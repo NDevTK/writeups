@@ -1,7 +1,5 @@
 ---
 title: Embed users content from Google Cloud Shell in remote iframes (Not fixed)
-tags: []
-date: 24/10/2021
 ---
 
 
