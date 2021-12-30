@@ -1,6 +1,9 @@
+---
+title: Google Cloud Shell XSS (Awarded $5000)
+---
+
 This is an attempt to make a better write up than [575924 – (CVE-2021-41038) XSS in @theia/plugin-ext webview](https://bugs.eclipse.org/bugs/show_bug.cgi?id=575924) :) (It's a Theia bug but Google paid for improving the security of the project after some discussion.)
 
-## Google Cloud Shell XSS (Awarded $5000)
 [https://shell.cloud.google.com/](https://shell.cloud.google.com/) embeds the [Theia IDE](https://theia-ide.org/) from a subdomain of “cloudshell.dev” that can request access to the GCP API via postMessage(), So bugs in the Theia project may affect the security of Google Cloud. (it's not on the Public Suffix List, used to be on appspot.com that is listed)
 I'm not sure when the API opt in was added, I think it used to have credentials by default.
 ```js
