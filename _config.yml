@@ -1,11 +1,9 @@
-url: https://ndevtk.github.io/writeups
-permalink: pretty
+title: Writeups
+baseurl: "/writeups"
+url: "https://ndevtk.github.io"
+
+twitter_username: ndevtk
+github_username:  ndevtk
+
 plugins:
   - jekyll-feed
-collections:
-  posts:
-    output: true
-feed:
-  collections:
-    posts:
-      path: "rss.xml"
