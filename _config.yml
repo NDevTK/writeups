@@ -3,8 +3,5 @@ baseurl: "/writeups"
 permalink: pretty
 url: "https://ndevtk.github.io"
 
-twitter_username: ndevtk
-github_username:  ndevtk
-
 plugins:
   - jekyll-feed
