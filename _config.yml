@@ -1,5 +1,5 @@
 name: Writeups
-url: https://ndevtk.github.io/writeups/
+url: https://ndevtk.github.io/writeups
 permalink: pretty
 plugins:
   - jekyll-feed
