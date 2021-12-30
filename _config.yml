@@ -1,4 +1,3 @@
-name: Writeups
 url: https://ndevtk.github.io/writeups
 permalink: pretty
 plugins:
@@ -10,9 +9,3 @@ feed:
   collections:
     posts:
       path: "rss.xml"
-defaults:
-  - scope:
-      path: ""
-      type: "posts"
-    values:
-      layout: "posts"
