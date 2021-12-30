@@ -1,6 +1,9 @@
 ---
 title: Embed users content from Google Cloud Shell in remote iframes (Not fixed)
+tags: []
+date: 24/10/2021
 ---
+
 
 Since there's no embedding protection on /_cloudshell/ and a “SameSite None” cookie is used for “CloudShellAuthorization” it's possible to embed the files on to an attacker controlled website like
 ```js
