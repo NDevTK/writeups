@@ -5,7 +5,7 @@ This is an attempt to make a better write up than [575924 – (CVE-2021-41038) X
 I'm not sure when the API opt in was added, I think it used to have credentials by default.
 ```js
 window.parent.postMessage({
-    "target": ""ID from URL of webview",
+    "target": "ID from URL of webview",
     "channel": "onmessage",
     "data": {
         "type": "LOG_IN"
