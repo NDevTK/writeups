@@ -1,5 +1,5 @@
 ---
-title: crossOriginIsolated bypass (Awarded $3000
+title: crossOriginIsolated bypass (Awarded $3000)
 ---
 
 Crashing tabs may cause bugs like [restrictions](https://web.dev/why-coop-coep/) being bypassed [(https://bugs.chromium.org/p/chromium/issues/detail?id=1226909)](https://bugs.chromium.org/p/chromium/issues/detail?id=1226909),
