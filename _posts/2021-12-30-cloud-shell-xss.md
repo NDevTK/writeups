@@ -38,7 +38,7 @@ However VS Code now uses MessageChannel and [only sends to window.parent](https:
 
 ## Exploitation
 In order to exploit this an attacker needs to send a message to the webview.
-After looking at the code in https://www.gstatic.com/_/cloudshell/_/js/ I found that using the “opencloudcodewelcome” URL parameter it will embed Theia and open a webview automatically. [https://shell.cloud.google.com/?show=ide&opencloudcodewelcome=true](https://shell.cloud.google.com/?show=ide&opencloudcodewelcome=true) (this now uses [COOP](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Opener-Policy) allow-popups so the opener can't be exploited)
+After looking at the code in `https://www.gstatic.com/_/cloudshell/_/js/` I found that using the “opencloudcodewelcome” URL parameter it will embed Theia and open a webview automatically. [https://shell.cloud.google.com/?show=ide&opencloudcodewelcome=true](https://shell.cloud.google.com/?show=ide&opencloudcodewelcome=true) (this now uses [COOP](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Opener-Policy) allow-popups so the opener can't be exploited)
 
 Then to get [XSS](https://owasp.org/www-community/attacks/xss/) any opener can send a message to the embedded webview.
 ```js
