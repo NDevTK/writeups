@@ -1,5 +1,5 @@
 ---
-title: Sandbox escape (Awarded 2500)
+title: Sandbox escape (Awarded $2500)
 ---
 
 An empty document did not apply the owner's document sandbox flags,
