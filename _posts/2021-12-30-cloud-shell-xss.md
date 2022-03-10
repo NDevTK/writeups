@@ -33,7 +33,7 @@ window.parent.postMessage({
 However they do use [CSP frame-ancestors](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors) to block embedding of the IDE and its webviews,
 `Content-Security-Policy: frame-ancestors 'self' https://*.corp.google.com:* https://*.sandbox.google.com:* https://*.googleplex.com:* https://byteboard.googleplex.com https://byteboard.dev https://edge.byteboard.dev https://enginterview.withgoogle.com https://console.cloud.google.com https://ide.cloud.google.com https://shell.cloud.google.com https://ssh.cloud.google.com;`
 So to prevent webview hijacking/xss Theia now checks that messages are from window.parent or a child of the webview. [(Change)](https://github.com/eclipse-theia/theia/pull/10202/files)
-Other web IDEs may still be vulnerable if the webviews have no embedding protection like “vscode-webview.net” [(Maybe Bug)](https://http.cat/404) or they have [copied](https://github.com/microsoft/vscode/blob/ba40bd16433d5a817bfae15f3b4350e18f144af4/src/vs/workbench/contrib/webview/browser/pre/host.js) from VS Code,
+Other web IDEs may still be vulnerable if the webviews have no embedding protection like “vscode-webview.net” [(Fixed CVE-2022-24526)](https://github.com/microsoft/vscode/issues/144703) or they have [copied](https://github.com/microsoft/vscode/blob/ba40bd16433d5a817bfae15f3b4350e18f144af4/src/vs/workbench/contrib/webview/browser/pre/host.js) from VS Code,
 However VS Code now uses MessageChannel and [only sends to window.parent](https://github.com/microsoft/vscode/blob/6960f154ec1db21df82e87c7b043f760e6d45b8f/src/vs/workbench/contrib/webview/browser/pre/main.js#L298).
 
 ## Exploitation
