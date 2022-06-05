@@ -16,7 +16,7 @@ frame.src = 'chrome-extension://mnjggcdmjocbbbhaepdhchncahnbgone/popup.html';
 document.body.appendChild(frame)
 ```
 This was fixed by just using the iframe and checking the origin of the parant with postMessage for *.youtube.com  
-On firefox this attack is harder because it uses a randomized id for the url.
+On firefox this attack is harder because it uses a randomized id for the url this also prevents detecting the existence of extensions.
 
 # Javascript allowed on the API (2021)
 Fixed by adding a CSP. [Post-Spectre Web Development](https://w3c.github.io/webappsec-post-spectre-webdev/)
@@ -34,3 +34,7 @@ But it used the insecure Math.random() it now uses window.crypto.getRandomValues
 
 # Rate limit bypass (2019)
 Since the server was using caddy it was possible to spoof your IP address with the x-forwarded-for header.
+
+# Users IPs exposed in public database (2019)
+While IPv4 address where hashed 5000 times its using sha256 with a static salt so it would be easy to compute all possible IP adresss.  
+This was fixed by moving the data to a private database.
