@@ -11,6 +11,6 @@ let w = open('https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dumm
 setTimeout(_ => w[0].postMessage({type: 'getThumbnail', page: '1337'}, "*"), 1000);
 ```
 This crash can be detected cross-origin in the following ways
-- Checking device performance monitoring after ```w[0].postMessage({type: 'print'});```  such as https://devicemonitor.glitch.me/ 
+- Checking device performance like with [devicemonitor](https://devicemonitor.glitch.me/) after ```w[0].postMessage({type: 'print'});```  
 - [Issue 1307087](https://bugs.chromium.org/p/chromium/issues/detail?id=1307087)
 - Extension tabs API looking for the status of unloaded (no permission needed)
