@@ -23,7 +23,7 @@ Fixed by adding a CSP. [Post-Spectre Web Development](https://w3c.github.io/weba
 
 # Trusting 3rd party (2021)
 The servers nginx.conf had a proxy_pass for a 3rd party service.  
-That would allow session and viewed video ids to be leaked via a service worker and impersonation of the sponsor.ajay.app domain.
+That would allow impersonation of the sponsor.ajay.app domain.
 
 # Unlisted video IDs exposed to the SponsorBlock server (2020)
 Fixed by checking if a video was unlisted and then asking the user, later changed to a k-anonymity system.
