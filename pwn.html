@@ -1,12 +1,9 @@
 <script>
- var devtools = function() {};
-    devtools.toString = function() {
-        alert('NOPE!!')
-        return '-'
-    }
-
     setInterval(()=>{
-        console.profile(devtools)
-        console.profileEnd(devtools)
+(() => { 
+  w = new Function();
+  w.toString = () => { debug() }
+  console.log('%c', w)
+})()
     }, 1000)
 </script>
