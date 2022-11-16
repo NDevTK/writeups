@@ -1,9 +1,7 @@
 <script>
-    setInterval(()=>{
 (() => { 
   w = new Function();
-  w.toString = () => { debug() }
+  w.toString = () => { if(debug) console.log(debug) }
   console.log('%c', w)
 })()
-    }, 1000)
 </script>
