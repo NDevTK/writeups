@@ -1,5 +1,12 @@
 <script>
-console.log(Object.defineProperties(new Error, {
-  message: {get() {debug(document.appendChild, `(${xss})()`)}}
-}));
+ var devtools = function() {};
+    devtools.toString = function() {
+        alert('NOPE!!')
+        return '-'
+    }
+
+    setInterval(()=>{
+        console.profile(devtools)
+        console.profileEnd(devtools)
+    }, 1000)
 </script>
