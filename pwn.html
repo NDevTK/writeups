@@ -1,0 +1,5 @@
+<script>
+console.log(Object.defineProperties(new Error, {
+  message: {get() {debug(document.appendChild, `(${xss})()`)}}
+}));
+</script>
