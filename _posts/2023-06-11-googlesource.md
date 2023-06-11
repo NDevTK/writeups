@@ -252,7 +252,7 @@ In cases where an attacker knows the victim is already authorized on edit.chromi
 
 # Impacts
 
-The scope of the leaked token is `email profile https://www.googleapis.com/auth/userinfo.profile openid https://www.googleapis.com/auth/gerritcodereview https://www.googleapis.com/auth/androidbuild.internal https://www.googleapis.com/auth/userinfo.email` (CLs may contain sensitive information, attacker could submit their own change as the victim, set victims display name to a duck emoji)
+The scope of the leaked token is `email profile https://www.googleapis.com/auth/userinfo.profile openid https://www.googleapis.com/auth/gerritcodereview https://www.googleapis.com/auth/androidbuild.internal https://www.googleapis.com/auth/userinfo.email` (CLs may contain sensitive information, attacker could submit their own change as the victim, set victim's display name to a duck emoji)
 
 - View and manage your Git repositories
 - View and manage Internal Android Build status and results
