@@ -7,8 +7,9 @@ A bug in the [Git Source Editor](https://source.android.com/docs/setup/contribut
 Target: *Applications that permits taking over a Google account*  
 Category: *Execute code on the client*
 
-The following regex was used to validate the redirect URLs. Normally, the URL would be restricted to `*.googlesource.com` or `*.git.corp.google.com`. 
-The regex, however, did not correctly validate the URLs, causing `https://android.googlesource.com/aogarantiza.com:1337#.googlesource.com/platform/build/+show/refs/heads/master/Changes.md` to send a request to `https://aogarantiza.com:1337`, instead of `https://android.googlesource.com`. This made it possible to leak the `access_token` to the attacker.
+The following regex was used to validate the redirect URLs. Normally, the URL would be restricted to `*.googlesource.com` or `*.git.corp.google.com`.  
+The regex, however, did not correctly validate the URLs, causing `https://android.googlesource.com/aogarantiza.com:1337#.googlesource.com/platform/build/+show/refs/heads/master/Changes.md` to send a request to `https://aogarantiza.com:1337`, instead of `https://android.googlesource.com`.  
+This made it possible to leak the `access_token` to the attacker.
 
 ```js
 L1.GERRIT_LINK_MATCHER = /(.*\/)?(.*?)\.((googlesource\.com)|(git\.corp\.google\.com))\/(.*)\/\+([a-zA-Z0-9]+)?(\/refs\/heads)?\/(.*?)[\/^](.*)/;
