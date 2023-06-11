@@ -269,7 +269,7 @@ Other instances of the editor may also be affected by this bug. For example, the
 
 Access tokens may expire after a certain time period or can be revoked for other reasons.
 
-There's an embed version of the [Git Source Editor](https://android-review.googlesource.com/plugins/git_source_editor/static/git_source_editor.html) that replaces `googlesource.com` URLs to `git.corp.google.com` (this is because `pluginMode` is `true`). We are not aware of any way to exploit this type of usage since it's not using OAuth). Using OAuth can however be forced using the `enable-gis` URL parameter.
+There's an embed version of the [Git Source Editor](https://android-review.googlesource.com/plugins/git_source_editor/static/git_source_editor.html) that replaces `googlesource.com` URLs to `git.corp.google.com` (this is because `pluginMode` is `true`). We are not aware of any way to exploit this type of usage since it's not using OAuth. Using OAuth can however be forced using the `enable-gis` URL parameter.
 ```js
  state.store = {...state.store, pluginMode: true};
 ```
