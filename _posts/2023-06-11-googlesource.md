@@ -4,10 +4,11 @@ title: googlesource.com access_token leak (Awarded $7500)
 
 A bug in the [Git Source Editor](https://source.android.com/docs/setup/contribute/source-editor), the official browser-based tool by Google for editing files in projects such as [Chromium](https://edit.chromium.org/edit) and [Android](https://ci.android.com/edit), allowed to leak the user's OAuth token by redirecting to an attacker-controlled URL supplied in the URL parameters.
 
-Target: *Applications that permits taking over a Google account*
+Target: *Applications that permits taking over a Google account*  
 Category: *Execute code on the client*
 
-The following regex was used to validate the redirect URLs. Normally, the URL would be restricted to `*.googlesource.com` or `*.git.corp.google.com`. The regex, however, did not correctly validate the URLs, causing `https://android.googlesource.com/aogarantiza.com:1337#.googlesource.com/platform/build/+show/refs/heads/master/Changes.md` to send a request to `https://aogarantiza.com:1337`, instead of `https://android.googlesource.com`. This made it possible to leak the `access_token` to the attacker.
+The following regex was used to validate the redirect URLs. Normally, the URL would be restricted to `*.googlesource.com` or `*.git.corp.google.com`. 
+The regex, however, did not correctly validate the URLs, causing `https://android.googlesource.com/aogarantiza.com:1337#.googlesource.com/platform/build/+show/refs/heads/master/Changes.md` to send a request to `https://aogarantiza.com:1337`, instead of `https://android.googlesource.com`. This made it possible to leak the `access_token` to the attacker.
 
 ```js
 L1.GERRIT_LINK_MATCHER = /(.*\/)?(.*?)\.((googlesource\.com)|(git\.corp\.google\.com))\/(.*)\/\+([a-zA-Z0-9]+)?(\/refs\/heads)?\/(.*?)[\/^](.*)/;
@@ -196,7 +197,7 @@ This uses Chromium's [Gerrit Code Review REST API](https://gerrit-review.googles
 
 # Attack scenario
 
-Attackers can steal chromium.org OAuth access token from any user who visits a specially crafted URL.
+Attackers can steal chromium.org OAuth access token from any user who visits a specially crafted URL.  
 If a user has previously authorized the "Android Build Team" OAuth app [1], only visiting the URL is required. If a user has not previously authorized the OAuth app, the user will see a legitimate Google OAuth prompt for the app, and the user only needs to grant access to the legit OAuth app.
 There are no other preconditions.
 
