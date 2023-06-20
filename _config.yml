@@ -3,5 +3,6 @@ baseurl: "/writeups"
 permalink: pretty
 url: "https://ndevtk.github.io"
 
+theme: minima
 plugins:
   - jekyll-feed
