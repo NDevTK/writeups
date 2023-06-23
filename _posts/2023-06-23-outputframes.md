@@ -1,5 +1,5 @@
 ---
-title: Insecure sandbox implementation on Colaboratory outputframes (Not Fixed)
+title: Insecure sandbox implementation on Colaboratory outputframes (Awarded $1337, Not Fixed)
 ---
 Google Colaboratory puts some output such as visualizations into a sandbox however it has no embedding protection such as csp frame-ancestors so the origin is exposed to attackers with local network access.
 
