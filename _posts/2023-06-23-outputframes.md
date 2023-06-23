@@ -22,8 +22,8 @@ document.body.appendChild(f);
 setTimeout(_ => { f.contentWindow.postMessage({sandboxed_iframe_evaluation: 'console.log(parent.opener[0].google)'}, '*'); }, 100);
 ```
 
-On the "Welcome to Colaboratory" project using the sandbox on attacker.
-```parent.opener[0].google``` refers to stuff.
-```parent.opener[5].document``` refers to the chart.
+On the "Welcome to Colaboratory" project using the sandbox embeded on the attackers website.
+- ```parent.opener[0].google``` refers to stuff.
+- ```parent.opener[5].document``` refers to the chart.
 
 Sometimes sandboxes use a randomly genrated subdomain for isolation unfortunately due to unencrypted DNS this is not safe <https://www.cloudflare.com/learning/dns/dns-over-tls/>
