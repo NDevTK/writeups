@@ -1,8 +1,7 @@
 ---
 title: Insecure sandbox implementation on Colaboratory outputframes (Not Fixed)
 ---
-Google Colaboratory puts some output such as visualizations into a sandbox however it has no embedding protection such as csp frame-ancestors so the origin is exposed to attackers.
-Attackers with local network access, Im aware its a boring bug.
+Google Colaboratory puts some output such as visualizations into a sandbox however it has no embedding protection such as csp frame-ancestors so the origin is exposed to attackers with local network access.
 
 ```js
 let w = open('about:blank');
