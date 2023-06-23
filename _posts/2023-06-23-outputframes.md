@@ -1,5 +1,5 @@
 ---
-title: Insecure sandbox implementation on Colaboratory outputframes (Awarded $1337, Not Fixed)
+title: Insecure sandbox implementation on Colaboratory output frames (Awarded $1337, Not Fixed)
 ---
 Google Colaboratory puts some output such as visualizations into a sandbox however it has no embedding protection such as csp frame-ancestors so the origin is exposed to attackers with local network access.
 
@@ -25,3 +25,5 @@ setTimeout(_ => { f.contentWindow.postMessage({sandboxed_iframe_evaluation: 'con
 On the "Welcome to Colaboratory" project using the sandbox on attacker.
 ```parent.opener[0].google``` refers to stuff.
 ```parent.opener[5].document``` refers to the chart.
+
+Sometimes sandboxes use a randomly genrated subdomain for isolation unfortunately due to unencrypted DNS this not safe consider moving over to DNS over TLS <https://www.cloudflare.com/learning/dns/dns-over-tls/>
