@@ -19,7 +19,7 @@ layout: default
 const postLinks = document.getElementById('postLinks');
 postLinks.addEventListener('click', async (e) => {
     let src = e.srcElement;
-    if (!navigator.userAgentData || !navigator.userAgentData.mobile) return;
+    if (!navigator.userAgentData || navigator.userAgentData.mobile !== false) return;
     if (!src || !self.documentPictureInPicture) return;
     e.preventDefault();
     let result = await fetch(src.href, {mode: 'same-origin'});
