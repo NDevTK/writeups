@@ -26,7 +26,7 @@ postLinks.addEventListener('click', async (e) => {
     e.preventDefault();
     let result = await fetch(src.href, {mode: 'same-origin'});
     let content = await result.text();
-    const pip = documentPictureInPicture.window;
+    let pip = documentPictureInPicture.window;
     if (!pip || pip.closed) {
         pip = await documentPictureInPicture.requestWindow({
             width: '1000',
