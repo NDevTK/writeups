@@ -16,6 +16,8 @@ layout: default
   <p>Subscribe <a href="{{ "/feed.xml" | relative_url }}">via RSS</a> my Chromium issues can be found <a href="https://bugs.chromium.org/p/chromium/issues/list?q=reporter%3Andevtk%40protonmail.com&can=1">here</a> report writeup issues <a href="https://github.com/NDevTK/writeups">here</a></p>
 </div>
 <script>
+"use strict";
+
 const postLinks = document.getElementById('postLinks');
 postLinks.addEventListener('click', async (e) => {
     let src = e.srcElement;
