@@ -23,7 +23,7 @@ postLinks.addEventListener('click', async (e) => {
     let src = e.srcElement;
     if (!navigator.userAgentData || navigator.userAgentData.mobile !== false) return;
     // Ignore same page hash navigations
-    if (!src || !src.href || src.href.startsWith(location.href + '#') || !self.documentPictureInPicture) return;
+    if (!src || !src.href || src.href.startsWith(location.origin + location.pathname + '#') || !self.documentPictureInPicture) return;
     e.preventDefault();
     let result = await fetch(src.href, {mode: 'same-origin'});
     let content = await result.text();
