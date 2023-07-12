@@ -22,7 +22,7 @@ const postLinks = document.getElementById('postLinks');
 postLinks.addEventListener('click', async (e) => {
     let src = e.srcElement;
     if (!navigator.userAgentData || navigator.userAgentData.mobile !== false) return;
-    if (!src || !src.href || src.href.startsWith('#') || !self.documentPictureInPicture) return;
+    if (!src || !src.href || !src.href.startsWith('/') || !self.documentPictureInPicture) return;
     e.preventDefault();
     let result = await fetch(src.href, {mode: 'same-origin'});
     let content = await result.text();
