@@ -245,7 +245,7 @@ After editor loads, observe a request to attacker URL (`https://aogarantiza.com:
 
 If the server receiving the request does not have the correct CORS headers, the server will still receive the token because the browser still needs to make the request to see which CORS headers (if any) the server will respond with. Therefore the attack is still successful even if you see the request "fail" due to a CORS error. The PoC server sends the appropriate headers, but you can modify the PoC to test the no-CORS-headers scenario.
 
-In cases where an attacker knows the victim is already authorized on edit.chromium.org, the attacker can open the specially-crafted URL in a popup/popunder, then navigate away or close the page after the attack is completed. In the PoC URLs above, the attacker URL is also obscured in the URL params where it is less likely to be detected. A shorter, lookalike origin could also be used, such as gsource[.]co.
+In cases where an attacker knows the victim is already authorized on edit.chromium.org, the attacker can open the specially-crafted URL in a popup/popunder, then navigate away or close the page after the attack is completed. In the PoC URLs above, the attacker URL is also obscured in the URL params where it is less likely to be detected. A shorter, lookalike origin could also be used, such as `gsource[.]co`.
 
 [1] The OAuth app used by edit.chromium.org is identified as "Android Build Team" when listed in https://myaccount.google.com/permissions, It seems to be the same OAuth app used in https://ci.android.com/edit  
 [2] Chromium Gerrit: https://chromium-review.googlesource.com 
