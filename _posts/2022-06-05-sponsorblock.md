@@ -30,7 +30,7 @@ Fixed by checking if a video was unlisted and then asking the user, later change
 
 # Insecure user id generation (2019)
 The extension uses a random id to authenticate users that is then hashed when stored in the public database.  
-But it used the insecure Math.random() it now uses window.crypto.getRandomValues
+But it used the insecure `Math.random()` it now uses `window.crypto.getRandomValues`
 
 # Rate limit bypass (2019)
 Since the server was using caddy it was possible to spoof your IP address with the x-forwarded-for header.
