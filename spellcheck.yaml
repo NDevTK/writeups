@@ -10,6 +10,7 @@ matrix:
   - pyspelling.filters.markdown:
       markdown_extensions:
       - pymdownx.superfences
+  - pyspelling.filters.url:
   - pyspelling.filters.html:
       comments: false
       ignores:
