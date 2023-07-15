@@ -107,7 +107,6 @@ GCP
 appspot
 dev
 UWTB
-opencloudcodewelcome
 ntp
 untrusted
 clickjacked
