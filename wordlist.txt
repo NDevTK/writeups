@@ -97,7 +97,6 @@ csp
 gmail
 dom
 hacky
-sendRequestToCustomServer
 ajay
 conf
 nginx
