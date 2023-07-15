@@ -10,7 +10,7 @@ Allowed leaking email content cross-site.
 
 # 1 Oct 25, 2020 11:21PM
 Created issue (on behalf of redacted).
-Summary: On a successful search on gmail the "send_googblue_20dp.png" is cached which maybe exploited with timing attacks (XS-Search)
+Summary: On a successful search on gmail the ```send_googblue_20dp.png``` is cached which maybe exploited with timing attacks (XS-Search)
 
 Proof of concept: https://drive.google.com/file/d/redacted
 Steps to reproduce:
@@ -23,7 +23,7 @@ Browser/OS: Chrome, Windows 10
 
 The script works by first opening a window on https://mail.google.com/mail
 Then using window.location to perform a search like https://mail.google.com/mail/u/0/#search/Google
-Then it detects if the "send_googblue_20dp.png" image is cached if it is the search was successful after that the image then get purged from the cache.
+Then it detects if the ```send_googblue_20dp.png``` image is cached if it is the search was successful after that the image then get purged from the cache.
 
 This probably would not be possible if the cache was not shared.
 
