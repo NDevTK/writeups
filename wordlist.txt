@@ -68,7 +68,6 @@ auth
 DevTools
 CORS
 popunder
-gsource
 CLs
 androidbuild
 gerritcodereview
