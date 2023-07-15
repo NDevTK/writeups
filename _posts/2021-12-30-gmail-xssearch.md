@@ -10,25 +10,25 @@ Allowed leaking email content cross-site.
 
 # 1 Oct 25, 2020 11:21PM
 Created issue (on behalf of redacted).
-Summary: On a successful search on gmail the ```send_googblue_20dp.png``` is cached which maybe exploited with timing attacks (XS-Search)
+Summary: On a successful search on Gmail the `send_googblue_20dp.png` is cached which maybe exploited with timing attacks (XS-Search)
 
 Proof of concept: https://drive.google.com/file/d/redacted
 Steps to reproduce:
   1. Run javascript in proof of concept
-  2. It can then be tested by using checkContent("Google", send2x).then(console.log) it should return true/false depending on the result of the search
+  2. It can then be tested by using `checkContent("Google", send2x).then(console.log)` it should return true/false depending on the result of the search
 
-It maybe send1x depending on the image used by gmail.
+It maybe send1x depending on the image used by Gmail.
 
 Browser/OS: Chrome, Windows 10
 
 The script works by first opening a window on https://mail.google.com/mail
 Then using window.location to perform a search like https://mail.google.com/mail/u/0/#search/Google
-Then it detects if the ```send_googblue_20dp.png``` image is cached if it is the search was successful after that the image then get purged from the cache.
+Then it detects if the `send_googblue_20dp.png` image is cached if it is the search was successful after that the image then get purged from the cache.
 
 This probably would not be possible if the cache was not shared.
 
 Attack scenario:
-I think malicious javascript running on a different website could perform an XS-Search attack on someones gmail account and search by letter to get email contents.
+I think malicious javascript running on a different website could perform an XS-Search attack on someones Gmail account and search by letter to get email contents.
 Because mail.google.com would not allow iframes to be used window.open is used instead this maybe suspicious to the user but it could be done when the device is idle or using a popunder.
 # 2 Oct 25, 2020 11:21PM
 NOTE: This e-mail has been generated automatically.
