@@ -16,7 +16,7 @@ frame.src = 'chrome-extension://mnjggcdmjocbbbhaepdhchncahnbgone/popup.html';
 document.body.appendChild(frame)
 ```
 This was fixed by just using the iframe and checking the origin of the parent with postMessage for `*.youtube.com`  
-On firefox this attack is harder because it uses a randomized id for the url this also prevents detecting the existence of extensions.
+On Firefox this attack is harder because it uses a randomized id for the url this also prevents detecting the existence of extensions.
 
 # Javascript allowed on the API (2021)
 Fixed by adding a CSP. [Post-Spectre Web Development](https://w3c.github.io/webappsec-post-spectre-webdev/)
