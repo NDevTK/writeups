@@ -15,7 +15,7 @@ let frame = document.createElement('iframe');
 frame.src = 'chrome-extension://mnjggcdmjocbbbhaepdhchncahnbgone/popup.html';
 document.body.appendChild(frame)
 ```
-This was fixed by just using the iframe and checking the origin of the parent with postMessage for *.youtube.com  
+This was fixed by just using the iframe and checking the origin of the parent with postMessage for `*.youtube.com`  
 On firefox this attack is harder because it uses a randomized id for the url this also prevents detecting the existence of extensions.
 
 # Javascript allowed on the API (2021)
