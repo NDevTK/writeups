@@ -108,7 +108,6 @@ IPv
 sha
 devicemonitor
 OOB
-getThumbnail
 CVE
 IDEs
 MessageChannel
