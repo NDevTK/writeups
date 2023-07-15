@@ -123,3 +123,4 @@ UWTB
 opencloudcodewelcome
 ntp
 untrusted
+clickjacked
