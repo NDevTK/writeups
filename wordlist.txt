@@ -57,7 +57,6 @@ repo
 param
 params
 hostname
-Encrypt’s
 NodeJS
 PoCs
 aogarantiza
@@ -96,7 +95,6 @@ SponsorBlock
 Clickjacking
 xss
 csp
-Encrypt’s
 gmail
 clickjacked
 dom
