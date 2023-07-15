@@ -82,7 +82,7 @@ googblue
 png
 checkContent
 mitigations
-protonmail
+ProtonMail
 tabunder
 NoScript
 baseURI
