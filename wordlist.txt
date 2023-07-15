@@ -89,7 +89,7 @@ baseURI
 xsleaks
 firefox
 postMessage
-youtube
+YouTube
 SponsorBlock
 Clickjacking
 xss
@@ -106,8 +106,7 @@ crypto
 getRandomValues
 caddy
 IPs
-IPv4
-IPv6
+IPv
 sha
 devicemonitor
 OOB
