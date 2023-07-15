@@ -36,5 +36,5 @@ But it used the insecure Math.random() it now uses window.crypto.getRandomValues
 Since the server was using caddy it was possible to spoof your IP address with the x-forwarded-for header.
 
 # Users IPs exposed in public database (2019)
-While IPv4 addresses where hashed 5000 times its using sha256 with a static salt so it would be easy to compute all possible IP adresss.  
+While IPv4 addresses where hashed 5000 times its using sha256 with a static salt so it would be easy to compute all possible IP addresses.  
 This was fixed by moving the data to a private database.
