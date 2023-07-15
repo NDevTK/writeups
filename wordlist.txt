@@ -16,13 +16,6 @@ googlesource
 crossOriginIsolated
 PoC
 UI
-OMX
-SimpleSoftOMXComponent
-StateExecuting
-StateLoaded
-cpp
-libstagefright
-omx
 webview
 AutoFill
 UI
@@ -78,9 +71,7 @@ Alesandro
 Orlita
 writeup
 Gmail
-googblue
 png
-checkContent
 mitigations
 ProtonMail
 tabunder
@@ -94,7 +85,6 @@ SponsorBlock
 Clickjacking
 xss
 csp
-gmail
 dom
 hacky
 ajay
