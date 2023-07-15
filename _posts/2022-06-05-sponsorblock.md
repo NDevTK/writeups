@@ -2,14 +2,14 @@
 title: SponsorBlock
 ---
 
-[SponsorBlock](https://sponsor.ajay.app/) is a browser extension to skip youtube sponsors using crowd sourced data.  
+[SponsorBlock](https://sponsor.ajay.app/) is a browser extension to skip YouTube sponsors using crowd sourced data.  
 Was forked from [my extension](https://github.com/NDevTK/YTSponsorSkip) despite what it says that was not in 2020.  
 Since its crowd sourced it has to trust its users but to prevent abuse VIPs can lock segments.
 
 # Clickjacking (2022)
 Because they wanted to insert the extension popup on to the YouTube page popup.html was added to web_accessible_resources,  
 The ability to use a iframe was unknown there was no embedding protection and it used a hacky sendRequestToCustomServer function to inject the content into the page dom.    
-This meant the persons user id was exposed to youtube and the popup controls such as the ability to turn off sponsor skipping could be clickjacked.
+This meant the persons user id was exposed to YouTube and the popup controls such as the ability to turn off sponsor skipping could be clickjacked.
 ```js
 let frame = document.createElement('iframe');
 frame.src = 'chrome-extension://mnjggcdmjocbbbhaepdhchncahnbgone/popup.html';
