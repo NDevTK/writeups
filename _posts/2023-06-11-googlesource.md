@@ -218,7 +218,7 @@ PoC URL 3, sends creds to non-existent hostname: `https://edit.chromium.org/edit
 NOTE: For PoC URL 1 or 2, we highly recommend using a test Google account, since the access token will be sent to `https://aogarantiza.com:1337/1338` which is running the PoC server above. The PoC server will update the "About me" (status) field in Chromium Gerrit [2] but does not log the access token.
 
 Setup if running PoC server yourself:
-Run attached server.js with NodeJS (provide your own privkey.pem and fullchain.pem; we generated it using Let’s Encrypt’s certbot). The server must run over HTTPS.
+Run attached server.js with NodeJS (provide your own privkey.pem and fullchain.pem; we generated it using Let's Encrypt’s certbot). The server must run over HTTPS.
 When running PoCs, replace "aogarantiza.com:1337/1338" in PoC URL 1/2 with the origin of your server.
 
 PoC, token sent to attacker server, OAuth app previously authorized scenario:
