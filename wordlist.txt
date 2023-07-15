@@ -87,7 +87,7 @@ tabunder
 NoScript
 baseURI
 xsleaks
-firefox
+Firefox
 postMessage
 YouTube
 SponsorBlock
