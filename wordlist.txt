@@ -107,7 +107,8 @@ crypto
 getRandomValues
 caddy
 IPs
-IPv
+IPv4
+IPv6
 sha
 devicemonitor
 OOB
@@ -125,3 +126,4 @@ UWTB
 opencloudcodewelcome
 ntp
 untrusted
+Let's Encrypt
