@@ -8,7 +8,7 @@ Duplicate and was done before Partitioned HTTP Cache was added.
 Allowed leaking email content cross-site.
 
 
-ap...@google.com #1 Oct 25, 2020 11:21PM
+# 1 Oct 25, 2020 11:21PM
 Created issue (on behalf of redacted).
 Summary: On a successful search on gmail the "send_googblue_20dp.png" is cached which maybe exploited with timing attacks (XS-Search)
 
@@ -30,7 +30,7 @@ This probably would not be possible if the cache was not shared.
 Attack scenario:
 I think malicious javascript running on a different website could perform an XS-Search attack on someones gmail account and search by letter to get email contents.
 Because mail.google.com would not allow iframes to be used window.open is used instead this maybe suspicious to the user but it could be done when the device is idle or using a popunder.
-ap...@google.com #2 Oct 25, 2020 11:21PM
+# 2 Oct 25, 2020 11:21PM
 NOTE: This e-mail has been generated automatically.
 
 Thanks for your report.
@@ -48,7 +48,7 @@ Google Security Bot
 
 Follow us on Twitter!
 
-ma...@google.com #3 Oct 26, 2020 10:00PM
+# 3 Oct 26, 2020 10:00PM
 Status: Duplicate of 1337
 Hello,
 
