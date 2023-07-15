@@ -95,7 +95,6 @@ Clickjacking
 xss
 csp
 gmail
-clickjacked
 dom
 hacky
 sendRequestToCustomServer
