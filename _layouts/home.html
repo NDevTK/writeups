@@ -37,3 +37,21 @@ postLinks.addEventListener('click', async (e) => {
     pip.document.body.innerHTML = '<base target="_blank">' + content;
 });
 </script>
+<script type="speculationrules">
+{
+  "prerender": [
+    {
+      "source": "document",
+      "where": { "href_matches": "/*\\?*#*" },
+      "eagerness": "moderate"
+    }
+  ],
+  "prefetch": [
+    {
+      "source": "document",
+      "where": { "not": { "href_matches": "/*\\?*#*" } },
+      "eagerness": "moderate"
+    }
+  ]
+}
+</script>
