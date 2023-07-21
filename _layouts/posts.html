@@ -7,12 +7,16 @@ layout: default
 {
   "prerender": [
     {
-      "source": "document"
+      "source": "document",
+      "where": { "href_matches": "/*\\?*#*" },
+      "eagerness": "moderate"
     }
   ],
   "prefetch": [
     {
-      "source": "document"
+      "source": "document",
+      "where": { "not": { "href_matches": "/*\\?*#*" } },
+      "eagerness": "moderate"
     }
   ]
 }
