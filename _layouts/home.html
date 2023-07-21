@@ -42,13 +42,15 @@ postLinks.addEventListener('click', async (e) => {
   "prerender": [
     {
       "source": "document",
-      "where": { "href_matches": "/*\\?*#*" }
+      "where": { "href_matches": "/*\\?*#*" },
+      "eagerness": "moderate"
     }
   ],
   "prefetch": [
     {
       "source": "document",
-      "where": { "href_matches": "/*\\?*#*" }
+      "where": { "not": { "href_matches": "/*\\?*#*" } },
+      "eagerness": "moderate"
     }
   ]
 }
