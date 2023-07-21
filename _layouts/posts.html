@@ -8,15 +8,13 @@ layout: default
   "prerender": [
     {
       "source": "document",
-      "where": { "href_matches": "/*\\?*#*" },
-      "eagerness": "moderate"
+      "where": { "href_matches": "/*\\?*#*" }
     }
   ],
   "prefetch": [
     {
       "source": "document",
-      "where": { "not": { "href_matches": "/*\\?*#*" } },
-      "eagerness": "moderate"
+      "where": { "not": { "href_matches": "/*\\?*#*" } }
     }
   ]
 }
