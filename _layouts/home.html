@@ -39,14 +39,10 @@ postLinks.addEventListener('click', async (e) => {
 </script>
 <script type="speculationrules">
 {
-  "prerender": [
-    {
-      "source": "document"
-    }
-  ],
   "prefetch": [
     {
-      "source": "document"
+      "source": "document",
+      "where": { "href_matches": "/*\\?*#*" }
     }
   ]
 }
