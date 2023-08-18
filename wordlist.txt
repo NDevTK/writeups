@@ -183,3 +183,7 @@ GSTATIC
 gstatic
 contentWindow
 txt
+chromeos
+VMs
+WAI
+playstation
