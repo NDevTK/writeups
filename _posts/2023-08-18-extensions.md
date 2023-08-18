@@ -281,7 +281,7 @@ The "Long Descriptions in Context Menu" is an accessibility extension by Google.
 Steps to reproduce:
 1. Install <https://chrome.google.com/webstore/detail/long-descriptions-in-cont/ohbmencljkleiedahijfkagnmmhbilgp>
 1. Open <https://vuln-long-desc-extension.websec.blog/poc.html>
-```
+```html
 <body longdesc="chrome-extension://iodihamcpbpeioajjeobimgagajmlibd/plugin/mosh/mosh_window.html">
     <h1 style="pointer-events: none;">Right click and select "Open Long Description In New Tab"</h1>
 </body>
@@ -392,7 +392,7 @@ By changing the action id  `aid` from image-entire to html, it will leak the sou
 This is exploitable from a browser extension with the Tabs API.
 
 Spoof the context menu to trick the user into leaking an unexpected url.
-```
+```html
 <img src="https://github.com/opensearch.xml">```
 Right click and save image to drive, this element could be overlapped with a duck image.
 Potential fix:
@@ -436,7 +436,7 @@ Another potential attack vector would be to connect to devices in the local netw
 [^1]: <https://chrome.google.com/webstore/detail/deprecated-secure-shell-a/pnhechapfaindjhompbnflcldabbghjo>
 
 poc.html:
-```
+```html
 <!doctype html>
 <html>
 <head>
