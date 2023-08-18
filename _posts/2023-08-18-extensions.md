@@ -395,7 +395,8 @@ This is exploitable from a browser extension with the Tabs API.
 Spoof the context menu to trick the user into leaking an unexpected url. 
 
 ```html
-<img src="https://github.com/opensearch.xml">```
+<img src="https://github.com/opensearch.xml">
+```
 Right click and save image to drive, this element could be overlapped with a duck image.
 Potential fix:
 - Check content-type for an image
