@@ -13,7 +13,7 @@ Notes:
 - `MessageSender.origin` doesn't exist on Firefox so you may need to use the URL.
 - Compromised renderers that never run a content script shouldn't be able to spoof `runtime.sendMessage`.
 
-For more information, check out [Deep Dive into Site Isolation (Part 2) | Microsoft Browser Vulnerability Research](https://microsoftedge.github.io/edgevr/posts/deep-dive-into-site-isolation-part-2/#abusing-extensions-to-bypass-site-isolation) :)  
+For more information, check out [Deep Dive into Site Isolation (Part 2)](https://microsoftedge.github.io/edgevr/posts/deep-dive-into-site-isolation-part-2/#abusing-extensions-to-bypass-site-isolation) :)  
 
 Introduction: <https://groups.google.com/a/chromium.org/g/chromium-extensions/c/0ei-UCHNm34/m/lDaXwQhzBAAJ>  
 My bad attempt at enforcing site isolation for SponsorBlock with its 3rd party player support [ajayyy/SponsorBlock#1784](https://github.com/ajayyy/SponsorBlock/pull/1784)
