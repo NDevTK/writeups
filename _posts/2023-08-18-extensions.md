@@ -281,6 +281,7 @@ The "Long Descriptions in Context Menu" is an accessibility extension by Google.
 Steps to reproduce:
 1. Install <https://chrome.google.com/webstore/detail/long-descriptions-in-cont/ohbmencljkleiedahijfkagnmmhbilgp>
 1. Open <https://vuln-long-desc-extension.websec.blog/poc.html>
+
 ```html
 <body longdesc="chrome-extension://iodihamcpbpeioajjeobimgagajmlibd/plugin/mosh/mosh_window.html">
     <h1 style="pointer-events: none;">Right click and select "Open Long Description In New Tab"</h1>
