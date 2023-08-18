@@ -328,7 +328,7 @@ I hope this clarifies the reward decision bit more. And I would like to thank yo
 4. Run
 ```js
 chrome.storage.sync.set({rules: [{"destination": "alert(window.origin)","disabled": false,"isNew": false,"operator": "injectJSCode","target": ""}]})
-Now open a tab (https://google.com) and click the extension action icon
+// Now open a tab (https://google.com) and click the extension action icon
 ```
 This can also be done via ```chrome.runtime.sendMessage```
 
@@ -392,7 +392,8 @@ This can only happen after the content script is injected, which happens when th
 By changing the action id  `aid` from image-entire to html, it will leak the source code of the page to the folder.
 This is exploitable from a browser extension with the Tabs API.
 
-Spoof the context menu to trick the user into leaking an unexpected url.
+Spoof the context menu to trick the user into leaking an unexpected url. 
+
 ```html
 <img src="https://github.com/opensearch.xml">```
 Right click and save image to drive, this element could be overlapped with a duck image.
