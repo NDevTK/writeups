@@ -152,20 +152,7 @@ VPN
 Wireguard
 config
 Wireguard
-IHVybChcImh
-ImJhY
-MTAwMH
 args
-bmQtaW
-cC
-dHBzOi
-eyJzdHlsZSI
-hZ
-iodihamcpbpeioajjeobimgagajmlibd
-jYXQvMjAwXCIpIiwid
-lkdGgiOjEwMDAsImhlaWdodCI
-tncm
-vaHR
 args
 lol
 MV
@@ -187,3 +174,6 @@ chromeos
 VMs
 WAI
 playstation
+webpage
+Ctrl
+poc
