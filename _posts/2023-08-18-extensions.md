@@ -404,7 +404,7 @@ Potential fix:
 
 ### Attack scenario
 
-A malicious attacker could exploit this bypass SOP.
+A malicious attacker could exploit this to bypass SOP.
 
 # ChromeOS RCE via the Secure Shell extension (Fixed, Unlikely user interaction)
 **URL:** 
