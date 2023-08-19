@@ -89,8 +89,8 @@ port.postMessage({method: 'GetCategories'});
 ```
 
 
-[^0-1]: <https://chrome.google.com/webstore/detail/perfetto-ui/lfmkphfpdbjijhpomgecfikhfohaoine>
-[^1-1]: <https://source.chromium.org/chromium/chromium/src/+/main:chrome/browser/extensions/api/debugger/debugger_api.cc;drc=3ecbe8e3eacb4ac62561e9e786e40e7e60eefd44;l=154>
+[^0-0]: <https://chrome.google.com/webstore/detail/perfetto-ui/lfmkphfpdbjijhpomgecfikhfohaoine>
+[^1-0]: <https://source.chromium.org/chromium/chromium/src/+/main:chrome/browser/extensions/api/debugger/debugger_api.cc;drc=3ecbe8e3eacb4ac62561e9e786e40e7e60eefd44;l=154>
 
 ### Attack scenario
 
@@ -136,12 +136,12 @@ headerDiv.innerHTML = html;
 ```
 
 ---
-[^0-2]: <https://chrome.google.com/webstore/detail/screen-reader/kgejglhpjiefppelpmljglcjbhoiplfn>
-[^1-2]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/>
-[^2-2]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/api_implementation.js;l=71;drc=a7bb5589468949d3c12d3e067621eb51252ee031>
-[^3-2]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/api_implementation.js;l=312;drc=a7bb5589468949d3c12d3e067621eb51252ee031>
-[^4-2]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/api_util.js;l=78;drc=3e1a26c44c024d97dc9a4c09bbc6a2365398ca2c>
-[^5-2]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/pdf_processor.js;l=138;drc=3e1a26c44c024d97dc9a4c09bbc6a2365398ca2c>
+[^0-1]: <https://chrome.google.com/webstore/detail/screen-reader/kgejglhpjiefppelpmljglcjbhoiplfn>
+[^1-1]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/>
+[^2-1]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/api_implementation.js;l=71;drc=a7bb5589468949d3c12d3e067621eb51252ee031>
+[^3-1]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/api_implementation.js;l=312;drc=a7bb5589468949d3c12d3e067621eb51252ee031>
+[^4-1]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/api_util.js;l=78;drc=3e1a26c44c024d97dc9a4c09bbc6a2365398ca2c>
+[^5-1]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/pdf_processor.js;l=138;drc=3e1a26c44c024d97dc9a4c09bbc6a2365398ca2c>
 
 ### Attack scenario
 
