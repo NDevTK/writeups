@@ -696,8 +696,7 @@ Leaks `slackWebhook`, `teamsWebhook`, `token` to a compromised renderer via `chr
 # Playstation password reset tokens leak (Not reported, Alesandro can't repo)
 **URL:** <https://www.playstation.com/>
 
-Playstation password reset emails use a insecure `http://` link
-As `http://click.txn-email.account.sony.com/` HAS to be loaded over `http:` this uses `exacttarget.com` a email analytics service by salesforce.
+Playstation password reset emails use a insecure `http://` link as `http://click.txn-email.account.sony.com/` has to be loaded over `http:` this uses `exacttarget.com` a email analytics service by salesforce.
 "Having worked with ExactTarget before SF acquisition, I can confirm it's a piece of crap enterprise software." ~ Alesandro Ortiz
 
 Both resets done from the same playstation login page:
