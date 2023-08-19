@@ -644,6 +644,8 @@ args from the url gets base64 decoded and set as attributes for a html embed tag
 While JS is prevented due to the CSP it still allows for CSS. <https://bugs.chromium.org/p/chromium/issues/detail?id=1345685>
 
 # Leaking passwords from Proton Pass (Awarded $200, Not a google app, but me putting here anyway lol)
+**URL:** <https://chrome.google.com/webstore/detail/proton-pass-free-password/ghmbeldphafepmbegfdlkpapadhbakde>
+
 Due to site isolation it should be expected that an attacker controlled process (a content script) should not gain access to a different site's passwords since it would be process isolated.
 
 However Proton Pass does not verify the sender of the `EXPORT_REQUEST` message allowing a renderer bug to leak in unencrypted form all the users passwords.
@@ -678,14 +680,15 @@ The token for the payload was stored in chrome.storage.local so the user interac
 # Screenwise Meter (Not a official google app)
 **URL:** <https://chrome.google.com/webstore/detail/screenwise-meter/hbmclfdibpffglligfnnppjocdlhgjbb>
 
-Login CSRF (leaking browser activity)
-WAR bypass via `chrome.runtime.sendMessage`
-Auth token leaked via `chrome.storage.local`
+- Login CSRF (leaking browser activity)
+- WAR bypass via `chrome.runtime.sendMessage`
+- Auth token leaked via `chrome.storage.local`
 
 TODO: Explain attacks
 
-# Mandiant Advantage | Threat Intelligence (Not reported, part of Google Cloud )
+# Mandiant Advantage | Threat Intelligence (Not reported, part of Google Cloud)
 **URL:** <https://chrome.google.com/webstore/detail/mandiant-advantage-threat/aghmgfkjfbkcockededacdhemkpgdcko>
+
 Leaks `slackWebhook`, `teamsWebhook`, `token` to a compromised renderer via `chrome.storage.local`
 
 # Credits :)
