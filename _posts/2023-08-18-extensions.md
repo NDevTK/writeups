@@ -737,6 +737,8 @@ Leaking connection and DNS timings for gstatic.com resources via the performance
 Sometimes it's used as an embed.
 
 ### XSS on Layout Shift Terminator
+**URL:** <https://googlechromelabs.github.io/layout-shift-terminator/> 
+
 Since the page allows embedding and it's possible to navigate nested iframes.
 It's possible to race the postMessage bypassing the `event.source === iframe.contentWindow` check.
 This could also be done by abusing the chromium max iframe limit with the null contentWindow trick.
