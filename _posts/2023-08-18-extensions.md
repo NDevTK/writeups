@@ -637,7 +637,7 @@ This was fixed by adding `frame-ancestors 'self';` to the extensions `content_se
 **URL:** <https://chrome.google.com/webstore/detail/secure-shell/iodihamcpbpeioajjeobimgagajmlibd>
 
 1. Download secure shell extension via <https://chrome.google.com/webstore/detail/secure-shell/iodihamcpbpeioajjeobimgagajmlibd>
-2. Go to chrome-extension://iodihamcpbpeioajjeobimgagajmlibd/plugin/mosh/mosh_window.html?args=eyJzdHlsZSI6ImJhY2tncm91bmQtaW1hZ2U6IHVybChcImh0dHBzOi8vaHR0cC5jYXQvMjAwXCIpIiwid2lkdGgiOjEwMDAsImhlaWdodCI6MTAwMH0= (This could be done directly or via a WAR bypass)
+2. Go to `chrome-extension://iodihamcpbpeioajjeobimgagajmlibd/plugin/mosh/mosh_window.html?args=eyJzdHlsZSI6ImJhY2tncm91bmQtaW1hZ2U6IHVybChcImh0dHBzOi8vaHR0cC5jYXQvMjAwXCIpIiwid2lkdGgiOjEwMDAsImhlaWdodCI6MTAwMH0=` (This could be done directly or via a WAR bypass)
 3. See cat
 
 args from the url gets base64 decoded and set as attributes for a html embed tag.
