@@ -714,7 +714,8 @@ May also require the user's data of birth depending on the account settings.
 # FREE XSS SECTION!
 
 ### XSS on AffiliCats
-**URL:** <https://googlechromelabs.github.io/affilicats/forward.html?url=javascript:alert(window.origin)>
+**URL:** <https://googlechromelabs.github.io/affilicats/forward.html?url=javascript:alert(window.origin)> 
+
 The "AffiliCats" website has an open redirect that sets `document.location.href` with the URL param called `url` this allows navigating to `javascript:`
 ```js
 f = new URLSearchParams(document.location.search) , g = new URL(f.get("url"));
