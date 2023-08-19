@@ -52,8 +52,8 @@ Fixed by changing `externally_connectable` to only `https://docs.google.com/*` a
 # Perfetto UI leaks sensitive browser logs (Fixed, Awarded $5000)
 **URL:** <https://chrome.google.com/webstore/detail/perfetto-ui/lfmkphfpdbjijhpomgecfikhfohaoine>
 
-Perfetto UI [^0] is a Chrome extension by Google for recording browser traces. The extension communicates with ui.perfetto.dev to record the browser traces.
-This extension is particularly powerful as it is hardcoded to receive special treatment from Chrome (`ExtensionIsTrusted`). [^1]
+Perfetto UI [^0-0] is a Chrome extension by Google for recording browser traces. The extension communicates with ui.perfetto.dev to record the browser traces.
+This extension is particularly powerful as it is hardcoded to receive special treatment from Chrome (`ExtensionIsTrusted`). [^1-0]
 
 However, from the manifest.json we can see that it can also connect to storage.googleapis.com, which is a domain used for storing arbitrary Google Cloud buckets that can be created by anyone.
 
@@ -74,7 +74,7 @@ Sensitive values from the logs are supposed to be stripped, however this filteri
 
 Steps to reproduce:
 
-1. Install the Perfetto UI extension [^0]
+1. Install the Perfetto UI extension [^0-0]
 2. Open <https://storage.googleapis.com/perfetto-ui-vuln-demo/vuln-poc.html>
 3. Enjoy
 
@@ -89,12 +89,12 @@ port.postMessage({method: 'GetCategories'});
 ```
 
 
-[^0]: <https://chrome.google.com/webstore/detail/perfetto-ui/lfmkphfpdbjijhpomgecfikhfohaoine>
-[^1]: <https://source.chromium.org/chromium/chromium/src/+/main:chrome/browser/extensions/api/debugger/debugger_api.cc;drc=3ecbe8e3eacb4ac62561e9e786e40e7e60eefd44;l=154>
+[^0-1]: <https://chrome.google.com/webstore/detail/perfetto-ui/lfmkphfpdbjijhpomgecfikhfohaoine>
+[^1-1]: <https://source.chromium.org/chromium/chromium/src/+/main:chrome/browser/extensions/api/debugger/debugger_api.cc;drc=3ecbe8e3eacb4ac62561e9e786e40e7e60eefd44;l=154>
 
 ### Attack scenario
 
-1. An attacker sends a link to the page to a victim who has the Perfetto UI [^0] extension installed.
+1. An attacker sends a link to the page to a victim who has the Perfetto UI [^0-0] extension installed.
 2. Once the victim opens the link, the attacker's page will record and save the victim's browser logs (which contain the browser "netlog" with access tokens, among others).
 
 This was fixed by removing `https://storage.googleapis.com/` from `externally_connectable` <https://github.com/google/perfetto/commit/493ab156ac9f2610f91f0d5df9a7a793b6539988>
@@ -104,9 +104,9 @@ This was fixed by removing `https://storage.googleapis.com/` from `externally_co
 
 **URL:** <https://chrome.google.com/webstore/detail/screen-reader/kgejglhpjiefppelpmljglcjbhoiplfn>
 
-Screen Reader [^0] is an accessibility extension by Google. Its source code [^1] is available in the chromium repository.
+Screen Reader [^0-1] is an accessibility extension by Google. Its source code [^1-1] is available in the chromium repository.
 
-It exposes various commands that can be called. The issue is that the message listeners do not check the origin of the incoming message. [^2] One of these commands is `clickNodeRef` [^3], which can, with the help of selector injection [^4], be used to click any element in the DOM, using an arbitrary selector.
+It exposes various commands that can be called. The issue is that the message listeners do not check the origin of the incoming message. [^2-1] One of these commands is `clickNodeRef` [^3-1], which can, with the help of selector injection [^4-1], be used to click any element in the DOM, using an arbitrary selector.
 
 
 ```js
@@ -128,7 +128,7 @@ After a few seconds, you should see in <https://myaccount.google.com/permissions
 
 ---
 
-Apart from this vulnerability, there might be other possible security issues with this extension. For example, as the following code [^5] does not sanitize user input; this could potentially lead to UXSS, if it is exploited. (we didn't analyze this yet, but it also looks vulnerable)
+Apart from this vulnerability, there might be other possible security issues with this extension. For example, as the following code [^5-1] does not sanitize user input; this could potentially lead to UXSS, if it is exploited. (we didn't analyze this yet, but it also looks vulnerable)
 
 ```js
 var html = Msgs.getMsg('pdf_header', [filename, src + '#original']);
@@ -136,16 +136,16 @@ headerDiv.innerHTML = html;
 ```
 
 ---
-[^0]: <https://chrome.google.com/webstore/detail/screen-reader/kgejglhpjiefppelpmljglcjbhoiplfn>
-[^1]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/>
-[^2]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/api_implementation.js;l=71;drc=a7bb5589468949d3c12d3e067621eb51252ee031>
-[^3]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/api_implementation.js;l=312;drc=a7bb5589468949d3c12d3e067621eb51252ee031>
-[^4]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/api_util.js;l=78;drc=3e1a26c44c024d97dc9a4c09bbc6a2365398ca2c>
-[^5]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/pdf_processor.js;l=138;drc=3e1a26c44c024d97dc9a4c09bbc6a2365398ca2c>
+[^0-2]: <https://chrome.google.com/webstore/detail/screen-reader/kgejglhpjiefppelpmljglcjbhoiplfn>
+[^1-2]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/>
+[^2-2]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/api_implementation.js;l=71;drc=a7bb5589468949d3c12d3e067621eb51252ee031>
+[^3-2]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/api_implementation.js;l=312;drc=a7bb5589468949d3c12d3e067621eb51252ee031>
+[^4-2]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/api_util.js;l=78;drc=3e1a26c44c024d97dc9a4c09bbc6a2365398ca2c>
+[^5-2]: <https://source.chromium.org/chromium/chromium/src/+/main:ui/accessibility/extensions/chromevoxclassic/chromevox/injected/pdf_processor.js;l=138;drc=3e1a26c44c024d97dc9a4c09bbc6a2365398ca2c>
 
 ### Attack scenario
 
-1. The attacker sends a link to a victim who uses the Screen Reader accessibility extension. [^0]
+1. The attacker sends a link to a victim who uses the Screen Reader accessibility extension. [^0-1]
 2. The victim opens the page and the attack takes place in the background.
 3. The attacker can now access the victim's account.
 
@@ -213,7 +213,7 @@ TODO: Explain the redacted attack :)
 
 **URL:** <https://chrome.google.com/webstore/detail/form-troubleshooter/lpjhcgjbicfdoijennopbjooigfipfjh>
 
-The Form Troubleshooter extension [^0] is a project from Google Chrome Labs [^1].
+The Form Troubleshooter extension [^0-2] is a project from Google Chrome Labs [^1-2].
 
 The extension adds a content script to all pages, which responds back with the DOM tree of the current document. The issue is that it accepts messages by any page that has a reference to the window.
 
@@ -244,12 +244,12 @@ setTimeout(() => {
 3. Observe that the document tree gets leaked.
 
 
-[^0]: <https://chrome.google.com/webstore/detail/form-troubleshooter/lpjhcgjbicfdoijennopbjooigfipfjh>
-[^1]: <https://github.com/GoogleChromeLabs/form-troubleshooter>
+[^0-2]: <https://chrome.google.com/webstore/detail/form-troubleshooter/lpjhcgjbicfdoijennopbjooigfipfjh>
+[^1-2]: <https://github.com/GoogleChromeLabs/form-troubleshooter>
 
 ### Attack scenario
 
-1. An attacker sends a link to the page with this payload to a victim who has the  Form Troubleshooter [^0] extension installed.
+1. An attacker sends a link to the page with this payload to a victim who has the  Form Troubleshooter [^0-2] extension installed.
 2. Once the victim opens the link, the attacker's page will be able to get the document tree of any web page that does not have an explicit Cross-Origin-Opener-Policy header (via `window.open`) OR that does not prevent being framed (`iframe`).
 
 This was fixed by adding an origin check <https://github.com/GoogleChromeLabs/form-troubleshooter/commit/f67dc76e304dfa29b6be16725287c1b84a27eabe>
@@ -257,7 +257,7 @@ This was fixed by adding an origin check <https://github.com/GoogleChromeLabs/fo
 # URLs leak in Tag Assistant for Conversions Beta (Partly Fixed, Unlikely user interaction)
 **URL:** <https://chrome.google.com/webstore/detail/tag-assistant-for-convers/llpfnmnallbompdmklfkcibfpcfpncdd>
 
-Click the start button via the extensions popup, then go to https://example.org/?secret
+Click the start button via the extensions popup, then go to `https://example.org/?secret`
 In the context of the content script on an attacker controlled website. 
 ```js
 chrome.runtime.sendMessage({messageType: 6}, tabInfo => { for (let page in tabInfo.pages) { console.log(tabInfo.pages[page].info.url); } });
@@ -412,14 +412,14 @@ A malicious attacker could exploit this to bypass SOP.
 
 OS: ChromeOS (regular or dev mode). Dev mode allows shell access, regular mode allows only predefined commands.
 
-Requires the Secure Shell extension [^0] by Google to be installed. Together with the old version [^1] they have over 1 million users.
+Requires the Secure Shell extension [^0-3] by Google to be installed. Together with the old version [^1-3] they have over 1 million users.
 
 The extension exposes `html/nassh.html` as a web accessible resource, which can be used to access Crosh (Chrome OS shell) and can be embedded by any webpage without restrictions. This way, a malicious website can make the user interact with the shell without the user knowing.
 
 There is some user interaction required, but this could be made inconspicuous to the user by making it a part of a game, for example.
 
 Steps to reproduce:
-1. Make sure the Secure Shell extension [^0] is installed
+1. Make sure the Secure Shell extension [^0-3] is installed
 2. Open poc.html
 3. Follow the instructions in the page (Ctrl+Shift+V, Enter, Ctrl+Shift+V, Enter) *
 4. Notice that `cat /etc/passwd` (or an arbitrary Linux command) has been executed
@@ -435,8 +435,8 @@ Note: the PoC works best with dev mode enabled. In regular mode, the shell comma
 
 Another potential attack vector would be to connect to devices in the local network that often have default credentials, for example: `html/nassh.html#root@192.168.1.1`
 
-[^0]: <https://chrome.google.com/webstore/detail/secure-shell/iodihamcpbpeioajjeobimgagajmlibd>
-[^1]: <https://chrome.google.com/webstore/detail/deprecated-secure-shell-a/pnhechapfaindjhompbnflcldabbghjo>
+[^0-3]: <https://chrome.google.com/webstore/detail/secure-shell/iodihamcpbpeioajjeobimgagajmlibd>
+[^1-3]: <https://chrome.google.com/webstore/detail/deprecated-secure-shell-a/pnhechapfaindjhompbnflcldabbghjo>
 
 poc.html:
 ```html
