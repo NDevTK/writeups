@@ -705,7 +705,7 @@ Both resets done from the same playstation login page:
 
 ### Attack scenario
 A local network attacker can gain account takeover if a user attempts to reset their password.
-May also requires the user's data of birth depending on the account settings.
+May also require the user's data of birth depending on the account settings.
 
 # FREE XSS SECTION!
 
