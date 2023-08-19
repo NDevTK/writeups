@@ -30,7 +30,7 @@ Create a directory that has automatically synced and beautified source code from
 - CodeQL
 
 # RCE in Application Launcher For Drive (Fixed, Awarded $3133.70)
-**URL:** <https://chrome.google.com/webstore/detail/application-launcher-for/lmjegmlicamnimmfhcmpkclmigmmcbeh>
+**URL:** <https://chrome.google.com/webstore/detail/application-launcher-for/lmjegmlicamnimmfhcmpkclmigmmcbeh> 
 **Drive for desktop:** <https://www.google.com/drive/download/>
 
 The lax rule that allows insecure origins: `"externally_connectable": { "matches": [ "://.google.com/*" ] }`
