@@ -661,7 +661,7 @@ chrome = f.contentWindow.chrome;
 chrome.runtime.sendMessage({type: 'EXPORT_REQUEST', payload: { encrypted: false } }, result => { console.log(atob(result.data)) });
 ```
 While the data in chrome.storage.local is shared to the content script which uses the same process as attacker controlled websites this is in encrypted form so not that useful but this could be improved by using the localStorage API directly in the background process.
-As I think I saw an AcessToken :/
+Since I think I also saw an access token :/
 
 MV3 Service workers don't allow localStorage but there are other alternatives. <https://developer.chrome.com/docs/extensions/migrating/to-service-workers/#convert-localstorage>
 
