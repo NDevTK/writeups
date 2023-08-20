@@ -30,7 +30,7 @@ Create a directory that has automatically synced and beautified source code from
 - Check for a message listener accessible to `postMessage` and verify the senders allowed.
 - Try searching for all XSS sinks such as `scripting.executeScript`, `document.write`, `innerHTML =`,  `location.href =`, `open()`
 - CodeQL
-- Check `web_accessible_resources` for clickjacking
+- Check `web_accessible_resources` for clickjacking, scripts here will also bypass the sites CSP.
 
 # RCE in Application Launcher For Drive (Fixed, Awarded $3133.70)
 **URL:** <https://chrome.google.com/webstore/detail/application-launcher-for/lmjegmlicamnimmfhcmpkclmigmmcbeh>  
