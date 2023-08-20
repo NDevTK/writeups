@@ -12,6 +12,8 @@ Notes:
 - CSP prevents some XSS :(
 - `MessageSender.origin` doesn't exist on Firefox so you may need to use the URL.
 - Compromised renderers that never run a content script shouldn't be able to spoof `runtime.sendMessage`.
+- WAR is initiator based its not the same as embed protection such as by using a CSP. <https://bugs.chromium.org/p/chromium/issues/detail?id=1343610#c24>
+- Useful website for viewing extension source code <https://robwu.nl/crxviewer/>
 
 For more information, check out [Deep Dive into Site Isolation (Part 2)](https://microsoftedge.github.io/edgevr/posts/deep-dive-into-site-isolation-part-2/#abusing-extensions-to-bypass-site-isolation) 
 
@@ -28,6 +30,7 @@ Create a directory that has automatically synced and beautified source code from
 - Check for a message listener accessible to `postMessage` and verify the senders allowed.
 - Try searching for all XSS sinks such as `document.write`, `innerHTML =`,  `location.href =`, `open()`
 - CodeQL
+- Check `web_accessible_resources` for clickjacking
 
 # RCE in Application Launcher For Drive (Fixed, Awarded $3133.70)
 **URL:** <https://chrome.google.com/webstore/detail/application-launcher-for/lmjegmlicamnimmfhcmpkclmigmmcbeh>  
