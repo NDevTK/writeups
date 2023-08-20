@@ -17,6 +17,13 @@ layout: default
 <script>
 "use strict";
 
+function renderBase(src) {
+  const base = document.createElement('base');
+  base.target = '_blank';
+  base.href = src;
+  return base;
+}
+
 const postLinks = document.getElementById('postLinks');
 postLinks.addEventListener('click', async (e) => {
     let src = e.srcElement;
@@ -34,7 +41,8 @@ postLinks.addEventListener('click', async (e) => {
             height: '1000'
         });
     }
-    pip.document.body.innerHTML = '<base target="_blank">' + content;
+    pip.document.head.appendChild(renderBase(src.href));
+    pip.document.body.innerHTML = content;
 });
 </script>
 <script type="speculationrules">
