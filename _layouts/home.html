@@ -14,37 +14,6 @@ layout: default
   </ul>
   <p>Subscribe <a href="{{ "/feed.xml" | relative_url }}">via RSS</a> my Chromium issues can be found <a href="https://bugs.chromium.org/p/chromium/issues/list?q=reporter%3Andevtk%40protonmail.com&can=1">here</a> report writeup issues <a href="https://github.com/NDevTK/writeups">here</a></p>
 </div>
-<script>
-"use strict";
-
-function renderBase(src) {
-  const base = document.createElement('base');
-  base.target = '_blank';
-  base.href = src;
-  return base;
-}
-
-const postLinks = document.getElementById('postLinks');
-postLinks.addEventListener('click', async (e) => {
-    let src = e.srcElement;
-    if (window !== window.top) return;
-    if (!navigator.userAgentData || navigator.userAgentData.mobile !== false) return;
-    // Ignore same page hash navigations
-    if (!src || !src.href || src.href.startsWith(location.origin + location.pathname + '#') || !self.documentPictureInPicture) return;
-    e.preventDefault();
-    let result = await fetch(src.href, {mode: 'same-origin'});
-    let content = await result.text();
-    let pip = documentPictureInPicture.window;
-    if (!pip || pip.closed) {
-        pip = await documentPictureInPicture.requestWindow({
-            width: '1000',
-            height: '1000'
-        });
-    }
-    pip.document.head.appendChild(renderBase(src.href));
-    pip.document.body.innerHTML = content;
-});
-</script>
 <script type="speculationrules">
 {
   "prerender": [
