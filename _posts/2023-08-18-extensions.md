@@ -26,9 +26,9 @@ Create a directory that has automatically synced and beautified source code from
 
 - Search for keywords such as `.onMessage`, `.onConnect`, `.onRequest`, `.onMessageExternal` and audit messages to background pages
 - Make sure nothing sensitive is stored in `chrome.storage` its viewable using `chrome.storage.local.get(null, console.log);` and `chrome.storage.sync.get(null, console.log);`
-- Search `externally_connectable` for unsafe origins such as `http://*.google.com` and `https://storage.googleapis.com`
+- Search `externally_connectable` and `content_scripts` for unsafe origins such as `http://*.google.com` and `https://storage.googleapis.com`
 - Check for a message listener accessible to `postMessage` and verify the senders allowed.
-- Try searching for all XSS sinks such as `document.write`, `innerHTML =`,  `location.href =`, `open()`
+- Try searching for all XSS sinks such as `scripting.executeScript`, `document.write`, `innerHTML =`,  `location.href =`, `open()`
 - CodeQL
 - Check `web_accessible_resources` for clickjacking
 
