@@ -11,7 +11,7 @@ Notes:
 - `chrome.storage` can't be trusted [1227410 - New Extension API function `chrome.storage.setAccessLevel` - chromium](https://bugs.chromium.org/p/chromium/issues/detail?id=1227410)
 - CSP prevents some XSS :(
 - `MessageSender.origin` doesn't exist on Firefox so you may need to use the URL.
-- Compromised renderers that never run a content script shouldn't be able to spoof `runtime.sendMessage`.
+- Compromised renderers that never run a content script shouldn't be able to spoof `runtime.sendMessage`
 - WAR is initiator based its not the same as embed protection such as by using a CSP <https://bugs.chromium.org/p/chromium/issues/detail?id=1343610#c24>
 - Useful website for viewing extension source code <https://robwu.nl/crxviewer/>
 
