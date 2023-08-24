@@ -384,7 +384,7 @@ chrome.storage.local.get('activeSites', e => { for (let url in JSON.parse(e.acti
 
 A compromised renderer can leak visited URLs (origin + pathname) enough to leak unlisted google doc IDs.
 
-# SOP bypass with save to drive extension. (Accepted, deprecated)
+# SOP bypass with save to drive extension. (Accepted, Not rewarded)
 **URL:** <https://chrome.google.com/webstore/detail/save-to-google-drive/gmbmikajjgmnabiglmofipeabaddhgne>
 
 The extension stores the folder ID of where to store files in `chrome.storage.sync` with a compromised renderer; this can leak their folder if it's set to "with a link" and changed to an attacker controlled value.
@@ -886,4 +886,5 @@ ijimhcgeahpgfdcgaheadagkjkiibcnj
 fpdeeiodjafkidabmmeighhmfffnldak
 daedidciajfkjpjfmailopfppehmdlkn
 omamhhjibghapdodkhlmcpibplefhmgl
+gmbmikajjgmnabiglmofipeabaddhgne
 ```
