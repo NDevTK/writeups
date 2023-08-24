@@ -155,7 +155,7 @@ headerDiv.innerHTML = html;
 
 This was fixed by removing the `clickNodeRef` method.
 
-# SOP bypass using Tag Assistant Legacy (Fixed, $5000)
+# SOP bypass using Tag Assistant Legacy (Fixed, Awarded $5000)
 Downgraded as needs a compromised renderer, maybe CPU bugs work as well :/
 
 **URL:** <https://chrome.google.com/webstore/detail/tag-assistant-legacy-by-g/kejbdjndbnbjgmefkgdddjlbokphdefk>
@@ -175,7 +175,7 @@ chrome.runtime.sendMessage({message: 'LoadScript', url: 'https://googleads.g.dou
 
 A compromised renderer can bypass the same origin policy.
 
-# Leaking URLs using Tag Assistant Legacy extension (Fixed, $6267.4)
+# Leaking URLs using Tag Assistant Legacy extension (Fixed, Awarded $6267.4)
 **URL:** <https://chrome.google.com/webstore/detail/tag-assistant-legacy-by-g/kejbdjndbnbjgmefkgdddjlbokphdefk>
 
 Change the JS execution context to the Tag Assistant Legacy's content script, and execute the following:
@@ -197,7 +197,7 @@ port.postMessage({message: "Status", tabId: "<TabID>"});
 
 A compromised renderer can leak visited URLs, which may contain sensitive data, such as an access_token.
 
-# XSS on 127.0.0.1:8090 (Accepted, deprecated)
+# XSS on 127.0.0.1:8090 (Accepted, Deprecated)
 **URL:** <https://chrome.google.com/webstore/detail/coding-with-chrome/becloognjehhioodmnimnehjcibkloed>
 
 For isolation the extension hosts user controlled code on localhost however it does not verify the sender of the messages or use a `null` origin.
@@ -671,7 +671,7 @@ MV3 Service workers don't allow localStorage but there are other alternatives. <
 
 Unverified fixes, <https://github.com/search?q=repo%3AProtonMail%2FWebClients+SECBTY-628&type=commits>
 
-# UXSS by Google Optimize extension (Awarded $500, deprecated)
+# UXSS by Google Optimize extension (Deprecated, Awarded $500)
 **URL:** <https://chrome.google.com/webstore/detail/google-optimize/bhdplaindhdkiflmbfbciehdccfhegci>
 
 The  summary of the attack:
