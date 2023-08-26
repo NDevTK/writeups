@@ -372,7 +372,7 @@ ChromeVox has a similar issue which never got fixed. <https://bugs.chromium.org/
 
 A compromised renderer can leak visited URLs, which may contain sensitive data, such as an access_token.
 
-This was fixed by https://github.com/GoogleChrome/web-vitals-extension/commit/5187dbddcdea7886009f937344a7d4c0b4590598
+This was fixed by <https://github.com/GoogleChrome/web-vitals-extension/commit/5187dbddcdea7886009f937344a7d4c0b4590598>
 
 # Site usage data leak in Chrome Reporting Extension (Accepted, Not rewarded)
 **URL:** <https://chrome.google.com/webstore/detail/chrome-reporting-extensio/emahakmocgideepebncgnmlmliepgpgb>
