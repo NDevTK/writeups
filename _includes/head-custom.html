@@ -14,3 +14,17 @@
   }
 }
 </style>
+
+<script>
+window.addEventListener('keyup', e => {
+    if (e.key !== '.') return;
+
+    let args = location.pathname.split('/');
+    if (args.length < 4) {
+        location.href = 'https://github.dev/NDevTK/writeups/blob/main/_layouts/home.html';
+    }
+    let file = [args[2], args[3], args[4], args[5]].join('-') + '.md';
+
+    location.href = 'https://github.dev/NDevTK/writeups/blob/main/_posts/' + file;
+});
+</script>
