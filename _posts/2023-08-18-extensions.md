@@ -53,6 +53,10 @@ Fixed by changing `externally_connectable` to only `https://docs.google.com/*` a
 A demo browser extension to get RCE <https://ndevtk.github.io/writeups/RCE.zip>
 
 
+https://github.com/NDevTK/writeups/assets/31563761/dead1638-c40d-4fd5-9626-253ea1bdd028
+
+
+
 # Perfetto UI leaks sensitive browser logs (Fixed, Awarded $5000)
 **URL:** <https://chrome.google.com/webstore/detail/perfetto-ui/lfmkphfpdbjijhpomgecfikhfohaoine>
 
