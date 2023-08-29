@@ -50,7 +50,7 @@ An attacker on the same network or a browser extension/XSS with any google subdo
 No "Mark Of The Web" is set. <https://textslashplain.com/2016/04/04/downloads-and-the-mark-of-the-web/>
 
 Fixed by changing `externally_connectable` to only `https://docs.google.com/*` and `https://drive.google.com/*` browser extensions with `<all_urls>` can still get an RCE with it. (WAI)  
-A demo browser extension to get RCE <https://ndevtk.github.io/writeups/RCE.zip>
+A demo browser extension to get RCE <https://ndevtk.github.io/writeups/RCE.zip> video PoC: <https://ndevtk.github.io/writeups/extensionRCE.mp4>
 
 
 https://github.com/NDevTK/writeups/assets/31563761/dead1638-c40d-4fd5-9626-253ea1bdd028
