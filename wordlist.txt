@@ -181,3 +181,4 @@ leet
 minecraft
 apk
 decompilers
+fullscreen
