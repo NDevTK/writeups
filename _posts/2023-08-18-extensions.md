@@ -210,7 +210,7 @@ let x = window.open('http://127.0.0.1:8090/preview/untitled_phaser_blockly_file.
 An attacker controlled website can get XSS on localhost this maybe trusted by applications since it refers to the users local machine <https://datatracker.ietf.org/doc/html/draft-west-let-localhost-be-localhost-06>
 
 
-# Limited URL Spoof via the Secure Shell extension
+# Limited URL Spoof via the Secure Shell extension (Fixed)
 **URL:** <https://chrome.google.com/webstore/detail/secure-shell/iodihamcpbpeioajjeobimgagajmlibd>
 
 A page can load or embed `chrome-extension://iodihamcpbpeioajjeobimgagajmlibd/html/nassh.html?openas=fullscreen#crosh` to make the current tab fullscreen without user interaction.
