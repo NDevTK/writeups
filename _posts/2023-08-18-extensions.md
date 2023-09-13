@@ -241,7 +241,7 @@ Impacts:
       break;
   }
 ```
-This was fixed by removing the opener reference https://chromium-review.googlesource.com/c/apps/libapps/+/4823645
+This was fixed by removing the opener reference <https://chromium-review.googlesource.com/c/apps/libapps/+/4823645>
 
 # SOP bypass using the Form Troubleshooter extension (Fixed, Not an official google app)
 
