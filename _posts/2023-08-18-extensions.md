@@ -210,8 +210,38 @@ let x = window.open('http://127.0.0.1:8090/preview/untitled_phaser_blockly_file.
 An attacker controlled website can get XSS on localhost this maybe trusted by applications since it refers to the users local machine <https://datatracker.ietf.org/doc/html/draft-west-let-localhost-be-localhost-06>
 
 
-# Redacted
-TODO: Explain the redacted attack :)
+# Limited URL Spoof via the Secure Shell extension
+**URL:** <https://chrome.google.com/webstore/detail/secure-shell/iodihamcpbpeioajjeobimgagajmlibd>
+
+A page can load or embed `chrome-extension://iodihamcpbpeioajjeobimgagajmlibd/html/nassh.html?openas=fullscreen#crosh` to make the current tab fullscreen without user interaction.
+
+Impacts:
+- Able to enter full screen while the user is away from there device (No fullscreen message would be seen)
+- Able to make full screen exit commands not work.
+
+```js
+ // Allow users to bookmark links that open as a window.
+  const openas = params.get('openas');
+  switch (openas) {
+    case 'window': {
+      // Delete the 'openas' string so we don't get into a loop.  We want to
+      // preserve the rest of the query string when opening the window.
+      params.delete('openas');
+      const url = new URL(document.location.toString());
+      url.search = params.toString();
+      openNewWindow(url.href).then(() => globalThis.close);
+      return;
+    }
+
+    case 'fullscreen':
+    case 'maximized':
+      chrome.windows.getCurrent((win) => {
+        chrome.windows.update(win.id, {state: openas});
+      });
+      break;
+  }
+```
+This was fixed by removing the opener reference https://chromium-review.googlesource.com/c/apps/libapps/+/4823645
 
 # SOP bypass using the Form Troubleshooter extension (Fixed, Not an official google app)
 
@@ -691,15 +721,13 @@ The token for the payload was stored in chrome.storage.local so the user interac
 - WAR bypass via `chrome.runtime.sendMessage`
 - Auth token leaked via `chrome.storage.local`
 
-TODO: Explain attacks
-
 # Mandiant Advantage | Threat Intelligence (Not reported, part of Google Cloud)
 **URL:** <https://chrome.google.com/webstore/detail/mandiant-advantage-threat/aghmgfkjfbkcockededacdhemkpgdcko>
 
 Leaks `slackWebhook`, `teamsWebhook`, `token` to a compromised renderer via `chrome.storage.local`
 
 # Credits :)
-- [Alesandro Ortiz](https://alesandroortiz.com/) for help with the Secure Shell report and finding the redacted bug.
+- [Alesandro Ortiz](https://alesandroortiz.com/) for help with the Secure Shell report and finding the Limited URL Spoof.
 - [Thomas Orlita](https://websecblog.com/) for help with reports and the writeup.
 - [Missoum Said](https://missoumsaid.com/) for finding the "Save to Drive" SOP bypass, the "Tag Assistant Legacy" URL Leak, localhost XSS, Screenwise Meter bugs and Google Optimize UXSS.
 
