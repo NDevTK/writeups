@@ -730,7 +730,7 @@ f = new URLSearchParams(document.location.search) , g = new URL(f.get("url"));
 ### Attack scenario
 An attacker controlled website gains the "cutest cats online"
 
-### XSS on GSTATIC
+### XSS on GSTATIC (Fixed, Awarded for individual impacts reported)
 ```js
 let payload = `
 alert(window.origin);
