@@ -328,7 +328,7 @@ Steps to reproduce:
 
 1. The victim opens the attacker's website and clicks the context menu item.
 2. A new tab with an arbitrary URL will be created with "sec-fetch-site: none", which can be abused to chain a full exploit, for example:
-- read local files, by opening a downloaded html file with a renderer exploit or via XSLeaks.
+- read local files, by opening a downloaded html file (deprecated <https://chromium-review.googlesource.com/c/chromium/src/+/4772028>) with a renderer exploit or via XSLeaks.
 - bypass web accessible resources navigation restrictions
 
 ### Rationale
