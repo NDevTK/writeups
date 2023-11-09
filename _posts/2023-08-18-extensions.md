@@ -372,7 +372,7 @@ This can also be done via ```chrome.runtime.sendMessage```
 If the victim visits a site that has a compromised renderer (can access the content script) and enables the extension there, the site will be able to bypass the same-origin policy.
 
 This is an extension by Google intended for frontend Gerrit developers.
-<https://gerrit.googlesource.com/gerrit-fe-dev-helper/>
+<https://gerrit.googlesource.com/gerrit-fe-dev-helper/>  
 Unverified fix,  <https://gerrit-review.googlesource.com/c/gerrit-fe-dev-helper/+/389216>
 
 # AMP Readiness Tool (Not an official Google app)
