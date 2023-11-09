@@ -3,7 +3,8 @@ title: Google Extensions (Awarded $18833.7)
 ---
 The reward total in the post title does not include other people's bugs that this writeup includes but does include that bug from Proton that's notably not a Google extension. This may not reflect the actual money received.
 
-Testing the security of extensions developed by Google with the help of a Vulnerability Research Grant from Google of $500.
+Testing the security of extensions developed by Google with the help of a Vulnerability Research Grant from Google of $500.  
+They have since added guidelines for Chrome Extension VRP <https://bughunters.google.com/about/rules/6625378258649088/google-and-alphabet-vulnerability-reward-program-vrp-rules#reward-amounts-for-vulnerabilities-in-chrome-extensions>
 
 Notes:
 - Content scripts exist in an [isolated world](https://chromium.googlesource.com/chromium/src/+/master/third_party/blink/renderer/bindings/core/v8/V8BindingDesign.md#world) but run in the same process as the attacker-controlled website. They can be attacked via [Meltdown/Spectre](https://chromium.googlesource.com/chromium/src/+/master/docs/security/side-channel-threat-model.md) or a [compromised renderer](https://chromium.googlesource.com/chromium/src/+/master/docs/security/compromised-renderers.md) some extensions may allow for bypassing site isolation this way.
@@ -372,6 +373,7 @@ If the victim visits a site that has a compromised renderer (can access the cont
 
 This is an extension by Google intended for frontend Gerrit developers.
 <https://gerrit.googlesource.com/gerrit-fe-dev-helper/>
+Unverified fix,  <https://gerrit-review.googlesource.com/c/gerrit-fe-dev-helper/+/389216>
 
 # AMP Readiness Tool (Not an official Google app)
 **URL:** <https://chrome.google.com/webstore/detail/amp-readiness-tool/fadclbipdhchagpdkjfcpippejnekimg>
@@ -730,6 +732,9 @@ Leaks `slackWebhook`, `teamsWebhook`, `token` to a compromised renderer via `chr
 - [Alesandro Ortiz](https://alesandroortiz.com/) for help with the Secure Shell report and finding the Limited URL Spoof.
 - [Thomas Orlita](https://websecblog.com/) for help with reports and the writeup.
 - [Missoum Said](https://missoumsaid.com/) for finding the "Save to Drive" SOP bypass, the "Tag Assistant Legacy" URL Leak, localhost XSS, Screenwise Meter bugs and Google Optimize UXSS.
+
+# Dart Debug Extension (Out of scope)
+<https://github.com/dart-lang/webdev/issues/2287>
 
 # Playstation password reset tokens leak (Not reported, Alesandro can't repo)
 **URL:** <https://www.playstation.com/>
