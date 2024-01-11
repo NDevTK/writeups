@@ -149,9 +149,9 @@ mnt
 Borealis
 PluginVM
 VPN
-Wireguard
+WireGuard
 config
-Wireguard
+wireguard
 args
 args
 lol
