@@ -814,7 +814,7 @@ npm -g install prettier
 # Downloads every extension ID in extensions.txt
 for extensionID in $(cat extensions.txt)
 do
-    wget "https://clients2.google.com/service/update2/crx?response=redirect&os=win&arch=x86-64&os_arch=x86-64&nacl_arch=x86-64&prod=chromiumcrx&prodchannel=unknown&prodversion=114.0.0.0&acceptformat=crx2,crx3&x=id%3D$extensionID%26uc" -O $extensionID.zip
+    wget "https://clients2.google.com/service/update2/crx?response=redirect&os=cros&arch=x86-64&os_arch=x86-64&nacl_arch=x86-64&prod=chromiumcrx&prodchannel=unknown&prodversion=120.0.0.0&acceptformat=crx2,crx3&x=id%3D$extensionID%26uc" -O $extensionID.zip
     unzip $extensionID.zip -d extensions/$extensionID
     rm $extensionID.zip
     chmod -R 777 extensions/$extensionID
