@@ -661,12 +661,12 @@ echo "Hello, this will record audio in 20-40 seconds... you can close this shell
 run_payload &
 ```
 
-### Set Wireguard configuration
+### Set WireGuard configuration
 (unsure if this is useful to attacker)
 
-Able to set Wireguard VPN config via crosh `wireguard` command. However, I can't get DNS working until I toggle "automatically configure network settings" in GUI. Maybe someone with more experience configuring Wireguard can figure out how to make this useful for an attacker. If it does work, I think this might allow attackers to tunnel traffic through their Wireguard server and potentially hijack DNS.
+Able to set WireGuard VPN config via crosh `wireguard` command. However, I can't get DNS working until I toggle "automatically configure network settings" in GUI. Maybe someone with more experience configuring WireGuard can figure out how to make this useful for an attacker. If it does work, I think this might allow attackers to tunnel traffic through their WireGuard server and potentially hijack DNS.
 
-No notification is shown when Wireguard is connected, but notification is shown when it is disconnected.
+No notification is shown when WireGuard is connected, but notification is shown when it is disconnected.
 
 This was fixed by adding `frame-ancestors 'self';` to the extensions `content_security_policy`.
 <https://chromium-review.googlesource.com/c/apps/libapps/+/4603751>
