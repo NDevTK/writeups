@@ -151,8 +151,6 @@ PluginVM
 VPN
 WireGuard
 config
-wireguard
-args
 args
 lol
 MV
@@ -178,7 +176,7 @@ webpage
 Ctrl
 poc
 leet
-minecraft
+Minecraft
 apk
 decompilers
 fullscreen
