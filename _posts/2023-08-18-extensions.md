@@ -81,7 +81,7 @@ Steps to reproduce:
 
 1. Install the Perfetto UI extension [^0-0]
 2. Open Attacker page that's hosted in a google cloud storage bucket
-4. Enjoy
+3. Enjoy
 
 
 The PoC essentially loads a copy of the Perfetto UI frontend in an iframe, and then configures it and clicks the Start button using JS. After 15s, the hidden iframe is revealed, showing the data that was recorded. The PoC page can access all of this data. To easily see the leaked data, convert the trace by clicking "Convert to .json" in the left menu.
