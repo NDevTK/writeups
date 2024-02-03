@@ -17,7 +17,7 @@ An intentional embeddable XSS existed at `jsfiddle.skia.org` that is cross-origi
 
 This means:
 - CPU bugs like Meltdown/Spectre or a compromised renderer can read the contents of private google issues of the logged in user, bypassing the `Cross-Origin-Resource-Policy: same-site` header and Cross-Origin Read Blocking.
-- Can modify and send `document.cookie` as first party, but not read the httponly cookies directly, allowing Login CSRF since no  [__Host-](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#__host-) cookie prefix is used only [__Secure-](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#__secure-) that protects from local network attackers.
+- Can modify and send `document.cookie` as first party, but not read the `HttpOnly` cookies directly, allowing Login CSRF since no  [__Host-](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#__host-) cookie prefix is used only [__Secure-](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#__secure-) that protects from local network attackers.
 - No more cache partitioning for `skia.org`
 
 While there may be other ways to bypass site isolation like an attacker controlled image, video or postMessage on the victim site allowing JS execution significantly increases the attack surface for renderer bugs. <https://www.chromium.org/Home/chromium-security/strict-origin-isolation-trial>
@@ -25,7 +25,7 @@ While there may be other ways to bypass site isolation like an attacker controll
 
 “The CORP bypass is an extra hardening bypass which is currently out-of-scope of VRP and this issue is also out-of-scope for Chrome Extension VRP due to it's not an extension. We may revisit this issue later when we include such bypasses into our VRP.”
 
-This was fixed by removing jsfiddle.skia.org
+This was fixed by removing `jsfiddle.skia.org`
 
 # That other thing
 So there was some other attack I liked but sadly they know about it internally and have not fixed it so cant include it but I would have liked to :(
