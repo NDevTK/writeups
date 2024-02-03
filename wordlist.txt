@@ -183,3 +183,5 @@ fullscreen
 fingerprintable
 css
 NSCL
+Buganizer
+embeddable
