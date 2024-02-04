@@ -8,6 +8,6 @@ Android 9 (x86): Launcher crash `frameworks/av/media/libstagefright/omx/SimpleSo
 
 I have also had issues where the address bar or a different website in the case of a webview get shown instead of the video element.
 ```js
-<script> onload = () => { createVideo();createVideo();createVideo();createVideo();createVideo(); } function createVideo() { let v = null; setInterval(() => { if (v) document.body.removeChild(v); v = document.createElement('video'); v.width="1000"; v.src = 'https://bugs.chromium.org/p/chromium/issues/attachment?aid=509705&signed_aid=QB-NucJqv2HA_Noz5yih-w==&inline=1'; document.body.appendChild(v); }, 2000); } </script>
+<script> onload = () => { createVideo();createVideo();createVideo();createVideo();createVideo(); } function createVideo() { let v = null; setInterval(() => { if (v) document.body.removeChild(v); v = document.createElement('video'); v.width="1000"; v.src = 'https://ndevtk.github.io/writeups/extensionRCE.mp4'; document.body.appendChild(v); }, 2000); } </script>
 ```
 Demos: [Doge PoC](https://ndev.tk/doge/) and [Unreliable Chrome UI spoof](https://ndev.tk/video.html)
