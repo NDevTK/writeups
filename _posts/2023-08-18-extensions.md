@@ -9,11 +9,11 @@ They have since added guidelines for Chrome Extension VRP <https://bughunters.go
 Notes:
 - Content scripts exist in an [isolated world](https://chromium.googlesource.com/chromium/src/+/master/third_party/blink/renderer/bindings/core/v8/V8BindingDesign.md#world) but run in the same process as the attacker-controlled website. They can be attacked via [Meltdown/Spectre](https://chromium.googlesource.com/chromium/src/+/master/docs/security/side-channel-threat-model.md) or a [compromised renderer](https://chromium.googlesource.com/chromium/src/+/master/docs/security/compromised-renderers.md) some extensions may allow for bypassing site isolation this way.
 - Background scripts using `XMLHttpRequest` will send cookies as if `xhr.withCredentials = true`; even if it's false and are able to read whatever the extension has access to.
-- `chrome.storage` can't be trusted [1227410 - New Extension API function `chrome.storage.setAccessLevel` - chromium](https://bugs.chromium.org/p/chromium/issues/detail?id=1227410)
+- `chrome.storage` can't be trusted [1227410 - New Extension API function `chrome.storage.setAccessLevel` - chromium](https://issues.chromium.org/issues/40189208)
 - CSP prevents some XSS :(
 - `MessageSender.origin` doesn't exist on Firefox so you may need to use the URL.
 - Compromised renderers that never run a content script shouldn't be able to spoof `runtime.sendMessage`
-- WAR is initiator based its not the same as embed protection such as by using a CSP <https://bugs.chromium.org/p/chromium/issues/detail?id=1343610#c24>
+- WAR is initiator based its not the same as embed protection such as by using a CSP <https://issues.chromium.org/issues/40060244#comment25>
 - Useful website for viewing extension source code <https://robwu.nl/crxviewer/>
 
 For more information, check out [Deep Dive into Site Isolation (Part 2)](https://microsoftedge.github.io/edgevr/posts/deep-dive-into-site-isolation-part-2/#abusing-extensions-to-bypass-site-isolation) 
@@ -340,7 +340,7 @@ We've also looked at 2 attack scenarios you have provided.
 
 achieve UXSS by navigating to a javascript: URI and using a renderer exploit
 
-The [bug](https://bugs.chromium.org/p/chromium/issues/detail?id=996741) you've mentioned is already fixed by Chrome. And therefore we don't believe UXSS is possible with this bug. However, we are happy to proven wrong, so let us know if this bug can result in UXSS 🙂
+The [bug](https://issues.chromium.org/issues/40096063) you've mentioned is already fixed by Chrome. And therefore we don't believe UXSS is possible with this bug. However, we are happy to proven wrong, so let us know if this bug can result in UXSS 🙂
 
 read local files by opening a downloaded html file with a renderer exploit
 
@@ -398,7 +398,7 @@ A compromised renderer can bypass the same origin policy.
 ```js
 chrome.storage.local.get(null, results => { for (let hash in results) { console.log(results[hash].location); } });
 ```
-ChromeVox has a similar issue which never got fixed. <https://bugs.chromium.org/p/chromium/issues/detail?id=1016535#c23>
+ChromeVox has a similar issue which never got fixed. <https://issues.chromium.org/issues/40050494#comment24>
 
 ### Attack scenario
 
@@ -679,7 +679,7 @@ This was fixed by adding `frame-ancestors 'self';` to the extensions `content_se
 3. See cat
 
 args from the url gets base64 decoded and set as attributes for a html embed tag.
-While JS is prevented due to the CSP it still allows for CSS. <https://bugs.chromium.org/p/chromium/issues/detail?id=1345685>
+While JS is prevented due to the CSP it still allows for CSS. <https://issuetracker.google.com/issues/260531249>
 
 # Leaking passwords from Proton Pass (Awarded $200, Not a google app, but me putting here anyway lol)
 **URL:** <https://chrome.google.com/webstore/detail/proton-pass-free-password/ghmbeldphafepmbegfdlkpapadhbakde>
