@@ -26,6 +26,3 @@ While there may be other ways to bypass site isolation like an attacker controll
 “The CORP bypass is an extra hardening bypass which is currently out-of-scope of VRP and this issue is also out-of-scope for Chrome Extension VRP due to it's not an extension. We may revisit this issue later when we include such bypasses into our VRP.”
 
 This was fixed by removing `jsfiddle.skia.org`
-
-# That other thing
-So there was some other attack I liked but sadly they know about it internally and have not fixed it so cant include it but I would have liked to :(
