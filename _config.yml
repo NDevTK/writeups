@@ -2,6 +2,6 @@ title: Writeups
 baseurl: "/writeups"
 permalink: pretty
 url: "https://ndevtk.github.io"
-
+incremental: true
 plugins:
   - jekyll-feed
