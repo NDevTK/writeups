@@ -278,5 +278,5 @@ Also, there is an [interesting feature](https://gerrit-documentation.storage.goo
 
 
 Credits:
-- {{ site.data.people.AlesandroOrtiz.credit }} for free server hosting for the PoC and helping with the report.
-- {{ site.data.people.ThomasOrlita.credit }} for help with the writeup.
+- { site.data.people.AlesandroOrtiz.credit } for free server hosting for the PoC and helping with the report.
+- { site.data.people.ThomasOrlita.credit } for help with the writeup.
