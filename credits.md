@@ -6,7 +6,7 @@ layout: default
     {% for person in site.data.people %}
       <li>
         <h2>
-          {{ site.data.people[person].credit }} <a href="{{ site.data.people[person].social | relative_url }}">Social</a>
+          {{ person }}
         </h2>
       </li>
     {% endfor %}
