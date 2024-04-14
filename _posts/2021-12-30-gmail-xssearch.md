@@ -7,8 +7,7 @@ Duplicate and was done before Partitioned HTTP Cache was added.
 [(Cache Probing | XS-Leaks Wiki)](https://xsleaks.dev/docs/attacks/cache-probing/#fetch-with-abortcontroller)  
 Allowed leaking email content cross-site.
 
-
-# 1 Oct 25, 2020 11:21PM
+# Oct 25, 2020 11:21PM
 Created issue (on behalf of redacted).
 Summary: On a successful search on Gmail the `send_googblue_20dp.png` is cached which maybe exploited with timing attacks (XS-Search)
 
@@ -30,7 +29,7 @@ This probably would not be possible if the cache was not shared.
 Attack scenario:
 I think malicious javascript running on a different website could perform an XS-Search attack on someones Gmail account and search by letter to get email contents.
 Because mail.google.com would not allow iframes to be used window.open is used instead this maybe suspicious to the user but it could be done when the device is idle or using a popunder.
-# 2 Oct 25, 2020 11:21PM
+# Oct 25, 2020 11:21PM
 NOTE: This e-mail has been generated automatically.
 
 Thanks for your report.
@@ -48,7 +47,7 @@ Google Security Bot
 
 Follow us on Twitter!
 
-# 3 Oct 26, 2020 10:00PM
+# Oct 26, 2020 10:00PM
 Status: Duplicate of 1337
 Hello,
 
