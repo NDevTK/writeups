@@ -3,7 +3,8 @@ layout: default
 ---
 <div>
   <ul id="credits">
-    {% for person in site.data.people %}
+    {% for person_hash in site.data.people %}
+    {% assign person = person_hash[1] %}
       <li>
         <h2>
           {{ person.credit }}
