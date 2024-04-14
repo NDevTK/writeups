@@ -3,10 +3,10 @@ layout: default
 ---
 <div>
   <ul id="credits">
-    {% for data in site.data.people %}
+    {% for person in site.data.people %}
       <li>
         <h2>
-          {{ data.credit }} <a href="{{ data.social | relative_url }}">Social</a>
+          {{ site.data.people[person].credit }} <a href="{{ site.data.people[person].social | relative_url }}">Social</a>
         </h2>
       </li>
     {% endfor %}
