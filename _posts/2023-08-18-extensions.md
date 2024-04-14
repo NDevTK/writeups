@@ -729,9 +729,9 @@ The token for the payload was stored in chrome.storage.local so the user interac
 Leaks `slackWebhook`, `teamsWebhook`, `token` to a compromised renderer via `chrome.storage.local`
 
 # Credits :)
-- [Alesandro Ortiz](https://alesandroortiz.com/) for help with the Secure Shell report and finding the Limited URL Spoof.
-- [Thomas Orlita](https://websecblog.com/) for help with reports and the writeup.
-- [Missoum Said](https://missoumsaid.com/) for finding the "Save to Drive" SOP bypass, the "Tag Assistant Legacy" URL Leak, localhost XSS, Screenwise Meter bugs and Google Optimize UXSS.
+- {{ site.data.people.AlesandroOrtiz.credit }} for help with the Secure Shell report and finding the Limited URL Spoof.
+- {{ site.data.people.ThomasOrlita.credit }} for help with reports and the writeup.
+- {{ site.data.people.MissoumSaid.credit }} for finding the "Save to Drive" SOP bypass, the "Tag Assistant Legacy" URL Leak, localhost XSS, Screenwise Meter bugs and Google Optimize UXSS.
 
 # Dart Debug Extension (Out of scope)
 <https://github.com/dart-lang/webdev/issues/2287>
