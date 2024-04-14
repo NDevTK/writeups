@@ -6,7 +6,7 @@ layout: default
     {% for person in site.data.people %}
       <li>
         <h2>
-          {{ person }}
+          {{ person.credit }}
         </h2>
       </li>
     {% endfor %}
