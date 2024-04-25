@@ -671,7 +671,7 @@ No notification is shown when WireGuard is connected, but notification is shown 
 This was fixed by adding `frame-ancestors 'self';` to the extensions `content_security_policy`.
 <https://chromium-review.googlesource.com/c/apps/libapps/+/4603751>
 
-# Content injection / CSP-prevented XSS in the Secure Shell extension (Assigned, Inactive)
+# Content injection / CSP-prevented XSS in the Secure Shell extension (Fixed)
 **URL:** <https://chrome.google.com/webstore/detail/secure-shell/iodihamcpbpeioajjeobimgagajmlibd>
 
 1. Download secure shell extension via <https://chrome.google.com/webstore/detail/secure-shell/iodihamcpbpeioajjeobimgagajmlibd>
