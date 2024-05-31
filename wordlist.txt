@@ -48,6 +48,7 @@ Gerrit
 creds
 repo
 param
+XSRF
 params
 hostname
 NodeJS
@@ -56,10 +57,15 @@ aogarantiza
 certbot
 fullchain
 pem
+thats
 privkey
 auth
+ip
 DevTools
 CORS
+WONTFIX
+XSRF
+filepicker
 popunder
 CLs
 androidbuild
