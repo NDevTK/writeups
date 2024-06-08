@@ -28,7 +28,7 @@ layout: default
 <script>
   const themes = document.getElementById("themes");
   themes.onchange = () => {
-    localStorage.setItem('theme', x.value);
+    localStorage.setItem('theme', themes.value);
     setTheme(theme);
   }
   theme.value = theme;
