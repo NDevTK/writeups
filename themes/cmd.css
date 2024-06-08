@@ -1,0 +1,17 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+  font-family: Consolas, monaco, monospace;
+  background-color: black;
+  color: rgb(22,198,12);
+  font-size: 16px;
+  border: 0;
+  outline: none;
+}
+
+::selection {
+  background: white;
+}
