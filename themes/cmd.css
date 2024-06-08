@@ -12,10 +12,6 @@ body {
   outline: none;
 }
 
-::selection {
-  background: white;
-}
-
 .markdown-body .highlight pre, .markdown-body pre {
   background-color: white;
 }
