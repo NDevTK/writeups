@@ -27,10 +27,16 @@ layout: default
 
 <script>
   const themes = document.getElementById("themes");
+  
   themes.onchange = () => {
-    localStorage.setItem('theme', themes.value);
+    if (themes.value == '') {
+      localStorage.removeItem('theme');
+    } else {
+      localStorage.setItem('theme', themes.value);
+    }
     // Being lazy here
     location.reload();
   }
+  
   themes.value = theme;
 </script>
