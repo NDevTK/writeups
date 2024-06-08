@@ -9,6 +9,8 @@
 
   gtag('config', 'G-8XH56RQPPT');
 </script>
+
+<!-- Prerender posts -->
 <script type="speculationrules">
 {
   "prerender": [
@@ -26,4 +28,18 @@
     }
   ]
 }
+</script>
+
+<!-- Themes -->
+<script>
+  function setTheme(theme) {
+    if (!theme) return;
+    const stylesheet = document.createElement('link');
+    stylesheet.href = '/writeups/themes/' + encodeURIComponent(src);
+    stylesheet.rel = 'stylesheet';
+    document.head.appendChild(stylesheet);
+  }
+
+  const theme = localStorage.getItem('theme');
+  setTheme(theme);
 </script>
