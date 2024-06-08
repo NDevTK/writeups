@@ -35,7 +35,7 @@
   function setTheme(theme) {
     if (!theme) return;
     const stylesheet = document.createElement('link');
-    stylesheet.href = '/writeups/themes/' + encodeURIComponent(src);
+    stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
     stylesheet.rel = 'stylesheet';
     document.head.appendChild(stylesheet);
   }
