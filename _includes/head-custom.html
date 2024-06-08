@@ -40,6 +40,6 @@
     document.head.appendChild(stylesheet);
   }
 
-  const theme = localStorage.getItem('theme');
+  const theme = localStorage.getItem('theme') || '';
   setTheme(theme);
 </script>
