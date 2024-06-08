@@ -33,13 +33,13 @@
 <!-- Themes -->
 <script>
   function setTheme(theme) {
-    if (!theme) return;
+    if (theme === 'default') return;
     const stylesheet = document.createElement('link');
     stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
     stylesheet.rel = 'stylesheet';
     document.head.appendChild(stylesheet);
   }
 
-  const theme = localStorage.getItem('theme') || '';
+  const theme = localStorage.getItem('theme') || 'default';
   setTheme(theme);
 </script>
