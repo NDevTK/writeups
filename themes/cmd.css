@@ -15,3 +15,7 @@ body {
 ::selection {
   background: white;
 }
+
+.markdown-body .highlight pre, .markdown-body pre {
+  text-color: white;
+}
