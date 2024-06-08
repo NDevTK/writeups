@@ -1,4 +1,4 @@
-body {
+body:not(.highlight) {
   background-color: Canvas;
   color: CanvasText;
   color-scheme: light dark;
