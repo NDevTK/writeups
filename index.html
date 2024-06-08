@@ -19,14 +19,14 @@ layout: default
   <iframe src="https://discord.com/widget?id=904747277938225173&theme=dark" title="Discord invite widget" width="350" height="500" credentialless allowtransparency="true" frameborder="0" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"></iframe>
 </div>
 
-<label for="themes">Theme:</label>
-<select id="themes">
-  <option selected value="default">default</option>
-  <option value="dark.css">dark</option>
+<label for='themes'>Theme:</label>
+<select id='themes'>
+  <option selected value='default'>default</option>
+  <option value='dark.css'>dark</option>
 </select>
 
 <script>
-  const themes = document.getElementById("themes");
+  const themes = document.getElementById('themes');
   
   themes.onchange = () => {
     if (themes.value == 'default') {
