@@ -31,6 +31,8 @@ layout: default
   "use strict";
   const themes = document.getElementById('themes');
   
+  themes.value = theme;
+  
   themes.onchange = () => {
     if (themes.value == 'default') {
       localStorage.removeItem('theme');
@@ -40,6 +42,4 @@ layout: default
     // Being lazy here
     location.reload();
   }
-  
-  themes.value = theme;
 </script>
