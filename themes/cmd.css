@@ -1,14 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap');
-
 * {
     margin: 0;
     padding: 0;
 }
 
-body {
+body {   
+  font-family: Consolas, monaco, monospace;
   background-color: black;
   color: rgb(22,198,12);
-  font-family: "Zen Dots", sans-serif;
   font-size: 16px;
   border: 0;
   outline: none;
