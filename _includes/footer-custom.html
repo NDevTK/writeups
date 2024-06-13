@@ -1,4 +1,4 @@
-{% github_edit_link "Improve this page" %} 
+{% github_edit_link "Improve this page" %}
 <label for='themes'>Theme:</label>
 <select id='themes'>
   <option value='default'>default</option>
@@ -9,6 +9,7 @@
 </select>
 
 <a href="https://translate.google.com/translate?u={{ page.url | absolute_url }}">English</a>
+<a id="share">Share</a>
 
 <script>
   "use strict";
@@ -24,5 +25,10 @@
     }
     // Being lazy here
     location.reload();
+  }
+
+  const share = document.getElementById('share');
+  share.onclick = () => {
+    navigator.share({url: location.href})
   }
 </script>
