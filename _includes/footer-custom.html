@@ -9,7 +9,7 @@
 </select>
 
 <a href="https://translate.google.com/translate?u={{ page.url | absolute_url }}">English</a>
-<a id="share">Share</a>
+<a hidden id="share">Share</a>
 
 <script>
   "use strict";
@@ -28,6 +28,9 @@
   }
 
   const share = document.getElementById('share');
+  
+  if (navigator.share) share.hidden = false;
+  
   share.onclick = () => {
     navigator.share({url: location.href})
   }
