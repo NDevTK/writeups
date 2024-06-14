@@ -13,6 +13,7 @@
     location.reload();
   }
 
+  // Dont assume the user has javascript enabled.
   themes.disabled = false;
 
   const share = document.getElementById('share');
