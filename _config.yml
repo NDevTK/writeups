@@ -1,6 +1,6 @@
 title: Writeups
 baseurl: "/writeups"
-description: "Writeups for vulnerabilities affecting the web platform"
+description: "Vulnerabilities affecting the web platform"
 permalink: pretty
 url: "https://ndevtk.github.io"
 plugins:
