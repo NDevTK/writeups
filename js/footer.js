@@ -2,7 +2,7 @@
   const themes = document.getElementById('themes');
   
   themes.value = theme;
-  
+
   themes.onchange = () => {
     if (themes.value == 'default') {
       localStorage.removeItem('theme');
@@ -12,6 +12,8 @@
     // Being lazy here
     location.reload();
   }
+
+  themes.disabled = false;
 
   const share = document.getElementById('share');
   
