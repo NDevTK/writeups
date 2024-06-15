@@ -10,6 +10,7 @@
       localStorage.setItem('theme', themes.value);
     }
     // Being lazy here
+    reload.postMessage('');
     location.reload();
   }
 
