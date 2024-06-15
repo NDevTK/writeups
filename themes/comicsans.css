@@ -1,4 +1,4 @@
 /* If someone wants dark mode and comic sans then we panic I guess */
-html {
+* {
   font-family: "Comic Sans MS", sans-serif;
 }
