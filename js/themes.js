@@ -11,6 +11,6 @@
 
   const reload = new BroadcastChannel('reload');
   reload.onmessage = (event) => {
-    if (location.origin === event.origin) return;
+    if (location.origin !== event.origin) return;
     location.reload();
   }
