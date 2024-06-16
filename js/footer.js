@@ -18,9 +18,11 @@
   if (window.top == window) themes.disabled = false;
 
   const share = document.getElementById('share');
-  
-  if (navigator.share) share.disabled = false;
-  
   share.onclick = () => {
-    navigator.share({url: location.href})
+      if (navigator.share) {
+        navigator.share({url: location.href});
+      } else {
+        open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(location.href));
+      }
   }
+  share.disabled = false;
