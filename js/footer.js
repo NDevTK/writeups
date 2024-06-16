@@ -14,8 +14,8 @@
     location.reload();
   }
 
-  // Dont assume the user has javascript enabled.
-  themes.disabled = false;
+  // Dont assume the user has javascript enabled and no clickjacking.
+  if (window.top == window) themes.disabled = false;
 
   const share = document.getElementById('share');
   
