@@ -19,7 +19,7 @@
 
   const share = document.getElementById('share');
   
-  if (navigator.share) share.hidden = false;
+  if (navigator.share) share.disabled = false;
   
   share.onclick = () => {
     navigator.share({url: location.href})
