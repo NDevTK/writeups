@@ -26,3 +26,7 @@
       }
   }
   share.disabled = false;
+
+  const translate = document.getElementById('translate');
+  // Dont translate the google translate
+  if (location.origin.endsWith('.translate.goog')) translate.hidden = true;
