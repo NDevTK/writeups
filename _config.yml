@@ -5,3 +5,4 @@ permalink: pretty
 url: "https://ndevtk.github.io"
 plugins:
   - jekyll-feed
+  - jekyll-sitemap
