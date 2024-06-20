@@ -1,9 +1,9 @@
   "use strict";
   const theme = localStorage.getItem('theme') || 'default';
+  gtag('set', 'user_properties', { theme: theme });
 
   // default is handled without JS
   if (theme !== 'default') {
-    gtag('set', 'user_properties', { theme: theme });
     const stylesheet = document.createElement('link');
     stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
     stylesheet.rel = 'stylesheet';
