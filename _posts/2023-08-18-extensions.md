@@ -51,7 +51,7 @@ An attacker on the same network or a browser extension/XSS with any google subdo
 No "Mark Of The Web" is set. <https://textslashplain.com/2016/04/04/downloads-and-the-mark-of-the-web/>
 
 Fixed by changing `externally_connectable` to only `https://docs.google.com/*` and `https://drive.google.com/*` browser extensions with `<all_urls>` can still get an RCE with it. (WAI)  
-A demo to get RCE: [extension](https://ndevtk.github.io/writeups/RCE.zip) [video](https://drive.google.com/open?id=1ogX2Cs7NHdaFgtn3F48gqnmuQdqgn-yS&authuser=0)  
+A demo to get RCE: [extension](https://ndevtk.github.io/writeups/RCE.zip) [video](https://www.youtube.com/watch?v=BI-szRhjO3g)  
 This could be fixed by adding `https://*.google.com` to `runtime_blocked_hosts` <https://github.com/NDevTK/DomainProtect>
 
 # Perfetto UI leaks sensitive browser logs (Fixed, Awarded $5000)
