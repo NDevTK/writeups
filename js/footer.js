@@ -32,5 +32,5 @@
   if (location.origin.endsWith('.translate.goog')) translate.hidden = true;
 
  if (theme === 'base64.css') {
-  [...document.body.querySelectorAll('p, span, li')].forEach(e => { e.innerText = btoa(encodeURI(e.innerText)) });
+  [...document.body.querySelectorAll('p, a')].forEach(e => { e.innerText = btoa(encodeURI(e.innerText)) });
  }
