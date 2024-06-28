@@ -30,3 +30,8 @@
   const translate = document.getElementById('translate');
   // Dont translate the google translate
   if (location.origin.endsWith('.translate.goog')) translate.hidden = true;
+
+  // Auto reload the page every 30 minutes (Keep content up to date)
+  // This should keep the scroll position
+  const autoReload = 1000 * 60 * 30;
+  setInterval(location.reload, autoReload);
