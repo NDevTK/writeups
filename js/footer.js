@@ -22,7 +22,7 @@
       if (navigator.share) {
         navigator.share({url: location.href});
       } else {
-        open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(location.href));
+        open('https://x.com/intent/post?url=' + encodeURIComponent(location.href));
       }
   }
   share.disabled = false;
