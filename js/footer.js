@@ -17,16 +17,6 @@
   // Dont assume the user has javascript enabled and no clickjacking.
   if (window.top == window) themes.disabled = false;
 
-  const share = document.getElementById('share');
-  share.onclick = () => {
-      if (navigator.share) {
-        navigator.share({url: location.href});
-      } else {
-        open('https://x.com/intent/post?url=' + encodeURIComponent(location.href));
-      }
-  }
-  share.disabled = false;
-
   const translate = document.getElementById('translate');
   // Dont translate the google translate
   if (location.origin.endsWith('.translate.goog')) translate.hidden = true;
