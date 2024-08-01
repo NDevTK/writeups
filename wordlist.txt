@@ -10,6 +10,17 @@ DOMPurify
 iframe
 javascript
 sandboxed
+CCT
+firebase
+addtohomescreen
+OEM
+Ade
+URIs
+BROWSABLE
+DartPad
+dartpad
+gists
+Chii
 https
 bypassable
 http
@@ -17,6 +28,8 @@ googlesource
 crossOriginIsolated
 PoC
 UI
+idx
+IDX
 webview
 AutoFill
 UI
