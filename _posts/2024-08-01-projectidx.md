@@ -8,8 +8,8 @@ Feature being abused: <https://developers.google.com/idx/guides/debug-in-idx#chr
 Its based of the Chii open source project <https://github.com/liriliri/chii/commit/0002b761737f450fe070699b6fec284d6e1e91e9>
 
 - Create a project as simple html.  
-- Once loaded, Take the <ID> from an iframe in the format `https://9000-monospace-<ID>.cloudworkstations.dev` (In a real attack this could be leaked from the network)
-- Run the following from any website replacing <ID> with your own ID.
+- Once loaded, Take the `ID` from an iframe in the format `https://9000-monospace-<ID>.cloudworkstations.dev` (In a real attack this could be leaked from the network)
+- Run the following from any website replacing `ID` with your own ID.
 
 ```js
 // Vulnerable debugger proxy (Runs any js code you want, Fetch as the victims server)
