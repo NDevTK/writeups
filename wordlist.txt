@@ -7,6 +7,12 @@ sanitization
 src
 url
 DOMPurify
+APIs
+gRPC
+RPC
+luci
+AuthDB
+allowlist
 iframe
 javascript
 sandboxed
