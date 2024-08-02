@@ -92,7 +92,7 @@ This was fixed in <https://github.com/dart-lang/dart-pad/pull/2943> by enforcing
 ## Firebase Authentication Emulator XSS (localhost) Not fixed
 This is a local test environment for Firebase.
 
-<https://github.com/firebase/firebase-tools/blob/80964d04ee34b204116be6139e76ad96f427a06d/src/emula
-tor/auth/widget_ui.ts#L65>
+<https://github.com/firebase/firebase-tools/blob/80964d04ee34b204116be6139e76ad96f427a06d/src/emulator/auth/widget_ui.ts#L65>
+
 Navigates to a `javascript:` path provided in the `redirectUrl` URL parameter for example, `/emulator/auth/handler?apiKey=1&providerId=1&redirectUrl=javascript:alert(origin)&appName=1`
 Other emulator XSS, <https://github.com/firebase/firebase-tools/blob/96fe35f4a38736f16a183c76a53112a7b86b2487/src/emulator/functionsEmulator.ts#L1554-L1556>
