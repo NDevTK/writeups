@@ -2,7 +2,7 @@
 title: Chromium infra
 ---
 
-# LUCI AuthDB leak (Awarded $1000)
+# LUCI AuthDB leak (Fixed, Awarded $1000)
 
 LUCI is the CI (Continuous integration) infrastructure for the Chromium project.
 This database represents all data used when authorizing incoming requests and handling authentication related tasks: user groups, IP allow lists, OAuth client ID allowlist, etc.
