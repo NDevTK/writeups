@@ -23,7 +23,7 @@ fetch("https://defaultv2-dot-chrome-infra-auth.appspot.com/auth_service/api/v1/a
 });
 ```
 
-You should now be granted permission to luci-go AuthDB without being in the "auth-trusted-services" group needed as per https://pkg.go.dev/go.chromium.org/luci/server/auth/service#AuthService.RequestAccess
+You should now be granted permission to luci-go AuthDB without being in the "auth-trusted-services" group needed as per <https://pkg.go.dev/go.chromium.org/luci/server/auth/service#AuthService.RequestAccess>
 
 `{"topic":"projects/chrome-infra-auth/topics/auth-db-changed","authorized":true,"gs":{"auth_db_gs_path":"chrome-infra-auth.appspot.com/auth-db","authorized":true}}`
 
