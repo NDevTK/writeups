@@ -8,7 +8,7 @@ LUCI is the CI (Continuous integration) infrastructure for the Chromium project.
 This database represents all data used when authorizing incoming requests and handling authentication related tasks: user groups, IP allow lists, OAuth client ID allowlist, etc.
 
 - Login to this URL as any normal google user.
-https://accounts.google.com/o/oauth2/v2/auth?gsiwebsdk=3&client_id=446450136466-tmlcmovb9hnoh8rhs39846vmmd0rrsl0.apps.googleusercontent.com&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email&redirect_uri=https%3A%2F%2Fdefaultv2-dot-chrome-infra-auth.appspot.com%2Fauth%2Fopenid%2Fcallback&prompt=select_account&response_type=token&include_granted_scopes=false&enable_granular_consent=true
+<https://accounts.google.com/o/oauth2/v2/auth?gsiwebsdk=3&client_id=446450136466-tmlcmovb9hnoh8rhs39846vmmd0rrsl0.apps.googleusercontent.com&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email&redirect_uri=https%3A%2F%2Fdefaultv2-dot-chrome-infra-auth.appspot.com%2Fauth%2Fopenid%2Fcallback&prompt=select_account&response_type=token&include_granted_scopes=false&enable_granular_consent=true>
 
 - Copy the `access_token` value from the url hash.
 - On that same page, run the following
