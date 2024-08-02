@@ -4,7 +4,7 @@ title: idx.google.com XSS (Awarded $3133.70)
 
 This is a hosted development environment called Project IDX based on [Visual Studio Code](https://github.com/microsoft/vscode) like [Google Cloud Shell](https://cloud.google.com/shell/)
 
-Feature being abused: <https://developers.google.com/idx/guides/debug-in-idx#chrome-devtools>
+Feature being abused: <https://developers.google.com/idx/guides/debug-in-idx#chrome-devtools>  
 Its based of the Chii open source project <https://github.com/liriliri/chii/commit/0002b761737f450fe070699b6fec284d6e1e91e9>
 
 - Create a project as simple html.  
