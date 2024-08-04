@@ -46,7 +46,7 @@ w[2][0].postMessage({channel: "content", args: {options: {allowScripts: true}, c
 ```
 
 # Further research
-Cant tell if the `Missing Schema Check` is a valid concern since `parentOrigin` should contain the scheme, however hash collisions may be possible.
+Cant tell if the `Missing Schema Check` is a valid concern for CVE-2022-24526 since `parentOrigin` should contain the scheme, however hash collisions may be possible.
 <https://github.com/google/security-research/security/advisories/GHSA-h924-7cqw-j96h>
 
 # Embed users content from Google Cloud Shell in cross-site iframes (Fixed)
