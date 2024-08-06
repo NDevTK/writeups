@@ -8,7 +8,8 @@ No data is collected or shared by the extensions with the exception of "RCE PoC"
 
 # Writeups Privacy Policy
 This website may store Cookies and use Google Analytics <https://www.google.com/policies/privacy/partners/> because I would like to know what posts and themes need improving.  
-It also uses GitHub Pages <https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement> and Google Fonts <https://fonts.google.com/>.
+It also uses GitHub Pages <https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement> and Google Fonts <https://fonts.google.com/>.  
+If your wondering about the lack of Cookie banner, it went on holiday.
 
 # `ndev.tk` Privacy Policy
 The following services are in use `cdn.jsdelivr.net`, Cloudflare, GitHub pages, Google embed.
