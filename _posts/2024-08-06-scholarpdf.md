@@ -1,7 +1,7 @@
 ---
 title: SOP bypass in Google Scholar PDF Reader (Fixed)
 ---
-Google Scholar PDF Reader is apparently not an official Google app so was not awarded :( 
+Google Scholar PDF Reader is apparently not an official Google app so was not awarded :(  
 Webstore: <https://chromewebstore.google.com/detail/google-scholar-pdf-reader/dahenjhkoodjbpjheillcadbppiidmhp>  
 
 # Leak 1 (With compromised renderer)
