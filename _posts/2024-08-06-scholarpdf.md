@@ -55,7 +55,7 @@ f.contentWindow[0].postMessage({type: 'getSelectedText'}, '*');
 ```
 
 # Attack scenario
-An attacker controlled website can bypass SOP if one of the follow is met:
+An attacker controlled website can bypass SOP if one of the following is met:
 
 - Attacker wants JSON data and has a compromised renderer bug
 - Attacker wants data from a origin that contains a PDF which allows embedding
