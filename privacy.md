@@ -12,7 +12,7 @@ It also uses GitHub Pages <https://docs.github.com/en/site-policy/privacy-polici
 If your wondering about the lack of Cookie banner, it went on holiday.
 
 # `ndev.tk` Privacy Policy
-The following services are in use `cdn.jsdelivr.net`, Cloudflare, GitHub pages, Google embed.
-
+The following services are in use `cdn.jsdelivr.net`, Cloudflare, GitHub pages, Google embed.  
+Sometimes data is stored in localStorage for website functionality.
 # Contact Information
 Site owner: [ndevtk@protonmail.com](mailto:ndevtk@protonmail.com)
