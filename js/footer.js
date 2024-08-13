@@ -8,7 +8,7 @@
       localStorage.removeItem('theme');
     } else {
       // Consent!
-      if (confirm('Do you allow this theme to be saved to localStorage?')) localStorage.setItem('theme', themes.value);
+      if (confirm('Allow this theme to be saved to localStorage?')) localStorage.setItem('theme', themes.value);
     }
     // Being lazy here
     reload.postMessage('');
