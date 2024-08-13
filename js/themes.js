@@ -1,5 +1,7 @@
   "use strict";
 
+  const theme = localStorage.getItem('theme') || 'default';
+
   // default is handled without JS
   if (theme !== 'default') {
     const stylesheet = document.createElement('link');
