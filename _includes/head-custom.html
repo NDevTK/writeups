@@ -6,6 +6,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <base target="_top" />
 
+<script>
+  if (localStorage.getItem('optout')) {
+    gtag('consent', 'default', {
+      'ad_storage': 'denied',
+      'ad_user_data': 'denied',
+      'ad_personalization': 'denied',
+      'analytics_storage': 'denied'
+    });
+  }
+</script>
+
 <!-- Google tag (gtag.js) -->
 <script defer src="https://www.googletagmanager.com/gtag/js?id=G-8XH56RQPPT"></script>
 <script defer>
