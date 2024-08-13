@@ -7,7 +7,8 @@
     if (themes.value == 'default') {
       localStorage.removeItem('theme');
     } else {
-      localStorage.setItem('theme', themes.value);
+      // Consent!
+      if (confirm('Do you allow this theme to be saved to localStorage?')) localStorage.setItem('theme', themes.value);
     }
     // Being lazy here
     reload.postMessage('');
