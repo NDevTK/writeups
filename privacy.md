@@ -14,5 +14,20 @@ If your wondering about the lack of Cookie banner, it went on holiday.
 # `ndev.tk` Privacy Policy
 The following services are in use `cdn.jsdelivr.net`, Cloudflare, GitHub pages, Google embed.  
 Sometimes data is stored in localStorage for website functionality.
+
+# Opt-out of Google Analytics for the listed sites.
+<button id="state">Opted-in</button>
+<script>
+  state.onclick = () => {
+    if (state.innerText === 'Opted-in') {
+      localStorage.setItem('optout', true);
+      state.innerText = 'Opted-out';
+    } else {
+      localStorage.removeItem('optout');
+      state.innerText = 'Opted-in';
+    }
+  }
+</script>
+
 # Contact Information
 Site owner: [ndevtk@protonmail.com](mailto:ndevtk@protonmail.com)
