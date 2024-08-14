@@ -2,5 +2,8 @@
 title: Partitioned HTTP Cache Bypass (Not fixed)
 ---
 
-Does not use the initiator, treating it as a bug until someone complains. [(Navigations | XS-Leaks Wiki)](https://xsleaks.dev/docs/attacks/navigations/#partitioned-http-cache-bypass)  
-This allows a cache based XS-Search on websites when same-site resources are used based on the search query controlled by the attacker.
+Since browser cache is keyed by window location its still possible to do a cache probing attack by timing navigation.  
+It does not matter if the navigation initiator is cross-site. [(Navigations | XS-Leaks Wiki)](https://xsleaks.dev/docs/attacks/navigations/#partitioned-http-cache-bypass)  
+This allows a cache based XS-Search on websites when same-site resources are used based on the search query controlled by the attacker.  
+
+My cache probing tool can be found at <https://sites.google.com/view/xsleaks>
