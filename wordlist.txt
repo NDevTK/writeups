@@ -5,6 +5,7 @@ HTTPLeaks
 SVG
 sanitization
 src
+UAC
 url
 DOMPurify
 APIs
