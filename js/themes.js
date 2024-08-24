@@ -15,3 +15,8 @@
     if (location.origin !== event.origin) return;
     location.reload();
   }
+  
+  onkeyup = (e) => {
+    if (e.key === 'ArrowLeft' ) history.back();
+    if (e.key === 'ArrowRight' ) history.forward();
+  }
