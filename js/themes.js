@@ -1,10 +1,14 @@
   "use strict";
 
-  try {
-    const theme = localStorage.getItem('theme') || 'default';
-  } catch {
-    const theme = 'default';
-  }
+	function getTheme() {
+		try {
+			return localStorage.getItem('theme') || 'default';
+		} catch {
+			return 'default';
+		}
+	}
+
+  const theme = getTheme();
 
   // default is handled without JS
   if (theme !== 'default') {
@@ -24,3 +28,4 @@
     if (e.key === 'ArrowLeft' ) history.back();
     if (e.key === 'ArrowRight' ) history.forward();
   }
+
