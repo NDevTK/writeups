@@ -3,8 +3,12 @@
   
   themes.value = theme;
 
+  if (themes.value === '') {
+    alert('The ' + theme + " theme doesn't exist, maybe file a bug :)");
+  }
+
   themes.onchange = () => {
-    if (themes.value == 'default') {
+    if (themes.value == 'default' || themes.value == '') {
       localStorage.removeItem('theme');
     } else {
       // Consent!
