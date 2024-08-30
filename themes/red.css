@@ -7,3 +7,7 @@ body {
 a {
   color: blue
 }
+
+.markdown-body {
+    backdrop-filter: blur(50rem);
+}
