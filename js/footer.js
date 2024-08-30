@@ -5,10 +5,12 @@
 
   if (themes.value === '') {
     alert('The ' + theme + " theme doesn't exist, maybe file a bug :)");
+    localStorage.removeItem('theme');
+    location.reload();
   }
 
   themes.onchange = () => {
-    if (themes.value == 'default' || themes.value == '') {
+    if (themes.value == 'default') {
       localStorage.removeItem('theme');
     } else {
       // Consent!
