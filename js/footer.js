@@ -6,7 +6,7 @@
   if (themes.value === '') {
     alert('The ' + theme + " theme doesn't exist, maybe file a bug :)");
     localStorage.removeItem('theme');
-    location.reload();
+    reloadAll();
   }
 
   themes.onchange = () => {
@@ -16,9 +16,7 @@
       // Consent!
       if (confirm('Allow theme to be saved to localStorage?')) localStorage.setItem('theme', themes.value);
     }
-    // Being lazy here
-    reload.postMessage('');
-    location.reload();
+    reloadAll();
   }
 
   // Dont assume the user has javascript enabled and no clickjacking.
@@ -27,3 +25,8 @@
  if (theme === 'base64.css') {
   [...document.body.querySelectorAll('p, a')].forEach(e => { e.innerText = btoa(encodeURI(e.innerText)) });
  }
+
+function reloadAll() {
+  reload.postMessage('');
+  location.reload();
+}
