@@ -15,7 +15,7 @@ jobs:
     - name: Prettier
       run: |
         npx prettier . --write --single-quote --no-bracket-spacing --bracket-same-line
-    - name: Commit and push changes
+    - name: Prettier submit
       continue-on-error: true
       run: |
         git config --global user.name "Prettier Bot"
