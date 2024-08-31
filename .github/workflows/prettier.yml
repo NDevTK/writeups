@@ -1,4 +1,4 @@
-name: Prettier action
+name: Prettier
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
       contents: write
     steps:
     - uses: actions/checkout@v4
-    - name: Format
+    - name: Prettier
       run: |
         npx prettier . --write --single-quote --no-bracket-spacing --bracket-same-line
     - name: Commit and push changes
