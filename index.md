@@ -1,6 +1,7 @@
 ---
 layout: default
 ---
+
 <div>
   <ul id="postLinks">
     {% for post in site.posts %}

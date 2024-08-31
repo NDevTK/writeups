@@ -6,8 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
 {% seo %}
-    <link rel="stylesheet" href="{{ "/assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
-    {% include head-custom.html %}
+<link rel="stylesheet" href="{{ "/assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
+{% include head-custom.html %}
+
   </head>
   <body>
     <div class="container-lg px-3 my-5 markdown-body">
@@ -21,5 +22,6 @@
         {% include footer-custom.html %}
       </div>
     </div>
+
   </body>
 </html>

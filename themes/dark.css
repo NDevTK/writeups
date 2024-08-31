@@ -4,7 +4,8 @@ body {
   color-scheme: light dark;
 }
 
-.markdown-body .highlight pre, .markdown-body pre {
+.markdown-body .highlight pre,
+.markdown-body pre {
   background-color: white;
   color: black;
 }

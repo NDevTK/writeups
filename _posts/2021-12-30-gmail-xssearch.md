@@ -8,13 +8,15 @@ title: Gmail XS-Search (Fixed, I hope)
 Allowed leaking email content cross-site.
 
 # Oct 25, 2020 11:21PM
+
 Created issue (on behalf of redacted).
 Summary: On a successful search on Gmail the `send_googblue_20dp.png` is cached which maybe exploited with timing attacks (XS-Search)
 
 Proof of concept: https://drive.google.com/file/d/redacted
 Steps to reproduce:
-  1. Run javascript in proof of concept
-  2. It can then be tested by using `checkContent("Google", send2x).then(console.log)` it should return true/false depending on the result of the search
+
+1. Run javascript in proof of concept
+2. It can then be tested by using `checkContent("Google", send2x).then(console.log)` it should return true/false depending on the result of the search
 
 It maybe send1x depending on the image used by Gmail.
 
@@ -29,7 +31,9 @@ This probably would not be possible if the cache was not shared.
 Attack scenario:
 I think malicious javascript running on a different website could perform an XS-Search attack on someones Gmail account and search by letter to get email contents.
 Because mail.google.com would not allow iframes to be used window.open is used instead this maybe suspicious to the user but it could be done when the device is idle or using a popunder.
+
 # Oct 25, 2020 11:21PM
+
 NOTE: This e-mail has been generated automatically.
 
 Thanks for your report.
@@ -48,14 +52,15 @@ Google Security Bot
 Follow us on Twitter!
 
 # Oct 26, 2020 10:00PM
+
 Status: Duplicate of 1337
 Hello,
 
 We have identified this issue to be in a family of XS-Search attacks. In order to fix this kind of issues, we are now considering larger scale changes to the behavior of our products. We are doing this in a few ways:
 
- - We are currently auditing which search endpoints exist in our web services that need to be protected against.
- - We are experimenting with different defenses that don't break existing user functionality but also are effective.
- - We are working with web browsers to find ways that the web platform can help defend against these attacks.
+- We are currently auditing which search endpoints exist in our web services that need to be protected against.
+- We are experimenting with different defenses that don't break existing user functionality but also are effective.
+- We are working with web browsers to find ways that the web platform can help defend against these attacks.
 
 As all this work is already undergoing, for now we consider vulnerability reports in this area to be duplicates, unless they significantly change our understanding of our defenses and mitigations. See https://sites.google.com/site/bughunteruniversity/nonvuln/xsleaks for a more comprehensive description.
 

@@ -2,22 +2,25 @@
 title: Google Issue Tracker leak (Fixed)
 ---
 
-Google Issue Tracker/Buganizer is hosted on multiple domains such as `issues.skia.org`, `issues.pigweed.dev`, `issues.gerritcodereview.com`, `git.issues.gerritcodereview.com`,  `issuetracker.google.com`, `issues.fuchsia.dev`, `issues.chromium.org` and one tracker can read issues from a different one like `fetch('https://issues.skia.org/action/issues/<ISSUE ID>/events');`
+Google Issue Tracker/Buganizer is hosted on multiple domains such as `issues.skia.org`, `issues.pigweed.dev`, `issues.gerritcodereview.com`, `git.issues.gerritcodereview.com`, `issuetracker.google.com`, `issues.fuchsia.dev`, `issues.chromium.org` and one tracker can read issues from a different one like `fetch('https://issues.skia.org/action/issues/<ISSUE ID>/events');`
 
 ```js
-for (let i=0; i < 1337; i++) {
-  fetch('https://issuetracker.google.com/action/trackers/' + i).then(async issue => {
-    let result = await issue.text();
-    if (result.includes('b.Tracker')) console.log(result);
-  });
+for (let i = 0; i < 1337; i++) {
+  fetch("https://issuetracker.google.com/action/trackers/" + i).then(
+    async (issue) => {
+      let result = await issue.text();
+      if (result.includes("b.Tracker")) console.log(result);
+    },
+  );
 }
 ```
 
 An intentional embeddable XSS existed at `jsfiddle.skia.org` that is cross-origin but same-site as somewhere the issue tracker is hosted hence bypassing site/process isolation protections.
 
 This means:
+
 - CPU bugs like Meltdown/Spectre or a compromised renderer can read the contents of private google issues of the logged in user, bypassing the `Cross-Origin-Resource-Policy: same-site` header and Cross-Origin Read Blocking.
-- Can modify and send `document.cookie` as first party, but not read the `HttpOnly` cookies directly, allowing Login CSRF since no  [__Host-](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#__host-) cookie prefix is used only [__Secure-](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#__secure-) that protects from local network attackers.
+- Can modify and send `document.cookie` as first party, but not read the `HttpOnly` cookies directly, allowing Login CSRF since no [\_\_Host-](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#__host-) cookie prefix is used only [\_\_Secure-](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#__secure-) that protects from local network attackers.
 - No more cache partitioning for `skia.org`
 
 While there may be other ways to bypass site isolation like an attacker controlled image, video or postMessage on the victim site allowing JS execution significantly increases the attack surface for renderer bugs. <https://www.chromium.org/Home/chromium-security/strict-origin-isolation-trial>
