@@ -18,7 +18,7 @@ Getting an error was simple as doing `/?search=&` and because `window.location` 
 ```js
 b.innerHTML = b.innerHTML.replace(
   /({query})/g,
-  "<a href='" + window.location + "'>" + a.g + "</a>",
+  "<a href='" + window.location + "'>" + a.g + '</a>',
 );
 ```
 

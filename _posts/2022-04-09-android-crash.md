@@ -22,9 +22,9 @@ I have also had issues where the address bar or a different website in the case 
     let v = null;
     setInterval(() => {
       if (v) document.body.removeChild(v);
-      v = document.createElement("video");
-      v.width = "1000";
-      v.src = "video.mp4";
+      v = document.createElement('video');
+      v.width = '1000';
+      v.src = 'video.mp4';
       document.body.appendChild(v);
     }, 2000);
   }

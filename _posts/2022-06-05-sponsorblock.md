@@ -13,8 +13,8 @@ The ability to use a iframe was unknown there was no embedding protection and it
 This meant the persons user id was exposed to YouTube and the popup controls such as the ability to turn off sponsor skipping could be clickjacked.
 
 ```js
-let frame = document.createElement("iframe");
-frame.src = "chrome-extension://mnjggcdmjocbbbhaepdhchncahnbgone/popup.html";
+let frame = document.createElement('iframe');
+frame.src = 'chrome-extension://mnjggcdmjocbbbhaepdhchncahnbgone/popup.html';
 document.body.appendChild(frame);
 ```
 

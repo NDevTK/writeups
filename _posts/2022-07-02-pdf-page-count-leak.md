@@ -7,10 +7,10 @@ By sending a message to the viewer with the type of `getThumbnail` and a page nu
 
 ```js
 let w = open(
-  "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+  'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
 );
 setTimeout(
-  (_) => w[0].postMessage({ type: "getThumbnail", page: "1337" }, "*"),
+  (_) => w[0].postMessage({type: 'getThumbnail', page: '1337'}, '*'),
   1000,
 );
 ```

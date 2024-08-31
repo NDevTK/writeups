@@ -1,8 +1,8 @@
 title: Writeups
-baseurl: "/writeups"
-description: "Vulnerabilities affecting the web platform"
+baseurl: '/writeups'
+description: 'Vulnerabilities affecting the web platform'
 permalink: pretty
-url: "https://ndevtk.github.io"
+url: 'https://ndevtk.github.io'
 plugins:
   - jekyll-feed
   - jekyll-sitemap

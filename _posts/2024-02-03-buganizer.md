@@ -6,10 +6,10 @@ Google Issue Tracker/Buganizer is hosted on multiple domains such as `issues.ski
 
 ```js
 for (let i = 0; i < 1337; i++) {
-  fetch("https://issuetracker.google.com/action/trackers/" + i).then(
+  fetch('https://issuetracker.google.com/action/trackers/' + i).then(
     async (issue) => {
       let result = await issue.text();
-      if (result.includes("b.Tracker")) console.log(result);
+      if (result.includes('b.Tracker')) console.log(result);
     },
   );
 }

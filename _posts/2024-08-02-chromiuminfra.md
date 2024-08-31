@@ -15,14 +15,14 @@ This database represents all data used when authorizing incoming requests and ha
 
 ```js
 fetch(
-  "https://defaultv2-dot-chrome-infra-auth.appspot.com/auth_service/api/v1/authdb/subscription/authorization?x=/auth_service/api/v1/importer/ingest_tarball/",
+  'https://defaultv2-dot-chrome-infra-auth.appspot.com/auth_service/api/v1/authdb/subscription/authorization?x=/auth_service/api/v1/importer/ingest_tarball/',
   {
     headers: {
-      authorization: "Bearer <token goes here>",
+      authorization: 'Bearer <token goes here>',
     },
-    referrerPolicy: "strict-origin-when-cross-origin",
-    method: "POST",
-    mode: "cors",
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    method: 'POST',
+    mode: 'cors',
   },
 );
 ```
@@ -35,14 +35,14 @@ You can also use the API to download the DB.
 
 ```js
 fetch(
-  "https://defaultv2-dot-chrome-infra-auth.appspot.com/auth_service/api/v2/authdb/revisions/latest?x=/auth_service/api/v1/importer/ingest_tarball/",
+  'https://defaultv2-dot-chrome-infra-auth.appspot.com/auth_service/api/v2/authdb/revisions/latest?x=/auth_service/api/v1/importer/ingest_tarball/',
   {
     headers: {
-      authorization: "Bearer <token>",
+      authorization: 'Bearer <token>',
     },
-    referrerPolicy: "strict-origin-when-cross-origin",
-    method: "GET",
-    mode: "cors",
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    method: 'GET',
+    mode: 'cors',
   },
 );
 ```

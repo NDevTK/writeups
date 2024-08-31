@@ -11,7 +11,7 @@ UPDATE: As part of <https://bugs.chromium.org/p/chromium/issues/detail?id=126915
 chrome.tabs.update(
   ID,
   {
-    url: "chrome-untrusted://new-tab-page/custom_background_image?url=https://a.a&size=%3C/style%3E%3Cscript%3Ealert(1)%3C/script%3E",
+    url: 'chrome-untrusted://new-tab-page/custom_background_image?url=https://a.a&size=%3C/style%3E%3Cscript%3Ealert(1)%3C/script%3E',
   },
   console.log,
 );

