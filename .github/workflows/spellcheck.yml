@@ -2,7 +2,7 @@ name: Spellcheck Action
 
 on:
   workflow_run:
-    workflows: [Prettier]
+    workflows: ["Prettier submit"]
 
 jobs:
   build:
