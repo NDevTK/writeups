@@ -1,10 +1,14 @@
 body {
   background-image: url('/writeups/mc.png');
   background-size: cover;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(20px);
   color: white;
 }
 
-code {
+.highlight {
   color: black;
+}
+
+a {
+  color: lightgreen;
 }
