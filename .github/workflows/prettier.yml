@@ -1,0 +1,26 @@
+name: Prettier action
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+jobs:
+  build:
+    name: Sync
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    - name: Download
+      run: |
+        npx prettier . --write
+    - name: Commit and push changes
+      continue-on-error: true
+      run: |
+        git config --global user.name "Prettier Bot"
+        git config --global user.email "sync@corp.google.com"
+
+        git add -A
+        git commit -m "Prettier"
+        git push origin main
