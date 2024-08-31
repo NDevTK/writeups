@@ -10,7 +10,7 @@ for (let i = 0; i < 1337; i++) {
     async (issue) => {
       let result = await issue.text();
       if (result.includes('b.Tracker')) console.log(result);
-    },
+    }
   );
 }
 ```

@@ -16,7 +16,7 @@ x.postMessage({
   type: 'fetch',
   method: 'GET',
   url: 'https://www.google.com/something.json',
-  id: 1,
+  id: 1
 });
 x.onMessage.addListener(console.log);
 ```
@@ -45,7 +45,7 @@ onmessage = async (e) => {
 };
 parent.parent.postMessage(
   {type: 'fetch', url: 'https://services.google.com/example'},
-  '*',
+  '*'
 );
 ```
 

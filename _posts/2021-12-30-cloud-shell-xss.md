@@ -12,8 +12,8 @@ window.parent.postMessage({
   target: 'ID from URL of webview',
   channel: 'onmessage',
   data: {
-    type: 'LOG_IN',
-  },
+    type: 'LOG_IN'
+  }
 }); // Childs are trusted just rename “channel” to “command” and remove “target”.
 ```
 
@@ -29,8 +29,8 @@ window.parent.postMessage({
   channel: 'onmessage',
   data: {
     text: "echo ':)'",
-    type: 'RUN_IN_TERMINAL',
-  },
+    type: 'RUN_IN_TERMINAL'
+  }
 });
 ```
 
@@ -53,10 +53,10 @@ w[2][0].postMessage(
     channel: 'content',
     args: {
       options: {allowScripts: true},
-      contents: '<script>document.write(document.domain)</script>',
-    },
+      contents: '<script>document.write(document.domain)</script>'
+    }
   },
-  '*',
+  '*'
 );
 ```
 

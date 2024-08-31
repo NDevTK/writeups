@@ -84,9 +84,9 @@ onclick = () => {
     frame.contentWindow.postMessage(
       {
         command: 'execute',
-        js: payload,
+        js: payload
       },
-      '*',
+      '*'
     );
   };
 };

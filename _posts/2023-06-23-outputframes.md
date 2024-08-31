@@ -26,7 +26,7 @@ document.body.appendChild(f);
 setTimeout((_) => {
   f.contentWindow.postMessage(
     {sandboxed_iframe_evaluation: 'console.log(parent.opener[0].google)'},
-    '*',
+    '*'
   );
 }, 100);
 ```

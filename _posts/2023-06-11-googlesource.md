@@ -32,14 +32,14 @@ function Z1(a) {
       host: f[2],
       project: f[6],
       branch: f[7],
-      file: f[8],
+      file: f[8]
     };
   if (d)
     return {
       host: d[2],
       project: d[6],
       branch: d[9],
-      file: d[10],
+      file: d[10]
     };
   throw Error('Unable to parse change pieces.');
 }
@@ -81,81 +81,81 @@ const app = (req, res) => {
         mode: 33188,
         type: 'blob',
         id: '54c90ede642a93580a98eb4ed6e821749b04a989',
-        name: '.gitignore',
+        name: '.gitignore'
       },
       {
         mode: 33188,
         type: 'blob',
         id: 'daebd5231a3ec9aafd58e6f4075f3b63e4c3bd53',
-        name: 'Changes.md',
+        name: 'Changes.md'
       },
       {
         mode: 33188,
         type: 'blob',
         id: '957da92f63926bf6013845f0ff0602d1f1620e0a',
-        name: 'CleanSpec.mk',
+        name: 'CleanSpec.mk'
       },
       {
         mode: 33188,
         type: 'blob',
         id: '74b54fadd522b739407d7d71b4ea3503fc666aeb',
-        name: 'Deprecation.md',
+        name: 'Deprecation.md'
       },
       {
         mode: 33188,
         type: 'blob',
         id: '44781a70880412fdd9007cc2bec16a4b09924c6d',
-        name: 'METADATA',
+        name: 'METADATA'
       },
       {
         mode: 33188,
         type: 'blob',
         id: '97fda40f7b2006ae5f6bc895a4a1d602ceb991c6',
-        name: 'OWNERS',
+        name: 'OWNERS'
       },
       {
         mode: 33188,
         type: 'blob',
         id: 'ce7515044e84d15868077c0a8319fc401442fc4d',
-        name: 'PREUPLOAD.cfg',
+        name: 'PREUPLOAD.cfg'
       },
       {
         mode: 33188,
         type: 'blob',
         id: '47809a95ac45ec11840166adac5eb31d3ed9c788',
-        name: 'README.md',
+        name: 'README.md'
       },
       {
         mode: 33188,
         type: 'blob',
         id: 'ea4788a1bc26b698697f9a1499cd2164e0d03d3d',
-        name: 'Usage.txt',
+        name: 'Usage.txt'
       },
       {
         mode: 33188,
         type: 'blob',
         id: 'b31578a29b5c64e4fa690b8f4062e045ba01185a',
-        name: 'buildspec.mk.default',
+        name: 'buildspec.mk.default'
       },
       {
         mode: 16384,
         type: 'tree',
         id: '9a970257168359bda2226ac81dd945e41a3db224',
-        name: 'common',
+        name: 'common'
       },
       {
         mode: 33188,
         type: 'blob',
         id: '004788a1bc26b698697f9a1499cd2164e0d03d3d',
-        name: 'HELLO_FROM_AO.txt',
+        name: 'HELLO_FROM_AO.txt'
       },
       {
         mode: 33188,
         type: 'blob', // Type param will be injected as CSS class in an element, but this is of limited use
         id: '00970257168359bda2226ac81dd945e41a3db224',
-        name: 'HELLO_FROM_AO_SERVER', // Will be added as text
-      },
-    ],
+        name: 'HELLO_FROM_AO_SERVER' // Will be added as text
+      }
+    ]
   };
 
   const query = url.parse(req.url, true).query;
@@ -184,8 +184,8 @@ const app = (req, res) => {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
-      'Content-Length': payload.length,
-    },
+      'Content-Length': payload.length
+    }
   };
 
   const api = https.request(options, (response) => {});
@@ -197,9 +197,9 @@ https
   .createServer(
     {
       key: fs.readFileSync('privkey.pem'),
-      cert: fs.readFileSync('fullchain.pem'),
+      cert: fs.readFileSync('fullchain.pem')
     },
-    app,
+    app
   )
   .listen(port, () => {
     console.log(`Server running on port ${port}`);
