@@ -1,8 +1,8 @@
 body {
- background-image: url('/writeups/mc.png');
- background-size: cover;
- backdrop-filter: blur(10px); 
- color: white;
+  background-image: url('/writeups/mc.png');
+  background-size: cover;
+  backdrop-filter: blur(10px);
+  color: white;
 }
 
 .language-js {
