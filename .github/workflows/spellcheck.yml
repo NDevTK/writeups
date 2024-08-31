@@ -2,8 +2,8 @@ name: Spellcheck Action
 
 on:
   workflow_run:
-    workflows: ["Prettier action"]
-      
+    workflows: [Prettier]
+
 jobs:
   build:
     name: Spellcheck
