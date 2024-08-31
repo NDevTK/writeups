@@ -13,11 +13,14 @@ seo
 gRPC
 RPC
 luci
+RSS
 AuthDB
 allowlist
 iframe
 javascript
 sandboxed
+endfor
+endif
 CCT
 firebase
 addtohomescreen
