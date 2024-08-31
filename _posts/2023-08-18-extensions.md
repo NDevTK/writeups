@@ -381,8 +381,7 @@ Steps to reproduce:
 
 ```html
 <body
-  longdesc="chrome-extension://iodihamcpbpeioajjeobimgagajmlibd/plugin/mosh/mosh_window.html"
->
+  longdesc="chrome-extension://iodihamcpbpeioajjeobimgagajmlibd/plugin/mosh/mosh_window.html">
   <h1 style="pointer-events: none;">
     Right click and select "Open Long Description In New Tab"
   </h1>
