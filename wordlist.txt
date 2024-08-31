@@ -9,6 +9,7 @@ UAC
 url
 DOMPurify
 APIs
+seo
 gRPC
 RPC
 luci
