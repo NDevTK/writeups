@@ -3,6 +3,8 @@ name: Spellcheck Action
 on:
   workflow_run:
     workflows: ["Prettier"]
+    types:
+      - completed
 
 jobs:
   build:
