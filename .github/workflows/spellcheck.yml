@@ -1,6 +1,11 @@
 name: Spellcheck Action
-on: push
 
+on:
+  workflow_run:
+    workflows: ["Prettier action"]
+    types:
+      - completed
+      
 jobs:
   build:
     name: Spellcheck
