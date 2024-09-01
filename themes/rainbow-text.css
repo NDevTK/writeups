@@ -1,6 +1,17 @@
-p, li, h1 {
+p,
+li,
+h1 {
   /* https://www.metoffice.gov.uk/weather/learn-about/weather/optical-effects/rainbows/colours-of-the-rainbow */
-  background-image: linear-gradient(to left, red, orange, yellow, green, blue, indigo, violet);
+  background-image: linear-gradient(
+    to left,
+    red,
+    orange,
+    yellow,
+    green,
+    blue,
+    indigo,
+    violet
+  );
   filter: brightness(90%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
