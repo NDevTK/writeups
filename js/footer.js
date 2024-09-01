@@ -14,7 +14,9 @@ themes.onchange = () => {
     localStorage.removeItem('theme');
   } else {
     if (themes.value == 'random') {
-      const allowedThemes = [...themes.options].filter((e) => { return e.value != 'random' && e.value != theme});
+      const allowedThemes = [...themes.options].filter((e) => {
+        return e.value != 'random' && e.value != theme;
+      });
       themes.value =
         allowedThemes[Math.floor(Math.random() * themes.options.length)].value;
     }
