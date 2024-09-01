@@ -1,6 +1,8 @@
 p,
 li,
-h1 {
+h1,
+h2,
+h3 {
   /* https://www.metoffice.gov.uk/weather/learn-about/weather/optical-effects/rainbows/colours-of-the-rainbow */
   background-image: linear-gradient(
     to left,
