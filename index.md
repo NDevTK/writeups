@@ -13,5 +13,5 @@ layout: default
     {% endfor %}
   </ul>
   
-  <p1><a href="{{ "/feed.xml" | relative_url }}">RSS</a> / <a href="https://issues.chromium.org/issues?q=reporter:(ndevtk@protonmail.com)">Chromium</a> / <a href="https://ndevtk.github.io/writeups/credits/">Credits</a> / <a href="https://x.com/ndevtk">X</a> / <a href="https://discord.gg/AUJjpZHFbP">Discord</a> / <a href="https://www.youtube.com/@NDevTK">YouTube</a> / <a href="https://ndevtk.github.io/writeups/privacy/">Privacy</a> / <a href="https://ndevtk.github.io/writeups/privacy/">GitHub</a> / <a href="https://ndev.tk/">ndev.tk</a></p1><br>
+  <p1><a href="{{ "/feed.xml" | relative_url }}">RSS</a> / [Chromium](https://issues.chromium.org/issues?q=reporter:(ndevtk@protonmail.com)) / [Credits](https://ndevtk.github.io/writeups/credits/) / [X](https://x.com/ndevtk) / [Discord](https://discord.gg/AUJjpZHFbP) / [YouTube](https://www.youtube.com/@NDevTK) / [Privacy](https://ndevtk.github.io/writeups/privacy/) / [GitHub](https://ndevtk.github.io/writeups/privacy/) / [ndev.tk](https://ndev.tk/)</p1><br>
 </div>
