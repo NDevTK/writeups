@@ -18,7 +18,7 @@ themes.onchange = () => {
         return e.value != themes.value && e.value != theme;
       });
       themes.value =
-        allowedThemes[Math.floor(Math.random() * themes.options.length)].value;
+        allowedThemes[Math.floor(Math.random() * allowedThemes.length)].value;
     }
     if (themes.value == 'mc.css') {
       // https://www.minecraft.net/en-us/usage-guidelines
