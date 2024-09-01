@@ -1,7 +1,7 @@
 body {
   background-image: url('/writeups/mc.webp');
   background-size: cover;
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(10px);
   color: white;
 }
 
