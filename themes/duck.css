@@ -1,3 +1,5 @@
 body {
-  cursor: url("/writeups/duck.svg") 16 0, auto;
+  cursor:
+    url('/writeups/duck.svg') 16 0,
+    auto;
 }
