@@ -14,8 +14,9 @@ themes.onchange = () => {
     localStorage.removeItem('theme');
   } else {
     if (themes.value == 'random') {
+      const allowedThemes = [...themes.options].filter((e) => { return e.value != 'random' && e.value != theme});
       themes.value =
-        themes.options[Math.floor(Math.random() * themes.options.length)].value;
+        allowedThemes[Math.floor(Math.random() * themes.options.length)].value;
     }
     if (themes.value == 'mc.css') {
       // https://www.minecraft.net/en-us/usage-guidelines
