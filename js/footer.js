@@ -15,7 +15,7 @@ themes.onchange = () => {
   } else {
     if (themes.value == 'random') {
       const allowedThemes = [...themes.options].filter((e) => {
-        return e.value != 'random' && e.value != theme;
+        return e.value != themes.value && e.value != theme;
       });
       themes.value =
         allowedThemes[Math.floor(Math.random() * themes.options.length)].value;
