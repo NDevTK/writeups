@@ -20,7 +20,8 @@ themes.onchange = () => {
       );
     }
     if (themes.value == 'random') {
-      themes.value = themes.options[Math.floor(Math.random() * themes.options.length)].value;
+      themes.value =
+        themes.options[Math.floor(Math.random() * themes.options.length)].value;
     }
     // Consent!
     if (confirm('Allow theme to be saved to localStorage?'))
