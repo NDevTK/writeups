@@ -13,15 +13,15 @@ themes.onchange = () => {
   if (themes.value == 'default') {
     localStorage.removeItem('theme');
   } else {
+    if (themes.value == 'random') {
+      themes.value =
+        themes.options[Math.floor(Math.random() * themes.options.length)].value;
+    }
     if (themes.value == 'mc.css') {
       // https://www.minecraft.net/en-us/usage-guidelines
       alert(
         'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT'
       );
-    }
-    if (themes.value == 'random') {
-      themes.value =
-        themes.options[Math.floor(Math.random() * themes.options.length)].value;
     }
     // Consent!
     if (confirm('Allow theme to be saved to localStorage?'))
