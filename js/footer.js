@@ -28,7 +28,7 @@ themes.onchange = () => {
       );
     }
     // Consent!
-    if (confirm('Allow theme to be saved to localStorage?'))
+    if (confirm('Allow the ' + themes.value + ' theme preference to be saved to localStorage?'))
       localStorage.setItem('theme', themes.value);
   }
   reloadAll();
