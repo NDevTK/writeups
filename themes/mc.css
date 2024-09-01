@@ -1,7 +1,7 @@
 @font-face {
   font-family: Monocraft;
   src: url('/writeups/Monocraft.otf') format('opentype');
-  /* https://github.com/IdreesInc/Monocraft/blob/main/LICENSE */
+  /* Copyright (c) 2022, Idrees Hassan (https://github.com/IdreesInc/Monocraft) under SIL Open Font License 1.1 */
 }
 
 * {
