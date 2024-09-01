@@ -19,6 +19,9 @@ themes.onchange = () => {
         'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT'
       );
     }
+    if (themes.value == 'random') {
+      themes.value = themes.options[Math.floor(Math.random() * themes.options.length)].value;
+    }
     // Consent!
     if (confirm('Allow theme to be saved to localStorage?'))
       localStorage.setItem('theme', themes.value);
