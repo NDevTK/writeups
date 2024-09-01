@@ -1,5 +1,6 @@
 body {
   background-color: #999eff;
+  background-attachment: fixed;
   background-image: radial-gradient(
       at 14% 69%,
       hsla(252, 64%, 69%, 1) 0px,
