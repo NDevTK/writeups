@@ -15,6 +15,7 @@ themes.onchange = () => {
   } else {
     if (themes.value == 'random') {
       const allowedThemes = [...themes.options].filter((e) => {
+        // Filter out the currently active theme and ourself.
         return e.value != themes.value && e.value != theme;
       });
       themes.value =
@@ -23,7 +24,7 @@ themes.onchange = () => {
     if (themes.value == 'mc.css') {
       // https://www.minecraft.net/en-us/usage-guidelines
       alert(
-        'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT'
+        'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.'
       );
     }
     // Consent!
