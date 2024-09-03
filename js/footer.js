@@ -46,6 +46,7 @@ themes.onchange = () => {
     } else {
     // Revert UI
     themes.value = theme;
+    }
   }
 };
 
