@@ -10,6 +10,11 @@ if (themes.value === '') {
   reloadAll();
 }
 
+function getRandom(max) {
+  // This is not secure
+  return Math.floor((Math.random() * 10) % max);
+}
+
 themes.onchange = () => {
   if (themes.value == 'default') {
     localStorage.removeItem('theme');
@@ -20,7 +25,7 @@ themes.onchange = () => {
         return e.value != themes.value && e.value != theme;
       });
       themes.value =
-        allowedThemes[Math.floor(Math.random() * allowedThemes.length)].value;
+        allowedThemes[getRandom(allowedThemes.length)].value;
     }
     if (themes.value == 'mc.css') {
       // https://www.minecraft.net/en-us/usage-guidelines
@@ -54,6 +59,49 @@ if (theme === 'base64.css') {
       String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
     );
   });
+}
+
+if (theme === 'typoifier.css') {
+  [...document.body.querySelectorAll('p, a')].forEach((e) => {
+    e.innerText = btoa(
+      String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
+    );
+  });
+}
+
+function AtPos(str, position, newStr) {
+    return str.slice(0, position) + newStr + str.slice(position);
+}
+
+function TypoSTR(str) {
+    if (str.length === 0) return
+    let words = str.split(" ");
+    words.forEach((word, index) => {
+        if (word.length === 0) return
+        if (getRandom(2)) words[index] = Typo(word);
+    })
+    return words.join(" ");
+}
+
+function Typo(word) {
+    let index = getRandom(word.length);
+    let letter = word[index];
+    let newString = AtPos(word, index, letter);
+    if (getRandom(2)) newString = AtPos(newString, index, letter);
+    return newString;
+}
+
+function Typoifier(tagName) {
+    document.querySelectorAll(tagName).forEach(e => {
+        e.childNodes.forEach(node => {
+            if (node.data === "" || node.data === undefined) return
+            node.data = TypoSTR(node.data);
+        })
+    });
+};
+
+if (theme === 'typoifier.css') {
+  ["span", "title", "a", "p", "h1", "h2", "h3", "h4", "h5", "h6", "td"].forEach(tag => Typoifier(tag));
 }
 
 function reloadAll() {
