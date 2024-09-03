@@ -93,13 +93,15 @@ if (theme === 'typoifier.css') {
 }
 
 if (theme === 'audio.css') {
-  const utterance = new SpeechSynthesisUtterance(document.body.innerText);
-  const voices = speechSynthesis.getVoices();
-  utterance.voice = voices[0];
-  speechSynthesis.speak(utterance);
-  window.addEventListener('pagehide', () => {
-    speechSynthesis.cancel();
-  });
+  setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(document.body.innerText);
+      const voices = speechSynthesis.getVoices();
+      utterance.voice = voices[0];
+      speechSynthesis.speak(utterance);
+      window.addEventListener('pagehide', () => {
+        speechSynthesis.cancel();
+      });
+  }, 1000)
 }
 
 function reloadAll() {
