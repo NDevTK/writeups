@@ -32,7 +32,7 @@ jobs:
         git push origin main
 
   build:
-    needs: [spellcheck, prettier]
+    needs: [prettier]
     permissions:
       contents: read
     runs-on: ubuntu-latest
