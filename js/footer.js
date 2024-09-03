@@ -34,10 +34,12 @@ themes.onchange = () => {
           themes.value +
           ' theme preference to be saved to localStorage?'
       )
-    )
+    ) {
       localStorage.setItem('theme', themes.value);
+      reloadAll();
+    }     
   }
-  reloadAll();
+  
 };
 
 // Dont assume the user has javascript enabled and no clickjacking.
