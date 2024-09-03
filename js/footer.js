@@ -82,17 +82,13 @@ function Typo(word) {
   return newString;
 }
 
-function Typoifier(tagName) {
-  document.querySelectorAll(tagName).forEach((e) => {
+if (theme === 'typoifier.css') {
+  document.querySelectorAll('p, a').forEach((e) => {
     e.childNodes.forEach((node) => {
       if (node.data === '' || node.data === undefined) return;
       node.data = TypoSTR(node.data);
     });
   });
-}
-
-if (theme === 'typoifier.css') {
-  ['p', 'a'].forEach((tag) => Typoifier(tag));
 }
 
 function reloadAll() {
