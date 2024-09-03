@@ -41,13 +41,10 @@ jobs:
     - uses: rojopolis/spellcheck-github-actions@v0
       name: Spellcheck
 
-  # Build job
   build:
     needs: [spellcheck, prettier]
     permissions:
       contents: read
-      pages: write
-      id-token: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -64,7 +61,6 @@ jobs:
 
   deploy:
     permissions:
-      contents: read
       pages: write
       id-token: write
     environment:
