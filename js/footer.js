@@ -39,6 +39,9 @@ themes.onchange = () => {
       reloadAll();
     }
   }
+  
+  // Ensure selected theme is correct
+  themes.value = theme;
 };
 
 // Dont assume the user has javascript enabled and no clickjacking.
