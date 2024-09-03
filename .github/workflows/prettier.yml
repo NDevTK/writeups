@@ -13,7 +13,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Format
       run: |
-        npx prettier . --write --single-quote --no-bracket-spacing --bracket-same-line --trailing-comma none
+        npx prettier . --write --single-quote --no-bracket-spacing --bracket-same-line --trailing-comma none --cache --cache-location=prettier_cache
     - name: Submit
       continue-on-error: true
       run: |
