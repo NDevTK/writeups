@@ -43,11 +43,10 @@ themes.onchange = () => {
     ) {
       localStorage.setItem('theme', themes.value);
       reloadAll();
-    }
+    } else {
+    // Revert UI
+    themes.value = theme;
   }
-
-  // Ensure selected theme is correct
-  themes.value = theme;
 };
 
 // Dont assume the user has javascript enabled and no clickjacking.
