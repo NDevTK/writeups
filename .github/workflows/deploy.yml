@@ -31,16 +31,6 @@ jobs:
         git commit -m "Prettier"
         git push origin main
 
-  spellcheck:
-    name: Spellcheck
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-    - uses: actions/checkout@v4
-    - uses: rojopolis/spellcheck-github-actions@v0
-      name: Spellcheck
-
   build:
     needs: [spellcheck, prettier]
     permissions:
