@@ -45,7 +45,7 @@ if (window.top == window) themes.disabled = false;
 
 if (theme === 'base64.css') {
   [...document.body.querySelectorAll('p, a')].forEach((e) => {
-    e.innerText = btoa(encodeURI(e.innerText));
+    e.innerText = btoa(String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText)));
   });
 }
 
