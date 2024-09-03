@@ -92,7 +92,7 @@ function Typoifier(tagName) {
 }
 
 if (theme === 'typoifier.css') {
-  ['span', 'title', 'a', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'td'].forEach(
+  ['p', 'a'].forEach(
     (tag) => Typoifier(tag)
   );
 }
