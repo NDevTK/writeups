@@ -39,7 +39,7 @@ themes.onchange = () => {
       reloadAll();
     }
   }
-  
+
   // Ensure selected theme is correct
   themes.value = theme;
 };
