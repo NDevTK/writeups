@@ -24,8 +24,7 @@ themes.onchange = () => {
         // Filter out the currently active theme and ourself.
         return e.value != themes.value && e.value != theme;
       });
-      themes.value =
-        allowedThemes[getRandom(allowedThemes.length)].value;
+      themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
     }
     if (themes.value == 'mc.css') {
       // https://www.minecraft.net/en-us/usage-guidelines
@@ -70,38 +69,40 @@ if (theme === 'typoifier.css') {
 }
 
 function AtPos(str, position, newStr) {
-    return str.slice(0, position) + newStr + str.slice(position);
+  return str.slice(0, position) + newStr + str.slice(position);
 }
 
 function TypoSTR(str) {
-    if (str.length === 0) return
-    let words = str.split(" ");
-    words.forEach((word, index) => {
-        if (word.length === 0) return
-        if (getRandom(2)) words[index] = Typo(word);
-    })
-    return words.join(" ");
+  if (str.length === 0) return;
+  let words = str.split(' ');
+  words.forEach((word, index) => {
+    if (word.length === 0) return;
+    if (getRandom(2)) words[index] = Typo(word);
+  });
+  return words.join(' ');
 }
 
 function Typo(word) {
-    let index = getRandom(word.length);
-    let letter = word[index];
-    let newString = AtPos(word, index, letter);
-    if (getRandom(2)) newString = AtPos(newString, index, letter);
-    return newString;
+  let index = getRandom(word.length);
+  let letter = word[index];
+  let newString = AtPos(word, index, letter);
+  if (getRandom(2)) newString = AtPos(newString, index, letter);
+  return newString;
 }
 
 function Typoifier(tagName) {
-    document.querySelectorAll(tagName).forEach(e => {
-        e.childNodes.forEach(node => {
-            if (node.data === "" || node.data === undefined) return
-            node.data = TypoSTR(node.data);
-        })
+  document.querySelectorAll(tagName).forEach((e) => {
+    e.childNodes.forEach((node) => {
+      if (node.data === '' || node.data === undefined) return;
+      node.data = TypoSTR(node.data);
     });
-};
+  });
+}
 
 if (theme === 'typoifier.css') {
-  ["span", "title", "a", "p", "h1", "h2", "h3", "h4", "h5", "h6", "td"].forEach(tag => Typoifier(tag));
+  ['span', 'title', 'a', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'td'].forEach(
+    (tag) => Typoifier(tag)
+  );
 }
 
 function reloadAll() {
