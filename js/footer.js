@@ -92,6 +92,14 @@ if (theme === 'typoifier.css') {
   });
 }
 
+if (theme === 'typoifier.css') {
+  const utterance = new SpeechSynthesisUtterance(document.body.innerText);
+  const voices = speechSynthesis.getVoices();
+  utterance.voice = voices[0];
+  speechSynthesis.speak(utterance);
+  window.addEventListener('pagehide', () => { speechSynthesis.cancel() });
+}
+
 function reloadAll() {
   reload.postMessage('');
   location.reload();
