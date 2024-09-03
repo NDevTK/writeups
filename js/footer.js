@@ -97,7 +97,9 @@ if (theme === 'audio.css') {
   const voices = speechSynthesis.getVoices();
   utterance.voice = voices[0];
   speechSynthesis.speak(utterance);
-  window.addEventListener('pagehide', () => { speechSynthesis.cancel() });
+  window.addEventListener('pagehide', () => {
+    speechSynthesis.cancel();
+  });
 }
 
 function reloadAll() {
