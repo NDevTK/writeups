@@ -92,7 +92,7 @@ if (theme === 'typoifier.css') {
   });
 }
 
-if (theme === 'typoifier.css') {
+if (theme === 'audio.css') {
   const utterance = new SpeechSynthesisUtterance(document.body.innerText);
   const voices = speechSynthesis.getVoices();
   utterance.voice = voices[0];
