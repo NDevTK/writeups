@@ -60,14 +60,6 @@ if (theme === 'base64.css') {
   });
 }
 
-if (theme === 'typoifier.css') {
-  [...document.body.querySelectorAll('p, a')].forEach((e) => {
-    e.innerText = btoa(
-      String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
-    );
-  });
-}
-
 function AtPos(str, position, newStr) {
   return str.slice(0, position) + newStr + str.slice(position);
 }
