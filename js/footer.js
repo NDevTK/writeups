@@ -6,7 +6,7 @@ themes.value = theme;
 if (themes.value === '') {
   alert('The ' + theme + " theme doesn't exist, maybe file a bug :)");
   localStorage.removeItem('theme');
-  // Prioritizes constancy over user preference :/
+  // Prioritizes consistency over user preference :/
   reloadAll();
 }
 
