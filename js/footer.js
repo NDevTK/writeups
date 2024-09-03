@@ -37,9 +37,8 @@ themes.onchange = () => {
     ) {
       localStorage.setItem('theme', themes.value);
       reloadAll();
-    }     
+    }
   }
-  
 };
 
 // Dont assume the user has javascript enabled and no clickjacking.
