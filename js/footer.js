@@ -92,17 +92,19 @@ if (theme === 'typoifier.css') {
   });
 }
 
-const utterance = new SpeechSynthesisUtterance(document.body.innerText);
-const voices = speechSynthesis.getVoices();
+
 
 if (theme === 'audio.css') {
-  setTimeout(() => {
-    utterance.voice = voices[0];
+  const utterance = new SpeechSynthesisUtterance(document.body.innerText);
+  const voices = speechSynthesis.getVoices();
+  utterance.voice = voices[0];
+  window.addEventListener('pagehide', () => {
+    speechSynthesis.cancel();
+  });
+  setInterval(() => {
+    if (speechSynthesis.speaking) return;
     speechSynthesis.speak(utterance);
-    window.addEventListener('pagehide', () => {
-      speechSynthesis.cancel();
-    });
-  }, 1000);
+  }, 1000)
 }
 
 function reloadAll() {
