@@ -2,6 +2,7 @@ body {
   background-color: Canvas;
   color: CanvasText;
   color-scheme: light dark;
+  background-image: none;
 }
 
 .markdown-body .highlight pre,
