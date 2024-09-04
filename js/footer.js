@@ -27,13 +27,13 @@ themes.onchange = () => {
           return e.value != themes.value && e.value != theme;
         });
         themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
-        break
+        break;
       case 'mc.css':
         // https://www.minecraft.net/en-us/usage-guidelines
         alert(
           'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.'
         );
-        break
+        break;
     }
     // Consent!
     if (
@@ -82,12 +82,12 @@ function reloadAll() {
 switch (theme) {
   case 'typoifier.css':
     document.querySelectorAll('p, a').forEach((e) => {
-        e.childNodes.forEach((node) => {
-          if (node.data === '' || node.data === undefined) return;
-          node.data = TypoSTR(node.data);
-        });
+      e.childNodes.forEach((node) => {
+        if (node.data === '' || node.data === undefined) return;
+        node.data = TypoSTR(node.data);
       });
-    break
+    });
+    break;
   case 'audio.css':
     const utterance = new SpeechSynthesisUtterance(document.body.innerText);
     const voices = speechSynthesis.getVoices();
@@ -99,14 +99,14 @@ switch (theme) {
       if (speechSynthesis.speaking) return;
       speechSynthesis.speak(utterance);
     }, 1000);
-    break
-case 'base64.css':
+    break;
+  case 'base64.css':
     [...document.body.querySelectorAll('p, a')].forEach((e) => {
       e.innerText = btoa(
         String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
       );
     });
-    break
+    break;
 }
 
 // Dont assume the user has javascript enabled and no clickjacking.
