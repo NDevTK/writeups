@@ -18,3 +18,8 @@ h3 {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+body {
+  background-image: none;
+  background-color: white;
+}
