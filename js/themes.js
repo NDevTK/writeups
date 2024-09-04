@@ -10,13 +10,11 @@ function getTheme() {
 
 const theme = getTheme();
 
-// default is handled without JS
-if (theme !== 'default.css') {
-  const stylesheet = document.createElement('link');
-  stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
-  stylesheet.rel = 'stylesheet';
-  document.head.appendChild(stylesheet);
-}
+
+const stylesheet = document.createElement('link');
+stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
+stylesheet.rel = 'stylesheet';
+document.head.appendChild(stylesheet);
 
 const reload = new BroadcastChannel('reload');
 reload.onmessage = (event) => {
