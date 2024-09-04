@@ -1,0 +1,8 @@
+html {
+  filter: invert(1);
+}
+iframe,
+img,
+video {
+  filter: invert(1);
+}
