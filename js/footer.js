@@ -92,8 +92,6 @@ if (theme === 'typoifier.css') {
   });
 }
 
-
-
 if (theme === 'audio.css') {
   const utterance = new SpeechSynthesisUtterance(document.body.innerText);
   const voices = speechSynthesis.getVoices();
@@ -104,7 +102,7 @@ if (theme === 'audio.css') {
   setInterval(() => {
     if (speechSynthesis.speaking) return;
     speechSynthesis.speak(utterance);
-  }, 1000)
+  }, 1000);
 }
 
 function reloadAll() {
