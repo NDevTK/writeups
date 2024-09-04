@@ -17,38 +17,38 @@ function getRandom(max) {
 
 themes.onchange = () => {
   switch (themes.value) {
-      case 'default.css':
-        localStorage.removeItem('theme');
-        reloadAll();
-        return
-      case 'random':
-        const allowedThemes = [...themes.options].filter((e) => {
-          // Filter out the currently active theme and ourself.
-          return e.value != themes.value && e.value != theme;
-        });
-        themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
-        break;
-      case 'mc.css':
-        // https://www.minecraft.net/en-us/usage-guidelines
-        alert(
-          'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.'
-        );
-        break;
-    }
-    // Consent!
-    if (
-      confirm(
-        'Allow the ' +
-          themes.value +
-          ' theme preference to be saved to localStorage?'
-      )
-    ) {
-      localStorage.setItem('theme', themes.value);
+    case 'default.css':
+      localStorage.removeItem('theme');
       reloadAll();
-    } else {
-      // Revert UI
-      themes.value = theme;
-    }
+      return;
+    case 'random':
+      const allowedThemes = [...themes.options].filter((e) => {
+        // Filter out the currently active theme and ourself.
+        return e.value != themes.value && e.value != theme;
+      });
+      themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
+      break;
+    case 'mc.css':
+      // https://www.minecraft.net/en-us/usage-guidelines
+      alert(
+        'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.'
+      );
+      break;
+  }
+  // Consent!
+  if (
+    confirm(
+      'Allow the ' +
+        themes.value +
+        ' theme preference to be saved to localStorage?'
+    )
+  ) {
+    localStorage.setItem('theme', themes.value);
+    reloadAll();
+  } else {
+    // Revert UI
+    themes.value = theme;
+  }
 };
 
 function AtPos(str, position, newStr) {
