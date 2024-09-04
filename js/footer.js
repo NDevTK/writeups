@@ -92,10 +92,11 @@ if (theme === 'typoifier.css') {
   });
 }
 
+const utterance = new SpeechSynthesisUtterance(document.body.innerText);
+const voices = speechSynthesis.getVoices();
+
 if (theme === 'audio.css') {
   setTimeout(() => {
-    const utterance = new SpeechSynthesisUtterance(document.body.innerText);
-    const voices = speechSynthesis.getVoices();
     utterance.voice = voices[0];
     speechSynthesis.speak(utterance);
     window.addEventListener('pagehide', () => {
