@@ -20,18 +20,20 @@ themes.onchange = () => {
     localStorage.removeItem('theme');
     reloadAll();
   } else {
-    if (themes.value == 'random') {
-      const allowedThemes = [...themes.options].filter((e) => {
-        // Filter out the currently active theme and ourself.
-        return e.value != themes.value && e.value != theme;
-      });
-      themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
-    }
-    if (themes.value == 'mc.css') {
-      // https://www.minecraft.net/en-us/usage-guidelines
-      alert(
-        'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.'
-      );
+    switch (themes.value) {
+      case 'random':
+        const allowedThemes = [...themes.options].filter((e) => {
+          // Filter out the currently active theme and ourself.
+          return e.value != themes.value && e.value != theme;
+        });
+        themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
+        break
+      case 'mc.css':
+        // https://www.minecraft.net/en-us/usage-guidelines
+        alert(
+          'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.'
+        );
+        break
     }
     // Consent!
     if (
@@ -49,17 +51,6 @@ themes.onchange = () => {
     }
   }
 };
-
-// Dont assume the user has javascript enabled and no clickjacking.
-if (window.top == window) themes.disabled = false;
-
-if (theme === 'base64.css') {
-  [...document.body.querySelectorAll('p, a')].forEach((e) => {
-    e.innerText = btoa(
-      String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
-    );
-  });
-}
 
 function AtPos(str, position, newStr) {
   return str.slice(0, position) + newStr + str.slice(position);
@@ -83,29 +74,40 @@ function Typo(word) {
   return newString;
 }
 
-if (theme === 'typoifier.css') {
-  document.querySelectorAll('p, a').forEach((e) => {
-    e.childNodes.forEach((node) => {
-      if (node.data === '' || node.data === undefined) return;
-      node.data = TypoSTR(node.data);
-    });
-  });
-}
-
-if (theme === 'audio.css') {
-  const utterance = new SpeechSynthesisUtterance(document.body.innerText);
-  const voices = speechSynthesis.getVoices();
-  utterance.voice = voices[0];
-  window.addEventListener('pagehide', () => {
-    speechSynthesis.cancel();
-  });
-  setInterval(() => {
-    if (speechSynthesis.speaking) return;
-    speechSynthesis.speak(utterance);
-  }, 1000);
-}
-
 function reloadAll() {
   reload.postMessage('');
   location.reload();
 }
+
+switch (theme) {
+  case 'typoifier.css':
+    document.querySelectorAll('p, a').forEach((e) => {
+        e.childNodes.forEach((node) => {
+          if (node.data === '' || node.data === undefined) return;
+          node.data = TypoSTR(node.data);
+        });
+      });
+    break
+  case 'audio.css':
+    const utterance = new SpeechSynthesisUtterance(document.body.innerText);
+    const voices = speechSynthesis.getVoices();
+    utterance.voice = voices[0];
+    window.addEventListener('pagehide', () => {
+      speechSynthesis.cancel();
+    });
+    setInterval(() => {
+      if (speechSynthesis.speaking) return;
+      speechSynthesis.speak(utterance);
+    }, 1000);
+    break
+case 'base64.css':
+    [...document.body.querySelectorAll('p, a')].forEach((e) => {
+      e.innerText = btoa(
+        String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
+      );
+    });
+    break
+}
+
+// Dont assume the user has javascript enabled and no clickjacking.
+if (window.top == window) themes.disabled = false;
