@@ -8,13 +8,12 @@ h3 {
     to left,
     red,
     orange,
-    yellow,
+    yellowgreen, /* Yellow is hard to read :( */
     green,
     blue,
     indigo,
     violet
   );
-  filter: brightness(90%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
