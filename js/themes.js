@@ -2,16 +2,16 @@
 
 function getTheme() {
   try {
-    return localStorage.getItem('theme') || 'default';
+    return localStorage.getItem('theme') || 'default.css';
   } catch {
-    return 'default';
+    return 'default.css';
   }
 }
 
 const theme = getTheme();
 
 // default is handled without JS
-if (theme !== 'default') {
+if (theme !== 'default.css') {
   const stylesheet = document.createElement('link');
   stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
   stylesheet.rel = 'stylesheet';
