@@ -16,11 +16,11 @@ function getRandom(max) {
 }
 
 themes.onchange = () => {
-  if (themes.value == 'default.css') {
-    localStorage.removeItem('theme');
-    reloadAll();
-  } else {
-    switch (themes.value) {
+  switch (themes.value) {
+      case 'default.css':
+        localStorage.removeItem('theme');
+        reloadAll();
+        return
       case 'random':
         const allowedThemes = [...themes.options].filter((e) => {
           // Filter out the currently active theme and ourself.
@@ -49,7 +49,6 @@ themes.onchange = () => {
       // Revert UI
       themes.value = theme;
     }
-  }
 };
 
 function AtPos(str, position, newStr) {
