@@ -10,7 +10,6 @@ function getTheme() {
 
 const theme = getTheme();
 
-
 const stylesheet = document.createElement('link');
 stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
 stylesheet.rel = 'stylesheet';
