@@ -16,7 +16,7 @@ function getRandom(max) {
 }
 
 themes.onchange = () => {
-  if (themes.value == 'default') {
+  if (themes.value == 'default.css') {
     localStorage.removeItem('theme');
     reloadAll();
   } else {
