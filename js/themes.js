@@ -22,12 +22,7 @@ reload.onmessage = (event) => {
 };
 
 onkeyup = (e) => {
-  if (e.key === 'ArrowLeft') {
-    if (location.pathname !== '/writeups/') {
-      location.href = '/writeups/';
-    } else {
-      history.back();
-    }
+  if (e.key === 'Period' && location.pathname !== '/writeups/') {
+    location.href = '/writeups/';
   }
-  if (e.key === 'ArrowRight') history.forward();
 };
