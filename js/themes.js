@@ -22,6 +22,8 @@ reload.onmessage = (event) => {
 };
 
 onkeyup = (e) => {
-  if (e.key === 'ArrowLeft') history.back();
+  if (e.key === 'ArrowLeft') {
+    location.href = '/writeups/';
+  }
   if (e.key === 'ArrowRight') history.forward();
 };
