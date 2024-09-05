@@ -22,7 +22,7 @@ reload.onmessage = (event) => {
 };
 
 onkeyup = (e) => {
-  if (e.key === 'Period' && location.pathname !== '/writeups/') {
+  if (e.key === '.' && location.pathname !== '/writeups/') {
     location.href = '/writeups/';
   }
 };
