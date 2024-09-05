@@ -12,5 +12,4 @@ layout: default
   {% endfor %}
 </ul>
 
-<p1><a href="{{ "/feed.xml" | relative_url }}">RSS</a> / <a href="https://issues.chromium.org/issues?q=reporter:(ndevtk@protonmail.com)">Chromium</a> / <a href="https://ndevtk.github.io/writeups/credits/">Credits</a> / <a href="https://x.com/ndevtk">X</a> / <a href="https://discord.gg/AUJjpZHFbP">Discord</a> / <a href="https://www.youtube.com/@NDevTK">YouTube</a> / <a href="https://ndevtk.github.io/writeups/privacy/">Privacy</a> / <a href="https://github.com/NDevTK">GitHub</a> / <a href="https://ndev.tk/">ndev.tk</a></p1>
-<p2>You can go between posts via the arrow keys.</p2>
+<p1><a href="{{ "/feed.xml" | relative_url }}">RSS</a> / <a href="https://issues.chromium.org/issues?q=reporter:(ndevtk@protonmail.com)">Chromium</a> / <a href="https://ndevtk.github.io/writeups/credits/">Credits</a> / <a href="https://x.com/ndevtk">X</a> / <a href="https://discord.gg/AUJjpZHFbP">Discord</a> / <a href="https://www.youtube.com/@NDevTK">YouTube</a> / <a href="https://ndevtk.github.io/writeups/privacy/">Privacy</a> / <a href="https://github.com/NDevTK">GitHub</a> / <a href="https://ndev.tk/">ndev.tk</a></p1><p2>You can go back here by pressing the . key</p2>
