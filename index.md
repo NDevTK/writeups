@@ -5,9 +5,9 @@ layout: default
 <ul id="postLinks">
   {% for post in site.posts %}
   <li>
-    <h1>
+    <h2>
       <a href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
-    </h1>
+    </h2>
   </li>
   {% endfor %}
 </ul>
