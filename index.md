@@ -1,17 +1,15 @@
 ---
 layout: default
 ---
+<ul id="postLinks">
+  {% for post in site.posts %}
+  <li>
+    <h1>
+      <a href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
+    </h1>
+  </li>
+  {% endfor %}
+</ul>
 
-<div>
-  <ul id="postLinks">
-    {% for post in site.posts %}
-      <li>
-        <h2>
-          <a href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
-        </h2>
-      </li>
-    {% endfor %}
-  </ul>
-  
-  <p1><a href="{{ "/feed.xml" | relative_url }}">RSS</a> / <a href="https://issues.chromium.org/issues?q=reporter:(ndevtk@protonmail.com)">Chromium</a> / <a href="https://ndevtk.github.io/writeups/credits/">Credits</a> / <a href="https://x.com/ndevtk">X</a> / <a href="https://discord.gg/AUJjpZHFbP">Discord</a> / <a href="https://www.youtube.com/@NDevTK">YouTube</a> / <a href="https://ndevtk.github.io/writeups/privacy/">Privacy</a> / <a href="https://github.com/NDevTK">GitHub</a> / <a href="https://ndev.tk/">ndev.tk</a></p1><br>
-</div>
+<p1><a href="{{ "/feed.xml" | relative_url }}">RSS</a> / <a href="https://issues.chromium.org/issues?q=reporter:(ndevtk@protonmail.com)">Chromium</a> / <a href="https://ndevtk.github.io/writeups/credits/">Credits</a> / <a href="https://x.com/ndevtk">X</a> / <a href="https://discord.gg/AUJjpZHFbP">Discord</a> / <a href="https://www.youtube.com/@NDevTK">YouTube</a> / <a href="https://ndevtk.github.io/writeups/privacy/">Privacy</a> / <a href="https://github.com/NDevTK">GitHub</a> / <a href="https://ndev.tk/">ndev.tk</a></p1><br>
+<p2>You can go between posts via the arrow keys</p2>
