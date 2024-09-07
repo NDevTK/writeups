@@ -8,3 +8,5 @@ This allows a cache based XS-Search on websites when same-site resources are use
 
 Cache probing tool: <https://sites.google.com/view/xsleaks>  
 Old cache probing attacks: <https://github.com/NDevTK/CacheAttack>
+
+A fix is being planned in <https://groups.google.com/a/chromium.org/g/blink-dev/c/YpxpzceGw68/m/ezbYJOSeAAAJ>
