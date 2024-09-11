@@ -10,6 +10,8 @@ url
 DOMPurify
 APIs
 seo
+NoScript's
+Yay
 gRPC
 RPC
 luci
