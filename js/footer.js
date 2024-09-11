@@ -16,18 +16,18 @@ function getRandom(max) {
 }
 
 themes.onchange = () => {
+  if (themes.value === 'random') {
+    const allowedThemes = [...themes.options].filter((e) => {
+      // Filter out the currently active theme and ourself.
+      return e.value != themes.value && e.value != theme;
+    });
+    themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
+  }
   switch (themes.value) {
     case 'default.css':
       localStorage.removeItem('theme');
       reloadAll();
       return;
-    case 'random':
-      const allowedThemes = [...themes.options].filter((e) => {
-        // Filter out the currently active theme and ourself.
-        return e.value != themes.value && e.value != theme;
-      });
-      themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
-      break;
     case 'mc.css':
       // https://www.minecraft.net/en-us/usage-guidelines
       alert(
