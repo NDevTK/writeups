@@ -15,7 +15,7 @@ function getRandom(max) {
   return Math.floor((Math.random() * 10) % max);
 }
 
-themes.onchange = () => { 
+themes.onchange = () => {
   if (themes.value === 'random') {
     const allowedThemes = [...themes.options].filter((e) => {
       // Filter out the currently active theme and ourself.
