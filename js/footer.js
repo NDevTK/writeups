@@ -110,7 +110,6 @@ switch (theme) {
     break;
 }
 
-
 // Dont assume the user has javascript enabled and no clickjacking.
 defaultOption.innerText = 'default';
 if (window.top == window) themes.disabled = false;
