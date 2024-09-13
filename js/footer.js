@@ -1,6 +1,5 @@
 'use strict';
 const themes = document.getElementById('themes');
-const defaultOption = document.getElementById('defaultOption');
 
 themes.value = theme;
 
@@ -115,5 +114,4 @@ switch (theme) {
 }
 
 // Dont assume the user has javascript enabled and no clickjacking.
-defaultOption.innerText = 'default';
 if (window.top == window) themes.disabled = false;
