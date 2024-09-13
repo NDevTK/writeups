@@ -38,6 +38,7 @@ themes.onchange = () => {
       break;
     case 'noscript.css':
       alert('This theme cant be used with javascript enabled.');
+      themes.value = theme;
       return;
   }
   // Consent!
