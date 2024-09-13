@@ -1,14 +1,17 @@
 body {
   background-attachment: fixed;
-  background-color:#ffb499;
-  background-image:
-radial-gradient(at 79% 35%, hsla(299,72%,76%,1) 0px, transparent 50%),
-radial-gradient(at 53% 93%, hsla(136,71%,78%,1) 0px, transparent 50%),
-radial-gradient(at 4% 3%, hsla(253,97%,61%,1) 0px, transparent 50%),
-radial-gradient(at 88% 58%, hsla(56,88%,66%,1) 0px, transparent 50%),
-radial-gradient(at 28% 50%, hsla(66,96%,60%,1) 0px, transparent 50%),
-radial-gradient(at 96% 21%, hsla(21,69%,74%,1) 0px, transparent 50%),
-radial-gradient(at 32% 56%, hsla(82,87%,63%,1) 0px, transparent 50%);
+  background-color: #ffb499;
+  background-image: radial-gradient(
+      at 79% 35%,
+      hsla(299, 72%, 76%, 1) 0px,
+      transparent 50%
+    ),
+    radial-gradient(at 53% 93%, hsla(136, 71%, 78%, 1) 0px, transparent 50%),
+    radial-gradient(at 4% 3%, hsla(253, 97%, 61%, 1) 0px, transparent 50%),
+    radial-gradient(at 88% 58%, hsla(56, 88%, 66%, 1) 0px, transparent 50%),
+    radial-gradient(at 28% 50%, hsla(66, 96%, 60%, 1) 0px, transparent 50%),
+    radial-gradient(at 96% 21%, hsla(21, 69%, 74%, 1) 0px, transparent 50%),
+    radial-gradient(at 32% 56%, hsla(82, 87%, 63%, 1) 0px, transparent 50%);
 }
 
 a {
