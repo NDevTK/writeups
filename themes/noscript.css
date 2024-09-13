@@ -17,3 +17,7 @@ body {
 a {
   color: blue;
 }
+
+.js {
+  visibility: hidden;
+}
