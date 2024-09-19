@@ -73,9 +73,3 @@ An attacker controlled website can bypass SOP if one of the following is met:
 
 - Attacker wants JSON data and has a compromised renderer bug
 - Attacker wants data from a origin that contains a PDF which allows embedding
-
-# frame-src 'self' bypass
-
-Because of an `about:blank` edge case it's possible to navigate a nested, nested 3rd party iframe to it and bypass the child's CSP.  
-This has resulted in leaking data due to the victim sending sensitive information to a iframe using the `*` scope that can be hijacked via good navigation timings even with the CSP.  
-A GitHub issue was opened about this <https://github.com/w3c/webappsec-csp/issues/662>
