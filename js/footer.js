@@ -42,7 +42,7 @@ themes.onchange = () => {
       break;
     case 'noscript.css':
       notSupported('javascript enabled');
-      return;
+      break;
     case 'spoof.css':
       if (
         /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
@@ -60,10 +60,10 @@ themes.onchange = () => {
         setInterval((_) => w.focus(), 5);
       }
       themes.value = theme;
-      return;
+      break;
   }
   // Consent!
-  if (
+  if (themes.value !== theme &&
     confirm(
       'Allow the ' +
         themes.value +
