@@ -52,13 +52,14 @@ themes.onchange = () => {
         notSupported('a mobile device');
       } else {
         let w = window.open(
-          'https://www.google.com/writeups',
+          'https://accounts.google.com/writeups',
           '',
           'width=1000000000,height=1'
         );
         w.resizeBy(0, -100000);
         setInterval((_) => w.focus(), 5);
       }
+      // Temp addon
       themes.value = theme;
       break;
   }
