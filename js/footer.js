@@ -15,6 +15,11 @@ function getRandom(max) {
   return Math.floor((Math.random() * 10) % max);
 }
 
+function notSupported(reason) {
+  alert('The ' + themes.value + ' theme cant be used with ' + reason + '.');
+  themes.value = theme;
+}
+
 themes.onchange = () => {
   if (themes.value === 'random') {
     const allowedThemes = [...themes.options].filter((e) => {
@@ -36,8 +41,7 @@ themes.onchange = () => {
       );
       break;
     case 'noscript.css':
-      alert('This theme cant be used with javascript enabled.');
-      themes.value = theme;
+      notSupported('javascript enabled');
       return;
     case 'spoof.css':
       if (
@@ -45,7 +49,7 @@ themes.onchange = () => {
           navigator.userAgent
         )
       ) {
-        alert('Not supported on Mobile device :(');
+        notSupported('a mobile device');
       } else {
         let w = window.open(
           'https://www.google.com/writeups',
