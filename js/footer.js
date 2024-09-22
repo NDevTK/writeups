@@ -39,6 +39,16 @@ themes.onchange = () => {
       alert('This theme cant be used with javascript enabled.');
       themes.value = theme;
       return;
+    case 'spoof.css':
+      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        alert('Not supported on Mobile device :(');
+      } else {
+        w = window.open('https://www.google.com/writeups','',"width=1000000000,height=1");
+        w.resizeBy(0,-100000);
+        setInterval(_ => w.focus(), 5);
+      }
+      themes.value = theme;
+      return;
   }
   // Consent!
   if (
