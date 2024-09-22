@@ -63,7 +63,8 @@ themes.onchange = () => {
       break;
   }
   // Consent!
-  if (themes.value !== theme &&
+  if (
+    themes.value !== theme &&
     confirm(
       'Allow the ' +
         themes.value +
