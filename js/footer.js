@@ -47,7 +47,7 @@ themes.onchange = () => {
       ) {
         alert('Not supported on Mobile device :(');
       } else {
-        w = window.open(
+        let w = window.open(
           'https://www.google.com/writeups',
           '',
           'width=1000000000,height=1'
