@@ -44,11 +44,7 @@ themes.onchange = () => {
       notSupported('javascript enabled');
       break;
     case 'spoof.css':
-      if (
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-          navigator.userAgent
-        )
-      ) {
+      if (isMobile) {
         notSupported('a mobile device');
       } else {
         let w = window.open(
