@@ -1,6 +1,9 @@
 'use strict';
 
-const isMobile =  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const isMobile =
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
 
 function getTheme() {
   try {
@@ -20,7 +23,8 @@ function platformTheme(theme) {
 const theme = getTheme();
 
 const stylesheet = document.createElement('link');
-stylesheet.href = '/writeups/themes/' + encodeURIComponent(platformTheme(theme));
+stylesheet.href =
+  '/writeups/themes/' + encodeURIComponent(platformTheme(theme));
 stylesheet.rel = 'stylesheet';
 document.head.appendChild(stylesheet);
 
