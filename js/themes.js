@@ -23,8 +23,7 @@ function platformCSS(theme) {
 const theme = getTheme();
 
 const stylesheet = document.createElement('link');
-stylesheet.href =
-  '/writeups/themes/' + encodeURIComponent(platformCSS(theme));
+stylesheet.href = '/writeups/themes/' + encodeURIComponent(platformCSS(theme));
 stylesheet.rel = 'stylesheet';
 document.head.appendChild(stylesheet);
 
