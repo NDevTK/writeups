@@ -1,0 +1,9 @@
+body {
+  background-attachment: fixed;
+  background: #FF2A88;
+  background: linear-gradient(135deg, #FF2A88, #41D725);
+}
+
+a {
+  color: blue;
+}
