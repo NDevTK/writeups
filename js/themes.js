@@ -1,5 +1,7 @@
 'use strict';
 
+const isMobile =  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 function getTheme() {
   try {
     return localStorage.getItem('theme') || 'default.css';
@@ -8,10 +10,17 @@ function getTheme() {
   }
 }
 
+function platformTheme(theme) {
+  if (theme === 'default.css' && isMobile) {
+    return 'default-mobile.css';
+  }
+  return theme;
+}
+
 const theme = getTheme();
 
 const stylesheet = document.createElement('link');
-stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
+stylesheet.href = '/writeups/themes/' + encodeURIComponent(platformTheme(theme));
 stylesheet.rel = 'stylesheet';
 document.head.appendChild(stylesheet);
 
