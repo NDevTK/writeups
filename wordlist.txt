@@ -9,6 +9,7 @@ WebExtensions
 UAC
 url
 DOMPurify
+reloader
 APIs
 seo
 NoScript's
