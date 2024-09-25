@@ -13,17 +13,10 @@ function getTheme() {
   }
 }
 
-function platformCSS(theme) {
-  if (theme === 'default.css' && isMobile) {
-    return 'default-mobile.css';
-  }
-  return theme;
-}
-
 const theme = getTheme();
 
 const stylesheet = document.createElement('link');
-stylesheet.href = '/writeups/themes/' + encodeURIComponent(platformCSS(theme));
+stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
 stylesheet.rel = 'stylesheet';
 document.head.appendChild(stylesheet);
 
