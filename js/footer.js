@@ -59,6 +59,9 @@ themes.onchange = () => {
       // Temp addon
       themes.value = theme;
       break;
+    case 'duck.css':
+      if (isMobile) notSupported('a mobile device');
+      break
   }
   // Consent!
   if (
