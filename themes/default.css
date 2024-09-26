@@ -1,6 +1,6 @@
 body {
   background-attachment: fixed;
-  transform:translatez(0);
+  transform: translatez(0);
   background-color: #99c0ff;
   background-image: radial-gradient(
       at 31% 87%,
