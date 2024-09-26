@@ -1,6 +1,11 @@
 'use strict';
 
-const isMobile = ('userAgentData' in navigator) ? navigator.userAgentData.mobile : /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const isMobile =
+  'userAgentData' in navigator
+    ? navigator.userAgentData.mobile
+    : /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      );
 
 function getTheme() {
   try {
