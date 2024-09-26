@@ -61,7 +61,7 @@ themes.onchange = () => {
       break;
     case 'duck.css':
       if (isMobile) notSupported('a mobile device');
-      break
+      break;
   }
   // Consent!
   if (
