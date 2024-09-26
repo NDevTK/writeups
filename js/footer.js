@@ -135,6 +135,6 @@ switch (theme) {
 }
 
 // Dont assume the user has javascript enabled and no clickjacking.
-if (window.top == window) themes.disabled = false;
+if (window.top === window) themes.disabled = false;
 // Javascript enabled and not a mobile device.
 if (!isMobile) info.innerText = 'You can go back here with the dot key.';
