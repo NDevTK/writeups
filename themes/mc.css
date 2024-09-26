@@ -9,7 +9,6 @@
 }
 
 body {
-  transform: translatez(0);
   background-image: url('/writeups/mc.webp');
   background-size: cover;
   background-attachment: fixed;
