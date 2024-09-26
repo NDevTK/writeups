@@ -1,5 +1,5 @@
 ---
-title: Gmail XS-Search (Fixed, I hope)
+title: Gmail XS-Search (Fixed)
 ---
 
 [Duplicate](https://www.youtube.com/watch?v=nQJHGHw94fM) and was done before Partitioned HTTP Cache was added.
