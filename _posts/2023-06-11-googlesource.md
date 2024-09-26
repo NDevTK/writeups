@@ -1,9 +1,10 @@
 ---
 title: googlesource.com access_token leak (Awarded $7500)
 ---
+
 A bug in the [Git Source Editor](https://source.android.com/docs/setup/contribute/source-editor), the official browser-based tool by Google for editing files in projects such as [Chromium](https://edit.chromium.org/edit) and [Android](https://ci.android.com/edit), allowed to leak the user's OAuth token by redirecting to an attacker-controlled URL supplied in the URL parameters.
 
-Video PoC: <https://www.youtube.com/watch?v=q_EcUph89WM>  
+Video PoC: <https://www.youtube.com/watch?v=q_EcUph89WM>
 
 Target: _Applications that permits taking over a Google account_  
 Category: _Execute code on the client_
