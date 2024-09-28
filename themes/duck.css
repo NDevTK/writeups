@@ -6,6 +6,6 @@ html {
 
 body {
   background-image: url('/writeups/duck.svg');
-  backdrop-filter: blur(0.2rem);
+  backdrop-filter: blur(0.3rem);
   background-attachment: fixed;
 }
