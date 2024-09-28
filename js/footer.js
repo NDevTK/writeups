@@ -95,7 +95,8 @@ function Typo(word) {
   let index = getRandom(word.length);
   let letter = word[index];
   let newString = AtPos(word, index, letter);
-  if (getRandom(2) && isNaN(letter)) newString = AtPos(newString, index, letter);
+  if (getRandom(2) && isNaN(letter))
+    newString = AtPos(newString, index, letter);
   return newString;
 }
 
