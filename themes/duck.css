@@ -3,3 +3,9 @@ html {
     url('/writeups/duck.svg') 16 0,
     auto;
 }
+
+body {
+  background-image: url('/writeups/duck.svg');
+  backdrop-filter: blur(0.2rem);
+  background-attachment: fixed;
+}
