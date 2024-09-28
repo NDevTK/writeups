@@ -94,8 +94,10 @@ function TypoSTR(str) {
 function Typo(word) {
   let index = getRandom(word.length);
   let letter = word[index];
+  // If chosen is a number then ignore
+  if (!isNaN(letter)) return word;
   let newString = AtPos(word, index, letter);
-  if (getRandom(2) && isNaN(letter))
+  if (getRandom(2))
     newString = AtPos(newString, index, letter);
   return newString;
 }
