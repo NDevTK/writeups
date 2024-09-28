@@ -87,7 +87,7 @@ function TypoSTR(str) {
   words.forEach((word, index) => {
     if (word.length === 0) return;
     // For security links wont get a typo
-    if (word.startsWith('https://') || word.startsWith('http://')) return;
+    if (word.includes('://')) return;
     if (getRandom(2)) words[index] = Typo(word);
   });
   return words.join(' ');
