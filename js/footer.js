@@ -97,8 +97,7 @@ function Typo(word) {
   // If chosen is a number then ignore
   if (!isNaN(letter)) return word;
   let newString = AtPos(word, index, letter);
-  if (getRandom(2))
-    newString = AtPos(newString, index, letter);
+  if (getRandom(2)) newString = AtPos(newString, index, letter);
   return newString;
 }
 
