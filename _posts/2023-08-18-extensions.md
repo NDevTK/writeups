@@ -9,6 +9,8 @@ They have since added guidelines for Chrome Extension VRP <https://bughunters.go
 
 Notes:
 
+- Content scripts are code injected from extensions to run on a website
+- Background scripts or extension service workers are background code running separately from websites
 - Content scripts exist in an [isolated world](https://chromium.googlesource.com/chromium/src/+/master/third_party/blink/renderer/bindings/core/v8/V8BindingDesign.md#world) but run in the same process as the attacker-controlled website. They can be attacked via [Meltdown/Spectre](https://chromium.googlesource.com/chromium/src/+/master/docs/security/side-channel-threat-model.md) or a [compromised renderer](https://chromium.googlesource.com/chromium/src/+/master/docs/security/compromised-renderers.md) some extensions may allow for bypassing site isolation this way.
 - Background scripts using `XMLHttpRequest` will send cookies as if `xhr.withCredentials = true`; even if it's false and are able to read whatever the extension has access to.
 - `chrome.storage` can't be trusted [40189208 - New Extension API function `chrome.storage.setAccessLevel` - chromium](https://issues.chromium.org/issues/40189208)
@@ -58,7 +60,7 @@ api.postMessage(request);
 
 ### Attack scenario
 
-An attacker on the same network or a browser extension/XSS with any google subdomain can send messages to a proxy that opens whatever file they want shared in their google drive as long as it's synced.
+An attacker on the same network or a browser extension/XSS with any google subdomain can send messages to a proxy that opens whatever file they want shared in their google drive as long as it's synced this could be used to run malware.
 
 No "Mark Of The Web" is set. <https://textslashplain.com/2016/04/04/downloads-and-the-mark-of-the-web/>
 
@@ -862,31 +864,15 @@ The summary of the attack:
 
 Leaks `slackWebhook`, `teamsWebhook`, `token` to a compromised renderer via `chrome.storage.local`
 
+# Dart Debug Extension (Out of scope)
+
+<https://github.com/dart-lang/webdev/issues/2287>
+
 # Credits :)
 
 - {{ site.data.people.AlesandroOrtiz.credit }} for help with the Secure Shell report and finding the Limited URL Spoof.
 - {{ site.data.people.ThomasOrlita.credit }} for help with reports and the writeup.
 - {{ site.data.people.MissoumSaid.credit }} for finding the "Save to Drive" SOP bypass, the "Tag Assistant Legacy" URL Leak, localhost XSS, Screenwise Meter bugs and Google Optimize UXSS.
-
-# Dart Debug Extension (Out of scope)
-
-<https://github.com/dart-lang/webdev/issues/2287>
-
-# Playstation password reset tokens leak (Not reported, Alesandro can't repo)
-
-**URL:** <https://www.playstation.com/>
-
-Playstation password reset emails use a insecure `http://` link as `http://click.txn-email.account.sony.com/` has to be loaded over `http:` this uses `exacttarget.com` a email analytics service by salesforce.
-"Having worked with ExactTarget before SF acquisition, I can confirm it's a piece of crap enterprise software." ~ Alesandro Ortiz
-
-Both resets done from the same playstation login page:
-`sony@email02.account.sony.com` -> http link
-`sony@txn-email03.playstation.com` -> https link
-
-### Attack scenario
-
-A local network attacker can gain account takeover if a user attempts to reset their password.
-May also require the user's data of birth depending on the account settings.
 
 # FREE XSS SECTION!
 
