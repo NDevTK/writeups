@@ -61,6 +61,7 @@ themes.onchange = () => {
       break;
     case 'ai.css':
       themes.value = theme;
+      alert('AI content, might be misleading');
       location.href =
         'https://notebooklm.google.com/notebook/3bd2faae-8639-4af5-8c5e-1d87886e555d/audio';
       break;
