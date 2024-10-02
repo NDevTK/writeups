@@ -62,8 +62,7 @@ themes.onchange = () => {
     case 'ai.css':
       themes.value = theme;
       alert('AI content, might be misleading');
-      location.href =
-        'https://www.youtube.com/watch?v=2jhVRk1H7vw';
+      location.href = 'https://www.youtube.com/watch?v=2jhVRk1H7vw';
       break;
   }
   // Consent!
