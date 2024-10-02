@@ -12,6 +12,9 @@ DOMPurify
 reloader
 APIs
 seo
+github
+googlechromelabs
+io
 NoScript's
 Yay
 gRPC
