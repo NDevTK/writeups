@@ -16,6 +16,7 @@ github
 googlechromelabs
 io
 NoScript's
+NotebookLM
 Yay
 gRPC
 RPC
@@ -23,6 +24,8 @@ luci
 RSS
 AuthDB
 allowlist
+Hackintosh
+MacOS
 iframe
 javascript
 sandboxed
