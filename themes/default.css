@@ -1,7 +1,10 @@
 body {
-  theme-color: black;
   background-attachment: fixed;
   background-color: #99c0ff;
+  background-position: center center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: cover;
   background-image: radial-gradient(
       at 31% 87%,
       hsla(103, 100%, 77%, 1) 0px,
