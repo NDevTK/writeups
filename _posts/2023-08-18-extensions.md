@@ -5,12 +5,12 @@ title: Google Extensions (Awarded $18833.7)
 The reward total in the post title does not include other people's bugs that this writeup includes but does include that bug from Proton that's notably not a Google extension. This may not reflect the actual money received.
 
 Testing the security of extensions developed by Google with the help of a Vulnerability Research Grant from Google of $500.  
-They have since added guidelines for Chrome Extension VRP <https://bughunters.google.com/about/rules/6625378258649088/google-and-alphabet-vulnerability-reward-program-vrp-rules#reward-amounts-for-vulnerabilities-in-chrome-extensions>
+They have since added guidelines for Chrome Extension VRP <https://bughunters.google.com/about/rules/chrome-friends/5668215344988160/chrome-extensions-vulnerability-reward-program-rules>
 
 Notes:
 
-- Content scripts are code injected from extensions to run on a website
-- Background scripts or extension service workers are background code running separately from websites
+- Content scripts are code injected from extensions to run on a website.
+- Background scripts or extension service workers are background code running separately from websites.
 - Content scripts exist in an [isolated world](https://chromium.googlesource.com/chromium/src/+/master/third_party/blink/renderer/bindings/core/v8/V8BindingDesign.md#world) but run in the same process as the attacker-controlled website. They can be attacked via [Meltdown/Spectre](https://chromium.googlesource.com/chromium/src/+/master/docs/security/side-channel-threat-model.md) or a [compromised renderer](https://chromium.googlesource.com/chromium/src/+/master/docs/security/compromised-renderers.md) some extensions may allow for bypassing site isolation this way.
 - Background scripts using `XMLHttpRequest` will send cookies as if `xhr.withCredentials = true`; even if it's false and are able to read whatever the extension has access to.
 - `chrome.storage` can't be trusted [40189208 - New Extension API function `chrome.storage.setAccessLevel` - chromium](https://issues.chromium.org/issues/40189208)
