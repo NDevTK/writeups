@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Module>
+<ModulePrefs title="PoC" />
+<Content type="html">
+<![CDATA[
+  <html>
+  <head>
+  <script>
+    alert(window.origin);
+  </script>
+</body>
+</html>
+]]>
+</Content>
+</Module>
