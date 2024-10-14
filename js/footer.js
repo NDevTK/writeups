@@ -114,6 +114,15 @@ function reloadAll() {
 }
 
 switch (theme) {
+  case 'duck.css':
+    const link = document.querySelector("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = '/writeups/duck.svg';
+    break;
   case 'typoifier.css':
     document.querySelectorAll('p, a').forEach((e) => {
       e.childNodes.forEach((node) => {
