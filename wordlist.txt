@@ -5,6 +5,7 @@ HTTPLeaks
 SVG
 sanitization
 src
+SignalPath
 WebExtensions
 UAC
 GOOGLEUSERCONTENT
