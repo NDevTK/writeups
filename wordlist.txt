@@ -10,6 +10,8 @@ WebExtensions
 UAC
 GOOGLEUSERCONTENT
 googleusercontent
+signalpath
+CTMS
 url
 DOMPurify
 reloader
