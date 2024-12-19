@@ -8,6 +8,7 @@ const isMobile =
       );
 
 function getTheme() {
+  if (location.search === '?readable') return 'basic.css';
   try {
     return localStorage.getItem('theme') || 'default.css';
   } catch {
