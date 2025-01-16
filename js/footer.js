@@ -5,7 +5,7 @@ const info = document.getElementById('info');
 themes.value = theme;
 
 if (themes.value === '') {
-  alert('The ' + theme + " theme doesn't exist, maybe file a bug :)");
+  alert("The theme doesn't exist, maybe file a bug :)");
   localStorage.removeItem('theme');
   // Prioritizes consistency over user preference :/
   reloadAll();
