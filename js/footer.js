@@ -4,14 +4,6 @@ const info = document.getElementById('info');
 
 themes.value = theme;
 
-if (themes.value === '') {
-  alert("The theme doesn't exist, maybe file a bug :)");
-  localStorage.removeItem('theme');
-  // Prioritizes consistency over user preference :/
-  reloadAll();
-  throw new Error('Theme provided is invalid');
-}
-
 function getRandom(max) {
   // This is not secure
   return Math.floor((Math.random() * 10) % max);
