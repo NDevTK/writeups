@@ -22,6 +22,12 @@ function getTheme() {
 
 const theme = getTheme();
 
+// Fix getting stuck with the NoScript theme.
+if (localStorage.getItem('theme') === 'noscript.css') {
+  localStorage.removeItem('theme');
+  location.reload();
+}
+
 const stylesheet = document.createElement('link');
 stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
 stylesheet.rel = 'stylesheet';
