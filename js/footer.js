@@ -147,7 +147,8 @@ switch (theme) {
 }
 
 // Dont assume the user has javascript enabled and no clickjacking.
-if (window.top === window && !searchParams.has('theme')) themes.disabled = false;
+if (window.top === window && !searchParams.has('theme'))
+  themes.disabled = false;
 // Javascript enabled, not a mobile device.
 if (location.pathname === '/writeups/' && !isMobile)
   info.innerText = 'You can go back here with the dot key.';
