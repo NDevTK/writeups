@@ -9,6 +9,7 @@ if (themes.value === '') {
   localStorage.removeItem('theme');
   // Prioritizes consistency over user preference :/
   reloadAll();
+  throw new Error('Theme provided is invalid'); 
 }
 
 function getRandom(max) {
