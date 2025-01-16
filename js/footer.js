@@ -103,7 +103,6 @@ function Typo(word) {
 
 function reloadAll() {
   reload.postMessage('');
-  location.search = '';
   location.reload();
 }
 
