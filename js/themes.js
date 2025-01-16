@@ -11,6 +11,7 @@ const searchParams = new URL(location.href).searchParams;
 
 function getTheme() {
   if (searchParams.has('theme')) {
+    themes.hidden = true;
     return searchParams.get('theme');
   }
   try {
