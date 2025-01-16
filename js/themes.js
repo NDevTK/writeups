@@ -7,8 +7,12 @@ const isMobile =
         navigator.userAgent
       );
 
+const searchParams = new URL(location.href).searchParams;
+
 function getTheme() {
-  if (location.search === '?readable') return 'basic.css';
+  if (searchParams.has('theme')) {
+    return searchParams.get('theme');
+  }
   try {
     return localStorage.getItem('theme') || 'default.css';
   } catch {
