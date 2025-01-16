@@ -144,7 +144,8 @@ switch (theme) {
     });
     break;
   case 'noscript.css':
-    document.body.innerText='You are using the NoScript theme with Javascript enabled :)';
+    document.body.innerText =
+      'You are using the NoScript theme with Javascript enabled :)';
     break;
 }
 
