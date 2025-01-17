@@ -146,8 +146,7 @@ switch (theme) {
 }
 
 if (!theme.endsWith('.css')) {
-  document.body.innerText =
-    'Themes end in .css :)';
+  document.body.innerText = 'Themes end in .css :)';
 }
 
 // Dont assume the user has javascript enabled and no clickjacking.
