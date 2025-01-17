@@ -2,7 +2,9 @@
 const themes = document.getElementById('themes');
 const info = document.getElementById('info');
 
-themes.value = theme;
+if (theme.endsWith('.css')) {
+  themes.value = theme;
+}
 
 function getRandom(max) {
   // This is not secure
