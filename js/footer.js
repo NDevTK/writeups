@@ -57,7 +57,8 @@ themes.onchange = () => {
   }
   // Consent!
   if (
-    themes.value.endsWith('.css') && themes.value !== theme &&
+    themes.value.endsWith('.css') &&
+    themes.value !== theme &&
     confirm(
       'Allow the ' +
         themes.value +
