@@ -49,18 +49,15 @@ themes.onchange = () => {
         w.resizeBy(0, -100000);
         setInterval((_) => w.focus(), 5);
       }
-      // Temp addon
-      themes.value = theme;
       break;
     case 'ai':
-      themes.value = theme;
       alert('AI content, might be misleading');
       location.href = 'https://www.youtube.com/watch?v=2jhVRk1H7vw';
       break;
   }
   // Consent!
   if (
-    themes.value !== theme &&
+    themes.value.endsWith('.css') && themes.value !== theme &&
     confirm(
       'Allow the ' +
         themes.value +
