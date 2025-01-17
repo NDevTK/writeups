@@ -145,6 +145,11 @@ switch (theme) {
     break;
 }
 
+if (!theme.endsWith('.css')) {
+  document.body.innerText =
+    'Themes end in .css :)';
+}
+
 // Dont assume the user has javascript enabled and no clickjacking.
 if (window.top === window && !searchParams.has('theme'))
   themes.disabled = false;
