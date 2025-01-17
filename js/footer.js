@@ -37,7 +37,7 @@ themes.onchange = () => {
     case 'noscript.css':
       notSupported('javascript enabled');
       break;
-    case 'spoof.css':
+    case 'spoof':
       if (isMobile) {
         notSupported('a mobile device');
       } else {
@@ -52,7 +52,7 @@ themes.onchange = () => {
       // Temp addon
       themes.value = theme;
       break;
-    case 'ai.css':
+    case 'ai':
       themes.value = theme;
       alert('AI content, might be misleading');
       location.href = 'https://www.youtube.com/watch?v=2jhVRk1H7vw';
