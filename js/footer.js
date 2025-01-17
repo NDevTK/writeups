@@ -2,10 +2,6 @@
 const themes = document.getElementById('themes');
 const info = document.getElementById('info');
 
-if (theme.endsWith('.css')) {
-  themes.value = theme;
-}
-
 function getRandom(max) {
   // This is not secure
   return Math.floor((Math.random() * 10) % max);
