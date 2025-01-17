@@ -2,6 +2,8 @@
 const themes = document.getElementById('themes');
 const info = document.getElementById('info');
 
+themes.value = theme;
+
 function getRandom(max) {
   // This is not secure
   return Math.floor((Math.random() * 10) % max);
