@@ -249,3 +249,5 @@ xs
 duckSpoof
 intentSpoof
 sbrowser
+HackerOne
+Bugcrowd
