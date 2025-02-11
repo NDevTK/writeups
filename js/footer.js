@@ -32,7 +32,7 @@ themes.onchange = () => {
       return e.value != themes.value && e.value != theme;
     });
     // Select a random dropdown option.
-    //themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
+    themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
   }
   switch (themes.value) {
     case 'default.css':
