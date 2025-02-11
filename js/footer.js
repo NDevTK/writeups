@@ -4,11 +4,12 @@ const info = document.getElementById('info');
 
 themes.value = theme;
 
+// prettier-ignore
 function getRandomIntInclusive(min, max) {
     const randomBuffer = new Uint32Array(1);
 
     window.crypto.getRandomValues(randomBuffer);
-    // prettier-ignore
+    
     let randomNumber = randomBuffer[0] / (0xffffffff + 1);
 
     min = Math.ceil(min);
