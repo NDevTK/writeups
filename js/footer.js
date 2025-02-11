@@ -4,30 +4,6 @@ const info = document.getElementById('info');
 
 themes.value = theme;
 
-function getRandomIntInclusive(min, max) {
-    const randomBuffer = new Uint32Array(1);
-
-    window.crypto.getRandomValues(randomBuffer);
-
-    let randomNumber = randomBuffer[0] / (0xffffffff + 1);
-
-    min = Math.ceil(min);
-    max = Math.floor(max);
-    return Math.floor(randomNumber * (max - min + 1)) + min;
-}
-
-function getRandom(max) {
-    if (window.crypto) {
-        return getRandomIntInclusive(0, max - 1);
-    }
-    return getRandomInsecure(max);
-}
-
-function getRandomInsecure(max) {
-  // This is not secure
-  return Math.floor((Math.random() * 10) % max);
-}
-
 function notSupported(reason) {
   alert('The ' + themes.value + ' theme cant be used with ' + reason + '.');
   themes.value = theme;
