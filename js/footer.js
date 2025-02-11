@@ -17,7 +17,8 @@ function getRandomIntInclusive(min, max) {
 }
 
 function getRandom(max) {
-  return getRandomIntInclusive(0, max-1);
+    const max2 = max - 1;
+    return getRandomIntInclusive(0, max2);
 }
 
 function notSupported(reason) {
