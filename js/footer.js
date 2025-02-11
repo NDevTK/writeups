@@ -8,7 +8,7 @@ function getRandomIntInclusive(min, max) {
     const randomBuffer = new Uint32Array(1);
 
     window.crypto.getRandomValues(randomBuffer);
-
+    // prettier-ignore
     let randomNumber = randomBuffer[0] / (0xffffffff + 1);
 
     min = Math.ceil(min);
@@ -32,7 +32,7 @@ themes.onchange = () => {
       return e.value != themes.value && e.value != theme;
     });
     // Select a random dropdown option.
-    themes.value = allowedThemes[1].value;
+    themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
   }
   switch (themes.value) {
     case 'default.css':
