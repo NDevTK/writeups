@@ -4,20 +4,20 @@ const info = document.getElementById('info');
 
 themes.value = theme;
 
-function getRandomInt(min, max) {       
-    // Create byte array and fill with 1 random number
-    var byteArray = new Uint8Array(1);
-    window.crypto.getRandomValues(byteArray);
+function getRandomIntInclusive(min, max) {
+    const randomBuffer = new Uint32Array(1);
 
-    var range = max - min + 1;
-    var max_range = 256;
-    if (byteArray[0] >= Math.floor(max_range / range) * range)
-        return getRandomInt(min, max);
-    return min + (byteArray[0] % range);
+    window.crypto.getRandomValues(randomBuffer);
+
+    let randomNumber = randomBuffer[0] / (0xffffffff + 1);
+
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(randomNumber * (max - min + 1)) + min;
 }
 
 function getRandom(max) {
-    return getRandomInt(0, max - 1);
+    return getRandomIntInclusive(0, max - 1);
 }
 
 function notSupported(reason) {
