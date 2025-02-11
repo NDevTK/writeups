@@ -17,8 +17,15 @@ function getRandomIntInclusive(min, max) {
 }
 
 function getRandom(max) {
-    const max2 = max - 1;
-    return getRandomIntInclusive(0, max2);
+    if (window.crypto) {
+        return getRandomIntInclusive(0, max - 1);
+    }
+    return getRandomInsecure(max);
+}
+
+function getRandomInsecure(max) {
+  // This is not secure
+  return Math.floor((Math.random() * 10) % max);
 }
 
 function notSupported(reason) {
