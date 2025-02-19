@@ -6,7 +6,7 @@ The Web Accessibility Library from [EqualWeb](https://www.equalweb.com/) that's 
 
 ```js
 onmessage = (e) => {
-  // This is here because company thinks AI is hard to exfiltate data from.
+  // This is here because company thinks AI is hard to exfiltrate data from.
   alert(e.data);
 };
 
