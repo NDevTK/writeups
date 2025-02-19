@@ -10,6 +10,7 @@ WebExtensions
 UAC
 GOOGLEUSERCONTENT
 googleusercontent
+EqualWeb
 signalpath
 CTMS
 url
@@ -29,6 +30,7 @@ luci
 RSS
 AuthDB
 allowlist
+attackable
 Hackintosh
 MacOS
 iframe
