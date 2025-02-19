@@ -41,5 +41,5 @@ Because this fix was not made server-side some companies may still be using the 
 
 It's still possible to send cross-origin messages so other attacks such as CSS and keystroke injection (via Virtual keyboard) may work.
 
-While this affected multiple bug bounty programs the one I did report it to gave it Low and ignored the comment about how to steal cookies for account takeover and instead went based off the PoC doing `window.alert()` but hey at least they accepted the bug in a 3rd party commonly used library and awarded it 
+While this affected multiple bug bounty programs the one I did report it to gave it Low and ignored the comment about how to steal cookies for account takeover and instead went based off the PoC doing `window.alert()` but hey at least they accepted the bug in a 3rd party commonly used library and awarded it
 $200 that's 200x more than the bank XSS I reported.
