@@ -1,2 +1,2 @@
 # Writeups
-This is a writeup version control :)
+This is writeup version control :)
