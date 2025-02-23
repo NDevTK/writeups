@@ -26,28 +26,28 @@ The association between a `RenderProcessHost` and a `StoragePartition` is crucia
 
 `RenderProcessHostImpl` interacts with the `StoragePartitionImpl` to provide access to various storage-related Mojo interfaces, such as:
 
--   `CacheStorage`
--   `IndexedDB`
--   `FileSystemManager`
--   `FileSystemAccessManager`
--   `FileBackedBlobFactory`
--   `RestrictedCookieManager`
--   `QuotaManagerHost`
--   `LockManager`
+- `CacheStorage`
+- `IndexedDB`
+- `FileSystemManager`
+- `FileSystemAccessManager`
+- `FileBackedBlobFactory`
+- `RestrictedCookieManager`
+- `QuotaManagerHost`
+- `LockManager`
 
 These interfaces are bound to the renderer process and allow it to interact with the storage APIs in a secure and isolated manner.
 
 ## Further Investigation
 
--   The detailed logic of how `StoragePartition`s are created and assigned to `RenderProcessHost`s.
--   The interaction between `RenderProcessHostImpl`, `StoragePartitionImpl`, and other storage-related components, such as `IndexedDBContext` and `CacheStorageContext`.
--   The impact of storage partitioning on process allocation and site isolation.
--   The handling of special cases, such as guests and extensions, which may have different storage partitioning requirements.
+- The detailed logic of how `StoragePartition`s are created and assigned to `RenderProcessHost`s.
+- The interaction between `RenderProcessHostImpl`, `StoragePartitionImpl`, and other storage-related components, such as `IndexedDBContext` and `CacheStorageContext`.
+- The impact of storage partitioning on process allocation and site isolation.
+- The handling of special cases, such as guests and extensions, which may have different storage partitioning requirements.
 
 ## Related Files
 
--   `content/browser/renderer_host/render_process_host_impl.h`
--   `content/browser/renderer_host/render_process_host_impl.cc`
--   `content/browser/storage_partition_impl.h`
--   `content/browser/storage_partition_impl.cc`
--   `content/public/browser/storage_partition.h`
+- `content/browser/renderer_host/render_process_host_impl.h`
+- `content/browser/renderer_host/render_process_host_impl.cc`
+- `content/browser/storage_partition_impl.h`
+- `content/browser/storage_partition_impl.cc`
+- `content/public/browser/storage_partition.h`
