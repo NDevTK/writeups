@@ -11,6 +11,9 @@ UAC
 GOOGLEUSERCONTENT
 googleusercontent
 EqualWeb
+UUID
+sdk
+websdk
 signalpath
 CTMS
 url
@@ -18,6 +21,7 @@ DOMPurify
 reloader
 APIs
 seo
+autocomplete
 github
 googlechromelabs
 io
@@ -27,6 +31,8 @@ Yay
 gRPC
 RPC
 luci
+NDA
+dont
 RSS
 AuthDB
 allowlist
