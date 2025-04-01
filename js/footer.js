@@ -28,7 +28,17 @@ function notSupported(reason) {
 
 const generic =
   'This plain text article with important details is intended for a tech-savvy audience.';
-let context = localStorage.getItem('context') || generic;
+
+function getContext() {
+  try {
+    return localStorage.getItem('context') || generic;
+  } catch {
+    return generic;
+  }
+}
+
+
+let context = getContext();
 
 themes.onchange = async () => {
   if (themes.value === 'random') {
