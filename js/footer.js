@@ -174,7 +174,7 @@ async function summarizerSupport() {
     const c = await ai.summarizer.capabilities();
     if (c.available === 'no') return notSupported('unusable Summarizer API');
     return true;
-  };
+  }
   return notSupported('no Summarizer API');
 }
 
@@ -187,7 +187,7 @@ async function summarizer() {
       if (node.data.length < 20) return;
       const summarizer = await ai.summarizer.create();
       node.data = await summarizer.summarize(node.data, {
-        context: 'This article is intended for a tech-savvy audience.',
+        context: 'This article is intended for a tech-savvy audience.'
       });
     });
   });
