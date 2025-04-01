@@ -48,6 +48,9 @@ themes.onchange = async () => {
     // Select a random dropdown option.
     themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
   }
+
+  localStorage.removeItem('context');
+  
   switch (themes.value) {
     case 'default.css':
       localStorage.removeItem('theme');
