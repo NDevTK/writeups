@@ -188,14 +188,7 @@ async function summarizer() {
   // Dont run on the listing page since for security AI is not allowed to render HTML.
   if (!supported || location.pathname === '/writeups/') return;
   const summarizer = await ai.summarizer.create();
-  const unsafe = (content.innerText = await summarizer.summarize(
-    content.innerText,
-    {
-      context:
-        'This article is intended for a tech-savvy audience. Reply in plain text'
-    }
-  ));
-  content.innerText = unsafe;
+  content.innerText = await summarizer.summarize(content.innerText, {context: 'This article is intended for a tech-savvy audience. Reply in plain text'});
 }
 
 // Dont assume the user has javascript enabled and no clickjacking.
