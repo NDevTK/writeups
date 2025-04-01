@@ -187,9 +187,13 @@ async function summarizer() {
   const supported = await summarizerSupport();
   if (!supported) return;
   const summarizer = await ai.summarizer.create();
-  const unsafe = content.innerText = await summarizer.summarize(content.innerText, {
-    context: 'This article is intended for a tech-savvy audience. Reply in plain text'
-  });
+  const unsafe = (content.innerText = await summarizer.summarize(
+    content.innerText,
+    {
+      context:
+        'This article is intended for a tech-savvy audience. Reply in plain text'
+    }
+  ));
   content.innerText = unsafe;
 }
 
