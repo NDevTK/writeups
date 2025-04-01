@@ -63,11 +63,12 @@ themes.onchange = async () => {
       }
       break;
     case 'ai':
-      alert('AI content, might be misleading');
+      AIWarning();
       location.href = 'https://www.youtube.com/watch?v=2jhVRk1H7vw';
       break;
     case 'summarizer':
       await summarizerSupport();
+      AIWarning();
       break;
   }
   // Consent!
@@ -178,19 +179,18 @@ async function summarizerSupport() {
   return notSupported('no Summarizer API');
 }
 
+function AIWarning() {
+  alert('AI content, might be misleading');
+}
+
 async function summarizer() {
   const supported = await summarizerSupport();
   if (!supported) return;
-  document.querySelectorAll('p, a').forEach((e) => {
-    e.childNodes.forEach(async (node) => {
-      if (node.data === '' || node.data === undefined) return;
-      if (node.data.length < 20) return;
-      const summarizer = await ai.summarizer.create();
-      node.data = await summarizer.summarize(node.data, {
-        context: 'This article is intended for a tech-savvy audience.'
-      });
-    });
+  const summarizer = await ai.summarizer.create();
+  const unsafe = content.innerText = await summarizer.summarize(content.innerText, {
+    context: 'This article is intended for a tech-savvy audience. Reply in plain text'
   });
+  content.innerText = unsafe;
 }
 
 // Dont assume the user has javascript enabled and no clickjacking.
