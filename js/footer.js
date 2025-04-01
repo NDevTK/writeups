@@ -197,7 +197,21 @@ async function summarizer() {
     return;
   const summarizer = await ai.summarizer.create({
     sharedContext:
-      'This is an infomation security bug writeup intended for a tech-savvy audience. Sometimes these acronyms are used Content-Security-Policy (CSP) Cross-Origin-Opener-Policy (COOP) Cross-Origin-Embedder-Policy (COEP) Cross-Origin-Resource-Policy (CORP)',
+      `**The writeups document a collection of security vulnerabilities discovered in various software and online services.** They primarily focus on web security issues, including Cross-Site Scripting (XSS), Same-Origin Policy (SOP) bypasses, information leaks (like access tokens, cookies, user data, and URLs), and other security flaws.
+
+Key aspects of the context include:
+
+*   **Focus on Google Products and Services:** Many writeups detail vulnerabilities found in Google Cloud Shell, Google extensions, Google Accounts/GAIA, Google Photos, Project IDX, Chromium infra, Google Scholar PDF Reader, and various Google websites and services.
+*   **Browser Security:** A significant portion of the writeups concerns browser security, particularly in Chromium and related browser extensions. There are also mentions of security features in browsers like Content Security Policy (CSP), Cross-Origin Opener Policy (COOP), and Site Isolation.
+*   **Vulnerability Research and Bug Bounties:** Many writeups mention reporting these vulnerabilities through bug bounty programs (like Google VRP) and the rewards received. The writeups often provide technical details and proof-of-concept code to demonstrate the vulnerabilities.
+*   **Cross-Site Leaks (XS-Leaks):** Several writeups specifically address cross-site information leaks (XS-Leaks), highlighting techniques like timing attacks and cache probing.
+*   **Security of Third-Party Libraries and Services:** Some writeups also cover vulnerabilities found in third-party libraries used by various websites and services, such as PDF.js, EqualWeb Accessibility Library, and Nuance Library.
+*   **Exploitation Techniques:** The writeups often include code snippets and detailed steps to reproduce the vulnerabilities, illustrating various exploitation techniques.
+*   **Fixes and Mitigations:** Some writeups mention how the reported vulnerabilities were fixed or the mitigations implemented by the affected vendors.
+*   **Tools and Methodologies:** The author sometimes mentions tools and methodologies used for vulnerability research, such as code auditing, dynamic analysis, and browser developer tools.
+*   **Personal Anecdotes and Opinions:** The author occasionally includes personal anecdotes, opinions on security practices, and interactions with bug bounty programs.
+
+In essence, the site serves as a technical blog or portfolio showcasing the author's findings in web security research, with a strong emphasis on vulnerabilities affecting Google products and the Chromium browser ecosystem, often discovered and reported through bug bounty programs.`,
     format: 'plain-text',
     length: 'long'
   });
