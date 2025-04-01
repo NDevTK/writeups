@@ -26,6 +26,9 @@ function notSupported(reason) {
   return false;
 }
 
+const generic = 'This plain text article with important details is intended for a tech-savvy audience.';
+let context = localStorage.getItem('context') || generic;
+
 themes.onchange = async () => {
   if (themes.value === 'random') {
     const allowedThemes = [...themes.options].filter((e) => {
@@ -70,10 +73,11 @@ themes.onchange = async () => {
       const supported = await summarizerSupport();
       if (!supported) break;
       AIWarning();
-      const audience = prompt(
-        'Optional saved prompt to allow for AI injection/customizion if you like ducks just say!'
-      );
-      if (audience) localStorage.setItem('audience', audience);
+      context = prompt(
+        'Optionally modify the saved context to allow for AI injection/customization if you like ducks just say!', generic
+      ) || generic;
+      // Only save if the user makes a change to the prompt
+      if (context !== generic) localStorage.setItem('context', context);
       break;
   }
   // Consent!
@@ -194,9 +198,7 @@ async function summarizer() {
   if (!supported || location.pathname === '/writeups/') return;
   const summarizer = await ai.summarizer.create();
   content.innerText = await summarizer.summarize(content.innerText, {
-    context:
-      'This plain text article with important details is intended for a tech-savvy audience. ' +
-      localStorage.getItem('audience')
+    context: context
   });
 }
 
