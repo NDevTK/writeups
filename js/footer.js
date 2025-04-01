@@ -185,7 +185,8 @@ function AIWarning() {
 
 async function summarizer() {
   const supported = await summarizerSupport();
-  if (!supported) return;
+  // Dont run on the listing page since for security AI is not allowed to render HTML.
+  if (!supported || location.pathname === '/writeups/') return;
   const summarizer = await ai.summarizer.create();
   const unsafe = (content.innerText = await summarizer.summarize(
     content.innerText,
