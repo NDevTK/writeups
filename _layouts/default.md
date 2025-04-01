@@ -16,9 +16,9 @@
       {% if site.title and site.title != page.title %}
       <h1><a href="{{ "/" | absolute_url }}">{{ site.title }}</a></h1>
       {% endif %}
-
+      <div id="content">
       {{ content }}
-
+      </div>
       <div class="footer border-top border-gray-light mt-5 pt-3 text-right">
         {% include footer-custom.html %}
       </div>
