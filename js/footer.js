@@ -26,7 +26,7 @@ function notSupported(reason) {
   return false;
 }
 
-const generic = 'This article is intended for a tech-savvy audience.';
+const generic = 'This is an infomation security bug writeup intended for a tech-savvy audience.';
 
 function getContext() {
   try {
