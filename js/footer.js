@@ -23,9 +23,10 @@ function getRandom(max) {
 function notSupported(reason) {
   alert('The ' + themes.value + ' theme cant be used with ' + reason + '.');
   themes.value = theme;
+  return false;
 }
 
-themes.onchange = () => {
+themes.onchange = async () => {
   if (themes.value === 'random') {
     const allowedThemes = [...themes.options].filter((e) => {
       // Filter out the currently active theme and ourself.
@@ -64,6 +65,9 @@ themes.onchange = () => {
     case 'ai':
       alert('AI content, might be misleading');
       location.href = 'https://www.youtube.com/watch?v=2jhVRk1H7vw';
+      break;
+    case 'summarizer':
+      await summarizerSupport();
       break;
   }
   // Consent!
@@ -156,10 +160,37 @@ switch (theme) {
     document.body.innerText =
       'You are using the NoScript theme with Javascript enabled :)';
     break;
+  case 'summarizer.css':
+    summarizer();
+    break;
 }
 
 if (!theme.endsWith('.css')) {
   document.body.innerText = 'Themes end in .css :)';
+}
+
+async function summarizerSupport() {
+  if ('ai' in self && 'summarizer' in self.ai) {
+    const c = await ai.summarizer.capabilities();
+    if (c.available === 'no') return notSupported('unusable Summarizer API');
+    return true;
+  });
+  return notSupported('no Summarizer API');
+}
+
+async function summarizer() {
+  const supported = await summarizerSupport();
+  if (!supported) return;
+  document.querySelectorAll('p, a').forEach((e) => {
+    e.childNodes.forEach(async (node) => {
+      if (node.data === '' || node.data === undefined) return;
+      if (node.data.length < 20) return;
+      const summarizer = await ai.summarizer.create();
+      node.data = await summarizer.summarize(node.data, {
+        context: 'This article is intended for a tech-savvy audience.',
+      });
+    });
+  });
 }
 
 // Dont assume the user has javascript enabled and no clickjacking.
