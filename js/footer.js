@@ -211,13 +211,11 @@ async function summarizer() {
   // Dont run on the listing page since for security AI is not allowed to render HTML.
   if (!supported || location.pathname === '/writeups/') return;
   const summarizer = await ai.summarizer.create({
-    sharedContext: 'This is an infomation security bug writeup',
+    sharedContext: context,
     format: 'plain-text',
     length: 'long'
   });
-  content.innerText = await summarizer.summarize(content.innerText, {
-    context: context
-  });
+  content.innerText = await summarizer.summarize(content.innerText);
 }
 
 // Dont assume the user has javascript enabled and no clickjacking.
