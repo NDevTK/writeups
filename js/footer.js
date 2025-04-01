@@ -26,19 +26,6 @@ function notSupported(reason) {
   return false;
 }
 
-const generic =
-  'This is an infomation security bug writeup intended for a tech-savvy audience.';
-
-function getContext() {
-  try {
-    return localStorage.getItem('context') || generic;
-  } catch {
-    return generic;
-  }
-}
-
-let context = getContext();
-
 themes.onchange = async () => {
   if (themes.value === 'random') {
     const allowedThemes = [...themes.options].filter((e) => {
@@ -48,8 +35,6 @@ themes.onchange = async () => {
     // Select a random dropdown option.
     themes.value = allowedThemes[getRandom(allowedThemes.length)].value;
   }
-
-  localStorage.removeItem('context');
 
   switch (themes.value) {
     case 'default.css':
@@ -86,13 +71,6 @@ themes.onchange = async () => {
       const supported = await summarizerSupport();
       if (!supported) break;
       AIWarning();
-      context =
-        prompt(
-          'Optionally modify the saved context to allow for AI injection/customization.',
-          generic
-        ) || generic;
-      // Only save if the user makes a change to the prompt
-      if (context !== generic) localStorage.setItem('context', context);
       break;
   }
   // Consent!
@@ -212,7 +190,7 @@ async function summarizer() {
   // Dont run on the listing page since for security AI is not allowed to render HTML.
   if (!supported || location.pathname === '/writeups/') return;
   const summarizer = await ai.summarizer.create({
-    sharedContext: context,
+    sharedContext: 'This is an infomation security bug writeup intended for a tech-savvy audience.',
     format: 'plain-text',
     length: 'long'
   });
