@@ -50,7 +50,7 @@ themes.onchange = async () => {
   }
 
   localStorage.removeItem('context');
-  
+
   switch (themes.value) {
     case 'default.css':
       localStorage.removeItem('theme');
