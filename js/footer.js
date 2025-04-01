@@ -197,7 +197,7 @@ async function summarizer() {
     return;
   const summarizer = await ai.summarizer.create({
     sharedContext:
-      'This is an infomation security bug writeup intended for a tech-savvy audience. Sometimes these acronyms are used Content-Security-Policy (CSP) Cross-Origin-Opener-Policy (COOP) Cross-Origin-Embedder-Policy (COEP) Cross-Origin-Resource-Policy (CORP)',
+      'This is an webapp infomation security bug writeup intended for a tech-savvy audience.',
     format: 'plain-text',
     length: 'long'
   });
