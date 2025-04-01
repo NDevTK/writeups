@@ -196,10 +196,7 @@ async function summarizer() {
   )
     return;
   const summarizer = await ai.summarizer.create({
-    sharedContext: `The writeups appear to be from a website documenting **security vulnerabilities and bugs** discovered in various software and online services. The content covers a wide range of issues, with a significant focus on **Google products and services** such as Google Cloud Shell, Gmail, Google Extensions like Perfetto UI and Tag Assistant Legacy, Google Issue Tracker, Google Accounts/GAIA, and Project IDX.
-The website also includes writeups on vulnerabilities found in **browser features and extensions** like NoScript, and issues related to Chromium. Additionally, it documents bugs in third-party services like Proton, SponsorBlock, leet.cc, EqualWeb, and Nuance Library.
-Many of the writeups detail the **technical aspects of the vulnerabilities**, including code snippets and steps to reproduce them. They often mention whether a vulnerability was **fixed, awarded a bounty by Google VRP (Vulnerability Reward Program), or remains unfixed**. Some writeups also describe the **potential impact** of the vulnerabilities, such as XSS (Cross-Site Scripting), account takeover, information leaks, and SOP (Same-Origin Policy) bypasses.
-The website seems to be authored by someone involved in security research, likely participating in bug bounty programs, as they mention reward amounts and the Google VRP process. There are also acknowledgements to collaborators for their help. The inclusion of personal anecdotes and opinions suggests it's an individual or small team's project.`,
+    sharedContext: 'This is an infomation security bug writeup intended for a tech-savvy audience. Sometimes these acronyms are used Content-Security-Policy (CSP) Cross-Origin-Opener-Policy (COOP) Cross-Origin-Embedder-Policy (COEP) Cross-Origin-Resource-Policy (CORP)',
     format: 'plain-text',
     length: 'long'
   });
