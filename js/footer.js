@@ -67,7 +67,8 @@ themes.onchange = async () => {
       location.href = 'https://www.youtube.com/watch?v=2jhVRk1H7vw';
       break;
     case 'summarizer.css':
-      await summarizerSupport();
+      const supported = await summarizerSupport();
+      if (!supported) break
       AIWarning();
       const audience = prompt(
         'Optional saved prompt to allow for AI injection/customizion if you like ducks just say!'
