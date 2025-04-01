@@ -174,7 +174,7 @@ async function summarizerSupport() {
     const c = await ai.summarizer.capabilities();
     if (c.available === 'no') return notSupported('unusable Summarizer API');
     return true;
-  });
+  };
   return notSupported('no Summarizer API');
 }
 
