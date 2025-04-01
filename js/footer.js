@@ -37,7 +37,6 @@ function getContext() {
   }
 }
 
-
 let context = getContext();
 
 themes.onchange = async () => {
