@@ -27,7 +27,7 @@ function notSupported(reason) {
 }
 
 const generic =
-  'This plain text article with important details is intended for a tech-savvy audience.';
+  'This article is intended for a tech-savvy audience.';
 
 function getContext() {
   try {
@@ -88,7 +88,7 @@ themes.onchange = async () => {
       AIWarning();
       context =
         prompt(
-          'Optionally modify the saved context to allow for AI injection/customization if you like ducks just say!',
+          'Optionally modify the saved context to allow for AI injection/customization.',
           generic
         ) || generic;
       // Only save if the user makes a change to the prompt
@@ -211,7 +211,7 @@ async function summarizer() {
   const supported = await summarizerSupport();
   // Dont run on the listing page since for security AI is not allowed to render HTML.
   if (!supported || location.pathname === '/writeups/') return;
-  const summarizer = await ai.summarizer.create();
+  const summarizer = await ai.summarizer.create({sharedContext: 'This is an infomation security bug writeup', format: 'plain-text', length: 'long'});
   content.innerText = await summarizer.summarize(content.innerText, {
     context: context
   });
