@@ -69,7 +69,9 @@ themes.onchange = async () => {
     case 'summarizer.css':
       await summarizerSupport();
       AIWarning();
-      const audience = prompt('Optional saved prompt to allow for AI injection/customizion if you like ducks just say!');
+      const audience = prompt(
+        'Optional saved prompt to allow for AI injection/customizion if you like ducks just say!'
+      );
       if (audience) localStorage.setItem('audience', audience);
       break;
   }
@@ -192,7 +194,8 @@ async function summarizer() {
   const summarizer = await ai.summarizer.create();
   content.innerText = await summarizer.summarize(content.innerText, {
     context:
-      'This plain text article with important details is intended for a tech-savvy audience. ' + localStorage.getItem('audience')
+      'This plain text article with important details is intended for a tech-savvy audience. ' +
+      localStorage.getItem('audience')
   });
 }
 
