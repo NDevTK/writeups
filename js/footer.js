@@ -68,7 +68,7 @@ themes.onchange = async () => {
       break;
     case 'summarizer.css':
       const supported = await summarizerSupport();
-      if (!supported) break
+      if (!supported) break;
       AIWarning();
       const audience = prompt(
         'Optional saved prompt to allow for AI injection/customizion if you like ducks just say!'
