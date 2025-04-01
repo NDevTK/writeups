@@ -196,8 +196,7 @@ async function summarizer() {
   )
     return;
   const summarizer = await ai.summarizer.create({
-    sharedContext:
-      `**The writeups document a collection of security vulnerabilities discovered in various software and online services.** They primarily focus on web security issues, including Cross-Site Scripting (XSS), Same-Origin Policy (SOP) bypasses, information leaks (like access tokens, cookies, user data, and URLs), and other security flaws.
+    sharedContext: `**The writeups document a collection of security vulnerabilities discovered in various software and online services.** They primarily focus on web security issues, including Cross-Site Scripting (XSS), Same-Origin Policy (SOP) bypasses, information leaks (like access tokens, cookies, user data, and URLs), and other security flaws.
 
 Key aspects of the context include:
 
