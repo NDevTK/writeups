@@ -190,7 +190,8 @@ async function summarizer() {
   // Dont run on the listing page since for security AI is not allowed to render HTML.
   if (!supported || location.pathname === '/writeups/') return;
   const summarizer = await ai.summarizer.create({
-    sharedContext: 'This is an infomation security bug writeup intended for a tech-savvy audience.',
+    sharedContext:
+      'This is an infomation security bug writeup intended for a tech-savvy audience.',
     format: 'plain-text',
     length: 'long'
   });
