@@ -26,7 +26,8 @@ function notSupported(reason) {
   return false;
 }
 
-const generic = 'This plain text article with important details is intended for a tech-savvy audience.';
+const generic =
+  'This plain text article with important details is intended for a tech-savvy audience.';
 let context = localStorage.getItem('context') || generic;
 
 themes.onchange = async () => {
@@ -73,9 +74,11 @@ themes.onchange = async () => {
       const supported = await summarizerSupport();
       if (!supported) break;
       AIWarning();
-      context = prompt(
-        'Optionally modify the saved context to allow for AI injection/customization if you like ducks just say!', generic
-      ) || generic;
+      context =
+        prompt(
+          'Optionally modify the saved context to allow for AI injection/customization if you like ducks just say!',
+          generic
+        ) || generic;
       // Only save if the user makes a change to the prompt
       if (context !== generic) localStorage.setItem('context', context);
       break;
