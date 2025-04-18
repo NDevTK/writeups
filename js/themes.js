@@ -33,7 +33,16 @@ reload.onmessage = (event) => {
   location.reload();
 };
 
+let count = 0;
+
 onkeyup = (e) => {
+  if (e.key === '.' && location.pathname === '/writeups/') {
+    count += 1;
+    if (count === 10) {
+      alert('Developer Mode enabled.');
+      count = 0;
+    }
+  }
   if (e.key === '.' && location.pathname !== '/writeups/') {
     location.href = '/writeups/';
   }
