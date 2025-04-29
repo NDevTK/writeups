@@ -65,7 +65,8 @@ themes.onchange = async () => {
       break;
     case 'ai':
       AIWarning();
-      location.href = 'https://drive.google.com/file/d/1KjQB7czJo3t8mgYRZMYkbrsY1JIriz7A/view?usp=sharing';
+      location.href =
+        'https://drive.google.com/file/d/1KjQB7czJo3t8mgYRZMYkbrsY1JIriz7A/view?usp=sharing';
       break;
     case 'summarizer.css':
       const supported = await summarizerSupport();
