@@ -18,13 +18,18 @@
     0deg,
     transparent,
     transparent 1px,
-    rgba(34, 204, 34, 0.03) 1px, /* Faint green scanlines */
-    rgba(34, 204, 34, 0.03) 2px
+    rgba(34, 204, 34, 0.03) 1px,
+    /* Faint green scanlines */ rgba(34, 204, 34, 0.03) 2px
   );
 }
 
 /* Typography */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: inherit; /* All text uses the same monospaced font */
   color: inherit; /* All text uses the same green color */
   margin-top: 1.5em;
@@ -32,12 +37,26 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: bold; /* Bold for headings for differentiation */
 }
 
-h1 { font-size: 1.8em; } /* Slightly reduced hierarchy for terminal feel */
-h2 { font-size: 1.5em; }
-h3 { font-size: 1.3em; }
-h4 { font-size: 1.1em; }
-h5 { font-size: 1em; }
-h6 { font-size: 0.9em; font-weight: normal; font-style: italic; } /* Less emphasis for h6 */
+h1 {
+  font-size: 1.8em;
+} /* Slightly reduced hierarchy for terminal feel */
+h2 {
+  font-size: 1.5em;
+}
+h3 {
+  font-size: 1.3em;
+}
+h4 {
+  font-size: 1.1em;
+}
+h5 {
+  font-size: 1em;
+}
+h6 {
+  font-size: 0.9em;
+  font-weight: normal;
+  font-style: italic;
+} /* Less emphasis for h6 */
 
 p {
   margin-top: 0;
@@ -83,7 +102,8 @@ table {
   margin: 1.5em 0;
 }
 
-th, td {
+th,
+td {
   border: 1px solid #22cc22; /* Green borders */
   padding: 0.5em;
   text-align: left;
@@ -117,7 +137,8 @@ code {
   /* text-decoration: underline; */ /* Optional: underline inline code if differentiation is desired */
 }
 
-pre code { /* Code inside pre should not add any further styling */
+pre code {
+  /* Code inside pre should not add any further styling */
   background-color: transparent;
   padding: 0;
   border: none;
