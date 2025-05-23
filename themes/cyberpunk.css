@@ -5,7 +5,8 @@
 body {
   background-color: #0d0d0d; /* Very dark, near-black background */
   color: #c0c0c0; /* Light, slightly desaturated color for default text */
-  font-family: 'Consolas', 'Monaco', 'Lucida Console', 'Courier New', monospace; /* Monospaced/futuristic font stack */
+  font-family:
+    'Consolas', 'Monaco', 'Lucida Console', 'Courier New', monospace; /* Monospaced/futuristic font stack */
   line-height: 1.7;
   /* Optional: Subtle scanline effect */
   background-image: repeating-linear-gradient(
@@ -18,7 +19,12 @@ body {
 }
 
 /* Headings - Neon Colors with Glow */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   margin-top: 1.5em;
   margin-bottom: 0.5em;
   font-weight: 500; /* Slightly bolder for better neon visibility */
@@ -26,54 +32,75 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 {
   color: #00ffff; /* Electric Blue */
-  text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff;
+  text-shadow:
+    0 0 5px #00ffff,
+    0 0 10px #00ffff,
+    0 0 15px #00ffff;
   font-size: 2.4em;
 }
 
 h2 {
   color: #ff00ff; /* Neon Pink/Magenta */
-  text-shadow: 0 0 5px #ff00ff, 0 0 10px #ff00ff;
-  font-size: 2.0em;
+  text-shadow:
+    0 0 5px #ff00ff,
+    0 0 10px #ff00ff;
+  font-size: 2em;
 }
 
 h3 {
   color: #39ff14; /* Lime Green */
-  text-shadow: 0 0 5px #39ff14, 0 0 8px #39ff14;
+  text-shadow:
+    0 0 5px #39ff14,
+    0 0 8px #39ff14;
   font-size: 1.6em;
 }
 
 h4 {
   color: #ffff00; /* Neon Yellow - also used for links, but good for smaller headings */
-  text-shadow: 0 0 4px #ffff00, 0 0 7px #ffff00;
+  text-shadow:
+    0 0 4px #ffff00,
+    0 0 7px #ffff00;
   font-size: 1.3em;
 }
 
-h5, h6 {
+h5,
+h6 {
   color: #ff8c00; /* Bright Orange - for less prominent headings */
-  text-shadow: 0 0 4px #ff8c00, 0 0 6px #ff8c00;
+  text-shadow:
+    0 0 4px #ff8c00,
+    0 0 6px #ff8c00;
   font-size: 1.1em;
 }
-
 
 /* Links */
 a {
   color: #ffff00; /* Vibrant Yellow */
   text-decoration: none;
   text-shadow: 0 0 3px #ffff00;
-  transition: color 0.3s ease, text-shadow 0.3s ease;
+  transition:
+    color 0.3s ease,
+    text-shadow 0.3s ease;
 }
 
 a:hover,
 a:focus {
   color: #fff; /* Brighter white on hover */
-  text-shadow: 0 0 5px #ffff00, 0 0 10px #ffff00, 0 0 15px #fff;
+  text-shadow:
+    0 0 5px #ffff00,
+    0 0 10px #ffff00,
+    0 0 15px #fff;
   text-decoration: none; /* Optional: underline on hover if preferred */
 }
 
 /* Accent Elements */
 blockquote {
   border-left: 4px solid #ff00ff; /* Neon Pink border */
-  background-color: rgba(30, 30, 45, 0.5); /* Slightly different dark background */
+  background-color: rgba(
+    30,
+    30,
+    45,
+    0.5
+  ); /* Slightly different dark background */
   padding: 1em 1.5em;
   margin-left: 0;
   color: #a0a0a0; /* Softer text color for blockquotes */
@@ -84,7 +111,9 @@ hr {
   border: 0;
   height: 1px;
   background-color: #00ffff; /* Electric Blue */
-  box-shadow: 0 0 3px #00ffff, 0 0 5px #00ffff;
+  box-shadow:
+    0 0 3px #00ffff,
+    0 0 5px #00ffff;
   margin-top: 2.5em;
   margin-bottom: 2.5em;
 }
@@ -97,7 +126,12 @@ code {
 }
 
 pre {
-  background-color: rgba(20, 20, 30, 0.85); /* Dark, semi-transparent background */
+  background-color: rgba(
+    20,
+    20,
+    30,
+    0.85
+  ); /* Dark, semi-transparent background */
   padding: 1.2em;
   border-radius: 4px;
   border: 1px solid #39ff14; /* Lime Green neon border */
@@ -107,7 +141,12 @@ pre {
 }
 
 code {
-  background-color: rgba(20, 20, 30, 0.7); /* Consistent background for inline code */
+  background-color: rgba(
+    20,
+    20,
+    30,
+    0.7
+  ); /* Consistent background for inline code */
   color: #39ff14; /* Lime green for inline code text */
   padding: 0.2em 0.4em;
   border-radius: 3px;
@@ -178,7 +217,6 @@ pre code {
 .token.variable {
   color: #ffb86c; /* Orange/Yellow variant */
 }
-
 
 /* Styles for .markdown-body if needed */
 .markdown-body {
