@@ -239,22 +239,6 @@ textarea {
   margin-bottom: 0 !important;
 }
 
-/* Optional: very subtle digital rain animation - use with caution for performance */
-/* This is a placeholder idea and would need careful implementation and testing */
-/*
-@keyframes digital-rain-animation {
-  0% { background-position: 0 0; }
-  100% { background-position: -200px 200px; } // Adjust values for speed/direction
+.highlight {
+  color: black;
 }
-
-.markdown-body::before {
-  content: "";
-  position: fixed; // or absolute if .markdown-body is the viewport
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><text x="0" y="15" font-family="monospace" font-size="10" fill="rgba(0,255,65,0.05)">10</text></svg>'); // Example SVG
-  background-repeat: repeat;
-  animation: digital-rain-animation 20s linear infinite;
-  z-index: -1; // Behind content
-  opacity: 0.3;
-}
-*/
