@@ -12,14 +12,21 @@
 
   /* Subtle background grid lines */
   background-image:
-    linear-gradient(rgba(121, 166, 220, 0.3) 1px, transparent 1px), /* Light blueprint blue, thinner lines */
-    linear-gradient(90deg, rgba(121, 166, 220, 0.3) 1px, transparent 1px);
+    linear-gradient(rgba(121, 166, 220, 0.3) 1px, transparent 1px),
+    /* Light blueprint blue, thinner lines */
+      linear-gradient(90deg, rgba(121, 166, 220, 0.3) 1px, transparent 1px);
   background-size: 25px 25px; /* Adjust grid size */
 }
 
 /* Typography */
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Montserrat', 'Open Sans', sans-serif; /* Geometric sans-serif for headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family:
+    'Montserrat', 'Open Sans', sans-serif; /* Geometric sans-serif for headings */
   color: #003366; /* Darker, more saturated blue */
   margin-top: 1.5em;
   margin-bottom: 0.5em;
@@ -28,8 +35,11 @@ h1, h2, h3, h4, h5, h6 {
   position: relative; /* For overline */
 }
 
-h1::before, h2::before, h3::before { /* Overline for major headings */
-  content: "";
+h1::before,
+h2::before,
+h3::before {
+  /* Overline for major headings */
+  content: '';
   position: absolute;
   top: -0.2em; /* Adjust based on font size and preference */
   left: 0;
@@ -38,12 +48,36 @@ h1::before, h2::before, h3::before { /* Overline for major headings */
   background-color: #aad1f5; /* Even lighter blue for overline */
 }
 
-h1 { font-size: 2.2em; font-weight: 600; }
-h2 { font-size: 1.8em; font-weight: 600; }
-h3 { font-size: 1.5em; font-weight: 600; }
-h4 { font-size: 1.2em; font-weight: 500; border-bottom-style: dashed; } /* Dashed underline for less emphasis */
-h5 { font-size: 1.1em; font-weight: 500; color: #345678; border-bottom: none; }
-h6 { font-size: 1em; font-weight: 500; color: #345678; border-bottom: none; font-style: italic; }
+h1 {
+  font-size: 2.2em;
+  font-weight: 600;
+}
+h2 {
+  font-size: 1.8em;
+  font-weight: 600;
+}
+h3 {
+  font-size: 1.5em;
+  font-weight: 600;
+}
+h4 {
+  font-size: 1.2em;
+  font-weight: 500;
+  border-bottom-style: dashed;
+} /* Dashed underline for less emphasis */
+h5 {
+  font-size: 1.1em;
+  font-weight: 500;
+  color: #345678;
+  border-bottom: none;
+}
+h6 {
+  font-size: 1em;
+  font-weight: 500;
+  color: #345678;
+  border-bottom: none;
+  font-style: italic;
+}
 
 p {
   margin-top: 0;
@@ -63,12 +97,12 @@ a:focus {
 }
 
 a:visited {
-    color: #551a8b; /* Standard purple for visited, or a muted blue if preferred */
+  color: #551a8b; /* Standard purple for visited, or a muted blue if preferred */
 }
 
 /* Elements */
 blockquote {
-  border-left: 4px solid #00529B; /* Primary blueprint blue */
+  border-left: 4px solid #00529b; /* Primary blueprint blue */
   background-color: #e0eef9; /* Very light blue background */
   padding: 0.8em 1.2em;
   margin: 1.5em 0;
@@ -82,7 +116,13 @@ blockquote p {
 hr {
   border: 0;
   height: 1px;
-  background-image: linear-gradient(to right, #79a6dc, #79a6dc 75%, transparent 75%, transparent 100%);
+  background-image: linear-gradient(
+    to right,
+    #79a6dc,
+    #79a6dc 75%,
+    transparent 75%,
+    transparent 100%
+  );
   background-size: 10px 1px; /* Creates a dashed effect */
   margin: 2.5em 0;
 }
@@ -96,7 +136,8 @@ table {
   border: 1px solid #79a6dc; /* Light blueprint blue border */
 }
 
-th, td {
+th,
+td {
   border: 1px solid #79a6dc;
   padding: 0.6em 0.8em;
   text-align: left;
@@ -119,7 +160,7 @@ pre {
   background-color: #dceaf8; /* Light blue/gray code background */
   padding: 1em;
   border-radius: 2px;
-  border: 1px solid #00529B; /* Primary blueprint blue border */
+  border: 1px solid #00529b; /* Primary blueprint blue border */
   overflow-x: auto;
   color: #002244; /* Dark blue code text */
 }
@@ -157,7 +198,7 @@ pre code {
 .token.constant,
 .token.symbol,
 .token.deleted {
-  color: #00529B; /* Primary blueprint blue */
+  color: #00529b; /* Primary blueprint blue */
 }
 
 .token.selector,
@@ -186,7 +227,7 @@ pre code {
 
 .token.function,
 .token.class-name {
-  color: #105CB6; /* Adjusted for better contrast (was #3273dc) */
+  color: #105cb6; /* Adjusted for better contrast (was #3273dc) */
 }
 
 .token.regex,
