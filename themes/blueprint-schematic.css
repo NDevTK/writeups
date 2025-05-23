@@ -1,0 +1,218 @@
+/* Theme Name: Blueprint/Schematic */
+
+/* Overall Feel: Clean, precise, technical, structured, and analytical. */
+
+.markdown-body {
+  background-color: #f0f8ff; /* AliceBlue - light off-white/cyan */
+  color: #002244; /* Dark blue text */
+  font-family: 'Open Sans', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  padding: 2em;
+
+  /* Subtle background grid lines */
+  background-image:
+    linear-gradient(rgba(121, 166, 220, 0.3) 1px, transparent 1px), /* Light blueprint blue, thinner lines */
+    linear-gradient(90deg, rgba(121, 166, 220, 0.3) 1px, transparent 1px);
+  background-size: 25px 25px; /* Adjust grid size */
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Montserrat', 'Open Sans', sans-serif; /* Geometric sans-serif for headings */
+  color: #003366; /* Darker, more saturated blue */
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  padding-bottom: 0.2em; /* Space for underline effect */
+  border-bottom: 1px solid #79a6dc; /* Light blueprint blue underline */
+  position: relative; /* For overline */
+}
+
+h1::before, h2::before, h3::before { /* Overline for major headings */
+  content: "";
+  position: absolute;
+  top: -0.2em; /* Adjust based on font size and preference */
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: #aad1f5; /* Even lighter blue for overline */
+}
+
+h1 { font-size: 2.2em; font-weight: 600; }
+h2 { font-size: 1.8em; font-weight: 600; }
+h3 { font-size: 1.5em; font-weight: 600; }
+h4 { font-size: 1.2em; font-weight: 500; border-bottom-style: dashed; } /* Dashed underline for less emphasis */
+h5 { font-size: 1.1em; font-weight: 500; color: #345678; border-bottom: none; }
+h6 { font-size: 1em; font-weight: 500; color: #345678; border-bottom: none; font-style: italic; }
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+/* Links */
+a {
+  color: #0066cc; /* Clear blue */
+  text-decoration: underline;
+}
+
+a:hover,
+a:focus {
+  color: #004080; /* Darker blue on hover */
+  text-decoration: none;
+}
+
+a:visited {
+    color: #551a8b; /* Standard purple for visited, or a muted blue if preferred */
+}
+
+/* Elements */
+blockquote {
+  border-left: 4px solid #00529B; /* Primary blueprint blue */
+  background-color: #e0eef9; /* Very light blue background */
+  padding: 0.8em 1.2em;
+  margin: 1.5em 0;
+  color: #003366; /* Darker blue for quote text */
+}
+
+blockquote p {
+  margin-bottom: 0.5em;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background-image: linear-gradient(to right, #79a6dc, #79a6dc 75%, transparent 75%, transparent 100%);
+  background-size: 10px 1px; /* Creates a dashed effect */
+  margin: 2.5em 0;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: 0.95em;
+  border: 1px solid #79a6dc; /* Light blueprint blue border */
+}
+
+th, td {
+  border: 1px solid #79a6dc;
+  padding: 0.6em 0.8em;
+  text-align: left;
+}
+
+th {
+  background-color: #d0e0f0; /* Light blue background for headers */
+  color: #002244;
+  font-weight: 600;
+}
+
+/* Code Blocks */
+pre,
+code {
+  font-family: 'Consolas', 'Lucida Console', 'Source Code Pro', monospace;
+  font-size: 0.9em;
+}
+
+pre {
+  background-color: #dceaf8; /* Light blue/gray code background */
+  padding: 1em;
+  border-radius: 2px;
+  border: 1px solid #00529B; /* Primary blueprint blue border */
+  overflow-x: auto;
+  color: #002244; /* Dark blue code text */
+}
+
+code {
+  background-color: #dceaf8;
+  color: #003366;
+  padding: 0.2em 0.4em;
+  border-radius: 2px;
+}
+
+pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+  border: none;
+}
+
+/* Basic Syntax Highlighting */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #5080a0; /* Muted blue-gray for comments */
+}
+
+.token.punctuation {
+  color: #345678; /* Dark gray-blue */
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #00529B; /* Primary blueprint blue */
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #0066cc; /* Link blue */
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #004080; /* Darker blue */
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #002244; /* Main text dark blue */
+  font-weight: bold;
+}
+
+.token.function,
+.token.class-name {
+  color: #105CB6; /* Adjusted for better contrast (was #3273dc) */
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #c00000; /* Muted red for "markup" */
+}
+
+/* Ensure no default browser styles interfere too much */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  background-color: #e8f4f8;
+  color: #002244;
+  border: 1px solid #79a6dc;
+}
+
+/* Further spacing refinement */
+.markdown-body > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0 !important;
+}
