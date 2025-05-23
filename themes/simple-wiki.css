@@ -1,0 +1,145 @@
+/* Theme Name: Simple Wiki */
+
+/* Overall Feel: Extremely utilitarian, content-first, no frills, fast-loading, and highly readable. */
+
+.markdown-body {
+  background-color: #ffffff; /* Pure white */
+  color: #111111; /* Very dark gray/near black */
+  font-family: Arial, Helvetica, Verdana, sans-serif; /* Common system sans-serif */
+  font-size: 16px;
+  line-height: 1.6;
+  /* max-width: 1100px; */ /* Optional: wider max-width, or remove for full-width */
+  /* margin: 0 auto; */ /* Needed if max-width is set */
+  padding: 15px; /* Minimal padding */
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  color: #111111; /* Same as body text */
+  font-family: Arial, Helvetica, Verdana, sans-serif; /* Same as body text */
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  font-weight: bold; /* Differentiate by weight */
+}
+
+h1 { font-size: 2em; }
+h2 { font-size: 1.75em; }
+h3 { font-size: 1.5em; }
+h4 { font-size: 1.25em; }
+h5 { font-size: 1.1em; }
+h6 { font-size: 1em; font-style: italic; } /* May use italic for h6 if desired */
+
+p {
+  margin-top: 0;
+  margin-bottom: 0.8em;
+}
+
+/* Links */
+a {
+  color: #0645ad; /* Standard wiki blue */
+  text-decoration: underline;
+}
+
+a:visited {
+  color: #551a8b; /* Standard visited purple */
+}
+
+a:hover,
+a:focus {
+  text-decoration: none; /* Optional: remove underline on hover */
+}
+
+/* Elements */
+blockquote {
+  border-left: 2px solid #aaaaaa; /* Plain left border */
+  padding-left: 1em;
+  margin: 1em 0;
+  color: #333333; /* Slightly lighter text for quotes if desired */
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background-color: #cccccc; /* Light gray line */
+  margin: 2em 0;
+}
+
+ul, ol {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding-left: 2em; /* Standard indentation for lists */
+}
+
+li {
+  margin-bottom: 0.2em;
+}
+
+/* Tables */
+table {
+  width: 100%; /* Or 'auto' if preferred */
+  border-collapse: collapse;
+  margin: 1em 0;
+  border: 1px solid #aaaaaa; /* Border around table */
+}
+
+th, td {
+  border: 1px solid #aaaaaa; /* Cell borders */
+  padding: 0.4em 0.6em; /* Minimal padding */
+  text-align: left;
+}
+
+th {
+  font-weight: bold;
+  background-color: #f0f0f0; /* Very light gray for header, optional */
+}
+
+/* Code Blocks */
+pre,
+code {
+  font-family: 'Courier New', Courier, monospace; /* Standard monospaced font */
+  font-size: 0.95em;
+  background-color: #f8f8f8; /* Very light gray background */
+  color: #111111; /* Same as body text */
+}
+
+pre {
+  padding: 0.8em;
+  border: 1px solid #dddddd; /* Subtle border around pre */
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+code {
+  padding: 0.1em 0.3em; /* Minimal padding for inline code */
+  /* No distinct background for inline code, or make it same as pre's background */
+}
+
+pre code {
+  background-color: transparent; /* Ensure no double background */
+  border: none;
+  padding: 0;
+}
+
+/* No syntax highlighting, or extremely minimal. */
+/* Example of minimal highlighting (e.g., bold keywords) if desired: */
+/* .token.keyword { font-weight: bold; } */
+
+
+/* Ensure no default browser styles interfere too much */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* Further spacing refinement */
+.markdown-body > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0 !important;
+}
