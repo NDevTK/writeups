@@ -19,8 +19,14 @@
 }
 
 /* Typography */
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Georgia', 'Palatino Linotype', 'Book Antiqua', Palatino, serif; /* Same serif for headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family:
+    'Georgia', 'Palatino Linotype', 'Book Antiqua', Palatino, serif; /* Same serif for headings */
   color: #111111; /* Slightly darker for headings */
   margin-top: 1.8em;
   margin-bottom: 0.6em;
@@ -28,12 +34,28 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.3;
 }
 
-h1 { font-size: 2.1em; }
-h2 { font-size: 1.7em; border-bottom: 1px solid #aaaaaa; padding-bottom: 0.2em; }
-h3 { font-size: 1.4em; }
-h4 { font-size: 1.2em; font-style: italic; } /* Italic for less emphasis */
-h5 { font-size: 1.1em; }
-h6 { font-size: 1em; color: #444444; }
+h1 {
+  font-size: 2.1em;
+}
+h2 {
+  font-size: 1.7em;
+  border-bottom: 1px solid #aaaaaa;
+  padding-bottom: 0.2em;
+}
+h3 {
+  font-size: 1.4em;
+}
+h4 {
+  font-size: 1.2em;
+  font-style: italic;
+} /* Italic for less emphasis */
+h5 {
+  font-size: 1.1em;
+}
+h6 {
+  font-size: 1em;
+  color: #444444;
+}
 
 p {
   margin-top: 0;
@@ -54,7 +76,7 @@ a:focus {
 }
 
 a:visited {
-    color: #551a8b; /* Standard purple for visited links */
+  color: #551a8b; /* Standard purple for visited links */
 }
 
 /* Elements */
@@ -87,7 +109,8 @@ table {
   border: 1px solid #bbbbbb;
 }
 
-th, td {
+th,
+td {
   border: 1px solid #bbbbbb; /* Gray cell borders */
   padding: 0.6em 0.8em;
   text-align: left;
@@ -190,13 +213,13 @@ pre code {
   margin-bottom: 0.5em;
 }
 
-
 /* Ensure no default browser styles interfere too much */
 button,
 input,
 select,
 textarea {
-  font-family: 'Helvetica Neue', Arial, sans-serif; /* Sans-serif for UI elements */
+  font-family:
+    'Helvetica Neue', Arial, sans-serif; /* Sans-serif for UI elements */
   font-size: 0.95em;
   line-height: inherit;
   background-color: #f8f8f8;
