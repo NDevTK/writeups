@@ -230,26 +230,56 @@ pre code {
 @keyframes glitch {
   0% {
     transform: translate(0);
-    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, 2px 2px #ff00ff, -2px -2px #39ff14;
+    text-shadow:
+      0 0 5px #00ffff,
+      0 0 10px #00ffff,
+      0 0 15px #00ffff,
+      2px 2px #ff00ff,
+      -2px -2px #39ff14;
   }
   20% {
     transform: translate(-2px, 2px);
-    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, 2px 0 #ff00ff, -2px 0 #39ff14;
+    text-shadow:
+      0 0 5px #00ffff,
+      0 0 10px #00ffff,
+      0 0 15px #00ffff,
+      2px 0 #ff00ff,
+      -2px 0 #39ff14;
   }
   40% {
     transform: translate(2px, -2px);
-    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, 0 2px #ff00ff, 0 -2px #39ff14;
+    text-shadow:
+      0 0 5px #00ffff,
+      0 0 10px #00ffff,
+      0 0 15px #00ffff,
+      0 2px #ff00ff,
+      0 -2px #39ff14;
   }
   60% {
     transform: translate(-1px, 1px);
-    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, -1px 0 #ff00ff, 1px 0 #39ff14;
+    text-shadow:
+      0 0 5px #00ffff,
+      0 0 10px #00ffff,
+      0 0 15px #00ffff,
+      -1px 0 #ff00ff,
+      1px 0 #39ff14;
   }
   80% {
     transform: translate(1px, -1px);
-    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, 0 -1px #ff00ff, 0 1px #39ff14;
+    text-shadow:
+      0 0 5px #00ffff,
+      0 0 10px #00ffff,
+      0 0 15px #00ffff,
+      0 -1px #ff00ff,
+      0 1px #39ff14;
   }
   100% {
     transform: translate(0);
-    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, -2px 2px #ff00ff, 2px -2px #39ff14;
+    text-shadow:
+      0 0 5px #00ffff,
+      0 0 10px #00ffff,
+      0 0 15px #00ffff,
+      -2px 2px #ff00ff,
+      2px -2px #39ff14;
   }
 }
