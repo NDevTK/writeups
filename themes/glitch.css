@@ -16,20 +16,48 @@
 }
 
 /* Typography */
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Roboto', 'Open Sans', Arial, sans-serif; /* Stick to standard sans-serif for readability */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family:
+    'Roboto', 'Open Sans', Arial, sans-serif; /* Stick to standard sans-serif for readability */
   color: #e0e0e0;
   margin-top: 1.5em;
   margin-bottom: 0.5em;
   font-weight: 600;
 }
 
-h1 { font-size: 2.3em; text-shadow: 1px 0 #ff00ff, -1px 0 #00ffff; } /* Magenta/Cyan text shadow glitch */
-h2 { font-size: 1.9em; text-shadow: 1px 0 #39ff14, -1px 0 #ff00ff; } /* Green/Magenta text shadow glitch */
-h3 { font-size: 1.6em; }
-h4 { font-size: 1.3em; color: #bbbbbb; }
-h5 { font-size: 1.15em; color: #aaaaaa; }
-h6 { font-size: 1em; color: #999999; font-style: italic; }
+h1 {
+  font-size: 2.3em;
+  text-shadow:
+    1px 0 #ff00ff,
+    -1px 0 #00ffff;
+} /* Magenta/Cyan text shadow glitch */
+h2 {
+  font-size: 1.9em;
+  text-shadow:
+    1px 0 #39ff14,
+    -1px 0 #ff00ff;
+} /* Green/Magenta text shadow glitch */
+h3 {
+  font-size: 1.6em;
+}
+h4 {
+  font-size: 1.3em;
+  color: #bbbbbb;
+}
+h5 {
+  font-size: 1.15em;
+  color: #aaaaaa;
+}
+h6 {
+  font-size: 1em;
+  color: #999999;
+  font-style: italic;
+}
 
 p {
   margin-top: 0;
@@ -51,10 +79,23 @@ a:focus {
 }
 
 @keyframes link-glitch {
-  0%, 100% { transform: translateX(0); text-shadow: none; }
-  25% { transform: translateX(-1px); text-shadow: 1px 0 #39ff14; }
-  50% { transform: translateX(1px); text-shadow: -1px 0 #00ffff; }
-  75% { transform: translateX(-1px); text-shadow: 1px 0 #ff00ff; }
+  0%,
+  100% {
+    transform: translateX(0);
+    text-shadow: none;
+  }
+  25% {
+    transform: translateX(-1px);
+    text-shadow: 1px 0 #39ff14;
+  }
+  50% {
+    transform: translateX(1px);
+    text-shadow: -1px 0 #00ffff;
+  }
+  75% {
+    transform: translateX(-1px);
+    text-shadow: 1px 0 #ff00ff;
+  }
 }
 
 /* Elements */
@@ -87,14 +128,19 @@ hr {
 }
 
 @keyframes hr-glitch-colors {
-  0% { background-position: 0 0; }
-  100% { background-position: 30px 0; } /* 2 * 15px segment */
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 30px 0;
+  } /* 2 * 15px segment */
 }
 
 /* Code Blocks */
 pre,
 code {
-  font-family: 'VT323', 'Courier New', Courier, monospace; /* Digital/Pixel font if available, fallback to Courier */
+  font-family:
+    'VT323', 'Courier New', Courier, monospace; /* Digital/Pixel font if available, fallback to Courier */
   font-size: 0.95em;
 }
 
@@ -110,7 +156,7 @@ pre {
 
 /* Subtle scanline effect for pre blocks */
 pre::before {
-  content: "";
+  content: '';
   position: absolute;
   top: 0;
   left: 0;
@@ -119,14 +165,15 @@ pre::before {
   background-image: repeating-linear-gradient(
     transparent,
     transparent 1px,
-    rgba(0, 255, 255, 0.02) 1px, /* Faint cyan scanlines */
-    rgba(0, 255, 255, 0.02) 2px
+    rgba(0, 255, 255, 0.02) 1px,
+    /* Faint cyan scanlines */ rgba(0, 255, 255, 0.02) 2px
   );
   pointer-events: none;
   z-index: 1;
 }
 
-pre code { /* Code inside pre should inherit pre's styles */
+pre code {
+  /* Code inside pre should inherit pre's styles */
   background-color: transparent;
   color: inherit;
   padding: 0;
@@ -200,7 +247,6 @@ code {
 .token.variable {
   color: #f0f; /* Re-use Magenta or another distinct color */
 }
-
 
 /* Ensure no default browser styles interfere too much */
 button,
