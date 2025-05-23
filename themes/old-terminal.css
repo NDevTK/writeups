@@ -1,0 +1,148 @@
+/* Theme Name: Old Terminal */
+
+/* Overall Feel: Retro, nostalgic, focused, and highly readable within its monochrome constraint. */
+
+.markdown-body {
+  background-color: #080808; /* Very dark gray/near-black */
+  color: #22cc22; /* Classic terminal green */
+  font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+  font-size: 16px;
+  line-height: 1.6;
+  padding: 2em;
+  /* For font clarity, browsers usually default to good smoothing. Can be explicit if needed: */
+  /* -webkit-font-smoothing: antialiased; */
+  /* -moz-osx-font-smoothing: grayscale; */
+
+  /* Optional: Subtle scanlines */
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(34, 204, 34, 0.03) 1px, /* Faint green scanlines */
+    rgba(34, 204, 34, 0.03) 2px
+  );
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: inherit; /* All text uses the same monospaced font */
+  color: inherit; /* All text uses the same green color */
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: bold; /* Bold for headings for differentiation */
+}
+
+h1 { font-size: 1.8em; } /* Slightly reduced hierarchy for terminal feel */
+h2 { font-size: 1.5em; }
+h3 { font-size: 1.3em; }
+h4 { font-size: 1.1em; }
+h5 { font-size: 1em; }
+h6 { font-size: 0.9em; font-weight: normal; font-style: italic; } /* Less emphasis for h6 */
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+/* Links */
+a {
+  color: inherit; /* Links are the same green */
+  text-decoration: underline; /* Underline is the primary differentiator */
+}
+
+a:hover,
+a:focus {
+  /* Optional: Invert colors on hover for a distinct terminal-like effect */
+  background-color: #22cc22;
+  color: #080808;
+  text-decoration: none; /* Remove underline when inverted */
+}
+
+/* Elements */
+blockquote {
+  margin: 1.5em 0;
+  padding-left: 1em;
+  border-left: 2px solid #22cc22; /* Simple green vertical line */
+}
+
+blockquote p {
+  margin-bottom: 0.5em;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background-color: #22cc22; /* Green line */
+  margin: 2em 0;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+}
+
+th, td {
+  border: 1px solid #22cc22; /* Green borders */
+  padding: 0.5em;
+  text-align: left;
+}
+
+th {
+  font-weight: bold; /* Keep table headers bold */
+}
+
+/* Code Blocks - Should be visually consistent with the rest of the terminal */
+pre,
+code {
+  font-family: inherit; /* Uses the main monospaced font */
+  font-size: inherit; /* Uses the main font size */
+  color: inherit; /* Uses the main green color */
+}
+
+pre {
+  background-color: transparent; /* No different background */
+  padding: 0; /* No extra padding beyond what paragraphs/text have */
+  border: 1px solid #22cc22; /* Simple border around pre blocks */
+  overflow-x: auto;
+  margin-bottom: 1em;
+  padding: 0.5em; /* Padding inside the border */
+}
+
+/* Inline code should not have distinct background or border */
+code {
+  background-color: transparent;
+  padding: 0;
+  /* text-decoration: underline; */ /* Optional: underline inline code if differentiation is desired */
+}
+
+pre code { /* Code inside pre should not add any further styling */
+  background-color: transparent;
+  padding: 0;
+  border: none;
+}
+
+/* No syntax highlighting - terminals are typically monochrome */
+
+/* Ensure no default browser styles interfere too much */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  background-color: #080808;
+  color: #22cc22;
+  border: 1px solid #22cc22;
+}
+
+/* Further spacing refinement */
+.markdown-body > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0 !important;
+}
