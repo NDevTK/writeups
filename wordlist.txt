@@ -9,6 +9,8 @@ SignalPath
 WebExtensions
 UAC
 GOOGLEUSERCONTENT
+dropdown
+monospaced
 googleusercontent
 EqualWeb
 UUID
