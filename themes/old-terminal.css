@@ -167,3 +167,7 @@ textarea {
 .markdown-body > *:last-child {
   margin-bottom: 0 !important;
 }
+
+.highlight {
+  color: black
+}
