@@ -4,8 +4,31 @@ body {
   color-scheme: light dark;
 }
 
+/* Code block styling for dark theme */
 .markdown-body .highlight pre,
 .markdown-body pre {
-  background-color: white;
-  color: black;
+  background-color: #222; /* Dark background for code blocks */
+  color: #ddd; /* Light gray text for code */
+  padding: 15px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin-bottom: 1em;
+  border: 1px solid #444; /* Optional: subtle border */
+}
+
+/* Inline code styling for dark theme */
+.markdown-body code {
+  background-color: #333; /* Slightly lighter dark bg for inline code */
+  color: #ddd;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+}
+
+/* Reset background for code inside pre, as pre has its own */
+.markdown-body pre code {
+  background-color: transparent;
+  color: inherit; /* Inherit from pre's color */
+  padding: 0;
+  border-radius: 0;
+  border: none;
 }
