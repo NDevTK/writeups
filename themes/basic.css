@@ -1,7 +1,9 @@
 /* themes/basic.css - Minimal and Clean */
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
   line-height: 1.5;
   color: #111; /* Near black for text */
   background-color: #fff; /* White background */
@@ -10,24 +12,43 @@ body {
 }
 
 /* Basic content centering and readability */
-.markdown-body, body > article, body > main {
+.markdown-body,
+body > article,
+body > main {
   max-width: 800px;
   margin: 0 auto;
   padding: 20px;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   margin-top: 1.2em;
   margin-bottom: 0.4em;
   font-weight: 600;
 }
 
-h1 { font-size: 2em; }
-h2 { font-size: 1.6em; }
-h3 { font-size: 1.4em; }
-h4 { font-size: 1.2em; }
-h5 { font-size: 1em; }
-h6 { font-size: 0.9em; }
+h1 {
+  font-size: 2em;
+}
+h2 {
+  font-size: 1.6em;
+}
+h3 {
+  font-size: 1.4em;
+}
+h4 {
+  font-size: 1.2em;
+}
+h5 {
+  font-size: 1em;
+}
+h6 {
+  font-size: 0.9em;
+}
 
 p {
   margin-bottom: 0.8em;
@@ -38,12 +59,17 @@ a {
   text-decoration: underline;
 }
 
-a:hover, a:focus {
-  color: #004C99; /* Darker blue on hover/focus */
+a:hover,
+a:focus {
+  color: #004c99; /* Darker blue on hover/focus */
 }
 
-pre, code, kbd, samp {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+pre,
+code,
+kbd,
+samp {
+  font-family:
+    'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
   font-size: 0.9em;
 }
 
@@ -81,7 +107,8 @@ table {
   margin-bottom: 0.8em;
 }
 
-th, td {
+th,
+td {
   padding: 0.5em;
   border: 1px solid #ccc; /* Gray borders for table cells */
   text-align: left;
@@ -100,7 +127,8 @@ blockquote {
   color: #333;
 }
 
-ul, ol {
+ul,
+ol {
   margin-bottom: 0.8em;
   padding-left: 1.3em;
 }
