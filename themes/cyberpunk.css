@@ -218,16 +218,11 @@ pre code {
   color: #ffb86c; /* Orange/Yellow variant */
 }
 
-/* Styles for .markdown-body if needed */
-.markdown-body {
-  /* Add specific overrides for .markdown-body if necessary */
-  /* Example: */
-  /* max-width: 900px; */
-  /* margin: 0 auto; */
+.highlight {
+  color: black;
 }
 
 /* Optional: Glitch effect on h1 hover - use with caution */
-/*
 .markdown-body h1:hover {
   animation: glitch 0.25s infinite;
 }
@@ -258,4 +253,3 @@ pre code {
     text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, -2px 2px #ff00ff, 2px -2px #39ff14;
   }
 }
-*/
