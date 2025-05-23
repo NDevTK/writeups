@@ -8,7 +8,9 @@
   font-family: 'Consolas', 'Monaco', 'Lucida Console', 'Courier New', monospace;
   font-size: 15px; /* Slightly smaller to enhance terminal feel, but readable */
   line-height: 1.7;
-  text-shadow: 0 0 2px rgba(0, 255, 65, 0.5), 0 0 4px rgba(0, 255, 65, 0.3);
+  text-shadow:
+    0 0 2px rgba(0, 255, 65, 0.5),
+    0 0 4px rgba(0, 255, 65, 0.3);
   padding: 2em;
 
   /* Optional: Subtle grid lines - very faint */
@@ -19,7 +21,12 @@
 }
 
 /* Typography */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: inherit; /* Monospaced */
   margin-top: 1.6em;
   margin-bottom: 0.6em;
@@ -29,13 +36,18 @@ h1, h2, h3, h4, h5, h6 {
 h1 {
   color: #ffb800; /* Contrasting Amber/Yellow */
   font-size: 2.2em;
-  text-shadow: 0 0 3px #ffb800, 0 0 6px rgba(255, 184, 0, 0.5), 0 0 9px rgba(255, 184, 0, 0.3);
+  text-shadow:
+    0 0 3px #ffb800,
+    0 0 6px rgba(255, 184, 0, 0.5),
+    0 0 9px rgba(255, 184, 0, 0.3);
 }
 
 h2 {
   color: #39ff14; /* Brighter Green */
   font-size: 1.9em;
-  text-shadow: 0 0 3px #39ff14, 0 0 6px rgba(57, 255, 20, 0.5);
+  text-shadow:
+    0 0 3px #39ff14,
+    0 0 6px rgba(57, 255, 20, 0.5);
 }
 
 h3 {
@@ -48,7 +60,8 @@ h4 {
   font-size: 1.3em;
 }
 
-h5, h6 {
+h5,
+h6 {
   color: #00cc2a; /* Even dimmer green */
   font-size: 1.1em;
 }
@@ -57,14 +70,21 @@ h5, h6 {
 a {
   color: #00ffff; /* Bright Cyan */
   text-decoration: none; /* Matrix style often has no underlines */
-  text-shadow: 0 0 3px #00ffff, 0 0 6px rgba(0, 255, 255, 0.5);
-  transition: color 0.3s ease, text-shadow 0.3s ease;
+  text-shadow:
+    0 0 3px #00ffff,
+    0 0 6px rgba(0, 255, 255, 0.5);
+  transition:
+    color 0.3s ease,
+    text-shadow 0.3s ease;
 }
 
 a:hover,
 a:focus {
   color: #8effff; /* Lighter Cyan on hover */
-  text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #8effff;
+  text-shadow:
+    0 0 5px #00ffff,
+    0 0 10px #00ffff,
+    0 0 15px #8effff;
 }
 
 /* Elements */
@@ -85,7 +105,9 @@ hr {
   border: 0;
   height: 1px;
   background-color: #00ff41; /* Glowing Green */
-  box-shadow: 0 0 4px #00ff41, 0 0 7px #00ff41;
+  box-shadow:
+    0 0 4px #00ff41,
+    0 0 7px #00ff41;
   margin: 2.5em 0;
 }
 
@@ -144,7 +166,9 @@ pre code {
 .token.symbol,
 .token.deleted {
   color: #ffb800; /* Amber */
-  text-shadow: 0 0 2px #ffb800, 0 0 4px rgba(255, 184, 0, 0.4);
+  text-shadow:
+    0 0 2px #ffb800,
+    0 0 4px rgba(255, 184, 0, 0.4);
 }
 
 .token.selector,
@@ -154,7 +178,9 @@ pre code {
 .token.builtin,
 .token.inserted {
   color: #00ffff; /* Cyan */
-  text-shadow: 0 0 2px #00ffff, 0 0 4px rgba(0, 255, 255, 0.4);
+  text-shadow:
+    0 0 2px #00ffff,
+    0 0 4px rgba(0, 255, 255, 0.4);
 }
 
 .token.operator,
@@ -169,20 +195,26 @@ pre code {
 .token.attr-value,
 .token.keyword {
   color: #f0f; /* Neon Magenta/Fuchsia */
-  text-shadow: 0 0 2px #f0f, 0 0 4px rgba(255, 0, 255, 0.4);
+  text-shadow:
+    0 0 2px #f0f,
+    0 0 4px rgba(255, 0, 255, 0.4);
 }
 
 .token.function,
 .token.class-name {
   color: #ffff00; /* Neon Yellow */
-  text-shadow: 0 0 2px #ffff00, 0 0 4px rgba(255, 255, 0, 0.4);
+  text-shadow:
+    0 0 2px #ffff00,
+    0 0 4px rgba(255, 255, 0, 0.4);
 }
 
 .token.regex,
 .token.important,
 .token.variable {
   color: #ff6000; /* Bright Orange */
-  text-shadow: 0 0 2px #ff6000, 0 0 4px rgba(255, 96, 0, 0.4);
+  text-shadow:
+    0 0 2px #ff6000,
+    0 0 4px rgba(255, 96, 0, 0.4);
 }
 
 /* Ensure no default browser styles interfere too much */
