@@ -5,7 +5,8 @@
 .markdown-body {
   background-color: #ffffff; /* Pure white */
   color: #111111; /* Very dark gray/near black */
-  font-family: Arial, Helvetica, Verdana, sans-serif; /* Common system sans-serif */
+  font-family:
+    Arial, Helvetica, Verdana, sans-serif; /* Common system sans-serif */
   font-size: 16px;
   line-height: 1.6;
   /* max-width: 1100px; */ /* Optional: wider max-width, or remove for full-width */
@@ -14,7 +15,12 @@
 }
 
 /* Typography */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: #111111; /* Same as body text */
   font-family: Arial, Helvetica, Verdana, sans-serif; /* Same as body text */
   margin-top: 1.2em;
@@ -22,12 +28,25 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: bold; /* Differentiate by weight */
 }
 
-h1 { font-size: 2em; }
-h2 { font-size: 1.75em; }
-h3 { font-size: 1.5em; }
-h4 { font-size: 1.25em; }
-h5 { font-size: 1.1em; }
-h6 { font-size: 1em; font-style: italic; } /* May use italic for h6 if desired */
+h1 {
+  font-size: 2em;
+}
+h2 {
+  font-size: 1.75em;
+}
+h3 {
+  font-size: 1.5em;
+}
+h4 {
+  font-size: 1.25em;
+}
+h5 {
+  font-size: 1.1em;
+}
+h6 {
+  font-size: 1em;
+  font-style: italic;
+} /* May use italic for h6 if desired */
 
 p {
   margin-top: 0;
@@ -64,7 +83,8 @@ hr {
   margin: 2em 0;
 }
 
-ul, ol {
+ul,
+ol {
   margin-top: 0.5em;
   margin-bottom: 0.5em;
   padding-left: 2em; /* Standard indentation for lists */
@@ -82,7 +102,8 @@ table {
   border: 1px solid #aaaaaa; /* Border around table */
 }
 
-th, td {
+th,
+td {
   border: 1px solid #aaaaaa; /* Cell borders */
   padding: 0.4em 0.6em; /* Minimal padding */
   text-align: left;
@@ -123,7 +144,6 @@ pre code {
 /* No syntax highlighting, or extremely minimal. */
 /* Example of minimal highlighting (e.g., bold keywords) if desired: */
 /* .token.keyword { font-weight: bold; } */
-
 
 /* Ensure no default browser styles interfere too much */
 button,
