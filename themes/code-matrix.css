@@ -1,0 +1,228 @@
+/* Theme Name: Code Matrix */
+
+/* Overall Feel: Dark, digital, immersive, focused on code and technical details. */
+
+.markdown-body {
+  background-color: #050805; /* Very dark, desaturated green/near-black */
+  color: #00ff41; /* Glowing green for primary text */
+  font-family: 'Consolas', 'Monaco', 'Lucida Console', 'Courier New', monospace;
+  font-size: 15px; /* Slightly smaller to enhance terminal feel, but readable */
+  line-height: 1.7;
+  text-shadow: 0 0 2px rgba(0, 255, 65, 0.5), 0 0 4px rgba(0, 255, 65, 0.3);
+  padding: 2em;
+
+  /* Optional: Subtle grid lines - very faint */
+  background-image:
+    linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px; /* Adjust size of grid */
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: inherit; /* Monospaced */
+  margin-top: 1.6em;
+  margin-bottom: 0.6em;
+  font-weight: 500; /* Standard weight for monospaced, glow will provide emphasis */
+}
+
+h1 {
+  color: #ffb800; /* Contrasting Amber/Yellow */
+  font-size: 2.2em;
+  text-shadow: 0 0 3px #ffb800, 0 0 6px rgba(255, 184, 0, 0.5), 0 0 9px rgba(255, 184, 0, 0.3);
+}
+
+h2 {
+  color: #39ff14; /* Brighter Green */
+  font-size: 1.9em;
+  text-shadow: 0 0 3px #39ff14, 0 0 6px rgba(57, 255, 20, 0.5);
+}
+
+h3 {
+  color: #00ff41; /* Main Green */
+  font-size: 1.6em;
+}
+
+h4 {
+  color: #00dd30; /* Slightly dimmer green */
+  font-size: 1.3em;
+}
+
+h5, h6 {
+  color: #00cc2a; /* Even dimmer green */
+  font-size: 1.1em;
+}
+
+/* Links */
+a {
+  color: #00ffff; /* Bright Cyan */
+  text-decoration: none; /* Matrix style often has no underlines */
+  text-shadow: 0 0 3px #00ffff, 0 0 6px rgba(0, 255, 255, 0.5);
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+a:hover,
+a:focus {
+  color: #8effff; /* Lighter Cyan on hover */
+  text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #8effff;
+}
+
+/* Elements */
+blockquote {
+  border-left: 3px solid #ffb800; /* Amber accent */
+  background-color: rgba(10, 25, 10, 0.4); /* Darker, semi-transparent green */
+  padding: 0.8em 1.2em;
+  margin: 1.5em 0;
+  color: #00dd30; /* Dimmer green for quote text */
+  text-shadow: 0 0 2px rgba(0, 221, 48, 0.5);
+}
+
+blockquote p {
+  margin-bottom: 0.5em;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background-color: #00ff41; /* Glowing Green */
+  box-shadow: 0 0 4px #00ff41, 0 0 7px #00ff41;
+  margin: 2.5em 0;
+}
+
+/* Code Blocks */
+pre,
+code {
+  font-family: inherit; /* Monospaced */
+  font-size: 0.95em; /* Relative to body's 15px */
+  text-shadow: 0 0 2px rgba(0, 255, 65, 0.4); /* Subtle glow for code */
+}
+
+pre {
+  background-color: rgba(10, 20, 10, 0.6); /* Semi-transparent dark overlay */
+  padding: 1em;
+  border-radius: 2px; /* Minimal radius for a blocky feel */
+  border: 1px solid #00ff41; /* Glowing green border */
+  box-shadow: 0 0 5px rgba(0, 255, 65, 0.2);
+  overflow-x: auto;
+  color: #39ff14; /* Brighter green for base code text */
+}
+
+code {
+  background-color: rgba(10, 30, 10, 0.5); /* Slightly different for inline */
+  color: #39ff14;
+  padding: 0.2em 0.4em;
+  border-radius: 2px;
+}
+
+pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  text-shadow: inherit; /* Inherit text shadow from pre */
+}
+
+/* Basic Syntax Highlighting (Matrix-themed) */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #008820; /* Dim, dark green for comments */
+  text-shadow: none;
+}
+
+.token.punctuation {
+  color: #00ff41; /* Main green */
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #ffb800; /* Amber */
+  text-shadow: 0 0 2px #ffb800, 0 0 4px rgba(255, 184, 0, 0.4);
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #00ffff; /* Cyan */
+  text-shadow: 0 0 2px #00ffff, 0 0 4px rgba(0, 255, 255, 0.4);
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #39ff14; /* Bright Green */
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #f0f; /* Neon Magenta/Fuchsia */
+  text-shadow: 0 0 2px #f0f, 0 0 4px rgba(255, 0, 255, 0.4);
+}
+
+.token.function,
+.token.class-name {
+  color: #ffff00; /* Neon Yellow */
+  text-shadow: 0 0 2px #ffff00, 0 0 4px rgba(255, 255, 0, 0.4);
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #ff6000; /* Bright Orange */
+  text-shadow: 0 0 2px #ff6000, 0 0 4px rgba(255, 96, 0, 0.4);
+}
+
+/* Ensure no default browser styles interfere too much */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  background-color: rgba(10, 20, 10, 0.8);
+  color: #00ff41;
+  border: 1px solid #00ff41;
+}
+
+/* Further spacing refinement */
+.markdown-body > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Optional: very subtle digital rain animation - use with caution for performance */
+/* This is a placeholder idea and would need careful implementation and testing */
+/*
+@keyframes digital-rain-animation {
+  0% { background-position: 0 0; }
+  100% { background-position: -200px 200px; } // Adjust values for speed/direction
+}
+
+.markdown-body::before {
+  content: "";
+  position: fixed; // or absolute if .markdown-body is the viewport
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><text x="0" y="15" font-family="monospace" font-size="10" fill="rgba(0,255,65,0.05)">10</text></svg>'); // Example SVG
+  background-repeat: repeat;
+  animation: digital-rain-animation 20s linear infinite;
+  z-index: -1; // Behind content
+  opacity: 0.3;
+}
+*/
