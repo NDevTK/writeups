@@ -1,0 +1,196 @@
+/* Theme Name: Redacted/Classified */
+
+/* Overall Feel: Stark, official, slightly mysterious, focus on typography and clear information hierarchy. */
+
+.markdown-body {
+  background-color: #f8f8f7; /* Off-white */
+  color: #111111; /* Near black */
+  font-family: 'Courier New', Courier, monospace; /* Typewriter style */
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 2em;
+}
+
+/* "CLASSIFIED" Stamp Effect - Example for a potential header element, not applied globally */
+.classified-stamp {
+  display: inline-block;
+  border: 3px double #990000; /* Red border */
+  padding: 0.3em 0.7em;
+  color: #990000; /* Red text */
+  font-family: 'Arial Black', 'Stencil', sans-serif; /* Stencil-like or bold font */
+  font-size: 1.8em;
+  font-weight: bold;
+  text-transform: uppercase;
+  margin-bottom: 1.5em;
+  transform: rotate(-3deg); /* Slight rotation for stamp effect */
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Courier New', Courier, monospace; /* Consistent typewriter font */
+  color: #000000;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: bold; /* Standard bold for headings */
+}
+
+h1 { font-size: 2em; border-bottom: 2px solid #990000; padding-bottom: 0.2em; } /* Red underline */
+h2 { font-size: 1.7em; border-bottom: 1px solid #555555; padding-bottom: 0.2em; } /* Gray underline */
+h3 { font-size: 1.4em; }
+h4 { font-size: 1.2em; }
+h5 { font-size: 1.1em; color: #333333; }
+h6 { font-size: 1em; color: #444444; font-style: italic; }
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+/* Links */
+a {
+  color: #003399; /* Serious blue */
+  text-decoration: underline;
+}
+
+a:hover,
+a:focus {
+  color: #000000; /* Black on hover */
+  background-color: #fffb00; /* Yellow highlight on hover */
+  text-decoration: none;
+}
+
+a:visited {
+    color: #001f5c; /* Darker blue for visited */
+}
+
+/* Emphasis with Yellow Highlighter */
+em, strong, .highlighted-text {
+  background-color: #fffb00;
+  color: #000000;
+  padding: 0.1em 0.05em; /* Subtle padding */
+  font-style: normal; /* Override italic for em if using for highlight */
+  font-weight: bold; /* Ensure strong is bold, em can be normal or bold */
+}
+
+strong.highlighted-text, strong { /* ensure strong remains bold */
+    font-weight: bold;
+}
+
+/* "Redacted" Text Style (for decorative elements, not actual content) */
+.redacted-effect {
+  background-color: #000000;
+  color: #000000;
+  user-select: none; /* Prevent selection of the "redacted" part */
+  /* To make it look like text is under, add a subtle text shadow of the same color to the background
+     This is a bit of a hack and might not look perfect everywhere. */
+  text-shadow: 0 0 0 #000;
+}
+
+
+/* Elements */
+blockquote {
+  border-left: 3px solid #555555; /* Dark gray left border */
+  padding: 0.5em 1em;
+  margin: 1.5em 0;
+  color: #222222; /* Slightly lighter than main text */
+  background-color: #efefef; /* Light gray background */
+}
+
+blockquote p {
+  margin-bottom: 0.5em;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background-color: #000000; /* Solid black line */
+  margin: 2.5em 0;
+}
+
+/* Code Blocks */
+pre,
+code {
+  font-family: 'Courier New', Courier, monospace; /* Strict typewriter for code */
+  font-size: 0.9em;
+}
+
+pre {
+  background-color: #eeeeee; /* Light gray background */
+  padding: 1em;
+  border: 1px solid #555555; /* Dark gray border */
+  overflow-x: auto;
+  color: #000000; /* Black text */
+}
+
+code {
+  background-color: #e0e0e0; /* Slightly darker gray for inline code */
+  color: #000000;
+  padding: 0.15em 0.3em;
+  border: 1px dashed #777777; /* Dashed border for inline code */
+}
+
+pre code {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* Minimal Syntax Highlighting (Stark) */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #666666; /* Dark gray for comments */
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: #333333;
+}
+
+.token.keyword,
+.token.operator,
+.token.tag {
+  font-weight: bold; /* Only bolding for keywords/operators */
+  color: #000000;
+}
+
+.token.string,
+.token.number,
+.token.boolean,
+.token.property,
+.token.constant,
+.token.symbol,
+.token.attr-name,
+.token.selector {
+  color: #111111; /* Default black for most tokens */
+}
+
+.token.function,
+.token.class-name {
+  color: #000000;
+  font-weight: bold;
+}
+
+
+/* Ensure no default browser styles interfere too much */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  background-color: #f0f0f0;
+  color: #000000;
+  border: 1px solid #555555;
+}
+
+/* Further spacing refinement */
+.markdown-body > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0 !important;
+}
