@@ -17,7 +17,8 @@
   border: 3px double #990000; /* Red border */
   padding: 0.3em 0.7em;
   color: #990000; /* Red text */
-  font-family: 'Arial Black', 'Stencil', sans-serif; /* Stencil-like or bold font */
+  font-family:
+    'Arial Black', 'Stencil', sans-serif; /* Stencil-like or bold font */
   font-size: 1.8em;
   font-weight: bold;
   text-transform: uppercase;
@@ -26,20 +27,45 @@
 }
 
 /* Typography */
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Courier New', Courier, monospace; /* Consistent typewriter font */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family:
+    'Courier New', Courier, monospace; /* Consistent typewriter font */
   color: #000000;
   margin-top: 1.5em;
   margin-bottom: 0.5em;
   font-weight: bold; /* Standard bold for headings */
 }
 
-h1 { font-size: 2em; border-bottom: 2px solid #990000; padding-bottom: 0.2em; } /* Red underline */
-h2 { font-size: 1.7em; border-bottom: 1px solid #555555; padding-bottom: 0.2em; } /* Gray underline */
-h3 { font-size: 1.4em; }
-h4 { font-size: 1.2em; }
-h5 { font-size: 1.1em; color: #333333; }
-h6 { font-size: 1em; color: #444444; font-style: italic; }
+h1 {
+  font-size: 2em;
+  border-bottom: 2px solid #990000;
+  padding-bottom: 0.2em;
+} /* Red underline */
+h2 {
+  font-size: 1.7em;
+  border-bottom: 1px solid #555555;
+  padding-bottom: 0.2em;
+} /* Gray underline */
+h3 {
+  font-size: 1.4em;
+}
+h4 {
+  font-size: 1.2em;
+}
+h5 {
+  font-size: 1.1em;
+  color: #333333;
+}
+h6 {
+  font-size: 1em;
+  color: #444444;
+  font-style: italic;
+}
 
 p {
   margin-top: 0;
@@ -60,11 +86,13 @@ a:focus {
 }
 
 a:visited {
-    color: #001f5c; /* Darker blue for visited */
+  color: #001f5c; /* Darker blue for visited */
 }
 
 /* Emphasis with Yellow Highlighter */
-em, strong, .highlighted-text {
+em,
+strong,
+.highlighted-text {
   background-color: #fffb00;
   color: #000000;
   padding: 0.1em 0.05em; /* Subtle padding */
@@ -72,8 +100,10 @@ em, strong, .highlighted-text {
   font-weight: bold; /* Ensure strong is bold, em can be normal or bold */
 }
 
-strong.highlighted-text, strong { /* ensure strong remains bold */
-    font-weight: bold;
+strong.highlighted-text,
+strong {
+  /* ensure strong remains bold */
+  font-weight: bold;
 }
 
 /* "Redacted" Text Style (for decorative elements, not actual content) */
@@ -85,7 +115,6 @@ strong.highlighted-text, strong { /* ensure strong remains bold */
      This is a bit of a hack and might not look perfect everywhere. */
   text-shadow: 0 0 0 #000;
 }
-
 
 /* Elements */
 blockquote {
@@ -110,7 +139,8 @@ hr {
 /* Code Blocks */
 pre,
 code {
-  font-family: 'Courier New', Courier, monospace; /* Strict typewriter for code */
+  font-family:
+    'Courier New', Courier, monospace; /* Strict typewriter for code */
   font-size: 0.9em;
 }
 
@@ -171,7 +201,6 @@ pre code {
   color: #000000;
   font-weight: bold;
 }
-
 
 /* Ensure no default browser styles interfere too much */
 button,
