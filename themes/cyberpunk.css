@@ -1,0 +1,223 @@
+/* Theme Name: Cyberpunk */
+
+/* Overall Feel: Dark, neon-infused, digital, and slightly gritty. */
+
+body {
+  background-color: #0d0d0d; /* Very dark, near-black background */
+  color: #c0c0c0; /* Light, slightly desaturated color for default text */
+  font-family: 'Consolas', 'Monaco', 'Lucida Console', 'Courier New', monospace; /* Monospaced/futuristic font stack */
+  line-height: 1.7;
+  /* Optional: Subtle scanline effect */
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.03),
+    rgba(255, 255, 255, 0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* Headings - Neon Colors with Glow */
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 500; /* Slightly bolder for better neon visibility */
+}
+
+h1 {
+  color: #00ffff; /* Electric Blue */
+  text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff;
+  font-size: 2.4em;
+}
+
+h2 {
+  color: #ff00ff; /* Neon Pink/Magenta */
+  text-shadow: 0 0 5px #ff00ff, 0 0 10px #ff00ff;
+  font-size: 2.0em;
+}
+
+h3 {
+  color: #39ff14; /* Lime Green */
+  text-shadow: 0 0 5px #39ff14, 0 0 8px #39ff14;
+  font-size: 1.6em;
+}
+
+h4 {
+  color: #ffff00; /* Neon Yellow - also used for links, but good for smaller headings */
+  text-shadow: 0 0 4px #ffff00, 0 0 7px #ffff00;
+  font-size: 1.3em;
+}
+
+h5, h6 {
+  color: #ff8c00; /* Bright Orange - for less prominent headings */
+  text-shadow: 0 0 4px #ff8c00, 0 0 6px #ff8c00;
+  font-size: 1.1em;
+}
+
+
+/* Links */
+a {
+  color: #ffff00; /* Vibrant Yellow */
+  text-decoration: none;
+  text-shadow: 0 0 3px #ffff00;
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+a:hover,
+a:focus {
+  color: #fff; /* Brighter white on hover */
+  text-shadow: 0 0 5px #ffff00, 0 0 10px #ffff00, 0 0 15px #fff;
+  text-decoration: none; /* Optional: underline on hover if preferred */
+}
+
+/* Accent Elements */
+blockquote {
+  border-left: 4px solid #ff00ff; /* Neon Pink border */
+  background-color: rgba(30, 30, 45, 0.5); /* Slightly different dark background */
+  padding: 1em 1.5em;
+  margin-left: 0;
+  color: #a0a0a0; /* Softer text color for blockquotes */
+  font-style: italic;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background-color: #00ffff; /* Electric Blue */
+  box-shadow: 0 0 3px #00ffff, 0 0 5px #00ffff;
+  margin-top: 2.5em;
+  margin-bottom: 2.5em;
+}
+
+/* Code Blocks */
+pre,
+code {
+  font-family: 'Consolas', 'Monaco', 'Lucida Console', 'Courier New', monospace;
+  font-size: 0.95em;
+}
+
+pre {
+  background-color: rgba(20, 20, 30, 0.85); /* Dark, semi-transparent background */
+  padding: 1.2em;
+  border-radius: 4px;
+  border: 1px solid #39ff14; /* Lime Green neon border */
+  box-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
+  overflow-x: auto;
+  color: #d0d0d0; /* Light gray/pale neon text for code */
+}
+
+code {
+  background-color: rgba(20, 20, 30, 0.7); /* Consistent background for inline code */
+  color: #39ff14; /* Lime green for inline code text */
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+}
+
+pre code {
+  background-color: transparent;
+  color: inherit; /* Inherit color from pre for code within pre */
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+
+/* Basic Syntax Highlighting (optional, can be expanded) */
+/* Using common cyberpunk colors */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #6a6a7e; /* Muted gray for comments */
+}
+
+.token.punctuation {
+  color: #c0c0c0; /* Default text color */
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #ff4f81; /* Neon Pink/Red variant */
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #50fa7b; /* Bright Green (similar to Lime) */
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #ff8c00; /* Bright Orange */
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #8be9fd; /* Light Cyan/Blue */
+}
+
+.token.function,
+.token.class-name {
+  color: #bd93f9; /* Light Purple/Violet */
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #ffb86c; /* Orange/Yellow variant */
+}
+
+
+/* Styles for .markdown-body if needed */
+.markdown-body {
+  /* Add specific overrides for .markdown-body if necessary */
+  /* Example: */
+  /* max-width: 900px; */
+  /* margin: 0 auto; */
+}
+
+/* Optional: Glitch effect on h1 hover - use with caution */
+/*
+.markdown-body h1:hover {
+  animation: glitch 0.25s infinite;
+}
+
+@keyframes glitch {
+  0% {
+    transform: translate(0);
+    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, 2px 2px #ff00ff, -2px -2px #39ff14;
+  }
+  20% {
+    transform: translate(-2px, 2px);
+    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, 2px 0 #ff00ff, -2px 0 #39ff14;
+  }
+  40% {
+    transform: translate(2px, -2px);
+    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, 0 2px #ff00ff, 0 -2px #39ff14;
+  }
+  60% {
+    transform: translate(-1px, 1px);
+    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, -1px 0 #ff00ff, 1px 0 #39ff14;
+  }
+  80% {
+    transform: translate(1px, -1px);
+    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, 0 -1px #ff00ff, 0 1px #39ff14;
+  }
+  100% {
+    transform: translate(0);
+    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff, -2px 2px #ff00ff, 2px -2px #39ff14;
+  }
+}
+*/
