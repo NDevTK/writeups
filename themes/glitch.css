@@ -1,0 +1,239 @@
+/* Theme Name: Glitch */
+
+/* Overall Feel: Edgy, digital, slightly chaotic but still structured and readable. */
+
+.markdown-body {
+  background-color: #101010; /* Off-black base */
+  color: #e0e0e0; /* Off-white for primary text */
+  font-family: 'Roboto', 'Open Sans', Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 2em;
+  overflow-x: hidden; /* Prevent horizontal scrollbars from subtle glitch effects */
+
+  /* Optional: Subtle static/noise background */
+  /* background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Cfilter id="n" x="0" y="0"%3E%3CfeTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="4" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100" height="100" filter="url(%23n)" opacity=".03"/%3E%3C/svg%3E'); */
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Roboto', 'Open Sans', Arial, sans-serif; /* Stick to standard sans-serif for readability */
+  color: #e0e0e0;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+}
+
+h1 { font-size: 2.3em; text-shadow: 1px 0 #ff00ff, -1px 0 #00ffff; } /* Magenta/Cyan text shadow glitch */
+h2 { font-size: 1.9em; text-shadow: 1px 0 #39ff14, -1px 0 #ff00ff; } /* Green/Magenta text shadow glitch */
+h3 { font-size: 1.6em; }
+h4 { font-size: 1.3em; color: #bbbbbb; }
+h5 { font-size: 1.15em; color: #aaaaaa; }
+h6 { font-size: 1em; color: #999999; font-style: italic; }
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+/* Links - Subtle Glitch on Hover */
+a {
+  color: #00ffff; /* Electric Blue */
+  text-decoration: none;
+  position: relative;
+  transition: color 0.2s ease-in-out;
+}
+
+a:hover,
+a:focus {
+  color: #ff00ff; /* Magenta on hover */
+  animation: link-glitch 0.25s infinite alternate;
+}
+
+@keyframes link-glitch {
+  0%, 100% { transform: translateX(0); text-shadow: none; }
+  25% { transform: translateX(-1px); text-shadow: 1px 0 #39ff14; }
+  50% { transform: translateX(1px); text-shadow: -1px 0 #00ffff; }
+  75% { transform: translateX(-1px); text-shadow: 1px 0 #ff00ff; }
+}
+
+/* Elements */
+blockquote {
+  border-left: 3px solid #ff00ff; /* Magenta */
+  background-color: rgba(30, 0, 30, 0.2); /* Dark magenta tint */
+  padding: 0.8em 1.2em;
+  margin: 1.5em 0;
+  color: #cccccc;
+}
+
+blockquote p {
+  margin-bottom: 0.5em;
+}
+
+hr {
+  border: 0;
+  height: 2px;
+  margin: 2.5em 0;
+  background-image: repeating-linear-gradient(
+    45deg,
+    #ff00ff,
+    #ff00ff 5px,
+    #39ff14 5px,
+    #39ff14 10px,
+    #00ffff 10px,
+    #00ffff 15px
+  );
+  animation: hr-glitch-colors 0.5s linear infinite;
+}
+
+@keyframes hr-glitch-colors {
+  0% { background-position: 0 0; }
+  100% { background-position: 30px 0; } /* 2 * 15px segment */
+}
+
+/* Code Blocks */
+pre,
+code {
+  font-family: 'VT323', 'Courier New', Courier, monospace; /* Digital/Pixel font if available, fallback to Courier */
+  font-size: 0.95em;
+}
+
+pre {
+  background-color: #1a1a1a; /* Dark gray, different from body */
+  padding: 1em;
+  border: 1px solid #39ff14; /* Lime Green border */
+  border-radius: 3px;
+  overflow-x: auto;
+  color: #d0d0d0; /* Light gray code text */
+  position: relative; /* For potential pseudo-element glitch effects */
+}
+
+/* Subtle scanline effect for pre blocks */
+pre::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 1px,
+    rgba(0, 255, 255, 0.02) 1px, /* Faint cyan scanlines */
+    rgba(0, 255, 255, 0.02) 2px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+pre code { /* Code inside pre should inherit pre's styles */
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  font-size: inherit; /* Ensure VT323 applies if set on pre */
+  z-index: 2; /* Above scanlines */
+  position: relative; /* Ensure it's rendered above ::before */
+}
+
+/* Inline code */
+code {
+  background-color: #2a2a2a; /* Slightly lighter dark bg for inline code */
+  color: #00ffff; /* Electric Blue */
+  padding: 0.2em 0.4em;
+  border-radius: 2px;
+}
+
+/* Syntax Highlighting (Glitch-themed) */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #666666; /* Muted gray for comments */
+}
+
+.token.punctuation {
+  color: #cccccc; /* Default text color */
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #ff00ff; /* Magenta */
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #39ff14; /* Lime Green */
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #00ffff; /* Electric Blue */
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #ffff00; /* Yellow - another contrasting glitch color */
+}
+
+.token.function,
+.token.class-name {
+  color: #ff8c00; /* Orange - for variety */
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #f0f; /* Re-use Magenta or another distinct color */
+}
+
+
+/* Ensure no default browser styles interfere too much */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  background-color: #1a1a1a;
+  color: #00ffff;
+  border: 1px solid #00ffff;
+}
+
+/* Further spacing refinement */
+.markdown-body > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Optional: Character flicker for a specific element (e.g., a title)
+   Requires JS or more complex CSS to target specific characters.
+   This is a conceptual placeholder for a decorative element.
+.glitch-title::after {
+  content: '_'; // Simulates cursor or glitched character
+  animation: flicker 0.5s infinite;
+  color: #39ff14;
+}
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+*/
