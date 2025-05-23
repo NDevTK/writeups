@@ -171,3 +171,8 @@ textarea {
 .highlight {
   color: black;
 }
+
+::selection {
+  color: purple;
+  background: white;
+}
