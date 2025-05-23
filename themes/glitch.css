@@ -10,9 +10,6 @@
   line-height: 1.7;
   padding: 2em;
   overflow-x: hidden; /* Prevent horizontal scrollbars from subtle glitch effects */
-
-  /* Optional: Subtle static/noise background */
-  /* background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Cfilter id="n" x="0" y="0"%3E%3CfeTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="4" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100" height="100" filter="url(%23n)" opacity=".03"/%3E%3C/svg%3E'); */
 }
 
 /* Typography */
@@ -270,16 +267,6 @@ textarea {
   margin-bottom: 0 !important;
 }
 
-/* Optional: Character flicker for a specific element (e.g., a title)
-   Requires JS or more complex CSS to target specific characters.
-   This is a conceptual placeholder for a decorative element.
-.glitch-title::after {
-  content: '_'; // Simulates cursor or glitched character
-  animation: flicker 0.5s infinite;
-  color: #39ff14;
+.highlight {
+  color: black;
 }
-@keyframes flicker {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.2; }
-}
-*/
