@@ -1,7 +1,9 @@
 /* themes/default.css - Modernized */
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
   line-height: 1.6;
   color: #333; /* Dark gray for text */
   background-color: #f8f9fa; /* Light, neutral background */
@@ -11,7 +13,10 @@ body {
 
 /* Apply a max-width and center content for better readability on wider screens */
 /* Assuming content is within .markdown-body or directly in body if no other container */
-.markdown-body, body > article, body > main { /* Common content wrappers, adjust if structure is different */
+.markdown-body,
+body > article,
+body > main {
+  /* Common content wrappers, adjust if structure is different */
   max-width: 800px;
   margin: 0 auto;
   padding: 20px;
@@ -26,20 +31,36 @@ body {
    Adjust if this causes issues with full-width elements if any are intended.
 */
 
-
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   margin-top: 1.5em;
   margin-bottom: 0.5em;
   font-weight: 600;
   line-height: 1.2;
 }
 
-h1 { font-size: 2.25em; }
-h2 { font-size: 1.75em; }
-h3 { font-size: 1.5em; }
-h4 { font-size: 1.25em; }
-h5 { font-size: 1em; }
-h6 { font-size: 0.875em; }
+h1 {
+  font-size: 2.25em;
+}
+h2 {
+  font-size: 1.75em;
+}
+h3 {
+  font-size: 1.5em;
+}
+h4 {
+  font-size: 1.25em;
+}
+h5 {
+  font-size: 1em;
+}
+h6 {
+  font-size: 0.875em;
+}
 
 p {
   margin-bottom: 1em;
@@ -50,13 +71,18 @@ a {
   text-decoration: none; /* Remove default underline */
 }
 
-a:hover, a:focus {
+a:hover,
+a:focus {
   color: #0056b3; /* Darker blue on hover/focus */
   text-decoration: underline;
 }
 
-pre, code, kbd, samp {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+pre,
+code,
+kbd,
+samp {
+  font-family:
+    'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
   font-size: 0.9em; /* Slightly smaller for code, adjust as needed */
 }
 
@@ -74,7 +100,8 @@ code {
   border-radius: 3px;
 }
 
-pre code { /* Reset background for code inside pre, as pre has its own */
+pre code {
+  /* Reset background for code inside pre, as pre has its own */
   background-color: transparent;
   padding: 0;
   border-radius: 0;
@@ -93,7 +120,8 @@ table {
   margin-bottom: 1em;
 }
 
-th, td {
+th,
+td {
   padding: 0.75em;
   border: 1px solid #dee2e6; /* Light gray borders for table cells */
   text-align: left;
@@ -112,7 +140,8 @@ blockquote {
   color: #555;
 }
 
-ul, ol {
+ul,
+ol {
   margin-bottom: 1em;
   padding-left: 1.5em; /* Standard indentation */
 }
