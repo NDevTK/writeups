@@ -1,5 +1,10 @@
 /* Typography */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: inherit; /* Use body font stack */
   color: #202124; /* Same as body text, or slightly darker if preferred */
   margin-top: 1.8em;
@@ -8,12 +13,28 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.3;
 }
 
-h1 { font-size: 2.2em; }
-h2 { font-size: 1.8em; }
-h3 { font-size: 1.5em; }
-h4 { font-size: 1.25em; color: #3c4043; } /* Slightly lighter for less emphasis */
-h5 { font-size: 1.1em; color: #3c4043; }
-h6 { font-size: 1em; color: #5f6368; font-weight: 500; } /* Lighter, less bold for h6 */
+h1 {
+  font-size: 2.2em;
+}
+h2 {
+  font-size: 1.8em;
+}
+h3 {
+  font-size: 1.5em;
+}
+h4 {
+  font-size: 1.25em;
+  color: #3c4043;
+} /* Slightly lighter for less emphasis */
+h5 {
+  font-size: 1.1em;
+  color: #3c4043;
+}
+h6 {
+  font-size: 1em;
+  color: #5f6368;
+  font-weight: 500;
+} /* Lighter, less bold for h6 */
 
 p {
   margin-top: 0;
@@ -33,7 +54,7 @@ a:focus {
 }
 
 a:visited {
-    color: #135abc; /* Slightly different shade for visited links */
+  color: #135abc; /* Slightly different shade for visited links */
 }
 
 /* Elements */
@@ -65,7 +86,8 @@ table {
   border: 1px solid #dadce0; /* Subtle border for the table */
 }
 
-th, td {
+th,
+td {
   border: 1px solid #dadce0; /* Subtle cell borders */
   padding: 0.8em 1em; /* Generous padding */
   text-align: left;
@@ -79,7 +101,8 @@ th {
 /* Code Blocks */
 pre,
 code {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-family:
+    'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
   font-size: 0.9em;
 }
 
@@ -183,10 +206,10 @@ textarea {
   border-radius: 4px;
 }
 
-input[type="text"],
-input[type="search"],
+input[type='text'],
+input[type='search'],
 textarea {
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 button {
@@ -196,7 +219,8 @@ button {
   cursor: pointer;
 }
 
-button:hover, button:focus {
+button:hover,
+button:focus {
   background-color: #005cb2;
 }
 
