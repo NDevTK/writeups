@@ -1,0 +1,102 @@
+body {
+  background: #0A2F35; /* Dark blue/teal */
+  color: #E0F4F4; /* Off-white/light cyan */
+  font-family: Arial, sans-serif;
+}
+
+h1 {
+  color: #90D0D8; /* Lighter blue */
+}
+
+h2 {
+  color: #7ABCC4; /* Seafoam green */
+}
+
+h3, h4, h5, h6 {
+  color: #A0D0D8; /* Lighter shades of blue for other headings */
+}
+
+p, li {
+  color: #E0F4F4; /* Off-white/light cyan */
+}
+
+a {
+  color: #FF7F50; /* Coral */
+  text-decoration: none;
+}
+
+a:hover {
+  color: #FFFF80; /* Bright yellow on hover */
+  text-decoration: underline; /* Optional: or a wave animation */
+}
+
+blockquote {
+  background: rgba(15, 68, 78, 0.7); /* Semi-transparent darker teal */
+  border-left: 4px solid #FF7F50; /* Coral */
+  padding: 10px;
+  margin: 10px;
+}
+
+pre, code {
+  background: #072428; /* Very dark desaturated cyan */
+  color: #C0E0E0;
+  padding: 5px;
+  border-radius: 4px;
+  font-family: "Courier New", Courier, monospace;
+}
+
+/* Basic syntax highlighting placeholders */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #6A9955; /* Green */
+}
+
+.token.punctuation {
+  color: #D4D4D4; /* Light gray */
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #569CD6; /* Blue */
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #CE9178; /* Orange/Coral */
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #DCDCAA; /* Yellow */
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #C586C0; /* Purple */
+}
+
+.token.function,
+.token.class-name {
+  color: #4EC9B0; /* Teal */
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #D16969; /* Reddish */
+}
