@@ -1,12 +1,17 @@
 body {
-  background: #D4D0C8; /* Classic OS gray */
+  background: #d4d0c8; /* Classic OS gray */
   color: #000000; /* Black text */
   font-family: Tahoma, 'MS Sans Serif', Arial, sans-serif;
   line-height: 1.5;
   margin: 0; /* Remove default margin */
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: #000000;
   font-family: Tahoma, 'MS Sans Serif', Arial, sans-serif;
   margin-top: 1em;
@@ -14,8 +19,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 h1 {
-  background-color: #005A9E; /* Dark blue title bar */
-  color: #FFFFFF; /* White text */
+  background-color: #005a9e; /* Dark blue title bar */
+  color: #ffffff; /* White text */
   padding: 5px 10px;
   font-size: 1.2em; /* More like a title bar font size */
   border: 1px solid #000000; /* Simple border */
@@ -49,23 +54,24 @@ h6 {
   font-weight: bold;
 }
 
-p, li {
+p,
+li {
   color: #000000;
   margin-bottom: 0.8em;
 }
 
 a {
-  color: #0000EE; /* Standard system blue */
+  color: #0000ee; /* Standard system blue */
   text-decoration: underline;
 }
 
 a:hover {
-  color: #3366CC; /* Slightly different blue on hover */
+  color: #3366cc; /* Slightly different blue on hover */
 }
 
 pre {
-  background: #FFFFFF; /* White */
-  border: 1px inset #7F7F7F; /* Inset text area look */
+  background: #ffffff; /* White */
+  border: 1px inset #7f7f7f; /* Inset text area look */
   padding: 0.5em;
   overflow-x: auto;
   margin: 1em 0; /* Added margin for spacing */
@@ -118,8 +124,8 @@ code {
 }
 
 blockquote {
-  background-color: #FFFFE1; /* Light yellow for alert box */
-  border: 1px solid #FFD700; /* Gold/dark yellow border */
+  background-color: #ffffe1; /* Light yellow for alert box */
+  border: 1px solid #ffd700; /* Gold/dark yellow border */
   padding: 1em;
   margin: 1em 0; /* Standard margin */
   color: #000000; /* Text should be black for readability */

@@ -1,14 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code&display=swap');
 
 body {
-  background: #1E1E1E; /* Dark background */
-  color: #D4D4D4; /* Light gray for general text */
+  background: #1e1e1e; /* Dark background */
+  color: #d4d4d4; /* Light gray for general text */
   font-family: 'Segoe UI', Arial, sans-serif; /* Clean sans-serif */
   line-height: 1.6;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  color: #EAEAEA; /* Slightly brighter than body text */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #eaeaea; /* Slightly brighter than body text */
   font-family: 'Segoe UI', Arial, sans-serif; /* Consistent modern sans-serif */
   margin-top: 1.2em;
   margin-bottom: 0.6em;
@@ -16,7 +21,7 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 {
   font-size: 2.4em;
-  border-bottom: 2px solid #4E9AF1; /* Accent color border */
+  border-bottom: 2px solid #4e9af1; /* Accent color border */
   padding-bottom: 0.3em;
 }
 
@@ -38,16 +43,17 @@ h5 {
 
 h6 {
   font-size: 1em;
-  color: #CECECE; /* Slightly dimmer for less emphasis */
+  color: #cecece; /* Slightly dimmer for less emphasis */
 }
 
-p, li {
-  color: #D4D4D4;
+p,
+li {
+  color: #d4d4d4;
   margin-bottom: 1em;
 }
 
 a {
-  color: #4E9AF1; /* Vibrant blue */
+  color: #4e9af1; /* Vibrant blue */
   text-decoration: none;
 }
 
@@ -57,10 +63,10 @@ a:hover {
 
 blockquote {
   background: #252526; /* Slightly different dark shade */
-  border-left: 4px solid #4E9AF1; /* Link blue accent */
+  border-left: 4px solid #4e9af1; /* Link blue accent */
   padding: 0.5em 1em;
   margin: 1em 0;
-  color: #CCC; /* Specific text color for blockquotes */
+  color: #ccc; /* Specific text color for blockquotes */
   font-style: italic; /* Common styling for quotes */
 }
 
@@ -73,7 +79,8 @@ pre {
 }
 
 code {
-  font-family: 'Fira Code', Consolas, Menlo, monospace; /* Fira Code with fallbacks */
+  font-family:
+    'Fira Code', Consolas, Menlo, monospace; /* Fira Code with fallbacks */
   font-size: 0.95em; /* Slightly smaller for code context */
 }
 
@@ -82,11 +89,11 @@ code {
 .token.prolog,
 .token.doctype,
 .token.cdata {
-  color: #6A9955; /* Green */
+  color: #6a9955; /* Green */
 }
 
 .token.punctuation {
-  color: #D4D4D4; /* Light gray */
+  color: #d4d4d4; /* Light gray */
 }
 
 .token.property,
@@ -96,7 +103,7 @@ code {
 .token.constant,
 .token.symbol,
 .token.deleted {
-  color: #CE9178; /* Peach/orange */
+  color: #ce9178; /* Peach/orange */
 }
 
 .token.selector,
@@ -105,32 +112,33 @@ code {
 .token.char,
 .token.builtin,
 .token.inserted {
-  color: #569CD6; /* Blue */
+  color: #569cd6; /* Blue */
 }
 
 .token.operator,
 .token.entity,
 .token.url,
 .language-css .token.string, /* Specificity for CSS strings if needed */
-.style .token.string {       /* Specificity for style strings if needed */
-  color: #D4D4D4; /* Light gray, similar to punctuation or default text */
+.style .token.string {
+  /* Specificity for style strings if needed */
+  color: #d4d4d4; /* Light gray, similar to punctuation or default text */
 }
 
 .token.atrule,
 .token.attr-value,
 .token.keyword {
-  color: #C586C0; /* Purple */
+  color: #c586c0; /* Purple */
 }
 
 .token.function,
 .token.class-name {
-  color: #DCDCAA; /* Yellowish */
+  color: #dcdcaa; /* Yellowish */
 }
 
 .token.regex,
 .token.important,
 .token.variable {
-  color: #9CDCFE; /* Light blue */
+  color: #9cdcfe; /* Light blue */
 }
 
 .token.important,
