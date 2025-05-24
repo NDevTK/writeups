@@ -154,3 +154,7 @@ code {
 .token.variable {
   color: #ff0000; /* Red */
 }
+
+.highlight span {
+  color: purple
+}
