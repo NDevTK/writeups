@@ -270,3 +270,7 @@ textarea {
 .highlight {
   color: black;
 }
+
+body {
+  background-color: black
+}
