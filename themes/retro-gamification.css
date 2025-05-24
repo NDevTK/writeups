@@ -1,0 +1,135 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+body {
+  background: #202030;
+  /* Subtle pixel grid pattern */
+  background-image: 
+    repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255,255,255,0.05) 1px, rgba(255,255,255,0.05) 2px),
+    repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255,255,255,0.05) 1px, rgba(255,255,255,0.05) 2px);
+  background-size: 2px 2px;
+  color: #E0E0E0;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+}
+
+h1 {
+  color: #FFFF00; /* yellow */
+}
+
+h2 {
+  color: #00FFFF; /* cyan */
+}
+
+h3 {
+  color: #FF00FF; /* magenta */
+}
+
+/* For h4-h6, we can cycle through the colors or use new ones */
+h4 {
+  color: #00FF00; /* green */
+}
+
+h5 {
+  color: #FFA500; /* orange */
+}
+
+h6 {
+  color: #FF0000; /* red */
+}
+
+p, li {
+  color: #E0E0E0;
+  line-height: 1.8; /* Increased line height for pixel font readability */
+}
+
+a {
+  color: #00FF00; /* Bright green */
+  text-decoration: none;
+  background-color: transparent;
+  padding: 2px 0; /* Minimal padding for non-hover state */
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out; /* Smooth transition */
+}
+
+a:hover {
+  background-color: #FFFF00; /* Contrasting dark shade - Yellow for button */
+  color: #202030; /* Text color to dark background color */
+  outline: 2px solid #FFFF00; /* Yellow outline for button effect */
+}
+
+blockquote {
+  border: 4px solid #FFFF00; /* yellow */
+  background: #303040;
+  padding: 15px;
+  margin: 15px 0;
+  font-size: 0.9em; /* Slightly smaller for dialogue box feel */
+  line-height: 1.6;
+}
+
+pre, code {
+  background: #101020;
+  color: #F0F0F0;
+  padding: 10px;
+  border-radius: 0; /* Blocky elements, no border-radius */
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.9em; /* Adjust for readability */
+  overflow-x: auto; /* Ensure code blocks are scrollable */
+}
+
+/* Basic syntax highlighting placeholders - Classic game palette */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #808080; /* Gray for comments */
+}
+
+.token.punctuation {
+  color: #FFFFFF; /* White */
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #00FFFF; /* Cyan */
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #FFFF00; /* Yellow */
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #00FF00; /* Green */
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #FF00FF; /* Magenta */
+}
+
+.token.function,
+.token.class-name {
+  color: #FFA500; /* Orange */
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #FF0000; /* Red */
+}
