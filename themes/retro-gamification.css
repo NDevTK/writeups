@@ -3,64 +3,84 @@
 body {
   background: #202030;
   /* Subtle pixel grid pattern */
-  background-image: 
-    repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255,255,255,0.05) 1px, rgba(255,255,255,0.05) 2px),
-    repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255,255,255,0.05) 1px, rgba(255,255,255,0.05) 2px);
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 1px,
+      rgba(255, 255, 255, 0.05) 1px,
+      rgba(255, 255, 255, 0.05) 2px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 1px,
+      rgba(255, 255, 255, 0.05) 1px,
+      rgba(255, 255, 255, 0.05) 2px
+    );
   background-size: 2px 2px;
-  color: #E0E0E0;
+  color: #e0e0e0;
   font-family: 'Press Start 2P', 'Courier New', monospace;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: 'Press Start 2P', 'Courier New', monospace;
 }
 
 h1 {
-  color: #FFFF00; /* yellow */
+  color: #ffff00; /* yellow */
 }
 
 h2 {
-  color: #00FFFF; /* cyan */
+  color: #00ffff; /* cyan */
 }
 
 h3 {
-  color: #FF00FF; /* magenta */
+  color: #ff00ff; /* magenta */
 }
 
 /* For h4-h6, we can cycle through the colors or use new ones */
 h4 {
-  color: #00FF00; /* green */
+  color: #00ff00; /* green */
 }
 
 h5 {
-  color: #FFA500; /* orange */
+  color: #ffa500; /* orange */
 }
 
 h6 {
-  color: #FF0000; /* red */
+  color: #ff0000; /* red */
 }
 
-p, li {
-  color: #E0E0E0;
+p,
+li {
+  color: #e0e0e0;
   line-height: 1.8; /* Increased line height for pixel font readability */
 }
 
 a {
-  color: #00FF00; /* Bright green */
+  color: #00ff00; /* Bright green */
   text-decoration: none;
   background-color: transparent;
   padding: 2px 0; /* Minimal padding for non-hover state */
-  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out; /* Smooth transition */
+  transition:
+    background-color 0.2s ease-in-out,
+    color 0.2s ease-in-out; /* Smooth transition */
 }
 
 a:hover {
-  background-color: #FFFF00; /* Contrasting dark shade - Yellow for button */
+  background-color: #ffff00; /* Contrasting dark shade - Yellow for button */
   color: #202030; /* Text color to dark background color */
-  outline: 2px solid #FFFF00; /* Yellow outline for button effect */
+  outline: 2px solid #ffff00; /* Yellow outline for button effect */
 }
 
 blockquote {
-  border: 4px solid #FFFF00; /* yellow */
+  border: 4px solid #ffff00; /* yellow */
   background: #303040;
   padding: 15px;
   margin: 15px 0;
@@ -68,9 +88,10 @@ blockquote {
   line-height: 1.6;
 }
 
-pre, code {
+pre,
+code {
   background: #101020;
-  color: #F0F0F0;
+  color: #f0f0f0;
   padding: 10px;
   border-radius: 0; /* Blocky elements, no border-radius */
   font-family: 'Press Start 2P', 'Courier New', monospace;
@@ -87,7 +108,7 @@ pre, code {
 }
 
 .token.punctuation {
-  color: #FFFFFF; /* White */
+  color: #ffffff; /* White */
 }
 
 .token.property,
@@ -97,7 +118,7 @@ pre, code {
 .token.constant,
 .token.symbol,
 .token.deleted {
-  color: #00FFFF; /* Cyan */
+  color: #00ffff; /* Cyan */
 }
 
 .token.selector,
@@ -106,7 +127,7 @@ pre, code {
 .token.char,
 .token.builtin,
 .token.inserted {
-  color: #FFFF00; /* Yellow */
+  color: #ffff00; /* Yellow */
 }
 
 .token.operator,
@@ -114,22 +135,22 @@ pre, code {
 .token.url,
 .language-css .token.string,
 .style .token.string {
-  color: #00FF00; /* Green */
+  color: #00ff00; /* Green */
 }
 
 .token.atrule,
 .token.attr-value,
 .token.keyword {
-  color: #FF00FF; /* Magenta */
+  color: #ff00ff; /* Magenta */
 }
 
 .token.function,
 .token.class-name {
-  color: #FFA500; /* Orange */
+  color: #ffa500; /* Orange */
 }
 
 .token.regex,
 .token.important,
 .token.variable {
-  color: #FF0000; /* Red */
+  color: #ff0000; /* Red */
 }

@@ -1,5 +1,5 @@
 body {
-  background: #FAFAFA;
+  background: #fafafa;
   color: #202020;
   font-family: Georgia, 'Times New Roman', serif;
   line-height: 1.7;
@@ -7,9 +7,15 @@ body {
   padding: 0;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: #101010;
-  font-family: Georgia, 'Times New Roman', serif; /* Consistent with body or can be a contrasting clean sans-serif */
+  font-family:
+    Georgia, 'Times New Roman', serif; /* Consistent with body or can be a contrasting clean sans-serif */
   margin-top: 1.5em;
   margin-bottom: 0.5em;
   line-height: 1.2;
@@ -74,21 +80,23 @@ blockquote {
   margin-bottom: 1.5em;
 }
 
-pre, code {
+pre,
+code {
   font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-  background: #F0F0F0;
+  background: #f0f0f0;
   color: #101010;
   padding: 8px 12px;
   border-radius: 3px; /* Subtle rounding */
   font-size: 0.95em;
   line-height: 1.5;
   overflow-x: auto;
-  border: 1px solid #D0D0D0; /* Alternative: no background, just border */
+  border: 1px solid #d0d0d0; /* Alternative: no background, just border */
 }
 
-code { /* Inline code style adjustments */
+code {
+  /* Inline code style adjustments */
   padding: 2px 4px;
-  background: #F0F0F0; /* Consistent with pre or slightly different */
+  background: #f0f0f0; /* Consistent with pre or slightly different */
   border-radius: 2px;
 }
 
