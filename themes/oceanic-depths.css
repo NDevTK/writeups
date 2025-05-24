@@ -105,3 +105,7 @@ code {
 .token.variable {
   color: #d16969; /* Reddish */
 }
+
+.highlight span {
+  color: purple
+}
