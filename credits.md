@@ -16,9 +16,9 @@ title: Credits
 
 # Fonts
 
-- `Shantell Sans` used in `comic`, Copyright 2022 The Shantell Sans Project Authors (<https://github.com/arrowtype/shantell-sans>)
-- `Monocraft` used in `minecraft`, Copyright (c) 2022, Idrees Hassan (<https://github.com/IdreesInc/Monocraft>)
-- `Press Start 2P` used in `Retro Gamification`, Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name "Press Start 2P".
+- `Shantell Sans` used in `Comic`, Copyright 2022 The Shantell Sans Project Authors (<https://github.com/arrowtype/shantell-sans>)
+- `Monocraft` used in `Minecraft`, Copyright (c) 2022, Idrees Hassan (<https://github.com/IdreesInc/Monocraft>)
+- `Press Start 2P` used in `Retro Gamification`, Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name "Press Start 2P"
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:
