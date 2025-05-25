@@ -165,6 +165,11 @@ switch (theme) {
       e.innerText = btoa(
         String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
       );
+      // Encode base64 into emoji
+      const encoding = base2base(
+        '0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz=',
+        '😀😁😂🤣😃😄😅😆😉😊😋😎😨😩🤯😬😮‍💨😰😱🥵🥶😳🤪😵👹👺💀☠️👻👽😹😸💩🤖👾🐻🐻‍❄️🐨🐼🐸🦓🐴🫎🫏🦄🐔🐲🐐🐫🦙🦘🦥🦨🦡🐘🦣🐁🐀🪲🐞🦂🕷️🕸️🐠🐡🦑🦐🐙🦞🦔🐇🐿️🦫🦎🐊🐴🫎'
+      );
       e.innerText = encoding(e.innerText);
     });
     break;
@@ -262,9 +267,3 @@ function base2base(srcAlphabet, dstAlphabet) {
     return result;
   };
 }
-
-// Encode base64 into emoji
-const encoding = base2base(
-  '0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz=',
-  '😀😁😂🤣😃😄😅😆😉😊😋😎😨😩🤯😬😮‍💨😰😱🥵🥶😳🤪😵👹👺💀☠️👻👽😹😸💩🤖👾🐻🐻‍❄️🐨🐼🐸🦓🐴🫎🫏🦄🐔🐲🐐🐫🦙🦘🦥🦨🦡🐘🦣🐁🐀🪲🐞🦂🕷️🕸️🐠🐡🦑🦐🐙🦞🦔🐇🐿️🦫🦎🐊🐴🫎'
-);
