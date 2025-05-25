@@ -221,48 +221,50 @@ if (location.pathname === '/writeups/' && !isMobile)
   info.innerText = 'You can go back here with the dot key.';
 
 function base2base(srcAlphabet, dstAlphabet) {
-    /* modification of github.com/HarasimowiczKamil/any-base to:
-		* support multibyte
-		* enforce unique alphabets
-	*/	
-	var  noDifference = srcAlphabet === dstAlphabet
-		,srcAlphabet = [...new Set([...srcAlphabet].join(""))]
-		,dstAlphabet = [...new Set([...dstAlphabet].join(""))]
-		,fromBase = srcAlphabet.length
-		,toBase = dstAlphabet.length
-		
-	return number=>{
-		if(noDifference) return number
+  /* modification of github.com/HarasimowiczKamil/any-base to:
+   * support multibyte
+   * enforce unique alphabets
+   */
+  var noDifference = srcAlphabet === dstAlphabet,
+    srcAlphabet = [...new Set([...srcAlphabet].join(''))],
+    dstAlphabet = [...new Set([...dstAlphabet].join(''))],
+    fromBase = srcAlphabet.length,
+    toBase = dstAlphabet.length;
 
-		number = [...number];
-		
-		var i, divide, newlen
-			,length = number.length
-			,result = ''
-			,numberMap = {}
-		
-		for(i = 0; i < length; i++)
-			numberMap[i] = srcAlphabet.indexOf(number[i])
-				
-		do {
-			divide = 0
-			newlen = 0
-			for(i = 0; i < length; i++) {
-				divide = divide * fromBase + numberMap[i]
-				if(divide >= toBase) {
-					numberMap[newlen++] = parseInt(divide / toBase, 10)
-					divide = divide % toBase
-				}
-				else if(newlen)
-					numberMap[newlen++] = 0
-			}
-			length = newlen
-			result = dstAlphabet[divide] + result
-		} while (newlen != 0)
-	
-		return result
-	}
+  return (number) => {
+    if (noDifference) return number;
+
+    number = [...number];
+
+    var i,
+      divide,
+      newlen,
+      length = number.length,
+      result = '',
+      numberMap = {};
+
+    for (i = 0; i < length; i++) numberMap[i] = srcAlphabet.indexOf(number[i]);
+
+    do {
+      divide = 0;
+      newlen = 0;
+      for (i = 0; i < length; i++) {
+        divide = divide * fromBase + numberMap[i];
+        if (divide >= toBase) {
+          numberMap[newlen++] = parseInt(divide / toBase, 10);
+          divide = divide % toBase;
+        } else if (newlen) numberMap[newlen++] = 0;
+      }
+      length = newlen;
+      result = dstAlphabet[divide] + result;
+    } while (newlen != 0);
+
+    return result;
+  };
 }
 
 // Encode base64 into emoji
-const encoding = base2base('0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz=', '😀😁😂🤣😃😄😅😆😉😊😋😎😨😩🤯😬😮‍💨😰😱🥵🥶😳🤪😵👹👺💀☠️👻👽😹😸💩🤖👾🐻🐻‍❄️🐨🐼🐸🦓🐴🫎🫏🦄🐔🐲🐐🐫🦙🦘🦥🦨🦡🐘🦣🐁🐀🪲🐞🦂🕷️🕸️🐠🐡🦑🦐🐙🦞🦔🐇🐿️🦫🦎🐊🐴🫎');
+const encoding = base2base(
+  '0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz=',
+  '😀😁😂🤣😃😄😅😆😉😊😋😎😨😩🤯😬😮‍💨😰😱🥵🥶😳🤪😵👹👺💀☠️👻👽😹😸💩🤖👾🐻🐻‍❄️🐨🐼🐸🦓🐴🫎🫏🦄🐔🐲🐐🐫🦙🦘🦥🦨🦡🐘🦣🐁🐀🪲🐞🦂🕷️🕸️🐠🐡🦑🦐🐙🦞🦔🐇🐿️🦫🦎🐊🐴🫎'
+);
