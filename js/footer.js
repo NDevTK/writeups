@@ -160,6 +160,14 @@ switch (theme) {
       );
     });
     break;
+  case 'emoji.css':
+    [...document.body.querySelectorAll('p, a')].forEach((e) => {
+      e.innerText = btoa(
+        String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
+      );
+      e.innerText = encoding(e.innerText);
+    });
+    break;
   case 'noscript.css':
     document.body.innerText =
       'You are using the NoScript theme with Javascript enabled :)';
@@ -211,3 +219,50 @@ if (window.top === window && !searchParams.has('theme'))
 // Javascript enabled, not a mobile device.
 if (location.pathname === '/writeups/' && !isMobile)
   info.innerText = 'You can go back here with the dot key.';
+
+function base2base(srcAlphabet, dstAlphabet) {
+    /* modification of github.com/HarasimowiczKamil/any-base to:
+		* support multibyte
+		* enforce unique alphabets
+	*/	
+	var  noDifference = srcAlphabet === dstAlphabet
+		,srcAlphabet = [...new Set([...srcAlphabet].join(""))]
+		,dstAlphabet = [...new Set([...dstAlphabet].join(""))]
+		,fromBase = srcAlphabet.length
+		,toBase = dstAlphabet.length
+		
+	return number=>{
+		if(noDifference) return number
+
+		number = [...number];
+		
+		var i, divide, newlen
+			,length = number.length
+			,result = ''
+			,numberMap = {}
+		
+		for(i = 0; i < length; i++)
+			numberMap[i] = srcAlphabet.indexOf(number[i])
+				
+		do {
+			divide = 0
+			newlen = 0
+			for(i = 0; i < length; i++) {
+				divide = divide * fromBase + numberMap[i]
+				if(divide >= toBase) {
+					numberMap[newlen++] = parseInt(divide / toBase, 10)
+					divide = divide % toBase
+				}
+				else if(newlen)
+					numberMap[newlen++] = 0
+			}
+			length = newlen
+			result = dstAlphabet[divide] + result
+		} while (newlen != 0)
+	
+		return result
+	}
+}
+
+// Encode base64 into emoji
+const encoding = base2base('0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz=', '😀😁😂🤣😃😄😅😆😉😊😋😎😨😩🤯😬😮‍💨😰😱🥵🥶😳🤪😵👹👺💀☠️👻👽😹😸💩🤖👾🐻🐻‍❄️🐨🐼🐸🦓🐴🫎🫏🦄🐔🐲🐐🐫🦙🦘🦥🦨🦡🐘🦣🐁🐀🪲🐞🦂🕷️🕸️🐠🐡🦑🦐🐙🦞🦔🐇🐿️🦫🦎🐊🐴🫎');
