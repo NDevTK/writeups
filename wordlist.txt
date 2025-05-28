@@ -205,6 +205,9 @@ exfiltrate
 mnt
 Borealis
 PluginVM
+AutoPause
+OriginMarker
+RequestIsolation
 VPN
 WireGuard
 config
