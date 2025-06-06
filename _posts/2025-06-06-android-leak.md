@@ -4,7 +4,7 @@ title: Android lock screen data leak (Awarded $500)
 
 Due to a lock screen race its possible to leak interactive app contents since app launches show on the lock screen temporarily.
 
-There's multiple ways to cause app launches from the lockscreen
+There's multiple ways to cause app launches from the lockscreen:
 
 - Deeplinks/BROWSABLE intents (when you hold down selected text and press open)
 - Gemini app will bypass PIN prompt when controlled via an external USB keyboard (USB to USB C adapter)
