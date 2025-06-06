@@ -20,10 +20,12 @@ signalpath
 CTMS
 url
 DOMPurify
+lockscreen
 reloader
 APIs
 allowlisted
 seo
+Deeplinks
 autocomplete
 github
 googlechromelabs
@@ -31,6 +33,7 @@ io
 NoScript's
 NotebookLM
 Yay
+GBoard
 gRPC
 RPC
 luci
