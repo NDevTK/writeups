@@ -6,7 +6,7 @@ Due to a lock screen race its possible to leak interactive app contents since ap
 
 There's multiple ways to cause app launches from the lockscreen
 
-- Deeplinks/Browsable intents (when you hold down selected text and press open)
+- Deeplinks/BROWSABLE intents (when you hold down selected text and press open)
 - Gemini app will bypass PIN prompt when controlled via an external USB keyboard (USB to USB C adapter)
 - GBoard settings icon
 
@@ -18,7 +18,7 @@ Steps on a locked Android device:
 - Select that text and tap open
 - Profit :)
 
-Stupid PoC minecraft video: <https://drive.google.com/file/d/1NKZmwtgmXpSL_uDnNrl_CUOgorfiCVKv/view?usp=sharing> when I made the report this was a private YouTube video but my channel got terminated for an unknown reason.
+Stupid PoC Minecraft video: <https://drive.google.com/file/d/1NKZmwtgmXpSL_uDnNrl_CUOgorfiCVKv/view?usp=sharing> when I made the report this was a private YouTube video but my channel got terminated for an unknown reason.
 
 # Impact
 
