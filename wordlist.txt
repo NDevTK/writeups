@@ -34,7 +34,7 @@ io
 NoScript's
 NotebookLM
 Yay
-GBoard
+Gboard
 gRPC
 RPC
 luci
