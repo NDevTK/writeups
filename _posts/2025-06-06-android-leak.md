@@ -6,9 +6,9 @@ Due to a lock screen race its possible to leak interactive app contents since ap
 
 There's multiple ways to cause app launches from the lockscreen:
 
-- Deeplinks/BROWSABLE intents (when you hold down selected text and press open)
+- [Deeplinks/BROWSABLE intents](https://ndevtk.github.io/writeups/2024/08/01/awas/) (when you hold down selected text and press open)
 - Gemini app will bypass PIN prompt when controlled via an external USB keyboard (USB to USB C adapter)
-- GBoard settings icon
+- Gboard settings icon
 
 They appear to not be willing to confirm if the fix covers all ways to launch apps from the lockscreen or just deeplinks are being patched as it would be a cross-report data leak.
 
