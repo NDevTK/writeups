@@ -1,3 +1,6 @@
+Cameyo's
+DaaS
+VDI
 html
 permalink
 navigations
