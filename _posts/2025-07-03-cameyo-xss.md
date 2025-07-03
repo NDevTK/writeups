@@ -11,33 +11,33 @@ This was fixed by sanitizing redirect URLs to only allow HTTP protocols.
 
 ```js
 function getSafeRedirectUrl(urlParameter) {
-            if (!urlParameter) {
-                return; // No URL provided
-            }
-            try {
-                const url = new URL(urlParameter, window.location.origin);
-                if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-                    return; //Blocked redirect to potentially unsafe URL
-                }
-                if (url.hostname !== window.location.hostname) {
-                    return; //Blocked redirect to external URL
-                }
-                return url;
-            } catch (e) {
-                return; // Handle cases where urlParameter is not a valid URL at all
-            }
-        }
+  if (!urlParameter) {
+    return; // No URL provided
+  }
+  try {
+    const url = new URL(urlParameter, window.location.origin);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return; //Blocked redirect to potentially unsafe URL
+    }
+    if (url.hostname !== window.location.hostname) {
+      return; //Blocked redirect to external URL
+    }
+    return url;
+  } catch (e) {
+    return; // Handle cases where urlParameter is not a valid URL at all
+  }
+}
 
-           // SetCookie (used by companyAdd.aspx)
-            var setCookie = getURLParameter("setCookie");
-            if (setCookie !== null && setCookie.startsWith('CyoMngEnt=')) {
-                var redirUrl = getURLParameter("redirUrl");
-                var safeUrl = getSafeRedirectUrl(redirUrl);
-                if (safeUrl) {
-                    document.cookie = setCookie;
-                    document.location.href = safeUrl;
-                }
-            }
+// SetCookie (used by companyAdd.aspx)
+var setCookie = getURLParameter('setCookie');
+if (setCookie !== null && setCookie.startsWith('CyoMngEnt=')) {
+  var redirUrl = getURLParameter('redirUrl');
+  var safeUrl = getSafeRedirectUrl(redirUrl);
+  if (safeUrl) {
+    document.cookie = setCookie;
+    document.location.href = safeUrl;
+  }
+}
 ```
 
 This was a duplicate report so was not rewarded.
