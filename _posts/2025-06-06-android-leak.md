@@ -18,7 +18,7 @@ Steps on a locked Android device:
 - Select that text and tap open
 - Profit :)
 
-Stupid PoC Minecraft video: <https://drive.google.com/file/d/1NKZmwtgmXpSL_uDnNrl_CUOgorfiCVKv/view?usp=sharing> when I made the report this was a private YouTube video but my channel got terminated for an unknown reason.
+Stupid PoC Minecraft video: <https://www.youtube.com/watch?v=TUysajkSlM4> when I made the report this was a private YouTube video but my channel got terminated for an unknown reason.
 
 # Impact
 
