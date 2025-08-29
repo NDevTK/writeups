@@ -48,5 +48,5 @@ onkeyup = (e) => {
   }
 };
 
-if (location.hash === '#deprecated/')
+if (location.hash.startsWith('#deprecated'))
   alert('Requested resource is apparently deprecated.');
