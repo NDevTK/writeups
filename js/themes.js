@@ -47,3 +47,5 @@ onkeyup = (e) => {
     location.href = '/writeups/';
   }
 };
+
+if (location.hash === '#deprecated/') alert('Requested resource is deprecated.');
