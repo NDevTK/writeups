@@ -8,6 +8,7 @@ navigations
 HTTPLeaks
 SVG
 sanitization
+deeplink
 src
 SignalPath
 WebExtensions
