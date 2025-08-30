@@ -8,17 +8,16 @@ When the Google Assistant is opened with a deeplink it should require manually p
 <h1>Click anywhere and wait.</h1>
 
 <script>
-onclick = () => {
+  onclick = () => {
+    const utterance = new SpeechSynthesisUtterance('Turn on airplane mode');
 
- const utterance = new SpeechSynthesisUtterance('Turn on airplane mode');
+    setInterval(() => {
+      if (speechSynthesis.speaking) return;
+      speechSynthesis.speak(utterance);
+    }, 2000);
 
- setInterval(() => {
-  if (speechSynthesis.speaking) return;
-  speechSynthesis.speak(utterance);
- }, 2000);
-
- open('market://launch?id=com.google.android.apps.googleassistant')
-}
+    open('market://launch?id=com.google.android.apps.googleassistant');
+  };
 </script>
 ```
 
