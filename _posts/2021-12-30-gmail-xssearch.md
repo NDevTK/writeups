@@ -5,7 +5,6 @@ title: Gmail XS-Search (Fixed)
 Allowed leaking email content cross-site but was [duplicate](https://www.youtube.com/watch?v=nQJHGHw94fM) and reported before Partitioned HTTP Cache was added.  
 See [XS-Search](https://xsleaks.dev/docs/attacks/xs-search/) and [Cache Probing](https://xsleaks.dev/docs/attacks/cache-probing/#fetch-with-abortcontroller) from the XSLeaks wiki.
 
-
 # Oct 25, 2020 11:21PM
 
 Created issue (on behalf of redacted).
