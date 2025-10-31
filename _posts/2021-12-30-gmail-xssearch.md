@@ -2,10 +2,9 @@
 title: Gmail XS-Search (Fixed)
 ---
 
-[Duplicate](https://www.youtube.com/watch?v=nQJHGHw94fM) and was done before Partitioned HTTP Cache was added.
-[(XS-Search | XS-Leaks Wiki)](https://xsleaks.dev/docs/attacks/xs-search/)
-[(Cache Probing | XS-Leaks Wiki)](https://xsleaks.dev/docs/attacks/cache-probing/#fetch-with-abortcontroller)  
-Allowed leaking email content cross-site.
+Allowed leaking email content cross-site but was [duplicate](https://www.youtube.com/watch?v=nQJHGHw94fM) and reported before Partitioned HTTP Cache was added.  
+See [XS-Search](https://xsleaks.dev/docs/attacks/xs-search/) and [Cache Probing](https://xsleaks.dev/docs/attacks/cache-probing/#fetch-with-abortcontroller) from the XSLeaks wiki.
+
 
 # Oct 25, 2020 11:21PM
 
@@ -62,6 +61,6 @@ We have identified this issue to be in a family of XS-Search attacks. In order t
 - We are experimenting with different defenses that don't break existing user functionality but also are effective.
 - We are working with web browsers to find ways that the web platform can help defend against these attacks.
 
-As all this work is already undergoing, for now we consider vulnerability reports in this area to be duplicates, unless they significantly change our understanding of our defenses and mitigations. See <https://sites.google.com/site/bughunteruniversity/nonvuln/xsleaks> for a more comprehensive description.
+As all this work is already undergoing, for now we consider vulnerability reports in this area to be duplicates, unless they significantly change our understanding of our defenses and mitigations. See `https://sites.google.com/site/bughunteruniversity/nonvuln/xsleaks` for a more comprehensive description.
 
 That said - if you think we misunderstood your report, and this issue does not meet the above criteria, feel free to let us know.
