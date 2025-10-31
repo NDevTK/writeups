@@ -22,8 +22,8 @@ It maybe send1x depending on the image used by Gmail.
 
 Browser/OS: Chrome, Windows 10
 
-The script works by first opening a window on https://mail.google.com/mail
-Then using window.location to perform a search like https://mail.google.com/mail/u/0/#search/Google
+The script works by first opening a window on <https://mail.google.com/mail>
+Then using window.location to perform a search like <https://mail.google.com/mail/u/0/#search/Google>
 Then it detects if the `send_googblue_20dp.png` image is cached if it is the search was successful after that the image then get purged from the cache.
 
 This probably would not be possible if the cache was not shared.
@@ -62,6 +62,6 @@ We have identified this issue to be in a family of XS-Search attacks. In order t
 - We are experimenting with different defenses that don't break existing user functionality but also are effective.
 - We are working with web browsers to find ways that the web platform can help defend against these attacks.
 
-As all this work is already undergoing, for now we consider vulnerability reports in this area to be duplicates, unless they significantly change our understanding of our defenses and mitigations. See https://sites.google.com/site/bughunteruniversity/nonvuln/xsleaks for a more comprehensive description.
+As all this work is already undergoing, for now we consider vulnerability reports in this area to be duplicates, unless they significantly change our understanding of our defenses and mitigations. See <https://sites.google.com/site/bughunteruniversity/nonvuln/xsleaks> for a more comprehensive description.
 
 That said - if you think we misunderstood your report, and this issue does not meet the above criteria, feel free to let us know.
