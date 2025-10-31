@@ -14,6 +14,7 @@ SignalPath
 WebExtensions
 UAC
 GOOGLEUSERCONTENT
+PiP
 COI
 dropdown
 monospaced
