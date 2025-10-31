@@ -10,6 +10,9 @@ SVG
 sanitization
 deeplink
 src
+FileSystemAccess
+FileSystemHandle
+PaymentRequest
 SignalPath
 WebExtensions
 UAC
