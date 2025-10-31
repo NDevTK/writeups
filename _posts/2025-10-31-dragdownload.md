@@ -2,8 +2,7 @@
 title: SameSite strict cookies bypass/cross-origin download (Awarded $1000)
 ---
 
-Drag the `foo` text on to your desktop.
-The file would contain `sec-fetch-site: 'none'`
+Drag the `foo` text on to your desktop it would contain `sec-fetch-site: 'none'`
 
 ```js
 let link = document.createElement('a');
