@@ -17,7 +17,7 @@ setTimeout(
 
 This crash can be detected cross-origin in the following ways
 
-- Checking device performance like with [devicemonitor](https://devicemonitor.glitch.me/) after `w[0].postMessage({type: 'print'});`
+- Checking device performance after `w[0].postMessage({type: 'print'});`
 - [Issue 40828189](https://issues.chromium.org/issues/40828189)
 - Extension tabs API looking for the status of unloaded (no permission needed)
 
