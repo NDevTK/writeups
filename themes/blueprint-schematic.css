@@ -14,7 +14,7 @@
   background-image:
     linear-gradient(rgba(121, 166, 220, 0.3) 1px, transparent 1px),
     /* Light blueprint blue, thinner lines */
-      linear-gradient(90deg, rgba(121, 166, 220, 0.3) 1px, transparent 1px);
+    linear-gradient(90deg, rgba(121, 166, 220, 0.3) 1px, transparent 1px);
   background-size: 25px 25px; /* Adjust grid size */
 }
 
