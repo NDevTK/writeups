@@ -187,9 +187,13 @@ if (!theme.endsWith('.css')) {
 
 async function summarizerSupport() {
   if ('Summarizer' in self) {
-    const a = await Summarizer.availability({languages: ["en"]});
-    if (a === 'downloadable' && !navigator.userActivation.isActive) return notSupported('user activation needed for downloading Summarizer API data');
-    if (a == 'downloading' || a == 'downloadable' || a == 'available') return true;
+    const a = await Summarizer.availability({languages: ['en']});
+    if (a === 'downloadable' && !navigator.userActivation.isActive)
+      return notSupported(
+        'user activation needed for downloading Summarizer API data'
+      );
+    if (a == 'downloading' || a == 'downloadable' || a == 'available')
+      return true;
     return notSupported('unusable Summarizer API');
   }
   return notSupported('no Summarizer API');
@@ -218,13 +222,13 @@ async function summarizer() {
     outputLanguage: 'en',
     expectedContextLanguages: ['en']
   });
-  
+
   content.innerText = '';
-  
+
   const stream = summarizer.summarizeStreaming(content.innerText, {
     context: document.title
   });
-  
+
   for await (const chunk of stream) {
     content.innerText += chunk;
   }
