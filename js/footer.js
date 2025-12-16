@@ -186,10 +186,11 @@ if (!theme.endsWith('.css')) {
 }
 
 async function summarizerSupport() {
-  if ('ai' in self && 'summarizer' in self.ai) {
-    const c = await ai.summarizer.capabilities();
-    if (c.available === 'no') return notSupported('unusable Summarizer API');
-    return true;
+  if ('Summarizer' in self) {
+    const a = await Summarizer.availability({languages: ["en"]});
+    if (a === 'downloadable' && !navigator.userActivation.isActive) return notSupported('user activation needed for downloading Summarizer API data');
+    if (a == 'downloading' || a == 'downloadable' || a == 'available') return true;
+    return notSupported('unusable Summarizer API');
   }
   return notSupported('no Summarizer API');
 }
@@ -208,13 +209,25 @@ async function summarizer() {
     location.pathname === '/writeups/'
   )
     return;
-  const summarizer = await ai.summarizer.create({
+  const summarizer = await Summarizer.create({
     sharedContext:
       'This is an webapp infomation security bug writeup intended for a tech-savvy audience.',
     format: 'plain-text',
-    length: 'long'
+    length: 'long',
+    expectedInputLanguages: ['en'],
+    outputLanguage: 'en',
+    expectedContextLanguages: ['en']
   });
-  content.innerText = await summarizer.summarize(content.innerText);
+  
+  content.innerText = '';
+  
+  const stream = summarizer.summarizeStreaming(content.innerText, {
+    context: document.title
+  });
+  
+  for await (const chunk of stream) {
+    content.innerText += chunk;
+  }
 }
 
 // Dont assume the user has javascript enabled and no clickjacking.
