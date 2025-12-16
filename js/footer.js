@@ -230,9 +230,9 @@ async function summarizer() {
   const stream = summarizer.summarizeStreaming(content.innerText, {
     context: document.title
   });
-  
+
   content.innerText = '';
-  
+
   for await (const chunk of stream) {
     content.innerText += chunk;
   }
