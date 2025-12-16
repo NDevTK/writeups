@@ -227,13 +227,12 @@ async function summarizer() {
     return;
 
   const summarizer = await Summarizer.create(writeupsContext);
-
-  content.innerText = '';
-
   const stream = summarizer.summarizeStreaming(content.innerText, {
     context: document.title
   });
-
+  
+  content.innerText = '';
+  
   for await (const chunk of stream) {
     content.innerText += chunk;
   }
