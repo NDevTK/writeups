@@ -5,14 +5,14 @@ const info = document.getElementById('info');
 themes.value = theme;
 
 const writeupsContext = {
-    sharedContext:
-      'This is an webapp infomation security bug writeup intended for a tech-savvy audience.',
-    format: 'plain-text',
-    length: 'long',
-    expectedInputLanguages: ['en'],
-    outputLanguage: 'en',
-    expectedContextLanguages: ['en']
-}
+  sharedContext:
+    'This is an webapp infomation security bug writeup intended for a tech-savvy audience.',
+  format: 'plain-text',
+  length: 'long',
+  expectedInputLanguages: ['en'],
+  outputLanguage: 'en',
+  expectedContextLanguages: ['en']
+};
 
 function getRandomIntInclusive(min, max) {
   const randomBuffer = new Uint32Array(1);
@@ -94,7 +94,8 @@ themes.onchange = async () => {
     )
   ) {
     localStorage.setItem('theme', themes.value);
-    if (themes.value == 'summarizer.css') await Summarizer.create(writeupsContext);
+    if (themes.value == 'summarizer.css')
+      await Summarizer.create(writeupsContext);
     reloadAll();
   } else {
     // Revert UI
@@ -224,7 +225,7 @@ async function summarizer() {
     location.pathname === '/writeups/'
   )
     return;
-  
+
   const summarizer = await Summarizer.create(writeupsContext);
 
   content.innerText = '';
