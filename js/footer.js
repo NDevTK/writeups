@@ -94,12 +94,12 @@ themes.onchange = async () => {
     )
   ) {
     localStorage.setItem('theme', themes.value);
-    
+
     if (themes.value == 'summarizer.css') {
       document.body.innerText = 'Please wait loading AI model...';
       await Summarizer.create(writeupsContext);
     }
-      
+
     reloadAll();
   } else {
     // Revert UI
