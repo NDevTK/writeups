@@ -9,23 +9,58 @@ const isMobile =
 
 const searchParams = new URL(location.href).searchParams;
 
+const allowedThemes = [
+  'audio.css',
+  'base64.css',
+  'basic.css',
+  'blueprint-schematic.css',
+  'code-matrix.css',
+  'comic.css',
+  'cyberpunk.css',
+  'default.css',
+  'duck.css',
+  'emoji.css',
+  'flip.css',
+  'glitch.css',
+  'gradient.css',
+  'light.css',
+  'mc.css',
+  'noscript.css',
+  'oceanic-depths.css',
+  'old-terminal.css',
+  'rainbow-text.css',
+  'redacted-classified.css',
+  'retro-gamification.css',
+  'typoifier.css',
+  'summarizer.css'
+];
+
 function getTheme() {
+  let theme;
   if (searchParams.has('theme')) {
-    return searchParams.get('theme');
+    theme = searchParams.get('theme');
+  } else {
+    try {
+      theme = localStorage.getItem('theme') || 'default.css';
+    } catch {
+      theme = 'default.css';
+    }
   }
-  try {
-    return localStorage.getItem('theme') || 'default.css';
-  } catch {
-    return 'default.css';
+
+  if (allowedThemes.includes(theme)) {
+    return theme;
   }
+  return 'default.css';
 }
 
 const theme = getTheme();
 
-const stylesheet = document.createElement('link');
-stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
-stylesheet.rel = 'stylesheet';
-document.head.appendChild(stylesheet);
+if (theme !== 'summarizer.css') {
+  const stylesheet = document.createElement('link');
+  stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
+  stylesheet.rel = 'stylesheet';
+  document.head.appendChild(stylesheet);
+}
 
 const reload = new BroadcastChannel('reload');
 reload.onmessage = (event) => {
