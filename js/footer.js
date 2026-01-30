@@ -285,9 +285,9 @@ function base2base(srcAlphabet, dstAlphabet) {
         } else if (newlen) numberMap[newlen++] = 0;
       }
       length = newlen;
-      result = dstAlphabet[divide] + result;
+      result.push(dstAlphabet[divide]);
     } while (newlen != 0);
 
-    return result;
+    return result.reverse().join('');
   };
 }
