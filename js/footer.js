@@ -237,8 +237,27 @@ async function summarizer() {
 
   content.innerText = '';
 
+  let buffer = '';
+  let frameId = null;
+
+  const updateDOM = () => {
+    content.innerText += buffer;
+    buffer = '';
+    frameId = null;
+  };
+
   for await (const chunk of stream) {
-    content.innerText += chunk;
+    buffer += chunk;
+    if (!frameId) {
+      frameId = requestAnimationFrame(updateDOM);
+    }
+  }
+
+  if (frameId) {
+    cancelAnimationFrame(frameId);
+    updateDOM();
+  } else if (buffer) {
+    updateDOM();
   }
 }
 
