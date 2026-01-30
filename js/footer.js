@@ -289,7 +289,7 @@ function base2base(srcAlphabet, dstAlphabet) {
       newlen,
       length = number.length,
       result = '',
-      numberMap = new Array(length);
+      numberMap = {};
 
     for (i = 0; i < length; i++) numberMap[i] = srcAlphabet.indexOf(number[i]);
 
