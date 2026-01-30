@@ -109,11 +109,8 @@ strong {
 /* "Redacted" Text Style (for decorative elements, not actual content) */
 .redacted-effect {
   background-color: #000000;
-  color: #000000;
+  color: transparent;
   user-select: none; /* Prevent selection of the "redacted" part */
-  /* To make it look like text is under, add a subtle text shadow of the same color to the background
-     This is a bit of a hack and might not look perfect everywhere. */
-  text-shadow: 0 0 0 #000;
 }
 
 /* Elements */
