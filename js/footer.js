@@ -269,7 +269,7 @@ function base2base(srcAlphabet, dstAlphabet) {
       divide,
       newlen,
       length = number.length,
-      result = '',
+      result = [],
       numberMap = {};
 
     for (i = 0; i < length; i++) numberMap[i] = srcAlphabet.indexOf(number[i]);
@@ -285,9 +285,9 @@ function base2base(srcAlphabet, dstAlphabet) {
         } else if (newlen) numberMap[newlen++] = 0;
       }
       length = newlen;
-      result = dstAlphabet[divide] + result;
+      result.push(dstAlphabet[divide]);
     } while (newlen != 0);
 
-    return result;
+    return result.reverse().join('');
   };
 }
