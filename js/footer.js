@@ -169,14 +169,14 @@ switch (theme) {
     }, 1000);
     break;
   case 'base64.css':
-    [...document.body.querySelectorAll('p, a')].forEach((e) => {
+    document.body.querySelectorAll('p, a').forEach((e) => {
       e.innerText = btoa(
         String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
       );
     });
     break;
   case 'emoji.css':
-    [...document.body.querySelectorAll('p, a')].forEach((e) => {
+    document.body.querySelectorAll('p, a').forEach((e) => {
       e.innerText = btoa(
         String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
       );
