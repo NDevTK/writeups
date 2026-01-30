@@ -2,9 +2,9 @@
 title: Android lock screen data leak (Awarded $500)
 ---
 
-Due to a lock screen race its possible to leak interactive app contents since app launches show on the lock screen temporarily.
+Due to a lock screen race, it's possible to leak interactive app contents since app launches show on the lock screen temporarily.
 
-There's multiple ways to cause app launches from the lockscreen:
+There are multiple ways to cause app launches from the lockscreen:
 
 - [Deeplinks/BROWSABLE intents](https://ndevtk.github.io/writeups/2024/08/01/awas/) (when you hold down selected text and press open)
 - Gemini app will bypass PIN prompt when controlled via an external USB keyboard (USB to USB C adapter)
@@ -14,7 +14,7 @@ They appear to not be willing to confirm if the fix covers all ways to launch ap
 
 Steps on a locked Android device:
 
-- Type in to Gemini "https://discord.gg/a"
+- Type into Gemini "https://discord.gg/a"
 - Select that text and tap open
 - Profit :)
 
@@ -29,4 +29,4 @@ It is assumed my report was wrongly triaged as a trust and safety issue and the 
 # Conclusion
 
 - Abuse VRP should stop hijacking reports
-- Android team should fix lockscreen bypasses quicker then 2 years
+- Android team should fix lockscreen bypasses quicker than 2 years

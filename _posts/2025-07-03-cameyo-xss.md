@@ -2,12 +2,12 @@
 title: Cameyo XSS
 ---
 
-XSS on Cameyo's Virtual App Delivery platform (alternative to VDI & DaaS) an TIER0 Google acquisition per <https://github.com/google/bughunters/blob/d1d112929c1e10ce86ec5686fa81eb1f828dd019/domain-tiers/external_domains_acquisitions.asciipb#L26>
+XSS on Cameyo's Virtual App Delivery platform (alternative to VDI & DaaS), a TIER0 Google acquisition per <https://github.com/google/bughunters/blob/d1d112929c1e10ce86ec5686fa81eb1f828dd019/domain-tiers/external_domains_acquisitions.asciipb#L26>
 
 PoC:
 <https://online.cameyo.com/apps/foo?setCookie=CyoMngEnt=&redirUrl=javascript:alert(origin)>
 
-This was fixed by sanitizing redirect URLs to only allow HTTP protocols.
+This was fixed by sanitizing redirect URLs to only allow the HTTP and HTTPS protocols.
 
 ```js
 function getSafeRedirectUrl(urlParameter) {
