@@ -2,7 +2,7 @@
 title: File picker UI spoof (Awarded $2000)
 ---
 
-File picker shown on the wrong origin while keeping FileSystemHandle.
+The file picker is shown on the wrong origin while keeping the FileSystemHandle.
 
 ```js
 onmouseup = (_) => {

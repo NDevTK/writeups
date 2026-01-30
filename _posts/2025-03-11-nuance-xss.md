@@ -2,13 +2,13 @@
 title: Nuance Library XSS
 ---
 
-The [@nuance-sdk/websdk-bootstrap](https://docs.nuance.com/agent-coach/APIs/Web-SDK/architectural-overview.html) version 2.5.0 or below would allow XSS via postMessage if the UUID is known its normally a hardcoded public value.
-Newer library versions added a origin check `if (this.frameEl && this.frameEl.src.indexOf(e.origin) == -1)`
+The [@nuance-sdk/websdk-bootstrap](https://docs.nuance.com/agent-coach/APIs/Web-SDK/architectural-overview.html) version 2.5.0 or below would allow XSS via postMessage if the UUID is known; it's normally a hardcoded public value.
+Newer library versions added an origin check `if (this.frameEl && this.frameEl.src.indexOf(e.origin) == -1)`
 
 # XSS on https://www.wellsfargo.com
 
-It was triaged as Medium (4.7) but later closed because "DOM-XSS is explicitly out of scope in the program policy" An attempt was made to contact HackerOne support who think DOM-XSS has a limited risk due to its client-side nature and said public disclosure is a code of conduct violation.
-During my account deletion request they changed program policy to allow DOM-XSS however still did not fix it. <https://hackerone.com/wellsfargo-bbp/policy_versions?change=3751314&type=team>
+It was triaged as Medium (4.7) but later closed because "DOM-XSS is explicitly out of scope in the program policy". An attempt was made to contact HackerOne support, who think DOM-XSS has a limited risk due to its client-side nature and said public disclosure is a code of conduct violation.
+During my account deletion request, they changed program policy to allow DOM-XSS; however, they still did not fix it. <https://hackerone.com/wellsfargo-bbp/policy_versions?change=3751314&type=team>
 
 ```js
 onclick = () => {
@@ -79,4 +79,4 @@ Other impacts may exist like if the origin contains or can embed account managem
 # Public disclosure
 
 While I acknowledge there's very "limited" extra risks in regards to public disclosure here I dont feel there is any more I can do with unresponsive teams. If companies do feel that report submitting requires an NDA they are wrong and should never threaten over disclosure or pay for silence.
-Also If I don't release this I will be thinking about it and that's a lot worse then any companies actions.
+Also, if I don't release this, I will be thinking about it, and that's a lot worse than any company's actions.
