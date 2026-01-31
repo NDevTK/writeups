@@ -277,42 +277,33 @@ function base2base(srcAlphabet, dstAlphabet) {
   var noDifference = srcAlphabet === dstAlphabet,
     srcAlphabet = [...new Set([...srcAlphabet].join(''))],
     dstAlphabet = [...new Set([...dstAlphabet].join(''))],
-    fromBase = srcAlphabet.length,
-    toBase = dstAlphabet.length;
+    fromBase = BigInt(srcAlphabet.length),
+    toBase = BigInt(dstAlphabet.length);
 
   // Optimization: Pre-compute lookup map for O(1) access
   var srcMap = {};
   for (var i = 0; i < srcAlphabet.length; i++) {
-    srcMap[srcAlphabet[i]] = i;
+    srcMap[srcAlphabet[i]] = BigInt(i);
   }
 
   return (number) => {
     if (noDifference) return number;
 
-    number = [...number];
+    var val = 0n;
+    for (var i = 0; i < number.length; i++) {
+      var char = number[i];
+      if (srcMap[char] === undefined) continue;
+      val = val * fromBase + srcMap[char];
+    }
 
-    var i,
-      divide,
-      newlen,
-      length = number.length,
-      result = [],
-      numberMap = new Array(length);
+    if (val === 0n) return dstAlphabet[0];
 
-    for (i = 0; i < length; i++) numberMap[i] = srcMap[number[i]];
-
-    do {
-      divide = 0;
-      newlen = 0;
-      for (i = 0; i < length; i++) {
-        divide = divide * fromBase + numberMap[i];
-        if (divide >= toBase) {
-          numberMap[newlen++] = parseInt(divide / toBase, 10);
-          divide = divide % toBase;
-        } else if (newlen) numberMap[newlen++] = 0;
-      }
-      length = newlen;
-      result.push(dstAlphabet[divide]);
-    } while (newlen != 0);
+    var result = [];
+    while (val > 0n) {
+      var remainder = val % toBase;
+      result.push(dstAlphabet[Number(remainder)]);
+      val = val / toBase;
+    }
 
     return result.reverse().join('');
   };
