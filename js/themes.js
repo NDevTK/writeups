@@ -1,5 +1,31 @@
 'use strict';
 
+const allowedThemes = [
+  'audio.css',
+  'base64.css',
+  'basic.css',
+  'blueprint-schematic.css',
+  'code-matrix.css',
+  'comic.css',
+  'cyberpunk.css',
+  'default.css',
+  'duck.css',
+  'emoji.css',
+  'flip.css',
+  'glitch.css',
+  'gradient.css',
+  'light.css',
+  'mc.css',
+  'noscript.css',
+  'oceanic-depths.css',
+  'old-terminal.css',
+  'rainbow-text.css',
+  'redacted-classified.css',
+  'retro-gamification.css',
+  'summarizer.css',
+  'typoifier.css'
+];
+
 const isMobile =
   'userAgentData' in navigator
     ? navigator.userAgentData.mobile
@@ -10,14 +36,21 @@ const isMobile =
 const searchParams = new URL(location.href).searchParams;
 
 function getTheme() {
+  let themeCandidate;
   if (searchParams.has('theme')) {
-    return searchParams.get('theme');
+    themeCandidate = searchParams.get('theme');
+  } else {
+    try {
+      themeCandidate = localStorage.getItem('theme') || 'default.css';
+    } catch {
+      themeCandidate = 'default.css';
+    }
   }
-  try {
-    return localStorage.getItem('theme') || 'default.css';
-  } catch {
-    return 'default.css';
+
+  if (allowedThemes.includes(themeCandidate)) {
+    return themeCandidate;
   }
+  return 'default.css';
 }
 
 const theme = getTheme();
