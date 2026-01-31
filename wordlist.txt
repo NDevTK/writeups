@@ -281,3 +281,4 @@ intentSpoof
 sbrowser
 HackerOne
 Bugcrowd
+WontFix
