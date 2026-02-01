@@ -56,9 +56,9 @@ function tryXSS(w) {
 
 Because this fix was not made server-side, some companies may still be using the insecure version of the library.
 
-It's still possible to send cross-origin messages, so other attacks such as CSS and keystroke injection (via Virtual keyboard) may work.
+It's still possible to send cross-origin messages, so other attacks such as CSS and keystroke injection (via virtual keyboard) may work.
 
 While this affected multiple bug bounty programs, the one I reported it to gave it Medium. They ignored the comment about how to steal cookies for account takeover and instead based their decision on the PoC doing `window.alert()`. But hey, at least they accepted the bug in a commonly used 3rd-party library and awarded it $200; that's 200x more than the bank XSS I reported.
 
 Given the high visibility of this attack, it might be used with a popunder/tabunder.
-This is not the first vulnerability found in the library <https://www.imperva.com/blog/vulnerability-discovered-in-equalweb-accessibility-widget>
+This is not the first vulnerability found in the library: <https://www.imperva.com/blog/vulnerability-discovered-in-equalweb-accessibility-widget>
