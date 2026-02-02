@@ -2,7 +2,7 @@
 title: Android lock screen data leak (Awarded $500)
 ---
 
-Due to a lock screen race, it's possible to leak interactive app contents since app launches show on the lock screen temporarily.
+Due to a lock screen race condition, it's possible to leak interactive app contents since app launches show on the lock screen temporarily.
 
 There are multiple ways to cause app launches from the lockscreen:
 
@@ -10,7 +10,7 @@ There are multiple ways to cause app launches from the lockscreen:
 - Gemini app will bypass PIN prompt when controlled via an external USB keyboard (USB to USB C adapter)
 - Gboard settings icon
 
-They appear to not be willing to confirm if the fix covers all ways to launch apps from the lockscreen or just deeplinks are being patched as it would be a cross-report data leak.
+They appear unwilling to confirm if the fix covers all ways to launch apps from the lockscreen or just deeplinks are being patched as it would be a cross-report data leak.
 
 Steps on a locked Android device:
 
@@ -18,7 +18,7 @@ Steps on a locked Android device:
 - Select that text and tap open
 - Profit :)
 
-Stupid PoC Minecraft video: <https://www.youtube.com/watch?v=TUysajkSlM4> when I made the report this was a private YouTube video but my channel got terminated for an unknown reason.
+Stupid PoC Minecraft video: <https://www.youtube.com/watch?v=TUysajkSlM4>. When I made the report, this was a private YouTube video, but my channel got terminated for an unknown reason.
 
 # Impact
 

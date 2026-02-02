@@ -7,7 +7,7 @@ Newer library versions added an origin check `if (this.frameEl && this.frameEl.s
 
 # XSS on https://www.wellsfargo.com
 
-It was triaged as Medium (4.7) but later closed because "DOM-XSS is explicitly out of scope in the program policy". An attempt was made to contact HackerOne support, who think DOM-XSS carries a limited risk due to its client-side nature and said public disclosure is a code of conduct violation.
+It was triaged as Medium (4.7) but later closed because "DOM-XSS is explicitly out of scope in the program policy". An attempt was made to contact HackerOne support, who believes DOM-XSS carries a limited risk due to its client-side nature and stated that public disclosure is a code of conduct violation.
 During my account deletion request, they changed program policy to allow DOM-XSS; however, they still did not fix it. <https://hackerone.com/wellsfargo-bbp/policy_versions?change=3751314&type=team>
 
 ```js
@@ -72,11 +72,11 @@ onclick = () => {
 
 Both sites have a login form so it could steal user passwords that may be automatic in the case of password manager usage or indirectly by using a scary message.
 
-It does have `autocomplete="off"` but many modern browsers do not support autocomplete="off" for login fields. <https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/Turning_off_form_autocompletion#managing_autofill_for_login_fields>
+The form has `autocomplete="off"` but many modern browsers do not support autocomplete="off" for login fields. <https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/Turning_off_form_autocompletion#managing_autofill_for_login_fields>
 
 Other impacts may exist, such as if the origin contains or can embed account management, has exposed cookies, or allows for site isolation bypass.
 
 # Public disclosure
 
-While I acknowledge there's very "limited" extra risks in regards to public disclosure here I don't feel there is any more I can do with unresponsive teams. If companies do feel that report submitting requires an NDA they are wrong and should never threaten over disclosure or pay for silence.
+While I acknowledge there's very "limited" extra risks regarding public disclosure here, I don't feel there is any more I can do with unresponsive teams. If companies do feel that report submitting requires an NDA, they are wrong and should never threaten over disclosure or pay for silence.
 Also, if I don't release this, I will be thinking about it, and that's a lot worse than any company's actions.
