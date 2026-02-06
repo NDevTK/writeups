@@ -1,6 +1,8 @@
 'use strict';
 const themes = document.getElementById('themes');
 const info = document.getElementById('info');
+// Shared buffer for random number generation to avoid allocation overhead
+const randomBuffer = new Uint32Array(1);
 
 themes.value = theme;
 
@@ -15,8 +17,6 @@ const writeupsContext = {
 };
 
 function getRandomIntInclusive(min, max) {
-  const randomBuffer = new Uint32Array(1);
-
   window.crypto.getRandomValues(randomBuffer);
 
   let randomNumber = randomBuffer[0] / (0xffffffff + 1);
@@ -149,12 +149,36 @@ switch (theme) {
     link.href = '/writeups/duck.svg';
     break;
   case 'typoifier.css':
-    document.querySelectorAll('p, a').forEach((e) => {
-      e.childNodes.forEach((node) => {
-        if (node.data === '' || node.data === undefined) return;
-        node.data = TypoSTR(node.data);
-      });
-    });
+    const typoElements = Array.from(document.querySelectorAll('p, a'));
+    let typoIndex = 0;
+
+    const processTypoChunk = () => {
+      const chunkStart = performance.now();
+      // Process for ~16ms to maintain 60fps
+      while (
+        typoIndex < typoElements.length &&
+        performance.now() - chunkStart < 16
+      ) {
+        // Optimization: check time only every 50 iterations to reduce overhead
+        for (
+          let i = 0;
+          i < 50 && typoIndex < typoElements.length;
+          i++, typoIndex++
+        ) {
+          const e = typoElements[typoIndex];
+          e.childNodes.forEach((node) => {
+            if (node.data === '' || node.data === undefined) return;
+            node.data = TypoSTR(node.data);
+          });
+        }
+      }
+
+      if (typoIndex < typoElements.length) {
+        requestAnimationFrame(processTypoChunk);
+      }
+    };
+
+    requestAnimationFrame(processTypoChunk);
     break;
   case 'audio.css':
     const utterance = new SpeechSynthesisUtterance(document.body.innerText);
