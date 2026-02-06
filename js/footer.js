@@ -188,9 +188,9 @@ switch (theme) {
       const base64 = btoa(
         String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
       );
-      updates.push({ element: e, text: encoding(base64) });
+      updates.push({element: e, text: encoding(base64)});
     });
-    updates.forEach(({ element, text }) => {
+    updates.forEach(({element, text}) => {
       element.innerText = text;
     });
     break;
