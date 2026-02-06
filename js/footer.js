@@ -163,10 +163,10 @@ switch (theme) {
     window.addEventListener('pagehide', () => {
       speechSynthesis.cancel();
     });
-    setInterval(() => {
-      if (speechSynthesis.speaking) return;
+    utterance.onend = () => {
       speechSynthesis.speak(utterance);
-    }, 1000);
+    };
+    speechSynthesis.speak(utterance);
     break;
   case 'base64.css':
     document.body.querySelectorAll('p, a').forEach((e) => {
