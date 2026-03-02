@@ -4,6 +4,7 @@ title: Privacy
 ---
 
 # Android App Privacy Policy
+
 No data is collected or shared by the Android apps.
 
 # Browser Extension Privacy Policy
