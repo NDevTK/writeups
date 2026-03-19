@@ -26,10 +26,14 @@ dropdown
 monospaced
 deeplinks
 googleusercontent
+CUI
+php
+pre
 Antigravity
 EqualWeb
 postLogger
 VSCode
+workspaces
 UUID
 sdk
 websdk
