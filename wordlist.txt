@@ -19,6 +19,8 @@ SignalPath
 WebExtensions
 UAC
 GOOGLEUSERCONTENT
+APIClient
+IndexedDB
 documentPictureInPicture
 PiP
 COI
