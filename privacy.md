@@ -11,7 +11,7 @@ No data is collected or shared by the Android apps.
 
 No data is collected or shared by the extensions with the exception of "RCE PoC" as that depends on google drive there <https://www.google.com/drive/terms-of-service/> still applies.  
 Sometimes data is stored in chrome.storage or localStorage for extension functionality.  
-APIClient stores request data localy in IndexedDB this can be cleared via popup UI and is not shared.
+APIClient stores request data locally in IndexedDB this can be cleared via popup UI and is not shared.
 
 # Writeups Privacy Policy
 
