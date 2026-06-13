@@ -2,8 +2,54 @@
 const themes = document.getElementById('themes');
 const info = document.getElementById('info');
 
-// Used for html themes support
-if (window.frame) document.body.prepend(frame);
+if (theme.endsWith('.html')) {
+  var frame = document.createElement('iframe');
+  frame.src = '/writeups/themes/' + encodeURIComponent(theme);
+  frame.setAttribute('aria-hidden', 'true');
+  frame.setAttribute('tabindex', '-1');
+  frame.style.cssText = [
+    'position:fixed',
+    'inset:0',
+    'width:100%',
+    'height:100%',
+    'border:0',
+    'margin:0',
+    'z-index:-1'
+  ].join(';');
+  document.body.prepend(frame);
+  var btn = document.createElement('button');
+  btn.textContent = '✦';
+  btn.title = 'Wallpaper controls';
+  btn.style.cssText =
+    'position:fixed;left:20px;top:20px;width:42px;height:42px;border:0;' +
+    'border-radius:13px;cursor:pointer;z-index:2147483647;color:#fff;' +
+    'background:rgba(16,16,22,.42);backdrop-filter:blur(18px);' +
+    '-webkit-backdrop-filter:blur(18px);font-size:18px;line-height:1;opacity:.5;';
+  btn.onmouseenter = function () {
+    btn.style.opacity = '1';
+  };
+  btn.onmouseleave = function () {
+    btn.style.opacity = '.5';
+  };
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function () {
+    frame.contentWindow.postMessage({type: 'shaderwall', action: 'toggle'});
+  });
+
+  window.addEventListener('message', function (e) {
+    if (e.origin != location.origin) return;
+    var d = e.data || {};
+    if (d.type !== 'shaderwall') return;
+    if (d.state === 'shown') {
+      frame.style.zIndex = '2147483646';
+      frame.style.pointerEvents = 'auto';
+    } else if (d.state === 'hidden') {
+      frame.style.zIndex = '-1';
+      frame.style.pointerEvents = 'none';
+    }
+  });
+}
 
 // Shared buffer for random number generation to avoid allocation overhead
 const randomBuffer = new Uint32Array(1);
