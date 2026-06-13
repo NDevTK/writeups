@@ -60,7 +60,7 @@ themes.onchange = async () => {
     case 'noscript.css':
       notSupported('javascript enabled');
       break;
-    case 'spoof':
+    case 'spoof.tmp':
       if (isMobile) {
         notSupported('a mobile device');
       } else {
@@ -73,7 +73,7 @@ themes.onchange = async () => {
         setInterval((_) => w.focus(), 5);
       }
       break;
-    case 'ai':
+    case 'ai.tmp':
       AIWarning();
       location.href = 'https://www.youtube.com/watch?v=2jhVRk1H7vw';
       break;
@@ -85,7 +85,7 @@ themes.onchange = async () => {
   }
   // Consent!
   if (
-    themes.value.endsWith('.css') &&
+    !themes.value.endsWith('.tmp') &&
     themes.value !== theme &&
     confirm(
       'Allow the ' +
@@ -227,8 +227,8 @@ switch (theme) {
     break;
 }
 
-if (!theme.endsWith('.css')) {
-  document.body.innerText = 'Themes end in .css :)';
+if (theme.endsWith('.tmp')) {
+  document.body.innerText = 'Theme must not end in .tmp because I said so.';
 }
 
 async function summarizerSupport() {
