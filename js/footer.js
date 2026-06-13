@@ -31,7 +31,6 @@ if (theme.endsWith('.html')) {
   btn.onmouseleave = function () {
     btn.style.opacity = '.5';
   };
-  document.body.appendChild(btn);
 
   btn.addEventListener('click', function () {
     frame.contentWindow.postMessage({type: 'shaderwall', action: 'toggle'});
@@ -42,6 +41,7 @@ if (theme.endsWith('.html')) {
     var d = e.data || {};
     if (d.type !== 'shaderwall') return;
     if (d.state === 'shown') {
+      document.body.appendChild(btn);
       frame.style.zIndex = '2147483646';
       frame.style.pointerEvents = 'auto';
     } else if (d.state === 'hidden') {
