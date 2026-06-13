@@ -40,8 +40,8 @@ if (theme.endsWith('.html')) {
     if (e.origin != location.origin) return;
     var d = e.data || {};
     if (d.type !== 'shaderwall') return;
+    document.body.appendChild(btn);
     if (d.state === 'shown') {
-      document.body.appendChild(btn);
       frame.style.zIndex = '2147483646';
       frame.style.pointerEvents = 'auto';
     } else if (d.state === 'hidden') {
