@@ -46,16 +46,20 @@ if (theme.endsWith('.html')) {
     'border-radius:13px;cursor:pointer;z-index:2147483647;color:#fff;' +
     'background:rgba(16,16,22,.42);backdrop-filter:blur(18px);' +
     '-webkit-backdrop-filter:blur(18px);font-size:18px;line-height:1;opacity:.5;';
-  btn.onmouseenter = function(){ btn.style.opacity = '1'; };
-  btn.onmouseleave = function(){ btn.style.opacity = '.5'; };
+  btn.onmouseenter = function () {
+    btn.style.opacity = '1';
+  };
+  btn.onmouseleave = function () {
+    btn.style.opacity = '.5';
+  };
   document.body.appendChild(btn);
 
   btn.addEventListener('click', function () {
-    frame.contentWindow.postMessage({ type: 'shaderwall', action: 'toggle' });
+    frame.contentWindow.postMessage({type: 'shaderwall', action: 'toggle'});
   });
 
   window.addEventListener('message', function (e) {
-    if (e.origin != location.origin) return
+    if (e.origin != location.origin) return;
     var d = e.data || {};
     if (d.type !== 'shaderwall') return;
     if (d.state === 'shown') {
