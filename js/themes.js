@@ -10,6 +10,9 @@ const isMobile =
 const searchParams = new URL(location.href).searchParams;
 
 function getTheme() {
+  if (location.pathname.startsWith('/writeups/themes/')) {
+    return 'recursion.css';
+  }
   if (searchParams.has('theme')) {
     return searchParams.get('theme');
   }
