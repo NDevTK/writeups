@@ -23,11 +23,11 @@ function getTheme() {
 const theme = getTheme();
 
 if (theme.endsWith('.html')) {
-  var iframe = document.createElement('iframe');
-  iframe.src = '/writeups/themes/' + encodeURIComponent(theme);
-  iframe.setAttribute('aria-hidden', 'true');
-  iframe.setAttribute('tabindex', '-1');
-  iframe.style.cssText = [
+  var frame = document.createElement('iframe');
+  frame.src = '/writeups/themes/' + encodeURIComponent(theme);
+  frame.setAttribute('aria-hidden', 'true');
+  frame.setAttribute('tabindex', '-1');
+  frame.style.cssText = [
     'position:fixed',
     'inset:0',
     'width:100%',
