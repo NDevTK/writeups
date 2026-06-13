@@ -36,7 +36,7 @@ if (theme.endsWith('.html')) {
     'margin:0',
     'z-index:-1'
   ].join(';');
-  document.body.prepend(iframe);
+  document.body.prepend(frame);
 
   var btn = document.createElement('button');
   btn.textContent = '✦';
