@@ -272,6 +272,10 @@ switch (theme) {
     document.body.innerText =
       'You are using the NoScript theme with Javascript enabled :)';
     break;
+  case 'recursion.css':
+    document.body.innerText =
+      'Theme not found';
+    break;
   case 'summarizer.css':
     summarizer();
     break;
