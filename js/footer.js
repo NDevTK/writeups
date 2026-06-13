@@ -37,7 +37,7 @@ function notSupported(reason) {
 }
 
 themes.onchange = async () => {
-  if (themes.value === 'random') {
+  if (themes.value === 'random.tmp') {
     const allowedThemes = [...themes.options].filter((e) => {
       // Filter out the currently active theme and ourself.
       return e.value != themes.value && e.value != theme;
