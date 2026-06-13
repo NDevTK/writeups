@@ -936,9 +936,12 @@ float grain(vec2 uv){ return hash21(uv*u_res + fract(u_time)*97.0); }
       // bring the iframe forward (interactive) while controls are open, then send it
       // back behind content (click-through) once they're closed.
       function notifyHost() {
-        window.parent.postMessage({type: 'shaderwall', state: uiHidden ? 'hidden' : 'shown'});
+        window.parent.postMessage({
+          type: 'shaderwall',
+          state: uiHidden ? 'hidden' : 'shown'
+        });
       }
-      
+
       const _setUI = setUI;
       setUI = function (hidden) {
         _setUI(hidden);
