@@ -22,11 +22,9 @@ function getTheme() {
 
 const theme = getTheme();
 
-
-
 if (theme.endsWith('.html')) {
   var iframe = document.createElement('iframe');
-  iframe.src =  '/writeups/themes/' + encodeURIComponent(theme);
+  iframe.src = '/writeups/themes/' + encodeURIComponent(theme);
   iframe.setAttribute('aria-hidden', 'true');
   iframe.setAttribute('tabindex', '-1');
   iframe.style.cssText = [
@@ -36,7 +34,7 @@ if (theme.endsWith('.html')) {
     'height:100%',
     'border:0',
     'margin:0',
-    'z-index:-1',
+    'z-index:-1'
   ].join(';');
   document.body.prepend(iframe);
 } else {
@@ -45,7 +43,6 @@ if (theme.endsWith('.html')) {
   stylesheet.rel = 'stylesheet';
   document.head.appendChild(stylesheet);
 }
-
 
 const reload = new BroadcastChannel('reload');
 reload.onmessage = (event) => {
