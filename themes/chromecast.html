@@ -4,17 +4,17 @@
       var frame = document.createElement('iframe');
       frame.sandbox = 'allow-scripts';
       frame.src = 'https://clients3.google.com/cast/chromecast/home';
-  frame.setAttribute('aria-hidden', 'true');
-  frame.setAttribute('tabindex', '-1');
-  frame.style.cssText = [
-    'position:fixed',
-    'inset:0',
-    'width:100%',
-    'height:100%',
-    'border:0',
-    'margin:0',
-    'z-index:-1'
-  ].join(';');
+      frame.setAttribute('aria-hidden', 'true');
+      frame.setAttribute('tabindex', '-1');
+      frame.style.cssText = [
+        'position:fixed',
+        'inset:0',
+        'width:100%',
+        'height:100%',
+        'border:0',
+        'margin:0',
+        'z-index:-1'
+      ].join(';');
       document.body.prepend(frame);
     </script>
   </body>
