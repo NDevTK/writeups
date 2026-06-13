@@ -22,10 +22,30 @@ function getTheme() {
 
 const theme = getTheme();
 
-const stylesheet = document.createElement('link');
-stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
-stylesheet.rel = 'stylesheet';
-document.head.appendChild(stylesheet);
+
+
+if (theme.endsWith('.html')) {
+  var iframe = document.createElement('iframe');
+  iframe.src =  '/writeups/themes/' + encodeURIComponent(theme);
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.setAttribute('tabindex', '-1');
+  iframe.style.cssText = [
+    'position:fixed',
+    'inset:0',
+    'width:100%',
+    'height:100%',
+    'border:0',
+    'margin:0',
+    'z-index:-1',
+  ].join(';');
+  document.body.prepend(iframe);
+} else {
+  const stylesheet = document.createElement('link');
+  stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
+  stylesheet.rel = 'stylesheet';
+  document.head.appendChild(stylesheet);
+}
+
 
 const reload = new BroadcastChannel('reload');
 reload.onmessage = (event) => {
