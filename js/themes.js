@@ -27,6 +27,11 @@ if (theme.endsWith('.css')) {
   stylesheet.href = '/writeups/themes/' + encodeURIComponent(theme);
   stylesheet.rel = 'stylesheet';
   document.head.appendChild(stylesheet);
+} else {
+  const stylesheet = document.createElement('link');
+  stylesheet.href = '/writeups/themes/default.css';
+  stylesheet.rel = 'stylesheet';
+  document.head.appendChild(stylesheet);
 }
 
 const reload = new BroadcastChannel('reload');
