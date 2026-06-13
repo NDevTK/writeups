@@ -38,6 +38,11 @@ if (theme.endsWith('.html')) {
 
   window.addEventListener('message', function (e) {
     if (e.origin != location.origin) return;
+    if (e.data === 'deleteme') {
+      document.body.removeChild(frame);
+      document.body.removeChild(btn);
+      return;
+    }
     var d = e.data || {};
     if (d.type !== 'shaderwall') return;
     document.body.appendChild(btn);
