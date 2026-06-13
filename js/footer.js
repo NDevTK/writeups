@@ -1,6 +1,10 @@
 'use strict';
 const themes = document.getElementById('themes');
 const info = document.getElementById('info');
+
+// Used for html themes support
+if (window.frame) document.body.prepend(frame);
+
 // Shared buffer for random number generation to avoid allocation overhead
 const randomBuffer = new Uint32Array(1);
 
