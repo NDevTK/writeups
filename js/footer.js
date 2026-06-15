@@ -5,8 +5,17 @@ const info = document.getElementById('info');
 // 1. A small set of notoriously common passwords to save API calls.
 // Convert inputs to lowercase before checking against this set.
 const COMMON_PASSWORDS = new Set([
-  "123456", "password", "123456789", "12345", "12345678", 
-  "qwerty", "password123", "admin", "111111", "letmein", "welcome"
+  '123456',
+  'password',
+  '123456789',
+  '12345',
+  '12345678',
+  'qwerty',
+  'password123',
+  'admin',
+  '111111',
+  'letmein',
+  'welcome'
 ]);
 
 /**
@@ -17,46 +26,68 @@ const COMMON_PASSWORDS = new Set([
 async function evaluatePassword(password) {
   // --- TIER 1: Basic Security Requirements ---
   if (password.length < 8) {
-    return { isValid: false, message: "Password must be at least 8 characters long." };
+    return {
+      isValid: false,
+      message: 'Password must be at least 8 characters long.'
+    };
   }
   if (!/[A-Z]/.test(password)) {
-    return { isValid: false, message: "Password must contain at least one uppercase letter." };
+    return {
+      isValid: false,
+      message: 'Password must contain at least one uppercase letter.'
+    };
   }
   if (!/[a-z]/.test(password)) {
-    return { isValid: false, message: "Password must contain at least one lowercase letter." };
+    return {
+      isValid: false,
+      message: 'Password must contain at least one lowercase letter.'
+    };
   }
   if (!/[0-9]/.test(password)) {
-    return { isValid: false, message: "Password must contain at least one number." };
+    return {
+      isValid: false,
+      message: 'Password must contain at least one number.'
+    };
   }
   // Matches any character that is NOT a word character (a-z, A-Z, 0-9) or underscore
   if (!/[^a-zA-Z0-9_]/.test(password)) {
-    return { isValid: false, message: "Password must contain at least one special character." };
+    return {
+      isValid: false,
+      message: 'Password must contain at least one special character.'
+    };
   }
 
   // --- TIER 2: Local Dictionary Check ---
   if (COMMON_PASSWORDS.has(password.toLowerCase())) {
-    return { isValid: false, message: "This password is too common. Please choose a unique one." };
+    return {
+      isValid: false,
+      message: 'This password is too common. Please choose a unique one.'
+    };
   }
 
   // --- TIER 3: HIBP Network API Call ---
   try {
     const isPwned = await checkHibpApi(password);
     if (isPwned) {
-      return { isValid: false, message: "This password has appeared in a data breach. Please choose another." };
+      return {
+        isValid: false,
+        message:
+          'This password has appeared in a data breach. Please choose another.'
+      };
     }
   } catch (error) {
-    console.warn("HIBP check failed, falling back to local validation.", error);
+    console.warn('HIBP check failed, falling back to local validation.', error);
     // If the API fails (e.g., network outage), we allow the password because it passed local complexity.
     // You can change this logic depending on how strict you want to be.
   }
 
   // If it survives all checks, it's valid!
-  return { isValid: true, message: "Password is secure." };
+  return {isValid: true, message: 'Password is secure.'};
 }
 
 /**
  * Helper function: Checks the password against the HIBP API using k-anonymity.
- * @param {string} password 
+ * @param {string} password
  * @returns {Promise<boolean>}
  */
 async function checkHibpApi(password) {
@@ -66,38 +97,41 @@ async function checkHibpApi(password) {
 
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray
-    .map(byte => byte.toString(16).padStart(2, '0'))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('')
     .toUpperCase();
 
   const prefix = hashHex.slice(0, 5);
   const suffix = hashHex.slice(5);
 
-  const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
-  if (!response.ok) throw new Error(`API request failed with status: ${response.status}`);
-  
+  const response = await fetch(
+    `https://api.pwnedpasswords.com/range/${prefix}`
+  );
+  if (!response.ok)
+    throw new Error(`API request failed with status: ${response.status}`);
+
   const text = await response.text();
   const pwnedLines = text.split(/\r?\n/);
-  
+
   for (const line of pwnedLines) {
     const [returnedSuffix] = line.split(':');
-    if (returnedSuffix === suffix) return true; 
+    if (returnedSuffix === suffix) return true;
   }
-  
-  return false; 
+
+  return false;
 }
 
 // --- Usage Examples ---
-// evaluatePassword("weak").then(console.log); 
+// evaluatePassword("weak").then(console.log);
 // -> { isValid: false, message: 'Password must be at least 8 characters long.' }
 
-// evaluatePassword("Password123!").then(console.log); 
+// evaluatePassword("Password123!").then(console.log);
 // -> { isValid: false, message: 'This password is too common. Please choose a unique one.' }
 
-// evaluatePassword("Tr0ub4dor&3").then(console.log); 
+// evaluatePassword("Tr0ub4dor&3").then(console.log);
 // -> { isValid: false, message: 'This password has appeared in a data breach. Please choose another.' }
 
-// evaluatePassword("SuperS3cr3t!Random_Phrase").then(console.log); 
+// evaluatePassword("SuperS3cr3t!Random_Phrase").then(console.log);
 // -> { isValid: true, message: 'Password is secure.' }
 
 if (theme.endsWith('.html')) {
@@ -292,101 +326,101 @@ function reloadAll() {
 }
 
 async function applyTheme() {
-switch (theme) {
-  case 'duck.css':
-    const link = document.querySelector("link[rel~='icon']");
-    if (!link) {
-      link = document.createElement('link');
-      link.rel = 'icon';
-      document.head.appendChild(link);
-    }
-    link.href = '/writeups/duck.svg';
-    break;
-  case 'typoifier.css':
-    const typoElements = Array.from(document.querySelectorAll('p, a'));
-    let typoIndex = 0;
+  switch (theme) {
+    case 'duck.css':
+      const link = document.querySelector("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      link.href = '/writeups/duck.svg';
+      break;
+    case 'typoifier.css':
+      const typoElements = Array.from(document.querySelectorAll('p, a'));
+      let typoIndex = 0;
 
-    const processTypoChunk = () => {
-      const chunkStart = performance.now();
-      // Process for ~16ms to maintain 60fps
-      while (
-        typoIndex < typoElements.length &&
-        performance.now() - chunkStart < 16
-      ) {
-        // Optimization: check time only every 50 iterations to reduce overhead
-        for (
-          let i = 0;
-          i < 50 && typoIndex < typoElements.length;
-          i++, typoIndex++
+      const processTypoChunk = () => {
+        const chunkStart = performance.now();
+        // Process for ~16ms to maintain 60fps
+        while (
+          typoIndex < typoElements.length &&
+          performance.now() - chunkStart < 16
         ) {
-          const e = typoElements[typoIndex];
-          e.childNodes.forEach((node) => {
-            if (node.data === '' || node.data === undefined) return;
-            node.data = TypoSTR(node.data);
-          });
+          // Optimization: check time only every 50 iterations to reduce overhead
+          for (
+            let i = 0;
+            i < 50 && typoIndex < typoElements.length;
+            i++, typoIndex++
+          ) {
+            const e = typoElements[typoIndex];
+            e.childNodes.forEach((node) => {
+              if (node.data === '' || node.data === undefined) return;
+              node.data = TypoSTR(node.data);
+            });
+          }
         }
-      }
 
-      if (typoIndex < typoElements.length) {
-        requestAnimationFrame(processTypoChunk);
-      }
-    };
+        if (typoIndex < typoElements.length) {
+          requestAnimationFrame(processTypoChunk);
+        }
+      };
 
-    requestAnimationFrame(processTypoChunk);
-    break;
-  case 'audio.css':
-    const utterance = new SpeechSynthesisUtterance(document.body.innerText);
-    const voices = speechSynthesis.getVoices();
-    utterance.voice = voices[0];
-    window.addEventListener('pagehide', () => {
-      speechSynthesis.cancel();
-    });
-    utterance.onend = () => {
+      requestAnimationFrame(processTypoChunk);
+      break;
+    case 'audio.css':
+      const utterance = new SpeechSynthesisUtterance(document.body.innerText);
+      const voices = speechSynthesis.getVoices();
+      utterance.voice = voices[0];
+      window.addEventListener('pagehide', () => {
+        speechSynthesis.cancel();
+      });
+      utterance.onend = () => {
+        speechSynthesis.speak(utterance);
+      };
       speechSynthesis.speak(utterance);
-    };
-    speechSynthesis.speak(utterance);
-    break;
-  case 'base64.css':
-    document.body.querySelectorAll('p, a').forEach((e) => {
-      e.innerText = btoa(
-        String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
+      break;
+    case 'base64.css':
+      document.body.querySelectorAll('p, a').forEach((e) => {
+        e.innerText = btoa(
+          String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
+        );
+      });
+      break;
+    case 'emoji.css':
+      // Encode base64 into emoji
+      const encoding = base2base(
+        '0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz=',
+        '😀 😃 😄 😁 😆 😅 🤣 😂 🥹 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 ☺️ 😚 😙 🥲 😋 😛 😜 🤪 😝 🤑 🤗 🫢 🤭 🤫 🤔 🙂‍↔️ 🙂‍↕️ 🫡 🤐 🤨 😐️ 😑 😶 😏 😒 🙄 😬 🤥 😌 😔 😪 😮‍💨 🤤 😴 😷 🤒 🤕 🤢 🤮 🤧 🫠 🥵 🥶 😶‍🌫️ 🫥 🥴 🫨 😵‍💫 😵 🤯 🤠 🥳 🥸 😎 🤓 🧐 🫤 😕 😟 🙁 ☹️ 😮 😯 😲 😳 🫣 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 ☠️ 💩 🤡 👹 👺 👻 👽️ 👾 🤖 😺 😸 😹 😻 😼 😽 🙀 😿 😾 🙈 🙉 🙊 👋 🤚 🖐️ ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈️ 👉️ 👆️ 🖕 👇️ ☝️ 🫵 👍️ 👎️ ✊ 👊 🤛 🤜 👏 🙌 👐 🫶 🤲 🫳 🫴 🫱 🫲 🤝 🫸 🫷 🙏 ✍️ 💅 🤳 💪 🦾 🦿 🦵 🦶 👂️ 🦻 👃 🧠 🫀 🫁 🦷 🦴 👀 👁️ 👅 👄 🫦 💋 👶 🧒 👦 👧 🧑 👨 👩 🧔 🧔‍♀️ 🧔‍♂️ 🧑‍🦰 👨‍🦰 👩‍🦰 🧑‍🦱 👨‍🦱 👩‍🦱 🧑‍🦳 👨‍🦳 👩‍🦳 🧑‍🦲 👨‍🦲 👩‍🦲 👱 👱‍♂️ 👱‍♀️ 🧓 👴 👵 🙍 🙍‍♂️ 🙍‍♀️ 🙎 🙎‍♂️ 🙎‍♀️ 🙅 🙅‍♂️ 🙅‍♀️ 🙆 🙆‍♂️ 🙆‍♀️ 💁 💁‍♂️ 💁‍♀️ 🙋 🙋‍♂️ 🙋‍♀️ 🧏 🧏‍♂️ 🧏‍♀️ 🙇 🙇‍♂️ 🙇‍♀️ 🤦 🤦‍♂️ 🤦‍♀️ 🤷 🤷‍♂️ 🤷‍♀️ 🧑‍⚕️ 👨‍⚕️ 👩‍⚕️ 🧑‍🎓 👨‍🎓 👩‍🎓 🧑‍🏫 👨‍🏫 👩‍🏫 🧑‍⚖️ 👨‍⚖️ 👩‍⚖️ 🧑‍🌾 👨‍🌾 👩‍🌾 🧑‍🍳 👨‍🍳 👩‍🍳 🧑‍🔧 👨‍🔧 👩‍🔧 🧑‍🏭 👨‍🏭 👩‍🏭 🧑‍💼 👨‍💼 👩‍💼 🧑‍🔬 👨‍🔬 👩‍🔬 🧑‍💻 👨‍💻 👩‍💻 🧑‍🎤 👨‍🎤 👩‍🎤 🧑‍🎨 👨‍🎨 👩‍🎨 🧑‍✈️ 👨‍✈️ 👩‍✈️ 🧑‍🚀 👨‍🚀 👩‍🚀 🧑‍🚒 👨‍🚒 👩‍🚒 👮 👮‍♂️ 👮‍♀️ 🕵️ 🕵️‍♂️ 🕵️‍♀️ 💂 💂‍♂️ 💂‍♀️ 🥷 👷 👷‍♂️ 👷‍♀️ 🫅 🤴 👸 👳 👳‍♂️ 👳‍♀️ 👲 🧕 🤵 🤵‍♂️ 🤵‍♀️ 👰 👰‍♂️ 👰‍♀️ 🫄 🫃 🤰 🤱 👩‍🍼 👨‍🍼 🧑‍🍼 👼 🎅 🤶 🧑‍🎄 🦸 🦸‍♂️ 🦸‍♀️ 🦹 🦹‍♂️ 🦹‍♀️ 🧙 🧙‍♂️ 🧙‍♀️ 🧚 🧚‍♂️ 🧚‍♀️ 🧛 🧛‍♂️ 🧛‍♀️ 🧜 🧜‍♂️ 🧜‍♀️ 🧝 🧝‍♂️ 🧝‍♀️ 🧞 🧞‍♂️ 🧞‍♀️ 🧟 🧟‍♂️ 🧟‍♀️ 🧌 💆 💆‍♂️ 💆‍♀️ 💇 💇‍♂️ 💇‍♀️ 🚶 🚶‍♂️ 🚶‍♀️ 🧍 🧍‍♂️ 🧍‍♀️ 🧎 🧎‍♂️ 🧎‍♀️ 🧑‍🦯 👨‍🦯 👩‍🦯 🧑‍🦼 👨‍🦼 👩‍🦼 🧑‍🦽 👨‍🦽 👩‍🦽 🏃 🏃‍♂️ 🏃‍♀️ 🚶‍➡️ 🚶‍♀️‍➡️ 🚶‍♂️‍➡️ 🧎‍➡️ 🧎‍♀️‍➡️ 🧎‍♂️‍➡️ 🧑‍🦯‍➡️ 👨‍🦯‍➡️ 👩‍🦯‍➡️ 🧑‍🦼‍➡️ 👨‍🦼‍➡️ 👩‍🦼‍➡️ 🧑‍🦽‍➡️ 👨‍🦽‍➡️ 👩‍🦽‍➡️ 🏃‍➡️ 🏃‍♀️‍➡️ 🏃‍♂️‍➡️ 💃 🕺 🕴️ 👯 👯‍♂️ 👯‍♀️ 🧖 🧖‍♂️ 🧖‍♀️ 🧗 🧗‍♂️ 🧗‍♀️ 🤺 🏇 ⛷️ 🏂️ 🏌️ 🏌️‍♂️ 🏌️‍♀️ 🏄️ 🏄‍♂️ 🏄‍♀️ 🚣 🚣‍♂️ 🚣‍♀️ 🏊️ 🏊‍♂️ 🏊‍♀️ ⛹️ ⛹️‍♂️ ⛹️‍♀️ 🏋️ 🏋️‍♂️ 🏋️‍♀️ 🚴 🚴‍♂️ 🚴‍♀️ 🚵 🚵‍♂️ 🚵‍♀️ 🤸 🤸‍♂️ 🤸‍♀️ 🤼 🤼‍♂️ 🤼‍♀️ 🤽 🤽‍♂️ 🤽‍♀️ 🤾 🤾‍♂️ 🤾‍♀️ 🤹 🤹‍♂️ 🤹‍♀️ 🧘 🧘‍♂️ 🧘‍♀️ 🛀 🛌 🧑‍🤝‍🧑 👭 👫 👬 💏 👩‍❤️‍💋‍👨 👨‍❤️‍💋‍👨 👩‍❤️‍💋‍👩 💑 👩‍❤️‍👨 👨‍❤️‍👨 👩‍❤️‍👩 👪️ 👨‍👩‍👦 👨‍👩‍👧 👨‍👩‍👧‍👦 👨‍👩‍👦‍👦 👨‍👩‍👧‍👧 👨‍👨‍👦 👨‍👨‍👧 👨‍👨‍👧‍👦 👨‍👨‍👦‍👦 👨‍👨‍👧‍👧 👩‍👩‍👦 👩‍👩‍👧 👩‍👩‍👧‍👦 👩‍👩‍👦‍👦 👩‍👩‍👧‍👧 👨‍👦 👨‍👦‍👦 👨‍👧 👨‍👧‍👦 👨‍👧‍👧 👩‍👦 👩‍👦‍👦 👩‍👧 👩‍👧‍👦 👩‍👧‍👧 🗣️ 👤 👥 🫂 👣🐵 🐒 🦍 🦧 🐶 🐕️ 🦮 🐕‍🦺 🐩 🐺 🦊 🦝 🐱 🐈️ 🐈‍⬛ 🦁 🐯 🐅 🐆 🐴 🐎 🦄 🫏 🦓 🦌 🫎 🦬 🐮 🐂 🐃 🐄 🐷 🐖 🐗 🐽 🐏 🐑 🐐 🐪 🐫 🦙 🦒 🐘 🦣 🦏 🦛 🐭 🐁 🐀 🐹 🐰 🐇 🐿️ 🦫 🦔 🦇 🐻 🐻‍❄️ 🐨 🐼 🦥 🦦 🦨 🦘 🦡 🐾 🦃 🐔 🐓 🐣 🐤 🐥 🐦️ 🐧 🐦‍⬛ 🕊️ 🦅 🦆 🪿 🦢 🦉 🦤 🦩 🦚 🦜 🐦‍🔥 🪽 🪶 🪹 🪺 🥚 🐸 🐊 🐢 🦎 🐍 🐲 🐉 🦕 🦖 🐳 🐋 🐬 🦭 🐟️ 🐠 🐡 🦈 🪼 🐙 🦑 🦀 🦞 🦐 🪸 🦪 🐚 🐌 🦋 🐛 🐜 🐝 🪲 🐞 🦗 🪳 🕷️ 🕸️ 🦂 🦟 🪰 🪱 🦠 🍄 🍄‍🟫 💐 💮 🏵️ 🌼 🌻 🌹 🥀 🌺 🌷 🌸 🪷 🪻 🌱 🪴 🏕️ 🌲 🌳 🌰 🌴 🌵 🎋 🎍 🌾 🌿 ☘️ 🍀 🍁 🍂 🍃 🌍️ 🌎️ 🌏️ 🌑 🌒 🌓 🌔 🌕️ 🌖 🌗 🌘 🌙 🌚 🌛 🌜️ ☀️ 🌝 🌞 🪐 💫 ⭐️ 🌟 ✨ 🌠 ☄️ 🌌 ☁️ ⛅️ ⛈️ 🌤️ 🌥️ 🌦️ 🌧️ 🌨️ 🌩️ 🌪️ 🌫️ 🌬️ 🌀 🌈 🌂 ☂️ ☔️ ⛱️ ⚡️ ❄️ ☃️ ⛄️ 🏔️ ⛰️ 🗻 🌋 🔥 💧 🌊 💥 💦 💨🍇 🍈 🍉 🍊 🍋 🍋‍🟩 🍌 🍍 🥭 🍎 🍏 🍐 🍑 🍒 🍓 🫐 🥝 🍅 🫒 🥥 🥑 🍆 🥔 🥕 🌽 🌶️ 🫑 🥒 🥬 🥦 🫛 🧄 🧅 🫚 🍄 🍄‍🟫 🫘 🥜 🌰 🍞 🥐 🥖 🫓 🥨 🥯 🥞 🧇 🧀 🍖 🍗 🥩 🥓 🍔 🍟 🍕 🌭 🥪 🌮 🌯 🫔 🥙 🧆 🥚 🍳 🥘 🍲 🫕 🥣 🥗 🍿 🧈 🧂 🥫 🍱 🍘 🍙 🍚 🍛 🍜 🍝 🍠 🍢 🍣 🍤 🍥 🥮 🍡 🥟 🥠 🥡 🍦 🍧 🍨 🍩 🍪 🎂 🍰 🧁 🥧 🍫 🍬 🍭 🍮 🍯 🍼 🥛 🫗 ☕️ 🫖 🍵 🍶 🍾 🍷 🍸️ 🍹 🍺 🍻 🥂 🥃 🥤 🧋 🧃 🧉 🧊 🥢 🍽️ 🍴 🥄 🔪⚽️ ⚾️ 🥎 🏀 🏐 🏈 🏉 🎾 🥏 🎳 🏏 🏑 🏒 🥍 🏓 🏸 🥊 🥋 🥅 ⛳️ ⛸️ 🎣 🤿 🎽 🎿 🛷 🥌 🎯 🪀 🪁 🎱 🎖️ 🏆️ 🏅 🥇 🥈 🥉🏔️ ⛰️ 🌋 🗻 🏕️ 🏖️ 🏜️ 🏝️ 🏟️ 🏛️ 🏗️ 🧱 🪨 🪵 🛖 🏘️ 🏚️ 🏠️ 🏡 🏢 🏣 🏤 🏥 🏦 🏨 🏩 🏪 🏫 🏬 🏭️ 🏯 🏰 💒 🗼 🗽 ⛪️ 🕌 🛕 🕍 ⛩️ 🕋 ⛲️ ⛺️ 🌁 🌃 🏙️ 🌄 🌅 🌆 🌇 🌉 🗾 🏞️ 🎠 🎡 🎢 💈 🎪 🚂 🚃 🚄 🚅 🚆 🚇️ 🚈 🚉 🚊 🚝 🚞 🚋 🚌 🚍️ 🚎 🚐 🚑️ 🚒 🚓 🚔️ 🚕 🚖 🚗 🚘️ 🚙 🛻 🚚 🚛 🚜 🏎️ 🏍️ 🛵 🦽 🦼 🛺 🚲️ 🛴 🛹 🛼 🚏 🛣️ 🛤️ 🛢️ ⛽️ 🚨 🚥 🚦 🛑 🚧 ⚓️ ⛵️ 🛶 🚤 🛳️ ⛴️ 🛥️ 🚢 ✈️ 🛩️ 🛫 🛬 🪂 💺 🚁 🚟 🚠 🚡 🛰️ 🚀 🛸 🎆 🎇 🎑 🗿🛎️ 🧳 ⌛️ ⏳️ ⌚️ ⏰ ⏱️ ⏲️ 🕰️ 🌡️ 🗺️ 🧭 🎃 🎄 🧨 🎈 🎉 🎊 🎎 🪭 🎏 🎐 🎀 🎁 🎗️ 🎟️ 🎫 🔮 🪄 🧿 🎮️ 🕹️ 🎰 🎲 ♟️ 🧩 🧸 🪅 🪆 🖼️ 🎨 🧵 🪡 🧶 🪢 👓️ 🕶️ 🥽 🥼 🦺 👔 👕 👖 🧣 🧤 🧥 🧦 👗 👘 🥻 🩱 🩲 🩳 👙 👚 👛 👜 👝 🛍️ 🎒 🩴 👞 👟 🥾 🥿 👠 👡 🩰 👢 👑 👒 🎩 🎓️ 🧢 🪖 ⛑️ 📿 💄 💍 💎 📢 📣 📯 🎙️ 🎚️ 🎛️ 🎤 🎧️ 📻️ 🎷 🪗 🎸 🎹 🎺 🎻 🪕 🪈 🪇 🥁 🪘 🪩 📱 📲 ☎️ 📞 📟️ 📠 🔋 🪫 🔌 💻️ 🖥️ 🖨️ ⌨️ 🖱️ 🖲️ 💽 💾 💿️ 📀 🧮 🎥 🎞️ 📽️ 🎬️ 📺️ 📷️ 📸 📹️ 📼 🔍️ 🔎 🕯️ 💡 🔦 🏮 🪔 📔 📕 📖 📗 📘 📙 📚️ 📓 📒 📃 📜 📄 📰 🗞️ 📑 🔖 🏷️ 💰️ 🪙 💴 💵 💶 💷 💸 💳️ 🪪 🧾 ✉️ 💌 📧 🧧 📨 📩 📤️ 📥️ 📦️ 📫️ 📪️ 📬️ 📭️ 📮 🗳️ ✏️ ✒️ 🖋️ 🖊️ 🖌️ 🖍️ 📝 💼 📁 📂 🗂️ 📅 📆 🗒️ 🗓️ 📇 📈 📉 📊 📋️ 📌 📍 📎 🖇️ 📏 📐 ✂️ 🗃️ 🗄️ 🗑️ 🔒️ 🔓️ 🔏 🔐 🔑 🗝️ 🔨 🪓 ⛏️ ⚒️ 🛠️ 🗡️ ⚔️ 💣️ 🔫 🪃 🏹 🛡️ 🪚 🔧 🪛 🔩 ⚙️ 🗜️ ⚖️ 🦯 🔗 ⛓️‍💥 ⛓️ 🪝 🧰 🧲 🪜 🛝 🛞 🫙 ⚗️ 🧪 🧫 🧬 🔬 🔭 📡 🩻 💉 🩸 💊 🩹 🩺 🩼 🚪 🛗 🪞 🪟 🛏️ 🛋️ 🪑 🪤 🚽 🪠 🚿 🛁 🧼 🫧 🪒 🪮 🧴 🧷 🧹 🧺 🧻 🪣 🪥 🧽 🧯 🛟 🛒 🚬 ⚰️ 🪦 ⚱️ 🏺 🪧 🕳️💘 💝 💖 💗 💓 💞 💕 💟 ❣️ 💔 ❤️ 🧡 💛 💚 🩵 💙 💜 🩷 🤎 🖤 🩶 🤍 ❤️‍🔥 ❤️‍🩹 💯 ♨️ 💢 💬 👁️‍🗨️ 🗨️ 🗯️ 💭 💤 🌐 ♠️ ♥️ ♦️ ♣️ 🃏 🀄️ 🎴 🎭️ 🔇 🔈️ 🔉 🔊 🔔 🔕 🎼 🎵 🎶 💹 🏧 🚮 🚰 ♿️ 🚹️ 🚺️ 🚻 🚼️ 🧑‍🧑‍🧒 🧑‍🧑‍🧒‍🧒 🧑‍🧒 🧑‍🧒‍🧒 🚾 🛂 🛃 🛄 🛅 🛜 ⛓️‍💥 ⚠️ 🚸 ⛔️ 🚫 🚳 🚭️ 🚯 🚱 🚷 📵 🔞 ☢️ ☣️ ⬆️ ↗️ ➡️ ↘️ ⬇️ ↙️ ⬅️ ↖️ ↕️ ↔️ ↩️ ↪️ ⤴️ ⤵️ 🔃 🔄 🔙 🔚 🔛 🔜 🔝 🛐 ⚛️ 🕉️ ✡️ ☸️ 🪯 ☯️ ✝️ ☦️ ☪️ ☮️ 🕎 🔯 🪬 ♈️ ♉️ ♊️ ♋️ ♌️ ♍️ ♎️ ♏️ ♐️ ♑️ ♒️ ♓️ ⛎ 🔀 🔁 🔂 ▶️ ⏩️ ⏭️ ⏯️ ◀️ ⏪️ ⏮️ 🔼 ⏫ 🔽 ⏬ ⏸️ ⏹️ ⏺️ ⏏️ 🎦 🔅 🔆 📶 📳 📴 ♀️ ♂️ ⚧ ✖️ ➕ ➖ ➗ 🟰 ♾️ ‼️ ⁉️ ❓️ ❔ ❕ ❗️ 〰️ 💱 💲 ⚕️ ♻️ ⚜️ 🔱 📛 🔰 ⭕️ ✅ ☑️ ✔️ ❌ ❎ ➰ ➿ 〽️ ✳️ ✴️ ❇️ ©️ ®️ ™️ #️⃣ *️⃣ 0️⃣ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣ 7️⃣ 8️⃣ 9️⃣ 🔟 🔠 🔡 🔢 🔣 🔤 🅰️ 🆎 🅱️ 🆑 🆒 🆓 ℹ️ 🆔 Ⓜ️ 🆕 🆖 🅾️ 🆗 🅿️ 🆘 🆙 🆚 🈁 🈂️ 🈷️ 🈶 🈯️ 🉐 🈹 🈚️ 🈲 🉑 🈸 🈴 🈳 ㊗️ ㊙️ 🈺 🈵 🔴 🟠 🟡 🟢 🔵 🟣 🟤 ⚫️ ⚪️ 🟥 🟧 🟨 🟩 🟦 🟪 🟫 ⬛️ ⬜️ ◼️ ◻️ ◾️ ◽️ ▪️ ▫️ 🔶 🔷 🔸 🔹 🔺 🔻 💠 🔘 🔳 🔲 🕛️ 🕧️ 🕐️ 🕜️ 🕑️ 🕝️ 🕒️ 🕞️ 🕓️ 🕟️ 🕔️ 🕠️ 🕕️ 🕡️ 🕖️ 🕢️ 🕗️ 🕣️ 🕘️ 🕤️ 🕙️ 🕥️ 🕚️ 🕦️🏁 🚩 🎌 🏴 🏳️ 🏳️‍🌈 🏳️‍⚧️ 🏴‍☠️👋🏻 🤚🏻 🖐🏻 ✋🏻 🖖🏻 👌🏻 🤌🏻 🤏🏻 ✌🏻 🤞🏻 🤟🏻 🤘🏻 🤙🏻 👈🏻 👉🏻 👆🏻 🖕🏻 👇🏻 ☝🏻 🫵🏻 👍🏻 👎🏻 ✊🏻 👊🏻 🤛🏻 🤜🏻 👏🏻 🙌🏻 👐🏻 🤲🏻 🫱🏻 🫲🏻 🤝🏻 🫳🏻 🫴🏻 🫸🏻 🫷🏻 🙏🏻 🫰🏻 🫶🏻 ✍🏻 💅🏻 🤳🏻 💪🏻 🦵🏻 🦶🏻 👂🏻 🦻🏻 👃🏻 👶🏻 🧒🏻 👦🏻 👧🏻 🧑🏻 👱🏻 👨🏻 🧔🏻 🧔🏻‍♀️ 🧔🏻‍♂️ 👨🏻‍🦰 👨🏻‍🦱 👨🏻‍🦳 👨🏻‍🦲 👩🏻 👩🏻‍🦰 🧑🏻‍🦰 👩🏻‍🦱 🧑🏻‍🦱 👩🏻‍🦳 🧑🏻‍🦳 👩🏻‍🦲 🧑🏻‍🦲 👱🏻‍♀️ 👱🏻‍♂️ 🧓🏻 👴🏻 👵🏻 🙍🏻 🙍🏻‍♂️ 🙍🏻‍♀️ 🙎🏻 🙎🏻‍♂️ 🙎🏻‍♀️ 🙅🏻 🙅🏻‍♂️ 🙅🏻‍♀️ 🙆🏻 🙆🏻‍♂️ 🙆🏻‍♀️ 💁🏻 💁🏻‍♂️ 💁🏻‍♀️ 🙋🏻 🙋🏻‍♂️ 🙋🏻‍♀️ 🧏🏻 🧏🏻‍♂️ 🧏🏻‍♀️ 🙇🏻 🙇🏻‍♂️ 🙇🏻‍♀️ 🤦🏻 🤦🏻‍♂️ 🤦🏻‍♀️ 🤷🏻 🤷🏻‍♂️ 🤷🏻‍♀️ 🧑🏻‍⚕️ 👨🏻‍⚕️ 👩🏻‍⚕️ 🧑🏻‍🎓 👨🏻‍🎓 👩🏻‍🎓 🧑🏻‍🏫 👨🏻‍🏫 👩🏻‍🏫 🧑🏻‍⚖️ 👨🏻‍⚖️ 👩🏻‍⚖️ 🧑🏻‍🌾 👨🏻‍🌾 👩🏻‍🌾 🧑🏻‍🍳 👨🏻‍🍳 👩🏻‍🍳 🧑🏻‍🔧 👨🏻‍🔧 👩🏻‍🔧 🧑🏻‍🏭 👨🏻‍🏭 👩🏻‍🏭 🧑🏻‍💼 👨🏻‍💼 👩🏻‍💼 🧑🏻‍🔬 👨🏻‍🔬 👩🏻‍🔬 🧑🏻‍💻 👨🏻‍💻 👩🏻‍💻 🧑🏻‍🎤 👨🏻‍🎤 👩🏻‍🎤 🧑🏻‍🎨 👨🏻‍🎨 👩🏻‍🎨 🧑🏻‍✈️ 👨🏻‍✈️ 👩🏻‍✈️ 🧑🏻‍🚀 👨🏻‍🚀 👩🏻‍🚀 🧑🏻‍🚒 👨🏻‍🚒 👩🏻‍🚒 👮🏻 👮🏻‍♂️ 👮🏻‍♀️ 🕵🏻 🕵🏻‍♂️ 🕵🏻‍♀️ 💂🏻 💂🏻‍♂️ 💂🏻‍♀️ 🥷🏻 👷🏻 👷🏻‍♂️ 👷🏻‍♀️ 🫅🏻 🤴🏻 👸🏻 👳🏻 👳🏻‍♂️ 👳🏻‍♀️ 👲🏻 🧕🏻 🤵🏻 🤵🏻‍♂️ 🤵🏻‍♀️ 👰🏻 👰🏻‍♂️ 👰🏻‍♀️ 🫄🏻 🫃🏻 🤰🏻 🧑🏻‍🍼 👨🏻‍🍼 👩🏻‍🍼 🤱🏻 👼🏻 🎅🏻 🤶🏻 🧑🏻‍🎄 🦸🏻 🦸🏻‍♂️ 🦸🏻‍♀️ 🦹🏻 🦹🏻‍♂️ 🦹🏻‍♀️ 🧙🏻 🧙🏻‍♂️ 🧙🏻‍♀️ 🧚🏻 🧚🏻‍♂️ 🧚🏻‍♀️ 🧛🏻 🧛🏻‍♂️ 🧛🏻‍♀️ 🧜🏻 🧜🏻‍♂️ 🧜🏻‍♀️ 🧝🏻 🧝🏻‍♂️ 🧝🏻‍♀️ 💆🏻 💆🏻‍♂️ 💆🏻‍♀️ 💇🏻 💇🏻‍♂️ 💇🏻‍♀️ 🚶🏻 🚶🏻‍♂️ 🚶🏻‍♀️ 🧍🏻 🧍🏻‍♂️ 🧍🏻‍♀️ 🧎🏻 🧎🏻‍♂️ 🧎🏻‍♀️ 🧑🏻‍🦯 👨🏻‍🦯 👩🏻‍🦯 🧑🏻‍🦼 👨🏻‍🦼 👩🏻‍🦼 🧑🏻‍🦽 👨🏻‍🦽 👩🏻‍🦽 🏃🏻 🏃🏻‍♂️ 🏃🏻‍♀️ 🚶🏻‍➡️ 🚶🏻‍♀️‍➡️ 🚶🏻‍♂️‍➡️ 🧎🏻‍➡️ 🧎🏻‍♀️‍➡️ 🧎🏻‍♂️‍➡️ 🧑🏻‍🦯‍➡️ 👨🏻‍🦯‍➡️ 👩🏻‍🦯‍➡️ 🧑🏻‍🦼‍➡️ 👨🏻‍🦼‍➡️ 👩🏻‍🦼‍➡️ 🧑🏻‍🦽‍➡️ 👨🏻‍🦽‍➡️ 👩🏻‍🦽‍➡️ 🏃🏻‍➡️ 🏃🏻‍♀️‍➡️ 🏃🏻‍♂️‍➡️ 💃🏻 🕺🏻 🕴🏻 🧖🏻 🧖🏻‍♂️ 🧖🏻‍♀️ 🧗🏻 🧗🏻‍♂️ 🧗🏻‍♀️ 🏇🏻 🏂🏻 🏌🏻 🏌🏻‍♂️ 🏌🏻‍♀️ 🏄🏻 🏄🏻‍♂️ 🏄🏻‍♀️ 🚣🏻 🚣🏻‍♂️ 🚣🏻‍♀️ 🏊🏻 🏊🏻‍♂️ 🏊🏻‍♀️ ⛹🏻 ⛹🏻‍♂️ ⛹🏻‍♀️ 🏋🏻 🏋🏻‍♂️ 🏋🏻‍♀️ 🚴🏻 🚴🏻‍♂️ 🚴🏻‍♀️ 🚵🏻 🚵🏻‍♂️ 🚵🏻‍♀️ 🤸🏻 🤸🏻‍♂️ 🤸🏻‍♀️ 🤽🏻 🤽🏻‍♂️ 🤽🏻‍♀️ 🤾🏻 🤾🏻‍♂️ 🤾🏻‍♀️ 🤹🏻 🤹🏻‍♂️ 🤹🏻‍♀️ 🧘🏻 🧘🏻‍♂️ 🧘🏻‍♀️ 🛀🏻 🛌🏻 💑🏻 💏🏻 👫🏻 👭🏻 👬🏻'
       );
-    });
-    break;
-  case 'emoji.css':
-    // Encode base64 into emoji
-    const encoding = base2base(
-      '0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz=',
-      '😀 😃 😄 😁 😆 😅 🤣 😂 🥹 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 ☺️ 😚 😙 🥲 😋 😛 😜 🤪 😝 🤑 🤗 🫢 🤭 🤫 🤔 🙂‍↔️ 🙂‍↕️ 🫡 🤐 🤨 😐️ 😑 😶 😏 😒 🙄 😬 🤥 😌 😔 😪 😮‍💨 🤤 😴 😷 🤒 🤕 🤢 🤮 🤧 🫠 🥵 🥶 😶‍🌫️ 🫥 🥴 🫨 😵‍💫 😵 🤯 🤠 🥳 🥸 😎 🤓 🧐 🫤 😕 😟 🙁 ☹️ 😮 😯 😲 😳 🫣 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 ☠️ 💩 🤡 👹 👺 👻 👽️ 👾 🤖 😺 😸 😹 😻 😼 😽 🙀 😿 😾 🙈 🙉 🙊 👋 🤚 🖐️ ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈️ 👉️ 👆️ 🖕 👇️ ☝️ 🫵 👍️ 👎️ ✊ 👊 🤛 🤜 👏 🙌 👐 🫶 🤲 🫳 🫴 🫱 🫲 🤝 🫸 🫷 🙏 ✍️ 💅 🤳 💪 🦾 🦿 🦵 🦶 👂️ 🦻 👃 🧠 🫀 🫁 🦷 🦴 👀 👁️ 👅 👄 🫦 💋 👶 🧒 👦 👧 🧑 👨 👩 🧔 🧔‍♀️ 🧔‍♂️ 🧑‍🦰 👨‍🦰 👩‍🦰 🧑‍🦱 👨‍🦱 👩‍🦱 🧑‍🦳 👨‍🦳 👩‍🦳 🧑‍🦲 👨‍🦲 👩‍🦲 👱 👱‍♂️ 👱‍♀️ 🧓 👴 👵 🙍 🙍‍♂️ 🙍‍♀️ 🙎 🙎‍♂️ 🙎‍♀️ 🙅 🙅‍♂️ 🙅‍♀️ 🙆 🙆‍♂️ 🙆‍♀️ 💁 💁‍♂️ 💁‍♀️ 🙋 🙋‍♂️ 🙋‍♀️ 🧏 🧏‍♂️ 🧏‍♀️ 🙇 🙇‍♂️ 🙇‍♀️ 🤦 🤦‍♂️ 🤦‍♀️ 🤷 🤷‍♂️ 🤷‍♀️ 🧑‍⚕️ 👨‍⚕️ 👩‍⚕️ 🧑‍🎓 👨‍🎓 👩‍🎓 🧑‍🏫 👨‍🏫 👩‍🏫 🧑‍⚖️ 👨‍⚖️ 👩‍⚖️ 🧑‍🌾 👨‍🌾 👩‍🌾 🧑‍🍳 👨‍🍳 👩‍🍳 🧑‍🔧 👨‍🔧 👩‍🔧 🧑‍🏭 👨‍🏭 👩‍🏭 🧑‍💼 👨‍💼 👩‍💼 🧑‍🔬 👨‍🔬 👩‍🔬 🧑‍💻 👨‍💻 👩‍💻 🧑‍🎤 👨‍🎤 👩‍🎤 🧑‍🎨 👨‍🎨 👩‍🎨 🧑‍✈️ 👨‍✈️ 👩‍✈️ 🧑‍🚀 👨‍🚀 👩‍🚀 🧑‍🚒 👨‍🚒 👩‍🚒 👮 👮‍♂️ 👮‍♀️ 🕵️ 🕵️‍♂️ 🕵️‍♀️ 💂 💂‍♂️ 💂‍♀️ 🥷 👷 👷‍♂️ 👷‍♀️ 🫅 🤴 👸 👳 👳‍♂️ 👳‍♀️ 👲 🧕 🤵 🤵‍♂️ 🤵‍♀️ 👰 👰‍♂️ 👰‍♀️ 🫄 🫃 🤰 🤱 👩‍🍼 👨‍🍼 🧑‍🍼 👼 🎅 🤶 🧑‍🎄 🦸 🦸‍♂️ 🦸‍♀️ 🦹 🦹‍♂️ 🦹‍♀️ 🧙 🧙‍♂️ 🧙‍♀️ 🧚 🧚‍♂️ 🧚‍♀️ 🧛 🧛‍♂️ 🧛‍♀️ 🧜 🧜‍♂️ 🧜‍♀️ 🧝 🧝‍♂️ 🧝‍♀️ 🧞 🧞‍♂️ 🧞‍♀️ 🧟 🧟‍♂️ 🧟‍♀️ 🧌 💆 💆‍♂️ 💆‍♀️ 💇 💇‍♂️ 💇‍♀️ 🚶 🚶‍♂️ 🚶‍♀️ 🧍 🧍‍♂️ 🧍‍♀️ 🧎 🧎‍♂️ 🧎‍♀️ 🧑‍🦯 👨‍🦯 👩‍🦯 🧑‍🦼 👨‍🦼 👩‍🦼 🧑‍🦽 👨‍🦽 👩‍🦽 🏃 🏃‍♂️ 🏃‍♀️ 🚶‍➡️ 🚶‍♀️‍➡️ 🚶‍♂️‍➡️ 🧎‍➡️ 🧎‍♀️‍➡️ 🧎‍♂️‍➡️ 🧑‍🦯‍➡️ 👨‍🦯‍➡️ 👩‍🦯‍➡️ 🧑‍🦼‍➡️ 👨‍🦼‍➡️ 👩‍🦼‍➡️ 🧑‍🦽‍➡️ 👨‍🦽‍➡️ 👩‍🦽‍➡️ 🏃‍➡️ 🏃‍♀️‍➡️ 🏃‍♂️‍➡️ 💃 🕺 🕴️ 👯 👯‍♂️ 👯‍♀️ 🧖 🧖‍♂️ 🧖‍♀️ 🧗 🧗‍♂️ 🧗‍♀️ 🤺 🏇 ⛷️ 🏂️ 🏌️ 🏌️‍♂️ 🏌️‍♀️ 🏄️ 🏄‍♂️ 🏄‍♀️ 🚣 🚣‍♂️ 🚣‍♀️ 🏊️ 🏊‍♂️ 🏊‍♀️ ⛹️ ⛹️‍♂️ ⛹️‍♀️ 🏋️ 🏋️‍♂️ 🏋️‍♀️ 🚴 🚴‍♂️ 🚴‍♀️ 🚵 🚵‍♂️ 🚵‍♀️ 🤸 🤸‍♂️ 🤸‍♀️ 🤼 🤼‍♂️ 🤼‍♀️ 🤽 🤽‍♂️ 🤽‍♀️ 🤾 🤾‍♂️ 🤾‍♀️ 🤹 🤹‍♂️ 🤹‍♀️ 🧘 🧘‍♂️ 🧘‍♀️ 🛀 🛌 🧑‍🤝‍🧑 👭 👫 👬 💏 👩‍❤️‍💋‍👨 👨‍❤️‍💋‍👨 👩‍❤️‍💋‍👩 💑 👩‍❤️‍👨 👨‍❤️‍👨 👩‍❤️‍👩 👪️ 👨‍👩‍👦 👨‍👩‍👧 👨‍👩‍👧‍👦 👨‍👩‍👦‍👦 👨‍👩‍👧‍👧 👨‍👨‍👦 👨‍👨‍👧 👨‍👨‍👧‍👦 👨‍👨‍👦‍👦 👨‍👨‍👧‍👧 👩‍👩‍👦 👩‍👩‍👧 👩‍👩‍👧‍👦 👩‍👩‍👦‍👦 👩‍👩‍👧‍👧 👨‍👦 👨‍👦‍👦 👨‍👧 👨‍👧‍👦 👨‍👧‍👧 👩‍👦 👩‍👦‍👦 👩‍👧 👩‍👧‍👦 👩‍👧‍👧 🗣️ 👤 👥 🫂 👣🐵 🐒 🦍 🦧 🐶 🐕️ 🦮 🐕‍🦺 🐩 🐺 🦊 🦝 🐱 🐈️ 🐈‍⬛ 🦁 🐯 🐅 🐆 🐴 🐎 🦄 🫏 🦓 🦌 🫎 🦬 🐮 🐂 🐃 🐄 🐷 🐖 🐗 🐽 🐏 🐑 🐐 🐪 🐫 🦙 🦒 🐘 🦣 🦏 🦛 🐭 🐁 🐀 🐹 🐰 🐇 🐿️ 🦫 🦔 🦇 🐻 🐻‍❄️ 🐨 🐼 🦥 🦦 🦨 🦘 🦡 🐾 🦃 🐔 🐓 🐣 🐤 🐥 🐦️ 🐧 🐦‍⬛ 🕊️ 🦅 🦆 🪿 🦢 🦉 🦤 🦩 🦚 🦜 🐦‍🔥 🪽 🪶 🪹 🪺 🥚 🐸 🐊 🐢 🦎 🐍 🐲 🐉 🦕 🦖 🐳 🐋 🐬 🦭 🐟️ 🐠 🐡 🦈 🪼 🐙 🦑 🦀 🦞 🦐 🪸 🦪 🐚 🐌 🦋 🐛 🐜 🐝 🪲 🐞 🦗 🪳 🕷️ 🕸️ 🦂 🦟 🪰 🪱 🦠 🍄 🍄‍🟫 💐 💮 🏵️ 🌼 🌻 🌹 🥀 🌺 🌷 🌸 🪷 🪻 🌱 🪴 🏕️ 🌲 🌳 🌰 🌴 🌵 🎋 🎍 🌾 🌿 ☘️ 🍀 🍁 🍂 🍃 🌍️ 🌎️ 🌏️ 🌑 🌒 🌓 🌔 🌕️ 🌖 🌗 🌘 🌙 🌚 🌛 🌜️ ☀️ 🌝 🌞 🪐 💫 ⭐️ 🌟 ✨ 🌠 ☄️ 🌌 ☁️ ⛅️ ⛈️ 🌤️ 🌥️ 🌦️ 🌧️ 🌨️ 🌩️ 🌪️ 🌫️ 🌬️ 🌀 🌈 🌂 ☂️ ☔️ ⛱️ ⚡️ ❄️ ☃️ ⛄️ 🏔️ ⛰️ 🗻 🌋 🔥 💧 🌊 💥 💦 💨🍇 🍈 🍉 🍊 🍋 🍋‍🟩 🍌 🍍 🥭 🍎 🍏 🍐 🍑 🍒 🍓 🫐 🥝 🍅 🫒 🥥 🥑 🍆 🥔 🥕 🌽 🌶️ 🫑 🥒 🥬 🥦 🫛 🧄 🧅 🫚 🍄 🍄‍🟫 🫘 🥜 🌰 🍞 🥐 🥖 🫓 🥨 🥯 🥞 🧇 🧀 🍖 🍗 🥩 🥓 🍔 🍟 🍕 🌭 🥪 🌮 🌯 🫔 🥙 🧆 🥚 🍳 🥘 🍲 🫕 🥣 🥗 🍿 🧈 🧂 🥫 🍱 🍘 🍙 🍚 🍛 🍜 🍝 🍠 🍢 🍣 🍤 🍥 🥮 🍡 🥟 🥠 🥡 🍦 🍧 🍨 🍩 🍪 🎂 🍰 🧁 🥧 🍫 🍬 🍭 🍮 🍯 🍼 🥛 🫗 ☕️ 🫖 🍵 🍶 🍾 🍷 🍸️ 🍹 🍺 🍻 🥂 🥃 🥤 🧋 🧃 🧉 🧊 🥢 🍽️ 🍴 🥄 🔪⚽️ ⚾️ 🥎 🏀 🏐 🏈 🏉 🎾 🥏 🎳 🏏 🏑 🏒 🥍 🏓 🏸 🥊 🥋 🥅 ⛳️ ⛸️ 🎣 🤿 🎽 🎿 🛷 🥌 🎯 🪀 🪁 🎱 🎖️ 🏆️ 🏅 🥇 🥈 🥉🏔️ ⛰️ 🌋 🗻 🏕️ 🏖️ 🏜️ 🏝️ 🏟️ 🏛️ 🏗️ 🧱 🪨 🪵 🛖 🏘️ 🏚️ 🏠️ 🏡 🏢 🏣 🏤 🏥 🏦 🏨 🏩 🏪 🏫 🏬 🏭️ 🏯 🏰 💒 🗼 🗽 ⛪️ 🕌 🛕 🕍 ⛩️ 🕋 ⛲️ ⛺️ 🌁 🌃 🏙️ 🌄 🌅 🌆 🌇 🌉 🗾 🏞️ 🎠 🎡 🎢 💈 🎪 🚂 🚃 🚄 🚅 🚆 🚇️ 🚈 🚉 🚊 🚝 🚞 🚋 🚌 🚍️ 🚎 🚐 🚑️ 🚒 🚓 🚔️ 🚕 🚖 🚗 🚘️ 🚙 🛻 🚚 🚛 🚜 🏎️ 🏍️ 🛵 🦽 🦼 🛺 🚲️ 🛴 🛹 🛼 🚏 🛣️ 🛤️ 🛢️ ⛽️ 🚨 🚥 🚦 🛑 🚧 ⚓️ ⛵️ 🛶 🚤 🛳️ ⛴️ 🛥️ 🚢 ✈️ 🛩️ 🛫 🛬 🪂 💺 🚁 🚟 🚠 🚡 🛰️ 🚀 🛸 🎆 🎇 🎑 🗿🛎️ 🧳 ⌛️ ⏳️ ⌚️ ⏰ ⏱️ ⏲️ 🕰️ 🌡️ 🗺️ 🧭 🎃 🎄 🧨 🎈 🎉 🎊 🎎 🪭 🎏 🎐 🎀 🎁 🎗️ 🎟️ 🎫 🔮 🪄 🧿 🎮️ 🕹️ 🎰 🎲 ♟️ 🧩 🧸 🪅 🪆 🖼️ 🎨 🧵 🪡 🧶 🪢 👓️ 🕶️ 🥽 🥼 🦺 👔 👕 👖 🧣 🧤 🧥 🧦 👗 👘 🥻 🩱 🩲 🩳 👙 👚 👛 👜 👝 🛍️ 🎒 🩴 👞 👟 🥾 🥿 👠 👡 🩰 👢 👑 👒 🎩 🎓️ 🧢 🪖 ⛑️ 📿 💄 💍 💎 📢 📣 📯 🎙️ 🎚️ 🎛️ 🎤 🎧️ 📻️ 🎷 🪗 🎸 🎹 🎺 🎻 🪕 🪈 🪇 🥁 🪘 🪩 📱 📲 ☎️ 📞 📟️ 📠 🔋 🪫 🔌 💻️ 🖥️ 🖨️ ⌨️ 🖱️ 🖲️ 💽 💾 💿️ 📀 🧮 🎥 🎞️ 📽️ 🎬️ 📺️ 📷️ 📸 📹️ 📼 🔍️ 🔎 🕯️ 💡 🔦 🏮 🪔 📔 📕 📖 📗 📘 📙 📚️ 📓 📒 📃 📜 📄 📰 🗞️ 📑 🔖 🏷️ 💰️ 🪙 💴 💵 💶 💷 💸 💳️ 🪪 🧾 ✉️ 💌 📧 🧧 📨 📩 📤️ 📥️ 📦️ 📫️ 📪️ 📬️ 📭️ 📮 🗳️ ✏️ ✒️ 🖋️ 🖊️ 🖌️ 🖍️ 📝 💼 📁 📂 🗂️ 📅 📆 🗒️ 🗓️ 📇 📈 📉 📊 📋️ 📌 📍 📎 🖇️ 📏 📐 ✂️ 🗃️ 🗄️ 🗑️ 🔒️ 🔓️ 🔏 🔐 🔑 🗝️ 🔨 🪓 ⛏️ ⚒️ 🛠️ 🗡️ ⚔️ 💣️ 🔫 🪃 🏹 🛡️ 🪚 🔧 🪛 🔩 ⚙️ 🗜️ ⚖️ 🦯 🔗 ⛓️‍💥 ⛓️ 🪝 🧰 🧲 🪜 🛝 🛞 🫙 ⚗️ 🧪 🧫 🧬 🔬 🔭 📡 🩻 💉 🩸 💊 🩹 🩺 🩼 🚪 🛗 🪞 🪟 🛏️ 🛋️ 🪑 🪤 🚽 🪠 🚿 🛁 🧼 🫧 🪒 🪮 🧴 🧷 🧹 🧺 🧻 🪣 🪥 🧽 🧯 🛟 🛒 🚬 ⚰️ 🪦 ⚱️ 🏺 🪧 🕳️💘 💝 💖 💗 💓 💞 💕 💟 ❣️ 💔 ❤️ 🧡 💛 💚 🩵 💙 💜 🩷 🤎 🖤 🩶 🤍 ❤️‍🔥 ❤️‍🩹 💯 ♨️ 💢 💬 👁️‍🗨️ 🗨️ 🗯️ 💭 💤 🌐 ♠️ ♥️ ♦️ ♣️ 🃏 🀄️ 🎴 🎭️ 🔇 🔈️ 🔉 🔊 🔔 🔕 🎼 🎵 🎶 💹 🏧 🚮 🚰 ♿️ 🚹️ 🚺️ 🚻 🚼️ 🧑‍🧑‍🧒 🧑‍🧑‍🧒‍🧒 🧑‍🧒 🧑‍🧒‍🧒 🚾 🛂 🛃 🛄 🛅 🛜 ⛓️‍💥 ⚠️ 🚸 ⛔️ 🚫 🚳 🚭️ 🚯 🚱 🚷 📵 🔞 ☢️ ☣️ ⬆️ ↗️ ➡️ ↘️ ⬇️ ↙️ ⬅️ ↖️ ↕️ ↔️ ↩️ ↪️ ⤴️ ⤵️ 🔃 🔄 🔙 🔚 🔛 🔜 🔝 🛐 ⚛️ 🕉️ ✡️ ☸️ 🪯 ☯️ ✝️ ☦️ ☪️ ☮️ 🕎 🔯 🪬 ♈️ ♉️ ♊️ ♋️ ♌️ ♍️ ♎️ ♏️ ♐️ ♑️ ♒️ ♓️ ⛎ 🔀 🔁 🔂 ▶️ ⏩️ ⏭️ ⏯️ ◀️ ⏪️ ⏮️ 🔼 ⏫ 🔽 ⏬ ⏸️ ⏹️ ⏺️ ⏏️ 🎦 🔅 🔆 📶 📳 📴 ♀️ ♂️ ⚧ ✖️ ➕ ➖ ➗ 🟰 ♾️ ‼️ ⁉️ ❓️ ❔ ❕ ❗️ 〰️ 💱 💲 ⚕️ ♻️ ⚜️ 🔱 📛 🔰 ⭕️ ✅ ☑️ ✔️ ❌ ❎ ➰ ➿ 〽️ ✳️ ✴️ ❇️ ©️ ®️ ™️ #️⃣ *️⃣ 0️⃣ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣ 7️⃣ 8️⃣ 9️⃣ 🔟 🔠 🔡 🔢 🔣 🔤 🅰️ 🆎 🅱️ 🆑 🆒 🆓 ℹ️ 🆔 Ⓜ️ 🆕 🆖 🅾️ 🆗 🅿️ 🆘 🆙 🆚 🈁 🈂️ 🈷️ 🈶 🈯️ 🉐 🈹 🈚️ 🈲 🉑 🈸 🈴 🈳 ㊗️ ㊙️ 🈺 🈵 🔴 🟠 🟡 🟢 🔵 🟣 🟤 ⚫️ ⚪️ 🟥 🟧 🟨 🟩 🟦 🟪 🟫 ⬛️ ⬜️ ◼️ ◻️ ◾️ ◽️ ▪️ ▫️ 🔶 🔷 🔸 🔹 🔺 🔻 💠 🔘 🔳 🔲 🕛️ 🕧️ 🕐️ 🕜️ 🕑️ 🕝️ 🕒️ 🕞️ 🕓️ 🕟️ 🕔️ 🕠️ 🕕️ 🕡️ 🕖️ 🕢️ 🕗️ 🕣️ 🕘️ 🕤️ 🕙️ 🕥️ 🕚️ 🕦️🏁 🚩 🎌 🏴 🏳️ 🏳️‍🌈 🏳️‍⚧️ 🏴‍☠️👋🏻 🤚🏻 🖐🏻 ✋🏻 🖖🏻 👌🏻 🤌🏻 🤏🏻 ✌🏻 🤞🏻 🤟🏻 🤘🏻 🤙🏻 👈🏻 👉🏻 👆🏻 🖕🏻 👇🏻 ☝🏻 🫵🏻 👍🏻 👎🏻 ✊🏻 👊🏻 🤛🏻 🤜🏻 👏🏻 🙌🏻 👐🏻 🤲🏻 🫱🏻 🫲🏻 🤝🏻 🫳🏻 🫴🏻 🫸🏻 🫷🏻 🙏🏻 🫰🏻 🫶🏻 ✍🏻 💅🏻 🤳🏻 💪🏻 🦵🏻 🦶🏻 👂🏻 🦻🏻 👃🏻 👶🏻 🧒🏻 👦🏻 👧🏻 🧑🏻 👱🏻 👨🏻 🧔🏻 🧔🏻‍♀️ 🧔🏻‍♂️ 👨🏻‍🦰 👨🏻‍🦱 👨🏻‍🦳 👨🏻‍🦲 👩🏻 👩🏻‍🦰 🧑🏻‍🦰 👩🏻‍🦱 🧑🏻‍🦱 👩🏻‍🦳 🧑🏻‍🦳 👩🏻‍🦲 🧑🏻‍🦲 👱🏻‍♀️ 👱🏻‍♂️ 🧓🏻 👴🏻 👵🏻 🙍🏻 🙍🏻‍♂️ 🙍🏻‍♀️ 🙎🏻 🙎🏻‍♂️ 🙎🏻‍♀️ 🙅🏻 🙅🏻‍♂️ 🙅🏻‍♀️ 🙆🏻 🙆🏻‍♂️ 🙆🏻‍♀️ 💁🏻 💁🏻‍♂️ 💁🏻‍♀️ 🙋🏻 🙋🏻‍♂️ 🙋🏻‍♀️ 🧏🏻 🧏🏻‍♂️ 🧏🏻‍♀️ 🙇🏻 🙇🏻‍♂️ 🙇🏻‍♀️ 🤦🏻 🤦🏻‍♂️ 🤦🏻‍♀️ 🤷🏻 🤷🏻‍♂️ 🤷🏻‍♀️ 🧑🏻‍⚕️ 👨🏻‍⚕️ 👩🏻‍⚕️ 🧑🏻‍🎓 👨🏻‍🎓 👩🏻‍🎓 🧑🏻‍🏫 👨🏻‍🏫 👩🏻‍🏫 🧑🏻‍⚖️ 👨🏻‍⚖️ 👩🏻‍⚖️ 🧑🏻‍🌾 👨🏻‍🌾 👩🏻‍🌾 🧑🏻‍🍳 👨🏻‍🍳 👩🏻‍🍳 🧑🏻‍🔧 👨🏻‍🔧 👩🏻‍🔧 🧑🏻‍🏭 👨🏻‍🏭 👩🏻‍🏭 🧑🏻‍💼 👨🏻‍💼 👩🏻‍💼 🧑🏻‍🔬 👨🏻‍🔬 👩🏻‍🔬 🧑🏻‍💻 👨🏻‍💻 👩🏻‍💻 🧑🏻‍🎤 👨🏻‍🎤 👩🏻‍🎤 🧑🏻‍🎨 👨🏻‍🎨 👩🏻‍🎨 🧑🏻‍✈️ 👨🏻‍✈️ 👩🏻‍✈️ 🧑🏻‍🚀 👨🏻‍🚀 👩🏻‍🚀 🧑🏻‍🚒 👨🏻‍🚒 👩🏻‍🚒 👮🏻 👮🏻‍♂️ 👮🏻‍♀️ 🕵🏻 🕵🏻‍♂️ 🕵🏻‍♀️ 💂🏻 💂🏻‍♂️ 💂🏻‍♀️ 🥷🏻 👷🏻 👷🏻‍♂️ 👷🏻‍♀️ 🫅🏻 🤴🏻 👸🏻 👳🏻 👳🏻‍♂️ 👳🏻‍♀️ 👲🏻 🧕🏻 🤵🏻 🤵🏻‍♂️ 🤵🏻‍♀️ 👰🏻 👰🏻‍♂️ 👰🏻‍♀️ 🫄🏻 🫃🏻 🤰🏻 🧑🏻‍🍼 👨🏻‍🍼 👩🏻‍🍼 🤱🏻 👼🏻 🎅🏻 🤶🏻 🧑🏻‍🎄 🦸🏻 🦸🏻‍♂️ 🦸🏻‍♀️ 🦹🏻 🦹🏻‍♂️ 🦹🏻‍♀️ 🧙🏻 🧙🏻‍♂️ 🧙🏻‍♀️ 🧚🏻 🧚🏻‍♂️ 🧚🏻‍♀️ 🧛🏻 🧛🏻‍♂️ 🧛🏻‍♀️ 🧜🏻 🧜🏻‍♂️ 🧜🏻‍♀️ 🧝🏻 🧝🏻‍♂️ 🧝🏻‍♀️ 💆🏻 💆🏻‍♂️ 💆🏻‍♀️ 💇🏻 💇🏻‍♂️ 💇🏻‍♀️ 🚶🏻 🚶🏻‍♂️ 🚶🏻‍♀️ 🧍🏻 🧍🏻‍♂️ 🧍🏻‍♀️ 🧎🏻 🧎🏻‍♂️ 🧎🏻‍♀️ 🧑🏻‍🦯 👨🏻‍🦯 👩🏻‍🦯 🧑🏻‍🦼 👨🏻‍🦼 👩🏻‍🦼 🧑🏻‍🦽 👨🏻‍🦽 👩🏻‍🦽 🏃🏻 🏃🏻‍♂️ 🏃🏻‍♀️ 🚶🏻‍➡️ 🚶🏻‍♀️‍➡️ 🚶🏻‍♂️‍➡️ 🧎🏻‍➡️ 🧎🏻‍♀️‍➡️ 🧎🏻‍♂️‍➡️ 🧑🏻‍🦯‍➡️ 👨🏻‍🦯‍➡️ 👩🏻‍🦯‍➡️ 🧑🏻‍🦼‍➡️ 👨🏻‍🦼‍➡️ 👩🏻‍🦼‍➡️ 🧑🏻‍🦽‍➡️ 👨🏻‍🦽‍➡️ 👩🏻‍🦽‍➡️ 🏃🏻‍➡️ 🏃🏻‍♀️‍➡️ 🏃🏻‍♂️‍➡️ 💃🏻 🕺🏻 🕴🏻 🧖🏻 🧖🏻‍♂️ 🧖🏻‍♀️ 🧗🏻 🧗🏻‍♂️ 🧗🏻‍♀️ 🏇🏻 🏂🏻 🏌🏻 🏌🏻‍♂️ 🏌🏻‍♀️ 🏄🏻 🏄🏻‍♂️ 🏄🏻‍♀️ 🚣🏻 🚣🏻‍♂️ 🚣🏻‍♀️ 🏊🏻 🏊🏻‍♂️ 🏊🏻‍♀️ ⛹🏻 ⛹🏻‍♂️ ⛹🏻‍♀️ 🏋🏻 🏋🏻‍♂️ 🏋🏻‍♀️ 🚴🏻 🚴🏻‍♂️ 🚴🏻‍♀️ 🚵🏻 🚵🏻‍♂️ 🚵🏻‍♀️ 🤸🏻 🤸🏻‍♂️ 🤸🏻‍♀️ 🤽🏻 🤽🏻‍♂️ 🤽🏻‍♀️ 🤾🏻 🤾🏻‍♂️ 🤾🏻‍♀️ 🤹🏻 🤹🏻‍♂️ 🤹🏻‍♀️ 🧘🏻 🧘🏻‍♂️ 🧘🏻‍♀️ 🛀🏻 🛌🏻 💑🏻 💏🏻 👫🏻 👭🏻 👬🏻'
-    );
-    const elements = document.body.querySelectorAll('p, a');
-    const updates = [];
-    elements.forEach((e) => {
-      // Optimization: Avoid double innerText write to prevent unnecessary layout thrashing
-      const base64 = btoa(
-        String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
-      );
-      updates.push({element: e, text: encoding(base64)});
-    });
-    updates.forEach(({element, text}) => {
-      element.innerText = text;
-    });
-    break;
-  case 'noscript.css':
-    document.body.innerText =
-      'You are using the NoScript theme with Javascript enabled :)';
-    break;
-  case 'lock.css':
-    document.body.innerText = 'Locked';
-    let result = await evaluatePassword(prompt('Enter password'));
-    if (result.valid) {
-      localStorage.removeItem('theme');
-    }
-    break;
-  case 'summarizer.css':
-    summarizer();
-    break;
-}
+      const elements = document.body.querySelectorAll('p, a');
+      const updates = [];
+      elements.forEach((e) => {
+        // Optimization: Avoid double innerText write to prevent unnecessary layout thrashing
+        const base64 = btoa(
+          String.fromCharCode(...new TextEncoder('utf-8').encode(e.innerText))
+        );
+        updates.push({element: e, text: encoding(base64)});
+      });
+      updates.forEach(({element, text}) => {
+        element.innerText = text;
+      });
+      break;
+    case 'noscript.css':
+      document.body.innerText =
+        'You are using the NoScript theme with Javascript enabled :)';
+      break;
+    case 'lock.css':
+      document.body.innerText = 'Locked';
+      let result = await evaluatePassword(prompt('Enter password'));
+      if (result.valid) {
+        localStorage.removeItem('theme');
+      }
+      break;
+    case 'summarizer.css':
+      summarizer();
+      break;
+  }
 }
 
 applyTheme();
