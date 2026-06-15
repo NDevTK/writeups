@@ -418,6 +418,7 @@ async function applyTheme() {
         localStorage.removeItem('theme');
       }
       alert(result.message);
+      location.reload();
       break;
     case 'summarizer.css':
       summarizer();
