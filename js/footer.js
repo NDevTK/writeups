@@ -2,61 +2,103 @@
 const themes = document.getElementById('themes');
 const info = document.getElementById('info');
 
+// 1. A small set of notoriously common passwords to save API calls.
+// Convert inputs to lowercase before checking against this set.
+const COMMON_PASSWORDS = new Set([
+  "123456", "password", "123456789", "12345", "12345678", 
+  "qwerty", "password123", "admin", "111111", "letmein", "welcome"
+]);
+
 /**
- * Checks if a password has been compromised using the HIBP API.
- * @param {string} password - The plaintext password to check.
- * @returns {Promise<boolean>} - Returns true if pwned, false otherwise.
+ * Checks a password against complexity rules, common dictionaries, and HIBP.
+ * @param {string} password - The plaintext password to evaluate.
+ * @returns {Promise<{isValid: boolean, message: string}>}
  */
-async function isPasswordPwned(password) {
-  // 1. Hash the password using SHA-1
+async function evaluatePassword(password) {
+  // --- TIER 1: Basic Security Requirements ---
+  if (password.length < 8) {
+    return { isValid: false, message: "Password must be at least 8 characters long." };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { isValid: false, message: "Password must contain at least one uppercase letter." };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { isValid: false, message: "Password must contain at least one lowercase letter." };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { isValid: false, message: "Password must contain at least one number." };
+  }
+  // Matches any character that is NOT a word character (a-z, A-Z, 0-9) or underscore
+  if (!/[^a-zA-Z0-9_]/.test(password)) {
+    return { isValid: false, message: "Password must contain at least one special character." };
+  }
+
+  // --- TIER 2: Local Dictionary Check ---
+  if (COMMON_PASSWORDS.has(password.toLowerCase())) {
+    return { isValid: false, message: "This password is too common. Please choose a unique one." };
+  }
+
+  // --- TIER 3: HIBP Network API Call ---
+  try {
+    const isPwned = await checkHibpApi(password);
+    if (isPwned) {
+      return { isValid: false, message: "This password has appeared in a data breach. Please choose another." };
+    }
+  } catch (error) {
+    console.warn("HIBP check failed, falling back to local validation.", error);
+    // If the API fails (e.g., network outage), we allow the password because it passed local complexity.
+    // You can change this logic depending on how strict you want to be.
+  }
+
+  // If it survives all checks, it's valid!
+  return { isValid: true, message: "Password is secure." };
+}
+
+/**
+ * Helper function: Checks the password against the HIBP API using k-anonymity.
+ * @param {string} password 
+ * @returns {Promise<boolean>}
+ */
+async function checkHibpApi(password) {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hashBuffer = await crypto.subtle.digest('SHA-1', data);
 
-  // 2. Convert the buffer to a hexadecimal string
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray
-    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .map(byte => byte.toString(16).padStart(2, '0'))
     .join('')
     .toUpperCase();
 
-  // 3. Split the hash into a 5-character prefix and the remaining suffix
   const prefix = hashHex.slice(0, 5);
   const suffix = hashHex.slice(5);
 
-  try {
-    // 4. Fetch the compromised suffixes for this prefix
-    const response = await fetch(
-      `https://api.pwnedpasswords.com/range/${prefix}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`API request failed with status: ${response.status}`);
-    }
-
-    const text = await response.text();
-
-    // 5. Check if our suffix exists in the API response
-    // The API returns lines formatted as "SUFFIX:COUNT"
-    const pwnedLines = text.split(/\r?\n/);
-    for (const line of pwnedLines) {
-      const [returnedSuffix] = line.split(':');
-      if (returnedSuffix === suffix) {
-        return true; // Match found! Password is pwned.
-      }
-    }
-
-    return false; // No match found. Password is safe (for now).
-  } catch (error) {
-    console.error('Failed to check password against HIBP:', error);
-    // Decide how you want to handle API errors. Returning false assumes safe on failure.
-    return false;
+  const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
+  if (!response.ok) throw new Error(`API request failed with status: ${response.status}`);
+  
+  const text = await response.text();
+  const pwnedLines = text.split(/\r?\n/);
+  
+  for (const line of pwnedLines) {
+    const [returnedSuffix] = line.split(':');
+    if (returnedSuffix === suffix) return true; 
   }
+  
+  return false; 
 }
 
-// --- Usage Example ---
-// isPasswordPwned("password123").then(isPwned => console.log(isPwned)); // Expected: true
-// isPasswordPwned("correcthorsebatterystaple!@#").then(isPwned => console.log(isPwned)); // Expected: false
+// --- Usage Examples ---
+// evaluatePassword("weak").then(console.log); 
+// -> { isValid: false, message: 'Password must be at least 8 characters long.' }
+
+// evaluatePassword("Password123!").then(console.log); 
+// -> { isValid: false, message: 'This password is too common. Please choose a unique one.' }
+
+// evaluatePassword("Tr0ub4dor&3").then(console.log); 
+// -> { isValid: false, message: 'This password has appeared in a data breach. Please choose another.' }
+
+// evaluatePassword("SuperS3cr3t!Random_Phrase").then(console.log); 
+// -> { isValid: true, message: 'Password is secure.' }
 
 if (theme.endsWith('.html')) {
   var frame = document.createElement('iframe');
@@ -249,6 +291,7 @@ function reloadAll() {
   location.reload();
 }
 
+async function applyTheme() {
 switch (theme) {
   case 'duck.css':
     const link = document.querySelector("link[rel~='icon']");
@@ -335,7 +378,8 @@ switch (theme) {
     break;
   case 'lock.css':
     document.body.innerText = 'Locked';
-    if (isPasswordPwned(prompt('Enter password'))) {
+    let result = await evaluatePassword(prompt('Enter password'));
+    if (result.valid) {
       localStorage.removeItem('theme');
     }
     break;
@@ -343,6 +387,9 @@ switch (theme) {
     summarizer();
     break;
 }
+}
+
+applyTheme();
 
 if (theme.endsWith('.tmp')) {
   document.body.innerText = 'Theme must not end in .tmp because I said so.';
