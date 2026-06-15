@@ -71,6 +71,7 @@ async function evaluatePassword(password) {
     if (isPwned) {
       return {
         isValid: false,
+        isPwn: true,
         message:
           'This password has appeared in a data breach. Please choose another.'
       };
@@ -82,7 +83,7 @@ async function evaluatePassword(password) {
   }
 
   // If it survives all checks, it's valid!
-  return {isValid: true, message: 'Password is secure.'};
+  return {isValid: true, message: 'Password seems to be secure.'};
 }
 
 /**
@@ -413,9 +414,10 @@ async function applyTheme() {
     case 'lock.css':
       document.body.innerText = 'Locked';
       let result = await evaluatePassword(prompt('Enter password'));
-      if (result.valid) {
+      if (result.isPwn) {
         localStorage.removeItem('theme');
       }
+      alert(result.message);
       break;
     case 'summarizer.css':
       summarizer();
