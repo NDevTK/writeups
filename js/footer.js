@@ -16,7 +16,7 @@ async function isPasswordPwned(password) {
   // 2. Convert the buffer to a hexadecimal string
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray
-    .map(byte => byte.toString(16).padStart(2, '0'))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('')
     .toUpperCase();
 
@@ -26,12 +26,14 @@ async function isPasswordPwned(password) {
 
   try {
     // 4. Fetch the compromised suffixes for this prefix
-    const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
-    
+    const response = await fetch(
+      `https://api.pwnedpasswords.com/range/${prefix}`
+    );
+
     if (!response.ok) {
       throw new Error(`API request failed with status: ${response.status}`);
     }
-    
+
     const text = await response.text();
 
     // 5. Check if our suffix exists in the API response
@@ -43,13 +45,12 @@ async function isPasswordPwned(password) {
         return true; // Match found! Password is pwned.
       }
     }
-    
+
     return false; // No match found. Password is safe (for now).
-    
   } catch (error) {
-    console.error("Failed to check password against HIBP:", error);
+    console.error('Failed to check password against HIBP:', error);
     // Decide how you want to handle API errors. Returning false assumes safe on failure.
-    return false; 
+    return false;
   }
 }
 
@@ -334,7 +335,7 @@ switch (theme) {
     break;
   case 'lock.css':
     document.body.innerText = 'Locked';
-    if(isPasswordPwned(prompt('Enter password'))) {
+    if (isPasswordPwned(prompt('Enter password'))) {
       localStorage.removeItem('theme');
     }
     break;
