@@ -2,6 +2,61 @@
 const themes = document.getElementById('themes');
 const info = document.getElementById('info');
 
+/**
+ * Checks if a password has been compromised using the HIBP API.
+ * @param {string} password - The plaintext password to check.
+ * @returns {Promise<boolean>} - Returns true if pwned, false otherwise.
+ */
+async function isPasswordPwned(password) {
+  // 1. Hash the password using SHA-1
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+
+  // 2. Convert the buffer to a hexadecimal string
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase();
+
+  // 3. Split the hash into a 5-character prefix and the remaining suffix
+  const prefix = hashHex.slice(0, 5);
+  const suffix = hashHex.slice(5);
+
+  try {
+    // 4. Fetch the compromised suffixes for this prefix
+    const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
+    
+    if (!response.ok) {
+      throw new Error(`API request failed with status: ${response.status}`);
+    }
+    
+    const text = await response.text();
+
+    // 5. Check if our suffix exists in the API response
+    // The API returns lines formatted as "SUFFIX:COUNT"
+    const pwnedLines = text.split(/\r?\n/);
+    for (const line of pwnedLines) {
+      const [returnedSuffix] = line.split(':');
+      if (returnedSuffix === suffix) {
+        return true; // Match found! Password is pwned.
+      }
+    }
+    
+    return false; // No match found. Password is safe (for now).
+    
+  } catch (error) {
+    console.error("Failed to check password against HIBP:", error);
+    // Decide how you want to handle API errors. Returning false assumes safe on failure.
+    return false; 
+  }
+}
+
+// --- Usage Example ---
+// isPasswordPwned("password123").then(isPwned => console.log(isPwned)); // Expected: true
+// isPasswordPwned("correcthorsebatterystaple!@#").then(isPwned => console.log(isPwned)); // Expected: false
+
 if (theme.endsWith('.html')) {
   var frame = document.createElement('iframe');
   frame.src = '/writeups/themes/' + encodeURIComponent(theme);
@@ -277,8 +332,11 @@ switch (theme) {
     document.body.innerText =
       'You are using the NoScript theme with Javascript enabled :)';
     break;
-  case 'recursion.css':
-    document.body.innerText = 'Theme not found';
+  case 'lock.css':
+    document.body.innerText = 'Locked';
+    if(isPasswordPwned(prompt('Enter password'))) {
+      localStorage.removeItem('theme');
+    }
     break;
   case 'summarizer.css':
     summarizer();
