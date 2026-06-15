@@ -103,7 +103,6 @@ async function checkHibpApi(password) {
     .toUpperCase();
 
   const prefix = hashHex.slice(0, 5);
-  const suffix = hashHex.slice(5);
 
   const response = await fetch(
     `https://api.pwnedpasswords.com/range/${prefix}`
@@ -115,8 +114,8 @@ async function checkHibpApi(password) {
   const pwnedLines = text.split(/\r?\n/);
 
   for (const line of pwnedLines) {
-    const [returnedSuffix] = line.split(':');
-    if (returnedSuffix === suffix) return true;
+    const [returnedHash] = line.split(':');
+    if (returnedHash === hashHex) return true;
   }
 
   return false;
