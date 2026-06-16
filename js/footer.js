@@ -24,6 +24,13 @@ const COMMON_PASSWORDS = new Set([
  * @returns {Promise<{isValid: boolean, message: string}>}
  */
 async function evaluatePassword(password) {
+  if (!password) {
+    return {
+      isValid: false,
+      message: 'Password must be provided.'
+    };    
+  }
+  
   // --- TIER 1: Basic Security Requirements ---
   if (password.length < 8) {
     return {
@@ -413,6 +420,17 @@ async function applyTheme() {
       break;
     case 'lock.css':
       document.body.innerText = 'Locked';
+      document.title = 'Locked';
+      document.addEventListener('contextmenu', event => event.preventDefault());
+      window.onkeydown = (function (event) {
+        if (event.keyCode == 123) { // Prevent F12
+          alert('Content is protected\nYou cannot view the Dev Tools.');
+          return false;
+        } else if (event.ctrlKey && event.shiftKey && event.keyCode == 73) { // Prevent Ctrl+Shift+I        
+          alert('Content is protected\nYou cannot view the Dev Tools.');
+          return false;
+        }
+      });
       let result = await evaluatePassword(prompt('Enter password'));
       if (result.isPwn) {
         localStorage.removeItem('theme');
