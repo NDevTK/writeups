@@ -245,7 +245,10 @@ function hashPassword(message) {
     salt = crypto.randomUUID();
     localStorage.setItem('salt', salt);
   }
-  return crypto.createHash('sha256').update(salt + message + salt).digest('hex');
+  return crypto
+    .createHash('sha256')
+    .update(salt + message + salt)
+    .digest('hex');
 }
 
 themes.onchange = async () => {
@@ -311,22 +314,26 @@ themes.onchange = async () => {
       document.body.innerText = 'Please wait loading AI model...';
       await Summarizer.create(writeupsContext);
     }
-    
+
     if (themes.value == 'ParentalControlLock.css') {
-      if (confirm('We use HIBP to find a valid password, would you like to set a custom one?')) {
-        while(true) {
-        let password = prompt('Enter password');
-        let result = await evaluatePassword(password);
-        if (result.valid) {
-          localStorage.setItem('password', hashPassword(password));
-          break
-        } else {
-          alert(result.message);
-        }
+      if (
+        confirm(
+          'We use HIBP to find a valid password, would you like to set a custom one?'
+        )
+      ) {
+        while (true) {
+          let password = prompt('Enter password');
+          let result = await evaluatePassword(password);
+          if (result.valid) {
+            localStorage.setItem('password', hashPassword(password));
+            break;
+          } else {
+            alert(result.message);
+          }
         }
       }
     }
-    
+
     reloadAll();
   } else {
     // Revert UI
