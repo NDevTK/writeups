@@ -326,7 +326,6 @@ themes.onchange = async () => {
           let result = await evaluatePassword(password);
           if (result.isValid) {
             localStorage.setItem('password', hashPassword(password));
-            await sleep(2000);
             alert('Custom password has been set');
             break;
           } else {
