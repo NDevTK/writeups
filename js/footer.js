@@ -471,21 +471,18 @@ async function applyTheme() {
       };
       await sleep(2000);
       let password = prompt('Enter password');
+      let result = await evaluatePassword(password);
       let hashedPassword = localStorage.getItem('password');
       if (hashedPassword) {
         let hashedInput = await hashPassword(password);
         if (hashedInput === hashedPassword) {
           localStorage.removeItem('password');
           localStorage.removeItem('theme');
-          location.reload();
         }
-      } else {
-        let result = await evaluatePassword(password);
-        if (result.isPwn) {
-          localStorage.removeItem('theme');
-        }
-        alert(result.message);
+      } else if (result.isPwn) { 
+        localStorage.removeItem('theme');
       }
+      alert(result.message);
       location.reload();
       break;
     case 'summarizer.css':
