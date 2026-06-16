@@ -238,6 +238,16 @@ function notSupported(reason) {
   return false;
 }
 
+function hashPassword(message) {
+  // SHA256 may seem fast
+  let salt = localStorage.getItem('salt');
+  if (!salt) {
+    salt = crypto.randomUUID();
+    localStorage.setItem('salt', salt);
+  }
+  return crypto.createHash('sha256').update(salt + message + salt).digest('hex');
+}
+
 themes.onchange = async () => {
   if (themes.value === 'random.tmp') {
     const allowedThemes = [...themes.options].filter((e) => {
@@ -301,7 +311,22 @@ themes.onchange = async () => {
       document.body.innerText = 'Please wait loading AI model...';
       await Summarizer.create(writeupsContext);
     }
-
+    
+    if (themes.value == 'ParentalControlLock.css') {
+      if (confirm('We use HIBP to find a valid password, would you like to set a custom one?')) {
+        while(true) {
+        let password = prompt('Enter password');
+        let result = await evaluatePassword(password);
+        if (result.valid) {
+          localStorage.setItem('password', hashPassword(password));
+          break
+        } else {
+          alert(result.message);
+        }
+        }
+      }
+    }
+    
     reloadAll();
   } else {
     // Revert UI
@@ -436,11 +461,21 @@ async function applyTheme() {
         event.preventDefault();
       };
       await sleep(2000);
-      let result = await evaluatePassword(prompt('Enter password'));
-      if (result.isPwn) {
-        localStorage.removeItem('theme');
+      let password = prompt('Enter password');
+      let hashedPassword = localStorage.getItem('password');
+      if (hashedPassword) {
+        if (hashPassword(password) === hashedPassword) {
+          localStorage.removeItem('password');
+          localStorage.removeItem('theme');
+          location.reload();
+        }
+      } else {
+        let result = await evaluatePassword(password);
+        if (result.isPwn) {
+          localStorage.removeItem('theme');
+        }
+        alert(result.message);
       }
-      alert(result.message);
       location.reload();
       break;
     case 'summarizer.css':
