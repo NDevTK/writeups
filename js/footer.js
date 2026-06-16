@@ -425,7 +425,8 @@ async function applyTheme() {
       document.body.innerText =
         'You are using the NoScript theme with Javascript enabled :)';
       break;
-    case 'lock.css':
+    case 'ParentalControlLock.css':
+      // Not a real security boundary
       document.body.innerText = 'Locked';
       document.title = 'Locked';
       document.addEventListener('contextmenu', (event) =>
