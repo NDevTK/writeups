@@ -90,9 +90,10 @@ async function evaluatePassword(password) {
       };
     }
   } catch (error) {
-    console.warn('HIBP check failed, falling back to local validation.', error);
-    // If the API fails (e.g., network outage), we allow the password because it passed local complexity.
-    // You can change this logic depending on how strict you want to be.
+    return {
+      isValid: false,
+      message: 'Error while checking password.'
+    };
   }
 
   // If it survives all checks, it's valid!
