@@ -120,9 +120,10 @@ async function checkHibpApi(password) {
   const suffix = hashHex.slice(5);
 
   const response = await fetch(
-    `https://api.pwnedpasswords.com/range/${prefix}`, {
+    `https://api.pwnedpasswords.com/range/${prefix}`,
+    {
       headers: {
-        "Add-Padding": "true"
+        'Add-Padding': 'true'
       }
     }
   );
