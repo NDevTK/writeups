@@ -479,7 +479,7 @@ async function applyTheme() {
           localStorage.removeItem('password');
           localStorage.removeItem('theme');
         }
-      } else if (result.isPwn) { 
+      } else if (result.isPwn) {
         localStorage.removeItem('theme');
       }
       alert(result.message);
