@@ -18,6 +18,12 @@ const COMMON_PASSWORDS = new Set([
   'welcome'
 ]);
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+};
+
 /**
  * Checks a password against complexity rules, common dictionaries, and HIBP.
  * @param {string} password - The plaintext password to evaluate.
@@ -424,17 +430,10 @@ async function applyTheme() {
       document.addEventListener('contextmenu', (event) =>
         event.preventDefault()
       );
-      window.onkeydown = function (event) {
-        if (event.keyCode == 123) {
-          // Prevent F12
-          alert('Content is protected\nYou cannot view the Dev Tools.');
-          return false;
-        } else if (event.ctrlKey && event.shiftKey && event.keyCode == 73) {
-          // Prevent Ctrl+Shift+I
-          alert('Content is protected\nYou cannot view the Dev Tools.');
-          return false;
-        }
-      };
+      window.onkeydown = (event) => {
+        event.preventDefault();
+      }
+      await sleep(2000);
       let result = await evaluatePassword(prompt('Enter password'));
       if (result.isPwn) {
         localStorage.removeItem('theme');
