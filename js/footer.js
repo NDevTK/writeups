@@ -22,7 +22,7 @@ function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
-};
+}
 
 /**
  * Checks a password against complexity rules, common dictionaries, and HIBP.
@@ -432,7 +432,7 @@ async function applyTheme() {
       );
       window.onkeydown = (event) => {
         event.preventDefault();
-      }
+      };
       await sleep(2000);
       let result = await evaluatePassword(prompt('Enter password'));
       if (result.isPwn) {
