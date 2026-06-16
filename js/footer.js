@@ -238,17 +238,17 @@ function notSupported(reason) {
   return false;
 }
 
-function hashPassword(message) {
+async function hashPassword(message) {
   // SHA256 may seem fast
   let salt = localStorage.getItem('salt');
   if (!salt) {
     salt = crypto.randomUUID();
     localStorage.setItem('salt', salt);
   }
-  return crypto
-    .createHash('sha256')
-    .update(salt + message + salt)
-    .digest('hex');
+  const msgUint8 = new TextEncoder().encode(salt + message + salt); // encode as (utf-8) Uint8Array
+  const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgUint8); // hash the message
+  const hashHex = new Uint8Array(hashBuffer).toHex(); // Convert ArrayBuffer to hex string.
+  return hashHex;
 }
 
 themes.onchange = async () => {
@@ -325,7 +325,8 @@ themes.onchange = async () => {
           let password = prompt('Enter password');
           let result = await evaluatePassword(password);
           if (result.isValid) {
-            localStorage.setItem('password', hashPassword(password));
+            let hashedInput = await hashPassword(password);
+            localStorage.setItem('password', hashedInput);
             alert('Custom password has been set');
             break;
           } else {
@@ -472,7 +473,8 @@ async function applyTheme() {
       let password = prompt('Enter password');
       let hashedPassword = localStorage.getItem('password');
       if (hashedPassword) {
-        if (hashPassword(password) === hashedPassword) {
+        let hashedInput = await hashPassword(password);
+        if (hashedInput === hashedPassword) {
           localStorage.removeItem('password');
           localStorage.removeItem('theme');
           location.reload();
