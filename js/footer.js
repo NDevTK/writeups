@@ -318,7 +318,7 @@ themes.onchange = async () => {
     if (themes.value == 'ParentalControlLock.css') {
       if (
         confirm(
-          'We use HIBP to find any valid password, would you like to set a custom one?'
+          'We use HIBP to find any valid password, would you like to set a custom one instead?'
         )
       ) {
         while (true) {
