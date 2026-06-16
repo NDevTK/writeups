@@ -318,13 +318,13 @@ themes.onchange = async () => {
     if (themes.value == 'ParentalControlLock.css') {
       if (
         confirm(
-          'We use HIBP to find a valid password, would you like to set a custom one?'
+          'We use HIBP to find any valid password, would you like to set a custom one?'
         )
       ) {
         while (true) {
           let password = prompt('Enter password');
           let result = await evaluatePassword(password);
-          if (result.valid) {
+          if (result.isValid) {
             localStorage.setItem('password', hashPassword(password));
             await sleep(2000);
             alert('Custom password has been set');
