@@ -246,7 +246,7 @@ async function hashPassword(message) {
     localStorage.setItem('salt', salt);
   }
   const msgUint8 = new TextEncoder().encode(salt + message + salt); // encode as (utf-8) Uint8Array
-  const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgUint8); // hash the message
+  const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8); // hash the message
   const hashHex = new Uint8Array(hashBuffer).toHex(); // Convert ArrayBuffer to hex string.
   return hashHex;
 }
