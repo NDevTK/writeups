@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Matrix Rain</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+        font-family: ui-monospace, 'Consolas', 'Courier New', monospace;
+      }
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      /* Control panel — only visible when the host brings the iframe forward */
+      #panel {
+        position: fixed;
+        left: 20px;
+        bottom: 20px;
+        min-width: 220px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: rgba(8, 16, 10, 0.72);
+        border: 1px solid rgba(120, 255, 160, 0.25);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        color: #d7ffe2;
+        font-size: 13px;
+        z-index: 10;
+      }
+      #panel[hidden] {
+        display: none;
+      }
+      #panel h2 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #8affa0;
+      }
+      .swatches {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .swatch {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        cursor: pointer;
+        padding: 0;
+      }
+      .swatch.active {
+        border-color: #fff;
+      }
+      label {
+        display: block;
+        margin: 8px 0 4px;
+        color: rgba(215, 255, 226, 0.7);
+      }
+      input[type='range'] {
+        width: 100%;
+        accent-color: #37ff6b;
+      }
+      #hint {
+        position: fixed;
+        left: 50%;
+        bottom: 22px;
+        transform: translateX(-50%);
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: rgba(8, 16, 10, 0.6);
+        border: 1px solid rgba(120, 255, 160, 0.2);
+        color: rgba(215, 255, 226, 0.85);
+        font-size: 12px;
+        letter-spacing: 0.02em;
+        transition: opacity 1s ease;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+
+    <div id="panel" hidden>
+      <h2>Matrix Rain</h2>
+      <div class="swatches" id="swatches"></div>
+      <label for="speed">Speed</label>
+      <input id="speed" type="range" min="0.2" max="2.5" step="0.1" />
+    </div>
+
+    <div id="hint">Matrix Rain · press H to open controls</div>
+
+    <script>
+      'use strict';
+      const canvas = document.getElementById('c');
+      const ctx = canvas.getContext('2d');
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const PALETTES = {
+        Matrix: {head: '#d7ffe2', body: '#37ff6b'},
+        Amber: {head: '#fff0c8', body: '#ffb000'},
+        Ice: {head: '#e6ffff', body: '#36c9ff'},
+        Neon: {head: '#ffe3fb', body: '#ff2e88'}
+      };
+      const GLYPHS =
+        'アイウエオカキクケコサシスセソタチツテトナニヌネノﾊﾋﾌﾍﾎ0123456789ABCDEF<>/\\|=+*#$%'.split(
+          ''
+        );
+
+      let state = {pal: 'Matrix', speed: 1};
+      try {
+        Object.assign(
+          state,
+          JSON.parse(localStorage.getItem('matrixrain')) || {}
+        );
+      } catch {}
+      if (!PALETTES[state.pal]) state.pal = 'Matrix';
+
+      function save() {
+        try {
+          localStorage.setItem('matrixrain', JSON.stringify(state));
+        } catch {}
+      }
+
+      let cols, drops, fontSize, W, H;
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        W = canvas.width = Math.floor(innerWidth * dpr);
+        H = canvas.height = Math.floor(innerHeight * dpr);
+        canvas.style.width = innerWidth + 'px';
+        canvas.style.height = innerHeight + 'px';
+        fontSize = Math.max(14, Math.round(16 * dpr));
+        cols = Math.ceil(W / fontSize);
+        drops = Array.from(
+          {length: cols},
+          () => (Math.random() * -H) / fontSize
+        );
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      function rand(arr) {
+        return arr[(Math.random() * arr.length) | 0];
+      }
+
+      function frame() {
+        const pal = PALETTES[state.pal];
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'; // fade for the trailing tails
+        ctx.fillRect(0, 0, W, H);
+        ctx.font = fontSize + "px ui-monospace, 'Consolas', monospace";
+        for (let i = 0; i < cols; i++) {
+          const x = i * fontSize;
+          const y = Math.floor(drops[i]) * fontSize;
+          if (y > 0) {
+            ctx.fillStyle = pal.body;
+            ctx.fillText(rand(GLYPHS), x, y - fontSize);
+            ctx.fillStyle = pal.head; // bright leading glyph
+            ctx.fillText(rand(GLYPHS), x, y);
+          }
+          if (y > H && Math.random() > 0.975)
+            drops[i] = (Math.random() * -20) | 0;
+          drops[i] += 0.5 * state.speed;
+        }
+      }
+
+      let raf;
+      function loop() {
+        frame();
+        raf = requestAnimationFrame(loop);
+      }
+      function start() {
+        cancelAnimationFrame(raf);
+        if (reduce) {
+          // No animation for reduced-motion: paint a single static field.
+          for (let k = 0; k < 80; k++) frame();
+        } else {
+          loop();
+        }
+      }
+
+      addEventListener('resize', () => {
+        resize();
+        start();
+      });
+      resize();
+      start();
+
+      // ---------- Controls ----------
+      const swatches = document.getElementById('swatches');
+      Object.keys(PALETTES).forEach((name) => {
+        const b = document.createElement('button');
+        b.className = 'swatch';
+        b.title = name;
+        b.style.background = PALETTES[name].body;
+        b.addEventListener('click', () => {
+          state.pal = name;
+          syncPanel();
+          save();
+        });
+        b.dataset.pal = name;
+        swatches.appendChild(b);
+      });
+      const speed = document.getElementById('speed');
+      speed.addEventListener('input', () => {
+        state.speed = +speed.value;
+        save();
+      });
+      function syncPanel() {
+        speed.value = state.speed;
+        swatches.querySelectorAll('.swatch').forEach((s) => {
+          s.classList.toggle('active', s.dataset.pal === state.pal);
+        });
+      }
+      syncPanel();
+
+      // ---------- Host bridge (shaderwall protocol) ----------
+      // The parent posts {type:'shaderwall', action:'show'|'hide'|'toggle'};
+      // we reply {type:'shaderwall', state:'shown'|'hidden'} so the host can
+      // bring us forward (interactive) or send us behind the content.
+      const panel = document.getElementById('panel');
+      let shown = false;
+      function setShown(value) {
+        shown = value;
+        panel.hidden = !shown;
+        window.parent.postMessage(
+          {type: 'shaderwall', state: shown ? 'shown' : 'hidden'},
+          location.origin
+        );
+      }
+      addEventListener('message', (e) => {
+        if (e.origin != location.origin) return;
+        const d = e.data || {};
+        if (d.type !== 'shaderwall') return;
+        if (d.action === 'show') setShown(true);
+        else if (d.action === 'hide') setShown(false);
+        else if (d.action === 'toggle') setShown(!shown);
+      });
+      addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H') setShown(!shown);
+      });
+
+      setTimeout(() => {
+        document.getElementById('hint').style.opacity = '0';
+      }, 6000);
+
+      setShown(false); // start as a background wallpaper
+    </script>
+  </body>
+</html>
