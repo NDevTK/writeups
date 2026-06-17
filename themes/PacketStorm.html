@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Packet Storm</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+        font-family: ui-monospace, 'Consolas', 'Courier New', monospace;
+      }
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      #panel {
+        position: fixed;
+        left: 20px;
+        bottom: 20px;
+        min-width: 220px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: rgba(6, 16, 10, 0.72);
+        border: 1px solid rgba(120, 255, 160, 0.25);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        color: #d7ffe2;
+        font-size: 13px;
+        z-index: 10;
+      }
+      #panel[hidden] {
+        display: none;
+      }
+      #panel h2 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #8affa0;
+      }
+      .swatches {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .swatch {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        cursor: pointer;
+        padding: 0;
+      }
+      .swatch.active {
+        border-color: #fff;
+      }
+      label {
+        display: block;
+        margin: 8px 0 4px;
+        color: rgba(215, 255, 226, 0.7);
+      }
+      input[type='range'] {
+        width: 100%;
+        accent-color: #37ff6b;
+      }
+      #hint {
+        position: fixed;
+        left: 50%;
+        bottom: 22px;
+        transform: translateX(-50%);
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: rgba(6, 16, 10, 0.6);
+        border: 1px solid rgba(120, 255, 160, 0.2);
+        color: rgba(215, 255, 226, 0.85);
+        font-size: 12px;
+        transition: opacity 1s ease;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+
+    <div id="panel" hidden>
+      <h2>Packet Storm</h2>
+      <div class="swatches" id="swatches"></div>
+      <label for="speed">Speed</label>
+      <input id="speed" type="range" min="0.2" max="3" step="0.1" />
+    </div>
+
+    <div id="hint">Packet Storm · press H to open controls</div>
+
+    <script>
+      'use strict';
+      const canvas = document.getElementById('c');
+      const ctx = canvas.getContext('2d');
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const PALETTES = {
+        Green: {
+          dim: '#2c7a4a',
+          ip: '#36c9ff',
+          proto: '#ffd479',
+          alert: '#ff5f5f'
+        },
+        Amber: {
+          dim: '#9a6b00',
+          ip: '#ffd479',
+          proto: '#7dffa0',
+          alert: '#ff5f5f'
+        },
+        Ice: {dim: '#2f5f78', ip: '#7dffa0', proto: '#ffd479', alert: '#ff5f5f'}
+      };
+      const BASE = {Green: '#3df36b', Amber: '#ffb000', Ice: '#9be8ff'};
+
+      const PROTOS = [
+        'TCP',
+        'UDP',
+        'TLSv1.3',
+        'HTTP',
+        'DNS',
+        'QUIC',
+        'ICMP',
+        'ARP'
+      ];
+      const NOTES = {
+        TCP: [
+          '[SYN]',
+          '[SYN, ACK]',
+          '[ACK]',
+          '[FIN, ACK]',
+          '[PSH, ACK]',
+          '[RST]'
+        ],
+        UDP: ['Len=42', 'Len=576', 'Len=1300'],
+        'TLSv1.3': [
+          'Client Hello',
+          'Server Hello',
+          'Application Data',
+          'Finished'
+        ],
+        HTTP: [
+          'GET /writeups/',
+          '200 OK',
+          'POST /login',
+          '301 Moved',
+          'GET /feed.xml'
+        ],
+        DNS: [
+          'A? ndev.tk',
+          'AAAA? example.com',
+          'PTR?',
+          'Standard query response'
+        ],
+        QUIC: ['Initial', 'Handshake', '1-RTT', '0-RTT'],
+        ICMP: [
+          'Echo (ping) request',
+          'Echo (ping) reply',
+          'Destination unreachable'
+        ],
+        ARP: [
+          'Who has 10.0.0.1? Tell 10.0.0.42',
+          '10.0.0.1 is at de:ad:be:ef:00:01'
+        ]
+      };
+
+      let state = {pal: 'Green', speed: 1};
+      try {
+        Object.assign(
+          state,
+          JSON.parse(localStorage.getItem('packetstorm')) || {}
+        );
+      } catch {}
+      if (!BASE[state.pal]) state.pal = 'Green';
+
+      function save() {
+        try {
+          localStorage.setItem('packetstorm', JSON.stringify(state));
+        } catch {}
+      }
+
+      const r = (n) => Math.floor(Math.random() * n);
+      const pick = (a) => a[r(a.length)];
+      function ip() {
+        const head = pick(['10', '172.16', '192.168', '' + (r(223) + 1)]);
+        const rest = 3 - (head.split('.').length - 1);
+        const tail = Array.from({length: rest}, () => r(256)).join('.');
+        return head + '.' + tail;
+      }
+      let clock = Date.now();
+      function stamp() {
+        clock += r(900) + 30;
+        const d = new Date(clock);
+        const p = (n, w = 2) => String(n).padStart(w, '0');
+        return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
+      }
+      function makeRow() {
+        const proto = pick(PROTOS);
+        const note = pick(NOTES[proto]);
+        const alert = Math.random() < 0.05;
+        return {
+          t: stamp(),
+          src: ip() + ':' + (r(60000) + 1024),
+          dst: ip() + ':' + pick([443, 80, 53, 22, 8443, 1883, r(60000)]),
+          proto,
+          note: alert ? '! flagged ' + note : note,
+          alert
+        };
+      }
+
+      let rows, lineH, W, H, offset;
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        W = canvas.width = Math.floor(innerWidth * dpr);
+        H = canvas.height = Math.floor(innerHeight * dpr);
+        canvas.style.width = innerWidth + 'px';
+        canvas.style.height = innerHeight + 'px';
+        lineH = Math.round(20 * dpr);
+        ctx.font =
+          Math.round(14 * dpr) + "px ui-monospace, 'Consolas', monospace";
+        ctx.textBaseline = 'top';
+        const n = Math.ceil(H / lineH) + 2;
+        rows = Array.from({length: n}, makeRow);
+        offset = 0;
+      }
+
+      function drawRow(row, y) {
+        const pal = PALETTES[state.pal];
+        const base = row.alert ? pal.alert : BASE[state.pal];
+        let x = Math.round(8 * (window.devicePixelRatio || 1));
+        const seg = (text, color) => {
+          ctx.fillStyle = color;
+          ctx.fillText(text, x, y);
+          x += ctx.measureText(text).width;
+        };
+        seg(row.t + '  ', pal.dim);
+        seg(row.src, pal.ip);
+        seg(' → ', base);
+        seg(row.dst, pal.ip);
+        seg('  ' + row.proto + ' ', pal.proto);
+        seg(' ' + row.note, base);
+      }
+
+      function frame() {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, W, H);
+        for (let i = 0; i < rows.length; i++)
+          drawRow(rows[i], i * lineH - offset);
+      }
+
+      let raf;
+      function loop() {
+        offset += lineH * 0.06 * state.speed;
+        while (offset >= lineH) {
+          offset -= lineH;
+          rows.shift();
+          rows.push(makeRow());
+        }
+        frame();
+        raf = requestAnimationFrame(loop);
+      }
+      function start() {
+        cancelAnimationFrame(raf);
+        if (reduce) frame();
+        else loop();
+      }
+
+      addEventListener('resize', () => {
+        resize();
+        start();
+      });
+      resize();
+      start();
+
+      // ---------- Controls ----------
+      const swatches = document.getElementById('swatches');
+      Object.keys(BASE).forEach((name) => {
+        const b = document.createElement('button');
+        b.className = 'swatch';
+        b.title = name;
+        b.style.background = BASE[name];
+        b.dataset.pal = name;
+        b.addEventListener('click', () => {
+          state.pal = name;
+          syncPanel();
+          save();
+        });
+        swatches.appendChild(b);
+      });
+      const speed = document.getElementById('speed');
+      speed.addEventListener('input', () => {
+        state.speed = +speed.value;
+        save();
+      });
+      function syncPanel() {
+        speed.value = state.speed;
+        swatches.querySelectorAll('.swatch').forEach((s) => {
+          s.classList.toggle('active', s.dataset.pal === state.pal);
+        });
+      }
+      syncPanel();
+
+      // ---------- Host bridge (shaderwall protocol) ----------
+      const panel = document.getElementById('panel');
+      let shown = false;
+      function setShown(value) {
+        shown = value;
+        panel.hidden = !shown;
+        window.parent.postMessage(
+          {type: 'shaderwall', state: shown ? 'shown' : 'hidden'},
+          location.origin
+        );
+      }
+      addEventListener('message', (e) => {
+        if (e.origin != location.origin) return;
+        const d = e.data || {};
+        if (d.type !== 'shaderwall') return;
+        if (d.action === 'show') setShown(true);
+        else if (d.action === 'hide') setShown(false);
+        else if (d.action === 'toggle') setShown(!shown);
+      });
+      addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H') setShown(!shown);
+      });
+
+      setTimeout(() => {
+        document.getElementById('hint').style.opacity = '0';
+      }, 6000);
+
+      setShown(false);
+    </script>
+  </body>
+</html>

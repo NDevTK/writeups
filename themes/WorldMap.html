@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>World Map</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #aad3df; /* OSM water, while tiles load */
+        overflow: hidden;
+        font-family: ui-sans-serif, system-ui, 'Segoe UI', Arial, sans-serif;
+      }
+      /* Oversized so the slow drift never reveals an edge */
+      #map {
+        position: fixed;
+        top: -15%;
+        left: -15%;
+        width: 130%;
+        height: 130%;
+        border: 0;
+        transform-origin: center;
+        animation: drift 120s ease-in-out infinite alternate;
+      }
+      @keyframes drift {
+        0% {
+          transform: scale(1.08) translate(-3%, -2%);
+        }
+        50% {
+          transform: scale(1.18) translate(2%, 3%);
+        }
+        100% {
+          transform: scale(1.12) translate(3%, -3%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #map {
+          animation: none;
+          transform: scale(1.05);
+        }
+      }
+      #fallback {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        text-align: center;
+        color: #2b4a55;
+        font-size: 14px;
+      }
+      #hint {
+        position: fixed;
+        left: 50%;
+        bottom: 22px;
+        transform: translateX(-50%);
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: rgba(10, 20, 24, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 12px;
+        transition: opacity 1s ease;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="fallback">
+      Loading an OpenStreetMap view — if nothing appears, the map declined to be
+      embedded.
+    </div>
+    <iframe
+      id="map"
+      src="https://www.openstreetmap.org/export/embed.html?bbox=-13.0,35.5,28.0,58.5&layer=mapnik"
+      title="OpenStreetMap"
+      sandbox="allow-scripts allow-same-origin allow-popups"
+      referrerpolicy="no-referrer"></iframe>
+    <div id="hint">World Map · drifting · press ✦ to explore</div>
+
+    <script>
+      'use strict';
+      const map = document.getElementById('map');
+      // ---------- Host bridge (shaderwall protocol) ----------
+      let shown = false;
+      function setShown(value) {
+        shown = value;
+        // Hold still while the reader is interacting with the map.
+        map.style.animationPlayState = shown ? 'paused' : 'running';
+        window.parent.postMessage(
+          {type: 'shaderwall', state: shown ? 'shown' : 'hidden'},
+          location.origin
+        );
+      }
+      addEventListener('message', (e) => {
+        if (e.origin != location.origin) return;
+        const d = e.data || {};
+        if (d.type !== 'shaderwall') return;
+        if (d.action === 'show') setShown(true);
+        else if (d.action === 'hide') setShown(false);
+        else if (d.action === 'toggle') setShown(!shown);
+      });
+      addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H') setShown(!shown);
+      });
+      setTimeout(() => {
+        const h = document.getElementById('hint');
+        if (h) h.style.opacity = '0';
+      }, 7000);
+      setShown(false);
+    </script>
+  </body>
+</html>

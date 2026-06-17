@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game of Life</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #05080a;
+        overflow: hidden;
+        font-family: ui-monospace, 'Consolas', 'Courier New', monospace;
+      }
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      #panel {
+        position: fixed;
+        left: 20px;
+        bottom: 20px;
+        min-width: 220px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: rgba(8, 14, 20, 0.72);
+        border: 1px solid rgba(120, 200, 255, 0.25);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        color: #d7ecff;
+        font-size: 13px;
+        z-index: 10;
+      }
+      #panel[hidden] {
+        display: none;
+      }
+      #panel h2 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #8ad0ff;
+      }
+      .swatches {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .swatch {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        cursor: pointer;
+        padding: 0;
+      }
+      .swatch.active {
+        border-color: #fff;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .row button {
+        flex: 1;
+        padding: 5px 0;
+        cursor: pointer;
+        color: #d7ecff;
+        background: rgba(120, 200, 255, 0.12);
+        border: 1px solid rgba(120, 200, 255, 0.25);
+        border-radius: 8px;
+        font: inherit;
+      }
+      label {
+        display: block;
+        margin: 8px 0 4px;
+        color: rgba(215, 236, 255, 0.7);
+      }
+      input[type='range'] {
+        width: 100%;
+        accent-color: #4ac0ff;
+      }
+      #hint {
+        position: fixed;
+        left: 50%;
+        bottom: 22px;
+        transform: translateX(-50%);
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: rgba(8, 14, 20, 0.6);
+        border: 1px solid rgba(120, 200, 255, 0.2);
+        color: rgba(215, 236, 255, 0.85);
+        font-size: 12px;
+        transition: opacity 1s ease;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+
+    <div id="panel" hidden>
+      <h2>Game of Life</h2>
+      <div class="swatches" id="swatches"></div>
+      <label for="speed">Speed</label>
+      <input id="speed" type="range" min="1" max="30" step="1" />
+      <div class="row"><button id="reseed">Reseed soup</button></div>
+    </div>
+
+    <div id="hint">Conway's Game of Life · press H to open controls</div>
+
+    <script>
+      'use strict';
+      const canvas = document.getElementById('c');
+      const ctx = canvas.getContext('2d');
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const PALETTES = {
+        Aqua: '#4ac0ff',
+        Lime: '#37ff6b',
+        Magenta: '#ff5fd2',
+        Amber: '#ffb000'
+      };
+
+      let state = {pal: 'Aqua', gps: 12};
+      try {
+        Object.assign(
+          state,
+          JSON.parse(localStorage.getItem('gameoflife')) || {}
+        );
+      } catch {}
+      if (!PALETTES[state.pal]) state.pal = 'Aqua';
+      function save() {
+        try {
+          localStorage.setItem('gameoflife', JSON.stringify(state));
+        } catch {}
+      }
+
+      let cols, rows, cell, grid, age, W, H, dpr;
+      function seed(density = 0.18) {
+        grid = new Uint8Array(cols * rows);
+        age = new Uint8Array(cols * rows);
+        for (let i = 0; i < grid.length; i++)
+          grid[i] = Math.random() < density ? 1 : 0;
+      }
+      function resize() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        W = canvas.width = Math.floor(innerWidth * dpr);
+        H = canvas.height = Math.floor(innerHeight * dpr);
+        canvas.style.width = innerWidth + 'px';
+        canvas.style.height = innerHeight + 'px';
+        cell = Math.round(14 * dpr);
+        cols = Math.ceil(W / cell);
+        rows = Math.ceil(H / cell);
+        seed();
+      }
+
+      function step() {
+        const next = new Uint8Array(cols * rows);
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < cols; x++) {
+            let n = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                if (!dx && !dy) continue;
+                const xx = (x + dx + cols) % cols;
+                const yy = (y + dy + rows) % rows;
+                n += grid[yy * cols + xx];
+              }
+            }
+            const i = y * cols + x;
+            next[i] = grid[i] ? n === 2 || n === 3 : n === 3;
+            age[i] = next[i] ? Math.min(255, age[i] + 24) : 0;
+          }
+        }
+        grid = next;
+      }
+
+      function draw() {
+        const color = PALETTES[state.pal];
+        ctx.fillStyle = 'rgba(5, 8, 10, 0.35)'; // gentle trail
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = color;
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < cols; x++) {
+            const i = y * cols + x;
+            if (!grid[i]) continue;
+            ctx.globalAlpha = 0.45 + (age[i] / 255) * 0.55;
+            ctx.fillRect(x * cell + 1, y * cell + 1, cell - 2, cell - 2);
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      let raf;
+      let acc = 0;
+      let last = performance.now();
+      let generations = 0;
+      function loop(now) {
+        const dt = now - last;
+        last = now;
+        acc += dt;
+        const interval = 1000 / state.gps;
+        while (acc >= interval) {
+          step();
+          acc -= interval;
+          if (++generations % 900 === 0) seed(); // refresh before it stagnates
+        }
+        draw();
+        raf = requestAnimationFrame(loop);
+      }
+      function start() {
+        cancelAnimationFrame(raf);
+        ctx.fillStyle = '#05080a';
+        ctx.fillRect(0, 0, W, H);
+        if (reduce) {
+          for (let k = 0; k < 4; k++) step();
+          draw();
+        } else {
+          last = performance.now();
+          raf = requestAnimationFrame(loop);
+        }
+      }
+
+      addEventListener('resize', () => {
+        resize();
+        start();
+      });
+      resize();
+      start();
+
+      // ---------- Controls ----------
+      const swatches = document.getElementById('swatches');
+      Object.keys(PALETTES).forEach((name) => {
+        const b = document.createElement('button');
+        b.className = 'swatch';
+        b.title = name;
+        b.style.background = PALETTES[name];
+        b.dataset.pal = name;
+        b.addEventListener('click', () => {
+          state.pal = name;
+          syncPanel();
+          save();
+        });
+        swatches.appendChild(b);
+      });
+      const speed = document.getElementById('speed');
+      speed.addEventListener('input', () => {
+        state.gps = +speed.value;
+        save();
+      });
+      document.getElementById('reseed').addEventListener('click', () => seed());
+      function syncPanel() {
+        speed.value = state.gps;
+        swatches.querySelectorAll('.swatch').forEach((s) => {
+          s.classList.toggle('active', s.dataset.pal === state.pal);
+        });
+      }
+      syncPanel();
+
+      // ---------- Host bridge (shaderwall protocol) ----------
+      const panel = document.getElementById('panel');
+      let shown = false;
+      function setShown(value) {
+        shown = value;
+        panel.hidden = !shown;
+        window.parent.postMessage(
+          {type: 'shaderwall', state: shown ? 'shown' : 'hidden'},
+          location.origin
+        );
+      }
+      addEventListener('message', (e) => {
+        if (e.origin != location.origin) return;
+        const d = e.data || {};
+        if (d.type !== 'shaderwall') return;
+        if (d.action === 'show') setShown(true);
+        else if (d.action === 'hide') setShown(false);
+        else if (d.action === 'toggle') setShown(!shown);
+      });
+      addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H') setShown(!shown);
+      });
+
+      setTimeout(() => {
+        document.getElementById('hint').style.opacity = '0';
+      }, 6000);
+
+      setShown(false);
+    </script>
+  </body>
+</html>
