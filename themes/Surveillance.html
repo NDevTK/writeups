@@ -45,6 +45,15 @@
       .leaflet-control-geocoder-alternatives li:hover {
         background: rgba(120, 200, 255, 0.12);
       }
+      /* Zoom + search stay hidden until the wallpaper is brought forward */
+      .leaflet-control-zoom,
+      .leaflet-control-geocoder {
+        display: none;
+      }
+      body.controls .leaflet-control-zoom,
+      body.controls .leaflet-control-geocoder {
+        display: block;
+      }
     </style>
   </head>
   <body>
@@ -156,6 +165,7 @@
       let shown = false;
       function setShown(value) {
         shown = value;
+        document.body.classList.toggle('controls', value);
         window.parent.postMessage(
           {type: 'shaderwall', state: shown ? 'shown' : 'hidden'},
           location.origin
