@@ -216,16 +216,35 @@ function notSupported(reason) {
 }
 
 async function hashPassword(message) {
-  // SHA256 may seem fast
+  // PBKDF2 is part of Web Crypto, so this stays library-free while being a
+  // proper slow password hash rather than a single fast SHA-256.
   let salt = localStorage.getItem('salt');
   if (!salt) {
     salt = crypto.randomUUID();
     localStorage.setItem('salt', salt);
   }
-  const msgUint8 = new TextEncoder().encode(salt + message + salt); // encode as (utf-8) Uint8Array
-  const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8); // hash the message
-  const hashHex = new Uint8Array(hashBuffer).toHex(); // Convert ArrayBuffer to hex string.
-  return hashHex;
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(message),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode(salt),
+      iterations: 600000, // OWASP 2023 floor for PBKDF2-HMAC-SHA256
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    256
+  );
+  // Portable hex (Uint8Array.toHex() is too new to rely on), like checkHibpApi.
+  return Array.from(new Uint8Array(bits))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 themes.onchange = async () => {
