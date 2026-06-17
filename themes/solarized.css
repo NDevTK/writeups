@@ -267,3 +267,13 @@ textarea {
 .markdown-body > *:last-child {
   margin-bottom: 0 !important;
 }
+
+/* Match Primer's .markdown-body specificity so the theme's own code
+   background wins over the bundled GitHub markdown stylesheet. */
+.markdown-body pre,
+.markdown-body .highlight pre {
+  background-color: #073642;
+}
+.markdown-body code {
+  background-color: #073642;
+}

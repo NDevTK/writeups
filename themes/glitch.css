@@ -324,3 +324,13 @@ body {
     animation: none;
   }
 }
+
+/* Match Primer's .markdown-body specificity so the theme's own code
+   background wins over the bundled GitHub markdown stylesheet. */
+.markdown-body pre,
+.markdown-body .highlight pre {
+  background-color: #1a1a1a;
+}
+.markdown-body code {
+  background-color: #2a2a2a;
+}

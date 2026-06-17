@@ -194,3 +194,13 @@ textarea {
   background: #ff7f50;
   color: #072428;
 }
+
+/* Match Primer's .markdown-body specificity so the theme's own code
+   background wins over the bundled GitHub markdown stylesheet. */
+.markdown-body pre,
+.markdown-body .highlight pre {
+  background-color: #072428;
+}
+.markdown-body code {
+  background-color: #072428;
+}

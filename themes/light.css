@@ -192,3 +192,13 @@ pre code {
   /* max-width: 800px; */
   /* margin: 0 auto; */
 }
+
+/* Match Primer's .markdown-body specificity so the theme's own code
+   background wins over the bundled GitHub markdown stylesheet. */
+.markdown-body pre,
+.markdown-body .highlight pre {
+  background-color: #e9ecef;
+}
+.markdown-body code {
+  background-color: #e9ecef;
+}
