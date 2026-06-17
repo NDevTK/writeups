@@ -118,8 +118,9 @@ async function checkHibpApi(password) {
   const pwnedLines = text.split(/\r?\n/);
 
   for (const line of pwnedLines) {
-    const [returnedSuffix] = line.split(':');
-    if (returnedSuffix === suffix) return true;
+    const [returnedSuffix, count] = line.split(':');
+    // Ignore Add-Padding entries: they are always returned with a count of 0.
+    if (returnedSuffix === suffix) return parseInt(count, 10) > 0;
   }
 
   return false;
