@@ -178,103 +178,102 @@ pre code {
   box-shadow: none;
 }
 
-/* Rouge syntax highlighting (Jekyll default highlighter) */
+/* Rouge syntax highlighting (Jekyll's default highlighter) */
 .highlight,
 .highlight pre,
-.highlight code {
+.highlight code,
+.highlight .n,
+.highlight .nx,
+.highlight .nl,
+.highlight .ni,
+.highlight .nn,
+.highlight .py {
   color: #f3e9ff;
 }
 .highlight .c,
-.highlight .c1,
+.highlight .ch,
 .highlight .cm,
+.highlight .cp,
+.highlight .c1,
+.highlight .cs,
 .highlight .cd {
-  color: #8d7bc0; /* Comments */
+  color: #8d7bc0;
+  font-style: italic;
 }
 .highlight .k,
+.highlight .kc,
 .highlight .kd,
 .highlight .kn,
-.highlight .kc,
-.highlight .kr {
-  color: #fe4450; /* Keywords */
-}
-.highlight .s,
-.highlight .s1,
-.highlight .s2,
-.highlight .sb,
-.highlight .se {
-  color: #fede5d; /* Strings */
-}
-.highlight .mi,
-.highlight .mf,
-.highlight .m,
-.highlight .il {
-  color: #f97e72; /* Numbers */
-}
-.highlight .nf,
-.highlight .nc,
-.highlight .nn,
-.highlight .nb {
-  color: #36f9f6; /* Functions / classes */
-}
-.highlight .nt {
-  color: #fe4450; /* Tags */
-}
-.highlight .na {
-  color: #fede5d; /* Attributes */
-}
-.highlight .o,
-.highlight .ow,
-.highlight .p {
-  color: #ff7edb; /* Operators / punctuation */
-}
-
-/* PrismJS parity (kept consistent with the other themes) */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
-  color: #8d7bc0;
-}
-.token.punctuation {
-  color: #d6d6e7;
-}
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
-  color: #f97e72;
-}
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
-  color: #fede5d;
-}
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
-  color: #ff8b39;
-}
-.token.atrule,
-.token.attr-value,
-.token.keyword {
+.highlight .kp,
+.highlight .kr,
+.highlight .kt {
   color: #fe4450;
 }
-.token.function,
-.token.class-name {
+.highlight .o,
+.highlight .ow {
+  color: #ff7edb;
+}
+.highlight .p,
+.highlight .pi {
+  color: #d6d6e7;
+}
+.highlight .s,
+.highlight .sa,
+.highlight .sb,
+.highlight .sc,
+.highlight .dl,
+.highlight .sd,
+.highlight .s2,
+.highlight .se,
+.highlight .sh,
+.highlight .si,
+.highlight .sx,
+.highlight .sr,
+.highlight .s1,
+.highlight .ss {
+  color: #fede5d;
+}
+.highlight .m,
+.highlight .mb,
+.highlight .mf,
+.highlight .mh,
+.highlight .mi,
+.highlight .mo,
+.highlight .il {
+  color: #f97e72;
+}
+.highlight .nf,
+.highlight .fm {
   color: #36f9f6;
 }
-.token.regex,
-.token.important,
-.token.variable {
+.highlight .nc,
+.highlight .no {
+  color: #36f9f6;
+}
+.highlight .nt {
+  color: #fe4450;
+}
+.highlight .na {
+  color: #fede5d;
+}
+.highlight .nb,
+.highlight .bp {
+  color: #f97e72;
+}
+.highlight .nv,
+.highlight .vc,
+.highlight .vg,
+.highlight .vi {
   color: #ff7edb;
+}
+.highlight .gi {
+  color: #72f1b8;
+}
+.highlight .gd {
+  color: #fe4450;
+}
+.highlight .err {
+  color: #fe4450;
 }
 
 /* Form controls */

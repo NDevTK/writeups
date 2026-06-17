@@ -493,7 +493,108 @@ async function applyTheme() {
     case 'summarizer.css':
       summarizer();
       break;
+    case 'cipher.css':
+      cipher();
+      break;
   }
+}
+
+// Cipher theme: deliver the writeup ROT13-encrypted and let the reader decode
+// each line by clicking it (or the banner to decode everything at once).
+const cipherStore = new WeakMap();
+
+function rot13(string) {
+  return string.replace(/[a-z]/gi, (character) => {
+    const base = character <= 'Z' ? 65 : 97;
+    return String.fromCharCode(
+      ((character.charCodeAt(0) - base + 13) % 26) + base
+    );
+  });
+}
+
+function cipher() {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const BLOCK = 'h1, h2, h3, h4, h5, h6, p, li, blockquote, td, th';
+
+  // Group eligible text nodes (skipping links, code and pre) under their
+  // closest block element so each node is encrypted exactly once.
+  const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.data.trim()) return NodeFilter.FILTER_REJECT;
+      for (
+        let p = node.parentElement;
+        p && p !== content;
+        p = p.parentElement
+      ) {
+        const tag = p.tagName;
+        if (tag === 'A' || tag === 'CODE' || tag === 'PRE')
+          return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+
+  const groups = new Map();
+  let node;
+  while ((node = walker.nextNode())) {
+    const block = node.parentElement && node.parentElement.closest(BLOCK);
+    if (!block) continue;
+    if (!groups.has(block)) groups.set(block, []);
+    groups.get(block).push(node);
+  }
+
+  const locked = [];
+  groups.forEach((nodes, element) => {
+    cipherStore.set(element, {nodes, plain: nodes.map((n) => n.data)});
+    nodes.forEach((n) => (n.data = rot13(n.data)));
+    element.classList.add('cipher-locked');
+    element.addEventListener('click', () => decode(element, reduce));
+    locked.push(element);
+  });
+
+  // Nothing to decode (e.g. the post listing is all links): skip the prompt.
+  if (!locked.length) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'cipher-banner';
+  banner.textContent = '🔒 ROT13 · click a line to decode · or here for all';
+  banner.addEventListener('click', () =>
+    locked.forEach((element) => decode(element, reduce))
+  );
+  document.body.prepend(banner);
+}
+
+function decode(element, reduce) {
+  const record = cipherStore.get(element);
+  if (!record || element.classList.contains('cipher-revealed')) return;
+  element.classList.add('cipher-revealed');
+  element.classList.remove('cipher-locked');
+
+  if (reduce) {
+    record.nodes.forEach((n, i) => (n.data = record.plain[i]));
+    return;
+  }
+
+  // Brief "decrypting" scramble that settles to the plaintext.
+  const glyphs = '!<>-_\\/[]{}=+*^?#abcdef0123456789';
+  const total = 28;
+  record.nodes.forEach((n, i) => {
+    const target = record.plain[i];
+    let frame = 0;
+    const tick = () => {
+      frame += 1;
+      const revealed = Math.floor((frame / total) * target.length);
+      let out = '';
+      for (let j = 0; j < target.length; j++) {
+        if (j < revealed || target[j] === ' ') out += target[j];
+        else out += glyphs[getRandom(glyphs.length)];
+      }
+      n.data = out;
+      if (frame < total) requestAnimationFrame(tick);
+      else n.data = target;
+    };
+    requestAnimationFrame(tick);
+  });
 }
 
 applyTheme();

@@ -189,60 +189,102 @@ code {
   border-radius: 2px;
 }
 
-/* Syntax Highlighting (Glitch-themed) */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
-  color: #666666; /* Muted gray for comments */
+/* Rouge syntax highlighting (Jekyll's default highlighter) */
+.highlight,
+.highlight pre,
+.highlight code,
+.highlight .n,
+.highlight .nx,
+.highlight .nl,
+.highlight .ni,
+.highlight .nn,
+.highlight .py {
+  color: #d0d0d0;
 }
-
-.token.punctuation {
-  color: #cccccc; /* Default text color */
+.highlight .c,
+.highlight .ch,
+.highlight .cm,
+.highlight .cp,
+.highlight .c1,
+.highlight .cs,
+.highlight .cd {
+  color: #666666;
+  font-style: italic;
 }
-
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
-  color: #ff00ff; /* Magenta */
+.highlight .k,
+.highlight .kc,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt {
+  color: #ffff00;
 }
-
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
-  color: #39ff14; /* Lime Green */
+.highlight .o,
+.highlight .ow {
+  color: #00ffff;
 }
-
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
-  color: #00ffff; /* Electric Blue */
+.highlight .p,
+.highlight .pi {
+  color: #cccccc;
 }
-
-.token.atrule,
-.token.attr-value,
-.token.keyword {
-  color: #ffff00; /* Yellow - another contrasting glitch color */
+.highlight .s,
+.highlight .sa,
+.highlight .sb,
+.highlight .sc,
+.highlight .dl,
+.highlight .sd,
+.highlight .s2,
+.highlight .se,
+.highlight .sh,
+.highlight .si,
+.highlight .sx,
+.highlight .sr,
+.highlight .s1,
+.highlight .ss {
+  color: #39ff14;
 }
-
-.token.function,
-.token.class-name {
-  color: #ff8c00; /* Orange - for variety */
+.highlight .m,
+.highlight .mb,
+.highlight .mf,
+.highlight .mh,
+.highlight .mi,
+.highlight .mo,
+.highlight .il {
+  color: #ff00ff;
 }
-
-.token.regex,
-.token.important,
-.token.variable {
-  color: #f0f; /* Re-use Magenta or another distinct color */
+.highlight .nf,
+.highlight .fm {
+  color: #ff8c00;
+}
+.highlight .nc,
+.highlight .no {
+  color: #ff8c00;
+}
+.highlight .nt {
+  color: #ff00ff;
+}
+.highlight .na {
+  color: #39ff14;
+}
+.highlight .nb,
+.highlight .bp {
+  color: #39ff14;
+}
+.highlight .nv,
+.highlight .vc,
+.highlight .vg,
+.highlight .vi {
+  color: #ff00ff;
+}
+.highlight .gi {
+  color: #39ff14;
+}
+.highlight .gd {
+  color: #ff00ff;
+}
+.highlight .err {
+  color: #ff00ff;
 }
 
 /* Ensure no default browser styles interfere too much */
@@ -265,10 +307,6 @@ textarea {
 
 .markdown-body > *:last-child {
   margin-bottom: 0 !important;
-}
-
-.highlight {
-  color: black;
 }
 
 body {

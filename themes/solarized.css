@@ -143,107 +143,102 @@ pre code {
   padding: 0;
 }
 
-/* Rouge syntax highlighting (Jekyll default highlighter) */
+/* Rouge syntax highlighting (Jekyll's default highlighter) */
 .highlight,
 .highlight pre,
-.highlight code {
+.highlight code,
+.highlight .n,
+.highlight .nx,
+.highlight .nl,
+.highlight .ni,
+.highlight .nn,
+.highlight .py {
   color: #93a1a1;
 }
 .highlight .c,
-.highlight .c1,
+.highlight .ch,
 .highlight .cm,
+.highlight .cp,
+.highlight .c1,
+.highlight .cs,
 .highlight .cd {
-  color: #586e75; /* Comments -- base01 */
-  font-style: italic;
-}
-.highlight .k,
-.highlight .kd,
-.highlight .kn,
-.highlight .kc,
-.highlight .kr {
-  color: #859900; /* Keywords -- green */
-}
-.highlight .s,
-.highlight .s1,
-.highlight .s2,
-.highlight .sb,
-.highlight .se {
-  color: #2aa198; /* Strings -- cyan */
-}
-.highlight .mi,
-.highlight .mf,
-.highlight .m,
-.highlight .il {
-  color: #d33682; /* Numbers -- magenta */
-}
-.highlight .nf,
-.highlight .nc,
-.highlight .nn,
-.highlight .nb {
-  color: #268bd2; /* Functions / builtins -- blue */
-}
-.highlight .nt {
-  color: #268bd2; /* Tags */
-}
-.highlight .na {
-  color: #b58900; /* Attributes -- yellow */
-}
-.highlight .o,
-.highlight .ow {
-  color: #859900; /* Operators -- green */
-}
-.highlight .err {
-  color: #dc322f; /* Errors -- red */
-}
-
-/* PrismJS parity (kept consistent with the other themes) */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
   color: #586e75;
   font-style: italic;
 }
-.token.punctuation {
+.highlight .k,
+.highlight .kc,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt {
+  color: #859900;
+}
+.highlight .o,
+.highlight .ow {
+  color: #859900;
+}
+.highlight .p,
+.highlight .pi {
   color: #839496;
 }
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
-  color: #d33682;
-}
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
+.highlight .s,
+.highlight .sa,
+.highlight .sb,
+.highlight .sc,
+.highlight .dl,
+.highlight .sd,
+.highlight .s2,
+.highlight .se,
+.highlight .sh,
+.highlight .si,
+.highlight .sx,
+.highlight .sr,
+.highlight .s1,
+.highlight .ss {
   color: #2aa198;
 }
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
-  color: #859900;
+.highlight .m,
+.highlight .mb,
+.highlight .mf,
+.highlight .mh,
+.highlight .mi,
+.highlight .mo,
+.highlight .il {
+  color: #d33682;
 }
-.token.atrule,
-.token.attr-value,
-.token.keyword {
-  color: #859900;
-}
-.token.function,
-.token.class-name {
+.highlight .nf,
+.highlight .fm {
   color: #268bd2;
 }
-.token.regex,
-.token.important,
-.token.variable {
+.highlight .nc,
+.highlight .no {
+  color: #268bd2;
+}
+.highlight .nt {
+  color: #268bd2;
+}
+.highlight .na {
   color: #b58900;
+}
+.highlight .nb,
+.highlight .bp {
+  color: #268bd2;
+}
+.highlight .nv,
+.highlight .vc,
+.highlight .vg,
+.highlight .vi {
+  color: #b58900;
+}
+.highlight .gi {
+  color: #859900;
+}
+.highlight .gd {
+  color: #dc322f;
+}
+.highlight .err {
+  color: #dc322f;
 }
 
 /* Form controls */

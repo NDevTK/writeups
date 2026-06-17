@@ -161,65 +161,102 @@ pre code {
   box-shadow: none;
 }
 
-/* Basic Syntax Highlighting (optional, can be expanded) */
-/* Using common cyberpunk colors */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
-  color: #6a6a7e; /* Muted gray for comments */
+/* Rouge syntax highlighting (Jekyll's default highlighter) */
+.highlight,
+.highlight pre,
+.highlight code,
+.highlight .n,
+.highlight .nx,
+.highlight .nl,
+.highlight .ni,
+.highlight .nn,
+.highlight .py {
+  color: #d0d0d0;
 }
-
-.token.punctuation {
-  color: #c0c0c0; /* Default text color */
+.highlight .c,
+.highlight .ch,
+.highlight .cm,
+.highlight .cp,
+.highlight .c1,
+.highlight .cs,
+.highlight .cd {
+  color: #6a6a7e;
+  font-style: italic;
 }
-
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
-  color: #ff4f81; /* Neon Pink/Red variant */
+.highlight .k,
+.highlight .kc,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt {
+  color: #8be9fd;
 }
-
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
-  color: #50fa7b; /* Bright Green (similar to Lime) */
+.highlight .o,
+.highlight .ow {
+  color: #ff8c00;
 }
-
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
-  color: #ff8c00; /* Bright Orange */
+.highlight .p,
+.highlight .pi {
+  color: #c0c0c0;
 }
-
-.token.atrule,
-.token.attr-value,
-.token.keyword {
-  color: #8be9fd; /* Light Cyan/Blue */
+.highlight .s,
+.highlight .sa,
+.highlight .sb,
+.highlight .sc,
+.highlight .dl,
+.highlight .sd,
+.highlight .s2,
+.highlight .se,
+.highlight .sh,
+.highlight .si,
+.highlight .sx,
+.highlight .sr,
+.highlight .s1,
+.highlight .ss {
+  color: #50fa7b;
 }
-
-.token.function,
-.token.class-name {
-  color: #bd93f9; /* Light Purple/Violet */
+.highlight .m,
+.highlight .mb,
+.highlight .mf,
+.highlight .mh,
+.highlight .mi,
+.highlight .mo,
+.highlight .il {
+  color: #ff4f81;
 }
-
-.token.regex,
-.token.important,
-.token.variable {
-  color: #ffb86c; /* Orange/Yellow variant */
+.highlight .nf,
+.highlight .fm {
+  color: #bd93f9;
 }
-
-.highlight {
-  color: black;
+.highlight .nc,
+.highlight .no {
+  color: #bd93f9;
+}
+.highlight .nt {
+  color: #ff4f81;
+}
+.highlight .na {
+  color: #50fa7b;
+}
+.highlight .nb,
+.highlight .bp {
+  color: #50fa7b;
+}
+.highlight .nv,
+.highlight .vc,
+.highlight .vg,
+.highlight .vi {
+  color: #ffb86c;
+}
+.highlight .gi {
+  color: #50fa7b;
+}
+.highlight .gd {
+  color: #ff4f81;
+}
+.highlight .err {
+  color: #ff4f81;
 }
 
 /* Optional: Glitch effect on h1 hover - use with caution */

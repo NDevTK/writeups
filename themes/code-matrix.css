@@ -145,76 +145,102 @@ pre code {
   text-shadow: inherit; /* Inherit text shadow from pre */
 }
 
-/* Basic Syntax Highlighting (Matrix-themed) */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
-  color: #008820; /* Dim, dark green for comments */
-  text-shadow: none;
+/* Rouge syntax highlighting (Jekyll's default highlighter) */
+.highlight,
+.highlight pre,
+.highlight code,
+.highlight .n,
+.highlight .nx,
+.highlight .nl,
+.highlight .ni,
+.highlight .nn,
+.highlight .py {
+  color: #39ff14;
 }
-
-.token.punctuation {
-  color: #00ff41; /* Main green */
+.highlight .c,
+.highlight .ch,
+.highlight .cm,
+.highlight .cp,
+.highlight .c1,
+.highlight .cs,
+.highlight .cd {
+  color: #008820;
+  font-style: italic;
 }
-
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
-  color: #ffb800; /* Amber */
-  text-shadow:
-    0 0 2px #ffb800,
-    0 0 4px rgba(255, 184, 0, 0.4);
+.highlight .k,
+.highlight .kc,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt {
+  color: #ff00ff;
 }
-
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
-  color: #00ffff; /* Cyan */
-  text-shadow:
-    0 0 2px #00ffff,
-    0 0 4px rgba(0, 255, 255, 0.4);
+.highlight .o,
+.highlight .ow {
+  color: #39ff14;
 }
-
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
-  color: #39ff14; /* Bright Green */
+.highlight .p,
+.highlight .pi {
+  color: #00ff41;
 }
-
-.token.atrule,
-.token.attr-value,
-.token.keyword {
-  color: #f0f; /* Neon Magenta/Fuchsia */
-  text-shadow:
-    0 0 2px #f0f,
-    0 0 4px rgba(255, 0, 255, 0.4);
+.highlight .s,
+.highlight .sa,
+.highlight .sb,
+.highlight .sc,
+.highlight .dl,
+.highlight .sd,
+.highlight .s2,
+.highlight .se,
+.highlight .sh,
+.highlight .si,
+.highlight .sx,
+.highlight .sr,
+.highlight .s1,
+.highlight .ss {
+  color: #00ffff;
 }
-
-.token.function,
-.token.class-name {
-  color: #ffff00; /* Neon Yellow */
-  text-shadow:
-    0 0 2px #ffff00,
-    0 0 4px rgba(255, 255, 0, 0.4);
+.highlight .m,
+.highlight .mb,
+.highlight .mf,
+.highlight .mh,
+.highlight .mi,
+.highlight .mo,
+.highlight .il {
+  color: #ffb800;
 }
-
-.token.regex,
-.token.important,
-.token.variable {
-  color: #ff6000; /* Bright Orange */
-  text-shadow:
-    0 0 2px #ff6000,
-    0 0 4px rgba(255, 96, 0, 0.4);
+.highlight .nf,
+.highlight .fm {
+  color: #ffff00;
+}
+.highlight .nc,
+.highlight .no {
+  color: #ffff00;
+}
+.highlight .nt {
+  color: #ffb800;
+}
+.highlight .na {
+  color: #00ffff;
+}
+.highlight .nb,
+.highlight .bp {
+  color: #00ffff;
+}
+.highlight .nv,
+.highlight .vc,
+.highlight .vg,
+.highlight .vi {
+  color: #ff6000;
+}
+.highlight .gi {
+  color: #00ffff;
+}
+.highlight .gd {
+  color: #ff6000;
+}
+.highlight .err {
+  color: #ff6000;
 }
 
 /* Ensure no default browser styles interfere too much */
@@ -237,10 +263,6 @@ textarea {
 
 .markdown-body > *:last-child {
   margin-bottom: 0 !important;
-}
-
-.highlight {
-  color: black;
 }
 
 body {

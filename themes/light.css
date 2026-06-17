@@ -88,60 +88,101 @@ pre code {
   border-radius: 0;
 }
 
-/* Basic Syntax Highlighting (optional, can be expanded) */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
-  color: #6c757d; /* Gray for comments */
+/* Rouge syntax highlighting (Jekyll's default highlighter) */
+.highlight,
+.highlight pre,
+.highlight code,
+.highlight .n,
+.highlight .nx,
+.highlight .nl,
+.highlight .ni,
+.highlight .nn,
+.highlight .py {
+  color: #212529;
 }
-
-.token.punctuation {
-  color: #212529; /* Default text color for punctuation */
+.highlight .c,
+.highlight .ch,
+.highlight .cm,
+.highlight .cp,
+.highlight .c1,
+.highlight .cs,
+.highlight .cd {
+  color: #6c757d;
 }
-
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
-  color: #dc3545; /* Red for properties, tags, etc. */
+.highlight .k,
+.highlight .kc,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt {
+  color: #007bff;
 }
-
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
-  color: #28a745; /* Green for selectors, strings, etc. */
+.highlight .o,
+.highlight .ow {
+  color: #fd7e14;
 }
-
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
-  color: #fd7e14; /* Orange for operators, entities, etc. */
+.highlight .p,
+.highlight .pi {
+  color: #212529;
 }
-
-.token.atrule,
-.token.attr-value,
-.token.keyword {
-  color: #007bff; /* Blue for at-rules, keywords */
+.highlight .s,
+.highlight .sa,
+.highlight .sb,
+.highlight .sc,
+.highlight .dl,
+.highlight .sd,
+.highlight .s2,
+.highlight .se,
+.highlight .sh,
+.highlight .si,
+.highlight .sx,
+.highlight .sr,
+.highlight .s1,
+.highlight .ss {
+  color: #28a745;
 }
-
-.token.function,
-.token.class-name {
-  color: #6f42c1; /* Purple for functions, class names */
+.highlight .m,
+.highlight .mb,
+.highlight .mf,
+.highlight .mh,
+.highlight .mi,
+.highlight .mo,
+.highlight .il {
+  color: #dc3545;
 }
-
-.token.regex,
-.token.important,
-.token.variable {
-  color: #e83e8c; /* Pink for regex, important, variables */
+.highlight .nf,
+.highlight .fm {
+  color: #6f42c1;
+}
+.highlight .nc,
+.highlight .no {
+  color: #6f42c1;
+}
+.highlight .nt {
+  color: #dc3545;
+}
+.highlight .na {
+  color: #28a745;
+}
+.highlight .nb,
+.highlight .bp {
+  color: #28a745;
+}
+.highlight .nv,
+.highlight .vc,
+.highlight .vg,
+.highlight .vi {
+  color: #e83e8c;
+}
+.highlight .gi {
+  color: #28a745;
+}
+.highlight .gd {
+  color: #dc3545;
+}
+.highlight .err {
+  color: #e83e8c;
 }
 
 /* Styles for .markdown-body if needed, but general styles above should cover most cases */

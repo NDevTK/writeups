@@ -1,0 +1,253 @@
+/* Theme Name: Cipher */
+
+/* Overall Feel: an intercepted transmission -- the writeup arrives ROT13
+   encrypted in phosphor green; click any line to decode it. */
+
+.markdown-body {
+  background-color: #0a0e0a;
+  color: #4be36a;
+  font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+  font-size: 16px;
+  line-height: 1.75;
+  padding: 2em;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #8affa0;
+  font-weight: 700;
+}
+
+/* Links stay decrypted so the page remains navigable */
+a {
+  color: #36c9ff;
+  text-decoration: underline;
+}
+
+a:hover,
+a:focus {
+  color: #9be8ff;
+}
+
+/* Encrypted lines: clearly interactive */
+.cipher-locked {
+  cursor: pointer;
+  color: #2f9b48;
+  text-shadow: 0 0 4px rgba(75, 227, 106, 0.35);
+  text-decoration: underline dotted rgba(75, 227, 106, 0.4);
+  text-underline-offset: 3px;
+  transition: color 0.2s ease;
+}
+
+.cipher-locked:hover {
+  color: #7dffa0;
+}
+
+/* Decoded lines settle to a brighter, calmer green */
+.cipher-revealed {
+  color: #d7ffe2;
+  text-shadow: none;
+}
+
+blockquote {
+  border-left: 3px solid #2f9b48;
+  background: rgba(20, 40, 24, 0.4);
+  padding: 0.6em 1.2em;
+  margin: 1.5em 0;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background: #2f9b48;
+  margin: 2.5em 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+}
+
+th,
+td {
+  border: 1px solid #1f5f32;
+  padding: 0.5em 0.8em;
+  text-align: left;
+}
+
+/* Code is never encrypted, so keep it readable */
+pre,
+code {
+  font-family: inherit;
+  font-size: 0.95em;
+}
+
+pre {
+  background: #06140a;
+  border: 1px solid #1f5f32;
+  border-radius: 4px;
+  padding: 1em;
+  overflow-x: auto;
+  color: #c6f7d4;
+}
+
+code {
+  background: #06140a;
+  color: #8affa0;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+/* Rouge syntax highlighting (Jekyll's default highlighter) */
+.highlight,
+.highlight pre,
+.highlight code,
+.highlight .n,
+.highlight .nx,
+.highlight .nl,
+.highlight .ni,
+.highlight .nn,
+.highlight .py {
+  color: #c6f7d4;
+}
+.highlight .c,
+.highlight .ch,
+.highlight .cm,
+.highlight .cp,
+.highlight .c1,
+.highlight .cs,
+.highlight .cd {
+  color: #4f8a5f;
+  font-style: italic;
+}
+.highlight .k,
+.highlight .kc,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt {
+  color: #36c9ff;
+}
+.highlight .o,
+.highlight .ow {
+  color: #8affa0;
+}
+.highlight .p,
+.highlight .pi {
+  color: #8fbf9c;
+}
+.highlight .s,
+.highlight .sa,
+.highlight .sb,
+.highlight .sc,
+.highlight .dl,
+.highlight .sd,
+.highlight .s2,
+.highlight .se,
+.highlight .sh,
+.highlight .si,
+.highlight .sx,
+.highlight .sr,
+.highlight .s1,
+.highlight .ss {
+  color: #e3ff9b;
+}
+.highlight .m,
+.highlight .mb,
+.highlight .mf,
+.highlight .mh,
+.highlight .mi,
+.highlight .mo,
+.highlight .il {
+  color: #ffd479;
+}
+.highlight .nf,
+.highlight .fm {
+  color: #9be8ff;
+}
+.highlight .nc,
+.highlight .no {
+  color: #9be8ff;
+}
+.highlight .nt {
+  color: #36c9ff;
+}
+.highlight .na {
+  color: #e3ff9b;
+}
+.highlight .nb,
+.highlight .bp {
+  color: #8affa0;
+}
+.highlight .nv,
+.highlight .vc,
+.highlight .vg,
+.highlight .vi {
+  color: #ff9b9b;
+}
+.highlight .gi {
+  color: #8affa0;
+}
+.highlight .gd {
+  color: #ff9b9b;
+}
+.highlight .err {
+  color: #ff6b6b;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  background: #06140a;
+  color: #4be36a;
+  border: 1px solid #1f5f32;
+}
+
+::selection {
+  background: #4be36a;
+  color: #06140a;
+}
+
+/* Decode prompt */
+#cipher-banner {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 2147483647;
+  cursor: pointer;
+  pointer-events: auto;
+  background: rgba(6, 20, 10, 0.85);
+  color: #7dffa0;
+  border: 1px solid #1f5f32;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.markdown-body > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0 !important;
+}

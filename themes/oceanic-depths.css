@@ -80,64 +80,102 @@ code {
   font-family: 'Courier New', Courier, monospace;
 }
 
-/* Basic syntax highlighting placeholders */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
-  color: #6a9955; /* Green */
+/* Rouge syntax highlighting (Jekyll's default highlighter) */
+.highlight,
+.highlight pre,
+.highlight code,
+.highlight .n,
+.highlight .nx,
+.highlight .nl,
+.highlight .ni,
+.highlight .nn,
+.highlight .py {
+  color: #c0e0e0;
 }
-
-.token.punctuation {
-  color: #d4d4d4; /* Light gray */
+.highlight .c,
+.highlight .ch,
+.highlight .cm,
+.highlight .cp,
+.highlight .c1,
+.highlight .cs,
+.highlight .cd {
+  color: #6a9955;
+  font-style: italic;
 }
-
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
-  color: #569cd6; /* Blue */
+.highlight .k,
+.highlight .kc,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt {
+  color: #c586c0;
 }
-
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
-  color: #ce9178; /* Orange/Coral */
+.highlight .o,
+.highlight .ow {
+  color: #dcdcaa;
 }
-
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
-  color: #dcdcaa; /* Yellow */
+.highlight .p,
+.highlight .pi {
+  color: #d4d4d4;
 }
-
-.token.atrule,
-.token.attr-value,
-.token.keyword {
-  color: #c586c0; /* Purple */
+.highlight .s,
+.highlight .sa,
+.highlight .sb,
+.highlight .sc,
+.highlight .dl,
+.highlight .sd,
+.highlight .s2,
+.highlight .se,
+.highlight .sh,
+.highlight .si,
+.highlight .sx,
+.highlight .sr,
+.highlight .s1,
+.highlight .ss {
+  color: #ce9178;
 }
-
-.token.function,
-.token.class-name {
-  color: #4ec9b0; /* Teal */
+.highlight .m,
+.highlight .mb,
+.highlight .mf,
+.highlight .mh,
+.highlight .mi,
+.highlight .mo,
+.highlight .il {
+  color: #569cd6;
 }
-
-.token.regex,
-.token.important,
-.token.variable {
-  color: #d16969; /* Reddish */
+.highlight .nf,
+.highlight .fm {
+  color: #4ec9b0;
 }
-
-.highlight span {
-  color: purple;
+.highlight .nc,
+.highlight .no {
+  color: #4ec9b0;
+}
+.highlight .nt {
+  color: #569cd6;
+}
+.highlight .na {
+  color: #9cdcfe;
+}
+.highlight .nb,
+.highlight .bp {
+  color: #4ec9b0;
+}
+.highlight .nv,
+.highlight .vc,
+.highlight .vg,
+.highlight .vi {
+  color: #d16969;
+}
+.highlight .gi {
+  color: #6a9955;
+}
+.highlight .gd {
+  color: #d16969;
+}
+.highlight .err {
+  color: #d16969;
 }
 
 button,

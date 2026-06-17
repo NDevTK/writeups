@@ -179,61 +179,101 @@ pre code {
   border: none;
 }
 
-/* Basic Syntax Highlighting */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
-  color: #5080a0; /* Muted blue-gray for comments */
+/* Rouge syntax highlighting (Jekyll's default highlighter) */
+.highlight,
+.highlight pre,
+.highlight code,
+.highlight .n,
+.highlight .nx,
+.highlight .nl,
+.highlight .ni,
+.highlight .nn,
+.highlight .py {
+  color: #002244;
 }
-
-.token.punctuation {
-  color: #345678; /* Dark gray-blue */
+.highlight .c,
+.highlight .ch,
+.highlight .cm,
+.highlight .cp,
+.highlight .c1,
+.highlight .cs,
+.highlight .cd {
+  color: #5080a0;
 }
-
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
-  color: #00529b; /* Primary blueprint blue */
+.highlight .k,
+.highlight .kc,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt {
+  color: #002244;
 }
-
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
-  color: #0066cc; /* Link blue */
+.highlight .o,
+.highlight .ow {
+  color: #004080;
 }
-
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
-  color: #004080; /* Darker blue */
+.highlight .p,
+.highlight .pi {
+  color: #345678;
 }
-
-.token.atrule,
-.token.attr-value,
-.token.keyword {
-  color: #002244; /* Main text dark blue */
-  font-weight: bold;
+.highlight .s,
+.highlight .sa,
+.highlight .sb,
+.highlight .sc,
+.highlight .dl,
+.highlight .sd,
+.highlight .s2,
+.highlight .se,
+.highlight .sh,
+.highlight .si,
+.highlight .sx,
+.highlight .sr,
+.highlight .s1,
+.highlight .ss {
+  color: #0066cc;
 }
-
-.token.function,
-.token.class-name {
-  color: #105cb6; /* Adjusted for better contrast (was #3273dc) */
+.highlight .m,
+.highlight .mb,
+.highlight .mf,
+.highlight .mh,
+.highlight .mi,
+.highlight .mo,
+.highlight .il {
+  color: #00529b;
 }
-
-.token.regex,
-.token.important,
-.token.variable {
-  color: #c00000; /* Muted red for "markup" */
+.highlight .nf,
+.highlight .fm {
+  color: #105cb6;
+}
+.highlight .nc,
+.highlight .no {
+  color: #105cb6;
+}
+.highlight .nt {
+  color: #00529b;
+}
+.highlight .na {
+  color: #0066cc;
+}
+.highlight .nb,
+.highlight .bp {
+  color: #0066cc;
+}
+.highlight .nv,
+.highlight .vc,
+.highlight .vg,
+.highlight .vi {
+  color: #c00000;
+}
+.highlight .gi {
+  color: #0066cc;
+}
+.highlight .gd {
+  color: #c00000;
+}
+.highlight .err {
+  color: #c00000;
 }
 
 /* Ensure no default browser styles interfere too much */

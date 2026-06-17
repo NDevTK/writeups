@@ -174,55 +174,102 @@ pre code {
   padding: 0;
 }
 
-/* PrismJS parity (kept consistent with the other themes) */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
+/* Rouge syntax highlighting (Jekyll's default highlighter) */
+.highlight,
+.highlight pre,
+.highlight code,
+.highlight .n,
+.highlight .nx,
+.highlight .nl,
+.highlight .ni,
+.highlight .nn,
+.highlight .py {
+  color: #1c1b18;
+}
+.highlight .c,
+.highlight .ch,
+.highlight .cm,
+.highlight .cp,
+.highlight .c1,
+.highlight .cs,
+.highlight .cd {
   color: #6f6a5b;
   font-style: italic;
 }
-.token.punctuation {
+.highlight .k,
+.highlight .kc,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt {
+  color: #5a1717;
+}
+.highlight .o,
+.highlight .ow {
+  color: #1c1b18;
+}
+.highlight .p,
+.highlight .pi {
   color: #444444;
 }
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
-  color: #6b1d1d;
-}
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
+.highlight .s,
+.highlight .sa,
+.highlight .sb,
+.highlight .sc,
+.highlight .dl,
+.highlight .sd,
+.highlight .s2,
+.highlight .se,
+.highlight .sh,
+.highlight .si,
+.highlight .sx,
+.highlight .sr,
+.highlight .s1,
+.highlight .ss {
   color: #2f5233;
 }
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
-  color: #1c1b18;
+.highlight .m,
+.highlight .mb,
+.highlight .mf,
+.highlight .mh,
+.highlight .mi,
+.highlight .mo,
+.highlight .il {
+  color: #6b1d1d;
 }
-.token.atrule,
-.token.attr-value,
-.token.keyword {
-  color: #1c1b18;
-  font-weight: bold;
-}
-.token.function,
-.token.class-name {
+.highlight .nf,
+.highlight .fm {
   color: #34435e;
 }
-.token.regex,
-.token.important,
-.token.variable {
+.highlight .nc,
+.highlight .no {
+  color: #34435e;
+}
+.highlight .nt {
+  color: #5a1717;
+}
+.highlight .na {
   color: #6b1d1d;
+}
+.highlight .nb,
+.highlight .bp {
+  color: #34435e;
+}
+.highlight .nv,
+.highlight .vc,
+.highlight .vg,
+.highlight .vi {
+  color: #6b1d1d;
+}
+.highlight .gi {
+  color: #2f5233;
+}
+.highlight .gd {
+  color: #a00000;
+}
+.highlight .err {
+  color: #a00000;
 }
 
 /* Form controls */

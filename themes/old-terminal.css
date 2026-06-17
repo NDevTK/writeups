@@ -168,10 +168,102 @@ textarea {
   margin-bottom: 0 !important;
 }
 
-.highlight {
-  color: black;
+/* Rouge syntax highlighting (Jekyll's default highlighter) */
+.highlight,
+.highlight pre,
+.highlight code,
+.highlight .n,
+.highlight .nx,
+.highlight .nl,
+.highlight .ni,
+.highlight .nn,
+.highlight .py {
+  color: inherit;
 }
-
+.highlight .c,
+.highlight .ch,
+.highlight .cm,
+.highlight .cp,
+.highlight .c1,
+.highlight .cs,
+.highlight .cd {
+  color: inherit;
+}
+.highlight .k,
+.highlight .kc,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt {
+  color: inherit;
+}
+.highlight .o,
+.highlight .ow {
+  color: inherit;
+}
+.highlight .p,
+.highlight .pi {
+  color: inherit;
+}
+.highlight .s,
+.highlight .sa,
+.highlight .sb,
+.highlight .sc,
+.highlight .dl,
+.highlight .sd,
+.highlight .s2,
+.highlight .se,
+.highlight .sh,
+.highlight .si,
+.highlight .sx,
+.highlight .sr,
+.highlight .s1,
+.highlight .ss {
+  color: inherit;
+}
+.highlight .m,
+.highlight .mb,
+.highlight .mf,
+.highlight .mh,
+.highlight .mi,
+.highlight .mo,
+.highlight .il {
+  color: inherit;
+}
+.highlight .nf,
+.highlight .fm {
+  color: inherit;
+}
+.highlight .nc,
+.highlight .no {
+  color: inherit;
+}
+.highlight .nt {
+  color: inherit;
+}
+.highlight .na {
+  color: inherit;
+}
+.highlight .nb,
+.highlight .bp {
+  color: inherit;
+}
+.highlight .nv,
+.highlight .vc,
+.highlight .vg,
+.highlight .vi {
+  color: inherit;
+}
+.highlight .gi {
+  color: inherit;
+}
+.highlight .gd {
+  color: inherit;
+}
+.highlight .err {
+  color: inherit;
+}
 ::selection {
   color: purple;
   background: white;
