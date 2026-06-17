@@ -2,21 +2,12 @@
 const themes = document.getElementById('themes');
 const info = document.getElementById('info');
 
-// 1. A small set of notoriously common passwords to save API calls.
-// Convert inputs to lowercase before checking against this set.
-const COMMON_PASSWORDS = new Set([
-  '123456',
-  'password',
-  '123456789',
-  '12345',
-  '12345678',
-  'qwerty',
-  'password123',
-  'admin',
-  '111111',
-  'letmein',
-  'welcome'
-]);
+// "Too common" is decided by prevalence in the HIBP corpus, not a static list:
+// a password counted at least this many times is treated as common. In the
+// ParentalControlLock fallback those must NOT carry isPwn, so the obvious
+// guesses can't open the lock. Tunable — for reference, "123456" is ~37M hits,
+// "qwerty123" ~800k, and the long tail drops off fast below here.
+const COMMON_PASSWORD_THRESHOLD = 100000;
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -25,9 +16,13 @@ function sleep(ms) {
 }
 
 /**
- * Checks a password against complexity rules, common dictionaries, and HIBP.
+ * Checks a password against a minimum length and its prevalence in the HIBP
+ * breached-password corpus. No composition rules (per NIST 800-63B): length
+ * plus the breach signal is what actually matters. A count >= the threshold is
+ * "too common"; any non-zero count is a breach. Network-only — no offline
+ * fallback, so it fails closed if HIBP is unreachable.
  * @param {string} password - The plaintext password to evaluate.
- * @returns {Promise<{isValid: boolean, message: string}>}
+ * @returns {Promise<{isValid: boolean, isPwn?: boolean, message: string}>}
  */
 async function evaluatePassword(password) {
   if (!password) {
@@ -37,58 +32,18 @@ async function evaluatePassword(password) {
     };
   }
 
-  // --- TIER 1: Basic Security Requirements ---
+  // --- TIER 1: Length only (no composition rules) ---
   if (password.length < 8) {
     return {
       isValid: false,
       message: 'Password must be at least 8 characters long.'
     };
   }
-  if (!/[A-Z]/.test(password)) {
-    return {
-      isValid: false,
-      message: 'Password must contain at least one uppercase letter.'
-    };
-  }
-  if (!/[a-z]/.test(password)) {
-    return {
-      isValid: false,
-      message: 'Password must contain at least one lowercase letter.'
-    };
-  }
-  if (!/[0-9]/.test(password)) {
-    return {
-      isValid: false,
-      message: 'Password must contain at least one number.'
-    };
-  }
-  // Matches any character that is NOT a word character (a-z, A-Z, 0-9) or underscore
-  if (!/[^a-zA-Z0-9_]/.test(password)) {
-    return {
-      isValid: false,
-      message: 'Password must contain at least one special character.'
-    };
-  }
 
-  // --- TIER 2: Local Dictionary Check ---
-  if (COMMON_PASSWORDS.has(password.toLowerCase())) {
-    return {
-      isValid: false,
-      message: 'This password is too common. Please choose a unique one.'
-    };
-  }
-
-  // --- TIER 3: HIBP Network API Call ---
+  // --- TIER 2: HIBP prevalence (breach count) ---
+  let breachCount;
   try {
-    const isPwned = await checkHibpApi(password);
-    if (isPwned) {
-      return {
-        isValid: false,
-        isPwn: true,
-        message:
-          'This password has appeared in a data breach. Please choose another.'
-      };
-    }
+    breachCount = await checkHibpApi(password);
   } catch (error) {
     return {
       isValid: false,
@@ -96,14 +51,33 @@ async function evaluatePassword(password) {
     };
   }
 
-  // If it survives all checks, it's valid!
+  if (breachCount >= COMMON_PASSWORD_THRESHOLD) {
+    // No isPwn on purpose: the most common passwords must not open the
+    // ParentalControlLock fallback.
+    return {
+      isValid: false,
+      message: 'This password is too common. Please choose a unique one.'
+    };
+  }
+  if (breachCount > 0) {
+    return {
+      isValid: false,
+      isPwn: true,
+      message:
+        'This password has appeared in a data breach. Please choose another.'
+    };
+  }
+
+  // No breaches on record.
   return {isValid: true, message: 'Password seems to be secure.'};
 }
 
 /**
- * Helper function: Checks the password against the HIBP API using k-anonymity.
+ * Looks the password up in HIBP via k-anonymity and returns how many times it
+ * appears in the corpus (0 if not found). Add-Padding rows have a count of 0,
+ * so they contribute nothing.
  * @param {string} password
- * @returns {Promise<boolean>}
+ * @returns {Promise<number>}
  */
 async function checkHibpApi(password) {
   const encoder = new TextEncoder();
@@ -134,25 +108,23 @@ async function checkHibpApi(password) {
   const pwnedLines = text.split(/\r?\n/);
 
   for (const line of pwnedLines) {
-    const [returnedSuffix] = line.split(':');
-    if (returnedSuffix === suffix) return true;
+    const [returnedSuffix, count] = line.split(':');
+    if (returnedSuffix === suffix) return parseInt(count, 10);
   }
 
-  return false;
+  return 0;
 }
 
-// --- Usage Examples ---
+// --- Usage Examples (now driven by the live HIBP count) ---
 // evaluatePassword("weak").then(console.log);
 // -> { isValid: false, message: 'Password must be at least 8 characters long.' }
 
-// evaluatePassword("Password123!").then(console.log);
+// evaluatePassword("password").then(console.log);   // count is well over the threshold
 // -> { isValid: false, message: 'This password is too common. Please choose a unique one.' }
 
-// evaluatePassword("Tr0ub4dor&3").then(console.log);
-// -> { isValid: false, message: 'This password has appeared in a data breach. Please choose another.' }
-
-// evaluatePassword("SuperS3cr3t!Random_Phrase").then(console.log);
-// -> { isValid: true, message: 'Password is secure.' }
+// A long unique passphrase (composition is not required); only a breach hit rejects it:
+// evaluatePassword("a fairly long unique passphrase").then(console.log);
+// -> { isValid: true, message: 'Password seems to be secure.' }  // if its HIBP count is 0
 
 if (theme.endsWith('.html')) {
   var frame = document.createElement('iframe');
@@ -244,16 +216,35 @@ function notSupported(reason) {
 }
 
 async function hashPassword(message) {
-  // SHA256 may seem fast
+  // PBKDF2 is part of Web Crypto, so this stays library-free while being a
+  // proper slow password hash rather than a single fast SHA-256.
   let salt = localStorage.getItem('salt');
   if (!salt) {
     salt = crypto.randomUUID();
     localStorage.setItem('salt', salt);
   }
-  const msgUint8 = new TextEncoder().encode(salt + message + salt); // encode as (utf-8) Uint8Array
-  const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8); // hash the message
-  const hashHex = new Uint8Array(hashBuffer).toHex(); // Convert ArrayBuffer to hex string.
-  return hashHex;
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(message),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode(salt),
+      iterations: 600000, // OWASP 2023 floor for PBKDF2-HMAC-SHA256
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    256
+  );
+  // Portable hex (Uint8Array.toHex() is too new to rely on), like checkHibpApi.
+  return Array.from(new Uint8Array(bits))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 themes.onchange = async () => {
