@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Surveillance</title>
+    <!-- Leaflet from CDN. For production, add SRI integrity hashes to these. -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0b0f14;
+        overflow: hidden;
+        font-family: ui-monospace, 'Consolas', 'Courier New', monospace;
+        color: #d7e6f0;
+      }
+      #map {
+        position: fixed;
+        inset: 0;
+      }
+      .leaflet-container {
+        background: #0b0f14;
+      }
+      #panel {
+        position: fixed;
+        left: 16px;
+        bottom: 16px;
+        max-width: 330px;
+        z-index: 1000;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgba(8, 14, 20, 0.82);
+        border: 1px solid rgba(120, 200, 255, 0.25);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        font-size: 12.5px;
+        line-height: 1.55;
+      }
+      #panel h2 {
+        margin: 0 0 6px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #ff7676;
+      }
+      #panel b {
+        color: #8ad0ff;
+      }
+      #panel .muted {
+        color: rgba(215, 230, 240, 0.6);
+        font-size: 11px;
+      }
+      #panel .cam {
+        color: #ffd166;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="panel">
+      <h2>📍 A website just located you</h2>
+      <div id="info">Locating you by IP…</div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      'use strict';
+
+      // HTML-escape anything that comes from a third party before it touches the DOM.
+      function esc(value) {
+        return String(value == null ? '' : value).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              '&': '&amp;',
+              '<': '&lt;',
+              '>': '&gt;',
+              '"': '&quot;',
+              "'": '&#39;'
+            })[c]
+        );
+      }
+
+      const info = document.getElementById('info');
+      const RADIUS = 2000; // metres to scan for cameras
+
+      const map = L.map('map', {
+        zoomControl: true,
+        attributionControl: true
+      }).setView([25, 0], 2);
+      L.tileLayer(
+        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        {
+          subdomains: 'abcd',
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        }
+      ).addTo(map);
+
+      async function locate() {
+        let g = {};
+        let lat;
+        let lon;
+        try {
+          const res = await fetch('https://get.geojs.io/v1/ip/geo.json', {
+            credentials: 'omit'
+          });
+          g = await res.json();
+          lat = parseFloat(g.latitude);
+          lon = parseFloat(g.longitude);
+        } catch (e) {
+          /* fall through to the not-found message */
+        }
+
+        if (!isFinite(lat) || !isFinite(lon)) {
+          info.textContent =
+            'Could not geolocate your IP (request blocked, or no network).';
+          return;
+        }
+
+        map.setView([lat, lon], 15);
+        // A fuzzy ring as an honest reminder that IP geolocation is approximate.
+        L.circle([lat, lon], {
+          radius: 1200,
+          color: '#8ad0ff',
+          weight: 1,
+          fillColor: '#8ad0ff',
+          fillOpacity: 0.07
+        }).addTo(map);
+        L.circleMarker([lat, lon], {
+          radius: 7,
+          color: '#8ad0ff',
+          weight: 2,
+          fillColor: '#1f6feb',
+          fillOpacity: 0.9
+        })
+          .addTo(map)
+          .bindPopup('You — approximate, from your IP');
+
+        const org = g.organization_name || g.organization || 'unknown network';
+        const asn = g.asn ? ' · AS' + esc(g.asn) : '';
+        info.innerHTML =
+          'Approx <b>' +
+          esc(g.city || '?') +
+          ', ' +
+          esc(g.country || '?') +
+          '</b><br>via IP <b>' +
+          esc(g.ip) +
+          '</b><br><span class="muted">' +
+          esc(org) +
+          asn +
+          '</span><br><span id="cams" class="cam">Scanning OpenStreetMap…</span>' +
+          '<br><span class="muted">IP-based &amp; approximate. No cookies, nothing stored.</span>';
+
+        cameras(lat, lon);
+      }
+
+      async function cameras(lat, lon) {
+        const query =
+          '[out:json][timeout:25];node["man_made"="surveillance"](around:' +
+          RADIUS +
+          ',' +
+          lat +
+          ',' +
+          lon +
+          ');out body 400;';
+        let data;
+        try {
+          const res = await fetch(
+            'https://overpass-api.de/api/interpreter?data=' +
+              encodeURIComponent(query),
+            {credentials: 'omit'}
+          );
+          data = await res.json();
+        } catch (e) {
+          const el = document.getElementById('cams');
+          if (el) el.textContent = 'Overpass unreachable.';
+          return;
+        }
+
+        const cams = (data.elements || []).filter((n) => n.lat && n.lon);
+        cams.forEach((n) => {
+          const kind = n.tags && n.tags['surveillance:type'];
+          L.circleMarker([n.lat, n.lon], {
+            radius: 4,
+            color: '#ff5f5f',
+            weight: 1,
+            fillColor: '#ffd166',
+            fillOpacity: 0.85
+          })
+            .addTo(map)
+            .bindPopup(
+              '📷 Surveillance camera' + (kind ? ' (' + esc(kind) + ')' : '')
+            );
+        });
+
+        const el = document.getElementById('cams');
+        if (el) {
+          el.innerHTML =
+            '📷 <b>' +
+            cams.length +
+            '</b> surveillance camera' +
+            (cams.length === 1 ? '' : 's') +
+            ' mapped within ' +
+            RADIUS / 1000 +
+            ' km';
+        }
+      }
+
+      locate();
+
+      // ---------- Host bridge (shaderwall protocol) ----------
+      let shown = false;
+      function setShown(value) {
+        shown = value;
+        window.parent.postMessage(
+          {type: 'shaderwall', state: shown ? 'shown' : 'hidden'},
+          location.origin
+        );
+        setTimeout(() => map.invalidateSize(), 60);
+      }
+      addEventListener('message', (e) => {
+        if (e.origin != location.origin) return;
+        const d = e.data || {};
+        if (d.type !== 'shaderwall') return;
+        if (d.action === 'show') setShown(true);
+        else if (d.action === 'hide') setShown(false);
+        else if (d.action === 'toggle') setShown(!shown);
+      });
+      addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H') setShown(!shown);
+      });
+      setShown(false);
+    </script>
+  </body>
+</html>
