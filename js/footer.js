@@ -2,27 +2,12 @@
 const themes = document.getElementById('themes');
 const info = document.getElementById('info');
 
-// The most common breached passwords, kept as a fast local blocklist. With the
-// composition rules gone, this is also what keeps the obvious guesses from
-// opening the ParentalControlLock fallback (they short-circuit before the HIBP
-// check, so they never carry isPwn), so it has to cover the top slice rather
-// than just save an API call. Inputs are lowercased before lookup; single
-// tokens only, so they can be stored space-separated.
-const COMMON_PASSWORDS = new Set(
-  (
-    '123456 123456789 12345678 12345 1234567 1234567890 1234 111111 000000 ' +
-    '11111111 123123 123321 654321 666666 121212 112233 159753 7777777 777777 ' +
-    '555555 999999 password password1 password123 passw0rd qwerty qwerty123 ' +
-    'qwertyuiop 1q2w3e4r 1q2w3e qazwsx zxcvbnm asdfghjkl abc123 123abc iloveyou ' +
-    'admin welcome login monkey dragon sunshine princess football baseball ' +
-    'soccer master shadow superman batman trustno1 starwars hello freedom ' +
-    'whatever letmein secret pokemon samsung google computer michael jordan ' +
-    'jennifer hunter harley ranger charlie robert thomas daniel michelle ' +
-    'jessica pepper ginger maggie ashley nicole amanda summer killer mustang ' +
-    'access yankees dallas austin thunder taylor matrix liverpool arsenal ' +
-    'chelsea cookie naruto'
-  ).split(' ')
-);
+// "Too common" is decided by prevalence in the HIBP corpus, not a static list:
+// a password counted at least this many times is treated as common. In the
+// ParentalControlLock fallback those must NOT carry isPwn, so the obvious
+// guesses can't open the lock. Tunable — for reference, "123456" is ~37M hits,
+// "qwerty123" ~800k, and the long tail drops off fast below here.
+const COMMON_PASSWORD_THRESHOLD = 100000;
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -31,10 +16,11 @@ function sleep(ms) {
 }
 
 /**
- * Checks a password against a minimum length, a common-password blocklist and
- * the HIBP breached-password corpus. No composition rules (per NIST 800-63B):
- * length plus a breach/blocklist check is what actually matters, and rules just
- * reject strong passphrases while nudging users to predictable patterns.
+ * Checks a password against a minimum length and its prevalence in the HIBP
+ * breached-password corpus. No composition rules (per NIST 800-63B): length
+ * plus the breach signal is what actually matters. A count >= the threshold is
+ * "too common"; any non-zero count is a breach. Network-only — no offline
+ * fallback, so it fails closed if HIBP is unreachable.
  * @param {string} password - The plaintext password to evaluate.
  * @returns {Promise<{isValid: boolean, isPwn?: boolean, message: string}>}
  */
@@ -54,25 +40,10 @@ async function evaluatePassword(password) {
     };
   }
 
-  // --- TIER 2: Local Dictionary Check ---
-  if (COMMON_PASSWORDS.has(password.toLowerCase())) {
-    return {
-      isValid: false,
-      message: 'This password is too common. Please choose a unique one.'
-    };
-  }
-
-  // --- TIER 3: HIBP Network API Call ---
+  // --- TIER 2: HIBP prevalence (breach count) ---
+  let breachCount;
   try {
-    const isPwned = await checkHibpApi(password);
-    if (isPwned) {
-      return {
-        isValid: false,
-        isPwn: true,
-        message:
-          'This password has appeared in a data breach. Please choose another.'
-      };
-    }
+    breachCount = await checkHibpApi(password);
   } catch (error) {
     return {
       isValid: false,
@@ -80,14 +51,33 @@ async function evaluatePassword(password) {
     };
   }
 
-  // If it survives all checks, it's valid!
+  if (breachCount >= COMMON_PASSWORD_THRESHOLD) {
+    // No isPwn on purpose: the most common passwords must not open the
+    // ParentalControlLock fallback.
+    return {
+      isValid: false,
+      message: 'This password is too common. Please choose a unique one.'
+    };
+  }
+  if (breachCount > 0) {
+    return {
+      isValid: false,
+      isPwn: true,
+      message:
+        'This password has appeared in a data breach. Please choose another.'
+    };
+  }
+
+  // No breaches on record.
   return {isValid: true, message: 'Password seems to be secure.'};
 }
 
 /**
- * Helper function: Checks the password against the HIBP API using k-anonymity.
+ * Looks the password up in HIBP via k-anonymity and returns how many times it
+ * appears in the corpus (0 if not found). Add-Padding rows have a count of 0,
+ * so they contribute nothing.
  * @param {string} password
- * @returns {Promise<boolean>}
+ * @returns {Promise<number>}
  */
 async function checkHibpApi(password) {
   const encoder = new TextEncoder();
@@ -119,24 +109,22 @@ async function checkHibpApi(password) {
 
   for (const line of pwnedLines) {
     const [returnedSuffix, count] = line.split(':');
-    // Ignore Add-Padding entries: they are always returned with a count of 0.
-    if (returnedSuffix === suffix) return parseInt(count, 10) > 0;
+    if (returnedSuffix === suffix) return parseInt(count, 10);
   }
 
-  return false;
+  return 0;
 }
 
-// --- Usage Examples ---
+// --- Usage Examples (now driven by the live HIBP count) ---
 // evaluatePassword("weak").then(console.log);
 // -> { isValid: false, message: 'Password must be at least 8 characters long.' }
 
-// evaluatePassword("password").then(console.log);
+// evaluatePassword("password").then(console.log);   // count is well over the threshold
 // -> { isValid: false, message: 'This password is too common. Please choose a unique one.' }
 
-// A long passphrase with no uppercase/number/symbol now clears the local checks
-// (composition is no longer required); only HIBP can still reject it:
+// A long unique passphrase (composition is not required); only a breach hit rejects it:
 // evaluatePassword("a fairly long unique passphrase").then(console.log);
-// -> { isValid: true, message: 'Password seems to be secure.' }  // if not in HIBP
+// -> { isValid: true, message: 'Password seems to be secure.' }  // if its HIBP count is 0
 
 if (theme.endsWith('.html')) {
   var frame = document.createElement('iframe');
