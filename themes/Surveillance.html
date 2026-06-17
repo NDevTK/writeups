@@ -49,12 +49,10 @@
       .leaflet-control-geocoder-alternatives li:hover {
         background: rgba(120, 200, 255, 0.12);
       }
-      /* Zoom + search stay hidden until the wallpaper is brought forward */
-      .leaflet-control-zoom,
+      /* Search stays hidden until the wallpaper is brought forward */
       .leaflet-control-geocoder {
         display: none;
       }
-      body.controls .leaflet-control-zoom,
       body.controls .leaflet-control-geocoder {
         display: block;
       }
@@ -222,7 +220,9 @@
         );
       }
 
-      const map = L.map('map', {zoomControl: true}).setView([25, 0], 2);
+      // No zoom buttons: they'd sit under the host's ✦ controls toggle, and
+      // scroll / double-click / pinch / +- keys still zoom the wallpaper.
+      const map = L.map('map', {zoomControl: false}).setView([25, 0], 2);
       L.tileLayer(
         'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
         {
