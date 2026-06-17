@@ -58,10 +58,67 @@
       body.controls .leaflet-control-geocoder {
         display: block;
       }
+      /* Dark popups for the camera details */
+      .leaflet-popup-content-wrapper,
+      .leaflet-popup-tip {
+        background: #0b0f14;
+        color: #d7e6f0;
+      }
+      .leaflet-popup-content-wrapper {
+        border: 1px solid rgba(120, 200, 255, 0.3);
+      }
+      .leaflet-container a.leaflet-popup-close-button {
+        color: #7fb6d6;
+      }
+      .cam b {
+        display: block;
+        margin-bottom: 4px;
+      }
+      .cam div {
+        margin: 1px 0;
+      }
+      .cam .k {
+        color: #7fb6d6;
+      }
+      .cam a {
+        color: #9be7ff;
+      }
+      /* Legend rides along with the other controls */
+      .legend {
+        position: fixed;
+        left: 10px;
+        bottom: 24px;
+        z-index: 500;
+        padding: 8px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        line-height: 1.6;
+        background: rgba(11, 15, 20, 0.85);
+        border: 1px solid rgba(120, 200, 255, 0.25);
+        display: none;
+      }
+      body.controls .legend {
+        display: block;
+      }
+      .legend .dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        margin-right: 6px;
+        border-radius: 50%;
+        vertical-align: middle;
+      }
     </style>
   </head>
   <body>
     <div id="map"></div>
+    <div class="legend" aria-hidden="true">
+      <div><span class="dot" style="background: #ffd166"></span>Camera</div>
+      <div>
+        <span class="dot" style="background: #5fd0ff"></span>ALPR (plate reader)
+      </div>
+      <div><span class="dot" style="background: #9be37d"></span>Guard</div>
+    </div>
 
     <script
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -86,6 +143,82 @@
               '"': '&quot;',
               "'": '&#39;'
             })[c]
+        );
+      }
+
+      // Marker colour + label for each kind of surveillance node.
+      function kindInfo(tags) {
+        const t = (tags['surveillance:type'] || '').toLowerCase();
+        if (t === 'alpr' || t === 'anpr')
+          return {
+            label: 'ALPR camera',
+            icon: '🚗',
+            color: '#1b9bd8',
+            fill: '#5fd0ff'
+          };
+        if (t === 'guard')
+          return {
+            label: 'Guard',
+            icon: '👮',
+            color: '#3fa34d',
+            fill: '#9be37d'
+          };
+        return {
+          label: 'Surveillance camera',
+          icon: '📷',
+          color: '#ff5f5f',
+          fill: '#ffd166'
+        };
+      }
+
+      // Build a popup from whatever tags the node carries (all escaped).
+      function popupHtml(node) {
+        const tags = node.tags || {};
+        const info = kindInfo(tags);
+        const rows = [];
+        function row(label, value) {
+          if (value)
+            rows.push(
+              '<div><span class="k">' +
+                label +
+                '</span> ' +
+                esc(value) +
+                '</div>'
+            );
+        }
+        row('Name', tags.name);
+        row('Operator', tags.operator);
+        row('Camera', tags['camera:type']);
+        row('Mount', tags['camera:mount']);
+        const dir = tags['camera:direction'] || tags.direction;
+        if (dir) row('Facing', /^-?\d+(\.\d+)?$/.test(dir) ? dir + '°' : dir);
+        row('Zone', tags['surveillance:zone'] || tags.surveillance);
+        row('Height', tags.height);
+
+        const feed =
+          tags['contact:webcam'] || tags.webcam || tags.website || tags.url;
+        let extra = '';
+        if (feed && /^https?:\/\//i.test(feed))
+          extra +=
+            '<div><a href="' +
+            esc(feed) +
+            '" target="_blank" rel="noreferrer noopener">▶ live feed</a></div>';
+        extra +=
+          '<div><a href="https://www.openstreetmap.org/node/' +
+          esc(node.id) +
+          '" target="_blank" rel="noreferrer noopener">OSM node ' +
+          esc(node.id) +
+          '</a></div>';
+
+        return (
+          '<div class="cam"><b>' +
+          info.icon +
+          ' ' +
+          esc(info.label) +
+          '</b>' +
+          rows.join('') +
+          extra +
+          '</div>'
         );
       }
 
@@ -127,7 +260,7 @@
           b.getEast() +
           ');out body 800;';
         fetch(
-          'https://overpass-api.de/api/interpreter?data=' +
+          'https://maps.mail.ru/osm/tools/overpass/api/interpreter?data=' +
             encodeURIComponent(query),
           {credentials: 'omit'}
         )
@@ -136,18 +269,15 @@
             cameras.clearLayers();
             (d.elements || []).forEach((n) => {
               if (!n.lat || !n.lon) return;
-              const kind = n.tags && n.tags['surveillance:type'];
+              const info = kindInfo(n.tags || {});
               L.circleMarker([n.lat, n.lon], {
                 radius: 4,
-                color: '#ff5f5f',
+                color: info.color,
                 weight: 1,
-                fillColor: '#ffd166',
+                fillColor: info.fill,
                 fillOpacity: 0.85
               })
-                .bindPopup(
-                  '📷 Surveillance camera' +
-                    (kind ? ' (' + esc(kind) + ')' : '')
-                )
+                .bindPopup(popupHtml(n))
                 .addTo(cameras);
             });
           })
