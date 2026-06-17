@@ -2,21 +2,27 @@
 const themes = document.getElementById('themes');
 const info = document.getElementById('info');
 
-// 1. A small set of notoriously common passwords to save API calls.
-// Convert inputs to lowercase before checking against this set.
-const COMMON_PASSWORDS = new Set([
-  '123456',
-  'password',
-  '123456789',
-  '12345',
-  '12345678',
-  'qwerty',
-  'password123',
-  'admin',
-  '111111',
-  'letmein',
-  'welcome'
-]);
+// The most common breached passwords, kept as a fast local blocklist. With the
+// composition rules gone, this is also what keeps the obvious guesses from
+// opening the ParentalControlLock fallback (they short-circuit before the HIBP
+// check, so they never carry isPwn), so it has to cover the top slice rather
+// than just save an API call. Inputs are lowercased before lookup; single
+// tokens only, so they can be stored space-separated.
+const COMMON_PASSWORDS = new Set(
+  (
+    '123456 123456789 12345678 12345 1234567 1234567890 1234 111111 000000 ' +
+    '11111111 123123 123321 654321 666666 121212 112233 159753 7777777 777777 ' +
+    '555555 999999 password password1 password123 passw0rd qwerty qwerty123 ' +
+    'qwertyuiop 1q2w3e4r 1q2w3e qazwsx zxcvbnm asdfghjkl abc123 123abc iloveyou ' +
+    'admin welcome login monkey dragon sunshine princess football baseball ' +
+    'soccer master shadow superman batman trustno1 starwars hello freedom ' +
+    'whatever letmein secret pokemon samsung google computer michael jordan ' +
+    'jennifer hunter harley ranger charlie robert thomas daniel michelle ' +
+    'jessica pepper ginger maggie ashley nicole amanda summer killer mustang ' +
+    'access yankees dallas austin thunder taylor matrix liverpool arsenal ' +
+    'chelsea cookie naruto'
+  ).split(' ')
+);
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -25,9 +31,12 @@ function sleep(ms) {
 }
 
 /**
- * Checks a password against complexity rules, common dictionaries, and HIBP.
+ * Checks a password against a minimum length, a common-password blocklist and
+ * the HIBP breached-password corpus. No composition rules (per NIST 800-63B):
+ * length plus a breach/blocklist check is what actually matters, and rules just
+ * reject strong passphrases while nudging users to predictable patterns.
  * @param {string} password - The plaintext password to evaluate.
- * @returns {Promise<{isValid: boolean, message: string}>}
+ * @returns {Promise<{isValid: boolean, isPwn?: boolean, message: string}>}
  */
 async function evaluatePassword(password) {
   if (!password) {
@@ -37,36 +46,11 @@ async function evaluatePassword(password) {
     };
   }
 
-  // --- TIER 1: Basic Security Requirements ---
+  // --- TIER 1: Length only (no composition rules) ---
   if (password.length < 8) {
     return {
       isValid: false,
       message: 'Password must be at least 8 characters long.'
-    };
-  }
-  if (!/[A-Z]/.test(password)) {
-    return {
-      isValid: false,
-      message: 'Password must contain at least one uppercase letter.'
-    };
-  }
-  if (!/[a-z]/.test(password)) {
-    return {
-      isValid: false,
-      message: 'Password must contain at least one lowercase letter.'
-    };
-  }
-  if (!/[0-9]/.test(password)) {
-    return {
-      isValid: false,
-      message: 'Password must contain at least one number.'
-    };
-  }
-  // Matches any character that is NOT a word character (a-z, A-Z, 0-9) or underscore
-  if (!/[^a-zA-Z0-9_]/.test(password)) {
-    return {
-      isValid: false,
-      message: 'Password must contain at least one special character.'
     };
   }
 
@@ -145,14 +129,13 @@ async function checkHibpApi(password) {
 // evaluatePassword("weak").then(console.log);
 // -> { isValid: false, message: 'Password must be at least 8 characters long.' }
 
-// evaluatePassword("Password123!").then(console.log);
+// evaluatePassword("password").then(console.log);
 // -> { isValid: false, message: 'This password is too common. Please choose a unique one.' }
 
-// evaluatePassword("Tr0ub4dor&3").then(console.log);
-// -> { isValid: false, message: 'This password has appeared in a data breach. Please choose another.' }
-
-// evaluatePassword("SuperS3cr3t!Random_Phrase").then(console.log);
-// -> { isValid: true, message: 'Password is secure.' }
+// A long passphrase with no uppercase/number/symbol now clears the local checks
+// (composition is no longer required); only HIBP can still reject it:
+// evaluatePassword("a fairly long unique passphrase").then(console.log);
+// -> { isValid: true, message: 'Password seems to be secure.' }  // if not in HIBP
 
 if (theme.endsWith('.html')) {
   var frame = document.createElement('iframe');
