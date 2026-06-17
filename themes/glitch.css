@@ -274,3 +274,15 @@ textarea {
 body {
   background-color: black;
 }
+
+/* Respect users who ask for less motion: drop the looping glitch animations */
+@media (prefers-reduced-motion: reduce) {
+  hr {
+    animation: none;
+  }
+
+  a:hover,
+  a:focus {
+    animation: none;
+  }
+}

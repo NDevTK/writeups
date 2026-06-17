@@ -1,0 +1,248 @@
+/* Theme Name: Newspaper */
+
+/* Overall Feel: An old broadsheet -- warm newsprint, justified serif columns, ruled headings and a drop cap. */
+
+body {
+  background-color: #e9e5da; /* Darker newsprint for the page margins */
+}
+
+.markdown-body {
+  background-color: #f7f4ec; /* Warm off-white paper */
+  color: #1c1b18; /* Ink black */
+  font-family: 'Georgia', 'Times New Roman', 'Times', serif;
+  font-size: 18px;
+  line-height: 1.6;
+  padding: 2.5em 3em;
+  text-align: justify;
+  hyphens: auto;
+  border: 1px solid #d8d2c4;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Masthead and section headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  color: #111111;
+  text-align: left;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-top: 1.2em;
+  margin-bottom: 0.4em;
+}
+
+h1 {
+  font-size: 2.8em;
+  text-align: center;
+  letter-spacing: 0.01em;
+  border-top: 3px double #1c1b18;
+  border-bottom: 3px double #1c1b18;
+  padding: 0.25em 0;
+  margin-bottom: 0.6em;
+}
+
+h2 {
+  font-size: 1.9em;
+  border-bottom: 1px solid #1c1b18;
+  padding-bottom: 0.15em;
+}
+
+h3 {
+  font-size: 1.45em;
+}
+
+h4 {
+  font-size: 1.2em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+h5 {
+  font-size: 1.05em;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+}
+
+h6 {
+  font-size: 0.95em;
+  font-style: italic;
+  color: #444444;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+/* Drop cap on the opening paragraph of an article */
+#content > p:first-of-type::first-letter {
+  float: left;
+  font-size: 3.4em;
+  line-height: 0.8;
+  padding: 0.05em 0.08em 0 0;
+  font-weight: 700;
+}
+
+/* Links -- classic underlined ink */
+a {
+  color: #6b1d1d; /* Faded red ink */
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a:hover,
+a:focus {
+  color: #111111;
+  background-color: #efe7c8; /* Highlighter on newsprint */
+}
+
+a:visited {
+  color: #4a2350;
+}
+
+/* Pull quotes */
+blockquote {
+  border-left: 4px solid #1c1b18;
+  padding: 0.3em 1.2em;
+  margin: 1.5em 0;
+  color: #333333;
+  font-style: italic;
+}
+
+blockquote p {
+  margin-bottom: 0.5em;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid #1c1b18;
+  border-bottom: 1px solid #1c1b18;
+  height: 3px;
+  margin: 2em 0;
+}
+
+/* Tables -- ruled like a classifieds grid */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: 0.95em;
+}
+
+th,
+td {
+  border: 1px solid #1c1b18;
+  padding: 0.5em 0.7em;
+  text-align: left;
+}
+
+th {
+  background-color: #e7e1d2;
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+}
+
+/* Code -- a monospaced "telegraph" insert */
+pre,
+code {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+}
+
+pre {
+  background-color: #efeadd;
+  padding: 1em;
+  border: 1px solid #b9b09a;
+  overflow-x: auto;
+  color: #1c1b18;
+}
+
+code {
+  background-color: #efeadd;
+  color: #1c1b18;
+  padding: 0.15em 0.35em;
+  border: 1px solid #d8cfb8;
+}
+
+pre code {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* PrismJS parity (kept consistent with the other themes) */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #6f6a5b;
+  font-style: italic;
+}
+.token.punctuation {
+  color: #444444;
+}
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #6b1d1d;
+}
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #2f5233;
+}
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #1c1b18;
+}
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #1c1b18;
+  font-weight: bold;
+}
+.token.function,
+.token.class-name {
+  color: #34435e;
+}
+.token.regex,
+.token.important,
+.token.variable {
+  color: #6b1d1d;
+}
+
+/* Form controls */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  background-color: #f1ece0;
+  color: #1c1b18;
+  border: 1px solid #1c1b18;
+}
+
+/* Spacing refinement */
+.markdown-body > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0 !important;
+}

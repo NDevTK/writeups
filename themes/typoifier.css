@@ -52,3 +52,13 @@ body {
     background-position: 0% 50%;
   }
 }
+
+/* Respect users who ask for less motion: stop the shifting gradient */
+@media (prefers-reduced-motion: reduce) {
+  body {
+    -webkit-animation: none;
+    -moz-animation: none;
+    -o-animation: none;
+    animation: none;
+  }
+}

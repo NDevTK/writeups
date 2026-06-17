@@ -227,6 +227,13 @@ pre code {
   animation: glitch 0.25s infinite;
 }
 
+/* Respect users who ask for less motion: hold the heading steady */
+@media (prefers-reduced-motion: reduce) {
+  .markdown-body h1:hover {
+    animation: none;
+  }
+}
+
 @keyframes glitch {
   0% {
     transform: translate(0);

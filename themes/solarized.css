@@ -1,0 +1,274 @@
+/* Theme Name: Solarized Dark */
+
+/* Overall Feel: Ethan Schoonover's precision palette -- calm, balanced low contrast that is easy on the eyes. */
+
+body {
+  background-color: #002b36; /* base03 */
+}
+
+.markdown-body {
+  background-color: #002b36; /* base03 */
+  color: #839496; /* base0 -- body text */
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  padding: 2em;
+}
+
+/* Typography */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #93a1a1; /* base1 -- emphasized */
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 2.2em;
+  color: #268bd2; /* blue */
+}
+h2 {
+  font-size: 1.8em;
+  color: #2aa198; /* cyan */
+}
+h3 {
+  font-size: 1.5em;
+  color: #859900; /* green */
+}
+h4 {
+  font-size: 1.25em;
+  color: #b58900; /* yellow */
+}
+h5 {
+  font-size: 1.1em;
+}
+h6 {
+  font-size: 1em;
+  font-style: italic;
+  color: #657b83; /* base00 */
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+/* Links */
+a {
+  color: #268bd2; /* blue */
+  text-decoration: none;
+}
+
+a:hover,
+a:focus {
+  color: #2aa198; /* cyan */
+  text-decoration: underline;
+}
+
+a:visited {
+  color: #6c71c4; /* violet */
+}
+
+/* Elements */
+blockquote {
+  border-left: 4px solid #859900; /* green */
+  background-color: #073642; /* base02 */
+  padding: 0.6em 1.2em;
+  margin: 1.5em 0;
+  color: #93a1a1;
+}
+
+blockquote p {
+  margin-bottom: 0.5em;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background-color: #586e75; /* base01 */
+  margin: 2.5em 0;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+}
+
+th,
+td {
+  border: 1px solid #586e75;
+  padding: 0.5em 0.8em;
+  text-align: left;
+}
+
+th {
+  background-color: #073642;
+  color: #93a1a1;
+}
+
+/* Code Blocks */
+pre,
+code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.9em;
+}
+
+pre {
+  background-color: #073642; /* base02 */
+  padding: 1em;
+  border-radius: 4px;
+  overflow-x: auto;
+  color: #93a1a1;
+}
+
+code {
+  background-color: #073642;
+  color: #93a1a1;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+}
+
+pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+/* Rouge syntax highlighting (Jekyll default highlighter) */
+.highlight,
+.highlight pre,
+.highlight code {
+  color: #93a1a1;
+}
+.highlight .c,
+.highlight .c1,
+.highlight .cm,
+.highlight .cd {
+  color: #586e75; /* Comments -- base01 */
+  font-style: italic;
+}
+.highlight .k,
+.highlight .kd,
+.highlight .kn,
+.highlight .kc,
+.highlight .kr {
+  color: #859900; /* Keywords -- green */
+}
+.highlight .s,
+.highlight .s1,
+.highlight .s2,
+.highlight .sb,
+.highlight .se {
+  color: #2aa198; /* Strings -- cyan */
+}
+.highlight .mi,
+.highlight .mf,
+.highlight .m,
+.highlight .il {
+  color: #d33682; /* Numbers -- magenta */
+}
+.highlight .nf,
+.highlight .nc,
+.highlight .nn,
+.highlight .nb {
+  color: #268bd2; /* Functions / builtins -- blue */
+}
+.highlight .nt {
+  color: #268bd2; /* Tags */
+}
+.highlight .na {
+  color: #b58900; /* Attributes -- yellow */
+}
+.highlight .o,
+.highlight .ow {
+  color: #859900; /* Operators -- green */
+}
+.highlight .err {
+  color: #dc322f; /* Errors -- red */
+}
+
+/* PrismJS parity (kept consistent with the other themes) */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #586e75;
+  font-style: italic;
+}
+.token.punctuation {
+  color: #839496;
+}
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #d33682;
+}
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #2aa198;
+}
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #859900;
+}
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #859900;
+}
+.token.function,
+.token.class-name {
+  color: #268bd2;
+}
+.token.regex,
+.token.important,
+.token.variable {
+  color: #b58900;
+}
+
+/* Form controls */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  background-color: #073642;
+  color: #93a1a1;
+  border: 1px solid #586e75;
+}
+
+::selection {
+  background: #073642;
+  color: #93a1a1;
+}
+
+/* Spacing refinement */
+.markdown-body > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0 !important;
+}
