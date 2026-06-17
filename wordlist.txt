@@ -6,6 +6,7 @@ impactful
 geolocation
 integrations
 VDI
+omnibox
 html
 permalink
 Werkzeug
