@@ -9,7 +9,7 @@
       body {
         margin: 0;
         height: 100%;
-        background: #aad3df; /* OSM water, while tiles load */
+        background: #10161d; /* dark, while tiles load */
         overflow: hidden;
         font-family: ui-sans-serif, system-ui, 'Segoe UI', Arial, sans-serif;
       }
@@ -21,6 +21,9 @@
         width: 130%;
         height: 130%;
         border: 0;
+        /* Render the light OSM tiles as a dark-mode map */
+        filter: invert(1) hue-rotate(180deg) brightness(0.75) contrast(0.95)
+          saturate(0.85);
         transform-origin: center;
         animation: drift 120s ease-in-out infinite alternate;
       }
@@ -50,22 +53,8 @@
         justify-content: center;
         padding: 2rem;
         text-align: center;
-        color: #2b4a55;
+        color: #8aa3b0;
         font-size: 14px;
-      }
-      #hint {
-        position: fixed;
-        left: 50%;
-        bottom: 22px;
-        transform: translateX(-50%);
-        padding: 6px 14px;
-        border-radius: 999px;
-        background: rgba(10, 20, 24, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 12px;
-        transition: opacity 1s ease;
-        pointer-events: none;
       }
     </style>
   </head>
@@ -80,7 +69,6 @@
       title="OpenStreetMap"
       sandbox="allow-scripts allow-same-origin allow-popups"
       referrerpolicy="no-referrer"></iframe>
-    <div id="hint">World Map · drifting · press ✦ to explore</div>
 
     <script>
       'use strict';
@@ -107,10 +95,6 @@
       addEventListener('keydown', (e) => {
         if (e.key === 'h' || e.key === 'H') setShown(!shown);
       });
-      setTimeout(() => {
-        const h = document.getElementById('hint');
-        if (h) h.style.opacity = '0';
-      }, 7000);
       setShown(false);
     </script>
   </body>
