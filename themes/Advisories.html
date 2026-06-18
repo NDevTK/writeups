@@ -22,6 +22,17 @@
         box-sizing: border-box;
         scrollbar-width: thin;
         scrollbar-color: rgba(138, 180, 248, 0.4) transparent;
+        /* Recede to a soft texture behind page content; full contrast only
+           once brought forward (controls shown) for reading. */
+        opacity: 0.38;
+        filter: blur(1px);
+        transition:
+          opacity 0.4s ease,
+          filter 0.4s ease;
+      }
+      body.shown #feed {
+        opacity: 1;
+        filter: none;
       }
       #feed::-webkit-scrollbar {
         width: 8px;
@@ -376,6 +387,7 @@
       // ---------- Host bridge (shaderwall protocol) ----------
       function setShown(value) {
         shown = value;
+        document.body.classList.toggle('shown', value);
         window.parent.postMessage(
           {type: 'shaderwall', state: shown ? 'shown' : 'hidden'},
           location.origin
