@@ -57,6 +57,22 @@
         null;
       const rtt = conn && typeof conn.rtt === 'number' ? conn.rtt : null;
 
+      // Thermal ramp cyan -> amber -> red (skips the muddy green a raw hue
+      // sweep passes through at mid load).
+      function heat(t) {
+        const stops = [
+          [95, 208, 255],
+          [255, 200, 70],
+          [255, 70, 55]
+        ];
+        const seg = t < 0.5 ? 0 : 1;
+        const f = t < 0.5 ? t / 0.5 : (t - 0.5) / 0.5;
+        const a = stops[seg];
+        const b = stops[seg + 1];
+        const m = (k) => Math.round(a[k] + (b[k] - a[k]) * f);
+        return 'rgb(' + m(0) + ',' + m(1) + ',' + m(2) + ')';
+      }
+
       // ---- canvas sizing (crisp on HiDPI) ----
       let W = 0;
       let H = 0;
@@ -166,9 +182,11 @@
         tiltX += (tgX - tiltX) * 0.08;
         tiltY += (tgY - tiltY) * 0.08;
 
-        // cyan when idle -> red as load climbs
-        const stroke = 'hsl(' + (200 - load * 200).toFixed(0) + ',85%,60%)';
-        const speed = reduced ? 0 : 0.3 + load * 2.6;
+        const stroke = heat(load);
+        // Gentle constant drift keeps the web alive and cohesive; load shows as
+        // agitation (per-frame jitter) so a busy system looks busy, not sparse.
+        const speed = reduced ? 0 : 0.35 * (1 + load * 0.8);
+        const jit = reduced ? 0 : load * load * 8;
         const par = reduced ? 0 : 1;
 
         // trails while animating; clean wipe under reduced motion
@@ -186,8 +204,8 @@
             if (p.y < -20) p.y = innerHeight + 20;
             if (p.y > innerHeight + 20) p.y = -20;
           }
-          p.sx = p.x + tiltX * p.z * 36 * par;
-          p.sy = p.y + tiltY * p.z * 36 * par;
+          p.sx = p.x + tiltX * p.z * 36 * par + (Math.random() - 0.5) * jit;
+          p.sy = p.y + tiltY * p.z * 36 * par + (Math.random() - 0.5) * jit;
         }
 
         ctx.lineWidth = 1;
