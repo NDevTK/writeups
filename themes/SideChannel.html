@@ -140,6 +140,64 @@
       }
       enableGyro(); // Android works now; iOS retries on the first ✦ gesture
 
+      // ---- gravity + motion via the Generic Sensor API (Android; auto-granted,
+      // no prompt). Feature-detected and guarded; otherwise the pointer /
+      // deviceorientation fallback above still drives the tilt. ----
+      let gx = 0; // gravity vector, device frame
+      let gy = 0;
+      let haveGravity = false;
+      let shakeRaw = 0; // momentary linear-acceleration magnitude
+      let shake = 0; // smoothed 0..1 — "is the phone being moved?"
+
+      function startSensor(Ctor, onReading) {
+        if (typeof Ctor !== 'function') return null;
+        try {
+          const s = new Ctor({frequency: 30});
+          s.addEventListener('reading', () => onReading(s));
+          s.addEventListener('error', () => {}); // no hardware / blocked by policy
+          s.start();
+          return s;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      // Gravity -> the "down" direction; drives the pooling current.
+      startSensor(self.GravitySensor, (s) => {
+        gx = s.x;
+        gy = s.y;
+        haveGravity = true;
+        tiltSource = 'gravity';
+      });
+      // Linear acceleration (gravity removed) -> a shake / motion burst.
+      startSensor(self.LinearAccelerationSensor, (s) => {
+        shakeRaw = Math.max(
+          shakeRaw,
+          Math.min(1, Math.hypot(s.x || 0, s.y || 0, s.z || 0) / 14)
+        );
+      });
+
+      // ---- active network side channel: time a small same-origin fetch and
+      // pulse the field to that rhythm. Paused while the tab is hidden. ----
+      let netMs = null;
+      let netPulse = 0;
+      function probeNetwork() {
+        if (document.hidden) return;
+        const base = location.href.split('#')[0];
+        const url =
+          base + (base.indexOf('?') < 0 ? '?' : '&') + 'net=' + Date.now();
+        const t0 = performance.now();
+        fetch(url, {cache: 'no-store', credentials: 'omit'})
+          .then((r) => r.blob())
+          .then(() => {
+            netMs = Math.round(performance.now() - t0);
+            netPulse = 1;
+          })
+          .catch(() => {});
+      }
+      setInterval(probeNetwork, 4000);
+      probeNetwork();
+
       // ---- constellation; particle count scales with the core count ----
       const N = Math.max(40, Math.min(150, cores * 14));
       const pts = [];
@@ -148,8 +206,10 @@
           x: Math.random() * innerWidth,
           y: Math.random() * innerHeight,
           z: 0.25 + Math.random() * 0.75,
-          a: Math.random() * Math.PI * 2,
-          s: 0.4 + Math.random() * 0.8,
+          dx: (Math.random() - 0.5) * 0.5, // constant ambient drift
+          dy: (Math.random() - 0.5) * 0.5,
+          vx: 0, // dynamic velocity: gravity + shake
+          vy: 0,
           sx: 0,
           sy: 0
         });
@@ -172,7 +232,9 @@
         lastT = now;
         baseDelta = Math.min(delta, baseDelta * 1.0006);
         if (!isFinite(baseDelta)) baseDelta = delta;
-        const jank = Math.max(0, Math.min(1, (delta - baseDelta) / (baseDelta * 1.5)));
+        // Deadzone: only frames >1.5x our fastest count as jank, so ordinary
+        // frame-pacing noise doesn't read as load (keeps idle genuinely cool).
+        const jank = Math.max(0, Math.min(1, (delta / baseDelta - 1.5) / 2));
 
         const reduced = reduce.matches;
         fc++;
@@ -182,10 +244,21 @@
         tiltX += (tgX - tiltX) * 0.08;
         tiltY += (tgY - tiltY) * 0.08;
 
-        const stroke = heat(load);
-        // Gentle constant drift keeps the web alive and cohesive; load shows as
-        // agitation (per-frame jitter) so a busy system looks busy, not sparse.
-        const speed = reduced ? 0 : 0.35 * (1 + load * 0.8);
+        // shake spikes then decays fast; the network ping fades slowly
+        shake = Math.max(shake * 0.9, shakeRaw);
+        shakeRaw *= 0.6;
+        netPulse *= 0.95;
+
+        // gravity's in-plane component = "down" on screen (zero when flat)
+        let poolX = 0;
+        let poolY = 0;
+        if (haveGravity) {
+          poolX = Math.max(-1, Math.min(1, gx / 9.81));
+          poolY = Math.max(-1, Math.min(1, -gy / 9.81));
+        }
+
+        // colour energy = CPU load, briefly flashed hot by a shake
+        const stroke = heat(Math.max(load, shake));
         const jit = reduced ? 0 : load * load * 8;
         const par = reduced ? 0 : 1;
 
@@ -195,10 +268,15 @@
 
         for (let i = 0; i < N; i++) {
           const p = pts[i];
-          if (speed) {
-            p.a += (Math.random() - 0.5) * 0.03;
-            p.x += Math.cos(p.a) * p.s * speed;
-            p.y += Math.sin(p.a) * p.s * speed;
+          if (!reduced) {
+            // gravity pull + shake chaos + a little brownian life, damped
+            const chaos = 0.03 + shake * 1.2;
+            p.vx += poolX * 0.05 + (Math.random() - 0.5) * chaos;
+            p.vy += poolY * 0.05 + (Math.random() - 0.5) * chaos;
+            p.vx = Math.max(-12, Math.min(12, p.vx * 0.94));
+            p.vy = Math.max(-12, Math.min(12, p.vy * 0.94));
+            p.x += p.dx + p.vx;
+            p.y += p.dy + p.vy;
             if (p.x < -20) p.x = innerWidth + 20;
             if (p.x > innerWidth + 20) p.x = -20;
             if (p.y < -20) p.y = innerHeight + 20;
@@ -235,6 +313,23 @@
           ctx.arc(p.sx, p.sy, 1.6 + p.z * 1.4, 0, Math.PI * 2);
           ctx.fill();
         }
+
+        // network ping: a ring expanding from centre on each completed probe,
+        // tinted by the measured latency (fast = cool, slow = hot).
+        if (netPulse > 0.02 && !reduced) {
+          ctx.globalAlpha = netPulse * 0.25;
+          ctx.strokeStyle = heat(netMs == null ? 0 : Math.min(1, netMs / 400));
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(
+            W / 2,
+            H / 2,
+            (1 - netPulse) * Math.max(W, H) * 0.7,
+            0,
+            Math.PI * 2
+          );
+          ctx.stroke();
+        }
         ctx.globalAlpha = 1;
       }
       requestAnimationFrame(frame);
@@ -247,7 +342,11 @@
           cores +
           '   ' +
           tiltSource +
-          (rtt != null ? '   rtt ' + rtt + 'ms' : '');
+          (netMs != null
+            ? '   net ' + netMs + 'ms'
+            : rtt != null
+              ? '   rtt ' + rtt + 'ms'
+              : '');
       }
       setInterval(updateReadout, 200);
 
