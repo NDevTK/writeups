@@ -78,6 +78,18 @@
       .meta .id:hover {
         text-decoration: underline;
       }
+      .credit {
+        margin-top: 2px;
+        font-size: 12px;
+        color: #8a97a8;
+      }
+      .credit .who {
+        color: #8ab4f8;
+        text-decoration: none;
+      }
+      .credit .who:hover {
+        text-decoration: underline;
+      }
       .note {
         padding: 14px 10px;
         text-align: center;
@@ -162,6 +174,17 @@
           default:
             return {label: 'UNKNOWN', color: '#6e7681'};
         }
+      }
+
+      // The credited reporter, preferring whoever actually found/reported it.
+      function pickCredit(credits) {
+        if (!Array.isArray(credits)) return null;
+        const named = credits.filter((c) => c && c.user && c.user.login);
+        return (
+          named.find((c) => c.type === 'finder' || c.type === 'reporter') ||
+          named[0] ||
+          null
+        );
       }
 
       // Pull the rel="next" cursor URL out of a Link header.
@@ -249,6 +272,36 @@
           );
 
         body.appendChild(meta);
+
+        // Credit the reporter so the feed never implies we found these.
+        const credit = pickCredit(a.credits);
+        if (credit) {
+          const line = document.createElement('div');
+          line.className = 'credit';
+          const role = String(credit.type || 'credit').replace(/_/g, ' ');
+          line.appendChild(document.createTextNode(role + ': '));
+          const login = credit.user.login;
+          const profile = safeUrl(credit.user.html_url);
+          if (profile) {
+            const who = document.createElement('a');
+            who.className = 'who';
+            who.href = profile;
+            who.target = '_blank';
+            who.rel = 'noreferrer noopener';
+            who.textContent = '@' + login;
+            line.appendChild(who);
+          } else {
+            const who = document.createElement('span');
+            who.className = 'who';
+            who.textContent = '@' + login;
+            line.appendChild(who);
+          }
+          const more = a.credits.length - 1;
+          if (more > 0)
+            line.appendChild(document.createTextNode(' (+' + more + ')'));
+          body.appendChild(line);
+        }
+
         row.appendChild(body);
         feed.insertBefore(row, sentinel);
       }
