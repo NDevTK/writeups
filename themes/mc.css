@@ -9,11 +9,29 @@
 }
 
 body {
-  background-image: url('/writeups/mc.webp');
+  /* Darken the busy screenshot so white text stays readable. The old
+     backdrop-filter blurred nothing here — a body's own background-image is
+     not its backdrop — so it gave no contrast at all. */
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
+    url('/writeups/mc.webp');
   background-size: cover;
   background-attachment: fixed;
-  backdrop-filter: blur(10px);
   color: white;
+}
+
+/* The signature Minecraft hard drop shadow: authentic and high-contrast over
+   any tile. Inherited across the content, then cleared on the light code
+   blocks where a dark shadow would only muddy things. */
+.markdown-body {
+  text-shadow: 2px 2px 0 #000;
+}
+
+pre,
+code,
+.highlight,
+.highlight * {
+  text-shadow: none;
 }
 
 .highlight {

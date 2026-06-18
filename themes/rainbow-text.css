@@ -15,5 +15,12 @@ h3 {
     violet
   );
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
+  /* Heavier strokes plus a dark halo keep the light part of the gradient
+     (orange/yellowgreen) legible against the white background. */
+  font-weight: 600;
+  text-shadow:
+    0 0 1px rgba(0, 0, 0, 0.5),
+    0 1px 1px rgba(0, 0, 0, 0.3);
 }
