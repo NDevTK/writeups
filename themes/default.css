@@ -6,3 +6,19 @@ img,
 video {
   filter: invert(1);
 }
+
+/* Wallpaper themes (.html) render the page over a full-screen iframe that
+   footer.js prepends to <body>. Give the content column a translucent frosted
+   panel so the writeup stays readable over any wallpaper — bright photos or
+   busy text feeds — while the wallpaper still shows through the margins. The
+   fill is light on purpose: the html invert(1) above flips it to a dark panel.
+   Scoped via :has() to the wallpaper iframe, so the plain Default theme (no
+   iframe) is left completely unchanged. */
+body:has(> iframe[aria-hidden="true"]) .markdown-body {
+  background: rgba(245, 243, 239, 0.55);
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  border-radius: 12px;
+  padding-top: 14px;
+  padding-bottom: 28px;
+}
