@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Side Channel</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0b0f14;
+        color: #d7e6f0;
+        font-family: ui-monospace, 'Consolas', 'Courier New', monospace;
+      }
+      #c {
+        position: fixed;
+        inset: 0;
+        display: block;
+      }
+      /* Tiny live readout, not a dashboard. */
+      .readout {
+        position: fixed;
+        left: 16px;
+        bottom: 16px;
+        padding: 7px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        letter-spacing: 0.2px;
+        white-space: pre;
+        color: #9fb6cc;
+        background: rgba(11, 15, 20, 0.55);
+        border: 1px solid rgba(120, 200, 255, 0.18);
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div class="readout" id="readout" aria-hidden="true">sensing…</div>
+
+    <script>
+      'use strict';
+
+      const canvas = document.getElementById('c');
+      const ctx = canvas.getContext('2d');
+      const readout = document.getElementById('readout');
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+
+      // ---- permission-free device facts ----
+      const cores = navigator.hardwareConcurrency || 4;
+      const conn =
+        navigator.connection ||
+        navigator.mozConnection ||
+        navigator.webkitConnection ||
+        null;
+      const rtt = conn && typeof conn.rtt === 'number' ? conn.rtt : null;
+
+      // Thermal ramp cyan -> amber -> red (skips the muddy green a raw hue
+      // sweep passes through at mid load).
+      function heat(t) {
+        const stops = [
+          [95, 208, 255],
+          [255, 200, 70],
+          [255, 70, 55]
+        ];
+        const seg = t < 0.5 ? 0 : 1;
+        const f = t < 0.5 ? t / 0.5 : (t - 0.5) / 0.5;
+        const a = stops[seg];
+        const b = stops[seg + 1];
+        const m = (k) => Math.round(a[k] + (b[k] - a[k]) * f);
+        return 'rgb(' + m(0) + ',' + m(1) + ',' + m(2) + ')';
+      }
+
+      // ---- canvas sizing (crisp on HiDPI) ----
+      let W = 0;
+      let H = 0;
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        W = innerWidth;
+        H = innerHeight;
+        canvas.width = Math.floor(W * dpr);
+        canvas.height = Math.floor(H * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      addEventListener('resize', resize);
+      resize();
+
+      // ---- inferred CPU load -------------------------------------------------
+      // Time a fixed unit of work and compare it to the fastest we've ever seen.
+      // When something else contends for the core, the same loop takes longer —
+      // a load signal with no permission prompt and no API to ask. Open a heavy
+      // tab and the wallpaper heats up.
+      let baseProbe = Infinity;
+      let sink = 0;
+      function cpuProbe() {
+        const t0 = performance.now();
+        let x = 0;
+        for (let i = 0; i < 60000; i++) x = (x + Math.sqrt(i + 1)) % 1000003;
+        sink += x;
+        self.__sc = sink; // keep the timing loop from being optimised away
+        const dt = performance.now() - t0;
+        baseProbe = Math.min(dt, baseProbe * 1.0006);
+        if (!isFinite(baseProbe)) baseProbe = dt;
+        return Math.max(0, Math.min(1, (dt - baseProbe) / (baseProbe * 2)));
+      }
+      let load = 0; // smoothed 0..1
+
+      // ---- tilt: gyroscope on mobile, pointer on desktop ----
+      let tiltX = 0;
+      let tiltY = 0;
+      let tgX = 0;
+      let tgY = 0;
+      let tiltSource = 'pointer';
+      addEventListener('pointermove', (e) => {
+        if (tiltSource === 'gyro') return;
+        tgX = (e.clientX / innerWidth) * 2 - 1;
+        tgY = (e.clientY / innerHeight) * 2 - 1;
+      });
+      function onTilt(e) {
+        if (e.gamma == null && e.beta == null) return;
+        tiltSource = 'gyro';
+        tgX = Math.max(-1, Math.min(1, (e.gamma || 0) / 40));
+        tgY = Math.max(-1, Math.min(1, ((e.beta || 0) - 90) / 40));
+      }
+      function enableGyro() {
+        if (typeof DeviceOrientationEvent === 'undefined') return;
+        // iOS gates motion behind a gesture; Android exposes it freely.
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission()
+            .then((s) => {
+              if (s === 'granted')
+                addEventListener('deviceorientation', onTilt);
+            })
+            .catch(() => {});
+        } else {
+          addEventListener('deviceorientation', onTilt);
+        }
+      }
+      enableGyro(); // Android works now; iOS retries on the first ✦ gesture
+
+      // ---- gravity + motion via the Generic Sensor API (Android; auto-granted,
+      // no prompt). Feature-detected and guarded; otherwise the pointer /
+      // deviceorientation fallback above still drives the tilt. ----
+      let gx = 0; // gravity vector, device frame
+      let gy = 0;
+      let haveGravity = false;
+      let shakeRaw = 0; // momentary linear-acceleration magnitude
+      let shake = 0; // smoothed 0..1 — "is the phone being moved?"
+
+      function startSensor(Ctor, onReading) {
+        if (typeof Ctor !== 'function') return null;
+        try {
+          const s = new Ctor({frequency: 30});
+          s.addEventListener('reading', () => onReading(s));
+          s.addEventListener('error', () => {}); // no hardware / blocked by policy
+          s.start();
+          return s;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      // Gravity -> the "down" direction; drives the pooling current.
+      startSensor(self.GravitySensor, (s) => {
+        gx = s.x;
+        gy = s.y;
+        haveGravity = true;
+        tiltSource = 'gravity';
+      });
+      // Linear acceleration (gravity removed) -> a shake / motion burst.
+      startSensor(self.LinearAccelerationSensor, (s) => {
+        shakeRaw = Math.max(
+          shakeRaw,
+          Math.min(1, Math.hypot(s.x || 0, s.y || 0, s.z || 0) / 14)
+        );
+      });
+
+      // ---- active network side channel: time a small same-origin fetch and
+      // pulse the field to that rhythm. Paused while the tab is hidden. ----
+      let netMs = null;
+      let netPulse = 0;
+      function probeNetwork() {
+        if (document.hidden) return;
+        const base = location.href.split('#')[0];
+        const url =
+          base + (base.indexOf('?') < 0 ? '?' : '&') + 'net=' + Date.now();
+        const t0 = performance.now();
+        fetch(url, {cache: 'no-store', credentials: 'omit'})
+          .then((r) => r.blob())
+          .then(() => {
+            netMs = Math.round(performance.now() - t0);
+            netPulse = 1;
+          })
+          .catch(() => {});
+      }
+      setInterval(probeNetwork, 4000);
+      probeNetwork();
+
+      // ---- constellation; particle count scales with the core count ----
+      const N = Math.max(40, Math.min(150, cores * 14));
+      const pts = [];
+      for (let i = 0; i < N; i++) {
+        pts.push({
+          x: Math.random() * innerWidth,
+          y: Math.random() * innerHeight,
+          z: 0.25 + Math.random() * 0.75,
+          dx: (Math.random() - 0.5) * 0.5, // constant ambient drift
+          dy: (Math.random() - 0.5) * 0.5,
+          vx: 0, // dynamic velocity: gravity + shake
+          vy: 0,
+          sx: 0,
+          sy: 0
+        });
+      }
+
+      let fc = 0;
+      let lastT = 0;
+      let baseDelta = Infinity;
+      function frame() {
+        requestAnimationFrame(frame);
+        if (document.hidden) {
+          lastT = 0; // don't let the resume gap look like a stall
+          return;
+        }
+        // Frame-pacing jank: when the machine is busy our own frames slip past
+        // the refresh interval — a second, render-side contention signal that
+        // catches load the fixed-work probe can miss on a many-core box.
+        const now = performance.now();
+        const delta = lastT ? now - lastT : 16.7;
+        lastT = now;
+        baseDelta = Math.min(delta, baseDelta * 1.0006);
+        if (!isFinite(baseDelta)) baseDelta = delta;
+        // Deadzone: only frames >1.5x our fastest count as jank, so ordinary
+        // frame-pacing noise doesn't read as load (keeps idle genuinely cool).
+        const jank = Math.max(0, Math.min(1, (delta / baseDelta - 1.5) / 2));
+
+        const reduced = reduce.matches;
+        fc++;
+        if (reduced && fc % 30 !== 0) return; // hold near-still for reduced motion
+
+        load += (Math.max(cpuProbe(), jank) - load) * 0.08;
+        tiltX += (tgX - tiltX) * 0.08;
+        tiltY += (tgY - tiltY) * 0.08;
+
+        // shake spikes then decays fast; the network ping fades slowly
+        shake = Math.max(shake * 0.9, shakeRaw);
+        shakeRaw *= 0.6;
+        netPulse *= 0.95;
+
+        // gravity's in-plane component = "down" on screen (zero when flat)
+        let poolX = 0;
+        let poolY = 0;
+        if (haveGravity) {
+          poolX = Math.max(-1, Math.min(1, gx / 9.81));
+          poolY = Math.max(-1, Math.min(1, -gy / 9.81));
+        }
+
+        // colour energy = CPU load, briefly flashed hot by a shake
+        const stroke = heat(Math.max(load, shake));
+        const jit = reduced ? 0 : load * load * 8;
+        const par = reduced ? 0 : 1;
+
+        // trails while animating; clean wipe under reduced motion
+        ctx.fillStyle = reduced ? '#0b0f14' : 'rgba(11,15,20,0.28)';
+        ctx.fillRect(0, 0, W, H);
+
+        for (let i = 0; i < N; i++) {
+          const p = pts[i];
+          if (!reduced) {
+            // gravity pull + shake chaos + a little brownian life, damped
+            const chaos = 0.03 + shake * 1.2;
+            p.vx += poolX * 0.05 + (Math.random() - 0.5) * chaos;
+            p.vy += poolY * 0.05 + (Math.random() - 0.5) * chaos;
+            p.vx = Math.max(-12, Math.min(12, p.vx * 0.94));
+            p.vy = Math.max(-12, Math.min(12, p.vy * 0.94));
+            p.x += p.dx + p.vx;
+            p.y += p.dy + p.vy;
+            if (p.x < -20) p.x = innerWidth + 20;
+            if (p.x > innerWidth + 20) p.x = -20;
+            if (p.y < -20) p.y = innerHeight + 20;
+            if (p.y > innerHeight + 20) p.y = -20;
+          }
+          p.sx = p.x + tiltX * p.z * 36 * par + (Math.random() - 0.5) * jit;
+          p.sy = p.y + tiltY * p.z * 36 * par + (Math.random() - 0.5) * jit;
+        }
+
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = stroke;
+        for (let i = 0; i < N; i++) {
+          const a = pts[i];
+          for (let j = i + 1; j < N; j++) {
+            const b = pts[j];
+            const dx = a.sx - b.sx;
+            const dy = a.sy - b.sy;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < 13000) {
+              ctx.globalAlpha = (1 - d2 / 13000) * 0.5;
+              ctx.beginPath();
+              ctx.moveTo(a.sx, a.sy);
+              ctx.lineTo(b.sx, b.sy);
+              ctx.stroke();
+            }
+          }
+        }
+
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = stroke;
+        for (let i = 0; i < N; i++) {
+          const p = pts[i];
+          ctx.beginPath();
+          ctx.arc(p.sx, p.sy, 1.6 + p.z * 1.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // network ping: a ring expanding from centre on each completed probe,
+        // tinted by the measured latency (fast = cool, slow = hot).
+        if (netPulse > 0.02 && !reduced) {
+          ctx.globalAlpha = netPulse * 0.25;
+          ctx.strokeStyle = heat(netMs == null ? 0 : Math.min(1, netMs / 400));
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(
+            W / 2,
+            H / 2,
+            (1 - netPulse) * Math.max(W, H) * 0.7,
+            0,
+            Math.PI * 2
+          );
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+      requestAnimationFrame(frame);
+
+      function updateReadout() {
+        readout.textContent =
+          'cpu ' +
+          String(Math.round(load * 100)).padStart(2, ' ') +
+          '%   cores ' +
+          cores +
+          '   ' +
+          tiltSource +
+          (netMs != null
+            ? '   net ' + netMs + 'ms'
+            : rtt != null
+              ? '   rtt ' + rtt + 'ms'
+              : '');
+      }
+      setInterval(updateReadout, 200);
+
+      // ---------- host bridge (shaderwall protocol) ----------
+      let shown = false;
+      function setShown(value) {
+        shown = value;
+        if (value) enableGyro(); // the ✦ click is the gesture iOS wants
+        window.parent.postMessage(
+          {type: 'shaderwall', state: shown ? 'shown' : 'hidden'},
+          location.origin
+        );
+      }
+      addEventListener('message', (e) => {
+        if (e.origin != location.origin) return;
+        const d = e.data || {};
+        if (d.type !== 'shaderwall') return;
+        if (d.action === 'show') setShown(true);
+        else if (d.action === 'hide') setShown(false);
+        else if (d.action === 'toggle') setShown(!shown);
+      });
+      addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H') setShown(!shown);
+      });
+      setShown(false);
+    </script>
+  </body>
+</html>
