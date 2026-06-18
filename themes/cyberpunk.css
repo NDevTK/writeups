@@ -283,3 +283,10 @@ pre code {
       2px -2px #39ff14;
   }
 }
+
+/* Respect a reduced-motion preference: drop the heading glitch. */
+@media (prefers-reduced-motion: reduce) {
+  .markdown-body h1:hover {
+    animation: none;
+  }
+}

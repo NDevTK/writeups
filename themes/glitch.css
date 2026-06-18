@@ -274,3 +274,12 @@ textarea {
 body {
   background-color: black;
 }
+
+/* Respect a reduced-motion preference: stop the looping/hover glitches. */
+@media (prefers-reduced-motion: reduce) {
+  hr,
+  a:hover,
+  a:focus {
+    animation: none;
+  }
+}

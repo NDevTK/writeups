@@ -280,8 +280,18 @@ themes.onchange = async () => {
           '',
           'width=1000000000,height=1'
         );
-        w.resizeBy(0, -100000);
-        setInterval((_) => w.focus(), 5);
+        // Popups can be blocked (w is null); and once the user closes the
+        // window, stop poking it so we don't spam focus() on a closed window.
+        if (w) {
+          w.resizeBy(0, -100000);
+          const focusLoop = setInterval(() => {
+            if (w.closed) {
+              clearInterval(focusLoop);
+              return;
+            }
+            w.focus();
+          }, 5);
+        }
       }
       break;
     case 'ai.tmp':

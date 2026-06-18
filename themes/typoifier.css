@@ -52,3 +52,13 @@ body {
     background-position: 0% 50%;
   }
 }
+
+/* Respect a reduced-motion preference: hold the gradient still. */
+@media (prefers-reduced-motion: reduce) {
+  body {
+    -webkit-animation: none;
+    -moz-animation: none;
+    -o-animation: none;
+    animation: none;
+  }
+}
