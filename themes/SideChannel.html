@@ -198,6 +198,48 @@
       setInterval(probeNetwork, 4000);
       probeNetwork();
 
+      // ---- Battery Status API: permission-free, and itself a privacy side
+      // channel (Firefox removed it and Safari never shipped it for exactly
+      // that reason). Level drives the field's vitality; charging adds a rising
+      // green pulse. Chrome / Android only — elsewhere it's simply absent. ----
+      let batLevel = 1;
+      let batCharging = false;
+      let haveBattery = false;
+      let chargePhase = 0;
+      if (navigator.getBattery) {
+        navigator
+          .getBattery()
+          .then((b) => {
+            haveBattery = true;
+            const sync = () => {
+              batLevel = b.level;
+              batCharging = b.charging;
+            };
+            sync();
+            b.addEventListener('levelchange', sync);
+            b.addEventListener('chargingchange', sync);
+          })
+          .catch(() => {});
+      }
+
+      // ---- Compute Pressure API: the platform's own CPU-pressure verdict — the
+      // official version of the timing probe. Four coarse states, smoothed into
+      // a floor under the continuous signal so it anchors without stepping. ----
+      const PRESSURE = {nominal: 0, fair: 0.4, serious: 0.75, critical: 1};
+      let pressureTarget = 0;
+      let pressureLevel = 0; // smoothed
+      if (typeof PressureObserver === 'function') {
+        try {
+          const po = new PressureObserver((records) => {
+            const last = records[records.length - 1];
+            if (last && last.state in PRESSURE)
+              pressureTarget = PRESSURE[last.state];
+          });
+          const r = po.observe('cpu', {sampleInterval: 1000});
+          if (r && r.catch) r.catch(() => {});
+        } catch (e) {}
+      }
+
       // ---- constellation; particle count scales with the core count ----
       const N = Math.max(40, Math.min(150, cores * 14));
       const pts = [];
@@ -240,7 +282,9 @@
         fc++;
         if (reduced && fc % 30 !== 0) return; // hold near-still for reduced motion
 
-        load += (Math.max(cpuProbe(), jank) - load) * 0.08;
+        // glide between the four pressure states so the floor never steps
+        pressureLevel += (pressureTarget - pressureLevel) * 0.05;
+        load += (Math.max(cpuProbe(), jank, pressureLevel) - load) * 0.08;
         tiltX += (tgX - tiltX) * 0.08;
         tiltY += (tgY - tiltY) * 0.08;
 
@@ -261,6 +305,8 @@
         const stroke = heat(Math.max(load, shake));
         const jit = reduced ? 0 : load * load * 8;
         const par = reduced ? 0 : 1;
+        // battery level -> overall vitality (brightness); full when no API
+        const vitality = haveBattery ? 0.35 + batLevel * 0.65 : 1;
 
         // trails while animating; clean wipe under reduced motion
         ctx.fillStyle = reduced ? '#0b0f14' : 'rgba(11,15,20,0.28)';
@@ -296,7 +342,7 @@
             const dy = a.sy - b.sy;
             const d2 = dx * dx + dy * dy;
             if (d2 < 13000) {
-              ctx.globalAlpha = (1 - d2 / 13000) * 0.5;
+              ctx.globalAlpha = (1 - d2 / 13000) * 0.5 * vitality;
               ctx.beginPath();
               ctx.moveTo(a.sx, a.sy);
               ctx.lineTo(b.sx, b.sy);
@@ -305,13 +351,27 @@
           }
         }
 
-        ctx.globalAlpha = 0.9;
+        ctx.globalAlpha = 0.9 * vitality;
         ctx.fillStyle = stroke;
         for (let i = 0; i < N; i++) {
           const p = pts[i];
           ctx.beginPath();
           ctx.arc(p.sx, p.sy, 1.6 + p.z * 1.4, 0, Math.PI * 2);
           ctx.fill();
+        }
+
+        // charging: a soft green pulse rising from the bottom edge
+        if (batCharging && !reduced) {
+          chargePhase += 0.008;
+          if (chargePhase > 1) chargePhase = 0;
+          const cy = H * (1 - chargePhase);
+          const ca = Math.sin(chargePhase * Math.PI) * 0.18 * vitality;
+          const g = ctx.createLinearGradient(0, cy - 42, 0, cy + 42);
+          g.addColorStop(0, 'rgba(60,220,130,0)');
+          g.addColorStop(0.5, 'rgba(60,220,130,' + ca + ')');
+          g.addColorStop(1, 'rgba(60,220,130,0)');
+          ctx.fillStyle = g;
+          ctx.fillRect(0, cy - 42, W, 84);
         }
 
         // network ping: a ring expanding from centre on each completed probe,
@@ -342,6 +402,12 @@
           cores +
           '   ' +
           tiltSource +
+          (haveBattery
+            ? '   bat ' +
+              Math.round(batLevel * 100) +
+              '%' +
+              (batCharging ? '⚡' : '')
+            : '') +
           (netMs != null
             ? '   net ' + netMs + 'ms'
             : rtt != null
