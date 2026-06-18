@@ -52,3 +52,26 @@ body {
     background-position: 0% 50%;
   }
 }
+
+/* Respect a reduced-motion preference: hold the gradient still. */
+@media (prefers-reduced-motion: reduce) {
+  body {
+    -webkit-animation: none;
+    -moz-animation: none;
+    -o-animation: none;
+    animation: none;
+  }
+}
+
+/* The animated gradient passes through the usual link blue, so links would
+   vanish on that phase. Give them a high-contrast, subtitle-style treatment
+   (light fill, dark outline) that stays legible on every colour — the typos
+   are the joke, an invisible link is just a bug. */
+a {
+  color: #fff;
+  font-weight: 700;
+  text-decoration: underline;
+  text-shadow:
+    0 0 2px #000,
+    1px 1px 1px #000;
+}
