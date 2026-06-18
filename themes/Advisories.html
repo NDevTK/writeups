@@ -361,10 +361,12 @@
       loadMore();
 
       // Gentle auto-scroll so it lives as a wallpaper; pauses while you read it
-      // (controls shown) or when the tab is hidden.
+      // (controls shown), when the tab is hidden, or when the visitor asked for
+      // reduced motion (they can still scroll it by hand once controls show).
       let shown = false;
+      const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
       function frame() {
-        if (!shown && !document.hidden) {
+        if (!shown && !document.hidden && !reduceMotion.matches) {
           feed.scrollTop += 0.4;
           if (feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 1)
             feed.scrollTop = 0;
