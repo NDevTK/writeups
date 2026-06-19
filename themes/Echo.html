@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Echo</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0b0f14;
+      }
+      #c {
+        position: fixed;
+        inset: 0;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script>
+      'use strict';
+
+      const canvas = document.getElementById('c');
+      const ctx = canvas.getContext('2d');
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+
+      let W = 0;
+      let H = 0;
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        W = innerWidth;
+        H = innerHeight;
+        canvas.width = Math.floor(W * dpr);
+        canvas.height = Math.floor(H * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      addEventListener('resize', resize);
+      resize();
+
+      // The wallpaper is made of the page's own words. This is a same-origin
+      // iframe, so it can read the host document directly; if it's ever opened
+      // on its own it falls back to a thematic word list.
+      const FALLBACK = [
+        'XSS', 'CSP', 'origin', 'token', 'sandbox', 'payload', 'cookie',
+        'header', 'fetch', 'iframe', 'nonce', 'RCE', 'CSRF', 'prototype',
+        'sanitize', 'escape', 'redirect', 'SSRF', 'referrer', 'postMessage',
+        'clickjack', 'exploit', 'same-origin', 'TrustedTypes'
+      ];
+      function readWords() {
+        try {
+          const doc = window.parent.document;
+          if (doc !== document) {
+            const el = doc.querySelector('#content') || doc.body;
+            const raw = (el.innerText || '').split(/\s+/);
+            const seen = {};
+            const out = [];
+            for (let i = 0; i < raw.length && out.length < 300; i++) {
+              const w = raw[i].replace(/[^\w:/.\-]/g, '');
+              if (w.length > 2 && w.length < 26 && !seen[w]) {
+                seen[w] = 1;
+                out.push(w);
+              }
+            }
+            if (out.length > 8) return out;
+          }
+        } catch (e) {}
+        return FALLBACK;
+      }
+      let words = readWords();
+      // The host content can settle a beat after we load — re-read once.
+      setTimeout(() => {
+        words = readWords();
+      }, 1200);
+
+      function pick() {
+        return words[(Math.random() * words.length) | 0];
+      }
+
+      const N = 70;
+      const field = [];
+      function spawn(p, atBottom) {
+        p.text = pick();
+        p.z = 0.3 + Math.random() * 0.7;
+        p.x = Math.random() * W;
+        p.y = atBottom ? H + 20 + Math.random() * 80 : Math.random() * H;
+        p.vx = (Math.random() - 0.5) * 0.2;
+      }
+      for (let i = 0; i < N; i++) {
+        const p = {};
+        spawn(p, false);
+        field.push(p);
+      }
+
+      let fc = 0;
+      function frame() {
+        requestAnimationFrame(frame);
+        if (document.hidden) return;
+        const reduced = reduce.matches;
+        fc++;
+        if (reduced && fc % 30 !== 0) return; // hold still for reduced motion
+
+        ctx.clearRect(0, 0, W, H);
+        ctx.textBaseline = 'middle';
+        for (let i = 0; i < N; i++) {
+          const p = field[i];
+          if (!reduced) {
+            p.y -= 0.25 + p.z * 0.5; // rise — the words evaporate upward
+            p.x += p.vx;
+            if (p.y < -20) spawn(p, true); // respawn at the bottom, new word
+          }
+          // emerge from the bottom, peak mid-screen, fade as they reach the top
+          const t = p.y / H;
+          const alpha = Math.max(0, Math.sin(t * Math.PI)) * 0.5 * p.z;
+          if (alpha < 0.01) continue;
+          ctx.font = (11 + p.z * 16).toFixed(0) + 'px ui-monospace, monospace';
+          ctx.fillStyle = 'rgba(127, 208, 255, ' + alpha.toFixed(3) + ')';
+          ctx.fillText(p.text, p.x, p.y);
+        }
+      }
+      requestAnimationFrame(frame);
+
+      // ---------- host bridge (shaderwall protocol) ----------
+      let shown = false;
+      function setShown(value) {
+        shown = value;
+        window.parent.postMessage(
+          {type: 'shaderwall', state: shown ? 'shown' : 'hidden'},
+          location.origin
+        );
+      }
+      addEventListener('message', (e) => {
+        if (e.origin != location.origin) return;
+        const d = e.data || {};
+        if (d.type !== 'shaderwall') return;
+        if (d.action === 'show') setShown(true);
+        else if (d.action === 'hide') setShown(false);
+        else if (d.action === 'toggle') setShown(!shown);
+      });
+      addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H') setShown(!shown);
+      });
+      setShown(false);
+    </script>
+  </body>
+</html>
