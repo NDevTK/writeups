@@ -163,7 +163,7 @@ if (theme.endsWith('.html')) {
   btn.addEventListener('click', function () {
     frame.contentWindow.postMessage({type: 'shaderwall', action: 'toggle'});
   });
- 
+
   window.addEventListener('message', function (e) {
     if (e.origin != location.origin) return;
     if (e.data === 'deleteme') {
