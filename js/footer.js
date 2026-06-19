@@ -163,8 +163,7 @@ if (theme.endsWith('.html')) {
   btn.addEventListener('click', function () {
     frame.contentWindow.postMessage({type: 'shaderwall', action: 'toggle'});
   });
-  // no clickjacking
-  if (window.top === window) document.body.appendChild(btn);
+ 
   window.addEventListener('message', function (e) {
     if (e.origin != location.origin) return;
     if (e.data === 'deleteme') {
@@ -174,6 +173,8 @@ if (theme.endsWith('.html')) {
     }
     var d = e.data || {};
     if (d.type !== 'shaderwall') return;
+    // no clickjacking, sending shaderwall type shows embed support
+    if (window.top === window) document.body.appendChild(btn);
     if (d.state === 'shown') {
       frame.style.zIndex = '2147483646';
       frame.style.pointerEvents = 'auto';
