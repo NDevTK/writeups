@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bleed</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0b0f14;
+      }
+      #c {
+        position: fixed;
+        inset: 0;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script>
+      'use strict';
+
+      const canvas = document.getElementById('c');
+      const ctx = canvas.getContext('2d');
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+
+      let W = 0;
+      let H = 0;
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        W = innerWidth;
+        H = innerHeight;
+        canvas.width = Math.floor(W * dpr);
+        canvas.height = Math.floor(H * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      addEventListener('resize', resize);
+      resize();
+
+      function hslToRgb(h, s, l) {
+        h = ((h % 360) + 360) % 360;
+        s /= 100;
+        l /= 100;
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+        const m = l - c / 2;
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        if (h < 60) (r = c), (g = x);
+        else if (h < 120) (r = x), (g = c);
+        else if (h < 180) (g = c), (b = x);
+        else if (h < 240) (g = x), (b = c);
+        else if (h < 300) (r = c), (b = x);
+        else (r = c), (b = x);
+        return [
+          Math.round((r + m) * 255),
+          Math.round((g + m) * 255),
+          Math.round((b + m) * 255)
+        ];
+      }
+
+      // Soft drifting colour blobs -> an aurora; its hue slowly cycles.
+      const blobs = [];
+      for (let i = 0; i < 5; i++) {
+        blobs.push({
+          x: Math.random() * innerWidth,
+          y: Math.random() * innerHeight,
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: (Math.random() - 0.5) * 0.3,
+          off: i * 55,
+          r: Math.max(innerWidth, innerHeight) * (0.4 + Math.random() * 0.3)
+        });
+      }
+      let hue = Math.random() * 360;
+
+      // ---- reach through the same-origin parent into its <head> and paint the
+      // browser chrome itself: the address-bar / status-bar tint (theme-color)
+      // and a live favicon. The background leaves the page. ----
+      function parentDoc() {
+        try {
+          const d = window.parent.document;
+          return d !== document ? d : null;
+        } catch (e) {
+          return null;
+        }
+      }
+      const host = parentDoc();
+      let favCanvas = null;
+      if (host) {
+        favCanvas = document.createElement('canvas');
+        favCanvas.width = favCanvas.height = 64;
+      }
+      function setMeta(name, val) {
+        let m = host.querySelector('meta[name="' + name + '"]');
+        if (!m) {
+          m = host.createElement('meta');
+          m.setAttribute('name', name);
+          host.head.appendChild(m);
+        }
+        m.setAttribute('content', val);
+      }
+      function setFavicon(url) {
+        let l = host.querySelector('link[rel~="icon"]');
+        if (!l) {
+          l = host.createElement('link');
+          l.setAttribute('rel', 'icon');
+          host.head.appendChild(l);
+        }
+        l.setAttribute('href', url);
+      }
+      let lastSpill = 0;
+      function spill(now) {
+        if (!host || now - lastSpill < 350) return;
+        lastSpill = now;
+        // a deep version of the current hue for the browser UI tint
+        const [r, g, b] = hslToRgb(hue, 55, 26);
+        setMeta('theme-color', 'rgb(' + r + ',' + g + ',' + b + ')');
+        // a tiny aurora snapshot for the tab icon
+        const f = favCanvas.getContext('2d');
+        f.fillStyle = '#0b0f14';
+        f.fillRect(0, 0, 64, 64);
+        f.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 3; i++) {
+          const [br, bg, bb] = hslToRgb(hue + i * 45, 70, 55);
+          const gx = 16 + i * 18;
+          const gy = 20 + ((i * 23) % 40);
+          const grd = f.createRadialGradient(gx, gy, 0, gx, gy, 40);
+          grd.addColorStop(0, 'rgba(' + br + ',' + bg + ',' + bb + ',0.9)');
+          grd.addColorStop(1, 'rgba(' + br + ',' + bg + ',' + bb + ',0)');
+          f.fillStyle = grd;
+          f.fillRect(0, 0, 64, 64);
+        }
+        f.globalCompositeOperation = 'source-over';
+        try {
+          setFavicon(favCanvas.toDataURL('image/png'));
+        } catch (e) {}
+      }
+
+      function frame(now) {
+        requestAnimationFrame(frame);
+        if (document.hidden) return;
+        const reduced = reduce.matches;
+        if (!reduced) hue += 0.06;
+
+        ctx.fillStyle = '#0b0f14';
+        ctx.fillRect(0, 0, W, H);
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < blobs.length; i++) {
+          const bl = blobs[i];
+          if (!reduced) {
+            bl.x += bl.vx;
+            bl.y += bl.vy;
+            if (bl.x < 0 || bl.x > W) bl.vx *= -1;
+            if (bl.y < 0 || bl.y > H) bl.vy *= -1;
+          }
+          const [r, g, b] = hslToRgb(hue + bl.off, 70, 55);
+          const grd = ctx.createRadialGradient(bl.x, bl.y, 0, bl.x, bl.y, bl.r);
+          grd.addColorStop(0, 'rgba(' + r + ',' + g + ',' + b + ',0.45)');
+          grd.addColorStop(1, 'rgba(' + r + ',' + g + ',' + b + ',0)');
+          ctx.fillStyle = grd;
+          ctx.fillRect(0, 0, W, H);
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        spill(now);
+      }
+      requestAnimationFrame(frame);
+
+      // ---------- host bridge (shaderwall protocol) ----------
+      let shown = false;
+      function setShown(value) {
+        shown = value;
+        window.parent.postMessage(
+          {type: 'shaderwall', state: shown ? 'shown' : 'hidden'},
+          location.origin
+        );
+      }
+      addEventListener('message', (e) => {
+        if (e.origin != location.origin) return;
+        const d = e.data || {};
+        if (d.type !== 'shaderwall') return;
+        if (d.action === 'show') setShown(true);
+        else if (d.action === 'hide') setShown(false);
+        else if (d.action === 'toggle') setShown(!shown);
+      });
+      addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H') setShown(!shown);
+      });
+      setShown(false);
+    </script>
+  </body>
+</html>
