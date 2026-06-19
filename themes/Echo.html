@@ -45,10 +45,30 @@
       // iframe, so it can read the host document directly; if it's ever opened
       // on its own it falls back to a thematic word list.
       const FALLBACK = [
-        'XSS', 'CSP', 'origin', 'token', 'sandbox', 'payload', 'cookie',
-        'header', 'fetch', 'iframe', 'nonce', 'RCE', 'CSRF', 'prototype',
-        'sanitize', 'escape', 'redirect', 'SSRF', 'referrer', 'postMessage',
-        'clickjack', 'exploit', 'same-origin', 'TrustedTypes'
+        'XSS',
+        'CSP',
+        'origin',
+        'token',
+        'sandbox',
+        'payload',
+        'cookie',
+        'header',
+        'fetch',
+        'iframe',
+        'nonce',
+        'RCE',
+        'CSRF',
+        'prototype',
+        'sanitize',
+        'escape',
+        'redirect',
+        'SSRF',
+        'referrer',
+        'postMessage',
+        'clickjack',
+        'exploit',
+        'same-origin',
+        'TrustedTypes'
       ];
       function readWords() {
         try {
