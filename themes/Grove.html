@@ -2494,6 +2494,10 @@
             f.vy = (Math.random() - 0.5) * 0.8;
             f.lo = 470;
             f.hi = 590;
+            f.isButterfly = true; // can alight on a flower to rest, then lift off
+            f.settleTmr = 3 + Math.random() * 7;
+            f.settled = 0;
+            f.landing = false;
             flutters.push(f);
             scene.addChild(f);
           }
@@ -4029,6 +4033,47 @@
               f.y = 120 + Math.random() * 80;
             }
             continue;
+          }
+          if (f.isButterfly) {
+            if (f.settled > 0) {
+              // resting on a flower with folded wings; lifts off when the rest is over
+              f.settled -= dt / 60;
+              f.alpha += ((raining ? 0 : 1) - f.alpha) * 0.04 * dt;
+              if (f.settled <= 0 || raining) {
+                f.play();
+                f.settleTmr = 6 + Math.random() * 9;
+                f.vy = -0.7; // a flick upward as it leaves
+                f.vx = (Math.random() - 0.5) * 1.2;
+              }
+              continue;
+            }
+            if (f.landing) {
+              // descending toward the chosen flower; bail out and fly off if a shower starts
+              if (raining) {
+                f.landing = false;
+                f.settleTmr = 4 + Math.random() * 6;
+              } else {
+                f.x += (f.tx - f.x) * 0.05 * dt;
+                f.y += (f.ty - f.y) * 0.07 * dt;
+                if (Math.abs(f.y - f.ty) < 3 && Math.abs(f.x - f.tx) < 6) {
+                  f.landing = false;
+                  f.settled = 1.6 + Math.random() * 2.8;
+                  f.gotoAndStop(0); // alight, wings folded
+                }
+                continue;
+              }
+            }
+            f.settleTmr -= dt / 60;
+            if (f.settleTmr <= 0 && !raining) {
+              // choose a nearby spot on the ground to alight
+              f.landing = true;
+              f.tx = Math.max(
+                40,
+                Math.min(VW - 40, f.x + (Math.random() - 0.5) * 140)
+              );
+              f.ty = groundY(f.tx) - 2;
+              continue;
+            }
           }
           f.x += f.vx * dt;
           f.y += f.vy * dt;
