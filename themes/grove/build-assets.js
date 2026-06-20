@@ -1122,8 +1122,66 @@ save(
   120
 );
 
+// ---- wildlife: seal (fjord), dolphin (coast), marmot (alpine) ----
+// harbour seal hauled out: plump body, raised head, rear flippers, soft spots (faces right)
+save(
+  'seal',
+  S(
+    '172 90',
+    `<defs><radialGradient id="slb" cx="50%" cy="34%"><stop offset="0" stop-color="#9ba7b2"/><stop offset="1" stop-color="#69757f"/></radialGradient></defs>
+<path d="M18,72 C6,68 0,76 9,82 C18,84 27,77 31,73 Z" fill="#69757f"/>
+<path d="M22,72 C16,52 52,46 98,48 C132,50 150,58 150,67 C150,75 118,80 78,80 C48,80 26,82 22,72 Z" fill="url(#slb)"/>
+<g fill="#5b6770" opacity="0.45"><circle cx="58" cy="60" r="3.2"/><circle cx="92" cy="65" r="2.6"/><circle cx="40" cy="67" r="2.6"/><circle cx="112" cy="62" r="2.2"/><circle cx="74" cy="58" r="2.4"/></g>
+<path d="M96,73 C100,83 113,85 117,79 C112,75 104,73 96,73 Z" fill="#606c75"/>
+<path d="M120,58 C123,38 140,30 153,36 C162,42 160,55 151,61 C140,65 127,64 120,58 Z" fill="url(#slb)"/>
+<ellipse cx="156" cy="46" rx="9" ry="6.5" fill="#7a8590"/>
+<circle cx="159" cy="46" r="1.5" fill="#33393f"/>
+<circle cx="146" cy="43" r="2.7" fill="#16191c"/><circle cx="147" cy="42" r="0.9" fill="#fff"/>
+<g stroke="#cfd6dd" stroke-width="0.8" opacity="0.7" fill="none"><path d="M157,48 L170,50"/><path d="M157,50 L169,54"/></g>`
+  ),
+  172
+);
+// dolphin mid-leap: streamlined body, beak, dorsal fin, fluke, pale belly (faces right)
+save(
+  'dolphin',
+  S(
+    '180 96',
+    `<defs><linearGradient id="dlp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5f6e7e"/><stop offset="0.55" stop-color="#8392a1"/><stop offset="1" stop-color="#d2dbe2"/></linearGradient></defs>
+<path d="M12,58 C36,44 84,34 132,40 C150,42 166,48 174,55 C164,57 152,57 142,56 C151,63 159,72 163,82 C147,75 135,67 126,62 C92,68 48,70 24,66 C15,64 10,61 12,58 Z" fill="url(#dlp)"/>
+<path d="M66,38 C72,20 88,18 96,36 C86,34 76,35 66,38 Z" fill="#6f7e8d"/>
+<path d="M40,40 C36,30 42,24 50,28 C48,34 44,38 40,40 Z" fill="#6f7e8d"/>
+<path d="M30,60 C72,67 112,64 142,56 C112,69 70,71 34,65 Z" fill="#dde4ea" opacity="0.6"/>
+<path d="M150,52 C162,50 173,53 176,57 C171,59 160,58 150,57 Z" fill="#7a8a98"/>
+<path d="M150,55 L161,55" stroke="#5f6e7e" stroke-width="1.4" opacity="0.6"/>
+<circle cx="144" cy="50" r="2.6" fill="#15181c"/><circle cx="145" cy="49" r="0.9" fill="#fff"/>`
+  ),
+  180
+);
+// marmot sentinel: sitting upright on its haunches, forepaws at chest (faces forward, right-ish)
+save(
+  'marmot',
+  S(
+    '98 122',
+    `<defs><radialGradient id="mmt" cx="50%" cy="34%"><stop offset="0" stop-color="#a47c4e"/><stop offset="1" stop-color="#6e5132"/></radialGradient></defs>
+<path d="M72,104 C88,100 92,112 82,118 C72,116 68,108 72,104 Z" fill="#6e5132"/>
+<ellipse cx="49" cy="86" rx="31" ry="31" fill="url(#mmt)"/>
+<ellipse cx="49" cy="92" rx="18" ry="22" fill="#caa97a"/>
+<g fill="#6e5132"><ellipse cx="40" cy="78" rx="6" ry="11"/><ellipse cx="58" cy="78" rx="6" ry="11"/></g>
+<circle cx="49" cy="44" r="23" fill="url(#mmt)"/>
+<circle cx="33" cy="27" r="7" fill="#6e5132"/><circle cx="65" cy="27" r="7" fill="#6e5132"/>
+<circle cx="33" cy="27" r="3.4" fill="#8a6845"/><circle cx="65" cy="27" r="3.4" fill="#8a6845"/>
+<ellipse cx="49" cy="51" rx="14" ry="12" fill="#caa97a"/>
+<circle cx="41" cy="41" r="2.8" fill="#1a120c"/><circle cx="57" cy="41" r="2.8" fill="#1a120c"/>
+<circle cx="42" cy="40" r="0.9" fill="#fff"/><circle cx="58" cy="40" r="0.9" fill="#fff"/>
+<ellipse cx="49" cy="52" rx="3.4" ry="2.4" fill="#3a2418"/>
+<path d="M49,54 L49,60 M49,60 Q43,62 40,60 M49,60 Q55,62 58,60" stroke="#7a5436" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+<path d="M44,62 L46,68 M54,62 L52,68" stroke="#caa97a" stroke-width="3" stroke-linecap="round"/>`
+  ),
+  98
+);
+
 // ---- contact sheet of new + polished ----
-const review = ['jungle_tree', 'vine', 'bigleaf', 'toucan', 'monkey'];
+const review = ['seal', 'dolphin', 'marmot'];
 const cols = 4,
   cell = 230,
   pad = 14,
