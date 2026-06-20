@@ -144,7 +144,14 @@
       };
       let timeMode = LS('time') || 'auto',
         seasonMode = LS('season') || 'auto',
-        rainOn = LS('rain') === '1';
+        weatherMode = LS('weather') || 'auto';
+      // weather front runtime: cover = cloud cover (0..1), wet = rain intensity (0..1)
+      let frontState = 'clear',
+        frontT = 60 + Math.random() * 120,
+        cover = 0,
+        wet = 0,
+        rainbow = 0,
+        rainbowLife = 0;
       function nowHour() {
         if (hourParam != null) return parseFloat(hourParam);
         if (timeMode === 'dawn') return 6.4;
@@ -718,6 +725,8 @@
         veil,
         glit,
         rainG,
+        overcastG,
+        rainbowG,
         deer,
         fox,
         rabbit,
@@ -800,6 +809,8 @@
           sg.endFill();
         }
         stars.addChild(sg);
+        rainbowG = new PIXI.Graphics();
+        farLayer.addChild(rainbowG); // rainbow arc (behind the sun/clouds), shown after a daytime shower
         shoot = null;
         shootT = 3 + Math.random() * 5; // shooting-star state (its layer is added on top, below, so the meteor stays above the night veil)
 
@@ -858,6 +869,14 @@
         // ---- scene (everything that night darkens) ----
         scene = new PIXI.Container();
         root.addChild(scene);
+        // overcast: a soft grey wash that dims sky + scene when clouds gather (above the scene, below the rain)
+        overcastG = new PIXI.Graphics();
+        overcastG
+          .beginFill(0x6b7686)
+          .drawRect(-40, -40, VW + 80, VH + 80)
+          .endFill();
+        overcastG.alpha = 0;
+        root.addChild(overcastG);
         if (BI.feature) {
           const fe = spr(BI.feature, 640, 486, 0.95);
           scene.addChild(fe);
@@ -1328,13 +1347,76 @@
         }
         veil.alpha = night * 0.72;
         stars.alpha = night;
+
+        // ---- weather front: clouds gather (cover), a shower rolls through (wet), then it clears ----
+        if (!reduce.matches) {
+          let coverTarget, wetTarget;
+          if (weatherMode === 'rain') {
+            coverTarget = 0.8;
+            wetTarget = 1;
+          } else if (weatherMode === 'clear') {
+            coverTarget = 0;
+            wetTarget = 0;
+          } else {
+            frontT -= dt / 60;
+            if (frontT < 0) {
+              if (frontState === 'clear') {
+                frontState = 'gather';
+                frontT = 20 + Math.random() * 14;
+              } else if (frontState === 'gather') {
+                frontState = 'rain';
+                frontT = 28 + Math.random() * 45;
+              } else if (frontState === 'rain') {
+                frontState = 'clearup';
+                frontT = 30;
+                if (cel.sun && P.light > 0.72) rainbowLife = 24; // sunshower payoff
+              } else {
+                frontState = 'clear';
+                frontT = 150 + Math.random() * 200;
+              }
+            }
+            coverTarget =
+              frontState === 'gather' || frontState === 'rain'
+                ? 0.88
+                : frontState === 'clearup'
+                  ? 0.4
+                  : 0;
+            wetTarget = frontState === 'rain' ? 1 : 0;
+          }
+          cover += (coverTarget - cover) * 0.008 * dt;
+          wet += (wetTarget - wet) * 0.025 * dt;
+          if (rainbowLife > 0) {
+            rainbowLife -= dt / 60;
+            rainbow = Math.sin(Math.max(0, 1 - rainbowLife / 24) * Math.PI);
+          } else rainbow = 0;
+        }
+        overcastG.alpha = cover * 0.55 * (0.25 + P.light * 0.75); // dim by cover, faint at night
+
+        // rainbow: a coloured arc that fades in after a daytime shower clears
+        rainbowG.clear();
+        if (rainbow > 0.01) {
+          const cols = [
+            0xff6a6a, 0xffa84a, 0xffe24a, 0x6ad86a, 0x52a8ff, 0x6a6aff, 0xb06aff
+          ];
+          for (let i = 0; i < 7; i++) {
+            rainbowG.lineStyle(8, cols[i], rainbow * 0.45);
+            rainbowG.arc(640, 620, 420 - i * 8, Math.PI * 1.06, Math.PI * 1.94);
+          }
+        }
+
         // aurora intensity: a slow swell/fade so it has quiet stretches and dramatic bursts
         const auroraI =
           0.22 + 0.78 * Math.pow(0.5 + 0.5 * Math.sin(t * 0.05), 2);
         if (BI.aurora) drawAurora(t, night, auroraI);
         fireflies.fl.alpha = night;
         for (const c of clouds) {
-          c.tint = hexI(lpH('#33406a', '#ffffff', Math.min(1, P.light + 0.05)));
+          c.tint = hexI(
+            lpH(
+              '#33406a',
+              '#ffffff',
+              Math.min(1, P.light + 0.05) * (1 - cover * 0.5)
+            )
+          );
         }
 
         // sun / moon + halo
@@ -1342,12 +1424,13 @@
           other = cel.sun ? moon : sun;
         other.visible = false;
         body.visible = true;
+        body.alpha = 1 - cover * 0.6; // sun/moon fades behind gathering cloud
         body.position.set(cel.x, cel.y);
         sunGlow.visible = true;
         sunGlow.position.set(cel.x, cel.y);
         sunGlow.tint = cel.sun ? 0xffe9a8 : 0x9fb6d8;
         sunGlow.scale.set((cel.sun ? 3.4 : 2.2) + Math.sin(t * 1.5) * 0.12);
-        sunGlow.alpha = cel.sun ? 0.8 : 0.5;
+        sunGlow.alpha = (cel.sun ? 0.8 : 0.5) * (1 - cover * 0.85);
 
         if (reduce.matches) {
           if (deer) deer.gotoAndStop(0);
@@ -1703,20 +1786,22 @@
           if (w.x < -14) w.x = VW + 14;
           else if (w.x > VW + 14) w.x = -14;
         }
-        // rain (toggleable, any season)
-        if (rainOn) {
+        // rain: intensity driven by the weather front (wet); shower slants harder as it picks up
+        if (wet > 0.02) {
           rainG.clear();
-          rainG.lineStyle(1.4, 0xbcd6e8, 0.5);
-          for (const d of rainDrops) {
+          rainG.lineStyle(1.4, 0xbcd6e8, 0.55 * wet);
+          const n = Math.ceil(rainDrops.length * Math.min(1, wet * 1.2));
+          for (let i = 0; i < n; i++) {
+            const d = rainDrops[i];
             d.y += d.sp * dt;
-            d.x += 1.4 * dt;
+            d.x += (1.4 + wet * 1.6) * dt;
             if (d.y > VH) {
               d.y = -d.len;
               d.x = Math.random() * VW;
             }
             if (d.x > VW) d.x -= VW;
             rainG.moveTo(d.x, d.y);
-            rainG.lineTo(d.x - 2.5, d.y + d.len);
+            rainG.lineTo(d.x - 2.5 - wet * 1.5, d.y + d.len);
           }
         } else if (rainG.geometry.graphicsData.length) rainG.clear();
 
@@ -1821,10 +1906,20 @@
             })
           )
         );
+        const WLBL = {
+          auto: '⛅ Weather: Auto',
+          rain: '🌧 Weather: Rain',
+          clear: '☀️ Weather: Clear'
+        };
+        const WNEXT = {auto: 'rain', rain: 'clear', clear: 'auto'};
         uiSeason.appendChild(
-          mkBtn('🌧 Rain', rainOn, () => {
-            rainOn = !rainOn;
-            LS('rain', rainOn ? '1' : '0');
+          mkBtn(WLBL[weatherMode], weatherMode !== 'auto', () => {
+            weatherMode = WNEXT[weatherMode];
+            LS('weather', weatherMode);
+            if (weatherMode === 'auto') {
+              frontState = 'clear';
+              frontT = 30 + Math.random() * 60;
+            }
             buildUI();
           })
         );
