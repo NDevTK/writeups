@@ -1333,8 +1333,38 @@ save(
   116
 );
 
+// ---- GLADE owl (2 wing frames): glides through the twilight on slow beats ----
+// muted cool greys so it sits in the dim glade, with a pale facial disc and big luminous eyes;
+// head turned to face the viewer (owl-style) while the body glides right. up = wings raised.
+const owl = (up) =>
+  S(
+    '152 104',
+    `<defs><linearGradient id="owb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c7e84"/><stop offset="1" stop-color="#565a61"/></linearGradient></defs>
+<path d="M34,62 C20,58 13,64 18,73 C27,75 33,70 39,65 Z" fill="#5c5f64"/>
+${
+  up
+    ? `<path d="M62,54 C46,28 28,20 12,25 C25,35 41,49 56,62 C60,60 61,57 62,54 Z" fill="#6e7177"/>
+<g stroke="#4f5258" stroke-width="1.2" opacity="0.5"><path d="M22,28 L40,46"/><path d="M33,24 L48,44"/></g>`
+    : `<path d="M62,66 C46,86 28,92 12,86 C25,78 41,68 56,60 C60,62 61,64 62,66 Z" fill="#5a5d63"/>
+<g stroke="#4f5258" stroke-width="1.2" opacity="0.5"><path d="M22,84 L40,66"/><path d="M33,88 L48,68"/></g>`
+}
+<ellipse cx="68" cy="62" rx="33" ry="23" fill="url(#owb)"/>
+<g fill="#494c52" opacity="0.4"><circle cx="58" cy="60" r="2"/><circle cx="72" cy="66" r="2"/><circle cx="64" cy="70" r="1.8"/><circle cx="80" cy="62" r="1.8"/></g>
+<path d="M92,28 C90,16 96,15 100,25 Z" fill="#54575c"/>
+<path d="M120,28 C122,16 116,15 112,25 Z" fill="#54575c"/>
+<circle cx="106" cy="50" r="26" fill="url(#owb)"/>
+<path d="M106,28 C127,28 129,58 106,69 C83,58 85,28 106,28 Z" fill="#dfe2d4"/>
+<circle cx="95" cy="48" r="11" fill="#eaffb0" opacity="0.35"/><circle cx="117" cy="48" r="11" fill="#eaffb0" opacity="0.35"/>
+<circle cx="95" cy="48" r="9" fill="#eaffb0"/><circle cx="117" cy="48" r="9" fill="#eaffb0"/>
+<circle cx="96" cy="49" r="4.6" fill="#1c1810"/><circle cx="118" cy="49" r="4.6" fill="#1c1810"/>
+<circle cx="97" cy="47" r="1.4" fill="#fff"/><circle cx="119" cy="47" r="1.4" fill="#fff"/>
+<path d="M106,55 L101,63 L111,63 Z" fill="#c98f33"/>`
+  );
+save('owl_a', owl(true), 152);
+save('owl_b', owl(false), 152);
+
 // ---- contact sheet of new + polished ----
-const review = ['mushroom_a', 'mushroom_b'];
+const review = ['owl_a', 'owl_b'];
 const cols = 4,
   cell = 230,
   pad = 14,
