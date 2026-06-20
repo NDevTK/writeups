@@ -818,8 +818,24 @@ save(
   160
 );
 
-// ---- NEW: waterfall set — a craggy overhanging rock ledge + falling water (2 flow frames) ----
-// bigrock + falls share one 380x340 frame so the water overlays the rock exactly when placed together
+// distant coastal headland: a layered rock promontory with a green scrub cap and a shadowed lee
+// face — a discrete landform, so a designed sprite; placed on the sea horizon and hazed
+save(
+  'headland',
+  S(
+    '250 196',
+    `<defs><linearGradient id="hl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9c9486"/><stop offset="1" stop-color="#6c655a"/></linearGradient>
+<linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fb066"/><stop offset="1" stop-color="#6c9047"/></linearGradient></defs>
+<path d="M18,196 L34,84 L92,52 L156,56 L214,86 L232,196 Z" fill="url(#hl)"/>
+<path d="M30,108 L222,110 L221,122 L31,120 Z" fill="#857c6e" opacity="0.5"/>
+<path d="M26,146 L226,148 L225,160 L27,158 Z" fill="#857c6e" opacity="0.45"/>
+<path d="M156,56 L214,86 L232,196 L182,196 Z" fill="#564f45" opacity="0.34"/>
+<path d="M34,84 L92,52 L156,56 L214,86 Q188,72 156,70 Q120,66 92,68 Q58,72 34,84 Z" fill="url(#hg)"/>
+<path d="M92,52 L156,56 Q150,62 120,62 Q104,62 92,58 Z" fill="#a3c178" opacity="0.7"/>
+<path d="M150,58 L160,84 M120,60 L116,86" stroke="#564f45" stroke-width="2" opacity="0.25" fill="none"/>`
+  ),
+  250
+);
 save(
   'bigrock',
   S(
@@ -1005,7 +1021,7 @@ save('jelly_a', jellySvg(0), 92);
 save('jelly_b', jellySvg(1), 92);
 
 // ---- contact sheet of new + polished ----
-const review = ['butte', 'icefloe'];
+const review = ['headland', 'butte', 'icefloe'];
 const cols = 4,
   cell = 230,
   pad = 14,

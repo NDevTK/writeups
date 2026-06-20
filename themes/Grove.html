@@ -311,6 +311,7 @@
           sky: 0xffffff,
           seasonal: true,
           hills: [0x9cc6b0, 0x73b25a, 0x4f9c3e],
+          distant: {style: 'forest', tint: 0x86a86a}, // forested hills along the horizon
           ground: 'meadow',
           mid: [
             ['pine', 0.7, 180],
@@ -391,6 +392,14 @@
             winter: {fol: 0xdfe6ea, hill: 0xeef0ee, grass: 0xc4c6b8}
           },
           hills: [0xe8ddbc, 0xe0cd9c, 0xd6bd80],
+          distant: {
+            sprite: 'headland',
+            count: 2,
+            sc: [0.5, 0.85],
+            y: 456,
+            tint: 0xcfd2cb,
+            alpha: 0.9
+          }, // rocky headlands on the horizon
           ground: 'beach',
           mid: [
             ['palm', 0.6, 250],
@@ -431,6 +440,7 @@
             winter: {fol: 0xc8d2cc, hill: 0xd8e0d8, grass: 0x9aae8a}
           },
           hills: [0x9ec1a0, 0x7caf6e, 0x5f9456],
+          distant: {style: 'forest', tint: 0x7fa074}, // a far tree line across the marsh
           ground: 'marsh',
           mid: [
             ['reed', 0.55, 210],
@@ -477,6 +487,7 @@
           foliageTint: 0x9ec4b4,
           aurora: true,
           feature: 'peak', // a snowy summit rises behind the hills (sets Alpine apart from the Fjord)
+          distant: {style: 'peak', tint: 0xa3afc4}, // a range receding behind the near summit
           hills: [0x8ea3bd, 0xb1c0d4, 0xe7eef6],
           ground: 'snow',
           mid: [
@@ -540,6 +551,7 @@
           fog: 0.7,
           sky: 0xeaf4e4,
           seasonal: false,
+          distant: {style: 'forest', tint: 0x9cc079}, // misty wooded hills behind the grove
           hills: [0xb6d3a4, 0x8cbd76, 0x6aa45a],
           ground: 'fern',
           mid: [
@@ -786,7 +798,8 @@
         'jelly_a',
         'jelly_b',
         'butte',
-        'icefloe'
+        'icefloe',
+        'headland'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -832,7 +845,11 @@
       // tops show, and it darkens with the night veil.
       function drawDistant(d) {
         const g = new PIXI.Graphics(),
-          base = 452;
+          base = 452,
+          shade = (c, f) =>
+            ((Math.min(255, ((c >> 16) & 255) * f) | 0) << 16) |
+            ((Math.min(255, ((c >> 8) & 255) * f) | 0) << 8) |
+            (Math.min(255, (c & 255) * f) | 0);
         if (d.style === 'peak') {
           // one continuous jagged ridge — summits linked by elevated cols. summits always clear the
           // snowline so every one keeps its snow; lit + shadowed faces give them form (not flat triangles)
@@ -857,14 +874,9 @@
               ]);
           }
           ridge.push(ctrl[ctrl.length - 1]);
-          const ti = d.tint,
-            dk = (f) =>
-              ((((((ti >> 16) & 255) * f) | 0) << 16) |
-                (((((ti >> 8) & 255) * f) | 0) << 8) |
-                (((ti & 255) * f) | 0)) >>>
-              0;
+          const ti = d.tint;
           // whole massif in the shadow tone...
-          g.beginFill(dk(0.84));
+          g.beginFill(shade(ti, 0.84));
           g.moveTo(-40, base);
           for (const [px, py] of ridge) g.lineTo(px, py);
           g.closePath();
@@ -914,6 +926,36 @@
             g.lineTo(x, base - 62 - Math.sin(x * 0.004 + 1) * 16);
           g.lineTo(VW + 40, base);
           g.closePath();
+          g.endFill();
+        } else if (d.style === 'forest') {
+          // a hazy forested hillside: a rolling ridge whose top edge is lumpy with canopy, with a
+          // sunlit sheen and a few darker clumps for depth (a continuous tree mass, not single trees)
+          const cr = (x) =>
+              base -
+              52 -
+              Math.sin(x * 0.0052 + 0.7) * 24 -
+              Math.sin(x * 0.013 + 2) * 9,
+            canopy = (x) =>
+              Math.abs(Math.sin(x * 0.085)) * 7 +
+              Math.abs(Math.sin(x * 0.19 + 1.3)) * 4,
+            topY = (x) => cr(x) - canopy(x);
+          g.beginFill(d.tint);
+          g.moveTo(-40, base);
+          for (let x = -40; x <= VW + 40; x += 7) g.lineTo(x, topY(x));
+          g.lineTo(VW + 40, base);
+          g.closePath();
+          g.endFill();
+          g.beginFill(shade(d.tint, 1.12), 0.4); // sun catching the top of the canopy
+          g.moveTo(-40, topY(-40));
+          for (let x = -40; x <= VW + 40; x += 7) g.lineTo(x, topY(x));
+          for (let x = VW + 40; x >= -40; x -= 7) g.lineTo(x, topY(x) + 18);
+          g.closePath();
+          g.endFill();
+          g.beginFill(shade(d.tint, 0.84), 0.5); // darker canopy clumps for depth
+          for (let i = 0; i < 16; i++) {
+            const x = -20 + Math.random() * (VW + 40);
+            g.drawEllipse(x, topY(x) + 10, 13, 8);
+          }
           g.endFill();
         }
         return g;
@@ -1239,13 +1281,10 @@
           .endFill();
         overcastG.alpha = 0;
         root.addChild(overcastG);
-        if (BI.feature) {
-          const fe = spr(BI.feature, 640, 486, 0.95);
-          scene.addChild(fe);
-        } // large background landmark behind the hills
         if (BI.distant) {
+          // the far horizon landform sits behind everything, including any feature landmark
           const D = BI.distant;
-          // a continuous landform (mountain range / ridge) is drawn procedurally; depends on
+          // a continuous landform (mountain range / ridge / forest) is drawn procedurally; depends on
           // spanning + connecting across the whole horizon, so it can't be a fixed sprite
           if (D.style) scene.addChild(drawDistant(D));
           // discrete landforms (buttes) are designed, textured sprites scattered across the horizon
@@ -1279,6 +1318,10 @@
               scene.addChild(tr);
             }
         }
+        if (BI.feature) {
+          const fe = spr(BI.feature, 640, 486, 0.95);
+          scene.addChild(fe);
+        } // large background landmark (in front of the distant range, behind the hills)
         const HILLS = [
           [420, 26, 0],
           [470, 30, 1.3],
