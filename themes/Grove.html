@@ -1053,10 +1053,10 @@
         } else fox = null;
         if (BI.hopper) {
           rabbit = spr(BI.hopper, 760, groundY(760) + 6, 0.55);
-          rabbit.scale.x = -0.55;
           rabbit.baseY = rabbit.y;
+          rabbit.dir = 1; // sprite faces right; dir flips (and mirrors it) when it turns around
           scene.addChild(rabbit);
-        } else rabbit = null; // flip to face its hop direction (rightward)
+        } else rabbit = null;
         if (BI.roller) {
           roller = spr(BI.roller, -60, groundY(-60) + 2, 0.5);
           roller.tint = 0xc2a468;
@@ -1137,6 +1137,9 @@
             ducks.push(d2);
             scene.addChild(d2);
           }
+          // float the lily pads (and the frogs on them) in front of the ducks, so a duck passing one swims behind it
+          for (const lp of lilies) if (!lp.isFrog) scene.addChild(lp);
+          for (const lp of lilies) if (lp.isFrog) scene.addChild(lp);
           if (BI.water.drag && !snow) {
             const dn = BI.water.drag === true ? 3 : BI.water.drag;
             for (let i = 0; i < dn; i++) {
@@ -1514,7 +1517,7 @@
           }
         }
 
-        // hopper (rabbit)
+        // hopper (rabbit): hops in its facing direction, then pauses and turns around at the edges
         if (rabbit) {
           rabbit.hopT = (rabbit.hopT == null ? 2 : rabbit.hopT) - dt / 60;
           const hop =
@@ -1522,10 +1525,12 @@
               ? Math.sin(((0.4 - rabbit.hopT) / 0.4) * Math.PI)
               : 0;
           rabbit.y = rabbit.baseY - hop * 24;
-          rabbit.x += hop * 1.1;
+          rabbit.x += rabbit.dir * hop * 1.8 * dt;
           if (rabbit.hopT < 0) {
-            rabbit.hopT = 3 + Math.random() * 4;
-            if (rabbit.x > VW - 80) rabbit.x = 120;
+            rabbit.hopT = 1.1 + Math.random() * 1.9;
+            if (rabbit.x > VW - 140) rabbit.dir = -1;
+            else if (rabbit.x < 140) rabbit.dir = 1;
+            rabbit.scale.x = rabbit.dir * Math.abs(rabbit.scale.x);
           }
         }
         // roller (tumbleweed) bounds across at intervals
@@ -1548,10 +1553,19 @@
         // ducks drift + bob, brood + reflection follow
         for (const d of ducks) {
           d.x += d.vx * dt;
-          d.y = d.baseY + Math.sin(t * 2 + d.x * 0.05) * 1.6;
           if (d.x > VW - 40) d.vx = -Math.abs(d.vx);
           if (d.x < 40) d.vx = Math.abs(d.vx);
+          // steer around lily pads: ease aside to give a nearby pad a berth, then settle back into the lane
+          let steer = 0;
+          for (const lp of lilies) {
+            if (lp.isFrog) continue;
+            const dx = Math.abs(lp.x - d.x);
+            if (dx < 80) steer += (1 - dx / 80) * 16;
+          }
+          const cur = d.sy || 0; // undefined on the first frame; || keeps it numeric (and self-heals from NaN)
+          d.sy = cur + (steer - cur) * 0.08;
           d.scale.x = (d.vx < 0 ? -1 : 1) * Math.abs(d.scale.x);
+          d.y = d.baseY + d.sy + Math.sin(t * 2 + d.x * 0.05) * 1.6;
           if (d.ref) {
             d.ref.x = d.x;
             d.ref.y = d.y + 18 + Math.sin(t * 2) * 1;
@@ -1561,7 +1575,7 @@
             d.kids.forEach((k, i) => {
               const b = d.vx < 0 ? 1 : -1;
               k.x = d.x + b * (34 + i * 22);
-              k.y = k.baseY + Math.sin(t * 2 + i) * 1.4;
+              k.y = k.baseY + d.sy + Math.sin(t * 2 + i) * 1.4;
               k.scale.x = (d.vx < 0 ? -1 : 1) * Math.abs(k.scale.x);
             });
           d.rip = (d.rip == null ? 0.5 : d.rip) - dt / 60;
