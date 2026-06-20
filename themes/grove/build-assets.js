@@ -836,6 +836,24 @@ save(
   ),
   250
 );
+// fjord wall: a tall, steep rock buttress that plunges to the water, snow-dusted top + ledges,
+// vertical striations on the face. Drawn as a left-side wall; mirror it for the right bank.
+save(
+  'cliff',
+  S(
+    '230 470',
+    `<defs><linearGradient id="clf" x1="0" y1="0" x2="1" y2="0.25"><stop offset="0" stop-color="#7f8da4"/><stop offset="1" stop-color="#3c4658"/></linearGradient></defs>
+<path d="M0,470 L0,40 L58,16 L120,58 L152,150 L168,300 L156,470 Z" fill="url(#clf)"/>
+<path d="M104,92 L114,470 L92,470 L82,104 Z" fill="#2e3949" opacity="0.28"/>
+<path d="M150,150 L168,196 L150,470 L140,470 L136,196 Z" fill="#2e3949" opacity="0.2"/>
+<g stroke="#2f3a4c" stroke-width="2.4" opacity="0.32" fill="none"><path d="M30,80 L38,468"/><path d="M58,70 L66,468"/><path d="M126,120 L132,468"/></g>
+<path d="M0,40 L58,16 L120,58 L152,150 Q150,120 120,96 Q78,66 40,66 L0,66 Z" fill="#e9eff7"/>
+<path d="M0,40 L58,16 L120,58 Q92,42 56,44 L0,52 Z" fill="#f6faff"/>
+<path d="M150,150 L168,196 Q150,180 138,190 L132,156 Z" fill="#dfe7f0" opacity="0.85"/>
+<path d="M88,108 Q96,140 92,210" stroke="#aab6c8" stroke-width="2" opacity="0.4" fill="none"/>`
+  ),
+  230
+);
 save(
   'bigrock',
   S(
@@ -1021,7 +1039,7 @@ save('jelly_a', jellySvg(0), 92);
 save('jelly_b', jellySvg(1), 92);
 
 // ---- contact sheet of new + polished ----
-const review = ['headland', 'butte', 'icefloe'];
+const review = ['cliff', 'headland', 'butte', 'icefloe'];
 const cols = 4,
   cell = 230,
   pad = 14,
