@@ -600,25 +600,8 @@
             [1220, 0xb98aff]
           ],
           glow: 'cave', // glowworms on the ceiling
-          // a big rock on the left: a wide stream crosses its top (from off-screen) and cascades off the edge
-          waterfall: {
-            bigRock: {
-              topPts: [
-                [-40, 320],
-                [70, 311],
-                [165, 304],
-                [255, 301],
-                [330, 303],
-                [352, 306]
-              ],
-              edgeX: 350,
-              edgeY: 306,
-              faceBot: 340,
-              bot: 600,
-              fallW: 30,
-              streamH: 14
-            }
-          },
+          // designed sprites: a big rock ledge on the left + the falling water that crosses + drops off it
+          waterfall: {sprite: true, x: -40, y: 614, scale: 1.12, plungeX: 303},
           walker: null,
           critter: null,
           hopper: null,
@@ -687,7 +670,10 @@
         'stalactite',
         'stalagmite',
         'crystal',
-        'peak'
+        'peak',
+        'bigrock',
+        'falls_a',
+        'falls_b'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -1051,31 +1037,11 @@
                 dropY: null
               });
           }
-          // a big rock chunk the waterfall's stream crosses and cascades off of
-          if (BI.waterfall && BI.waterfall.bigRock) {
-            const R = BI.waterfall.bigRock,
-              rk = new PIXI.Graphics();
-            rk.beginFill(0x191323); // rock body
-            rk.moveTo(-40, R.bot);
-            rk.lineTo(-40, R.topPts[0][1]);
-            for (const [x, y] of R.topPts) rk.lineTo(x, y);
-            rk.lineTo(R.faceBot, R.bot);
-            rk.closePath();
-            rk.endFill();
-            rk.beginFill(0x2a2238, 0.6); // a lit top facet for form
-            rk.moveTo(-40, R.topPts[0][1]);
-            for (const [x, y] of R.topPts) rk.lineTo(x, y);
-            rk.lineTo(R.edgeX - 26, R.edgeY + 52);
-            rk.lineTo(-40, R.topPts[0][1] + 40);
-            rk.closePath();
-            rk.endFill();
-            rk.beginFill(0x0e0a16, 0.55); // shadowed right face the cascade falls past
-            rk.moveTo(R.edgeX, R.edgeY);
-            rk.lineTo(R.faceBot, R.bot);
-            rk.lineTo(R.faceBot - 30, R.bot);
-            rk.lineTo(R.edgeX - 22, R.edgeY + 36);
-            rk.closePath();
-            rk.endFill();
+          // the big rock ledge (a designed sprite, tinted to the cave's dark stone), behind the crystals
+          if (BI.waterfall && BI.waterfall.sprite) {
+            const wf = BI.waterfall,
+              rk = spr('bigrock', wf.x, wf.y, wf.scale, 0, 1);
+            rk.tint = 0x6b6488; // cool cave-stone, lit enough to read against the dark
             scene.addChild(rk);
           }
         }
@@ -1397,7 +1363,15 @@
         }
         if (BI.waterfall) {
           wfG = new PIXI.Graphics();
-          scene.addChild(wfG); // cascade rendered above the water so its base mist sits on the surface
+          scene.addChild(wfG); // coded fall (fjord) / plunge rings, above the water surface
+          if (BI.waterfall.sprite) {
+            // the falling water itself is a 2-frame sprite, sat in front of the rock + pool
+            const wf = BI.waterfall,
+              fa = anim(['falls_a', 'falls_b'], wf.x, wf.y, wf.scale, 0.05);
+            fa.anchor.set(0, 1);
+            if (reduce.matches) fa.gotoAndStop(0); // hold a still frame when motion is reduced
+            scene.addChild(fa);
+          }
         } else wfG = null;
         if (BI.flutter && !snow)
           for (let i = 0; i < 4; i++) {
@@ -2235,105 +2209,63 @@
           }
         }
 
-        // waterfall: water cascades down a stack of rock the way real water does — hugging each
-        // boulder's face and bursting into foam as it drops to the next, source hidden up top
+        // waterfall: the cave's is designed sprites (rock + 2-frame falls); the fjord is a coded spill
         if (wfG) {
-          const wf = BI.waterfall,
-            w = wf.w || 22,
-            bot = wf.bot || 600;
           wfG.clear();
-          // one falling reach of water with the wavy-streak look (reused for every tier)
-          const seg = (sx, y0, y1, sw) => {
-            wfG.beginFill(0xbfe0f0, 0.26);
-            wfG.moveTo(sx - sw / 2, y0);
-            for (let y = y0; y <= y1; y += 14)
-              wfG.lineTo(sx - sw / 2 + Math.sin(y * 0.05 + t * 4) * 2.5, y);
-            for (let y = y1; y >= y0; y -= 14)
-              wfG.lineTo(sx + sw / 2 + Math.sin(y * 0.05 + t * 4 + 2) * 2.5, y);
+          const wf = BI.waterfall;
+          if (wf.sprite) {
+            // the rock + falls are real sprites; just ring the pool where the water lands
+            if (water && Math.random() < 0.12 * dt)
+              ripples.push({
+                x: wf.plungeX + (Math.random() - 0.5) * 20,
+                y: 606,
+                r: 3,
+                life: 1
+              });
+          } else {
+            const w = wf.w || 22,
+              bot = wf.bot || 600;
+            wfG.beginFill(0xbfe0f0, 0.26); // a falling sheet with wavering sides
+            wfG.moveTo(wf.x - w / 2, wf.top);
+            for (let y = wf.top; y <= bot; y += 14)
+              wfG.lineTo(wf.x - w / 2 + Math.sin(y * 0.05 + t * 4) * 2.5, y);
+            for (let y = bot; y >= wf.top; y -= 14)
+              wfG.lineTo(
+                wf.x + w / 2 + Math.sin(y * 0.05 + t * 4 + 2) * 2.5,
+                y
+              );
             wfG.closePath();
             wfG.endFill();
-            for (let i = 0; i < 5; i++) {
-              const base = sx - sw / 2 + ((i + 0.5) / 5) * sw,
-                a = 0.12 + 0.16 * (0.5 + 0.5 * Math.sin(t * 3 + i * 2 + sx));
+            for (let i = 0; i < 6; i++) {
+              const base = wf.x - w / 2 + ((i + 0.5) / 6) * w,
+                a = 0.12 + 0.16 * (0.5 + 0.5 * Math.sin(t * 3 + i * 2));
               wfG.lineStyle(1.4, 0xeaf6ff, a);
-              wfG.moveTo(base + Math.sin(y0 * 0.05 + t * 4 + i) * 2.2, y0);
-              for (let y = y0; y <= y1; y += 14)
-                wfG.lineTo(base + Math.sin(y * 0.05 + t * 4 + i) * 2.2, y);
+              wfG.moveTo(
+                base + Math.sin(wf.top * 0.05 + t * 4 + i) * 2.5,
+                wf.top
+              );
+              for (let y = wf.top; y <= bot; y += 14)
+                wfG.lineTo(base + Math.sin(y * 0.05 + t * 4 + i) * 2.5, y);
             }
             wfG.lineStyle(0);
-            for (let i = 0; i < 4; i++) {
-              const hx = sx - sw / 2 + 3 + ((i * 0.41) % 1) * (sw - 6),
-                hy = y0 + ((t * (230 + i * 50) + i * 120) % (y1 - y0));
-              wfG.beginFill(0xffffff, 0.55);
-              wfG.drawRect(hx - 1, hy, 2, 11);
-              wfG.endFill();
-            }
-          };
-          // foam where falling water strikes a rock or the pool
-          const foam = (fx, fy, fw) => {
-            wfG.beginFill(0xffffff, 0.42 + Math.sin(t * 6 + fx) * 0.16);
-            wfG.drawEllipse(fx, fy, fw * 0.7, 5);
-            wfG.endFill();
             for (let i = 0; i < 5; i++) {
-              wfG.beginFill(0xffffff, 0.3 * Math.random());
-              wfG.drawCircle(
-                fx + (Math.random() - 0.5) * fw * 1.4,
-                fy - Math.random() * 9,
-                1.2
-              );
+              const hx = wf.x - w / 2 + 3 + ((i * 0.41) % 1) * (w - 6),
+                hy = wf.top + ((t * (240 + i * 50) + i * 120) % (bot - wf.top));
+              wfG.beginFill(0xffffff, 0.6);
+              wfG.drawRect(hx - 1, hy, 2, 12);
               wfG.endFill();
             }
-          };
-          let px = wf.x || 350,
-            py = bot;
-          if (wf.bigRock) {
-            const R = wf.bigRock,
-              P = R.topPts,
-              topAt = (x) => {
-                if (x <= P[0][0]) return P[0][1];
-                for (let i = 1; i < P.length; i++)
-                  if (x <= P[i][0]) {
-                    const f = (x - P[i - 1][0]) / (P[i][0] - P[i - 1][0]);
-                    return P[i - 1][1] + (P[i][1] - P[i - 1][1]) * f;
-                  }
-                return P[P.length - 1][1];
-              };
-            // a wide stream sliding across the rock top toward the edge (source off-screen left)
-            wfG.beginFill(0xbfe0f0, 0.32);
-            wfG.moveTo(-40, P[0][1] + 2);
-            for (const [x, y] of P) wfG.lineTo(x, y + 2);
-            wfG.lineTo(R.edgeX, R.edgeY - R.streamH);
-            for (let i = P.length - 1; i >= 0; i--)
-              wfG.lineTo(P[i][0], P[i][1] - R.streamH);
-            wfG.lineTo(-40, P[0][1] - R.streamH);
-            wfG.closePath();
+            wfG.beginFill(0xffffff, 0.42 + Math.sin(t * 6) * 0.16); // base foam
+            wfG.drawEllipse(wf.x, bot, w * 0.8, 5);
             wfG.endFill();
-            for (let i = 0; i < 9; i++) {
-              // highlights ride the surface toward the lip
-              const u = (t * 0.16 + i / 9) % 1,
-                sx = -40 + u * (R.edgeX + 40),
-                sy = topAt(sx) - R.streamH * 0.5;
-              wfG.beginFill(0xffffff, 0.38);
-              wfG.drawRect(sx - 6, sy - 1, 12, 2.4);
-              wfG.endFill();
-            }
-            // and cascades off the edge into the pool
-            seg(R.edgeX, R.edgeY, R.bot, R.fallW);
-            foam(R.edgeX, R.edgeY + 5, R.fallW * 0.8); // foam where it spills over the lip
-            foam(R.edgeX, R.bot, R.fallW); // and where it plunges in
-            px = R.edgeX;
-          } else {
-            seg(wf.x, wf.top, bot, w);
-            foam(wf.x, bot, w);
-            px = wf.x;
+            if (water && Math.random() < 0.12 * dt)
+              ripples.push({
+                x: wf.x + (Math.random() - 0.5) * w,
+                y: bot + 6,
+                r: 3,
+                life: 1
+              });
           }
-          if (water && Math.random() < 0.12 * dt)
-            ripples.push({
-              x: px + (Math.random() - 0.5) * w,
-              y: py + 6,
-              r: 3,
-              life: 1
-            });
         }
 
         // butterflies, dragonflies, bird — wandering / crossing

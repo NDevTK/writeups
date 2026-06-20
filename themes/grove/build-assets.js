@@ -760,8 +760,38 @@ save(
   430
 );
 
+// ---- NEW: waterfall set — a tintable rock ledge + the falling water (2 flow frames) ----
+// authored in one shared 380x330 frame so the water overlays the rock exactly when placed together
+save(
+  'bigrock',
+  S(
+    '380 330',
+    `<defs><linearGradient id="bk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfd2dd"/><stop offset="1" stop-color="#7c7f92"/></linearGradient>
+<linearGradient id="bkt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eceef4"/><stop offset="1" stop-color="#b8bccb"/></linearGradient></defs>
+<path d="M0,330 L0,72 Q70,54 150,56 Q220,58 256,64 L308,84 L300,210 L334,330 Z" fill="url(#bk)"/>
+<path d="M0,72 Q70,54 150,56 Q220,58 256,64 L308,84 L306,104 Q210,82 150,80 Q70,80 0,92 Z" fill="url(#bkt)"/>
+<path d="M308,84 L300,210 L334,330 L352,330 L322,86 Z" fill="#5b5e70" opacity="0.55"/>
+<g fill="#9c9fb2" opacity="0.38"><path d="M44,140 L92,128 L78,196 L36,186 Z"/><path d="M150,168 L206,156 L196,232 L150,224 Z"/><path d="M236,150 L284,166 L270,226 L232,212 Z"/></g>
+<g fill="#e4e6ee" opacity="0.5"><path d="M20,96 L70,86 L58,120 L24,124 Z"/></g>`
+  ),
+  380
+);
+const falls = (a) =>
+  S(
+    '380 330',
+    `<defs><linearGradient id="fw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2f1fa"/><stop offset="1" stop-color="#a6cadf"/></linearGradient></defs>
+<path d="M0,40 Q140,30 270,42 L296,62 Q150,50 0,58 Z" fill="url(#fw)" opacity="0.82"/>
+<path d="M282,50 Q276,180 296,300 Q300,320 314,320 Q328,320 330,300 Q316,180 316,54 Z" fill="url(#fw)" opacity="0.8"/>
+<g stroke="#f4fbff" stroke-width="2.4" fill="none" opacity="0.72"><path d="M292,${58 + a} Q288,180 300,300"/><path d="M308,${52 + a} Q316,180 308,300"/><path d="M300,${64 + a} Q299,180 304,300"/></g>
+<g stroke="#ffffff" stroke-width="1.8" opacity="0.5"><line x1="${30 + a * 4}" y1="46" x2="${88 + a * 4}" y2="45"/><line x1="${130 + a * 4}" y1="44" x2="${188 + a * 4}" y2="46"/><line x1="${70 + a * 4}" y1="52" x2="${120 + a * 4}" y2="51"/></g>
+<g fill="#ffffff"><ellipse cx="298" cy="50" rx="20" ry="8"/><ellipse cx="284" cy="44" rx="8" ry="5"/><ellipse cx="314" cy="46" rx="7" ry="5"/></g>
+<g fill="#ffffff"><ellipse cx="310" cy="314" rx="28" ry="9"/><ellipse cx="286" cy="310" rx="10" ry="6"/><ellipse cx="332" cy="310" rx="10" ry="6"/><ellipse cx="${300 + a * 3}" cy="318" rx="6" ry="4"/></g>`
+  );
+save('falls_a', falls(0), 380);
+save('falls_b', falls(7), 380);
+
 // ---- contact sheet of new + polished ----
-const review = ['eagle', 'peak', 'bat_a', 'stalactite', 'crystal'];
+const review = ['bigrock', 'falls_a', 'falls_b', 'eagle', 'peak'];
 const cols = 4,
   cell = 230,
   pad = 14,
