@@ -850,8 +850,122 @@ save(
   256
 );
 
+// ---- REEF biome (underwater) ----
+// kelp: a tall frond rising from the seabed; anchored at the base and swayed by the current
+save(
+  'kelp',
+  S(
+    '60 320',
+    `<defs><linearGradient id="kl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#62a847"/><stop offset="1" stop-color="#2b5422"/></linearGradient></defs>
+<path d="M30,320 C22,256 40,214 30,152 C22,102 38,54 30,6 C40,54 52,104 44,154 C36,216 46,258 42,320 Z" fill="url(#kl)"/>
+<path d="M31,300 C16,270 8,232 16,196 C20,224 28,252 33,288 Z" fill="url(#kl)" opacity="0.85"/>
+<path d="M40,288 C56,258 62,224 54,190 C50,222 42,248 39,280 Z" fill="url(#kl)" opacity="0.85"/>
+<path d="M30,320 C30,200 34,110 31,8" fill="none" stroke="#234a1c" stroke-width="2" opacity="0.5"/>
+<g fill="#bfe89a" opacity="0.6"><circle cx="33" cy="60" r="3"/><circle cx="29" cy="150" r="3"/><circle cx="34" cy="232" r="3"/></g>`
+  ),
+  80
+);
+// sea fan: a flat lattice of fine branches that filter the current
+save(
+  'coral_fan',
+  S(
+    '150 150',
+    `<defs><linearGradient id="cf" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#9b3a7a"/><stop offset="1" stop-color="#e07cb6"/></linearGradient></defs>
+<g fill="none" stroke="url(#cf)" stroke-linecap="round">
+<path d="M75,148 C72,120 72,108 75,96" stroke-width="6"/>
+<path d="M75,96 C66,78 54,64 44,40" stroke-width="4"/><path d="M75,96 C84,78 96,64 106,40" stroke-width="4"/>
+<path d="M75,100 C72,76 70,52 72,18" stroke-width="3.4"/>
+<path d="M72,60 C62,44 52,32 46,16" stroke-width="2.4"/><path d="M78,60 C88,44 98,32 104,16" stroke-width="2.4"/>
+<path d="M58,52 C50,40 44,30 40,16" stroke-width="1.7"/><path d="M92,52 C100,40 106,30 110,16" stroke-width="1.7"/>
+<path d="M50,38 C44,28 40,22 36,12" stroke-width="1.3"/><path d="M100,38 C106,28 110,22 114,12" stroke-width="1.3"/>
+<path d="M66,42 C62,30 60,22 60,12" stroke-width="1.3"/><path d="M84,42 C88,30 90,22 90,12" stroke-width="1.3"/></g>
+<g fill="none" stroke="#cf63a6" stroke-width="0.9" opacity="0.55"><path d="M55,60 Q75,52 95,60"/><path d="M50,36 Q75,30 100,36"/><path d="M44,20 Q75,14 106,20"/></g>`
+  ),
+  150
+);
+// staghorn coral: chunky branching colony with pale polyp tips
+save(
+  'coral_branch',
+  S(
+    '170 150',
+    `<defs><linearGradient id="cb" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#d96a3a"/><stop offset="1" stop-color="#f4a772"/></linearGradient></defs>
+<g fill="none" stroke="url(#cb)" stroke-linecap="round">
+<path d="M85,148 C84,120 82,108 84,92" stroke-width="14"/>
+<path d="M84,96 C74,80 60,72 50,52" stroke-width="11"/><path d="M84,96 C96,80 110,72 122,54" stroke-width="11"/>
+<path d="M84,100 C84,78 86,58 86,34" stroke-width="10"/>
+<path d="M52,58 C44,46 40,38 36,26" stroke-width="7"/><path d="M120,58 C128,46 132,38 138,26" stroke-width="7"/>
+<path d="M86,40 C80,30 76,24 74,14" stroke-width="6"/><path d="M86,40 C92,30 96,24 100,14" stroke-width="6"/></g>
+<g fill="#ffd9b8"><circle cx="36" cy="25" r="4.2"/><circle cx="138" cy="25" r="4.2"/><circle cx="74" cy="13" r="3.6"/><circle cx="100" cy="13" r="3.6"/><circle cx="86" cy="32" r="3.6"/><circle cx="50" cy="50" r="3.4"/><circle cx="122" cy="52" r="3.4"/></g>`
+  ),
+  165
+);
+// coral knobs: a low cluster colony on the seabed
+save(
+  'coral_round',
+  S(
+    '130 84',
+    `<ellipse cx="65" cy="76" rx="60" ry="14" fill="#1f5a4f" opacity="0.45"/>
+<circle cx="40" cy="54" r="20" fill="#3fa890"/><circle cx="72" cy="48" r="24" fill="#49bda0"/><circle cx="100" cy="56" r="17" fill="#3fa890"/>
+<circle cx="54" cy="62" r="13" fill="#8a6fc0"/><circle cx="88" cy="64" r="12" fill="#9a7fce"/>
+<g fill="#2b7a68" opacity="0.7"><circle cx="36" cy="50" r="2"/><circle cx="46" cy="58" r="2"/><circle cx="70" cy="44" r="2.2"/><circle cx="78" cy="54" r="2"/><circle cx="100" cy="54" r="2"/></g>
+<g fill="#bdf0e2" opacity="0.5"><circle cx="66" cy="40" r="5"/><circle cx="34" cy="48" r="4"/><circle cx="96" cy="50" r="3.5"/></g>`
+  ),
+  130
+);
+// anemone: a crown of soft tentacles waving in the current (swayed)
+save(
+  'anemone',
+  S(
+    '100 100',
+    `<defs><linearGradient id="an" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#c9447e"/><stop offset="1" stop-color="#f792c2"/></linearGradient></defs>
+<ellipse cx="50" cy="88" rx="30" ry="13" fill="#b23a6e"/>
+<g fill="none" stroke="url(#an)" stroke-width="5" stroke-linecap="round">
+<path d="M50,86 C40,60 36,42 30,22"/><path d="M50,86 C50,58 50,40 50,18"/><path d="M50,86 C60,60 64,42 70,22"/>
+<path d="M50,86 C32,66 24,50 18,34"/><path d="M50,86 C68,66 76,50 82,34"/>
+<path d="M50,86 C44,58 42,40 40,20"/><path d="M50,86 C56,58 58,40 60,20"/></g>
+<g fill="#ffe0ef"><circle cx="30" cy="22" r="3"/><circle cx="50" cy="18" r="3"/><circle cx="70" cy="22" r="3"/><circle cx="18" cy="34" r="3"/><circle cx="82" cy="34" r="3"/><circle cx="40" cy="20" r="3"/><circle cx="60" cy="20" r="3"/></g>`
+  ),
+  100
+);
+// sea turtle: glides across the reef now and then, facing right (front flipper sweeps like a wing)
+save(
+  'turtle',
+  S(
+    '200 132',
+    `<defs><radialGradient id="tsh" cx="44%" cy="32%"><stop offset="0" stop-color="#74b46c"/><stop offset="1" stop-color="#3a6a3e"/></radialGradient></defs>
+<path d="M44,70 C22,66 10,78 15,94 C30,90 45,82 53,73 Z" fill="#4a7d4a"/>
+<path d="M150,58 C168,52 182,56 184,66 C182,76 168,78 152,72 Z" fill="#5a9456"/>
+<circle cx="173" cy="63" r="2.6" fill="#14210f"/><circle cx="174" cy="62" r="0.9" fill="#fff"/>
+<ellipse cx="92" cy="64" rx="64" ry="41" fill="url(#tsh)"/>
+<path d="M40,76 C70,98 120,98 148,76 C120,88 64,88 40,76 Z" fill="#84bd7c" opacity="0.45"/>
+<g fill="none" stroke="#2f5733" stroke-width="2" opacity="0.55"><path d="M92,24 L92,104"/><path d="M60,32 Q92,42 124,32"/><path d="M56,64 Q92,72 128,64"/><path d="M70,26 L60,62 L72,100"/><path d="M114,26 L124,62 L112,100"/></g>
+<path d="M120,48 C140,32 160,26 168,36 C160,50 140,58 122,62 Z" fill="#5a9456"/>
+<path d="M122,50 C138,38 154,34 164,40 C150,44 136,48 124,56 Z" fill="#74b46c" opacity="0.6"/>`
+  ),
+  210
+);
+// bubble: rises from the reef and wobbles upward
+save(
+  'bubble',
+  S(
+    '24 24',
+    `<circle cx="12" cy="12" r="9" fill="#bfe8f0" opacity="0.26"/>
+<circle cx="12" cy="12" r="9" fill="none" stroke="#eafaff" stroke-width="1.6" opacity="0.8"/>
+<circle cx="9" cy="9" r="2.4" fill="#ffffff" opacity="0.9"/>`
+  ),
+  24
+);
+
 // ---- contact sheet of new + polished ----
-const review = ['fish_a', 'fish_b'];
+const review = [
+  'kelp',
+  'coral_fan',
+  'coral_branch',
+  'coral_round',
+  'anemone',
+  'turtle',
+  'bubble'
+];
 const cols = 4,
   cell = 230,
   pad = 14,

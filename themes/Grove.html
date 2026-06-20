@@ -659,6 +659,35 @@
           flutter: false,
           roller: null,
           water: {top: '#1b2742', bot: '#0b1120', glow: true} // still underground pool
+        },
+        reef: {
+          label: '🐠 Reef',
+          underwater: true, // a fully submerged scene: water column + god-rays instead of sky
+          sky: 0x0e4a5e, // base water tint (drawSky paints the full column gradient over it)
+          // distant reef ridges fading into the blue haze
+          hills: [0x10566c, 0x176880, 0x217e96],
+          ground: 'reef',
+          mid: [],
+          near: [],
+          // bright surface water up top -> deep blue below; both dimmed toward night by daylight level
+          column: {surf: '#7fe0e6', mid: '#1f7e96', deep: '#06243c'},
+          reef: {
+            kelp: 7,
+            fan: 3,
+            branch: 3,
+            round: 4,
+            anemone: 5,
+            fish: 11,
+            bubbles: 16,
+            turtle: true
+          },
+          walker: null,
+          critter: 'crab',
+          critterScale: 0.5,
+          hopper: null,
+          flyer: 0xffffff,
+          flutter: false,
+          roller: null
         }
       };
       const RIGID = {rock: 1, cactus: 1, cactus2: 1};
@@ -732,7 +761,14 @@
         'vfall_a',
         'vfall_b',
         'wstreak',
-        'fog'
+        'fog',
+        'kelp',
+        'coral_fan',
+        'coral_branch',
+        'coral_round',
+        'anemone',
+        'turtle',
+        'bubble'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -776,6 +812,32 @@
       function drawSky(P) {
         // banded gradient via Graphics (no texture upload quirks)
         sky.clear();
+        if (BI.underwater) {
+          // the water column: bright near the surface, deepening to dark blue; the whole
+          // thing sinks toward darkness at night as less light filters down from above
+          const C = BI.column,
+            dim = 0.28 + 0.72 * P.light,
+            surf = mixA([0, 0, 0], hx(C.surf), dim),
+            mid = mixA([0, 0, 0], hx(C.mid), dim),
+            deep = mixA([0, 0, 0], hx(C.deep), dim),
+            N = 90;
+          for (let i = 0; i < N; i++) {
+            const u = i / (N - 1),
+              col =
+                u < 0.5
+                  ? mixA(surf, mid, u / 0.5)
+                  : mixA(mid, deep, (u - 0.5) / 0.5);
+            sky.beginFill(hexI(col));
+            sky.drawRect(
+              -40,
+              Math.floor(u * VH),
+              VW + 80,
+              Math.ceil(VH / N) + 1
+            );
+            sky.endFill();
+          }
+          return;
+        }
         if (BI.interior) {
           // a cavern: deep rock that fades from near-black at the ceiling to a faint warmth low down
           const top = [16, 12, 24],
@@ -868,6 +930,7 @@
         crystals = [],
         drips = [],
         fogLayers = [],
+        bubbles = [],
         hillBands = [];
       let sky,
         stars,
@@ -897,6 +960,8 @@
         iceG,
         tracksG,
         streakTile,
+        turtle,
+        causticG,
         SE,
         BI,
         ready = false;
@@ -930,10 +995,11 @@
           crystals.length =
           drips.length =
           fogLayers.length =
+          bubbles.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = -1; // force the gated snow/puddle shapes to draw once on the first frame of the new scene
-        lavaGlow = null;
+        lavaGlow = turtle = causticG = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
         // SP = optional per-biome season palette (tint-only seasons); else fall back to the global SEASONS, and non-seasonal biomes ignore the season entirely.
@@ -959,7 +1025,7 @@
         farLayer = new PIXI.Container();
         root.addChild(farLayer); // sky/celestial group: parallaxes less than the foreground scene
         sky = new PIXI.Graphics();
-        sky.tint = BI.sky;
+        sky.tint = BI.underwater ? 0xffffff : BI.sky; // underwater paints true column colours (no sky-tint multiply)
         farLayer.addChild(sky);
         auroraG = new PIXI.Graphics();
         auroraG.blendMode = PIXI.BLEND_MODES.ADD;
@@ -994,7 +1060,7 @@
         raysG.blendMode = PIXI.BLEND_MODES.ADD;
         farLayer.addChild(raysG); // god-rays shafting from the sun through breaking cloud (clouds render over)
 
-        if (!BI.interior)
+        if (!BI.interior && !BI.underwater)
           for (let i = 0; i < 4; i++) {
             const c = spr(
               'cloud',
@@ -1009,23 +1075,26 @@
             farLayer.addChild(c);
           }
 
-        const bird = anim(
-          BI.flyerFrames || ['bird_a', 'bird_b'],
-          -80,
-          150,
-          0.7,
-          0.06
-        );
-        bird.isBird = true;
-        bird.isBat = !!BI.interior; // bats flit erratically rather than gliding across
-        bird.vx = 1.2;
-        bird.vy = 0;
-        bird.tint = BI.flyer;
-        flutters.push(bird);
-        farLayer.addChild(bird);
+        // crossing flyer (bird, or bat underground); the reef has no sky flyer (the turtle crosses instead)
+        if (!BI.underwater) {
+          const bird = anim(
+            BI.flyerFrames || ['bird_a', 'bird_b'],
+            -80,
+            150,
+            0.7,
+            0.06
+          );
+          bird.isBird = true;
+          bird.isBat = !!BI.interior; // bats flit erratically rather than gliding across
+          bird.vx = 1.2;
+          bird.vy = 0;
+          bird.tint = BI.flyer;
+          flutters.push(bird);
+          farLayer.addChild(bird);
+        }
 
         // migrating flock: a V of birds that crosses the sky occasionally (created hidden, parallaxes with the far sky)
-        if (!BI.interior)
+        if (!BI.interior && !BI.underwater)
           for (let i = 0; i < 7; i++) {
             const fb = anim(
               ['bird_a', 'bird_b'],
@@ -1287,6 +1356,67 @@
             cr.lineTo(x + 28 + Math.random() * 46, y - 4);
           }
           scene.addChild(cr);
+        } else if (BI.ground === 'reef') {
+          const R = BI.reef;
+          // sandy seabed floor laid over the front ridge, paler than the blue background reef
+          const floor = new PIXI.Graphics();
+          floor.beginFill(0x2f7f86);
+          floor.moveTo(-40, VH + 40);
+          for (let x = -40; x <= VW + 40; x += 10)
+            floor.lineTo(x, groundY(x) + 10);
+          floor.lineTo(VW + 40, VH + 40);
+          floor.closePath();
+          floor.endFill();
+          floor.beginFill(0x5aa89c, 0.45); // a lighter sand band catching the light along the crest
+          floor.moveTo(-40, VH + 40);
+          for (let x = -40; x <= VW + 40; x += 10)
+            floor.lineTo(x, groundY(x) + 12);
+          floor.lineTo(VW + 40, VH + 40);
+          floor.closePath();
+          floor.endFill();
+          scene.addChild(floor);
+          for (let i = 0; i < 10; i++) {
+            const x = 20 + Math.random() * (VW - 40),
+              r = spr('rock', x, groundY(x) + 13, 0.08 + Math.random() * 0.16);
+            r.tint = 0x2b5f63;
+            scene.addChild(r);
+          }
+          // kelp stand (behind the coral), swayed by the current
+          for (let i = 0; i < R.kelp; i++) {
+            const x = 20 + Math.random() * (VW - 40),
+              k = spr('kelp', x, groundY(x) + 14, 0.5 + Math.random() * 0.7);
+            k.tint = 0xcfe8dd; // washed a touch by the blue water
+            scene.addChild(k);
+            swayers.push({s: k, amp: 0.05, sp: 0.8, ph: Math.random() * 6});
+          }
+          // coral colonies scattered along the seabed
+          const corals = [];
+          for (let i = 0; i < R.round; i++) corals.push('coral_round');
+          for (let i = 0; i < R.fan; i++) corals.push('coral_fan');
+          for (let i = 0; i < R.branch; i++) corals.push('coral_branch');
+          for (const n of corals) {
+            const x = 40 + Math.random() * (VW - 80),
+              c = spr(n, x, groundY(x) + 13, 0.42 + Math.random() * 0.4);
+            scene.addChild(c);
+          }
+          // anemones wave softly
+          for (let i = 0; i < R.anemone; i++) {
+            const x = 40 + Math.random() * (VW - 80),
+              a = spr(
+                'anemone',
+                x,
+                groundY(x) + 13,
+                0.36 + Math.random() * 0.3
+              );
+            scene.addChild(a);
+            swayers.push({s: a, amp: 0.07, sp: 1.2, ph: Math.random() * 6});
+          }
+          for (let i = 0; i < 4; i++) {
+            const x = 60 + Math.random() * (VW - 120);
+            scene.addChild(
+              spr('starfish', x, groundY(x) + 14, 0.26 + Math.random() * 0.18)
+            );
+          }
         }
         // puddles collect on the foreground after rain (behind the animals); drawn each frame, sized by wetness
         puddleG = new PIXI.Graphics();
@@ -1503,6 +1633,68 @@
             flutters.push(f);
             scene.addChild(f);
           }
+
+        // ---- reef life: surface caustics, schooling fish, rising bubbles, a gliding turtle ----
+        if (BI.underwater) {
+          const R = BI.reef;
+          causticG = new PIXI.Graphics();
+          causticG.blendMode = PIXI.BLEND_MODES.ADD;
+          scene.addChild(causticG); // wavy light dapples from the surface (drawn each frame)
+          // schools of reef fish roaming the whole water column
+          const tints = [0xffcf5a, 0xff8a4a, 0x66c8e0, 0xe87a9a, 0xa6e060];
+          const schools = Math.max(1, Math.round(R.fish / 4));
+          for (let i = 0; i < R.fish; i++) {
+            const f = anim(
+              ['fish_a', 'fish_b'],
+              Math.random() * VW,
+              130 + Math.random() * 360,
+              0.15 + Math.random() * 0.12,
+              0.06 + Math.random() * 0.05
+            );
+            f.anchor.set(0.5, 0.5);
+            f.reef = true;
+            f.dir = Math.random() < 0.5 ? 1 : -1;
+            f.baseSc = Math.abs(f.scale.x);
+            f.scale.x = f.dir * f.baseSc;
+            f.school = i % schools; // the loose group it drifts with
+            f.ox = (Math.random() - 0.5) * 130; // its slot within the school
+            f.oy = (Math.random() - 0.5) * 80;
+            f.wob = Math.random() * 6.28;
+            f.tint = tints[i % tints.length];
+            f.alpha = 0.95;
+            if (reduce.matches) f.gotoAndStop(0);
+            fish.push(f);
+            scene.addChild(f);
+          }
+          // rising bubbles streaming up from a few vents in the reef
+          const vents = [];
+          for (let i = 0; i < 3; i++)
+            vents.push(60 + Math.random() * (VW - 120));
+          for (let i = 0; i < R.bubbles; i++) {
+            const vx = vents[i % vents.length],
+              b = spr(
+                'bubble',
+                vx,
+                120 + Math.random() * 420,
+                0.3 + Math.random() * 0.7,
+                0.5,
+                0.5
+              );
+            b.vy = -(0.4 + Math.random() * 0.7);
+            b.ph = Math.random() * 6.28;
+            b.vent = vx;
+            bubbles.push(b);
+            scene.addChild(b);
+          }
+          // a sea turtle that glides across the reef now and then (hidden until its cue)
+          if (R.turtle) {
+            turtle = spr('turtle', -160, 230, 0.6, 0.5, 0.5);
+            turtle.visible = false;
+            turtle.dir = 1;
+            turtle.tmr = 5 + Math.random() * 8;
+            scene.addChild(turtle);
+          }
+        }
 
         if (BI.fog) {
           // ground fog pooling low, in front of the scene (tree bases sink into it)
@@ -1724,11 +1916,16 @@
           lastSkyH = h;
           drawSky(P);
         }
-        veil.alpha = BI.interior ? night * 0.2 : night * 0.72; // a cave is already dark; barely dims further
-        stars.alpha = BI.interior ? 0 : night;
+        veil.alpha = BI.interior
+          ? night * 0.2 // a cave is already dark; barely dims further
+          : BI.underwater
+            ? night * 0.5 // the reef sinks into gloom at night (the column already darkens too)
+            : night * 0.72;
+        stars.alpha = BI.interior || BI.underwater ? 0 : night;
 
         // ---- weather front: clouds gather (cover), a shower rolls through (wet), then it clears ----
-        if (!reduce.matches) {
+        // (no weather underwater: cover/wet/snow all stay 0, which silences rain, overcast, lightning, etc.)
+        if (!reduce.matches && !BI.underwater) {
           let coverTarget, wetTarget;
           if (weatherMode === 'rain') {
             coverTarget = 0.8;
@@ -1794,9 +1991,10 @@
           }
           flash = Math.max(0, flash - (dt / 60) * 3.5);
         }
-        overcastG.alpha = BI.interior
-          ? 0
-          : cover * 0.55 * (0.25 + P.light * 0.75); // dim by cover, faint at night (no weather underground)
+        overcastG.alpha =
+          BI.interior || BI.underwater
+            ? 0
+            : cover * 0.55 * (0.25 + P.light * 0.75); // dim by cover, faint at night (no weather underground/underwater)
 
         // morning mist: thickest at dawn, burning off by midday, lingering after rain; tinted to the horizon
         if (fogLayers.length) {
@@ -1969,17 +2167,45 @@
         const body = cel.sun ? sun : moon,
           other = cel.sun ? moon : sun;
         other.visible = false;
-        body.visible = !BI.interior;
+        body.visible = !BI.interior && !BI.underwater;
         body.alpha = 1 - cover * 0.6; // sun/moon fades behind gathering cloud
         body.position.set(cel.x, cel.y);
-        sunGlow.visible = !BI.interior;
+        sunGlow.visible = !BI.interior && !BI.underwater;
         sunGlow.position.set(cel.x, cel.y);
         sunGlow.tint = cel.sun ? 0xffe9a8 : 0x9fb6d8;
         sunGlow.scale.set((cel.sun ? 3.4 : 2.2) + Math.sin(t * 1.5) * 0.12);
         sunGlow.alpha = (cel.sun ? 0.8 : 0.5) * (1 - cover * 0.85);
 
         raysG.clear();
-        if (BI.interior) {
+        if (BI.underwater) {
+          // sunlight filtering down from the surface as broad slanted shafts — strong by day, gone at night
+          const baseA = 0.03 + 0.13 * P.light;
+          if (baseA > 0.02)
+            for (let i = 0; i < 6; i++) {
+              const sx = 110 + i * 205 + Math.sin(t * 0.1 + i) * 28,
+                top = -30,
+                depth = 540,
+                w0 = 24 + 9 * Math.sin(t * 0.5 + i * 1.7),
+                N = 12;
+              for (let k = 0; k < N; k++) {
+                const u0 = k / N,
+                  u1 = (k + 1) / N,
+                  y0 = top + u0 * (depth - top),
+                  y1 = top + u1 * (depth - top),
+                  ww0 = w0 * (1 + u0 * 0.7),
+                  ww1 = w0 * (1 + u1 * 0.7),
+                  sl = 46, // shafts lean a little as they sink
+                  a = baseA * (1 - u0) * (1 - u0);
+                raysG.beginFill(0xcdf3ff, a);
+                raysG.moveTo(sx - ww0 + u0 * sl, y0);
+                raysG.lineTo(sx + ww0 + u0 * sl, y0);
+                raysG.lineTo(sx + ww1 + u1 * sl, y1);
+                raysG.lineTo(sx - ww1 + u1 * sl, y1);
+                raysG.closePath();
+                raysG.endFill();
+              }
+            }
+        } else if (BI.interior) {
           // a soft shaft of daylight spilling through the ceiling — brightest up top, dissolving before the floor
           const sx = 760,
             top = 24,
@@ -2028,6 +2254,29 @@
           }
         }
 
+        // reef caustics: wavy bands of light rippling just under the surface (additive, fading at night)
+        if (causticG) {
+          causticG.clear();
+          const ca = 0.03 + 0.11 * P.light;
+          for (let b = 0; b < 5; b++) {
+            const y = 14 + b * 24;
+            causticG.beginFill(0xbff0ff, ca * (1 - b * 0.13));
+            causticG.moveTo(-40, y);
+            for (let x = -40; x <= VW + 40; x += 24)
+              causticG.lineTo(
+                x,
+                y + Math.sin(x * 0.02 + t * 0.8 + b * 1.3) * 7
+              );
+            for (let x = VW + 40; x >= -40; x -= 24)
+              causticG.lineTo(
+                x,
+                y + 9 + Math.sin(x * 0.02 + t * 0.8 + b * 1.3) * 7
+              );
+            causticG.closePath();
+            causticG.endFill();
+          }
+        }
+
         if (reduce.matches) {
           if (deer) deer.gotoAndStop(0);
           return;
@@ -2050,7 +2299,7 @@
 
         // shooting stars: an occasional streak across the night sky (any biome, but not underground)
         shootG.clear();
-        if (night > 0.34 && !BI.interior) {
+        if (night > 0.34 && !BI.interior && !BI.underwater) {
           if (shoot) {
             shoot.x += shoot.vx * dt;
             shoot.y += shoot.vy * dt;
@@ -2342,6 +2591,22 @@
           const fLo = ice > 0.05 ? VW / 2 - openHalf + 50 : 64, // keep to the open lead once the pond ices over
             fHi = ice > 0.05 ? VW / 2 + openHalf - 50 : VW - 64;
           for (const f of fish) {
+            if (f.reef) {
+              // reef fish: drift through the whole column in a loose school that wanders the reef
+              const cx =
+                  VW * 0.5 + Math.sin(t * 0.12 + f.school * 2.1) * VW * 0.4,
+                cy = 280 + Math.sin(t * 0.08 + f.school * 1.7) * 150,
+                tx = cx + f.ox,
+                ty = cy + f.oy + Math.sin(t * 1.3 + f.wob) * 6,
+                pxx = f.x;
+              f.x += (tx - f.x) * 0.02 * dt;
+              f.y += (ty - f.y) * 0.02 * dt;
+              if (Math.abs(f.x - pxx) > 0.06 * dt) {
+                f.dir = f.x < pxx ? -1 : 1; // turn to face the way it's drifting
+                f.scale.x = f.dir * f.baseSc;
+              }
+              continue;
+            }
             if (f.jump > 0) {
               // a leap: rise from cruising depth, break the surface, arc over and splash back
               f.jump += dt / 42;
@@ -2387,6 +2652,36 @@
                 if (water) ripples.push({x: f.x, y: 606, r: 3, life: 0.85}); // a quiet rise that just rings the surface
                 f.next = 5 + Math.random() * 8;
               }
+            }
+          }
+        }
+        // reef bubbles stream up from their vents, wobbling, fading out near the surface
+        for (const b of bubbles) {
+          b.y += b.vy * dt;
+          b.x = b.vent + Math.sin(t * 2 + b.ph) * 8;
+          b.alpha = 0.6 * Math.max(0, Math.min(1, (b.y - 70) / 130));
+          if (b.y < 64) {
+            b.y = groundY(b.vent) + 6;
+            b.ph = Math.random() * 6.28;
+          }
+        }
+        // a sea turtle glides slowly across the reef now and then
+        if (turtle) {
+          if (turtle.visible) {
+            turtle.x += turtle.dir * 0.9 * dt;
+            turtle.y += Math.sin(t * 0.6) * 0.25 * dt; // a gentle rise and fall as it paddles
+            turtle.scale.x = turtle.dir * Math.abs(turtle.scale.x);
+            if (turtle.x > VW + 170 || turtle.x < -170) {
+              turtle.visible = false;
+              turtle.tmr = 12 + Math.random() * 16;
+            }
+          } else {
+            turtle.tmr -= dt / 60;
+            if (turtle.tmr < 0) {
+              turtle.dir = Math.random() < 0.5 ? 1 : -1;
+              turtle.x = turtle.dir > 0 ? -160 : VW + 160;
+              turtle.y = 170 + Math.random() * 180;
+              turtle.visible = true;
             }
           }
         }
