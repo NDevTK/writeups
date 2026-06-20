@@ -213,12 +213,12 @@
       }
       const groundY = (x) => 540 + Math.sin(x * 0.006 + 2.4) * 26;
 
-      const swayers = [], clouds = [], ducks = [], flutters = [], dragons = [], fireflies = [], lilies = [], weather = [], rainDrops = [], smoke = [], embers = [];
-      let sky, stars, sun, moon, sunGlow, scene, veil, glit, rainG, deer, fox, rabbit, roller, water, lavaGlow, shootG, auroraG, SE, BI, ready = false;
+      const swayers = [], clouds = [], ducks = [], flutters = [], dragons = [], fireflies = [], lilies = [], weather = [], rainDrops = [], smoke = [], embers = [], ripples = [];
+      let sky, stars, sun, moon, sunGlow, scene, veil, glit, rainG, deer, fox, rabbit, roller, water, lavaGlow, shootG, auroraG, rippleG, SE, BI, ready = false;
       let lastSkyH = -99, deerMode = 'walk', deerTimer = 5, foxTimer = 6, rollerTimer = 4, shoot = null, shootT = 4;
 
       function build() {
-        root.removeChildren(); swayers.length = clouds.length = ducks.length = flutters.length = dragons.length = fireflies.length = lilies.length = weather.length = smoke.length = embers.length = 0;
+        root.removeChildren(); swayers.length = clouds.length = ducks.length = flutters.length = dragons.length = fireflies.length = lilies.length = weather.length = smoke.length = embers.length = ripples.length = 0;
         lavaGlow = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
@@ -292,7 +292,7 @@
         }
         if (BI.walker) { deer = anim(BI.walker, 300, groundY(300) + 8, BI.walkerScale, 0.12); if (BI.walker.length > 1) deer.stop(); else deer.gotoAndStop(0); deer.graze = BI.graze; scene.addChild(deer); } else deer = null;
         if (BI.critter) { fox = spr(BI.critter, -80, groundY(-80) + 6, BI.critterScale); if (BI.critterTint) fox.tint = BI.critterTint; scene.addChild(fox); fox.dir = 1; } else fox = null;
-        if (BI.hopper) { rabbit = spr(BI.hopper, 760, groundY(760) + 6, 0.55); rabbit.baseY = rabbit.y; scene.addChild(rabbit); } else rabbit = null;
+        if (BI.hopper) { rabbit = spr(BI.hopper, 760, groundY(760) + 6, 0.55); rabbit.scale.x = -0.55; rabbit.baseY = rabbit.y; scene.addChild(rabbit); } else rabbit = null; // flip to face its hop direction (rightward)
         if (BI.roller) { roller = spr(BI.roller, -60, groundY(-60) + 2, 0.5); roller.tint = 0xc2a468; scene.addChild(roller); roller.visible = false; rollerTimer = 2 + Math.random() * 3; } else roller = null;
 
         // water biomes (pond) — reflections, lilies, ducks, dragonflies
@@ -301,6 +301,7 @@
           water = new PIXI.Sprite(gradTex([[0, BI.water.top], [1, BI.water.bot]], 288)); water.position.set(0, 600); water.width = VW; water.height = VH - 600; water.tint = snow ? 0xcfe6ef : 0xffffff; scene.addChild(water);
           const lip = new PIXI.Graphics(); lip.beginFill(0xbfe6ef, 0.5); lip.drawRect(0, 600, VW, 3); lip.endFill(); scene.addChild(lip);
           scene.addChild(glit);
+          rippleG = new PIXI.Graphics(); scene.addChild(rippleG); // expanding ripple rings under ducks/boat
           if (BI.water.lily && !snow) for (const [lx, ly, ls] of (BI.water.lilyPos || [[230, 632, 0.7], [610, 648, 0.82], [1010, 636, 0.66]])) { const lp = spr('lily', lx, ly, ls, 0.5, 0.5); lp.baseY = ly; scene.addChild(lp); lilies.push(lp); }
           if (BI.water.frogs && !snow) for (const [fx, fy] of [[180, 624], [900, 642]]) { const fr = spr('frog', fx, fy, 0.42); fr.baseY = fy; scene.addChild(fr); lilies.push(fr); }
           if (BI.water.ducks) {
@@ -390,13 +391,14 @@
           } else { shootT -= dt / 60; if (shootT < 0) shoot = { x: 60 + Math.random() * VW * 0.6, y: 20 + Math.random() * 120, vx: 7 + Math.random() * 4, vy: 2.4 + Math.random() * 2, life: 0.9, dur: 0.9 }; }
         }
 
-        // glitter: sun/moon reflection shimmer on the pond
+        // sun/moon reflection on the pond: a soft reflected disc at the waterline + a shimmering trail below it
         glit.clear();
         if (water && cel.y < 560) {
-          const col = cel.sun ? 0xfff0b8 : 0xc9d8ea;
+          const col = cel.sun ? 0xfff0b8 : 0xc9d8ea, str = cel.sun ? 1 : 0.7;
+          for (let k = 3; k >= 1; k--) { glit.beginFill(col, 0.14 * str * (k / 3)); glit.drawEllipse(cel.x, 611, 9 + k * 7, 3 + k * 2.4); glit.endFill(); }
           for (let y = 606; y < VH; y += 5) {
             const d = (y - 606) / (VH - 606), wob = Math.sin(y * 0.6 + t * 2.2) * (2 + d * 10);
-            glit.beginFill(col, (1 - d) * 0.5 * (cel.sun ? 1 : 0.7)); glit.drawRect(cel.x + wob - (2 + d * 4), y, 4 + d * 8, 2); glit.endFill();
+            glit.beginFill(col, (1 - d) * 0.5 * str); glit.drawRect(cel.x + wob - (2 + d * 4), y, 4 + d * 8, 2); glit.endFill();
           }
         }
 
@@ -443,7 +445,10 @@
           d.scale.x = (d.vx < 0 ? -1 : 1) * Math.abs(d.scale.x);
           if (d.ref) { d.ref.x = d.x; d.ref.y = d.y + 18 + Math.sin(t * 2) * 1; d.ref.scale.x = d.scale.x; }
           if (d.kids) d.kids.forEach((k, i) => { const b = d.vx < 0 ? 1 : -1; k.x = d.x + b * (34 + i * 22); k.y = k.baseY + Math.sin(t * 2 + i) * 1.4; k.scale.x = (d.vx < 0 ? -1 : 1) * Math.abs(k.scale.x); });
+          d.rip = (d.rip == null ? 0.5 : d.rip) - dt / 60; if (d.rip < 0) { ripples.push({ x: d.x - (d.vx < 0 ? -1 : 1) * 14, y: d.baseY + 9, r: 4, life: 1 }); d.rip = 0.8 + Math.random() * 0.6; }
         }
+        // expanding ripple rings trailing the ducks/boat on the water surface
+        if (water) { rippleG.clear(); for (let i = ripples.length - 1; i >= 0; i--) { const rp = ripples[i]; rp.r += 0.7 * dt; rp.life -= dt / 60 * 0.85; if (rp.life <= 0) { ripples.splice(i, 1); continue; } rippleG.lineStyle(1.4, 0xdff1f6, rp.life * 0.32); rippleG.drawEllipse(rp.x, rp.y, rp.r, rp.r * 0.34); } }
 
         // butterflies, dragonflies, bird — wandering / crossing
         for (const f of flutters) {
