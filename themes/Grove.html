@@ -4289,6 +4289,30 @@
         s.textContent = text;
         row.appendChild(s);
       };
+      // ---- fullscreen (with vendor fallbacks; may be blocked when embedded without permission) ----
+      const fsTarget = document.documentElement;
+      const fsEl = () =>
+        document.fullscreenElement || document.webkitFullscreenElement || null;
+      function toggleFullscreen() {
+        try {
+          if (fsEl()) {
+            const exit =
+              document.exitFullscreen || document.webkitExitFullscreen;
+            if (exit) exit.call(document);
+          } else {
+            const req =
+              fsTarget.requestFullscreen || fsTarget.webkitRequestFullscreen;
+            if (req) {
+              const p = req.call(fsTarget);
+              if (p && p.catch) p.catch(() => {});
+            }
+          }
+        } catch (e) {}
+      }
+      // keep the button label in sync when fullscreen is exited via Esc or the system
+      ['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) =>
+        document.addEventListener(ev, () => buildUI())
+      );
       function buildUI() {
         uiBiome.textContent = '';
         uiTime.textContent = '';
@@ -4353,6 +4377,11 @@
             }
             buildUI();
           })
+        );
+        uiSeason.appendChild(
+          mkBtn(fsEl() ? '⛶ Exit Fullscreen' : '⛶ Fullscreen', !!fsEl(), () =>
+            toggleFullscreen()
+          )
         );
       }
       buildUI();
