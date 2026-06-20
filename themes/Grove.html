@@ -159,6 +159,15 @@
           walker: ['giraffe'], walkerScale: 0.5, graze: true,
           critter: 'zebra', critterScale: 0.6, hopper: null, flyer: 0xffffff, flyerFrames: ['vulture'], flutter: false, roller: null,
         },
+        bamboo: {
+          label: '🎋 Bamboo', sky: 0xeaf4e4, seasonal: false,
+          hills: [0xb6d3a4, 0x8cbd76, 0x6aa45a], ground: 'fern',
+          mid: [['bamboo', 0.6, 160], ['bamboo', 0.5, 520], ['bamboo', 0.55, 900], ['bamboo', 0.5, 1180]],
+          near: [['bamboo', 1.0, 90], ['bamboo', 1.1, 360], ['bamboo', 0.95, 760], ['bamboo', 1.05, 1120]],
+          water: null,
+          walker: ['panda'], walkerScale: 0.58, graze: true,
+          critter: 'redpanda', critterScale: 0.48, hopper: null, flyer: 0x6a7a4a, flutter: false, roller: null,
+        },
       };
       const RIGID = { rock: 1, cactus: 1, cactus2: 1 };
 
@@ -168,7 +177,8 @@
         'cactus', 'cactus2', 'rock', 'lizard', 'camel', 'tumbleweed',
         'palm', 'crab', 'sailboat', 'starfish', 'gull',
         'reed', 'heron', 'frog', 'goat', 'eagle',
-        'acacia', 'giraffe', 'zebra', 'vulture'];
+        'acacia', 'giraffe', 'zebra', 'vulture',
+        'bamboo', 'panda', 'redpanda'];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => { const p = new PIXI.Sprite(T(n)); p.anchor.set(ax == null ? 0.5 : ax, ay == null ? 1 : ay); p.position.set(x, y); if (s) p.scale.set(s); return p; };
       const anim = (frames, x, y, s, spd) => { const a = new PIXI.AnimatedSprite(frames.map(T)); a.anchor.set(0.5, 1); a.position.set(x, y); if (s) a.scale.set(s); a.animationSpeed = spd; a.play(); return a; };
@@ -237,6 +247,10 @@
         } else if (BI.ground === 'savanna') {
           for (let i = 0; i < 6; i++) { const x = 30 + Math.random() * (VW - 60); scene.addChild(spr('rock', x, groundY(x) + 8, 0.06 + Math.random() * 0.08)); }
           for (let i = 0; i < 20; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.5 + Math.random() * 0.6); g.tint = 0xcaad5e; scene.addChild(g); swayers.push({ s: g, amp: 0.06, sp: 1.5, ph: Math.random() * 6 }); }
+        } else if (BI.ground === 'fern') {
+          for (let i = 0; i < 5; i++) { const x = 30 + Math.random() * (VW - 60); scene.addChild(spr('rock', x, groundY(x) + 8, 0.05 + Math.random() * 0.06)); }
+          for (let i = 0; i < 18; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.7); g.tint = 0x6fae4a; scene.addChild(g); swayers.push({ s: g, amp: 0.06, sp: 1.6, ph: Math.random() * 6 }); }
+          for (let i = 0; i < 4; i++) { const x = Math.random() * VW, b = spr('bamboo', x, groundY(x) + 8, 0.26 + Math.random() * 0.12); scene.addChild(b); swayers.push({ s: b, amp: 0.02, sp: 0.9, ph: Math.random() * 6 }); }
         }
         if (BI.walker) { deer = anim(BI.walker, 300, groundY(300) + 8, BI.walkerScale, 0.12); if (BI.walker.length > 1) deer.stop(); else deer.gotoAndStop(0); deer.graze = BI.graze; scene.addChild(deer); } else deer = null;
         if (BI.critter) { fox = spr(BI.critter, -80, groundY(-80) + 6, BI.critterScale); scene.addChild(fox); fox.dir = 1; } else fox = null;
@@ -268,7 +282,7 @@
 
         // fireflies above the veil (warm seasons only)
         const fl = new PIXI.Container(); root.addChild(fl); fireflies.fl = fl;
-        if ((BI.ground === 'meadow' || BI.ground === 'marsh') && !snow) for (let i = 0; i < 16; i++) { const g = spr('glow', 60 + Math.random() * (VW - 120), 470 + Math.random() * 130, 0.16, 0.5, 0.5); g.tint = 0xeaff8a; g.blendMode = PIXI.BLEND_MODES.ADD; g.ph = Math.random() * 6.28; g.vx = (Math.random() - 0.5) * 0.4; g.vy = (Math.random() - 0.5) * 0.3; fireflies.push(g); fl.addChild(g); }
+        if ((BI.ground === 'meadow' || BI.ground === 'marsh' || BI.ground === 'fern') && !snow) for (let i = 0; i < 16; i++) { const g = spr('glow', 60 + Math.random() * (VW - 120), 470 + Math.random() * 130, 0.16, 0.5, 0.5); g.tint = 0xeaff8a; g.blendMode = PIXI.BLEND_MODES.ADD; g.ph = Math.random() * 6.28; g.vx = (Math.random() - 0.5) * 0.4; g.vy = (Math.random() - 0.5) * 0.3; fireflies.push(g); fl.addChild(g); }
 
         // seasonal weather: drifting petals / tumbling leaves / falling snow
         const wl = new PIXI.Container(); root.addChild(wl); weather.layer = wl;

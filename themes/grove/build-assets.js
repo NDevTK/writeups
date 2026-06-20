@@ -315,8 +315,38 @@ save('vulture', S('156 74', `<defs><linearGradient id="vu" x1="0" y1="0" x2="0" 
 <path d="M76,24 L76,17 L80,24 Z" fill="#3a2a1a"/>
 <circle cx="74" cy="27" r="1.3" fill="#1a1a1a"/>`), 134);
 
+// ---- BAMBOO biome ----
+save('bamboo', S('132 268', `<defs><linearGradient id="bm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6fa83e"/><stop offset=".5" stop-color="#9ccf63"/><stop offset="1" stop-color="#5e9636"/></linearGradient></defs>
+<g><rect x="40" y="40" width="14" height="222" rx="6" fill="url(#bm)"/><rect x="64" y="26" width="15" height="236" rx="6" fill="url(#bm)"/><rect x="88" y="58" width="12" height="204" rx="6" fill="url(#bm)"/></g>
+<g stroke="#4f7e2e" stroke-width="2.5"><line x1="40" y1="92" x2="54" y2="92"/><line x1="40" y1="150" x2="54" y2="150"/><line x1="40" y1="208" x2="54" y2="208"/><line x1="64" y1="78" x2="79" y2="78"/><line x1="64" y1="140" x2="79" y2="140"/><line x1="64" y1="202" x2="79" y2="202"/><line x1="88" y1="108" x2="100" y2="108"/><line x1="88" y1="166" x2="100" y2="166"/><line x1="88" y1="224" x2="100" y2="224"/></g>
+<g fill="#5c9e3c"><path d="M71,28 C56,16 40,16 30,24 C46,26 60,32 70,40 Z"/><path d="M72,28 C87,16 103,16 113,24 C97,26 83,32 73,40 Z"/><path d="M47,44 C34,36 22,36 14,42 C26,44 38,50 48,56 Z"/><path d="M93,62 C106,52 118,52 126,58 C114,60 102,66 92,72 Z"/></g>`), 126);
+save('panda', S('200 150', `
+<g stroke="#2a2a2a" stroke-width="13" stroke-linecap="round"><line x1="66" y1="96" x2="62" y2="138"/><line x1="92" y1="98" x2="92" y2="140"/><line x1="120" y1="98" x2="124" y2="140"/><line x1="144" y1="96" x2="150" y2="138"/></g>
+<path d="M52,98 C44,68 72,52 110,52 C150,52 168,64 168,90 C168,106 138,110 104,110 C74,110 60,110 52,98 Z" fill="#f4f2ee"/>
+<path d="M148,56 C164,60 170,74 168,92 C162,104 150,108 140,108 C150,92 150,72 148,56 Z" fill="#2a2a2a"/>
+<circle cx="166" cy="64" r="24" fill="#f4f2ee"/>
+<circle cx="156" cy="44" r="10" fill="#2a2a2a"/>
+<ellipse cx="172" cy="60" rx="8" ry="10" fill="#2a2a2a"/>
+<circle cx="174" cy="60" r="2.6" fill="#fff"/><circle cx="174" cy="61" r="1.4" fill="#1a1a1a"/>
+<path d="M186,66 C194,68 196,76 189,80 C183,80 181,72 182,68 Z" fill="#f4f2ee"/>
+<ellipse cx="190" cy="72" rx="3.6" ry="2.6" fill="#2a2a2a"/>
+<path d="M52,86 C42,86 38,96 44,102 C50,98 54,92 58,90 Z" fill="#f4f2ee"/>`), 180);
+save('redpanda', S('208 124', `<defs><linearGradient id="rp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c45a2a"/><stop offset="1" stop-color="#9c421c"/></linearGradient>
+<linearGradient id="rpt" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7a3416"/><stop offset="1" stop-color="#bd5428"/></linearGradient></defs>
+<path d="M70,86 C44,98 16,98 8,78 C4,68 10,58 20,56 C16,66 22,76 40,80 C52,83 64,84 74,82 Z" fill="url(#rpt)"/>
+<g stroke="#3a1e10" stroke-width="7" stroke-linecap="round" fill="none"><path d="M14,68 q9,9 19,8"/><path d="M22,56 q9,6 18,7"/><path d="M34,82 q11,4 21,0"/></g>
+<g stroke="#3a2014" stroke-width="8" stroke-linecap="round"><line x1="84" y1="88" x2="82" y2="110"/><line x1="110" y1="90" x2="110" y2="112"/><line x1="138" y1="90" x2="140" y2="110"/></g>
+<path d="M60,86 C56,64 80,56 116,56 C148,56 164,64 164,82 C164,94 140,98 112,98 C84,98 68,96 60,86 Z" fill="url(#rp)"/>
+<circle cx="170" cy="66" r="20" fill="url(#rp)"/>
+<path d="M170,51 C180,51 188,58 188,68 C188,77 181,83 171,82 C176,72 176,59 170,51 Z" fill="#f7ece0"/>
+<path d="M170,51 C160,51 152,58 152,68 C152,77 159,83 169,82 C164,72 164,59 170,51 Z" fill="#f7ece0"/>
+<circle cx="156" cy="49" r="9" fill="url(#rp)"/><circle cx="184" cy="49" r="9" fill="url(#rp)"/>
+<circle cx="156" cy="49" r="4.5" fill="#f7ece0"/><circle cx="184" cy="49" r="4.5" fill="#f7ece0"/>
+<circle cx="163" cy="65" r="2.2" fill="#1a1a1a"/><circle cx="177" cy="65" r="2.2" fill="#1a1a1a"/>
+<circle cx="170" cy="74" r="3" fill="#241008"/>`), 192);
+
 // ---- contact sheet of new + polished ----
-const review = ['acacia', 'sailboat', 'bush'];
+const review = ['bamboo', 'panda', 'redpanda'];
 const cols = 4, cell = 230, pad = 14, rows = Math.ceil(review.length / cols);
 (async () => {
   const comps = [];
