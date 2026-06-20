@@ -814,6 +814,20 @@ save(
   64
 );
 
+// soft fog bank — tiled horizontally and drifted to make low mist; alpha driven by time of day
+save(
+  'fog',
+  S(
+    '256 90',
+    `<defs><radialGradient id="fg"><stop offset="0" stop-color="#ffffff" stop-opacity="0.92"/><stop offset="0.6" stop-color="#ffffff" stop-opacity="0.4"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient></defs>
+<ellipse cx="24" cy="48" rx="76" ry="30" fill="url(#fg)"/>
+<ellipse cx="96" cy="40" rx="84" ry="34" fill="url(#fg)"/>
+<ellipse cx="172" cy="50" rx="80" ry="30" fill="url(#fg)"/>
+<ellipse cx="248" cy="42" rx="76" ry="30" fill="url(#fg)"/>`
+  ),
+  256
+);
+
 // ---- contact sheet of new + polished ----
 const review = ['bigrock', 'falls_a', 'vfall_a', 'eagle', 'peak'];
 const cols = 4,
