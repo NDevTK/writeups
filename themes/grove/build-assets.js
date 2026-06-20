@@ -685,8 +685,64 @@ save(
   420
 );
 
+// ---- NEW: cave set (bat 2 frames, stalactite, stalagmite, glowing crystal cluster) ----
+// dark cool-rock palette so the glow of crystals + glowworms reads against it
+const bat = (tip, mid) =>
+  S(
+    '140 86',
+    `<g fill="#2b2536">
+<path d="M70,30 L63,11 L72,26 Z"/><path d="M70,30 L77,11 L68,26 Z"/>
+<circle cx="70" cy="30" r="8"/><ellipse cx="70" cy="46" rx="9" ry="15"/>
+<path d="M62,38 C44,${tip} 24,${tip - 2} 8,${mid} C24,${mid + 6} 32,${mid + 13} 40,${mid + 9} C44,${mid + 17} 54,${mid + 12} 60,52 Z"/>
+<path d="M78,38 C96,${tip} 116,${tip - 2} 132,${mid} C116,${mid + 6} 108,${mid + 13} 100,${mid + 9} C96,${mid + 17} 86,${mid + 12} 80,52 Z"/></g>
+<g fill="#3c3449" opacity="0.6"><path d="M62,40 C46,${tip + 6} 30,${tip + 3} 16,${mid + 2} C30,${mid + 8} 38,${mid + 11} 58,50 Z"/>
+<path d="M78,40 C94,${tip + 6} 110,${tip + 3} 124,${mid + 2} C110,${mid + 8} 102,${mid + 11} 82,50 Z"/></g>`
+  );
+save('bat_a', bat(20, 34), 112);
+save('bat_b', bat(44, 54), 112);
+
+save(
+  'stalactite',
+  S(
+    '56 210',
+    `<defs><linearGradient id="sl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#37304a"/><stop offset=".6" stop-color="#251f33"/><stop offset="1" stop-color="#171320"/></linearGradient></defs>
+<path d="M2,0 C6,70 12,130 28,206 C42,132 50,72 54,0 Z" fill="url(#sl)"/>
+<path d="M20,0 C22,54 24,96 28,150 C31,96 33,54 35,0 Z" fill="#473d5c" opacity="0.45"/>
+<path d="M35,0 C40,60 45,110 40,150 C46,108 50,58 53,0 Z" fill="#0f0c16" opacity="0.4"/>`
+  ),
+  56
+);
+
+save(
+  'stalagmite',
+  S(
+    '64 176',
+    `<defs><linearGradient id="sm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3350"/><stop offset="1" stop-color="#191420"/></linearGradient></defs>
+<path d="M6,176 C12,104 18,54 32,2 C46,54 52,104 58,176 Z" fill="url(#sm)"/>
+<path d="M30,176 C30,120 30,70 32,12 C34,70 35,120 38,176 Z" fill="#4c4263" opacity="0.4"/>
+<path d="M42,176 C47,120 50,80 52,42" stroke="#0f0c16" stroke-width="3" opacity="0.3" fill="none"/>`
+  ),
+  64
+);
+
+// crystal kept light + faceted so it can be tinted per cluster (teal / violet / blue)
+save(
+  'crystal',
+  S(
+    '96 120',
+    `<defs><linearGradient id="cr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eaf6ff"/><stop offset="1" stop-color="#9fc4e8"/></linearGradient>
+<linearGradient id="cr2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#bcd6f0"/></linearGradient></defs>
+<path d="M30,118 L20,52 L36,18 L46,54 Z" fill="url(#cr)"/>
+<path d="M58,118 L50,64 L62,30 L72,66 Z" fill="url(#cr)"/>
+<path d="M44,118 L36,72 L48,40 L56,74 Z" fill="url(#cr2)"/>
+<g fill="#ffffff" opacity="0.55"><path d="M36,18 L41,40 L31,46 Z"/><path d="M62,30 L67,52 L57,56 Z"/><path d="M48,40 L52,60 L44,62 Z"/></g>
+<g fill="#7fa6cc" opacity="0.45"><path d="M46,54 L40,72 L44,52 Z"/><path d="M72,66 L64,34 L70,60 Z"/></g>`
+  ),
+  96
+);
+
 // ---- contact sheet of new + polished ----
-const review = ['rabbit'];
+const review = ['bat_a', 'bat_b', 'stalactite', 'stalagmite', 'crystal'];
 const cols = 4,
   cell = 230,
   pad = 14,

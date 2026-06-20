@@ -574,6 +574,40 @@
           flyerFrames: ['gull'],
           flutter: false,
           roller: null
+        },
+        cave: {
+          label: '🦇 Cave',
+          interior: true,
+          sky: 0x141020,
+          hills: [0x171220, 0x201a2c, 0x2b2338], // dark rock mounds; front catches a little glow
+          ground: 'rock',
+          mid: [
+            ['stalagmite', 0.5, 250],
+            ['stalagmite', 0.34, 720],
+            ['stalagmite', 0.42, 1060]
+          ],
+          near: [
+            ['stalagmite', 0.85, 110],
+            ['stalagmite', 0.62, 560],
+            ['stalagmite', 0.95, 1170]
+          ],
+          // [x, tint] crystal clusters that glow and gently pulse
+          crystals: [
+            [170, 0x6ff0e0],
+            [430, 0xb98aff],
+            [770, 0x6fc8ff],
+            [1040, 0x7af0c8],
+            [1220, 0xb98aff]
+          ],
+          glow: 'cave', // glowworms on the ceiling
+          walker: null,
+          critter: null,
+          hopper: null,
+          flyer: 0x4a4760,
+          flyerFrames: ['bat_a', 'bat_b'],
+          flutter: false,
+          roller: null,
+          water: {top: '#1b2742', bot: '#0b1120', glow: true} // still underground pool
         }
       };
       const RIGID = {rock: 1, cactus: 1, cactus2: 1};
@@ -628,7 +662,12 @@
         'bamboo',
         'panda',
         'redpanda',
-        'volcano'
+        'volcano',
+        'bat_a',
+        'bat_b',
+        'stalactite',
+        'stalagmite',
+        'crystal'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -672,6 +711,29 @@
       function drawSky(P) {
         // banded gradient via Graphics (no texture upload quirks)
         sky.clear();
+        if (BI.interior) {
+          // a cavern: deep rock that fades from near-black at the ceiling to a faint warmth low down
+          const top = [16, 12, 24],
+            mid = [26, 20, 38],
+            bot = [40, 32, 54],
+            N = 70;
+          for (let i = 0; i < N; i++) {
+            const u = i / (N - 1),
+              col =
+                u < 0.55
+                  ? mixA(top, mid, u / 0.55)
+                  : mixA(mid, bot, (u - 0.55) / 0.45);
+            sky.beginFill(hexI(col));
+            sky.drawRect(
+              -40,
+              Math.floor(u * VH),
+              VW + 80,
+              Math.ceil(VH / N) + 1
+            );
+            sky.endFill();
+          }
+          return;
+        }
         const mid = mixA(P.top, P.bot, 0.7),
           N = 90;
         for (let i = 0; i < N; i++) {
@@ -737,6 +799,8 @@
         flock = [],
         puddles = [],
         tracks = [],
+        crystals = [],
+        drips = [],
         hillBands = [];
       let sky,
         stars,
@@ -794,6 +858,8 @@
           flock.length =
           puddles.length =
           tracks.length =
+          crystals.length =
+          drips.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lavaGlow = null;
@@ -857,19 +923,20 @@
         raysG.blendMode = PIXI.BLEND_MODES.ADD;
         farLayer.addChild(raysG); // god-rays shafting from the sun through breaking cloud (clouds render over)
 
-        for (let i = 0; i < 4; i++) {
-          const c = spr(
-            'cloud',
-            Math.random() * VW,
-            60 + Math.random() * 150,
-            0.5 + Math.random() * 0.5,
-            0.5,
-            0.5
-          );
-          c.vx = 0.12 + Math.random() * 0.22;
-          clouds.push(c);
-          farLayer.addChild(c);
-        }
+        if (!BI.interior)
+          for (let i = 0; i < 4; i++) {
+            const c = spr(
+              'cloud',
+              Math.random() * VW,
+              60 + Math.random() * 150,
+              0.5 + Math.random() * 0.5,
+              0.5,
+              0.5
+            );
+            c.vx = 0.12 + Math.random() * 0.22;
+            clouds.push(c);
+            farLayer.addChild(c);
+          }
 
         const bird = anim(
           BI.flyerFrames || ['bird_a', 'bird_b'],
@@ -884,21 +951,22 @@
         farLayer.addChild(bird);
 
         // migrating flock: a V of birds that crosses the sky occasionally (created hidden, parallaxes with the far sky)
-        for (let i = 0; i < 7; i++) {
-          const fb = anim(
-            ['bird_a', 'bird_b'],
-            0,
-            0,
-            0.4,
-            0.05 + Math.random() * 0.02
-          );
-          fb.tint = 0x49515f;
-          fb.visible = false;
-          fb.wing = i === 0 ? 0 : Math.ceil(i / 2) * (i % 2 ? -1 : 1);
-          fb.ph = Math.random() * 6.28;
-          flock.push(fb);
-          farLayer.addChild(fb);
-        }
+        if (!BI.interior)
+          for (let i = 0; i < 7; i++) {
+            const fb = anim(
+              ['bird_a', 'bird_b'],
+              0,
+              0,
+              0.4,
+              0.05 + Math.random() * 0.02
+            );
+            fb.tint = 0x49515f;
+            fb.visible = false;
+            fb.wing = i === 0 ? 0 : Math.ceil(i / 2) * (i % 2 ? -1 : 1);
+            fb.ph = Math.random() * 6.28;
+            flock.push(fb);
+            farLayer.addChild(fb);
+          }
         flockT = 8 + Math.random() * 14;
 
         // ---- scene (everything that night darkens) ----
@@ -931,20 +999,65 @@
         // crest snow lives just behind the trees; redrawn each frame to grow with accumulation
         crestG = new PIXI.Graphics();
         scene.addChild(crestG);
+        const ceilEdge = (x) =>
+          74 + Math.sin(x * 0.012 + 1) * 26 + Math.sin(x * 0.05) * 8;
+        if (BI.interior) {
+          // rock ceiling across the top with stalactites hanging from its underside
+          const ceil = new PIXI.Graphics();
+          ceil.beginFill(0x130f1d);
+          ceil.moveTo(-40, -40);
+          ceil.lineTo(VW + 40, -40);
+          for (let x = VW + 40; x >= -40; x -= 26) ceil.lineTo(x, ceilEdge(x));
+          ceil.closePath();
+          ceil.endFill();
+          scene.addChild(ceil);
+          for (const x of [110, 300, 470, 690, 880, 1040, 1200]) {
+            const cy = ceilEdge(x),
+              s = spr(
+                'stalactite',
+                x,
+                cy - 6,
+                0.42 + Math.random() * 0.5,
+                0.5,
+                0
+              );
+            scene.addChild(s);
+            if (Math.random() < 0.55)
+              drips.push({
+                x,
+                y0: cy + 200 * s.scale.y,
+                t: Math.random() * 4,
+                dropY: null
+              });
+          }
+        }
         for (const [n, sc, x] of BI.mid) {
           const t = spr(n, x, 482 + Math.sin(x * 0.006 + 1.3) * 30, sc);
-          t.tint = mulTint(0xcfe3d0, folTint);
+          t.tint = BI.interior ? 0xffffff : mulTint(0xcfe3d0, folTint);
           scene.addChild(t);
-          if (!RIGID[n])
+          if (!RIGID[n] && !BI.interior)
             swayers.push({s: t, amp: 0.012, sp: 0.7, ph: Math.random() * 6});
         }
         for (const [n, sc, x] of BI.near) {
           const t = spr(n, x, groundY(x) + 4, sc);
-          t.tint = folTint;
+          t.tint = BI.interior ? 0xffffff : folTint;
           scene.addChild(t);
-          if (!RIGID[n])
+          if (!RIGID[n] && !BI.interior)
             swayers.push({s: t, amp: 0.02, sp: 0.9, ph: Math.random() * 6});
         }
+        if (BI.crystals)
+          for (const [x, col] of BI.crystals) {
+            const fy = groundY(x) + 6,
+              gl = spr('glow', x, fy - 26, 0.9, 0.5, 0.5);
+            gl.tint = col;
+            gl.blendMode = PIXI.BLEND_MODES.ADD;
+            gl.ph = Math.random() * 6.28;
+            scene.addChild(gl);
+            crystals.push(gl);
+            const c = spr('crystal', x, fy, 0.34 + Math.random() * 0.16);
+            c.tint = col;
+            scene.addChild(c);
+          }
         if (BI.ground === 'meadow') {
           for (let i = 0; i < 16; i++) {
             const x = 40 + Math.random() * (VW - 80),
@@ -1260,33 +1373,40 @@
         veil.blendMode = PIXI.BLEND_MODES.MULTIPLY;
         scene.addChild(veil);
 
-        // fireflies above the veil (warm seasons only)
+        // fireflies above the veil (warm seasons only) — or glowworms strung under a cave ceiling
         const fl = new PIXI.Container();
         root.addChild(fl);
         fireflies.fl = fl;
-        if (
-          (BI.ground === 'meadow' ||
+        const hasFlies =
+          BI.glow === 'cave' ||
+          ((BI.ground === 'meadow' ||
             BI.ground === 'marsh' ||
             BI.ground === 'fern') &&
-          !snow
-        )
-          for (let i = 0; i < 16; i++) {
-            const g = spr(
-              'glow',
-              60 + Math.random() * (VW - 120),
-              470 + Math.random() * 130,
-              0.16,
-              0.5,
-              0.5
-            );
-            g.tint = 0xeaff8a;
+            !snow);
+        if (hasFlies) {
+          const cave = BI.glow === 'cave',
+            n = cave ? 30 : 16;
+          for (let i = 0; i < n; i++) {
+            const gx = 40 + Math.random() * (VW - 80),
+              g = spr(
+                'glow',
+                gx,
+                cave
+                  ? ceilEdge(gx) + 10 + Math.random() * 120
+                  : 470 + Math.random() * 130,
+                cave ? 0.1 + Math.random() * 0.06 : 0.16,
+                0.5,
+                0.5
+              );
+            g.tint = cave ? 0x8ff0ff : 0xeaff8a;
             g.blendMode = PIXI.BLEND_MODES.ADD;
             g.ph = Math.random() * 6.28;
-            g.vx = (Math.random() - 0.5) * 0.4;
-            g.vy = (Math.random() - 0.5) * 0.3;
+            g.vx = (Math.random() - 0.5) * (cave ? 0.16 : 0.4);
+            g.vy = (Math.random() - 0.5) * (cave ? 0.12 : 0.3);
             fireflies.push(g);
             fl.addChild(g);
           }
+        }
 
         // seasonal weather: drifting petals / tumbling leaves / falling snow
         const wl = new PIXI.Container();
@@ -1452,8 +1572,8 @@
           lastSkyH = h;
           drawSky(P);
         }
-        veil.alpha = night * 0.72;
-        stars.alpha = night;
+        veil.alpha = BI.interior ? night * 0.2 : night * 0.72; // a cave is already dark; barely dims further
+        stars.alpha = BI.interior ? 0 : night;
 
         // ---- weather front: clouds gather (cover), a shower rolls through (wet), then it clears ----
         if (!reduce.matches) {
@@ -1502,8 +1622,8 @@
             rainbowLife -= dt / 60;
             rainbow = Math.sin(Math.max(0, 1 - rainbowLife / 24) * Math.PI);
           } else rainbow = 0;
-          // lightning: occasional strike during a heavy shower
-          if (wet > 0.55) {
+          // lightning: occasional strike during a heavy shower (never underground)
+          if (wet > 0.55 && !BI.interior) {
             flashT -= dt / 60;
             if (flashT < 0) {
               flashT = 4 + Math.random() * 11;
@@ -1522,7 +1642,9 @@
           }
           flash = Math.max(0, flash - (dt / 60) * 3.5);
         }
-        overcastG.alpha = cover * 0.55 * (0.25 + P.light * 0.75); // dim by cover, faint at night
+        overcastG.alpha = BI.interior
+          ? 0
+          : cover * 0.55 * (0.25 + P.light * 0.75); // dim by cover, faint at night (no weather underground)
 
         // audio follows the mute toggle and swells with the rain (click-free via setTargetAtTime)
         if (audio) {
@@ -1537,7 +1659,7 @@
 
         // rainbow: a coloured arc that fades in after a daytime shower clears
         rainbowG.clear();
-        if (rainbow > 0.01) {
+        if (rainbow > 0.01 && !BI.interior) {
           const cols = [
             0xff6a6a, 0xffa84a, 0xffe24a, 0x6ad86a, 0x52a8ff, 0x6a6aff, 0xb06aff
           ];
@@ -1549,7 +1671,7 @@
 
         // puddles: grow with ground wetness, reflecting a sliver of sky, then dry up
         puddleG.clear();
-        if (wetness > 0.02) {
+        if (wetness > 0.02 && !BI.interior) {
           for (const pd of puddles) {
             const rx = pd.r * Math.min(1, wetness * 1.3);
             puddleG.beginFill(0x2b3a52, wetness * 0.28);
@@ -1646,7 +1768,7 @@
         const auroraI =
           0.22 + 0.78 * Math.pow(0.5 + 0.5 * Math.sin(t * 0.05), 2);
         if (BI.aurora) drawAurora(t, night, auroraI);
-        fireflies.fl.alpha = night;
+        fireflies.fl.alpha = BI.interior ? 0.8 + night * 0.2 : night; // glowworms glow around the clock underground
         for (const c of clouds) {
           c.tint = hexI(
             lpH(
@@ -1657,41 +1779,66 @@
           );
         }
 
-        // sun / moon + halo
+        // sun / moon + halo (hidden underground — no sky bodies in a cave)
         const body = cel.sun ? sun : moon,
           other = cel.sun ? moon : sun;
         other.visible = false;
-        body.visible = true;
+        body.visible = !BI.interior;
         body.alpha = 1 - cover * 0.6; // sun/moon fades behind gathering cloud
         body.position.set(cel.x, cel.y);
-        sunGlow.visible = true;
+        sunGlow.visible = !BI.interior;
         sunGlow.position.set(cel.x, cel.y);
         sunGlow.tint = cel.sun ? 0xffe9a8 : 0x9fb6d8;
         sunGlow.scale.set((cel.sun ? 3.4 : 2.2) + Math.sin(t * 1.5) * 0.12);
         sunGlow.alpha = (cel.sun ? 0.8 : 0.5) * (1 - cover * 0.85);
 
-        // god-rays: shafts from the sun when cloud is breaking up — peak near light cover (~1/3),
-        // fading to nothing under solid overcast (no sun) and clear sky (nothing to shaft through)
         raysG.clear();
-        const rays = cel.sun
-          ? Math.max(0, cover * (1 - cover) * (1 - cover) * 6.75)
-          : 0;
-        if (rays > 0.03) {
-          for (let i = 0; i < 7; i++) {
-            const ang =
-              Math.PI * 0.5 + (i - 3) * 0.13 + Math.sin(t * 0.25 + i) * 0.012;
-            const len = 600,
-              w = 15 + 6 * Math.sin(t * 0.6 + i * 2),
-              ex = cel.x + Math.cos(ang) * len,
-              ey = cel.y + Math.sin(ang) * len,
-              nx = -Math.sin(ang) * w,
-              ny = Math.cos(ang) * w;
-            raysG.beginFill(0xfff1c4, rays * 0.06);
-            raysG.moveTo(cel.x, cel.y);
-            raysG.lineTo(ex + nx, ey + ny);
-            raysG.lineTo(ex - nx, ey - ny);
+        if (BI.interior) {
+          // a soft shaft of daylight spilling through the ceiling — brightest up top, dissolving before the floor
+          const sx = 760,
+            top = 24,
+            depth = 452,
+            baseA = (0.05 + P.light * 0.13) * (1 - cover * 0.6),
+            N = 16;
+          for (let k = 0; k < N; k++) {
+            const u0 = k / N,
+              u1 = (k + 1) / N,
+              y0 = top + u0 * (depth - top),
+              y1 = top + u1 * (depth - top),
+              w0 = 18 + u0 * 58,
+              w1 = 18 + u1 * 58,
+              a = baseA * (1 - u0) * (1 - u0); // quadratic falloff so it fades into the dark
+            raysG.beginFill(0xd6e6ff, a);
+            raysG.moveTo(sx - w0, y0);
+            raysG.lineTo(sx + w0, y0);
+            raysG.lineTo(sx + w1, y1);
+            raysG.lineTo(sx - w1, y1);
             raysG.closePath();
             raysG.endFill();
+          }
+        } else {
+          // god-rays: shafts from the sun when cloud is breaking up — peak near light cover (~1/3),
+          // fading to nothing under solid overcast (no sun) and clear sky (nothing to shaft through)
+          const rays = cel.sun
+            ? Math.max(0, cover * (1 - cover) * (1 - cover) * 6.75)
+            : 0;
+          if (rays > 0.03) {
+            for (let i = 0; i < 7; i++) {
+              const ang =
+                Math.PI * 0.5 + (i - 3) * 0.13 + Math.sin(t * 0.25 + i) * 0.012;
+              const len = 600,
+                w = 15 + 6 * Math.sin(t * 0.6 + i * 2),
+                ex = cel.x + Math.cos(ang) * len,
+                ey = cel.y + Math.sin(ang) * len,
+                nx = -Math.sin(ang) * w,
+                ny = Math.cos(ang) * w;
+              raysG.beginFill(0xfff1c4, rays * 0.06);
+              raysG.moveTo(cel.x, cel.y);
+              raysG.lineTo(ex + nx, ey + ny);
+              raysG.lineTo(ex - nx, ey - ny);
+              raysG.closePath();
+              raysG.endFill();
+            }
           }
         }
 
@@ -1715,9 +1862,9 @@
           Math.sin(t * 0.11 + 1.3) * 0.45 +
           Math.sin(t * 0.07) * 0.25;
 
-        // shooting stars: an occasional streak across the night sky (any biome)
+        // shooting stars: an occasional streak across the night sky (any biome, but not underground)
         shootG.clear();
-        if (night > 0.34) {
+        if (night > 0.34 && !BI.interior) {
           if (shoot) {
             shoot.x += shoot.vx * dt;
             shoot.y += shoot.vy * dt;
@@ -1761,7 +1908,27 @@
 
         // sun/moon reflection on the pond: a soft reflected disc at the waterline + a shimmering trail below it
         glit.clear();
-        if (water && cel.y < 560) {
+        if (water && BI.interior) {
+          // underground pool mirrors the glowing crystals instead of any sky body
+          for (const gl of crystals) {
+            const a = gl.alpha;
+            glit.beginFill(gl.tint, 0.16 * a);
+            glit.drawEllipse(gl.x, 609, 20, 5);
+            glit.endFill();
+            for (let y = 612; y < VH; y += 6) {
+              const d = (y - 612) / (VH - 612);
+              glit.beginFill(gl.tint, (1 - d) * 0.13 * a);
+              glit.drawRect(
+                gl.x + Math.sin(y * 0.5 + t * 1.6 + gl.ph) * (2 + d * 7) - 3,
+                y,
+                6,
+                2
+              );
+              glit.endFill();
+            }
+          }
+        }
+        if (water && !BI.interior && cel.y < 560) {
           const col = cel.sun ? 0xfff0b8 : 0xc9d8ea,
             str = cel.sun ? 1 : 0.7;
           for (let k = 3; k >= 1; k--) {
@@ -1981,9 +2148,28 @@
             d.rip = (0.8 + Math.random() * 0.6) * (1 + ice * 1.6); // wakes come slower through slush
           }
         }
-        // expanding ripple rings trailing the ducks/boat on the water surface
+        // expanding ripple rings trailing the ducks/boat (or cave drips) on the water surface
         if (water) {
           rippleG.clear();
+          // cave drips: a stalactite releases a drop that falls and rings the pool (faster when it's wet outside)
+          if (BI.interior)
+            for (const dp of drips) {
+              if (dp.dropY == null) {
+                dp.t -= dt / 60;
+                if (dp.t < 0) dp.dropY = dp.y0;
+              } else {
+                dp.dropY += 4.5 * dt;
+                if (dp.dropY >= 604) {
+                  dp.dropY = null;
+                  dp.t = 2 + Math.random() * 3 + (wet > 0.3 ? 0 : 2.5);
+                  ripples.push({x: dp.x, y: 607, r: 3, life: 1});
+                } else {
+                  rippleG.beginFill(0xafe0ee, 0.8);
+                  rippleG.drawEllipse(dp.x, dp.dropY, 1.5, 4.5);
+                  rippleG.endFill();
+                }
+              }
+            }
           for (let i = ripples.length - 1; i >= 0; i--) {
             const rp = ripples[i];
             rp.r += 0.7 * dt;
@@ -2055,6 +2241,9 @@
             }
           }
         }
+        // crystals breathe a slow glow (and the pool mirrors it)
+        for (const gl of crystals)
+          gl.alpha = 0.62 + Math.sin(t * 1.3 + gl.ph) * 0.3;
         // fireflies drift + twinkle
         for (const g of fireflies) {
           g.x += g.vx * dt;
@@ -2097,7 +2286,7 @@
           else if (w.x > VW + 14) w.x = -14;
         }
         // rain: intensity driven by the weather front (wet); shower slants harder as it picks up
-        if (wet > 0.02) {
+        if (wet > 0.02 && !BI.interior) {
           rainG.clear();
           rainG.lineStyle(1.4, 0xbcd6e8, 0.55 * wet);
           const n = Math.ceil(rainDrops.length * Math.min(1, wet * 1.2));
@@ -2117,7 +2306,7 @@
 
         // lightning: a brief flash that lights the whole scene, plus a jagged bolt
         flashG.clear();
-        if (flash > 0.01) {
+        if (flash > 0.01 && !BI.interior) {
           flashG.beginFill(0xc8d6ff, flash * 0.5);
           flashG.drawRect(0, 0, VW, VH);
           flashG.endFill();
