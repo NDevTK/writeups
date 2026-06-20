@@ -529,21 +529,24 @@ save(
   ),
   168
 );
+// eagle redrawn as a side-on glide facing right (head + beak forward, not the old top-down view)
 save(
   'eagle',
   S(
-    '150 72',
-    `<defs><linearGradient id="eg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a4632"/><stop offset="1" stop-color="#392a1b"/></linearGradient></defs>
-<path d="M72,36 C54,18 32,12 8,18 C18,22 12,28 6,31 C22,28 30,32 42,35 C54,40 65,40 72,38 Z" fill="url(#eg)"/>
-<path d="M72,36 C90,18 112,12 136,18 C126,22 132,28 138,31 C122,28 114,32 102,35 C90,40 79,40 72,38 Z" fill="url(#eg)"/>
-<g fill="#2c2114"><path d="M8,18 l-7,1 l6,4 Z"/><path d="M136,18 l7,1 l-6,4 Z"/></g>
-<ellipse cx="72" cy="38" rx="9" ry="14" fill="url(#eg)"/>
-<path d="M64,49 L80,49 L72,62 Z" fill="#f1ede4"/>
-<circle cx="72" cy="26" r="7.5" fill="#f1ede4"/>
-<path d="M72,20 L72,11 L77,20 Z" fill="#e7b53f"/>
-<circle cx="70" cy="25" r="1.5" fill="#1a1a1a"/>`
+    '160 96',
+    `<defs><linearGradient id="eg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a5236"/><stop offset="1" stop-color="#3a2c1c"/></linearGradient>
+<linearGradient id="egw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#574330"/><stop offset="1" stop-color="#2f2418"/></linearGradient></defs>
+<path d="M42,56 L10,49 L8,61 L42,62 Z" fill="#ece6da"/>
+<path d="M40,55 C54,47 92,46 120,53 C112,62 66,64 38,60 Z" fill="url(#eg)"/>
+<path d="M88,52 C72,28 50,10 20,3 C40,9 54,20 64,34 C54,28 44,28 36,30 C54,38 70,46 86,52 Z" fill="url(#egw)"/>
+<path d="M78,54 C66,70 50,80 28,84 C46,78 56,68 66,56 Z" fill="#3c2d1d"/>
+<path d="M112,53 C112,45 120,41 129,43 C124,47 124,53 127,57 C120,59 114,58 112,53 Z" fill="#ece6da"/>
+<circle cx="128" cy="48" r="8.5" fill="#ece6da"/>
+<path d="M135,45 L152,48 L136,53 Z" fill="#e8b53f"/>
+<path d="M152,48 C154,49.5 152,51.5 148,51 Z" fill="#c9952a"/>
+<circle cx="131" cy="46" r="1.7" fill="#16120c"/>`
   ),
-  132
+  140
 );
 
 // ---- SAVANNA biome ----
@@ -741,8 +744,24 @@ save(
   96
 );
 
+// snow-capped massif that rises behind the alpine hills (a `feature`, so it sits at the back)
+save(
+  'peak',
+  S(
+    '440 320',
+    `<defs><linearGradient id="pk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b7c5da"/><stop offset="1" stop-color="#61728a"/></linearGradient></defs>
+<path d="M150,320 L300,66 L440,320 Z" fill="#8295ad"/>
+<path d="M0,320 L150,36 L340,320 Z" fill="url(#pk)"/>
+<path d="M150,36 L104,128 L132,116 L150,150 L176,104 L150,36 Z" fill="#f3f8ff"/>
+<path d="M300,66 L266,128 L286,120 L300,148 L320,116 L300,66 Z" fill="#e9f1fb"/>
+<path d="M150,36 L176,104 L150,150 L132,116 Z" fill="#9aa9bf" opacity="0.5"/>
+<path d="M150,150 L196,236 L150,320 L122,232 Z" fill="#536378" opacity="0.45"/>`
+  ),
+  430
+);
+
 // ---- contact sheet of new + polished ----
-const review = ['bat_a', 'bat_b', 'stalactite', 'stalagmite', 'crystal'];
+const review = ['eagle', 'peak', 'bat_a', 'stalactite', 'crystal'];
 const cols = 4,
   cell = 230,
   pad = 14,
