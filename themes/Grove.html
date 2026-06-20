@@ -150,6 +150,15 @@
           walker: ['goat'], walkerScale: 0.52, graze: true,
           critter: null, hopper: null, flyer: 0xffffff, flyerFrames: ['eagle'], flutter: false, roller: null,
         },
+        savanna: {
+          label: '🌅 Savanna', sky: 0xffeccb, seasonal: false,
+          hills: [0xe6d29a, 0xd7bd76, 0xc6a85a], ground: 'savanna',
+          mid: [['acacia', 0.55, 320], ['acacia', 0.45, 980]],
+          near: [['acacia', 1.0, 200], ['acacia', 0.85, 1080]],
+          water: null,
+          walker: ['giraffe'], walkerScale: 0.5, graze: true,
+          critter: 'zebra', critterScale: 0.6, hopper: null, flyer: 0xffffff, flyerFrames: ['vulture'], flutter: false, roller: null,
+        },
       };
       const RIGID = { rock: 1, cactus: 1, cactus2: 1 };
 
@@ -158,7 +167,8 @@
         'dragonfly_a', 'dragonfly_b', 'deer_a', 'deer_b', 'lily', 'leaf', 'petal', 'flake',
         'cactus', 'cactus2', 'rock', 'lizard', 'camel', 'tumbleweed',
         'palm', 'crab', 'sailboat', 'starfish', 'gull',
-        'reed', 'heron', 'frog', 'goat', 'eagle'];
+        'reed', 'heron', 'frog', 'goat', 'eagle',
+        'acacia', 'giraffe', 'zebra', 'vulture'];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => { const p = new PIXI.Sprite(T(n)); p.anchor.set(ax == null ? 0.5 : ax, ay == null ? 1 : ay); p.position.set(x, y); if (s) p.scale.set(s); return p; };
       const anim = (frames, x, y, s, spd) => { const a = new PIXI.AnimatedSprite(frames.map(T)); a.anchor.set(0.5, 1); a.position.set(x, y); if (s) a.scale.set(s); a.animationSpeed = spd; a.play(); return a; };
@@ -224,6 +234,9 @@
         } else if (BI.ground === 'snow') {
           for (let i = 0; i < 12; i++) { const x = 20 + Math.random() * (VW - 40), r = spr('rock', x, groundY(x) + 8, 0.08 + Math.random() * 0.12); r.tint = 0x9aa6b4; scene.addChild(r); }
           for (let i = 0; i < 5; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.4 + Math.random() * 0.3); g.tint = 0xc6ccba; scene.addChild(g); swayers.push({ s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6 }); }
+        } else if (BI.ground === 'savanna') {
+          for (let i = 0; i < 6; i++) { const x = 30 + Math.random() * (VW - 60); scene.addChild(spr('rock', x, groundY(x) + 8, 0.06 + Math.random() * 0.08)); }
+          for (let i = 0; i < 20; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.5 + Math.random() * 0.6); g.tint = 0xcaad5e; scene.addChild(g); swayers.push({ s: g, amp: 0.06, sp: 1.5, ph: Math.random() * 6 }); }
         }
         if (BI.walker) { deer = anim(BI.walker, 300, groundY(300) + 8, BI.walkerScale, 0.12); if (BI.walker.length > 1) deer.stop(); else deer.gotoAndStop(0); deer.graze = BI.graze; scene.addChild(deer); } else deer = null;
         if (BI.critter) { fox = spr(BI.critter, -80, groundY(-80) + 6, BI.critterScale); scene.addChild(fox); fox.dir = 1; } else fox = null;
