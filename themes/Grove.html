@@ -677,7 +677,10 @@
             branch: 3,
             round: 4,
             anemone: 5,
-            fish: 11,
+            fish: 12, // near schools roaming the column
+            far: 9, // a distant, dim, blue-shifted school for depth
+            jelly: 3, // translucent jellyfish pulsing slowly upward
+            motes: 46, // drifting marine-snow specks for atmosphere
             bubbles: 16,
             turtle: true
           },
@@ -768,7 +771,9 @@
         'coral_round',
         'anemone',
         'turtle',
-        'bubble'
+        'bubble',
+        'jelly_a',
+        'jelly_b'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -931,6 +936,8 @@
         drips = [],
         fogLayers = [],
         bubbles = [],
+        motes = [],
+        jellies = [],
         hillBands = [];
       let sky,
         stars,
@@ -996,6 +1003,8 @@
           drips.length =
           fogLayers.length =
           bubbles.length =
+          motes.length =
+          jellies.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = -1; // force the gated snow/puddle shapes to draw once on the first frame of the new scene
@@ -1381,6 +1390,31 @@
             r.tint = 0x2b5f63;
             scene.addChild(r);
           }
+          // a distant, dim school hanging in the haze behind the kelp — pure depth cue
+          const farA = lpH(BI.column.deep, BI.column.mid, 0.5);
+          for (let i = 0; i < R.far; i++) {
+            const f = anim(
+              ['fish_a', 'fish_b'],
+              Math.random() * VW,
+              150 + Math.random() * 230,
+              0.1 + Math.random() * 0.05,
+              0.05 + Math.random() * 0.03
+            );
+            f.anchor.set(0.5, 0.5);
+            f.reef = true;
+            f.dir = Math.random() < 0.5 ? 1 : -1;
+            f.baseSc = Math.abs(f.scale.x);
+            f.scale.x = f.dir * f.baseSc;
+            f.school = 90; // all one tight, far-off school
+            f.ox = (Math.random() - 0.5) * 90;
+            f.oy = (Math.random() - 0.5) * 34;
+            f.wob = Math.random() * 6.28;
+            f.tint = hexI(farA); // blue-shifted into the background water
+            f.alpha = 0.4;
+            if (reduce.matches) f.gotoAndStop(0);
+            fish.push(f);
+            scene.addChild(f);
+          }
           // kelp stand (behind the coral), swayed by the current
           for (let i = 0; i < R.kelp; i++) {
             const x = 20 + Math.random() * (VW - 40),
@@ -1640,6 +1674,23 @@
           causticG = new PIXI.Graphics();
           causticG.blendMode = PIXI.BLEND_MODES.ADD;
           scene.addChild(causticG); // wavy light dapples from the surface (drawn each frame)
+          // drifting marine snow: faint specks suspended through the water for depth
+          for (let i = 0; i < R.motes; i++) {
+            const m = spr(
+              'glow',
+              Math.random() * VW,
+              Math.random() * VH,
+              0.03 + Math.random() * 0.05,
+              0.5,
+              0.5
+            );
+            m.tint = 0xdfeef0;
+            m.alpha = 0.1 + Math.random() * 0.16;
+            m.vy = 0.12 + Math.random() * 0.22; // sinks slowly
+            m.ph = Math.random() * 6.28;
+            motes.push(m);
+            scene.addChild(m);
+          }
           // schools of reef fish roaming the whole water column
           const tints = [0xffcf5a, 0xff8a4a, 0x66c8e0, 0xe87a9a, 0xa6e060];
           const schools = Math.max(1, Math.round(R.fish / 4));
@@ -1657,8 +1708,8 @@
             f.baseSc = Math.abs(f.scale.x);
             f.scale.x = f.dir * f.baseSc;
             f.school = i % schools; // the loose group it drifts with
-            f.ox = (Math.random() - 0.5) * 130; // its slot within the school
-            f.oy = (Math.random() - 0.5) * 80;
+            f.ox = (Math.random() - 0.5) * 72; // its slot within a tighter school
+            f.oy = (Math.random() - 0.5) * 44;
             f.wob = Math.random() * 6.28;
             f.tint = tints[i % tints.length];
             f.alpha = 0.95;
@@ -1685,6 +1736,23 @@
             b.vent = vx;
             bubbles.push(b);
             scene.addChild(b);
+          }
+          // jellyfish: translucent bells pulsing slowly up the column
+          for (let i = 0; i < R.jelly; i++) {
+            const j = anim(
+              ['jelly_a', 'jelly_b'],
+              120 + Math.random() * (VW - 240),
+              200 + Math.random() * 340,
+              0.5 + Math.random() * 0.35,
+              0.03 + Math.random() * 0.025
+            );
+            j.anchor.set(0.5, 0.5);
+            j.vy = -(0.22 + Math.random() * 0.28); // drifts gently upward
+            j.ph = Math.random() * 6.28;
+            j.alpha = 0.85;
+            if (reduce.matches) j.gotoAndStop(0);
+            jellies.push(j);
+            scene.addChild(j);
           }
           // a sea turtle that glides across the reef now and then (hidden until its cue)
           if (R.turtle) {
@@ -2663,6 +2731,24 @@
           if (b.y < 64) {
             b.y = groundY(b.vent) + 6;
             b.ph = Math.random() * 6.28;
+          }
+        }
+        // marine snow drifts slowly down, swaying, wrapping back to the top
+        for (const m of motes) {
+          m.y += m.vy * dt;
+          m.x += Math.sin(t * 0.5 + m.ph) * 0.18 * dt;
+          if (m.y > VH + 6) {
+            m.y = -6;
+            m.x = Math.random() * VW;
+          }
+        }
+        // jellyfish pulse (the 2-frame sprite) and drift up, swaying, wrapping at the surface
+        for (const j of jellies) {
+          j.y += j.vy * dt;
+          j.x += Math.sin(t * 0.6 + j.ph) * 0.3 * dt;
+          if (j.y < -90) {
+            j.y = VH + 90;
+            j.x = 120 + Math.random() * (VW - 240);
           }
         }
         // a sea turtle glides slowly across the reef now and then
