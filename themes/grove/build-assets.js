@@ -955,17 +955,33 @@ save(
   ),
   24
 );
+// jellyfish (2 frames): a translucent bell that pulses — relaxed (p=0) vs contracted (p=1) —
+// while trailing oral arms and fine tentacles; drifts slowly up the column
+const jellySvg = (p) => {
+  const rx = 36 - p * 8,
+    ry = 23 + p * 10,
+    cy = 50 - p * 8,
+    sp = 1 - p * 0.4; // tentacles gather as the bell contracts
+  return S(
+    '92 166',
+    `<defs><radialGradient id="jb" cx="50%" cy="38%"><stop offset="0" stop-color="#ffdcf1" stop-opacity="0.9"/><stop offset="0.7" stop-color="#cfa6e8" stop-opacity="0.55"/><stop offset="1" stop-color="#9a7fd0" stop-opacity="0.22"/></radialGradient></defs>
+<g fill="none" stroke-linecap="round">
+<path d="M${46 - 22 * sp},${cy + 6} q-6,42 ${-4 * sp},92" stroke="#e9b9ea" stroke-width="3" opacity="0.55"/>
+<path d="M${46 - 8 * sp},${cy + 9} q-2,48 ${-2 * sp},94" stroke="#e9b9ea" stroke-width="3" opacity="0.55"/>
+<path d="M${46 + 8 * sp},${cy + 9} q2,48 ${2 * sp},94" stroke="#e9b9ea" stroke-width="3" opacity="0.55"/>
+<path d="M${46 + 22 * sp},${cy + 6} q6,42 ${4 * sp},92" stroke="#e9b9ea" stroke-width="3" opacity="0.55"/>
+<path d="M${46 - 29 * sp},${cy + 3} q-4,56 ${-7 * sp},110" stroke="#f3d2ee" stroke-width="1.2" opacity="0.45"/>
+<path d="M${46 + 29 * sp},${cy + 3} q4,56 ${7 * sp},110" stroke="#f3d2ee" stroke-width="1.2" opacity="0.45"/>
+<path d="M46,${cy + 9} q0,58 0,112" stroke="#f3d2ee" stroke-width="1.2" opacity="0.45"/></g>
+<path d="M${46 - rx},${cy} a${rx},${ry} 0 0 1 ${rx * 2},0 q${-rx},16 ${-rx * 2},0 Z" fill="url(#jb)"/>
+<ellipse cx="40" cy="${cy - ry * 0.45}" rx="${rx * 0.36}" ry="${ry * 0.34}" fill="#ffffff" opacity="0.32"/>`
+  );
+};
+save('jelly_a', jellySvg(0), 92);
+save('jelly_b', jellySvg(1), 92);
 
 // ---- contact sheet of new + polished ----
-const review = [
-  'kelp',
-  'coral_fan',
-  'coral_branch',
-  'coral_round',
-  'anemone',
-  'turtle',
-  'bubble'
-];
+const review = ['jelly_a', 'jelly_b', 'turtle'];
 const cols = 4,
   cell = 230,
   pad = 14,
