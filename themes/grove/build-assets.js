@@ -1214,8 +1214,35 @@ const koiSvg = (tf) =>
 save('koi_a', koiSvg(0), 120);
 save('koi_b', koiSvg(7), 120);
 
+// ---- CANYON biome ----
+// roadrunner: a streaky desert bird in a running stride — long legs, long up-cocked tail,
+// shaggy crest, long beak and a red eye-patch (faces right)
+save(
+  'roadrunner',
+  S(
+    '178 120',
+    `<defs><linearGradient id="rrb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7e6a52"/><stop offset="1" stop-color="#52422f"/></linearGradient></defs>
+<g stroke="#7d6038" stroke-width="4.5" stroke-linecap="round"><line x1="74" y1="80" x2="56" y2="110"/><line x1="92" y1="80" x2="104" y2="108"/></g>
+<g stroke="#7d6038" stroke-width="3" stroke-linecap="round" fill="none"><path d="M56,110 L47,113"/><path d="M56,110 L62,116"/><path d="M104,108 L96,112"/><path d="M104,108 L111,113"/></g>
+<path d="M52,72 C30,62 14,42 8,18 C24,28 40,44 58,64 Z" fill="url(#rrb)"/>
+<path d="M50,78 C28,72 14,58 8,40 C24,46 40,58 56,72 Z" fill="#5c4a36" opacity="0.85"/>
+<path d="M48,78 C46,58 70,52 98,55 C118,57 130,64 127,74 C122,84 96,86 72,84 C58,82 50,84 48,78 Z" fill="url(#rrb)"/>
+<path d="M58,80 C78,84 104,82 122,73 C102,86 70,88 54,82 Z" fill="#cabb9c" opacity="0.6"/>
+<g stroke="#3c3024" stroke-width="1.3" opacity="0.4"><path d="M60,64 L66,76"/><path d="M76,60 L82,74"/><path d="M92,60 L97,73"/><path d="M108,64 L111,74"/></g>
+<path d="M116,62 C128,46 144,40 153,46 C148,57 137,61 126,64 Z" fill="url(#rrb)"/>
+<ellipse cx="152" cy="44" rx="13" ry="11" fill="url(#rrb)"/>
+<path d="M144,32 C140,22 146,15 154,17 C153,24 152,29 153,35 Z" fill="#52422f"/>
+<path d="M138,28 C136,20 141,16 147,19 C146,25 145,29 147,33 Z" fill="#52422f"/>
+<path d="M162,44 C174,43 180,45 182,47 C178,50 169,49 161,47 Z" fill="#3a3026"/>
+<path d="M161,46 L181,47" stroke="#2a2018" stroke-width="0.8" opacity="0.6"/>
+<circle cx="154" cy="41" r="2.7" fill="#15110b"/><circle cx="155" cy="40" r="0.9" fill="#fff"/>
+<path d="M156,47 C161,48 164,50 163,53" stroke="#bd553a" stroke-width="2.4" fill="none" opacity="0.85" stroke-linecap="round"/>`
+  ),
+  178
+);
+
 // ---- contact sheet of new + polished ----
-const review = ['sakura', 'koi_a', 'koi_b'];
+const review = ['roadrunner'];
 const cols = 4,
   cell = 230,
   pad = 14,
