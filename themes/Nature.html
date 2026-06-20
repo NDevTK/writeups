@@ -81,6 +81,7 @@
     <div id="ui" aria-hidden="true">
       <div class="row" id="uiBiomes"></div>
       <div class="row" id="uiTimes"></div>
+      <div class="row" id="uiSeasons"></div>
     </div>
     <script>
       'use strict';
@@ -121,8 +122,22 @@
           }
         return tod(0.001);
       }
-      // tint a biome colour for the current light: darken + blend toward night blue
-      const tint = (c, P) => mix(dim(c, P.li), NIGHT, P.st * 0.22);
+      // seasonal colour grade (recomputed each frame from the active season + daylight)
+      let seasonGrade = {mul: [1, 1, 1], add: [0, 0, 0], desat: 0};
+      function grade(c) {
+        const g = seasonGrade; let r = c[0], gg = c[1], b = c[2];
+        if (g.desat) { const m = (r + gg + b) / 3; r += (m - r) * g.desat; gg += (m - gg) * g.desat; b += (m - b) * g.desat; }
+        return [r * g.mul[0] + g.add[0], gg * g.mul[1] + g.add[1], b * g.mul[2] + g.add[2]];
+      }
+      // tint a biome colour for the current light: darken, blend toward night, then season-grade
+      const tint = (c, P) => grade(mix(dim(c, P.li), NIGHT, P.st * 0.22));
+      const SEASONS = {
+        spring: {mul: [1.04, 1.05, 1.0], add: [10, 5, 12], desat: 0, particle: 'petal'},
+        summer: {mul: [1.0, 1.0, 1.0], add: [0, 0, 0], desat: 0, particle: 'none'},
+        autumn: {mul: [1.22, 0.83, 0.48], add: [26, 6, 0], desat: 0.1, particle: 'leaf'},
+        winter: {mul: [0.96, 0.99, 1.06], add: [22, 24, 32], desat: 0.5, particle: 'snow'}
+      };
+      const LEAFCOL = [[206, 110, 40], [214, 150, 52], [184, 72, 40], [150, 92, 44]];
 
       // ---------- canvas sizing ----------
       let vw = 0, vh = 0, horizon = 0, PX = 5;
@@ -139,6 +154,14 @@
       // ---------- state ----------
       let biome = LS('biome') || 'pond';
       let timeMode = LS('time') || 'auto'; // auto|dawn|day|dusk|night
+      let season = LS('season') || 'auto'; // auto|spring|summer|autumn|winter
+      function seasonNow() {
+        const o = new URLSearchParams(location.search).get('season');
+        if (o) return o;
+        if (season !== 'auto') return season;
+        const m = new Date().getMonth(); // 0=Jan, northern hemisphere
+        return m < 2 || m === 11 ? 'winter' : m < 5 ? 'spring' : m < 8 ? 'summer' : 'autumn';
+      }
       function nowHour() {
         const q = new URLSearchParams(location.search);
         if (q.get('hour') != null) return parseFloat(q.get('hour'));
@@ -262,6 +285,32 @@
         ctx.globalAlpha = 1;
       }
 
+      // seasonal particles: falling leaves (autumn) / snow (winter) / blossom petals (spring)
+      let flakes = [], flakeType = '';
+      function ensureFlakes(type) {
+        if (type === flakeType && flakes.length) return;
+        flakeType = type; flakes = [];
+        if (type === 'none') return;
+        const n = type === 'leaf' ? 34 : type === 'snow' ? 90 : 54;
+        for (let i = 0; i < n; i++) flakes.push({x: Math.random() * vw, y: Math.random() * vh, ph: Math.random() * 6.28, sp: 0.2 + Math.random() * 0.5, c: LEAFCOL[(Math.random() * LEAFCOL.length) | 0]});
+      }
+      function drawFlakes(P, T, reduced) {
+        ensureFlakes(SEASONS[seasonNow()].particle);
+        if (flakeType === 'none') return;
+        for (const f of flakes) {
+          if (!reduced) {
+            f.y += f.sp * (flakeType === 'snow' ? 0.8 : flakeType === 'petal' ? 0.9 : 1.4);
+            f.x += Math.sin(T * 1.1 + f.ph) * (flakeType === 'snow' ? 0.4 : 0.85) + (flakeType === 'leaf' ? 0.25 : 0);
+            if (f.y > vh + 2) { f.y = -3; f.x = Math.random() * vw; }
+            if (f.x > vw + 3) f.x = -3; else if (f.x < -3) f.x = vw + 3;
+          }
+          if (flakeType === 'snow') { ctx.globalAlpha = 0.9; ctx.fillStyle = rgb(dim([240, 248, 255], 0.55 + P.li * 0.45)); ctx.fillRect(f.x | 0, f.y | 0, 1, 1); }
+          else if (flakeType === 'petal') { ctx.globalAlpha = 0.85; ctx.fillStyle = rgb(dim([250, 198, 218], 0.5 + P.li * 0.5)); ctx.fillRect(f.x | 0, f.y | 0, 1, 1); }
+          else { ctx.globalAlpha = 0.92; ctx.fillStyle = rgb(dim(f.c, 0.45 + P.li * 0.55)); ctx.fillRect(f.x | 0, f.y | 0, 2, 1); }
+        }
+        ctx.globalAlpha = 1;
+      }
+
       // water surface (reflection + shimmer + sun glitter), used by pond/mountains
       function water(topY, P, T, reduced, baseCol) {
         for (let y = topY; y < vh; y++) {
@@ -335,12 +384,51 @@
         ctx.restore();
       }
 
+      // small broadleaf tree dotted across the vista's hills
+      function roundTree(x, gy, h, P, hue) {
+        const w = h * 0.5;
+        ctx.fillStyle = rgb(tint([58, 42, 28], P)); ctx.fillRect((x - 1) | 0, (gy - h * 0.55) | 0, 2, Math.ceil(h * 0.55));
+        ctx.fillStyle = rgb(tint([40, 96 + (hue || 0), 52], P));
+        for (const [dx, dy, r] of [[0, -0.62, 1], [-0.6, -0.4, 0.66], [0.6, -0.4, 0.66]]) { ctx.beginPath(); ctx.arc(x + dx * w, gy + dy * h, r * w, 0, 6.2832); ctx.fill(); }
+        ctx.fillStyle = rgb(tint([54, 120 + (hue || 0), 64], P));
+        ctx.beginPath(); ctx.arc(x - w * 0.25, gy - h * 0.78, w * 0.5, 0, 6.2832); ctx.fill();
+      }
+      // a layered conifer
+      function pineTree(x, gy, h, P) {
+        ctx.fillStyle = rgb(tint([60, 44, 28], P)); ctx.fillRect((x - 0.5) | 0, (gy - h * 0.12) | 0, 1, Math.ceil(h * 0.12));
+        ctx.fillStyle = rgb(tint([26, 64, 42], P));
+        for (let k = 0; k < 3; k++) { const yy = gy - h * (0.1 + k * 0.28), ww = h * (0.34 - k * 0.08); ctx.beginPath(); ctx.moveTo(x, yy - h * 0.32); ctx.lineTo(x - ww, yy); ctx.lineTo(x + ww, yy); ctx.fill(); }
+      }
+      // a grazing deer silhouette (12x9, faces right; flip for left)
+      const DEER = ['..........#.', '.........#.#', '..#.......##', '..##....###.', '..#########.', '.##########.', '.##########.', '..#.##.##...', '..#.##.#.#..'];
+      function drawDeer(x, y, flip, P) {
+        ctx.fillStyle = rgb(tint([66, 46, 32], P));
+        const w = DEER[0].length;
+        for (let r = 0; r < DEER.length; r++) for (let c = 0; c < w; c++) if (DEER[r][c] !== '.') ctx.fillRect((flip ? x + (w - 1 - c) : x + c) | 0, (y + r) | 0, 1, 1);
+      }
+      // an occasional fish breaking the surface, leaving splash ripples
+      let fish = null;
+      function fishStart(top) { fish = {st: 'wait', timer: 80 + Math.random() * 280, top}; }
+      function fishStep(P, reduced, top) {
+        if (!fish || reduced) return;
+        if (fish.st === 'wait') {
+          if (--fish.timer <= 0) { fish.st = 'jump'; fish.t = 0; fish.dur = 26; fish.x = vw * (0.25 + Math.random() * 0.5); fish.dir = Math.random() < 0.5 ? 1 : -1; fish.peak = vh * (0.05 + Math.random() * 0.05); ripples.push({x: fish.x, y: top + 1, r: 1, life: 0.7}); }
+          return;
+        }
+        fish.t++;
+        const p = fish.t / fish.dur, fx = fish.x + fish.dir * (p - 0.5) * 14, fy = top - Math.sin(p * Math.PI) * fish.peak;
+        ctx.fillStyle = rgb(dim([170, 185, 205], 0.45 + P.li * 0.55));
+        ctx.fillRect(fx | 0, fy | 0, 2, 1); ctx.fillRect((fx + (fish.dir > 0 ? -1 : 2)) | 0, fy | 0, 1, 1);
+        if (p >= 1) { ripples.push({x: fx, y: top + 1, r: 1, life: 0.85}); fish.st = 'wait'; fish.timer = 160 + Math.random() * 360; }
+      }
+
       // ================= BIOMES =================
-      let ducks = [], reeds = [], lily = [], hills = [], flowers = [], butterflies = [], grass = [], trees = [], waves = [], aurora = [], mtn = [];
+      let ducks = [], reeds = [], lily = [], hills = [], flowers = [], butterflies = [], grass = [], trees = [], waves = [], aurora = [], mtn = [], forest = [], deerObj = null;
 
       function applyBiome() {
         horizon = Math.round(vh * (BIOME[biome].horizon));
         initShared();
+        flakeType = ''; // re-seed seasonal particles for the new canvas size
         ffList = [];
         for (let i = 0; i < 16; i++) ffList.push({x: Math.random() * vw, y: horizon + Math.random() * (vh - horizon), ph: Math.random() * 6.28, vx: (Math.random() - 0.5) * 0.05, vy: (Math.random() - 0.5) * 0.05});
         BIOME[biome].init();
@@ -356,10 +444,12 @@
             for (let i = 0; i < 8; i++) { const left = i < 4; reeds.push({x: left ? 1 + i * 2 : vw - 2 - (i - 4) * 2, h: 6 + Math.random() * 8}); }
             lily = [];
             for (let i = 0; i < 5; i++) lily.push({x: Math.random() * vw, y: horizon + 8 + Math.random() * (vh - horizon - 12)});
+            fishStart(horizon);
           },
           draw(P, T, reduced) {
             water(horizon, P, T, reduced, [26, 48, 70]);
             for (const lp of lily) { ctx.fillStyle = rgb(tint([40, 96, 58], P)); ctx.fillRect(lp.x - 1, lp.y, 3, 1); ctx.fillRect(lp.x, lp.y - 1, 1, 1); }
+            fishStep(P, reduced, horizon);
             ripplesDraw(P, reduced, dim(P.su, 0.9));
             for (const dk of ducks) {
               if (!reduced) { dk.x += dk.dir * dk.sp; dk.bob += 0.04; if (dk.x < 6) dk.dir = 1; if (dk.x > vw - 18) dk.dir = -1; if (Math.random() < 0.003) dk.dir *= -1; dk.wk++; if (dk.wk > 28) { dk.wk = 0; ripples.push({x: dk.x + (dk.dir > 0 ? 1 : 11), y: dk.y + 7, r: 1, life: 0.8}); } }
@@ -382,6 +472,7 @@
             grass = [];
             for (let i = 0; i < vw; i += 2) grass.push({x: i, h: 3 + Math.random() * 5, ph: Math.random() * 6.28});
             trees = [{x: Math.round(vw * 0.16)}];
+            deerObj = {x: vw * 0.62, gy: hills[1], dir: -1, t: 0};
           },
           draw(P, T, reduced) {
             ctx.fillStyle = rgb(tint([124, 195, 94], P)); ctx.fillRect(0, hills[0] - 1, vw, vh - hills[0] + 1);
@@ -389,6 +480,11 @@
             fillUnder((x) => hills[1] + Math.sin(x * 0.06 + 0.8) * vh * 0.04, tint([95, 168, 74], P));
             fillUnder((x) => hills[2] + Math.sin(x * 0.06 + 1.7) * vh * 0.05, tint([70, 138, 55], P));
             for (const tr of trees) { const gy = hills[2] + Math.sin(tr.x * 0.06 + 1.7) * vh * 0.05; ctx.fillStyle = rgb(tint([74, 52, 36], P)); ctx.fillRect(tr.x, gy, 2, vh * 0.09); const cr = Math.round(vh * 0.07); ctx.fillStyle = rgb(tint([54, 110, 52], P)); ctx.beginPath(); ctx.arc(tr.x + 1, gy - cr * 0.6, cr, 0, 6.2832); ctx.fill(); ctx.beginPath(); ctx.arc(tr.x + 1 - cr * 0.7, gy - cr * 0.2, cr * 0.7, 0, 6.2832); ctx.fill(); ctx.beginPath(); ctx.arc(tr.x + 1 + cr * 0.7, gy - cr * 0.2, cr * 0.7, 0, 6.2832); ctx.fill(); }
+            if (deerObj) {
+              if (!reduced) { deerObj.t++; deerObj.x += deerObj.dir * 0.05; if (deerObj.x < vw * 0.25) deerObj.dir = 1; if (deerObj.x > vw * 0.82) deerObj.dir = -1; }
+              const dgy = hills[1] + Math.sin(deerObj.x * 0.06 + 0.8) * vh * 0.04;
+              drawDeer(deerObj.x | 0, (dgy - 9) | 0, deerObj.dir < 0, P);
+            }
             for (const fl of flowers) { const sw = reduced ? 0 : Math.sin(T * 1.2 + fl.ph) * 0.6; ctx.fillStyle = rgb(tint(fl.c, P)); ctx.fillRect((fl.x + sw) | 0, fl.y | 0, 1, 1); ctx.fillStyle = rgb(tint([240, 240, 200], P)); ctx.fillRect((fl.x + sw) | 0, (fl.y | 0) - 1, 1, 1); }
             for (const g of grass) { const sw = reduced ? 0 : Math.sin(T * 1.4 + g.ph) * 1.2; ctx.strokeStyle = rgb(tint([46, 92, 44], P)); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(g.x, vh); ctx.lineTo(g.x + sw, vh - g.h); ctx.stroke(); }
             if (P.st < 0.5) for (const bf of butterflies) {
@@ -505,6 +601,75 @@
             ctx.strokeStyle = rgb(tint([30, 60, 36], P)); ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(vw * 0.72, 0); for (let y = 0; y < vh * 0.26; y++) ctx.lineTo(vw * 0.72 + Math.sin(y * 0.25) * 2, y); ctx.stroke();
           }
+        },
+        // a composite vista: distant mountains → forested hills → meadow bank → foreground pond
+        wilds: {
+          horizon: 0.32,
+          init() {
+            mtn = [];
+            const amp = [0.08, 0.12];
+            for (let l = 0; l < 2; l++) { const pts = []; for (let x = 0; x <= vw; x += 4) pts.push((Math.sin(x * 0.05 + l * 2.1) + Math.sin(x * 0.12 + l) * 0.5) * vh * amp[l]); mtn.push(pts); }
+            const hillBack = Math.round(vh * 0.46), hillFront = Math.round(vh * 0.56);
+            forest = [];
+            for (let i = 0; i < 14; i++) { const front = Math.random() < 0.55, x = Math.random() * vw; if (Math.abs(x - vw * 0.66) < vw * 0.05) continue; forest.push({x, base: front ? hillFront : hillBack, ph: front ? 1.5 : 0.6, fr: front ? 0.06 : 0.05, h: vh * (front ? 0.1 : 0.07) * (0.8 + Math.random() * 0.5), pine: Math.random() < 0.4, hue: (Math.random() * 20) | 0}); }
+            forest.sort((a, b) => a.base - b.base);
+            ducks = [];
+            for (let i = 0; i < 3; i++) ducks.push({x: Math.random() * vw, y: vh * 0.72 + Math.random() * (vh * 0.22), dir: Math.random() < 0.5 ? -1 : 1, sp: 0.05 + Math.random() * 0.05, bob: Math.random() * 6.28, wk: 0});
+            reeds = [];
+            for (let i = 0; i < 8; i++) { const left = i < 4; reeds.push({x: left ? 1 + i * 2 : vw - 2 - (i - 4) * 2, h: 5 + Math.random() * 7}); }
+            lily = [];
+            for (let i = 0; i < 4; i++) lily.push({x: Math.random() * vw, y: vh * 0.74 + Math.random() * (vh * 0.18)});
+            flowers = [];
+            for (let i = 0; i < 28; i++) flowers.push({x: Math.random() * vw, y: vh * (0.575 + Math.random() * 0.035), c: FLO[(Math.random() * FLO.length) | 0], ph: Math.random() * 6.28});
+            butterflies = [];
+            for (let i = 0; i < 4; i++) butterflies.push({x: Math.random() * vw, y: vh * (0.5 + Math.random() * 0.1), vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.2, flap: 0, c: FLO[(Math.random() * FLO.length) | 0]});
+            deerObj = {x: vw * (0.2 + Math.random() * 0.2), base: hillFront, ph: 1.5, fr: 0.06, dir: 1, t: 0};
+            fishStart(Math.round(vh * 0.6));
+          },
+          draw(P, T, reduced) {
+            const pondY = Math.round(vh * 0.6);
+            // distant mountains with snow caps + a thin cascade
+            const baseY = [horizon - vh * 0.03, horizon + vh * 0.03], haze = [0.6, 0.32];
+            for (let l = 0; l < 2; l++) {
+              ctx.fillStyle = rgb(tint(mix([48, 56, 80], [198, 220, 240], haze[l]), P)); ctx.beginPath(); ctx.moveTo(0, vh * 0.5);
+              for (let x = 0; x <= vw; x++) ctx.lineTo(x, baseY[l] + mtn[l][(x / 4) | 0]);
+              ctx.lineTo(vw, vh * 0.5); ctx.fill();
+              ctx.fillStyle = rgb(tint(mix([238, 244, 250], [198, 220, 240], haze[l] * 0.6), P));
+              for (let x = 0; x <= vw; x++) { const m = mtn[l][(x / 4) | 0]; if (m < -vh * 0.035) ctx.fillRect(x, (baseY[l] + m) | 0, 1, 2); }
+            }
+            // forested hills
+            fillUnder((x) => vh * 0.46 + Math.sin(x * 0.05 + 0.6) * vh * 0.03, tint([60, 124, 66], P));
+            fillUnder((x) => vh * 0.56 + Math.sin(x * 0.06 + 1.5) * vh * 0.03, tint([46, 104, 54], P));
+            for (const f of forest) { const gy = f.base + Math.sin(f.x * f.fr + f.ph) * vh * 0.03; if (f.pine) pineTree(f.x, gy, f.h, P); else roundTree(f.x, gy, f.h, P, f.hue); }
+            // a deer grazing on the near hill
+            if (deerObj) {
+              if (!reduced) { deerObj.t++; deerObj.x += deerObj.dir * 0.05; if (deerObj.x < vw * 0.1) deerObj.dir = 1; if (deerObj.x > vw * 0.6) deerObj.dir = -1; }
+              const dgy = deerObj.base + Math.sin(deerObj.x * deerObj.fr + deerObj.ph) * vh * 0.03;
+              drawDeer(deerObj.x | 0, (dgy - 9) | 0, deerObj.dir < 0, P);
+            }
+            // foreground pond
+            water(pondY, P, T, reduced, [28, 58, 78]);
+            // a cascade tumbling down the cleared gap in the hillside into the pond
+            waterfall(Math.round(vw * 0.66), Math.max(2, Math.round(vw * 0.014)), Math.round(vh * 0.46), pondY, P, T, reduced);
+            for (const lp of lily) { ctx.fillStyle = rgb(tint([40, 96, 58], P)); ctx.fillRect(lp.x - 1, lp.y, 3, 1); ctx.fillRect(lp.x, lp.y - 1, 1, 1); }
+            fishStep(P, reduced, pondY);
+            ripplesDraw(P, reduced, dim(P.su, 0.9));
+            for (const dk of ducks) {
+              if (!reduced) { dk.x += dk.dir * dk.sp; dk.bob += 0.04; if (dk.x < 6) dk.dir = 1; if (dk.x > vw - 18) dk.dir = -1; if (Math.random() < 0.003) dk.dir *= -1; dk.wk++; if (dk.wk > 28) { dk.wk = 0; ripples.push({x: dk.x + (dk.dir > 0 ? 1 : 11), y: dk.y + 7, r: 1, life: 0.8}); } }
+              const by = dk.y + (reduced ? 0 : Math.sin(dk.bob) * 0.6);
+              ctx.globalAlpha = 0.25; drawDuck(dk.x, by + 8, dk.dir < 0, P.li * 0.4); ctx.globalAlpha = 1;
+              drawDuck(dk.x, by, dk.dir < 0, P.li);
+            }
+            for (const rd of reeds) { ctx.strokeStyle = rgb(tint([34, 64, 38], P)); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(rd.x, vh); ctx.lineTo(rd.x, vh - rd.h); ctx.stroke(); }
+            // wildflowers on the near bank + butterflies
+            for (const fl of flowers) { const sw = reduced ? 0 : Math.sin(T * 1.2 + fl.ph) * 0.6; ctx.fillStyle = rgb(tint(fl.c, P)); ctx.fillRect((fl.x + sw) | 0, fl.y | 0, 1, 1); }
+            if (P.st < 0.5) for (const bf of butterflies) {
+              if (!reduced) { bf.x += bf.vx; bf.y += bf.vy; bf.flap += 0.5; if (Math.random() < 0.03) { bf.vx = (Math.random() - 0.5) * 0.4; bf.vy = (Math.random() - 0.5) * 0.3; } if (bf.x < 2 || bf.x > vw - 2) bf.vx *= -1; if (bf.y < vh * 0.42 || bf.y > pondY) bf.vy *= -1; }
+              const x = bf.x | 0, y = bf.y | 0, up = (bf.flap | 0) % 2 === 0; ctx.fillStyle = rgb(tint(bf.c, P));
+              ctx.fillRect(x - 1, up ? y - 1 : y, 1, 1); ctx.fillRect(x + 1, up ? y - 1 : y, 1, 1);
+            }
+            fireflies(P, T, reduced, pondY);
+          }
         }
       };
       const FLO = [[230, 80, 90], [240, 210, 90], [240, 240, 245], [225, 130, 200], [150, 120, 230]];
@@ -515,24 +680,32 @@
         requestAnimationFrame(draw);
         if (document.hidden) return;
         const reduced = reduce.matches, T = reduced ? 0 : now / 1000, P = tod(nowHour());
+        // resolve the active season into a colour grade, eased out toward night
+        const sb = SEASONS[seasonNow()], k = 1 - 0.5 * P.st;
+        seasonGrade = {mul: [1 + (sb.mul[0] - 1) * k, 1 + (sb.mul[1] - 1) * k, 1 + (sb.mul[2] - 1) * k], add: [sb.add[0] * k, sb.add[1] * k, sb.add[2] * k], desat: sb.desat * k};
         drawSky(P, T);
         BIOME[biome].draw(P, T, reduced);
         drawBirds(P, reduced);
         if (rain) drawRain(P, T, reduced);
+        drawFlakes(P, T, reduced);
       }
       requestAnimationFrame(draw);
 
       // ---------- custom controls UI ----------
-      const BLIST = [['pond', '🦆 Pond'], ['meadow', '🌼 Meadow'], ['beach', '🏖️ Beach'], ['mountains', '⛰️ Mountains'], ['rainforest', '🌴 Jungle']];
+      const BLIST = [['pond', '🦆 Pond'], ['meadow', '🌼 Meadow'], ['beach', '🏖️ Beach'], ['mountains', '⛰️ Mountains'], ['rainforest', '🌴 Jungle'], ['wilds', '🏞️ Wilds']];
       const TLIST = [['auto', 'Auto'], ['dawn', 'Dawn'], ['day', 'Day'], ['dusk', 'Dusk'], ['night', 'Night']];
-      const uiB = document.getElementById('uiBiomes'), uiT = document.getElementById('uiTimes');
+      const SLIST = [['auto', 'Auto'], ['spring', 'Spring'], ['summer', 'Summer'], ['autumn', 'Autumn'], ['winter', 'Winter']];
+      const uiB = document.getElementById('uiBiomes'), uiT = document.getElementById('uiTimes'), uiS = document.getElementById('uiSeasons');
       function mkBtn(label, on, fn) { const b = document.createElement('button'); b.textContent = label; if (on) b.className = 'on'; b.addEventListener('click', fn); return b; }
+      function lbl(text, row) { const s = document.createElement('span'); s.className = 'lbl'; s.textContent = text; row.appendChild(s); }
       function buildUI() {
-        uiB.textContent = ''; uiT.textContent = '';
+        uiB.textContent = ''; uiT.textContent = ''; uiS.textContent = '';
         BLIST.forEach(([k, l]) => uiB.appendChild(mkBtn(l, k === biome, () => { biome = k; LS('biome', k); applyBiome(); buildUI(); })));
-        const lt = document.createElement('span'); lt.className = 'lbl'; lt.textContent = 'time'; uiT.appendChild(lt);
+        lbl('time', uiT);
         TLIST.forEach(([k, l]) => uiT.appendChild(mkBtn(l, k === timeMode, () => { timeMode = k; LS('time', k); buildUI(); })));
         uiT.appendChild(mkBtn('🌧️ Rain', rain, () => { rain = !rain; LS('rain', rain ? '1' : '0'); buildUI(); }));
+        lbl('season', uiS);
+        SLIST.forEach(([k, l]) => uiS.appendChild(mkBtn(l, k === season, () => { season = k; LS('season', k); flakeType = ''; buildUI(); })));
       }
       buildUI();
       resize();
