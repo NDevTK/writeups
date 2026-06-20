@@ -803,6 +803,17 @@ const vfall = (a) =>
 save('vfall_a', vfall(0), 90);
 save('vfall_b', vfall(7), 90);
 
+// seamless vertical streak/droplet tile — scrolled downward over a fall to read as flowing water
+save(
+  'wstreak',
+  S(
+    '64 140',
+    `<g stroke="#eaf7ff" stroke-width="2.6" fill="none" opacity="0.38"><line x1="12" y1="-4" x2="12" y2="144"/><line x1="26" y1="-4" x2="26" y2="144"/><line x1="40" y1="-4" x2="40" y2="144"/><line x1="52" y1="-4" x2="52" y2="144"/></g>
+<g fill="#ffffff" opacity="0.85"><rect x="10.5" y="8" width="3" height="18" rx="1.5"/><rect x="24.5" y="52" width="3" height="20" rx="1.5"/><rect x="38.5" y="26" width="3" height="16" rx="1.5"/><rect x="50.5" y="64" width="3" height="15" rx="1.5"/><rect x="11" y="92" width="3" height="17" rx="1.5"/><rect x="25" y="113" width="3" height="18" rx="1.5"/><rect x="39" y="98" width="3" height="16" rx="1.5"/><rect x="51" y="121" width="3" height="14" rx="1.5"/></g>`
+  ),
+  64
+);
+
 // ---- contact sheet of new + polished ----
 const review = ['bigrock', 'falls_a', 'vfall_a', 'eagle', 'peak'];
 const cols = 4,
