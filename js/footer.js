@@ -141,6 +141,15 @@ if (theme.endsWith('.html')) {
     'z-index:-1'
   ].join(';');
   document.body.prepend(frame);
+  // Forward pointer position into the wallpaper iframe so HTML themes can
+  // parallax even while it sits behind the page content (which eats the events).
+  document.addEventListener('pointermove', function (e) {
+    frame.contentWindow.postMessage({
+      type: 'wallpaper-pointer',
+      x: e.clientX / window.innerWidth,
+      y: e.clientY / window.innerHeight
+    }, location.origin);
+  }, {passive: true});
   var btn = document.createElement('button');
   btn.textContent = '✦';
   btn.title = 'Wallpaper controls';
