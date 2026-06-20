@@ -575,7 +575,16 @@
             y: 606,
             scale: 0.74,
             ax: 0.5,
-            plungeX: 700
+            plungeX: 700,
+            streak: {
+              x: 690,
+              y: 414,
+              w: 21,
+              h: 174,
+              scale: 0.5,
+              speed: 2.6,
+              alpha: 0.85
+            }
           },
           walker: null,
           critter: null,
@@ -616,7 +625,17 @@
             y: 616,
             scale: 1.12,
             ax: 0,
-            plungeX: 332
+            plungeX: 332,
+            // scrolling-streak band over the cascade so it reads as flowing
+            streak: {
+              x: 309,
+              y: 322,
+              w: 46,
+              h: 258,
+              scale: 0.62,
+              speed: 3,
+              alpha: 0.9
+            }
           },
           walker: null,
           critter: null,
@@ -691,7 +710,8 @@
         'falls_a',
         'falls_b',
         'vfall_a',
-        'vfall_b'
+        'vfall_b',
+        'wstreak'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -853,6 +873,7 @@
         rippleG,
         iceG,
         tracksG,
+        streakTile,
         SE,
         BI,
         ready = false;
@@ -1378,6 +1399,7 @@
           water = null;
           iceG = null;
         }
+        streakTile = null;
         if (BI.waterfall && BI.waterfall.falls) {
           // the falling water is a 2-frame sprite, in front of the rock + pool
           const wf = BI.waterfall,
@@ -1385,6 +1407,17 @@
           fa.anchor.set(wf.ax, 1);
           if (reduce.matches) fa.gotoAndStop(0); // hold a still frame when motion is reduced
           scene.addChild(fa);
+          if (wf.streak) {
+            // a seamless streak texture scrolled down over the cascade — this is what reads as "flowing"
+            const s = wf.streak,
+              ts = new PIXI.TilingSprite(T('wstreak'), s.w, s.h);
+            ts.position.set(s.x, s.y);
+            ts.tileScale.set(s.scale);
+            ts.alpha = s.alpha;
+            ts.spd = s.speed;
+            scene.addChild(ts);
+            streakTile = ts;
+          }
         }
         if (BI.flutter && !snow)
           for (let i = 0; i < 4; i++) {
@@ -2222,7 +2255,8 @@
           }
         }
 
-        // waterfall (cave + fjord) are designed sprites; just ring the water where the fall lands
+        // waterfall: scroll the streak texture down so the cascade flows, and ring the plunge pool
+        if (streakTile) streakTile.tilePosition.y += streakTile.spd * dt;
         if (BI.waterfall && water && Math.random() < 0.12 * dt)
           ripples.push({
             x: BI.waterfall.plungeX + (Math.random() - 0.5) * 20,
