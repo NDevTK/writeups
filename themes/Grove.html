@@ -185,6 +185,14 @@
           walker: null,
           critter: 'lizard', critterScale: 0.55, critterTint: 0x5a3e34, hopper: null, flyer: 0x33302e, flutter: false, roller: null,
         },
+        fjord: {
+          label: '🌌 Fjord', sky: 0x9fb0c8, seasonal: false, foliageTint: 0x9ec4b4, aurora: true,
+          hills: [0x7a8aa4, 0x9fb0c6, 0xe2ecf4], ground: 'snow',
+          mid: [['pine', 0.55, 200], ['pine', 0.5, 980]],
+          near: [['pine', 1.0, 120], ['pine', 0.92, 1130]],
+          water: { top: '#2a4a6a', bot: '#15263c', lily: false, ducks: false, drag: false },
+          walker: null, critter: null, hopper: null, flyer: 0xffffff, flyerFrames: ['gull'], flutter: false, roller: null,
+        },
       };
       const RIGID = { rock: 1, cactus: 1, cactus2: 1 };
 
@@ -309,7 +317,7 @@
           scene.addChild(glit);
           rippleG = new PIXI.Graphics(); scene.addChild(rippleG); // expanding ripple rings under ducks/boat
           if (BI.water.lily && !snow) for (const [lx, ly, ls] of (BI.water.lilyPos || [[230, 632, 0.7], [610, 648, 0.82], [1010, 636, 0.66]])) { const lp = spr('lily', lx, ly, ls, 0.5, 0.5); lp.baseY = ly; scene.addChild(lp); lilies.push(lp); }
-          if (BI.water.frogs && !snow) for (const [fx, fy] of [[180, 624], [900, 642]]) { const fr = spr('frog', fx, fy, 0.42); fr.baseY = fy; scene.addChild(fr); lilies.push(fr); }
+          if (BI.water.frogs && !snow) for (const [fx, fy] of [[180, 624], [900, 642]]) { const fr = spr('frog', fx, fy, 0.42); fr.baseY = fy; fr.isFrog = true; scene.addChild(fr); lilies.push(fr); }
           if (BI.water.ducks) {
             const dm = spr('duck', 380, 656, 0.6); dm.baseY = dm.y; dm.vx = 0.5; dm.kids = [];
             dm.ref = spr('duck', 380, 0, 0.6); dm.ref.scale.y = -0.6; dm.ref.alpha = 0.28; dm.ref.tint = 0x6f8ea0; scene.addChildAt(dm.ref, scene.getChildIndex(glit));
@@ -413,9 +421,15 @@
             glit.beginFill(col, (1 - d) * 0.5 * str); glit.drawRect(cel.x + wob - (2 + d * 4), y, 4 + d * 8, 2); glit.endFill();
           }
         }
+        if (water && BI.aurora && night > 0.08) { // aurora mirrored on the water: wavy green/teal bands, brightest at night
+          const acols = [0x4fffa8, 0x36c9ff];
+          for (let b = 0; b < 2; b++) { glit.beginFill(acols[b], night * 0.17); const by = 622 + b * 28; glit.moveTo(0, by + Math.sin(t * 1.3 + b) * 4); for (let x = 0; x <= VW; x += 30) glit.lineTo(x, by + Math.sin(x * 0.017 + t * 1.4 + b) * 6); for (let x = VW; x >= 0; x -= 30) glit.lineTo(x, by + 18 + Math.sin(x * 0.017 + t * 1.4 + b + 1) * 6); glit.closePath(); glit.endFill(); }
+        }
 
-        for (const c of clouds) { c.x += c.vx * dt; if (c.x - c.width > VW) c.x = -c.width; }
-        for (const w of swayers) w.s.rotation = Math.sin(t * w.sp + w.ph) * w.amp;
+        // wind: a breeze that slowly varies and gusts (sum of slow sines), leaning foliage and pushing particles the same way
+        const wind = Math.sin(t * 0.35) * 0.35 + Math.sin(t * 0.11 + 1.3) * 0.45 + Math.sin(t * 0.07) * 0.25;
+        for (const c of clouds) { c.x += (c.vx + wind * 0.18) * dt; if (c.x - c.width > VW) c.x = -c.width; else if (c.x + c.width < 0) c.x = VW + c.width; }
+        for (const w of swayers) w.s.rotation = Math.sin(t * w.sp + w.ph) * w.amp + wind * w.amp * 2.5;
 
         // walker: deer ambles then grazes; a camel just plods along
         if (deer) {
@@ -472,8 +486,12 @@
         // fireflies drift + twinkle
         for (const g of fireflies) { g.x += g.vx * dt; g.y += g.vy * dt; if (Math.random() < 0.02) { g.vx = (Math.random() - 0.5) * 0.4; g.vy = (Math.random() - 0.5) * 0.3; } if (g.x < 40 || g.x > VW - 40) g.vx *= -1; if (g.y < 460 || g.y > 600) g.vy *= -1; g.alpha = 0.4 + 0.6 * (Math.sin(t * 3 + g.ph) * 0.5 + 0.5); }
         // lily pads bob; seasonal weather falls
-        for (const lp of lilies) lp.y = lp.baseY + Math.sin(t * 1.5 + lp.x * 0.05) * 1.2;
-        for (const w of weather) { w.y += w.vy * dt; w.x += (w.vx + Math.sin(t * 1.2 + w.ph) * w.sw) * dt; w.rotation += w.spin * dt; if (w.y > VH + 14) { w.y = -14; w.x = Math.random() * VW; } if (w.x < -14) w.x = VW + 14; else if (w.x > VW + 14) w.x = -14; }
+        for (const lp of lilies) {
+          const bob = Math.sin(t * 1.5 + lp.x * 0.05) * 1.2;
+          if (lp.isFrog) { lp.hopT = (lp.hopT == null ? 1.5 + Math.random() * 3 : lp.hopT) - dt / 60; const hop = (lp.hopT < 0.35 && lp.hopT > 0) ? Math.sin((0.35 - lp.hopT) / 0.35 * Math.PI) : 0; lp.y = lp.baseY + bob - hop * 14; if (lp.hopT < 0) { if (water) ripples.push({ x: lp.x, y: lp.baseY + 8, r: 4, life: 1 }); lp.hopT = 2.5 + Math.random() * 4; } }
+          else lp.y = lp.baseY + bob;
+        }
+        for (const w of weather) { w.y += w.vy * dt; w.x += (w.vx + Math.sin(t * 1.2 + w.ph) * w.sw + wind * 2.2) * dt; w.rotation += w.spin * dt; if (w.y > VH + 14) { w.y = -14; w.x = Math.random() * VW; } if (w.x < -14) w.x = VW + 14; else if (w.x > VW + 14) w.x = -14; }
         // rain (toggleable, any season)
         if (rainOn) {
           rainG.clear(); rainG.lineStyle(1.4, 0xbcd6e8, 0.5);
