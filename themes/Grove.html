@@ -150,15 +150,17 @@
       let frontState = 'clear',
         frontT = 60 + Math.random() * 120,
         cover = 0,
-        wet = 0,
+        wet = 0, // rain intensity (front-driven, warm scenes)
         wetness = 0,
-        snowAcc = 0,
+        snowAcc = 0, // settled snow depth on the ground (0..1)
+        snowI = 0, // snowfall intensity right now (front-driven, cold scenes)
         rainbow = 0,
         rainbowLife = 0,
         flash = 0,
         flashT = 6,
         boltPts = [],
-        snowing = false,
+        snowing = false, // cold scene: precipitation falls as snow
+        weatherIsSnow = false, // the falling-particle layer is snowflakes (gate their density on snowI)
         lastSnowDraw = -1, // snowAcc/wetness at last redraw of the (heavy) settling-snow + puddle shapes;
         lastWetDraw = -1, // they only change while those values move, so we skip the rebuild once settled
         lastLightDraw = -1;
@@ -1468,7 +1470,10 @@
         scene.addChild(snowAccG);
         tracksG = new PIXI.Graphics();
         scene.addChild(tracksG); // footprints sit on the snow, under the animals that make them
-        snowing = snow; // is snow actively falling in this scene?
+        snowing = snow; // cold scene: precipitation falls as snow rather than rain
+        weatherIsSnow = weatherKind === 'flake';
+        snowI = 0;
+        snowAcc = snowing ? 0.4 : 0; // cold scenes open with a base cover that squalls deepen and clear spells melt
         if (BI.walker) {
           deer = anim(BI.walker, 300, groundY(300) + 8, BI.walkerScale, 0.12);
           if (BI.walker.length > 1) deer.stop();
@@ -1994,29 +1999,33 @@
         // ---- weather front: clouds gather (cover), a shower rolls through (wet), then it clears ----
         // (no weather underwater: cover/wet/snow all stay 0, which silences rain, overcast, lightning, etc.)
         if (!reduce.matches && !BI.underwater) {
-          let coverTarget, wetTarget;
+          let coverTarget, precipTarget; // precip = the front's precipitation phase (falls as rain, or snow when cold)
           if (weatherMode === 'rain') {
-            coverTarget = 0.8;
-            wetTarget = 1;
+            coverTarget = 0.82;
+            precipTarget = 1;
           } else if (weatherMode === 'clear') {
             coverTarget = 0;
-            wetTarget = 0;
+            precipTarget = 0;
           } else {
             frontT -= dt / 60;
             if (frontT < 0) {
               if (frontState === 'clear') {
                 frontState = 'gather';
-                frontT = 20 + Math.random() * 14;
+                frontT = (snowing ? 14 : 20) + Math.random() * 14;
               } else if (frontState === 'gather') {
-                frontState = 'rain';
-                frontT = 28 + Math.random() * 45;
+                frontState = 'rain'; // precipitation phase (rain or a snow squall)
+                // cold scenes get longer, more frequent squalls so winter still reads as wintry
+                frontT =
+                  (snowing ? 45 : 28) + Math.random() * (snowing ? 80 : 45);
               } else if (frontState === 'rain') {
                 frontState = 'clearup';
                 frontT = 30;
-                if (cel.sun && P.light > 0.72) rainbowLife = 24; // sunshower payoff
+                if (!snowing && cel.sun && P.light > 0.72) rainbowLife = 24; // sunshower payoff (rain only)
               } else {
                 frontState = 'clear';
-                frontT = 150 + Math.random() * 200;
+                // shorter dry gaps when it's cold, so the snow doesn't all melt away between squalls
+                frontT =
+                  (snowing ? 45 : 150) + Math.random() * (snowing ? 70 : 200);
               }
             }
             coverTarget =
@@ -2025,16 +2034,23 @@
                 : frontState === 'clearup'
                   ? 0.4
                   : 0;
-            wetTarget = frontState === 'rain' ? 1 : 0;
+            precipTarget = frontState === 'rain' ? 1 : 0;
           }
           cover += (coverTarget - cover) * 0.008 * dt;
-          wet += (wetTarget - wet) * 0.025 * dt;
+          // the same front falls as rain in the warmth and snow in the cold
+          wet += ((snowing ? 0 : precipTarget) - wet) * 0.025 * dt;
+          snowI += ((snowing ? precipTarget : 0) - snowI) * 0.02 * dt;
           // ground wetness rises in rain and dries slowly afterwards
           const wetUp = wet > 0.3;
           wetness += ((wetUp ? 1 : 0) - wetness) * (wetUp ? 0.012 : 0.004) * dt;
-          // snow settles while it falls and melts once it stops
-          snowAcc +=
-            ((snowing ? 1 : 0) - snowAcc) * (snowing ? 0.005 : 0.007) * dt;
+          // snow depth: builds while it's actually snowing (faster the heavier the fall),
+          // and melts slowly once the squall passes — so the amount rises and falls with the weather
+          if (snowing)
+            snowAcc = Math.max(
+              0,
+              Math.min(1, snowAcc + (snowI * 0.0004 - 0.00013) * dt)
+            );
+          else snowAcc += (0 - snowAcc) * 0.02 * dt;
           if (rainbowLife > 0) {
             rainbowLife -= dt / 60;
             rainbow = Math.sin(Math.max(0, 1 - rainbowLife / 24) * Math.PI);
@@ -2927,7 +2943,18 @@
             }
           } else lp.y = lp.baseY + bob;
         }
-        for (const w of weather) {
+        // falling weather: petals/leaves drift the whole time; snowflakes thin out to match the
+        // current snowfall (heavy during a squall, none on a clear cold day) so snow reads as an event
+        const flakeN = weatherIsSnow
+          ? Math.ceil(weather.length * Math.min(1, snowI * 1.15))
+          : weather.length;
+        for (let wi = 0; wi < weather.length; wi++) {
+          const w = weather[wi];
+          if (wi >= flakeN) {
+            w.visible = false;
+            continue;
+          }
+          w.visible = true;
           w.y += w.vy * dt;
           w.x += (w.vx + Math.sin(t * 1.2 + w.ph) * w.sw + wind * 2.2) * dt;
           w.rotation += w.spin * dt;
