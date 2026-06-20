@@ -180,7 +180,9 @@
         fjord: -4,
         cave: 7,
         reef: 15,
-        jungle: 26
+        jungle: 26,
+        canyon: 21,
+        polar: -9
       };
       const SEASON_TEMP = {winter: -16, autumn: -5, spring: 1, summer: 5};
       function nowHour() {
@@ -824,6 +826,48 @@
           roadrunner: true,
           flutter: false,
           roller: null
+        },
+        polar: {
+          label: '🐧 Polar',
+          fog: 0.7, // cold sea-mist haze drifting over the ice
+          sky: 0xdcecf7, // bright, cold icy light (pale so the day sky stays clean; night deepens for the aurora)
+          seasonal: false,
+          snowCaps: true, // a permanently snowy biome: the ground opens with cover and a constant light fall
+          aurora: true, // the polar lights at night
+          foliageTint: 0xffffff,
+          distant: {
+            sprite: 'iceberg',
+            count: 4,
+            sc: [0.55, 1.1],
+            y: 470,
+            tint: 0xeaf4fb,
+            alpha: 0.96
+          }, // tabular bergs along the cold horizon
+          hills: [0x9fc0d8, 0xc2dcec, 0xeaf4fb], // snow slopes receding into the haze
+          ground: 'packice',
+          mid: [],
+          near: [],
+          water: {
+            top: '#34556e',
+            bot: '#12243a',
+            lily: false,
+            ducks: false,
+            drag: false,
+            fish: 2,
+            floes: 4, // pack ice drifting on the open leads
+            seal: true, // a seal hauls out on the largest floe
+            dolphins: 1, // a lone orca patrols the lead, surfacing now and then
+            dolphinSprite: 'orca',
+            dolphinScale: 0.5
+          },
+          penguins: 4, // a little colony waddles the ice
+          walker: null,
+          critter: null,
+          hopper: null,
+          flyer: 0x6b7078, // a dark skua glides over (the gull silhouette, greyed)
+          flyerFrames: ['gull'],
+          flutter: false,
+          roller: null
         }
       };
       const RIGID = {rock: 1, cactus: 1, cactus2: 1};
@@ -920,7 +964,10 @@
         'sakura',
         'koi_a',
         'koi_b',
-        'roadrunner'
+        'roadrunner',
+        'penguin',
+        'iceberg',
+        'orca'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -1265,6 +1312,7 @@
         jellies = [],
         floes = [],
         dolphins = [],
+        penguins = [],
         hillBands = [];
       let sky,
         stars,
@@ -1337,6 +1385,7 @@
           jellies.length =
           floes.length =
           dolphins.length =
+          penguins.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
@@ -1860,6 +1909,26 @@
             scene.addChild(g);
             swayers.push({s: g, amp: 0.05, sp: 1.4, ph: Math.random() * 6});
           });
+        } else if (BI.ground === 'packice') {
+          // flat snowfield: a few soft drifts, then scattered ice blocks poking through (icy white-blue)
+          for (let i = 0; i < 3; i++) {
+            const x = 120 + Math.random() * (VW - 240),
+              w = 60 + Math.random() * 46,
+              m = new PIXI.Graphics();
+            m.beginFill(0xf2f8fc, 0.92);
+            m.drawEllipse(x, groundY(x) + 9, w, 13);
+            m.endFill();
+            m.beginFill(0xd7e7f1, 0.5);
+            m.drawEllipse(x, groundY(x) + 15, w, 7);
+            m.endFill();
+            scene.addChild(m);
+          }
+          for (let i = 0; i < 13; i++) {
+            const x = 16 + Math.random() * (VW - 32),
+              r = spr('rock', x, groundY(x) + 8, 0.08 + Math.random() * 0.16);
+            r.tint = Math.random() < 0.5 ? 0xd2e4ef : 0xeef6fb; // ice chunks
+            scene.addChild(r);
+          }
         } else if (BI.ground === 'reef') {
           const R = BI.reef;
           // sandy seabed floor laid over the front ridge, paler than the blue background reef
@@ -2015,6 +2084,22 @@
           roadrunner.dir = 1;
           roadrunner.pause = 1 + Math.random() * 2;
           scene.addChild(roadrunner);
+        }
+        if (BI.penguins) {
+          // a little colony waddles the snowfield: each penguin ambles at its own pace, some just stand
+          for (let i = 0; i < BI.penguins; i++) {
+            const x = 150 + Math.random() * (VW - 300),
+              p = spr('penguin', x, groundY(x) + 6, 0.3 + Math.random() * 0.06);
+            p.baseSc = Math.abs(p.scale.x);
+            p.dir = Math.random() < 0.5 ? -1 : 1;
+            p.spd = 0.5 + Math.random() * 0.4; // a slow waddle
+            p.ph = Math.random() * 6.28;
+            p.pause = Math.random() * 3;
+            p.standing = Math.random() < 0.35; // a few just stand and look about
+            p.scale.x = p.dir * p.baseSc;
+            penguins.push(p);
+            scene.addChild(p);
+          }
         }
 
         // water biomes (pond) — reflections, lilies, ducks, dragonflies
@@ -2191,10 +2276,10 @@
           if (BI.water.dolphins)
             for (let i = 0; i < BI.water.dolphins; i++) {
               const d = spr(
-                'dolphin',
+                BI.water.dolphinSprite || 'dolphin', // polar reuses this to surface an orca
                 200 + i * 260 + Math.random() * 120,
                 648,
-                0.34 + Math.random() * 0.06,
+                (BI.water.dolphinScale || 0.34) + Math.random() * 0.06,
                 0.5,
                 0.5
               );
@@ -3272,6 +3357,9 @@
               tracksG.drawEllipse(tr.x + 3, tr.y, 2.3, 1.5);
             } else if (tr.kind === 'fox') {
               tracksG.drawEllipse(tr.x, tr.y, 2, 1.5); // a neat single pad
+            } else if (tr.kind === 'paw') {
+              tracksG.drawEllipse(tr.x - 2, tr.y, 1.4, 2); // penguin's two little webbed feet
+              tracksG.drawEllipse(tr.x + 2, tr.y, 1.4, 2);
             } else {
               tracksG.drawEllipse(tr.x - 4, tr.y, 1.8, 2.6); // rabbit's paired hind feet
               tracksG.drawEllipse(tr.x + 4, tr.y, 1.8, 2.6);
@@ -3483,6 +3571,28 @@
           }
           roadrunner.y = groundY(roadrunner.x) + 6;
           roadrunner.scale.x = roadrunner.dir * roadrunner.baseSc;
+        }
+        // the penguin colony waddles the ice: a slow amble with a side-to-side rock and the odd pause
+        for (const p of penguins) {
+          if (p.standing) {
+            p.rotation = Math.sin(t * 3 + p.ph) * 0.04; // rocks gently in place
+            if (Math.random() < 0.004 * dt) p.dir = -p.dir; // turns to look the other way
+            p.scale.x = p.dir * p.baseSc;
+            continue;
+          }
+          if (p.pause > 0) {
+            p.pause -= dt / 60;
+            p.rotation = Math.sin(t * 2 + p.ph) * 0.03; // a little shuffle while stopped
+          } else {
+            p.x += p.dir * p.spd * dt;
+            p.rotation = Math.sin(t * 7 + p.ph) * 0.12; // the waddle, rocking on its feet with each step
+            if (Math.random() < 0.01 * dt) p.pause = 0.6 + Math.random() * 2;
+            if (p.x > VW - 120) p.dir = -1;
+            else if (p.x < 120) p.dir = 1;
+          }
+          p.y = groundY(p.x) + 6;
+          p.scale.x = p.dir * p.baseSc;
+          dropTrack(p, 'paw', 26); // little prints in the settled snow
         }
         // reef bubbles stream up from their vents, wobbling, fading out near the surface
         for (const b of bubbles) {
