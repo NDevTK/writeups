@@ -284,17 +284,18 @@ save('acacia', S('236 190', `<defs><linearGradient id="ac" x1="0" y1="0" x2="0" 
 <ellipse cx="118" cy="44" rx="104" ry="17" fill="url(#acf)"/>
 <ellipse cx="118" cy="37" rx="78" ry="12" fill="#90af68"/>
 <g fill="#6f9450" opacity="0.5"><ellipse cx="56" cy="50" rx="24" ry="8"/><ellipse cx="118" cy="46" rx="30" ry="9"/><ellipse cx="182" cy="50" rx="24" ry="8"/></g>`), 210);
-save('giraffe', S('212 322', `<defs><linearGradient id="gf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ecc46e"/><stop offset="1" stop-color="#cf9e44"/></linearGradient></defs>
-<g stroke="#cf9e44" stroke-width="11" stroke-linecap="round"><line x1="72" y1="168" x2="66" y2="306"/><line x1="98" y1="170" x2="98" y2="308"/><line x1="122" y1="170" x2="126" y2="308"/><line x1="144" y1="168" x2="152" y2="304"/></g>
-<g stroke="#5a4326" stroke-width="11" stroke-linecap="round"><line x1="66" y1="298" x2="66" y2="306"/><line x1="98" y1="300" x2="98" y2="308"/><line x1="126" y1="300" x2="126" y2="308"/><line x1="152" y1="296" x2="152" y2="304"/></g>
-<path d="M54,166 C48,138 70,118 108,116 C144,114 166,124 166,148 C166,168 130,176 98,176 C76,176 60,174 54,166 Z" fill="url(#gf)"/>
-<path d="M140,132 C152,94 160,58 168,30" stroke="url(#gf)" stroke-width="27" fill="none" stroke-linecap="round"/>
-<path d="M152,118 C161,84 169,50 176,26" stroke="#9c6f34" stroke-width="6" fill="none" stroke-linecap="round"/>
-<path d="M160,32 C154,18 164,8 178,9 C190,10 196,18 193,28 C200,30 203,37 198,43 C191,49 174,48 167,42 C161,38 160,35 160,32 Z" fill="url(#gf)"/>
-<g stroke="#7a5a30" stroke-width="4" stroke-linecap="round"><line x1="171" y1="11" x2="169" y2="1"/><line x1="185" y1="11" x2="187" y2="1"/></g>
-<circle cx="169" cy="1" r="3.6" fill="#5a4326"/><circle cx="187" cy="1" r="3.6" fill="#5a4326"/>
-<circle cx="176" cy="28" r="2.4" fill="#3a2a16"/>
-<g fill="#a9742f" opacity="0.85"><path d="M66,138 l16,-4 l6,15 l-15,5 Z"/><path d="M96,148 l17,-2 l4,15 l-17,4 Z"/><path d="M124,138 l16,-2 l5,15 l-16,4 Z"/><path d="M144,156 l15,0 l2,13 l-15,2 Z"/><path d="M148,94 l12,-2 l3,13 l-12,3 Z"/><path d="M154,60 l11,-2 l3,12 l-11,3 Z"/><path d="M159,34 l9,-2 l2,9 l-9,2 Z"/></g>`), 198);
+save('giraffe', S('214 322', `<defs><linearGradient id="gf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eec670"/><stop offset="1" stop-color="#cf9e44"/></linearGradient></defs>
+<g stroke="#d4a44a" stroke-width="15" stroke-linecap="round"><line x1="70" y1="170" x2="64" y2="304"/><line x1="98" y1="172" x2="98" y2="306"/><line x1="126" y1="172" x2="130" y2="306"/><line x1="150" y1="170" x2="158" y2="302"/></g>
+<g stroke="#4a3520" stroke-width="15" stroke-linecap="round"><line x1="64" y1="296" x2="64" y2="305"/><line x1="98" y1="298" x2="98" y2="307"/><line x1="130" y1="298" x2="130" y2="307"/><line x1="158" y1="294" x2="158" y2="303"/></g>
+<path d="M52,150 C42,162 40,182 46,194" stroke="#cf9e44" stroke-width="6" fill="none" stroke-linecap="round"/><line x1="46" y1="190" x2="43" y2="202" stroke="#4a3520" stroke-width="6" stroke-linecap="round"/>
+<path d="M46,166 C40,128 70,106 112,104 C154,102 178,118 178,150 C178,174 136,184 98,184 C72,184 54,178 46,166 Z" fill="url(#gf)"/>
+<path d="M146,126 C158,90 166,54 174,30" stroke="url(#gf)" stroke-width="31" fill="none" stroke-linecap="round"/>
+<path d="M158,114 C167,80 175,46 182,24" stroke="#9c6f34" stroke-width="7" fill="none" stroke-linecap="round"/>
+<path d="M164,32 C158,18 168,8 182,9 C194,10 200,18 197,28 C204,30 207,37 202,43 C195,49 178,48 171,42 C165,38 164,35 164,32 Z" fill="url(#gf)"/>
+<g stroke="#7a5a30" stroke-width="4.5" stroke-linecap="round"><line x1="175" y1="11" x2="173" y2="1"/><line x1="189" y1="11" x2="191" y2="1"/></g>
+<circle cx="173" cy="1" r="4" fill="#5a4326"/><circle cx="191" cy="1" r="4" fill="#5a4326"/>
+<circle cx="180" cy="28" r="2.6" fill="#3a2a16"/>
+<g fill="#a9742f" opacity="0.85"><path d="M60,138 l18,-4 l7,17 l-17,5 Z"/><path d="M94,150 l19,-2 l5,17 l-19,4 Z"/><path d="M126,138 l18,-2 l6,17 l-18,5 Z"/><path d="M150,158 l17,0 l2,15 l-17,2 Z"/><path d="M154,90 l14,-2 l3,15 l-14,3 Z"/><path d="M161,56 l12,-2 l3,13 l-12,3 Z"/><path d="M167,30 l10,-2 l2,10 l-10,2 Z"/></g>`), 202);
 save('zebra', S('204 152', `
 <g stroke="#3a3a3a" stroke-width="9" stroke-linecap="round"><line x1="62" y1="92" x2="58" y2="138"/><line x1="86" y1="94" x2="86" y2="140"/><line x1="118" y1="94" x2="122" y2="140"/><line x1="142" y1="92" x2="148" y2="138"/></g>
 <path d="M46,94 C38,68 60,54 102,54 C142,54 160,64 160,86 C160,100 132,104 98,104 C68,104 54,104 46,94 Z" fill="#f2efe8"/>
@@ -358,7 +359,7 @@ save('volcano', S('420 300', `<defs>
 <g fill="#1d171f" opacity="0.55"><ellipse cx="120" cy="244" rx="20" ry="8"/><ellipse cx="322" cy="256" rx="22" ry="9"/><ellipse cx="286" cy="210" rx="12" ry="6"/></g>`), 420);
 
 // ---- contact sheet of new + polished ----
-const review = ['volcano'];
+const review = ['giraffe'];
 const cols = 4, cell = 230, pad = 14, rows = Math.ceil(review.length / cols);
 (async () => {
   const comps = [];
