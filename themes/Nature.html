@@ -124,6 +124,7 @@
       }
       // seasonal colour grade (recomputed each frame from the active season + daylight)
       let seasonGrade = {mul: [1, 1, 1], add: [0, 0, 0], desat: 0};
+      let isWinter = false;
       function grade(c) {
         const g = seasonGrade; let r = c[0], gg = c[1], b = c[2];
         if (g.desat) { const m = (r + gg + b) / 3; r += (m - r) * g.desat; gg += (m - gg) * g.desat; b += (m - b) * g.desat; }
@@ -183,6 +184,12 @@
         ctx.closePath();
         ctx.fill();
       }
+      // in winter, settle a crest of snow along a ground silhouette
+      function snowCap(curve, P) {
+        if (!isWinter) return;
+        ctx.fillStyle = rgb(dim([238, 246, 252], 0.62 + P.li * 0.38));
+        for (let x = 0; x <= vw; x++) ctx.fillRect(x, curve(x) | 0, 1, 2);
+      }
       function drawSprite(map, color, x, y, light, alpha, flip) {
         const w = map[0].length;
         ctx.globalAlpha = alpha == null ? 1 : alpha;
@@ -204,6 +211,11 @@
             ctx.fillStyle = rgb(dim(DPAL[ch], light));
             ctx.fillRect((flip ? x + (w - 1 - c) : x + c) | 0, (y + r) | 0, 1, 1);
           }
+      }
+      // a fuzzy duckling (3px body + a head pip), paddling behind its mother
+      function drawDuckling(x, y, flip, light) {
+        ctx.fillStyle = rgb(dim([198, 172, 98], light)); ctx.fillRect(x | 0, (y + 1) | 0, 3, 2);
+        ctx.fillStyle = rgb(dim([220, 200, 134], light)); ctx.fillRect((flip ? x : x + 2) | 0, y | 0, 1, 1);
       }
 
       // shared scene actors
@@ -406,6 +418,13 @@
         const w = DEER[0].length;
         for (let r = 0; r < DEER.length; r++) for (let c = 0; c < w; c++) if (DEER[r][c] !== '.') ctx.fillRect((flip ? x + (w - 1 - c) : x + c) | 0, (y + r) | 0, 1, 1);
       }
+      // a smaller, lighter fawn (no antlers) that keeps near the deer
+      const FAWN = ['.......#', '..####.#', '.######.', '.######.', '.#.##.#.', '.#.##.#.'];
+      function drawFawn(x, y, flip, P) {
+        ctx.fillStyle = rgb(tint([120, 86, 56], P));
+        const w = FAWN[0].length;
+        for (let r = 0; r < FAWN.length; r++) for (let c = 0; c < w; c++) if (FAWN[r][c] !== '.') ctx.fillRect((flip ? x + (w - 1 - c) : x + c) | 0, (y + r) | 0, 1, 1);
+      }
       // an occasional fish breaking the surface, leaving splash ripples
       let fish = null;
       function fishStart(top) { fish = {st: 'wait', timer: 80 + Math.random() * 280, top}; }
@@ -440,6 +459,7 @@
           init() {
             ducks = [];
             for (let i = 0; i < 3; i++) ducks.push({x: Math.random() * vw, y: horizon + 6 + Math.random() * (vh - horizon - 12), dir: Math.random() < 0.5 ? -1 : 1, sp: 0.06 + Math.random() * 0.05, bob: Math.random() * 6.28, wk: 0});
+            ducks[0].kids = 2 + (Math.random() * 2 | 0); // one mother with a brood
             reeds = [];
             for (let i = 0; i < 8; i++) { const left = i < 4; reeds.push({x: left ? 1 + i * 2 : vw - 2 - (i - 4) * 2, h: 6 + Math.random() * 8}); }
             lily = [];
@@ -456,6 +476,11 @@
               const by = dk.y + (reduced ? 0 : Math.sin(dk.bob) * 0.6);
               ctx.globalAlpha = 0.25; drawDuck(dk.x, by + 8, dk.dir < 0, P.li * 0.4); ctx.globalAlpha = 1;
               drawDuck(dk.x, by, dk.dir < 0, P.li);
+              for (let i = 0; i < (dk.kids || 0); i++) {
+                const kx = dk.x + (dk.dir > 0 ? -(i + 1) * 5 : 10 + (i + 1) * 5), ky = by + 4 + (reduced ? 0 : Math.sin(dk.bob + i * 1.3) * 0.5);
+                ctx.globalAlpha = 0.22; drawDuckling(kx, ky + 5, dk.dir < 0, P.li * 0.4); ctx.globalAlpha = 1;
+                drawDuckling(kx, ky, dk.dir < 0, P.li);
+              }
             }
             for (const rd of reeds) { ctx.strokeStyle = rgb(tint([34, 64, 38], P)); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(rd.x, vh); ctx.lineTo(rd.x, vh - rd.h); ctx.stroke(); }
             fireflies(P, T, reduced, horizon);
@@ -475,14 +500,19 @@
             deerObj = {x: vw * 0.62, gy: hills[1], dir: -1, t: 0};
           },
           draw(P, T, reduced) {
+            const mc0 = (x) => hills[0] + Math.sin(x * 0.04 + 0.5) * vh * 0.04;
+            const mc1 = (x) => hills[1] + Math.sin(x * 0.06 + 0.8) * vh * 0.04;
+            const mc2 = (x) => hills[2] + Math.sin(x * 0.06 + 1.7) * vh * 0.05;
             ctx.fillStyle = rgb(tint([124, 195, 94], P)); ctx.fillRect(0, hills[0] - 1, vw, vh - hills[0] + 1);
-            fillUnder((x) => hills[0] + Math.sin(x * 0.04 + 0.5) * vh * 0.04, tint([124, 195, 94], P));
-            fillUnder((x) => hills[1] + Math.sin(x * 0.06 + 0.8) * vh * 0.04, tint([95, 168, 74], P));
-            fillUnder((x) => hills[2] + Math.sin(x * 0.06 + 1.7) * vh * 0.05, tint([70, 138, 55], P));
+            fillUnder(mc0, tint([124, 195, 94], P)); snowCap(mc0, P);
+            fillUnder(mc1, tint([95, 168, 74], P)); snowCap(mc1, P);
+            fillUnder(mc2, tint([70, 138, 55], P)); snowCap(mc2, P);
             for (const tr of trees) { const gy = hills[2] + Math.sin(tr.x * 0.06 + 1.7) * vh * 0.05; ctx.fillStyle = rgb(tint([74, 52, 36], P)); ctx.fillRect(tr.x, gy, 2, vh * 0.09); const cr = Math.round(vh * 0.07); ctx.fillStyle = rgb(tint([54, 110, 52], P)); ctx.beginPath(); ctx.arc(tr.x + 1, gy - cr * 0.6, cr, 0, 6.2832); ctx.fill(); ctx.beginPath(); ctx.arc(tr.x + 1 - cr * 0.7, gy - cr * 0.2, cr * 0.7, 0, 6.2832); ctx.fill(); ctx.beginPath(); ctx.arc(tr.x + 1 + cr * 0.7, gy - cr * 0.2, cr * 0.7, 0, 6.2832); ctx.fill(); }
             if (deerObj) {
               if (!reduced) { deerObj.t++; deerObj.x += deerObj.dir * 0.05; if (deerObj.x < vw * 0.25) deerObj.dir = 1; if (deerObj.x > vw * 0.82) deerObj.dir = -1; }
               const dgy = hills[1] + Math.sin(deerObj.x * 0.06 + 0.8) * vh * 0.04;
+              const ffx = deerObj.x + (deerObj.dir > 0 ? -14 : 14), ffgy = hills[1] + Math.sin(ffx * 0.06 + 0.8) * vh * 0.04;
+              drawFawn(ffx | 0, (ffgy - 6) | 0, deerObj.dir < 0, P);
               drawDeer(deerObj.x | 0, (dgy - 9) | 0, deerObj.dir < 0, P);
             }
             for (const fl of flowers) { const sw = reduced ? 0 : Math.sin(T * 1.2 + fl.ph) * 0.6; ctx.fillStyle = rgb(tint(fl.c, P)); ctx.fillRect((fl.x + sw) | 0, fl.y | 0, 1, 1); ctx.fillStyle = rgb(tint([240, 240, 200], P)); ctx.fillRect((fl.x + sw) | 0, (fl.y | 0) - 1, 1, 1); }
@@ -615,6 +645,7 @@
             forest.sort((a, b) => a.base - b.base);
             ducks = [];
             for (let i = 0; i < 3; i++) ducks.push({x: Math.random() * vw, y: vh * 0.72 + Math.random() * (vh * 0.22), dir: Math.random() < 0.5 ? -1 : 1, sp: 0.05 + Math.random() * 0.05, bob: Math.random() * 6.28, wk: 0});
+            ducks[0].kids = 2 + (Math.random() * 2 | 0); // mother with a brood
             reeds = [];
             for (let i = 0; i < 8; i++) { const left = i < 4; reeds.push({x: left ? 1 + i * 2 : vw - 2 - (i - 4) * 2, h: 5 + Math.random() * 7}); }
             lily = [];
@@ -638,13 +669,17 @@
               for (let x = 0; x <= vw; x++) { const m = mtn[l][(x / 4) | 0]; if (m < -vh * 0.035) ctx.fillRect(x, (baseY[l] + m) | 0, 1, 2); }
             }
             // forested hills
-            fillUnder((x) => vh * 0.46 + Math.sin(x * 0.05 + 0.6) * vh * 0.03, tint([60, 124, 66], P));
-            fillUnder((x) => vh * 0.56 + Math.sin(x * 0.06 + 1.5) * vh * 0.03, tint([46, 104, 54], P));
+            const wc0 = (x) => vh * 0.46 + Math.sin(x * 0.05 + 0.6) * vh * 0.03;
+            const wc1 = (x) => vh * 0.56 + Math.sin(x * 0.06 + 1.5) * vh * 0.03;
+            fillUnder(wc0, tint([60, 124, 66], P)); snowCap(wc0, P);
+            fillUnder(wc1, tint([46, 104, 54], P)); snowCap(wc1, P);
             for (const f of forest) { const gy = f.base + Math.sin(f.x * f.fr + f.ph) * vh * 0.03; if (f.pine) pineTree(f.x, gy, f.h, P); else roundTree(f.x, gy, f.h, P, f.hue); }
             // a deer grazing on the near hill
             if (deerObj) {
               if (!reduced) { deerObj.t++; deerObj.x += deerObj.dir * 0.05; if (deerObj.x < vw * 0.1) deerObj.dir = 1; if (deerObj.x > vw * 0.6) deerObj.dir = -1; }
               const dgy = deerObj.base + Math.sin(deerObj.x * deerObj.fr + deerObj.ph) * vh * 0.03;
+              const ffx = deerObj.x + (deerObj.dir > 0 ? -14 : 14), ffgy = deerObj.base + Math.sin(ffx * deerObj.fr + deerObj.ph) * vh * 0.03;
+              drawFawn(ffx | 0, (ffgy - 6) | 0, deerObj.dir < 0, P);
               drawDeer(deerObj.x | 0, (dgy - 9) | 0, deerObj.dir < 0, P);
             }
             // foreground pond
@@ -659,6 +694,11 @@
               const by = dk.y + (reduced ? 0 : Math.sin(dk.bob) * 0.6);
               ctx.globalAlpha = 0.25; drawDuck(dk.x, by + 8, dk.dir < 0, P.li * 0.4); ctx.globalAlpha = 1;
               drawDuck(dk.x, by, dk.dir < 0, P.li);
+              for (let i = 0; i < (dk.kids || 0); i++) {
+                const kx = dk.x + (dk.dir > 0 ? -(i + 1) * 5 : 10 + (i + 1) * 5), ky = by + 4 + (reduced ? 0 : Math.sin(dk.bob + i * 1.3) * 0.5);
+                ctx.globalAlpha = 0.22; drawDuckling(kx, ky + 5, dk.dir < 0, P.li * 0.4); ctx.globalAlpha = 1;
+                drawDuckling(kx, ky, dk.dir < 0, P.li);
+              }
             }
             for (const rd of reeds) { ctx.strokeStyle = rgb(tint([34, 64, 38], P)); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(rd.x, vh); ctx.lineTo(rd.x, vh - rd.h); ctx.stroke(); }
             // wildflowers on the near bank + butterflies
@@ -681,7 +721,8 @@
         if (document.hidden) return;
         const reduced = reduce.matches, T = reduced ? 0 : now / 1000, P = tod(nowHour());
         // resolve the active season into a colour grade, eased out toward night
-        const sb = SEASONS[seasonNow()], k = 1 - 0.5 * P.st;
+        const sn = seasonNow(); isWinter = sn === 'winter';
+        const sb = SEASONS[sn], k = 1 - 0.5 * P.st;
         seasonGrade = {mul: [1 + (sb.mul[0] - 1) * k, 1 + (sb.mul[1] - 1) * k, 1 + (sb.mul[2] - 1) * k], add: [sb.add[0] * k, sb.add[1] * k, sb.add[2] * k], desat: sb.desat * k};
         drawSky(P, T);
         BIOME[biome].draw(P, T, reduced);
