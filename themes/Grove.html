@@ -284,6 +284,7 @@
       const BIOMES = {
         grove: {
           label: '🌳 Grove',
+          fog: 0.8,
           sky: 0xffffff,
           seasonal: true,
           hills: [0x9cc6b0, 0x73b25a, 0x4f9c3e],
@@ -348,6 +349,7 @@
         },
         coast: {
           label: '🏖️ Coast',
+          fog: 0.9,
           sky: 0xffffff,
           seasonal: true,
           seasonPalette: {
@@ -386,6 +388,7 @@
         },
         wetland: {
           label: '🪷 Wetland',
+          fog: 1,
           sky: 0xf2f7ee,
           seasonal: true,
           seasonPalette: {
@@ -433,6 +436,7 @@
         },
         alpine: {
           label: '🏔️ Alpine',
+          fog: 0.5,
           sky: 0xdfeaff,
           seasonal: false,
           snowCaps: true,
@@ -465,6 +469,7 @@
         },
         savanna: {
           label: '🌅 Savanna',
+          fog: 0.3,
           sky: 0xffeccb,
           seasonal: true,
           seasonPalette: {
@@ -497,6 +502,7 @@
         },
         bamboo: {
           label: '🎋 Bamboo',
+          fog: 0.7,
           sky: 0xeaf4e4,
           seasonal: false,
           hills: [0xb6d3a4, 0x8cbd76, 0x6aa45a],
@@ -546,6 +552,7 @@
         },
         fjord: {
           label: '🌌 Fjord',
+          fog: 0.85,
           sky: 0x9fb0c8,
           seasonal: false,
           snowCaps: true,
@@ -711,7 +718,8 @@
         'falls_b',
         'vfall_a',
         'vfall_b',
-        'wstreak'
+        'wstreak',
+        'fog'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -845,6 +853,7 @@
         tracks = [],
         crystals = [],
         drips = [],
+        fogLayers = [],
         hillBands = [];
       let sky,
         stars,
@@ -905,6 +914,7 @@
           tracks.length =
           crystals.length =
           drips.length =
+          fogLayers.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lavaGlow = null;
@@ -1041,6 +1051,17 @@
           hh.tint = hillTint;
           scene.addChild(hh);
         });
+        if (BI.fog) {
+          // distant haze softening the hills, behind the trees
+          const fz = new PIXI.TilingSprite(T('fog'), VW + 120, 120);
+          fz.position.set(-60, 372);
+          fz.tileScale.set(1.6, 120 / 90);
+          fz.baseA = 0.62;
+          fz.spd = 0.1;
+          fz.windF = 4;
+          scene.addChild(fz);
+          fogLayers.push(fz);
+        }
         // crest snow lives just behind the trees; redrawn each frame to grow with accumulation
         crestG = new PIXI.Graphics();
         scene.addChild(crestG);
@@ -1436,6 +1457,18 @@
             scene.addChild(f);
           }
 
+        if (BI.fog) {
+          // ground fog pooling low, in front of the scene (tree bases sink into it)
+          const fz = new PIXI.TilingSprite(T('fog'), VW + 120, 135);
+          fz.position.set(-60, 498);
+          fz.tileScale.set(1.4, 135 / 90);
+          fz.baseA = 1;
+          fz.spd = 0.28;
+          fz.windF = 9;
+          scene.addChild(fz);
+          fogLayers.push(fz);
+        }
+
         // night veil (multiply) — only darkens the scene's pixels
         veil = new PIXI.Graphics();
         veil
@@ -1717,6 +1750,20 @@
         overcastG.alpha = BI.interior
           ? 0
           : cover * 0.55 * (0.25 + P.light * 0.75); // dim by cover, faint at night (no weather underground)
+
+        // morning mist: thickest at dawn, burning off by midday, lingering after rain; tinted to the horizon
+        if (fogLayers.length) {
+          const fogTOD =
+            0.06 +
+            0.56 * Math.exp(-Math.pow((h - 6.3) / 1.9, 2)) +
+            0.3 * (1 - P.light);
+          const fogAmt = Math.min(1, (BI.fog || 0) * (fogTOD + wetness * 0.35)),
+            fogTint = hexI(mixA(P.bot, [255, 255, 255], 0.55));
+          for (const fz of fogLayers) {
+            fz.alpha = fogAmt * fz.baseA;
+            fz.tint = fogTint;
+          }
+        }
 
         // audio follows the mute toggle and swells with the rain (click-free via setTargetAtTime)
         if (audio) {
@@ -2060,6 +2107,9 @@
           if (c.x - c.width > VW) c.x = -c.width;
           else if (c.x + c.width < 0) c.x = VW + c.width;
         }
+        // fog drifts on the breeze (each layer at its own pace for parallax)
+        for (const fz of fogLayers)
+          fz.tilePosition.x -= (fz.spd + wind * fz.windF * 0.25) * dt;
         for (const w of swayers)
           w.s.rotation = Math.sin(t * w.sp + w.ph) * w.amp + wind * w.amp * 2.5;
 
