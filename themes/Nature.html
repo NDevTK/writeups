@@ -233,6 +233,9 @@
       }
       function drawSky(P, T) {
         for (let y = 0; y < horizon; y++) { ctx.fillStyle = rgb(mix(P.t, P.hz, y / horizon)); ctx.fillRect(0, y, vw, 1); }
+        // continue the haze colour behind the skyline so distant ridges/valleys
+        // never reveal the page background (the scene overdraws this everywhere else)
+        ctx.fillStyle = rgb(P.hz); ctx.fillRect(0, horizon, vw, vh - horizon);
         if (P.st > 0.05) {
           ctx.fillStyle = '#fff';
           for (const s of stars) { ctx.globalAlpha = P.st * (0.35 + 0.65 * ((Math.sin(T * 2 + s.ph) + 1) / 2)); ctx.fillRect(s.x | 0, s.y | 0, 1, 1); }
@@ -345,6 +348,17 @@
 
       // waterfall down a cliff into a pool
       function waterfall(x, w, topY, botY, P, T, reduced) {
+        // source: a rocky ledge the stream slides over, so the water comes from
+        // somewhere — an irregular shelf (not a box, not two symmetric "eyes")
+        ctx.fillStyle = rgb(tint([46, 52, 48], P)); // dark wet rock shelf
+        ctx.beginPath(); ctx.ellipse(x + w / 2, topY, w / 2 + 4, 2.6, 0, 0, 6.2832); ctx.fill();
+        ctx.fillStyle = rgb(tint([60, 68, 62], P)); // a couple of lit rocks on the shelf, uneven
+        ctx.beginPath(); ctx.ellipse(x - 2, topY - 1, 2.4, 2, 0, 0, 6.2832); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(x + w + 2, topY - 1, 1.5, 1.4, 0, 0, 6.2832); ctx.fill();
+        // smooth water sliding over the lip of the shelf, then breaking white below
+        ctx.fillStyle = rgb(dim(mix([66, 116, 148], [198, 228, 240], 0.55), P.li));
+        ctx.fillRect(x - 1, topY - 2, w + 2, 2);
+        if (!reduced) { ctx.fillStyle = rgb(dim([220, 238, 246], P.li)); ctx.fillRect((x - 1 + ((T * 6) % (w + 2))) | 0, topY - 2, 1, 1); }
         ctx.fillStyle = rgb(tint([60, 70, 64], P)); // rock face
         ctx.fillRect(x - 2, topY, w + 4, botY - topY);
         for (let c = 0; c < w; c++) {
@@ -411,17 +425,30 @@
         ctx.fillStyle = rgb(tint([26, 64, 42], P));
         for (let k = 0; k < 3; k++) { const yy = gy - h * (0.1 + k * 0.28), ww = h * (0.34 - k * 0.08); ctx.beginPath(); ctx.moveTo(x, yy - h * 0.32); ctx.lineTo(x - ww, yy); ctx.lineTo(x + ww, yy); ctx.fill(); }
       }
-      // a grazing deer silhouette (12x9, faces right; flip for left)
-      const DEER = ['..........#.', '.........#.#', '..#.......##', '..##....###.', '..#########.', '.##########.', '.##########.', '..#.##.##...', '..#.##.#.#..'];
+      // a doe silhouette (12x11, faces right; flip for left): upright ears, long
+      // neck, four slim legs — reads as a deer without the antlers turning to noise
+      const DEER = [
+        '.........#.#',
+        '.........###',
+        '.........##.',
+        '........###.',
+        '.......##...',
+        '.#######....',
+        '########....',
+        '########....',
+        '.#.#.#.#....',
+        '.#.#.#.#....',
+        '.#.#.#.#....'
+      ];
       function drawDeer(x, y, flip, P) {
-        ctx.fillStyle = rgb(tint([66, 46, 32], P));
+        ctx.fillStyle = rgb(tint([74, 52, 36], P));
         const w = DEER[0].length;
         for (let r = 0; r < DEER.length; r++) for (let c = 0; c < w; c++) if (DEER[r][c] !== '.') ctx.fillRect((flip ? x + (w - 1 - c) : x + c) | 0, (y + r) | 0, 1, 1);
       }
-      // a smaller, lighter fawn (no antlers) that keeps near the deer
-      const FAWN = ['.......#', '..####.#', '.######.', '.######.', '.#.##.#.', '.#.##.#.'];
+      // a smaller, lighter fawn that keeps near the doe (no spots — they read as eyes)
+      const FAWN = ['.....#.#', '.....###', '....##..', '.#####..', '######..', '.#.#.#..', '.#.#.#..'];
       function drawFawn(x, y, flip, P) {
-        ctx.fillStyle = rgb(tint([120, 86, 56], P));
+        ctx.fillStyle = rgb(tint([126, 92, 62], P));
         const w = FAWN[0].length;
         for (let r = 0; r < FAWN.length; r++) for (let c = 0; c < w; c++) if (FAWN[r][c] !== '.') ctx.fillRect((flip ? x + (w - 1 - c) : x + c) | 0, (y + r) | 0, 1, 1);
       }
@@ -513,7 +540,7 @@
               const dgy = hills[1] + Math.sin(deerObj.x * 0.06 + 0.8) * vh * 0.04;
               const ffx = deerObj.x + (deerObj.dir > 0 ? -14 : 14), ffgy = hills[1] + Math.sin(ffx * 0.06 + 0.8) * vh * 0.04;
               drawFawn(ffx | 0, (ffgy - 6) | 0, deerObj.dir < 0, P);
-              drawDeer(deerObj.x | 0, (dgy - 9) | 0, deerObj.dir < 0, P);
+              drawDeer(deerObj.x | 0, (dgy - 10) | 0, deerObj.dir < 0, P);
             }
             for (const fl of flowers) { const sw = reduced ? 0 : Math.sin(T * 1.2 + fl.ph) * 0.6; ctx.fillStyle = rgb(tint(fl.c, P)); ctx.fillRect((fl.x + sw) | 0, fl.y | 0, 1, 1); ctx.fillStyle = rgb(tint([240, 240, 200], P)); ctx.fillRect((fl.x + sw) | 0, (fl.y | 0) - 1, 1, 1); }
             for (const g of grass) { const sw = reduced ? 0 : Math.sin(T * 1.4 + g.ph) * 1.2; ctx.strokeStyle = rgb(tint([46, 92, 44], P)); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(g.x, vh); ctx.lineTo(g.x + sw, vh - g.h); ctx.stroke(); }
@@ -680,7 +707,7 @@
               const dgy = deerObj.base + Math.sin(deerObj.x * deerObj.fr + deerObj.ph) * vh * 0.03;
               const ffx = deerObj.x + (deerObj.dir > 0 ? -14 : 14), ffgy = deerObj.base + Math.sin(ffx * deerObj.fr + deerObj.ph) * vh * 0.03;
               drawFawn(ffx | 0, (ffgy - 6) | 0, deerObj.dir < 0, P);
-              drawDeer(deerObj.x | 0, (dgy - 9) | 0, deerObj.dir < 0, P);
+              drawDeer(deerObj.x | 0, (dgy - 10) | 0, deerObj.dir < 0, P);
             }
             // foreground pond
             water(pondY, P, T, reduced, [28, 58, 78]);
