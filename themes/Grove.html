@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grove</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #bfe3f2; }
+      canvas { position: fixed; inset: 0; display: block; }
+    </style>
+  </head>
+  <body>
+    <script src="grove/pixi.min.js"></script>
+    <script>
+      'use strict';
+      const VW = 1280, VH = 720; // virtual design space, scaled to cover the screen
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+
+      const app = new PIXI.Application({ resizeTo: window, antialias: true, backgroundAlpha: 0 });
+      document.body.appendChild(app.view);
+
+      const root = new PIXI.Container();
+      app.stage.addChild(root);
+      function fit() {
+        const s = Math.max(app.screen.width / VW, app.screen.height / VH);
+        root.scale.set(s);
+        root.position.set((app.screen.width - VW * s) / 2, (app.screen.height - VH * s) / 2);
+      }
+      app.renderer.on('resize', fit);
+
+      const NAMES = ['oak', 'pine', 'bush', 'grass', 'flower_p', 'flower_w', 'cloud', 'sun',
+        'duck', 'duckling', 'bird_a', 'bird_b', 'butterfly_a', 'butterfly_b', 'rabbit', 'deer_a', 'deer_b'];
+
+      // sky / water gradients as textures (canvas2d -> Pixi)
+      function grad(h, stops) {
+        const c = document.createElement('canvas'); c.width = 1; c.height = h;
+        const g = c.getContext('2d'), lg = g.createLinearGradient(0, 0, 0, h);
+        stops.forEach(([o, col]) => lg.addColorStop(o, col));
+        g.fillStyle = lg; g.fillRect(0, 0, 1, h);
+        return PIXI.Texture.from(c);
+      }
+      // a wavy-topped hill polygon
+      function hill(crestY, amp, color, phase) {
+        const g = new PIXI.Graphics(); g.beginFill(color);
+        g.moveTo(0, VH); g.lineTo(0, crestY);
+        for (let x = 0; x <= VW; x += 8) g.lineTo(x, crestY + Math.sin(x * 0.006 + phase) * amp);
+        g.lineTo(VW, VH); g.closePath(); g.endFill();
+        return g;
+      }
+      const T = (n) => PIXI.Assets.get(n);
+      const spr = (n, x, y, s, ax, ay) => {
+        const p = new PIXI.Sprite(T(n));
+        p.anchor.set(ax == null ? 0.5 : ax, ay == null ? 1 : ay);
+        p.position.set(x, y); if (s) p.scale.set(s);
+        return p;
+      };
+      const anim = (frames, x, y, s, spd) => {
+        const a = new PIXI.AnimatedSprite(frames.map(T));
+        a.anchor.set(0.5, 1); a.position.set(x, y); if (s) a.scale.set(s);
+        a.animationSpeed = spd; a.play();
+        return a;
+      };
+
+      const swayers = []; // {sprite, amp, sp, ph}
+      const clouds = [], ducks = [], flutters = [];
+      let deer, deerBob = 0, bird, birdT = 0, rabbit, hopT = 2, water, sunGlow, ready = false;
+
+      function build() {
+        root.removeChildren();
+
+        // --- sky ---
+        const sky = new PIXI.Sprite(grad(VH * 0.62, [[0, '#7bbce6'], [0.6, '#bfe3f2'], [1, '#e8f4ee']]));
+        sky.width = VW; sky.height = VH * 0.62; root.addChild(sky);
+
+        // --- sun + soft glow ---
+        const sunWrap = new PIXI.Container(); sunWrap.position.set(940, 132); root.addChild(sunWrap);
+        sunGlow = spr('sun', 0, 0, 2.7, 0.5, 0.5); sunGlow.alpha = 0.25; sunWrap.addChild(sunGlow);
+        sunWrap.addChild(spr('sun', 0, 0, 1, 0.5, 0.5));
+
+        // --- clouds (parallax, drifting) ---
+        for (let i = 0; i < 4; i++) {
+          const c = spr('cloud', Math.random() * VW, 60 + Math.random() * 150, 0.5 + Math.random() * 0.5, 0.5, 0.5);
+          c.alpha = 0.95; c.vx = 0.15 + Math.random() * 0.25; clouds.push(c); root.addChild(c);
+        }
+
+        // --- a flock bird crossing the sky ---
+        bird = anim(['bird_a', 'bird_b'], -80, 150, 0.7, 0.06); root.addChild(bird);
+
+        // --- hills (far -> near, atmospheric haze) ---
+        root.addChild(hill(420, 26, 0x9cc6b0, 0.0));
+        root.addChild(hill(470, 30, 0x73b25a, 1.3));
+        const near = hill(540, 26, 0x4f9c3e, 2.4); root.addChild(near);
+
+        // --- mid-hill trees (smaller, hazier) ---
+        for (const [x, n, sc] of [[180, 'pine', 0.7], [330, 'oak', 0.7], [1040, 'oak', 0.66], [1180, 'pine', 0.64]]) {
+          const t = spr(n, x, 482 + Math.sin(x * 0.006 + 1.3) * 30, sc); t.tint = 0xcfe3d0; root.addChild(t);
+          swayers.push({ s: t, amp: 0.015, sp: 0.7, ph: Math.random() * 6 });
+        }
+
+        // --- near hill: trees, bushes, grass, flowers, rabbit, deer ---
+        const groundY = (x) => 540 + Math.sin(x * 0.006 + 2.4) * 26;
+        for (const [x, n, sc] of [[120, 'oak', 1.05], [430, 'pine', 1.0], [900, 'oak', 1.1], [1150, 'bush', 1.0]]) {
+          const t = spr(n, x, groundY(x) + 4, sc); root.addChild(t);
+          swayers.push({ s: t, amp: 0.02, sp: 0.9, ph: Math.random() * 6 });
+        }
+        for (let i = 0; i < 16; i++) {
+          const x = 40 + Math.random() * (VW - 80), g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.5);
+          root.addChild(g); swayers.push({ s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6 });
+        }
+        for (let i = 0; i < 10; i++) {
+          const x = 60 + Math.random() * (VW - 120);
+          const f = spr(Math.random() < 0.5 ? 'flower_p' : 'flower_w', x, groundY(x) + 8, 0.6 + Math.random() * 0.4);
+          root.addChild(f); swayers.push({ s: f, amp: 0.06, sp: 1.4, ph: Math.random() * 6 });
+        }
+        rabbit = spr('rabbit', 760, groundY(760) + 6, 0.55); root.addChild(rabbit); rabbit.baseY = rabbit.y;
+        deer = anim(['deer_a', 'deer_b'], 300, groundY(300) + 8, 0.62, 0); deer.gotoAndStop(0); root.addChild(deer);
+
+        // --- foreground pond ---
+        water = new PIXI.Sprite(grad(VH * 0.4, [[0, '#5fa7ca'], [1, '#2f6f93']]));
+        water.position.set(0, 600); water.width = VW; water.height = VH - 600; root.addChild(water);
+        const lip = new PIXI.Graphics(); lip.beginFill(0xbfe6ef, 0.5); lip.drawRect(0, 600, VW, 3); lip.endFill(); root.addChild(lip);
+
+        // --- ducks (mother + brood) on the pond ---
+        const dm = spr('duck', 380, 656, 0.6); dm.baseY = dm.y; dm.vx = 0.5; dm.kids = [];
+        for (let i = 0; i < 3; i++) { const k = spr('duckling', dm.x - 34 - i * 22, 668, 0.5); k.baseY = k.y; root.addChild(k); dm.kids.push(k); }
+        root.addChild(dm); ducks.push(dm);
+        const d2 = spr('duck', 980, 690, 0.55, 0.5, 1); d2.scale.x = -0.55; d2.baseY = d2.y; d2.vx = -0.4; ducks.push(d2); root.addChild(d2);
+
+        // --- butterflies fluttering over the meadow ---
+        for (let i = 0; i < 4; i++) {
+          const f = anim(['butterfly_a', 'butterfly_b'], Math.random() * VW, 500 + Math.random() * 70, 0.5, 0.18);
+          f.vx = (Math.random() - 0.5) * 1.2; f.vy = (Math.random() - 0.5) * 0.8; flutters.push(f); root.addChild(f);
+        }
+        fit();
+        ready = true;
+      }
+
+      // --- animation ---
+      let t = 0;
+      app.ticker.add((dt) => {
+        if (!ready || document.hidden) return;
+        if (reduce.matches) { deer.gotoAndStop(0); return; }
+        t += dt / 60;
+        sunGlow.scale.set(2.6 + Math.sin(t * 1.5) * 0.12);
+        for (const c of clouds) { c.x += c.vx * dt; if (c.x - c.width > VW) c.x = -c.width; }
+        for (const w of swayers) w.s.rotation = Math.sin(t * w.sp + w.ph) * w.amp;
+        // bird arcs across the sky, flapping
+        birdT += dt; bird.x += 1.1 * dt; bird.y = 150 + Math.sin(bird.x * 0.004) * 30;
+        if (bird.x > VW + 80) { bird.x = -80; bird.y = 120 + Math.random() * 80; }
+        // deer ambles, legs cycling; gentle body bob
+        deer.x += 0.35 * dt; if (deer.x > VW + 60) deer.x = -60;
+        deer.y = 540 + Math.sin(deer.x * 0.006 + 2.4) * 26 + 8 + Math.abs(Math.sin(t * 4)) * -2;
+        deer.animationSpeed = 0.12;
+        // rabbit hops now and then
+        hopT -= dt / 60; const hop = hopT < 0.4 && hopT > 0 ? Math.sin((0.4 - hopT) / 0.4 * Math.PI) : 0;
+        rabbit.y = rabbit.baseY - hop * 26; rabbit.x += hop * 1.2;
+        if (hopT < 0) { hopT = 3 + Math.random() * 4; if (rabbit.x > VW - 80) rabbit.x = 120; }
+        // ducks drift + bob, ducklings trail
+        for (const d of ducks) {
+          d.x += d.vx * dt; d.y = d.baseY + Math.sin(t * 2 + d.x * 0.05) * 1.6;
+          if (d.x > VW - 40) d.vx = -Math.abs(d.vx); if (d.x < 40) d.vx = Math.abs(d.vx);
+          if (d.scale) d.scale.x = (d.vx < 0 ? -1 : 1) * Math.abs(d.scale.x);
+          if (d.kids) d.kids.forEach((k, i) => {
+            const back = d.vx < 0 ? 1 : -1;
+            k.x = d.x + back * (34 + i * 22); k.y = k.baseY + Math.sin(t * 2 + i) * 1.4;
+            k.scale.x = (d.vx < 0 ? -1 : 1) * Math.abs(k.scale.x);
+          });
+        }
+        // butterflies wander
+        for (const f of flutters) {
+          f.x += f.vx * dt; f.y += f.vy * dt;
+          if (Math.random() < 0.02) { f.vx = (Math.random() - 0.5) * 1.2; f.vy = (Math.random() - 0.5) * 0.8; }
+          if (f.x < 20 || f.x > VW - 20) f.vx *= -1; if (f.y < 470 || f.y > 590) f.vy *= -1;
+        }
+      });
+
+      PIXI.Assets.load(NAMES.map((n) => ({ alias: n, src: `grove/assets/${n}.png` }))).then(() => {
+        build();
+        if (reduce.matches) deer.gotoAndStop(0);
+      }).catch((e) => console.error('Grove asset load failed:', e));
+
+      // ---- host bridge (shaderwall protocol) + pause when hidden ----
+      let shown = false;
+      function setShown(v) { shown = v; window.parent.postMessage({ type: 'shaderwall', state: v ? 'shown' : 'hidden' }, location.origin); }
+      addEventListener('message', (e) => {
+        if (e.origin != location.origin) return; const d = e.data || {};
+        if (d.type !== 'shaderwall') return;
+        if (d.action === 'show') setShown(true); else if (d.action === 'hide') setShown(false); else if (d.action === 'toggle') setShown(!shown);
+      });
+      document.addEventListener('visibilitychange', () => { document.hidden ? app.ticker.stop() : app.ticker.start(); });
+      setShown(false);
+    </script>
+  </body>
+</html>
