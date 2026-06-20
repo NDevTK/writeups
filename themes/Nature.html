@@ -346,30 +346,12 @@
         ctx.globalAlpha = 1;
       }
 
-      // waterfall over a rocky brink into a pool. depth: 0 = far (thin, hazy, faint,
-      // little mist), 1 = near (crisp white, billowing mist, big splash). water obeys
-      // atmospheric perspective like the ridges — distance fades contrast, not just size
-      function waterfall(x, w, topY, botY, P, T, reduced, depth) {
-        depth = depth == null ? 1 : depth;
-        const fade = (c) => mix(c, P.hz, (1 - depth) * 0.6); // distance washes toward the sky
-        const lit = P.li;
-        // source: a rocky ledge the stream slides over (smaller/hazier when far)
-        ctx.fillStyle = rgb(fade(tint([46, 52, 48], P)));
-        ctx.beginPath(); ctx.ellipse(x + w / 2, topY, w / 2 + 2 * depth + 1, 2 + depth, 0, 0, 6.2832); ctx.fill();
-        if (depth > 0.3) { // near falls get framing rocks; distant ones stay a clean thread
-          ctx.fillStyle = rgb(fade(tint([60, 68, 62], P)));
-          ctx.beginPath(); ctx.ellipse(x - 2, topY - 1, 2.4, 2, 0, 0, 6.2832); ctx.fill();
-          ctx.beginPath(); ctx.ellipse(x + w + 2, topY - 1, 1.5, 1.4, 0, 0, 6.2832); ctx.fill();
-        }
-        // smooth water sliding over the lip
-        ctx.fillStyle = rgb(fade(dim(mix([66, 116, 148], [198, 228, 240], 0.55), lit)));
-        ctx.fillRect(x - 1, topY - 2, w + 2, 2);
-        if (!reduced && depth > 0.45) { ctx.fillStyle = rgb(fade(dim([220, 238, 246], lit))); ctx.fillRect((x - 1 + ((T * 6) % (w + 2))) | 0, topY - 2, 1, 1); }
-        // rock face behind the falls
-        ctx.fillStyle = rgb(fade(tint([60, 70, 64], P)));
-        ctx.fillRect(x - 2, topY, w + 4, botY - topY);
-        // falling water — near is dense + high-contrast, far is sparse + flat
+      // the falling water itself — depth-aware (far = thin/hazy/flat, near = crisp/misty)
+      function fallWater(x, w, topY, botY, P, T, reduced, depth) {
+        const fade = (c) => mix(c, P.hz, (1 - depth) * 0.55), lit = P.li;
         const density = 0.5 + 0.4 * depth, contrast = 0.4 + 0.6 * depth;
+        ctx.fillStyle = rgb(fade(dim(mix([66, 116, 148], [198, 228, 240], 0.55), lit)));
+        ctx.fillRect(x - 1, topY - 1, w + 2, 2); // smooth lip at the brink
         for (let c = 0; c < w; c++) {
           const cx = x + c;
           for (let y = topY; y < botY; y++) {
@@ -381,18 +363,54 @@
             if (Math.random() < density) ctx.fillRect(cx, y, 1, 1);
           }
         }
-        // splash pool + ripples scale with proximity
         const sp = 1 + Math.round(2 * depth);
         ctx.fillStyle = rgb(fade(dim([225, 245, 250], lit)));
         ctx.fillRect(x - sp, botY - 1, w + 2 * sp, 2);
         if (!reduced && Math.random() < 0.25 + 0.4 * depth) ripples.push({x: x + Math.random() * w, y: botY + 1, r: 1, life: 0.55 + 0.3 * depth});
-        // mist billows up near, barely there far
         const mist = Math.round(7 * depth);
         for (let i = 0; i < mist; i++) {
           ctx.globalAlpha = (0.1 + Math.random() * 0.1) * (0.5 + 0.5 * depth); ctx.fillStyle = '#dfeef2';
           ctx.fillRect((x + Math.random() * w) | 0, (botY - 2 - (reduced ? 0 : (T * 4 + i * 5) % (3 + 6 * depth))) | 0, 1, 1);
         }
         ctx.globalAlpha = 1;
+      }
+      // a waterfall as a rocky gorge cut INTO existing terrain (mountainside / hill),
+      // planted in the pool at the base and tied to the ground it flows from at the top
+      // — so it never floats. cx is the centre of the channel; cap names the source
+      // terrain ('snow' meltwater / 'grass' hill spring / 'moss' jungle).
+      function waterfall(cx, w, topY, botY, P, T, reduced, depth, cap) {
+        depth = depth == null ? 1 : depth; cap = cap || 'rock';
+        const fade = (c) => mix(c, P.hz, (1 - depth) * 0.55), H = botY - topY;
+        const gw = w / 2 + 1 + depth * 1.5, flare = 1 + depth * 2; // gorge half-width + base flare
+        // exposed wet rock the water has cut, darker than the land around it
+        ctx.fillStyle = rgb(fade(tint([50, 54, 50], P)));
+        ctx.beginPath();
+        ctx.moveTo(cx - gw, topY); ctx.lineTo(cx - gw - flare, botY + 1);
+        ctx.lineTo(cx + gw + flare, botY + 1); ctx.lineTo(cx + gw, topY); ctx.closePath(); ctx.fill();
+        // shaded right wall + strata (deterministic — static terrain, mustn't flicker)
+        ctx.fillStyle = rgb(fade(tint([38, 42, 39], P)));
+        ctx.beginPath(); ctx.moveTo(cx + w / 2 + 1, topY); ctx.lineTo(cx + gw, topY); ctx.lineTo(cx + gw + flare, botY + 1); ctx.lineTo(cx + w / 2 + 1 + flare, botY + 1); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = rgb(fade(tint([34, 38, 36], P))); ctx.lineWidth = 1;
+        for (let y = topY + 4; y < botY; y += 5) { const hw = gw + flare * ((y - topY) / H); ctx.beginPath(); ctx.moveTo(cx - hw, y); ctx.lineTo(cx - hw * 0.3, y + 1); ctx.stroke(); }
+        // boulders where the rock meets the pool (planted in the water)
+        if (depth > 0.3) { ctx.fillStyle = rgb(fade(tint([40, 44, 41], P))); for (const f of [-0.85, -0.3, 0.35, 0.85]) { ctx.beginPath(); ctx.ellipse(cx + f * (gw + flare), botY, 1.4 + depth, 1 + depth * 0.6, 0, 0, 6.2832); ctx.fill(); } }
+        // the water in the channel
+        fallWater((cx - (w / 2 | 0)) | 0, w, topY, botY, P, T, reduced, depth);
+        // source: tie the top of the gorge into the ground it flows from
+        if (cap === 'snow') {
+          ctx.fillStyle = rgb(fade(dim([238, 246, 252], P.li)));
+          ctx.beginPath(); ctx.moveTo(cx - gw - 2, topY + 1); ctx.lineTo(cx - gw + 1, topY - 3); ctx.lineTo(cx, topY - 4); ctx.lineTo(cx + gw - 1, topY - 3); ctx.lineTo(cx + gw + 2, topY + 1); ctx.closePath(); ctx.fill();
+        } else if (cap === 'grass') {
+          ctx.fillStyle = rgb(tint([78, 142, 68], P));
+          ctx.beginPath(); ctx.ellipse(cx - gw, topY, 3, 2.2, 0, 0, 6.2832); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(cx + gw, topY, 3, 2.2, 0, 0, 6.2832); ctx.fill();
+        } else if (cap === 'moss') {
+          ctx.fillStyle = rgb(tint([42, 96, 54], P));
+          ctx.beginPath(); ctx.ellipse(cx - gw, topY, 3, 2, 0, 0, 6.2832); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(cx + gw, topY, 3, 2, 0, 0, 6.2832); ctx.fill();
+        }
+        // the stream gathering at the lip just before the drop (the visible source)
+        if (depth > 0.3) { ctx.fillStyle = rgb(fade(dim(mix([70, 120, 150], [192, 224, 238], 0.5), P.li))); ctx.fillRect((cx - gw * 0.7) | 0, topY - 2, Math.max(2, (gw * 1.4) | 0), 2); }
       }
 
       // a tall jungle tree: trunk rising from the bank to a canopy dome up high
@@ -632,9 +650,9 @@
             // lake at the base with reflection
             const lakeY = Math.round(vh * 0.8);
             water(lakeY, P, T, reduced, [30, 50, 72]);
-            // waterfall pouring from the near ridge's surface into the lake
+            // waterfall: a gorge cut down the mountainside from the snow into the lake
             const wfx = Math.round(vw * 0.62), wfTop = (baseY[2] + mtn[2][(wfx / 4) | 0]) | 0;
-            waterfall(wfx, Math.max(2, Math.round(vw * 0.02)), wfTop, lakeY, P, T, reduced, 0.6);
+            waterfall(wfx, Math.max(2, Math.round(vw * 0.02)), wfTop, lakeY, P, T, reduced, 0.6, 'snow');
             ripplesDraw(P, reduced, [220, 240, 248]);
             // pine trees along the shore
             for (const tr of trees) { const ty = lakeY - 1; const th = vh * 0.1 * tr.s; ctx.fillStyle = rgb(tint([24, 60, 40], P)); ctx.beginPath(); ctx.moveTo(tr.x, ty - th); ctx.lineTo(tr.x - th * 0.35, ty); ctx.lineTo(tr.x + th * 0.35, ty); ctx.fill(); }
@@ -644,29 +662,28 @@
         rainforest: {
           horizon: 0.4,
           init() {
+            // trees kept to the flanks so the waterfall channel stays clear
             trees = [];
-            const N = 4;
-            for (let i = 0; i < N; i++) {
-              const depth = N === 1 ? 1 : i / (N - 1); // 0 far .. 1 near
-              trees.push({x: ((i + 0.5) / N) * vw + (Math.random() - 0.5) * vw * 0.12, h: vh * (0.5 + depth * 0.32), w: vh * (0.09 + depth * 0.05), depth});
-            }
+            for (const [fx, depth] of [[0.1, 0.4], [0.29, 0.85], [0.71, 0.8], [0.9, 0.45]]) trees.push({x: fx * vw, depth, h: vh * (0.28 + depth * 0.2), w: vh * (0.08 + depth * 0.05)});
             butterflies = [];
             for (let i = 0; i < 5; i++) butterflies.push({x: Math.random() * vw, y: horizon + Math.random() * (vh - horizon), vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.2, flap: 0, c: FLO[(Math.random() * FLO.length) | 0]});
             if (LS('rain') == null) rain = true; // rainforest defaults to rain
           },
           draw(P, T, reduced) {
-            const bank = Math.round(vh * 0.82);
+            const bank = Math.round(vh * 0.82), cliffTop = Math.round(vh * 0.44), cx = Math.round(vw * 0.5), hw = vw * 0.34;
+            const hillY = (x) => bank - (bank - cliffTop) * Math.max(0, Math.cos(((x - cx) / hw) * (Math.PI / 2)));
             // misty layered canopy ridges in the distance
             for (let l = 0; l < 3; l++) {
               const yy = horizon * (0.45 + l * 0.2);
               fillUnder((x) => yy + Math.sin(x * 0.05 + l) * vh * 0.03, tint([18 + l * 6, 60 + l * 16, 36 + l * 8], P));
             }
-            // tall jungle trees on the bank (far → near)
-            for (const tr of trees) jungleTree(tr.x, bank, tr.h, tr.w, P, tr.depth);
-            // river + waterfall through a clearing
+            // a near jungle hill in the mid-ground — the terrain the waterfall cuts down
+            fillUnder(hillY, tint([34, 86, 46], P));
+            // tall trees rooted on the hill flanks (centre channel left clear)
+            for (const tr of trees) jungleTree(tr.x, hillY(tr.x) + 1, tr.h, tr.w, P, tr.depth);
+            // river + the gorge waterfall plunging into it, sourced from the mossy hilltop
             water(bank, P, T, reduced, [26, 64, 64]);
-            const wfx = (vw * 0.5 - vh * 0.03) | 0;
-            waterfall(wfx, Math.max(2, Math.round(vw * 0.022)), (horizon * 0.85) | 0, bank, P, T, reduced, 0.72);
+            waterfall(cx, Math.max(2, Math.round(vw * 0.022)), cliffTop, bank, P, T, reduced, 0.72, 'moss');
             ripplesDraw(P, reduced, [205, 232, 232]);
             if (P.st < 0.5) for (const bf of butterflies) {
               if (!reduced) { bf.x += bf.vx; bf.y += bf.vy; bf.flap += 0.5; if (Math.random() < 0.03) { bf.vx = (Math.random() - 0.5) * 0.4; bf.vy = (Math.random() - 0.5) * 0.3; } if (bf.x < 2 || bf.x > vw - 2) bf.vx *= -1; if (bf.y < horizon || bf.y > vh - 4) bf.vy *= -1; }
@@ -722,7 +739,7 @@
             // a distant waterfall threading down the far mountains — thin and hazy,
             // proof that water reads its depth (it slips behind the hills below)
             const fwx = Math.round(vw * 0.22), fwTop = (baseY[1] + mtn[1][(fwx / 4) | 0]) | 0;
-            waterfall(fwx, 1, fwTop, Math.round(vh * 0.46), P, T, reduced, 0.13);
+            waterfall(fwx, 1, fwTop, Math.round(vh * 0.46), P, T, reduced, 0.13, 'snow');
             // forested hills
             const wc0 = (x) => vh * 0.46 + Math.sin(x * 0.05 + 0.6) * vh * 0.03;
             const wc1 = (x) => vh * 0.56 + Math.sin(x * 0.06 + 1.5) * vh * 0.03;
@@ -740,8 +757,8 @@
             }
             // foreground pond
             water(pondY, P, T, reduced, [28, 58, 78]);
-            // a cascade tumbling down the cleared gap in the hillside into the pond
-            waterfall(Math.round(vw * 0.66), Math.max(2, Math.round(vw * 0.014)), Math.round(vh * 0.46), pondY, P, T, reduced, 0.5);
+            // a cascade tumbling down a rocky gully in the hillside into the pond
+            waterfall(Math.round(vw * 0.66), Math.max(2, Math.round(vw * 0.014)), Math.round(vh * 0.46), pondY, P, T, reduced, 0.5, 'grass');
             for (const lp of lily) { ctx.fillStyle = rgb(tint([40, 96, 58], P)); ctx.fillRect(lp.x - 1, lp.y, 3, 1); ctx.fillRect(lp.x, lp.y - 1, 1, 1); }
             fishStep(P, reduced, pondY);
             ripplesDraw(P, reduced, dim(P.su, 0.9));
