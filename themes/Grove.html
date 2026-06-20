@@ -179,7 +179,8 @@
         volcanic: 24,
         fjord: -4,
         cave: 7,
-        reef: 15
+        reef: 15,
+        jungle: 26
       };
       const SEASON_TEMP = {winter: -16, autumn: -5, spring: 1, summer: 5};
       function nowHour() {
@@ -721,6 +722,40 @@
           flyer: 0xffffff,
           flutter: false,
           roller: null
+        },
+        jungle: {
+          label: '🦜 Jungle',
+          canopy: true, // dense overhead canopy + dappled light shafts (its own sky treatment)
+          fog: 0.85, // humid haze
+          sky: 0x9fd07a, // bright green light filtering down
+          seasonal: false,
+          distant: {style: 'forest', tint: 0x3f7a40}, // deep layered jungle receding into the mist
+          hills: [0x2f6b39, 0x357b3f, 0x3f8c46],
+          ground: 'jungle',
+          mid: [
+            ['jungle_tree', 0.62, 250],
+            ['jungle_tree', 0.55, 980]
+          ],
+          near: [
+            ['jungle_tree', 1.0, 90],
+            ['jungle_tree', 0.92, 1180]
+          ],
+          vines: 7, // hanging vines that sway
+          water: {
+            top: '#3a6b54',
+            bot: '#1f3f30',
+            lily: false,
+            frogs: true,
+            fish: 2
+          },
+          walker: null,
+          critter: 'monkey',
+          critterScale: 0.5,
+          hopper: null,
+          flyer: 0xffffff,
+          flyerFrames: ['toucan'],
+          flutter: true,
+          roller: null
         }
       };
       const RIGID = {rock: 1, cactus: 1, cactus2: 1};
@@ -805,7 +840,12 @@
         'butte',
         'icefloe',
         'headland',
-        'cliff'
+        'cliff',
+        'jungle_tree',
+        'vine',
+        'bigleaf',
+        'toucan',
+        'monkey'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -1002,6 +1042,31 @@
       function drawSky(P) {
         // banded gradient via Graphics (no texture upload quirks)
         sky.clear();
+        if (BI.canopy) {
+          // light filtering through the forest canopy: a warm green glow up high (where the gaps
+          // are) deepening to shaded green below; dims toward night
+          const lit = 0.32 + 0.68 * P.light,
+            top = mixA([0, 0, 0], hx('#bfe08a'), lit),
+            mid = mixA([0, 0, 0], hx('#7cae5c'), lit),
+            bot = mixA([0, 0, 0], hx('#3f6e3c'), lit * 0.92),
+            N = 90;
+          for (let i = 0; i < N; i++) {
+            const u = i / (N - 1),
+              col =
+                u < 0.45
+                  ? mixA(top, mid, u / 0.45)
+                  : mixA(mid, bot, (u - 0.45) / 0.55);
+            sky.beginFill(hexI(col));
+            sky.drawRect(
+              -40,
+              Math.floor(u * VH),
+              VW + 80,
+              Math.ceil(VH / N) + 1
+            );
+            sky.endFill();
+          }
+          return;
+        }
         if (BI.underwater) {
           // the water column: bright near the surface, deepening to dark blue; the whole
           // thing sinks toward darkness at night as less light filters down from above
@@ -1221,7 +1286,7 @@
         farLayer = new PIXI.Container();
         root.addChild(farLayer); // sky/celestial group: parallaxes less than the foreground scene
         sky = new PIXI.Graphics();
-        sky.tint = BI.underwater ? 0xffffff : BI.sky; // underwater paints true column colours (no sky-tint multiply)
+        sky.tint = BI.underwater || BI.canopy ? 0xffffff : BI.sky; // underwater/canopy paint their own true colours
         farLayer.addChild(sky);
         auroraG = new PIXI.Graphics();
         auroraG.blendMode = PIXI.BLEND_MODES.ADD;
@@ -1256,7 +1321,7 @@
         raysG.blendMode = PIXI.BLEND_MODES.ADD;
         farLayer.addChild(raysG); // god-rays shafting from the sun through breaking cloud (clouds render over)
 
-        if (!BI.interior && !BI.underwater)
+        if (!BI.interior && !BI.underwater && !BI.canopy)
           for (let i = 0; i < 4; i++) {
             const c = spr(
               'cloud',
@@ -1271,8 +1336,8 @@
             farLayer.addChild(c);
           }
 
-        // crossing flyer (bird, or bat underground); the reef has no sky flyer (the turtle crosses instead)
-        if (!BI.underwater) {
+        // crossing flyer (bird, or bat underground); reef + jungle handle their own flyers below
+        if (!BI.underwater && !BI.canopy) {
           const bird = anim(
             BI.flyerFrames || ['bird_a', 'bird_b'],
             -80,
@@ -1290,7 +1355,7 @@
         }
 
         // migrating flock: a V of birds that crosses the sky occasionally (created hidden, parallaxes with the far sky)
-        if (!BI.interior && !BI.underwater)
+        if (!BI.interior && !BI.underwater && !BI.canopy)
           for (let i = 0; i < 7; i++) {
             const fb = anim(
               ['bird_a', 'bird_b'],
@@ -1424,6 +1489,37 @@
             rk.tint = wf.rock; // lit enough to read against the dark
             scene.addChild(rk);
           }
+        }
+        if (BI.canopy) {
+          // a dense leaf canopy across the top with a lumpy underside (the gaps let the light + rays through)
+          const cEdge = (x) =>
+            96 +
+            Math.sin(x * 0.013 + 1) * 30 +
+            Math.abs(Math.sin(x * 0.088)) * 16;
+          const cg = new PIXI.Graphics();
+          cg.beginFill(0x244c21);
+          cg.moveTo(-40, -40);
+          cg.lineTo(VW + 40, -40);
+          for (let x = VW + 40; x >= -40; x -= 9) cg.lineTo(x, cEdge(x));
+          cg.closePath();
+          cg.endFill();
+          cg.beginFill(0x357b33, 0.55); // lit leaf clumps
+          for (let i = 0; i < 28; i++) {
+            const x = -20 + Math.random() * (VW + 40);
+            cg.drawEllipse(x, cEdge(x) - 16 + Math.random() * 8, 24, 15);
+          }
+          cg.endFill();
+          cg.beginFill(0x16330f, 0.5); // shaded underside fringe
+          for (let i = 0; i < 32; i++) {
+            const x = -20 + Math.random() * (VW + 40);
+            cg.drawEllipse(x, cEdge(x) - 3, 17, 10);
+          }
+          cg.endFill();
+          scene.addChild(cg);
+          // dappled light shafts breaking through the canopy (additive, drawn each frame, behind the trees)
+          causticG = new PIXI.Graphics();
+          causticG.blendMode = PIXI.BLEND_MODES.ADD;
+          scene.addChild(causticG);
         }
         for (const [n, sc, x] of BI.mid) {
           const t = spr(n, x, 482 + Math.sin(x * 0.006 + 1.3) * 30, sc);
@@ -1615,6 +1711,34 @@
             cr.lineTo(x + 28 + Math.random() * 46, y - 4);
           }
           scene.addChild(cr);
+        } else if (BI.ground === 'jungle') {
+          // lush undergrowth: big split leaves, ferny grass and the odd mossy rock
+          for (let i = 0; i < 6; i++) {
+            const x = 20 + Math.random() * (VW - 40),
+              r = spr('rock', x, groundY(x) + 8, 0.06 + Math.random() * 0.1);
+            r.tint = 0x4a6240;
+            scene.addChild(r);
+          }
+          for (let i = 0; i < 16; i++) {
+            const x = Math.random() * VW,
+              g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.7);
+            g.tint = 0x4f9e3a;
+            scene.addChild(g);
+            swayers.push({s: g, amp: 0.06, sp: 1.6, ph: Math.random() * 6});
+          }
+          for (let i = 0; i < 9; i++) {
+            const x = -10 + Math.random() * (VW + 20),
+              lf = spr(
+                'bigleaf',
+                x,
+                groundY(x) + 12,
+                0.4 + Math.random() * 0.42
+              );
+            lf.tint = 0xcfeeb4;
+            lf.scale.x *= Math.random() < 0.5 ? -1 : 1;
+            scene.addChild(lf);
+            swayers.push({s: lf, amp: 0.035, sp: 1.0, ph: Math.random() * 6});
+          }
         } else if (BI.ground === 'reef') {
           const R = BI.reef;
           // sandy seabed floor laid over the front ridge, paler than the blue background reef
@@ -1944,6 +2068,7 @@
               0.5,
               0.18
             );
+            if (BI.canopy) f.tint = 0x4aa0ff; // jungle: iridescent blue morphos
             f.vx = (Math.random() - 0.5) * 1.2;
             f.vy = (Math.random() - 0.5) * 0.8;
             f.lo = 470;
@@ -2048,6 +2173,29 @@
           }
         }
 
+        // ---- jungle life: hanging vines (sway) + a toucan crossing the understory ----
+        if (BI.canopy) {
+          for (let i = 0; i < (BI.vines || 0); i++) {
+            const x = 40 + Math.random() * (VW - 80),
+              v = spr(
+                'vine',
+                x,
+                104 + Math.random() * 26,
+                0.55 + Math.random() * 0.7,
+                0.5,
+                0
+              );
+            scene.addChild(v);
+            swayers.push({s: v, amp: 0.04, sp: 0.7, ph: Math.random() * 6});
+          }
+          const tk = spr('toucan', 200 + Math.random() * (VW - 400), 210, 0.46);
+          tk.isToucan = true;
+          tk.vx = (Math.random() < 0.5 ? -1 : 1) * (0.9 + Math.random() * 0.4);
+          tk.baseY = 180 + Math.random() * 150;
+          flutters.push(tk);
+          scene.addChild(tk);
+        }
+
         if (BI.fog) {
           // ground fog pooling low, in front of the scene (tree bases sink into it)
           const fz = new PIXI.TilingSprite(T('fog'), VW + 120, 135);
@@ -2077,7 +2225,8 @@
           BI.glow === 'cave' ||
           ((BI.ground === 'meadow' ||
             BI.ground === 'marsh' ||
-            BI.ground === 'fern') &&
+            BI.ground === 'fern' ||
+            BI.ground === 'jungle') &&
             !snow);
         if (hasFlies) {
           const cave = BI.glow === 'cave',
@@ -2273,7 +2422,7 @@
           : BI.underwater
             ? night * 0.5 // the reef sinks into gloom at night (the column already darkens too)
             : night * 0.72;
-        stars.alpha = BI.interior || BI.underwater ? 0 : night;
+        stars.alpha = BI.interior || BI.underwater || BI.canopy ? 0 : night;
 
         // ---- weather front: clouds gather (cover), a shower rolls through (wet), then it clears ----
         // (no weather underwater: cover/wet/snow all stay 0, which silences rain, overcast, lightning, etc.)
@@ -2403,7 +2552,7 @@
 
         // rainbow: a coloured arc that fades in after a daytime shower clears
         rainbowG.clear();
-        if (rainbow > 0.01 && !BI.interior) {
+        if (rainbow > 0.01 && !BI.interior && !BI.canopy) {
           const cols = [
             0xff6a6a, 0xffa84a, 0xffe24a, 0x6ad86a, 0x52a8ff, 0x6a6aff, 0xb06aff
           ];
@@ -2549,10 +2698,10 @@
         const body = cel.sun ? sun : moon,
           other = cel.sun ? moon : sun;
         other.visible = false;
-        body.visible = !BI.interior && !BI.underwater;
+        body.visible = !BI.interior && !BI.underwater && !BI.canopy;
         body.alpha = 1 - cover * 0.6; // sun/moon fades behind gathering cloud
         body.position.set(cel.x, cel.y);
-        sunGlow.visible = !BI.interior && !BI.underwater;
+        sunGlow.visible = !BI.interior && !BI.underwater && !BI.canopy;
         sunGlow.position.set(cel.x, cel.y);
         sunGlow.tint = cel.sun ? 0xffe9a8 : 0x9fb6d8;
         sunGlow.scale.set((cel.sun ? 3.4 : 2.2) + Math.sin(t * 1.5) * 0.12);
@@ -2636,26 +2785,54 @@
           }
         }
 
-        // reef caustics: wavy bands of light rippling just under the surface (additive, fading at night)
+        // additive light layer: caustics under the reef surface, or dappled shafts through the jungle canopy
         if (causticG) {
           causticG.clear();
-          const ca = 0.03 + 0.11 * P.light;
-          for (let b = 0; b < 5; b++) {
-            const y = 14 + b * 24;
-            causticG.beginFill(0xbff0ff, ca * (1 - b * 0.13));
-            causticG.moveTo(-40, y);
-            for (let x = -40; x <= VW + 40; x += 24)
-              causticG.lineTo(
-                x,
-                y + Math.sin(x * 0.02 + t * 0.8 + b * 1.3) * 7
-              );
-            for (let x = VW + 40; x >= -40; x -= 24)
-              causticG.lineTo(
-                x,
-                y + 9 + Math.sin(x * 0.02 + t * 0.8 + b * 1.3) * 7
-              );
-            causticG.closePath();
-            causticG.endFill();
+          if (BI.canopy) {
+            // god-rays slanting down through gaps in the canopy — warm green-gold, fading at night
+            const baseA = 0.02 + 0.1 * P.light;
+            if (baseA > 0.015)
+              for (let i = 0; i < 7; i++) {
+                const sx = 70 + i * 178 + Math.sin(t * 0.12 + i) * 22,
+                  top = 70,
+                  depth = 580,
+                  w0 = 14 + 6 * Math.sin(t * 0.5 + i * 1.7),
+                  N = 10;
+                for (let k = 0; k < N; k++) {
+                  const u0 = k / N,
+                    u1 = (k + 1) / N,
+                    y0 = top + u0 * (depth - top),
+                    y1 = top + u1 * (depth - top),
+                    sl = 64,
+                    a = baseA * (1 - u0) * (1 - u0);
+                  causticG.beginFill(0xe6f0a4, a);
+                  causticG.moveTo(sx - w0 * (1 + u0 * 0.5) + u0 * sl, y0);
+                  causticG.lineTo(sx + w0 * (1 + u0 * 0.5) + u0 * sl, y0);
+                  causticG.lineTo(sx + w0 * (1 + u1 * 0.5) + u1 * sl, y1);
+                  causticG.lineTo(sx - w0 * (1 + u1 * 0.5) + u1 * sl, y1);
+                  causticG.closePath();
+                  causticG.endFill();
+                }
+              }
+          } else {
+            const ca = 0.03 + 0.11 * P.light;
+            for (let b = 0; b < 5; b++) {
+              const y = 14 + b * 24;
+              causticG.beginFill(0xbff0ff, ca * (1 - b * 0.13));
+              causticG.moveTo(-40, y);
+              for (let x = -40; x <= VW + 40; x += 24)
+                causticG.lineTo(
+                  x,
+                  y + Math.sin(x * 0.02 + t * 0.8 + b * 1.3) * 7
+                );
+              for (let x = VW + 40; x >= -40; x -= 24)
+                causticG.lineTo(
+                  x,
+                  y + 9 + Math.sin(x * 0.02 + t * 0.8 + b * 1.3) * 7
+                );
+              causticG.closePath();
+              causticG.endFill();
+            }
           }
         }
 
@@ -2681,7 +2858,7 @@
 
         // shooting stars: an occasional streak across the night sky (any biome, but not underground)
         shootG.clear();
-        if (night > 0.34 && !BI.interior && !BI.underwater) {
+        if (night > 0.34 && !BI.interior && !BI.underwater && !BI.canopy) {
           if (shoot) {
             shoot.x += shoot.vx * dt;
             shoot.y += shoot.vy * dt;
@@ -3158,6 +3335,17 @@
               f.x = -58;
             }
             f.scale.x = (f.vx < 0 ? -1 : 1) * Math.abs(f.scale.x);
+            continue;
+          }
+          if (f.isToucan) {
+            // glides across the understory with a gentle bob, then loops back after a rest
+            f.x += f.vx * dt;
+            f.y = f.baseY + Math.sin(f.x * 0.006) * 16;
+            f.scale.x = (f.vx < 0 ? -1 : 1) * Math.abs(f.scale.x);
+            if (f.x > VW + 110 || f.x < -110) {
+              f.vx = -f.vx;
+              f.baseY = 170 + Math.random() * 160;
+            }
             continue;
           }
           if (f.isBird) {

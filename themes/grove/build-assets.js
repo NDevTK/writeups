@@ -1038,8 +1038,92 @@ const jellySvg = (p) => {
 save('jelly_a', jellySvg(0), 92);
 save('jelly_b', jellySvg(1), 92);
 
+// ---- JUNGLE biome ----
+// tall buttressed rainforest tree: flared roots, a tall trunk rising into a high canopy + moss
+save(
+  'jungle_tree',
+  S(
+    '184 470',
+    `<defs><linearGradient id="jtt" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6f5238"/><stop offset="0.5" stop-color="#56402a"/><stop offset="1" stop-color="#3c2a1a"/></linearGradient>
+<radialGradient id="jtc" cx="44%" cy="36%" r="72%"><stop offset="0" stop-color="#59a040"/><stop offset="1" stop-color="#2d5b26"/></radialGradient></defs>
+<ellipse cx="40" cy="98" rx="46" ry="36" fill="url(#jtc)"/>
+<ellipse cx="146" cy="92" rx="48" ry="36" fill="url(#jtc)"/>
+<ellipse cx="90" cy="70" rx="94" ry="60" fill="url(#jtc)"/>
+<path d="M70,120 C58,150 56,176 64,200 C76,180 80,150 84,124 Z" fill="#2d5b26" opacity="0.6"/>
+<path d="M114,118 C126,150 128,178 120,202 C108,182 104,150 100,122 Z" fill="#2d5b26" opacity="0.5"/>
+<path d="M80,462 C76,322 80,182 86,118 L100,118 C106,182 110,322 104,462 Z" fill="url(#jtt)"/>
+<path d="M80,462 C70,414 50,392 24,384 C34,416 50,440 64,462 Z" fill="url(#jtt)"/>
+<path d="M104,462 C114,414 134,392 160,384 C150,416 134,440 120,462 Z" fill="url(#jtt)"/>
+<path d="M91,140 C89,290 91,404 94,456" stroke="#3c2a1a" stroke-width="3" opacity="0.4" fill="none"/>
+<g fill="#3f7a30" opacity="0.6"><ellipse cx="95" cy="232" rx="6" ry="15"/><ellipse cx="88" cy="318" rx="5" ry="13"/><ellipse cx="97" cy="392" rx="5" ry="12"/></g>`
+  ),
+  184
+);
+// hanging vine with leaves (anchored at the top; sways)
+save(
+  'vine',
+  S(
+    '46 300',
+    `<path d="M23,2 C16,70 30,140 21,210 C16,256 26,282 23,300" fill="none" stroke="#3f6b2e" stroke-width="4" stroke-linecap="round"/>
+<g fill="#4e8c3a"><path d="M22,40 C8,34 4,46 16,52 C24,52 26,44 22,40 Z"/><path d="M26,86 C40,80 44,92 32,98 C24,98 22,90 26,86 Z"/><path d="M20,140 C6,136 4,148 16,152 C24,150 24,144 20,140 Z"/><path d="M25,196 C39,192 42,204 30,208 C23,206 22,200 25,196 Z"/><path d="M21,250 C8,247 6,258 17,261 C24,260 24,253 21,250 Z"/></g>`
+  ),
+  46
+);
+// big split tropical leaf (monstera) for the undergrowth
+save(
+  'bigleaf',
+  S(
+    '172 150',
+    `<defs><linearGradient id="bl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#62b048"/><stop offset="1" stop-color="#357a2a"/></linearGradient></defs>
+<path d="M86,150 C84,118 82,96 86,78" stroke="#357a2a" stroke-width="5" fill="none" stroke-linecap="round"/>
+<path d="M86,80 C40,78 12,58 8,30 C6,14 18,6 40,10 C30,22 36,40 64,52 C44,40 52,18 78,18 C70,30 78,46 86,58 C94,46 102,30 94,18 C120,18 128,40 108,52 C136,40 142,22 132,10 C154,6 166,14 164,30 C160,58 132,78 86,80 Z" fill="url(#bl)"/>
+<g stroke="#2f6a24" stroke-width="2" opacity="0.5" fill="none"><path d="M86,78 L52,32"/><path d="M86,78 L86,22"/><path d="M86,78 L120,32"/><path d="M86,70 L24,28"/><path d="M86,70 L148,28"/></g>`
+  ),
+  172
+);
+// toucan: black body, cream throat, blue eye-ring and a big orange-yellow beak (faces right)
+save(
+  'toucan',
+  S(
+    '150 116',
+    `<defs><linearGradient id="tkb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff9a1e"/><stop offset="0.7" stop-color="#ffd23e"/><stop offset="1" stop-color="#ffe27a"/></linearGradient></defs>
+<path d="M22,96 C10,92 6,80 14,74 C22,76 30,86 34,94 Z" fill="#14141a"/>
+<ellipse cx="60" cy="62" rx="42" ry="34" fill="#1b1b22"/>
+<path d="M40,40 C44,26 60,20 78,24 C66,30 56,40 52,52 C46,50 42,46 40,40 Z" fill="#2a2a33"/>
+<ellipse cx="92" cy="46" rx="26" ry="24" fill="#1b1b22"/>
+<path d="M78,72 C86,80 104,82 118,74 C104,86 86,86 76,80 Z" fill="#f4efe1"/>
+<path d="M70,52 C72,64 78,74 92,78 C86,66 84,58 84,50 Z" fill="#f4efe1"/>
+<path d="M108,34 C140,30 150,40 148,50 C146,60 120,62 104,56 C100,46 102,38 108,34 Z" fill="url(#tkb)"/>
+<path d="M144,46 C150,48 150,54 144,55 C138,55 138,48 144,46 Z" fill="#e23a2a"/>
+<path d="M108,38 C124,36 138,40 146,48" stroke="#d98018" stroke-width="1.6" fill="none" opacity="0.6"/>
+<circle cx="101" cy="44" r="6.5" fill="#3fb6d6"/><circle cx="101" cy="44" r="3.2" fill="#10141a"/><circle cx="102.4" cy="42.6" r="1" fill="#fff"/>
+<path d="M58,94 L56,108 M70,96 L70,110" stroke="#5b6470" stroke-width="3" stroke-linecap="round"/>`
+  ),
+  150
+);
+// monkey: a small brown monkey sitting with a curled tail (faces right)
+save(
+  'monkey',
+  S(
+    '120 128',
+    `<defs><radialGradient id="mk" cx="50%" cy="40%"><stop offset="0" stop-color="#866043"/><stop offset="1" stop-color="#5e4430"/></radialGradient></defs>
+<path d="M30,96 C8,92 2,70 16,58 C26,52 34,64 34,80 C34,88 32,94 30,96 Z" fill="#5e4430"/>
+<path d="M24,68 C10,64 8,52 18,48 C26,48 28,58 26,66 Z" fill="#6b4f38"/>
+<ellipse cx="62" cy="92" rx="30" ry="28" fill="url(#mk)"/>
+<g stroke="#5e4430" stroke-width="9" stroke-linecap="round"><line x1="48" y1="110" x2="44" y2="126"/><line x1="76" y1="110" x2="80" y2="126"/></g>
+<g stroke="#6b4f38" stroke-width="7" stroke-linecap="round"><line x1="44" y1="86" x2="30" y2="104"/><line x1="82" y1="84" x2="96" y2="100"/></g>
+<circle cx="84" cy="58" r="26" fill="url(#mk)"/>
+<circle cx="40" cy="50" r="9" fill="#6b4f38"/><circle cx="78" cy="34" r="8" fill="#6b4f38"/>
+<ellipse cx="90" cy="62" rx="18" ry="16" fill="#cBA883"/>
+<ellipse cx="90" cy="62" rx="18" ry="16" fill="#c9a883"/>
+<circle cx="84" cy="56" r="2.6" fill="#1a120c"/><circle cx="98" cy="56" r="2.6" fill="#1a120c"/>
+<path d="M84,68 Q90,72 96,68" stroke="#7a5034" stroke-width="2" fill="none" stroke-linecap="round"/>`
+  ),
+  120
+);
+
 // ---- contact sheet of new + polished ----
-const review = ['cliff', 'headland', 'butte', 'icefloe'];
+const review = ['jungle_tree', 'vine', 'bigleaf', 'toucan', 'monkey'];
 const cols = 4,
   cell = 230,
   pad = 14,
