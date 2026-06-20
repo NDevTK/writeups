@@ -346,39 +346,51 @@
         ctx.globalAlpha = 1;
       }
 
-      // waterfall down a cliff into a pool
-      function waterfall(x, w, topY, botY, P, T, reduced) {
-        // source: a rocky ledge the stream slides over, so the water comes from
-        // somewhere — an irregular shelf (not a box, not two symmetric "eyes")
-        ctx.fillStyle = rgb(tint([46, 52, 48], P)); // dark wet rock shelf
-        ctx.beginPath(); ctx.ellipse(x + w / 2, topY, w / 2 + 4, 2.6, 0, 0, 6.2832); ctx.fill();
-        ctx.fillStyle = rgb(tint([60, 68, 62], P)); // a couple of lit rocks on the shelf, uneven
-        ctx.beginPath(); ctx.ellipse(x - 2, topY - 1, 2.4, 2, 0, 0, 6.2832); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(x + w + 2, topY - 1, 1.5, 1.4, 0, 0, 6.2832); ctx.fill();
-        // smooth water sliding over the lip of the shelf, then breaking white below
-        ctx.fillStyle = rgb(dim(mix([66, 116, 148], [198, 228, 240], 0.55), P.li));
+      // waterfall over a rocky brink into a pool. depth: 0 = far (thin, hazy, faint,
+      // little mist), 1 = near (crisp white, billowing mist, big splash). water obeys
+      // atmospheric perspective like the ridges — distance fades contrast, not just size
+      function waterfall(x, w, topY, botY, P, T, reduced, depth) {
+        depth = depth == null ? 1 : depth;
+        const fade = (c) => mix(c, P.hz, (1 - depth) * 0.6); // distance washes toward the sky
+        const lit = P.li;
+        // source: a rocky ledge the stream slides over (smaller/hazier when far)
+        ctx.fillStyle = rgb(fade(tint([46, 52, 48], P)));
+        ctx.beginPath(); ctx.ellipse(x + w / 2, topY, w / 2 + 2 * depth + 1, 2 + depth, 0, 0, 6.2832); ctx.fill();
+        if (depth > 0.3) { // near falls get framing rocks; distant ones stay a clean thread
+          ctx.fillStyle = rgb(fade(tint([60, 68, 62], P)));
+          ctx.beginPath(); ctx.ellipse(x - 2, topY - 1, 2.4, 2, 0, 0, 6.2832); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(x + w + 2, topY - 1, 1.5, 1.4, 0, 0, 6.2832); ctx.fill();
+        }
+        // smooth water sliding over the lip
+        ctx.fillStyle = rgb(fade(dim(mix([66, 116, 148], [198, 228, 240], 0.55), lit)));
         ctx.fillRect(x - 1, topY - 2, w + 2, 2);
-        if (!reduced) { ctx.fillStyle = rgb(dim([220, 238, 246], P.li)); ctx.fillRect((x - 1 + ((T * 6) % (w + 2))) | 0, topY - 2, 1, 1); }
-        ctx.fillStyle = rgb(tint([60, 70, 64], P)); // rock face
+        if (!reduced && depth > 0.45) { ctx.fillStyle = rgb(fade(dim([220, 238, 246], lit))); ctx.fillRect((x - 1 + ((T * 6) % (w + 2))) | 0, topY - 2, 1, 1); }
+        // rock face behind the falls
+        ctx.fillStyle = rgb(fade(tint([60, 70, 64], P)));
         ctx.fillRect(x - 2, topY, w + 4, botY - topY);
+        // falling water — near is dense + high-contrast, far is sparse + flat
+        const density = 0.5 + 0.4 * depth, contrast = 0.4 + 0.6 * depth;
         for (let c = 0; c < w; c++) {
           const cx = x + c;
           for (let y = topY; y < botY; y++) {
             const flow = ((y * 0.5 - (reduced ? 0 : T * 18) + c * 7) % 6 + 6) % 6;
-            const bright = flow < 1.5 ? 1 : flow < 3 ? 0.7 : 0.5;
+            let bright = flow < 1.5 ? 1 : flow < 3 ? 0.7 : 0.5;
+            bright = 0.62 + (bright - 0.62) * contrast;
             const edge = c === 0 || c === w - 1 ? 1.1 : 1;
-            ctx.fillStyle = rgb(dim(mix([150, 200, 230], [235, 248, 252], bright), edge * P.li));
-            if (Math.random() < 0.85) ctx.fillRect(cx, y, 1, 1);
+            ctx.fillStyle = rgb(fade(dim(mix([150, 200, 230], [235, 248, 252], bright), edge * lit)));
+            if (Math.random() < density) ctx.fillRect(cx, y, 1, 1);
           }
         }
-        // splash pool
-        ctx.fillStyle = rgb(dim([225, 245, 250], P.li));
-        ctx.fillRect(x - 3, botY - 1, w + 6, 2);
-        if (!reduced && Math.random() < 0.5) ripples.push({x: x + Math.random() * w, y: botY + 1, r: 1, life: 0.7});
-        // mist
-        for (let i = 0; i < 6; i++) {
-          ctx.globalAlpha = 0.12 + Math.random() * 0.1; ctx.fillStyle = '#dfeef2';
-          ctx.fillRect((x + Math.random() * w) | 0, (botY - 2 - (reduced ? 0 : (T * 4 + i * 5) % 8)) | 0, 1, 1);
+        // splash pool + ripples scale with proximity
+        const sp = 1 + Math.round(2 * depth);
+        ctx.fillStyle = rgb(fade(dim([225, 245, 250], lit)));
+        ctx.fillRect(x - sp, botY - 1, w + 2 * sp, 2);
+        if (!reduced && Math.random() < 0.25 + 0.4 * depth) ripples.push({x: x + Math.random() * w, y: botY + 1, r: 1, life: 0.55 + 0.3 * depth});
+        // mist billows up near, barely there far
+        const mist = Math.round(7 * depth);
+        for (let i = 0; i < mist; i++) {
+          ctx.globalAlpha = (0.1 + Math.random() * 0.1) * (0.5 + 0.5 * depth); ctx.fillStyle = '#dfeef2';
+          ctx.fillRect((x + Math.random() * w) | 0, (botY - 2 - (reduced ? 0 : (T * 4 + i * 5) % (3 + 6 * depth))) | 0, 1, 1);
         }
         ctx.globalAlpha = 1;
       }
@@ -425,32 +437,43 @@
         ctx.fillStyle = rgb(tint([26, 64, 42], P));
         for (let k = 0; k < 3; k++) { const yy = gy - h * (0.1 + k * 0.28), ww = h * (0.34 - k * 0.08); ctx.beginPath(); ctx.moveTo(x, yy - h * 0.32); ctx.lineTo(x - ww, yy); ctx.lineTo(x + ww, yy); ctx.fill(); }
       }
-      // a doe silhouette (12x11, faces right; flip for left): upright ears, long
-      // neck, four slim legs — reads as a deer without the antlers turning to noise
-      const DEER = [
-        '.........#.#',
-        '.........###',
-        '.........##.',
-        '........###.',
-        '.......##...',
-        '.#######....',
-        '########....',
-        '########....',
-        '.#.#.#.#....',
-        '.#.#.#.#....',
-        '.#.#.#.#....'
-      ];
-      function drawDeer(x, y, flip, P) {
-        ctx.fillStyle = rgb(tint([74, 52, 36], P));
-        const w = DEER[0].length;
-        for (let r = 0; r < DEER.length; r++) for (let c = 0; c < w; c++) if (DEER[r][c] !== '.') ctx.fillRect((flip ? x + (w - 1 - c) : x + c) | 0, (y + r) | 0, 1, 1);
-      }
-      // a smaller, lighter fawn that keeps near the doe (no spots — they read as eyes)
-      const FAWN = ['.....#.#', '.....###', '....##..', '.#####..', '######..', '.#.#.#..', '.#.#.#..'];
-      function drawFawn(x, y, flip, P) {
-        ctx.fillStyle = rgb(tint([126, 92, 62], P));
-        const w = FAWN[0].length;
-        for (let r = 0; r < FAWN.length; r++) for (let c = 0; c < w; c++) if (FAWN[r][c] !== '.') ctx.fillRect((flip ? x + (w - 1 - c) : x + c) | 0, (y + r) | 0, 1, 1);
+      // a deer drawn procedurally (foot at x,gy; h = shoulder height) so it scales
+      // with depth and carries anatomy: chest, haunch, neck, head w/ ear + muzzle +
+      // eye, four legs, white tail, and antlers for a buck. faces right; flip for left.
+      function drawDeer(x, gy, h, flip, buck, P) {
+        const s = flip ? -1 : 1, X = (d) => x + s * d * h, Y = (u) => gy - u * h;
+        const body = tint([124, 86, 54], P), dark = tint([86, 60, 38], P),
+          light = tint([156, 116, 78], P), white = tint([228, 218, 200], P),
+          antler = tint([160, 140, 106], P), eye = tint([18, 14, 10], P);
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        // legs (back pair drawn first, behind the body)
+        ctx.strokeStyle = rgb(dark); ctx.lineWidth = Math.max(1, h * 0.055);
+        for (const lx of [-0.2, -0.13, 0.14, 0.21]) { ctx.beginPath(); ctx.moveTo(X(lx), Y(0.46)); ctx.lineTo(X(lx), Y(0)); ctx.stroke(); }
+        // body: barrel + haunch + chest
+        ctx.fillStyle = rgb(body);
+        ctx.beginPath(); ctx.ellipse(X(-0.02), Y(0.6), h * 0.31, h * 0.17, 0, 0, 6.2832); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(X(-0.22), Y(0.62), h * 0.13, h * 0.15, 0, 0, 6.2832); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(X(0.17), Y(0.6), h * 0.12, h * 0.15, 0, 0, 6.2832); ctx.fill();
+        // sunlit back
+        ctx.fillStyle = rgb(light); ctx.beginPath(); ctx.ellipse(X(-0.04), Y(0.69), h * 0.26, h * 0.07, 0, 0, 6.2832); ctx.fill();
+        // white tail
+        ctx.fillStyle = rgb(white); ctx.beginPath(); ctx.ellipse(X(-0.32), Y(0.6), h * 0.04, h * 0.06, s * -0.4, 0, 6.2832); ctx.fill();
+        // neck
+        ctx.strokeStyle = rgb(body); ctx.lineWidth = h * 0.15; ctx.beginPath(); ctx.moveTo(X(0.18), Y(0.64)); ctx.lineTo(X(0.33), Y(0.9)); ctx.stroke();
+        // head + muzzle + ear + eye
+        ctx.fillStyle = rgb(body); ctx.beginPath(); ctx.ellipse(X(0.39), Y(0.96), h * 0.085, h * 0.07, s * 0.4, 0, 6.2832); ctx.fill();
+        ctx.fillStyle = rgb(dark); ctx.beginPath(); ctx.ellipse(X(0.48), Y(0.92), h * 0.045, h * 0.035, 0, 0, 6.2832); ctx.fill();
+        ctx.fillStyle = rgb(body); ctx.beginPath(); ctx.moveTo(X(0.32), Y(1.0)); ctx.lineTo(X(0.27), Y(1.12)); ctx.lineTo(X(0.36), Y(1.04)); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = rgb(eye); ctx.beginPath(); ctx.arc(X(0.42), Y(0.97), Math.max(0.6, h * 0.02), 0, 6.2832); ctx.fill();
+        // antlers (buck): a beam with three tines, swept up and back
+        if (buck) {
+          ctx.strokeStyle = rgb(antler); ctx.lineWidth = Math.max(1, h * 0.03);
+          ctx.beginPath(); ctx.moveTo(X(0.34), Y(1.02)); ctx.lineTo(X(0.33), Y(1.2)); ctx.lineTo(X(0.28), Y(1.34)); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(X(0.335), Y(1.12)); ctx.lineTo(X(0.43), Y(1.18)); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(X(0.31), Y(1.26)); ctx.lineTo(X(0.4), Y(1.32)); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(X(0.29), Y(1.3)); ctx.lineTo(X(0.23), Y(1.42)); ctx.stroke();
+        }
+        ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
       }
       // an occasional fish breaking the surface, leaving splash ripples
       let fish = null;
@@ -537,10 +560,11 @@
             for (const tr of trees) { const gy = hills[2] + Math.sin(tr.x * 0.06 + 1.7) * vh * 0.05; ctx.fillStyle = rgb(tint([74, 52, 36], P)); ctx.fillRect(tr.x, gy, 2, vh * 0.09); const cr = Math.round(vh * 0.07); ctx.fillStyle = rgb(tint([54, 110, 52], P)); ctx.beginPath(); ctx.arc(tr.x + 1, gy - cr * 0.6, cr, 0, 6.2832); ctx.fill(); ctx.beginPath(); ctx.arc(tr.x + 1 - cr * 0.7, gy - cr * 0.2, cr * 0.7, 0, 6.2832); ctx.fill(); ctx.beginPath(); ctx.arc(tr.x + 1 + cr * 0.7, gy - cr * 0.2, cr * 0.7, 0, 6.2832); ctx.fill(); }
             if (deerObj) {
               if (!reduced) { deerObj.t++; deerObj.x += deerObj.dir * 0.05; if (deerObj.x < vw * 0.25) deerObj.dir = 1; if (deerObj.x > vw * 0.82) deerObj.dir = -1; }
+              const dh = vh * 0.12, fh = vh * 0.078;
               const dgy = hills[1] + Math.sin(deerObj.x * 0.06 + 0.8) * vh * 0.04;
-              const ffx = deerObj.x + (deerObj.dir > 0 ? -14 : 14), ffgy = hills[1] + Math.sin(ffx * 0.06 + 0.8) * vh * 0.04;
-              drawFawn(ffx | 0, (ffgy - 6) | 0, deerObj.dir < 0, P);
-              drawDeer(deerObj.x | 0, (dgy - 10) | 0, deerObj.dir < 0, P);
+              const ffx = deerObj.x + (deerObj.dir > 0 ? -dh : dh), ffgy = hills[1] + Math.sin(ffx * 0.06 + 0.8) * vh * 0.04;
+              drawDeer(ffx, ffgy, fh, deerObj.dir < 0, false, P);
+              drawDeer(deerObj.x, dgy, dh, deerObj.dir < 0, true, P);
             }
             for (const fl of flowers) { const sw = reduced ? 0 : Math.sin(T * 1.2 + fl.ph) * 0.6; ctx.fillStyle = rgb(tint(fl.c, P)); ctx.fillRect((fl.x + sw) | 0, fl.y | 0, 1, 1); ctx.fillStyle = rgb(tint([240, 240, 200], P)); ctx.fillRect((fl.x + sw) | 0, (fl.y | 0) - 1, 1, 1); }
             for (const g of grass) { const sw = reduced ? 0 : Math.sin(T * 1.4 + g.ph) * 1.2; ctx.strokeStyle = rgb(tint([46, 92, 44], P)); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(g.x, vh); ctx.lineTo(g.x + sw, vh - g.h); ctx.stroke(); }
@@ -610,7 +634,7 @@
             water(lakeY, P, T, reduced, [30, 50, 72]);
             // waterfall pouring from the near ridge's surface into the lake
             const wfx = Math.round(vw * 0.62), wfTop = (baseY[2] + mtn[2][(wfx / 4) | 0]) | 0;
-            waterfall(wfx, Math.max(2, Math.round(vw * 0.02)), wfTop, lakeY, P, T, reduced);
+            waterfall(wfx, Math.max(2, Math.round(vw * 0.02)), wfTop, lakeY, P, T, reduced, 0.6);
             ripplesDraw(P, reduced, [220, 240, 248]);
             // pine trees along the shore
             for (const tr of trees) { const ty = lakeY - 1; const th = vh * 0.1 * tr.s; ctx.fillStyle = rgb(tint([24, 60, 40], P)); ctx.beginPath(); ctx.moveTo(tr.x, ty - th); ctx.lineTo(tr.x - th * 0.35, ty); ctx.lineTo(tr.x + th * 0.35, ty); ctx.fill(); }
@@ -642,7 +666,7 @@
             // river + waterfall through a clearing
             water(bank, P, T, reduced, [26, 64, 64]);
             const wfx = (vw * 0.5 - vh * 0.03) | 0;
-            waterfall(wfx, Math.max(2, Math.round(vw * 0.022)), (horizon * 0.85) | 0, bank, P, T, reduced);
+            waterfall(wfx, Math.max(2, Math.round(vw * 0.022)), (horizon * 0.85) | 0, bank, P, T, reduced, 0.72);
             ripplesDraw(P, reduced, [205, 232, 232]);
             if (P.st < 0.5) for (const bf of butterflies) {
               if (!reduced) { bf.x += bf.vx; bf.y += bf.vy; bf.flap += 0.5; if (Math.random() < 0.03) { bf.vx = (Math.random() - 0.5) * 0.4; bf.vy = (Math.random() - 0.5) * 0.3; } if (bf.x < 2 || bf.x > vw - 2) bf.vx *= -1; if (bf.y < horizon || bf.y > vh - 4) bf.vy *= -1; }
@@ -695,6 +719,10 @@
               ctx.fillStyle = rgb(tint(mix([238, 244, 250], [198, 220, 240], haze[l] * 0.6), P));
               for (let x = 0; x <= vw; x++) { const m = mtn[l][(x / 4) | 0]; if (m < -vh * 0.035) ctx.fillRect(x, (baseY[l] + m) | 0, 1, 2); }
             }
+            // a distant waterfall threading down the far mountains — thin and hazy,
+            // proof that water reads its depth (it slips behind the hills below)
+            const fwx = Math.round(vw * 0.22), fwTop = (baseY[1] + mtn[1][(fwx / 4) | 0]) | 0;
+            waterfall(fwx, 1, fwTop, Math.round(vh * 0.46), P, T, reduced, 0.13);
             // forested hills
             const wc0 = (x) => vh * 0.46 + Math.sin(x * 0.05 + 0.6) * vh * 0.03;
             const wc1 = (x) => vh * 0.56 + Math.sin(x * 0.06 + 1.5) * vh * 0.03;
@@ -704,15 +732,16 @@
             // a deer grazing on the near hill
             if (deerObj) {
               if (!reduced) { deerObj.t++; deerObj.x += deerObj.dir * 0.05; if (deerObj.x < vw * 0.1) deerObj.dir = 1; if (deerObj.x > vw * 0.6) deerObj.dir = -1; }
+              const dh = vh * 0.11, fh = vh * 0.072;
               const dgy = deerObj.base + Math.sin(deerObj.x * deerObj.fr + deerObj.ph) * vh * 0.03;
-              const ffx = deerObj.x + (deerObj.dir > 0 ? -14 : 14), ffgy = deerObj.base + Math.sin(ffx * deerObj.fr + deerObj.ph) * vh * 0.03;
-              drawFawn(ffx | 0, (ffgy - 6) | 0, deerObj.dir < 0, P);
-              drawDeer(deerObj.x | 0, (dgy - 10) | 0, deerObj.dir < 0, P);
+              const ffx = deerObj.x + (deerObj.dir > 0 ? -dh : dh), ffgy = deerObj.base + Math.sin(ffx * deerObj.fr + deerObj.ph) * vh * 0.03;
+              drawDeer(ffx, ffgy, fh, deerObj.dir < 0, false, P);
+              drawDeer(deerObj.x, dgy, dh, deerObj.dir < 0, true, P);
             }
             // foreground pond
             water(pondY, P, T, reduced, [28, 58, 78]);
             // a cascade tumbling down the cleared gap in the hillside into the pond
-            waterfall(Math.round(vw * 0.66), Math.max(2, Math.round(vw * 0.014)), Math.round(vh * 0.46), pondY, P, T, reduced);
+            waterfall(Math.round(vw * 0.66), Math.max(2, Math.round(vw * 0.014)), Math.round(vh * 0.46), pondY, P, T, reduced, 0.5);
             for (const lp of lily) { ctx.fillStyle = rgb(tint([40, 96, 58], P)); ctx.fillRect(lp.x - 1, lp.y, 3, 1); ctx.fillRect(lp.x, lp.y - 1, 1, 1); }
             fishStep(P, reduced, pondY);
             ripplesDraw(P, reduced, dim(P.su, 0.9));
