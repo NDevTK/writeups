@@ -305,7 +305,8 @@
             bot: '#2f6f93',
             lily: true,
             ducks: true,
-            drag: true
+            drag: true,
+            freeze: true
           },
           walker: ['deer_a', 'deer_b'],
           walkerScale: 0.62,
@@ -1580,7 +1581,7 @@
 
         // winter ice: shelves creep in from both banks as snow settles, leaving a shrinking
         // open lead down the middle (the ducks keep to it). melts back with snowAcc.
-        const ice = water ? Math.min(1, snowAcc) : 0;
+        const ice = water && BI.water.freeze ? Math.min(1, snowAcc) : 0; // only the shallow pond freezes; the deep fjord stays open
         const openHalf = VW / 2 + 40 - ice * (VW / 2 + 40 - 190); // lead never closes below ~380px
         if (iceG) {
           iceG.clear();
