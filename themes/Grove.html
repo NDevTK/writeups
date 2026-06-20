@@ -29,6 +29,7 @@
   </head>
   <body>
     <div id="ui" aria-hidden="true">
+      <div class="row" id="uiBiome"></div>
       <div class="row" id="uiTime"></div>
       <div class="row" id="uiSeason"></div>
     </div>
@@ -99,9 +100,36 @@
       const LEAFTINTS = [0xe07a2e, 0xd9a441, 0xc24f2e, 0xb8862e];
       const mulTint = (a, b) => { const r = (a >> 16 & 255) * (b >> 16 & 255) / 255, g = (a >> 8 & 255) * (b >> 8 & 255) / 255, bl = (a & 255) * (b & 255) / 255; return (r << 16 | g << 8 | bl) & 0xffffff; };
 
+      // ---------- biome ----------
+      const biomeParam = q.get('biome');
+      let biomeMode = LS('biome') || 'grove';
+      function nowBiome() { return biomeParam || biomeMode; }
+      const BIOMES = {
+        grove: {
+          label: '🌳 Grove', sky: 0xffffff, seasonal: true,
+          hills: [0x9cc6b0, 0x73b25a, 0x4f9c3e], ground: 'meadow',
+          mid: [['pine', 0.7, 180], ['oak', 0.7, 330], ['oak', 0.66, 1040], ['pine', 0.64, 1180]],
+          near: [['oak', 1.05, 120], ['pine', 1, 430], ['oak', 1.1, 900], ['bush', 1, 1150]],
+          water: { top: '#5fa7ca', bot: '#2f6f93', lily: true, ducks: true, drag: true },
+          walker: ['deer_a', 'deer_b'], walkerScale: 0.62, graze: true,
+          critter: 'fox', critterScale: 0.42, hopper: 'rabbit', flyer: 0xffffff, flutter: true, roller: null,
+        },
+        desert: {
+          label: '🏜️ Desert', sky: 0xfff0d6, seasonal: false,
+          hills: [0xe9d3a4, 0xdcbb80, 0xcca35f], ground: 'sand',
+          mid: [['cactus', 0.5, 260], ['rock', 0.7, 1010], ['cactus2', 0.55, 700]],
+          near: [['cactus', 1, 170], ['cactus2', 1, 480], ['rock', 1, 900], ['cactus', 0.8, 1120]],
+          water: null,
+          walker: ['camel'], walkerScale: 0.62, graze: false,
+          critter: 'lizard', critterScale: 0.5, hopper: null, flyer: 0x4a4036, flutter: false, roller: 'tumbleweed',
+        },
+      };
+      const RIGID = { rock: 1, cactus: 1, cactus2: 1 };
+
       const NAMES = ['oak', 'pine', 'bush', 'grass', 'flower_p', 'flower_w', 'cloud', 'sun', 'moon', 'glow',
         'duck', 'duckling', 'bird_a', 'bird_b', 'butterfly_a', 'butterfly_b', 'rabbit', 'fox',
-        'dragonfly_a', 'dragonfly_b', 'deer_a', 'deer_b', 'lily', 'leaf', 'petal', 'flake'];
+        'dragonfly_a', 'dragonfly_b', 'deer_a', 'deer_b', 'lily', 'leaf', 'petal', 'flake',
+        'cactus', 'cactus2', 'rock', 'lizard', 'camel', 'tumbleweed'];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => { const p = new PIXI.Sprite(T(n)); p.anchor.set(ax == null ? 0.5 : ax, ay == null ? 1 : ay); p.position.set(x, y); if (s) p.scale.set(s); return p; };
       const anim = (frames, x, y, s, spd) => { const a = new PIXI.AnimatedSprite(frames.map(T)); a.anchor.set(0.5, 1); a.position.set(x, y); if (s) a.scale.set(s); a.animationSpeed = spd; a.play(); return a; };
@@ -114,14 +142,17 @@
       const groundY = (x) => 540 + Math.sin(x * 0.006 + 2.4) * 26;
 
       const swayers = [], clouds = [], ducks = [], flutters = [], dragons = [], fireflies = [], lilies = [], weather = [], rainDrops = [];
-      let sky, stars, sun, moon, sunGlow, scene, veil, glit, rainG, deer, fox, rabbit, water, SE, ready = false;
-      let lastSkyH = -99, deerMode = 'walk', deerTimer = 5, foxTimer = 6;
+      let sky, stars, sun, moon, sunGlow, scene, veil, glit, rainG, deer, fox, rabbit, roller, water, SE, BI, ready = false;
+      let lastSkyH = -99, deerMode = 'walk', deerTimer = 5, foxTimer = 6, rollerTimer = 4;
 
       function build() {
         root.removeChildren(); swayers.length = clouds.length = ducks.length = flutters.length = dragons.length = fireflies.length = lilies.length = weather.length = 0;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
+        BI = BIOMES[nowBiome()] || BIOMES.grove;
+        const folTint = BI.seasonal ? SE.foliage : 0xffffff, snow = SE.snow, weatherKind = BI.seasonal ? SE.weather : (snow ? 'flake' : 'none');
+        lastSkyH = -99; // force the sky to redraw into the fresh Graphics next frame
 
-        sky = new PIXI.Graphics(); root.addChild(sky);
+        sky = new PIXI.Graphics(); sky.tint = BI.sky; root.addChild(sky);
 
         stars = new PIXI.Container(); root.addChild(stars);
         const sg = new PIXI.Graphics();
@@ -134,56 +165,61 @@
 
         for (let i = 0; i < 4; i++) { const c = spr('cloud', Math.random() * VW, 60 + Math.random() * 150, 0.5 + Math.random() * 0.5, 0.5, 0.5); c.vx = 0.12 + Math.random() * 0.22; clouds.push(c); root.addChild(c); }
 
-        const bird = anim(['bird_a', 'bird_b'], -80, 150, 0.7, 0.06); bird.isBird = true; flutters.push(bird); root.addChild(bird);
+        const bird = anim(['bird_a', 'bird_b'], -80, 150, 0.7, 0.06); bird.isBird = true; bird.tint = BI.flyer; flutters.push(bird); root.addChild(bird);
 
         // ---- scene (everything that night darkens) ----
         scene = new PIXI.Container(); root.addChild(scene);
-        const HILLS = [[420, 26, 0x9cc6b0, 0], [470, 30, 0x73b25a, 1.3], [540, 26, 0x4f9c3e, 2.4]];
-        for (const [cy, am, col, ph] of HILLS) { const hh = hill(cy, am, col, ph); hh.tint = SE.hill; scene.addChild(hh); }
-        if (SE.snow) for (const [cy, am, , ph] of HILLS) { // snow settled along each crest
+        const HILLS = [[420, 26, 0], [470, 30, 1.3], [540, 26, 2.4]];
+        HILLS.forEach(([cy, am, ph], i) => { const hh = hill(cy, am, BI.hills[i], ph); hh.tint = SE.hill; scene.addChild(hh); });
+        if (snow) for (const [cy, am, ph] of HILLS) { // snow settled along each crest
           const g = new PIXI.Graphics(); g.beginFill(0xeef5fc); g.moveTo(0, cy + Math.sin(ph) * am);
           for (let x = 0; x <= VW; x += 8) g.lineTo(x, cy + Math.sin(x * 0.006 + ph) * am);
           for (let x = VW; x >= 0; x -= 8) g.lineTo(x, cy + Math.sin(x * 0.006 + ph) * am + 13);
           g.closePath(); g.endFill(); scene.addChild(g);
         }
-        for (const [x, n, sc] of [[180, 'pine', 0.7], [330, 'oak', 0.7], [1040, 'oak', 0.66], [1180, 'pine', 0.64]]) {
-          const t = spr(n, x, 482 + Math.sin(x * 0.006 + 1.3) * 30, sc); t.tint = mulTint(0xcfe3d0, SE.foliage); scene.addChild(t); swayers.push({ s: t, amp: 0.015, sp: 0.7, ph: Math.random() * 6 });
+        for (const [n, sc, x] of BI.mid) { const t = spr(n, x, 482 + Math.sin(x * 0.006 + 1.3) * 30, sc); t.tint = mulTint(0xcfe3d0, folTint); scene.addChild(t); if (!RIGID[n]) swayers.push({ s: t, amp: 0.012, sp: 0.7, ph: Math.random() * 6 }); }
+        for (const [n, sc, x] of BI.near) { const t = spr(n, x, groundY(x) + 4, sc); t.tint = folTint; scene.addChild(t); if (!RIGID[n]) swayers.push({ s: t, amp: 0.02, sp: 0.9, ph: Math.random() * 6 }); }
+        if (BI.ground === 'meadow') {
+          for (let i = 0; i < 16; i++) { const x = 40 + Math.random() * (VW - 80), g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.5); g.tint = folTint; scene.addChild(g); swayers.push({ s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6 }); }
+          if (!snow) for (let i = 0; i < 10; i++) { const x = 60 + Math.random() * (VW - 120), f = spr(Math.random() < 0.5 ? 'flower_p' : 'flower_w', x, groundY(x) + 8, 0.6 + Math.random() * 0.4); scene.addChild(f); swayers.push({ s: f, amp: 0.06, sp: 1.4, ph: Math.random() * 6 }); }
+        } else if (BI.ground === 'sand') {
+          for (let i = 0; i < 16; i++) { const x = 30 + Math.random() * (VW - 60); scene.addChild(spr('rock', x, groundY(x) + 8, 0.1 + Math.random() * 0.14)); }
+          for (let i = 0; i < 6; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.4 + Math.random() * 0.3); g.tint = 0xcdb87a; scene.addChild(g); swayers.push({ s: g, amp: 0.04, sp: 1.4, ph: Math.random() * 6 }); }
         }
-        for (const [x, n, sc] of [[120, 'oak', 1.05], [430, 'pine', 1], [900, 'oak', 1.1], [1150, 'bush', 1]]) {
-          const t = spr(n, x, groundY(x) + 4, sc); t.tint = SE.foliage; scene.addChild(t); swayers.push({ s: t, amp: 0.02, sp: 0.9, ph: Math.random() * 6 });
-        }
-        for (let i = 0; i < 16; i++) { const x = 40 + Math.random() * (VW - 80), g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.5); g.tint = SE.foliage; scene.addChild(g); swayers.push({ s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6 }); }
-        if (!SE.snow) for (let i = 0; i < 10; i++) { const x = 60 + Math.random() * (VW - 120), f = spr(Math.random() < 0.5 ? 'flower_p' : 'flower_w', x, groundY(x) + 8, 0.6 + Math.random() * 0.4); scene.addChild(f); swayers.push({ s: f, amp: 0.06, sp: 1.4, ph: Math.random() * 6 }); }
-        fox = spr('fox', -80, groundY(-80) + 6, 0.42); scene.addChild(fox); fox.dir = 1;
-        rabbit = spr('rabbit', 760, groundY(760) + 6, 0.55); rabbit.baseY = rabbit.y; scene.addChild(rabbit);
-        deer = anim(['deer_a', 'deer_b'], 300, groundY(300) + 8, 0.62, 0.12); deer.stop(); scene.addChild(deer);
+        deer = anim(BI.walker, 300, groundY(300) + 8, BI.walkerScale, 0.12); if (BI.walker.length > 1) deer.stop(); else deer.gotoAndStop(0); deer.graze = BI.graze; scene.addChild(deer);
+        fox = spr(BI.critter, -80, groundY(-80) + 6, BI.critterScale); scene.addChild(fox); fox.dir = 1;
+        if (BI.hopper) { rabbit = spr(BI.hopper, 760, groundY(760) + 6, 0.55); rabbit.baseY = rabbit.y; scene.addChild(rabbit); } else rabbit = null;
+        if (BI.roller) { roller = spr(BI.roller, -60, groundY(-60) + 2, 0.5); roller.tint = 0xc2a468; scene.addChild(roller); roller.visible = false; rollerTimer = 2 + Math.random() * 3; } else roller = null;
 
-        // pond
-        water = new PIXI.Sprite(gradTex([[0, '#5fa7ca'], [1, '#2f6f93']], 288)); water.position.set(0, 600); water.width = VW; water.height = VH - 600; water.tint = SE.snow ? 0xcfe6ef : 0xffffff; scene.addChild(water);
-        const lip = new PIXI.Graphics(); lip.beginFill(0xbfe6ef, 0.5); lip.drawRect(0, 600, VW, 3); lip.endFill(); scene.addChild(lip);
-        glit = new PIXI.Graphics(); scene.addChild(glit); // sun/moon reflection, drawn per frame
-        if (!SE.snow) for (const [lx, ly, ls] of [[230, 632, 0.7], [610, 648, 0.82], [1010, 636, 0.66]]) { const lp = spr('lily', lx, ly, ls, 0.5, 0.5); lp.baseY = ly; scene.addChild(lp); lilies.push(lp); }
-
-        const dm = spr('duck', 380, 656, 0.6); dm.baseY = dm.y; dm.vx = 0.5; dm.kids = [];
-        dm.ref = spr('duck', 380, 0, 0.6); dm.ref.scale.y = -0.6; dm.ref.alpha = 0.28; dm.ref.tint = 0x6f8ea0; scene.addChildAt(dm.ref, scene.getChildIndex(glit));
-        for (let i = 0; i < 3; i++) { const k = spr('duckling', dm.x - 34 - i * 22, 668, 0.5); k.baseY = k.y; scene.addChild(k); dm.kids.push(k); }
-        scene.addChild(dm); ducks.push(dm);
-        const d2 = spr('duck', 980, 690, 0.55); d2.scale.x = -0.55; d2.baseY = d2.y; d2.vx = -0.4; ducks.push(d2); scene.addChild(d2);
-
-        if (!SE.snow) for (let i = 0; i < 4; i++) { const f = anim(['butterfly_a', 'butterfly_b'], Math.random() * VW, 500 + Math.random() * 70, 0.5, 0.18); f.vx = (Math.random() - 0.5) * 1.2; f.vy = (Math.random() - 0.5) * 0.8; f.lo = 470; f.hi = 590; flutters.push(f); scene.addChild(f); }
-        if (!SE.snow) for (let i = 0; i < 3; i++) { const d = anim(['dragonfly_a', 'dragonfly_b'], 200 + Math.random() * 880, 612 + Math.random() * 60, 0.45, 0.4); d.vx = (Math.random() - 0.5) * 2.4; d.vy = (Math.random() - 0.5) * 1.2; d.lo = 605; d.hi = 690; flutters.push(d); scene.addChild(d); }
+        // water biomes (pond) — reflections, lilies, ducks, dragonflies
+        glit = new PIXI.Graphics();
+        if (BI.water) {
+          water = new PIXI.Sprite(gradTex([[0, BI.water.top], [1, BI.water.bot]], 288)); water.position.set(0, 600); water.width = VW; water.height = VH - 600; water.tint = snow ? 0xcfe6ef : 0xffffff; scene.addChild(water);
+          const lip = new PIXI.Graphics(); lip.beginFill(0xbfe6ef, 0.5); lip.drawRect(0, 600, VW, 3); lip.endFill(); scene.addChild(lip);
+          scene.addChild(glit);
+          if (BI.water.lily && !snow) for (const [lx, ly, ls] of [[230, 632, 0.7], [610, 648, 0.82], [1010, 636, 0.66]]) { const lp = spr('lily', lx, ly, ls, 0.5, 0.5); lp.baseY = ly; scene.addChild(lp); lilies.push(lp); }
+          if (BI.water.ducks) {
+            const dm = spr('duck', 380, 656, 0.6); dm.baseY = dm.y; dm.vx = 0.5; dm.kids = [];
+            dm.ref = spr('duck', 380, 0, 0.6); dm.ref.scale.y = -0.6; dm.ref.alpha = 0.28; dm.ref.tint = 0x6f8ea0; scene.addChildAt(dm.ref, scene.getChildIndex(glit));
+            for (let i = 0; i < 3; i++) { const k = spr('duckling', dm.x - 34 - i * 22, 668, 0.5); k.baseY = k.y; scene.addChild(k); dm.kids.push(k); }
+            scene.addChild(dm); ducks.push(dm);
+            const d2 = spr('duck', 980, 690, 0.55); d2.scale.x = -0.55; d2.baseY = d2.y; d2.vx = -0.4; ducks.push(d2); scene.addChild(d2);
+          }
+          if (BI.water.drag && !snow) for (let i = 0; i < 3; i++) { const d = anim(['dragonfly_a', 'dragonfly_b'], 200 + Math.random() * 880, 612 + Math.random() * 60, 0.45, 0.4); d.vx = (Math.random() - 0.5) * 2.4; d.vy = (Math.random() - 0.5) * 1.2; d.lo = 605; d.hi = 690; flutters.push(d); scene.addChild(d); }
+        } else { scene.addChild(glit); water = null; }
+        if (BI.flutter && !snow) for (let i = 0; i < 4; i++) { const f = anim(['butterfly_a', 'butterfly_b'], Math.random() * VW, 500 + Math.random() * 70, 0.5, 0.18); f.vx = (Math.random() - 0.5) * 1.2; f.vy = (Math.random() - 0.5) * 0.8; f.lo = 470; f.hi = 590; flutters.push(f); scene.addChild(f); }
 
         // night veil (multiply) — only darkens the scene's pixels
         veil = new PIXI.Graphics(); veil.beginFill(0x2b3a66).drawRect(0, 0, VW, VH).endFill(); veil.blendMode = PIXI.BLEND_MODES.MULTIPLY; scene.addChild(veil);
 
         // fireflies above the veil (warm seasons only)
         const fl = new PIXI.Container(); root.addChild(fl); fireflies.fl = fl;
-        if (!SE.snow) for (let i = 0; i < 16; i++) { const g = spr('glow', 60 + Math.random() * (VW - 120), 470 + Math.random() * 130, 0.16, 0.5, 0.5); g.tint = 0xeaff8a; g.blendMode = PIXI.BLEND_MODES.ADD; g.ph = Math.random() * 6.28; g.vx = (Math.random() - 0.5) * 0.4; g.vy = (Math.random() - 0.5) * 0.3; fireflies.push(g); fl.addChild(g); }
+        if (BI.ground === 'meadow' && !snow) for (let i = 0; i < 16; i++) { const g = spr('glow', 60 + Math.random() * (VW - 120), 470 + Math.random() * 130, 0.16, 0.5, 0.5); g.tint = 0xeaff8a; g.blendMode = PIXI.BLEND_MODES.ADD; g.ph = Math.random() * 6.28; g.vx = (Math.random() - 0.5) * 0.4; g.vy = (Math.random() - 0.5) * 0.3; fireflies.push(g); fl.addChild(g); }
 
         // seasonal weather: drifting petals / tumbling leaves / falling snow
         const wl = new PIXI.Container(); root.addChild(wl); weather.layer = wl;
-        if (SE.weather !== 'none') {
-          const count = SE.weather === 'flake' ? 70 : SE.weather === 'leaf' ? 26 : 34, kind = SE.weather;
+        if (weatherKind !== 'none') {
+          const count = weatherKind === 'flake' ? 70 : weatherKind === 'leaf' ? 26 : 34, kind = weatherKind;
           for (let i = 0; i < count; i++) {
             const p = spr(kind === 'flake' ? 'flake' : kind === 'leaf' ? 'leaf' : 'petal', Math.random() * VW, Math.random() * VH, kind === 'flake' ? 0.3 + Math.random() * 0.4 : 0.5 + Math.random() * 0.5, 0.5, 0.5);
             if (kind === 'leaf') p.tint = LEAFTINTS[(Math.random() * LEAFTINTS.length) | 0];
@@ -228,7 +264,7 @@
 
         // glitter: sun/moon reflection shimmer on the pond
         glit.clear();
-        if (cel.y < 560) {
+        if (water && cel.y < 560) {
           const col = cel.sun ? 0xfff0b8 : 0xc9d8ea;
           for (let y = 606; y < VH; y += 5) {
             const d = (y - 606) / (VH - 606), wob = Math.sin(y * 0.6 + t * 2.2) * (2 + d * 10);
@@ -239,10 +275,11 @@
         for (const c of clouds) { c.x += c.vx * dt; if (c.x - c.width > VW) c.x = -c.width; }
         for (const w of swayers) w.s.rotation = Math.sin(t * w.sp + w.ph) * w.amp;
 
-        // deer: amble, then graze (pause), repeat
-        deerTimer -= dt / 60;
-        if (deerMode === 'walk') { deer.x += 0.35 * dt; if (!deer.playing) deer.play(); if (deerTimer < 0) { deerMode = 'graze'; deerTimer = 2.5 + Math.random() * 3; deer.gotoAndStop(0); } }
-        else { if (deerTimer < 0) { deerMode = 'walk'; deerTimer = 5 + Math.random() * 6; } }
+        // walker: deer ambles then grazes; a camel just plods along
+        deerTimer -= dt / 60; const multi = deer.totalFrames > 1;
+        if (!deer.graze) deerMode = 'walk';
+        if (deerMode === 'walk') { deer.x += 0.35 * dt; if (multi && !deer.playing) deer.play(); if (deer.graze && deerTimer < 0) { deerMode = 'graze'; deerTimer = 2.5 + Math.random() * 3; if (multi) deer.gotoAndStop(0); } }
+        else if (deerTimer < 0) { deerMode = 'walk'; deerTimer = 5 + Math.random() * 6; }
         if (deer.x > VW + 60) deer.x = -60;
         deer.y = groundY(deer.x) + 8 + (deerMode === 'walk' ? Math.abs(Math.sin(t * 4)) * -2 : 0);
 
@@ -253,12 +290,19 @@
           if (fox.x > VW + 80) { fox.visible = false; foxTimer = 8 + Math.random() * 10; }
         } else if (foxTimer < 0) { fox.visible = true; fox.x = -80; fox.dir = 1; }
 
-        // rabbit hops
-        deerTimer; // noop guard
-        rabbit.hopT = (rabbit.hopT == null ? 2 : rabbit.hopT) - dt / 60;
-        const hop = rabbit.hopT < 0.4 && rabbit.hopT > 0 ? Math.sin((0.4 - rabbit.hopT) / 0.4 * Math.PI) : 0;
-        rabbit.y = rabbit.baseY - hop * 24; rabbit.x += hop * 1.1;
-        if (rabbit.hopT < 0) { rabbit.hopT = 3 + Math.random() * 4; if (rabbit.x > VW - 80) rabbit.x = 120; }
+        // hopper (rabbit)
+        if (rabbit) {
+          rabbit.hopT = (rabbit.hopT == null ? 2 : rabbit.hopT) - dt / 60;
+          const hop = rabbit.hopT < 0.4 && rabbit.hopT > 0 ? Math.sin((0.4 - rabbit.hopT) / 0.4 * Math.PI) : 0;
+          rabbit.y = rabbit.baseY - hop * 24; rabbit.x += hop * 1.1;
+          if (rabbit.hopT < 0) { rabbit.hopT = 3 + Math.random() * 4; if (rabbit.x > VW - 80) rabbit.x = 120; }
+        }
+        // roller (tumbleweed) bounds across at intervals
+        if (roller) {
+          rollerTimer -= dt / 60;
+          if (roller.visible) { roller.x += 3 * dt; roller.rotation += 0.13 * dt; roller.y = groundY(roller.x) + 2 - Math.abs(Math.sin(t * 6)) * 10; if (roller.x > VW + 60) { roller.visible = false; rollerTimer = 5 + Math.random() * 7; } }
+          else if (rollerTimer < 0) { roller.visible = true; roller.x = -60; }
+        }
 
         // ducks drift + bob, brood + reflection follow
         for (const d of ducks) {
@@ -293,11 +337,12 @@
       // ---- control panel (revealed by the ✦ wallpaper toggle) ----
       const TLIST = [['auto', 'Auto'], ['dawn', 'Dawn'], ['day', 'Day'], ['dusk', 'Dusk'], ['night', 'Night']];
       const SLIST = [['auto', 'Auto'], ['spring', 'Spring'], ['summer', 'Summer'], ['autumn', 'Autumn'], ['winter', 'Winter']];
-      const uiTime = document.getElementById('uiTime'), uiSeason = document.getElementById('uiSeason');
+      const uiBiome = document.getElementById('uiBiome'), uiTime = document.getElementById('uiTime'), uiSeason = document.getElementById('uiSeason');
       const mkBtn = (label, on, fn) => { const b = document.createElement('button'); b.textContent = label; if (on) b.className = 'on'; b.addEventListener('click', fn); return b; };
       const lbl = (text, row) => { const s = document.createElement('span'); s.className = 'lbl'; s.textContent = text; row.appendChild(s); };
       function buildUI() {
-        uiTime.textContent = ''; uiSeason.textContent = '';
+        uiBiome.textContent = ''; uiTime.textContent = ''; uiSeason.textContent = '';
+        Object.entries(BIOMES).forEach(([k, v]) => uiBiome.appendChild(mkBtn(v.label, k === biomeMode, () => { biomeMode = k; LS('biome', k); if (ready) build(); buildUI(); })));
         lbl('time', uiTime);
         TLIST.forEach(([k, l]) => uiTime.appendChild(mkBtn(l, k === timeMode, () => { timeMode = k; LS('time', k); lastSkyH = -99; buildUI(); })));
         lbl('season', uiSeason);
