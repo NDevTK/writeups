@@ -981,7 +981,7 @@ save('jelly_a', jellySvg(0), 92);
 save('jelly_b', jellySvg(1), 92);
 
 // ---- contact sheet of new + polished ----
-const review = ['jelly_a', 'jelly_b', 'turtle'];
+const review = ['peak'];
 const cols = 4,
   cell = 230,
   pad = 14,

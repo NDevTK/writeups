@@ -330,6 +330,7 @@
           sky: 0xfff0d6,
           seasonal: false,
           hills: [0xe9d3a4, 0xdcbb80, 0xcca35f],
+          distant: {style: 'mesa', tint: 0xdcc59c}, // buttes in the heat haze
           ground: 'sand',
           mid: [
             ['cactus', 0.5, 260],
@@ -487,6 +488,7 @@
             winter: {fol: 0xe8dcb0, hill: 0xede2c2, grass: 0xccbf86}
           },
           hills: [0xe6d29a, 0xd7bd76, 0xc6a85a],
+          distant: {style: 'ridge', tint: 0xd2c084}, // far ridge dotted with acacia
           ground: 'savanna',
           mid: [
             ['acacia', 0.55, 320],
@@ -566,6 +568,7 @@
           snowCaps: true,
           foliageTint: 0x9ec4b4,
           aurora: true,
+          distant: {style: 'peak', tint: 0x91a3bd}, // a connected wall of snow-capped peaks
           hills: [0x7a8aa4, 0x9fb0c6, 0xe2ecf4],
           ground: 'snow',
           mid: [
@@ -814,6 +817,98 @@
         g.lineTo(VW + 40, VH);
         g.closePath();
         g.endFill();
+        return g;
+      }
+      // a hazy silhouette along the horizon, behind the near hills, for atmospheric depth.
+      // one connected landform (not separate cut-outs); the near hills cover its base so only the
+      // tops show, and it darkens with the night veil.
+      function drawDistant(d) {
+        const g = new PIXI.Graphics(),
+          base = 452;
+        if (d.style === 'peak') {
+          // one continuous jagged ridge — summits linked by elevated cols — sampled into a dense
+          // polyline so snow can lie naturally on the upper slopes down to a snowline
+          const ctrl = [[-40, base]];
+          let x = -40;
+          while (x <= VW + 40) {
+            ctrl.push([x, base - (118 + Math.random() * 104)]); // a summit
+            x += 68 + Math.random() * 56;
+            ctrl.push([x, base - (58 + Math.random() * 40)]); // a col, still high (the ridge stays connected)
+            x += 68 + Math.random() * 56;
+          }
+          ctrl.push([VW + 40, base]);
+          const ridge = [];
+          for (let i = 0; i < ctrl.length - 1; i++) {
+            const [x0, y0] = ctrl[i],
+              [x1, y1] = ctrl[i + 1],
+              steps = Math.max(1, Math.round((x1 - x0) / 7));
+            for (let s = 0; s < steps; s++)
+              ridge.push([
+                x0 + ((x1 - x0) * s) / steps,
+                y0 + ((y1 - y0) * s) / steps
+              ]);
+          }
+          ridge.push(ctrl[ctrl.length - 1]);
+          g.beginFill(d.tint);
+          g.moveTo(-40, base);
+          for (const [px, py] of ridge) g.lineTo(px, py);
+          g.closePath();
+          g.endFill();
+          // snow lies on everything above a gently undulating snowline, staying connected across
+          // the high ground and receding into the cols — natural cover, not a cap on each summit
+          const slY = (x) => base - 132 + Math.sin(x * 0.021) * 9;
+          g.beginFill(0xeef4fb, 0.92);
+          let run = [];
+          const flush = () => {
+            if (run.length >= 2) {
+              g.moveTo(run[0][0], slY(run[0][0]));
+              for (const p of run) g.lineTo(p[0], p[1]); // up and over the ridge
+              for (let k = run.length - 1; k >= 0; k--)
+                g.lineTo(run[k][0], slY(run[k][0])); // back along the snowline
+              g.closePath();
+            }
+            run = [];
+          };
+          for (const p of ridge) {
+            if (p[1] <= slY(p[0])) run.push(p);
+            else flush();
+          }
+          flush();
+          g.endFill();
+        } else if (d.style === 'mesa') {
+          // flat-topped buttes scattered across the heat haze (naturally separate landforms)
+          g.beginFill(d.tint);
+          let x = 30;
+          while (x < VW) {
+            const w = 130 + Math.random() * 150,
+              top = base - (58 + Math.random() * 64),
+              t = w * 0.12; // a slight taper to the base
+            g.moveTo(x, base);
+            g.lineTo(x + t, top);
+            g.lineTo(x + w - t, top);
+            g.lineTo(x + w, base);
+            g.closePath();
+            x += w + 70 + Math.random() * 150;
+          }
+          g.endFill();
+        } else if (d.style === 'ridge') {
+          // one low rolling ridge dotted with distant umbrella trees (savanna)
+          const ry = (x) => base - 62 - Math.sin(x * 0.004 + 1) * 16;
+          g.beginFill(d.tint);
+          g.moveTo(-40, base);
+          for (let x = -40; x <= VW + 40; x += 18) g.lineTo(x, ry(x));
+          g.lineTo(VW + 40, base);
+          g.closePath();
+          g.endFill();
+          g.beginFill(d.tint);
+          for (let i = 0; i < 9; i++) {
+            const x = 50 + Math.random() * (VW - 100),
+              y = ry(x) + 2;
+            g.drawRect(x - 1, y - 15, 2, 15); // slim trunk
+            g.drawEllipse(x, y - 17, 16, 5.5); // flat acacia canopy
+          }
+          g.endFill();
+        }
         return g;
       }
       function drawSky(P) {
@@ -1138,6 +1233,10 @@
           const fe = spr(BI.feature, 640, 486, 0.95);
           scene.addChild(fe);
         } // large background landmark behind the hills
+        if (BI.distant) {
+          const dg = drawDistant(BI.distant);
+          scene.addChild(dg);
+        } // hazy horizon silhouette for depth (behind the hills)
         const HILLS = [
           [420, 26, 0],
           [470, 30, 1.3],
@@ -1343,9 +1442,20 @@
             scene.addChild(g);
             swayers.push({s: g, amp: 0.06, sp: 1.6, ph: Math.random() * 6});
           }
-          for (let i = 0; i < 4; i++) {
-            const x = Math.random() * VW,
-              b = spr('bamboo', x, groundY(x) + 8, 0.26 + Math.random() * 0.12);
+          // a fuller bamboo stand: a hazy back row that recedes into the mist + a denser foreground
+          for (let i = 0; i < 15; i++) {
+            const x = -20 + Math.random() * (VW + 40),
+              far = Math.random() < 0.45,
+              b = spr(
+                'bamboo',
+                x,
+                groundY(x) + (far ? -4 : 8),
+                (far ? 0.17 : 0.27) + Math.random() * 0.12
+              );
+            if (far) {
+              b.tint = 0xbcd9b0; // paler, sunk into the green haze
+              b.alpha = 0.82;
+            }
             scene.addChild(b);
             swayers.push({s: b, amp: 0.02, sp: 0.9, ph: Math.random() * 6});
           }
