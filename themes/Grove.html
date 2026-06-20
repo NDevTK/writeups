@@ -2977,7 +2977,11 @@
             0.06 +
             0.56 * Math.exp(-Math.pow((h - 6.3) / 1.9, 2)) +
             0.3 * (1 - P.light);
-          const fogAmt = Math.min(1, (BI.fog || 0) * (fogTOD + wetness * 0.35)),
+          const fogAmt = Math.min(
+              1,
+              (BI.fog || 0) *
+                (fogTOD + wetness * 0.35 + cover * 0.45 + wet * 0.3) // haze thickens as a front gathers + rains
+            ),
             fogTint = hexI(mixA(P.bot, [255, 255, 255], 0.55));
           for (const fz of fogLayers) {
             fz.alpha = fogAmt * fz.baseA;
@@ -3298,11 +3302,15 @@
         scene.position.set(parX * 14, parY * 8);
         fireflies.fl.position.set(parX * 14, parY * 8);
 
-        // wind: a breeze that slowly varies and gusts (used by foliage, particles, and the water surface)
+        // wind: a breeze that slowly varies and gusts (used by foliage, particles, and the water surface).
+        // it freshens and gusts as a weather front gathers and blows through, then calms as it clears.
+        const stormWind = cover * 0.4 + wet * 0.8;
         const wind =
-          Math.sin(t * 0.35) * 0.35 +
-          Math.sin(t * 0.11 + 1.3) * 0.45 +
-          Math.sin(t * 0.07) * 0.25;
+          (Math.sin(t * 0.35) * 0.35 +
+            Math.sin(t * 0.11 + 1.3) * 0.45 +
+            Math.sin(t * 0.07) * 0.25) *
+            (1 + stormWind) +
+          Math.sin(t * 1.7 + 0.6) * 0.28 * stormWind; // sharper gusting under the storm
 
         // shooting stars: an occasional streak across the night sky (any biome, but not underground)
         shootG.clear();
