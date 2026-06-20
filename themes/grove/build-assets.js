@@ -1295,8 +1295,46 @@ save(
   192
 );
 
+// ---- GLADE biome (bioluminescent mushrooms) ----
+// kept white/pale so the engine tints each cluster to its glow colour (like the cave crystals):
+// a tall trio of toadstools with luminous caps, pale stems, faint spots and an under-cap gill line
+save(
+  'mushroom_a',
+  S(
+    '120 134',
+    `<defs><radialGradient id="mca" cx="50%" cy="36%"><stop offset="0" stop-color="#ffffff"/><stop offset="0.68" stop-color="#e2f4f5"/><stop offset="1" stop-color="#bfe2e4"/></radialGradient></defs>
+<path d="M25,124 C23,110 22,100 26,94 L35,94 C38,102 37,112 35,124 Z" fill="#e7f3f4"/>
+<ellipse cx="30" cy="92" rx="18" ry="10.5" fill="url(#mca)"/>
+<path d="M86,128 C84,110 83,98 87,86 L98,86 C101,98 99,112 97,128 Z" fill="#e7f3f4"/>
+<ellipse cx="92" cy="84" rx="21" ry="12.5" fill="url(#mca)"/>
+<path d="M54,130 C51,104 50,84 55,70 L67,70 C73,84 71,106 68,130 Z" fill="#eef7f7"/>
+<ellipse cx="60" cy="62" rx="29" ry="16" fill="url(#mca)"/>
+<path d="M36,57 Q60,46 84,57 Q60,53 36,57 Z" fill="#ffffff" opacity="0.7"/>
+<path d="M33,64 Q60,74 87,64" stroke="#a9d6d9" stroke-width="2" fill="none" opacity="0.6"/>
+<g fill="#ffffff" opacity="0.85"><circle cx="52" cy="59" r="3"/><circle cx="70" cy="57" r="2.4"/><circle cx="63" cy="65" r="1.9"/><circle cx="27" cy="90" r="1.8"/><circle cx="95" cy="82" r="2"/></g>`
+  ),
+  120
+);
+// a big domed-cap toadstool with two babies (same pale, tintable palette)
+save(
+  'mushroom_b',
+  S(
+    '116 122',
+    `<defs><radialGradient id="mcb" cx="50%" cy="34%"><stop offset="0" stop-color="#ffffff"/><stop offset="0.68" stop-color="#e2f4f5"/><stop offset="1" stop-color="#bfe2e4"/></radialGradient></defs>
+<path d="M12,112 C10,102 10,96 13,92 L21,92 C24,98 23,106 22,112 Z" fill="#e7f3f4"/>
+<ellipse cx="17" cy="92" rx="13" ry="8" fill="url(#mcb)"/>
+<path d="M94,116 C92,106 92,100 95,96 L102,96 C105,102 104,110 103,116 Z" fill="#e7f3f4"/>
+<ellipse cx="98" cy="96" rx="11" ry="7" fill="url(#mcb)"/>
+<path d="M48,116 C44,92 44,72 51,58 L66,58 C73,74 72,98 67,116 Z" fill="#eef7f7"/>
+<path d="M22,60 C26,32 90,32 94,60 C70,66 46,66 22,60 Z" fill="url(#mcb)"/>
+<path d="M22,60 C46,68 70,68 94,60 C70,64 46,64 22,60 Z" fill="#bfe6e8" opacity="0.7"/>
+<g fill="#ffffff" opacity="0.85"><circle cx="42" cy="50" r="3.4"/><circle cx="62" cy="46" r="2.8"/><circle cx="76" cy="52" r="2.6"/><circle cx="54" cy="54" r="2.2"/></g>`
+  ),
+  116
+);
+
 // ---- contact sheet of new + polished ----
-const review = ['penguin', 'iceberg', 'orca'];
+const review = ['mushroom_a', 'mushroom_b'];
 const cols = 4,
   cell = 230,
   pad = 14,
