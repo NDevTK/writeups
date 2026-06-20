@@ -52,10 +52,11 @@ save('pine', S('140 220', `
 <g fill="url(#pine)"><path d="M70,18 L106,86 L34,86 Z"/><path d="M70,58 L116,136 L24,136 Z"/><path d="M70,104 L124,188 L16,188 Z"/></g>
 <g fill="#5cb050" opacity="0.4"><path d="M70,18 L86,52 L70,52 Z"/><path d="M70,58 L92,100 L70,100 Z"/></g>`), 120);
 
-save('bush', S('150 96', `
-<defs><radialGradient id="b" gradientUnits="userSpaceOnUse" cx="52" cy="30" r="74"><stop offset="0" stop-color="#86c64a"/><stop offset="1" stop-color="#357020"/></radialGradient></defs>
-<g fill="url(#b)"><circle cx="48" cy="60" r="32"/><circle cx="96" cy="62" r="30"/><circle cx="72" cy="42" r="30"/></g>
-<g fill="#9ad65a" opacity="0.5"><circle cx="52" cy="38" r="10"/></g>`), 130);
+save('bush', S('178 86', `
+<defs><radialGradient id="b" gradientUnits="userSpaceOnUse" cx="64" cy="36" r="96"><stop offset="0" stop-color="#86c64a"/><stop offset="1" stop-color="#357020"/></radialGradient></defs>
+<g fill="url(#b)"><ellipse cx="40" cy="66" rx="34" ry="18"/><ellipse cx="92" cy="68" rx="42" ry="20"/><ellipse cx="142" cy="66" rx="32" ry="17"/><circle cx="56" cy="50" r="24"/><circle cx="100" cy="46" r="27"/><circle cx="136" cy="52" r="19"/></g>
+<g fill="#9ad65a" opacity="0.5"><circle cx="58" cy="42" r="9"/><circle cx="102" cy="40" r="8"/></g>
+<ellipse cx="92" cy="80" rx="82" ry="7" fill="#2f6a1e" opacity="0.3"/>`), 150);
 
 save('grass', S('80 60', `<g fill="none" stroke-linecap="round">
 <path d="M14,58 C12,46 10,40 6,34" stroke="#458c2e" stroke-width="4"/><path d="M22,58 C20,40 16,30 12,22" stroke="#4f9c34" stroke-width="4"/>
@@ -205,7 +206,7 @@ save('crab', S('100 56', `<defs><linearGradient id="cr" x1="0" y1="0" x2="0" y2=
 <g stroke="#b8401e" stroke-width="2.5"><line x1="44" y1="25" x2="42" y2="16"/><line x1="56" y1="25" x2="58" y2="16"/></g>
 <circle cx="42" cy="14" r="3" fill="#2a1810"/><circle cx="58" cy="14" r="3" fill="#2a1810"/>
 <g fill="#f0a080" opacity="0.5"><circle cx="44" cy="33" r="2.5"/><circle cx="56" cy="33" r="2.5"/></g>`), 90);
-save('sailboat', S('140 150', `<rect x="67" y="22" width="4" height="72" fill="#8a6a40"/>
+save('sailboat', S('140 116', `<rect x="67" y="22" width="4" height="72" fill="#8a6a40"/>
 <path d="M73,26 L73,88 L112,88 Z" fill="#f6f2e8"/><path d="M73,26 L73,88 L112,88 Z" fill="none" stroke="#d8d0bc" stroke-width="1.5"/>
 <path d="M65,32 L65,86 L34,86 Z" fill="#eae3d2"/>
 <path d="M71,20 L86,25 L71,30 Z" fill="#d84a3a"/>
@@ -275,14 +276,14 @@ save('eagle', S('150 72', `<defs><linearGradient id="eg" x1="0" y1="0" x2="0" y2
 <circle cx="70" cy="25" r="1.5" fill="#1a1a1a"/>`), 132);
 
 // ---- SAVANNA biome ----
-save('acacia', S('236 184', `<defs><linearGradient id="ac" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a6a3e"/><stop offset="1" stop-color="#674c2a"/></linearGradient>
+save('acacia', S('236 190', `<defs><linearGradient id="ac" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a6a3e"/><stop offset="1" stop-color="#674c2a"/></linearGradient>
 <linearGradient id="acf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#86a55f"/><stop offset="1" stop-color="#5c7d3c"/></linearGradient></defs>
-<path d="M106,182 C110,132 106,98 102,74 L120,74 C118,100 124,136 128,182 Z" fill="url(#ac)"/>
-<g stroke="#674c2a" stroke-width="7" stroke-linecap="round" fill="none"><path d="M110,86 C86,78 60,72 40,72"/><path d="M114,82 C142,74 172,68 196,68"/><path d="M111,94 C98,84 80,80 66,80"/><path d="M113,90 C132,80 156,74 176,74"/></g>
-<path d="M18,66 C44,40 96,32 118,32 C150,32 200,42 218,66 C198,58 150,54 118,54 C84,54 40,58 18,66 Z" fill="url(#acf)"/>
-<ellipse cx="118" cy="46" rx="100" ry="17" fill="url(#acf)"/>
-<ellipse cx="118" cy="38" rx="74" ry="12" fill="#90af68"/>
-<g fill="#6f9450" opacity="0.55"><ellipse cx="58" cy="50" rx="24" ry="8"/><ellipse cx="118" cy="46" rx="28" ry="9"/><ellipse cx="178" cy="50" rx="24" ry="8"/></g>`), 210);
+<path d="M106,188 C110,136 106,98 103,72 L119,72 C117,100 124,140 128,188 Z" fill="url(#ac)"/>
+<g stroke="#674c2a" stroke-width="8" stroke-linecap="round" fill="none"><path d="M109,82 C84,70 56,58 32,54"/><path d="M113,78 C144,66 176,56 204,54"/><path d="M110,90 C90,76 70,62 54,57"/><path d="M112,86 C136,72 164,60 186,56"/></g>
+<path d="M14,60 C44,32 96,24 118,24 C152,24 204,34 222,60 C200,52 152,50 118,50 C82,50 38,52 14,60 Z" fill="url(#acf)"/>
+<ellipse cx="118" cy="44" rx="104" ry="17" fill="url(#acf)"/>
+<ellipse cx="118" cy="37" rx="78" ry="12" fill="#90af68"/>
+<g fill="#6f9450" opacity="0.5"><ellipse cx="56" cy="50" rx="24" ry="8"/><ellipse cx="118" cy="46" rx="30" ry="9"/><ellipse cx="182" cy="50" rx="24" ry="8"/></g>`), 210);
 save('giraffe', S('212 322', `<defs><linearGradient id="gf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ecc46e"/><stop offset="1" stop-color="#cf9e44"/></linearGradient></defs>
 <g stroke="#cf9e44" stroke-width="11" stroke-linecap="round"><line x1="72" y1="168" x2="66" y2="306"/><line x1="98" y1="170" x2="98" y2="308"/><line x1="122" y1="170" x2="126" y2="308"/><line x1="144" y1="168" x2="152" y2="304"/></g>
 <g stroke="#5a4326" stroke-width="11" stroke-linecap="round"><line x1="66" y1="298" x2="66" y2="306"/><line x1="98" y1="300" x2="98" y2="308"/><line x1="126" y1="300" x2="126" y2="308"/><line x1="152" y1="296" x2="152" y2="304"/></g>
@@ -315,7 +316,7 @@ save('vulture', S('156 74', `<defs><linearGradient id="vu" x1="0" y1="0" x2="0" 
 <circle cx="74" cy="27" r="1.3" fill="#1a1a1a"/>`), 134);
 
 // ---- contact sheet of new + polished ----
-const review = ['acacia', 'giraffe', 'zebra', 'vulture'];
+const review = ['acacia', 'sailboat', 'bush'];
 const cols = 4, cell = 230, pad = 14, rows = Math.ceil(review.length / cols);
 (async () => {
   const comps = [];
