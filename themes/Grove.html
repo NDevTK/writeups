@@ -4297,30 +4297,6 @@
         s.textContent = text;
         row.appendChild(s);
       };
-      // ---- fullscreen (with vendor fallbacks; may be blocked when embedded without permission) ----
-      const fsTarget = document.documentElement;
-      const fsEl = () =>
-        document.fullscreenElement || document.webkitFullscreenElement || null;
-      function toggleFullscreen() {
-        try {
-          if (fsEl()) {
-            const exit =
-              document.exitFullscreen || document.webkitExitFullscreen;
-            if (exit) exit.call(document);
-          } else {
-            const req =
-              fsTarget.requestFullscreen || fsTarget.webkitRequestFullscreen;
-            if (req) {
-              const p = req.call(fsTarget);
-              if (p && p.catch) p.catch(() => {});
-            }
-          }
-        } catch (e) {}
-      }
-      // keep the button label in sync when fullscreen is exited via Esc or the system
-      ['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) =>
-        document.addEventListener(ev, () => buildUI())
-      );
       function buildUI() {
         uiBiome.textContent = '';
         uiTime.textContent = '';
@@ -4387,20 +4363,22 @@
           })
         );
         uiSeason.appendChild(
-          mkBtn(fsEl() ? '⛶ Exit Fullscreen' : '⛶ Fullscreen', !!fsEl(), () =>
-            toggleFullscreen()
-          )
-        );
+          mkBtn('✕ Hide options', false, () => setMode('bare'))
+        ); // drop to a clean wallpaper; the ✦ toggle brings the controls back
       }
       buildUI();
 
       // ---- host bridge + pause when hidden ----
-      let shown = false;
-      function setShown(v) {
-        shown = v;
-        document.body.classList.toggle('shown', v);
+      // three states: 'hidden' = page content (the iframe sits behind the page) | 'shown' = the
+      // controls panel is up | 'bare' = a clean wallpaper (controls hidden, but the host keeps the
+      // iframe forward, covering the page). 'Hide options' goes to 'bare'; the ✦ toggle brings the
+      // controls back.
+      let wpMode = 'hidden';
+      function setMode(m) {
+        wpMode = m;
+        document.body.classList.toggle('shown', m === 'shown'); // the panel shows only in 'shown'
         window.parent.postMessage(
-          {type: 'shaderwall', state: v ? 'shown' : 'hidden'},
+          {type: 'shaderwall', state: m},
           location.origin
         );
       }
@@ -4413,17 +4391,21 @@
           return;
         }
         if (d.type !== 'shaderwall') return;
-        if (d.action === 'show') setShown(true);
-        else if (d.action === 'hide') setShown(false);
-        else if (d.action === 'toggle') setShown(!shown);
+        if (d.action === 'show') setMode('shown');
+        else if (d.action === 'hide') setMode('hidden');
+        // the ✦ toggle: from the controls drop back to the page; from the page (or a bare
+        // wallpaper) bring the controls up
+        else if (d.action === 'toggle')
+          setMode(wpMode === 'shown' ? 'hidden' : 'shown');
       });
       addEventListener('keydown', (e) => {
-        if (e.key === 'h' || e.key === 'H') setShown(!shown);
+        if (e.key === 'h' || e.key === 'H')
+          setMode(wpMode === 'shown' ? 'hidden' : 'shown');
       });
       document.addEventListener('visibilitychange', () => {
         document.hidden ? app.ticker.stop() : app.ticker.start();
       });
-      setShown(false);
+      setMode('hidden');
     </script>
   </body>
 </html>
