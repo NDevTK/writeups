@@ -191,7 +191,9 @@ if (theme.endsWith('.html')) {
     if (d.type !== 'shaderwall') return;
     // no clickjacking, sending shaderwall type shows embed support
     if (window.top === window) document.body.appendChild(btn);
-    if (d.state === 'shown') {
+    if (d.state === 'shown' || d.state === 'bare') {
+      // 'bare' is a clean wallpaper: keep the iframe forward (covering the page) but with the
+      // theme's own controls hidden. The toggle button (above the iframe) brings the controls back.
       frame.style.zIndex = '2147483646';
       frame.style.pointerEvents = 'auto';
     } else if (d.state === 'hidden') {
