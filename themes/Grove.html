@@ -422,7 +422,8 @@
             drag: false,
             sailboat: true,
             fish: 2,
-            dolphins: 2 // a pod porpoises across the bay
+            dolphins: 2, // a pod porpoises across the bay
+            whale: true // a whale surfaces and blows far out
           },
           walker: null,
           critter: 'crab',
@@ -635,7 +636,8 @@
             drag: false,
             fish: 2,
             floes: 3, // ice floes drift on the cold water
-            seal: true // a seal basks on one of them
+            seal: true, // a seal basks on one of them
+            whale: true // a whale surfaces and blows out in the inlet
           },
           walker: null,
           critter: null,
@@ -859,7 +861,8 @@
             seal: true, // a seal hauls out on the largest floe
             dolphins: 1, // a lone orca patrols the lead, surfacing now and then
             dolphinSprite: 'orca',
-            dolphinScale: 0.5
+            dolphinScale: 0.5,
+            whale: true // a whale surfaces and blows far out among the bergs
           },
           penguins: 4, // a little colony waddles the ice
           walker: null,
@@ -1010,7 +1013,9 @@
         'mushroom_a',
         'mushroom_b',
         'owl_a',
-        'owl_b'
+        'owl_b',
+        'whale_back',
+        'whale_fluke'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -1358,6 +1363,7 @@
         penguins = [],
         spores = [],
         frontRocks = [],
+        spout = [],
         hillBands = [];
       let sky,
         stars,
@@ -1392,6 +1398,8 @@
         marmot,
         seal,
         roadrunner,
+        whale,
+        spoutG,
         SE,
         BI,
         ready = false;
@@ -1433,10 +1441,12 @@
           penguins.length =
           spores.length =
           frontRocks.length =
+          spout.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
         lavaGlow = turtle = causticG = marmot = seal = roadrunner = null;
+        whale = spoutG = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
         // SP = optional per-biome season palette (tint-only seasons); else fall back to the global SEASONS, and non-seasonal biomes ignore the season entirely.
@@ -2239,6 +2249,30 @@
           water.height = VH - 600;
           water.tint = snow ? 0xcfe6ef : 0xffffff;
           scene.addChild(water);
+          if (BI.water.whale) {
+            // a whale surfaces out in the water (backmost water element), blows a misty spout, then sounds
+            whale = spr('whale_back', 400, 642, 0.4, 0.5, 1);
+            whale.baseY = 642;
+            whale.alpha = 0;
+            whale.dir = Math.random() < 0.5 ? -1 : 1;
+            whale.scale.x = whale.dir * Math.abs(whale.scale.x);
+            whale.state = 'rest';
+            whale.tmr = 2 + Math.random() * 5;
+            whale.blows = 0;
+            whale.blowGap = 0;
+            scene.addChild(whale);
+            whale.fluke = spr('whale_fluke', 400, 642, 0.4, 0.5, 1);
+            whale.fluke.alpha = 0;
+            scene.addChild(whale.fluke);
+            spoutG = new PIXI.Graphics();
+            scene.addChild(spoutG);
+            if (reduce.matches) {
+              // hold a static surfaced whale (the ticker that animates it doesn't run under reduced motion)
+              whale.x = 360;
+              whale.y = whale.baseY - 12;
+              whale.alpha = 1;
+            }
+          }
           const lip = new PIXI.Graphics();
           lip.beginFill(0xbfe6ef, 0.5);
           lip.drawRect(-40, 600, VW + 80, 3);
@@ -3625,6 +3659,95 @@
                 f.next = 5 + Math.random() * 8;
               }
             }
+          }
+        }
+        // a whale far out: rises to break the surface, blows a spout or two, drifts, then sounds (fluke-up dive)
+        if (whale) {
+          whale.tmr -= dt / 60;
+          const cruise = whale.baseY - 12;
+          if (whale.state === 'rest') {
+            whale.alpha = Math.max(0, whale.alpha - 0.06 * dt);
+            whale.fluke.alpha = Math.max(0, whale.fluke.alpha - 0.06 * dt);
+            if (whale.tmr <= 0) {
+              whale.x = 150 + Math.random() * (VW - 300);
+              whale.dir = Math.random() < 0.5 ? -1 : 1;
+              whale.scale.x = whale.dir * Math.abs(whale.scale.x);
+              whale.state = 'rise';
+              whale.tmr = 1.2;
+            }
+          } else if (whale.state === 'rise') {
+            whale.alpha = Math.min(1, whale.alpha + 0.05 * dt);
+            whale.y = whale.baseY - (1 - Math.max(0, whale.tmr) / 1.2) * 12; // eases up to break the surface
+            whale.x += whale.dir * 0.1 * dt;
+            if (whale.tmr <= 0) {
+              whale.state = 'blow';
+              whale.tmr = 0.05;
+              whale.blows = 1 + (Math.random() < 0.5 ? 1 : 0);
+              whale.blowGap = 0;
+            }
+          } else if (whale.state === 'blow') {
+            whale.y = cruise;
+            whale.x += whale.dir * 0.1 * dt;
+            whale.blowGap -= dt / 60;
+            if (whale.blowGap <= 0 && whale.blows > 0) {
+              // a misty blow from the blowhole near the head
+              const bx = whale.x + whale.dir * 38,
+                by = whale.y - 14;
+              for (let i = 0; i < 20; i++)
+                spout.push({
+                  x: bx + (Math.random() - 0.5) * 7,
+                  y: by,
+                  vx: (Math.random() - 0.5) * 0.5 + whale.dir * 0.1,
+                  vy: -(1.6 + Math.random() * 1.3),
+                  r: 1.5 + Math.random() * 2.6,
+                  life: 0.9 + Math.random() * 0.5
+                });
+              whale.blows--;
+              whale.blowGap = 0.9;
+            }
+            if (whale.tmr <= 0 && whale.blows <= 0) {
+              whale.state = 'hold';
+              whale.tmr = 2.5 + Math.random() * 2.5;
+            }
+          } else if (whale.state === 'hold') {
+            whale.y = cruise;
+            whale.x += whale.dir * 0.09 * dt;
+            if (whale.tmr <= 0) {
+              whale.state = 'sound';
+              whale.tmr = 1.5;
+            }
+          } else if (whale.state === 'sound') {
+            const k = Math.max(0, whale.tmr) / 1.5; // 1 -> 0 over the dive
+            whale.alpha = k; // the back slides under
+            whale.y = whale.baseY - 12 * k;
+            const fk = Math.sin((1 - k) * Math.PI); // flukes rise then slip under
+            whale.fluke.x = whale.x - whale.dir * 30; // at the tail (behind its travel)
+            whale.fluke.scale.x = whale.dir * Math.abs(whale.fluke.scale.x);
+            whale.fluke.y = whale.baseY - fk * 22;
+            whale.fluke.alpha = fk;
+            if (whale.tmr <= 0) {
+              whale.state = 'rest';
+              whale.alpha = whale.fluke.alpha = 0;
+              whale.tmr = 7 + Math.random() * 9;
+            }
+          }
+        }
+        // the whale's spout: misty droplets rise from the blowhole, fan out under gravity and fade
+        if (spoutG) {
+          spoutG.clear();
+          for (let i = spout.length - 1; i >= 0; i--) {
+            const s = spout[i];
+            s.life -= (dt / 60) * 0.5;
+            if (s.life <= 0) {
+              spout.splice(i, 1);
+              continue;
+            }
+            s.x += s.vx * dt;
+            s.y += s.vy * dt;
+            s.vy += 0.06 * dt; // gravity pulls the mist back down
+            spoutG.beginFill(0xffffff, 0.5 * Math.min(1, s.life));
+            spoutG.drawCircle(s.x, s.y, s.r);
+            spoutG.endFill();
           }
         }
         // ice floes drift slowly across the fjord and bob on the swell, wrapping at the edges

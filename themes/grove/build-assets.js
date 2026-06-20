@@ -1363,8 +1363,40 @@ ${
 save('owl_a', owl(true), 152);
 save('owl_b', owl(false), 152);
 
+// ---- distant whale (coast / polar / fjord): surfaces far out, blows, then dives ----
+// just the exposed back breaking the surface (flat bottom sits at the waterline): a long low
+// arch with a small dorsal hump, a blowhole bump near the head, a wet sheen and some mottling
+save(
+  'whale_back',
+  S(
+    '200 64',
+    `<defs><linearGradient id="whb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a6b78"/><stop offset="1" stop-color="#2c3a45"/></linearGradient></defs>
+<path d="M8,60 C20,40 60,30 110,28 C150,27 178,34 192,46 C196,50 196,56 194,60 Z" fill="url(#whb)"/>
+<path d="M126,30 C132,18 144,18 148,30 C140,29 132,29 126,30 Z" fill="#3a4a55"/>
+<path d="M176,36 C180,30 186,30 188,36 C184,35 180,35 176,36 Z" fill="#3a4a55"/>
+<path d="M30,42 C70,33 120,32 170,40 C120,37 72,38 34,46 Z" fill="#8aa0ad" opacity="0.5"/>
+<g fill="#46545f" opacity="0.5"><circle cx="70" cy="42" r="2.4"/><circle cx="100" cy="38" r="2"/><circle cx="140" cy="42" r="2.2"/></g>`
+  ),
+  200
+);
+// tail flukes lifting for the dive — roughly symmetric so it mirrors cleanly; flat bottom at the waterline
+save(
+  'whale_fluke',
+  S(
+    '120 92',
+    `<defs><linearGradient id="whf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a6b78"/><stop offset="1" stop-color="#2c3a45"/></linearGradient></defs>
+<path d="M54,92 C52,72 54,58 60,52 L64,52 C70,58 70,74 68,92 Z" fill="url(#whf)"/>
+<path d="M61,54 C45,42 25,38 9,42 C23,48 41,54 59,60 Z" fill="url(#whf)"/>
+<path d="M63,54 C79,42 99,38 115,42 C101,48 83,54 65,60 Z" fill="url(#whf)"/>
+<path d="M59,55 L65,55 L62,60 Z" fill="#22303a"/>
+<g fill="#8aa0ad" opacity="0.4"><path d="M15,43 C31,46 47,51 59,57 C45,51 29,47 15,45 Z"/><path d="M105,43 C89,46 73,51 61,57 C77,51 93,47 105,45 Z"/></g>
+<g fill="#bcd3dd" opacity="0.7"><circle cx="21" cy="48" r="1.4"/><circle cx="99" cy="48" r="1.4"/><circle cx="41" cy="56" r="1.2"/></g>`
+  ),
+  120
+);
+
 // ---- contact sheet of new + polished ----
-const review = ['owl_a', 'owl_b'];
+const review = ['whale_back', 'whale_fluke'];
 const cols = 4,
   cell = 230,
   pad = 14,
