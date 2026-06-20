@@ -568,7 +568,15 @@
             ducks: false,
             drag: false
           },
-          waterfall: {x: 700, top: 398, w: 18}, // spills over the ridge and cascades down the cliff into the sea
+          // a slim falls sprite spilling over the ridge into the sea
+          waterfall: {
+            falls: ['vfall_a', 'vfall_b'],
+            x: 700,
+            y: 606,
+            scale: 0.74,
+            ax: 0.5,
+            plungeX: 700
+          },
           walker: null,
           critter: null,
           hopper: null,
@@ -600,8 +608,16 @@
             [1220, 0xb98aff]
           ],
           glow: 'cave', // glowworms on the ceiling
-          // designed sprites: a big rock ledge on the left + the falling water that crosses + drops off it
-          waterfall: {sprite: true, x: -40, y: 614, scale: 1.12, plungeX: 303},
+          // designed sprites: a craggy overhang ledge + falls that cross its top and drop off the lip
+          waterfall: {
+            rock: 0x6b6488,
+            falls: ['falls_a', 'falls_b'],
+            x: -40,
+            y: 616,
+            scale: 1.12,
+            ax: 0,
+            plungeX: 332
+          },
           walker: null,
           critter: null,
           hopper: null,
@@ -673,7 +689,9 @@
         'peak',
         'bigrock',
         'falls_a',
-        'falls_b'
+        'falls_b',
+        'vfall_a',
+        'vfall_b'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -835,7 +853,6 @@
         rippleG,
         iceG,
         tracksG,
-        wfG,
         SE,
         BI,
         ready = false;
@@ -1037,11 +1054,11 @@
                 dropY: null
               });
           }
-          // the big rock ledge (a designed sprite, tinted to the cave's dark stone), behind the crystals
-          if (BI.waterfall && BI.waterfall.sprite) {
+          // the big rock ledge (a designed sprite, tinted to the cave's cool stone), behind the crystals
+          if (BI.waterfall && BI.waterfall.rock) {
             const wf = BI.waterfall,
-              rk = spr('bigrock', wf.x, wf.y, wf.scale, 0, 1);
-            rk.tint = 0x6b6488; // cool cave-stone, lit enough to read against the dark
+              rk = spr('bigrock', wf.x, wf.y, wf.scale, wf.ax, 1);
+            rk.tint = wf.rock; // lit enough to read against the dark
             scene.addChild(rk);
           }
         }
@@ -1361,18 +1378,14 @@
           water = null;
           iceG = null;
         }
-        if (BI.waterfall) {
-          wfG = new PIXI.Graphics();
-          scene.addChild(wfG); // coded fall (fjord) / plunge rings, above the water surface
-          if (BI.waterfall.sprite) {
-            // the falling water itself is a 2-frame sprite, sat in front of the rock + pool
-            const wf = BI.waterfall,
-              fa = anim(['falls_a', 'falls_b'], wf.x, wf.y, wf.scale, 0.05);
-            fa.anchor.set(0, 1);
-            if (reduce.matches) fa.gotoAndStop(0); // hold a still frame when motion is reduced
-            scene.addChild(fa);
-          }
-        } else wfG = null;
+        if (BI.waterfall && BI.waterfall.falls) {
+          // the falling water is a 2-frame sprite, in front of the rock + pool
+          const wf = BI.waterfall,
+            fa = anim(wf.falls, wf.x, wf.y, wf.scale, 0.05);
+          fa.anchor.set(wf.ax, 1);
+          if (reduce.matches) fa.gotoAndStop(0); // hold a still frame when motion is reduced
+          scene.addChild(fa);
+        }
         if (BI.flutter && !snow)
           for (let i = 0; i < 4; i++) {
             const f = anim(
@@ -2209,64 +2222,14 @@
           }
         }
 
-        // waterfall: the cave's is designed sprites (rock + 2-frame falls); the fjord is a coded spill
-        if (wfG) {
-          wfG.clear();
-          const wf = BI.waterfall;
-          if (wf.sprite) {
-            // the rock + falls are real sprites; just ring the pool where the water lands
-            if (water && Math.random() < 0.12 * dt)
-              ripples.push({
-                x: wf.plungeX + (Math.random() - 0.5) * 20,
-                y: 606,
-                r: 3,
-                life: 1
-              });
-          } else {
-            const w = wf.w || 22,
-              bot = wf.bot || 600;
-            wfG.beginFill(0xbfe0f0, 0.26); // a falling sheet with wavering sides
-            wfG.moveTo(wf.x - w / 2, wf.top);
-            for (let y = wf.top; y <= bot; y += 14)
-              wfG.lineTo(wf.x - w / 2 + Math.sin(y * 0.05 + t * 4) * 2.5, y);
-            for (let y = bot; y >= wf.top; y -= 14)
-              wfG.lineTo(
-                wf.x + w / 2 + Math.sin(y * 0.05 + t * 4 + 2) * 2.5,
-                y
-              );
-            wfG.closePath();
-            wfG.endFill();
-            for (let i = 0; i < 6; i++) {
-              const base = wf.x - w / 2 + ((i + 0.5) / 6) * w,
-                a = 0.12 + 0.16 * (0.5 + 0.5 * Math.sin(t * 3 + i * 2));
-              wfG.lineStyle(1.4, 0xeaf6ff, a);
-              wfG.moveTo(
-                base + Math.sin(wf.top * 0.05 + t * 4 + i) * 2.5,
-                wf.top
-              );
-              for (let y = wf.top; y <= bot; y += 14)
-                wfG.lineTo(base + Math.sin(y * 0.05 + t * 4 + i) * 2.5, y);
-            }
-            wfG.lineStyle(0);
-            for (let i = 0; i < 5; i++) {
-              const hx = wf.x - w / 2 + 3 + ((i * 0.41) % 1) * (w - 6),
-                hy = wf.top + ((t * (240 + i * 50) + i * 120) % (bot - wf.top));
-              wfG.beginFill(0xffffff, 0.6);
-              wfG.drawRect(hx - 1, hy, 2, 12);
-              wfG.endFill();
-            }
-            wfG.beginFill(0xffffff, 0.42 + Math.sin(t * 6) * 0.16); // base foam
-            wfG.drawEllipse(wf.x, bot, w * 0.8, 5);
-            wfG.endFill();
-            if (water && Math.random() < 0.12 * dt)
-              ripples.push({
-                x: wf.x + (Math.random() - 0.5) * w,
-                y: bot + 6,
-                r: 3,
-                life: 1
-              });
-          }
-        }
+        // waterfall (cave + fjord) are designed sprites; just ring the water where the fall lands
+        if (BI.waterfall && water && Math.random() < 0.12 * dt)
+          ripples.push({
+            x: BI.waterfall.plungeX + (Math.random() - 0.5) * 20,
+            y: 606,
+            r: 3,
+            life: 1
+          });
 
         // butterflies, dragonflies, bird — wandering / crossing
         for (const f of flutters) {
