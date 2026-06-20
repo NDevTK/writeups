@@ -124,7 +124,8 @@
           critter: 'lizard', critterScale: 0.5, hopper: null, flyer: 0x4a4036, flutter: false, roller: 'tumbleweed',
         },
         coast: {
-          label: '🏖️ Coast', sky: 0xffffff, seasonal: false,
+          label: '🏖️ Coast', sky: 0xffffff, seasonal: true,
+          seasonPalette: { spring: { fol: 0xeafff0, hill: 0xfff8ee, grass: 0xcfd89a }, summer: { fol: 0xffffff, hill: 0xffffff, grass: 0xd8c88a }, autumn: { fol: 0xffd9a8, hill: 0xf6e6c4, grass: 0xc8a86a }, winter: { fol: 0xdfe6ea, hill: 0xeef0ee, grass: 0xc4c6b8 } },
           hills: [0xe8ddbc, 0xe0cd9c, 0xd6bd80], ground: 'beach',
           mid: [['palm', 0.6, 250], ['palm', 0.5, 1010]],
           near: [['palm', 1.05, 150], ['palm', 0.9, 1130], ['rock', 0.7, 520]],
@@ -132,7 +133,8 @@
           walker: null, critter: 'crab', critterScale: 0.5, hopper: null, flyer: 0xffffff, flyerFrames: ['gull'], flutter: false, roller: null,
         },
         wetland: {
-          label: '🪷 Wetland', sky: 0xf2f7ee, seasonal: false,
+          label: '🪷 Wetland', sky: 0xf2f7ee, seasonal: true,
+          seasonPalette: { spring: { fol: 0xeafff0, hill: 0xeafff2, grass: 0x8fc25a }, summer: { fol: 0xffffff, hill: 0xffffff, grass: 0x8fae5c }, autumn: { fol: 0xe8c878, hill: 0xe0d29a, grass: 0x9a9a4a }, winter: { fol: 0xc8d2cc, hill: 0xd8e0d8, grass: 0x9aae8a } },
           hills: [0x9ec1a0, 0x7caf6e, 0x5f9456], ground: 'marsh',
           mid: [['reed', 0.55, 210], ['reed', 0.48, 560], ['reed', 0.6, 1040]],
           near: [['reed', 1.05, 120], ['reed', 0.92, 470], ['reed', 1.12, 880], ['reed', 0.88, 1160]],
@@ -151,7 +153,8 @@
           critter: null, hopper: null, flyer: 0xffffff, flyerFrames: ['eagle'], flutter: false, roller: null,
         },
         savanna: {
-          label: '🌅 Savanna', sky: 0xffeccb, seasonal: false,
+          label: '🌅 Savanna', sky: 0xffeccb, seasonal: true,
+          seasonPalette: { spring: { fol: 0xb6e87e, hill: 0xc0eea2, grass: 0x8cc24e }, summer: { fol: 0xffffff, hill: 0xffffff, grass: 0xcaad5e }, autumn: { fol: 0xf0c060, hill: 0xeccf86, grass: 0xc29a46 }, winter: { fol: 0xe8dcb0, hill: 0xede2c2, grass: 0xccbf86 } },
           hills: [0xe6d29a, 0xd7bd76, 0xc6a85a], ground: 'savanna',
           mid: [['acacia', 0.55, 320], ['acacia', 0.45, 980]],
           near: [['acacia', 1.0, 200], ['acacia', 0.85, 1080]],
@@ -208,7 +211,13 @@
         lavaGlow = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
-        const folTint = BI.foliageTint || (BI.seasonal ? SE.foliage : 0xffffff), snow = SE.snow || BI.snowCaps, weatherKind = BI.seasonal ? SE.weather : (snow ? 'flake' : 'none');
+        // SP = optional per-biome season palette (tint-only seasons); else fall back to the global SEASONS, and non-seasonal biomes ignore the season entirely.
+        const SP = (BI.seasonal && BI.seasonPalette) ? BI.seasonPalette[nowSeason()] : null;
+        const folTint = BI.foliageTint || (SP ? SP.fol : BI.seasonal ? SE.foliage : 0xffffff);
+        const snow = (SP ? false : BI.seasonal ? SE.snow : false) || !!BI.snowCaps;
+        const weatherKind = SP ? (SP.weather || 'none') : (BI.seasonal ? SE.weather : (snow ? 'flake' : 'none'));
+        const hillTint = SP ? SP.hill : (BI.seasonal ? SE.hill : 0xffffff);
+        const grassTint = (SP && SP.grass) ? SP.grass : null;
         lastSkyH = -99; // force the sky to redraw into the fresh Graphics next frame
 
         sky = new PIXI.Graphics(); sky.tint = BI.sky; root.addChild(sky);
@@ -230,7 +239,7 @@
         scene = new PIXI.Container(); root.addChild(scene);
         if (BI.feature) { const fe = spr(BI.feature, 640, 486, 0.95); scene.addChild(fe); } // large background landmark behind the hills
         const HILLS = [[420, 26, 0], [470, 30, 1.3], [540, 26, 2.4]];
-        HILLS.forEach(([cy, am, ph], i) => { const hh = hill(cy, am, BI.hills[i], ph); hh.tint = SE.hill; scene.addChild(hh); });
+        HILLS.forEach(([cy, am, ph], i) => { const hh = hill(cy, am, BI.hills[i], ph); hh.tint = hillTint; scene.addChild(hh); });
         if (snow) for (const [cy, am, ph] of HILLS) { // snow settled along each crest
           const g = new PIXI.Graphics(); g.beginFill(0xeef5fc); g.moveTo(0, cy + Math.sin(ph) * am);
           for (let x = 0; x <= VW; x += 8) g.lineTo(x, cy + Math.sin(x * 0.006 + ph) * am);
@@ -248,16 +257,16 @@
         } else if (BI.ground === 'beach') {
           for (let i = 0; i < 12; i++) { const x = 30 + Math.random() * (VW - 60); scene.addChild(spr('rock', x, groundY(x) + 8, 0.07 + Math.random() * 0.09)); }
           for (let i = 0; i < 6; i++) scene.addChild(spr('starfish', 60 + Math.random() * (VW - 120), 582 + Math.random() * 14, 0.28 + Math.random() * 0.22));
-          for (let i = 0; i < 5; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.4 + Math.random() * 0.3); g.tint = 0xd8c88a; scene.addChild(g); swayers.push({ s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6 }); }
+          for (let i = 0; i < 5; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.4 + Math.random() * 0.3); g.tint = grassTint || 0xd8c88a; scene.addChild(g); swayers.push({ s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6 }); }
         } else if (BI.ground === 'marsh') {
           for (let i = 0; i < 8; i++) { const x = 30 + Math.random() * (VW - 60); scene.addChild(spr('rock', x, groundY(x) + 8, 0.05 + Math.random() * 0.07)); }
-          for (let i = 0; i < 15; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.6); g.tint = 0x8fae5c; scene.addChild(g); swayers.push({ s: g, amp: 0.06, sp: 1.7, ph: Math.random() * 6 }); }
+          for (let i = 0; i < 15; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.6); g.tint = grassTint || 0x8fae5c; scene.addChild(g); swayers.push({ s: g, amp: 0.06, sp: 1.7, ph: Math.random() * 6 }); }
         } else if (BI.ground === 'snow') {
           for (let i = 0; i < 12; i++) { const x = 20 + Math.random() * (VW - 40), r = spr('rock', x, groundY(x) + 8, 0.08 + Math.random() * 0.12); r.tint = 0x9aa6b4; scene.addChild(r); }
           for (let i = 0; i < 5; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.4 + Math.random() * 0.3); g.tint = 0xc6ccba; scene.addChild(g); swayers.push({ s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6 }); }
         } else if (BI.ground === 'savanna') {
           for (let i = 0; i < 6; i++) { const x = 30 + Math.random() * (VW - 60); scene.addChild(spr('rock', x, groundY(x) + 8, 0.06 + Math.random() * 0.08)); }
-          for (let i = 0; i < 20; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.5 + Math.random() * 0.6); g.tint = 0xcaad5e; scene.addChild(g); swayers.push({ s: g, amp: 0.06, sp: 1.5, ph: Math.random() * 6 }); }
+          for (let i = 0; i < 20; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.5 + Math.random() * 0.6); g.tint = grassTint || 0xcaad5e; scene.addChild(g); swayers.push({ s: g, amp: 0.06, sp: 1.5, ph: Math.random() * 6 }); }
         } else if (BI.ground === 'fern') {
           for (let i = 0; i < 5; i++) { const x = 30 + Math.random() * (VW - 60); scene.addChild(spr('rock', x, groundY(x) + 8, 0.05 + Math.random() * 0.06)); }
           for (let i = 0; i < 18; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.7); g.tint = 0x6fae4a; scene.addChild(g); swayers.push({ s: g, amp: 0.06, sp: 1.6, ph: Math.random() * 6 }); }
