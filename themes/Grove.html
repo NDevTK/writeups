@@ -348,7 +348,14 @@
           sky: 0xfff0d6,
           seasonal: false,
           hills: [0xe9d3a4, 0xdcbb80, 0xcca35f],
-          distant: {style: 'mesa', tint: 0xdcc59c}, // buttes in the heat haze
+          distant: {
+            sprite: 'butte',
+            count: 4,
+            sc: [0.55, 1.0],
+            y: 474,
+            tint: 0xe7d4ab,
+            alpha: 0.96
+          }, // textured buttes hazed into the heat shimmer
           ground: 'sand',
           mid: [
             ['cactus', 0.5, 260],
@@ -603,25 +610,8 @@
             lily: false,
             ducks: false,
             drag: false,
-            fish: 2
-          },
-          // a slim falls sprite spilling over the ridge into the sea
-          waterfall: {
-            falls: ['vfall_a', 'vfall_b'],
-            x: 700,
-            y: 606,
-            scale: 0.74,
-            ax: 0.5,
-            plungeX: 700,
-            streak: {
-              x: 690,
-              y: 414,
-              w: 21,
-              h: 174,
-              scale: 0.5,
-              speed: 2.6,
-              alpha: 0.85
-            }
+            fish: 2,
+            floes: 3 // ice floes drift on the cold water
           },
           walker: null,
           critter: null,
@@ -784,8 +774,6 @@
         'bigrock',
         'falls_a',
         'falls_b',
-        'vfall_a',
-        'vfall_b',
         'wstreak',
         'fog',
         'kelp',
@@ -796,7 +784,9 @@
         'turtle',
         'bubble',
         'jelly_a',
-        'jelly_b'
+        'jelly_b',
+        'butte',
+        'icefloe'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -844,15 +834,15 @@
         const g = new PIXI.Graphics(),
           base = 452;
         if (d.style === 'peak') {
-          // one continuous jagged ridge — summits linked by elevated cols — sampled into a dense
-          // polyline so snow can lie naturally on the upper slopes down to a snowline
+          // one continuous jagged ridge — summits linked by elevated cols. summits always clear the
+          // snowline so every one keeps its snow; lit + shadowed faces give them form (not flat triangles)
           const ctrl = [[-40, base]];
           let x = -40;
           while (x <= VW + 40) {
-            ctrl.push([x, base - (118 + Math.random() * 104)]); // a summit
-            x += 68 + Math.random() * 56;
-            ctrl.push([x, base - (58 + Math.random() * 40)]); // a col, still high (the ridge stays connected)
-            x += 68 + Math.random() * 56;
+            ctrl.push([x, base - (152 + Math.random() * 86)]); // a summit (always above the snowline)
+            x += 70 + Math.random() * 54;
+            ctrl.push([x, base - (54 + Math.random() * 42)]); // a col, still high (the ridge stays connected)
+            x += 70 + Math.random() * 54;
           }
           ctrl.push([VW + 40, base]);
           const ridge = [];
@@ -867,48 +857,55 @@
               ]);
           }
           ridge.push(ctrl[ctrl.length - 1]);
-          g.beginFill(d.tint);
+          const ti = d.tint,
+            dk = (f) =>
+              ((((((ti >> 16) & 255) * f) | 0) << 16) |
+                (((((ti >> 8) & 255) * f) | 0) << 8) |
+                (((ti & 255) * f) | 0)) >>>
+              0;
+          // whole massif in the shadow tone...
+          g.beginFill(dk(0.84));
           g.moveTo(-40, base);
           for (const [px, py] of ridge) g.lineTo(px, py);
           g.closePath();
           g.endFill();
-          // snow lies on everything above a gently undulating snowline, staying connected across
-          // the high ground and receding into the cols — natural cover, not a cap on each summit
-          const slY = (x) => base - 132 + Math.sin(x * 0.021) * 9;
-          g.beginFill(0xeef4fb, 0.92);
+          // ...then the sunlit (left-facing) slope of each summit on top, for relief
+          g.beginFill(ti);
+          for (let i = 1; i < ctrl.length - 1; i += 2) {
+            const [sx, sy] = ctrl[i],
+              [lx, ly] = ctrl[i - 1];
+            g.moveTo(lx, base);
+            g.lineTo(lx, ly);
+            g.lineTo(sx, sy);
+            g.lineTo(sx, base);
+            g.closePath();
+          }
+          g.endFill();
+          // snow above an undulating snowline (connected across the high ground, receding into the cols)
+          const slY = (x) => base - 128 + Math.sin(x * 0.021) * 9;
           let run = [];
-          const flush = () => {
+          const flush = (fill, alpha, drop) => {
             if (run.length >= 2) {
-              g.moveTo(run[0][0], slY(run[0][0]));
-              for (const p of run) g.lineTo(p[0], p[1]); // up and over the ridge
+              g.beginFill(fill, alpha);
+              g.moveTo(run[0][0], slY(run[0][0]) + drop);
+              for (const p of run) g.lineTo(p[0], p[1] + drop);
               for (let k = run.length - 1; k >= 0; k--)
-                g.lineTo(run[k][0], slY(run[k][0])); // back along the snowline
+                g.lineTo(run[k][0], slY(run[k][0]) + drop);
               g.closePath();
+              g.endFill();
             }
-            run = [];
           };
+          // a faint blue under-shadow of the snow, then the bright snow over it
           for (const p of ridge) {
             if (p[1] <= slY(p[0])) run.push(p);
-            else flush();
+            else {
+              flush(0xc9d8e8, 0.9, 6);
+              flush(0xeff5fb, 0.96, 0);
+              run = [];
+            }
           }
-          flush();
-          g.endFill();
-        } else if (d.style === 'mesa') {
-          // flat-topped buttes scattered across the heat haze (naturally separate landforms)
-          g.beginFill(d.tint);
-          let x = 30;
-          while (x < VW) {
-            const w = 130 + Math.random() * 150,
-              top = base - (58 + Math.random() * 64),
-              t = w * 0.12; // a slight taper to the base
-            g.moveTo(x, base);
-            g.lineTo(x + t, top);
-            g.lineTo(x + w - t, top);
-            g.lineTo(x + w, base);
-            g.closePath();
-            x += w + 70 + Math.random() * 150;
-          }
-          g.endFill();
+          flush(0xc9d8e8, 0.9, 6);
+          flush(0xeff5fb, 0.96, 0);
         } else if (d.style === 'ridge') {
           // one low rolling ridge (the landform); distant acacia sprites are scattered on it in build
           g.beginFill(d.tint);
@@ -1046,6 +1043,7 @@
         bubbles = [],
         motes = [],
         jellies = [],
+        floes = [],
         hillBands = [];
       let sky,
         stars,
@@ -1113,6 +1111,7 @@
           bubbles.length =
           motes.length =
           jellies.length =
+          floes.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
@@ -1245,11 +1244,29 @@
           scene.addChild(fe);
         } // large background landmark behind the hills
         if (BI.distant) {
-          const dg = drawDistant(BI.distant);
-          scene.addChild(dg); // hazy horizon landform for depth (behind the hills)
+          const D = BI.distant;
+          // a continuous landform (mountain range / ridge) is drawn procedurally; depends on
+          // spanning + connecting across the whole horizon, so it can't be a fixed sprite
+          if (D.style) scene.addChild(drawDistant(D));
+          // discrete landforms (buttes) are designed, textured sprites scattered across the horizon
+          if (D.sprite) {
+            const span = VW / D.count;
+            for (let i = 0; i < D.count; i++) {
+              const bx = (i + 0.5) * span + (Math.random() - 0.5) * span * 0.7,
+                bt = spr(
+                  D.sprite,
+                  bx,
+                  D.y,
+                  D.sc[0] + Math.random() * (D.sc[1] - D.sc[0])
+                );
+              bt.tint = D.tint;
+              if (D.alpha != null) bt.alpha = D.alpha;
+              scene.addChild(bt);
+            }
+          }
           // far acacia (the real sprite, small + hazed) standing on the savanna ridge — reads as trees, not blobs
-          if (BI.distant.trees)
-            for (let i = 0; i < BI.distant.trees; i++) {
+          if (D.trees)
+            for (let i = 0; i < D.trees; i++) {
               const x = 40 + Math.random() * (VW - 80),
                 tr = spr(
                   'acacia',
@@ -1770,6 +1787,25 @@
               scene.addChildAt(f, scene.getChildIndex(glit)); // under the shimmer, ripples and ducks
             }
           }
+          // ice floes drifting on the cold water (in front of the surface)
+          if (BI.water.floes)
+            for (let i = 0; i < BI.water.floes; i++) {
+              const fl = spr(
+                'icefloe',
+                Math.random() * VW,
+                612 + Math.random() * 30,
+                0.4 + Math.random() * 0.4,
+                0.5,
+                0.7
+              );
+              fl.baseY = fl.y;
+              fl.vx =
+                (Math.random() < 0.5 ? -1 : 1) * (0.08 + Math.random() * 0.12);
+              fl.ph = Math.random() * 6.28;
+              fl.scale.x = (fl.vx < 0 ? -1 : 1) * Math.abs(fl.scale.x);
+              floes.push(fl);
+              scene.addChild(fl);
+            }
         } else {
           scene.addChild(glit);
           water = null;
@@ -2896,6 +2932,14 @@
               }
             }
           }
+        }
+        // ice floes drift slowly across the fjord and bob on the swell, wrapping at the edges
+        for (const fl of floes) {
+          fl.x += fl.vx * dt;
+          fl.y = fl.baseY + Math.sin(t * 0.8 + fl.ph) * 1.6;
+          fl.rotation = Math.sin(t * 0.5 + fl.ph) * 0.03;
+          if (fl.x > VW + 120) fl.x = -120;
+          else if (fl.x < -120) fl.x = VW + 120;
         }
         // reef bubbles stream up from their vents, wobbling, fading out near the surface
         for (const b of bubbles) {
