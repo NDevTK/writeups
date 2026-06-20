@@ -363,20 +363,20 @@ save(
   ),
   110
 );
-save(
-  'camel',
+// camel with 2 walk frames (legs stride between frames)
+const camelSvg = (lf) =>
   S(
     '200 160',
     `<defs><linearGradient id="cm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d6ac6a"/><stop offset="1" stop-color="#a87e44"/></linearGradient></defs>
-<g stroke="#9a7038" stroke-width="9" stroke-linecap="round"><line x1="72" y1="96" x2="68" y2="150"/><line x1="92" y1="98" x2="92" y2="152"/><line x1="124" y1="98" x2="128" y2="150"/><line x1="142" y1="96" x2="148" y2="148"/></g>
+<g stroke="#9a7038" stroke-width="9" stroke-linecap="round"><line x1="72" y1="96" x2="${68 + lf[0]}" y2="150"/><line x1="92" y1="98" x2="${92 + lf[1]}" y2="152"/><line x1="124" y1="98" x2="${128 + lf[2]}" y2="150"/><line x1="142" y1="96" x2="${148 + lf[3]}" y2="148"/></g>
 <path d="M58,98 C50,86 60,78 78,76 C86,54 118,54 126,76 C144,78 156,84 156,98 C148,106 80,108 58,98 Z" fill="url(#cm)"/>
 <path d="M150,90 C160,74 164,56 168,44 C170,37 180,37 180,46 C180,60 176,76 166,90 Z" fill="url(#cm)"/>
 <path d="M176,42 C187,40 193,45 190,51 C187,56 179,54 175,49 Z" fill="url(#cm)"/>
 <path d="M174,40 L172,33 L179,38 Z" fill="#a87e44"/><circle cx="182" cy="44" r="2" fill="#1a120a"/>
 <path d="M58,92 C50,93 48,101 54,105 C59,101 60,95 60,91 Z" fill="#a87e44"/>`
-  ),
-  175
-);
+  );
+save('camel', camelSvg([0, 0, 0, 0]), 175);
+save('camel_b', camelSvg([9, -7, -8, 8]), 175);
 save(
   'tumbleweed',
   S(
@@ -510,13 +510,12 @@ save(
 );
 
 // ---- ALPINE biome ----
-save(
-  'goat',
+const goatSvg = (lf) =>
   S(
     '180 152',
     `<defs><linearGradient id="gt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f2ea"/><stop offset="1" stop-color="#ccc4b1"/></linearGradient></defs>
-<g stroke="#bbb39e" stroke-width="9" stroke-linecap="round"><line x1="46" y1="92" x2="42" y2="140"/><line x1="66" y1="94" x2="66" y2="142"/><line x1="98" y1="94" x2="102" y2="142"/><line x1="116" y1="92" x2="122" y2="140"/></g>
-<g stroke="#3a3026" stroke-width="9" stroke-linecap="round"><line x1="42" y1="137" x2="42" y2="144"/><line x1="66" y1="139" x2="66" y2="146"/><line x1="102" y1="139" x2="102" y2="146"/><line x1="122" y1="137" x2="122" y2="144"/></g>
+<g stroke="#bbb39e" stroke-width="9" stroke-linecap="round"><line x1="46" y1="92" x2="${42 + lf[0]}" y2="140"/><line x1="66" y1="94" x2="${66 + lf[1]}" y2="142"/><line x1="98" y1="94" x2="${102 + lf[2]}" y2="142"/><line x1="116" y1="92" x2="${122 + lf[3]}" y2="140"/></g>
+<g stroke="#3a3026" stroke-width="9" stroke-linecap="round"><line x1="${42 + lf[0]}" y1="137" x2="${42 + lf[0]}" y2="144"/><line x1="${66 + lf[1]}" y1="139" x2="${66 + lf[1]}" y2="146"/><line x1="${102 + lf[2]}" y1="139" x2="${102 + lf[2]}" y2="146"/><line x1="${122 + lf[3]}" y1="137" x2="${122 + lf[3]}" y2="144"/></g>
 <path d="M40,96 C32,70 50,54 90,54 C126,54 140,68 140,90 C140,102 118,106 88,106 C58,106 48,106 40,96 Z" fill="url(#gt)"/>
 <path d="M40,92 C36,84 38,74 44,70 C46,80 46,88 50,96 Z" fill="#e3ddcd" opacity="0.7"/>
 <path d="M132,90 C142,82 148,72 152,62 C154,72 152,84 146,94 Z" fill="url(#gt)"/>
@@ -526,9 +525,9 @@ save(
 <path d="M155,44 C155,30 159,20 165,16" stroke="#2c241a" stroke-width="4.2" fill="none" stroke-linecap="round"/>
 <path d="M155,72 C153,84 151,92 149,97 C147,89 147,79 149,70 Z" fill="#e2dccb"/>
 <circle cx="153" cy="56" r="2.4" fill="#1c160e"/><circle cx="163" cy="72" r="1.7" fill="#3a3026"/>`
-  ),
-  168
-);
+  );
+save('goat', goatSvg([0, 0, 0, 0]), 168);
+save('goat_b', goatSvg([7, -6, -6, 7]), 168);
 // eagle redrawn as a side-on glide facing right (head + beak forward, not the old top-down view)
 save(
   'eagle',
@@ -565,13 +564,12 @@ save(
   ),
   210
 );
-save(
-  'giraffe',
+const giraffeSvg = (lf) =>
   S(
     '214 322',
     `<defs><linearGradient id="gf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eec670"/><stop offset="1" stop-color="#cf9e44"/></linearGradient></defs>
-<g stroke="#d4a44a" stroke-width="15" stroke-linecap="round"><line x1="70" y1="170" x2="64" y2="304"/><line x1="98" y1="172" x2="98" y2="306"/><line x1="126" y1="172" x2="130" y2="306"/><line x1="150" y1="170" x2="158" y2="302"/></g>
-<g stroke="#4a3520" stroke-width="15" stroke-linecap="round"><line x1="64" y1="296" x2="64" y2="305"/><line x1="98" y1="298" x2="98" y2="307"/><line x1="130" y1="298" x2="130" y2="307"/><line x1="158" y1="294" x2="158" y2="303"/></g>
+<g stroke="#d4a44a" stroke-width="15" stroke-linecap="round"><line x1="70" y1="170" x2="${64 + lf[0]}" y2="304"/><line x1="98" y1="172" x2="${98 + lf[1]}" y2="306"/><line x1="126" y1="172" x2="${130 + lf[2]}" y2="306"/><line x1="150" y1="170" x2="${158 + lf[3]}" y2="302"/></g>
+<g stroke="#4a3520" stroke-width="15" stroke-linecap="round"><line x1="${64 + lf[0]}" y1="296" x2="${64 + lf[0]}" y2="305"/><line x1="${98 + lf[1]}" y1="298" x2="${98 + lf[1]}" y2="307"/><line x1="${130 + lf[2]}" y1="298" x2="${130 + lf[2]}" y2="307"/><line x1="${158 + lf[3]}" y1="294" x2="${158 + lf[3]}" y2="303"/></g>
 <path d="M52,150 C42,162 40,182 46,194" stroke="#cf9e44" stroke-width="6" fill="none" stroke-linecap="round"/><line x1="46" y1="190" x2="43" y2="202" stroke="#4a3520" stroke-width="6" stroke-linecap="round"/>
 <path d="M46,166 C40,128 70,106 112,104 C154,102 178,118 178,150 C178,174 136,184 98,184 C72,184 54,178 46,166 Z" fill="url(#gf)"/>
 <path d="M146,126 C158,90 166,54 174,30" stroke="url(#gf)" stroke-width="31" fill="none" stroke-linecap="round"/>
@@ -581,9 +579,9 @@ save(
 <circle cx="173" cy="1" r="4" fill="#5a4326"/><circle cx="191" cy="1" r="4" fill="#5a4326"/>
 <circle cx="180" cy="28" r="2.6" fill="#3a2a16"/>
 <g fill="#a9742f" opacity="0.85"><path d="M60,138 l18,-4 l7,17 l-17,5 Z"/><path d="M94,150 l19,-2 l5,17 l-19,4 Z"/><path d="M126,138 l18,-2 l6,17 l-18,5 Z"/><path d="M150,158 l17,0 l2,15 l-17,2 Z"/><path d="M154,90 l14,-2 l3,15 l-14,3 Z"/><path d="M161,56 l12,-2 l3,13 l-12,3 Z"/><path d="M167,30 l10,-2 l2,10 l-10,2 Z"/></g>`
-  ),
-  202
-);
+  );
+save('giraffe', giraffeSvg([0, 0, 0, 0]), 202);
+save('giraffe_b', giraffeSvg([9, -8, -8, 9]), 202);
 save(
   'zebra',
   S(
@@ -635,12 +633,11 @@ save(
   ),
   126
 );
-save(
-  'panda',
+const pandaSvg = (lf) =>
   S(
     '200 150',
     `
-<g stroke="#2a2a2a" stroke-width="13" stroke-linecap="round"><line x1="66" y1="96" x2="62" y2="138"/><line x1="92" y1="98" x2="92" y2="140"/><line x1="120" y1="98" x2="124" y2="140"/><line x1="144" y1="96" x2="150" y2="138"/></g>
+<g stroke="#2a2a2a" stroke-width="13" stroke-linecap="round"><line x1="66" y1="96" x2="${62 + lf[0]}" y2="138"/><line x1="92" y1="98" x2="${92 + lf[1]}" y2="140"/><line x1="120" y1="98" x2="${124 + lf[2]}" y2="140"/><line x1="144" y1="96" x2="${150 + lf[3]}" y2="138"/></g>
 <path d="M52,98 C44,68 72,52 110,52 C150,52 168,64 168,90 C168,106 138,110 104,110 C74,110 60,110 52,98 Z" fill="#f4f2ee"/>
 <path d="M148,56 C164,60 170,74 168,92 C162,104 150,108 140,108 C150,92 150,72 148,56 Z" fill="#2a2a2a"/>
 <circle cx="166" cy="64" r="24" fill="#f4f2ee"/>
@@ -650,9 +647,9 @@ save(
 <path d="M186,66 C194,68 196,76 189,80 C183,80 181,72 182,68 Z" fill="#f4f2ee"/>
 <ellipse cx="190" cy="72" rx="3.6" ry="2.6" fill="#2a2a2a"/>
 <path d="M52,86 C42,86 38,96 44,102 C50,98 54,92 58,90 Z" fill="#f4f2ee"/>`
-  ),
-  180
-);
+  );
+save('panda', pandaSvg([0, 0, 0, 0]), 180);
+save('panda_b', pandaSvg([8, -7, -7, 8]), 180);
 save(
   'redpanda',
   S(
@@ -835,7 +832,16 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['bird_a', 'vulture', 'gull', 'fog', 'eagle'];
+const review = [
+  'camel',
+  'camel_b',
+  'giraffe',
+  'giraffe_b',
+  'goat',
+  'goat_b',
+  'panda',
+  'panda_b'
+];
 const cols = 4,
   cell = 230,
   pad = 14,
