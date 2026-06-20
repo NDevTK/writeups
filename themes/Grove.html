@@ -144,7 +144,7 @@
           critter: null, hopper: null, flyer: 0x6a7b8a, flutter: false, roller: null,
         },
         alpine: {
-          label: '🏔️ Alpine', sky: 0xdfeaff, seasonal: false, snowCaps: true, foliageTint: 0x9ec4b4,
+          label: '🏔️ Alpine', sky: 0xdfeaff, seasonal: false, snowCaps: true, foliageTint: 0x9ec4b4, aurora: true,
           hills: [0x8ea3bd, 0xb1c0d4, 0xe7eef6], ground: 'snow',
           mid: [['pine', 0.6, 240], ['pine', 0.5, 600], ['pine', 0.66, 1020]],
           near: [['pine', 1.05, 140], ['pine', 0.92, 470], ['pine', 1.12, 880], ['pine', 0.8, 1170]],
@@ -200,11 +200,22 @@
         sky.clear(); const mid = mixA(P.top, P.bot, 0.7), N = 90;
         for (let i = 0; i < N; i++) { const t = i / (N - 1), col = t < 0.62 ? mixA(P.top, mid, t / 0.62) : mixA(mid, P.bot, (t - 0.62) / 0.38); sky.beginFill(hexI(col)); sky.drawRect(0, Math.floor(t * VH), VW, Math.ceil(VH / N) + 1); sky.endFill(); }
       }
+      function drawAurora(time, night) { // wavy additive ribbons in the upper sky
+        auroraG.clear(); if (night < 0.04) return;
+        const cols = [0x5fffa6, 0x3ad6ff, 0x9a7aff];
+        for (let b = 0; b < 3; b++) {
+          const baseY = 66 + b * 30, amp = 20 + b * 4, al = night * (0.2 - b * 0.03);
+          auroraG.beginFill(cols[b], al); auroraG.moveTo(0, baseY + Math.sin(time * 0.5 + b) * amp);
+          for (let x = 0; x <= VW; x += 24) auroraG.lineTo(x, baseY + Math.sin(x * 0.0045 + time * 0.5 + b) * amp);
+          for (let x = VW; x >= 0; x -= 24) auroraG.lineTo(x, baseY + 48 + Math.sin(x * 0.0045 + time * 0.5 + b + 1.4) * amp);
+          auroraG.closePath(); auroraG.endFill();
+        }
+      }
       const groundY = (x) => 540 + Math.sin(x * 0.006 + 2.4) * 26;
 
       const swayers = [], clouds = [], ducks = [], flutters = [], dragons = [], fireflies = [], lilies = [], weather = [], rainDrops = [], smoke = [], embers = [];
-      let sky, stars, sun, moon, sunGlow, scene, veil, glit, rainG, deer, fox, rabbit, roller, water, lavaGlow, SE, BI, ready = false;
-      let lastSkyH = -99, deerMode = 'walk', deerTimer = 5, foxTimer = 6, rollerTimer = 4;
+      let sky, stars, sun, moon, sunGlow, scene, veil, glit, rainG, deer, fox, rabbit, roller, water, lavaGlow, shootG, auroraG, SE, BI, ready = false;
+      let lastSkyH = -99, deerMode = 'walk', deerTimer = 5, foxTimer = 6, rollerTimer = 4, shoot = null, shootT = 4;
 
       function build() {
         root.removeChildren(); swayers.length = clouds.length = ducks.length = flutters.length = dragons.length = fireflies.length = lilies.length = weather.length = smoke.length = embers.length = 0;
@@ -221,11 +232,13 @@
         lastSkyH = -99; // force the sky to redraw into the fresh Graphics next frame
 
         sky = new PIXI.Graphics(); sky.tint = BI.sky; root.addChild(sky);
+        auroraG = new PIXI.Graphics(); auroraG.blendMode = PIXI.BLEND_MODES.ADD; root.addChild(auroraG); // polar lights (aurora biomes only)
 
         stars = new PIXI.Container(); root.addChild(stars);
         const sg = new PIXI.Graphics();
         for (let i = 0; i < 70; i++) { sg.beginFill(0xffffff, 0.5 + Math.random() * 0.5); sg.drawCircle(Math.random() * VW, Math.random() * HZ * 0.95, Math.random() < 0.2 ? 1.6 : 1); sg.endFill(); }
         stars.addChild(sg);
+        shoot = null; shootT = 3 + Math.random() * 5; // shooting-star state (its layer is added on top, below, so the meteor stays above the night veil)
 
         sunGlow = spr('glow', 0, 0, 3.4, 0.5, 0.5); sunGlow.blendMode = PIXI.BLEND_MODES.ADD; root.addChild(sunGlow);
         sun = spr('sun', 0, 0, 1, 0.5, 0.5); root.addChild(sun);
@@ -336,6 +349,8 @@
         }
         if (BI.embers) for (let i = 0; i < 22; i++) { const e = spr('glow', Math.random() * VW, 400 + Math.random() * 180, 0.07 + Math.random() * 0.06, 0.5, 0.5); e.tint = Math.random() < 0.5 ? 0xff7a2a : 0xffb84a; e.blendMode = PIXI.BLEND_MODES.ADD; e.vy = -(0.3 + Math.random() * 0.6); e.vx = (Math.random() - 0.5) * 0.3; e.ph = Math.random() * 6.28; embers.push(e); root.addChild(e); }
 
+        shootG = new PIXI.Graphics(); root.addChild(shootG); // shooting stars render on top, above the night veil so the meteor reads bright
+
         fit(); ready = true;
       }
 
@@ -349,6 +364,7 @@
         if (Math.abs(h - lastSkyH) > 0.04) { lastSkyH = h; drawSky(P); }
         veil.alpha = night * 0.72;
         stars.alpha = night;
+        if (BI.aurora) drawAurora(t, night);
         fireflies.fl.alpha = night;
         for (const c of clouds) { c.tint = hexI(lpH('#33406a', '#ffffff', Math.min(1, P.light + 0.05))); }
 
@@ -361,6 +377,18 @@
         sunGlow.alpha = cel.sun ? 0.8 : 0.5;
 
         if (reduce.matches) { if (deer) deer.gotoAndStop(0); return; }
+
+        // shooting stars: an occasional streak across the night sky (any biome)
+        shootG.clear();
+        if (night > 0.34) {
+          if (shoot) {
+            shoot.x += shoot.vx * dt; shoot.y += shoot.vy * dt; shoot.life -= dt / 60;
+            const fade = Math.sin(Math.max(0, 1 - shoot.life / shoot.dur) * Math.PI), steps = 9;
+            for (let i = 0; i < steps; i++) { const f = i / steps; shootG.lineStyle(3 * (1 - f) + 0.3, 0xffffff, fade * (1 - f)); shootG.moveTo(shoot.x - shoot.vx * f * 4, shoot.y - shoot.vy * f * 4); shootG.lineTo(shoot.x - shoot.vx * (f + 1 / steps) * 4, shoot.y - shoot.vy * (f + 1 / steps) * 4); }
+            shootG.beginFill(0xffffff, fade); shootG.drawCircle(shoot.x, shoot.y, 2); shootG.endFill();
+            if (shoot.life <= 0 || shoot.x > VW + 40 || shoot.y > 420) { shoot = null; shootT = 5 + Math.random() * 8; }
+          } else { shootT -= dt / 60; if (shootT < 0) shoot = { x: 60 + Math.random() * VW * 0.6, y: 20 + Math.random() * 120, vx: 7 + Math.random() * 4, vy: 2.4 + Math.random() * 2, life: 0.9, dur: 0.9 }; }
+        }
 
         // glitter: sun/moon reflection shimmer on the pond
         glit.clear();
