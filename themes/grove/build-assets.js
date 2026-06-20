@@ -781,6 +781,43 @@ save(
   430
 );
 
+// distant mesa/butte (desert horizon): layered sedimentary rock with a sunlit + shadowed face,
+// a cap rock and erosion gullies — light + tintable so it hazes into the distance
+save(
+  'butte',
+  S(
+    '240 178',
+    `<defs><linearGradient id="bz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2c794"/><stop offset="1" stop-color="#c0a06d"/></linearGradient></defs>
+<path d="M14,178 L40,118 L200,118 L228,178 Z" fill="#cdb182"/>
+<path d="M40,178 L48,46 L194,46 L202,178 Z" fill="url(#bz)"/>
+<path d="M46,64 L195,64 L194,76 L47,76 Z" fill="#caa771" opacity="0.55"/>
+<path d="M45,90 L196,90 L195,100 L46,100 Z" fill="#bd9a64" opacity="0.5"/>
+<path d="M44,112 L197,112 L196,122 L45,122 Z" fill="#caa771" opacity="0.45"/>
+<path d="M46,46 L194,46 L192,58 L48,58 Z" fill="#e8cf9d"/>
+<path d="M48,46 L194,46 L186,40 L56,40 Z" fill="#f1deb2"/>
+<path d="M152,48 L194,46 L202,178 L162,178 Z" fill="#a88a5c" opacity="0.34"/>
+<path d="M112,47 L108,178" stroke="#a88a5c" stroke-width="2.6" opacity="0.32" fill="none"/>
+<path d="M150,47 L156,118" stroke="#a88a5c" stroke-width="2" opacity="0.26" fill="none"/>
+<path d="M76,47 L72,118" stroke="#a88a5c" stroke-width="1.6" opacity="0.22" fill="none"/>`
+  ),
+  240
+);
+// ice floe drifting on the fjord: a flat slab with sunlit facets and a waterline shadow
+save(
+  'icefloe',
+  S(
+    '160 82',
+    `<defs><linearGradient id="ifc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3f9ff"/><stop offset="1" stop-color="#c7d9e8"/></linearGradient></defs>
+<ellipse cx="80" cy="62" rx="72" ry="13" fill="#88acc6" opacity="0.55"/>
+<path d="M14,56 L34,38 L72,30 L118,32 L148,46 L150,58 L118,66 L38,66 Z" fill="url(#ifc)"/>
+<path d="M40,48 L66,34 L112,36 L132,47 L108,54 L54,54 Z" fill="#ffffff" opacity="0.85"/>
+<path d="M72,32 L80,54" stroke="#bcd2e2" stroke-width="1.5" opacity="0.6" fill="none"/>
+<path d="M118,34 L108,54" stroke="#bcd2e2" stroke-width="1.3" opacity="0.5" fill="none"/>
+<path d="M34,40 L40,64" stroke="#bcd2e2" stroke-width="1.2" opacity="0.45" fill="none"/>`
+  ),
+  160
+);
+
 // ---- NEW: waterfall set — a craggy overhanging rock ledge + falling water (2 flow frames) ----
 // bigrock + falls share one 380x340 frame so the water overlays the rock exactly when placed together
 save(
@@ -810,19 +847,6 @@ const falls = (a) =>
   );
 save('falls_a', falls(0), 380);
 save('falls_b', falls(7), 380);
-
-// a slim vertical fall for the fjord (water over the snowy cliff — foam crest at top, plunge at base)
-const vfall = (a) =>
-  S(
-    '90 280',
-    `<defs><linearGradient id="vf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6f3fb"/><stop offset="1" stop-color="#aacfe2"/></linearGradient></defs>
-<path d="M30,12 Q22,140 32,266 Q44,276 56,266 Q66,140 58,12 Z" fill="url(#vf)" opacity="0.8"/>
-<g stroke="#f4fbff" stroke-width="2.2" fill="none" opacity="0.7"><path d="M36,${20 + a} Q30,140 40,262"/><path d="M52,${16 + a} Q60,140 50,262"/><path d="M44,${24 + a} Q43,140 46,262"/></g>
-<g fill="#ffffff"><ellipse cx="44" cy="14" rx="20" ry="8"/><ellipse cx="30" cy="10" rx="8" ry="5"/><ellipse cx="58" cy="11" rx="8" ry="5"/></g>
-<g fill="#ffffff"><ellipse cx="44" cy="268" rx="24" ry="9"/><ellipse cx="26" cy="264" rx="9" ry="6"/><ellipse cx="62" cy="264" rx="9" ry="6"/><ellipse cx="${40 + a * 3}" cy="274" rx="6" ry="4"/></g>`
-  );
-save('vfall_a', vfall(0), 90);
-save('vfall_b', vfall(7), 90);
 
 // seamless vertical streak/droplet tile — scrolled downward over a fall to read as flowing water
 save(
@@ -981,7 +1005,7 @@ save('jelly_a', jellySvg(0), 92);
 save('jelly_b', jellySvg(1), 92);
 
 // ---- contact sheet of new + polished ----
-const review = ['peak'];
+const review = ['butte', 'icefloe'];
 const cols = 4,
   cell = 230,
   pad = 14,
