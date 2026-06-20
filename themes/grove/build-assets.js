@@ -1241,8 +1241,62 @@ save(
   178
 );
 
+// ---- POLAR biome (penguin, tabular iceberg, orca) ----
+// gentoo-ish penguin standing upright: black back + head, white front, orange beak + webbed
+// feet, a pale bonnet patch around the eye (faces right; the engine rocks it for a waddle)
+save(
+  'penguin',
+  S(
+    '96 136',
+    `<defs><linearGradient id="pgb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c3542"/><stop offset="1" stop-color="#0e1219"/></linearGradient></defs>
+<g fill="#f2a73c"><path d="M38,118 C30,117 22,122 26,128 C33,131 44,128 47,123 Z"/><path d="M54,119 C62,117 71,122 66,128 C59,131 49,128 47,123 Z"/></g>
+<path d="M24,104 C15,114 16,122 26,118 C32,114 33,106 32,100 Z" fill="#12161d"/>
+<path d="M26,92 C16,66 22,30 40,18 C54,9 70,16 72,36 C77,60 74,94 62,112 C53,124 34,122 26,92 Z" fill="url(#pgb)"/>
+<path d="M28,46 C16,58 17,88 28,102 C33,92 33,60 32,48 Z" fill="#161b23"/>
+<path d="M44,28 C60,32 62,74 55,100 C50,114 39,113 35,100 C31,76 34,38 44,28 Z" fill="#f4f8fb"/>
+<path d="M52,24 C64,24 67,40 56,46 C47,47 44,32 52,24 Z" fill="#eaf2f8"/>
+<circle cx="56" cy="33" r="2.7" fill="#0d1118"/><circle cx="57" cy="32" r="0.9" fill="#fff"/>
+<path d="M60,37 C73,35 80,40 77,45 C70,48 63,45 60,43 Z" fill="#f2a73c"/>
+<path d="M60,41 L77,43" stroke="#c97f24" stroke-width="0.9" opacity="0.7"/>`
+  ),
+  96
+);
+// tabular iceberg on the polar horizon: flat-topped ice block with a sunlit cap, a shaded
+// face and a waterline shadow — a discrete landform, so a designed sprite (light + tintable)
+save(
+  'iceberg',
+  S(
+    '224 152',
+    `<defs><linearGradient id="ibg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcfdff"/><stop offset="1" stop-color="#d3e4ef"/></linearGradient></defs>
+<path d="M10,152 L18,78 L52,58 L108,50 L168,56 L206,82 L214,152 Z" fill="url(#ibg)"/>
+<path d="M18,78 L52,58 L108,50 L168,56 L138,74 L64,80 Z" fill="#ffffff" opacity="0.92"/>
+<path d="M168,56 L206,82 L214,152 L176,152 L166,80 Z" fill="#a6c4d7" opacity="0.85"/>
+<path d="M10,152 L10,138 L214,138 L214,152 Z" fill="#93b6cc" opacity="0.55"/>
+<g stroke="#bdd7e5" stroke-width="2" opacity="0.7" fill="none"><path d="M64,80 L78,134"/><path d="M112,62 L120,136"/></g>`
+  ),
+  224
+);
+// orca surfacing: black body with a tall dorsal fin, white eye-patch, belly and grey saddle
+// (faces right; reuses the dolphin porpoise mechanic, so anchored at its centre like the dolphin)
+save(
+  'orca',
+  S(
+    '192 106',
+    `<defs><linearGradient id="orb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b212a"/><stop offset="1" stop-color="#05070b"/></linearGradient></defs>
+<path d="M60,64 C56,82 72,90 82,82 C73,73 65,67 60,64 Z" fill="#0b0e13"/>
+<path d="M12,60 C38,44 88,34 136,40 C154,42 170,48 180,55 C170,58 158,58 148,57 C158,67 166,77 170,90 C151,81 139,71 129,65 C93,71 47,73 24,69 C14,67 9,63 12,60 Z" fill="url(#orb)"/>
+<path d="M64,38 C70,6 94,8 100,36 C88,32 76,33 64,38 Z" fill="#10141b"/>
+<path d="M98,40 C112,40 122,45 124,52 C112,48 102,48 94,50 Z" fill="#5a6571" opacity="0.65"/>
+<path d="M42,68 C86,74 122,69 148,57 C122,73 80,75 48,71 Z" fill="#eef3f6"/>
+<ellipse cx="152" cy="50" rx="9" ry="5.2" fill="#eef3f6" transform="rotate(-13 152 50)"/>
+<circle cx="158" cy="52" r="2.3" fill="#090b0f"/>
+<path d="M150,53 C163,51 174,54 178,57 C172,59 161,58 150,57 Z" fill="#161b22"/>`
+  ),
+  192
+);
+
 // ---- contact sheet of new + polished ----
-const review = ['roadrunner'];
+const review = ['penguin', 'iceberg', 'orca'];
 const cols = 4,
   cell = 230,
   pad = 14,
