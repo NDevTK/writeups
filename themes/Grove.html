@@ -158,7 +158,10 @@
         flash = 0,
         flashT = 6,
         boltPts = [],
-        snowing = false;
+        snowing = false,
+        lastSnowDraw = -1, // snowAcc/wetness at last redraw of the (heavy) settling-snow + puddle shapes;
+        lastWetDraw = -1, // they only change while those values move, so we skip the rebuild once settled
+        lastLightDraw = -1;
       function nowHour() {
         if (hourParam != null) return parseFloat(hourParam);
         if (timeMode === 'dawn') return 6.4;
@@ -921,6 +924,7 @@
           fogLayers.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
+        lastSnowDraw = lastWetDraw = lastLightDraw = -1; // force the gated snow/puddle shapes to draw once on the first frame of the new scene
         lavaGlow = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
@@ -1795,62 +1799,82 @@
           }
         }
 
-        // puddles: grow with ground wetness, reflecting a sliver of sky, then dry up
-        puddleG.clear();
-        if (wetness > 0.02 && !BI.interior) {
-          for (const pd of puddles) {
-            const rx = pd.r * Math.min(1, wetness * 1.3);
-            puddleG.beginFill(0x2b3a52, wetness * 0.28);
-            puddleG.drawEllipse(pd.x, pd.y, rx, rx * 0.3);
-            puddleG.endFill();
-            puddleG.beginFill(
-              hexI(lpH('#5b7da0', '#d6ecff', P.light)),
-              wetness * 0.5
-            );
-            puddleG.drawEllipse(pd.x, pd.y - 1, rx * 0.82, rx * 0.22);
-            puddleG.endFill();
+        // puddles: grow with ground wetness, reflecting a sliver of sky, then dry up.
+        // Both the size (wetness) and the reflected colour (light) crawl, so only redraw when one actually moves.
+        if (
+          Math.abs(wetness - lastWetDraw) > 0.0015 ||
+          Math.abs(P.light - lastLightDraw) > 0.01
+        ) {
+          lastWetDraw = wetness;
+          lastLightDraw = P.light;
+          puddleG.clear();
+          if (wetness > 0.02 && !BI.interior) {
+            for (const pd of puddles) {
+              const rx = pd.r * Math.min(1, wetness * 1.3);
+              puddleG.beginFill(0x2b3a52, wetness * 0.28);
+              puddleG.drawEllipse(pd.x, pd.y, rx, rx * 0.3);
+              puddleG.endFill();
+              puddleG.beginFill(
+                hexI(lpH('#5b7da0', '#d6ecff', P.light)),
+                wetness * 0.5
+              );
+              puddleG.drawEllipse(pd.x, pd.y - 1, rx * 0.82, rx * 0.22);
+              puddleG.endFill();
+            }
           }
         }
 
-        // settling snow, two parts that both grow with snowAcc and melt back when it stops:
-        // (1) a deepening cap along every hill crest (reads even over water, behind the trees)
-        crestG.clear();
-        if (snowing || snowAcc > 0.02) {
-          const lift = snowAcc * 5, // crest creeps a touch higher as it deepens
-            thick = 7 + snowAcc * 26; // and gets fatter underneath
-          crestG.beginFill(0xeef5fc, Math.min(1, 0.7 + snowAcc * 0.3));
-          for (const [cy, am, ph] of hillBands) {
-            crestG.moveTo(-40, cy + Math.sin(-40 * 0.006 + ph) * am - lift);
-            for (let x = -40; x <= VW + 40; x += 8)
-              crestG.lineTo(x, cy + Math.sin(x * 0.006 + ph) * am - lift);
-            for (let x = VW + 40; x >= -40; x -= 8)
-              crestG.lineTo(x, cy + Math.sin(x * 0.006 + ph) * am + thick);
-            crestG.closePath();
+        // settling snow + winter ice — all driven purely by snowAcc, which crawls in then settles
+        // and sits static for minutes. These are the heaviest per-frame shapes (the crest cap alone
+        // is ~1600 points across every hill), so rebuild them only while snowAcc is actually moving.
+        const snowDirty = Math.abs(snowAcc - lastSnowDraw) > 0.0015;
+        if (snowDirty) lastSnowDraw = snowAcc;
+        if (snowDirty) {
+          // (1) a deepening cap along every hill crest (reads even over water, behind the trees)
+          crestG.clear();
+          if (snowing || snowAcc > 0.02) {
+            const lift = snowAcc * 5, // crest creeps a touch higher as it deepens
+              thick = 7 + snowAcc * 26; // and gets fatter underneath
+            crestG.beginFill(0xeef5fc, Math.min(1, 0.7 + snowAcc * 0.3));
+            for (const [cy, am, ph] of hillBands) {
+              crestG.moveTo(-40, cy + Math.sin(-40 * 0.006 + ph) * am - lift);
+              for (let x = -40; x <= VW + 40; x += 8)
+                crestG.lineTo(x, cy + Math.sin(x * 0.006 + ph) * am - lift);
+              for (let x = VW + 40; x >= -40; x -= 8)
+                crestG.lineTo(x, cy + Math.sin(x * 0.006 + ph) * am + thick);
+              crestG.closePath();
+            }
+            crestG.endFill();
           }
-          crestG.endFill();
-        }
-        // (2) snow piling up on the open foreground
-        snowAccG.clear();
-        if (snowAcc > 0.02) {
-          if (!BI.water) {
-            // dry biome: a blanket rising across the whole foreground
-            const topY = VH - 26 - snowAcc * 158;
-            snowAccG.beginFill(0xeef5fc, Math.min(0.96, 0.45 + snowAcc * 0.55));
-            snowAccG.moveTo(-40, VH + 40);
-            for (let x = -40; x <= VW + 40; x += 14)
-              snowAccG.lineTo(x, topY + Math.sin(x * 0.02 + 1.5) * 7);
-            snowAccG.lineTo(VW + 40, VH + 40);
-            snowAccG.closePath();
-            snowAccG.endFill();
-          } else {
-            // water biome: snow covers the visible bank (ground contour down to the waterline), never the pond
-            snowAccG.beginFill(0xeef5fc, Math.min(0.9, 0.32 + snowAcc * 0.58));
-            snowAccG.moveTo(-40, 602);
-            for (let x = -40; x <= VW + 40; x += 12)
-              snowAccG.lineTo(x, groundY(x) - 2);
-            snowAccG.lineTo(VW + 40, 602);
-            snowAccG.closePath();
-            snowAccG.endFill();
+          // (2) snow piling up on the open foreground
+          snowAccG.clear();
+          if (snowAcc > 0.02) {
+            if (!BI.water) {
+              // dry biome: a blanket rising across the whole foreground
+              const topY = VH - 26 - snowAcc * 158;
+              snowAccG.beginFill(
+                0xeef5fc,
+                Math.min(0.96, 0.45 + snowAcc * 0.55)
+              );
+              snowAccG.moveTo(-40, VH + 40);
+              for (let x = -40; x <= VW + 40; x += 14)
+                snowAccG.lineTo(x, topY + Math.sin(x * 0.02 + 1.5) * 7);
+              snowAccG.lineTo(VW + 40, VH + 40);
+              snowAccG.closePath();
+              snowAccG.endFill();
+            } else {
+              // water biome: snow covers the visible bank (ground contour down to the waterline), never the pond
+              snowAccG.beginFill(
+                0xeef5fc,
+                Math.min(0.9, 0.32 + snowAcc * 0.58)
+              );
+              snowAccG.moveTo(-40, 602);
+              for (let x = -40; x <= VW + 40; x += 12)
+                snowAccG.lineTo(x, groundY(x) - 2);
+              snowAccG.lineTo(VW + 40, 602);
+              snowAccG.closePath();
+              snowAccG.endFill();
+            }
           }
         }
 
@@ -1858,7 +1882,7 @@
         // open lead down the middle (the ducks keep to it). melts back with snowAcc.
         const ice = water && BI.water.freeze ? Math.min(1, snowAcc) : 0; // only the shallow pond freezes; the deep fjord stays open
         const openHalf = VW / 2 + 40 - ice * (VW / 2 + 40 - 190); // lead never closes below ~380px
-        if (iceG) {
+        if (iceG && snowDirty) {
           iceG.clear();
           if (ice > 0.02) {
             const cx = VW / 2,
