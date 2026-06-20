@@ -711,6 +711,16 @@
         }
       }
       const groundY = (x) => 540 + Math.sin(x * 0.006 + 2.4) * 26;
+      // leave a footprint when an animal has walked a stride over settled snow; trails fill in over time
+      function dropTrack(obj, kind, stride) {
+        if (!obj || obj.visible === false || snowAcc < 0.22) return;
+        if (obj.trackX == null) obj.trackX = obj.x;
+        if (Math.abs(obj.x - obj.trackX) >= stride) {
+          obj.trackX = obj.x;
+          tracks.push({x: obj.x, y: groundY(obj.x) + 9, kind, life: 1});
+          if (tracks.length > 130) tracks.shift();
+        }
+      }
 
       const swayers = [],
         clouds = [],
@@ -726,6 +736,7 @@
         ripples = [],
         flock = [],
         puddles = [],
+        tracks = [],
         hillBands = [];
       let sky,
         stars,
@@ -753,6 +764,7 @@
         auroraG,
         rippleG,
         iceG,
+        tracksG,
         SE,
         BI,
         ready = false;
@@ -781,6 +793,7 @@
           ripples.length =
           flock.length =
           puddles.length =
+          tracks.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lavaGlow = null;
@@ -1084,6 +1097,8 @@
         // settling snow that deepens while it falls and melts afterwards (drawn each frame from snowAcc)
         snowAccG = new PIXI.Graphics();
         scene.addChild(snowAccG);
+        tracksG = new PIXI.Graphics();
+        scene.addChild(tracksG); // footprints sit on the snow, under the animals that make them
         snowing = snow; // is snow actively falling in this scene?
         if (BI.walker) {
           deer = anim(BI.walker, 300, groundY(300) + 8, BI.walkerScale, 0.12);
@@ -1566,17 +1581,29 @@
           }
           crestG.endFill();
         }
-        // (2) a blanket piling up across the open foreground (dry biomes only — not over water)
+        // (2) snow piling up on the open foreground
         snowAccG.clear();
-        if (snowAcc > 0.02 && !BI.water) {
-          const topY = VH - 26 - snowAcc * 158;
-          snowAccG.beginFill(0xeef5fc, Math.min(0.96, 0.45 + snowAcc * 0.55));
-          snowAccG.moveTo(-40, VH + 40);
-          for (let x = -40; x <= VW + 40; x += 14)
-            snowAccG.lineTo(x, topY + Math.sin(x * 0.02 + 1.5) * 7);
-          snowAccG.lineTo(VW + 40, VH + 40);
-          snowAccG.closePath();
-          snowAccG.endFill();
+        if (snowAcc > 0.02) {
+          if (!BI.water) {
+            // dry biome: a blanket rising across the whole foreground
+            const topY = VH - 26 - snowAcc * 158;
+            snowAccG.beginFill(0xeef5fc, Math.min(0.96, 0.45 + snowAcc * 0.55));
+            snowAccG.moveTo(-40, VH + 40);
+            for (let x = -40; x <= VW + 40; x += 14)
+              snowAccG.lineTo(x, topY + Math.sin(x * 0.02 + 1.5) * 7);
+            snowAccG.lineTo(VW + 40, VH + 40);
+            snowAccG.closePath();
+            snowAccG.endFill();
+          } else {
+            // water biome: snow covers the visible bank (ground contour down to the waterline), never the pond
+            snowAccG.beginFill(0xeef5fc, Math.min(0.9, 0.32 + snowAcc * 0.58));
+            snowAccG.moveTo(-40, 602);
+            for (let x = -40; x <= VW + 40; x += 12)
+              snowAccG.lineTo(x, groundY(x) - 2);
+            snowAccG.lineTo(VW + 40, 602);
+            snowAccG.closePath();
+            snowAccG.endFill();
+          }
         }
 
         // winter ice: shelves creep in from both banks as snow settles, leaving a shrinking
@@ -1824,6 +1851,7 @@
               8 +
               (deerMode === 'walk' ? Math.abs(Math.sin(t * 4)) * -2 : 0);
           }
+          dropTrack(deer, 'deer', 30);
         }
 
         // critter (fox / lizard / crab): trots across now and then
@@ -1832,6 +1860,7 @@
           if (fox.visible !== false) {
             fox.x += fox.dir * 1.5 * dt;
             fox.y = groundY(fox.x) + 6 + Math.abs(Math.sin(t * 7)) * -2;
+            dropTrack(fox, 'fox', 18);
             if (fox.x > VW + 80) {
               fox.visible = false;
               foxTimer = 8 + Math.random() * 10;
@@ -1855,6 +1884,7 @@
                 : 0;
             rabbit.y = rabbit.baseY - hop * 24;
             rabbit.x += rabbit.dir * hop * 1.8 * dt;
+            dropTrack(rabbit, 'rabbit', 26);
             if (rabbit.hopT < 0) {
               rabbit.hopT = 1.1 + Math.random() * 1.9;
               if (rabbit.x > VW - 140) rabbit.dir = -1;
@@ -1877,6 +1907,30 @@
           } else if (rollerTimer < 0) {
             roller.visible = true;
             roller.x = -60;
+          }
+        }
+
+        // footprint trails: prints fade over time and fill in faster while snow is actively falling
+        if (tracksG) {
+          tracksG.clear();
+          for (let i = tracks.length - 1; i >= 0; i--) {
+            const tr = tracks[i];
+            tr.life -= (dt / 60) * (snowing ? 0.04 : 0.014);
+            if (tr.life <= 0) {
+              tracks.splice(i, 1);
+              continue;
+            }
+            tracksG.beginFill(0x7e98bc, 0.5 * Math.min(1, tr.life));
+            if (tr.kind === 'deer') {
+              tracksG.drawEllipse(tr.x - 3, tr.y, 2.3, 1.5); // cloven pair
+              tracksG.drawEllipse(tr.x + 3, tr.y, 2.3, 1.5);
+            } else if (tr.kind === 'fox') {
+              tracksG.drawEllipse(tr.x, tr.y, 2, 1.5); // a neat single pad
+            } else {
+              tracksG.drawEllipse(tr.x - 4, tr.y, 1.8, 2.6); // rabbit's paired hind feet
+              tracksG.drawEllipse(tr.x + 4, tr.y, 1.8, 2.6);
+            }
+            tracksG.endFill();
           }
         }
 
