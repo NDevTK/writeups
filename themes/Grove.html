@@ -758,6 +758,42 @@
           flyer: 0xffffff,
           flyerFrames: ['toucan'],
           flutter: true,
+          flutterTint: 0x4aa0ff, // blue morphos
+          roller: null
+        },
+        blossom: {
+          label: '🌸 Blossom',
+          fog: 0.6,
+          sky: 0xffe9f0, // soft, warm pink light
+          seasonal: false,
+          ambientWeather: 'petal', // blossom petals always drift down
+          distant: {style: 'forest', tint: 0xf2b4cf}, // pink blossom hills on the horizon
+          hills: [0xbfe0b0, 0x9ecb86, 0x7bb566],
+          ground: 'meadow',
+          mid: [
+            ['sakura', 0.7, 220],
+            ['sakura', 0.6, 1000]
+          ],
+          near: [
+            ['sakura', 1.1, 110],
+            ['sakura', 0.96, 1170]
+          ],
+          water: {
+            top: '#a8d6e6',
+            bot: '#5fa2c2',
+            lily: false,
+            fish: 4,
+            fishSprite: ['koi_a', 'koi_b'], // a koi pond
+            petals: true // petals settle on the surface
+          },
+          walker: ['deer_a', 'deer_b'], // deer wander the grove (Nara-style)
+          walkerScale: 0.6,
+          graze: true,
+          critter: null,
+          hopper: 'rabbit',
+          flyer: 0xffffff,
+          flutter: true,
+          flutterTint: 0xffbcdb, // soft pink blossom butterflies
           roller: null
         }
       };
@@ -851,7 +887,10 @@
         'monkey',
         'seal',
         'dolphin',
-        'marmot'
+        'marmot',
+        'sakura',
+        'koi_a',
+        'koi_b'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -1282,13 +1321,15 @@
           BI.foliageTint || (SP ? SP.fol : BI.seasonal ? SE.foliage : 0xffffff);
         const snow =
           (SP ? false : BI.seasonal ? SE.snow : false) || !!BI.snowCaps;
-        const weatherKind = SP
-          ? SP.weather || 'none'
-          : BI.seasonal
-            ? SE.weather
-            : snow
-              ? 'flake'
-              : 'none';
+        const weatherKind =
+          BI.ambientWeather || // a biome can force a constant fall (blossom petals)
+          (SP
+            ? SP.weather || 'none'
+            : BI.seasonal
+              ? SE.weather
+              : snow
+                ? 'flake'
+                : 'none');
         const hillTint = SP ? SP.hill : BI.seasonal ? SE.hill : 0xffffff;
         const grassTint = SP && SP.grass ? SP.grass : null;
         lastSkyH = -99; // force the sky to redraw into the fresh Graphics next frame
@@ -2003,10 +2044,14 @@
           // fish cruise below the surface, rising now and then to dimple it or leap clear
           if (BI.water.fish) {
             const fn = BI.water.fish === true ? 3 : BI.water.fish;
-            const subA = lpH(BI.water.bot, BI.water.top, 0.4); // dyed to the deep water while submerged
+            const koiPond = !!BI.water.fishSprite, // a koi pond shows its fish in full colour, just under the surface
+              frames = BI.water.fishSprite || ['fish_a', 'fish_b'],
+              subA = koiPond
+                ? [255, 255, 255]
+                : lpH(BI.water.bot, BI.water.top, 0.4);
             for (let i = 0; i < fn; i++) {
               const f = anim(
-                ['fish_a', 'fish_b'],
+                frames,
                 140 + Math.random() * (VW - 280),
                 634 + Math.random() * 48,
                 0.22 + Math.random() * 0.12,
@@ -2022,7 +2067,7 @@
               f.next = 4 + Math.random() * 8; // seconds until the next rise/leap
               f.subA = subA;
               f.tint = hexI(subA);
-              f.alpha = 0.82;
+              f.alpha = koiPond ? 0.92 : 0.82;
               if (reduce.matches) f.gotoAndStop(0); // hold a still frame when motion is reduced
               fish.push(f);
               scene.addChildAt(f, scene.getChildIndex(glit)); // under the shimmer, ripples and ducks
@@ -2127,7 +2172,7 @@
               0.5,
               0.18
             );
-            if (BI.canopy) f.tint = 0x4aa0ff; // jungle: iridescent blue morphos
+            if (BI.flutterTint) f.tint = BI.flutterTint; // jungle blue morphos / blossom pale-pink
             f.vx = (Math.random() - 0.5) * 1.2;
             f.vy = (Math.random() - 0.5) * 0.8;
             f.lo = 470;

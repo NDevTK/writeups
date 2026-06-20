@@ -1180,8 +1180,42 @@ save(
   98
 );
 
+// ---- BLOSSOM biome ----
+// flowering cherry: a soft pink blossom canopy over a pale trunk, with lighter + deeper clusters
+save(
+  'sakura',
+  S(
+    '192 222',
+    `<defs><radialGradient id="skc" gradientUnits="userSpaceOnUse" cx="96" cy="62" r="104"><stop offset="0" stop-color="#ffe2ef"/><stop offset="0.55" stop-color="#ffb7d4"/><stop offset="1" stop-color="#ef8bbb"/></radialGradient></defs>
+<path d="M88,218 C86,168 82,138 80,112 L106,112 C110,140 108,178 104,218 Z" fill="#70605a"/>
+<g stroke="#5e4d46" stroke-width="6" fill="none" stroke-linecap="round"><path d="M94,142 C78,122 58,114 44,100"/><path d="M96,150 C112,128 134,120 150,108"/><path d="M95,122 C92,102 90,86 94,68"/></g>
+<g fill="url(#skc)"><circle cx="94" cy="74" r="47"/><circle cx="50" cy="86" r="34"/><circle cx="140" cy="84" r="34"/><circle cx="72" cy="50" r="30"/><circle cx="118" cy="52" r="30"/><circle cx="96" cy="38" r="26"/></g>
+<g fill="#ffeaf3" opacity="0.6"><circle cx="74" cy="48" r="14"/><circle cx="116" cy="50" r="11"/><circle cx="96" cy="36" r="9"/></g>
+<g fill="#ef7cb1" opacity="0.32"><circle cx="58" cy="98" r="13"/><circle cx="132" cy="96" r="13"/><circle cx="96" cy="88" r="11"/></g>
+<g fill="#fff4f8"><circle cx="40" cy="74" r="3.5"/><circle cx="156" cy="74" r="3.5"/><circle cx="92" cy="20" r="3.5"/><circle cx="120" cy="34" r="3"/><circle cx="66" cy="34" r="3"/></g>`
+  ),
+  160
+);
+// koi (2 frames): a white kohaku with orange patches, a dark spot, barbels (faces right)
+const koiSvg = (tf) =>
+  S(
+    '120 60',
+    `<path d="M34,30 L9,${17 + tf} C17,25 17,35 9,${43 + tf} Z" fill="#f2f5f7" opacity="0.95"/>
+<path d="M58,15 Q70,3 84,17 Z" fill="#eaedf0" opacity="0.85"/>
+<path d="M64,44 Q74,55 84,43 Z" fill="#eaedf0" opacity="0.8"/>
+<path d="M30,30 C42,13 70,9 96,16 C107,19 113,24 113,30 C113,36 107,41 96,44 C70,51 42,47 30,30 Z" fill="#fbfdfe"/>
+<g fill="#f2882c"><path d="M44,21 C58,15 71,18 73,28 C66,37 51,36 41,31 Z"/><path d="M86,18 C100,17 107,23 104,31 C97,39 86,36 81,28 Z"/></g>
+<ellipse cx="65" cy="23" rx="5" ry="4" fill="#2b2b2f"/>
+<path d="M86,35 Q93,45 99,36 Z" fill="#eaedf0" opacity="0.7"/>
+<path d="M92,18 C96,24 96,36 92,42" stroke="#d8b48d" stroke-width="1.3" fill="none" opacity="0.5"/>
+<circle cx="100" cy="26" r="3" fill="#171210"/><circle cx="101" cy="25" r="1" fill="#fff"/>
+<g stroke="#e2c4a2" stroke-width="1" opacity="0.7" fill="none"><path d="M112,29 C118,29 120,32 121,34"/><path d="M112,31 C117,33 119,36 119,38"/></g>`
+  );
+save('koi_a', koiSvg(0), 120);
+save('koi_b', koiSvg(7), 120);
+
 // ---- contact sheet of new + polished ----
-const review = ['seal', 'dolphin', 'marmot'];
+const review = ['sakura', 'koi_a', 'koi_b'];
 const cols = 4,
   cell = 230,
   pad = 14,
