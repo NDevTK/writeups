@@ -145,13 +145,17 @@
       let timeMode = LS('time') || 'auto',
         seasonMode = LS('season') || 'auto',
         weatherMode = LS('weather') || 'auto';
-      // weather front runtime: cover = cloud cover (0..1), wet = rain intensity (0..1)
+      // weather front runtime: cover = cloud cover, wet = rain intensity, wetness = lingering ground wetness
       let frontState = 'clear',
         frontT = 60 + Math.random() * 120,
         cover = 0,
         wet = 0,
+        wetness = 0,
         rainbow = 0,
-        rainbowLife = 0;
+        rainbowLife = 0,
+        flash = 0,
+        flashT = 6,
+        boltPts = [];
       function nowHour() {
         if (hourParam != null) return parseFloat(hourParam);
         if (timeMode === 'dawn') return 6.4;
@@ -715,7 +719,8 @@
         smoke = [],
         embers = [],
         ripples = [],
-        flock = [];
+        flock = [],
+        puddles = [];
       let sky,
         stars,
         sun,
@@ -727,6 +732,8 @@
         rainG,
         overcastG,
         rainbowG,
+        puddleG,
+        flashG,
         deer,
         fox,
         rabbit,
@@ -763,6 +770,7 @@
           embers.length =
           ripples.length =
           flock.length =
+          puddles.length =
             0;
         lavaGlow = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
@@ -1057,6 +1065,17 @@
           }
           scene.addChild(cr);
         }
+        // puddles collect on the foreground after rain (behind the animals); drawn each frame, sized by wetness
+        puddleG = new PIXI.Graphics();
+        scene.addChild(puddleG);
+        for (let i = 0; i < 5; i++) {
+          const px = 60 + Math.random() * (VW - 120);
+          puddles.push({
+            x: px,
+            y: (BI.water ? 566 : 612) + Math.random() * 26,
+            r: 26 + Math.random() * 30
+          });
+        }
         if (BI.walker) {
           deer = anim(BI.walker, 300, groundY(300) + 8, BI.walkerScale, 0.12);
           if (BI.walker.length > 1) deer.stop();
@@ -1327,6 +1346,10 @@
         shootG = new PIXI.Graphics();
         root.addChild(shootG); // shooting stars render on top, above the night veil so the meteor reads bright
 
+        flashG = new PIXI.Graphics();
+        flashG.blendMode = PIXI.BLEND_MODES.ADD;
+        root.addChild(flashG); // lightning flash + bolt, on top so it lights the whole scene
+
         fit();
         ready = true;
       }
@@ -1385,10 +1408,31 @@
           }
           cover += (coverTarget - cover) * 0.008 * dt;
           wet += (wetTarget - wet) * 0.025 * dt;
+          // ground wetness rises in rain and dries slowly afterwards
+          const wetUp = wet > 0.3;
+          wetness += ((wetUp ? 1 : 0) - wetness) * (wetUp ? 0.012 : 0.004) * dt;
           if (rainbowLife > 0) {
             rainbowLife -= dt / 60;
             rainbow = Math.sin(Math.max(0, 1 - rainbowLife / 24) * Math.PI);
           } else rainbow = 0;
+          // lightning: occasional strike during a heavy shower
+          if (wet > 0.55) {
+            flashT -= dt / 60;
+            if (flashT < 0) {
+              flashT = 4 + Math.random() * 11;
+              flash = 1;
+              boltPts = [];
+              let bx = 180 + Math.random() * (VW - 360),
+                by = 0;
+              while (by < 430) {
+                boltPts.push([bx, by]);
+                by += 24 + Math.random() * 26;
+                bx += (Math.random() - 0.5) * 56;
+              }
+              boltPts.push([bx, by]);
+            }
+          }
+          flash = Math.max(0, flash - (dt / 60) * 3.5);
         }
         overcastG.alpha = cover * 0.55 * (0.25 + P.light * 0.75); // dim by cover, faint at night
 
@@ -1401,6 +1445,23 @@
           for (let i = 0; i < 7; i++) {
             rainbowG.lineStyle(8, cols[i], rainbow * 0.45);
             rainbowG.arc(640, 620, 420 - i * 8, Math.PI * 1.06, Math.PI * 1.94);
+          }
+        }
+
+        // puddles: grow with ground wetness, reflecting a sliver of sky, then dry up
+        puddleG.clear();
+        if (wetness > 0.02) {
+          for (const pd of puddles) {
+            const rx = pd.r * Math.min(1, wetness * 1.3);
+            puddleG.beginFill(0x2b3a52, wetness * 0.28);
+            puddleG.drawEllipse(pd.x, pd.y, rx, rx * 0.3);
+            puddleG.endFill();
+            puddleG.beginFill(
+              hexI(lpH('#5b7da0', '#d6ecff', P.light)),
+              wetness * 0.5
+            );
+            puddleG.drawEllipse(pd.x, pd.y - 1, rx * 0.82, rx * 0.22);
+            puddleG.endFill();
           }
         }
 
@@ -1436,6 +1497,8 @@
           if (deer) deer.gotoAndStop(0);
           return;
         }
+
+        const raining = wet > 0.45; // animals hunker down / shelter in a real shower
 
         // parallax: ease toward the pointer/tilt target; the foreground scene shifts more than the far sky
         parX += (parTX - parX) * 0.05;
@@ -1559,28 +1622,33 @@
         for (const w of swayers)
           w.s.rotation = Math.sin(t * w.sp + w.ph) * w.amp + wind * w.amp * 2.5;
 
-        // walker: deer ambles then grazes; a camel just plods along
+        // walker: deer ambles then grazes; a camel plods along; in rain it stands and waits it out
         if (deer) {
-          deerTimer -= dt / 60;
           const multi = deer.totalFrames > 1;
-          if (!deer.graze) deerMode = 'walk';
-          if (deerMode === 'walk') {
-            deer.x += 0.35 * dt;
-            if (multi && !deer.playing) deer.play();
-            if (deer.graze && deerTimer < 0) {
-              deerMode = 'graze';
-              deerTimer = 2.5 + Math.random() * 3;
-              if (multi) deer.gotoAndStop(0);
+          if (raining) {
+            if (multi) deer.gotoAndStop(0);
+            deer.y = groundY(deer.x) + 8;
+          } else {
+            deerTimer -= dt / 60;
+            if (!deer.graze) deerMode = 'walk';
+            if (deerMode === 'walk') {
+              deer.x += 0.35 * dt;
+              if (multi && !deer.playing) deer.play();
+              if (deer.graze && deerTimer < 0) {
+                deerMode = 'graze';
+                deerTimer = 2.5 + Math.random() * 3;
+                if (multi) deer.gotoAndStop(0);
+              }
+            } else if (deerTimer < 0) {
+              deerMode = 'walk';
+              deerTimer = 5 + Math.random() * 6;
             }
-          } else if (deerTimer < 0) {
-            deerMode = 'walk';
-            deerTimer = 5 + Math.random() * 6;
+            if (deer.x > VW + 60) deer.x = -60;
+            deer.y =
+              groundY(deer.x) +
+              8 +
+              (deerMode === 'walk' ? Math.abs(Math.sin(t * 4)) * -2 : 0);
           }
-          if (deer.x > VW + 60) deer.x = -60;
-          deer.y =
-            groundY(deer.x) +
-            8 +
-            (deerMode === 'walk' ? Math.abs(Math.sin(t * 4)) * -2 : 0);
         }
 
         // critter (fox / lizard / crab): trots across now and then
@@ -1600,20 +1668,24 @@
           }
         }
 
-        // hopper (rabbit): hops in its facing direction, then pauses and turns around at the edges
+        // hopper (rabbit): hops in its facing direction and turns at the edges; in rain it hunkers down still
         if (rabbit) {
-          rabbit.hopT = (rabbit.hopT == null ? 2 : rabbit.hopT) - dt / 60;
-          const hop =
-            rabbit.hopT < 0.4 && rabbit.hopT > 0
-              ? Math.sin(((0.4 - rabbit.hopT) / 0.4) * Math.PI)
-              : 0;
-          rabbit.y = rabbit.baseY - hop * 24;
-          rabbit.x += rabbit.dir * hop * 1.8 * dt;
-          if (rabbit.hopT < 0) {
-            rabbit.hopT = 1.1 + Math.random() * 1.9;
-            if (rabbit.x > VW - 140) rabbit.dir = -1;
-            else if (rabbit.x < 140) rabbit.dir = 1;
-            rabbit.scale.x = rabbit.dir * Math.abs(rabbit.scale.x);
+          if (raining) {
+            rabbit.y = rabbit.baseY + 2;
+          } else {
+            rabbit.hopT = (rabbit.hopT == null ? 2 : rabbit.hopT) - dt / 60;
+            const hop =
+              rabbit.hopT < 0.4 && rabbit.hopT > 0
+                ? Math.sin(((0.4 - rabbit.hopT) / 0.4) * Math.PI)
+                : 0;
+            rabbit.y = rabbit.baseY - hop * 24;
+            rabbit.x += rabbit.dir * hop * 1.8 * dt;
+            if (rabbit.hopT < 0) {
+              rabbit.hopT = 1.1 + Math.random() * 1.9;
+              if (rabbit.x > VW - 140) rabbit.dir = -1;
+              else if (rabbit.x < 140) rabbit.dir = 1;
+              rabbit.scale.x = rabbit.dir * Math.abs(rabbit.scale.x);
+            }
           }
         }
         // roller (tumbleweed) bounds across at intervals
@@ -1701,6 +1773,7 @@
           }
           f.x += f.vx * dt;
           f.y += f.vy * dt;
+          f.alpha += ((raining ? 0 : 1) - f.alpha) * 0.04 * dt; // butterflies/dragonflies shelter in rain
           if (Math.random() < 0.02) {
             f.vx = (Math.random() - 0.5) * (f.hi > 600 ? 2.4 : 1.2);
             f.vy = (Math.random() - 0.5) * (f.hi > 600 ? 1.2 : 0.8);
@@ -1730,7 +1803,7 @@
             }
           } else {
             flockT -= dt / 60;
-            if (flockT < 0) {
+            if (flockT < 0 && !raining) {
               flockDir = Math.random() < 0.5 ? 1 : -1;
               const sx = flockDir > 0 ? -130 : VW + 130,
                 sy = 66 + Math.random() * 84;
@@ -1804,6 +1877,20 @@
             rainG.lineTo(d.x - 2.5 - wet * 1.5, d.y + d.len);
           }
         } else if (rainG.geometry.graphicsData.length) rainG.clear();
+
+        // lightning: a brief flash that lights the whole scene, plus a jagged bolt
+        flashG.clear();
+        if (flash > 0.01) {
+          flashG.beginFill(0xc8d6ff, flash * 0.5);
+          flashG.drawRect(0, 0, VW, VH);
+          flashG.endFill();
+          flashG.lineStyle(2.5, 0xffffff, flash);
+          if (boltPts.length) {
+            flashG.moveTo(boltPts[0][0], boltPts[0][1]);
+            for (let i = 1; i < boltPts.length; i++)
+              flashG.lineTo(boltPts[i][0], boltPts[i][1]);
+          }
+        }
 
         // volcanic: pulse the crater glow, billow smoke upward, drift embers up
         if (lavaGlow) {
