@@ -751,6 +751,7 @@
         shootG,
         auroraG,
         rippleG,
+        iceG,
         SE,
         BI,
         ready = false;
@@ -1135,6 +1136,8 @@
           scene.addChild(glit);
           rippleG = new PIXI.Graphics();
           scene.addChild(rippleG); // expanding ripple rings under ducks/boat
+          iceG = new PIXI.Graphics();
+          scene.addChild(iceG); // winter ice shelves creep in from the banks (over the glitter, under the ducks)
           if (BI.water.lily && !snow)
             for (const [lx, ly, ls] of BI.water.lilyPos || [
               [230, 632, 0.7],
@@ -1213,6 +1216,7 @@
         } else {
           scene.addChild(glit);
           water = null;
+          iceG = null;
         }
         if (BI.flutter && !snow)
           for (let i = 0; i < 4; i++) {
@@ -1574,6 +1578,42 @@
           snowAccG.endFill();
         }
 
+        // winter ice: shelves creep in from both banks as snow settles, leaving a shrinking
+        // open lead down the middle (the ducks keep to it). melts back with snowAcc.
+        const ice = water ? Math.min(1, snowAcc) : 0;
+        const openHalf = VW / 2 + 40 - ice * (VW / 2 + 40 - 190); // lead never closes below ~380px
+        if (iceG) {
+          iceG.clear();
+          if (ice > 0.02) {
+            const cx = VW / 2,
+              lE = cx - openHalf,
+              rE = cx + openHalf,
+              topY = 600,
+              botY = VH + 10,
+              a = Math.min(0.94, 0.5 + ice * 0.5);
+            for (const [bank, edge, dir] of [
+              [-40, lE, 1],
+              [VW + 40, rE, -1]
+            ]) {
+              // shelf body with a ragged, slightly broken inner edge biting back toward the bank
+              iceG.beginFill(0xe2eff5, a);
+              iceG.moveTo(bank, topY);
+              for (let y = topY; y <= botY; y += 16)
+                iceG.lineTo(edge - dir * (4 + Math.sin(y * 0.13 + dir) * 6), y);
+              iceG.lineTo(bank, botY);
+              iceG.closePath();
+              iceG.endFill();
+              // a brighter frost rim picks out the open edge
+              iceG.lineStyle(2, 0xf6fcff, a * 0.7);
+              for (let y = topY; y <= botY; y += 16) {
+                const ex = edge - dir * (4 + Math.sin(y * 0.13 + dir) * 6);
+                y === topY ? iceG.moveTo(ex, y) : iceG.lineTo(ex, y);
+              }
+              iceG.lineStyle(0);
+            }
+          }
+        }
+
         // aurora intensity: a slow swell/fade so it has quiet stretches and dramatic bursts
         const auroraI =
           0.22 + 0.78 * Math.pow(0.5 + 0.5 * Math.sin(t * 0.05), 2);
@@ -1842,8 +1882,11 @@
         // ducks drift + bob, brood + reflection follow
         for (const d of ducks) {
           d.x += d.vx * dt;
-          if (d.x > VW - 40) d.vx = -Math.abs(d.vx);
-          if (d.x < 40) d.vx = Math.abs(d.vx);
+          // keep to the open lead — as winter ice closes in, the frozen banks turn the duck back
+          const loX = ice > 0.02 ? VW / 2 - openHalf + 40 : 40,
+            hiX = ice > 0.02 ? VW / 2 + openHalf - 40 : VW - 40;
+          if (d.x > hiX) d.vx = -Math.abs(d.vx);
+          if (d.x < loX) d.vx = Math.abs(d.vx);
           // steer around lily pads: ease aside to give a nearby pad a berth, then settle back into the lane
           let steer = 0;
           for (const lp of lilies) {
@@ -1854,11 +1897,15 @@
           const cur = d.sy || 0; // undefined on the first frame; || keeps it numeric (and self-heals from NaN)
           d.sy = cur + (steer - cur) * 0.08;
           d.scale.x = (d.vx < 0 ? -1 : 1) * Math.abs(d.scale.x);
-          d.y = d.baseY + d.sy + Math.sin(t * 2 + d.x * 0.05) * 1.6;
+          d.y =
+            d.baseY +
+            d.sy +
+            Math.sin(t * 2 + d.x * 0.05) * 1.6 * (1 - ice * 0.5); // stiller on slush
           if (d.ref) {
             d.ref.x = d.x;
             d.ref.y = d.y + 18 + Math.sin(t * 2) * 1;
             d.ref.scale.x = d.scale.x;
+            d.ref.alpha = 0.28 * (1 - ice * 0.55); // the freezing surface reflects less
           }
           if (d.kids)
             d.kids.forEach((k, i) => {
@@ -1866,6 +1913,7 @@
               k.x = d.x + b * (34 + i * 22);
               k.y = k.baseY + d.sy + Math.sin(t * 2 + i) * 1.4;
               k.scale.x = (d.vx < 0 ? -1 : 1) * Math.abs(k.scale.x);
+              k.alpha = Math.max(0, 1 - ice * 1.8); // the brood doesn't winter on the ice
             });
           d.rip = (d.rip == null ? 0.5 : d.rip) - dt / 60;
           if (d.rip < 0) {
@@ -1873,9 +1921,9 @@
               x: d.x - (d.vx < 0 ? -1 : 1) * 14,
               y: d.baseY + 9,
               r: 4,
-              life: 1
+              life: 1 - ice * 0.5
             });
-            d.rip = 0.8 + Math.random() * 0.6;
+            d.rip = (0.8 + Math.random() * 0.6) * (1 + ice * 1.6); // wakes come slower through slush
           }
         }
         // expanding ripple rings trailing the ducks/boat on the water surface
