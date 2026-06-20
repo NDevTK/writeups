@@ -154,6 +154,8 @@
         wetness = 0,
         snowAcc = 0, // settled snow depth on the ground (0..1)
         snowI = 0, // snowfall intensity right now (front-driven, cold scenes)
+        temp = 0, // biome temperature (~degrees, 0 = freezing): climate + season + time of day + weather
+        iceAmt = 0, // how frozen the pond is (0..1), driven by temperature
         rainbow = 0,
         rainbowLife = 0,
         flash = 0,
@@ -163,7 +165,23 @@
         weatherIsSnow = false, // the falling-particle layer is snowflakes (gate their density on snowI)
         lastSnowDraw = -1, // snowAcc/wetness at last redraw of the (heavy) settling-snow + puddle shapes;
         lastWetDraw = -1, // they only change while those values move, so we skip the rebuild once settled
-        lastLightDraw = -1;
+        lastLightDraw = -1,
+        lastIceDraw = -1;
+      // baseline climate per biome (~degrees, 0 = freezing); season, time of day and weather shift it
+      const TEMP_BASE = {
+        grove: 9,
+        desert: 22,
+        coast: 14,
+        wetland: 11,
+        alpine: -5,
+        savanna: 18,
+        bamboo: 12,
+        volcanic: 24,
+        fjord: -4,
+        cave: 7,
+        reef: 15
+      };
+      const SEASON_TEMP = {winter: -16, autumn: -5, spring: 1, summer: 5};
       function nowHour() {
         if (hourParam != null) return parseFloat(hourParam);
         if (timeMode === 'dawn') return 6.4;
@@ -488,7 +506,7 @@
             winter: {fol: 0xe8dcb0, hill: 0xede2c2, grass: 0xccbf86}
           },
           hills: [0xe6d29a, 0xd7bd76, 0xc6a85a],
-          distant: {style: 'ridge', tint: 0xd2c084}, // far ridge dotted with acacia
+          distant: {style: 'ridge', tint: 0xd2c084, trees: 7}, // far ridge with acacia standing on it
           ground: 'savanna',
           mid: [
             ['acacia', 0.55, 320],
@@ -892,25 +910,18 @@
           }
           g.endFill();
         } else if (d.style === 'ridge') {
-          // one low rolling ridge dotted with distant umbrella trees (savanna)
-          const ry = (x) => base - 62 - Math.sin(x * 0.004 + 1) * 16;
+          // one low rolling ridge (the landform); distant acacia sprites are scattered on it in build
           g.beginFill(d.tint);
           g.moveTo(-40, base);
-          for (let x = -40; x <= VW + 40; x += 18) g.lineTo(x, ry(x));
+          for (let x = -40; x <= VW + 40; x += 18)
+            g.lineTo(x, base - 62 - Math.sin(x * 0.004 + 1) * 16);
           g.lineTo(VW + 40, base);
           g.closePath();
-          g.endFill();
-          g.beginFill(d.tint);
-          for (let i = 0; i < 9; i++) {
-            const x = 50 + Math.random() * (VW - 100),
-              y = ry(x) + 2;
-            g.drawRect(x - 1, y - 15, 2, 15); // slim trunk
-            g.drawEllipse(x, y - 17, 16, 5.5); // flat acacia canopy
-          }
           g.endFill();
         }
         return g;
       }
+      const ridgeY = (x) => 452 - 62 - Math.sin(x * 0.004 + 1) * 16; // crest of the savanna 'ridge', for placing trees on
       function drawSky(P) {
         // banded gradient via Graphics (no texture upload quirks)
         sky.clear();
@@ -1104,7 +1115,7 @@
           jellies.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
-        lastSnowDraw = lastWetDraw = lastLightDraw = -1; // force the gated snow/puddle shapes to draw once on the first frame of the new scene
+        lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
         lavaGlow = turtle = causticG = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
@@ -1235,8 +1246,22 @@
         } // large background landmark behind the hills
         if (BI.distant) {
           const dg = drawDistant(BI.distant);
-          scene.addChild(dg);
-        } // hazy horizon silhouette for depth (behind the hills)
+          scene.addChild(dg); // hazy horizon landform for depth (behind the hills)
+          // far acacia (the real sprite, small + hazed) standing on the savanna ridge — reads as trees, not blobs
+          if (BI.distant.trees)
+            for (let i = 0; i < BI.distant.trees; i++) {
+              const x = 40 + Math.random() * (VW - 80),
+                tr = spr(
+                  'acacia',
+                  x,
+                  ridgeY(x) + 3,
+                  0.13 + Math.random() * 0.05
+                );
+              tr.tint = 0xa7b48f; // sun-bleached, hazed into the distance
+              tr.alpha = 0.9;
+              scene.addChild(tr);
+            }
+        }
         const HILLS = [
           [420, 26, 0],
           [470, 30, 1.3],
@@ -1584,6 +1609,10 @@
         weatherIsSnow = weatherKind === 'flake';
         snowI = 0;
         snowAcc = snowing ? 0.4 : 0; // cold scenes open with a base cover that squalls deepen and clear spells melt
+        temp =
+          (TEMP_BASE[nowBiome()] ?? 9) +
+          (BI.seasonal ? (SEASON_TEMP[nowSeason()] ?? 0) : 0); // seed near the climate so it doesn't have to thaw/freeze from 0
+        iceAmt = snowing && BI.water && BI.water.freeze ? 0.45 : 0; // a frozen pond opens partly iced
         if (BI.walker) {
           deer = anim(BI.walker, 300, groundY(300) + 8, BI.walkerScale, 0.12);
           if (BI.walker.length > 1) deer.stop();
@@ -2153,14 +2182,31 @@
           // ground wetness rises in rain and dries slowly afterwards
           const wetUp = wet > 0.3;
           wetness += ((wetUp ? 1 : 0) - wetness) * (wetUp ? 0.012 : 0.004) * dt;
-          // snow depth: builds while it's actually snowing (faster the heavier the fall),
-          // and melts slowly once the squall passes — so the amount rises and falls with the weather
-          if (snowing)
-            snowAcc = Math.max(
-              0,
-              Math.min(1, snowAcc + (snowI * 0.0004 - 0.00013) * dt)
-            );
-          else snowAcc += (0 - snowAcc) * 0.02 * dt;
+          // temperature: the climate baseline, cooled at night and under cloud/precip, warmed by midday
+          // sun — eased so it has thermal inertia. it sets how fast snow settles and whether ice forms.
+          const tTarget =
+            (TEMP_BASE[nowBiome()] ?? 9) +
+            (BI.seasonal ? (SEASON_TEMP[nowSeason()] ?? 0) : 0) +
+            (P.light - 0.55) * 9 -
+            cover * 3.5 -
+            snowI * 2.5 -
+            wet * 1.5;
+          temp += (tTarget - temp) * 0.01 * dt;
+          const coldness = Math.max(0, -temp), // degrees below freezing
+            warmth = Math.max(0, temp); // degrees above
+          // snow settles faster the colder and heavier the fall; melts faster the warmer it gets
+          if (snowing) {
+            const build = snowI * (0.00028 + coldness * 0.00006),
+              melt = 0.00004 + warmth * 0.00012;
+            snowAcc = Math.max(0, Math.min(1, snowAcc + (build - melt) * dt));
+          } else snowAcc += (0 - snowAcc) * 0.02 * dt;
+          // ice forms on a freezable pond once it's below freezing (more the colder), and thaws when it warms
+          const iceTarget =
+            water && BI.water && BI.water.freeze && temp < 0
+              ? Math.min(1, coldness / 7)
+              : 0;
+          iceAmt +=
+            (iceTarget - iceAmt) * (iceTarget > iceAmt ? 0.004 : 0.006) * dt;
           if (rainbowLife > 0) {
             rainbowLife -= dt / 60;
             rainbow = Math.sin(Math.max(0, 1 - rainbowLife / 24) * Math.PI);
@@ -2306,11 +2352,13 @@
           }
         }
 
-        // winter ice: shelves creep in from both banks as snow settles, leaving a shrinking
-        // open lead down the middle (the ducks keep to it). melts back with snowAcc.
-        const ice = water && BI.water.freeze ? Math.min(1, snowAcc) : 0; // only the shallow pond freezes; the deep fjord stays open
+        // winter ice: shelves creep in from both banks as the pond freezes, leaving a shrinking
+        // open lead down the middle (the ducks keep to it). driven by temperature now, not snow depth.
+        const ice = iceAmt; // 0 on the deep fjord / unfrozen ponds; grows as it gets colder
         const openHalf = VW / 2 + 40 - ice * (VW / 2 + 40 - 190); // lead never closes below ~380px
-        if (iceG && snowDirty) {
+        const iceDirty = Math.abs(ice - lastIceDraw) > 0.0015;
+        if (iceDirty) lastIceDraw = ice;
+        if (iceG && iceDirty) {
           iceG.clear();
           if (ice > 0.02) {
             const cx = VW / 2,
