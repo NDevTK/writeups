@@ -182,7 +182,8 @@
         reef: 15,
         jungle: 26,
         canyon: 21,
-        polar: -9
+        polar: -9,
+        glade: 13
       };
       const SEASON_TEMP = {winter: -16, autumn: -5, spring: 1, summer: 5};
       function nowHour() {
@@ -868,6 +869,43 @@
           flyerFrames: ['gull'],
           flutter: false,
           roller: null
+        },
+        glade: {
+          label: '🍄 Glade',
+          glade: true, // an enchanted clearing held in perpetual twilight (its own dim sky; the glow always reads)
+          fog: 0.5,
+          sky: 0x223a45, // nominal dusk tone (the glade paints its own true-colour gradient, so this isn't used as a wash)
+          seasonal: false,
+          foliageTint: 0x5e7e84, // moody, dim foliage so the trees and the deer read as soft twilight shapes
+          hills: [0x1c2b3a, 0x24384a, 0x2c465a], // dark forest hills
+          ground: 'glade',
+          mid: [
+            ['oak', 0.5, 300],
+            ['pine', 0.46, 940]
+          ],
+          near: [
+            ['oak', 0.78, 150],
+            ['pine', 0.7, 1120]
+          ],
+          // luminous toadstool clusters [x, sprite, tint] that glow and pulse like the cave crystals
+          mushrooms: [
+            [120, 'mushroom_a', 0x6ff0c8],
+            [360, 'mushroom_b', 0x8a7bff],
+            [560, 'mushroom_a', 0x5fd8ff],
+            [820, 'mushroom_b', 0x7af0a0],
+            [1060, 'mushroom_a', 0xb98aff],
+            [1205, 'mushroom_b', 0x6ff0c8]
+          ],
+          spores: 22, // glowing spores drift up through the clearing
+          water: {top: '#1e4a4e', bot: '#0c2326', glow: true, fish: 2}, // a softly glowing creek
+          walker: ['deer_a', 'deer_b'], // a deer steps through the glow
+          walkerScale: 0.6,
+          graze: true,
+          critter: null,
+          hopper: null,
+          flyer: 0x3a4a55,
+          flutter: false,
+          roller: null
         }
       };
       const RIGID = {rock: 1, cactus: 1, cactus2: 1};
@@ -967,7 +1005,9 @@
         'roadrunner',
         'penguin',
         'iceberg',
-        'orca'
+        'orca',
+        'mushroom_a',
+        'mushroom_b'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -1313,6 +1353,7 @@
         floes = [],
         dolphins = [],
         penguins = [],
+        spores = [],
         hillBands = [];
       let sky,
         stars,
@@ -1386,6 +1427,7 @@
           floes.length =
           dolphins.length =
           penguins.length =
+          spores.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
@@ -1417,7 +1459,7 @@
         farLayer = new PIXI.Container();
         root.addChild(farLayer); // sky/celestial group: parallaxes less than the foreground scene
         sky = new PIXI.Graphics();
-        sky.tint = BI.underwater || BI.canopy ? 0xffffff : BI.sky; // underwater/canopy paint their own true colours
+        sky.tint = BI.underwater || BI.canopy || BI.glade ? 0xffffff : BI.sky; // underwater/canopy/glade paint their own true colours
         farLayer.addChild(sky);
         auroraG = new PIXI.Graphics();
         auroraG.blendMode = PIXI.BLEND_MODES.ADD;
@@ -1452,7 +1494,7 @@
         raysG.blendMode = PIXI.BLEND_MODES.ADD;
         farLayer.addChild(raysG); // god-rays shafting from the sun through breaking cloud (clouds render over)
 
-        if (!BI.interior && !BI.underwater && !BI.canopy)
+        if (!BI.interior && !BI.underwater && !BI.canopy && !BI.glade)
           for (let i = 0; i < 4; i++) {
             const c = spr(
               'cloud',
@@ -1468,7 +1510,7 @@
           }
 
         // crossing flyer (bird, or bat underground); reef + jungle handle their own flyers below
-        if (!BI.underwater && !BI.canopy) {
+        if (!BI.underwater && !BI.canopy && !BI.glade) {
           const bird = anim(
             BI.flyerFrames || ['bird_a', 'bird_b'],
             -80,
@@ -1486,7 +1528,7 @@
         }
 
         // migrating flock: a V of birds that crosses the sky occasionally (created hidden, parallaxes with the far sky)
-        if (!BI.interior && !BI.underwater && !BI.canopy)
+        if (!BI.interior && !BI.underwater && !BI.canopy && !BI.glade)
           for (let i = 0; i < 7; i++) {
             const fb = anim(
               ['bird_a', 'bird_b'],
@@ -1678,6 +1720,42 @@
             const c = spr('crystal', x, fy, 0.34 + Math.random() * 0.16);
             c.tint = col;
             scene.addChild(c);
+          }
+        if (BI.mushrooms)
+          // luminous toadstools: a tinted glow halo (pulsed by the crystal ticker) under each cluster
+          for (const [x, sprite, col] of BI.mushrooms) {
+            const fy = groundY(x) + 6,
+              sc = 0.66 + Math.random() * 0.22,
+              gl = spr('glow', x, fy - 30 * sc, 1.1 * sc, 0.5, 0.5);
+            gl.tint = col;
+            gl.blendMode = PIXI.BLEND_MODES.ADD;
+            gl.ph = Math.random() * 6.28;
+            scene.addChild(gl);
+            crystals.push(gl);
+            const m = spr(sprite, x, fy, sc);
+            m.tint = col;
+            scene.addChild(m);
+          }
+        if (BI.spores)
+          // glowing spores: ADD-blended motes that rise slowly through the clearing, wobbling and twinkling
+          for (let i = 0; i < BI.spores; i++) {
+            const sx = 40 + Math.random() * (VW - 80),
+              g = spr(
+                'glow',
+                sx,
+                380 + Math.random() * 220,
+                0.05 + Math.random() * 0.06,
+                0.5,
+                0.5
+              );
+            g.tint = 0xbfffe0;
+            g.blendMode = PIXI.BLEND_MODES.ADD;
+            g.baseX = sx;
+            g.ph = Math.random() * 6.28;
+            g.vy = 0.25 + Math.random() * 0.22;
+            g.alpha = 0.4; // a sensible static value for reduced motion (the ticker drives it otherwise)
+            spores.push(g);
+            scene.addChild(g);
           }
         if (BI.ground === 'meadow') {
           for (let i = 0; i < 16; i++) {
@@ -1928,6 +2006,38 @@
               r = spr('rock', x, groundY(x) + 8, 0.08 + Math.random() * 0.16);
             r.tint = Math.random() < 0.5 ? 0xd2e4ef : 0xeef6fb; // ice chunks
             scene.addChild(r);
+          }
+        } else if (BI.ground === 'glade') {
+          // a dim mossy floor: dark grass + bushes, with a scatter of faintly glowing moss specks
+          for (let i = 0; i < 16; i++) {
+            const x = 30 + Math.random() * (VW - 60),
+              g = spr('grass', x, groundY(x) + 6, 0.5 + Math.random() * 0.4);
+            g.tint = 0x3c5e54; // deep moss
+            scene.addChild(g);
+            swayers.push({s: g, amp: 0.05, sp: 1.3, ph: Math.random() * 6});
+          }
+          for (let i = 0; i < 5; i++) {
+            const x = 70 + Math.random() * (VW - 140),
+              b = spr('bush', x, groundY(x) + 6, 0.5 + Math.random() * 0.3);
+            b.tint = 0x33564b;
+            scene.addChild(b);
+            swayers.push({s: b, amp: 0.03, sp: 0.9, ph: Math.random() * 6});
+          }
+          for (let i = 0; i < 10; i++) {
+            const x = 30 + Math.random() * (VW - 60),
+              gl = spr(
+                'glow',
+                x,
+                groundY(x) + 4,
+                0.07 + Math.random() * 0.05,
+                0.5,
+                0.5
+              );
+            gl.tint = Math.random() < 0.5 ? 0x6ff0c8 : 0x8a7bff;
+            gl.blendMode = PIXI.BLEND_MODES.ADD;
+            gl.ph = Math.random() * 6.28;
+            scene.addChild(gl);
+            crystals.push(gl); // pulses with the mushrooms via the crystal ticker
           }
         } else if (BI.ground === 'reef') {
           const R = BI.reef;
@@ -2490,6 +2600,7 @@
         fireflies.fl = fl;
         const hasFlies =
           BI.glow === 'cave' ||
+          BI.glade ||
           ((BI.ground === 'meadow' ||
             BI.ground === 'marsh' ||
             BI.ground === 'fern' ||
@@ -2510,7 +2621,7 @@
                 0.5,
                 0.5
               );
-            g.tint = cave ? 0x8ff0ff : 0xeaff8a;
+            g.tint = cave ? 0x8ff0ff : BI.glade ? 0x9affd2 : 0xeaff8a;
             g.blendMode = PIXI.BLEND_MODES.ADD;
             g.ph = Math.random() * 6.28;
             g.vx = (Math.random() - 0.5) * (cave ? 0.16 : 0.4);
@@ -2674,9 +2785,14 @@
       app.ticker.add((dt) => {
         if (!ready || document.hidden) return;
         const h = nowHour(),
-          P = tod(h),
-          cel = celestial(h),
+          cel = celestial(h);
+        let P = tod(h),
           night = Math.min(1, Math.max(0, (0.78 - P.light) / 0.46));
+        if (BI.glade) {
+          // an enchanted clearing held in perpetual twilight, so its glow always reads
+          P = {top: hx('#181333'), bot: hx('#27474a'), light: 0.22};
+          night = 0.82;
+        }
         if (!reduce.matches) t += dt / 60;
 
         // sky (rebuild texture only when the hour shifts)
@@ -2688,7 +2804,9 @@
           ? night * 0.2 // a cave is already dark; barely dims further
           : BI.underwater
             ? night * 0.5 // the reef sinks into gloom at night (the column already darkens too)
-            : night * 0.72;
+            : BI.glade
+              ? 0.28 // a soft, constant dusk shade (night is forced high, so don't crush it to black)
+              : night * 0.72;
         stars.alpha = BI.interior || BI.underwater || BI.canopy ? 0 : night;
 
         // ---- weather front: clouds gather (cover), a shower rolls through (wet), then it clears ----
@@ -2965,10 +3083,12 @@
         const body = cel.sun ? sun : moon,
           other = cel.sun ? moon : sun;
         other.visible = false;
-        body.visible = !BI.interior && !BI.underwater && !BI.canopy;
+        body.visible =
+          !BI.interior && !BI.underwater && !BI.canopy && !BI.glade;
         body.alpha = 1 - cover * 0.6; // sun/moon fades behind gathering cloud
         body.position.set(cel.x, cel.y);
-        sunGlow.visible = !BI.interior && !BI.underwater && !BI.canopy;
+        sunGlow.visible =
+          !BI.interior && !BI.underwater && !BI.canopy && !BI.glade;
         sunGlow.position.set(cel.x, cel.y);
         sunGlow.tint = cel.sun ? 0xffe9a8 : 0x9fb6d8;
         sunGlow.scale.set((cel.sun ? 3.4 : 2.2) + Math.sin(t * 1.5) * 0.12);
@@ -3169,8 +3289,8 @@
 
         // sun/moon reflection on the pond: a soft reflected disc at the waterline + a shimmering trail below it
         glit.clear();
-        if (water && BI.interior) {
-          // underground pool mirrors the glowing crystals instead of any sky body
+        if (water && (BI.interior || BI.glade)) {
+          // an underground pool / glade creek mirrors the glowing crystals + mushrooms, not any sky body
           for (const gl of crystals) {
             const a = gl.alpha;
             glit.beginFill(gl.tint, 0.16 * a);
@@ -3189,7 +3309,7 @@
             }
           }
         }
-        if (water && !BI.interior && cel.y < 560) {
+        if (water && !BI.interior && !BI.glade && cel.y < 560) {
           const col = cel.sun ? 0xfff0b8 : 0xc9d8ea,
             str = cel.sun ? 1 : 0.7;
           for (let k = 3; k >= 1; k--) {
@@ -3779,6 +3899,20 @@
         // crystals breathe a slow glow (and the pool mirrors it)
         for (const gl of crystals)
           gl.alpha = 0.62 + Math.sin(t * 1.3 + gl.ph) * 0.3;
+        // glade spores rise, wobble and twinkle — fading in low, out high, then respawning near the floor
+        for (const g of spores) {
+          g.y -= g.vy * dt;
+          g.x = g.baseX + Math.sin(t * 0.6 + g.ph) * 14;
+          if (g.y < 372) {
+            g.y = 556 + Math.random() * 70;
+            g.baseX = 40 + Math.random() * (VW - 80);
+          }
+          const f = Math.max(
+            0,
+            Math.min(1, (558 - g.y) / 60, (g.y - 372) / 80)
+          );
+          g.alpha = 0.45 * f * (0.7 + 0.3 * Math.sin(t * 2 + g.ph));
+        }
         // fireflies drift + twinkle
         for (const g of fireflies) {
           g.x += g.vx * dt;
