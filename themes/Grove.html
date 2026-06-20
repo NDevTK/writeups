@@ -7,9 +7,31 @@
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #0c1430; }
       canvas { position: fixed; inset: 0; display: block; }
+      /* control panel — revealed only when the wallpaper is brought forward (✦) */
+      #ui {
+        position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 10;
+        display: none; flex-direction: column; gap: 6px; align-items: center;
+        padding: 10px 12px; border-radius: 12px; max-width: 92vw;
+        background: rgba(12, 20, 40, 0.7); border: 1px solid rgba(160, 200, 255, 0.22);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+        color: #d7e6f0; font: 13px ui-monospace, 'Consolas', monospace;
+      }
+      body.shown #ui { display: flex; }
+      #ui .row { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
+      #ui button {
+        font: inherit; color: #cfe0ef; background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(160, 200, 255, 0.2); border-radius: 8px; padding: 5px 9px; cursor: pointer;
+      }
+      #ui button:hover { background: rgba(255, 255, 255, 0.12); }
+      #ui button.on { background: #2c5a8c; border-color: #6fb0ef; color: #fff; }
+      #ui .lbl { opacity: 0.6; font-size: 11px; align-self: center; margin-right: 2px; }
     </style>
   </head>
   <body>
+    <div id="ui" aria-hidden="true">
+      <div class="row" id="uiTime"></div>
+      <div class="row" id="uiSeason"></div>
+    </div>
     <script src="grove/pixi.min.js"></script>
     <script>
       'use strict';
@@ -26,9 +48,15 @@
 
       // ---------- time of day ----------
       const q = new URLSearchParams(location.search);
-      const hourParam = q.get('hour'), cyc = parseFloat(q.get('cycle'));
+      const hourParam = q.get('hour'), cyc = parseFloat(q.get('cycle')), seasonParam = q.get('season');
+      const LS = (k, v) => { try { if (v === undefined) return localStorage.getItem('grove:' + k); localStorage.setItem('grove:' + k, v); } catch (e) {} };
+      let timeMode = LS('time') || 'auto', seasonMode = LS('season') || 'auto', rainOn = LS('rain') === '1';
       function nowHour() {
         if (hourParam != null) return parseFloat(hourParam);
+        if (timeMode === 'dawn') return 6.4;
+        if (timeMode === 'day') return 13;
+        if (timeMode === 'dusk') return 18.7;
+        if (timeMode === 'night') return 23;
         if (cyc > 0) return ((performance.now() / 1000) / cyc * 24 + 6) % 24;
         const d = new Date(); return d.getHours() + d.getMinutes() / 60;
       }
@@ -56,9 +84,9 @@
         const nh = h < 6 ? h + 24 : h, f = (nh - 19) / 11; return { x: VW * f, y: HZ - Math.sin(f * Math.PI) * HZ * 0.66, sun: false };
       }
       // ---------- season ----------
-      const seasonParam = q.get('season');
       function nowSeason() {
         if (seasonParam) return seasonParam;
+        if (seasonMode !== 'auto') return seasonMode;
         const m = new Date().getMonth(); // N hemisphere
         return m < 2 || m === 11 ? 'winter' : m < 5 ? 'spring' : m < 8 ? 'summer' : 'autumn';
       }
@@ -85,8 +113,8 @@
       }
       const groundY = (x) => 540 + Math.sin(x * 0.006 + 2.4) * 26;
 
-      const swayers = [], clouds = [], ducks = [], flutters = [], dragons = [], fireflies = [], lilies = [], weather = [];
-      let sky, stars, sun, moon, sunGlow, scene, veil, glit, deer, fox, rabbit, water, SE, ready = false;
+      const swayers = [], clouds = [], ducks = [], flutters = [], dragons = [], fireflies = [], lilies = [], weather = [], rainDrops = [];
+      let sky, stars, sun, moon, sunGlow, scene, veil, glit, rainG, deer, fox, rabbit, water, SE, ready = false;
       let lastSkyH = -99, deerMode = 'walk', deerTimer = 5, foxTimer = 6;
 
       function build() {
@@ -166,6 +194,11 @@
             weather.push(p); wl.addChild(p);
           }
         }
+
+        // rain (independent of season; toggled live) — drawn each frame
+        rainG = new PIXI.Graphics(); root.addChild(rainG);
+        rainDrops.length = 0;
+        for (let i = 0; i < 130; i++) rainDrops.push({ x: Math.random() * VW, y: Math.random() * VH, len: 9 + Math.random() * 8, sp: 9 + Math.random() * 5 });
 
         fit(); ready = true;
       }
@@ -248,14 +281,36 @@
         // lily pads bob; seasonal weather falls
         for (const lp of lilies) lp.y = lp.baseY + Math.sin(t * 1.5 + lp.x * 0.05) * 1.2;
         for (const w of weather) { w.y += w.vy * dt; w.x += (w.vx + Math.sin(t * 1.2 + w.ph) * w.sw) * dt; w.rotation += w.spin * dt; if (w.y > VH + 14) { w.y = -14; w.x = Math.random() * VW; } if (w.x < -14) w.x = VW + 14; else if (w.x > VW + 14) w.x = -14; }
+        // rain (toggleable, any season)
+        if (rainOn) {
+          rainG.clear(); rainG.lineStyle(1.4, 0xbcd6e8, 0.5);
+          for (const d of rainDrops) { d.y += d.sp * dt; d.x += 1.4 * dt; if (d.y > VH) { d.y = -d.len; d.x = Math.random() * VW; } if (d.x > VW) d.x -= VW; rainG.moveTo(d.x, d.y); rainG.lineTo(d.x - 2.5, d.y + d.len); }
+        } else if (rainG.geometry.graphicsData.length) rainG.clear();
       });
 
       PIXI.Assets.load(NAMES.map((n) => ({ alias: n, src: `grove/assets/${n}.png` }))).then(build).catch((e) => console.error('Grove load failed:', e));
 
+      // ---- control panel (revealed by the ✦ wallpaper toggle) ----
+      const TLIST = [['auto', 'Auto'], ['dawn', 'Dawn'], ['day', 'Day'], ['dusk', 'Dusk'], ['night', 'Night']];
+      const SLIST = [['auto', 'Auto'], ['spring', 'Spring'], ['summer', 'Summer'], ['autumn', 'Autumn'], ['winter', 'Winter']];
+      const uiTime = document.getElementById('uiTime'), uiSeason = document.getElementById('uiSeason');
+      const mkBtn = (label, on, fn) => { const b = document.createElement('button'); b.textContent = label; if (on) b.className = 'on'; b.addEventListener('click', fn); return b; };
+      const lbl = (text, row) => { const s = document.createElement('span'); s.className = 'lbl'; s.textContent = text; row.appendChild(s); };
+      function buildUI() {
+        uiTime.textContent = ''; uiSeason.textContent = '';
+        lbl('time', uiTime);
+        TLIST.forEach(([k, l]) => uiTime.appendChild(mkBtn(l, k === timeMode, () => { timeMode = k; LS('time', k); lastSkyH = -99; buildUI(); })));
+        lbl('season', uiSeason);
+        SLIST.forEach(([k, l]) => uiSeason.appendChild(mkBtn(l, k === seasonMode, () => { seasonMode = k; LS('season', k); if (ready) build(); buildUI(); })));
+        uiSeason.appendChild(mkBtn('🌧 Rain', rainOn, () => { rainOn = !rainOn; LS('rain', rainOn ? '1' : '0'); buildUI(); }));
+      }
+      buildUI();
+
       // ---- host bridge + pause when hidden ----
       let shown = false;
-      function setShown(v) { shown = v; window.parent.postMessage({ type: 'shaderwall', state: v ? 'shown' : 'hidden' }, location.origin); }
+      function setShown(v) { shown = v; document.body.classList.toggle('shown', v); window.parent.postMessage({ type: 'shaderwall', state: v ? 'shown' : 'hidden' }, location.origin); }
       addEventListener('message', (e) => { if (e.origin != location.origin) return; const d = e.data || {}; if (d.type !== 'shaderwall') return; if (d.action === 'show') setShown(true); else if (d.action === 'hide') setShown(false); else if (d.action === 'toggle') setShown(!shown); });
+      addEventListener('keydown', (e) => { if (e.key === 'h' || e.key === 'H') setShown(!shown); });
       document.addEventListener('visibilitychange', () => { document.hidden ? app.ticker.stop() : app.ticker.start(); });
       setShown(false);
     </script>
