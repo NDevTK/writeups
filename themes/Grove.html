@@ -1001,6 +1001,9 @@
           0.06
         );
         bird.isBird = true;
+        bird.isBat = !!BI.interior; // bats flit erratically rather than gliding across
+        bird.vx = 1.2;
+        bird.vy = 0;
         bird.tint = BI.flyer;
         flutters.push(bird);
         farLayer.addChild(bird);
@@ -2317,6 +2320,26 @@
 
         // butterflies, dragonflies, bird — wandering / crossing
         for (const f of flutters) {
+          if (f.isBat) {
+            // erratic flit: darts and changes direction rather than gliding sideways
+            f.x += f.vx * dt;
+            f.y += f.vy * dt;
+            if (Math.random() < 0.06 * dt) f.vy = (Math.random() - 0.5) * 5;
+            if (Math.random() < 0.03 * dt)
+              f.vx = (f.vx < 0 ? -1 : 1) * (0.7 + Math.random() * 2);
+            if (f.y < 64) f.vy = Math.abs(f.vy) + 0.4;
+            if (f.y > 340) f.vy = -Math.abs(f.vy) - 0.4;
+            if (f.x > VW + 60) {
+              f.vx = -Math.abs(f.vx);
+              f.x = VW + 58;
+            }
+            if (f.x < -60) {
+              f.vx = Math.abs(f.vx);
+              f.x = -58;
+            }
+            f.scale.x = (f.vx < 0 ? -1 : 1) * Math.abs(f.scale.x);
+            continue;
+          }
           if (f.isBird) {
             f.x += 1.1 * dt;
             f.y = 150 + Math.sin(f.x * 0.004) * 30;

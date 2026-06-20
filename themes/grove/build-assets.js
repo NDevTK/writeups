@@ -185,7 +185,7 @@ save(
 const bird = (wings) =>
   S(
     '100 80',
-    `<g fill="#46637a">${wings}<ellipse cx="50" cy="50" rx="15" ry="8.5"/><circle cx="63" cy="47" r="6"/></g><path d="M69,47 L78,45 L69,50 Z" fill="#e8a23a"/>`
+    `<g fill="#46637a">${wings}<ellipse cx="50" cy="50" rx="15" ry="8.5"/><circle cx="63" cy="47" r="6"/></g><path d="M69,47 L78,45 L69,50 Z" fill="#e8a23a"/><circle cx="65" cy="46" r="1.5" fill="#10181f"/><circle cx="65.5" cy="45.5" r="0.5" fill="#fff"/>`
   );
 save(
   'bird_a',
@@ -602,20 +602,25 @@ save(
   ),
   188
 );
+// vulture redrawn side-on facing right (bald head + hooked beak), not the old top-down soaring view
 save(
   'vulture',
   S(
-    '156 74',
-    `<defs><linearGradient id="vu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a3e34"/><stop offset="1" stop-color="#2c241c"/></linearGradient></defs>
-<path d="M76,38 C58,22 38,16 14,18 C22,22 18,26 12,28 C24,27 28,30 36,33 C28,34 22,36 18,37 C30,39 42,39 52,40 C62,41 70,41 76,40 Z" fill="url(#vu)"/>
-<path d="M76,38 C94,22 114,16 138,18 C130,22 134,26 140,28 C128,27 124,30 116,33 C124,34 130,36 134,37 C122,39 110,39 100,40 C90,41 82,41 76,40 Z" fill="url(#vu)"/>
-<ellipse cx="76" cy="40" rx="9" ry="13" fill="url(#vu)"/>
-<path d="M68,50 L84,50 L76,60 Z" fill="#241d16"/>
-<circle cx="76" cy="28" r="5.5" fill="#caa9a0"/>
-<path d="M76,24 L76,17 L80,24 Z" fill="#3a2a1a"/>
-<circle cx="74" cy="27" r="1.3" fill="#1a1a1a"/>`
+    '162 96',
+    `<defs><linearGradient id="vu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b4d40"/><stop offset="1" stop-color="#312820"/></linearGradient>
+<linearGradient id="vuw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#493d31"/><stop offset="1" stop-color="#241c14"/></linearGradient></defs>
+<path d="M44,58 L8,51 L6,64 L44,65 Z" fill="url(#vuw)"/>
+<path d="M42,58 C58,49 98,48 124,55 C116,65 68,67 40,63 Z" fill="url(#vu)"/>
+<path d="M92,54 C76,28 52,9 22,2 C42,8 58,20 68,35 C56,28 46,28 38,31 C56,40 74,48 90,54 Z" fill="url(#vuw)"/>
+<path d="M80,57 C68,74 50,84 28,88 C48,81 60,70 70,58 Z" fill="#2b2117"/>
+<path d="M112,56 C113,49 119,45 124,47 C120,51 121,57 124,60 C118,61 113,60 112,56 Z" fill="#6c5e50"/>
+<circle cx="131" cy="50" r="7" fill="#bd9186"/>
+<path d="M126,45 C129,42 135,42 137,46 C133,47 130,48 127,49 Z" fill="#a87c72"/>
+<path d="M137,47 L155,50 L138,56 Z" fill="#2c2118"/>
+<path d="M155,50 C157,51.5 155,53.5 151,53 Z" fill="#191009"/>
+<circle cx="134" cy="48" r="1.7" fill="#0f0a05"/><circle cx="134.6" cy="47.4" r="0.5" fill="#e8d8c0"/>`
   ),
-  134
+  140
 );
 
 // ---- BAMBOO biome ----
@@ -820,16 +825,17 @@ save(
   S(
     '256 90',
     `<defs><radialGradient id="fg"><stop offset="0" stop-color="#ffffff" stop-opacity="0.92"/><stop offset="0.6" stop-color="#ffffff" stop-opacity="0.4"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient></defs>
-<ellipse cx="24" cy="48" rx="76" ry="30" fill="url(#fg)"/>
-<ellipse cx="96" cy="40" rx="84" ry="34" fill="url(#fg)"/>
-<ellipse cx="172" cy="50" rx="80" ry="30" fill="url(#fg)"/>
-<ellipse cx="248" cy="42" rx="76" ry="30" fill="url(#fg)"/>`
+<ellipse cx="50" cy="46" rx="85" ry="32" fill="url(#fg)"/>
+<ellipse cx="130" cy="40" rx="88" ry="35" fill="url(#fg)"/>
+<ellipse cx="210" cy="48" rx="84" ry="31" fill="url(#fg)"/>
+<ellipse cx="306" cy="46" rx="85" ry="32" fill="url(#fg)"/>
+<ellipse cx="-46" cy="48" rx="84" ry="31" fill="url(#fg)"/>`
   ),
   256
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['bigrock', 'falls_a', 'vfall_a', 'eagle', 'peak'];
+const review = ['bird_a', 'vulture', 'gull', 'fog', 'eagle'];
 const cols = 4,
   cell = 230,
   pad = 14,
