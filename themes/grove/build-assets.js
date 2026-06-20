@@ -760,38 +760,51 @@ save(
   430
 );
 
-// ---- NEW: waterfall set — a tintable rock ledge + the falling water (2 flow frames) ----
-// authored in one shared 380x330 frame so the water overlays the rock exactly when placed together
+// ---- NEW: waterfall set — a craggy overhanging rock ledge + falling water (2 flow frames) ----
+// bigrock + falls share one 380x340 frame so the water overlays the rock exactly when placed together
 save(
   'bigrock',
   S(
-    '380 330',
-    `<defs><linearGradient id="bk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfd2dd"/><stop offset="1" stop-color="#7c7f92"/></linearGradient>
-<linearGradient id="bkt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eceef4"/><stop offset="1" stop-color="#b8bccb"/></linearGradient></defs>
-<path d="M0,330 L0,72 Q70,54 150,56 Q220,58 256,64 L308,84 L300,210 L334,330 Z" fill="url(#bk)"/>
-<path d="M0,72 Q70,54 150,56 Q220,58 256,64 L308,84 L306,104 Q210,82 150,80 Q70,80 0,92 Z" fill="url(#bkt)"/>
-<path d="M308,84 L300,210 L334,330 L352,330 L322,86 Z" fill="#5b5e70" opacity="0.55"/>
-<g fill="#9c9fb2" opacity="0.38"><path d="M44,140 L92,128 L78,196 L36,186 Z"/><path d="M150,168 L206,156 L196,232 L150,224 Z"/><path d="M236,150 L284,166 L270,226 L232,212 Z"/></g>
-<g fill="#e4e6ee" opacity="0.5"><path d="M20,96 L70,86 L58,120 L24,124 Z"/></g>`
+    '380 340',
+    `<defs><linearGradient id="bk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9ccd8"/><stop offset="1" stop-color="#73768a"/></linearGradient>
+<linearGradient id="bkt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef0f6"/><stop offset="1" stop-color="#aeb2c4"/></linearGradient></defs>
+<path d="M0,340 L0,78 L48,58 L106,68 L168,52 L232,64 L300,68 L332,94 L314,142 L288,170 L304,216 L284,268 L246,308 L196,340 Z" fill="url(#bk)"/>
+<path d="M0,78 L48,58 L106,68 L168,52 L232,64 L300,68 L332,94 L322,114 L300,88 L232,82 L168,72 L106,86 L48,78 L0,94 Z" fill="url(#bkt)" opacity="0.72"/>
+<path d="M332,94 L314,142 L288,170 L304,216 L290,218 L276,170 L300,138 L320,100 Z" fill="#3c3f4b" opacity="0.66"/>
+<g fill="#85889b" opacity="0.42"><path d="M30,128 L86,112 L72,190 L26,178 Z"/><path d="M128,152 L194,136 L184,224 L126,214 Z"/><path d="M216,120 L284,114 L296,178 L238,192 Z"/></g>
+<g fill="#dfe1ea" opacity="0.5"><path d="M16,100 L64,86 L52,126 L20,130 Z"/><path d="M150,70 L212,64 L200,98 L150,98 Z"/></g>`
   ),
   380
 );
 const falls = (a) =>
   S(
-    '380 330',
+    '380 340',
     `<defs><linearGradient id="fw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2f1fa"/><stop offset="1" stop-color="#a6cadf"/></linearGradient></defs>
-<path d="M0,40 Q140,30 270,42 L296,62 Q150,50 0,58 Z" fill="url(#fw)" opacity="0.82"/>
-<path d="M282,50 Q276,180 296,300 Q300,320 314,320 Q328,320 330,300 Q316,180 316,54 Z" fill="url(#fw)" opacity="0.8"/>
-<g stroke="#f4fbff" stroke-width="2.4" fill="none" opacity="0.72"><path d="M292,${58 + a} Q288,180 300,300"/><path d="M308,${52 + a} Q316,180 308,300"/><path d="M300,${64 + a} Q299,180 304,300"/></g>
-<g stroke="#ffffff" stroke-width="1.8" opacity="0.5"><line x1="${30 + a * 4}" y1="46" x2="${88 + a * 4}" y2="45"/><line x1="${130 + a * 4}" y1="44" x2="${188 + a * 4}" y2="46"/><line x1="${70 + a * 4}" y1="52" x2="${120 + a * 4}" y2="51"/></g>
-<g fill="#ffffff"><ellipse cx="298" cy="50" rx="20" ry="8"/><ellipse cx="284" cy="44" rx="8" ry="5"/><ellipse cx="314" cy="46" rx="7" ry="5"/></g>
-<g fill="#ffffff"><ellipse cx="310" cy="314" rx="28" ry="9"/><ellipse cx="286" cy="310" rx="10" ry="6"/><ellipse cx="332" cy="310" rx="10" ry="6"/><ellipse cx="${300 + a * 3}" cy="318" rx="6" ry="4"/></g>`
+<path d="M0,50 Q150,40 300,56 L326,82 Q160,66 0,68 Z" fill="url(#fw)" opacity="0.82"/>
+<path d="M310,66 Q304,200 320,310 Q324,328 338,328 Q350,328 352,310 Q338,200 340,70 Z" fill="url(#fw)" opacity="0.8"/>
+<g stroke="#f4fbff" stroke-width="2.4" fill="none" opacity="0.72"><path d="M318,${76 + a} Q314,200 326,310"/><path d="M332,${70 + a} Q340,200 332,310"/><path d="M325,${82 + a} Q324,200 329,310"/></g>
+<g stroke="#ffffff" stroke-width="1.8" opacity="0.5"><line x1="${30 + a * 4}" y1="56" x2="${88 + a * 4}" y2="55"/><line x1="${134 + a * 4}" y1="54" x2="${196 + a * 4}" y2="56"/><line x1="${72 + a * 4}" y1="62" x2="${124 + a * 4}" y2="61"/></g>
+<g fill="#ffffff"><ellipse cx="326" cy="70" rx="22" ry="9"/><ellipse cx="310" cy="64" rx="9" ry="6"/><ellipse cx="342" cy="66" rx="8" ry="5"/></g>
+<g fill="#ffffff"><ellipse cx="332" cy="322" rx="28" ry="10"/><ellipse cx="308" cy="318" rx="10" ry="6"/><ellipse cx="354" cy="318" rx="10" ry="6"/><ellipse cx="${322 + a * 3}" cy="326" rx="6" ry="4"/></g>`
   );
 save('falls_a', falls(0), 380);
 save('falls_b', falls(7), 380);
 
+// a slim vertical fall for the fjord (water over the snowy cliff — foam crest at top, plunge at base)
+const vfall = (a) =>
+  S(
+    '90 280',
+    `<defs><linearGradient id="vf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6f3fb"/><stop offset="1" stop-color="#aacfe2"/></linearGradient></defs>
+<path d="M30,12 Q22,140 32,266 Q44,276 56,266 Q66,140 58,12 Z" fill="url(#vf)" opacity="0.8"/>
+<g stroke="#f4fbff" stroke-width="2.2" fill="none" opacity="0.7"><path d="M36,${20 + a} Q30,140 40,262"/><path d="M52,${16 + a} Q60,140 50,262"/><path d="M44,${24 + a} Q43,140 46,262"/></g>
+<g fill="#ffffff"><ellipse cx="44" cy="14" rx="20" ry="8"/><ellipse cx="30" cy="10" rx="8" ry="5"/><ellipse cx="58" cy="11" rx="8" ry="5"/></g>
+<g fill="#ffffff"><ellipse cx="44" cy="268" rx="24" ry="9"/><ellipse cx="26" cy="264" rx="9" ry="6"/><ellipse cx="62" cy="264" rx="9" ry="6"/><ellipse cx="${40 + a * 3}" cy="274" rx="6" ry="4"/></g>`
+  );
+save('vfall_a', vfall(0), 90);
+save('vfall_b', vfall(7), 90);
+
 // ---- contact sheet of new + polished ----
-const review = ['bigrock', 'falls_a', 'falls_b', 'eagle', 'peak'];
+const review = ['bigrock', 'falls_a', 'vfall_a', 'eagle', 'peak'];
 const cols = 4,
   cell = 230,
   pad = 14,
