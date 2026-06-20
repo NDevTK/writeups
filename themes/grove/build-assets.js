@@ -345,8 +345,20 @@ save('redpanda', S('208 124', `<defs><linearGradient id="rp" x1="0" y1="0" x2="0
 <circle cx="163" cy="65" r="2.2" fill="#1a1a1a"/><circle cx="177" cy="65" r="2.2" fill="#1a1a1a"/>
 <circle cx="170" cy="74" r="3" fill="#241008"/>`), 192);
 
+// ---- VOLCANIC biome ----
+save('volcano', S('420 300', `<defs>
+<linearGradient id="vc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5c4f56"/><stop offset="1" stop-color="#2e2630"/></linearGradient>
+<linearGradient id="vl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe27a"/><stop offset=".5" stop-color="#ff7a2a"/><stop offset="1" stop-color="#d2331a"/></linearGradient></defs>
+<path d="M24,298 L150,74 C160,52 260,52 270,74 L396,298 Z" fill="url(#vc)"/>
+<path d="M150,74 C162,56 258,56 270,74 C248,88 188,88 150,74 Z" fill="#221c24"/>
+<ellipse cx="210" cy="74" rx="52" ry="11" fill="url(#vl)"/>
+<path d="M196,80 C190,140 186,210 180,296 L202,296 C206,210 210,140 216,82 Z" fill="url(#vl)" opacity="0.85"/>
+<path d="M236,82 C244,150 250,224 258,296 L242,296 C234,212 226,150 220,84 Z" fill="url(#vl)" opacity="0.7"/>
+<path d="M24,298 L150,74 C138,98 112,166 86,238 C74,272 54,292 44,298 Z" fill="#241e26" opacity="0.45"/>
+<g fill="#1d171f" opacity="0.55"><ellipse cx="120" cy="244" rx="20" ry="8"/><ellipse cx="322" cy="256" rx="22" ry="9"/><ellipse cx="286" cy="210" rx="12" ry="6"/></g>`), 420);
+
 // ---- contact sheet of new + polished ----
-const review = ['bamboo', 'panda', 'redpanda'];
+const review = ['volcano'];
 const cols = 4, cell = 230, pad = 14, rows = Math.ceil(review.length / cols);
 (async () => {
   const comps = [];
