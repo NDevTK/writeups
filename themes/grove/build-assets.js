@@ -221,8 +221,61 @@ save('gull', S('110 60', `<g fill="#f2f5f8">
 <g fill="#b8c2ca"><path d="M10,22 L19,20 L16,26 Z"/><path d="M100,22 L91,20 L94,26 Z"/></g>
 <path d="M67,37 L75,36 L67,41 Z" fill="#f0b43a"/><circle cx="61" cy="36" r="1.5" fill="#222"/>`), 100);
 
+// ---- WETLAND biome ----
+save('reed', S('120 230', `<defs><linearGradient id="rd" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#4a7a2c"/><stop offset="1" stop-color="#84bd50"/></linearGradient></defs>
+<g fill="url(#rd)">
+<path d="M60,226 C54,150 44,92 28,44 C44,90 60,148 64,226 Z"/>
+<path d="M60,226 C66,150 78,98 96,56 C80,100 66,150 66,226 Z"/>
+<path d="M60,226 C57,140 55,78 53,28 C61,80 63,148 64,226 Z"/>
+<path d="M60,226 C53,170 46,128 34,96 C48,130 58,172 62,226 Z"/>
+<path d="M60,226 C64,170 72,130 86,100 C72,132 62,174 62,226 Z"/></g>
+<g stroke="#7a5028" stroke-width="4.5" stroke-linecap="round"><line x1="50" y1="224" x2="44" y2="150"/><line x1="70" y1="224" x2="76" y2="138"/></g>
+<rect x="39.5" y="118" width="9" height="36" rx="4.5" fill="#7c4f28"/><rect x="71.5" y="106" width="9" height="36" rx="4.5" fill="#89592c"/>
+<line x1="44" y1="118" x2="44" y2="106" stroke="#9a6a36" stroke-width="2.4" stroke-linecap="round"/><line x1="76" y1="106" x2="76" y2="94" stroke="#9a6a36" stroke-width="2.4" stroke-linecap="round"/>`), 112);
+save('heron', S('190 232', `<defs><linearGradient id="hr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b3c0cf"/><stop offset="1" stop-color="#6f8398"/></linearGradient></defs>
+<g stroke="#caa24a" stroke-width="4" stroke-linecap="round" fill="none"><path d="M82,148 L74,226"/><path d="M98,148 L108,226"/><path d="M74,226 l14,3"/><path d="M108,226 l14,3"/></g>
+<ellipse cx="92" cy="128" rx="40" ry="25" fill="url(#hr)"/>
+<path d="M106,118 C134,122 156,132 172,146 C152,152 122,150 100,138 Z" fill="#5f7488"/>
+<path d="M88,112 C68,96 76,68 98,56 C108,50 112,46 118,40" stroke="url(#hr)" stroke-width="13" fill="none" stroke-linecap="round"/>
+<ellipse cx="122" cy="40" rx="12" ry="9" fill="#b3c0cf"/>
+<path d="M128,34 C144,28 156,28 164,32 C150,33 138,36 130,41 Z" fill="#8b99a8"/>
+<path d="M132,40 L176,36 L132,46 Z" fill="#e3b653"/>
+<circle cx="124" cy="38" r="2.4" fill="#16181c"/>`), 158);
+save('frog', S('70 56', `<defs><radialGradient id="fg" cx="50%" cy="34%"><stop offset="0" stop-color="#7cc24a"/><stop offset="1" stop-color="#3f8a2e"/></radialGradient></defs>
+<ellipse cx="35" cy="45" rx="29" ry="10" fill="#327a26"/>
+<path d="M12,46 C8,32 19,38 22,47 Z" fill="#3f8a2e"/><path d="M58,46 C62,32 51,38 48,47 Z" fill="#3f8a2e"/>
+<ellipse cx="35" cy="38" rx="21" ry="15" fill="url(#fg)"/>
+<circle cx="24" cy="24" r="8" fill="url(#fg)"/><circle cx="46" cy="24" r="8" fill="url(#fg)"/>
+<circle cx="24" cy="22" r="4.6" fill="#f4e04a"/><circle cx="46" cy="22" r="4.6" fill="#f4e04a"/>
+<circle cx="24" cy="22" r="2.2" fill="#16240c"/><circle cx="46" cy="22" r="2.2" fill="#16240c"/>
+<path d="M26,42 Q35,49 44,42" stroke="#235a1a" stroke-width="2" fill="none" stroke-linecap="round"/>
+<g fill="#2d6b22" opacity="0.55"><circle cx="30" cy="36" r="2"/><circle cx="41" cy="38" r="2"/><circle cx="35" cy="32" r="1.8"/></g>`), 66);
+
+// ---- ALPINE biome ----
+save('goat', S('180 152', `<defs><linearGradient id="gt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f2ea"/><stop offset="1" stop-color="#ccc4b1"/></linearGradient></defs>
+<g stroke="#bbb39e" stroke-width="9" stroke-linecap="round"><line x1="46" y1="92" x2="42" y2="140"/><line x1="66" y1="94" x2="66" y2="142"/><line x1="98" y1="94" x2="102" y2="142"/><line x1="116" y1="92" x2="122" y2="140"/></g>
+<g stroke="#3a3026" stroke-width="9" stroke-linecap="round"><line x1="42" y1="137" x2="42" y2="144"/><line x1="66" y1="139" x2="66" y2="146"/><line x1="102" y1="139" x2="102" y2="146"/><line x1="122" y1="137" x2="122" y2="144"/></g>
+<path d="M40,96 C32,70 50,54 90,54 C126,54 140,68 140,90 C140,102 118,106 88,106 C58,106 48,106 40,96 Z" fill="url(#gt)"/>
+<path d="M40,92 C36,84 38,74 44,70 C46,80 46,88 50,96 Z" fill="#e3ddcd" opacity="0.7"/>
+<path d="M132,90 C142,82 148,72 152,62 C154,72 152,84 146,94 Z" fill="url(#gt)"/>
+<ellipse cx="151" cy="58" rx="13" ry="15" fill="url(#gt)"/>
+<path d="M159,64 C169,66 173,74 167,80 C161,80 157,74 155,68 Z" fill="#e8e2d2"/>
+<path d="M147,44 C145,30 147,20 153,16" stroke="#2c241a" stroke-width="4.2" fill="none" stroke-linecap="round"/>
+<path d="M155,44 C155,30 159,20 165,16" stroke="#2c241a" stroke-width="4.2" fill="none" stroke-linecap="round"/>
+<path d="M155,72 C153,84 151,92 149,97 C147,89 147,79 149,70 Z" fill="#e2dccb"/>
+<circle cx="153" cy="56" r="2.4" fill="#1c160e"/><circle cx="163" cy="72" r="1.7" fill="#3a3026"/>`), 168);
+save('eagle', S('150 72', `<defs><linearGradient id="eg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a4632"/><stop offset="1" stop-color="#392a1b"/></linearGradient></defs>
+<path d="M72,36 C54,18 32,12 8,18 C18,22 12,28 6,31 C22,28 30,32 42,35 C54,40 65,40 72,38 Z" fill="url(#eg)"/>
+<path d="M72,36 C90,18 112,12 136,18 C126,22 132,28 138,31 C122,28 114,32 102,35 C90,40 79,40 72,38 Z" fill="url(#eg)"/>
+<g fill="#2c2114"><path d="M8,18 l-7,1 l6,4 Z"/><path d="M136,18 l7,1 l-6,4 Z"/></g>
+<ellipse cx="72" cy="38" rx="9" ry="14" fill="url(#eg)"/>
+<path d="M64,49 L80,49 L72,62 Z" fill="#f1ede4"/>
+<circle cx="72" cy="26" r="7.5" fill="#f1ede4"/>
+<path d="M72,20 L72,11 L77,20 Z" fill="#e7b53f"/>
+<circle cx="70" cy="25" r="1.5" fill="#1a1a1a"/>`), 132);
+
 // ---- contact sheet of new + polished ----
-const review = ['palm', 'crab', 'sailboat', 'starfish', 'gull'];
+const review = ['reed', 'heron', 'frog', 'goat', 'eagle'];
 const cols = 4, cell = 230, pad = 14, rows = Math.ceil(review.length / cols);
 (async () => {
   const comps = [];

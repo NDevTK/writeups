@@ -131,6 +131,25 @@
           water: { top: '#62c8e4', bot: '#2f86b4', lily: false, ducks: false, drag: false, sailboat: true },
           walker: null, critter: 'crab', critterScale: 0.5, hopper: null, flyer: 0xffffff, flyerFrames: ['gull'], flutter: false, roller: null,
         },
+        wetland: {
+          label: '🪷 Wetland', sky: 0xf2f7ee, seasonal: false,
+          hills: [0x9ec1a0, 0x7caf6e, 0x5f9456], ground: 'marsh',
+          mid: [['reed', 0.55, 210], ['reed', 0.48, 560], ['reed', 0.6, 1040]],
+          near: [['reed', 1.05, 120], ['reed', 0.92, 470], ['reed', 1.12, 880], ['reed', 0.88, 1160]],
+          water: { top: '#5f9e86', bot: '#356b58', lily: true, ducks: false, drag: 6, frogs: true,
+            lilyPos: [[180, 628, 0.7], [430, 640, 0.78], [660, 632, 0.66], [900, 646, 0.82], [1110, 634, 0.7]] },
+          walker: ['heron'], walkerScale: 0.6, graze: true,
+          critter: null, hopper: null, flyer: 0x6a7b8a, flutter: false, roller: null,
+        },
+        alpine: {
+          label: '🏔️ Alpine', sky: 0xdfeaff, seasonal: false, snowCaps: true, foliageTint: 0x9ec4b4,
+          hills: [0x8ea3bd, 0xb1c0d4, 0xe7eef6], ground: 'snow',
+          mid: [['pine', 0.6, 240], ['pine', 0.5, 600], ['pine', 0.66, 1020]],
+          near: [['pine', 1.05, 140], ['pine', 0.92, 470], ['pine', 1.12, 880], ['pine', 0.8, 1170]],
+          water: null,
+          walker: ['goat'], walkerScale: 0.52, graze: true,
+          critter: null, hopper: null, flyer: 0xffffff, flyerFrames: ['eagle'], flutter: false, roller: null,
+        },
       };
       const RIGID = { rock: 1, cactus: 1, cactus2: 1 };
 
@@ -138,7 +157,8 @@
         'duck', 'duckling', 'bird_a', 'bird_b', 'butterfly_a', 'butterfly_b', 'rabbit', 'fox',
         'dragonfly_a', 'dragonfly_b', 'deer_a', 'deer_b', 'lily', 'leaf', 'petal', 'flake',
         'cactus', 'cactus2', 'rock', 'lizard', 'camel', 'tumbleweed',
-        'palm', 'crab', 'sailboat', 'starfish', 'gull'];
+        'palm', 'crab', 'sailboat', 'starfish', 'gull',
+        'reed', 'heron', 'frog', 'goat', 'eagle'];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => { const p = new PIXI.Sprite(T(n)); p.anchor.set(ax == null ? 0.5 : ax, ay == null ? 1 : ay); p.position.set(x, y); if (s) p.scale.set(s); return p; };
       const anim = (frames, x, y, s, spd) => { const a = new PIXI.AnimatedSprite(frames.map(T)); a.anchor.set(0.5, 1); a.position.set(x, y); if (s) a.scale.set(s); a.animationSpeed = spd; a.play(); return a; };
@@ -158,7 +178,7 @@
         root.removeChildren(); swayers.length = clouds.length = ducks.length = flutters.length = dragons.length = fireflies.length = lilies.length = weather.length = 0;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
-        const folTint = BI.seasonal ? SE.foliage : 0xffffff, snow = SE.snow, weatherKind = BI.seasonal ? SE.weather : (snow ? 'flake' : 'none');
+        const folTint = BI.foliageTint || (BI.seasonal ? SE.foliage : 0xffffff), snow = SE.snow || BI.snowCaps, weatherKind = BI.seasonal ? SE.weather : (snow ? 'flake' : 'none');
         lastSkyH = -99; // force the sky to redraw into the fresh Graphics next frame
 
         sky = new PIXI.Graphics(); sky.tint = BI.sky; root.addChild(sky);
@@ -198,9 +218,15 @@
           for (let i = 0; i < 12; i++) { const x = 30 + Math.random() * (VW - 60); scene.addChild(spr('rock', x, groundY(x) + 8, 0.07 + Math.random() * 0.09)); }
           for (let i = 0; i < 6; i++) scene.addChild(spr('starfish', 60 + Math.random() * (VW - 120), 582 + Math.random() * 14, 0.28 + Math.random() * 0.22));
           for (let i = 0; i < 5; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.4 + Math.random() * 0.3); g.tint = 0xd8c88a; scene.addChild(g); swayers.push({ s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6 }); }
+        } else if (BI.ground === 'marsh') {
+          for (let i = 0; i < 8; i++) { const x = 30 + Math.random() * (VW - 60); scene.addChild(spr('rock', x, groundY(x) + 8, 0.05 + Math.random() * 0.07)); }
+          for (let i = 0; i < 15; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.6); g.tint = 0x8fae5c; scene.addChild(g); swayers.push({ s: g, amp: 0.06, sp: 1.7, ph: Math.random() * 6 }); }
+        } else if (BI.ground === 'snow') {
+          for (let i = 0; i < 12; i++) { const x = 20 + Math.random() * (VW - 40), r = spr('rock', x, groundY(x) + 8, 0.08 + Math.random() * 0.12); r.tint = 0x9aa6b4; scene.addChild(r); }
+          for (let i = 0; i < 5; i++) { const x = Math.random() * VW, g = spr('grass', x, groundY(x) + 6, 0.4 + Math.random() * 0.3); g.tint = 0xc6ccba; scene.addChild(g); swayers.push({ s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6 }); }
         }
         if (BI.walker) { deer = anim(BI.walker, 300, groundY(300) + 8, BI.walkerScale, 0.12); if (BI.walker.length > 1) deer.stop(); else deer.gotoAndStop(0); deer.graze = BI.graze; scene.addChild(deer); } else deer = null;
-        fox = spr(BI.critter, -80, groundY(-80) + 6, BI.critterScale); scene.addChild(fox); fox.dir = 1;
+        if (BI.critter) { fox = spr(BI.critter, -80, groundY(-80) + 6, BI.critterScale); scene.addChild(fox); fox.dir = 1; } else fox = null;
         if (BI.hopper) { rabbit = spr(BI.hopper, 760, groundY(760) + 6, 0.55); rabbit.baseY = rabbit.y; scene.addChild(rabbit); } else rabbit = null;
         if (BI.roller) { roller = spr(BI.roller, -60, groundY(-60) + 2, 0.5); roller.tint = 0xc2a468; scene.addChild(roller); roller.visible = false; rollerTimer = 2 + Math.random() * 3; } else roller = null;
 
@@ -210,7 +236,8 @@
           water = new PIXI.Sprite(gradTex([[0, BI.water.top], [1, BI.water.bot]], 288)); water.position.set(0, 600); water.width = VW; water.height = VH - 600; water.tint = snow ? 0xcfe6ef : 0xffffff; scene.addChild(water);
           const lip = new PIXI.Graphics(); lip.beginFill(0xbfe6ef, 0.5); lip.drawRect(0, 600, VW, 3); lip.endFill(); scene.addChild(lip);
           scene.addChild(glit);
-          if (BI.water.lily && !snow) for (const [lx, ly, ls] of [[230, 632, 0.7], [610, 648, 0.82], [1010, 636, 0.66]]) { const lp = spr('lily', lx, ly, ls, 0.5, 0.5); lp.baseY = ly; scene.addChild(lp); lilies.push(lp); }
+          if (BI.water.lily && !snow) for (const [lx, ly, ls] of (BI.water.lilyPos || [[230, 632, 0.7], [610, 648, 0.82], [1010, 636, 0.66]])) { const lp = spr('lily', lx, ly, ls, 0.5, 0.5); lp.baseY = ly; scene.addChild(lp); lilies.push(lp); }
+          if (BI.water.frogs && !snow) for (const [fx, fy] of [[180, 624], [900, 642]]) { const fr = spr('frog', fx, fy, 0.42); fr.baseY = fy; scene.addChild(fr); lilies.push(fr); }
           if (BI.water.ducks) {
             const dm = spr('duck', 380, 656, 0.6); dm.baseY = dm.y; dm.vx = 0.5; dm.kids = [];
             dm.ref = spr('duck', 380, 0, 0.6); dm.ref.scale.y = -0.6; dm.ref.alpha = 0.28; dm.ref.tint = 0x6f8ea0; scene.addChildAt(dm.ref, scene.getChildIndex(glit));
@@ -218,7 +245,7 @@
             scene.addChild(dm); ducks.push(dm);
             const d2 = spr('duck', 980, 690, 0.55); d2.scale.x = -0.55; d2.baseY = d2.y; d2.vx = -0.4; ducks.push(d2); scene.addChild(d2);
           }
-          if (BI.water.drag && !snow) for (let i = 0; i < 3; i++) { const d = anim(['dragonfly_a', 'dragonfly_b'], 200 + Math.random() * 880, 612 + Math.random() * 60, 0.45, 0.4); d.vx = (Math.random() - 0.5) * 2.4; d.vy = (Math.random() - 0.5) * 1.2; d.lo = 605; d.hi = 690; flutters.push(d); scene.addChild(d); }
+          if (BI.water.drag && !snow) { const dn = BI.water.drag === true ? 3 : BI.water.drag; for (let i = 0; i < dn; i++) { const d = anim(['dragonfly_a', 'dragonfly_b'], 200 + Math.random() * 880, 612 + Math.random() * 60, 0.45, 0.4); d.vx = (Math.random() - 0.5) * 2.4; d.vy = (Math.random() - 0.5) * 1.2; d.lo = 605; d.hi = 690; flutters.push(d); scene.addChild(d); } }
           if (BI.water.sailboat) { const sb = spr('sailboat', 740, 614, 0.5); sb.baseY = 614; sb.vx = 0.22; ducks.push(sb); scene.addChild(sb); }
         } else { scene.addChild(glit); water = null; }
         if (BI.flutter && !snow) for (let i = 0; i < 4; i++) { const f = anim(['butterfly_a', 'butterfly_b'], Math.random() * VW, 500 + Math.random() * 70, 0.5, 0.18); f.vx = (Math.random() - 0.5) * 1.2; f.vy = (Math.random() - 0.5) * 0.8; f.lo = 470; f.hi = 590; flutters.push(f); scene.addChild(f); }
@@ -228,7 +255,7 @@
 
         // fireflies above the veil (warm seasons only)
         const fl = new PIXI.Container(); root.addChild(fl); fireflies.fl = fl;
-        if (BI.ground === 'meadow' && !snow) for (let i = 0; i < 16; i++) { const g = spr('glow', 60 + Math.random() * (VW - 120), 470 + Math.random() * 130, 0.16, 0.5, 0.5); g.tint = 0xeaff8a; g.blendMode = PIXI.BLEND_MODES.ADD; g.ph = Math.random() * 6.28; g.vx = (Math.random() - 0.5) * 0.4; g.vy = (Math.random() - 0.5) * 0.3; fireflies.push(g); fl.addChild(g); }
+        if ((BI.ground === 'meadow' || BI.ground === 'marsh') && !snow) for (let i = 0; i < 16; i++) { const g = spr('glow', 60 + Math.random() * (VW - 120), 470 + Math.random() * 130, 0.16, 0.5, 0.5); g.tint = 0xeaff8a; g.blendMode = PIXI.BLEND_MODES.ADD; g.ph = Math.random() * 6.28; g.vx = (Math.random() - 0.5) * 0.4; g.vy = (Math.random() - 0.5) * 0.3; fireflies.push(g); fl.addChild(g); }
 
         // seasonal weather: drifting petals / tumbling leaves / falling snow
         const wl = new PIXI.Container(); root.addChild(wl); weather.layer = wl;
@@ -299,12 +326,14 @@
           deer.y = groundY(deer.x) + 8 + (deerMode === 'walk' ? Math.abs(Math.sin(t * 4)) * -2 : 0);
         }
 
-        // fox: trots across now and then
-        foxTimer -= dt / 60;
-        if (fox.visible !== false) {
-          fox.x += fox.dir * 1.5 * dt; fox.y = groundY(fox.x) + 6 + Math.abs(Math.sin(t * 7)) * -2;
-          if (fox.x > VW + 80) { fox.visible = false; foxTimer = 8 + Math.random() * 10; }
-        } else if (foxTimer < 0) { fox.visible = true; fox.x = -80; fox.dir = 1; }
+        // critter (fox / lizard / crab): trots across now and then
+        if (fox) {
+          foxTimer -= dt / 60;
+          if (fox.visible !== false) {
+            fox.x += fox.dir * 1.5 * dt; fox.y = groundY(fox.x) + 6 + Math.abs(Math.sin(t * 7)) * -2;
+            if (fox.x > VW + 80) { fox.visible = false; foxTimer = 8 + Math.random() * 10; }
+          } else if (foxTimer < 0) { fox.visible = true; fox.x = -80; fox.dir = 1; }
+        }
 
         // hopper (rabbit)
         if (rabbit) {
