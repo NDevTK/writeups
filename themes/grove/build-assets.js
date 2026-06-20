@@ -137,8 +137,24 @@ const dragon = (wA, wB) => S('100 60', `
 save('dragonfly_a', dragon(18, 20), 90);
 save('dragonfly_b', dragon(24, 26), 90);
 
+// ---- NEW: lily pad with blossom ----
+save('lily', S('90 60', `<defs><linearGradient id="lp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#54a542"/><stop offset="1" stop-color="#327028"/></linearGradient></defs>
+<ellipse cx="45" cy="36" rx="40" ry="16" fill="url(#lp)"/><path d="M45,36 L72,28 L72,44 Z" fill="#27581f"/>
+<ellipse cx="32" cy="32" rx="14" ry="5" fill="#6fbb50" opacity="0.55"/>
+<g fill="#f6cfe0"><ellipse cx="56" cy="30" rx="6" ry="3.4"/><ellipse cx="56" cy="30" rx="3.4" ry="7"/><ellipse cx="51" cy="33" rx="4" ry="2.4" transform="rotate(-30 51 33)"/><ellipse cx="61" cy="33" rx="4" ry="2.4" transform="rotate(30 61 33)"/></g>
+<circle cx="56" cy="30" r="2.6" fill="#ffd24a"/>`), 80);
+
+// ---- NEW: falling leaf (white base, tinted per-leaf in the engine) ----
+save('leaf', S('40 40', `<path d="M20,4 C31,7 35,18 31,30 C28,37 18,38 12,30 C7,23 9,11 20,4 Z" fill="#ffffff"/><path d="M20,7 L23,31 M20,15 L13,20 M21,20 L29,18" stroke="#d2d2d2" stroke-width="1.4" fill="none"/>`), 36);
+
+// ---- NEW: blossom petal (spring) ----
+save('petal', S('30 30', `<defs><linearGradient id="pt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe2ee"/><stop offset="1" stop-color="#f4a9c8"/></linearGradient></defs><path d="M15,3 C23,7 24,18 15,27 C6,18 7,7 15,3 Z" fill="url(#pt)"/>`), 26);
+
+// ---- NEW: soft snowflake (winter) ----
+save('flake', S('24 24', `<defs><radialGradient id="fl"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#f2f8ff"/><stop offset="1" stop-color="#dfeefc" stop-opacity="0"/></radialGradient></defs><circle cx="12" cy="12" r="9" fill="url(#fl)"/>`), 24);
+
 // ---- contact sheet of new + polished ----
-const review = ['moon', 'glow', 'fox', 'dragonfly_a', 'dragonfly_b', 'duck', 'bird_b', 'deer_a'];
+const review = ['lily', 'leaf', 'petal', 'flake'];
 const cols = 4, cell = 230, pad = 14, rows = Math.ceil(review.length / cols);
 (async () => {
   const comps = [];
