@@ -669,15 +669,15 @@
           sky.endFill();
         }
       }
-      function drawAurora(time, night) {
-        // wavy additive ribbons in the upper sky
+      function drawAurora(time, night, intensity) {
+        // wavy additive ribbons in the upper sky; intensity swells and fades them over minutes
         auroraG.clear();
         if (night < 0.04) return;
         const cols = [0x5fffa6, 0x3ad6ff, 0x9a7aff];
         for (let b = 0; b < 3; b++) {
           const baseY = 66 + b * 30,
-            amp = 20 + b * 4,
-            al = night * (0.2 - b * 0.03);
+            amp = (20 + b * 4) * (0.65 + intensity * 0.6),
+            al = night * (0.2 - b * 0.03) * intensity;
           auroraG.beginFill(cols[b], al);
           auroraG.moveTo(0, baseY + Math.sin(time * 0.5 + b) * amp);
           for (let x = 0; x <= VW; x += 24)
@@ -707,7 +707,8 @@
         rainDrops = [],
         smoke = [],
         embers = [],
-        ripples = [];
+        ripples = [],
+        flock = [];
       let sky,
         stars,
         sun,
@@ -735,7 +736,9 @@
         foxTimer = 6,
         rollerTimer = 4,
         shoot = null,
-        shootT = 4;
+        shootT = 4,
+        flockT = 15,
+        flockDir = 1;
 
       function build() {
         root.removeChildren();
@@ -750,6 +753,7 @@
           smoke.length =
           embers.length =
           ripples.length =
+          flock.length =
             0;
         lavaGlow = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
@@ -832,6 +836,24 @@
         bird.tint = BI.flyer;
         flutters.push(bird);
         farLayer.addChild(bird);
+
+        // migrating flock: a V of birds that crosses the sky occasionally (created hidden, parallaxes with the far sky)
+        for (let i = 0; i < 7; i++) {
+          const fb = anim(
+            ['bird_a', 'bird_b'],
+            0,
+            0,
+            0.4,
+            0.05 + Math.random() * 0.02
+          );
+          fb.tint = 0x49515f;
+          fb.visible = false;
+          fb.wing = i === 0 ? 0 : Math.ceil(i / 2) * (i % 2 ? -1 : 1);
+          fb.ph = Math.random() * 6.28;
+          flock.push(fb);
+          farLayer.addChild(fb);
+        }
+        flockT = 8 + Math.random() * 14;
 
         // ---- scene (everything that night darkens) ----
         scene = new PIXI.Container();
@@ -1303,7 +1325,10 @@
         }
         veil.alpha = night * 0.72;
         stars.alpha = night;
-        if (BI.aurora) drawAurora(t, night);
+        // aurora intensity: a slow swell/fade so it has quiet stretches and dramatic bursts
+        const auroraI =
+          0.22 + 0.78 * Math.pow(0.5 + 0.5 * Math.sin(t * 0.05), 2);
+        if (BI.aurora) drawAurora(t, night, auroraI);
         fireflies.fl.alpha = night;
         for (const c of clouds) {
           c.tint = hexI(lpH('#33406a', '#ffffff', Math.min(1, P.light + 0.05)));
@@ -1332,6 +1357,12 @@
         farLayer.position.set(parX * 5, parY * 3);
         scene.position.set(parX * 14, parY * 8);
         fireflies.fl.position.set(parX * 14, parY * 8);
+
+        // wind: a breeze that slowly varies and gusts (used by foliage, particles, and the water surface)
+        const wind =
+          Math.sin(t * 0.35) * 0.35 +
+          Math.sin(t * 0.11 + 1.3) * 0.45 +
+          Math.sin(t * 0.07) * 0.25;
 
         // shooting stars: an occasional streak across the night sky (any biome)
         shootG.clear();
@@ -1389,17 +1420,20 @@
           }
           for (let y = 606; y < VH; y += 5) {
             const d = (y - 606) / (VH - 606),
-              wob = Math.sin(y * 0.6 + t * 2.2) * (2 + d * 10);
+              wob =
+                Math.sin(y * 0.6 + t * 2.2) *
+                (2 + d * 10) *
+                (1 + Math.abs(wind) * 1.1); // gusts scatter the reflection
             glit.beginFill(col, (1 - d) * 0.5 * str);
             glit.drawRect(cel.x + wob - (2 + d * 4), y, 4 + d * 8, 2);
             glit.endFill();
           }
         }
         if (water && BI.aurora && night > 0.08) {
-          // aurora mirrored on the water: wavy green/teal bands, brightest at night
+          // aurora mirrored on the water: wavy green/teal bands, scaled by the live aurora intensity
           const acols = [0x4fffa8, 0x36c9ff];
           for (let b = 0; b < 2; b++) {
-            glit.beginFill(acols[b], night * 0.17);
+            glit.beginFill(acols[b], night * 0.2 * auroraI);
             const by = 622 + b * 28;
             glit.moveTo(0, by + Math.sin(t * 1.3 + b) * 4);
             for (let x = 0; x <= VW; x += 30)
@@ -1413,12 +1447,24 @@
             glit.endFill();
           }
         }
+        if (water && Math.abs(wind) > 0.16) {
+          // wind chop: faint wavelets that ripple across the water surface during gusts
+          const chop = Math.abs(wind) - 0.16;
+          for (let i = 0; i < 5; i++) {
+            const wy = 614 + i * 20,
+              a = chop * 0.16 * (1 - i * 0.12);
+            if (a <= 0) continue;
+            glit.lineStyle(1.2, 0xffffff, a);
+            glit.moveTo(0, wy);
+            for (let x = 0; x <= VW; x += 24)
+              glit.lineTo(
+                x,
+                wy + Math.sin(x * 0.03 + t * 3 + i) * (1.4 + chop * 4)
+              );
+          }
+          glit.lineStyle(0);
+        }
 
-        // wind: a breeze that slowly varies and gusts (sum of slow sines), leaning foliage and pushing particles the same way
-        const wind =
-          Math.sin(t * 0.35) * 0.35 +
-          Math.sin(t * 0.11 + 1.3) * 0.45 +
-          Math.sin(t * 0.07) * 0.25;
         for (const c of clouds) {
           c.x += (c.vx + wind * 0.18) * dt;
           if (c.x - c.width > VW) c.x = -c.width;
@@ -1564,6 +1610,43 @@
           }
           if (f.x < 20 || f.x > VW - 20) f.vx *= -1;
           if (f.y < f.lo || f.y > f.hi) f.vy *= -1;
+        }
+        // migrating flock: crosses the sky now and then, holding a loose V behind the lead
+        if (flock.length) {
+          const lead = flock[0];
+          if (lead.visible) {
+            lead.fx += flockDir * 2.6 * dt;
+            lead.fy += Math.sin(t * 0.5) * 0.2 * dt;
+            for (const fb of flock) {
+              const tx = lead.fx - flockDir * Math.abs(fb.wing) * 26,
+                ty = lead.fy + fb.wing * 11 + Math.sin(t * 3 + fb.ph) * 2;
+              fb.x += (tx - fb.x) * 0.2; // ease toward the slot for a lagging, lifelike V
+              fb.y += (ty - fb.y) * 0.2;
+              fb.scale.x = (flockDir < 0 ? -1 : 1) * Math.abs(fb.scale.x);
+            }
+            if (
+              (flockDir > 0 && lead.fx > VW + 130) ||
+              (flockDir < 0 && lead.fx < -130)
+            ) {
+              for (const fb of flock) fb.visible = false;
+              flockT = 28 + Math.random() * 50;
+            }
+          } else {
+            flockT -= dt / 60;
+            if (flockT < 0) {
+              flockDir = Math.random() < 0.5 ? 1 : -1;
+              const sx = flockDir > 0 ? -130 : VW + 130,
+                sy = 66 + Math.random() * 84;
+              lead.fx = sx;
+              lead.fy = sy;
+              for (const fb of flock) {
+                fb.x = sx - flockDir * Math.abs(fb.wing) * 26;
+                fb.y = sy + fb.wing * 11;
+                fb.scale.x = (flockDir < 0 ? -1 : 1) * Math.abs(fb.scale.x);
+                fb.visible = true;
+              }
+            }
+          }
         }
         // fireflies drift + twinkle
         for (const g of fireflies) {
