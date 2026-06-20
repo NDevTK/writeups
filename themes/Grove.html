@@ -310,7 +310,8 @@
             lily: true,
             ducks: true,
             drag: true,
-            freeze: true
+            freeze: true,
+            fish: 3
           },
           walker: ['deer_a', 'deer_b'],
           walkerScale: 0.62,
@@ -378,7 +379,8 @@
             lily: false,
             ducks: false,
             drag: false,
-            sailboat: true
+            sailboat: true,
+            fish: 2
           },
           walker: null,
           critter: 'crab',
@@ -420,6 +422,7 @@
             ducks: false,
             drag: 6,
             frogs: true,
+            fish: 4,
             lilyPos: [
               [180, 628, 0.7],
               [430, 640, 0.78],
@@ -576,7 +579,8 @@
             bot: '#15263c',
             lily: false,
             ducks: false,
-            drag: false
+            drag: false,
+            fish: 2
           },
           // a slim falls sprite spilling over the ridge into the sea
           waterfall: {
@@ -672,6 +676,8 @@
         'glow',
         'duck',
         'duckling',
+        'fish_a',
+        'fish_b',
         'bird_a',
         'bird_b',
         'butterfly_a',
@@ -846,6 +852,7 @@
       const swayers = [],
         clouds = [],
         ducks = [],
+        fish = [],
         flutters = [],
         dragons = [],
         fireflies = [],
@@ -908,6 +915,7 @@
         swayers.length =
           clouds.length =
           ducks.length =
+          fish.length =
           flutters.length =
           dragons.length =
           fireflies.length =
@@ -1425,6 +1433,34 @@
             sb.vx = 0.22;
             ducks.push(sb);
             scene.addChild(sb);
+          }
+          // fish cruise below the surface, rising now and then to dimple it or leap clear
+          if (BI.water.fish) {
+            const fn = BI.water.fish === true ? 3 : BI.water.fish;
+            const subA = lpH(BI.water.bot, BI.water.top, 0.4); // dyed to the deep water while submerged
+            for (let i = 0; i < fn; i++) {
+              const f = anim(
+                ['fish_a', 'fish_b'],
+                140 + Math.random() * (VW - 280),
+                634 + Math.random() * 48,
+                0.22 + Math.random() * 0.12,
+                0.05 + Math.random() * 0.04
+              );
+              f.anchor.set(0.5, 0.5); // pivot at the body centre so leaps rotate cleanly
+              f.dir = Math.random() < 0.5 ? 1 : -1;
+              f.baseSc = Math.abs(f.scale.x);
+              f.scale.x = f.dir * f.baseSc;
+              f.spd = 0.4 + Math.random() * 0.7;
+              f.cruiseY = f.y; // resting depth it eases back to
+              f.jump = 0; // 0 = cruising; climbs 0->1 across a leap arc
+              f.next = 4 + Math.random() * 8; // seconds until the next rise/leap
+              f.subA = subA;
+              f.tint = hexI(subA);
+              f.alpha = 0.82;
+              if (reduce.matches) f.gotoAndStop(0); // hold a still frame when motion is reduced
+              fish.push(f);
+              scene.addChildAt(f, scene.getChildIndex(glit)); // under the shimmer, ripples and ducks
+            }
           }
         } else {
           scene.addChild(glit);
@@ -2299,6 +2335,59 @@
               life: 1 - ice * 0.5
             });
             d.rip = (0.8 + Math.random() * 0.6) * (1 + ice * 1.6); // wakes come slower through slush
+          }
+        }
+        // fish: cruise below the surface, dimple it now and then, and occasionally leap clear with a splash
+        if (fish.length) {
+          const fLo = ice > 0.05 ? VW / 2 - openHalf + 50 : 64, // keep to the open lead once the pond ices over
+            fHi = ice > 0.05 ? VW / 2 + openHalf - 50 : VW - 64;
+          for (const f of fish) {
+            if (f.jump > 0) {
+              // a leap: rise from cruising depth, break the surface, arc over and splash back
+              f.jump += dt / 42;
+              const a = Math.min(1, f.jump),
+                arc = Math.sin(a * Math.PI),
+                py = f.y;
+              f.x += f.dir * f.spd * 1.5 * dt;
+              f.y = f.cruiseY + (f.apexY - f.cruiseY) * arc;
+              const clear = Math.max(0, Math.min(1, (600 - f.y) / 46)); // how far it is out of the water
+              f.alpha = 0.82 + clear * 0.18;
+              f.tint = hexI(mixA(f.subA, [228, 240, 247], clear)); // flashes silver in the air
+              f.rotation =
+                f.dir *
+                Math.max(-0.6, Math.min(0.6, (f.y - py) * 0.05)) *
+                clear; // nose tips up rising, down on re-entry
+              if (water) {
+                if (py >= 600 && f.y < 600)
+                  ripples.push({x: f.x, y: 602, r: 4, life: 0.9}); // surface break on the way up
+                if (py < 600 && f.y >= 600)
+                  ripples.push({x: f.x, y: 602, r: 6, life: 1}); // bigger splash on re-entry
+              }
+              if (f.jump >= 1) {
+                f.jump = 0;
+                f.rotation = 0;
+                f.y = f.cruiseY;
+                f.tint = hexI(f.subA);
+                f.next = 7 + Math.random() * 10;
+              }
+              continue;
+            }
+            f.x += f.dir * f.spd * dt;
+            if (f.x > fHi) f.dir = -1;
+            else if (f.x < fLo) f.dir = 1;
+            f.scale.x = f.dir * f.baseSc;
+            f.y = f.cruiseY + Math.sin(t * 1.1 + f.x * 0.018) * 4; // slow depth wobble
+            f.alpha = 0.82 * (1 - ice * 0.55); // sluggish and all but hidden once it ices over
+            f.next -= dt / 60;
+            if (f.next < 0) {
+              if (ice < 0.15 && Math.random() < 0.4) {
+                f.jump = 0.0001; // launch a leap
+                f.apexY = 600 - (40 + Math.random() * 34);
+              } else {
+                if (water) ripples.push({x: f.x, y: 606, r: 3, life: 0.85}); // a quiet rise that just rings the surface
+                f.next = 5 + Math.random() * 8;
+              }
+            }
           }
         }
         // expanding ripple rings trailing the ducks/boat (or cave drips) on the water surface

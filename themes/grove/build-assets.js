@@ -509,6 +509,25 @@ save(
   66
 );
 
+// ---- fish (2 frames, tail sweeps; side-on facing right) ----
+// Kept light + silvery so it tints to each pond's deep colour while submerged
+// and reads as a bright fish when it leaps clear of the surface.
+const fishSvg = (tf) =>
+  S(
+    '120 60',
+    `<defs><linearGradient id="fsb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8ea6b9"/><stop offset="0.5" stop-color="#c2d3de"/><stop offset="1" stop-color="#eef5f9"/></linearGradient></defs>
+<path d="M34,30 L9,${17 + tf} C17,25 17,35 9,${43 + tf} Z" fill="#9fb4c4" opacity="0.92"/>
+<path d="M58,15 Q70,2 84,17 Z" fill="#8fa6b8" opacity="0.85"/>
+<path d="M64,44 Q74,55 84,43 Z" fill="#8fa6b8" opacity="0.8"/>
+<path d="M30,30 C42,13 70,9 96,16 C107,19 113,24 113,30 C113,36 107,41 96,44 C70,51 42,47 30,30 Z" fill="url(#fsb)"/>
+<path d="M86,35 Q93,45 99,36 Z" fill="#86a0b3" opacity="0.75"/>
+<path d="M40,30 C60,22 86,22 104,28 C86,32 60,34 40,30 Z" fill="#7f97a8" opacity="0.5"/>
+<path d="M92,18 C96,24 96,36 92,42" stroke="#7f97a8" stroke-width="1.4" fill="none" opacity="0.6"/>
+<circle cx="100" cy="26" r="3" fill="#16242e"/><circle cx="101" cy="25" r="1" fill="#eaf3f7"/>`
+  );
+save('fish_a', fishSvg(0), 120);
+save('fish_b', fishSvg(7), 120);
+
 // ---- ALPINE biome ----
 const goatSvg = (lf) =>
   S(
@@ -832,16 +851,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = [
-  'camel',
-  'camel_b',
-  'giraffe',
-  'giraffe_b',
-  'goat',
-  'goat_b',
-  'panda',
-  'panda_b'
-];
+const review = ['fish_a', 'fish_b'];
 const cols = 4,
   cell = 230,
   pad = 14,
