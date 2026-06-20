@@ -480,16 +480,15 @@
         },
         alpine: {
           label: '🏔️ Alpine',
-          fog: 0.5,
-          sky: 0xdfeaff,
+          fog: 0.4,
+          sky: 0xd4ecff, // bright, sunlit high-altitude sky (no aurora — that's the polar Fjord's)
           seasonal: false,
           snowCaps: true,
-          foliageTint: 0x9ec4b4,
-          aurora: true,
+          foliageTint: 0xcfe4c2, // crisp sunlit green pines
           feature: 'peak', // a snowy summit rises behind the hills (sets Alpine apart from the Fjord)
-          distant: {style: 'peak', tint: 0xa3afc4}, // a range receding behind the near summit
-          hills: [0x8ea3bd, 0xb1c0d4, 0xe7eef6],
-          ground: 'snow',
+          distant: {style: 'peak', tint: 0xaebfd2}, // a range receding behind the near summit
+          hills: [0x96abc2, 0xbccadb, 0xeef3f8],
+          ground: 'scree', // exposed alpine rock among the snow, not a clean blanket
           mid: [
             ['pine', 0.6, 240],
             ['pine', 0.5, 600],
@@ -581,6 +580,7 @@
           label: '🌋 Volcanic',
           sky: 0xc8a59a,
           seasonal: false,
+          distant: {style: 'cones', tint: 0x4a3c44}, // a far field of dark cinder cones
           hills: [0x4a4048, 0x382f38, 0x2a2230],
           ground: 'basalt',
           feature: 'volcano',
@@ -599,26 +599,31 @@
         },
         fjord: {
           label: '🌌 Fjord',
-          fog: 0.85,
-          sky: 0x9fb0c8,
+          fog: 0.9,
+          sky: 0x8a9cb8, // deeper, moodier polar light
           seasonal: false,
           snowCaps: true,
-          foliageTint: 0x9ec4b4,
-          aurora: true,
-          distant: {style: 'peak', tint: 0x91a3bd}, // a connected wall of snow-capped peaks
-          hills: [0x7a8aa4, 0x9fb0c6, 0xe2ecf4],
+          foliageTint: 0x7c9ca0, // cool, dark pines on the shadowed walls
+          aurora: true, // the polar signature (Alpine no longer has it)
+          // steep rock walls plunging to the water frame the inlet (the defining fjord feature)
+          cliffs: [
+            {x: 70, s: 1.02},
+            {x: 1210, s: 1.08, flip: true}
+          ],
+          distant: {style: 'peak', tint: 0x8294ac}, // peaks at the head of the inlet
+          hills: [0x6a798f, 0x8b9bb2, 0xdce6f0],
           ground: 'snow',
           mid: [
-            ['pine', 0.55, 200],
-            ['pine', 0.5, 980]
+            ['pine', 0.5, 330],
+            ['pine', 0.46, 880]
           ],
           near: [
-            ['pine', 1.0, 120],
-            ['pine', 0.92, 1130]
+            ['pine', 0.72, 250],
+            ['pine', 0.66, 1010]
           ],
           water: {
-            top: '#2a4a6a',
-            bot: '#15263c',
+            top: '#284766',
+            bot: '#101f33',
             lily: false,
             ducks: false,
             drag: false,
@@ -799,7 +804,8 @@
         'jelly_b',
         'butte',
         'icefloe',
-        'headland'
+        'headland',
+        'cliff'
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -956,6 +962,38 @@
             const x = -20 + Math.random() * (VW + 40);
             g.drawEllipse(x, topY(x) + 10, 13, 8);
           }
+          g.endFill();
+        } else if (d.style === 'cones') {
+          // a far field of dark cinder cones (volcanic): jagged dark peaks linked by low saddles,
+          // each with a shadowed lee face — no snow, dusted with ash
+          const ctrl = [[-40, base]];
+          let x = -40;
+          while (x <= VW + 40) {
+            ctrl.push([x, base - (66 + Math.random() * 86)]); // a cone summit
+            x += 78 + Math.random() * 70;
+            ctrl.push([x, base - (12 + Math.random() * 26)]); // a low saddle (cones nearly separate)
+            x += 78 + Math.random() * 70;
+          }
+          ctrl.push([VW + 40, base]);
+          g.beginFill(d.tint);
+          g.moveTo(-40, base);
+          for (const [px, py] of ctrl) g.lineTo(px, py);
+          g.lineTo(VW + 40, base);
+          g.closePath();
+          g.endFill();
+          g.beginFill(shade(d.tint, 0.66)); // shadowed lee face of each cone
+          for (let i = 1; i < ctrl.length - 1; i += 2) {
+            const [sx, sy] = ctrl[i],
+              [rx] = ctrl[i + 1];
+            g.moveTo(sx, sy);
+            g.lineTo(rx, base);
+            g.lineTo(sx, base);
+            g.closePath();
+          }
+          g.endFill();
+          g.beginFill(0xff6a2a, 0.4); // a faint ember crust on one cone's tip
+          const gi = 1 + ((Math.random() * ((ctrl.length - 2) / 2)) | 0) * 2;
+          if (ctrl[gi]) g.drawEllipse(ctrl[gi][0], ctrl[gi][1] + 3, 5, 3);
           g.endFill();
         }
         return g;
@@ -1499,6 +1537,21 @@
             scene.addChild(g);
             swayers.push({s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6});
           }
+        } else if (BI.ground === 'scree') {
+          // exposed alpine rock: plenty of weathered boulders + outcrops breaking through the snow
+          for (let i = 0; i < 22; i++) {
+            const x = 16 + Math.random() * (VW - 32),
+              r = spr('rock', x, groundY(x) + 8, 0.1 + Math.random() * 0.22);
+            r.tint = Math.random() < 0.5 ? 0x8a93a2 : 0xa6aeba;
+            scene.addChild(r);
+          }
+          for (let i = 0; i < 4; i++) {
+            const x = Math.random() * VW,
+              g = spr('grass', x, groundY(x) + 6, 0.35 + Math.random() * 0.3);
+            g.tint = 0xbfc6b2; // hardy alpine tufts
+            scene.addChild(g);
+            swayers.push({s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6});
+          }
         } else if (BI.ground === 'savanna') {
           for (let i = 0; i < 6; i++) {
             const x = 30 + Math.random() * (VW - 60);
@@ -1854,6 +1907,14 @@
           water = null;
           iceG = null;
         }
+        // steep rock walls plunging to the water (the fjord's framing) — in front of the water
+        if (BI.cliffs)
+          for (const c of BI.cliffs) {
+            const cl = spr('cliff', c.x, 616, c.s, 0.5, 1);
+            if (c.flip) cl.scale.x = -Math.abs(cl.scale.x);
+            if (c.tint) cl.tint = c.tint;
+            scene.addChild(cl);
+          }
         streakTile = null;
         if (BI.waterfall && BI.waterfall.falls) {
           // the falling water is a 2-frame sprite, in front of the rock + pool
