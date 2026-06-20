@@ -268,7 +268,9 @@
         if (a.published_at) bits.push(ago(a.published_at));
         if (bits.length)
           meta.appendChild(
-            document.createTextNode((idText ? '  ·  ' : '') + bits.join('  ·  '))
+            document.createTextNode(
+              (idText ? '  ·  ' : '') + bits.join('  ·  ')
+            )
           );
 
         body.appendChild(meta);

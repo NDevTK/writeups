@@ -182,7 +182,8 @@ if (theme.endsWith('.html')) {
     }
     var d = e.data || {};
     if (d.type !== 'shaderwall') return;
-    document.body.appendChild(btn);
+    // no clickjacking, sending shaderwall type shows embed support
+    if (window.top === window) document.body.appendChild(btn);
     if (d.state === 'shown') {
       frame.style.zIndex = '2147483646';
       frame.style.pointerEvents = 'auto';
