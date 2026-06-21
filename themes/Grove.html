@@ -1175,6 +1175,8 @@
         'reed',
         'heron',
         'frog',
+        'frog_b',
+        'frog_y',
         'goat',
         'eagle',
         'acacia',
@@ -3567,9 +3569,16 @@
               [180, 624],
               [900, 642]
             ]) {
-              const fr = spr('frog', fx, fy, 0.42);
+              if (Math.random() < 0.25) continue; // not every lily has a frog on it
+              // mostly green, with the occasional brown (common frog/toad) or golden morph
+              const frCoat = ['frog', 'frog', 'frog_b', 'frog_y'][
+                (Math.random() * 4) | 0
+              ];
+              const fr = spr(frCoat, fx, fy, 0.4 + Math.random() * 0.06);
               fr.baseY = fy;
               fr.isFrog = true;
+              fr.scale.x =
+                (Math.random() < 0.5 ? 1 : -1) * Math.abs(fr.scale.x);
               scene.addChild(fr);
               lilies.push(fr);
             }

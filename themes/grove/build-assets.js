@@ -609,20 +609,34 @@ save(
   ),
   158
 );
-save(
-  'frog',
+// frog — green by default, with brown (common frog/toad) and golden morphs that
+// surface now and then on the lily pads (eye colour shifts to keep the gaze legible)
+const frogSvg = (top, bot, base, eye, line, spot) =>
   S(
     '70 56',
-    `<defs><radialGradient id="fg" cx="50%" cy="34%"><stop offset="0" stop-color="#7cc24a"/><stop offset="1" stop-color="#3f8a2e"/></radialGradient></defs>
-<ellipse cx="35" cy="45" rx="29" ry="10" fill="#327a26"/>
-<path d="M12,46 C8,32 19,38 22,47 Z" fill="#3f8a2e"/><path d="M58,46 C62,32 51,38 48,47 Z" fill="#3f8a2e"/>
+    `<defs><radialGradient id="fg" cx="50%" cy="34%"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bot}"/></radialGradient></defs>
+<ellipse cx="35" cy="45" rx="29" ry="10" fill="${base}"/>
+<path d="M12,46 C8,32 19,38 22,47 Z" fill="${bot}"/><path d="M58,46 C62,32 51,38 48,47 Z" fill="${bot}"/>
 <ellipse cx="35" cy="38" rx="21" ry="15" fill="url(#fg)"/>
 <circle cx="24" cy="24" r="8" fill="url(#fg)"/><circle cx="46" cy="24" r="8" fill="url(#fg)"/>
-<circle cx="24" cy="22" r="4.6" fill="#f4e04a"/><circle cx="46" cy="22" r="4.6" fill="#f4e04a"/>
+<circle cx="24" cy="22" r="4.6" fill="${eye}"/><circle cx="46" cy="22" r="4.6" fill="${eye}"/>
 <circle cx="24" cy="22" r="2.2" fill="#16240c"/><circle cx="46" cy="22" r="2.2" fill="#16240c"/>
-<path d="M26,42 Q35,49 44,42" stroke="#235a1a" stroke-width="2" fill="none" stroke-linecap="round"/>
-<g fill="#2d6b22" opacity="0.55"><circle cx="30" cy="36" r="2"/><circle cx="41" cy="38" r="2"/><circle cx="35" cy="32" r="1.8"/></g>`
-  ),
+<path d="M26,42 Q35,49 44,42" stroke="${line}" stroke-width="2" fill="none" stroke-linecap="round"/>
+<g fill="${spot}" opacity="0.55"><circle cx="30" cy="36" r="2"/><circle cx="41" cy="38" r="2"/><circle cx="35" cy="32" r="1.8"/></g>`
+  );
+save(
+  'frog',
+  frogSvg('#7cc24a', '#3f8a2e', '#327a26', '#f4e04a', '#235a1a', '#2d6b22'),
+  66
+);
+save(
+  'frog_b',
+  frogSvg('#a98559', '#7a5a36', '#664a2c', '#d99a3a', '#4a3320', '#5a3f22'),
+  66
+);
+save(
+  'frog_y',
+  frogSvg('#d8c84a', '#9a8a2e', '#86782a', '#2e2e26', '#6a5e1e', '#8a7a26'),
   66
 );
 
@@ -2773,16 +2787,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = [
-  'robin',
-  'bluebird',
-  'finch',
-  'bluetit',
-  'goldcrest',
-  'wren',
-  'parrot',
-  'damselfly_a'
-];
+const review = ['frog', 'frog_b', 'frog_y', 'duckling'];
 const cols = 4,
   cell = 230,
   pad = 14,
