@@ -2198,6 +2198,23 @@ save(
   40
 );
 
+// ======== a ladybird — red domed elytra with black spots, trundles the meadow (faces right) ========
+save(
+  'ladybird',
+  S(
+    '50 32',
+    `<g stroke="#1e1b16" stroke-width="1.7" stroke-linecap="round"><path d="M15,24 L10,30"/><path d="M21,25 L20,31"/><path d="M27,24 L31,30"/><path d="M15,9 L10,3"/><path d="M21,8 L20,2"/><path d="M27,9 L31,3"/></g>
+<ellipse cx="20" cy="16" rx="15.5" ry="12" fill="#e23528"/>
+<path d="M7,16 L31,16" stroke="#1a1612" stroke-width="1.3"/>
+<ellipse cx="16" cy="10" rx="5.5" ry="2.8" fill="#f47a6c" opacity="0.55"/>
+<g fill="#15110d"><circle cx="25" cy="16" r="1.8"/><circle cx="22" cy="10.5" r="1.8"/><circle cx="22" cy="21.5" r="1.8"/><circle cx="15" cy="8.5" r="1.8"/><circle cx="15" cy="23.5" r="1.8"/><circle cx="10" cy="13" r="1.8"/><circle cx="10" cy="19" r="1.8"/></g>
+<circle cx="33" cy="16" r="4.4" fill="#1a1612"/>
+<g fill="#e9e5d8" opacity="0.85"><circle cx="34.5" cy="14" r="1.2"/><circle cx="34.5" cy="18" r="1.2"/></g>
+<g stroke="#1a1612" stroke-width="1.2" fill="none" stroke-linecap="round"><path d="M37,13 C41,10 43,9 45,8"/><path d="M37,19 C41,20 43,21 45,22"/></g>`
+  ),
+  44
+);
+
 // ======== a garden snail — creeps out onto the wet ground after rain (faces right) ========
 save(
   'snail',
@@ -2856,7 +2873,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['dragonfly_a', 'dragonfly_r_a', 'dragonfly_g_a', 'damselfly_a'];
+const review = ['ladybird', 'beetle', 'bee_a', 'snail'];
 const cols = 4,
   cell = 230,
   pad = 14,
