@@ -4436,15 +4436,32 @@
                 }
               }
             }
+          // rain dimples the surface: a fine patter of small quick rings spreads across the
+          // water through a shower (thinning where ice has formed, since drops land on the ice)
+          if (wet > 0.12 && !BI.interior && !BI.underwater) {
+            let nd = wet * 2.1 * dt * (1 - iceAmt * 0.85);
+            while (nd > 0) {
+              if (nd < 1 && Math.random() > nd) break;
+              ripples.push({
+                x: Math.random() * VW,
+                y: 606 + Math.random() * 86, // on the open water (surface starts at 600)
+                r: 0.6,
+                life: 0.5,
+                gr: 0.22, // grow slowly so each dimple stays small
+                as: 0.62 // but read a touch brighter than a wake ring
+              });
+              nd -= 1;
+            }
+          }
           for (let i = ripples.length - 1; i >= 0; i--) {
             const rp = ripples[i];
-            rp.r += 0.7 * dt;
+            rp.r += (rp.gr ?? 0.7) * dt;
             rp.life -= (dt / 60) * 0.85;
             if (rp.life <= 0) {
               ripples.splice(i, 1);
               continue;
             }
-            rippleG.lineStyle(1.4, 0xdff1f6, rp.life * 0.32);
+            rippleG.lineStyle(1.4, 0xdff1f6, rp.life * (rp.as ?? 0.32));
             rippleG.drawEllipse(rp.x, rp.y, rp.r, rp.r * 0.34);
           }
         }
