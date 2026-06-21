@@ -2094,16 +2094,87 @@ save(
   62
 );
 
+// ======== a great egret — a white wading bird (faces right; reuses the heron's stalk + strike) ========
+save(
+  'egret',
+  S(
+    '190 232',
+    `<defs><linearGradient id="eg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfe8ee"/></linearGradient></defs>
+<g stroke="#2a2e34" stroke-width="3.6" stroke-linecap="round" fill="none"><path d="M84,150 L78,226"/><path d="M98,150 L106,226"/></g>
+<g stroke="#e3b653" stroke-width="3.6" stroke-linecap="round"><path d="M78,226 l12,3"/><path d="M106,226 l12,3"/></g>
+<ellipse cx="92" cy="130" rx="36" ry="21" fill="url(#eg)"/>
+<g stroke="#f2f6f9" stroke-width="1.4" fill="none" opacity="0.8"><path d="M64,126 C44,128 30,134 18,144"/><path d="M66,132 C48,136 36,142 26,150"/><path d="M68,120 C50,120 38,124 28,130"/></g>
+<path d="M104,122 C130,126 150,134 164,146 C146,151 120,150 100,140 Z" fill="#eef3f7"/>
+<path d="M90,116 C70,100 78,70 100,58 C110,52 114,48 120,42" stroke="url(#eg)" stroke-width="10" fill="none" stroke-linecap="round"/>
+<ellipse cx="124" cy="42" rx="10" ry="8" fill="#ffffff"/>
+<path d="M132,40 L180,38 L132,46 Z" fill="#e8c23a"/>
+<path d="M168,39 L180,38 L168,41 Z" fill="#3a3a2a"/>
+<circle cx="126" cy="40" r="2.2" fill="#16181c"/>`
+  ),
+  158
+);
+
+// ======== reef fish variants ========
+// a tall disc angelfish (silver, tints with the school like the torpedo fish) — 2 swim frames
+const angelSvg = (tf) =>
+  S(
+    '100 96',
+    `<defs><linearGradient id="anf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fb4c4"/><stop offset="0.5" stop-color="#cfdde6"/><stop offset="1" stop-color="#eef5f9"/></linearGradient></defs>
+<path d="M46,20 C42,7 54,5 58,15 C56,25 52,31 48,35 Z" fill="#aebfcd" opacity="0.82"/>
+<path d="M46,76 C42,89 54,91 58,81 C56,71 52,65 48,61 Z" fill="#aebfcd" opacity="0.82"/>
+<path d="M24,48 L${8 - tf},33 C16,44 16,52 ${8 - tf},63 Z" fill="#9fb4c4" opacity="0.9"/>
+<path d="M24,48 C30,20 50,16 64,22 C78,28 84,40 84,48 C84,56 78,68 64,74 C50,80 30,76 24,48 Z" fill="url(#anf)"/>
+<g stroke="#7f97a8" stroke-width="3" opacity="0.38" fill="none"><path d="M46,24 C44,40 44,56 46,72"/><path d="M60,25 C58,40 58,56 60,71"/></g>
+<path d="M64,74 C66,84 66,90 64,94" stroke="#aebfcd" stroke-width="1.3" fill="none" opacity="0.7"/>
+<circle cx="76" cy="42" r="3" fill="#16242e"/><circle cx="77" cy="41" r="1" fill="#eaf3f7"/>
+<path d="M83,46 L93,44 L83,50 Z" fill="#cfdde6"/>`
+  );
+save('angelfish_a', angelSvg(0), 90);
+save('angelfish_b', angelSvg(6), 90);
+// a clownfish — its own orange/white/black, doesn't tint — 2 swim frames
+const clownSvg = (tf) =>
+  S(
+    '112 60',
+    `<path d="M30,30 L${12 - tf},16 C20,26 20,34 ${12 - tf},44 Z" fill="#ef7f2a"/>
+<path d="M${12 - tf},16 L${6 - tf},14 C13,25 13,35 ${6 - tf},46 L${12 - tf},44 C20,34 20,26 ${12 - tf},16 Z" fill="#1f1206" opacity="0.5"/>
+<path d="M28,30 C40,14 68,12 92,20 C102,23 106,27 106,30 C106,33 102,37 92,40 C68,48 40,46 28,30 Z" fill="#ef7f2a"/>
+<path d="M50,15 C47,30 47,40 51,46 L60,44 C56,34 56,24 58,16 Z" fill="#fdfdfb"/>
+<path d="M74,18 C71,30 71,38 74,44 L80,42 C77,34 77,26 79,19 Z" fill="#fdfdfb"/>
+<g stroke="#1f1206" stroke-width="1.4" fill="none" opacity="0.7"><path d="M49,16 C46,30 46,41 50,47"/><path d="M60,16 C57,26 57,36 60,45"/><path d="M73,19 C70,30 70,38 73,45"/><path d="M80,19 C77,28 77,36 80,43"/></g>
+<path d="M58,40 Q66,52 76,41 Z" fill="#ef7f2a" opacity="0.9"/>
+<path d="M86,33 Q92,42 98,34 Z" fill="#e8731e" opacity="0.85"/>
+<circle cx="94" cy="26" r="3" fill="#1a120a"/><circle cx="95" cy="25" r="1" fill="#fff"/>`
+  );
+save('clownfish_a', clownSvg(0), 105);
+save('clownfish_b', clownSvg(7), 105);
+
+// a blue moon jelly — wide flat bell, short frilly arms, the four horseshoe marks — 2 pulse frames
+const jelly2Svg = (p) => {
+  const rx = 42 - p * 8,
+    ry = 17 + p * 8,
+    cy = 46 - p * 6;
+  return S(
+    '100 132',
+    `<defs><radialGradient id="jb2" cx="50%" cy="40%"><stop offset="0" stop-color="#d6f6ff" stop-opacity="0.9"/><stop offset="0.7" stop-color="#7fcfe8" stop-opacity="0.5"/><stop offset="1" stop-color="#4a9fd0" stop-opacity="0.2"/></radialGradient></defs>
+<g fill="none" stroke="#bfeaf6" stroke-width="3" opacity="0.5" stroke-linecap="round"><path d="M32,${cy + 8} q-3,24 -6,46"/><path d="M44,${cy + 10} q-1,26 -2,48"/><path d="M56,${cy + 10} q1,26 2,48"/><path d="M68,${cy + 8} q3,24 6,46"/></g>
+<path d="M${50 - rx},${cy} a${rx},${ry} 0 0 1 ${rx * 2},0 q${-rx},14 ${-rx * 2},0 Z" fill="url(#jb2)"/>
+<g fill="#8fd6ec" opacity="0.5"><ellipse cx="36" cy="${cy - 4}" rx="6" ry="4"/><ellipse cx="64" cy="${cy - 4}" rx="6" ry="4"/><ellipse cx="50" cy="${cy - 7}" rx="6" ry="4"/></g>
+<ellipse cx="${50 - rx * 0.3}" cy="${cy - ry * 0.4}" rx="${rx * 0.3}" ry="${ry * 0.4}" fill="#ffffff" opacity="0.3"/>`
+  );
+};
+save('jelly2_a', jelly2Svg(0), 92);
+save('jelly2_b', jelly2Svg(1), 92);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'monarch_a',
-  'monarch_b',
-  'butterfly_a',
-  'swallow_a',
-  'parrot',
-  'toucan',
-  'robin',
-  'heron'
+  'egret',
+  'heron',
+  'angelfish_a',
+  'clownfish_a',
+  'fish_a',
+  'jelly2_a',
+  'jelly_a',
+  'turtle'
 ];
 const cols = 4,
   cell = 230,

@@ -1059,6 +1059,13 @@
         'monarch_a',
         'monarch_b',
         'parrot',
+        'egret',
+        'angelfish_a',
+        'angelfish_b',
+        'clownfish_a',
+        'clownfish_b',
+        'jelly2_a',
+        'jelly2_b',
         'grass',
         'flower_p',
         'flower_w',
@@ -2884,8 +2891,12 @@
                   (Math.random() < 0.6 ? 1 : 0) +
                   (Math.random() < 0.3 ? 1 : 0);
           for (let k = 0; k < herd; k++) {
+            // the wading bird is the grey heron most visits, a white egret some — same patient
+            // stalk-and-strike either way
+            const wadeFrames =
+              heron && Math.random() < 0.45 ? ['egret'] : BI.walker;
             const d = anim(
-              BI.walker,
+              wadeFrames,
               300,
               groundY(300) + 8,
               BI.walkerScale,
@@ -3469,11 +3480,25 @@
           const tints = [0xffcf5a, 0xff8a4a, 0x66c8e0, 0xe87a9a, 0xa6e060];
           const schools = Math.max(1, Math.round(R.fish / 4));
           for (let i = 0; i < R.fish; i++) {
+            // mix the body shapes so a school isn't a row of clones: silver torpedoes and disc
+            // angelfish take the school colour; clownfish swim through in their own orange
+            const rr = Math.random();
+            let frames = ['fish_a', 'fish_b'],
+              fsc = 0.15 + Math.random() * 0.12,
+              clown = false;
+            if (rr < 0.3) {
+              frames = ['angelfish_a', 'angelfish_b'];
+              fsc = 0.16 + Math.random() * 0.12;
+            } else if (rr < 0.5) {
+              frames = ['clownfish_a', 'clownfish_b'];
+              fsc = 0.14 + Math.random() * 0.1;
+              clown = true;
+            }
             const f = anim(
-              ['fish_a', 'fish_b'],
+              frames,
               Math.random() * VW,
               130 + Math.random() * 360,
-              0.15 + Math.random() * 0.12,
+              fsc,
               0.06 + Math.random() * 0.05
             );
             f.anchor.set(0.5, 0.5);
@@ -3485,7 +3510,7 @@
             f.ox = (Math.random() - 0.5) * 72; // its slot within a tighter school
             f.oy = (Math.random() - 0.5) * 44;
             f.wob = Math.random() * 6.28;
-            f.tint = tints[i % tints.length];
+            f.tint = clown ? 0xffffff : tints[i % tints.length]; // the clownfish keeps its own colours
             f.alpha = 0.95;
             if (reduce.matches) f.gotoAndStop(0);
             fish.push(f);
@@ -3511,10 +3536,13 @@
             bubbles.push(b);
             scene.addChild(b);
           }
-          // jellyfish: translucent bells pulsing slowly up the column
+          // jellyfish: translucent bells pulsing slowly up the column — pink sea-nettles and
+          // flat cyan moon jellies drift together
           for (let i = 0; i < R.jelly; i++) {
             const j = anim(
-              ['jelly_a', 'jelly_b'],
+              Math.random() < 0.5
+                ? ['jelly2_a', 'jelly2_b']
+                : ['jelly_a', 'jelly_b'],
               120 + Math.random() * (VW - 240),
               200 + Math.random() * 340,
               0.5 + Math.random() * 0.35,
