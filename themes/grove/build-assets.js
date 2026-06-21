@@ -1848,17 +1848,75 @@ save(
   100
 );
 
+// ======== SAVANNA detail ========
+// a termite mound — a tall reddish spire with smaller turrets
+save(
+  'termite_mound',
+  S(
+    '64 112',
+    `<defs><linearGradient id="tm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9c5e34"/><stop offset="0.5" stop-color="#be7e4c"/><stop offset="1" stop-color="#864e2c"/></linearGradient></defs>
+<ellipse cx="32" cy="107" rx="25" ry="5" fill="#6a4424" opacity="0.22"/>
+<path d="M44,107 C44,86 46,72 50,62 C52,58 55,58 56,64 C58,78 58,93 56,107 Z" fill="url(#tm)"/>
+<path d="M10,107 C10,93 12,83 15,77 C17,74 19,75 20,80 C21,91 21,99 20,107 Z" fill="url(#tm)"/>
+<path d="M18,107 C16,72 20,42 28,18 C30,12 35,12 37,18 C45,44 49,74 47,107 Z" fill="url(#tm)"/>
+<path d="M28,62 C24,46 26,32 30,22 C28,42 30,72 30,105 Z" fill="#7a4e2c" opacity="0.4"/>
+<g fill="#864e2c" opacity="0.45"><ellipse cx="24" cy="52" rx="3.5" ry="8"/><ellipse cx="40" cy="62" rx="3.5" ry="9"/><ellipse cx="33" cy="80" rx="3" ry="7"/></g>`
+  ),
+  56
+);
+// a baobab — a fat swollen trunk with a sparse crown of branches
+save(
+  'baobab',
+  S(
+    '140 200',
+    `<defs><linearGradient id="bao" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#94805a"/><stop offset="0.5" stop-color="#b89a68"/><stop offset="1" stop-color="#86704a"/></linearGradient></defs>
+<path d="M44,196 C40,150 46,110 58,90 C50,70 56,56 70,56 C84,56 90,70 82,90 C94,110 100,150 96,196 Z" fill="url(#bao)"/>
+<path d="M58,90 C66,86 76,86 84,90 C76,96 66,96 58,90 Z" fill="#7a624a" opacity="0.4"/>
+<path d="M52,150 C50,120 54,100 62,90 C58,110 58,150 60,194 Z" fill="#7a644a" opacity="0.35"/>
+<g stroke="#86704a" stroke-width="5" fill="none" stroke-linecap="round"><path d="M70,58 C66,44 58,34 48,28"/><path d="M70,58 C74,44 82,34 92,28"/><path d="M70,58 C70,42 70,32 70,22"/><path d="M50,30 C44,26 40,22 36,16"/><path d="M90,30 C96,26 100,22 104,16"/><path d="M70,24 C66,20 64,16 62,10"/><path d="M70,24 C74,20 76,16 78,10"/></g>
+<g fill="#86a84e" opacity="0.85"><ellipse cx="40" cy="18" rx="10" ry="6"/><ellipse cx="100" cy="18" rx="10" ry="6"/><ellipse cx="70" cy="12" rx="9" ry="5.5"/><ellipse cx="58" cy="20" rx="6" ry="4"/><ellipse cx="84" cy="20" rx="6" ry="4"/></g>`
+  ),
+  120
+);
+// an aloe — a rosette of pointed succulent leaves with reddish tips
+save(
+  'aloe',
+  S(
+    '50 52',
+    `<g fill="#5e9a4e">
+<path d="M25,49 C22,30 20,18 18,8 C24,16 26,30 27,47 Z"/>
+<path d="M25,49 C18,34 12,24 6,16 C16,24 22,34 27,46 Z"/>
+<path d="M25,49 C32,34 38,24 44,16 C34,24 28,34 23,46 Z"/>
+<path d="M25,49 C14,41 8,35 3,29 C13,35 20,41 26,47 Z"/>
+<path d="M25,49 C36,41 42,35 47,29 C37,35 30,41 24,47 Z"/></g>
+<path d="M25,47 C23,32 22,22 21,14 C25,22 26,34 27,46 Z" fill="#7cbf5e"/>
+<g fill="#d86a4a" opacity="0.7"><circle cx="18" cy="9" r="1.6"/><circle cx="6" cy="16" r="1.4"/><circle cx="44" cy="16" r="1.4"/><circle cx="3" cy="29" r="1.3"/><circle cx="47" cy="29" r="1.3"/></g>`
+  ),
+  50
+);
+
+// ======== a squirrel — a cross-biome critter that sits and nibbles ========
+save(
+  'squirrel',
+  S(
+    '70 66',
+    `<defs><linearGradient id="sq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bc6e3c"/><stop offset="1" stop-color="#8a4e28"/></linearGradient></defs>
+<path d="M22,58 C7,54 3,37 9,23 C15,11 27,11 31,19 C23,19 15,27 17,39 C19,49 27,53 33,53 C29,57 25,59 22,58 Z" fill="url(#sq)"/>
+<path d="M13,31 C11,23 15,17 21,15 C17,21 17,29 21,35 Z" fill="#d49058" opacity="0.6"/>
+<path d="M34,57 C30,45 32,33 40,29 C48,25 56,31 56,43 C56,53 50,59 44,59 C40,59 36,59 34,57 Z" fill="url(#sq)"/>
+<circle cx="49" cy="25" r="11" fill="url(#sq)"/>
+<path d="M43,17 C41,11 43,7 47,9 C47,13 46,17 45,19 Z" fill="#8a4e28"/>
+<path d="M55,17 C57,11 55,7 51,9 C51,13 52,17 53,19 Z" fill="#8a4e28"/>
+<path d="M40,53 C38,43 40,35 45,33 C44,41 44,49 46,55 C43,56 41,55 40,53 Z" fill="#e8c89c"/>
+<circle cx="45" cy="40" r="3.4" fill="#a06a3a"/>
+<circle cx="52" cy="24" r="2" fill="#140e09"/><circle cx="52.6" cy="23.4" r="0.6" fill="#fff"/>
+<circle cx="58" cy="27" r="1.6" fill="#3a241a"/>`
+  ),
+  62
+);
+
 // ---- contact sheet of new + polished ----
-const review = [
-  'barrel_cactus',
-  'skull',
-  'cactus',
-  'shell',
-  'conch',
-  'driftwood',
-  'starfish',
-  'crab'
-];
+const review = ['termite_mound', 'baobab', 'aloe', 'acacia', 'squirrel', 'fawn_a', 'barrel_cactus', 'shell'];
 const cols = 4,
   cell = 230,
   pad = 14,

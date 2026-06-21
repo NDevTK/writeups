@@ -38,7 +38,7 @@
         color: #d7e6f0;
         font:
           13px ui-monospace,
-          'Consolas',
+          "Consolas",
           monospace;
       }
       body.shown #ui {
@@ -80,22 +80,23 @@
       id="ui"
       role="group"
       aria-label="Wallpaper controls"
-      aria-hidden="true">
+      aria-hidden="true"
+    >
       <div class="row" id="uiBiome"></div>
       <div class="row" id="uiTime"></div>
       <div class="row" id="uiSeason"></div>
     </div>
     <script src="grove/pixi.min.js"></script>
     <script>
-      'use strict';
+      "use strict";
       const VW = 1280,
         VH = 720,
         HZ = 430; // design space + celestial horizon
-      const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)");
       const app = new PIXI.Application({
         resizeTo: window,
         antialias: true,
-        backgroundAlpha: 0
+        backgroundAlpha: 0,
       });
       document.body.appendChild(app.view);
       const root = new PIXI.Container();
@@ -107,10 +108,10 @@
         root.scale.set(s);
         root.position.set(
           (app.screen.width - VW * s) / 2,
-          (app.screen.height - VH * s) / 2
+          (app.screen.height - VH * s) / 2,
         );
       }
-      app.renderer.on('resize', fit);
+      app.renderer.on("resize", fit);
       // gentle parallax: pointer (desktop/standalone) or device tilt (mobile) nudges near layers more than far
       let farLayer,
         parX = 0,
@@ -118,48 +119,48 @@
         parTX = 0,
         parTY = 0;
       addEventListener(
-        'pointermove',
+        "pointermove",
         (e) => {
           parTX = (e.clientX / innerWidth - 0.5) * 2;
           parTY = (e.clientY / innerHeight - 0.5) * 2;
         },
-        {passive: true}
+        { passive: true },
       );
       addEventListener(
-        'deviceorientation',
+        "deviceorientation",
         (e) => {
           if (e.gamma == null) return;
           parTX = Math.max(-1, Math.min(1, e.gamma / 28));
           parTY = Math.max(-1, Math.min(1, ((e.beta || 45) - 45) / 28));
         },
-        {passive: true}
+        { passive: true },
       );
 
       // ---------- time of day ----------
       const q = new URLSearchParams(location.search);
-      const hourParam = q.get('hour'),
-        cyc = parseFloat(q.get('cycle')),
-        seasonParam = q.get('season'),
-        moonParam = q.get('moon'), // 0..1 phase override for previewing (0/1 new, .5 full)
-        coverParam = q.get('cover'); // 0..1 cloud-cover override for previewing weather states
+      const hourParam = q.get("hour"),
+        cyc = parseFloat(q.get("cycle")),
+        seasonParam = q.get("season"),
+        moonParam = q.get("moon"), // 0..1 phase override for previewing (0/1 new, .5 full)
+        coverParam = q.get("cover"); // 0..1 cloud-cover override for previewing weather states
       const LS = (k, v) => {
         try {
-          if (v === undefined) return localStorage.getItem('grove:' + k);
-          localStorage.setItem('grove:' + k, v);
+          if (v === undefined) return localStorage.getItem("grove:" + k);
+          localStorage.setItem("grove:" + k, v);
         } catch (e) {}
       };
-      let timeMode = LS('time') || 'auto',
-        seasonMode = LS('season') || 'auto',
-        weatherMode = LS('weather') || 'auto',
-        soundOn = LS('sound') === '1',
-        journeyOn = LS('journey') === '1';
+      let timeMode = LS("time") || "auto",
+        seasonMode = LS("season") || "auto",
+        weatherMode = LS("weather") || "auto",
+        soundOn = LS("sound") === "1",
+        journeyOn = LS("journey") === "1";
       // journey: slowly drift through the biomes, fading between them
       const JOURNEY_PERIOD = 120; // seconds spent on each biome
       let journeyTimer = JOURNEY_PERIOD,
         journeyFade = 0, // 0 idle | -1 fading the scene out | +1 fading it back in
         journeyNext = null; // the biome to build at the bottom of the fade
       // weather front runtime: cover = cloud cover, wet = rain intensity, wetness = lingering ground wetness
-      let frontState = 'clear',
+      let frontState = "clear",
         frontT = 60 + Math.random() * 120,
         cover = 0,
         wet = 0, // rain intensity (front-driven, warm scenes)
@@ -198,33 +199,33 @@
         canyon: 21,
         polar: -9,
         glade: 13,
-        summit: 1
+        summit: 1,
       };
-      const SEASON_TEMP = {winter: -16, autumn: -5, spring: 1, summer: 5};
+      const SEASON_TEMP = { winter: -16, autumn: -5, spring: 1, summer: 5 };
       function nowHour() {
         if (hourParam != null) return parseFloat(hourParam);
-        if (timeMode === 'dawn') return 6.4;
-        if (timeMode === 'day') return 13;
-        if (timeMode === 'dusk') return 18.7;
-        if (timeMode === 'night') return 23;
+        if (timeMode === "dawn") return 6.4;
+        if (timeMode === "day") return 13;
+        if (timeMode === "dusk") return 18.7;
+        if (timeMode === "night") return 23;
         if (cyc > 0) return ((performance.now() / 1000 / cyc) * 24 + 6) % 24;
         const d = new Date();
         return d.getHours() + d.getMinutes() / 60;
       }
       const SKY = [
-        {h: 0, top: '#10183a', bot: '#243a5e', light: 0.3},
-        {h: 5, top: '#26305c', bot: '#caa05e', light: 0.45},
-        {h: 7, top: '#6aaedd', bot: '#cfe7f2', light: 0.9},
-        {h: 12, top: '#54a3e0', bot: '#d6eef0', light: 1},
-        {h: 17, top: '#58a6df', bot: '#e2eec6', light: 0.95},
-        {h: 19, top: '#39406e', bot: '#e88a4a', light: 0.5},
-        {h: 20.5, top: '#141d44', bot: '#2a3e60', light: 0.32},
-        {h: 24, top: '#10183a', bot: '#243a5e', light: 0.3}
+        { h: 0, top: "#10183a", bot: "#243a5e", light: 0.3 },
+        { h: 5, top: "#26305c", bot: "#caa05e", light: 0.45 },
+        { h: 7, top: "#6aaedd", bot: "#cfe7f2", light: 0.9 },
+        { h: 12, top: "#54a3e0", bot: "#d6eef0", light: 1 },
+        { h: 17, top: "#58a6df", bot: "#e2eec6", light: 0.95 },
+        { h: 19, top: "#39406e", bot: "#e88a4a", light: 0.5 },
+        { h: 20.5, top: "#141d44", bot: "#2a3e60", light: 0.32 },
+        { h: 24, top: "#10183a", bot: "#243a5e", light: 0.3 },
       ];
       const hx = (s) => [
         parseInt(s.slice(1, 3), 16),
         parseInt(s.slice(3, 5), 16),
-        parseInt(s.slice(5, 7), 16)
+        parseInt(s.slice(5, 7), 16),
       ];
       const lp = (a, b, t) => a + (b - a) * t;
       const lpH = (a, b, t) => {
@@ -235,7 +236,7 @@
       const mixA = (a, b, t) => [
         lp(a[0], b[0], t),
         lp(a[1], b[1], t),
-        lp(a[2], b[2], t)
+        lp(a[2], b[2], t),
       ]; // rgb arrays
       const css = (c) => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
       const hexI = (c) => ((c[0] | 0) << 16) | ((c[1] | 0) << 8) | (c[2] | 0);
@@ -248,7 +249,7 @@
             return {
               top: lpH(a.top, b.top, t),
               bot: lpH(a.bot, b.bot, t),
-              light: lp(a.light, b.light, t)
+              light: lp(a.light, b.light, t),
             };
           }
         return tod(0.01);
@@ -259,7 +260,7 @@
           return {
             x: VW * f,
             y: HZ - Math.sin(f * Math.PI) * HZ * 0.78,
-            sun: true
+            sun: true,
           };
         }
         const nh = h < 6 ? h + 24 : h,
@@ -267,47 +268,47 @@
         return {
           x: VW * f,
           y: HZ - Math.sin(f * Math.PI) * HZ * 0.66,
-          sun: false
+          sun: false,
         };
       }
       // ---------- season ----------
       function nowSeason() {
         if (seasonParam) return seasonParam;
-        if (seasonMode !== 'auto') return seasonMode;
+        if (seasonMode !== "auto") return seasonMode;
         const m = new Date().getMonth(); // N hemisphere
         return m < 2 || m === 11
-          ? 'winter'
+          ? "winter"
           : m < 5
-            ? 'spring'
+            ? "spring"
             : m < 8
-              ? 'summer'
-              : 'autumn';
+              ? "summer"
+              : "autumn";
       }
       const SEASONS = {
         spring: {
           foliage: 0xeafff0,
           hill: 0xeafff2,
-          weather: 'petal',
-          snow: false
+          weather: "petal",
+          snow: false,
         },
         summer: {
           foliage: 0xffffff,
           hill: 0xffffff,
-          weather: 'none',
-          snow: false
+          weather: "none",
+          snow: false,
         },
         autumn: {
           foliage: 0xffb765,
           hill: 0xe9ce93,
-          weather: 'leaf',
-          snow: false
+          weather: "leaf",
+          snow: false,
         },
         winter: {
           foliage: 0xd2e2ec,
           hill: 0xdfeaf2,
-          weather: 'flake',
-          snow: true
-        }
+          weather: "flake",
+          snow: true,
+        },
       };
       const LEAFTINTS = [0xe07a2e, 0xd9a441, 0xc24f2e, 0xb8862e];
       const mulTint = (a, b) => {
@@ -326,7 +327,7 @@
           ch = (v) =>
             Math.max(
               0,
-              Math.min(255, (v * (1 + (Math.random() - 0.5) * 2 * a)) | 0)
+              Math.min(255, (v * (1 + (Math.random() - 0.5) * 2 * a)) | 0),
             );
         return (
           (ch((base >> 16) & 255) << 16) |
@@ -345,175 +346,176 @@
       };
 
       // ---------- biome ----------
-      let biomeParam = q.get('biome'); // cleared once Journey/Surprise takes over so biomeMode drives
-      let biomeMode = LS('biome') || 'grove';
+      let biomeParam = q.get("biome"); // cleared once Journey/Surprise takes over so biomeMode drives
+      let biomeMode = LS("biome") || "grove";
       function nowBiome() {
         return biomeParam || biomeMode;
       }
       const BIOMES = {
         grove: {
-          label: '🌳 Grove',
+          label: "🌳 Grove",
           fog: 0.8,
           sky: 0xffffff,
           seasonal: true,
           hills: [0x9cc6b0, 0x73b25a, 0x4f9c3e],
-          distant: {style: 'forest', tint: 0x86a86a}, // forested hills along the horizon
-          ground: 'meadow',
+          distant: { style: "forest", tint: 0x86a86a }, // forested hills along the horizon
+          ground: "meadow",
           mid: [
-            ['pine', 0.7, 180],
-            ['oak', 0.7, 330],
-            ['oak', 0.66, 1040],
-            ['pine', 0.64, 1180]
+            ["pine", 0.7, 180],
+            ["oak", 0.7, 330],
+            ["oak", 0.66, 1040],
+            ["pine", 0.64, 1180],
           ],
           near: [
-            ['oak', 1.05, 120],
-            ['pine', 1, 430],
-            ['oak', 1.1, 900],
-            ['bush', 1, 1150]
+            ["oak", 1.05, 120],
+            ["pine", 1, 430],
+            ["oak", 1.1, 900],
+            ["bush", 1, 1150],
           ],
-          treeExtras: ['birch', 'fir', 'poplar', 'willow', 'snag'], // mixed into the stand by the variety system
+          treeExtras: ["birch", "fir", "poplar", "willow", "snag"], // mixed into the stand by the variety system
           water: {
-            top: '#5fa7ca',
-            bot: '#2f6f93',
+            top: "#5fa7ca",
+            bot: "#2f6f93",
             lily: true,
             ducks: true,
             drag: true,
             freeze: true,
-            fish: 3
+            fish: 3,
           },
-          walker: ['deer_a', 'deer_b'],
+          walker: ["deer_a", "deer_b"],
           walkerScale: 0.62,
           graze: true,
-          critter: 'fox',
+          critter: "fox",
           critterScale: 0.42,
-          hopper: 'rabbit',
+          hopper: "rabbit",
+          squirrel: true, // a squirrel forages the grove floor now and then
           flyer: 0xffffff,
           flutter: true,
           bats: 3, // bats feed over the meadow at dusk
-          roller: null
+          roller: null,
         },
         desert: {
-          label: '🏜️ Desert',
+          label: "🏜️ Desert",
           sky: 0xfff0d6,
           seasonal: false,
           hills: [0xe9d3a4, 0xdcbb80, 0xcca35f],
           distant: {
-            sprite: 'butte',
+            sprite: "butte",
             count: 4,
             sc: [0.55, 1.0],
             y: 474,
             tint: 0xe7d4ab,
-            alpha: 0.96
+            alpha: 0.96,
           }, // textured buttes hazed into the heat shimmer
-          ground: 'sand',
+          ground: "sand",
           mid: [
-            ['cactus', 0.5, 260],
-            ['rock', 0.7, 1010],
-            ['cactus2', 0.55, 700]
+            ["cactus", 0.5, 260],
+            ["rock", 0.7, 1010],
+            ["cactus2", 0.55, 700],
           ],
           near: [
-            ['cactus', 1, 170],
-            ['cactus2', 1, 480],
-            ['rock', 1, 900],
-            ['cactus', 0.8, 1120]
+            ["cactus", 1, 170],
+            ["cactus2", 1, 480],
+            ["rock", 1, 900],
+            ["cactus", 0.8, 1120],
           ],
           water: null,
-          walker: ['camel', 'camel_b'],
+          walker: ["camel", "camel_b"],
           walkerScale: 0.62,
           graze: false,
-          critter: 'lizard',
+          critter: "lizard",
           critterScale: 0.5,
           hopper: null,
           flyer: 0x4a4036,
           soar: {
-            frames: ['vulture'],
+            frames: ["vulture"],
             count: 1,
             tint: 0x4a4036,
             yLo: 150,
-            yHi: 290
+            yHi: 290,
           }, // a vulture circles the heat
           flutter: false,
-          roller: 'tumbleweed'
+          roller: "tumbleweed",
         },
         coast: {
-          label: '🏖️ Coast',
+          label: "🏖️ Coast",
           fog: 0.9,
           sky: 0xffffff,
           seasonal: true,
           seasonPalette: {
-            spring: {fol: 0xeafff0, hill: 0xfff8ee, grass: 0xcfd89a},
-            summer: {fol: 0xffffff, hill: 0xffffff, grass: 0xd8c88a},
-            autumn: {fol: 0xffd9a8, hill: 0xf6e6c4, grass: 0xc8a86a},
-            winter: {fol: 0xdfe6ea, hill: 0xeef0ee, grass: 0xc4c6b8}
+            spring: { fol: 0xeafff0, hill: 0xfff8ee, grass: 0xcfd89a },
+            summer: { fol: 0xffffff, hill: 0xffffff, grass: 0xd8c88a },
+            autumn: { fol: 0xffd9a8, hill: 0xf6e6c4, grass: 0xc8a86a },
+            winter: { fol: 0xdfe6ea, hill: 0xeef0ee, grass: 0xc4c6b8 },
           },
           hills: [0xe8ddbc, 0xe0cd9c, 0xd6bd80],
           distant: {
-            sprite: 'headland',
+            sprite: "headland",
             count: 2,
             sc: [0.5, 0.85],
             y: 456,
             tint: 0xcfd2cb,
-            alpha: 0.9
+            alpha: 0.9,
           }, // rocky headlands on the horizon
-          ground: 'beach',
+          ground: "beach",
           mid: [
-            ['palm', 0.6, 250],
-            ['palm', 0.5, 1010]
+            ["palm", 0.6, 250],
+            ["palm", 0.5, 1010],
           ],
           near: [
-            ['palm', 1.05, 150],
-            ['palm', 0.9, 1130],
-            ['rock', 0.7, 520]
+            ["palm", 1.05, 150],
+            ["palm", 0.9, 1130],
+            ["rock", 0.7, 520],
           ],
           water: {
-            top: '#62c8e4',
-            bot: '#2f86b4',
+            top: "#62c8e4",
+            bot: "#2f86b4",
             lily: false,
             ducks: false,
             drag: false,
             sailboat: true,
             fish: 2,
             dolphins: 2, // a pod porpoises across the bay
-            whale: true // a whale surfaces and blows far out
+            whale: true, // a whale surfaces and blows far out
           },
           walker: null,
-          critter: 'crab',
+          critter: "crab",
           critterScale: 0.5,
           hopper: null,
           flyer: 0xffffff,
-          flyerFrames: ['gull'],
+          flyerFrames: ["gull"],
           flutter: false,
-          roller: null
+          roller: null,
         },
         wetland: {
-          label: '🪷 Wetland',
+          label: "🪷 Wetland",
           fog: 1,
           sky: 0xf2f7ee,
           seasonal: true,
           seasonPalette: {
-            spring: {fol: 0xeafff0, hill: 0xeafff2, grass: 0x8fc25a},
-            summer: {fol: 0xffffff, hill: 0xffffff, grass: 0x8fae5c},
-            autumn: {fol: 0xe8c878, hill: 0xe0d29a, grass: 0x9a9a4a},
-            winter: {fol: 0xc8d2cc, hill: 0xd8e0d8, grass: 0x9aae8a}
+            spring: { fol: 0xeafff0, hill: 0xeafff2, grass: 0x8fc25a },
+            summer: { fol: 0xffffff, hill: 0xffffff, grass: 0x8fae5c },
+            autumn: { fol: 0xe8c878, hill: 0xe0d29a, grass: 0x9a9a4a },
+            winter: { fol: 0xc8d2cc, hill: 0xd8e0d8, grass: 0x9aae8a },
           },
           hills: [0x9ec1a0, 0x7caf6e, 0x5f9456],
-          distant: {style: 'forest', tint: 0x7fa074}, // a far tree line across the marsh
-          ground: 'marsh',
+          distant: { style: "forest", tint: 0x7fa074 }, // a far tree line across the marsh
+          ground: "marsh",
           mid: [
-            ['reed', 0.55, 210],
-            ['reed', 0.48, 560],
-            ['reed', 0.6, 1040]
+            ["reed", 0.55, 210],
+            ["reed", 0.48, 560],
+            ["reed", 0.6, 1040],
           ],
           near: [
-            ['reed', 1.05, 120],
-            ['reed', 0.92, 470],
-            ['reed', 1.12, 880],
-            ['reed', 0.88, 1160]
+            ["reed", 1.05, 120],
+            ["reed", 0.92, 470],
+            ["reed", 1.12, 880],
+            ["reed", 0.88, 1160],
           ],
-          treeExtras: ['willow'], // the odd willow leaning over the marsh
+          treeExtras: ["willow"], // the odd willow leaning over the marsh
           water: {
-            top: '#5f9e86',
-            bot: '#356b58',
+            top: "#5f9e86",
+            bot: "#356b58",
             lily: true,
             ducks: false,
             drag: 6,
@@ -524,10 +526,10 @@
               [430, 640, 0.78],
               [660, 632, 0.66],
               [900, 646, 0.82],
-              [1110, 634, 0.7]
-            ]
+              [1110, 634, 0.7],
+            ],
           },
-          walker: ['heron'],
+          walker: ["heron"],
           walkerScale: 0.6,
           graze: true,
           critter: null,
@@ -535,133 +537,134 @@
           flyer: 0x6a7b8a,
           flutter: false,
           bats: 4, // bats work the pond at dusk (most insects over the water)
-          roller: null
+          roller: null,
         },
         alpine: {
-          label: '🏔️ Alpine',
+          label: "🏔️ Alpine",
           fog: 0.4,
           sky: 0xd4ecff, // bright, sunlit high-altitude sky (no aurora — that's the polar Fjord's)
           seasonal: false,
           snowCaps: true,
           foliageTint: 0xcfe4c2, // crisp sunlit green pines
           marmot: true, // a marmot keeps watch among the scree
-          feature: 'peak', // a snowy summit rises behind the hills (sets Alpine apart from the Fjord)
-          distant: {style: 'peak', tint: 0xaebfd2}, // a range receding behind the near summit
+          feature: "peak", // a snowy summit rises behind the hills (sets Alpine apart from the Fjord)
+          distant: { style: "peak", tint: 0xaebfd2 }, // a range receding behind the near summit
           hills: [0x96abc2, 0xbccadb, 0xeef3f8],
-          ground: 'scree', // exposed alpine rock among the snow, not a clean blanket
+          ground: "scree", // exposed alpine rock among the snow, not a clean blanket
           mid: [
-            ['pine', 0.6, 240],
-            ['pine', 0.5, 600],
-            ['pine', 0.66, 1020]
+            ["pine", 0.6, 240],
+            ["pine", 0.5, 600],
+            ["pine", 0.66, 1020],
           ],
           near: [
-            ['pine', 1.05, 140],
-            ['pine', 0.92, 470],
-            ['pine', 1.12, 880],
-            ['pine', 0.8, 1170]
+            ["pine", 1.05, 140],
+            ["pine", 0.92, 470],
+            ["pine", 1.12, 880],
+            ["pine", 0.8, 1170],
           ],
-          treeExtras: ['fir', 'birch'], // snow-laden firs and the odd birch among the pines
+          treeExtras: ["fir", "birch"], // snow-laden firs and the odd birch among the pines
           water: null,
-          walker: ['goat', 'goat_b'],
+          walker: ["goat", "goat_b"],
           walkerScale: 0.52,
           graze: true,
           critter: null,
           hopper: null,
           flyer: 0xffffff,
-          flyerFrames: ['eagle'],
+          flyerFrames: ["eagle"],
           flutter: false,
-          roller: null
+          roller: null,
         },
         savanna: {
-          label: '🌅 Savanna',
+          label: "🌅 Savanna",
           fog: 0.3,
           sky: 0xffeccb,
           seasonal: true,
           seasonPalette: {
-            spring: {fol: 0xb6e87e, hill: 0xc0eea2, grass: 0x8cc24e},
-            summer: {fol: 0xffffff, hill: 0xffffff, grass: 0xcaad5e},
-            autumn: {fol: 0xf0c060, hill: 0xeccf86, grass: 0xc29a46},
-            winter: {fol: 0xe8dcb0, hill: 0xede2c2, grass: 0xccbf86}
+            spring: { fol: 0xb6e87e, hill: 0xc0eea2, grass: 0x8cc24e },
+            summer: { fol: 0xffffff, hill: 0xffffff, grass: 0xcaad5e },
+            autumn: { fol: 0xf0c060, hill: 0xeccf86, grass: 0xc29a46 },
+            winter: { fol: 0xe8dcb0, hill: 0xede2c2, grass: 0xccbf86 },
           },
           hills: [0xe6d29a, 0xd7bd76, 0xc6a85a],
-          distant: {style: 'ridge', tint: 0xd2c084, trees: 7}, // far ridge with acacia standing on it
-          ground: 'savanna',
+          distant: { style: "ridge", tint: 0xd2c084, trees: 7 }, // far ridge with acacia standing on it
+          ground: "savanna",
           mid: [
-            ['acacia', 0.55, 320],
-            ['acacia', 0.45, 980]
+            ["acacia", 0.55, 320],
+            ["acacia", 0.45, 980],
           ],
           near: [
-            ['acacia', 1.0, 200],
-            ['acacia', 0.85, 1080]
+            ["acacia", 1.0, 200],
+            ["acacia", 0.85, 1080],
           ],
+          treeExtras: ["baobab"], // the odd fat baobab stands among the acacias
           water: null,
-          walker: ['giraffe', 'giraffe_b'],
+          walker: ["giraffe", "giraffe_b"],
           walkerScale: 0.5,
           graze: true,
-          critter: 'zebra',
+          critter: "zebra",
           critterScale: 0.6,
           hopper: null,
           flyer: 0xffffff,
-          flyerFrames: ['vulture'],
+          flyerFrames: ["vulture"],
           flutter: false,
-          roller: null
+          roller: null,
         },
         bamboo: {
-          label: '🎋 Bamboo',
+          label: "🎋 Bamboo",
           fog: 0.7,
           sky: 0xeaf4e4,
           seasonal: false,
-          distant: {style: 'forest', tint: 0x9cc079}, // misty wooded hills behind the grove
+          distant: { style: "forest", tint: 0x9cc079 }, // misty wooded hills behind the grove
           hills: [0xb6d3a4, 0x8cbd76, 0x6aa45a],
-          ground: 'fern',
+          ground: "fern",
           mid: [
-            ['bamboo', 0.6, 160],
-            ['bamboo', 0.5, 520],
-            ['bamboo', 0.55, 900],
-            ['bamboo', 0.5, 1180]
+            ["bamboo", 0.6, 160],
+            ["bamboo", 0.5, 520],
+            ["bamboo", 0.55, 900],
+            ["bamboo", 0.5, 1180],
           ],
           near: [
-            ['bamboo', 1.0, 90],
-            ['bamboo', 1.1, 360],
-            ['bamboo', 0.95, 760],
-            ['bamboo', 1.05, 1120]
+            ["bamboo", 1.0, 90],
+            ["bamboo", 1.1, 360],
+            ["bamboo", 0.95, 760],
+            ["bamboo", 1.05, 1120],
           ],
           water: null,
-          walker: ['panda', 'panda_b'],
+          walker: ["panda", "panda_b"],
           walkerScale: 0.58,
           graze: true,
-          critter: 'redpanda',
+          critter: "redpanda",
           critterScale: 0.48,
           hopper: null,
           flyer: 0x6a7a4a,
           flutter: true,
           flutterTint: 0xfff0a0, // pale-yellow brimstones drift the grove
           bats: 3, // bats flit the grove at dusk
-          roller: null
+          roller: null,
         },
         volcanic: {
-          label: '🌋 Volcanic',
+          label: "🌋 Volcanic",
           sky: 0xc8a59a,
           seasonal: false,
-          distant: {style: 'cones', tint: 0x4a3c44}, // a far field of dark cinder cones
+          distant: { style: "cones", tint: 0x4a3c44 }, // a far field of dark cinder cones
           hills: [0x4a4048, 0x382f38, 0x2a2230],
-          ground: 'basalt',
-          feature: 'volcano',
+          ground: "basalt",
+          feature: "volcano",
           embers: true,
           mid: [],
           near: [],
           water: null,
           walker: null,
-          critter: 'lizard',
+          critter: "lizard",
           critterScale: 0.55,
           critterTint: 0x5a3e34,
           hopper: null,
           flyer: 0x33302e,
           flutter: false,
-          roller: null
+          roller: null,
         },
         fjord: {
-          label: '🌌 Fjord',
+          label: "🌌 Fjord",
           fog: 0.9,
           sky: 0x8a9cb8, // deeper, moodier polar light
           seasonal: false,
@@ -670,53 +673,53 @@
           aurora: true, // the polar signature (Alpine no longer has it)
           // steep rock walls plunging to the water frame the inlet (the defining fjord feature)
           cliffs: [
-            {x: 70, s: 1.02},
-            {x: 1210, s: 1.08, flip: true}
+            { x: 70, s: 1.02 },
+            { x: 1210, s: 1.08, flip: true },
           ],
-          distant: {style: 'peak', tint: 0x8294ac}, // peaks at the head of the inlet
+          distant: { style: "peak", tint: 0x8294ac }, // peaks at the head of the inlet
           hills: [0x6a798f, 0x8b9bb2, 0xdce6f0],
-          ground: 'snow',
+          ground: "snow",
           mid: [
-            ['pine', 0.5, 330],
-            ['pine', 0.46, 880]
+            ["pine", 0.5, 330],
+            ["pine", 0.46, 880],
           ],
           near: [
-            ['pine', 0.72, 250],
-            ['pine', 0.66, 1010]
+            ["pine", 0.72, 250],
+            ["pine", 0.66, 1010],
           ],
-          treeExtras: ['fir'], // snowy firs among the fjord pines
+          treeExtras: ["fir"], // snowy firs among the fjord pines
           water: {
-            top: '#284766',
-            bot: '#101f33',
+            top: "#284766",
+            bot: "#101f33",
             lily: false,
             ducks: false,
             drag: false,
             fish: 2,
             floes: 3, // ice floes drift on the cold water
             seal: true, // a seal basks on one of them
-            whale: true // a whale surfaces and blows out in the inlet
+            whale: true, // a whale surfaces and blows out in the inlet
           },
           walker: null,
           critter: null,
           hopper: null,
           flyer: 0xffffff,
-          flyerFrames: ['gull'],
+          flyerFrames: ["gull"],
           flutter: false,
-          roller: null
+          roller: null,
         },
         cave: {
-          label: '🦇 Cave',
+          label: "🦇 Cave",
           interior: true,
           sky: 0x141020,
           hills: [0x171220, 0x201a2c, 0x2b2338], // dark rock mounds; front catches a little glow
-          ground: 'rock',
+          ground: "rock",
           mid: [
-            ['stalagmite', 0.34, 720],
-            ['stalagmite', 0.42, 1060]
+            ["stalagmite", 0.34, 720],
+            ["stalagmite", 0.42, 1060],
           ],
           near: [
-            ['stalagmite', 0.62, 560],
-            ['stalagmite', 0.95, 1170]
+            ["stalagmite", 0.62, 560],
+            ["stalagmite", 0.95, 1170],
           ],
           // [x, tint] crystal clusters that glow and gently pulse (200 sits embedded in the big rock)
           crystals: [
@@ -724,13 +727,13 @@
             [500, 0xb98aff],
             [780, 0x6fc8ff],
             [1050, 0x7af0c8],
-            [1220, 0xb98aff]
+            [1220, 0xb98aff],
           ],
-          glow: 'cave', // glowworms on the ceiling
+          glow: "cave", // glowworms on the ceiling
           // designed sprites: a craggy overhang ledge + falls that cross its top and drop off the lip
           waterfall: {
             rock: 0x6b6488,
-            falls: ['falls_a', 'falls_b'],
+            falls: ["falls_a", "falls_b"],
             x: -40,
             y: 616,
             scale: 1.12,
@@ -744,29 +747,29 @@
               h: 258,
               scale: 0.62,
               speed: 3,
-              alpha: 0.9
-            }
+              alpha: 0.9,
+            },
           },
           walker: null,
           critter: null,
           hopper: null,
           flyer: 0x4a4760,
-          flyerFrames: ['bat_a', 'bat_b'],
+          flyerFrames: ["bat_a", "bat_b"],
           flutter: false,
           roller: null,
-          water: {top: '#1b2742', bot: '#0b1120', glow: true} // still underground pool
+          water: { top: "#1b2742", bot: "#0b1120", glow: true }, // still underground pool
         },
         reef: {
-          label: '🐠 Reef',
+          label: "🐠 Reef",
           underwater: true, // a fully submerged scene: water column + god-rays instead of sky
           sky: 0x0e4a5e, // base water tint (drawSky paints the full column gradient over it)
           // distant reef ridges fading into the blue haze
           hills: [0x10566c, 0x176880, 0x217e96],
-          ground: 'reef',
+          ground: "reef",
           mid: [],
           near: [],
           // bright surface water up top -> deep blue below; both dimmed toward night by daylight level
-          column: {surf: '#7fe0e6', mid: '#1f7e96', deep: '#06243c'},
+          column: { surf: "#7fe0e6", mid: "#1f7e96", deep: "#06243c" },
           reef: {
             kelp: 7,
             fan: 3,
@@ -778,118 +781,119 @@
             jelly: 3, // translucent jellyfish pulsing slowly upward
             motes: 46, // drifting marine-snow specks for atmosphere
             bubbles: 16,
-            turtle: true
+            turtle: true,
           },
           walker: null,
-          critter: 'crab',
+          critter: "crab",
           critterScale: 0.5,
           hopper: null,
           flyer: 0xffffff,
           flutter: false,
-          roller: null
+          roller: null,
         },
         jungle: {
-          label: '🦜 Jungle',
+          label: "🦜 Jungle",
           canopy: true, // dense overhead canopy + dappled light shafts (its own sky treatment)
           fog: 0.85, // humid haze
           sky: 0x9fd07a, // bright green light filtering down
           seasonal: false,
-          distant: {style: 'forest', tint: 0x3f7a40}, // deep layered jungle receding into the mist
+          distant: { style: "forest", tint: 0x3f7a40 }, // deep layered jungle receding into the mist
           hills: [0x2f6b39, 0x357b3f, 0x3f8c46],
-          ground: 'jungle',
+          ground: "jungle",
           mid: [
-            ['jungle_tree', 0.62, 250],
-            ['jungle_tree', 0.55, 980]
+            ["jungle_tree", 0.62, 250],
+            ["jungle_tree", 0.55, 980],
           ],
           near: [
-            ['jungle_tree', 1.0, 90],
-            ['jungle_tree', 0.92, 1180]
+            ["jungle_tree", 1.0, 90],
+            ["jungle_tree", 0.92, 1180],
           ],
           vines: 7, // hanging vines that sway
           water: {
-            top: '#3a6b54',
-            bot: '#1f3f30',
+            top: "#3a6b54",
+            bot: "#1f3f30",
             lily: false,
             frogs: true,
-            fish: 2
+            fish: 2,
           },
           walker: null,
-          critter: 'monkey',
+          critter: "monkey",
           critterScale: 0.5,
           hopper: null,
           flyer: 0xffffff,
-          flyerFrames: ['toucan'],
+          flyerFrames: ["toucan"],
           flutter: true,
           flutterTint: 0x4aa0ff, // blue morphos
-          roller: null
+          roller: null,
         },
         blossom: {
-          label: '🌸 Blossom',
+          label: "🌸 Blossom",
           fog: 0.6,
           sky: 0xffe9f0, // soft, warm pink light
           seasonal: false,
-          ambientWeather: 'petal', // blossom petals always drift down
-          distant: {style: 'forest', tint: 0xf2b4cf}, // pink blossom hills on the horizon
+          ambientWeather: "petal", // blossom petals always drift down
+          distant: { style: "forest", tint: 0xf2b4cf }, // pink blossom hills on the horizon
           hills: [0xbfe0b0, 0x9ecb86, 0x7bb566],
-          ground: 'meadow',
+          ground: "meadow",
           mid: [
-            ['sakura', 0.7, 220],
-            ['sakura', 0.6, 1000]
+            ["sakura", 0.7, 220],
+            ["sakura", 0.6, 1000],
           ],
           near: [
-            ['sakura', 1.1, 110],
-            ['sakura', 0.96, 1170]
+            ["sakura", 1.1, 110],
+            ["sakura", 0.96, 1170],
           ],
           water: {
-            top: '#a8d6e6',
-            bot: '#5fa2c2',
+            top: "#a8d6e6",
+            bot: "#5fa2c2",
             lily: false,
             fish: 4,
-            fishSprite: ['koi_a', 'koi_b'], // a koi pond
-            petals: true // petals settle on the surface
+            fishSprite: ["koi_a", "koi_b"], // a koi pond
+            petals: true, // petals settle on the surface
           },
-          walker: ['deer_a', 'deer_b'], // deer wander the grove (Nara-style)
+          walker: ["deer_a", "deer_b"], // deer wander the grove (Nara-style)
           walkerScale: 0.6,
           graze: true,
           critter: null,
-          hopper: 'rabbit',
+          hopper: "rabbit",
+          squirrel: true, // a squirrel forages beneath the sakura
           flyer: 0xffffff,
           flutter: true,
           flutterTint: 0xffbcdb, // soft pink blossom butterflies
           bats: 3, // bats flit the orchard at dusk
-          roller: null
+          roller: null,
         },
         canyon: {
-          label: '🪨 Canyon',
+          label: "🪨 Canyon",
           fog: 0.45, // dusty heat haze
           sky: 0xfbe6c2, // pale, warm desert light (kept light so the day sky stays clean)
           seasonal: false,
           distant: {
-            sprite: 'butte',
+            sprite: "butte",
             count: 5,
             sc: [0.5, 1.05],
             y: 478,
             tint: 0xc06438,
-            alpha: 0.94
+            alpha: 0.94,
           }, // red mesas receding into the haze
           hills: [0xa85636, 0x934628, 0x7e3c22], // red rock
-          ground: 'redrock',
+          ground: "redrock",
           mid: [],
           near: [],
-          water: {top: '#5f8a72', bot: '#39584a', fish: 2}, // a muddy river winding through
+          water: { top: "#5f8a72", bot: "#39584a", fish: 2 }, // a muddy river winding through
           walker: null,
-          critter: 'fox', // a coyote trots through (the fox, greyed)
+          critter: "fox", // a coyote trots through (the fox, greyed)
           critterScale: 0.42,
           critterTint: 0x9a8a6e,
           hopper: null,
           flyer: 0x3a342e, // a condor circles
-          flyerFrames: ['vulture'],
+          flyerFrames: ["vulture"],
           roadrunner: true,
           flutter: false,
-          roller: null
+          roller: null,
         },
         polar: {
-          label: '🐧 Polar',
+          label: "🐧 Polar",
           fog: 0.7, // cold sea-mist haze drifting over the ice
           sky: 0xdcecf7, // bright, cold icy light (pale so the day sky stays clean; night deepens for the aurora)
           seasonal: false,
@@ -897,20 +901,20 @@
           aurora: true, // the polar lights at night
           foliageTint: 0xffffff,
           distant: {
-            sprite: 'iceberg',
+            sprite: "iceberg",
             count: 4,
             sc: [0.55, 1.1],
             y: 470,
             tint: 0xeaf4fb,
-            alpha: 0.96
+            alpha: 0.96,
           }, // tabular bergs along the cold horizon
           hills: [0x9fc0d8, 0xc2dcec, 0xeaf4fb], // snow slopes receding into the haze
-          ground: 'packice',
+          ground: "packice",
           mid: [],
           near: [],
           water: {
-            top: '#34556e',
-            bot: '#12243a',
+            top: "#34556e",
+            bot: "#12243a",
             lily: false,
             ducks: false,
             drag: false,
@@ -918,220 +922,225 @@
             floes: 4, // pack ice drifting on the open leads
             seal: true, // a seal hauls out on the largest floe
             dolphins: 1, // a lone orca patrols the lead, surfacing now and then
-            dolphinSprite: 'orca',
+            dolphinSprite: "orca",
             dolphinScale: 0.5,
-            whale: true // a whale surfaces and blows far out among the bergs
+            whale: true, // a whale surfaces and blows far out among the bergs
           },
           penguins: 4, // a little colony waddles the ice
           walker: null,
           critter: null,
           hopper: null,
           flyer: 0x6b7078, // a dark skua glides over (the gull silhouette, greyed)
-          flyerFrames: ['gull'],
+          flyerFrames: ["gull"],
           flutter: false,
-          roller: null
+          roller: null,
         },
         glade: {
-          label: '🍄 Glade',
+          label: "🍄 Glade",
           glade: true, // an enchanted clearing held in perpetual twilight (its own dim sky; the glow always reads)
           fog: 0.5,
           sky: 0x223a45, // nominal dusk tone (the glade paints its own true-colour gradient, so this isn't used as a wash)
           seasonal: false,
           foliageTint: 0x5e7e84, // moody, dim foliage so the trees and the deer read as soft twilight shapes
           hills: [0x1c2b3a, 0x24384a, 0x2c465a], // dark forest hills
-          ground: 'glade',
+          ground: "glade",
           mid: [
-            ['oak', 0.5, 300],
-            ['pine', 0.46, 940]
+            ["oak", 0.5, 300],
+            ["pine", 0.46, 940],
           ],
           near: [
-            ['oak', 0.78, 150],
-            ['pine', 0.7, 1120]
+            ["oak", 0.78, 150],
+            ["pine", 0.7, 1120],
           ],
-          treeExtras: ['birch', 'fir'], // a few birches and firs among the glade's oaks and pines
+          treeExtras: ["birch", "fir"], // a few birches and firs among the glade's oaks and pines
           // luminous toadstool clusters [x, sprite, tint] that glow and pulse like the cave crystals
           mushrooms: [
-            [120, 'mushroom_a', 0x6ff0c8],
-            [360, 'mushroom_b', 0x8a7bff],
-            [560, 'mushroom_a', 0x5fd8ff],
-            [820, 'mushroom_b', 0x7af0a0],
-            [1060, 'mushroom_a', 0xb98aff],
-            [1205, 'mushroom_b', 0x6ff0c8]
+            [120, "mushroom_a", 0x6ff0c8],
+            [360, "mushroom_b", 0x8a7bff],
+            [560, "mushroom_a", 0x5fd8ff],
+            [820, "mushroom_b", 0x7af0a0],
+            [1060, "mushroom_a", 0xb98aff],
+            [1205, "mushroom_b", 0x6ff0c8],
           ],
           spores: 22, // glowing spores drift up through the clearing
           owl: true, // an owl glides silently through the twilight
-          water: {top: '#1e4a4e', bot: '#0c2326', glow: true, fish: 2}, // a softly glowing creek
-          walker: ['deer_a', 'deer_b'], // a deer steps through the glow
+          water: { top: "#1e4a4e", bot: "#0c2326", glow: true, fish: 2 }, // a softly glowing creek
+          walker: ["deer_a", "deer_b"], // a deer steps through the glow
           walkerScale: 0.6,
           graze: true,
           critter: null,
           hopper: null,
+          squirrel: true, // a squirrel forages among the toadstools
           flyer: 0x3a4a55,
           flutter: false,
-          roller: null
+          roller: null,
         },
         summit: {
-          label: '☁️ Summit',
+          label: "☁️ Summit",
           cloudSea: true, // above the clouds: a vast open sky over a rolling sea of cloud with peaks
           fog: 0, // the cloud sea is the atmosphere; no separate ground haze
           sky: 0xbfe0f5, // clean, pale high-altitude light
           seasonal: false,
           hills: [0x9fb4c8, 0xb4c6d6, 0xcadbe6], // (unused — hills are suppressed for the cloud sea)
-          ground: 'none',
+          ground: "none",
           mid: [],
           near: [],
           walker: null,
           critter: null,
           hopper: null,
           flyer: 0x3a3326, // an eagle glides across…
-          flyerFrames: ['eagle'],
+          flyerFrames: ["eagle"],
           soar: {
-            frames: ['eagle'],
+            frames: ["eagle"],
             count: 2,
             tint: 0x4a4030,
             yLo: 290,
-            yHi: 420
+            yHi: 420,
           }, // …while two more circle the thermals
           flutter: false,
-          roller: null
-        }
+          roller: null,
+        },
       };
-      const RIGID = {rock: 1, cactus: 1, cactus2: 1};
+      const RIGID = { rock: 1, cactus: 1, cactus2: 1 };
 
       const NAMES = [
-        'oak',
-        'pine',
-        'pine_snow',
-        'oak_snow',
-        'bush',
-        'bush_snow',
-        'birch',
-        'fir',
-        'poplar',
-        'birch_snow',
-        'fir_snow',
-        'poplar_snow',
-        'willow',
-        'willow_snow',
-        'snag',
-        'shrub',
-        'berrybush',
-        'poppy',
-        'toadstool',
-        'shroom',
-        'log',
-        'stump',
-        'duck_f',
-        'fawn_a',
-        'fawn_b',
-        'barrel_cactus',
-        'skull',
-        'shell',
-        'conch',
-        'driftwood',
-        'grass',
-        'flower_p',
-        'flower_w',
-        'flower_y',
-        'flower_b',
-        'tulip',
-        'swallow_a',
-        'swallow_b',
-        'cloud',
-        'sun',
-        'moon',
-        'glow',
-        'duck',
-        'duckling',
-        'fish_a',
-        'fish_b',
-        'bird_a',
-        'bird_b',
-        'butterfly_a',
-        'butterfly_b',
-        'rabbit',
-        'fox',
-        'dragonfly_a',
-        'dragonfly_b',
-        'deer_a',
-        'deer_b',
-        'lily',
-        'leaf',
-        'petal',
-        'flake',
-        'cactus',
-        'cactus2',
-        'rock',
-        'lizard',
-        'camel',
-        'tumbleweed',
-        'palm',
-        'crab',
-        'sailboat',
-        'starfish',
-        'gull',
-        'reed',
-        'heron',
-        'frog',
-        'goat',
-        'eagle',
-        'acacia',
-        'giraffe',
-        'zebra',
-        'vulture',
-        'bamboo',
-        'panda',
-        'panda_b',
-        'camel_b',
-        'goat_b',
-        'giraffe_b',
-        'redpanda',
-        'volcano',
-        'bat_a',
-        'bat_b',
-        'stalactite',
-        'stalagmite',
-        'crystal',
-        'peak',
-        'bigrock',
-        'falls_a',
-        'falls_b',
-        'wstreak',
-        'fog',
-        'kelp',
-        'coral_fan',
-        'coral_branch',
-        'coral_round',
-        'anemone',
-        'turtle',
-        'bubble',
-        'jelly_a',
-        'jelly_b',
-        'butte',
-        'icefloe',
-        'headland',
-        'cliff',
-        'jungle_tree',
-        'vine',
-        'bigleaf',
-        'toucan',
-        'monkey',
-        'seal',
-        'dolphin',
-        'marmot',
-        'sakura',
-        'koi_a',
-        'koi_b',
-        'roadrunner',
-        'penguin',
-        'iceberg',
-        'orca',
-        'mushroom_a',
-        'mushroom_b',
-        'owl_a',
-        'owl_b',
-        'whale_back',
-        'whale_fluke'
+        "oak",
+        "pine",
+        "pine_snow",
+        "oak_snow",
+        "bush",
+        "bush_snow",
+        "birch",
+        "fir",
+        "poplar",
+        "birch_snow",
+        "fir_snow",
+        "poplar_snow",
+        "willow",
+        "willow_snow",
+        "snag",
+        "shrub",
+        "berrybush",
+        "poppy",
+        "toadstool",
+        "shroom",
+        "log",
+        "stump",
+        "duck_f",
+        "fawn_a",
+        "fawn_b",
+        "barrel_cactus",
+        "skull",
+        "shell",
+        "conch",
+        "driftwood",
+        "termite_mound",
+        "baobab",
+        "aloe",
+        "squirrel",
+        "grass",
+        "flower_p",
+        "flower_w",
+        "flower_y",
+        "flower_b",
+        "tulip",
+        "swallow_a",
+        "swallow_b",
+        "cloud",
+        "sun",
+        "moon",
+        "glow",
+        "duck",
+        "duckling",
+        "fish_a",
+        "fish_b",
+        "bird_a",
+        "bird_b",
+        "butterfly_a",
+        "butterfly_b",
+        "rabbit",
+        "fox",
+        "dragonfly_a",
+        "dragonfly_b",
+        "deer_a",
+        "deer_b",
+        "lily",
+        "leaf",
+        "petal",
+        "flake",
+        "cactus",
+        "cactus2",
+        "rock",
+        "lizard",
+        "camel",
+        "tumbleweed",
+        "palm",
+        "crab",
+        "sailboat",
+        "starfish",
+        "gull",
+        "reed",
+        "heron",
+        "frog",
+        "goat",
+        "eagle",
+        "acacia",
+        "giraffe",
+        "zebra",
+        "vulture",
+        "bamboo",
+        "panda",
+        "panda_b",
+        "camel_b",
+        "goat_b",
+        "giraffe_b",
+        "redpanda",
+        "volcano",
+        "bat_a",
+        "bat_b",
+        "stalactite",
+        "stalagmite",
+        "crystal",
+        "peak",
+        "bigrock",
+        "falls_a",
+        "falls_b",
+        "wstreak",
+        "fog",
+        "kelp",
+        "coral_fan",
+        "coral_branch",
+        "coral_round",
+        "anemone",
+        "turtle",
+        "bubble",
+        "jelly_a",
+        "jelly_b",
+        "butte",
+        "icefloe",
+        "headland",
+        "cliff",
+        "jungle_tree",
+        "vine",
+        "bigleaf",
+        "toucan",
+        "monkey",
+        "seal",
+        "dolphin",
+        "marmot",
+        "sakura",
+        "koi_a",
+        "koi_b",
+        "roadrunner",
+        "penguin",
+        "iceberg",
+        "orca",
+        "mushroom_a",
+        "mushroom_b",
+        "owl_a",
+        "owl_b",
+        "whale_back",
+        "whale_fluke",
       ];
       const T = (n) => PIXI.Assets.get(n);
       const spr = (n, x, y, s, ax, ay) => {
@@ -1151,10 +1160,10 @@
         return a;
       };
       function gradTex(stops, h) {
-        const c = document.createElement('canvas');
+        const c = document.createElement("canvas");
         c.width = 1;
         c.height = h;
-        const g = c.getContext('2d'),
+        const g = c.getContext("2d"),
           lg = g.createLinearGradient(0, 0, 0, h);
         stops.forEach(([o, col]) => lg.addColorStop(o, col));
         g.fillStyle = lg;
@@ -1183,7 +1192,7 @@
             (Math.min(255, (c & 255) * f) | 0),
           // mix toward frost-white in winter, so the far tree line goes wintry too
           frostT = (c) => (frost ? frostHex(c, frost * 0.62) : c);
-        if (d.style === 'peak') {
+        if (d.style === "peak") {
           // one continuous jagged ridge — summits linked by elevated cols. summits always clear the
           // snowline so every one keeps its snow; lit + shadowed faces give them form (not flat triangles)
           const ctrl = [[-40, base]];
@@ -1203,7 +1212,7 @@
             for (let s = 0; s < steps; s++)
               ridge.push([
                 x0 + ((x1 - x0) * s) / steps,
-                y0 + ((y1 - y0) * s) / steps
+                y0 + ((y1 - y0) * s) / steps,
               ]);
           }
           ridge.push(ctrl[ctrl.length - 1]);
@@ -1251,7 +1260,7 @@
           }
           flush(0xc9d8e8, 0.9, 6);
           flush(0xeff5fb, 0.96, 0);
-        } else if (d.style === 'ridge') {
+        } else if (d.style === "ridge") {
           // one low rolling ridge (the landform); distant acacia sprites are scattered on it in build
           g.beginFill(d.tint);
           g.moveTo(-40, base);
@@ -1260,7 +1269,7 @@
           g.lineTo(VW + 40, base);
           g.closePath();
           g.endFill();
-        } else if (d.style === 'forest') {
+        } else if (d.style === "forest") {
           // a hazy forested hillside: a rolling ridge whose top edge is lumpy with canopy, with a
           // sunlit sheen and a few darker clumps for depth (a continuous tree mass, not single trees)
           const cr = (x) =>
@@ -1301,7 +1310,7 @@
             g.closePath();
             g.endFill();
           }
-        } else if (d.style === 'cones') {
+        } else if (d.style === "cones") {
           // a far field of dark cinder cones (volcanic): jagged dark peaks linked by low saddles,
           // each with a shadowed lee face — no snow, dusted with ash
           const ctrl = [[-40, base]];
@@ -1344,9 +1353,9 @@
           // light filtering through the forest canopy: a warm green glow up high (where the gaps
           // are) deepening to shaded green below; dims toward night
           const lit = 0.32 + 0.68 * P.light,
-            top = mixA([0, 0, 0], hx('#bfe08a'), lit),
-            mid = mixA([0, 0, 0], hx('#7cae5c'), lit),
-            bot = mixA([0, 0, 0], hx('#3f6e3c'), lit * 0.92),
+            top = mixA([0, 0, 0], hx("#bfe08a"), lit),
+            mid = mixA([0, 0, 0], hx("#7cae5c"), lit),
+            bot = mixA([0, 0, 0], hx("#3f6e3c"), lit * 0.92),
             N = 90;
           for (let i = 0; i < N; i++) {
             const u = i / (N - 1),
@@ -1359,7 +1368,7 @@
               -40,
               Math.floor(u * VH),
               VW + 80,
-              Math.ceil(VH / N) + 1
+              Math.ceil(VH / N) + 1,
             );
             sky.endFill();
           }
@@ -1385,7 +1394,7 @@
               -40,
               Math.floor(u * VH),
               VW + 80,
-              Math.ceil(VH / N) + 1
+              Math.ceil(VH / N) + 1,
             );
             sky.endFill();
           }
@@ -1408,7 +1417,7 @@
               -40,
               Math.floor(u * VH),
               VW + 80,
-              Math.ceil(VH / N) + 1
+              Math.ceil(VH / N) + 1,
             );
             sky.endFill();
           }
@@ -1441,12 +1450,12 @@
           for (let x = 0; x <= VW; x += 24)
             auroraG.lineTo(
               x,
-              baseY + Math.sin(x * 0.0045 + time * 0.5 + b) * amp
+              baseY + Math.sin(x * 0.0045 + time * 0.5 + b) * amp,
             );
           for (let x = VW; x >= 0; x -= 24)
             auroraG.lineTo(
               x,
-              baseY + 48 + Math.sin(x * 0.0045 + time * 0.5 + b + 1.4) * amp
+              baseY + 48 + Math.sin(x * 0.0045 + time * 0.5 + b + 1.4) * amp,
             );
           auroraG.closePath();
           auroraG.endFill();
@@ -1471,7 +1480,7 @@
         if (obj.trackX == null) obj.trackX = obj.x;
         if (Math.abs(obj.x - obj.trackX) >= stride) {
           obj.trackX = obj.x;
-          tracks.push({x: obj.x, y: groundY(obj.x) + 9, kind, life: 1});
+          tracks.push({ x: obj.x, y: groundY(obj.x) + 9, kind, life: 1 });
           if (tracks.length > 130) tracks.shift();
         }
       }
@@ -1584,6 +1593,7 @@
         turtle,
         causticG,
         marmot,
+        squirrel,
         seal,
         roadrunner,
         whale,
@@ -1638,7 +1648,14 @@
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
-        lavaGlow = turtle = causticG = marmot = seal = roadrunner = null;
+        lavaGlow =
+          turtle =
+          causticG =
+          marmot =
+          seal =
+          roadrunner =
+          squirrel =
+            null;
         whale = spoutG = surfG = cloudSeaG = cloudGlow = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
@@ -1654,12 +1671,12 @@
         const weatherKind =
           BI.ambientWeather || // a biome can force a constant fall (blossom petals)
           (SP
-            ? SP.weather || 'none'
+            ? SP.weather || "none"
             : BI.seasonal
               ? SE.weather
               : snow
-                ? 'flake'
-                : 'none');
+                ? "flake"
+                : "none");
         const hillTint = SP ? SP.hill : BI.seasonal ? SE.hill : 0xffffff;
         const grassTint = SP && SP.grass ? SP.grass : null;
         lastSkyH = -99; // force the sky to redraw into the fresh Graphics next frame
@@ -1681,7 +1698,7 @@
           sg.drawCircle(
             Math.random() * VW,
             Math.random() * HZ * 0.95,
-            Math.random() < 0.2 ? 1.6 : 1
+            Math.random() < 0.2 ? 1.6 : 1,
           );
           sg.endFill();
         }
@@ -1691,12 +1708,12 @@
         shoot = null;
         shootT = 3 + Math.random() * 5; // shooting-star state (its layer is added on top, below, so the meteor stays above the night veil)
 
-        sunGlow = spr('glow', 0, 0, 3.4, 0.5, 0.5);
+        sunGlow = spr("glow", 0, 0, 3.4, 0.5, 0.5);
         sunGlow.blendMode = PIXI.BLEND_MODES.ADD;
         farLayer.addChild(sunGlow);
-        sun = spr('sun', 0, 0, 1, 0.5, 0.5);
+        sun = spr("sun", 0, 0, 1, 0.5, 0.5);
         farLayer.addChild(sun);
-        moon = spr('moon', 0, 0, 0.9, 0.5, 0.5);
+        moon = spr("moon", 0, 0, 0.9, 0.5, 0.5);
         farLayer.addChild(moon);
         // clip the moon to tonight's phase (the disc is r=40 in a 100px sprite → 0.8 of the half-width)
         moonR = (moon.width / 2) * 0.8;
@@ -1714,17 +1731,17 @@
           for (let i = 0, n = 1 + ((Math.random() * 6) | 0); i < n; i++) {
             const sc = 0.5 + Math.random() * 0.5,
               c = spr(
-                'cloud',
+                "cloud",
                 Math.random() * VW,
                 60 + Math.random() * 150,
                 sc,
                 0.5,
-                0.5
+                0.5,
               );
             // squash/stretch and flip each one so no two puffs are the same shape
             c.scale.set(
               sc * (0.8 + Math.random() * 0.5) * (Math.random() < 0.5 ? -1 : 1),
-              sc * (0.78 + Math.random() * 0.34)
+              sc * (0.78 + Math.random() * 0.34),
             );
             c.vx = 0.12 + Math.random() * 0.22;
             clouds.push(c);
@@ -1734,11 +1751,11 @@
         // crossing flyer (bird, or bat underground); reef + jungle handle their own flyers below
         if (!BI.underwater && !BI.canopy && !BI.glade) {
           const bird = anim(
-            BI.flyerFrames || ['bird_a', 'bird_b'],
+            BI.flyerFrames || ["bird_a", "bird_b"],
             -80,
             150,
             0.7,
-            0.06
+            0.06,
           );
           bird.isBird = true;
           bird.isBat = !!BI.interior; // bats flit erratically rather than gliding across
@@ -1753,11 +1770,11 @@
         if (!BI.interior && !BI.underwater && !BI.canopy && !BI.glade)
           for (let i = 0, n = 5 + ((Math.random() * 5) | 0); i < n; i++) {
             const fb = anim(
-              ['bird_a', 'bird_b'],
+              ["bird_a", "bird_b"],
               0,
               0,
               0.4,
-              0.05 + Math.random() * 0.02
+              0.05 + Math.random() * 0.02,
             );
             fb.tint = 0x49515f;
             fb.visible = false;
@@ -1778,12 +1795,12 @@
           farLayer.addChild(murmurC);
           for (let i = 0; i < 56; i++) {
             const b = spr(
-              'bird_a',
+              "bird_a",
               0,
               0,
               0.1 + Math.random() * 0.055,
               0.5,
-              0.5
+              0.5,
             );
             b.tint = 0x2c333f;
             b.a0 = Math.random() * 6.283; // its fixed angle within the cloud
@@ -1827,7 +1844,7 @@
                   D.sprite,
                   bx,
                   D.y,
-                  D.sc[0] + Math.random() * (D.sc[1] - D.sc[0])
+                  D.sc[0] + Math.random() * (D.sc[1] - D.sc[0]),
                 );
               bt.tint = D.tint;
               if (D.alpha != null) bt.alpha = D.alpha;
@@ -1839,10 +1856,10 @@
             for (let i = 0; i < D.trees; i++) {
               const x = 40 + Math.random() * (VW - 80),
                 tr = spr(
-                  'acacia',
+                  "acacia",
                   x,
                   ridgeY(x) + 3,
-                  0.13 + Math.random() * 0.05
+                  0.13 + Math.random() * 0.05,
                 );
               tr.tint = 0xa7b48f; // sun-bleached, hazed into the distance
               tr.alpha = 0.9;
@@ -1869,15 +1886,15 @@
             396 + Math.random() * 28,
             18 + Math.random() * 15,
             Math.random() * 6.283,
-            0.004 + Math.random() * 0.004
+            0.004 + Math.random() * 0.004,
           ),
           wave(
             450 + Math.random() * 24,
             20 + Math.random() * 15,
             Math.random() * 6.283,
-            0.0045 + Math.random() * 0.004
+            0.0045 + Math.random() * 0.004,
           ),
-          groundY // the front band IS the ground the trees and animals stand on
+          groundY, // the front band IS the ground the trees and animals stand on
         ];
         hillBands.length = 0;
         if (BI.cloudSea) {
@@ -1937,7 +1954,7 @@
             if (run.length < 2) return;
             for (const [col, a, dy] of [
               [0xbfd2e6, 0.85, 7], // faint blue under-shadow
-              [0xeef5fb, 0.97, 0] // bright snow over it
+              [0xeef5fb, 0.97, 0], // bright snow over it
             ]) {
               peaks.beginFill(col, a);
               peaks.moveTo(run[0][0], snowLo(run[0][0]) + dy);
@@ -1981,12 +1998,12 @@
           // a fluffy rolling top made of soft cloud puffs sitting on the surface
           for (let x = -40; x <= VW + 80; x += 64) {
             const c = spr(
-              'cloud',
+              "cloud",
               x + (Math.random() - 0.5) * 22,
               surfY(x) + 10,
               0.5 + Math.random() * 0.3,
               0.5,
-              0.5
+              0.5,
             );
             c.tint = 0xf4f9fd;
             cloudSeaG.addChild(c);
@@ -1995,12 +2012,12 @@
           // a few nearer puffs drifting over the sea (reuse the cloud drift + day/night tint)
           for (let i = 0; i < 3; i++) {
             const c = spr(
-              'cloud',
+              "cloud",
               Math.random() * VW,
               486 + Math.random() * 40,
               0.6 + Math.random() * 0.45,
               0.5,
-              0.5
+              0.5,
             );
             c.vx = 0.14 + Math.random() * 0.2;
             clouds.push(c);
@@ -2011,12 +2028,12 @@
           cloudGlow = new PIXI.Sprite(
             gradTex(
               [
-                [0, '#000000'],
-                [0.42, '#ffba74'],
-                [1, '#000000']
+                [0, "#000000"],
+                [0.42, "#ffba74"],
+                [1, "#000000"],
               ],
-              180
-            )
+              180,
+            ),
           );
           cloudGlow.position.set(-40, 420);
           cloudGlow.width = VW + 80;
@@ -2042,7 +2059,7 @@
         }
         if (BI.fog) {
           // distant haze softening the hills, behind the trees
-          const fz = new PIXI.TilingSprite(T('fog'), VW + 120, 120);
+          const fz = new PIXI.TilingSprite(T("fog"), VW + 120, 120);
           fz.position.set(-60, 372);
           fz.tileScale.set(1.6, 120 / 90);
           fz.baseA = 0.62;
@@ -2069,12 +2086,12 @@
           for (const x of [110, 300, 470, 690, 880, 1040, 1200]) {
             const cy = ceilEdge(x),
               s = spr(
-                'stalactite',
+                "stalactite",
                 x,
                 cy - 6,
                 0.42 + Math.random() * 0.5,
                 0.5,
-                0
+                0,
               );
             scene.addChild(s);
             if (Math.random() < 0.55)
@@ -2082,13 +2099,13 @@
                 x,
                 y0: cy + 200 * s.scale.y,
                 t: Math.random() * 4,
-                dropY: null
+                dropY: null,
               });
           }
           // the big rock ledge (a designed sprite, tinted to the cave's cool stone), behind the crystals
           if (BI.waterfall && BI.waterfall.rock) {
             const wf = BI.waterfall,
-              rk = spr('bigrock', wf.x, wf.y, wf.scale, wf.ax, 1);
+              rk = spr("bigrock", wf.x, wf.y, wf.scale, wf.ax, 1);
             rk.tint = wf.rock; // lit enough to read against the dark
             scene.addChild(rk);
           }
@@ -2133,12 +2150,12 @@
           cloudShadows.layer = csl;
           for (let i = 0; i < 4; i++) {
             const s = spr(
-              'glow',
+              "glow",
               (i / 4) * VW + Math.random() * 220,
               498 + Math.random() * 66,
               5 + Math.random() * 3,
               0.5,
-              0.5
+              0.5,
             );
             s.tint = 0x556074; // cool grey shade
             s.blendMode = PIXI.BLEND_MODES.MULTIPLY;
@@ -2157,11 +2174,11 @@
           birch: 1,
           fir: 1,
           poplar: 1,
-          willow: 1
+          willow: 1,
         };
         const snowCap = (t, n) => {
           if (snow && SNOWABLE[n]) {
-            const ov = new PIXI.Sprite(T(n + '_snow'));
+            const ov = new PIXI.Sprite(T(n + "_snow"));
             ov.anchor.set(0.5, 1); // same registration as the tree, so it overlays exactly
             ov.alpha = 0;
             t.addChild(ov);
@@ -2177,8 +2194,8 @@
               .filter((n) => !RIGID[n]),
             // biome-appropriate extra species mixed in by the variety system (they have snow
             // overlays now, so they read in winter too)
-            ...(BI.treeExtras || [])
-          ])
+            ...(BI.treeExtras || []),
+          ]),
         ];
         const varyLayer = (layer) => {
           if (!treePool.length || !layer.length) return layer.slice();
@@ -2198,7 +2215,7 @@
             out.push([
               treePool[(Math.random() * treePool.length) | 0],
               sMin + Math.random() * (sMax - sMin),
-              60 + Math.random() * (VW - 120)
+              60 + Math.random() * (VW - 120),
             ]); // one extra, tucked in among the rest
           return out;
         };
@@ -2210,13 +2227,13 @@
               n,
               jx,
               470 + Math.sin(jx * 0.006 + midPh) * 32,
-              sc * (0.86 + Math.random() * 0.28)
+              sc * (0.86 + Math.random() * 0.28),
             );
           t.tint = BI.interior ? 0xffffff : tintJit(mulTint(0xcfe3d0, folTint));
           if (!RIGID[n] && Math.random() < 0.5) t.scale.x *= -1; // mirror about half of them
           scene.addChild(t);
           if (!RIGID[n] && !BI.interior)
-            swayers.push({s: t, amp: 0.012, sp: 0.7, ph: Math.random() * 6});
+            swayers.push({ s: t, amp: 0.012, sp: 0.7, ph: Math.random() * 6 });
           snowCap(t, n);
         }
         for (const [n, sc, x] of varyLayer(BI.near)) {
@@ -2226,19 +2243,19 @@
           if (!RIGID[n] && Math.random() < 0.5) t.scale.x *= -1;
           scene.addChild(t);
           if (!RIGID[n] && !BI.interior)
-            swayers.push({s: t, amp: 0.02, sp: 0.9, ph: Math.random() * 6});
+            swayers.push({ s: t, amp: 0.02, sp: 0.9, ph: Math.random() * 6 });
           snowCap(t, n);
         }
         if (BI.crystals)
           for (const [x, col] of BI.crystals) {
             const fy = groundY(x) + 6,
-              gl = spr('glow', x, fy - 26, 0.9, 0.5, 0.5);
+              gl = spr("glow", x, fy - 26, 0.9, 0.5, 0.5);
             gl.tint = col;
             gl.blendMode = PIXI.BLEND_MODES.ADD;
             gl.ph = Math.random() * 6.28;
             scene.addChild(gl);
             crystals.push(gl);
-            const c = spr('crystal', x, fy, 0.34 + Math.random() * 0.16);
+            const c = spr("crystal", x, fy, 0.34 + Math.random() * 0.16);
             c.tint = col;
             scene.addChild(c);
           }
@@ -2247,7 +2264,7 @@
           for (const [x, sprite, col] of BI.mushrooms) {
             const fy = groundY(x) + 6,
               sc = 0.66 + Math.random() * 0.22,
-              gl = spr('glow', x, fy - 30 * sc, 1.1 * sc, 0.5, 0.5);
+              gl = spr("glow", x, fy - 30 * sc, 1.1 * sc, 0.5, 0.5);
             gl.tint = col;
             gl.blendMode = PIXI.BLEND_MODES.ADD;
             gl.ph = Math.random() * 6.28;
@@ -2262,12 +2279,12 @@
           for (let i = 0; i < BI.spores; i++) {
             const sx = 40 + Math.random() * (VW - 80),
               g = spr(
-                'glow',
+                "glow",
                 sx,
                 380 + Math.random() * 220,
                 0.05 + Math.random() * 0.06,
                 0.5,
-                0.5
+                0.5,
               );
             g.tint = 0xbfffe0;
             g.blendMode = PIXI.BLEND_MODES.ADD;
@@ -2278,49 +2295,49 @@
             spores.push(g);
             scene.addChild(g);
           }
-        if (BI.ground === 'meadow') {
+        if (BI.ground === "meadow") {
           for (let i = 0, n = 11 + ((Math.random() * 10) | 0); i < n; i++) {
             const x = 40 + Math.random() * (VW - 80),
-              g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.5);
+              g = spr("grass", x, groundY(x) + 6, 0.6 + Math.random() * 0.5);
             g.tint = tintJit(folTint, 0.13);
             scene.addChild(g);
-            swayers.push({s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6});
+            swayers.push({ s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6 });
           }
           if (!snow) {
             // a meadow draws from a wider mix now — the round pink/white blooms plus daisies,
             // a blue floret spike and tulips (pink/white still the most common)
             const FL = [
-              'flower_p',
-              'flower_w',
-              'flower_p',
-              'flower_w',
-              'flower_y',
-              'flower_b',
-              'tulip',
-              'poppy'
+              "flower_p",
+              "flower_w",
+              "flower_p",
+              "flower_w",
+              "flower_y",
+              "flower_b",
+              "tulip",
+              "poppy",
             ];
             // the odd flowering or berry shrub dotted about the meadow
             for (let i = 0, n = (Math.random() * 3) | 0; i < n; i++) {
               const x = 80 + Math.random() * (VW - 160),
                 sh = spr(
-                  Math.random() < 0.5 ? 'shrub' : 'berrybush',
+                  Math.random() < 0.5 ? "shrub" : "berrybush",
                   x,
                   groundY(x) + 8,
-                  0.32 + Math.random() * 0.22
+                  0.32 + Math.random() * 0.22,
                 );
               sh.tint = tintJit(folTint, 0.1);
               if (Math.random() < 0.5) sh.scale.x *= -1;
               scene.addChild(sh);
-              swayers.push({s: sh, amp: 0.022, sp: 1, ph: Math.random() * 6});
+              swayers.push({ s: sh, amp: 0.022, sp: 1, ph: Math.random() * 6 });
             }
             // toadstools and mushrooms tucked low in the grass
             for (let i = 0, n = (Math.random() * 4) | 0; i < n; i++) {
               const x = 50 + Math.random() * (VW - 100),
                 m = spr(
-                  Math.random() < 0.5 ? 'toadstool' : 'shroom',
+                  Math.random() < 0.5 ? "toadstool" : "shroom",
                   x,
                   groundY(x) + 9,
-                  0.5 + Math.random() * 0.45
+                  0.5 + Math.random() * 0.45,
                 );
               if (Math.random() < 0.5) m.scale.x *= -1;
               scene.addChild(m);
@@ -2329,10 +2346,10 @@
             if (Math.random() < 0.4) {
               const x = 120 + Math.random() * (VW - 240),
                 lg = spr(
-                  Math.random() < 0.5 ? 'log' : 'stump',
+                  Math.random() < 0.5 ? "log" : "stump",
                   x,
                   groundY(x) + 9,
-                  0.6 + Math.random() * 0.4
+                  0.6 + Math.random() * 0.4,
                 );
               lg.tint = tintJit(0xffffff, 0.05);
               if (Math.random() < 0.5) lg.scale.x *= -1;
@@ -2344,34 +2361,34 @@
                   FL[(Math.random() * FL.length) | 0],
                   x,
                   groundY(x) + 8,
-                  0.6 + Math.random() * 0.4
+                  0.6 + Math.random() * 0.4,
                 );
               scene.addChild(f);
-              swayers.push({s: f, amp: 0.06, sp: 1.4, ph: Math.random() * 6});
+              swayers.push({ s: f, amp: 0.06, sp: 1.4, ph: Math.random() * 6 });
             }
           }
-        } else if (BI.ground === 'sand') {
+        } else if (BI.ground === "sand") {
           for (let i = 0, _m = vc(16); i < _m; i++) {
             const x = 30 + Math.random() * (VW - 60);
             scene.addChild(
-              spr('rock', x, groundY(x) + 8, 0.1 + Math.random() * 0.14)
+              spr("rock", x, groundY(x) + 8, 0.1 + Math.random() * 0.14),
             );
           }
           for (let i = 0, _m = vc(6); i < _m; i++) {
             const x = Math.random() * VW,
-              g = spr('grass', x, groundY(x) + 6, 0.4 + Math.random() * 0.3);
+              g = spr("grass", x, groundY(x) + 6, 0.4 + Math.random() * 0.3);
             g.tint = 0xcdb87a;
             scene.addChild(g);
-            swayers.push({s: g, amp: 0.04, sp: 1.4, ph: Math.random() * 6});
+            swayers.push({ s: g, amp: 0.04, sp: 1.4, ph: Math.random() * 6 });
           }
           // a few barrel cacti and the odd bleached skull on the sand
           for (let i = 0, n = (Math.random() * 3) | 0; i < n; i++) {
             const x = 60 + Math.random() * (VW - 120),
               bc = spr(
-                'barrel_cactus',
+                "barrel_cactus",
                 x,
                 groundY(x) + 8,
-                0.4 + Math.random() * 0.4
+                0.4 + Math.random() * 0.4,
               );
             bc.tint = tintJit(0xffffff, 0.07);
             if (Math.random() < 0.5) bc.scale.x *= -1;
@@ -2379,41 +2396,41 @@
           }
           if (Math.random() < 0.5) {
             const x = 80 + Math.random() * (VW - 160),
-              sk = spr('skull', x, groundY(x) + 9, 0.34 + Math.random() * 0.2);
+              sk = spr("skull", x, groundY(x) + 9, 0.34 + Math.random() * 0.2);
             if (Math.random() < 0.5) sk.scale.x *= -1;
             scene.addChild(sk);
           }
-        } else if (BI.ground === 'beach') {
+        } else if (BI.ground === "beach") {
           for (let i = 0, _m = vc(12); i < _m; i++) {
             const x = 30 + Math.random() * (VW - 60);
             scene.addChild(
-              spr('rock', x, groundY(x) + 8, 0.07 + Math.random() * 0.09)
+              spr("rock", x, groundY(x) + 8, 0.07 + Math.random() * 0.09),
             );
           }
           for (let i = 0, _m = vc(6); i < _m; i++)
             scene.addChild(
               spr(
-                'starfish',
+                "starfish",
                 60 + Math.random() * (VW - 120),
                 582 + Math.random() * 14,
-                0.28 + Math.random() * 0.22
-              )
+                0.28 + Math.random() * 0.22,
+              ),
             );
           for (let i = 0, _m = vc(5); i < _m; i++) {
             const x = Math.random() * VW,
-              g = spr('grass', x, groundY(x) + 6, 0.4 + Math.random() * 0.3);
+              g = spr("grass", x, groundY(x) + 6, 0.4 + Math.random() * 0.3);
             g.tint = grassTint || 0xd8c88a;
             scene.addChild(g);
-            swayers.push({s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6});
+            swayers.push({ s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6 });
           }
           // shells and a conch washed up, with the odd piece of driftwood
           for (let i = 0, n = 2 + ((Math.random() * 4) | 0); i < n; i++) {
             const x = 50 + Math.random() * (VW - 100),
               sh = spr(
-                Math.random() < 0.6 ? 'shell' : 'conch',
+                Math.random() < 0.6 ? "shell" : "conch",
                 x,
                 582 + Math.random() * 18,
-                0.4 + Math.random() * 0.4
+                0.4 + Math.random() * 0.4,
               );
             sh.rotation = (Math.random() - 0.5) * 0.8;
             if (Math.random() < 0.5) sh.scale.x *= -1;
@@ -2422,107 +2439,128 @@
           if (Math.random() < 0.55) {
             const x = 90 + Math.random() * (VW - 180),
               dw = spr(
-                'driftwood',
+                "driftwood",
                 x,
                 groundY(x) + 8,
-                0.5 + Math.random() * 0.4
+                0.5 + Math.random() * 0.4,
               );
             dw.rotation = (Math.random() - 0.5) * 0.3;
             if (Math.random() < 0.5) dw.scale.x *= -1;
             scene.addChild(dw);
           }
-        } else if (BI.ground === 'marsh') {
+        } else if (BI.ground === "marsh") {
           for (let i = 0, _m = vc(8); i < _m; i++) {
             const x = 30 + Math.random() * (VW - 60);
             scene.addChild(
-              spr('rock', x, groundY(x) + 8, 0.05 + Math.random() * 0.07)
+              spr("rock", x, groundY(x) + 8, 0.05 + Math.random() * 0.07),
             );
           }
           for (let i = 0, _m = vc(15); i < _m; i++) {
             const x = Math.random() * VW,
-              g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.6);
+              g = spr("grass", x, groundY(x) + 6, 0.6 + Math.random() * 0.6);
             g.tint = grassTint || 0x8fae5c;
             scene.addChild(g);
-            swayers.push({s: g, amp: 0.06, sp: 1.7, ph: Math.random() * 6});
+            swayers.push({ s: g, amp: 0.06, sp: 1.7, ph: Math.random() * 6 });
           }
-        } else if (BI.ground === 'snow') {
+        } else if (BI.ground === "snow") {
           for (let i = 0, _m = vc(12); i < _m; i++) {
             const x = 20 + Math.random() * (VW - 40),
-              r = spr('rock', x, groundY(x) + 8, 0.08 + Math.random() * 0.12);
+              r = spr("rock", x, groundY(x) + 8, 0.08 + Math.random() * 0.12);
             r.tint = 0x9aa6b4;
             scene.addChild(r);
           }
           for (let i = 0, _m = vc(5); i < _m; i++) {
             const x = Math.random() * VW,
-              g = spr('grass', x, groundY(x) + 6, 0.4 + Math.random() * 0.3);
+              g = spr("grass", x, groundY(x) + 6, 0.4 + Math.random() * 0.3);
             g.tint = 0xc6ccba;
             scene.addChild(g);
-            swayers.push({s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6});
+            swayers.push({ s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6 });
           }
-        } else if (BI.ground === 'scree') {
+        } else if (BI.ground === "scree") {
           // exposed alpine rock: plenty of weathered boulders + outcrops breaking through the snow
           for (let i = 0, _m = vc(22); i < _m; i++) {
             const x = 16 + Math.random() * (VW - 32),
-              r = spr('rock', x, groundY(x) + 8, 0.1 + Math.random() * 0.22);
+              r = spr("rock", x, groundY(x) + 8, 0.1 + Math.random() * 0.22);
             r.tint = Math.random() < 0.5 ? 0x8a93a2 : 0xa6aeba;
             scene.addChild(r);
           }
           for (let i = 0, _m = vc(4); i < _m; i++) {
             const x = Math.random() * VW,
-              g = spr('grass', x, groundY(x) + 6, 0.35 + Math.random() * 0.3);
+              g = spr("grass", x, groundY(x) + 6, 0.35 + Math.random() * 0.3);
             g.tint = 0xbfc6b2; // hardy alpine tufts
             scene.addChild(g);
-            swayers.push({s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6});
+            swayers.push({ s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6 });
           }
-        } else if (BI.ground === 'savanna') {
+        } else if (BI.ground === "savanna") {
           for (let i = 0, _m = vc(6); i < _m; i++) {
             const x = 30 + Math.random() * (VW - 60);
             scene.addChild(
-              spr('rock', x, groundY(x) + 8, 0.06 + Math.random() * 0.08)
+              spr("rock", x, groundY(x) + 8, 0.06 + Math.random() * 0.08),
             );
           }
           for (let i = 0, _m = vc(20); i < _m; i++) {
             const x = Math.random() * VW,
-              g = spr('grass', x, groundY(x) + 6, 0.5 + Math.random() * 0.6);
+              g = spr("grass", x, groundY(x) + 6, 0.5 + Math.random() * 0.6);
             g.tint = grassTint || 0xcaad5e;
             scene.addChild(g);
-            swayers.push({s: g, amp: 0.06, sp: 1.5, ph: Math.random() * 6});
+            swayers.push({ s: g, amp: 0.06, sp: 1.5, ph: Math.random() * 6 });
           }
-        } else if (BI.ground === 'fern') {
+          // a termite mound or two stands sentinel over the grass
+          for (let i = 0, n = (Math.random() * 2.4) | 0; i < n; i++) {
+            const x = 80 + Math.random() * (VW - 160),
+              tm = spr(
+                "termite_mound",
+                x,
+                groundY(x) + 8,
+                0.45 + Math.random() * 0.5,
+              );
+            tm.tint = tintJit(0xffffff, 0.06);
+            if (Math.random() < 0.5) tm.scale.x *= -1;
+            scene.addChild(tm);
+          }
+          // clumps of aloe scattered low on the ground
+          for (let i = 0, _m = vc(3); i < _m; i++) {
+            const x = 30 + Math.random() * (VW - 60),
+              al = spr("aloe", x, groundY(x) + 7, 0.3 + Math.random() * 0.35);
+            al.tint = tintJit(0xffffff, 0.08);
+            if (Math.random() < 0.5) al.scale.x *= -1;
+            scene.addChild(al);
+          }
+        } else if (BI.ground === "fern") {
           for (let i = 0, _m = vc(5); i < _m; i++) {
             const x = 30 + Math.random() * (VW - 60);
             scene.addChild(
-              spr('rock', x, groundY(x) + 8, 0.05 + Math.random() * 0.06)
+              spr("rock", x, groundY(x) + 8, 0.05 + Math.random() * 0.06),
             );
           }
           for (let i = 0, _m = vc(18); i < _m; i++) {
             const x = Math.random() * VW,
-              g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.7);
+              g = spr("grass", x, groundY(x) + 6, 0.6 + Math.random() * 0.7);
             g.tint = 0x6fae4a;
             scene.addChild(g);
-            swayers.push({s: g, amp: 0.06, sp: 1.6, ph: Math.random() * 6});
+            swayers.push({ s: g, amp: 0.06, sp: 1.6, ph: Math.random() * 6 });
           }
           // a fuller bamboo stand: a hazy back row that recedes into the mist + a denser foreground
           for (let i = 0, _m = vc(15); i < _m; i++) {
             const x = -20 + Math.random() * (VW + 40),
               far = Math.random() < 0.45,
               b = spr(
-                'bamboo',
+                "bamboo",
                 x,
                 groundY(x) + (far ? -4 : 8),
-                (far ? 0.17 : 0.27) + Math.random() * 0.12
+                (far ? 0.17 : 0.27) + Math.random() * 0.12,
               );
             if (far) {
               b.tint = 0xbcd9b0; // paler, sunk into the green haze
               b.alpha = 0.82;
             }
             scene.addChild(b);
-            swayers.push({s: b, amp: 0.02, sp: 0.9, ph: Math.random() * 6});
+            swayers.push({ s: b, amp: 0.02, sp: 0.9, ph: Math.random() * 6 });
           }
-        } else if (BI.ground === 'basalt') {
+        } else if (BI.ground === "basalt") {
           for (let i = 0, _m = vc(14); i < _m; i++) {
             const x = 20 + Math.random() * (VW - 40),
-              r = spr('rock', x, groundY(x) + 8, 0.1 + Math.random() * 0.22);
+              r = spr("rock", x, groundY(x) + 8, 0.1 + Math.random() * 0.22);
             r.tint = 0x3a323c;
             scene.addChild(r);
           }
@@ -2537,43 +2575,43 @@
             cr.lineTo(x + 28 + Math.random() * 46, y - 4);
           }
           scene.addChild(cr);
-        } else if (BI.ground === 'jungle') {
+        } else if (BI.ground === "jungle") {
           // lush undergrowth: big split leaves, ferny grass and the odd mossy rock
           for (let i = 0, _m = vc(6); i < _m; i++) {
             const x = 20 + Math.random() * (VW - 40),
-              r = spr('rock', x, groundY(x) + 8, 0.06 + Math.random() * 0.1);
+              r = spr("rock", x, groundY(x) + 8, 0.06 + Math.random() * 0.1);
             r.tint = 0x4a6240;
             scene.addChild(r);
           }
           for (let i = 0, _m = vc(16); i < _m; i++) {
             const x = Math.random() * VW,
-              g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.7);
+              g = spr("grass", x, groundY(x) + 6, 0.6 + Math.random() * 0.7);
             g.tint = 0x4f9e3a;
             scene.addChild(g);
-            swayers.push({s: g, amp: 0.06, sp: 1.6, ph: Math.random() * 6});
+            swayers.push({ s: g, amp: 0.06, sp: 1.6, ph: Math.random() * 6 });
           }
           for (let i = 0, _m = vc(9); i < _m; i++) {
             const x = -10 + Math.random() * (VW + 20),
               lf = spr(
-                'bigleaf',
+                "bigleaf",
                 x,
                 groundY(x) + 12,
-                0.4 + Math.random() * 0.42
+                0.4 + Math.random() * 0.42,
               );
             lf.tint = 0xcfeeb4;
             lf.scale.x *= Math.random() < 0.5 ? -1 : 1;
             scene.addChild(lf);
-            swayers.push({s: lf, amp: 0.035, sp: 1.0, ph: Math.random() * 6});
+            swayers.push({ s: lf, amp: 0.035, sp: 1.0, ph: Math.random() * 6 });
           }
-        } else if (BI.ground === 'redrock') {
+        } else if (BI.ground === "redrock") {
           // big red rock mesas framing the canyon from the very edges (textured butte, recoloured).
           // their x-span is kept to the sides so the open floor stays clear of overlapping decor.
           const wallSpan = 200; // keep plants/brush out of these edge zones so nothing sits in the rock
           for (const [bx, bs] of [
             [44, 1.18],
-            [1238, 1.34]
+            [1238, 1.34],
           ]) {
-            const bt = spr('butte', bx, groundY(bx) + 34, bs);
+            const bt = spr("butte", bx, groundY(bx) + 34, bs);
             bt.tint = 0xb05a32;
             scene.addChild(bt);
             frontRocks.push(bt); // lifted in front of the animals so they pass behind the side rocks
@@ -2585,27 +2623,27 @@
             }
           };
           open(11, wallSpan, VW - wallSpan, (x) => {
-            const r = spr('rock', x, groundY(x) + 8, 0.1 + Math.random() * 0.2);
+            const r = spr("rock", x, groundY(x) + 8, 0.1 + Math.random() * 0.2);
             r.tint = 0x9a4e2c;
             scene.addChild(r);
           });
           open(4, wallSpan + 40, VW - wallSpan - 40, (x) => {
             scene.addChild(
-              spr('cactus', x, groundY(x) + 8, 0.42 + Math.random() * 0.28)
+              spr("cactus", x, groundY(x) + 8, 0.42 + Math.random() * 0.28),
             );
           });
           open(8, wallSpan, VW - wallSpan, (x) => {
             const g = spr(
-              'grass',
+              "grass",
               x,
               groundY(x) + 6,
-              0.4 + Math.random() * 0.3
+              0.4 + Math.random() * 0.3,
             );
             g.tint = 0xc0a064; // dry brush
             scene.addChild(g);
-            swayers.push({s: g, amp: 0.05, sp: 1.4, ph: Math.random() * 6});
+            swayers.push({ s: g, amp: 0.05, sp: 1.4, ph: Math.random() * 6 });
           });
-        } else if (BI.ground === 'packice') {
+        } else if (BI.ground === "packice") {
           // flat snowfield: a few soft drifts, then scattered ice blocks poking through (icy white-blue)
           for (let i = 0, _m = vc(3); i < _m; i++) {
             const x = 120 + Math.random() * (VW - 240),
@@ -2621,35 +2659,35 @@
           }
           for (let i = 0, _m = vc(13); i < _m; i++) {
             const x = 16 + Math.random() * (VW - 32),
-              r = spr('rock', x, groundY(x) + 8, 0.08 + Math.random() * 0.16);
+              r = spr("rock", x, groundY(x) + 8, 0.08 + Math.random() * 0.16);
             r.tint = Math.random() < 0.5 ? 0xd2e4ef : 0xeef6fb; // ice chunks
             scene.addChild(r);
           }
-        } else if (BI.ground === 'glade') {
+        } else if (BI.ground === "glade") {
           // a dim mossy floor: dark grass + bushes, with a scatter of faintly glowing moss specks
           for (let i = 0, _m = vc(16); i < _m; i++) {
             const x = 30 + Math.random() * (VW - 60),
-              g = spr('grass', x, groundY(x) + 6, 0.5 + Math.random() * 0.4);
+              g = spr("grass", x, groundY(x) + 6, 0.5 + Math.random() * 0.4);
             g.tint = 0x3c5e54; // deep moss
             scene.addChild(g);
-            swayers.push({s: g, amp: 0.05, sp: 1.3, ph: Math.random() * 6});
+            swayers.push({ s: g, amp: 0.05, sp: 1.3, ph: Math.random() * 6 });
           }
           for (let i = 0; i < 5; i++) {
             const x = 70 + Math.random() * (VW - 140),
-              b = spr('bush', x, groundY(x) + 6, 0.5 + Math.random() * 0.3);
+              b = spr("bush", x, groundY(x) + 6, 0.5 + Math.random() * 0.3);
             b.tint = 0x33564b;
             scene.addChild(b);
-            swayers.push({s: b, amp: 0.03, sp: 0.9, ph: Math.random() * 6});
+            swayers.push({ s: b, amp: 0.03, sp: 0.9, ph: Math.random() * 6 });
           }
           for (let i = 0; i < 10; i++) {
             const x = 30 + Math.random() * (VW - 60),
               gl = spr(
-                'glow',
+                "glow",
                 x,
                 groundY(x) + 4,
                 0.07 + Math.random() * 0.05,
                 0.5,
-                0.5
+                0.5,
               );
             gl.tint = Math.random() < 0.5 ? 0x6ff0c8 : 0x8a7bff;
             gl.blendMode = PIXI.BLEND_MODES.ADD;
@@ -2657,7 +2695,7 @@
             scene.addChild(gl);
             crystals.push(gl); // pulses with the mushrooms via the crystal ticker
           }
-        } else if (BI.ground === 'reef') {
+        } else if (BI.ground === "reef") {
           const R = BI.reef;
           // sandy seabed floor laid over the front ridge, paler than the blue background reef
           const floor = new PIXI.Graphics();
@@ -2678,7 +2716,7 @@
           scene.addChild(floor);
           for (let i = 0; i < 10; i++) {
             const x = 20 + Math.random() * (VW - 40),
-              r = spr('rock', x, groundY(x) + 13, 0.08 + Math.random() * 0.16);
+              r = spr("rock", x, groundY(x) + 13, 0.08 + Math.random() * 0.16);
             r.tint = 0x2b5f63;
             scene.addChild(r);
           }
@@ -2686,11 +2724,11 @@
           const farA = lpH(BI.column.deep, BI.column.mid, 0.5);
           for (let i = 0; i < R.far; i++) {
             const f = anim(
-              ['fish_a', 'fish_b'],
+              ["fish_a", "fish_b"],
               Math.random() * VW,
               150 + Math.random() * 230,
               0.1 + Math.random() * 0.05,
-              0.05 + Math.random() * 0.03
+              0.05 + Math.random() * 0.03,
             );
             f.anchor.set(0.5, 0.5);
             f.reef = true;
@@ -2710,16 +2748,16 @@
           // kelp stand (behind the coral), swayed by the current
           for (let i = 0; i < R.kelp; i++) {
             const x = 20 + Math.random() * (VW - 40),
-              k = spr('kelp', x, groundY(x) + 14, 0.5 + Math.random() * 0.7);
+              k = spr("kelp", x, groundY(x) + 14, 0.5 + Math.random() * 0.7);
             k.tint = 0xcfe8dd; // washed a touch by the blue water
             scene.addChild(k);
-            swayers.push({s: k, amp: 0.05, sp: 0.8, ph: Math.random() * 6});
+            swayers.push({ s: k, amp: 0.05, sp: 0.8, ph: Math.random() * 6 });
           }
           // coral colonies scattered along the seabed
           const corals = [];
-          for (let i = 0; i < R.round; i++) corals.push('coral_round');
-          for (let i = 0; i < R.fan; i++) corals.push('coral_fan');
-          for (let i = 0; i < R.branch; i++) corals.push('coral_branch');
+          for (let i = 0; i < R.round; i++) corals.push("coral_round");
+          for (let i = 0; i < R.fan; i++) corals.push("coral_fan");
+          for (let i = 0; i < R.branch; i++) corals.push("coral_branch");
           for (const n of corals) {
             const x = 40 + Math.random() * (VW - 80),
               c = spr(n, x, groundY(x) + 13, 0.42 + Math.random() * 0.4);
@@ -2729,18 +2767,18 @@
           for (let i = 0; i < R.anemone; i++) {
             const x = 40 + Math.random() * (VW - 80),
               a = spr(
-                'anemone',
+                "anemone",
                 x,
                 groundY(x) + 13,
-                0.36 + Math.random() * 0.3
+                0.36 + Math.random() * 0.3,
               );
             scene.addChild(a);
-            swayers.push({s: a, amp: 0.07, sp: 1.2, ph: Math.random() * 6});
+            swayers.push({ s: a, amp: 0.07, sp: 1.2, ph: Math.random() * 6 });
           }
           for (let i = 0; i < 4; i++) {
             const x = 60 + Math.random() * (VW - 120);
             scene.addChild(
-              spr('starfish', x, groundY(x) + 14, 0.26 + Math.random() * 0.18)
+              spr("starfish", x, groundY(x) + 14, 0.26 + Math.random() * 0.18),
             );
           }
         }
@@ -2754,7 +2792,7 @@
             puddles.push({
               x: px,
               y: (BI.water ? 566 : 612) + Math.random() * 26,
-              r: 26 + Math.random() * 30
+              r: 26 + Math.random() * 30,
             });
           }
         // settling snow that deepens while it falls and melts afterwards (drawn each frame from snowAcc)
@@ -2763,7 +2801,7 @@
         tracksG = new PIXI.Graphics();
         scene.addChild(tracksG); // footprints sit on the snow, under the animals that make them
         snowing = snow; // cold scene: precipitation falls as snow rather than rain
-        weatherIsSnow = weatherKind === 'flake';
+        weatherIsSnow = weatherKind === "flake";
         snowI = 0;
         snowAcc = snowing ? 0.22 + Math.random() * 0.36 : 0; // a different base depth each visit; squalls deepen it, clear spells melt it
         snowRate = 0.7 + Math.random() * 0.7; // some scenes settle/melt faster than others
@@ -2774,7 +2812,7 @@
         iceAmt = snowing && BI.water && BI.water.freeze ? 0.45 : 0; // a frozen pond opens partly iced
         walkers.length = 0;
         if (BI.walker) {
-          const heron = BI.walker[0] === 'heron';
+          const heron = BI.walker[0] === "heron";
           // a lone grazer some visits, a small scattered herd others, an empty meadow now and then
           // (the heron is always the single focal bird; non-grazers stay solitary)
           const herd = heron
@@ -2792,7 +2830,7 @@
               300,
               groundY(300) + 8,
               BI.walkerScale,
-              0.1 + Math.random() * 0.04 // each animates at its own pace
+              0.1 + Math.random() * 0.04, // each animates at its own pace
             );
             if (BI.walker.length > 1) d.stop();
             else d.gotoAndStop(0);
@@ -2815,7 +2853,7 @@
               d.x = 140 + Math.random() * (VW - 280);
               d.y = groundY(d.x) + 8;
               d.scale.x = d.dir * Math.abs(d.scale.x);
-              d.mode = 'walk';
+              d.mode = "walk";
               d.timer = Math.random() * 5;
             }
             scene.addChild(d);
@@ -2823,17 +2861,17 @@
           }
           // a spotted fawn sometimes trails the herd, keeping close to one of the adult deer
           if (
-            BI.walker[0] === 'deer_a' &&
+            BI.walker[0] === "deer_a" &&
             walkers.length &&
             Math.random() < 0.45
           ) {
             const mum = walkers[(Math.random() * walkers.length) | 0],
               fawn = anim(
-                ['fawn_a', 'fawn_b'],
+                ["fawn_a", "fawn_b"],
                 mum.x - mum.dir * 44,
                 groundY(mum.x) + 8,
                 BI.walkerScale * 0.62,
-                0.09
+                0.09,
               );
             fawn.stop();
             fawn.tint = tintJit(0xffffff, 0.06);
@@ -2875,7 +2913,7 @@
         if (BI.marmot) {
           // a marmot sits sentinel on the scree; now and then it ducks down and pops back up
           const mx = 560 + Math.random() * 360;
-          marmot = spr('marmot', mx, groundY(mx) + 6, 0.42);
+          marmot = spr("marmot", mx, groundY(mx) + 6, 0.42);
           marmot.baseY = marmot.y;
           marmot.baseSc = 0.42; // sign flips when it glances around; magnitude drives the duck squash
           marmot.duck = 0; // 0 = up and watchful; rises toward 1 while ducked
@@ -2885,17 +2923,35 @@
         }
         if (BI.roadrunner) {
           // a roadrunner dashes back and forth across the canyon floor, pausing now and then
-          roadrunner = spr('roadrunner', 300, groundY(300) + 6, 0.34);
+          roadrunner = spr("roadrunner", 300, groundY(300) + 6, 0.34);
           roadrunner.baseSc = 0.34;
           roadrunner.dir = 1;
           roadrunner.pause = 1 + Math.random() * 2;
           scene.addChild(roadrunner);
         }
+        if (BI.squirrel && Math.random() < 0.6) {
+          // a squirrel forages the clearing floor: it sits and nibbles, then darts to a fresh spot
+          const sx = 180 + Math.random() * (VW - 360);
+          squirrel = spr(
+            "squirrel",
+            sx,
+            groundY(sx) + 6,
+            0.32 + Math.random() * 0.1,
+          );
+          squirrel.baseSc = Math.abs(squirrel.scale.x);
+          squirrel.tint = tintJit(0xffffff, 0.06); // coats vary a touch
+          squirrel.dir = Math.random() < 0.5 ? 1 : -1; // sprite faces right; dir mirrors it
+          squirrel.scale.x = squirrel.dir * squirrel.baseSc;
+          squirrel.mode = "sit"; // sit (nibble in place) → run (scamper to tx) → sit
+          squirrel.tmr = 1.5 + Math.random() * 4;
+          squirrel.tx = sx;
+          scene.addChild(squirrel);
+        } else squirrel = null;
         if (BI.penguins) {
           // a little colony waddles the snowfield: each penguin ambles at its own pace, some just stand
           for (let i = 0; i < BI.penguins; i++) {
             const x = 150 + Math.random() * (VW - 300),
-              p = spr('penguin', x, groundY(x) + 6, 0.3 + Math.random() * 0.06);
+              p = spr("penguin", x, groundY(x) + 6, 0.3 + Math.random() * 0.06);
             p.baseSc = Math.abs(p.scale.x);
             p.dir = Math.random() < 0.5 ? -1 : 1;
             p.spd = 0.5 + Math.random() * 0.4; // a slow waddle
@@ -2920,17 +2976,17 @@
             gradTex(
               [
                 [0, BI.water.top],
-                [1, BI.water.bot]
+                [1, BI.water.bot],
               ],
-              288
-            )
+              288,
+            ),
           );
           water.position.set(-40, 600);
           water.width = VW + 80;
           water.height = VH - 600;
           water.tint = snow ? 0xcfe6ef : 0xffffff;
           scene.addChild(water);
-          if (BI.ground === 'beach') {
+          if (BI.ground === "beach") {
             // shore break: foam washes up the sand and slides back, drawn each frame in the ticker
             surfG = new PIXI.Graphics();
             scene.addChild(surfG);
@@ -2945,7 +3001,7 @@
               for (let x = -40; x <= VW + 40; x += 14)
                 surfG.lineTo(
                   x,
-                  edgeY + Math.sin(x * 0.05) * 2.3 + Math.sin(x * 0.13) * 1.3
+                  edgeY + Math.sin(x * 0.05) * 2.3 + Math.sin(x * 0.13) * 1.3,
                 );
               surfG.lineTo(VW + 40, edgeY + 7);
               surfG.closePath();
@@ -2954,17 +3010,17 @@
           }
           if (BI.water.whale) {
             // a whale surfaces out in the water (backmost water element), blows a misty spout, then sounds
-            whale = spr('whale_back', 400, 642, 0.4, 0.5, 1);
+            whale = spr("whale_back", 400, 642, 0.4, 0.5, 1);
             whale.baseY = 642;
             whale.alpha = 0;
             whale.dir = Math.random() < 0.5 ? -1 : 1;
             whale.scale.x = whale.dir * Math.abs(whale.scale.x);
-            whale.state = 'rest';
+            whale.state = "rest";
             whale.tmr = 2 + Math.random() * 5;
             whale.blows = 0;
             whale.blowGap = 0;
             scene.addChild(whale);
-            whale.fluke = spr('whale_fluke', 400, 642, 0.4, 0.5, 1);
+            whale.fluke = spr("whale_fluke", 400, 642, 0.4, 0.5, 1);
             whale.fluke.alpha = 0;
             scene.addChild(whale.fluke);
             spoutG = new PIXI.Graphics();
@@ -3003,9 +3059,9 @@
             for (const [lx, ly, ls] of BI.water.lilyPos || [
               [230, 632, 0.7],
               [610, 648, 0.82],
-              [1010, 636, 0.66]
+              [1010, 636, 0.66],
             ]) {
-              const lp = spr('lily', lx, ly, ls, 0.5, 0.5);
+              const lp = spr("lily", lx, ly, ls, 0.5, 0.5);
               lp.baseY = ly;
               scene.addChild(lp);
               lilies.push(lp);
@@ -3013,9 +3069,9 @@
           if (BI.water.frogs && !snow)
             for (const [fx, fy] of [
               [180, 624],
-              [900, 642]
+              [900, 642],
             ]) {
-              const fr = spr('frog', fx, fy, 0.42);
+              const fr = spr("frog", fx, fy, 0.42);
               fr.baseY = fy;
               fr.isFrog = true;
               scene.addChild(fr);
@@ -3023,18 +3079,18 @@
             }
           if (BI.water.ducks) {
             // the female (mottled brown) tends the brood; the drake (green head) is the second bird
-            const dm = spr('duck_f', 250 + Math.random() * 760, 656, 0.6);
+            const dm = spr("duck_f", 250 + Math.random() * 760, 656, 0.6);
             dm.baseY = dm.y;
             dm.baseSpd = 0.3 + Math.random() * 0.3;
             dm.vx = dm.baseSpd;
             dm.kids = [];
-            dm.ref = spr('duck_f', 380, 0, 0.6);
+            dm.ref = spr("duck_f", 380, 0, 0.6);
             dm.ref.scale.y = -0.6;
             dm.ref.alpha = 0.28;
             dm.ref.tint = 0x6f8ea0;
             scene.addChildAt(dm.ref, scene.getChildIndex(glit));
             for (let i = 0; i < 3; i++) {
-              const k = spr('duckling', dm.x - 34 - i * 22, 668, 0.5);
+              const k = spr("duckling", dm.x - 34 - i * 22, 668, 0.5);
               k.baseY = k.y;
               scene.addChild(k);
               dm.kids.push(k);
@@ -3042,10 +3098,10 @@
             scene.addChild(dm);
             ducks.push(dm);
             const d2 = spr(
-              'duck',
+              "duck",
               250 + Math.random() * 760,
               682 + Math.random() * 16,
-              0.55
+              0.55,
             );
             d2.scale.x = -0.55;
             d2.baseY = d2.y;
@@ -3062,15 +3118,15 @@
               1,
               (BI.water.drag === true ? 3 : BI.water.drag) +
                 ((Math.random() * 3) | 0) -
-                1
+                1,
             ); // ±1
             for (let i = 0; i < dn; i++) {
               const d = anim(
-                ['dragonfly_a', 'dragonfly_b'],
+                ["dragonfly_a", "dragonfly_b"],
                 200 + Math.random() * 880,
                 612 + Math.random() * 60,
                 0.45,
-                0.4
+                0.4,
               );
               d.vx = (Math.random() - 0.5) * 2.4;
               d.vy = (Math.random() - 0.5) * 1.2;
@@ -3081,7 +3137,7 @@
             }
           }
           if (BI.water.sailboat) {
-            const sb = spr('sailboat', 740, 606, 0.5);
+            const sb = spr("sailboat", 740, 606, 0.5);
             sb.baseY = 606;
             sb.vx = 0.22;
             ducks.push(sb);
@@ -3093,10 +3149,10 @@
               1,
               (BI.water.fish === true ? 3 : BI.water.fish) +
                 ((Math.random() * 3) | 0) -
-                1
+                1,
             ); // ±1
             const koiPond = !!BI.water.fishSprite, // a koi pond shows its fish in full colour, just under the surface
-              frames = BI.water.fishSprite || ['fish_a', 'fish_b'],
+              frames = BI.water.fishSprite || ["fish_a", "fish_b"],
               subA = koiPond
                 ? [255, 255, 255]
                 : lpH(BI.water.bot, BI.water.top, 0.4);
@@ -3106,7 +3162,7 @@
                 140 + Math.random() * (VW - 280),
                 634 + Math.random() * 48,
                 0.22 + Math.random() * 0.12,
-                0.05 + Math.random() * 0.04
+                0.05 + Math.random() * 0.04,
               );
               f.anchor.set(0.5, 0.5); // pivot at the body centre so leaps rotate cleanly
               f.dir = Math.random() < 0.5 ? 1 : -1;
@@ -3128,12 +3184,12 @@
           if (BI.water.floes)
             for (let i = 0; i < BI.water.floes; i++) {
               const fl = spr(
-                'icefloe',
+                "icefloe",
                 Math.random() * VW,
                 612 + Math.random() * 30,
                 0.4 + Math.random() * 0.4,
                 0.5,
-                0.7
+                0.7,
               );
               fl.baseY = fl.y;
               fl.vx =
@@ -3150,10 +3206,10 @@
               if (Math.abs(fl.scale.x) > Math.abs(big.scale.x)) big = fl;
             const rideOff = 3 + Math.abs(big.scale.x) * 8;
             seal = spr(
-              'seal',
+              "seal",
               big.x,
               big.baseY - rideOff,
-              0.3 + Math.abs(big.scale.x) * 0.3
+              0.3 + Math.abs(big.scale.x) * 0.3,
             );
             seal.rideOff = rideOff;
             seal.scale.x = (big.vx < 0 ? -1 : 1) * Math.abs(seal.scale.x);
@@ -3164,12 +3220,12 @@
           if (BI.water.dolphins)
             for (let i = 0; i < BI.water.dolphins; i++) {
               const d = spr(
-                BI.water.dolphinSprite || 'dolphin', // polar reuses this to surface an orca
+                BI.water.dolphinSprite || "dolphin", // polar reuses this to surface an orca
                 200 + i * 260 + Math.random() * 120,
                 648,
                 (BI.water.dolphinScale || 0.34) + Math.random() * 0.06,
                 0.5,
-                0.5
+                0.5,
               );
               d.dir = 1;
               d.baseSc = Math.abs(d.scale.x);
@@ -3189,7 +3245,7 @@
         // steep rock walls plunging to the water (the fjord's framing) — in front of the water
         if (BI.cliffs)
           for (const c of BI.cliffs) {
-            const cl = spr('cliff', c.x, 616, c.s, 0.5, 1);
+            const cl = spr("cliff", c.x, 616, c.s, 0.5, 1);
             if (c.flip) cl.scale.x = -Math.abs(cl.scale.x);
             if (c.tint) cl.tint = c.tint;
             scene.addChild(cl);
@@ -3205,7 +3261,7 @@
           if (wf.streak) {
             // a seamless streak texture scrolled down over the cascade — this is what reads as "flowing"
             const s = wf.streak,
-              ts = new PIXI.TilingSprite(T('wstreak'), s.w, s.h);
+              ts = new PIXI.TilingSprite(T("wstreak"), s.w, s.h);
             ts.position.set(s.x, s.y);
             ts.tileScale.set(s.scale);
             ts.alpha = s.alpha;
@@ -3221,12 +3277,12 @@
             const swallow = !BI.flutterTint && Math.random() < 0.5,
               f = anim(
                 swallow
-                  ? ['swallow_a', 'swallow_b']
-                  : ['butterfly_a', 'butterfly_b'],
+                  ? ["swallow_a", "swallow_b"]
+                  : ["butterfly_a", "butterfly_b"],
                 Math.random() * VW,
                 500 + Math.random() * 70,
                 swallow ? 0.42 : 0.5,
-                0.18
+                0.18,
               );
             if (BI.flutterTint) f.tint = BI.flutterTint; // jungle blue morphos / blossom pale-pink
             f.vx = (Math.random() - 0.5) * 1.2;
@@ -3249,21 +3305,21 @@
           !BI.underwater &&
           !BI.canopy &&
           Math.random() < 0.22 &&
-          (BI.ground === 'meadow' ||
-            BI.ground === 'marsh' ||
-            BI.ground === 'savanna' ||
-            BI.ground === 'fern' ||
-            BI.ground === 'beach')
+          (BI.ground === "meadow" ||
+            BI.ground === "marsh" ||
+            BI.ground === "savanna" ||
+            BI.ground === "fern" ||
+            BI.ground === "beach")
         )
           for (let i = 0, n = 1 + ((Math.random() * 2) | 0); i < n; i++) {
             const f = anim(
               Math.random() < 0.5
-                ? ['swallow_a', 'swallow_b']
-                : ['butterfly_a', 'butterfly_b'],
+                ? ["swallow_a", "swallow_b"]
+                : ["butterfly_a", "butterfly_b"],
               Math.random() * VW,
               500 + Math.random() * 70,
               0.42,
-              0.18
+              0.18,
             );
             f.vx = (Math.random() - 0.5) * 1.2;
             f.vy = (Math.random() - 0.5) * 0.8;
@@ -3286,12 +3342,12 @@
           // drifting marine snow: faint specks suspended through the water for depth
           for (let i = 0; i < R.motes; i++) {
             const m = spr(
-              'glow',
+              "glow",
               Math.random() * VW,
               Math.random() * VH,
               0.03 + Math.random() * 0.05,
               0.5,
-              0.5
+              0.5,
             );
             m.tint = 0xdfeef0;
             m.alpha = 0.1 + Math.random() * 0.16;
@@ -3305,11 +3361,11 @@
           const schools = Math.max(1, Math.round(R.fish / 4));
           for (let i = 0; i < R.fish; i++) {
             const f = anim(
-              ['fish_a', 'fish_b'],
+              ["fish_a", "fish_b"],
               Math.random() * VW,
               130 + Math.random() * 360,
               0.15 + Math.random() * 0.12,
-              0.06 + Math.random() * 0.05
+              0.06 + Math.random() * 0.05,
             );
             f.anchor.set(0.5, 0.5);
             f.reef = true;
@@ -3333,12 +3389,12 @@
           for (let i = 0; i < R.bubbles; i++) {
             const vx = vents[i % vents.length],
               b = spr(
-                'bubble',
+                "bubble",
                 vx,
                 120 + Math.random() * 420,
                 0.3 + Math.random() * 0.7,
                 0.5,
-                0.5
+                0.5,
               );
             b.vy = -(0.4 + Math.random() * 0.7);
             b.ph = Math.random() * 6.28;
@@ -3349,11 +3405,11 @@
           // jellyfish: translucent bells pulsing slowly up the column
           for (let i = 0; i < R.jelly; i++) {
             const j = anim(
-              ['jelly_a', 'jelly_b'],
+              ["jelly_a", "jelly_b"],
               120 + Math.random() * (VW - 240),
               200 + Math.random() * 340,
               0.5 + Math.random() * 0.35,
-              0.03 + Math.random() * 0.025
+              0.03 + Math.random() * 0.025,
             );
             j.anchor.set(0.5, 0.5);
             j.vy = -(0.22 + Math.random() * 0.28); // drifts gently upward
@@ -3365,7 +3421,7 @@
           }
           // a sea turtle that glides across the reef now and then (hidden until its cue)
           if (R.turtle) {
-            turtle = spr('turtle', -160, 230, 0.6, 0.5, 0.5);
+            turtle = spr("turtle", -160, 230, 0.6, 0.5, 0.5);
             turtle.visible = false;
             turtle.dir = 1;
             turtle.tmr = 5 + Math.random() * 8;
@@ -3378,17 +3434,17 @@
           for (let i = 0; i < (BI.vines || 0); i++) {
             const x = 40 + Math.random() * (VW - 80),
               v = spr(
-                'vine',
+                "vine",
                 x,
                 104 + Math.random() * 26,
                 0.55 + Math.random() * 0.7,
                 0.5,
-                0
+                0,
               );
             scene.addChild(v);
-            swayers.push({s: v, amp: 0.04, sp: 0.7, ph: Math.random() * 6});
+            swayers.push({ s: v, amp: 0.04, sp: 0.7, ph: Math.random() * 6 });
           }
-          const tk = spr('toucan', 200 + Math.random() * (VW - 400), 210, 0.46);
+          const tk = spr("toucan", 200 + Math.random() * (VW - 400), 210, 0.46);
           tk.isToucan = true;
           tk.vx = (Math.random() < 0.5 ? -1 : 1) * (0.9 + Math.random() * 0.4);
           tk.baseY = 180 + Math.random() * 150;
@@ -3397,7 +3453,7 @@
         }
         if (BI.owl) {
           // an owl glides silently across the twilight on slow beats, resting out of sight between crossings
-          const ow = anim(['owl_a', 'owl_b'], 320, 210, 0.44, 0.04);
+          const ow = anim(["owl_a", "owl_b"], 320, 210, 0.44, 0.04);
           ow.isOwl = true;
           ow.dir = Math.random() < 0.5 ? -1 : 1;
           ow.vx = ow.dir * (0.7 + Math.random() * 0.3);
@@ -3411,7 +3467,7 @@
 
         if (BI.fog) {
           // ground fog pooling low, in front of the scene (tree bases sink into it)
-          const fz = new PIXI.TilingSprite(T('fog'), VW + 120, 135);
+          const fz = new PIXI.TilingSprite(T("fog"), VW + 120, 135);
           fz.position.set(-60, 498);
           fz.tileScale.set(1.4, 135 / 90);
           fz.baseA = 1;
@@ -3430,7 +3486,7 @@
               0,
               0,
               (BI.soar.scale || 0.6) + i * 0.12,
-              0.05
+              0.05,
             );
             e.isSoar = true;
             e.cx = 240 + Math.random() * (VW - 480);
@@ -3453,15 +3509,15 @@
         if (BI.bats && !snow) {
           const night0 = Math.min(
             1,
-            Math.max(0, (0.78 - tod(nowHour()).light) / 0.46)
+            Math.max(0, (0.78 - tod(nowHour()).light) / 0.46),
           ); // a correct static alpha for reduced motion (the ticker drives it otherwise)
           for (let i = 0; i < BI.bats; i++) {
             const b = anim(
-              ['bat_a', 'bat_b'],
+              ["bat_a", "bat_b"],
               Math.random() * VW,
               320 + Math.random() * 150,
               0.3 + Math.random() * 0.12,
-              0.24
+              0.24,
             );
             b.isBat = true;
             b.isDuskBat = true;
@@ -3479,7 +3535,7 @@
 
         // dawn mist rising off the water — a low wispy band over the surface, in only at first light
         if (BI.water && !BI.underwater && !BI.cloudSea) {
-          const mist = new PIXI.TilingSprite(T('fog'), VW + 120, 86);
+          const mist = new PIXI.TilingSprite(T("fog"), VW + 120, 86);
           mist.position.set(-60, 576);
           mist.tileScale.set(1.5, 86 / 90);
           mist.baseA = 0.6;
@@ -3504,27 +3560,27 @@
         root.addChild(fl);
         fireflies.fl = fl;
         const hasFlies =
-          BI.glow === 'cave' ||
+          BI.glow === "cave" ||
           BI.glade ||
-          ((BI.ground === 'meadow' ||
-            BI.ground === 'marsh' ||
-            BI.ground === 'fern' ||
-            BI.ground === 'jungle') &&
+          ((BI.ground === "meadow" ||
+            BI.ground === "marsh" ||
+            BI.ground === "fern" ||
+            BI.ground === "jungle") &&
             !snow);
         if (hasFlies) {
-          const cave = BI.glow === 'cave',
+          const cave = BI.glow === "cave",
             n = cave ? 30 : 16;
           for (let i = 0; i < n; i++) {
             const gx = 40 + Math.random() * (VW - 80),
               g = spr(
-                'glow',
+                "glow",
                 gx,
                 cave
                   ? ceilEdge(gx) + 10 + Math.random() * 120
                   : 470 + Math.random() * 130,
                 cave ? 0.1 + Math.random() * 0.06 : 0.16,
                 0.5,
-                0.5
+                0.5,
               );
             g.tint = cave ? 0x8ff0ff : BI.glade ? 0x9affd2 : 0xeaff8a;
             g.blendMode = PIXI.BLEND_MODES.ADD;
@@ -3546,23 +3602,23 @@
           !BI.underwater &&
           !BI.interior &&
           !BI.cloudSea &&
-          (BI.ground === 'meadow' ||
-            BI.ground === 'marsh' ||
-            BI.ground === 'fern' ||
-            BI.ground === 'jungle' ||
-            BI.ground === 'glade' ||
-            BI.ground === 'savanna');
+          (BI.ground === "meadow" ||
+            BI.ground === "marsh" ||
+            BI.ground === "fern" ||
+            BI.ground === "jungle" ||
+            BI.ground === "glade" ||
+            BI.ground === "savanna");
         if (hasDew) {
           for (let i = 0; i < 36; i++) {
             const dx = 24 + Math.random() * (VW - 48),
               warm = Math.random() < 0.34, // a third catch the sunrise gold; the rest read sky-cool
               d = spr(
-                'glow',
+                "glow",
                 dx,
                 560 + Math.random() * 72,
                 0.04 + Math.random() * 0.05,
                 0.5,
-                0.5
+                0.5,
               );
             d.tint = warm ? 0xffe6a8 : 0xdaf3ff;
             d.blendMode = PIXI.BLEND_MODES.ADD;
@@ -3578,33 +3634,33 @@
         const wl = new PIXI.Container();
         root.addChild(wl);
         weather.layer = wl;
-        if (weatherKind !== 'none') {
+        if (weatherKind !== "none") {
           const count =
-              weatherKind === 'flake' ? 70 : weatherKind === 'leaf' ? 26 : 34,
+              weatherKind === "flake" ? 70 : weatherKind === "leaf" ? 26 : 34,
             kind = weatherKind;
           for (let i = 0; i < count; i++) {
             const p = spr(
-              kind === 'flake' ? 'flake' : kind === 'leaf' ? 'leaf' : 'petal',
+              kind === "flake" ? "flake" : kind === "leaf" ? "leaf" : "petal",
               Math.random() * VW,
               Math.random() * VH,
-              kind === 'flake'
+              kind === "flake"
                 ? 0.3 + Math.random() * 0.4
                 : 0.5 + Math.random() * 0.5,
               0.5,
-              0.5
+              0.5,
             );
-            if (kind === 'leaf')
+            if (kind === "leaf")
               p.tint = LEAFTINTS[(Math.random() * LEAFTINTS.length) | 0];
             p.vy =
-              kind === 'flake'
+              kind === "flake"
                 ? 0.6 + Math.random() * 0.8
-                : kind === 'leaf'
+                : kind === "leaf"
                   ? 1 + Math.random() * 1.2
                   : 0.7 + Math.random() * 0.8;
-            p.vx = (Math.random() - 0.5) * (kind === 'leaf' ? 1.2 : 0.6);
-            p.spin = (Math.random() - 0.5) * (kind === 'leaf' ? 0.06 : 0.02);
+            p.vx = (Math.random() - 0.5) * (kind === "leaf" ? 1.2 : 0.6);
+            p.spin = (Math.random() - 0.5) * (kind === "leaf" ? 0.06 : 0.02);
             p.ph = Math.random() * 6.28;
-            p.sw = kind === 'flake' ? 0.5 : 1.2;
+            p.sw = kind === "flake" ? 0.5 : 1.2;
             weather.push(p);
             wl.addChild(p);
           }
@@ -3619,17 +3675,17 @@
             x: Math.random() * VW,
             y: Math.random() * VH,
             len: 9 + Math.random() * 8,
-            sp: 9 + Math.random() * 5
+            sp: 9 + Math.random() * 5,
           });
 
         // volcanic feature: crater glow, drifting smoke, rising embers (all on root so night never dims them)
-        if (BI.feature === 'volcano') {
-          lavaGlow = spr('glow', 640, 270, 1.6, 0.5, 0.5);
+        if (BI.feature === "volcano") {
+          lavaGlow = spr("glow", 640, 270, 1.6, 0.5, 0.5);
           lavaGlow.tint = 0xff6a26;
           lavaGlow.blendMode = PIXI.BLEND_MODES.ADD;
           root.addChild(lavaGlow);
           for (let i = 0; i < 4; i++) {
-            const p = spr('cloud', 636, 262 - i * 42, 0.22, 0.5, 0.5);
+            const p = spr("cloud", 636, 262 - i * 42, 0.22, 0.5, 0.5);
             p.tint = 0x4a444c;
             p.alpha = 0.5;
             p.ph = Math.random() * 6.28;
@@ -3640,12 +3696,12 @@
         if (BI.embers)
           for (let i = 0; i < 22; i++) {
             const e = spr(
-              'glow',
+              "glow",
               Math.random() * VW,
               400 + Math.random() * 180,
               0.07 + Math.random() * 0.06,
               0.5,
-              0.5
+              0.5,
             );
             e.tint = Math.random() < 0.5 ? 0xff7a2a : 0xffb84a;
             e.blendMode = PIXI.BLEND_MODES.ADD;
@@ -3688,16 +3744,16 @@
           rainSrc.buffer = buf;
           rainSrc.loop = true;
           const hp = ctx.createBiquadFilter();
-          hp.type = 'highpass';
+          hp.type = "highpass";
           hp.frequency.value = 600;
           const lp = ctx.createBiquadFilter();
-          lp.type = 'lowpass';
+          lp.type = "lowpass";
           lp.frequency.value = 3200;
           const rainGain = ctx.createGain();
           rainGain.gain.value = 0;
           rainSrc.connect(hp).connect(lp).connect(rainGain).connect(master);
           rainSrc.start();
-          audio = {ctx, master, rainGain, buf};
+          audio = { ctx, master, rainGain, buf };
         } catch (e) {
           audio = null;
         }
@@ -3706,12 +3762,12 @@
       function thunder() {
         if (!audio) return;
         try {
-          const {ctx, master, buf} = audio;
+          const { ctx, master, buf } = audio;
           const now = ctx.currentTime;
           const src = ctx.createBufferSource();
           src.buffer = buf;
           const lp = ctx.createBiquadFilter();
-          lp.type = 'lowpass';
+          lp.type = "lowpass";
           lp.frequency.setValueAtTime(400, now);
           lp.frequency.exponentialRampToValueAtTime(90, now + 2.2);
           const g = ctx.createGain();
@@ -3745,7 +3801,7 @@
         if (reduce.matches) {
           biomeParam = null;
           biomeMode = biome;
-          LS('biome', biome);
+          LS("biome", biome);
           build();
           buildUI();
           return;
@@ -3761,12 +3817,12 @@
         if (journeyFade) {
           root.alpha = Math.max(
             0,
-            Math.min(1, root.alpha + journeyFade * 0.025 * dt)
+            Math.min(1, root.alpha + journeyFade * 0.025 * dt),
           );
           if (journeyFade < 0 && root.alpha <= 0.001) {
             biomeParam = null; // let biomeMode drive nowBiome() from here on
             biomeMode = journeyNext;
-            LS('biome', biomeMode);
+            LS("biome", biomeMode);
             build();
             buildUI();
             journeyFade = 1; // now fade the new scene in
@@ -3775,7 +3831,7 @@
             journeyFade = 0;
             journeyNext = null;
           }
-        } else if (journeyOn && wpMode !== 'shown') {
+        } else if (journeyOn && wpMode !== "shown") {
           journeyTimer -= dt / 60;
           if (journeyTimer <= 0) startJourney(nextJourneyBiome(false));
         }
@@ -3785,7 +3841,7 @@
           night = Math.min(1, Math.max(0, (0.78 - P.light) / 0.46));
         if (BI.glade) {
           // an enchanted clearing held in perpetual twilight, so its glow always reads
-          P = {top: hx('#181333'), bot: hx('#27474a'), light: 0.22};
+          P = { top: hx("#181333"), bot: hx("#27474a"), light: 0.22 };
           night = 0.82;
         }
         if (!reduce.matches) t += dt / 60;
@@ -3808,41 +3864,41 @@
         // (no weather underwater: cover/wet/snow all stay 0, which silences rain, overcast, lightning, etc.)
         if (!reduce.matches && !BI.underwater) {
           let coverTarget, precipTarget; // precip = the front's precipitation phase (falls as rain, or snow when cold)
-          if (weatherMode === 'rain') {
+          if (weatherMode === "rain") {
             coverTarget = 0.82;
             precipTarget = 1;
-          } else if (weatherMode === 'clear') {
+          } else if (weatherMode === "clear") {
             coverTarget = 0;
             precipTarget = 0;
           } else {
             frontT -= dt / 60;
             if (frontT < 0) {
-              if (frontState === 'clear') {
-                frontState = 'gather';
+              if (frontState === "clear") {
+                frontState = "gather";
                 frontT = (snowing ? 14 : 20) + Math.random() * 14;
-              } else if (frontState === 'gather') {
-                frontState = 'rain'; // precipitation phase (rain or a snow squall)
+              } else if (frontState === "gather") {
+                frontState = "rain"; // precipitation phase (rain or a snow squall)
                 // cold scenes get longer, more frequent squalls so winter still reads as wintry
                 frontT =
                   (snowing ? 45 : 28) + Math.random() * (snowing ? 80 : 45);
-              } else if (frontState === 'rain') {
-                frontState = 'clearup';
+              } else if (frontState === "rain") {
+                frontState = "clearup";
                 frontT = 30;
                 if (!snowing && cel.sun && P.light > 0.72) rainbowLife = 24; // sunshower payoff (rain only)
               } else {
-                frontState = 'clear';
+                frontState = "clear";
                 // shorter dry gaps when it's cold, so the snow doesn't all melt away between squalls
                 frontT =
                   (snowing ? 45 : 150) + Math.random() * (snowing ? 70 : 200);
               }
             }
             coverTarget =
-              frontState === 'gather' || frontState === 'rain'
+              frontState === "gather" || frontState === "rain"
                 ? 0.88
-                : frontState === 'clearup'
+                : frontState === "clearup"
                   ? 0.4
                   : 0;
-            precipTarget = frontState === 'rain' ? 1 : 0;
+            precipTarget = frontState === "rain" ? 1 : 0;
           }
           cover += (coverTarget - cover) * 0.008 * dt;
           if (coverParam != null) cover = parseFloat(coverParam); // preview override
@@ -3918,7 +3974,7 @@
           const fogAmt = Math.min(
               1,
               (BI.fog || 0) *
-                (fogTOD + wetness * 0.35 + cover * 0.45 + wet * 0.3) // haze thickens as a front gathers + rains
+                (fogTOD + wetness * 0.35 + cover * 0.45 + wet * 0.3), // haze thickens as a front gathers + rains
             ),
             fogTint = hexI(mixA(P.bot, [255, 255, 255], 0.55));
           // mist that rises off the water peaks sharply at first light and burns off as the sun climbs
@@ -3937,7 +3993,7 @@
           audio.rainGain.gain.setTargetAtTime(
             soundOn ? Math.min(1, wet * 1.1) : 0,
             at,
-            0.5
+            0.5,
           );
         }
 
@@ -3945,7 +4001,8 @@
         rainbowG.clear();
         if (rainbow > 0.01 && !BI.interior && !BI.canopy) {
           const cols = [
-            0xff6a6a, 0xffa84a, 0xffe24a, 0x6ad86a, 0x52a8ff, 0x6a6aff, 0xb06aff
+            0xff6a6a, 0xffa84a, 0xffe24a, 0x6ad86a, 0x52a8ff, 0x6a6aff,
+            0xb06aff,
           ];
           for (let i = 0; i < 7; i++) {
             rainbowG.lineStyle(8, cols[i], rainbow * 0.45);
@@ -3969,8 +4026,8 @@
               puddleG.drawEllipse(pd.x, pd.y, rx, rx * 0.3);
               puddleG.endFill();
               puddleG.beginFill(
-                hexI(lpH('#5b7da0', '#d6ecff', P.light)),
-                wetness * 0.5
+                hexI(lpH("#5b7da0", "#d6ecff", P.light)),
+                wetness * 0.5,
               );
               puddleG.drawEllipse(pd.x, pd.y - 1, rx * 0.82, rx * 0.22);
               puddleG.endFill();
@@ -4008,7 +4065,7 @@
               const topY = VH - 26 - snowAcc * 158;
               snowAccG.beginFill(
                 0xeef5fc,
-                Math.min(0.96, 0.45 + snowAcc * 0.55)
+                Math.min(0.96, 0.45 + snowAcc * 0.55),
               );
               snowAccG.moveTo(-40, VH + 40);
               for (let x = -40; x <= VW + 40; x += 14)
@@ -4020,7 +4077,7 @@
               // water biome: snow covers the visible bank (ground contour down to the waterline), never the pond
               snowAccG.beginFill(
                 0xeef5fc,
-                Math.min(0.9, 0.32 + snowAcc * 0.58)
+                Math.min(0.9, 0.32 + snowAcc * 0.58),
               );
               snowAccG.moveTo(-40, 602);
               for (let x = -40; x <= VW + 40; x += 12)
@@ -4052,7 +4109,7 @@
               a = Math.min(0.94, 0.5 + ice * 0.5);
             for (const [bank, edge, dir] of [
               [-40, lE, 1],
-              [VW + 40, rE, -1]
+              [VW + 40, rE, -1],
             ]) {
               // shelf body with a ragged, slightly broken inner edge biting back toward the bank
               iceG.beginFill(0xe2eff5, a);
@@ -4098,10 +4155,10 @@
         for (const c of clouds) {
           c.tint = hexI(
             lpH(
-              '#33406a',
-              '#ffffff',
-              Math.min(1, P.light + 0.05) * (1 - cover * 0.5)
-            )
+              "#33406a",
+              "#ffffff",
+              Math.min(1, P.light + 0.05) * (1 - cover * 0.5),
+            ),
           );
         }
 
@@ -4238,12 +4295,12 @@
               for (let x = -40; x <= VW + 40; x += 24)
                 causticG.lineTo(
                   x,
-                  y + Math.sin(x * 0.02 + t * 0.8 + b * 1.3) * 7
+                  y + Math.sin(x * 0.02 + t * 0.8 + b * 1.3) * 7,
                 );
               for (let x = VW + 40; x >= -40; x -= 24)
                 causticG.lineTo(
                   x,
-                  y + 9 + Math.sin(x * 0.02 + t * 0.8 + b * 1.3) * 7
+                  y + 9 + Math.sin(x * 0.02 + t * 0.8 + b * 1.3) * 7,
                 );
               causticG.closePath();
               causticG.endFill();
@@ -4284,7 +4341,7 @@
             shoot.y += shoot.vy * dt;
             shoot.life -= dt / 60;
             const fade = Math.sin(
-                Math.max(0, 1 - shoot.life / shoot.dur) * Math.PI
+                Math.max(0, 1 - shoot.life / shoot.dur) * Math.PI,
               ),
               steps = 9;
             for (let i = 0; i < steps; i++) {
@@ -4292,11 +4349,11 @@
               shootG.lineStyle(3 * (1 - f) + 0.3, 0xffffff, fade * (1 - f));
               shootG.moveTo(
                 shoot.x - shoot.vx * f * 4,
-                shoot.y - shoot.vy * f * 4
+                shoot.y - shoot.vy * f * 4,
               );
               shootG.lineTo(
                 shoot.x - shoot.vx * (f + 1 / steps) * 4,
-                shoot.y - shoot.vy * (f + 1 / steps) * 4
+                shoot.y - shoot.vy * (f + 1 / steps) * 4,
               );
             }
             shootG.beginFill(0xffffff, fade);
@@ -4315,7 +4372,7 @@
                 vx: 7 + Math.random() * 4,
                 vy: 2.4 + Math.random() * 2,
                 life: 0.9,
-                dur: 0.9
+                dur: 0.9,
               };
           }
         }
@@ -4336,7 +4393,7 @@
                 gl.x + Math.sin(y * 0.5 + t * 1.6 + gl.ph) * (2 + d * 7) - 3,
                 y,
                 6,
-                2
+                2,
               );
               glit.endFill();
             }
@@ -4373,7 +4430,7 @@
             for (let x = VW; x >= 0; x -= 30)
               glit.lineTo(
                 x,
-                by + 18 + Math.sin(x * 0.017 + t * 1.4 + b + 1) * 6
+                by + 18 + Math.sin(x * 0.017 + t * 1.4 + b + 1) * 6,
               );
             glit.closePath();
             glit.endFill();
@@ -4391,7 +4448,7 @@
             for (let x = 0; x <= VW; x += 24)
               glit.lineTo(
                 x,
-                wy + Math.sin(x * 0.03 + t * 3 + i) * (1.4 + chop * 4)
+                wy + Math.sin(x * 0.03 + t * 3 + i) * (1.4 + chop * 4),
               );
           }
           glit.lineStyle(0);
@@ -4472,7 +4529,7 @@
           if (deer.strike > 0) {
             deer.strike -= dt / 60;
             const lunge = Math.sin(
-              Math.max(0, Math.min(1, 1 - deer.strike / STRIKE)) * Math.PI
+              Math.max(0, Math.min(1, 1 - deer.strike / STRIKE)) * Math.PI,
             ); // 0 -> 1 -> 0
             deer.rotation = deer.dir * lunge * 0.7; // the head stabs down and forward
             deer.y = 602 + lunge * 16;
@@ -4485,7 +4542,7 @@
                   x: deer.x + deer.dir * 60,
                   y: 604,
                   r: 5,
-                  life: 1
+                  life: 1,
                 }); // the splash
             }
           } else if (raining) {
@@ -4506,8 +4563,8 @@
                   140,
                   Math.min(
                     VW - 140,
-                    deer.x + deer.dir * (50 + Math.random() * 70)
-                  )
+                    deer.x + deer.dir * (50 + Math.random() * 70),
+                  ),
                 );
                 deer.fishTmr = 3 + Math.random() * 3;
               } else deer.strike = STRIKE;
@@ -4534,7 +4591,7 @@
                 d.scale.x = d.mum.dir * Math.abs(d.scale.x); // face the way mum faces
                 d.y = groundY(d.x) + 8;
               }
-              dropTrack(d, 'deer', 24);
+              dropTrack(d, "deer", 24);
               continue;
             }
             if (raining) {
@@ -4542,17 +4599,17 @@
               d.y = groundY(d.x) + 8;
             } else {
               d.timer -= dt / 60;
-              if (!d.graze) d.mode = 'walk';
-              if (d.mode === 'walk') {
+              if (!d.graze) d.mode = "walk";
+              if (d.mode === "walk") {
                 d.x += d.dir * (d.spd ?? 0.35) * dt;
                 if (multi && !d.playing) d.play();
                 if (d.graze && d.timer < 0) {
-                  d.mode = 'graze';
+                  d.mode = "graze";
                   d.timer = 2.5 + Math.random() * 3;
                   if (multi) d.gotoAndStop(0);
                 }
               } else if (d.timer < 0) {
-                d.mode = 'walk';
+                d.mode = "walk";
                 d.timer = 5 + Math.random() * 6;
                 // after a graze it often wanders off a new way rather than always plodding onward
                 if (Math.random() < 0.4) {
@@ -4565,9 +4622,9 @@
               d.y =
                 groundY(d.x) +
                 8 +
-                (d.mode === 'walk' ? Math.abs(Math.sin(t * 4 + d.x)) * -2 : 0);
+                (d.mode === "walk" ? Math.abs(Math.sin(t * 4 + d.x)) * -2 : 0);
             }
-            dropTrack(d, 'deer', 30);
+            dropTrack(d, "deer", 30);
           }
         }
 
@@ -4577,7 +4634,7 @@
           if (fox.visible !== false) {
             fox.x += fox.dir * (fox.spd ?? 1.5) * dt;
             fox.y = groundY(fox.x) + 6 + Math.abs(Math.sin(t * 7)) * -2;
-            dropTrack(fox, 'fox', 18);
+            dropTrack(fox, "fox", 18);
             if (fox.dir > 0 ? fox.x > VW + 80 : fox.x < -80) {
               fox.visible = false;
               foxTimer = 8 + Math.random() * 10;
@@ -4641,7 +4698,7 @@
             // ride the land contour at the rabbit's current spot, then add the hop on top — it was
             // holding its start-of-scene ground height, so fleeing uphill flung it into the hills
             rabbit.y = groundY(rabbit.x) + 6 - hop * (flee ? 30 : 24);
-            dropTrack(rabbit, 'rabbit', 26);
+            dropTrack(rabbit, "rabbit", 26);
             if (rabbit.hopT < 0) {
               rabbit.hopT = flee
                 ? 0.12 + Math.random() * 0.18 // panicked, rapid hops
@@ -4682,12 +4739,12 @@
               continue;
             }
             tracksG.beginFill(0x7e98bc, 0.5 * Math.min(1, tr.life));
-            if (tr.kind === 'deer') {
+            if (tr.kind === "deer") {
               tracksG.drawEllipse(tr.x - 3, tr.y, 2.3, 1.5); // cloven pair
               tracksG.drawEllipse(tr.x + 3, tr.y, 2.3, 1.5);
-            } else if (tr.kind === 'fox') {
+            } else if (tr.kind === "fox") {
               tracksG.drawEllipse(tr.x, tr.y, 2, 1.5); // a neat single pad
-            } else if (tr.kind === 'paw') {
+            } else if (tr.kind === "paw") {
               tracksG.drawEllipse(tr.x - 2, tr.y, 1.4, 2); // penguin's two little webbed feet
               tracksG.drawEllipse(tr.x + 2, tr.y, 1.4, 2);
             } else {
@@ -4760,7 +4817,7 @@
               x: d.x - (d.vx < 0 ? -1 : 1) * 14,
               y: d.baseY + 9,
               r: 4,
-              life: 1 - ice * 0.5
+              life: 1 - ice * 0.5,
             });
             d.rip = (0.8 + Math.random() * 0.6) * (1 + ice * 1.6); // wakes come slower through slush
           } else if (d.rip < 0) d.rip = 0.5;
@@ -4803,9 +4860,9 @@
                 clear; // nose tips up rising, down on re-entry
               if (water) {
                 if (py >= 600 && f.y < 600)
-                  ripples.push({x: f.x, y: 602, r: 4, life: 0.9}); // surface break on the way up
+                  ripples.push({ x: f.x, y: 602, r: 4, life: 0.9 }); // surface break on the way up
                 if (py < 600 && f.y >= 600)
-                  ripples.push({x: f.x, y: 602, r: 6, life: 1}); // bigger splash on re-entry
+                  ripples.push({ x: f.x, y: 602, r: 6, life: 1 }); // bigger splash on re-entry
               }
               if (f.jump >= 1) {
                 f.jump = 0;
@@ -4828,7 +4885,7 @@
                 f.jump = 0.0001; // launch a leap
                 f.apexY = 600 - (40 + Math.random() * 34);
               } else {
-                if (water) ripples.push({x: f.x, y: 606, r: 3, life: 0.85}); // a quiet rise that just rings the surface
+                if (water) ripples.push({ x: f.x, y: 606, r: 3, life: 0.85 }); // a quiet rise that just rings the surface
                 f.next = 5 + Math.random() * 8;
               }
             }
@@ -4838,27 +4895,27 @@
         if (whale) {
           whale.tmr -= dt / 60;
           const cruise = whale.baseY - 12;
-          if (whale.state === 'rest') {
+          if (whale.state === "rest") {
             whale.alpha = Math.max(0, whale.alpha - 0.06 * dt);
             whale.fluke.alpha = Math.max(0, whale.fluke.alpha - 0.06 * dt);
             if (whale.tmr <= 0) {
               whale.x = 150 + Math.random() * (VW - 300);
               whale.dir = Math.random() < 0.5 ? -1 : 1;
               whale.scale.x = whale.dir * Math.abs(whale.scale.x);
-              whale.state = 'rise';
+              whale.state = "rise";
               whale.tmr = 1.2;
             }
-          } else if (whale.state === 'rise') {
+          } else if (whale.state === "rise") {
             whale.alpha = Math.min(1, whale.alpha + 0.05 * dt);
             whale.y = whale.baseY - (1 - Math.max(0, whale.tmr) / 1.2) * 12; // eases up to break the surface
             whale.x += whale.dir * 0.1 * dt;
             if (whale.tmr <= 0) {
-              whale.state = 'blow';
+              whale.state = "blow";
               whale.tmr = 0.05;
               whale.blows = 1 + (Math.random() < 0.5 ? 1 : 0);
               whale.blowGap = 0;
             }
-          } else if (whale.state === 'blow') {
+          } else if (whale.state === "blow") {
             whale.y = cruise;
             whale.x += whale.dir * 0.1 * dt;
             whale.blowGap -= dt / 60;
@@ -4873,23 +4930,23 @@
                   vx: (Math.random() - 0.5) * 0.5 + whale.dir * 0.1,
                   vy: -(1.6 + Math.random() * 1.3),
                   r: 1.5 + Math.random() * 2.6,
-                  life: 0.9 + Math.random() * 0.5
+                  life: 0.9 + Math.random() * 0.5,
                 });
               whale.blows--;
               whale.blowGap = 0.9;
             }
             if (whale.tmr <= 0 && whale.blows <= 0) {
-              whale.state = 'hold';
+              whale.state = "hold";
               whale.tmr = 2.5 + Math.random() * 2.5;
             }
-          } else if (whale.state === 'hold') {
+          } else if (whale.state === "hold") {
             whale.y = cruise;
             whale.x += whale.dir * 0.09 * dt;
             if (whale.tmr <= 0) {
-              whale.state = 'sound';
+              whale.state = "sound";
               whale.tmr = 1.5;
             }
-          } else if (whale.state === 'sound') {
+          } else if (whale.state === "sound") {
             const k = Math.max(0, whale.tmr) / 1.5; // 1 -> 0 over the dive
             whale.alpha = k; // the back slides under
             whale.y = whale.baseY - 12 * k;
@@ -4899,7 +4956,7 @@
             whale.fluke.y = whale.baseY - fk * 22;
             whale.fluke.alpha = fk;
             if (whale.tmr <= 0) {
-              whale.state = 'rest';
+              whale.state = "rest";
               whale.alpha = whale.fluke.alpha = 0;
               whale.tmr = 7 + Math.random() * 9;
             }
@@ -4954,9 +5011,9 @@
             d.scale.x = d.dir * d.baseSc;
             if (water) {
               if (py >= 600 && d.y < 600)
-                ripples.push({x: d.x, y: 602, r: 6, life: 0.9});
+                ripples.push({ x: d.x, y: 602, r: 6, life: 0.9 });
               if (py < 600 && d.y >= 600)
-                ripples.push({x: d.x, y: 602, r: 9, life: 1});
+                ripples.push({ x: d.x, y: 602, r: 9, life: 1 });
             }
             if (d.leap >= 1) {
               d.leap = 0;
@@ -4996,6 +5053,31 @@
             (marmot.baseSc < 0 ? -1 : 1) * Math.abs(marmot.baseSc);
           marmot.scale.y = Math.abs(marmot.baseSc) * (1 - marmot.duck * 0.55);
           marmot.alpha = 1 - marmot.duck * 0.5;
+        }
+        // a squirrel forages the clearing: sits and nibbles with a little body-bob, then
+        // scampers in quick low hops to a new spot — never the same beat twice
+        if (squirrel) {
+          squirrel.tmr -= dt / 60;
+          if (squirrel.mode === "sit") {
+            squirrel.y = groundY(squirrel.x) + 6 + Math.sin(t * 5) * 0.7; // nibbling bob
+            squirrel.rotation = Math.sin(t * 3.3) * 0.05;
+            if (squirrel.tmr < 0) {
+              squirrel.mode = "run";
+              squirrel.tx = 110 + Math.random() * (VW - 220); // a fresh foraging spot
+              squirrel.dir = squirrel.tx > squirrel.x ? 1 : -1;
+              squirrel.scale.x = squirrel.dir * squirrel.baseSc;
+            }
+          } else {
+            const dx = squirrel.tx - squirrel.x;
+            squirrel.x += Math.sign(dx) * Math.min(Math.abs(dx), 3.2 * dt);
+            squirrel.rotation = 0;
+            squirrel.y =
+              groundY(squirrel.x) + 6 - Math.abs(Math.sin(t * 17)) * 7; // scurrying hops
+            if (Math.abs(dx) < 4) {
+              squirrel.mode = "sit";
+              squirrel.tmr = 2 + Math.random() * 5;
+            }
+          }
         }
         // the roadrunner dashes across the canyon floor, stopping now and then to look about —
         // but bolts flat-out away from the coyote (the critter) when it ventures close
@@ -5050,7 +5132,7 @@
             p.rotation = p.dir * p.lie * 1.5; // tips onto its belly
             p.y = groundY(p.x) + 6 + p.lie * 8;
             p.scale.x = p.dir * p.baseSc;
-            dropTrack(p, 'paw', 16);
+            dropTrack(p, "paw", 16);
             continue;
           }
           p.rotation = 0;
@@ -5075,7 +5157,7 @@
           }
           p.y = groundY(p.x) + 6;
           p.scale.x = p.dir * p.baseSc;
-          dropTrack(p, 'paw', 26); // little prints in the settled snow
+          dropTrack(p, "paw", 26); // little prints in the settled snow
         }
         // reef bubbles stream up from their vents, wobbling, fading out near the surface
         for (const b of bubbles) {
@@ -5139,7 +5221,7 @@
                 if (dp.dropY >= 604) {
                   dp.dropY = null;
                   dp.t = 2 + Math.random() * 3 + (wet > 0.3 ? 0 : 2.5);
-                  ripples.push({x: dp.x, y: 607, r: 3, life: 1});
+                  ripples.push({ x: dp.x, y: 607, r: 3, life: 1 });
                 } else {
                   rippleG.beginFill(0xafe0ee, 0.8);
                   rippleG.drawEllipse(dp.x, dp.dropY, 1.5, 4.5);
@@ -5159,7 +5241,7 @@
                 r: 0.6,
                 life: 0.5,
                 gr: 0.22, // grow slowly so each dimple stays small
-                as: 0.62 // but read a touch brighter than a wake ring
+                as: 0.62, // but read a touch brighter than a wake ring
               });
               nd -= 1;
             }
@@ -5184,7 +5266,7 @@
             x: BI.waterfall.plungeX + (Math.random() - 0.5) * 20,
             y: 606,
             r: 3,
-            life: 1
+            life: 1,
           });
 
         // butterflies, dragonflies, bird — wandering / crossing
@@ -5291,7 +5373,7 @@
               f.landing = true;
               f.tx = Math.max(
                 40,
-                Math.min(VW - 40, f.x + (Math.random() - 0.5) * 140)
+                Math.min(VW - 40, f.x + (Math.random() - 0.5) * 140),
               );
               f.ty = groundY(f.tx) - 2;
               continue;
@@ -5381,7 +5463,7 @@
           }
           const f = Math.max(
             0,
-            Math.min(1, (558 - g.y) / 60, (g.y - 372) / 80)
+            Math.min(1, (558 - g.y) / 60, (g.y - 372) / 80),
           );
           g.alpha = 0.45 * f * (0.7 + 0.3 * Math.sin(t * 2 + g.ph));
         }
@@ -5415,7 +5497,7 @@
             lp.y = lp.baseY + bob - hop * 14;
             if (lp.hopT < 0) {
               if (water)
-                ripples.push({x: lp.x, y: lp.baseY + 8, r: 4, life: 1});
+                ripples.push({ x: lp.x, y: lp.baseY + 8, r: 4, life: 1 });
               lp.hopT = 2.5 + Math.random() * 4;
             }
           } else lp.y = lp.baseY + bob;
@@ -5504,126 +5586,126 @@
       });
 
       PIXI.Assets.load(
-        NAMES.map((n) => ({alias: n, src: `grove/assets/${n}.png`}))
+        NAMES.map((n) => ({ alias: n, src: `grove/assets/${n}.png` })),
       )
         .then(build)
-        .catch((e) => console.error('Grove load failed:', e));
+        .catch((e) => console.error("Grove load failed:", e));
 
       // ---- control panel (revealed by the ✦ wallpaper toggle) ----
       const TLIST = [
-        ['auto', 'Auto'],
-        ['dawn', 'Dawn'],
-        ['day', 'Day'],
-        ['dusk', 'Dusk'],
-        ['night', 'Night']
+        ["auto", "Auto"],
+        ["dawn", "Dawn"],
+        ["day", "Day"],
+        ["dusk", "Dusk"],
+        ["night", "Night"],
       ];
       const SLIST = [
-        ['auto', 'Auto'],
-        ['spring', 'Spring'],
-        ['summer', 'Summer'],
-        ['autumn', 'Autumn'],
-        ['winter', 'Winter']
+        ["auto", "Auto"],
+        ["spring", "Spring"],
+        ["summer", "Summer"],
+        ["autumn", "Autumn"],
+        ["winter", "Winter"],
       ];
-      const uiBiome = document.getElementById('uiBiome'),
-        uiTime = document.getElementById('uiTime'),
-        uiSeason = document.getElementById('uiSeason');
+      const uiBiome = document.getElementById("uiBiome"),
+        uiTime = document.getElementById("uiTime"),
+        uiSeason = document.getElementById("uiSeason");
       const mkBtn = (label, on, fn) => {
-        const b = document.createElement('button');
+        const b = document.createElement("button");
         b.textContent = label;
-        if (on) b.className = 'on';
-        b.addEventListener('click', fn);
+        if (on) b.className = "on";
+        b.addEventListener("click", fn);
         return b;
       };
       const lbl = (text, row) => {
-        const s = document.createElement('span');
-        s.className = 'lbl';
+        const s = document.createElement("span");
+        s.className = "lbl";
         s.textContent = text;
         row.appendChild(s);
       };
       function buildUI() {
-        uiBiome.textContent = '';
-        uiTime.textContent = '';
-        uiSeason.textContent = '';
+        uiBiome.textContent = "";
+        uiTime.textContent = "";
+        uiSeason.textContent = "";
         Object.entries(BIOMES).forEach(([k, v]) =>
           uiBiome.appendChild(
             mkBtn(v.label, k === biomeMode, () => {
               biomeMode = k;
-              LS('biome', k);
+              LS("biome", k);
               if (ready) build();
               buildUI();
-            })
-          )
+            }),
+          ),
         );
-        lbl('time', uiTime);
+        lbl("time", uiTime);
         TLIST.forEach(([k, l]) =>
           uiTime.appendChild(
             mkBtn(l, k === timeMode, () => {
               timeMode = k;
-              LS('time', k);
+              LS("time", k);
               lastSkyH = -99;
               buildUI();
-            })
-          )
+            }),
+          ),
         );
-        lbl('season', uiSeason);
+        lbl("season", uiSeason);
         SLIST.forEach(([k, l]) =>
           uiSeason.appendChild(
             mkBtn(l, k === seasonMode, () => {
               seasonMode = k;
-              LS('season', k);
+              LS("season", k);
               if (ready) build();
               buildUI();
-            })
-          )
+            }),
+          ),
         );
         const WLBL = {
-          auto: '⛅ Weather: Auto',
-          rain: '🌧 Weather: Rain',
-          clear: '☀️ Weather: Clear'
+          auto: "⛅ Weather: Auto",
+          rain: "🌧 Weather: Rain",
+          clear: "☀️ Weather: Clear",
         };
-        const WNEXT = {auto: 'rain', rain: 'clear', clear: 'auto'};
+        const WNEXT = { auto: "rain", rain: "clear", clear: "auto" };
         uiSeason.appendChild(
-          mkBtn(WLBL[weatherMode], weatherMode !== 'auto', () => {
+          mkBtn(WLBL[weatherMode], weatherMode !== "auto", () => {
             weatherMode = WNEXT[weatherMode];
-            LS('weather', weatherMode);
-            if (weatherMode === 'auto') {
-              frontState = 'clear';
+            LS("weather", weatherMode);
+            if (weatherMode === "auto") {
+              frontState = "clear";
               frontT = 30 + Math.random() * 60;
             }
             buildUI();
-          })
+          }),
         );
         uiSeason.appendChild(
-          mkBtn(soundOn ? '🔊 Sound: On' : '🔇 Sound: Off', soundOn, () => {
+          mkBtn(soundOn ? "🔊 Sound: On" : "🔇 Sound: Off", soundOn, () => {
             soundOn = !soundOn;
-            LS('sound', soundOn ? '1' : '0');
+            LS("sound", soundOn ? "1" : "0");
             // the click is the user gesture autoplay policies need: create + resume here
             if (soundOn) {
               initAudio();
               if (audio) audio.ctx.resume().catch(() => {});
             }
             buildUI();
-          })
+          }),
         );
         uiSeason.appendChild(
-          mkBtn('🎲 Surprise', false, () =>
-            startJourney(nextJourneyBiome(true))
-          )
+          mkBtn("🎲 Surprise", false, () =>
+            startJourney(nextJourneyBiome(true)),
+          ),
         ); // jump to a random biome
         uiSeason.appendChild(
           mkBtn(
-            journeyOn ? '🧭 Journey: On' : '🧭 Journey: Off',
+            journeyOn ? "🧭 Journey: On" : "🧭 Journey: Off",
             journeyOn,
             () => {
               journeyOn = !journeyOn;
-              LS('journey', journeyOn ? '1' : '0');
+              LS("journey", journeyOn ? "1" : "0");
               journeyTimer = JOURNEY_PERIOD; // don't fire immediately on toggle
               buildUI();
-            }
-          )
+            },
+          ),
         ); // slowly auto-cycle through the biomes
         uiSeason.appendChild(
-          mkBtn('✕ Hide options', false, () => setMode('bare'))
+          mkBtn("✕ Hide options", false, () => setMode("bare")),
         ); // drop to a clean wallpaper; the ✦ toggle brings the controls back
       }
       buildUI();
@@ -5633,42 +5715,42 @@
       // controls panel is up | 'bare' = a clean wallpaper (controls hidden, but the host keeps the
       // iframe forward, covering the page). 'Hide options' goes to 'bare'; the ✦ toggle brings the
       // controls back.
-      let wpMode = 'hidden';
-      const uiPanel = document.getElementById('ui');
+      let wpMode = "hidden";
+      const uiPanel = document.getElementById("ui");
       function setMode(m) {
         wpMode = m;
-        document.body.classList.toggle('shown', m === 'shown'); // the panel shows only in 'shown'
+        document.body.classList.toggle("shown", m === "shown"); // the panel shows only in 'shown'
         // expose the controls to assistive tech only while they're actually on screen
-        uiPanel.setAttribute('aria-hidden', m === 'shown' ? 'false' : 'true');
+        uiPanel.setAttribute("aria-hidden", m === "shown" ? "false" : "true");
         window.parent.postMessage(
-          {type: 'shaderwall', state: m},
-          location.origin
+          { type: "shaderwall", state: m },
+          location.origin,
         );
       }
-      addEventListener('message', (e) => {
+      addEventListener("message", (e) => {
         if (e.origin != location.origin) return;
         const d = e.data || {};
-        if (d.type === 'wallpaper-pointer') {
+        if (d.type === "wallpaper-pointer") {
           parTX = (d.x - 0.5) * 2;
           parTY = (d.y - 0.5) * 2;
           return;
         }
-        if (d.type !== 'shaderwall') return;
-        if (d.action === 'show') setMode('shown');
-        else if (d.action === 'hide') setMode('hidden');
+        if (d.type !== "shaderwall") return;
+        if (d.action === "show") setMode("shown");
+        else if (d.action === "hide") setMode("hidden");
         // the ✦ toggle: from the controls drop back to the page; from the page (or a bare
         // wallpaper) bring the controls up
-        else if (d.action === 'toggle')
-          setMode(wpMode === 'shown' ? 'hidden' : 'shown');
+        else if (d.action === "toggle")
+          setMode(wpMode === "shown" ? "hidden" : "shown");
       });
-      addEventListener('keydown', (e) => {
-        if (e.key === 'h' || e.key === 'H')
-          setMode(wpMode === 'shown' ? 'hidden' : 'shown');
+      addEventListener("keydown", (e) => {
+        if (e.key === "h" || e.key === "H")
+          setMode(wpMode === "shown" ? "hidden" : "shown");
       });
-      document.addEventListener('visibilitychange', () => {
+      document.addEventListener("visibilitychange", () => {
         document.hidden ? app.ticker.stop() : app.ticker.start();
       });
-      setMode('hidden');
+      setMode("hidden");
     </script>
   </body>
 </html>
