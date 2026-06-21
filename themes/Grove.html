@@ -427,7 +427,10 @@
           graze: false,
           critter: ['lizard', 'lizard_b'], // a different basking lizard each visit
           critterScale: 0.5,
+          diurnalCritter: true, // the lizard basks by day and hides after dark
+          nightCritter: 'fennec', // a fennec fox forages the cool night sand
           beetle: true, // a beetle scuttles the sand
+          scorpion: true, // …a scorpion takes over the scuttle at night
           hopper: null,
           flyer: 0x4a4036,
           soar: {
@@ -904,6 +907,7 @@
           flyerFrames: ['vulture'],
           roadrunner: true,
           beetle: true, // a beetle scuttles the red rock
+          scorpion: true, // …a scorpion after dark
           flutter: false,
           roller: null
         },
@@ -1084,6 +1088,8 @@
         'moth_a',
         'moth_b',
         'hedgehog',
+        'fennec',
+        'scorpion',
         'grass',
         'flower_p',
         'flower_w',
@@ -1648,6 +1654,7 @@
         salamander,
         olm,
         hedgehog,
+        fennec,
         seal,
         roadrunner,
         whale,
@@ -1718,6 +1725,7 @@
           salamander =
           olm =
           hedgehog =
+          fennec =
             null;
         whale = spoutG = surfG = cloudSeaG = cloudGlow = choughHub = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
@@ -2992,7 +3000,11 @@
         } else deer = null;
         // the critter and hopper each sit out some visits, so the cast isn't always the full set
         // (with the herd already able to be empty, that gives quiet scenes through to a busy one)
-        if (BI.critter && Math.random() > 0.3) {
+        if (
+          BI.critter &&
+          !(BI.diurnalCritter && buildNight > 0.5) && // cold-blooded basker hides after dark
+          Math.random() > 0.3
+        ) {
           const cr = Array.isArray(BI.critter)
             ? BI.critter[(Math.random() * BI.critter.length) | 0]
             : BI.critter; // pick the species for this visit
@@ -3077,13 +3089,15 @@
           scene.addChild(songbird);
         } else songbird = null;
         if (BI.beetle && Math.random() < 0.7) {
-          // a beetle scuttles the ground, pausing to forage and turning back at the edges
+          // a beetle scuttles the ground, pausing to forage and turning back at the edges — but in
+          // the desert and canyon a scorpion takes the night shift
+          const scorp = BI.scorpion && buildNight > 0.5;
           const bx = 120 + Math.random() * (VW - 240);
           beetle = spr(
-            'beetle',
+            scorp ? 'scorpion' : 'beetle',
             bx,
             groundY(bx) + 4,
-            0.2 + Math.random() * 0.08
+            scorp ? 0.3 + Math.random() * 0.1 : 0.2 + Math.random() * 0.08
           );
           beetle.baseSc = Math.abs(beetle.scale.x);
           beetle.dir = Math.random() < 0.5 ? 1 : -1;
@@ -3149,6 +3163,27 @@
           hedgehog.pauseT = Math.random() * 2;
           scene.addChild(hedgehog);
         } else hedgehog = null;
+        if (
+          BI.nightCritter === 'fennec' &&
+          buildNight > 0.5 &&
+          Math.random() < 0.75
+        ) {
+          // a fennec fox forages the cool sand: ears up and listening, then a light trot to a new spot
+          const fnx = 200 + Math.random() * (VW - 400);
+          fennec = spr(
+            'fennec',
+            fnx,
+            groundY(fnx) + 6,
+            0.34 + Math.random() * 0.1
+          );
+          fennec.baseSc = Math.abs(fennec.scale.x);
+          fennec.dir = Math.random() < 0.5 ? 1 : -1;
+          fennec.scale.x = fennec.dir * fennec.baseSc;
+          fennec.mode = 'listen'; // listen (still, ears alert) → trot (to tx) → listen
+          fennec.tmr = 2 + Math.random() * 4;
+          fennec.tx = fnx;
+          scene.addChild(fennec);
+        } else fennec = null;
         if (BI.penguins) {
           // a little colony waddles the snowfield: each penguin ambles at its own pace, some just stand
           for (let i = 0; i < BI.penguins; i++) {
@@ -5523,6 +5558,28 @@
             else if (Math.random() < 0.004 * dt) {
               hedgehog.dir = -hedgehog.dir;
               hedgehog.scale.x = hedgehog.dir * hedgehog.baseSc;
+            }
+          }
+        }
+        // a fennec fox forages the night sand: it stops to listen with those big ears, then trots
+        // on to a fresh spot — never the same round twice
+        if (fennec) {
+          fennec.tmr -= dt / 60;
+          if (fennec.mode === 'listen') {
+            fennec.y = groundY(fennec.x) + 6 + Math.sin(t * 2.5) * 0.4; // still, a slight sway
+            if (fennec.tmr < 0) {
+              fennec.mode = 'trot';
+              fennec.tx = 120 + Math.random() * (VW - 240);
+              fennec.dir = fennec.tx > fennec.x ? 1 : -1;
+              fennec.scale.x = fennec.dir * fennec.baseSc;
+            }
+          } else {
+            const dx = fennec.tx - fennec.x;
+            fennec.x += Math.sign(dx) * Math.min(Math.abs(dx), 2.2 * dt);
+            fennec.y = groundY(fennec.x) + 6 + Math.abs(Math.sin(t * 8)) * -1.5; // a light trot
+            if (Math.abs(dx) < 5) {
+              fennec.mode = 'listen';
+              fennec.tmr = 2.5 + Math.random() * 5;
             }
           }
         }

@@ -2297,16 +2297,60 @@ save(
   84
 );
 
+// ======== a fennec fox — pale, with enormous ears, forages the desert at night (faces right) ========
+save(
+  'fennec',
+  S(
+    '156 132',
+    `<defs><linearGradient id="fn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2dfb8"/><stop offset="1" stop-color="#d6b885"/></linearGradient></defs>
+<path d="M44,86 C12,84 4,52 22,42 C28,60 38,74 58,84 Z" fill="url(#fn)"/>
+<path d="M26,48 C12,52 10,66 20,72 C19,60 21,52 28,50 Z" fill="#9a7e54"/>
+<g stroke="#caa873" stroke-width="7" stroke-linecap="round"><line x1="64" y1="90" x2="62" y2="120"/><line x1="84" y1="92" x2="84" y2="122"/><line x1="104" y1="92" x2="106" y2="122"/><line x1="120" y1="90" x2="124" y2="118"/></g>
+<path d="M48,86 C44,62 70,54 96,55 C120,56 134,62 136,76 C138,90 116,96 92,95 C66,94 54,94 48,86 Z" fill="url(#fn)"/>
+<path d="M62,92 C86,97 114,95 134,84 C116,98 78,100 62,93 Z" fill="#fbf2dd" opacity="0.9"/>
+<path d="M110,52 C100,24 96,8 106,8 C116,12 120,38 122,56 Z" fill="url(#fn)"/>
+<path d="M134,54 C140,26 150,12 154,18 C156,26 144,46 136,60 Z" fill="url(#fn)"/>
+<path d="M109,48 C104,30 102,18 107,16" stroke="#e6b69a" stroke-width="3.5" fill="none"/>
+<path d="M136,52 C140,32 145,22 149,22" stroke="#e6b69a" stroke-width="3.5" fill="none"/>
+<circle cx="124" cy="66" r="16" fill="url(#fn)"/>
+<path d="M138,68 C148,66 154,70 149,75 C144,78 138,75 136,71 Z" fill="url(#fn)"/>
+<path d="M149,71 l5,2.2 l-5,2.2 Z" fill="#3a2a1a"/>
+<circle cx="126" cy="63" r="2.7" fill="#1a120a"/><circle cx="127" cy="62" r="0.8" fill="#fff"/>`
+  ),
+  150
+);
+
+// ======== a scorpion — scuttles the night sand, tail arched over its back (faces right) ========
+save(
+  'scorpion',
+  S(
+    '94 64',
+    `<defs><linearGradient id="sco" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#caa05e"/><stop offset="1" stop-color="#946a38"/></linearGradient></defs>
+<g stroke="#7a5630" stroke-width="2.3" stroke-linecap="round" fill="none"><path d="M30,44 L20,56"/><path d="M37,45 L30,58"/><path d="M44,45 L40,58"/><path d="M50,45 L52,58"/><path d="M40,40 L33,30"/><path d="M47,40 L44,28"/></g>
+<ellipse cx="30" cy="42" rx="7" ry="5" fill="url(#sco)"/>
+<ellipse cx="40" cy="43" rx="6.5" ry="5.5" fill="url(#sco)"/>
+<ellipse cx="50" cy="42" rx="7.5" ry="6" fill="url(#sco)"/>
+<g stroke="url(#sco)" stroke-width="4.5" fill="none" stroke-linecap="round"><path d="M58,40 C66,36 72,38 75,43"/></g>
+<path d="M73,38 C82,35 86,40 82,45 C80,42 76,42 74,44 Z" fill="url(#sco)"/>
+<path d="M75,44 C84,44 88,48 84,52 C82,49 78,49 75,50 Z" fill="#a87a44"/>
+<g stroke="url(#sco)" stroke-width="5.5" fill="none" stroke-linecap="round"><path d="M24,40 C12,38 8,28 12,20 C15,13 23,13 26,19"/></g>
+<g fill="#7a5630"><path d="M22,15 l-4,-5 l6,0 Z"/></g>
+<ellipse cx="26" cy="20" rx="4" ry="3.5" fill="#a87a44"/>
+<circle cx="52" cy="40" r="1.3" fill="#2a1c10"/>`
+  ),
+  84
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'moth_a',
-  'moth_b',
-  'butterfly_a',
-  'hedgehog',
-  'owl_a',
+  'fennec',
   'fox',
-  'rabbit',
-  'squirrel'
+  'scorpion',
+  'beetle',
+  'lizard',
+  'hedgehog',
+  'moth_a',
+  'owl_a'
 ];
 const cols = 4,
   cell = 230,
