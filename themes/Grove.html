@@ -356,6 +356,7 @@
             ['oak', 1.1, 900],
             ['bush', 1, 1150]
           ],
+          treeExtras: ['birch', 'fir', 'poplar'], // mixed into the stand by the variety system
           water: {
             top: '#5fa7ca',
             bot: '#2f6f93',
@@ -929,6 +930,7 @@
             ['oak', 0.78, 150],
             ['pine', 0.7, 1120]
           ],
+          treeExtras: ['birch', 'fir'], // a few birches and firs among the glade's oaks and pines
           // luminous toadstool clusters [x, sprite, tint] that glow and pulse like the cave crystals
           mushrooms: [
             [120, 'mushroom_a', 0x6ff0c8],
@@ -985,9 +987,17 @@
         'oak_snow',
         'bush',
         'bush_snow',
+        'birch',
+        'fir',
+        'poplar',
         'grass',
         'flower_p',
         'flower_w',
+        'flower_y',
+        'flower_b',
+        'tulip',
+        'swallow_a',
+        'swallow_b',
         'cloud',
         'sun',
         'moon',
@@ -2107,9 +2117,14 @@
         // vary which trees fill a stand and how many, drawing only on the types this biome already
         // uses (so it stays in character): swap some slots, thin out or add the odd extra
         const treePool = [
-          ...new Set(
-            [...BI.mid, ...BI.near].map((e) => e[0]).filter((n) => !RIGID[n])
-          )
+          ...new Set([
+            ...[...BI.mid, ...BI.near]
+              .map((e) => e[0])
+              .filter((n) => !RIGID[n]),
+            // biome-appropriate extra species mixed in by the variety system — held back in snow,
+            // since the new trees have no snow overlay yet (the oaks/pines/bushes do)
+            ...(!snow && BI.treeExtras ? BI.treeExtras : [])
+          ])
         ];
         const varyLayer = (layer) => {
           if (!treePool.length || !layer.length) return layer.slice();
@@ -2217,11 +2232,22 @@
             scene.addChild(g);
             swayers.push({s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6});
           }
-          if (!snow)
+          if (!snow) {
+            // a meadow draws from a wider mix now — the round pink/white blooms plus daisies,
+            // a blue floret spike and tulips (pink/white still the most common)
+            const FL = [
+              'flower_p',
+              'flower_w',
+              'flower_p',
+              'flower_w',
+              'flower_y',
+              'flower_b',
+              'tulip'
+            ];
             for (let i = 0, n = 6 + ((Math.random() * 8) | 0); i < n; i++) {
               const x = 60 + Math.random() * (VW - 120),
                 f = spr(
-                  Math.random() < 0.5 ? 'flower_p' : 'flower_w',
+                  FL[(Math.random() * FL.length) | 0],
                   x,
                   groundY(x) + 8,
                   0.6 + Math.random() * 0.4
@@ -2229,6 +2255,7 @@
               scene.addChild(f);
               swayers.push({s: f, amp: 0.06, sp: 1.4, ph: Math.random() * 6});
             }
+          }
         } else if (BI.ground === 'sand') {
           for (let i = 0, _m = vc(16); i < _m; i++) {
             const x = 30 + Math.random() * (VW - 60);
@@ -3025,13 +3052,18 @@
         }
         if (BI.flutter && !snow)
           for (let i = 0, n = 2 + ((Math.random() * 5) | 0); i < n; i++) {
-            const f = anim(
-              ['butterfly_a', 'butterfly_b'],
-              Math.random() * VW,
-              500 + Math.random() * 70,
-              0.5,
-              0.18
-            );
+            // where a biome tints its butterflies (jungle morphos, blossom pinks) keep the plain
+            // round wing that tints cleanly; otherwise mix in the patterned swallowtail
+            const swallow = !BI.flutterTint && Math.random() < 0.5,
+              f = anim(
+                swallow
+                  ? ['swallow_a', 'swallow_b']
+                  : ['butterfly_a', 'butterfly_b'],
+                Math.random() * VW,
+                500 + Math.random() * 70,
+                swallow ? 0.42 : 0.5,
+                0.18
+              );
             if (BI.flutterTint) f.tint = BI.flutterTint; // jungle blue morphos / blossom pale-pink
             f.vx = (Math.random() - 0.5) * 1.2;
             f.vy = (Math.random() - 0.5) * 0.8;
@@ -3061,10 +3093,12 @@
         )
           for (let i = 0, n = 1 + ((Math.random() * 2) | 0); i < n; i++) {
             const f = anim(
-              ['butterfly_a', 'butterfly_b'],
+              Math.random() < 0.5
+                ? ['swallow_a', 'swallow_b']
+                : ['butterfly_a', 'butterfly_b'],
               Math.random() * VW,
               500 + Math.random() * 70,
-              0.45,
+              0.42,
               0.18
             );
             f.vx = (Math.random() - 0.5) * 1.2;
@@ -4852,6 +4886,7 @@
             if (Math.random() < 0.01 * dt) p.pause = 0.6 + Math.random() * 2;
             else if (Math.random() < 0.0016 * dt)
               p.tobog = 1.3 + Math.random() * 1.4; // flop down for a slide
+            else if (Math.random() < 0.006 * dt) p.dir = -p.dir; // turns about now and then — mills around the floe rather than pacing end to end
             if (p.x > VW - 120) p.dir = -1;
             else if (p.x < 120) p.dir = 1;
           }
