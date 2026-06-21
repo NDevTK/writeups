@@ -1916,7 +1916,16 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['termite_mound', 'baobab', 'aloe', 'acacia', 'squirrel', 'fawn_a', 'barrel_cactus', 'shell'];
+const review = [
+  'termite_mound',
+  'baobab',
+  'aloe',
+  'acacia',
+  'squirrel',
+  'fawn_a',
+  'barrel_cactus',
+  'shell'
+];
 const cols = 4,
   cell = 230,
   pad = 14,
