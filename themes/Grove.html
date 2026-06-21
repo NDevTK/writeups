@@ -1064,6 +1064,7 @@
         'snag',
         'shrub',
         'berrybush',
+        'fern',
         'poppy',
         'toadstool',
         'shroom',
@@ -2564,6 +2565,20 @@
               scene.addChild(f);
               swayers.push({s: f, amp: 0.06, sp: 1.4, ph: Math.random() * 6});
             }
+            // a fern or two tucked low in the grass
+            for (let i = 0, n = 1 + ((Math.random() * 2) | 0); i < n; i++) {
+              const x = 70 + Math.random() * (VW - 140),
+                fn = spr(
+                  'fern',
+                  x,
+                  groundY(x) + 9,
+                  0.46 + Math.random() * 0.34
+                );
+              fn.tint = tintJit(folTint, 0.08);
+              if (Math.random() < 0.5) fn.scale.x *= -1;
+              scene.addChild(fn);
+              swayers.push({s: fn, amp: 0.04, sp: 1.2, ph: Math.random() * 6});
+            }
           }
         } else if (BI.ground === 'sand') {
           for (let i = 0, _m = vc(16); i < _m; i++) {
@@ -2847,6 +2862,15 @@
             }
             scene.addChild(b);
             swayers.push({s: b, amp: 0.02, sp: 0.9, ph: Math.random() * 6});
+          }
+          // ferns nestle through the understory
+          for (let i = 0, _m = vc(5); i < _m; i++) {
+            const x = 30 + Math.random() * (VW - 60),
+              f = spr('fern', x, groundY(x) + 9, 0.5 + Math.random() * 0.4);
+            f.tint = tintJit(0xeaffea, 0.06);
+            if (Math.random() < 0.5) f.scale.x *= -1;
+            scene.addChild(f);
+            swayers.push({s: f, amp: 0.035, sp: 1.1, ph: Math.random() * 6});
           }
         } else if (BI.ground === 'basalt') {
           for (let i = 0, _m = vc(14); i < _m; i++) {

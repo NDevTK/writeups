@@ -1806,6 +1806,49 @@ save(
   140
 );
 
+// fern — an arching clump of feathery fronds for the woodland/jungle understory (procedural)
+const fernBody = (() => {
+  const frond = (cx, cy, deg, len, col) => {
+    const a = ((deg - 90) * Math.PI) / 180; // 0deg points straight up
+    const ex = cx + Math.cos(a) * len,
+      ey = cy + Math.sin(a) * len;
+    const perp = a + Math.PI / 2,
+      arch = len * 0.16;
+    const qx = cx + Math.cos(a) * len * 0.5 + Math.cos(perp) * arch,
+      qy = cy + Math.sin(a) * len * 0.5 + Math.sin(perp) * arch;
+    const r1 = (v) => v.toFixed(1);
+    let s = `<path d="M${r1(cx)},${r1(cy)} Q${r1(qx)},${r1(qy)} ${r1(ex)},${r1(ey)}" stroke="${col}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
+    const N = 9;
+    for (let i = 1; i <= N; i++) {
+      const t = i / (N + 1);
+      const px = (1 - t) * (1 - t) * cx + 2 * (1 - t) * t * qx + t * t * ex,
+        py = (1 - t) * (1 - t) * cy + 2 * (1 - t) * t * qy + t * t * ey;
+      const ll = (1 - t * 0.7) * len * 0.2 + 2; // leaflets taper toward the tip
+      const f1 = a + Math.PI / 2 - 0.7, // both sides, swept toward the tip
+        f2 = a - Math.PI / 2 + 0.7;
+      s += `<path d="M${r1(px)},${r1(py)} L${r1(px + Math.cos(f1) * ll)},${r1(py + Math.sin(f1) * ll)}" stroke="${col}" stroke-width="1.5" stroke-linecap="round"/>`;
+      s += `<path d="M${r1(px)},${r1(py)} L${r1(px + Math.cos(f2) * ll)},${r1(py + Math.sin(f2) * ll)}" stroke="${col}" stroke-width="1.5" stroke-linecap="round"/>`;
+    }
+    return s;
+  };
+  const cols = ['#56953e', '#67a64a', '#478034', '#5e9c42'];
+  const specs = [
+    [-50, 60],
+    [-30, 72],
+    [-12, 80],
+    [8, 80],
+    [26, 72],
+    [46, 60],
+    [-2, 58]
+  ];
+  let body = '';
+  specs.forEach((sp, i) => {
+    body += frond(70, 100, sp[0], sp[1], cols[i % cols.length]);
+  });
+  return body;
+})();
+save('fern', S('140 110', fernBody), 124);
+
 // poppy — broad red petals with a dark heart, a distinct bloom from the round flower
 save(
   'poppy',
@@ -2958,7 +3001,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['kingfisher', 'heron', 'robin', 'frog'];
+const review = ['fern', 'shrub', 'toadstool', 'berrybush'];
 const cols = 4,
   cell = 230,
   pad = 14,
