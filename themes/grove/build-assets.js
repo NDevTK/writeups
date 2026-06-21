@@ -115,6 +115,18 @@ save(
   150
 );
 
+// snow settled over the bush crown (overlaid as a child, same registration as 'bush')
+save(
+  'bush_snow',
+  S(
+    '178 86',
+    `
+<path fill="#e7eff9" d="M30,54 C34,36 48,30 60,34 C70,18 92,16 104,28 C116,20 132,30 138,50 C130,44 122,46 116,54 C108,42 96,44 88,54 C78,42 66,44 58,54 C48,44 38,46 30,54 Z"/>
+<path fill="#ffffff" opacity="0.8" d="M68,34 C80,22 98,24 106,34 C98,31 90,35 84,41 C78,33 73,33 68,34 Z"/>`
+  ),
+  150
+);
+
 save(
   'grass',
   S(
