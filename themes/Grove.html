@@ -1178,6 +1178,7 @@
         'deer_a',
         'deer_b',
         'lily',
+        'skater',
         'leaf',
         'leaf_m',
         'leaf_o',
@@ -1678,6 +1679,7 @@
         sandpipers = [],
         choughs = [],
         ghostCrabs = [],
+        skaters = [],
         hillBands = [];
       let sky,
         stars,
@@ -1783,6 +1785,7 @@
           sandpipers.length =
           choughs.length =
           ghostCrabs.length =
+          skaters.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
@@ -3707,6 +3710,34 @@
               d.hi = 690;
               flutters.push(d);
               scene.addChild(d);
+            }
+          }
+          if (
+            (BI.water.lily ||
+              BI.water.frogs ||
+              BI.water.ducks ||
+              BI.water.fishSprite) && // calm freshwater ponds only, never the open sea
+            !snow
+          ) {
+            // pond-skaters rest on the calm surface, then dart in quick bursts that ring the water
+            for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
+              const sx = 180 + Math.random() * (VW - 360);
+              const sk = spr(
+                'skater',
+                sx,
+                612 + Math.random() * 40,
+                0.3 + Math.random() * 0.12
+              );
+              sk.baseSc = Math.abs(sk.scale.x);
+              sk.dir = Math.random() < 0.5 ? 1 : -1;
+              sk.scale.x = sk.dir * sk.baseSc;
+              sk.baseY = sk.y;
+              sk.ph = Math.random() * 6.28;
+              sk.vx = 0;
+              sk.dartT = 0;
+              sk.pauseT = 0.4 + Math.random() * 2;
+              skaters.push(sk);
+              scene.addChild(sk);
             }
           }
           if (BI.water.sailboat) {
@@ -6330,6 +6361,38 @@
             life: 1
           });
 
+        // pond-skaters: sit still on the surface, then dart in quick bursts that ring the water
+        for (const sk of skaters) {
+          if (sk.dartT > 0) {
+            sk.dartT -= dt / 60;
+            sk.x += sk.vx * dt;
+            if (sk.x > VW - 120) {
+              sk.dir = -1;
+              sk.vx = -Math.abs(sk.vx);
+              sk.scale.x = -sk.baseSc;
+            } else if (sk.x < 120) {
+              sk.dir = 1;
+              sk.vx = Math.abs(sk.vx);
+              sk.scale.x = sk.baseSc;
+            }
+            if (water && Math.random() < 0.25 * dt)
+              ripples.push({x: sk.x, y: sk.baseY, r: 2, life: 0.5}); // wake dimples
+            if (sk.dartT <= 0) {
+              sk.vx = 0;
+              sk.pauseT = 0.6 + Math.random() * 2.4;
+              if (water) ripples.push({x: sk.x, y: sk.baseY, r: 3, life: 0.7});
+            }
+          } else {
+            sk.pauseT -= dt / 60;
+            sk.y = sk.baseY + Math.sin(t * 1.4 + sk.ph) * 0.5; // a tiny idle bob on the meniscus
+            if (sk.pauseT <= 0) {
+              sk.dir = Math.random() < 0.5 ? 1 : -1;
+              sk.scale.x = sk.dir * sk.baseSc;
+              sk.dartT = 0.16 + Math.random() * 0.22; // a short, quick skate
+              sk.vx = sk.dir * (4 + Math.random() * 4);
+            }
+          }
+        }
         // butterflies, dragonflies, bird — wandering / crossing
         for (const f of flutters) {
           if (f.isBat) {
