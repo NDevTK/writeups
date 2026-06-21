@@ -2476,14 +2476,49 @@ save(
   50
 );
 
+// ======== an aardvark — snuffles the night savanna for termites (faces right) ========
+save(
+  'aardvark',
+  S(
+    '164 112',
+    `<defs><linearGradient id="av" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cdac8a"/><stop offset="1" stop-color="#9a7e62"/></linearGradient></defs>
+<g stroke="#8a6e54" stroke-width="9" stroke-linecap="round"><line x1="54" y1="70" x2="52" y2="102"/><line x1="78" y1="74" x2="78" y2="104"/><line x1="104" y1="74" x2="106" y2="104"/><line x1="124" y1="70" x2="128" y2="100"/></g>
+<path d="M40,66 C16,66 6,82 13,92 C22,83 34,74 48,70 Z" fill="url(#av)"/>
+<path d="M40,70 C34,40 64,28 92,30 C122,32 142,44 144,62 C146,78 118,84 88,84 C58,84 48,84 40,70 Z" fill="url(#av)"/>
+<path d="M118,40 C114,16 117,6 123,9 C129,13 127,34 125,48 Z" fill="url(#av)"/>
+<path d="M130,40 C128,16 133,7 139,12 C144,18 137,35 133,49 Z" fill="url(#av)"/>
+<path d="M126,58 C134,44 148,40 156,48 C160,53 157,61 151,64 L162,72 L144,75 C137,76 130,71 126,64 Z" fill="url(#av)"/>
+<ellipse cx="159" cy="69" rx="3.4" ry="2.6" fill="#5a4636"/>
+<circle cx="134" cy="54" r="2" fill="#1a120a"/>`
+  ),
+  154
+);
+
+// ======== a ghost crab — pale, stalk-eyed, skitters the night beach sideways (top view) ========
+save(
+  'ghost_crab',
+  S(
+    '70 50',
+    `<defs><linearGradient id="gcr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2e8d2"/><stop offset="1" stop-color="#d4c2a0"/></linearGradient></defs>
+<g stroke="#c8b48c" stroke-width="2.6" stroke-linecap="round" fill="none"><path d="M25,32 L12,42"/><path d="M29,34 L18,46"/><path d="M41,34 L52,46"/><path d="M45,32 L58,42"/><path d="M25,29 L11,26"/><path d="M45,29 L59,26"/></g>
+<path d="M21,26 C13,23 8,27 13,32 C15,29 19,29 22,30 Z" fill="url(#gcr)"/>
+<path d="M49,26 C57,23 62,27 57,32 C55,29 51,29 48,30 Z" fill="url(#gcr)"/>
+<rect x="23" y="20" width="24" height="15" rx="6" fill="url(#gcr)"/>
+<ellipse cx="35" cy="24" rx="9" ry="4" fill="#fbf4e4" opacity="0.5"/>
+<g stroke="#d4c2a0" stroke-width="2.6" stroke-linecap="round"><line x1="30" y1="20" x2="30" y2="9"/><line x1="40" y1="20" x2="40" y2="9"/></g>
+<circle cx="30" cy="8" r="2.6" fill="#2a2218"/><circle cx="40" cy="8" r="2.6" fill="#2a2218"/>`
+  ),
+  66
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
+  'aardvark',
+  'ghost_crab',
+  'fennec',
+  'scorpion',
   'rowan',
-  'oak',
-  'birch',
   'seedhead',
-  'grass',
-  'acacia',
   'ocotillo',
   'cattail'
 ];
