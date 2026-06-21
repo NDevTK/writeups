@@ -3845,8 +3845,13 @@
         // fog drifts on the breeze (each layer at its own pace for parallax)
         for (const fz of fogLayers)
           fz.tilePosition.x -= (fz.spd + wind * fz.windF * 0.25) * dt;
-        for (const w of swayers)
-          w.s.rotation = Math.sin(t * w.sp + w.ph) * w.amp + wind * w.amp * 2.5;
+        for (const w of swayers) {
+          // a gust rolls across the field as a wave (phase keyed to x), so the grass ripples in
+          // sequence rather than leaning all as one; the wave vanishes when the air falls calm
+          const gust = Math.sin(t * 2.1 - w.s.x * 0.009) * wind * 0.8;
+          w.s.rotation =
+            Math.sin(t * w.sp + w.ph) * w.amp + (wind + gust) * w.amp * 2.5;
+        }
         // the mirrored trees drift on the breeze and fade as the surface roughens or freezes over
         if (reflLayer) {
           reflLayer.x = Math.sin(t * 0.7) * 1.2 + wind * 2.2;
