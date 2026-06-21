@@ -2056,16 +2056,54 @@ save(
   40
 );
 
+// ======== a monarch butterfly — patterned orange wings (2 flap frames) ========
+const monarch = (fx) =>
+  S(
+    '80 70',
+    `<g stroke="#241308" stroke-width="3.4">
+<ellipse cx="${40 - fx}" cy="25" rx="${fx > 10 ? 15 : 9}" ry="12" fill="#e8731e"/>
+<ellipse cx="${40 + fx}" cy="25" rx="${fx > 10 ? 15 : 9}" ry="12" fill="#e8731e"/>
+<ellipse cx="${40 - fx + 3}" cy="47" rx="${fx > 10 ? 11 : 7}" ry="9.5" fill="#e8731e"/>
+<ellipse cx="${40 + fx - 3}" cy="47" rx="${fx > 10 ? 11 : 7}" ry="9.5" fill="#e8731e"/></g>
+<g stroke="#241308" stroke-width="1.3" opacity="0.85" fill="none"><path d="M40,22 L${40 - fx - 8},18"/><path d="M40,27 L${40 - fx - 10},27"/><path d="M40,42 L${40 - fx},54"/><path d="M40,22 L${40 + fx + 8},18"/><path d="M40,27 L${40 + fx + 10},27"/><path d="M40,42 L${40 + fx},54"/></g>
+<g fill="#fff"><circle cx="${40 - fx - 9}" cy="21" r="1.6"/><circle cx="${40 - fx - 6}" cy="32" r="1.5"/><circle cx="${40 + fx + 9}" cy="21" r="1.6"/><circle cx="${40 + fx + 6}" cy="32" r="1.5"/><circle cx="${40 - fx + 1}" cy="54" r="1.3"/><circle cx="${40 + fx - 1}" cy="54" r="1.3"/></g>
+<ellipse cx="40" cy="35" rx="2.8" ry="15" fill="#241308"/><circle cx="40" cy="20" r="2.4" fill="#241308"/>
+<g stroke="#241308" stroke-width="1.2" fill="none" stroke-linecap="round"><path d="M40,19 C37,13 35,10 33,8"/><path d="M40,19 C43,13 45,10 47,8"/></g>`
+  );
+save('monarch_a', monarch(14), 80);
+save('monarch_b', monarch(8), 80);
+
+// ======== a scarlet macaw — perches in the jungle canopy and flits the boughs (faces right) ========
+save(
+  'parrot',
+  S(
+    '70 68',
+    `<path d="M16,38 L1,58 L7,60 L22,44 Z" fill="#d83a2e"/>
+<path d="M17,40 L5,56" stroke="#a82a20" stroke-width="1.4"/>
+<ellipse cx="28" cy="35" rx="14" ry="15" fill="#d83a2e"/>
+<path d="M18,30 C27,25 35,28 38,39 C30,46 21,43 17,38 Z" fill="#2f6fb0"/>
+<path d="M21,33 C28,30 34,32 37,38" stroke="#ecc63a" stroke-width="3.4" fill="none"/>
+<circle cx="41" cy="20" r="11" fill="#d83a2e"/>
+<ellipse cx="45" cy="19" rx="6" ry="5.6" fill="#f2ece2"/>
+<g stroke="#d0d0c4" stroke-width="0.7" fill="none" opacity="0.7"><path d="M42,15 C46,16 48,18 49,22"/><path d="M41,20 C45,21 47,22 49,24"/></g>
+<path d="M50,14 C60,13 61,22 53,27 C51,25 51,22 52,21 C55,20 55,16 50,17 Z" fill="#e8e2d6"/>
+<path d="M52,21 C54,23 54,26 51,27 C53,24 52,22 52,21 Z" fill="#3a352f"/>
+<circle cx="46" cy="18" r="2" fill="#140e09"/><circle cx="46.6" cy="17.4" r="0.6" fill="#fff"/>
+<g stroke="#6a5238" stroke-width="2" stroke-linecap="round"><line x1="27" y1="48" x2="27" y2="56"/><line x1="34" y1="48" x2="34" y2="56"/></g>`
+  ),
+  62
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'arctic_fox',
-  'fox',
-  'hare',
-  'lizard_b',
-  'lizard',
-  'beetle',
-  'roadrunner',
-  'marmot'
+  'monarch_a',
+  'monarch_b',
+  'butterfly_a',
+  'swallow_a',
+  'parrot',
+  'toucan',
+  'robin',
+  'heron'
 ];
 const cols = 4,
   cell = 230,
