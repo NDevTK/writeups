@@ -2001,16 +2001,71 @@ save(
   50
 );
 
+// ======== an arctic fox — white, fluffier and round-eared (faces right) ========
+save(
+  'arctic_fox',
+  S(
+    '210 150',
+    `<defs><linearGradient id="afx" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d4e1ee"/></linearGradient></defs>
+<path d="M46,90 C8,90 -2,52 18,38 C24,60 36,76 60,86 Z" fill="url(#afx)"/>
+<path d="M22,48 C6,52 2,70 14,78 C13,64 16,54 26,52 Z" fill="#ffffff"/>
+<g stroke="#a6b6c8" stroke-width="9" stroke-linecap="round"><line x1="72" y1="92" x2="70" y2="132"/><line x1="96" y1="94" x2="96" y2="134"/><line x1="120" y1="94" x2="122" y2="134"/><line x1="140" y1="92" x2="144" y2="130"/></g>
+<path d="M50,86 C44,62 74,54 104,55 C136,56 156,64 158,80 C160,96 132,102 102,101 C72,100 56,98 50,86 Z" fill="url(#afx)"/>
+<path d="M66,94 C92,100 126,98 152,86 C132,103 86,105 66,98 Z" fill="#ffffff" opacity="0.9"/>
+<path d="M142,72 C148,58 162,50 176,52 C190,54 196,66 190,76 L201,88 L178,90 C170,92 158,90 150,86 Z" fill="url(#afx)"/>
+<path d="M178,82 L202,88 L179,92 Z" fill="#ffffff"/>
+<circle cx="202" cy="88" r="3.6" fill="#23282f"/>
+<path d="M150,56 C146,42 153,36 161,43 C162,49 159,55 157,58 Z" fill="url(#afx)"/><path d="M153,53 C152,47 156,45 159,49 C159,53 157,55 156,55 Z" fill="#c2cedd"/>
+<path d="M170,55 C168,41 177,37 183,45 C183,51 180,56 177,58 Z" fill="url(#afx)"/><path d="M173,52 C172,46 176,45 179,49 C179,53 177,55 176,55 Z" fill="#c2cedd"/>
+<circle cx="170" cy="66" r="2.7" fill="#1a1f26"/>`
+  ),
+  175
+);
+
+// ======== a second desert lizard — olive, spiny-crested with a throat fan (faces right) ========
+save(
+  'lizard_b',
+  S(
+    '124 54',
+    `<defs><linearGradient id="lzb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fa07a"/><stop offset="1" stop-color="#5f6e4a"/></linearGradient></defs>
+<path d="M10,32 C0,31 0,35 10,36 C22,37 34,35 44,33 Z" fill="url(#lzb)"/>
+<g stroke="#4f5a3c" stroke-width="4.4" stroke-linecap="round"><line x1="48" y1="38" x2="40" y2="48"/><line x1="56" y1="39" x2="62" y2="49"/><line x1="78" y1="39" x2="70" y2="49"/><line x1="86" y1="38" x2="94" y2="48"/></g>
+<ellipse cx="64" cy="31" rx="30" ry="12" fill="url(#lzb)"/>
+<path d="M44,22 l4,-6 l4,6 l5,-7 l4,7 l5,-6 l4,6 l5,-5 l4,5 Z" fill="#4f5a3c"/>
+<path d="M90,27 C104,24 114,29 109,35 C104,40 92,38 88,33 Z" fill="url(#lzb)"/>
+<circle cx="100" cy="29" r="2.2" fill="#10120a"/>
+<path d="M92,36 C96,42 102,42 104,38 C100,38 96,37 92,34 Z" fill="#c87a52" opacity="0.7"/>
+<g fill="#4f5a3c" opacity="0.5"><circle cx="56" cy="28" r="2.2"/><circle cx="68" cy="29" r="2.2"/><circle cx="80" cy="29" r="1.8"/></g>`
+  ),
+  114
+);
+
+// ======== a scuttling beetle — a little dark scarab (faces right) ========
+save(
+  'beetle',
+  S(
+    '48 32',
+    `<defs><linearGradient id="btl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a4640"/><stop offset="1" stop-color="#26231e"/></linearGradient></defs>
+<g stroke="#1e1b16" stroke-width="1.8" stroke-linecap="round"><path d="M16,23 L10,30"/><path d="M22,24 L20,31"/><path d="M28,23 L32,30"/><path d="M16,21 L9,23"/><path d="M30,21 L37,23"/></g>
+<ellipse cx="23" cy="17" rx="14" ry="10" fill="url(#btl)"/>
+<path d="M23,8 L23,26" stroke="#1a1813" stroke-width="1.2"/>
+<ellipse cx="19" cy="13" rx="4" ry="2.6" fill="#6a655c" opacity="0.5"/>
+<circle cx="36" cy="17" r="4.4" fill="#322e28"/>
+<g stroke="#1e1b16" stroke-width="1.2" fill="none" stroke-linecap="round"><path d="M38,14 C42,11 45,9 46,7"/><path d="M39,17 C43,16 45,15 47,14"/></g>`
+  ),
+  40
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'snowrock_a',
-  'snowrock_b',
+  'arctic_fox',
+  'fox',
   'hare',
-  'rabbit',
-  'robin',
-  'bluebird',
-  'finch',
-  'swallow_a'
+  'lizard_b',
+  'lizard',
+  'beetle',
+  'roadrunner',
+  'marmot'
 ];
 const cols = 4,
   cell = 230,
