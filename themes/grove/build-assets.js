@@ -1687,16 +1687,81 @@ save(
   160
 );
 
+// toadstool — classic red fly-agaric with white spots, for the meadow/fern floor
+save(
+  'toadstool',
+  S(
+    '40 46',
+    `<ellipse cx="20" cy="43" rx="9" ry="2.4" fill="#2f5a24" opacity="0.28"/>
+<path d="M17,28 C16,36 16,40 18,43 L23,43 C25,40 25,36 24,28 Z" fill="#f1ebda"/>
+<path d="M5,26 C5,14 13,8 20,8 C27,8 35,14 35,26 C28,30 12,30 5,26 Z" fill="#d8392f"/>
+<path d="M5,26 C12,28 28,28 35,26 C30,23.5 10,23.5 5,26 Z" fill="#b22922" opacity="0.5"/>
+<g fill="#f6ecd8"><circle cx="13" cy="18" r="2.1"/><circle cx="22" cy="14" r="2.5"/><circle cx="29" cy="21" r="1.9"/><circle cx="19" cy="22" r="1.5"/></g>`
+  ),
+  44
+);
+// a plain brown mushroom alongside it
+save(
+  'shroom',
+  S(
+    '40 40',
+    `<ellipse cx="20" cy="37" rx="8" ry="2.2" fill="#2f5a24" opacity="0.28"/>
+<path d="M16,23 C15,30 15,34 18,37 L22,37 C25,34 25,30 24,23 Z" fill="#e9ddc1"/>
+<path d="M7,23 C8,14 13,10 20,10 C27,10 32,14 33,23 C27,27 13,27 7,23 Z" fill="#9c6b3e"/>
+<path d="M7,23 C13,25 27,25 33,23 C28,21 12,21 7,23 Z" fill="#caa06a" opacity="0.5"/>`
+  ),
+  40
+);
+// a fallen mossy log
+save(
+  'log',
+  S(
+    '124 50',
+    `<defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a6a48"/><stop offset="1" stop-color="#5e4429"/></linearGradient></defs>
+<rect x="10" y="20" width="104" height="22" rx="11" fill="url(#lg)"/>
+<ellipse cx="16" cy="31" rx="7" ry="11" fill="#7a5836"/><ellipse cx="16" cy="31" rx="4.2" ry="7" fill="#9c7a52"/><ellipse cx="16" cy="31" rx="1.8" ry="3.4" fill="#7a5836"/>
+<path d="M22,20 C42,16 72,16 102,19 C92,22 42,23 22,24 Z" fill="#5e8a3e"/>
+<g fill="#6fa04a"><ellipse cx="42" cy="20" rx="11" ry="4"/><ellipse cx="74" cy="20" rx="13" ry="4"/></g>
+<g fill="#4e3820" opacity="0.3"><rect x="40" y="30" width="22" height="2" rx="1"/><rect x="70" y="34" width="18" height="2" rx="1"/></g>`
+  ),
+  112
+);
+// a tree stump with cut rings
+save(
+  'stump',
+  S(
+    '70 56',
+    `<defs><linearGradient id="stp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a6a48"/><stop offset="1" stop-color="#5e4429"/></linearGradient></defs>
+<path d="M14,52 C12,32 14,22 18,18 L52,18 C56,22 58,32 56,52 Z" fill="url(#stp)"/>
+<path d="M16,28 C30,30 44,30 54,28" stroke="#4e3820" stroke-width="1.4" fill="none" opacity="0.35"/>
+<path d="M22,22 C24,30 26,42 25,50" stroke="#4e3820" stroke-width="1.1" fill="none" opacity="0.3"/>
+<ellipse cx="35" cy="18" rx="21" ry="9" fill="#a07c52"/><ellipse cx="35" cy="18" rx="15" ry="6" fill="#8a6638" opacity="0.5"/><ellipse cx="35" cy="18" rx="8" ry="3.4" fill="#a07c52"/><ellipse cx="35" cy="18" rx="3" ry="1.3" fill="#7a5630"/>`
+  ),
+  64
+);
+// a berry bush — a bush variant studded with red berries
+save(
+  'berrybush',
+  S(
+    '160 92',
+    `<defs><radialGradient id="bry" gradientUnits="userSpaceOnUse" cx="60" cy="34" r="92"><stop offset="0" stop-color="#5fa040"/><stop offset="1" stop-color="#2a6018"/></radialGradient></defs>
+<g fill="url(#bry)"><ellipse cx="38" cy="66" rx="32" ry="17"/><ellipse cx="84" cy="68" rx="40" ry="19"/><ellipse cx="126" cy="66" rx="30" ry="16"/><circle cx="52" cy="50" r="22"/><circle cx="92" cy="46" r="25"/><circle cx="124" cy="52" r="18"/></g>
+<g fill="#cf2f2f"><circle cx="46" cy="48" r="3"/><circle cx="60" cy="44" r="3"/><circle cx="88" cy="42" r="3.2"/><circle cx="104" cy="48" r="3"/><circle cx="120" cy="54" r="2.8"/><circle cx="36" cy="60" r="2.8"/><circle cx="76" cy="56" r="3"/><circle cx="100" cy="58" r="3"/></g>
+<g fill="#f47a68" opacity="0.7"><circle cx="45" cy="47" r="1"/><circle cx="87" cy="41" r="1.1"/><circle cx="103" cy="47" r="1"/></g>`
+  ),
+  140
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'willow',
-  'snag',
+  'toadstool',
+  'shroom',
+  'log',
+  'stump',
+  'berrybush',
   'shrub',
-  'poppy',
-  'duck_f',
-  'duck',
-  'flower_y',
-  'tulip'
+  'snag',
+  'willow'
 ];
 const cols = 4,
   cell = 230,

@@ -1015,7 +1015,12 @@
         'willow_snow',
         'snag',
         'shrub',
+        'berrybush',
         'poppy',
+        'toadstool',
+        'shroom',
+        'log',
+        'stump',
         'duck_f',
         'grass',
         'flower_p',
@@ -1732,7 +1737,7 @@
           bird.isBat = !!BI.interior; // bats flit erratically rather than gliding across
           bird.vx = 1.2;
           bird.vy = 0;
-          bird.tint = BI.flyer;
+          bird.tint = BI.flyer ? tintJit(BI.flyer, 0.12) : 0xffffff; // a slightly different bird each time
           flutters.push(bird);
           farLayer.addChild(bird);
         }
@@ -2287,11 +2292,11 @@
               'tulip',
               'poppy'
             ];
-            // the odd flowering shrub dotted about the meadow
+            // the odd flowering or berry shrub dotted about the meadow
             for (let i = 0, n = (Math.random() * 3) | 0; i < n; i++) {
               const x = 80 + Math.random() * (VW - 160),
                 sh = spr(
-                  'shrub',
+                  Math.random() < 0.5 ? 'shrub' : 'berrybush',
                   x,
                   groundY(x) + 8,
                   0.32 + Math.random() * 0.22
@@ -2300,6 +2305,31 @@
               if (Math.random() < 0.5) sh.scale.x *= -1;
               scene.addChild(sh);
               swayers.push({s: sh, amp: 0.022, sp: 1, ph: Math.random() * 6});
+            }
+            // toadstools and mushrooms tucked low in the grass
+            for (let i = 0, n = (Math.random() * 4) | 0; i < n; i++) {
+              const x = 50 + Math.random() * (VW - 100),
+                m = spr(
+                  Math.random() < 0.5 ? 'toadstool' : 'shroom',
+                  x,
+                  groundY(x) + 9,
+                  0.5 + Math.random() * 0.45
+                );
+              if (Math.random() < 0.5) m.scale.x *= -1;
+              scene.addChild(m);
+            }
+            // now and then a fallen log or an old stump
+            if (Math.random() < 0.4) {
+              const x = 120 + Math.random() * (VW - 240),
+                lg = spr(
+                  Math.random() < 0.5 ? 'log' : 'stump',
+                  x,
+                  groundY(x) + 9,
+                  0.6 + Math.random() * 0.4
+                );
+              lg.tint = tintJit(0xffffff, 0.05);
+              if (Math.random() < 0.5) lg.scale.x *= -1;
+              scene.addChild(lg);
             }
             for (let i = 0, n = 6 + ((Math.random() * 8) | 0); i < n; i++) {
               const x = 60 + Math.random() * (VW - 120),
