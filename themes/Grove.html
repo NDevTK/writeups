@@ -389,6 +389,7 @@
           hopper: 'rabbit',
           squirrel: true, // a squirrel forages the grove floor now and then
           perchBird: true, // a songbird perches in the canopy and flits between trees
+          woodpecker: true, // a woodpecker drums on a trunk by day
           owl: true, // an owl hunts the meadow after dark
           kingfisher: true, // a kingfisher plunge-dives the pond for fish by day
           hedgehog: true, // a hedgehog snuffles the floor at night
@@ -885,6 +886,7 @@
           hopper: 'rabbit',
           squirrel: true, // a squirrel forages beneath the sakura
           perchBird: true, // a songbird perches among the blossom
+          woodpecker: true, // a woodpecker drums on an orchard trunk by day
           owl: true, // an owl crosses the orchard after dark
           hedgehog: true, // a hedgehog snuffles the orchard floor at night
           snail: true, // a snail glides out across the wet orchard floor after rain
@@ -1013,6 +1015,7 @@
           ladybird: true, // a ladybird trundles the leaf-litter by day
           mouse: true, // a wood mouse scurries the leaf-litter by day
           perchBird: true, // a songbird perches among the boughs
+          woodpecker: true, // a woodpecker drums on a woodland trunk by day
           flyer: 0x3a4a55,
           flutter: false,
           roller: null
@@ -1099,6 +1102,7 @@
         'mouse',
         'grasshopper',
         'kingfisher',
+        'woodpecker',
         'monarch_a',
         'monarch_b',
         'parrot',
@@ -1689,6 +1693,7 @@
         frontRocks = [],
         spout = [],
         perches = [],
+        trunks = [],
         sandpipers = [],
         choughs = [],
         ghostCrabs = [],
@@ -1742,6 +1747,7 @@
         mouse,
         grasshopper,
         kingfisher,
+        woodpecker,
         fennec,
         aardvark,
         kinkajou,
@@ -1799,6 +1805,7 @@
           frontRocks.length =
           spout.length =
           perches.length =
+          trunks.length =
           sandpipers.length =
           choughs.length =
           ghostCrabs.length =
@@ -1823,6 +1830,7 @@
           mouse =
           grasshopper =
           kingfisher =
+          woodpecker =
           fennec =
           aardvark =
           kinkajou =
@@ -2427,6 +2435,18 @@
             perches.push({
               x: jx,
               y: t.y - t.height * (0.5 + Math.random() * 0.2)
+            });
+          // …and a bare lower trunk gives a woodpecker something to cling to and drum on —
+          // only the broadleaf/snag trees, never a conifer or bamboo whose foliage reaches low
+          if (
+            BI.woodpecker &&
+            !RIGID[n] &&
+            t.height > 120 &&
+            !/pine|fir|bamboo/.test(n)
+          )
+            trunks.push({
+              x: jx,
+              y: t.y - t.height * (0.2 + Math.random() * 0.12)
             });
         }
         if (BI.crystals)
@@ -3362,6 +3382,29 @@
           kinkajou.pauseT = Math.random() * 2;
           scene.addChild(kinkajou);
         } else kinkajou = null;
+        if (
+          BI.woodpecker &&
+          buildNight < 0.5 &&
+          trunks.length &&
+          Math.random() < 0.6
+        ) {
+          // a woodpecker clings to a tree trunk and drums on it in sudden bursts (faces into the trunk)
+          const tr = trunks[(Math.random() * trunks.length) | 0];
+          woodpecker = spr(
+            'woodpecker',
+            tr.x + 3,
+            tr.y,
+            0.3 + Math.random() * 0.06
+          );
+          woodpecker.bx = woodpecker.x;
+          woodpecker.by = tr.y;
+          woodpecker.byMin = tr.y - 26;
+          woodpecker.byMax = tr.y + 30;
+          woodpecker.dir = -1; // jabs left, into the trunk
+          woodpecker.pkT = 1 + Math.random() * 3;
+          woodpecker.pecking = 0;
+          scene.addChild(woodpecker);
+        } else woodpecker = null;
         if ((BI.beetle || BI.ladybird) && Math.random() < 0.7) {
           // a beetle scuttles the ground, pausing to forage and turning back at the edges — but in
           // the desert and canyon a scorpion takes the night shift, and the temperate meadows a ladybird
@@ -6627,6 +6670,35 @@
               k.rotation = 0;
               k.mode = 'perch';
               k.tmr = 4 + Math.random() * 6;
+            }
+          }
+        }
+        // a woodpecker clings to the trunk and drums in sudden fast bursts, pausing to look about
+        if (woodpecker) {
+          const w = woodpecker;
+          if (w.pecking > 0) {
+            w.pecking -= dt / 60;
+            w.x = w.bx + w.dir * (1.4 + 1.4 * Math.abs(Math.sin(t * 46))); // the jackhammer jabs
+            w.rotation = 0;
+            if (w.pecking <= 0) {
+              w.x = w.bx;
+              w.pkT = 1.4 + Math.random() * 3.2;
+            }
+          } else {
+            w.x = w.bx;
+            w.y = w.by;
+            w.rotation = Math.sin(t * 1.1) * 0.05; // cocks its head, watching the bark
+            w.pkT -= dt / 60;
+            if (w.pkT <= 0) {
+              w.pecking = 0.45 + Math.random() * 0.7; // a drumroll
+              if (Math.random() < 0.35) {
+                // now and then it hitches a little way up or down the trunk
+                w.by = Math.max(
+                  w.byMin,
+                  Math.min(w.byMax, w.by + (Math.random() - 0.5) * 34)
+                );
+                w.y = w.by;
+              }
             }
           }
         }
