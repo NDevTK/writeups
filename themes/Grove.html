@@ -390,6 +390,7 @@
           squirrel: true, // a squirrel forages the grove floor now and then
           perchBird: true, // a songbird perches in the canopy and flits between trees
           owl: true, // an owl hunts the meadow after dark
+          kingfisher: true, // a kingfisher plunge-dives the pond for fish by day
           hedgehog: true, // a hedgehog snuffles the floor at night
           snail: true, // a snail glides out onto the wet grass after rain
           ladybird: true, // a ladybird trundles the meadow floor by day
@@ -548,6 +549,7 @@
           critter: null,
           hopper: null,
           owl: true, // an owl quarters the marsh after dark
+          kingfisher: true, // a kingfisher plunge-dives the marsh pools for fish by day
           snail: true, // a pond snail glides the wet bank after rain
           flyer: 0x6a7b8a,
           flutter: false,
@@ -1095,6 +1097,7 @@
         'snail',
         'mouse',
         'grasshopper',
+        'kingfisher',
         'monarch_a',
         'monarch_b',
         'parrot',
@@ -1737,6 +1740,7 @@
         hedgehog,
         mouse,
         grasshopper,
+        kingfisher,
         fennec,
         aardvark,
         kinkajou,
@@ -1817,6 +1821,7 @@
           hedgehog =
           mouse =
           grasshopper =
+          kingfisher =
           fennec =
           aardvark =
           kinkajou =
@@ -3812,6 +3817,29 @@
               scene.addChild(sk);
             }
           }
+          if (BI.kingfisher && buildNight < 0.5 && Math.random() < 0.7) {
+            // a kingfisher perches on an overhanging twig above the pond, then plunge-dives for a
+            // fish and climbs straight back up to its perch to watch the water again
+            const px = 200 + Math.random() * (VW - 400),
+              py = 542 + Math.random() * 26;
+            const tw = new PIXI.Graphics();
+            tw.lineStyle(3, 0x6a5236, 1)
+              .moveTo(px - 28, py + 15)
+              .lineTo(px + 10, py + 4);
+            tw.lineStyle(2.2, 0x6a5236, 1)
+              .moveTo(px - 4, py + 9)
+              .lineTo(px - 11, py + 1);
+            scene.addChild(tw);
+            kingfisher = spr('kingfisher', px, py, 0.32 + Math.random() * 0.06);
+            kingfisher.baseSc = Math.abs(kingfisher.scale.x);
+            kingfisher.dir = Math.random() < 0.5 ? 1 : -1;
+            kingfisher.scale.x = kingfisher.dir * kingfisher.baseSc;
+            kingfisher.px = px;
+            kingfisher.py = py;
+            kingfisher.mode = 'perch';
+            kingfisher.tmr = 3 + Math.random() * 5;
+            scene.addChild(kingfisher);
+          } else kingfisher = null;
           if (BI.water.sailboat) {
             const sb = spr('sailboat', 740, 606, 0.5);
             sb.baseY = 606;
@@ -6531,6 +6559,52 @@
           if (td.x > VW - 120) td.vx = -Math.abs(td.vx);
           else if (td.x < 120) td.vx = Math.abs(td.vx);
           td.scale.x = (td.vx < 0 ? -1 : 1) * Math.abs(td.scale.x);
+        }
+        // a kingfisher watches from its twig, then plunges bill-first to the water and climbs back
+        if (kingfisher) {
+          const k = kingfisher;
+          if (k.mode === 'perch') {
+            k.y = k.py + Math.sin(t * 1.5) * 0.6; // a gentle perched bob
+            k.rotation = Math.sin(t * 0.7) * 0.04; // turning its head to watch the water
+            k.tmr -= dt / 60;
+            if (k.tmr <= 0 && !raining) {
+              k.mode = 'dive';
+              k.diveT = 0;
+              k.diveDur = 0.45 + Math.random() * 0.15;
+              k.tx = k.px + k.dir * (10 + Math.random() * 40);
+              k.ty = 602; // the water surface
+            }
+          } else if (k.mode === 'dive') {
+            k.diveT += dt / 60;
+            const p = Math.min(1, k.diveT / k.diveDur);
+            k.x = k.px + (k.tx - k.px) * p;
+            k.y = k.py + (k.ty - k.py) * (p * p); // an accelerating plunge
+            k.rotation = k.dir * (0.2 + p * 1.0); // tip bill-down through the dive
+            if (p >= 1) {
+              if (water) {
+                ripples.push({x: k.x, y: k.ty, r: 5, life: 1});
+                ripples.push({x: k.x, y: k.ty, r: 9, life: 1}); // the splash
+              }
+              k.mode = 'rise';
+              k.riseT = 0;
+              k.riseDur = 0.55 + Math.random() * 0.2;
+              k.fromX = k.x;
+              k.fromY = k.y;
+            }
+          } else {
+            k.riseT += dt / 60;
+            const p = Math.min(1, k.riseT / k.riseDur);
+            k.x = k.fromX + (k.px - k.fromX) * p;
+            k.y = k.fromY + (k.py - k.fromY) * (1 - (1 - p) * (1 - p)); // a decelerating climb
+            k.rotation = k.dir * 1.2 * (1 - p); // straighten up as it lands
+            if (p >= 1) {
+              k.x = k.px;
+              k.y = k.py;
+              k.rotation = 0;
+              k.mode = 'perch';
+              k.tmr = 4 + Math.random() * 6;
+            }
+          }
         }
         // butterflies, dragonflies, bird — wandering / crossing
         for (const f of flutters) {
