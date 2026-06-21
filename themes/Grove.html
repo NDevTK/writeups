@@ -384,7 +384,7 @@
           walker: ['deer_a', 'deer_b'],
           walkerScale: 0.62,
           graze: true,
-          critter: 'fox',
+          critter: ['fox', 'fox', 'fox', 'fox_s'], // mostly a red fox, the odd silver morph
           critterScale: 0.42,
           hopper: 'rabbit',
           squirrel: true, // a squirrel forages the grove floor now and then
@@ -1118,6 +1118,9 @@
         'squirrel_k',
         'rabbit_g',
         'rabbit_k',
+        'fox_s',
+        'deer_d_a',
+        'deer_d_b',
         'grass',
         'flower_p',
         'flower_w',
@@ -3067,7 +3070,12 @@
             // stalk-and-strike either way
             const wadeFrames =
               heron && Math.random() < 0.45 ? ['egret'] : BI.walker;
-            const frames = resting ? [restSprite] : wadeFrames;
+            // a darker, melanistic deer turns up among the standing ones now and then
+            const walkFrames =
+              BI.walker[0] === 'deer_a' && Math.random() < 0.2
+                ? ['deer_d_a', 'deer_d_b']
+                : wadeFrames;
+            const frames = resting ? [restSprite] : walkFrames;
             const d = anim(
               frames,
               300,
