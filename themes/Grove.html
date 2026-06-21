@@ -423,8 +423,9 @@
           walker: ['camel', 'camel_b'],
           walkerScale: 0.62,
           graze: false,
-          critter: 'lizard',
+          critter: ['lizard', 'lizard_b'], // a different basking lizard each visit
           critterScale: 0.5,
+          beetle: true, // a beetle scuttles the sand
           hopper: null,
           flyer: 0x4a4036,
           soar: {
@@ -567,7 +568,8 @@
           walker: ['goat', 'goat_b'],
           walkerScale: 0.52,
           graze: true,
-          critter: null,
+          critter: 'arctic_fox', // an arctic fox hunts the scree — the hare bolts when it nears
+          critterScale: 0.4,
           hopper: 'hare', // an arctic hare forages the snowy scree
           flyer: 0xffffff,
           flyerFrames: ['eagle'],
@@ -604,6 +606,7 @@
           critter: 'zebra',
           critterScale: 0.6,
           hopper: null,
+          beetle: true, // a dung beetle trundles the savanna
           flyer: 0xffffff,
           flyerFrames: ['vulture'],
           flutter: false,
@@ -890,6 +893,7 @@
           flyer: 0x3a342e, // a condor circles
           flyerFrames: ['vulture'],
           roadrunner: true,
+          beetle: true, // a beetle scuttles the red rock
           flutter: false,
           roller: null
         },
@@ -1046,6 +1050,9 @@
         'robin',
         'bluebird',
         'finch',
+        'arctic_fox',
+        'lizard_b',
+        'beetle',
         'grass',
         'flower_p',
         'flower_w',
@@ -1604,6 +1611,7 @@
         marmot,
         squirrel,
         songbird,
+        beetle,
         seal,
         roadrunner,
         whale,
@@ -1667,6 +1675,7 @@
           roadrunner =
           squirrel =
           songbird =
+          beetle =
             null;
         whale = spoutG = surfG = cloudSeaG = cloudGlow = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
@@ -2931,7 +2940,10 @@
         // the critter and hopper each sit out some visits, so the cast isn't always the full set
         // (with the herd already able to be empty, that gives quiet scenes through to a busy one)
         if (BI.critter && Math.random() > 0.3) {
-          fox = spr(BI.critter, -80, groundY(-80) + 6, BI.critterScale);
+          const cr = Array.isArray(BI.critter)
+            ? BI.critter[(Math.random() * BI.critter.length) | 0]
+            : BI.critter; // pick the species for this visit
+          fox = spr(cr, -80, groundY(-80) + 6, BI.critterScale);
           fox.tint = tintJit(BI.critterTint || 0xffffff, 0.06);
           fox.dir = Math.random() < 0.5 ? 1 : -1; // comes in from either side at its own trot
           fox.spd = 1.1 + Math.random() * 0.9;
@@ -3004,6 +3016,22 @@
           songbird.tmr = 2 + Math.random() * 5;
           scene.addChild(songbird);
         } else songbird = null;
+        if (BI.beetle && Math.random() < 0.7) {
+          // a beetle scuttles the ground, pausing to forage and turning back at the edges
+          const bx = 120 + Math.random() * (VW - 240);
+          beetle = spr(
+            'beetle',
+            bx,
+            groundY(bx) + 4,
+            0.2 + Math.random() * 0.08
+          );
+          beetle.baseSc = Math.abs(beetle.scale.x);
+          beetle.dir = Math.random() < 0.5 ? 1 : -1;
+          beetle.scale.x = beetle.dir * beetle.baseSc;
+          beetle.spd = 0.5 + Math.random() * 0.5;
+          beetle.pauseT = Math.random() * 2;
+          scene.addChild(beetle);
+        } else beetle = null;
         if (BI.penguins) {
           // a little colony waddles the snowfield: each penguin ambles at its own pace, some just stand
           for (let i = 0; i < BI.penguins; i++) {
@@ -5177,6 +5205,30 @@
               songbird.perch = songbird.target;
               songbird.rotation = 0;
               songbird.mode = 'perch';
+            }
+          }
+        }
+        // a beetle scuttles the ground in little bursts, pausing to forage and reversing at the edges
+        if (beetle) {
+          if (beetle.pauseT > 0) {
+            beetle.pauseT -= dt / 60; // stopped, antennae twitching
+            beetle.rotation = Math.sin(t * 18) * 0.03;
+          } else {
+            beetle.x += beetle.dir * beetle.spd * dt;
+            beetle.y = groundY(beetle.x) + 4 + Math.abs(Math.sin(t * 22)) * -1; // scuttle bob
+            beetle.rotation = Math.sin(t * 22) * 0.06; // a little side-to-side waddle
+            if (beetle.x > VW - 70) {
+              beetle.dir = -1;
+              beetle.scale.x = -beetle.baseSc;
+            } else if (beetle.x < 70) {
+              beetle.dir = 1;
+              beetle.scale.x = beetle.baseSc;
+            }
+            if (Math.random() < 0.004 * dt)
+              beetle.pauseT = 0.5 + Math.random() * 1.6; // stop to forage
+            else if (Math.random() < 0.003 * dt) {
+              beetle.dir = -beetle.dir; // change its mind
+              beetle.scale.x = beetle.dir * beetle.baseSc;
             }
           }
         }
