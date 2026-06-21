@@ -1024,6 +1024,11 @@
         'duck_f',
         'fawn_a',
         'fawn_b',
+        'barrel_cactus',
+        'skull',
+        'shell',
+        'conch',
+        'driftwood',
         'grass',
         'flower_p',
         'flower_w',
@@ -2359,6 +2364,25 @@
             scene.addChild(g);
             swayers.push({s: g, amp: 0.04, sp: 1.4, ph: Math.random() * 6});
           }
+          // a few barrel cacti and the odd bleached skull on the sand
+          for (let i = 0, n = (Math.random() * 3) | 0; i < n; i++) {
+            const x = 60 + Math.random() * (VW - 120),
+              bc = spr(
+                'barrel_cactus',
+                x,
+                groundY(x) + 8,
+                0.4 + Math.random() * 0.4
+              );
+            bc.tint = tintJit(0xffffff, 0.07);
+            if (Math.random() < 0.5) bc.scale.x *= -1;
+            scene.addChild(bc);
+          }
+          if (Math.random() < 0.5) {
+            const x = 80 + Math.random() * (VW - 160),
+              sk = spr('skull', x, groundY(x) + 9, 0.34 + Math.random() * 0.2);
+            if (Math.random() < 0.5) sk.scale.x *= -1;
+            scene.addChild(sk);
+          }
         } else if (BI.ground === 'beach') {
           for (let i = 0, _m = vc(12); i < _m; i++) {
             const x = 30 + Math.random() * (VW - 60);
@@ -2381,6 +2405,31 @@
             g.tint = grassTint || 0xd8c88a;
             scene.addChild(g);
             swayers.push({s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6});
+          }
+          // shells and a conch washed up, with the odd piece of driftwood
+          for (let i = 0, n = 2 + ((Math.random() * 4) | 0); i < n; i++) {
+            const x = 50 + Math.random() * (VW - 100),
+              sh = spr(
+                Math.random() < 0.6 ? 'shell' : 'conch',
+                x,
+                582 + Math.random() * 18,
+                0.4 + Math.random() * 0.4
+              );
+            sh.rotation = (Math.random() - 0.5) * 0.8;
+            if (Math.random() < 0.5) sh.scale.x *= -1;
+            scene.addChild(sh);
+          }
+          if (Math.random() < 0.55) {
+            const x = 90 + Math.random() * (VW - 180),
+              dw = spr(
+                'driftwood',
+                x,
+                groundY(x) + 8,
+                0.5 + Math.random() * 0.4
+              );
+            dw.rotation = (Math.random() - 0.5) * 0.3;
+            if (Math.random() < 0.5) dw.scale.x *= -1;
+            scene.addChild(dw);
           }
         } else if (BI.ground === 'marsh') {
           for (let i = 0, _m = vc(8); i < _m; i++) {
