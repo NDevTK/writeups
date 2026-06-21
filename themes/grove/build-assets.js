@@ -385,6 +385,21 @@ const admiral = (fx) =>
   );
 save('admiral_a', admiral(14), 80);
 save('admiral_b', admiral(8), 80);
+// a bumblebee — fuzzy amber-and-black body, pale tail, blurred wings (2 wingbeat frames)
+const bee = (wy) =>
+  S(
+    '48 34',
+    `<defs><clipPath id="bb"><ellipse cx="22" cy="21" rx="15" ry="9.5"/></clipPath></defs>
+<g stroke="#1c1813" stroke-width="1.3" stroke-linecap="round"><line x1="17" y1="29" x2="15" y2="33"/><line x1="23" y1="30" x2="23" y2="34"/><line x1="29" y1="29" x2="31" y2="33"/></g>
+<g clip-path="url(#bb)"><rect x="6" y="11" width="34" height="20" fill="#e7a31c"/><rect x="13" y="11" width="5.5" height="20" fill="#241d15"/><rect x="23" y="11" width="5.5" height="20" fill="#241d15"/><rect x="32" y="11" width="9" height="20" fill="#241d15"/></g>
+<ellipse cx="22" cy="21" rx="15" ry="9.5" fill="none" stroke="#3a2f1f" stroke-width="1" opacity="0.35"/>
+<ellipse cx="8.5" cy="21" rx="3.6" ry="6.4" fill="#f0d9a0"/>
+<circle cx="36" cy="20" r="5.6" fill="#241d15"/><circle cx="38" cy="18.5" r="1.3" fill="#fffdf4" opacity="0.6"/>
+<g stroke="#241d15" stroke-width="1.1" fill="none" stroke-linecap="round"><path d="M39,16 C42,12 44,11 46,11"/><path d="M40,18 C43,15 45,14 47,15"/></g>
+<g fill="#eef5fb" opacity="0.62"><ellipse cx="20" cy="${21 - wy}" rx="12" ry="6" transform="rotate(-16 20 ${21 - wy})"/><ellipse cx="27" cy="${22 - wy}" rx="8.5" ry="4.6" transform="rotate(-6 27 ${22 - wy})"/></g>`
+  );
+save('bee_a', bee(7), 44); // wings raised
+save('bee_b', bee(1), 44); // wings level
 
 // ---- NEW: lily pad with blossom ----
 save(
@@ -2807,7 +2822,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['petal', 'petal_w', 'petal_r', 'leaf_m'];
+const review = ['bee_a', 'bee_b', 'monarch_a', 'damselfly_a'];
 const cols = 4,
   cell = 230,
   pad = 14,
