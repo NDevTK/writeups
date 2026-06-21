@@ -1128,6 +1128,8 @@
         'deer_d_b',
         'admiral_a',
         'admiral_b',
+        'peacock_a',
+        'peacock_b',
         'damselfly_a',
         'damselfly_b',
         'grass',
@@ -3820,16 +3822,20 @@
               frames = ['moth_a', 'moth_b']; // night shift: pale moths
               fsc = 0.46;
               tinted = false;
-            } else if (r < 0.22) {
+            } else if (r < 0.2) {
               frames = ['monarch_a', 'monarch_b']; // a monarch
               fsc = 0.48;
               tinted = false;
-            } else if (r < 0.38) {
+            } else if (r < 0.35) {
               frames = ['swallow_a', 'swallow_b']; // a swallowtail
               fsc = 0.42;
               tinted = false;
-            } else if (r < 0.54) {
+            } else if (r < 0.5) {
               frames = ['admiral_a', 'admiral_b']; // a red admiral
+              fsc = 0.46;
+              tinted = false;
+            } else if (r < 0.64) {
+              frames = ['peacock_a', 'peacock_b']; // a peacock, eyespots and all
               fsc = 0.46;
               tinted = false;
             }
@@ -3894,9 +3900,11 @@
         )
           for (let i = 0, n = 1 + ((Math.random() * 2) | 0); i < n; i++) {
             const f = anim(
-              Math.random() < 0.5
-                ? ['swallow_a', 'swallow_b']
-                : ['butterfly_a', 'butterfly_b'],
+              [
+                ['swallow_a', 'swallow_b'],
+                ['peacock_a', 'peacock_b'],
+                ['butterfly_a', 'butterfly_b']
+              ][(Math.random() * 3) | 0],
               Math.random() * VW,
               500 + Math.random() * 70,
               0.42,
