@@ -2341,16 +2341,61 @@ save(
   84
 );
 
+// ======== wildflowers — more species for the meadow mix ========
+// a foxglove — a tall spire of pink bells, for vertical interest among the low blooms
+save(
+  'foxglove',
+  S(
+    '34 92',
+    `<defs><linearGradient id="fxg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e69ad2"/><stop offset="1" stop-color="#bd5ea8"/></linearGradient></defs>
+<path d="M17,90 C16,66 17,42 18,22" stroke="#588a40" stroke-width="3" fill="none"/>
+<path d="M17,86 C9,82 4,84 2,90 C8,87 14,88 17,89 Z" fill="#588a40"/>
+<path d="M18,80 C26,76 31,78 33,84 C27,81 21,82 18,83 Z" fill="#588a40"/>
+<g fill="url(#fxg)"><ellipse cx="11" cy="66" rx="7.5" ry="5.5"/><ellipse cx="25" cy="60" rx="7.5" ry="5.5"/><ellipse cx="12" cy="54" rx="6.5" ry="5"/><ellipse cx="24" cy="48" rx="6.5" ry="5"/><ellipse cx="14" cy="42" rx="5.5" ry="4.5"/><ellipse cx="22" cy="37" rx="5" ry="4"/></g>
+<g fill="#fbe0ef" opacity="0.85"><ellipse cx="11" cy="67" rx="3" ry="2.2"/><ellipse cx="25" cy="61" rx="3" ry="2.2"/><ellipse cx="12" cy="55" rx="2.5" ry="1.8"/><ellipse cx="24" cy="49" rx="2.5" ry="1.8"/></g>
+<g fill="#9a3a86" opacity="0.55"><circle cx="11" cy="68" r="1.2"/><circle cx="25" cy="62" r="1.2"/></g>
+<g fill="#cd78ba"><circle cx="18" cy="30" r="3.5"/><circle cx="17" cy="25" r="2.8"/><circle cx="19" cy="21" r="2.2"/></g>`
+  ),
+  34
+);
+// a cornflower — a frilly blue head on a slim stem
+save(
+  'cornflower',
+  S(
+    '40 60',
+    `<path d="M20,58 C19,44 20,32 20,24" stroke="#6a9a52" stroke-width="2.5" fill="none"/>
+<path d="M20,50 C12,47 8,49 7,54 C12,51 17,51 20,52 Z" fill="#6a9a52"/>
+<path d="M20,7 Q24,13 28,10 Q26,16 32,17 Q26,20 30,26 Q23,23 24,30 Q20,24 16,30 Q17,23 10,26 Q14,20 8,17 Q14,16 12,10 Q16,13 20,7 Z" fill="#4a72c8"/>
+<path d="M20,12 Q23,16 26,15 Q24,19 28,20 Q24,22 26,26 Q21,24 22,28 Q20,24 18,28 Q19,24 14,26 Q16,22 12,20 Q16,19 14,15 Q17,16 20,12 Z" fill="#7a9ee0" opacity="0.55"/>
+<circle cx="20" cy="18" r="3.6" fill="#2f4f9a"/>
+<g fill="#1f3a7a"><circle cx="18" cy="17" r="1"/><circle cx="22" cy="18" r="1"/><circle cx="20" cy="20" r="1"/></g>`
+  ),
+  40
+);
+// clover — a low pink puff over a trefoil leaf
+save(
+  'clover',
+  S(
+    '40 50',
+    `<path d="M20,48 C19,40 20,34 20,28" stroke="#5a8a42" stroke-width="2.5" fill="none"/>
+<g fill="#5a8a42"><ellipse cx="13" cy="38" rx="4.5" ry="5.5"/><ellipse cx="27" cy="38" rx="4.5" ry="5.5"/><ellipse cx="20" cy="42" rx="4.5" ry="5.5"/></g>
+<circle cx="20" cy="18" r="8.5" fill="#d87aae"/>
+<g fill="#e8a0c8"><circle cx="15" cy="15" r="2.4"/><circle cx="21" cy="13" r="2.4"/><circle cx="25" cy="17" r="2.4"/><circle cx="17" cy="20" r="2.4"/><circle cx="23" cy="21" r="2.4"/><circle cx="20" cy="17" r="2.4"/></g>
+<g fill="#f4c8de"><circle cx="18" cy="14" r="1.2"/><circle cx="23" cy="16" r="1.2"/><circle cx="19" cy="19" r="1.2"/></g>`
+  ),
+  40
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'fennec',
-  'fox',
-  'scorpion',
-  'beetle',
-  'lizard',
-  'hedgehog',
-  'moth_a',
-  'owl_a'
+  'foxglove',
+  'cornflower',
+  'clover',
+  'poppy',
+  'tulip',
+  'flower_b',
+  'flower_w',
+  'flower_y'
 ];
 const cols = 4,
   cell = 230,

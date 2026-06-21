@@ -1096,6 +1096,9 @@
         'flower_y',
         'flower_b',
         'tulip',
+        'foxglove',
+        'cornflower',
+        'clover',
         'swallow_a',
         'swallow_b',
         'cloud',
@@ -2386,8 +2389,8 @@
             swayers.push({s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6});
           }
           if (!snow) {
-            // a meadow draws from a wider mix now — the round pink/white blooms plus daisies,
-            // a blue floret spike and tulips (pink/white still the most common)
+            // a meadow draws from a wider mix now — the round pink/white blooms plus daisies, a
+            // blue floret spike, tulips, frilly cornflowers and low clover (pink/white most common)
             const FL = [
               'flower_p',
               'flower_w',
@@ -2396,8 +2399,24 @@
               'flower_y',
               'flower_b',
               'tulip',
-              'poppy'
+              'poppy',
+              'cornflower',
+              'clover',
+              'clover'
             ];
+            // a few foxglove spires stand tall above the low blooms
+            for (let i = 0, n = (Math.random() * 2.5) | 0; i < n; i++) {
+              const x = 80 + Math.random() * (VW - 160),
+                fg = spr(
+                  'foxglove',
+                  x,
+                  groundY(x) + 8,
+                  0.7 + Math.random() * 0.4
+                );
+              if (Math.random() < 0.5) fg.scale.x *= -1;
+              scene.addChild(fg);
+              swayers.push({s: fg, amp: 0.04, sp: 1.1, ph: Math.random() * 6});
+            }
             // the odd flowering or berry shrub dotted about the meadow
             for (let i = 0, n = (Math.random() * 3) | 0; i < n; i++) {
               const x = 80 + Math.random() * (VW - 160),
