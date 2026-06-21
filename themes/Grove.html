@@ -2854,7 +2854,12 @@
           for (const lp of lilies) if (!lp.isFrog) scene.addChild(lp);
           for (const lp of lilies) if (lp.isFrog) scene.addChild(lp);
           if (BI.water.drag && !snow) {
-            const dn = BI.water.drag === true ? 3 : BI.water.drag;
+            const dn = Math.max(
+              1,
+              (BI.water.drag === true ? 3 : BI.water.drag) +
+                ((Math.random() * 3) | 0) -
+                1
+            ); // ±1
             for (let i = 0; i < dn; i++) {
               const d = anim(
                 ['dragonfly_a', 'dragonfly_b'],
@@ -2880,7 +2885,12 @@
           }
           // fish cruise below the surface, rising now and then to dimple it or leap clear
           if (BI.water.fish) {
-            const fn = BI.water.fish === true ? 3 : BI.water.fish;
+            const fn = Math.max(
+              1,
+              (BI.water.fish === true ? 3 : BI.water.fish) +
+                ((Math.random() * 3) | 0) -
+                1
+            ); // ±1
             const koiPond = !!BI.water.fishSprite, // a koi pond shows its fish in full colour, just under the surface
               frames = BI.water.fishSprite || ['fish_a', 'fish_b'],
               subA = koiPond
@@ -3001,7 +3011,7 @@
           }
         }
         if (BI.flutter && !snow)
-          for (let i = 0; i < 4; i++) {
+          for (let i = 0, n = 2 + ((Math.random() * 5) | 0); i < n; i++) {
             const f = anim(
               ['butterfly_a', 'butterfly_b'],
               Math.random() * VW,
