@@ -1436,8 +1436,148 @@ save(
   120
 );
 
+// ======== NEW SPRITE VARIANTS: more trees, flowers and a second butterfly ========
+
+// birch — a slim white-barked, airy deciduous to break up the oaks
+save(
+  'birch',
+  S(
+    '130 210',
+    `
+<defs><radialGradient id="bch" cx="50%" cy="36%" r="64%"><stop offset="0" stop-color="#c4e67d"/><stop offset=".6" stop-color="#86c24a"/><stop offset="1" stop-color="#5a9636"/></radialGradient></defs>
+<path d="M60,208 C58,150 57,104 62,58 L72,58 C76,104 74,150 70,208 Z" fill="#eef1ea"/>
+<path d="M64,60 C60,104 61,154 62,206" stroke="#d2d9cd" stroke-width="1.6" fill="none"/>
+<g fill="#39403a"><path d="M57,92 h10 v3.2 h-10 z"/><path d="M66,118 h7 v2.6 h-7 z"/><path d="M58,146 h10 v3.2 h-10 z"/><path d="M66,172 h7 v2.6 h-7 z"/><path d="M60,196 h6 v2.4 h-6 z"/></g>
+<g stroke="#cdd4c8" stroke-width="2" fill="none" stroke-linecap="round"><path d="M64,74 C54,66 47,60 41,52"/><path d="M68,80 C78,72 86,66 92,58"/></g>
+<g fill="url(#bch)"><circle cx="64" cy="44" r="25"/><circle cx="40" cy="55" r="19"/><circle cx="88" cy="55" r="19"/><circle cx="52" cy="30" r="17"/><circle cx="78" cy="32" r="16"/><circle cx="66" cy="20" r="14"/></g>
+<g fill="#d8f094" opacity="0.55"><circle cx="54" cy="33" r="8"/><circle cx="75" cy="35" r="7"/><circle cx="65" cy="22" r="6"/></g>`
+  ),
+  120
+);
+
+// fir — a fuller, cooler conifer with soft drooping tiers, distinct from the sharp pine
+save(
+  'fir',
+  S(
+    '140 224',
+    `
+<defs><linearGradient id="fr" x1="0" y1="0" x2="0.5" y2="1"><stop offset="0" stop-color="#5aa46a"/><stop offset="1" stop-color="#1b5440"/></linearGradient></defs>
+<rect x="64" y="190" width="12" height="34" rx="3" fill="#664527"/>
+<g fill="url(#fr)">
+<path d="M70,14 C78,30 86,40 96,50 C84,46 76,48 70,48 C64,48 56,46 44,50 C54,40 62,30 70,14 Z"/>
+<path d="M70,44 C80,62 90,74 104,86 C88,80 78,82 70,82 C62,82 52,80 36,86 C50,74 60,62 70,44 Z"/>
+<path d="M70,78 C82,98 94,112 112,126 C92,118 80,120 70,120 C60,120 48,118 28,126 C46,112 58,98 70,78 Z"/>
+<path d="M70,114 C84,136 98,152 120,168 C96,158 82,160 70,160 C58,160 44,158 20,168 C42,152 56,136 70,114 Z"/>
+<path d="M70,152 C86,176 102,194 128,210 C100,198 84,200 70,200 C56,200 36,198 12,210 C38,194 54,176 70,152 Z"/></g>
+<g fill="#7cc086" opacity="0.4"><path d="M70,18 C76,32 82,41 90,49 C80,45 74,47 70,47 Z"/><path d="M70,48 C78,64 86,74 98,84 C86,79 76,81 70,81 Z"/><path d="M70,82 C80,100 90,113 104,124 C90,117 78,119 70,119 Z"/></g>`
+  ),
+  120
+);
+
+// poplar — a tall narrow column (Lombardy), great for lining a far bank or breaking the skyline
+save(
+  'poplar',
+  S(
+    '80 232',
+    `
+<defs><linearGradient id="pop" x1="0" y1="0" x2="1" y2="0.6"><stop offset="0" stop-color="#82bc4c"/><stop offset="1" stop-color="#3a7830"/></linearGradient></defs>
+<rect x="36" y="150" width="8" height="80" rx="3" fill="#664527"/>
+<path d="M40,6 C58,40 64,72 62,110 C61,142 54,170 40,198 C26,170 19,142 18,110 C16,72 22,40 40,6 Z" fill="url(#pop)"/>
+<path d="M40,12 C52,44 57,72 55,106 C50,80 45,52 40,32 Z" fill="#a4d66a" opacity="0.45"/>
+<path d="M40,32 C44,64 48,98 50,134 C47,162 44,182 40,198 C40,150 40,92 40,32 Z" fill="#2f6328" opacity="0.4"/>`
+  ),
+  70
+);
+
+// flower variants — genuinely different shapes, not just a recolour of the round bloom
+save(
+  'flower_y',
+  S(
+    '40 60',
+    `<path d="M20,58 L20,28" stroke="#4f9c34" stroke-width="3"/>
+<g fill="#fbf3d4">
+<ellipse cx="20" cy="9" rx="3.2" ry="8"/>
+<ellipse cx="20" cy="9" rx="3.2" ry="8" transform="rotate(45 20 19)"/>
+<ellipse cx="20" cy="9" rx="3.2" ry="8" transform="rotate(90 20 19)"/>
+<ellipse cx="20" cy="9" rx="3.2" ry="8" transform="rotate(135 20 19)"/>
+<ellipse cx="20" cy="9" rx="3.2" ry="8" transform="rotate(180 20 19)"/>
+<ellipse cx="20" cy="9" rx="3.2" ry="8" transform="rotate(225 20 19)"/>
+<ellipse cx="20" cy="9" rx="3.2" ry="8" transform="rotate(270 20 19)"/>
+<ellipse cx="20" cy="9" rx="3.2" ry="8" transform="rotate(315 20 19)"/></g>
+<circle cx="20" cy="19" r="5.5" fill="#eaa72e"/><circle cx="18.5" cy="17.5" r="2.6" fill="#f6d36a"/>`
+  ),
+  44
+);
+save(
+  'flower_b',
+  S(
+    '40 60',
+    `<path d="M20,58 L20,22" stroke="#3f7a2e" stroke-width="3"/>
+<path d="M20,40 C11,39 8,32 11,28 C14,34 20,36 20,40 Z" fill="#3f7a2e"/>
+<g fill="#6f86dd">
+<circle cx="20" cy="20" r="3.6"/>
+<circle cx="15.5" cy="26" r="3.8"/><circle cx="24.5" cy="26" r="3.8"/>
+<circle cx="13" cy="33" r="4.2"/><circle cx="20" cy="32" r="4.2"/><circle cx="27" cy="33" r="4.2"/>
+<circle cx="14.5" cy="40" r="3.8"/><circle cx="25.5" cy="40" r="3.8"/></g>
+<g fill="#9fb1f0" opacity="0.6"><circle cx="18" cy="24" r="1.8"/><circle cx="22" cy="30" r="1.8"/><circle cx="17" cy="37" r="1.6"/></g>`
+  ),
+  44
+);
+save(
+  'tulip',
+  S(
+    '40 60',
+    `<path d="M20,58 L20,30" stroke="#3f8a2e" stroke-width="3.5"/>
+<path d="M20,42 C10,40 8,31 12,27 C15,35 20,37 20,42 Z" fill="#3f8a2e"/>
+<path d="M12,22 C12,13 16,7 20,7 C24,7 28,13 28,22 C28,28 24,31 20,31 C16,31 12,28 12,22 Z" fill="#e0556a"/>
+<path d="M20,8 C18,14 18,24 20,31 C22,24 22,14 20,8 Z" fill="#c33f54" opacity="0.5"/>
+<path d="M12.5,22 C14,16 16,11 20,8 C18,15 17,22 18,29 Z" fill="#f3899a" opacity="0.6"/>`
+  ),
+  44
+);
+
+// swallowtail — a second butterfly with a real different silhouette (tails) and pattern, not a tint
+save(
+  'swallow_a',
+  S(
+    '84 74',
+    `<g fill="#f4cf4a">
+<ellipse cx="27" cy="28" rx="18" ry="13"/><ellipse cx="57" cy="28" rx="18" ry="13"/>
+<path d="M33,40 C27,52 24,60 27,67 L33,58 L37,67 L41,55 Z"/>
+<path d="M51,40 C57,52 60,60 57,67 L51,58 L47,67 L43,55 Z"/></g>
+<g stroke="#2b2418" stroke-width="2.6" fill="none" stroke-linecap="round">
+<path d="M17,18 C16,26 18,34 23,39"/><path d="M28,15 C26,25 28,34 31,40"/>
+<path d="M67,18 C68,26 66,34 61,39"/><path d="M56,15 C58,25 56,34 53,40"/></g>
+<g fill="#3f86c6"><circle cx="33" cy="58" r="2.6"/><circle cx="51" cy="58" r="2.6"/></g>
+<circle cx="42" cy="60" r="2.2" fill="#e07a2e"/>
+<ellipse cx="42" cy="40" rx="2.8" ry="17" fill="#241c12"/><circle cx="42" cy="22" r="3" fill="#241c12"/>`
+  ),
+  84
+);
+save(
+  'swallow_b',
+  S(
+    '84 74',
+    `<g fill="#eac43e">
+<ellipse cx="36" cy="28" rx="9" ry="13"/><ellipse cx="48" cy="28" rx="9" ry="13"/>
+<path d="M39,40 C36,52 35,60 37,67 L41,57 Z"/><path d="M45,40 C48,52 49,60 47,67 L43,57 Z"/></g>
+<g stroke="#2b2418" stroke-width="2.2" fill="none" stroke-linecap="round"><path d="M33,18 C32,26 33,34 37,40"/><path d="M51,18 C52,26 51,34 47,40"/></g>
+<ellipse cx="42" cy="40" rx="2.8" ry="17" fill="#241c12"/><circle cx="42" cy="22" r="3" fill="#241c12"/>`
+  ),
+  84
+);
+
 // ---- contact sheet of new + polished ----
-const review = ['whale_back', 'whale_fluke'];
+const review = [
+  'birch',
+  'fir',
+  'poplar',
+  'flower_y',
+  'flower_b',
+  'tulip',
+  'swallow_a',
+  'swallow_b'
+];
 const cols = 4,
   cell = 230,
   pad = 14,
