@@ -319,6 +319,21 @@
       // vary a base count by roughly ±a third per build (min 1) — so scatters aren't a fixed number
       const vc = (n) =>
         Math.max(1, Math.round(n * (0.68 + Math.random() * 0.5)));
+      // nudge a tint a little per instance (lighter/darker, warmer/cooler), so a stand of one sprite
+      // isn't a single flat shade — the foliage reads as living, not stamped copies
+      const tintJit = (base, amt) => {
+        const a = amt == null ? 0.1 : amt,
+          ch = (v) =>
+            Math.max(
+              0,
+              Math.min(255, (v * (1 + (Math.random() - 0.5) * 2 * a)) | 0)
+            );
+        return (
+          (ch((base >> 16) & 255) << 16) |
+          (ch((base >> 8) & 255) << 8) |
+          ch(base & 255)
+        );
+      };
       // lerp a hex colour toward cool frost-white (for whitening hills/forest in winter — a job a
       // multiply tint can't do, since multiplying only darkens)
       const frostHex = (c, a) => {
@@ -544,6 +559,7 @@
             ['pine', 1.12, 880],
             ['pine', 0.8, 1170]
           ],
+          treeExtras: ['fir', 'birch'], // snow-laden firs and the odd birch among the pines
           water: null,
           walker: ['goat', 'goat_b'],
           walkerScale: 0.52,
@@ -667,6 +683,7 @@
             ['pine', 0.72, 250],
             ['pine', 0.66, 1010]
           ],
+          treeExtras: ['fir'], // snowy firs among the fjord pines
           water: {
             top: '#284766',
             bot: '#101f33',
@@ -990,6 +1007,9 @@
         'birch',
         'fir',
         'poplar',
+        'birch_snow',
+        'fir_snow',
+        'poplar_snow',
         'grass',
         'flower_p',
         'flower_w',
@@ -2105,8 +2125,16 @@
         }
         // in a snowy scene, lay a snow sprite over each pine/oak as a child, so it settles on the
         // branches and sways with the tree; its alpha tracks how much snow has piled up
+        const SNOWABLE = {
+          pine: 1,
+          oak: 1,
+          bush: 1,
+          birch: 1,
+          fir: 1,
+          poplar: 1
+        };
         const snowCap = (t, n) => {
-          if (snow && (n === 'pine' || n === 'oak' || n === 'bush')) {
+          if (snow && SNOWABLE[n]) {
             const ov = new PIXI.Sprite(T(n + '_snow'));
             ov.anchor.set(0.5, 1); // same registration as the tree, so it overlays exactly
             ov.alpha = 0;
@@ -2121,9 +2149,9 @@
             ...[...BI.mid, ...BI.near]
               .map((e) => e[0])
               .filter((n) => !RIGID[n]),
-            // biome-appropriate extra species mixed in by the variety system — held back in snow,
-            // since the new trees have no snow overlay yet (the oaks/pines/bushes do)
-            ...(!snow && BI.treeExtras ? BI.treeExtras : [])
+            // biome-appropriate extra species mixed in by the variety system (they have snow
+            // overlays now, so they read in winter too)
+            ...(BI.treeExtras || [])
           ])
         ];
         const varyLayer = (layer) => {
@@ -2158,7 +2186,7 @@
               470 + Math.sin(jx * 0.006 + midPh) * 32,
               sc * (0.86 + Math.random() * 0.28)
             );
-          t.tint = BI.interior ? 0xffffff : mulTint(0xcfe3d0, folTint);
+          t.tint = BI.interior ? 0xffffff : tintJit(mulTint(0xcfe3d0, folTint));
           if (!RIGID[n] && Math.random() < 0.5) t.scale.x *= -1; // mirror about half of them
           scene.addChild(t);
           if (!RIGID[n] && !BI.interior)
@@ -2168,7 +2196,7 @@
         for (const [n, sc, x] of varyLayer(BI.near)) {
           const jx = x + (Math.random() - 0.5) * 64,
             t = spr(n, jx, groundY(jx) + 4, sc * (0.86 + Math.random() * 0.26));
-          t.tint = BI.interior ? 0xffffff : folTint;
+          t.tint = BI.interior ? 0xffffff : tintJit(folTint);
           if (!RIGID[n] && Math.random() < 0.5) t.scale.x *= -1;
           scene.addChild(t);
           if (!RIGID[n] && !BI.interior)
@@ -2228,7 +2256,7 @@
           for (let i = 0, n = 11 + ((Math.random() * 10) | 0); i < n; i++) {
             const x = 40 + Math.random() * (VW - 80),
               g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.5);
-            g.tint = folTint;
+            g.tint = tintJit(folTint, 0.13);
             scene.addChild(g);
             swayers.push({s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6});
           }
@@ -2659,6 +2687,7 @@
             if (BI.walker.length > 1) d.stop();
             else d.gotoAndStop(0);
             d.graze = BI.graze;
+            d.tint = tintJit(0xffffff, 0.06); // each animal a slightly different shade
             if (heron) {
               // a heron wades the shallows: mostly statue-still, the odd slow step, the odd strike
               d.isHeron = true;
@@ -2688,7 +2717,7 @@
         // (with the herd already able to be empty, that gives quiet scenes through to a busy one)
         if (BI.critter && Math.random() > 0.3) {
           fox = spr(BI.critter, -80, groundY(-80) + 6, BI.critterScale);
-          if (BI.critterTint) fox.tint = BI.critterTint;
+          fox.tint = tintJit(BI.critterTint || 0xffffff, 0.06);
           fox.dir = Math.random() < 0.5 ? 1 : -1; // comes in from either side at its own trot
           fox.spd = 1.1 + Math.random() * 0.9;
           fox.x = fox.dir > 0 ? -80 : VW + 80;
@@ -2699,6 +2728,7 @@
           rabbit = spr(BI.hopper, 240 + Math.random() * (VW - 480), 0, 0.55);
           rabbit.y = groundY(rabbit.x) + 6;
           rabbit.baseY = rabbit.y;
+          rabbit.tint = tintJit(0xffffff, 0.07); // brown/grey coats vary a little
           rabbit.dir = 1; // sprite faces right; dir flips (and mirrors it) when it turns around
           scene.addChild(rabbit);
         } else rabbit = null;
