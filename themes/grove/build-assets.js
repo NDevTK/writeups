@@ -400,12 +400,32 @@ save(
   80
 );
 
-// ---- NEW: falling leaf (white base, tinted per-leaf in the engine) ----
+// ---- NEW: falling leaves (white base, tinted per-leaf in the engine) ----
+// three silhouettes tumble down in autumn: a simple ovate, a pointed maple, a round-lobed oak
 save(
   'leaf',
   S(
     '40 40',
     `<path d="M20,4 C31,7 35,18 31,30 C28,37 18,38 12,30 C7,23 9,11 20,4 Z" fill="#ffffff"/><path d="M20,7 L23,31 M20,15 L13,20 M21,20 L29,18" stroke="#d2d2d2" stroke-width="1.4" fill="none"/>`
+  ),
+  36
+);
+save(
+  'leaf_m',
+  S(
+    '40 40',
+    `<path d="M20,4 L23,13 L31,11 L27,19 L35,22 L27,25 L30,33 L22,28 L20,36 L18,28 L10,33 L13,25 L5,22 L13,19 L9,11 L17,13 Z" fill="#ffffff"/>
+<path d="M20,34 L20,38" stroke="#d2d2d2" stroke-width="1.6" stroke-linecap="round"/>
+<path d="M20,31 L20,9 M20,23 L31,13 M20,23 L9,13 M20,27 L34,22 M20,27 L6,22" stroke="#d2d2d2" stroke-width="1.1" fill="none" opacity="0.85"/>`
+  ),
+  36
+);
+save(
+  'leaf_o',
+  S(
+    '40 40',
+    `<path d="M20,4 C24,5 24,9 27,10 C31,10 31,14 28,15 C32,16 32,20 28,21 C32,22 31,26 27,27 C24,28 24,32 20,35 C16,32 16,28 13,27 C9,26 8,22 12,21 C8,20 8,16 12,15 C9,14 9,10 13,10 C16,9 16,5 20,4 Z" fill="#ffffff"/>
+<path d="M20,6 L20,33 M20,14 L27,12 M20,14 L13,12 M20,21 L28,20 M20,21 L12,20" stroke="#d2d2d2" stroke-width="1.1" fill="none" opacity="0.85"/>`
   ),
   36
 );
@@ -2787,7 +2807,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['frog', 'frog_b', 'frog_y', 'duckling'];
+const review = ['leaf', 'leaf_m', 'leaf_o', 'petal'];
 const cols = 4,
   cell = 230,
   pad = 14,
