@@ -1114,6 +1114,10 @@
         'octopus',
         'goat_rest',
         'giraffe_rest',
+        'squirrel_g',
+        'squirrel_k',
+        'rabbit_g',
+        'rabbit_k',
         'grass',
         'flower_p',
         'flower_w',
@@ -3153,10 +3157,17 @@
           scene.addChild(fox);
         } else fox = null;
         if (BI.hopper && Math.random() > 0.25) {
-          rabbit = spr(BI.hopper, 240 + Math.random() * (VW - 480), 0, 0.55);
+          // a rabbit comes in a few coats (sandy, grey, the odd charcoal); the hare stays itself
+          const rbCoat =
+            BI.hopper === 'rabbit'
+              ? ['rabbit', 'rabbit', 'rabbit_g', 'rabbit_k'][
+                  (Math.random() * 4) | 0
+                ]
+              : BI.hopper;
+          rabbit = spr(rbCoat, 240 + Math.random() * (VW - 480), 0, 0.55);
           rabbit.y = groundY(rabbit.x) + 6;
           rabbit.baseY = rabbit.y;
-          rabbit.tint = tintJit(0xffffff, 0.07); // brown/grey coats vary a little
+          rabbit.tint = tintJit(0xffffff, 0.05); // a little extra variation on top of the coat
           rabbit.dir = 1; // sprite faces right; dir flips (and mirrors it) when it turns around
           scene.addChild(rabbit);
         } else rabbit = null;
@@ -3188,9 +3199,17 @@
         }
         if (BI.squirrel && Math.random() < 0.6) {
           // a squirrel forages the clearing floor: it sits and nibbles, then darts to a fresh spot
-          const sx = 180 + Math.random() * (VW - 360);
+          // — a different coat each visit (red, grey, the odd black)
+          const sx = 180 + Math.random() * (VW - 360),
+            sqCoat = [
+              'squirrel',
+              'squirrel_g',
+              'squirrel',
+              'squirrel_g',
+              'squirrel_k'
+            ][(Math.random() * 5) | 0];
           squirrel = spr(
-            'squirrel',
+            sqCoat,
             sx,
             groundY(sx) + 6,
             0.32 + Math.random() * 0.1

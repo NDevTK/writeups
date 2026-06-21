@@ -294,21 +294,22 @@ save(
   80
 );
 
-save(
-  'rabbit',
+// the rabbit's coat varies too — sandy brown, grey, or a dark charcoal (the tail stays white)
+const rabbitSvg = (g0, g1, foot) =>
   S(
     '104 116',
-    `<defs><linearGradient id="rb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8b49a"/><stop offset="1" stop-color="#94795f"/></linearGradient></defs>
+    `<defs><linearGradient id="rb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0}"/><stop offset="1" stop-color="${g1}"/></linearGradient></defs>
 <path d="M49,58 C43,28 41,8 48,5 C55,4 57,26 56,54 Z" fill="url(#rb)"/><path d="M62,56 C59,28 62,8 70,8 C78,11 72,32 69,54 Z" fill="url(#rb)"/>
 <path d="M48,50 C46,30 46,18 49,12" stroke="#e7b9b0" stroke-width="3.4" fill="none"/><path d="M65,50 C64,32 66,20 70,14" stroke="#e7b9b0" stroke-width="3" fill="none"/>
 <ellipse cx="36" cy="94" rx="21" ry="18" fill="url(#rb)"/><ellipse cx="53" cy="84" rx="23" ry="21" fill="url(#rb)"/>
-<circle cx="21" cy="99" r="10" fill="#f2ebe0"/><ellipse cx="60" cy="107" rx="16" ry="5.5" fill="#bda78c"/>
+<circle cx="21" cy="99" r="10" fill="#f2ebe0"/><ellipse cx="60" cy="107" rx="16" ry="5.5" fill="${foot}"/>
 <circle cx="64" cy="56" r="16" fill="url(#rb)"/><path d="M75,55 C81,56 83,62 78,66 C74,67 71,63 72,58 Z" fill="url(#rb)"/>
 <path d="M80,59 l4.5,2.3 l-4.5,2.3 Z" fill="#c97f8a"/><path d="M80,63.4 q-2.6,3.4 -6,2.4" stroke="#7a5648" stroke-width="1.2" fill="none"/>
 <circle cx="65" cy="52" r="2.6" fill="#1a1208"/><circle cx="66" cy="51" r="0.8" fill="#fff"/>`
-  ),
-  104
-);
+  );
+save('rabbit', rabbitSvg('#c8b49a', '#94795f', '#bda78c'), 104);
+save('rabbit_g', rabbitSvg('#b2b6bc', '#7e828a', '#9a9ea4'), 104);
+save('rabbit_k', rabbitSvg('#5e5a54', '#3a362f', '#4e4a44'), 104);
 
 // ---- NEW: fox (trotting, faces right) ----
 save(
@@ -1896,22 +1897,35 @@ save(
 );
 
 // ======== a squirrel — a cross-biome critter that sits and nibbles ========
-save(
-  'squirrel',
+// the squirrel comes in a few coats — red, grey and the odd melanistic black
+const squirrelSvg = (g0, g1, ear, belly, inner) =>
   S(
     '70 66',
-    `<defs><linearGradient id="sq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bc6e3c"/><stop offset="1" stop-color="#8a4e28"/></linearGradient></defs>
+    `<defs><linearGradient id="sq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0}"/><stop offset="1" stop-color="${g1}"/></linearGradient></defs>
 <path d="M22,58 C7,54 3,37 9,23 C15,11 27,11 31,19 C23,19 15,27 17,39 C19,49 27,53 33,53 C29,57 25,59 22,58 Z" fill="url(#sq)"/>
-<path d="M13,31 C11,23 15,17 21,15 C17,21 17,29 21,35 Z" fill="#d49058" opacity="0.6"/>
+<path d="M13,31 C11,23 15,17 21,15 C17,21 17,29 21,35 Z" fill="${inner}" opacity="0.6"/>
 <path d="M34,57 C30,45 32,33 40,29 C48,25 56,31 56,43 C56,53 50,59 44,59 C40,59 36,59 34,57 Z" fill="url(#sq)"/>
 <circle cx="49" cy="25" r="11" fill="url(#sq)"/>
-<path d="M43,17 C41,11 43,7 47,9 C47,13 46,17 45,19 Z" fill="#8a4e28"/>
-<path d="M55,17 C57,11 55,7 51,9 C51,13 52,17 53,19 Z" fill="#8a4e28"/>
-<path d="M40,53 C38,43 40,35 45,33 C44,41 44,49 46,55 C43,56 41,55 40,53 Z" fill="#e8c89c"/>
+<path d="M43,17 C41,11 43,7 47,9 C47,13 46,17 45,19 Z" fill="${ear}"/>
+<path d="M55,17 C57,11 55,7 51,9 C51,13 52,17 53,19 Z" fill="${ear}"/>
+<path d="M40,53 C38,43 40,35 45,33 C44,41 44,49 46,55 C43,56 41,55 40,53 Z" fill="${belly}"/>
 <circle cx="45" cy="40" r="3.4" fill="#a06a3a"/>
 <circle cx="52" cy="24" r="2" fill="#140e09"/><circle cx="52.6" cy="23.4" r="0.6" fill="#fff"/>
 <circle cx="58" cy="27" r="1.6" fill="#3a241a"/>`
-  ),
+  );
+save(
+  'squirrel',
+  squirrelSvg('#bc6e3c', '#8a4e28', '#8a4e28', '#e8c89c', '#d49058'),
+  62
+);
+save(
+  'squirrel_g',
+  squirrelSvg('#9aa0a8', '#6a7078', '#6a7078', '#eef1f3', '#b6bcc2'),
+  62
+);
+save(
+  'squirrel_k',
+  squirrelSvg('#4c4c50', '#2a2a2e', '#26262a', '#7a7a7e', '#5e5e62'),
   62
 );
 
@@ -2698,14 +2712,14 @@ save(
 
 // ---- contact sheet of new + polished ----
 const review = [
-  'goat_rest',
-  'goat',
-  'giraffe_rest',
-  'giraffe',
-  'deer_rest',
-  'deer_a',
-  'octopus',
-  'moorhen'
+  'squirrel',
+  'squirrel_g',
+  'squirrel_k',
+  'fox',
+  'rabbit',
+  'rabbit_g',
+  'rabbit_k',
+  'hare'
 ];
 const cols = 4,
   cell = 230,
