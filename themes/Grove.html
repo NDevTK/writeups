@@ -166,6 +166,8 @@
         wetness = 0,
         snowAcc = 0, // settled snow depth on the ground (0..1)
         snowI = 0, // snowfall intensity right now (front-driven, cold scenes)
+        snowRate = 1, // per-build multiplier on how fast snow settles/melts (variety)
+        iceRate = 1, // per-build multiplier on how fast the pond freezes/thaws (variety)
         temp = 0, // biome temperature (~degrees, 0 = freezing): climate + season + time of day + weather
         iceAmt = 0, // how frozen the pond is (0..1), driven by temperature
         rainbow = 0,
@@ -1107,12 +1109,11 @@
         g.fillRect(0, 0, 1, h);
         return PIXI.Texture.from(c);
       }
-      function hill(crestY, amp, color, phase) {
+      function hill(contourFn, color) {
         const g = new PIXI.Graphics();
         g.beginFill(color);
         g.moveTo(-40, VH);
-        for (let x = -40; x <= VW + 40; x += 8)
-          g.lineTo(x, crestY + Math.sin(x * 0.006 + phase) * amp);
+        for (let x = -40; x <= VW + 40; x += 8) g.lineTo(x, contourFn(x));
         g.lineTo(VW + 40, VH);
         g.closePath();
         g.endFill();
@@ -1399,7 +1400,19 @@
           auroraG.endFill();
         }
       }
-      const groundY = (x) => 540 + Math.sin(x * 0.006 + 2.4) * 26;
+      // the ground contour the trees/animals stand on — its wavelength, phase, height and roll are
+      // randomised per build (below), so the land is a different shape every visit
+      let gFreq = 0.006,
+        gPh = 2.4,
+        gAmp = 26,
+        gBase = 540,
+        gFreq2 = 0.015,
+        gPh2 = 0,
+        gAmp2 = 0;
+      const groundY = (x) =>
+        gBase +
+        Math.sin(x * gFreq + gPh) * gAmp +
+        Math.sin(x * gFreq2 + gPh2) * gAmp2;
       // leave a footprint when an animal has walked a stride over settled snow; trails fill in over time
       function dropTrack(obj, kind, stride) {
         if (!obj || obj.visible === false || snowAcc < 0.22) return;
@@ -1782,10 +1795,31 @@
           const fe = spr(BI.feature, 640, 486, 0.95);
           scene.addChild(fe);
         } // large background landmark (in front of the distant range, behind the hills)
+        // randomise the land for this build: the front ground (gFreq/gPh/gAmp…, set above) carries
+        // the trees; two rolling background bands get their own wave each. Stored as contour
+        // functions so the crest snow follows whatever shape they take.
+        gFreq = 0.0042 + Math.random() * 0.0045; // wavelength of the rolls
+        gPh = Math.random() * 6.283;
+        gAmp = 17 + Math.random() * 17; // flatter ↔ hillier
+        gBase = 530 + Math.random() * 10;
+        gFreq2 = 0.013 + Math.random() * 0.01; // a second, shorter roll for a less sine-y line
+        gPh2 = Math.random() * 6.283;
+        gAmp2 = 4 + Math.random() * 8;
+        const wave = (cy, a, p, f) => (x) => cy + Math.sin(x * f + p) * a;
         const HILLS = [
-          [420, 26, 0],
-          [470, 30, 1.3],
-          [540, 26, 2.4]
+          wave(
+            396 + Math.random() * 28,
+            18 + Math.random() * 15,
+            Math.random() * 6.283,
+            0.004 + Math.random() * 0.004
+          ),
+          wave(
+            450 + Math.random() * 24,
+            20 + Math.random() * 15,
+            Math.random() * 6.283,
+            0.0045 + Math.random() * 0.004
+          ),
+          groundY // the front band IS the ground the trees and animals stand on
         ];
         hillBands.length = 0;
         if (BI.cloudSea) {
@@ -1936,14 +1970,14 @@
             0.62;
           scene.addChild(cloudGlow);
         } else {
-          for (const hb of HILLS) hillBands.push(hb); // remembered so settling snow can thicken each crest over time
-          HILLS.forEach(([cy, am, ph], i) => {
+          for (const fn of HILLS) hillBands.push(fn); // remembered so settling snow can thicken each crest over time
+          HILLS.forEach((fn, i) => {
             // winter whitens the actual hill colour (deeper on the near bands), then the seasonal
             // multiply tint still cools it — so the slopes read as snow, not green under a wash
             const base = snow
               ? frostHex(BI.hills[i], 0.45 + i * 0.12)
               : BI.hills[i];
-            const hh = hill(cy, am, base, ph);
+            const hh = hill(fn, base);
             hh.tint = hillTint;
             scene.addChild(hh);
           });
@@ -2067,17 +2101,28 @@
             snowTrees.push(ov);
           }
         };
+        // jitter every tree's spot, size and facing per build so a stand never repeats exactly
+        const midPh = Math.random() * 6.283;
         for (const [n, sc, x] of BI.mid) {
-          const t = spr(n, x, 482 + Math.sin(x * 0.006 + 1.3) * 30, sc);
+          const jx = x + (Math.random() - 0.5) * 70,
+            t = spr(
+              n,
+              jx,
+              470 + Math.sin(jx * 0.006 + midPh) * 32,
+              sc * (0.86 + Math.random() * 0.28)
+            );
           t.tint = BI.interior ? 0xffffff : mulTint(0xcfe3d0, folTint);
+          if (!RIGID[n] && Math.random() < 0.5) t.scale.x *= -1; // mirror about half of them
           scene.addChild(t);
           if (!RIGID[n] && !BI.interior)
             swayers.push({s: t, amp: 0.012, sp: 0.7, ph: Math.random() * 6});
           snowCap(t, n);
         }
         for (const [n, sc, x] of BI.near) {
-          const t = spr(n, x, groundY(x) + 4, sc);
+          const jx = x + (Math.random() - 0.5) * 64,
+            t = spr(n, jx, groundY(jx) + 4, sc * (0.86 + Math.random() * 0.26));
           t.tint = BI.interior ? 0xffffff : folTint;
+          if (!RIGID[n] && Math.random() < 0.5) t.scale.x *= -1;
           scene.addChild(t);
           if (!RIGID[n] && !BI.interior)
             swayers.push({s: t, amp: 0.02, sp: 0.9, ph: Math.random() * 6});
@@ -2133,7 +2178,7 @@
             scene.addChild(g);
           }
         if (BI.ground === 'meadow') {
-          for (let i = 0; i < 16; i++) {
+          for (let i = 0, n = 11 + ((Math.random() * 10) | 0); i < n; i++) {
             const x = 40 + Math.random() * (VW - 80),
               g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.5);
             g.tint = folTint;
@@ -2141,7 +2186,7 @@
             swayers.push({s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6});
           }
           if (!snow)
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0, n = 6 + ((Math.random() * 8) | 0); i < n; i++) {
               const x = 60 + Math.random() * (VW - 120),
                 f = spr(
                   Math.random() < 0.5 ? 'flower_p' : 'flower_w',
@@ -2523,7 +2568,9 @@
         snowing = snow; // cold scene: precipitation falls as snow rather than rain
         weatherIsSnow = weatherKind === 'flake';
         snowI = 0;
-        snowAcc = snowing ? 0.4 : 0; // cold scenes open with a base cover that squalls deepen and clear spells melt
+        snowAcc = snowing ? 0.22 + Math.random() * 0.36 : 0; // a different base depth each visit; squalls deepen it, clear spells melt it
+        snowRate = 0.7 + Math.random() * 0.7; // some scenes settle/melt faster than others
+        iceRate = 0.6 + Math.random() * 0.9; // the pond freezes at its own pace too
         temp =
           (TEMP_BASE[nowBiome()] ?? 9) +
           (BI.seasonal ? (SEASON_TEMP[nowSeason()] ?? 0) : 0); // seed near the climate so it doesn't have to thaw/freeze from 0
@@ -2543,17 +2590,28 @@
             deer.fishTmr = 2 + Math.random() * 4;
             deer.strike = 0;
             deer.stepTarget = null;
+          } else {
+            // start somewhere different, facing either way, ambling at its own pace each visit
+            deer.dir = Math.random() < 0.5 ? 1 : -1;
+            deer.spd = 0.26 + Math.random() * 0.22;
+            deer.x = 160 + Math.random() * (VW - 320);
+            deer.y = groundY(deer.x) + 8;
+            deer.scale.x = deer.dir * Math.abs(deer.scale.x);
           }
           scene.addChild(deer);
         } else deer = null;
         if (BI.critter) {
           fox = spr(BI.critter, -80, groundY(-80) + 6, BI.critterScale);
           if (BI.critterTint) fox.tint = BI.critterTint;
+          fox.dir = Math.random() < 0.5 ? 1 : -1; // comes in from either side at its own trot
+          fox.spd = 1.1 + Math.random() * 0.9;
+          fox.x = fox.dir > 0 ? -80 : VW + 80;
+          fox.scale.x = fox.dir * Math.abs(fox.scale.x);
           scene.addChild(fox);
-          fox.dir = 1;
         } else fox = null;
         if (BI.hopper) {
-          rabbit = spr(BI.hopper, 760, groundY(760) + 6, 0.55);
+          rabbit = spr(BI.hopper, 240 + Math.random() * (VW - 480), 0, 0.55);
+          rabbit.y = groundY(rabbit.x) + 6;
           rabbit.baseY = rabbit.y;
           rabbit.dir = 1; // sprite faces right; dir flips (and mirrors it) when it turns around
           scene.addChild(rabbit);
@@ -3500,8 +3558,8 @@
             warmth = Math.max(0, temp); // degrees above
           // snow settles faster the colder and heavier the fall; melts faster the warmer it gets
           if (snowing) {
-            const build = snowI * (0.00028 + coldness * 0.00006),
-              melt = 0.00004 + warmth * 0.00012;
+            const build = snowI * (0.00028 + coldness * 0.00006) * snowRate,
+              melt = (0.00004 + warmth * 0.00012) * snowRate;
             snowAcc = Math.max(0, Math.min(1, snowAcc + (build - melt) * dt));
           } else snowAcc += (0 - snowAcc) * 0.02 * dt;
           // ice forms on a freezable pond once it's below freezing (more the colder), and thaws when it warms
@@ -3510,7 +3568,10 @@
               ? Math.min(1, coldness / 7)
               : 0;
           iceAmt +=
-            (iceTarget - iceAmt) * (iceTarget > iceAmt ? 0.004 : 0.006) * dt;
+            (iceTarget - iceAmt) *
+            (iceTarget > iceAmt ? 0.004 : 0.006) *
+            iceRate *
+            dt;
           if (rainbowLife > 0) {
             rainbowLife -= dt / 60;
             rainbow = Math.sin(Math.max(0, 1 - rainbowLife / 24) * Math.PI);
@@ -3621,12 +3682,12 @@
             const lift = snowAcc * 5, // crest creeps a touch higher as it deepens
               thick = 7 + snowAcc * 26; // and gets fatter underneath
             crestG.beginFill(0xeef5fc, Math.min(1, 0.7 + snowAcc * 0.3));
-            for (const [cy, am, ph] of hillBands) {
-              crestG.moveTo(-40, cy + Math.sin(-40 * 0.006 + ph) * am - lift);
+            for (const fn of hillBands) {
+              crestG.moveTo(-40, fn(-40) - lift);
               for (let x = -40; x <= VW + 40; x += 8)
-                crestG.lineTo(x, cy + Math.sin(x * 0.006 + ph) * am - lift);
+                crestG.lineTo(x, fn(x) - lift);
               for (let x = VW + 40; x >= -40; x -= 8)
-                crestG.lineTo(x, cy + Math.sin(x * 0.006 + ph) * am + thick);
+                crestG.lineTo(x, fn(x) + thick);
               crestG.closePath();
             }
             crestG.endFill();
@@ -4154,7 +4215,7 @@
             deerTimer -= dt / 60;
             if (!deer.graze) deerMode = 'walk';
             if (deerMode === 'walk') {
-              deer.x += 0.35 * dt;
+              deer.x += deer.dir * (deer.spd ?? 0.35) * dt;
               if (multi && !deer.playing) deer.play();
               if (deer.graze && deerTimer < 0) {
                 deerMode = 'graze';
@@ -4165,7 +4226,8 @@
               deerMode = 'walk';
               deerTimer = 5 + Math.random() * 6;
             }
-            if (deer.x > VW + 60) deer.x = -60;
+            if (deer.dir > 0 && deer.x > VW + 60) deer.x = -60;
+            else if (deer.dir < 0 && deer.x < -60) deer.x = VW + 60;
             deer.y =
               groundY(deer.x) +
               8 +
@@ -4178,18 +4240,20 @@
         if (fox) {
           foxTimer -= dt / 60;
           if (fox.visible !== false) {
-            fox.x += fox.dir * 1.5 * dt;
+            fox.x += fox.dir * (fox.spd ?? 1.5) * dt;
             fox.y = groundY(fox.x) + 6 + Math.abs(Math.sin(t * 7)) * -2;
             dropTrack(fox, 'fox', 18);
-            if (fox.x > VW + 80) {
+            if (fox.dir > 0 ? fox.x > VW + 80 : fox.x < -80) {
               fox.visible = false;
               foxTimer = 8 + Math.random() * 10;
             }
           } else if (foxTimer < 0 && !raining) {
-            // stays tucked away until the shower passes, then trots out again
+            // stays tucked away until the shower passes, then trots out from either side, any pace
             fox.visible = true;
-            fox.x = -80;
-            fox.dir = 1;
+            fox.dir = Math.random() < 0.5 ? 1 : -1;
+            fox.spd = 1.1 + Math.random() * 0.9;
+            fox.x = fox.dir > 0 ? -80 : VW + 80;
+            fox.scale.x = fox.dir * Math.abs(fox.scale.x);
           }
         }
 
