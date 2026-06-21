@@ -2446,16 +2446,46 @@ save(
   46
 );
 
+// ======== a rowan — a light green crown hung with clusters of red-orange berries ========
+save(
+  'rowan',
+  S(
+    '180 210',
+    `<defs><radialGradient id="rwn" gradientUnits="userSpaceOnUse" cx="64" cy="54" r="86"><stop offset="0" stop-color="#86c258"/><stop offset=".55" stop-color="#5a9a3e"/><stop offset="1" stop-color="#3a6f28"/></radialGradient></defs>
+<path d="M86,206 C85,168 84,148 85,116 L98,116 C99,148 98,176 95,206 Z" fill="#7a5436"/>
+<path d="M91,150 C82,142 74,140 67,135" stroke="#6a4a30" stroke-width="4" fill="none" stroke-linecap="round"/>
+<path d="M92,148 C100,138 108,136 116,132" stroke="#6a4a30" stroke-width="4" fill="none" stroke-linecap="round"/>
+<g fill="url(#rwn)"><circle cx="90" cy="74" r="40"/><circle cx="56" cy="86" r="28"/><circle cx="124" cy="84" r="28"/><circle cx="72" cy="52" r="26"/><circle cx="110" cy="54" r="26"/><circle cx="92" cy="40" r="22"/></g>
+<g fill="#9ed070" opacity="0.5"><circle cx="74" cy="50" r="11"/><circle cx="106" cy="52" r="8"/></g>
+<g fill="#dd501c"><circle cx="60" cy="80" r="3.6"/><circle cx="56" cy="86" r="3.2"/><circle cx="64" cy="86" r="3"/><circle cx="104" cy="80" r="3.6"/><circle cx="100" cy="86" r="3.2"/><circle cx="108" cy="86" r="3"/><circle cx="84" cy="98" r="3.4"/><circle cx="89" cy="102" r="3"/><circle cx="80" cy="103" r="2.8"/><circle cx="118" cy="66" r="3.2"/><circle cx="122" cy="71" r="2.8"/><circle cx="74" cy="62" r="3.2"/><circle cx="70" cy="67" r="2.8"/></g>
+<g fill="#f3793c" opacity="0.7"><circle cx="59" cy="79" r="1.4"/><circle cx="103" cy="79" r="1.4"/><circle cx="83" cy="97" r="1.3"/><circle cx="117" cy="65" r="1.3"/><circle cx="73" cy="61" r="1.3"/></g>`
+  ),
+  150
+);
+
+// ======== savanna seedheads — tall dry grass with feathery golden plumes ========
+save(
+  'seedhead',
+  S(
+    '52 98',
+    `<g stroke="#c2a258" stroke-width="2" fill="none" stroke-linecap="round"><path d="M26,96 C23,62 21,36 18,14"/><path d="M26,96 C26,60 27,34 28,12"/><path d="M26,96 C29,62 33,38 37,18"/><path d="M26,96 C19,64 13,42 9,24"/><path d="M26,96 C33,66 41,46 47,30"/></g>
+<g fill="#e2c886" opacity="0.85"><ellipse cx="18" cy="13" rx="3.6" ry="9"/><ellipse cx="28" cy="11" rx="3.6" ry="10"/><ellipse cx="37" cy="17" rx="3" ry="8"/><ellipse cx="9" cy="23" rx="2.8" ry="7"/><ellipse cx="47" cy="29" rx="2.8" ry="7"/></g>
+<g fill="#f0dca8" opacity="0.7"><ellipse cx="18" cy="10" rx="1.8" ry="4.5"/><ellipse cx="28" cy="8" rx="1.8" ry="5"/><ellipse cx="37" cy="14" rx="1.5" ry="4"/></g>
+<g stroke="#d6bc78" stroke-width="0.7" opacity="0.55" fill="none"><path d="M18,13 l-4,-3"/><path d="M18,13 l4,-3"/><path d="M28,11 l-4,-3"/><path d="M28,11 l4,-3"/></g>`
+  ),
+  50
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
+  'rowan',
+  'oak',
+  'birch',
+  'seedhead',
+  'grass',
+  'acacia',
   'ocotillo',
-  'prickly_pear',
-  'barrel_cactus',
-  'cactus',
-  'cattail',
-  'marsh_marigold',
-  'reed',
-  'foxglove'
+  'cattail'
 ];
 const cols = 4,
   cell = 230,

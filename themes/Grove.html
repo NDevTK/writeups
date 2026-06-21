@@ -371,7 +371,7 @@
             ['oak', 1.1, 900],
             ['bush', 1, 1150]
           ],
-          treeExtras: ['birch', 'fir', 'poplar', 'willow', 'snag'], // mixed into the stand by the variety system
+          treeExtras: ['birch', 'fir', 'poplar', 'willow', 'snag', 'rowan'], // mixed into the stand by the variety system
           water: {
             top: '#5fa7ca',
             bot: '#2f6f93',
@@ -971,7 +971,7 @@
             ['oak', 0.78, 150],
             ['pine', 0.7, 1120]
           ],
-          treeExtras: ['birch', 'fir'], // a few birches and firs among the glade's oaks and pines
+          treeExtras: ['birch', 'fir', 'rowan'], // a few birches, firs and a berried rowan among the glade's oaks and pines
           // luminous toadstool clusters [x, sprite, tint] that glow and pulse like the cave crystals
           mushrooms: [
             [120, 'mushroom_a', 0x6ff0c8],
@@ -1094,6 +1094,8 @@
         'prickly_pear',
         'cattail',
         'marsh_marigold',
+        'rowan',
+        'seedhead',
         'grass',
         'flower_p',
         'flower_w',
@@ -2709,6 +2711,20 @@
             al.tint = tintJit(0xffffff, 0.08);
             if (Math.random() < 0.5) al.scale.x *= -1;
             scene.addChild(al);
+          }
+          // tall dry-grass seedheads catch the light and nod in the wind
+          for (let i = 0, _m = vc(7); i < _m; i++) {
+            const x = 20 + Math.random() * (VW - 40),
+              sh = spr(
+                'seedhead',
+                x,
+                groundY(x) + 7,
+                0.5 + Math.random() * 0.5
+              );
+            sh.tint = tintJit(0xffffff, 0.06); // keep the dry golden plume, just a little variation
+            if (Math.random() < 0.5) sh.scale.x *= -1;
+            scene.addChild(sh);
+            swayers.push({s: sh, amp: 0.07, sp: 1.4, ph: Math.random() * 6});
           }
         } else if (BI.ground === 'fern') {
           for (let i = 0, _m = vc(5); i < _m; i++) {
