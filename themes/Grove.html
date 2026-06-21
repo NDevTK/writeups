@@ -392,6 +392,13 @@
           critterScale: 0.5,
           hopper: null,
           flyer: 0x4a4036,
+          soar: {
+            frames: ['vulture'],
+            count: 1,
+            tint: 0x4a4036,
+            yLo: 150,
+            yHi: 290
+          }, // a vulture circles the heat
           flutter: false,
           roller: 'tumbleweed'
         },
@@ -591,7 +598,8 @@
           critterScale: 0.48,
           hopper: null,
           flyer: 0x6a7a4a,
-          flutter: false,
+          flutter: true,
+          flutterTint: 0xfff0a0, // pale-yellow brimstones drift the grove
           roller: null
         },
         volcanic: {
@@ -935,8 +943,15 @@
           walker: null,
           critter: null,
           hopper: null,
-          flyer: 0x3a3326, // an eagle soars over the cloud sea
+          flyer: 0x3a3326, // an eagle glides across…
           flyerFrames: ['eagle'],
+          soar: {
+            frames: ['eagle'],
+            count: 2,
+            tint: 0x4a4030,
+            yLo: 290,
+            yHi: 420
+          }, // …while two more circle the thermals
           flutter: false,
           roller: null
         }
@@ -1776,24 +1791,7 @@
             clouds.push(c);
             scene.addChild(c);
           }
-          // a couple of eagles soaring lazily on the thermals over the cloud sea
-          for (let i = 0; i < 2; i++) {
-            const e = anim(['eagle'], 0, 0, 0.62 + i * 0.12, 0.05);
-            e.isSoar = true;
-            e.cx = 340 + i * 520 + Math.random() * 160;
-            e.cy = 290 + Math.random() * 130;
-            e.rx = 100 + Math.random() * 80;
-            e.ry = 26 + Math.random() * 20;
-            e.sp = 0.1 + Math.random() * 0.06;
-            e.ph = Math.random() * 6.28;
-            e.tint = 0x4a4030;
-            e.baseSc = Math.abs(e.scale.x);
-            e.x = e.cx + Math.cos(e.ph) * e.rx; // a sensible static spot for reduced motion
-            e.y = e.cy + Math.sin(e.ph) * e.ry;
-            if (reduce.matches) e.gotoAndStop(0);
-            flutters.push(e);
-            scene.addChild(e);
-          }
+          // (eagles soar over the cloud sea via the shared BI.soar builder above)
           // warm light that catches the cloud tops at sunrise / sunset (ADD; alpha set by the sun's height)
           cloudGlow = new PIXI.Sprite(
             gradTex(
@@ -2845,6 +2843,33 @@
           fogLayers.push(fz);
         }
 
+        // soaring raptors circle lazily on the thermals (summit eagles, desert vulture) — over the
+        // landscape, dimmed by the night veil added below
+        if (BI.soar)
+          for (let i = 0; i < BI.soar.count; i++) {
+            const e = anim(
+              BI.soar.frames,
+              0,
+              0,
+              (BI.soar.scale || 0.6) + i * 0.12,
+              0.05
+            );
+            e.isSoar = true;
+            e.cx = 240 + Math.random() * (VW - 480);
+            e.cy = BI.soar.yLo + Math.random() * (BI.soar.yHi - BI.soar.yLo);
+            e.rx = 100 + Math.random() * 80;
+            e.ry = 26 + Math.random() * 20;
+            e.sp = 0.1 + Math.random() * 0.06;
+            e.ph = Math.random() * 6.28;
+            if (BI.soar.tint != null) e.tint = BI.soar.tint;
+            e.baseSc = Math.abs(e.scale.x);
+            e.x = e.cx + Math.cos(e.ph) * e.rx; // a sensible static spot for reduced motion
+            e.y = e.cy + Math.sin(e.ph) * e.ry;
+            if (reduce.matches) e.gotoAndStop(0);
+            flutters.push(e);
+            scene.addChild(e);
+          }
+
         // night veil (multiply) — only darkens the scene's pixels
         veil = new PIXI.Graphics();
         veil
@@ -3745,7 +3770,8 @@
               fox.visible = false;
               foxTimer = 8 + Math.random() * 10;
             }
-          } else if (foxTimer < 0) {
+          } else if (foxTimer < 0 && !raining) {
+            // stays tucked away until the shower passes, then trots out again
             fox.visible = true;
             fox.x = -80;
             fox.dir = 1;
