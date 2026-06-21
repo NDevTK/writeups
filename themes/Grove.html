@@ -1422,6 +1422,7 @@
         scene,
         veil,
         glit,
+        reflLayer,
         rainG,
         overcastG,
         rainbowG,
@@ -2448,6 +2449,7 @@
 
         // water biomes (pond) — reflections, lilies, ducks, dragonflies
         glit = new PIXI.Graphics();
+        reflLayer = null;
         if (BI.water) {
           water = new PIXI.Sprite(
             gradTex(
@@ -2492,6 +2494,19 @@
           lip.drawRect(-40, 600, VW + 80, 3);
           lip.endFill();
           scene.addChild(lip);
+          // bankside trees mirrored in the still water — a soft, wavering reflection just under the
+          // surface (added before the shimmer/ducks so they pass over it). Calm water only, no ice.
+          if (!snow && BI.near) {
+            reflLayer = new PIXI.Container();
+            scene.addChild(reflLayer);
+            for (const [n, sc, x] of BI.near) {
+              const r = spr(n, x, 600, sc);
+              r.scale.y = -sc; // flip about the bank-level anchor so it hangs into the water
+              r.tint = mulTint(folTint, 0x6f8ca4); // foliage colour sunk toward the water
+              r.alpha = 0.2;
+              reflLayer.addChild(r);
+            }
+          }
           scene.addChild(glit);
           rippleG = new PIXI.Graphics();
           scene.addChild(rippleG); // expanding ripple rings under ducks/boat
@@ -3832,6 +3847,12 @@
           fz.tilePosition.x -= (fz.spd + wind * fz.windF * 0.25) * dt;
         for (const w of swayers)
           w.s.rotation = Math.sin(t * w.sp + w.ph) * w.amp + wind * w.amp * 2.5;
+        // the mirrored trees drift on the breeze and fade as the surface roughens or freezes over
+        if (reflLayer) {
+          reflLayer.x = Math.sin(t * 0.7) * 1.2 + wind * 2.2;
+          reflLayer.alpha =
+            (1 - iceAmt * 0.8) * (1 - cover * 0.3) * (1 - wet * 0.4);
+        }
 
         // walker: deer ambles then grazes; a camel plods along; in rain it stands and waits it out
         if (deer && deer.isHeron) {
