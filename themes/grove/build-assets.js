@@ -73,6 +73,35 @@ save(
   120
 );
 
+// ---- snow overlays: drawn on the SAME canvas as the green tree so they register exactly when
+//      laid over it as a child sprite, settling on the branches and swaying with the tree ----
+save(
+  'pine_snow',
+  S(
+    '140 220',
+    `
+<g fill="#e7eff9">
+<path d="M70,18 L86,49 C83,55 77,53 70,54 C63,53 57,55 54,49 Z"/>
+<path d="M70,58 L91,93 C87,100 79,97 70,98 C61,97 53,100 49,93 Z"/>
+<path d="M70,104 L94,142 C89,150 80,147 70,148 C60,147 51,150 46,142 Z"/></g>
+<g fill="#ffffff">
+<path d="M70,20 L80,40 C78,44 74,43 70,43 C66,43 62,44 60,40 Z"/>
+<path d="M70,60 L83,82 C80,86 75,85 70,85 C65,85 60,86 57,82 Z"/>
+<path d="M70,106 L86,132 C82,137 76,136 70,136 C64,136 58,137 54,132 Z"/></g>`
+  ),
+  120
+);
+save(
+  'oak_snow',
+  S(
+    '180 210',
+    `
+<path fill="#e7eff9" d="M46,64 C50,42 64,30 78,34 C86,18 102,18 110,32 C126,30 136,46 132,64 C126,57 118,59 112,66 C106,55 96,57 90,66 C82,56 72,58 66,66 C58,57 50,59 46,64 Z"/>
+<path fill="#ffffff" d="M72,38 C82,24 100,24 108,36 C100,33 92,37 86,43 C80,35 76,36 72,38 Z"/>`
+  ),
+  150
+);
+
 save(
   'bush',
   S(

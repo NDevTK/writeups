@@ -967,6 +967,8 @@
       const NAMES = [
         'oak',
         'pine',
+        'pine_snow',
+        'oak_snow',
         'bush',
         'grass',
         'flower_p',
@@ -1434,7 +1436,7 @@
         dewdrops = [],
         murmur = [],
         cloudShadows = [],
-        snowyTops = [],
+        snowTrees = [],
         lilies = [],
         weather = [],
         rainDrops = [],
@@ -1525,7 +1527,7 @@
           dewdrops.length =
           murmur.length =
           cloudShadows.length =
-          snowyTops.length =
+          snowTrees.length =
           lilies.length =
           weather.length =
           smoke.length =
@@ -2026,16 +2028,16 @@
             csl.addChild(s);
           }
         }
-        // record pine/oak tops so the snow blanket can settle a cap on each in winter
-        const noteSnowTop = (t, n) => {
-          if (n === 'pine' || n === 'oak')
-            snowyTops.push({
-              x: t.x,
-              top: t.y - t.height,
-              w: t.width,
-              h: t.height,
-              pine: n === 'pine'
-            });
+        // in a snowy scene, lay a snow sprite over each pine/oak as a child, so it settles on the
+        // branches and sways with the tree; its alpha tracks how much snow has piled up
+        const snowCap = (t, n) => {
+          if (snow && (n === 'pine' || n === 'oak')) {
+            const ov = new PIXI.Sprite(T(n + '_snow'));
+            ov.anchor.set(0.5, 1); // same registration as the tree, so it overlays exactly
+            ov.alpha = 0;
+            t.addChild(ov);
+            snowTrees.push(ov);
+          }
         };
         for (const [n, sc, x] of BI.mid) {
           const t = spr(n, x, 482 + Math.sin(x * 0.006 + 1.3) * 30, sc);
@@ -2043,7 +2045,7 @@
           scene.addChild(t);
           if (!RIGID[n] && !BI.interior)
             swayers.push({s: t, amp: 0.012, sp: 0.7, ph: Math.random() * 6});
-          if (!BI.interior) noteSnowTop(t, n);
+          snowCap(t, n);
         }
         for (const [n, sc, x] of BI.near) {
           const t = spr(n, x, groundY(x) + 4, sc);
@@ -2051,7 +2053,7 @@
           scene.addChild(t);
           if (!RIGID[n] && !BI.interior)
             swayers.push({s: t, amp: 0.02, sp: 0.9, ph: Math.random() * 6});
-          if (!BI.interior) noteSnowTop(t, n);
+          snowCap(t, n);
         }
         if (BI.crystals)
           for (const [x, col] of BI.crystals) {
@@ -3630,35 +3632,10 @@
               snowAccG.closePath();
               snowAccG.endFill();
             }
-            // (3) snow settling on the pine and oak canopies
-            const sf = Math.min(1, snowAcc * 1.25), // how laden the caps get
-              ca = Math.min(0.95, 0.5 + snowAcc * 0.5);
-            for (const tp of snowyTops) {
-              snowAccG.beginFill(0xeef5fc, ca);
-              if (tp.pine) {
-                // snow draped over the top tiers (the art's apex sits ~8% down from the sprite top),
-                // sagging a touch lower at the sides than the middle
-                const apexY = tp.top + tp.h * 0.08,
-                  baseY = tp.top + tp.h * (0.2 + 0.22 * sf),
-                  halfW = tp.w * (0.12 + 0.13 * sf);
-                snowAccG.moveTo(tp.x, apexY);
-                snowAccG.lineTo(tp.x + halfW, baseY);
-                snowAccG.lineTo(tp.x, baseY - tp.h * 0.045);
-                snowAccG.lineTo(tp.x - halfW, baseY);
-                snowAccG.closePath();
-              } else {
-                // a rounded crown of snow capping the round canopy
-                const rx = tp.w * (0.2 + 0.15 * sf);
-                snowAccG.drawEllipse(
-                  tp.x,
-                  tp.top + tp.h * 0.16,
-                  rx,
-                  tp.h * (0.07 + 0.09 * sf)
-                );
-              }
-              snowAccG.endFill();
-            }
           }
+          // (3) snow on the pine/oak crowns fades in with the depth (the sprite itself sways)
+          const capA = Math.min(1, 0.2 + snowAcc * 1.9);
+          for (const ov of snowTrees) ov.alpha = capA;
         }
 
         // winter ice: shelves creep in from both banks as the pond freezes, leaving a shrinking
