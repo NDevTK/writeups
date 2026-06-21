@@ -2557,16 +2557,62 @@ save(
   160
 );
 
+// ======== a snowy owl — white with dark flecks, drifts the polar night (2 wing frames) ========
+const snowyOwl = (up) =>
+  S(
+    '152 104',
+    `<defs><linearGradient id="sow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3f6f9"/><stop offset="1" stop-color="#d2dae1"/></linearGradient></defs>
+<path d="M34,62 C20,58 13,64 18,73 C27,75 33,70 39,65 Z" fill="#e2e8ee"/>
+${
+  up
+    ? `<path d="M62,54 C46,28 28,20 12,25 C25,35 41,49 56,62 C60,60 61,57 62,54 Z" fill="#e9eef3"/>
+<g fill="#9aa6b2" opacity="0.55"><circle cx="28" cy="34" r="1.6"/><circle cx="38" cy="44" r="1.5"/><circle cx="46" cy="52" r="1.4"/></g>`
+    : `<path d="M62,66 C46,86 28,92 12,86 C25,78 41,68 56,60 C60,62 61,64 62,66 Z" fill="#dde4ea"/>
+<g fill="#9aa6b2" opacity="0.55"><circle cx="28" cy="80" r="1.6"/><circle cx="38" cy="70" r="1.5"/></g>`
+}
+<ellipse cx="68" cy="62" rx="33" ry="23" fill="url(#sow)"/>
+<g fill="#9aa6b2" opacity="0.5"><circle cx="56" cy="58" r="1.8"/><circle cx="72" cy="64" r="1.8"/><circle cx="64" cy="70" r="1.6"/><circle cx="82" cy="60" r="1.6"/><circle cx="76" cy="70" r="1.5"/><circle cx="60" cy="66" r="1.4"/></g>
+<circle cx="106" cy="50" r="26" fill="url(#sow)"/>
+<path d="M106,28 C127,28 129,58 106,69 C83,58 85,28 106,28 Z" fill="#fbfdff"/>
+<circle cx="95" cy="48" r="9" fill="#f4c838"/><circle cx="117" cy="48" r="9" fill="#f4c838"/>
+<circle cx="96" cy="49" r="4.6" fill="#1c1810"/><circle cx="118" cy="49" r="4.6" fill="#1c1810"/>
+<circle cx="97" cy="47" r="1.4" fill="#fff"/><circle cx="119" cy="47" r="1.4" fill="#fff"/>
+<path d="M106,55 L101,63 L111,63 Z" fill="#3a352c"/>`
+  );
+save('snowy_owl_a', snowyOwl(true), 152);
+save('snowy_owl_b', snowyOwl(false), 152);
+
+// ======== a resting deer — bedded down, legs folded, neck up and watchful (faces right) ========
+save(
+  'deer_rest',
+  S(
+    '230 140',
+    `<defs><linearGradient id="drb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a8773f"/><stop offset="1" stop-color="#6c4626"/></linearGradient></defs>
+<g fill="#553a23"><ellipse cx="92" cy="128" rx="18" ry="7"/><ellipse cx="138" cy="130" rx="16" ry="6.5"/></g>
+<path d="M44,118 C38,88 74,76 116,76 C158,76 186,88 188,110 C189,126 156,132 112,132 C78,132 52,130 44,118 Z" fill="url(#drb)"/>
+<path d="M62,90 C102,78 152,80 184,98 C152,90 102,90 70,98 Z" fill="#b88350" opacity="0.45"/>
+<path d="M60,124 C104,132 156,130 182,114 C156,132 104,134 60,128 Z" fill="#3f2a18" opacity="0.4"/>
+<path d="M158,98 C166,72 178,52 191,44 L205,53 C195,68 183,86 177,108 Z" fill="url(#drb)"/>
+<ellipse cx="202" cy="44" rx="16" ry="12" fill="url(#drb)"/>
+<path d="M212,34 C224,36 232,45 229,56 C227,64 214,61 206,54 C202,48 206,38 212,34 Z" fill="url(#drb)"/>
+<ellipse cx="228" cy="54" rx="4.5" ry="3.5" fill="#2a1c12"/>
+<path d="M190,32 C183,21 186,14 195,19 C200,23 199,33 194,37 Z" fill="#7c5230"/>
+<circle cx="208" cy="42" r="2.6" fill="#140e09"/><circle cx="209" cy="41" r="0.8" fill="#d8c7a8"/>
+<g fill="none" stroke="#bda572" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M196,30 C192,18 190,9 195,3"/><path d="M192,18 C185,14 180,10 177,5"/><path d="M201,30 C206,19 210,10 208,4"/><path d="M209,18 C217,15 222,11 225,7"/></g>`
+  ),
+  186
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
+  'snowy_owl_a',
+  'owl_a',
+  'deer_rest',
+  'deer_a',
   'kinkajou',
   'wood_duck',
-  'duck',
-  'duck_f',
-  'parrot',
-  'aardvark',
-  'ghost_crab',
-  'duckling'
+  'fawn_a',
+  'penguin'
 ];
 const cols = 4,
   cell = 230,
