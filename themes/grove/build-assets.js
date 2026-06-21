@@ -1915,16 +1915,102 @@ save(
   62
 );
 
+// ======== WINTER ground: snow-capped boulders (the snow is part of the rock) ========
+// a single boulder wearing a settled, drooping cap of snow
+save(
+  'snowrock_a',
+  S(
+    '104 74',
+    `<defs><linearGradient id="srka" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#828b99"/><stop offset="1" stop-color="#565e6c"/></linearGradient>
+<linearGradient id="srsa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dbe6f1"/></linearGradient></defs>
+<ellipse cx="52" cy="69" rx="44" ry="5" fill="#3a4350" opacity="0.18"/>
+<path d="M10,67 C2,47 16,35 34,39 C44,23 70,23 82,39 C100,37 104,55 96,67 Z" fill="url(#srka)"/>
+<path d="M16,49 C12,41 22,32 34,39 C44,25 70,25 82,39 C92,39 98,45 96,53 C92,49 86,50 82,54 C80,50 75,50 72,53 C65,47 55,47 49,53 C43,48 36,49 32,54 C28,50 22,50 18,53 C16,52 15,50 16,49 Z" fill="url(#srsa)"/>
+<path d="M22,53 C32,50 42,52 49,53 C58,51 70,52 80,53" stroke="#c2d0e0" stroke-width="1.8" fill="none" opacity="0.6"/>
+<path d="M40,63 C48,59 58,59 64,63" stroke="#454d5a" stroke-width="1.5" fill="none" opacity="0.5"/>`
+  ),
+  92
+);
+// a low cluster of two boulders under one snow blanket
+save(
+  'snowrock_b',
+  S(
+    '128 66',
+    `<defs><linearGradient id="srkb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b94a2"/><stop offset="1" stop-color="#5c6470"/></linearGradient>
+<linearGradient id="srsb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d8e4f0"/></linearGradient></defs>
+<ellipse cx="64" cy="61" rx="56" ry="5" fill="#3a4350" opacity="0.18"/>
+<path d="M6,59 C0,45 14,37 28,40 C34,30 52,30 58,42 C70,40 78,48 74,59 Z" fill="url(#srkb)"/>
+<path d="M66,59 C62,46 76,38 92,41 C100,30 118,32 122,46 C128,52 124,60 118,59 Z" fill="url(#srkb)"/>
+<path d="M10,46 C8,39 16,34 28,40 C34,31 52,31 58,42 C66,42 70,47 68,52 C62,48 54,49 50,53 C44,48 34,48 28,52 C22,47 14,48 12,52 C9,50 9,47 10,46 Z" fill="url(#srsb)"/>
+<path d="M70,46 C76,38 84,35 92,41 C100,32 116,33 120,45 C124,48 123,53 120,55 C114,50 106,50 100,54 C92,49 82,50 78,54 C74,50 70,49 70,46 Z" fill="url(#srsb)"/>`
+  ),
+  116
+);
+
+// ======== an arctic hare — white winter coat, long black-tipped ears (faces right) ========
+save(
+  'hare',
+  S(
+    '100 128',
+    `<defs><linearGradient id="hr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6f9fd"/><stop offset="1" stop-color="#cfdae8"/></linearGradient></defs>
+<path d="M46,66 C40,30 38,10 46,7 C54,6 56,30 54,64 Z" fill="url(#hr)"/>
+<path d="M60,64 C57,30 60,10 69,11 C78,15 71,36 67,62 Z" fill="url(#hr)"/>
+<path d="M45,18 C43,10 47,7 48,12 C48,15 47,18 46,20 Z" fill="#2b2f38"/>
+<path d="M67,19 C66,12 69,11 70,15 C70,18 69,21 68,22 Z" fill="#2b2f38"/>
+<path d="M46,56 C44,36 45,24 48,18" stroke="#e8c8cc" stroke-width="3" fill="none"/>
+<path d="M61,55 C60,37 62,25 66,20" stroke="#e8c8cc" stroke-width="2.6" fill="none"/>
+<ellipse cx="40" cy="106" rx="22" ry="20" fill="url(#hr)"/>
+<ellipse cx="53" cy="89" rx="23" ry="22" fill="url(#hr)"/>
+<circle cx="22" cy="108" r="10" fill="#ffffff"/>
+<ellipse cx="59" cy="118" rx="15" ry="5" fill="#c2cedd"/>
+<circle cx="61" cy="61" r="16" fill="url(#hr)"/>
+<path d="M72,60 C78,61 80,67 75,71 C71,72 68,68 69,63 Z" fill="url(#hr)"/>
+<path d="M77,64 l4.6,2.3 l-4.6,2.3 Z" fill="#d98a92"/>
+<circle cx="62" cy="57" r="2.6" fill="#1a1a20"/><circle cx="63" cy="56" r="0.8" fill="#fff"/>`
+  ),
+  100
+);
+
+// ======== perched songbirds — sit in the canopy and flit between trees (face right) ========
+const perchBird = (id, back, breast, beak, wing) =>
+  S(
+    '58 52',
+    `<path d="M18,38 L2,32 L4,41 L18,42 Z" fill="${wing}"/>
+<ellipse cx="26" cy="32" rx="15" ry="14" fill="${back}"/>
+<path d="M30,21 C41,23 43,41 30,45 C23,45 21,34 23,28 C25,23 27,21 30,21 Z" fill="${breast}"/>
+<circle cx="36" cy="20" r="11" fill="${back}"/>
+<path d="M40,13 C47,15 47,27 40,29 C33,28 33,16 40,13 Z" fill="${breast}"/>
+<path d="M46,18 L55,20 L46,23 Z" fill="${beak}"/>
+<circle cx="41" cy="18" r="2" fill="#1a140d"/>
+<path d="M16,27 C25,23 34,25 37,34 C30,40 21,38 16,34 Z" fill="${wing}"/>
+<g stroke="${wing}" stroke-width="1.7" stroke-linecap="round"><line x1="26" y1="45" x2="26" y2="50"/><line x1="32" y1="45" x2="32" y2="50"/></g>`
+  );
+save(
+  'robin',
+  perchBird('robin', '#8a7a60', '#d8643a', '#e2a23a', '#6f6048'),
+  50
+);
+save(
+  'bluebird',
+  perchBird('bluebird', '#4a82c8', '#d59060', '#3a3a40', '#37619a'),
+  50
+);
+save(
+  'finch',
+  perchBird('finch', '#b6b04e', '#ecd24e', '#3a3a40', '#8a8638'),
+  50
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'termite_mound',
-  'baobab',
-  'aloe',
-  'acacia',
-  'squirrel',
-  'fawn_a',
-  'barrel_cactus',
-  'shell'
+  'snowrock_a',
+  'snowrock_b',
+  'hare',
+  'rabbit',
+  'robin',
+  'bluebird',
+  'finch',
+  'swallow_a'
 ];
 const cols = 4,
   cell = 230,

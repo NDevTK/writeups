@@ -388,6 +388,7 @@
           critterScale: 0.42,
           hopper: 'rabbit',
           squirrel: true, // a squirrel forages the grove floor now and then
+          perchBird: true, // a songbird perches in the canopy and flits between trees
           flyer: 0xffffff,
           flutter: true,
           bats: 3, // bats feed over the meadow at dusk
@@ -567,7 +568,7 @@
           walkerScale: 0.52,
           graze: true,
           critter: null,
-          hopper: null,
+          hopper: 'hare', // an arctic hare forages the snowy scree
           flyer: 0xffffff,
           flyerFrames: ['eagle'],
           flutter: false,
@@ -856,6 +857,7 @@
           critter: null,
           hopper: 'rabbit',
           squirrel: true, // a squirrel forages beneath the sakura
+          perchBird: true, // a songbird perches among the blossom
           flyer: 0xffffff,
           flutter: true,
           flutterTint: 0xffbcdb, // soft pink blossom butterflies
@@ -970,6 +972,7 @@
           critter: null,
           hopper: null,
           squirrel: true, // a squirrel forages among the toadstools
+          perchBird: true, // a songbird perches among the boughs
           flyer: 0x3a4a55,
           flutter: false,
           roller: null
@@ -1037,6 +1040,12 @@
         'baobab',
         'aloe',
         'squirrel',
+        'snowrock_a',
+        'snowrock_b',
+        'hare',
+        'robin',
+        'bluebird',
+        'finch',
         'grass',
         'flower_p',
         'flower_w',
@@ -1554,6 +1563,7 @@
         spores = [],
         frontRocks = [],
         spout = [],
+        perches = [],
         hillBands = [];
       let sky,
         stars,
@@ -1593,6 +1603,7 @@
         causticG,
         marmot,
         squirrel,
+        songbird,
         seal,
         roadrunner,
         whale,
@@ -1644,6 +1655,7 @@
           spores.length =
           frontRocks.length =
           spout.length =
+          perches.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
@@ -1654,6 +1666,7 @@
           seal =
           roadrunner =
           squirrel =
+          songbird =
             null;
         whale = spoutG = surfG = cloudSeaG = cloudGlow = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
@@ -2244,6 +2257,12 @@
           if (!RIGID[n] && !BI.interior)
             swayers.push({s: t, amp: 0.02, sp: 0.9, ph: Math.random() * 6});
           snowCap(t, n);
+          // a leafy near-tree offers a perch up in its canopy for a songbird to sit on
+          if (BI.perchBird && !RIGID[n])
+            perches.push({
+              x: jx,
+              y: t.y - t.height * (0.5 + Math.random() * 0.2)
+            });
         }
         if (BI.crystals)
           for (const [x, col] of BI.crystals) {
@@ -2468,6 +2487,19 @@
             r.tint = 0x9aa6b4;
             scene.addChild(r);
           }
+          // a couple of snow-capped boulders break through the blanket
+          for (let i = 0, n = 1 + ((Math.random() * 2.5) | 0); i < n; i++) {
+            const x = 40 + Math.random() * (VW - 80),
+              sr = spr(
+                Math.random() < 0.5 ? 'snowrock_a' : 'snowrock_b',
+                x,
+                groundY(x) + 7,
+                0.4 + Math.random() * 0.45
+              );
+            sr.tint = tintJit(0xffffff, 0.04);
+            if (Math.random() < 0.5) sr.scale.x *= -1;
+            scene.addChild(sr);
+          }
           for (let i = 0, _m = vc(5); i < _m; i++) {
             const x = Math.random() * VW,
               g = spr('grass', x, groundY(x) + 6, 0.4 + Math.random() * 0.3);
@@ -2482,6 +2514,19 @@
               r = spr('rock', x, groundY(x) + 8, 0.1 + Math.random() * 0.22);
             r.tint = Math.random() < 0.5 ? 0x8a93a2 : 0xa6aeba;
             scene.addChild(r);
+          }
+          // larger boulders carry a settled cap of snow
+          for (let i = 0, _m = vc(3); i < _m; i++) {
+            const x = 30 + Math.random() * (VW - 60),
+              sr = spr(
+                Math.random() < 0.5 ? 'snowrock_a' : 'snowrock_b',
+                x,
+                groundY(x) + 7,
+                0.45 + Math.random() * 0.6
+              );
+            sr.tint = tintJit(0xffffff, 0.05);
+            if (Math.random() < 0.5) sr.scale.x *= -1;
+            scene.addChild(sr);
           }
           for (let i = 0, _m = vc(4); i < _m; i++) {
             const x = Math.random() * VW,
@@ -2946,6 +2991,19 @@
           squirrel.tx = sx;
           scene.addChild(squirrel);
         } else squirrel = null;
+        if (BI.perchBird && perches.length && Math.random() < 0.75) {
+          // a songbird (a random species each visit) perches in a tree and flits between boughs
+          const p = perches[(Math.random() * perches.length) | 0],
+            kind = ['robin', 'bluebird', 'finch'][(Math.random() * 3) | 0];
+          songbird = spr(kind, p.x, p.y, 0.26 + Math.random() * 0.08);
+          songbird.baseSc = Math.abs(songbird.scale.x);
+          songbird.dir = Math.random() < 0.5 ? 1 : -1;
+          songbird.scale.x = songbird.dir * songbird.baseSc;
+          songbird.perch = p; // current perch
+          songbird.mode = 'perch'; // perch (sit + look about) → flit (arc to a new bough)
+          songbird.tmr = 2 + Math.random() * 5;
+          scene.addChild(songbird);
+        } else songbird = null;
         if (BI.penguins) {
           // a little colony waddles the snowfield: each penguin ambles at its own pace, some just stand
           for (let i = 0; i < BI.penguins; i++) {
@@ -5074,6 +5132,51 @@
             if (Math.abs(dx) < 4) {
               squirrel.mode = 'sit';
               squirrel.tmr = 2 + Math.random() * 5;
+            }
+          }
+        }
+        // a songbird sits in the canopy looking about, then flits in a shallow flapping arc to
+        // another bough — a different perch (and a different bird) every visit
+        if (songbird) {
+          songbird.tmr -= dt / 60;
+          if (songbird.mode === 'perch') {
+            songbird.y = songbird.perch.y + Math.sin(t * 3) * 0.6; // gentle perch bob
+            if (songbird.tmr < 0) {
+              if (perches.length > 1 && Math.random() < 0.72) {
+                let np = songbird.perch; // hop to a different bough
+                for (let k = 0; k < 6 && np === songbird.perch; k++)
+                  np = perches[(Math.random() * perches.length) | 0];
+                songbird.fromX = songbird.x;
+                songbird.fromY = songbird.perch.y;
+                songbird.target = np;
+                songbird.flit = 0;
+                songbird.mode = 'flit';
+                songbird.dir = np.x >= songbird.x ? 1 : -1;
+                songbird.scale.x = songbird.dir * songbird.baseSc;
+                songbird.tmr = 2.5 + Math.random() * 5;
+              } else {
+                songbird.dir = -songbird.dir; // just glance the other way
+                songbird.scale.x = songbird.dir * songbird.baseSc;
+                songbird.tmr = 1.5 + Math.random() * 3.5;
+              }
+            }
+          } else {
+            songbird.flit += dt / 60 / 0.7; // ~0.7s of flight
+            const f = Math.min(1, songbird.flit),
+              ar = 26 + Math.abs(songbird.target.x - songbird.fromX) * 0.06,
+              flap = Math.sin(songbird.flit * 34) * 1.4 * (1 - f); // wingbeats, easing out on landing
+            songbird.x =
+              songbird.fromX + (songbird.target.x - songbird.fromX) * f;
+            songbird.y =
+              songbird.fromY +
+              (songbird.target.y - songbird.fromY) * f -
+              Math.sin(f * Math.PI) * ar +
+              flap;
+            songbird.rotation = Math.sin(f * Math.PI) * 0.12 * songbird.dir; // tip into the arc
+            if (f >= 1) {
+              songbird.perch = songbird.target;
+              songbird.rotation = 0;
+              songbird.mode = 'perch';
             }
           }
         }
