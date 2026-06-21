@@ -2914,6 +2914,19 @@
           }
         }
 
+        // dawn mist rising off the water — a low wispy band over the surface, in only at first light
+        if (BI.water && !BI.underwater && !BI.cloudSea) {
+          const mist = new PIXI.TilingSprite(T('fog'), VW + 120, 86);
+          mist.position.set(-60, 576);
+          mist.tileScale.set(1.5, 86 / 90);
+          mist.baseA = 0.6;
+          mist.spd = 0.05;
+          mist.windF = 3;
+          mist.dawnMist = true; // alpha driven by the dawn factor; hugs the water
+          scene.addChild(mist);
+          fogLayers.push(mist);
+        }
+
         // night veil (multiply) — only darkens the scene's pixels
         veil = new PIXI.Graphics();
         veil
@@ -3303,8 +3316,11 @@
                 (fogTOD + wetness * 0.35 + cover * 0.45 + wet * 0.3) // haze thickens as a front gathers + rains
             ),
             fogTint = hexI(mixA(P.bot, [255, 255, 255], 0.55));
+          // mist that rises off the water peaks sharply at first light and burns off as the sun climbs
+          const dawnMist =
+            Math.exp(-Math.pow((h - 6.1) / 1.3, 2)) * (1 - cover * 0.4);
           for (const fz of fogLayers) {
-            fz.alpha = fogAmt * fz.baseA;
+            fz.alpha = (fz.dawnMist ? dawnMist : fogAmt) * fz.baseA;
             fz.tint = fogTint;
           }
         }
