@@ -2240,16 +2240,39 @@ save(
   110
 );
 
+// ======== an alpine chough — a small black mountain crow that tumbles in flocks (2 wing frames) ========
+const chough = (wings) =>
+  S(
+    '100 80',
+    `<g fill="#1d1b22">${wings}<ellipse cx="50" cy="50" rx="14" ry="8"/><circle cx="62" cy="47" r="5.5"/></g>
+<path d="M67,45 C73,44 76,46 73,49 C71,49 69,49 67,49 Z" fill="#f0be2e"/>
+<circle cx="64" cy="46" r="1.4" fill="#0a0a0c"/>`
+  );
+save(
+  'chough_a',
+  chough(
+    `<path d="M50,46 C36,30 20,24 10,28 C20,33 32,40 48,49 Z"/><path d="M50,46 C64,30 80,24 90,28 C80,33 68,40 52,49 Z"/>`
+  ),
+  100
+);
+save(
+  'chough_b',
+  chough(
+    `<path d="M50,50 C36,47 20,51 10,59 C22,55 36,52 48,52 Z"/><path d="M50,50 C64,47 80,51 90,59 C78,55 64,52 52,52 Z"/>`
+  ),
+  100
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
+  'chough_a',
+  'chough_b',
+  'eagle',
+  'bird_a',
   'salamander',
-  'lizard',
   'olm',
-  'crab',
-  'stalagmite',
-  'crystal',
-  'beetle',
-  'rock'
+  'gull',
+  'swallow_a'
 ];
 const cols = 4,
   cell = 230,
