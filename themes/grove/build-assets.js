@@ -2240,6 +2240,26 @@ save(
   44
 );
 
+// ======== a grasshopper — springs through the dry summer grass (faces right) ========
+save(
+  'grasshopper',
+  S(
+    '58 34',
+    `<defs><linearGradient id="gh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8aa84a"/><stop offset="1" stop-color="#5a7a30"/></linearGradient></defs>
+<path d="M12,10 L3,30" stroke="#4e6a28" stroke-width="2" stroke-linecap="round"/>
+<g stroke="#3e5620" stroke-width="1.1" stroke-linecap="round"><path d="M9,16 L6,18"/><path d="M7,21 L4,23"/><path d="M5,26 L2,28"/></g>
+<g stroke="#5a7a30" stroke-width="1.6" stroke-linecap="round"><path d="M30,21 L33,31"/><path d="M36,21 L43,30"/></g>
+<path d="M9,18 Q11,13 28,13 Q41,13 46,17 Q41,22 28,22 Q13,23 9,18 Z" fill="url(#gh)"/>
+<path d="M14,15 Q27,12 42,15 Q31,18 16,17 Z" fill="#739340" opacity="0.6"/>
+<path d="M22,20 Q27,17 24,10 Q21,6 13,9 Q9,12 13,17 Q17,21 22,20 Z" fill="url(#gh)"/>
+<path d="M14,9 L11,8" stroke="#4e6a28" stroke-width="1.6" stroke-linecap="round"/>
+<circle cx="43" cy="17" r="5" fill="url(#gh)"/>
+<circle cx="45" cy="15.5" r="1.8" fill="#1a2410"/><circle cx="45.6" cy="15" r="0.6" fill="#ffffff" opacity="0.7"/>
+<g stroke="#4e6a2a" stroke-width="1" fill="none" stroke-linecap="round"><path d="M46,14 C50,10 53,8 56,6"/><path d="M47,15 C51,12 54,11 57,10"/></g>`
+  ),
+  50
+);
+
 // ======== a garden snail — creeps out onto the wet ground after rain (faces right) ========
 save(
   'snail',
@@ -2918,7 +2938,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['tadpole_a', 'tadpole_b', 'frog', 'lily'];
+const review = ['grasshopper', 'ladybird', 'beetle', 'mouse'];
 const cols = 4,
   cell = 230,
   pad = 14,

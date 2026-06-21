@@ -394,6 +394,7 @@
           snail: true, // a snail glides out onto the wet grass after rain
           ladybird: true, // a ladybird trundles the meadow floor by day
           mouse: true, // a field mouse scurries the meadow grass by day
+          grasshopper: true, // a grasshopper springs through the warm meadow grass
           flyer: 0xffffff,
           flutter: true,
           bee: 2, // bumblebees work the wildflowers by day
@@ -620,6 +621,7 @@
           critterScale: 0.6,
           hopper: null,
           beetle: true, // a dung beetle trundles the savanna
+          grasshopper: true, // grasshoppers spring through the dry savanna grass
           nightForager: 'aardvark', // an aardvark snuffles for termites after dark
           flyer: 0xffffff,
           flyerFrames: ['vulture'],
@@ -1092,6 +1094,7 @@
         'ladybird',
         'snail',
         'mouse',
+        'grasshopper',
         'monarch_a',
         'monarch_b',
         'parrot',
@@ -1733,6 +1736,7 @@
         olm,
         hedgehog,
         mouse,
+        grasshopper,
         fennec,
         aardvark,
         kinkajou,
@@ -1812,6 +1816,7 @@
           olm =
           hedgehog =
           mouse =
+          grasshopper =
           fennec =
           aardvark =
           kinkajou =
@@ -3379,6 +3384,27 @@
           mouse.pauseT = 0.3 + Math.random() * 1.2;
           scene.addChild(mouse);
         } else mouse = null;
+        if (
+          BI.grasshopper &&
+          buildNight < 0.5 &&
+          nowSeason() !== 'winter' &&
+          Math.random() < 0.6
+        ) {
+          // a grasshopper rests in the warm grass, then springs off in a sudden arc
+          const gx = 140 + Math.random() * (VW - 280);
+          grasshopper = spr(
+            'grasshopper',
+            gx,
+            groundY(gx) + 2,
+            0.22 + Math.random() * 0.07
+          );
+          grasshopper.baseSc = Math.abs(grasshopper.scale.x);
+          grasshopper.dir = Math.random() < 0.5 ? 1 : -1;
+          grasshopper.scale.x = grasshopper.dir * grasshopper.baseSc;
+          grasshopper.pauseT = 0.6 + Math.random() * 2.5;
+          grasshopper.hopT = 0;
+          scene.addChild(grasshopper);
+        } else grasshopper = null;
         if (BI.shoreBird && BI.ground === 'beach') {
           // a little party of sandpipers runs the waterline, chasing the wash out then fleeing it in
           for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
@@ -6097,6 +6123,38 @@
             }
             if (Math.random() < 0.025 * dt)
               mouse.pauseT = 0.3 + Math.random() * 1.4; // freeze, alert
+          }
+        }
+        // a grasshopper sits in the grass, then springs off in a sudden parabolic arc and settles again
+        if (grasshopper) {
+          const g = grasshopper;
+          if (g.hopT > 0) {
+            g.hopT -= dt / 60;
+            const p = Math.max(0, Math.min(1, 1 - g.hopT / g.hopDur)); // 0..1 along the hop
+            g.x = g.x0 + (g.x1 - g.x0) * p;
+            g.y = groundY(g.x) + 2 - Math.sin(p * Math.PI) * g.hopH; // the arc
+            g.rotation = g.dir * Math.sin(p * Math.PI) * -0.22; // pitch up then down through the leap
+            if (g.hopT <= 0) {
+              g.y = groundY(g.x) + 2;
+              g.rotation = 0;
+              g.pauseT = 0.7 + Math.random() * 2.6;
+            }
+          } else {
+            g.pauseT -= dt / 60;
+            g.rotation = Math.sin(t * 9) * 0.008; // a tiny idle stir
+            g.y = groundY(g.x) + 2;
+            if (g.pauseT <= 0) {
+              const reach =
+                (60 + Math.random() * 90) *
+                (Math.random() < 0.78 ? g.dir : -g.dir);
+              g.x0 = g.x;
+              g.x1 = Math.max(80, Math.min(VW - 80, g.x + reach));
+              g.dir = g.x1 >= g.x0 ? 1 : -1;
+              g.scale.x = g.dir * g.baseSc;
+              g.hopH = 26 + Math.random() * 20; // how high it springs
+              g.hopDur = 0.5 + Math.random() * 0.22;
+              g.hopT = g.hopDur;
+            }
           }
         }
         // a fennec fox forages the night sand: it stops to listen with those big ears, then trots
