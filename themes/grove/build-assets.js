@@ -2165,16 +2165,55 @@ const jelly2Svg = (p) => {
 save('jelly2_a', jelly2Svg(0), 92);
 save('jelly2_b', jelly2Svg(1), 92);
 
+// ======== a sandpiper — a little shorebird that runs the waterline (faces right) ========
+save(
+  'sandpiper',
+  S(
+    '72 56',
+    `<defs><linearGradient id="sp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b7a890"/><stop offset="1" stop-color="#8f8068"/></linearGradient></defs>
+<g stroke="#2e2a24" stroke-width="1.8" stroke-linecap="round"><path d="M30,38 L26,52"/><path d="M38,38 L40,52"/></g>
+<path d="M16,28 L4,32 L16,34 Z" fill="#8f8068"/>
+<ellipse cx="30" cy="28" rx="16" ry="12" fill="url(#sp)"/>
+<path d="M22,34 C30,40 42,38 48,30 C40,38 28,40 22,34 Z" fill="#f2efe6"/>
+<path d="M18,24 C28,20 38,22 42,30 C34,36 24,34 18,30 Z" fill="#9a8a70"/>
+<g fill="#6f6450" opacity="0.4"><circle cx="24" cy="24" r="1.5"/><circle cx="32" cy="22" r="1.5"/><circle cx="38" cy="26" r="1.3"/></g>
+<circle cx="44" cy="22" r="9" fill="url(#sp)"/>
+<path d="M44,26 C48,28 50,24 48,22 C46,24 45,25 44,26 Z" fill="#f2efe6"/>
+<path d="M52,21 L68,22 L52,24 Z" fill="#2a2620"/>
+<circle cx="46" cy="20" r="2" fill="#141009"/><circle cx="46.6" cy="19.4" r="0.6" fill="#fff"/>`
+  ),
+  60
+);
+
+// ======== a panda cub — round, big-headed, trails its mother (2 walk frames, faces right) ========
+const pandaCubSvg = (lf) =>
+  S(
+    '132 112',
+    `<g stroke="#2a2a2a" stroke-width="11" stroke-linecap="round"><line x1="46" y1="72" x2="${44 + lf[0]}" y2="98"/><line x1="64" y1="74" x2="${64 + lf[1]}" y2="100"/><line x1="84" y1="74" x2="${86 + lf[2]}" y2="100"/><line x1="100" y1="72" x2="${104 + lf[3]}" y2="98"/></g>
+<ellipse cx="74" cy="62" rx="34" ry="26" fill="#f4f2ee"/>
+<path d="M96,46 C108,48 113,60 109,73 C103,81 93,81 87,79 C97,69 97,57 96,46 Z" fill="#2a2a2a"/>
+<circle cx="104" cy="42" r="20" fill="#f4f2ee"/>
+<circle cx="92" cy="27" r="8" fill="#2a2a2a"/><circle cx="116" cy="27" r="8" fill="#2a2a2a"/>
+<path d="M96,36 C100,34 104,37 104,42 C103,47 99,49 96,47 C93,44 93,38 96,36 Z" fill="#2a2a2a"/>
+<path d="M118,36 C114,34 110,37 110,42 C111,47 115,49 118,47 C121,44 121,38 118,36 Z" fill="#2a2a2a"/>
+<circle cx="100" cy="41" r="2.2" fill="#fff"/><circle cx="114" cy="41" r="2.2" fill="#fff"/>
+<circle cx="100" cy="42" r="1.2" fill="#1a1a1a"/><circle cx="114" cy="42" r="1.2" fill="#1a1a1a"/>
+<ellipse cx="107" cy="52" rx="7" ry="5" fill="#f4f2ee"/>
+<ellipse cx="110" cy="51" rx="2.6" ry="2" fill="#2a2a2a"/>`
+  );
+save('panda_cub_a', pandaCubSvg([0, 0, 0, 0]), 118);
+save('panda_cub_b', pandaCubSvg([6, -5, -5, 6]), 118);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'egret',
-  'heron',
-  'angelfish_a',
-  'clownfish_a',
-  'fish_a',
-  'jelly2_a',
-  'jelly_a',
-  'turtle'
+  'sandpiper',
+  'gull',
+  'panda_cub_a',
+  'panda',
+  'redpanda',
+  'crab',
+  'palm',
+  'bamboo'
 ];
 const cols = 4,
   cell = 230,
