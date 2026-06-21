@@ -1391,6 +1391,7 @@
         flutters = [],
         dragons = [],
         fireflies = [],
+        dewdrops = [],
         lilies = [],
         weather = [],
         rainDrops = [],
@@ -1472,6 +1473,7 @@
           flutters.length =
           dragons.length =
           fireflies.length =
+          dewdrops.length =
           lilies.length =
           weather.length =
           smoke.length =
@@ -2973,6 +2975,44 @@
           }
         }
 
+        // morning dew: a scatter of tiny glints beaded on the grass that catch the low sun
+        // at first light and burn off as it climbs — pairs with the mist rising off the water.
+        const dl = new PIXI.Container();
+        root.addChild(dl);
+        dewdrops.dl = dl;
+        const hasDew =
+          !snow &&
+          !BI.underwater &&
+          !BI.interior &&
+          !BI.cloudSea &&
+          (BI.ground === 'meadow' ||
+            BI.ground === 'marsh' ||
+            BI.ground === 'fern' ||
+            BI.ground === 'jungle' ||
+            BI.ground === 'glade' ||
+            BI.ground === 'savanna');
+        if (hasDew) {
+          for (let i = 0; i < 36; i++) {
+            const dx = 24 + Math.random() * (VW - 48),
+              warm = Math.random() < 0.34, // a third catch the sunrise gold; the rest read sky-cool
+              d = spr(
+                'glow',
+                dx,
+                560 + Math.random() * 72,
+                0.04 + Math.random() * 0.05,
+                0.5,
+                0.5
+              );
+            d.tint = warm ? 0xffe6a8 : 0xdaf3ff;
+            d.blendMode = PIXI.BLEND_MODES.ADD;
+            d.ph = Math.random() * 6.28;
+            d.sp = 2.2 + Math.random() * 2.6; // each beads sharply at its own pace
+            d.alpha = 0.55; // a sensible static glint for reduced motion (the twinkle drives it otherwise)
+            dewdrops.push(d);
+            dl.addChild(d);
+          }
+        }
+
         // seasonal weather: drifting petals / tumbling leaves / falling snow
         const wl = new PIXI.Container();
         root.addChild(wl);
@@ -3473,6 +3513,9 @@
           Math.min(1.25, 0.55 + Math.max(0, -temp) * 0.08);
         if (BI.aurora) drawAurora(t, night, auroraI);
         fireflies.fl.alpha = BI.interior ? 0.8 + night * 0.2 : night; // glowworms glow around the clock underground
+        // dew sparkles strongest at first light and dries off as the sun climbs; a clear night beads more
+        dewdrops.dl.alpha =
+          Math.exp(-Math.pow((h - 6.2) / 1.0, 2)) * (1 - cover * 0.7);
         for (const c of clouds) {
           c.tint = hexI(
             lpH(
@@ -3640,6 +3683,7 @@
         farLayer.position.set(parX * 5, parY * 3);
         scene.position.set(parX * 14, parY * 8);
         fireflies.fl.position.set(parX * 14, parY * 8);
+        dewdrops.dl.position.set(parX * 14, parY * 8); // dew rides the grass, same parallax as the scene
 
         // wind: a breeze that slowly varies and gusts (used by foliage, particles, and the water surface).
         // it freshens and gusts as a weather front gathers and blows through, then calms as it clears.
@@ -4600,6 +4644,11 @@
           if (g.x < 40 || g.x > VW - 40) g.vx *= -1;
           if (g.y < 460 || g.y > 600) g.vy *= -1;
           g.alpha = 0.4 + 0.6 * (Math.sin(t * 3 + g.ph) * 0.5 + 0.5);
+        }
+        // dew sits still on the grass and glints — a sharp catch of light rather than a soft pulse
+        for (const d of dewdrops) {
+          const s = 0.5 + 0.5 * Math.sin(t * d.sp + d.ph);
+          d.alpha = 0.12 + 0.88 * s * s * s * s;
         }
         // lily pads bob; seasonal weather falls
         for (const lp of lilies) {
