@@ -357,6 +357,7 @@
           hopper: 'rabbit',
           flyer: 0xffffff,
           flutter: true,
+          bats: 3, // bats feed over the meadow at dusk
           roller: null
         },
         desert: {
@@ -500,6 +501,7 @@
           hopper: null,
           flyer: 0x6a7b8a,
           flutter: false,
+          bats: 4, // bats work the pond at dusk (most insects over the water)
           roller: null
         },
         alpine: {
@@ -600,6 +602,7 @@
           flyer: 0x6a7a4a,
           flutter: true,
           flutterTint: 0xfff0a0, // pale-yellow brimstones drift the grove
+          bats: 3, // bats flit the grove at dusk
           roller: null
         },
         volcanic: {
@@ -818,6 +821,7 @@
           flyer: 0xffffff,
           flutter: true,
           flutterTint: 0xffbcdb, // soft pink blossom butterflies
+          bats: 3, // bats flit the orchard at dusk
           roller: null
         },
         canyon: {
@@ -2881,6 +2885,35 @@
             scene.addChild(e);
           }
 
+        // bats emerge at dusk and flit low over the water + meadow, feeding on the insects
+        // (the fireflies). gone by day — they fade in with the night. (not in winter; they hibernate)
+        if (BI.bats && !snow) {
+          const night0 = Math.min(
+            1,
+            Math.max(0, (0.78 - tod(nowHour()).light) / 0.46)
+          ); // a correct static alpha for reduced motion (the ticker drives it otherwise)
+          for (let i = 0; i < BI.bats; i++) {
+            const b = anim(
+              ['bat_a', 'bat_b'],
+              Math.random() * VW,
+              320 + Math.random() * 150,
+              0.3 + Math.random() * 0.12,
+              0.24
+            );
+            b.isBat = true;
+            b.isDuskBat = true;
+            b.tint = 0x241f2b;
+            b.lo = 300;
+            b.hi = 500; // flit low against the twilight, over the scene
+            b.vx = (Math.random() < 0.5 ? -1 : 1) * (1 + Math.random() * 1.6);
+            b.vy = (Math.random() - 0.5) * 2.4;
+            b.alpha = night0;
+            if (reduce.matches) b.gotoAndStop(0);
+            flutters.push(b);
+            scene.addChild(b);
+          }
+        }
+
         // night veil (multiply) — only darkens the scene's pixels
         veil = new PIXI.Graphics();
         veil
@@ -4337,8 +4370,8 @@
             if (Math.random() < 0.06 * dt) f.vy = (Math.random() - 0.5) * 5;
             if (Math.random() < 0.03 * dt)
               f.vx = (f.vx < 0 ? -1 : 1) * (0.7 + Math.random() * 2);
-            if (f.y < 64) f.vy = Math.abs(f.vy) + 0.4;
-            if (f.y > 340) f.vy = -Math.abs(f.vy) - 0.4;
+            if (f.y < (f.lo ?? 64)) f.vy = Math.abs(f.vy) + 0.4;
+            if (f.y > (f.hi ?? 340)) f.vy = -Math.abs(f.vy) - 0.4;
             if (f.x > VW + 60) {
               f.vx = -Math.abs(f.vx);
               f.x = VW + 58;
@@ -4348,6 +4381,7 @@
               f.x = -58;
             }
             f.scale.x = (f.vx < 0 ? -1 : 1) * Math.abs(f.scale.x);
+            if (f.isDuskBat) f.alpha = night; // out only after dusk, like the fireflies
             continue;
           }
           if (f.isToucan) {
