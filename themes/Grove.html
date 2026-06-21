@@ -139,7 +139,8 @@
       const q = new URLSearchParams(location.search);
       const hourParam = q.get('hour'),
         cyc = parseFloat(q.get('cycle')),
-        seasonParam = q.get('season');
+        seasonParam = q.get('season'),
+        moonParam = q.get('moon'); // 0..1 phase override for previewing (0/1 new, .5 full)
       const LS = (k, v) => {
         try {
           if (v === undefined) return localStorage.getItem('grove:' + k);
@@ -1383,6 +1384,44 @@
           if (tracks.length > 130) tracks.shift();
         }
       }
+      // tonight's real moon phase as a fraction 0..1 (0/1 = new, 0.5 = full), from the synodic
+      // month anchored to a known new moon — overridable with ?moon= for previewing
+      function moonPhaseFraction() {
+        if (moonParam != null) return parseFloat(moonParam);
+        const syn = 29.530588853,
+          ref = Date.UTC(2000, 0, 6, 18, 14) / 864e5; // 2000-01-06 new moon, in days
+        const age = (((Date.now() / 864e5 - ref) % syn) + syn) % syn;
+        return age / syn;
+      }
+      // mask the moon to its lit phase: the terminator is a half-ellipse, the limb a semicircle.
+      // Drawn at (cx,cy) with disc radius R; waxing lights the right limb, waning the left.
+      function drawMoonPhase(g, cx, cy, R, p) {
+        g.clear();
+        const k = (1 - Math.cos(2 * Math.PI * p)) / 2; // illuminated fraction
+        if (k < 0.02) return; // new moon: nothing lit, fully masked away
+        g.beginFill(0xffffff);
+        if (k > 0.985) {
+          g.drawCircle(cx, cy, R + 1); // full moon: whole disc
+          g.endFill();
+          return;
+        }
+        const sgn = p < 0.5 ? 1 : -1, // waxing → right limb, waning → left
+          term = Math.cos(2 * Math.PI * p), // terminator x-scale: +1 new … −1 full
+          N = 26,
+          pts = [];
+        for (let i = 0; i <= N; i++) {
+          const t = -1 + (2 * i) / N,
+            w = R * Math.sqrt(Math.max(0, 1 - t * t));
+          pts.push(cx + sgn * w, cy + R * t); // the lit limb, top → bottom
+        }
+        for (let i = N; i >= 0; i--) {
+          const t = -1 + (2 * i) / N,
+            w = R * Math.sqrt(Math.max(0, 1 - t * t));
+          pts.push(cx + sgn * term * w, cy + R * t); // the terminator, back up
+        }
+        g.drawPolygon(pts);
+        g.endFill();
+      }
 
       const swayers = [],
         clouds = [],
@@ -1419,6 +1458,9 @@
         stars,
         sun,
         moon,
+        moonShadow,
+        moonR = 36,
+        moonPh = 0.5,
         sunGlow,
         scene,
         veil,
@@ -1561,6 +1603,13 @@
         farLayer.addChild(sun);
         moon = spr('moon', 0, 0, 0.9, 0.5, 0.5);
         farLayer.addChild(moon);
+        // clip the moon to tonight's phase (the disc is r=40 in a 100px sprite → 0.8 of the half-width)
+        moonR = (moon.width / 2) * 0.8;
+        moonPh = moonPhaseFraction();
+        moonShadow = new PIXI.Graphics();
+        farLayer.addChild(moonShadow);
+        moon.mask = moonShadow;
+        drawMoonPhase(moonShadow, 0, 0, moonR, moonPh); // a sensible static phase for reduced motion
         raysG = new PIXI.Graphics();
         raysG.blendMode = PIXI.BLEND_MODES.ADD;
         farLayer.addChild(raysG); // god-rays shafting from the sun through breaking cloud (clouds render over)
@@ -3591,6 +3640,8 @@
           !BI.interior && !BI.underwater && !BI.canopy && !BI.glade;
         body.alpha = 1 - cover * 0.6; // sun/moon fades behind gathering cloud
         body.position.set(cel.x, cel.y);
+        if (moon.visible)
+          drawMoonPhase(moonShadow, cel.x, cel.y, moonR, moonPh); // ride the moon, hold the phase
         sunGlow.visible =
           !BI.interior && !BI.underwater && !BI.canopy && !BI.glade;
         sunGlow.position.set(cel.x, cel.y);
