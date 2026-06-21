@@ -2263,16 +2263,50 @@ save(
   100
 );
 
+// ======== a moth — drab, fuzzy, comes out after dusk in place of the butterflies (2 frames) ========
+const moth = (fx) =>
+  S(
+    '80 70',
+    `<g fill="#cabfa6">
+<path d="M40,30 L${40 - fx - 6},22 C${40 - fx - 13},26 ${40 - fx - 10},35 ${40 - fx - 1},37 Z"/>
+<path d="M40,30 L${40 + fx + 6},22 C${40 + fx + 13},26 ${40 + fx + 10},35 ${40 + fx + 1},37 Z"/>
+<ellipse cx="${40 - fx * 0.5 - 2}" cy="45" rx="${fx > 10 ? 8 : 5}" ry="7"/>
+<ellipse cx="${40 + fx * 0.5 + 2}" cy="45" rx="${fx > 10 ? 8 : 5}" ry="7"/></g>
+<g fill="#9b8c70" opacity="0.55"><ellipse cx="${40 - fx - 3}" cy="29" rx="4" ry="2.2"/><ellipse cx="${40 + fx + 3}" cy="29" rx="4" ry="2.2"/></g>
+<ellipse cx="40" cy="35" rx="3.4" ry="13" fill="#7e7058"/>
+<circle cx="40" cy="23" r="3.8" fill="#8a7c62"/>
+<g stroke="#6e6048" stroke-width="1.1" fill="none" stroke-linecap="round"><path d="M40,21 C36,16 32,14 29,14"/><path d="M40,21 C44,16 48,14 51,14"/></g>`
+  );
+save('moth_a', moth(14), 70);
+save('moth_b', moth(8), 70);
+
+// ======== a hedgehog — snuffles the night floor (faces right) ========
+save(
+  'hedgehog',
+  S(
+    '92 56',
+    `<defs><linearGradient id="hh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a7258"/><stop offset="1" stop-color="#54422f"/></linearGradient></defs>
+<g stroke="#4a3a2a" stroke-width="3.5" stroke-linecap="round"><line x1="34" y1="44" x2="31" y2="51"/><line x1="52" y1="44" x2="55" y2="51"/></g>
+<path d="M12,45 L16,30 L21,39 L25,23 L30,35 L35,21 L40,34 L45,19 L50,33 L55,20 L60,34 L65,25 L70,40 C76,40 80,44 76,47 L14,47 C11,47 11,46 12,45 Z" fill="url(#hh)"/>
+<g stroke="#3e3022" stroke-width="1.6" opacity="0.5" stroke-linecap="round"><path d="M24,42 L22,34"/><path d="M34,42 L33,31"/><path d="M44,42 L43,30"/><path d="M54,42 L54,31"/><path d="M62,42 L62,33"/></g>
+<path d="M66,40 C80,37 87,41 82,46 C77,50 68,48 63,43 Z" fill="#cbb89a"/>
+<circle cx="85" cy="43" r="2.2" fill="#1a120a"/>
+<circle cx="71" cy="39" r="1.8" fill="#140e08"/><circle cx="71.5" cy="38.5" r="0.5" fill="#fff"/>
+<path d="M60,30 C58,25 61,23 64,26 C64,29 62,31 60,30 Z" fill="#6a543e"/>`
+  ),
+  84
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'chough_a',
-  'chough_b',
-  'eagle',
-  'bird_a',
-  'salamander',
-  'olm',
-  'gull',
-  'swallow_a'
+  'moth_a',
+  'moth_b',
+  'butterfly_a',
+  'hedgehog',
+  'owl_a',
+  'fox',
+  'rabbit',
+  'squirrel'
 ];
 const cols = 4,
   cell = 230,

@@ -389,6 +389,8 @@
           hopper: 'rabbit',
           squirrel: true, // a squirrel forages the grove floor now and then
           perchBird: true, // a songbird perches in the canopy and flits between trees
+          owl: true, // an owl hunts the meadow after dark
+          hedgehog: true, // a hedgehog snuffles the floor at night
           flyer: 0xffffff,
           flutter: true,
           bats: 3, // bats feed over the meadow at dusk
@@ -536,6 +538,7 @@
           graze: true,
           critter: null,
           hopper: null,
+          owl: true, // an owl quarters the marsh after dark
           flyer: 0x6a7b8a,
           flutter: false,
           bats: 4, // bats work the pond at dusk (most insects over the water)
@@ -866,6 +869,8 @@
           hopper: 'rabbit',
           squirrel: true, // a squirrel forages beneath the sakura
           perchBird: true, // a songbird perches among the blossom
+          owl: true, // an owl crosses the orchard after dark
+          hedgehog: true, // a hedgehog snuffles the orchard floor at night
           flyer: 0xffffff,
           flutter: true,
           flutterTint: 0xffbcdb, // soft pink blossom butterflies
@@ -1076,6 +1081,9 @@
         'olm',
         'chough_a',
         'chough_b',
+        'moth_a',
+        'moth_b',
+        'hedgehog',
         'grass',
         'flower_p',
         'flower_w',
@@ -1639,6 +1647,7 @@
         beetle,
         salamander,
         olm,
+        hedgehog,
         seal,
         roadrunner,
         whale,
@@ -1708,6 +1717,7 @@
           beetle =
           salamander =
           olm =
+          hedgehog =
             null;
         whale = spoutG = surfG = cloudSeaG = cloudGlow = choughHub = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
@@ -1721,6 +1731,11 @@
           BI.foliageTint || (SP ? SP.fol : BI.seasonal ? SE.foliage : 0xffffff);
         const snow =
           (SP ? false : BI.seasonal ? SE.snow : false) || !!BI.snowCaps;
+        // build-time darkness (0 by day → 1 deep night) so nocturnal life knows whether to come out
+        const buildNight = Math.min(
+          1,
+          Math.max(0, (0.78 - tod(nowHour()).light) / 0.46)
+        );
         const weatherKind =
           BI.ambientWeather || // a biome can force a constant fall (blossom petals)
           (SP
@@ -3118,6 +3133,22 @@
           salamander.glow = gl;
           scene.addChild(salamander);
         } else salamander = null;
+        if (BI.hedgehog && buildNight > 0.5 && Math.random() < 0.6) {
+          // a hedgehog trundles the night floor, nose down, pausing to snuffle, turning at the edges
+          const hx = 200 + Math.random() * (VW - 400);
+          hedgehog = spr(
+            'hedgehog',
+            hx,
+            groundY(hx) + 6,
+            0.42 + Math.random() * 0.12
+          );
+          hedgehog.baseSc = Math.abs(hedgehog.scale.x);
+          hedgehog.dir = Math.random() < 0.5 ? 1 : -1;
+          hedgehog.scale.x = hedgehog.dir * hedgehog.baseSc;
+          hedgehog.spd = 0.3 + Math.random() * 0.2; // a slow snuffling amble
+          hedgehog.pauseT = Math.random() * 2;
+          scene.addChild(hedgehog);
+        } else hedgehog = null;
         if (BI.penguins) {
           // a little colony waddles the snowfield: each penguin ambles at its own pace, some just stand
           for (let i = 0; i < BI.penguins; i++) {
@@ -3463,14 +3494,18 @@
         }
         if (BI.flutter && !snow)
           for (let i = 0, n = 2 + ((Math.random() * 5) | 0); i < n; i++) {
-            // a mix of species so they're not all the same wing: the biome's signature colour
-            // (flutterTint — jungle morphos, blossom pinks) dominates, but patterned monarchs and
-            // swallowtails flit through in their own colours for genuine variety
+            // after dusk the butterflies give way to drab moths; by day a mix of species so
+            // they're not all the same wing — the biome's signature colour (flutterTint) dominates,
+            // but patterned monarchs and swallowtails flit through in their own colours
             const r = Math.random();
             let frames = ['butterfly_a', 'butterfly_b'],
               fsc = 0.5,
               tinted = !!BI.flutterTint;
-            if (r < 0.26) {
+            if (buildNight > 0.5) {
+              frames = ['moth_a', 'moth_b']; // night shift: pale moths
+              fsc = 0.46;
+              tinted = false;
+            } else if (r < 0.26) {
               frames = ['monarch_a', 'monarch_b']; // a monarch
               fsc = 0.48;
               tinted = false;
@@ -3670,8 +3705,9 @@
           flutters.push(tk);
           scene.addChild(tk);
         }
-        if (BI.owl) {
-          // an owl glides silently across the twilight on slow beats, resting out of sight between crossings
+        if (BI.owl && (BI.glade || buildNight > 0.45)) {
+          // an owl glides silently across the twilight on slow beats, resting out of sight between
+          // crossings — always in the glade's perpetual dusk, only after dark in the open biomes
           const ow = anim(['owl_a', 'owl_b'], 320, 210, 0.44, 0.04);
           ow.isOwl = true;
           ow.dir = Math.random() < 0.5 ? -1 : 1;
@@ -5461,6 +5497,32 @@
             if (Math.abs(dx) < 4) {
               salamander.mode = 'bask';
               salamander.tmr = 4 + Math.random() * 6;
+            }
+          }
+        }
+        // a hedgehog trundles the night floor in short bursts, pausing nose-down to snuffle
+        if (hedgehog) {
+          if (hedgehog.pauseT > 0) {
+            hedgehog.pauseT -= dt / 60; // snuffling in place
+            hedgehog.rotation = Math.sin(t * 8) * 0.025; // a busy little wobble
+            hedgehog.y = groundY(hedgehog.x) + 6;
+          } else {
+            hedgehog.x += hedgehog.dir * hedgehog.spd * dt;
+            hedgehog.y =
+              groundY(hedgehog.x) + 6 + Math.abs(Math.sin(t * 6)) * -0.8; // trundling bob
+            hedgehog.rotation = 0;
+            if (hedgehog.x > VW - 90) {
+              hedgehog.dir = -1;
+              hedgehog.scale.x = -hedgehog.baseSc;
+            } else if (hedgehog.x < 90) {
+              hedgehog.dir = 1;
+              hedgehog.scale.x = hedgehog.baseSc;
+            }
+            if (Math.random() < 0.01 * dt)
+              hedgehog.pauseT = 0.8 + Math.random() * 2; // stop to snuffle
+            else if (Math.random() < 0.004 * dt) {
+              hedgehog.dir = -hedgehog.dir;
+              hedgehog.scale.x = hedgehog.dir * hedgehog.baseSc;
             }
           }
         }
