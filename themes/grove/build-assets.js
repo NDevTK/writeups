@@ -2656,16 +2656,56 @@ save(
   108
 );
 
+// ======== a resting goat — bedded on the scree, legs folded, head up (faces right) ========
+save(
+  'goat_rest',
+  S(
+    '172 132',
+    `<defs><linearGradient id="gtr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f2ea"/><stop offset="1" stop-color="#ccc4b1"/></linearGradient></defs>
+<g fill="#bbb39e"><ellipse cx="70" cy="110" rx="17" ry="6.5"/><ellipse cx="108" cy="112" rx="15" ry="6"/></g>
+<path d="M34,102 C28,76 60,66 100,66 C136,66 158,76 160,96 C161,110 130,116 96,116 C64,116 44,114 34,102 Z" fill="url(#gtr)"/>
+<path d="M50,78 C90,68 130,70 156,86 C130,78 90,78 58,86 Z" fill="#e3ddcd" opacity="0.5"/>
+<path d="M132,90 C140,66 148,50 156,44" stroke="url(#gtr)" stroke-width="17" fill="none" stroke-linecap="round"/>
+<ellipse cx="156" cy="42" rx="13" ry="14" fill="url(#gtr)"/>
+<path d="M164,48 C174,50 178,58 172,64 C166,64 162,58 160,52 Z" fill="#e8e2d2"/>
+<path d="M152,30 C150,16 152,7 158,3" stroke="#2c241a" stroke-width="4.2" fill="none" stroke-linecap="round"/>
+<path d="M160,30 C160,16 164,7 170,3" stroke="#2c241a" stroke-width="4.2" fill="none" stroke-linecap="round"/>
+<path d="M160,58 C158,70 156,78 154,83 C152,75 152,65 154,56 Z" fill="#e2dccb"/>
+<circle cx="158" cy="40" r="2.4" fill="#1c160e"/><circle cx="168" cy="58" r="1.7" fill="#3a3026"/>`
+  ),
+  160
+);
+
+// ======== a resting giraffe — folded onto the ground, neck up and watchful (faces right) ========
+save(
+  'giraffe_rest',
+  S(
+    '176 238',
+    `<defs><linearGradient id="gfr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eec670"/><stop offset="1" stop-color="#cf9e44"/></linearGradient></defs>
+<g fill="#c4923e"><ellipse cx="62" cy="220" rx="24" ry="9"/><ellipse cx="110" cy="222" rx="22" ry="8"/></g>
+<path d="M30,206 C22,178 58,166 104,166 C146,166 168,178 168,200 C168,216 132,224 94,224 C58,224 42,218 30,206 Z" fill="url(#gfr)"/>
+<path d="M32,190 C24,200 24,212 30,220" stroke="#cf9e44" stroke-width="5" fill="none" stroke-linecap="round"/>
+<path d="M130,178 C142,130 150,82 158,42" stroke="url(#gfr)" stroke-width="27" fill="none" stroke-linecap="round"/>
+<path d="M140,168 C150,122 158,76 165,38" stroke="#9c6f34" stroke-width="6" fill="none" stroke-linecap="round"/>
+<path d="M148,44 C142,30 152,20 166,21 C178,22 184,30 181,40 C188,42 191,49 186,55 C179,61 162,60 155,54 C149,50 148,47 148,44 Z" fill="url(#gfr)"/>
+<g stroke="#7a5a30" stroke-width="4.5" stroke-linecap="round"><line x1="159" y1="23" x2="157" y2="13"/><line x1="173" y1="23" x2="175" y2="13"/></g>
+<circle cx="157" cy="13" r="4" fill="#5a4326"/><circle cx="175" cy="13" r="4" fill="#5a4326"/>
+<circle cx="164" cy="40" r="2.6" fill="#3a2a16"/>
+<g fill="#a9742e" opacity="0.6"><ellipse cx="50" cy="190" rx="10" ry="8"/><ellipse cx="78" cy="184" rx="11" ry="9"/><ellipse cx="108" cy="186" rx="11" ry="9"/><ellipse cx="136" cy="194" rx="9" ry="8"/><ellipse cx="64" cy="210" rx="9" ry="7"/><ellipse cx="98" cy="210" rx="10" ry="7"/><ellipse cx="128" cy="206" rx="8" ry="6"/><ellipse cx="138" cy="150" rx="7" ry="9"/><ellipse cx="146" cy="118" rx="6" ry="9"/><ellipse cx="152" cy="86" rx="6" ry="8"/><ellipse cx="157" cy="60" rx="5" ry="7"/></g>`
+  ),
+  150
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
+  'goat_rest',
+  'goat',
+  'giraffe_rest',
+  'giraffe',
+  'deer_rest',
+  'deer_a',
   'octopus',
-  'turtle',
-  'jelly2_a',
-  'clownfish_a',
-  'angelfish_a',
-  'rudd_a',
-  'crab',
-  'anemone'
+  'moorhen'
 ];
 const cols = 4,
   cell = 230,

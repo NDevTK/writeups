@@ -1112,6 +1112,8 @@
         'rudd_a',
         'rudd_b',
         'octopus',
+        'goat_rest',
+        'giraffe_rest',
         'grass',
         'flower_p',
         'flower_w',
@@ -3049,14 +3051,19 @@
                   (Math.random() < 0.6 ? 1 : 0) +
                   (Math.random() < 0.3 ? 1 : 0);
           for (let k = 0; k < herd; k++) {
-            // some deer are bedded down rather than up and walking, so a herd isn't all on its feet
-            const resting =
-              !heron && BI.walker[0] === 'deer_a' && Math.random() < 0.3;
+            // some animals are bedded down rather than up and walking, so a herd isn't all on its
+            // feet — deer, goats and giraffes each have their own resting pose
+            const restSprite =
+              !heron &&
+              {deer_a: 'deer_rest', goat: 'goat_rest', giraffe: 'giraffe_rest'}[
+                BI.walker[0]
+              ];
+            const resting = restSprite && Math.random() < 0.3;
             // the wading bird is the grey heron most visits, a white egret some — same patient
             // stalk-and-strike either way
             const wadeFrames =
               heron && Math.random() < 0.45 ? ['egret'] : BI.walker;
-            const frames = resting ? ['deer_rest'] : wadeFrames;
+            const frames = resting ? [restSprite] : wadeFrames;
             const d = anim(
               frames,
               300,
