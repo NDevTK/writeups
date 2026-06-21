@@ -393,6 +393,7 @@
           hedgehog: true, // a hedgehog snuffles the floor at night
           snail: true, // a snail glides out onto the wet grass after rain
           ladybird: true, // a ladybird trundles the meadow floor by day
+          mouse: true, // a field mouse scurries the meadow grass by day
           flyer: 0xffffff,
           flutter: true,
           bee: 2, // bumblebees work the wildflowers by day
@@ -884,6 +885,7 @@
           hedgehog: true, // a hedgehog snuffles the orchard floor at night
           snail: true, // a snail glides out across the wet orchard floor after rain
           ladybird: true, // a ladybird trundles the orchard floor by day
+          mouse: true, // a field mouse scurries the orchard grass by day
           flyer: 0xffffff,
           flutter: true,
           flutterTint: 0xffbcdb, // soft pink blossom butterflies
@@ -1005,6 +1007,7 @@
           squirrel: true, // a squirrel forages among the toadstools
           snail: true, // a snail glides the damp leaf-litter after rain
           ladybird: true, // a ladybird trundles the leaf-litter by day
+          mouse: true, // a wood mouse scurries the leaf-litter by day
           perchBird: true, // a songbird perches among the boughs
           flyer: 0x3a4a55,
           flutter: false,
@@ -1088,6 +1091,7 @@
         'beetle',
         'ladybird',
         'snail',
+        'mouse',
         'monarch_a',
         'monarch_b',
         'parrot',
@@ -1725,6 +1729,7 @@
         salamander,
         olm,
         hedgehog,
+        mouse,
         fennec,
         aardvark,
         kinkajou,
@@ -1802,6 +1807,7 @@
           salamander =
           olm =
           hedgehog =
+          mouse =
           fennec =
           aardvark =
           kinkajou =
@@ -3353,6 +3359,22 @@
           snail.spd = 0.12 + Math.random() * 0.06; // a glacial creep
           scene.addChild(snail);
         } else snail = null;
+        if (BI.mouse && buildNight < 0.5 && Math.random() < 0.6) {
+          // a field mouse scurries the meadow grass in quick bursts, freezing to sit alert
+          const mx = 140 + Math.random() * (VW - 280);
+          mouse = spr(
+            'mouse',
+            mx,
+            groundY(mx) + 3,
+            0.26 + Math.random() * 0.07
+          );
+          mouse.baseSc = Math.abs(mouse.scale.x);
+          mouse.dir = Math.random() < 0.5 ? 1 : -1;
+          mouse.scale.x = mouse.dir * mouse.baseSc;
+          mouse.spd = 1.4 + Math.random() * 0.8; // quick and darty
+          mouse.pauseT = 0.3 + Math.random() * 1.2;
+          scene.addChild(mouse);
+        } else mouse = null;
         if (BI.shoreBird && BI.ground === 'beach') {
           // a little party of sandpipers runs the waterline, chasing the wash out then fleeing it in
           for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
@@ -6025,6 +6047,32 @@
               hedgehog.dir = -hedgehog.dir;
               hedgehog.scale.x = hedgehog.dir * hedgehog.baseSc;
             }
+          }
+        }
+        // a field mouse: short, quick scurries through the grass, then it freezes and sits stock-still
+        // — a tiny alert tremor — before darting on; pauses often and briefly, the way a mouse does
+        if (mouse) {
+          if (mouse.pauseT > 0) {
+            mouse.pauseT -= dt / 60; // frozen, alert
+            mouse.rotation = Math.sin(t * 22) * 0.02; // a fine nervous tremor
+            mouse.y = groundY(mouse.x) + 3;
+            if (mouse.pauseT <= 0 && Math.random() < 0.5) {
+              mouse.dir = -mouse.dir; // often bolts off in a new direction
+              mouse.scale.x = mouse.dir * mouse.baseSc;
+            }
+          } else {
+            mouse.x += mouse.dir * mouse.spd * dt;
+            mouse.y = groundY(mouse.x) + 3 + Math.abs(Math.sin(t * 26)) * -0.7; // a low, quick scurry
+            mouse.rotation = 0;
+            if (mouse.x > VW - 80) {
+              mouse.dir = -1;
+              mouse.scale.x = -mouse.baseSc;
+            } else if (mouse.x < 80) {
+              mouse.dir = 1;
+              mouse.scale.x = mouse.baseSc;
+            }
+            if (Math.random() < 0.025 * dt)
+              mouse.pauseT = 0.3 + Math.random() * 1.4; // freeze, alert
           }
         }
         // a fennec fox forages the night sand: it stops to listen with those big ears, then trots

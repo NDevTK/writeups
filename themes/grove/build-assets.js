@@ -2487,6 +2487,26 @@ save(
   84
 );
 
+// ======== a field mouse — scurries the meadow grass and freezes alert (faces right) ========
+save(
+  'mouse',
+  S(
+    '54 34',
+    `<defs><linearGradient id="ms" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a8855e"/><stop offset="1" stop-color="#caad88"/></linearGradient></defs>
+<path d="M10,25 C-1,24 1,15 6,11" fill="none" stroke="#b39476" stroke-width="2.2" stroke-linecap="round"/>
+<g stroke="#856546" stroke-width="1.6" stroke-linecap="round"><path d="M17,30 L14,33"/><path d="M21,31 L20,34"/></g>
+<path d="M10,24 Q9,13 23,12 Q35,12 41,18 Q45,22 41,26 Q31,30 19,29 Q12,29 10,24 Z" fill="url(#ms)"/>
+<ellipse cx="25" cy="26" rx="13" ry="4" fill="#ecdcc2" opacity="0.6"/>
+<g stroke="#856546" stroke-width="1.6" stroke-linecap="round"><path d="M35,27 L34,32"/><path d="M31,28 L29,33"/></g>
+<circle cx="37" cy="13" r="6.6" fill="#a8855e"/><circle cx="37" cy="13.5" r="4" fill="#d8aa9c"/>
+<path d="M38,18 Q51,16 48,24 Q43,27 38,25 Z" fill="url(#ms)"/>
+<circle cx="43" cy="19.6" r="1.8" fill="#140f0b"/><circle cx="43.6" cy="19" r="0.6" fill="#ffffff" opacity="0.7"/>
+<circle cx="50" cy="22" r="1.3" fill="#d68a8a"/>
+<g stroke="#6a5038" stroke-width="0.6" opacity="0.55" stroke-linecap="round"><path d="M49,21.5 L55,19.5"/><path d="M49,22.5 L55,23.5"/></g>`
+  ),
+  46
+);
+
 // ======== a fennec fox — pale, with enormous ears, forages the desert at night (faces right) ========
 save(
   'fennec',
@@ -2887,7 +2907,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['skater', 'lily', 'damselfly_a', 'frog'];
+const review = ['mouse', 'hedgehog', 'ladybird', 'snail'];
 const cols = 4,
   cell = 230,
   pad = 14,
