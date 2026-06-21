@@ -655,6 +655,7 @@
           ground: 'basalt',
           feature: 'volcano',
           embers: true,
+          salamander: true, // a fire salamander basks on the warm basalt
           mid: [],
           near: [],
           water: null,
@@ -761,7 +762,7 @@
           flyerFrames: ['bat_a', 'bat_b'],
           flutter: false,
           roller: null,
-          water: {top: '#1b2742', bot: '#0b1120', glow: true} // still underground pool
+          water: {top: '#1b2742', bot: '#0b1120', glow: true, olm: true} // still underground pool; a pale olm drifts in it
         },
         reef: {
           label: '🐠 Reef',
@@ -1070,6 +1071,8 @@
         'sandpiper',
         'panda_cub_a',
         'panda_cub_b',
+        'salamander',
+        'olm',
         'grass',
         'flower_p',
         'flower_w',
@@ -1630,6 +1633,8 @@
         squirrel,
         songbird,
         beetle,
+        salamander,
+        olm,
         seal,
         roadrunner,
         whale,
@@ -1695,6 +1700,8 @@
           squirrel =
           songbird =
           beetle =
+          salamander =
+          olm =
             null;
         whale = spoutG = surfG = cloudSeaG = cloudGlow = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
@@ -3081,6 +3088,30 @@
             scene.addChild(s);
           }
         }
+        if (BI.salamander && Math.random() < 0.75) {
+          // a fire salamander basks on the warm basalt, a faint heat-glow pooled beneath it, and
+          // now and then scuttles low and quick to a fresh warm slab
+          const sx = 200 + Math.random() * (VW - 400);
+          salamander = spr(
+            'salamander',
+            sx,
+            groundY(sx) + 6,
+            0.4 + Math.random() * 0.14
+          );
+          salamander.baseSc = Math.abs(salamander.scale.x);
+          salamander.dir = Math.random() < 0.5 ? 1 : -1;
+          salamander.scale.x = salamander.dir * salamander.baseSc;
+          salamander.mode = 'bask'; // bask (still, glowing) → scuttle (dart to tx) → bask
+          salamander.tmr = 3 + Math.random() * 5;
+          salamander.tx = sx;
+          const gl = spr('glow', 0, -6, 1.1, 0.5, 0.5); // warm pool of heat under the belly
+          gl.tint = 0xff6a26;
+          gl.blendMode = PIXI.BLEND_MODES.ADD;
+          gl.alpha = 0.2;
+          salamander.addChild(gl);
+          salamander.glow = gl;
+          scene.addChild(salamander);
+        } else salamander = null;
         if (BI.penguins) {
           // a little colony waddles the snowfield: each penguin ambles at its own pace, some just stand
           for (let i = 0; i < BI.penguins; i++) {
@@ -3120,6 +3151,26 @@
           water.height = VH - 600;
           water.tint = snow ? 0xcfe6ef : 0xffffff;
           scene.addChild(water);
+          if (BI.water.olm) {
+            // a pale, blind olm drifts just under the surface of the still cave pool
+            const ox = 220 + Math.random() * (VW - 440);
+            olm = spr(
+              'olm',
+              ox,
+              624 + Math.random() * 26,
+              0.4 + Math.random() * 0.12,
+              0.5,
+              0.5
+            );
+            olm.baseSc = Math.abs(olm.scale.x);
+            olm.dir = Math.random() < 0.5 ? 1 : -1;
+            olm.scale.x = olm.dir * olm.baseSc;
+            olm.spd = 0.18 + Math.random() * 0.2; // a slow, ghostly drift
+            olm.ph = Math.random() * 6.28;
+            olm.ty = olm.y;
+            olm.alpha = 0.9;
+            scene.addChild(olm);
+          }
           if (BI.ground === 'beach') {
             // shore break: foam washes up the sand and slides back, drawn each frame in the ticker
             surfG = new PIXI.Graphics();
@@ -5345,6 +5396,48 @@
               beetle.dir = -beetle.dir; // change its mind
               beetle.scale.x = beetle.dir * beetle.baseSc;
             }
+          }
+        }
+        // a fire salamander basks on the warm rock, its heat-glow breathing, and now and then
+        // scuttles low and quick to a fresh warm slab
+        if (salamander) {
+          salamander.tmr -= dt / 60;
+          if (salamander.glow)
+            salamander.glow.alpha = 0.16 + Math.abs(Math.sin(t * 1.5)) * 0.22;
+          if (salamander.mode === 'bask') {
+            salamander.y = groundY(salamander.x) + 6 + Math.sin(t * 2) * 0.4; // slow breathing
+            if (salamander.tmr < 0) {
+              salamander.mode = 'scuttle';
+              salamander.tx = 150 + Math.random() * (VW - 300);
+              salamander.dir = salamander.tx > salamander.x ? 1 : -1;
+              salamander.scale.x = salamander.dir * salamander.baseSc;
+            }
+          } else {
+            const dx = salamander.tx - salamander.x;
+            salamander.x += Math.sign(dx) * Math.min(Math.abs(dx), 1.7 * dt);
+            salamander.y =
+              groundY(salamander.x) + 6 - Math.abs(Math.sin(t * 13)) * 2; // low scuttle
+            if (Math.abs(dx) < 4) {
+              salamander.mode = 'bask';
+              salamander.tmr = 4 + Math.random() * 6;
+            }
+          }
+        }
+        // a pale olm drifts the cave pool, undulating slowly, turning at the banks or on a whim
+        if (olm) {
+          olm.x += olm.dir * olm.spd * dt;
+          olm.y = olm.ty + Math.sin(t * 0.8 + olm.ph) * 6; // gentle rise and sink
+          olm.rotation = Math.sin(t * 1.2 + olm.ph) * 0.06 * olm.dir; // slow body undulation
+          if (olm.x > VW - 140) {
+            olm.dir = -1;
+            olm.scale.x = -olm.baseSc;
+          } else if (olm.x < 140) {
+            olm.dir = 1;
+            olm.scale.x = olm.baseSc;
+          } else if (Math.random() < 0.0025 * dt) {
+            olm.dir = -olm.dir;
+            olm.scale.x = olm.dir * olm.baseSc;
+            olm.ty = 622 + Math.random() * 30; // drift to a new depth
           }
         }
         // the roadrunner dashes across the canyon floor, stopping now and then to look about —

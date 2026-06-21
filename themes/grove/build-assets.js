@@ -2204,16 +2204,52 @@ const pandaCubSvg = (lf) =>
 save('panda_cub_a', pandaCubSvg([0, 0, 0, 0]), 118);
 save('panda_cub_b', pandaCubSvg([6, -5, -5, 6]), 118);
 
+// ======== a fire salamander — black with molten orange blotches, basks on the warm basalt ========
+save(
+  'salamander',
+  S(
+    '120 54',
+    `<defs><linearGradient id="sal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a342f"/><stop offset="1" stop-color="#16120f"/></linearGradient></defs>
+<path d="M10,32 C0,31 0,36 10,37 C24,38 36,36 46,33 Z" fill="url(#sal)"/>
+<g stroke="#221d18" stroke-width="5" stroke-linecap="round"><path d="M46,37 L40,48"/><path d="M56,38 L60,49"/><path d="M78,38 L72,49"/><path d="M88,37 L94,48"/></g>
+<path d="M40,31 C44,20 64,17 80,18 C98,19 106,24 106,31 C106,38 98,42 80,43 C62,44 46,42 40,31 Z" fill="url(#sal)"/>
+<ellipse cx="100" cy="31" rx="13" ry="9" fill="url(#sal)"/>
+<g fill="#f0a01e"><ellipse cx="56" cy="26" rx="6" ry="4"/><ellipse cx="74" cy="24" rx="5" ry="3.5"/><ellipse cx="64" cy="35" rx="5" ry="3"/><ellipse cx="86" cy="28" rx="4.5" ry="3"/><ellipse cx="48" cy="33" rx="4" ry="2.5"/><ellipse cx="22" cy="34" rx="3.5" ry="2"/></g>
+<g fill="#f8d23a" opacity="0.65"><ellipse cx="56" cy="25" rx="3" ry="2"/><ellipse cx="74" cy="23" rx="2.5" ry="1.6"/><ellipse cx="86" cy="27" rx="2" ry="1.4"/></g>
+<circle cx="106" cy="28" r="2.4" fill="#0e0a08"/><circle cx="107" cy="27.4" r="0.8" fill="#f0a01e"/>
+<circle cx="110" cy="32" r="1" fill="#0e0a08"/>`
+  ),
+  108
+);
+
+// ======== a cave olm — a pale, blind salamander with feathery red gills, drifts the pool ========
+save(
+  'olm',
+  S(
+    '124 44',
+    `<defs><linearGradient id="olm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2dde0"/><stop offset="1" stop-color="#d8b6be"/></linearGradient></defs>
+<path d="M8,24 C0,20 0,28 8,26 C24,27 40,25 52,24 C40,23 24,21 8,24 Z" fill="url(#olm)"/>
+<path d="M12,24 C5,17 5,31 12,26 Z" fill="#e8c2c8" opacity="0.7"/>
+<g stroke="#d8b6be" stroke-width="2.6" stroke-linecap="round"><path d="M50,28 L46,36"/><path d="M62,29 L64,37"/><path d="M82,29 L78,37"/><path d="M92,28 L96,36"/></g>
+<path d="M44,24 C50,16 72,15 92,17 C104,18 110,21 110,24 C110,27 104,30 92,31 C72,33 50,32 44,24 Z" fill="url(#olm)"/>
+<ellipse cx="104" cy="24" rx="11" ry="7" fill="url(#olm)"/>
+<g stroke="#e87a8a" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.85"><path d="M92,18 C90,12 88,8 84,6"/><path d="M95,17 C95,11 94,7 92,4"/><path d="M98,18 C100,12 101,8 101,5"/></g>
+<g stroke="#f29aa6" stroke-width="1.2" fill="none" opacity="0.7"><path d="M90,18 C87,13 85,10 82,8"/><path d="M97,17 C98,12 99,9 100,7"/></g>
+<circle cx="110" cy="22" r="1.4" fill="#b08088" opacity="0.7"/>`
+  ),
+  110
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'sandpiper',
-  'gull',
-  'panda_cub_a',
-  'panda',
-  'redpanda',
+  'salamander',
+  'lizard',
+  'olm',
   'crab',
-  'palm',
-  'bamboo'
+  'stalagmite',
+  'crystal',
+  'beetle',
+  'rock'
 ];
 const cols = 4,
   cell = 230,
