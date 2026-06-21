@@ -1167,6 +1167,10 @@
         'fox',
         'dragonfly_a',
         'dragonfly_b',
+        'dragonfly_r_a',
+        'dragonfly_r_b',
+        'dragonfly_g_a',
+        'dragonfly_g_b',
         'deer_a',
         'deer_b',
         'lily',
@@ -3671,12 +3675,18 @@
                 ((Math.random() * 3) | 0) -
                 1
             ); // ±1
+            // dragonflies come teal, red (a darter) or golden (a hawker); slim blue damselflies
+            // flit among them
+            const dragonKinds = [
+              ['dragonfly_a', 'dragonfly_b'],
+              ['dragonfly_r_a', 'dragonfly_r_b'],
+              ['dragonfly_g_a', 'dragonfly_g_b']
+            ];
             for (let i = 0; i < dn; i++) {
-              // slimmer blue damselflies flit over the water among the dragonflies
               const d = anim(
                 Math.random() < 0.4
                   ? ['damselfly_a', 'damselfly_b']
-                  : ['dragonfly_a', 'dragonfly_b'],
+                  : dragonKinds[(Math.random() * dragonKinds.length) | 0],
                 200 + Math.random() * 880,
                 612 + Math.random() * 60,
                 0.45,

@@ -350,17 +350,21 @@ const foxSvg = (g0, g1, light, dark) =>
 save('fox', foxSvg('#e07a2e', '#bd5e1e', '#f3ead8', '#2a2018'), 175);
 save('fox_s', foxSvg('#64686f', '#3a3e44', '#eef2f5', '#1c1e22'), 175);
 
-// ---- NEW: dragonfly (2 wing frames) ----
-const dragon = (wA, wB) =>
+// ---- NEW: dragonfly (2 wing frames) — teal by default, plus a red darter and golden hawker ----
+const dragon = (wA, wB, body, dark) =>
   S(
     '100 60',
     `
 <g fill="#bfeaf2" opacity="0.55"><ellipse cx="42" cy="${wA}" rx="20" ry="6"/><ellipse cx="42" cy="${60 - wA}" rx="20" ry="6"/><ellipse cx="60" cy="${wB}" rx="15" ry="5"/><ellipse cx="60" cy="${60 - wB}" rx="15" ry="5"/></g>
-<rect x="28" y="28" width="50" height="4" rx="2" fill="#2f9a8f"/><rect x="74" y="28.5" width="14" height="3" rx="1.5" fill="#1d6f66"/>
-<circle cx="28" cy="30" r="6" fill="#2f9a8f"/><circle cx="24" cy="28" r="3.5" fill="#1d6f66"/>`
+<rect x="28" y="28" width="50" height="4" rx="2" fill="${body}"/><rect x="74" y="28.5" width="14" height="3" rx="1.5" fill="${dark}"/>
+<circle cx="28" cy="30" r="6" fill="${body}"/><circle cx="24" cy="28" r="3.5" fill="${dark}"/>`
   );
-save('dragonfly_a', dragon(18, 20), 90);
-save('dragonfly_b', dragon(24, 26), 90);
+save('dragonfly_a', dragon(18, 20, '#2f9a8f', '#1d6f66'), 90);
+save('dragonfly_b', dragon(24, 26, '#2f9a8f', '#1d6f66'), 90);
+save('dragonfly_r_a', dragon(18, 20, '#d6483a', '#9a2e24'), 90); // a red darter
+save('dragonfly_r_b', dragon(24, 26, '#d6483a', '#9a2e24'), 90);
+save('dragonfly_g_a', dragon(18, 20, '#d2a32e', '#9a751e'), 90); // a golden hawker
+save('dragonfly_g_b', dragon(24, 26, '#d2a32e', '#9a751e'), 90);
 // a damselfly — slimmer than the dragonfly, a thin blue body with narrow wings (2 frames)
 const damsel = (w) =>
   S(
@@ -2852,7 +2856,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['snail', 'hedgehog', 'beetle', 'frog'];
+const review = ['dragonfly_a', 'dragonfly_r_a', 'dragonfly_g_a', 'damselfly_a'];
 const cols = 4,
   cell = 230,
   pad = 14,
