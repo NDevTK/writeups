@@ -952,6 +952,8 @@
           walker: null,
           critter: null,
           hopper: null,
+          owl: true, // a snowy owl drifts over the ice after dark
+          owlFrames: ['snowy_owl_a', 'snowy_owl_b'],
           flyer: 0x6b7078, // a dark skua glides over (the gull silhouette, greyed)
           flyerFrames: ['gull'],
           flutter: false,
@@ -1103,6 +1105,9 @@
         'ghost_crab',
         'kinkajou',
         'wood_duck',
+        'snowy_owl_a',
+        'snowy_owl_b',
+        'deer_rest',
         'grass',
         'flower_p',
         'flower_w',
@@ -3038,22 +3043,35 @@
                   (Math.random() < 0.6 ? 1 : 0) +
                   (Math.random() < 0.3 ? 1 : 0);
           for (let k = 0; k < herd; k++) {
+            // some deer are bedded down rather than up and walking, so a herd isn't all on its feet
+            const resting =
+              !heron && BI.walker[0] === 'deer_a' && Math.random() < 0.3;
             // the wading bird is the grey heron most visits, a white egret some — same patient
             // stalk-and-strike either way
             const wadeFrames =
               heron && Math.random() < 0.45 ? ['egret'] : BI.walker;
+            const frames = resting ? ['deer_rest'] : wadeFrames;
             const d = anim(
-              wadeFrames,
+              frames,
               300,
               groundY(300) + 8,
               BI.walkerScale,
               0.1 + Math.random() * 0.04 // each animates at its own pace
             );
-            if (BI.walker.length > 1) d.stop();
+            if (frames.length > 1) d.stop();
             else d.gotoAndStop(0);
             d.graze = BI.graze;
             d.tint = tintJit(0xffffff, 0.06); // each animal a slightly different shade
-            if (heron) {
+            if (resting) {
+              // bedded on the ground, just breathing and the odd look-around
+              d.isRest = true;
+              d.dir = Math.random() < 0.5 ? 1 : -1;
+              d.x = 160 + Math.random() * (VW - 320);
+              d.scale.x = d.dir * Math.abs(d.scale.x);
+              d.baseY = groundY(d.x) + 8;
+              d.y = d.baseY;
+              d.ph = Math.random() * 6.28;
+            } else if (heron) {
               // a heron wades the shallows: mostly statue-still, the odd slow step, the odd strike
               d.isHeron = true;
               d.dir = 1;
@@ -3910,7 +3928,14 @@
         if (BI.owl && (BI.glade || buildNight > 0.45)) {
           // an owl glides silently across the twilight on slow beats, resting out of sight between
           // crossings — always in the glade's perpetual dusk, only after dark in the open biomes
-          const ow = anim(['owl_a', 'owl_b'], 320, 210, 0.44, 0.04);
+          // (a tawny owl in the woods, a snowy owl drifting the polar night)
+          const ow = anim(
+            BI.owlFrames || ['owl_a', 'owl_b'],
+            320,
+            210,
+            0.44,
+            0.04
+          );
           ow.isOwl = true;
           ow.dir = Math.random() < 0.5 ? -1 : 1;
           ow.vx = ow.dir * (0.7 + Math.random() * 0.3);
@@ -5104,6 +5129,15 @@
           // the herd: each grazer keeps its own walk/graze state, so they don't move in lockstep
           for (const d of walkers) {
             const multi = d.totalFrames > 1;
+            if (d.isRest) {
+              // bedded down: it just breathes, with the odd slow look to either side
+              d.y = d.baseY + Math.sin(t * 1.4 + d.ph) * 0.6;
+              if (Math.random() < 0.004 * dt) {
+                d.dir = -d.dir;
+                d.scale.x = d.dir * Math.abs(d.scale.x);
+              }
+              continue;
+            }
             if (d.isFawn) {
               // keep just behind mum, scampering to catch up when she gets ahead, idling when close
               const tx = d.mum.x - d.mum.dir * 46,
