@@ -391,6 +391,7 @@
           perchBird: true, // a songbird perches in the canopy and flits between trees
           owl: true, // an owl hunts the meadow after dark
           hedgehog: true, // a hedgehog snuffles the floor at night
+          snail: true, // a snail glides out onto the wet grass after rain
           flyer: 0xffffff,
           flutter: true,
           bee: 2, // bumblebees work the wildflowers by day
@@ -544,6 +545,7 @@
           critter: null,
           hopper: null,
           owl: true, // an owl quarters the marsh after dark
+          snail: true, // a pond snail glides the wet bank after rain
           flyer: 0x6a7b8a,
           flutter: false,
           bats: 4, // bats work the pond at dusk (most insects over the water)
@@ -838,6 +840,7 @@
           perchSpecies: ['parrot'],
           perchScale: 0.4,
           nightCanopy: 'kinkajou', // …and a kinkajou creeps the canopy once it's dark
+          snail: true, // a big rainforest snail glides the wet floor after a downpour
           flyer: 0xffffff,
           flyerFrames: ['toucan'],
           flutter: true,
@@ -878,6 +881,7 @@
           perchBird: true, // a songbird perches among the blossom
           owl: true, // an owl crosses the orchard after dark
           hedgehog: true, // a hedgehog snuffles the orchard floor at night
+          snail: true, // a snail glides out across the wet orchard floor after rain
           flyer: 0xffffff,
           flutter: true,
           flutterTint: 0xffbcdb, // soft pink blossom butterflies
@@ -997,6 +1001,7 @@
           critter: null,
           hopper: null,
           squirrel: true, // a squirrel forages among the toadstools
+          snail: true, // a snail glides the damp leaf-litter after rain
           perchBird: true, // a songbird perches among the boughs
           flyer: 0x3a4a55,
           flutter: false,
@@ -1078,6 +1083,7 @@
         'arctic_fox',
         'lizard_b',
         'beetle',
+        'snail',
         'monarch_a',
         'monarch_b',
         'parrot',
@@ -1705,6 +1711,7 @@
         squirrel,
         songbird,
         beetle,
+        snail,
         salamander,
         olm,
         hedgehog,
@@ -1780,6 +1787,7 @@
           squirrel =
           songbird =
           beetle =
+          snail =
           salamander =
           olm =
           hedgehog =
@@ -3317,6 +3325,18 @@
           beetle.pauseT = Math.random() * 2;
           scene.addChild(beetle);
         } else beetle = null;
+        if (BI.snail && !snow) {
+          // a garden snail waits out of sight and only creeps onto the ground once rain has
+          // dampened it — emerging slowly, gliding at a snail's pace, retreating as it dries
+          const sx = 140 + Math.random() * (VW - 280);
+          snail = spr('snail', sx, groundY(sx) + 2, 0.3 + Math.random() * 0.08);
+          snail.baseSc = Math.abs(snail.scale.x);
+          snail.dir = Math.random() < 0.5 ? 1 : -1;
+          snail.scale.x = snail.dir * snail.baseSc;
+          snail.alpha = 0; // hidden until the ground is wet enough
+          snail.spd = 0.12 + Math.random() * 0.06; // a glacial creep
+          scene.addChild(snail);
+        } else snail = null;
         if (BI.shoreBird && BI.ground === 'beach') {
           // a little party of sandpipers runs the waterline, chasing the wash out then fleeing it in
           for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
@@ -5886,6 +5906,23 @@
             else if (Math.random() < 0.003 * dt) {
               beetle.dir = -beetle.dir; // change its mind
               beetle.scale.x = beetle.dir * beetle.baseSc;
+            }
+          }
+        }
+        // a garden snail glides out once the ground is wet, then retreats as it dries — its
+        // alpha tracks the lingering wetness, so it fades in during a shower and lingers after
+        if (snail) {
+          const out = wetness > 0.4;
+          snail.alpha += ((out ? 1 : 0) - snail.alpha) * 0.015 * dt;
+          if (snail.alpha > 0.01) {
+            snail.x += snail.dir * snail.spd * dt; // a glacial, perfectly smooth glide
+            snail.y = groundY(snail.x) + 2;
+            if (snail.x > VW - 90) {
+              snail.dir = -1;
+              snail.scale.x = -snail.baseSc;
+            } else if (snail.x < 90) {
+              snail.dir = 1;
+              snail.scale.x = snail.baseSc;
             }
           }
         }
