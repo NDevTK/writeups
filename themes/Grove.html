@@ -1022,6 +1022,8 @@
         'log',
         'stump',
         'duck_f',
+        'fawn_a',
+        'fawn_b',
         'grass',
         'flower_p',
         'flower_w',
@@ -2770,6 +2772,29 @@
             scene.addChild(d);
             walkers.push(d);
           }
+          // a spotted fawn sometimes trails the herd, keeping close to one of the adult deer
+          if (
+            BI.walker[0] === 'deer_a' &&
+            walkers.length &&
+            Math.random() < 0.45
+          ) {
+            const mum = walkers[(Math.random() * walkers.length) | 0],
+              fawn = anim(
+                ['fawn_a', 'fawn_b'],
+                mum.x - mum.dir * 44,
+                groundY(mum.x) + 8,
+                BI.walkerScale * 0.62,
+                0.09
+              );
+            fawn.stop();
+            fawn.tint = tintJit(0xffffff, 0.06);
+            fawn.isFawn = true;
+            fawn.mum = mum;
+            fawn.dir = mum.dir;
+            fawn.scale.x = fawn.dir * Math.abs(fawn.scale.x);
+            scene.addChild(fawn);
+            walkers.push(fawn);
+          }
           deer = walkers[0] || null;
         } else deer = null;
         // the critter and hopper each sit out some visits, so the cast isn't always the full set
@@ -4444,6 +4469,25 @@
           // the herd: each grazer keeps its own walk/graze state, so they don't move in lockstep
           for (const d of walkers) {
             const multi = d.totalFrames > 1;
+            if (d.isFawn) {
+              // keep just behind mum, scampering to catch up when she gets ahead, idling when close
+              const tx = d.mum.x - d.mum.dir * 46,
+                gap = tx - d.x,
+                step = Math.max(-3.4, Math.min(3.4, gap * 0.08)) * dt;
+              if (Math.abs(gap) > 6) {
+                d.x += step;
+                d.dir = gap >= 0 ? 1 : -1;
+                d.scale.x = d.dir * Math.abs(d.scale.x);
+                if (!d.playing) d.play();
+                d.y = groundY(d.x) + 8 + Math.abs(Math.sin(t * 5 + d.x)) * -1.6;
+              } else {
+                if (d.playing) d.gotoAndStop(0);
+                d.scale.x = d.mum.dir * Math.abs(d.scale.x); // face the way mum faces
+                d.y = groundY(d.x) + 8;
+              }
+              dropTrack(d, 'deer', 24);
+              continue;
+            }
             if (raining) {
               if (multi) d.gotoAndStop(0);
               d.y = groundY(d.x) + 8;

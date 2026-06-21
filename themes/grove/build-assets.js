@@ -1752,15 +1752,41 @@ save(
   140
 );
 
+// fawn — a small spotted deer (no antlers) that trails the herd; two walk frames like the deer
+const fawnSvg = (lf) =>
+  S(
+    '190 152',
+    `<defs><linearGradient id="fbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c28c50"/><stop offset="1" stop-color="#8a5e34"/></linearGradient>
+<linearGradient id="flg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9c6c3e"/><stop offset="1" stop-color="#5e3e22"/></linearGradient></defs>
+<g stroke-linecap="round">
+<line x1="62" y1="96" x2="${60 + lf[0]}" y2="138" stroke="#5e4026" stroke-width="6"/>
+<line x1="106" y1="95" x2="${107 + lf[1]}" y2="137" stroke="#5e4026" stroke-width="6"/>
+<line x1="70" y1="98" x2="${68 + lf[2]}" y2="140" stroke="url(#flg)" stroke-width="6.5"/>
+<line x1="114" y1="97" x2="${116 + lf[3]}" y2="139" stroke="url(#flg)" stroke-width="6.5"/></g>
+<path d="M44,78 C40,62 58,56 76,57 C96,58 110,60 120,70 C126,76 124,86 116,92 C104,99 84,100 68,98 C54,96 46,92 44,78 Z" fill="url(#fbg)"/>
+<circle cx="58" cy="84" r="17" fill="url(#fbg)"/>
+<path d="M110,74 C118,62 128,54 138,50 L149,57 C141,69 131,79 125,90 Z" fill="url(#fbg)"/>
+<ellipse cx="147" cy="49" rx="13" ry="10.5" fill="url(#fbg)"/>
+<path d="M155,42 C165,44 171,51 168,60 C166,66 155,63 149,57 C146,51 149,46 155,42 Z" fill="url(#fbg)"/>
+<ellipse cx="167" cy="58" rx="3.4" ry="2.6" fill="#2a1c12"/>
+<path d="M139,42 C133,31 135,25 142,29 C146,33 145,41 141,46 Z" fill="#7c5230"/>
+<path d="M151,38 C153,29 157,24 163,23 C159,31 157,39 155,46 Z" fill="#7c5230"/>
+<circle cx="151" cy="48" r="2.2" fill="#140e09"/><circle cx="151.6" cy="47.4" r="0.7" fill="#d8c7a8"/>
+<g fill="#f0e2c4" opacity="0.85"><circle cx="66" cy="71" r="2.4"/><circle cx="80" cy="66" r="2.6"/><circle cx="94" cy="69" r="2.3"/><circle cx="76" cy="79" r="2.1"/><circle cx="90" cy="81" r="2.1"/><circle cx="104" cy="75" r="2.3"/></g>
+<path d="M68,82 C84,88 104,86 117,78 C101,91 80,92 68,85 Z" fill="#5e3e22" opacity="0.35"/>`
+  );
+save('fawn_a', fawnSvg([0, 0, 0, 0]), 150);
+save('fawn_b', fawnSvg([6, -5, -5, 6]), 150);
+
 // ---- contact sheet of new + polished ----
 const review = [
+  'fawn_a',
+  'fawn_b',
+  'deer_a',
   'toadstool',
-  'shroom',
   'log',
   'stump',
   'berrybush',
-  'shrub',
-  'snag',
   'willow'
 ];
 const cols = 4,
