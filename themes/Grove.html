@@ -393,6 +393,7 @@
           hedgehog: true, // a hedgehog snuffles the floor at night
           flyer: 0xffffff,
           flutter: true,
+          bee: 2, // bumblebees work the wildflowers by day
           bats: 3, // bats feed over the meadow at dusk
           roller: null
         },
@@ -880,6 +881,7 @@
           flyer: 0xffffff,
           flutter: true,
           flutterTint: 0xffbcdb, // soft pink blossom butterflies
+          bee: 3, // bumblebees crowd the spring blossom
           bats: 3, // bats flit the orchard at dusk
           roller: null
         },
@@ -1151,6 +1153,8 @@
         'bird_b',
         'butterfly_a',
         'butterfly_b',
+        'bee_a',
+        'bee_b',
         'rabbit',
         'fox',
         'dragonfly_a',
@@ -3848,6 +3852,31 @@
             flutters.push(f);
             scene.addChild(f);
           }
+        // bumblebees work the flowers by day in warm seasons — cruising low between blooms and
+        // hovering over each one (faster, lower and busier than the butterflies up above)
+        if (BI.bee && !snow && buildNight < 0.5)
+          for (let i = 0, n = BI.bee; i < n; i++) {
+            const bx = 60 + Math.random() * (VW - 120);
+            const b = anim(
+              ['bee_a', 'bee_b'],
+              bx,
+              groundY(bx) - (12 + Math.random() * 44),
+              0.4 + Math.random() * 0.12,
+              0.5 // a fast wingbeat reads as a buzz
+            );
+            b.isBee = true;
+            b.baseSc = Math.abs(b.scale.x);
+            b.ph = Math.random() * 6.28;
+            b.mode = 'cruise';
+            b.tx = Math.max(
+              40,
+              Math.min(VW - 40, bx + (Math.random() - 0.5) * 220)
+            );
+            b.ty = groundY(b.tx) - (12 + Math.random() * 44);
+            b.hoverT = 0;
+            flutters.push(b);
+            scene.addChild(b);
+          }
         // surprise visitor: a stray butterfly or two now and then drifts through a warm, grassy
         // scene that doesn't keep its own — there one visit, gone the next
         if (
@@ -6304,6 +6333,34 @@
             f.x = f.cx + Math.cos(a) * f.rx;
             f.y = f.cy + Math.sin(a) * f.ry;
             f.scale.x = (Math.sin(a) > 0 ? -1 : 1) * f.baseSc;
+            continue;
+          }
+          if (f.isBee) {
+            // bumbles flower to flower: cruises low to a new bloom, then hovers over it a while
+            if (f.mode === 'hover') {
+              f.hoverT -= dt / 60;
+              f.x = f.tx + Math.cos(t * 9 + f.ph) * 3; // a tight buzzing bob over the bloom
+              f.y = f.ty + Math.sin(t * 7 + f.ph) * 2.6;
+              if (f.hoverT <= 0 || raining) {
+                f.mode = 'cruise';
+                f.tx = Math.max(
+                  40,
+                  Math.min(VW - 40, f.x + (Math.random() - 0.5) * 240)
+                );
+                f.ty = groundY(f.tx) - (12 + Math.random() * 46);
+              }
+            } else {
+              const dx = f.tx - f.x,
+                dy = f.ty - f.y;
+              f.x += dx * 0.045 * dt;
+              f.y += dy * 0.045 * dt + Math.sin(t * 8 + f.ph) * 0.7; // bumbling wobble en route
+              if (Math.abs(dx) > 2) f.scale.x = (dx < 0 ? -1 : 1) * f.baseSc;
+              if (Math.abs(dx) < 8 && Math.abs(dy) < 10) {
+                f.mode = 'hover';
+                f.hoverT = 1.2 + Math.random() * 2.4;
+              }
+            }
+            f.alpha += ((raining ? 0.25 : 1) - f.alpha) * 0.04 * dt; // shelters when it rains
             continue;
           }
           if (f.isButterfly) {
