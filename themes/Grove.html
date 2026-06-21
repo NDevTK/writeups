@@ -1008,6 +1008,7 @@
             yLo: 290,
             yHi: 420
           }, // …while two more circle the thermals
+          choughs: 7, // …and a flock of choughs tumbles and wheels up near the crags
           flutter: false,
           roller: null
         }
@@ -1073,6 +1074,8 @@
         'panda_cub_b',
         'salamander',
         'olm',
+        'chough_a',
+        'chough_b',
         'grass',
         'flower_p',
         'flower_w',
@@ -1592,6 +1595,7 @@
         spout = [],
         perches = [],
         sandpipers = [],
+        choughs = [],
         hillBands = [];
       let sky,
         stars,
@@ -1651,7 +1655,8 @@
         shoot = null,
         shootT = 4,
         flockT = 15,
-        flockDir = 1;
+        flockDir = 1,
+        choughHub = null;
 
       function build() {
         root.removeChildren();
@@ -1688,6 +1693,7 @@
           spout.length =
           perches.length =
           sandpipers.length =
+          choughs.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
@@ -1703,7 +1709,7 @@
           salamander =
           olm =
             null;
-        whale = spoutG = surfG = cloudSeaG = cloudGlow = null;
+        whale = spoutG = surfG = cloudSeaG = cloudGlow = choughHub = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
         // SP = optional per-biome season palette (tint-only seasons); else fall back to the global SEASONS, and non-seasonal biomes ignore the season entirely.
@@ -3716,6 +3722,41 @@
             flutters.push(e);
             scene.addChild(e);
           }
+
+        // a flock of alpine choughs wheels and tumbles up near the crags — fast and playful, the
+        // foil to the eagles' slow circles. they share a drifting centre and now and then all swoop
+        if (BI.choughs) {
+          choughHub = {
+            x: VW * 0.35 + Math.random() * VW * 0.3,
+            y: 200 + Math.random() * 60,
+            vx: (0.3 + Math.random() * 0.4) * (Math.random() < 0.5 ? 1 : -1),
+            ph: Math.random() * 6.28,
+            tmb: 3 + Math.random() * 4,
+            tumble: 0
+          };
+          for (let i = 0; i < BI.choughs; i++) {
+            const c = anim(
+              ['chough_a', 'chough_b'],
+              0,
+              0,
+              0.24 + Math.random() * 0.12,
+              0.18 + Math.random() * 0.1
+            );
+            c.orx = 26 + Math.random() * 46; // its own loose loop within the flock
+            c.ory = 16 + Math.random() * 22;
+            c.ox = (Math.random() - 0.5) * 90;
+            c.oy = (Math.random() - 0.5) * 50;
+            c.ph = Math.random() * 6.28;
+            c.sp = 0.7 + Math.random() * 0.7;
+            c.tint = 0x2a2630; // near-black, a hint of the sky in it
+            c.baseSc = Math.abs(c.scale.x);
+            c.x = choughHub.x + c.ox + Math.cos(c.ph) * c.orx; // a sensible spread for reduced motion
+            c.y = choughHub.y + c.oy + Math.sin(c.ph) * c.ory;
+            if (reduce.matches) c.gotoAndStop(0);
+            choughs.push(c);
+            scene.addChild(c);
+          }
+        }
 
         // bats emerge at dusk and flit low over the water + meadow, feeding on the insects
         // (the fireflies). gone by day — they fade in with the night. (not in winter; they hibernate)
@@ -5749,6 +5790,33 @@
           }
           if (f.x < 20 || f.x > VW - 20) f.vx *= -1;
           if (f.y < f.lo || f.y > f.hi) f.vy *= -1;
+        }
+        // alpine choughs: the flock drifts on a shared centre, each bird looping within it, and now
+        // and then the whole group tumbles — a quick shared swoop and climb on the updraught
+        if (choughs.length && choughHub) {
+          const h = choughHub;
+          h.x += h.vx * dt;
+          if (h.x > VW * 0.8) h.vx = -Math.abs(h.vx);
+          else if (h.x < VW * 0.2) h.vx = Math.abs(h.vx);
+          h.ph += dt / 60;
+          h.tmb -= dt / 60;
+          if (h.tmb < 0) {
+            h.tumble = 1;
+            h.tmb = 4 + Math.random() * 5;
+          }
+          if (h.tumble > 0) h.tumble = Math.max(0, h.tumble - dt / 45);
+          const hubY =
+            h.y +
+            Math.sin(h.ph * 0.7) * 18 -
+            Math.sin((1 - h.tumble) * Math.PI) * 50; // the shared tumble-swoop
+          for (const c of choughs) {
+            c.ph += c.sp * dt * 0.05;
+            const tx = h.x + c.ox + Math.cos(c.ph) * c.orx,
+              ty = hubY + c.oy + Math.sin(c.ph * 1.3) * c.ory;
+            c.scale.x = (tx >= c.x ? 1 : -1) * c.baseSc; // face the way it's heading
+            c.x = tx;
+            c.y = ty;
+          }
         }
         // murmuration: the whole cloud wanders, wheels, breathes and shears while a density wave
         // sweeps round it — so the shape boils and never settles, the way a starling flock does
