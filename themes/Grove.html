@@ -145,7 +145,13 @@
       let timeMode = LS('time') || 'auto',
         seasonMode = LS('season') || 'auto',
         weatherMode = LS('weather') || 'auto',
-        soundOn = LS('sound') === '1';
+        soundOn = LS('sound') === '1',
+        journeyOn = LS('journey') === '1';
+      // journey: slowly drift through the biomes, fading between them
+      const JOURNEY_PERIOD = 120; // seconds spent on each biome
+      let journeyTimer = JOURNEY_PERIOD,
+        journeyFade = 0, // 0 idle | -1 fading the scene out | +1 fading it back in
+        journeyNext = null; // the biome to build at the bottom of the fade
       // weather front runtime: cover = cloud cover, wet = rain intensity, wetness = lingering ground wetness
       let frontState = 'clear',
         frontT = 60 + Math.random() * 120,
@@ -303,7 +309,7 @@
       };
 
       // ---------- biome ----------
-      const biomeParam = q.get('biome');
+      let biomeParam = q.get('biome'); // cleared once Journey/Surprise takes over so biomeMode drives
       let biomeMode = LS('biome') || 'grove';
       function nowBiome() {
         return biomeParam || biomeMode;
@@ -2842,9 +2848,61 @@
         } catch (e) {}
       }
 
+      // the next biome in the loop, or a random different one for 'Surprise me'
+      function nextJourneyBiome(random) {
+        const keys = Object.keys(BIOMES),
+          cur = nowBiome();
+        if (random && keys.length > 1) {
+          let k;
+          do {
+            k = keys[(Math.random() * keys.length) | 0];
+          } while (k === cur);
+          return k;
+        }
+        return keys[(keys.indexOf(cur) + 1) % keys.length];
+      }
+      // switch biome with a gentle fade: fade the scene down, rebuild it at the bottom, fade back up
+      // (an instant swap when motion is reduced)
+      function startJourney(biome) {
+        if (journeyFade) return; // already mid-transition
+        journeyTimer = JOURNEY_PERIOD;
+        if (reduce.matches) {
+          biomeParam = null;
+          biomeMode = biome;
+          LS('biome', biome);
+          build();
+          buildUI();
+          return;
+        }
+        journeyNext = biome;
+        journeyFade = -1;
+      }
+
       let t = 0;
       app.ticker.add((dt) => {
         if (!ready || document.hidden) return;
+        // journey: run an in-progress fade, otherwise tick the auto-cycle timer
+        if (journeyFade) {
+          root.alpha = Math.max(
+            0,
+            Math.min(1, root.alpha + journeyFade * 0.025 * dt)
+          );
+          if (journeyFade < 0 && root.alpha <= 0.001) {
+            biomeParam = null; // let biomeMode drive nowBiome() from here on
+            biomeMode = journeyNext;
+            LS('biome', biomeMode);
+            build();
+            buildUI();
+            journeyFade = 1; // now fade the new scene in
+          } else if (journeyFade > 0 && root.alpha >= 0.999) {
+            root.alpha = 1;
+            journeyFade = 0;
+            journeyNext = null;
+          }
+        } else if (journeyOn && wpMode !== 'shown') {
+          journeyTimer -= dt / 60;
+          if (journeyTimer <= 0) startJourney(nextJourneyBiome(false));
+        }
         const h = nowHour(),
           cel = celestial(h);
         let P = tod(h),
@@ -4362,6 +4420,23 @@
             buildUI();
           })
         );
+        uiSeason.appendChild(
+          mkBtn('🎲 Surprise', false, () =>
+            startJourney(nextJourneyBiome(true))
+          )
+        ); // jump to a random biome
+        uiSeason.appendChild(
+          mkBtn(
+            journeyOn ? '🧭 Journey: On' : '🧭 Journey: Off',
+            journeyOn,
+            () => {
+              journeyOn = !journeyOn;
+              LS('journey', journeyOn ? '1' : '0');
+              journeyTimer = JOURNEY_PERIOD; // don't fire immediately on toggle
+              buildUI();
+            }
+          )
+        ); // slowly auto-cycle through the biomes
         uiSeason.appendChild(
           mkBtn('✕ Hide options', false, () => setMode('bare'))
         ); // drop to a clean wallpaper; the ✦ toggle brings the controls back
