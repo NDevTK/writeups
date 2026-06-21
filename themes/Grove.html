@@ -2368,6 +2368,17 @@
           if (BI.walker.length > 1) deer.stop();
           else deer.gotoAndStop(0);
           deer.graze = BI.graze;
+          if (BI.walker[0] === 'heron') {
+            // a heron wades the shallows: mostly statue-still, the odd slow step, the odd strike
+            deer.isHeron = true;
+            deer.dir = 1;
+            deer.baseSc = Math.abs(deer.scale.x);
+            deer.x = 360 + Math.random() * 480;
+            deer.y = 602; // stand at the water's edge, not up on the bank
+            deer.fishTmr = 2 + Math.random() * 4;
+            deer.strike = 0;
+            deer.stepTarget = null;
+          }
           scene.addChild(deer);
         } else deer = null;
         if (BI.critter) {
@@ -3730,7 +3741,56 @@
           w.s.rotation = Math.sin(t * w.sp + w.ph) * w.amp + wind * w.amp * 2.5;
 
         // walker: deer ambles then grazes; a camel plods along; in rain it stands and waits it out
-        if (deer) {
+        if (deer && deer.isHeron) {
+          // heron: stands statue-still watching the water, takes the odd slow wading step, and now
+          // and then strikes — a sharp downward stab that splashes the surface
+          const STRIKE = 0.7;
+          if (deer.strike > 0) {
+            deer.strike -= dt / 60;
+            const lunge = Math.sin(
+              Math.max(0, Math.min(1, 1 - deer.strike / STRIKE)) * Math.PI
+            ); // 0 -> 1 -> 0
+            deer.rotation = deer.dir * lunge * 0.7; // the head stabs down and forward
+            deer.y = 602 + lunge * 16;
+            if (deer.strike <= 0) {
+              deer.rotation = 0;
+              deer.y = 602;
+              deer.fishTmr = 3 + Math.random() * 4;
+              if (water)
+                ripples.push({
+                  x: deer.x + deer.dir * 60,
+                  y: 604,
+                  r: 5,
+                  life: 1
+                }); // the splash
+            }
+          } else if (raining) {
+            deer.y = 602;
+            deer.rotation = Math.sin(t * 0.6) * 0.01; // hunkers, statue-still
+          } else {
+            deer.fishTmr -= dt / 60;
+            deer.y = 602;
+            deer.rotation = Math.sin(t * 0.5 + deer.x) * 0.013; // a slight idle sway
+            if (deer.stepTarget != null) {
+              deer.x += Math.sign(deer.stepTarget - deer.x) * 0.45 * dt; // a slow, deliberate step
+              if (Math.abs(deer.x - deer.stepTarget) < 2)
+                deer.stepTarget = null;
+            } else if (deer.fishTmr <= 0) {
+              if (Math.random() < 0.45) {
+                if (Math.random() < 0.35) deer.dir = -deer.dir; // sometimes turn to face the other way
+                deer.stepTarget = Math.max(
+                  140,
+                  Math.min(
+                    VW - 140,
+                    deer.x + deer.dir * (50 + Math.random() * 70)
+                  )
+                );
+                deer.fishTmr = 3 + Math.random() * 3;
+              } else deer.strike = STRIKE;
+            }
+          }
+          deer.scale.x = deer.dir * deer.baseSc;
+        } else if (deer) {
           const multi = deer.totalFrames > 1;
           if (raining) {
             if (multi) deer.gotoAndStop(0);
