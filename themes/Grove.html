@@ -1434,6 +1434,7 @@
         dewdrops = [],
         murmur = [],
         cloudShadows = [],
+        snowyTops = [],
         lilies = [],
         weather = [],
         rainDrops = [],
@@ -1524,6 +1525,7 @@
           dewdrops.length =
           murmur.length =
           cloudShadows.length =
+          snowyTops.length =
           lilies.length =
           weather.length =
           smoke.length =
@@ -2024,12 +2026,24 @@
             csl.addChild(s);
           }
         }
+        // record pine/oak tops so the snow blanket can settle a cap on each in winter
+        const noteSnowTop = (t, n) => {
+          if (n === 'pine' || n === 'oak')
+            snowyTops.push({
+              x: t.x,
+              top: t.y - t.height,
+              w: t.width,
+              h: t.height,
+              pine: n === 'pine'
+            });
+        };
         for (const [n, sc, x] of BI.mid) {
           const t = spr(n, x, 482 + Math.sin(x * 0.006 + 1.3) * 30, sc);
           t.tint = BI.interior ? 0xffffff : mulTint(0xcfe3d0, folTint);
           scene.addChild(t);
           if (!RIGID[n] && !BI.interior)
             swayers.push({s: t, amp: 0.012, sp: 0.7, ph: Math.random() * 6});
+          if (!BI.interior) noteSnowTop(t, n);
         }
         for (const [n, sc, x] of BI.near) {
           const t = spr(n, x, groundY(x) + 4, sc);
@@ -2037,6 +2051,7 @@
           scene.addChild(t);
           if (!RIGID[n] && !BI.interior)
             swayers.push({s: t, amp: 0.02, sp: 0.9, ph: Math.random() * 6});
+          if (!BI.interior) noteSnowTop(t, n);
         }
         if (BI.crystals)
           for (const [x, col] of BI.crystals) {
@@ -3613,6 +3628,34 @@
                 snowAccG.lineTo(x, groundY(x) - 2);
               snowAccG.lineTo(VW + 40, 602);
               snowAccG.closePath();
+              snowAccG.endFill();
+            }
+            // (3) snow settling on the pine and oak canopies
+            const sf = Math.min(1, snowAcc * 1.25), // how laden the caps get
+              ca = Math.min(0.95, 0.5 + snowAcc * 0.5);
+            for (const tp of snowyTops) {
+              snowAccG.beginFill(0xeef5fc, ca);
+              if (tp.pine) {
+                // snow draped over the top tiers (the art's apex sits ~8% down from the sprite top),
+                // sagging a touch lower at the sides than the middle
+                const apexY = tp.top + tp.h * 0.08,
+                  baseY = tp.top + tp.h * (0.2 + 0.22 * sf),
+                  halfW = tp.w * (0.12 + 0.13 * sf);
+                snowAccG.moveTo(tp.x, apexY);
+                snowAccG.lineTo(tp.x + halfW, baseY);
+                snowAccG.lineTo(tp.x, baseY - tp.h * 0.045);
+                snowAccG.lineTo(tp.x - halfW, baseY);
+                snowAccG.closePath();
+              } else {
+                // a rounded crown of snow capping the round canopy
+                const rx = tp.w * (0.2 + 0.15 * sf);
+                snowAccG.drawEllipse(
+                  tp.x,
+                  tp.top + tp.h * 0.16,
+                  rx,
+                  tp.h * (0.07 + 0.09 * sf)
+                );
+              }
               snowAccG.endFill();
             }
           }
