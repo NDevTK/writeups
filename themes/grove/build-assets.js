@@ -430,15 +430,15 @@ save(
   36
 );
 
-// ---- NEW: blossom petal (spring) ----
-save(
-  'petal',
+// ---- NEW: blossom petals (spring) — pink, near-white, and deep-rose drift together ----
+const petalSvg = (c0, c1) =>
   S(
     '30 30',
-    `<defs><linearGradient id="pt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe2ee"/><stop offset="1" stop-color="#f4a9c8"/></linearGradient></defs><path d="M15,3 C23,7 24,18 15,27 C6,18 7,7 15,3 Z" fill="url(#pt)"/>`
-  ),
-  26
-);
+    `<defs><linearGradient id="pt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c0}"/><stop offset="1" stop-color="${c1}"/></linearGradient></defs><path d="M15,3 C23,7 24,18 15,27 C6,18 7,7 15,3 Z" fill="url(#pt)"/>`
+  );
+save('petal', petalSvg('#ffe2ee', '#f4a9c8'), 26); // classic cherry pink
+save('petal_w', petalSvg('#ffffff', '#ffe6f0'), 26); // white cherry / apple blossom
+save('petal_r', petalSvg('#fbc0d6', '#e87aa6'), 26); // deeper rose
 
 // ---- NEW: soft snowflake (winter) ----
 save(
@@ -2807,7 +2807,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['leaf', 'leaf_m', 'leaf_o', 'petal'];
+const review = ['petal', 'petal_w', 'petal_r', 'leaf_m'];
 const cols = 4,
   cell = 230,
   pad = 14,

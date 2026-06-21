@@ -1162,6 +1162,8 @@
         'leaf_m',
         'leaf_o',
         'petal',
+        'petal_w',
+        'petal_r',
         'flake',
         'cactus',
         'cactus2',
@@ -4288,14 +4290,15 @@
           const count =
               weatherKind === 'flake' ? 70 : weatherKind === 'leaf' ? 26 : 34,
             kind = weatherKind,
-            leafKinds = ['leaf', 'leaf_m', 'leaf_o']; // ovate / maple / oak tumble together
+            leafKinds = ['leaf', 'leaf_m', 'leaf_o'], // ovate / maple / oak tumble together
+            petalKinds = ['petal', 'petal', 'petal_w', 'petal_r']; // cherry pink, white, rose
           for (let i = 0; i < count; i++) {
             const p = spr(
               kind === 'flake'
                 ? 'flake'
                 : kind === 'leaf'
                   ? leafKinds[(Math.random() * leafKinds.length) | 0]
-                  : 'petal',
+                  : petalKinds[(Math.random() * petalKinds.length) | 0],
               Math.random() * VW,
               Math.random() * VH,
               kind === 'flake'
