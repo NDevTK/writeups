@@ -483,6 +483,7 @@
           critter: 'crab',
           critterScale: 0.5,
           hopper: null,
+          shoreBird: true, // sandpipers run the waterline, chasing the wash in and out
           flyer: 0xffffff,
           flyerFrames: ['gull'],
           flutter: false,
@@ -1066,6 +1067,9 @@
         'clownfish_b',
         'jelly2_a',
         'jelly2_b',
+        'sandpiper',
+        'panda_cub_a',
+        'panda_cub_b',
         'grass',
         'flower_p',
         'flower_w',
@@ -1584,6 +1588,7 @@
         frontRocks = [],
         spout = [],
         perches = [],
+        sandpipers = [],
         hillBands = [];
       let sky,
         stars,
@@ -1677,6 +1682,7 @@
           frontRocks.length =
           spout.length =
           perches.length =
+          sandpipers.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
@@ -2929,15 +2935,17 @@
             scene.addChild(d);
             walkers.push(d);
           }
-          // a spotted fawn sometimes trails the herd, keeping close to one of the adult deer
-          if (
-            BI.walker[0] === 'deer_a' &&
-            walkers.length &&
-            Math.random() < 0.45
-          ) {
+          // a youngster sometimes trails the herd, keeping close to one of the adults — a spotted
+          // fawn behind the deer, a tumbling cub behind the pandas
+          const CALF = {
+            deer_a: ['fawn_a', 'fawn_b'],
+            panda: ['panda_cub_a', 'panda_cub_b']
+          };
+          const calfFrames = CALF[BI.walker[0]];
+          if (calfFrames && walkers.length && Math.random() < 0.45) {
             const mum = walkers[(Math.random() * walkers.length) | 0],
               fawn = anim(
-                ['fawn_a', 'fawn_b'],
+                calfFrames,
                 mum.x - mum.dir * 44,
                 groundY(mum.x) + 8,
                 BI.walkerScale * 0.62,
@@ -3056,6 +3064,23 @@
           beetle.pauseT = Math.random() * 2;
           scene.addChild(beetle);
         } else beetle = null;
+        if (BI.shoreBird && BI.ground === 'beach') {
+          // a little party of sandpipers runs the waterline, chasing the wash out then fleeing it in
+          for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
+            const sx = 120 + Math.random() * (VW - 240),
+              s = spr('sandpiper', sx, 594, 0.34 + Math.random() * 0.1);
+            s.baseSc = Math.abs(s.scale.x);
+            s.dir = Math.random() < 0.5 ? 1 : -1;
+            s.scale.x = s.dir * s.baseSc;
+            s.baseY = 594;
+            s.spd = 1.4 + Math.random() * 0.9; // quick little runners
+            s.ph = Math.random() * 6.28;
+            s.pauseT = Math.random() * 1.5;
+            s.peck = 0;
+            sandpipers.push(s);
+            scene.addChild(s);
+          }
+        }
         if (BI.penguins) {
           // a little colony waddles the snowfield: each penguin ambles at its own pace, some just stand
           for (let i = 0; i < BI.penguins; i++) {
@@ -4655,6 +4680,44 @@
           surfG.moveTo(-40, edgeY + wob(-40));
           for (let x = -26; x <= VW + 40; x += 14)
             surfG.lineTo(x, edgeY + wob(x));
+        }
+
+        // sandpipers run the waterline: their footing tracks the foam edge — they scurry up sharply
+        // when a wave rushes in, then chase it back down to peck at the freshly wetted sand
+        if (sandpipers.length) {
+          const set = 0.6 + 0.4 * Math.sin(t * 0.11 + 0.5),
+            pulse = Math.pow(Math.max(0, Math.sin(t * 0.5)), 1.2),
+            swash = (0.3 + 0.7 * pulse) * set * (1 + Math.abs(wind) * 0.2),
+            edge = 598 - swash * 34; // the leading foam edge, same as the shore break
+          for (const s of sandpipers) {
+            const targetY = Math.min(600, edge + 9); // stay just seaward of the foam
+            // flee an incoming wave fast (target rises above it), follow it back down at a stroll
+            s.baseY +=
+              (targetY - s.baseY) * (targetY < s.baseY ? 0.3 : 0.12) * dt;
+            let bob = 0;
+            if (s.pauseT > 0) {
+              s.pauseT -= dt / 60; // paused to forage
+              if (s.peck > 0) s.peck -= dt / 9;
+              else if (Math.random() < 0.05 * dt) s.peck = 1; // a quick jab at the sand
+              s.rotation = Math.max(0, s.peck) * 0.5;
+            } else {
+              s.x += s.dir * s.spd * dt;
+              s.rotation = 0;
+              bob = Math.abs(Math.sin(t * 18 + s.ph)) * -1.2; // twinkling little legs
+              if (s.x > VW - 80) {
+                s.dir = -1;
+                s.scale.x = -s.baseSc;
+              } else if (s.x < 80) {
+                s.dir = 1;
+                s.scale.x = s.baseSc;
+              }
+              if (Math.random() < 0.02 * dt) {
+                s.pauseT = 0.4 + Math.random() * 1.6;
+                s.peck = 1;
+              }
+            }
+            s.y = s.baseY + bob;
+          }
         }
 
         // walker: deer ambles then grazes; a camel plods along; in rain it stands and waits it out
