@@ -140,7 +140,8 @@
       const hourParam = q.get('hour'),
         cyc = parseFloat(q.get('cycle')),
         seasonParam = q.get('season'),
-        moonParam = q.get('moon'); // 0..1 phase override for previewing (0/1 new, .5 full)
+        moonParam = q.get('moon'), // 0..1 phase override for previewing (0/1 new, .5 full)
+        coverParam = q.get('cover'); // 0..1 cloud-cover override for previewing weather states
       const LS = (k, v) => {
         try {
           if (v === undefined) return localStorage.getItem('grove:' + k);
@@ -1432,6 +1433,7 @@
         fireflies = [],
         dewdrops = [],
         murmur = [],
+        cloudShadows = [],
         lilies = [],
         weather = [],
         rainDrops = [],
@@ -1521,6 +1523,7 @@
           fireflies.length =
           dewdrops.length =
           murmur.length =
+          cloudShadows.length =
           lilies.length =
           weather.length =
           smoke.length =
@@ -1996,6 +1999,30 @@
           causticG = new PIXI.Graphics();
           causticG.blendMode = PIXI.BLEND_MODES.ADD;
           scene.addChild(causticG);
+        }
+        // cloud shadows: soft dark patches that drift across the hills when the sun is out behind
+        // broken cloud. Multiply-blended over the land (under the trees) so only the ground dims.
+        if (!BI.interior && !BI.underwater && !BI.canopy && !BI.glade) {
+          const csl = new PIXI.Container();
+          scene.addChild(csl);
+          csl.alpha = 0;
+          cloudShadows.layer = csl;
+          for (let i = 0; i < 4; i++) {
+            const s = spr(
+              'glow',
+              (i / 4) * VW + Math.random() * 220,
+              498 + Math.random() * 66,
+              5 + Math.random() * 3,
+              0.5,
+              0.5
+            );
+            s.tint = 0x556074; // cool grey shade
+            s.blendMode = PIXI.BLEND_MODES.MULTIPLY;
+            s.scale.y *= 0.38; // flatten so the shadow pools low along the ground, off the sky
+            s.spd = 0.7 + Math.random() * 0.7;
+            cloudShadows.push(s);
+            csl.addChild(s);
+          }
         }
         for (const [n, sc, x] of BI.mid) {
           const t = spr(n, x, 482 + Math.sin(x * 0.006 + 1.3) * 30, sc);
@@ -3407,6 +3434,7 @@
             precipTarget = frontState === 'rain' ? 1 : 0;
           }
           cover += (coverTarget - cover) * 0.008 * dt;
+          if (coverParam != null) cover = parseFloat(coverParam); // preview override
           // the same front falls as rain in the warmth and snow in the cold
           wet += ((snowing ? 0 : precipTarget) - wet) * 0.025 * dt;
           snowI += ((snowing ? precipTarget : 0) - snowI) * 0.02 * dt;
@@ -3645,6 +3673,11 @@
             Math.exp(-Math.pow((h - 18.1) / 0.95, 2)) *
             (1 - cover * 0.45) *
             0.92;
+        // cloud shadows read strongest when the sky is half-broken (sun out between clouds), and
+        // fade away when it's clear, fully overcast, raining or after dark
+        if (cloudShadows.length)
+          cloudShadows.layer.alpha =
+            cover * (1 - cover) * 4 * P.light * (1 - wet) * 0.62;
         for (const c of clouds) {
           c.tint = hexI(
             lpH(
@@ -3974,6 +4007,14 @@
           reflLayer.alpha =
             (1 - iceAmt * 0.8) * (1 - cover * 0.3) * (1 - wet * 0.4);
         }
+
+        // cloud shadows drift across the land on the wind, wrapping round as they leave the frame
+        if (cloudShadows.length && cloudShadows.layer.alpha > 0.003)
+          for (const s of cloudShadows) {
+            s.x += (s.spd + wind * 5) * dt * 0.2;
+            if (s.x > VW + 300) s.x = -300;
+            else if (s.x < -300) s.x = VW + 300;
+          }
 
         // shore break: a wave swashes up the sand and slides back, leaving a lacy foam edge and a
         // wet sheen behind it. Sets of bigger and smaller waves come through, and the surf freshens
