@@ -1206,6 +1206,8 @@
         'frog',
         'frog_b',
         'frog_y',
+        'tadpole_a',
+        'tadpole_b',
         'goat',
         'eagle',
         'acacia',
@@ -1684,6 +1686,7 @@
         choughs = [],
         ghostCrabs = [],
         skaters = [],
+        tadpoles = [],
         hillBands = [];
       let sky,
         stars,
@@ -1791,6 +1794,7 @@
           choughs.length =
           ghostCrabs.length =
           skaters.length =
+          tadpoles.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
@@ -3650,6 +3654,26 @@
               scene.addChild(fr);
               lilies.push(fr);
             }
+          if ((BI.water.frogs || BI.water.lily) && !snow) {
+            // a wriggle of tadpoles drifts the shallows by the lily pads — the frogs-to-be
+            const cx = 220 + Math.random() * (VW - 440);
+            for (let i = 0, n = 4 + ((Math.random() * 4) | 0); i < n; i++) {
+              const td = anim(
+                ['tadpole_a', 'tadpole_b'],
+                cx + (Math.random() - 0.5) * 100,
+                622 + Math.random() * 34,
+                0.24 + Math.random() * 0.12,
+                0.1 + Math.random() * 0.1
+              );
+              td.baseY = td.y;
+              td.vx = (Math.random() - 0.5) * 0.4;
+              td.ph = Math.random() * 6.28;
+              td.scale.x = (td.vx < 0 ? -1 : 1) * Math.abs(td.scale.x);
+              td.alpha = 0.85;
+              tadpoles.push(td);
+              scene.addChild(td);
+            }
+          }
           if (BI.water.ducks) {
             // the female (mottled brown) tends the brood; the drake (green head) is the second bird
             const dm = spr('duck_f', 250 + Math.random() * 760, 656, 0.6);
@@ -6440,6 +6464,15 @@
               sk.vx = sk.dir * (4 + Math.random() * 4);
             }
           }
+        }
+        // tadpoles wriggle (the 2-frame tail flick) and drift slowly about the shallows
+        for (const td of tadpoles) {
+          td.x += td.vx * dt;
+          td.y = td.baseY + Math.sin(t * 1.6 + td.ph) * 1.4; // a gentle bob in the shallows
+          if (Math.random() < 0.015 * dt) td.vx = (Math.random() - 0.5) * 0.5; // wander
+          if (td.x > VW - 120) td.vx = -Math.abs(td.vx);
+          else if (td.x < 120) td.vx = Math.abs(td.vx);
+          td.scale.x = (td.vx < 0 ? -1 : 1) * Math.abs(td.scale.x);
         }
         // butterflies, dragonflies, bird — wandering / crossing
         for (const f of flutters) {
