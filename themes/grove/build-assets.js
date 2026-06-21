@@ -361,6 +361,30 @@ const dragon = (wA, wB) =>
   );
 save('dragonfly_a', dragon(18, 20), 90);
 save('dragonfly_b', dragon(24, 26), 90);
+// a damselfly — slimmer than the dragonfly, a thin blue body with narrow wings (2 frames)
+const damsel = (w) =>
+  S(
+    '100 56',
+    `<g fill="#bcdcf2" opacity="0.5"><ellipse cx="44" cy="${28 - w}" rx="22" ry="4"/><ellipse cx="44" cy="${28 + w}" rx="22" ry="4"/><ellipse cx="58" cy="${28 - w + 2}" rx="15" ry="3"/><ellipse cx="58" cy="${28 + w - 2}" rx="15" ry="3"/></g>
+<rect x="26" y="26.6" width="60" height="2.8" rx="1.4" fill="#3a86d6"/>
+<rect x="80" y="27" width="12" height="2.2" rx="1.1" fill="#234e94"/>
+<g fill="#2a66b0"><rect x="42" y="26.6" width="2.6" height="2.8"/><rect x="54" y="26.6" width="2.6" height="2.8"/><rect x="66" y="26.6" width="2.6" height="2.8"/></g>
+<circle cx="26" cy="28" r="4.4" fill="#3a86d6"/><circle cx="22" cy="27" r="2.5" fill="#234e94"/>`
+  );
+save('damselfly_a', damsel(7), 90);
+save('damselfly_b', damsel(11), 90);
+// a Red Admiral — dark wings crossed by orange-red bands, white tips (2 flap frames)
+const admiral = (fx) =>
+  S(
+    '80 70',
+    `<g fill="#2a2420"><ellipse cx="${40 - fx}" cy="26" rx="${fx > 10 ? 15 : 9}" ry="12"/><ellipse cx="${40 + fx}" cy="26" rx="${fx > 10 ? 15 : 9}" ry="12"/><ellipse cx="${40 - fx + 3}" cy="47" rx="${fx > 10 ? 11 : 7}" ry="9.5"/><ellipse cx="${40 + fx - 3}" cy="47" rx="${fx > 10 ? 11 : 7}" ry="9.5"/></g>
+<g fill="#d4502a"><path d="M${40 - fx - 13},31 L${40 - fx - 2},15 L${40 - fx + 3},17 L${40 - fx - 8},33 Z"/><path d="M${40 + fx + 13},31 L${40 + fx + 2},15 L${40 + fx - 3},17 L${40 + fx + 8},33 Z"/><path d="M${40 - fx - 4},52 C${40 - fx + 4},50 ${40 - fx + 8},50 ${40 - fx + 10},53 C${40 - fx + 4},55 ${40 - fx - 2},55 ${40 - fx - 4},52 Z"/><path d="M${40 + fx + 4},52 C${40 + fx - 4},50 ${40 + fx - 8},50 ${40 + fx - 10},53 C${40 + fx - 4},55 ${40 + fx + 2},55 ${40 + fx + 4},52 Z"/></g>
+<g fill="#f0ece0"><circle cx="${40 - fx - 9}" cy="19" r="1.8"/><circle cx="${40 - fx - 5}" cy="23" r="1.4"/><circle cx="${40 + fx + 9}" cy="19" r="1.8"/><circle cx="${40 + fx + 5}" cy="23" r="1.4"/></g>
+<ellipse cx="40" cy="35" rx="2.8" ry="14" fill="#1a1612"/><circle cx="40" cy="21" r="2.4" fill="#1a1612"/>
+<g stroke="#1a1612" stroke-width="1.2" fill="none" stroke-linecap="round"><path d="M40,19 C37,13 35,10 33,8"/><path d="M40,19 C43,13 45,10 47,8"/></g>`
+  );
+save('admiral_a', admiral(14), 80);
+save('admiral_b', admiral(8), 80);
 
 // ---- NEW: lily pad with blossom ----
 save(
@@ -2729,14 +2753,14 @@ save(
 
 // ---- contact sheet of new + polished ----
 const review = [
-  'fox',
-  'fox_s',
-  'deer_a',
-  'deer_d_a',
-  'squirrel_k',
-  'rabbit_k',
-  'moorhen',
-  'goat'
+  'admiral_a',
+  'monarch_a',
+  'swallow_a',
+  'butterfly_a',
+  'damselfly_a',
+  'dragonfly_a',
+  'moth_a',
+  'admiral_b'
 ];
 const cols = 4,
   cell = 230,

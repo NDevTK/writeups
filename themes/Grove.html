@@ -1121,6 +1121,10 @@
         'fox_s',
         'deer_d_a',
         'deer_d_b',
+        'admiral_a',
+        'admiral_b',
+        'damselfly_a',
+        'damselfly_b',
         'grass',
         'flower_p',
         'flower_w',
@@ -3619,8 +3623,11 @@
                 1
             ); // ±1
             for (let i = 0; i < dn; i++) {
+              // slimmer blue damselflies flit over the water among the dragonflies
               const d = anim(
-                ['dragonfly_a', 'dragonfly_b'],
+                Math.random() < 0.4
+                  ? ['damselfly_a', 'damselfly_b']
+                  : ['dragonfly_a', 'dragonfly_b'],
                 200 + Math.random() * 880,
                 612 + Math.random() * 60,
                 0.45,
@@ -3786,13 +3793,17 @@
               frames = ['moth_a', 'moth_b']; // night shift: pale moths
               fsc = 0.46;
               tinted = false;
-            } else if (r < 0.26) {
+            } else if (r < 0.22) {
               frames = ['monarch_a', 'monarch_b']; // a monarch
               fsc = 0.48;
               tinted = false;
-            } else if (r < 0.44) {
+            } else if (r < 0.38) {
               frames = ['swallow_a', 'swallow_b']; // a swallowtail
               fsc = 0.42;
+              tinted = false;
+            } else if (r < 0.54) {
+              frames = ['admiral_a', 'admiral_b']; // a red admiral
+              fsc = 0.46;
               tinted = false;
             }
             const f = anim(
