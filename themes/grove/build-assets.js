@@ -2511,16 +2511,62 @@ save(
   66
 );
 
+// ======== a kinkajou — golden, big-eyed, creeps the jungle canopy at night (faces right) ========
+save(
+  'kinkajou',
+  S(
+    '124 92',
+    `<defs><linearGradient id="kk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cc9c5e"/><stop offset="1" stop-color="#9a6e3c"/></linearGradient></defs>
+<path d="M42,52 C18,56 8,44 11,31 C14,20 26,18 30,27 C24,27 19,33 21,41 C23,48 32,50 42,47" stroke="url(#kk)" stroke-width="7" fill="none" stroke-linecap="round"/>
+<g stroke="#8a6238" stroke-width="6" stroke-linecap="round"><line x1="56" y1="64" x2="54" y2="80"/><line x1="92" y1="62" x2="95" y2="78"/></g>
+<path d="M38,54 C34,34 56,26 78,28 C100,30 112,40 110,56 C108,68 86,72 64,70 C48,68 42,66 38,54 Z" fill="url(#kk)"/>
+<path d="M52,60 C64,66 84,66 98,60 C88,68 64,70 52,62 Z" fill="#b5824a" opacity="0.6"/>
+<circle cx="98" cy="42" r="16" fill="url(#kk)"/>
+<circle cx="90" cy="28" r="5.5" fill="url(#kk)"/><circle cx="106" cy="28" r="5.5" fill="url(#kk)"/>
+<circle cx="90" cy="28" r="2.6" fill="#7a5630"/><circle cx="106" cy="28" r="2.6" fill="#7a5630"/>
+<path d="M108,46 C116,46 120,50 116,54 C112,56 108,54 106,50 Z" fill="#b88a52"/>
+<ellipse cx="116" cy="50" rx="2.4" ry="1.9" fill="#241810"/>
+<circle cx="99" cy="41" r="4.2" fill="#160f08"/><circle cx="100.6" cy="39.4" r="1.3" fill="#fff"/>
+<circle cx="88" cy="43" r="2.8" fill="#160f08"/><circle cx="88.8" cy="41.8" r="0.8" fill="#fff"/>`
+  ),
+  118
+);
+
+// ======== a wood duck drake — crested green head, white face stripes, chestnut breast (faces right) ========
+save(
+  'wood_duck',
+  S(
+    '170 116',
+    `<defs><linearGradient id="wdb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cdaa6c"/><stop offset="1" stop-color="#9a7c4a"/></linearGradient>
+<linearGradient id="wdh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f8a72"/><stop offset="1" stop-color="#123f44"/></linearGradient>
+<linearGradient id="wdr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9c5038"/><stop offset="1" stop-color="#6e3424"/></linearGradient></defs>
+<path d="M32,74 C22,70 14,62 12,54 C20,60 28,68 38,78 Z" fill="#394a44"/>
+<path d="M30,80 C24,58 50,50 80,52 C108,54 124,64 124,76 C124,90 98,98 70,96 C48,94 36,94 30,80 Z" fill="#42554f"/>
+<path d="M56,78 C72,68 96,68 112,74 C104,87 76,90 60,84 Z" fill="url(#wdb)"/>
+<path d="M62,80 C78,74 96,74 108,79" stroke="#7c6644" stroke-width="1.2" fill="none" opacity="0.5"/>
+<path d="M99,73 C107,64 118,62 122,71 C123,81 113,87 103,84 C97,82 95,79 99,73 Z" fill="url(#wdr)"/>
+<g fill="#f0e6d2" opacity="0.85"><circle cx="108" cy="72" r="1"/><circle cx="113" cy="76" r="1"/><circle cx="106" cy="79" r="1"/></g>
+<path d="M106,68 C108,47 117,35 129,33 C141,31 148,40 146,50 C151,52 151,60 145,63 C138,67 127,70 117,72 C111,73 108,74 106,68 Z" fill="url(#wdh)"/>
+<path d="M117,39 C110,41 105,48 103,57 C109,52 116,50 122,50 Z" fill="url(#wdh)"/>
+<path d="M123,53 C128,55 134,56 141,55" stroke="#fbfbf6" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+<path d="M119,61 C126,62 133,61 139,59" stroke="#fbfbf6" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+<path d="M143,53 C156,51 162,55 159,60 C156,63 146,62 141,59 Z" fill="#d4543a"/>
+<path d="M156,54 L162,56 L156,59 Z" fill="#2a2018"/>
+<circle cx="133" cy="50" r="2.8" fill="#c0291e"/><circle cx="134" cy="49" r="0.9" fill="#fff"/>`
+  ),
+  160
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
+  'kinkajou',
+  'wood_duck',
+  'duck',
+  'duck_f',
+  'parrot',
   'aardvark',
   'ghost_crab',
-  'fennec',
-  'scorpion',
-  'rowan',
-  'seedhead',
-  'ocotillo',
-  'cattail'
+  'duckling'
 ];
 const cols = 4,
   cell = 230,

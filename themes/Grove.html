@@ -836,6 +836,7 @@
           perchBird: true, // a scarlet macaw perches in the canopy and flits the boughs
           perchSpecies: ['parrot'],
           perchScale: 0.4,
+          nightCanopy: 'kinkajou', // …and a kinkajou creeps the canopy once it's dark
           flyer: 0xffffff,
           flyerFrames: ['toucan'],
           flutter: true,
@@ -1100,6 +1101,8 @@
         'seedhead',
         'aardvark',
         'ghost_crab',
+        'kinkajou',
+        'wood_duck',
         'grass',
         'flower_p',
         'flower_w',
@@ -1670,6 +1673,7 @@
         hedgehog,
         fennec,
         aardvark,
+        kinkajou,
         seal,
         roadrunner,
         whale,
@@ -1743,6 +1747,7 @@
           hedgehog =
           fennec =
           aardvark =
+          kinkajou =
             null;
         whale = spoutG = surfG = cloudSeaG = cloudGlow = choughHub = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
@@ -3168,7 +3173,12 @@
           squirrel.tx = sx;
           scene.addChild(squirrel);
         } else squirrel = null;
-        if (BI.perchBird && perches.length && Math.random() < 0.75) {
+        if (
+          BI.perchBird &&
+          (BI.glade || buildNight < 0.55) && // perching birds roost after dark (the glade's dusk keeps its own)
+          perches.length &&
+          Math.random() < 0.75
+        ) {
           // a perching bird (a random species each visit) sits in a tree and flits between boughs —
           // songbirds in the temperate woods, a scarlet macaw in the jungle canopy
           const species = BI.perchSpecies || ['robin', 'bluebird', 'finch'],
@@ -3188,6 +3198,23 @@
           songbird.tmr = 2 + Math.random() * 5;
           scene.addChild(songbird);
         } else songbird = null;
+        if (
+          BI.nightCanopy === 'kinkajou' &&
+          buildNight > 0.5 &&
+          perches.length &&
+          Math.random() < 0.7
+        ) {
+          // a kinkajou creeps the dark canopy where the macaw perched by day, pausing to forage
+          const p = perches[(Math.random() * perches.length) | 0];
+          kinkajou = spr('kinkajou', p.x, p.y, 0.34 + Math.random() * 0.1);
+          kinkajou.baseSc = Math.abs(kinkajou.scale.x);
+          kinkajou.dir = Math.random() < 0.5 ? 1 : -1;
+          kinkajou.scale.x = kinkajou.dir * kinkajou.baseSc;
+          kinkajou.cy = p.y; // the canopy band it creeps along
+          kinkajou.spd = 0.4 + Math.random() * 0.3; // a slow, deliberate creep
+          kinkajou.pauseT = Math.random() * 2;
+          scene.addChild(kinkajou);
+        } else kinkajou = null;
         if (BI.beetle && Math.random() < 0.7) {
           // a beetle scuttles the ground, pausing to forage and turning back at the edges — but in
           // the desert and canyon a scorpion takes the night shift
@@ -3495,7 +3522,7 @@
             scene.addChild(dm);
             ducks.push(dm);
             const d2 = spr(
-              'duck',
+              Math.random() < 0.5 ? 'wood_duck' : 'duck', // the drake is a mallard or a wood duck
               250 + Math.random() * 760,
               682 + Math.random() * 16,
               0.55
@@ -5746,6 +5773,32 @@
             else if (Math.random() < 0.003 * dt) {
               aardvark.dir = -aardvark.dir;
               aardvark.scale.x = aardvark.dir * aardvark.baseSc;
+            }
+          }
+        }
+        // a kinkajou creeps slowly along the dark canopy band, pausing to reach and forage
+        if (kinkajou) {
+          if (kinkajou.pauseT > 0) {
+            kinkajou.pauseT -= dt / 60; // pause to forage, a gentle sway
+            kinkajou.y = kinkajou.cy + Math.sin(t * 2) * 1.2;
+            kinkajou.rotation = Math.sin(t * 2.4) * 0.04;
+          } else {
+            kinkajou.x += kinkajou.dir * kinkajou.spd * dt;
+            kinkajou.rotation = 0;
+            kinkajou.y =
+              kinkajou.cy + Math.sin(t * 3 + kinkajou.x * 0.02) * 1.6; // creeps with a slight clamber
+            if (kinkajou.x > VW - 120) {
+              kinkajou.dir = -1;
+              kinkajou.scale.x = -kinkajou.baseSc;
+            } else if (kinkajou.x < 120) {
+              kinkajou.dir = 1;
+              kinkajou.scale.x = kinkajou.baseSc;
+            }
+            if (Math.random() < 0.01 * dt)
+              kinkajou.pauseT = 1 + Math.random() * 2.5; // stop to forage
+            else if (Math.random() < 0.004 * dt) {
+              kinkajou.dir = -kinkajou.dir;
+              kinkajou.scale.x = kinkajou.dir * kinkajou.baseSc;
             }
           }
         }
