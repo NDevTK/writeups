@@ -443,6 +443,26 @@ const tad = (c) =>
 save('tadpole_a', tad(6), 22);
 save('tadpole_b', tad(-6), 22);
 
+// ---- NEW: kingfisher — perches over the pond, then plunge-dives for a fish (faces right) ----
+save(
+  'kingfisher',
+  S(
+    '46 54',
+    `<path d="M15,40 L9,49 L19,44 Z" fill="#1f6aa8"/>
+<ellipse cx="22" cy="31" rx="11.5" ry="14" fill="#2a8fd6"/>
+<path d="M13,24 Q22,22 24,37 Q17,41 12,36 Z" fill="#1f72b8"/>
+<path d="M25,19 C34,23 33,42 24,45 C21,40 20,25 25,19 Z" fill="#d6822e"/>
+<circle cx="24" cy="16" r="10.5" fill="#2a8fd6"/>
+<path d="M27,18 C32,19 33,24 29,25 C26,24 25,19 27,18 Z" fill="#d6822e"/>
+<path d="M30,20 C34,20 34,25 31,26 C29,25 28,21 30,20 Z" fill="#f2ece0"/>
+<path d="M33,13 L46,15.5 L33,18 Z" fill="#241f1a"/>
+<circle cx="28" cy="13.5" r="2" fill="#120d08"/><circle cx="28.6" cy="13" r="0.6" fill="#ffffff" opacity="0.7"/>
+<g fill="#1f72b8" opacity="0.5"><circle cx="20" cy="10" r="1.3"/><circle cx="24" cy="8" r="1.3"/><circle cx="17" cy="14" r="1.2"/></g>
+<g stroke="#d2521e" stroke-width="2" stroke-linecap="round"><line x1="20" y1="44" x2="20" y2="50"/><line x1="25" y1="44" x2="25" y2="50"/></g>`
+  ),
+  42
+);
+
 // ---- NEW: lily pad with blossom ----
 save(
   'lily',
@@ -2938,7 +2958,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['grasshopper', 'ladybird', 'beetle', 'mouse'];
+const review = ['kingfisher', 'heron', 'robin', 'frog'];
 const cols = 4,
   cell = 230,
   pad = 14,
