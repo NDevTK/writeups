@@ -418,6 +418,20 @@ const bee = (wy) =>
 save('bee_a', bee(7), 44); // wings raised
 save('bee_b', bee(1), 44); // wings level
 
+// ---- NEW: pond-skater (water strider) — thin body on long splayed legs, sits on the surface ----
+save(
+  'skater',
+  S(
+    '64 40',
+    `<g stroke="#cfe8ef" stroke-width="1.2" stroke-linecap="round" opacity="0.5"><line x1="9" y1="9" x2="12" y2="12"/><line x1="7" y1="30" x2="11" y2="27"/><line x1="50" y1="11" x2="46" y2="14"/><line x1="50" y1="29" x2="46" y2="26"/></g>
+<g stroke="#464134" stroke-width="1.5" stroke-linecap="round" fill="none"><path d="M34,20 L48,11"/><path d="M34,20 L48,29"/><path d="M30,20 L9,9"/><path d="M30,20 L7,30"/><path d="M27,20 L13,12"/><path d="M27,20 L13,28"/></g>
+<ellipse cx="30" cy="20" rx="9.5" ry="2.3" fill="#2f2b23"/>
+<circle cx="41" cy="20" r="2.6" fill="#2f2b23"/>
+<g stroke="#2f2b23" stroke-width="1" fill="none" stroke-linecap="round"><path d="M43,19 C46,16 48,15 50,15"/><path d="M43,21 C46,22 48,23 50,23"/></g>`
+  ),
+  52
+);
+
 // ---- NEW: lily pad with blossom ----
 save(
   'lily',
@@ -2873,7 +2887,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['ladybird', 'beetle', 'bee_a', 'snail'];
+const review = ['skater', 'lily', 'damselfly_a', 'frog'];
 const cols = 4,
   cell = 230,
   pad = 14,
