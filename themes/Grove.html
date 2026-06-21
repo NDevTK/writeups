@@ -1070,6 +1070,9 @@
         'robin',
         'bluebird',
         'finch',
+        'bluetit',
+        'goldcrest',
+        'wren',
         'arctic_fox',
         'lizard_b',
         'beetle',
@@ -3243,7 +3246,14 @@
         ) {
           // a perching bird (a random species each visit) sits in a tree and flits between boughs —
           // songbirds in the temperate woods, a scarlet macaw in the jungle canopy
-          const species = BI.perchSpecies || ['robin', 'bluebird', 'finch'],
+          const species = BI.perchSpecies || [
+              'robin',
+              'bluebird',
+              'finch',
+              'bluetit',
+              'goldcrest',
+              'wren'
+            ],
             p = perches[(Math.random() * perches.length) | 0],
             kind = species[(Math.random() * species.length) | 0];
           songbird = spr(
