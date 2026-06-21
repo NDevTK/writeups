@@ -17,18 +17,18 @@ const save = (name, svg, w) =>
   fs.writeFileSync(`${OUT}/${name}.png`, png(svg, w));
 
 // ---- deer (2 walk frames) with belly shadow + leg shading ----
-const deerSvg = (lf) =>
+const deerSvg = (lf, g0, g1, lg0, lg1, mid) =>
   S(
     '260 215',
     `
-<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a8773f"/><stop offset="1" stop-color="#6c4626"/></linearGradient>
-<linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6f4a2b"/><stop offset="1" stop-color="#3f2a18"/></linearGradient></defs>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0 || '#a8773f'}"/><stop offset="1" stop-color="${g1 || '#6c4626'}"/></linearGradient>
+<linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${lg0 || '#6f4a2b'}"/><stop offset="1" stop-color="${lg1 || '#3f2a18'}"/></linearGradient></defs>
 <g stroke-linecap="round">
-<line x1="86" y1="132" x2="${84 + lf[0]}" y2="196" stroke="#553a23" stroke-width="8"/>
-<line x1="150" y1="130" x2="${151 + lf[1]}" y2="194" stroke="#553a23" stroke-width="8"/>
+<line x1="86" y1="132" x2="${84 + lf[0]}" y2="196" stroke="${mid || '#553a23'}" stroke-width="8"/>
+<line x1="150" y1="130" x2="${151 + lf[1]}" y2="194" stroke="${mid || '#553a23'}" stroke-width="8"/>
 <line x1="98" y1="135" x2="${95 + lf[2]}" y2="201" stroke="url(#lg)" stroke-width="9"/>
 <line x1="161" y1="133" x2="${164 + lf[3]}" y2="199" stroke="url(#lg)" stroke-width="9"/></g>
-<path d="M58,104 C49,101 47,113 55,119 C60,121 63,113 62,107 Z" fill="#6b4626"/>
+<path d="M58,104 C49,101 47,113 55,119 C60,121 63,113 62,107 Z" fill="${mid || '#6b4626'}"/>
 <path d="M60,120 C56,99 80,89 102,90 C128,91 150,94 166,106 C174,113 171,127 162,134 C148,143 116,146 94,143 C76,141 63,140 60,120 Z" fill="url(#bg)"/>
 <circle cx="80" cy="116" r="23" fill="url(#bg)"/>
 <path d="M70,104 C95,92 135,93 168,107 C150,99 110,99 84,108 Z" fill="#b88350" opacity="0.5"/>
@@ -45,6 +45,24 @@ const deerSvg = (lf) =>
   );
 save('deer_a', deerSvg([0, 0, 0, 0]), 210);
 save('deer_b', deerSvg([7, -6, -6, 7]), 210);
+// a darker, melanistic deer that turns up in the herd now and then
+save(
+  'deer_d_a',
+  deerSvg([0, 0, 0, 0], '#6e4c2c', '#3e2818', '#46301a', '#261810', '#3a281a'),
+  210
+);
+save(
+  'deer_d_b',
+  deerSvg(
+    [7, -6, -6, 7],
+    '#6e4c2c',
+    '#3e2818',
+    '#46301a',
+    '#261810',
+    '#3a281a'
+  ),
+  210
+);
 
 save(
   'oak',
@@ -311,27 +329,26 @@ save('rabbit', rabbitSvg('#c8b49a', '#94795f', '#bda78c'), 104);
 save('rabbit_g', rabbitSvg('#b2b6bc', '#7e828a', '#9a9ea4'), 104);
 save('rabbit_k', rabbitSvg('#5e5a54', '#3a362f', '#4e4a44'), 104);
 
-// ---- NEW: fox (trotting, faces right) ----
-save(
-  'fox',
+// ---- fox (trotting, faces right) — red, or a dark silver morph ----
+const foxSvg = (g0, g1, light, dark) =>
   S(
     '210 150',
     `
-<defs><linearGradient id="fx" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e07a2e"/><stop offset="1" stop-color="#bd5e1e"/></linearGradient></defs>
+<defs><linearGradient id="fx" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0}"/><stop offset="1" stop-color="${g1}"/></linearGradient></defs>
 <path d="M44,86 C10,82 4,50 20,42 C28,60 38,72 58,82 Z" fill="url(#fx)"/>
-<path d="M24,48 C10,50 6,66 16,72 C15,60 18,52 26,50 Z" fill="#f3ead8"/>
-<g stroke="#2a2018" stroke-width="8" stroke-linecap="round"><line x1="72" y1="92" x2="70" y2="132"/><line x1="94" y1="94" x2="94" y2="134"/><line x1="120" y1="94" x2="122" y2="134"/><line x1="140" y1="92" x2="144" y2="130"/></g>
+<path d="M24,48 C10,50 6,66 16,72 C15,60 18,52 26,50 Z" fill="${light}"/>
+<g stroke="${dark}" stroke-width="8" stroke-linecap="round"><line x1="72" y1="92" x2="70" y2="132"/><line x1="94" y1="94" x2="94" y2="134"/><line x1="120" y1="94" x2="122" y2="134"/><line x1="140" y1="92" x2="144" y2="130"/></g>
 <path d="M50,84 C46,64 72,56 102,57 C132,58 152,64 156,78 C158,92 132,100 102,99 C74,98 56,98 50,84 Z" fill="url(#fx)"/>
-<path d="M66,92 C92,99 126,97 152,85 C132,104 86,106 66,98 Z" fill="#f3ead8" opacity="0.92"/>
+<path d="M66,92 C92,99 126,97 152,85 C132,104 86,106 66,98 Z" fill="${light}" opacity="0.92"/>
 <path d="M140,74 C148,60 160,52 172,52 C184,52 190,62 186,72 L198,86 L174,88 C168,91 158,91 150,87 Z" fill="url(#fx)"/>
-<path d="M174,80 L200,87 L177,91 Z" fill="#f3ead8"/>
+<path d="M174,80 L200,87 L177,91 Z" fill="${light}"/>
 <circle cx="200" cy="87" r="3.6" fill="#1d160f"/>
-<path d="M150,56 L145,36 L163,49 Z" fill="url(#fx)"/><path d="M151,52 L149,41 L158,49 Z" fill="#2a2018"/>
-<path d="M171,54 L173,34 L186,49 Z" fill="url(#fx)"/><path d="M173,50 L174,40 L182,49 Z" fill="#2a2018"/>
+<path d="M150,56 L145,36 L163,49 Z" fill="url(#fx)"/><path d="M151,52 L149,41 L158,49 Z" fill="${dark}"/>
+<path d="M171,54 L173,34 L186,49 Z" fill="url(#fx)"/><path d="M173,50 L174,40 L182,49 Z" fill="${dark}"/>
 <circle cx="169" cy="65" r="2.7" fill="#140e09"/>`
-  ),
-  175
-);
+  );
+save('fox', foxSvg('#e07a2e', '#bd5e1e', '#f3ead8', '#2a2018'), 175);
+save('fox_s', foxSvg('#64686f', '#3a3e44', '#eef2f5', '#1c1e22'), 175);
 
 // ---- NEW: dragonfly (2 wing frames) ----
 const dragon = (wA, wB) =>
@@ -2712,14 +2729,14 @@ save(
 
 // ---- contact sheet of new + polished ----
 const review = [
-  'squirrel',
-  'squirrel_g',
-  'squirrel_k',
   'fox',
-  'rabbit',
-  'rabbit_g',
+  'fox_s',
+  'deer_a',
+  'deer_d_a',
+  'squirrel_k',
   'rabbit_k',
-  'hare'
+  'moorhen',
+  'goat'
 ];
 const cols = 4,
   cell = 230,
