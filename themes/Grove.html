@@ -1108,6 +1108,9 @@
         'snowy_owl_a',
         'snowy_owl_b',
         'deer_rest',
+        'moorhen',
+        'rudd_a',
+        'rudd_b',
         'grass',
         'flower_p',
         'flower_w',
@@ -3551,6 +3554,22 @@
             d2.vx = Math.random() < 0.5 ? d2.baseSpd : -d2.baseSpd;
             ducks.push(d2);
             scene.addChild(d2);
+            // a moorhen often potters among them — darker, smaller, with a red bill
+            if (Math.random() < 0.5) {
+              const mh = spr(
+                'moorhen',
+                250 + Math.random() * 760,
+                680 + Math.random() * 18,
+                0.42
+              );
+              mh.baseY = mh.y;
+              mh.baseSpd = 0.22 + Math.random() * 0.2; // potters a little slower than the ducks
+              mh.dir = Math.random() < 0.5 ? 1 : -1;
+              mh.scale.x = mh.dir * 0.42;
+              mh.vx = mh.dir * mh.baseSpd;
+              ducks.push(mh);
+              scene.addChild(mh);
+            }
           }
           // float the lily pads (and the frogs on them) in front of the ducks, so a duck passing one swims behind it
           for (const lp of lilies) if (!lp.isFrog) scene.addChild(lp);
@@ -3594,11 +3613,16 @@
                 1
             ); // ±1
             const koiPond = !!BI.water.fishSprite, // a koi pond shows its fish in full colour, just under the surface
-              frames = BI.water.fishSprite || ['fish_a', 'fish_b'],
               subA = koiPond
                 ? [255, 255, 255]
                 : lpH(BI.water.bot, BI.water.top, 0.4);
             for (let i = 0; i < fn; i++) {
+              // a mix of slim and deep-bodied fish under the surface (koi ponds keep their koi)
+              const frames =
+                BI.water.fishSprite ||
+                (Math.random() < 0.4
+                  ? ['rudd_a', 'rudd_b']
+                  : ['fish_a', 'fish_b']);
               const f = anim(
                 frames,
                 140 + Math.random() * (VW - 280),

@@ -2603,16 +2603,51 @@ save(
   186
 );
 
+// ======== a moorhen — dark, red-billed, potters among the ducks (faces right) ========
+save(
+  'moorhen',
+  S(
+    '152 110',
+    `<defs><linearGradient id="mh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c434b"/><stop offset="1" stop-color="#23282e"/></linearGradient></defs>
+<path d="M30,72 C20,62 16,54 16,48 C24,56 32,64 40,74 Z" fill="#2a2f35"/>
+<path d="M22,60 C18,56 18,60 22,64 C25,64 26,61 24,59 Z" fill="#eef2f2"/>
+<path d="M28,80 C22,60 48,52 78,54 C106,56 122,64 122,76 C122,90 96,96 70,94 C48,92 34,92 28,80 Z" fill="url(#mh)"/>
+<path d="M44,84 C64,78 90,78 108,82" stroke="#dfe4e4" stroke-width="2.6" fill="none" opacity="0.85"/>
+<path d="M104,68 C108,50 116,40 128,38 C140,36 146,44 143,54 C140,64 130,68 120,72 C114,74 108,74 104,68 Z" fill="url(#mh)"/>
+<path d="M138,44 C146,42 150,45 150,49 L150,52 C146,51 142,50 138,50 Z" fill="#cf3a2a"/>
+<path d="M148,48 L161,50 L148,53 Z" fill="#e8b43c"/>
+<circle cx="132" cy="48" r="2.4" fill="#b02818"/><circle cx="133" cy="47" r="0.7" fill="#fff"/>`
+  ),
+  142
+);
+
+// ======== a rudd — a deep-bodied pond fish with reddish fins (2 swim frames) ========
+const ruddSvg = (tf) =>
+  S(
+    '116 64',
+    `<defs><linearGradient id="rd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fb0a0"/><stop offset="0.5" stop-color="#cfd8c8"/><stop offset="1" stop-color="#eef2e8"/></linearGradient></defs>
+<path d="M34,32 L9,${17 + tf} C18,26 18,38 9,${47 + tf} Z" fill="#c46a4a" opacity="0.9"/>
+<path d="M60,15 Q72,5 84,16 Z" fill="#b8604a" opacity="0.7"/>
+<path d="M28,32 C40,12 72,8 98,18 C108,22 112,28 112,32 C112,36 108,42 98,46 C72,56 40,52 28,32 Z" fill="url(#rd)"/>
+<path d="M56,46 Q66,58 78,46 Z" fill="#c46a4a" opacity="0.8"/>
+<path d="M86,41 Q92,50 99,42 Z" fill="#c46a4a" opacity="0.65"/>
+<path d="M44,30 C64,22 88,22 104,28 C88,32 64,34 44,30 Z" fill="#86a088" opacity="0.45"/>
+<path d="M92,20 C96,26 96,38 92,44" stroke="#8aa089" stroke-width="1.3" fill="none" opacity="0.6"/>
+<circle cx="100" cy="28" r="3" fill="#16221c"/><circle cx="101" cy="27" r="1" fill="#eaf3ea"/>`
+  );
+save('rudd_a', ruddSvg(0), 112);
+save('rudd_b', ruddSvg(7), 112);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'snowy_owl_a',
-  'owl_a',
-  'deer_rest',
-  'deer_a',
-  'kinkajou',
+  'moorhen',
+  'duck',
+  'duck_f',
   'wood_duck',
-  'fawn_a',
-  'penguin'
+  'rudd_a',
+  'fish_a',
+  'koi_a',
+  'duckling'
 ];
 const cols = 4,
   cell = 230,
