@@ -76,7 +76,11 @@
     </style>
   </head>
   <body>
-    <div id="ui" aria-hidden="true">
+    <div
+      id="ui"
+      role="group"
+      aria-label="Wallpaper controls"
+      aria-hidden="true">
       <div class="row" id="uiBiome"></div>
       <div class="row" id="uiTime"></div>
       <div class="row" id="uiSeason"></div>
@@ -4626,9 +4630,12 @@
       // iframe forward, covering the page). 'Hide options' goes to 'bare'; the ✦ toggle brings the
       // controls back.
       let wpMode = 'hidden';
+      const uiPanel = document.getElementById('ui');
       function setMode(m) {
         wpMode = m;
         document.body.classList.toggle('shown', m === 'shown'); // the panel shows only in 'shown'
+        // expose the controls to assistive tech only while they're actually on screen
+        uiPanel.setAttribute('aria-hidden', m === 'shown' ? 'false' : 'true');
         window.parent.postMessage(
           {type: 'shaderwall', state: m},
           location.origin

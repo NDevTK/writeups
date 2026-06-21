@@ -906,9 +906,13 @@ float grain(vec2 uv){ return hash21(uv*u_res + fract(u_time)*97.0); }
       const uiToggle = document.getElementById('uiToggle');
       function setUI(hidden) {
         uiHidden = hidden;
-        document
-          .querySelectorAll('.ui')
-          .forEach((el) => el.classList.toggle('hidden', hidden));
+        document.querySelectorAll('.ui').forEach((el) => {
+          el.classList.toggle('hidden', hidden);
+          // hidden controls fade with opacity (not display:none), so keep them out of the
+          // a11y tree + tab order while invisible
+          el.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+          el.inert = hidden;
+        });
         document.getElementById('hint').style.opacity = hidden ? '0' : '';
         uiToggle.classList.toggle('on', !hidden);
         if (hidden) {
