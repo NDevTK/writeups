@@ -432,6 +432,17 @@ save(
   52
 );
 
+// ---- NEW: tadpole (2 frames, tail wriggles) — a dark head trailing a flicking tail (faces right) ----
+const tad = (c) =>
+  S(
+    '44 22',
+    `<path d="M25,11 Q15,${11 + c} 5,${11 - c * 0.55}" stroke="#34302a" stroke-width="3.6" fill="none" stroke-linecap="round"/>
+<ellipse cx="29" cy="11" rx="7.5" ry="6" fill="#2b2823"/>
+<circle cx="32" cy="9" r="1.1" fill="#8a8076" opacity="0.8"/>`
+  );
+save('tadpole_a', tad(6), 22);
+save('tadpole_b', tad(-6), 22);
+
 // ---- NEW: lily pad with blossom ----
 save(
   'lily',
@@ -2907,7 +2918,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['mouse', 'hedgehog', 'ladybird', 'snail'];
+const review = ['tadpole_a', 'tadpole_b', 'frog', 'lily'];
 const cols = 4,
   cell = 230,
   pad = 14,
