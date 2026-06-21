@@ -385,6 +385,19 @@ const admiral = (fx) =>
   );
 save('admiral_a', admiral(14), 80);
 save('admiral_b', admiral(8), 80);
+// a Peacock butterfly — rusty-red wings with the signature blue-and-cream eyespots (2 flap frames)
+const peacock = (fx) =>
+  S(
+    '80 70',
+    `<g fill="#9a2f2a"><ellipse cx="${40 - fx}" cy="26" rx="${fx > 10 ? 15 : 9}" ry="12"/><ellipse cx="${40 + fx}" cy="26" rx="${fx > 10 ? 15 : 9}" ry="12"/><ellipse cx="${40 - fx + 3}" cy="47" rx="${fx > 10 ? 11 : 7}" ry="9.5"/><ellipse cx="${40 + fx - 3}" cy="47" rx="${fx > 10 ? 11 : 7}" ry="9.5"/></g>
+<g fill="#5e1c19" opacity="0.55"><ellipse cx="${40 - fx - 6}" cy="30" rx="${fx > 10 ? 8 : 5}" ry="9"/><ellipse cx="${40 + fx + 6}" cy="30" rx="${fx > 10 ? 8 : 5}" ry="9"/></g>
+<g><circle cx="${40 - fx - 5}" cy="20" r="4.6" fill="#f1e2a4"/><circle cx="${40 - fx - 5}" cy="20" r="3" fill="#2f5aa8"/><circle cx="${40 - fx - 5}" cy="20" r="1.4" fill="#16101a"/><circle cx="${40 + fx + 5}" cy="20" r="4.6" fill="#f1e2a4"/><circle cx="${40 + fx + 5}" cy="20" r="3" fill="#2f5aa8"/><circle cx="${40 + fx + 5}" cy="20" r="1.4" fill="#16101a"/></g>
+<g><circle cx="${40 - fx + 2}" cy="48" r="3.6" fill="#3a2a6a"/><circle cx="${40 - fx + 2}" cy="48" r="1.8" fill="#7e6ed6"/><circle cx="${40 + fx - 2}" cy="48" r="3.6" fill="#3a2a6a"/><circle cx="${40 + fx - 2}" cy="48" r="1.8" fill="#7e6ed6"/></g>
+<ellipse cx="40" cy="35" rx="2.8" ry="14" fill="#1a1612"/><circle cx="40" cy="21" r="2.4" fill="#1a1612"/>
+<g stroke="#1a1612" stroke-width="1.2" fill="none" stroke-linecap="round"><path d="M40,19 C37,13 35,10 33,8"/><path d="M40,19 C43,13 45,10 47,8"/></g>`
+  );
+save('peacock_a', peacock(14), 80);
+save('peacock_b', peacock(8), 80);
 // a bumblebee — fuzzy amber-and-black body, pale tail, blurred wings (2 wingbeat frames)
 const bee = (wy) =>
   S(
@@ -2822,7 +2835,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['bee_a', 'bee_b', 'monarch_a', 'damselfly_a'];
+const review = ['peacock_a', 'admiral_a', 'monarch_a', 'swallow_a'];
 const cols = 4,
   cell = 230,
   pad = 14,
