@@ -1430,6 +1430,7 @@
         whale,
         spoutG,
         cloudSeaG,
+        cloudGlow,
         SE,
         BI,
         ready = false;
@@ -1476,7 +1477,7 @@
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
         lavaGlow = turtle = causticG = marmot = seal = roadrunner = null;
-        whale = spoutG = cloudSeaG = null;
+        whale = spoutG = cloudSeaG = cloudGlow = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
         // SP = optional per-biome season palette (tint-only seasons); else fall back to the global SEASONS, and non-seasonal biomes ignore the season entirely.
@@ -1793,6 +1794,26 @@
             flutters.push(e);
             scene.addChild(e);
           }
+          // warm light that catches the cloud tops at sunrise / sunset (ADD; alpha set by the sun's height)
+          cloudGlow = new PIXI.Sprite(
+            gradTex(
+              [
+                [0, '#000000'],
+                [0.42, '#ffba74'],
+                [1, '#000000']
+              ],
+              180
+            )
+          );
+          cloudGlow.position.set(-40, 420);
+          cloudGlow.width = VW + 80;
+          cloudGlow.height = 180;
+          cloudGlow.blendMode = PIXI.BLEND_MODES.ADD;
+          const cel0 = celestial(nowHour()); // a correct static value for reduced motion
+          cloudGlow.alpha =
+            (cel0.sun ? Math.max(0, Math.min(1, (cel0.y - 240) / 175)) : 0) *
+            0.62;
+          scene.addChild(cloudGlow);
         } else {
           for (const hb of HILLS) hillBands.push(hb); // remembered so settling snow can thicken each crest over time
           HILLS.forEach(([cy, am, ph], i) => {
@@ -3359,9 +3380,12 @@
           }
         }
 
-        // aurora intensity: a slow swell/fade so it has quiet stretches and dramatic bursts
+        // aurora intensity: a slow swell/fade for quiet stretches and dramatic bursts — and it
+        // swells on clear cold nights (cloud veils it; the colder the air, the more vivid it burns)
         const auroraI =
-          0.22 + 0.78 * Math.pow(0.5 + 0.5 * Math.sin(t * 0.05), 2);
+          (0.22 + 0.78 * Math.pow(0.5 + 0.5 * Math.sin(t * 0.05), 2)) *
+          (1 - cover * 0.8) *
+          Math.min(1.25, 0.55 + Math.max(0, -temp) * 0.08);
         if (BI.aurora) drawAurora(t, night, auroraI);
         fireflies.fl.alpha = BI.interior ? 0.8 + night * 0.2 : night; // glowworms glow around the clock underground
         for (const c of clouds) {
@@ -3669,6 +3693,11 @@
           else if (c.x + c.width < 0) c.x = VW + c.width;
         }
         if (cloudSeaG) cloudSeaG.y = Math.sin(t * 0.3) * 4; // the cloud sea breathes slowly
+        if (cloudGlow)
+          // warm light grows as the sun nears the horizon (low sun = golden hour)
+          cloudGlow.alpha =
+            (cel.sun ? Math.max(0, Math.min(1, (cel.y - 240) / 175)) : 0) *
+            0.62;
         // fog drifts on the breeze (each layer at its own pace for parallax)
         for (const fz of fogLayers)
           fz.tilePosition.x -= (fz.spd + wind * fz.windF * 0.25) * dt;
