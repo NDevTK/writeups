@@ -489,6 +489,7 @@
           critterScale: 0.5,
           hopper: null,
           shoreBird: true, // sandpipers run the waterline, chasing the wash in and out
+          ghostCrab: true, // ghost crabs skitter the sand after dark
           flyer: 0xffffff,
           flyerFrames: ['gull'],
           flutter: false,
@@ -614,6 +615,7 @@
           critterScale: 0.6,
           hopper: null,
           beetle: true, // a dung beetle trundles the savanna
+          nightForager: 'aardvark', // an aardvark snuffles for termites after dark
           flyer: 0xffffff,
           flyerFrames: ['vulture'],
           flutter: false,
@@ -1096,6 +1098,8 @@
         'marsh_marigold',
         'rowan',
         'seedhead',
+        'aardvark',
+        'ghost_crab',
         'grass',
         'flower_p',
         'flower_w',
@@ -1619,6 +1623,7 @@
         perches = [],
         sandpipers = [],
         choughs = [],
+        ghostCrabs = [],
         hillBands = [];
       let sky,
         stars,
@@ -1664,6 +1669,7 @@
         olm,
         hedgehog,
         fennec,
+        aardvark,
         seal,
         roadrunner,
         whale,
@@ -1719,6 +1725,7 @@
           perches.length =
           sandpipers.length =
           choughs.length =
+          ghostCrabs.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
@@ -1735,6 +1742,7 @@
           olm =
           hedgehog =
           fennec =
+          aardvark =
             null;
         whale = spoutG = surfG = cloudSeaG = cloudGlow = choughHub = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
@@ -3215,6 +3223,26 @@
             scene.addChild(s);
           }
         }
+        if (BI.ghostCrab && BI.ground === 'beach' && buildNight > 0.5) {
+          // pale ghost crabs skitter the night sand in sudden bursts, then freeze stock-still
+          for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
+            const cx = 100 + Math.random() * (VW - 200),
+              gc = spr(
+                'ghost_crab',
+                cx,
+                591 + Math.random() * 10,
+                0.28 + Math.random() * 0.12
+              );
+            gc.baseSc = Math.abs(gc.scale.x);
+            gc.dir = Math.random() < 0.5 ? 1 : -1;
+            gc.scale.x = gc.dir * gc.baseSc;
+            gc.spd = 1.8 + Math.random() * 1.4; // quick, darting little runs
+            gc.freezeT = Math.random() * 1.6;
+            gc.runT = 0;
+            ghostCrabs.push(gc);
+            scene.addChild(gc);
+          }
+        }
         if (BI.salamander && Math.random() < 0.75) {
           // a fire salamander basks on the warm basalt, a faint heat-glow pooled beneath it, and
           // now and then scuttles low and quick to a fresh warm slab
@@ -3276,6 +3304,26 @@
           fennec.tx = fnx;
           scene.addChild(fennec);
         } else fennec = null;
+        if (
+          BI.nightForager === 'aardvark' &&
+          buildNight > 0.5 &&
+          Math.random() < 0.7
+        ) {
+          // an aardvark ambles the night savanna, stopping to dig and rummage for termites
+          const ax = 200 + Math.random() * (VW - 400);
+          aardvark = spr(
+            'aardvark',
+            ax,
+            groundY(ax) + 6,
+            0.42 + Math.random() * 0.12
+          );
+          aardvark.baseSc = Math.abs(aardvark.scale.x);
+          aardvark.dir = Math.random() < 0.5 ? 1 : -1;
+          aardvark.scale.x = aardvark.dir * aardvark.baseSc;
+          aardvark.spd = 0.3 + Math.random() * 0.2; // a slow, heavy amble
+          aardvark.pauseT = Math.random() * 2;
+          scene.addChild(aardvark);
+        } else aardvark = null;
         if (BI.penguins) {
           // a little colony waddles the snowfield: each penguin ambles at its own pace, some just stand
           for (let i = 0; i < BI.penguins; i++) {
@@ -5673,6 +5721,54 @@
               fennec.mode = 'listen';
               fennec.tmr = 2.5 + Math.random() * 5;
             }
+          }
+        }
+        // an aardvark ambles the night savanna, stopping to dig and rummage for termites
+        if (aardvark) {
+          if (aardvark.pauseT > 0) {
+            aardvark.pauseT -= dt / 60; // head-down, rummaging
+            aardvark.rotation = Math.sin(t * 9) * 0.04;
+            aardvark.y = groundY(aardvark.x) + 6;
+          } else {
+            aardvark.x += aardvark.dir * aardvark.spd * dt;
+            aardvark.rotation = 0;
+            aardvark.y =
+              groundY(aardvark.x) + 6 + Math.abs(Math.sin(t * 5)) * -1; // a heavy amble
+            if (aardvark.x > VW - 110) {
+              aardvark.dir = -1;
+              aardvark.scale.x = -aardvark.baseSc;
+            } else if (aardvark.x < 110) {
+              aardvark.dir = 1;
+              aardvark.scale.x = aardvark.baseSc;
+            }
+            if (Math.random() < 0.008 * dt)
+              aardvark.pauseT = 1.2 + Math.random() * 2.5; // stop to dig
+            else if (Math.random() < 0.003 * dt) {
+              aardvark.dir = -aardvark.dir;
+              aardvark.scale.x = aardvark.dir * aardvark.baseSc;
+            }
+          }
+        }
+        // pale ghost crabs dart the night beach in sudden bursts, then freeze stock-still
+        for (const gc of ghostCrabs) {
+          if (gc.freezeT > 0) {
+            gc.freezeT -= dt / 60; // frozen — almost invisible against the sand
+            if (gc.freezeT <= 0) {
+              gc.dir = Math.random() < 0.5 ? 1 : -1;
+              gc.scale.x = gc.dir * gc.baseSc;
+              gc.runT = 0.3 + Math.random() * 0.6; // a quick burst
+            }
+          } else {
+            gc.x += gc.dir * gc.spd * dt;
+            gc.runT -= dt / 60;
+            if (gc.x > VW - 80) {
+              gc.dir = -1;
+              gc.scale.x = -gc.baseSc;
+            } else if (gc.x < 80) {
+              gc.dir = 1;
+              gc.scale.x = gc.baseSc;
+            }
+            if (gc.runT <= 0) gc.freezeT = 0.4 + Math.random() * 1.8; // freeze again
           }
         }
         // a pale olm drifts the cave pool, undulating slowly, turning at the banks or on a whim
