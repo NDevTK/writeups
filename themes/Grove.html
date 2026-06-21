@@ -189,7 +189,8 @@
         jungle: 26,
         canyon: 21,
         polar: -9,
-        glade: 13
+        glade: 13,
+        summit: 1
       };
       const SEASON_TEMP = {winter: -16, autumn: -5, spring: 1, summer: 5};
       function nowHour() {
@@ -916,6 +917,24 @@
           flyer: 0x3a4a55,
           flutter: false,
           roller: null
+        },
+        summit: {
+          label: '☁️ Summit',
+          cloudSea: true, // above the clouds: a vast open sky over a rolling sea of cloud with peaks
+          fog: 0, // the cloud sea is the atmosphere; no separate ground haze
+          sky: 0xbfe0f5, // clean, pale high-altitude light
+          seasonal: false,
+          hills: [0x9fb4c8, 0xb4c6d6, 0xcadbe6], // (unused — hills are suppressed for the cloud sea)
+          ground: 'none',
+          mid: [],
+          near: [],
+          walker: null,
+          critter: null,
+          hopper: null,
+          flyer: 0x3a3326, // an eagle soars over the cloud sea
+          flyerFrames: ['eagle'],
+          flutter: false,
+          roller: null
         }
       };
       const RIGID = {rock: 1, cactus: 1, cactus2: 1};
@@ -1406,6 +1425,7 @@
         roadrunner,
         whale,
         spoutG,
+        cloudSeaG,
         SE,
         BI,
         ready = false;
@@ -1452,7 +1472,7 @@
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
         lavaGlow = turtle = causticG = marmot = seal = roadrunner = null;
-        whale = spoutG = null;
+        whale = spoutG = cloudSeaG = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
         // SP = optional per-biome season palette (tint-only seasons); else fall back to the global SEASONS, and non-seasonal biomes ignore the season entirely.
@@ -1625,12 +1645,158 @@
           [540, 26, 2.4]
         ];
         hillBands.length = 0;
-        for (const hb of HILLS) hillBands.push(hb); // remembered so settling snow can thicken each crest over time
-        HILLS.forEach(([cy, am, ph], i) => {
-          const hh = hill(cy, am, BI.hills[i], ph);
-          hh.tint = hillTint;
-          scene.addChild(hh);
-        });
+        if (BI.cloudSea) {
+          // ── above the clouds: snow peaks poking through a slow rolling sea of cloud ──
+          const surfY = (x) =>
+            500 + Math.sin(x * 0.012) * 12 + Math.sin(x * 0.031 + 1) * 6;
+          // a natural, jagged range: a multi-octave silhouette (peaks at all heights), snow that
+          // clings to the high ground in patches with rock spurs poking through, and a wandering
+          // snowline — so the snow never starts from one flat line. Feet hidden in the cloud.
+          const off = Math.random() * 3000; // a different slice of the range each visit
+          const ridgeY = (x) => {
+            x += off;
+            return (
+              266 +
+              Math.sin(x * 0.0061 + 1.2) * 80 + // where the big peaks rise / valleys fall
+              Math.sin(x * 0.0173 + 3.0) * 34 + // secondary ridges
+              Math.sin(x * 0.047 + 0.7) * 16 + // jaggedness
+              Math.sin(x * 0.121 + 2.1) * 7 // fine roughness
+            );
+          };
+          const peaks = new PIXI.Graphics();
+          peaks.beginFill(0x808fa4); // rock massif
+          peaks.moveTo(-60, 660);
+          for (let x = -60; x <= VW + 60; x += 5) peaks.lineTo(x, ridgeY(x));
+          peaks.lineTo(VW + 60, 660);
+          peaks.closePath();
+          peaks.endFill();
+          peaks.beginFill(0x5c6b80, 0.5); // a hazier, shadowed lower band for depth
+          peaks.moveTo(-60, 660);
+          for (let x = -60; x <= VW + 60; x += 5)
+            peaks.lineTo(x, ridgeY(x) + 130);
+          peaks.lineTo(VW + 60, 660);
+          peaks.closePath();
+          peaks.endFill();
+          for (let x = -30; x <= VW + 30; x += 53) {
+            // shaded gullies running down from the ridge, for rocky texture
+            const ry = ridgeY(x);
+            peaks.beginFill(0x6c7b90, 0.4);
+            peaks.moveTo(x - 3, ry + 6);
+            peaks.lineTo(x + 4, ry + 6);
+            peaks.lineTo(x + 9, 660);
+            peaks.lineTo(x - 8, 660);
+            peaks.closePath();
+            peaks.endFill();
+          }
+          const snowLo = (x) => {
+            x += off;
+            return (
+              352 +
+              Math.sin(x * 0.013) * 22 +
+              Math.sin(x * 0.043 + 1.5) * 14 +
+              Math.sin(x * 0.105 + 0.3) * 7
+            ); // the snowline wanders, never flat
+          };
+          let run = [];
+          const flushSnow = () => {
+            if (run.length < 2) return;
+            for (const [col, a, dy] of [
+              [0xbfd2e6, 0.85, 7], // faint blue under-shadow
+              [0xeef5fb, 0.97, 0] // bright snow over it
+            ]) {
+              peaks.beginFill(col, a);
+              peaks.moveTo(run[0][0], snowLo(run[0][0]) + dy);
+              for (const p of run) peaks.lineTo(p[0], p[1] + dy); // along the ridge
+              for (let k = run.length - 1; k >= 0; k--)
+                peaks.lineTo(run[k][0], snowLo(run[k][0]) + dy); // back along the snowline
+              peaks.closePath();
+              peaks.endFill();
+            }
+          };
+          for (let x = -60; x <= VW + 60; x += 5) {
+            const ry = ridgeY(x),
+              lo = snowLo(x),
+              sx = x + off,
+              spur =
+                Math.sin(sx * 0.19 + 0.4) * 0.6 + Math.sin(sx * 0.07 + 2) * 0.5; // rock spurs break the snow up
+            if (ry <= lo - 3 && spur > -0.5) run.push([x, ry]);
+            else {
+              flushSnow();
+              run = [];
+            }
+          }
+          flushSnow();
+          scene.addChild(peaks);
+          cloudSeaG = new PIXI.Container();
+          const body = new PIXI.Graphics();
+          body.beginFill(0xe7f0f8); // the cloud mass
+          body.moveTo(-60, VH + 60);
+          for (let x = -60; x <= VW + 60; x += 12) body.lineTo(x, surfY(x));
+          body.lineTo(VW + 60, VH + 60);
+          body.closePath();
+          body.endFill();
+          body.beginFill(0x9fb6cc, 0.45); // hazy depth lower down
+          body.moveTo(-60, VH + 60);
+          for (let x = -60; x <= VW + 60; x += 12)
+            body.lineTo(x, surfY(x) + 90);
+          body.lineTo(VW + 60, VH + 60);
+          body.closePath();
+          body.endFill();
+          cloudSeaG.addChild(body);
+          // a fluffy rolling top made of soft cloud puffs sitting on the surface
+          for (let x = -40; x <= VW + 80; x += 64) {
+            const c = spr(
+              'cloud',
+              x + (Math.random() - 0.5) * 22,
+              surfY(x) + 10,
+              0.5 + Math.random() * 0.3,
+              0.5,
+              0.5
+            );
+            c.tint = 0xf4f9fd;
+            cloudSeaG.addChild(c);
+          }
+          scene.addChild(cloudSeaG);
+          // a few nearer puffs drifting over the sea (reuse the cloud drift + day/night tint)
+          for (let i = 0; i < 3; i++) {
+            const c = spr(
+              'cloud',
+              Math.random() * VW,
+              486 + Math.random() * 40,
+              0.6 + Math.random() * 0.45,
+              0.5,
+              0.5
+            );
+            c.vx = 0.14 + Math.random() * 0.2;
+            clouds.push(c);
+            scene.addChild(c);
+          }
+          // a couple of eagles soaring lazily on the thermals over the cloud sea
+          for (let i = 0; i < 2; i++) {
+            const e = anim(['eagle'], 0, 0, 0.62 + i * 0.12, 0.05);
+            e.isSoar = true;
+            e.cx = 340 + i * 520 + Math.random() * 160;
+            e.cy = 290 + Math.random() * 130;
+            e.rx = 100 + Math.random() * 80;
+            e.ry = 26 + Math.random() * 20;
+            e.sp = 0.1 + Math.random() * 0.06;
+            e.ph = Math.random() * 6.28;
+            e.tint = 0x4a4030;
+            e.baseSc = Math.abs(e.scale.x);
+            e.x = e.cx + Math.cos(e.ph) * e.rx; // a sensible static spot for reduced motion
+            e.y = e.cy + Math.sin(e.ph) * e.ry;
+            if (reduce.matches) e.gotoAndStop(0);
+            flutters.push(e);
+            scene.addChild(e);
+          }
+        } else {
+          for (const hb of HILLS) hillBands.push(hb); // remembered so settling snow can thicken each crest over time
+          HILLS.forEach(([cy, am, ph], i) => {
+            const hh = hill(cy, am, BI.hills[i], ph);
+            hh.tint = hillTint;
+            scene.addChild(hh);
+          });
+        }
         if (BI.fog) {
           // distant haze softening the hills, behind the trees
           const fz = new PIXI.TilingSprite(T('fog'), VW + 120, 120);
@@ -2151,14 +2317,16 @@
         // puddles collect on the foreground after rain (behind the animals); drawn each frame, sized by wetness
         puddleG = new PIXI.Graphics();
         scene.addChild(puddleG);
-        for (let i = 0; i < 5; i++) {
-          const px = 60 + Math.random() * (VW - 120);
-          puddles.push({
-            x: px,
-            y: (BI.water ? 566 : 612) + Math.random() * 26,
-            r: 26 + Math.random() * 30
-          });
-        }
+        if (!BI.cloudSea)
+          // no puddles on the cloud sea
+          for (let i = 0; i < 5; i++) {
+            const px = 60 + Math.random() * (VW - 120);
+            puddles.push({
+              x: px,
+              y: (BI.water ? 566 : 612) + Math.random() * 26,
+              r: 26 + Math.random() * 30
+            });
+          }
         // settling snow that deepens while it falls and melts afterwards (drawn each frame from snowAcc)
         snowAccG = new PIXI.Graphics();
         scene.addChild(snowAccG);
@@ -3119,7 +3287,7 @@
           }
           // (2) snow piling up on the open foreground
           snowAccG.clear();
-          if (snowAcc > 0.02) {
+          if (snowAcc > 0.02 && !BI.cloudSea) {
             if (!BI.water) {
               // dry biome: a blanket rising across the whole foreground
               const topY = VH - 26 - snowAcc * 158;
@@ -3496,6 +3664,7 @@
           if (c.x - c.width > VW) c.x = -c.width;
           else if (c.x + c.width < 0) c.x = VW + c.width;
         }
+        if (cloudSeaG) cloudSeaG.y = Math.sin(t * 0.3) * 4; // the cloud sea breathes slowly
         // fog drifts on the breeze (each layer at its own pace for parallax)
         for (const fz of fogLayers)
           fz.tilePosition.x -= (fz.spd + wind * fz.windF * 0.25) * dt;
@@ -4098,6 +4267,14 @@
               f.x = -80;
               f.y = 120 + Math.random() * 80;
             }
+            continue;
+          }
+          if (f.isSoar) {
+            // a lazy thermal circle over the cloud sea, facing into the turn
+            const a = t * f.sp + f.ph;
+            f.x = f.cx + Math.cos(a) * f.rx;
+            f.y = f.cy + Math.sin(a) * f.ry;
+            f.scale.x = (Math.sin(a) > 0 ? -1 : 1) * f.baseSc;
             continue;
           }
           if (f.isButterfly) {
