@@ -970,6 +970,7 @@
         'pine_snow',
         'oak_snow',
         'bush',
+        'bush_snow',
         'grass',
         'flower_p',
         'flower_w',
@@ -2031,7 +2032,7 @@
         // in a snowy scene, lay a snow sprite over each pine/oak as a child, so it settles on the
         // branches and sways with the tree; its alpha tracks how much snow has piled up
         const snowCap = (t, n) => {
-          if (snow && (n === 'pine' || n === 'oak')) {
+          if (snow && (n === 'pine' || n === 'oak' || n === 'bush')) {
             const ov = new PIXI.Sprite(T(n + '_snow'));
             ov.anchor.set(0.5, 1); // same registration as the tree, so it overlays exactly
             ov.alpha = 0;
