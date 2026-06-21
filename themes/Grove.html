@@ -2100,9 +2100,38 @@
             snowTrees.push(ov);
           }
         };
+        // vary which trees fill a stand and how many, drawing only on the types this biome already
+        // uses (so it stays in character): swap some slots, thin out or add the odd extra
+        const treePool = [
+          ...new Set(
+            [...BI.mid, ...BI.near].map((e) => e[0]).filter((n) => !RIGID[n])
+          )
+        ];
+        const varyLayer = (layer) => {
+          if (!treePool.length || !layer.length) return layer.slice();
+          const sc = layer.map((e) => e[1]),
+            sMin = Math.min(...sc),
+            sMax = Math.max(...sc),
+            out = [];
+          for (const [n, s, x] of layer) {
+            if (!RIGID[n] && Math.random() < 0.1) continue; // thin out now and then
+            const nn =
+              !RIGID[n] && Math.random() < 0.45
+                ? treePool[(Math.random() * treePool.length) | 0]
+                : n;
+            out.push([nn, s, x]);
+          }
+          if (Math.random() < 0.5)
+            out.push([
+              treePool[(Math.random() * treePool.length) | 0],
+              sMin + Math.random() * (sMax - sMin),
+              60 + Math.random() * (VW - 120)
+            ]); // one extra, tucked in among the rest
+          return out;
+        };
         // jitter every tree's spot, size and facing per build so a stand never repeats exactly
         const midPh = Math.random() * 6.283;
-        for (const [n, sc, x] of BI.mid) {
+        for (const [n, sc, x] of varyLayer(BI.mid)) {
           const jx = x + (Math.random() - 0.5) * 70,
             t = spr(
               n,
@@ -2117,7 +2146,7 @@
             swayers.push({s: t, amp: 0.012, sp: 0.7, ph: Math.random() * 6});
           snowCap(t, n);
         }
-        for (const [n, sc, x] of BI.near) {
+        for (const [n, sc, x] of varyLayer(BI.near)) {
           const jx = x + (Math.random() - 0.5) * 64,
             t = spr(n, jx, groundY(jx) + 4, sc * (0.86 + Math.random() * 0.26));
           t.tint = BI.interior ? 0xffffff : folTint;
