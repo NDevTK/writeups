@@ -101,13 +101,18 @@
       const root = new PIXI.Container();
       app.stage.addChild(root);
       const OVERSCAN = 1.05; // a little zoom so parallax layer shifts never reveal the page behind
+      const PAR_V = 10; // vertical foreground parallax travel (design px) to keep below the fold
       function fit() {
+        // cover the display, then anchor the FOREGROUND (ground + water) to the bottom rather than
+        // centring — the water sits at the very bottom of the design, so centring always clipped it
+        // (even on a 16:9 laptop, by the overscan). Anchoring the bottom keeps the water fully in
+        // view on any shape of screen; the slack crops the sky at the top instead, which is filler.
         const s =
           Math.max(app.screen.width / VW, app.screen.height / VH) * OVERSCAN;
         root.scale.set(s);
         root.position.set(
-          (app.screen.width - VW * s) / 2,
-          (app.screen.height - VH * s) / 2
+          (app.screen.width - VW * s) / 2, // centre horizontally (overscan leaves parallax margin)
+          app.screen.height - (VH - PAR_V) * s // anchor the water to the bottom (a few px of margin for parallax)
         );
       }
       app.renderer.on('resize', fit);
