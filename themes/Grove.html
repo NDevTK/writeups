@@ -1392,6 +1392,7 @@
         dragons = [],
         fireflies = [],
         dewdrops = [],
+        murmur = [],
         lilies = [],
         weather = [],
         rainDrops = [],
@@ -1423,6 +1424,7 @@
         veil,
         glit,
         reflLayer,
+        murmurC,
         rainG,
         overcastG,
         rainbowG,
@@ -1475,6 +1477,7 @@
           dragons.length =
           fireflies.length =
           dewdrops.length =
+          murmur.length =
           lilies.length =
           weather.length =
           smoke.length =
@@ -1613,6 +1616,39 @@
             farLayer.addChild(fb);
           }
         flockT = 8 + Math.random() * 14;
+
+        // dusk murmuration: a cloud of starlings wheels and boils over the horizon before they
+        // roost. Built as dark specks on the far sky; a dusk factor fades it in (set pre-veil so
+        // it's right under reduced motion), and the swirl itself is driven from the ticker.
+        murmurC = null;
+        if (!BI.interior && !BI.underwater && !BI.canopy) {
+          murmurC = new PIXI.Container();
+          murmurC.alpha = 0;
+          farLayer.addChild(murmurC);
+          for (let i = 0; i < 56; i++) {
+            const b = spr(
+              'bird_a',
+              0,
+              0,
+              0.1 + Math.random() * 0.055,
+              0.5,
+              0.5
+            );
+            b.tint = 0x2c333f;
+            b.a0 = Math.random() * 6.283; // its fixed angle within the cloud
+            b.r0 = Math.sqrt(Math.random()); // sqrt fills the disk evenly to the rim
+            b.wob = Math.random() * 6.283;
+            b.ws = 0.8 + Math.random() * 0.9;
+            // a static blob, in case the swirl ticker doesn't run (reduced motion)
+            b.x = VW * 0.5 + Math.cos(b.a0) * b.r0 * 150;
+            b.y = 200 + Math.sin(b.a0) * b.r0 * 58;
+            murmur.push(b);
+            murmurC.addChild(b);
+          }
+          if (reduce.matches)
+            murmurC.alpha =
+              Math.exp(-Math.pow((nowHour() - 18.1) / 0.95, 2)) * 0.85;
+        }
 
         // ---- scene (everything that night darkens) ----
         scene = new PIXI.Container();
@@ -3531,6 +3567,12 @@
         // dew sparkles strongest at first light and dries off as the sun climbs; a clear night beads more
         dewdrops.dl.alpha =
           Math.exp(-Math.pow((h - 6.2) / 1.0, 2)) * (1 - cover * 0.7);
+        // the murmuration gathers as the sun goes down and is gone by full dark / daylight
+        if (murmur.length)
+          murmurC.alpha =
+            Math.exp(-Math.pow((h - 18.1) / 0.95, 2)) *
+            (1 - cover * 0.45) *
+            0.92;
         for (const c of clouds) {
           c.tint = hexI(
             lpH(
@@ -4622,6 +4664,30 @@
           if (f.x < 20 || f.x > VW - 20) f.vx *= -1;
           if (f.y < f.lo || f.y > f.hi) f.vy *= -1;
         }
+        // murmuration: the whole cloud wanders, wheels, breathes and shears while a density wave
+        // sweeps round it — so the shape boils and never settles, the way a starling flock does
+        if (murmur.length && murmurC.alpha > 0.01) {
+          const cx =
+              VW * 0.5 +
+              Math.sin(t * 0.11) * VW * 0.33 +
+              Math.sin(t * 0.05 + 1) * 90,
+            cy = 178 + Math.sin(t * 0.15 + 0.5) * 44 + Math.sin(t * 0.23) * 16,
+            rot = t * 0.2,
+            stretch = 1.5 + 0.7 * Math.sin(t * 0.31),
+            breathe = 74 + 26 * Math.sin(t * 0.47),
+            shear = Math.sin(t * 0.26) * 0.55;
+          for (const b of murmur) {
+            const wave = 1 + 0.34 * Math.sin(b.a0 * 2.5 - t * 1.5), // dark bands sweep round
+              rr = b.r0 * breathe * wave,
+              ang = b.a0 + rot;
+            let ox = Math.cos(ang) * rr * stretch,
+              oy = Math.sin(ang) * rr * 0.62;
+            oy += ox * shear;
+            b.x = cx + ox + Math.sin(t * b.ws + b.wob) * 3;
+            b.y = cy + oy + Math.cos(t * b.ws + b.wob) * 2.4;
+          }
+        }
+
         // migrating flock: crosses the sky now and then, holding a loose V behind the lead
         if (flock.length) {
           const lead = flock[0];
