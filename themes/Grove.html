@@ -392,6 +392,7 @@
           owl: true, // an owl hunts the meadow after dark
           hedgehog: true, // a hedgehog snuffles the floor at night
           snail: true, // a snail glides out onto the wet grass after rain
+          ladybird: true, // a ladybird trundles the meadow floor by day
           flyer: 0xffffff,
           flutter: true,
           bee: 2, // bumblebees work the wildflowers by day
@@ -882,6 +883,7 @@
           owl: true, // an owl crosses the orchard after dark
           hedgehog: true, // a hedgehog snuffles the orchard floor at night
           snail: true, // a snail glides out across the wet orchard floor after rain
+          ladybird: true, // a ladybird trundles the orchard floor by day
           flyer: 0xffffff,
           flutter: true,
           flutterTint: 0xffbcdb, // soft pink blossom butterflies
@@ -1002,6 +1004,7 @@
           hopper: null,
           squirrel: true, // a squirrel forages among the toadstools
           snail: true, // a snail glides the damp leaf-litter after rain
+          ladybird: true, // a ladybird trundles the leaf-litter by day
           perchBird: true, // a songbird perches among the boughs
           flyer: 0x3a4a55,
           flutter: false,
@@ -1083,6 +1086,7 @@
         'arctic_fox',
         'lizard_b',
         'beetle',
+        'ladybird',
         'snail',
         'monarch_a',
         'monarch_b',
@@ -3311,16 +3315,21 @@
           kinkajou.pauseT = Math.random() * 2;
           scene.addChild(kinkajou);
         } else kinkajou = null;
-        if (BI.beetle && Math.random() < 0.7) {
+        if ((BI.beetle || BI.ladybird) && Math.random() < 0.7) {
           // a beetle scuttles the ground, pausing to forage and turning back at the edges — but in
-          // the desert and canyon a scorpion takes the night shift
+          // the desert and canyon a scorpion takes the night shift, and the temperate meadows a ladybird
           const scorp = BI.scorpion && buildNight > 0.5;
+          const bug = scorp ? 'scorpion' : BI.ladybird ? 'ladybird' : 'beetle';
           const bx = 120 + Math.random() * (VW - 240);
           beetle = spr(
-            scorp ? 'scorpion' : 'beetle',
+            bug,
             bx,
             groundY(bx) + 4,
-            scorp ? 0.3 + Math.random() * 0.1 : 0.2 + Math.random() * 0.08
+            scorp
+              ? 0.3 + Math.random() * 0.1
+              : BI.ladybird
+                ? 0.2 + Math.random() * 0.06
+                : 0.2 + Math.random() * 0.08
           );
           beetle.baseSc = Math.abs(beetle.scale.x);
           beetle.dir = Math.random() < 0.5 ? 1 : -1;
