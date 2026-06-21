@@ -1601,16 +1601,102 @@ save(
   84
 );
 
+// willow — a weeping form for the water's edge, with a curtain of drooping fronds
+save(
+  'willow',
+  S(
+    '160 200',
+    `<defs><linearGradient id="wil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fc857"/><stop offset="1" stop-color="#5a9438"/></linearGradient></defs>
+<rect x="72" y="116" width="14" height="84" rx="4" fill="#6b4a30"/>
+<ellipse cx="79" cy="72" rx="60" ry="38" fill="url(#wil)"/>
+<g fill="none" stroke-linecap="round">
+<g stroke="#6ba33f" stroke-width="5">
+<path d="M30,80 C28,106 31,130 28,156"/><path d="M46,94 C44,122 47,148 44,174"/><path d="M62,102 C60,132 63,160 60,186"/><path d="M79,104 C77,136 80,164 78,190"/><path d="M96,102 C98,132 95,160 98,186"/><path d="M112,94 C114,122 111,148 114,174"/><path d="M128,80 C130,106 127,130 130,156"/></g>
+<g stroke="#a6d165" stroke-width="2.5" opacity="0.6"><path d="M38,86 C36,110 39,132 37,154"/><path d="M70,104 C68,134 71,160 69,184"/><path d="M104,98 C106,126 103,150 105,176"/></g></g>`
+  ),
+  135
+);
+save(
+  'willow_snow',
+  S(
+    '160 200',
+    `<path fill="#e7eff9" d="M24,72 C30,52 52,40 79,40 C106,40 128,52 134,72 C124,62 110,62 100,70 C90,58 70,58 60,70 C50,62 34,62 24,72 Z"/>
+<path fill="#ffffff" opacity="0.7" d="M48,52 C62,44 96,44 110,52 C98,48 86,52 79,58 C72,52 60,48 48,52 Z"/>`
+  ),
+  135
+);
+
+// dead snag — a bare, weathered standing trunk for a bit of character (good year-round)
+save(
+  'snag',
+  S(
+    '120 210',
+    `<g fill="none" stroke-linecap="round" stroke-linejoin="round">
+<path d="M52,208 C50,150 53,96 59,46" stroke="#9a8a72" stroke-width="13"/>
+<path d="M53,200 C51,150 54,98 59,50" stroke="#bcad92" stroke-width="5"/>
+<g stroke="#9a8a72" stroke-width="6"><path d="M56,98 C44,86 36,76 26,68"/><path d="M58,74 C70,64 78,54 88,48"/><path d="M55,130 C45,122 39,114 32,102"/><path d="M59,58 C58,46 60,36 64,26"/></g>
+<g stroke="#9a8a72" stroke-width="3.5"><path d="M30,70 C24,64 20,58 17,50"/><path d="M86,50 C92,44 96,38 98,30"/><path d="M33,104 C28,98 25,92 23,84"/></g></g>`
+  ),
+  105
+);
+
+// flowering shrub — a denser, blossom-flecked bush variant
+save(
+  'shrub',
+  S(
+    '160 92',
+    `<defs><radialGradient id="shr" gradientUnits="userSpaceOnUse" cx="60" cy="34" r="92"><stop offset="0" stop-color="#7eba48"/><stop offset="1" stop-color="#316a1e"/></radialGradient></defs>
+<g fill="url(#shr)"><ellipse cx="38" cy="66" rx="32" ry="17"/><ellipse cx="84" cy="68" rx="40" ry="19"/><ellipse cx="126" cy="66" rx="30" ry="16"/><circle cx="52" cy="50" r="22"/><circle cx="92" cy="46" r="25"/><circle cx="124" cy="52" r="18"/></g>
+<g fill="#f6e9f0"><circle cx="44" cy="46" r="3.4"/><circle cx="64" cy="40" r="3"/><circle cx="86" cy="38" r="3.4"/><circle cx="106" cy="44" r="3"/><circle cx="120" cy="52" r="3"/><circle cx="34" cy="60" r="3"/><circle cx="74" cy="56" r="3"/><circle cx="100" cy="58" r="3.2"/></g>
+<g fill="#e6b0c8"><circle cx="54" cy="52" r="2"/><circle cx="94" cy="48" r="2"/><circle cx="116" cy="58" r="1.8"/></g>`
+  ),
+  140
+);
+
+// poppy — broad red petals with a dark heart, a distinct bloom from the round flower
+save(
+  'poppy',
+  S(
+    '40 60',
+    `<path d="M20,58 C18,46 19,38 20,26" stroke="#4f8a35" stroke-width="2.5" fill="none"/>
+<g fill="#e0392f"><ellipse cx="20" cy="13" rx="9" ry="8"/><ellipse cx="12" cy="20" rx="8" ry="7"/><ellipse cx="28" cy="20" rx="8" ry="7"/><ellipse cx="20" cy="25" rx="9" ry="6"/></g>
+<g fill="#c22b22" opacity="0.5"><ellipse cx="13" cy="20" rx="5" ry="4"/><ellipse cx="27" cy="20" rx="5" ry="4"/></g>
+<circle cx="20" cy="19" r="4.2" fill="#241410"/>
+<g fill="#3a241a"><circle cx="17" cy="17" r="1"/><circle cx="23" cy="17" r="1"/><circle cx="20" cy="21.5" r="1"/></g>`
+  ),
+  44
+);
+
+// female mallard — mottled brown plumage, brown head, orange bill (a real plumage, not a tint)
+save(
+  'duck_f',
+  S(
+    '170 116',
+    `<defs><linearGradient id="dfb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c6a675"/><stop offset="1" stop-color="#7e5e3c"/></linearGradient>
+<linearGradient id="dfh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ad8c5e"/><stop offset="1" stop-color="#6d5232"/></linearGradient></defs>
+<path d="M32,74 C22,70 14,62 12,54 C20,60 28,68 38,78 Z" fill="#7e5e3c"/>
+<path d="M18,57 C12,53 10,56 13,61 C16,63 19,60 18,57 Z" fill="#33271a"/>
+<path d="M30,80 C24,58 50,50 80,52 C108,54 124,64 124,76 C124,90 98,98 70,96 C48,94 36,94 30,80 Z" fill="url(#dfb)"/>
+<g stroke="#5e442a" stroke-width="2" fill="none" opacity="0.45" stroke-linecap="round"><path d="M44,70 C54,68 64,68 72,70"/><path d="M50,80 C62,78 76,78 88,80"/><path d="M60,88 C72,87 86,87 98,88"/></g>
+<path d="M66,74 C80,69 92,70 100,75 C92,82 78,84 68,80 Z" fill="#5a6b86" opacity="0.65"/>
+<path d="M106,68 C110,50 118,40 128,38 C139,36 145,45 142,55 C139,66 128,71 118,73 C112,74 108,74 106,68 Z" fill="url(#dfh)"/>
+<path d="M112,52 C122,50 132,50 140,53" stroke="#4a3820" stroke-width="2.4" fill="none"/>
+<path d="M140,51 C153,49 159,53 156,58 C153,62 143,61 138,58 Z" fill="#c98a3e"/>
+<circle cx="131" cy="49" r="2.6" fill="#111"/><circle cx="132" cy="48" r="0.8" fill="#fff"/>`
+  ),
+  160
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'birch',
-  'fir',
-  'poplar',
+  'willow',
+  'snag',
+  'shrub',
+  'poppy',
+  'duck_f',
+  'duck',
   'flower_y',
-  'flower_b',
-  'tulip',
-  'swallow_a',
-  'swallow_b'
+  'tulip'
 ];
 const cols = 4,
   cell = 230,

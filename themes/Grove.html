@@ -371,7 +371,7 @@
             ['oak', 1.1, 900],
             ['bush', 1, 1150]
           ],
-          treeExtras: ['birch', 'fir', 'poplar'], // mixed into the stand by the variety system
+          treeExtras: ['birch', 'fir', 'poplar', 'willow', 'snag'], // mixed into the stand by the variety system
           water: {
             top: '#5fa7ca',
             bot: '#2f6f93',
@@ -510,6 +510,7 @@
             ['reed', 1.12, 880],
             ['reed', 0.88, 1160]
           ],
+          treeExtras: ['willow'], // the odd willow leaning over the marsh
           water: {
             top: '#5f9e86',
             bot: '#356b58',
@@ -1010,6 +1011,12 @@
         'birch_snow',
         'fir_snow',
         'poplar_snow',
+        'willow',
+        'willow_snow',
+        'snag',
+        'shrub',
+        'poppy',
+        'duck_f',
         'grass',
         'flower_p',
         'flower_w',
@@ -1693,13 +1700,19 @@
         if (!BI.interior && !BI.underwater && !BI.canopy && !BI.glade)
           // a clear-ish sky some visits, a busier one others
           for (let i = 0, n = 1 + ((Math.random() * 6) | 0); i < n; i++) {
-            const c = spr(
-              'cloud',
-              Math.random() * VW,
-              60 + Math.random() * 150,
-              0.5 + Math.random() * 0.5,
-              0.5,
-              0.5
+            const sc = 0.5 + Math.random() * 0.5,
+              c = spr(
+                'cloud',
+                Math.random() * VW,
+                60 + Math.random() * 150,
+                sc,
+                0.5,
+                0.5
+              );
+            // squash/stretch and flip each one so no two puffs are the same shape
+            c.scale.set(
+              sc * (0.8 + Math.random() * 0.5) * (Math.random() < 0.5 ? -1 : 1),
+              sc * (0.78 + Math.random() * 0.34)
             );
             c.vx = 0.12 + Math.random() * 0.22;
             clouds.push(c);
@@ -2131,7 +2144,8 @@
           bush: 1,
           birch: 1,
           fir: 1,
-          poplar: 1
+          poplar: 1,
+          willow: 1
         };
         const snowCap = (t, n) => {
           if (snow && SNOWABLE[n]) {
@@ -2270,8 +2284,23 @@
               'flower_w',
               'flower_y',
               'flower_b',
-              'tulip'
+              'tulip',
+              'poppy'
             ];
+            // the odd flowering shrub dotted about the meadow
+            for (let i = 0, n = (Math.random() * 3) | 0; i < n; i++) {
+              const x = 80 + Math.random() * (VW - 160),
+                sh = spr(
+                  'shrub',
+                  x,
+                  groundY(x) + 8,
+                  0.32 + Math.random() * 0.22
+                );
+              sh.tint = tintJit(folTint, 0.1);
+              if (Math.random() < 0.5) sh.scale.x *= -1;
+              scene.addChild(sh);
+              swayers.push({s: sh, amp: 0.022, sp: 1, ph: Math.random() * 6});
+            }
             for (let i = 0, n = 6 + ((Math.random() * 8) | 0); i < n; i++) {
               const x = 60 + Math.random() * (VW - 120),
                 f = spr(
@@ -2889,12 +2918,13 @@
               lilies.push(fr);
             }
           if (BI.water.ducks) {
-            const dm = spr('duck', 250 + Math.random() * 760, 656, 0.6);
+            // the female (mottled brown) tends the brood; the drake (green head) is the second bird
+            const dm = spr('duck_f', 250 + Math.random() * 760, 656, 0.6);
             dm.baseY = dm.y;
             dm.baseSpd = 0.3 + Math.random() * 0.3;
             dm.vx = dm.baseSpd;
             dm.kids = [];
-            dm.ref = spr('duck', 380, 0, 0.6);
+            dm.ref = spr('duck_f', 380, 0, 0.6);
             dm.ref.scale.y = -0.6;
             dm.ref.alpha = 0.28;
             dm.ref.tint = 0x6f8ea0;
