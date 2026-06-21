@@ -1778,16 +1778,86 @@ const fawnSvg = (lf) =>
 save('fawn_a', fawnSvg([0, 0, 0, 0]), 150);
 save('fawn_b', fawnSvg([6, -5, -5, 6]), 150);
 
+// ======== DESERT detail ========
+// a barrel cactus crowned with bloom
+save(
+  'barrel_cactus',
+  S(
+    '70 84',
+    `<defs><linearGradient id="bcg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4e8038"/><stop offset="0.5" stop-color="#78a850"/><stop offset="1" stop-color="#44742e"/></linearGradient></defs>
+<ellipse cx="35" cy="78" rx="20" ry="4" fill="#7a5a2e" opacity="0.2"/>
+<path d="M15,76 C11,42 18,20 35,20 C52,20 59,42 55,76 Z" fill="url(#bcg)"/>
+<g stroke="#3f6a2e" stroke-width="1.6" fill="none" opacity="0.45"><path d="M25,72 C22,46 25,30 29,22"/><path d="M35,74 L35,21"/><path d="M45,72 C48,46 45,30 41,22"/><path d="M20,66 C18,46 20,32 24,24"/><path d="M50,66 C52,46 50,32 46,24"/></g>
+<g stroke="#eee6c8" stroke-width="1.1" stroke-linecap="round" opacity="0.7"><path d="M21,44 l-3,-1"/><path d="M30,38 l0,-3"/><path d="M40,38 l0,-3"/><path d="M49,44 l3,-1"/><path d="M24,58 l-3,0"/><path d="M46,58 l3,0"/></g>
+<g fill="#ef5f92"><ellipse cx="35" cy="16" rx="5" ry="6"/><ellipse cx="29" cy="19" rx="4.5" ry="5"/><ellipse cx="41" cy="19" rx="4.5" ry="5"/><ellipse cx="32" cy="14" rx="4" ry="5"/><ellipse cx="38" cy="14" rx="4" ry="5"/></g>
+<circle cx="35" cy="17" r="2.6" fill="#f6cf52"/>`
+  ),
+  60
+);
+// a bleached longhorn skull
+save(
+  'skull',
+  S(
+    '74 58',
+    `<path d="M22,22 C22,9 31,4 37,4 C43,4 52,9 52,22 C52,30 48,37 41,41 L43,54 L37,48 L31,54 L33,41 C26,37 22,30 22,22 Z" fill="#ece6d6"/>
+<path d="M37,4 C31,4 22,9 22,22 C24,16 30,12 37,12 C44,12 50,16 52,22 C52,9 43,4 37,4 Z" fill="#f6f2e6" opacity="0.55"/>
+<g fill="#39332a"><ellipse cx="30" cy="24" rx="4.5" ry="5.5"/><ellipse cx="44" cy="24" rx="4.5" ry="5.5"/></g>
+<path d="M35,32 L39,32 L37,40 Z" fill="#39332a"/>
+<path d="M22,20 C9,15 2,19 5,26 C9,23 17,23 24,26 Z" fill="#dcd4c0"/>
+<path d="M52,20 C65,15 72,19 69,26 C65,23 57,23 50,26 Z" fill="#dcd4c0"/>`
+  ),
+  64
+);
+
+// ======== COAST detail ========
+// a fan scallop shell
+save(
+  'shell',
+  S(
+    '40 34',
+    `<defs><linearGradient id="shl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6e0cc"/><stop offset="1" stop-color="#e2b89a"/></linearGradient></defs>
+<path d="M20,31 C7,29 3,15 7,7 C10,12 14,9 17,7 C18,5 22,5 23,7 C26,9 30,12 33,7 C37,15 33,29 20,31 Z" fill="url(#shl)"/>
+<g stroke="#cf9e7e" stroke-width="1.2" fill="none" stroke-linecap="round"><path d="M20,29 L20,8"/><path d="M20,29 L13,11"/><path d="M20,29 L27,11"/><path d="M20,29 L9,16"/><path d="M20,29 L31,16"/></g>
+<ellipse cx="20" cy="30" rx="5" ry="3" fill="#d8a584"/>`
+  ),
+  40
+);
+// a spiral conch
+save(
+  'conch',
+  S(
+    '46 42',
+    `<defs><linearGradient id="cnc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7ecda"/><stop offset="1" stop-color="#e7a892"/></linearGradient></defs>
+<path d="M10,32 C4,22 9,8 24,8 C37,8 43,19 40,29 C37,37 28,39 22,36 C29,35 33,28 31,22 C29,16 21,15 17,21 C14,26 18,33 24,33 C18,37 13,36 10,32 Z" fill="url(#cnc)"/>
+<path d="M24,8 C31,11 35,17 33,23 C31,17 22,15 17,21 C20,13 27,12 24,8 Z" fill="#d98876" opacity="0.5"/>
+<g fill="#eaa08e" opacity="0.6"><circle cx="22" cy="14" r="1.5"/><circle cx="31" cy="20" r="1.3"/><circle cx="14" cy="24" r="1.2"/></g>`
+  ),
+  44
+);
+// a weathered piece of driftwood
+save(
+  'driftwood',
+  S(
+    '112 38',
+    `<defs><linearGradient id="dw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c6baa6"/><stop offset="1" stop-color="#8e8270"/></linearGradient></defs>
+<path d="M8,24 C30,18 60,16 92,18 C102,18 106,22 102,26 C82,30 40,30 14,30 C8,30 6,26 8,24 Z" fill="url(#dw)"/>
+<g stroke="#7a6e5c" stroke-width="1" fill="none" opacity="0.5"><path d="M16,24 C40,22 70,22 98,24"/><path d="M22,28 C46,27 70,27 94,28"/></g>
+<path d="M92,18 C100,13 106,15 106,21 C102,19 96,19 92,22 Z" fill="#b2a690"/>
+<ellipse cx="12" cy="26" rx="4.4" ry="4.4" fill="#9a8e7a"/><ellipse cx="12" cy="26" rx="2" ry="2.4" fill="#7a6e5c"/>`
+  ),
+  100
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'fawn_a',
-  'fawn_b',
-  'deer_a',
-  'toadstool',
-  'log',
-  'stump',
-  'berrybush',
-  'willow'
+  'barrel_cactus',
+  'skull',
+  'cactus',
+  'shell',
+  'conch',
+  'driftwood',
+  'starfish',
+  'crab'
 ];
 const cols = 4,
   cell = 230,
