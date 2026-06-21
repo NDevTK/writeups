@@ -2638,16 +2638,34 @@ const ruddSvg = (tf) =>
 save('rudd_a', ruddSvg(0), 112);
 save('rudd_b', ruddSvg(7), 112);
 
+// ======== an octopus — creeps the reef floor at night, big-eyed, arms curling (faces right) ========
+save(
+  'octopus',
+  S(
+    '116 92',
+    `<defs><radialGradient id="oct" cx="44%" cy="34%"><stop offset="0" stop-color="#d6694a"/><stop offset="1" stop-color="#963e26"/></radialGradient></defs>
+<g stroke="#a8472c" stroke-width="6.5" fill="none" stroke-linecap="round"><path d="M44,56 C33,70 23,78 11,79 C20,73 27,66 31,57"/><path d="M52,60 C48,76 42,86 31,89"/><path d="M62,61 C62,79 60,88 53,90"/><path d="M72,58 C78,74 86,83 97,86"/><path d="M78,52 C89,63 99,68 108,67"/></g>
+<g stroke="#8a3620" stroke-width="2" stroke-linecap="round" opacity="0.5"><path d="M30,62 l4,1"/><path d="M40,74 l4,0"/><path d="M84,76 l4,-1"/><path d="M94,66 l4,0"/></g>
+<ellipse cx="60" cy="40" rx="27" ry="25" fill="url(#oct)"/>
+<ellipse cx="51" cy="29" rx="9" ry="6.5" fill="#e88e6c" opacity="0.5"/>
+<g fill="#7a3018" opacity="0.4"><circle cx="66" cy="46" r="2.6"/><circle cx="55" cy="50" r="2.1"/><circle cx="72" cy="36" r="2.1"/><circle cx="48" cy="38" r="1.8"/></g>
+<ellipse cx="49" cy="42" rx="7" ry="6" fill="#f2e4c6"/><ellipse cx="72" cy="42" rx="7" ry="6" fill="#f2e4c6"/>
+<ellipse cx="50" cy="43" rx="3" ry="4" fill="#16100a"/><ellipse cx="71" cy="43" rx="3" ry="4" fill="#16100a"/>
+<circle cx="51.5" cy="41" r="1" fill="#fff"/><circle cx="72.5" cy="41" r="1" fill="#fff"/>`
+  ),
+  108
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'moorhen',
-  'duck',
-  'duck_f',
-  'wood_duck',
+  'octopus',
+  'turtle',
+  'jelly2_a',
+  'clownfish_a',
+  'angelfish_a',
   'rudd_a',
-  'fish_a',
-  'koi_a',
-  'duckling'
+  'crab',
+  'anemone'
 ];
 const cols = 4,
   cell = 230,
