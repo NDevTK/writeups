@@ -1111,6 +1111,7 @@
         'moorhen',
         'rudd_a',
         'rudd_b',
+        'octopus',
         'grass',
         'flower_p',
         'flower_w',
@@ -1682,6 +1683,7 @@
         fennec,
         aardvark,
         kinkajou,
+        octopus,
         seal,
         roadrunner,
         whale,
@@ -1756,6 +1758,7 @@
           fennec =
           aardvark =
           kinkajou =
+          octopus =
             null;
         whale = spoutG = surfG = cloudSeaG = cloudGlow = choughHub = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
@@ -3837,6 +3840,29 @@
             motes.push(m);
             scene.addChild(m);
           }
+          // after dark the water comes alive with bioluminescent plankton — glowing specks that
+          // bloom and fade as they drift, brightest where it's darkest
+          if (buildNight > 0.5)
+            for (let i = 0, n = 70 + ((Math.random() * 40) | 0); i < n; i++) {
+              const m = spr(
+                'glow',
+                Math.random() * VW,
+                Math.random() * VH,
+                0.03 + Math.random() * 0.055,
+                0.5,
+                0.5
+              );
+              m.tint = Math.random() < 0.5 ? 0x6ff0e0 : 0x8affc8; // cyan-green glow
+              m.blendMode = PIXI.BLEND_MODES.ADD;
+              m.bio = true;
+              m.baseA = 0.3 + Math.random() * 0.55;
+              m.alpha = 0;
+              m.tw = 0.5 + Math.random() * 1.4; // each twinkles at its own rate
+              m.ph = Math.random() * 6.28;
+              m.vy = 0.03 + Math.random() * 0.09; // drifts very slowly
+              motes.push(m);
+              scene.addChild(m);
+            }
           // schools of reef fish roaming the whole water column
           const tints = [0xffcf5a, 0xff8a4a, 0x66c8e0, 0xe87a9a, 0xa6e060];
           const schools = Math.max(1, Math.round(R.fish / 4));
@@ -3924,6 +3950,23 @@
             turtle.dir = 1;
             turtle.tmr = 5 + Math.random() * 8;
             scene.addChild(turtle);
+          }
+          // an octopus emerges after dark and creeps the reef floor, pausing to feel about
+          if (buildNight > 0.5 && Math.random() < 0.7) {
+            const ox = 160 + Math.random() * (VW - 320);
+            octopus = spr(
+              'octopus',
+              ox,
+              groundY(ox) + 6,
+              0.42 + Math.random() * 0.14
+            );
+            octopus.baseSc = Math.abs(octopus.scale.x);
+            octopus.dir = Math.random() < 0.5 ? 1 : -1;
+            octopus.scale.x = octopus.dir * octopus.baseSc;
+            octopus.spd = 0.25 + Math.random() * 0.2; // a slow, deliberate crawl
+            octopus.pauseT = Math.random() * 2;
+            octopus.ph = Math.random() * 6.28;
+            scene.addChild(octopus);
           }
         }
 
@@ -5989,13 +6032,44 @@
             b.ph = Math.random() * 6.28;
           }
         }
-        // marine snow drifts slowly down, swaying, wrapping back to the top
+        // marine snow drifts slowly down, swaying, wrapping back to the top; bioluminescent
+        // plankton bloom and fade as they drift
         for (const m of motes) {
           m.y += m.vy * dt;
           m.x += Math.sin(t * 0.5 + m.ph) * 0.18 * dt;
+          if (m.bio)
+            m.alpha =
+              m.baseA * (0.35 + 0.65 * Math.max(0, Math.sin(t * m.tw + m.ph)));
           if (m.y > VH + 6) {
             m.y = -6;
             m.x = Math.random() * VW;
+          }
+        }
+        // an octopus creeps the reef floor in slow bursts, pausing to feel about with its arms
+        if (octopus) {
+          if (octopus.pauseT > 0) {
+            octopus.pauseT -= dt / 60; // settled, arms exploring
+            octopus.y =
+              groundY(octopus.x) + 6 + Math.sin(t * 1.6 + octopus.ph) * 0.8;
+            octopus.rotation = Math.sin(t * 1.2 + octopus.ph) * 0.03;
+          } else {
+            octopus.x += octopus.dir * octopus.spd * dt;
+            octopus.rotation = 0;
+            octopus.y =
+              groundY(octopus.x) + 6 + Math.abs(Math.sin(t * 3)) * -1.2; // a gliding crawl
+            if (octopus.x > VW - 130) {
+              octopus.dir = -1;
+              octopus.scale.x = -octopus.baseSc;
+            } else if (octopus.x < 130) {
+              octopus.dir = 1;
+              octopus.scale.x = octopus.baseSc;
+            }
+            if (Math.random() < 0.01 * dt)
+              octopus.pauseT = 1.5 + Math.random() * 3; // settle and feel about
+            else if (Math.random() < 0.003 * dt) {
+              octopus.dir = -octopus.dir;
+              octopus.scale.x = octopus.dir * octopus.baseSc;
+            }
           }
         }
         // jellyfish pulse (the 2-frame sprite) and drift up, swaying, wrapping at the surface
