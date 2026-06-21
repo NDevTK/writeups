@@ -1517,6 +1517,7 @@
         crestG,
         flashG,
         deer,
+        walkers = [],
         fox,
         rabbit,
         roller,
@@ -1542,8 +1543,6 @@
         BI,
         ready = false;
       let lastSkyH = -99,
-        deerMode = 'walk',
-        deerTimer = 5,
         foxTimer = 6,
         rollerTimer = 4,
         shoot = null,
@@ -2575,30 +2574,55 @@
           (TEMP_BASE[nowBiome()] ?? 9) +
           (BI.seasonal ? (SEASON_TEMP[nowSeason()] ?? 0) : 0); // seed near the climate so it doesn't have to thaw/freeze from 0
         iceAmt = snowing && BI.water && BI.water.freeze ? 0.45 : 0; // a frozen pond opens partly iced
+        walkers.length = 0;
         if (BI.walker) {
-          deer = anim(BI.walker, 300, groundY(300) + 8, BI.walkerScale, 0.12);
-          if (BI.walker.length > 1) deer.stop();
-          else deer.gotoAndStop(0);
-          deer.graze = BI.graze;
-          if (BI.walker[0] === 'heron') {
-            // a heron wades the shallows: mostly statue-still, the odd slow step, the odd strike
-            deer.isHeron = true;
-            deer.dir = 1;
-            deer.baseSc = Math.abs(deer.scale.x);
-            deer.x = 360 + Math.random() * 480;
-            deer.y = 602; // stand at the water's edge, not up on the bank
-            deer.fishTmr = 2 + Math.random() * 4;
-            deer.strike = 0;
-            deer.stepTarget = null;
-          } else {
-            // start somewhere different, facing either way, ambling at its own pace each visit
-            deer.dir = Math.random() < 0.5 ? 1 : -1;
-            deer.spd = 0.26 + Math.random() * 0.22;
-            deer.x = 160 + Math.random() * (VW - 320);
-            deer.y = groundY(deer.x) + 8;
-            deer.scale.x = deer.dir * Math.abs(deer.scale.x);
+          const heron = BI.walker[0] === 'heron';
+          // a lone grazer some visits, a small scattered herd others, an empty meadow now and then
+          // (the heron is always the single focal bird; non-grazers stay solitary)
+          const herd = heron
+            ? 1
+            : !BI.graze
+              ? 1
+              : Math.random() < 0.15
+                ? 0
+                : 1 +
+                  (Math.random() < 0.6 ? 1 : 0) +
+                  (Math.random() < 0.3 ? 1 : 0);
+          for (let k = 0; k < herd; k++) {
+            const d = anim(
+              BI.walker,
+              300,
+              groundY(300) + 8,
+              BI.walkerScale,
+              0.1 + Math.random() * 0.04 // each animates at its own pace
+            );
+            if (BI.walker.length > 1) d.stop();
+            else d.gotoAndStop(0);
+            d.graze = BI.graze;
+            if (heron) {
+              // a heron wades the shallows: mostly statue-still, the odd slow step, the odd strike
+              d.isHeron = true;
+              d.dir = 1;
+              d.baseSc = Math.abs(d.scale.x);
+              d.x = 360 + Math.random() * 480;
+              d.y = 602; // stand at the water's edge, not up on the bank
+              d.fishTmr = 2 + Math.random() * 4;
+              d.strike = 0;
+              d.stepTarget = null;
+            } else {
+              // each starts somewhere different, faces either way, ambles at its own pace
+              d.dir = Math.random() < 0.5 ? 1 : -1;
+              d.spd = 0.26 + Math.random() * 0.22;
+              d.x = 140 + Math.random() * (VW - 280);
+              d.y = groundY(d.x) + 8;
+              d.scale.x = d.dir * Math.abs(d.scale.x);
+              d.mode = 'walk';
+              d.timer = Math.random() * 5;
+            }
+            scene.addChild(d);
+            walkers.push(d);
           }
-          scene.addChild(deer);
+          deer = walkers[0] || null;
         } else deer = null;
         if (BI.critter) {
           fox = spr(BI.critter, -80, groundY(-80) + 6, BI.critterScale);
@@ -3944,7 +3968,7 @@
         }
 
         if (reduce.matches) {
-          if (deer) deer.gotoAndStop(0);
+          for (const d of walkers) if (d.totalFrames > 1) d.gotoAndStop(0);
           return;
         }
 
@@ -4206,34 +4230,37 @@
             }
           }
           deer.scale.x = deer.dir * deer.baseSc;
-        } else if (deer) {
-          const multi = deer.totalFrames > 1;
-          if (raining) {
-            if (multi) deer.gotoAndStop(0);
-            deer.y = groundY(deer.x) + 8;
-          } else {
-            deerTimer -= dt / 60;
-            if (!deer.graze) deerMode = 'walk';
-            if (deerMode === 'walk') {
-              deer.x += deer.dir * (deer.spd ?? 0.35) * dt;
-              if (multi && !deer.playing) deer.play();
-              if (deer.graze && deerTimer < 0) {
-                deerMode = 'graze';
-                deerTimer = 2.5 + Math.random() * 3;
-                if (multi) deer.gotoAndStop(0);
+        } else {
+          // the herd: each grazer keeps its own walk/graze state, so they don't move in lockstep
+          for (const d of walkers) {
+            const multi = d.totalFrames > 1;
+            if (raining) {
+              if (multi) d.gotoAndStop(0);
+              d.y = groundY(d.x) + 8;
+            } else {
+              d.timer -= dt / 60;
+              if (!d.graze) d.mode = 'walk';
+              if (d.mode === 'walk') {
+                d.x += d.dir * (d.spd ?? 0.35) * dt;
+                if (multi && !d.playing) d.play();
+                if (d.graze && d.timer < 0) {
+                  d.mode = 'graze';
+                  d.timer = 2.5 + Math.random() * 3;
+                  if (multi) d.gotoAndStop(0);
+                }
+              } else if (d.timer < 0) {
+                d.mode = 'walk';
+                d.timer = 5 + Math.random() * 6;
               }
-            } else if (deerTimer < 0) {
-              deerMode = 'walk';
-              deerTimer = 5 + Math.random() * 6;
+              if (d.dir > 0 && d.x > VW + 60) d.x = -60;
+              else if (d.dir < 0 && d.x < -60) d.x = VW + 60;
+              d.y =
+                groundY(d.x) +
+                8 +
+                (d.mode === 'walk' ? Math.abs(Math.sin(t * 4 + d.x)) * -2 : 0);
             }
-            if (deer.dir > 0 && deer.x > VW + 60) deer.x = -60;
-            else if (deer.dir < 0 && deer.x < -60) deer.x = VW + 60;
-            deer.y =
-              groundY(deer.x) +
-              8 +
-              (deerMode === 'walk' ? Math.abs(Math.sin(t * 4)) * -2 : 0);
+            dropTrack(d, 'deer', 30);
           }
-          dropTrack(deer, 'deer', 30);
         }
 
         // critter (fox / lizard / crab): trots across now and then
