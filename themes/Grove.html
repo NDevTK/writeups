@@ -1090,6 +1090,10 @@
         'hedgehog',
         'fennec',
         'scorpion',
+        'ocotillo',
+        'prickly_pear',
+        'cattail',
+        'marsh_marigold',
         'grass',
         'flower_p',
         'flower_w',
@@ -2501,6 +2505,33 @@
             if (Math.random() < 0.5) sk.scale.x *= -1;
             scene.addChild(sk);
           }
+          // the odd ocotillo fans its red-tipped canes up from the sand
+          for (let i = 0, n = (Math.random() * 2.4) | 0; i < n; i++) {
+            const x = 70 + Math.random() * (VW - 140),
+              oc = spr(
+                'ocotillo',
+                x,
+                groundY(x) + 8,
+                0.55 + Math.random() * 0.4
+              );
+            oc.tint = tintJit(0xffffff, 0.05);
+            if (Math.random() < 0.5) oc.scale.x *= -1;
+            scene.addChild(oc);
+            swayers.push({s: oc, amp: 0.02, sp: 1.2, ph: Math.random() * 6});
+          }
+          // flowering prickly pears clump low on the sand
+          for (let i = 0, n = (Math.random() * 3) | 0; i < n; i++) {
+            const x = 50 + Math.random() * (VW - 100),
+              pp = spr(
+                'prickly_pear',
+                x,
+                groundY(x) + 8,
+                0.4 + Math.random() * 0.35
+              );
+            pp.tint = tintJit(0xffffff, 0.06);
+            if (Math.random() < 0.5) pp.scale.x *= -1;
+            scene.addChild(pp);
+          }
         } else if (BI.ground === 'beach') {
           for (let i = 0, _m = vc(12); i < _m; i++) {
             const x = 30 + Math.random() * (VW - 60);
@@ -2562,6 +2593,32 @@
             g.tint = grassTint || 0x8fae5c;
             scene.addChild(g);
             swayers.push({s: g, amp: 0.06, sp: 1.7, ph: Math.random() * 6});
+          }
+          // cattail clumps stand along the marsh, their brown heads nodding
+          for (let i = 0, n = 1 + ((Math.random() * 3) | 0); i < n; i++) {
+            const x = 40 + Math.random() * (VW - 80),
+              ct = spr(
+                'cattail',
+                x,
+                groundY(x) + 8,
+                0.55 + Math.random() * 0.45
+              );
+            if (Math.random() < 0.5) ct.scale.x *= -1;
+            scene.addChild(ct);
+            swayers.push({s: ct, amp: 0.05, sp: 1.5, ph: Math.random() * 6});
+          }
+          // marsh marigolds dot the wet ground with yellow
+          for (let i = 0, n = (Math.random() * 4) | 0; i < n; i++) {
+            const x = 40 + Math.random() * (VW - 80),
+              mm = spr(
+                'marsh_marigold',
+                x,
+                groundY(x) + 8,
+                0.5 + Math.random() * 0.4
+              );
+            if (Math.random() < 0.5) mm.scale.x *= -1;
+            scene.addChild(mm);
+            swayers.push({s: mm, amp: 0.04, sp: 1.4, ph: Math.random() * 6});
           }
         } else if (BI.ground === 'snow') {
           for (let i = 0, _m = vc(12); i < _m; i++) {

@@ -2386,16 +2386,76 @@ save(
   40
 );
 
+// ======== desert flora ========
+// an ocotillo — tall spindly canes fanning from the base, tipped with flame-red flowers
+save(
+  'ocotillo',
+  S(
+    '74 112',
+    `<g stroke="#6f7e50" stroke-width="3.4" fill="none" stroke-linecap="round"><path d="M37,110 C32,72 26,42 20,14"/><path d="M37,110 C35,70 33,40 31,12"/><path d="M37,110 C39,70 41,40 43,12"/><path d="M37,110 C42,72 48,44 54,18"/><path d="M37,110 C45,76 55,50 64,28"/><path d="M37,110 C29,76 19,50 11,28"/></g>
+<g stroke="#5f6e44" stroke-width="1" opacity="0.5" fill="none"><path d="M31,40 l-3,2"/><path d="M43,40 l3,2"/><path d="M26,60 l-3,2"/><path d="M48,60 l3,2"/></g>
+<g fill="#df4329"><ellipse cx="20" cy="13" rx="3" ry="5.5"/><ellipse cx="31" cy="11" rx="2.6" ry="5"/><ellipse cx="43" cy="11" rx="2.6" ry="5"/><ellipse cx="54" cy="17" rx="3" ry="5"/><ellipse cx="64" cy="27" rx="2.6" ry="4.5"/><ellipse cx="11" cy="27" rx="2.6" ry="4.5"/></g>
+<g fill="#f47a4e" opacity="0.7"><ellipse cx="20" cy="11" rx="1.6" ry="3"/><ellipse cx="31" cy="9" rx="1.4" ry="2.6"/><ellipse cx="43" cy="9" rx="1.4" ry="2.6"/><ellipse cx="54" cy="15" rx="1.6" ry="2.6"/></g>`
+  ),
+  74
+);
+// a flowering prickly pear — stacked flat pads, yellow blooms on top
+save(
+  'prickly_pear',
+  S(
+    '68 84',
+    `<defs><linearGradient id="pp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#62a35c"/><stop offset="1" stop-color="#3f7a40"/></linearGradient></defs>
+<ellipse cx="33" cy="60" rx="16" ry="21" fill="url(#pp)"/>
+<ellipse cx="20" cy="35" rx="11.5" ry="15" fill="url(#pp)"/>
+<ellipse cx="47" cy="33" rx="11.5" ry="15" fill="url(#pp)"/>
+<g fill="#2f5e30" opacity="0.45"><circle cx="27" cy="52" r="1.3"/><circle cx="36" cy="48" r="1.3"/><circle cx="33" cy="62" r="1.3"/><circle cx="40" cy="64" r="1.3"/><circle cx="18" cy="34" r="1.2"/><circle cx="24" cy="30" r="1.2"/><circle cx="45" cy="32" r="1.2"/><circle cx="50" cy="28" r="1.2"/></g>
+<g fill="#f0c020"><circle cx="17" cy="22" r="4.5"/><circle cx="48" cy="20" r="4.5"/><circle cx="33" cy="40" r="4"/></g>
+<g fill="#f8e25e"><circle cx="17" cy="21" r="2.2"/><circle cx="48" cy="19" r="2.2"/><circle cx="33" cy="39" r="2"/></g>
+<g fill="#e08a1a"><circle cx="17" cy="22" r="1"/><circle cx="48" cy="20" r="1"/><circle cx="33" cy="40" r="1"/></g>`
+  ),
+  68
+);
+
+// ======== marsh flora ========
+// a cattail clump — long blades and brown sausage seed-heads
+save(
+  'cattail',
+  S(
+    '44 104',
+    `<g stroke="#6a9a4e" stroke-width="3" fill="none" stroke-linecap="round"><path d="M20,102 C18,62 18,32 18,8"/><path d="M20,102 C11,66 7,40 5,16"/><path d="M20,102 C29,66 33,40 35,16"/><path d="M30,102 C30,74 30,56 30,44"/></g>
+<path d="M18,12 L18,2" stroke="#6a9a4e" stroke-width="2" stroke-linecap="round"/>
+<rect x="14.5" y="12" width="7" height="28" rx="3.5" fill="#7a5230"/>
+<ellipse cx="18" cy="12.5" rx="3.5" ry="2.4" fill="#8a623a"/>
+<rect x="26.5" y="30" width="6" height="22" rx="3" fill="#6e4a2c"/>
+<ellipse cx="29.5" cy="30.5" rx="3" ry="2" fill="#7e5634"/>
+<g fill="#5a4326" opacity="0.4"><rect x="16" y="18" width="3.4" height="16" rx="1.7"/></g>`
+  ),
+  44
+);
+// marsh marigold — glossy round leaves under a cluster of yellow cups
+save(
+  'marsh_marigold',
+  S(
+    '46 42',
+    `<g fill="#3f7a3a"><ellipse cx="13" cy="33" rx="8" ry="5.5"/><ellipse cx="31" cy="33" rx="8" ry="5.5"/><ellipse cx="22" cy="36" rx="7" ry="5"/></g>
+<g stroke="#4f8a42" stroke-width="2" fill="none"><path d="M16,35 C16,27 17,21 18,16"/><path d="M30,35 C30,27 29,23 27,19"/></g>
+<g fill="#f4c024"><circle cx="18" cy="13" r="7.5"/><circle cx="29" cy="17" r="6.5"/></g>
+<g fill="#f9dc54"><circle cx="18" cy="12" r="4"/><circle cx="29" cy="16" r="3.5"/></g>
+<g fill="#e0991a"><circle cx="18" cy="13" r="1.6"/><circle cx="29" cy="17" r="1.5"/></g>`
+  ),
+  46
+);
+
 // ---- contact sheet of new + polished ----
 const review = [
-  'foxglove',
-  'cornflower',
-  'clover',
-  'poppy',
-  'tulip',
-  'flower_b',
-  'flower_w',
-  'flower_y'
+  'ocotillo',
+  'prickly_pear',
+  'barrel_cactus',
+  'cactus',
+  'cattail',
+  'marsh_marigold',
+  'reed',
+  'foxglove'
 ];
 const cols = 4,
   cell = 230,
