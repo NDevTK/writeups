@@ -2194,6 +2194,23 @@ save(
   40
 );
 
+// ======== a garden snail — creeps out onto the wet ground after rain (faces right) ========
+save(
+  'snail',
+  S(
+    '62 40',
+    `<path d="M7,34 Q5,28 14,27 L44,27 Q53,28 51,34 Q45,38 28,38 L15,38 Q8,38 7,34 Z" fill="#d4c6af"/>
+<path d="M42,29 Q52,28 55,21 Q57,16 53,15 L49,18 Q48,25 40,27 Z" fill="#ccbfa7"/>
+<ellipse cx="52" cy="19" rx="5.4" ry="4.8" fill="#d4c6af"/>
+<g stroke="#c2b49a" stroke-width="2.1" stroke-linecap="round"><line x1="53" y1="16" x2="58" y2="6"/><line x1="49" y1="16" x2="50" y2="5"/></g>
+<circle cx="58" cy="5" r="2" fill="#3a3228"/><circle cx="50" cy="4" r="2" fill="#3a3228"/>
+<circle cx="23" cy="16" r="15" fill="#c88a47"/>
+<g fill="none" stroke="#9a6630" stroke-width="2.3" stroke-linecap="round"><circle cx="23" cy="16" r="15"/><path d="M24,5 A11,11 0 1,1 22,5.1"/><path d="M24,9 A7,7 0 1,1 22,9.1"/><path d="M23.5,12.5 A3.5,3.5 0 1,1 22.5,12.6"/></g>
+<path d="M13,8 A15,15 0 0,1 33,7" fill="none" stroke="#e6b074" stroke-width="2.4" stroke-linecap="round" opacity="0.55"/>`
+  ),
+  56
+);
+
 // ======== a monarch butterfly — patterned orange wings (2 flap frames) ========
 const monarch = (fx) =>
   S(
@@ -2835,7 +2852,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['peacock_a', 'admiral_a', 'monarch_a', 'swallow_a'];
+const review = ['snail', 'hedgehog', 'beetle', 'frog'];
 const cols = 4,
   cell = 230,
   pad = 14,
