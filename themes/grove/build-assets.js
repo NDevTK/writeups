@@ -463,6 +463,26 @@ save(
   42
 );
 
+// ---- NEW: woodpecker — clings upright to a trunk and drums (bill points left, into the trunk) ----
+save(
+  'woodpecker',
+  S(
+    '38 58',
+    `<path d="M20,42 L15,57 L26,57 L24,44 Z" fill="#2a2620"/>
+<ellipse cx="22" cy="30" rx="8.5" ry="15" fill="#f1ede3"/>
+<path d="M22,15 C14,19 13,41 19,45 C15,40 16,21 22,15 Z" fill="#26221c"/>
+<g fill="#f1ede3"><circle cx="16" cy="23" r="1.5"/><circle cx="15" cy="29" r="1.5"/><circle cx="16" cy="35" r="1.5"/><circle cx="18" cy="26" r="1.3"/><circle cx="17" cy="32" r="1.3"/></g>
+<path d="M21,40 C25,40 25,46 22,47 C19,46 19,41 21,40 Z" fill="#d23a2a"/>
+<circle cx="21" cy="13" r="8" fill="#26221c"/>
+<ellipse cx="24" cy="15" rx="3.6" ry="3.2" fill="#f1ede3"/>
+<path d="M15,8 C13,4 19,3 22,6 C20,8 17,9 15,8 Z" fill="#d23a2a"/>
+<path d="M14,12 L2,13.5 L14,15.5 Z" fill="#3a352c"/>
+<circle cx="20" cy="11" r="1.5" fill="#0e0a06"/>
+<g stroke="#5a4a32" stroke-width="1.6" stroke-linecap="round"><path d="M16,37 L11,39"/><path d="M17,41 L12,43"/></g>`
+  ),
+  34
+);
+
 // ---- NEW: lily pad with blossom ----
 save(
   'lily',
@@ -3001,7 +3021,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['fern', 'shrub', 'toadstool', 'berrybush'];
+const review = ['woodpecker', 'kingfisher', 'robin', 'fern'];
 const cols = 4,
   cell = 230,
   pad = 14,
