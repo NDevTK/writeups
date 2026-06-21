@@ -2027,14 +2027,17 @@ save(
 );
 
 // ======== perched songbirds — sit in the canopy and flit between trees (face right) ========
-const perchBird = (id, back, breast, beak, wing) =>
+// crest (optional) paints a little crown stripe; cock (optional) flicks an upturned wren tail
+const perchBird = (id, back, breast, beak, wing, crest, cock) =>
   S(
     '58 52',
-    `<path d="M18,38 L2,32 L4,41 L18,42 Z" fill="${wing}"/>
+    `${cock ? `<path d="M15,31 L3,14 L11,19 L19,29 Z" fill="${wing}"/>` : ''}
+<path d="M18,38 L2,32 L4,41 L18,42 Z" fill="${wing}"/>
 <ellipse cx="26" cy="32" rx="15" ry="14" fill="${back}"/>
 <path d="M30,21 C41,23 43,41 30,45 C23,45 21,34 23,28 C25,23 27,21 30,21 Z" fill="${breast}"/>
 <circle cx="36" cy="20" r="11" fill="${back}"/>
 <path d="M40,13 C47,15 47,27 40,29 C33,28 33,16 40,13 Z" fill="${breast}"/>
+${crest ? `<path d="M30,13 C34,8 41,8 45,12 C40,11 34,11 30,15 Z" fill="${crest}"/>` : ''}
 <path d="M46,18 L55,20 L46,23 Z" fill="${beak}"/>
 <circle cx="41" cy="18" r="2" fill="#1a140d"/>
 <path d="M16,27 C25,23 34,25 37,34 C30,40 21,38 16,34 Z" fill="${wing}"/>
@@ -2053,6 +2056,24 @@ save(
 save(
   'finch',
   perchBird('finch', '#b6b04e', '#ecd24e', '#3a3a40', '#8a8638'),
+  50
+);
+// a blue tit — slate-blue cap and wings over a lemon breast
+save(
+  'bluetit',
+  perchBird('bluetit', '#4f8fce', '#ecd24e', '#3a3a40', '#3a6fae'),
+  50
+);
+// a goldcrest — olive back, pale belly, and its signature fiery crown stripe
+save(
+  'goldcrest',
+  perchBird('goldcrest', '#7e8a4e', '#d4cea8', '#3a3a40', '#5f6a38', '#e8b73a'),
+  50
+);
+// a wren — warm-brown and round, tail cocked smartly upward
+save(
+  'wren',
+  perchBird('wren', '#7a5436', '#c69a6a', '#caa45a', '#5a3c26', null, true),
   50
 );
 
@@ -2753,14 +2774,14 @@ save(
 
 // ---- contact sheet of new + polished ----
 const review = [
-  'admiral_a',
-  'monarch_a',
-  'swallow_a',
-  'butterfly_a',
-  'damselfly_a',
-  'dragonfly_a',
-  'moth_a',
-  'admiral_b'
+  'robin',
+  'bluebird',
+  'finch',
+  'bluetit',
+  'goldcrest',
+  'wren',
+  'parrot',
+  'damselfly_a'
 ];
 const cols = 4,
   cell = 230,
