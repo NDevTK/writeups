@@ -1494,6 +1494,7 @@
         roadrunner,
         whale,
         spoutG,
+        surfG,
         cloudSeaG,
         cloudGlow,
         SE,
@@ -1544,7 +1545,7 @@
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
         lavaGlow = turtle = causticG = marmot = seal = roadrunner = null;
-        whale = spoutG = cloudSeaG = cloudGlow = null;
+        whale = spoutG = surfG = cloudSeaG = cloudGlow = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
         // SP = optional per-biome season palette (tint-only seasons); else fall back to the global SEASONS, and non-seasonal biomes ignore the season entirely.
@@ -2550,6 +2551,28 @@
           water.height = VH - 600;
           water.tint = snow ? 0xcfe6ef : 0xffffff;
           scene.addChild(water);
+          if (BI.ground === 'beach') {
+            // shore break: foam washes up the sand and slides back, drawn each frame in the ticker
+            surfG = new PIXI.Graphics();
+            scene.addChild(surfG);
+            if (reduce.matches) {
+              // a static lapping line when the swash ticker won't run
+              const edgeY = 584;
+              surfG.beginFill(0x4c3d28, 0.16);
+              surfG.drawRect(-40, edgeY + 2, VW + 80, 600 - edgeY);
+              surfG.endFill();
+              surfG.beginFill(0xffffff, 0.5);
+              surfG.moveTo(-40, edgeY + 7);
+              for (let x = -40; x <= VW + 40; x += 14)
+                surfG.lineTo(
+                  x,
+                  edgeY + Math.sin(x * 0.05) * 2.3 + Math.sin(x * 0.13) * 1.3
+                );
+              surfG.lineTo(VW + 40, edgeY + 7);
+              surfG.closePath();
+              surfG.endFill();
+            }
+          }
           if (BI.water.whale) {
             // a whale surfaces out in the water (backmost water element), blows a misty spout, then sounds
             whale = spr('whale_back', 400, 642, 0.4, 0.5, 1);
@@ -3950,6 +3973,37 @@
           reflLayer.x = Math.sin(t * 0.7) * 1.2 + wind * 2.2;
           reflLayer.alpha =
             (1 - iceAmt * 0.8) * (1 - cover * 0.3) * (1 - wet * 0.4);
+        }
+
+        // shore break: a wave swashes up the sand and slides back, leaving a lacy foam edge and a
+        // wet sheen behind it. Sets of bigger and smaller waves come through, and the surf freshens
+        // as the wind gets up.
+        if (surfG) {
+          surfG.clear();
+          const set = 0.6 + 0.4 * Math.sin(t * 0.11 + 0.5), // wave sets roll through
+            pulse = Math.pow(Math.max(0, Math.sin(t * 0.5)), 1.2), // a wave runs in, then draws back
+            swash = (0.3 + 0.7 * pulse) * set * (1 + Math.abs(wind) * 0.2), // always some lap
+            edgeY = 598 - swash * 34, // leading foam edge, always up on the sand above the waterline
+            wob = (x) =>
+              Math.sin(x * 0.05 + t * 2.4) * 2.3 +
+              Math.sin(x * 0.13 - t * 1.7) * 1.3;
+          // the thin sheet of water / wet sheen the wave leaves on the sand, down to the waterline
+          surfG.beginFill(0x4c3d28, 0.2 * (0.4 + 0.6 * swash));
+          surfG.drawRect(-40, edgeY + 2, VW + 80, 600 - edgeY);
+          surfG.endFill();
+          // the lacy band of foam riding the leading edge (wavy top, flat back)
+          surfG.beginFill(0xffffff, 0.5);
+          surfG.moveTo(-40, edgeY + 7);
+          for (let x = -40; x <= VW + 40; x += 14)
+            surfG.lineTo(x, edgeY + wob(x));
+          surfG.lineTo(VW + 40, edgeY + 7);
+          surfG.closePath();
+          surfG.endFill();
+          // a brighter crest picked out right on the wavy lip
+          surfG.lineStyle(1.6, 0xffffff, 0.85);
+          surfG.moveTo(-40, edgeY + wob(-40));
+          for (let x = -26; x <= VW + 40; x += 14)
+            surfG.lineTo(x, edgeY + wob(x));
         }
 
         // walker: deer ambles then grazes; a camel plods along; in rain it stands and waits it out
