@@ -4331,16 +4331,31 @@
           if (fox && fox.visible !== false) {
             const dx = rabbit.x - fox.x,
               dist = Math.abs(dx);
-            if (dist < 125) {
+            // Freeze faces the fox; flee faces away. The hop-chase makes the gap wobble across the
+            // 125px line every hop, so the old code flipped the rabbit's head back and forth. Fix:
+            // it BOLTS once the fox is close and stays committed (facing away) until the fox is well
+            // clear (240px) — no toggling back to 'watch' mid-chase.
+            if (rabbit.fleeDir == null && dist < 125) {
+              rabbit.fleeDir = dx >= 0 ? 1 : -1; // commit a heading away from the fox
+              if (rabbit.fleeDir > 0 && rabbit.x > VW - 150)
+                rabbit.fleeDir = -1;
+              else if (rabbit.fleeDir < 0 && rabbit.x < 150) rabbit.fleeDir = 1;
+            } else if (rabbit.fleeDir != null && dist > 240) {
+              rabbit.fleeDir = null; // fox is well clear now — stand down
+            }
+            if (rabbit.fleeDir != null) {
               flee = true;
-              rabbit.dir = dx >= 0 ? 1 : -1; // bolt away from the fox
+              // juke off an edge and bolt past, rather than hop in place against the wall
+              if (rabbit.fleeDir > 0 && rabbit.x > VW - 96) rabbit.fleeDir = -1;
+              else if (rabbit.fleeDir < 0 && rabbit.x < 96) rabbit.fleeDir = 1;
+              rabbit.dir = rabbit.fleeDir;
               rabbit.scale.x = rabbit.dir * Math.abs(rabbit.scale.x);
             } else if (dist < 250) {
               freeze = true;
               rabbit.dir = dx >= 0 ? -1 : 1; // sit up and watch it
               rabbit.scale.x = rabbit.dir * Math.abs(rabbit.scale.x);
             }
-          }
+          } else rabbit.fleeDir = null;
           if (freeze) {
             rabbit.y = rabbit.baseY; // frozen, dead still
           } else if (raining && !flee) {
@@ -4695,15 +4710,27 @@
         // but bolts flat-out away from the coyote (the critter) when it ventures close
         if (roadrunner) {
           let flee = false;
-          if (
-            fox &&
-            fox.visible !== false &&
-            Math.abs(fox.x - roadrunner.x) < 210
-          ) {
-            flee = true;
-            roadrunner.dir = fox.x > roadrunner.x ? -1 : 1; // away from the coyote
-            roadrunner.pause = 0;
-          }
+          if (fox && fox.visible !== false) {
+            const dist = Math.abs(fox.x - roadrunner.x);
+            if (dist < 210 || (roadrunner.fleeDir != null && dist < 250)) {
+              flee = true;
+              // same as the rabbit: commit a heading when the bolt starts (no per-frame whipping),
+              // and juke past the coyote if cornered rather than pinning against the canyon wall
+              if (roadrunner.fleeDir == null) {
+                roadrunner.fleeDir = fox.x > roadrunner.x ? -1 : 1;
+                if (roadrunner.fleeDir > 0 && roadrunner.x > VW - 170)
+                  roadrunner.fleeDir = -1;
+                else if (roadrunner.fleeDir < 0 && roadrunner.x < 170)
+                  roadrunner.fleeDir = 1;
+              }
+              if (roadrunner.fleeDir > 0 && roadrunner.x > VW - 64)
+                roadrunner.fleeDir = -1;
+              else if (roadrunner.fleeDir < 0 && roadrunner.x < 64)
+                roadrunner.fleeDir = 1;
+              roadrunner.dir = roadrunner.fleeDir;
+              roadrunner.pause = 0;
+            } else roadrunner.fleeDir = null;
+          } else roadrunner.fleeDir = null;
           if (roadrunner.pause > 0) {
             roadrunner.pause -= dt / 60;
           } else {
