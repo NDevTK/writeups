@@ -1350,6 +1350,20 @@
         if (s) p.scale.set(s);
         return p;
       };
+      // light intensity [0..1] of the dawn/dusk shafts at a point, mirroring how beamField is drawn,
+      // so drifting dust can catch a beam and glow where it crosses one
+      const beamLightAt = (x, y) => {
+        const F = beamField;
+        if (!F.on || y < F.topY || y > F.botY) return 0;
+        const fr = (y - F.topY) / (F.botY - F.topY); // 0 at the top, 1 at the bottom
+        let best = 0;
+        for (let i = 0; i < F.bx.length; i++) {
+          const cx = F.bx[i] - F.lean * (y - F.topY), // beam centre at this height
+            d = Math.abs(x - cx) / (F.w[i] * (1 + fr * 0.44)); // widens as it falls
+          if (d < 1 && (1 - d) * (1 - fr) > best) best = (1 - d) * (1 - fr);
+        }
+        return best * F.beam;
+      };
       const anim = (frames, x, y, s, spd) => {
         const a = new PIXI.AnimatedSprite(frames.map(T));
         a.anchor.set(0.5, 1);
@@ -1753,6 +1767,7 @@
         fogLayers = [],
         bubbles = [],
         motes = [],
+        dust = [],
         jellies = [],
         floes = [],
         dolphins = [],
@@ -1786,6 +1801,15 @@
         rainbowG,
         raysG,
         beamG,
+        beamField = {
+          on: false,
+          beam: 0,
+          lean: 0,
+          topY: 0,
+          botY: 0,
+          bx: [],
+          w: []
+        },
         puddleG,
         snowAccG,
         crestG,
@@ -1872,6 +1896,7 @@
           fogLayers.length =
           bubbles.length =
           motes.length =
+          dust.length =
           jellies.length =
           floes.length =
           dolphins.length =
@@ -2825,6 +2850,26 @@
           beamG = new PIXI.Graphics();
           beamG.blendMode = PIXI.BLEND_MODES.ADD;
           scene.addChild(beamG);
+          // fine dust hanging in the air: nearly invisible in shade, flaring warm where a shaft
+          // crosses it, so the beams read as light with volume rather than a flat overlay
+          for (let i = 0; i < 72; i++) {
+            const d = spr(
+              'glow',
+              Math.random() * VW,
+              384 + Math.random() * 246,
+              0.045 + Math.random() * 0.06,
+              0.5,
+              0.5
+            );
+            d.tint = 0xffe6b0;
+            d.blendMode = PIXI.BLEND_MODES.ADD;
+            d.baseA = 0.02 + Math.random() * 0.03; // a faint mote even out of the light
+            d.alpha = d.baseA;
+            d.vy = 0.1 + Math.random() * 0.22; // sinks slowly
+            d.ph = Math.random() * 6.28;
+            dust.push(d);
+            scene.addChild(d);
+          }
         }
         for (const [n, sc, x] of varyLayer(BI.near)) {
           const jx = x + (Math.random() - 0.5) * 64,
@@ -5911,16 +5956,24 @@
               ? Math.max(0, Math.min(1, (cel.y - 250) / 150))
               : 0,
             beam = low * low * (1 - cover * 0.7); // ease in low; fade as cloud hides the sun
-          if (beam > 0.02) {
+          beamField.on = beam > 0.02;
+          beamField.beam = beam;
+          if (beamField.on) {
             const lean = (cel.x / VW - 0.5) * 1.7, // tilt away from the sun's side
               topY = 380,
               botY = 700,
               N = 8,
               span = VW / (N - 1),
               SEG = 3;
+            beamField.lean = lean;
+            beamField.topY = topY;
+            beamField.botY = botY;
+            beamField.bx.length = beamField.w.length = 0;
             for (let i = 0; i < N; i++) {
               const bx = i * span + Math.sin(t * 0.07 + i * 1.3) * 28, // slow drift
                 w = 15 + 6 * Math.sin(t * 0.4 + i * 2);
+              beamField.bx.push(bx); // remembered so drifting dust can catch this beam
+              beamField.w.push(w);
               for (let s = 0; s < SEG; s++) {
                 const y0 = topY + ((botY - topY) * s) / SEG,
                   y1 = topY + ((botY - topY) * (s + 1)) / SEG,
@@ -7412,6 +7465,17 @@
             m.y = -6;
             m.x = Math.random() * VW;
           }
+        }
+        // air dust sinking through the dawn/dusk shafts: a faint mote in shade, flaring warm as it
+        // crosses a beam, so the light reads as something hanging in the air
+        for (const d of dust) {
+          d.y += d.vy * dt;
+          d.x += Math.sin(t * 0.4 + d.ph) * 0.22 * dt; // wanders sideways as it falls
+          if (d.y > 632) {
+            d.y = 384;
+            d.x = Math.random() * VW;
+          }
+          d.alpha = d.baseA + beamLightAt(d.x, d.y) * 1.0;
         }
         // an octopus creeps the reef floor in slow bursts, pausing to feel about with its arms
         if (octopus) {
