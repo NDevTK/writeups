@@ -1201,6 +1201,9 @@
         'lupine_b',
         'lupine_k',
         'lupine_w',
+        'bush_h',
+        'bush_p',
+        'bush_w',
         'cornflower',
         'clover',
         'swallow_a',
@@ -1648,6 +1651,10 @@
         gBase +
         Math.sin(x * gFreq + gPh) * gAmp +
         Math.sin(x * gFreq2 + gPh2) * gAmp2;
+      // the mid-hill surface — its own depth plane behind the foreground ground. The midground flora
+      // and the far herd stand on this contour (it matches the mid-tree line).
+      let farHillPh = 0;
+      const farY = (x) => 470 + Math.sin(x * 0.006 + farHillPh) * 32;
       // leave a footprint when an animal has walked a stride over settled snow; trails fill in over time
       function dropTrack(obj, kind, stride) {
         if (!obj || obj.visible === false || snowAcc < 0.22) return;
@@ -1701,6 +1708,7 @@
         clouds = [],
         ducks = [],
         fish = [],
+        farHerd = [],
         flutters = [],
         dragons = [],
         fireflies = [],
@@ -1819,6 +1827,7 @@
           clouds.length =
           ducks.length =
           fish.length =
+          farHerd.length =
           flutters.length =
           dragons.length =
           fireflies.length =
@@ -2508,21 +2517,157 @@
           return out;
         };
         // jitter every tree's spot, size and facing per build so a stand never repeats exactly
-        const midPh = Math.random() * 6.283;
+        farHillPh = Math.random() * 6.283;
         for (const [n, sc, x] of varyLayer(BI.mid)) {
           const jx = x + (Math.random() - 0.5) * 70,
-            t = spr(
-              n,
-              jx,
-              470 + Math.sin(jx * 0.006 + midPh) * 32,
-              sc * (0.86 + Math.random() * 0.28)
-            );
+            t = spr(n, jx, farY(jx), sc * (0.86 + Math.random() * 0.28));
           t.tint = BI.interior ? 0xffffff : tintJit(mulTint(0xcfe3d0, folTint));
           if (!RIGID[n] && Math.random() < 0.5) t.scale.x *= -1; // mirror about half of them
           scene.addChild(t);
           if (!RIGID[n] && !BI.interior)
             swayers.push({s: t, amp: 0.012, sp: 0.7, ph: Math.random() * 6});
           snowCap(t, n);
+        }
+        // midground flora: the same plants as the foreground carried up onto the mid-hill at a small,
+        // hazed size, so vegetation reads as continuous into the distance rather than a bare band
+        const MIDFLORA = {
+          meadow: [
+            ['grass', 0.22],
+            ['grass', 0.2],
+            ['shrub', 0.16],
+            ['fern', 0.18]
+          ],
+          marsh: [
+            ['grass', 0.24],
+            ['grass', 0.2],
+            ['reed', 0.18],
+            ['shrub', 0.15]
+          ],
+          fern: [
+            ['grass', 0.22],
+            ['fern', 0.2],
+            ['shrub', 0.16]
+          ],
+          glade: [
+            ['grass', 0.22],
+            ['fern', 0.2],
+            ['shrub', 0.16]
+          ],
+          jungle: [
+            ['fern', 0.22],
+            ['fern', 0.18],
+            ['bigleaf', 0.16]
+          ],
+          savanna: [
+            ['grass', 0.24],
+            ['grass', 0.2],
+            ['aloe', 0.16],
+            ['seedhead', 0.2]
+          ],
+          sand: [
+            ['cactus', 0.16],
+            ['rock', 0.07],
+            ['barrel_cactus', 0.14]
+          ],
+          redrock: [
+            ['cactus', 0.16],
+            ['rock', 0.08],
+            ['rock', 0.06]
+          ],
+          scree: [
+            ['rock', 0.1],
+            ['rock', 0.07],
+            ['grass', 0.18]
+          ],
+          beach: [
+            ['grass', 0.2],
+            ['rock', 0.07]
+          ]
+        };
+        const dryMid = [
+          'sand',
+          'savanna',
+          'redrock',
+          'scree',
+          'beach'
+        ].includes(BI.ground);
+        const midSet =
+          !snow && !BI.interior && !BI.underwater ? MIDFLORA[BI.ground] : null;
+        if (midSet) {
+          const mhaze = mulTint(dryMid ? 0xd8cfb6 : 0xccdcc4, folTint),
+            msway = {grass: 1, fern: 1, reed: 1, seedhead: 1};
+          const mn = vc(9) + Math.max(0, Math.round((VW - VWBASE) / 240));
+          for (let i = 0; i < mn; i++) {
+            const [name, bs] = midSet[(Math.random() * midSet.length) | 0],
+              x = 24 + Math.random() * (VW - 48),
+              m = spr(name, x, farY(x) + 1, bs + Math.random() * bs * 0.5);
+            m.tint = tintJit(mhaze, 0.05);
+            m.alpha = 0.92;
+            if (Math.random() < 0.5) m.scale.x *= -1;
+            scene.addChild(m);
+            if (msway[name])
+              swayers.push({s: m, amp: 0.045, sp: 1.2, ph: Math.random() * 6});
+          }
+        }
+        // the odd lone tree crowning a distant rise — a natural focal point on the far hills
+        if (
+          !snow &&
+          !BI.interior &&
+          ['meadow', 'marsh', 'fern', 'glade'].includes(BI.ground) &&
+          treePool.length &&
+          Math.random() < 0.5
+        ) {
+          const tx = 120 + Math.random() * Math.max(1, VW - 240),
+            lt = spr(
+              treePool[(Math.random() * treePool.length) | 0],
+              tx,
+              farY(tx),
+              0.66 + Math.random() * 0.22 // a clearly prominent tree crowning the rise
+            );
+          lt.tint = tintJit(mulTint(0xbccfba, folTint)); // hazier and cooler than the near trees
+          if (Math.random() < 0.5) lt.scale.x *= -1;
+          scene.addChild(lt);
+          swayers.push({s: lt, amp: 0.01, sp: 0.7, ph: Math.random() * 6});
+        }
+        // a far herd ambles the mid-hill — the biome's OWN animal, the very sprite the foreground
+        // walker uses, scaled down and hazed for the distance and moving at a slow far pace. Mipmaps
+        // keep the shrunk sprite smooth, not crunchy; it walks the farY plane, its own depth.
+        const farWalk =
+          !BI.interior &&
+          !BI.underwater &&
+          BI.walker &&
+          !['heron', 'egret'].includes(BI.walker[0])
+            ? BI.walker
+            : null;
+        if (farWalk && Math.random() < 0.6) {
+          const herdX = 170 + Math.random() * Math.max(1, VW - 340),
+            haze = mulTint(dryMid ? 0xd4cdb8 : 0xccd2c2, folTint);
+          for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
+            const d = anim(
+              farWalk,
+              0,
+              0,
+              (BI.walkerScale || 0.5) * 0.55,
+              0.06 + Math.random() * 0.03
+            );
+            d.x = Math.max(
+              36,
+              Math.min(VW - 36, herdX + (Math.random() - Math.random()) * 150)
+            );
+            d.tint = haze;
+            d.alpha = 0.94;
+            d.dir = Math.random() < 0.5 ? 1 : -1;
+            d.baseSc = Math.abs(d.scale.x);
+            d.scale.x = d.dir * d.baseSc;
+            d.spd = 0.07 + Math.random() * 0.05; // a slow, far-off amble
+            d.mode = Math.random() < 0.6 ? 'graze' : 'walk';
+            d.timer = 1 + Math.random() * 5;
+            d.y = farY(d.x);
+            if (reduce.matches) d.gotoAndStop(0);
+            else d.stop();
+            farHerd.push(d);
+            scene.addChild(d);
+          }
         }
         for (const [n, sc, x] of varyLayer(BI.near)) {
           const jx = x + (Math.random() - 0.5) * 64,
@@ -2789,6 +2934,26 @@
               if (Math.random() < 0.5) sh.scale.x *= -1;
               scene.addChild(sh);
               swayers.push({s: sh, amp: 0.022, sp: 1, ph: Math.random() * 6});
+            }
+            // a flowering bush or two in bloom — hydrangea blues, pinks and whites, a patch leaning
+            // to one colour with the odd other among it
+            if (seas !== 'autumn' && Math.random() < 0.55) {
+              const BSH = ['bush_h', 'bush_p', 'bush_w'],
+                pick = BSH[(Math.random() * BSH.length) | 0];
+              for (let i = 0, n = 1 + ((Math.random() * 2) | 0); i < n; i++) {
+                const x = 70 + Math.random() * (VW - 140),
+                  fb = spr(
+                    Math.random() < 0.7
+                      ? pick
+                      : BSH[(Math.random() * BSH.length) | 0],
+                    x,
+                    groundY(x) + 8,
+                    0.34 + Math.random() * 0.2
+                  );
+                if (Math.random() < 0.5) fb.scale.x *= -1;
+                scene.addChild(fb);
+                swayers.push({s: fb, amp: 0.02, sp: 1, ph: Math.random() * 6});
+              }
             }
             // toadstools and mushrooms tucked low in the grass
             for (let i = 0, n = (Math.random() * 4) | 0; i < n; i++) {
@@ -5770,6 +5935,30 @@
           if (c.x - c.width > VW) c.x = -c.width;
           else if (c.x + c.width < 0) c.x = VW + c.width;
         }
+        // the far herd: a slow amble along the mid-hill with grazing pauses, turning at the edges,
+        // on its own depth plane (farY) at a far pace
+        if (!reduce.matches)
+          for (const d of farHerd) {
+            d.timer -= dt / 60;
+            if (d.mode === 'walk') {
+              d.x += d.dir * d.spd * dt;
+              if (!d.playing) d.play();
+              if (d.x > VW - 30) d.dir = -1;
+              else if (d.x < 30) d.dir = 1;
+              d.scale.x = d.dir * d.baseSc;
+              if (d.timer < 0) {
+                d.mode = 'graze';
+                d.timer = 2 + Math.random() * 5;
+                d.gotoAndStop(0);
+              }
+            } else if (d.timer < 0) {
+              d.mode = 'walk';
+              d.timer = 3 + Math.random() * 6;
+              if (Math.random() < 0.4) d.dir = -d.dir;
+              d.scale.x = d.dir * d.baseSc;
+            }
+            d.y = farY(d.x);
+          }
         if (cloudSeaG) cloudSeaG.y = Math.sin(t * 0.3) * 4; // the cloud sea breathes slowly
         if (cloudGlow)
           // warm light grows as the sun nears the horizon (low sun = golden hour)
