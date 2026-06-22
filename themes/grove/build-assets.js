@@ -199,6 +199,64 @@ const flower = (c) =>
   );
 save('flower_p', flower('#ef6a8a'), 44);
 save('flower_w', flower('#f3ecf2'), 44);
+// ---- spring bulbs + a few more blooms, to give the seasonal meadow mixes some range ----
+// a daffodil: six yellow petals around a deep orange trumpet, a blade leaf at the stem
+const daffodilSvg = () =>
+  S(
+    '40 60',
+    `<path d="M20,58 L20,26" stroke="#4f9c34" stroke-width="3"/>
+<path d="M20,40 C12,38 9,30 13,26 C16,33 20,35 20,40 Z" fill="#4f9c34"/>
+<g fill="#f8d94a">${Array.from({length: 6}, (_, k) => {
+      const a = (k / 6) * Math.PI * 2,
+        cx = (20 + Math.cos(a) * 7.5).toFixed(1),
+        cy = (17 + Math.sin(a) * 7.5).toFixed(1);
+      return `<ellipse cx="${cx}" cy="${cy}" rx="4" ry="6.5" transform="rotate(${((a * 180) / Math.PI + 90).toFixed(0)} ${cx} ${cy})"/>`;
+    }).join('')}</g>
+<circle cx="20" cy="17" r="5.5" fill="#f3a52e"/><circle cx="20" cy="17" r="3.2" fill="#dd8722"/><circle cx="20" cy="17" r="1.6" fill="#c9760f"/>`
+  );
+save('daffodil', daffodilSvg(), 42);
+// a crocus: a closed goblet of petals on grassy leaves (purple and white forms)
+const crocusSvg = (c1, c2, c3) =>
+  S(
+    '40 56',
+    `<g stroke="#5fa048" stroke-width="2.5" stroke-linecap="round"><path d="M20,54 L18,28"/><path d="M15,54 L12,32"/><path d="M25,54 L28,33"/></g>
+<path d="M13,30 C12,17 16,9 20,8 C24,9 28,17 27,30 C24,33 16,33 13,30 Z" fill="${c1}"/>
+<path d="M13,29 C13,19 15,12 19,9 C17,17 17,25 19,32 Z" fill="${c2}"/>
+<path d="M27,29 C27,19 25,12 21,9 C23,17 23,25 21,32 Z" fill="${c2}"/>
+<path d="M20,9 C18,16 18,25 20,32 C22,25 22,16 20,9 Z" fill="${c3}" opacity="0.6"/>`
+  );
+save('crocus_p', crocusSvg('#9a6fd0', '#b48fe0', '#7e52b8'), 38);
+save('crocus_w', crocusSvg('#f2ecf8', '#fbf8ff', '#d8c8ec'), 38);
+// a bluebell: an arching stem hung with drooping blue bells
+const bluebellSvg = (c1, c2) =>
+  S(
+    '48 76',
+    `<path d="M14,74 C12,52 15,30 26,15" stroke="#5e8a3e" stroke-width="3" fill="none" stroke-linecap="round"/>
+<g fill="${c1}"><path d="M24,18 C20,18 18,25 22,29 C26,29 28,24 27,19 C26,17 25,17 24,18 Z"/><path d="M20,28 C16,28 14,35 18,39 C22,39 24,34 23,29 C22,27 21,27 20,28 Z"/><path d="M17,38 C13,38 11,45 15,49 C19,49 21,44 20,39 C19,37 18,37 17,38 Z"/><path d="M15,48 C11,48 9,55 13,59 C17,59 19,54 18,49 C17,47 16,47 15,48 Z"/></g>
+<g fill="${c2}" opacity="0.55"><ellipse cx="23" cy="27" rx="2.6" ry="1.8"/><ellipse cx="19" cy="37" rx="2.6" ry="1.8"/><ellipse cx="16" cy="47" rx="2.6" ry="1.8"/><ellipse cx="14" cy="57" rx="2.4" ry="1.8"/></g>`
+  );
+save('bluebell', bluebellSvg('#5b6fd0', '#3f4fb0'), 44);
+// a cosmos: a broad eight-petal daisy form with a gold eye (pink and white forms)
+const cosmosSvg = (c, cd) =>
+  S(
+    '40 60',
+    `<path d="M20,58 L20,26" stroke="#4f9c34" stroke-width="2.5"/>
+<g fill="${c}">${Array.from({length: 8}, (_, k) => {
+      const a = (k / 8) * Math.PI * 2,
+        cx = (20 + Math.cos(a) * 8).toFixed(1),
+        cy = (18 + Math.sin(a) * 8).toFixed(1);
+      return `<ellipse cx="${cx}" cy="${cy}" rx="3.4" ry="7" transform="rotate(${((a * 180) / Math.PI + 90).toFixed(0)} ${cx} ${cy})"/>`;
+    }).join('')}</g>
+<g fill="${cd}" opacity="0.5">${Array.from({length: 8}, (_, k) => {
+      const a = (k / 8) * Math.PI * 2,
+        cx = (20 + Math.cos(a) * 8).toFixed(1),
+        cy = (18 + Math.sin(a) * 8).toFixed(1);
+      return `<ellipse cx="${cx}" cy="${cy}" rx="1.5" ry="4" transform="rotate(${((a * 180) / Math.PI + 90).toFixed(0)} ${cx} ${cy})"/>`;
+    }).join('')}</g>
+<circle cx="20" cy="18" r="4.5" fill="#f6d24a"/><circle cx="20" cy="18" r="2.4" fill="#e0a82e"/>`
+  );
+save('cosmos_p', cosmosSvg('#f2a0c0', '#e07ba6'), 44);
+save('cosmos_w', cosmosSvg('#fbf2f6', '#e6cdd8'), 44);
 
 save(
   'cloud',

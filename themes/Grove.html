@@ -1212,6 +1212,12 @@
         'flower_y',
         'flower_b',
         'tulip',
+        'daffodil',
+        'crocus_p',
+        'crocus_w',
+        'bluebell',
+        'cosmos_p',
+        'cosmos_w',
         'foxglove',
         'sunflower',
         'lupine_p',
@@ -2892,12 +2898,15 @@
             const seas = BI.seasonal ? nowSeason() : 'summer';
             const FL = {
               spring: [
-                'flower_p',
+                'daffodil',
+                'daffodil',
+                'crocus_p',
+                'crocus_w',
+                'bluebell',
+                'tulip',
+                'tulip',
                 'flower_w',
-                'flower_y',
                 'flower_b',
-                'tulip',
-                'tulip',
                 'cornflower',
                 'clover'
               ],
@@ -2909,10 +2918,19 @@
                 'poppy',
                 'poppy',
                 'cornflower',
+                'cosmos_p',
+                'cosmos_w',
                 'clover',
                 'clover'
               ],
-              autumn: ['flower_y', 'flower_w', 'poppy', 'clover', 'clover']
+              autumn: [
+                'flower_y',
+                'flower_w',
+                'poppy',
+                'cosmos_p',
+                'clover',
+                'clover'
+              ]
             }[seas] || ['flower_p', 'flower_w', 'flower_y', 'poppy', 'clover'];
             // how many blooms, and whether they gather into a few dense patches or spread out —
             // each build leans one way, so some meadows read as even scatters, others as clumped drifts
