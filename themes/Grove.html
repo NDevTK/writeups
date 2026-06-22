@@ -99,6 +99,9 @@
         antialias: true,
         backgroundAlpha: 0
       });
+      // far-off content is heavily downscaled; without mipmaps that minification aliases into a
+      // crunchy, "pixelated" look a real distant object never has. Mipmaps give smooth downscaling.
+      PIXI.BaseTexture.defaultOptions.mipmap = PIXI.MIPMAP_MODES.ON;
       // the canvas width tracks the display's aspect (the height stays fixed at VH, so the vertical
       // composition — sky, horizon, ground, water — is constant), clamped so extreme ratios stay
       // sensible. A 21:9 screen simply gets more landscape; portrait a narrower slice. No cropping.
