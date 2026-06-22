@@ -6136,8 +6136,15 @@
           }
         }
         if (water && !BI.interior && !BI.glade && cel.y < 560) {
-          const col = cel.sun ? 0xfff0b8 : 0xc9d8ea,
-            str = cel.sun ? 1 : 0.7;
+          // the reflection deepens to gold and burns brighter as the sun drops toward the horizon —
+          // the same golden-hour fall that lights the shafts, now caught and rippling on the water
+          const low = cel.sun
+            ? Math.max(0, Math.min(1, (cel.y - 250) / 150))
+            : 0;
+          const col = cel.sun
+              ? hexI(mixA([255, 240, 184], [255, 166, 77], low))
+              : 0xc9d8ea,
+            str = (cel.sun ? 1 : 0.7) * (1 + low * 0.5);
           for (let k = 3; k >= 1; k--) {
             glit.beginFill(col, 0.14 * str * (k / 3));
             glit.drawEllipse(cel.x, 611, 9 + k * 7, 3 + k * 2.4);
@@ -6152,6 +6159,34 @@
             glit.beginFill(col, (1 - d) * 0.5 * str);
             glit.drawRect(cel.x + wob - (2 + d * 4), y, 4 + d * 8, 2);
             glit.endFill();
+          }
+        }
+        if (water && beamField.on && !BI.interior && !BI.glade) {
+          // dawn/dusk shafts striking the pond: warm sparkle pooling on the surface wherever a beam
+          // reaches the water — at full golden strength (not the beams' faded tail), each glint
+          // winking and scattered into wavelets by the breeze
+          const F = beamField;
+          for (let x = 0; x <= VW; x += 9) {
+            let cov = 0; // how squarely a beam's column lands on this stretch of water
+            for (let i = 0; i < F.bx.length; i++) {
+              const cx = F.bx[i] - F.lean * (612 - F.topY),
+                dd = Math.abs(x - cx) / (F.w[i] * 1.32);
+              if (dd < 1 && 1 - dd > cov) cov = 1 - dd;
+            }
+            const glow = cov * F.beam;
+            if (glow < 0.025) continue;
+            const tw = 0.55 + 0.45 * Math.sin(x * 0.5 + t * 3); // individual sparkles wink
+            for (let r = 0; r < 3; r++) {
+              const wy = 611 + r * 18,
+                a = glow * tw * 1.3 * (1 - r * 0.28),
+                ww =
+                  Math.sin(x * 0.06 + t * 2.4 + r) *
+                  (2 + r * 3) *
+                  (1 + Math.abs(wind));
+              glit.beginFill(0xffe6a8, Math.min(0.5, a));
+              glit.drawRect(x - 4 + ww, wy, 9, 2.4);
+              glit.endFill();
+            }
           }
         }
         if (water && BI.aurora && night > 0.08) {
