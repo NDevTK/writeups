@@ -3378,6 +3378,7 @@
               d.mode = 'walk';
               d.timer = Math.random() * 5;
               d.trot = 0; // seconds left in a brief trot burst (0 = plain amble)
+              d.startle = 0; // seconds left bolting from a fright (0 = calm)
               d.baseAnim = d.animationSpeed; // resting gait, so a trot can quicken the legs
             }
             scene.addChild(d);
@@ -5824,6 +5825,46 @@
               }
               dropTrack(d, 'deer', 24);
               continue;
+            }
+            // startle: now and then one takes fright and bolts, and the herd scatters outward from
+            // the fright — those to its left break left, those to its right break right
+            if (d.startle > 0) {
+              d.startle -= dt / 60;
+              d.x += d.startleDir * (d.spd ?? 0.35) * 4.5 * dt;
+              d.scale.x = d.startleDir * Math.abs(d.scale.x);
+              if (multi) {
+                if (!d.playing) d.play();
+                d.animationSpeed = (d.baseAnim ?? 0.12) * 2.4;
+              }
+              if (d.x > VW + 80) d.x = -80;
+              else if (d.x < -80) d.x = VW + 80;
+              d.y = groundY(d.x) + 8 + Math.abs(Math.sin(t * 8 + d.x)) * -3.6;
+              if (d.startle <= 0) {
+                // the fright passes: settle back to an amble, facing the way it bolted
+                d.mode = 'walk';
+                d.dir = d.startleDir;
+                d.timer = 0.8 + Math.random() * 2;
+                d.trot = 0;
+              }
+              dropTrack(d, 'deer', 20);
+              continue;
+            }
+            // rarely it spooks of its own accord, sending a ripple of fright through the herd
+            if (!raining && Math.random() < 0.00013 * dt) {
+              const spookX = d.x;
+              for (const o of walkers) {
+                if (o.isRest || o.isFawn) continue;
+                if (Math.abs(o.x - spookX) < 300) {
+                  o.startle = 0.7 + Math.random() * 0.7;
+                  o.startleDir =
+                    o.x === spookX
+                      ? Math.random() < 0.5
+                        ? 1
+                        : -1
+                      : Math.sign(o.x - spookX);
+                  o.trot = 0;
+                }
+              }
             }
             if (raining) {
               if (multi) d.gotoAndStop(0);
