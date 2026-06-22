@@ -5987,13 +5987,17 @@
                 scene.addChildAt(d.under, scene.getChildIndex(d)); // just behind the bright half
               }
               d.mask = d.wmask;
+              d.wmask.visible = true; // visible so it can serve as the mask; hidden again on un-dunk
               d.under.visible = true;
               d.under.position.set(d.x, d.y);
               d.under.rotation = d.rotation;
               d.under.scale.set(d.scale.x, d.scale.y);
               d.under.alpha = 0.62 * Math.min(1, d.up * 1.4); // dimmer, half-seen through the water
             } else {
+              // nulling the mask flips the white mask rect back to renderable, so without
+              // hiding it here it flashes up over the whole scene as the head comes back up
               if (d.mask) d.mask = null;
+              if (d.wmask) d.wmask.visible = false;
               if (d.under) d.under.visible = false;
             }
           }
