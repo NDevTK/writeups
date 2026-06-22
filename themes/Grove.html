@@ -2093,13 +2093,18 @@
         // randomise the land for this build: the front ground (gFreq/gPh/gAmp…, set above) carries
         // the trees; two rolling background bands get their own wave each. Stored as contour
         // functions so the crest snow follows whatever shape they take.
+        // this build's terrain mood: usually gentle rolls, but sometimes a near-flat plain and
+        // sometimes a notably hillier run, so the land's character changes build to build. The
+        // hillier setting is held back on water biomes so a deep roll can't undercut the pond bank.
+        const tMood = Math.random();
+        const relief = tMood < 0.3 ? 0.5 : tMood > 0.76 && !BI.water ? 1.7 : 1;
         gFreq = 0.0042 + Math.random() * 0.0045; // wavelength of the rolls
         gPh = Math.random() * 6.283;
-        gAmp = 17 + Math.random() * 17; // flatter ↔ hillier
+        gAmp = (17 + Math.random() * 17) * relief; // flatter ↔ hillier
         gBase = 530 + Math.random() * 10;
         gFreq2 = 0.013 + Math.random() * 0.01; // a second, shorter roll for a less sine-y line
         gPh2 = Math.random() * 6.283;
-        gAmp2 = 4 + Math.random() * 8;
+        gAmp2 = (4 + Math.random() * 8) * relief;
         const wave = (cy, a, p, f) => (x) => cy + Math.sin(x * f + p) * a;
         const HILLS = [
           wave(
@@ -5713,7 +5718,6 @@
               d.y = groundY(d.x) + 8;
             } else {
               d.timer -= dt / 60;
-              if (!d.graze) d.mode = 'walk';
               if (d.mode === 'walk') {
                 // now and then it breaks into a short trot — quicker stride, springier step —
                 // before settling back to an amble, so a herd never moves in a uniform plod
@@ -5727,20 +5731,34 @@
                   d.animationSpeed =
                     (d.baseAnim ?? 0.12) * (trotting ? 1.9 : 1);
                 }
-                if (d.graze && d.timer < 0) {
-                  d.mode = 'graze';
-                  d.timer = 2.5 + Math.random() * 3;
-                  d.trot = 0; // a grazing animal isn't mid-trot
-                  if (multi) {
-                    d.animationSpeed = d.baseAnim ?? 0.12;
-                    d.gotoAndStop(0);
+                if (d.timer < 0) {
+                  if (d.graze) {
+                    // grazers drop their head to crop the grass for a spell
+                    d.mode = 'graze';
+                    d.timer = 2.5 + Math.random() * 3;
+                    d.trot = 0; // a grazing animal isn't mid-trot
+                    if (multi) {
+                      d.animationSpeed = d.baseAnim ?? 0.12;
+                      d.gotoAndStop(0);
+                    }
+                  } else if (Math.random() < 0.45) {
+                    // the others now and then halt to stand and look about
+                    d.mode = 'pause';
+                    d.timer = 1.2 + Math.random() * 2.8;
+                    d.trot = 0;
+                    if (multi) {
+                      d.animationSpeed = d.baseAnim ?? 0.12;
+                      d.gotoAndStop(0);
+                    }
+                  } else {
+                    d.timer = 4 + Math.random() * 5; // carry on ambling a while longer
                   }
                 }
               } else if (d.timer < 0) {
+                // coming out of a graze or a standing pause: amble on, often a new way
                 d.mode = 'walk';
                 d.timer = 5 + Math.random() * 6;
-                // after a graze it often wanders off a new way rather than always plodding onward
-                if (Math.random() < 0.4) {
+                if (Math.random() < (d.graze ? 0.4 : 0.5)) {
                   d.dir = -d.dir;
                   d.scale.x = d.dir * Math.abs(d.scale.x);
                 }
