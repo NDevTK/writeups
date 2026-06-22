@@ -4201,6 +4201,9 @@
               f.cruiseY = f.y; // resting depth it eases back to
               f.jump = 0; // 0 = cruising; climbs 0->1 across a leap arc
               f.next = 4 + Math.random() * 8; // seconds until the next rise/leap
+              f.shoalOx = (Math.random() - 0.5) * 120; // its slot in a loose shoal
+              f.shoalOy = (Math.random() - 0.5) * 24;
+              f.wob = Math.random() * 6.28;
               f.subA = subA;
               f.tint = hexI(subA);
               f.alpha = koiPond ? 0.92 : 0.82;
@@ -4208,6 +4211,11 @@
               fish.push(f);
               scene.addChildAt(f, scene.getChildIndex(glit)); // under the shimmer, ripples and ducks
             }
+            // the shoal drifts between gathering together and scattering to roam (toggled over time
+            // in the ticker); start in a random state so no two ponds are ever quite in step
+            fish.shoalOn = fish.length > 1 && Math.random() < 0.5;
+            fish.shoalTmr = 9 + Math.random() * 12;
+            fish.shoalPh = Math.random() * 6.28;
           }
           // ice floes drifting on the cold water (in front of the surface)
           if (BI.water.floes)
@@ -6186,6 +6194,15 @@
         if (fish.length) {
           const fLo = ice > 0.05 ? VW / 2 - openHalf + 50 : waterL, // keep to the open lead once the pond ices over
             fHi = ice > 0.05 ? VW / 2 + openHalf - 50 : waterR;
+          // pond fish drift between gathering into a loose shoal and scattering to roam free
+          if (!fish[0].reef && fish.shoalTmr != null) {
+            fish.shoalTmr -= dt / 60;
+            if (fish.shoalTmr <= 0) {
+              fish.shoalOn = fish.length > 1 ? !fish.shoalOn : false;
+              fish.shoalTmr = 10 + Math.random() * 14;
+              fish.shoalPh = Math.random() * 6.28;
+            }
+          }
           for (const f of fish) {
             if (f.reef) {
               // reef fish: drift through the whole column in a loose school that wanders the reef
@@ -6235,11 +6252,29 @@
               }
               continue;
             }
-            f.x += f.dir * f.spd * dt;
-            if (f.x > fHi) f.dir = -1;
-            else if (f.x < fLo) f.dir = 1;
-            f.scale.x = f.dir * f.baseSc;
-            f.y = f.cruiseY + Math.sin(t * 1.1 + f.x * 0.018) * 4; // slow depth wobble
+            if (fish.shoalOn) {
+              // gathered into a loose shoal: ease toward a slowly drifting centre, each holding its
+              // own slot so the group stays loose, all facing the way the shoal drifts
+              const span = fHi - fLo,
+                scx =
+                  fLo + span * (0.5 + Math.sin(t * 0.05 + fish.shoalPh) * 0.32),
+                tx = scx + f.shoalOx,
+                ty = f.cruiseY + f.shoalOy + Math.sin(t * 1.2 + f.wob) * 3,
+                px = f.x;
+              f.x += (tx - f.x) * 0.014 * dt;
+              f.y += (ty - f.y) * 0.03 * dt;
+              if (Math.abs(f.x - px) > 0.02 * dt) {
+                f.dir = f.x < px ? -1 : 1;
+                f.scale.x = f.dir * f.baseSc;
+              }
+            } else {
+              // roaming free: cruise and turn back at the banks, each on its own
+              f.x += f.dir * f.spd * dt;
+              if (f.x > fHi) f.dir = -1;
+              else if (f.x < fLo) f.dir = 1;
+              f.scale.x = f.dir * f.baseSc;
+              f.y = f.cruiseY + Math.sin(t * 1.1 + f.x * 0.018) * 4; // slow depth wobble
+            }
             f.alpha = 0.82 * (1 - ice * 0.55); // sluggish and all but hidden once it ices over
             f.next -= dt / 60;
             if (f.next < 0) {
