@@ -1203,6 +1203,10 @@
         'bush_w',
         'deer_far_a',
         'deer_far_b',
+        'eleph_far_a',
+        'eleph_far_b',
+        'ibex_far_a',
+        'ibex_far_b',
         'cornflower',
         'clover',
         'swallow_a',
@@ -2625,22 +2629,64 @@
           scene.addChild(lt);
           swayers.push({s: lt, amp: 0.01, sp: 0.7, ph: Math.random() * 6});
         }
-        // a small herd of deer grazes and ambles along the far hill — its own depth plane: drawn for
-        // a small size so it stays crisp, hazed into the atmosphere, and moving at a slow, far pace
-        if (
-          !snow &&
-          !BI.interior &&
-          ['meadow', 'marsh', 'fern', 'glade'].includes(BI.ground) &&
-          Math.random() < 0.6
-        ) {
+        // a far herd ambles along the mid-hill — the biome's own distant wildlife, each drawn for a
+        // small size so it stays crisp, hazed into the atmosphere, and moving at a slow, far pace on
+        // its own depth plane: deer on the green hills, elephants on the savanna, ibex on the scree
+        const FARFAUNA = {
+          meadow: {
+            f: ['deer_far_a', 'deer_far_b'],
+            sc: 0.44,
+            ds: 0.12,
+            spd: 0.08,
+            haze: 0xc6ccb2
+          },
+          marsh: {
+            f: ['deer_far_a', 'deer_far_b'],
+            sc: 0.42,
+            ds: 0.1,
+            spd: 0.08,
+            haze: 0xc6ccb2
+          },
+          fern: {
+            f: ['deer_far_a', 'deer_far_b'],
+            sc: 0.44,
+            ds: 0.12,
+            spd: 0.08,
+            haze: 0xc6ccb2
+          },
+          glade: {
+            f: ['deer_far_a', 'deer_far_b'],
+            sc: 0.44,
+            ds: 0.12,
+            spd: 0.08,
+            haze: 0xc6ccb2
+          },
+          savanna: {
+            f: ['eleph_far_a', 'eleph_far_b'],
+            sc: 0.5,
+            ds: 0.14,
+            spd: 0.05,
+            haze: 0xccc6ac
+          },
+          scree: {
+            f: ['ibex_far_a', 'ibex_far_b'],
+            sc: 0.4,
+            ds: 0.1,
+            spd: 0.07,
+            haze: 0xc4cad2,
+            snowOK: true
+          }
+        };
+        const ff = !BI.interior && !BI.underwater ? FARFAUNA[BI.ground] : null;
+        if (ff && (!snow || ff.snowOK) && Math.random() < 0.6) {
           const herdX = 170 + Math.random() * Math.max(1, VW - 340),
-            haze = mulTint(0xc6ccb2, folTint); // washed lighter and cooler, sitting back in the haze
+            haze = mulTint(ff.haze, folTint); // washed lighter/cooler, sitting back in the haze
           for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
             const d = anim(
-              ['deer_far_a', 'deer_far_b'],
+              ff.f,
               0,
               0,
-              0.44 + Math.random() * 0.12,
+              ff.sc + Math.random() * ff.ds,
               0.07 + Math.random() * 0.03
             );
             d.x = Math.max(
@@ -2652,7 +2698,7 @@
             d.dir = Math.random() < 0.5 ? 1 : -1;
             d.baseSc = Math.abs(d.scale.x);
             d.scale.x = d.dir * d.baseSc;
-            d.spd = 0.08 + Math.random() * 0.06; // a slow, far-off amble
+            d.spd = ff.spd + Math.random() * 0.05; // a slow, far-off amble
             d.mode = Math.random() < 0.6 ? 'graze' : 'walk';
             d.timer = 1 + Math.random() * 5;
             d.y = farY(d.x);
