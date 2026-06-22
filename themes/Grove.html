@@ -1785,6 +1785,7 @@
         overcastG,
         rainbowG,
         raysG,
+        beamG,
         puddleG,
         snowAccG,
         crestG,
@@ -1910,7 +1911,14 @@
           kinkajou =
           octopus =
             null;
-        whale = spoutG = surfG = cloudSeaG = cloudGlow = choughHub = null;
+        whale =
+          spoutG =
+          surfG =
+          cloudSeaG =
+          cloudGlow =
+          choughHub =
+          beamG =
+            null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
         // SP = optional per-biome season palette (tint-only seasons); else fall back to the global SEASONS, and non-seasonal biomes ignore the season entirely.
@@ -2810,6 +2818,13 @@
             farHerd.push(d);
             scene.addChild(d);
           }
+        }
+        // dawn/dusk light shafts hang in the air over the land — made here, before the foreground
+        // trees, so those trees break across them; the ticker draws them from the sun's height
+        if (!BI.interior && !BI.underwater && !BI.canopy && !BI.glade) {
+          beamG = new PIXI.Graphics();
+          beamG.blendMode = PIXI.BLEND_MODES.ADD;
+          scene.addChild(beamG);
         }
         for (const [n, sc, x] of varyLayer(BI.near)) {
           const jx = x + (Math.random() - 0.5) * 64,
@@ -5883,6 +5898,44 @@
               raysG.lineTo(ex - nx, ey - ny);
               raysG.closePath();
               raysG.endFill();
+            }
+          }
+        }
+
+        // dawn/dusk light shafts: soft golden beams raking across the open land, ramping up as the
+        // sun nears the horizon and gone by midday and night. Additive and faint, leaning away from
+        // the sun's side and drifting slowly — light hanging in the hazy air, not hard rays.
+        if (beamG) {
+          beamG.clear();
+          const low = cel.sun
+              ? Math.max(0, Math.min(1, (cel.y - 250) / 150))
+              : 0,
+            beam = low * low * (1 - cover * 0.7); // ease in low; fade as cloud hides the sun
+          if (beam > 0.02) {
+            const lean = (cel.x / VW - 0.5) * 1.7, // tilt away from the sun's side
+              topY = 380,
+              botY = 700,
+              N = 8,
+              span = VW / (N - 1),
+              SEG = 3;
+            for (let i = 0; i < N; i++) {
+              const bx = i * span + Math.sin(t * 0.07 + i * 1.3) * 28, // slow drift
+                w = 15 + 6 * Math.sin(t * 0.4 + i * 2);
+              for (let s = 0; s < SEG; s++) {
+                const y0 = topY + ((botY - topY) * s) / SEG,
+                  y1 = topY + ((botY - topY) * (s + 1)) / SEG,
+                  x0 = bx - lean * (y0 - topY),
+                  x1 = bx - lean * (y1 - topY),
+                  w0 = w * (1 + s * 0.22),
+                  w1 = w * (1 + (s + 1) * 0.22);
+                beamG.beginFill(0xffd488, beam * 0.13 * (1 - s / SEG)); // fades as it falls
+                beamG.moveTo(x0 - w0, y0);
+                beamG.lineTo(x0 + w0, y0);
+                beamG.lineTo(x1 + w1, y1);
+                beamG.lineTo(x1 - w1, y1);
+                beamG.closePath();
+                beamG.endFill();
+              }
             }
           }
         }
