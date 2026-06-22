@@ -3824,7 +3824,21 @@
                 camel: 'camel_rest',
                 panda: 'panda_rest'
               }[BI.walker[0]];
-            const resting = restSprite && Math.random() < 0.3;
+            // grazers are crepuscular: risen to feed through the dawn and dusk golden hours, and
+            // bedded down through the night (a few also lie up out of the midday lull). Weight how
+            // much of the herd spawns at rest by the time of day, so the meadow suits the light.
+            const hr = nowHour(),
+              restChance =
+                hr >= 20 || hr < 5
+                  ? 0.8 // deep night: most of the herd is bedded
+                  : hr < 7
+                    ? 0.15 // dawn: up and feeding
+                    : hr < 16
+                      ? 0.3 // day: a few lie up to ruminate
+                      : hr < 18
+                        ? 0.42 // late afternoon: some begin to settle
+                        : 0.6; // dusk into evening: bedding down for the night
+            const resting = restSprite && Math.random() < restChance;
             // the wading bird is the grey heron most visits, a white egret some — same patient
             // stalk-and-strike either way
             const wadeFrames =
