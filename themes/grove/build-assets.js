@@ -795,6 +795,25 @@ const flowerBushSvg = (c1, c2) =>
 save('bush_h', flowerBushSvg('#bcd4f2', '#7ea8e0'), 110); // hydrangea blue
 save('bush_p', flowerBushSvg('#f6c2dc', '#e483b4'), 110); // pink
 save('bush_w', flowerBushSvg('#fbf6ff', '#e2d6ee'), 110); // white
+// ---- BACKGROUND wildlife: a clean, simple deer silhouette built to read sharp at a small,
+// far-off size (NOT a shrunk foreground sprite). Two walk frames; hazed and walked along the
+// mid-hill in the scene so it keeps to its own depth plane. ----
+const deerFarSvg = (legs) =>
+  S(
+    '84 76',
+    `<g stroke="#6f5236" stroke-width="1.7" stroke-linecap="round" fill="none"><path d="M57,18 C58,12 55,9 57,5"/><path d="M57,12 L61,9"/><path d="M58,8 L62,6"/></g>
+<g fill="#6f5236">
+<ellipse cx="37" cy="40" rx="20" ry="11"/>
+<path d="M49,44 C55,36 57,27 56,19 C59,18 61,15 59,12 C57,13 55,14 54,17 C52,23 45,35 43,43 Z"/>
+<path d="M55,18 L60,13 L60,19 Z"/>
+<path d="M18,36 C12,33 12,39 17,41 Z"/>
+${legs}
+</g>`
+  );
+const deerLegsA = `<g stroke="#5e4530" stroke-width="3.4" stroke-linecap="round"><line x1="25" y1="45" x2="24" y2="68"/><line x1="33" y1="46" x2="33" y2="68"/><line x1="44" y1="46" x2="44" y2="68"/><line x1="51" y1="45" x2="52" y2="68"/></g>`;
+const deerLegsB = `<g stroke="#5e4530" stroke-width="3.4" stroke-linecap="round"><line x1="23" y1="45" x2="19" y2="67"/><line x1="33" y1="46" x2="37" y2="66"/><line x1="44" y1="46" x2="40" y2="66"/><line x1="53" y1="45" x2="57" y2="67"/></g>`;
+save('deer_far_a', deerFarSvg(deerLegsA), 88);
+save('deer_far_b', deerFarSvg(deerLegsB), 88);
 save(
   'heron',
   S(
@@ -3107,7 +3126,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['bush_h', 'bush_p', 'bush_w', 'sunflower'];
+const review = ['deer_far_a', 'deer_far_b', 'sunflower', 'bush_h'];
 const cols = 4,
   cell = 230,
   pad = 14,

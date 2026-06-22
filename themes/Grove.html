@@ -1201,6 +1201,8 @@
         'bush_h',
         'bush_p',
         'bush_w',
+        'deer_far_a',
+        'deer_far_b',
         'cornflower',
         'clover',
         'swallow_a',
@@ -1648,6 +1650,10 @@
         gBase +
         Math.sin(x * gFreq + gPh) * gAmp +
         Math.sin(x * gFreq2 + gPh2) * gAmp2;
+      // the mid-hill surface — its own walkable depth plane, well behind the foreground ground.
+      // distant wildlife keeps to this contour (matches the mid-tree line), at its own smaller scale
+      let farHillPh = 0;
+      const farY = (x) => 470 + Math.sin(x * 0.006 + farHillPh) * 32;
       // leave a footprint when an animal has walked a stride over settled snow; trails fill in over time
       function dropTrack(obj, kind, stride) {
         if (!obj || obj.visible === false || snowAcc < 0.22) return;
@@ -1701,6 +1707,7 @@
         clouds = [],
         ducks = [],
         fish = [],
+        farDeer = [],
         flutters = [],
         dragons = [],
         fireflies = [],
@@ -1819,6 +1826,7 @@
           clouds.length =
           ducks.length =
           fish.length =
+          farDeer.length =
           flutters.length =
           dragons.length =
           fireflies.length =
@@ -2508,15 +2516,10 @@
           return out;
         };
         // jitter every tree's spot, size and facing per build so a stand never repeats exactly
-        const midPh = Math.random() * 6.283;
+        farHillPh = Math.random() * 6.283; // this build's mid-hill phase (mid trees + far deer share it)
         for (const [n, sc, x] of varyLayer(BI.mid)) {
           const jx = x + (Math.random() - 0.5) * 70,
-            t = spr(
-              n,
-              jx,
-              470 + Math.sin(jx * 0.006 + midPh) * 32,
-              sc * (0.86 + Math.random() * 0.28)
-            );
+            t = spr(n, jx, farY(jx), sc * (0.86 + Math.random() * 0.28));
           t.tint = BI.interior ? 0xffffff : tintJit(mulTint(0xcfe3d0, folTint));
           if (!RIGID[n] && Math.random() < 0.5) t.scale.x *= -1; // mirror about half of them
           scene.addChild(t);
@@ -2536,13 +2539,50 @@
             lt = spr(
               treePool[(Math.random() * treePool.length) | 0],
               tx,
-              470 + Math.sin(tx * 0.006 + midPh) * 32,
+              farY(tx),
               0.66 + Math.random() * 0.22 // a clearly prominent tree crowning the rise
             );
           lt.tint = tintJit(mulTint(0xbccfba, folTint)); // hazier and cooler than the near trees
           if (Math.random() < 0.5) lt.scale.x *= -1;
           scene.addChild(lt);
           swayers.push({s: lt, amp: 0.01, sp: 0.7, ph: Math.random() * 6});
+        }
+        // a small herd of deer grazes and ambles along the far hill — its own depth plane: drawn for
+        // a small size so it stays crisp, hazed into the atmosphere, and moving at a slow, far pace
+        if (
+          !snow &&
+          !BI.interior &&
+          ['meadow', 'marsh', 'fern', 'glade'].includes(BI.ground) &&
+          Math.random() < 0.6
+        ) {
+          const herdX = 170 + Math.random() * Math.max(1, VW - 340),
+            haze = mulTint(0xc6ccb2, folTint); // washed lighter and cooler, sitting back in the haze
+          for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
+            const d = anim(
+              ['deer_far_a', 'deer_far_b'],
+              0,
+              0,
+              0.44 + Math.random() * 0.12,
+              0.07 + Math.random() * 0.03
+            );
+            d.x = Math.max(
+              36,
+              Math.min(VW - 36, herdX + (Math.random() - Math.random()) * 150)
+            );
+            d.tint = haze;
+            d.alpha = 0.96;
+            d.dir = Math.random() < 0.5 ? 1 : -1;
+            d.baseSc = Math.abs(d.scale.x);
+            d.scale.x = d.dir * d.baseSc;
+            d.spd = 0.08 + Math.random() * 0.06; // a slow, far-off amble
+            d.mode = Math.random() < 0.6 ? 'graze' : 'walk';
+            d.timer = 1 + Math.random() * 5;
+            d.y = farY(d.x);
+            if (reduce.matches) d.gotoAndStop(0);
+            else d.stop();
+            farDeer.push(d);
+            scene.addChild(d);
+          }
         }
         for (const [n, sc, x] of varyLayer(BI.near)) {
           const jx = x + (Math.random() - 0.5) * 64,
@@ -5810,6 +5850,30 @@
           if (c.x - c.width > VW) c.x = -c.width;
           else if (c.x + c.width < 0) c.x = VW + c.width;
         }
+        // the far herd: a slow amble along the mid-hill with grazing pauses, turning at the edges —
+        // its own depth plane (the farY contour), at its own far pace
+        if (!reduce.matches)
+          for (const d of farDeer) {
+            d.timer -= dt / 60;
+            if (d.mode === 'walk') {
+              d.x += d.dir * d.spd * dt;
+              if (!d.playing) d.play();
+              if (d.x > VW - 30) d.dir = -1;
+              else if (d.x < 30) d.dir = 1;
+              d.scale.x = d.dir * d.baseSc;
+              if (d.timer < 0) {
+                d.mode = 'graze';
+                d.timer = 2 + Math.random() * 5;
+                d.gotoAndStop(0);
+              }
+            } else if (d.timer < 0) {
+              d.mode = 'walk';
+              d.timer = 3 + Math.random() * 6;
+              if (Math.random() < 0.4) d.dir = -d.dir;
+              d.scale.x = d.dir * d.baseSc;
+            }
+            d.y = farY(d.x);
+          }
         if (cloudSeaG) cloudSeaG.y = Math.sin(t * 0.3) * 4; // the cloud sea breathes slowly
         if (cloudGlow)
           // warm light grows as the sun nears the horizon (low sun = golden hour)
