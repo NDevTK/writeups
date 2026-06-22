@@ -7466,16 +7466,25 @@
             m.x = Math.random() * VW;
           }
         }
-        // air dust sinking through the dawn/dusk shafts: a faint mote in shade, flaring warm as it
-        // crosses a beam, so the light reads as something hanging in the air
+        // air dust drifting through the dawn/dusk shafts: a faint mote in shade that flares warm in a
+        // beam. It rides the same wind as the grass and fog, and warm air rising in a shaft makes a lit
+        // mote linger, lift, and swirl while shaded dust just sinks — so the light feels alive, not flat
         for (const d of dust) {
-          d.y += d.vy * dt;
-          d.x += Math.sin(t * 0.4 + d.ph) * 0.22 * dt; // wanders sideways as it falls
-          if (d.y > 632) {
-            d.y = 384;
+          const lit = beamLightAt(d.x, d.y);
+          d.y += (d.vy - lit * 0.35) * dt; // sinks, but the warmth of a shaft buoys it up
+          d.x +=
+            (Math.sin(t * 0.4 + d.ph) * 0.16 + // its own slow wander
+              wind * 0.6 + // blows with the shared breeze and gusts
+              Math.sin(t * 1.1 + d.ph * 2) * lit * 0.5) * // swirls where the light catches it
+            dt;
+          if (d.y > 632 || d.y < 372) {
+            d.y = d.y < 372 ? 628 : 384; // recirculate: risen out the top, or sunk past the bottom
             d.x = Math.random() * VW;
           }
-          d.alpha = d.baseA + beamLightAt(d.x, d.y) * 1.0;
+          if (d.x < -16)
+            d.x += VW + 32; // wrap sideways so gusts can't sweep it off-screen
+          else if (d.x > VW + 16) d.x -= VW + 32;
+          d.alpha = d.baseA + lit * 1.0;
         }
         // an octopus creeps the reef floor in slow bursts, pausing to feel about with its arms
         if (octopus) {
