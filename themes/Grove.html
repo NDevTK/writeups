@@ -3905,6 +3905,7 @@
             dm.baseY = dm.y;
             dm.baseSpd = 0.3 + Math.random() * 0.3;
             dm.vx = dm.baseSpd;
+            dm.dabbler = true; // up-ends to feed
             dm.kids = [];
             dm.ref = spr('duck_f', 380, 0, 0.6);
             dm.ref.scale.y = -0.6;
@@ -3929,6 +3930,7 @@
             d2.baseY = d2.y;
             d2.baseSpd = 0.28 + Math.random() * 0.3;
             d2.vx = Math.random() < 0.5 ? d2.baseSpd : -d2.baseSpd;
+            d2.dabbler = true; // up-ends to feed
             ducks.push(d2);
             scene.addChild(d2);
             // a moorhen often potters among them — darker, smaller, with a red bill
@@ -5880,7 +5882,14 @@
             d.vx += (dir * spd - d.vx) * 0.05 * dt; // ease toward a gentle cruise
             if (Math.abs(d.x - d.tx) < 16) {
               // arrived: usually pause to dabble, then strike out for a new, unrelated spot
-              if (Math.random() < 0.6) d.pauseT = 1.5 + Math.random() * 4;
+              if (Math.random() < 0.6) {
+                d.pauseT = 1.5 + Math.random() * 4;
+                // a dabbling duck often up-ends to feed — bottom-up, tail in the air — before righting
+                if (d.dabbler && !d.upend && !ice && Math.random() < 0.5) {
+                  d.upend = 1 + Math.random() * 1.6;
+                  d.pauseT = Math.max(d.pauseT, d.upend + 0.6);
+                }
+              }
               d.tx = loX + Math.random() * (hiX - loX);
             }
           }
@@ -5902,15 +5911,59 @@
           const cur = d.sy || 0; // undefined on the first frame; || keeps it numeric (and self-heals from NaN)
           d.sy = cur + (steer - cur) * 0.08;
           d.scale.x = (d.vx < 0 ? -1 : 1) * Math.abs(d.scale.x);
+          // up-end: ease the tip in while feeding bottom-up, then right itself; rings the surface
+          if (d.upend > 0) {
+            d.upend -= dt / 60;
+            if (water && Math.random() < 0.18 * dt)
+              ripples.push({x: d.x, y: d.baseY + 6, r: 3, life: 0.6});
+          }
+          d.up = (d.up || 0) + ((d.upend > 0 ? 1 : 0) - (d.up || 0)) * 0.1 * dt;
+          d.rotation = d.up * 1.25 * Math.sign(d.scale.x || 1); // head dips, tail lifts
           d.y =
             d.baseY +
             d.sy +
-            Math.sin(t * 2 + d.x * 0.05) * 1.6 * (1 - ice * 0.5); // stiller on slush
+            Math.sin(t * 2 + d.x * 0.05) * 1.6 * (1 - ice * 0.5) + // stiller on slush
+            d.up * 9; // sink the front as it tips bottom-up
+          // when it up-ends, half the duck is under the (transparent) water. Follow the fish
+          // convention rather than cutting the head off: the part above the waterline stays bright,
+          // the submerged head/breast shows MURKY — sunk toward the water colour, half-seen through
+          // the surface. Two clips of the same duck composite it: bright above, murky below.
+          if (d.dabbler) {
+            if (d.up > 0.04) {
+              const wl = d.baseY + 7; // the waterline this duck floats at
+              if (!d.under) {
+                d.wmask = new PIXI.Graphics()
+                  .beginFill(0xffffff)
+                  .drawRect(-VW, wl - 1600, VW * 3, 1600)
+                  .endFill(); // above the waterline
+                d.umask = new PIXI.Graphics()
+                  .beginFill(0xffffff)
+                  .drawRect(-VW, wl, VW * 3, 1600)
+                  .endFill(); // below it
+                d.under = new PIXI.Sprite(d.texture);
+                d.under.anchor.copyFrom(d.anchor);
+                d.under.tint = 0x6f8ea0; // murky, sunk toward the water colour (as the fish are)
+                d.under.mask = d.umask;
+                scene.addChild(d.wmask);
+                scene.addChild(d.umask);
+                scene.addChildAt(d.under, scene.getChildIndex(d)); // just behind the bright half
+              }
+              d.mask = d.wmask;
+              d.under.visible = true;
+              d.under.position.set(d.x, d.y);
+              d.under.rotation = d.rotation;
+              d.under.scale.set(d.scale.x, d.scale.y);
+              d.under.alpha = 0.62 * Math.min(1, d.up * 1.4); // dimmer, half-seen through the water
+            } else {
+              if (d.mask) d.mask = null;
+              if (d.under) d.under.visible = false;
+            }
+          }
           if (d.ref) {
             d.ref.x = d.x;
             d.ref.y = d.y + 18 + Math.sin(t * 2) * 1;
             d.ref.scale.x = d.scale.x;
-            d.ref.alpha = 0.28 * (1 - ice * 0.55); // the freezing surface reflects less
+            d.ref.alpha = 0.28 * (1 - ice * 0.55) * (1 - d.up * 0.85); // reflection breaks up as it tips
           }
           if (d.kids)
             d.kids.forEach((k, i) => {
