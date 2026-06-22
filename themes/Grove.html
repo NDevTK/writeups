@@ -2554,23 +2554,63 @@
             swayers.push({s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6});
           }
           if (!snow) {
-            // a meadow draws from a wider mix now — the round pink/white blooms plus daisies, a
-            // blue floret spike, tulips, frilly cornflowers and low clover (pink/white most common)
-            const FL = [
-              'flower_p',
-              'flower_w',
-              'flower_p',
-              'flower_w',
-              'flower_y',
-              'flower_b',
-              'tulip',
-              'poppy',
-              'cornflower',
-              'clover',
-              'clover'
-            ];
-            // a few foxglove spires stand tall above the low blooms
-            for (let i = 0, n = (Math.random() * 2.5) | 0; i < n; i++) {
+            // the meadow's flowering shifts with the season: a fresh, tulip-heavy spring flush,
+            // poppies and cornflowers through high summer, and a sparser, muted scatter come autumn
+            const seas = BI.seasonal ? nowSeason() : 'summer';
+            const FL = {
+              spring: [
+                'flower_p',
+                'flower_w',
+                'flower_y',
+                'flower_b',
+                'tulip',
+                'tulip',
+                'cornflower',
+                'clover'
+              ],
+              summer: [
+                'flower_p',
+                'flower_w',
+                'flower_y',
+                'flower_b',
+                'poppy',
+                'poppy',
+                'cornflower',
+                'clover',
+                'clover'
+              ],
+              autumn: ['flower_y', 'flower_w', 'poppy', 'clover', 'clover']
+            }[seas] || ['flower_p', 'flower_w', 'flower_y', 'poppy', 'clover'];
+            // how many blooms, and whether they gather into a few dense patches or spread out —
+            // each build leans one way, so some meadows read as even scatters, others as clumped drifts
+            const bloomN = {spring: 11, summer: 8, autumn: 4}[seas] || 8;
+            const clumps =
+              Math.random() < 0.5
+                ? Array.from(
+                    {length: 2 + ((Math.random() * 3) | 0)},
+                    () => 70 + Math.random() * (VW - 140)
+                  )
+                : null;
+            const flx = () =>
+              clumps
+                ? Math.max(
+                    40,
+                    Math.min(
+                      VW - 40,
+                      clumps[(Math.random() * clumps.length) | 0] +
+                        (Math.random() - Math.random()) * 95
+                    )
+                  )
+                : 60 + Math.random() * (VW - 120);
+            // now and then a bloom comes up an unexpected colour — a sport that's clearly off the
+            // meadow's usual pink/white/yellow/blue: a vivid orange, purple, magenta, violet or teal
+            const ODD = [0xff6a1f, 0xb84fd6, 0xe84bb0, 0x6c4cff, 0x2fb6c4];
+            // a few foxglove spires stand tall above the low blooms — but they've gone over by autumn
+            for (
+              let i = 0, n = seas === 'autumn' ? 0 : (Math.random() * 2.5) | 0;
+              i < n;
+              i++
+            ) {
               const x = 80 + Math.random() * (VW - 160),
                 fg = spr(
                   'foxglove',
@@ -2621,14 +2661,19 @@
               if (Math.random() < 0.5) lg.scale.x *= -1;
               scene.addChild(lg);
             }
-            for (let i = 0, n = 6 + ((Math.random() * 8) | 0); i < n; i++) {
-              const x = 60 + Math.random() * (VW - 120),
+            for (let i = 0, n = vc(bloomN); i < n; i++) {
+              const odd = Math.random() < 0.06;
+              const x = flx(),
                 f = spr(
-                  FL[(Math.random() * FL.length) | 0],
+                  odd ? 'flower_w' : FL[(Math.random() * FL.length) | 0],
                   x,
                   groundY(x) + 8,
                   0.6 + Math.random() * 0.4
                 );
+              // off-palette sports get the surprise hue; the rest a gentle per-bloom shade shift
+              f.tint = odd
+                ? ODD[(Math.random() * ODD.length) | 0]
+                : tintJit(0xffffff, 0.06);
               scene.addChild(f);
               swayers.push({s: f, amp: 0.06, sp: 1.4, ph: Math.random() * 6});
             }
