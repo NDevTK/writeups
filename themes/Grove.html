@@ -88,15 +88,27 @@
     <script src="grove/pixi.min.js"></script>
     <script>
       'use strict';
-      const VW = 1280,
+      let VW = 1280; // canvas width — tracks the display aspect so any screen ratio fills (see fitVW)
+      const VWBASE = 1280, // the width the per-biome art was composed at; backgrounds scale from this
         VH = 720,
         HZ = 430; // design space + celestial horizon
+      let XS = 1; // VW / VWBASE — scales the hand-placed background content to the current width
       const reduce = matchMedia('(prefers-reduced-motion: reduce)');
       const app = new PIXI.Application({
         resizeTo: window,
         antialias: true,
         backgroundAlpha: 0
       });
+      // the canvas width tracks the display's aspect (the height stays fixed at VH, so the vertical
+      // composition — sky, horizon, ground, water — is constant), clamped so extreme ratios stay
+      // sensible. A 21:9 screen simply gets more landscape; portrait a narrower slice. No cropping.
+      const fitVW = () =>
+        Math.round(
+          Math.max(
+            840,
+            Math.min(2560, VH * (app.screen.width / app.screen.height))
+          )
+        );
       document.body.appendChild(app.view);
       const root = new PIXI.Container();
       app.stage.addChild(root);
@@ -115,7 +127,16 @@
           app.screen.height - (VH - PAR_V) * s // anchor the water to the bottom (a few px of margin for parallax)
         );
       }
-      app.renderer.on('resize', fit);
+      // on resize, re-fit immediately for a snappy feel; if the window's aspect changed enough that
+      // the canvas width should change, rebuild the scene to the new width once the drag settles
+      let resizeT;
+      app.renderer.on('resize', () => {
+        fit();
+        if (ready && Math.abs(fitVW() - VW) > 48) {
+          clearTimeout(resizeT);
+          resizeT = setTimeout(build, 220);
+        }
+      });
       // gentle parallax: pointer (desktop/standalone) or device tilt (mobile) nudges near layers more than far
       let farLayer,
         parX = 0,
@@ -1783,6 +1804,8 @@
         choughHub = null;
 
       function build() {
+        VW = fitVW(); // size the canvas to the current display aspect, then build to fill it
+        XS = VW / VWBASE;
         root.removeChildren();
         swayers.length =
           clouds.length =
@@ -1923,8 +1946,9 @@
         farLayer.addChild(raysG); // god-rays shafting from the sun through breaking cloud (clouds render over)
 
         if (!BI.interior && !BI.underwater && !BI.canopy && !BI.glade)
-          // a clear-ish sky some visits, a busier one others
-          for (let i = 0, n = 1 + ((Math.random() * 6) | 0); i < n; i++) {
+          // a clear-ish sky some visits, a busier one others (count scales with width so a wide sky
+          // isn't left bare)
+          for (let i = 0, n = 1 + ((Math.random() * 6 * XS) | 0); i < n; i++) {
             const sc = 0.5 + Math.random() * 0.5,
               c = spr(
                 'cloud',
@@ -2405,14 +2429,21 @@
               !RIGID[n] && Math.random() < 0.45
                 ? treePool[(Math.random() * treePool.length) | 0]
                 : n;
-            out.push([nn, s, x]);
+            // hand-placed positions are composed for the 1280 base width; scale them to the current
+            // width so the stand spreads to fill a wide screen instead of leaving the far edge bare
+            out.push([nn, s, x * XS]);
           }
-          if (Math.random() < 0.5)
+          // seed the odd extra, plus more across any width the canvas gains beyond its base, so a
+          // wider screen fills with trees rather than thinning out
+          const nExtra =
+            (Math.random() < 0.5 ? 1 : 0) +
+            Math.max(0, Math.round((VW - VWBASE) / 320));
+          for (let i = 0; i < nExtra; i++)
             out.push([
               treePool[(Math.random() * treePool.length) | 0],
               sMin + Math.random() * (sMax - sMin),
               60 + Math.random() * (VW - 120)
-            ]); // one extra, tucked in among the rest
+            ]);
           return out;
         };
         // jitter every tree's spot, size and facing per build so a stand never repeats exactly
@@ -3649,8 +3680,13 @@
                   ? 0.4 + Math.random() * 0.06
                   : 0.29 + Math.random() * 0.08),
               cx = VW / 2 + (Math.random() - 0.5) * (wide ? 90 : 230),
-              ry = 50 + Math.random() * 14; // shallower lens or a deeper, rounder pond
-            pondShape = {cx, cy: 654 + Math.random() * 10, rx, ry};
+              // the far shore sits a touch INTO the water (>= 606, never above the 600 waterline) so
+              // the oval's top never exposes the grass behind it; the depth varies the rest
+              top = 606 + Math.random() * 8,
+              bot = 700 + Math.random() * 24,
+              cy = (top + bot) / 2,
+              ry = (bot - top) / 2;
+            pondShape = {cx, cy, rx, ry};
             waterL = cx - rx * 0.82;
             waterR = cx + rx * 0.82;
           }
@@ -3745,7 +3781,7 @@
             reflLayer = new PIXI.Container();
             scene.addChild(reflLayer);
             for (const [n, sc, x] of BI.near) {
-              const r = spr(n, x, 600, sc);
+              const r = spr(n, x * XS, 600, sc); // match the (width-scaled) bankside trees above
               r.scale.y = -sc; // flip about the bank-level anchor so it hangs into the water
               r.tint = mulTint(folTint, 0x6f8ca4); // foliage colour sunk toward the water
               r.alpha = 0.2;
