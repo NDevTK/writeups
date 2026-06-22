@@ -1201,8 +1201,6 @@
         'bush_h',
         'bush_p',
         'bush_w',
-        'windmill',
-        'windmill_sail',
         'cornflower',
         'clover',
         'swallow_a',
@@ -1801,7 +1799,6 @@
         surfG,
         cloudSeaG,
         cloudGlow,
-        windmillSail,
         SE,
         BI,
         ready = false;
@@ -1881,14 +1878,7 @@
           kinkajou =
           octopus =
             null;
-        whale =
-          spoutG =
-          surfG =
-          cloudSeaG =
-          cloudGlow =
-          choughHub =
-          windmillSail =
-            null;
+        whale = spoutG = surfG = cloudSeaG = cloudGlow = choughHub = null;
         SE = SEASONS[nowSeason()] || SEASONS.summer;
         BI = BIOMES[nowBiome()] || BIOMES.grove;
         // SP = optional per-biome season palette (tint-only seasons); else fall back to the global SEASONS, and non-seasonal biomes ignore the season entirely.
@@ -2534,23 +2524,50 @@
             swayers.push({s: t, amp: 0.012, sp: 0.7, ph: Math.random() * 6});
           snowCap(t, n);
         }
-        // a windmill turns on a far hill in the gentler countryside biomes — a landmark for the eye,
-        // its sails spun by the wind in the ticker. Tower + a separately-pinned, rotating sail cross.
+        // give the far hills some life and a natural focal point: the odd lone tree crowning a
+        // distant rise, and a few deer grazing the slopes — small and hazed into the distance
         if (
           !snow &&
-          ['meadow', 'marsh', 'fern', 'glade'].includes(BI.ground) &&
-          Math.random() < 0.4
+          !BI.interior &&
+          ['meadow', 'marsh', 'fern', 'glade'].includes(BI.ground)
         ) {
-          const wx = 130 + Math.random() * Math.max(1, VW - 260),
-            ws = 0.5 + Math.random() * 0.2,
-            wy = 476 + Math.sin(wx * 0.006 + midPh) * 26; // sit on the mid-hill line
-          const tower = spr('windmill', wx, wy, ws);
-          tower.tint = tintJit(0xeae6d6, 0.04); // softly hazed into the distance
-          scene.addChild(tower);
-          const sail = spr('windmill_sail', wx, wy - 100 * ws, ws, 0.5, 0.5);
-          sail.tint = tower.tint;
-          scene.addChild(sail);
-          windmillSail = sail;
+          const hillY = (x) => 470 + Math.sin(x * 0.006 + midPh) * 32; // the mid-hill surface
+          if (treePool.length && Math.random() < 0.55) {
+            const tx = 120 + Math.random() * Math.max(1, VW - 240),
+              lt = spr(
+                treePool[(Math.random() * treePool.length) | 0],
+                tx,
+                hillY(tx),
+                0.66 + Math.random() * 0.22 // a clearly prominent tree crowning the rise
+              );
+            lt.tint = tintJit(mulTint(0xbccfba, folTint)); // hazier and cooler than the near trees
+            if (Math.random() < 0.5) lt.scale.x *= -1;
+            scene.addChild(lt);
+            swayers.push({s: lt, amp: 0.01, sp: 0.7, ph: Math.random() * 6});
+          }
+          // a small herd grazes one far slope together rather than dotting the whole ridge
+          if (Math.random() < 0.6) {
+            const herdX = 150 + Math.random() * Math.max(1, VW - 300);
+            for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
+              const dx = Math.max(
+                  40,
+                  Math.min(
+                    VW - 40,
+                    herdX + (Math.random() - Math.random()) * 130
+                  )
+                ),
+                dd = spr(
+                  Math.random() < 0.5 ? 'deer_a' : 'deer_b',
+                  dx,
+                  hillY(dx) + 2,
+                  0.18 + Math.random() * 0.06
+                );
+              dd.tint = 0xb0a288; // grazing far off, hazed warm into the hillside
+              dd.alpha = 0.94;
+              if (Math.random() < 0.5) dd.scale.x *= -1;
+              scene.addChild(dd);
+            }
+          }
         }
         for (const [n, sc, x] of varyLayer(BI.near)) {
           const jx = x + (Math.random() - 0.5) * 64,
@@ -5818,8 +5835,6 @@
           if (c.x - c.width > VW) c.x = -c.width;
           else if (c.x + c.width < 0) c.x = VW + c.width;
         }
-        if (windmillSail)
-          windmillSail.rotation += (0.005 + Math.abs(wind) * 0.014) * dt; // sails turn, faster in a gust
         if (cloudSeaG) cloudSeaG.y = Math.sin(t * 0.3) * 4; // the cloud sea breathes slowly
         if (cloudGlow)
           // warm light grows as the sun nears the horizon (low sun = golden hour)
