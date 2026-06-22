@@ -2308,7 +2308,11 @@
           ceil.closePath();
           ceil.endFill();
           scene.addChild(ceil);
-          for (const x of [110, 300, 470, 690, 880, 1040, 1200]) {
+          for (
+            let x = 70 + Math.random() * 60;
+            x < VW - 30;
+            x += 120 + Math.random() * 90 // spaced across the full ceiling, however wide the cave
+          ) {
             const cy = ceilEdge(x),
               s = spr(
                 'stalactite',
@@ -2498,29 +2502,31 @@
         }
         if (BI.crystals)
           for (const [x, col] of BI.crystals) {
-            const fy = groundY(x) + 6,
-              gl = spr('glow', x, fy - 26, 0.9, 0.5, 0.5);
+            const cx = x * XS, // spread the clusters across the live width, not the old 1280 base
+              fy = groundY(cx) + 6,
+              gl = spr('glow', cx, fy - 26, 0.9, 0.5, 0.5);
             gl.tint = col;
             gl.blendMode = PIXI.BLEND_MODES.ADD;
             gl.ph = Math.random() * 6.28;
             scene.addChild(gl);
             crystals.push(gl);
-            const c = spr('crystal', x, fy, 0.34 + Math.random() * 0.16);
+            const c = spr('crystal', cx, fy, 0.34 + Math.random() * 0.16);
             c.tint = col;
             scene.addChild(c);
           }
         if (BI.mushrooms)
           // luminous toadstools: a tinted glow halo (pulsed by the crystal ticker) under each cluster
           for (const [x, sprite, col] of BI.mushrooms) {
-            const fy = groundY(x) + 6,
+            const cx = x * XS, // distribute across the live width rather than the old 1280 base
+              fy = groundY(cx) + 6,
               sc = 0.66 + Math.random() * 0.22,
-              gl = spr('glow', x, fy - 30 * sc, 1.1 * sc, 0.5, 0.5);
+              gl = spr('glow', cx, fy - 30 * sc, 1.1 * sc, 0.5, 0.5);
             gl.tint = col;
             gl.blendMode = PIXI.BLEND_MODES.ADD;
             gl.ph = Math.random() * 6.28;
             scene.addChild(gl);
             crystals.push(gl);
-            const m = spr(sprite, x, fy, sc);
+            const m = spr(sprite, cx, fy, sc);
             m.tint = col;
             scene.addChild(m);
           }
