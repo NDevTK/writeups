@@ -2534,35 +2534,58 @@
           meadow: [
             ['grass', 0.22],
             ['grass', 0.2],
+            ['grass', 0.2],
             ['shrub', 0.16],
-            ['fern', 0.18]
+            ['fern', 0.18],
+            ['fern', 0.16],
+            ['poppy', 0.15],
+            ['cornflower', 0.15],
+            ['flower_p', 0.14],
+            ['flower_w', 0.14],
+            ['flower_y', 0.14],
+            ['clover', 0.16]
           ],
           marsh: [
             ['grass', 0.24],
             ['grass', 0.2],
             ['reed', 0.18],
-            ['shrub', 0.15]
+            ['reed', 0.16],
+            ['shrub', 0.15],
+            ['fern', 0.16],
+            ['flower_w', 0.14],
+            ['flower_p', 0.14]
           ],
           fern: [
             ['grass', 0.22],
             ['fern', 0.2],
-            ['shrub', 0.16]
+            ['fern', 0.18],
+            ['shrub', 0.16],
+            ['flower_w', 0.14],
+            ['poppy', 0.14]
           ],
           glade: [
             ['grass', 0.22],
             ['fern', 0.2],
-            ['shrub', 0.16]
+            ['fern', 0.18],
+            ['shrub', 0.16],
+            ['flower_p', 0.14],
+            ['flower_w', 0.14],
+            ['clover', 0.16]
           ],
           jungle: [
             ['fern', 0.22],
             ['fern', 0.18],
-            ['bigleaf', 0.16]
+            ['fern', 0.2],
+            ['bigleaf', 0.16],
+            ['flower_p', 0.13]
           ],
           savanna: [
             ['grass', 0.24],
             ['grass', 0.2],
             ['aloe', 0.16],
-            ['seedhead', 0.2]
+            ['seedhead', 0.2],
+            ['seedhead', 0.18],
+            ['flower_y', 0.13]
           ],
           sand: [
             ['cactus', 0.16],
@@ -2595,17 +2618,33 @@
           !snow && !BI.interior && !BI.underwater ? MIDFLORA[BI.ground] : null;
         if (midSet) {
           const mhaze = mulTint(dryMid ? 0xd8cfb6 : 0xccdcc4, folTint),
+            fhaze = mulTint(dryMid ? 0xe6dcc4 : 0xe0e4d2, folTint), // lighter, so far blooms keep colour
+            FLOWERY = {
+              poppy: 1,
+              cornflower: 1,
+              clover: 1,
+              tulip: 1,
+              flower_b: 1,
+              flower_p: 1,
+              flower_w: 1,
+              flower_y: 1,
+              lupine_p: 1,
+              lupine_b: 1,
+              lupine_k: 1,
+              lupine_w: 1
+            },
             msway = {grass: 1, fern: 1, reed: 1, seedhead: 1};
-          const mn = vc(9) + Math.max(0, Math.round((VW - VWBASE) / 240));
+          const mn = vc(18) + Math.max(0, Math.round((VW - VWBASE) / 150));
           for (let i = 0; i < mn; i++) {
             const [name, bs] = midSet[(Math.random() * midSet.length) | 0],
+              fl = FLOWERY[name],
               x = 24 + Math.random() * (VW - 48),
               m = spr(name, x, farY(x) + 1, bs + Math.random() * bs * 0.5);
-            m.tint = tintJit(mhaze, 0.05);
-            m.alpha = 0.92;
+            m.tint = tintJit(fl ? fhaze : mhaze, 0.05);
+            m.alpha = fl ? 0.96 : 0.92;
             if (Math.random() < 0.5) m.scale.x *= -1;
             scene.addChild(m);
-            if (msway[name])
+            if (msway[name] || fl)
               swayers.push({s: m, amp: 0.045, sp: 1.2, ph: Math.random() * 6});
           }
         }
@@ -2641,30 +2680,40 @@
             : null;
         if (farWalk && Math.random() < 0.6) {
           const herdX = 170 + Math.random() * Math.max(1, VW - 340),
-            haze = mulTint(dryMid ? 0xd4cdb8 : 0xccd2c2, folTint);
+            haze = mulTint(dryMid ? 0xd4cdb8 : 0xccd2c2, folTint),
+            mob = [];
           for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
-            const d = anim(
-              farWalk,
-              0,
-              0,
-              (BI.walkerScale || 0.5) * 0.55,
-              0.06 + Math.random() * 0.03
-            );
+            // each animal sits at its own depth on the slope — farther ones smaller and higher,
+            // nearer ones larger and lower — so the herd reads as scattered over the hill, not a row
+            const dep = 0.82 + Math.random() * 0.4,
+              d = anim(
+                farWalk,
+                0,
+                0,
+                (BI.walkerScale || 0.5) * 0.55 * dep,
+                0.06 + Math.random() * 0.03
+              );
             d.x = Math.max(
               36,
-              Math.min(VW - 36, herdX + (Math.random() - Math.random()) * 150)
+              Math.min(VW - 36, herdX + (Math.random() - Math.random()) * 220)
             );
             d.tint = haze;
             d.alpha = 0.94;
             d.dir = Math.random() < 0.5 ? 1 : -1;
             d.baseSc = Math.abs(d.scale.x);
             d.scale.x = d.dir * d.baseSc;
-            d.spd = 0.07 + Math.random() * 0.05; // a slow, far-off amble
+            d.spd = (0.07 + Math.random() * 0.05) * dep; // nearer ones cover ground a touch faster
             d.mode = Math.random() < 0.6 ? 'graze' : 'walk';
             d.timer = 1 + Math.random() * 5;
-            d.y = farY(d.x);
+            d.dep = dep;
+            d.dy = (dep - 1) * 60; // depth lifts/drops the animal on the slope
+            d.y = farY(d.x) + d.dy;
             if (reduce.matches) d.gotoAndStop(0);
             else d.stop();
+            mob.push(d);
+          }
+          mob.sort((a, b) => a.dep - b.dep); // draw farther (smaller) behind nearer (larger)
+          for (const d of mob) {
             farHerd.push(d);
             scene.addChild(d);
           }
@@ -5957,7 +6006,7 @@
               if (Math.random() < 0.4) d.dir = -d.dir;
               d.scale.x = d.dir * d.baseSc;
             }
-            d.y = farY(d.x);
+            d.y = farY(d.x) + d.dy;
           }
         if (cloudSeaG) cloudSeaG.y = Math.sin(t * 0.3) * 4; // the cloud sea breathes slowly
         if (cloudGlow)
