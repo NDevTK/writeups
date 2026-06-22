@@ -814,6 +814,40 @@ const deerLegsA = `<g stroke="#5e4530" stroke-width="3.4" stroke-linecap="round"
 const deerLegsB = `<g stroke="#5e4530" stroke-width="3.4" stroke-linecap="round"><line x1="23" y1="45" x2="19" y2="67"/><line x1="33" y1="46" x2="37" y2="66"/><line x1="44" y1="46" x2="40" y2="66"/><line x1="53" y1="45" x2="57" y2="67"/></g>`;
 save('deer_far_a', deerFarSvg(deerLegsA), 88);
 save('deer_far_b', deerFarSvg(deerLegsB), 88);
+// far elephant for the savanna mid-hill — big body, trunk and ear read as elephant even small
+const elephFarSvg = (legs) =>
+  S(
+    '116 90',
+    `<g fill="#8b837a">
+${legs}
+<ellipse cx="44" cy="42" rx="33" ry="21"/>
+<path d="M62,23 C48,23 48,51 63,55 C74,51 76,29 62,23 Z"/>
+<ellipse cx="82" cy="35" rx="15" ry="16"/>
+<path d="M91,40 C102,46 106,60 104,75 C103,83 96,85 93,77 C91,70 90,61 88,53 C87,48 88,44 87,41 Z"/>
+<path d="M13,40 C7,44 8,54 13,56 Z"/>
+</g>`
+  );
+const elephLegsA = `<g stroke="#8b837a" stroke-width="10" stroke-linecap="round"><line x1="27" y1="54" x2="27" y2="82"/><line x1="43" y1="56" x2="43" y2="82"/><line x1="60" y1="56" x2="60" y2="82"/><line x1="75" y1="54" x2="75" y2="82"/></g>`;
+const elephLegsB = `<g stroke="#8b837a" stroke-width="10" stroke-linecap="round"><line x1="24" y1="54" x2="20" y2="81"/><line x1="43" y1="56" x2="47" y2="81"/><line x1="60" y1="56" x2="56" y2="81"/><line x1="78" y1="54" x2="82" y2="81"/></g>`;
+save('eleph_far_a', elephFarSvg(elephLegsA), 116);
+save('eleph_far_b', elephFarSvg(elephLegsB), 116);
+// far ibex for the alpine scree — body + slender neck + the backward-curving horns that say "ibex"
+const ibexFarSvg = (legs) =>
+  S(
+    '88 80',
+    `<g stroke="#7a6a52" stroke-width="2.4" stroke-linecap="round" fill="none"><path d="M55,21 C64,15 70,8 66,3"/><path d="M57,21 C66,16 72,10 69,5"/></g>
+<g fill="#9a8a74">
+<ellipse cx="36" cy="44" rx="19" ry="10.5"/>
+<path d="M48,48 C54,40 57,30 55,22 C59,21 61,18 58,15 C55,16 53,18 52,21 C50,27 44,38 42,47 Z"/>
+<path d="M52,26 L49,33 L55,32 Z"/>
+<path d="M16,40 C11,38 11,45 16,46 Z"/>
+${legs}
+</g>`
+  );
+const ibexLegsA = `<g stroke="#7c6d57" stroke-width="3.2" stroke-linecap="round"><line x1="25" y1="49" x2="24" y2="72"/><line x1="33" y1="50" x2="33" y2="72"/><line x1="43" y1="50" x2="43" y2="72"/><line x1="50" y1="49" x2="51" y2="72"/></g>`;
+const ibexLegsB = `<g stroke="#7c6d57" stroke-width="3.2" stroke-linecap="round"><line x1="23" y1="49" x2="19" y2="71"/><line x1="33" y1="50" x2="37" y2="70"/><line x1="43" y1="50" x2="39" y2="70"/><line x1="52" y1="49" x2="56" y2="71"/></g>`;
+save('ibex_far_a', ibexFarSvg(ibexLegsA), 92);
+save('ibex_far_b', ibexFarSvg(ibexLegsB), 92);
 save(
   'heron',
   S(
@@ -3126,7 +3160,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['deer_far_a', 'deer_far_b', 'sunflower', 'bush_h'];
+const review = ['eleph_far_a', 'ibex_far_a', 'deer_far_a', 'sunflower'];
 const cols = 4,
   cell = 230,
   pad = 14,
