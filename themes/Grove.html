@@ -725,7 +725,7 @@
           // steep rock walls plunging to the water frame the inlet (the defining fjord feature)
           cliffs: [
             {x: 70, s: 1.02},
-            {x: 1210, s: 1.08, flip: true}
+            {xr: 70, s: 1.08, flip: true} // xr: inset from the right edge, applied against the live VW
           ],
           distant: {style: 'peak', tint: 0x8294ac}, // peaks at the head of the inlet
           hills: [0x6a798f, 0x8b9bb2, 0xdce6f0],
@@ -3102,7 +3102,7 @@
           const wallSpan = 200; // keep plants/brush out of these edge zones so nothing sits in the rock
           for (const [bx, bs] of [
             [44, 1.18],
-            [1238, 1.34]
+            [VW - 42, 1.34] // track the live width so the right mesa hugs the actual edge
           ]) {
             const bt = spr('butte', bx, groundY(bx) + 34, bs);
             bt.tint = 0xb05a32;
@@ -4274,7 +4274,9 @@
         // steep rock walls plunging to the water (the fjord's framing) — in front of the water
         if (BI.cliffs)
           for (const c of BI.cliffs) {
-            const cl = spr('cliff', c.x, 616, c.s, 0.5, 1);
+            // xr anchors a cliff to the right edge of the live viewport (x to the left edge)
+            const cx = c.xr != null ? VW - c.xr : c.x;
+            const cl = spr('cliff', cx, 616, c.s, 0.5, 1);
             if (c.flip) cl.scale.x = -Math.abs(cl.scale.x);
             if (c.tint) cl.tint = c.tint;
             scene.addChild(cl);
