@@ -857,6 +857,7 @@ save(
 <g stroke="#3a3a3a" stroke-width="9" stroke-linecap="round"><line x1="62" y1="92" x2="58" y2="138"/><line x1="86" y1="94" x2="86" y2="140"/><line x1="118" y1="94" x2="122" y2="140"/><line x1="142" y1="92" x2="148" y2="138"/></g>
 <path d="M46,94 C38,68 60,54 102,54 C142,54 160,64 160,86 C160,100 132,104 98,104 C68,104 54,104 46,94 Z" fill="#f2efe8"/>
 <path d="M152,84 C164,70 172,54 178,40 C184,46 186,58 182,72 C178,86 166,94 156,96 Z" fill="#f2efe8"/>
+<path d="M147,50 C159,44 171,45 178,47 C177,64 170,82 161,92 C150,84 144,62 147,50 Z" fill="#f2efe8"/>
 <path d="M178,40 C188,34 198,37 197,47 C196,55 188,58 180,56 Z" fill="#f2efe8"/>
 <path d="M170,40 L166,26 L178,34 Z" fill="#f2efe8"/>
 <path d="M152,48 C160,38 170,32 178,30 C172,40 164,50 158,60 Z" fill="#3a3a3a"/>
@@ -878,12 +879,12 @@ save(
 <path d="M42,58 C58,49 98,48 124,55 C116,65 68,67 40,63 Z" fill="url(#vu)"/>
 <path d="M92,54 C76,28 52,9 22,2 C42,8 58,20 68,35 C56,28 46,28 38,31 C56,40 74,48 90,54 Z" fill="url(#vuw)"/>
 <path d="M80,57 C68,74 50,84 28,88 C48,81 60,70 70,58 Z" fill="#2b2117"/>
-<path d="M112,56 C113,49 119,45 124,47 C120,51 121,57 124,60 C118,61 113,60 112,56 Z" fill="#6c5e50"/>
-<circle cx="131" cy="50" r="7" fill="#bd9186"/>
-<path d="M126,45 C129,42 135,42 137,46 C133,47 130,48 127,49 Z" fill="#a87c72"/>
-<path d="M137,47 L155,50 L138,56 Z" fill="#2c2118"/>
-<path d="M155,50 C157,51.5 155,53.5 151,53 Z" fill="#191009"/>
-<circle cx="134" cy="48" r="1.7" fill="#0f0a05"/><circle cx="134.6" cy="47.4" r="0.5" fill="#e8d8c0"/>`
+<path d="M108,56 C110,48 120,44 128,47 C122,51 124,57 128,61 C118,62 110,60 108,56 Z" fill="#6c5e50"/>
+<circle cx="125" cy="50" r="7" fill="#bd9186"/>
+<path d="M120,45 C123,42 129,42 131,46 C127,47 124,48 121,49 Z" fill="#a87c72"/>
+<path d="M131,47 L149,50 L132,56 Z" fill="#2c2118"/>
+<path d="M149,50 C151,51.5 149,53.5 145,53 Z" fill="#191009"/>
+<circle cx="128" cy="48" r="1.7" fill="#0f0a05"/><circle cx="128.6" cy="47.4" r="0.5" fill="#e8d8c0"/>`
   ),
   140
 );
@@ -1780,7 +1781,7 @@ save(
   S(
     '160 200',
     `<defs><linearGradient id="wil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fc857"/><stop offset="1" stop-color="#5a9438"/></linearGradient></defs>
-<rect x="72" y="116" width="14" height="84" rx="4" fill="#6b4a30"/>
+<rect x="72" y="92" width="14" height="108" rx="4" fill="#6b4a30"/>
 <ellipse cx="79" cy="72" rx="60" ry="38" fill="url(#wil)"/>
 <g fill="none" stroke-linecap="round">
 <g stroke="#6ba33f" stroke-width="5">
@@ -2910,7 +2911,7 @@ save('snowy_owl_b', snowyOwl(false), 152);
 save(
   'deer_rest',
   S(
-    '230 140',
+    '236 140',
     `<defs><linearGradient id="drb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a8773f"/><stop offset="1" stop-color="#6c4626"/></linearGradient></defs>
 <g fill="#553a23"><ellipse cx="92" cy="128" rx="18" ry="7"/><ellipse cx="138" cy="130" rx="16" ry="6.5"/></g>
 <path d="M44,118 C38,88 74,76 116,76 C158,76 186,88 188,110 C189,126 156,132 112,132 C78,132 52,130 44,118 Z" fill="url(#drb)"/>
@@ -2924,7 +2925,7 @@ save(
 <circle cx="208" cy="42" r="2.6" fill="#140e09"/><circle cx="209" cy="41" r="0.8" fill="#d8c7a8"/>
 <g fill="none" stroke="#bda572" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M196,30 C192,18 190,9 195,3"/><path d="M192,18 C185,14 180,10 177,5"/><path d="M201,30 C206,19 210,10 208,4"/><path d="M209,18 C217,15 222,11 225,7"/></g>`
   ),
-  186
+  191
 );
 
 // ======== a moorhen — dark, red-billed, potters among the ducks (faces right) ========
@@ -2984,7 +2985,7 @@ save(
 save(
   'goat_rest',
   S(
-    '172 132',
+    '182 132',
     `<defs><linearGradient id="gtr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f2ea"/><stop offset="1" stop-color="#ccc4b1"/></linearGradient></defs>
 <g fill="#bbb39e"><ellipse cx="70" cy="110" rx="17" ry="6.5"/><ellipse cx="108" cy="112" rx="15" ry="6"/></g>
 <path d="M34,102 C28,76 60,66 100,66 C136,66 158,76 160,96 C161,110 130,116 96,116 C64,116 44,114 34,102 Z" fill="url(#gtr)"/>
@@ -2997,14 +2998,14 @@ save(
 <path d="M160,58 C158,70 156,78 154,83 C152,75 152,65 154,56 Z" fill="#e2dccb"/>
 <circle cx="158" cy="40" r="2.4" fill="#1c160e"/><circle cx="168" cy="58" r="1.7" fill="#3a3026"/>`
   ),
-  160
+  169
 );
 
 // ======== a resting giraffe — folded onto the ground, neck up and watchful (faces right) ========
 save(
   'giraffe_rest',
   S(
-    '176 238',
+    '198 238',
     `<defs><linearGradient id="gfr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eec670"/><stop offset="1" stop-color="#cf9e44"/></linearGradient></defs>
 <g fill="#c4923e"><ellipse cx="62" cy="220" rx="24" ry="9"/><ellipse cx="110" cy="222" rx="22" ry="8"/></g>
 <path d="M30,206 C22,178 58,166 104,166 C146,166 168,178 168,200 C168,216 132,224 94,224 C58,224 42,218 30,206 Z" fill="url(#gfr)"/>
@@ -3017,11 +3018,11 @@ save(
 <circle cx="164" cy="40" r="2.6" fill="#3a2a16"/>
 <g fill="#a9742e" opacity="0.6"><ellipse cx="50" cy="190" rx="10" ry="8"/><ellipse cx="78" cy="184" rx="11" ry="9"/><ellipse cx="108" cy="186" rx="11" ry="9"/><ellipse cx="136" cy="194" rx="9" ry="8"/><ellipse cx="64" cy="210" rx="9" ry="7"/><ellipse cx="98" cy="210" rx="10" ry="7"/><ellipse cx="128" cy="206" rx="8" ry="6"/><ellipse cx="138" cy="150" rx="7" ry="9"/><ellipse cx="146" cy="118" rx="6" ry="9"/><ellipse cx="152" cy="86" rx="6" ry="8"/><ellipse cx="157" cy="60" rx="5" ry="7"/></g>`
   ),
-  150
+  169
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['woodpecker', 'kingfisher', 'robin', 'fern'];
+const review = ['giraffe_rest', 'zebra', 'goat_rest', 'deer_rest'];
 const cols = 4,
   cell = 230,
   pad = 14,
