@@ -2548,7 +2548,7 @@
         // an occasional wildflower flush for the drier grounds: mostly a bare build, but now and
         // then (after the rains) a low scatter of blooms springs up — sometimes gathered into
         // patches, with the odd off-palette sport — across the sand or the savanna grass
-        const wildflowerFlush = (list, baseScale, warm) => {
+        const wildflowerFlush = (list, baseScale, warm, count) => {
           const odds = [0xff6a1f, 0xb84fd6, 0xe84bb0, 0x6c4cff, 0x2fb6c4];
           const clumps =
             Math.random() < 0.6
@@ -2557,7 +2557,7 @@
                   () => 60 + Math.random() * (VW - 120)
                 )
               : null;
-          for (let i = 0, n = vc(7); i < n; i++) {
+          for (let i = 0, n = vc(count || 7); i < n; i++) {
             const x = clumps
               ? Math.max(
                   30,
@@ -2940,6 +2940,20 @@
             scene.addChild(g);
             swayers.push({s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6});
           }
+          // in the brief alpine summer, hardy cushion flowers find a foothold among the rock —
+          // gentian blue, edelweiss white, pink saxifrage; the rest of the year the scree stays bare
+          const alSeas = nowSeason();
+          if (
+            (alSeas === 'spring' || alSeas === 'summer') &&
+            Math.random() < 0.4
+          )
+            wildflowerFlush(
+              // favour vivid gentian blue and pink saxifrage — white edelweiss vanishes on snow
+              ['flower_b', 'flower_p', 'flower_b', 'flower_p', 'flower_w'],
+              0.26,
+              0xffffff,
+              5
+            );
         } else if (BI.ground === 'savanna') {
           for (let i = 0, _m = vc(6); i < _m; i++) {
             const x = 30 + Math.random() * (VW - 60);
