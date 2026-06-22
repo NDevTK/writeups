@@ -1080,6 +1080,15 @@
         }
       };
       const RIGID = {rock: 1, cactus: 1, cactus2: 1};
+      // a herd animal's young, keyed by its lead walk frame — a youngster trails the adults both in
+      // the foreground herd and (smaller still) in the far herd on the mid-hill
+      const CALF = {
+        deer_a: ['fawn_a', 'fawn_b'],
+        panda: ['panda_cub_a', 'panda_cub_b'],
+        camel: ['camel_calf_a', 'camel_calf_b'],
+        giraffe: ['giraffe_calf_a', 'giraffe_calf_b'],
+        goat: ['goat_kid_a', 'goat_kid_b']
+      };
 
       const NAMES = [
         'oak',
@@ -2720,6 +2729,32 @@
             else d.stop();
             mob.push(d);
           }
+          // a youngster sometimes trails the far herd too, keeping by one of the adults
+          const farYoung = CALF[farWalk[0]];
+          if (farYoung && mob.length && Math.random() < 0.4) {
+            const p = mob[(Math.random() * mob.length) | 0],
+              y = anim(
+                farYoung,
+                0,
+                0,
+                (BI.walkerScale || 0.5) * 0.55 * p.dep * 0.62, // smaller again, like the near calf
+                0.07 + Math.random() * 0.03
+              );
+            y.tint = haze;
+            y.alpha = 0.94;
+            y.dep = p.dep + 0.001; // sort just in front of its parent
+            y.dy = p.dy;
+            y.baseSc = Math.abs(y.scale.x);
+            y.dir = p.dir;
+            y.scale.x = y.dir * y.baseSc;
+            y.x = Math.max(30, Math.min(VW - 30, p.x - p.dir * 16));
+            y.y = farY(y.x) + y.dy;
+            y.isYoung = true;
+            y.followAdult = p;
+            if (reduce.matches) y.gotoAndStop(0);
+            else y.stop();
+            mob.push(y);
+          }
           mob.sort((a, b) => a.dep - b.dep); // draw farther (smaller) behind nearer (larger)
           for (const d of mob) {
             farHerd.push(d);
@@ -3727,14 +3762,7 @@
             walkers.push(d);
           }
           // a youngster sometimes trails the herd, keeping close to one of the adults — a spotted
-          // fawn behind the deer, a tumbling cub behind the pandas
-          const CALF = {
-            deer_a: ['fawn_a', 'fawn_b'],
-            panda: ['panda_cub_a', 'panda_cub_b'],
-            camel: ['camel_calf_a', 'camel_calf_b'],
-            giraffe: ['giraffe_calf_a', 'giraffe_calf_b'],
-            goat: ['goat_kid_a', 'goat_kid_b']
-          };
+          // fawn behind the deer, a tumbling cub behind the pandas (CALF map is shared up top)
           const calfFrames = CALF[BI.walker[0]];
           if (calfFrames && walkers.length && Math.random() < 0.45) {
             const mum = walkers[(Math.random() * walkers.length) | 0],
@@ -6003,6 +6031,20 @@
         // on its own depth plane (farY) at a far pace
         if (!reduce.matches)
           for (const d of farHerd) {
+            if (d.isYoung) {
+              // trail just behind the adult, catching up when it walks, settling when it grazes
+              const p = d.followAdult,
+                tx = p.x - p.dir * 18;
+              if (Math.abs(tx - d.x) > 4) {
+                d.dir = tx < d.x ? -1 : 1;
+                d.x +=
+                  d.dir * Math.min(Math.abs(tx - d.x), (p.spd + 0.04) * dt);
+                if (!d.playing) d.play();
+                d.scale.x = d.dir * d.baseSc;
+              } else if (d.playing) d.gotoAndStop(0);
+              d.y = farY(d.x) + d.dy;
+              continue;
+            }
             d.timer -= dt / 60;
             if (d.mode === 'walk') {
               d.x += d.dir * d.spd * dt;
