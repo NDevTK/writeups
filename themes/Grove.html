@@ -3261,6 +3261,8 @@
               d.scale.x = d.dir * Math.abs(d.scale.x);
               d.mode = 'walk';
               d.timer = Math.random() * 5;
+              d.trot = 0; // seconds left in a brief trot burst (0 = plain amble)
+              d.baseAnim = d.animationSpeed; // resting gait, so a trot can quicken the legs
             }
             scene.addChild(d);
             walkers.push(d);
@@ -5713,12 +5715,26 @@
               d.timer -= dt / 60;
               if (!d.graze) d.mode = 'walk';
               if (d.mode === 'walk') {
-                d.x += d.dir * (d.spd ?? 0.35) * dt;
-                if (multi && !d.playing) d.play();
+                // now and then it breaks into a short trot — quicker stride, springier step —
+                // before settling back to an amble, so a herd never moves in a uniform plod
+                if (d.trot > 0) d.trot -= dt / 60;
+                else if (Math.random() < 0.0016 * dt)
+                  d.trot = 0.7 + Math.random() * 1.2;
+                const trotting = d.trot > 0;
+                d.x += d.dir * (d.spd ?? 0.35) * (trotting ? 2.5 : 1) * dt;
+                if (multi) {
+                  if (!d.playing) d.play();
+                  d.animationSpeed =
+                    (d.baseAnim ?? 0.12) * (trotting ? 1.9 : 1);
+                }
                 if (d.graze && d.timer < 0) {
                   d.mode = 'graze';
                   d.timer = 2.5 + Math.random() * 3;
-                  if (multi) d.gotoAndStop(0);
+                  d.trot = 0; // a grazing animal isn't mid-trot
+                  if (multi) {
+                    d.animationSpeed = d.baseAnim ?? 0.12;
+                    d.gotoAndStop(0);
+                  }
                 }
               } else if (d.timer < 0) {
                 d.mode = 'walk';
@@ -5731,10 +5747,14 @@
               }
               if (d.dir > 0 && d.x > VW + 60) d.x = -60;
               else if (d.dir < 0 && d.x < -60) d.x = VW + 60;
+              const trot = d.mode === 'walk' && d.trot > 0;
               d.y =
                 groundY(d.x) +
                 8 +
-                (d.mode === 'walk' ? Math.abs(Math.sin(t * 4 + d.x)) * -2 : 0);
+                (d.mode === 'walk'
+                  ? Math.abs(Math.sin(t * (trot ? 6.5 : 4) + d.x)) *
+                    (trot ? -3.2 : -2)
+                  : 0);
             }
             dropTrack(d, 'deer', 30);
           }
