@@ -768,6 +768,33 @@ save('lupine_p', lupineSvg('#cba2f0', '#8f63c8'), 56); // purple
 save('lupine_b', lupineSvg('#abc4f6', '#5f86d8'), 56); // blue
 save('lupine_k', lupineSvg('#f7bcda', '#e072a8'), 56); // pink
 save('lupine_w', lupineSvg('#fcf8ff', '#ddd0ee'), 56); // white
+// a flowering bush (leafy mound topped with bloom pom-poms) — baked colours so the leaves stay
+// green; dotted among the meadow shrubs
+const flowerBushSvg = (c1, c2) =>
+  S(
+    '116 88',
+    `<defs><radialGradient id="fbf" cx="0.4" cy="0.34" r="0.72"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></radialGradient></defs>
+<g fill="#56883b"><ellipse cx="32" cy="68" rx="28" ry="20"/><ellipse cx="82" cy="66" rx="32" ry="24"/><ellipse cx="56" cy="54" rx="30" ry="23"/></g>
+<g fill="#46763010"><ellipse cx="44" cy="74" rx="20" ry="11"/></g>
+<g fill="url(#fbf)" stroke="${c2}" stroke-width="0.5">${[
+      [34, 48],
+      [58, 42],
+      [82, 48],
+      [46, 58],
+      [74, 58]
+    ]
+      .map(
+        ([bx, by]) =>
+          Array.from({length: 7}, (_, k) => {
+            const a = (k / 7) * Math.PI * 2;
+            return `<circle cx="${(bx + Math.cos(a) * 5).toFixed(1)}" cy="${(by + Math.sin(a) * 4).toFixed(1)}" r="2.7"/>`;
+          }).join('') + `<circle cx="${bx}" cy="${by}" r="3.1"/>`
+      )
+      .join('')}</g>`
+  );
+save('bush_h', flowerBushSvg('#bcd4f2', '#7ea8e0'), 110); // hydrangea blue
+save('bush_p', flowerBushSvg('#f6c2dc', '#e483b4'), 110); // pink
+save('bush_w', flowerBushSvg('#fbf6ff', '#e2d6ee'), 110); // white
 save(
   'heron',
   S(
