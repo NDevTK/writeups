@@ -1183,6 +1183,14 @@
         'fox_s',
         'deer_d_a',
         'deer_d_b',
+        'goat_kid_a',
+        'goat_kid_b',
+        'camel_calf_a',
+        'camel_calf_b',
+        'camel_rest',
+        'giraffe_calf_a',
+        'giraffe_calf_b',
+        'panda_rest',
         'admiral_a',
         'admiral_b',
         'peacock_a',
@@ -3652,9 +3660,13 @@
             // feet — deer, goats and giraffes each have their own resting pose
             const restSprite =
               !heron &&
-              {deer_a: 'deer_rest', goat: 'goat_rest', giraffe: 'giraffe_rest'}[
-                BI.walker[0]
-              ];
+              {
+                deer_a: 'deer_rest',
+                goat: 'goat_rest',
+                giraffe: 'giraffe_rest',
+                camel: 'camel_rest',
+                panda: 'panda_rest'
+              }[BI.walker[0]];
             const resting = restSprite && Math.random() < 0.3;
             // the wading bird is the grey heron most visits, a white egret some — same patient
             // stalk-and-strike either way
@@ -3718,7 +3730,10 @@
           // fawn behind the deer, a tumbling cub behind the pandas
           const CALF = {
             deer_a: ['fawn_a', 'fawn_b'],
-            panda: ['panda_cub_a', 'panda_cub_b']
+            panda: ['panda_cub_a', 'panda_cub_b'],
+            camel: ['camel_calf_a', 'camel_calf_b'],
+            giraffe: ['giraffe_calf_a', 'giraffe_calf_b'],
+            goat: ['goat_kid_a', 'goat_kid_b']
           };
           const calfFrames = CALF[BI.walker[0]];
           if (calfFrames && walkers.length && Math.random() < 0.45) {

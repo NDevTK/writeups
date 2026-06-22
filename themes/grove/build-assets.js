@@ -611,6 +611,37 @@ const camelSvg = (lf) =>
   );
 save('camel', camelSvg([0, 0, 0, 0]), 175);
 save('camel_b', camelSvg([9, -7, -8, 8]), 175);
+// a camel calf — a small camel with a soft little hump, big head and stubby legs (faces right)
+const camelCalfSvg = (lf) =>
+  S(
+    '154 128',
+    `<defs><linearGradient id="cmc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e0b878"/><stop offset="1" stop-color="#b48a50"/></linearGradient></defs>
+<g stroke="#a47c44" stroke-width="7.5" stroke-linecap="round"><line x1="52" y1="78" x2="${49 + lf[0]}" y2="116"/><line x1="68" y1="80" x2="${68 + lf[1]}" y2="118"/><line x1="92" y1="80" x2="${96 + lf[2]}" y2="116"/><line x1="106" y1="78" x2="${111 + lf[3]}" y2="114"/></g>
+<path d="M42,82 C36,70 46,62 62,61 C68,48 94,48 100,61 C116,63 126,69 126,82 C118,90 60,92 42,82 Z" fill="url(#cmc)"/>
+<path d="M120,76 C129,62 133,48 136,38 C138,31 147,32 146,41 C145,54 140,68 130,80 Z" fill="url(#cmc)"/>
+<path d="M142,36 C151,35 156,40 153,45 C150,49 143,47 140,43 Z" fill="url(#cmc)"/>
+<path d="M140,35 L138,29 L144,33 Z" fill="#b48a50"/><circle cx="148" cy="39" r="1.8" fill="#1a120a"/>
+<path d="M42,77 C35,78 33,85 38,89 C43,85 44,79 44,76 Z" fill="#b48a50"/>`
+  );
+save('camel_calf_a', camelCalfSvg([0, 0, 0, 0]), 122);
+save('camel_calf_b', camelCalfSvg([7, -5, -6, 6]), 122);
+// a resting camel — bedded down, legs folded under, hump and long neck up, watchful (faces right)
+save(
+  'camel_rest',
+  S(
+    '212 152',
+    `<defs><linearGradient id="cmr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d6ac6a"/><stop offset="1" stop-color="#a87e44"/></linearGradient></defs>
+<g fill="#9a7038"><ellipse cx="86" cy="132" rx="24" ry="8"/><ellipse cx="136" cy="134" rx="20" ry="7"/></g>
+<path d="M40,118 C32,92 74,80 118,80 C162,80 188,92 188,114 C188,130 152,138 110,138 C74,138 50,130 40,118 Z" fill="url(#cmr)"/>
+<path d="M96,80 C102,52 138,52 142,80 C132,72 106,72 96,80 Z" fill="url(#cmr)"/>
+<path d="M170,104 C182,84 188,62 192,48 C194,40 204,41 203,50 C202,66 196,86 184,108 Z" fill="url(#cmr)"/>
+<path d="M199,46 C210,44 216,49 213,55 C210,60 202,58 198,53 Z" fill="url(#cmr)"/>
+<path d="M197,44 L195,37 L202,42 Z" fill="#a87e44"/><circle cx="206" cy="49" r="2.3" fill="#140e09"/>
+<path d="M70,120 C100,128 150,126 178,112 C150,130 100,132 70,126 Z" fill="#7a5a30" opacity="0.35"/>
+<path d="M40,112 C33,113 31,121 37,125 C43,121 44,114 44,110 Z" fill="#a87e44"/>`
+  ),
+  192
+);
 save(
   'tumbleweed',
   S(
@@ -880,6 +911,23 @@ const goatSvg = (lf) =>
   );
 save('goat', goatSvg([0, 0, 0, 0]), 168);
 save('goat_b', goatSvg([7, -6, -6, 7]), 168);
+// a goat kid — a small goat with a big head, stubby legs and little horn nubs (faces right)
+const goatKidSvg = (lf) =>
+  S(
+    '140 118',
+    `<defs><linearGradient id="gtk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f4ec"/><stop offset="1" stop-color="#d4ccb9"/></linearGradient></defs>
+<g stroke="#c2baa5" stroke-width="7.5" stroke-linecap="round"><line x1="38" y1="72" x2="${35 + lf[0]}" y2="104"/><line x1="54" y1="74" x2="${54 + lf[1]}" y2="106"/><line x1="76" y1="74" x2="${79 + lf[2]}" y2="106"/><line x1="90" y1="72" x2="${94 + lf[3]}" y2="104"/></g>
+<g stroke="#3a3026" stroke-width="7.5" stroke-linecap="round"><line x1="${35 + lf[0]}" y1="101" x2="${35 + lf[0]}" y2="107"/><line x1="${54 + lf[1]}" y1="103" x2="${54 + lf[1]}" y2="109"/><line x1="${79 + lf[2]}" y1="103" x2="${79 + lf[2]}" y2="109"/><line x1="${94 + lf[3]}" y1="101" x2="${94 + lf[3]}" y2="107"/></g>
+<path d="M32,76 C26,56 44,44 74,44 C100,44 110,54 110,72 C110,82 92,86 70,86 C48,86 40,84 32,76 Z" fill="url(#gtk)"/>
+<path d="M104,72 C113,66 118,57 121,49 C123,57 121,68 115,77 Z" fill="url(#gtk)"/>
+<ellipse cx="119" cy="48" rx="11.5" ry="12.5" fill="url(#gtk)"/>
+<path d="M127,53 C135,55 138,62 133,67 C128,67 124,61 122,55 Z" fill="#ece6d6"/>
+<path d="M114,37 C113,31 115,26 118,23" stroke="#6f6452" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+<path d="M121,37 C121,31 124,26 127,23" stroke="#6f6452" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+<circle cx="121" cy="46" r="2.2" fill="#1c160e"/><circle cx="130" cy="61" r="1.5" fill="#3a3026"/>`
+  );
+save('goat_kid_a', goatKidSvg([0, 0, 0, 0]), 120);
+save('goat_kid_b', goatKidSvg([5, -4, -4, 5]), 120);
 // eagle redrawn as a side-on glide facing right (head + beak forward, not the old top-down view)
 save(
   'eagle',
@@ -934,6 +982,25 @@ const giraffeSvg = (lf) =>
   );
 save('giraffe', giraffeSvg([0, 0, 0, 0]), 202);
 save('giraffe_b', giraffeSvg([9, -8, -8, 9]), 202);
+// a giraffe calf — a shorter neck, big head with ossicones, leggy but stubby, spotted (faces right)
+const giraffeCalfSvg = (lf) =>
+  S(
+    '170 230',
+    `<defs><linearGradient id="gfc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0ca78"/><stop offset="1" stop-color="#d4a44a"/></linearGradient></defs>
+<g stroke="#d8a850" stroke-width="11" stroke-linecap="round"><line x1="56" y1="138" x2="${51 + lf[0]}" y2="214"/><line x1="78" y1="140" x2="${78 + lf[1]}" y2="216"/><line x1="100" y1="140" x2="${104 + lf[2]}" y2="216"/><line x1="120" y1="138" x2="${127 + lf[3]}" y2="212"/></g>
+<g stroke="#4a3520" stroke-width="11" stroke-linecap="round"><line x1="${51 + lf[0]}" y1="208" x2="${51 + lf[0]}" y2="216"/><line x1="${78 + lf[1]}" y1="210" x2="${78 + lf[1]}" y2="218"/><line x1="${104 + lf[2]}" y1="210" x2="${104 + lf[2]}" y2="218"/><line x1="${127 + lf[3]}" y1="206" x2="${127 + lf[3]}" y2="214"/></g>
+<path d="M40,124 C34,98 64,84 100,84 C136,84 150,98 150,124 C150,144 116,150 86,150 C60,150 48,142 40,124 Z" fill="url(#gfc)"/>
+<path d="M40,116 C33,126 33,138 39,146" stroke="#d4a44a" stroke-width="5" fill="none" stroke-linecap="round"/><line x1="39" y1="142" x2="36" y2="152" stroke="#4a3520" stroke-width="5" stroke-linecap="round"/>
+<path d="M124,104 C134,78 142,52 148,34" stroke="url(#gfc)" stroke-width="22" fill="none" stroke-linecap="round"/>
+<path d="M134,96 C142,70 150,46 156,30" stroke="#b78838" stroke-width="5" fill="none" stroke-linecap="round" opacity="0.6"/>
+<path d="M140,38 C135,26 144,17 156,18 C167,19 172,27 169,35 C175,37 177,43 173,48 C167,53 152,52 146,46 C141,43 140,40 140,38 Z" fill="url(#gfc)"/>
+<g stroke="#7a5a30" stroke-width="4" stroke-linecap="round"><line x1="150" y1="20" x2="148" y2="10"/><line x1="162" y1="20" x2="164" y2="10"/></g>
+<circle cx="148" cy="10" r="3.6" fill="#5a4326"/><circle cx="164" cy="10" r="3.6" fill="#5a4326"/>
+<circle cx="156" cy="34" r="2.3" fill="#3a2a16"/>
+<g fill="#bd8c3c" opacity="0.8"><path d="M54,110 l13,-3 l5,12 l-12,4 Z"/><path d="M84,120 l13,-2 l4,12 l-13,3 Z"/><path d="M110,110 l12,-2 l4,12 l-12,3 Z"/><path d="M130,72 l10,-2 l3,11 l-10,2 Z"/><path d="M136,46 l9,-2 l2,10 l-9,2 Z"/></g>`
+  );
+save('giraffe_calf_a', giraffeCalfSvg([0, 0, 0, 0]), 150);
+save('giraffe_calf_b', giraffeCalfSvg([7, -6, -6, 7]), 150);
 save(
   'zebra',
   S(
@@ -1003,6 +1070,25 @@ const pandaSvg = (lf) =>
   );
 save('panda', pandaSvg([0, 0, 0, 0]), 180);
 save('panda_b', pandaSvg([8, -7, -7, 8]), 180);
+// a resting panda — reclining, legs folded, head up and watchful (faces right)
+save(
+  'panda_rest',
+  S(
+    '188 134',
+    `<g fill="#1f1f1f"><ellipse cx="78" cy="124" rx="24" ry="8"/><ellipse cx="122" cy="126" rx="18" ry="7"/></g>
+<path d="M34,108 C26,80 70,66 116,66 C156,66 178,78 178,102 C178,118 142,124 102,124 C66,124 46,120 34,108 Z" fill="#f4f2ee"/>
+<path d="M150,70 C168,74 176,90 172,108 C160,120 146,122 138,120 C150,104 152,84 150,70 Z" fill="#2a2a2a"/>
+<path d="M40,104 C34,112 36,121 45,123 C53,119 53,109 51,100 Z" fill="#2a2a2a"/>
+<path d="M92,116 C104,122 120,122 132,116 C120,126 104,126 92,120 Z" fill="#d9d6d0" opacity="0.5"/>
+<ellipse cx="170" cy="56" rx="22" ry="20" fill="#f4f2ee"/>
+<circle cx="158" cy="38" r="9" fill="#2a2a2a"/><circle cx="182" cy="40" r="9" fill="#2a2a2a"/>
+<ellipse cx="176" cy="54" rx="7" ry="9" fill="#2a2a2a"/><ellipse cx="161" cy="55" rx="5.5" ry="7.5" fill="#2a2a2a"/>
+<circle cx="177" cy="53" r="2.4" fill="#fff"/><circle cx="177" cy="54" r="1.2" fill="#1a1a1a"/>
+<circle cx="162" cy="54" r="1.8" fill="#fff"/><circle cx="162" cy="55" r="1" fill="#1a1a1a"/>
+<path d="M185,60 C193,62 195,71 188,75 C183,74 182,66 183,62 Z" fill="#f4f2ee"/><ellipse cx="189" cy="66" rx="3" ry="2.4" fill="#2a2a2a"/>`
+  ),
+  176
+);
 save(
   'redpanda',
   S(
