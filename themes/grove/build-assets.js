@@ -768,38 +768,6 @@ save('lupine_p', lupineSvg('#cba2f0', '#8f63c8'), 56); // purple
 save('lupine_b', lupineSvg('#abc4f6', '#5f86d8'), 56); // blue
 save('lupine_k', lupineSvg('#f7bcda', '#e072a8'), 56); // pink
 save('lupine_w', lupineSvg('#fcf8ff', '#ddd0ee'), 56); // white
-// ---- BACKGROUND landmark: a windmill on a far hill (tower + separately-spun sails) ----
-// cream tower with a brown cap; the hub at (42,46) is where the sail sprite is pinned and turned
-save(
-  'windmill',
-  S(
-    '84 146',
-    `<defs><linearGradient id="wmt" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f3eddd"/><stop offset="0.62" stop-color="#e0d6bd"/><stop offset="1" stop-color="#c5b89b"/></linearGradient></defs>
-<path d="M25,142 L33,46 L51,46 L59,142 Z" fill="url(#wmt)"/>
-<rect x="29" y="92" width="26" height="4" fill="#b1a383"/>
-<path d="M30,48 C30,32 54,32 54,48 Z" fill="#6e4d32"/>
-<path d="M42,33 L42,21" stroke="#5a3e28" stroke-width="2.4" stroke-linecap="round"/>
-<circle cx="42" cy="46" r="4.5" fill="#46301d"/>
-<path d="M37,142 L37,119 C37,114 47,114 47,119 L47,142 Z" fill="#6e4d32"/>
-<rect x="39.4" y="74" width="6" height="7" rx="1.2" fill="#7d5836"/>
-<rect x="40" y="58" width="5" height="6" rx="1.2" fill="#7d5836"/>`
-  ),
-  84
-);
-save(
-  'windmill_sail',
-  S(
-    '116 116',
-    `${[0, 90, 180, 270]
-      .map(
-        (a) =>
-          `<g transform="rotate(${a} 58 58)"><rect x="55" y="13" width="6" height="43" rx="1" fill="#6e4d32"/><path d="M61,15 L75,17 L73,54 L61,52 Z" fill="#efe8d4" stroke="#c2b594" stroke-width="1"/><g stroke="#c2b594" stroke-width="0.8"><line x1="61" y1="25" x2="74" y2="26"/><line x1="61" y1="35" x2="73" y2="36"/><line x1="61" y1="45" x2="73" y2="46"/></g></g>`
-      )
-      .join('')}
-<circle cx="58" cy="58" r="5" fill="#46301d"/>`
-  ),
-  116
-);
 // ---- FOREGROUND: a flowering bush (leafy mound topped with bloom pom-poms) — baked colours so the
 // leaves stay green; placed among the meadow shrubs ----
 const flowerBushSvg = (c1, c2) =>
@@ -3139,7 +3107,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['windmill', 'windmill_sail', 'bush_h', 'bush_p'];
+const review = ['bush_h', 'bush_p', 'bush_w', 'sunflower'];
 const cols = 4,
   cell = 230,
   pad = 14,
