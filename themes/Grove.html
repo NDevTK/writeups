@@ -4638,6 +4638,7 @@
             e.ry = 26 + Math.random() * 20;
             e.sp = 0.1 + Math.random() * 0.06;
             e.ph = Math.random() * 6.28;
+            e.drift = (Math.random() - 0.5) * 0.24; // its thermal drifts slowly across the sky
             if (BI.soar.tint != null) e.tint = BI.soar.tint;
             e.baseSc = Math.abs(e.scale.x);
             e.x = e.cx + Math.cos(e.ph) * e.rx; // a sensible static spot for reduced motion
@@ -7104,10 +7105,16 @@
             continue;
           }
           if (f.isSoar) {
-            // a lazy thermal circle over the cloud sea, facing into the turn
-            const a = t * f.sp + f.ph;
-            f.x = f.cx + Math.cos(a) * f.rx;
-            f.y = f.cy + Math.sin(a) * f.ry;
+            // a lazy thermal circle, facing into the turn — but the thermal itself drifts on the
+            // wind and the circle slowly breathes, so the bird wanders the sky and never traces the
+            // exact same loop twice rather than staying pinned over one spot
+            f.cx += (f.drift + wind * 0.08) * dt;
+            if (f.cx > VW + 170) f.cx = -170;
+            else if (f.cx < -170) f.cx = VW + 170;
+            const a = t * f.sp + f.ph,
+              breath = 1 + Math.sin(t * 0.11 + f.ph) * 0.18;
+            f.x = f.cx + Math.cos(a) * f.rx * breath;
+            f.y = f.cy + Math.sin(a) * f.ry * breath;
             f.scale.x = (Math.sin(a) > 0 ? -1 : 1) * f.baseSc;
             continue;
           }
