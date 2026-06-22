@@ -2524,50 +2524,25 @@
             swayers.push({s: t, amp: 0.012, sp: 0.7, ph: Math.random() * 6});
           snowCap(t, n);
         }
-        // give the far hills some life and a natural focal point: the odd lone tree crowning a
-        // distant rise, and a few deer grazing the slopes — small and hazed into the distance
+        // the odd lone tree crowning a distant rise — a natural focal point on the far hills
         if (
           !snow &&
           !BI.interior &&
-          ['meadow', 'marsh', 'fern', 'glade'].includes(BI.ground)
+          ['meadow', 'marsh', 'fern', 'glade'].includes(BI.ground) &&
+          treePool.length &&
+          Math.random() < 0.5
         ) {
-          const hillY = (x) => 470 + Math.sin(x * 0.006 + midPh) * 32; // the mid-hill surface
-          if (treePool.length && Math.random() < 0.55) {
-            const tx = 120 + Math.random() * Math.max(1, VW - 240),
-              lt = spr(
-                treePool[(Math.random() * treePool.length) | 0],
-                tx,
-                hillY(tx),
-                0.66 + Math.random() * 0.22 // a clearly prominent tree crowning the rise
-              );
-            lt.tint = tintJit(mulTint(0xbccfba, folTint)); // hazier and cooler than the near trees
-            if (Math.random() < 0.5) lt.scale.x *= -1;
-            scene.addChild(lt);
-            swayers.push({s: lt, amp: 0.01, sp: 0.7, ph: Math.random() * 6});
-          }
-          // a small herd grazes one far slope together rather than dotting the whole ridge
-          if (Math.random() < 0.6) {
-            const herdX = 150 + Math.random() * Math.max(1, VW - 300);
-            for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
-              const dx = Math.max(
-                  40,
-                  Math.min(
-                    VW - 40,
-                    herdX + (Math.random() - Math.random()) * 130
-                  )
-                ),
-                dd = spr(
-                  Math.random() < 0.5 ? 'deer_a' : 'deer_b',
-                  dx,
-                  hillY(dx) + 2,
-                  0.18 + Math.random() * 0.06
-                );
-              dd.tint = 0xb0a288; // grazing far off, hazed warm into the hillside
-              dd.alpha = 0.94;
-              if (Math.random() < 0.5) dd.scale.x *= -1;
-              scene.addChild(dd);
-            }
-          }
+          const tx = 120 + Math.random() * Math.max(1, VW - 240),
+            lt = spr(
+              treePool[(Math.random() * treePool.length) | 0],
+              tx,
+              470 + Math.sin(tx * 0.006 + midPh) * 32,
+              0.66 + Math.random() * 0.22 // a clearly prominent tree crowning the rise
+            );
+          lt.tint = tintJit(mulTint(0xbccfba, folTint)); // hazier and cooler than the near trees
+          if (Math.random() < 0.5) lt.scale.x *= -1;
+          scene.addChild(lt);
+          swayers.push({s: lt, amp: 0.01, sp: 0.7, ph: Math.random() * 6});
         }
         for (const [n, sc, x] of varyLayer(BI.near)) {
           const jx = x + (Math.random() - 0.5) * 64,
