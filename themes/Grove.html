@@ -2545,6 +2545,44 @@
             spores.push(g);
             scene.addChild(g);
           }
+        // an occasional wildflower flush for the drier grounds: mostly a bare build, but now and
+        // then (after the rains) a low scatter of blooms springs up — sometimes gathered into
+        // patches, with the odd off-palette sport — across the sand or the savanna grass
+        const wildflowerFlush = (list, baseScale, warm) => {
+          const odds = [0xff6a1f, 0xb84fd6, 0xe84bb0, 0x6c4cff, 0x2fb6c4];
+          const clumps =
+            Math.random() < 0.6
+              ? Array.from(
+                  {length: 2 + ((Math.random() * 3) | 0)},
+                  () => 60 + Math.random() * (VW - 120)
+                )
+              : null;
+          for (let i = 0, n = vc(7); i < n; i++) {
+            const x = clumps
+              ? Math.max(
+                  30,
+                  Math.min(
+                    VW - 30,
+                    clumps[(Math.random() * clumps.length) | 0] +
+                      (Math.random() - Math.random()) * 85
+                  )
+                )
+              : 40 + Math.random() * (VW - 80);
+            const odd = Math.random() < 0.07;
+            const f = spr(
+              odd ? 'flower_w' : list[(Math.random() * list.length) | 0],
+              x,
+              groundY(x) + 7,
+              baseScale + Math.random() * 0.22
+            );
+            f.tint = odd
+              ? odds[(Math.random() * odds.length) | 0]
+              : tintJit(warm || 0xffffff, 0.08);
+            if (Math.random() < 0.5) f.scale.x *= -1;
+            scene.addChild(f);
+            swayers.push({s: f, amp: 0.05, sp: 1.5, ph: Math.random() * 6});
+          }
+        };
         if (BI.ground === 'meadow') {
           for (let i = 0, n = 11 + ((Math.random() * 10) | 0); i < n; i++) {
             const x = 40 + Math.random() * (VW - 80),
@@ -2752,6 +2790,13 @@
             if (Math.random() < 0.5) pp.scale.x *= -1;
             scene.addChild(pp);
           }
+          // and, after a rare desert rain, a low super-bloom of bright yellows, whites and reds
+          if (Math.random() < 0.3)
+            wildflowerFlush(
+              ['flower_y', 'flower_w', 'poppy', 'flower_y'],
+              0.3,
+              0xfff0d0
+            );
         } else if (BI.ground === 'beach') {
           for (let i = 0, _m = vc(12); i < _m; i++) {
             const x = 30 + Math.random() * (VW - 60);
@@ -2944,6 +2989,13 @@
             scene.addChild(sh);
             swayers.push({s: sh, amp: 0.07, sp: 1.4, ph: Math.random() * 6});
           }
+          // after the wet season the savanna can flower: a low scatter of pale and golden blooms
+          if (Math.random() < 0.3)
+            wildflowerFlush(
+              ['flower_w', 'flower_y', 'flower_p', 'poppy'],
+              0.32,
+              0xfff2d6
+            );
         } else if (BI.ground === 'fern') {
           for (let i = 0, _m = vc(5); i < _m; i++) {
             const x = 30 + Math.random() * (VW - 60);
