@@ -710,6 +710,64 @@ save(
   ),
   112
 );
+// a sunflower for the back of the high-summer meadow — tall stem, broad leaves, a brown seed disc
+// ringed by yellow petals; stands well above the low blooms (and off the animals' open ground)
+save(
+  'sunflower',
+  S(
+    '80 150',
+    `<defs>
+<radialGradient id="sfd" cx="0.42" cy="0.4" r="0.64"><stop offset="0" stop-color="#7d5527"/><stop offset="0.72" stop-color="#523414"/><stop offset="1" stop-color="#39240d"/></radialGradient>
+<linearGradient id="sfp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd540"/><stop offset="1" stop-color="#ef9e1a"/></linearGradient></defs>
+<path d="M40,148 C38,108 41,78 43,50" stroke="#507b37" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+<path d="M41,104 C25,96 14,100 11,115 C25,119 34,115 42,106 Z" fill="#5c8c40"/>
+<path d="M43,82 C58,72 69,76 72,90 C58,94 49,90 42,84 Z" fill="#669a48"/>
+<g fill="url(#sfp)" stroke="#e8941a" stroke-width="0.5">${Array.from(
+      {length: 18},
+      (_, i) => {
+        const a = (i / 18) * Math.PI * 2,
+          cx = 42 + Math.cos(a) * 21,
+          cy = 42 + Math.sin(a) * 21;
+        return `<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="11.5" ry="4.6" transform="rotate(${((a * 180) / Math.PI).toFixed(1)} ${cx.toFixed(1)} ${cy.toFixed(1)})"/>`;
+      }
+    ).join('')}</g>
+<circle cx="42" cy="42" r="17.5" fill="url(#sfd)"/>
+<circle cx="42" cy="42" r="8.5" fill="#3c2710" opacity="0.4"/>`
+  ),
+  78
+);
+// lupine: a tall tapering spire of florets (pale base, so a per-plant tint gives purple, pink, blue
+// or white), with palmate leaves at the foot — a back-of-the-meadow spring/summer bloom
+// lupine: a tall tapering spire of florets with palmate leaves at the foot — a back-of-the-meadow
+// spring/summer bloom. Baked in a few colours (the green stem stays green) rather than tinted whole.
+const lupineFlorets = (() => {
+  let o = '';
+  for (let k = 0; k < 20; k++) {
+    const t = k / 19,
+      y = 70 - t * 58,
+      halfW = (1 - t) * 9.5 + 1.6,
+      cnt = Math.max(1, Math.round(halfW / 2.8));
+    for (let i = 0; i < cnt; i++) {
+      const off = cnt === 1 ? 0 : (i - (cnt - 1) / 2) * ((halfW * 1.5) / cnt),
+        wob = Math.sin(k * 1.7 + i) * 1.1,
+        r = (2.7 - t * 1.2).toFixed(1);
+      o += `<circle cx="${(28 + off + wob).toFixed(1)}" cy="${y.toFixed(1)}" r="${r}"/>`;
+    }
+  }
+  return o;
+})();
+const lupineSvg = (c1, c2) =>
+  S(
+    '56 154',
+    `<defs><linearGradient id="lup" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs>
+<path d="M28,152 C27,120 28,96 28,72" stroke="#5e8a3e" stroke-width="4" fill="none" stroke-linecap="round"/>
+<g stroke="#5c8c40" stroke-width="3" stroke-linecap="round" fill="none"><path d="M28,96 L16,86"/><path d="M28,96 L13,96"/><path d="M28,96 L16,106"/><path d="M28,98 L40,88"/><path d="M28,98 L43,98"/><path d="M28,98 L40,108"/></g>
+<g fill="url(#lup)">${lupineFlorets}</g>`
+  );
+save('lupine_p', lupineSvg('#cba2f0', '#8f63c8'), 56); // purple
+save('lupine_b', lupineSvg('#abc4f6', '#5f86d8'), 56); // blue
+save('lupine_k', lupineSvg('#f7bcda', '#e072a8'), 56); // pink
+save('lupine_w', lupineSvg('#fcf8ff', '#ddd0ee'), 56); // white
 save(
   'heron',
   S(
@@ -3022,7 +3080,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['giraffe_rest', 'zebra', 'goat_rest', 'deer_rest'];
+const review = ['sunflower', 'lupine_p', 'lupine_b', 'lupine_k'];
 const cols = 4,
   cell = 230,
   pad = 14,

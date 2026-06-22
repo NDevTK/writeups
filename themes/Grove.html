@@ -1193,6 +1193,11 @@
         'flower_b',
         'tulip',
         'foxglove',
+        'sunflower',
+        'lupine_p',
+        'lupine_b',
+        'lupine_k',
+        'lupine_w',
         'cornflower',
         'clover',
         'swallow_a',
@@ -2709,6 +2714,64 @@
               if (Math.random() < 0.5) fg.scale.x *= -1;
               scene.addChild(fg);
               swayers.push({s: fg, amp: 0.04, sp: 1.1, ph: Math.random() * 6});
+            }
+            // at the height of summer a clump of sunflowers; in spring/summer a patch of lupines
+            // raising colour-tipped spires — tall blooms grouped together, set behind the animals
+            if (seas === 'summer' && Math.random() < 0.5) {
+              const cx0 = 130 + Math.random() * Math.max(1, VW - 260);
+              for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
+                const x = Math.max(
+                    50,
+                    Math.min(
+                      VW - 50,
+                      cx0 + (Math.random() - Math.random()) * 130
+                    )
+                  ),
+                  sf = spr(
+                    'sunflower',
+                    x,
+                    groundY(x) + 8,
+                    0.42 + Math.random() * 0.22
+                  );
+                if (Math.random() < 0.5) sf.scale.x *= -1;
+                scene.addChild(sf);
+                swayers.push({
+                  s: sf,
+                  amp: 0.03,
+                  sp: 0.9,
+                  ph: Math.random() * 6
+                });
+              }
+            }
+            if (seas !== 'autumn' && Math.random() < 0.5) {
+              const LUP = ['lupine_p', 'lupine_b', 'lupine_k', 'lupine_w'],
+                base = LUP[(Math.random() * LUP.length) | 0],
+                cx0 = 110 + Math.random() * Math.max(1, VW - 220);
+              for (let i = 0, n = 3 + ((Math.random() * 4) | 0); i < n; i++) {
+                const x = Math.max(
+                    40,
+                    Math.min(
+                      VW - 40,
+                      cx0 + (Math.random() - Math.random()) * 150
+                    )
+                  ),
+                  lp = spr(
+                    Math.random() < 0.7
+                      ? base
+                      : LUP[(Math.random() * LUP.length) | 0],
+                    x,
+                    groundY(x) + 8,
+                    0.42 + Math.random() * 0.26
+                  );
+                if (Math.random() < 0.5) lp.scale.x *= -1;
+                scene.addChild(lp);
+                swayers.push({
+                  s: lp,
+                  amp: 0.05,
+                  sp: 1.2,
+                  ph: Math.random() * 6
+                });
+              }
             }
             // the odd flowering or berry shrub dotted about the meadow
             for (let i = 0, n = (Math.random() * 3) | 0; i < n; i++) {
