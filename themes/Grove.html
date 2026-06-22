@@ -2542,7 +2542,11 @@
         // dot the two far rolling hill-bands with small, hazed trees — a tree-studded middle distance
         // between the solid forest horizon and the detailed mid-hill. Only the wooded-horizon biomes
         // (those with a forest distant) get them; further band = smaller, hazier, cooler.
-        if (BI.distant && BI.distant.style === 'forest' && treePool.length)
+        if (BI.distant && BI.distant.style === 'forest' && treePool.length) {
+          // sink them into the haze if the biome has fog, so the whole far background sits behind the
+          // same veil as the hills they stand on — proper aerial perspective. With fog carrying the
+          // distance, the trees take a fuller tint; without it, they self-haze toward the hills.
+          const hasFog = fogLayers.length > 0;
           for (let bi = 0; bi < 2; bi++) {
             const fn = HILLS[bi],
               far = bi === 0,
@@ -2558,15 +2562,27 @@
                   fn(x) + 2,
                   (far ? 0.12 : 0.17) + Math.random() * 0.05
                 );
-              tr.tint = mulTint(
-                snow ? (far ? 0xcdd6dc : 0xd6dee2) : far ? 0xbcc8b0 : 0xc8d4b8,
-                folTint
-              );
-              tr.alpha = far ? 0.82 : 0.9;
+              const baseTint = snow
+                ? far
+                  ? 0xcdd6dc
+                  : 0xd6dee2
+                : hasFog
+                  ? far
+                    ? 0xc4d6ba
+                    : 0xcfe0c4
+                  : far
+                    ? 0xbcc8b0
+                    : 0xc8d4b8;
+              tr.tint = mulTint(baseTint, folTint);
+              tr.alpha = hasFog ? 0.96 : far ? 0.82 : 0.9;
               if (Math.random() < 0.5) tr.scale.x *= -1;
-              scene.addChild(tr);
+              // behind the fog when present (re-fetch the index so each lands just behind the veil)
+              if (hasFog)
+                scene.addChildAt(tr, scene.getChildIndex(fogLayers[0]));
+              else scene.addChild(tr);
             }
           }
+        }
         // jitter every tree's spot, size and facing per build so a stand never repeats exactly
         farHillPh = Math.random() * 6.283;
         for (const [n, sc, x] of varyLayer(BI.mid)) {
