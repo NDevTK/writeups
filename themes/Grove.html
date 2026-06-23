@@ -1375,13 +1375,21 @@
       // so drifting dust can catch a beam and glow where it crosses one
       const beamLightAt = (x, y) => {
         const F = beamField;
-        if (!F.on || y < F.topY || y > F.botY) return 0;
-        const fr = (y - F.topY) / (F.botY - F.topY); // 0 at the top, 1 at the bottom
+        if (!F.on) return 0;
+        const dx = x - F.sunX,
+          dy = y - F.sunY;
         let best = 0;
-        for (let i = 0; i < F.bx.length; i++) {
-          const cx = F.bx[i] - F.lean * (y - F.topY), // beam centre at this height
-            d = Math.abs(x - cx) / (F.w[i] * (1 + fr * 0.44)); // widens as it falls
-          if (d < 1 && (1 - d) * (1 - fr) > best) best = (1 - d) * (1 - fr);
+        for (let i = 0; i < F.rays.length; i++) {
+          const r = F.rays[i],
+            along = dx * r.dirx + dy * r.diry; // distance from the sun along this ray
+          if (along < 50 || along > F.len) continue;
+          const perp = Math.abs(dx * -r.diry + dy * r.dirx), // distance off the ray's axis
+            halfW = r.w * (0.28 + (along / F.len) * 0.9), // the shaft widens with distance
+            d = perp / halfW;
+          if (d < 1) {
+            const v = (1 - d) * (1 - along / F.len); // brightest near the sun, fading out
+            if (v > best) best = v;
+          }
         }
         return best * F.beam;
       };
@@ -1827,11 +1835,10 @@
         beamField = {
           on: false,
           beam: 0,
-          lean: 0,
-          topY: 0,
-          botY: 0,
-          bx: [],
-          w: []
+          sunX: 0,
+          sunY: 0,
+          len: 1,
+          rays: [] // god-rays fanning from the sun: each {dirx, diry, w}
         },
         puddleG,
         snowAccG,
@@ -6101,45 +6108,58 @@
           }
         }
 
-        // dawn/dusk light shafts: soft golden beams raking across the open land, ramping up as the
-        // sun nears the horizon and gone by midday and night. Additive and faint, leaning away from
-        // the sun's side and drifting slowly — light hanging in the hazy air, not hard rays.
+        // dawn/dusk light shafts: soft golden god-rays fanning out from the low sun and raking
+        // across the land — brightest near the sun, fading with distance, gone by midday and night.
+        // Anchored to the sun, so they lean in low from the left at dawn and from the right at dusk.
+        // Additive and faint, drifting slowly — light hanging in the hazy air, not hard rays.
         if (beamG) {
           beamG.clear();
           const low = cel.sun
               ? Math.max(0, Math.min(1, (cel.y - 250) / 150))
               : 0,
-            beam = low * low * (1 - cover * 0.7); // ease in low; fade as cloud hides the sun
+            beam = low * low * (1 - cover * 0.7); // ease in as the sun drops; fade as cloud hides it
           beamField.on = beam > 0.02;
           beamField.beam = beam;
           if (beamField.on) {
-            const lean = (cel.x / VW - 0.5) * 1.7, // tilt away from the sun's side
-              topY = 380,
-              botY = 700,
-              N = 8,
-              span = VW / (N - 1),
-              SEG = 3;
-            beamField.lean = lean;
-            beamField.topY = topY;
-            beamField.botY = botY;
-            beamField.bx.length = beamField.w.length = 0;
+            const sunX = cel.x,
+              sunY = cel.y,
+              baseAng = Math.atan2(VH * 0.9 - sunY, VW * 0.5 - sunX), // aim into the scene
+              N = 10,
+              halfSpread = 0.32, // the fan's half-angle
+              len = 1500,
+              SEG = 4;
+            beamField.sunX = sunX;
+            beamField.sunY = sunY;
+            beamField.len = len;
+            beamField.rays.length = 0;
             for (let i = 0; i < N; i++) {
-              const bx = i * span + Math.sin(t * 0.07 + i * 1.3) * 28, // slow drift
-                w = 15 + 6 * Math.sin(t * 0.4 + i * 2);
-              beamField.bx.push(bx); // remembered so drifting dust can catch this beam
-              beamField.w.push(w);
+              const fr = N > 1 ? i / (N - 1) - 0.5 : 0, // -0.5..0.5 across the fan
+                ang =
+                  baseAng +
+                  fr * 2 * halfSpread +
+                  Math.sin(t * 0.07 + i * 1.3) * 0.014, // slow drift
+                dirx = Math.cos(ang),
+                diry = Math.sin(ang),
+                px = -diry, // unit perpendicular to the ray
+                py = dirx,
+                w = 24 + 8 * Math.sin(t * 0.4 + i * 2); // far-end half-width, gently pulsing
+              beamField.rays.push({dirx, diry, w}); // remembered so drifting dust can catch a beam
               for (let s = 0; s < SEG; s++) {
-                const y0 = topY + ((botY - topY) * s) / SEG,
-                  y1 = topY + ((botY - topY) * (s + 1)) / SEG,
-                  x0 = bx - lean * (y0 - topY),
-                  x1 = bx - lean * (y1 - topY),
-                  w0 = w * (1 + s * 0.22),
-                  w1 = w * (1 + (s + 1) * 0.22);
-                beamG.beginFill(0xffd488, beam * 0.13 * (1 - s / SEG)); // fades as it falls
-                beamG.moveTo(x0 - w0, y0);
-                beamG.lineTo(x0 + w0, y0);
-                beamG.lineTo(x1 + w1, y1);
-                beamG.lineTo(x1 - w1, y1);
+                const a0 = s / SEG,
+                  a1 = (s + 1) / SEG,
+                  d0 = 50 + a0 * (len - 50), // distance from the sun along the ray
+                  d1 = 50 + a1 * (len - 50),
+                  w0 = w * (0.28 + a0 * 0.9), // narrow at the sun, widening outward
+                  w1 = w * (0.28 + a1 * 0.9),
+                  cx0 = sunX + dirx * d0,
+                  cy0 = sunY + diry * d0,
+                  cx1 = sunX + dirx * d1,
+                  cy1 = sunY + diry * d1;
+                beamG.beginFill(0xffd488, beam * 0.13 * (1 - a0)); // fades out from the sun
+                beamG.moveTo(cx0 + px * w0, cy0 + py * w0);
+                beamG.lineTo(cx0 - px * w0, cy0 - py * w0);
+                beamG.lineTo(cx1 - px * w1, cy1 - py * w1);
+                beamG.lineTo(cx1 + px * w1, cy1 + py * w1);
                 beamG.closePath();
                 beamG.endFill();
               }
@@ -6319,12 +6339,22 @@
           // dawn/dusk shafts striking the pond: warm sparkle pooling on the surface wherever a beam
           // reaches the water — at full golden strength (not the beams' faded tail), each glint
           // winking and scattered into wavelets by the breeze
-          const F = beamField;
+          const F = beamField,
+            cols = []; // where each downward ray crosses the waterline, and its width there
+          for (let i = 0; i < F.rays.length; i++) {
+            const r = F.rays[i];
+            if (r.diry <= 0.03) continue; // only rays angled down reach the water
+            const d = (612 - F.sunY) / r.diry; // distance from the sun to the waterline
+            if (d < 50 || d > F.len) continue;
+            cols.push({
+              cx: F.sunX + r.dirx * d,
+              hw: r.w * (0.28 + (d / F.len) * 0.9) * 1.32
+            });
+          }
           for (let x = 0; x <= VW; x += 9) {
-            let cov = 0; // how squarely a beam's column lands on this stretch of water
-            for (let i = 0; i < F.bx.length; i++) {
-              const cx = F.bx[i] - F.lean * (612 - F.topY),
-                dd = Math.abs(x - cx) / (F.w[i] * 1.32);
+            let cov = 0; // how squarely a beam lands on this stretch of water
+            for (let i = 0; i < cols.length; i++) {
+              const dd = Math.abs(x - cols[i].cx) / cols[i].hw;
               if (dd < 1 && 1 - dd > cov) cov = 1 - dd;
             }
             const glow = cov * F.beam;
