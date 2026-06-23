@@ -1204,6 +1204,8 @@
         'deer_d_b',
         'deer_drink',
         'deer_d_drink',
+        'deer_swish',
+        'deer_d_swish',
         'goat_kid_a',
         'goat_kid_b',
         'camel_calf_a',
@@ -3929,6 +3931,14 @@
                   ? 'deer_d_drink'
                   : 'deer_drink'
                 : null;
+              // the tail-flicked pose for an idle swish (deer only, matching the coat)
+              d.swishTex = isDeerWalker
+                ? darkDeer
+                  ? 'deer_d_swish'
+                  : 'deer_swish'
+                : null;
+              d.swishT = 0; // >0 while a swish is held
+              d.swishCD = 1.5 + Math.random() * 3.5; // until the next one
             }
             scene.addChild(d);
             walkers.push(d);
@@ -6721,9 +6731,24 @@
                 // coming out of a graze or a standing pause: amble on, often a new way
                 d.mode = 'walk';
                 d.timer = 5 + Math.random() * 6;
+                d.swishT = 0; // tail settled as it sets off (play() restores the frames)
                 if (Math.random() < (d.graze ? 0.4 : 0.5)) {
                   d.dir = -d.dir;
                   d.scale.x = d.dir * Math.abs(d.scale.x);
+                }
+              }
+              // a grazing or standing deer gives its tail the odd flick at the flies
+              if (d.swishTex && (d.mode === 'graze' || d.mode === 'pause')) {
+                if (d.swishT > 0) {
+                  d.swishT -= dt / 60;
+                  if (d.swishT <= 0) d.gotoAndStop(0); // tail settles back
+                } else if (
+                  (d.swishCD =
+                    (d.swishCD ?? 1.5 + Math.random() * 3.5) - dt / 60) <= 0
+                ) {
+                  d.texture = T(d.swishTex); // tail flicks out
+                  d.swishT = 0.18 + Math.random() * 0.16;
+                  d.swishCD = 2 + Math.random() * 3;
                 }
               }
               if (d.dir > 0 && d.x > VW + 60) d.x = -60;

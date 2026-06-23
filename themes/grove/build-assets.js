@@ -17,7 +17,7 @@ const save = (name, svg, w) =>
   fs.writeFileSync(`${OUT}/${name}.png`, png(svg, w));
 
 // ---- deer (2 walk frames) with belly shadow + leg shading ----
-const deerSvg = (lf, g0, g1, lg0, lg1, mid) =>
+const deerSvg = (lf, g0, g1, lg0, lg1, mid, tailRot) =>
   S(
     '260 215',
     `
@@ -28,7 +28,7 @@ const deerSvg = (lf, g0, g1, lg0, lg1, mid) =>
 <line x1="150" y1="130" x2="${151 + lf[1]}" y2="194" stroke="${mid || '#553a23'}" stroke-width="8"/>
 <line x1="98" y1="135" x2="${95 + lf[2]}" y2="201" stroke="url(#lg)" stroke-width="9"/>
 <line x1="161" y1="133" x2="${164 + lf[3]}" y2="199" stroke="url(#lg)" stroke-width="9"/></g>
-<path d="M58,104 C49,101 47,113 55,119 C60,121 63,113 62,107 Z" fill="${mid || '#6b4626'}"/>
+${tailRot ? `<g transform="rotate(${tailRot} 60 107)">` : ''}<path d="M58,104 C49,101 47,113 55,119 C60,121 63,113 62,107 Z" fill="${mid || '#6b4626'}"/>${tailRot ? '</g>' : ''}
 <path d="M60,120 C56,99 80,89 102,90 C128,91 150,94 166,106 C174,113 171,127 162,134 C148,143 116,146 94,143 C76,141 63,140 60,120 Z" fill="url(#bg)"/>
 <circle cx="80" cy="116" r="23" fill="url(#bg)"/>
 <path d="M70,104 C95,92 135,93 168,107 C150,99 110,99 84,108 Z" fill="#b88350" opacity="0.5"/>
@@ -60,6 +60,26 @@ save(
     '#46301a',
     '#261810',
     '#3a281a'
+  ),
+  210
+);
+// a deer mid tail-swish — frame-0 stance with the tail flicked out; the live sprite swaps to it
+// for a moment as it grazes or stands, the way deer flick their tails at flies
+save(
+  'deer_swish',
+  deerSvg([0, 0, 0, 0], undefined, undefined, undefined, undefined, undefined, 30),
+  210
+);
+save(
+  'deer_d_swish',
+  deerSvg(
+    [0, 0, 0, 0],
+    '#6e4c2c',
+    '#3e2818',
+    '#46301a',
+    '#261810',
+    '#3a281a',
+    30
   ),
   210
 );
