@@ -6939,6 +6939,13 @@
                   fox.mode = 'leap';
                   fox.pounceT = 0;
                   fox.texture = T(fox.pounceTex);
+                  // the mouse breaks the instant the fox springs, bolting clear the other way
+                  if (fox.prey && fox.prey.visible !== false) {
+                    const m = fox.prey;
+                    m.dir = m.x >= fox.x ? 1 : -1;
+                    m.scale.x = m.dir * m.baseSc;
+                    m.flee = 1 + Math.random() * 0.6;
+                  }
                 }
               } else if (fox.mode === 'leap') {
                 const a = Math.min(1, fox.pounceT / 0.6),
@@ -6987,6 +6994,24 @@
                 fox.pounceT = 0;
                 fox.listenDur = 0.7 + Math.random() * 0.6;
                 fox.lungeSpd = 1.3 + Math.random() * 0.7;
+                fox.prey = null;
+                // if a field mouse is out within range it's onto that, not a hidden vole: it turns
+                // to face it, lines the pounce up, and the mouse freezes as it senses the stalk
+                if (
+                  mouse &&
+                  mouse.visible !== false &&
+                  Math.abs(mouse.x - fox.x) < 230
+                ) {
+                  fox.prey = mouse;
+                  fox.dir = mouse.x >= fox.x ? 1 : -1;
+                  fox.scale.x = fox.dir * Math.abs(fox.scale.x);
+                  fox.lungeSpd = Math.min(
+                    3.2,
+                    Math.max(1.4, Math.abs(mouse.x - fox.x) / 38)
+                  );
+                  mouse.flee = 0;
+                  mouse.pauseT = fox.listenDur + 0.12; // frozen, sensing the fox
+                }
               }
               if (fox.dir > 0 ? fox.x > VW + 80 : fox.x < -80) {
                 fox.visible = false;
@@ -8073,7 +8098,20 @@
         // a field mouse: short, quick scurries through the grass, then it freezes and sits stock-still
         // — a tiny alert tremor — before darting on; pauses often and briefly, the way a mouse does
         if (mouse) {
-          if (mouse.pauseT > 0) {
+          if (mouse.flee > 0) {
+            // panic: it caught the fox's spring and bolts flat-out the other way
+            mouse.flee -= dt / 60;
+            mouse.x += mouse.dir * mouse.spd * 2.1 * dt;
+            mouse.y = groundY(mouse.x) + 3 + Math.abs(Math.sin(t * 40)) * -0.6; // a frantic scurry
+            mouse.rotation = 0;
+            if (mouse.x > VW - 70) {
+              mouse.dir = -1;
+              mouse.scale.x = -mouse.baseSc;
+            } else if (mouse.x < 70) {
+              mouse.dir = 1;
+              mouse.scale.x = mouse.baseSc;
+            }
+          } else if (mouse.pauseT > 0) {
             mouse.pauseT -= dt / 60; // frozen, alert
             mouse.rotation = Math.sin(t * 22) * 0.02; // a fine nervous tremor
             mouse.y = groundY(mouse.x) + 3;
