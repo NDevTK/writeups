@@ -63,6 +63,40 @@ save(
   ),
   210
 );
+// a deer with its head lowered to the water to drink — body + legs match deer_a so the live
+// sprite can swap to this pose in place; neck curves down, muzzle reaches the ground (faces right)
+const deerDrinkSvg = (g0, g1, lg0, lg1, mid) =>
+  S(
+    '260 215',
+    `
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0 || '#a8773f'}"/><stop offset="1" stop-color="${g1 || '#6c4626'}"/></linearGradient>
+<linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${lg0 || '#6f4a2b'}"/><stop offset="1" stop-color="${lg1 || '#3f2a18'}"/></linearGradient></defs>
+<g stroke-linecap="round">
+<line x1="86" y1="132" x2="84" y2="196" stroke="${mid || '#553a23'}" stroke-width="8"/>
+<line x1="150" y1="130" x2="151" y2="194" stroke="${mid || '#553a23'}" stroke-width="8"/>
+<line x1="98" y1="135" x2="95" y2="201" stroke="url(#lg)" stroke-width="9"/>
+<line x1="161" y1="133" x2="164" y2="199" stroke="url(#lg)" stroke-width="9"/></g>
+<path d="M58,104 C49,101 47,113 55,119 C60,121 63,113 62,107 Z" fill="${mid || '#6b4626'}"/>
+<path d="M60,120 C56,99 80,89 102,90 C128,91 150,94 166,106 C174,113 171,127 162,134 C148,143 116,146 94,143 C76,141 63,140 60,120 Z" fill="url(#bg)"/>
+<circle cx="80" cy="116" r="23" fill="url(#bg)"/>
+<path d="M70,104 C95,92 135,93 168,107 C150,99 110,99 84,108 Z" fill="#b88350" opacity="0.4"/>
+<path d="M72,138 C100,146 140,144 160,133 C136,148 96,149 72,143 Z" fill="#3f2a18" opacity="0.4"/>
+<path d="M152,102 C178,110 195,132 198,158 L181,166 C176,140 160,123 140,122 Z" fill="url(#bg)"/>
+<ellipse cx="192" cy="159" rx="15" ry="12.5" fill="url(#bg)"/>
+<path d="M182,165 C179,182 187,194 199,192 C207,190 208,179 203,170 C197,163 186,159 182,165 Z" fill="url(#bg)"/>
+<ellipse cx="199" cy="190" rx="4.6" ry="3.6" fill="#2a1c12"/>
+<path d="M181,149 C172,142 174,134 183,139 C188,142 187,151 183,153 Z" fill="#7c5230"/>
+<circle cx="189" cy="157" r="2.6" fill="#140e09"/><circle cx="190" cy="156" r="0.8" fill="#d8c7a8"/>
+<g fill="none" stroke="#bda572" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round">
+<path d="M187,150 C177,137 169,124 170,108"/><path d="M175,131 C167,128 161,124 157,117"/><path d="M170,110 C166,103 164,99 166,92"/>
+<path d="M196,149 C194,133 193,121 198,109"/><path d="M196,123 C204,120 210,116 214,110"/><path d="M198,110 C196,103 195,99 198,92"/></g>`
+  );
+save('deer_drink', deerDrinkSvg(), 210);
+save(
+  'deer_d_drink',
+  deerDrinkSvg('#6e4c2c', '#3e2818', '#46301a', '#261810', '#3a281a'),
+  210
+);
 
 save(
   'oak',
