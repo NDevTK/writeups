@@ -1192,6 +1192,8 @@
         'fox_s',
         'deer_d_a',
         'deer_d_b',
+        'deer_drink',
+        'deer_d_drink',
         'goat_kid_a',
         'goat_kid_b',
         'camel_calf_a',
@@ -3844,10 +3846,9 @@
             const wadeFrames =
               heron && Math.random() < 0.45 ? ['egret'] : BI.walker;
             // a darker, melanistic deer turns up among the standing ones now and then
-            const walkFrames =
-              BI.walker[0] === 'deer_a' && Math.random() < 0.2
-                ? ['deer_d_a', 'deer_d_b']
-                : wadeFrames;
+            const isDeerWalker = BI.walker[0] === 'deer_a';
+            const darkDeer = isDeerWalker && Math.random() < 0.2;
+            const walkFrames = darkDeer ? ['deer_d_a', 'deer_d_b'] : wadeFrames;
             const frames = resting ? [restSprite] : walkFrames;
             const d = anim(
               frames,
@@ -3893,6 +3894,12 @@
               d.trot = 0; // seconds left in a brief trot burst (0 = plain amble)
               d.startle = 0; // seconds left bolting from a fright (0 = calm)
               d.baseAnim = d.animationSpeed; // resting gait, so a trot can quicken the legs
+              // the head-down pose it swaps to when drinking (only deer have one; matches its coat)
+              d.drinkTex = isDeerWalker
+                ? darkDeer
+                  ? 'deer_d_drink'
+                  : 'deer_drink'
+                : null;
             }
             scene.addChild(d);
             walkers.push(d);
@@ -6506,8 +6513,9 @@
                 }
               }
             }
-            // drink: a grazer ambles down to the water's edge, lowers its head a while, then heads
-            // back up to the grass — no drinking pose, so the head dips with a tilt and rings the water
+            // drink: a deer ambles down to the water's edge, drops into its head-down drinking pose
+            // for a spell — muzzle in the water, the part below the surface murking — then heads back
+            // up to the grass, lifting its head now and then to look about
             if (d.mode === 'drink' && !raining) {
               const gy = groundY(d.x) + 8;
               if (d.drinkPhase === 'go') {
@@ -6520,38 +6528,45 @@
                 const near = Math.max(0, Math.min(1, 1 - Math.abs(ddx) / 130));
                 d.y =
                   gy +
-                  (604 - gy) * near +
+                  (623 - gy) * near +
                   Math.abs(Math.sin(t * 4 + d.x)) * -1.8 * (1 - near);
                 if (Math.abs(ddx) < 4) {
                   d.drinkPhase = 'sip';
                   d.timer = 4.5 + Math.random() * 5;
                   d.lookT = 0;
-                  if (multi) d.gotoAndStop(0);
+                  d.stop();
+                  d.texture = T(d.drinkTex); // drop the head into the water
                 }
               } else if (d.drinkPhase === 'sip') {
-                // head down at the water, lifting it now and then to look about
                 d.timer -= dt / 60;
-                d.y = 604;
+                d.y = 623; // muzzle at the surface, hooves in the shallows
                 d.lookT = (d.lookT ?? 0) - dt / 60;
                 if (d.lookT <= 0 && Math.random() < 0.012 * dt)
                   d.lookT = 0.5 + Math.random() * 0.9;
-                const lifting = d.lookT > 0;
-                d.rotation = d.dir * (lifting ? 0.04 : 0.42); // dip to drink, raise to look round
-                if (!lifting && water && Math.random() < 0.05 * dt)
-                  ripples.push({x: d.x + d.dir * 26, y: 608, r: 3, life: 0.7});
+                if (d.lookT > 0)
+                  d.gotoAndStop(0); // head up, watchful
+                else {
+                  d.texture = T(d.drinkTex); // head down, drinking
+                  if (water && Math.random() < 0.05 * dt)
+                    ripples.push({
+                      x: d.x + d.dir * 32,
+                      y: 611,
+                      r: 3,
+                      life: 0.7
+                    });
+                }
                 if (d.timer < 0) {
                   d.drinkPhase = 'leave';
-                  d.rotation = 0;
-                  if (multi && !d.playing) d.play();
+                  if (multi) d.play(); // back to the walk frames
                 }
               } else {
                 // leave: amble back up the bank to the meadow grass
+                if (multi && !d.playing) d.play();
                 d.y +=
                   Math.sign(gy - d.y) * Math.min(Math.abs(gy - d.y), 0.9 * dt);
                 d.x += d.dir * (d.spd ?? 0.35) * 0.6 * dt;
                 if (Math.abs(d.y - gy) < 1.5) {
                   d.y = gy;
-                  d.rotation = 0;
                   d.mode = 'walk';
                   d.timer = 4 + Math.random() * 5;
                   d.drinkDone = t;
@@ -6567,10 +6582,11 @@
             } else {
               d.timer -= dt / 60;
               if (d.mode === 'walk') {
-                // now and then it heads off down to the water for a drink (only where it can reach it)
+                // now and then it heads off down to the water for a drink (deer only, where it can reach it)
                 if (
                   d.graze &&
                   canDrink &&
+                  d.drinkTex &&
                   d.trot <= 0 &&
                   t - (d.drinkDone ?? -99) > 16 &&
                   Math.random() < 0.0007 * dt
