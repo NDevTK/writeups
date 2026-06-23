@@ -1833,6 +1833,7 @@
         shootG,
         auroraG,
         rippleG,
+        frogTongueG,
         iceG,
         tracksG,
         streakTile,
@@ -4308,6 +4309,7 @@
         // water biomes (pond) — reflections, lilies, ducks, dragonflies
         glit = new PIXI.Graphics();
         reflLayer = null;
+        frogTongueG = null;
         pondShape = null;
         waterL = 120;
         waterR = VW - 120;
@@ -4598,6 +4600,11 @@
           // float the lily pads (and the frogs on them) in front of the ducks, so a duck passing one swims behind it
           for (const lp of lilies) if (!lp.isFrog) scene.addChild(lp);
           for (const lp of lilies) if (lp.isFrog) scene.addChild(lp);
+          // a layer for a frog's tongue to flick across, drawn over the frogs each frame
+          if (lilies.some((lp) => lp.isFrog)) {
+            frogTongueG = new PIXI.Graphics();
+            scene.addChild(frogTongueG);
+          }
           if (BI.water.drag && !snow) {
             const dn = Math.max(
               1,
@@ -8459,6 +8466,7 @@
           d.alpha = 0.12 + 0.88 * s * s * s * s;
         }
         // lily pads bob; seasonal weather falls
+        if (frogTongueG) frogTongueG.clear();
         for (const lp of lilies) {
           const bob = Math.sin(t * 1.5 + lp.x * 0.05) * 1.2;
           if (lp.isFrog) {
@@ -8473,6 +8481,52 @@
               if (water)
                 ripples.push({x: lp.x, y: lp.baseY + 8, r: 4, life: 1});
               lp.hopT = 2.5 + Math.random() * 4;
+            }
+            // snap at a dragonfly that strays within reach — the tongue flicks out and the
+            // dragonfly bolts (it nearly always gets away)
+            lp.flickCD = (lp.flickCD ?? Math.random() * 2) - dt / 60;
+            if (lp.flickT > 0) {
+              lp.flickT -= dt / 60;
+              if (frogTongueG) {
+                const e = 1 - Math.abs(lp.flickT / 0.34 - 0.5) * 2, // out then back
+                  mx = lp.x + lp.dir * 5,
+                  my = lp.y - 6,
+                  tx = mx + (lp.tongueX - mx) * e,
+                  ty = my + (lp.tongueY - my) * e;
+                frogTongueG.lineStyle(2.2, 0xcf5168);
+                frogTongueG.moveTo(mx, my);
+                frogTongueG.lineTo(tx, ty);
+                frogTongueG.lineStyle(0);
+                frogTongueG
+                  .beginFill(0xcf5168)
+                  .drawCircle(tx, ty, 2.6)
+                  .endFill();
+              }
+            } else if (lp.flickCD <= 0 && hop === 0) {
+              for (const fl of flutters) {
+                if (!fl.water || fl.alpha < 0.3) continue;
+                const ddx = fl.x - lp.x,
+                  ddy = fl.y - lp.y;
+                if (Math.abs(ddx) < 56 && ddy > -50 && ddy < 35) {
+                  lp.flickT = 0.34;
+                  lp.tongueX = fl.x;
+                  lp.tongueY = fl.y;
+                  lp.dir = ddx >= 0 ? 1 : -1;
+                  lp.scale.x = lp.dir * Math.abs(lp.scale.x);
+                  lp.flickCD = 2 + Math.random() * 3;
+                  fl.darting = true; // the dragonfly jinks away
+                  fl.dtx = Math.max(
+                    waterL + 20,
+                    Math.min(
+                      waterR - 40,
+                      fl.x - Math.sign(ddx || 1) * (90 + Math.random() * 60)
+                    )
+                  );
+                  fl.dty = Math.max(fl.lo ?? 605, fl.y - 16);
+                  fl.dartT = 0.45;
+                  break;
+                }
+              }
             }
           } else lp.y = lp.baseY + bob;
         }
