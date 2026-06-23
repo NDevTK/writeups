@@ -1404,6 +1404,21 @@
         }
         return best * F.beam;
       };
+      // a quick spray of little specks kicked up off the ground (grass, dirt, bark): n specks from
+      // (x, gy) flung up and out in the given colours, arcing back down under gravity and fading
+      const emitBurst = (x, gy, n, cols, up, spread) => {
+        for (let i = 0; i < n; i++)
+          bursts.push({
+            x: x + (Math.random() - 0.5) * 8,
+            y: gy - 2 - Math.random() * 5,
+            gy: gy + 2,
+            vx: (Math.random() - 0.5) * spread,
+            vy: -up * (0.5 + Math.random()),
+            sz: 1.8 + Math.random() * 2,
+            c: cols[(Math.random() * cols.length) | 0],
+            life: 0.34 + Math.random() * 0.32
+          });
+      };
       const anim = (frames, x, y, s, spd) => {
         const a = new PIXI.AnimatedSprite(frames.map(T));
         a.anchor.set(0.5, 1);
@@ -1801,6 +1816,7 @@
         smoke = [],
         embers = [],
         ripples = [],
+        bursts = [], // little kicked-up specks: grass/dirt as a paw or talon strikes, bark chips
         flock = [],
         puddles = [],
         tracks = [],
@@ -1868,6 +1884,7 @@
         shootG,
         auroraG,
         rippleG,
+        burstG,
         frogTongueG,
         iceG,
         tracksG,
@@ -1933,6 +1950,7 @@
           smoke.length =
           embers.length =
           ripples.length =
+          bursts.length =
           flock.length =
           puddles.length =
           tracks.length =
@@ -4441,6 +4459,10 @@
         // lift any framing rocks above the animals so they pass behind the side rocks (canyon mesas)
         for (const r of frontRocks) scene.addChild(r);
 
+        // little kicked-up specks (grass, dirt, bark) when a paw, talon or bill strikes — sits in
+        // front of the land creatures, behind the pond foreground; empty where nothing kicks up
+        burstG = new PIXI.Graphics();
+        scene.addChild(burstG);
         // water biomes (pond) — reflections, lilies, ducks, dragonflies
         glit = new PIXI.Graphics();
         reflLayer = null;
@@ -6927,6 +6949,15 @@
                 if (a >= 1) {
                   fox.y = groundY(fox.x) + 9;
                   fox.rotation = fox.dir * 0.66; // pitched right down, nose-first in the grass
+                  // a spray of grass and dirt kicked up where it strikes
+                  emitBurst(
+                    fox.x + fox.dir * 16,
+                    groundY(fox.x + fox.dir * 16) + 6,
+                    7,
+                    [0x6fae4a, 0x57933a, 0x6e4f32],
+                    2.7,
+                    3.6
+                  );
                   fox.mode = 'recover';
                   fox.pounceT = 0;
                 }
@@ -8384,6 +8415,24 @@
             rippleG.drawEllipse(rp.x, rp.y, rp.r, rp.r * 0.34);
           }
         }
+        // kicked-up specks arc up and fall back to the ground, fading as they go
+        if (burstG) {
+          burstG.clear();
+          for (let i = bursts.length - 1; i >= 0; i--) {
+            const b = bursts[i];
+            b.x += b.vx * dt;
+            b.y += b.vy * dt;
+            b.vy += 0.55 * dt; // gravity pulls them back down
+            b.life -= dt / 60;
+            if (b.life <= 0 || b.y > b.gy) {
+              bursts.splice(i, 1);
+              continue;
+            }
+            burstG.beginFill(b.c, Math.min(1, b.life * 3.5));
+            burstG.drawRect(b.x, b.y, b.sz, b.sz);
+            burstG.endFill();
+          }
+        }
 
         // waterfall: scroll the streak texture down so the cascade flows, and ring the plunge pool
         if (streakTile) streakTile.tilePosition.y += streakTile.spd * dt;
@@ -8594,6 +8643,17 @@
               f.y = glideY + (lowY - glideY) * dip;
               f.scale.x = (f.vx < 0 ? -1 : 1) * Math.abs(f.scale.x);
               f.rotation = Math.sign(f.vx) * Math.cos(p * Math.PI) * 0.4; // nose-down in, nose-up out
+              if (p >= 0.46 && !f.struck) {
+                f.struck = true; // a few blades of grass kicked up as it reaches the turf
+                emitBurst(
+                  f.x,
+                  groundY(f.x) + 2,
+                  4,
+                  [0x6fae4a, 0x57933a],
+                  2.1,
+                  3
+                );
+              }
               if (p >= 1) {
                 f.swoop = null;
                 f.rotation = 0;
@@ -8608,8 +8668,10 @@
                 f.x < VW - 150 &&
                 !raining &&
                 Math.random() < 0.0034 * dt
-              )
+              ) {
                 f.swoop = 0;
+                f.struck = false;
+              }
               if (f.x > VW + 120 || f.x < -120) {
                 f.dir = -f.dir;
                 f.vx = f.dir * (0.7 + Math.random() * 0.3);
