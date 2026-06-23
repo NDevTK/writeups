@@ -1142,6 +1142,12 @@
         'bluetit',
         'goldcrest',
         'wren',
+        'robin_roost',
+        'bluebird_roost',
+        'finch_roost',
+        'bluetit_roost',
+        'goldcrest_roost',
+        'wren_roost',
         'arctic_fox',
         'lizard_b',
         'beetle',
@@ -4092,7 +4098,9 @@
         } else squirrel = null;
         if (
           BI.perchBird &&
-          (BI.glade || buildNight < 0.55) && // perching birds roost after dark (the glade's dusk keeps its own)
+          // songbirds stay on, roosting after dark; only where a night creature takes the canopy
+          // (the jungle's kinkajou) is the perching bird day-only
+          (buildNight < 0.55 || !BI.nightCanopy) &&
           perches.length &&
           Math.random() < 0.75
         ) {
@@ -4120,6 +4128,13 @@
           songbird.perch = p; // current perch
           songbird.mode = 'perch'; // perch (sit + look about) → flit (arc to a new bough)
           songbird.tmr = 2 + Math.random() * 5;
+          songbird.baseTex = songbird.curTex = kind; // head-up pose / current pose
+          songbird.roostTex = kind === 'parrot' ? null : kind + '_roost'; // fluffed asleep
+          if (songbird.roostTex && buildNight > 0.5) {
+            // built after dusk: already roosting, tucked up on its bough
+            songbird.texture = T(songbird.roostTex);
+            songbird.curTex = songbird.roostTex;
+          }
           scene.addChild(songbird);
         } else songbird = null;
         if (
@@ -7686,7 +7701,25 @@
           // an outdoor pond to drop down and splash in
           const canBathe =
             !!water && !BI.interior && !BI.underwater && !BI.glade;
-          if (songbird.mode === 'perch') {
+          // at dusk it settles to roost: once it's back on a bough it fluffs up, tucks its head
+          // and sleeps still until first light, when the lifting dark rouses it again
+          const roosting =
+            songbird.roostTex && night > 0.5 && songbird.mode === 'perch';
+          if (roosting) {
+            if (songbird.curTex !== songbird.roostTex) {
+              songbird.texture = T(songbird.roostTex);
+              songbird.curTex = songbird.roostTex;
+            }
+            songbird.preenT = 0;
+            songbird.rotation = 0;
+            songbird.y =
+              songbird.perch.y + Math.sin(t * 0.7 + songbird.dir) * 0.3; // a faint sleeping breath
+            songbird.tmr = Math.max(songbird.tmr, 0.5); // no flitting off while it sleeps
+          } else if (songbird.mode === 'perch') {
+            if (songbird.curTex !== songbird.baseTex) {
+              songbird.texture = T(songbird.baseTex); // roused at first light: head back up
+              songbird.curTex = songbird.baseTex;
+            }
             // now and then it has a preen — ducks its head to its breast and fusses there with
             // quick little jerks before sitting up again
             songbird.preenCD =

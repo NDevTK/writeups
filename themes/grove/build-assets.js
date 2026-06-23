@@ -2725,6 +2725,29 @@ save(
   perchBird('wren', '#7a5436', '#c69a6a', '#caa45a', '#5a3c26', null, true),
   50
 );
+// each perching bird roosting — fluffed into a round ball, head drawn down and turned back with
+// the beak buried in the back feathers, eye closed. Same palette/flags as its head-up frame, so
+// the live sprite swaps to it in place when it settles to sleep at dusk (faces right).
+const perchRoost = (id, back, breast, beak, wing, crest, cock) =>
+  S(
+    '58 52',
+    `<path d="M16,41 L3,38 L7,46 L18,45 Z" fill="${wing}"/>
+<ellipse cx="29" cy="34" rx="17" ry="15.5" fill="${back}"/>
+<path d="M34,27 C45,30 45,45 32,48 C25,47 24,38 27,32 C29,28 31,27 34,27 Z" fill="${breast}"/>
+<path d="M17,31 C26,27 34,29 38,37 C31,42 22,40 17,37 Z" fill="${wing}"/>
+<ellipse cx="27" cy="22" rx="11.5" ry="10.5" fill="${back}"/>
+${crest ? `<path d="M21,14 C25,10 33,11 37,15 C31,13 25,13 21,17 Z" fill="${crest}"/>` : ''}
+<path d="M21,21 L10,18 L21,25 Z" fill="${beak}"/>
+<path d="M23,17 C29,15 35,17 37,22 C31,24 24,23 20,21 Z" fill="${back}"/>
+<path d="M29,20 C32,18 35,19 37,21" stroke="#1a140d" stroke-width="1.3" fill="none"/>
+<g stroke="${wing}" stroke-width="1.7" stroke-linecap="round"><line x1="27" y1="48.5" x2="27" y2="50.5"/><line x1="32" y1="48.5" x2="32" y2="50.5"/></g>`
+  );
+save('robin_roost', perchRoost('robin', '#8a7a60', '#d8643a', '#e2a23a', '#6f6048'), 50);
+save('bluebird_roost', perchRoost('bluebird', '#4a82c8', '#d59060', '#3a3a40', '#37619a'), 50);
+save('finch_roost', perchRoost('finch', '#b6b04e', '#ecd24e', '#3a3a40', '#8a8638'), 50);
+save('bluetit_roost', perchRoost('bluetit', '#4f8fce', '#ecd24e', '#3a3a40', '#3a6fae'), 50);
+save('goldcrest_roost', perchRoost('goldcrest', '#7e8a4e', '#d4cea8', '#3a3a40', '#5f6a38', '#e8b73a'), 50);
+save('wren_roost', perchRoost('wren', '#7a5436', '#c69a6a', '#caa45a', '#5a3c26', null, true), 50);
 
 // ======== an arctic fox — white, fluffier and round-eared (faces right) ========
 save(
