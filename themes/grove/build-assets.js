@@ -2346,6 +2346,19 @@ const webSvg = () => {
   );
 };
 save('web', webSvg(), 120);
+// a fresh molehill — a crumbly mound of dark soil pushed up through the turf (sits on the ground)
+save(
+  'molehill',
+  S(
+    '52 32',
+    `<defs><radialGradient id="mh" cx="0.5" cy="0.95" r="0.85"><stop offset="0" stop-color="#6e4c30"/><stop offset="1" stop-color="#3c2917"/></radialGradient></defs>
+<ellipse cx="26" cy="30" rx="25" ry="4.5" fill="#2f2010" opacity="0.3"/>
+<path d="M3,30 C4,15 14,8 26,8 C38,8 48,15 49,30 Z" fill="url(#mh)"/>
+<circle cx="16" cy="22" r="3.4" fill="#5c3e26"/><circle cx="30" cy="17" r="4" fill="#785532"/><circle cx="37" cy="23" r="2.8" fill="#4e3420"/><circle cx="22" cy="25" r="2.6" fill="#664526"/><circle cx="25" cy="14" r="2.4" fill="#80592f"/><circle cx="11" cy="27" r="2" fill="#553923"/><circle cx="42" cy="27" r="2.2" fill="#5a3d25"/>
+<circle cx="29" cy="16" r="1.4" fill="#8c6238" opacity="0.6"/><circle cx="24" cy="13" r="1.1" fill="#8a6036" opacity="0.55"/><circle cx="15" cy="21" r="1" fill="#7a5430" opacity="0.5"/>`
+  ),
+  46
+);
 // a fallen mossy log
 save(
   'log',

@@ -426,6 +426,7 @@
           snail: true, // a snail glides out onto the wet grass after rain
           toadstools: true, // fly-agaric sprout under the trees after rain
           dewWeb: true, // a spider's web beads with dew at first light
+          molehill: true, // a mole pushes up fresh molehills across the meadow
           ladybird: true, // a ladybird trundles the meadow floor by day
           mouse: true, // a field mouse scurries the meadow grass by day
           grasshopper: true, // a grasshopper springs through the warm meadow grass
@@ -928,6 +929,7 @@
           snail: true, // a snail glides out across the wet orchard floor after rain
           toadstools: true, // toadstools come up on the orchard floor after rain
           dewWeb: true, // a web beads with dew in the orchard boughs at first light
+          molehill: true, // a mole pushes up molehills across the orchard floor
           ladybird: true, // a ladybird trundles the orchard floor by day
           mouse: true, // a field mouse scurries the orchard grass by day
           flyer: 0xffffff,
@@ -1119,6 +1121,7 @@
         'toadstool',
         'shroom',
         'web',
+        'molehill',
         'log',
         'stump',
         'duck_f',
@@ -1816,6 +1819,7 @@
       const swayers = [],
         flowers = [], // the subset of swayers that are blooms — they nod when an insect alights
         fungi = [], // toadstools that sprout after rain and shrink back as the ground dries
+        molehills = [], // fresh molehills a mole pushes up across the meadow, one by one
         clouds = [],
         ducks = [],
         fish = [],
@@ -1951,6 +1955,7 @@
         swayers.length =
           flowers.length =
           fungi.length =
+          molehills.length =
           clouds.length =
           ducks.length =
           fish.length =
@@ -4280,6 +4285,33 @@
               fungi.push(m);
             }
           }
+        }
+        if (BI.molehill && !snow && Math.random() < 0.7) {
+          // a mole works a line of fresh molehills across the meadow, heaving them up one at a
+          // time (in the ticker). Lay the hidden mounds out along its tunnel now.
+          let mx = 150 + Math.random() * (VW - 300);
+          const mdir0 = Math.random() < 0.5 ? 1 : -1;
+          let mdir = mdir0;
+          for (let i = 0, n = 3 + ((Math.random() * 3) | 0); i < n; i++) {
+            const cx = Math.max(70, Math.min(VW - 70, mx));
+            const m = spr(
+              'molehill',
+              cx,
+              groundY(cx) + 4,
+              0.5 + Math.random() * 0.3
+            );
+            m.baseSc = Math.abs(m.scale.x);
+            m.sgn = Math.random() < 0.5 ? -1 : 1;
+            m.baseScY = m.scale.y;
+            m.scale.set(0, 0); // not pushed up yet — the mole hasn't reached here
+            m.grow = 0;
+            m.heaving = false;
+            scene.addChild(m);
+            molehills.push(m);
+            mx += mdir * (70 + Math.random() * 60); // the tunnel runs on a little each time
+            if (mx < 90 || mx > VW - 90) mdir = -mdir; // and turns back at the edges
+          }
+          molehills.timer = 1.5 + Math.random() * 4; // until the first heave
         }
         if (BI.dewWeb && !snow && Math.random() < 0.85) {
           // a spider's orb web slung in a corner among the boughs, jewelled with dew at first
@@ -8081,6 +8113,33 @@
             m.scale.y = m.baseScY * m.grow;
             m.alpha = Math.min(1, m.grow * 1.5);
           } else m.alpha = 0;
+        }
+        // the mole reaches the next spot and heaves a fresh molehill up through the turf with a
+        // little spray of soil; once it's up, the mound stays put
+        if (molehills.length) {
+          molehills.timer -= dt / 60;
+          if (molehills.timer <= 0) {
+            const next = molehills.find((m) => !m.heaving);
+            if (next) {
+              next.heaving = true;
+              emitBurst(
+                next.x,
+                groundY(next.x) + 3,
+                6,
+                [0x6e4c30, 0x4e3420, 0x3c2917],
+                2.2,
+                3.4
+              ); // soil kicked up as it pushes through
+              molehills.timer = 3.5 + Math.random() * 6;
+            } else molehills.timer = 1e9; // the whole line is up — nothing left to heave
+          }
+          for (const m of molehills) {
+            if (!m.heaving || m.grow >= 1) continue;
+            m.grow = Math.min(1, m.grow + dt / 60 / 1.1); // heaves up over ~1.1s
+            const e = 1 - (1 - m.grow) * (1 - m.grow); // ease-out as it settles
+            m.scale.x = m.sgn * m.baseSc * e;
+            m.scale.y = m.baseScY * e;
+          }
         }
         // a fire salamander basks on the warm rock, its heat-glow breathing, and now and then
         // scuttles low and quick to a fresh warm slab
