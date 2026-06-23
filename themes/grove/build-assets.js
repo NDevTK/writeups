@@ -2408,6 +2408,52 @@ save(
   62
 );
 
+// ======== a squirrel hunched over digging — caching a nut in the turf (faces right) ========
+const squirrelDigSvg = (g0, g1, ear, belly, inner) =>
+  S(
+    '70 66',
+    `<defs><linearGradient id="sq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0}"/><stop offset="1" stop-color="${g1}"/></linearGradient></defs>
+<path d="M26,44 C7,42 1,20 10,8 C17,0 29,3 30,14 C22,13 13,21 17,33 C19,41 24,44 26,44 Z" fill="url(#sq)"/>
+<path d="M12,23 C10,15 14,9 20,7 C16,13 16,21 20,27 Z" fill="${inner}" opacity="0.55"/>
+<path d="M22,42 C22,28 38,26 47,34 C53,39 52,49 46,53 C38,58 26,51 22,44 Z" fill="url(#sq)"/>
+<path d="M42,40 C49,42 57,50 61,58 C63,62 57,63 51,60 C44,57 39,47 42,40 Z" fill="url(#sq)"/>
+<path d="M43,40 C41,33 44,29 48,31 C48,36 47,40 45,43 Z" fill="${ear}"/>
+<path d="M50,41 C51,34 54,31 57,34 C55,39 53,42 51,44 Z" fill="${ear}"/>
+<path d="M30,53 C28,45 33,39 39,39 C38,45 39,51 43,55 C39,57 33,56 30,53 Z" fill="${belly}" opacity="0.85"/>
+<path d="M52,59 C55,62 59,62 61,60 L60,63 L51,63 Z" fill="${belly}"/>
+<circle cx="52" cy="50" r="2.1" fill="#140e09"/><circle cx="52.7" cy="49.3" r="0.6" fill="#fff"/>
+<circle cx="61" cy="58" r="1.7" fill="#3a241a"/>`
+  );
+save(
+  'squirrel_dig',
+  squirrelDigSvg('#bc6e3c', '#8a4e28', '#8a4e28', '#e8c89c', '#d49058'),
+  62
+);
+save(
+  'squirrel_g_dig',
+  squirrelDigSvg('#9aa0a8', '#6a7078', '#6a7078', '#eef1f3', '#b6bcc2'),
+  62
+);
+save(
+  'squirrel_k_dig',
+  squirrelDigSvg('#4c4c50', '#2a2a2e', '#26262a', '#7a7a7e', '#5e5e62'),
+  62
+);
+
+// ======== an acorn — the nut the squirrel buries ========
+save(
+  'acorn',
+  S(
+    '24 30',
+    `<path d="M5,13 C5,23 9,28 12,28 C15,28 19,23 19,13 C19,12 5,12 5,13 Z" fill="#d1a064"/>
+<path d="M7,16 C9,17.5 15,17.5 17,16" stroke="#a8703c" stroke-width="0.9" fill="none" opacity="0.5"/>
+<path d="M4,12 C4,6 8,3 12,3 C16,3 20,6 20,12 C20,14.5 4,14.5 4,12 Z" fill="#6e4a2a"/>
+<path d="M5,11 C9,12.5 15,12.5 19,11" stroke="#523414" stroke-width="0.8" fill="none" opacity="0.4"/>
+<rect x="10.8" y="0" width="2.4" height="4" rx="1" fill="#4a3018"/>`
+  ),
+  16
+);
+
 // ======== WINTER ground: snow-capped boulders (the snow is part of the rock) ========
 // a single boulder wearing a settled, drooping cap of snow
 save(
