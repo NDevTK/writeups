@@ -7315,16 +7315,34 @@
         // another bough — a different perch (and a different bird) every visit
         if (songbird) {
           songbird.tmr -= dt / 60;
+          // an outdoor pond to drop down and splash in
+          const canBathe =
+            !!water && !BI.interior && !BI.underwater && !BI.glade;
           if (songbird.mode === 'perch') {
             songbird.y = songbird.perch.y + Math.sin(t * 3) * 0.6; // gentle perch bob
             if (songbird.tmr < 0) {
-              if (perches.length > 1 && Math.random() < 0.72) {
+              if (canBathe && Math.random() < 0.22) {
+                // drop down to the water's edge for a splash-about, then back up to the boughs
+                songbird.fromX = songbird.x;
+                songbird.fromY = songbird.perch.y;
+                songbird.target = {
+                  x: waterL + 30 + Math.random() * (waterR - waterL - 60),
+                  y: 601
+                };
+                songbird.toWater = true;
+                songbird.flit = 0;
+                songbird.mode = 'flit';
+                songbird.dir = songbird.target.x >= songbird.x ? 1 : -1;
+                songbird.scale.x = songbird.dir * songbird.baseSc;
+                songbird.tmr = 2.5 + Math.random() * 5;
+              } else if (perches.length > 1 && Math.random() < 0.72) {
                 let np = songbird.perch; // hop to a different bough
                 for (let k = 0; k < 6 && np === songbird.perch; k++)
                   np = perches[(Math.random() * perches.length) | 0];
                 songbird.fromX = songbird.x;
                 songbird.fromY = songbird.perch.y;
                 songbird.target = np;
+                songbird.toWater = false;
                 songbird.flit = 0;
                 songbird.mode = 'flit';
                 songbird.dir = np.x >= songbird.x ? 1 : -1;
@@ -7335,6 +7353,31 @@
                 songbird.scale.x = songbird.dir * songbird.baseSc;
                 songbird.tmr = 1.5 + Math.random() * 3.5;
               }
+            }
+          } else if (songbird.mode === 'bathe') {
+            // a splash-about at the water's edge: quick dips that ring the surface, then a shiver
+            const dip = Math.max(0, Math.sin(t * 9));
+            songbird.y = 600 + dip * 4;
+            songbird.rotation = Math.sin(t * 30) * 0.09; // shaking the water off
+            if (water && Math.random() < 0.16 * dt)
+              ripples.push({
+                x: songbird.x + (Math.random() - 0.5) * 9,
+                y: 605,
+                r: 2,
+                life: 0.6
+              });
+            if (songbird.tmr < 0) {
+              // flit back up to a bough
+              songbird.fromX = songbird.x;
+              songbird.fromY = songbird.y;
+              songbird.target = perches[(Math.random() * perches.length) | 0];
+              songbird.toWater = false;
+              songbird.flit = 0;
+              songbird.mode = 'flit';
+              songbird.dir = songbird.target.x >= songbird.x ? 1 : -1;
+              songbird.scale.x = songbird.dir * songbird.baseSc;
+              songbird.rotation = 0;
+              songbird.tmr = 2.5 + Math.random() * 5;
             }
           } else {
             songbird.flit += dt / 60 / 0.7; // ~0.7s of flight
@@ -7350,9 +7393,14 @@
               flap;
             songbird.rotation = Math.sin(f * Math.PI) * 0.12 * songbird.dir; // tip into the arc
             if (f >= 1) {
-              songbird.perch = songbird.target;
               songbird.rotation = 0;
-              songbird.mode = 'perch';
+              if (songbird.toWater) {
+                songbird.mode = 'bathe';
+                songbird.tmr = 2 + Math.random() * 2.5; // splash for a few seconds
+              } else {
+                songbird.perch = songbird.target;
+                songbird.mode = 'perch';
+              }
             }
           }
         }
