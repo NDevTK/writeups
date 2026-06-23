@@ -8846,6 +8846,14 @@
             continue;
           }
           if (f.isBee) {
+            // at dusk it calls it a day, drifting down low to tuck into a grass tussock for the night
+            if (night > 0.45) {
+              f.homeY = f.homeY ?? groundY(f.x) - 3;
+              f.x += Math.sin(t * 6 + f.ph) * 0.5; // a last bumbling drift
+              f.y += (f.homeY - f.y) * 0.03 * dt;
+              f.alpha = Math.max(0, f.alpha - 0.012 * dt); // settles in and is gone for the night
+              continue;
+            }
             // bumbles flower to flower: cruises low to a new bloom, then hovers over it a while
             if (f.mode === 'hover') {
               f.hoverT -= dt / 60;
