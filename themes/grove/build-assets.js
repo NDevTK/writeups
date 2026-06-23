@@ -421,6 +421,26 @@ save('rabbit', rabbitSvg('#c8b49a', '#94795f', '#bda78c'), 104);
 save('rabbit_g', rabbitSvg('#b2b6bc', '#7e828a', '#9a9ea4'), 104);
 save('rabbit_k', rabbitSvg('#5e5a54', '#3a362f', '#4e4a44'), 104);
 
+// the rabbit mid ear-twitch — the nearer ear swivelled back about its base, so a brief swap to
+// this frame reads as a flick of the ear while it sits and crops the grass
+const rabbitEarsSvg = (g0, g1, foot) =>
+  S(
+    '104 116',
+    `<defs><linearGradient id="rb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0}"/><stop offset="1" stop-color="${g1}"/></linearGradient></defs>
+<path d="M49,58 C43,28 41,8 48,5 C55,4 57,26 56,54 Z" fill="url(#rb)"/>
+<g transform="rotate(-27 66 54)"><path d="M62,56 C59,28 62,8 70,8 C78,11 72,32 69,54 Z" fill="url(#rb)"/>
+<path d="M65,50 C64,32 66,20 70,14" stroke="#e7b9b0" stroke-width="3" fill="none"/></g>
+<path d="M48,50 C46,30 46,18 49,12" stroke="#e7b9b0" stroke-width="3.4" fill="none"/>
+<ellipse cx="36" cy="94" rx="21" ry="18" fill="url(#rb)"/><ellipse cx="53" cy="84" rx="23" ry="21" fill="url(#rb)"/>
+<circle cx="21" cy="99" r="10" fill="#f2ebe0"/><ellipse cx="60" cy="107" rx="16" ry="5.5" fill="${foot}"/>
+<circle cx="64" cy="56" r="16" fill="url(#rb)"/><path d="M75,55 C81,56 83,62 78,66 C74,67 71,63 72,58 Z" fill="url(#rb)"/>
+<path d="M80,59 l4.5,2.3 l-4.5,2.3 Z" fill="#c97f8a"/><path d="M80,63.4 q-2.6,3.4 -6,2.4" stroke="#7a5648" stroke-width="1.2" fill="none"/>
+<circle cx="65" cy="52" r="2.6" fill="#1a1208"/><circle cx="66" cy="51" r="0.8" fill="#fff"/>`
+  );
+save('rabbit_ears', rabbitEarsSvg('#c8b49a', '#94795f', '#bda78c'), 104);
+save('rabbit_g_ears', rabbitEarsSvg('#b2b6bc', '#7e828a', '#9a9ea4'), 104);
+save('rabbit_k_ears', rabbitEarsSvg('#5e5a54', '#3a362f', '#4e4a44'), 104);
+
 // ---- fox (trotting, faces right) — red, or a dark silver morph ----
 const foxSvg = (g0, g1, light, dark) =>
   S(

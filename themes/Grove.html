@@ -1196,6 +1196,9 @@
         'acorn',
         'rabbit_g',
         'rabbit_k',
+        'rabbit_ears',
+        'rabbit_g_ears',
+        'rabbit_k_ears',
         'fox_s',
         'deer_d_a',
         'deer_d_b',
@@ -3984,6 +3987,10 @@
           rabbit.baseY = rabbit.y;
           rabbit.tint = tintJit(0xffffff, 0.05); // a little extra variation on top of the coat
           rabbit.dir = 1; // sprite faces right; dir flips (and mirrors it) when it turns around
+          rabbit.coatTex = rbCoat; // pose to return to after an ear-twitch
+          rabbit.earTex = rbCoat === 'hare' ? null : rbCoat + '_ears'; // one-ear-back frame
+          rabbit.earT = 0; // >0 while a twitch is held
+          rabbit.earCD = 1 + Math.random() * 3; // until the next one
           scene.addChild(rabbit);
         } else rabbit = null;
         if (BI.roller) {
@@ -6788,6 +6795,11 @@
               rabbit.scale.x = rabbit.dir * Math.abs(rabbit.scale.x);
             }
           } else rabbit.fleeDir = null;
+          // a twitch in progress is dropped the moment it stops foraging (freezes, bolts or hunkers)
+          if (rabbit.earT > 0 && (freeze || flee || raining)) {
+            rabbit.earT = 0;
+            rabbit.texture = T(rabbit.coatTex);
+          }
           if (freeze) {
             rabbit.y = groundY(rabbit.x) + 6; // frozen, dead still, on the ground
           } else if (raining && !flee) {
@@ -6800,8 +6812,21 @@
             // far more than they hop
             rabbit.forageT -= dt / 60;
             rabbit.y = groundY(rabbit.x) + 6 + Math.sin(t * 3 + rabbit.x) * 0.5;
+            // the odd ear-twitch while it sits and crops — one ear swivels back, then forward
+            if (rabbit.earTex) {
+              if (rabbit.earT > 0) {
+                rabbit.earT -= dt / 60;
+                if (rabbit.earT <= 0) rabbit.texture = T(rabbit.coatTex);
+              } else if ((rabbit.earCD -= dt / 60) <= 0) {
+                rabbit.texture = T(rabbit.earTex); // an ear flicks back
+                rabbit.earT = 0.16 + Math.random() * 0.16;
+                rabbit.earCD = 2.5 + Math.random() * 4;
+              }
+            }
             if (rabbit.forageT <= 0) {
               // then a short bout of hops off to a fresh patch
+              rabbit.earT = 0;
+              rabbit.texture = T(rabbit.coatTex); // ears forward before it goes
               rabbit.hopsLeft = 2 + ((Math.random() * 3) | 0);
               rabbit.hopT = 0.5 + Math.random() * 0.6;
               if (rabbit.x > VW - 140) rabbit.dir = -1;
