@@ -1190,6 +1190,9 @@
         'squirrel_dig',
         'squirrel_g_dig',
         'squirrel_k_dig',
+        'squirrel_flick',
+        'squirrel_g_flick',
+        'squirrel_k_flick',
         'acorn',
         'rabbit_g',
         'rabbit_k',
@@ -4035,6 +4038,9 @@
           squirrel.tx = sx;
           squirrel.coatTex = sqCoat; // upright pose to return to
           squirrel.digTex = sqCoat + '_dig'; // hunched digging pose, matching the coat
+          squirrel.flickTex = sqCoat + '_flick'; // tail snapped up, for the odd idle flick
+          squirrel.flickT = 0; // >0 while a flick is held
+          squirrel.flickCD = 1.5 + Math.random() * 3.5; // until the next one
           scene.addChild(squirrel);
           // the acorn it buries — kept hidden until it caches one
           squirrel.acorn = spr('acorn', sx, groundY(sx) + 5, 0.6);
@@ -7420,7 +7426,21 @@
           if (squirrel.mode === 'sit') {
             squirrel.y = groundY(squirrel.x) + 6 + Math.sin(t * 5) * 0.7; // nibbling bob
             squirrel.rotation = Math.sin(t * 3.3) * 0.05;
+            // the odd flick of the tail as it sits and nibbles — a quick snap up, then back
+            if (squirrel.flickT > 0) {
+              squirrel.flickT -= dt / 60;
+              if (squirrel.flickT <= 0) squirrel.texture = T(squirrel.coatTex);
+            } else {
+              squirrel.flickCD -= dt / 60;
+              if (squirrel.flickCD <= 0) {
+                squirrel.texture = T(squirrel.flickTex); // brush snaps up
+                squirrel.flickT = 0.22 + Math.random() * 0.16;
+                squirrel.flickCD = 2 + Math.random() * 4;
+              }
+            }
             if (squirrel.tmr < 0) {
+              squirrel.flickT = 0;
+              squirrel.texture = T(squirrel.coatTex); // settle the tail before it scampers off
               squirrel.mode = 'run';
               squirrel.tx = 110 + Math.random() * (VW - 220); // a fresh foraging spot
               squirrel.dir = squirrel.tx > squirrel.x ? 1 : -1;
