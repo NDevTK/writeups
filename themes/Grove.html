@@ -1187,6 +1187,10 @@
         'giraffe_rest',
         'squirrel_g',
         'squirrel_k',
+        'squirrel_dig',
+        'squirrel_g_dig',
+        'squirrel_k_dig',
+        'acorn',
         'rabbit_g',
         'rabbit_k',
         'fox_s',
@@ -4010,7 +4014,13 @@
           squirrel.mode = 'sit'; // sit (nibble in place) → run (scamper to tx) → sit
           squirrel.tmr = 1.5 + Math.random() * 4;
           squirrel.tx = sx;
+          squirrel.coatTex = sqCoat; // upright pose to return to
+          squirrel.digTex = sqCoat + '_dig'; // hunched digging pose, matching the coat
           scene.addChild(squirrel);
+          // the acorn it buries — kept hidden until it caches one
+          squirrel.acorn = spr('acorn', sx, groundY(sx) + 5, 0.6);
+          squirrel.acorn.alpha = 0;
+          scene.addChild(squirrel.acorn);
         } else squirrel = null;
         if (
           BI.perchBird &&
@@ -7326,6 +7336,36 @@
               squirrel.dir = squirrel.tx > squirrel.x ? 1 : -1;
               squirrel.scale.x = squirrel.dir * squirrel.baseSc;
             }
+          } else if (squirrel.mode === 'cache') {
+            // bury the nut: scrabble a hollow and drop the acorn in, then pat the soil down over it
+            if (squirrel.cachePhase === 'dig') {
+              squirrel.y =
+                groundY(squirrel.x) + 6 + Math.abs(Math.sin(t * 22)) * -2; // quick digging jitter
+              squirrel.rotation = Math.sin(t * 22) * 0.05;
+              squirrel.acorn.alpha = Math.min(
+                1,
+                squirrel.acorn.alpha + 0.06 * dt
+              );
+              if (squirrel.tmr < 0) {
+                squirrel.cachePhase = 'pat';
+                squirrel.tmr = 0.6 + Math.random() * 0.5;
+              }
+            } else {
+              squirrel.y =
+                groundY(squirrel.x) + 6 + Math.abs(Math.sin(t * 13)) * -3; // firm pats
+              squirrel.rotation = 0;
+              squirrel.acorn.alpha = Math.max(
+                0,
+                squirrel.acorn.alpha - 0.05 * dt
+              ); // covered over
+              if (squirrel.tmr < 0) {
+                squirrel.acorn.alpha = 0;
+                squirrel.texture = T(squirrel.coatTex); // sit back up
+                squirrel.rotation = 0;
+                squirrel.mode = 'sit';
+                squirrel.tmr = 1.5 + Math.random() * 3;
+              }
+            }
           } else {
             const dx = squirrel.tx - squirrel.x;
             squirrel.x += Math.sign(dx) * Math.min(Math.abs(dx), 3.2 * dt);
@@ -7333,8 +7373,19 @@
             squirrel.y =
               groundY(squirrel.x) + 6 - Math.abs(Math.sin(t * 17)) * 7; // scurrying hops
             if (Math.abs(dx) < 4) {
-              squirrel.mode = 'sit';
-              squirrel.tmr = 2 + Math.random() * 5;
+              if (Math.random() < 0.3) {
+                // now and then it caches a nut here rather than just sitting to nibble
+                squirrel.mode = 'cache';
+                squirrel.cachePhase = 'dig';
+                squirrel.tmr = 1.2 + Math.random() * 0.8;
+                squirrel.texture = T(squirrel.digTex); // hunch over the spot
+                squirrel.acorn.x = squirrel.x + squirrel.dir * 9;
+                squirrel.acorn.y = groundY(squirrel.acorn.x) + 5;
+                squirrel.acorn.alpha = 0;
+              } else {
+                squirrel.mode = 'sit';
+                squirrel.tmr = 2 + Math.random() * 5;
+              }
             }
           }
         }
