@@ -4733,6 +4733,8 @@
               f.spd = 0.4 + Math.random() * 0.7;
               f.cruiseY = f.y; // resting depth it eases back to
               f.jump = 0; // 0 = cruising; climbs 0->1 across a leap arc
+              f.rise = 0; // 0 = cruising; climbs 0->1 across a rise-to-take at an insect
+              f.riseCD = 3 + Math.random() * 6; // a cooldown so rises stay occasional
               f.next = 4 + Math.random() * 8; // seconds until the next rise/leap
               f.shoalOx = (Math.random() - 0.5) * 120; // its slot in a loose shoal
               f.shoalOy = (Math.random() - 0.5) * 24;
@@ -7131,6 +7133,27 @@
               }
               continue;
             }
+            if (f.rise > 0) {
+              // a quiet rise to sip an insect off the film: noses up to just under the
+              // surface, dimples it, then slips back down — gentler than a clearing leap
+              f.rise += dt / 40;
+              const a = Math.min(1, f.rise),
+                arc = Math.sin(a * Math.PI),
+                py = f.y;
+              f.x += (f.riseTx - f.x) * 0.05 * dt; // drift under the target as it rises
+              f.y = f.cruiseY + (603 - f.cruiseY) * arc; // up to just under the surface
+              f.rotation = f.dir * 0.16 * arc; // nose tips up into the rise
+              f.alpha = 0.82 + arc * 0.12; // shows a touch as it nears the light
+              if (water && py > 607 && f.y <= 607)
+                ripples.push({x: f.x, y: 606, r: 3, life: 0.95}); // the dimple as it breaks the film
+              if (f.rise >= 1) {
+                f.rise = 0;
+                f.rotation = 0;
+                f.y = f.cruiseY;
+                f.alpha = 0.82;
+              }
+              continue;
+            }
             if (fish.shoalOn) {
               // gathered into a loose shoal: ease toward a slowly drifting centre, each holding its
               // own slot so the group stays loose, all facing the way the shoal drifts
@@ -7155,8 +7178,43 @@
               f.y = f.cruiseY + Math.sin(t * 1.1 + f.x * 0.018) * 4; // slow depth wobble
             }
             f.alpha = 0.82 * (1 - ice * 0.55); // sluggish and all but hidden once it ices over
+            // rise to take a low insect: a dragonfly skimming the pond, or a butterfly
+            // puddling at the water's edge — the fish noses up to sip it and dimples the film
+            f.riseCD = (f.riseCD ?? 3 + Math.random() * 6) - dt / 60;
+            if (f.riseCD <= 0 && ice < 0.15) {
+              for (const fl of flutters) {
+                if (fl.alpha < 0.3) continue;
+                if (
+                  !fl.water &&
+                  !(fl.isButterfly && fl.puddling && fl.settled > 0)
+                )
+                  continue;
+                if (Math.abs(fl.x - f.x) < 64) {
+                  f.rise = 0.0001; // launch the rise
+                  f.riseTx = Math.max(fLo, Math.min(fHi, fl.x));
+                  f.dir = fl.x >= f.x ? 1 : -1;
+                  f.scale.x = f.dir * f.baseSc;
+                  f.riseCD = 7 + Math.random() * 11;
+                  f.next = 4 + Math.random() * 6; // don't chain straight into a leap
+                  if (fl.water) {
+                    // the dragonfly bolts up and away from the swirl
+                    fl.darting = true;
+                    fl.dtx = Math.max(
+                      waterL + 20,
+                      Math.min(
+                        waterR - 40,
+                        fl.x + f.dir * (60 + Math.random() * 50)
+                      )
+                    );
+                    fl.dty = Math.max(fl.lo ?? 605, fl.y - 24);
+                    fl.dartT = 0.4;
+                  } else fl.settled = 0; // the butterfly startles up off the water
+                  break;
+                }
+              }
+            }
             f.next -= dt / 60;
-            if (f.next < 0) {
+            if (f.next < 0 && f.rise === 0) {
               if (ice < 0.15 && Math.random() < 0.4) {
                 f.jump = 0.0001; // launch a leap
                 f.apexY = 600 - (40 + Math.random() * 34);
