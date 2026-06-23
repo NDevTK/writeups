@@ -424,6 +424,7 @@
           kingfisher: true, // a kingfisher plunge-dives the pond for fish by day
           hedgehog: true, // a hedgehog snuffles the floor at night
           snail: true, // a snail glides out onto the wet grass after rain
+          toadstools: true, // fly-agaric sprout under the trees after rain
           ladybird: true, // a ladybird trundles the meadow floor by day
           mouse: true, // a field mouse scurries the meadow grass by day
           grasshopper: true, // a grasshopper springs through the warm meadow grass
@@ -583,6 +584,7 @@
           owl: true, // an owl quarters the marsh after dark
           kingfisher: true, // a kingfisher plunge-dives the marsh pools for fish by day
           snail: true, // a pond snail glides the wet bank after rain
+          toadstools: true, // toadstools come up on the damp marsh banks after rain
           flyer: 0x6a7b8a,
           flutter: false,
           bats: 4, // bats work the pond at dusk (most insects over the water)
@@ -922,6 +924,7 @@
           owl: true, // an owl crosses the orchard after dark
           hedgehog: true, // a hedgehog snuffles the orchard floor at night
           snail: true, // a snail glides out across the wet orchard floor after rain
+          toadstools: true, // toadstools come up on the orchard floor after rain
           ladybird: true, // a ladybird trundles the orchard floor by day
           mouse: true, // a field mouse scurries the orchard grass by day
           flyer: 0xffffff,
@@ -1757,6 +1760,7 @@
 
       const swayers = [],
         flowers = [], // the subset of swayers that are blooms — they nod when an insect alights
+        fungi = [], // toadstools that sprout after rain and shrink back as the ground dries
         clouds = [],
         ducks = [],
         fish = [],
@@ -1889,6 +1893,7 @@
         root.removeChildren();
         swayers.length =
           flowers.length =
+          fungi.length =
           clouds.length =
           ducks.length =
           fish.length =
@@ -4177,6 +4182,35 @@
           snail.spd = 0.12 + Math.random() * 0.06; // a glacial creep
           scene.addChild(snail);
         } else snail = null;
+        if (BI.toadstools && !snow) {
+          // toadstools push up through the turf after rain — a clump or two, mostly red
+          // fly-agaric with the odd brown mushroom, hidden until the ground's been wet a while
+          for (let c = 0, cn = 1 + ((Math.random() * 2) | 0); c < cn; c++) {
+            const cx = 120 + Math.random() * (VW - 240);
+            for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
+              const mx = Math.max(
+                60,
+                Math.min(VW - 60, cx + (Math.random() - Math.random()) * 70)
+              );
+              const m = spr(
+                Math.random() < 0.78 ? 'toadstool' : 'shroom',
+                mx,
+                groundY(mx) + 4,
+                0.3 + Math.random() * 0.2
+              );
+              m.tint = tintJit(0xffffff, 0.05);
+              if (Math.random() < 0.5) m.scale.x *= -1;
+              m.baseSc = m.scale.x; // signed base scale to ease up to as it sprouts
+              m.baseScY = m.scale.y;
+              m.grow = 0; // 0 = still underground; eases to 1 as it pushes up
+              m.sproutAt = 0.48 + Math.random() * 0.3; // the ground wetness it needs to show
+              m.scale.set(0, 0);
+              m.alpha = 0;
+              scene.addChild(m);
+              fungi.push(m);
+            }
+          }
+        }
         if (BI.mouse && buildNight < 0.5 && Math.random() < 0.6) {
           // a field mouse scurries the meadow grass in quick bursts, freezing to sit alert
           const mx = 140 + Math.random() * (VW - 280);
@@ -7713,6 +7747,17 @@
               snail.scale.x = snail.baseSc;
             }
           }
+        }
+        // toadstools: push up once the ground is wet enough, then shrink back into the turf as
+        // it dries (slower than they came, so they linger a good while after the rain)
+        for (const m of fungi) {
+          const up = wetness > m.sproutAt;
+          m.grow += ((up ? 1 : 0) - m.grow) * (up ? 0.02 : 0.009) * dt;
+          if (m.grow > 0.001) {
+            m.scale.x = m.baseSc * m.grow;
+            m.scale.y = m.baseScY * m.grow;
+            m.alpha = Math.min(1, m.grow * 1.5);
+          } else m.alpha = 0;
         }
         // a fire salamander basks on the warm rock, its heat-glow breathing, and now and then
         // scuttles low and quick to a fresh warm slab
