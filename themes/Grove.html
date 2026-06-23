@@ -6434,6 +6434,8 @@
           deer.scale.x = deer.dir * deer.baseSc;
         } else {
           // the herd: each grazer keeps its own walk/graze state, so they don't move in lockstep
+          const canDrink =
+            !!water && !BI.interior && !BI.underwater && !BI.cloudSea; // somewhere to drink
           for (const d of walkers) {
             const multi = d.totalFrames > 1;
             if (d.isRest) {
@@ -6504,12 +6506,82 @@
                 }
               }
             }
+            // drink: a grazer ambles down to the water's edge, lowers its head a while, then heads
+            // back up to the grass — no drinking pose, so the head dips with a tilt and rings the water
+            if (d.mode === 'drink' && !raining) {
+              const gy = groundY(d.x) + 8;
+              if (d.drinkPhase === 'go') {
+                // walk to the chosen spot, easing down the bank to the waterline as it nears
+                const ddx = d.drinkX - d.x;
+                d.x += Math.sign(ddx) * (d.spd ?? 0.35) * dt;
+                d.dir = ddx >= 0 ? 1 : -1;
+                d.scale.x = d.dir * Math.abs(d.scale.x);
+                if (multi && !d.playing) d.play();
+                const near = Math.max(0, Math.min(1, 1 - Math.abs(ddx) / 130));
+                d.y =
+                  gy +
+                  (604 - gy) * near +
+                  Math.abs(Math.sin(t * 4 + d.x)) * -1.8 * (1 - near);
+                if (Math.abs(ddx) < 4) {
+                  d.drinkPhase = 'sip';
+                  d.timer = 4.5 + Math.random() * 5;
+                  d.lookT = 0;
+                  if (multi) d.gotoAndStop(0);
+                }
+              } else if (d.drinkPhase === 'sip') {
+                // head down at the water, lifting it now and then to look about
+                d.timer -= dt / 60;
+                d.y = 604;
+                d.lookT = (d.lookT ?? 0) - dt / 60;
+                if (d.lookT <= 0 && Math.random() < 0.012 * dt)
+                  d.lookT = 0.5 + Math.random() * 0.9;
+                const lifting = d.lookT > 0;
+                d.rotation = d.dir * (lifting ? 0.04 : 0.42); // dip to drink, raise to look round
+                if (!lifting && water && Math.random() < 0.05 * dt)
+                  ripples.push({x: d.x + d.dir * 26, y: 608, r: 3, life: 0.7});
+                if (d.timer < 0) {
+                  d.drinkPhase = 'leave';
+                  d.rotation = 0;
+                  if (multi && !d.playing) d.play();
+                }
+              } else {
+                // leave: amble back up the bank to the meadow grass
+                d.y +=
+                  Math.sign(gy - d.y) * Math.min(Math.abs(gy - d.y), 0.9 * dt);
+                d.x += d.dir * (d.spd ?? 0.35) * 0.6 * dt;
+                if (Math.abs(d.y - gy) < 1.5) {
+                  d.y = gy;
+                  d.rotation = 0;
+                  d.mode = 'walk';
+                  d.timer = 4 + Math.random() * 5;
+                  d.drinkDone = t;
+                }
+              }
+              dropTrack(d, 'deer', 30);
+              continue;
+            }
+            if (d.mode === 'drink') d.mode = 'walk'; // a shower cut the drink short
             if (raining) {
               if (multi) d.gotoAndStop(0);
               d.y = groundY(d.x) + 8;
             } else {
               d.timer -= dt / 60;
               if (d.mode === 'walk') {
+                // now and then it heads off down to the water for a drink (only where it can reach it)
+                if (
+                  d.graze &&
+                  canDrink &&
+                  d.trot <= 0 &&
+                  t - (d.drinkDone ?? -99) > 16 &&
+                  Math.random() < 0.0007 * dt
+                ) {
+                  d.mode = 'drink';
+                  d.drinkPhase = 'go';
+                  d.drinkX = Math.max(
+                    waterL + 20,
+                    Math.min(waterR - 20, d.x + (Math.random() - 0.5) * 260)
+                  );
+                }
                 // now and then it breaks into a short trot — quicker stride, springier step —
                 // before settling back to an amble, so a herd never moves in a uniform plod
                 if (d.trot > 0) d.trot -= dt / 60;
@@ -6522,7 +6594,7 @@
                   d.animationSpeed =
                     (d.baseAnim ?? 0.12) * (trotting ? 1.9 : 1);
                 }
-                if (d.timer < 0) {
+                if (d.mode === 'walk' && d.timer < 0) {
                   if (d.graze) {
                     // grazers drop their head to crop the grass for a spell
                     d.mode = 'graze';
