@@ -425,6 +425,7 @@
           hedgehog: true, // a hedgehog snuffles the floor at night
           snail: true, // a snail glides out onto the wet grass after rain
           toadstools: true, // fly-agaric sprout under the trees after rain
+          dewWeb: true, // a spider's web beads with dew at first light
           ladybird: true, // a ladybird trundles the meadow floor by day
           mouse: true, // a field mouse scurries the meadow grass by day
           grasshopper: true, // a grasshopper springs through the warm meadow grass
@@ -585,6 +586,7 @@
           kingfisher: true, // a kingfisher plunge-dives the marsh pools for fish by day
           snail: true, // a pond snail glides the wet bank after rain
           toadstools: true, // toadstools come up on the damp marsh banks after rain
+          dewWeb: true, // a web beads with dew over the reeds at first light
           flyer: 0x6a7b8a,
           flutter: false,
           bats: 4, // bats work the pond at dusk (most insects over the water)
@@ -925,6 +927,7 @@
           hedgehog: true, // a hedgehog snuffles the orchard floor at night
           snail: true, // a snail glides out across the wet orchard floor after rain
           toadstools: true, // toadstools come up on the orchard floor after rain
+          dewWeb: true, // a web beads with dew in the orchard boughs at first light
           ladybird: true, // a ladybird trundles the orchard floor by day
           mouse: true, // a field mouse scurries the orchard grass by day
           flyer: 0xffffff,
@@ -1115,6 +1118,7 @@
         'poppy',
         'toadstool',
         'shroom',
+        'web',
         'log',
         'stump',
         'duck_f',
@@ -1857,6 +1861,7 @@
         songbird,
         beetle,
         snail,
+        dewWeb,
         salamander,
         olm,
         hedgehog,
@@ -4211,6 +4216,25 @@
             }
           }
         }
+        if (BI.dewWeb && !snow && Math.random() < 0.85) {
+          // a spider's orb web slung in a corner among the boughs, jewelled with dew at first
+          // light and fading as it dries — hung off to one side so it frames the scene
+          const wx =
+            Math.random() < 0.5
+              ? 90 + Math.random() * 150
+              : VW - 240 + Math.random() * 150;
+          dewWeb = spr(
+            'web',
+            wx,
+            240 + Math.random() * 120,
+            0.55 + Math.random() * 0.4,
+            0.5,
+            0.16 // pivot near the top anchor, so it hangs from the branch
+          );
+          dewWeb.alpha = 0; // only beads up at dawn (driven in the ticker)
+          dewWeb.ph = Math.random() * 6.28; // its own shimmer phase
+          scene.addChild(dewWeb);
+        } else dewWeb = null;
         if (BI.mouse && buildNight < 0.5 && Math.random() < 0.6) {
           // a field mouse scurries the meadow grass in quick bursts, freezing to sit alert
           const mx = 140 + Math.random() * (VW - 280);
@@ -5952,6 +5976,15 @@
         // dew sparkles strongest at first light and dries off as the sun climbs; a clear night beads more
         dewdrops.dl.alpha =
           Math.exp(-Math.pow((h - 6.2) / 1.0, 2)) * (1 - cover * 0.7);
+        // the dew-beaded web rides the same first-light window (a touch wider — a strung web holds
+        // its dew a little longer than the grass), shimmering faintly and swaying in the air
+        if (dewWeb) {
+          const webDawn =
+            Math.exp(-Math.pow((h - 6.3) / 1.2, 2)) * (1 - cover * 0.6);
+          dewWeb.alpha =
+            webDawn * (0.82 + Math.sin(t * 1.7 + dewWeb.ph) * 0.12);
+          dewWeb.rotation = Math.sin(t * 0.7 + dewWeb.ph) * 0.02;
+        }
         // the murmuration gathers as the sun goes down and is gone by full dark / daylight
         if (murmur.length)
           murmurC.alpha =

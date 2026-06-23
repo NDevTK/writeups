@@ -2232,6 +2232,58 @@ save(
   ),
   40
 );
+// a dew-beaded orb web — faint pale strands with a scatter of dew beads that catch the dawn
+// light; the live sprite only shows at first light and fades as the dew dries. Deterministic.
+const webSvg = () => {
+  const cx = 60,
+    cy = 48,
+    N = 10,
+    Rr = [48, 50, 46, 52, 47, 49, 51, 45, 50, 47],
+    wob = [0, 4, -3, 2, -4, 3, -2, 4, -3, 2];
+  const pt = (i, f) => {
+    const a = -Math.PI / 2 + (i / N) * Math.PI * 2 + wob[i] * 0.01,
+      r = Rr[i] * f;
+    return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+  };
+  let strands = '';
+  for (let i = 0; i < N; i++) {
+    const [x, y] = pt(i, 1);
+    strands += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`;
+  }
+  for (let ring = 1; ring <= 5; ring++) {
+    const f = 0.2 + (ring / 5) * 0.8;
+    const pts = [];
+    for (let i = 0; i < N; i++) {
+      const [x, y] = pt(i, f);
+      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+    strands += `<polygon points="${pts.join(' ')}"/>`;
+  }
+  // anchor threads slung out to the branches: straight up, and out to the upper corners
+  const [ulx, uly] = pt(8, 1),
+    [urx, ury] = pt(2, 1);
+  const anchors =
+    `<line x1="${cx}" y1="${cy}" x2="${cx}" y2="2"/>` +
+    `<line x1="${ulx.toFixed(1)}" y1="${uly.toFixed(1)}" x2="6" y2="6"/>` +
+    `<line x1="${urx.toFixed(1)}" y1="${ury.toFixed(1)}" x2="114" y2="6"/>`;
+  let beads = '';
+  for (let ring = 1; ring <= 5; ring++) {
+    const f = 0.2 + (ring / 5) * 0.8;
+    for (let i = 0; i < N; i++) {
+      if ((i + ring) % 2 === 0) continue; // bead every other crossing
+      const [x, y] = pt(i, f);
+      const big = (i * 3 + ring) % 5 === 0;
+      beads += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${big ? 1.9 : 1.1}" fill="#eef9ff"/>`;
+      if (big)
+        beads += `<circle cx="${(x - 0.5).toFixed(1)}" cy="${(y - 0.6).toFixed(1)}" r="0.7" fill="#ffffff"/>`;
+    }
+  }
+  return S(
+    '120 110',
+    `<g fill="none" stroke="#cfe6f5" stroke-width="0.7" opacity="0.5" stroke-linejoin="round">${anchors}${strands}</g><g opacity="0.92">${beads}</g>`
+  );
+};
+save('web', webSvg(), 120);
 // a fallen mossy log
 save(
   'log',
