@@ -7703,9 +7703,65 @@
         }
         // a squirrel forages the clearing: sits and nibbles with a little body-bob, then
         // scampers in quick low hops to a new spot — never the same beat twice
-        if (squirrel) {
+        if (squirrel && squirrel.mode !== 'gone') {
           squirrel.tmr -= dt / 60;
-          if (squirrel.mode === 'sit') {
+          // dusk: it breaks off foraging and heads up to its drey for the night
+          if (night > 0.45 && squirrel.mode !== 'retreat') {
+            squirrel.mode = 'retreat';
+            const trees = perches.length ? perches : trunks;
+            let best = null,
+              bd = 1e9;
+            for (const tr of trees) {
+              const d = Math.abs(tr.x - squirrel.x);
+              if (d < bd) {
+                bd = d;
+                best = tr;
+              }
+            }
+            squirrel.tree = best; // a canopy spot to climb to, if there's a tree to hand
+            squirrel.climbY = null;
+            squirrel.flickT = 0;
+            squirrel.texture = T(squirrel.coatTex);
+            squirrel.acorn.alpha = 0;
+          }
+          if (squirrel.mode === 'retreat') {
+            const tx = squirrel.tree
+              ? squirrel.tree.x
+              : squirrel.x < VW / 2
+                ? -60
+                : VW + 60;
+            if (squirrel.tree && Math.abs(squirrel.x - tx) <= 5) {
+              // scrabble up the trunk and slip out of sight into the drey
+              squirrel.x = tx;
+              squirrel.climbY = squirrel.climbY ?? groundY(tx) + 6;
+              squirrel.climbY -= 2.8 * dt;
+              squirrel.y = squirrel.climbY - Math.abs(Math.sin(t * 27)) * 3; // little scrabbles up
+              squirrel.rotation = squirrel.dir * 0.16 * Math.sin(t * 27); // wriggling up the bark
+              const climbed = groundY(tx) + 6 - squirrel.climbY;
+              squirrel.alpha = Math.max(0, 1 - climbed / 120); // up the bark and gone
+              if (squirrel.alpha <= 0) {
+                squirrel.mode = 'gone';
+                squirrel.visible = false;
+              }
+            } else {
+              // dash to the foot of the tree (or off the nearest edge if there's none to hand)
+              squirrel.x +=
+                Math.sign(tx - squirrel.x) *
+                Math.min(Math.abs(tx - squirrel.x), 4.4 * dt);
+              squirrel.dir = tx > squirrel.x ? 1 : -1;
+              squirrel.scale.x = squirrel.dir * squirrel.baseSc;
+              squirrel.y =
+                groundY(squirrel.x) + 6 - Math.abs(Math.sin(t * 18)) * 8;
+              squirrel.rotation = 0;
+              if (
+                !squirrel.tree &&
+                (squirrel.x < -55 || squirrel.x > VW + 55)
+              ) {
+                squirrel.mode = 'gone';
+                squirrel.visible = false;
+              }
+            }
+          } else if (squirrel.mode === 'sit') {
             squirrel.y = groundY(squirrel.x) + 6 + Math.sin(t * 5) * 0.7; // nibbling bob
             squirrel.rotation = Math.sin(t * 3.3) * 0.05;
             // the odd flick of the tail as it sits and nibbles — a quick snap up, then back
