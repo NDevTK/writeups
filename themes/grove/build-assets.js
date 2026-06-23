@@ -374,6 +374,27 @@ save(
   ),
   160
 );
+// the drake asleep — a loaf with the head turned back and the bill tucked into the back feathers,
+// eye closed (faces right). Body/tail/wing match 'duck' so the live sprite can swap to it in place.
+save(
+  'duck_sleep',
+  S(
+    '170 116',
+    `
+<defs><linearGradient id="db" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c2a06e"/><stop offset="1" stop-color="#8a6a44"/></linearGradient>
+<linearGradient id="dh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2faa55"/><stop offset="1" stop-color="#176b34"/></linearGradient></defs>
+<path d="M32,74 C22,70 14,62 12,54 C20,60 28,68 38,78 Z" fill="#8a6a44"/>
+<path d="M18,57 C12,53 10,56 13,61 C16,63 19,60 18,57 Z" fill="#33271a"/>
+<path d="M30,80 C24,58 50,50 80,52 C108,54 124,64 124,76 C124,90 98,98 70,96 C48,94 36,94 30,80 Z" fill="url(#db)"/>
+<path d="M58,76 C74,66 96,66 108,73 C99,82 74,86 60,82 Z" fill="#eef2f2"/>
+<path d="M62,78 C76,72 94,72 104,77" stroke="#c9d2d2" stroke-width="2" fill="none"/>
+<path d="M92,60 C82,59 74,61 77,65 C80,67 88,66 95,62 Z" fill="#eab43c"/>
+<path d="M96,46 C112,43 124,49 123,60 C122,70 108,73 97,68 C86,63 84,51 96,46 Z" fill="url(#dh)"/>
+<path d="M92,62 C98,66 108,66 116,62" stroke="#fff" stroke-width="2.4" fill="none"/>
+<path d="M104,54 C108,52 112,53 114,55" stroke="#0b2a16" stroke-width="1.6" fill="none"/>`
+  ),
+  160
+);
 
 save(
   'duckling',
@@ -2206,6 +2227,24 @@ save(
   ),
   160
 );
+// the female asleep — head turned back, bill tucked into the back feathers, eye closed (faces right)
+save(
+  'duck_f_sleep',
+  S(
+    '170 116',
+    `<defs><linearGradient id="dfb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c6a675"/><stop offset="1" stop-color="#7e5e3c"/></linearGradient>
+<linearGradient id="dfh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ad8c5e"/><stop offset="1" stop-color="#6d5232"/></linearGradient></defs>
+<path d="M32,74 C22,70 14,62 12,54 C20,60 28,68 38,78 Z" fill="#7e5e3c"/>
+<path d="M18,57 C12,53 10,56 13,61 C16,63 19,60 18,57 Z" fill="#33271a"/>
+<path d="M30,80 C24,58 50,50 80,52 C108,54 124,64 124,76 C124,90 98,98 70,96 C48,94 36,94 30,80 Z" fill="url(#dfb)"/>
+<g stroke="#5e442a" stroke-width="2" fill="none" opacity="0.45" stroke-linecap="round"><path d="M44,70 C54,68 64,68 72,70"/><path d="M50,80 C62,78 76,78 88,80"/><path d="M60,88 C72,87 86,87 98,88"/></g>
+<path d="M66,74 C80,69 92,70 100,75 C92,82 78,84 68,80 Z" fill="#5a6b86" opacity="0.65"/>
+<path d="M92,60 C82,59 74,61 77,65 C80,67 88,66 95,62 Z" fill="#c98a3e"/>
+<path d="M96,46 C112,43 124,49 123,60 C122,70 108,73 97,68 C86,63 84,51 96,46 Z" fill="url(#dfh)"/>
+<path d="M104,54 C108,52 112,53 114,55" stroke="#3a2c18" stroke-width="1.6" fill="none"/>`
+  ),
+  160
+);
 
 // toadstool — classic red fly-agaric with white spots, for the meadow/fern floor
 save(
@@ -3313,6 +3352,30 @@ save(
 <path d="M143,53 C156,51 162,55 159,60 C156,63 146,62 141,59 Z" fill="#d4543a"/>
 <path d="M156,54 L162,56 L156,59 Z" fill="#2a2018"/>
 <circle cx="133" cy="50" r="2.8" fill="#c0291e"/><circle cx="134" cy="49" r="0.9" fill="#fff"/>`
+  ),
+  160
+);
+// the wood duck drake asleep — crested head turned back over the body, crest drooping, bill tucked
+// into the back feathers, eye closed (faces right). Body/breast match 'wood_duck' for an in-place swap
+save(
+  'wood_duck_sleep',
+  S(
+    '170 116',
+    `<defs><linearGradient id="wdb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cdaa6c"/><stop offset="1" stop-color="#9a7c4a"/></linearGradient>
+<linearGradient id="wdh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f8a72"/><stop offset="1" stop-color="#123f44"/></linearGradient>
+<linearGradient id="wdr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9c5038"/><stop offset="1" stop-color="#6e3424"/></linearGradient></defs>
+<path d="M32,74 C22,70 14,62 12,54 C20,60 28,68 38,78 Z" fill="#394a44"/>
+<path d="M30,80 C24,58 50,50 80,52 C108,54 124,64 124,76 C124,90 98,98 70,96 C48,94 36,94 30,80 Z" fill="#42554f"/>
+<path d="M56,78 C72,68 96,68 112,74 C104,87 76,90 60,84 Z" fill="url(#wdb)"/>
+<path d="M62,80 C78,74 96,74 108,79" stroke="#7c6644" stroke-width="1.2" fill="none" opacity="0.5"/>
+<path d="M99,73 C107,64 118,62 122,71 C123,81 113,87 103,84 C97,82 95,79 99,73 Z" fill="url(#wdr)"/>
+<g fill="#f0e6d2" opacity="0.85"><circle cx="108" cy="72" r="1"/><circle cx="113" cy="76" r="1"/><circle cx="106" cy="79" r="1"/></g>
+<path d="M93,62 C83,61 77,63 80,67 C83,69 90,68 97,64 Z" fill="#d4543a"/>
+<path d="M86,64 L80,66 L86,68 Z" fill="#2a2018"/>
+<path d="M122,52 C124,46 115,43 104,45 C92,47 83,53 79,60 C86,62 95,59 102,61 C112,64 121,61 122,52 Z" fill="url(#wdh)"/>
+<path d="M100,52 C94,55 89,59 86,63" stroke="#fbfbf6" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+<path d="M110,53 C104,56 99,60 95,64" stroke="#fbfbf6" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M106,55 C110,53 114,54 116,56" stroke="#0a1c1a" stroke-width="1.6" fill="none"/>`
   ),
   160
 );

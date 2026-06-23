@@ -1257,6 +1257,9 @@
         'moon',
         'glow',
         'duck',
+        'duck_sleep',
+        'duck_f_sleep',
+        'wood_duck_sleep',
         'duckling',
         'fish_a',
         'fish_b',
@@ -4665,6 +4668,8 @@
             dm.baseSpd = 0.3 + Math.random() * 0.3;
             dm.vx = dm.baseSpd;
             dm.dabbler = true; // up-ends to feed
+            dm.baseTex = dm.curTex = 'duck_f'; // head-up pose / current pose
+            dm.sleepTex = 'duck_f_sleep'; // bill tucked into the back, for a settled nap
             dm.kids = [];
             dm.ref = spr('duck_f', 380, 0, 0.6);
             dm.ref.scale.y = -0.6;
@@ -4679,8 +4684,9 @@
             }
             scene.addChild(dm);
             ducks.push(dm);
+            const drakeTex = Math.random() < 0.5 ? 'wood_duck' : 'duck'; // mallard or wood duck
             const d2 = spr(
-              Math.random() < 0.5 ? 'wood_duck' : 'duck', // the drake is a mallard or a wood duck
+              drakeTex,
               waterL + 30 + Math.random() * (waterR - waterL - 60),
               682 + Math.random() * 16,
               0.55
@@ -4690,6 +4696,8 @@
             d2.baseSpd = 0.28 + Math.random() * 0.3;
             d2.vx = Math.random() < 0.5 ? d2.baseSpd : -d2.baseSpd;
             d2.dabbler = true; // up-ends to feed
+            d2.baseTex = d2.curTex = drakeTex; // head-up pose / current pose
+            d2.sleepTex = drakeTex + '_sleep'; // bill tucked into the back, for a settled nap
             ducks.push(d2);
             scene.addChild(d2);
             // a moorhen often potters among them — darker, smaller, with a red bill
@@ -7175,6 +7183,19 @@
             d.up * 9; // sink the front as it tips bottom-up
           // lerp up onto the bank as it hauls out; the bob (part of waterY) fades with it
           d.y = d.land ? waterY + (d.land.y - waterY) * d.haul : waterY;
+          // bill-tuck: once it's stopped at its sleeping spot, turn the head back and bury the bill
+          // in the back feathers; the head comes straight back up the moment it stirs or wakes
+          if (d.sleepTex) {
+            const want =
+              sleeping && atSpot && Math.abs(d.vx) < 0.14
+                ? d.sleepTex
+                : d.baseTex;
+            if (want !== d.curTex) {
+              d.curTex = want;
+              d.texture = T(want);
+              if (d.ref) d.ref.texture = T(want); // the reflection tucks too
+            }
+          }
           // when it up-ends, half the duck is under the (transparent) water. Follow the fish
           // convention rather than cutting the head off: the part above the waterline stays bright,
           // the submerged head/breast shows MURKY — sunk toward the water colour, half-seen through
