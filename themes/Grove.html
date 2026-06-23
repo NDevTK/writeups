@@ -8582,10 +8582,34 @@
             // a slow, silent glide across the clearing; rests off-screen, then crosses back the other way
             if (f.rest > 0) {
               f.rest -= dt / 60;
+            } else if (f.swoop != null) {
+              // a hunting stoop: drops from the glide right down to the grass, reaches for prey,
+              // and sweeps back up onto the wing — pitching down into it and up out of it
+              f.swoop += dt / 60 / 1.3; // ~1.3s
+              const p = Math.min(1, f.swoop),
+                dip = Math.sin(p * Math.PI),
+                glideY = f.baseY + Math.sin(f.x * 0.006) * 14,
+                lowY = groundY(f.x) - 26; // just over the meadow grass
+              f.x += f.vx * (1 + dip * 0.45) * dt; // a touch quicker through the stoop
+              f.y = glideY + (lowY - glideY) * dip;
+              f.scale.x = (f.vx < 0 ? -1 : 1) * Math.abs(f.scale.x);
+              f.rotation = Math.sign(f.vx) * Math.cos(p * Math.PI) * 0.4; // nose-down in, nose-up out
+              if (p >= 1) {
+                f.swoop = null;
+                f.rotation = 0;
+              }
             } else {
               f.x += f.vx * dt;
               f.y = f.baseY + Math.sin(f.x * 0.006) * 14;
               f.scale.x = (f.vx < 0 ? -1 : 1) * Math.abs(f.scale.x);
+              // out over the open meadow it now and then stoops to hunt
+              if (
+                f.x > 150 &&
+                f.x < VW - 150 &&
+                !raining &&
+                Math.random() < 0.0034 * dt
+              )
+                f.swoop = 0;
               if (f.x > VW + 120 || f.x < -120) {
                 f.dir = -f.dir;
                 f.vx = f.dir * (0.7 + Math.random() * 0.3);
