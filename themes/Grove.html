@@ -3979,9 +3979,9 @@
           roadrunner.pause = 1 + Math.random() * 2;
           scene.addChild(roadrunner);
         }
-        if (BI.squirrel && Math.random() < 0.6) {
+        if (BI.squirrel && Math.random() < 0.6 && buildNight < 0.5) {
           // a squirrel forages the clearing floor: it sits and nibbles, then darts to a fresh spot
-          // — a different coat each visit (red, grey, the odd black)
+          // — a different coat each visit (red, grey, the odd black). Diurnal, so it's gone after dark.
           const sx = 180 + Math.random() * (VW - 360),
             sqCoat = [
               'squirrel',
@@ -6707,14 +6707,20 @@
             d.vx += (0 - d.vx) * 0.08 * dt; // ease to a near stop
           } else {
             const dir = Math.sign(d.tx - d.x) || 1,
-              spd = d.baseSpd ?? 0.4;
+              // ducks drowse after dark: barely cruising and resting far longer, asleep on the water
+              spd = (d.baseSpd ?? 0.4) * (1 - 0.8 * night);
             d.vx += (dir * spd - d.vx) * 0.05 * dt; // ease toward a gentle cruise
             if (Math.abs(d.x - d.tx) < 16) {
               // arrived: usually pause to dabble, then strike out for a new, unrelated spot
               if (Math.random() < 0.6) {
-                d.pauseT = 1.5 + Math.random() * 4;
-                // a dabbling duck often up-ends to feed — bottom-up, tail in the air — before righting
-                if (d.dabbler && !d.upend && !ice && Math.random() < 0.5) {
+                d.pauseT = (1.5 + Math.random() * 4) * (1 + night * 2.5);
+                // a dabbling duck up-ends to feed — bottom-up, tail in the air — but not while it sleeps
+                if (
+                  d.dabbler &&
+                  !d.upend &&
+                  !ice &&
+                  Math.random() < 0.5 * (1 - night)
+                ) {
                   d.upend = 1 + Math.random() * 1.6;
                   d.pauseT = Math.max(d.pauseT, d.upend + 0.6);
                 }
