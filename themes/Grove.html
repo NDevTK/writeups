@@ -6597,6 +6597,33 @@
                     waterL + 20,
                     Math.min(waterR - 20, d.x + (Math.random() - 0.5) * 260)
                   );
+                  // a herd drinks together: a nearby companion often follows it down to the bank,
+                  // settling in to drink a little along the shore from it
+                  if (Math.random() < 0.55)
+                    for (const o of walkers) {
+                      if (
+                        o === d ||
+                        o.isRest ||
+                        o.isFawn ||
+                        o.mode === 'drink' ||
+                        !o.drinkTex ||
+                        o.startle > 0 ||
+                        Math.abs(o.x - d.x) > 340
+                      )
+                        continue;
+                      o.mode = 'drink';
+                      o.drinkPhase = 'go';
+                      o.trot = 0;
+                      o.drinkX = Math.max(
+                        waterL + 20,
+                        Math.min(
+                          waterR - 20,
+                          d.drinkX +
+                            (o.x < d.x ? -1 : 1) * (46 + Math.random() * 40)
+                        )
+                      );
+                      break; // just the one
+                    }
                 }
                 // now and then it breaks into a short trot — quicker stride, springier step —
                 // before settling back to an amble, so a herd never moves in a uniform plod
