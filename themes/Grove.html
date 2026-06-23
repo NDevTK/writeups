@@ -1277,6 +1277,8 @@
         'bee_b',
         'rabbit',
         'fox',
+        'fox_pounce',
+        'fox_s_pounce',
         'dragonfly_a',
         'dragonfly_b',
         'dragonfly_r_a',
@@ -4010,6 +4012,9 @@
             : BI.critter; // pick the species for this visit
           fox = spr(cr, -80, groundY(-80) + 6, BI.critterScale);
           fox.tint = tintJit(BI.critterTint || 0xffffff, 0.06);
+          fox.isFox = cr === 'fox' || cr === 'fox_s'; // a fox/coyote mouses; other critters don't
+          fox.baseTex = cr;
+          fox.pounceTex = cr + '_pounce';
           fox.dir = Math.random() < 0.5 ? 1 : -1; // comes in from either side at its own trot
           fox.spd = 1.1 + Math.random() * 0.9;
           fox.x = fox.dir > 0 ? -80 : VW + 80;
@@ -6902,16 +6907,67 @@
         if (fox) {
           foxTimer -= dt / 60;
           if (fox.visible !== false) {
-            fox.x += fox.dir * (fox.spd ?? 1.5) * dt;
-            fox.y = groundY(fox.x) + 6 + Math.abs(Math.sin(t * 7)) * -2;
-            dropTrack(fox, 'fox', 18);
-            if (fox.dir > 0 ? fox.x > VW + 80 : fox.x < -80) {
-              fox.visible = false;
-              foxTimer = 8 + Math.random() * 10;
+            if (fox.pounce) {
+              // a mousing pounce: freeze to locate the vole, then spring up and forward and come
+              // down nose-first into the grass, hold a beat, and trot on
+              fox.pounceT += dt / 60;
+              if (fox.mode === 'listen') {
+                fox.y = groundY(fox.x) + 6; // dead still, ears pricked, head cocked
+                if (fox.pounceT >= fox.listenDur) {
+                  fox.mode = 'leap';
+                  fox.pounceT = 0;
+                  fox.texture = T(fox.pounceTex);
+                }
+              } else if (fox.mode === 'leap') {
+                const a = Math.min(1, fox.pounceT / 0.6),
+                  arc = Math.sin(a * Math.PI);
+                fox.x += fox.dir * fox.lungeSpd * dt; // springs forward onto the spot
+                fox.y = groundY(fox.x) + 6 - arc * 48; // up high, then plunging back down
+                fox.rotation = fox.dir * (a - 0.4) * 1.15; // nose up on the launch, steep nose-down on the dive
+                if (a >= 1) {
+                  fox.y = groundY(fox.x) + 9;
+                  fox.rotation = fox.dir * 0.66; // pitched right down, nose-first in the grass
+                  fox.mode = 'recover';
+                  fox.pounceT = 0;
+                }
+              } else {
+                fox.y = groundY(fox.x) + 9; // a beat with its nose buried, then up and away
+                if (fox.pounceT >= 0.4) {
+                  fox.pounce = false;
+                  fox.rotation = 0;
+                  fox.texture = T(fox.baseTex);
+                }
+              }
+            } else {
+              fox.x += fox.dir * (fox.spd ?? 1.5) * dt;
+              fox.y = groundY(fox.x) + 6 + Math.abs(Math.sin(t * 7)) * -2;
+              dropTrack(fox, 'fox', 18);
+              // out in the open it stops to mouse now and then — never right at the edges, so the
+              // whole pounce plays on-screen
+              if (
+                fox.isFox &&
+                !raining &&
+                fox.x > 170 &&
+                fox.x < VW - 170 &&
+                Math.random() < 0.004 * dt
+              ) {
+                fox.pounce = true;
+                fox.mode = 'listen';
+                fox.pounceT = 0;
+                fox.listenDur = 0.7 + Math.random() * 0.6;
+                fox.lungeSpd = 1.3 + Math.random() * 0.7;
+              }
+              if (fox.dir > 0 ? fox.x > VW + 80 : fox.x < -80) {
+                fox.visible = false;
+                foxTimer = 8 + Math.random() * 10;
+              }
             }
           } else if (foxTimer < 0 && !raining) {
             // stays tucked away until the shower passes, then trots out from either side, any pace
             fox.visible = true;
+            fox.pounce = false;
+            fox.rotation = 0;
+            fox.texture = T(fox.baseTex);
             fox.dir = Math.random() < 0.5 ? 1 : -1;
             fox.spd = 1.1 + Math.random() * 0.9;
             fox.x = fox.dir > 0 ? -80 : VW + 80;

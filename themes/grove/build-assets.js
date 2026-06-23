@@ -502,6 +502,27 @@ const foxSvg = (g0, g1, light, dark) =>
   );
 save('fox', foxSvg('#e07a2e', '#bd5e1e', '#f3ead8', '#2a2018'), 175);
 save('fox_s', foxSvg('#64686f', '#3a3e44', '#eef2f5', '#1c1e22'), 175);
+// the fox mid mousing-pounce — sprung up and plunging nose-first, body arched, brush streaming up,
+// forepaws reaching down at the grass (faces right). The live sprite swaps to this at the dive.
+const foxPounceSvg = (g0, g1, light, dark) =>
+  S(
+    '210 150',
+    `<defs><linearGradient id="fx" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0}"/><stop offset="1" stop-color="${g1}"/></linearGradient></defs>
+<path d="M70,70 C40,58 18,40 8,22 C24,24 50,38 84,58 Z" fill="url(#fx)"/>
+<path d="M16,26 C6,22 4,30 12,36 C16,30 12,28 20,30 Z" fill="${light}"/>
+<g stroke="${dark}" stroke-width="8" stroke-linecap="round"><line x1="92" y1="66" x2="74" y2="34"/><line x1="106" y1="70" x2="96" y2="36"/></g>
+<path d="M80,60 C86,40 112,38 134,58 C152,74 158,102 150,116 C140,130 116,126 102,108 C86,88 76,76 80,60 Z" fill="url(#fx)"/>
+<path d="M112,104 C126,114 140,114 150,106 C146,122 122,126 110,114 Z" fill="${light}" opacity="0.9"/>
+<g stroke="${dark}" stroke-width="8" stroke-linecap="round"><line x1="138" y1="112" x2="150" y2="142"/><line x1="150" y1="108" x2="160" y2="140"/></g>
+<path d="M132,104 C126,120 132,134 146,138 C157,140 167,131 164,119 C161,108 148,101 132,104 Z" fill="url(#fx)"/>
+<path d="M150,124 C158,132 166,134 170,132 L162,140 L150,136 Z" fill="${light}"/>
+<circle cx="160" cy="138" r="3.6" fill="#1d160f"/>
+<path d="M126,98 L112,90 L130,86 Z" fill="url(#fx)"/><path d="M124,95 L116,91 L128,89 Z" fill="${dark}"/>
+<path d="M140,94 L130,80 L146,82 Z" fill="url(#fx)"/><path d="M139,91 L133,83 L144,84 Z" fill="${dark}"/>
+<circle cx="146" cy="116" r="2.7" fill="#140e09"/>`
+  );
+save('fox_pounce', foxPounceSvg('#e07a2e', '#bd5e1e', '#f3ead8', '#2a2018'), 175);
+save('fox_s_pounce', foxPounceSvg('#64686f', '#3a3e44', '#eef2f5', '#1c1e22'), 175);
 
 // ---- NEW: dragonfly (2 wing frames) — teal by default, plus a red darter and golden hawker ----
 const dragon = (wA, wB, body, dark) =>
