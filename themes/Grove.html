@@ -7532,8 +7532,27 @@
           const canBathe =
             !!water && !BI.interior && !BI.underwater && !BI.glade;
           if (songbird.mode === 'perch') {
-            songbird.y = songbird.perch.y + Math.sin(t * 3) * 0.6; // gentle perch bob
+            // now and then it has a preen — ducks its head to its breast and fusses there with
+            // quick little jerks before sitting up again
+            songbird.preenCD =
+              (songbird.preenCD ?? 3 + Math.random() * 4) - dt / 60;
+            if (songbird.preenT > 0) {
+              songbird.preenT -= dt / 60;
+              songbird.rotation =
+                songbird.dir *
+                (0.18 + Math.sin(t * 6) * 0.13 + Math.sin(t * 23) * 0.05); // reach down and fuss
+              songbird.y = songbird.perch.y + Math.abs(Math.sin(t * 6)) * 1.3;
+              if (songbird.preenT <= 0) songbird.rotation = 0; // sit back up
+            } else {
+              songbird.y = songbird.perch.y + Math.sin(t * 3) * 0.6; // gentle perch bob
+              if (songbird.preenCD <= 0) {
+                songbird.preenT = 1.1 + Math.random() * 1.5;
+                songbird.preenCD = 5 + Math.random() * 7;
+              }
+            }
             if (songbird.tmr < 0) {
+              songbird.preenT = 0;
+              songbird.rotation = 0; // never flit off mid-duck
               if (canBathe && Math.random() < 0.22) {
                 // drop down to the water's edge for a splash-about, then back up to the boughs
                 songbird.fromX = songbird.x;
