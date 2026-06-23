@@ -7440,6 +7440,16 @@
               }
               continue;
             }
+            if (f.scatterT > 0) {
+              // bolting from a kingfisher's strike: a fast dart away and down into deeper water
+              f.scatterT -= dt / 60;
+              f.x = Math.max(fLo, Math.min(fHi, f.x + f.scatterDir * 5 * dt));
+              f.y += (f.cruiseY + 18 - f.y) * 0.1 * dt; // ducks a little deeper as it flees
+              f.dir = f.scatterDir;
+              f.scale.x = f.dir * f.baseSc;
+              f.jump = f.rise = 0; // not leaping or rising — fleeing
+              continue;
+            }
             if (f.jump > 0) {
               // a leap: rise from cruising depth, break the surface, arc over and splash back
               f.jump += dt / 42;
@@ -8633,6 +8643,12 @@
               if (water) {
                 ripples.push({x: k.x, y: k.ty, r: 5, life: 1});
                 ripples.push({x: k.x, y: k.ty, r: 9, life: 1}); // the splash
+                // the fish nearby panic and scatter from the strike
+                for (const f of fish) {
+                  if (f.reef || Math.abs(f.x - k.x) > 150) continue;
+                  f.scatterT = 0.5 + Math.random() * 0.5;
+                  f.scatterDir = f.x >= k.x ? 1 : -1;
+                }
               }
               k.mode = 'rise';
               k.riseT = 0;
