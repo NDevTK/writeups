@@ -2340,7 +2340,9 @@ const webSvg = () => {
   }
   return S(
     '120 110',
-    `<g fill="none" stroke="#cfe6f5" stroke-width="0.7" opacity="0.5" stroke-linejoin="round">${anchors}${strands}</g><g opacity="0.92">${beads}</g>`
+    `<g fill="none" stroke="#cfe6f5" stroke-width="0.7" opacity="0.5" stroke-linejoin="round">${anchors}${strands}</g><g opacity="0.92">${beads}</g>
+<g stroke="#2a2018" stroke-width="0.7" fill="none" stroke-linecap="round"><path d="M58,45 Q50,42 46,43"/><path d="M58,46.5 Q49,46 45,47.5"/><path d="M58,48 Q50,50 46,51.5"/><path d="M58,49.5 Q51,53 48,55.5"/><path d="M62,45 Q70,42 74,43"/><path d="M62,46.5 Q71,46 75,47.5"/><path d="M62,48 Q70,50 74,51.5"/><path d="M62,49.5 Q69,53 72,55.5"/></g>
+<ellipse cx="60" cy="49" rx="3" ry="3.8" fill="#3a3026"/><ellipse cx="60" cy="44.6" rx="2.1" ry="1.9" fill="#241b13"/><path d="M60,46.4 L60,51.6 M57.6,49 L62.4,49" stroke="#cdbf9e" stroke-width="0.45" opacity="0.7"/>`
   );
 };
 save('web', webSvg(), 120);
