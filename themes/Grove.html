@@ -8185,10 +8185,25 @@
               f.y = f.ty + Math.sin(t * 7 + f.ph) * 2.6;
               if (f.hoverT <= 0 || raining) {
                 f.mode = 'cruise';
-                f.tx = Math.max(
-                  40,
-                  Math.min(VW - 40, f.x + (Math.random() - 0.5) * 240)
-                );
+                if (f.patchN > 0) {
+                  // drift to a neighbouring bloom in the same patch
+                  f.patchN -= 1;
+                  f.tx = Math.max(
+                    40,
+                    Math.min(VW - 40, f.patchX + (Math.random() - 0.5) * 90)
+                  );
+                } else {
+                  // patch worked out — off to a fresh patch of flowers a little way along
+                  f.patchX = Math.max(
+                    60,
+                    Math.min(VW - 60, f.x + (Math.random() - 0.5) * 360)
+                  );
+                  f.patchN = 3 + ((Math.random() * 5) | 0); // a few blooms to work here
+                  f.tx = Math.max(
+                    40,
+                    Math.min(VW - 40, f.patchX + (Math.random() - 0.5) * 60)
+                  );
+                }
                 f.ty = groundY(f.tx) - (12 + Math.random() * 46);
               }
             } else {
