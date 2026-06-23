@@ -6702,19 +6702,39 @@
           const loX = ice > 0.02 ? VW / 2 - openHalf + 40 : waterL,
             hiX = ice > 0.02 ? VW / 2 + openHalf - 40 : waterR;
           if (d.tx == null) d.tx = loX + Math.random() * (hiX - loX);
+          // ducks doze off to sleep — a brief loaf by day, long stretches through the night, and not
+          // only after dark (a daytime nap can take any of them). They make for the nearer bank to
+          // sleep tucked at the water's edge rather than out in open water.
+          if (d.sleep == null) d.sleep = 0;
+          if (d.sleep > 0) d.sleep -= dt / 60;
+          else if (
+            d.pauseT <= 0 &&
+            Math.random() < (0.0004 + 0.004 * night) * dt
+          ) {
+            d.sleep = (4 + Math.random() * 6) * (1 + night * 4); // far longer asleep at night
+            d.sleepX = d.x < (loX + hiX) / 2 ? loX + 14 : hiX - 14; // the nearer side bank
+          }
+          const sleeping = d.sleep > 0;
+          if (sleeping) {
+            d.tx = d.sleepX;
+            d.upend = 0; // it doesn't feed while it sleeps
+          }
           if (d.pauseT > 0) {
-            d.pauseT -= dt / 60; // dabbling / preening in place
+            d.pauseT -= dt / 60; // dabbling / preening / dozing in place
             d.vx += (0 - d.vx) * 0.08 * dt; // ease to a near stop
           } else {
             const dir = Math.sign(d.tx - d.x) || 1,
-              // ducks drowse after dark: barely cruising and resting far longer, asleep on the water
-              spd = (d.baseSpd ?? 0.4) * (1 - 0.8 * night);
+              // barely cruising after dark, slower still while slipping off to the bank to sleep
+              spd =
+                (d.baseSpd ?? 0.4) * (1 - 0.8 * night) * (sleeping ? 0.6 : 1);
             d.vx += (dir * spd - d.vx) * 0.05 * dt; // ease toward a gentle cruise
             if (Math.abs(d.x - d.tx) < 16) {
-              // arrived: usually pause to dabble, then strike out for a new, unrelated spot
-              if (Math.random() < 0.6) {
+              if (sleeping) {
+                d.pauseT = 2 + Math.random() * 2.5; // settled at the bank, dozing
+              } else if (Math.random() < 0.6) {
+                // arrived: usually pause to dabble, then strike out for a new, unrelated spot
                 d.pauseT = (1.5 + Math.random() * 4) * (1 + night * 2.5);
-                // a dabbling duck up-ends to feed — bottom-up, tail in the air — but not while it sleeps
+                // a dabbling duck up-ends to feed — bottom-up, tail in the air — before righting
                 if (
                   d.dabbler &&
                   !d.upend &&
@@ -6725,7 +6745,7 @@
                   d.pauseT = Math.max(d.pauseT, d.upend + 0.6);
                 }
               }
-              d.tx = loX + Math.random() * (hiX - loX);
+              d.tx = sleeping ? d.sleepX : loX + Math.random() * (hiX - loX);
             }
           }
           d.x += d.vx * dt;
@@ -6804,14 +6824,30 @@
             d.ref.scale.x = d.scale.x;
             d.ref.alpha = 0.28 * (1 - ice * 0.55) * (1 - d.up * 0.85); // reflection breaks up as it tips
           }
-          if (d.kids)
+          if (d.kids) {
+            // following mum she strings them out in a line astern; when she settles to sleep they
+            // gather in and huddle against her instead, easing between the two so it reads smoothly
+            const huddle =
+              d.sleep > 0 || (d.pauseT > 0 && Math.abs(d.vx) < 0.07);
             d.kids.forEach((k, i) => {
-              const b = d.vx < 0 ? 1 : -1;
-              k.x = d.x + b * (34 + i * 22);
-              k.y = k.baseY + d.sy + Math.sin(t * 2 + i) * 1.4;
-              k.scale.x = (d.vx < 0 ? -1 : 1) * Math.abs(k.scale.x);
+              if (k.hx == null) {
+                k.hx =
+                  (i - (d.kids.length - 1) / 2) * 15 +
+                  (Math.random() - 0.5) * 7;
+                k.hy = (Math.random() - 0.5) * 5;
+              }
+              const b = d.vx < 0 ? 1 : -1,
+                tx = huddle ? d.x + k.hx : d.x + b * (34 + i * 22),
+                ty = huddle
+                  ? k.baseY + d.sy + k.hy + Math.sin(t * 1.3 + i) * 0.6
+                  : k.baseY + d.sy + Math.sin(t * 2 + i) * 1.4;
+              k.x += (tx - k.x) * 0.09 * dt; // paddle to keep up / gather in, never snapping into place
+              k.y += (ty - k.y) * 0.12 * dt;
+              if (!huddle)
+                k.scale.x = (d.vx < 0 ? -1 : 1) * Math.abs(k.scale.x);
               k.alpha = Math.max(0, 1 - ice * 1.8); // the brood doesn't winter on the ice
             });
+          }
           d.rip = (d.rip == null ? 0.5 : d.rip) - dt / 60;
           if (d.rip < 0 && Math.abs(d.vx) > 0.12) {
             // a wake only while actually paddling — a dabbling duck sits still
