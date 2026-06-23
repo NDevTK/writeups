@@ -1177,6 +1177,7 @@
         'moth_a',
         'moth_b',
         'hedgehog',
+        'hedgehog_curl',
         'fennec',
         'scorpion',
         'ocotillo',
@@ -8071,7 +8072,36 @@
         }
         // a hedgehog trundles the night floor in short bursts, pausing nose-down to snuffle
         if (hedgehog) {
-          if (hedgehog.pauseT > 0) {
+          const h = hedgehog;
+          // a stooping owl low overhead is a threat — it rolls up tight
+          let threat = false;
+          for (const f of flutters)
+            if (
+              f.isOwl &&
+              f.swoop != null &&
+              Math.abs(f.x - h.x) < 110 &&
+              f.y > groundY(f.x) - 130
+            ) {
+              threat = true;
+              break;
+            }
+          if (h.curlT > 0) {
+            // curled into a ball, prickles out, dead still until the danger passes
+            h.curlT -= dt / 60;
+            h.y = groundY(h.x) + 6;
+            h.rotation = 0;
+            if (threat) h.curlT = Math.max(h.curlT, 0.7); // stays balled while it's near
+            if (h.curlT <= 0) {
+              h.texture = T('hedgehog'); // unrolls
+              h.pauseT = 0.4 + Math.random() * 0.8; // a cautious pause before trundling on
+            }
+          } else if (threat || Math.random() < 0.0011 * dt) {
+            // startles into a ball — at a stooping owl, or now and then at a noise in the dark
+            h.curlT = 1.6 + Math.random() * 1.8;
+            h.texture = T('hedgehog_curl');
+            h.y = groundY(h.x) + 6;
+            h.rotation = 0;
+          } else if (hedgehog.pauseT > 0) {
             hedgehog.pauseT -= dt / 60; // snuffling in place
             hedgehog.rotation = Math.sin(t * 8) * 0.025; // a busy little wobble
             hedgehog.y = groundY(hedgehog.x) + 6;

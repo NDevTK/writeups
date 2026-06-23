@@ -3121,6 +3121,39 @@ save(
   ),
   84
 );
+// the hedgehog curled into a defensive ball — head and legs tucked, a spiky dome of prickles
+// (the live sprite swaps to this when it's startled, then unrolls again)
+const hedgehogCurlSvg = () => {
+  const cx = 46,
+    cy = 34,
+    rO = 22,
+    rI = 16,
+    N = 16;
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const aO = (i / N) * Math.PI * 2 - Math.PI / 2,
+      aI = ((i + 0.5) / N) * Math.PI * 2 - Math.PI / 2;
+    pts.push(
+      `${(cx + Math.cos(aO) * rO).toFixed(1)},${(cy + Math.sin(aO) * rO * 0.92).toFixed(1)}`
+    );
+    pts.push(
+      `${(cx + Math.cos(aI) * rI).toFixed(1)},${(cy + Math.sin(aI) * rI * 0.92).toFixed(1)}`
+    );
+  }
+  let lines = '';
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
+    lines += `<path d="M${(cx + Math.cos(a) * 5).toFixed(1)},${(cy + Math.sin(a) * 4.5).toFixed(1)} L${(cx + Math.cos(a) * (rI - 1)).toFixed(1)},${(cy + Math.sin(a) * (rI - 1) * 0.92).toFixed(1)}"/>`;
+  }
+  return S(
+    '92 56',
+    `<defs><linearGradient id="hh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a7258"/><stop offset="1" stop-color="#54422f"/></linearGradient></defs>
+<polygon points="${pts.join(' ')}" fill="url(#hh)" stroke="#4a3a2a" stroke-width="0.5" stroke-linejoin="round"/>
+<ellipse cx="${cx}" cy="${cy + 1}" rx="13" ry="11.5" fill="#5c4832"/>
+<g stroke="#3e3022" stroke-width="1.3" opacity="0.4" stroke-linecap="round" fill="none">${lines}</g>`
+  );
+};
+save('hedgehog_curl', hedgehogCurlSvg(), 84);
 
 // ======== a field mouse — scurries the meadow grass and freezes alert (faces right) ========
 save(
