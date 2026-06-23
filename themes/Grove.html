@@ -6715,6 +6715,23 @@
             rabbit.y = groundY(rabbit.x) + 6; // frozen, dead still, on the ground
           } else if (raining && !flee) {
             rabbit.y = groundY(rabbit.x) + 8;
+          } else if (
+            (rabbit.forageT = rabbit.forageT ?? 1 + Math.random() * 3) > 0 &&
+            !flee
+          ) {
+            // settle and crop the grass for a good spell, with a small nibbling bob — rabbits sit
+            // far more than they hop
+            rabbit.forageT -= dt / 60;
+            rabbit.y = groundY(rabbit.x) + 6 + Math.sin(t * 3 + rabbit.x) * 0.5;
+            if (rabbit.forageT <= 0) {
+              // then a short bout of hops off to a fresh patch
+              rabbit.hopsLeft = 2 + ((Math.random() * 3) | 0);
+              rabbit.hopT = 0.5 + Math.random() * 0.6;
+              if (rabbit.x > VW - 140) rabbit.dir = -1;
+              else if (rabbit.x < 140) rabbit.dir = 1;
+              else if (Math.random() < 0.5) rabbit.dir = -rabbit.dir;
+              rabbit.scale.x = rabbit.dir * Math.abs(rabbit.scale.x);
+            }
           } else {
             rabbit.hopT = (rabbit.hopT == null ? 2 : rabbit.hopT) - dt / 60;
             const dur = flee ? 0.3 : 0.4,
@@ -6729,10 +6746,13 @@
             rabbit.y = groundY(rabbit.x) + 6 - hop * (flee ? 30 : 24);
             dropTrack(rabbit, 'rabbit', 26);
             if (rabbit.hopT < 0) {
-              rabbit.hopT = flee
-                ? 0.12 + Math.random() * 0.18 // panicked, rapid hops
-                : 1.1 + Math.random() * 1.9;
-              if (!flee) {
+              if (flee)
+                rabbit.hopT = 0.12 + Math.random() * 0.18; // panicked, rapid hops
+              else {
+                rabbit.hopsLeft = (rabbit.hopsLeft ?? 1) - 1;
+                if (rabbit.hopsLeft <= 0)
+                  rabbit.forageT = 3.5 + Math.random() * 5; // bout done — settle to forage again
+                else rabbit.hopT = 0.5 + Math.random() * 0.7;
                 if (rabbit.x > VW - 140) rabbit.dir = -1;
                 else if (rabbit.x < 140) rabbit.dir = 1;
                 rabbit.scale.x = rabbit.dir * Math.abs(rabbit.scale.x);
