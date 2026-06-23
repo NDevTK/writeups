@@ -1748,6 +1748,7 @@
       }
 
       const swayers = [],
+        flowers = [], // the subset of swayers that are blooms — they nod when an insect alights
         clouds = [],
         ducks = [],
         fish = [],
@@ -1879,6 +1880,7 @@
         XS = VW / VWBASE;
         root.removeChildren();
         swayers.length =
+          flowers.length =
           clouds.length =
           ducks.length =
           fish.length =
@@ -2992,7 +2994,15 @@
               : tintJit(warm || 0xffffff, 0.08);
             if (Math.random() < 0.5) f.scale.x *= -1;
             scene.addChild(f);
-            swayers.push({s: f, amp: 0.05, sp: 1.5, ph: Math.random() * 6});
+            const sw = {
+              s: f,
+              amp: 0.05,
+              sp: 1.5,
+              ph: Math.random() * 6,
+              nod: 0
+            };
+            swayers.push(sw);
+            flowers.push(sw); // a bloom an insect can alight on and nod
           }
         };
         if (BI.ground === 'meadow') {
@@ -3215,7 +3225,15 @@
                 ? ODD[(Math.random() * ODD.length) | 0]
                 : tintJit(0xffffff, 0.06);
               scene.addChild(f);
-              swayers.push({s: f, amp: 0.06, sp: 1.4, ph: Math.random() * 6});
+              const sw = {
+                s: f,
+                amp: 0.06,
+                sp: 1.4,
+                ph: Math.random() * 6,
+                nod: 0
+              };
+              swayers.push(sw);
+              flowers.push(sw); // a bloom an insect can alight on and nod
             }
             // a fern or two tucked low in the grass
             for (let i = 0, n = 1 + ((Math.random() * 2) | 0); i < n; i++) {
@@ -6323,6 +6341,13 @@
           const gust = Math.sin(t * 2.1 - w.s.x * 0.009) * wind * 0.8;
           w.s.rotation =
             Math.sin(t * w.sp + w.ph) * w.amp + (wind + gust) * w.amp * 2.5;
+          if (w.nod > 0) {
+            // an insect just alighted: the bloom dips and springs back in a damped bob
+            w.nod -= dt / 60;
+            const e = w.nodD - Math.max(0, w.nod); // seconds since the alight
+            w.s.rotation +=
+              w.nodDir * w.nodA * Math.exp(-4 * e) * Math.cos(e * 13);
+          }
         }
         // the mirrored trees drift on the breeze and fade as the surface roughens or freezes over
         if (reflLayer) {
@@ -8167,6 +8192,39 @@
             }
           }
         }
+        // a bloom dips and springs back when a bee or butterfly settles on it: find the
+        // nearest unbobbing flower to the alighting point and give it a damped nod
+        const nodNearestFlower = (px, py, reach) => {
+          let best = null,
+            bd = reach;
+          for (const fl of flowers) {
+            if (fl.nod > 0) continue; // already bobbing from a recent visit
+            const d = Math.abs(fl.s.x - px);
+            if (d < bd && Math.abs(fl.s.y - py) < 140) {
+              best = fl;
+              bd = d;
+            }
+          }
+          if (best) {
+            best.nod = best.nodD = 0.95 + Math.random() * 0.2;
+            best.nodA = 0.2 + Math.random() * 0.12;
+            best.nodDir = px >= best.s.x ? 1 : -1;
+          }
+        };
+        // the x of the nearest real bloom to a point (so an insect can make for an actual
+        // flower rather than a bare patch of grass), or null when none is close enough
+        const nearestFlowerX = (x, reach) => {
+          let bx = null,
+            bd = reach;
+          for (const fl of flowers) {
+            const d = Math.abs(fl.s.x - x);
+            if (d < bd) {
+              bd = d;
+              bx = fl.s.x;
+            }
+          }
+          return bx;
+        };
         // butterflies, dragonflies, bird — wandering / crossing
         for (const f of flutters) {
           if (f.isBat) {
@@ -8258,17 +8316,22 @@
                     Math.min(VW - 40, f.patchX + (Math.random() - 0.5) * 90)
                   );
                 } else {
-                  // patch worked out — off to a fresh patch of flowers a little way along
+                  // patch worked out — off to a fresh patch of flowers a little way along,
+                  // settling on a real bloom cluster so the bee works actual flowers
                   f.patchX = Math.max(
                     60,
                     Math.min(VW - 60, f.x + (Math.random() - 0.5) * 360)
                   );
+                  const pfx = nearestFlowerX(f.patchX, 180);
+                  if (pfx != null) f.patchX = pfx;
                   f.patchN = 3 + ((Math.random() * 5) | 0); // a few blooms to work here
                   f.tx = Math.max(
                     40,
                     Math.min(VW - 40, f.patchX + (Math.random() - 0.5) * 60)
                   );
                 }
+                const fx = nearestFlowerX(f.tx, 75); // make for an actual bloom if one's near
+                if (fx != null) f.tx = fx;
                 f.ty = groundY(f.tx) - (12 + Math.random() * 46);
               }
             } else {
@@ -8280,6 +8343,7 @@
               if (Math.abs(dx) < 8 && Math.abs(dy) < 10) {
                 f.mode = 'hover';
                 f.hoverT = 1.2 + Math.random() * 2.4;
+                nodNearestFlower(f.x, f.y, 42); // the bloom it settles onto dips under it
               }
             }
             f.alpha += ((raining ? 0.25 : 1) - f.alpha) * 0.04 * dt; // shelters when it rains
@@ -8312,6 +8376,7 @@
                     ? 5 + Math.random() * 6 // lingers at the water, sipping
                     : 1.6 + Math.random() * 2.8;
                   f.gotoAndStop(0); // alight, wings folded
+                  if (!f.puddling) nodNearestFlower(f.x, f.y, 46); // a bloom it lands on nods
                 }
                 continue;
               }
@@ -8332,11 +8397,14 @@
                 f.ty = 597;
                 f.puddling = true;
               } else {
-                // otherwise alight on a nearby spot on the ground
+                // otherwise alight on a nearby spot on the ground, making for a real bloom
+                // if one is close (so it rests on a flower and nods it)
                 f.tx = Math.max(
                   40,
                   Math.min(VW - 40, f.x + (Math.random() - 0.5) * 140)
                 );
+                const fx = nearestFlowerX(f.tx, 90);
+                if (fx != null) f.tx = fx;
                 f.ty = groundY(f.tx) - 2;
                 f.puddling = false;
               }
