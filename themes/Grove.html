@@ -3007,7 +3007,10 @@
               amp: 0.05,
               sp: 1.5,
               ph: Math.random() * 6,
-              nod: 0
+              nod: 0,
+              sx0: f.scale.x, // base scale, so the bloom can open by day and close at dusk
+              sy0: f.scale.y,
+              closes: Math.random() < 0.72 // most blooms close up at night; a few stay open
             };
             swayers.push(sw);
             flowers.push(sw); // a bloom an insect can alight on and nod
@@ -3238,7 +3241,10 @@
                 amp: 0.06,
                 sp: 1.4,
                 ph: Math.random() * 6,
-                nod: 0
+                nod: 0,
+                sx0: f.scale.x, // base scale, so the bloom can open by day and close at dusk
+                sy0: f.scale.y,
+                closes: Math.random() < 0.72 // most blooms close up at night; a few stay open
               };
               swayers.push(sw);
               flowers.push(sw); // a bloom an insect can alight on and nod
@@ -6370,6 +6376,12 @@
             const e = w.nodD - Math.max(0, w.nod); // seconds since the alight
             w.s.rotation +=
               w.nodDir * w.nodA * Math.exp(-4 * e) * Math.cos(e * 13);
+          }
+          if (w.closes) {
+            // a closing bloom folds in as the light fades — petals draw together (narrows and
+            // shortens a touch) — and opens out again with the returning day
+            w.s.scale.x = w.sx0 * (1 - night * 0.55);
+            w.s.scale.y = w.sy0 * (1 - night * 0.28);
           }
         }
         // the mirrored trees drift on the breeze and fade as the surface roughens or freezes over
