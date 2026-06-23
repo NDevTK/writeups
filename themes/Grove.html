@@ -1420,6 +1420,22 @@
             life: 0.34 + Math.random() * 0.32
           });
       };
+      // a soft puff of breath fogging in cold air, from a muzzle facing dir: drifts out and up,
+      // billowing and thinning as it goes (strength scales with how cold it is)
+      const emitBreath = (x, y, dir, cold) => {
+        for (let i = 0; i < 3; i++)
+          bursts.push({
+            x: x + (Math.random() - 0.5) * 3,
+            y: y + (Math.random() - 0.5) * 2,
+            vx: dir * (0.4 + Math.random() * 0.55),
+            vy: -0.2 - Math.random() * 0.3,
+            sz: 1.7 + Math.random() * 1.4,
+            c: 0xe7eef6,
+            life: 0.9 + Math.random() * 0.5,
+            soft: true,
+            a0: 0.34 + cold * 0.34 // colder air holds the fog longer and thicker
+          });
+      };
       const anim = (frames, x, y, s, spd) => {
         const a = new PIXI.AnimatedSprite(frames.map(T));
         a.anchor.set(0.5, 1);
@@ -6923,6 +6939,17 @@
                   : 0);
             }
             dropTrack(d, 'deer', 30);
+            // its breath fogs in cold air — a soft puff from the muzzle now and then, more often
+            // and thicker the colder it is (so it shows on a frosty morning, not a mild day)
+            const cold = Math.max(0, Math.min(1, (4 - temp) / 8));
+            if (d.drinkTex && cold > 0.06 && d.mode !== 'drink') {
+              d.breathT = (d.breathT ?? Math.random() * 2) - dt / 60;
+              if (d.breathT <= 0) {
+                const sc = Math.abs(d.scale.y);
+                emitBreath(d.x + d.dir * 92 * sc, d.y - 135 * sc, d.dir, cold);
+                d.breathT = (1.6 + Math.random() * 1.8) * (1.4 - cold * 0.6);
+              }
+            }
           }
         }
 
@@ -8549,22 +8576,34 @@
             rippleG.drawEllipse(rp.x, rp.y, rp.r, rp.r * 0.34);
           }
         }
-        // kicked-up specks arc up and fall back to the ground, fading as they go
+        // kicked-up specks arc up and fall back to the ground; breath puffs drift, billow and thin
         if (burstG) {
           burstG.clear();
           for (let i = bursts.length - 1; i >= 0; i--) {
             const b = bursts[i];
             b.x += b.vx * dt;
             b.y += b.vy * dt;
-            b.vy += 0.55 * dt; // gravity pulls them back down
             b.life -= dt / 60;
-            if (b.life <= 0 || b.y > b.gy) {
-              bursts.splice(i, 1);
-              continue;
+            if (b.soft) {
+              b.vx *= 1 - 0.02 * dt; // slows as it spreads
+              b.sz += 0.5 * dt; // billows out
+              if (b.life <= 0) {
+                bursts.splice(i, 1);
+                continue;
+              }
+              burstG.beginFill(b.c, b.a0 * Math.max(0, Math.min(1, b.life)));
+              burstG.drawCircle(b.x, b.y, b.sz);
+              burstG.endFill();
+            } else {
+              b.vy += 0.55 * dt; // gravity pulls them back down
+              if (b.life <= 0 || b.y > b.gy) {
+                bursts.splice(i, 1);
+                continue;
+              }
+              burstG.beginFill(b.c, Math.min(1, b.life * 3.5));
+              burstG.drawRect(b.x, b.y, b.sz, b.sz);
+              burstG.endFill();
             }
-            burstG.beginFill(b.c, Math.min(1, b.life * 3.5));
-            burstG.drawRect(b.x, b.y, b.sz, b.sz);
-            burstG.endFill();
           }
         }
 
