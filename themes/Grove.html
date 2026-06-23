@@ -8150,7 +8150,9 @@
                 f.y += (f.ty - f.y) * 0.07 * dt;
                 if (Math.abs(f.y - f.ty) < 3 && Math.abs(f.x - f.tx) < 6) {
                   f.landing = false;
-                  f.settled = 1.6 + Math.random() * 2.8;
+                  f.settled = f.puddling
+                    ? 5 + Math.random() * 6 // lingers at the water, sipping
+                    : 1.6 + Math.random() * 2.8;
                   f.gotoAndStop(0); // alight, wings folded
                 }
                 continue;
@@ -8158,13 +8160,28 @@
             }
             f.settleTmr -= dt / 60;
             if (f.settleTmr <= 0 && !raining) {
-              // choose a nearby spot on the ground to alight
               f.landing = true;
-              f.tx = Math.max(
-                40,
-                Math.min(VW - 40, f.x + (Math.random() - 0.5) * 140)
-              );
-              f.ty = groundY(f.tx) - 2;
+              if (
+                !!water &&
+                night < 0.5 &&
+                !BI.interior &&
+                !BI.underwater &&
+                !BI.glade &&
+                Math.random() < 0.32
+              ) {
+                // puddle at the damp water's edge to sip minerals — butterflies gather at the shore
+                f.tx = waterL + 20 + Math.random() * (waterR - waterL - 40);
+                f.ty = 597;
+                f.puddling = true;
+              } else {
+                // otherwise alight on a nearby spot on the ground
+                f.tx = Math.max(
+                  40,
+                  Math.min(VW - 40, f.x + (Math.random() - 0.5) * 140)
+                );
+                f.ty = groundY(f.tx) - 2;
+                f.puddling = false;
+              }
               continue;
             }
           }
