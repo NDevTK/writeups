@@ -1448,6 +1448,48 @@
         a.play();
         return a;
       };
+      // register a soft contact shadow under a grounded animal: a flattened glow blob, multiplied
+      // over the ground, that the ticker stretches and leans with the sun and fades after dark. foot
+      // is how wide the pool is as a fraction of the sprite's own width (narrower for a leggy bird).
+      // it's slipped into the scene just beneath its animal, so the ground the animal stands on shows
+      // through it but the animal sits on top — off underground/underwater, where there's no sky.
+      const addShadow = (obj, foot) => {
+        if (BI.interior || BI.underwater || BI.canopy || obj.parent !== scene)
+          return;
+        const sh = spr('glow', obj.x, 0, 1, 0.5, 0.5);
+        sh.tint = 0x2a2438; // a cool near-black that reads on grass, sand or snow alike
+        sh.blendMode = PIXI.BLEND_MODES.MULTIPLY;
+        sh.host = obj;
+        sh.foot = foot || 0.5;
+        scene.addChildAt(sh, scene.getChildIndex(obj));
+        groundShadows.push(sh);
+      };
+      // each frame, sit every contact shadow at its animal's feet and shape it by the sun: short and
+      // round under a high sun, long and leaning away from a low one, and all but gone after dark or
+      // under heavy cloud. cel is the sun/moon position, light the daylight level [0..1].
+      const updateGroundShadows = (cel, light) => {
+        if (!groundShadows.length) return;
+        const elev = Math.max(0, Math.min(1, (HZ - cel.y) / (HZ * 0.78))), // 1 overhead, 0 at the horizon
+          long = 0.85 + (1 - elev) * 1.9, // the lower the sun, the longer the shadow it throws
+          moonlit = !cel.sun; // the moon casts only a faint one
+        for (const sh of groundShadows) {
+          const o = sh.host;
+          if (!o || o.visible === false || o.parent === null) {
+            sh.visible = false;
+            continue;
+          }
+          sh.visible = true;
+          const gx = o.x,
+            w = o.width * sh.foot, // footprint width from the sprite's own size
+            lean = Math.max(-1, Math.min(1, (gx - cel.x) / (VW * 0.55))); // it falls away from the sun
+          sh.position.set(gx + lean * w * 0.5 * (long - 1), groundY(gx) + 9);
+          sh.scale.set((w / 128) * long, (w / 128) * 0.17);
+          sh.alpha =
+            (moonlit ? 0.12 : 0.24 + elev * 0.14) * // a low sun rakes a long shadow that still reads
+            Math.max(0, light) *
+            (1 - cover * 0.55);
+        }
+      };
       function gradTex(stops, h) {
         const c = document.createElement('canvas');
         c.width = 1;
@@ -1830,6 +1872,7 @@
         dewdrops = [],
         murmur = [],
         cloudShadows = [],
+        groundShadows = [],
         snowTrees = [],
         lilies = [],
         weather = [],
@@ -1966,6 +2009,7 @@
           dewdrops.length =
           murmur.length =
           cloudShadows.length =
+          groundShadows.length =
           snowTrees.length =
           lilies.length =
           weather.length =
@@ -4016,6 +4060,9 @@
             }
             scene.addChild(d);
             walkers.push(d);
+            // a bedded animal pools a wider shadow; the wading bird stands in the water, so it casts
+            // none on the bank (its reflection carries it instead)
+            if (!d.isHeron) addShadow(d, d.isRest ? 0.72 : 0.5);
           }
           // a youngster sometimes trails the herd, keeping close to one of the adults — a spotted
           // fawn behind the deer, a tumbling cub behind the pandas (CALF map is shared up top)
@@ -4037,6 +4084,7 @@
             fawn.scale.x = fawn.dir * Math.abs(fawn.scale.x);
             scene.addChild(fawn);
             walkers.push(fawn);
+            addShadow(fawn, 0.5);
           }
           deer = walkers[0] || null;
         } else deer = null;
@@ -5786,6 +5834,8 @@
           P = {top: hx('#181333'), bot: hx('#27474a'), light: 0.22};
           night = 0.82;
         }
+        // anchor the herd's shadows to the sun before any early-out, so they read even at rest
+        updateGroundShadows(cel, P.light);
         if (!reduce.matches) t += dt / 60;
 
         // sky (rebuild texture only when the hour shifts)
