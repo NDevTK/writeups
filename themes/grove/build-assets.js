@@ -490,6 +490,27 @@ save('rabbit_ears', rabbitEarsSvg('#c8b49a', '#94795f', '#bda78c'), 104);
 save('rabbit_g_ears', rabbitEarsSvg('#b2b6bc', '#7e828a', '#9a9ea4'), 104);
 save('rabbit_k_ears', rabbitEarsSvg('#5e5a54', '#3a362f', '#4e4a44'), 104);
 
+// the rabbit washing its face — head dipped, both forepaws raised to the muzzle with pale paw-tips,
+// the way a rabbit grooms; a brief swap to this while it sits reads as a wash-down
+const rabbitGroomSvg = (g0, g1, foot) =>
+  S(
+    '104 116',
+    `<defs><linearGradient id="rb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0}"/><stop offset="1" stop-color="${g1}"/></linearGradient></defs>
+<path d="M49,58 C43,28 41,8 48,5 C55,4 57,26 56,54 Z" fill="url(#rb)"/><path d="M62,56 C59,28 62,8 70,8 C78,11 72,32 69,54 Z" fill="url(#rb)"/>
+<path d="M48,50 C46,30 46,18 49,12" stroke="#e7b9b0" stroke-width="3.4" fill="none"/><path d="M65,50 C64,32 66,20 70,14" stroke="#e7b9b0" stroke-width="3" fill="none"/>
+<ellipse cx="36" cy="94" rx="21" ry="18" fill="url(#rb)"/><ellipse cx="53" cy="84" rx="23" ry="21" fill="url(#rb)"/>
+<circle cx="21" cy="99" r="10" fill="#f2ebe0"/><ellipse cx="60" cy="107" rx="16" ry="5.5" fill="${foot}"/>
+<g transform="rotate(16 64 56)">
+<circle cx="64" cy="56" r="16" fill="url(#rb)"/><path d="M75,55 C81,56 83,62 78,66 C74,67 71,63 72,58 Z" fill="url(#rb)"/>
+<path d="M80,59 l4.5,2.3 l-4.5,2.3 Z" fill="#c97f8a"/>
+<circle cx="64" cy="52" r="2.6" fill="#1a1208"/><circle cx="65" cy="51" r="0.8" fill="#fff"/></g>
+<g stroke="url(#rb)" stroke-width="7" stroke-linecap="round" fill="none"><path d="M69,92 C71,82 76,74 81,69"/><path d="M73,93 C76,83 81,75 85,70"/></g>
+<circle cx="81" cy="68.5" r="3.1" fill="${foot}"/><circle cx="84.5" cy="69.5" r="2.9" fill="${foot}"/>`
+  );
+save('rabbit_groom', rabbitGroomSvg('#c8b49a', '#94795f', '#bda78c'), 104);
+save('rabbit_g_groom', rabbitGroomSvg('#b2b6bc', '#7e828a', '#9a9ea4'), 104);
+save('rabbit_k_groom', rabbitGroomSvg('#5e5a54', '#3a362f', '#4e4a44'), 104);
+
 // ---- fox (trotting, faces right) — red, or a dark silver morph ----
 const foxSvg = (g0, g1, light, dark) =>
   S(
@@ -3780,12 +3801,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = [
-  'dandelion_clock',
-  'dandelion_clock2',
-  'dandelion_bare',
-  'dandelion'
-];
+const review = ['rabbit', 'rabbit_groom', 'rabbit_g_groom', 'rabbit_k_groom'];
 const cols = 4,
   cell = 230,
   pad = 14,
