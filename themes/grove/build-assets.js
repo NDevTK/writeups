@@ -2678,6 +2678,44 @@ save(
   62
 );
 
+// ======== the sitting squirrel nibbling an acorn held up in both forepaws (faces right) ========
+// the upright pose, head tipped down a touch, with a nut cupped at the muzzle and the paws round it
+const squirrelEatSvg = (g0, g1, ear, belly, inner) =>
+  S(
+    '70 66',
+    `<defs><linearGradient id="sq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0}"/><stop offset="1" stop-color="${g1}"/></linearGradient></defs>
+<path d="M22,58 C7,54 3,37 9,23 C15,11 27,11 31,19 C23,19 15,27 17,39 C19,49 27,53 33,53 C29,57 25,59 22,58 Z" fill="url(#sq)"/>
+<path d="M13,31 C11,23 15,17 21,15 C17,21 17,29 21,35 Z" fill="${inner}" opacity="0.6"/>
+<path d="M34,57 C30,45 32,33 40,29 C48,25 56,31 56,43 C56,53 50,59 44,59 C40,59 36,59 34,57 Z" fill="url(#sq)"/>
+<path d="M40,53 C38,43 40,35 45,33 C44,41 44,49 46,55 C43,56 41,55 40,53 Z" fill="${belly}"/>
+<g transform="rotate(20 46 32)">
+<circle cx="49" cy="25" r="11" fill="url(#sq)"/>
+<path d="M43,17 C41,11 43,7 47,9 C47,13 46,17 45,19 Z" fill="${ear}"/>
+<path d="M55,17 C57,11 55,7 51,9 C51,13 52,17 53,19 Z" fill="${ear}"/>
+<circle cx="52" cy="24" r="2" fill="#140e09"/><circle cx="52.6" cy="23.4" r="0.6" fill="#fff"/>
+<circle cx="58" cy="27" r="1.6" fill="#3a241a"/></g>
+<g transform="translate(53 32) rotate(16) scale(0.5)">
+<path d="M5,13 C5,23 9,28 12,28 C15,28 19,23 19,13 C19,12 5,12 5,13 Z" fill="#d1a064"/>
+<path d="M4,12 C4,6 8,3 12,3 C16,3 20,6 20,12 C20,14.5 4,14.5 4,12 Z" fill="#6e4a2a"/></g>
+<ellipse cx="50" cy="36" rx="3.6" ry="2.5" transform="rotate(-28 50 36)" fill="url(#sq)"/>
+<ellipse cx="58" cy="38" rx="3.6" ry="2.5" transform="rotate(30 58 38)" fill="url(#sq)"/>`
+  );
+save(
+  'squirrel_eat',
+  squirrelEatSvg('#bc6e3c', '#8a4e28', '#8a4e28', '#e8c89c', '#d49058'),
+  62
+);
+save(
+  'squirrel_g_eat',
+  squirrelEatSvg('#9aa0a8', '#6a7078', '#6a7078', '#eef1f3', '#b6bcc2'),
+  62
+);
+save(
+  'squirrel_k_eat',
+  squirrelEatSvg('#4c4c50', '#2a2a2e', '#26262a', '#7a7a7e', '#5e5e62'),
+  62
+);
+
 // ======== an acorn — the nut the squirrel buries ========
 save(
   'acorn',
@@ -3801,7 +3839,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['rabbit', 'rabbit_groom', 'rabbit_g_groom', 'rabbit_k_groom'];
+const review = ['squirrel', 'squirrel_eat', 'squirrel_g_eat', 'squirrel_k_eat'];
 const cols = 4,
   cell = 230,
   pad = 14,

@@ -1212,6 +1212,9 @@
         'squirrel_flick',
         'squirrel_g_flick',
         'squirrel_k_flick',
+        'squirrel_eat',
+        'squirrel_g_eat',
+        'squirrel_k_eat',
         'acorn',
         'rabbit_g',
         'rabbit_k',
@@ -4224,6 +4227,9 @@
           squirrel.flickTex = sqCoat + '_flick'; // tail snapped up, for the odd idle flick
           squirrel.flickT = 0; // >0 while a flick is held
           squirrel.flickCD = 1.5 + Math.random() * 3.5; // until the next one
+          squirrel.eatTex = sqCoat + '_eat'; // sat up turning a nut in its paws, nibbling
+          squirrel.eatT = 0; // >0 while a feed is held
+          squirrel.eatCD = 3 + Math.random() * 5; // until the next one
           scene.addChild(squirrel);
           // the acorn it buries — kept hidden until it caches one
           squirrel.acorn = spr('acorn', sx, groundY(sx) + 5, 0.6);
@@ -8030,6 +8036,7 @@
             squirrel.tree = best; // a canopy spot to climb to, if there's a tree to hand
             squirrel.climbY = null;
             squirrel.flickT = 0;
+            squirrel.eatT = 0;
             squirrel.texture = T(squirrel.coatTex);
             squirrel.acorn.alpha = 0;
           }
@@ -8073,10 +8080,18 @@
           } else if (squirrel.mode === 'sit') {
             squirrel.y = groundY(squirrel.x) + 6 + Math.sin(t * 5) * 0.7; // nibbling bob
             squirrel.rotation = Math.sin(t * 3.3) * 0.05;
-            // the odd flick of the tail as it sits and nibbles — a quick snap up, then back
-            if (squirrel.flickT > 0) {
+            // as it sits it sometimes rears up to turn a nut in its paws and nibble, and otherwise
+            // gives its brush the odd flick — a quick snap up, then back
+            if (squirrel.eatT > 0) {
+              squirrel.eatT -= dt / 60;
+              if (squirrel.eatT <= 0) squirrel.texture = T(squirrel.coatTex);
+            } else if (squirrel.flickT > 0) {
               squirrel.flickT -= dt / 60;
               if (squirrel.flickT <= 0) squirrel.texture = T(squirrel.coatTex);
+            } else if ((squirrel.eatCD -= dt / 60) <= 0) {
+              squirrel.texture = T(squirrel.eatTex); // up on its haunches with a nut
+              squirrel.eatT = 1.8 + Math.random() * 2.6;
+              squirrel.eatCD = 5 + Math.random() * 7;
             } else {
               squirrel.flickCD -= dt / 60;
               if (squirrel.flickCD <= 0) {
@@ -8087,6 +8102,7 @@
             }
             if (squirrel.tmr < 0) {
               squirrel.flickT = 0;
+              squirrel.eatT = 0;
               squirrel.texture = T(squirrel.coatTex); // settle the tail before it scampers off
               squirrel.mode = 'run';
               squirrel.tx = 110 + Math.random() * (VW - 220); // a fresh foraging spot
