@@ -67,7 +67,15 @@ save(
 // for a moment as it grazes or stands, the way deer flick their tails at flies
 save(
   'deer_swish',
-  deerSvg([0, 0, 0, 0], undefined, undefined, undefined, undefined, undefined, 30),
+  deerSvg(
+    [0, 0, 0, 0],
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    30
+  ),
   210
 );
 save(
@@ -521,8 +529,16 @@ const foxPounceSvg = (g0, g1, light, dark) =>
 <path d="M140,94 L130,80 L146,82 Z" fill="url(#fx)"/><path d="M139,91 L133,83 L144,84 Z" fill="${dark}"/>
 <circle cx="146" cy="116" r="2.7" fill="#140e09"/>`
   );
-save('fox_pounce', foxPounceSvg('#e07a2e', '#bd5e1e', '#f3ead8', '#2a2018'), 175);
-save('fox_s_pounce', foxPounceSvg('#64686f', '#3a3e44', '#eef2f5', '#1c1e22'), 175);
+save(
+  'fox_pounce',
+  foxPounceSvg('#e07a2e', '#bd5e1e', '#f3ead8', '#2a2018'),
+  175
+);
+save(
+  'fox_s_pounce',
+  foxPounceSvg('#64686f', '#3a3e44', '#eef2f5', '#1c1e22'),
+  175
+);
 
 // ---- NEW: dragonfly (2 wing frames) — teal by default, plus a red darter and golden hawker ----
 const dragon = (wA, wB, body, dark) =>
@@ -2778,12 +2794,43 @@ ${crest ? `<path d="M21,14 C25,10 33,11 37,15 C31,13 25,13 21,17 Z" fill="${cres
 <path d="M29,20 C32,18 35,19 37,21" stroke="#1a140d" stroke-width="1.3" fill="none"/>
 <g stroke="${wing}" stroke-width="1.7" stroke-linecap="round"><line x1="27" y1="48.5" x2="27" y2="50.5"/><line x1="32" y1="48.5" x2="32" y2="50.5"/></g>`
   );
-save('robin_roost', perchRoost('robin', '#8a7a60', '#d8643a', '#e2a23a', '#6f6048'), 50);
-save('bluebird_roost', perchRoost('bluebird', '#4a82c8', '#d59060', '#3a3a40', '#37619a'), 50);
-save('finch_roost', perchRoost('finch', '#b6b04e', '#ecd24e', '#3a3a40', '#8a8638'), 50);
-save('bluetit_roost', perchRoost('bluetit', '#4f8fce', '#ecd24e', '#3a3a40', '#3a6fae'), 50);
-save('goldcrest_roost', perchRoost('goldcrest', '#7e8a4e', '#d4cea8', '#3a3a40', '#5f6a38', '#e8b73a'), 50);
-save('wren_roost', perchRoost('wren', '#7a5436', '#c69a6a', '#caa45a', '#5a3c26', null, true), 50);
+save(
+  'robin_roost',
+  perchRoost('robin', '#8a7a60', '#d8643a', '#e2a23a', '#6f6048'),
+  50
+);
+save(
+  'bluebird_roost',
+  perchRoost('bluebird', '#4a82c8', '#d59060', '#3a3a40', '#37619a'),
+  50
+);
+save(
+  'finch_roost',
+  perchRoost('finch', '#b6b04e', '#ecd24e', '#3a3a40', '#8a8638'),
+  50
+);
+save(
+  'bluetit_roost',
+  perchRoost('bluetit', '#4f8fce', '#ecd24e', '#3a3a40', '#3a6fae'),
+  50
+);
+save(
+  'goldcrest_roost',
+  perchRoost(
+    'goldcrest',
+    '#7e8a4e',
+    '#d4cea8',
+    '#3a3a40',
+    '#5f6a38',
+    '#e8b73a'
+  ),
+  50
+);
+save(
+  'wren_roost',
+  perchRoost('wren', '#7a5436', '#c69a6a', '#caa45a', '#5a3c26', null, true),
+  50
+);
 
 // ======== an arctic fox — white, fluffier and round-eared (faces right) ========
 save(
