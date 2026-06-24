@@ -5068,6 +5068,15 @@
             kingfisher.py = py;
             kingfisher.mode = 'perch';
             kingfisher.tmr = 3 + Math.random() * 5;
+            // a minnow it carries back to the twig on a successful plunge, then beats and swallows.
+            // a child of the bird, so it tracks the bill and flips with the kingfisher's facing
+            kingfisher.catchFish = new PIXI.Sprite(T('fish_a'));
+            kingfisher.catchFish.anchor.set(0.5, 0.5);
+            kingfisher.catchFish.position.set(20, -34); // gripped at the bill tip, in local space
+            kingfisher.catchFish.rotation = 0.25;
+            kingfisher.catchFish.scale.set(0.22);
+            kingfisher.catchFish.visible = false;
+            kingfisher.addChild(kingfisher.catchFish);
             scene.addChild(kingfisher);
           } else kingfisher = null;
           if (BI.water.sailboat) {
@@ -9366,8 +9375,14 @@
               k.riseDur = 0.55 + Math.random() * 0.2;
               k.fromX = k.x;
               k.fromY = k.y;
+              k.caught = Math.random() < 0.6; // most plunges come up with a minnow
+              if (k.catchFish) {
+                k.catchFish.visible = k.caught;
+                k.catchFish.alpha = 1;
+                k.catchFish.scale.set(0.22);
+              }
             }
-          } else {
+          } else if (k.mode === 'rise') {
             k.riseT += dt / 60;
             const p = Math.min(1, k.riseT / k.riseDur);
             k.x = k.fromX + (k.px - k.fromX) * p;
@@ -9377,6 +9392,30 @@
               k.x = k.px;
               k.y = k.py;
               k.rotation = 0;
+              if (k.caught) {
+                k.mode = 'gulp'; // back on the twig with a catch — beat it and swallow
+                k.gulpT = 0;
+              } else {
+                k.mode = 'perch';
+                k.tmr = 4 + Math.random() * 6;
+              }
+            }
+          } else {
+            // gulp: a few sharp head-flicks to batter the fish against the twig, then it goes down
+            const GD = 0.95;
+            k.gulpT += dt / 60;
+            const g = Math.min(1, k.gulpT / GD);
+            k.y = k.py;
+            k.rotation = k.dir * 0.5 * Math.sin(g * Math.PI * 3) * (1 - g); // quick beating flicks
+            if (k.catchFish) {
+              const fade = Math.max(0, 1 - Math.max(0, (g - 0.6) / 0.28)); // flicked down the throat
+              k.catchFish.alpha = fade;
+              k.catchFish.scale.set(0.22 * (0.3 + 0.7 * fade));
+              if (g >= 0.88) k.catchFish.visible = false;
+            }
+            if (g >= 1) {
+              k.rotation = 0;
+              if (k.catchFish) k.catchFish.visible = false;
               k.mode = 'perch';
               k.tmr = 4 + Math.random() * 6;
             }
