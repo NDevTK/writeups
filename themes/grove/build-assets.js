@@ -3324,6 +3324,61 @@ save(
   40
 );
 
+// a dandelion — a shaggy golden composite head over a toothed leaf, and its seed-head "clock":
+// a gossamer sphere of parachute seeds. Both centred at (20,18) so they swap cleanly in the meadow.
+const dandyRays = (n, inner, len, rx, fill) =>
+  `<g fill="${fill}">${Array.from({length: n}, (_, k) => {
+    const a = (k / n) * Math.PI * 2,
+      mid = (inner + len) / 2,
+      cx = (20 + Math.cos(a) * mid).toFixed(1),
+      cy = (18 + Math.sin(a) * mid).toFixed(1);
+    return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${((len - inner) / 2).toFixed(1)}" transform="rotate(${((a * 180) / Math.PI + 90).toFixed(0)} ${cx} ${cy})"/>`;
+  }).join('')}</g>`;
+save(
+  'dandelion',
+  S(
+    '40 60',
+    `<path d="M20,58 L20,22" stroke="#5a8a3e" stroke-width="3"/>
+<path d="M20,44 C11,44 6,38 8,31 C11,33 13,36 14,40 C16,40 18,42 20,42 Z" fill="#5a8a3e"/>
+<path d="M20,41 C29,41 34,35 32,28 C29,30 27,33 26,37 C24,37 22,39 20,39 Z" fill="#4f7d36"/>
+${dandyRays(26, 1, 13, 1.4, '#e0991c')}
+${dandyRays(22, 1, 10.5, 1.2, '#ffc62e')}
+${dandyRays(14, 1, 7, 1, '#ffdb5e')}
+<circle cx="20" cy="18" r="3" fill="#f1ad20"/>`
+  ),
+  40
+);
+const dandyFloss = (n, r0, r1) =>
+  Array.from({length: n}, (_, k) => {
+    const a = (k / n) * Math.PI * 2 + (k % 2) * 0.08,
+      x0 = (20 + Math.cos(a) * r0).toFixed(1),
+      y0 = (18 + Math.sin(a) * r0).toFixed(1),
+      x1 = (20 + Math.cos(a) * r1).toFixed(1),
+      y1 = (18 + Math.sin(a) * r1).toFixed(1);
+    return {a, x0, y0, x1, y1};
+  });
+save(
+  'dandelion_clock',
+  (() => {
+    const f = dandyFloss(42, 2.5, 13);
+    return S(
+      '40 60',
+      `<path d="M20,58 L20,20" stroke="#9aa06a" stroke-width="2.4"/>
+<circle cx="20" cy="18" r="13" fill="#ffffff" opacity="0.1"/>
+<g stroke="#dde6ea" stroke-width="0.7" opacity="0.85" stroke-linecap="round">${f
+        .map(
+          (s) => `<line x1="${s.x0}" y1="${s.y0}" x2="${s.x1}" y2="${s.y1}"/>`
+        )
+        .join('')}</g>
+<g fill="#f4f9fb" opacity="0.7">${f
+        .map((s) => `<circle cx="${s.x1}" cy="${s.y1}" r="1.3"/>`)
+        .join('')}</g>
+<circle cx="20" cy="18" r="2" fill="#c2a86a"/>`
+    );
+  })(),
+  40
+);
+
 // ======== desert flora ========
 // an ocotillo — tall spindly canes fanning from the base, tipped with flame-red flowers
 save(
@@ -3659,7 +3714,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['sunflower', 'lupine_p', 'lupine_b', 'lupine_k'];
+const review = ['dandelion', 'dandelion_clock', 'flower_y', 'clover'];
 const cols = 4,
   cell = 230,
   pad = 14,
