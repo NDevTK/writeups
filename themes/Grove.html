@@ -1402,7 +1402,7 @@
             halfW = r.w * (0.28 + (along / F.len) * 0.9), // the shaft widens with distance
             d = perp / halfW;
           if (d < 1) {
-            const v = (1 - d) * (1 - along / F.len); // brightest near the sun, fading out
+            const v = (1 - d) * (1 - along / F.len) * (1 - along / F.len); // brightest near the sun, fading out (matches the beam's quadratic falloff)
             if (v > best) best = v;
           }
         }
@@ -6207,10 +6207,10 @@
           }
         }
 
-        // dawn/dusk light shafts: soft golden god-rays fanning out from the low sun and raking
-        // across the land — brightest near the sun, fading with distance, gone by midday and night.
-        // Anchored to the sun, so they lean in low from the left at dawn and from the right at dusk.
-        // Additive and faint, drifting slowly — light hanging in the hazy air, not hard rays.
+        // dawn/dusk light shafts: soft golden god-rays fanning out from the low sun — a glow that
+        // pools close around the sun and fades out within a few hundred pixels, never a hard line
+        // reaching across the frame. Anchored to the sun, so they lean in low from the left at dawn
+        // and from the right at dusk. Additive and faint — light hanging in the hazy air.
         if (beamG) {
           beamG.clear();
           const low = cel.sun
@@ -6223,10 +6223,10 @@
             const sunX = cel.x,
               sunY = cel.y,
               baseAng = Math.atan2(VH * 0.9 - sunY, VW * 0.5 - sunX), // aim into the scene
-              N = 10,
-              halfSpread = 0.32, // the fan's half-angle
-              len = 1500,
-              SEG = 4;
+              N = 7,
+              halfSpread = 0.28, // the fan's half-angle
+              len = 820, // short — the glow fades out long before the far edge
+              SEG = 6;
             beamField.sunX = sunX;
             beamField.sunY = sunY;
             beamField.len = len;
@@ -6254,7 +6254,7 @@
                   cy0 = sunY + diry * d0,
                   cx1 = sunX + dirx * d1,
                   cy1 = sunY + diry * d1;
-                beamG.beginFill(0xffd488, beam * 0.13 * (1 - a0)); // fades out from the sun
+                beamG.beginFill(0xffd488, beam * 0.12 * (1 - a0) * (1 - a0)); // quadratic falloff — pools at the sun
                 beamG.moveTo(cx0 + px * w0, cy0 + py * w0);
                 beamG.lineTo(cx0 - px * w0, cy0 - py * w0);
                 beamG.lineTo(cx1 - px * w1, cy1 - py * w1);
