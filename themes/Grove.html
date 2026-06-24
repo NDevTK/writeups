@@ -9174,9 +9174,23 @@
           }
           if (f.isButterfly) {
             if (f.settled > 0) {
-              // resting on a flower with folded wings; lifts off when the rest is over
+              // resting on a flower; lifts off when the rest is over
               f.settled -= dt / 60;
               f.alpha += ((raining ? 0 : 1) - f.alpha) * 0.04 * dt;
+              // basking: in the sun it slowly works its wings open and shut to soak up the warmth;
+              // in dull light or at dusk it just holds them closed
+              if (P.light > 0.6 && cover < 0.55 && night < 0.4) {
+                f.wingT = (f.wingT ?? 0.8 + Math.random()) - dt / 60;
+                if (f.wingT <= 0) {
+                  f.wingOpen = !f.wingOpen;
+                  f.gotoAndStop(f.wingOpen ? 0 : 1);
+                  f.wingT = f.wingOpen
+                    ? 1.1 + Math.random() * 1.6 // held open to the sun a good while
+                    : 0.3 + Math.random() * 0.35; // a brief close between
+                }
+              } else {
+                f.gotoAndStop(1); // wings shut in shade
+              }
               if (f.settled <= 0 || raining) {
                 f.play();
                 f.settleTmr = 6 + Math.random() * 9;
@@ -9198,7 +9212,9 @@
                   f.settled = f.puddling
                     ? 5 + Math.random() * 6 // lingers at the water, sipping
                     : 1.6 + Math.random() * 2.8;
-                  f.gotoAndStop(0); // alight, wings folded
+                  f.gotoAndStop(0); // alight, wings open to the sun
+                  f.wingOpen = true;
+                  f.wingT = 1 + Math.random() * 1.2; // before the first slow wing-beat
                   if (!f.puddling) nodNearestFlower(f.x, f.y, 46); // a bloom it lands on nods
                 }
                 continue;
