@@ -1882,6 +1882,7 @@
         groundShadows = [],
         snowTrees = [],
         lilies = [],
+        petalRaft = [], // blossom petals that collect on the pond and drift on the breeze
         weather = [],
         rainDrops = [],
         smoke = [],
@@ -2020,6 +2021,7 @@
           groundShadows.length =
           snowTrees.length =
           lilies.length =
+          petalRaft.length =
           weather.length =
           smoke.length =
           embers.length =
@@ -5116,6 +5118,56 @@
               dolphins.push(d);
               scene.addChild(d);
             }
+          // blossom petals collect on the pond and ride the breeze — a soft raft of pink, white and
+          // rose flecks lying on the surface, drifting and slowly turning (kept within the water)
+          if (BI.water.petals && !snow) {
+            petalRaft.layer = new PIXI.Container();
+            scene.addChild(petalRaft.layer);
+            const onWater = (x, y) =>
+              pondShape
+                ? ((x - pondShape.cx) / pondShape.rx) ** 2 +
+                    ((y - pondShape.cy) / pondShape.ry) ** 2 <
+                  0.86
+                : x > 50 && x < VW - 50 && y > 608 && y < 690;
+            const spawn = () => {
+              for (let k = 0; k < 24; k++) {
+                const x = pondShape
+                    ? pondShape.cx + (Math.random() - 0.5) * 1.9 * pondShape.rx
+                    : 50 + Math.random() * (VW - 100),
+                  y = pondShape
+                    ? pondShape.cy + (Math.random() - 0.5) * 1.8 * pondShape.ry
+                    : 610 + Math.random() * 78;
+                if (onWater(x, y)) return {x, y};
+              }
+              return {
+                x: pondShape ? pondShape.cx : VW / 2,
+                y: pondShape ? pondShape.cy : 645
+              };
+            };
+            petalRaft.onWater = onWater;
+            petalRaft.spawn = spawn;
+            const pk = ['petal', 'petal', 'petal_w', 'petal_r'];
+            for (let i = 0, n = 16 + ((Math.random() * 10) | 0); i < n; i++) {
+              const s = spawn(),
+                p = spr(
+                  pk[(Math.random() * pk.length) | 0],
+                  s.x,
+                  s.y,
+                  0.24 + Math.random() * 0.18,
+                  0.5,
+                  0.5
+                );
+              p.scale.y *= 0.5; // lying flat on the water, seen at a shallow angle
+              p.rotation = Math.random() * 6.28;
+              p.baseY = s.y;
+              p.drift = 0.04 + Math.random() * 0.07; // its own slow surface creep
+              p.spin = (Math.random() - 0.5) * 0.02;
+              p.ph = Math.random() * 6.28;
+              p.a0 = 0.78 + Math.random() * 0.16;
+              petalRaft.layer.addChild(p);
+              petalRaft.push(p);
+            }
+          }
         } else {
           scene.addChild(glit);
           water = null;
@@ -6696,6 +6748,24 @@
             if (s.x > VW + 300) s.x = -300;
             else if (s.x < -300) s.x = VW + 300;
           }
+
+        // blossom petals riding the pond: a slow creep on the breeze, a gentle bob on the ripples and
+        // a lazy turn — when one reaches the bank it slips back onto the water elsewhere
+        if (petalRaft.length) {
+          const dim = 0.4 + 0.6 * P.light; // they sink into shade with the water at night
+          for (const p of petalRaft) {
+            p.x += (p.drift + wind * 0.5) * dt;
+            p.rotation += p.spin * dt;
+            p.y = p.baseY + Math.sin(t * 1.1 + p.ph) * 1.1;
+            if (!petalRaft.onWater(p.x, p.y)) {
+              const s = petalRaft.spawn();
+              p.x = s.x;
+              p.baseY = s.y;
+              p.ph = Math.random() * 6.28;
+            }
+            p.alpha = p.a0 * dim;
+          }
+        }
 
         // shore break: a wave swashes up the sand and slides back, leaving a lacy foam edge and a
         // wet sheen behind it. Sets of bigger and smaller waves come through, and the surf freshens
