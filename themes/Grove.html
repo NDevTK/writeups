@@ -4632,9 +4632,21 @@
             if (reduce.matches) {
               // a static lapping line when the swash ticker won't run
               const edgeY = 584;
-              surfG.beginFill(0x4c3d28, 0.16);
-              surfG.drawRect(-40, edgeY + 2, VW + 80, 600 - edgeY);
-              surfG.endFill();
+              // the shallow wash sheet, in the sea's colour, connecting the foam down to the waterline
+              const seaC = hexI(
+                  lpH('#0b2433', BI.water.top, 0.3 + 0.7 * tod(nowHour()).light)
+                ),
+                reach = 600 - (edgeY + 2);
+              for (let b = 0; b < 7; b++) {
+                surfG.beginFill(seaC, 0.16 + 0.74 * ((b + 1) / 7));
+                surfG.drawRect(
+                  -40,
+                  edgeY + 2 + (b / 7) * reach,
+                  VW + 80,
+                  reach / 7 + 1
+                );
+                surfG.endFill();
+              }
               surfG.beginFill(0xffffff, 0.5);
               surfG.moveTo(-40, edgeY + 7);
               for (let x = -40; x <= VW + 40; x += 14)
@@ -6657,10 +6669,25 @@
             wob = (x) =>
               Math.sin(x * 0.05 + t * 2.4) * 2.3 +
               Math.sin(x * 0.13 - t * 1.7) * 1.3;
-          // the thin sheet of water / wet sheen the wave leaves on the sand, down to the waterline
-          surfG.beginFill(0x4c3d28, 0.2 * (0.4 + 0.6 * swash));
-          surfG.drawRect(-40, edgeY + 2, VW + 80, 600 - edgeY);
-          surfG.endFill();
+          // the thin sheet of seawater the wave slides up the sand: drawn in the sea's own colour so
+          // the wash reads as the sea reaching up the beach, not a stripe stranded on dry sand. It's
+          // near-opaque down at the waterline — matching the sea, so there's no seam where they meet —
+          // and thins to clear sand at the leading foam edge.
+          const seaC = hexI(lpH('#0b2433', BI.water.top, 0.3 + 0.7 * P.light)),
+            reach = 600 - (edgeY + 2),
+            BANDS = 7;
+          for (let b = 0; b < BANDS; b++) {
+            const f0 = b / BANDS, // 0 at the foam edge .. 1 down at the waterline
+              f1 = (b + 1) / BANDS;
+            surfG.beginFill(seaC, (0.16 + 0.74 * f1) * (0.7 + 0.3 * swash));
+            surfG.drawRect(
+              -40,
+              edgeY + 2 + f0 * reach,
+              VW + 80,
+              reach / BANDS + 1
+            );
+            surfG.endFill();
+          }
           // the lacy band of foam riding the leading edge (wavy top, flat back)
           surfG.beginFill(0xffffff, 0.5);
           surfG.moveTo(-40, edgeY + 7);
