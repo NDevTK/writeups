@@ -1264,6 +1264,8 @@
         'clover',
         'dandelion',
         'dandelion_clock',
+        'dandelion_clock2',
+        'dandelion_bare',
         'swallow_a',
         'swallow_b',
         'cloud',
@@ -3236,6 +3238,8 @@
                 if (Math.random() < 0.5) ck.scale.x *= -1;
                 ck.hy = groundY(x) + 8 - 42 * sc; // the seed-head's height, where parachutes lift off
                 ck.seedT = 1 + Math.random() * 3; // a beat before it can shed again
+                ck.fluff = 0.7 + Math.random() * 0.3; // varying down left, so they don't all go bald together
+                ck.stage = 0; // 0 full → 1 part-shed → 2 spent stalk, swapped as the seeds blow away
                 scene.addChild(ck);
                 swayers.push({
                   s: ck,
@@ -8748,14 +8752,20 @@
             rippleG.drawEllipse(rp.x, rp.y, rp.r, rp.r * 0.34);
           }
         }
-        // dandelion clocks: a stiff gust lifts a few parachute seeds off the seed-head to drift away
+        // dandelion clocks: a stiff gust lifts a few parachute seeds off the seed-head to drift away,
+        // and the head visibly thins as it goes — full → part-shed → a bare stalk once the down is gone
         if (clocks.length) {
           const gust = Math.abs(wind);
           for (const ck of clocks) {
-            if (ck.visible === false) continue;
+            if (ck.visible === false || ck.stage >= 2) continue; // a spent stalk has nothing left to give
             ck.seedT -= dt / 60;
             if (ck.seedT <= 0 && gust > 0.85) {
-              for (let k = 0, n = 1 + ((Math.random() * 2) | 0); k < n; k++)
+              // a fuller head lets go of more at once
+              for (
+                let k = 0, n = 1 + (Math.random() < ck.fluff ? 1 : 0);
+                k < n;
+                k++
+              )
                 bursts.push({
                   x: ck.x + (Math.random() - 0.5) * 9,
                   y: ck.hy + (Math.random() - 0.5) * 9,
@@ -8766,6 +8776,16 @@
                   life: 3 + Math.random() * 2.5,
                   seed: true
                 });
+              ck.fluff -= 0.07 + Math.random() * 0.05; // that much less down left on the head
+              const want = ck.fluff > 0.5 ? 0 : ck.fluff > 0.18 ? 1 : 2;
+              if (want !== ck.stage) {
+                ck.stage = want;
+                ck.texture = T(
+                  ['dandelion_clock', 'dandelion_clock2', 'dandelion_bare'][
+                    want
+                  ]
+                );
+              }
               ck.seedT = 1.5 + Math.random() * 3; // a beat before it sheds again
             }
           }

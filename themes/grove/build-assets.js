@@ -3396,6 +3396,54 @@ save(
   })(),
   40
 );
+// the same clock part-shed by the wind: thinner, with a bare gap where a gust stripped one side,
+// and a little more of the seed-bearing receptacle showing through
+save(
+  'dandelion_clock2',
+  (() => {
+    const f = dandyFloss(24, 2.5, 13).filter((s) => !(s.a > 3.5 && s.a < 4.9));
+    return S(
+      '40 60',
+      `<path d="M20,58 L20,20" stroke="#9aa06a" stroke-width="2.4"/>
+<circle cx="20" cy="18" r="13" fill="#ffffff" opacity="0.06"/>
+<g stroke="#dde6ea" stroke-width="0.7" opacity="0.78" stroke-linecap="round">${f
+        .map(
+          (s) => `<line x1="${s.x0}" y1="${s.y0}" x2="${s.x1}" y2="${s.y1}"/>`
+        )
+        .join('')}</g>
+<g fill="#f4f9fb" opacity="0.62">${f
+        .map((s) => `<circle cx="${s.x1}" cy="${s.y1}" r="1.2"/>`)
+        .join('')}</g>
+<ellipse cx="20" cy="18.3" rx="3.4" ry="2.4" fill="#cdb88a"/>
+<circle cx="20" cy="18" r="1.6" fill="#b0935e"/>`
+    );
+  })(),
+  40
+);
+// the spent stalk — its seeds all gone to the wind, just the bare domed receptacle and a few last
+// parachutes still clinging on
+save(
+  'dandelion_bare',
+  (() => {
+    const f = dandyFloss(7, 2.5, 11).filter((s) => s.a < 1.6 || s.a > 4.2);
+    return S(
+      '40 60',
+      `<path d="M20,58 L20,21" stroke="#9aa06a" stroke-width="2.4"/>
+<g stroke="#dde6ea" stroke-width="0.7" opacity="0.7" stroke-linecap="round">${f
+        .map(
+          (s) => `<line x1="${s.x0}" y1="${s.y0}" x2="${s.x1}" y2="${s.y1}"/>`
+        )
+        .join('')}</g>
+<g fill="#f4f9fb" opacity="0.6">${f
+        .map((s) => `<circle cx="${s.x1}" cy="${s.y1}" r="1.1"/>`)
+        .join('')}</g>
+<ellipse cx="20" cy="19" rx="4.6" ry="3.1" fill="#cdb88a"/>
+<ellipse cx="20" cy="18.4" rx="3.6" ry="2.2" fill="#d8c69a"/>
+<g fill="#a98a52" opacity="0.7"><circle cx="18" cy="18.6" r="0.7"/><circle cx="20.5" cy="17.8" r="0.7"/><circle cx="22" cy="19" r="0.7"/><circle cx="19" cy="20" r="0.7"/></g>`
+    );
+  })(),
+  40
+);
 
 // ======== desert flora ========
 // an ocotillo — tall spindly canes fanning from the base, tipped with flame-red flowers
@@ -3732,7 +3780,12 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['bullfinch', 'robin', 'bluebird', 'wren'];
+const review = [
+  'dandelion_clock',
+  'dandelion_clock2',
+  'dandelion_bare',
+  'dandelion'
+];
 const cols = 4,
   cell = 230,
   pad = 14,
