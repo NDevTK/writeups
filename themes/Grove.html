@@ -7289,6 +7289,9 @@
                   d.swishCD = 2 + Math.random() * 3;
                 }
               }
+              // a grazing deer drifts slowly forward into fresh grass — cropping on the move
+              // rather than staying rooted to one spot
+              if (d.mode === 'graze') d.x += d.dir * 0.13 * dt;
               if (d.dir > 0 && d.x > VW + 60) d.x = -60;
               else if (d.dir < 0 && d.x < -60) d.x = VW + 60;
               const trot = d.mode === 'walk' && d.trot > 0;
