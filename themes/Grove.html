@@ -1217,6 +1217,9 @@
         'squirrel_eat',
         'squirrel_g_eat',
         'squirrel_k_eat',
+        'squirrel_climb',
+        'squirrel_g_climb',
+        'squirrel_k_climb',
         'acorn',
         'rabbit_g',
         'rabbit_k',
@@ -4248,6 +4251,7 @@
           squirrel.eatTex = sqCoat + '_eat'; // sat up turning a nut in its paws, nibbling
           squirrel.eatT = 0; // >0 while a feed is held
           squirrel.eatCD = 3 + Math.random() * 5; // until the next one
+          squirrel.climbTex = sqCoat + '_climb'; // stretched vertical, clinging head-up to bark
           scene.addChild(squirrel);
           // the acorn it buries — kept hidden until it caches one
           squirrel.acorn = spr('acorn', sx, groundY(sx) + 5, 0.6);
@@ -8234,10 +8238,15 @@
             if (squirrel.tree && Math.abs(squirrel.x - tx) <= 5) {
               // scrabble up the trunk and slip out of sight into the drey
               squirrel.x = tx;
+              if (
+                squirrel.climbTex &&
+                squirrel.texture !== T(squirrel.climbTex)
+              )
+                squirrel.texture = T(squirrel.climbTex); // clinging pose, head-up
               squirrel.climbY = squirrel.climbY ?? groundY(tx) + 6;
               squirrel.climbY -= 2.8 * dt;
               squirrel.y = squirrel.climbY - Math.abs(Math.sin(t * 27)) * 3; // little scrabbles up
-              squirrel.rotation = squirrel.dir * 0.16 * Math.sin(t * 27); // wriggling up the bark
+              squirrel.rotation = squirrel.dir * 0.08 * Math.sin(t * 27); // wriggling up the bark
               const climbed = groundY(tx) + 6 - squirrel.climbY;
               squirrel.alpha = Math.max(0, 1 - climbed / 120); // up the bark and gone
               if (squirrel.alpha <= 0) {
@@ -8289,10 +8298,37 @@
               squirrel.flickT = 0;
               squirrel.eatT = 0;
               squirrel.texture = T(squirrel.coatTex); // settle the tail before it scampers off
-              squirrel.mode = 'run';
-              squirrel.tx = 110 + Math.random() * (VW - 220); // a fresh foraging spot
-              squirrel.dir = squirrel.tx > squirrel.x ? 1 : -1;
-              squirrel.scale.x = squirrel.dir * squirrel.baseSc;
+              // now and then it dashes up a nearby trunk, clings a moment to look about, then comes
+              // back down — squirrels are climbers, not just floor foragers
+              let climbing = false;
+              if (squirrel.climbTex && night < 0.3 && Math.random() < 0.28) {
+                const trees = trunks.length ? trunks : perches;
+                let best = null,
+                  bd = 1e9;
+                for (const tr of trees) {
+                  const d = Math.abs(tr.x - squirrel.x);
+                  if (d < bd) {
+                    bd = d;
+                    best = tr;
+                  }
+                }
+                if (best && bd < 380) {
+                  climbing = true;
+                  squirrel.mode = 'tree';
+                  squirrel.climbPhase = 'approach';
+                  squirrel.climbX = best.x;
+                  const G = groundY(best.x) + 6;
+                  squirrel.climbTop = Math.min(best.y, G - 44); // up the visible bark
+                  squirrel.dir = best.x > squirrel.x ? 1 : -1;
+                  squirrel.scale.x = squirrel.dir * squirrel.baseSc;
+                }
+              }
+              if (!climbing) {
+                squirrel.mode = 'run';
+                squirrel.tx = 110 + Math.random() * (VW - 220); // a fresh foraging spot
+                squirrel.dir = squirrel.tx > squirrel.x ? 1 : -1;
+                squirrel.scale.x = squirrel.dir * squirrel.baseSc;
+              }
             }
           } else if (squirrel.mode === 'cache') {
             // bury the nut: scrabble a hollow and drop the acorn in, then pat the soil down over it
@@ -8320,6 +8356,52 @@
                 squirrel.acorn.alpha = 0;
                 squirrel.texture = T(squirrel.coatTex); // sit back up
                 squirrel.rotation = 0;
+                squirrel.mode = 'sit';
+                squirrel.tmr = 1.5 + Math.random() * 3;
+              }
+            }
+          } else if (squirrel.mode === 'tree') {
+            // a climb excursion: dash to the foot of a trunk, scrabble up the bark, cling a
+            // moment to look about, then come back down and forage on
+            const tx = squirrel.climbX,
+              G = groundY(tx) + 6;
+            if (squirrel.climbPhase === 'approach') {
+              squirrel.x +=
+                Math.sign(tx - squirrel.x) *
+                Math.min(Math.abs(tx - squirrel.x), 4 * dt);
+              squirrel.dir = tx > squirrel.x ? 1 : -1;
+              squirrel.scale.x = squirrel.dir * squirrel.baseSc;
+              squirrel.y = G - Math.abs(Math.sin(t * 18)) * 7; // scurrying hops
+              squirrel.rotation = 0;
+              if (Math.abs(squirrel.x - tx) <= 4) {
+                squirrel.x = tx;
+                squirrel.climbY = G;
+                squirrel.climbPhase = 'up';
+                squirrel.texture = T(squirrel.climbTex); // clinging pose, head-up
+              }
+            } else if (squirrel.climbPhase === 'up') {
+              squirrel.x = tx;
+              squirrel.climbY -= 2.4 * dt;
+              squirrel.y = squirrel.climbY - Math.abs(Math.sin(t * 26)) * 2.2; // little scrabbles
+              squirrel.rotation = squirrel.dir * 0.05 * Math.sin(t * 26);
+              if (squirrel.climbY <= squirrel.climbTop) {
+                squirrel.climbPhase = 'cling';
+                squirrel.tmr = 1.4 + Math.random() * 2.4;
+              }
+            } else if (squirrel.climbPhase === 'cling') {
+              squirrel.x = tx;
+              squirrel.y = squirrel.climbTop + Math.sin(t * 4) * 0.5; // clinging, looking about
+              squirrel.rotation = squirrel.dir * 0.06 * Math.sin(t * 5);
+              if (squirrel.tmr < 0) squirrel.climbPhase = 'down';
+            } else {
+              squirrel.x = tx;
+              squirrel.climbY += 3 * dt;
+              squirrel.y = squirrel.climbY - Math.abs(Math.sin(t * 24)) * 2; // backing down
+              squirrel.rotation = squirrel.dir * 0.05 * Math.sin(t * 24);
+              if (squirrel.climbY >= G) {
+                squirrel.y = G;
+                squirrel.rotation = 0;
+                squirrel.texture = T(squirrel.coatTex); // back on its feet
                 squirrel.mode = 'sit';
                 squirrel.tmr = 1.5 + Math.random() * 3;
               }

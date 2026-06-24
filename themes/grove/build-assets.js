@@ -2803,6 +2803,40 @@ save(
   62
 );
 
+// ======== a squirrel clinging head-up to a tree trunk, climbing (faces right) ========
+// body stretched vertical, head tipped up, the bushy brush sweeping up behind it — the
+// iconic climbing silhouette. drawn to cling at the right edge, so it sits against a trunk
+const squirrelClimbSvg = (g0, g1, ear, belly, inner) =>
+  S(
+    '70 66',
+    `<defs><linearGradient id="sq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0}"/><stop offset="1" stop-color="${g1}"/></linearGradient></defs>
+<path d="M34,60 C16,57 9,38 14,20 C18,7 31,6 35,16 C26,17 19,28 22,42 C24,52 31,56 38,55 C37,58 36,60 34,60 Z" fill="url(#sq)"/>
+<path d="M19,32 C16,23 20,15 27,13 C22,20 22,30 26,37 Z" fill="${inner}" opacity="0.55"/>
+<path d="M35,58 C30,46 31,28 39,18 C44,11 53,13 54,24 C55,35 50,48 45,57 C42,60 38,60 35,58 Z" fill="url(#sq)"/>
+<path d="M39,55 C36,44 38,31 44,24 C44,34 44,46 46,55 C43,57 41,57 39,55 Z" fill="${belly}" opacity="0.8"/>
+<circle cx="47" cy="15" r="10" fill="url(#sq)"/>
+<path d="M41,7 C39,2 42,0 45,2 C45,5 44,9 43,10 Z" fill="${ear}"/>
+<path d="M53,7 C55,2 52,0 49,2 C49,5 50,9 51,10 Z" fill="${ear}"/>
+<path d="M44,40 C47,38 51,39 52,43 C49,44 45,43 44,40 Z" fill="${belly}" opacity="0.7"/>
+<circle cx="50" cy="13" r="2" fill="#140e09"/><circle cx="50.6" cy="12.4" r="0.6" fill="#fff"/>
+<circle cx="49" cy="6" r="1.6" fill="#3a241a"/>`
+  );
+save(
+  'squirrel_climb',
+  squirrelClimbSvg('#bc6e3c', '#8a4e28', '#8a4e28', '#e8c89c', '#d49058'),
+  62
+);
+save(
+  'squirrel_g_climb',
+  squirrelClimbSvg('#9aa0a8', '#6a7078', '#6a7078', '#eef1f3', '#b6bcc2'),
+  62
+);
+save(
+  'squirrel_k_climb',
+  squirrelClimbSvg('#4c4c50', '#2a2a2e', '#26262a', '#7a7a7e', '#5e5e62'),
+  62
+);
+
 // ======== an acorn — the nut the squirrel buries ========
 save(
   'acorn',
