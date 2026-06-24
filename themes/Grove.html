@@ -1971,7 +1971,6 @@
         shootG,
         auroraG,
         rippleG,
-        wadeG,
         burstG,
         frogTongueG,
         iceG,
@@ -5209,11 +5208,7 @@
         }
         // the wading heron is built with the herd, before the pond is carved — lift it in front of the
         // water now so it stands IN the shallows rather than being hidden behind the pool
-        if (deer && deer.isHeron) {
-          scene.addChild(deer);
-          wadeG = new PIXI.Graphics();
-          scene.addChild(wadeG); // a film of water over its submerged legs, drawn over the bird
-        } else wadeG = null;
+        if (deer && deer.isHeron) scene.addChild(deer);
         // steep rock walls plunging to the water (the fjord's framing) — in front of the water
         if (BI.cliffs)
           for (const c of BI.cliffs) {
@@ -6971,23 +6966,42 @@
             }
           }
           deer.scale.x = deer.dir * deer.baseSc;
-          // tint just the submerged length of the legs toward the water's own colour, so the feet
-          // sink into the shallows rather than sitting crisp on top (no ring — only over the legs)
-          if (wadeG) {
-            wadeG.clear();
-            if (water && pondShape) {
-              const surfY = deer.y - 22, // the waterline, a way up the legs
-                filmC = hexI(
-                  lpH('#16332b', BI.water.top, 0.35 + 0.55 * P.light)
-                );
-              wadeG.beginFill(filmC, 0.6);
-              wadeG.drawRect(deer.x - 9, surfY, 18, deer.y + 5 - surfY);
-              wadeG.endFill();
-              // a short bright glint right where the legs cut the surface
-              wadeG.beginFill(hexI(lpH('#16332b', BI.water.top, 0.9)), 0.45);
-              wadeG.drawRect(deer.x - 9, surfY - 0.8, 18, 1.6);
-              wadeG.endFill();
+          // submerge the legs: clip the crisp bird to ABOVE the waterline, and composite a murky,
+          // water-tinted copy of it BELOW the line — the same two-clip trick the dabbling ducks use,
+          // so the legs read as half-seen through the water rather than crisp on top of it
+          if (water && pondShape) {
+            const wl = hY - 18; // the surface, a way up the legs (a fixed line; the bird bobs through it)
+            if (!deer.under) {
+              deer.wmask = new PIXI.Graphics()
+                .beginFill(0xffffff)
+                .drawRect(-VW, wl - 1600, VW * 3, 1600)
+                .endFill(); // above the waterline
+              deer.umask = new PIXI.Graphics()
+                .beginFill(0xffffff)
+                .drawRect(-VW, wl, VW * 3, 1600)
+                .endFill(); // below it
+              deer.under = new PIXI.Sprite(deer.texture);
+              deer.under.anchor.copyFrom(deer.anchor);
+              deer.under.tint = hexI(
+                lpH('#243f36', BI.water.top, 0.45 + 0.45 * P.light)
+              ); // sunk toward the pond colour, as the fish are
+              deer.under.mask = deer.umask;
+              scene.addChild(deer.wmask);
+              scene.addChild(deer.umask);
+              scene.addChildAt(deer.under, scene.getChildIndex(deer)); // just behind the bright half
             }
+            deer.mask = deer.wmask;
+            deer.wmask.visible = true;
+            deer.under.visible = true;
+            deer.under.texture = deer.texture; // follow the pose (standing / preen)
+            deer.under.position.set(deer.x, deer.y);
+            deer.under.rotation = deer.rotation;
+            deer.under.scale.set(deer.scale.x, deer.scale.y);
+            deer.under.alpha = 0.68; // half-seen through the water
+          } else if (deer.under) {
+            deer.mask = null;
+            deer.wmask.visible = false;
+            deer.under.visible = false;
           }
         } else {
           // the herd: each grazer keeps its own walk/graze state, so they don't move in lockstep
