@@ -4491,6 +4491,8 @@
             s.baseY = 594;
             s.spd = 1.4 + Math.random() * 0.9; // quick little runners
             s.ph = Math.random() * 6.28;
+            s.foamOff = 7 + Math.random() * 26; // how far seaward of the foam it keeps — so the party
+            s.chase = 0.1 + Math.random() * 0.07; // spreads over the wet sand and doesn't move as one
             s.pauseT = Math.random() * 1.5;
             s.peck = 0;
             sandpipers.push(s);
@@ -6866,10 +6868,10 @@
             swash = (0.3 + 0.7 * pulse) * set * (1 + Math.abs(wind) * 0.2),
             edge = 598 - swash * 34; // the leading foam edge, same as the shore break
           for (const s of sandpipers) {
-            const targetY = Math.min(600, edge + 9); // stay just seaward of the foam
-            // flee an incoming wave fast (target rises above it), follow it back down at a stroll
+            const targetY = Math.min(600, edge + s.foamOff); // each keeps its own distance from the foam
+            // flee an incoming wave fast (target rises above it), follow it back down at its own stroll
             s.baseY +=
-              (targetY - s.baseY) * (targetY < s.baseY ? 0.3 : 0.12) * dt;
+              (targetY - s.baseY) * (targetY < s.baseY ? 0.32 : s.chase) * dt;
             let bob = 0;
             if (s.pauseT > 0) {
               s.pauseT -= dt / 60; // paused to forage
@@ -8056,7 +8058,7 @@
             }
           } else if (whale.state === 'sound') {
             const k = Math.max(0, whale.tmr) / 1.5; // 1 -> 0 over the dive
-            whale.alpha = k; // the back slides under
+            whale.alpha = Math.max(0, (k - 0.45) / 0.55); // the back arches under early, before the flukes peak
             whale.y = whale.baseY - 12 * k;
             const fk = Math.sin((1 - k) * Math.PI); // flukes rise then slip under
             whale.fluke.x = whale.x - whale.dir * 30; // at the tail (behind its travel)
