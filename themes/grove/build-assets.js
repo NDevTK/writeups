@@ -639,6 +639,32 @@ const peacock = (fx) =>
   );
 save('peacock_a', peacock(14), 80);
 save('peacock_b', peacock(8), 80);
+// a common blue — vivid violet-blue upperwings with a thin dark rim and a bright sheen (a small one)
+const commonBlue = (fx) =>
+  S(
+    '80 70',
+    `<g fill="#2b3e74"><ellipse cx="${40 - fx}" cy="26" rx="${fx > 10 ? 14 : 9}" ry="12"/><ellipse cx="${40 + fx}" cy="26" rx="${fx > 10 ? 14 : 9}" ry="12"/><ellipse cx="${40 - fx + 3}" cy="47" rx="${fx > 10 ? 10.5 : 7}" ry="9.5"/><ellipse cx="${40 + fx - 3}" cy="47" rx="${fx > 10 ? 10.5 : 7}" ry="9.5"/></g>
+<g fill="#6f8fe8"><ellipse cx="${40 - fx}" cy="26" rx="${fx > 10 ? 12 : 7.5}" ry="10.2"/><ellipse cx="${40 + fx}" cy="26" rx="${fx > 10 ? 12 : 7.5}" ry="10.2"/><ellipse cx="${40 - fx + 3}" cy="47" rx="${fx > 10 ? 8.8 : 5.8}" ry="8.2"/><ellipse cx="${40 + fx - 3}" cy="47" rx="${fx > 10 ? 8.8 : 5.8}" ry="8.2"/></g>
+<g fill="#a6bbf4" opacity="0.6"><ellipse cx="${40 - fx}" cy="24" rx="${fx > 10 ? 6 : 4}" ry="5"/><ellipse cx="${40 + fx}" cy="24" rx="${fx > 10 ? 6 : 4}" ry="5"/></g>
+<g fill="#fff" opacity="0.8"><circle cx="${40 - fx - (fx > 10 ? 12 : 8)}" cy="27" r="1"/><circle cx="${40 + fx + (fx > 10 ? 12 : 8)}" cy="27" r="1"/></g>
+<ellipse cx="40" cy="35" rx="2.6" ry="13" fill="#2a2a30"/><circle cx="40" cy="22" r="2.3" fill="#2a2a30"/>
+<g stroke="#2a2a30" stroke-width="1.1" fill="none" stroke-linecap="round"><path d="M40,20 C37,14 35,11 33,9"/><path d="M40,20 C43,14 45,11 47,9"/></g>`
+  );
+save('blue_a', commonBlue(14), 76);
+save('blue_b', commonBlue(8), 76);
+// a small white (cabbage white) — cream wings with dark forewing tips and a black spot on each
+const smallWhite = (fx) =>
+  S(
+    '80 70',
+    `<g fill="#cfcfc6"><ellipse cx="${40 - fx}" cy="26" rx="${fx > 10 ? 14 : 9}" ry="12"/><ellipse cx="${40 + fx}" cy="26" rx="${fx > 10 ? 14 : 9}" ry="12"/><ellipse cx="${40 - fx + 3}" cy="47" rx="${fx > 10 ? 11 : 7}" ry="9.5"/><ellipse cx="${40 + fx - 3}" cy="47" rx="${fx > 10 ? 11 : 7}" ry="9.5"/></g>
+<g fill="#f6f4ea"><ellipse cx="${40 - fx}" cy="26" rx="${fx > 10 ? 12 : 7.5}" ry="10.2"/><ellipse cx="${40 + fx}" cy="26" rx="${fx > 10 ? 12 : 7.5}" ry="10.2"/><ellipse cx="${40 - fx + 3}" cy="47" rx="${fx > 10 ? 9.2 : 6}" ry="8.2"/><ellipse cx="${40 + fx - 3}" cy="47" rx="${fx > 10 ? 9.2 : 6}" ry="8.2"/></g>
+<g fill="#43413c"><ellipse cx="${40 - fx - (fx > 10 ? 7 : 4)}" cy="19" rx="${fx > 10 ? 5 : 3.4}" ry="4.4"/><ellipse cx="${40 + fx + (fx > 10 ? 7 : 4)}" cy="19" rx="${fx > 10 ? 5 : 3.4}" ry="4.4"/></g>
+<g fill="#3a3a36"><circle cx="${40 - fx}" cy="28" r="1.7"/><circle cx="${40 + fx}" cy="28" r="1.7"/></g>
+<ellipse cx="40" cy="35" rx="2.6" ry="13" fill="#42423c"/><circle cx="40" cy="22" r="2.3" fill="#42423c"/>
+<g stroke="#42423c" stroke-width="1.1" fill="none" stroke-linecap="round"><path d="M40,20 C37,14 35,11 33,9"/><path d="M40,20 C43,14 45,11 47,9"/></g>`
+  );
+save('white_a', smallWhite(14), 76);
+save('white_b', smallWhite(8), 76);
 // a bumblebee — fuzzy amber-and-black body, pale tail, blurred wings (2 wingbeat frames)
 const bee = (wy) =>
   S(
@@ -3907,7 +3933,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['duck_flap', 'duck_f_flap', 'wood_duck_flap', 'duck'];
+const review = ['blue_a', 'white_a', 'admiral_a', 'monarch_a'];
 const cols = 4,
   cell = 230,
   pad = 14,

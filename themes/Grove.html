@@ -1292,6 +1292,10 @@
         'bird_b',
         'butterfly_a',
         'butterfly_b',
+        'blue_a',
+        'blue_b',
+        'white_a',
+        'white_b',
         'bee_a',
         'bee_b',
         'rabbit',
@@ -5228,9 +5232,10 @@
         }
         if (BI.flutter && !snow)
           for (let i = 0, n = 2 + ((Math.random() * 5) | 0); i < n; i++) {
-            // after dusk the butterflies give way to drab moths; by day a mix of species so
-            // they're not all the same wing — the biome's signature colour (flutterTint) dominates,
-            // but patterned monarchs and swallowtails flit through in their own colours
+            // after dusk the butterflies give way to drab moths; by day a broad mix of species so
+            // they're not all the same wing — monarchs, swallowtails, admirals, peacocks, cabbage
+            // whites and little blues flit through in their own colours, with the biome's signature
+            // colour (flutterTint) on the rest
             const r = Math.random();
             let frames = ['butterfly_a', 'butterfly_b'],
               fsc = 0.5,
@@ -5251,9 +5256,17 @@
               frames = ['admiral_a', 'admiral_b']; // a red admiral
               fsc = 0.46;
               tinted = false;
-            } else if (r < 0.64) {
+            } else if (r < 0.63) {
               frames = ['peacock_a', 'peacock_b']; // a peacock, eyespots and all
               fsc = 0.46;
+              tinted = false;
+            } else if (r < 0.75) {
+              frames = ['white_a', 'white_b']; // a cabbage white
+              fsc = 0.44;
+              tinted = false;
+            } else if (r < 0.85) {
+              frames = ['blue_a', 'blue_b']; // a little common blue
+              fsc = 0.34;
               tinted = false;
             }
             const f = anim(
