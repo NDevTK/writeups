@@ -4629,6 +4629,8 @@
             // shore break: foam washes up the sand and slides back, drawn each frame in the ticker
             surfG = new PIXI.Graphics();
             scene.addChild(surfG);
+            // lift the shorebirds above the wash so they run in the shallows, not drowned beneath them
+            for (const s of sandpipers) scene.addChild(s);
             if (reduce.matches) {
               // a static lapping line when the swash ticker won't run
               const edgeY = 584;
@@ -4965,8 +4967,8 @@
             scene.addChild(kingfisher);
           } else kingfisher = null;
           if (BI.water.sailboat) {
-            const sb = spr('sailboat', 740, 606, 0.5);
-            sb.baseY = 606;
+            const sb = spr('sailboat', 740, 648, 0.5); // out on the bay, not parked at the shoreline
+            sb.baseY = 648;
             sb.vx = 0.22;
             ducks.push(sb);
             scene.addChild(sb);
@@ -6250,9 +6252,13 @@
             ? Math.max(0, cover * (1 - cover) * (1 - cover) * 6.75)
             : 0;
           if (rays > 0.03) {
+            // fan the shafts around the sun's line into the scene, so they slant down-and-away from
+            // an off-centre sun (down-right in the morning, down-left in the afternoon) rather than
+            // always dropping straight down — the same aim the dawn/dusk beams use
+            const baseAng = Math.atan2(VH * 0.9 - cel.y, VW * 0.5 - cel.x);
             for (let i = 0; i < 7; i++) {
               const ang =
-                Math.PI * 0.5 + (i - 3) * 0.13 + Math.sin(t * 0.25 + i) * 0.012;
+                baseAng + (i - 3) * 0.13 + Math.sin(t * 0.25 + i) * 0.012;
               const len = 600,
                 w = 15 + 6 * Math.sin(t * 0.6 + i * 2),
                 ex = cel.x + Math.cos(ang) * len,
