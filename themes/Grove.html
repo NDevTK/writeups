@@ -4122,6 +4122,8 @@
             fawn.isFawn = true;
             fawn.mum = mum;
             fawn.dir = mum.dir;
+            fawn.gambolT = 0; // >0 mid-pronk (a playful springy leap)
+            fawn.gambolCD = 2 + Math.random() * 5; // until the next one
             fawn.scale.x = fawn.dir * Math.abs(fawn.scale.x);
             scene.addChild(fawn);
             walkers.push(fawn);
@@ -6939,10 +6941,36 @@
                 d.scale.x = d.dir * Math.abs(d.scale.x);
                 if (!d.playing) d.play();
                 d.y = groundY(d.x) + 8 + Math.abs(Math.sin(t * 5 + d.x)) * -1.6;
+                d.rotation = 0;
+              } else if (d.gambolT > 0) {
+                // a pronk: springs up off all fours with a little buck, then lands and settles
+                d.gambolT -= dt / 60;
+                const p = 1 - Math.max(0, d.gambolT) / d.gambolDur; // 0..1 through the leap
+                if (!d.playing) d.play(); // legs tuck and kick out
+                d.y =
+                  groundY(d.x) +
+                  8 -
+                  Math.sin(Math.min(1, p) * Math.PI) * 36 * Math.abs(d.scale.y); // springs proportional to its size
+                d.rotation = d.dir * Math.sin(p * Math.PI * 2) * 0.2; // nose up, then a hind kick
+                if (d.gambolT <= 0) {
+                  d.rotation = 0;
+                  d.gotoAndStop(0);
+                  d.gambolCD = 4 + Math.random() * 7;
+                }
               } else {
                 if (d.playing) d.gotoAndStop(0);
                 d.scale.x = d.mum.dir * Math.abs(d.scale.x); // face the way mum faces
                 d.y = groundY(d.x) + 8;
+                d.rotation = 0;
+                // settled by mum and full of beans — every so often it can't help a playful spring
+                if (
+                  !raining &&
+                  (d.gambolCD -= dt / 60) <= 0 &&
+                  d.mum.mode !== 'walk'
+                ) {
+                  d.gambolDur = 0.62 + Math.random() * 0.22;
+                  d.gambolT = d.gambolDur;
+                }
               }
               dropTrack(d, 'deer', 24);
               continue;
