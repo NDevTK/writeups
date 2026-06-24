@@ -4286,19 +4286,19 @@
             }
           }
         }
-        if (BI.molehill && !snow && Math.random() < 0.7) {
-          // a mole works a line of fresh molehills across the meadow, heaving them up one at a
-          // time (in the ticker). Lay the hidden mounds out along its tunnel now.
+        if (BI.molehill && !snow && Math.random() < 0.3) {
+          // once in a while a mole pushes up a fresh molehill or two — heaved up one at a time
+          // (in the ticker), kept rare and small so it reads as a quiet surprise, not clutter.
           let mx = 150 + Math.random() * (VW - 300);
           const mdir0 = Math.random() < 0.5 ? 1 : -1;
           let mdir = mdir0;
-          for (let i = 0, n = 3 + ((Math.random() * 3) | 0); i < n; i++) {
+          for (let i = 0, n = 1 + ((Math.random() * 2) | 0); i < n; i++) {
             const cx = Math.max(70, Math.min(VW - 70, mx));
             const m = spr(
               'molehill',
               cx,
               groundY(cx) + 4,
-              0.5 + Math.random() * 0.3
+              0.4 + Math.random() * 0.18
             );
             m.baseSc = Math.abs(m.scale.x);
             m.sgn = Math.random() < 0.5 ? -1 : 1;
