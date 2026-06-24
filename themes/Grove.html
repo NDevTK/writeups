@@ -424,6 +424,9 @@
           kingfisher: true, // a kingfisher plunge-dives the pond for fish by day
           hedgehog: true, // a hedgehog snuffles the floor at night
           snail: true, // a snail glides out onto the wet grass after rain
+          toadstools: true, // fly-agaric sprout under the trees after rain
+          dewWeb: true, // a spider's web beads with dew at first light
+          molehill: true, // a mole pushes up fresh molehills across the meadow
           ladybird: true, // a ladybird trundles the meadow floor by day
           mouse: true, // a field mouse scurries the meadow grass by day
           grasshopper: true, // a grasshopper springs through the warm meadow grass
@@ -583,6 +586,8 @@
           owl: true, // an owl quarters the marsh after dark
           kingfisher: true, // a kingfisher plunge-dives the marsh pools for fish by day
           snail: true, // a pond snail glides the wet bank after rain
+          toadstools: true, // toadstools come up on the damp marsh banks after rain
+          dewWeb: true, // a web beads with dew over the reeds at first light
           flyer: 0x6a7b8a,
           flutter: false,
           bats: 4, // bats work the pond at dusk (most insects over the water)
@@ -922,6 +927,9 @@
           owl: true, // an owl crosses the orchard after dark
           hedgehog: true, // a hedgehog snuffles the orchard floor at night
           snail: true, // a snail glides out across the wet orchard floor after rain
+          toadstools: true, // toadstools come up on the orchard floor after rain
+          dewWeb: true, // a web beads with dew in the orchard boughs at first light
+          molehill: true, // a mole pushes up molehills across the orchard floor
           ladybird: true, // a ladybird trundles the orchard floor by day
           mouse: true, // a field mouse scurries the orchard grass by day
           flyer: 0xffffff,
@@ -1112,6 +1120,8 @@
         'poppy',
         'toadstool',
         'shroom',
+        'web',
+        'molehill',
         'log',
         'stump',
         'duck_f',
@@ -1135,6 +1145,12 @@
         'bluetit',
         'goldcrest',
         'wren',
+        'robin_roost',
+        'bluebird_roost',
+        'finch_roost',
+        'bluetit_roost',
+        'goldcrest_roost',
+        'wren_roost',
         'arctic_fox',
         'lizard_b',
         'beetle',
@@ -1164,6 +1180,7 @@
         'moth_a',
         'moth_b',
         'hedgehog',
+        'hedgehog_curl',
         'fennec',
         'scorpion',
         'ocotillo',
@@ -1190,14 +1207,22 @@
         'squirrel_dig',
         'squirrel_g_dig',
         'squirrel_k_dig',
+        'squirrel_flick',
+        'squirrel_g_flick',
+        'squirrel_k_flick',
         'acorn',
         'rabbit_g',
         'rabbit_k',
+        'rabbit_ears',
+        'rabbit_g_ears',
+        'rabbit_k_ears',
         'fox_s',
         'deer_d_a',
         'deer_d_b',
         'deer_drink',
         'deer_d_drink',
+        'deer_swish',
+        'deer_d_swish',
         'goat_kid_a',
         'goat_kid_b',
         'camel_calf_a',
@@ -1242,6 +1267,9 @@
         'moon',
         'glow',
         'duck',
+        'duck_sleep',
+        'duck_f_sleep',
+        'wood_duck_sleep',
         'duckling',
         'fish_a',
         'fish_b',
@@ -1253,6 +1281,8 @@
         'bee_b',
         'rabbit',
         'fox',
+        'fox_pounce',
+        'fox_s_pounce',
         'dragonfly_a',
         'dragonfly_b',
         'dragonfly_r_a',
@@ -1360,15 +1390,54 @@
       // so drifting dust can catch a beam and glow where it crosses one
       const beamLightAt = (x, y) => {
         const F = beamField;
-        if (!F.on || y < F.topY || y > F.botY) return 0;
-        const fr = (y - F.topY) / (F.botY - F.topY); // 0 at the top, 1 at the bottom
+        if (!F.on) return 0;
+        const dx = x - F.sunX,
+          dy = y - F.sunY;
         let best = 0;
-        for (let i = 0; i < F.bx.length; i++) {
-          const cx = F.bx[i] - F.lean * (y - F.topY), // beam centre at this height
-            d = Math.abs(x - cx) / (F.w[i] * (1 + fr * 0.44)); // widens as it falls
-          if (d < 1 && (1 - d) * (1 - fr) > best) best = (1 - d) * (1 - fr);
+        for (let i = 0; i < F.rays.length; i++) {
+          const r = F.rays[i],
+            along = dx * r.dirx + dy * r.diry; // distance from the sun along this ray
+          if (along < 50 || along > F.len) continue;
+          const perp = Math.abs(dx * -r.diry + dy * r.dirx), // distance off the ray's axis
+            halfW = r.w * (0.28 + (along / F.len) * 0.9), // the shaft widens with distance
+            d = perp / halfW;
+          if (d < 1) {
+            const v = (1 - d) * (1 - along / F.len) * (1 - along / F.len); // brightest near the sun, fading out (matches the beam's quadratic falloff)
+            if (v > best) best = v;
+          }
         }
         return best * F.beam;
+      };
+      // a quick spray of little specks kicked up off the ground (grass, dirt, bark): n specks from
+      // (x, gy) flung up and out in the given colours, arcing back down under gravity and fading
+      const emitBurst = (x, gy, n, cols, up, spread) => {
+        for (let i = 0; i < n; i++)
+          bursts.push({
+            x: x + (Math.random() - 0.5) * 8,
+            y: gy - 2 - Math.random() * 5,
+            gy: gy + 2,
+            vx: (Math.random() - 0.5) * spread,
+            vy: -up * (0.5 + Math.random()),
+            sz: 1.8 + Math.random() * 2,
+            c: cols[(Math.random() * cols.length) | 0],
+            life: 0.34 + Math.random() * 0.32
+          });
+      };
+      // a soft puff of breath fogging in cold air, from a muzzle facing dir: drifts out and up,
+      // billowing and thinning as it goes (strength scales with how cold it is)
+      const emitBreath = (x, y, dir, cold) => {
+        for (let i = 0; i < 3; i++)
+          bursts.push({
+            x: x + (Math.random() - 0.5) * 3,
+            y: y + (Math.random() - 0.5) * 2,
+            vx: dir * (0.4 + Math.random() * 0.55),
+            vy: -0.2 - Math.random() * 0.3,
+            sz: 1.7 + Math.random() * 1.4,
+            c: 0xe7eef6,
+            life: 0.9 + Math.random() * 0.5,
+            soft: true,
+            a0: 0.34 + cold * 0.34 // colder air holds the fog longer and thicker
+          });
       };
       const anim = (frames, x, y, s, spd) => {
         const a = new PIXI.AnimatedSprite(frames.map(T));
@@ -1748,6 +1817,9 @@
       }
 
       const swayers = [],
+        flowers = [], // the subset of swayers that are blooms — they nod when an insect alights
+        fungi = [], // toadstools that sprout after rain and shrink back as the ground dries
+        molehills = [], // fresh molehills a mole pushes up across the meadow, one by one
         clouds = [],
         ducks = [],
         fish = [],
@@ -1765,6 +1837,7 @@
         smoke = [],
         embers = [],
         ripples = [],
+        bursts = [], // little kicked-up specks: grass/dirt as a paw or talon strikes, bark chips
         flock = [],
         puddles = [],
         tracks = [],
@@ -1810,11 +1883,10 @@
         beamField = {
           on: false,
           beam: 0,
-          lean: 0,
-          topY: 0,
-          botY: 0,
-          bx: [],
-          w: []
+          sunX: 0,
+          sunY: 0,
+          len: 1,
+          rays: [] // god-rays fanning from the sun: each {dirx, diry, w}
         },
         puddleG,
         snowAccG,
@@ -1833,6 +1905,8 @@
         shootG,
         auroraG,
         rippleG,
+        burstG,
+        frogTongueG,
         iceG,
         tracksG,
         streakTile,
@@ -1843,6 +1917,7 @@
         songbird,
         beetle,
         snail,
+        dewWeb,
         salamander,
         olm,
         hedgehog,
@@ -1878,6 +1953,9 @@
         XS = VW / VWBASE;
         root.removeChildren();
         swayers.length =
+          flowers.length =
+          fungi.length =
+          molehills.length =
           clouds.length =
           ducks.length =
           fish.length =
@@ -1894,6 +1972,7 @@
           smoke.length =
           embers.length =
           ripples.length =
+          bursts.length =
           flock.length =
           puddles.length =
           tracks.length =
@@ -2991,7 +3070,18 @@
               : tintJit(warm || 0xffffff, 0.08);
             if (Math.random() < 0.5) f.scale.x *= -1;
             scene.addChild(f);
-            swayers.push({s: f, amp: 0.05, sp: 1.5, ph: Math.random() * 6});
+            const sw = {
+              s: f,
+              amp: 0.05,
+              sp: 1.5,
+              ph: Math.random() * 6,
+              nod: 0,
+              sx0: f.scale.x, // base scale, so the bloom can open by day and close at dusk
+              sy0: f.scale.y,
+              closes: Math.random() < 0.72 // most blooms close up at night; a few stay open
+            };
+            swayers.push(sw);
+            flowers.push(sw); // a bloom an insect can alight on and nod
           }
         };
         if (BI.ground === 'meadow') {
@@ -3214,7 +3304,18 @@
                 ? ODD[(Math.random() * ODD.length) | 0]
                 : tintJit(0xffffff, 0.06);
               scene.addChild(f);
-              swayers.push({s: f, amp: 0.06, sp: 1.4, ph: Math.random() * 6});
+              const sw = {
+                s: f,
+                amp: 0.06,
+                sp: 1.4,
+                ph: Math.random() * 6,
+                nod: 0,
+                sx0: f.scale.x, // base scale, so the bloom can open by day and close at dusk
+                sy0: f.scale.y,
+                closes: Math.random() < 0.72 // most blooms close up at night; a few stay open
+              };
+              swayers.push(sw);
+              flowers.push(sw); // a bloom an insect can alight on and nod
             }
             // a fern or two tucked low in the grass
             for (let i = 0, n = 1 + ((Math.random() * 2) | 0); i < n; i++) {
@@ -3904,6 +4005,14 @@
                   ? 'deer_d_drink'
                   : 'deer_drink'
                 : null;
+              // the tail-flicked pose for an idle swish (deer only, matching the coat)
+              d.swishTex = isDeerWalker
+                ? darkDeer
+                  ? 'deer_d_swish'
+                  : 'deer_swish'
+                : null;
+              d.swishT = 0; // >0 while a swish is held
+              d.swishCD = 1.5 + Math.random() * 3.5; // until the next one
             }
             scene.addChild(d);
             walkers.push(d);
@@ -3943,6 +4052,9 @@
             : BI.critter; // pick the species for this visit
           fox = spr(cr, -80, groundY(-80) + 6, BI.critterScale);
           fox.tint = tintJit(BI.critterTint || 0xffffff, 0.06);
+          fox.isFox = cr === 'fox' || cr === 'fox_s'; // a fox/coyote mouses; other critters don't
+          fox.baseTex = cr;
+          fox.pounceTex = cr + '_pounce';
           fox.dir = Math.random() < 0.5 ? 1 : -1; // comes in from either side at its own trot
           fox.spd = 1.1 + Math.random() * 0.9;
           fox.x = fox.dir > 0 ? -80 : VW + 80;
@@ -3962,6 +4074,10 @@
           rabbit.baseY = rabbit.y;
           rabbit.tint = tintJit(0xffffff, 0.05); // a little extra variation on top of the coat
           rabbit.dir = 1; // sprite faces right; dir flips (and mirrors it) when it turns around
+          rabbit.coatTex = rbCoat; // pose to return to after an ear-twitch
+          rabbit.earTex = rbCoat === 'hare' ? null : rbCoat + '_ears'; // one-ear-back frame
+          rabbit.earT = 0; // >0 while a twitch is held
+          rabbit.earCD = 1 + Math.random() * 3; // until the next one
           scene.addChild(rabbit);
         } else rabbit = null;
         if (BI.roller) {
@@ -4016,6 +4132,9 @@
           squirrel.tx = sx;
           squirrel.coatTex = sqCoat; // upright pose to return to
           squirrel.digTex = sqCoat + '_dig'; // hunched digging pose, matching the coat
+          squirrel.flickTex = sqCoat + '_flick'; // tail snapped up, for the odd idle flick
+          squirrel.flickT = 0; // >0 while a flick is held
+          squirrel.flickCD = 1.5 + Math.random() * 3.5; // until the next one
           scene.addChild(squirrel);
           // the acorn it buries — kept hidden until it caches one
           squirrel.acorn = spr('acorn', sx, groundY(sx) + 5, 0.6);
@@ -4024,7 +4143,9 @@
         } else squirrel = null;
         if (
           BI.perchBird &&
-          (BI.glade || buildNight < 0.55) && // perching birds roost after dark (the glade's dusk keeps its own)
+          // songbirds stay on, roosting after dark; only where a night creature takes the canopy
+          // (the jungle's kinkajou) is the perching bird day-only
+          (buildNight < 0.55 || !BI.nightCanopy) &&
           perches.length &&
           Math.random() < 0.75
         ) {
@@ -4052,6 +4173,13 @@
           songbird.perch = p; // current perch
           songbird.mode = 'perch'; // perch (sit + look about) → flit (arc to a new bough)
           songbird.tmr = 2 + Math.random() * 5;
+          songbird.baseTex = songbird.curTex = kind; // head-up pose / current pose
+          songbird.roostTex = kind === 'parrot' ? null : kind + '_roost'; // fluffed asleep
+          if (songbird.roostTex && buildNight > 0.5) {
+            // built after dusk: already roosting, tucked up on its bough
+            songbird.texture = T(songbird.roostTex);
+            songbird.curTex = songbird.roostTex;
+          }
           scene.addChild(songbird);
         } else songbird = null;
         if (
@@ -4129,6 +4257,81 @@
           snail.spd = 0.12 + Math.random() * 0.06; // a glacial creep
           scene.addChild(snail);
         } else snail = null;
+        if (BI.toadstools && !snow) {
+          // toadstools push up through the turf after rain — a clump or two, mostly red
+          // fly-agaric with the odd brown mushroom, hidden until the ground's been wet a while
+          for (let c = 0, cn = 1 + ((Math.random() * 2) | 0); c < cn; c++) {
+            const cx = 120 + Math.random() * (VW - 240);
+            for (let i = 0, n = 2 + ((Math.random() * 3) | 0); i < n; i++) {
+              const mx = Math.max(
+                60,
+                Math.min(VW - 60, cx + (Math.random() - Math.random()) * 70)
+              );
+              const m = spr(
+                Math.random() < 0.78 ? 'toadstool' : 'shroom',
+                mx,
+                groundY(mx) + 4,
+                0.3 + Math.random() * 0.2
+              );
+              m.tint = tintJit(0xffffff, 0.05);
+              if (Math.random() < 0.5) m.scale.x *= -1;
+              m.baseSc = m.scale.x; // signed base scale to ease up to as it sprouts
+              m.baseScY = m.scale.y;
+              m.grow = 0; // 0 = still underground; eases to 1 as it pushes up
+              m.sproutAt = 0.48 + Math.random() * 0.3; // the ground wetness it needs to show
+              m.scale.set(0, 0);
+              m.alpha = 0;
+              scene.addChild(m);
+              fungi.push(m);
+            }
+          }
+        }
+        if (BI.molehill && !snow && Math.random() < 0.3) {
+          // once in a while a mole pushes up a fresh molehill or two — heaved up one at a time
+          // (in the ticker), kept rare and small so it reads as a quiet surprise, not clutter.
+          let mx = 150 + Math.random() * (VW - 300);
+          const mdir0 = Math.random() < 0.5 ? 1 : -1;
+          let mdir = mdir0;
+          for (let i = 0, n = 1 + ((Math.random() * 2) | 0); i < n; i++) {
+            const cx = Math.max(70, Math.min(VW - 70, mx));
+            const m = spr(
+              'molehill',
+              cx,
+              groundY(cx) + 4,
+              0.4 + Math.random() * 0.18
+            );
+            m.baseSc = Math.abs(m.scale.x);
+            m.sgn = Math.random() < 0.5 ? -1 : 1;
+            m.baseScY = m.scale.y;
+            m.scale.set(0, 0); // not pushed up yet — the mole hasn't reached here
+            m.grow = 0;
+            m.heaving = false;
+            scene.addChild(m);
+            molehills.push(m);
+            mx += mdir * (70 + Math.random() * 60); // the tunnel runs on a little each time
+            if (mx < 90 || mx > VW - 90) mdir = -mdir; // and turns back at the edges
+          }
+          molehills.timer = 1.5 + Math.random() * 4; // until the first heave
+        }
+        if (BI.dewWeb && !snow && Math.random() < 0.85) {
+          // a spider's orb web slung in a corner among the boughs, jewelled with dew at first
+          // light and fading as it dries — hung off to one side so it frames the scene
+          const wx =
+            Math.random() < 0.5
+              ? 90 + Math.random() * 150
+              : VW - 240 + Math.random() * 150;
+          dewWeb = spr(
+            'web',
+            wx,
+            240 + Math.random() * 120,
+            0.55 + Math.random() * 0.4,
+            0.5,
+            0.16 // pivot near the top anchor, so it hangs from the branch
+          );
+          dewWeb.alpha = 0; // only beads up at dawn (driven in the ticker)
+          dewWeb.ph = Math.random() * 6.28; // its own shimmer phase
+          scene.addChild(dewWeb);
+        } else dewWeb = null;
         if (BI.mouse && buildNight < 0.5 && Math.random() < 0.6) {
           // a field mouse scurries the meadow grass in quick bursts, freezing to sit alert
           const mx = 140 + Math.random() * (VW - 280);
@@ -4305,9 +4508,14 @@
         // lift any framing rocks above the animals so they pass behind the side rocks (canyon mesas)
         for (const r of frontRocks) scene.addChild(r);
 
+        // little kicked-up specks (grass, dirt, bark) when a paw, talon or bill strikes — sits in
+        // front of the land creatures, behind the pond foreground; empty where nothing kicks up
+        burstG = new PIXI.Graphics();
+        scene.addChild(burstG);
         // water biomes (pond) — reflections, lilies, ducks, dragonflies
         glit = new PIXI.Graphics();
         reflLayer = null;
+        frogTongueG = null;
         pondShape = null;
         waterL = 120;
         waterR = VW - 120;
@@ -4551,6 +4759,8 @@
             dm.baseSpd = 0.3 + Math.random() * 0.3;
             dm.vx = dm.baseSpd;
             dm.dabbler = true; // up-ends to feed
+            dm.baseTex = dm.curTex = 'duck_f'; // head-up pose / current pose
+            dm.sleepTex = 'duck_f_sleep'; // bill tucked into the back, for a settled nap
             dm.kids = [];
             dm.ref = spr('duck_f', 380, 0, 0.6);
             dm.ref.scale.y = -0.6;
@@ -4565,8 +4775,9 @@
             }
             scene.addChild(dm);
             ducks.push(dm);
+            const drakeTex = Math.random() < 0.5 ? 'wood_duck' : 'duck'; // mallard or wood duck
             const d2 = spr(
-              Math.random() < 0.5 ? 'wood_duck' : 'duck', // the drake is a mallard or a wood duck
+              drakeTex,
               waterL + 30 + Math.random() * (waterR - waterL - 60),
               682 + Math.random() * 16,
               0.55
@@ -4576,6 +4787,8 @@
             d2.baseSpd = 0.28 + Math.random() * 0.3;
             d2.vx = Math.random() < 0.5 ? d2.baseSpd : -d2.baseSpd;
             d2.dabbler = true; // up-ends to feed
+            d2.baseTex = d2.curTex = drakeTex; // head-up pose / current pose
+            d2.sleepTex = drakeTex + '_sleep'; // bill tucked into the back, for a settled nap
             ducks.push(d2);
             scene.addChild(d2);
             // a moorhen often potters among them — darker, smaller, with a red bill
@@ -4598,6 +4811,11 @@
           // float the lily pads (and the frogs on them) in front of the ducks, so a duck passing one swims behind it
           for (const lp of lilies) if (!lp.isFrog) scene.addChild(lp);
           for (const lp of lilies) if (lp.isFrog) scene.addChild(lp);
+          // a layer for a frog's tongue to flick across, drawn over the frogs each frame
+          if (lilies.some((lp) => lp.isFrog)) {
+            frogTongueG = new PIXI.Graphics();
+            scene.addChild(frogTongueG);
+          }
           if (BI.water.drag && !snow) {
             const dn = Math.max(
               1,
@@ -4726,6 +4944,8 @@
               f.spd = 0.4 + Math.random() * 0.7;
               f.cruiseY = f.y; // resting depth it eases back to
               f.jump = 0; // 0 = cruising; climbs 0->1 across a leap arc
+              f.rise = 0; // 0 = cruising; climbs 0->1 across a rise-to-take at an insect
+              f.riseCD = 3 + Math.random() * 6; // a cooldown so rises stay occasional
               f.next = 4 + Math.random() * 8; // seconds until the next rise/leap
               f.shoalOx = (Math.random() - 0.5) * 120; // its slot in a loose shoal
               f.shoalOy = (Math.random() - 0.5) * 24;
@@ -5862,6 +6082,15 @@
         // dew sparkles strongest at first light and dries off as the sun climbs; a clear night beads more
         dewdrops.dl.alpha =
           Math.exp(-Math.pow((h - 6.2) / 1.0, 2)) * (1 - cover * 0.7);
+        // the dew-beaded web rides the same first-light window (a touch wider — a strung web holds
+        // its dew a little longer than the grass), shimmering faintly and swaying in the air
+        if (dewWeb) {
+          const webDawn =
+            Math.exp(-Math.pow((h - 6.3) / 1.2, 2)) * (1 - cover * 0.6);
+          dewWeb.alpha =
+            webDawn * (0.82 + Math.sin(t * 1.7 + dewWeb.ph) * 0.12);
+          dewWeb.rotation = Math.sin(t * 0.7 + dewWeb.ph) * 0.02;
+        }
         // the murmuration gathers as the sun goes down and is gone by full dark / daylight
         if (murmur.length)
           murmurC.alpha =
@@ -5978,45 +6207,58 @@
           }
         }
 
-        // dawn/dusk light shafts: soft golden beams raking across the open land, ramping up as the
-        // sun nears the horizon and gone by midday and night. Additive and faint, leaning away from
-        // the sun's side and drifting slowly — light hanging in the hazy air, not hard rays.
+        // dawn/dusk light shafts: soft golden god-rays fanning out from the low sun — a glow that
+        // pools close around the sun and fades out within a few hundred pixels, never a hard line
+        // reaching across the frame. Anchored to the sun, so they lean in low from the left at dawn
+        // and from the right at dusk. Additive and faint — light hanging in the hazy air.
         if (beamG) {
           beamG.clear();
           const low = cel.sun
               ? Math.max(0, Math.min(1, (cel.y - 250) / 150))
               : 0,
-            beam = low * low * (1 - cover * 0.7); // ease in low; fade as cloud hides the sun
+            beam = low * low * (1 - cover * 0.7); // ease in as the sun drops; fade as cloud hides it
           beamField.on = beam > 0.02;
           beamField.beam = beam;
           if (beamField.on) {
-            const lean = (cel.x / VW - 0.5) * 1.7, // tilt away from the sun's side
-              topY = 380,
-              botY = 700,
-              N = 8,
-              span = VW / (N - 1),
-              SEG = 3;
-            beamField.lean = lean;
-            beamField.topY = topY;
-            beamField.botY = botY;
-            beamField.bx.length = beamField.w.length = 0;
+            const sunX = cel.x,
+              sunY = cel.y,
+              baseAng = Math.atan2(VH * 0.9 - sunY, VW * 0.5 - sunX), // aim into the scene
+              N = 7,
+              halfSpread = 0.28, // the fan's half-angle
+              len = 820, // short — the glow fades out long before the far edge
+              SEG = 6;
+            beamField.sunX = sunX;
+            beamField.sunY = sunY;
+            beamField.len = len;
+            beamField.rays.length = 0;
             for (let i = 0; i < N; i++) {
-              const bx = i * span + Math.sin(t * 0.07 + i * 1.3) * 28, // slow drift
-                w = 15 + 6 * Math.sin(t * 0.4 + i * 2);
-              beamField.bx.push(bx); // remembered so drifting dust can catch this beam
-              beamField.w.push(w);
+              const fr = N > 1 ? i / (N - 1) - 0.5 : 0, // -0.5..0.5 across the fan
+                ang =
+                  baseAng +
+                  fr * 2 * halfSpread +
+                  Math.sin(t * 0.07 + i * 1.3) * 0.014, // slow drift
+                dirx = Math.cos(ang),
+                diry = Math.sin(ang),
+                px = -diry, // unit perpendicular to the ray
+                py = dirx,
+                w = 24 + 8 * Math.sin(t * 0.4 + i * 2); // far-end half-width, gently pulsing
+              beamField.rays.push({dirx, diry, w}); // remembered so drifting dust can catch a beam
               for (let s = 0; s < SEG; s++) {
-                const y0 = topY + ((botY - topY) * s) / SEG,
-                  y1 = topY + ((botY - topY) * (s + 1)) / SEG,
-                  x0 = bx - lean * (y0 - topY),
-                  x1 = bx - lean * (y1 - topY),
-                  w0 = w * (1 + s * 0.22),
-                  w1 = w * (1 + (s + 1) * 0.22);
-                beamG.beginFill(0xffd488, beam * 0.13 * (1 - s / SEG)); // fades as it falls
-                beamG.moveTo(x0 - w0, y0);
-                beamG.lineTo(x0 + w0, y0);
-                beamG.lineTo(x1 + w1, y1);
-                beamG.lineTo(x1 - w1, y1);
+                const a0 = s / SEG,
+                  a1 = (s + 1) / SEG,
+                  d0 = 50 + a0 * (len - 50), // distance from the sun along the ray
+                  d1 = 50 + a1 * (len - 50),
+                  w0 = w * (0.28 + a0 * 0.9), // narrow at the sun, widening outward
+                  w1 = w * (0.28 + a1 * 0.9),
+                  cx0 = sunX + dirx * d0,
+                  cy0 = sunY + diry * d0,
+                  cx1 = sunX + dirx * d1,
+                  cy1 = sunY + diry * d1;
+                beamG.beginFill(0xffd488, beam * 0.12 * (1 - a0) * (1 - a0)); // quadratic falloff — pools at the sun
+                beamG.moveTo(cx0 + px * w0, cy0 + py * w0);
+                beamG.lineTo(cx0 - px * w0, cy0 - py * w0);
+                beamG.lineTo(cx1 - px * w1, cy1 - py * w1);
+                beamG.lineTo(cx1 + px * w1, cy1 + py * w1);
                 beamG.closePath();
                 beamG.endFill();
               }
@@ -6196,12 +6438,22 @@
           // dawn/dusk shafts striking the pond: warm sparkle pooling on the surface wherever a beam
           // reaches the water — at full golden strength (not the beams' faded tail), each glint
           // winking and scattered into wavelets by the breeze
-          const F = beamField;
+          const F = beamField,
+            cols = []; // where each downward ray crosses the waterline, and its width there
+          for (let i = 0; i < F.rays.length; i++) {
+            const r = F.rays[i];
+            if (r.diry <= 0.03) continue; // only rays angled down reach the water
+            const d = (612 - F.sunY) / r.diry; // distance from the sun to the waterline
+            if (d < 50 || d > F.len) continue;
+            cols.push({
+              cx: F.sunX + r.dirx * d,
+              hw: r.w * (0.28 + (d / F.len) * 0.9) * 1.32
+            });
+          }
           for (let x = 0; x <= VW; x += 9) {
-            let cov = 0; // how squarely a beam's column lands on this stretch of water
-            for (let i = 0; i < F.bx.length; i++) {
-              const cx = F.bx[i] - F.lean * (612 - F.topY),
-                dd = Math.abs(x - cx) / (F.w[i] * 1.32);
+            let cov = 0; // how squarely a beam lands on this stretch of water
+            for (let i = 0; i < cols.length; i++) {
+              const dd = Math.abs(x - cols[i].cx) / cols[i].hw;
               if (dd < 1 && 1 - dd > cov) cov = 1 - dd;
             }
             const glow = cov * F.beam;
@@ -6314,6 +6566,19 @@
           const gust = Math.sin(t * 2.1 - w.s.x * 0.009) * wind * 0.8;
           w.s.rotation =
             Math.sin(t * w.sp + w.ph) * w.amp + (wind + gust) * w.amp * 2.5;
+          if (w.nod > 0) {
+            // an insect just alighted: the bloom dips and springs back in a damped bob
+            w.nod -= dt / 60;
+            const e = w.nodD - Math.max(0, w.nod); // seconds since the alight
+            w.s.rotation +=
+              w.nodDir * w.nodA * Math.exp(-4 * e) * Math.cos(e * 13);
+          }
+          if (w.closes) {
+            // a closing bloom folds in as the light fades — petals draw together (narrows and
+            // shortens a touch) — and opens out again with the returning day
+            w.s.scale.x = w.sx0 * (1 - night * 0.55);
+            w.s.scale.y = w.sy0 * (1 - night * 0.28);
+          }
         }
         // the mirrored trees drift on the breeze and fade as the surface roughens or freezes over
         if (reflLayer) {
@@ -6674,9 +6939,24 @@
                 // coming out of a graze or a standing pause: amble on, often a new way
                 d.mode = 'walk';
                 d.timer = 5 + Math.random() * 6;
+                d.swishT = 0; // tail settled as it sets off (play() restores the frames)
                 if (Math.random() < (d.graze ? 0.4 : 0.5)) {
                   d.dir = -d.dir;
                   d.scale.x = d.dir * Math.abs(d.scale.x);
+                }
+              }
+              // a grazing or standing deer gives its tail the odd flick at the flies
+              if (d.swishTex && (d.mode === 'graze' || d.mode === 'pause')) {
+                if (d.swishT > 0) {
+                  d.swishT -= dt / 60;
+                  if (d.swishT <= 0) d.gotoAndStop(0); // tail settles back
+                } else if (
+                  (d.swishCD =
+                    (d.swishCD ?? 1.5 + Math.random() * 3.5) - dt / 60) <= 0
+                ) {
+                  d.texture = T(d.swishTex); // tail flicks out
+                  d.swishT = 0.18 + Math.random() * 0.16;
+                  d.swishCD = 2 + Math.random() * 3;
                 }
               }
               if (d.dir > 0 && d.x > VW + 60) d.x = -60;
@@ -6691,6 +6971,17 @@
                   : 0);
             }
             dropTrack(d, 'deer', 30);
+            // its breath fogs in cold air — a soft puff from the muzzle now and then, more often
+            // and thicker the colder it is (so it shows on a frosty morning, not a mild day)
+            const cold = Math.max(0, Math.min(1, (4 - temp) / 8));
+            if (d.drinkTex && cold > 0.06 && d.mode !== 'drink') {
+              d.breathT = (d.breathT ?? Math.random() * 2) - dt / 60;
+              if (d.breathT <= 0) {
+                const sc = Math.abs(d.scale.y);
+                emitBreath(d.x + d.dir * 92 * sc, d.y - 135 * sc, d.dir, cold);
+                d.breathT = (1.6 + Math.random() * 1.8) * (1.4 - cold * 0.6);
+              }
+            }
           }
         }
 
@@ -6698,16 +6989,101 @@
         if (fox) {
           foxTimer -= dt / 60;
           if (fox.visible !== false) {
-            fox.x += fox.dir * (fox.spd ?? 1.5) * dt;
-            fox.y = groundY(fox.x) + 6 + Math.abs(Math.sin(t * 7)) * -2;
-            dropTrack(fox, 'fox', 18);
-            if (fox.dir > 0 ? fox.x > VW + 80 : fox.x < -80) {
-              fox.visible = false;
-              foxTimer = 8 + Math.random() * 10;
+            if (fox.pounce) {
+              // a mousing pounce: freeze to locate the vole, then spring up and forward and come
+              // down nose-first into the grass, hold a beat, and trot on
+              fox.pounceT += dt / 60;
+              if (fox.mode === 'listen') {
+                fox.y = groundY(fox.x) + 6; // dead still, ears pricked, head cocked
+                if (fox.pounceT >= fox.listenDur) {
+                  fox.mode = 'leap';
+                  fox.pounceT = 0;
+                  fox.texture = T(fox.pounceTex);
+                  // the mouse breaks the instant the fox springs, bolting clear the other way
+                  if (fox.prey && fox.prey.visible !== false) {
+                    const m = fox.prey;
+                    m.dir = m.x >= fox.x ? 1 : -1;
+                    m.scale.x = m.dir * m.baseSc;
+                    m.flee = 1 + Math.random() * 0.6;
+                  }
+                }
+              } else if (fox.mode === 'leap') {
+                const a = Math.min(1, fox.pounceT / 0.6),
+                  arc = Math.sin(a * Math.PI);
+                fox.x += fox.dir * fox.lungeSpd * dt; // springs forward onto the spot
+                fox.y = groundY(fox.x) + 6 - arc * 48; // up high, then plunging back down
+                fox.rotation = fox.dir * (a - 0.4) * 1.15; // nose up on the launch, steep nose-down on the dive
+                if (a >= 1) {
+                  fox.y = groundY(fox.x) + 9;
+                  fox.rotation = fox.dir * 0.66; // pitched right down, nose-first in the grass
+                  // a spray of grass and dirt kicked up where it strikes
+                  emitBurst(
+                    fox.x + fox.dir * 16,
+                    groundY(fox.x + fox.dir * 16) + 6,
+                    7,
+                    [0x6fae4a, 0x57933a, 0x6e4f32],
+                    2.7,
+                    3.6
+                  );
+                  fox.mode = 'recover';
+                  fox.pounceT = 0;
+                }
+              } else {
+                fox.y = groundY(fox.x) + 9; // a beat with its nose buried, then up and away
+                if (fox.pounceT >= 0.4) {
+                  fox.pounce = false;
+                  fox.rotation = 0;
+                  fox.texture = T(fox.baseTex);
+                }
+              }
+            } else {
+              fox.x += fox.dir * (fox.spd ?? 1.5) * dt;
+              fox.y = groundY(fox.x) + 6 + Math.abs(Math.sin(t * 7)) * -2;
+              dropTrack(fox, 'fox', 18);
+              // out in the open it stops to mouse now and then — never right at the edges, so the
+              // whole pounce plays on-screen
+              if (
+                fox.isFox &&
+                !raining &&
+                fox.x > 170 &&
+                fox.x < VW - 170 &&
+                Math.random() < 0.004 * dt
+              ) {
+                fox.pounce = true;
+                fox.mode = 'listen';
+                fox.pounceT = 0;
+                fox.listenDur = 0.7 + Math.random() * 0.6;
+                fox.lungeSpd = 1.3 + Math.random() * 0.7;
+                fox.prey = null;
+                // if a field mouse is out within range it's onto that, not a hidden vole: it turns
+                // to face it, lines the pounce up, and the mouse freezes as it senses the stalk
+                if (
+                  mouse &&
+                  mouse.visible !== false &&
+                  Math.abs(mouse.x - fox.x) < 230
+                ) {
+                  fox.prey = mouse;
+                  fox.dir = mouse.x >= fox.x ? 1 : -1;
+                  fox.scale.x = fox.dir * Math.abs(fox.scale.x);
+                  fox.lungeSpd = Math.min(
+                    3.2,
+                    Math.max(1.4, Math.abs(mouse.x - fox.x) / 38)
+                  );
+                  mouse.flee = 0;
+                  mouse.pauseT = fox.listenDur + 0.12; // frozen, sensing the fox
+                }
+              }
+              if (fox.dir > 0 ? fox.x > VW + 80 : fox.x < -80) {
+                fox.visible = false;
+                foxTimer = 8 + Math.random() * 10;
+              }
             }
           } else if (foxTimer < 0 && !raining) {
             // stays tucked away until the shower passes, then trots out from either side, any pace
             fox.visible = true;
+            fox.pounce = false;
+            fox.rotation = 0;
+            fox.texture = T(fox.baseTex);
             fox.dir = Math.random() < 0.5 ? 1 : -1;
             fox.spd = 1.1 + Math.random() * 0.9;
             fox.x = fox.dir > 0 ? -80 : VW + 80;
@@ -6748,6 +7124,11 @@
               rabbit.scale.x = rabbit.dir * Math.abs(rabbit.scale.x);
             }
           } else rabbit.fleeDir = null;
+          // a twitch in progress is dropped the moment it stops foraging (freezes, bolts or hunkers)
+          if (rabbit.earT > 0 && (freeze || flee || raining)) {
+            rabbit.earT = 0;
+            rabbit.texture = T(rabbit.coatTex);
+          }
           if (freeze) {
             rabbit.y = groundY(rabbit.x) + 6; // frozen, dead still, on the ground
           } else if (raining && !flee) {
@@ -6760,8 +7141,21 @@
             // far more than they hop
             rabbit.forageT -= dt / 60;
             rabbit.y = groundY(rabbit.x) + 6 + Math.sin(t * 3 + rabbit.x) * 0.5;
+            // the odd ear-twitch while it sits and crops — one ear swivels back, then forward
+            if (rabbit.earTex) {
+              if (rabbit.earT > 0) {
+                rabbit.earT -= dt / 60;
+                if (rabbit.earT <= 0) rabbit.texture = T(rabbit.coatTex);
+              } else if ((rabbit.earCD -= dt / 60) <= 0) {
+                rabbit.texture = T(rabbit.earTex); // an ear flicks back
+                rabbit.earT = 0.16 + Math.random() * 0.16;
+                rabbit.earCD = 2.5 + Math.random() * 4;
+              }
+            }
             if (rabbit.forageT <= 0) {
               // then a short bout of hops off to a fresh patch
+              rabbit.earT = 0;
+              rabbit.texture = T(rabbit.coatTex); // ears forward before it goes
               rabbit.hopsLeft = 2 + ((Math.random() * 3) | 0);
               rabbit.hopT = 0.5 + Math.random() * 0.6;
               if (rabbit.x > VW - 140) rabbit.dir = -1;
@@ -6976,6 +7370,19 @@
             d.up * 9; // sink the front as it tips bottom-up
           // lerp up onto the bank as it hauls out; the bob (part of waterY) fades with it
           d.y = d.land ? waterY + (d.land.y - waterY) * d.haul : waterY;
+          // bill-tuck: once it's stopped at its sleeping spot, turn the head back and bury the bill
+          // in the back feathers; the head comes straight back up the moment it stirs or wakes
+          if (d.sleepTex) {
+            const want =
+              sleeping && atSpot && Math.abs(d.vx) < 0.14
+                ? d.sleepTex
+                : d.baseTex;
+            if (want !== d.curTex) {
+              d.curTex = want;
+              d.texture = T(want);
+              if (d.ref) d.ref.texture = T(want); // the reflection tucks too
+            }
+          }
           // when it up-ends, half the duck is under the (transparent) water. Follow the fish
           // convention rather than cutting the head off: the part above the waterline stays bright,
           // the submerged head/breast shows MURKY — sunk toward the water colour, half-seen through
@@ -7092,6 +7499,16 @@
               }
               continue;
             }
+            if (f.scatterT > 0) {
+              // bolting from a kingfisher's strike: a fast dart away and down into deeper water
+              f.scatterT -= dt / 60;
+              f.x = Math.max(fLo, Math.min(fHi, f.x + f.scatterDir * 5 * dt));
+              f.y += (f.cruiseY + 18 - f.y) * 0.1 * dt; // ducks a little deeper as it flees
+              f.dir = f.scatterDir;
+              f.scale.x = f.dir * f.baseSc;
+              f.jump = f.rise = 0; // not leaping or rising — fleeing
+              continue;
+            }
             if (f.jump > 0) {
               // a leap: rise from cruising depth, break the surface, arc over and splash back
               f.jump += dt / 42;
@@ -7124,6 +7541,27 @@
               }
               continue;
             }
+            if (f.rise > 0) {
+              // a quiet rise to sip an insect off the film: noses up to just under the
+              // surface, dimples it, then slips back down — gentler than a clearing leap
+              f.rise += dt / 40;
+              const a = Math.min(1, f.rise),
+                arc = Math.sin(a * Math.PI),
+                py = f.y;
+              f.x += (f.riseTx - f.x) * 0.05 * dt; // drift under the target as it rises
+              f.y = f.cruiseY + (603 - f.cruiseY) * arc; // up to just under the surface
+              f.rotation = f.dir * 0.16 * arc; // nose tips up into the rise
+              f.alpha = 0.82 + arc * 0.12; // shows a touch as it nears the light
+              if (water && py > 607 && f.y <= 607)
+                ripples.push({x: f.x, y: 606, r: 3, life: 0.95}); // the dimple as it breaks the film
+              if (f.rise >= 1) {
+                f.rise = 0;
+                f.rotation = 0;
+                f.y = f.cruiseY;
+                f.alpha = 0.82;
+              }
+              continue;
+            }
             if (fish.shoalOn) {
               // gathered into a loose shoal: ease toward a slowly drifting centre, each holding its
               // own slot so the group stays loose, all facing the way the shoal drifts
@@ -7148,8 +7586,43 @@
               f.y = f.cruiseY + Math.sin(t * 1.1 + f.x * 0.018) * 4; // slow depth wobble
             }
             f.alpha = 0.82 * (1 - ice * 0.55); // sluggish and all but hidden once it ices over
+            // rise to take a low insect: a dragonfly skimming the pond, or a butterfly
+            // puddling at the water's edge — the fish noses up to sip it and dimples the film
+            f.riseCD = (f.riseCD ?? 3 + Math.random() * 6) - dt / 60;
+            if (f.riseCD <= 0 && ice < 0.15) {
+              for (const fl of flutters) {
+                if (fl.alpha < 0.3) continue;
+                if (
+                  !fl.water &&
+                  !(fl.isButterfly && fl.puddling && fl.settled > 0)
+                )
+                  continue;
+                if (Math.abs(fl.x - f.x) < 64) {
+                  f.rise = 0.0001; // launch the rise
+                  f.riseTx = Math.max(fLo, Math.min(fHi, fl.x));
+                  f.dir = fl.x >= f.x ? 1 : -1;
+                  f.scale.x = f.dir * f.baseSc;
+                  f.riseCD = 7 + Math.random() * 11;
+                  f.next = 4 + Math.random() * 6; // don't chain straight into a leap
+                  if (fl.water) {
+                    // the dragonfly bolts up and away from the swirl
+                    fl.darting = true;
+                    fl.dtx = Math.max(
+                      waterL + 20,
+                      Math.min(
+                        waterR - 40,
+                        fl.x + f.dir * (60 + Math.random() * 50)
+                      )
+                    );
+                    fl.dty = Math.max(fl.lo ?? 605, fl.y - 24);
+                    fl.dartT = 0.4;
+                  } else fl.settled = 0; // the butterfly startles up off the water
+                  break;
+                }
+              }
+            }
             f.next -= dt / 60;
-            if (f.next < 0) {
+            if (f.next < 0 && f.rise === 0) {
               if (ice < 0.15 && Math.random() < 0.4) {
                 f.jump = 0.0001; // launch a leap
                 f.apexY = 600 - (40 + Math.random() * 34);
@@ -7325,12 +7798,82 @@
         }
         // a squirrel forages the clearing: sits and nibbles with a little body-bob, then
         // scampers in quick low hops to a new spot — never the same beat twice
-        if (squirrel) {
+        if (squirrel && squirrel.mode !== 'gone') {
           squirrel.tmr -= dt / 60;
-          if (squirrel.mode === 'sit') {
+          // dusk: it breaks off foraging and heads up to its drey for the night
+          if (night > 0.45 && squirrel.mode !== 'retreat') {
+            squirrel.mode = 'retreat';
+            const trees = perches.length ? perches : trunks;
+            let best = null,
+              bd = 1e9;
+            for (const tr of trees) {
+              const d = Math.abs(tr.x - squirrel.x);
+              if (d < bd) {
+                bd = d;
+                best = tr;
+              }
+            }
+            squirrel.tree = best; // a canopy spot to climb to, if there's a tree to hand
+            squirrel.climbY = null;
+            squirrel.flickT = 0;
+            squirrel.texture = T(squirrel.coatTex);
+            squirrel.acorn.alpha = 0;
+          }
+          if (squirrel.mode === 'retreat') {
+            const tx = squirrel.tree
+              ? squirrel.tree.x
+              : squirrel.x < VW / 2
+                ? -60
+                : VW + 60;
+            if (squirrel.tree && Math.abs(squirrel.x - tx) <= 5) {
+              // scrabble up the trunk and slip out of sight into the drey
+              squirrel.x = tx;
+              squirrel.climbY = squirrel.climbY ?? groundY(tx) + 6;
+              squirrel.climbY -= 2.8 * dt;
+              squirrel.y = squirrel.climbY - Math.abs(Math.sin(t * 27)) * 3; // little scrabbles up
+              squirrel.rotation = squirrel.dir * 0.16 * Math.sin(t * 27); // wriggling up the bark
+              const climbed = groundY(tx) + 6 - squirrel.climbY;
+              squirrel.alpha = Math.max(0, 1 - climbed / 120); // up the bark and gone
+              if (squirrel.alpha <= 0) {
+                squirrel.mode = 'gone';
+                squirrel.visible = false;
+              }
+            } else {
+              // dash to the foot of the tree (or off the nearest edge if there's none to hand)
+              squirrel.x +=
+                Math.sign(tx - squirrel.x) *
+                Math.min(Math.abs(tx - squirrel.x), 4.4 * dt);
+              squirrel.dir = tx > squirrel.x ? 1 : -1;
+              squirrel.scale.x = squirrel.dir * squirrel.baseSc;
+              squirrel.y =
+                groundY(squirrel.x) + 6 - Math.abs(Math.sin(t * 18)) * 8;
+              squirrel.rotation = 0;
+              if (
+                !squirrel.tree &&
+                (squirrel.x < -55 || squirrel.x > VW + 55)
+              ) {
+                squirrel.mode = 'gone';
+                squirrel.visible = false;
+              }
+            }
+          } else if (squirrel.mode === 'sit') {
             squirrel.y = groundY(squirrel.x) + 6 + Math.sin(t * 5) * 0.7; // nibbling bob
             squirrel.rotation = Math.sin(t * 3.3) * 0.05;
+            // the odd flick of the tail as it sits and nibbles — a quick snap up, then back
+            if (squirrel.flickT > 0) {
+              squirrel.flickT -= dt / 60;
+              if (squirrel.flickT <= 0) squirrel.texture = T(squirrel.coatTex);
+            } else {
+              squirrel.flickCD -= dt / 60;
+              if (squirrel.flickCD <= 0) {
+                squirrel.texture = T(squirrel.flickTex); // brush snaps up
+                squirrel.flickT = 0.22 + Math.random() * 0.16;
+                squirrel.flickCD = 2 + Math.random() * 4;
+              }
+            }
             if (squirrel.tmr < 0) {
+              squirrel.flickT = 0;
+              squirrel.texture = T(squirrel.coatTex); // settle the tail before it scampers off
               squirrel.mode = 'run';
               squirrel.tx = 110 + Math.random() * (VW - 220); // a fresh foraging spot
               squirrel.dir = squirrel.tx > squirrel.x ? 1 : -1;
@@ -7396,9 +7939,46 @@
           // an outdoor pond to drop down and splash in
           const canBathe =
             !!water && !BI.interior && !BI.underwater && !BI.glade;
-          if (songbird.mode === 'perch') {
-            songbird.y = songbird.perch.y + Math.sin(t * 3) * 0.6; // gentle perch bob
+          // at dusk it settles to roost: once it's back on a bough it fluffs up, tucks its head
+          // and sleeps still until first light, when the lifting dark rouses it again
+          const roosting =
+            songbird.roostTex && night > 0.5 && songbird.mode === 'perch';
+          if (roosting) {
+            if (songbird.curTex !== songbird.roostTex) {
+              songbird.texture = T(songbird.roostTex);
+              songbird.curTex = songbird.roostTex;
+            }
+            songbird.preenT = 0;
+            songbird.rotation = 0;
+            songbird.y =
+              songbird.perch.y + Math.sin(t * 0.7 + songbird.dir) * 0.3; // a faint sleeping breath
+            songbird.tmr = Math.max(songbird.tmr, 0.5); // no flitting off while it sleeps
+          } else if (songbird.mode === 'perch') {
+            if (songbird.curTex !== songbird.baseTex) {
+              songbird.texture = T(songbird.baseTex); // roused at first light: head back up
+              songbird.curTex = songbird.baseTex;
+            }
+            // now and then it has a preen — ducks its head to its breast and fusses there with
+            // quick little jerks before sitting up again
+            songbird.preenCD =
+              (songbird.preenCD ?? 3 + Math.random() * 4) - dt / 60;
+            if (songbird.preenT > 0) {
+              songbird.preenT -= dt / 60;
+              songbird.rotation =
+                songbird.dir *
+                (0.18 + Math.sin(t * 6) * 0.13 + Math.sin(t * 23) * 0.05); // reach down and fuss
+              songbird.y = songbird.perch.y + Math.abs(Math.sin(t * 6)) * 1.3;
+              if (songbird.preenT <= 0) songbird.rotation = 0; // sit back up
+            } else {
+              songbird.y = songbird.perch.y + Math.sin(t * 3) * 0.6; // gentle perch bob
+              if (songbird.preenCD <= 0) {
+                songbird.preenT = 1.1 + Math.random() * 1.5;
+                songbird.preenCD = 5 + Math.random() * 7;
+              }
+            }
             if (songbird.tmr < 0) {
+              songbird.preenT = 0;
+              songbird.rotation = 0; // never flit off mid-duck
               if (canBathe && Math.random() < 0.22) {
                 // drop down to the water's edge for a splash-about, then back up to the boughs
                 songbird.fromX = songbird.x;
@@ -7523,6 +8103,44 @@
             }
           }
         }
+        // toadstools: push up once the ground is wet enough, then shrink back into the turf as
+        // it dries (slower than they came, so they linger a good while after the rain)
+        for (const m of fungi) {
+          const up = wetness > m.sproutAt;
+          m.grow += ((up ? 1 : 0) - m.grow) * (up ? 0.02 : 0.009) * dt;
+          if (m.grow > 0.001) {
+            m.scale.x = m.baseSc * m.grow;
+            m.scale.y = m.baseScY * m.grow;
+            m.alpha = Math.min(1, m.grow * 1.5);
+          } else m.alpha = 0;
+        }
+        // the mole reaches the next spot and heaves a fresh molehill up through the turf with a
+        // little spray of soil; once it's up, the mound stays put
+        if (molehills.length) {
+          molehills.timer -= dt / 60;
+          if (molehills.timer <= 0) {
+            const next = molehills.find((m) => !m.heaving);
+            if (next) {
+              next.heaving = true;
+              emitBurst(
+                next.x,
+                groundY(next.x) + 3,
+                6,
+                [0x6e4c30, 0x4e3420, 0x3c2917],
+                2.2,
+                3.4
+              ); // soil kicked up as it pushes through
+              molehills.timer = 3.5 + Math.random() * 6;
+            } else molehills.timer = 1e9; // the whole line is up — nothing left to heave
+          }
+          for (const m of molehills) {
+            if (!m.heaving || m.grow >= 1) continue;
+            m.grow = Math.min(1, m.grow + dt / 60 / 1.1); // heaves up over ~1.1s
+            const e = 1 - (1 - m.grow) * (1 - m.grow); // ease-out as it settles
+            m.scale.x = m.sgn * m.baseSc * e;
+            m.scale.y = m.baseScY * e;
+          }
+        }
         // a fire salamander basks on the warm rock, its heat-glow breathing, and now and then
         // scuttles low and quick to a fresh warm slab
         if (salamander) {
@@ -7550,7 +8168,36 @@
         }
         // a hedgehog trundles the night floor in short bursts, pausing nose-down to snuffle
         if (hedgehog) {
-          if (hedgehog.pauseT > 0) {
+          const h = hedgehog;
+          // a stooping owl low overhead is a threat — it rolls up tight
+          let threat = false;
+          for (const f of flutters)
+            if (
+              f.isOwl &&
+              f.swoop != null &&
+              Math.abs(f.x - h.x) < 110 &&
+              f.y > groundY(f.x) - 130
+            ) {
+              threat = true;
+              break;
+            }
+          if (h.curlT > 0) {
+            // curled into a ball, prickles out, dead still until the danger passes
+            h.curlT -= dt / 60;
+            h.y = groundY(h.x) + 6;
+            h.rotation = 0;
+            if (threat) h.curlT = Math.max(h.curlT, 0.7); // stays balled while it's near
+            if (h.curlT <= 0) {
+              h.texture = T('hedgehog'); // unrolls
+              h.pauseT = 0.4 + Math.random() * 0.8; // a cautious pause before trundling on
+            }
+          } else if (threat || Math.random() < 0.0011 * dt) {
+            // startles into a ball — at a stooping owl, or now and then at a noise in the dark
+            h.curlT = 1.6 + Math.random() * 1.8;
+            h.texture = T('hedgehog_curl');
+            h.y = groundY(h.x) + 6;
+            h.rotation = 0;
+          } else if (hedgehog.pauseT > 0) {
             hedgehog.pauseT -= dt / 60; // snuffling in place
             hedgehog.rotation = Math.sin(t * 8) * 0.025; // a busy little wobble
             hedgehog.y = groundY(hedgehog.x) + 6;
@@ -7577,7 +8224,20 @@
         // a field mouse: short, quick scurries through the grass, then it freezes and sits stock-still
         // — a tiny alert tremor — before darting on; pauses often and briefly, the way a mouse does
         if (mouse) {
-          if (mouse.pauseT > 0) {
+          if (mouse.flee > 0) {
+            // panic: it caught the fox's spring and bolts flat-out the other way
+            mouse.flee -= dt / 60;
+            mouse.x += mouse.dir * mouse.spd * 2.1 * dt;
+            mouse.y = groundY(mouse.x) + 3 + Math.abs(Math.sin(t * 40)) * -0.6; // a frantic scurry
+            mouse.rotation = 0;
+            if (mouse.x > VW - 70) {
+              mouse.dir = -1;
+              mouse.scale.x = -mouse.baseSc;
+            } else if (mouse.x < 70) {
+              mouse.dir = 1;
+              mouse.scale.x = mouse.baseSc;
+            }
+          } else if (mouse.pauseT > 0) {
             mouse.pauseT -= dt / 60; // frozen, alert
             mouse.rotation = Math.sin(t * 22) * 0.02; // a fine nervous tremor
             mouse.y = groundY(mouse.x) + 3;
@@ -7975,6 +8635,36 @@
             rippleG.drawEllipse(rp.x, rp.y, rp.r, rp.r * 0.34);
           }
         }
+        // kicked-up specks arc up and fall back to the ground; breath puffs drift, billow and thin
+        if (burstG) {
+          burstG.clear();
+          for (let i = bursts.length - 1; i >= 0; i--) {
+            const b = bursts[i];
+            b.x += b.vx * dt;
+            b.y += b.vy * dt;
+            b.life -= dt / 60;
+            if (b.soft) {
+              b.vx *= 1 - 0.02 * dt; // slows as it spreads
+              b.sz += 0.5 * dt; // billows out
+              if (b.life <= 0) {
+                bursts.splice(i, 1);
+                continue;
+              }
+              burstG.beginFill(b.c, b.a0 * Math.max(0, Math.min(1, b.life)));
+              burstG.drawCircle(b.x, b.y, b.sz);
+              burstG.endFill();
+            } else {
+              b.vy += 0.55 * dt; // gravity pulls them back down
+              if (b.life <= 0 || b.y > b.gy) {
+                bursts.splice(i, 1);
+                continue;
+              }
+              burstG.beginFill(b.c, Math.min(1, b.life * 3.5));
+              burstG.drawRect(b.x, b.y, b.sz, b.sz);
+              burstG.endFill();
+            }
+          }
+        }
 
         // waterfall: scroll the streak texture down so the cascade flows, and ring the plunge pool
         if (streakTile) streakTile.tilePosition.y += streakTile.spd * dt;
@@ -8051,6 +8741,12 @@
               if (water) {
                 ripples.push({x: k.x, y: k.ty, r: 5, life: 1});
                 ripples.push({x: k.x, y: k.ty, r: 9, life: 1}); // the splash
+                // the fish nearby panic and scatter from the strike
+                for (const f of fish) {
+                  if (f.reef || Math.abs(f.x - k.x) > 150) continue;
+                  f.scatterT = 0.5 + Math.random() * 0.5;
+                  f.scatterDir = f.x >= k.x ? 1 : -1;
+                }
               }
               k.mode = 'rise';
               k.riseT = 0;
@@ -8102,6 +8798,39 @@
             }
           }
         }
+        // a bloom dips and springs back when a bee or butterfly settles on it: find the
+        // nearest unbobbing flower to the alighting point and give it a damped nod
+        const nodNearestFlower = (px, py, reach) => {
+          let best = null,
+            bd = reach;
+          for (const fl of flowers) {
+            if (fl.nod > 0) continue; // already bobbing from a recent visit
+            const d = Math.abs(fl.s.x - px);
+            if (d < bd && Math.abs(fl.s.y - py) < 140) {
+              best = fl;
+              bd = d;
+            }
+          }
+          if (best) {
+            best.nod = best.nodD = 0.95 + Math.random() * 0.2;
+            best.nodA = 0.2 + Math.random() * 0.12;
+            best.nodDir = px >= best.s.x ? 1 : -1;
+          }
+        };
+        // the x of the nearest real bloom to a point (so an insect can make for an actual
+        // flower rather than a bare patch of grass), or null when none is close enough
+        const nearestFlowerX = (x, reach) => {
+          let bx = null,
+            bd = reach;
+          for (const fl of flowers) {
+            const d = Math.abs(fl.s.x - x);
+            if (d < bd) {
+              bd = d;
+              bx = fl.s.x;
+            }
+          }
+          return bx;
+        };
         // butterflies, dragonflies, bird — wandering / crossing
         for (const f of flutters) {
           if (f.isBat) {
@@ -8140,10 +8869,47 @@
             // a slow, silent glide across the clearing; rests off-screen, then crosses back the other way
             if (f.rest > 0) {
               f.rest -= dt / 60;
+            } else if (f.swoop != null) {
+              // a hunting stoop: drops from the glide right down to the grass, reaches for prey,
+              // and sweeps back up onto the wing — pitching down into it and up out of it
+              f.swoop += dt / 60 / 1.3; // ~1.3s
+              const p = Math.min(1, f.swoop),
+                dip = Math.sin(p * Math.PI),
+                glideY = f.baseY + Math.sin(f.x * 0.006) * 14,
+                lowY = groundY(f.x) - 26; // just over the meadow grass
+              f.x += f.vx * (1 + dip * 0.45) * dt; // a touch quicker through the stoop
+              f.y = glideY + (lowY - glideY) * dip;
+              f.scale.x = (f.vx < 0 ? -1 : 1) * Math.abs(f.scale.x);
+              f.rotation = Math.sign(f.vx) * Math.cos(p * Math.PI) * 0.4; // nose-down in, nose-up out
+              if (p >= 0.46 && !f.struck) {
+                f.struck = true; // a few blades of grass kicked up as it reaches the turf
+                emitBurst(
+                  f.x,
+                  groundY(f.x) + 2,
+                  4,
+                  [0x6fae4a, 0x57933a],
+                  2.1,
+                  3
+                );
+              }
+              if (p >= 1) {
+                f.swoop = null;
+                f.rotation = 0;
+              }
             } else {
               f.x += f.vx * dt;
               f.y = f.baseY + Math.sin(f.x * 0.006) * 14;
               f.scale.x = (f.vx < 0 ? -1 : 1) * Math.abs(f.scale.x);
+              // out over the open meadow it now and then stoops to hunt
+              if (
+                f.x > 150 &&
+                f.x < VW - 150 &&
+                !raining &&
+                Math.random() < 0.0034 * dt
+              ) {
+                f.swoop = 0;
+                f.struck = false;
+              }
               if (f.x > VW + 120 || f.x < -120) {
                 f.dir = -f.dir;
                 f.vx = f.dir * (0.7 + Math.random() * 0.3);
@@ -8178,6 +8944,14 @@
             continue;
           }
           if (f.isBee) {
+            // at dusk it calls it a day, drifting down low to tuck into a grass tussock for the night
+            if (night > 0.45) {
+              f.homeY = f.homeY ?? groundY(f.x) - 3;
+              f.x += Math.sin(t * 6 + f.ph) * 0.5; // a last bumbling drift
+              f.y += (f.homeY - f.y) * 0.03 * dt;
+              f.alpha = Math.max(0, f.alpha - 0.012 * dt); // settles in and is gone for the night
+              continue;
+            }
             // bumbles flower to flower: cruises low to a new bloom, then hovers over it a while
             if (f.mode === 'hover') {
               f.hoverT -= dt / 60;
@@ -8193,17 +8967,22 @@
                     Math.min(VW - 40, f.patchX + (Math.random() - 0.5) * 90)
                   );
                 } else {
-                  // patch worked out — off to a fresh patch of flowers a little way along
+                  // patch worked out — off to a fresh patch of flowers a little way along,
+                  // settling on a real bloom cluster so the bee works actual flowers
                   f.patchX = Math.max(
                     60,
                     Math.min(VW - 60, f.x + (Math.random() - 0.5) * 360)
                   );
+                  const pfx = nearestFlowerX(f.patchX, 180);
+                  if (pfx != null) f.patchX = pfx;
                   f.patchN = 3 + ((Math.random() * 5) | 0); // a few blooms to work here
                   f.tx = Math.max(
                     40,
                     Math.min(VW - 40, f.patchX + (Math.random() - 0.5) * 60)
                   );
                 }
+                const fx = nearestFlowerX(f.tx, 75); // make for an actual bloom if one's near
+                if (fx != null) f.tx = fx;
                 f.ty = groundY(f.tx) - (12 + Math.random() * 46);
               }
             } else {
@@ -8215,6 +8994,7 @@
               if (Math.abs(dx) < 8 && Math.abs(dy) < 10) {
                 f.mode = 'hover';
                 f.hoverT = 1.2 + Math.random() * 2.4;
+                nodNearestFlower(f.x, f.y, 42); // the bloom it settles onto dips under it
               }
             }
             f.alpha += ((raining ? 0.25 : 1) - f.alpha) * 0.04 * dt; // shelters when it rains
@@ -8247,6 +9027,7 @@
                     ? 5 + Math.random() * 6 // lingers at the water, sipping
                     : 1.6 + Math.random() * 2.8;
                   f.gotoAndStop(0); // alight, wings folded
+                  if (!f.puddling) nodNearestFlower(f.x, f.y, 46); // a bloom it lands on nods
                 }
                 continue;
               }
@@ -8267,11 +9048,14 @@
                 f.ty = 597;
                 f.puddling = true;
               } else {
-                // otherwise alight on a nearby spot on the ground
+                // otherwise alight on a nearby spot on the ground, making for a real bloom
+                // if one is close (so it rests on a flower and nods it)
                 f.tx = Math.max(
                   40,
                   Math.min(VW - 40, f.x + (Math.random() - 0.5) * 140)
                 );
+                const fx = nearestFlowerX(f.tx, 90);
+                if (fx != null) f.tx = fx;
                 f.ty = groundY(f.tx) - 2;
                 f.puddling = false;
               }
@@ -8459,6 +9243,7 @@
           d.alpha = 0.12 + 0.88 * s * s * s * s;
         }
         // lily pads bob; seasonal weather falls
+        if (frogTongueG) frogTongueG.clear();
         for (const lp of lilies) {
           const bob = Math.sin(t * 1.5 + lp.x * 0.05) * 1.2;
           if (lp.isFrog) {
@@ -8473,6 +9258,52 @@
               if (water)
                 ripples.push({x: lp.x, y: lp.baseY + 8, r: 4, life: 1});
               lp.hopT = 2.5 + Math.random() * 4;
+            }
+            // snap at a dragonfly that strays within reach — the tongue flicks out and the
+            // dragonfly bolts (it nearly always gets away)
+            lp.flickCD = (lp.flickCD ?? Math.random() * 2) - dt / 60;
+            if (lp.flickT > 0) {
+              lp.flickT -= dt / 60;
+              if (frogTongueG) {
+                const e = 1 - Math.abs(lp.flickT / 0.34 - 0.5) * 2, // out then back
+                  mx = lp.x + lp.dir * 5,
+                  my = lp.y - 6,
+                  tx = mx + (lp.tongueX - mx) * e,
+                  ty = my + (lp.tongueY - my) * e;
+                frogTongueG.lineStyle(2.2, 0xcf5168);
+                frogTongueG.moveTo(mx, my);
+                frogTongueG.lineTo(tx, ty);
+                frogTongueG.lineStyle(0);
+                frogTongueG
+                  .beginFill(0xcf5168)
+                  .drawCircle(tx, ty, 2.6)
+                  .endFill();
+              }
+            } else if (lp.flickCD <= 0 && hop === 0) {
+              for (const fl of flutters) {
+                if (!fl.water || fl.alpha < 0.3) continue;
+                const ddx = fl.x - lp.x,
+                  ddy = fl.y - lp.y;
+                if (Math.abs(ddx) < 56 && ddy > -50 && ddy < 35) {
+                  lp.flickT = 0.34;
+                  lp.tongueX = fl.x;
+                  lp.tongueY = fl.y;
+                  lp.dir = ddx >= 0 ? 1 : -1;
+                  lp.scale.x = lp.dir * Math.abs(lp.scale.x);
+                  lp.flickCD = 2 + Math.random() * 3;
+                  fl.darting = true; // the dragonfly jinks away
+                  fl.dtx = Math.max(
+                    waterL + 20,
+                    Math.min(
+                      waterR - 40,
+                      fl.x - Math.sign(ddx || 1) * (90 + Math.random() * 60)
+                    )
+                  );
+                  fl.dty = Math.max(fl.lo ?? 605, fl.y - 16);
+                  fl.dartT = 0.45;
+                  break;
+                }
+              }
             }
           } else lp.y = lp.baseY + bob;
         }

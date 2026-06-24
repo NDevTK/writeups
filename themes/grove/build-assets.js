@@ -17,7 +17,7 @@ const save = (name, svg, w) =>
   fs.writeFileSync(`${OUT}/${name}.png`, png(svg, w));
 
 // ---- deer (2 walk frames) with belly shadow + leg shading ----
-const deerSvg = (lf, g0, g1, lg0, lg1, mid) =>
+const deerSvg = (lf, g0, g1, lg0, lg1, mid, tailRot) =>
   S(
     '260 215',
     `
@@ -28,7 +28,7 @@ const deerSvg = (lf, g0, g1, lg0, lg1, mid) =>
 <line x1="150" y1="130" x2="${151 + lf[1]}" y2="194" stroke="${mid || '#553a23'}" stroke-width="8"/>
 <line x1="98" y1="135" x2="${95 + lf[2]}" y2="201" stroke="url(#lg)" stroke-width="9"/>
 <line x1="161" y1="133" x2="${164 + lf[3]}" y2="199" stroke="url(#lg)" stroke-width="9"/></g>
-<path d="M58,104 C49,101 47,113 55,119 C60,121 63,113 62,107 Z" fill="${mid || '#6b4626'}"/>
+${tailRot ? `<g transform="rotate(${tailRot} 60 107)">` : ''}<path d="M58,104 C49,101 47,113 55,119 C60,121 63,113 62,107 Z" fill="${mid || '#6b4626'}"/>${tailRot ? '</g>' : ''}
 <path d="M60,120 C56,99 80,89 102,90 C128,91 150,94 166,106 C174,113 171,127 162,134 C148,143 116,146 94,143 C76,141 63,140 60,120 Z" fill="url(#bg)"/>
 <circle cx="80" cy="116" r="23" fill="url(#bg)"/>
 <path d="M70,104 C95,92 135,93 168,107 C150,99 110,99 84,108 Z" fill="#b88350" opacity="0.5"/>
@@ -60,6 +60,26 @@ save(
     '#46301a',
     '#261810',
     '#3a281a'
+  ),
+  210
+);
+// a deer mid tail-swish — frame-0 stance with the tail flicked out; the live sprite swaps to it
+// for a moment as it grazes or stands, the way deer flick their tails at flies
+save(
+  'deer_swish',
+  deerSvg([0, 0, 0, 0], undefined, undefined, undefined, undefined, undefined, 30),
+  210
+);
+save(
+  'deer_d_swish',
+  deerSvg(
+    [0, 0, 0, 0],
+    '#6e4c2c',
+    '#3e2818',
+    '#46301a',
+    '#261810',
+    '#3a281a',
+    30
   ),
   210
 );
@@ -354,6 +374,27 @@ save(
   ),
   160
 );
+// the drake asleep — a loaf with the head turned back and the bill tucked into the back feathers,
+// eye closed (faces right). Body/tail/wing match 'duck' so the live sprite can swap to it in place.
+save(
+  'duck_sleep',
+  S(
+    '170 116',
+    `
+<defs><linearGradient id="db" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c2a06e"/><stop offset="1" stop-color="#8a6a44"/></linearGradient>
+<linearGradient id="dh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2faa55"/><stop offset="1" stop-color="#176b34"/></linearGradient></defs>
+<path d="M32,74 C22,70 14,62 12,54 C20,60 28,68 38,78 Z" fill="#8a6a44"/>
+<path d="M18,57 C12,53 10,56 13,61 C16,63 19,60 18,57 Z" fill="#33271a"/>
+<path d="M30,80 C24,58 50,50 80,52 C108,54 124,64 124,76 C124,90 98,98 70,96 C48,94 36,94 30,80 Z" fill="url(#db)"/>
+<path d="M58,76 C74,66 96,66 108,73 C99,82 74,86 60,82 Z" fill="#eef2f2"/>
+<path d="M62,78 C76,72 94,72 104,77" stroke="#c9d2d2" stroke-width="2" fill="none"/>
+<path d="M92,60 C82,59 74,61 77,65 C80,67 88,66 95,62 Z" fill="#eab43c"/>
+<path d="M96,46 C112,43 124,49 123,60 C122,70 108,73 97,68 C86,63 84,51 96,46 Z" fill="url(#dh)"/>
+<path d="M92,62 C98,66 108,66 116,62" stroke="#fff" stroke-width="2.4" fill="none"/>
+<path d="M104,54 C108,52 112,53 114,55" stroke="#0b2a16" stroke-width="1.6" fill="none"/>`
+  ),
+  160
+);
 
 save(
   'duckling',
@@ -421,6 +462,26 @@ save('rabbit', rabbitSvg('#c8b49a', '#94795f', '#bda78c'), 104);
 save('rabbit_g', rabbitSvg('#b2b6bc', '#7e828a', '#9a9ea4'), 104);
 save('rabbit_k', rabbitSvg('#5e5a54', '#3a362f', '#4e4a44'), 104);
 
+// the rabbit mid ear-twitch — the nearer ear swivelled back about its base, so a brief swap to
+// this frame reads as a flick of the ear while it sits and crops the grass
+const rabbitEarsSvg = (g0, g1, foot) =>
+  S(
+    '104 116',
+    `<defs><linearGradient id="rb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0}"/><stop offset="1" stop-color="${g1}"/></linearGradient></defs>
+<path d="M49,58 C43,28 41,8 48,5 C55,4 57,26 56,54 Z" fill="url(#rb)"/>
+<g transform="rotate(-27 66 54)"><path d="M62,56 C59,28 62,8 70,8 C78,11 72,32 69,54 Z" fill="url(#rb)"/>
+<path d="M65,50 C64,32 66,20 70,14" stroke="#e7b9b0" stroke-width="3" fill="none"/></g>
+<path d="M48,50 C46,30 46,18 49,12" stroke="#e7b9b0" stroke-width="3.4" fill="none"/>
+<ellipse cx="36" cy="94" rx="21" ry="18" fill="url(#rb)"/><ellipse cx="53" cy="84" rx="23" ry="21" fill="url(#rb)"/>
+<circle cx="21" cy="99" r="10" fill="#f2ebe0"/><ellipse cx="60" cy="107" rx="16" ry="5.5" fill="${foot}"/>
+<circle cx="64" cy="56" r="16" fill="url(#rb)"/><path d="M75,55 C81,56 83,62 78,66 C74,67 71,63 72,58 Z" fill="url(#rb)"/>
+<path d="M80,59 l4.5,2.3 l-4.5,2.3 Z" fill="#c97f8a"/><path d="M80,63.4 q-2.6,3.4 -6,2.4" stroke="#7a5648" stroke-width="1.2" fill="none"/>
+<circle cx="65" cy="52" r="2.6" fill="#1a1208"/><circle cx="66" cy="51" r="0.8" fill="#fff"/>`
+  );
+save('rabbit_ears', rabbitEarsSvg('#c8b49a', '#94795f', '#bda78c'), 104);
+save('rabbit_g_ears', rabbitEarsSvg('#b2b6bc', '#7e828a', '#9a9ea4'), 104);
+save('rabbit_k_ears', rabbitEarsSvg('#5e5a54', '#3a362f', '#4e4a44'), 104);
+
 // ---- fox (trotting, faces right) — red, or a dark silver morph ----
 const foxSvg = (g0, g1, light, dark) =>
   S(
@@ -441,6 +502,27 @@ const foxSvg = (g0, g1, light, dark) =>
   );
 save('fox', foxSvg('#e07a2e', '#bd5e1e', '#f3ead8', '#2a2018'), 175);
 save('fox_s', foxSvg('#64686f', '#3a3e44', '#eef2f5', '#1c1e22'), 175);
+// the fox mid mousing-pounce — sprung up and plunging nose-first, body arched, brush streaming up,
+// forepaws reaching down at the grass (faces right). The live sprite swaps to this at the dive.
+const foxPounceSvg = (g0, g1, light, dark) =>
+  S(
+    '210 150',
+    `<defs><linearGradient id="fx" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0}"/><stop offset="1" stop-color="${g1}"/></linearGradient></defs>
+<path d="M70,70 C40,58 18,40 8,22 C24,24 50,38 84,58 Z" fill="url(#fx)"/>
+<path d="M16,26 C6,22 4,30 12,36 C16,30 12,28 20,30 Z" fill="${light}"/>
+<g stroke="${dark}" stroke-width="8" stroke-linecap="round"><line x1="92" y1="66" x2="74" y2="34"/><line x1="106" y1="70" x2="96" y2="36"/></g>
+<path d="M80,60 C86,40 112,38 134,58 C152,74 158,102 150,116 C140,130 116,126 102,108 C86,88 76,76 80,60 Z" fill="url(#fx)"/>
+<path d="M112,104 C126,114 140,114 150,106 C146,122 122,126 110,114 Z" fill="${light}" opacity="0.9"/>
+<g stroke="${dark}" stroke-width="8" stroke-linecap="round"><line x1="138" y1="112" x2="150" y2="142"/><line x1="150" y1="108" x2="160" y2="140"/></g>
+<path d="M132,104 C126,120 132,134 146,138 C157,140 167,131 164,119 C161,108 148,101 132,104 Z" fill="url(#fx)"/>
+<path d="M150,124 C158,132 166,134 170,132 L162,140 L150,136 Z" fill="${light}"/>
+<circle cx="160" cy="138" r="3.6" fill="#1d160f"/>
+<path d="M126,98 L112,90 L130,86 Z" fill="url(#fx)"/><path d="M124,95 L116,91 L128,89 Z" fill="${dark}"/>
+<path d="M140,94 L130,80 L146,82 Z" fill="url(#fx)"/><path d="M139,91 L133,83 L144,84 Z" fill="${dark}"/>
+<circle cx="146" cy="116" r="2.7" fill="#140e09"/>`
+  );
+save('fox_pounce', foxPounceSvg('#e07a2e', '#bd5e1e', '#f3ead8', '#2a2018'), 175);
+save('fox_s_pounce', foxPounceSvg('#64686f', '#3a3e44', '#eef2f5', '#1c1e22'), 175);
 
 // ---- NEW: dragonfly (2 wing frames) — teal by default, plus a red darter and golden hawker ----
 const dragon = (wA, wB, body, dark) =>
@@ -2166,6 +2248,24 @@ save(
   ),
   160
 );
+// the female asleep — head turned back, bill tucked into the back feathers, eye closed (faces right)
+save(
+  'duck_f_sleep',
+  S(
+    '170 116',
+    `<defs><linearGradient id="dfb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c6a675"/><stop offset="1" stop-color="#7e5e3c"/></linearGradient>
+<linearGradient id="dfh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ad8c5e"/><stop offset="1" stop-color="#6d5232"/></linearGradient></defs>
+<path d="M32,74 C22,70 14,62 12,54 C20,60 28,68 38,78 Z" fill="#7e5e3c"/>
+<path d="M18,57 C12,53 10,56 13,61 C16,63 19,60 18,57 Z" fill="#33271a"/>
+<path d="M30,80 C24,58 50,50 80,52 C108,54 124,64 124,76 C124,90 98,98 70,96 C48,94 36,94 30,80 Z" fill="url(#dfb)"/>
+<g stroke="#5e442a" stroke-width="2" fill="none" opacity="0.45" stroke-linecap="round"><path d="M44,70 C54,68 64,68 72,70"/><path d="M50,80 C62,78 76,78 88,80"/><path d="M60,88 C72,87 86,87 98,88"/></g>
+<path d="M66,74 C80,69 92,70 100,75 C92,82 78,84 68,80 Z" fill="#5a6b86" opacity="0.65"/>
+<path d="M92,60 C82,59 74,61 77,65 C80,67 88,66 95,62 Z" fill="#c98a3e"/>
+<path d="M96,46 C112,43 124,49 123,60 C122,70 108,73 97,68 C86,63 84,51 96,46 Z" fill="url(#dfh)"/>
+<path d="M104,54 C108,52 112,53 114,55" stroke="#3a2c18" stroke-width="1.6" fill="none"/>`
+  ),
+  160
+);
 
 // toadstool — classic red fly-agaric with white spots, for the meadow/fern floor
 save(
@@ -2191,6 +2291,73 @@ save(
 <path d="M7,23 C13,25 27,25 33,23 C28,21 12,21 7,23 Z" fill="#caa06a" opacity="0.5"/>`
   ),
   40
+);
+// a dew-beaded orb web — faint pale strands with a scatter of dew beads that catch the dawn
+// light; the live sprite only shows at first light and fades as the dew dries. Deterministic.
+const webSvg = () => {
+  const cx = 60,
+    cy = 48,
+    N = 10,
+    Rr = [48, 50, 46, 52, 47, 49, 51, 45, 50, 47],
+    wob = [0, 4, -3, 2, -4, 3, -2, 4, -3, 2];
+  const pt = (i, f) => {
+    const a = -Math.PI / 2 + (i / N) * Math.PI * 2 + wob[i] * 0.01,
+      r = Rr[i] * f;
+    return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+  };
+  let strands = '';
+  for (let i = 0; i < N; i++) {
+    const [x, y] = pt(i, 1);
+    strands += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`;
+  }
+  for (let ring = 1; ring <= 5; ring++) {
+    const f = 0.2 + (ring / 5) * 0.8;
+    const pts = [];
+    for (let i = 0; i < N; i++) {
+      const [x, y] = pt(i, f);
+      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+    strands += `<polygon points="${pts.join(' ')}"/>`;
+  }
+  // anchor threads slung out to the branches: straight up, and out to the upper corners
+  const [ulx, uly] = pt(8, 1),
+    [urx, ury] = pt(2, 1);
+  const anchors =
+    `<line x1="${cx}" y1="${cy}" x2="${cx}" y2="2"/>` +
+    `<line x1="${ulx.toFixed(1)}" y1="${uly.toFixed(1)}" x2="6" y2="6"/>` +
+    `<line x1="${urx.toFixed(1)}" y1="${ury.toFixed(1)}" x2="114" y2="6"/>`;
+  let beads = '';
+  for (let ring = 1; ring <= 5; ring++) {
+    const f = 0.2 + (ring / 5) * 0.8;
+    for (let i = 0; i < N; i++) {
+      if ((i + ring) % 2 === 0) continue; // bead every other crossing
+      const [x, y] = pt(i, f);
+      const big = (i * 3 + ring) % 5 === 0;
+      beads += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${big ? 1.9 : 1.1}" fill="#eef9ff"/>`;
+      if (big)
+        beads += `<circle cx="${(x - 0.5).toFixed(1)}" cy="${(y - 0.6).toFixed(1)}" r="0.7" fill="#ffffff"/>`;
+    }
+  }
+  return S(
+    '120 110',
+    `<g fill="none" stroke="#cfe6f5" stroke-width="0.7" opacity="0.5" stroke-linejoin="round">${anchors}${strands}</g><g opacity="0.92">${beads}</g>
+<g stroke="#2a2018" stroke-width="0.7" fill="none" stroke-linecap="round"><path d="M58,45 Q50,42 46,43"/><path d="M58,46.5 Q49,46 45,47.5"/><path d="M58,48 Q50,50 46,51.5"/><path d="M58,49.5 Q51,53 48,55.5"/><path d="M62,45 Q70,42 74,43"/><path d="M62,46.5 Q71,46 75,47.5"/><path d="M62,48 Q70,50 74,51.5"/><path d="M62,49.5 Q69,53 72,55.5"/></g>
+<ellipse cx="60" cy="49" rx="3" ry="3.8" fill="#3a3026"/><ellipse cx="60" cy="44.6" rx="2.1" ry="1.9" fill="#241b13"/><path d="M60,46.4 L60,51.6 M57.6,49 L62.4,49" stroke="#cdbf9e" stroke-width="0.45" opacity="0.7"/>`
+  );
+};
+save('web', webSvg(), 120);
+// a fresh molehill — a crumbly mound of dark soil pushed up through the turf (sits on the ground)
+save(
+  'molehill',
+  S(
+    '52 32',
+    `<defs><radialGradient id="mh" cx="0.5" cy="0.95" r="0.85"><stop offset="0" stop-color="#6e4c30"/><stop offset="1" stop-color="#3c2917"/></radialGradient></defs>
+<ellipse cx="26" cy="30" rx="25" ry="4.5" fill="#2f2010" opacity="0.3"/>
+<path d="M3,30 C4,15 14,8 26,8 C38,8 48,15 49,30 Z" fill="url(#mh)"/>
+<circle cx="16" cy="22" r="3.4" fill="#5c3e26"/><circle cx="30" cy="17" r="4" fill="#785532"/><circle cx="37" cy="23" r="2.8" fill="#4e3420"/><circle cx="22" cy="25" r="2.6" fill="#664526"/><circle cx="25" cy="14" r="2.4" fill="#80592f"/><circle cx="11" cy="27" r="2" fill="#553923"/><circle cx="42" cy="27" r="2.2" fill="#5a3d25"/>
+<circle cx="29" cy="16" r="1.4" fill="#8c6238" opacity="0.6"/><circle cx="24" cy="13" r="1.1" fill="#8a6036" opacity="0.55"/><circle cx="15" cy="21" r="1" fill="#7a5430" opacity="0.5"/>`
+  ),
+  46
 );
 // a fallen mossy log
 save(
@@ -2440,6 +2607,40 @@ save(
   62
 );
 
+// ======== the sitting squirrel mid tail-flick — tail snapped up and arched over the back ========
+// identical to the upright pose but for the tail (first path + its inner shading), which is
+// rotated up about its base so a quick swap to this frame reads as a flick of the brush
+const squirrelFlickSvg = (g0, g1, ear, belly, inner) =>
+  S(
+    '70 66',
+    `<defs><linearGradient id="sq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g0}"/><stop offset="1" stop-color="${g1}"/></linearGradient></defs>
+<g transform="rotate(23 30 54)"><path d="M22,58 C7,54 3,37 9,23 C15,11 27,11 31,19 C23,19 15,27 17,39 C19,49 27,53 33,53 C29,57 25,59 22,58 Z" fill="url(#sq)"/>
+<path d="M13,31 C11,23 15,17 21,15 C17,21 17,29 21,35 Z" fill="${inner}" opacity="0.6"/></g>
+<path d="M34,57 C30,45 32,33 40,29 C48,25 56,31 56,43 C56,53 50,59 44,59 C40,59 36,59 34,57 Z" fill="url(#sq)"/>
+<circle cx="49" cy="25" r="11" fill="url(#sq)"/>
+<path d="M43,17 C41,11 43,7 47,9 C47,13 46,17 45,19 Z" fill="${ear}"/>
+<path d="M55,17 C57,11 55,7 51,9 C51,13 52,17 53,19 Z" fill="${ear}"/>
+<path d="M40,53 C38,43 40,35 45,33 C44,41 44,49 46,55 C43,56 41,55 40,53 Z" fill="${belly}"/>
+<circle cx="45" cy="40" r="3.4" fill="#a06a3a"/>
+<circle cx="52" cy="24" r="2" fill="#140e09"/><circle cx="52.6" cy="23.4" r="0.6" fill="#fff"/>
+<circle cx="58" cy="27" r="1.6" fill="#3a241a"/>`
+  );
+save(
+  'squirrel_flick',
+  squirrelFlickSvg('#bc6e3c', '#8a4e28', '#8a4e28', '#e8c89c', '#d49058'),
+  62
+);
+save(
+  'squirrel_g_flick',
+  squirrelFlickSvg('#9aa0a8', '#6a7078', '#6a7078', '#eef1f3', '#b6bcc2'),
+  62
+);
+save(
+  'squirrel_k_flick',
+  squirrelFlickSvg('#4c4c50', '#2a2a2e', '#26262a', '#7a7a7e', '#5e5e62'),
+  62
+);
+
 // ======== an acorn — the nut the squirrel buries ========
 save(
   'acorn',
@@ -2560,6 +2761,29 @@ save(
   perchBird('wren', '#7a5436', '#c69a6a', '#caa45a', '#5a3c26', null, true),
   50
 );
+// each perching bird roosting — fluffed into a round ball, head drawn down and turned back with
+// the beak buried in the back feathers, eye closed. Same palette/flags as its head-up frame, so
+// the live sprite swaps to it in place when it settles to sleep at dusk (faces right).
+const perchRoost = (id, back, breast, beak, wing, crest, cock) =>
+  S(
+    '58 52',
+    `<path d="M16,41 L3,38 L7,46 L18,45 Z" fill="${wing}"/>
+<ellipse cx="29" cy="34" rx="17" ry="15.5" fill="${back}"/>
+<path d="M34,27 C45,30 45,45 32,48 C25,47 24,38 27,32 C29,28 31,27 34,27 Z" fill="${breast}"/>
+<path d="M17,31 C26,27 34,29 38,37 C31,42 22,40 17,37 Z" fill="${wing}"/>
+<ellipse cx="27" cy="22" rx="11.5" ry="10.5" fill="${back}"/>
+${crest ? `<path d="M21,14 C25,10 33,11 37,15 C31,13 25,13 21,17 Z" fill="${crest}"/>` : ''}
+<path d="M21,21 L10,18 L21,25 Z" fill="${beak}"/>
+<path d="M23,17 C29,15 35,17 37,22 C31,24 24,23 20,21 Z" fill="${back}"/>
+<path d="M29,20 C32,18 35,19 37,21" stroke="#1a140d" stroke-width="1.3" fill="none"/>
+<g stroke="${wing}" stroke-width="1.7" stroke-linecap="round"><line x1="27" y1="48.5" x2="27" y2="50.5"/><line x1="32" y1="48.5" x2="32" y2="50.5"/></g>`
+  );
+save('robin_roost', perchRoost('robin', '#8a7a60', '#d8643a', '#e2a23a', '#6f6048'), 50);
+save('bluebird_roost', perchRoost('bluebird', '#4a82c8', '#d59060', '#3a3a40', '#37619a'), 50);
+save('finch_roost', perchRoost('finch', '#b6b04e', '#ecd24e', '#3a3a40', '#8a8638'), 50);
+save('bluetit_roost', perchRoost('bluetit', '#4f8fce', '#ecd24e', '#3a3a40', '#3a6fae'), 50);
+save('goldcrest_roost', perchRoost('goldcrest', '#7e8a4e', '#d4cea8', '#3a3a40', '#5f6a38', '#e8b73a'), 50);
+save('wren_roost', perchRoost('wren', '#7a5436', '#c69a6a', '#caa45a', '#5a3c26', null, true), 50);
 
 // ======== an arctic fox — white, fluffier and round-eared (faces right) ========
 save(
@@ -2910,6 +3134,39 @@ save(
   ),
   84
 );
+// the hedgehog curled into a defensive ball — head and legs tucked, a spiky dome of prickles
+// (the live sprite swaps to this when it's startled, then unrolls again)
+const hedgehogCurlSvg = () => {
+  const cx = 46,
+    cy = 34,
+    rO = 22,
+    rI = 16,
+    N = 16;
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const aO = (i / N) * Math.PI * 2 - Math.PI / 2,
+      aI = ((i + 0.5) / N) * Math.PI * 2 - Math.PI / 2;
+    pts.push(
+      `${(cx + Math.cos(aO) * rO).toFixed(1)},${(cy + Math.sin(aO) * rO * 0.92).toFixed(1)}`
+    );
+    pts.push(
+      `${(cx + Math.cos(aI) * rI).toFixed(1)},${(cy + Math.sin(aI) * rI * 0.92).toFixed(1)}`
+    );
+  }
+  let lines = '';
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
+    lines += `<path d="M${(cx + Math.cos(a) * 5).toFixed(1)},${(cy + Math.sin(a) * 4.5).toFixed(1)} L${(cx + Math.cos(a) * (rI - 1)).toFixed(1)},${(cy + Math.sin(a) * (rI - 1) * 0.92).toFixed(1)}"/>`;
+  }
+  return S(
+    '92 56',
+    `<defs><linearGradient id="hh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a7258"/><stop offset="1" stop-color="#54422f"/></linearGradient></defs>
+<polygon points="${pts.join(' ')}" fill="url(#hh)" stroke="#4a3a2a" stroke-width="0.5" stroke-linejoin="round"/>
+<ellipse cx="${cx}" cy="${cy + 1}" rx="13" ry="11.5" fill="#5c4832"/>
+<g stroke="#3e3022" stroke-width="1.3" opacity="0.4" stroke-linecap="round" fill="none">${lines}</g>`
+  );
+};
+save('hedgehog_curl', hedgehogCurlSvg(), 84);
 
 // ======== a field mouse — scurries the meadow grass and freezes alert (faces right) ========
 save(
@@ -3187,6 +3444,30 @@ save(
 <path d="M143,53 C156,51 162,55 159,60 C156,63 146,62 141,59 Z" fill="#d4543a"/>
 <path d="M156,54 L162,56 L156,59 Z" fill="#2a2018"/>
 <circle cx="133" cy="50" r="2.8" fill="#c0291e"/><circle cx="134" cy="49" r="0.9" fill="#fff"/>`
+  ),
+  160
+);
+// the wood duck drake asleep — crested head turned back over the body, crest drooping, bill tucked
+// into the back feathers, eye closed (faces right). Body/breast match 'wood_duck' for an in-place swap
+save(
+  'wood_duck_sleep',
+  S(
+    '170 116',
+    `<defs><linearGradient id="wdb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cdaa6c"/><stop offset="1" stop-color="#9a7c4a"/></linearGradient>
+<linearGradient id="wdh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f8a72"/><stop offset="1" stop-color="#123f44"/></linearGradient>
+<linearGradient id="wdr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9c5038"/><stop offset="1" stop-color="#6e3424"/></linearGradient></defs>
+<path d="M32,74 C22,70 14,62 12,54 C20,60 28,68 38,78 Z" fill="#394a44"/>
+<path d="M30,80 C24,58 50,50 80,52 C108,54 124,64 124,76 C124,90 98,98 70,96 C48,94 36,94 30,80 Z" fill="#42554f"/>
+<path d="M56,78 C72,68 96,68 112,74 C104,87 76,90 60,84 Z" fill="url(#wdb)"/>
+<path d="M62,80 C78,74 96,74 108,79" stroke="#7c6644" stroke-width="1.2" fill="none" opacity="0.5"/>
+<path d="M99,73 C107,64 118,62 122,71 C123,81 113,87 103,84 C97,82 95,79 99,73 Z" fill="url(#wdr)"/>
+<g fill="#f0e6d2" opacity="0.85"><circle cx="108" cy="72" r="1"/><circle cx="113" cy="76" r="1"/><circle cx="106" cy="79" r="1"/></g>
+<path d="M93,62 C83,61 77,63 80,67 C83,69 90,68 97,64 Z" fill="#d4543a"/>
+<path d="M86,64 L80,66 L86,68 Z" fill="#2a2018"/>
+<path d="M122,52 C124,46 115,43 104,45 C92,47 83,53 79,60 C86,62 95,59 102,61 C112,64 121,61 122,52 Z" fill="url(#wdh)"/>
+<path d="M100,52 C94,55 89,59 86,63" stroke="#fbfbf6" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+<path d="M110,53 C104,56 99,60 95,64" stroke="#fbfbf6" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+<path d="M106,55 C110,53 114,54 116,56" stroke="#0a1c1a" stroke-width="1.6" fill="none"/>`
   ),
   160
 );
