@@ -2777,6 +2777,12 @@ save(
   perchBird('wren', '#7a5436', '#c69a6a', '#caa45a', '#5a3c26', null, true),
   50
 );
+// a bullfinch — soft blue-grey body, a glossy black cap and wings, and a bold rosy-red breast
+save(
+  'bullfinch',
+  perchBird('bullfinch', '#9aa0aa', '#d76a72', '#2b2b33', '#2b2b33', '#222228'),
+  50
+);
 // each perching bird roosting — fluffed into a round ball, head drawn down and turned back with
 // the beak buried in the back feathers, eye closed. Same palette/flags as its head-up frame, so
 // the live sprite swaps to it in place when it settles to sleep at dusk (faces right).
@@ -2829,6 +2835,18 @@ save(
 save(
   'wren_roost',
   perchRoost('wren', '#7a5436', '#c69a6a', '#caa45a', '#5a3c26', null, true),
+  50
+);
+save(
+  'bullfinch_roost',
+  perchRoost(
+    'bullfinch',
+    '#9aa0aa',
+    '#d76a72',
+    '#2b2b33',
+    '#2b2b33',
+    '#222228'
+  ),
   50
 );
 
@@ -3714,7 +3732,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['dandelion', 'dandelion_clock', 'flower_y', 'clover'];
+const review = ['bullfinch', 'robin', 'bluebird', 'wren'];
 const cols = 4,
   cell = 230,
   pad = 14,
