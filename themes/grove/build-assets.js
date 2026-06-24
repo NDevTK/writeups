@@ -3452,6 +3452,27 @@ save(
   46
 );
 
+// ======== a field mouse sat up on its haunches, nibbling a seed in its forepaws (faces right) ========
+save(
+  'mouse_sit',
+  S(
+    '40 48',
+    `<defs><linearGradient id="ms" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a8855e"/><stop offset="1" stop-color="#caad88"/></linearGradient></defs>
+<path d="M13,44 C1,45 1,32 9,29" fill="none" stroke="#b39476" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M11,45 C7,34 9,20 18,15 C26,11 32,17 32,27 C32,35 29,42 24,45 C20,47 14,47 11,45 Z" fill="url(#ms)"/>
+<path d="M19,44 C16,34 17,24 23,20 C23,29 23,38 26,45 C23,46 21,46 19,44 Z" fill="#ecdcc2" opacity="0.6"/>
+<g stroke="#856546" stroke-width="1.7" stroke-linecap="round"><path d="M24,43 L27,46"/><path d="M28,41 L31,44"/></g>
+<circle cx="22" cy="11" r="4.4" fill="#a8855e"/><circle cx="22" cy="11.5" r="2.6" fill="#d8aa9c"/>
+<circle cx="26" cy="15" r="7" fill="#a8855e"/>
+<ellipse cx="30" cy="23" rx="3.2" ry="4.4" fill="url(#ms)"/>
+<circle cx="31" cy="19" r="2.1" fill="#c79a52"/>
+<circle cx="28" cy="13.5" r="1.8" fill="#140f0b"/><circle cx="28.7" cy="13" r="0.6" fill="#ffffff" opacity="0.7"/>
+<circle cx="32" cy="13.5" r="1.3" fill="#d68a8a"/>
+<g stroke="#6a5038" stroke-width="0.6" opacity="0.55" stroke-linecap="round"><path d="M31,12.5 L38,9.5"/><path d="M31,14 L38,15"/></g>`
+  ),
+  40
+);
+
 // ======== a fennec fox — pale, with enormous ears, forages the desert at night (faces right) ========
 save(
   'fennec',

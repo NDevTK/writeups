@@ -1175,6 +1175,7 @@
         'ladybird',
         'snail',
         'mouse',
+        'mouse_sit',
         'grasshopper',
         'kingfisher',
         'woodpecker',
@@ -4490,6 +4491,9 @@
           mouse.scale.x = mouse.dir * mouse.baseSc;
           mouse.spd = 1.4 + Math.random() * 0.8; // quick and darty
           mouse.pauseT = 0.3 + Math.random() * 1.2;
+          mouse.baseTex = 'mouse'; // on all fours, scurrying/frozen
+          mouse.sitTex = 'mouse_sit'; // sat up on its haunches with a seed
+          mouse.nibbleT = 0; // >0 while it sits up to feed
           scene.addChild(mouse);
         } else mouse = null;
         if (
@@ -7498,6 +7502,7 @@
                     Math.max(1.4, Math.abs(mouse.x - fox.x) / 38)
                   );
                   mouse.flee = 0;
+                  mouse.nibbleT = 0; // drops any feed and freezes as it senses the fox
                   mouse.pauseT = fox.listenDur + 0.12; // frozen, sensing the fox
                 }
               }
@@ -8793,6 +8798,10 @@
         if (mouse) {
           if (mouse.flee > 0) {
             // panic: it caught the fox's spring and bolts flat-out the other way
+            if (mouse.nibbleT > 0) {
+              mouse.nibbleT = 0;
+              mouse.texture = T(mouse.baseTex); // drops the seed and bolts
+            }
             mouse.flee -= dt / 60;
             mouse.x += mouse.dir * mouse.spd * 2.1 * dt;
             mouse.y = groundY(mouse.x) + 3 + Math.abs(Math.sin(t * 40)) * -0.6; // a frantic scurry
@@ -8804,7 +8813,18 @@
               mouse.dir = 1;
               mouse.scale.x = mouse.baseSc;
             }
+          } else if (mouse.nibbleT > 0) {
+            // sat up on its haunches, turning a seed in its forepaws with quick little nibbles
+            mouse.nibbleT -= dt / 60;
+            mouse.y = groundY(mouse.x) + 3 + Math.abs(Math.sin(t * 13)) * -0.5; // the nibbling bob
+            mouse.rotation = Math.sin(t * 5) * 0.03; // small shifts as it works the seed round
+            if (mouse.nibbleT <= 0) {
+              mouse.texture = T(mouse.baseTex); // drops back to all fours
+              mouse.rotation = 0;
+            }
           } else if (mouse.pauseT > 0) {
+            if (mouse.texture !== T(mouse.baseTex))
+              mouse.texture = T(mouse.baseTex); // back on all fours if it was sat up
             mouse.pauseT -= dt / 60; // frozen, alert
             mouse.rotation = Math.sin(t * 22) * 0.02; // a fine nervous tremor
             mouse.y = groundY(mouse.x) + 3;
@@ -8823,8 +8843,13 @@
               mouse.dir = 1;
               mouse.scale.x = mouse.baseSc;
             }
-            if (Math.random() < 0.025 * dt)
-              mouse.pauseT = 0.3 + Math.random() * 1.4; // freeze, alert
+            if (Math.random() < 0.025 * dt) {
+              if (Math.random() < 0.4) {
+                // settles up onto its haunches for a feed
+                mouse.nibbleT = 1.2 + Math.random() * 1.8;
+                mouse.texture = T(mouse.sitTex);
+              } else mouse.pauseT = 0.3 + Math.random() * 1.4; // or just freezes, alert
+            }
           }
         }
         // a grasshopper sits in the grass, then springs off in a sudden parabolic arc and settles again
