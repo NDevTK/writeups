@@ -404,6 +404,32 @@ save(
   160
 );
 
+// a raised, spread wing for a duck mid wing-flap — rises from the shoulder, primaries fanned at the
+// tip, a paler trailing edge and a hint of the speculum. fill is the body gradient, edge the lining.
+const duckFlapWing = (fill, edge) =>
+  `<path d="M70,66 C66,46 64,28 70,12 C80,18 96,40 104,60 C107,67 98,73 88,72 C80,71 73,70 70,66 Z" fill="${fill}"/>
+<path d="M70,12 C80,18 96,40 104,60" stroke="${edge}" stroke-width="2.4" fill="none" stroke-linecap="round" opacity="0.7"/>
+<g stroke="${edge}" stroke-width="1.4" fill="none" opacity="0.5"><path d="M74,20 C82,30 92,46 99,58"/><path d="M70,30 C77,40 86,52 94,62"/></g>
+<path d="M90,60 C96,56 102,57 105,61 C101,65 94,65 89,63 Z" fill="#eef2f2" opacity="0.85"/>`;
+save(
+  'duck_flap',
+  S(
+    '170 116',
+    `
+<defs><linearGradient id="db" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c2a06e"/><stop offset="1" stop-color="#8a6a44"/></linearGradient>
+<linearGradient id="dh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2faa55"/><stop offset="1" stop-color="#176b34"/></linearGradient></defs>
+<path d="M32,74 C22,70 14,62 12,54 C20,60 28,68 38,78 Z" fill="#8a6a44"/>
+<path d="M18,57 C12,53 10,56 13,61 C16,63 19,60 18,57 Z" fill="#33271a"/>
+<path d="M30,80 C24,58 50,50 80,52 C108,54 124,64 124,76 C124,90 98,98 70,96 C48,94 36,94 30,80 Z" fill="url(#db)"/>
+${duckFlapWing('url(#db)', '#6f532f')}
+<path d="M106,68 C110,50 118,40 128,38 C139,36 145,45 142,55 C139,66 128,71 118,73 C112,74 108,74 106,68 Z" fill="url(#dh)"/>
+<path d="M110,68 C116,70 123,69 127,65" stroke="#fff" stroke-width="2.4" fill="none"/>
+<path d="M140,51 C153,49 159,53 156,58 C153,62 143,61 138,58 Z" fill="#eab43c"/>
+<circle cx="131" cy="49" r="2.6" fill="#111"/><circle cx="132" cy="48" r="0.8" fill="#fff"/>`
+  ),
+  160
+);
+
 save(
   'duckling',
   S(
@@ -2285,6 +2311,24 @@ save(
   ),
   160
 );
+// the female mid wing-flap — the same body with a wing thrown up
+save(
+  'duck_f_flap',
+  S(
+    '170 116',
+    `<defs><linearGradient id="dfb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c6a675"/><stop offset="1" stop-color="#7e5e3c"/></linearGradient>
+<linearGradient id="dfh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ad8c5e"/><stop offset="1" stop-color="#6d5232"/></linearGradient></defs>
+<path d="M32,74 C22,70 14,62 12,54 C20,60 28,68 38,78 Z" fill="#7e5e3c"/>
+<path d="M18,57 C12,53 10,56 13,61 C16,63 19,60 18,57 Z" fill="#33271a"/>
+<path d="M30,80 C24,58 50,50 80,52 C108,54 124,64 124,76 C124,90 98,98 70,96 C48,94 36,94 30,80 Z" fill="url(#dfb)"/>
+${duckFlapWing('url(#dfb)', '#5e442a')}
+<path d="M106,68 C110,50 118,40 128,38 C139,36 145,45 142,55 C139,66 128,71 118,73 C112,74 108,74 106,68 Z" fill="url(#dfh)"/>
+<path d="M112,52 C122,50 132,50 140,53" stroke="#4a3820" stroke-width="2.4" fill="none"/>
+<path d="M140,51 C153,49 159,53 156,58 C153,62 143,61 138,58 Z" fill="#c98a3e"/>
+<circle cx="131" cy="49" r="2.6" fill="#111"/><circle cx="132" cy="48" r="0.8" fill="#fff"/>`
+  ),
+  160
+);
 // the female asleep — head turned back, bill tucked into the back feathers, eye closed (faces right)
 save(
   'duck_f_sleep',
@@ -3674,6 +3718,30 @@ save(
   ),
   160
 );
+// the wood duck drake mid wing-flap — the same body with a dark wing thrown up
+save(
+  'wood_duck_flap',
+  S(
+    '170 116',
+    `<defs><linearGradient id="wdb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cdaa6c"/><stop offset="1" stop-color="#9a7c4a"/></linearGradient>
+<linearGradient id="wdh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f8a72"/><stop offset="1" stop-color="#123f44"/></linearGradient>
+<linearGradient id="wdr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9c5038"/><stop offset="1" stop-color="#6e3424"/></linearGradient></defs>
+<path d="M32,74 C22,70 14,62 12,54 C20,60 28,68 38,78 Z" fill="#394a44"/>
+<path d="M30,80 C24,58 50,50 80,52 C108,54 124,64 124,76 C124,90 98,98 70,96 C48,94 36,94 30,80 Z" fill="#42554f"/>
+${duckFlapWing('#42554f', '#2b3a35')}
+<path d="M56,78 C72,68 96,68 112,74 C104,87 76,90 60,84 Z" fill="url(#wdb)"/>
+<path d="M99,73 C107,64 118,62 122,71 C123,81 113,87 103,84 C97,82 95,79 99,73 Z" fill="url(#wdr)"/>
+<g fill="#f0e6d2" opacity="0.85"><circle cx="108" cy="72" r="1"/><circle cx="113" cy="76" r="1"/><circle cx="106" cy="79" r="1"/></g>
+<path d="M106,68 C108,47 117,35 129,33 C141,31 148,40 146,50 C151,52 151,60 145,63 C138,67 127,70 117,72 C111,73 108,74 106,68 Z" fill="url(#wdh)"/>
+<path d="M117,39 C110,41 105,48 103,57 C109,52 116,50 122,50 Z" fill="url(#wdh)"/>
+<path d="M123,53 C128,55 134,56 141,55" stroke="#fbfbf6" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+<path d="M119,61 C126,62 133,61 139,59" stroke="#fbfbf6" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+<path d="M143,53 C156,51 162,55 159,60 C156,63 146,62 141,59 Z" fill="#d4543a"/>
+<path d="M156,54 L162,56 L156,59 Z" fill="#2a2018"/>
+<circle cx="133" cy="50" r="2.8" fill="#c0291e"/><circle cx="134" cy="49" r="0.9" fill="#fff"/>`
+  ),
+  160
+);
 // the wood duck drake asleep — crested head turned back over the body, crest drooping, bill tucked
 // into the back feathers, eye closed (faces right). Body/breast match 'wood_duck' for an in-place swap
 save(
@@ -3839,7 +3907,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['squirrel', 'squirrel_eat', 'squirrel_g_eat', 'squirrel_k_eat'];
+const review = ['duck_flap', 'duck_f_flap', 'wood_duck_flap', 'duck'];
 const cols = 4,
   cell = 230,
   pad = 14,

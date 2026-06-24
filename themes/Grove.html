@@ -1282,6 +1282,9 @@
         'duck_sleep',
         'duck_f_sleep',
         'wood_duck_sleep',
+        'duck_flap',
+        'duck_f_flap',
+        'wood_duck_flap',
         'duckling',
         'fish_a',
         'fish_b',
@@ -4873,6 +4876,9 @@
             dm.dabbler = true; // up-ends to feed
             dm.baseTex = dm.curTex = 'duck_f'; // head-up pose / current pose
             dm.sleepTex = 'duck_f_sleep'; // bill tucked into the back, for a settled nap
+            dm.flapTex = 'duck_f_flap'; // reared up, wings thrown open in a flap
+            dm.flapT = 0; // >0 while a wing-flap is held
+            dm.flapCD = 6 + Math.random() * 10; // until the next one
             dm.kids = [];
             dm.ref = spr('duck_f', 380, 0, 0.6);
             dm.ref.scale.y = -0.6;
@@ -4901,6 +4907,9 @@
             d2.dabbler = true; // up-ends to feed
             d2.baseTex = d2.curTex = drakeTex; // head-up pose / current pose
             d2.sleepTex = drakeTex + '_sleep'; // bill tucked into the back, for a settled nap
+            d2.flapTex = drakeTex + '_flap'; // reared up, wings thrown open in a flap
+            d2.flapT = 0; // >0 while a wing-flap is held
+            d2.flapCD = 6 + Math.random() * 10; // until the next one
             ducks.push(d2);
             scene.addChild(d2);
             // a moorhen often potters among them — darker, smaller, with a red bill
@@ -7611,16 +7620,46 @@
           }
           d.up = (d.up || 0) + ((d.upend > 0 ? 1 : 0) - (d.up || 0)) * 0.1 * dt;
           d.rotation = d.up * 1.25 * Math.sign(d.scale.x || 1); // head dips, tail lifts
+          // wing-flap: every so often a duck on the water rears up and beats its wings, then settles
+          // back with a spreading ring — only awake, idling and not mid-dabble
+          if (d.flapTex && !d.land) {
+            if (d.flapT > 0) {
+              d.flapT -= dt / 60;
+              if (d.flapT <= 0 && water)
+                ripples.push({x: d.x, y: d.baseY + 7, r: 4, life: 1}); // settles with a ring
+            } else if (
+              !sleeping &&
+              (d.up || 0) < 0.05 &&
+              Math.abs(d.vx) < 0.2 &&
+              (d.flapCD -= dt / 60) <= 0
+            ) {
+              d.flapT = d.flapDur = 0.7 + Math.random() * 0.4;
+              d.flapCD = 8 + Math.random() * 12;
+            }
+          }
+          const flapRise =
+            d.flapT > 0
+              ? Math.sin((1 - d.flapT / d.flapDur) * Math.PI) * 7 + // rears up over the flap
+                Math.abs(Math.sin(t * 26)) * 2.5 // the quick beat of the wings
+              : 0;
           const waterY =
             d.baseY +
             d.sy +
             Math.sin(t * 2 + d.x * 0.05) * 1.6 * (1 - ice * 0.5) + // stiller on slush
-            d.up * 9; // sink the front as it tips bottom-up
+            d.up * 9 - // sink the front as it tips bottom-up
+            flapRise; // ride up out of the water as it flaps
           // lerp up onto the bank as it hauls out; the bob (part of waterY) fades with it
           d.y = d.land ? waterY + (d.land.y - waterY) * d.haul : waterY;
           // bill-tuck: once it's stopped at its sleeping spot, turn the head back and bury the bill
           // in the back feathers; the head comes straight back up the moment it stirs or wakes
-          if (d.sleepTex) {
+          if (d.flapTex && d.flapT > 0) {
+            // wings thrown open — overrides the resting pose for the beat of the flap
+            if (d.curTex !== d.flapTex) {
+              d.curTex = d.flapTex;
+              d.texture = T(d.flapTex);
+              if (d.ref) d.ref.texture = T(d.flapTex);
+            }
+          } else if (d.sleepTex) {
             const want =
               sleeping && atSpot && Math.abs(d.vx) < 0.14
                 ? d.sleepTex
