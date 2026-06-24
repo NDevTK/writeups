@@ -4096,6 +4096,16 @@
               d.preenTex = frames[0] + '_preen'; // neck folded, bill in the breast feathers
               d.preenT = 0; // >0 while preening
               d.preenCD = 6 + Math.random() * 12; // until the next preen
+              d.gulpT = 0; // >0 while it tips its head back to swallow a catch
+              // a small fish that appears in the bill on a successful strike, then is gulped down.
+              // a child of the bird, so it tracks the bill through the swallow and flips with its facing
+              d.catchFish = new PIXI.Sprite(T('fish_a'));
+              d.catchFish.anchor.set(0.5, 0.5);
+              d.catchFish.position.set(64, -158); // at the bill tip, in the heron's local space
+              d.catchFish.rotation = -1.0; // held nose-up, the way a heron juggles a catch
+              d.catchFish.scale.set(0.34);
+              d.catchFish.visible = false;
+              d.addChild(d.catchFish);
             } else {
               // each starts somewhere different, faces either way, ambles at its own pace
               d.dir = Math.random() < 0.5 ? 1 : -1;
@@ -6921,7 +6931,8 @@
         if (deer && deer.isHeron) {
           // heron: stands statue-still watching the water, takes the odd slow wading step, and now
           // and then strikes — a sharp downward stab that splashes the surface
-          const STRIKE = 0.7;
+          const STRIKE = 0.7,
+            GULP = 1.1;
           // wade in the shallows of the actual pond, not up on the bank — the pond is carved after
           // the herd is built, so the bird is anchored to it here, where pondShape is known
           const hY = pondShape ? pondShape.cy - pondShape.ry * 0.5 : 602,
@@ -6938,7 +6949,6 @@
             if (deer.strike <= 0) {
               deer.rotation = 0;
               deer.y = hY;
-              deer.fishTmr = 3 + Math.random() * 4;
               if (water)
                 ripples.push({
                   x: deer.x + deer.dir * 60,
@@ -6946,6 +6956,38 @@
                   r: 5,
                   life: 1
                 }); // the splash
+              if (deer.caught) {
+                // the stab connected — come up with a fish and swallow it
+                deer.caught = false;
+                deer.gulpT = GULP;
+                if (deer.catchFish) {
+                  deer.catchFish.visible = true;
+                  deer.catchFish.alpha = 1;
+                  deer.catchFish.scale.set(0.34);
+                }
+              } else {
+                deer.fishTmr = 3 + Math.random() * 4; // a miss — back to watching
+              }
+            }
+          } else if (deer.gulpT > 0) {
+            // came up with a catch: throw the head back and work the fish down, then settle level
+            deer.gulpT -= dt / 60;
+            const g = 1 - deer.gulpT / GULP; // 0 -> 1
+            deer.y = hY - Math.sin(g * Math.PI) * 2;
+            deer.rotation = deer.dir * -0.4 * Math.sin(g * Math.PI); // head thrown back to gulp
+            if (deer.catchFish) {
+              const f = deer.catchFish;
+              f.rotation = -1.0 + Math.sin(t * 24) * 0.2; // a wriggle in the bill
+              const fade = Math.max(0, 1 - Math.max(0, (g - 0.5) / 0.32)); // down the gullet
+              f.alpha = fade;
+              f.scale.set(0.34 * (0.35 + 0.65 * fade));
+              if (g >= 0.85) f.visible = false;
+            }
+            if (deer.gulpT <= 0) {
+              deer.rotation = 0;
+              deer.y = hY;
+              if (deer.catchFish) deer.catchFish.visible = false;
+              deer.fishTmr = 4 + Math.random() * 4; // sated; watches a while before the next
             }
           } else if (deer.preenT > 0) {
             // preening: head tucked to the breast, running the bill through the feathers with a
@@ -6983,7 +7025,10 @@
                   Math.min(hHi, deer.x + deer.dir * (50 + Math.random() * 70))
                 );
                 deer.fishTmr = 3 + Math.random() * 3;
-              } else deer.strike = STRIKE;
+              } else {
+                deer.strike = STRIKE;
+                deer.caught = Math.random() < 0.45; // some stabs come up with a fish
+              }
             }
           }
           deer.scale.x = deer.dir * deer.baseSc;
