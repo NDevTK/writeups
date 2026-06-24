@@ -6136,15 +6136,19 @@
           );
         }
 
-        // rainbow: a coloured arc that fades in after a daytime shower clears
+        // rainbow: a coloured arc that fades in after a daytime shower clears.
+        // The bow is centred on the anti-solar point — directly opposite the
+        // sun — so a low sun on one side throws the arc out to the other.
         rainbowG.clear();
         if (rainbow > 0.01 && !BI.interior && !BI.canopy) {
           const cols = [
             0xff6a6a, 0xffa84a, 0xffe24a, 0x6ad86a, 0x52a8ff, 0x6a6aff, 0xb06aff
           ];
+          const rbx = Math.max(VW * 0.25, Math.min(VW * 0.75, VW - cel.x));
+          const rad = VW * 0.33;
           for (let i = 0; i < 7; i++) {
             rainbowG.lineStyle(8, cols[i], rainbow * 0.45);
-            rainbowG.arc(640, 620, 420 - i * 8, Math.PI * 1.06, Math.PI * 1.94);
+            rainbowG.arc(rbx, 620, rad - i * 8, Math.PI * 1.06, Math.PI * 1.94);
           }
         }
 
