@@ -1105,6 +1105,23 @@ save(
   ),
   158
 );
+// the heron preening — neck folded down so the bill runs through the breast feathers (faces right)
+save(
+  'heron_preen',
+  S(
+    '190 232',
+    `<defs><linearGradient id="hr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b3c0cf"/><stop offset="1" stop-color="#6f8398"/></linearGradient></defs>
+<g stroke="#caa24a" stroke-width="4" stroke-linecap="round" fill="none"><path d="M82,148 L74,226"/><path d="M98,148 L108,226"/><path d="M74,226 l14,3"/><path d="M108,226 l14,3"/></g>
+<ellipse cx="92" cy="128" rx="40" ry="25" fill="url(#hr)"/>
+<path d="M106,118 C134,122 156,132 172,146 C152,152 122,150 100,138 Z" fill="#5f7488"/>
+<path d="M90,112 C80,92 92,74 112,76 C128,78 132,92 124,104" stroke="url(#hr)" stroke-width="13" fill="none" stroke-linecap="round"/>
+<ellipse cx="123" cy="104" rx="11" ry="8.5" fill="#b3c0cf"/>
+<path d="M128,98 C142,93 152,94 158,98 C146,99 136,101 129,105 Z" fill="#8b99a8"/>
+<path d="M120,108 L101,132" stroke="#e3b653" stroke-width="4" stroke-linecap="round"/>
+<circle cx="125" cy="101" r="2.4" fill="#16181c"/>`
+  ),
+  158
+);
 // frog — green by default, with brown (common frog/toad) and golden morphs that
 // surface now and then on the lily pads (eye colour shifts to keep the gaze legible)
 const frogSvg = (top, bot, base, eye, line, spot) =>
@@ -3145,6 +3162,25 @@ save(
   ),
   158
 );
+// the egret preening — neck folded down so the bill runs through the breast feathers (faces right)
+save(
+  'egret_preen',
+  S(
+    '190 232',
+    `<defs><linearGradient id="eg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfe8ee"/></linearGradient></defs>
+<g stroke="#2a2e34" stroke-width="3.6" stroke-linecap="round" fill="none"><path d="M84,150 L78,226"/><path d="M98,150 L106,226"/></g>
+<g stroke="#e3b653" stroke-width="3.6" stroke-linecap="round"><path d="M78,226 l12,3"/><path d="M106,226 l12,3"/></g>
+<ellipse cx="92" cy="130" rx="36" ry="21" fill="url(#eg)"/>
+<g stroke="#f2f6f9" stroke-width="1.4" fill="none" opacity="0.8"><path d="M64,126 C44,128 30,134 18,144"/><path d="M66,132 C48,136 36,142 26,150"/><path d="M68,120 C50,120 38,124 28,130"/></g>
+<path d="M104,122 C130,126 150,134 164,146 C146,151 120,150 100,140 Z" fill="#eef3f7"/>
+<path d="M90,116 C80,96 92,78 112,80 C128,82 132,96 124,106" stroke="url(#eg)" stroke-width="10" fill="none" stroke-linecap="round"/>
+<ellipse cx="123" cy="106" rx="10" ry="8" fill="#ffffff"/>
+<path d="M120,110 L101,134" stroke="#e8c23a" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M104,131 L101,134 L107,133 Z" fill="#3a3a2a"/>
+<circle cx="125" cy="103" r="2.2" fill="#16181c"/>`
+  ),
+  158
+);
 
 // ======== reef fish variants ========
 // a tall disc angelfish (silver, tints with the school like the torpedo fish) — 2 swim frames
@@ -3933,7 +3969,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['blue_a', 'white_a', 'admiral_a', 'monarch_a'];
+const review = ['heron', 'heron_preen', 'egret', 'egret_preen'];
 const cols = 4,
   cell = 230,
   pad = 14,

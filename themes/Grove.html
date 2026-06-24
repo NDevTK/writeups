@@ -1166,6 +1166,8 @@
         'monarch_b',
         'parrot',
         'egret',
+        'heron_preen',
+        'egret_preen',
         'angelfish_a',
         'angelfish_b',
         'clownfish_a',
@@ -4079,6 +4081,10 @@
               d.fishTmr = 2 + Math.random() * 4;
               d.strike = 0;
               d.stepTarget = null;
+              d.baseTex = frames[0]; // 'heron' or 'egret' — the standing pose
+              d.preenTex = frames[0] + '_preen'; // neck folded, bill in the breast feathers
+              d.preenT = 0; // >0 while preening
+              d.preenCD = 6 + Math.random() * 12; // until the next preen
             } else {
               // each starts somewhere different, faces either way, ambles at its own pace
               d.dir = Math.random() < 0.5 ? 1 : -1;
@@ -6911,11 +6917,24 @@
                   life: 1
                 }); // the splash
             }
+          } else if (deer.preenT > 0) {
+            // preening: head tucked to the breast, running the bill through the feathers with a
+            // small repetitive shuffle, then it straightens back up
+            deer.preenT -= dt / 60;
+            deer.y = 602;
+            deer.rotation = Math.sin(t * 7) * 0.05; // the bill-shuffle
+            if (deer.preenT <= 0) {
+              deer.rotation = 0;
+              deer.texture = T(deer.baseTex); // neck unfolds, head back up
+              deer.fishTmr = 2 + Math.random() * 3;
+              deer.preenCD = 14 + Math.random() * 16;
+            }
           } else if (raining) {
             deer.y = 602;
             deer.rotation = Math.sin(t * 0.6) * 0.01; // hunkers, statue-still
           } else {
             deer.fishTmr -= dt / 60;
+            deer.preenCD -= dt / 60;
             deer.y = 602;
             deer.rotation = Math.sin(t * 0.5 + deer.x) * 0.013; // a slight idle sway
             if (deer.stepTarget != null) {
@@ -6923,7 +6942,11 @@
               if (Math.abs(deer.x - deer.stepTarget) < 2)
                 deer.stepTarget = null;
             } else if (deer.fishTmr <= 0) {
-              if (Math.random() < 0.45) {
+              if (deer.preenCD <= 0 && deer.preenTex) {
+                // settle in for a preen — fold the neck down and work the breast feathers
+                deer.preenT = 3 + Math.random() * 3;
+                deer.texture = T(deer.preenTex);
+              } else if (Math.random() < 0.45) {
                 if (Math.random() < 0.35) deer.dir = -deer.dir; // sometimes turn to face the other way
                 deer.stepTarget = Math.max(
                   140,
