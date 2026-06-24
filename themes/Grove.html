@@ -7247,6 +7247,8 @@
                       d.gotoAndStop(0);
                     }
                     if (d.grazeTex) d.texture = T(d.grazeTex); // head down to crop the grass
+                    d.grazeLook = 0; // not yet due to raise its head
+                    d.grazeLookCD = 2.5 + Math.random() * 4; // crops a while before the first look-up
                   } else if (Math.random() < 0.45) {
                     // the others now and then halt to stand and look about
                     d.mode = 'pause';
@@ -7264,10 +7266,28 @@
                 // coming out of a graze or a standing pause: amble on, often a new way
                 d.mode = 'walk';
                 d.timer = 5 + Math.random() * 6;
+                d.grazeLook = 0; // head comes up to set off
                 d.swishT = 0; // tail settled as it sets off (play() restores the frames)
                 if (Math.random() < (d.graze ? 0.4 : 0.5)) {
                   d.dir = -d.dir;
                   d.scale.x = d.dir * Math.abs(d.scale.x);
+                }
+              }
+              // vigilant grazing: now and then it lifts its head to chew and watch the meadow for
+              // a spell, then dips back to crop — the head-up/head-down rhythm of a feeding deer
+              if (d.mode === 'graze' && d.grazeTex) {
+                if (d.grazeLook > 0) {
+                  d.grazeLook -= dt / 60;
+                  // head back to the grass when the watch ends (unless a tail-flick is mid-swing)
+                  if (d.grazeLook <= 0 && !(d.swishT > 0))
+                    d.texture = T(d.grazeTex);
+                } else if (
+                  (d.grazeLookCD =
+                    (d.grazeLookCD ?? 2.5 + Math.random() * 4) - dt / 60) <= 0
+                ) {
+                  d.grazeLook = 1.2 + Math.random() * 1.8;
+                  d.grazeLookCD = 5 + Math.random() * 6;
+                  if (multi) d.gotoAndStop(0); // raise the head, watchful
                 }
               }
               // a grazing or standing deer gives its tail the odd flick at the flies
@@ -7275,8 +7295,8 @@
                 if (d.swishT > 0) {
                   d.swishT -= dt / 60;
                   if (d.swishT <= 0) {
-                    // a grazer dips its head back to the grass; a standing deer just settles upright
-                    if (d.mode === 'graze' && d.grazeTex)
+                    // a head-down grazer dips back to the grass; one mid look-up (or standing) stays upright
+                    if (d.mode === 'graze' && d.grazeTex && !(d.grazeLook > 0))
                       d.texture = T(d.grazeTex);
                     else d.gotoAndStop(0);
                   } // tail settles back
@@ -7290,8 +7310,9 @@
                 }
               }
               // a grazing deer drifts slowly forward into fresh grass — cropping on the move
-              // rather than staying rooted to one spot
-              if (d.mode === 'graze') d.x += d.dir * 0.13 * dt;
+              // rather than staying rooted to one spot; it stands still while head-up and watching
+              if (d.mode === 'graze' && !(d.grazeLook > 0))
+                d.x += d.dir * 0.13 * dt;
               if (d.dir > 0 && d.x > VW + 60) d.x = -60;
               else if (d.dir < 0 && d.x < -60) d.x = VW + 60;
               const trot = d.mode === 'walk' && d.trot > 0;
