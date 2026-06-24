@@ -6971,38 +6971,22 @@
             }
           }
           deer.scale.x = deer.dir * deer.baseSc;
-          // a film of water over the part of its legs below the surface: the submerged length sinks
-          // toward the water's own colour, so the feet read as standing IN the shallows, not on them
+          // tint just the submerged length of the legs toward the water's own colour, so the feet
+          // sink into the shallows rather than sitting crisp on top (no ring — only over the legs)
           if (wadeG) {
             wadeG.clear();
             if (water && pondShape) {
-              const surfY = deer.y - 24, // the waterline, a way up the legs
-                botY = deer.y + 5,
+              const surfY = deer.y - 22, // the waterline, a way up the legs
                 filmC = hexI(
                   lpH('#16332b', BI.water.top, 0.35 + 0.55 * P.light)
                 );
-              wadeG.beginFill(filmC, 0.62);
-              wadeG.drawEllipse(
-                deer.x,
-                (surfY + botY) / 2,
-                16,
-                (botY - surfY) / 2
-              );
+              wadeG.beginFill(filmC, 0.6);
+              wadeG.drawRect(deer.x - 9, surfY, 18, deer.y + 5 - surfY);
               wadeG.endFill();
-              // the bright meniscus where the legs cut the surface, and a soft ring spreading off them
-              wadeG.lineStyle(
-                1.4,
-                hexI(lpH('#16332b', BI.water.top, 0.85)),
-                0.6
-              );
-              wadeG.drawEllipse(deer.x, surfY, 15, 3.2);
-              wadeG.lineStyle(1.2, 0xffffff, 0.18);
-              wadeG.drawEllipse(
-                deer.x,
-                surfY + 1,
-                22 + Math.sin(t * 1.3) * 3,
-                4
-              );
+              // a short bright glint right where the legs cut the surface
+              wadeG.beginFill(hexI(lpH('#16332b', BI.water.top, 0.9)), 0.45);
+              wadeG.drawRect(deer.x - 9, surfY - 0.8, 18, 1.6);
+              wadeG.endFill();
             }
           }
         } else {
