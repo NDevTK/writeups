@@ -4103,6 +4103,9 @@
                   ? 'deer_d_drink'
                   : 'deer_drink'
                 : null;
+              // grazing crops the grass with the same head-to-the-ground reach as drinking,
+              // so a feeding deer drops its head rather than standing bolt upright
+              d.grazeTex = d.drinkTex;
               // the tail-flicked pose for an idle swish (deer only, matching the coat)
               d.swishTex = isDeerWalker
                 ? darkDeer
@@ -7243,6 +7246,7 @@
                       d.animationSpeed = d.baseAnim ?? 0.12;
                       d.gotoAndStop(0);
                     }
+                    if (d.grazeTex) d.texture = T(d.grazeTex); // head down to crop the grass
                   } else if (Math.random() < 0.45) {
                     // the others now and then halt to stand and look about
                     d.mode = 'pause';
@@ -7270,7 +7274,12 @@
               if (d.swishTex && (d.mode === 'graze' || d.mode === 'pause')) {
                 if (d.swishT > 0) {
                   d.swishT -= dt / 60;
-                  if (d.swishT <= 0) d.gotoAndStop(0); // tail settles back
+                  if (d.swishT <= 0) {
+                    // a grazer dips its head back to the grass; a standing deer just settles upright
+                    if (d.mode === 'graze' && d.grazeTex)
+                      d.texture = T(d.grazeTex);
+                    else d.gotoAndStop(0);
+                  } // tail settles back
                 } else if (
                   (d.swishCD =
                     (d.swishCD ?? 1.5 + Math.random() * 3.5) - dt / 60) <= 0
