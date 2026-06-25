@@ -4469,17 +4469,31 @@
           molehills.timer = 1.5 + Math.random() * 4; // until the first heave
         }
         if (BI.dewWeb && !snow && Math.random() < 0.85) {
-          // a spider's orb web slung in a corner among the boughs, jewelled with dew at first
-          // light and fading as it dries — hung off to one side so it frames the scene
-          const wx =
-            Math.random() < 0.5
-              ? 90 + Math.random() * 150
-              : VW - 240 + Math.random() * 150;
+          // a spider's orb web jewelled with dew at first light, fading as it dries. Sling it in the
+          // boughs of an actual tree (a canopy perch, or a branch on a trunk) so its anchor threads
+          // run into real foliage rather than leaving it floating in open sky; with no trees to hand
+          // (the marsh), string it low among the shoreline reeds instead.
+          const anchor = perches.length
+            ? perches[(Math.random() * perches.length) | 0]
+            : trunks.length
+              ? trunks[(Math.random() * trunks.length) | 0]
+              : null;
+          let wx, wy;
+          if (anchor) {
+            wx = anchor.x + (Math.random() - 0.5) * 28;
+            wy = anchor.y + 10 + Math.random() * 20; // hangs just below the bough it's slung from
+          } else {
+            wx =
+              Math.random() < 0.5
+                ? 80 + Math.random() * 120
+                : VW - 200 + Math.random() * 120;
+            wy = 556 + Math.random() * 38; // down among the reeds at the water's edge
+          }
           dewWeb = spr(
             'web',
             wx,
-            240 + Math.random() * 120,
-            0.55 + Math.random() * 0.4,
+            wy,
+            0.5 + Math.random() * 0.32,
             0.5,
             0.16 // pivot near the top anchor, so it hangs from the branch
           );
