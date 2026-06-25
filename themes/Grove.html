@@ -7957,6 +7957,9 @@
             } else if (tr.kind === 'paw') {
               tracksG.drawEllipse(tr.x - 2, tr.y, 1.4, 2); // penguin's two little webbed feet
               tracksG.drawEllipse(tr.x + 2, tr.y, 1.4, 2);
+            } else if (tr.kind === 'stoat') {
+              tracksG.drawEllipse(tr.x - 1.6, tr.y - 0.7, 1.2, 1.5); // a bounding mustelid's paired
+              tracksG.drawEllipse(tr.x + 1.6, tr.y + 0.7, 1.2, 1.5); // prints, set close and on the slant
             } else {
               tracksG.drawEllipse(tr.x - 4, tr.y, 1.8, 2.6); // rabbit's paired hind feet
               tracksG.drawEllipse(tr.x + 4, tr.y, 1.8, 2.6);
@@ -9309,6 +9312,7 @@
             s.x += s.dir * s.spd * dt;
             s.y = groundY(s.x) + 4 - Math.abs(Math.sin(t * 12)) * 6; // the arching bound
             s.rotation = s.dir * Math.cos(t * 12) * 0.1; // the body pitches with each hump
+            dropTrack(s, 'stoat', 16); // the ermine leaves a bounding trail across the snow
             if (s.x > VW - 70) {
               s.dir = -1;
               s.scale.x = -s.baseSc;
