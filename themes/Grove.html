@@ -4222,6 +4222,7 @@
           fox = spr(cr, -80, groundY(-80) + 6, BI.critterScale);
           fox.tint = tintJit(BI.critterTint || 0xffffff, 0.06);
           fox.isFox = cr === 'fox' || cr === 'fox_s'; // a fox/coyote mouses; other critters don't
+          fox.breathes = cr === 'fox' || cr === 'fox_s' || cr === 'arctic_fox'; // warm-blooded: fogs in the cold (lizard/crab don't)
           fox.baseTex = cr;
           fox.pounceTex = cr + '_pounce';
           fox.dir = Math.random() < 0.5 ? 1 : -1; // comes in from either side at its own trot
@@ -7692,6 +7693,22 @@
               if (fox.dir > 0 ? fox.x > VW + 80 : fox.x < -80) {
                 fox.visible = false;
                 foxTimer = 8 + Math.random() * 10;
+              }
+            }
+            // its breath fogs in the cold, the same as the deer's — a soft puff drifting from the
+            // muzzle now and then, more often the colder it is (so it shows on a frosty morning)
+            const fcold = Math.max(0, Math.min(1, (4 - temp) / 8));
+            if (fox.breathes && fcold > 0.06 && !fox.pounce) {
+              fox.breathT = (fox.breathT ?? Math.random() * 2) - dt / 60;
+              if (fox.breathT <= 0) {
+                const fsc = Math.abs(fox.scale.y);
+                emitBreath(
+                  fox.x + fox.dir * 79 * fsc,
+                  fox.y - 52 * fsc,
+                  fox.dir,
+                  fcold
+                );
+                fox.breathT = (1.8 + Math.random() * 1.8) * (1.4 - fcold * 0.6);
               }
             }
           } else if (foxTimer < 0 && !raining) {
