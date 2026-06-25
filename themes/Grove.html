@@ -432,6 +432,7 @@
           mouse: true, // a field mouse scurries the meadow grass by day
           grasshopper: true, // a grasshopper springs through the warm meadow grass
           pheasant: true, // a cock pheasant struts the meadow, pecking, by day
+          stoat: true, // a stoat bounds the meadow and stands up to periscope, by day
           flyer: 0xffffff,
           soar: {
             frames: ['eagle'],
@@ -1185,6 +1186,8 @@
         'pheasant_peck',
         'badger_a',
         'badger_b',
+        'stoat',
+        'stoat_up',
         'grasshopper',
         'kingfisher',
         'woodpecker',
@@ -2021,6 +2024,7 @@
         mouse,
         pheasant,
         badger,
+        stoat,
         grasshopper,
         kingfisher,
         woodpecker,
@@ -4557,6 +4561,19 @@
           pheasant.play();
           scene.addChild(pheasant);
         } else pheasant = null;
+        if (BI.stoat && buildNight < 0.5 && !snow && Math.random() < 0.45) {
+          // a stoat bounds through the grass in quick arching hops, then pops bolt upright to
+          // periscope — scanning over the grass — before darting on
+          const sx = 150 + Math.random() * (VW - 300);
+          stoat = spr('stoat', sx, groundY(sx) + 4, 0.3 + Math.random() * 0.06);
+          stoat.baseSc = Math.abs(stoat.scale.x);
+          stoat.dir = Math.random() < 0.5 ? 1 : -1;
+          stoat.scale.x = stoat.dir * stoat.baseSc;
+          stoat.spd = 1.5 + Math.random() * 0.8; // quick and darty
+          stoat.mode = 'bound';
+          stoat.tmr = 0.8 + Math.random() * 1.6;
+          scene.addChild(stoat);
+        } else stoat = null;
         if (
           BI.grasshopper &&
           buildNight < 0.5 &&
@@ -9087,6 +9104,53 @@
             if (p.tmr <= 0) {
               p.mode = 'strut';
               p.tmr = 2 + Math.random() * 4;
+            }
+          }
+        }
+        // a stoat bounds through the grass in quick arching hops, then rears bolt upright to
+        // periscope over the grass before darting on
+        if (stoat) {
+          const s = stoat;
+          s.tmr -= dt / 60;
+          if (s.mode === 'bound') {
+            s.x += s.dir * s.spd * dt;
+            s.y = groundY(s.x) + 4 - Math.abs(Math.sin(t * 12)) * 6; // the arching bound
+            s.rotation = s.dir * Math.cos(t * 12) * 0.1; // the body pitches with each hump
+            if (s.x > VW - 70) {
+              s.dir = -1;
+              s.scale.x = -s.baseSc;
+            } else if (s.x < 70) {
+              s.dir = 1;
+              s.scale.x = s.baseSc;
+            }
+            if (s.tmr <= 0) {
+              if (Math.random() < 0.6) {
+                s.mode = 'look';
+                s.tmr = 1 + Math.random() * 2;
+                s.texture = T('stoat_up');
+                s.rotation = 0;
+                s.y = groundY(s.x) + 4;
+              } else {
+                s.tmr = 0.8 + Math.random() * 1.5;
+                if (Math.random() < 0.5) {
+                  s.dir = -s.dir;
+                  s.scale.x = s.dir * s.baseSc;
+                }
+              }
+            }
+          } else {
+            // reared up on its haunches, periscoping — a slight alert sway as it scans
+            s.y = groundY(s.x) + 4;
+            s.rotation = Math.sin(t * 3) * 0.04;
+            if (s.tmr <= 0) {
+              s.mode = 'bound';
+              s.tmr = 1 + Math.random() * 2;
+              s.texture = T('stoat');
+              s.rotation = 0;
+              if (Math.random() < 0.4) {
+                s.dir = -s.dir;
+                s.scale.x = s.dir * s.baseSc;
+              }
             }
           }
         }
