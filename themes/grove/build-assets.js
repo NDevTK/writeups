@@ -3102,6 +3102,24 @@ save(
   44
 );
 
+// ======== a ladybird in flight — elytra open, translucent hindwings fanned out (faces right) ========
+save(
+  'ladybird_fly',
+  S(
+    '62 46',
+    `<g fill="#dfe7ee" opacity="0.5"><ellipse cx="22" cy="11" rx="18" ry="8.5" transform="rotate(-24 22 11)"/><ellipse cx="22" cy="35" rx="18" ry="8.5" transform="rotate(24 22 35)"/></g>
+<g fill="#f1f5fa" opacity="0.33"><ellipse cx="19" cy="8" rx="13" ry="6" transform="rotate(-31 19 8)"/><ellipse cx="19" cy="38" rx="13" ry="6" transform="rotate(31 19 38)"/></g>
+<ellipse cx="27" cy="23" rx="13" ry="10.5" fill="#e23528"/>
+<path d="M14,23 L40,23" stroke="#1a1612" stroke-width="1.4"/>
+<g fill="#15110d"><circle cx="31" cy="23" r="1.6"/><circle cx="28" cy="17" r="1.6"/><circle cx="28" cy="29" r="1.6"/><circle cx="22" cy="15.5" r="1.6"/><circle cx="22" cy="30.5" r="1.6"/><circle cx="18" cy="19.5" r="1.6"/><circle cx="18" cy="26.5" r="1.6"/></g>
+<ellipse cx="22" cy="13" rx="5" ry="2.4" fill="#f47a6c" opacity="0.5"/>
+<circle cx="41" cy="23" r="4.4" fill="#1a1612"/>
+<g fill="#e9e5d8" opacity="0.85"><circle cx="42.5" cy="21" r="1.1"/><circle cx="42.5" cy="25" r="1.1"/></g>
+<g stroke="#1a1612" stroke-width="1.2" fill="none" stroke-linecap="round"><path d="M45,20 C49,17 51,16 53,15"/><path d="M45,26 C49,27 51,28 53,29"/></g>`
+  ),
+  54
+);
+
 // ======== a grasshopper — springs through the dry summer grass (faces right) ========
 save(
   'grasshopper',

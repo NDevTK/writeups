@@ -1173,6 +1173,7 @@
         'lizard_b',
         'beetle',
         'ladybird',
+        'ladybird_fly',
         'snail',
         'mouse',
         'mouse_sit',
@@ -4388,6 +4389,11 @@
           beetle.scale.x = beetle.dir * beetle.baseSc;
           beetle.spd = 0.5 + Math.random() * 0.5;
           beetle.pauseT = Math.random() * 2;
+          // a ladybird (or beetle) can open up and take to the wing; the scorpion stays grounded
+          beetle.canFly = !scorp;
+          beetle.baseTex = bug; // the grounded pose it folds back to on landing
+          beetle.flyTex = BI.ladybird ? 'ladybird_fly' : null;
+          beetle.flyT = 0; // >0 mid-flight
           scene.addChild(beetle);
         } else beetle = null;
         if (BI.snail && !snow) {
@@ -8636,7 +8642,27 @@
         }
         // a beetle scuttles the ground in little bursts, pausing to forage and reversing at the edges
         if (beetle) {
-          if (beetle.pauseT > 0) {
+          if (beetle.flyT > 0) {
+            // on the wing: opens up and buzzes in a wobbling arc to a fresh patch, then drops back
+            // down and folds its wings away
+            beetle.flyT -= dt / 60;
+            const p = Math.max(0, Math.min(1, 1 - beetle.flyT / beetle.flyDur));
+            beetle.x =
+              beetle.flyX0 +
+              (beetle.flyX1 - beetle.flyX0) * p +
+              Math.sin(t * 28 + beetle.ph) * 1.4; // a buzzing wobble across
+            const gy = groundY(beetle.x) + 4;
+            beetle.y =
+              gy - Math.sin(p * Math.PI) * beetle.flyH + Math.sin(t * 33) * 1.3; // rise, hover, settle
+            beetle.rotation = Math.sin(t * 26) * 0.14; // pitching about in the air
+            if (beetle.flyT <= 0) {
+              beetle.x = beetle.flyX1;
+              beetle.y = groundY(beetle.flyX1) + 4;
+              beetle.rotation = 0;
+              beetle.texture = T(beetle.baseTex); // touches down and folds its wings
+              beetle.pauseT = 0.6 + Math.random() * 1.2; // a beat to settle
+            }
+          } else if (beetle.pauseT > 0) {
             beetle.pauseT -= dt / 60; // stopped, antennae twitching
             beetle.rotation = Math.sin(t * 18) * 0.03;
           } else {
@@ -8650,7 +8676,18 @@
               beetle.dir = 1;
               beetle.scale.x = beetle.baseSc;
             }
-            if (Math.random() < 0.004 * dt)
+            if (beetle.flyTex && !raining && Math.random() < 0.0015 * dt) {
+              // now and then it opens its elytra and takes to the wing
+              beetle.flyX0 = beetle.x;
+              beetle.flyX1 = 110 + Math.random() * (VW - 220);
+              beetle.flyDur = 1.9 + Math.random() * 1.6;
+              beetle.flyH = 55 + Math.random() * 70;
+              beetle.ph = Math.random() * 6.28;
+              beetle.flyT = beetle.flyDur;
+              beetle.dir = beetle.flyX1 > beetle.x ? 1 : -1;
+              beetle.scale.x = beetle.dir * beetle.baseSc;
+              beetle.texture = T(beetle.flyTex);
+            } else if (Math.random() < 0.004 * dt)
               beetle.pauseT = 0.5 + Math.random() * 1.6; // stop to forage
             else if (Math.random() < 0.003 * dt) {
               beetle.dir = -beetle.dir; // change its mind
