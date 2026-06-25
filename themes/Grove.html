@@ -433,6 +433,7 @@
           grasshopper: true, // a grasshopper springs through the warm meadow grass
           pheasant: true, // a cock pheasant struts the meadow, pecking, by day
           stoat: true, // a stoat bounds the meadow and stands up to periscope, by day
+          hare: true, // a brown hare sits sentinel in the open and bounds off across it, by day
           flyer: 0xffffff,
           soar: {
             frames: ['eagle'],
@@ -1189,6 +1190,8 @@
         'badger_b',
         'stoat',
         'stoat_up',
+        'brownhare',
+        'brownhare_run',
         'grasshopper',
         'kingfisher',
         'woodpecker',
@@ -2026,6 +2029,7 @@
         pheasant,
         badger,
         stoat,
+        hare,
         grasshopper,
         kingfisher,
         woodpecker,
@@ -4575,6 +4579,25 @@
           stoat.tmr = 0.8 + Math.random() * 1.6;
           scene.addChild(stoat);
         } else stoat = null;
+        if (BI.hare && buildNight < 0.5 && !snow && Math.random() < 0.45) {
+          // a brown hare out in the open: sits tall and watchful most of the time, then bounds
+          // flat-out across the field to a new spot
+          const hx = 200 + Math.random() * (VW - 400);
+          hare = spr(
+            'brownhare',
+            hx,
+            groundY(hx) + 5,
+            0.6 + Math.random() * 0.08
+          );
+          hare.baseSc = Math.abs(hare.scale.x);
+          hare.dir = Math.random() < 0.5 ? 1 : -1;
+          hare.scale.x = hare.dir * hare.baseSc;
+          hare.spd = 2 + Math.random() * 0.8; // a fast, ground-covering bound
+          hare.mode = 'sit';
+          hare.tmr = 2 + Math.random() * 4;
+          hare.fleeDir = null;
+          scene.addChild(hare);
+        } else hare = null;
         if (
           BI.grasshopper &&
           buildNight < 0.5 &&
@@ -9228,6 +9251,76 @@
                 s.dir = -s.dir;
                 s.scale.x = s.dir * s.baseSc;
               }
+            }
+          }
+        }
+        // a brown hare sits tall and watchful in the open, lopes off to a fresh spot now and then,
+        // and — warier than the rabbit — flushes early and runs flat-out from a fox or stoat
+        if (hare) {
+          const h = hare;
+          h.tmr -= dt / 60;
+          let threatX = fox && fox.visible !== false ? fox.x : null;
+          if (
+            stoat &&
+            (threatX == null ||
+              Math.abs(h.x - stoat.x) < Math.abs(h.x - threatX))
+          )
+            threatX = stoat.x;
+          if (threatX != null) {
+            const dist = Math.abs(h.x - threatX);
+            if (h.fleeDir == null && dist < 200) {
+              h.fleeDir = h.x - threatX >= 0 ? 1 : -1;
+              if (h.fleeDir > 0 && h.x > VW - 140) h.fleeDir = -1;
+              else if (h.fleeDir < 0 && h.x < 140) h.fleeDir = 1;
+            } else if (h.fleeDir != null && dist > 320) h.fleeDir = null;
+          } else h.fleeDir = null;
+          if (h.fleeDir != null) {
+            if (h.fleeDir > 0 && h.x > VW - 90) h.fleeDir = -1;
+            else if (h.fleeDir < 0 && h.x < 90) h.fleeDir = 1;
+            h.dir = h.fleeDir;
+            h.scale.x = h.dir * h.baseSc;
+            h.x += h.dir * h.spd * 2.1 * dt; // flat out
+            h.y = groundY(h.x) + 5 - Math.abs(Math.sin(t * 11)) * 9; // long, low bounds
+            h.rotation = h.dir * Math.cos(t * 11) * 0.08;
+            if (h.curTex !== 'run') {
+              h.texture = T('brownhare_run');
+              h.curTex = 'run';
+            }
+            h.mode = 'sit'; // settles to sit once it has run clear
+          } else if (h.mode === 'sit') {
+            if (h.curTex !== 'sit') {
+              h.texture = T('brownhare');
+              h.curTex = 'sit';
+            }
+            h.y = groundY(h.x) + 5;
+            h.rotation = Math.sin(t * 1.4 + h.x) * 0.015; // a faint watchful sway
+            if (h.tmr <= 0) {
+              h.mode = 'lope';
+              h.loX = Math.max(
+                120,
+                Math.min(
+                  VW - 120,
+                  h.x +
+                    (Math.random() < 0.5 ? -1 : 1) * (200 + Math.random() * 240)
+                )
+              );
+              h.dir = h.loX > h.x ? 1 : -1;
+              h.scale.x = h.dir * h.baseSc;
+              h.texture = T('brownhare_run');
+              h.curTex = 'run';
+            }
+          } else {
+            h.x += h.dir * h.spd * dt;
+            h.y = groundY(h.x) + 5 - Math.abs(Math.sin(t * 9)) * 7; // bounding lope
+            h.rotation = h.dir * Math.cos(t * 9) * 0.06;
+            if (Math.abs(h.x - h.loX) < 8) {
+              h.mode = 'sit';
+              h.tmr = 2.5 + Math.random() * 4;
+              h.x = h.loX;
+              h.y = groundY(h.x) + 5;
+              h.rotation = 0;
+              h.texture = T('brownhare');
+              h.curTex = 'sit';
             }
           }
         }
