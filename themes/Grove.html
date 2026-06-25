@@ -3533,7 +3533,7 @@
           for (let i = 0, _m = vc(5); i < _m; i++) {
             const x = Math.random() * VW,
               g = spr('grass', x, groundY(x) + 6, 0.4 + Math.random() * 0.3);
-            g.tint = grassTint || 0xd8c88a;
+            g.tint = grassTint || mulTint(0xd8c88a, folTint);
             scene.addChild(g);
             swayers.push({s: g, amp: 0.05, sp: 1.5, ph: Math.random() * 6});
           }
@@ -3572,7 +3572,7 @@
           for (let i = 0, _m = vc(15); i < _m; i++) {
             const x = Math.random() * VW,
               g = spr('grass', x, groundY(x) + 6, 0.6 + Math.random() * 0.6);
-            g.tint = grassTint || 0x8fae5c;
+            g.tint = grassTint || mulTint(0x8fae5c, folTint); // greens off to gold in autumn, frosts pale in winter
             scene.addChild(g);
             swayers.push({s: g, amp: 0.06, sp: 1.7, ph: Math.random() * 6});
           }
@@ -3681,7 +3681,7 @@
           for (let i = 0, _m = vc(20); i < _m; i++) {
             const x = Math.random() * VW,
               g = spr('grass', x, groundY(x) + 6, 0.5 + Math.random() * 0.6);
-            g.tint = grassTint || 0xcaad5e;
+            g.tint = grassTint || mulTint(0xcaad5e, folTint);
             scene.addChild(g);
             swayers.push({s: g, amp: 0.06, sp: 1.5, ph: Math.random() * 6});
           }
@@ -4861,7 +4861,7 @@
                 gy = p.cy + Math.sin(a) * p.ry * (0.86 + Math.random() * 0.16);
               if (gy > 612) {
                 const gr = spr('grass', gx, gy + 3, 0.4 + Math.random() * 0.4);
-                gr.tint = tintJit(0x6fae4a, 0.1);
+                gr.tint = tintJit(mulTint(0x6fae4a, folTint), 0.1); // shoreline reeds take the season too
                 if (Math.random() < 0.5) gr.scale.x *= -1;
                 scene.addChild(gr);
                 swayers.push({
