@@ -3515,6 +3515,40 @@ save(
   40
 );
 
+// ======== a cock pheasant — copper body, long barred tail, green head with a red wattle and white
+// ring; struts the meadow and pecks the ground (faces right). a=stride, b=stride, peck=head down ====
+const pheasant = (legf, peck) =>
+  S(
+    '128 80',
+    `<defs><linearGradient id="phb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c87e3e"/><stop offset="1" stop-color="#85491f"/></linearGradient></defs>
+<path d="M52,46 C40,43 22,37 6,31 C20,41 38,49 52,53 Z" fill="#b08544"/>
+<g stroke="#5e3a1a" stroke-width="1.6" opacity="0.7" fill="none"><path d="M17,35 L21,43"/><path d="M27,39 L30,47"/><path d="M37,43 L39,50"/><path d="M46,46 L47,52"/></g>
+<g stroke="#6f6253" stroke-width="3.2" stroke-linecap="round"><line x1="66" y1="59" x2="${64 + legf}" y2="74"/><line x1="77" y1="59" x2="${79 - legf}" y2="74"/></g>
+<ellipse cx="70" cy="48" rx="27" ry="18" fill="url(#phb)"/>
+<path d="M50,40 C68,32 90,34 96,44 C88,40 68,40 52,48 Z" fill="#e3a45e" opacity="0.4"/>
+<g fill="#5e3414" opacity="0.55"><circle cx="62" cy="46" r="1.6"/><circle cx="72" cy="50" r="1.6"/><circle cx="80" cy="46" r="1.5"/><circle cx="66" cy="54" r="1.4"/><circle cx="76" cy="56" r="1.4"/><circle cx="86" cy="52" r="1.4"/></g>
+<path d="M90,46 C98,46 100,58 92,62 C86,60 84,50 90,46 Z" fill="#9c4a28"/>
+${
+  peck
+    ? `<path d="M91,52 C97,60 101,68 101,73" stroke="#1d5a42" stroke-width="9" fill="none" stroke-linecap="round"/>
+<path d="M92,57 C95,55 99,55 101,57" stroke="#eef0e8" stroke-width="3" fill="none" stroke-linecap="round"/>
+<circle cx="102" cy="72" r="7.6" fill="#1c5440"/>
+<ellipse cx="105" cy="72" rx="5.2" ry="4" fill="#cc352b"/>
+<circle cx="105" cy="70.6" r="1.4" fill="#120a04"/>
+<path d="M109,72 L118,73 L109,75.5 Z" fill="#d9cca0"/>`
+    : `<path d="M92,42 C98,32 102,24 101,18" stroke="#1d5a42" stroke-width="10" fill="none" stroke-linecap="round"/>
+<path d="M93,33 C97,31 101,31 104,33" stroke="#eef0e8" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+<path d="M97,9 C96,5 98,4 100,7 Z" fill="#1c5440"/><path d="M105,9 C106,5 104,4 102,7 Z" fill="#1c5440"/>
+<circle cx="101" cy="16" r="8.5" fill="#1c5440"/>
+<ellipse cx="104" cy="15" rx="5.5" ry="4.2" fill="#cc352b"/>
+<circle cx="105" cy="13.5" r="1.5" fill="#120a04"/><circle cx="105.6" cy="13" r="0.5" fill="#fff"/>
+<path d="M109,15 L119,14 L109,18 Z" fill="#d9cca0"/>`
+}`
+  );
+save('pheasant_a', pheasant(0, false), 116);
+save('pheasant_b', pheasant(6, false), 116);
+save('pheasant_peck', pheasant(2, true), 116);
+
 // ======== a fennec fox — pale, with enormous ears, forages the desert at night (faces right) ========
 save(
   'fennec',

@@ -430,6 +430,7 @@
           ladybird: true, // a ladybird trundles the meadow floor by day
           mouse: true, // a field mouse scurries the meadow grass by day
           grasshopper: true, // a grasshopper springs through the warm meadow grass
+          pheasant: true, // a cock pheasant struts the meadow, pecking, by day
           flyer: 0xffffff,
           soar: {
             frames: ['eagle'],
@@ -948,6 +949,7 @@
           molehill: true, // a mole pushes up molehills across the orchard floor
           ladybird: true, // a ladybird trundles the orchard floor by day
           mouse: true, // a field mouse scurries the orchard grass by day
+          pheasant: true, // a cock pheasant struts the orchard, pecking, by day
           flyer: 0xffffff,
           flutter: true,
           flutterTint: 0xffbcdb, // soft pink blossom butterflies
@@ -1177,6 +1179,9 @@
         'snail',
         'mouse',
         'mouse_sit',
+        'pheasant_a',
+        'pheasant_b',
+        'pheasant_peck',
         'grasshopper',
         'kingfisher',
         'woodpecker',
@@ -2011,6 +2016,7 @@
         olm,
         hedgehog,
         mouse,
+        pheasant,
         grasshopper,
         kingfisher,
         woodpecker,
@@ -4527,6 +4533,26 @@
           mouse.nibbleT = 0; // >0 while it sits up to feed
           scene.addChild(mouse);
         } else mouse = null;
+        if (BI.pheasant && buildNight < 0.5 && !snow && Math.random() < 0.5) {
+          // a cock pheasant struts the meadow, stopping to peck the turf and looking up warily
+          const px = 170 + Math.random() * (VW - 340);
+          pheasant = anim(
+            ['pheasant_a', 'pheasant_b'],
+            px,
+            groundY(px) + 4,
+            0.38 + Math.random() * 0.06,
+            0.1
+          );
+          pheasant.baseSc = Math.abs(pheasant.scale.x);
+          pheasant.dir = Math.random() < 0.5 ? 1 : -1;
+          pheasant.scale.x = pheasant.dir * pheasant.baseSc;
+          pheasant.spd = 0.32 + Math.random() * 0.16; // a measured strut
+          pheasant.mode = 'strut';
+          pheasant.tmr = 1.5 + Math.random() * 3;
+          pheasant.headUp = true;
+          pheasant.play();
+          scene.addChild(pheasant);
+        } else pheasant = null;
         if (
           BI.grasshopper &&
           buildNight < 0.5 &&
@@ -8920,6 +8946,76 @@
             else if (Math.random() < 0.004 * dt) {
               hedgehog.dir = -hedgehog.dir;
               hedgehog.scale.x = hedgehog.dir * hedgehog.baseSc;
+            }
+          }
+        }
+        // a cock pheasant struts the meadow, stops to peck the turf in a head-down/head-up rhythm,
+        // and now and then stands tall and alert before strutting on
+        if (pheasant) {
+          const p = pheasant;
+          p.tmr -= dt / 60;
+          if (p.mode === 'strut') {
+            if (!p.playing) p.play();
+            p.x += p.dir * p.spd * dt;
+            p.y = groundY(p.x) + 4 + Math.abs(Math.sin(t * 5 + p.x)) * -1; // a measured strutting bob
+            if (p.x > VW - 80) {
+              p.dir = -1;
+              p.scale.x = -p.baseSc;
+            } else if (p.x < 80) {
+              p.dir = 1;
+              p.scale.x = p.baseSc;
+            }
+            if (p.tmr <= 0) {
+              const r = Math.random();
+              if (r < 0.55) {
+                p.mode = 'peck';
+                p.tmr = 2 + Math.random() * 2.5;
+                p.stop();
+                p.headUp = false;
+                p.texture = T('pheasant_peck');
+                p.peckT = 0.3 + Math.random() * 0.2;
+              } else if (r < 0.78) {
+                p.mode = 'alert';
+                p.tmr = 1.2 + Math.random() * 2;
+                p.stop();
+                p.gotoAndStop(0); // stands tall, head up
+              } else {
+                p.tmr = 2 + Math.random() * 3;
+                if (Math.random() < 0.4) {
+                  p.dir = -p.dir;
+                  p.scale.x = p.dir * p.baseSc;
+                }
+              }
+            }
+          } else if (p.mode === 'peck') {
+            // head down jabbing at the turf, lifting it now and then to glance about between pecks
+            p.y =
+              groundY(p.x) +
+              4 +
+              (p.headUp ? 0 : Math.abs(Math.sin(t * 11)) * -1.6);
+            if ((p.peckT -= dt / 60) <= 0) {
+              p.headUp = !p.headUp;
+              p.texture = T(p.headUp ? 'pheasant_a' : 'pheasant_peck');
+              p.peckT = p.headUp
+                ? 0.35 + Math.random() * 0.5
+                : 0.3 + Math.random() * 0.3;
+            }
+            if (p.tmr <= 0) {
+              p.mode = 'strut';
+              p.tmr = 2 + Math.random() * 4;
+              p.texture = T('pheasant_a');
+              p.headUp = true;
+              if (Math.random() < 0.4) {
+                p.dir = -p.dir;
+                p.scale.x = p.dir * p.baseSc;
+              }
+            }
+          } else {
+            // alert: stands still, head up
+            p.y = groundY(p.x) + 4;
+            if (p.tmr <= 0) {
+              p.mode = 'strut';
+              p.tmr = 2 + Math.random() * 4;
             }
           }
         }
