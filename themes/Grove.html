@@ -1313,6 +1313,8 @@
         'fish_b',
         'bird_a',
         'bird_b',
+        'martin_a',
+        'martin_b',
         'butterfly_a',
         'butterfly_b',
         'blue_a',
@@ -5047,6 +5049,30 @@
               flutters.push(d);
               scene.addChild(d);
             }
+          }
+          // a swallow (house martin) hawks low over the pond on warm days — fast swooping passes
+          // just above the water, nicking the surface now and then for a sip
+          if (!snow && buildNight < 0.5 && Math.random() < 0.6) {
+            const m = anim(
+              ['martin_a', 'martin_b'],
+              waterL + 80,
+              565,
+              0.36,
+              0.16
+            );
+            m.isMartin = true;
+            m.baseSc = Math.abs(m.scale.x);
+            m.dir = Math.random() < 0.5 ? -1 : 1;
+            m.vx = m.dir * (2.6 + Math.random() * 1);
+            m.scale.x = m.dir * m.baseSc;
+            m.loX = waterL + 30;
+            m.hiX = waterR - 30;
+            m.surfaceY = 600;
+            m.ph = Math.random() * 6.28;
+            m.skimCD = 1 + Math.random() * 2;
+            m.alpha = 1;
+            flutters.push(m);
+            scene.addChild(m);
           }
           if (
             (BI.water.lily ||
@@ -9713,6 +9739,25 @@
               f.x = -80;
               f.y = 120 + Math.random() * 80;
             }
+            continue;
+          }
+          if (f.isMartin) {
+            // a fast, low, swooping hawk back and forth over the pond, weaving just above the
+            // surface and dipping to nick it now and then for a drink
+            f.x += f.vx * dt;
+            if (f.x > f.hiX) f.vx = -Math.abs(f.vx);
+            else if (f.x < f.loX) f.vx = Math.abs(f.vx);
+            f.scale.x = (f.vx < 0 ? -1 : 1) * f.baseSc;
+            const a = f.x * 0.018 + f.ph,
+              swoop = Math.sin(a) * 0.5 + 0.5; // 0 skimming the water .. 1 at the top of the arc
+            f.y = f.surfaceY - 7 - swoop * 44;
+            f.rotation = (f.vx < 0 ? -1 : 1) * Math.cos(a) * -0.26; // nose down into the dip, up out
+            f.skimCD -= dt / 60;
+            if (swoop < 0.08 && f.skimCD <= 0 && !raining && water) {
+              ripples.push({x: f.x, y: f.surfaceY + 2, r: 2.5, life: 0.6}); // a sip rings the surface
+              f.skimCD = 1.4 + Math.random() * 2.6;
+            }
+            f.alpha += ((raining ? 0 : 1) - f.alpha) * 0.04 * dt; // sweeps off to cover in the rain
             continue;
           }
           if (f.isSoar) {

@@ -441,6 +441,30 @@ save(
   80
 );
 
+// ---- swallow (skims low over the pond; a = wings up, b = down-stroke). Faces right: forked tail
+// trailing left, swept pointed wings, a rusty throat — the barn-swallow silhouette ----
+const swallow = (wings) =>
+  S(
+    '92 56',
+    `<g fill="#27384e"><path d="M46,30 L19,23 L33,30 L19,37 Z"/>${wings}<ellipse cx="49" cy="30" rx="11" ry="4.2"/><circle cx="59" cy="28" r="4.2"/></g>
+<path d="M56,25.5 C60,24.5 62,26.5 60,28.8 C57.5,30 54.5,28 56,25.5 Z" fill="#b05a38"/>
+<path d="M62,28 L69,27.3 L62,29.6 Z" fill="#141414"/><circle cx="60" cy="27.4" r="1.2" fill="#0a0f14"/>`
+  );
+save(
+  'martin_a',
+  swallow(
+    `<path d="M49,28 C39,13 24,6 12,7 C25,15 38,23 49,30 Z"/><path d="M49,28 C59,14 71,8 83,10 C71,16 59,23 51,30 Z"/>`
+  ),
+  86
+);
+save(
+  'martin_b',
+  swallow(
+    `<path d="M49,32 C39,41 26,51 14,50 C26,42 38,35 49,32 Z"/><path d="M49,32 C59,41 71,51 83,50 C72,42 60,35 51,32 Z"/>`
+  ),
+  86
+);
+
 // ---- bird (a = wings up; b = graceful down-stroke) ----
 const bird = (wings) =>
   S(
