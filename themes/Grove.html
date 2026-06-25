@@ -4375,7 +4375,15 @@
               'bullfinch'
             ],
             p = perches[(Math.random() * perches.length) | 0],
-            kind = species[(Math.random() * species.length) | 0];
+            // the robin holds its territory and sings on through the snow while the rest fall quiet —
+            // the bird of a british winter — so it turns up far more often once the snow is down
+            kind =
+              snow &&
+              !BI.perchSpecies &&
+              species.includes('robin') &&
+              Math.random() < 0.5
+                ? 'robin'
+                : species[(Math.random() * species.length) | 0];
           songbird = spr(
             kind,
             p.x,
