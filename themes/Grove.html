@@ -5612,6 +5612,20 @@
           ow.rest = 0;
           ow.scale.x = ow.dir * Math.abs(ow.scale.x);
           if (reduce.matches) ow.gotoAndStop(0);
+          // a small dark vole it lifts from the grass on a successful stoop and carries off
+          ow.prey = new PIXI.Graphics();
+          ow.prey
+            .beginFill(0x352c22)
+            .drawEllipse(0, 0, 12, 6.5)
+            .drawEllipse(9, 1.5, 5, 4)
+            .endFill();
+          ow.prey.lineStyle(1.8, 0x352c22);
+          ow.prey.moveTo(-10, 0);
+          ow.prey.quadraticCurveTo(-19, 1, -20, 9); // a thin tail
+          ow.prey.position.set(0, -9); // clutched in the talons, under the body
+          ow.prey.rotation = 0.18;
+          ow.prey.visible = false;
+          ow.addChild(ow.prey);
           flutters.push(ow);
           scene.addChild(ow);
         }
@@ -9639,6 +9653,7 @@
                   2.1,
                   3
                 );
+                if (f.gotCatch && f.prey) f.prey.visible = true; // talons close on a vole
               }
               if (p >= 1) {
                 f.swoop = null;
@@ -9648,17 +9663,21 @@
               f.x += f.vx * dt;
               f.y = f.baseY + Math.sin(f.x * 0.006) * 14;
               f.scale.x = (f.vx < 0 ? -1 : 1) * Math.abs(f.scale.x);
-              // out over the open meadow it now and then stoops to hunt
+              // out over the open meadow it now and then stoops to hunt — but not while it's
+              // already carrying a kill
               if (
                 f.x > 150 &&
                 f.x < VW - 150 &&
                 !raining &&
+                !(f.prey && f.prey.visible) &&
                 Math.random() < 0.0034 * dt
               ) {
                 f.swoop = 0;
                 f.struck = false;
+                f.gotCatch = Math.random() < 0.4; // four stoops in ten come up with a vole
               }
               if (f.x > VW + 120 || f.x < -120) {
+                if (f.prey) f.prey.visible = false; // carried it off into the dark
                 f.dir = -f.dir;
                 f.vx = f.dir * (0.7 + Math.random() * 0.3);
                 f.baseY = 170 + Math.random() * 130;
