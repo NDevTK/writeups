@@ -423,6 +423,7 @@
           owl: true, // an owl hunts the meadow after dark
           kingfisher: true, // a kingfisher plunge-dives the pond for fish by day
           hedgehog: true, // a hedgehog snuffles the floor at night
+          badger: true, // a badger snuffles and roots the meadow at night
           snail: true, // a snail glides out onto the wet grass after rain
           toadstools: true, // fly-agaric sprout under the trees after rain
           dewWeb: true, // a spider's web beads with dew at first light
@@ -1182,6 +1183,8 @@
         'pheasant_a',
         'pheasant_b',
         'pheasant_peck',
+        'badger_a',
+        'badger_b',
         'grasshopper',
         'kingfisher',
         'woodpecker',
@@ -2017,6 +2020,7 @@
         hedgehog,
         mouse,
         pheasant,
+        badger,
         grasshopper,
         kingfisher,
         woodpecker,
@@ -4653,6 +4657,25 @@
           hedgehog.pauseT = Math.random() * 2;
           scene.addChild(hedgehog);
         } else hedgehog = null;
+        if (BI.badger && buildNight > 0.5 && !snow && Math.random() < 0.5) {
+          // a badger trundles the night meadow, nose to the turf, pausing to snuffle and root
+          const bx = 180 + Math.random() * (VW - 360);
+          badger = anim(
+            ['badger_a', 'badger_b'],
+            bx,
+            groundY(bx) + 5,
+            0.4 + Math.random() * 0.08,
+            0.09
+          );
+          badger.baseSc = Math.abs(badger.scale.x);
+          badger.dir = Math.random() < 0.5 ? 1 : -1;
+          badger.scale.x = badger.dir * badger.baseSc;
+          badger.spd = 0.26 + Math.random() * 0.16; // a slow, purposeful trundle
+          badger.mode = 'trundle';
+          badger.tmr = 2 + Math.random() * 3;
+          badger.play();
+          scene.addChild(badger);
+        } else badger = null;
         if (
           BI.nightCritter === 'fennec' &&
           buildNight > 0.5 &&
@@ -8891,6 +8914,54 @@
             if (Math.abs(dx) < 4) {
               salamander.mode = 'bask';
               salamander.tmr = 4 + Math.random() * 6;
+            }
+          }
+        }
+        // a badger trundles the night meadow, then stops to snuffle and root the turf for worms
+        if (badger) {
+          const b = badger;
+          b.tmr -= dt / 60;
+          if (b.mode === 'trundle') {
+            if (!b.playing) b.play();
+            b.x += b.dir * b.spd * dt;
+            b.y = groundY(b.x) + 5 + Math.abs(Math.sin(t * 6 + b.x)) * -0.8; // a low waddle
+            b.rotation = 0;
+            if (b.x > VW - 70) {
+              b.dir = -1;
+              b.scale.x = -b.baseSc;
+            } else if (b.x < 70) {
+              b.dir = 1;
+              b.scale.x = b.baseSc;
+            }
+            if (b.tmr <= 0) {
+              b.mode = 'snuffle';
+              b.tmr = 1.6 + Math.random() * 2.6;
+              b.stop();
+              b.rootCD = 0.4 + Math.random() * 0.6;
+            }
+          } else {
+            // nose buried in the turf, snuffling and now and then rooting up a little soil
+            b.y = groundY(b.x) + 5 + Math.abs(Math.sin(t * 10)) * -1; // the rooting bob
+            b.rotation = b.dir * (0.05 + Math.sin(t * 9) * 0.03); // snout working the ground
+            if ((b.rootCD -= dt / 60) <= 0) {
+              emitBurst(
+                b.x + b.dir * 26 * b.baseSc,
+                groundY(b.x + b.dir * 26 * b.baseSc) + 3,
+                3,
+                [0x4e3420, 0x3c2917, 0x6e4c30],
+                1.6,
+                2.4
+              ); // soil flicked back as it digs for worms
+              b.rootCD = 0.9 + Math.random() * 1.5;
+            }
+            if (b.tmr <= 0) {
+              b.mode = 'trundle';
+              b.tmr = 2.5 + Math.random() * 4;
+              b.rotation = 0;
+              if (Math.random() < 0.35) {
+                b.dir = -b.dir;
+                b.scale.x = b.dir * b.baseSc;
+              }
             }
           }
         }

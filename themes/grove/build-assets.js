@@ -3549,6 +3549,26 @@ save('pheasant_a', pheasant(0, false), 116);
 save('pheasant_b', pheasant(6, false), 116);
 save('pheasant_peck', pheasant(2, true), 116);
 
+// ======== a badger — low, grizzled-grey, with the black-and-white striped face; snuffles and roots
+// the meadow at night (faces right). a/b = trundling stride ========
+const badger = (legf) =>
+  S(
+    '120 60',
+    `<defs><linearGradient id="bgr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a8aaae"/><stop offset="1" stop-color="#6c6e72"/></linearGradient></defs>
+<g stroke="#1d1e22" stroke-width="6.5" stroke-linecap="round"><line x1="40" y1="40" x2="${38 + legf}" y2="55"/><line x1="70" y1="40" x2="${72 - legf}" y2="55"/></g>
+<path d="M14,34 C6,32 5,39 11,41 C15,41 17,37 17,34 Z" fill="#8c8e92"/>
+<path d="M16,33 C18,21 40,17 64,18 C84,19 95,23 97,31 C97,39 82,43 58,43 C34,43 19,42 16,33 Z" fill="url(#bgr)"/>
+<path d="M28,40 C50,45 78,44 93,36 C82,43 54,45 30,43 Z" fill="#24252a" opacity="0.55"/>
+<g fill="#6a6c70" opacity="0.45"><circle cx="34" cy="28" r="1.4"/><circle cx="48" cy="26" r="1.4"/><circle cx="62" cy="27" r="1.3"/><circle cx="76" cy="28" r="1.3"/></g>
+<path d="M90,28 C99,21 112,21 117,27 C112,33 100,37 91,34 Z" fill="#eef0ee"/>
+<path d="M92,26 C100,21 110,22 116,26 L112,28.5 C107,25.5 99,26.5 94,29 Z" fill="#1f2024"/>
+<circle cx="92" cy="24" r="3.6" fill="#2a2b2f"/><circle cx="92.5" cy="24" r="1.6" fill="#5a5c60"/>
+<circle cx="101" cy="27.5" r="1.5" fill="#0a0a0c"/>
+<circle cx="116" cy="27" r="2.1" fill="#141418"/>`
+  );
+save('badger_a', badger(0), 108);
+save('badger_b', badger(7), 108);
+
 // ======== a fennec fox — pale, with enormous ears, forages the desert at night (faces right) ========
 save(
   'fennec',
