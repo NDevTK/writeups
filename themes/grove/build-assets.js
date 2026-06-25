@@ -3699,6 +3699,26 @@ const wagtail = (tu) => {
 };
 save('wagtail', wagtail(0), 60);
 save('wagtail_up', wagtail(1), 60);
+// in flight: wings spread mid-beat, tail streaming — for the bounding, undulating relocations
+save(
+  'wagtail_fly',
+  S(
+    '74 46',
+    `<path d="M20,22 L2,28 L6,31 L24,26 Z" fill="#22232a"/>
+<path d="M2,28 L6,31" stroke="#eef1f4" stroke-width="1.3" fill="none"/>
+<path d="M31,20 C25,11 19,7 15,9 C20,13 26,18 32,22 Z" fill="#2c2e34"/>
+<ellipse cx="35" cy="24" rx="14" ry="7.5" fill="#f3f6f8"/>
+<path d="M23,21 C29,15 45,15 50,21 C46,25 30,26 23,23 Z" fill="#3b3e44"/>
+<path d="M34,24 C29,32 21,38 16,40 C24,36 33,30 39,26 Z" fill="#202227"/>
+<path d="M34,24 C28,31 22,36 17,39" stroke="#cfd6dc" stroke-width="1" fill="none"/>
+<circle cx="51" cy="20" r="7.5" fill="#f3f6f8"/>
+<path d="M44,16 C47,10 57,10 59,17 C55,14 48,14 44,19 Z" fill="#16171b"/>
+<path d="M45,19 C50,19 53,23 50,26 C45,27 42,24 44,20 Z" fill="#16171b"/>
+<path d="M58,18.5 L65,19.6 L58,21.4 Z" fill="#1a1a1e"/>
+<circle cx="53.5" cy="17.6" r="1.6" fill="#0a0a0c"/><circle cx="54.1" cy="17" r="0.5" fill="#fff"/>`
+  ),
+  66
+);
 
 // ======== a fennec fox — pale, with enormous ears, forages the desert at night (faces right) ========
 save(

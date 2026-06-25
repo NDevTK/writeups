@@ -1195,6 +1195,7 @@
         'brownhare_run',
         'wagtail',
         'wagtail_up',
+        'wagtail_fly',
         'grasshopper',
         'kingfisher',
         'woodpecker',
@@ -9347,18 +9348,71 @@
             }
           }
         }
-        // a pied wagtail works the short grass: quick little dashes, a stop to teeter and peck, and
-        // all the while that long tail pumping — a fast flick up, a slower settle low
+        // a pied wagtail works the short grass: quick little dashes, a stop to teeter and peck, the
+        // long tail pumping all the while — and a low, bounding, undulating flight to a fresh patch,
+        // which it breaks into urgently when a fox or stoat draws near
         if (wagtail) {
           const w = wagtail;
           w.tmr -= dt / 60;
-          w.bob += dt * (w.mode === 'pause' ? 0.18 : 0.12);
-          const up = Math.sin(w.bob) > 0.45; // up only at the top of the flick — mostly held low
-          if (up !== w.up) {
-            w.up = up;
-            w.texture = T(up ? 'wagtail_up' : 'wagtail');
+          const takeFlight = (dir, dist, urgent) => {
+            if (dir > 0 && w.x > VW - 160) dir = -1;
+            else if (dir < 0 && w.x < 160) dir = 1;
+            w.dir = dir;
+            w.scale.x = w.dir * w.baseSc;
+            w.mode = 'fly';
+            w.flyT = 0;
+            w.flyDur = urgent
+              ? 1.1 + Math.random() * 0.3
+              : 0.8 + Math.random() * 0.3;
+            w.x0 = w.x;
+            w.landX = Math.max(110, Math.min(VW - 110, w.x + dir * dist));
+            w.bounds = 2 + Math.round(dist / 130); // longer flights swoop more times
+            w.urgent = urgent;
+            w.texture = T('wagtail_fly');
+          };
+          if (w.mode !== 'fly') {
+            // the tail-pump: a quick flick up, mostly held low (still while perched on the ground)
+            w.bob += dt * (w.mode === 'pause' ? 0.18 : 0.12);
+            const up = Math.sin(w.bob) > 0.45;
+            if (up !== w.up) {
+              w.up = up;
+              w.texture = T(up ? 'wagtail_up' : 'wagtail');
+            }
+            // a fox or stoat closing in flushes it into the air, away from the threat
+            let predX = fox && fox.visible !== false ? fox.x : null;
+            if (
+              stoat &&
+              (predX == null || Math.abs(w.x - stoat.x) < Math.abs(w.x - predX))
+            )
+              predX = stoat.x;
+            if (predX != null && Math.abs(w.x - predX) < 150)
+              takeFlight(
+                w.x - predX >= 0 ? 1 : -1,
+                300 + Math.random() * 160,
+                true
+              );
           }
-          if (w.mode === 'run') {
+          if (w.mode === 'fly') {
+            // takes off, swoops along in a string of shallow arcs (the bounding flight), then drops
+            // back onto the grass
+            w.flyT += dt / 60;
+            const a = Math.min(1, w.flyT / w.flyDur);
+            const env = Math.sin(Math.min(1, a * 1.08) * Math.PI); // takeoff → landing lift
+            const swoop = Math.sin(a * Math.PI * w.bounds); // the undulation along the way
+            w.x = w.x0 + (w.landX - w.x0) * a;
+            w.y =
+              groundY(w.x) + 2 - env * (30 + swoop * 15) - (w.urgent ? 8 : 0);
+            w.rotation = w.dir * Math.cos(a * Math.PI * w.bounds) * 0.16; // pitches with each swoop
+            if (a >= 1) {
+              w.mode = 'pause';
+              w.x = w.landX;
+              w.y = groundY(w.landX) + 2;
+              w.rotation = 0;
+              w.up = false;
+              w.texture = T('wagtail');
+              w.tmr = 0.5 + Math.random() * 1.2;
+            }
+          } else if (w.mode === 'run') {
             w.x += w.dir * 1.7 * dt;
             if (w.dir > 0 && w.x > VW - 120) w.dir = -1;
             else if (w.dir < 0 && w.x < 120) w.dir = 1;
@@ -9373,11 +9427,20 @@
             w.y = groundY(w.x) + 2;
             w.rotation = Math.sin(t * 2.4) * 0.03; // a slight teeter as it stands
             if (w.tmr <= 0) {
-              w.mode = 'run';
-              w.rotation = 0;
-              if (Math.random() < 0.4) w.dir = -w.dir; // now and then it trots the other way
-              w.scale.x = w.dir * w.baseSc;
-              w.tmr = 0.5 + Math.random() * 1.1;
+              if (Math.random() < 0.25) {
+                // now and then it flits off to a new patch of grass
+                takeFlight(
+                  Math.random() < 0.5 ? 1 : -1,
+                  150 + Math.random() * 140,
+                  false
+                );
+              } else {
+                w.mode = 'run';
+                w.rotation = 0;
+                if (Math.random() < 0.4) w.dir = -w.dir; // now and then it trots the other way
+                w.scale.x = w.dir * w.baseSc;
+                w.tmr = 0.5 + Math.random() * 1.1;
+              }
             }
           }
         }
