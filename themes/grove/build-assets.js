@@ -3569,6 +3569,45 @@ const badger = (legf) =>
 save('badger_a', badger(0), 108);
 save('badger_b', badger(7), 108);
 
+// ======== a stoat — small, low and sinuous, russet above with a cream belly and a black-tipped
+// tail; bounds through the grass and stands bolt upright to periscope (faces right) ========
+const STDEF = `<defs><linearGradient id="st" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bb6a26"/><stop offset="1" stop-color="#9a531c"/></linearGradient></defs>`;
+save(
+  'stoat',
+  S(
+    '96 72',
+    `${STDEF}
+<path d="M30,52 C20,52 11,50 5,46" stroke="#a85a1e" stroke-width="6.5" fill="none" stroke-linecap="round"/>
+<path d="M10,49 C7,48 4,47 2,45" stroke="#1c1a17" stroke-width="6.5" fill="none" stroke-linecap="round"/>
+<g stroke="#8a4a18" stroke-width="4" stroke-linecap="round"><line x1="38" y1="55" x2="36" y2="66"/><line x1="68" y1="55" x2="70" y2="66"/></g>
+<path d="M28,52 C30,38 46,33 62,36 C76,38 82,46 78,53 C66,58 42,58 28,52 Z" fill="url(#st)"/>
+<path d="M40,55 C54,58 70,56 78,51 C70,57 52,58 40,56 Z" fill="#f1e7d2"/>
+<ellipse cx="80" cy="44" rx="9" ry="7.5" fill="url(#st)"/>
+<circle cx="76" cy="37.5" r="2.8" fill="#9a531c"/><circle cx="84" cy="38.5" r="2.4" fill="#9a531c"/>
+<path d="M81,49 C85,49 87,47 87,45 C85,49 83,50 81,50 Z" fill="#f1e7d2"/>
+<circle cx="83" cy="42" r="1.5" fill="#100c08"/><circle cx="89" cy="44" r="1.8" fill="#171310"/>`
+  ),
+  92
+);
+save(
+  'stoat_up',
+  S(
+    '96 72',
+    `${STDEF}
+<path d="M44,60 C34,62 29,66 33,70" stroke="#a85a1e" stroke-width="6" fill="none" stroke-linecap="round"/>
+<path d="M35,68 C33,69 31,69 30,69.5" stroke="#1c1a17" stroke-width="6" fill="none" stroke-linecap="round"/>
+<g stroke="#8a4a18" stroke-width="4" stroke-linecap="round"><line x1="46" y1="64" x2="44" y2="70"/><line x1="55" y1="64" x2="57" y2="70"/></g>
+<path d="M41,68 C37,52 41,33 49,27 C57,22 65,29 64,42 C63,54 59,64 53,68 C49,70 44,70 41,68 Z" fill="url(#st)"/>
+<path d="M49,66 C46,52 48,37 53,31 C53,44 53,56 56,66 C53,68 51,68 49,66 Z" fill="#f1e7d2"/>
+<ellipse cx="51" cy="21" rx="8" ry="7" fill="url(#st)"/>
+<circle cx="46" cy="15.5" r="2.8" fill="#9a531c"/><circle cx="56" cy="15.5" r="2.8" fill="#9a531c"/>
+<ellipse cx="55" cy="40" rx="3" ry="4.5" fill="url(#st)"/>
+<path d="M51,26 C54,26 56,24 56,22 C55,26 53,27 51,27 Z" fill="#f1e7d2"/>
+<circle cx="53" cy="20" r="1.5" fill="#100c08"/><circle cx="50" cy="24" r="1.5" fill="#171310"/>`
+  ),
+  92
+);
+
 // ======== a fennec fox — pale, with enormous ears, forages the desert at night (faces right) ========
 save(
   'fennec',
