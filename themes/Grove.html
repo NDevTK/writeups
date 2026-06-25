@@ -5397,9 +5397,11 @@
               dolphins.push(d);
               scene.addChild(d);
             }
-          // blossom petals collect on the pond and ride the breeze — a soft raft of pink, white and
-          // rose flecks lying on the surface, drifting and slowly turning (kept within the water)
-          if (BI.water.petals && !snow) {
+          // flecks collecting on the pond and riding the breeze — spring blossom (pink, white and
+          // rose) lying on the surface, drifting and slowly turning, or fallen leaves doing the same
+          // through the autumn fall (kept within the water). leaves win over petals out of season.
+          const raftLeaves = weatherKind === 'leaf';
+          if ((BI.water.petals || raftLeaves) && !snow) {
             petalRaft.layer = new PIXI.Container();
             scene.addChild(petalRaft.layer);
             const onWater = (x, y) =>
@@ -5425,17 +5427,27 @@
             };
             petalRaft.onWater = onWater;
             petalRaft.spawn = spawn;
-            const pk = ['petal', 'petal', 'petal_w', 'petal_r'];
-            for (let i = 0, n = 16 + ((Math.random() * 10) | 0); i < n; i++) {
+            const pk = raftLeaves
+              ? ['leaf', 'leaf_m', 'leaf_o']
+              : ['petal', 'petal', 'petal_w', 'petal_r'];
+            for (
+              let i = 0, n = (raftLeaves ? 9 : 16) + ((Math.random() * 9) | 0);
+              i < n;
+              i++
+            ) {
               const s = spawn(),
                 p = spr(
                   pk[(Math.random() * pk.length) | 0],
                   s.x,
                   s.y,
-                  0.24 + Math.random() * 0.18,
+                  raftLeaves
+                    ? 0.3 + Math.random() * 0.2
+                    : 0.24 + Math.random() * 0.18,
                   0.5,
                   0.5
                 );
+              if (raftLeaves)
+                p.tint = LEAFTINTS[(Math.random() * LEAFTINTS.length) | 0];
               p.scale.y *= 0.5; // lying flat on the water, seen at a shallow angle
               p.rotation = Math.random() * 6.28;
               p.baseY = s.y;
