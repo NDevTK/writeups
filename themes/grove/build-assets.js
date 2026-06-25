@@ -3634,6 +3634,48 @@ save(
   92
 );
 
+// ======== a brown hare — bigger and leggier than the rabbit, tawny-gold, with very long
+// black-tipped ears; sits bolt upright as a sentinel and bounds flat-out across the open (faces right) ====
+const HRDEF = `<defs><linearGradient id="hr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bd8c4e"/><stop offset="1" stop-color="#8a6230"/></linearGradient></defs>`;
+save(
+  'brownhare',
+  S(
+    '70 100',
+    `${HRDEF}
+<path d="M40,92 C30,90 26,78 30,70 C34,62 44,62 48,70 C50,76 50,86 46,92 Z" fill="#7c5628"/>
+<path d="M30,94 C26,80 30,56 40,44 C48,34 60,40 59,56 C58,72 52,86 46,94 C42,97 34,97 30,94 Z" fill="url(#hr)"/>
+<path d="M40,92 C37,76 39,58 45,48 C45,62 45,78 49,90 C46,93 43,93 40,92 Z" fill="#ece0c8" opacity="0.7"/>
+<ellipse cx="50" cy="56" rx="6" ry="5" fill="url(#hr)"/>
+<ellipse cx="50" cy="34" rx="9" ry="8.5" fill="url(#hr)"/>
+<path d="M45,27 C40,10 39,3 43,2 C48,4 50,18 51,28 Z" fill="url(#hr)"/>
+<path d="M44,11 C40,4 40,2 43,2 C46,4 47,9 48,14 Z" fill="#1a1410"/>
+<path d="M55,27 C58,10 60,3 56,2 C51,4 51,18 51,28 Z" fill="url(#hr)"/>
+<path d="M56,11 C60,4 60,2 57,2 C54,4 53,9 52,14 Z" fill="#1a1410"/>
+<path d="M55,33 C59,33 61,30 60,27 C58,32 55,33 54,33 Z" fill="#ece0c8"/>
+<circle cx="54" cy="31" r="2" fill="#3a2814"/><circle cx="54.6" cy="30.4" r="0.7" fill="#d8b86a"/>
+<circle cx="59" cy="35" r="1.4" fill="#171008"/>`
+  ),
+  62
+);
+save(
+  'brownhare_run',
+  S(
+    '112 64',
+    `${HRDEF}
+<path d="M16,40 C8,34 4,38 6,44 C10,48 16,46 20,42 Z" fill="#ece0c8"/>
+<g stroke="#7c5628" stroke-width="5" stroke-linecap="round"><path d="M34,44 C24,46 16,52 12,58"/><path d="M44,44 C36,50 30,56 28,60"/></g>
+<g stroke="#8a6230" stroke-width="5" stroke-linecap="round"><path d="M78,42 C88,46 96,50 102,52"/><path d="M86,40 C94,46 100,52 104,56"/></g>
+<path d="M24,40 C30,28 56,24 80,28 C96,30 102,38 98,44 C90,50 60,52 38,48 C30,46 26,44 24,40 Z" fill="url(#hr)"/>
+<path d="M40,46 C58,50 82,49 96,43 C84,49 58,51 40,48 Z" fill="#ece0c8" opacity="0.5"/>
+<ellipse cx="92" cy="34" rx="9" ry="7.5" fill="url(#hr)"/>
+<path d="M86,30 C78,20 74,16 76,14 C82,16 88,24 92,31 Z" fill="url(#hr)"/>
+<path d="M80,21 C74,15 72,13 74,13 C78,15 82,19 84,23 Z" fill="#1a1410"/>
+<path d="M98,30 L108,28 L99,33 Z" fill="#ece0c8"/>
+<circle cx="95" cy="32" r="1.8" fill="#3a2814"/><circle cx="100" cy="33" r="1.4" fill="#171008"/>`
+  ),
+  100
+);
+
 // ======== a fennec fox — pale, with enormous ears, forages the desert at night (faces right) ========
 save(
   'fennec',
