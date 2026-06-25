@@ -4059,7 +4059,14 @@
         if (weatherKind === 'leaf' && !BI.cloudSea && !BI.underwater) {
           const leafKinds = ['leaf', 'leaf_m', 'leaf_o'];
           for (let i = 0; i < 26; i++) {
-            const lx = 24 + Math.random() * (VW - 48);
+            // most drift up against the foot of a tree (a triangular spread, densest at the trunk);
+            // the rest blow out across the open grass
+            let lx;
+            if (trunks.length && Math.random() < 0.6) {
+              const tr = trunks[(Math.random() * trunks.length) | 0];
+              lx = tr.x + (Math.random() - Math.random()) * 66;
+            } else lx = 24 + Math.random() * (VW - 48);
+            lx = Math.max(20, Math.min(VW - 20, lx));
             const lf = spr(
               leafKinds[(Math.random() * leafKinds.length) | 0],
               lx,
