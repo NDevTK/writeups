@@ -1924,6 +1924,7 @@
       const swayers = [],
         flowers = [], // the subset of swayers that are blooms — they nod when an insect alights
         clocks = [], // dandelion seed-heads that shed drifting parachute seeds on a gust
+        leafLitter = [], // fallen leaves resting on the ground in autumn; they rustle on a gust
         fungi = [], // toadstools that sprout after rain and shrink back as the ground dries
         molehills = [], // fresh molehills a mole pushes up across the meadow, one by one
         clouds = [],
@@ -2112,6 +2113,7 @@
           ghostCrabs.length =
           skaters.length =
           tadpoles.length =
+          leafLitter.length =
             0;
         snowAcc = 0; // each scene starts bare; snow re-settles if it's a snowy biome
         lastSnowDraw = lastWetDraw = lastLightDraw = lastIceDraw = -1; // force the gated snow/ice/puddle shapes to draw once on the first frame of the new scene
@@ -4051,6 +4053,32 @@
           (TEMP_BASE[nowBiome()] ?? 9) +
           (BI.seasonal ? (SEASON_TEMP[nowSeason()] ?? 0) : 0); // seed near the climate so it doesn't have to thaw/freeze from 0
         iceAmt = snowing && BI.water && BI.water.freeze ? 0.45 : 0; // a frozen pond opens partly iced
+        // autumn leaf litter: a scatter of fallen leaves resting on the ground (the same leaves that
+        // are coming down), settled at all angles, that lift and rustle when a gust rolls through.
+        // laid down before the animals so they tread over it, not under it.
+        if (weatherKind === 'leaf' && !BI.cloudSea && !BI.underwater) {
+          const leafKinds = ['leaf', 'leaf_m', 'leaf_o'];
+          for (let i = 0; i < 26; i++) {
+            const lx = 24 + Math.random() * (VW - 48);
+            const lf = spr(
+              leafKinds[(Math.random() * leafKinds.length) | 0],
+              lx,
+              groundY(lx) + 2 + Math.random() * 5,
+              0.4 + Math.random() * 0.34,
+              0.5,
+              0.5
+            );
+            lf.tint = LEAFTINTS[(Math.random() * LEAFTINTS.length) | 0];
+            lf.scale.y *= 0.6; // foreshortened, lying flat on the grass
+            if (Math.random() < 0.5) lf.scale.x *= -1;
+            lf.rest = (Math.random() - 0.5) * 3.1; // the angle it has settled at
+            lf.rotation = lf.rest;
+            lf.yRest = lf.y;
+            lf.amp = 0.1 + Math.random() * 0.16; // how much this one stirs in a gust
+            scene.addChild(lf);
+            leafLitter.push(lf);
+          }
+        }
         walkers.length = 0;
         if (BI.walker) {
           const heron = BI.walker[0] === 'heron';
@@ -7014,6 +7042,13 @@
             w.s.scale.x = w.sx0 * (1 - night * 0.55);
             w.s.scale.y = w.sy0 * (1 - night * 0.28);
           }
+        }
+        // the autumn litter stirs as the same gust wave rolls across — leaves twitch at their angle
+        // and an edge lifts in a strong gust, then settle again as the air calms
+        for (const lf of leafLitter) {
+          const gust = Math.sin(t * 2.1 - lf.x * 0.009) * wind * 0.8;
+          lf.rotation = lf.rest + (wind + gust) * lf.amp * 3;
+          lf.y = lf.yRest - Math.max(0, gust) * lf.amp * 16;
         }
         // the mirrored trees drift on the breeze and fade as the surface roughens or freezes over
         if (reflLayer) {
