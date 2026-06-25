@@ -9828,7 +9828,34 @@
           }
           if (f.water) {
             // a dragonfly hangs in the air on a faint wobble, then darts to a fresh spot and hangs
-            // again — patrolling the pond in quick stop-start bursts rather than aimless drift
+            // again — patrolling the pond in quick stop-start bursts; now and then it drops onto a
+            // lily pad to bask with its wings held still
+            if (f.perchT > 0) {
+              if (f.darting) {
+                f.perchT = 0; // a fish struck — break off the bask and bolt
+                if (f._stopped) {
+                  f.play();
+                  f._stopped = false;
+                }
+              } else {
+                f.perchT -= dt / 60;
+                if (!f._stopped) {
+                  f.gotoAndStop(0); // wings held out, basking
+                  f._stopped = true;
+                }
+                f.x = f.perchX;
+                f.y = f.perchY + Math.sin(t * 2 + f.x) * 0.4; // dead still but for a faint sway
+                if (f.perchT <= 0) {
+                  f.play(); // wings whir back up and it lifts off
+                  f._stopped = false;
+                  f.hx = f.x;
+                  f.hy = f.y;
+                  f.dartT = 0.4 + Math.random() * 0.5;
+                }
+                f.alpha += ((raining ? 0 : 1) - f.alpha) * 0.04 * dt;
+                continue;
+              }
+            }
             if (f.ph0 == null) {
               f.ph0 = Math.random() * 6.28;
               f.ph1 = Math.random() * 6.28;
@@ -9843,9 +9870,17 @@
               f.y += (ddy / dd) * step;
               if (dd < 8 || f.dartT <= 0) {
                 f.darting = false;
-                f.hx = f.x;
-                f.hy = f.y;
-                f.dartT = 0.6 + Math.random() * 1.9; // then hang a while
+                if (f.toPerch) {
+                  // touched down on a lily pad — settle and bask for a spell
+                  f.toPerch = false;
+                  f.perchX = f.x;
+                  f.perchY = f.y;
+                  f.perchT = 2 + Math.random() * 3.5;
+                } else {
+                  f.hx = f.x;
+                  f.hy = f.y;
+                  f.dartT = 0.6 + Math.random() * 1.9; // then hang a while
+                }
               }
             } else {
               if (f.hx == null) {
@@ -9856,15 +9891,29 @@
               f.y = f.hy + Math.sin(t * 7 + f.ph1) * 1.2;
               if (f.dartT <= 0) {
                 f.darting = true;
-                f.dtx = Math.max(
-                  waterL + 20,
-                  Math.min(waterR - 40, f.x + (Math.random() - 0.5) * 300)
-                );
-                f.dty = Math.max(
-                  f.lo,
-                  Math.min(f.hi, f.y + (Math.random() - 0.5) * 70)
-                );
-                f.dartT = 0.2 + Math.random() * 0.4;
+                // now and then make for a lily pad to perch on; otherwise dart to a fresh hover spot
+                let pad = null;
+                if (lilies.length && Math.random() < 0.3) {
+                  const lp = lilies[(Math.random() * lilies.length) | 0];
+                  if (lp && !lp.isFrog) pad = lp;
+                }
+                if (pad) {
+                  f.toPerch = true;
+                  f.dtx = pad.x + (Math.random() - 0.5) * 14;
+                  f.dty = pad.baseY - 6; // just onto the pad's surface
+                  f.dartT = 0.3 + Math.random() * 0.4;
+                } else {
+                  f.toPerch = false;
+                  f.dtx = Math.max(
+                    waterL + 20,
+                    Math.min(waterR - 40, f.x + (Math.random() - 0.5) * 300)
+                  );
+                  f.dty = Math.max(
+                    f.lo,
+                    Math.min(f.hi, f.y + (Math.random() - 0.5) * 70)
+                  );
+                  f.dartT = 0.2 + Math.random() * 0.4;
+                }
                 f.scale.x = (f.dtx >= f.x ? 1 : -1) * Math.abs(f.scale.x);
               }
             }
