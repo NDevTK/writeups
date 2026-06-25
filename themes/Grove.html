@@ -434,6 +434,7 @@
           pheasant: true, // a cock pheasant struts the meadow, pecking, by day
           stoat: true, // a stoat bounds the meadow and stands up to periscope, by day
           hare: true, // a brown hare sits sentinel in the open and bounds off across it, by day
+          wagtail: true, // a pied wagtail runs the short grass in spurts, tail forever pumping, by day
           flyer: 0xffffff,
           soar: {
             frames: ['eagle'],
@@ -1192,6 +1193,8 @@
         'stoat_up',
         'brownhare',
         'brownhare_run',
+        'wagtail',
+        'wagtail_up',
         'grasshopper',
         'kingfisher',
         'woodpecker',
@@ -2030,6 +2033,7 @@
         badger,
         stoat,
         hare,
+        wagtail,
         grasshopper,
         kingfisher,
         woodpecker,
@@ -4598,6 +4602,25 @@
           hare.fleeDir = null;
           scene.addChild(hare);
         } else hare = null;
+        if (BI.wagtail && buildNight < 0.6 && !snow) {
+          // a pied wagtail works the short grass: quick little dashes, a stop to peck, and all the
+          // while that long tail pumping up and down
+          const wx = 180 + Math.random() * (VW - 360);
+          wagtail = spr(
+            'wagtail',
+            wx,
+            groundY(wx) + 2,
+            0.34 + Math.random() * 0.05
+          );
+          wagtail.baseSc = Math.abs(wagtail.scale.x);
+          wagtail.dir = Math.random() < 0.5 ? 1 : -1;
+          wagtail.scale.x = wagtail.dir * wagtail.baseSc;
+          wagtail.mode = 'pause';
+          wagtail.tmr = 0.4 + Math.random() * 1.2;
+          wagtail.bob = Math.random() * 6.28; // tail-pump phase
+          wagtail.up = false; // which tail frame is showing
+          scene.addChild(wagtail);
+        } else wagtail = null;
         if (
           BI.grasshopper &&
           buildNight < 0.5 &&
@@ -9321,6 +9344,40 @@
               h.rotation = 0;
               h.texture = T('brownhare');
               h.curTex = 'sit';
+            }
+          }
+        }
+        // a pied wagtail works the short grass: quick little dashes, a stop to teeter and peck, and
+        // all the while that long tail pumping — a fast flick up, a slower settle low
+        if (wagtail) {
+          const w = wagtail;
+          w.tmr -= dt / 60;
+          w.bob += dt * (w.mode === 'pause' ? 0.18 : 0.12);
+          const up = Math.sin(w.bob) > 0.45; // up only at the top of the flick — mostly held low
+          if (up !== w.up) {
+            w.up = up;
+            w.texture = T(up ? 'wagtail_up' : 'wagtail');
+          }
+          if (w.mode === 'run') {
+            w.x += w.dir * 1.7 * dt;
+            if (w.dir > 0 && w.x > VW - 120) w.dir = -1;
+            else if (w.dir < 0 && w.x < 120) w.dir = 1;
+            w.scale.x = w.dir * w.baseSc;
+            w.y = groundY(w.x) + 2 - Math.abs(Math.sin(t * 18)) * 1.2; // a faint scurrying bob
+            w.rotation = 0;
+            if (w.tmr <= 0) {
+              w.mode = 'pause';
+              w.tmr = 0.4 + Math.random() * 1.4;
+            }
+          } else {
+            w.y = groundY(w.x) + 2;
+            w.rotation = Math.sin(t * 2.4) * 0.03; // a slight teeter as it stands
+            if (w.tmr <= 0) {
+              w.mode = 'run';
+              w.rotation = 0;
+              if (Math.random() < 0.4) w.dir = -w.dir; // now and then it trots the other way
+              w.scale.x = w.dir * w.baseSc;
+              w.tmr = 0.5 + Math.random() * 1.1;
             }
           }
         }

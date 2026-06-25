@@ -3676,6 +3676,30 @@ save(
   100
 );
 
+// ======== a pied wagtail — small, slim, black-white-and-grey, with a very long tail it pumps
+// constantly; runs the short grass in quick spurts, snapping at insects (faces right).
+// tu = tail raised (the up-flick of the pump); 0 = tail held low ========
+const wagtail = (tu) => {
+  const ty = tu ? 9 : 33; // tail-tip y: flicked up vs held low
+  const tcy = tu ? 15 : 30; // mid-tail control
+  return S(
+    '66 46',
+    `<g stroke="#1b1b1f" stroke-width="1.6" stroke-linecap="round"><line x1="33" y1="31" x2="32" y2="42"/><line x1="39" y1="31" x2="40" y2="42"/></g>
+<path d="M27,27 C18,${tcy} 11,${tcy + 1} 5,${ty} C8,${ty + 4} 10,${ty + 5} 13,${ty + 3} C20,${tcy + 4} 26,31 30,30 Z" fill="#22232a"/>
+<path d="M5,${ty} C8,${ty + 4} 10,${ty + 5} 13,${ty + 3}" stroke="#eef1f4" stroke-width="1.4" fill="none"/>
+<ellipse cx="35" cy="26" rx="13" ry="9" fill="#f3f6f8"/>
+<path d="M22,23 C27,15 44,15 49,22 C46,27 30,28 22,25 Z" fill="#3b3e44"/>
+<path d="M27,24 C34,22 43,22 47,24" stroke="#26282d" stroke-width="1" fill="none"/>
+<circle cx="49" cy="18" r="8" fill="#f3f6f8"/>
+<path d="M42,14 C45,8 55,8 57,15 C53,12 46,12 42,17 Z" fill="#16171b"/>
+<path d="M43,17 C48,17 51,21 49,25 C44,27 40,25 41,21 C41,18 42,17 43,17 Z" fill="#16171b"/>
+<path d="M56,16.5 L63,17.6 L56,19.4 Z" fill="#1a1a1e"/>
+<circle cx="51.5" cy="16" r="1.7" fill="#0a0a0c"/><circle cx="52.1" cy="15.4" r="0.5" fill="#fff"/>`
+  );
+};
+save('wagtail', wagtail(0), 60);
+save('wagtail_up', wagtail(1), 60);
+
 // ======== a fennec fox — pale, with enormous ears, forages the desert at night (faces right) ========
 save(
   'fennec',
