@@ -4406,6 +4406,10 @@
           snail.scale.x = snail.dir * snail.baseSc;
           snail.alpha = 0; // hidden until the ground is wet enough
           snail.spd = 0.12 + Math.random() * 0.06; // a glacial creep
+          snail.trail = []; // the glistening slime it lays down behind the foot
+          snail.trailDrop = 0; // px counter until the next dab of slime
+          snail.trailG = new PIXI.Graphics();
+          scene.addChild(snail.trailG); // under the snail, so the foot rides over its own trail
           scene.addChild(snail);
         } else snail = null;
         if (BI.toadstools && !snow) {
@@ -8709,6 +8713,36 @@
             } else if (snail.x < 90) {
               snail.dir = 1;
               snail.scale.x = snail.baseSc;
+            }
+            // dab down a fresh bead of slime behind the foot every few px of creep
+            snail.trailDrop -= snail.spd * dt;
+            if (snail.trailDrop <= 0) {
+              snail.trail.push({
+                x: snail.x - snail.dir * 5,
+                y: groundY(snail.x) + 4,
+                life: 1
+              });
+              snail.trailDrop = 3;
+              if (snail.trail.length > 90) snail.trail.shift();
+            }
+          }
+          // the trail glistens, then slowly dries and fades — redrawn each frame even after the
+          // snail has crept off, so the smear lingers and dries up on its own
+          if (snail.trailG) {
+            const g = snail.trailG;
+            g.clear();
+            for (let i = snail.trail.length - 1; i >= 0; i--) {
+              const p = snail.trail[i];
+              p.life -= dt / 60 / 7; // dries over ~7s
+              if (p.life <= 0) {
+                snail.trail.splice(i, 1);
+                continue;
+              }
+              const a = p.life * snail.alpha * 0.3;
+              g.beginFill(0xdff0ee, a).drawEllipse(p.x, p.y, 4, 1.3).endFill();
+              g.beginFill(0xffffff, a * 0.55)
+                .drawEllipse(p.x, p.y - 0.4, 1.8, 0.7)
+                .endFill(); // a wet glint
             }
           }
         }
