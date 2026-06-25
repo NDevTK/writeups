@@ -3548,6 +3548,32 @@ ${
 save('pheasant_a', pheasant(0, false), 116);
 save('pheasant_b', pheasant(6, false), 116);
 save('pheasant_peck', pheasant(2, true), 116);
+// the cock pheasant flushed into flight — wings beating, neck out, long tail streaming (faces right)
+save(
+  'pheasant_fly',
+  S(
+    '134 96',
+    `<defs><linearGradient id="phb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c87e3e"/><stop offset="1" stop-color="#85491f"/></linearGradient></defs>
+<path d="M54,52 C40,50 20,46 4,42 C20,52 40,58 56,60 Z" fill="#b08544"/>
+<g stroke="#5e3a1a" stroke-width="1.6" opacity="0.7" fill="none"><path d="M16,46 L20,53"/><path d="M28,49 L31,56"/><path d="M40,52 L42,58"/></g>
+<path d="M70,47 C62,29 52,12 60,8 C70,16 80,32 86,47 Z" fill="#9a531c"/>
+<path d="M67,41 C63,31 61,23 64,15" stroke="#5e3414" stroke-width="1.4" opacity="0.5" fill="none"/>
+<ellipse cx="74" cy="50" rx="26" ry="15" fill="url(#phb)"/>
+<path d="M56,43 C74,36 94,38 100,47 C92,43 72,42 58,50 Z" fill="#e3a45e" opacity="0.4"/>
+<g fill="#5e3414" opacity="0.5"><circle cx="66" cy="48" r="1.6"/><circle cx="76" cy="52" r="1.6"/><circle cx="84" cy="48" r="1.5"/><circle cx="70" cy="55" r="1.4"/></g>
+<path d="M94,48 C102,48 104,58 97,62 C91,60 89,51 94,48 Z" fill="#9c4a28"/>
+<path d="M96,46 C104,40 112,36 116,33" stroke="#1d5a42" stroke-width="9" fill="none" stroke-linecap="round"/>
+<path d="M98,42 C102,40 106,40 109,42" stroke="#eef0e8" stroke-width="3" fill="none" stroke-linecap="round"/>
+<circle cx="118" cy="31" r="8" fill="#1c5440"/>
+<ellipse cx="121" cy="30" rx="5.2" ry="4" fill="#cc352b"/>
+<circle cx="121" cy="28.6" r="1.4" fill="#120a04"/><circle cx="121.5" cy="28.1" r="0.5" fill="#fff"/>
+<path d="M125,31 L134,30 L125,33.5 Z" fill="#d9cca0"/>
+<path d="M78,54 C70,72 60,88 70,90 C82,86 92,68 96,54 Z" fill="url(#phb)"/>
+<g stroke="#5e3414" stroke-width="1.5" opacity="0.5" fill="none"><path d="M80,60 C76,72 72,80 74,86"/><path d="M86,58 C84,70 82,78 84,84"/></g>
+<g stroke="#6f6253" stroke-width="3" stroke-linecap="round"><line x1="64" y1="62" x2="54" y2="66"/><line x1="70" y1="63" x2="60" y2="68"/></g>`
+  ),
+  120
+);
 
 // ======== a badger — low, grizzled-grey, with the black-and-white striped face; snuffles and roots
 // the meadow at night (faces right). a/b = trundling stride ========
