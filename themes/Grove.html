@@ -363,11 +363,11 @@
           ch(base & 255)
         );
       };
-      // lerp a hex colour toward cool frost-white (for whitening hills/forest in winter — a job a
-      // multiply tint can't do, since multiplying only darkens)
-      const frostHex = (c, a) => {
-        const w = 0xe6eff7,
-          r = (((c >> 16) & 255) * (1 - a) + ((w >> 16) & 255) * a) | 0,
+      // lerp a hex colour toward a target (default cool frost-white, for whitening hills/forest in
+      // winter — a job a multiply tint can't do, since multiplying only darkens; also reused to dry
+      // the slopes off toward autumn gold)
+      const frostHex = (c, a, w = 0xe6eff7) => {
+        const r = (((c >> 16) & 255) * (1 - a) + ((w >> 16) & 255) * a) | 0,
           g = (((c >> 8) & 255) * (1 - a) + ((w >> 8) & 255) * a) | 0,
           b = ((c & 255) * (1 - a) + (w & 255) * a) | 0;
         return (r << 16) | (g << 8) | b;
@@ -2563,12 +2563,17 @@
           scene.addChild(cloudGlow);
         } else {
           for (const fn of HILLS) hillBands.push(fn); // remembered so settling snow can thicken each crest over time
+          const autumnGround = !snow && SE === SEASONS.autumn;
           HILLS.forEach((fn, i) => {
             // winter whitens the actual hill colour (deeper on the near bands), then the seasonal
-            // multiply tint still cools it — so the slopes read as snow, not green under a wash
+            // multiply tint still cools it — so the slopes read as snow, not green under a wash;
+            // autumn instead dries the green off toward gold so the meadow turns rather than staying
+            // mid-summer green under the tint
             const base = snow
               ? frostHex(BI.hills[i], 0.45 + i * 0.12)
-              : BI.hills[i];
+              : autumnGround
+                ? frostHex(BI.hills[i], 0.3 + i * 0.06, 0xc6a14e)
+                : BI.hills[i];
             const hh = hill(fn, base);
             hh.tint = hillTint;
             scene.addChild(hh);
