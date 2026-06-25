@@ -9830,6 +9830,30 @@
             // a dragonfly hangs in the air on a faint wobble, then darts to a fresh spot and hangs
             // again — patrolling the pond in quick stop-start bursts; now and then it drops onto a
             // lily pad to bask with its wings held still
+            if (f.eaten) {
+              // snapped up by a frog — gone a while, then a fresh dragonfly arrives at the pond
+              f.respawnT -= dt / 60;
+              if (f.respawnT <= 0) {
+                f.eaten = false;
+                f.visible = true;
+                f.x = waterL + 30 + Math.random() * (waterR - waterL - 60);
+                f.y = (f.lo + f.hi) / 2;
+                f.hx = f.x;
+                f.hy = f.y;
+                f.alpha = 0; // fades back in
+                f.darting = false;
+                f.perchT = 0;
+                if (f._stopped) {
+                  f.play();
+                  f._stopped = false;
+                }
+              }
+              continue;
+            }
+            if (f.caught) {
+              // held fast on the frog's tongue; the frog drives its position until it's gulped down
+              continue;
+            }
             if (f.perchT > 0) {
               if (f.darting) {
                 f.perchT = 0; // a fish struck — break off the bask and bolt
@@ -10077,12 +10101,12 @@
             lp.flickCD = (lp.flickCD ?? Math.random() * 2) - dt / 60;
             if (lp.flickT > 0) {
               lp.flickT -= dt / 60;
+              const e = 1 - Math.abs(lp.flickT / 0.34 - 0.5) * 2, // out then back
+                mx = lp.x + lp.dir * 5,
+                my = lp.y - 6,
+                tx = mx + (lp.tongueX - mx) * e,
+                ty = my + (lp.tongueY - my) * e;
               if (frogTongueG) {
-                const e = 1 - Math.abs(lp.flickT / 0.34 - 0.5) * 2, // out then back
-                  mx = lp.x + lp.dir * 5,
-                  my = lp.y - 6,
-                  tx = mx + (lp.tongueX - mx) * e,
-                  ty = my + (lp.tongueY - my) * e;
                 frogTongueG.lineStyle(2.2, 0xcf5168);
                 frogTongueG.moveTo(mx, my);
                 frogTongueG.lineTo(tx, ty);
@@ -10091,6 +10115,21 @@
                   .beginFill(0xcf5168)
                   .drawCircle(tx, ty, 2.6)
                   .endFill();
+              }
+              // a caught dragonfly rides the tongue back to the mouth on the return stroke, then
+              // is gulped down — gone until a fresh one drifts in over the pond
+              if (lp.caughtFly) {
+                if (lp.flickT <= 0.17) {
+                  lp.caughtFly.x = tx;
+                  lp.caughtFly.y = ty;
+                }
+                if (lp.flickT <= 0) {
+                  lp.caughtFly.visible = false;
+                  lp.caughtFly.eaten = true;
+                  lp.caughtFly.caught = false;
+                  lp.caughtFly.respawnT = 5 + Math.random() * 6;
+                  lp.caughtFly = null;
+                }
               }
             } else if (lp.flickCD <= 0 && hop === 0) {
               for (const fl of flutters) {
@@ -10104,16 +10143,24 @@
                   lp.dir = ddx >= 0 ? 1 : -1;
                   lp.scale.x = lp.dir * Math.abs(lp.scale.x);
                   lp.flickCD = 2 + Math.random() * 3;
-                  fl.darting = true; // the dragonfly jinks away
-                  fl.dtx = Math.max(
-                    waterL + 20,
-                    Math.min(
-                      waterR - 40,
-                      fl.x - Math.sign(ddx || 1) * (90 + Math.random() * 60)
-                    )
-                  );
-                  fl.dty = Math.max(fl.lo ?? 605, fl.y - 16);
-                  fl.dartT = 0.45;
+                  if (Math.random() < 0.2) {
+                    // now and then the tongue connects — the fly sticks fast and is reeled in
+                    lp.caughtFly = fl;
+                    fl.caught = true;
+                    fl.darting = false;
+                    fl.perchT = 0;
+                  } else {
+                    fl.darting = true; // usually the dragonfly jinks clear in time
+                    fl.dtx = Math.max(
+                      waterL + 20,
+                      Math.min(
+                        waterR - 40,
+                        fl.x - Math.sign(ddx || 1) * (90 + Math.random() * 60)
+                      )
+                    );
+                    fl.dty = Math.max(fl.lo ?? 605, fl.y - 16);
+                    fl.dartT = 0.45;
+                  }
                   break;
                 }
               }
