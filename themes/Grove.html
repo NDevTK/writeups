@@ -1191,6 +1191,8 @@
         'badger_b',
         'stoat',
         'stoat_up',
+        'ermine',
+        'ermine_up',
         'brownhare',
         'brownhare_run',
         'wagtail',
@@ -4607,11 +4609,15 @@
           pheasant.play();
           scene.addChild(pheasant);
         } else pheasant = null;
-        if (BI.stoat && buildNight < 0.5 && !snow && Math.random() < 0.45) {
+        if (BI.stoat && buildNight < 0.5 && Math.random() < 0.45) {
           // a stoat bounds through the grass in quick arching hops, then pops bolt upright to
-          // periscope — scanning over the grass — before darting on
+          // periscope — scanning over the grass — before darting on. in winter it's moulted to a
+          // white ermine (black tail-tip and all), bounding over the snow instead
           const sx = 150 + Math.random() * (VW - 300);
-          stoat = spr('stoat', sx, groundY(sx) + 4, 0.3 + Math.random() * 0.06);
+          const coat = snow ? 'ermine' : 'stoat';
+          stoat = spr(coat, sx, groundY(sx) + 4, 0.3 + Math.random() * 0.06);
+          stoat.coatTex = coat; // bounding pose, by season
+          stoat.upTex = snow ? 'ermine_up' : 'stoat_up'; // periscope pose, by season
           stoat.baseSc = Math.abs(stoat.scale.x);
           stoat.dir = Math.random() < 0.5 ? 1 : -1;
           stoat.scale.x = stoat.dir * stoat.baseSc;
@@ -9322,7 +9328,7 @@
               } else if (Math.random() < 0.6) {
                 s.mode = 'look';
                 s.tmr = 1 + Math.random() * 2;
-                s.texture = T('stoat_up');
+                s.texture = T(s.upTex);
                 s.rotation = 0;
                 s.y = groundY(s.x) + 4;
               } else {
@@ -9340,7 +9346,7 @@
             if (s.tmr <= 0) {
               s.mode = 'bound';
               s.tmr = 1 + Math.random() * 2;
-              s.texture = T('stoat');
+              s.texture = T(s.coatTex);
               s.rotation = 0;
               if (Math.random() < 0.4) {
                 s.dir = -s.dir;
