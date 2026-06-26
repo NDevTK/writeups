@@ -620,6 +620,22 @@ save(
   ),
   150
 );
+// a harebell: a few pale-blue open bells nodding on hair-fine wiry stems — the delicate "bluebell of
+// summer" of dry grassland, airier and paler than the spring bluebell
+const harebellBell = (cx, cy, rot) =>
+  `<g transform="translate(${cx} ${cy}) rotate(${rot})"><path d="M0,-7 C-5,-6 -7,-1 -6,3 C-5,2 -4,3 -3,4 C-2,2 -1,4 0,4 C1,4 2,2 3,4 C4,3 5,2 6,3 C7,-1 5,-6 0,-7 Z" fill="#a6bff0"/><path d="M0,-7 C-3,-6 -4,-2 -4,1 C-2,-1 2,-1 4,1 C4,-2 3,-6 0,-7 Z" fill="#7e9bda"/><path d="M0,2 L0,-3" stroke="#dfe8fb" stroke-width="0.8" stroke-linecap="round"/></g>`;
+save(
+  'harebell',
+  S(
+    '46 72',
+    `<g stroke="#6f9450" stroke-width="1.6" fill="none" stroke-linecap="round"><path d="M22,70 C21,52 20,36 19,22"/><path d="M22,58 C24,46 28,36 33,29"/><path d="M22,52 C19,42 15,34 11,28"/></g>
+<g fill="#7a9a60"><path d="M22,64 C17,63 14,60 13,55 C16,57 20,60 22,63 Z"/><path d="M22,60 C27,59 30,56 31,51 C28,53 24,56 22,59 Z"/></g>
+${harebellBell(19, 20, -6)}
+${harebellBell(34, 28, 22)}
+${harebellBell(10, 26, -26)}`
+  ),
+  42
+);
 // a cosmos: a broad eight-petal daisy form with a gold eye (pink and white forms)
 const cosmosSvg = (c, cd) =>
   S(
