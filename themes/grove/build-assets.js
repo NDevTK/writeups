@@ -397,6 +397,69 @@ save(
   ),
   56
 );
+// a bramble in fruit — a low, arching tangle of dark leaves hung with blackberries at every stage:
+// ripe black, ripening red, with the odd white flower. Late summer into autumn, the picking season
+const brambleBerry = (cx, cy, c, hl) => {
+  const pts = [
+    [0, -2.4],
+    [-2.2, -0.4],
+    [2.2, -0.4],
+    [-1.3, 1.8],
+    [1.3, 1.8],
+    [0, 0.4]
+  ];
+  let s = `<g fill="${c}">`;
+  for (const [dx, dy] of pts)
+    s += `<circle cx="${(cx + dx).toFixed(1)}" cy="${(cy + dy).toFixed(1)}" r="1.5"/>`;
+  return `${s}</g><circle cx="${(cx - 0.8).toFixed(1)}" cy="${(cy - 1.7).toFixed(1)}" r="0.6" fill="${hl}"/>`;
+};
+const brambleFlower = (cx, cy) => {
+  let p = '';
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * 6.2832 - 1.5708,
+      ex = (cx + Math.cos(a) * 2.6).toFixed(1),
+      ey = (cy + Math.sin(a) * 2.6).toFixed(1);
+    p += `<circle cx="${ex}" cy="${ey}" r="1.7"/>`;
+  }
+  return `<g fill="#f6eef0">${p}</g><circle cx="${cx}" cy="${cy}" r="1.3" fill="#e3d24a"/>`;
+};
+save(
+  'bramble',
+  S(
+    '156 96',
+    `<defs><radialGradient id="brm" gradientUnits="userSpaceOnUse" cx="74" cy="40" r="98"><stop offset="0" stop-color="#46763a"/><stop offset="1" stop-color="#214618"/></radialGradient></defs>
+<g stroke="#7a5a40" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.85"><path d="M34,80 C44,42 86,26 132,36"/><path d="M126,82 C112,46 78,30 50,42"/><path d="M60,82 C66,52 84,40 104,40"/></g>
+<g fill="url(#brm)"><ellipse cx="42" cy="74" rx="36" ry="20"/><ellipse cx="92" cy="76" rx="46" ry="22"/><ellipse cx="130" cy="74" rx="28" ry="17"/><circle cx="54" cy="54" r="25"/><circle cx="96" cy="50" r="28"/><circle cx="128" cy="58" r="19"/><circle cx="74" cy="44" r="21"/></g>
+<g fill="#5e9440" opacity="0.4"><circle cx="58" cy="46" r="9"/><circle cx="92" cy="42" r="10"/><circle cx="118" cy="52" r="7"/></g>
+${[
+  [46, 52],
+  [70, 60],
+  [88, 44],
+  [108, 58],
+  [124, 50],
+  [62, 70],
+  [100, 70],
+  [132, 66],
+  [80, 54]
+]
+  .map(([x, y]) => brambleBerry(x, y, '#241a26', '#6a5a72'))
+  .join('')}
+${[
+  [56, 62],
+  [114, 44],
+  [90, 62]
+]
+  .map(([x, y]) => brambleBerry(x, y, '#a81f2a', '#e0705e'))
+  .join('')}
+${[
+  [40, 44],
+  [104, 38]
+]
+  .map(([x, y]) => brambleFlower(x, y))
+  .join('')}`
+  ),
+  140
+);
 // a cosmos: a broad eight-petal daisy form with a gold eye (pink and white forms)
 const cosmosSvg = (c, cd) =>
   S(

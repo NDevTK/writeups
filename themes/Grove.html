@@ -1148,6 +1148,7 @@
         'snag',
         'shrub',
         'berrybush',
+        'bramble',
         'fern',
         'poppy',
         'toadstool',
@@ -3455,6 +3456,30 @@
                 if (Math.random() < 0.5) fb.scale.x *= -1;
                 scene.addChild(fb);
                 swayers.push({s: fb, amp: 0.02, sp: 1, ph: Math.random() * 6});
+              }
+            }
+            // a bramble thicket or two, heavy with blackberries — through the late-summer and autumn
+            // picking season (in flower and fruit at once); bare canes in winter, so it sits those out
+            if (
+              (seas === 'summer' || seas === 'autumn') &&
+              Math.random() < 0.5
+            ) {
+              for (let i = 0, n = 1 + ((Math.random() * 2) | 0); i < n; i++) {
+                const x = 80 + Math.random() * (VW - 160),
+                  br = spr(
+                    'bramble',
+                    x,
+                    groundY(x) + 8,
+                    0.4 + Math.random() * 0.24
+                  );
+                if (Math.random() < 0.5) br.scale.x *= -1;
+                scene.addChild(br);
+                swayers.push({
+                  s: br,
+                  amp: 0.018,
+                  sp: 0.9,
+                  ph: Math.random() * 6
+                });
               }
             }
             // toadstools and mushrooms tucked low in the grass
