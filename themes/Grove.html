@@ -1309,6 +1309,7 @@
         'crocus_p',
         'crocus_w',
         'bluebell',
+        'snowdrop',
         'cosmos_p',
         'cosmos_w',
         'foxglove',
@@ -3228,6 +3229,29 @@
             scene.addChild(g);
             swayers.push({s: g, amp: 0.05, sp: 1.6, ph: Math.random() * 6});
           }
+          // snowdrops: the first flower of the year, a small scatter pushing up through the last of
+          // the winter snow — so the one season the other blooms sit out isn't bare of flowers
+          if (snow && BI.seasonal) {
+            const sclump = 90 + Math.random() * (VW - 180); // they come up in a loose clump
+            for (let i = 0, n = 3 + ((Math.random() * 4) | 0); i < n; i++) {
+              const x = Math.max(
+                  40,
+                  Math.min(
+                    VW - 40,
+                    sclump + (Math.random() - Math.random()) * 120
+                  )
+                ),
+                sd = spr(
+                  'snowdrop',
+                  x,
+                  groundY(x) + 7,
+                  0.7 + Math.random() * 0.4
+                );
+              if (Math.random() < 0.5) sd.scale.x *= -1;
+              scene.addChild(sd);
+              swayers.push({s: sd, amp: 0.05, sp: 1.4, ph: Math.random() * 6});
+            }
+          }
           if (!snow) {
             // the meadow's flowering shifts with the season: a fresh, tulip-heavy spring flush,
             // poppies and cornflowers through high summer, and a sparser, muted scatter come autumn
@@ -3236,6 +3260,7 @@
               spring: [
                 'daffodil',
                 'daffodil',
+                'snowdrop',
                 'crocus_p',
                 'crocus_w',
                 'bluebell',

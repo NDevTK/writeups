@@ -298,6 +298,21 @@ const bluebellSvg = (c1, c2) =>
 <g fill="${c2}" opacity="0.55"><ellipse cx="23" cy="27" rx="2.6" ry="1.8"/><ellipse cx="19" cy="37" rx="2.6" ry="1.8"/><ellipse cx="16" cy="47" rx="2.6" ry="1.8"/><ellipse cx="14" cy="57" rx="2.4" ry="1.8"/></g>`
   );
 save('bluebell', bluebellSvg('#5b6fd0', '#3f4fb0'), 44);
+// a snowdrop: a single white nodding bell on an arching stem, with strappy blue-green leaves —
+// the first flower of the year, pushing up through the last of the winter snow
+const snowdropSvg = () =>
+  S(
+    '40 64',
+    `<g stroke="#86a86a" stroke-width="3.4" stroke-linecap="round" fill="none"><path d="M15,62 C12,44 13,26 18,14"/><path d="M25,62 C28,46 27,30 22,18"/></g>
+<path d="M20,61 C19,46 19,32 21,23" stroke="#5e8a3e" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+<path d="M21,23 C22,18 26,16 29,19" stroke="#5e8a3e" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+<path d="M26,17 C32,18 33,24 29,26 C27,24 26,21 26,18 Z" fill="#6f9a4e"/>
+<g fill="#ffffff"><path d="M29,24 C25,31 25,40 29,44 C33,40 33,31 29,24 Z"/><path d="M29,24 C33,30 35,37 34,42 C31,41 29,35 29,29 Z"/><path d="M29,24 C25,30 23,37 24,42 C27,41 29,35 29,29 Z"/></g>
+<path d="M29,28 C27,32 27,38 29,41 C31,38 31,32 29,28 Z" fill="#e7f0e7"/>
+<path d="M27.4,39 L29,42 L30.6,39 Z" fill="#3f9c30"/>
+<ellipse cx="27" cy="27" rx="1.8" ry="1.3" fill="#ffffff" opacity="0.5"/>`
+  );
+save('snowdrop', snowdropSvg(), 34);
 // a cosmos: a broad eight-petal daisy form with a gold eye (pink and white forms)
 const cosmosSvg = (c, cd) =>
   S(
