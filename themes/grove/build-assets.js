@@ -494,6 +494,34 @@ ${thistleTuft()}`
   ),
   40
 );
+// a teasel: a tall dried seed-head — a spiny tan egg ringed by long upward-curving bracts, on a
+// stiff prickly stem — standing architectural over the faded grass through autumn and winter
+const teaselSpines = () => {
+  let s = '<g stroke="#6e5832" stroke-width="0.7" stroke-linecap="round">';
+  for (let row = 0; row < 7; row++) {
+    const y = 12 + row * 3.2,
+      halfw = 6.2 - Math.abs(row - 3) * 0.95;
+    for (let dx = -halfw; dx <= halfw; dx += 2.5) {
+      const x = 25 + dx + (row % 2 ? 1.25 : 0);
+      s += `<path d="M${x.toFixed(1)},${y.toFixed(1)} l1.3,-1.7"/>`;
+    }
+  }
+  return s + '</g>';
+};
+save(
+  'teasel',
+  S(
+    '50 100',
+    `<defs><linearGradient id="tsl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c4ab76"/><stop offset="1" stop-color="#8c7242"/></linearGradient></defs>
+<path d="M25,98 C24,72 24,48 25,37" stroke="#a3905e" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+<g stroke="#9a8654" stroke-width="0.8" fill="none" stroke-linecap="round"><path d="M25,86 l-3,-2"/><path d="M25,78 l3,-2"/><path d="M25,68 l-3,-2"/><path d="M25,58 l3,-2"/><path d="M25,48 l-3,-2"/></g>
+<g fill="#9a9a64"><path d="M25,72 C13,70 7,63 6,54 C12,57 19,62 25,68 Z"/><path d="M25,68 C37,66 43,59 44,50 C38,53 31,58 25,63 Z"/></g>
+<path d="M18,35 C16,18 21,7 25,7 C29,7 34,18 32,35 C30,39 20,39 18,35 Z" fill="url(#tsl)"/>
+${teaselSpines()}
+<g stroke="#8a7848" stroke-width="1.4" fill="none" stroke-linecap="round"><path d="M19,33 C9,27 7,14 12,5"/><path d="M31,33 C41,27 43,14 38,5"/><path d="M22,36 C17,28 16,17 20,7"/><path d="M28,36 C33,28 34,17 30,7"/></g>`
+  ),
+  44
+);
 // a cosmos: a broad eight-petal daisy form with a gold eye (pink and white forms)
 const cosmosSvg = (c, cd) =>
   S(
