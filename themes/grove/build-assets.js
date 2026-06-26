@@ -345,6 +345,41 @@ ${[
   ),
   50
 );
+// wild garlic (ramsons): broad lance leaves and a loose round umbel of little white six-point star
+// flowers — carpets the damp woodland floor in spring, alongside the bluebells
+const garlicStar = (cx, cy, r) => {
+  let s = '<g fill="#ffffff">';
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * 6.2832,
+      ex = (cx + Math.cos(a) * r * 0.7).toFixed(1),
+      ey = (cy + Math.sin(a) * r * 0.7).toFixed(1),
+      rot = ((a * 180) / Math.PI + 90).toFixed(0);
+    s += `<ellipse cx="${ex}" cy="${ey}" rx="${(r * 0.34).toFixed(1)}" ry="${(r * 0.7).toFixed(1)}" transform="rotate(${rot} ${ex} ${ey})"/>`;
+  }
+  return `${s}</g><circle cx="${cx}" cy="${cy}" r="${(r * 0.3).toFixed(1)}" fill="#cfe08a"/>`;
+};
+save(
+  'wildgarlic',
+  S(
+    '54 58',
+    `<g fill="#4e9038"><path d="M26,56 C16,40 13,22 19,9 C25,21 29,40 26,52 Z"/><path d="M26,56 C36,40 41,24 35,11 C29,23 25,40 26,52 Z"/><path d="M26,56 C19,42 17,30 22,20 C26,30 28,42 26,54 Z"/></g>
+<g stroke="#3f7a2c" stroke-width="0.8" opacity="0.5" fill="none"><path d="M20,12 C22,26 24,40 26,52"/><path d="M34,14 C31,28 28,42 26,52"/></g>
+<path d="M26,52 C26,40 26,28 27,18" stroke="#6aa048" stroke-width="2" fill="none" stroke-linecap="round"/>
+<g stroke="#7caa52" stroke-width="1" opacity="0.7" fill="none" stroke-linecap="round"><path d="M27,18 L18,11"/><path d="M27,18 L36,11"/><path d="M27,18 L27,8"/><path d="M27,18 L13,16"/><path d="M27,18 L41,16"/></g>
+${[
+  [18, 10, 4.4],
+  [36, 10, 4.4],
+  [27, 7, 4.6],
+  [12, 15, 4],
+  [42, 15, 4],
+  [22, 14, 4],
+  [32, 14, 4]
+]
+  .map(([x, y, r]) => garlicStar(x, y, r))
+  .join('')}`
+  ),
+  48
+);
 // a cosmos: a broad eight-petal daisy form with a gold eye (pink and white forms)
 const cosmosSvg = (c, cd) =>
   S(
