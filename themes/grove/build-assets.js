@@ -4045,6 +4045,70 @@ save(
   150
 );
 
+// ======== a holly — dark glossy evergreen, spiny leaves and bright red berries; holds its green
+// (and its berries) right through the winter when the rest stand bare ========
+// a single spiky holly leaf, drawn pointing up and placed/rotated by transform
+const hollyLeaf = (x, y, rot, s, fill) =>
+  `<path transform="translate(${x} ${y}) rotate(${rot}) scale(${s})" fill="${fill}" d="M0,9 L-2.5,4.8 L-5.2,6.2 L-3.6,1.4 L-6.4,2 L-3.8,-2.8 L-5.8,-2.6 L-2.6,-6 L0,-9.2 L2.6,-6 L5.8,-2.6 L3.8,-2.8 L6.4,2 L3.6,1.4 L5.2,6.2 L2.5,4.8 Z"/>`;
+const hollyLeaves = [
+  [64, 50, -24, 1.5],
+  [98, 50, 22, 1.5],
+  [82, 36, 2, 1.5],
+  [50, 70, -36, 1.4],
+  [112, 66, 32, 1.4],
+  [70, 74, -12, 1.5],
+  [94, 76, 14, 1.5],
+  [82, 60, 0, 1.7],
+  [58, 56, -14, 1.3],
+  [106, 54, 18, 1.3],
+  [84, 90, 4, 1.3],
+  [40, 88, -30, 1.2]
+]
+  .map(([x, y, r, s]) => hollyLeaf(x, y, r, s, '#3c8a4d'))
+  .join('');
+const hollyLeavesLit = [
+  [74, 46, -18, 1.05],
+  [92, 48, 16, 1.05],
+  [82, 38, 0, 1.05]
+]
+  .map(([x, y, r, s]) => hollyLeaf(x, y, r, s, '#62b06a'))
+  .join('');
+const hollyBerry = (x, y) =>
+  `<circle cx="${x}" cy="${y}" r="3.4" fill="#cf2330"/><circle cx="${x - 3.4}" cy="${y + 4}" r="2.9" fill="#bb1f2b"/><circle cx="${x + 3}" cy="${y + 4.4}" r="2.7" fill="#d8323d"/><circle cx="${x - 1}" cy="${y - 1}" r="1.1" fill="#f4736e"/>`;
+const hollyBerries = [
+  [58, 80],
+  [104, 80],
+  [82, 96],
+  [120, 62],
+  [46, 62]
+]
+  .map(([x, y]) => hollyBerry(x, y))
+  .join('');
+save(
+  'holly',
+  S(
+    '170 210',
+    `<defs><radialGradient id="hol" gradientUnits="userSpaceOnUse" cx="78" cy="58" r="84"><stop offset="0" stop-color="#2e7342"/><stop offset=".55" stop-color="#1c5e34"/><stop offset="1" stop-color="#0f4527"/></radialGradient></defs>
+<path d="M80,206 C79,166 78,148 79,116 L93,116 C94,148 93,176 90,206 Z" fill="#7a6a58"/>
+<path d="M86,150 C78,144 71,142 65,138" stroke="#675847" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+<path d="M86,150 C95,142 102,140 109,137" stroke="#675847" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+<g fill="url(#hol)"><circle cx="82" cy="76" r="42"/><circle cx="50" cy="86" r="29"/><circle cx="116" cy="84" r="29"/><circle cx="64" cy="52" r="27"/><circle cx="104" cy="52" r="27"/><circle cx="84" cy="40" r="23"/></g>
+${hollyLeaves}
+${hollyLeavesLit}
+${hollyBerries}`
+  ),
+  145
+);
+save(
+  'holly_snow',
+  S(
+    '170 210',
+    `<g fill="#e7eff9"><path d="M60,34 C66,24 80,22 88,30 C96,22 108,26 110,38 C102,33 94,35 88,41 C80,33 70,35 64,42 C61,40 60,37 60,34 Z"/><path d="M40,58 C46,50 58,50 64,57 C57,54 50,56 45,62 C42,61 40,60 40,58 Z"/><path d="M96,56 C102,49 114,50 120,58 C113,55 106,57 101,62 C98,60 96,58 96,56 Z"/></g>
+<path fill="#ffffff" opacity="0.7" d="M64,31 C72,23 84,23 90,31 C83,28 76,31 71,36 C68,31 66,31 64,31 Z"/>`
+  ),
+  145
+);
+
 // ======== savanna seedheads — tall dry grass with feathery golden plumes ========
 save(
   'seedhead',

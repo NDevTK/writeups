@@ -400,7 +400,15 @@
             ['oak', 1.1, 900],
             ['bush', 1, 1150]
           ],
-          treeExtras: ['birch', 'fir', 'poplar', 'willow', 'snag', 'rowan'], // mixed into the stand by the variety system
+          treeExtras: [
+            'birch',
+            'fir',
+            'poplar',
+            'willow',
+            'snag',
+            'rowan',
+            'holly'
+          ], // mixed into the stand by the variety system
           water: {
             top: '#5fa7ca',
             bot: '#2f6f93',
@@ -1135,6 +1143,8 @@
         'poplar_snow',
         'willow',
         'willow_snow',
+        'holly',
+        'holly_snow',
         'snag',
         'shrub',
         'berrybush',
@@ -2730,7 +2740,8 @@
           birch: 1,
           fir: 1,
           poplar: 1,
-          willow: 1
+          willow: 1,
+          holly: 1
         };
         const snowCap = (t, n) => {
           if (snow && SNOWABLE[n]) {
