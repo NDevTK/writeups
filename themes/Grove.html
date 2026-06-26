@@ -1327,6 +1327,7 @@
         'bush_w',
         'cornflower',
         'thistle',
+        'teasel',
         'clover',
         'dandelion',
         'dandelion_clock',
@@ -3255,6 +3256,27 @@
               if (Math.random() < 0.5) sd.scale.x *= -1;
               scene.addChild(sd);
               swayers.push({s: sd, amp: 0.05, sp: 1.4, ph: Math.random() * 6});
+            }
+          }
+          // teasels: dried seed-heads standing dead and architectural over the faded grass through
+          // autumn and on into the winter snow (the goldfinches work them for seed)
+          if (snow || (BI.seasonal && nowSeason() === 'autumn')) {
+            for (let i = 0, n = 1 + ((Math.random() * 3) | 0); i < n; i++) {
+              const x = 60 + Math.random() * (VW - 120),
+                ts = spr(
+                  'teasel',
+                  x,
+                  groundY(x) + 7,
+                  0.55 + Math.random() * 0.32
+                );
+              if (Math.random() < 0.5) ts.scale.x *= -1;
+              scene.addChild(ts);
+              swayers.push({
+                s: ts,
+                amp: 0.022,
+                sp: 0.85,
+                ph: Math.random() * 6
+              });
             }
           }
           if (!snow) {
