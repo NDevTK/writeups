@@ -4333,6 +4333,31 @@ save(
   145
 );
 
+// ======== a hazel — a small coppice tree: several slender stems fanning from one base under a low,
+// broad, soft-green crown, with a few pale catkins hanging at the fringe ========
+save(
+  'hazel',
+  S(
+    '180 200',
+    `<defs><radialGradient id="haz" gradientUnits="userSpaceOnUse" cx="84" cy="74" r="92"><stop offset="0" stop-color="#8ac84e"/><stop offset=".55" stop-color="#549a38"/><stop offset="1" stop-color="#356f26"/></radialGradient></defs>
+<g stroke="#7c5836" stroke-width="5" fill="none" stroke-linecap="round"><path d="M90,198 C86,168 80,148 70,128"/><path d="M90,198 C90,166 91,142 95,122"/><path d="M90,198 C95,170 106,148 118,130"/><path d="M90,198 C84,172 75,156 63,140"/><path d="M90,198 C97,174 112,160 126,144"/></g>
+<g stroke="#6a4a2c" stroke-width="1.4" opacity="0.5" fill="none" stroke-linecap="round"><path d="M84,168 C82,160 80,154 76,148"/><path d="M98,150 C100,144 104,138 108,134"/></g>
+<g fill="url(#haz)"><circle cx="88" cy="92" r="42"/><circle cx="52" cy="100" r="30"/><circle cx="124" cy="100" r="30"/><circle cx="68" cy="72" r="29"/><circle cx="110" cy="72" r="29"/><circle cx="88" cy="58" r="25"/></g>
+<g fill="#a6db66" opacity="0.5"><circle cx="68" cy="68" r="12"/><circle cx="104" cy="66" r="9"/></g>
+<g fill="#cdd884" opacity="0.85"><ellipse cx="56" cy="118" rx="2" ry="6.5"/><ellipse cx="110" cy="120" rx="2" ry="6.5"/><ellipse cx="84" cy="126" rx="1.9" ry="6"/><ellipse cx="126" cy="104" rx="1.9" ry="5.5"/></g>`
+  ),
+  138
+);
+save(
+  'hazel_snow',
+  S(
+    '180 200',
+    `<g fill="#e7eff9"><path d="M58,44 C66,33 82,33 90,42 C98,33 112,36 116,49 C107,43 98,45 91,52 C82,43 71,45 64,53 C61,50 58,47 58,44 Z"/><path d="M36,72 C44,63 58,64 64,72 C56,68 48,70 43,77 C40,75 37,74 36,72 Z"/><path d="M104,72 C112,64 126,65 132,73 C124,69 116,71 111,77 C108,75 105,74 104,72 Z"/></g>
+<path fill="#ffffff" opacity="0.7" d="M62,41 C72,32 84,32 90,41 C82,37 74,40 69,46 C66,40 64,40 62,41 Z"/>`
+  ),
+  138
+);
+
 // ======== savanna seedheads — tall dry grass with feathery golden plumes ========
 save(
   'seedhead',
