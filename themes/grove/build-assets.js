@@ -460,6 +460,40 @@ ${[
   ),
   140
 );
+// a thistle: a spiny green head topped with a purple tuft of florets, on a prickly stem with lobed
+// grey-green leaves — a meadow flower of high summer, worked by the bees and butterflies
+const thistleTuft = () => {
+  let s =
+    '<g stroke="#9a4fc8" stroke-width="1.5" fill="none" stroke-linecap="round">';
+  for (let k = 0; k < 11; k++) {
+    const a = -1.5708 + (k / 10 - 0.5) * 1.8,
+      x2 = (22 + Math.cos(a) * 12).toFixed(1),
+      y2 = (18 + Math.sin(a) * 12).toFixed(1);
+    s += `<path d="M22,19 L${x2},${y2}"/>`;
+  }
+  s +=
+    '</g><g stroke="#c08ce8" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.8">';
+  for (let k = 0; k < 7; k++) {
+    const a = -1.5708 + (k / 6 - 0.5) * 1.5,
+      x2 = (22 + Math.cos(a) * 8.5).toFixed(1),
+      y2 = (18.5 + Math.sin(a) * 8.5).toFixed(1);
+    s += `<path d="M22,19.5 L${x2},${y2}"/>`;
+  }
+  return s + '</g>';
+};
+save(
+  'thistle',
+  S(
+    '46 86',
+    `<path d="M22,84 C21,62 21,42 23,26" stroke="#5e8a3e" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+<g fill="#84a070"><path d="M22,66 C12,64 6,58 4,49 C9,50 13,53 16,58 C13,54 12,50 13,47 C16,51 19,56 22,61 Z"/><path d="M22,58 C32,56 39,50 41,41 C36,42 32,45 29,50 C32,46 33,42 32,39 C29,43 25,49 22,53 Z"/><path d="M22,74 C14,73 9,68 8,61 C12,62 16,65 19,69 C17,65 16,62 17,59 C19,63 21,68 22,71 Z"/></g>
+<path d="M15,30 C15,39 29,39 29,30 C29,21 22,17 22,17 C22,17 15,21 15,30 Z" fill="#6f9a52"/>
+<path d="M16,30 C18,34 26,34 28,30 C26,28 18,28 16,30 Z" fill="#5c8442" opacity="0.5"/>
+<g stroke="#5c8442" stroke-width="1" fill="none" stroke-linecap="round"><path d="M15,30 L10,32"/><path d="M29,30 L34,32"/><path d="M16,25 L12,23"/><path d="M28,25 L32,23"/><path d="M22,38 L22,41"/><path d="M18,36 L16,39"/><path d="M26,36 L28,39"/></g>
+${thistleTuft()}`
+  ),
+  40
+);
 // a cosmos: a broad eight-petal daisy form with a gold eye (pink and white forms)
 const cosmosSvg = (c, cd) =>
   S(
