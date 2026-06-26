@@ -1312,6 +1312,7 @@
         'snowdrop',
         'primrose',
         'wildgarlic',
+        'iris',
         'cosmos_p',
         'cosmos_w',
         'foxglove',
@@ -5082,6 +5083,42 @@
                   sp: 1.5,
                   ph: Math.random() * 6
                 });
+              }
+            }
+            // a clump or two of yellow flag iris stands among the shoreline reeds on the near bank
+            // while it's in flower (late spring into summer) — never in autumn or under the ice
+            const irisSeas = BI.seasonal ? nowSeason() : 'summer';
+            if (irisSeas === 'spring' || irisSeas === 'summer') {
+              for (
+                let placed = 0,
+                  target = 1 + ((Math.random() * 2) | 0),
+                  tries = 0;
+                placed < target && tries < 24;
+                tries++
+              ) {
+                const a = Math.random() * Math.PI * 2,
+                  gx =
+                    p.cx + Math.cos(a) * p.rx * (0.82 + Math.random() * 0.14),
+                  gy =
+                    p.cy + Math.sin(a) * p.ry * (0.82 + Math.random() * 0.14);
+                if (gy > 622) {
+                  // the near (front) shore only, so it stands in front of the water
+                  const ir = spr(
+                    'iris',
+                    gx,
+                    gy + 4,
+                    0.5 + Math.random() * 0.28
+                  );
+                  if (Math.random() < 0.5) ir.scale.x *= -1;
+                  scene.addChild(ir);
+                  swayers.push({
+                    s: ir,
+                    amp: 0.035,
+                    sp: 1.2,
+                    ph: Math.random() * 6
+                  });
+                  placed++;
+                }
               }
             }
           }
