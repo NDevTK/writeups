@@ -380,6 +380,23 @@ ${[
   ),
   48
 );
+// a yellow flag iris: tall sword leaves and a bright yellow iris bloom — three drooping falls with
+// brown nectar-guides and upright standards — standing at the water's edge through early summer
+save(
+  'iris',
+  S(
+    '60 100',
+    `<defs><linearGradient id="iri" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd83a"/><stop offset="1" stop-color="#f0a81e"/></linearGradient></defs>
+<g fill="#4e8e3a"><path d="M30,98 C26,60 25,30 28,8 C32,30 33,60 31,98 Z"/><path d="M30,98 C21,66 17,40 15,16 C22,42 27,66 30,94 Z"/><path d="M30,98 C39,66 43,42 45,18 C38,44 33,68 30,94 Z"/></g>
+<g stroke="#3c7430" stroke-width="0.9" opacity="0.45" fill="none"><path d="M28,10 C29,40 30,68 30,94"/><path d="M16,18 C22,44 27,68 30,92"/></g>
+<path d="M31,92 C33,66 34,44 34,28" stroke="#5e9a40" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+<g fill="url(#iri)"><path d="M34,24 C24,24 17,30 16,40 C22,43 30,37 34,28 Z"/><path d="M34,24 C44,24 51,30 52,40 C46,43 38,37 34,28 Z"/><path d="M33,26 C30,35 30,44 34,50 C38,44 38,35 35,26 Z"/></g>
+<g stroke="#bd5e10" stroke-width="1.5" opacity="0.6" fill="none" stroke-linecap="round"><path d="M23,35 C27,36 30,34 33,31"/><path d="M45,35 C41,36 38,34 35,31"/><path d="M34,46 C34,41 34,36 34,31"/></g>
+<g fill="#ffe25a"><path d="M34,23 C30,15 30,9 34,5 C38,9 38,15 34,23 Z"/><path d="M30,22 C24,17 22,12 24,8 C29,11 32,16 33,22 Z"/><path d="M38,22 C44,17 46,12 44,8 C39,11 36,16 35,22 Z"/></g>
+<circle cx="34" cy="24" r="3" fill="#f0a81e"/><circle cx="34" cy="23" r="1.3" fill="#c87a14"/>`
+  ),
+  56
+);
 // a cosmos: a broad eight-petal daisy form with a gold eye (pink and white forms)
 const cosmosSvg = (c, cd) =>
   S(
