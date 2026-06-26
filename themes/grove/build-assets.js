@@ -522,6 +522,41 @@ ${teaselSpines()}
   ),
   44
 );
+// a field scabious: a pale-lilac pincushion — a ring of frilled outer florets round a domed centre
+// pricked with pale stamens — on a tall wiry stem; a butterfly flower of high summer
+const scabiousHead = () => {
+  let s = '<g fill="#b9a8e0">';
+  for (let k = 0; k < 9; k++) {
+    const a = (k / 9) * 6.2832,
+      ex = (20 + Math.cos(a) * 7).toFixed(1),
+      ey = (15 + Math.sin(a) * 6).toFixed(1),
+      rot = ((a * 180) / Math.PI + 90).toFixed(0);
+    s += `<ellipse cx="${ex}" cy="${ey}" rx="2.5" ry="3.7" transform="rotate(${rot} ${ex} ${ey})"/>`;
+  }
+  s +=
+    '</g><ellipse cx="20" cy="15" rx="6.2" ry="5.2" fill="#9f88d2"/><g fill="#e8e0f6">';
+  for (const [dx, dy] of [
+    [-2.5, -1.5],
+    [1.5, -2],
+    [3, 0.5],
+    [-1, 1.5],
+    [0, -0.4],
+    [-3.6, 0.2],
+    [2.2, 2]
+  ])
+    s += `<circle cx="${(20 + dx).toFixed(1)}" cy="${(15 + dy).toFixed(1)}" r="0.95"/>`;
+  return s + '</g>';
+};
+save(
+  'scabious',
+  S(
+    '40 74',
+    `<path d="M20,72 C20,54 20,36 20,23" stroke="#6a9450" stroke-width="2" fill="none" stroke-linecap="round"/>
+<g fill="#7a9a60"><path d="M20,54 C13,52 9,48 8,42 C12,44 17,48 20,52 Z"/><path d="M20,48 C27,46 31,42 32,36 C28,38 23,42 20,46 Z"/></g>
+${scabiousHead()}`
+  ),
+  38
+);
 // a cosmos: a broad eight-petal daisy form with a gold eye (pink and white forms)
 const cosmosSvg = (c, cd) =>
   S(
