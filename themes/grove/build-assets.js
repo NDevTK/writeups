@@ -313,6 +313,38 @@ const snowdropSvg = () =>
 <ellipse cx="27" cy="27" rx="1.8" ry="1.3" fill="#ffffff" opacity="0.5"/>`
   );
 save('snowdrop', snowdropSvg(), 34);
+// a primrose: a low clump of pale-yellow five-petal flowers with a deeper eye, sitting on a rosette
+// of crinkly leaves — a woodland-floor flower of early spring, after the snowdrops
+const primFlower = (cx, cy, R) => {
+  let pet = '';
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * 6.2832 - 1.5708,
+      ex = (cx + Math.cos(a) * R * 0.86).toFixed(1),
+      ey = (cy + Math.sin(a) * R * 0.86).toFixed(1),
+      rot = ((a * 180) / Math.PI + 90).toFixed(0);
+    pet += `<ellipse cx="${ex}" cy="${ey}" rx="${(R * 0.46).toFixed(1)}" ry="${(R * 0.66).toFixed(1)}" transform="rotate(${rot} ${ex} ${ey})"/>`;
+  }
+  return `<g fill="#f7f0a0">${pet}</g><circle cx="${cx}" cy="${cy}" r="${(R * 0.4).toFixed(1)}" fill="#eab838"/><circle cx="${cx}" cy="${cy}" r="${(R * 0.18).toFixed(1)}" fill="#dc9a2a"/>`;
+};
+save(
+  'primrose',
+  S(
+    '56 46',
+    `<g fill="#5e9440"><path d="M28,43 C12,42 4,36 6,29 C16,29 24,34 28,40 Z"/><path d="M28,43 C44,42 52,36 50,29 C40,29 32,34 28,40 Z"/><path d="M28,44 C20,40 16,32 18,25 C24,28 28,34 28,42 Z"/><path d="M28,44 C36,40 40,32 38,25 C32,28 28,34 28,42 Z"/></g>
+<g stroke="#4a7a32" stroke-width="0.8" opacity="0.5" fill="none"><path d="M10,30 C18,31 24,34 27,39"/><path d="M46,30 C38,31 32,34 29,39"/></g>
+${[
+  [20, 26, 6.5],
+  [36, 26, 6.5],
+  [28, 20, 7],
+  [15, 33, 5.5],
+  [41, 33, 5.5],
+  [28, 32, 6]
+]
+  .map(([x, y, r]) => primFlower(x, y, r))
+  .join('')}`
+  ),
+  50
+);
 // a cosmos: a broad eight-petal daisy form with a gold eye (pink and white forms)
 const cosmosSvg = (c, cd) =>
   S(
