@@ -557,6 +557,25 @@ ${scabiousHead()}`
   ),
   38
 );
+// a bracket fungus: warm tan shelves stepping out from a trunk, banded on top and pale-pored beneath
+// — it juts from the dead and living wood through the damp of autumn. Attaches at its left edge
+save(
+  'bracket',
+  S(
+    '50 70',
+    `<defs><linearGradient id="brk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e0a85a"/><stop offset="1" stop-color="#b97e3e"/></linearGradient></defs>
+<path d="M6,28 C6,16 26,14 40,22 C45,25 44,30 37,31 C22,33 8,32 6,29 Z" fill="url(#brk)"/>
+<path d="M6,29 C16,34 30,33 40,28 C42,31 30,37 18,37 C11,36 6,32 6,29 Z" fill="#f0e6cc"/>
+<path d="M10,25 C20,21 32,21 38,25" stroke="#f2dcab" stroke-width="1.1" fill="none" opacity="0.7"/>
+<path d="M9,28 C20,25 32,25 39,27" stroke="#9c6e36" stroke-width="0.9" fill="none" opacity="0.55"/>
+<path d="M6,44 C6,34 22,33 33,39 C37,42 36,46 30,46 C18,48 8,47 6,45 Z" fill="url(#brk)"/>
+<path d="M6,45 C14,49 26,48 33,44 C34,47 24,51 15,51 C10,50 6,47 6,45 Z" fill="#f0e6cc"/>
+<path d="M10,41 C18,38 28,38 32,41" stroke="#f2dcab" stroke-width="1" fill="none" opacity="0.65"/>
+<path d="M6,57 C6,49 18,48 27,53 C30,55 29,58 24,58 C15,59 8,58 6,57 Z" fill="url(#brk)"/>
+<path d="M6,57 C13,60 22,59 27,56 C28,58 20,61 13,61 C9,60 6,59 6,57 Z" fill="#f0e6cc"/>`
+  ),
+  40
+);
 // a cosmos: a broad eight-petal daisy form with a gold eye (pink and white forms)
 const cosmosSvg = (c, cd) =>
   S(

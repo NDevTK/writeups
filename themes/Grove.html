@@ -1155,6 +1155,7 @@
         'fern',
         'poppy',
         'toadstool',
+        'bracket',
         'shroom',
         'web',
         'molehill',
@@ -4183,6 +4184,23 @@
             lf.amp = 0.1 + Math.random() * 0.16; // how much this one stirs in a gust
             scene.addChild(lf);
             leafLitter.push(lf);
+          }
+        }
+        // bracket fungus juts from the trunks through the damp of autumn — a shelf or two stepping
+        // out of the bark of the broadleaf and dead wood
+        if (BI.seasonal && nowSeason() === 'autumn' && trunks.length) {
+          for (let i = 0, n = 1 + ((Math.random() * 2) | 0); i < n; i++) {
+            const tr = trunks[(Math.random() * trunks.length) | 0],
+              bf = spr(
+                'bracket',
+                tr.x,
+                tr.y + (Math.random() - 0.5) * 24,
+                0.42 + Math.random() * 0.22
+              );
+            bf.anchor.set(0.12, 0.55); // attaches at its left edge, against the trunk
+            if (Math.random() < 0.5) bf.scale.x *= -1; // juts from the left or the right side
+            bf.tint = tintJit(0xffffff, 0.06);
+            scene.addChild(bf);
           }
         }
         walkers.length = 0;
