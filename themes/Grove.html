@@ -1246,6 +1246,7 @@
         'cattail',
         'marsh_marigold',
         'rowan',
+        'hawthorn',
         'seedhead',
         'aardvark',
         'ghost_crab',
@@ -3132,6 +3133,26 @@
               x: jx,
               y: t.y - t.height * (0.2 + Math.random() * 0.12)
             });
+        }
+        // a hawthorn in full may-blossom stands among the trees in spring — the hedgerow "may tree",
+        // its whole crown smothered white. Only in spring; the rest of the year it sits out
+        if (
+          BI.seasonal &&
+          BI.ground === 'meadow' &&
+          nowSeason() === 'spring' &&
+          Math.random() < 0.5
+        ) {
+          const hx = 120 + Math.random() * (VW - 240),
+            hw = spr(
+              'hawthorn',
+              hx,
+              groundY(hx) + 4,
+              0.72 + Math.random() * 0.22
+            );
+          hw.tint = tintJit(0xffffff, 0.04); // keep the blossom white, not seasonally tinted
+          if (Math.random() < 0.5) hw.scale.x *= -1;
+          scene.addChild(hw);
+          swayers.push({s: hw, amp: 0.02, sp: 0.9, ph: Math.random() * 6});
         }
         if (BI.crystals)
           for (const [x, col] of BI.crystals) {

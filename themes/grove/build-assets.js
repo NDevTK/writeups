@@ -576,6 +576,50 @@ save(
   ),
   40
 );
+// a hawthorn in full may-blossom: a small tree smothered in white blossom over a green crown, on a
+// short gnarled trunk — the hedgerow "may tree" of spring. (fixed dabs, so the build stays stable)
+const hawBlossom = [
+  [86, 50, 9],
+  [64, 58, 8],
+  [108, 56, 8],
+  [50, 80, 8],
+  [120, 82, 8],
+  [86, 76, 9],
+  [72, 40, 7],
+  [100, 40, 7],
+  [56, 66, 7],
+  [114, 66, 7],
+  [78, 64, 8],
+  [96, 64, 8],
+  [44, 92, 6],
+  [126, 92, 6],
+  [66, 90, 7],
+  [106, 90, 7],
+  [88, 96, 7],
+  [60, 48, 6],
+  [112, 46, 6],
+  [84, 34, 6],
+  [74, 80, 7],
+  [98, 80, 7],
+  [54, 74, 6],
+  [118, 74, 6]
+];
+save(
+  'hawthorn',
+  S(
+    '180 210',
+    `<defs><radialGradient id="hwg" gradientUnits="userSpaceOnUse" cx="84" cy="62" r="92"><stop offset="0" stop-color="#7eb84a"/><stop offset="1" stop-color="#477f2e"/></radialGradient></defs>
+<path d="M84,206 C82,168 78,150 82,116 L100,116 C103,150 100,178 96,206 Z" fill="#6e5236"/>
+<path d="M90,150 C80,140 72,138 64,134" stroke="#5e4630" stroke-width="5" fill="none" stroke-linecap="round"/>
+<path d="M92,148 C102,138 110,136 118,132" stroke="#5e4630" stroke-width="5" fill="none" stroke-linecap="round"/>
+<g fill="url(#hwg)"><circle cx="86" cy="76" r="45"/><circle cx="50" cy="86" r="31"/><circle cx="120" cy="86" r="31"/><circle cx="66" cy="52" r="29"/><circle cx="108" cy="54" r="29"/><circle cx="88" cy="40" r="25"/></g>
+<g fill="#f6f9f4" opacity="0.5"><circle cx="86" cy="66" r="36"/><circle cx="56" cy="82" r="23"/><circle cx="116" cy="82" r="23"/><circle cx="70" cy="48" r="21"/><circle cx="106" cy="50" r="21"/><circle cx="88" cy="40" r="18"/></g>
+<g fill="#fbfdfb">${hawBlossom.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</g>
+<g fill="#f0ecdd" opacity="0.7"><circle cx="70" cy="56" r="3"/><circle cx="100" cy="58" r="2.6"/><circle cx="86" cy="44" r="2.6"/><circle cx="58" cy="82" r="2.4"/><circle cx="116" cy="84" r="2.4"/></g>
+<g fill="#e8c4cc" opacity="0.45"><circle cx="86" cy="50" r="1.6"/><circle cx="64" cy="68" r="1.4"/><circle cx="110" cy="66" r="1.4"/><circle cx="78" cy="86" r="1.4"/><circle cx="100" cy="74" r="1.4"/></g>`
+  ),
+  150
+);
 // a cosmos: a broad eight-petal daisy form with a gold eye (pink and white forms)
 const cosmosSvg = (c, cd) =>
   S(
