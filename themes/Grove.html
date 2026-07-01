@@ -3513,8 +3513,10 @@
               }
             }
             // a bramble thicket or two, heavy with blackberries — through the late-summer and autumn
-            // picking season (in flower and fruit at once); bare canes in winter, so it sits those out
+            // picking season (in flower and fruit at once); bare canes in winter, so it sits those out.
+            // seasonal grounds only: the blossom orchard's eternal spring never reaches fruiting time
             if (
+              BI.seasonal &&
               (seas === 'summer' || seas === 'autumn') &&
               Math.random() < 0.5
             ) {
