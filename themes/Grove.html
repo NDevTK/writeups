@@ -104,7 +104,9 @@
       PIXI.BaseTexture.defaultOptions.mipmap = PIXI.MIPMAP_MODES.ON;
       // the canvas width tracks the display's aspect (the height stays fixed at VH, so the vertical
       // composition — sky, horizon, ground, water — is constant), clamped so extreme ratios stay
-      // sensible. A 21:9 screen simply gets more landscape; portrait a narrower slice. No cropping.
+      // sensible. A 21:9 screen simply gets more landscape; portrait a narrower slice down to the
+      // 840 clamp — anything narrower still (phones) is covered by cropping the sides evenly, with
+      // the water kept anchored at the bottom (see fit()).
       const fitVW = () =>
         Math.round(
           Math.max(
