@@ -2173,6 +2173,39 @@ save(
   ),
   150
 );
+// …and on the wing: body levelled out, big beak leading, wings actually beating (2 frames) —
+// the perched pose used to drift across the understory with its feet dangling
+const toucanFly = (wings) =>
+  S(
+    '170 104',
+    `<defs><linearGradient id="tkf" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff9a1e"/><stop offset="0.7" stop-color="#ffd23e"/><stop offset="1" stop-color="#ffe27a"/></linearGradient></defs>
+${wings}
+<path d="M30,50 L4,42 L10,58 L28,62 Z" fill="#14141a"/>
+<path d="M28,60 L12,57 L16,66 L28,65 Z" fill="#e23a2a"/>
+<path d="M30,50 C34,46 40,45 44,46 L42,60 C38,62 32,62 28,60 Z" fill="#f4efe1"/>
+<ellipse cx="66" cy="56" rx="38" ry="19" fill="#1b1b22"/>
+<path d="M48,44 C58,38 76,37 90,42 C76,44 62,46 52,50 Z" fill="#2a2a33"/>
+<ellipse cx="106" cy="46" rx="21" ry="18" fill="#1b1b22"/>
+<path d="M98,54 C106,62 118,62 126,52 C120,66 102,68 92,60 Z" fill="#f4efe1"/>
+<path d="M124,32 C156,28 168,38 166,48 C164,58 138,60 122,54 C118,44 120,36 124,32 Z" fill="url(#tkf)"/>
+<path d="M162,44 C168,46 168,52 162,53 C156,53 156,46 162,44 Z" fill="#e23a2a"/>
+<path d="M124,36 C140,34 154,38 162,46" stroke="#d98018" stroke-width="1.6" fill="none" opacity="0.6"/>
+<circle cx="115" cy="42" r="6" fill="#3fb6d6"/><circle cx="115" cy="42" r="3" fill="#10141a"/><circle cx="116.4" cy="40.6" r="1" fill="#fff"/>`
+  );
+save(
+  'toucan_fly_a',
+  toucanFly(
+    `<path d="M60,48 C50,24 38,10 20,4 C34,20 46,36 54,54 Z" fill="#14141a"/><path d="M70,46 C78,20 92,8 110,4 C96,20 84,36 76,52 Z" fill="#1b1b22"/>`
+  ),
+  160
+);
+save(
+  'toucan_fly_b',
+  toucanFly(
+    `<path d="M58,62 C46,82 32,92 16,94 C30,78 42,66 52,58 Z" fill="#14141a"/><path d="M68,64 C76,86 90,96 106,98 C94,82 82,70 74,60 Z" fill="#1b1b22"/>`
+  ),
+  160
+);
 // monkey: a small brown monkey sitting with a curled tail (faces right)
 save(
   'monkey',

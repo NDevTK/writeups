@@ -1460,6 +1460,8 @@
         'vine',
         'bigleaf',
         'toucan',
+        'toucan_fly_a',
+        'toucan_fly_b',
         'monkey',
         'seal',
         'dolphin',
@@ -6088,7 +6090,14 @@
             scene.addChild(v);
             swayers.push({s: v, amp: 0.04, sp: 0.7, ph: Math.random() * 6});
           }
-          const tk = spr('toucan', 200 + Math.random() * (VW - 400), 210, 0.46);
+          // on the wing (2 beating frames) — the perched pose used to float across, feet dangling
+          const tk = anim(
+            ['toucan_fly_a', 'toucan_fly_b'],
+            200 + Math.random() * (VW - 400),
+            210,
+            0.46,
+            0.1
+          );
           tk.isToucan = true;
           tk.vx = (Math.random() < 0.5 ? -1 : 1) * (0.9 + Math.random() * 0.4);
           tk.baseY = 180 + Math.random() * 150;
