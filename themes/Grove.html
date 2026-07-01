@@ -977,12 +977,12 @@
           seasonal: false,
           distant: {
             sprite: 'butte',
-            count: 5,
-            sc: [0.5, 1.05],
+            count: 7,
+            sc: [0.45, 1.05],
             y: 478,
             tint: 0xc06438,
             alpha: 0.94
-          }, // red mesas receding into the haze
+          }, // red mesas receding into the haze, layered deeper across the skyline
           hills: [0xa85636, 0x934628, 0x7e3c22], // red rock
           ground: 'redrock',
           mid: [],
@@ -993,13 +993,23 @@
           critterScale: 0.42,
           critterTint: 0x9a8a6e,
           hopper: null,
-          flyer: 0x3a342e, // a condor circles
+          flyer: 0x3a342e, // a condor crosses low
           flyerFrames: ['vulture'],
+          soar: {
+            frames: ['vulture'],
+            count: 2,
+            scale: 0.26,
+            tint: 0x3a342e,
+            yLo: 110,
+            yHi: 240
+          }, // …while two more wheel high on the thermals, filling the big desert sky
           roadrunner: true,
           beetle: true, // a beetle scuttles the red rock
           scorpion: true, // …a scorpion after dark
+          bats: 2, // bats hawk over the river at dusk
           flutter: false,
-          roller: null
+          roller: 'tumbleweed', // a tumbleweed bounds through on the wind
+          rollerTint: 0xf2e4c0 // bleached straw, so it reads against the red rock
         },
         polar: {
           label: '🐧 Polar',
@@ -4432,7 +4442,7 @@
         } else rabbit = null;
         if (BI.roller) {
           roller = spr(BI.roller, -60, groundY(-60) + 2, 0.5);
-          roller.tint = 0xc2a468;
+          roller.tint = BI.rollerTint || 0xc2a468; // pale straw on dark grounds, sandy by default
           scene.addChild(roller);
           roller.visible = false;
           rollerTimer = 2 + Math.random() * 3;
