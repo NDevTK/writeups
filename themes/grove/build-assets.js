@@ -3754,6 +3754,21 @@ save(
   ),
   100
 );
+// …and one perched: wings folded, sat up on a crag with the yellow bill and red legs showing
+save(
+  'chough_perch',
+  S(
+    '48 44',
+    `<g stroke="#d8502c" stroke-width="1.8" stroke-linecap="round"><path d="M20,32 L19,41"/><path d="M26,32 L27,41"/></g>
+<path d="M12,28 L2,36 L4,29 L11,23 Z" fill="#16141b"/>
+<ellipse cx="22" cy="24" rx="12" ry="8.5" fill="#1d1b22"/>
+<path d="M13,20 C19,15 30,15 34,21 C28,18 18,18 13,23 Z" fill="#2e2b36"/>
+<circle cx="33" cy="14" r="6" fill="#1d1b22"/>
+<path d="M38,12.5 L46,14.5 L38,16.5 Z" fill="#f0be2e"/>
+<circle cx="34.5" cy="12.5" r="1.3" fill="#08080a"/><circle cx="35" cy="12" r="0.5" fill="#8a879a"/>`
+  ),
+  46
+);
 
 // ======== a moth — drab, fuzzy, comes out after dusk in place of the butterflies (2 frames) ========
 const moth = (fx) =>

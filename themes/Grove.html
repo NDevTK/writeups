@@ -1245,6 +1245,7 @@
         'olm',
         'chough_a',
         'chough_b',
+        'chough_perch',
         'moth_a',
         'moth_b',
         'hedgehog',
@@ -2590,6 +2591,99 @@
             cloudSeaG.addChild(c);
           }
           scene.addChild(cloudSeaG);
+          // a near crag pokes through the sea in the foreground — a dark anchor for the empty
+          // near field, snow clinging to its top, cloud lapping its base — with a pair of
+          // choughs perched on its shoulders, sitting out the flock's wheeling overhead
+          {
+            const cragX =
+              Math.random() < 0.5
+                ? 180 + Math.random() * 110
+                : VW - 290 + Math.random() * 110;
+            const ay = 372; // the apex, well clear of the cloud tops
+            const crag = new PIXI.Graphics();
+            const pts = [
+              [-100, 148],
+              [-80, 96],
+              [-58, 122],
+              [-30, 36],
+              [-12, 48],
+              [0, 0],
+              [20, 56],
+              [42, 40],
+              [66, 118],
+              [90, 102],
+              [102, 148]
+            ];
+            crag.beginFill(0x4c5a6e); // nearer, so clearly darker than the far massif — it has to silhouette against it
+            crag.moveTo(cragX + pts[0][0], ay + pts[0][1]);
+            for (const [dx, dy] of pts) crag.lineTo(cragX + dx, ay + dy);
+            crag.closePath();
+            crag.endFill();
+            crag.beginFill(0x3d4a5c, 0.55); // a shaded gully running down from the apex
+            crag.moveTo(cragX - 6, ay + 54);
+            crag.lineTo(cragX + 5, ay + 54);
+            crag.lineTo(cragX + 17, ay + 152);
+            crag.lineTo(cragX - 15, ay + 152);
+            crag.closePath();
+            crag.endFill();
+            // snow clinging to the high ground, with the blue under-shadow the far peaks use
+            const snowPts = [
+              // up over the apex…
+              [-34, 72],
+              [-30, 36],
+              [-12, 48],
+              [0, 0],
+              [20, 56],
+              [42, 40],
+              [48, 74],
+              // …and back along a wandering snowline, like the far peaks keep
+              [28, 64],
+              [12, 80],
+              [-6, 68],
+              [-22, 82]
+            ];
+            for (const [col, a, dy] of [
+              [0xbfd2e6, 0.85, 6],
+              [0xeef5fb, 0.97, 0]
+            ]) {
+              crag.beginFill(col, a);
+              crag.moveTo(cragX + snowPts[0][0], ay + snowPts[0][1] + dy);
+              for (const [dx, dy2] of snowPts)
+                crag.lineTo(cragX + dx, ay + dy2 + dy);
+              crag.closePath();
+              crag.endFill();
+            }
+            scene.addChild(crag);
+            // the perched pair, one on each shoulder, ruffled a little by the summit wind
+            for (const [dx, dy, sc, flip] of [
+              [-30, 37, 0.6, true],
+              [42, 41, 0.52, false]
+            ]) {
+              const pc = spr('chough_perch', cragX + dx, ay + dy, sc);
+              if (flip) pc.scale.x *= -1;
+              scene.addChild(pc);
+              swayers.push({s: pc, amp: 0.015, sp: 1.2, ph: Math.random() * 6});
+            }
+            // cloud lapping round the base, so the rock reads as poking through the sea —
+            // bigger fixed puffs over the base corners, so no bare rock edge peeks out
+            for (const [dx, psc] of [
+              [-108, 0.82],
+              [-44, 0.62 + Math.random() * 0.16],
+              [36, 0.62 + Math.random() * 0.16],
+              [104, 0.82]
+            ]) {
+              const c = spr(
+                'cloud',
+                cragX + dx,
+                surfY(cragX + dx) + 12,
+                psc,
+                0.5,
+                0.5
+              );
+              c.tint = 0xf4f9fd;
+              scene.addChild(c);
+            }
+          }
           // a few nearer puffs drifting over the sea (reuse the cloud drift + day/night tint)
           for (let i = 0; i < 3; i++) {
             const c = spr(
