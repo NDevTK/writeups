@@ -263,14 +263,18 @@ save(
   80
 );
 
-const flower = (c) =>
+// each petal gets a deeper rim behind it so the five circles read as petals, not one blob,
+// and the eye is two-tone like the newer blooms
+const flower = (c, cd) =>
   S(
     '40 60',
     `<path d="M20,58 L20,28" stroke="#4f9c34" stroke-width="3"/>
-<g fill="${c}"><circle cx="20" cy="18" r="6"/><circle cx="12" cy="23" r="6"/><circle cx="28" cy="23" r="6"/><circle cx="15" cy="13" r="6"/><circle cx="25" cy="13" r="6"/></g><circle cx="20" cy="18" r="4.5" fill="#ffd24a"/>`
+<g fill="${cd}"><circle cx="20" cy="19.4" r="6"/><circle cx="11.2" cy="24.2" r="6"/><circle cx="28.8" cy="24.2" r="6"/><circle cx="14.2" cy="14.2" r="6"/><circle cx="25.8" cy="14.2" r="6"/></g>
+<g fill="${c}"><circle cx="20" cy="17.6" r="5.6"/><circle cx="12.2" cy="22.6" r="5.6"/><circle cx="27.8" cy="22.6" r="5.6"/><circle cx="15" cy="12.6" r="5.6"/><circle cx="25" cy="12.6" r="5.6"/></g>
+<circle cx="20" cy="18" r="4.5" fill="#ffd24a"/><circle cx="20" cy="18" r="2.2" fill="#e0a030"/>`
   );
-save('flower_p', flower('#ef6a8a'), 44);
-save('flower_w', flower('#f3ecf2'), 44);
+save('flower_p', flower('#ef6a8a', '#c94b6c'), 44);
+save('flower_w', flower('#f5eef5', '#cfc2d8'), 44);
 // ---- spring bulbs + a few more blooms, to give the seasonal meadow mixes some range ----
 // a daffodil: six yellow petals around a deep orange trumpet, a blade leaf at the stem
 const daffodilSvg = () =>
@@ -4812,7 +4816,7 @@ save(
 );
 
 // ---- contact sheet of new + polished ----
-const review = ['heron', 'heron_preen', 'egret', 'egret_preen'];
+const review = ['flower_p', 'flower_w', 'flower_y', 'clover'];
 const cols = 4,
   cell = 230,
   pad = 14,
