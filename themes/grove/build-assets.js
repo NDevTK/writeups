@@ -13,8 +13,18 @@ const S = (vb, body) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vb}">${body}</svg>`;
 const png = (svg, w) =>
   new Resvg(svg, {fitTo: {mode: 'width', value: w}}).render().asPng();
-const save = (name, svg, w) =>
+// every sprite name must be unique: a repeated name would silently overwrite the earlier
+// sprite's PNG (this has bitten twice — a 'swallow_a' bird colliding with the swallowtail
+// butterfly, and a brown 'hare' overwriting the arctic hare), so fail the build loudly instead
+const seenNames = new Set();
+const save = (name, svg, w) => {
+  if (seenNames.has(name))
+    throw new Error(
+      `duplicate sprite name '${name}' — it would overwrite the earlier sprite; pick a distinct name`
+    );
+  seenNames.add(name);
   fs.writeFileSync(`${OUT}/${name}.png`, png(svg, w));
+};
 
 // ---- deer (2 walk frames) with belly shadow + leg shading ----
 const deerSvg = (lf, g0, g1, lg0, lg1, mid, tailRot) =>
