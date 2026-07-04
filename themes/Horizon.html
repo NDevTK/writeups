@@ -13,10 +13,13 @@
       - a multiple-scattering atmosphere after Hillaire (2020):
         transmittance, multiple-scattering and per-frame sky-view LUTs
         with Rayleigh, Mie (scaled by the measured AOD) and ozone
-        profiles, so twilight structure emerges from the raymarch; the
-        sun's terrain light carries its true transmitted colour; sun
-        position from astronomy-engine (VSOP87/ELP truncations,
-        topocentric, refraction-corrected); Preetham as fallback
+        profiles, so twilight structure emerges from the raymarch; an
+        aerial-perspective LUT applies the same scattering to the air
+        BETWEEN camera and terrain, so distant ridges blue out by
+        physics; the sun's terrain light carries its true transmitted
+        colour; sun position from astronomy-engine (VSOP87/ELP
+        truncations, topocentric, refraction-corrected); Preetham as
+        fallback
       - the actual night sky (Yale Bright Star Catalog: 2887 stars with
         real positions, magnitudes and colour temperatures) rotated for
         the latitude and the current sidereal time; the five naked-eye
@@ -29,7 +32,10 @@
         riding its own real wind (surface, 700hPa, 250hPa jet); the low
         deck is a raymarched volumetric cloudscape after Schneider & Vos
         (SIGGRAPH 2015): Perlin-Worley density carved by the real cover
-        at the real LCL, Beer-powder sun lighting, dual-lobe
+        at the real LCL, a zero-mean weather map varying that cover
+        across the sky without changing it, stratus/cumulus/cumulonimbus
+        height profiles picked by the reported WMO code, adaptive
+        coarse-to-fine marching, Beer-powder sun lighting, dual-lobe
         Henyey-Greenstein phase (high ice cloud stays 2D, as in the
         research)
       - the snowline tracks the real freezing level; the treeline follows
@@ -882,6 +888,79 @@
         record('Preetham sky (fallback)', 'no float render targets');
       }
 
+      // Aerial perspective (Hillaire 2020, sec. 5.2): the atmosphere
+      // BETWEEN the camera and every surface. atmosphere.js marches a
+      // 64x32 LUT of inscattered radiance and mean transmittance over
+      // (relative azimuth x distance), and every world material swaps
+      // three.js' colour-only fog input for it - distant ridges turn
+      // blue by scattering physics, then the Koschmieder haze (which
+      // carries the MEASURED visibility) applies on top.
+      const aerialU = {
+        uAerialTex: {value: atmo.ok ? atmo.aerialTex : null},
+        uAerialMaxU: {value: atmo.ok ? atmo.aerialMaxUnits : 1},
+        uSunAzV: {value: new THREE.Vector2(1, 0)},
+        uAerialExp: {value: 0}
+      };
+      const AERIAL_PARS =
+        'uniform sampler2D uAerialTex; uniform float uAerialMaxU;\n' +
+        'uniform vec2 uSunAzV; uniform float uAerialExp;\n' +
+        'varying vec3 vAerialDir;';
+      const AERIAL_FOG_FRAG =
+        '#ifdef USE_FOG\n' +
+        'float aerD = length(vAerialDir);\n' +
+        'vec2 aerH = normalize(vAerialDir.xz + vec2(1e-6));\n' +
+        'float aerAz = acos(clamp(dot(aerH, uSunAzV), -1.0, 1.0)) / 3.14159265;\n' +
+        'vec4 aer = texture2D(uAerialTex, vec2(aerAz, min(aerD / uAerialMaxU, 1.0)));\n' +
+        'gl_FragColor.rgb = gl_FragColor.rgb * aer.a + aer.rgb * uAerialExp;\n' +
+        '#ifdef FOG_EXP2\n' +
+        'float kFog = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);\n' +
+        'gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, kFog);\n' +
+        '#endif\n' +
+        '#endif';
+      let aerialId = 0;
+      function applyAerial(mat) {
+        if (!atmo.ok) return;
+        const prev = mat.onBeforeCompile;
+        // The wrapper's source is identical for every material, so
+        // three.js' program cache (keyed on onBeforeCompile.toString())
+        // would hand them all ONE compiled program - the terrain would
+        // silently get the tree shader. A unique key per material keeps
+        // each wrapped program distinct.
+        const id = aerialId++;
+        mat.customProgramCacheKey = () => 'aerial' + id;
+        mat.onBeforeCompile = (shader, r) => {
+          if (prev) prev(shader, r);
+          Object.assign(shader.uniforms, aerialU);
+          shader.vertexShader = shader.vertexShader
+            .replace(
+              '#include <fog_pars_vertex>',
+              '#include <fog_pars_vertex>\nvarying vec3 vAerialDir;'
+            )
+            .replace(
+              '#include <fog_vertex>',
+              '#include <fog_vertex>\n' +
+                '#ifdef USE_INSTANCING\n' +
+                'vAerialDir = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz - cameraPosition;\n' +
+                '#else\n' +
+                'vAerialDir = (modelMatrix * vec4(transformed, 1.0)).xyz - cameraPosition;\n' +
+                '#endif'
+            );
+          shader.fragmentShader = shader.fragmentShader
+            .replace(
+              '#include <fog_pars_fragment>',
+              '#include <fog_pars_fragment>\n' + AERIAL_PARS
+            )
+            .replace('#include <fog_fragment>', AERIAL_FOG_FRAG);
+        };
+        mat.needsUpdate = true;
+      }
+      if (atmo.ok) {
+        record(
+          'Aerial perspective LUT',
+          'per-pixel inscatter + transmittance on every material'
+        );
+      }
+
       // Overcast veil: a translucent grey dome that fades in with real
       // cloud cover (the scattering model alone stays too blue).
       const veilU = {
@@ -1029,6 +1108,7 @@
         new THREE.MeshLambertMaterial({color: '#4a7d33', flatShading: true}),
         new THREE.MeshLambertMaterial({color: '#5d8a3c', flatShading: true})
       ];
+      [trunkMat, ...leafMats, ...broadMats].forEach(applyAerial);
       const geoTrunk = new THREE.CylinderGeometry(0.13, 0.2, 1.1, 5);
       const geoCone1 = new THREE.ConeGeometry(1.15, 2.3, 7);
       const geoCone2 = new THREE.ConeGeometry(0.82, 1.8, 7);
@@ -1174,6 +1254,7 @@
             'outgoingLight += vWet * seaSpec(vWp);\n#include <opaque_fragment>'
           );
       };
+      applyAerial(terrainMat);
 
       function buildWorld() {
         ground.clear();
@@ -1344,6 +1425,29 @@
                 'albedo = mix( albedo, vec3( 0.82, 0.86, 0.88 ) * ( 0.3 + max( sunDirection.y, 0.0 ) ), clamp( capMask * 0.9 + surf * 0.85, 0.0, 1.0 ) );\n' +
                 'vec3 outgoingLight = albedo;'
             );
+          // Aerial perspective for the sea, via the Water shader's own
+          // worldPosition varying and eye uniform (its vertex stage has
+          // no `transformed`, so the generic hook cannot apply).
+          if (atmo.ok) {
+            Object.assign(water.material.uniforms, aerialU);
+            water.material.fragmentShader = water.material.fragmentShader
+              .replace(
+                '#include <fog_pars_fragment>',
+                '#include <fog_pars_fragment>\n' +
+                  'uniform sampler2D uAerialTex; uniform float uAerialMaxU;\n' +
+                  'uniform vec2 uSunAzV; uniform float uAerialExp;'
+              )
+              .replace(
+                '#include <fog_fragment>',
+                'vec3 aerDir = worldPosition.xyz - eye;\n' +
+                  'float aerD = length(aerDir);\n' +
+                  'vec2 aerH = normalize(aerDir.xz + vec2(1e-6));\n' +
+                  'float aerAz = acos(clamp(dot(aerH, uSunAzV), -1.0, 1.0)) / 3.14159265;\n' +
+                  'vec4 aer = texture2D(uAerialTex, vec2(aerAz, min(aerD / uAerialMaxU, 1.0)));\n' +
+                  'gl_FragColor.rgb = gl_FragColor.rgb * aer.a + aer.rgb * uAerialExp;\n' +
+                  '#include <fog_fragment>'
+              );
+          }
           water.material.needsUpdate = true;
           record(
             'three.js Water (vendored)',
@@ -1663,6 +1767,8 @@
         opacity: 0.15,
         depthWrite: false
       });
+      applyAerial(cloudMat);
+      applyAerial(cirrusMat);
       function makeBlob(puffs, radius, flat) {
         const blob = new THREE.Group();
         for (let j = 0; j < puffs; j++) {
@@ -1796,6 +1902,7 @@
       );
       driftMesh.count = 0;
       driftMesh.frustumCulled = false;
+      applyAerial(driftMesh.material);
       scene.add(driftMesh);
       const flakeMesh = new THREE.InstancedMesh(
         new THREE.IcosahedronGeometry(0.12, 0),
@@ -2095,12 +2202,12 @@
         // the temperate baseline); the grey veil handles overcast.
         const mieScale = THREE.MathUtils.clamp(state.aod / 0.12, 0.25, 8);
         if (atmo.ok) {
-          atmo.update(
-            sunVec,
-            mieScale,
-            Math.max(centerElev, 50),
-            24 / (0.2 + 0.8 * day)
-          );
+          const skyExposure = 24 / (0.2 + 0.8 * day);
+          atmo.update(sunVec, mieScale, Math.max(centerElev, 50), skyExposure);
+          // Aerial perspective shares the dome's exposure so inscattered
+          // light on the terrain matches the sky it comes from.
+          aerialU.uSunAzV.value.set(sunVec.x, sunVec.z).normalize();
+          aerialU.uAerialExp.value = skyExposure;
         } else {
           skyU.sunPosition.value.copy(sunVec);
           skyU.turbidity.value = 1.6 + state.aod * 14 + cloudy * 12 + dusk * 2;
@@ -2273,8 +2380,17 @@
           const cu = cloudDeck.uniforms;
           cloudDeck.mesh.visible = cLow > 2;
           cu.cov.value = THREE.MathUtils.clamp(cLow / 100, 0, 0.95);
+          // Cloud TYPE from the reported WMO code: overcast, fog and
+          // drizzle/steady-rain codes mean a flat stratiform sheet,
+          // shower and thunderstorm codes mean towering convection,
+          // anything else is fair-weather cumulus. The deck's thickness
+          // follows the type.
+          const wmo = state.code || 0;
+          const cTypeT =
+            wmo >= 80 ? 1.85 : wmo === 3 || (wmo >= 45 && wmo <= 67) ? 0.15 : 1;
+          cu.cType.value += (cTypeT - cu.cType.value) * Math.min(dt * 0.5, 1);
           cu.yBase.value = yCloud;
-          cu.yTop.value = yCloud + 14;
+          cu.yTop.value = yCloud + 8 + cu.cType.value * 9;
           cu.sunDirW.value.copy(sunVec);
           cu.sunCol.value
             .copy(sunLight.color)

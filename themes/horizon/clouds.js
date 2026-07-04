@@ -6,12 +6,22 @@ import * as THREE from 'three';
  * "Nubis" follow-ups, with the energy-conserving scatter integration
  * from Hillaire's Frostbite course (2016):
  *
- *  - base shape: tileable Perlin-Worley 3D noise (64^3), remapped by the
- *    REAL low-cloud cover, with a cumulus vertical profile
+ *  - base shape: tileable Perlin-Worley 3D noise (64^3; the paper uses
+ *    128^3 - the only concession, for CPU generation time), remapped by
+ *    the REAL low-cloud cover
+ *  - weather map (Schneider's 2D coverage texture): a low-frequency,
+ *    wind-advected field varies cover across the sky. It is built as the
+ *    difference of two samples of the same stationary noise, which has
+ *    exactly zero mean - the reported cover is conserved, not decorated
+ *  - vertical profiles by cloud TYPE (stratus / cumulus / cumulonimbus
+ *    height gradients as in Nubis), selected by the reported WMO code
  *  - edge erosion: tileable Worley 3D detail (32^3), wispy at the base
  *    and billowy at the tops (the paper's height-dependent mix)
  *  - lighting: Beer-powder toward the sun with a dual-lobe
  *    Henyey-Greenstein phase, plus sky ambient
+ *  - adaptive march (Schneider sec. 5): a cheap erosion-free ranging
+ *    pass at coarse step finds the cloud boundary, then the full-detail
+ *    march spends every step inside the occupied span
  *  - the slab sits at the real lifting condensation level and is
  *    advected by the real wind; per-pixel dithered march start kills
  *    banding
@@ -219,6 +229,7 @@ const CLOUD_FRAG = /* glsl */ `
   uniform float cov;     // real low-cloud cover 0..1
   uniform float yBase;   // real LCL, scene units
   uniform float yTop;
+  uniform float cType;   // 0 stratus, 1 cumulus, 2 cumulonimbus (WMO code)
   uniform vec2 wOff;     // real wind advection offset
   in vec3 vWorld;
   out vec4 outColor;
@@ -227,7 +238,33 @@ const CLOUD_FRAG = /* glsl */ `
     return c + (clamp(v, a, b) - a) / (b - a) * (d - c);
   }
 
-  float density(vec3 p, float h) {
+  // Weather map (Schneider's 2D coverage texture): low-frequency,
+  // wind-advected spatial variation of the cover. The difference of two
+  // samples of the same stationary noise has exactly zero mean, so the
+  // REAL reported cover is conserved across the sky, not decorated.
+  float coverAt(vec2 xz) {
+    vec2 q = (xz + wOff) * 0.0019;
+    float wvar = texture(baseTex, vec3(q.x, 0.5, q.y)).g -
+                 texture(baseTex, vec3(q.x + 0.5, 0.13, q.y + 0.5)).g;
+    return clamp(cov + wvar * 1.6 * cov * (1.0 - cov), 0.0, 1.0);
+  }
+
+  // Height gradients by cloud type (Nubis): a thin flat stratus sheet,
+  // the round-topped cumulus, the full-depth cumulonimbus tower.
+  float heightProfile(float h) {
+    float vpS = smoothstep(0.0, 0.1, h) * (1.0 - smoothstep(0.25, 0.55, h));
+    float vpC = smoothstep(0.0, 0.08, h) * smoothstep(1.0, 0.3, h);
+    float vpT = smoothstep(0.0, 0.05, h) * smoothstep(1.0, 0.9, h);
+    return mix(
+      mix(vpS, vpC, clamp(cType, 0.0, 1.0)),
+      vpT,
+      clamp(cType - 1.0, 0.0, 1.0)
+    );
+  }
+
+  // Erosion-free density: the base shape only. Used by the coarse
+  // ranging pass, and as the first (early-out) half of density().
+  float densityCoarse(vec3 p, float h) {
     vec3 uvw = vec3(
       (p.x + wOff.x) * 0.0055,
       p.y * 0.016,
@@ -237,11 +274,20 @@ const CLOUD_FRAG = /* glsl */ `
     float wfbm = nb.g * 0.625 + nb.b * 0.25 + nb.a * 0.125;
     float d = remapf(nb.r, -(1.0 - wfbm), 1.0, 0.0, 1.0);
     // Coverage remap (Schneider): the real cover carves the field.
-    d = remapf(d, 1.0 - cov, 1.0, 0.0, 1.0) * cov;
-    // Cumulus vertical profile: flat-ish base, rounded top.
-    d *= smoothstep(0.0, 0.08, h) * smoothstep(1.0, 0.3, h);
+    float covL = coverAt(p.xz);
+    d = remapf(d, 1.0 - covL, 1.0, 0.0, 1.0) * covL;
+    return d * heightProfile(h);
+  }
+
+  float density(vec3 p, float h) {
+    float d = densityCoarse(p, h);
     if (d <= 0.0) return 0.0;
     // Erosion: wispy at the base, billowy at the top.
+    vec3 uvw = vec3(
+      (p.x + wOff.x) * 0.0055,
+      p.y * 0.016,
+      (p.z + wOff.y) * 0.0055
+    );
     vec3 dn = texture(detailTex, uvw * 6.0).rgb;
     float dfbm = dn.r * 0.625 + dn.g * 0.25 + dn.b * 0.125;
     float er = mix(dfbm, 1.0 - dfbm, clamp(h * 3.0, 0.0, 1.0));
@@ -273,10 +319,29 @@ const CLOUD_FRAG = /* glsl */ `
     // ending at a hard march boundary.
     float horizonFade = exp(-t0 * 0.0011);
 
+    // Adaptive march (Schneider sec. 5): a cheap erosion-free ranging
+    // pass at coarse step finds the first occupied sample; the
+    // full-detail march then spends every step inside the cloud span
+    // instead of on empty air before it.
+    const int COARSE = 14;
+    float dtc = (t1 - t0) / float(COARSE);
+    float tStart = -1.0;
+    float tc = t0 + dtc * 0.5;
+    for (int i = 0; i < COARSE; i++) {
+      vec3 pc = ro + rd * tc;
+      float hc = clamp((pc.y - yBase) / (yTop - yBase), 0.0, 1.0);
+      if (densityCoarse(pc, hc) > 0.0) {
+        tStart = max(tc - dtc, t0);
+        break;
+      }
+      tc += dtc;
+    }
+    if (tStart < 0.0) discard;
+
     const int STEPS = 28;
-    float dt = (t1 - t0) / float(STEPS);
+    float dt = (t1 - tStart) / float(STEPS);
     // Dithered start: trades banding for noise (Schneider sec. 5).
-    float t = t0 + dt * hash12(gl_FragCoord.xy);
+    float t = tStart + dt * hash12(gl_FragCoord.xy);
 
     const float SIGMA = 0.9; // extinction per scene unit at density 1
     float cSun = dot(rd, sunDirW);
@@ -327,6 +392,7 @@ export function createCloudDeck() {
     cov: {value: 0},
     yBase: {value: 24},
     yTop: {value: 38},
+    cType: {value: 1},
     wOff: {value: new THREE.Vector2(0, 0)}
   };
   const mesh = new THREE.Mesh(

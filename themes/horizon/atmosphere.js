@@ -249,6 +249,61 @@ const SKYVIEW_FRAG =
   }
 `;
 
+const AERIAL_FRAG =
+  COMMON +
+  /* glsl */ `
+  uniform sampler2D tLut;
+  uniform sampler2D msLut;
+  uniform float sunMu;
+  uniform float camH;
+  uniform float maxDistM;
+  varying vec2 vUv;
+
+  vec3 sunT(float r, float mu) {
+    return texture2D(tLut, tParamsToUv(r, mu)).rgb;
+  }
+  vec3 psiMS(float r, float mu) {
+    return texture2D(msLut, vec2(mu * 0.5 + 0.5, (r - Rb) / (Rt - Rb))).rgb;
+  }
+
+  // Hillaire's aerial perspective, specialised to near-horizontal rays:
+  // every fog-receiving fragment in this scene sits within a few degrees
+  // of the camera's horizon, so the froxel volume collapses to
+  // (relative azimuth x distance). rgb = inscattered radiance,
+  // a = mean transmittance.
+  void main() {
+    float relAz = vUv.x * 3.14159265;
+    float dist = vUv.y * maxDistM;
+    float r = Rb + max(camH, 1.0);
+    vec3 dir = vec3(cos(relAz), 0.0, sin(relAz));
+    float sunS = sqrt(max(1.0 - sunMu * sunMu, 0.0));
+    vec3 sunDir = vec3(sunS, sunMu, 0.0);
+    float cSun = dot(dir, sunDir);
+
+    const int STEPS = 20;
+    float dt = dist / float(STEPS);
+    vec3 T = vec3(1.0);
+    vec3 L = vec3(0.0);
+    for (int s = 0; s < STEPS; s++) {
+      float ti = (float(s) + 0.5) * dt;
+      float ri = sqrt(r * r + ti * ti);
+      float h = ri - Rb;
+      vec3 dens = densities(h);
+      vec3 scatR = rayleighS * dens.x;
+      vec3 scatM = vec3(mieS0 * mieScale * dens.y);
+      vec3 ext = extinction(h);
+      float muSi = clamp((r * sunMu + ti * cSun) / ri, -1.0, 1.0);
+      vec3 Ts = sunT(ri, muSi);
+      vec3 S = (scatR * phaseR(cSun) + scatM * phaseM(cSun)) * Ts +
+               (scatR + scatM) * psiMS(ri, muSi);
+      vec3 stepT = exp(-ext * dt);
+      L += T * (S - S * stepT) / max(ext, vec3(1e-9));
+      T *= stepT;
+    }
+    gl_FragColor = vec4(L, dot(T, vec3(0.3333)));
+  }
+`;
+
 const DOME_FRAG = /* glsl */ `
   uniform sampler2D skyLut;
   uniform sampler2D tLutD;
@@ -323,6 +378,8 @@ export function createAtmosphere(renderer) {
   const tLut = makeTarget(256, 64);
   const msLut = makeTarget(32, 32);
   const skyLut = makeTarget(192, 108);
+  const aerialLut = makeTarget(64, 32);
+  const MAX_DIST_M = 25700; // 450 scene units at 57.14 m/unit
 
   const mieU = {value: 1};
   const tMat = new THREE.ShaderMaterial({
@@ -346,6 +403,19 @@ export function createAtmosphere(renderer) {
     uniforms: svUniforms,
     vertexShader: VERT,
     fragmentShader: SKYVIEW_FRAG
+  });
+  const aerialUniforms = {
+    mieScale: mieU,
+    tLut: {value: tLut.texture},
+    msLut: {value: msLut.texture},
+    sunMu: {value: 0.5},
+    camH: {value: 300},
+    maxDistM: {value: MAX_DIST_M}
+  };
+  const aerialMat = new THREE.ShaderMaterial({
+    uniforms: aerialUniforms,
+    vertexShader: VERT,
+    fragmentShader: AERIAL_FRAG
   });
 
   const domeU = {
@@ -381,6 +451,8 @@ export function createAtmosphere(renderer) {
   return {
     ok: true,
     mesh,
+    aerialTex: aerialLut.texture,
+    aerialMaxUnits: MAX_DIST_M / 57.14,
     // Called each frame: cheap sky-view raymarch for the current sun.
     // exposure models the eye's photopic adaptation (tone reproduction,
     // not physics): twilight is genuinely darker, but not pitch black.
@@ -391,10 +463,13 @@ export function createAtmosphere(renderer) {
       if (!lutsBuilt || Math.abs(mieScale - lastMie) > 0.05) buildLuts();
       svUniforms.sunMu.value = sunDir.y;
       svUniforms.camH.value = camHMetres;
+      aerialUniforms.sunMu.value = sunDir.y;
+      aerialUniforms.camH.value = camHMetres;
       domeU.sunDirW.value.copy(sunDir);
       domeU.camHD.value = camHMetres;
       if (exposure) domeU.exposure.value = exposure;
       pass(renderer, svMat, skyLut);
+      pass(renderer, aerialMat, aerialLut);
     }
   };
 }
