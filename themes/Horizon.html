@@ -11,11 +11,17 @@
         falling back to the open-meteo elevation API), with sea rendered
         where the sea actually is
       - a physically-based scattering sky (Preetham model via the three.js
-        Sky addon) lit by the sun's true computed position
-      - the actual night sky (Yale Bright Star Catalog: 1630 stars with
+        Sky addon) lit by the sun's true position from astronomy-engine
+        (VSOP87/ELP truncations, topocentric, refraction-corrected)
+      - the actual night sky (Yale Bright Star Catalog: 2887 stars with
         real positions, magnitudes and colour temperatures) rotated for
-        the latitude and the current sidereal time; the moon shows its
-        real phase because it is lit from the sun's real direction
+        the latitude and the current sidereal time; the five naked-eye
+        planets at their ephemeris positions and magnitudes; the moon
+        shows its real phase (lit from the sun's true direction) and its
+        real apparent size for today's Earth-Moon distance
+      - fog obeys the Koschmieder relation on the MEASURED visibility;
+        sun glitter follows Cox & Munk (1954) slope statistics; cloud
+        cover renders in the model's real low/mid/high layers
       - live weather (open-meteo + geojs, both keyless): cloud cover,
         rain, snow, fog, wind-driven sway; fresh snow whitens the ground
         only when it is actually freezing where you are
@@ -46,8 +52,9 @@
       Standalone debug overrides (query params, e.g. Horizon.html?time=...):
         lat, lon, time (ISO), cloud (0-100), wind (km/h), winddir (deg),
         gust (km/h), precip (mm), snow (cm), temp (C), dew (C), aod,
-        pm25, code (WMO weather code), quake (magnitude), kp (0-9),
-        aurora (0-1), auroralat (deg), dem=0 (skip real terrain), debug=1
+        pm25, vis (m), cloudlow/cloudmid/cloudhigh (0-100), code (WMO
+        weather code), quake (magnitude), kp (0-9), aurora (0-1),
+        auroralat (deg), dem=0 (skip real terrain), debug=1
     -->
     <style>
       html,
@@ -111,6 +118,7 @@
     <div id="caption"></div>
     <div id="panel" hidden></div>
     <script src="./horizon/satellite.min.js"></script>
+    <script src="./horizon/astronomy.browser.min.js"></script>
     <script type="module">
       import * as THREE from 'three';
       import {Sky} from './horizon/Sky.js';
@@ -218,6 +226,10 @@
         dew: params.has('dew') ? +params.get('dew') : 8,
         aod: params.has('aod') ? +params.get('aod') : 0.12,
         pm25: params.has('pm25') ? +params.get('pm25') : 6,
+        cloudLow: params.has('cloudlow') ? +params.get('cloudlow') : null,
+        cloudMid: params.has('cloudmid') ? +params.get('cloudmid') : null,
+        cloudHigh: params.has('cloudhigh') ? +params.get('cloudhigh') : null,
+        visibility: params.has('vis') ? +params.get('vis') : 30000,
         code: params.has('code') ? +params.get('code') : 1,
         kp: params.has('kp') ? +params.get('kp') : 0,
         auroraP: null, // OVATION oval probability 0..1, null = use Kp
@@ -312,13 +324,17 @@
                 state.lat +
                 '&longitude=' +
                 state.lon +
-                '&current=weather_code,cloud_cover,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,dew_point_2m',
+                '&current=weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,dew_point_2m',
               {credentials: 'omit'}
             )
           ).json();
           const c = w.current;
           state.code = c.weather_code;
           state.cloud = c.cloud_cover;
+          state.cloudLow = c.cloud_cover_low;
+          state.cloudMid = c.cloud_cover_mid;
+          state.cloudHigh = c.cloud_cover_high;
+          state.visibility = c.visibility || state.visibility;
           state.precip = c.precipitation;
           state.snow = c.snowfall;
           state.wind = c.wind_speed_10m;
@@ -1170,8 +1186,37 @@
           });
           water.rotation.x = -Math.PI / 2;
           water.position.y = 16 * Math.asinh((0 - centerElev) / 500) - 0.15;
-          ground.add(water);
-          record('three.js Water (vendored)', 'planar reflections · 512px');
+          // Cox & Munk (1954): sun glitter is shaped by the sea-surface
+          // slope variance, mss = 0.003 + 0.00512*U. Patch the vendored
+          // shader's fixed Blinn lobe to follow it, and mix in Monahan
+          // whitecaps.
+          Object.assign(water.material.uniforms, {
+            shiny: {value: 200},
+            whitecapW: {value: 0},
+            windDirW: {value: new THREE.Vector2(1, 0)}
+          });
+          water.material.fragmentShader = water.material.fragmentShader
+            .replace(
+              'uniform vec3 waterColor;',
+              'uniform vec3 waterColor; uniform float shiny;' +
+                ' uniform float whitecapW; uniform vec2 windDirW;'
+            )
+            .replace(
+              'sunLight( surfaceNormal, eyeDirection, 100.0, 2.0, 0.5, diffuseLight, specularLight );',
+              'sunLight( surfaceNormal, eyeDirection, shiny, shiny * 0.02 + 0.5, 0.5, diffuseLight, specularLight );'
+            )
+            .replace(
+              'vec3 outgoingLight = albedo;',
+              'float capN = texture2D( normalSampler, worldPosition.xz * 0.02 + windDirW * time * 0.012 ).g;\n' +
+                'float capMask = smoothstep( 1.0 - whitecapW - 0.04, 1.0 - whitecapW + 0.02, capN );\n' +
+                'albedo = mix( albedo, vec3( 0.75, 0.8, 0.84 ) * ( 0.25 + max( sunDirection.y, 0.0 ) ), capMask * 0.9 );\n' +
+                'vec3 outgoingLight = albedo;'
+            );
+          water.material.needsUpdate = true;
+          record(
+            'three.js Water (vendored)',
+            'planar reflections · Cox-Munk glitter · Monahan whitecaps'
+          );
         }
 
         camBaseY = sample(0, -26 * viewSign).y + 5;
@@ -1301,6 +1346,65 @@
       scene.add(moonLight);
       scene.add(moonLight.target);
 
+      // Naked-eye planets at their true ephemeris positions, sized by
+      // real apparent magnitude, tinted like the eye sees them.
+      const PLANETS = ['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn'];
+      const PLANET_TINTS = [
+        [0.9, 0.85, 0.78],
+        [1, 0.98, 0.9],
+        [1, 0.62, 0.44],
+        [0.98, 0.92, 0.8],
+        [0.95, 0.9, 0.72]
+      ];
+      const planetGeo = new THREE.BufferGeometry();
+      planetGeo.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(
+          new Float32Array(PLANETS.length * 3),
+          3
+        )
+      );
+      planetGeo.setAttribute(
+        'color',
+        new THREE.Float32BufferAttribute(PLANET_TINTS.flat(), 3)
+      );
+      planetGeo.setAttribute(
+        'size',
+        new THREE.Float32BufferAttribute(
+          new Float32Array(PLANETS.length).fill(4),
+          1
+        )
+      );
+      const planetMat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        uniforms: {night: {value: 0}},
+        vertexShader:
+          'attribute float size; varying vec3 vc;' +
+          ' void main(){ vc = color;' +
+          ' vec4 mv = modelViewMatrix * vec4(position, 1.0);' +
+          ' gl_PointSize = size; gl_Position = projectionMatrix * mv; }',
+        fragmentShader:
+          'uniform float night; varying vec3 vc;' +
+          ' void main(){ float d = length(gl_PointCoord - 0.5);' +
+          ' if (d > 0.5) discard;' +
+          ' gl_FragColor = vec4(vc, night * smoothstep(0.5, 0.2, d)); }',
+        vertexColors: true
+      });
+      const planetPoints = new THREE.Points(planetGeo, planetMat);
+      planetPoints.frustumCulled = false;
+      scene.add(planetPoints);
+
+      // Ephemeris cache, refreshed at 1Hz in the frame loop.
+      const astro = {
+        at: -1e9,
+        sun: {alt: 0.5, az: Math.PI},
+        moon: {alt: -1, az: 0},
+        moonScale: 0.28,
+        planets: [],
+        recorded: false
+      };
+
       // Aurora: additive curtains over the poleward horizon, driven by
       // NOAA's OVATION oval (Kp heuristic as fallback). The oval's real
       // latitude sets the curtain's true elevation via uBase.
@@ -1347,7 +1451,9 @@
       aurora.position.y = 420;
       scene.add(aurora);
 
-      // Clouds: soft blobs; coverage and drift follow the real weather.
+      // Clouds in the three layers the weather model actually reports
+      // (open-meteo cloud_cover_low/mid/high): puffy cumulus at the LCL,
+      // flatter altostratus in the mid levels, thin cirrus sheets high up.
       const cloudGroup = new THREE.Group();
       const cloudMat = new THREE.MeshLambertMaterial({
         color: '#ffffff',
@@ -1355,16 +1461,25 @@
         opacity: 0.85,
         flatShading: true
       });
-      const clouds = [];
-      for (let i = 0; i < 16; i++) {
+      const cirrusMat = new THREE.MeshBasicMaterial({
+        color: '#ffffff',
+        transparent: true,
+        opacity: 0.15,
+        depthWrite: false
+      });
+      function makeBlob(puffs, radius, flat) {
         const blob = new THREE.Group();
-        for (let j = 0; j < 4; j++) {
+        for (let j = 0; j < puffs; j++) {
           const puff = new THREE.Mesh(
-            new THREE.IcosahedronGeometry(6 + rand() * 6, 0),
+            new THREE.IcosahedronGeometry(radius * (0.6 + rand() * 0.7), 0),
             cloudMat
           );
-          puff.position.set((j - 1.5) * 7 + rand() * 3, rand() * 3, rand() * 4);
-          puff.scale.y = 0.45;
+          puff.position.set(
+            (j - (puffs - 1) / 2) * radius * 1.1 + rand() * 3,
+            rand() * 3,
+            rand() * 5
+          );
+          puff.scale.y = flat;
           blob.add(puff);
         }
         blob.position.set(
@@ -1372,10 +1487,26 @@
           70 + rand() * 30,
           (rand() - 0.5) * 480
         );
-        // Altitude jitter around the real cloud base (set each frame).
         blob.userData.jitter = rand() * 10;
-        clouds.push(blob);
         cloudGroup.add(blob);
+        return blob;
+      }
+      const cloudsLow = [];
+      for (let i = 0; i < 14; i++) cloudsLow.push(makeBlob(4, 6.5, 0.45));
+      const cloudsMid = [];
+      for (let i = 0; i < 9; i++) cloudsMid.push(makeBlob(5, 9, 0.22));
+      const cloudsHigh = [];
+      for (let i = 0; i < 7; i++) {
+        const sheet = new THREE.Mesh(
+          new THREE.PlaneGeometry(80 + rand() * 50, 9 + rand() * 8),
+          cirrusMat
+        );
+        sheet.rotation.x = -Math.PI / 2;
+        sheet.rotation.z = rand() * Math.PI;
+        sheet.position.set((rand() - 0.5) * 480, 90, (rand() - 0.5) * 480);
+        sheet.userData.jitter = rand() * 6;
+        cloudsHigh.push(sheet);
+        cloudGroup.add(sheet);
       }
       scene.add(cloudGroup);
 
@@ -1663,8 +1794,58 @@
         last = t;
         const d = now();
 
-        const sun = altAz(sunEquatorial(d), d, state.lat, state.lon);
-        const moon = altAz(moonEquatorial(d), d, state.lat, state.lon);
+        // Ephemerides: astronomy-engine (VSOP87/ELP truncations,
+        // topocentric, refraction-corrected) at 1Hz; the hand-rolled
+        // low-precision formulas remain as offline fallback.
+        if (t - astro.at > 1000) {
+          astro.at = t;
+          if (window.Astronomy) {
+            const AE = window.Astronomy;
+            const obs = new AE.Observer(state.lat, state.lon, centerElev);
+            const pos = (body) => {
+              const eq = AE.Equator(body, d, obs, true, true);
+              const h = AE.Horizon(d, obs, eq.ra, eq.dec, 'normal');
+              return {alt: h.altitude * RAD, az: h.azimuth * RAD};
+            };
+            astro.sun = pos(AE.Body.Sun);
+            astro.moon = pos(AE.Body.Moon);
+            // True apparent size: the moon disc scales with its real
+            // distance (supermoon vs apogee is a visible ~7%).
+            const distKm = AE.GeoMoon(d).Length() * AE.KM_PER_AU;
+            astro.moonScale = (1500 * 1737) / distKm / 24;
+            for (let i = 0; i < PLANETS.length; i++) {
+              const p = pos(AE.Body[PLANETS[i]]);
+              const mag = AE.Illumination(AE.Body[PLANETS[i]], d).mag;
+              astro.planets[i] = {alt: p.alt, az: p.az, mag};
+            }
+            if (!astro.recorded) {
+              astro.recorded = true;
+              record(
+                'astronomy-engine (vendored)',
+                'VSOP87/ELP · topocentric · refraction · 5 planets'
+              );
+            }
+          } else {
+            astro.sun = altAz(sunEquatorial(d), d, state.lat, state.lon);
+            astro.moon = altAz(moonEquatorial(d), d, state.lat, state.lon);
+          }
+        }
+        const sun = astro.sun;
+        const moon = astro.moon;
+        moonDisc.scale.setScalar(astro.moonScale);
+        if (planetMat) {
+          const pp = planetGeo.attributes.position;
+          const ps = planetGeo.attributes.size;
+          for (let i = 0; i < PLANETS.length; i++) {
+            const pl = astro.planets[i];
+            if (!pl) continue;
+            const v = skyPoint(pl.alt, pl.az, 860);
+            pp.setXYZ(i, v.x, v.y, v.z);
+            ps.setX(i, THREE.MathUtils.clamp(6 - pl.mag * 1.4, 2, 9.5));
+          }
+          pp.needsUpdate = true;
+          ps.needsUpdate = true;
+        }
         const sunVec = skyPoint(sun.alt, sun.az, 1);
         skyU.sunPosition.value.copy(sunVec);
         sunLight.position.copy(skyPoint(Math.max(sun.alt, -0.12), sun.az, 190));
@@ -1691,13 +1872,11 @@
           .lerp(cSetBot, dusk * 0.8)
           .lerp(cGray, cloudy * 0.7 * day);
         scene.fog.color.copy(tmpB);
-        const foggy = state.code === 45 || state.code === 48;
-        // Particulate haze: real PM2.5 shortens the visibility.
+        // Koschmieder relation: extinction from the MEASURED visibility
+        // (2% contrast at V). Fog codes need no special-casing - a foggy
+        // hour reports a short visibility by itself.
         scene.fog.density =
-          0.004 +
-          (foggy ? 0.028 : 0) +
-          cloudy * 0.002 +
-          Math.min(state.pm25, 150) * 0.00006;
+          1.98 / (Math.max(state.visibility, 400) / 57.14) + cloudy * 0.001;
 
         sunLight.intensity = (0.25 + day) * (1 - cloudy * 0.55);
         sunLight.color.setHSL(0.12, 0.5, 0.6 + day * 0.4 - dusk * 0.15);
@@ -1713,16 +1892,22 @@
         if (constMat) constMat.opacity = (1 - day) * (1 - cloudy * 0.9) * 0.2;
         moonDisc.visible = moon.alt > -0.05;
 
-        // The Water plane: real waves via the sea-state, real sun tint.
+        // The Water plane: Cox-Munk slope statistics set the glitter
+        // lobe, Monahan sets the whitecap fraction, Pierson-Moskowitz
+        // scales the distortion - all from the one real wind speed.
         if (water) {
           const wu = water.material.uniforms;
-          wu.time.value += dt * (0.3 + (state.wind / 3.6) * 0.05);
+          const Ums = state.wind / 3.6;
+          wu.time.value += dt * (0.3 + Ums * 0.05);
           wu.sunDirection.value.copy(sunVec);
           wu.sunColor.value
             .copy(sunLight.color)
             .multiplyScalar(sunLight.intensity);
-          wu.distortionScale.value =
-            0.6 + ((0.21 * Math.pow(state.wind / 3.6, 2)) / 9.81) * 2.5;
+          wu.distortionScale.value = 0.6 + ((0.21 * Ums * Ums) / 9.81) * 2.5;
+          const mss = 0.003 + 0.00512 * Ums;
+          wu.shiny.value = Math.max(2 / mss - 2, 30);
+          wu.whitecapW.value = Math.min(3.84e-6 * Math.pow(Ums, 3.41), 0.5);
+          wu.windDirW.value.set(windV.x, windV.z);
         }
 
         // The real wind vector: meteorological direction is where wind
@@ -1768,29 +1953,43 @@
         aurora.position.y = yAurora + 200;
         aurora.rotation.y = state.lat < 0 ? Math.PI : 0;
 
-        // Clouds ride the real wind vector, based at the real lifting
-        // condensation level (Espy: ~125m per degree of dew point spread).
-        // Clamped above the camera: the asinh height compression squeezes
-        // low cloud decks harder than the terrain they sit over.
+        // Three cloud layers from the model's real per-layer covers.
+        // Cumulus base at the real lifting condensation level (Espy:
+        // ~125m per degree of dew point spread), clamped above the
+        // camera because the asinh height compression squeezes low
+        // decks harder than the terrain they sit over.
+        const cLow = state.cloudLow ?? state.cloud * 0.7;
+        const cMid = state.cloudMid ?? state.cloud * 0.5;
+        const cHigh = state.cloudHigh ?? state.cloud * 0.3;
         const lcl = Math.max(125 * (state.temp - state.dew), 150);
         const yCloud = Math.max(16 * Math.asinh(lcl / 500) + 8, camBaseY + 26);
-        const showClouds = Math.round(cloudy * clouds.length);
-        clouds.forEach((c, i) => {
-          c.visible = i < showClouds;
-          c.position.x += windV.x * state.wind * 0.06 * dt;
-          c.position.z += windV.z * state.wind * 0.06 * dt;
-          c.position.y +=
-            (yCloud + c.userData.jitter - c.position.y) * Math.min(dt, 1);
-          if (c.position.x > 260) c.position.x = -260;
-          if (c.position.x < -260) c.position.x = 260;
-          if (c.position.z > 260) c.position.z = -260;
-          if (c.position.z < -260) c.position.z = 260;
-        });
+        const driftLayer = (arr, cover, y) => {
+          const showN = Math.round((cover / 100) * arr.length);
+          arr.forEach((c, i) => {
+            c.visible = i < showN;
+            c.position.x += windV.x * state.wind * 0.06 * dt;
+            c.position.z += windV.z * state.wind * 0.06 * dt;
+            c.position.y +=
+              (y + c.userData.jitter - c.position.y) * Math.min(dt, 1);
+            if (c.position.x > 260) c.position.x = -260;
+            if (c.position.x < -260) c.position.x = 260;
+            if (c.position.z > 260) c.position.z = -260;
+            if (c.position.z < -260) c.position.z = 260;
+          });
+        };
+        driftLayer(cloudsLow, cLow, yCloud);
+        driftLayer(cloudsMid, cMid, Math.max(16 * Math.asinh(8), yCloud + 14));
+        driftLayer(
+          cloudsHigh,
+          cHigh,
+          Math.max(16 * Math.asinh(16), yCloud + 26)
+        );
         cloudMat.opacity = 0.5 + cloudy * 0.4;
         // Unlit clouds are dark; only daylight (or moonlight) brightens.
         cloudMat.color.setScalar(
           0.3 + day * 0.7 + (moon.alt > 0 ? 0.08 * (1 - day) : 0)
         );
+        cirrusMat.opacity = 0.05 + day * 0.12;
 
         // Ground snow cover reacts live to the real temperature.
         const snowyGround =
@@ -1994,14 +2193,18 @@
             ((((sun.az / RAD) % 360) + 360) % 360).toFixed(0) +
             '° az';
           live['moon (computed)'] = (moon.alt / RAD).toFixed(1) + '° alt';
-          live['sea (Pierson-Moskowitz)'] =
+          live['sea state'] =
             'Hs ' +
             ((0.21 * Ums * Ums) / 9.81).toFixed(2) +
             ' m · Tp ' +
             (0.7305 * Ums).toFixed(1) +
-            ' s · whitecaps ' +
+            ' s (Pierson-Moskowitz) · mss ' +
+            (0.003 + 0.00512 * Ums).toFixed(4) +
+            ' (Cox-Munk) · whitecaps ' +
             (3.84e-4 * Math.pow(Ums, 3.41)).toFixed(2) +
-            '%';
+            '% (Monahan)';
+          live['visibility (Koschmieder fog)'] =
+            (state.visibility / 1000).toFixed(1) + ' km measured';
           live['aurora curtain'] =
             auroraU.strength.value.toFixed(2) + ' strength';
           if (snowSim)
