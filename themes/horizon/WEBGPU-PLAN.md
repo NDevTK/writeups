@@ -88,5 +88,28 @@ Scenes (all at Grindelwald unless noted):
 ## Status
 
 - Phase 1 complete (r185 vendored, matrix green, A/B 3.5/255).
-- Phase 2 not started. First step: vendor `three.webgpu.js` /
-  `three.tsl.js` at the same r185 tag and port the terrain material.
+- Phase 2 in progress:
+  - `three.webgpu.min.js` + `three.tsl.min.js` vendored at r185;
+    WebGPURenderer boots on the WebGL2 backend in the harness
+    (`forceWebGL: true`, `await renderer.init()`,
+    `renderer.backend.isWebGLBackend`).
+  - Terrain material ported: `terrain-tsl.js` exports
+    `createTerrainNodeMaterial(normalMapTex, aerialLutTex)` — the
+    complete GLSL logic as node code (noise, DEM normal map,
+    grass/rock/snow/sea with asinh elevation inversion,
+    Pierson-Moskowitz sea normals, Blinn+Schlick glitter as
+    emissiveNode, Monahan whitecaps, per-pixel roughnessNode, aerial
+    LUT + Koschmieder outputNode). Unit-validated on the WebGL
+    backend: altitude bands with jittered snowline, normal-map
+    lighting, wet-attribute sea, wave normals.
+  - TSL gotchas recorded: textures are graph nodes (pass to the
+    factory, swap via `node.value` on rebake — `uniform(null)` does
+    NOT work); `uniform()` takes THREE objects (Vector2/Color), not
+    TSL constructors; `transformNormalToView` is object→view space
+    (fine while the terrain mesh transform is identity — revisit if
+    that changes).
+  - Next: aerial-fog TSL node shared across tree/drift materials;
+    `CSMShadowNode`; TSL Water/Sky with the Cox-Munk physics
+    re-applied; atmosphere + cloud passes as node render-target
+    passes; then the Horizon.html renderer switch and the full
+    matrix.
