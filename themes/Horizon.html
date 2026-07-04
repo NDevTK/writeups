@@ -7,8 +7,9 @@
     <!--
       A 3D landscape where everything shown is real state:
       - the terrain is your terrain: real elevations around the visitor's
-        location (open-meteo elevation API, Copernicus DEM), with sea
-        rendered where the sea actually is
+        location (AWS terrarium elevation tiles at ~30-90m resolution,
+        falling back to the open-meteo elevation API), with sea rendered
+        where the sea actually is
       - a physically-based scattering sky (Preetham model via the three.js
         Sky addon) lit by the sun's true computed position
       - the actual night sky (Yale Bright Star Catalog: 1630 stars with
@@ -315,8 +316,99 @@
       const DEM_HALF_M = 8000;
       const WORLD = 280; // scene units across; ~57 m per unit
 
+      // Primary source: AWS terrarium tiles (Mapzen open data). Elevation
+      // is PNG-encoded as (R*256 + G + B/256) - 32768, CORS-open, so a
+      // stitched canvas gives ~30-90m real elevations in a few requests.
+      async function fetchDEMTiles(lat, lon) {
+        const key = 'horizon-dem-t-' + lat.toFixed(2) + ',' + lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) return JSON.parse(hit);
+        } catch {}
+        const z = Math.max(
+          8,
+          Math.min(
+            13,
+            Math.round(Math.log2((40075000 * Math.cos(lat * RAD)) / 8000))
+          )
+        );
+        const world = 2 ** z * 256; // global pixels at this zoom
+        const px = (lo) => ((lo + 180) / 360) * world;
+        const py = (la) => {
+          const r = la * RAD;
+          return (
+            ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) *
+            world
+          );
+        };
+        const mLat = 111320;
+        const mLon = Math.max(111320 * Math.cos(lat * RAD), 1e-6);
+        const dLat = DEM_HALF_M / mLat;
+        const dLon = DEM_HALF_M / mLon;
+        const x0 = Math.floor(px(lon - dLon) / 256);
+        const x1 = Math.floor(px(lon + dLon) / 256);
+        const y0 = Math.floor(py(lat + dLat) / 256);
+        const y1 = Math.floor(py(lat - dLat) / 256);
+        if ((x1 - x0 + 1) * (y1 - y0 + 1) > 12)
+          throw new Error('tile span too large');
+        const canvas = document.createElement('canvas');
+        canvas.width = (x1 - x0 + 1) * 256;
+        canvas.height = (y1 - y0 + 1) * 256;
+        const ctx = canvas.getContext('2d', {willReadFrequently: true});
+        const jobs = [];
+        for (let ty = y0; ty <= y1; ty++)
+          for (let tx = x0; tx <= x1; tx++)
+            jobs.push(
+              new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                  ctx.drawImage(img, (tx - x0) * 256, (ty - y0) * 256);
+                  resolve();
+                };
+                img.onerror = reject;
+                img.src =
+                  'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/' +
+                  z +
+                  '/' +
+                  tx +
+                  '/' +
+                  ty +
+                  '.png';
+              })
+            );
+        await Promise.all(jobs);
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        const T = 96; // sampling grid, same layout as the API path
+        const grid = [];
+        for (let j = 0; j < T; j++)
+          for (let i = 0; i < T; i++) {
+            const la = lat + (j / (T - 1) - 0.5) * 2 * dLat;
+            const lo = lon + (i / (T - 1) - 0.5) * 2 * dLon;
+            const gx = Math.min(
+              Math.max(Math.round(px(lo) - x0 * 256), 0),
+              canvas.width - 1
+            );
+            const gy = Math.min(
+              Math.max(Math.round(py(la) - y0 * 256), 0),
+              canvas.height - 1
+            );
+            const k = (gy * canvas.width + gx) * 4;
+            grid.push(
+              Math.round(
+                (data[k] * 256 + data[k + 1] + data[k + 2] / 256 - 32768) * 10
+              ) / 10
+            );
+          }
+        const dem = {n: T, grid};
+        try {
+          localStorage.setItem(key, JSON.stringify(dem));
+        } catch {}
+        return dem;
+      }
+
       async function fetchDEM(lat, lon) {
-        const key = 'horizon-dem-' + lat.toFixed(2) + ',' + lon.toFixed(2);
+        const key = 'horizon-dem-om-' + lat.toFixed(2) + ',' + lon.toFixed(2);
         try {
           const hit = localStorage.getItem(key);
           if (hit) return JSON.parse(hit);
@@ -350,7 +442,7 @@
           if (!r.ok) throw new Error(r.status);
           grid.push(...(await r.json()).elevation);
         }
-        const dem = {grid};
+        const dem = {n: DEM_N, grid};
         try {
           localStorage.setItem(key, JSON.stringify(dem));
         } catch {}
@@ -463,19 +555,19 @@
         return 90 + 700 * ridged * ridged + 260 * fbm(x / 40, z / 40);
       }
 
-      let demData = null; // {grid} once loaded
+      let demData = null; // {n, grid} once loaded
       function demElev(x, z) {
         // x east, z south, in scene units -> bilinear over the DEM grid.
-        const u = THREE.MathUtils.clamp(x / WORLD + 0.5, 0, 1) * (DEM_N - 1);
-        const v =
-          THREE.MathUtils.clamp(1 - (z / WORLD + 0.5), 0, 1) * (DEM_N - 1);
-        const i = Math.min(Math.floor(u), DEM_N - 2);
-        const j = Math.min(Math.floor(v), DEM_N - 2);
+        const N = demData.n;
+        const u = THREE.MathUtils.clamp(x / WORLD + 0.5, 0, 1) * (N - 1);
+        const v = THREE.MathUtils.clamp(1 - (z / WORLD + 0.5), 0, 1) * (N - 1);
+        const i = Math.min(Math.floor(u), N - 2);
+        const j = Math.min(Math.floor(v), N - 2);
         const g = demData.grid;
-        const e00 = g[j * DEM_N + i];
-        const e10 = g[j * DEM_N + i + 1];
-        const e01 = g[(j + 1) * DEM_N + i];
-        const e11 = g[(j + 1) * DEM_N + i + 1];
+        const e00 = g[j * N + i];
+        const e10 = g[j * N + i + 1];
+        const e01 = g[(j + 1) * N + i];
+        const e11 = g[(j + 1) * N + i + 1];
         return lerp(lerp(e00, e10, u - i), lerp(e01, e11, u - i), v - j);
       }
 
@@ -968,10 +1060,15 @@
         setInterval(syncKp, 15 * 60 * 1000);
         if (params.get('dem') !== '0') {
           try {
-            demData = await fetchDEM(state.lat, state.lon);
+            demData = await fetchDEMTiles(state.lat, state.lon);
             buildWorld();
           } catch {
-            // Keep the procedural fallback silently.
+            try {
+              demData = await fetchDEM(state.lat, state.lon);
+              buildWorld();
+            } catch {
+              // Keep the procedural fallback silently.
+            }
           }
         }
         if (params.has('quake')) {
