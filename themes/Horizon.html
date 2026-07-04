@@ -5,18 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Horizon</title>
     <!--
-      A low-poly 3D landscape where everything shown is real state:
-      - sun and moon at their true computed positions for your time/place
-      - the actual night sky (Yale Bright Star Catalog, 1630 stars with
+      A 3D landscape where everything shown is real state:
+      - the terrain is your terrain: real elevations around the visitor's
+        location (open-meteo elevation API, Copernicus DEM), with sea
+        rendered where the sea actually is
+      - a physically-based scattering sky (Preetham model via the three.js
+        Sky addon) lit by the sun's true computed position
+      - the actual night sky (Yale Bright Star Catalog: 1630 stars with
         real positions, magnitudes and colour temperatures) rotated for
-        your latitude and the current sidereal time
+        the latitude and the current sidereal time; the moon shows its
+        real phase because it is lit from the sun's real direction
       - live weather (open-meteo + geojs, both keyless): cloud cover,
-        rain, snow, fog and wind driving the scene
-      - USGS earthquakes (M4.5+) arrive as a brief camera rumble
+        rain, snow, fog, wind-driven sway; fresh snow whitens the ground
+        only when it is actually freezing where you are
+      - USGS M4.5+ earthquakes rumble the camera, attenuated by their
+        real distance from you
+      - aurora appears only when NOAA's planetary K-index is genuinely
+        high and you are at auroral latitudes
 
       Standalone debug overrides (query params, e.g. Horizon.html?time=...):
         lat, lon, time (ISO), cloud (0-100), wind (km/h), precip (mm),
-        snow (cm), code (WMO weather code), quake (magnitude)
+        snow (cm), temp (C), code (WMO weather code), quake (magnitude),
+        kp (0-9), dem=0 (skip real terrain)
     -->
     <style>
       html,
@@ -46,12 +56,16 @@
         transition: opacity 1.2s ease;
       }
     </style>
+    <script type="importmap">
+      {"imports": {"three": "./horizon/three.module.min.js"}}
+    </script>
   </head>
   <body>
     <canvas id="gl"></canvas>
     <div id="caption"></div>
     <script type="module">
-      import * as THREE from './horizon/three.module.min.js';
+      import * as THREE from 'three';
+      import {Sky} from './horizon/Sky.js';
 
       const params = new URL(location.href).searchParams;
       const reduceMotion = matchMedia(
@@ -131,6 +145,15 @@
           -r * Math.cos(alt) * Math.cos(az)
         );
 
+      const haversineKm = (lat1, lon1, lat2, lon2) => {
+        const a =
+          Math.sin(((lat2 - lat1) * RAD) / 2) ** 2 +
+          Math.cos(lat1 * RAD) *
+            Math.cos(lat2 * RAD) *
+            Math.sin(((lon2 - lon1) * RAD) / 2) ** 2;
+        return 12742 * Math.asin(Math.sqrt(a));
+      };
+
       // ---------- state from the real world ----------
       const state = {
         lat: params.has('lat') ? +params.get('lat') : 51.48,
@@ -140,7 +163,9 @@
         wind: params.has('wind') ? +params.get('wind') : 8,
         precip: params.has('precip') ? +params.get('precip') : 0,
         snow: params.has('snow') ? +params.get('snow') : 0,
+        temp: params.has('temp') ? +params.get('temp') : 14,
         code: params.has('code') ? +params.get('code') : 1,
+        kp: params.has('kp') ? +params.get('kp') : 0,
         shake: 0
       };
       const overridden = [
@@ -150,6 +175,7 @@
         'wind',
         'precip',
         'snow',
+        'temp',
         'code'
       ].some((k) => params.has(k));
 
@@ -211,7 +237,7 @@
                 state.lat +
                 '&longitude=' +
                 state.lon +
-                '&current=weather_code,cloud_cover,precipitation,snowfall,wind_speed_10m',
+                '&current=weather_code,cloud_cover,precipitation,snowfall,wind_speed_10m,temperature_2m',
               {credentials: 'omit'}
             )
           ).json();
@@ -221,13 +247,29 @@
           state.precip = c.precipitation;
           state.snow = c.snowfall;
           state.wind = c.wind_speed_10m;
+          state.temp = c.temperature_2m;
           say(
             (state.place ? state.place + ' · ' : '') +
               (WMO[state.code] || 'weather code ' + state.code) +
-              ' · this scene mirrors your sky'
+              ' · this scene mirrors your sky and terrain'
           );
         } catch {
           say('weather unavailable · showing a calm day');
+        }
+      }
+
+      async function syncKp() {
+        if (params.has('kp')) return;
+        try {
+          const rows = await (
+            await fetch(
+              'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json',
+              {credentials: 'omit'}
+            )
+          ).json();
+          state.kp = +rows[rows.length - 1].estimated_kp || 0;
+        } catch {
+          state.kp = 0;
         }
       }
 
@@ -244,16 +286,20 @@
           for (const f of q.features) {
             if (seenQuakes.has(f.id)) continue;
             seenQuakes.add(f.id);
-            // Only rumble for events that arrive while watching.
-            if (!firstQuakePoll) {
-              state.shake = Math.min((f.properties.mag - 4) * 0.35, 1.2);
-              say(
-                'M' +
-                  f.properties.mag.toFixed(1) +
-                  ' earthquake · ' +
-                  f.properties.place
-              );
-            }
+            if (firstQuakePoll) continue; // only rumble live events
+            // Real distance decides how hard it shakes here.
+            const [qlon, qlat] = f.geometry.coordinates;
+            const km = haversineKm(state.lat, state.lon, qlat, qlon);
+            const atten = Math.max(Math.exp(-km / 2500), 0.04);
+            state.shake = Math.min((f.properties.mag - 4) * 0.5 * atten, 1.2);
+            say(
+              'M' +
+                f.properties.mag.toFixed(1) +
+                ' earthquake · ' +
+                Math.round(km).toLocaleString('en') +
+                ' km away · ' +
+                f.properties.place
+            );
           }
           firstQuakePoll = false;
         } catch {
@@ -261,15 +307,65 @@
         }
       }
 
+      // ---------- real terrain (open-meteo elevation, Copernicus DEM) ----------
+      // 24x24 real elevations spanning 16km around the visitor, cached per
+      // rounded location. The mesh gets macro relief from the DEM and only
+      // fine detail from noise, so the landscape is recognisably *yours*.
+      const DEM_N = 24;
+      const DEM_HALF_M = 8000;
+      const WORLD = 280; // scene units across; ~57 m per unit
+
+      async function fetchDEM(lat, lon) {
+        const key = 'horizon-dem-' + lat.toFixed(2) + ',' + lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) return JSON.parse(hit);
+        } catch {}
+        const mLat = 111320;
+        const mLon = Math.max(111320 * Math.cos(lat * RAD), 1e-6);
+        const lats = [];
+        const lons = [];
+        for (let j = 0; j < DEM_N; j++)
+          for (let i = 0; i < DEM_N; i++) {
+            lats.push(
+              (lat + ((j / (DEM_N - 1) - 0.5) * 2 * DEM_HALF_M) / mLat).toFixed(
+                4
+              )
+            );
+            lons.push(
+              (lon + ((i / (DEM_N - 1) - 0.5) * 2 * DEM_HALF_M) / mLon).toFixed(
+                4
+              )
+            );
+          }
+        const grid = [];
+        for (let o = 0; o < DEM_N * DEM_N; o += 96) {
+          const r = await fetch(
+            'https://api.open-meteo.com/v1/elevation?latitude=' +
+              lats.slice(o, o + 96).join(',') +
+              '&longitude=' +
+              lons.slice(o, o + 96).join(','),
+            {credentials: 'omit'}
+          );
+          if (!r.ok) throw new Error(r.status);
+          grid.push(...(await r.json()).elevation);
+        }
+        const dem = {grid};
+        try {
+          localStorage.setItem(key, JSON.stringify(dem));
+        } catch {}
+        return dem;
+      }
+
       // ---------- scene ----------
       const canvas = document.getElementById('gl');
       const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 0.55;
       const scene = new THREE.Scene();
-      // Face south (+z): from the northern hemisphere that keeps the sun
-      // and moon arcs in view.
-      const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 900);
-      camera.position.set(0, 6, -26);
+      const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+      camera.layers.enable(2);
 
       function resize() {
         renderer.setSize(innerWidth, innerHeight);
@@ -284,31 +380,44 @@
       const ambient = new THREE.AmbientLight(0xffffff, 0.5);
       scene.add(ambient);
 
-      // Sky dome: vertical gradient, colours driven each frame.
-      const skyUniforms = {
-        top: {value: new THREE.Color('#87c5eb')},
-        bottom: {value: new THREE.Color('#dceef7')}
+      // Physically-based sky: Preetham analytic scattering, driven by the
+      // real sun vector. Turbidity rises with real cloud cover.
+      const sky = new Sky();
+      sky.scale.setScalar(1200);
+      scene.add(sky);
+      const skyU = sky.material.uniforms;
+      skyU.rayleigh.value = 2.2;
+      skyU.mieCoefficient.value = 0.004;
+      skyU.mieDirectionalG.value = 0.8;
+
+      // Overcast veil: a translucent grey dome that fades in with real
+      // cloud cover (the scattering model alone stays too blue).
+      const veilU = {
+        alpha: {value: 0},
+        top: {value: new THREE.Color('#79838c')},
+        bottom: {value: new THREE.Color('#a2abb3')}
       };
-      const sky = new THREE.Mesh(
+      const veil = new THREE.Mesh(
         new THREE.SphereGeometry(600, 24, 16),
         new THREE.ShaderMaterial({
           side: THREE.BackSide,
+          transparent: true,
           depthWrite: false,
-          uniforms: skyUniforms,
+          uniforms: veilU,
           vertexShader:
             'varying vec3 p; void main(){ p = position;' +
             ' gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
           fragmentShader:
-            'varying vec3 p; uniform vec3 top; uniform vec3 bottom;' +
+            'varying vec3 p; uniform vec3 top; uniform vec3 bottom; uniform float alpha;' +
             ' void main(){ float h = clamp(normalize(p).y * 1.4 + 0.25, 0.0, 1.0);' +
-            ' gl_FragColor = vec4(mix(bottom, top, h), 1.0); }'
+            ' gl_FragColor = vec4(mix(bottom, top, h), alpha); }'
         })
       );
-      sky.renderOrder = -2;
-      scene.add(sky);
+      veil.renderOrder = -1;
+      scene.add(veil);
       scene.fog = new THREE.FogExp2('#dceef7', 0.004);
 
-      // Terrain: deterministic value-noise hills with height/slope colours.
+      // ---------- terrain ----------
       function mulberry32(a) {
         return () => {
           a |= 0;
@@ -339,82 +448,176 @@
           ty
         );
       }
-      const height = (x, z) =>
-        8 * noise2(x / 34 + 7, z / 34 + 3) +
-        3 * noise2(x / 11 + 40, z / 11 + 9) +
-        0.7 * noise2(x / 4, z / 4) -
-        6 -
-        Math.max(0, 18 - Math.hypot(x, z - 14)) * 0.18; // clearing near camera
+      const fbm = (x, y) =>
+        0.55 * noise2(x, y) +
+        0.27 * noise2(x * 2.1 + 13, y * 2.1 + 7) +
+        0.13 * noise2(x * 4.3 + 41, y * 4.3 + 3) +
+        0.05 * noise2(x * 8.9 + 5, y * 8.9 + 59);
 
-      const terrainGeo = new THREE.PlaneGeometry(280, 280, 110, 110);
-      terrainGeo.rotateX(-Math.PI / 2);
-      {
-        const pos = terrainGeo.attributes.position;
-        const colors = [];
-        const grass = new THREE.Color('#5e8c4f');
-        const meadow = new THREE.Color('#7ba55e');
-        const rock = new THREE.Color('#8d8577');
-        const snowC = new THREE.Color('#e8ecef');
-        for (let i = 0; i < pos.count; i++) {
-          const x = pos.getX(i),
-            z = pos.getZ(i);
-          const y = height(x, z);
-          pos.setY(i, y);
-          const c = grass
-            .clone()
-            .lerp(meadow, noise2(x / 9 + 99, z / 9))
-            .lerp(rock, THREE.MathUtils.smoothstep(y, 3.5, 7))
-            .lerp(snowC, THREE.MathUtils.smoothstep(y, 6.5, 9));
-          colors.push(c.r, c.g, c.b);
-        }
-        terrainGeo.setAttribute(
-          'color',
-          new THREE.Float32BufferAttribute(colors, 3)
-        );
-        terrainGeo.computeVertexNormals();
+      // Fallback height model when the DEM is unavailable: domain-warped
+      // fBm, in real metres so the colouring logic stays unified.
+      function proceduralElev(x, z) {
+        const wx = x / 90 + 1.7 * fbm(x / 60 + 31, z / 60 + 17);
+        const wz = z / 90 + 1.7 * fbm(x / 60 + 3, z / 60 + 47);
+        const ridged = 1 - Math.abs(2 * fbm(wx, wz) - 1);
+        return 90 + 700 * ridged * ridged + 260 * fbm(x / 40, z / 40);
       }
-      const terrain = new THREE.Mesh(
-        terrainGeo,
-        new THREE.MeshLambertMaterial({vertexColors: true, flatShading: true})
-      );
-      scene.add(terrain);
 
-      // Trees: low-poly conifers, swaying with the real wind speed.
-      const trees = new THREE.Group();
+      let demData = null; // {grid} once loaded
+      function demElev(x, z) {
+        // x east, z south, in scene units -> bilinear over the DEM grid.
+        const u = THREE.MathUtils.clamp(x / WORLD + 0.5, 0, 1) * (DEM_N - 1);
+        const v =
+          THREE.MathUtils.clamp(1 - (z / WORLD + 0.5), 0, 1) * (DEM_N - 1);
+        const i = Math.min(Math.floor(u), DEM_N - 2);
+        const j = Math.min(Math.floor(v), DEM_N - 2);
+        const g = demData.grid;
+        const e00 = g[j * DEM_N + i];
+        const e10 = g[j * DEM_N + i + 1];
+        const e01 = g[(j + 1) * DEM_N + i];
+        const e11 = g[(j + 1) * DEM_N + i + 1];
+        return lerp(lerp(e00, e10, u - i), lerp(e01, e11, u - i), v - j);
+      }
+
+      let centerElev = 300;
+      function sample(x, z) {
+        const e = demData ? demElev(x, z) : proceduralElev(x, z);
+        const water = demData && e <= 0.3;
+        // Real metres compressed onto the scene: asinh keeps flatlands
+        // honest while alpine relief still towers.
+        let y = 16 * Math.asinh((e - centerElev) / 500);
+        if (water) y = 16 * Math.asinh((0 - centerElev) / 500) - 0.6;
+        else y += 1.6 * (fbm(x / 7, z / 7) - 0.5);
+        return {e, y, water};
+      }
+
+      const ground = new THREE.Group();
+      scene.add(ground);
       const trunkMat = new THREE.MeshLambertMaterial({color: '#6b4a33'});
       const leafMat = new THREE.MeshLambertMaterial({
         color: '#3f6b3a',
         flatShading: true
       });
-      for (let i = 0; i < 90; i++) {
-        const x = (rand() - 0.5) * 220;
-        const z = (rand() - 0.5) * 220;
-        const y = height(x, z);
-        // No trees looming right at the camera (it sits at z=-26).
-        if (y > 4 || y < -4 || z < -10 || Math.hypot(x, z + 26) < 18) continue;
-        const s = 0.8 + rand() * 1.4;
-        const tree = new THREE.Group();
-        const trunk = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.14 * s, 0.2 * s, 1.1 * s, 5),
-          trunkMat
-        );
-        trunk.position.y = 0.55 * s;
-        const crown = new THREE.Mesh(
-          new THREE.ConeGeometry(1.15 * s, 3.1 * s, 6),
-          leafMat
-        );
-        crown.position.y = 2.5 * s;
-        tree.add(trunk, crown);
-        tree.position.set(x, y, z);
-        tree.userData.phase = rand() * Math.PI * 2;
-        trees.add(tree);
-      }
-      scene.add(trees);
+      let trees = [];
+      let camBaseY = 6;
+      let viewSign = 1; // +1: camera looks south (north hemisphere)
 
-      // Stars: the real sky. Positions/magnitude/colour from the Yale
-      // Bright Star Catalog; the dome rotates with sidereal time.
-      const celestial = new THREE.Group(); // spins with the sky
-      const polar = new THREE.Group(); // tilts the pole to the latitude
+      const cGrass = new THREE.Color('#5e8c4f');
+      const cMeadow = new THREE.Color('#7ba55e');
+      const cRock = new THREE.Color('#8d8577');
+      const cSnow = new THREE.Color('#eef1f4');
+      const cSea = new THREE.Color('#33607e');
+
+      function buildWorld() {
+        ground.clear();
+        trees = [];
+        if (demData) {
+          const mid = [];
+          for (let j = 10; j < 14; j++)
+            for (let i = 10; i < 14; i++) mid.push(demData.grid[j * DEM_N + i]);
+          centerElev = Math.max(
+            mid.reduce((a, b) => a + b, 0) / mid.length,
+            0.3
+          );
+        } else {
+          centerElev = 300;
+        }
+        viewSign = state.lat < 0 ? -1 : 1;
+
+        const geo = new THREE.PlaneGeometry(WORLD, WORLD, 120, 120);
+        geo.rotateX(-Math.PI / 2);
+        const pos = geo.attributes.position;
+        const elev = [];
+        const wet = [];
+        for (let i = 0; i < pos.count; i++) {
+          const s = sample(pos.getX(i), pos.getZ(i));
+          pos.setY(i, s.y);
+          elev.push(s.e);
+          wet.push(s.water);
+        }
+        geo.computeVertexNormals();
+        const nrm = geo.attributes.normal;
+        const colors = [];
+        const c = new THREE.Color();
+        const snowyGround =
+          state.temp <= 0.5 && (state.snow > 0 || state.code >= 71);
+        for (let i = 0; i < pos.count; i++) {
+          if (wet[i]) {
+            c.copy(cSea);
+          } else {
+            const x = pos.getX(i);
+            const z = pos.getZ(i);
+            const slope = 1 - nrm.getY(i); // 0 flat .. 1 cliff
+            c.copy(cGrass)
+              .lerp(cMeadow, noise2(x / 9 + 99, z / 9))
+              .lerp(cRock, THREE.MathUtils.smoothstep(slope, 0.12, 0.4))
+              .lerp(
+                cRock,
+                THREE.MathUtils.smoothstep(elev[i], 1600, 2400) * 0.9
+              )
+              .lerp(cSnow, THREE.MathUtils.smoothstep(elev[i], 2300, 3100));
+            if (snowyGround && slope < 0.3) c.lerp(cSnow, 0.8);
+          }
+          colors.push(c.r, c.g, c.b);
+        }
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        ground.add(
+          new THREE.Mesh(
+            geo,
+            new THREE.MeshLambertMaterial({
+              vertexColors: true,
+              flatShading: true
+            })
+          )
+        );
+
+        // Trees: below the real tree line, off cliffs, out of the sea,
+        // and not right on top of either camera spot (it can face both
+        // ways, so keep both clear).
+        for (let i = 0; i < 240 && trees.length < 90; i++) {
+          const x = (rand() - 0.5) * (WORLD - 40);
+          const z = (rand() - 0.5) * (WORLD - 40);
+          const s0 = sample(x, z);
+          if (s0.water || s0.e > 1900) continue;
+          const grade =
+            Math.abs(sample(x + 2, z).y - sample(x - 2, z).y) +
+            Math.abs(sample(x, z + 2).y - sample(x, z - 2).y);
+          if (grade > 2.2) continue;
+          if (Math.hypot(x, z - 26) < 24 || Math.hypot(x, z + 26) < 24)
+            continue;
+          const sc = 0.8 + rand() * 1.4;
+          const tree = new THREE.Group();
+          const trunk = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.14 * sc, 0.2 * sc, 1.1 * sc, 5),
+            trunkMat
+          );
+          trunk.position.y = 0.55 * sc;
+          const crown = new THREE.Mesh(
+            new THREE.ConeGeometry(1.15 * sc, 3.1 * sc, 6),
+            leafMat
+          );
+          crown.position.y = 2.5 * sc;
+          tree.add(trunk, crown);
+          tree.position.set(x, s0.y, z);
+          tree.userData.phase = rand() * Math.PI * 2;
+          trees.push(tree);
+          ground.add(tree);
+        }
+
+        camBaseY = sample(0, -26 * viewSign).y + 5;
+      }
+      buildWorld();
+
+      // Camera yaw: equatorward by default (that is where the sun arc
+      // lives), but pan poleward at night when a real aurora is on. The
+      // first frame snaps; only live changes pan.
+      let yaw = state.lat < 0 ? Math.PI : 0;
+      let yawInit = false;
+
+      // Stars: the real sky (Yale Bright Star Catalog), spun by sidereal
+      // time around a pole tilted to the latitude.
+      const celestial = new THREE.Group();
+      const polar = new THREE.Group();
       polar.add(celestial);
       scene.add(polar);
       let starMat = null;
@@ -429,11 +632,10 @@
             const raR = ra * RAD;
             const decR = dec * RAD;
             pos.push(
-              500 * Math.cos(decR) * Math.sin(raR),
-              500 * Math.sin(decR),
-              500 * Math.cos(decR) * Math.cos(raR)
+              900 * Math.cos(decR) * Math.sin(raR),
+              900 * Math.sin(decR),
+              900 * Math.cos(decR) * Math.cos(raR)
             );
-            // Blackbody-ish tint from the catalog temperature.
             const t = THREE.MathUtils.clamp((kelvin - 3000) / 9000, 0, 1);
             col.setRGB(
               1 - t * 0.25,
@@ -469,17 +671,66 @@
           celestial.add(new THREE.Points(geo, starMat));
         });
 
-      // Sun and moon discs, placed at their true positions each frame.
-      const sunDisc = new THREE.Mesh(
-        new THREE.SphereGeometry(14, 16, 12),
-        new THREE.MeshBasicMaterial({color: '#fff3c4', fog: false})
-      );
-      scene.add(sunDisc);
+      // The moon: a lit sphere on its own light layer. Because its light
+      // comes from the sun's real direction, the phase is always correct.
       const moonDisc = new THREE.Mesh(
-        new THREE.SphereGeometry(9, 16, 12),
-        new THREE.MeshBasicMaterial({color: '#e8ecf4', fog: false})
+        new THREE.SphereGeometry(24, 24, 18),
+        new THREE.MeshLambertMaterial({
+          color: '#cdd4e2',
+          emissive: '#0c0f16',
+          fog: false
+        })
       );
+      moonDisc.layers.set(2);
       scene.add(moonDisc);
+      const moonLight = new THREE.DirectionalLight(0xffffff, 2.2);
+      moonLight.layers.set(2);
+      scene.add(moonLight);
+      scene.add(moonLight.target);
+
+      // Aurora: three additive curtains over the poleward horizon. Only
+      // shown when the real planetary K-index and the latitude justify it.
+      const auroraU = {
+        time: {value: 0},
+        strength: {value: 0}
+      };
+      const aurora = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          760,
+          760,
+          720,
+          64,
+          1,
+          true,
+          Math.PI - Math.PI / 2.6,
+          Math.PI / 1.3
+        ),
+        new THREE.ShaderMaterial({
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          uniforms: auroraU,
+          vertexShader:
+            'varying vec2 u; varying float vy; void main(){ u = uv;' +
+            ' vy = (modelMatrix * vec4(position, 1.0)).y;' +
+            ' gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+          fragmentShader:
+            'uniform float time; uniform float strength;' +
+            ' varying vec2 u; varying float vy;' +
+            ' void main(){' +
+            ' float h = clamp((vy - 60.0) / 720.0, 0.0, 1.0);' +
+            ' float w = sin(u.x * 38.0 + time * 0.9 + sin(u.x * 7.0 + time * 0.35) * 2.4)' +
+            '   * 0.5 + 0.5;' +
+            ' float w2 = sin(u.x * 61.0 - time * 0.6 + 2.1) * 0.5 + 0.5;' +
+            ' float band = pow(1.0 - h, 2.0) * smoothstep(0.08, 0.32, h);' +
+            ' float a = strength * band * (0.9 + 1.0 * w * w2);' +
+            ' vec3 col = mix(vec3(0.13, 0.95, 0.45), vec3(0.5, 0.25, 0.95), h * 1.3);' +
+            ' gl_FragColor = vec4(col * a, a); }'
+        })
+      );
+      aurora.position.y = 420;
+      scene.add(aurora);
 
       // Clouds: soft blobs; coverage and drift follow the real weather.
       const cloudGroup = new THREE.Group();
@@ -503,7 +754,7 @@
         }
         blob.position.set(
           (rand() - 0.5) * 480,
-          55 + rand() * 25,
+          70 + rand() * 30,
           (rand() - 0.5) * 480
         );
         clouds.push(blob);
@@ -523,7 +774,6 @@
           new THREE.Float32BufferAttribute(p, 3)
         );
       }
-      // Round sprite so drops and flakes aren't square points.
       const dot = document.createElement('canvas');
       dot.width = dot.height = 32;
       {
@@ -545,15 +795,11 @@
       const precip = new THREE.Points(precipGeo, precipMat);
       scene.add(precip);
 
-      // ---------- colour ramps ----------
-      const cDayTop = new THREE.Color('#7ec0ea');
+      // ---------- colour ramps for light/fog ----------
       const cDayBot = new THREE.Color('#dceef7');
-      const cSetTop = new THREE.Color('#4c5f9e');
       const cSetBot = new THREE.Color('#f2a65e');
-      const cNightTop = new THREE.Color('#070b18');
       const cNightBot = new THREE.Color('#141c33');
       const cGray = new THREE.Color('#9aa4ad');
-      const tmpA = new THREE.Color();
       const tmpB = new THREE.Color();
 
       // ---------- pointer parallax (forwarded by footer.js) ----------
@@ -575,43 +821,39 @@
         last = t;
         const d = now();
 
-        // Sky bodies at their true places.
-        const sunEq = sunEquatorial(d);
-        const sun = altAz(sunEq, d, state.lat, state.lon);
+        const sun = altAz(sunEquatorial(d), d, state.lat, state.lon);
         const moon = altAz(moonEquatorial(d), d, state.lat, state.lon);
-        sunDisc.position.copy(skyPoint(sun.alt, sun.az, 560));
-        moonDisc.position.copy(skyPoint(moon.alt, moon.az, 540));
+        const sunVec = skyPoint(sun.alt, sun.az, 1);
+        skyU.sunPosition.value.copy(sunVec);
         sunLight.position.copy(skyPoint(Math.max(sun.alt, -0.12), sun.az, 100));
+        moonDisc.position.copy(skyPoint(moon.alt, moon.az, 1500));
+        moonLight.position.copy(skyPoint(sun.alt, sun.az, 200));
+        moonLight.target.position.copy(moonDisc.position);
 
-        // Star dome: tilt pole to latitude, spin with sidereal time.
-        // (Signs verified numerically against the altAz transform.)
         polar.rotation.x = -(90 - state.lat) * RAD;
         celestial.rotation.y = -(gmst(d) + state.lon * RAD);
 
-        // Day/night mix from solar altitude, gray mix from cloud cover.
-        const e = (sun.alt / RAD + 6) / 24; // -6deg .. 18deg ramp
-        const day = THREE.MathUtils.clamp(e, 0, 1);
+        const day = THREE.MathUtils.clamp((sun.alt / RAD + 6) / 24, 0, 1);
         const dusk = 1 - Math.abs(day - 0.5) * 2;
         const cloudy = state.cloud / 100;
-        tmpA
-          .copy(cNightTop)
-          .lerp(cDayTop, day)
-          .lerp(cSetTop, dusk * 0.55);
+
+        // Scattering sky: haze rises with cloud; the grey veil finishes
+        // the overcast look.
+        skyU.turbidity.value = 2 + cloudy * 18 + dusk * 2;
+        skyU.mieCoefficient.value = 0.0035 + cloudy * 0.006;
+        veilU.alpha.value = cloudy * cloudy * 0.85 * day;
+
         tmpB
           .copy(cNightBot)
           .lerp(cDayBot, day)
-          .lerp(cSetBot, dusk * 0.8);
-        tmpA.lerp(cGray, cloudy * 0.75 * day);
-        tmpB.lerp(cGray, cloudy * 0.7 * day);
-        skyUniforms.top.value.copy(tmpA);
-        skyUniforms.bottom.value.copy(tmpB);
+          .lerp(cSetBot, dusk * 0.8)
+          .lerp(cGray, cloudy * 0.7 * day);
         scene.fog.color.copy(tmpB);
         const foggy = state.code === 45 || state.code === 48;
         scene.fog.density = 0.004 + (foggy ? 0.028 : 0) + cloudy * 0.002;
 
         sunLight.intensity = (0.25 + day) * (1 - cloudy * 0.55);
         sunLight.color.setHSL(0.12, 0.5, 0.6 + day * 0.4 - dusk * 0.15);
-        // A touch of moonlight when the real moon is up.
         ambient.intensity =
           0.12 +
           day * 0.42 * (1 - cloudy * 0.3) +
@@ -619,12 +861,16 @@
         ambient.color.copy(tmpB);
         if (starMat)
           starMat.uniforms.night.value = (1 - day) * (1 - cloudy * 0.85);
-        sunDisc.material.color.setHSL(0.11, 0.9, 0.75 + day * 0.2);
-        sunDisc.visible = sun.alt > -0.15;
         moonDisc.visible = moon.alt > -0.05;
 
-        // Clouds: real coverage decides how many blobs show; the real
-        // wind decides how fast they drift (eastward).
+        // Aurora strength: real Kp, auroral latitude, and darkness.
+        const kpFactor =
+          THREE.MathUtils.clamp((state.kp - 4) / 4, 0, 1) *
+          THREE.MathUtils.clamp((Math.abs(state.lat) - 46) / 14, 0, 1);
+        auroraU.strength.value = kpFactor * (1 - day) * (1 - cloudy * 0.7);
+        auroraU.time.value = t / 1000;
+        aurora.rotation.y = state.lat < 0 ? Math.PI : 0;
+
         const showClouds = Math.round(cloudy * clouds.length);
         clouds.forEach((c, i) => {
           c.visible = i < showClouds;
@@ -633,14 +879,11 @@
         });
         cloudMat.opacity = 0.5 + cloudy * 0.4;
 
-        // Precipitation from the real rates: rain falls hard, snow drifts.
         const snowing =
           state.snow > 0 ||
           (state.code >= 71 &&
             state.code <= 86 &&
-            state.code !== 80 &&
-            state.code !== 81 &&
-            state.code !== 82);
+            ![80, 81, 82].includes(state.code));
         const raining = !snowing && (state.precip > 0 || state.code >= 51);
         const rate = snowing
           ? THREE.MathUtils.clamp(state.snow / 2, 0.3, 1)
@@ -664,17 +907,15 @@
           p.needsUpdate = true;
         }
 
-        // Trees lean and shiver with the real wind speed.
         const sway = Math.min(state.wind / 60, 1);
-        trees.children.forEach((tree) => {
+        for (const tree of trees) {
           tree.rotation.z =
             sway * 0.06 +
             Math.sin(t / (900 - sway * 500) + tree.userData.phase) *
               sway *
               0.05;
-        });
+        }
 
-        // Earthquake rumble, decaying. (Skipped under reduced motion.)
         let shakeX = 0;
         let shakeY = 0;
         if (state.shake > 0.005 && !reduceMotion) {
@@ -683,9 +924,31 @@
           state.shake *= Math.pow(0.35, dt);
         }
 
-        camera.position.x = look.x * 3 + shakeX;
-        camera.position.y = 6 + look.y * -1.2 + shakeY;
-        camera.lookAt(look.x * 8, 7 + look.y * -5, 40);
+        const equatorYaw = state.lat < 0 ? Math.PI : 0;
+        const auroraOn = auroraU.strength.value > 0.04;
+        const targetYaw = auroraOn ? Math.PI - equatorYaw : equatorYaw;
+        if (!yawInit) {
+          yaw = targetYaw;
+          yawInit = true;
+        }
+        yaw += (targetYaw - yaw) * Math.min(dt * 0.4, 1);
+        const vx = Math.sin(yaw);
+        const vz = Math.cos(yaw);
+        const camZ = -26 * vz;
+        const camX = -26 * vx;
+        const baseY = sample(camX, camZ).y + 5;
+        camBaseY += (baseY - camBaseY) * Math.min(dt * 2, 1);
+
+        camera.position.set(
+          camX + look.x * 3 + shakeX,
+          camBaseY + look.y * -1.2 + shakeY,
+          camZ
+        );
+        camera.lookAt(
+          camX + vx * 66 + look.x * 8,
+          camBaseY + 1 + look.y * -5,
+          camZ + vz * 66
+        );
 
         renderer.render(scene, camera);
       }
@@ -701,9 +964,19 @@
         requestAnimationFrame(frame);
         await syncWeather();
         setInterval(syncWeather, 15 * 60 * 1000);
+        syncKp();
+        setInterval(syncKp, 15 * 60 * 1000);
+        if (params.get('dem') !== '0') {
+          try {
+            demData = await fetchDEM(state.lat, state.lon);
+            buildWorld();
+          } catch {
+            // Keep the procedural fallback silently.
+          }
+        }
         if (params.has('quake')) {
           setTimeout(() => {
-            state.shake = Math.min((+params.get('quake') - 4) * 0.35, 1.2);
+            state.shake = Math.min((+params.get('quake') - 4) * 0.5, 1.2);
             say('M' + params.get('quake') + ' earthquake · debug override');
           }, 1500);
         } else {
