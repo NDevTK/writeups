@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Git Diff</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0d1117;
+        color: #c9d1d9;
+        font:
+          12.5px/1.55 'Consolas',
+          'Monaco',
+          'Lucida Console',
+          'Courier New',
+          monospace;
+      }
+      #scroller {
+        padding: 24px 28px;
+        white-space: pre;
+        will-change: transform;
+      }
+      .commit {
+        color: #d29922;
+      }
+      .meta {
+        color: #e6edf3;
+        font-weight: 600;
+      }
+      .hunk {
+        color: #58a6ff;
+      }
+      .add {
+        color: #3fb950;
+      }
+      .del {
+        color: #f85149;
+      }
+      #note {
+        position: fixed;
+        left: 12px;
+        bottom: 12px;
+        color: #8b949e;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="scroller"><div id="log"></div></div>
+    <div id="note" hidden></div>
+    <script>
+      'use strict';
+
+      function diffLine(text, type) {
+        const line = document.createElement('span');
+        line.textContent = text + '\n';
+        if (type) line.className = type;
+        log.appendChild(line);
+      }
+
+      function renderCommit(entry, files, path) {
+        diffLine('commit ' + entry.sha, 'commit');
+        diffLine('Author: ' + entry.commit.author.name);
+        diffLine('Date:   ' + entry.commit.author.date);
+        diffLine('');
+        entry.commit.message
+          .split('\n')
+          .forEach((line) => diffLine('    ' + line));
+        diffLine('');
+
+        // files is capped at 300 entries by the API; a huge commit may
+        // omit ours.
+        const file = files && files.find((f) => f.filename === path);
+        if (!file) return;
+        diffLine('diff --git a/' + path + ' b/' + path, 'meta');
+        diffLine(
+          '--- ' + (file.status === 'added' ? '/dev/null' : 'a/' + path),
+          'meta'
+        );
+        diffLine(
+          '+++ ' + (file.status === 'removed' ? '/dev/null' : 'b/' + path),
+          'meta'
+        );
+        // Binary or oversized changes come back without a patch.
+        const patch = file.patch || '(no textual diff available)';
+        patch.split('\n').forEach((line) => {
+          let type;
+          if (line.startsWith('@@')) type = 'hunk';
+          else if (line.startsWith('+')) type = 'add';
+          else if (line.startsWith('-')) type = 'del';
+          diffLine(line, type);
+        });
+        diffLine('');
+      }
+
+      // Endless slow scroll, looping seamlessly via a cloned copy of the
+      // log. Only runs when the log overflows the viewport.
+      function startScroll() {
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const gap = 160;
+        const cycle = log.offsetHeight + gap;
+        if (cycle - gap <= innerHeight) return;
+        const copy = log.cloneNode(true);
+        copy.style.marginTop = gap + 'px';
+        scroller.appendChild(copy);
+        const speed = 24; // px per second
+        let y = 0;
+        let prev = performance.now();
+        function step(now) {
+          y += ((now - prev) / 1000) * speed;
+          prev = now;
+          if (y >= cycle) y -= cycle;
+          scroller.style.transform = 'translateY(' + -y + 'px)';
+          requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+
+      (async () => {
+        // Speculation rules prerender posts; hold the API calls (and
+        // their rate limit cost) until the page is actually viewed.
+        if (document.prerendering) {
+          await new Promise((resolve) =>
+            document.addEventListener('prerenderingchange', resolve, {
+              once: true
+            })
+          );
+        }
+
+        // The github_edit_link anchor in the parent's footer (same origin)
+        // already knows which source file made this page; reuse it. When
+        // viewed standalone there is no parent, so show the listing's file.
+        let repo = 'NDevTK/writeups';
+        let branch = 'main';
+        let path = 'index.md';
+        try {
+          const edit = parent.document.querySelector(
+            "a[href*='github.com'][href*='/edit/']"
+          );
+          const match =
+            edit &&
+            edit.href.match(/github\.com\/([^/]+\/[^/]+)\/edit\/([^/]+)\/(.+)/);
+          if (match) [, repo, branch, path] = match;
+        } catch {
+          // Cross-origin parent (embedded elsewhere): keep the fallback.
+        }
+
+        const api = 'https://api.github.com/repos/' + repo + '/commits';
+        try {
+          const response = await fetch(
+            api + '?sha=' + branch + '&path=' + path + '&per_page=5',
+            {credentials: 'omit'}
+          );
+          if (!response.ok) throw new Error(response.status);
+          const commits = await response.json();
+          for (const entry of commits) {
+            const detail = await fetch(api + '/' + entry.sha, {
+              credentials: 'omit'
+            });
+            if (!detail.ok) break; // Keep the commits already rendered.
+            renderCommit(entry, (await detail.json()).files, path);
+          }
+        } catch {
+          // Fall through: an empty log shows the note instead.
+        }
+
+        if (log.childElementCount) {
+          startScroll();
+        } else {
+          note.textContent =
+            'Could not fetch the git history of ' +
+            path +
+            ' — GitHub API unreachable or rate limited.';
+          note.hidden = false;
+        }
+      })();
+    </script>
+  </body>
+</html>

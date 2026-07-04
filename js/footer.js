@@ -517,9 +517,6 @@ async function applyTheme() {
     case 'summarizer.css':
       summarizer();
       break;
-    case 'diff.css':
-      gitLog();
-      break;
   }
 }
 
@@ -587,98 +584,6 @@ async function summarizer() {
   } else if (buffer) {
     updateDOM();
   }
-}
-
-async function gitLog() {
-  // Speculation rules prerender posts; hold the API calls (and their rate
-  // limit cost) until the page is actually being viewed.
-  if (document.prerendering) {
-    await new Promise((resolve) =>
-      document.addEventListener('prerenderingchange', resolve, {once: true})
-    );
-  }
-
-  // The github_edit_link anchor in the footer already knows this page's
-  // source file; reuse it instead of duplicating the URL-to-path mapping.
-  const edit = document.querySelector("a[href*='github.com'][href*='/edit/']");
-  const match =
-    edit && edit.href.match(/github\.com\/([^/]+\/[^/]+)\/edit\/([^/]+)\/(.+)/);
-  if (!match) return;
-  const [, repo, branch, path] = match;
-  const api = 'https://api.github.com/repos/' + repo + '/commits';
-
-  let commits;
-  try {
-    const response = await fetch(
-      api + '?sha=' + branch + '&path=' + path + '&per_page=3',
-      {credentials: 'omit'}
-    );
-    if (!response.ok) throw new Error(response.status);
-    commits = await response.json();
-  } catch {
-    // API unreachable or rate limited: leave the writeup readable.
-    return;
-  }
-
-  const log = document.createElement('pre');
-  log.className = 'git-log';
-  for (const entry of commits) {
-    let files;
-    try {
-      const response = await fetch(api + '/' + entry.sha, {
-        credentials: 'omit'
-      });
-      if (!response.ok) throw new Error(response.status);
-      files = (await response.json()).files;
-    } catch {
-      break; // Keep the commits already rendered.
-    }
-    renderCommit(log, entry, files, path);
-  }
-  if (log.childElementCount) content.replaceChildren(log);
-}
-
-function renderCommit(log, entry, files, path) {
-  diffLine(log, 'commit ' + entry.sha, 'git-commit');
-  diffLine(log, 'Author: ' + entry.commit.author.name);
-  diffLine(log, 'Date:   ' + entry.commit.author.date);
-  diffLine(log, '');
-  entry.commit.message
-    .split('\n')
-    .forEach((line) => diffLine(log, '    ' + line));
-  diffLine(log, '');
-
-  // files is capped at 300 entries by the API; a huge commit may omit ours.
-  const file = files && files.find((f) => f.filename === path);
-  if (!file) return;
-  diffLine(log, 'diff --git a/' + path + ' b/' + path, 'git-meta');
-  diffLine(
-    log,
-    '--- ' + (file.status === 'added' ? '/dev/null' : 'a/' + path),
-    'git-meta'
-  );
-  diffLine(
-    log,
-    '+++ ' + (file.status === 'removed' ? '/dev/null' : 'b/' + path),
-    'git-meta'
-  );
-  // Binary or oversized changes come back without a patch.
-  const patch = file.patch || '(no textual diff available)';
-  patch.split('\n').forEach((line) => {
-    let type;
-    if (line.startsWith('@@')) type = 'git-hunk';
-    else if (line.startsWith('+')) type = 'git-add';
-    else if (line.startsWith('-')) type = 'git-del';
-    diffLine(log, line, type);
-  });
-  diffLine(log, '');
-}
-
-function diffLine(log, text, type) {
-  const line = document.createElement('span');
-  line.textContent = text + '\n';
-  if (type) line.className = type;
-  log.appendChild(line);
 }
 
 // Dont assume the user has javascript enabled and no clickjacking.
