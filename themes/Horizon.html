@@ -288,17 +288,37 @@
             if (seenQuakes.has(f.id)) continue;
             seenQuakes.add(f.id);
             if (firstQuakePoll) continue; // only rumble live events
-            // Real distance decides how hard it shakes here.
+            // Real distance decides how hard it shakes here - and real
+            // seismology decides WHEN. Waves are not instant: P-waves
+            // average ~7.8 km/s and the stronger S-waves ~4.4 km/s, so
+            // each arrival is scheduled at its true travel time (unless
+            // feed latency means it already passed).
             const [qlon, qlat] = f.geometry.coordinates;
             const km = haversineKm(state.lat, state.lon, qlat, qlon);
             const atten = Math.max(Math.exp(-km / 2500), 0.04);
-            state.shake = Math.min((f.properties.mag - 4) * 0.5 * atten, 1.2);
+            const mag = f.properties.mag;
+            const elapsed = (Date.now() - f.properties.time) / 1000;
+            const pDelay = km / 7.8 - elapsed;
+            const sDelay = km / 4.4 - elapsed;
+            if (sDelay < -120) continue; // shaking here is long over
+            const jolt = (amp) => {
+              state.shake = Math.max(
+                state.shake,
+                Math.min((mag - 4) * 0.5 * atten * amp, 1.2)
+              );
+            };
+            if (pDelay > 0) setTimeout(() => jolt(0.35), pDelay * 1000);
+            if (sDelay > 0) setTimeout(() => jolt(1), sDelay * 1000);
+            else jolt(1);
             say(
               'M' +
-                f.properties.mag.toFixed(1) +
+                mag.toFixed(1) +
                 ' earthquake · ' +
                 Math.round(km).toLocaleString('en') +
                 ' km away · ' +
+                (sDelay > 5
+                  ? 'S-wave arrives in ' + Math.round(sDelay) + 's · '
+                  : '') +
                 f.properties.place
             );
           }
@@ -319,12 +339,9 @@
       // Primary source: AWS terrarium tiles (Mapzen open data). Elevation
       // is PNG-encoded as (R*256 + G + B/256) - 32768, CORS-open, so a
       // stitched canvas gives ~30-90m real elevations in a few requests.
+      // Kept at full pixel resolution (no downsampled cache: the browser's
+      // HTTP cache already holds the tiles themselves).
       async function fetchDEMTiles(lat, lon) {
-        const key = 'horizon-dem-t-' + lat.toFixed(2) + ',' + lon.toFixed(2);
-        try {
-          const hit = localStorage.getItem(key);
-          if (hit) return JSON.parse(hit);
-        } catch {}
         const z = Math.max(
           8,
           Math.min(
@@ -379,32 +396,23 @@
             );
         await Promise.all(jobs);
         const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-        const T = 96; // sampling grid, same layout as the API path
-        const grid = [];
-        for (let j = 0; j < T; j++)
-          for (let i = 0; i < T; i++) {
-            const la = lat + (j / (T - 1) - 0.5) * 2 * dLat;
-            const lo = lon + (i / (T - 1) - 0.5) * 2 * dLon;
-            const gx = Math.min(
-              Math.max(Math.round(px(lo) - x0 * 256), 0),
-              canvas.width - 1
-            );
-            const gy = Math.min(
-              Math.max(Math.round(py(la) - y0 * 256), 0),
-              canvas.height - 1
-            );
-            const k = (gy * canvas.width + gx) * 4;
-            grid.push(
-              Math.round(
-                (data[k] * 256 + data[k + 1] + data[k + 2] / 256 - 32768) * 10
-              ) / 10
-            );
-          }
-        const dem = {n: T, grid};
-        try {
-          localStorage.setItem(key, JSON.stringify(dem));
-        } catch {}
-        return dem;
+        const elev = new Float32Array(canvas.width * canvas.height);
+        for (let k = 0; k < elev.length; k++)
+          elev[k] =
+            data[k * 4] * 256 + data[k * 4 + 1] + data[k * 4 + 2] / 256 - 32768;
+        return {
+          kind: 'img',
+          w: canvas.width,
+          h: canvas.height,
+          elev,
+          ox: x0 * 256,
+          oy: y0 * 256,
+          worldPx: world,
+          lat,
+          lon,
+          dLat,
+          dLon
+        };
       }
 
       async function fetchDEM(lat, lon) {
@@ -455,6 +463,8 @@
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 0.55;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
       camera.layers.enable(2);
@@ -468,7 +478,18 @@
       resize();
 
       const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.setScalar(innerWidth < 800 ? 1024 : 2048);
+      sunLight.shadow.camera.left = -170;
+      sunLight.shadow.camera.right = 170;
+      sunLight.shadow.camera.top = 170;
+      sunLight.shadow.camera.bottom = -170;
+      sunLight.shadow.camera.near = 20;
+      sunLight.shadow.camera.far = 460;
+      sunLight.shadow.bias = -0.0004;
+      sunLight.shadow.normalBias = 1.5;
       scene.add(sunLight);
+      scene.add(sunLight.target);
       const ambient = new THREE.AmbientLight(0xffffff, 0.5);
       scene.add(ambient);
 
@@ -555,8 +576,35 @@
         return 90 + 700 * ridged * ridged + 260 * fbm(x / 40, z / 40);
       }
 
-      let demData = null; // {n, grid} once loaded
+      let demData = null; // full-res tile image or {n, grid} API fallback
       function demElev(x, z) {
+        if (demData.kind === 'img') {
+          // Scene x/z -> lat/lon -> mercator pixel, bilinear on the tiles.
+          const la = demData.lat - (z / WORLD) * 2 * demData.dLat;
+          const lo = demData.lon + (x / WORLD) * 2 * demData.dLon;
+          const r = la * RAD;
+          const gx = THREE.MathUtils.clamp(
+            ((lo + 180) / 360) * demData.worldPx - demData.ox,
+            0,
+            demData.w - 1.001
+          );
+          const gy = THREE.MathUtils.clamp(
+            ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) *
+              demData.worldPx -
+              demData.oy,
+            0,
+            demData.h - 1.001
+          );
+          const i = Math.floor(gx);
+          const j = Math.floor(gy);
+          const e = demData.elev;
+          const w = demData.w;
+          return lerp(
+            lerp(e[j * w + i], e[j * w + i + 1], gx - i),
+            lerp(e[(j + 1) * w + i], e[(j + 1) * w + i + 1], gx - i),
+            gy - j
+          );
+        }
         // x east, z south, in scene units -> bilinear over the DEM grid.
         const N = demData.n;
         const u = THREE.MathUtils.clamp(x / WORLD + 0.5, 0, 1) * (N - 1);
@@ -579,7 +627,12 @@
         // honest while alpine relief still towers.
         let y = 16 * Math.asinh((e - centerElev) / 500);
         if (water) y = 16 * Math.asinh((0 - centerElev) / 500) - 0.6;
-        else y += 1.6 * (fbm(x / 7, z / 7) - 0.5);
+        else {
+          // With 30m tile data the noise is only seasoning; the coarse
+          // fallbacks need more of it to avoid reading as blobs.
+          const micro = demData && demData.kind === 'img' ? 0.5 : 1.6;
+          y += micro * (fbm(x / 7, z / 7) - 0.5);
+        }
         return {e, y, water};
       }
 
@@ -594,74 +647,100 @@
       let camBaseY = 6;
       let viewSign = 1; // +1: camera looks south (north hemisphere)
 
-      const cGrass = new THREE.Color('#5e8c4f');
-      const cMeadow = new THREE.Color('#7ba55e');
-      const cRock = new THREE.Color('#8d8577');
-      const cSnow = new THREE.Color('#eef1f4');
-      const cSea = new THREE.Color('#33607e');
+      // Terrain material: grass/rock/snow/sea decided per PIXEL in the
+      // fragment shader (slope and altitude with noise-jittered borders),
+      // not per vertex, so faces stay crisp at any distance. Elevation in
+      // metres is recovered in-shader by inverting the asinh compression.
+      const terrainUniforms = {
+        uCenterElev: {value: 300},
+        uSnowy: {value: 0}
+      };
+      const TERRAIN_GLSL =
+        'uniform float uCenterElev;\n' +
+        'uniform float uSnowy;\n' +
+        'varying float vWet;\n' +
+        'varying vec3 vWp;\n' +
+        'float thash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
+        'float tnoise(vec2 p){\n' +
+        '  vec2 i = floor(p); vec2 f = fract(p);\n' +
+        '  vec2 u = f * f * (3.0 - 2.0 * f);\n' +
+        '  return mix(mix(thash(i), thash(i + vec2(1.0, 0.0)), u.x),\n' +
+        '             mix(thash(i + vec2(0.0, 1.0)), thash(i + vec2(1.0, 1.0)), u.x), u.y);\n' +
+        '}\n' +
+        'float tfbm(vec2 p){ return 0.6 * tnoise(p) + 0.28 * tnoise(p * 2.7 + 19.0) + 0.12 * tnoise(p * 6.1 + 47.0); }\n' +
+        'vec3 terrainColor(vec3 wp, float wetF){\n' +
+        '  vec3 nW = normalize(cross(dFdx(wp), dFdy(wp)));\n' +
+        '  if (nW.y < 0.0) nW = -nW;\n' +
+        '  float slope = 1.0 - nW.y;\n' +
+        '  float e = uCenterElev + 500.0 * sinh(wp.y / 16.0);\n' +
+        '  float n1 = tfbm(wp.xz * 0.11);\n' +
+        '  float n2 = tfbm(wp.xz * 0.6);\n' +
+        '  vec3 grass = mix(vec3(0.09, 0.21, 0.05), vec3(0.19, 0.33, 0.08), n1);\n' +
+        '  vec3 rock = mix(vec3(0.28, 0.25, 0.21), vec3(0.4, 0.37, 0.32), n2);\n' +
+        '  vec3 col = mix(grass, rock, smoothstep(0.2, 0.45, slope + (n2 - 0.5) * 0.08));\n' +
+        '  col = mix(col, rock, smoothstep(1600.0, 2400.0, e) * 0.92);\n' +
+        '  float snowLine = 2300.0 + (n1 - 0.5) * 500.0;\n' +
+        '  float snow = smoothstep(snowLine, snowLine + 700.0, e) * (1.0 - smoothstep(0.35, 0.6, slope));\n' +
+        '  snow = max(snow, uSnowy * (1.0 - smoothstep(0.25, 0.45, slope)) * 0.85);\n' +
+        '  col = mix(col, vec3(0.87, 0.9, 0.93), snow);\n' +
+        '  vec3 sea = mix(vec3(0.05, 0.13, 0.2), vec3(0.07, 0.17, 0.25), n1);\n' +
+        '  return mix(col, sea, wetF);\n' +
+        '}\n';
+      const terrainMat = new THREE.MeshLambertMaterial({flatShading: true});
+      terrainMat.onBeforeCompile = (shader) => {
+        Object.assign(shader.uniforms, terrainUniforms);
+        shader.vertexShader = shader.vertexShader
+          .replace(
+            '#include <common>',
+            '#include <common>\nattribute float wet; varying float vWet; varying vec3 vWp;'
+          )
+          .replace(
+            '#include <begin_vertex>',
+            '#include <begin_vertex>\nvWet = wet; vWp = transformed;'
+          );
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\n' + TERRAIN_GLSL)
+          .replace(
+            '#include <color_fragment>',
+            '#include <color_fragment>\ndiffuseColor.rgb = terrainColor(vWp, vWet);'
+          );
+      };
 
       function buildWorld() {
         ground.clear();
         trees = [];
         if (demData) {
-          const mid = [];
-          for (let j = 10; j < 14; j++)
-            for (let i = 10; i < 14; i++) mid.push(demData.grid[j * DEM_N + i]);
-          centerElev = Math.max(
-            mid.reduce((a, b) => a + b, 0) / mid.length,
-            0.3
-          );
+          // Average the real elevation in a small ring around the scene
+          // centre (grid-layout agnostic).
+          let sum = 0;
+          let cnt = 0;
+          for (let dx = -12; dx <= 12; dx += 6)
+            for (let dz = -12; dz <= 12; dz += 6) {
+              sum += demElev(dx, dz);
+              cnt++;
+            }
+          centerElev = Math.max(sum / cnt, 0.3);
         } else {
           centerElev = 300;
         }
+        terrainUniforms.uCenterElev.value = centerElev;
         viewSign = state.lat < 0 ? -1 : 1;
 
-        const geo = new THREE.PlaneGeometry(WORLD, WORLD, 120, 120);
+        const geo = new THREE.PlaneGeometry(WORLD, WORLD, 220, 220);
         geo.rotateX(-Math.PI / 2);
         const pos = geo.attributes.position;
-        const elev = [];
-        const wet = [];
+        const wet = new Float32Array(pos.count);
         for (let i = 0; i < pos.count; i++) {
           const s = sample(pos.getX(i), pos.getZ(i));
           pos.setY(i, s.y);
-          elev.push(s.e);
-          wet.push(s.water);
+          wet[i] = s.water ? 1 : 0;
         }
         geo.computeVertexNormals();
-        const nrm = geo.attributes.normal;
-        const colors = [];
-        const c = new THREE.Color();
-        const snowyGround =
-          state.temp <= 0.5 && (state.snow > 0 || state.code >= 71);
-        for (let i = 0; i < pos.count; i++) {
-          if (wet[i]) {
-            c.copy(cSea);
-          } else {
-            const x = pos.getX(i);
-            const z = pos.getZ(i);
-            const slope = 1 - nrm.getY(i); // 0 flat .. 1 cliff
-            c.copy(cGrass)
-              .lerp(cMeadow, noise2(x / 9 + 99, z / 9))
-              .lerp(cRock, THREE.MathUtils.smoothstep(slope, 0.12, 0.4))
-              .lerp(
-                cRock,
-                THREE.MathUtils.smoothstep(elev[i], 1600, 2400) * 0.9
-              )
-              .lerp(cSnow, THREE.MathUtils.smoothstep(elev[i], 2300, 3100));
-            if (snowyGround && slope < 0.3) c.lerp(cSnow, 0.8);
-          }
-          colors.push(c.r, c.g, c.b);
-        }
-        geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-        ground.add(
-          new THREE.Mesh(
-            geo,
-            new THREE.MeshLambertMaterial({
-              vertexColors: true,
-              flatShading: true
-            })
-          )
-        );
+        geo.setAttribute('wet', new THREE.BufferAttribute(wet, 1));
+        const terrain = new THREE.Mesh(geo, terrainMat);
+        terrain.castShadow = true;
+        terrain.receiveShadow = true;
+        ground.add(terrain);
 
         // Trees: below the real tree line, off cliffs, out of the sea,
         // and not right on top of either camera spot (it can face both
@@ -689,6 +768,8 @@
             leafMat
           );
           crown.position.y = 2.5 * sc;
+          trunk.castShadow = crown.castShadow = true;
+          crown.receiveShadow = true;
           tree.add(trunk, crown);
           tree.position.set(x, s0.y, z);
           tree.userData.phase = rand() * Math.PI * 2;
@@ -917,7 +998,7 @@
         const moon = altAz(moonEquatorial(d), d, state.lat, state.lon);
         const sunVec = skyPoint(sun.alt, sun.az, 1);
         skyU.sunPosition.value.copy(sunVec);
-        sunLight.position.copy(skyPoint(Math.max(sun.alt, -0.12), sun.az, 100));
+        sunLight.position.copy(skyPoint(Math.max(sun.alt, -0.12), sun.az, 190));
         moonDisc.position.copy(skyPoint(moon.alt, moon.az, 1500));
         moonLight.position.copy(skyPoint(sun.alt, sun.az, 200));
         moonLight.target.position.copy(moonDisc.position);
@@ -946,9 +1027,11 @@
 
         sunLight.intensity = (0.25 + day) * (1 - cloudy * 0.55);
         sunLight.color.setHSL(0.12, 0.5, 0.6 + day * 0.4 - dusk * 0.15);
+        // Kept moderate so the sun's cast shadows stay readable.
         ambient.intensity =
           0.12 +
-          day * 0.42 * (1 - cloudy * 0.3) +
+          day * 0.3 * (1 - cloudy * 0.3) +
+          cloudy * day * 0.12 +
           (moon.alt > 0 ? 0.07 * (1 - day) : 0);
         ambient.color.copy(tmpB);
         if (starMat)
@@ -970,6 +1053,12 @@
           if (c.position.x > 260) c.position.x = -260;
         });
         cloudMat.opacity = 0.5 + cloudy * 0.4;
+
+        // Ground snow cover reacts live to the real temperature.
+        const snowyGround =
+          state.temp <= 0.5 && (state.snow > 0 || state.code >= 71) ? 1 : 0;
+        terrainUniforms.uSnowy.value +=
+          (snowyGround - terrainUniforms.uSnowy.value) * Math.min(dt, 1);
 
         const snowing =
           state.snow > 0 ||
@@ -1028,7 +1117,16 @@
         const vz = Math.cos(yaw);
         const camZ = -26 * vz;
         const camX = -26 * vx;
-        const baseY = sample(camX, camZ).y + 5;
+        // Clear the immediate foreground so the camera never sits with
+        // its face in a hillside.
+        const baseY =
+          Math.max(
+            sample(camX, camZ).y,
+            sample(camX + 5, camZ).y,
+            sample(camX - 5, camZ).y,
+            sample(camX, camZ + 5).y,
+            sample(camX, camZ - 5).y
+          ) + 4.5;
         camBaseY += (baseY - camBaseY) * Math.min(dt * 2, 1);
 
         camera.position.set(
