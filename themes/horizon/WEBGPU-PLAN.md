@@ -125,10 +125,38 @@ Scenes (all at Grindelwald unless noted):
     Usage: `sun.shadow.shadowNode = new CSMShadowNode(sun, {cascades:
 3, maxFar, mode: 'practical'})`, `csm.fade = true`;
     `updateFrustums()` on resize.
-  - Next: TSL Water/Sky with the Cox-Munk physics re-applied;
-    atmosphere + cloud passes as node render-target passes (then
-    compute in phase 3); moon/aurora/optics/star ShaderMaterials →
-    NodeMaterial equivalents; then the Horizon.html renderer switch,
+  - Atmosphere ported to `atmosphere-tsl.js` (full Hillaire chain:
+    transmittance / multiple-scattering / sky-view / aerial /
+    irradiance passes + dome, same LUT sizes, Loop/If/toVar node
+    code). Status: WIP — domes match structurally (horizon, sun,
+    ground) in the A/B harness, transmittance LUT validated
+    NUMERICALLY to <1% against sunTransmittanceJS, but the sky-view
+    output runs ~0.7x in blue vs the GLSL reference. Fault isolated
+    to the multiple-scattering LUT or the sky-view march (tLut is
+    proven good). Next session: JS double-precision reference of the
+    MS integral + sky-view march to pin the stage, then fix.
+  - Texture-coordinate conventions on WebGPURenderer's WebGL backend,
+    established by readback probes (cost a lot — do not rediscover):
+    - readback rows and SCENE-geometry RT writes: GL bottom-origin
+    - QuadMesh RT writes AND `texture().sample()` reads: both
+      V-flipped → QuadMesh-write + sample() is SELF-CONSISTENT and is
+      what atmosphere-tsl uses; scene-geometry writes must not be
+      mixed into that chain; numeric readbacks of QuadMesh-written
+      LUTs see flipped rows (flip j → H-1-j, texel-exact).
+  - Harness gotchas (again: do not rediscover): WebGPURenderer.init()
+    hangs on a DETACHED canvas (append to DOM first); interleaving
+    readRenderTargetPixelsAsync with subsequent renderAsync calls
+    deadlocks (batch ALL renders, then ALL readbacks); sync render()
+    for offscreen passes works inside a frame but multiple top-level
+    awaited renderAsync sequences can stall under
+    --virtual-time-budget; readbacks of HalfFloat targets return raw
+    fp16 bit patterns (decode: 15360 = 1.0); two-canvas comparison
+    pages mis-size the second canvas — use one full-window page per
+    renderer and diff screenshots.
+  - Next: fix the sky-view/MS deficit; TSL Water/Sky with the
+    Cox-Munk physics re-applied; cloud reconstruction as node passes
+    (then compute in phase 3); moon/aurora/optics/star ShaderMaterials
+    → NodeMaterial equivalents; then the Horizon.html renderer switch,
     full matrix, and DELETION of the WebGL-only code paths
     (onBeforeCompile hooks, GLSL CSM trio, Sky.js/Water.js if fully
     replaced).
