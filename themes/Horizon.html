@@ -21,7 +21,17 @@
         real apparent size for today's Earth-Moon distance
       - fog obeys the Koschmieder relation on the MEASURED visibility;
         sun glitter follows Cox & Munk (1954) slope statistics; cloud
-        cover renders in the model's real low/mid/high layers
+        cover renders in the model's real low/mid/high layers, each deck
+        riding its own real wind (surface, 700hPa, 250hPa jet)
+      - the snowline tracks the real freezing level; the treeline follows
+        Körner & Paulsen (2004); deciduous leaves follow Hopkins' law
+        (real date, latitude and elevation), so autumn arrives when it
+        actually does; surf breaks along the real shallows (McCowan
+        H > 0.78d on the terrarium bathymetry)
+      - atmospheric optics appear only under their true conditions:
+        Descartes rainbows (42/51 deg) opposite a low sun during real
+        rain, the 22 deg cirrus halo with low-sun parhelia, star twinkle
+        growing with airmass, and real solar eclipses dimming the scene
       - live weather (open-meteo + geojs, both keyless): cloud cover,
         rain, snow, fog, wind-driven sway; fresh snow whitens the ground
         only when it is actually freezing where you are
@@ -230,6 +240,11 @@
         cloudMid: params.has('cloudmid') ? +params.get('cloudmid') : null,
         cloudHigh: params.has('cloudhigh') ? +params.get('cloudhigh') : null,
         visibility: params.has('vis') ? +params.get('vis') : 30000,
+        wind700: params.has('w700') ? +params.get('w700') : null,
+        dir700: params.has('d700') ? +params.get('d700') : null,
+        wind250: params.has('w250') ? +params.get('w250') : null,
+        dir250: params.has('d250') ? +params.get('d250') : null,
+        freezing: params.has('fl') ? +params.get('fl') : null,
         code: params.has('code') ? +params.get('code') : 1,
         kp: params.has('kp') ? +params.get('kp') : 0,
         auroraP: null, // OVATION oval probability 0..1, null = use Kp
@@ -366,6 +381,47 @@
           );
         } catch {
           say('weather unavailable · showing a calm day');
+        }
+      }
+
+      // Winds aloft and the freezing level: mid clouds ride the 700hPa
+      // wind, cirrus rides the 250hPa jet, and the snowline on the peaks
+      // follows the real 0°C isotherm.
+      async function syncAloft() {
+        if (params.has('fl') || params.has('w250')) return;
+        try {
+          const w = await (
+            await fetch(
+              'https://api.open-meteo.com/v1/forecast?latitude=' +
+                state.lat +
+                '&longitude=' +
+                state.lon +
+                '&hourly=wind_speed_700hPa,wind_direction_700hPa,wind_speed_250hPa,wind_direction_250hPa,freezing_level_height&forecast_hours=1',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const h = w.hourly;
+          state.wind700 = h.wind_speed_700hPa[0];
+          state.dir700 = h.wind_direction_700hPa[0];
+          state.wind250 = h.wind_speed_250hPa[0];
+          state.dir250 = h.wind_direction_250hPa[0];
+          state.freezing = h.freezing_level_height[0];
+          record(
+            'open-meteo winds aloft',
+            '700hPa ' +
+              state.wind700 +
+              ' km/h @' +
+              state.dir700 +
+              '° · 250hPa jet ' +
+              state.wind250 +
+              ' km/h @' +
+              state.dir250 +
+              '° · freezing level ' +
+              state.freezing +
+              ' m'
+          );
+        } catch {
+          // Layers fall back to the surface wind.
         }
       }
 
@@ -945,6 +1001,18 @@
       const geoCone1 = new THREE.ConeGeometry(1.15, 2.3, 7);
       const geoCone2 = new THREE.ConeGeometry(0.82, 1.8, 7);
       const geoCanopy = new THREE.IcosahedronGeometry(1.25, 1);
+      // Deciduous phenology bases (Hopkins' law shifts the calendar).
+      const broadBases = broadMats.map((m) => m.color.clone());
+      const cBare = new THREE.Color('#6f5b46');
+      const cSpring = new THREE.Color('#7cbf5d');
+      const cAutumn = new THREE.Color('#b95f24');
+      // Climatic treeline vs latitude, after Körner & Paulsen (2004).
+      function treelineM(lat) {
+        const a = Math.abs(lat);
+        return a < 30
+          ? 3500 + (30 - a) * 13
+          : Math.max(3500 - 92 * (a - 30), 0);
+      }
       let trees = [];
       let camBaseY = 6;
       let viewSign = 1; // +1: camera looks south (north hemisphere)
@@ -963,6 +1031,7 @@
       const terrainUniforms = {
         uCenterElev: {value: 300},
         uSnowy: {value: 0},
+        uSnowLine: {value: 2300},
         uTime: {value: 0},
         uWindMs: {value: 3},
         uWindVec: {value: new THREE.Vector2(1, 0)},
@@ -972,6 +1041,7 @@
       const TERRAIN_GLSL =
         'uniform float uCenterElev;\n' +
         'uniform float uSnowy;\n' +
+        'uniform float uSnowLine;\n' +
         'uniform float uTime;\n' +
         'uniform float uWindMs;\n' +
         'uniform vec2 uWindVec;\n' +
@@ -1030,7 +1100,7 @@
         '  vec3 rock = mix(vec3(0.28, 0.25, 0.21), vec3(0.4, 0.37, 0.32), n2);\n' +
         '  vec3 col = mix(grass, rock, smoothstep(0.2, 0.45, slope + (n2 - 0.5) * 0.08));\n' +
         '  col = mix(col, rock, smoothstep(1600.0, 2400.0, e) * 0.92);\n' +
-        '  float snowLine = 2300.0 + (n1 - 0.5) * 500.0;\n' +
+        '  float snowLine = uSnowLine + (n1 - 0.5) * 500.0;\n' +
         '  float snow = smoothstep(snowLine, snowLine + 700.0, e) * (1.0 - smoothstep(0.35, 0.6, slope));\n' +
         '  snow = max(snow, uSnowy * (1.0 - smoothstep(0.25, 0.45, slope)) * 0.85);\n' +
         '  col = mix(col, vec3(0.87, 0.9, 0.93), snow);\n' +
@@ -1112,11 +1182,12 @@
         // Trees: inside the real OSM woods when we have them, below the
         // real tree line, off cliffs, out of the sea, and not on top of
         // either camera spot (it can face both ways).
+        const tl = treelineM(state.lat);
         for (let i = 0; i < 1800 && trees.length < 140; i++) {
           const x = (rand() - 0.5) * (WORLD - 40);
           const z = (rand() - 0.5) * (WORLD - 40);
           const s0 = sample(x, z);
-          if (s0.water || s0.e > 1900) continue;
+          if (s0.water || s0.e > tl) continue;
           if (!inForest(x, z)) continue;
           // Real forests stand on ~35° alpine slopes; the asinh height
           // compression roughly doubles scene gradients, hence 4.5.
@@ -1127,7 +1198,8 @@
           if (Math.hypot(x, z - 26) < 24 || Math.hypot(x, z + 26) < 24)
             continue;
           const sc = 0.8 + rand() * 1.4;
-          const conifer = s0.e > 1000 || rand() < 0.4;
+          // Conifers own the subalpine belt below the climatic treeline.
+          const conifer = s0.e > tl - 700 || rand() < 0.4;
           const tree = new THREE.Group();
           const trunk = new THREE.Mesh(geoTrunk, trunkMat);
           trunk.position.y = 0.55;
@@ -1188,18 +1260,41 @@
           water.position.y = 16 * Math.asinh((0 - centerElev) / 500) - 0.15;
           // Cox & Munk (1954): sun glitter is shaped by the sea-surface
           // slope variance, mss = 0.003 + 0.00512*U. Patch the vendored
-          // shader's fixed Blinn lobe to follow it, and mix in Monahan
-          // whitecaps.
+          // shader's fixed Blinn lobe to follow it, mix in Monahan
+          // whitecaps, and break surf along the REAL shallows: a depth
+          // texture sampled from the terrarium bathymetry, with the
+          // McCowan criterion (waves break where H > 0.78d).
+          const DT = 128;
+          const dArr = new Uint8Array(DT * DT);
+          for (let dj = 0; dj < DT; dj++)
+            for (let di = 0; di < DT; di++) {
+              const e = demData
+                ? demElev(
+                    (di / (DT - 1) - 0.5) * WORLD,
+                    (dj / (DT - 1) - 0.5) * WORLD
+                  )
+                : 1;
+              dArr[dj * DT + di] = THREE.MathUtils.clamp(
+                (-e / 40) * 255,
+                0,
+                255
+              );
+            }
+          const depthTex = new THREE.DataTexture(dArr, DT, DT, THREE.RedFormat);
+          depthTex.needsUpdate = true;
           Object.assign(water.material.uniforms, {
             shiny: {value: 200},
             whitecapW: {value: 0},
-            windDirW: {value: new THREE.Vector2(1, 0)}
+            windDirW: {value: new THREE.Vector2(1, 0)},
+            depthTex: {value: depthTex},
+            hsWave: {value: 0.5}
           });
           water.material.fragmentShader = water.material.fragmentShader
             .replace(
               'uniform vec3 waterColor;',
               'uniform vec3 waterColor; uniform float shiny;' +
-                ' uniform float whitecapW; uniform vec2 windDirW;'
+                ' uniform float whitecapW; uniform vec2 windDirW;' +
+                ' uniform sampler2D depthTex; uniform float hsWave;'
             )
             .replace(
               'sunLight( surfaceNormal, eyeDirection, 100.0, 2.0, 0.5, diffuseLight, specularLight );',
@@ -1209,7 +1304,12 @@
               'vec3 outgoingLight = albedo;',
               'float capN = texture2D( normalSampler, worldPosition.xz * 0.02 + windDirW * time * 0.012 ).g;\n' +
                 'float capMask = smoothstep( 1.0 - whitecapW - 0.04, 1.0 - whitecapW + 0.02, capN );\n' +
-                'albedo = mix( albedo, vec3( 0.75, 0.8, 0.84 ) * ( 0.25 + max( sunDirection.y, 0.0 ) ), capMask * 0.9 );\n' +
+                'float dpt = texture2D( depthTex, worldPosition.xz / 280.0 + 0.5 ).r * 40.0;\n' +
+                'float db = hsWave / 0.78;\n' +
+                'float shoal = smoothstep( db * 2.4, db * 0.6, dpt ) * smoothstep( 0.012, 0.05, dpt );\n' +
+                'float surfN = texture2D( normalSampler, worldPosition.xz * 0.05 + windDirW * time * 0.03 ).b;\n' +
+                'float surf = shoal * smoothstep( 0.35, 0.7, surfN + shoal * 0.25 );\n' +
+                'albedo = mix( albedo, vec3( 0.82, 0.86, 0.88 ) * ( 0.3 + max( sunDirection.y, 0.0 ) ), clamp( capMask * 0.9 + surf * 0.85, 0.0, 1.0 ) );\n' +
                 'vec3 outgoingLight = albedo;'
             );
           water.material.needsUpdate = true;
@@ -1272,20 +1372,28 @@
           );
           geo.setAttribute('color', new THREE.Float32BufferAttribute(color, 3));
           geo.setAttribute('size', new THREE.Float32BufferAttribute(size, 1));
+          // Scintillation: Kolmogorov turbulence makes twinkle grow with
+          // airmass (~sec z), so horizon stars shimmer and zenith stars
+          // barely do.
           starMat = new THREE.ShaderMaterial({
             transparent: true,
             depthWrite: false,
-            uniforms: {night: {value: 0}},
+            uniforms: {night: {value: 0}, time: {value: 0}},
             vertexShader:
-              'attribute float size; varying vec3 vc;' +
+              'attribute float size; uniform float time;' +
+              ' varying vec3 vc; varying float vtw;' +
               ' void main(){ vc = color;' +
+              '  float alt = max(normalize((modelMatrix * vec4(position, 1.0)).xyz).y, 0.04);' +
+              '  float am = 1.0 / alt;' +
+              '  float ph = fract(sin(dot(position.xy, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831;' +
+              '  vtw = 1.0 + clamp(0.06 * (am - 1.0), 0.0, 0.5) * sin(time * 9.0 + ph);' +
               ' vec4 mv = modelViewMatrix * vec4(position, 1.0);' +
-              ' gl_PointSize = size; gl_Position = projectionMatrix * mv; }',
+              ' gl_PointSize = size * vtw; gl_Position = projectionMatrix * mv; }',
             fragmentShader:
-              'uniform float night; varying vec3 vc;' +
+              'uniform float night; varying vec3 vc; varying float vtw;' +
               ' void main(){ float d = length(gl_PointCoord - 0.5);' +
               ' if (d > 0.5) discard;' +
-              ' gl_FragColor = vec4(vc, night * smoothstep(0.5, 0.2, d)); }',
+              ' gl_FragColor = vec4(vc, night * vtw * smoothstep(0.5, 0.2, d)); }',
             vertexColors: true
           });
           celestial.add(new THREE.Points(geo, starMat));
@@ -1450,6 +1558,62 @@
       );
       aurora.position.y = 420;
       scene.add(aurora);
+
+      // Atmospheric optics on one additive dome:
+      // - primary and secondary rainbows at their Descartes angles (42.0
+      //   and 51 deg around the antisolar point, reversed colours,
+      //   Alexander's dark band between) - only when real rain falls with
+      //   the sun shining below 42 deg
+      // - the 22 deg ice-crystal halo (red inner edge) whenever real
+      //   cirrus is present, with parhelia (sundogs) at low sun
+      const opticsU = {
+        sunDir: {value: new THREE.Vector3(0, 1, 0)},
+        antisolar: {value: new THREE.Vector3(0, -1, 0)},
+        bow: {value: 0},
+        halo: {value: 0},
+        dogs: {value: 0}
+      };
+      const optics = new THREE.Mesh(
+        new THREE.SphereGeometry(590, 32, 20),
+        new THREE.ShaderMaterial({
+          side: THREE.BackSide,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          uniforms: opticsU,
+          vertexShader:
+            'varying vec3 vDir; void main(){ vDir = position;' +
+            ' gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+          fragmentShader:
+            'uniform vec3 sunDir; uniform vec3 antisolar;' +
+            ' uniform float bow; uniform float halo; uniform float dogs;' +
+            ' varying vec3 vDir;' +
+            ' vec3 spectral(float h){' +
+            '  return clamp(vec3(' +
+            '    1.6 * h - 0.35,' +
+            '    1.0 - abs(2.4 * h - 1.25),' +
+            '    1.05 - 1.7 * h), 0.0, 1.0); }' +
+            ' void main(){' +
+            '  vec3 v = normalize(vDir);' +
+            '  float aA = degrees(acos(clamp(dot(v, antisolar), -1.0, 1.0)));' +
+            '  float aS = degrees(acos(clamp(dot(v, sunDir), -1.0, 1.0)));' +
+            '  vec3 col = vec3(0.0);' +
+            // primary bow: violet 40.6 inner -> red 42.4 outer
+            '  float b1 = smoothstep(40.4, 40.9, aA) * (1.0 - smoothstep(42.2, 42.6, aA));' +
+            '  col += spectral(1.0 - clamp((aA - 40.6) / 1.8, 0.0, 1.0)) * b1 * bow * 0.55;' +
+            // secondary: red 50.4 inner -> violet 53.2 outer, 43% brightness
+            '  float b2 = smoothstep(50.2, 50.8, aA) * (1.0 - smoothstep(52.8, 53.6, aA));' +
+            '  col += spectral(clamp((aA - 50.4) / 2.8, 0.0, 1.0)) * b2 * bow * 0.24;' +
+            // 22 deg halo, red inner edge fading to bluish white
+            '  float th = smoothstep(21.2, 21.9, aS) * (1.0 - smoothstep(22.5, 23.8, aS));' +
+            '  vec3 hcol = mix(vec3(1.0, 0.5, 0.35), vec3(0.85, 0.92, 1.0), clamp((aS - 21.8) / 1.6, 0.0, 1.0));' +
+            '  float dogBand = exp(-pow((v.y - sunDir.y) * 14.0, 2.0));' +
+            '  col += hcol * th * halo * (0.18 + dogs * dogBand * 0.6);' +
+            '  gl_FragColor = vec4(col, 1.0); }'
+        })
+      );
+      optics.renderOrder = 1;
+      scene.add(optics);
 
       // Clouds in the three layers the weather model actually reports
       // (open-meteo cloud_cover_low/mid/high): puffy cumulus at the LCL,
@@ -1719,7 +1883,10 @@
       const cGray = new THREE.Color('#9aa4ad');
       const tmpB = new THREE.Color();
       const windV = new THREE.Vector3(1, 0, 0);
+      const windVMid = new THREE.Vector3(1, 0, 0);
+      const windVHigh = new THREE.Vector3(1, 0, 0);
       const treeAxis = new THREE.Vector3(0, 0, 1);
+      const tmpP = new THREE.Color();
 
       // ---------- data panel (✦ toggle / ?debug=1 / D key) ----------
       const panel = document.getElementById('panel');
@@ -1813,6 +1980,31 @@
             // distance (supermoon vs apogee is a visible ~7%).
             const distKm = AE.GeoMoon(d).Length() * AE.KM_PER_AU;
             astro.moonScale = (1500 * 1737) / distKm / 24;
+            // Solar eclipse: topocentric angular separation against the
+            // two real disc radii. Nonzero only when one is underway.
+            const cosSep =
+              Math.sin(astro.sun.alt) * Math.sin(astro.moon.alt) +
+              Math.cos(astro.sun.alt) *
+                Math.cos(astro.moon.alt) *
+                Math.cos(astro.sun.az - astro.moon.az);
+            const sepDeg =
+              Math.acos(THREE.MathUtils.clamp(cosSep, -1, 1)) / RAD;
+            const moonR = Math.asin(1737 / distKm) / RAD;
+            astro.eclipse = THREE.MathUtils.clamp(
+              (0.267 + moonR - sepDeg) / (2 * 0.267),
+              0,
+              1
+            );
+            if (astro.eclipse > 0.05 && !astro.eclipseSaid) {
+              astro.eclipseSaid = true;
+              say(
+                'solar eclipse in progress · ~' +
+                  Math.round(astro.eclipse * 100) +
+                  '% obscured'
+              );
+            } else if (astro.eclipse < 0.01) {
+              astro.eclipseSaid = false;
+            }
             for (let i = 0; i < PLANETS.length; i++) {
               const p = pos(AE.Body[PLANETS[i]]);
               const mag = AE.Illumination(AE.Body[PLANETS[i]], d).mag;
@@ -1859,6 +2051,10 @@
         const day = THREE.MathUtils.clamp((sun.alt / RAD + 6) / 24, 0, 1);
         const dusk = 1 - Math.abs(day - 0.5) * 2;
         const cloudy = state.cloud / 100;
+        // Stars belong to dusk, not daylight: the night sky fades in only
+        // once the sun is truly below the horizon (civil to nautical
+        // twilight, -3 to -9 deg).
+        const nightSky = THREE.MathUtils.clamp(-(sun.alt / RAD + 3) / 6, 0, 1);
 
         // Scattering sky: turbidity from MEASURED aerosols (AOD), plus
         // cloud haze; the grey veil finishes the overcast look.
@@ -1878,18 +2074,27 @@
         scene.fog.density =
           1.98 / (Math.max(state.visibility, 400) / 57.14) + cloudy * 0.001;
 
-        sunLight.intensity = (0.25 + day) * (1 - cloudy * 0.55);
+        // A real solar eclipse dims the direct light by its obscuration.
+        const ecl = astro.eclipse || 0;
+        sunLight.intensity =
+          (0.25 + day) * (1 - cloudy * 0.55) * (1 - 0.93 * ecl);
         sunLight.color.setHSL(0.12, 0.5, 0.6 + day * 0.4 - dusk * 0.15);
         // Kept moderate so the sun's cast shadows stay readable.
         ambient.intensity =
-          0.12 +
-          day * 0.3 * (1 - cloudy * 0.3) +
-          cloudy * day * 0.12 +
-          (moon.alt > 0 ? 0.07 * (1 - day) : 0);
+          (0.12 +
+            day * 0.3 * (1 - cloudy * 0.3) +
+            cloudy * day * 0.12 +
+            (moon.alt > 0 ? 0.07 * (1 - day) : 0)) *
+          (1 - 0.8 * ecl);
         ambient.color.copy(tmpB);
-        if (starMat)
-          starMat.uniforms.night.value = (1 - day) * (1 - cloudy * 0.85);
-        if (constMat) constMat.opacity = (1 - day) * (1 - cloudy * 0.9) * 0.2;
+        if (starMat) {
+          starMat.uniforms.night.value = nightSky * (1 - cloudy * 0.85);
+          starMat.uniforms.time.value = t / 1000;
+        }
+        if (constMat) constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2;
+        // Venus and Jupiter pierce twilight a little before the stars.
+        planetMat.uniforms.night.value =
+          THREE.MathUtils.clamp(nightSky * 1.6, 0, 1) * (1 - cloudy * 0.85);
         moonDisc.visible = moon.alt > -0.05;
 
         // The Water plane: Cox-Munk slope statistics set the glitter
@@ -1908,12 +2113,27 @@
           wu.shiny.value = Math.max(2 / mss - 2, 30);
           wu.whitecapW.value = Math.min(3.84e-6 * Math.pow(Ums, 3.41), 0.5);
           wu.windDirW.value.set(windV.x, windV.z);
+          wu.hsWave.value = (0.21 * Ums * Ums) / 9.81;
         }
 
-        // The real wind vector: meteorological direction is where wind
-        // comes FROM; the scene advects along where it blows TO.
-        const windTo = (state.winddir + 180) * RAD;
-        windV.set(Math.sin(windTo), 0, -Math.cos(windTo));
+        // The real wind vectors, per level: meteorological direction is
+        // where wind comes FROM; the scene advects along where it blows.
+        const dirOf = (deg, out) => {
+          const a = (deg + 180) * RAD;
+          out.set(Math.sin(a), 0, -Math.cos(a));
+        };
+        dirOf(state.winddir, windV);
+        dirOf(state.dir700 ?? state.winddir, windVMid);
+        dirOf(state.dir250 ?? state.winddir, windVHigh);
+
+        // The snowline on the peaks tracks the real freezing level (snow
+        // lingers a little below the instantaneous 0°C isotherm).
+        terrainUniforms.uSnowLine.value +=
+          ((state.freezing != null
+            ? THREE.MathUtils.clamp(state.freezing - 300, 600, 5500)
+            : 2300) -
+            terrainUniforms.uSnowLine.value) *
+          Math.min(dt, 1);
 
         // Sea-state uniforms: real wind feeds the wave model.
         terrainUniforms.uTime.value = t / 1000;
@@ -1946,7 +2166,7 @@
           Math.max(ovalKm, 60)
         );
         auroraU.strength.value =
-          auroraP * (1 - day) * (1 - cloudy * 0.7) * (elevA > 0.035 ? 1 : 0);
+          auroraP * nightSky * (1 - cloudy * 0.7) * (elevA > 0.035 ? 1 : 0);
         auroraU.time.value = t / 1000;
         const yAurora = Math.tan(THREE.MathUtils.clamp(elevA, 0.06, 1.1)) * 760;
         auroraU.uBase.value = yAurora - 160;
@@ -1963,12 +2183,13 @@
         const cHigh = state.cloudHigh ?? state.cloud * 0.3;
         const lcl = Math.max(125 * (state.temp - state.dew), 150);
         const yCloud = Math.max(16 * Math.asinh(lcl / 500) + 8, camBaseY + 26);
-        const driftLayer = (arr, cover, y) => {
+        // Each deck rides its own real wind: surface, 700hPa, 250hPa jet.
+        const driftLayer = (arr, cover, y, wv, speed) => {
           const showN = Math.round((cover / 100) * arr.length);
           arr.forEach((c, i) => {
             c.visible = i < showN;
-            c.position.x += windV.x * state.wind * 0.06 * dt;
-            c.position.z += windV.z * state.wind * 0.06 * dt;
+            c.position.x += wv.x * speed * 0.06 * dt;
+            c.position.z += wv.z * speed * 0.06 * dt;
             c.position.y +=
               (y + c.userData.jitter - c.position.y) * Math.min(dt, 1);
             if (c.position.x > 260) c.position.x = -260;
@@ -1977,12 +2198,20 @@
             if (c.position.z < -260) c.position.z = 260;
           });
         };
-        driftLayer(cloudsLow, cLow, yCloud);
-        driftLayer(cloudsMid, cMid, Math.max(16 * Math.asinh(8), yCloud + 14));
+        driftLayer(cloudsLow, cLow, yCloud, windV, state.wind);
+        driftLayer(
+          cloudsMid,
+          cMid,
+          Math.max(16 * Math.asinh(8), yCloud + 14),
+          windVMid,
+          state.wind700 ?? state.wind
+        );
         driftLayer(
           cloudsHigh,
           cHigh,
-          Math.max(16 * Math.asinh(16), yCloud + 26)
+          Math.max(16 * Math.asinh(16), yCloud + 26),
+          windVHigh,
+          state.wind250 ?? state.wind
         );
         cloudMat.opacity = 0.5 + cloudy * 0.4;
         // Unlit clouds are dark; only daylight (or moonlight) brightens.
@@ -2030,6 +2259,48 @@
           }
           p.needsUpdate = true;
         }
+
+        // Atmospheric optics, gated by the real conditions: bows need
+        // rain with the sun shining below the Descartes angle; the halo
+        // needs real cirrus; parhelia strengthen at low sun.
+        opticsU.sunDir.value.copy(sunVec);
+        opticsU.antisolar.value.copy(sunVec).negate();
+        const sunOut = day * THREE.MathUtils.clamp(1 - cloudy * 1.1, 0, 1);
+        opticsU.bow.value =
+          raining && sun.alt > 0 && sun.alt < 0.733 ? sunOut : 0;
+        opticsU.halo.value =
+          (cHigh / 100) *
+          (cHigh < 90 ? 1 : 0.5) *
+          sunOut *
+          (sun.alt > 0 ? 1 : 0);
+        opticsU.dogs.value = THREE.MathUtils.clamp(
+          (0.44 - sun.alt) / 0.26,
+          0,
+          1
+        );
+
+        // Deciduous phenology: Hopkins' bioclimatic law shifts the leaf
+        // calendar ~4 days per degree of latitude and per 122m of
+        // elevation; the southern hemisphere is half a year out of phase.
+        let doy = (d.getTime() - Date.UTC(d.getUTCFullYear(), 0, 0)) / 86400000;
+        if (state.lat < 0) doy = (doy + 182.5) % 365;
+        const hop = 4 * (Math.abs(state.lat) - 39) + centerElev / 30.5;
+        const leafOut = 105 + hop;
+        const senesce = 265 - hop;
+        const frac = (x, a, b) =>
+          THREE.MathUtils.clamp((x - a) / (b - a), 0, 1);
+        const spring = frac(doy, leafOut, leafOut + 18);
+        const mature = frac(doy, leafOut + 18, leafOut + 45);
+        const fall = frac(doy, senesce, senesce + 20);
+        const drop = frac(doy, senesce + 25, senesce + 45);
+        broadMats.forEach((m, i) => {
+          m.color
+            .copy(cBare)
+            .lerp(cSpring, spring)
+            .lerp(broadBases[i], spring * mature)
+            .lerp(cAutumn, fall)
+            .lerp(cBare, drop);
+        });
 
         // Physical snow: lazily boot Rapier the first time it really
         // snows, then step the world once per frame.
@@ -2205,6 +2476,18 @@
             '% (Monahan)';
           live['visibility (Koschmieder fog)'] =
             (state.visibility / 1000).toFixed(1) + ' km measured';
+          live['snowline (freezing level)'] =
+            Math.round(terrainUniforms.uSnowLine.value) + ' m';
+          live['treeline (Körner & Paulsen)'] =
+            Math.round(treelineM(state.lat)) + ' m';
+          live['optics'] =
+            'bow ' +
+            opticsU.bow.value.toFixed(2) +
+            ' · halo ' +
+            opticsU.halo.value.toFixed(2) +
+            ' · eclipse ' +
+            ((astro.eclipse || 0) * 100).toFixed(0) +
+            '%';
           live['aurora curtain'] =
             auroraU.strength.value.toFixed(2) + ' strength';
           if (snowSim)
@@ -2231,6 +2514,8 @@
         setInterval(syncWeather, 15 * 60 * 1000);
         syncAir();
         setInterval(syncAir, 30 * 60 * 1000);
+        syncAloft();
+        setInterval(syncAloft, 30 * 60 * 1000);
         syncForests();
         syncKp();
         setInterval(syncKp, 15 * 60 * 1000);
