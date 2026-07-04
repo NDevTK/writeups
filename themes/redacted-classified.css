@@ -32,7 +32,13 @@ h2,
 h3,
 h4,
 h5,
-h6 {
+h6,
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
   font-family:
     'Courier New', Courier, monospace; /* Consistent typewriter font */
   color: #000000;
@@ -41,27 +47,40 @@ h6 {
   font-weight: bold; /* Standard bold for headings */
 }
 
-h1 {
+h1,
+.markdown-body h1 {
   font-size: 2em;
   border-bottom: 2px solid #990000;
   padding-bottom: 0.2em;
-} /* Red underline */
-h2 {
+}
+
+/* Red underline */
+h2,
+.markdown-body h2 {
   font-size: 1.7em;
   border-bottom: 1px solid #555555;
   padding-bottom: 0.2em;
-} /* Gray underline */
-h3 {
+}
+
+/* Gray underline */
+h3,
+.markdown-body h3 {
   font-size: 1.4em;
 }
-h4 {
+
+h4,
+.markdown-body h4 {
   font-size: 1.2em;
 }
-h5 {
+
+h5,
+.markdown-body h5 {
   font-size: 1.1em;
   color: #333333;
 }
-h6 {
+
+h6,
+.markdown-body h6 {
   font-size: 1em;
   color: #444444;
   font-style: italic;
@@ -114,7 +133,8 @@ strong {
 }
 
 /* Elements */
-blockquote {
+blockquote,
+.markdown-body blockquote {
   border-left: 3px solid #555555; /* Dark gray left border */
   padding: 0.5em 1em;
   margin: 1.5em 0;
@@ -126,7 +146,8 @@ blockquote p {
   margin-bottom: 0.5em;
 }
 
-hr {
+hr,
+.markdown-body hr {
   border: 0;
   height: 1px;
   background-color: #000000; /* Solid black line */
@@ -135,13 +156,18 @@ hr {
 
 /* Code Blocks */
 pre,
-code {
+code,
+.markdown-body pre,
+.markdown-body .highlight pre,
+.markdown-body code {
   font-family:
     'Courier New', Courier, monospace; /* Strict typewriter for code */
   font-size: 0.9em;
 }
 
-pre {
+pre,
+.markdown-body pre,
+.markdown-body .highlight pre {
   background-color: #eeeeee; /* Light gray background */
   padding: 1em;
   border: 1px solid #555555; /* Dark gray border */
@@ -149,52 +175,71 @@ pre {
   color: #000000; /* Black text */
 }
 
-code {
+code,
+.markdown-body code {
   background-color: #e0e0e0; /* Slightly darker gray for inline code */
   color: #000000;
   padding: 0.15em 0.3em;
   border: 1px dashed #777777; /* Dashed border for inline code */
 }
 
-pre code {
+pre code,
+.markdown-body pre code {
   background-color: transparent;
   border: none;
   padding: 0;
 }
 
 /* Minimal Syntax Highlighting (Stark) */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
+.highlight .c,
+.highlight .c1,
+.highlight .cm,
+.highlight .cd,
+.highlight .cp {
   color: #666666; /* Dark gray for comments */
   font-style: italic;
 }
 
-.token.punctuation {
+.highlight .p {
   color: #333333;
 }
 
-.token.keyword,
-.token.operator,
-.token.tag {
+.highlight .k,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt,
+.highlight .kv,
+.highlight .o,
+.highlight .ow,
+.highlight .nt {
   font-weight: bold; /* Only bolding for keywords/operators */
   color: #000000;
 }
 
-.token.string,
-.token.number,
-.token.boolean,
-.token.property,
-.token.constant,
-.token.symbol,
-.token.attr-name,
-.token.selector {
+.highlight .s,
+.highlight .s1,
+.highlight .s2,
+.highlight .sb,
+.highlight .dl,
+.highlight .m,
+.highlight .mi,
+.highlight .mf,
+.highlight .mh,
+.highlight .mo,
+.highlight .il,
+.highlight .kc,
+.highlight .py,
+.highlight .no,
+.highlight .ss,
+.highlight .na {
   color: #111111; /* Default black for most tokens */
 }
 
-.token.function,
-.token.class-name {
+.highlight .nf,
+.highlight .fm,
+.highlight .nc {
   color: #000000;
   font-weight: bold;
 }

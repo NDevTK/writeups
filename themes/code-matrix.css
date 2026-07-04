@@ -26,14 +26,21 @@ h2,
 h3,
 h4,
 h5,
-h6 {
+h6,
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
   font-family: inherit; /* Monospaced */
   margin-top: 1.6em;
   margin-bottom: 0.6em;
   font-weight: 500; /* Standard weight for monospaced, glow will provide emphasis */
 }
 
-h1 {
+h1,
+.markdown-body h1 {
   color: #ffb800; /* Contrasting Amber/Yellow */
   font-size: 2.2em;
   text-shadow:
@@ -42,7 +49,8 @@ h1 {
     0 0 9px rgba(255, 184, 0, 0.3);
 }
 
-h2 {
+h2,
+.markdown-body h2 {
   color: #39ff14; /* Brighter Green */
   font-size: 1.9em;
   text-shadow:
@@ -50,18 +58,22 @@ h2 {
     0 0 6px rgba(57, 255, 20, 0.5);
 }
 
-h3 {
+h3,
+.markdown-body h3 {
   color: #00ff41; /* Main Green */
   font-size: 1.6em;
 }
 
-h4 {
+h4,
+.markdown-body h4 {
   color: #00dd30; /* Slightly dimmer green */
   font-size: 1.3em;
 }
 
 h5,
-h6 {
+h6,
+.markdown-body h5,
+.markdown-body h6 {
   color: #00cc2a; /* Even dimmer green */
   font-size: 1.1em;
 }
@@ -88,7 +100,8 @@ a:focus {
 }
 
 /* Elements */
-blockquote {
+blockquote,
+.markdown-body blockquote {
   border-left: 3px solid #ffb800; /* Amber accent */
   background-color: rgba(10, 25, 10, 0.4); /* Darker, semi-transparent green */
   padding: 0.8em 1.2em;
@@ -101,7 +114,8 @@ blockquote p {
   margin-bottom: 0.5em;
 }
 
-hr {
+hr,
+.markdown-body hr {
   border: 0;
   height: 1px;
   background-color: #00ff41; /* Glowing Green */
@@ -113,13 +127,18 @@ hr {
 
 /* Code Blocks */
 pre,
-code {
+code,
+.markdown-body pre,
+.markdown-body .highlight pre,
+.markdown-body code {
   font-family: inherit; /* Monospaced */
   font-size: 0.95em; /* Relative to body's 15px */
   text-shadow: 0 0 2px rgba(0, 255, 65, 0.4); /* Subtle glow for code */
 }
 
-pre {
+pre,
+.markdown-body pre,
+.markdown-body .highlight pre {
   background-color: rgba(10, 20, 10, 0.6); /* Semi-transparent dark overlay */
   padding: 1em;
   border-radius: 2px; /* Minimal radius for a blocky feel */
@@ -129,14 +148,16 @@ pre {
   color: #39ff14; /* Brighter green for base code text */
 }
 
-code {
+code,
+.markdown-body code {
   background-color: rgba(10, 30, 10, 0.5); /* Slightly different for inline */
   color: #39ff14;
   padding: 0.2em 0.4em;
   border-radius: 2px;
 }
 
-pre code {
+pre code,
+.markdown-body pre code {
   background-color: transparent;
   color: inherit;
   padding: 0;
@@ -146,71 +167,86 @@ pre code {
 }
 
 /* Basic Syntax Highlighting (Matrix-themed) */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
+.highlight .c,
+.highlight .c1,
+.highlight .cm,
+.highlight .cd,
+.highlight .cp {
   color: #008820; /* Dim, dark green for comments */
   text-shadow: none;
 }
 
-.token.punctuation {
+.highlight .p {
   color: #00ff41; /* Main green */
 }
 
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
+.highlight .py,
+.highlight .nt,
+.highlight .kc,
+.highlight .m,
+.highlight .mi,
+.highlight .mf,
+.highlight .mh,
+.highlight .mo,
+.highlight .il,
+.highlight .no,
+.highlight .ss,
+.highlight .gd {
   color: #ffb800; /* Amber */
   text-shadow:
     0 0 2px #ffb800,
     0 0 4px rgba(255, 184, 0, 0.4);
 }
 
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
+.highlight .na,
+.highlight .s,
+.highlight .s1,
+.highlight .s2,
+.highlight .sb,
+.highlight .dl,
+.highlight .sc,
+.highlight .nb,
+.highlight .bp,
+.highlight .gi {
   color: #00ffff; /* Cyan */
   text-shadow:
     0 0 2px #00ffff,
     0 0 4px rgba(0, 255, 255, 0.4);
 }
 
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
+.highlight .o,
+.highlight .ow,
+.highlight .ni {
   color: #39ff14; /* Bright Green */
 }
 
-.token.atrule,
-.token.attr-value,
-.token.keyword {
+.highlight .k,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt,
+.highlight .kv {
   color: #f0f; /* Neon Magenta/Fuchsia */
   text-shadow:
     0 0 2px #f0f,
     0 0 4px rgba(255, 0, 255, 0.4);
 }
 
-.token.function,
-.token.class-name {
+.highlight .nf,
+.highlight .fm,
+.highlight .nc {
   color: #ffff00; /* Neon Yellow */
   text-shadow:
     0 0 2px #ffff00,
     0 0 4px rgba(255, 255, 0, 0.4);
 }
 
-.token.regex,
-.token.important,
-.token.variable {
+.highlight .sr,
+.highlight .nv,
+.highlight .vg,
+.highlight .vi,
+.highlight .vc {
   color: #ff6000; /* Bright Orange */
   text-shadow:
     0 0 2px #ff6000,
@@ -245,4 +281,16 @@ textarea {
 
 body {
   background-color: black;
+}
+
+/* Tables: the theme never styled them, so primer's white rows and light
+   borders bled through. Let the dark background show instead. */
+.markdown-body table tr,
+.markdown-body table tr:nth-child(2n) {
+  background-color: transparent;
+}
+
+.markdown-body table th,
+.markdown-body table td {
+  border-color: rgba(0, 255, 70, 0.35);
 }

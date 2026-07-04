@@ -17,19 +17,30 @@ h2,
 h3,
 h4,
 h5,
-h6 {
+h6,
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
   color: #007bff; /* Bright blue */
   margin-top: 1.5em;
   margin-bottom: 0.5em;
 }
 
-h1 {
+h1,
+.markdown-body h1 {
   font-size: 2.2em;
 }
-h2 {
+
+h2,
+.markdown-body h2 {
   font-size: 1.8em;
 }
-h3 {
+
+h3,
+.markdown-body h3 {
   font-size: 1.5em;
 }
 
@@ -46,14 +57,16 @@ a:focus {
 }
 
 /* Accent Colors */
-blockquote {
+blockquote,
+.markdown-body blockquote {
   border-left: 4px solid #fd7e14; /* Warm orange accent for blockquotes */
   padding-left: 1em;
   margin-left: 0;
   color: #6c757d; /* Softer text color for blockquotes */
 }
 
-hr {
+hr,
+.markdown-body hr {
   border: 0;
   height: 1px;
   background-color: #ced4da; /* Light gray for horizontal rules */
@@ -63,84 +76,106 @@ hr {
 
 /* Code Blocks */
 pre,
-code {
+code,
+.markdown-body pre,
+.markdown-body .highlight pre,
+.markdown-body code {
   font-family:
     'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; /* Monospace font stack for code */
   font-size: 0.9em;
 }
 
-pre {
+pre,
+.markdown-body pre,
+.markdown-body .highlight pre {
   background-color: #e9ecef; /* Slightly darker shade than body background */
   padding: 1em;
   border-radius: 4px;
   overflow-x: auto; /* Allow horizontal scrolling for long code lines */
 }
 
-code {
+code,
+.markdown-body code {
   background-color: #e9ecef; /* Consistent background for inline code */
   padding: 0.2em 0.4em;
   border-radius: 3px;
 }
 
-pre code {
+pre code,
+.markdown-body pre code {
   background-color: transparent; /* Avoid double background for code within pre */
   padding: 0;
   border-radius: 0;
 }
 
 /* Basic Syntax Highlighting (optional, can be expanded) */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
+.highlight .c,
+.highlight .c1,
+.highlight .cm,
+.highlight .cd,
+.highlight .cp {
   color: #6c757d; /* Gray for comments */
 }
 
-.token.punctuation {
+.highlight .p {
   color: #212529; /* Default text color for punctuation */
 }
 
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
+.highlight .py,
+.highlight .nt,
+.highlight .kc,
+.highlight .m,
+.highlight .mi,
+.highlight .mf,
+.highlight .mh,
+.highlight .mo,
+.highlight .il,
+.highlight .no,
+.highlight .ss,
+.highlight .gd {
   color: #dc3545; /* Red for properties, tags, etc. */
 }
 
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
+.highlight .na,
+.highlight .s,
+.highlight .s1,
+.highlight .s2,
+.highlight .sb,
+.highlight .dl,
+.highlight .sc,
+.highlight .nb,
+.highlight .bp,
+.highlight .gi {
   color: #28a745; /* Green for selectors, strings, etc. */
 }
 
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
+.highlight .o,
+.highlight .ow,
+.highlight .ni {
   color: #fd7e14; /* Orange for operators, entities, etc. */
 }
 
-.token.atrule,
-.token.attr-value,
-.token.keyword {
+.highlight .k,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt,
+.highlight .kv {
   color: #007bff; /* Blue for at-rules, keywords */
 }
 
-.token.function,
-.token.class-name {
+.highlight .nf,
+.highlight .fm,
+.highlight .nc {
   color: #6f42c1; /* Purple for functions, class names */
 }
 
-.token.regex,
-.token.important,
-.token.variable {
+.highlight .sr,
+.highlight .nv,
+.highlight .vg,
+.highlight .vi,
+.highlight .vc {
   color: #e83e8c; /* Pink for regex, important, variables */
 }
 
