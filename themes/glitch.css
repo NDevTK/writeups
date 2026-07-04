@@ -11,14 +11,19 @@
   padding: 2em;
   overflow-x: hidden; /* Prevent horizontal scrollbars from subtle glitch effects */
 }
-
 /* Typography */
 h1,
 h2,
 h3,
 h4,
 h5,
-h6 {
+h6,
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
   font-family:
     'Roboto', 'Open Sans', Arial, sans-serif; /* Stick to standard sans-serif for readability */
   color: #e0e0e0;
@@ -26,31 +31,38 @@ h6 {
   margin-bottom: 0.5em;
   font-weight: 600;
 }
-
-h1 {
+h1,
+.markdown-body h1 {
   font-size: 2.3em;
   text-shadow:
     1px 0 #ff00ff,
     -1px 0 #00ffff;
-} /* Magenta/Cyan text shadow glitch */
-h2 {
+}
+/* Magenta/Cyan text shadow glitch */
+h2,
+.markdown-body h2 {
   font-size: 1.9em;
   text-shadow:
     1px 0 #39ff14,
     -1px 0 #ff00ff;
-} /* Green/Magenta text shadow glitch */
-h3 {
+}
+/* Green/Magenta text shadow glitch */
+h3,
+.markdown-body h3 {
   font-size: 1.6em;
 }
-h4 {
+h4,
+.markdown-body h4 {
   font-size: 1.3em;
   color: #bbbbbb;
 }
-h5 {
+h5,
+.markdown-body h5 {
   font-size: 1.15em;
   color: #aaaaaa;
 }
-h6 {
+h6,
+.markdown-body h6 {
   font-size: 1em;
   color: #999999;
   font-style: italic;
@@ -94,9 +106,9 @@ a:focus {
     text-shadow: 1px 0 #ff00ff;
   }
 }
-
 /* Elements */
-blockquote {
+blockquote,
+.markdown-body blockquote {
   border-left: 3px solid #ff00ff; /* Magenta */
   background-color: rgba(30, 0, 30, 0.2); /* Dark magenta tint */
   padding: 0.8em 1.2em;
@@ -107,8 +119,8 @@ blockquote {
 blockquote p {
   margin-bottom: 0.5em;
 }
-
-hr {
+hr,
+.markdown-body hr {
   border: 0;
   height: 2px;
   margin: 2.5em 0;
@@ -132,16 +144,19 @@ hr {
     background-position: 30px 0;
   } /* 2 * 15px segment */
 }
-
 /* Code Blocks */
 pre,
-code {
+code,
+.markdown-body pre,
+.markdown-body .highlight pre,
+.markdown-body code {
   font-family:
     'VT323', 'Courier New', Courier, monospace; /* Digital/Pixel font if available, fallback to Courier */
   font-size: 0.95em;
 }
-
-pre {
+pre,
+.markdown-body pre,
+.markdown-body .highlight pre {
   background-color: #1a1a1a; /* Dark gray, different from body */
   padding: 1em;
   border: 1px solid #39ff14; /* Lime Green border */
@@ -168,8 +183,8 @@ pre::before {
   pointer-events: none;
   z-index: 1;
 }
-
-pre code {
+pre code,
+.markdown-body pre code {
   /* Code inside pre should inherit pre's styles */
   background-color: transparent;
   color: inherit;
@@ -180,68 +195,75 @@ pre code {
   z-index: 2; /* Above scanlines */
   position: relative; /* Ensure it's rendered above ::before */
 }
-
 /* Inline code */
-code {
+code,
+.markdown-body code {
   background-color: #2a2a2a; /* Slightly lighter dark bg for inline code */
   color: #00ffff; /* Electric Blue */
   padding: 0.2em 0.4em;
   border-radius: 2px;
 }
-
 /* Syntax Highlighting (Glitch-themed) */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
+.highlight .c,
+.highlight .c1,
+.highlight .cm,
+.highlight .cd,
+.highlight .cp {
   color: #666666; /* Muted gray for comments */
 }
-
-.token.punctuation {
+.highlight .p {
   color: #cccccc; /* Default text color */
 }
-
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
+.highlight .py,
+.highlight .nt,
+.highlight .kc,
+.highlight .m,
+.highlight .mi,
+.highlight .mf,
+.highlight .mh,
+.highlight .mo,
+.highlight .il,
+.highlight .no,
+.highlight .ss,
+.highlight .gd {
   color: #ff00ff; /* Magenta */
 }
-
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
+.highlight .na,
+.highlight .s,
+.highlight .s1,
+.highlight .s2,
+.highlight .sb,
+.highlight .dl,
+.highlight .sc,
+.highlight .nb,
+.highlight .bp,
+.highlight .gi {
   color: #39ff14; /* Lime Green */
 }
-
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
+.highlight .o,
+.highlight .ow,
+.highlight .ni {
   color: #00ffff; /* Electric Blue */
 }
-
-.token.atrule,
-.token.attr-value,
-.token.keyword {
+.highlight .k,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt,
+.highlight .kv {
   color: #ffff00; /* Yellow - another contrasting glitch color */
 }
-
-.token.function,
-.token.class-name {
+.highlight .nf,
+.highlight .fm,
+.highlight .nc {
   color: #ff8c00; /* Orange - for variety */
 }
-
-.token.regex,
-.token.important,
-.token.variable {
+.highlight .sr,
+.highlight .nv,
+.highlight .vg,
+.highlight .vi,
+.highlight .vc {
   color: #f0f; /* Re-use Magenta or another distinct color */
 }
 
@@ -279,7 +301,19 @@ body {
 @media (prefers-reduced-motion: reduce) {
   hr,
   a:hover,
-  a:focus {
+  a:focus,
+  .markdown-body hr {
     animation: none;
   }
+}
+
+/* Tables: the theme never styled them, so primer's white rows and light
+   borders bled through. Let the dark background show instead. */
+.markdown-body table tr,
+.markdown-body table tr:nth-child(2n) {
+  background-color: transparent;
+}
+.markdown-body table th,
+.markdown-body table td {
+  border-color: rgba(224, 224, 224, 0.3);
 }

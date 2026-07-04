@@ -3,19 +3,22 @@ body {
   color: #e0f4f4; /* Off-white/light cyan */
   font-family: Arial, sans-serif;
 }
-
-h1 {
+h1,
+.markdown-body h1 {
   color: #90d0d8; /* Lighter blue */
 }
-
-h2 {
+h2,
+.markdown-body h2 {
   color: #7abcc4; /* Seafoam green */
 }
-
 h3,
 h4,
 h5,
-h6 {
+h6,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
   color: #a0d0d8; /* Lighter shades of blue for other headings */
 }
 
@@ -33,79 +36,99 @@ a:hover {
   color: #ffff80; /* Bright yellow on hover */
   text-decoration: underline; /* Optional: or a wave animation */
 }
-
-blockquote {
+blockquote,
+.markdown-body blockquote {
   background: rgba(15, 68, 78, 0.7); /* Semi-transparent darker teal */
   border-left: 4px solid #ff7f50; /* Coral */
   padding: 10px;
   margin: 10px;
 }
-
 pre,
-code {
+code,
+.markdown-body pre,
+.markdown-body .highlight pre,
+.markdown-body code {
   background: #072428; /* Very dark desaturated cyan */
   color: #c0e0e0;
   padding: 5px;
   border-radius: 4px;
   font-family: 'Courier New', Courier, monospace;
 }
-
 /* Basic syntax highlighting placeholders */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
+.highlight .c,
+.highlight .c1,
+.highlight .cm,
+.highlight .cd,
+.highlight .cp {
   color: #6a9955; /* Green */
 }
-
-.token.punctuation {
+.highlight .p {
   color: #d4d4d4; /* Light gray */
 }
-
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
+.highlight .py,
+.highlight .nt,
+.highlight .kc,
+.highlight .m,
+.highlight .mi,
+.highlight .mf,
+.highlight .mh,
+.highlight .mo,
+.highlight .il,
+.highlight .no,
+.highlight .ss,
+.highlight .gd {
   color: #569cd6; /* Blue */
 }
-
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
+.highlight .na,
+.highlight .s,
+.highlight .s1,
+.highlight .s2,
+.highlight .sb,
+.highlight .dl,
+.highlight .sc,
+.highlight .nb,
+.highlight .bp,
+.highlight .gi {
   color: #ce9178; /* Orange/Coral */
 }
-
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
+.highlight .o,
+.highlight .ow,
+.highlight .ni {
   color: #dcdcaa; /* Yellow */
 }
-
-.token.atrule,
-.token.attr-value,
-.token.keyword {
+.highlight .k,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt,
+.highlight .kv {
   color: #c586c0; /* Purple */
 }
-
-.token.function,
-.token.class-name {
+.highlight .nf,
+.highlight .fm,
+.highlight .nc {
   color: #4ec9b0; /* Teal */
 }
-
-.token.regex,
-.token.important,
-.token.variable {
+.highlight .sr,
+.highlight .nv,
+.highlight .vg,
+.highlight .vi,
+.highlight .vc {
   color: #d16969; /* Reddish */
 }
 
 .highlight span {
   color: purple;
+}
+
+/* Tables: the theme never styled them, so primer's white rows and light
+   borders bled through. Let the dark background show instead. */
+.markdown-body table tr,
+.markdown-body table tr:nth-child(2n) {
+  background-color: transparent;
+}
+.markdown-body table th,
+.markdown-body table td {
+  border-color: rgba(122, 188, 196, 0.45);
 }
