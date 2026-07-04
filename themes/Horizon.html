@@ -40,7 +40,12 @@
         without changing it, stratus/cumulus/cumulonimbus height
         profiles picked by the reported WMO code, adaptive
         coarse-to-fine marching, Beer-powder sun lighting, dual-lobe
-        Henyey-Greenstein phase (only thin cirrus stays 2D, as in the
+        Henyey-Greenstein phase - reconstructed temporally exactly as
+        shipped in HZD (quarter-res buffer, 1-of-16 Bayer refresh,
+        reprojection, golden-ratio jitter integration) with a terrain
+        depth prepass so cloud passes IN FRONT of far ridges, and
+        nearest-depth upsampling (Jansen & Bavoil 2010) keeping
+        silhouettes clean (only thin cirrus stays 2D, as in the
         research)
       - the snowline tracks the real freezing level; the treeline follows
         Körner & Paulsen (2004); deciduous leaves follow Hopkins' law
@@ -157,7 +162,7 @@
         sunTransmittanceJS
       } from './horizon/atmosphere.js';
       import {
-        createCloudDeck,
+        createCloudSystem,
         generateCloudTextures
       } from './horizon/clouds.js';
 
@@ -843,10 +848,12 @@
       const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
       camera.layers.enable(2);
 
+      let sizeCloudTargets = null;
       function resize() {
         renderer.setSize(innerWidth, innerHeight);
         camera.aspect = innerWidth / innerHeight;
         camera.updateProjectionMatrix();
+        if (sizeCloudTargets) sizeCloudTargets();
       }
       addEventListener('resize', resize);
       resize();
@@ -1407,6 +1414,7 @@
         const terrain = new THREE.Mesh(geo, terrainMat);
         terrain.castShadow = true;
         terrain.receiveShadow = true;
+        terrain.layers.enable(3); // cloud depth prepass
         ground.add(terrain);
 
         // Trees: inside the real OSM woods when we have them, below the
@@ -1889,11 +1897,14 @@
 
       // Clouds in the three layers the weather model actually reports
       // (open-meteo cloud_cover_low/mid/high): the low cumulus deck and
-      // the mid altostratus deck are both volumetric Nubis slabs
-      // (clouds.js, after Schneider & Vos) sharing one noise set - the
-      // mid deck gets a stratiform profile and the genuinely lower
-      // extinction of altostratus, riding the real 700 hPa wind. Only
-      // thin cirrus stays a 2D sheet, as in the research.
+      // the mid altostratus deck march in ONE volumetric pass
+      // (clouds.js, after Schneider & Vos) with temporal reconstruction
+      // exactly as shipped in Horizon Zero Dawn - a quarter-res buffer,
+      // one 4x4 Bayer pixel marched per frame, the rest reprojected -
+      // plus a terrain depth prepass so the march clips against the
+      // real ridges and the depth-aware upsample never bleeds cloud
+      // across a silhouette. Only thin cirrus stays a 2D sheet, as in
+      // the research.
       const cloudGroup = new THREE.Group();
       const cirrusMat = new THREE.MeshBasicMaterial({
         color: '#ffffff',
@@ -1902,12 +1913,22 @@
         depthWrite: false
       });
       applyAerial(cirrusMat);
-      const cloudDeck = createCloudDeck();
-      scene.add(cloudDeck.mesh);
-      const cloudDeckMid = createCloudDeck();
-      cloudDeckMid.uniforms.sigma.value = 0.45;
-      cloudDeckMid.uniforms.cType.value = 0.15;
-      scene.add(cloudDeckMid.mesh);
+      const cloudSys = createCloudSystem(renderer);
+      record(
+        'Temporal cloud reconstruction',
+        'quarter-res march · 1/16 Bayer refresh · reprojection'
+      );
+      const cloudDepthRT = new THREE.WebGLRenderTarget(2, 2, {
+        depthTexture: new THREE.DepthTexture(2, 2)
+      });
+      const depthOnlyMat = new THREE.MeshBasicMaterial({colorWrite: false});
+      sizeCloudTargets = () => {
+        const s = renderer.getDrawingBufferSize(new THREE.Vector2());
+        cloudDepthRT.setSize(s.x, s.y);
+        cloudSys.setSize(s.x, s.y);
+      };
+      sizeCloudTargets();
+      let cloudsActive = false;
       let cloudTexPending = false;
       const cloudsHigh = [];
       for (let i = 0; i < 7; i++) {
@@ -1988,6 +2009,7 @@
         opacity: 0
       });
       const precip = new THREE.Points(precipGeo, precipMat);
+      precip.layers.set(4); // drawn in the post-cloud overlay pass
       scene.add(precip);
 
       // ---------- physical snow (Rapier, loaded only when it snows) ----------
@@ -2019,6 +2041,7 @@
       );
       flakeMesh.count = 0;
       flakeMesh.frustumCulled = false;
+      flakeMesh.layers.set(4); // falls in front of the far cloud decks
       scene.add(flakeMesh);
 
       async function initSnowSim() {
@@ -2517,20 +2540,34 @@
           cloudTexPending = true;
           setTimeout(() => {
             const tex = generateCloudTextures();
-            for (const deck of [cloudDeck, cloudDeckMid]) {
-              deck.uniforms.baseTex.value = tex.baseTex;
-              deck.uniforms.detailTex.value = tex.detailTex;
-            }
+            cloudSys.shared.baseTex.value = tex.baseTex;
+            cloudSys.shared.detailTex.value = tex.detailTex;
             record(
               'Nubis cloud noise (generated)',
               'Perlin-Worley 64³ + Worley 32³, tileable'
             );
           }, 60);
         }
-        if (cloudDeck.uniforms.baseTex.value) {
-          const cu = cloudDeck.uniforms;
-          cloudDeck.mesh.visible = cLow > 2;
-          cu.cov.value = THREE.MathUtils.clamp(cLow / 100, 0, 0.95);
+        cloudsActive =
+          !!cloudSys.shared.baseTex.value && (cLow > 2 || cMid > 2);
+        if (cloudsActive) {
+          cloudSys.shared.sunDirW.value.copy(sunVec);
+          cloudSys.shared.sunCol.value
+            .copy(sunLight.color)
+            .multiplyScalar(Math.max(sunLight.intensity, 0.02) * 0.55);
+          // Cloud ambient is the same integrated sky the terrain gets.
+          if (atmo.ok)
+            cloudSys.shared.ambCol.value
+              .copy(ambient.color)
+              .multiplyScalar(0.6);
+          else
+            cloudSys.shared.ambCol.value
+              .copy(tmpB)
+              .multiplyScalar(0.22 + day * 0.5);
+
+          const lu = cloudSys.uniformsLow;
+          lu.cov.value =
+            cLow > 2 ? THREE.MathUtils.clamp(cLow / 100, 0, 0.95) : 0;
           // Cloud TYPE from the reported WMO code: overcast, fog and
           // drizzle/steady-rain codes mean a flat stratiform sheet,
           // shower and thunderstorm codes mean towering convection,
@@ -2539,37 +2576,23 @@
           const wmo = state.code || 0;
           const cTypeT =
             wmo >= 80 ? 1.85 : wmo === 3 || (wmo >= 45 && wmo <= 67) ? 0.15 : 1;
-          cu.cType.value += (cTypeT - cu.cType.value) * Math.min(dt * 0.5, 1);
-          cu.yBase.value = yCloud;
-          cu.yTop.value = yCloud + 8 + cu.cType.value * 9;
-          cu.sunDirW.value.copy(sunVec);
-          cu.sunCol.value
-            .copy(sunLight.color)
-            .multiplyScalar(Math.max(sunLight.intensity, 0.02) * 0.55);
-          // Cloud ambient is the same integrated sky the terrain gets.
-          if (atmo.ok) cu.ambCol.value.copy(ambient.color).multiplyScalar(0.6);
-          else cu.ambCol.value.copy(tmpB).multiplyScalar(0.22 + day * 0.5);
-          cu.wOff.value.x += windV.x * state.wind * 0.06 * dt;
-          cu.wOff.value.y += windV.z * state.wind * 0.06 * dt;
-        }
-        // Mid deck: altostratus at the 700 hPa level - stratiform
-        // profile, lower liquid water content (sigma set at creation),
-        // advected by the REAL wind at its own altitude.
-        if (cloudDeckMid.uniforms.baseTex.value) {
-          const cm = cloudDeckMid.uniforms;
-          cloudDeckMid.mesh.visible = cMid > 2;
-          cm.cov.value = THREE.MathUtils.clamp(cMid / 100, 0, 0.95);
-          cm.yBase.value = Math.max(16 * Math.asinh(8), yCloud + 16);
-          cm.yTop.value = cm.yBase.value + 6;
-          cm.sunDirW.value.copy(sunVec);
-          cm.sunCol.value
-            .copy(sunLight.color)
-            .multiplyScalar(Math.max(sunLight.intensity, 0.02) * 0.55);
-          if (atmo.ok) cm.ambCol.value.copy(ambient.color).multiplyScalar(0.6);
-          else cm.ambCol.value.copy(tmpB).multiplyScalar(0.22 + day * 0.5);
+          lu.cType.value += (cTypeT - lu.cType.value) * Math.min(dt * 0.5, 1);
+          lu.yBase.value = yCloud;
+          lu.yTop.value = yCloud + 8 + lu.cType.value * 9;
+          lu.wOff.value.x += windV.x * state.wind * 0.06 * dt;
+          lu.wOff.value.y += windV.z * state.wind * 0.06 * dt;
+
+          // Mid deck: altostratus at the 700 hPa level - stratiform
+          // profile, lower liquid water content, advected by the REAL
+          // wind at its own altitude.
+          const mu = cloudSys.uniformsMid;
+          mu.cov.value =
+            cMid > 2 ? THREE.MathUtils.clamp(cMid / 100, 0, 0.95) : 0;
+          mu.yBase.value = Math.max(16 * Math.asinh(8), yCloud + 16);
+          mu.yTop.value = mu.yBase.value + 6;
           const w700 = state.wind700 ?? state.wind;
-          cm.wOff.value.x += windVMid.x * w700 * 0.06 * dt;
-          cm.wOff.value.y += windVMid.z * w700 * 0.06 * dt;
+          mu.wOff.value.x += windVMid.x * w700 * 0.06 * dt;
+          mu.wOff.value.y += windVMid.z * w700 * 0.06 * dt;
         }
         driftLayer(
           cloudsHigh,
@@ -2858,7 +2881,33 @@
               ' falling';
         }
 
+        if (cloudsActive) {
+          // Terrain depth prepass (cheap: colour writes off, override
+          // material): gives the cloud march its scene depth and the
+          // composite its bilateral weights.
+          const mask = camera.layers.mask;
+          scene.overrideMaterial = depthOnlyMat;
+          camera.layers.mask = 1 << 3;
+          renderer.setRenderTarget(cloudDepthRT);
+          renderer.render(scene, camera);
+          renderer.setRenderTarget(null);
+          camera.layers.mask = mask;
+          scene.overrideMaterial = null;
+          cloudSys.render(camera, cloudDepthRT.depthTexture);
+        }
         renderer.render(scene, camera);
+        if (cloudsActive) cloudSys.composite();
+        // Precipitation overlays the composite (rain and snow fall in
+        // FRONT of the far cloud decks), still depth-tested against the
+        // scene via the preserved depth buffer.
+        {
+          const mask = camera.layers.mask;
+          camera.layers.mask = 1 << 4;
+          renderer.autoClear = false;
+          renderer.render(scene, camera);
+          renderer.autoClear = true;
+          camera.layers.mask = mask;
+        }
       }
 
       (async () => {
