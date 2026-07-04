@@ -11,10 +11,8 @@ import {
   float,
   fract,
   max,
-  min,
   mix,
   normalize,
-  output,
   positionWorld,
   pow,
   sin,
@@ -23,8 +21,7 @@ import {
   transformNormalToView,
   uniform,
   vec2,
-  vec3,
-  vec4
+  vec3
 } from 'three/tsl';
 
 /**
@@ -47,10 +44,9 @@ import {
  * the single GLSL terrainColor() into separate nodes loses nothing.
  */
 
-export function createTerrainNodeMaterial(normalMapTex, aerialLutTex) {
+export function createTerrainNodeMaterial(normalMapTex, aerial) {
   // TextureNodes are part of the graph; rebakes swap via node.value.
   const normalTexNode = texture(normalMapTex);
-  const aerialTexNode = texture(aerialLutTex);
   const u = {
     uWorldSize: uniform(280),
     uCenterElev: uniform(300),
@@ -60,14 +56,7 @@ export function createTerrainNodeMaterial(normalMapTex, aerialLutTex) {
     uWindMs: uniform(3),
     uWindVec: uniform(new Vector2(1, 0)),
     uSunDirW: uniform(new Vector3(0, 1, 0)),
-    uSunCol: uniform(new Color(0, 0, 0)),
-    // aerial perspective + Koschmieder
-    uAerialMaxU: uniform(450),
-    uSunAzV: uniform(new Vector2(1, 0)),
-    uAerialExp: uniform(0),
-    uFogColor: uniform(new Color(0.86, 0.93, 0.97)),
-    uFogDensity: uniform(0.004),
-    uAerialOn: uniform(0)
+    uSunCol: uniform(new Color(0, 0, 0))
   };
 
   const thash = Fn(([p]) =>
@@ -214,30 +203,13 @@ export function createTerrainNodeMaterial(normalMapTex, aerialLutTex) {
   // `outgoingLight += vWet * seaSpec(vWp)`.
   const emissiveNode = seaSpec(positionWorld).mul(wet);
 
-  // Aerial perspective (Hillaire aerial LUT: rgb = inscatter,
-  // a = mean transmittance over (relative azimuth x distance)), then
-  // Koschmieder fog carrying the MEASURED visibility - applied to the
-  // lit output, same order as the GLSL fog hook.
-  const outputNode = Fn(() => {
-    const dir = positionWorld.sub(cameraPosition);
-    const d = dir.length();
-    const aerH = normalize(dir.xz.add(vec2(1e-6, 1e-6)));
-    const aerAz = dot(aerH, u.uSunAzV).clamp(-1, 1).acos().div(3.14159265);
-    const aer = aerialTexNode.sample(
-      vec2(aerAz, min(d.div(u.uAerialMaxU), 1.0))
-    );
-    const lit = output.rgb
-      .mul(mix(1.0, aer.a, u.uAerialOn))
-      .add(aer.rgb.mul(u.uAerialExp).mul(u.uAerialOn));
-    const kf = exp(d.mul(u.uFogDensity).pow(2).negate()).oneMinus();
-    return vec4(mix(lit, u.uFogColor, kf), output.a);
-  })();
-
   const mat = new MeshStandardNodeMaterial({metalness: 0});
   mat.colorNode = colorNode;
   mat.roughnessNode = roughnessNode;
   mat.normalNode = normalNode;
   mat.emissiveNode = emissiveNode;
-  mat.outputNode = outputNode;
-  return {material: mat, uniforms: u, normalTexNode, aerialTexNode};
+  // Aerial perspective + Koschmieder: the ONE shared hook from
+  // aerial-tsl.js, same graph every world material uses.
+  aerial.apply(mat);
+  return {material: mat, uniforms: u, normalTexNode};
 }

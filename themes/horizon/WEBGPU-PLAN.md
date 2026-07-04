@@ -3,8 +3,14 @@
 The goal: move Horizon.html from WebGLRenderer to three.js
 WebGPURenderer with the research passes (Hillaire atmosphere LUTs,
 Nubis cloud march, irradiance integral) running as real compute
-shaders — the way the papers themselves run — while keeping the WebGL2
-path working for browsers without WebGPU.
+shaders — the way the papers themselves run.
+
+This is a REPLACEMENT, not a parallel path: once the validation
+matrix is green on WebGPURenderer, the old WebGLRenderer code
+(onBeforeCompile hooks, ShaderMaterial passes, the GLSL CSM) is
+deleted. Browsers without WebGPU run the SAME node code on
+WebGPURenderer's WebGL2 backend — there is exactly one
+implementation of every piece of physics.
 
 ## Ground rules (do not relax these to "finish" a phase)
 
@@ -108,8 +114,21 @@ Scenes (all at Grindelwald unless noted):
     TSL constructors; `transformNormalToView` is object→view space
     (fine while the terrain mesh transform is identity — revisit if
     that changes).
-  - Next: aerial-fog TSL node shared across tree/drift materials;
-    `CSMShadowNode`; TSL Water/Sky with the Cox-Munk physics
-    re-applied; atmosphere + cloud passes as node render-target
-    passes; then the Horizon.html renderer switch and the full
-    matrix.
+  - Aerial fog extracted to `aerial-tsl.js` — ONE shared node graph
+    (and uniforms object) applied to every world material via
+    `aerial.apply(mat)`; terrain-tsl consumes it. Unit-validated on a
+    scene with the terrain plus instanced conifers sharing the hook.
+  - `CSMShadowNode.js` vendored (r185, node-based CSM: a shadow node
+    on ONE real light — sun colour/intensity stay on that light, no
+    mirrored cascade lights like the WebGL CSM). Validated in the
+    same scene: per-tree soft cascade shadows on the WebGL backend.
+    Usage: `sun.shadow.shadowNode = new CSMShadowNode(sun, {cascades:
+3, maxFar, mode: 'practical'})`, `csm.fade = true`;
+    `updateFrustums()` on resize.
+  - Next: TSL Water/Sky with the Cox-Munk physics re-applied;
+    atmosphere + cloud passes as node render-target passes (then
+    compute in phase 3); moon/aurora/optics/star ShaderMaterials →
+    NodeMaterial equivalents; then the Horizon.html renderer switch,
+    full matrix, and DELETION of the WebGL-only code paths
+    (onBeforeCompile hooks, GLSL CSM trio, Sky.js/Water.js if fully
+    replaced).
