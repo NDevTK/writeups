@@ -26,7 +26,12 @@
       - fog obeys the Koschmieder relation on the MEASURED visibility;
         sun glitter follows Cox & Munk (1954) slope statistics; cloud
         cover renders in the model's real low/mid/high layers, each deck
-        riding its own real wind (surface, 700hPa, 250hPa jet)
+        riding its own real wind (surface, 700hPa, 250hPa jet); the low
+        deck is a raymarched volumetric cloudscape after Schneider & Vos
+        (SIGGRAPH 2015): Perlin-Worley density carved by the real cover
+        at the real LCL, Beer-powder sun lighting, dual-lobe
+        Henyey-Greenstein phase (high ice cloud stays 2D, as in the
+        research)
       - the snowline tracks the real freezing level; the treeline follows
         Körner & Paulsen (2004); deciduous leaves follow Hopkins' law
         (real date, latitude and elevation), so autumn arrives when it
@@ -141,6 +146,10 @@
         createAtmosphere,
         sunTransmittanceJS
       } from './horizon/atmosphere.js';
+      import {
+        createCloudDeck,
+        generateCloudTextures
+      } from './horizon/clouds.js';
 
       const params = new URL(location.href).searchParams;
       const reduceMotion = matchMedia(
@@ -1678,8 +1687,12 @@
         cloudGroup.add(blob);
         return blob;
       }
-      const cloudsLow = [];
-      for (let i = 0; i < 14; i++) cloudsLow.push(makeBlob(4, 6.5, 0.45));
+      // The low deck is volumetric (clouds.js, after Schneider & Vos):
+      // Perlin-Worley density carved by the real cover at the real LCL.
+      // Noise textures generate lazily on the first cloudy frame.
+      const cloudDeck = createCloudDeck();
+      scene.add(cloudDeck.mesh);
+      let cloudTexPending = false;
       const cloudsMid = [];
       for (let i = 0; i < 9; i++) cloudsMid.push(makeBlob(5, 9, 0.22));
       const cloudsHigh = [];
@@ -2241,7 +2254,35 @@
             if (c.position.z < -260) c.position.z = 260;
           });
         };
-        driftLayer(cloudsLow, cLow, yCloud, windV, state.wind);
+        // Volumetric low deck: real cover carves the density field, the
+        // real wind advects it, the physically transmitted sun lights it.
+        if (cLow > 3 && !cloudTexPending) {
+          cloudTexPending = true;
+          setTimeout(() => {
+            const tex = generateCloudTextures();
+            cloudDeck.uniforms.baseTex.value = tex.baseTex;
+            cloudDeck.uniforms.detailTex.value = tex.detailTex;
+            cloudDeck.mesh.visible = true;
+            record(
+              'Nubis cloud noise (generated)',
+              'Perlin-Worley 64³ + Worley 32³, tileable'
+            );
+          }, 60);
+        }
+        if (cloudDeck.uniforms.baseTex.value) {
+          const cu = cloudDeck.uniforms;
+          cloudDeck.mesh.visible = cLow > 2;
+          cu.cov.value = THREE.MathUtils.clamp(cLow / 100, 0, 0.95);
+          cu.yBase.value = yCloud;
+          cu.yTop.value = yCloud + 14;
+          cu.sunDirW.value.copy(sunVec);
+          cu.sunCol.value
+            .copy(sunLight.color)
+            .multiplyScalar(Math.max(sunLight.intensity, 0.02) * 0.55);
+          cu.ambCol.value.copy(tmpB).multiplyScalar(0.22 + day * 0.5);
+          cu.wOff.value.x += windV.x * state.wind * 0.06 * dt;
+          cu.wOff.value.y += windV.z * state.wind * 0.06 * dt;
+        }
         driftLayer(
           cloudsMid,
           cMid,
