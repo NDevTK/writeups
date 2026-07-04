@@ -155,8 +155,23 @@ Scenes (all at Grindelwald unless noted):
     fp16 bit patterns (decode: 15360 = 1.0); two-canvas comparison
     pages mis-size the second canvas — use one full-window page per
     renderer and diff screenshots.
-  - Next: TSL Water/Sky with the Cox-Munk physics re-applied; cloud
-    reconstruction as node passes
+  - Clouds ported to `clouds-tsl.js` — DONE at the A/B level: the
+    noise physics extracted to renderer-agnostic `cloud-noise.js`
+    (one definition, both implementations wrap it), the full
+    temporal-reconstruction pipeline as node code (Bayer via the
+    closed form 4\*((3(y&1))^(2(x&1))) + ((3((y>>1)&1))^(2((x>>1)&1)))
+    instead of a const array; history reprojection with the top-origin
+    uv flip at NDC conversions; depth-clamped march; nearest-depth
+    composite with premultiplied blending). Deterministic warm-frame
+    A/B vs the GLSL system: mean abs diff 1.25/255, residual explained
+    by per-pixel jitter orientation (gl_FragCoord bottom-origin vs
+    screenCoordinate top-origin) and fp. Further conventions pinned:
+    depth-texture sample() is top-origin like colour; scene depth
+    prepasses need no flip when sampled at uv(); Color uniforms upload
+    RAW (no implicit sRGB conversion); an A/B page's scene.background
+    bleeds through semi-transparent composites differently per output
+    colorspace - compare over black.
+  - Next: TSL Water/Sky with the Cox-Munk physics re-applied
     (then compute in phase 3); moon/aurora/optics/star ShaderMaterials
     → NodeMaterial equivalents; then the Horizon.html renderer switch,
     full matrix, and DELETION of the WebGL-only code paths
