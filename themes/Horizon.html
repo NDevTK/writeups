@@ -35,14 +35,19 @@
         heightfield of the local terrain and with settled flakes, so
         drifts accumulate while the page is open and melt when the real
         temperature rises
+      - sky turbidity and haze come from measured air quality (open-meteo
+        AOD and PM2.5); trees stand inside the real OSM forest polygons
+        around you; the sea is a reflecting three.js Water plane whose
+        wave energy follows the real sea state; constellation figures
+        (d3-celestial data) ride the same sidereal dome as the stars
       - a data panel (the ✦ wallpaper control, ?debug=1, or the D key)
         lists every live source with its last real value
 
       Standalone debug overrides (query params, e.g. Horizon.html?time=...):
         lat, lon, time (ISO), cloud (0-100), wind (km/h), winddir (deg),
-        gust (km/h), precip (mm), snow (cm), temp (C), dew (C), code
-        (WMO weather code), quake (magnitude), kp (0-9), aurora (0-1),
-        auroralat (deg), dem=0 (skip real terrain), debug=1
+        gust (km/h), precip (mm), snow (cm), temp (C), dew (C), aod,
+        pm25, code (WMO weather code), quake (magnitude), kp (0-9),
+        aurora (0-1), auroralat (deg), dem=0 (skip real terrain), debug=1
     -->
     <style>
       html,
@@ -109,6 +114,7 @@
     <script type="module">
       import * as THREE from 'three';
       import {Sky} from './horizon/Sky.js';
+      import {Water} from './horizon/Water.js';
 
       const params = new URL(location.href).searchParams;
       const reduceMotion = matchMedia(
@@ -210,6 +216,8 @@
         winddir: params.has('winddir') ? +params.get('winddir') : 250,
         gust: params.has('gust') ? +params.get('gust') : 12,
         dew: params.has('dew') ? +params.get('dew') : 8,
+        aod: params.has('aod') ? +params.get('aod') : 0.12,
+        pm25: params.has('pm25') ? +params.get('pm25') : 6,
         code: params.has('code') ? +params.get('code') : 1,
         kp: params.has('kp') ? +params.get('kp') : 0,
         auroraP: null, // OVATION oval probability 0..1, null = use Kp
@@ -343,6 +351,126 @@
         } catch {
           say('weather unavailable · showing a calm day');
         }
+      }
+
+      // Real aerosols: the scattering sky's turbidity and the haze come
+      // from measured air quality, not guesses.
+      async function syncAir() {
+        if (params.has('aod') || params.has('pm25')) return;
+        try {
+          const a = await (
+            await fetch(
+              'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' +
+                state.lat +
+                '&longitude=' +
+                state.lon +
+                '&current=aerosol_optical_depth,pm2_5',
+              {credentials: 'omit'}
+            )
+          ).json();
+          state.aod = a.current.aerosol_optical_depth ?? state.aod;
+          state.pm25 = a.current.pm2_5 ?? state.pm25;
+          record(
+            'open-meteo air quality',
+            'AOD ' + state.aod + ' · PM2.5 ' + state.pm25 + ' µg/m³'
+          );
+        } catch {
+          // Keep the temperate defaults.
+        }
+      }
+
+      // Real forests: OSM wood/forest polygons around the visitor decide
+      // where trees stand (scene-space polygons, cached per location).
+      let forestPolys = null;
+      async function syncForests() {
+        const key =
+          'horizon-forest-' + state.lat.toFixed(2) + ',' + state.lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) {
+            forestPolys = JSON.parse(hit);
+            record(
+              'OSM Overpass forests (cached)',
+              forestPolys.length + ' wood polygons'
+            );
+            buildWorld();
+            return;
+          }
+        } catch {}
+        try {
+          const mLat = 111320;
+          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+          const dLat = DEM_HALF_M / mLat;
+          const dLon = DEM_HALF_M / mLon;
+          const bbox =
+            (state.lat - dLat).toFixed(4) +
+            ',' +
+            (state.lon - dLon).toFixed(4) +
+            ',' +
+            (state.lat + dLat).toFixed(4) +
+            ',' +
+            (state.lon + dLon).toFixed(4);
+          const q =
+            '[out:json][timeout:25];(way[natural=wood](' +
+            bbox +
+            ');way[landuse=forest](' +
+            bbox +
+            '););out geom 120;';
+          // The mail.ru mirror is faster (Surveillance.html uses it too);
+          // the main overpass-api.de instance is the fallback.
+          let osm = null;
+          for (const host of [
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+            'https://overpass-api.de/api/interpreter'
+          ]) {
+            try {
+              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
+                credentials: 'omit'
+              });
+              if (!r.ok) throw new Error(r.status);
+              osm = await r.json();
+              break;
+            } catch {
+              // Try the next mirror.
+            }
+          }
+          if (!osm) throw new Error('overpass unavailable');
+          forestPolys = osm.elements
+            .filter((w) => w.geometry && w.geometry.length > 3)
+            .map((w) =>
+              w.geometry.map((g) => [
+                +(((g.lon - state.lon) / (2 * dLon)) * WORLD).toFixed(1),
+                +((-(g.lat - state.lat) / (2 * dLat)) * WORLD).toFixed(1)
+              ])
+            );
+          record('OSM Overpass forests', forestPolys.length + ' wood polygons');
+          try {
+            localStorage.setItem(key, JSON.stringify(forestPolys));
+          } catch {}
+          buildWorld(); // replant where the real woods are
+        } catch {
+          forestPolys = null; // procedural scatter stays
+        }
+      }
+
+      function inForest(x, z) {
+        if (!forestPolys || !forestPolys.length) return true;
+        for (const poly of forestPolys) {
+          let inside = false;
+          for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+            const xi = poly[i][0];
+            const zi = poly[i][1];
+            const xj = poly[j][0];
+            const zj = poly[j][1];
+            if (
+              zi > z !== zj > z &&
+              x < ((xj - xi) * (z - zi)) / (zj - zi) + xi
+            )
+              inside = !inside;
+          }
+          if (inside) return true;
+        }
+        return false;
       }
 
       async function syncKp() {
@@ -785,16 +913,32 @@
 
       const ground = new THREE.Group();
       scene.add(ground);
+      // Tree archetypes (shared geometry, per-tree scale): conifers for
+      // the subalpine band, broadleaves lower down.
       const trunkMat = new THREE.MeshLambertMaterial({color: '#6b4a33'});
-      const leafMat = new THREE.MeshLambertMaterial({
-        color: '#3f6b3a',
-        flatShading: true
-      });
+      const leafMats = [
+        new THREE.MeshLambertMaterial({color: '#2e5230', flatShading: true}),
+        new THREE.MeshLambertMaterial({color: '#3f6b3a', flatShading: true}),
+        new THREE.MeshLambertMaterial({color: '#4d7a35', flatShading: true})
+      ];
+      const broadMats = [
+        new THREE.MeshLambertMaterial({color: '#4a7d33', flatShading: true}),
+        new THREE.MeshLambertMaterial({color: '#5d8a3c', flatShading: true})
+      ];
+      const geoTrunk = new THREE.CylinderGeometry(0.13, 0.2, 1.1, 5);
+      const geoCone1 = new THREE.ConeGeometry(1.15, 2.3, 7);
+      const geoCone2 = new THREE.ConeGeometry(0.82, 1.8, 7);
+      const geoCanopy = new THREE.IcosahedronGeometry(1.25, 1);
       let trees = [];
       let camBaseY = 6;
       let viewSign = 1; // +1: camera looks south (north hemisphere)
       let snowSim = null; // Rapier world, booted the first time it snows
       let snowLoading = false;
+      let water = null; // three.js Water plane, built when the DEM has sea
+      const waterNormalsTex = new THREE.TextureLoader().load(
+        './horizon/waternormals.jpg'
+      );
+      waterNormalsTex.wrapS = waterNormalsTex.wrapT = THREE.RepeatWrapping;
 
       // Terrain material: grass/rock/snow/sea decided per PIXEL in the
       // fragment shader (slope and altitude with noise-jittered borders),
@@ -949,39 +1093,85 @@
         terrain.receiveShadow = true;
         ground.add(terrain);
 
-        // Trees: below the real tree line, off cliffs, out of the sea,
-        // and not right on top of either camera spot (it can face both
-        // ways, so keep both clear).
-        for (let i = 0; i < 240 && trees.length < 90; i++) {
+        // Trees: inside the real OSM woods when we have them, below the
+        // real tree line, off cliffs, out of the sea, and not on top of
+        // either camera spot (it can face both ways).
+        for (let i = 0; i < 1800 && trees.length < 140; i++) {
           const x = (rand() - 0.5) * (WORLD - 40);
           const z = (rand() - 0.5) * (WORLD - 40);
           const s0 = sample(x, z);
           if (s0.water || s0.e > 1900) continue;
+          if (!inForest(x, z)) continue;
+          // Real forests stand on ~35° alpine slopes; the asinh height
+          // compression roughly doubles scene gradients, hence 4.5.
           const grade =
             Math.abs(sample(x + 2, z).y - sample(x - 2, z).y) +
             Math.abs(sample(x, z + 2).y - sample(x, z - 2).y);
-          if (grade > 2.2) continue;
+          if (grade > 4.5) continue;
           if (Math.hypot(x, z - 26) < 24 || Math.hypot(x, z + 26) < 24)
             continue;
           const sc = 0.8 + rand() * 1.4;
+          const conifer = s0.e > 1000 || rand() < 0.4;
           const tree = new THREE.Group();
-          const trunk = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.14 * sc, 0.2 * sc, 1.1 * sc, 5),
-            trunkMat
-          );
-          trunk.position.y = 0.55 * sc;
-          const crown = new THREE.Mesh(
-            new THREE.ConeGeometry(1.15 * sc, 3.1 * sc, 6),
-            leafMat
-          );
-          crown.position.y = 2.5 * sc;
-          trunk.castShadow = crown.castShadow = true;
-          crown.receiveShadow = true;
-          tree.add(trunk, crown);
+          const trunk = new THREE.Mesh(geoTrunk, trunkMat);
+          trunk.position.y = 0.55;
+          trunk.castShadow = true;
+          tree.add(trunk);
+          if (conifer) {
+            const mat = leafMats[Math.floor(rand() * leafMats.length)];
+            const c1 = new THREE.Mesh(geoCone1, mat);
+            c1.position.y = 1.7;
+            const c2 = new THREE.Mesh(geoCone2, mat);
+            c2.position.y = 3.1;
+            c1.castShadow = c2.castShadow = true;
+            c1.receiveShadow = true;
+            tree.add(c1, c2);
+          } else {
+            const canopy = new THREE.Mesh(
+              geoCanopy,
+              broadMats[Math.floor(rand() * broadMats.length)]
+            );
+            canopy.position.y = 2.2;
+            canopy.scale.y = 0.82;
+            canopy.castShadow = canopy.receiveShadow = true;
+            tree.add(canopy);
+          }
+          tree.scale.setScalar(sc);
           tree.position.set(x, s0.y, z);
           tree.userData = {phase: rand() * Math.PI * 2, a: 0, v: 0};
           trees.push(tree);
           ground.add(tree);
+        }
+
+        // The sea: three.js Water (planar reflections) riding at real sea
+        // level wherever the DEM says there is water.
+        if (water) {
+          ground.remove(water);
+          water.geometry.dispose();
+          water.material.dispose();
+          water = null;
+        }
+        let hasWater = false;
+        for (let i = 0; i < wet.length; i++)
+          if (wet[i]) {
+            hasWater = true;
+            break;
+          }
+        if (hasWater && waterNormalsTex) {
+          water = new Water(new THREE.PlaneGeometry(WORLD, WORLD), {
+            textureWidth: 512,
+            textureHeight: 512,
+            waterNormals: waterNormalsTex,
+            sunDirection: new THREE.Vector3(0, 1, 0),
+            sunColor: 0xffffff,
+            waterColor: 0x0a2431,
+            distortionScale: 1.4,
+            fog: true
+          });
+          water.rotation.x = -Math.PI / 2;
+          water.position.y = 16 * Math.asinh((0 - centerElev) / 500) - 0.15;
+          ground.add(water);
+          record('three.js Water (vendored)', 'planar reflections · 512px');
         }
 
         camBaseY = sample(0, -26 * viewSign).y + 5;
@@ -1057,6 +1247,40 @@
           record(
             'Yale Bright Star Catalog',
             stars.length + ' stars (vendored)'
+          );
+        });
+
+      // Constellation figures (d3-celestial dataset): faint real lines
+      // riding the same sidereal dome as the stars.
+      let constMat = null;
+      fetch('./horizon/constellations.lines.json')
+        .then((r) => r.json())
+        .then((geo) => {
+          const pts = [];
+          for (const f of geo.features)
+            for (const line of f.geometry.coordinates)
+              for (let i = 0; i < line.length - 1; i++)
+                for (const p of [line[i], line[i + 1]]) {
+                  const ra = (((p[0] % 360) + 360) % 360) * RAD;
+                  const dec = p[1] * RAD;
+                  pts.push(
+                    870 * Math.cos(dec) * Math.sin(ra),
+                    870 * Math.sin(dec),
+                    870 * Math.cos(dec) * Math.cos(ra)
+                  );
+                }
+          const g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+          constMat = new THREE.LineBasicMaterial({
+            color: '#7f9fc4',
+            transparent: true,
+            opacity: 0,
+            depthWrite: false
+          });
+          celestial.add(new THREE.LineSegments(g, constMat));
+          record(
+            'd3-celestial constellations',
+            geo.features.length + ' figures (vendored)'
           );
         });
 
@@ -1455,10 +1679,10 @@
         const dusk = 1 - Math.abs(day - 0.5) * 2;
         const cloudy = state.cloud / 100;
 
-        // Scattering sky: haze rises with cloud; the grey veil finishes
-        // the overcast look.
-        skyU.turbidity.value = 2 + cloudy * 18 + dusk * 2;
-        skyU.mieCoefficient.value = 0.0035 + cloudy * 0.006;
+        // Scattering sky: turbidity from MEASURED aerosols (AOD), plus
+        // cloud haze; the grey veil finishes the overcast look.
+        skyU.turbidity.value = 1.6 + state.aod * 14 + cloudy * 12 + dusk * 2;
+        skyU.mieCoefficient.value = 0.003 + state.aod * 0.012 + cloudy * 0.005;
         veilU.alpha.value = cloudy * cloudy * 0.85 * day;
 
         tmpB
@@ -1468,7 +1692,12 @@
           .lerp(cGray, cloudy * 0.7 * day);
         scene.fog.color.copy(tmpB);
         const foggy = state.code === 45 || state.code === 48;
-        scene.fog.density = 0.004 + (foggy ? 0.028 : 0) + cloudy * 0.002;
+        // Particulate haze: real PM2.5 shortens the visibility.
+        scene.fog.density =
+          0.004 +
+          (foggy ? 0.028 : 0) +
+          cloudy * 0.002 +
+          Math.min(state.pm25, 150) * 0.00006;
 
         sunLight.intensity = (0.25 + day) * (1 - cloudy * 0.55);
         sunLight.color.setHSL(0.12, 0.5, 0.6 + day * 0.4 - dusk * 0.15);
@@ -1481,7 +1710,20 @@
         ambient.color.copy(tmpB);
         if (starMat)
           starMat.uniforms.night.value = (1 - day) * (1 - cloudy * 0.85);
+        if (constMat) constMat.opacity = (1 - day) * (1 - cloudy * 0.9) * 0.2;
         moonDisc.visible = moon.alt > -0.05;
+
+        // The Water plane: real waves via the sea-state, real sun tint.
+        if (water) {
+          const wu = water.material.uniforms;
+          wu.time.value += dt * (0.3 + (state.wind / 3.6) * 0.05);
+          wu.sunDirection.value.copy(sunVec);
+          wu.sunColor.value
+            .copy(sunLight.color)
+            .multiplyScalar(sunLight.intensity);
+          wu.distortionScale.value =
+            0.6 + ((0.21 * Math.pow(state.wind / 3.6, 2)) / 9.81) * 2.5;
+        }
 
         // The real wind vector: meteorological direction is where wind
         // comes FROM; the scene advects along where it blows TO.
@@ -1784,6 +2026,9 @@
         requestAnimationFrame(frame);
         await syncWeather();
         setInterval(syncWeather, 15 * 60 * 1000);
+        syncAir();
+        setInterval(syncAir, 30 * 60 * 1000);
+        syncForests();
         syncKp();
         setInterval(syncKp, 15 * 60 * 1000);
         syncOvation();
