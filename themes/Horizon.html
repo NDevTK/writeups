@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Horizon</title>
+    <!--
+      A low-poly 3D landscape where everything shown is real state:
+      - sun and moon at their true computed positions for your time/place
+      - the actual night sky (Yale Bright Star Catalog, 1630 stars with
+        real positions, magnitudes and colour temperatures) rotated for
+        your latitude and the current sidereal time
+      - live weather (open-meteo + geojs, both keyless): cloud cover,
+        rain, snow, fog and wind driving the scene
+      - USGS earthquakes (M4.5+) arrive as a brief camera rumble
+
+      Standalone debug overrides (query params, e.g. Horizon.html?time=...):
+        lat, lon, time (ISO), cloud (0-100), wind (km/h), precip (mm),
+        snow (cm), code (WMO weather code), quake (magnitude)
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0a0e1d;
+      }
+      #gl {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      #caption {
+        position: fixed;
+        left: 14px;
+        bottom: 12px;
+        color: rgba(255, 255, 255, 0.75);
+        font:
+          12px/1.5 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+        transition: opacity 1.2s ease;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="gl"></canvas>
+    <div id="caption"></div>
+    <script type="module">
+      import * as THREE from './horizon/three.module.min.js';
+
+      const params = new URL(location.href).searchParams;
+      const reduceMotion = matchMedia(
+        '(prefers-reduced-motion: reduce)'
+      ).matches;
+      const timeScale = reduceMotion ? 0.25 : 1;
+
+      // ---------- real time (with optional ?time= override) ----------
+      const t0 = performance.now();
+      const timeBase = params.has('time')
+        ? new Date(params.get('time')).getTime()
+        : 0;
+      const now = () =>
+        timeBase ? new Date(timeBase + (performance.now() - t0)) : new Date();
+
+      // ---------- astronomy (NOAA/Almanac low-precision, ~0.1 deg) ----------
+      const RAD = Math.PI / 180;
+      const days2000 = (d) => d.getTime() / 86400000 - 10957.5;
+
+      function sunEquatorial(d) {
+        const n = days2000(d);
+        const L = (280.46 + 0.9856474 * n) % 360;
+        const g = (357.528 + 0.9856003 * n) * RAD;
+        const lambda = (L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * RAD;
+        const eps = 23.439 * RAD;
+        return {
+          ra: Math.atan2(Math.cos(eps) * Math.sin(lambda), Math.cos(lambda)),
+          dec: Math.asin(Math.sin(eps) * Math.sin(lambda))
+        };
+      }
+
+      function moonEquatorial(d) {
+        const n = days2000(d);
+        const L = (218.316 + 13.176396 * n) * RAD;
+        const M = (134.963 + 13.064993 * n) * RAD;
+        const F = (93.272 + 13.22935 * n) * RAD;
+        const lambda = L + 6.289 * RAD * Math.sin(M);
+        const beta = 5.128 * RAD * Math.sin(F);
+        const eps = 23.439 * RAD;
+        return {
+          ra: Math.atan2(
+            Math.sin(lambda) * Math.cos(eps) - Math.tan(beta) * Math.sin(eps),
+            Math.cos(lambda)
+          ),
+          dec: Math.asin(
+            Math.sin(beta) * Math.cos(eps) +
+              Math.cos(beta) * Math.sin(eps) * Math.sin(lambda)
+          )
+        };
+      }
+
+      // Greenwich mean sidereal time, radians.
+      const gmst = (d) =>
+        ((18.697374558 + 24.06570982441908 * days2000(d)) % 24) * 15 * RAD;
+
+      // Equatorial -> local horizontal (altitude/azimuth from north, cw).
+      function altAz(eq, d, lat, lon) {
+        const lst = gmst(d) + lon * RAD;
+        const H = lst - eq.ra;
+        const phi = lat * RAD;
+        const alt = Math.asin(
+          Math.sin(phi) * Math.sin(eq.dec) +
+            Math.cos(phi) * Math.cos(eq.dec) * Math.cos(H)
+        );
+        const az = Math.atan2(
+          Math.sin(H),
+          Math.cos(H) * Math.sin(phi) - Math.tan(eq.dec) * Math.cos(phi)
+        );
+        return {alt, az: az + Math.PI}; // 0 = north, clockwise via east
+      }
+
+      // Alt/az onto the sky dome. East = +x, north = -z, up = +y.
+      const skyPoint = (alt, az, r) =>
+        new THREE.Vector3(
+          r * Math.cos(alt) * Math.sin(az),
+          r * Math.sin(alt),
+          -r * Math.cos(alt) * Math.cos(az)
+        );
+
+      // ---------- state from the real world ----------
+      const state = {
+        lat: params.has('lat') ? +params.get('lat') : 51.48,
+        lon: params.has('lon') ? +params.get('lon') : 0,
+        place: '',
+        cloud: params.has('cloud') ? +params.get('cloud') : 20,
+        wind: params.has('wind') ? +params.get('wind') : 8,
+        precip: params.has('precip') ? +params.get('precip') : 0,
+        snow: params.has('snow') ? +params.get('snow') : 0,
+        code: params.has('code') ? +params.get('code') : 1,
+        shake: 0
+      };
+      const overridden = [
+        'lat',
+        'lon',
+        'cloud',
+        'wind',
+        'precip',
+        'snow',
+        'code'
+      ].some((k) => params.has(k));
+
+      const caption = document.getElementById('caption');
+      let captionTimer = 0;
+      function say(text, sticky) {
+        caption.textContent = text;
+        caption.style.opacity = 1;
+        clearTimeout(captionTimer);
+        if (!sticky)
+          captionTimer = setTimeout(() => (caption.style.opacity = 0), 12000);
+      }
+
+      const WMO = {
+        0: 'clear',
+        1: 'mostly clear',
+        2: 'partly cloudy',
+        3: 'overcast',
+        45: 'fog',
+        48: 'rime fog',
+        51: 'drizzle',
+        53: 'drizzle',
+        55: 'drizzle',
+        61: 'light rain',
+        63: 'rain',
+        65: 'heavy rain',
+        71: 'light snow',
+        73: 'snow',
+        75: 'heavy snow',
+        77: 'snow grains',
+        80: 'showers',
+        81: 'showers',
+        82: 'heavy showers',
+        85: 'snow showers',
+        86: 'snow showers',
+        95: 'thunderstorm',
+        96: 'thunderstorm',
+        99: 'thunderstorm'
+      };
+
+      async function syncWeather() {
+        if (overridden) return;
+        try {
+          const geo = await (
+            await fetch('https://get.geojs.io/v1/ip/geo.json', {
+              credentials: 'omit'
+            })
+          ).json();
+          state.lat = +geo.latitude;
+          state.lon = +geo.longitude;
+          state.place = geo.city || geo.country || '';
+        } catch {
+          // Keep the Greenwich fallback.
+        }
+        try {
+          const w = await (
+            await fetch(
+              'https://api.open-meteo.com/v1/forecast?latitude=' +
+                state.lat +
+                '&longitude=' +
+                state.lon +
+                '&current=weather_code,cloud_cover,precipitation,snowfall,wind_speed_10m',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const c = w.current;
+          state.code = c.weather_code;
+          state.cloud = c.cloud_cover;
+          state.precip = c.precipitation;
+          state.snow = c.snowfall;
+          state.wind = c.wind_speed_10m;
+          say(
+            (state.place ? state.place + ' · ' : '') +
+              (WMO[state.code] || 'weather code ' + state.code) +
+              ' · this scene mirrors your sky'
+          );
+        } catch {
+          say('weather unavailable · showing a calm day');
+        }
+      }
+
+      const seenQuakes = new Set();
+      let firstQuakePoll = true;
+      async function pollQuakes() {
+        try {
+          const q = await (
+            await fetch(
+              'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson',
+              {credentials: 'omit'}
+            )
+          ).json();
+          for (const f of q.features) {
+            if (seenQuakes.has(f.id)) continue;
+            seenQuakes.add(f.id);
+            // Only rumble for events that arrive while watching.
+            if (!firstQuakePoll) {
+              state.shake = Math.min((f.properties.mag - 4) * 0.35, 1.2);
+              say(
+                'M' +
+                  f.properties.mag.toFixed(1) +
+                  ' earthquake · ' +
+                  f.properties.place
+              );
+            }
+          }
+          firstQuakePoll = false;
+        } catch {
+          // Silent: quakes are garnish, not the meal.
+        }
+      }
+
+      // ---------- scene ----------
+      const canvas = document.getElementById('gl');
+      const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+      const scene = new THREE.Scene();
+      // Face south (+z): from the northern hemisphere that keeps the sun
+      // and moon arcs in view.
+      const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 900);
+      camera.position.set(0, 6, -26);
+
+      function resize() {
+        renderer.setSize(innerWidth, innerHeight);
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+      }
+      addEventListener('resize', resize);
+      resize();
+
+      const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+      scene.add(sunLight);
+      const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambient);
+
+      // Sky dome: vertical gradient, colours driven each frame.
+      const skyUniforms = {
+        top: {value: new THREE.Color('#87c5eb')},
+        bottom: {value: new THREE.Color('#dceef7')}
+      };
+      const sky = new THREE.Mesh(
+        new THREE.SphereGeometry(600, 24, 16),
+        new THREE.ShaderMaterial({
+          side: THREE.BackSide,
+          depthWrite: false,
+          uniforms: skyUniforms,
+          vertexShader:
+            'varying vec3 p; void main(){ p = position;' +
+            ' gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+          fragmentShader:
+            'varying vec3 p; uniform vec3 top; uniform vec3 bottom;' +
+            ' void main(){ float h = clamp(normalize(p).y * 1.4 + 0.25, 0.0, 1.0);' +
+            ' gl_FragColor = vec4(mix(bottom, top, h), 1.0); }'
+        })
+      );
+      sky.renderOrder = -2;
+      scene.add(sky);
+      scene.fog = new THREE.FogExp2('#dceef7', 0.004);
+
+      // Terrain: deterministic value-noise hills with height/slope colours.
+      function mulberry32(a) {
+        return () => {
+          a |= 0;
+          a = (a + 0x6d2b79f5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      const rand = mulberry32(20260704);
+      const gridN = 48;
+      const grid = Array.from({length: gridN * gridN}, rand);
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const smooth = (t) => t * t * (3 - 2 * t);
+      function noise2(x, y) {
+        const xi = Math.floor(x),
+          yi = Math.floor(y);
+        const g = (ix, iy) =>
+          grid[
+            (((iy % gridN) + gridN) % gridN) * gridN +
+              (((ix % gridN) + gridN) % gridN)
+          ];
+        const tx = smooth(x - xi),
+          ty = smooth(y - yi);
+        return lerp(
+          lerp(g(xi, yi), g(xi + 1, yi), tx),
+          lerp(g(xi, yi + 1), g(xi + 1, yi + 1), tx),
+          ty
+        );
+      }
+      const height = (x, z) =>
+        8 * noise2(x / 34 + 7, z / 34 + 3) +
+        3 * noise2(x / 11 + 40, z / 11 + 9) +
+        0.7 * noise2(x / 4, z / 4) -
+        6 -
+        Math.max(0, 18 - Math.hypot(x, z - 14)) * 0.18; // clearing near camera
+
+      const terrainGeo = new THREE.PlaneGeometry(280, 280, 110, 110);
+      terrainGeo.rotateX(-Math.PI / 2);
+      {
+        const pos = terrainGeo.attributes.position;
+        const colors = [];
+        const grass = new THREE.Color('#5e8c4f');
+        const meadow = new THREE.Color('#7ba55e');
+        const rock = new THREE.Color('#8d8577');
+        const snowC = new THREE.Color('#e8ecef');
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i),
+            z = pos.getZ(i);
+          const y = height(x, z);
+          pos.setY(i, y);
+          const c = grass
+            .clone()
+            .lerp(meadow, noise2(x / 9 + 99, z / 9))
+            .lerp(rock, THREE.MathUtils.smoothstep(y, 3.5, 7))
+            .lerp(snowC, THREE.MathUtils.smoothstep(y, 6.5, 9));
+          colors.push(c.r, c.g, c.b);
+        }
+        terrainGeo.setAttribute(
+          'color',
+          new THREE.Float32BufferAttribute(colors, 3)
+        );
+        terrainGeo.computeVertexNormals();
+      }
+      const terrain = new THREE.Mesh(
+        terrainGeo,
+        new THREE.MeshLambertMaterial({vertexColors: true, flatShading: true})
+      );
+      scene.add(terrain);
+
+      // Trees: low-poly conifers, swaying with the real wind speed.
+      const trees = new THREE.Group();
+      const trunkMat = new THREE.MeshLambertMaterial({color: '#6b4a33'});
+      const leafMat = new THREE.MeshLambertMaterial({
+        color: '#3f6b3a',
+        flatShading: true
+      });
+      for (let i = 0; i < 90; i++) {
+        const x = (rand() - 0.5) * 220;
+        const z = (rand() - 0.5) * 220;
+        const y = height(x, z);
+        // No trees looming right at the camera (it sits at z=-26).
+        if (y > 4 || y < -4 || z < -10 || Math.hypot(x, z + 26) < 18) continue;
+        const s = 0.8 + rand() * 1.4;
+        const tree = new THREE.Group();
+        const trunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.14 * s, 0.2 * s, 1.1 * s, 5),
+          trunkMat
+        );
+        trunk.position.y = 0.55 * s;
+        const crown = new THREE.Mesh(
+          new THREE.ConeGeometry(1.15 * s, 3.1 * s, 6),
+          leafMat
+        );
+        crown.position.y = 2.5 * s;
+        tree.add(trunk, crown);
+        tree.position.set(x, y, z);
+        tree.userData.phase = rand() * Math.PI * 2;
+        trees.add(tree);
+      }
+      scene.add(trees);
+
+      // Stars: the real sky. Positions/magnitude/colour from the Yale
+      // Bright Star Catalog; the dome rotates with sidereal time.
+      const celestial = new THREE.Group(); // spins with the sky
+      const polar = new THREE.Group(); // tilts the pole to the latitude
+      polar.add(celestial);
+      scene.add(polar);
+      let starMat = null;
+      fetch('./horizon/stars.json')
+        .then((r) => r.json())
+        .then((stars) => {
+          const pos = [];
+          const color = [];
+          const size = [];
+          const col = new THREE.Color();
+          for (const [ra, dec, mag, kelvin] of stars) {
+            const raR = ra * RAD;
+            const decR = dec * RAD;
+            pos.push(
+              500 * Math.cos(decR) * Math.sin(raR),
+              500 * Math.sin(decR),
+              500 * Math.cos(decR) * Math.cos(raR)
+            );
+            // Blackbody-ish tint from the catalog temperature.
+            const t = THREE.MathUtils.clamp((kelvin - 3000) / 9000, 0, 1);
+            col.setRGB(
+              1 - t * 0.25,
+              0.88 - Math.abs(t - 0.45) * 0.2,
+              0.72 + t * 0.28
+            );
+            color.push(col.r, col.g, col.b);
+            size.push(THREE.MathUtils.clamp(7.5 - mag, 1.8, 7.5));
+          }
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute(
+            'position',
+            new THREE.Float32BufferAttribute(pos, 3)
+          );
+          geo.setAttribute('color', new THREE.Float32BufferAttribute(color, 3));
+          geo.setAttribute('size', new THREE.Float32BufferAttribute(size, 1));
+          starMat = new THREE.ShaderMaterial({
+            transparent: true,
+            depthWrite: false,
+            uniforms: {night: {value: 0}},
+            vertexShader:
+              'attribute float size; varying vec3 vc;' +
+              ' void main(){ vc = color;' +
+              ' vec4 mv = modelViewMatrix * vec4(position, 1.0);' +
+              ' gl_PointSize = size; gl_Position = projectionMatrix * mv; }',
+            fragmentShader:
+              'uniform float night; varying vec3 vc;' +
+              ' void main(){ float d = length(gl_PointCoord - 0.5);' +
+              ' if (d > 0.5) discard;' +
+              ' gl_FragColor = vec4(vc, night * smoothstep(0.5, 0.2, d)); }',
+            vertexColors: true
+          });
+          celestial.add(new THREE.Points(geo, starMat));
+        });
+
+      // Sun and moon discs, placed at their true positions each frame.
+      const sunDisc = new THREE.Mesh(
+        new THREE.SphereGeometry(14, 16, 12),
+        new THREE.MeshBasicMaterial({color: '#fff3c4', fog: false})
+      );
+      scene.add(sunDisc);
+      const moonDisc = new THREE.Mesh(
+        new THREE.SphereGeometry(9, 16, 12),
+        new THREE.MeshBasicMaterial({color: '#e8ecf4', fog: false})
+      );
+      scene.add(moonDisc);
+
+      // Clouds: soft blobs; coverage and drift follow the real weather.
+      const cloudGroup = new THREE.Group();
+      const cloudMat = new THREE.MeshLambertMaterial({
+        color: '#ffffff',
+        transparent: true,
+        opacity: 0.85,
+        flatShading: true
+      });
+      const clouds = [];
+      for (let i = 0; i < 16; i++) {
+        const blob = new THREE.Group();
+        for (let j = 0; j < 4; j++) {
+          const puff = new THREE.Mesh(
+            new THREE.IcosahedronGeometry(6 + rand() * 6, 0),
+            cloudMat
+          );
+          puff.position.set((j - 1.5) * 7 + rand() * 3, rand() * 3, rand() * 4);
+          puff.scale.y = 0.45;
+          blob.add(puff);
+        }
+        blob.position.set(
+          (rand() - 0.5) * 480,
+          55 + rand() * 25,
+          (rand() - 0.5) * 480
+        );
+        clouds.push(blob);
+        cloudGroup.add(blob);
+      }
+      scene.add(cloudGroup);
+
+      // Precipitation: one particle field, styled as rain or snow.
+      const PRECIP_N = 1600;
+      const precipGeo = new THREE.BufferGeometry();
+      {
+        const p = [];
+        for (let i = 0; i < PRECIP_N; i++)
+          p.push((rand() - 0.5) * 90, rand() * 45, (rand() - 0.5) * 90);
+        precipGeo.setAttribute(
+          'position',
+          new THREE.Float32BufferAttribute(p, 3)
+        );
+      }
+      // Round sprite so drops and flakes aren't square points.
+      const dot = document.createElement('canvas');
+      dot.width = dot.height = 32;
+      {
+        const g = dot.getContext('2d');
+        const grad = g.createRadialGradient(16, 16, 2, 16, 16, 15);
+        grad.addColorStop(0, 'rgba(255,255,255,1)');
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, 32, 32);
+      }
+      const precipMat = new THREE.PointsMaterial({
+        color: '#bcd2e8',
+        size: 0.22,
+        map: new THREE.CanvasTexture(dot),
+        depthWrite: false,
+        transparent: true,
+        opacity: 0
+      });
+      const precip = new THREE.Points(precipGeo, precipMat);
+      scene.add(precip);
+
+      // ---------- colour ramps ----------
+      const cDayTop = new THREE.Color('#7ec0ea');
+      const cDayBot = new THREE.Color('#dceef7');
+      const cSetTop = new THREE.Color('#4c5f9e');
+      const cSetBot = new THREE.Color('#f2a65e');
+      const cNightTop = new THREE.Color('#070b18');
+      const cNightBot = new THREE.Color('#141c33');
+      const cGray = new THREE.Color('#9aa4ad');
+      const tmpA = new THREE.Color();
+      const tmpB = new THREE.Color();
+
+      // ---------- pointer parallax (forwarded by footer.js) ----------
+      const look = {x: 0, y: 0};
+      addEventListener('message', (e) => {
+        if (e.origin !== location.origin) return;
+        const d = e.data || {};
+        if (d.type === 'wallpaper-pointer' && !reduceMotion) {
+          look.x = (d.x - 0.5) * 2;
+          look.y = (d.y - 0.5) * 2;
+        }
+      });
+
+      // ---------- main loop ----------
+      let last = performance.now();
+      function frame(t) {
+        requestAnimationFrame(frame);
+        const dt = Math.min((t - last) / 1000, 0.1) * timeScale;
+        last = t;
+        const d = now();
+
+        // Sky bodies at their true places.
+        const sunEq = sunEquatorial(d);
+        const sun = altAz(sunEq, d, state.lat, state.lon);
+        const moon = altAz(moonEquatorial(d), d, state.lat, state.lon);
+        sunDisc.position.copy(skyPoint(sun.alt, sun.az, 560));
+        moonDisc.position.copy(skyPoint(moon.alt, moon.az, 540));
+        sunLight.position.copy(skyPoint(Math.max(sun.alt, -0.12), sun.az, 100));
+
+        // Star dome: tilt pole to latitude, spin with sidereal time.
+        // (Signs verified numerically against the altAz transform.)
+        polar.rotation.x = -(90 - state.lat) * RAD;
+        celestial.rotation.y = -(gmst(d) + state.lon * RAD);
+
+        // Day/night mix from solar altitude, gray mix from cloud cover.
+        const e = (sun.alt / RAD + 6) / 24; // -6deg .. 18deg ramp
+        const day = THREE.MathUtils.clamp(e, 0, 1);
+        const dusk = 1 - Math.abs(day - 0.5) * 2;
+        const cloudy = state.cloud / 100;
+        tmpA
+          .copy(cNightTop)
+          .lerp(cDayTop, day)
+          .lerp(cSetTop, dusk * 0.55);
+        tmpB
+          .copy(cNightBot)
+          .lerp(cDayBot, day)
+          .lerp(cSetBot, dusk * 0.8);
+        tmpA.lerp(cGray, cloudy * 0.75 * day);
+        tmpB.lerp(cGray, cloudy * 0.7 * day);
+        skyUniforms.top.value.copy(tmpA);
+        skyUniforms.bottom.value.copy(tmpB);
+        scene.fog.color.copy(tmpB);
+        const foggy = state.code === 45 || state.code === 48;
+        scene.fog.density = 0.004 + (foggy ? 0.028 : 0) + cloudy * 0.002;
+
+        sunLight.intensity = (0.25 + day) * (1 - cloudy * 0.55);
+        sunLight.color.setHSL(0.12, 0.5, 0.6 + day * 0.4 - dusk * 0.15);
+        // A touch of moonlight when the real moon is up.
+        ambient.intensity =
+          0.12 +
+          day * 0.42 * (1 - cloudy * 0.3) +
+          (moon.alt > 0 ? 0.07 * (1 - day) : 0);
+        ambient.color.copy(tmpB);
+        if (starMat)
+          starMat.uniforms.night.value = (1 - day) * (1 - cloudy * 0.85);
+        sunDisc.material.color.setHSL(0.11, 0.9, 0.75 + day * 0.2);
+        sunDisc.visible = sun.alt > -0.15;
+        moonDisc.visible = moon.alt > -0.05;
+
+        // Clouds: real coverage decides how many blobs show; the real
+        // wind decides how fast they drift (eastward).
+        const showClouds = Math.round(cloudy * clouds.length);
+        clouds.forEach((c, i) => {
+          c.visible = i < showClouds;
+          c.position.x += state.wind * 0.06 * dt;
+          if (c.position.x > 260) c.position.x = -260;
+        });
+        cloudMat.opacity = 0.5 + cloudy * 0.4;
+
+        // Precipitation from the real rates: rain falls hard, snow drifts.
+        const snowing =
+          state.snow > 0 ||
+          (state.code >= 71 &&
+            state.code <= 86 &&
+            state.code !== 80 &&
+            state.code !== 81 &&
+            state.code !== 82);
+        const raining = !snowing && (state.precip > 0 || state.code >= 51);
+        const rate = snowing
+          ? THREE.MathUtils.clamp(state.snow / 2, 0.3, 1)
+          : THREE.MathUtils.clamp(state.precip / 4, 0.25, 1);
+        precipMat.opacity = raining || snowing ? 0.35 + rate * 0.45 : 0;
+        precipMat.size = snowing ? 0.34 : 0.16;
+        precipMat.color.set(snowing ? '#ffffff' : '#a9c6e2');
+        if (raining || snowing) {
+          const p = precipGeo.attributes.position;
+          const fall = (snowing ? 6 : 34) * (0.4 + rate * 0.6) * dt;
+          const drift = state.wind * 0.05 * dt;
+          for (let i = 0; i < PRECIP_N; i++) {
+            let y = p.getY(i) - fall;
+            let x =
+              p.getX(i) + drift + (snowing ? Math.sin(t / 900 + i) * 0.02 : 0);
+            if (y < 0) y += 45;
+            if (x > 45) x -= 90;
+            p.setY(i, y);
+            p.setX(i, x);
+          }
+          p.needsUpdate = true;
+        }
+
+        // Trees lean and shiver with the real wind speed.
+        const sway = Math.min(state.wind / 60, 1);
+        trees.children.forEach((tree) => {
+          tree.rotation.z =
+            sway * 0.06 +
+            Math.sin(t / (900 - sway * 500) + tree.userData.phase) *
+              sway *
+              0.05;
+        });
+
+        // Earthquake rumble, decaying. (Skipped under reduced motion.)
+        let shakeX = 0;
+        let shakeY = 0;
+        if (state.shake > 0.005 && !reduceMotion) {
+          shakeX = (Math.random() - 0.5) * state.shake;
+          shakeY = (Math.random() - 0.5) * state.shake * 0.6;
+          state.shake *= Math.pow(0.35, dt);
+        }
+
+        camera.position.x = look.x * 3 + shakeX;
+        camera.position.y = 6 + look.y * -1.2 + shakeY;
+        camera.lookAt(look.x * 8, 7 + look.y * -5, 40);
+
+        renderer.render(scene, camera);
+      }
+
+      (async () => {
+        if (document.prerendering) {
+          await new Promise((resolve) =>
+            document.addEventListener('prerenderingchange', resolve, {
+              once: true
+            })
+          );
+        }
+        requestAnimationFrame(frame);
+        await syncWeather();
+        setInterval(syncWeather, 15 * 60 * 1000);
+        if (params.has('quake')) {
+          setTimeout(() => {
+            state.shake = Math.min((+params.get('quake') - 4) * 0.35, 1.2);
+            say('M' + params.get('quake') + ' earthquake · debug override');
+          }, 1500);
+        } else {
+          pollQuakes();
+          setInterval(pollQuakes, 5 * 60 * 1000);
+        }
+      })();
+    </script>
+  </body>
+</html>
