@@ -26,8 +26,10 @@ import * as THREE from 'three';
  *    advected by the real wind; per-pixel dithered march start kills
  *    banding
  *
- * As in the research, only the low deck is volumetric: high ice cloud
- * stays a 2D treatment.
+ * Both the low deck and the 700 hPa altostratus deck are volumetric
+ * instances of this shader (extinction is a uniform - altostratus has
+ * a genuinely lower liquid water content than cumulus). High ice cloud
+ * stays a 2D treatment, as in the research.
  */
 
 // ---------- tileable noise generation (CPU, once, lazily) ----------
@@ -230,6 +232,7 @@ const CLOUD_FRAG = /* glsl */ `
   uniform float yBase;   // real LCL, scene units
   uniform float yTop;
   uniform float cType;   // 0 stratus, 1 cumulus, 2 cumulonimbus (WMO code)
+  uniform float sigma;   // extinction per scene unit at density 1
   uniform vec2 wOff;     // real wind advection offset
   in vec3 vWorld;
   out vec4 outColor;
@@ -343,7 +346,6 @@ const CLOUD_FRAG = /* glsl */ `
     // Dithered start: trades banding for noise (Schneider sec. 5).
     float t = tStart + dt * hash12(gl_FragCoord.xy);
 
-    const float SIGMA = 0.9; // extinction per scene unit at density 1
     float cSun = dot(rd, sunDirW);
     float phase = mix(hg(cSun, 0.6), hg(cSun, -0.3), 0.35);
 
@@ -363,13 +365,13 @@ const CLOUD_FRAG = /* glsl */ `
           float hs = clamp((ps.y - yBase) / (yTop - yBase), 0.0, 1.0);
           tauS += density(ps, hs) * dts;
         }
-        tauS *= SIGMA;
+        tauS *= sigma;
         // Beer-powder (Schneider 2015).
         float beer = exp(-tauS) * (1.0 - exp(-2.0 * tauS)) * 2.0;
         vec3 S =
           sunCol * beer * phase * 18.0 +
           ambCol * mix(0.35, 1.0, h);
-        float sig = SIGMA * d;
+        float sig = sigma * d;
         float sT = exp(-sig * dt);
         L += T * (S - S * sT); // energy-conserving (Hillaire 2016)
         T *= sT;
@@ -393,6 +395,7 @@ export function createCloudDeck() {
     yBase: {value: 24},
     yTop: {value: 38},
     cType: {value: 1},
+    sigma: {value: 0.9},
     wOff: {value: new THREE.Vector2(0, 0)}
   };
   const mesh = new THREE.Mesh(
