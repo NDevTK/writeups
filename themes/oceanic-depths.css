@@ -3,14 +3,17 @@ body {
   color: #e0f4f4; /* Off-white/light cyan */
   font-family: Arial, sans-serif;
 }
+
 h1,
 .markdown-body h1 {
   color: #90d0d8; /* Lighter blue */
 }
+
 h2,
 .markdown-body h2 {
   color: #7abcc4; /* Seafoam green */
 }
+
 h3,
 h4,
 h5,
@@ -36,6 +39,7 @@ a:hover {
   color: #ffff80; /* Bright yellow on hover */
   text-decoration: underline; /* Optional: or a wave animation */
 }
+
 blockquote,
 .markdown-body blockquote {
   background: rgba(15, 68, 78, 0.7); /* Semi-transparent darker teal */
@@ -43,6 +47,7 @@ blockquote,
   padding: 10px;
   margin: 10px;
 }
+
 pre,
 code,
 .markdown-body pre,
@@ -54,6 +59,7 @@ code,
   border-radius: 4px;
   font-family: 'Courier New', Courier, monospace;
 }
+
 /* Basic syntax highlighting placeholders */
 .highlight .c,
 .highlight .c1,
@@ -62,9 +68,11 @@ code,
 .highlight .cp {
   color: #6a9955; /* Green */
 }
+
 .highlight .p {
   color: #d4d4d4; /* Light gray */
 }
+
 .highlight .py,
 .highlight .nt,
 .highlight .kc,
@@ -79,6 +87,7 @@ code,
 .highlight .gd {
   color: #569cd6; /* Blue */
 }
+
 .highlight .na,
 .highlight .s,
 .highlight .s1,
@@ -91,11 +100,13 @@ code,
 .highlight .gi {
   color: #ce9178; /* Orange/Coral */
 }
+
 .highlight .o,
 .highlight .ow,
 .highlight .ni {
   color: #dcdcaa; /* Yellow */
 }
+
 .highlight .k,
 .highlight .kd,
 .highlight .kn,
@@ -105,11 +116,13 @@ code,
 .highlight .kv {
   color: #c586c0; /* Purple */
 }
+
 .highlight .nf,
 .highlight .fm,
 .highlight .nc {
   color: #4ec9b0; /* Teal */
 }
+
 .highlight .sr,
 .highlight .nv,
 .highlight .vg,
@@ -128,6 +141,7 @@ code,
 .markdown-body table tr:nth-child(2n) {
   background-color: transparent;
 }
+
 .markdown-body table th,
 .markdown-body table td {
   border-color: rgba(122, 188, 196, 0.45);

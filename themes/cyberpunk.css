@@ -17,6 +17,7 @@ body {
     transparent 3px
   );
 }
+
 /* Headings - Neon Colors with Glow */
 h1,
 h2,
@@ -34,6 +35,7 @@ h6,
   margin-bottom: 0.5em;
   font-weight: 500; /* Slightly bolder for better neon visibility */
 }
+
 h1,
 .markdown-body h1 {
   color: #00ffff; /* Electric Blue */
@@ -43,6 +45,7 @@ h1,
     0 0 15px #00ffff;
   font-size: 2.4em;
 }
+
 h2,
 .markdown-body h2 {
   color: #ff00ff; /* Neon Pink/Magenta */
@@ -51,6 +54,7 @@ h2,
     0 0 10px #ff00ff;
   font-size: 2em;
 }
+
 h3,
 .markdown-body h3 {
   color: #39ff14; /* Lime Green */
@@ -59,6 +63,7 @@ h3,
     0 0 8px #39ff14;
   font-size: 1.6em;
 }
+
 h4,
 .markdown-body h4 {
   color: #ffff00; /* Neon Yellow - also used for links, but good for smaller headings */
@@ -67,6 +72,7 @@ h4,
     0 0 7px #ffff00;
   font-size: 1.3em;
 }
+
 h5,
 h6,
 .markdown-body h5,
@@ -97,6 +103,7 @@ a:focus {
     0 0 15px #fff;
   text-decoration: none; /* Optional: underline on hover if preferred */
 }
+
 /* Accent Elements */
 blockquote,
 .markdown-body blockquote {
@@ -112,6 +119,7 @@ blockquote,
   color: #a0a0a0; /* Softer text color for blockquotes */
   font-style: italic;
 }
+
 hr,
 .markdown-body hr {
   border: 0;
@@ -123,6 +131,7 @@ hr,
   margin-top: 2.5em;
   margin-bottom: 2.5em;
 }
+
 /* Code Blocks */
 pre,
 code,
@@ -132,6 +141,7 @@ code,
   font-family: 'Consolas', 'Monaco', 'Lucida Console', 'Courier New', monospace;
   font-size: 0.95em;
 }
+
 pre,
 .markdown-body pre,
 .markdown-body .highlight pre {
@@ -148,6 +158,7 @@ pre,
   overflow-x: auto;
   color: #d0d0d0; /* Light gray/pale neon text for code */
 }
+
 code,
 .markdown-body code {
   background-color: rgba(
@@ -160,6 +171,7 @@ code,
   padding: 0.2em 0.4em;
   border-radius: 3px;
 }
+
 pre code,
 .markdown-body pre code {
   background-color: transparent;
@@ -169,6 +181,7 @@ pre code,
   border: none;
   box-shadow: none;
 }
+
 /* Basic Syntax Highlighting (optional, can be expanded) */
 /* Using common cyberpunk colors */
 .highlight .c,
@@ -178,9 +191,11 @@ pre code,
 .highlight .cp {
   color: #6a6a7e; /* Muted gray for comments */
 }
+
 .highlight .p {
   color: #c0c0c0; /* Default text color */
 }
+
 .highlight .py,
 .highlight .nt,
 .highlight .kc,
@@ -195,6 +210,7 @@ pre code,
 .highlight .gd {
   color: #ff4f81; /* Neon Pink/Red variant */
 }
+
 .highlight .na,
 .highlight .s,
 .highlight .s1,
@@ -207,11 +223,13 @@ pre code,
 .highlight .gi {
   color: #50fa7b; /* Bright Green (similar to Lime) */
 }
+
 .highlight .o,
 .highlight .ow,
 .highlight .ni {
   color: #ff8c00; /* Bright Orange */
 }
+
 .highlight .k,
 .highlight .kd,
 .highlight .kn,
@@ -221,11 +239,13 @@ pre code,
 .highlight .kv {
   color: #8be9fd; /* Light Cyan/Blue */
 }
+
 .highlight .nf,
 .highlight .fm,
 .highlight .nc {
   color: #bd93f9; /* Light Purple/Violet */
 }
+
 .highlight .sr,
 .highlight .nv,
 .highlight .vg,
@@ -253,6 +273,7 @@ pre code,
       2px 2px #ff00ff,
       -2px -2px #39ff14;
   }
+
   20% {
     transform: translate(-2px, 2px);
     text-shadow:
@@ -262,6 +283,7 @@ pre code,
       2px 0 #ff00ff,
       -2px 0 #39ff14;
   }
+
   40% {
     transform: translate(2px, -2px);
     text-shadow:
@@ -271,6 +293,7 @@ pre code,
       0 2px #ff00ff,
       0 -2px #39ff14;
   }
+
   60% {
     transform: translate(-1px, 1px);
     text-shadow:
@@ -280,6 +303,7 @@ pre code,
       -1px 0 #ff00ff,
       1px 0 #39ff14;
   }
+
   80% {
     transform: translate(1px, -1px);
     text-shadow:
@@ -289,6 +313,7 @@ pre code,
       0 -1px #ff00ff,
       0 1px #39ff14;
   }
+
   100% {
     transform: translate(0);
     text-shadow:
@@ -313,6 +338,7 @@ pre code,
 .markdown-body table tr:nth-child(2n) {
   background-color: transparent;
 }
+
 .markdown-body table th,
 .markdown-body table td {
   border-color: rgba(0, 255, 255, 0.35);

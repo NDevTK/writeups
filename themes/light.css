@@ -10,6 +10,7 @@ body {
     Arial, sans-serif; /* Modern sans-serif font stack */
   line-height: 1.6;
 }
+
 /* Headings */
 h1,
 h2,
@@ -27,14 +28,17 @@ h6,
   margin-top: 1.5em;
   margin-bottom: 0.5em;
 }
+
 h1,
 .markdown-body h1 {
   font-size: 2.2em;
 }
+
 h2,
 .markdown-body h2 {
   font-size: 1.8em;
 }
+
 h3,
 .markdown-body h3 {
   font-size: 1.5em;
@@ -51,6 +55,7 @@ a:focus {
   color: #17a2b8; /* Slightly different shade of teal or blue for hover/focus */
   text-decoration: underline; /* Ensures underline remains, can be text-decoration: none; if color change is very distinct */
 }
+
 /* Accent Colors */
 blockquote,
 .markdown-body blockquote {
@@ -59,6 +64,7 @@ blockquote,
   margin-left: 0;
   color: #6c757d; /* Softer text color for blockquotes */
 }
+
 hr,
 .markdown-body hr {
   border: 0;
@@ -67,6 +73,7 @@ hr,
   margin-top: 2em;
   margin-bottom: 2em;
 }
+
 /* Code Blocks */
 pre,
 code,
@@ -77,6 +84,7 @@ code,
     'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; /* Monospace font stack for code */
   font-size: 0.9em;
 }
+
 pre,
 .markdown-body pre,
 .markdown-body .highlight pre {
@@ -85,18 +93,21 @@ pre,
   border-radius: 4px;
   overflow-x: auto; /* Allow horizontal scrolling for long code lines */
 }
+
 code,
 .markdown-body code {
   background-color: #e9ecef; /* Consistent background for inline code */
   padding: 0.2em 0.4em;
   border-radius: 3px;
 }
+
 pre code,
 .markdown-body pre code {
   background-color: transparent; /* Avoid double background for code within pre */
   padding: 0;
   border-radius: 0;
 }
+
 /* Basic Syntax Highlighting (optional, can be expanded) */
 .highlight .c,
 .highlight .c1,
@@ -105,9 +116,11 @@ pre code,
 .highlight .cp {
   color: #6c757d; /* Gray for comments */
 }
+
 .highlight .p {
   color: #212529; /* Default text color for punctuation */
 }
+
 .highlight .py,
 .highlight .nt,
 .highlight .kc,
@@ -122,6 +135,7 @@ pre code,
 .highlight .gd {
   color: #dc3545; /* Red for properties, tags, etc. */
 }
+
 .highlight .na,
 .highlight .s,
 .highlight .s1,
@@ -134,11 +148,13 @@ pre code,
 .highlight .gi {
   color: #28a745; /* Green for selectors, strings, etc. */
 }
+
 .highlight .o,
 .highlight .ow,
 .highlight .ni {
   color: #fd7e14; /* Orange for operators, entities, etc. */
 }
+
 .highlight .k,
 .highlight .kd,
 .highlight .kn,
@@ -148,11 +164,13 @@ pre code,
 .highlight .kv {
   color: #007bff; /* Blue for at-rules, keywords */
 }
+
 .highlight .nf,
 .highlight .fm,
 .highlight .nc {
   color: #6f42c1; /* Purple for functions, class names */
 }
+
 .highlight .sr,
 .highlight .nv,
 .highlight .vg,

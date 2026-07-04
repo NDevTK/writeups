@@ -17,6 +17,7 @@
     linear-gradient(90deg, rgba(121, 166, 220, 0.3) 1px, transparent 1px);
   background-size: 25px 25px; /* Adjust grid size */
 }
+
 /* Typography */
 h1,
 h2,
@@ -52,27 +53,32 @@ h3::before {
   height: 1px;
   background-color: #aad1f5; /* Even lighter blue for overline */
 }
+
 h1,
 .markdown-body h1 {
   font-size: 2.2em;
   font-weight: 600;
 }
+
 h2,
 .markdown-body h2 {
   font-size: 1.8em;
   font-weight: 600;
 }
+
 h3,
 .markdown-body h3 {
   font-size: 1.5em;
   font-weight: 600;
 }
+
 h4,
 .markdown-body h4 {
   font-size: 1.2em;
   font-weight: 500;
   border-bottom-style: dashed;
 }
+
 /* Dashed underline for less emphasis */
 h5,
 .markdown-body h5 {
@@ -81,6 +87,7 @@ h5,
   color: #345678;
   border-bottom: none;
 }
+
 h6,
 .markdown-body h6 {
   font-size: 1em;
@@ -110,6 +117,7 @@ a:focus {
 a:visited {
   color: #551a8b; /* Standard purple for visited, or a muted blue if preferred */
 }
+
 /* Elements */
 blockquote,
 .markdown-body blockquote {
@@ -123,6 +131,7 @@ blockquote,
 blockquote p {
   margin-bottom: 0.5em;
 }
+
 hr,
 .markdown-body hr {
   border: 0;
@@ -137,6 +146,7 @@ hr,
   background-size: 10px 1px; /* Creates a dashed effect */
   margin: 2.5em 0;
 }
+
 /* Tables */
 table,
 .markdown-body table {
@@ -146,6 +156,7 @@ table,
   font-size: 0.95em;
   border: 1px solid #79a6dc; /* Light blueprint blue border */
 }
+
 th,
 td,
 .markdown-body th,
@@ -154,12 +165,14 @@ td,
   padding: 0.6em 0.8em;
   text-align: left;
 }
+
 th,
 .markdown-body th {
   background-color: #d0e0f0; /* Light blue background for headers */
   color: #002244;
   font-weight: 600;
 }
+
 /* Code Blocks */
 pre,
 code,
@@ -169,6 +182,7 @@ code,
   font-family: 'Consolas', 'Lucida Console', 'Source Code Pro', monospace;
   font-size: 0.9em;
 }
+
 pre,
 .markdown-body pre,
 .markdown-body .highlight pre {
@@ -179,6 +193,7 @@ pre,
   overflow-x: auto;
   color: #002244; /* Dark blue code text */
 }
+
 code,
 .markdown-body code {
   background-color: #dceaf8;
@@ -186,6 +201,7 @@ code,
   padding: 0.2em 0.4em;
   border-radius: 2px;
 }
+
 pre code,
 .markdown-body pre code {
   background-color: transparent;
@@ -193,6 +209,7 @@ pre code,
   padding: 0;
   border: none;
 }
+
 /* Basic Syntax Highlighting */
 .highlight .c,
 .highlight .c1,
@@ -201,9 +218,11 @@ pre code,
 .highlight .cp {
   color: #5080a0; /* Muted blue-gray for comments */
 }
+
 .highlight .p {
   color: #345678; /* Dark gray-blue */
 }
+
 .highlight .py,
 .highlight .nt,
 .highlight .kc,
@@ -218,6 +237,7 @@ pre code,
 .highlight .gd {
   color: #00529b; /* Primary blueprint blue */
 }
+
 .highlight .na,
 .highlight .s,
 .highlight .s1,
@@ -230,11 +250,13 @@ pre code,
 .highlight .gi {
   color: #0066cc; /* Link blue */
 }
+
 .highlight .o,
 .highlight .ow,
 .highlight .ni {
   color: #004080; /* Darker blue */
 }
+
 .highlight .k,
 .highlight .kd,
 .highlight .kn,
@@ -245,11 +267,13 @@ pre code,
   color: #002244; /* Main text dark blue */
   font-weight: bold;
 }
+
 .highlight .nf,
 .highlight .fm,
 .highlight .nc {
   color: #105cb6; /* Adjusted for better contrast (was #3273dc) */
 }
+
 .highlight .sr,
 .highlight .nv,
 .highlight .vg,

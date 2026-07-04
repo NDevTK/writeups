@@ -54,6 +54,43 @@
     <script>
       'use strict';
 
+      // The API returns ISO 8601; git log prints its own format.
+      function gitDate(iso) {
+        const d = new Date(iso);
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const months = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec'
+        ];
+        const pad = (n) => String(n).padStart(2, '0');
+        return (
+          days[d.getUTCDay()] +
+          ' ' +
+          months[d.getUTCMonth()] +
+          ' ' +
+          d.getUTCDate() +
+          ' ' +
+          pad(d.getUTCHours()) +
+          ':' +
+          pad(d.getUTCMinutes()) +
+          ':' +
+          pad(d.getUTCSeconds()) +
+          ' ' +
+          d.getUTCFullYear() +
+          ' +0000'
+        );
+      }
+
       function diffLine(text, type) {
         const line = document.createElement('span');
         line.textContent = text + '\n';
@@ -64,7 +101,7 @@
       function renderCommit(entry, files, path) {
         diffLine('commit ' + entry.sha, 'commit');
         diffLine('Author: ' + entry.commit.author.name);
-        diffLine('Date:   ' + entry.commit.author.date);
+        diffLine('Date:   ' + gitDate(entry.commit.author.date));
         diffLine('');
         entry.commit.message
           .split('\n')
