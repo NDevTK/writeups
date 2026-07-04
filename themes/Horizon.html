@@ -165,6 +165,7 @@
         createCloudSystem,
         generateCloudTextures
       } from './horizon/clouds.js';
+      import {CSM} from './horizon/CSM.js';
 
       const params = new URL(location.href).searchParams;
       const reduceMotion = matchMedia(
@@ -840,7 +841,10 @@
       const canvas = document.getElementById('gl');
       const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      // AgX tone reproduction (Sobotka; Blender 4's default view
+      // transform, in three since r160): better hue preservation toward
+      // clipping than ACES, which notoriously skews bright chroma.
+      renderer.toneMapping = THREE.AgXToneMapping;
       renderer.toneMappingExposure = 0.55;
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -848,29 +852,45 @@
       const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
       camera.layers.enable(2);
 
+      // Cascaded shadow maps (vendored three.js CSM: practical split
+      // scheme after Zhang et al. 2006). A single fixed ortho shadow box
+      // only ever worked because the camera never moved; three cascades
+      // follow the view frustum instead.
+      const csm = new CSM({
+        camera,
+        parent: scene,
+        cascades: 3,
+        maxFar: 460,
+        mode: 'practical',
+        shadowMapSize: innerWidth < 800 ? 1024 : 2048,
+        lightDirection: new THREE.Vector3(0, -1, 0),
+        lightIntensity: 1,
+        lightNear: 1,
+        lightFar: 800,
+        lightMargin: 150
+      });
+      csm.fade = true;
+      csm.lights.forEach((l) => {
+        l.shadow.bias = -0.0004;
+        l.shadow.normalBias = 1.5;
+      });
+      record('Cascaded shadow maps', '3 cascades · practical splits (CSM)');
+
       let sizeCloudTargets = null;
       function resize() {
         renderer.setSize(innerWidth, innerHeight);
         camera.aspect = innerWidth / innerHeight;
         camera.updateProjectionMatrix();
+        csm.updateFrustums();
         if (sizeCloudTargets) sizeCloudTargets();
       }
       addEventListener('resize', resize);
       resize();
 
+      // Pure data holder now: its colour/intensity (from the CPU
+      // transmittance mirror) drive the CSM cascade lights, the clouds
+      // and the water each frame.
       const sunLight = new THREE.DirectionalLight(0xffffff, 1);
-      sunLight.castShadow = true;
-      sunLight.shadow.mapSize.setScalar(innerWidth < 800 ? 1024 : 2048);
-      sunLight.shadow.camera.left = -170;
-      sunLight.shadow.camera.right = 170;
-      sunLight.shadow.camera.top = 170;
-      sunLight.shadow.camera.bottom = -170;
-      sunLight.shadow.camera.near = 20;
-      sunLight.shadow.camera.far = 460;
-      sunLight.shadow.bias = -0.0004;
-      sunLight.shadow.normalBias = 1.5;
-      scene.add(sunLight);
-      scene.add(sunLight.target);
       // Ambient is a hemisphere fed by the REAL sky: the atmosphere pass
       // integrates its own sky-view LUT (cosine-weighted) and the result
       // is read back at 1 Hz - twilight blues, overcast greys and sunset
@@ -1139,7 +1159,10 @@
         new THREE.MeshStandardMaterial({color: '#4a7d33', roughness: 1}),
         new THREE.MeshStandardMaterial({color: '#5d8a3c', roughness: 1})
       ];
-      [trunkMat, ...leafMats, ...broadMats].forEach(applyAerial);
+      [trunkMat, ...leafMats, ...broadMats].forEach((m) => {
+        csm.setupMaterial(m); // first: its onBeforeCompile gets chained
+        applyAerial(m);
+      });
       const geoTrunk = new THREE.CylinderGeometry(0.13, 0.2, 1.1, 7);
       const geoCone1 = new THREE.ConeGeometry(1.15, 2.3, 10);
       const geoCone2 = new THREE.ConeGeometry(0.82, 1.8, 10);
@@ -1305,7 +1328,10 @@
         'per-pixel roughness · vegetation/rock/snow'
       );
       record('Lommel-Seeliger moon', 'lunar regolith photometry');
-      terrainMat.onBeforeCompile = (shader) => {
+      csm.setupMaterial(terrainMat);
+      const terrainCSMHook = terrainMat.onBeforeCompile;
+      terrainMat.onBeforeCompile = (shader, r) => {
+        terrainCSMHook(shader, r);
         Object.assign(shader.uniforms, terrainUniforms);
         shader.vertexShader = shader.vertexShader
           .replace(
@@ -2025,9 +2051,14 @@
       const DRIFT_CAP = 2400;
       const SNOW_EXT = 120;
       const tmpM4 = new THREE.Matrix4();
+      const driftSnowMat = new THREE.MeshStandardMaterial({
+        color: '#eef2f6',
+        roughness: 0.5
+      });
+      csm.setupMaterial(driftSnowMat);
       const driftMesh = new THREE.InstancedMesh(
         new THREE.IcosahedronGeometry(0.16, 0),
-        new THREE.MeshStandardMaterial({color: '#eef2f6', roughness: 0.5}),
+        driftSnowMat,
         DRIFT_CAP
       );
       driftMesh.count = 0;
@@ -2199,7 +2230,9 @@
         refreshPanel();
       }
       addEventListener('keydown', (e) => {
-        if (e.key === 'd') setPanel(!panelOn);
+        // 'd' strafes once the free camera is engaged; use ?debug=1 or
+        // the shaderwall toggle for the panel then.
+        if (e.key === 'd' && !freeCam.on) setPanel(!panelOn);
       });
       // Announce support for the site's ✦ wallpaper control.
       if (window.parent !== window) {
@@ -2207,6 +2240,85 @@
           {type: 'shaderwall', state: 'hidden'},
           location.origin
         );
+      }
+
+      // ---------- free camera ----------
+      // Drag to look, WASD/arrows to fly (Shift for speed, R/F for
+      // altitude), wheel to dolly. Until the first interaction the
+      // camera keeps its cinematic auto spot (and pans poleward for
+      // aurora); afterwards the view is yours. Height stays clamped to
+      // the real terrain, bounds to the loaded DEM.
+      const freeCam = {
+        on: false,
+        yaw: 0,
+        pitch: 0.015,
+        dolly: 0,
+        pos: new THREE.Vector3(),
+        keys: new Set()
+      };
+      function engageFreeCam() {
+        if (freeCam.on) return;
+        freeCam.on = true;
+        freeCam.pos.copy(camera.position);
+        freeCam.yaw = yaw;
+        freeCam.pitch = 0.015;
+      }
+      {
+        let dragId = -1;
+        let lastPX = 0;
+        let lastPY = 0;
+        canvas.addEventListener('pointerdown', (e) => {
+          dragId = e.pointerId;
+          lastPX = e.clientX;
+          lastPY = e.clientY;
+          // Capture can throw for an already-released pointer; the drag
+          // still works without it.
+          try {
+            canvas.setPointerCapture(e.pointerId);
+          } catch {}
+          engageFreeCam();
+        });
+        canvas.addEventListener('pointermove', (e) => {
+          if (e.pointerId !== dragId) return;
+          freeCam.yaw -= (e.clientX - lastPX) * 0.0032;
+          freeCam.pitch += (e.clientY - lastPY) * 0.0032;
+          freeCam.pitch = THREE.MathUtils.clamp(freeCam.pitch, -1.35, 1.35);
+          lastPX = e.clientX;
+          lastPY = e.clientY;
+        });
+        addEventListener('pointerup', (e) => {
+          if (e.pointerId === dragId) dragId = -1;
+        });
+        canvas.addEventListener(
+          'wheel',
+          (e) => {
+            engageFreeCam();
+            freeCam.dolly -= e.deltaY * 0.02;
+            e.preventDefault();
+          },
+          {passive: false}
+        );
+        const moveCodes = [
+          'KeyW',
+          'KeyA',
+          'KeyS',
+          'KeyD',
+          'KeyR',
+          'KeyF',
+          'ArrowUp',
+          'ArrowDown',
+          'ArrowLeft',
+          'ArrowRight',
+          'ShiftLeft',
+          'ShiftRight'
+        ];
+        addEventListener('keydown', (e) => {
+          if (freeCam.on && moveCodes.includes(e.code))
+            freeCam.keys.add(e.code);
+        });
+        addEventListener('keyup', (e) => {
+          freeCam.keys.delete(e.code);
+        });
       }
 
       // ---------- pointer parallax (forwarded by footer.js) ----------
@@ -2313,7 +2425,12 @@
           ps.needsUpdate = true;
         }
         const sunVec = skyPoint(sun.alt, sun.az, 1);
-        sunLight.position.copy(skyPoint(Math.max(sun.alt, -0.12), sun.az, 190));
+        // The CSM cascades carry the sun: true direction, transmitted
+        // colour and intensity mirrored from the data holder below.
+        csm.lightDirection
+          .copy(skyPoint(Math.max(sun.alt, -0.12), sun.az, 1))
+          .negate()
+          .normalize();
         moonDisc.position.copy(skyPoint(moon.alt, moon.az, 1500));
         // Sun direction as seen at the moon disc (same geometry the old
         // directional light encoded), feeding the Lommel-Seeliger shader.
@@ -2338,7 +2455,11 @@
         const mieScale = THREE.MathUtils.clamp(state.aod / 0.12, 0.25, 8);
         if (atmo.ok) {
           const skyExposure = 24 / (0.2 + 0.8 * day);
-          atmo.update(sunVec, mieScale, Math.max(centerElev, 50), skyExposure);
+          // The camera's REAL altitude (inverting the asinh height
+          // compression) feeds the sky and aerial LUTs, so flying up
+          // physically lowers the horizon and thins the haze.
+          const eCam = centerElev + 500 * Math.sinh(camera.position.y / 16);
+          atmo.update(sunVec, mieScale, Math.max(eCam, 50), skyExposure);
           // Aerial perspective shares the dome's exposure so inscattered
           // light on the terrain matches the sky it comes from.
           aerialU.uSunAzV.value.set(sunVec.x, sunVec.z).normalize();
@@ -2804,40 +2925,97 @@
           state.shake *= Math.pow(0.35, dt);
         }
 
-        const equatorYaw = state.lat < 0 ? Math.PI : 0;
-        const auroraOn = auroraU.strength.value > 0.04;
-        const targetYaw = auroraOn ? Math.PI - equatorYaw : equatorYaw;
-        if (!yawInit) {
-          yaw = targetYaw;
-          yawInit = true;
-        }
-        yaw += (targetYaw - yaw) * Math.min(dt * 0.4, 1);
-        const vx = Math.sin(yaw);
-        const vz = Math.cos(yaw);
-        const camZ = -26 * vz;
-        const camX = -26 * vx;
-        // Clear the immediate foreground so the camera never sits with
-        // its face in a hillside.
-        const baseY =
-          Math.max(
-            sample(camX, camZ).y,
-            sample(camX + 5, camZ).y,
-            sample(camX - 5, camZ).y,
-            sample(camX, camZ + 5).y,
-            sample(camX, camZ - 5).y
-          ) + 4.5;
-        camBaseY += (baseY - camBaseY) * Math.min(dt * 2, 1);
+        if (freeCam.on) {
+          // Free flight: yaw/pitch from drag, movement from keys and
+          // wheel, height clamped to the real terrain.
+          const cp = Math.cos(freeCam.pitch);
+          const fx = Math.sin(freeCam.yaw) * cp;
+          const fy = -Math.sin(freeCam.pitch);
+          const fz = Math.cos(freeCam.yaw) * cp;
+          const rx = Math.cos(freeCam.yaw);
+          const rz = -Math.sin(freeCam.yaw);
+          const k = freeCam.keys;
+          const fast = k.has('ShiftLeft') || k.has('ShiftRight') ? 3 : 1;
+          const sp = 12 * fast * dt;
+          let mx = 0;
+          let my = 0;
+          let mz = 0;
+          if (k.has('KeyW') || k.has('ArrowUp')) {
+            mx += fx * sp;
+            my += fy * sp;
+            mz += fz * sp;
+          }
+          if (k.has('KeyS') || k.has('ArrowDown')) {
+            mx -= fx * sp;
+            my -= fy * sp;
+            mz -= fz * sp;
+          }
+          if (k.has('KeyD') || k.has('ArrowRight')) {
+            mx += rx * sp;
+            mz += rz * sp;
+          }
+          if (k.has('KeyA') || k.has('ArrowLeft')) {
+            mx -= rx * sp;
+            mz -= rz * sp;
+          }
+          if (k.has('KeyR')) my += sp;
+          if (k.has('KeyF')) my -= sp;
+          // Wheel dolly eases out along the view direction.
+          const dol = freeCam.dolly * Math.min(dt * 8, 1);
+          freeCam.dolly -= dol;
+          mx += fx * dol;
+          my += fy * dol;
+          mz += fz * dol;
+          freeCam.pos.x = THREE.MathUtils.clamp(freeCam.pos.x + mx, -130, 130);
+          freeCam.pos.z = THREE.MathUtils.clamp(freeCam.pos.z + mz, -130, 130);
+          const ground = sample(freeCam.pos.x, freeCam.pos.z).y + 1.6;
+          freeCam.pos.y = THREE.MathUtils.clamp(freeCam.pos.y + my, ground, 95);
+          camera.position.set(
+            freeCam.pos.x + shakeX,
+            freeCam.pos.y + shakeY,
+            freeCam.pos.z
+          );
+          camera.lookAt(
+            freeCam.pos.x + fx,
+            freeCam.pos.y + fy,
+            freeCam.pos.z + fz
+          );
+        } else {
+          const equatorYaw = state.lat < 0 ? Math.PI : 0;
+          const auroraOn = auroraU.strength.value > 0.04;
+          const targetYaw = auroraOn ? Math.PI - equatorYaw : equatorYaw;
+          if (!yawInit) {
+            yaw = targetYaw;
+            yawInit = true;
+          }
+          yaw += (targetYaw - yaw) * Math.min(dt * 0.4, 1);
+          const vx = Math.sin(yaw);
+          const vz = Math.cos(yaw);
+          const camZ = -26 * vz;
+          const camX = -26 * vx;
+          // Clear the immediate foreground so the camera never sits with
+          // its face in a hillside.
+          const baseY =
+            Math.max(
+              sample(camX, camZ).y,
+              sample(camX + 5, camZ).y,
+              sample(camX - 5, camZ).y,
+              sample(camX, camZ + 5).y,
+              sample(camX, camZ - 5).y
+            ) + 4.5;
+          camBaseY += (baseY - camBaseY) * Math.min(dt * 2, 1);
 
-        camera.position.set(
-          camX + look.x * 3 + shakeX,
-          camBaseY + look.y * -1.2 + shakeY,
-          camZ
-        );
-        camera.lookAt(
-          camX + vx * 66 + look.x * 8,
-          camBaseY + 1 + look.y * -5,
-          camZ + vz * 66
-        );
+          camera.position.set(
+            camX + look.x * 3 + shakeX,
+            camBaseY + look.y * -1.2 + shakeY,
+            camZ
+          );
+          camera.lookAt(
+            camX + vx * 66 + look.x * 8,
+            camBaseY + 1 + look.y * -5,
+            camZ + vz * 66
+          );
+        }
 
         if (!panel.hidden) {
           const Ums = state.wind / 3.6;
@@ -2880,6 +3058,13 @@
               flakeMesh.count +
               ' falling';
         }
+
+        csm.lights.forEach((l) => {
+          l.color.copy(sunLight.color);
+          l.intensity = sunLight.intensity;
+        });
+        camera.updateMatrixWorld();
+        csm.update();
 
         if (cloudsActive) {
           // Terrain depth prepass (cheap: colour writes off, override
