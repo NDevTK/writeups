@@ -10,9 +10,13 @@
         location (AWS terrarium elevation tiles at ~30-90m resolution,
         falling back to the open-meteo elevation API), with sea rendered
         where the sea actually is
-      - a physically-based scattering sky (Preetham model via the three.js
-        Sky addon) lit by the sun's true position from astronomy-engine
-        (VSOP87/ELP truncations, topocentric, refraction-corrected)
+      - a multiple-scattering atmosphere after Hillaire (2020):
+        transmittance, multiple-scattering and per-frame sky-view LUTs
+        with Rayleigh, Mie (scaled by the measured AOD) and ozone
+        profiles, so twilight structure emerges from the raymarch; the
+        sun's terrain light carries its true transmitted colour; sun
+        position from astronomy-engine (VSOP87/ELP truncations,
+        topocentric, refraction-corrected); Preetham as fallback
       - the actual night sky (Yale Bright Star Catalog: 2887 stars with
         real positions, magnitudes and colour temperatures) rotated for
         the latitude and the current sidereal time; the five naked-eye
@@ -133,6 +137,10 @@
       import * as THREE from 'three';
       import {Sky} from './horizon/Sky.js';
       import {Water} from './horizon/Water.js';
+      import {
+        createAtmosphere,
+        sunTransmittanceJS
+      } from './horizon/atmosphere.js';
 
       const params = new URL(location.href).searchParams;
       const reduceMotion = matchMedia(
@@ -840,15 +848,30 @@
       const ambient = new THREE.AmbientLight(0xffffff, 0.5);
       scene.add(ambient);
 
-      // Physically-based sky: Preetham analytic scattering, driven by the
-      // real sun vector. Turbidity rises with real cloud cover.
-      const sky = new Sky();
-      sky.scale.setScalar(1200);
-      scene.add(sky);
-      const skyU = sky.material.uniforms;
-      skyU.rayleigh.value = 2.2;
-      skyU.mieCoefficient.value = 0.004;
-      skyU.mieDirectionalG.value = 0.8;
+      // The sky: Hillaire (2020) multiple-scattering atmosphere -
+      // transmittance, multiple-scattering and per-frame sky-view LUTs
+      // with Rayleigh, Mie (scaled by measured AOD) and ozone profiles.
+      // Twilight arch and the Belt of Venus emerge from the raymarch
+      // instead of being painted. Preetham (three.js Sky) remains as the
+      // fallback when float render targets are unavailable.
+      const atmo = createAtmosphere(renderer);
+      let skyU = null;
+      if (atmo.ok) {
+        scene.add(atmo.mesh);
+        record(
+          'Hillaire (2020) atmosphere',
+          'multiple-scattering LUTs · ozone · AOD-scaled Mie'
+        );
+      } else {
+        const sky = new Sky();
+        sky.scale.setScalar(1200);
+        scene.add(sky);
+        skyU = sky.material.uniforms;
+        skyU.rayleigh.value = 2.2;
+        skyU.mieCoefficient.value = 0.004;
+        skyU.mieDirectionalG.value = 0.8;
+        record('Preetham sky (fallback)', 'no float render targets');
+      }
 
       // Overcast veil: a translucent grey dome that fades in with real
       // cloud cover (the scattering model alone stays too blue).
@@ -2039,7 +2062,6 @@
           ps.needsUpdate = true;
         }
         const sunVec = skyPoint(sun.alt, sun.az, 1);
-        skyU.sunPosition.value.copy(sunVec);
         sunLight.position.copy(skyPoint(Math.max(sun.alt, -0.12), sun.az, 190));
         moonDisc.position.copy(skyPoint(moon.alt, moon.az, 1500));
         moonLight.position.copy(skyPoint(sun.alt, sun.az, 200));
@@ -2056,10 +2078,22 @@
         // twilight, -3 to -9 deg).
         const nightSky = THREE.MathUtils.clamp(-(sun.alt / RAD + 3) / 6, 0, 1);
 
-        // Scattering sky: turbidity from MEASURED aerosols (AOD), plus
-        // cloud haze; the grey veil finishes the overcast look.
-        skyU.turbidity.value = 1.6 + state.aod * 14 + cloudy * 12 + dusk * 2;
-        skyU.mieCoefficient.value = 0.003 + state.aod * 0.012 + cloudy * 0.005;
+        // The sky: aerosols scale the Mie profile physically (AOD 0.12 as
+        // the temperate baseline); the grey veil handles overcast.
+        const mieScale = THREE.MathUtils.clamp(state.aod / 0.12, 0.25, 8);
+        if (atmo.ok) {
+          atmo.update(
+            sunVec,
+            mieScale,
+            Math.max(centerElev, 50),
+            24 / (0.2 + 0.8 * day)
+          );
+        } else {
+          skyU.sunPosition.value.copy(sunVec);
+          skyU.turbidity.value = 1.6 + state.aod * 14 + cloudy * 12 + dusk * 2;
+          skyU.mieCoefficient.value =
+            0.003 + state.aod * 0.012 + cloudy * 0.005;
+        }
         veilU.alpha.value = cloudy * cloudy * 0.85 * day;
 
         tmpB
@@ -2076,9 +2110,18 @@
 
         // A real solar eclipse dims the direct light by its obscuration.
         const ecl = astro.eclipse || 0;
+        // The sun's light on the world carries its true transmitted
+        // colour: the CPU mirror of the transmittance integral reddens
+        // low sun physically instead of by hue heuristic.
+        const st = sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieScale);
+        const stMax = Math.max(st[0], st[1], st[2], 1e-4);
+        sunLight.color.setRGB(st[0] / stMax, st[1] / stMax, st[2] / stMax);
+        const stLum = 0.2126 * st[0] + 0.7152 * st[1] + 0.0722 * st[2];
         sunLight.intensity =
-          (0.25 + day) * (1 - cloudy * 0.55) * (1 - 0.93 * ecl);
-        sunLight.color.setHSL(0.12, 0.5, 0.6 + day * 0.4 - dusk * 0.15);
+          (0.18 + 2.4 * stLum) *
+          (day > 0 ? 1 : 0) *
+          (1 - cloudy * 0.55) *
+          (1 - 0.93 * ecl);
         // Kept moderate so the sun's cast shadows stay readable.
         ambient.intensity =
           (0.12 +
