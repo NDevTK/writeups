@@ -19,15 +19,23 @@
       - live weather (open-meteo + geojs, both keyless): cloud cover,
         rain, snow, fog, wind-driven sway; fresh snow whitens the ground
         only when it is actually freezing where you are
-      - USGS M4.5+ earthquakes rumble the camera, attenuated by their
-        real distance from you
-      - aurora appears only when NOAA's planetary K-index is genuinely
-        high and you are at auroral latitudes
+      - the sea follows oceanography: Pierson-Moskowitz wave height and
+        period from the real wind, deep-water dispersion, whitecap
+        fraction from Monahan & O'Muircheartaigh, fresnel sun glitter
+      - clouds ride the true wind vector at the real lifting condensation
+        level; trees are spring-dampers forced by real mean wind and gusts
+      - USGS M4.5+ earthquakes arrive at their true seismic travel times
+        (P then S), attenuated by real distance
+      - aurora follows NOAA's OVATION forecast oval: its real latitude
+        sets the curtain's elevation in the sky (Kp heuristic fallback)
+      - the ISS crosses the sky via SGP4-propagated live elements, drawn
+        only during genuinely visible passes
 
       Standalone debug overrides (query params, e.g. Horizon.html?time=...):
-        lat, lon, time (ISO), cloud (0-100), wind (km/h), precip (mm),
-        snow (cm), temp (C), code (WMO weather code), quake (magnitude),
-        kp (0-9), dem=0 (skip real terrain)
+        lat, lon, time (ISO), cloud (0-100), wind (km/h), winddir (deg),
+        gust (km/h), precip (mm), snow (cm), temp (C), dew (C), code
+        (WMO weather code), quake (magnitude), kp (0-9), aurora (0-1),
+        auroralat (deg), dem=0 (skip real terrain)
     -->
     <style>
       html,
@@ -64,6 +72,7 @@
   <body>
     <canvas id="gl"></canvas>
     <div id="caption"></div>
+    <script src="./horizon/satellite.min.js"></script>
     <script type="module">
       import * as THREE from 'three';
       import {Sky} from './horizon/Sky.js';
@@ -165,8 +174,13 @@
         precip: params.has('precip') ? +params.get('precip') : 0,
         snow: params.has('snow') ? +params.get('snow') : 0,
         temp: params.has('temp') ? +params.get('temp') : 14,
+        winddir: params.has('winddir') ? +params.get('winddir') : 250,
+        gust: params.has('gust') ? +params.get('gust') : 12,
+        dew: params.has('dew') ? +params.get('dew') : 8,
         code: params.has('code') ? +params.get('code') : 1,
         kp: params.has('kp') ? +params.get('kp') : 0,
+        auroraP: null, // OVATION oval probability 0..1, null = use Kp
+        auroraLat: 68,
         shake: 0
       };
       const overridden = [
@@ -177,6 +191,9 @@
         'precip',
         'snow',
         'temp',
+        'winddir',
+        'gust',
+        'dew',
         'code'
       ].some((k) => params.has(k));
 
@@ -238,7 +255,7 @@
                 state.lat +
                 '&longitude=' +
                 state.lon +
-                '&current=weather_code,cloud_cover,precipitation,snowfall,wind_speed_10m,temperature_2m',
+                '&current=weather_code,cloud_cover,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,dew_point_2m',
               {credentials: 'omit'}
             )
           ).json();
@@ -248,7 +265,10 @@
           state.precip = c.precipitation;
           state.snow = c.snowfall;
           state.wind = c.wind_speed_10m;
+          state.winddir = c.wind_direction_10m;
+          state.gust = c.wind_gusts_10m;
           state.temp = c.temperature_2m;
+          state.dew = c.dew_point_2m;
           say(
             (state.place ? state.place + ' · ' : '') +
               (WMO[state.code] || 'weather code ' + state.code) +
@@ -271,6 +291,46 @@
           state.kp = +rows[rows.length - 1].estimated_kp || 0;
         } catch {
           state.kp = 0;
+        }
+      }
+
+      // NOAA's OVATION model: the actual forecast auroral oval. We take
+      // the strongest probability near our meridian on our hemisphere,
+      // and where it sits decides the curtain's true elevation in the
+      // sky (overhead if the oval reaches our latitude).
+      async function syncOvation() {
+        if (params.has('aurora')) {
+          state.auroraP = +params.get('aurora');
+          state.auroraLat = params.has('auroralat')
+            ? +params.get('auroralat')
+            : state.lat + 6;
+          return;
+        }
+        try {
+          const o = await (
+            await fetch(
+              'https://services.swpc.noaa.gov/json/ovation_aurora_latest.json',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const myLon = ((state.lon % 360) + 360) % 360;
+          const south = state.lat < 0;
+          let best = 0;
+          let bestLat = south ? -68 : 68;
+          for (const [lon, la, val] of o.coordinates) {
+            if (south ? la > -40 : la < 40) continue;
+            let dl = Math.abs(lon - myLon);
+            if (dl > 180) dl = 360 - dl;
+            if (dl > 3) continue;
+            if (val > best) {
+              best = val;
+              bestLat = la;
+            }
+          }
+          state.auroraP = best / 100;
+          state.auroraLat = bestLat;
+        } catch {
+          state.auroraP = null; // fall back to the Kp heuristic
         }
       }
 
@@ -653,11 +713,21 @@
       // metres is recovered in-shader by inverting the asinh compression.
       const terrainUniforms = {
         uCenterElev: {value: 300},
-        uSnowy: {value: 0}
+        uSnowy: {value: 0},
+        uTime: {value: 0},
+        uWindMs: {value: 3},
+        uWindVec: {value: new THREE.Vector2(1, 0)},
+        uSunDirW: {value: new THREE.Vector3(0, 1, 0)},
+        uSunCol: {value: new THREE.Color(0, 0, 0)}
       };
       const TERRAIN_GLSL =
         'uniform float uCenterElev;\n' +
         'uniform float uSnowy;\n' +
+        'uniform float uTime;\n' +
+        'uniform float uWindMs;\n' +
+        'uniform vec2 uWindVec;\n' +
+        'uniform vec3 uSunDirW;\n' +
+        'uniform vec3 uSunCol;\n' +
         'varying float vWet;\n' +
         'varying vec3 vWp;\n' +
         'float thash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
@@ -668,6 +738,38 @@
         '             mix(thash(i + vec2(0.0, 1.0)), thash(i + vec2(1.0, 1.0)), u.x), u.y);\n' +
         '}\n' +
         'float tfbm(vec2 p){ return 0.6 * tnoise(p) + 0.28 * tnoise(p * 2.7 + 19.0) + 0.12 * tnoise(p * 6.1 + 47.0); }\n' +
+        // The sea obeys oceanography, scaled honestly (1 unit = 57.14m).
+        // Pierson-Moskowitz fully developed sea: significant wave height
+        // Hs = 0.21 U^2/g, peak period Tp = 2*pi*U/(0.877g); each wave
+        // train moves at its true deep-water dispersion speed w = sqrt(gk)
+        // and tilts the normal by the real steepness pi*Hs/lambda.
+        'vec3 seaNormal(vec3 wp){\n' +
+        '  float U = max(uWindMs, 0.8);\n' +
+        '  float Hs = 0.21 * U * U / 9.81;\n' +
+        '  float Tp = 0.7305 * U;\n' +
+        '  float Lp = max(1.5614 * Tp * Tp, 4.0);\n' +
+        '  vec2 pm = wp.xz * 57.14;\n' +
+        '  vec2 d1 = normalize(uWindVec);\n' +
+        '  vec2 d2 = normalize(uWindVec + vec2(-uWindVec.y, uWindVec.x) * 0.6);\n' +
+        '  float k1 = 6.28318 / Lp;\n' +
+        '  float k2 = 6.28318 / (Lp * 0.45);\n' +
+        '  float s1 = 3.14159 * Hs / Lp;\n' +
+        '  float a1 = cos(dot(pm, d1) * k1 - uTime * sqrt(9.81 * k1));\n' +
+        '  float a2 = cos(dot(pm, d2) * k2 - uTime * sqrt(9.81 * k2) + 1.7);\n' +
+        '  float chop = (tnoise(pm * 0.05 + uTime * 0.15 * d1) - 0.5) * s1 * 1.2;\n' +
+        '  vec2 grad = d1 * (s1 * a1) + d2 * (s1 * 0.6 * a2) + vec2(chop);\n' +
+        '  return normalize(vec3(-grad.x, 1.0, -grad.y));\n' +
+        '}\n' +
+        // Sun glitter: Blinn lobe on the wave normals with Schlick
+        // fresnel; calm water gives a tight bright path, wind spreads it.
+        'vec3 seaSpec(vec3 wp){\n' +
+        '  vec3 n = seaNormal(wp);\n' +
+        '  vec3 V = normalize(cameraPosition - wp);\n' +
+        '  vec3 H = normalize(V + uSunDirW);\n' +
+        '  float gloss = mix(700.0, 60.0, clamp(uWindMs / 15.0, 0.0, 1.0));\n' +
+        '  float f = pow(clamp(1.0 - dot(V, n), 0.0, 1.0), 5.0) * 0.95 + 0.05;\n' +
+        '  return uSunCol * pow(max(dot(n, H), 0.0), gloss) * f * 6.0;\n' +
+        '}\n' +
         'vec3 terrainColor(vec3 wp, float wetF){\n' +
         '  vec3 nW = normalize(cross(dFdx(wp), dFdy(wp)));\n' +
         '  if (nW.y < 0.0) nW = -nW;\n' +
@@ -684,6 +786,13 @@
         '  snow = max(snow, uSnowy * (1.0 - smoothstep(0.25, 0.45, slope)) * 0.85);\n' +
         '  col = mix(col, vec3(0.87, 0.9, 0.93), snow);\n' +
         '  vec3 sea = mix(vec3(0.05, 0.13, 0.2), vec3(0.07, 0.17, 0.25), n1);\n' +
+        // Whitecap coverage from Monahan & O'Muircheartaigh (1980):
+        // W = 3.84e-6 * U^3.41 - a real few percent at 10 m/s.
+        '  float U = max(uWindMs, 0.8);\n' +
+        '  float W = clamp(3.84e-6 * pow(U, 3.41), 0.0, 0.6);\n' +
+        '  vec2 pmc = wp.xz * 57.14 * 0.11;\n' +
+        '  float capN = tnoise(pmc + uTime * 0.25 * normalize(uWindVec) + 31.0);\n' +
+        '  sea = mix(sea, vec3(0.75, 0.8, 0.84), smoothstep(1.0 - W, 1.0 - W + 0.04, capN));\n' +
         '  return mix(col, sea, wetF);\n' +
         '}\n';
       const terrainMat = new THREE.MeshLambertMaterial({flatShading: true});
@@ -703,6 +812,15 @@
           .replace(
             '#include <color_fragment>',
             '#include <color_fragment>\ndiffuseColor.rgb = terrainColor(vWp, vWet);'
+          )
+          .replace(
+            '#include <normal_fragment_begin>',
+            '#include <normal_fragment_begin>\n' +
+              'if (vWet > 0.5) normal = normalize((viewMatrix * vec4(seaNormal(vWp), 0.0)).xyz);'
+          )
+          .replace(
+            '#include <opaque_fragment>',
+            'outgoingLight += vWet * seaSpec(vWp);\n#include <opaque_fragment>'
           );
       };
 
@@ -772,7 +890,7 @@
           crown.receiveShadow = true;
           tree.add(trunk, crown);
           tree.position.set(x, s0.y, z);
-          tree.userData.phase = rand() * Math.PI * 2;
+          tree.userData = {phase: rand() * Math.PI * 2, a: 0, v: 0};
           trees.push(tree);
           ground.add(tree);
         }
@@ -861,11 +979,13 @@
       scene.add(moonLight);
       scene.add(moonLight.target);
 
-      // Aurora: three additive curtains over the poleward horizon. Only
-      // shown when the real planetary K-index and the latitude justify it.
+      // Aurora: additive curtains over the poleward horizon, driven by
+      // NOAA's OVATION oval (Kp heuristic as fallback). The oval's real
+      // latitude sets the curtain's true elevation via uBase.
       const auroraU = {
         time: {value: 0},
-        strength: {value: 0}
+        strength: {value: 0},
+        uBase: {value: 60}
       };
       const aurora = new THREE.Mesh(
         new THREE.CylinderGeometry(
@@ -889,10 +1009,10 @@
             ' vy = (modelMatrix * vec4(position, 1.0)).y;' +
             ' gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
           fragmentShader:
-            'uniform float time; uniform float strength;' +
+            'uniform float time; uniform float strength; uniform float uBase;' +
             ' varying vec2 u; varying float vy;' +
             ' void main(){' +
-            ' float h = clamp((vy - 60.0) / 720.0, 0.0, 1.0);' +
+            ' float h = clamp((vy - uBase) / 720.0, 0.0, 1.0);' +
             ' float w = sin(u.x * 38.0 + time * 0.9 + sin(u.x * 7.0 + time * 0.35) * 2.4)' +
             '   * 0.5 + 0.5;' +
             ' float w2 = sin(u.x * 61.0 - time * 0.6 + 2.1) * 0.5 + 0.5;' +
@@ -930,10 +1050,37 @@
           70 + rand() * 30,
           (rand() - 0.5) * 480
         );
+        // Altitude jitter around the real cloud base (set each frame).
+        blob.userData.jitter = rand() * 10;
         clouds.push(blob);
         cloudGroup.add(blob);
       }
       scene.add(cloudGroup);
+
+      // The ISS: real orbital mechanics. Current elements from
+      // wheretheiss.at, propagated locally with SGP4 (satellite.js), shown
+      // only during genuinely visible passes: above the horizon, sunlit,
+      // and the observer in twilight or darkness.
+      let satrec = null;
+      let lastPassSaid = -1e9;
+      const iss = new THREE.Mesh(
+        new THREE.SphereGeometry(2.4, 8, 6),
+        new THREE.MeshBasicMaterial({color: '#f4f7ff', fog: false})
+      );
+      iss.visible = false;
+      scene.add(iss);
+      async function syncISS() {
+        try {
+          const tle = await (
+            await fetch('https://api.wheretheiss.at/v1/satellites/25544/tles', {
+              credentials: 'omit'
+            })
+          ).json();
+          satrec = satellite.twoline2satrec(tle.line1, tle.line2);
+        } catch {
+          // Keep any previous elements; SGP4 stays accurate for days.
+        }
+      }
 
       // Precipitation: one particle field, styled as rain or snow.
       const PRECIP_N = 1600;
@@ -974,6 +1121,8 @@
       const cNightBot = new THREE.Color('#141c33');
       const cGray = new THREE.Color('#9aa4ad');
       const tmpB = new THREE.Color();
+      const windV = new THREE.Vector3(1, 0, 0);
+      const treeAxis = new THREE.Vector3(0, 0, 1);
 
       // ---------- pointer parallax (forwarded by footer.js) ----------
       const look = {x: 0, y: 0};
@@ -1038,21 +1187,72 @@
           starMat.uniforms.night.value = (1 - day) * (1 - cloudy * 0.85);
         moonDisc.visible = moon.alt > -0.05;
 
-        // Aurora strength: real Kp, auroral latitude, and darkness.
-        const kpFactor =
-          THREE.MathUtils.clamp((state.kp - 4) / 4, 0, 1) *
-          THREE.MathUtils.clamp((Math.abs(state.lat) - 46) / 14, 0, 1);
-        auroraU.strength.value = kpFactor * (1 - day) * (1 - cloudy * 0.7);
+        // The real wind vector: meteorological direction is where wind
+        // comes FROM; the scene advects along where it blows TO.
+        const windTo = (state.winddir + 180) * RAD;
+        windV.set(Math.sin(windTo), 0, -Math.cos(windTo));
+
+        // Sea-state uniforms: real wind feeds the wave model.
+        terrainUniforms.uTime.value = t / 1000;
+        terrainUniforms.uWindMs.value = state.wind / 3.6;
+        terrainUniforms.uWindVec.value.set(windV.x, windV.z);
+        terrainUniforms.uSunDirW.value.copy(sunVec);
+        terrainUniforms.uSunCol.value
+          .copy(sunLight.color)
+          .multiplyScalar(
+            sunLight.intensity * (sun.alt > 0.01 ? 1 : 0) * (1 - cloudy * 0.8)
+          );
+
+        // Aurora: OVATION oval probability when available (Kp heuristic
+        // otherwise), with the curtain elevation from the oval's true
+        // distance - Earth curvature included, ~150km emission height.
+        let auroraP;
+        let ovalDeg;
+        if (state.auroraP !== null) {
+          auroraP = state.auroraP;
+          ovalDeg = Math.abs(state.auroraLat) - Math.abs(state.lat);
+        } else {
+          auroraP =
+            THREE.MathUtils.clamp((state.kp - 4) / 4, 0, 1) *
+            THREE.MathUtils.clamp((Math.abs(state.lat) - 46) / 14, 0, 1);
+          ovalDeg = 8;
+        }
+        const ovalKm = Math.max(ovalDeg, 0) * 111;
+        const elevA = Math.atan2(
+          150 - (ovalKm * ovalKm) / 12742,
+          Math.max(ovalKm, 60)
+        );
+        auroraU.strength.value =
+          auroraP * (1 - day) * (1 - cloudy * 0.7) * (elevA > 0.035 ? 1 : 0);
         auroraU.time.value = t / 1000;
+        const yAurora = Math.tan(THREE.MathUtils.clamp(elevA, 0.06, 1.1)) * 760;
+        auroraU.uBase.value = yAurora - 160;
+        aurora.position.y = yAurora + 200;
         aurora.rotation.y = state.lat < 0 ? Math.PI : 0;
 
+        // Clouds ride the real wind vector, based at the real lifting
+        // condensation level (Espy: ~125m per degree of dew point spread).
+        // Clamped above the camera: the asinh height compression squeezes
+        // low cloud decks harder than the terrain they sit over.
+        const lcl = Math.max(125 * (state.temp - state.dew), 150);
+        const yCloud = Math.max(16 * Math.asinh(lcl / 500) + 8, camBaseY + 26);
         const showClouds = Math.round(cloudy * clouds.length);
         clouds.forEach((c, i) => {
           c.visible = i < showClouds;
-          c.position.x += state.wind * 0.06 * dt;
+          c.position.x += windV.x * state.wind * 0.06 * dt;
+          c.position.z += windV.z * state.wind * 0.06 * dt;
+          c.position.y +=
+            (yCloud + c.userData.jitter - c.position.y) * Math.min(dt, 1);
           if (c.position.x > 260) c.position.x = -260;
+          if (c.position.x < -260) c.position.x = 260;
+          if (c.position.z > 260) c.position.z = -260;
+          if (c.position.z < -260) c.position.z = 260;
         });
         cloudMat.opacity = 0.5 + cloudy * 0.4;
+        // Unlit clouds are dark; only daylight (or moonlight) brightens.
+        cloudMat.color.setScalar(
+          0.3 + day * 0.7 + (moon.alt > 0 ? 0.08 * (1 - day) : 0)
+        );
 
         // Ground snow cover reacts live to the real temperature.
         const snowyGround =
@@ -1075,26 +1275,87 @@
         if (raining || snowing) {
           const p = precipGeo.attributes.position;
           const fall = (snowing ? 6 : 34) * (0.4 + rate * 0.6) * dt;
+          // Advected along the true wind vector, not just eastward.
           const drift = state.wind * 0.05 * dt;
           for (let i = 0; i < PRECIP_N; i++) {
             let y = p.getY(i) - fall;
-            let x =
-              p.getX(i) + drift + (snowing ? Math.sin(t / 900 + i) * 0.02 : 0);
+            const wob = snowing ? Math.sin(t / 900 + i) * 0.02 : 0;
+            let x = p.getX(i) + windV.x * drift + wob;
+            let z = p.getZ(i) + windV.z * drift;
             if (y < 0) y += 45;
             if (x > 45) x -= 90;
+            if (x < -45) x += 90;
+            if (z > 45) z -= 90;
+            if (z < -45) z += 90;
             p.setY(i, y);
             p.setX(i, x);
+            p.setZ(i, z);
           }
           p.needsUpdate = true;
         }
 
-        const sway = Math.min(state.wind / 60, 1);
+        // Trees: an underdamped spring-damper per tree, forced by the
+        // real mean wind and the real gust spread, leaning along the
+        // true wind direction.
+        const meanLean = Math.min(state.wind / 130, 0.5);
+        const gustAmp = Math.min(
+          Math.max(state.gust - state.wind, 0) / 90,
+          0.6
+        );
+        treeAxis.set(windV.z, 0, -windV.x);
         for (const tree of trees) {
-          tree.rotation.z =
-            sway * 0.06 +
-            Math.sin(t / (900 - sway * 500) + tree.userData.phase) *
-              sway *
-              0.05;
+          const u = tree.userData;
+          const forcing =
+            meanLean +
+            gustAmp *
+              (0.6 *
+                Math.sin(t * 0.0011 + u.phase) *
+                Math.sin(t * 0.00043 + u.phase * 2.7) +
+                0.4 * Math.sin(t * 0.0027 + u.phase * 1.3));
+          u.v += (14 * (forcing - u.a) - 4.2 * u.v) * dt;
+          u.a += u.v * dt;
+          tree.setRotationFromAxisAngle(treeAxis, u.a);
+        }
+
+        // ISS: SGP4-propagated position; drawn only when the pass is
+        // genuinely visible (above horizon, sunlit against a dark sky).
+        if (satrec && window.satellite) {
+          const pv = satellite.propagate(satrec, d);
+          if (pv.position) {
+            const lk = satellite.ecfToLookAngles(
+              {
+                latitude: state.lat * RAD,
+                longitude: state.lon * RAD,
+                height: centerElev / 1000
+              },
+              satellite.eciToEcf(pv.position, satellite.gstime(d))
+            );
+            // Cylindrical Earth-shadow test in the equatorial frame.
+            const sEq = sunEquatorial(d);
+            const sx = Math.cos(sEq.dec) * Math.cos(sEq.ra);
+            const sy = Math.cos(sEq.dec) * Math.sin(sEq.ra);
+            const sz = Math.sin(sEq.dec);
+            const r = pv.position;
+            const dp = r.x * sx + r.y * sy + r.z * sz;
+            const perp = Math.hypot(
+              r.x - dp * sx,
+              r.y - dp * sy,
+              r.z - dp * sz
+            );
+            const sunlit = dp > 0 || perp > 6371;
+            iss.visible = lk.elevation > 0.09 && sunlit && sun.alt < -0.05;
+            if (iss.visible) {
+              iss.position.copy(skyPoint(lk.elevation, lk.azimuth, 820));
+              if (t - lastPassSaid > 900000) {
+                lastPassSaid = t;
+                say(
+                  'ISS pass · ' +
+                    Math.round(lk.rangeSat) +
+                    ' km away · real orbit via SGP4'
+                );
+              }
+            }
+          }
         }
 
         let shakeX = 0;
@@ -1156,6 +1417,10 @@
         setInterval(syncWeather, 15 * 60 * 1000);
         syncKp();
         setInterval(syncKp, 15 * 60 * 1000);
+        syncOvation();
+        setInterval(syncOvation, 30 * 60 * 1000);
+        syncISS();
+        setInterval(syncISS, 6 * 60 * 60 * 1000);
         if (params.get('dem') !== '0') {
           try {
             demData = await fetchDEMTiles(state.lat, state.lon);
