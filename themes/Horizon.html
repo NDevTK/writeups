@@ -1115,15 +1115,22 @@
       scene.add(ground);
       // Tree archetypes (shared geometry, per-tree scale): conifers for
       // the subalpine band, broadleaves lower down.
-      const trunkMat = new THREE.MeshLambertMaterial({color: '#6b4a33'});
+      // GGX standard materials: bark and foliage are near-diffuse
+      // (roughness ~1), which the microfacet model represents honestly
+      // instead of Lambert's zero specular.
+      const trunkMat = new THREE.MeshStandardMaterial({
+        color: '#6b4a33',
+        roughness: 0.9,
+        metalness: 0
+      });
       const leafMats = [
-        new THREE.MeshLambertMaterial({color: '#2e5230'}),
-        new THREE.MeshLambertMaterial({color: '#3f6b3a'}),
-        new THREE.MeshLambertMaterial({color: '#4d7a35'})
+        new THREE.MeshStandardMaterial({color: '#2e5230', roughness: 1}),
+        new THREE.MeshStandardMaterial({color: '#3f6b3a', roughness: 1}),
+        new THREE.MeshStandardMaterial({color: '#4d7a35', roughness: 1})
       ];
       const broadMats = [
-        new THREE.MeshLambertMaterial({color: '#4a7d33'}),
-        new THREE.MeshLambertMaterial({color: '#5d8a3c'})
+        new THREE.MeshStandardMaterial({color: '#4a7d33', roughness: 1}),
+        new THREE.MeshStandardMaterial({color: '#5d8a3c', roughness: 1})
       ];
       [trunkMat, ...leafMats, ...broadMats].forEach(applyAerial);
       const geoTrunk = new THREE.CylinderGeometry(0.13, 0.2, 1.1, 7);
@@ -1200,6 +1207,7 @@
         'uniform vec3 uSunCol;\n' +
         'varying float vWet;\n' +
         'varying vec3 vWp;\n' +
+        'float gRough = 0.95;\n' +
         'float thash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
         'float tnoise(vec2 p){\n' +
         '  vec2 i = floor(p); vec2 f = fract(p);\n' +
@@ -1257,12 +1265,19 @@
         '  grass *= 0.85 + n3 * 0.3;\n' +
         '  vec3 rock = mix(vec3(0.28, 0.25, 0.21), vec3(0.4, 0.37, 0.32), n2);\n' +
         '  rock *= 0.82 + n3 * 0.36;\n' +
-        '  vec3 col = mix(grass, rock, smoothstep(0.2, 0.45, slope + (n2 - 0.5) * 0.08));\n' +
+        '  float rockF = smoothstep(0.2, 0.45, slope + (n2 - 0.5) * 0.08);\n' +
+        '  vec3 col = mix(grass, rock, rockF);\n' +
         '  col = mix(col, rock, smoothstep(1600.0, 2400.0, e) * 0.92);\n' +
         '  float snowLine = uSnowLine + (n1 - 0.5) * 500.0;\n' +
         '  float snow = smoothstep(snowLine, snowLine + 700.0, e) * (1.0 - smoothstep(0.35, 0.6, slope));\n' +
         '  snow = max(snow, uSnowy * (1.0 - smoothstep(0.25, 0.45, slope)) * 0.85);\n' +
         '  col = mix(col, vec3(0.87, 0.9, 0.93), snow);\n' +
+        // Per-pixel microfacet roughness for the GGX BRDF: measured-ish
+        // values - vegetation ~0.95, rock ~0.88, snow much glossier
+        // (0.45, its forward-scattering sheen). Wet sea pixels keep
+        // roughness 1 so Cox-Munk seaSpec stays the one glitter model.
+        '  gRough = mix(mix(0.95, 0.88, rockF), 0.45, snow);\n' +
+        '  gRough = mix(gRough, 1.0, wetF);\n' +
         '  vec3 sea = mix(vec3(0.05, 0.13, 0.2), vec3(0.07, 0.17, 0.25), n1);\n' +
         // Whitecap coverage from Monahan & O'Muircheartaigh (1980):
         // W = 3.84e-6 * U^3.41 - a real few percent at 10 m/s.
@@ -1273,7 +1288,16 @@
         '  sea = mix(sea, vec3(0.75, 0.8, 0.84), smoothstep(1.0 - W, 1.0 - W + 0.04, capN));\n' +
         '  return mix(col, sea, wetF);\n' +
         '}\n';
-      const terrainMat = new THREE.MeshLambertMaterial();
+      // MeshStandardMaterial is three's vendored implementation of the
+      // research BRDF (GGX + Smith height-correlated visibility after
+      // Karis 2013, Schlick fresnel, Burley diffuse) - the terrain gets
+      // the real microfacet model with per-pixel roughness, not Lambert.
+      const terrainMat = new THREE.MeshStandardMaterial({metalness: 0});
+      record(
+        'GGX microfacet BRDF (Karis 2013)',
+        'per-pixel roughness · vegetation/rock/snow'
+      );
+      record('Lommel-Seeliger moon', 'lunar regolith photometry');
       terrainMat.onBeforeCompile = (shader) => {
         Object.assign(shader.uniforms, terrainUniforms);
         shader.vertexShader = shader.vertexShader
@@ -1296,6 +1320,10 @@
             '#include <normal_fragment_begin>\n' +
               'vec3 wNrm = vWet > 0.5 ? seaNormal(vWp) : demNormal(vWp.xz);\n' +
               'normal = normalize((viewMatrix * vec4(wNrm, 0.0)).xyz);'
+          )
+          .replace(
+            '#include <roughnessmap_fragment>',
+            'float roughnessFactor = gRough;'
           )
           .replace(
             '#include <opaque_fragment>',
@@ -1662,22 +1690,41 @@
           );
         });
 
-      // The moon: a lit sphere on its own light layer. Because its light
-      // comes from the sun's real direction, the phase is always correct.
+      // The moon: a sphere lit from the sun's REAL direction, so the
+      // phase is always correct - and shaded by the Lommel-Seeliger
+      // photometric function (the standard lunar regolith model, the
+      // basis of McEwen's lunar-Lambert), not Lambert. That is why a
+      // full moon renders flat like the real one instead of
+      // limb-darkening like a billiard ball.
+      const moonU = {
+        sunDirM: {value: new THREE.Vector3(0, 1, 0)},
+        albM: {value: new THREE.Color('#cdd4e2')},
+        glowM: {value: new THREE.Color('#0c0f16')}
+      };
       const moonDisc = new THREE.Mesh(
         new THREE.SphereGeometry(24, 24, 18),
-        new THREE.MeshLambertMaterial({
-          color: '#cdd4e2',
-          emissive: '#0c0f16',
-          fog: false
+        new THREE.ShaderMaterial({
+          uniforms: moonU,
+          vertexShader:
+            'varying vec3 vN; varying vec3 vWpM; void main(){' +
+            ' vN = normalize(mat3(modelMatrix) * normal);' +
+            ' vWpM = (modelMatrix * vec4(position, 1.0)).xyz;' +
+            ' gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+          fragmentShader:
+            'uniform vec3 sunDirM; uniform vec3 albM; uniform vec3 glowM;' +
+            'varying vec3 vN; varying vec3 vWpM;' +
+            'void main(){' +
+            '  vec3 n = normalize(vN);' +
+            '  float mu0 = dot(n, sunDirM);' + // cos incidence
+            '  float mu = dot(n, normalize(cameraPosition - vWpM));' + // cos emission
+            '  float ls = mu0 > 0.0 ? mu0 / max(mu0 + mu, 1e-3) : 0.0;' +
+            // Lommel-Seeliger reflectance; x2 normalises the full-moon
+            // face back to the albedo.
+            '  gl_FragColor = vec4(albM * ls * 2.0 + glowM, 1.0); }'
         })
       );
       moonDisc.layers.set(2);
       scene.add(moonDisc);
-      const moonLight = new THREE.DirectionalLight(0xffffff, 2.2);
-      moonLight.layers.set(2);
-      scene.add(moonLight);
-      scene.add(moonLight.target);
 
       // Naked-eye planets at their true ephemeris positions, sized by
       // real apparent magnitude, tinted like the eye sees them.
@@ -1958,7 +2005,7 @@
       const tmpM4 = new THREE.Matrix4();
       const driftMesh = new THREE.InstancedMesh(
         new THREE.IcosahedronGeometry(0.16, 0),
-        new THREE.MeshLambertMaterial({color: '#eef2f6'}),
+        new THREE.MeshStandardMaterial({color: '#eef2f6', roughness: 0.5}),
         DRIFT_CAP
       );
       driftMesh.count = 0;
@@ -2245,8 +2292,12 @@
         const sunVec = skyPoint(sun.alt, sun.az, 1);
         sunLight.position.copy(skyPoint(Math.max(sun.alt, -0.12), sun.az, 190));
         moonDisc.position.copy(skyPoint(moon.alt, moon.az, 1500));
-        moonLight.position.copy(skyPoint(sun.alt, sun.az, 200));
-        moonLight.target.position.copy(moonDisc.position);
+        // Sun direction as seen at the moon disc (same geometry the old
+        // directional light encoded), feeding the Lommel-Seeliger shader.
+        moonU.sunDirM.value
+          .copy(skyPoint(sun.alt, sun.az, 200))
+          .sub(moonDisc.position)
+          .normalize();
 
         polar.rotation.x = -(90 - state.lat) * RAD;
         celestial.rotation.y = -(gmst(d) + state.lon * RAD);
