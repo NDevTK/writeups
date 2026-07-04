@@ -349,6 +349,39 @@ const DOME_FRAG = /* glsl */ `
   }
 `;
 
+const IRRADIANCE_FRAG = /* glsl */ `
+  uniform sampler2D skyLutI;
+  uniform float camHI;
+  varying vec2 vUv;
+  const float RbI = 6360e3;
+
+  // Cosine-weighted integral of the sky-view LUT over the upper
+  // hemisphere: the scene's ambient term IS the rendered sky (Hillaire
+  // feeds the sky into the ambient probe the same way), not a tuned
+  // constant. The LUT covers relative azimuth 0..pi symmetrically, so
+  // averaging that half-range equals the full-circle mean.
+  void main() {
+    float r = RbI + max(camHI, 1.0);
+    float horizon = -sqrt(max(r * r - RbI * RbI, 0.0)) / r;
+    float hAngle = asin(clamp(horizon, -1.0, 1.0));
+    vec3 E = vec3(0.0);
+    float wSum = 0.0;
+    for (int ie = 0; ie < 6; ie++) {
+      float elev = (float(ie) + 0.5) / 6.0 * 1.5707963;
+      float uy = 0.5 +
+        0.5 * sqrt(clamp((elev - hAngle) / (1.5707963 - hAngle), 0.0, 1.0));
+      // cos(theta_zenith) = sin(elev); d-omega = cos(elev) d-elev d-az
+      float w = sin(elev) * cos(elev);
+      for (int ia = 0; ia < 8; ia++) {
+        float az = (float(ia) + 0.5) / 8.0;
+        E += texture2D(skyLutI, vec2(az, uy)).rgb * w;
+        wSum += w;
+      }
+    }
+    gl_FragColor = vec4(E / max(wSum, 1e-6), 1.0);
+  }
+`;
+
 function pass(renderer, material, target) {
   const scene = new THREE.Scene();
   const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -417,6 +450,24 @@ export function createAtmosphere(renderer) {
     vertexShader: VERT,
     fragmentShader: AERIAL_FRAG
   });
+  // 1x1 float target so the integrated sky irradiance can be read back
+  // (FloatType: readPixels on RGBA32F is guaranteed once
+  // EXT_color_buffer_float is present, which ok already requires).
+  const irrLut = new THREE.WebGLRenderTarget(1, 1, {
+    type: THREE.FloatType,
+    depthBuffer: false,
+    stencilBuffer: false
+  });
+  const irrU = {
+    skyLutI: {value: skyLut.texture},
+    camHI: {value: 300}
+  };
+  const irrMat = new THREE.ShaderMaterial({
+    uniforms: irrU,
+    vertexShader: VERT,
+    fragmentShader: IRRADIANCE_FRAG
+  });
+  const irrBuf = new Float32Array(4);
 
   const domeU = {
     skyLut: {value: skyLut.texture},
@@ -468,8 +519,16 @@ export function createAtmosphere(renderer) {
       domeU.sunDirW.value.copy(sunDir);
       domeU.camHD.value = camHMetres;
       if (exposure) domeU.exposure.value = exposure;
+      irrU.camHI.value = camHMetres;
       pass(renderer, svMat, skyLut);
       pass(renderer, aerialMat, aerialLut);
+      pass(renderer, irrMat, irrLut);
+    },
+    // Cosine-weighted mean sky radiance (multiply by pi for irradiance);
+    // a 1x1 readback, called at low frequency by the scene.
+    readIrradiance() {
+      renderer.readRenderTargetPixels(irrLut, 0, 0, 1, 1, irrBuf);
+      return irrBuf;
     }
   };
 }

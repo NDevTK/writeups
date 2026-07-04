@@ -864,7 +864,13 @@
       sunLight.shadow.normalBias = 1.5;
       scene.add(sunLight);
       scene.add(sunLight.target);
-      const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+      // Ambient is a hemisphere fed by the REAL sky: the atmosphere pass
+      // integrates its own sky-view LUT (cosine-weighted) and the result
+      // is read back at 1 Hz - twilight blues, overcast greys and sunset
+      // warmth arrive from the raymarch, not from a tuned formula. The
+      // ground half is that irradiance bounced off an estimated terrain
+      // albedo (0.25 grass/rock, 0.7 snow - the one disclosed estimate).
+      const ambient = new THREE.HemisphereLight(0xffffff, 0x404038, 0.5);
       scene.add(ambient);
 
       // The sky: Hillaire (2020) multiple-scattering atmosphere -
@@ -963,7 +969,14 @@
           'Aerial perspective LUT',
           'per-pixel inscatter + transmittance on every material'
         );
+        record(
+          'Sky-irradiance ambient',
+          'hemisphere light integrated from the sky-view LUT'
+        );
       }
+      const skyIrr = new THREE.Color(0.05, 0.07, 0.1);
+      const tmpC = new THREE.Color();
+      let lastIrrT = -1e9;
 
       // Overcast veil: a translucent grey dome that fades in with real
       // cloud cover (the scattering model alone stays too blue).
@@ -2290,14 +2303,52 @@
           (day > 0 ? 1 : 0) *
           (1 - cloudy * 0.55) *
           (1 - 0.93 * ecl);
-        // Kept moderate so the sun's cast shadows stay readable.
-        ambient.intensity =
-          (0.12 +
-            day * 0.3 * (1 - cloudy * 0.3) +
-            cloudy * day * 0.12 +
-            (moon.alt > 0 ? 0.07 * (1 - day) : 0)) *
-          (1 - 0.8 * ecl);
-        ambient.color.copy(tmpB);
+        const moonUp = moon.alt > 0 ? 0.07 * (1 - day) : 0;
+        if (atmo.ok) {
+          if (t - lastIrrT > 1000) {
+            lastIrrT = t;
+            const ir = atmo.readIrradiance();
+            if (ir[0] + ir[1] + ir[2] > 1e-7)
+              skyIrr.setRGB(ir[0], ir[1], ir[2]);
+          }
+          // The ambient term IS the sky: cosine-weighted irradiance
+          // integrated from the sky-view LUT (read back at 1 Hz), in the
+          // dome's own eye-adaptation exposure - twilight blues, sunset
+          // warmth and dusk falloff arrive from the raymarch, not from a
+          // tuned curve. One calibration constant maps LUT radiance into
+          // three's light units (the sun's intensity mapping already
+          // does the same). The LUT is clear-sky and sunlit only, so the
+          // measured cloud dimming, the eclipse obscuration and a small
+          // moonlit-sky term apply here.
+          const expo = 24 / (0.2 + 0.8 * day);
+          const dim = (1 - 0.85 * ecl) * (1 - cloudy * 0.3);
+          ambient.intensity = 1;
+          // 1.1 puts the clear-sky diffuse fraction at ~20% of direct,
+          // the measured real-world ratio.
+          ambient.color.copy(skyIrr).multiplyScalar(expo * 1.1 * dim);
+          tmpC.setRGB(0.05, 0.055, 0.075).multiplyScalar(moonUp * 14);
+          ambient.color.add(tmpC);
+          // Ground half: sky plus direct sun bounced off the terrain
+          // albedo (0.25 grass/rock to 0.7 snow).
+          const alb = 0.25 + 0.45 * terrainUniforms.uSnowy.value;
+          tmpC
+            .copy(sunLight.color)
+            .multiplyScalar(
+              sunLight.intensity * Math.max(Math.sin(sun.alt), 0) * 0.55
+            )
+            .add(ambient.color);
+          ambient.groundColor.copy(tmpC).multiplyScalar(alb);
+        } else {
+          // Preetham fallback keeps the tuned formula.
+          ambient.intensity =
+            (0.12 +
+              day * 0.3 * (1 - cloudy * 0.3) +
+              cloudy * day * 0.12 +
+              moonUp) *
+            (1 - 0.8 * ecl);
+          ambient.color.copy(tmpB);
+          ambient.groundColor.copy(tmpB).multiplyScalar(0.4);
+        }
         if (starMat) {
           starMat.uniforms.night.value = nightSky * (1 - cloudy * 0.85);
           starMat.uniforms.time.value = t / 1000;
@@ -2444,7 +2495,9 @@
           cu.sunCol.value
             .copy(sunLight.color)
             .multiplyScalar(Math.max(sunLight.intensity, 0.02) * 0.55);
-          cu.ambCol.value.copy(tmpB).multiplyScalar(0.22 + day * 0.5);
+          // Cloud ambient is the same integrated sky the terrain gets.
+          if (atmo.ok) cu.ambCol.value.copy(ambient.color).multiplyScalar(0.6);
+          else cu.ambCol.value.copy(tmpB).multiplyScalar(0.22 + day * 0.5);
           cu.wOff.value.x += windV.x * state.wind * 0.06 * dt;
           cu.wOff.value.y += windV.z * state.wind * 0.06 * dt;
         }
@@ -2461,7 +2514,8 @@
           cm.sunCol.value
             .copy(sunLight.color)
             .multiplyScalar(Math.max(sunLight.intensity, 0.02) * 0.55);
-          cm.ambCol.value.copy(tmpB).multiplyScalar(0.22 + day * 0.5);
+          if (atmo.ok) cm.ambCol.value.copy(ambient.color).multiplyScalar(0.6);
+          else cm.ambCol.value.copy(tmpB).multiplyScalar(0.22 + day * 0.5);
           const w700 = state.wind700 ?? state.wind;
           cm.wOff.value.x += windVMid.x * w700 * 0.06 * dt;
           cm.wOff.value.y += windVMid.z * w700 * 0.06 * dt;
