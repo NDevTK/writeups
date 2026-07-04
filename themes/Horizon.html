@@ -30,12 +30,19 @@
         sets the curtain's elevation in the sky (Kp heuristic fallback)
       - the ISS crosses the sky via SGP4-propagated live elements, drawn
         only during genuinely visible passes
+      - when it snows, flakes are rigid bodies in a real physics engine
+        (vendored Rapier): air drag, real wind force, collision with a
+        heightfield of the local terrain and with settled flakes, so
+        drifts accumulate while the page is open and melt when the real
+        temperature rises
+      - a data panel (the ✦ wallpaper control, ?debug=1, or the D key)
+        lists every live source with its last real value
 
       Standalone debug overrides (query params, e.g. Horizon.html?time=...):
         lat, lon, time (ISO), cloud (0-100), wind (km/h), winddir (deg),
         gust (km/h), precip (mm), snow (cm), temp (C), dew (C), code
         (WMO weather code), quake (magnitude), kp (0-9), aurora (0-1),
-        auroralat (deg), dem=0 (skip real terrain)
+        auroralat (deg), dem=0 (skip real terrain), debug=1
     -->
     <style>
       html,
@@ -64,6 +71,31 @@
         text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
         transition: opacity 1.2s ease;
       }
+      #panel {
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        max-width: 380px;
+        max-height: 80vh;
+        overflow-y: auto;
+        padding: 12px 14px;
+        border-radius: 10px;
+        background: rgba(10, 14, 24, 0.82);
+        backdrop-filter: blur(6px);
+        color: rgba(230, 237, 243, 0.92);
+        font:
+          11px/1.6 ui-monospace,
+          'Cascadia Mono',
+          Consolas,
+          monospace;
+        white-space: pre-wrap;
+      }
+      #panel b {
+        color: #7ee2a8;
+      }
+      #panel .age {
+        color: rgba(230, 237, 243, 0.45);
+      }
     </style>
     <script type="importmap">
       {"imports": {"three": "./horizon/three.module.min.js"}}
@@ -72,6 +104,7 @@
   <body>
     <canvas id="gl"></canvas>
     <div id="caption"></div>
+    <div id="panel" hidden></div>
     <script src="./horizon/satellite.min.js"></script>
     <script type="module">
       import * as THREE from 'three';
@@ -207,6 +240,14 @@
           captionTimer = setTimeout(() => (caption.style.opacity = 0), 12000);
       }
 
+      // Every live data source records what it last delivered, so the
+      // panel (the site's ✦ wallpaper toggle, or ?debug=1, or the D key)
+      // can prove nothing here is invented.
+      const sources = {};
+      function record(name, value) {
+        sources[name] = {value: String(value), at: Date.now()};
+      }
+
       const WMO = {
         0: 'clear',
         1: 'mostly clear',
@@ -245,6 +286,14 @@
           state.lat = +geo.latitude;
           state.lon = +geo.longitude;
           state.place = geo.city || geo.country || '';
+          record(
+            'geojs.io IP location',
+            state.lat.toFixed(2) +
+              ', ' +
+              state.lon.toFixed(2) +
+              ' · ' +
+              state.place
+          );
         } catch {
           // Keep the Greenwich fallback.
         }
@@ -269,6 +318,23 @@
           state.gust = c.wind_gusts_10m;
           state.temp = c.temperature_2m;
           state.dew = c.dew_point_2m;
+          record(
+            'open-meteo current',
+            (WMO[state.code] || state.code) +
+              ' · ' +
+              state.temp +
+              '°C · wind ' +
+              state.wind +
+              ' km/h from ' +
+              state.winddir +
+              '° gust ' +
+              state.gust +
+              ' · cloud ' +
+              state.cloud +
+              '% · dew ' +
+              state.dew +
+              '°C'
+          );
           say(
             (state.place ? state.place + ' · ' : '') +
               (WMO[state.code] || 'weather code ' + state.code) +
@@ -289,6 +355,7 @@
             )
           ).json();
           state.kp = +rows[rows.length - 1].estimated_kp || 0;
+          record('NOAA SWPC planetary K-index', state.kp.toFixed(2));
         } catch {
           state.kp = 0;
         }
@@ -329,6 +396,10 @@
           }
           state.auroraP = best / 100;
           state.auroraLat = bestLat;
+          record(
+            'NOAA OVATION aurora oval',
+            best + '% at lat ' + bestLat + '° on this meridian'
+          );
         } catch {
           state.auroraP = null; // fall back to the Kp heuristic
         }
@@ -383,6 +454,7 @@
             );
           }
           firstQuakePoll = false;
+          record('USGS M4.5+ quake feed', q.features.length + ' events today');
         } catch {
           // Silent: quakes are garnish, not the meal.
         }
@@ -460,6 +532,17 @@
         for (let k = 0; k < elev.length; k++)
           elev[k] =
             data[k * 4] * 256 + data[k * 4 + 1] + data[k * 4 + 2] / 256 - 32768;
+        record(
+          'AWS terrarium DEM tiles',
+          jobs.length +
+            ' tiles at z' +
+            z +
+            ' · ' +
+            canvas.width +
+            'x' +
+            canvas.height +
+            ' px'
+        );
         return {
           kind: 'img',
           w: canvas.width,
@@ -511,6 +594,10 @@
           grid.push(...(await r.json()).elevation);
         }
         const dem = {n: DEM_N, grid};
+        record(
+          'open-meteo elevation API',
+          DEM_N + 'x' + DEM_N + ' grid (fallback)'
+        );
         try {
           localStorage.setItem(key, JSON.stringify(dem));
         } catch {}
@@ -706,6 +793,8 @@
       let trees = [];
       let camBaseY = 6;
       let viewSign = 1; // +1: camera looks south (north hemisphere)
+      let snowSim = null; // Rapier world, booted the first time it snows
+      let snowLoading = false;
 
       // Terrain material: grass/rock/snow/sea decided per PIXEL in the
       // fragment shader (slope and altitude with noise-jittered borders),
@@ -896,6 +985,11 @@
         }
 
         camBaseY = sample(0, -26 * viewSign).y + 5;
+        // New terrain invalidates the physics heightfield and any drifts.
+        if (snowSim) {
+          snowSim.rebuildTerrain();
+          snowSim.clearDrifts();
+        }
       }
       buildWorld();
 
@@ -960,6 +1054,10 @@
             vertexColors: true
           });
           celestial.add(new THREE.Points(geo, starMat));
+          record(
+            'Yale Bright Star Catalog',
+            stars.length + ' stars (vendored)'
+          );
         });
 
       // The moon: a lit sphere on its own light layer. Because its light
@@ -1077,6 +1175,14 @@
             })
           ).json();
           satrec = satellite.twoline2satrec(tle.line1, tle.line2);
+          record(
+            'ISS TLE (wheretheiss.at)',
+            'epoch ' +
+              satrec.epochyr +
+              '/' +
+              satrec.epochdays.toFixed(2) +
+              ' · SGP4'
+          );
         } catch {
           // Keep any previous elements; SGP4 stays accurate for days.
         }
@@ -1115,6 +1221,142 @@
       const precip = new THREE.Points(precipGeo, precipMat);
       scene.add(precip);
 
+      // ---------- physical snow (Rapier, loaded only when it snows) ----------
+      // The near-field weather box is human scale (roughly 1 unit = 1m),
+      // unlike the 57 m/unit map scale. Flakes are rigid bodies in a real
+      // physics engine: gravity against air drag (linear damping gives the
+      // ~1.4 m/s terminal velocity), pushed by the real wind, colliding
+      // with a heightfield of the actual local terrain AND with every
+      // flake already settled - so drifts grow on the real topography for
+      // as long as the page stays open, and melt when the real
+      // temperature says so.
+      const SNOW_N = 240;
+      const DRIFT_CAP = 2400;
+      const SNOW_EXT = 120;
+      const tmpM4 = new THREE.Matrix4();
+      const driftMesh = new THREE.InstancedMesh(
+        new THREE.IcosahedronGeometry(0.16, 0),
+        new THREE.MeshLambertMaterial({color: '#eef2f6'}),
+        DRIFT_CAP
+      );
+      driftMesh.count = 0;
+      driftMesh.frustumCulled = false;
+      scene.add(driftMesh);
+      const flakeMesh = new THREE.InstancedMesh(
+        new THREE.IcosahedronGeometry(0.12, 0),
+        new THREE.MeshBasicMaterial({color: '#ffffff'}),
+        SNOW_N
+      );
+      flakeMesh.count = 0;
+      flakeMesh.frustumCulled = false;
+      scene.add(flakeMesh);
+
+      async function initSnowSim() {
+        snowLoading = true;
+        const RAPIER = await import('./horizon/rapier.es.js');
+        await RAPIER.init();
+        const world = new RAPIER.World({x: 0, y: -3, z: 0});
+        const sim = {
+          world,
+          bodies: [],
+          drifts: new Array(DRIFT_CAP).fill(null),
+          head: 0,
+          countD: 0,
+          highWater: 0,
+          melt: 0
+        };
+        sim.rebuildTerrain = () => {
+          if (sim.terrain) world.removeCollider(sim.terrain, false);
+          const HF = 60;
+          const heights = new Float32Array((HF + 1) * (HF + 1));
+          for (let r = 0; r <= HF; r++)
+            for (let c = 0; c <= HF; c++)
+              heights[r * (HF + 1) + c] = sample(
+                (r / HF - 0.5) * SNOW_EXT, // rows run along +x (verified)
+                (c / HF - 0.5) * SNOW_EXT
+              ).y;
+          sim.terrain = world.createCollider(
+            RAPIER.ColliderDesc.heightfield(HF, HF, heights, {
+              x: SNOW_EXT,
+              y: 1,
+              z: SNOW_EXT
+            })
+          );
+        };
+        sim.clearDrifts = () => {
+          for (let i = 0; i < DRIFT_CAP; i++) {
+            if (sim.drifts[i]) {
+              world.removeCollider(sim.drifts[i], false);
+              sim.drifts[i] = null;
+            }
+            tmpM4.makeScale(0, 0, 0);
+            driftMesh.setMatrixAt(i, tmpM4);
+          }
+          sim.head = 0;
+          sim.countD = 0;
+          sim.highWater = 0;
+          driftMesh.count = 0;
+          driftMesh.instanceMatrix.needsUpdate = true;
+        };
+        sim.spawn = (body) => {
+          body.setTranslation(
+            {
+              x: (Math.random() - 0.5) * 80,
+              y: camBaseY + 26 + Math.random() * 10,
+              z: (Math.random() - 0.5) * 80
+            },
+            true
+          );
+          body.setLinvel({x: 0, y: -1, z: 0}, true);
+        };
+        sim.deposit = (p) => {
+          const slot = sim.head;
+          sim.head = (sim.head + 1) % DRIFT_CAP;
+          if (sim.drifts[slot]) world.removeCollider(sim.drifts[slot], false);
+          else sim.countD++;
+          sim.drifts[slot] = world.createCollider(
+            RAPIER.ColliderDesc.ball(0.14).setTranslation(p.x, p.y, p.z)
+          );
+          tmpM4.makeScale(1, 0.72, 1).setPosition(p.x, p.y, p.z);
+          driftMesh.setMatrixAt(slot, tmpM4);
+          sim.highWater = Math.max(sim.highWater, slot + 1);
+          driftMesh.count = sim.highWater;
+          driftMesh.instanceMatrix.needsUpdate = true;
+        };
+        sim.meltOldest = () => {
+          for (let i = 0; i < DRIFT_CAP; i++) {
+            const slot = (sim.head + i) % DRIFT_CAP; // oldest surviving
+            if (!sim.drifts[slot]) continue;
+            world.removeCollider(sim.drifts[slot], false);
+            sim.drifts[slot] = null;
+            sim.countD--;
+            tmpM4.makeScale(0, 0, 0);
+            driftMesh.setMatrixAt(slot, tmpM4);
+            driftMesh.instanceMatrix.needsUpdate = true;
+            return;
+          }
+        };
+        sim.rebuildTerrain();
+        for (let i = 0; i < SNOW_N; i++) {
+          const body = world.createRigidBody(
+            // Locked rotations: flakes must not roll away downwind on
+            // landing (validated: rolling leaked 95% of deposits).
+            RAPIER.RigidBodyDesc.dynamic().setLinearDamping(2.1).lockRotations()
+          );
+          world.createCollider(
+            RAPIER.ColliderDesc.ball(0.12).setRestitution(0.02).setFriction(1),
+            body
+          );
+          sim.spawn(body);
+          sim.bodies.push(body);
+        }
+        snowSim = sim;
+        record(
+          'Rapier physics engine (vendored)',
+          SNOW_N + ' snow bodies · heightfield of the local terrain'
+        );
+      }
+
       // ---------- colour ramps for light/fog ----------
       const cDayBot = new THREE.Color('#dceef7');
       const cSetBot = new THREE.Color('#f2a65e');
@@ -1124,6 +1366,53 @@
       const windV = new THREE.Vector3(1, 0, 0);
       const treeAxis = new THREE.Vector3(0, 0, 1);
 
+      // ---------- data panel (✦ toggle / ?debug=1 / D key) ----------
+      const panel = document.getElementById('panel');
+      const live = {};
+      let panelOn = params.get('debug') === '1';
+      panel.hidden = !panelOn;
+      function refreshPanel() {
+        if (panel.hidden) return;
+        panel.replaceChildren();
+        const title = document.createElement('b');
+        title.textContent = 'HORIZON · every value below is real\n\n';
+        panel.appendChild(title);
+        for (const [k, v] of Object.entries(live)) {
+          const line = document.createElement('div');
+          line.textContent = k + ': ' + v;
+          panel.appendChild(line);
+        }
+        const hdr = document.createElement('b');
+        hdr.textContent = '\nlive sources\n';
+        panel.appendChild(hdr);
+        for (const [k, s] of Object.entries(sources)) {
+          const line = document.createElement('div');
+          line.textContent = '· ' + k + ' — ' + s.value;
+          const age = document.createElement('span');
+          age.className = 'age';
+          age.textContent =
+            ' (' + Math.round((Date.now() - s.at) / 1000) + 's ago)';
+          line.appendChild(age);
+          panel.appendChild(line);
+        }
+      }
+      setInterval(refreshPanel, 1000);
+      function setPanel(on) {
+        panelOn = on;
+        panel.hidden = !on;
+        refreshPanel();
+      }
+      addEventListener('keydown', (e) => {
+        if (e.key === 'd') setPanel(!panelOn);
+      });
+      // Announce support for the site's ✦ wallpaper control.
+      if (window.parent !== window) {
+        parent.postMessage(
+          {type: 'shaderwall', state: 'hidden'},
+          location.origin
+        );
+      }
+
       // ---------- pointer parallax (forwarded by footer.js) ----------
       const look = {x: 0, y: 0};
       addEventListener('message', (e) => {
@@ -1132,6 +1421,13 @@
         if (d.type === 'wallpaper-pointer' && !reduceMotion) {
           look.x = (d.x - 0.5) * 2;
           look.y = (d.y - 0.5) * 2;
+        }
+        if (d.type === 'shaderwall' && d.action === 'toggle') {
+          setPanel(!panelOn);
+          parent.postMessage(
+            {type: 'shaderwall', state: panelOn ? 'shown' : 'hidden'},
+            location.origin
+          );
         }
       });
 
@@ -1294,6 +1590,53 @@
           p.needsUpdate = true;
         }
 
+        // Physical snow: lazily boot Rapier the first time it really
+        // snows, then step the world once per frame.
+        if (snowing && !snowSim && !snowLoading && !reduceMotion) initSnowSim();
+        if (snowSim) {
+          snowSim.world.step();
+          let fi = 0;
+          for (const body of snowSim.bodies) {
+            // The real wind pushes every airborne flake.
+            body.resetForces(true);
+            body.addForce(
+              {
+                x: windV.x * state.wind * 0.0004,
+                y: 0,
+                z: windV.z * state.wind * 0.0004
+              },
+              true
+            );
+            const p = body.translation();
+            // Settled = genuinely at rest. The per-frame wind force keeps
+            // bodies formally awake, so ask the velocity, not sleep state.
+            const v = body.linvel();
+            const settled =
+              body.isSleeping() ||
+              Math.hypot(v.x, v.y, v.z) < 0.07 ||
+              p.y < sample(p.x, p.z).y + 0.05;
+            if (settled) {
+              if (snowing) snowSim.deposit(p);
+              snowSim.spawn(body);
+            } else if (Math.abs(p.x) > 130 || Math.abs(p.z) > 130) {
+              snowSim.spawn(body); // blown out of the near field
+            } else if (snowing) {
+              tmpM4.makeScale(1, 1, 1).setPosition(p.x, p.y, p.z);
+              flakeMesh.setMatrixAt(fi++, tmpM4);
+            }
+          }
+          flakeMesh.count = fi;
+          flakeMesh.instanceMatrix.needsUpdate = true;
+          // Warm real temperatures erode the drifts, oldest first.
+          if (state.temp > 1 && snowSim.countD) {
+            snowSim.melt += dt * (state.temp - 1) * 1.5;
+            while (snowSim.melt > 1 && snowSim.countD) {
+              snowSim.melt -= 1;
+              snowSim.meltOldest();
+            }
+          }
+        }
+
         // Trees: an underdamped spring-damper per tree, forced by the
         // real mean wind and the real gust spread, leaning along the
         // true wind direction.
@@ -1400,6 +1743,32 @@
           camBaseY + 1 + look.y * -5,
           camZ + vz * 66
         );
+
+        if (!panel.hidden) {
+          const Ums = state.wind / 3.6;
+          live['sun (computed)'] =
+            (sun.alt / RAD).toFixed(1) +
+            '° alt · ' +
+            ((((sun.az / RAD) % 360) + 360) % 360).toFixed(0) +
+            '° az';
+          live['moon (computed)'] = (moon.alt / RAD).toFixed(1) + '° alt';
+          live['sea (Pierson-Moskowitz)'] =
+            'Hs ' +
+            ((0.21 * Ums * Ums) / 9.81).toFixed(2) +
+            ' m · Tp ' +
+            (0.7305 * Ums).toFixed(1) +
+            ' s · whitecaps ' +
+            (3.84e-4 * Math.pow(Ums, 3.41)).toFixed(2) +
+            '%';
+          live['aurora curtain'] =
+            auroraU.strength.value.toFixed(2) + ' strength';
+          if (snowSim)
+            live['snow (Rapier)'] =
+              snowSim.countD +
+              ' drift deposits · ' +
+              flakeMesh.count +
+              ' falling';
+        }
 
         renderer.render(scene, camera);
       }
