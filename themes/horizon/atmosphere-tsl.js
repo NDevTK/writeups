@@ -231,22 +231,29 @@ export function createAtmosphereTSL(renderer) {
     const fms = vec3(0).toVar();
     const DIRS = 64;
     Loop(DIRS, ({i}) => {
-      const fi = float(i).add(0.5);
-      const cosT = float(1.0).sub(fi.mul(2.0 / DIRS));
-      const sinT = sqrt(max(cosT.mul(cosT).oneMinus(), 0.0));
-      const phi = fi.mul(2.399963);
-      const dir = vec3(sinT.mul(cos(phi)), cosT, sinT.mul(sin(phi)));
+      // Everything derived from the OUTER counter must be materialised
+      // with toVar() before the inner Loop: nested TSL Loops both name
+      // their counter `i`, and un-var'd expressions are inlined into
+      // the inner body where GLSL scoping makes the INNER i win
+      // (verified by probe: sum test returned the shadowed value).
+      const fi = float(i).add(0.5).toVar();
+      const cosT = float(1.0)
+        .sub(fi.mul(2.0 / DIRS))
+        .toVar();
+      const sinT = sqrt(max(cosT.mul(cosT).oneMinus(), 0.0)).toVar();
+      const phi = fi.mul(2.399963).toVar();
+      const dir = vec3(sinT.mul(cos(phi)), cosT, sinT.mul(sin(phi))).toVar();
 
-      const mu = dir.y;
-      const dGround = raySphere(r, mu, float(RB));
-      const dTop = raySphere(r, mu, float(RT));
-      const dEnd = select(dGround.greaterThan(0.0), dGround, dTop);
+      const mu = dir.y.toVar();
+      const dGround = raySphere(r, mu, float(RB)).toVar();
+      const dTop = raySphere(r, mu, float(RT)).toVar();
+      const dEnd = select(dGround.greaterThan(0.0), dGround, dTop).toVar();
       const STEPS = 20;
-      const dt = dEnd.div(STEPS);
+      const dt = dEnd.div(STEPS).toVar();
       const T = vec3(1).toVar();
       const Li = vec3(0).toVar();
       const fi3 = vec3(0).toVar();
-      const cSun = dot(dir, sunDir);
+      const cSun = dot(dir, sunDir).toVar();
       Loop(STEPS, ({i: s}) => {
         const ti = float(s).add(0.5).mul(dt);
         const ri = sqrt(
@@ -372,16 +379,21 @@ export function createAtmosphereTSL(renderer) {
     const E = vec3(0).toVar();
     const wSum = float(0).toVar();
     Loop(6, ({i: ie}) => {
+      // toVar() everything outer-counter-derived before the inner Loop
+      // (nested counters shadow - see the multiscatter comment).
       const elev = float(ie)
         .add(0.5)
-        .mul(1.5707963 / 6);
-      const uy = float(0.5).add(
-        sqrt(
-          clamp(elev.sub(hAngle).div(float(1.5707963).sub(hAngle)), 0.0, 1.0)
-        ).mul(0.5)
-      );
+        .mul(1.5707963 / 6)
+        .toVar();
+      const uy = float(0.5)
+        .add(
+          sqrt(
+            clamp(elev.sub(hAngle).div(float(1.5707963).sub(hAngle)), 0.0, 1.0)
+          ).mul(0.5)
+        )
+        .toVar();
       // cos(theta_zenith) = sin(elev); d-omega = cos(elev) d-elev d-az
-      const w = sin(elev).mul(cos(elev));
+      const w = sin(elev).mul(cos(elev)).toVar();
       Loop(8, ({i: ia}) => {
         const ax = float(ia)
           .add(0.5)

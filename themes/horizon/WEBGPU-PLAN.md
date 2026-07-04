@@ -125,16 +125,18 @@ Scenes (all at Grindelwald unless noted):
     Usage: `sun.shadow.shadowNode = new CSMShadowNode(sun, {cascades:
 3, maxFar, mode: 'practical'})`, `csm.fade = true`;
     `updateFrustums()` on resize.
-  - Atmosphere ported to `atmosphere-tsl.js` (full Hillaire chain:
-    transmittance / multiple-scattering / sky-view / aerial /
-    irradiance passes + dome, same LUT sizes, Loop/If/toVar node
-    code). Status: WIP — domes match structurally (horizon, sun,
-    ground) in the A/B harness, transmittance LUT validated
-    NUMERICALLY to <1% against sunTransmittanceJS, but the sky-view
-    output runs ~0.7x in blue vs the GLSL reference. Fault isolated
-    to the multiple-scattering LUT or the sky-view march (tLut is
-    proven good). Next session: JS double-precision reference of the
-    MS integral + sky-view march to pin the stage, then fix.
+  - Atmosphere ported to `atmosphere-tsl.js` — DONE and validated at
+    the strongest level available: every probed texel of every LUT
+    matches `atmo-reference.mjs` (an independent double-precision JS
+    implementation, kept in the repo) to fp16 quantization, and the
+    rendered dome is PIXEL-IDENTICAL (mean abs diff 0.0) to the
+    shipped GLSL dome at the same sun/exposure. The one real bug on
+    the way: nested TSL Loops both name their counter `i`, and
+    outer-counter-derived EXPRESSIONS are inlined into the inner body
+    where GLSL scoping makes the inner `i` win — the MS integral came
+    out orders of magnitude small. Rule: `.toVar()` everything
+    derived from an outer loop counter before entering an inner Loop
+    (verified by a sum-probe; fixed in multiscatter + irradiance).
   - Texture-coordinate conventions on WebGPURenderer's WebGL backend,
     established by readback probes (cost a lot — do not rediscover):
     - readback rows and SCENE-geometry RT writes: GL bottom-origin
@@ -153,8 +155,8 @@ Scenes (all at Grindelwald unless noted):
     fp16 bit patterns (decode: 15360 = 1.0); two-canvas comparison
     pages mis-size the second canvas — use one full-window page per
     renderer and diff screenshots.
-  - Next: fix the sky-view/MS deficit; TSL Water/Sky with the
-    Cox-Munk physics re-applied; cloud reconstruction as node passes
+  - Next: TSL Water/Sky with the Cox-Munk physics re-applied; cloud
+    reconstruction as node passes
     (then compute in phase 3); moon/aurora/optics/star ShaderMaterials
     → NodeMaterial equivalents; then the Horizon.html renderer switch,
     full matrix, and DELETION of the WebGL-only code paths
