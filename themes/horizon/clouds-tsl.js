@@ -1,4 +1,5 @@
 import {
+  WebGLCoordinateSystem,
   CustomBlending,
   NoBlending,
   OneFactor,
@@ -200,11 +201,17 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   // screen-aligned uv needs no flip; NDC does (y = 1 - 2v).
   // NOTE(phase 3): d*2-1 assumes GL clip-z; parameterise for WebGPU's
   // 0..1 clip-z when the backend flips.
+  // Depth-value -> NDC z differs per backend: GL clip z is -1..1
+  // (z = 2d-1), WebGPU is 0..1 (z = d). The ray build at the far
+  // plane (z = 1) is the same in both. coordinateSystem is final
+  // after renderer.init(), and this factory runs after it.
+  const glClip = renderer.coordinateSystem === WebGLCoordinateSystem;
   const sceneDist = Fn(([vUv, ndc]) => {
     const res = float(1e8).toVar();
     const d = depthNode.sample(vUv).r;
     If(d.lessThan(0.9999), () => {
-      const w = invVP.mul(vec4(ndc, d.mul(2.0).sub(1.0), 1.0));
+      const zNdc = glClip ? d.mul(2.0).sub(1.0) : d;
+      const w = invVP.mul(vec4(ndc, zNdc, 1.0));
       res.assign(w.xyz.div(w.w).sub(camPos).length());
     });
     return res;
