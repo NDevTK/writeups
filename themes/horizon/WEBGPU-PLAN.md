@@ -420,7 +420,47 @@ Scenes (all at Grindelwald unless noted):
     0.44, aurora 0.0003 - every scene at or better than the
     fragment-vs-fragment baseline above. Nelson's pinned run also
     got ~25% faster wall-clock (compute march).
-  - Phase 3 complete. Next: phase 4 polish (blue-noise march jitter
-    via void-and-cluster, sky-view horizon-band fix with Bruneton's
-    parameterization near the horizon, motion-vector history if the
-    camera ever translates).
+  - Phase 3 complete.
+- Phase 4, steps 1-2 DONE - horizon-band fix and blue-noise jitter.
+  - Sky-view horizon fix (Bruneton). The horizon is a true radiance
+    discontinuity (ground-terminated march below, full path above);
+    the old mapping put it mid-texel at v=0.5 and bilinear filtering
+    smeared it into the band. Now: each half-range maps to its own
+    texel-centre range with half-texel guards at the seam (sqrt warp
+    kept), the ray CLASS is assigned by texture half (Bruneton's
+    ray_r_mu_intersects_ground - the below-boundary row marches to
+    the ground at the exact tangent distance, the above row to the
+    top, storing the two one-sided limits), and the dome blends the
+    limits by pixel coverage (fwidth(elev)) - the box-filter integral
+    of the discontinuity, which also keeps the dome continuous in
+    elev so backends cannot disagree on single-pixel classification
+    along the horizon row. atmo-reference.mjs mirrors the mapping;
+    per-texel validation passes within ~0.1% including both guard
+    rows (below 4.96e-2 vs above 8.66e-2 red - the discontinuity is
+    real and now resolved crisply). Dome A/B history: pre-fix 0.0017
+    with a 102-px seam band; guarded split alone 0.0102 (571 px of
+    single-pixel classification flips - each backend crisp but
+    disagreeing sub-pixel); with coverage blend 0.0004 and 6 px > 8.
+  - Blue-noise march jitter (blue-noise.js): Ulichney's
+    void-and-cluster, full algorithm (phase 0 relaxation + all three
+    rank phases, toroidal Gaussian sigma 1.5, seeded LCG -
+    deterministic everywhere). Verified: exact permutation,
+    neighbour-threshold separation 0.41 vs white noise's 1/3. Ranks
+    ship 16-bit across R/G of a 64x64 nearest/repeat DataTexture;
+    marchBody's jit = fract(blueNoise(pix) + frameI * 0.618034) - the
+    golden-ratio sequence stays as the temporal decorrelator, blue
+    noise replaces the white sin-hash spatially. hash12 deleted.
+  - Full pinned matrix (WebGPU compute vs WebGL2 fragment, /255):
+    noon 0.0062, sunset 0.067, night 0.0009, stratus 0.54 (was 0.84
+    - the blue noise dithers cross-compiler fp differences at high
+    frequency and they cancel in the temporal average; 3.5x fewer
+    >8 outliers), towering 0.33, Nelson 0.0070 (max 6), snow 0.48,
+    aurora 0.0003. Sea horizon at Nelson and the alpine noon horizon
+    render as crisp AA'd lines.
+  - Remaining phase 4: motion-vector history. The camera DOES
+    translate (intro height ease + free-flight KeyW), and the
+    reprojection currently uses a fixed 600-unit proxy point; proper
+    per-pixel motion needs the march to output its mean cloud depth
+    (second storage target / MRT on the WebGL side) and the
+    reprojection to use it. Take this as its own step with the
+    scripted-flight matrix scene as acceptance.

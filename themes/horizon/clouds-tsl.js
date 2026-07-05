@@ -6,11 +6,13 @@ import {
   OneMinusSrcAlphaFactor,
   Color,
   Data3DTexture,
+  DataTexture,
   DepthTexture,
   HalfFloatType,
   LinearFilter,
   Matrix4,
   MeshBasicNodeMaterial,
+  NearestFilter,
   QuadMesh,
   RGBAFormat,
   RenderTarget,
@@ -38,7 +40,6 @@ import {
   normalize,
   screenCoordinate,
   select,
-  sin,
   smoothstep,
   texture,
   texture3D,
@@ -50,6 +51,7 @@ import {
   vec4
 } from 'three/tsl';
 import {generateCloudArrays} from './cloud-noise.js';
+import {generateBlueNoise} from './blue-noise.js';
 
 /**
  * TSL port of the temporally reconstructed Nubis cloud system (WebGPU
@@ -201,9 +203,29 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     );
   };
 
-  const hash12 = Fn(([p]) =>
-    fract(sin(dot(p, vec2(12.9898, 78.233))).mul(43758.5453))
-  );
+  // Blue-noise march jitter (phase 4): a 64x64 void-and-cluster rank
+  // mask replaces the white-noise sin-hash - neighbouring pixels get
+  // maximally different march phases, so the un-converged temporal
+  // estimate dithers at the highest frequency instead of mottling.
+  // Ranks are stored 16-bit across R and G (a uint8 pair); the
+  // golden-ratio sequence stays as the TEMPORAL decorrelator.
+  const bn = generateBlueNoise();
+  const bnData = new Uint8Array(bn.N * bn.N * 4);
+  for (let i = 0; i < bn.N * bn.N; i++) {
+    const q = bn.rank[i] * 16 + 8; // (rank + 0.5) / 4096 in 16 bits
+    bnData[i * 4] = q >> 8;
+    bnData[i * 4 + 1] = q & 255;
+    bnData[i * 4 + 3] = 255;
+  }
+  const bnTex = new DataTexture(bnData, bn.N, bn.N, RGBAFormat);
+  bnTex.minFilter = bnTex.magFilter = NearestFilter;
+  bnTex.wrapS = bnTex.wrapT = RepeatWrapping;
+  bnTex.needsUpdate = true;
+  const bnNode = texture(bnTex);
+  const blueNoiseAt = Fn(([pix]) => {
+    const t = bnNode.sample(pix.div(bn.N));
+    return t.r.mul((255 * 256) / 65536).add(t.g.mul(255 / 65536));
+  });
 
   // World-space distance to the terrain along this pixel's ray from
   // the depth prepass (1.0 = far plane = unoccluded sky). Depth
@@ -350,7 +372,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       const sceneD = sceneDist(vUv, ndc).toVar();
       // Golden-ratio temporal jitter + exponential integration: the
       // march-start estimate converges to the true integral over time.
-      const jit = fract(hash12(pix).add(frameI.mul(0.618034))).toVar();
+      const jit = fract(blueNoiseAt(pix).add(frameI.mul(0.618034))).toVar();
       const cSun = dot(rd, shared.sunDirW);
       const phase = mix(hg(cSun, 0.6), hg(cSun, -0.3), 0.35).toVar();
       const A = marchSlab(

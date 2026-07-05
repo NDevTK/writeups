@@ -162,13 +162,17 @@ const sky = (i, j) => {
   const r = Rb + 300;
   const horizon = -Math.sqrt(Math.max(r * r - Rb * Rb, 0)) / r;
   const hA = Math.asin(Math.min(Math.max(horizon, -1), 1));
+  // Guarded split (Bruneton) - mirrors atmosphere-tsl.js exactly:
+  // half-texel guards at the v=0.5 horizon seam, ray class by half.
+  const guard = 0.5 / SH,
+    span = 0.5 - 1 / SH;
   let elev;
   if (uyv < 0.5) {
-    const c = 1 - uyv * 2;
-    elev = hA - c * c * (hA + Math.PI / 2);
+    const s = Math.min(Math.max((0.5 - guard - uyv) / span, 0), 1);
+    elev = hA - s * s * (hA + Math.PI / 2);
   } else {
-    const c = uyv * 2 - 1;
-    elev = hA + c * c * (Math.PI / 2 - hA);
+    const s = Math.min(Math.max((uyv - 0.5 - guard) / span, 0), 1);
+    elev = hA + s * s * (Math.PI / 2 - hA);
   }
   const relAz = ux * Math.PI;
   const se = Math.sin(elev),
@@ -179,7 +183,8 @@ const sky = (i, j) => {
   const mu = dir[1];
   const dG = raySphere(r, mu, Rb),
     dT = raySphere(r, mu, Rt);
-  const dEnd = Math.max(dG > 0 ? dG : dT, 0);
+  const dTan = Math.sqrt(Math.max(r * r - Rb * Rb, 0));
+  const dEnd = Math.max(uyv < 0.5 ? (dG > 0 ? dG : dTan) : dT, 0);
   const dt = dEnd / 32;
   const T = [1, 1, 1],
     L = [0, 0, 0];
@@ -218,3 +223,7 @@ console.log('REF sky(30,80):', fmt(sky(30, 80)));
 console.log('REF sky(96,60):', fmt(sky(96, 60)));
 console.log('REF sky(5,90):', fmt(sky(5, 90)));
 console.log('REF sky(30,20):', fmt(sky(30, 20)));
+// The guard rows either side of the horizon seam: the one-sided
+// limits (below: ground at the tangent distance; above: full path).
+console.log('REF sky(30,53):', fmt(sky(30, 53)));
+console.log('REF sky(30,54):', fmt(sky(30, 54)));

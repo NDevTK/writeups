@@ -22,11 +22,13 @@ import {
   dot,
   exp,
   float,
+  fwidth,
   instanceIndex,
   int,
   ivec2,
   max,
   min,
+  mix,
   normalize,
   positionLocal,
   select,
@@ -69,6 +71,7 @@ import {
 const RB = 6360e3;
 const RT = 6460e3;
 const MAX_DIST_M = 25700; // 450 scene units at 57.14 m/unit
+const SKY_H = 108; // sky-view LUT rows; the guarded split needs it
 
 export function createAtmosphereTSL(renderer) {
   // Float render targets are required; on the WebGL2 backend that
@@ -202,7 +205,7 @@ export function createAtmosphereTSL(renderer) {
 
   const tLut = makeLut(256, 64);
   const msLut = makeLut(32, 32);
-  const skyLut = makeLut(192, 108);
+  const skyLut = makeLut(192, SKY_H);
   const aerialLut = makeLut(64, 32);
   // The irradiance readback needs a RenderTarget on both backends
   // (readRenderTargetPixelsAsync is the async staging read); it is a
@@ -365,6 +368,54 @@ export function createAtmosphereTSL(renderer) {
   const marchSky32 = makeMarchSky(32);
   const marchSky20 = makeMarchSky(20);
 
+  // Sky-view vertical mapping, Bruneton-style guarded split (phase 4
+  // horizon-band fix). Sky radiance is DISCONTINUOUS at the horizon
+  // (ground-terminated march below vs full path to the atmosphere top
+  // above); the old mapping put the seam mid-texel at v=0.5 and
+  // bilinear filtering smeared it into a band. Now each half-range
+  // maps to its own texel-CENTRE range with a half-texel guard on
+  // either side of the seam - a sampled v never mixes rows across it
+  // - keeping the sqrt warp that concentrates resolution at the
+  // horizon. The ray class is assigned BY HALF (Bruneton 2008 's
+  // ray_r_mu_intersects_ground), not by intersection test, so the two
+  // boundary rows store the true one-sided limits: the below row
+  // marches to the ground at the exact tangent distance, the above
+  // row to the top.
+  const SKY_GUARD = 0.5 / SKY_H;
+  const SKY_SPAN = 0.5 - 1 / SKY_H;
+  const skyVFromElev = Fn(([elev, hAngle]) => {
+    const res = float(0).toVar();
+    If(elev.lessThan(hAngle), () => {
+      const s = sqrt(
+        clamp(hAngle.sub(elev).div(hAngle.add(1.5707963)), 0.0, 1.0)
+      );
+      res.assign(float(0.5 - SKY_GUARD).sub(s.mul(SKY_SPAN)));
+    }).Else(() => {
+      const s = sqrt(
+        clamp(elev.sub(hAngle).div(float(1.5707963).sub(hAngle)), 0.0, 1.0)
+      );
+      res.assign(float(0.5 + SKY_GUARD).add(s.mul(SKY_SPAN)));
+    });
+    return res;
+  });
+  const elevFromSkyV = Fn(([v, hAngle]) => {
+    const res = float(0).toVar();
+    If(v.lessThan(0.5), () => {
+      const s = clamp(
+        float(0.5 - SKY_GUARD)
+          .sub(v)
+          .div(SKY_SPAN),
+        0.0,
+        1.0
+      );
+      res.assign(hAngle.sub(s.mul(s).mul(hAngle.add(1.5707963))));
+    }).Else(() => {
+      const s = clamp(v.sub(0.5 + SKY_GUARD).div(SKY_SPAN), 0.0, 1.0);
+      res.assign(hAngle.add(s.mul(s).mul(float(1.5707963).sub(hAngle))));
+    });
+    return res;
+  });
+
   // ---------- sky-view (per frame) ----------
   const skyviewNode = Fn(([vUv]) => {
     const r = float(RB).add(max(camH, 1.0));
@@ -372,21 +423,24 @@ export function createAtmosphereTSL(renderer) {
       .div(r)
       .negate();
     const hAngle = horizon.clamp(-1, 1).asin();
-    const elev = float(0).toVar();
-    If(vUv.y.lessThan(0.5), () => {
-      const c = float(1.0).sub(vUv.y.mul(2.0));
-      elev.assign(hAngle.sub(c.mul(c).mul(hAngle.add(1.5707963))));
-    }).Else(() => {
-      const c = vUv.y.mul(2.0).sub(1.0);
-      elev.assign(hAngle.add(c.mul(c).mul(float(1.5707963).sub(hAngle))));
-    });
+    const elev = elevFromSkyV(vUv.y, hAngle);
     const relAz = vUv.x.mul(3.14159265);
     const se = sin(elev);
     const ce = cos(elev);
     const dir = vec3(ce.mul(cos(relAz)), se, ce.mul(sin(relAz)));
     const dGround = raySphere(r, dir.y, float(RB));
     const dTop = raySphere(r, dir.y, float(RT));
-    const dEnd = max(select(dGround.greaterThan(0.0), dGround, dTop), 0.0);
+    // Ray class by texture half; the tangent distance is the exact
+    // disc==0 fallback for the below-boundary row.
+    const dTangent = sqrt(max(r.mul(r).sub(RB * RB), 0.0));
+    const dEnd = max(
+      select(
+        vUv.y.lessThan(0.5),
+        select(dGround.greaterThan(0.0), dGround, dTangent),
+        dTop
+      ),
+      0.0
+    );
     return marchSky32(r, dir, dEnd);
   });
 
@@ -415,13 +469,7 @@ export function createAtmosphereTSL(renderer) {
         .add(0.5)
         .mul(1.5707963 / 6)
         .toVar();
-      const uy = float(0.5)
-        .add(
-          sqrt(
-            clamp(elev.sub(hAngle).div(float(1.5707963).sub(hAngle)), 0.0, 1.0)
-          ).mul(0.5)
-        )
-        .toVar();
+      const uy = skyVFromElev(elev, hAngle).toVar();
       // cos(theta_zenith) = sin(elev); d-omega = cos(elev) d-elev d-az
       const w = sin(elev).mul(cos(elev)).toVar();
       Loop(8, ({i: ia}) => {
@@ -444,28 +492,38 @@ export function createAtmosphereTSL(renderer) {
       .negate();
     const hAngle = horizon.clamp(-1, 1).asin();
     const elev = v.y.clamp(-1, 1).asin();
-    const uy = float(0).toVar();
-    If(elev.lessThan(hAngle), () => {
-      uy.assign(
-        float(0.5).sub(
-          sqrt(
-            clamp(hAngle.sub(elev).div(hAngle.add(1.5707963)), 0.0, 1.0)
-          ).mul(0.5)
-        )
-      );
-    }).Else(() => {
-      uy.assign(
-        float(0.5).add(
-          sqrt(
-            clamp(elev.sub(hAngle).div(float(1.5707963).sub(hAngle)), 0.0, 1.0)
-          ).mul(0.5)
-        )
-      );
-    });
     const sunH = normalize(sunDirW.xz.add(vec2(1e-6, 1e-6)));
     const vH = normalize(v.xz.add(vec2(1e-6, 1e-6)));
     const relAz = dot(sunH, vH).clamp(-1, 1).acos();
-    const col = skyTexNode.sample(vec2(relAz.div(3.14159265), uy)).rgb.toVar();
+    const ux = relAz.div(3.14159265);
+    // The horizon is a true radiance discontinuity (the guarded LUT
+    // split stores its one-sided limits in the two seam rows). A
+    // pixel straddling it should show the box-filter integral of
+    // both sides, so blend the limits by pixel coverage
+    // (fwidth(elev) = the pixel's elevation footprint); this also
+    // keeps the dome a continuous function of elev - no cross-device
+    // single-pixel classification flips along the horizon row.
+    const sA = sqrt(
+      clamp(elev.sub(hAngle).div(float(1.5707963).sub(hAngle)), 0.0, 1.0)
+    );
+    const sB = sqrt(
+      clamp(hAngle.sub(elev).div(hAngle.add(1.5707963)), 0.0, 1.0)
+    );
+    const uyAbove = float(0.5 + SKY_GUARD).add(sA.mul(SKY_SPAN));
+    const uyBelow = float(0.5 - SKY_GUARD).sub(sB.mul(SKY_SPAN));
+    const cov = clamp(
+      elev
+        .sub(hAngle)
+        .div(max(fwidth(elev), 1e-7))
+        .add(0.5),
+      0.0,
+      1.0
+    );
+    const col = mix(
+      skyTexNode.sample(vec2(ux, uyBelow)).rgb,
+      skyTexNode.sample(vec2(ux, uyAbove)).rgb,
+      cov
+    ).toVar();
     // The sun disc itself: direct transmittance, honestly clipped.
     const cSun = dot(v, sunDirW);
     If(cSun.greaterThan(0.9999893), () => {
