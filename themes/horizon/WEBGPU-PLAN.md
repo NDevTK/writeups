@@ -72,10 +72,27 @@ Rebuild recipe: copy the site into a scratch dir as
 Nelson −41.27,173.28 z12), inject a fetch stub before the module
 script that serves OSM Overpass fixtures by URL suffix and rejects
 everything else (stars.json / constellations / rapier pass through to
-disk), serve with `python3 -m http.server`, and shoot with headless
-Chromium `--use-angle=swiftshader --virtual-time-budget=N
---screenshot` (console via `--enable-logging=stderr`, state probes via
-`window.__dbg` → `document.title`).
+disk), and serve with `python3 -m http.server`.
+
+Shooting: a Node driver (playwright-core) that SPAWNS Chrome for
+Testing itself (headed, under `xvfb-run`) and attaches via
+`connectOverCDP`, waits for a console marker, then captures by
+replaying one full frame into a `RenderTarget` in-page
+(`readRenderTargetPixelsAsync`) and writing a PPM. Every piece is
+forced by a measured failure — see "Real-WebGPU harness" below. The
+old `--virtual-time-budget --screenshot` recipe only works for
+WebGL-backend pages without async GPU readbacks; the driver replaces
+it for both backends.
+
+Determinism: animated scenes (cloud advection, water, twinkle) cannot
+be A/B'd across two wall-clock runs. The harness page accepts
+`pin=1[&pinstop=N]`: rAF callbacks get synthetic 60 Hz timestamps
+(`performance.now` follows), `Math.random` is a seeded LCG, and at
+frame N (default 600) the clock FREEZES while rAF keeps dispatching —
+dt becomes 0, uTime stops, the frame is capture-time-invariant, and a
+`PINSTOP` console line tells the driver to shoot. Freezing (not
+stopping) rAF matters: three's WebGL-backend async readback polls its
+fence via rAF, so a hard rAF stop deadlocks the capture itself.
 
 Scenes (all at Grindelwald unless noted):
 
@@ -317,27 +334,56 @@ Scenes (all at Grindelwald unless noted):
     Post-deletion harness check: noon 2.39 / night 0.34 / Nelson 0.22
     vs the pre-deletion build (temporal randomness only). There is
     now exactly ONE implementation of every piece of physics.
-  - Phase 3 groundwork (real-WebGPU findings from this harness):
-    - Headless WebGPU EXISTS here: `--enable-unsafe-webgpu` gives a
-      Dawn/SwiftShader adapter+device (probe: vendor google, arch
-      swiftshader). No extra Vulkan flags needed.
-    - three r185 passes `swizzle` in GPUTextureViewDescriptor; this
-      chromium predates it and throws. Harness-only shim (strip the
-      property in a createView wrapper) — real current Chrome is fine.
-    - HARD WALL in this harness: Dawn readbacks
-      (readRenderTargetPixelsAsync -> mapAsync) abort with "A valid
-      external Instance reference no longer exists" / stall under both
-      --virtual-time-budget (virtual clock skips through GPU awaits
-      and exhausts the budget) and real-time --timeout runs. The full
-      theme reaches "WebGPU Device Lost". The dome pipeline runs
-      without errors on WebGPU but presents black. Verdict: the
-      REAL-WebGPU matrix needs a real browser/GPU (or a newer
-      headless chromium); the WebGL2-backend matrix stays the
-      harness-checkable path.
-    - Known code work for phase 3 regardless of harness: parameterise
-      the d*2-1 clip-z assumption in clouds-tsl sceneDist (WebGPU
-      clip z is 0..1); re-verify the QuadMesh/RT orientation
-      conventions on WebGPU proper (they were pinned on the WebGL
-      backend); then the compute ports (LUT chain, cloud march).
-    Then phase 4 polish (blue-noise jitter, sky-view horizon-band
-    fix, motion vectors).
+- Phase 3, step 1 DONE — the full validation matrix ran on the REAL
+  WebGPU backend (Dawn/SwiftShader Vulkan) in this environment and is
+  green. The earlier session's verdict that this "needs a real
+  browser/GPU" was WRONG — the blockers were all in the presentation/
+  capture path, never in theme code. What was actually wrong, and the
+  working recipe (the "Real-WebGPU harness"):
+  - Headless chromium: Dawn loses its instance (`mapAsync` → "external
+    Instance reference no longer exists"). HEADED under `xvfb-run`
+    works.
+  - ANY Playwright-LAUNCHED browser breaks Dawn the same way (default
+    args, `ignoreAllDefaultArgs`, persistent context — all tried).
+    The driver must `spawn()` the browser itself (plain flags:
+    `--enable-unsafe-webgpu --no-sandbox --user-data-dir=…
+    --remote-debugging-port=…`) and attach with `connectOverCDP`.
+  - Compositor screenshots are blank for GPU surfaces under Xvfb, and
+    WebGPU canvases recycle their texture on present (`toDataURL` /
+    `drawImage` see stale frames). The ONLY reliable capture is an
+    in-page render-target readback through three itself; the harness
+    page exposes `window.__capture(w,h)` which replays one full frame
+    (cloud prepass → march → main render → composite → precip
+    overlay) into a fresh RT and returns
+    `readRenderTargetPixelsAsync` bytes.
+  - Readback row order differs: WebGL-backend readbacks are
+    bottom-origin, WebGPU's top-origin — the driver normalises.
+  - three r185 passes `swizzle` in GPUTextureViewDescriptor; the
+    fixture chromium (Chrome for Testing 150, fetched with
+    `npx @puppeteer/browsers install chrome@stable`) predates it —
+    harness-only createView shim strips it.
+  - SwiftShader-Vulkan throughput: most scenes ~10–30 fps; Nelson
+    (planar-reflector water + cloud deck = the scene rendered twice)
+    crawls at ~1.2 fps — budget ~900 s for its 600 pinned frames.
+  - Results, pinned deterministic matrix at frame 600 (mean abs
+    diff /255, real WebGPU vs WebGL2 backend of the SAME build):
+    noon 0.005 (max 3), sunset 0.054, night 0.001 (16 star px at fp
+    twinkle thresholds), stratus 0.92, towering 0.31, Nelson sea
+    0.075 (glitter + twinkle points), snow 0.52, aurora 0.0003. The
+    stratus/towering/snow residual is confined to
+    the cloud deck (terrain rows diff exactly 0.000) and decomposes
+    into: fp accumulation along the 600-frame temporal march (WGSL vs
+    GLSL transcendentals), Bayer cells refreshed in the ~15
+    post-freeze frames before each capture, quarter-res upsample
+    edges at the terrain silhouette, and (snow) flake positions
+    offset because the async Rapier wasm load lands on a different
+    frame. Structure is identical throughout.
+  - Subsystem pages on real WebGPU vs WebGL backend: dome 0.00,
+    clouds 0.01, water 0.03 (specular-glint fp noise, no structure),
+    moon/veil/aurora/optics/stars/planets 0.0000 (bit-exact). The
+    clouds-tsl `coordinateSystem` clip-z branch and all QuadMesh/RT
+    orientation conventions are hereby validated on WebGPU proper.
+  - Remaining phase 3: the compute ports (LUT chain → compute +
+    storage textures, cloud march → compute, async irradiance
+    staging read). Then phase 4 polish (blue-noise jitter, sky-view
+    horizon-band fix, motion vectors).
