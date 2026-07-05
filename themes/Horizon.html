@@ -2266,10 +2266,8 @@
             (s, c) => s + c.resolvedMss,
             0
           );
-          water.shiny.value = Math.max(
-            2 / Math.max(mss - resolved, 1e-4) - 2,
-            30
-          );
+          water.mssSubgrid.value = Math.max(mss - resolved, 1e-4);
+          water.foamW.value = Math.min(3.84e-6 * Math.pow(Ums, 3.41), 0.5);
           water.windDirW.value.set(windV.x, windV.z);
           water.hsWave.value = (0.21 * Ums * Ums) / 9.81;
         }

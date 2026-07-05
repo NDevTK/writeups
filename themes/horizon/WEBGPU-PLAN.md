@@ -579,12 +579,27 @@ Scenes (all at Grindelwald unless noted):
       PlaneGeometry now 192x192 segments for the displacement.
     - Acceptance: pinned Nelson (28 m/s gale) on real WebGPU vs the
       WebGL2 backend: mean 0.0279, frac>8 0.00002 - green.
-  - NEXT (step 3): wave FILTERING - the maps have no mip chain, so
-    distant minification of the fine cascade aliases (visible as
-    glitter speckle on the daytime subsystem page, amplified by the
-    Blinn exponent). The paper-true fix is slope-variance-preserving
-    filtering: distance-blend the fine cascade's per-pixel normal
-    contribution into the BRDF roughness (the same Bruneton 2010
-    variance bookkeeping already used for sub-grid slopes), or full
-    LEAN/CLEAN mapping. Then a daytime-sea visual pass (glitter,
-    foam at gale winds).
+  - Tessendorf FFT ocean, step 3 DONE - slope-variance-preserving
+    wave filtering (the maps have no mip chain; unfiltered
+    minification of the fine cascade aliased into glitter speckle,
+    12% of daytime-page samples diverging cross-backend).
+    - Each cascade's slope/Jacobian contribution fades by its
+      MEASURED per-pixel minification: f = smoothstep(4, 1,
+      |fwidth(uv * N)|) - the same quantity a mip LOD would compute.
+      Scaling Gaussian slopes by f scales their variance by f^2, so
+      the Blinn lobe's per-pixel effective variance
+      mssEff = mssSubgrid + sum (1 - f_c^2) mss_c preserves TOTAL
+      slope variance at every distance (Bruneton 2010's bookkeeping,
+      per pixel): the sea keeps its roughness as detail leaves the
+      pixel footprint - it just stops aliasing. The shiny uniform is
+      gone; the theme now feeds mssSubgrid and each cascade
+      contributes through its self-updating mssUniform.
+    - Foam: where minification fades the fine cascade, the folding
+      mask converges to the Monahan MEAN coverage (foamW uniform) -
+      the same statistic the folding threshold was calibrated
+      against - so a distant gale sea keeps its aggregate whiteness.
+    - Results: daytime water subsystem A/B 5.41 -> 0.118 mean (46x),
+      outliers 12% -> 0.18%; the distant glitter is a smooth
+      Cox-Munk lobe. Pinned Nelson gale: 0.0279 -> 0.0007 mean with
+      ZERO samples over 8 - the best cross-backend number in the
+      project. FFT ocean complete.

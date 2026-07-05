@@ -6,6 +6,7 @@ import {
   cross,
   dot,
   float,
+  fwidth,
   length,
   max,
   mix,
@@ -76,8 +77,12 @@ export class HorizonWaterMesh extends Mesh {
 
     // HORIZON uniforms (same names/semantics as the classic patch).
     this.timeU = uniform(0);
-    this.shiny = uniform(200);
+    // Sub-grid slope variance (total wind mss minus what the
+    // cascades resolve); the per-pixel effective mss adds back the
+    // variance of whatever the pixel footprint filters out.
+    this.mssSubgrid = uniform(0.01);
     this.foamJ = uniform(0.4745); // folding threshold, see header
+    this.foamW = uniform(0); // Monahan mean coverage, far-field foam
     this.windDirW = uniform(new Vector2(1, 0));
     this.hsWave = uniform(0.5);
     this.worldSize = uniform(options.worldSize ?? 280);
@@ -97,7 +102,9 @@ export class HorizonWaterMesh extends Mesh {
     const cascadeNodes = cascades.map((c) => ({
       disp: texture(c.displacementTex),
       deriv: texture(c.derivTex),
-      invL: 1 / c.patchSize
+      invL: 1 / c.patchSize,
+      mss: c.mssUniform,
+      mapSize: c.mapSize
     }));
 
     // Vertex displacement: world (Dx, h, Dz) metres -> local
@@ -112,20 +119,37 @@ export class HorizonWaterMesh extends Mesh {
     // Fragment: sum the combinable spectral terms across cascades,
     // then build the exact displaced-surface normal and the folding
     // Jacobian ONCE from the totals.
+    //
+    // Wave FILTERING (slope-variance-preserving minification,
+    // Bruneton, Neyret & Holzschuch 2010): the maps have no mip
+    // chain, so each cascade's contribution fades with its MEASURED
+    // per-pixel minification (fwidth of the map uv in texels - what
+    // a mip LOD would measure), and the faded-out slope variance
+    // moves into the Blinn lobe below. Scaling Gaussian slopes by f
+    // scales their variance by f^2, so mssEff = mssSubgrid +
+    // sum (1 - f_c^2) mss_c preserves TOTAL slope variance at every
+    // distance - the sea keeps its roughness as detail leaves the
+    // pixel; it just stops aliasing.
     const fragXZ = vertexStage(baseXZm);
     let sumSx = float(0);
     let sumSz = float(0);
     let sumJxx = float(0);
     let sumJzz = float(0);
     let sumJxz = float(0);
-    for (const {disp, deriv, invL} of cascadeNodes) {
+    let mssEff = this.mssSubgrid;
+    let fFine = float(1); // finest cascade's fade, for the foam
+    for (const {disp, deriv, invL, mss, mapSize} of cascadeNodes) {
       const uvC = fragXZ.mul(invL);
+      const texPerPix = length(fwidth(uvC.mul(mapSize)));
+      const f = smoothstep(4.0, 1.0, texPerPix);
+      fFine = f;
       const d4 = deriv.sample(uvC);
-      sumSx = sumSx.add(d4.x);
-      sumSz = sumSz.add(d4.y);
-      sumJxx = sumJxx.add(d4.z);
-      sumJzz = sumJzz.add(d4.w);
-      sumJxz = sumJxz.add(disp.sample(uvC).w);
+      sumSx = sumSx.add(d4.x.mul(f));
+      sumSz = sumSz.add(d4.y.mul(f));
+      sumJxx = sumJxx.add(d4.z.mul(f));
+      sumJzz = sumJzz.add(d4.w.mul(f));
+      sumJxz = sumJxz.add(disp.sample(uvC).w.mul(f));
+      mssEff = mssEff.add(float(1).sub(f.mul(f)).mul(mss));
     }
     const tanX = vec3(float(1).add(sumJxx), sumSx, sumJxz);
     const tanZ = vec3(sumJxz, sumSz, float(1).add(sumJzz));
@@ -134,6 +158,8 @@ export class HorizonWaterMesh extends Mesh {
       .add(sumJxx)
       .mul(float(1).add(sumJzz))
       .sub(sumJxz.mul(sumJxz));
+    // Cox-Munk Blinn lobe from the per-pixel EFFECTIVE variance.
+    const shiny = max(float(2).div(max(mssEff, 1e-4)).sub(2), 30.0);
 
     const worldToEye = cameraPosition.sub(positionWorld);
     const eyeDirection = normalize(worldToEye);
@@ -143,9 +169,10 @@ export class HorizonWaterMesh extends Mesh {
     );
     const direction = max(0.0, dot(eyeDirection, reflection));
     // HORIZON: Cox-Munk-driven Blinn lobe - gloss and its energy
-    // follow the wind (classic patch: pow(dir, shiny)*(shiny*0.02+0.5)).
-    const specularLight = pow(direction, this.shiny)
-      .mul(this.shiny.mul(0.02).add(0.5))
+    // follow the per-pixel effective slope variance (classic patch:
+    // pow(dir, shiny)*(shiny*0.02+0.5)).
+    const specularLight = pow(direction, shiny)
+      .mul(shiny.mul(0.02).add(0.5))
       .mul(this.sunColor);
     const diffuseLight = max(dot(this.sunDirection, surfaceNormal), 0.0)
       .mul(this.sunColor)
@@ -195,7 +222,15 @@ export class HorizonWaterMesh extends Mesh {
       // - plus McCowan surf on the real bathymetry (the shoal ramp
       // is written as oneMinus of an ordered smoothstep because
       // reversed-edge smoothstep is undefined per spec).
-      const capMask = smoothstep(this.foamJ, this.foamJ.sub(0.35), jacobian);
+      // Folding foam where resolved; where minification fades the
+      // fine cascade out, converge to the Monahan MEAN coverage (the
+      // same statistic the folding threshold was calibrated to) so a
+      // distant gale sea keeps its aggregate whiteness.
+      const capMask = mix(
+        this.foamW,
+        smoothstep(this.foamJ, this.foamJ.sub(0.35), jacobian),
+        fFine
+      );
       const dpt = depthTexNode
         .sample(positionWorld.xz.div(this.worldSize).add(0.5))
         .r.mul(40.0);

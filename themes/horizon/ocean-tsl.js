@@ -94,6 +94,9 @@ export function createOceanFFT(renderer, opts = {}) {
   // ---------- CPU init: h0 + omega, butterfly LUT ----------
   const h0Data = new Float32Array(N * N * 4);
   let resolvedMss = 0;
+  // Node-side copy for the material's variance bookkeeping (updates
+  // itself on setWind).
+  const mssUniform = uniform(0);
   function fillSpectrum() {
     const spec = buildInitialSpectrum(N, L, params, seed);
     for (let i = 0; i < N * N; i++) {
@@ -102,6 +105,7 @@ export function createOceanFFT(renderer, opts = {}) {
       h0Data[i * 4 + 2] = spec.omega[i];
     }
     resolvedMss = spec.mss;
+    mssUniform.value = spec.mss;
   }
   fillSpectrum();
   const h0Tex = new DataTexture(h0Data, N, N, RGBAFormat, FloatType);
@@ -376,6 +380,8 @@ export function createOceanFFT(renderer, opts = {}) {
     get resolvedMss() {
       return resolvedMss;
     },
+    mssUniform,
+    mapSize: N,
     // Winds change: rebuild the spectrum IN PLACE (same textures and
     // kernels - only the h0/omega data re-uploads), the same pattern
     // as the aerosol-gated atmosphere LUTs.
