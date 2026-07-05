@@ -321,14 +321,25 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
                   tauS.addAssign(density(ps, hs, cov, cTy, wO).mul(dts));
                 });
                 tauS.mulAssign(sg);
-                // Beer-powder (Schneider 2015).
-                const beer = exp(tauS.negate()).mul(
-                  exp(tauS.mul(-2.0)).oneMinus().mul(2.0)
-                );
+                // Multiple scattering by attenuated octaves
+                // (Wrenninge et al. 2013 "Oz: The Great and
+                // Volumetric"; real-time form per Hillaire, Frostbite
+                // 2016), replacing the Beer-powder cheat: octave i
+                // scales contribution by a^i, sun optical depth by
+                // b^i, and phase eccentricity by c^i (the phase
+                // vector arrives per octave). a = b = c = 0.5,
+                // N = 3; a <= b keeps it energy-conserving.
+                const octA = vec3(1.0, 0.5, 0.25);
+                const octExt = exp(tauS.negate().mul(vec3(1.0, 0.5, 0.25)));
+                const sunTerm = dot(octA.mul(octExt), phase);
+                // 18 was the display calibration of the old
+                // single-scatter term; dividing by sum(a^i) = 1.75
+                // keeps that white point - the octave SHAPE (deep
+                // transmission, more isotropic side-lighting) is the
+                // physics, the constant is exposure.
                 const S = shared.sunCol
-                  .mul(beer)
-                  .mul(phase)
-                  .mul(18.0)
+                  .mul(sunTerm)
+                  .mul(18.0 / 1.75)
                   .add(shared.ambCol.mul(mix(0.35, 1.0, h)));
                 const sT = exp(sg.mul(d).mul(dt).negate());
                 L.addAssign(T.mul(S.sub(S.mul(sT))));
@@ -427,7 +438,10 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       // march-start estimate converges to the true integral over time.
       const jit = fract(blueNoiseAt(pix).add(frameI.mul(0.618034))).toVar();
       const cSun = dot(rd, shared.sunDirW);
-      const phase = mix(hg(cSun, 0.6), hg(cSun, -0.3), 0.35).toVar();
+      // Dual-lobe HG per multiple-scattering octave: eccentricity
+      // scaled by c^i (c = 0.5) on both lobes (Wrenninge 2013).
+      const dualHG = (s) => mix(hg(cSun, 0.6 * s), hg(cSun, -0.3 * s), 0.35);
+      const phase = vec3(dualHG(1), dualHG(0.5), dualHG(0.25)).toVar();
       const fLow = slabFront(
         camPos,
         rd,

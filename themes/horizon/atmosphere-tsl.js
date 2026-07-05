@@ -31,6 +31,7 @@ import {
   mix,
   normalize,
   positionLocal,
+  pow,
   select,
   sin,
   sqrt,
@@ -524,10 +525,21 @@ export function createAtmosphereTSL(renderer) {
       skyTexNode.sample(vec2(ux, uyAbove)).rgb,
       cov
     ).toVar();
-    // The sun disc itself: direct transmittance, honestly clipped.
+    // The sun disc: direct transmittance with photospheric limb
+    // darkening, Hestroffer & Magnan (1998) power law I(mu) = mu^a,
+    // a(lambda_um) = -0.023 + 0.292 / lambda, at the same 680/550/440
+    // nm the scattering coefficients use. mu = cos of the angular
+    // offset from disc centre normalised to the disc radius; the 120
+    // constant is now the CENTRAL intensity.
     const cSun = dot(v, sunDirW);
     If(cSun.greaterThan(0.9999893), () => {
-      col.addAssign(tTexNode.sample(tParamsToUv(r, v.y)).rgb.mul(120.0));
+      const sin2R = 1 - 0.9999893 * 0.9999893;
+      const s2 = clamp(cSun.mul(cSun).oneMinus().div(sin2R), 0.0, 1.0);
+      const muD = sqrt(s2.oneMinus());
+      const limb = pow(vec3(muD), vec3(0.4064, 0.5079, 0.6406));
+      col.addAssign(
+        tTexNode.sample(tParamsToUv(r, v.y)).rgb.mul(limb).mul(120.0)
+      );
     });
     return vec4(col.mul(exposure), 1.0);
   });

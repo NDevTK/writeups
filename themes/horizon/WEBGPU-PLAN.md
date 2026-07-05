@@ -491,3 +491,35 @@ Scenes (all at Grindelwald unless noted):
     every piece of physics, compute-driven on WebGPU, QuadMesh-driven
     on the WebGL2 fallback, reference-validated per-texel and
     matrix-validated cross-backend at every step.
+- Phase 5 - ongoing state-of-the-art upgrades. Method lesson from
+  the port, now standing policy: the durable ground truth is a
+  double-precision CPU mirror (atmo-reference.mjs), not any previous
+  GPU build - write the reference first, then the shader.
+  - DONE: cloud multiple scattering by attenuated octaves (Wrenninge
+    et al. 2013 "Oz"; real-time form per Hillaire, Frostbite 2016),
+    replacing Schneider's Beer-powder cheat. Octave i scales
+    contribution a^i, sun optical depth b^i, dual-lobe HG
+    eccentricity c^i; a = b = c = 0.5, N = 3, a <= b for energy
+    conservation. The legacy x18 display calibration is divided by
+    sum(a^i) = 1.75 so the validated white point is preserved - the
+    octave SHAPE (deep transmission, more isotropic side-lighting)
+    is the physics, the constant is exposure. Deck means moved
+    stratus 85->95 / towering 61->67 (multiple scattering is why a
+    real overcast is not black); structure intact; cross-backend
+    stratus 1.03 with the usual deck-confined fp-dither profile
+    (terrain rows exactly 0, outlier tail unchanged - amplitude
+    scales with the larger transmitted signal).
+  - DONE: photospheric limb darkening on the sun disc, Hestroffer &
+    Magnan (1998) power law I(mu) = mu^alpha with
+    alpha(lambda_um) = -0.023 + 0.292/lambda at the same 680/550/440
+    nm the scattering coefficients use; the disc constant is now the
+    CENTRAL intensity. Dome A/B unchanged (0.0004).
+  - NEXT (large, own commit series): Tessendorf FFT ocean for the
+    water - JONSWAP/TMA spectrum with Hasselmann directional
+    spreading, time-evolved via compute-shader FFT (storage-texture
+    butterfly passes; the WebGL2 fallback needs a fragment ping-pong
+    FFT or a reduced-resolution path), displacement + slope maps
+    feeding the existing Cox-Munk BRDF, and whitecaps from the
+    Jacobian folding criterion (Tessendorf 2001) replacing the
+    Monahan wind heuristic. Write the CPU reference spectrum/FFT
+    first per the standing policy.
