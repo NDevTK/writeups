@@ -1,0 +1,108 @@
+<!doctype html><html><head><script type="importmap">
+{
+  "imports": {
+    "three": "./writeups/themes/horizon/three.module.min.js",
+    "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+    "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+  }
+}
+</script></head><body style="margin:0;overflow:hidden"><canvas id="gl"></canvas><script>/* swizzle shim */ if (navigator.gpu && self.GPUTexture) { const ov = GPUTexture.prototype.createView; GPUTexture.prototype.createView = function (d) { if (d && 'swizzle' in d) { d = Object.assign({}, d); delete d.swizzle; } return ov.call(this, d); }; }</script><script type="module">
+import * as GL from 'three';
+import * as GPU from 'three/webgpu';
+const V = 'gpu';
+try {
+  const P = new URLSearchParams(location.search);
+  const capW = +(P.get('cap') ?? 0.12), hsW = +(P.get('hs') ?? 1.2), shinyW = +(P.get('shiny') ?? 120), mirrorFull = P.get('mirror') === 'full', noMip = P.get('nomip') === '1', distS = +(P.get('dist') ?? 1.4);
+  const W = innerWidth, H = innerHeight;
+  const T = V === 'gl' ? GL : GPU;
+  const r = V === 'gl'
+    ? new GL.WebGLRenderer({canvas: document.getElementById('gl'), antialias: false})
+    : new GPU.WebGPURenderer({canvas: document.getElementById('gl'), forceWebGL: !new URLSearchParams(location.search).get('wgpu') /* wgpuParam */, antialias: false});
+  if (V === 'gpu') { await r.init(); }
+  r.setSize(W, H);
+  const scene = new T.Scene();
+  scene.background = new T.Color('#000000');
+  const cam = new T.PerspectiveCamera(55, W / H, 0.1, 2000);
+  cam.position.set(0, 6, 30);
+  cam.lookAt(0, 0, -40);
+  cam.updateMatrixWorld();
+
+  const wn = await new T.TextureLoader().loadAsync('./writeups/themes/horizon/waternormals.jpg');
+  wn.wrapS = wn.wrapT = T.RepeatWrapping;
+  if (P.get('flip') === '0') wn.flipY = false;
+  if (noMip) { wn.generateMipmaps = false; wn.minFilter = T.LinearFilter; }
+
+  // synthetic bathymetry ramp: shallow at -x, deep at +x (same data both pages)
+  const D = 64;
+  const dArr = new Uint8Array(D * D);
+  for (let j = 0; j < D; j++) for (let i = 0; i < D; i++) dArr[j * D + i] = Math.min(255, (i / (D - 1)) * 255);
+  const depthTex = new T.DataTexture(dArr, D, D, T.RedFormat);
+  depthTex.needsUpdate = true;
+
+  const sunDir = new T.Vector3(0.5, 0.35, -0.8).normalize();
+  const sunCol = P.get('sun') === '0' ? 0x000000 : 0xffffff;
+  const geo = new T.PlaneGeometry(280, 280);
+  let water;
+  if (V === 'gl') {
+    const {Water} = await import('./writeups/themes/horizon/Water.js');
+    water = new Water(geo, {
+      textureWidth: mirrorFull ? W : 512, textureHeight: mirrorFull ? H : 512, waterNormals: wn,
+      sunDirection: sunDir.clone(), sunColor: sunCol, waterColor: 0x0a2431,
+      distortionScale: distS, fog: false
+    });
+    Object.assign(water.material.uniforms, {
+      shiny: {value: shinyW}, whitecapW: {value: capW},
+      windDirW: {value: new GL.Vector2(1, 0)},
+      depthTex: {value: depthTex}, hsWave: {value: hsW}
+    });
+    water.material.fragmentShader = water.material.fragmentShader
+      .replace('uniform vec3 waterColor;',
+        'uniform vec3 waterColor; uniform float shiny; uniform float whitecapW; uniform vec2 windDirW; uniform sampler2D depthTex; uniform float hsWave;')
+      .replace('sunLight( surfaceNormal, eyeDirection, 100.0, 2.0, 0.5, diffuseLight, specularLight );',
+        'sunLight( surfaceNormal, eyeDirection, shiny, shiny * 0.02 + 0.5, 0.5, diffuseLight, specularLight );')
+      .replace('vec3 outgoingLight = albedo;',
+        'float capN = texture2D( normalSampler, worldPosition.xz * 0.02 + windDirW * time * 0.012 ).g;\n' +
+        'float capMask = smoothstep( 1.0 - whitecapW - 0.04, 1.0 - whitecapW + 0.02, capN );\n' +
+        'float dpt = texture2D( depthTex, worldPosition.xz / 280.0 + 0.5 ).r * 40.0;\n' +
+        'float db = hsWave / 0.78;\n' +
+        'float shoal = smoothstep( db * 2.4, db * 0.6, dpt ) * smoothstep( 0.012, 0.05, dpt );\n' +
+        'float surfN = texture2D( normalSampler, worldPosition.xz * 0.05 + windDirW * time * 0.03 ).b;\n' +
+        'float surf = shoal * smoothstep( 0.35, 0.7, surfN + shoal * 0.25 );\n' +
+        'albedo = mix( albedo, vec3( 0.82, 0.86, 0.88 ) * ( 0.3 + max( sunDirection.y, 0.0 ) ), clamp( capMask * 0.9 + surf * 0.85, 0.0, 1.0 ) );\n' +
+        'vec3 outgoingLight = albedo;');
+    water.material.needsUpdate = true;
+    water.material.uniforms.time.value = 0.7;
+  } else {
+    const {HorizonWaterMesh} = await import('./writeups/themes/horizon/water-tsl.js');
+    const {createOceanFFT} = await import('./writeups/themes/horizon/ocean-tsl.js');
+    const SPLIT = (2 * Math.PI) / 25;
+    const U10 = +(P.get('u') ?? 12);
+    const cascades = [
+      createOceanFFT(r, {N: 256, L: 1000, U10, F: 150e3, D: 60, windDir: 0, kMax: SPLIT, seed: 1337, lambda: 1.1}),
+      createOceanFFT(r, {N: 256, L: 120, U10, F: 150e3, D: 60, windDir: 0, kMin: SPLIT, seed: 7331, lambda: 1.1})
+    ];
+    for (const c of cascades) c.update(13.7);
+    water = new HorizonWaterMesh(geo, {
+      waterNormals: wn, sunDirection: sunDir.clone(), sunColor: sunCol,
+      waterColor: 0x0a2431, distortionScale: distS, depthTex, worldSize: 280,
+      resolutionScale: mirrorFull ? 1 : 512 / Math.max(W, H),
+      ocean: {cascades, metersPerUnit: 57.14}
+    });
+    water.mssSubgrid.value = Math.max(0.003 + 0.00512 * U10 - cascades[0].resolvedMss - cascades[1].resolvedMss, 1e-4);
+    water.foamW.value = Math.min(3.84e-6 * Math.pow(U10, 3.41), 0.5);
+    water.windDirW.value.set(1, 0);
+    water.hsWave.value = hsW;
+    water.timeU.value = 0.7;
+  }
+  water.rotation.x = -Math.PI / 2;
+  scene.add(water);
+
+  const box = new T.Mesh(new T.BoxGeometry(10, 10, 10), new T.MeshBasicMaterial({color: 0xff0000}));
+  box.position.set(0, 9, -30);
+  scene.add(box);
+
+  if (V === 'gl') r.render(scene, cam); else { await r.renderAsync(scene, cam); await r.renderAsync(scene, cam); }
+  window.__r = r; window.__scene = scene; window.__cam = cam; window.__THREE = T;
+  console.log(V + ' water frame done');
+} catch (e) { console.log('ERR', e.message); }
+</script></body></html>

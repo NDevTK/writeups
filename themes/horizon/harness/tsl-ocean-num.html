@@ -26,7 +26,13 @@ try {
   for (const [i, j] of pts) {
     const d = await ocean.readMap('disp', i, j, 1, 1);
     const v = await ocean.readMap('deriv', i, j, 1, 1);
-    log(`(${i},${j}): h=${d[1].toFixed(4)} Dx=${(d[0] / LAMBDA).toFixed(4)} Dz=${(d[2] / LAMBDA).toFixed(4)} nx=${v[0].toFixed(4)} nz=${v[1].toFixed(4)} J=${v[2].toFixed(4)}`);
+    // maps carry combinable terms; rebuild n and J like the material
+    const lxx = v[2], lzz = v[3], lxz = d[3];
+    const J = (1 + lxx) * (1 + lzz) - lxz * lxz;
+    const tx = [1 + lxx, v[0], lxz], tz = [lxz, v[1], 1 + lzz];
+    const n = [tz[1] * tx[2] - tz[2] * tx[1], tz[2] * tx[0] - tz[0] * tx[2], tz[0] * tx[1] - tz[1] * tx[0]];
+    const nl = Math.hypot(...n);
+    log(`(${i},${j}): h=${d[1].toFixed(4)} Dx=${(d[0] / LAMBDA).toFixed(4)} Dz=${(d[2] / LAMBDA).toFixed(4)} nx=${(n[0] / nl).toFixed(4)} nz=${(n[2] / nl).toFixed(4)} J=${J.toFixed(4)}`);
   }
   // Full-column scan: locate reference h(37,81)=1.20377 in the map.
   const col = await ocean.readMap('disp', 37, 0, 1, 256);

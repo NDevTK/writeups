@@ -603,3 +603,14 @@ Scenes (all at Grindelwald unless noted):
       Cox-Munk lobe. Pinned Nelson gale: 0.0279 -> 0.0007 mean with
       ZERO samples over 8 - the best cross-backend number in the
       project. FFT ocean complete.
+  - Phase 5 CERTIFICATION - full pinned matrix with everything
+    (octave clouds, limb darkening, FFT ocean + filtering), real
+    WebGPU vs WebGL2 backend, mean abs /255: noon 0.0099, sunset
+    0.040, night 0.0009, stratus 1.10 (the known deck fp-dither
+    profile at the octave model's larger transmitted signal; terrain
+    rows exactly 0), towering 0.30, Nelson 0.0007, snow 0.39,
+    aurora 0.0003 - all green. Wind-range visual pass (u = 4/12/28
+    on harness/tsl-water-gpu.html): calm glassy sea with a tight
+    glitter lobe, moderate sea with a broadened dimmer lobe, gale
+    sea whitecapped to ~32% Monahan coverage - physical across the
+    range.
