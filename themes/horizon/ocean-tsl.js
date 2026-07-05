@@ -21,8 +21,6 @@ import {
   ivec2,
   max,
   mrt,
-  normalize,
-  cross,
   screenCoordinate,
   sin,
   sqrt,
@@ -54,10 +52,10 @@ import {buildInitialSpectrum} from './ocean-spectrum.js';
  *    chain (both chains in one pass), driven by a precomputed LUT
  *    (bit-reversal folded into pass 0, bottom-half twiddle signs
  *    folded into the LUT) - the exact algorithm of the reference
- *  - unpack: displacement map (lambda Dx, h, lambda Dz) and a
- *    derivative map (n.x, n.z, J) with the EXACT displaced-surface
- *    normal from the spectral tangents and the Jacobian
- *    J = (1+l Jxx)(1+l Jzz) - (l Jxz)^2 (folding -> whitecaps)
+ *  - unpack to two COMBINABLE maps (cascades sum linearly; normals
+ *    and the Jacobian are built once from the totals in the water
+ *    material): (lambda Dx, h, lambda Dz, lambda Jxz) and
+ *    (Sx, Sz, lambda Jxx, lambda Jzz)
  *
  * All passes are per-texel builders with the project's dual drivers:
  * compute + storage textures on WebGPU, struct/MRT QuadMesh passes on
@@ -77,7 +75,9 @@ export function createOceanFFT(renderer, opts = {}) {
     U10: opts.U10 ?? 12,
     F: opts.F ?? 120e3,
     D: opts.D ?? 60,
-    windDir: opts.windDir ?? 0
+    windDir: opts.windDir ?? 0,
+    kMin: opts.kMin,
+    kMax: opts.kMax
   };
   const seed = opts.seed ?? 1337;
   const useCompute = !!renderer.backend.isWebGPUBackend;
@@ -92,13 +92,18 @@ export function createOceanFFT(renderer, opts = {}) {
   const uLambda = uniform(opts.lambda ?? 1.1);
 
   // ---------- CPU init: h0 + omega, butterfly LUT ----------
-  const spec = buildInitialSpectrum(N, L, params, seed);
   const h0Data = new Float32Array(N * N * 4);
-  for (let i = 0; i < N * N; i++) {
-    h0Data[i * 4] = spec.h0[i * 2];
-    h0Data[i * 4 + 1] = spec.h0[i * 2 + 1];
-    h0Data[i * 4 + 2] = spec.omega[i];
+  let resolvedMss = 0;
+  function fillSpectrum() {
+    const spec = buildInitialSpectrum(N, L, params, seed);
+    for (let i = 0; i < N * N; i++) {
+      h0Data[i * 4] = spec.h0[i * 2];
+      h0Data[i * 4 + 1] = spec.h0[i * 2 + 1];
+      h0Data[i * 4 + 2] = spec.omega[i];
+    }
+    resolvedMss = spec.mss;
   }
+  fillSpectrum();
   const h0Tex = new DataTexture(h0Data, N, N, RGBAFormat, FloatType);
   h0Tex.minFilter = h0Tex.magFilter = NearestFilter;
   h0Tex.needsUpdate = true;
@@ -312,6 +317,12 @@ export function createOceanFFT(renderer, opts = {}) {
   };
 
   // ---------- unpack: final chains -> display maps ----------
+  // The maps carry COMBINABLE quantities: displacements, slopes and
+  // choppiness-scaled Jacobian derivatives sum linearly across
+  // cascades, so the material adds cascade samples first and builds
+  // the exact displaced-surface normal and folding Jacobian ONCE
+  // from the totals (normals and J of the sum are not the sum of
+  // normals / J).
   const unpackAt = (pix, srcA, srcB) => {
     const a4 = loadTexel(srcA, pix);
     const b4 = loadTexel(srcB, pix);
@@ -323,17 +334,9 @@ export function createOceanFFT(renderer, opts = {}) {
     const Jxx = b4.y;
     const Jzz = b4.z;
     const Jxz = b4.w;
-    const lx = uLambda.mul(Jxx);
-    const lz = uLambda.mul(Jzz);
-    const lc = uLambda.mul(Jxz);
-    const J = float(1).add(lx).mul(float(1).add(lz)).sub(lc.mul(lc));
-    // Exact displaced-surface normal from the spectral tangents.
-    const tx = vec3(float(1).add(lx), Sx, lc);
-    const tz = vec3(lc, Sz, float(1).add(lz));
-    const n = normalize(cross(tz, tx));
     return {
-      a: vec4(uLambda.mul(Dx), h, uLambda.mul(Dz), 1.0),
-      b: vec4(n.x, n.z, J, 1.0)
+      a: vec4(uLambda.mul(Dx), h, uLambda.mul(Dz), uLambda.mul(Jxz)),
+      b: vec4(Sx, Sz, uLambda.mul(Jxx), uLambda.mul(Jzz))
     };
   };
 
@@ -367,6 +370,21 @@ export function createOceanFFT(renderer, opts = {}) {
     displacementTex: maps.a,
     derivTex: maps.b,
     lambda: uLambda,
+    // Exact resolved mean-square slope of this (banded) grid; the
+    // material's Cox-Munk lobe uses total-minus-resolved (Bruneton
+    // et al. 2010) so sub-grid slopes are neither lost nor doubled.
+    get resolvedMss() {
+      return resolvedMss;
+    },
+    // Winds change: rebuild the spectrum IN PLACE (same textures and
+    // kernels - only the h0/omega data re-uploads), the same pattern
+    // as the aerosol-gated atmosphere LUTs.
+    setWind(U10, windDir) {
+      params.U10 = U10;
+      params.windDir = windDir;
+      fillSpectrum();
+      h0Tex.needsUpdate = true;
+    },
     update(tSeconds) {
       uTime.value = tSeconds;
       for (const fill of fills) fill();

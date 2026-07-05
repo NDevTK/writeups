@@ -1,10 +1,9 @@
 import {Color, Mesh, NodeMaterial, Vector2, Vector3} from 'three/webgpu';
 import {
   Fn,
-  add,
   cameraPosition,
   clamp,
-  div,
+  cross,
   dot,
   float,
   length,
@@ -12,34 +11,44 @@ import {
   mix,
   mul,
   normalize,
+  positionGeometry,
   positionWorld,
   pow,
   reflect,
   reflector,
   smoothstep,
-  sub,
   texture,
   uniform,
   vec2,
-  vec3
+  vec3,
+  vertexStage
 } from 'three/tsl';
 
 /**
- * Horizon's sea as a TSL node material (WebGPU project, phase 2).
+ * Horizon's sea as a TSL node material (WebGPU project, phase 2;
+ * FFT waves phase 5).
  *
  * Forked from three r185 examples/jsm/objects/WaterMesh.js (vendored
- * unmodified alongside for provenance) with the physics the classic
- * pipeline applied as runtime string patches - node graphs cannot be
- * string-patched, so the fork carries them at source level, each block
- * marked HORIZON:
+ * unmodified alongside for provenance). The wave field is the
+ * Tessendorf FFT ocean (ocean-tsl.js cascades, reference-validated):
+ *  - vertex displacement (lambda-choppy Dx/Dz + h) summed over the
+ *    k-space-partitioned cascades
+ *  - the EXACT displaced-surface normal, built once from the summed
+ *    spectral slopes and Jacobian derivatives (maps carry combinable
+ *    terms; normals of a sum are not sums of normals)
+ *  - whitecaps from the Jacobian folding criterion (Tessendorf 2001,
+ *    J < Jt), with Jt = 0.4745 calibrated so coverage matches
+ *    Monahan & O'Muircheartaigh (1980) W = 3.84e-6 U^3.41 at
+ *    U = 12 m/s (ocean-reference.mjs prints the percentile) - at
+ *    every other wind, coverage follows from the physics
  *  - Cox & Munk (1954) glitter: the Blinn lobe's gloss follows the
- *    wind-driven slope variance (shiny uniform), not a fixed 100
- *  - Monahan & O'Muircheartaigh (1980) whitecaps: coverage
- *    W = 3.84e-6 U^3.41 drives a noise-thresholded foam mask
+ *    RESIDUAL slope variance - total wind mss minus what the FFT
+ *    cascades resolve (Bruneton, Neyret & Holzschuch 2010) - via the
+ *    shiny uniform the theme computes
  *  - McCowan surf: waves break where H > 0.78 d against the REAL
  *    terrarium bathymetry (depth texture), foam along the shallows
- *  - deterministic time uniform (the caller advances it, exactly like
- *    the classic `time` uniform - also what makes A/B tests exact)
+ *  - deterministic time uniforms (the caller advances them - also
+ *    what makes A/B tests exact)
  *  - the shared aerial-perspective + Koschmieder hook applies as the
  *    material's outputNode
  */
@@ -54,7 +63,6 @@ export class HorizonWaterMesh extends Mesh {
 
     this.waterNormals = texture(options.waterNormals);
     this.alpha = uniform(options.alpha !== undefined ? options.alpha : 1.0);
-    this.size = uniform(options.size !== undefined ? options.size : 1.0);
     this.sunColor = uniform(new Color(options.sunColor ?? 0xffffff));
     this.sunDirection = uniform(
       options.sunDirection !== undefined
@@ -69,47 +77,63 @@ export class HorizonWaterMesh extends Mesh {
     // HORIZON uniforms (same names/semantics as the classic patch).
     this.timeU = uniform(0);
     this.shiny = uniform(200);
-    this.whitecapW = uniform(0);
+    this.foamJ = uniform(0.4745); // folding threshold, see header
     this.windDirW = uniform(new Vector2(1, 0));
     this.hsWave = uniform(0.5);
     this.worldSize = uniform(options.worldSize ?? 280);
     const depthTexNode = texture(options.depthTex);
     this.depthTexNode = depthTexNode; // swap via .value on rebuild
 
-    // TSL (WaterMesh recipe, with the deterministic time uniform)
-    const getNoise = Fn(([uv]) => {
-      const offset = this.timeU;
-      const uv0 = add(
-        div(uv, 103),
-        vec2(div(offset, 17), div(offset, 29))
-      ).toVar();
-      const uv1 = div(uv, 107)
-        .sub(vec2(div(offset, -19), div(offset, 31)))
-        .toVar();
-      const uv2 = add(
-        div(uv, vec2(8907.0, 9803.0)),
-        vec2(div(offset, 101), div(offset, 97))
-      ).toVar();
-      const uv3 = sub(
-        div(uv, vec2(1091.0, 1027.0)),
-        vec2(div(offset, 109), div(offset, -113))
-      ).toVar();
-      const noise = this.waterNormals
-        .sample(uv0)
-        .add(this.waterNormals.sample(uv1))
-        .add(this.waterNormals.sample(uv2))
-        .add(this.waterNormals.sample(uv3));
-      return noise.mul(0.5).sub(1);
-    });
+    // ---------- FFT ocean cascades (phase 5) ----------
+    // The plane is rotated x = -pi/2: local (x, y) -> world (x, -y),
+    // world up -> local +z. Sampling uses the UNDISPLACED surface
+    // parameter, carried to the fragment stage as a varying so the
+    // horizontal chop does not re-parameterise the maps.
+    const {cascades, metersPerUnit} = options.ocean;
+    const mpu = metersPerUnit;
+    const baseXZm = vec2(positionGeometry.x, positionGeometry.y.negate()).mul(
+      mpu
+    );
+    const cascadeNodes = cascades.map((c) => ({
+      disp: texture(c.displacementTex),
+      deriv: texture(c.derivTex),
+      invL: 1 / c.patchSize
+    }));
 
-    const noise = getNoise(positionWorld.xz.mul(this.size));
-    // HORIZON: classic Water.js scales the swizzled noise by
-    // vec3(1.5, 1.0, 1.5) BEFORE normalizing - the anisotropy is the
-    // wave slope. Upstream WaterMesh.js writes `.mul(1.5, 1.0, 1.5)`,
-    // but TSL mul() chains extra args as scalar factors (x2.25
-    // uniformly), which normalize() cancels - flattening the sea.
-    // A/B against the GLSL reference caught it; keep the vec3.
-    const surfaceNormal = normalize(noise.xzy.mul(vec3(1.5, 1.0, 1.5)));
+    // Vertex displacement: world (Dx, h, Dz) metres -> local
+    // (Dx, -Dz, h) scene units.
+    const dispSum = cascadeNodes
+      .map(({disp, invL}) => disp.sample(baseXZm.mul(invL)).xyz)
+      .reduce((acc, d) => acc.add(d));
+    material.positionNode = positionGeometry.add(
+      vec3(dispSum.x, dispSum.z.negate(), dispSum.y).div(mpu)
+    );
+
+    // Fragment: sum the combinable spectral terms across cascades,
+    // then build the exact displaced-surface normal and the folding
+    // Jacobian ONCE from the totals.
+    const fragXZ = vertexStage(baseXZm);
+    let sumSx = float(0);
+    let sumSz = float(0);
+    let sumJxx = float(0);
+    let sumJzz = float(0);
+    let sumJxz = float(0);
+    for (const {disp, deriv, invL} of cascadeNodes) {
+      const uvC = fragXZ.mul(invL);
+      const d4 = deriv.sample(uvC);
+      sumSx = sumSx.add(d4.x);
+      sumSz = sumSz.add(d4.y);
+      sumJxx = sumJxx.add(d4.z);
+      sumJzz = sumJzz.add(d4.w);
+      sumJxz = sumJxz.add(disp.sample(uvC).w);
+    }
+    const tanX = vec3(float(1).add(sumJxx), sumSx, sumJxz);
+    const tanZ = vec3(sumJxz, sumSz, float(1).add(sumJzz));
+    const surfaceNormal = normalize(cross(tanZ, tanX));
+    const jacobian = float(1)
+      .add(sumJxx)
+      .mul(float(1).add(sumJzz))
+      .sub(sumJxz.mul(sumJxz));
 
     const worldToEye = cameraPosition.sub(positionWorld);
     const eyeDirection = normalize(worldToEye);
@@ -165,18 +189,13 @@ export class HorizonWaterMesh extends Mesh {
         reflectance
       );
 
-      // HORIZON: Monahan whitecaps + McCowan surf on the real
-      // bathymetry (same math as the classic string patch; the shoal
-      // ramp is written as oneMinus of an ordered smoothstep because
+      // HORIZON: whitecaps from the Jacobian folding criterion
+      // (Tessendorf 2001) - foam where the horizontal displacement
+      // folds the surface (J below the Monahan-calibrated threshold)
+      // - plus McCowan surf on the real bathymetry (the shoal ramp
+      // is written as oneMinus of an ordered smoothstep because
       // reversed-edge smoothstep is undefined per spec).
-      const capN = this.waterNormals.sample(
-        positionWorld.xz.mul(0.02).add(this.windDirW.mul(this.timeU.mul(0.012)))
-      ).g;
-      const capMask = smoothstep(
-        this.whitecapW.oneMinus().sub(0.04),
-        this.whitecapW.oneMinus().add(0.02),
-        capN
-      );
+      const capMask = smoothstep(this.foamJ, this.foamJ.sub(0.35), jacobian);
       const dpt = depthTexNode
         .sample(positionWorld.xz.div(this.worldSize).add(0.5))
         .r.mul(40.0);

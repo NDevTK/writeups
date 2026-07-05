@@ -548,8 +548,43 @@ Scenes (all at Grindelwald unless noted):
       numeric readbacks of signed data go through an fp32 affine
       encode. And ivec2.toFloat() collapses to a scalar - convert
       vectors with vec2()/vec3(), never .toFloat().
-  - NEXT (step 2): integrate into water-tsl - vertex displacement +
-    exact normals into the Cox-Munk BRDF, Jacobian-folding whitecaps
-    replacing the Monahan wind heuristic, cascade instantiation
-    (2 patch scales, k-space partitioned to avoid double-counting),
-    Nelson scene wiring + pinned matrix acceptance.
+  - Tessendorf FFT ocean, step 2 DONE - water integration.
+    - Two cascades (L = 1000 m and 120 m, N = 256), k-space
+      partitioned at lambda = 25 m via exact kMin/kMax band limits in
+      the h0 build - summed cascades never double-count energy. The
+      unpack maps now carry COMBINABLE terms - (lDx, h, lDz, lJxz)
+      and (Sx, Sz, lJxx, lJzz) - because normals and the folding
+      Jacobian of a sum are not sums of per-cascade ones; the
+      material sums cascade samples and builds both once.
+    - water-tsl: vertex displacement (world (Dx,h,Dz) -> the rotated
+      plane's local frame), the exact displaced-surface normal from
+      summed spectral tangents (sampled at the UNDISPLACED parameter,
+      carried by vertexStage), Jacobian-folding whitecaps with
+      Jt = 0.4745 - calibrated by ocean-reference.mjs so coverage
+      matches Monahan W = 3.84e-6 U^3.41 at U = 12 m/s; at every
+      other wind coverage follows from the physics. The 4-octave
+      scrolling-normal-map sea and the Monahan noise mask are
+      DELETED; the waterNormals texture remains only for McCowan
+      surf noise. Cox-Munk glitter now uses the RESIDUAL slope
+      variance (total wind mss minus the cascades' exact resolved
+      mss, computed as sum k^2 S dk^2 at init - Bruneton, Neyret &
+      Holzschuch 2010), so sub-grid slopes are neither lost nor
+      counted twice.
+    - Horizon.html: cascades built with the water plane (TMA depth =
+      mean of the real bathymetry, F = 150 km fixed - the weather
+      API reports no fetch), advanced on REAL seconds (dispersion is
+      physical), spectrum rebuilt IN PLACE via setWind() when the
+      wind moves > 1.5 m/s or > 20 deg (same gating pattern as the
+      aerosol LUTs; same textures/kernels, only h0 re-uploads).
+      PlaneGeometry now 192x192 segments for the displacement.
+    - Acceptance: pinned Nelson (28 m/s gale) on real WebGPU vs the
+      WebGL2 backend: mean 0.0279, frac>8 0.00002 - green.
+  - NEXT (step 3): wave FILTERING - the maps have no mip chain, so
+    distant minification of the fine cascade aliases (visible as
+    glitter speckle on the daytime subsystem page, amplified by the
+    Blinn exponent). The paper-true fix is slope-variance-preserving
+    filtering: distance-blend the fine cascade's per-pixel normal
+    contribution into the BRDF roughness (the same Bruneton 2010
+    variance bookkeeping already used for sub-grid slopes), or full
+    LEAN/CLEAN mapping. Then a daytime-sea visual pass (glitter,
+    foam at gale winds).

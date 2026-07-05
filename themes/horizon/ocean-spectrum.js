@@ -136,13 +136,26 @@ export function makeGaussian(seed) {
  * Grid convention: index i in [0,N) maps to wavenumber component
  * k_i = 2 pi (i - N/2) / L (signed, DC at i = N/2), matching the
  * shifted layout both the reference FFT and the GPU FFT use.
- * Returns {h0: Float64Array(N*N*2), omega: Float64Array(N*N)}.
+ *
+ * params.kMin / params.kMax (optional, rad/m) band-limit the grid -
+ * cascades partition k-space with them exactly (h0 = 0 outside
+ * [kMin, kMax)), so summed cascades never double-count energy.
+ *
+ * Returns {h0, omega, mss}: mss is the RESOLVED mean-square slope
+ * E[|grad h|^2] = sum k^2 S(k) dk^2 over the banded grid - the exact
+ * variance the FFT waves realise. The BRDF's Cox-Munk glitter lobe
+ * uses the residual (total wind mss minus resolved) so sub-grid
+ * slopes are neither lost nor counted twice (the split of Bruneton,
+ * Neyret & Holzschuch 2010).
  */
 export function buildInitialSpectrum(N, L, params, seed = 1337) {
   const h0 = new Float64Array(N * N * 2);
   const omega = new Float64Array(N * N);
   const gauss = makeGaussian(seed);
   const dk = (2 * Math.PI) / L;
+  const kMin = params.kMin ?? 0;
+  const kMax = params.kMax ?? Infinity;
+  let mss = 0;
   for (let j = 0; j < N; j++) {
     for (let i = 0; i < N; i++) {
       const kx = dk * (i - N / 2);
@@ -154,11 +167,13 @@ export function buildInitialSpectrum(N, L, params, seed = 1337) {
       // alignment is index-pure (skipping DC would shift everything
       // after it and make h0 depend on grid traversal details).
       const [gr, gi] = gauss();
-      const Sk = spectrumK(kx, kz, params);
+      const inBand = k >= kMin && k < kMax;
+      const Sk = inBand ? spectrumK(kx, kz, params) : 0;
+      mss += k * k * Sk * dk * dk;
       const amp = Math.sqrt(2 * Sk * dk * dk) / Math.SQRT2;
       h0[idx * 2] = gr * amp;
       h0[idx * 2 + 1] = gi * amp;
     }
   }
-  return {h0, omega};
+  return {h0, omega, mss};
 }

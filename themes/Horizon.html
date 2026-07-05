@@ -170,6 +170,7 @@
       import {createAerialFog} from './horizon/aerial-tsl.js';
       import {createTerrainNodeMaterial} from './horizon/terrain-tsl.js';
       import {HorizonWaterMesh} from './horizon/water-tsl.js';
+      import {createOceanFFT} from './horizon/ocean-tsl.js';
       import {
         createVeilMaterial,
         createMoonMaterial,
@@ -1159,6 +1160,11 @@
       let snowSim = null; // Rapier world, booted the first time it snows
       let snowLoading = false;
       let water = null; // three.js Water plane, built when the DEM has sea
+      let oceanCascades = null; // FFT ocean (phase 5), built with water
+      let oceanBuiltU = -1; // wind the spectrum was built at (m/s)
+      let oceanBuiltDir = 0;
+      let oceanSeaDepth = 60;
+      let oceanTime = 0; // REAL seconds - the dispersion is physical
       const waterNormalsTex = new THREE.TextureLoader().load(
         './horizon/waternormals.jpg'
       );
@@ -1333,6 +1339,8 @@
           // from the terrarium tiles into a depth texture.
           const DT = 128;
           const dArr = new Uint8Array(DT * DT);
+          let dSum = 0;
+          let dCnt = 0;
           for (let dj = 0; dj < DT; dj++)
             for (let di = 0; di < DT; di++) {
               const e = demData
@@ -1341,6 +1349,10 @@
                     (dj / (DT - 1) - 0.5) * WORLD
                   )
                 : 1;
+              if (e < 0) {
+                dSum += -e;
+                dCnt++;
+              }
               dArr[dj * DT + di] = THREE.MathUtils.clamp(
                 (-e / 40) * 255,
                 0,
@@ -1349,24 +1361,62 @@
             }
           const depthTex = new THREE.DataTexture(dArr, DT, DT, THREE.RedFormat);
           depthTex.needsUpdate = true;
-          water = new HorizonWaterMesh(new THREE.PlaneGeometry(WORLD, WORLD), {
-            waterNormals: waterNormalsTex,
-            sunDirection: new THREE.Vector3(0, 1, 0),
-            sunColor: 0xffffff,
-            waterColor: 0x0a2431,
-            distortionScale: 1.4,
-            depthTex,
-            worldSize: WORLD,
-            resolutionScale: 0.5
-          });
+          // Tessendorf FFT ocean cascades (phase 5): JONSWAP/TMA at
+          // the real wind, TMA depth from the mean of the real
+          // bathymetry, k-space partitioned at lambda = 25 m so the
+          // two patch scales never double-count energy. The spectrum
+          // rebuilds in place when the wind moves materially (same
+          // gating pattern as the aerosol LUTs).
+          oceanSeaDepth = dCnt ? Math.max(dSum / dCnt, 5) : 60;
+          oceanBuiltU = state.wind / 3.6;
+          oceanBuiltDir = Math.atan2(windV.z, windV.x);
+          const OCEAN_SPLIT = (2 * Math.PI) / 25;
+          oceanCascades = [
+            createOceanFFT(renderer, {
+              N: 256,
+              L: 1000,
+              U10: oceanBuiltU,
+              F: 150e3,
+              D: oceanSeaDepth,
+              windDir: oceanBuiltDir,
+              kMax: OCEAN_SPLIT,
+              seed: 1337,
+              lambda: 1.1
+            }),
+            createOceanFFT(renderer, {
+              N: 256,
+              L: 120,
+              U10: oceanBuiltU,
+              F: 150e3,
+              D: oceanSeaDepth,
+              windDir: oceanBuiltDir,
+              kMin: OCEAN_SPLIT,
+              seed: 7331,
+              lambda: 1.1
+            })
+          ];
+          water = new HorizonWaterMesh(
+            new THREE.PlaneGeometry(WORLD, WORLD, 192, 192),
+            {
+              waterNormals: waterNormalsTex,
+              sunDirection: new THREE.Vector3(0, 1, 0),
+              sunColor: 0xffffff,
+              waterColor: 0x0a2431,
+              distortionScale: 1.4,
+              depthTex,
+              worldSize: WORLD,
+              resolutionScale: 0.5,
+              ocean: {cascades: oceanCascades, metersPerUnit: 57.14}
+            }
+          );
           water.rotation.x = -Math.PI / 2;
           water.position.y = 16 * Math.asinh((0 - centerElev) / 500) - 0.15;
           // Aerial perspective + AgX for the sea via the shared hook.
           applyAerial(water.material);
           ground.add(water);
           record(
-            'three.js WaterMesh (forked)',
-            'planar reflections · Cox-Munk glitter · Monahan whitecaps'
+            'Tessendorf FFT ocean',
+            'JONSWAP/TMA cascades · exact spectral normals · Jacobian whitecaps'
           );
         }
 
@@ -2182,20 +2232,44 @@
           THREE.MathUtils.clamp(nightSky * 1.6, 0, 1) * (1 - cloudy * 0.85);
         moonDisc.visible = moon.alt > -0.05;
 
-        // The Water plane: Cox-Munk slope statistics set the glitter
-        // lobe, Monahan sets the whitecap fraction, Pierson-Moskowitz
-        // scales the distortion - all from the one real wind speed.
-        if (water) {
+        // The Water plane: the FFT ocean advances on REAL seconds
+        // (finite-depth dispersion is physical), the spectrum rebuilds
+        // in place when the wind moves materially, the Cox-Munk
+        // glitter lobe gets the RESIDUAL slope variance - total wind
+        // mss minus what the cascades resolve (Bruneton et al. 2010) -
+        // and whitecap coverage now emerges from the folding Jacobian
+        // inside the material.
+        if (water && oceanCascades) {
           const Ums = state.wind / 3.6;
           water.timeU.value += dt * (0.3 + Ums * 0.05);
+          oceanTime += dt;
+          const dirNow = Math.atan2(windV.z, windV.x);
+          const dDir = Math.abs(
+            Math.atan2(
+              Math.sin(dirNow - oceanBuiltDir),
+              Math.cos(dirNow - oceanBuiltDir)
+            )
+          );
+          if (Math.abs(Ums - oceanBuiltU) > 1.5 || dDir > 0.35) {
+            for (const c of oceanCascades) c.setWind(Ums, dirNow);
+            oceanBuiltU = Ums;
+            oceanBuiltDir = dirNow;
+          }
+          for (const c of oceanCascades) c.update(oceanTime);
           water.sunDirection.value.copy(sunVec);
           water.sunColor.value
             .copy(sunLight.color)
             .multiplyScalar(sunLight.intensity);
           water.distortionScale.value = 0.6 + ((0.21 * Ums * Ums) / 9.81) * 2.5;
           const mss = 0.003 + 0.00512 * Ums;
-          water.shiny.value = Math.max(2 / mss - 2, 30);
-          water.whitecapW.value = Math.min(3.84e-6 * Math.pow(Ums, 3.41), 0.5);
+          const resolved = oceanCascades.reduce(
+            (s, c) => s + c.resolvedMss,
+            0
+          );
+          water.shiny.value = Math.max(
+            2 / Math.max(mss - resolved, 1e-4) - 2,
+            30
+          );
           water.windDirW.value.set(windV.x, windV.z);
           water.hsWave.value = (0.21 * Ums * Ums) / 9.81;
         }

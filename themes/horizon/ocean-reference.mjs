@@ -180,6 +180,27 @@ const jxz = ifft2(F.Jxz);
   );
 }
 
+// Foam-threshold calibration: the folding criterion (foam where
+// J < Jt) gets its Jt by matching Monahan & O'Muircheartaigh (1980)
+// whitecap coverage W = 3.84e-6 U^3.41 at this wind - after that,
+// coverage at every other wind follows from the physics alone.
+{
+  const U = PARAMS.U10;
+  const W = 3.84e-6 * Math.pow(U, 3.41);
+  const Js = new Float64Array(N * N);
+  for (let a = 0; a < N * N; a++) {
+    Js[a] =
+      (1 + LAMBDA * jxx.re[a]) * (1 + LAMBDA * jzz.re[a]) -
+      LAMBDA * LAMBDA * jxz.re[a] * jxz.re[a];
+  }
+  Js.sort();
+  const Jt = Js[Math.max(Math.floor(W * N * N) - 1, 0)];
+  console.log(
+    `REF foam calibration: Monahan W(${U}) = ${(W * 100).toFixed(2)}%` +
+      ` -> Jt = ${Jt.toFixed(4)} (J range ${Js[0].toFixed(3)}..${Js[N * N - 1].toFixed(3)})`
+  );
+}
+
 const pts = [
   [0, 0],
   [37, 81],
