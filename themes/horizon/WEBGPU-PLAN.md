@@ -383,7 +383,44 @@ Scenes (all at Grindelwald unless noted):
     moon/veil/aurora/optics/stars/planets 0.0000 (bit-exact). The
     clouds-tsl `coordinateSystem` clip-z branch and all QuadMesh/RT
     orientation conventions are hereby validated on WebGPU proper.
-  - Remaining phase 3: the compute ports (LUT chain → compute +
-    storage textures, cloud march → compute, async irradiance
-    staging read). Then phase 4 polish (blue-noise jitter, sky-view
-    horizon-band fix, motion vectors).
+- Phase 3, step 2 DONE — compute ports. The physics stayed
+  single-source: every LUT builder and the cloud march body are now
+  coordinate-parameterised Fns with two thin drivers - on WebGPU a
+  compute dispatch writing a StorageTexture (one invocation per
+  texel, vUv at texel centres exactly matching the raster path's
+  uv()); on the WebGL2 backend, which has no compute, the same Fn
+  still renders through the phase-2 QuadMesh pass.
+  - atmosphere-tsl.js: transmittance / multiscatter / sky-view /
+    aerial LUTs are compute on WebGPU. The 1x1 irradiance stays a
+    raster pass on both backends: readRenderTargetPixelsAsync IS the
+    async staging read (no sync stall since phase 2), and a single
+    texel gives compute nothing to win. Harness readLut() blits
+    storage textures through a temp RT.
+  - clouds-tsl.js: the march ping-pongs two StorageTextures via
+    per-buffer kernels; history/composite consume them through the
+    same swappable texture nodes as before. `pix` carries
+    fragment-convention pixel centres (x+0.5) so the Bayer lattice
+    and per-pixel hash are bit-identical across drivers. The
+    composite remains raster (it blends into the frame).
+  - Compute-primitive probe (tsl-compute-probe.html), all PASS on
+    Dawn: textureStore row == sample v == readback row (no flip);
+    filtered texture sampling and Loop/If inside kernels; DepthTexture
+    sampling inside kernels. Also caught: WebGPU float readbacks
+    narrower than 64 px come back 256-byte-row-padded (scrambled) -
+    keep probe/LUT widths at w*16 bytes % 256 == 0.
+  - Subsystem A/B, compute (WebGPU) vs fragment (WebGL2): dome
+    0.0017 (the only >8 outliers are a 2-px band at the sky-view
+    horizon seam - linear filtering across the physical discontinuity
+    amplifies half-float FMA differences; the phase-4 Bruneton
+    horizon-band item targets exactly this seam), clouds 0.0375
+    after 64 temporal frames with max 8.
+  - Full pinned matrix, WebGPU compute vs WebGL2 fragment (mean abs
+    /255): noon 0.005 (a single pixel >8), sunset 0.059, night
+    0.001, stratus 0.84, towering 0.32, Nelson 0.007 (max 8!), snow
+    0.44, aurora 0.0003 - every scene at or better than the
+    fragment-vs-fragment baseline above. Nelson's pinned run also
+    got ~25% faster wall-clock (compute march).
+  - Phase 3 complete. Next: phase 4 polish (blue-noise march jitter
+    via void-and-cluster, sky-view horizon-band fix with Bruneton's
+    parameterization near the horizon, motion-vector history if the
+    camera ever translates).

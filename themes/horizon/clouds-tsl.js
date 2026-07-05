@@ -15,6 +15,7 @@ import {
   RGBAFormat,
   RenderTarget,
   RepeatWrapping,
+  StorageTexture,
   Vector2,
   Vector3
 } from 'three/webgpu';
@@ -28,7 +29,9 @@ import {
   exp,
   float,
   fract,
+  instanceIndex,
   int,
+  ivec2,
   max,
   min,
   mix,
@@ -39,6 +42,7 @@ import {
   smoothstep,
   texture,
   texture3D,
+  textureStore,
   uniform,
   uv,
   vec2,
@@ -56,6 +60,12 @@ import {generateCloudArrays} from './cloud-noise.js';
  * real terrain depth, golden-ratio jitter with exponential history
  * integration, nearest-depth upsampling at composite (Jansen & Bavoil
  * 2010). The noise physics lives once in cloud-noise.js.
+ *
+ * Phase 3: the march body is a coordinate-parameterised Fn (single
+ * physics definition) with two drivers - on WebGPU it is a compute
+ * dispatch ping-ponging two StorageTextures; on the WebGL2 backend it
+ * stays the QuadMesh pass into render targets. The composite remains
+ * a raster pass on both (it blends into the frame).
  *
  * Texture-coordinate conventions (pinned by probes, WEBGPU-PLAN.md):
  * in TSL-land QuadMesh uv(), colour sample() and depth-texture
@@ -294,17 +304,19 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     }
   );
 
-  // ---------- the reconstruction pass (quarter res) ----------
-  const marchNode = Fn(() => {
-    const vUv = uv();
+  // ---------- the reconstruction (quarter res) ----------
+  // pix carries fragment-convention pixel CENTRES (x+0.5, y+0.5) -
+  // exactly screenCoordinate.xy in the raster driver - so the Bayer
+  // lattice and the per-pixel hash are bit-identical in both drivers.
+  const marchBody = Fn(([vUv, pix]) => {
     const ndc = vec2(vUv.x.mul(2.0).sub(1.0), float(1.0).sub(vUv.y.mul(2.0)));
     const wf = invVP.mul(vec4(ndc, 1.0, 1.0));
     const rd = normalize(wf.xyz.div(wf.w).sub(camPos)).toVar();
 
     // 4x4 Bayer in closed form: B4(x,y) = 4*b2(x&1,y&1) +
     // b2((x>>1)&1,(y>>1)&1) with b2(x,y) = (3y)^(2x).
-    const px = screenCoordinate.x.toInt();
-    const py = screenCoordinate.y.toInt();
+    const px = pix.x.toInt();
+    const py = pix.y.toInt();
     const b2lo = py
       .bitAnd(int(1))
       .mul(int(3))
@@ -338,9 +350,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       const sceneD = sceneDist(vUv, ndc).toVar();
       // Golden-ratio temporal jitter + exponential integration: the
       // march-start estimate converges to the true integral over time.
-      const jit = fract(
-        hash12(screenCoordinate.xy).add(frameI.mul(0.618034))
-      ).toVar();
+      const jit = fract(hash12(pix).add(frameI.mul(0.618034))).toVar();
       const cSun = dot(rd, shared.sunDirW);
       const phase = mix(hg(cSun, 0.6), hg(cSun, -0.3), 0.35).toVar();
       const A = marchSlab(
@@ -428,15 +438,19 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   });
 
   const quad = new QuadMesh();
-  const marchMat = new MeshBasicNodeMaterial();
-  marchMat.colorNode = marchNode();
-  marchMat.toneMapped = false;
-  // The march WRITES transmittance in alpha, and an OPAQUE node
-  // material stomps output alpha to 1 (invisible over the black A/B
-  // background, fatal over a real scene). transparent + NoBlending
-  // writes source RGBA verbatim.
-  marchMat.transparent = true;
-  marchMat.blending = NoBlending;
+  const useCompute = !!renderer.backend.isWebGPUBackend;
+  let marchMat = null;
+  if (!useCompute) {
+    marchMat = new MeshBasicNodeMaterial();
+    marchMat.colorNode = marchBody(uv(), screenCoordinate.xy);
+    marchMat.toneMapped = false;
+    // The march WRITES transmittance in alpha, and an OPAQUE node
+    // material stomps output alpha to 1 (invisible over the black A/B
+    // background, fatal over a real scene). transparent + NoBlending
+    // writes source RGBA verbatim.
+    marchMat.transparent = true;
+    marchMat.blending = NoBlending;
+  }
   const compMat = new MeshBasicNodeMaterial();
   compMat.colorNode = compositeNode();
   compMat.toneMapped = false;
@@ -452,19 +466,53 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   compMat.depthTest = false;
   compMat.depthWrite = false;
 
-  let rtA = null;
-  let rtB = null;
+  // Ping-pong pair: {tex, fill()} - fill() marches into tex reading
+  // history from the OTHER buffer via histNode (swapped in render()).
+  let bufA = null;
+  let bufB = null;
   const prevVPStore = new Matrix4();
+
+  function makeBuffer(qw, qh) {
+    if (useCompute) {
+      const tex = new StorageTexture(qw, qh);
+      tex.type = HalfFloatType;
+      tex.minFilter = tex.magFilter = LinearFilter;
+      const kernel = Fn(() => {
+        const i = int(instanceIndex);
+        const x = i.mod(qw);
+        const y = i.div(qw);
+        const vUv = vec2(float(x).add(0.5).div(qw), float(y).add(0.5).div(qh));
+        const pix = vec2(float(x).add(0.5), float(y).add(0.5));
+        textureStore(tex, ivec2(x, y), marchBody(vUv, pix));
+      })().compute(qw * qh);
+      return {
+        tex,
+        fill: () => renderer.compute(kernel),
+        dispose: () => tex.dispose()
+      };
+    }
+    const rt = quarterTarget(qw, qh);
+    return {
+      tex: rt.texture,
+      fill: () => {
+        quad.material = marchMat;
+        renderer.setRenderTarget(rt);
+        quad.render(renderer);
+        renderer.setRenderTarget(null);
+      },
+      dispose: () => rt.dispose()
+    };
+  }
 
   function setSize(w, h) {
     const qw = Math.max(Math.ceil(w / 4), 8);
     const qh = Math.max(Math.ceil(h / 4), 8);
-    if (rtA) {
-      rtA.dispose();
-      rtB.dispose();
+    if (bufA) {
+      bufA.dispose();
+      bufB.dispose();
     }
-    rtA = quarterTarget(qw, qh);
-    rtB = quarterTarget(qw, qh);
+    bufA = makeBuffer(qw, qh);
+    bufB = makeBuffer(qw, qh);
     resQ.value.set(qw, qh);
     warm.value = 1; // history is gone; march everything once
   }
@@ -478,14 +526,11 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       camera.projectionMatrixInverse
     );
     prevVP.value.copy(prevVPStore);
-    histNode.value = rtB.texture;
-    quad.material = marchMat;
-    renderer.setRenderTarget(rtA);
-    quad.render(renderer);
-    renderer.setRenderTarget(null);
-    const t = rtA;
-    rtA = rtB;
-    rtB = t; // rtB now holds the newest reconstruction
+    histNode.value = bufB.tex;
+    bufA.fill();
+    const t = bufA;
+    bufA = bufB;
+    bufB = t; // bufB now holds the newest reconstruction
     prevVPStore.multiplyMatrices(
       camera.projectionMatrix,
       camera.matrixWorldInverse
@@ -495,7 +540,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   }
 
   function composite() {
-    cloudNode.value = rtB.texture;
+    cloudNode.value = bufB.tex;
     const auto = renderer.autoClear;
     renderer.autoClear = false;
     quad.material = compMat;

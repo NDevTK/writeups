@@ -9,6 +9,7 @@ import {
   MeshBasicNodeMaterial,
   RenderTarget,
   SphereGeometry,
+  StorageTexture,
   Vector3
 } from 'three/webgpu';
 import {
@@ -21,6 +22,9 @@ import {
   dot,
   exp,
   float,
+  instanceIndex,
+  int,
+  ivec2,
   max,
   min,
   normalize,
@@ -29,6 +33,7 @@ import {
   sin,
   sqrt,
   texture,
+  textureStore,
   uniform,
   uv,
   vec2,
@@ -52,9 +57,13 @@ import {
  *  - the dome samples the sky-view LUT and adds the sun disc through
  *    the transmittance LUT
  *
- * Runs identically on WebGPU and on WebGPURenderer's WebGL2 backend -
- * in phase 3 the LUT passes become compute dispatches; the functions
- * here stay the single definition of the physics.
+ * Runs identically on WebGPU and on WebGPURenderer's WebGL2 backend.
+ * The LUT builders are coordinate-parameterised Fns - the single
+ * definition of the physics - driven two ways (phase 3): on WebGPU
+ * each LUT is a compute dispatch writing a StorageTexture (probe:
+ * store-y == sample-v == readback-row, filtered sampling works inside
+ * kernels); on the WebGL2 backend, which has no compute, the same Fn
+ * renders through a QuadMesh pass exactly as in phase 2.
  */
 
 const RB = 6360e3;
@@ -159,6 +168,10 @@ export function createAtmosphereTSL(renderer) {
     return m.mul(sqrt(m));
   });
 
+  // WebGPU: compute + storage textures. WebGL2 backend: QuadMesh
+  // passes into render targets. Same physics Fns drive both.
+  const useCompute = !!renderer.backend.isWebGPUBackend;
+
   function makeTarget(w, h, type) {
     const rt = new RenderTarget(w, h, {
       type: type || HalfFloatType,
@@ -170,15 +183,35 @@ export function createAtmosphereTSL(renderer) {
     return rt;
   }
 
-  const tLut = makeTarget(256, 64);
-  const msLut = makeTarget(32, 32);
-  const skyLut = makeTarget(192, 108);
-  const aerialLut = makeTarget(64, 32);
+  function makeStorage(w, h, type) {
+    const t = new StorageTexture(w, h);
+    t.type = type || HalfFloatType;
+    t.minFilter = t.magFilter = LinearFilter;
+    return t;
+  }
+
+  // {tex, w, h} per LUT, plus the driver-specific handle.
+  function makeLut(w, h, type) {
+    if (useCompute) {
+      const tex = makeStorage(w, h, type);
+      return {tex, w, h};
+    }
+    const rt = makeTarget(w, h, type);
+    return {tex: rt.texture, w, h, rt};
+  }
+
+  const tLut = makeLut(256, 64);
+  const msLut = makeLut(32, 32);
+  const skyLut = makeLut(192, 108);
+  const aerialLut = makeLut(64, 32);
+  // The irradiance readback needs a RenderTarget on both backends
+  // (readRenderTargetPixelsAsync is the async staging read); it is a
+  // single texel - nothing for compute to win.
   const irrLut = makeTarget(1, 1, FloatType);
 
-  const tTexNode = texture(tLut.texture);
-  const msTexNode = texture(msLut.texture);
-  const skyTexNode = texture(skyLut.texture);
+  const tTexNode = texture(tLut.tex);
+  const msTexNode = texture(msLut.tex);
+  const skyTexNode = texture(skyLut.tex);
 
   const sunT = Fn(([r, mu]) => tTexNode.sample(tParamsToUv(r, mu)).rgb);
   const psiMS = Fn(
@@ -187,8 +220,7 @@ export function createAtmosphereTSL(renderer) {
   );
 
   // ---------- transmittance (built once per aerosol change) ----------
-  const transmittanceNode = Fn(() => {
-    const vUv = uv();
+  const transmittanceNode = Fn(([vUv]) => {
     const H = float(Math.sqrt(RT * RT - RB * RB));
     const rho = H.mul(vUv.y);
     const r = sqrt(rho.mul(rho).add(RB * RB));
@@ -218,8 +250,7 @@ export function createAtmosphereTSL(renderer) {
   });
 
   // ---------- multiple scattering (built once) ----------
-  const multiscatterNode = Fn(() => {
-    const vUv = uv();
+  const multiscatterNode = Fn(([vUv]) => {
     const muS = vUv.x.mul(2.0).sub(1.0);
     const r = float(RB)
       .add(vUv.y.mul(RT - RB))
@@ -335,8 +366,7 @@ export function createAtmosphereTSL(renderer) {
   const marchSky20 = makeMarchSky(20);
 
   // ---------- sky-view (per frame) ----------
-  const skyviewNode = Fn(() => {
-    const vUv = uv();
+  const skyviewNode = Fn(([vUv]) => {
     const r = float(RB).add(max(camH, 1.0));
     const horizon = sqrt(max(r.mul(r).sub(RB * RB), 0.0))
       .div(r)
@@ -361,8 +391,7 @@ export function createAtmosphereTSL(renderer) {
   });
 
   // ---------- aerial perspective (per frame) ----------
-  const aerialNode = Fn(() => {
-    const vUv = uv();
+  const aerialNode = Fn(([vUv]) => {
     const relAz = vUv.x.mul(3.14159265);
     const dist = vUv.y.mul(MAX_DIST_M);
     const r = float(RB).add(max(camH, 1.0));
@@ -457,7 +486,7 @@ export function createAtmosphereTSL(renderer) {
 
   function passMaterial(node) {
     const m = new MeshBasicNodeMaterial();
-    m.colorNode = node();
+    m.colorNode = node;
     m.toneMapped = false;
     // LUT alpha channels carry data (the aerial LUT stores mean
     // transmittance in alpha); opaque node materials stomp output
@@ -466,18 +495,42 @@ export function createAtmosphereTSL(renderer) {
     m.blending = NoBlending;
     return m;
   }
-  const tMat = passMaterial(transmittanceNode);
-  const msMat = passMaterial(multiscatterNode);
-  const svMat = passMaterial(skyviewNode);
-  const aerialMat = passMaterial(aerialNode);
-  const irrMat = passMaterial(irradianceNode);
 
-  function pass(mat, target) {
-    quad.material = mat;
-    renderer.setRenderTarget(target);
-    quad.render(renderer);
-    renderer.setRenderTarget(null);
+  // One compute invocation per texel; vUv matches the fragment path's
+  // uv() at texel centres, so both drivers evaluate the physics at
+  // identical coordinates.
+  function makeKernel(fn, lut) {
+    const {w, h} = lut;
+    return Fn(() => {
+      const i = int(instanceIndex);
+      const x = i.mod(w);
+      const y = i.div(w);
+      const vUv = vec2(float(x).add(0.5).div(w), float(y).add(0.5).div(h));
+      textureStore(lut.tex, ivec2(x, y), fn(vUv));
+    })().compute(w * h);
   }
+
+  // Per-LUT fill: {run()} dispatching compute or rendering the quad.
+  function makeFill(fn, lut) {
+    if (useCompute) {
+      const kernel = makeKernel(fn, lut);
+      return () => renderer.compute(kernel);
+    }
+    const mat = passMaterial(fn(uv()));
+    return () => {
+      quad.material = mat;
+      renderer.setRenderTarget(lut.rt);
+      quad.render(renderer);
+      renderer.setRenderTarget(null);
+    };
+  }
+
+  const fillT = makeFill(transmittanceNode, tLut);
+  const fillMs = makeFill(multiscatterNode, msLut);
+  const fillSky = makeFill(skyviewNode, skyLut);
+  const fillAerial = makeFill(aerialNode, aerialLut);
+
+  const irrMat = passMaterial(irradianceNode());
 
   const domeMat = new MeshBasicNodeMaterial({side: BackSide});
   domeMat.colorNode = domeColor();
@@ -492,19 +545,34 @@ export function createAtmosphereTSL(renderer) {
   return {
     ok: true,
     mesh,
-    aerialTex: aerialLut.texture,
+    aerialTex: aerialLut.tex,
     aerialMaxUnits: MAX_DIST_M / 57.14,
     // Exposed for the validation harness (orientation / content
     // checks against the GLSL reference).
     luts: {
-      t: tLut.texture,
-      ms: msLut.texture,
-      sky: skyLut.texture
+      t: tLut.tex,
+      ms: msLut.tex,
+      sky: skyLut.tex
     },
-    // Harness-only numeric readback of a LUT region.
+    // Harness-only numeric readback of a LUT region. Under compute
+    // the LUTs are storage textures, not render targets - blit
+    // through a quad into a temp RT first. (All LUT widths keep
+    // w*16 bytes 256-aligned; narrower WebGPU readbacks come back
+    // row-padded.)
     async readLut(name, x, y, w, h) {
-      const rt = {t: tLut, ms: msLut, sky: skyLut, aerial: aerialLut}[name];
-      return renderer.readRenderTargetPixelsAsync(rt, x, y, w, h);
+      const lut = {t: tLut, ms: msLut, sky: skyLut, aerial: aerialLut}[name];
+      let rt = lut.rt;
+      if (!rt) {
+        rt = makeTarget(lut.w, lut.h, FloatType);
+        const m = passMaterial(texture(lut.tex).sample(uv()));
+        quad.material = m;
+        renderer.setRenderTarget(rt);
+        quad.render(renderer);
+        renderer.setRenderTarget(null);
+      }
+      const px = await renderer.readRenderTargetPixelsAsync(rt, x, y, w, h);
+      if (!lut.rt) rt.dispose();
+      return px;
     },
     // Called each frame: cheap sky-view raymarch for the current sun.
     // exposure models the eye's photopic adaptation (tone
@@ -519,14 +587,17 @@ export function createAtmosphereTSL(renderer) {
       // Aerosols change slowly; rebuild the static LUTs only when the
       // measured AOD moves.
       if (!lutsBuilt || Math.abs(mie - lastMie) > 0.05) {
-        pass(tMat, tLut);
-        pass(msMat, msLut);
+        fillT();
+        fillMs();
         lutsBuilt = true;
         lastMie = mie;
       }
-      pass(svMat, skyLut);
-      pass(aerialMat, aerialLut);
-      pass(irrMat, irrLut);
+      fillSky();
+      fillAerial();
+      quad.material = irrMat;
+      renderer.setRenderTarget(irrLut);
+      quad.render(renderer);
+      renderer.setRenderTarget(null);
     },
     // Cosine-weighted mean sky radiance (multiply by pi for
     // irradiance). Async: no pipeline stall, the caller updates the

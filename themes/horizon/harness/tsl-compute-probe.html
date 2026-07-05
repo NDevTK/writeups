@@ -1,0 +1,120 @@
+<!doctype html><html><head><script type="importmap">
+{
+  "imports": {
+    "three": "./writeups/themes/horizon/three.webgpu.min.js",
+    "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+    "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+  }
+}
+</script></head><body style="margin:0;overflow:hidden"><canvas id="gl"></canvas><script>/* swizzle shim */ if (navigator.gpu && self.GPUTexture) { const ov = GPUTexture.prototype.createView; GPUTexture.prototype.createView = function (d) { if (d && 'swizzle' in d) { d = Object.assign({}, d); delete d.swizzle; } return ov.call(this, d); }; }</script><script type="module">
+// Compute-primitive probe for the phase-3 LUT/march ports:
+//  A. textureStore into a StorageTexture from a compute kernel,
+//     then sample() it from a fragment blit - value + ROW ORIENTATION.
+//  B. filtered texture .sample() INSIDE a compute kernel (the sky-view
+//     march samples the transmittance/ms LUTs), incl. a Loop().
+//  C. DepthTexture .sample() inside a compute kernel (sceneDist).
+import * as T from 'three/webgpu';
+import {Fn, If, Loop, float, instanceIndex, int, ivec2, texture, textureStore, uv, vec2, vec4} from 'three/tsl';
+const log = (s) => console.log('PROBE|' + s);
+try {
+  const r = new T.WebGPURenderer({canvas: document.getElementById('gl'), antialias: false});
+  await r.init();
+  if (!r.backend.isWebGPUBackend) { log('SKIP not webgpu backend'); throw new Error('skip'); }
+  r.setSize(64, 64);
+  // W*16 bytes must be 256-aligned: WebGPU readbacks are row-padded
+  // to 256 and narrow RTs come back stride-scrambled (verified).
+  const W = 64, H = 4;
+
+  const mkStorage = () => {
+    const t = new T.StorageTexture(W, H);
+    t.type = T.HalfFloatType;
+    t.minFilter = t.magFilter = T.LinearFilter;
+    return t;
+  };
+  const texA = mkStorage();
+
+  // A: write a coordinate ramp.
+  const kernelA = Fn(() => {
+    const i = int(instanceIndex);
+    const x = i.mod(W);
+    const y = i.div(W);
+    textureStore(texA, ivec2(x, y), vec4(
+      float(x).add(0.5).div(W),
+      float(y).add(0.5).div(H),
+      0.25, 1.0));
+  })().compute(W * H);
+  await r.computeAsync(kernelA);
+  log('A computed');
+
+  // Blit texA through a fragment sample() and read back.
+  const quad = new T.QuadMesh();
+  const rt = new T.RenderTarget(W, H, {type: T.FloatType, depthBuffer: false});
+  const blit = (tex) => {
+    const m = new T.MeshBasicNodeMaterial();
+    m.colorNode = texture(tex).sample(uv());
+    m.transparent = true; m.blending = T.NoBlending; m.toneMapped = false;
+    quad.material = m;
+    r.setRenderTarget(rt); quad.render(r); r.setRenderTarget(null);
+    return r.readRenderTargetPixelsAsync(rt, 0, 0, W, H);
+  };
+  const a = await blit(texA);
+  // readback row 0 is TOP on webgpu. If orientation is self-consistent
+  // (store y -> sample v -> readback row y), a[row y].g == (y+0.5)/H.
+  const g00 = a[1], gLast = a[(W * (H - 1)) * 4 + 1];
+  const r00 = a[0];
+  log(`A readback g(row0)=${g00.toFixed(3)} g(row${H - 1})=${gLast.toFixed(3)} r(col0)=${r00.toFixed(3)}`);
+  const aOK = Math.abs(g00 - 0.5 / H) < 0.01 && Math.abs(gLast - (H - 0.5) / H) < 0.01;
+  log('A orientation ' + (aOK ? 'PASS (store-y == sample-v == readback-row)' : 'FLIPPED'));
+
+  // B: sample texA (linear, half-texel offset) inside compute + Loop.
+  const texB = mkStorage();
+  const texANode = texture(texA);
+  const kernelB = Fn(() => {
+    const i = int(instanceIndex);
+    const x = i.mod(W);
+    const y = i.div(W);
+    // Sample BETWEEN texel columns x and x+1: linear filtering makes
+    // .r the mean of the two ramps = (x+1)/W.
+    const s = texANode.sample(vec2(float(x).add(1.0).div(W), float(y).add(0.5).div(H)));
+    const acc = float(0).toVar();
+    Loop(4, ({i: k}) => {
+      If(float(k).lessThan(3.0), () => { acc.addAssign(0.125); });
+    });
+    textureStore(texB, ivec2(x, y), vec4(s.r, s.g, acc, 1.0));
+  })().compute(W * H);
+  await r.computeAsync(kernelB);
+  const b = await blit(texB);
+  const br = b[0], bacc = b[2];
+  log(`B sample-in-compute r(0,0)=${br.toFixed(3)} (expect ${(1 / W).toFixed(3)}) loop=${bacc.toFixed(3)} (expect 0.375)`);
+  log('B ' + (Math.abs(br - 1 / W) < 0.01 && Math.abs(bacc - 0.375) < 0.001 ? 'PASS' : 'FAIL'));
+
+  // C: depth texture sampled inside compute.
+  const dRT = new T.RenderTarget(W, H, {depthBuffer: true});
+  dRT.depthTexture = new T.DepthTexture(W, H);
+  const dScene = new T.Scene();
+  const dCam = new T.PerspectiveCamera(60, W / H, 1, 100);
+  dCam.position.set(0, 0, 5);
+  const plane = new T.Mesh(new T.PlaneGeometry(6, 20), new T.MeshBasicNodeMaterial());
+  plane.position.set(-4, 0, 0); // covers only the left of the frame
+  dScene.add(plane);
+  r.setRenderTarget(dRT); r.render(dScene, dCam); r.setRenderTarget(null);
+  const texC = mkStorage();
+  const depthN = texture(dRT.depthTexture);
+  const kernelC = Fn(() => {
+    const i = int(instanceIndex);
+    const x = i.mod(W);
+    const y = i.div(W);
+    const d = depthN.sample(vec2(float(x).add(0.5).div(W), float(y).add(0.5).div(H))).r;
+    textureStore(texC, ivec2(x, y), vec4(d, 0, 0, 1));
+  })().compute(W * H);
+  await r.computeAsync(kernelC);
+  const c = await blit(texC);
+  const dl = c[(W / 2 - 2) * 4], dr2 = c[(W - 1) * 4];
+  log(`C depth-in-compute left=${dl.toFixed(3)} right=${dr2.toFixed(3)} (left<1, right==1)`);
+  log('C ' + (dl < 0.999 && dr2 > 0.999 ? 'PASS' : 'FAIL'));
+  log('DONE');
+} catch (e) {
+  log('ERR ' + e.message + ' :: ' + (e.stack || '').split('\n')[1]);
+  console.log('PROBE|DONE');
+}
+</script></body></html>
