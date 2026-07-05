@@ -1661,7 +1661,9 @@
           geo.setAttribute('size', new THREE.Float32BufferAttribute(size, 1));
           // Scintillation: Kolmogorov turbulence makes twinkle grow with
           // airmass (~sec z), so horizon stars shimmer and zenith stars
-          // barely do.
+          // barely do. Per-star phase from a PCG hash (Jarzynski &
+          // Olano 2020) on the position bits - the old sin-hash
+          // decorrelates across shader compilers at fp32.
           starMat = new THREE.ShaderMaterial({
             transparent: true,
             depthWrite: false,
@@ -1669,10 +1671,14 @@
             vertexShader:
               'attribute float size; uniform float time;' +
               ' varying vec3 vc; varying float vtw;' +
+              ' uint pcg(uint v){ uint s = v * 747796405u + 2891336453u;' +
+              '  uint w = ((s >> ((s >> 28) + 4u)) ^ s) * 277803737u;' +
+              '  return (w >> 22) ^ w; }' +
               ' void main(){ vc = color;' +
               '  float alt = max(normalize((modelMatrix * vec4(position, 1.0)).xyz).y, 0.04);' +
               '  float am = 1.0 / alt;' +
-              '  float ph = fract(sin(dot(position.xy, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831;' +
+              '  float ph = float(pcg(floatBitsToUint(position.x) ^ (floatBitsToUint(position.y) * 2654435769u)))' +
+              '    * 1.46291807e-9;' + // 2*pi / 2^32
               '  vtw = 1.0 + clamp(0.06 * (am - 1.0), 0.0, 0.5) * sin(time * 9.0 + ph);' +
               ' vec4 mv = modelViewMatrix * vec4(position, 1.0);' +
               ' gl_PointSize = size * vtw; gl_Position = projectionMatrix * mv; }',

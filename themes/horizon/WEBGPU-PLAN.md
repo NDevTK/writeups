@@ -201,9 +201,42 @@ Scenes (all at Grindelwald unless noted):
       from the TSL one when its texture was un-flipped) — no
       orientation fix-ups needed for image textures, the earlier
       QuadMesh/RT conventions are about render targets only.
-  - Next: moon/aurora/optics/star ShaderMaterials → NodeMaterial
-    equivalents (Sky.js needs no TSL port — the atmosphere-tsl dome
-    replaces it); then the Horizon.html renderer switch, full matrix,
-    and DELETION of the WebGL-only code paths (onBeforeCompile hooks,
-    GLSL CSM trio, Sky.js/Water.js, clouds.js GLSL, atmosphere.js
-    GLSL passes — the sunTransmittanceJS CPU mirror stays).
+  - Sky objects ported to `sky-objects-tsl.js` — DONE, strongest A/B:
+    veil dome, Lommel-Seeliger moon, aurora curtains, optics dome
+    (bows/halo/sundogs, both camera aims) all PIXEL-IDENTICAL
+    (mean 0.000, max 0); planets identical; stars mean 0.005/255 with
+    ≤1 edge pixel over threshold under active twinkle. Notes that cost
+    real debugging — do not rediscover:
+    - Stars/planets are instanced sprite quads (SpriteNodeMaterial +
+      InstancedBufferAttribute + InstancedMesh): WebGPU has no
+      gl_PointSize. scaleNode = px·2·viewZ/(screenH·P[1][1])
+      reproduces gl_PointSize exactly (validated: static field has
+      zero differing pixels vs gl_PointSize rendering).
+    - The scintillation hash is now PCG (Jarzynski & Olano 2020) in
+      BOTH implementations (Horizon.html updated): the legacy
+      fract(sin(dot·43758)) hash decorrelates between shader
+      compilers at fp32 — 34/400 stars twinkled with different
+      phases. Integer hashing is bit-exact.
+    - `vertexStage()` is load-bearing for attribute-hashing in TSL:
+      node graphs evaluate in the fragment stage by default, so the
+      attribute arrives through an INTERPOLATED varying and ULP-level
+      interpolation noise rerolls the hash. Hash in the vertex stage,
+      pass the float result through the varying.
+    - TSL uint ops (bitcast/bitAnd/shiftRight/mul-wrap, >2^31
+      constants) are all CORRECT on the WebGL backend — an apparent
+      failure was stale `--screenshot`s of tiny single-render probe
+      pages. For small probes, read back in-page
+      (drawImage + getImageData) — that readback is authoritative.
+    - These ShaderMaterials render RAW in the classic pipeline (no
+      tonemapping/colorspace chunks, so they bypass AgX + sRGB);
+      the A/B ran with LinearSRGB output on the TSL side. AT
+      INTEGRATION: NodeMaterials go through the renderer output
+      transform, so each of these needs the same bypass decision
+      (`material.toneMapped = false` equivalent / raw outputNode) or
+      the sky objects will double-transform.
+  - Next: Horizon.html renderer switch (WebGPURenderer on WebGL
+    backend), full validation matrix, A/B vs phase 1, then DELETION
+    of the WebGL-only code paths (onBeforeCompile hooks, GLSL CSM
+    trio, Sky.js/Water.js, clouds.js GLSL passes, atmosphere.js GLSL
+    passes — the sunTransmittanceJS CPU mirror stays). Then phase 3
+    (WebGPU backend + compute).
