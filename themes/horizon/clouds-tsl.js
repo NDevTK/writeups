@@ -1,14 +1,15 @@
 import {
-  Color,
   CustomBlending,
+  NoBlending,
+  OneFactor,
+  OneMinusSrcAlphaFactor,
+  Color,
   Data3DTexture,
   DepthTexture,
   HalfFloatType,
   LinearFilter,
   Matrix4,
   MeshBasicNodeMaterial,
-  OneFactor,
-  OneMinusSrcAlphaFactor,
   QuadMesh,
   RGBAFormat,
   RenderTarget,
@@ -423,12 +424,21 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   const marchMat = new MeshBasicNodeMaterial();
   marchMat.colorNode = marchNode();
   marchMat.toneMapped = false;
+  // The march WRITES transmittance in alpha, and an OPAQUE node
+  // material stomps output alpha to 1 (invisible over the black A/B
+  // background, fatal over a real scene). transparent + NoBlending
+  // writes source RGBA verbatim.
+  marchMat.transparent = true;
+  marchMat.blending = NoBlending;
   const compMat = new MeshBasicNodeMaterial();
   compMat.colorNode = compositeNode();
   compMat.toneMapped = false;
   // Premultiplied-alpha over: the volumetric integral's radiance is
   // already transmittance-weighted.
   compMat.transparent = true;
+  // Premultiplied-alpha over: the volumetric integral's radiance is
+  // already transmittance-weighted. NOT material.premultipliedAlpha -
+  // that flag makes the shader multiply rgb by alpha a second time.
   compMat.blending = CustomBlending;
   compMat.blendSrc = OneFactor;
   compMat.blendDst = OneMinusSrcAlphaFactor;

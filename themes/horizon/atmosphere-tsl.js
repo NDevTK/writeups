@@ -1,4 +1,5 @@
 import {
+  NoBlending,
   BackSide,
   QuadMesh,
   HalfFloatType,
@@ -458,6 +459,11 @@ export function createAtmosphereTSL(renderer) {
     const m = new MeshBasicNodeMaterial();
     m.colorNode = node();
     m.toneMapped = false;
+    // LUT alpha channels carry data (the aerial LUT stores mean
+    // transmittance in alpha); opaque node materials stomp output
+    // alpha to 1, so write source RGBA verbatim.
+    m.transparent = true;
+    m.blending = NoBlending;
     return m;
   }
   const tMat = passMaterial(transmittanceNode);

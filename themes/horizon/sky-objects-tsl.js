@@ -35,6 +35,7 @@ import {
   select,
   sin,
   smoothstep,
+  texture,
   uint,
   uniform,
   uv,
@@ -221,7 +222,7 @@ function makeSprites({positions, colors, sizes, opacityFor}) {
   material.opacityNode = opacityNode.mul(smoothstep(0.2, 0.5, d).oneMinus());
   const mesh = new InstancedMesh(geo, material, count);
   mesh.frustumCulled = false;
-  return {mesh, posAttr};
+  return {mesh, posAttr, sizeAttr};
 }
 
 // PCG hash (Jarzynski & Olano 2020, "Hash Functions for GPU
@@ -283,7 +284,7 @@ export function createStarSprites(positions, colors, sizes) {
 // live ephemeris positions (write posAttr + needsUpdate at 1 Hz).
 export function createPlanetSprites(positions, colors, sizes) {
   const u = {night: uniform(0)};
-  const {mesh, posAttr} = makeSprites({
+  const {mesh, posAttr, sizeAttr} = makeSprites({
     positions,
     colors,
     sizes,
@@ -292,5 +293,37 @@ export function createPlanetSprites(positions, colors, sizes) {
       opacityNode: u.night
     })
   });
+  return {mesh, u, posAttr, sizeAttr};
+}
+
+// Precipitation particles: the classic PointsMaterial with a soft
+// radial map, as instanced billboards. A size-attenuated point of
+// size S covers S*0.5*screenH/viewZ pixels; a view-plane quad of
+// world scale S/P[1][1] projects identically, so the two match
+// exactly at every depth.
+export function createPrecipSprites(positions, dotTex, encodeFog) {
+  const u = {
+    color: uniform(new Color('#bcd2e8')),
+    size: uniform(0.22),
+    opacity: uniform(0)
+  };
+  const count = positions.length / 3;
+  const posAttr = new InstancedBufferAttribute(positions, 3);
+  const material = new SpriteNodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  const center = instancedBufferAttribute(posAttr);
+  material.positionNode = center;
+  const p11 = cameraProjectionMatrix.element(1).element(1);
+  material.scaleNode = u.size.div(p11);
+  const texel = texture(dotTex);
+  const base = u.color.mul(texel.rgb);
+  // the caller passes the shared AgX+sRGB+fog colour hook - as a
+  // colorNode transform, because the sprite pipeline does not compose
+  // opacityNode into `output` for outputNode hooks
+  material.colorNode = encodeFog ? encodeFog(base) : base;
+  material.opacityNode = u.opacity.mul(texel.a);
+  const mesh = new InstancedMesh(new PlaneGeometry(1, 1), material, count);
+  mesh.frustumCulled = false;
   return {mesh, u, posAttr};
 }

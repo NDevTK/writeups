@@ -234,9 +234,71 @@ Scenes (all at Grindelwald unless noted):
       transform, so each of these needs the same bypass decision
       (`material.toneMapped = false` equivalent / raw outputNode) or
       the sky objects will double-transform.
-  - Next: Horizon.html renderer switch (WebGPURenderer on WebGL
-    backend), full validation matrix, A/B vs phase 1, then DELETION
-    of the WebGL-only code paths (onBeforeCompile hooks, GLSL CSM
-    trio, Sky.js/Water.js, clouds.js GLSL passes, atmosphere.js GLSL
-    passes — the sunTransmittanceJS CPU mirror stays). Then phase 3
-    (WebGPU backend + compute).
+  - RENDERER SWITCH LANDED (in progress): Horizon.html now boots
+    WebGPURenderer (top-level `await renderer.init()`; WebGL2 backend
+    fallback automatic) with ALL subsystems on the TSL ports:
+    terrain-tsl, aerial-tsl, atmosphere-tsl, clouds-tsl, water-tsl,
+    sky-objects-tsl, CSMShadowNode on ONE real sun light, precip as
+    instanced sprites. Output architecture: the renderer runs
+    NoToneMapping + LinearSRGB (identity global transform) and the
+    shared aerial hooks apply AgX(0.55)+sRGB per material IN THE
+    CLASSIC CHUNK ORDER (fog/aerial AFTER the encode - that is what
+    shipped; `workingToColorSpace(toneMapping(AgX, exp, output.rgb))`
+    reproduces classic bytes exactly, probe-validated). Raw-output
+    passes (dome, sky objects, cloud composite) set no hook.
+    Fixes found on the way (all repo'd):
+    - RenderTarget.setSize does NOT resize an attached DepthTexture -
+      recreate the RT+DepthTexture on resize or the cloud march reads
+      a stale 2x2 depth (NaN-ish sceneDist).
+    - OPAQUE node materials stomp output alpha to 1: the cloud march
+      and the atmosphere LUT passes (aerial LUT alpha = mean
+      transmittance!) need `transparent = true; blending = NoBlending`
+      to write RGBA verbatim. Invisible over the black A/B background,
+      fatal over a real scene - A/B over a NON-black background too.
+    - Do NOT use material.premultipliedAlpha for the premultiplied
+      cloud composite - that flag multiplies rgb by alpha IN-SHADER a
+      second time. CustomBlending One/OneMinusSrcAlpha works fine on
+      the node pipeline (the original suspicion was wrong).
+    - The sprite/line pipelines do not compose opacityNode into
+      `output` when an outputNode hook is set: transparent unlit
+      things (precip, constellation lines, flakes) take the
+      AgX+sRGB+fog chain on COLORNODE via aerial.encodeFog()/
+      applyFogColor() instead of the output hook.
+    - InstancedMesh with count = 0 still draws on WebGPU: gate
+      `mesh.visible` (flakes/drift cluster at origin otherwise).
+    - CSMShadowNode binds its camera lazily on first render: guard
+      `csm.updateFrustums()` on resize until `csm.camera` exists.
+    - The theme's water was NEVER added to the scene in the classic
+      build (ground.remove on rebuild but no add - latent regression);
+      the port restores `ground.add(water)`.
+  - Validation matrix vs phase 1 (identical fixture URLs, mean abs
+    diff /255): noon 2.10, night 0.93, sunset 6.04 (residuals: tree
+    sway phase, cloud wisps, star twinkle), dome+veil under overcast
+    3.03 — but heavy-cloud scenes (stratus 26, towering 29) show the
+    LIVE cloud buffer brighter/washed on the WebGPU build. OPEN ISSUE,
+    heavily bisected, not yet root-caused:
+    - Deterministic warm-frame subsystem A/B is EXACT (mean 0.00) at
+      cumulus AND stratus configs, mid deck on/off, moving camera
+      (theme-like ease+yaw), dpr 1.5, interleaved shadow/RT passes -
+      the isolated temporal loop matches GL bit-for-bit-ish in every
+      constructed condition, 300-frame loops included.
+    - In the FULL THEME only: the live march buffer accumulates cloud
+      BELOW the ray horizon (impossible from a fresh march - downward
+      rays exit the slab) in a fresh-vs-history dither, i.e. history
+      REPROJECTION drags content in; the fresh 1/16 keeps cleaning it,
+      steady state stays contaminated => deck reads ~1.5x brighter.
+      March-side sceneDist verified correct (terrain silhouette),
+      history IS used (marker probe), fresh DOES fire (~1/16), blend
+      semantics/filters/prevVP bookkeeping identical to clouds.js,
+      uniforms dumped equal (amb within 10%), async irradiance
+      readback exonerated.
+    - Next lead: something in the theme frame makes prevVP/history
+      systematically mis-aimed for the QUARTER-res pass only in situ
+      (e.g. a per-frame projection/viewport state the harness does not
+      replicate). Instrument pUv-vUv displacement as a colour ramp in
+      situ; compare against p1 by patching the same vis into classic.
+  - After the cloud issue: full matrix re-run, THEN delete the
+    WebGL-only code paths (onBeforeCompile hooks, GLSL CSM trio,
+    Sky.js/Water.js, clouds.js GLSL passes, atmosphere.js GLSL passes
+    — the sunTransmittanceJS CPU mirror stays). Then phase 3 (WebGPU
+    backend + compute).

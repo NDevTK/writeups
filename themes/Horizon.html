@@ -144,7 +144,13 @@
       }
     </style>
     <script type="importmap">
-      {"imports": {"three": "./horizon/three.module.min.js"}}
+      {
+        "imports": {
+          "three": "./horizon/three.webgpu.min.js",
+          "three/webgpu": "./horizon/three.webgpu.min.js",
+          "three/tsl": "./horizon/three.tsl.min.js"
+        }
+      }
     </script>
   </head>
   <body>
@@ -155,17 +161,25 @@
     <script src="./horizon/astronomy.browser.min.js"></script>
     <script type="module">
       import * as THREE from 'three';
-      import {Sky} from './horizon/Sky.js';
-      import {Water} from './horizon/Water.js';
+      import {sunTransmittanceJS} from './horizon/atmosphere.js';
+      import {createAtmosphereTSL} from './horizon/atmosphere-tsl.js';
       import {
-        createAtmosphere,
-        sunTransmittanceJS
-      } from './horizon/atmosphere.js';
+        createCloudSystemTSL,
+        generateCloudTexturesTSL
+      } from './horizon/clouds-tsl.js';
+      import {createAerialFog} from './horizon/aerial-tsl.js';
+      import {createTerrainNodeMaterial} from './horizon/terrain-tsl.js';
+      import {HorizonWaterMesh} from './horizon/water-tsl.js';
       import {
-        createCloudSystem,
-        generateCloudTextures
-      } from './horizon/clouds.js';
-      import {CSM} from './horizon/CSM.js';
+        createVeilMaterial,
+        createMoonMaterial,
+        createAuroraMaterial,
+        createOpticsMaterial,
+        createStarSprites,
+        createPlanetSprites,
+        createPrecipSprites
+      } from './horizon/sky-objects-tsl.js';
+      import {CSMShadowNode} from './horizon/CSMShadowNode.js';
 
       const params = new URL(location.href).searchParams;
       const reduceMotion = matchMedia(
@@ -839,41 +853,50 @@
 
       // ---------- scene ----------
       const canvas = document.getElementById('gl');
-      const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
+      // WebGPU when the browser has it; the SAME node materials run on
+      // the WebGL 2 backend otherwise - one implementation of every
+      // piece of physics either way.
+      const renderer = new THREE.WebGPURenderer({canvas, antialias: true});
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
-      // AgX tone reproduction (Sobotka; Blender 4's default view
-      // transform, in three since r160): better hue preservation toward
-      // clipping than ACES, which notoriously skews bright chroma.
-      renderer.toneMapping = THREE.AgXToneMapping;
-      renderer.toneMappingExposure = 0.55;
+      await renderer.init();
+      // The renderer's own output transform stays identity: AgX (Sobotka;
+      // Blender 4's default view transform - better hue preservation
+      // toward clipping than ACES) and the sRGB encode are applied
+      // per-material by the shared output hooks in aerial-tsl, in the
+      // same order the classic chunk pipeline ran them, so raw-output
+      // passes (the atmosphere dome, the sky objects, the cloud
+      // composite) stay raw exactly as they shipped.
+      renderer.toneMapping = THREE.NoToneMapping;
+      renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
       camera.layers.enable(2);
 
-      // Cascaded shadow maps (vendored three.js CSM: practical split
-      // scheme after Zhang et al. 2006). A single fixed ortho shadow box
-      // only ever worked because the camera never moved; three cascades
-      // follow the view frustum instead.
-      const csm = new CSM({
-        camera,
-        parent: scene,
+      // Cascaded shadow maps (vendored three.js CSMShadowNode: practical
+      // split scheme after Zhang et al. 2006) as a shadow node on ONE
+      // real sun light - cascades split the shadow frustum without
+      // mirrored cascade lights. Its colour/intensity come from the CPU
+      // transmittance mirror each frame.
+      const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+      sunLight.castShadow = true;
+      const shadowRes = innerWidth < 800 ? 1024 : 2048;
+      sunLight.shadow.mapSize.set(shadowRes, shadowRes);
+      sunLight.shadow.bias = -0.0004;
+      sunLight.shadow.normalBias = 1.5;
+      sunLight.shadow.camera.near = 1;
+      sunLight.shadow.camera.far = 800;
+      const csm = new CSMShadowNode(sunLight, {
         cascades: 3,
         maxFar: 460,
         mode: 'practical',
-        shadowMapSize: innerWidth < 800 ? 1024 : 2048,
-        lightDirection: new THREE.Vector3(0, -1, 0),
-        lightIntensity: 1,
-        lightNear: 1,
-        lightFar: 800,
         lightMargin: 150
       });
       csm.fade = true;
-      csm.lights.forEach((l) => {
-        l.shadow.bias = -0.0004;
-        l.shadow.normalBias = 1.5;
-      });
+      sunLight.shadow.shadowNode = csm;
+      scene.add(sunLight);
+      scene.add(sunLight.target);
       record('Cascaded shadow maps', '3 cascades · practical splits (CSM)');
 
       let sizeCloudTargets = null;
@@ -881,16 +904,13 @@
         renderer.setSize(innerWidth, innerHeight);
         camera.aspect = innerWidth / innerHeight;
         camera.updateProjectionMatrix();
-        csm.updateFrustums();
+        // The CSM shadow node binds its camera on first render.
+        if (csm.camera) csm.updateFrustums();
         if (sizeCloudTargets) sizeCloudTargets();
       }
       addEventListener('resize', resize);
       resize();
 
-      // Pure data holder now: its colour/intensity (from the CPU
-      // transmittance mirror) drive the CSM cascade lights, the clouds
-      // and the water each frame.
-      const sunLight = new THREE.DirectionalLight(0xffffff, 1);
       // Ambient is a hemisphere fed by the REAL sky: the atmosphere pass
       // integrates its own sky-view LUT (cosine-weighted) and the result
       // is read back at 1 Hz - twilight blues, overcast greys and sunset
@@ -904,10 +924,8 @@
       // transmittance, multiple-scattering and per-frame sky-view LUTs
       // with Rayleigh, Mie (scaled by measured AOD) and ozone profiles.
       // Twilight arch and the Belt of Venus emerge from the raymarch
-      // instead of being painted. Preetham (three.js Sky) remains as the
-      // fallback when float render targets are unavailable.
-      const atmo = createAtmosphere(renderer);
-      let skyU = null;
+      // instead of being painted.
+      const atmo = createAtmosphereTSL(renderer);
       if (atmo.ok) {
         scene.add(atmo.mesh);
         record(
@@ -915,14 +933,7 @@
           'multiple-scattering LUTs · ozone · AOD-scaled Mie'
         );
       } else {
-        const sky = new Sky();
-        sky.scale.setScalar(1200);
-        scene.add(sky);
-        skyU = sky.material.uniforms;
-        skyU.rayleigh.value = 2.2;
-        skyU.mieCoefficient.value = 0.004;
-        skyU.mieDirectionalG.value = 0.8;
-        record('Preetham sky (fallback)', 'no float render targets');
+        record('atmosphere unavailable', 'no float render targets');
       }
 
       // Aerial perspective (Hillaire 2020, sec. 5.2): the atmosphere
@@ -932,65 +943,23 @@
       // three.js' colour-only fog input for it - distant ridges turn
       // blue by scattering physics, then the Koschmieder haze (which
       // carries the MEASURED visibility) applies on top.
-      const aerialU = {
-        uAerialTex: {value: atmo.ok ? atmo.aerialTex : null},
-        uAerialMaxU: {value: atmo.ok ? atmo.aerialMaxUnits : 1},
-        uSunAzV: {value: new THREE.Vector2(1, 0)},
-        uAerialExp: {value: 0}
-      };
-      const AERIAL_PARS =
-        'uniform sampler2D uAerialTex; uniform float uAerialMaxU;\n' +
-        'uniform vec2 uSunAzV; uniform float uAerialExp;\n' +
-        'varying vec3 vAerialDir;';
-      const AERIAL_FOG_FRAG =
-        '#ifdef USE_FOG\n' +
-        'float aerD = length(vAerialDir);\n' +
-        'vec2 aerH = normalize(vAerialDir.xz + vec2(1e-6));\n' +
-        'float aerAz = acos(clamp(dot(aerH, uSunAzV), -1.0, 1.0)) / 3.14159265;\n' +
-        'vec4 aer = texture2D(uAerialTex, vec2(aerAz, min(aerD / uAerialMaxU, 1.0)));\n' +
-        'gl_FragColor.rgb = gl_FragColor.rgb * aer.a + aer.rgb * uAerialExp;\n' +
-        '#ifdef FOG_EXP2\n' +
-        'float kFog = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);\n' +
-        'gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, kFog);\n' +
-        '#endif\n' +
-        '#endif';
-      let aerialId = 0;
-      function applyAerial(mat) {
-        if (!atmo.ok) return;
-        const prev = mat.onBeforeCompile;
-        // The wrapper's source is identical for every material, so
-        // three.js' program cache (keyed on onBeforeCompile.toString())
-        // would hand them all ONE compiled program - the terrain would
-        // silently get the tree shader. A unique key per material keeps
-        // each wrapped program distinct.
-        const id = aerialId++;
-        mat.customProgramCacheKey = () => 'aerial' + id;
-        mat.onBeforeCompile = (shader, r) => {
-          if (prev) prev(shader, r);
-          Object.assign(shader.uniforms, aerialU);
-          shader.vertexShader = shader.vertexShader
-            .replace(
-              '#include <fog_pars_vertex>',
-              '#include <fog_pars_vertex>\nvarying vec3 vAerialDir;'
-            )
-            .replace(
-              '#include <fog_vertex>',
-              '#include <fog_vertex>\n' +
-                '#ifdef USE_INSTANCING\n' +
-                'vAerialDir = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz - cameraPosition;\n' +
-                '#else\n' +
-                'vAerialDir = (modelMatrix * vec4(transformed, 1.0)).xyz - cameraPosition;\n' +
-                '#endif'
-            );
-          shader.fragmentShader = shader.fragmentShader
-            .replace(
-              '#include <fog_pars_fragment>',
-              '#include <fog_pars_fragment>\n' + AERIAL_PARS
-            )
-            .replace('#include <fog_fragment>', AERIAL_FOG_FRAG);
-        };
-        mat.needsUpdate = true;
+      function dummyTex(bytes) {
+        const t = new THREE.DataTexture(
+          new Uint8Array(bytes),
+          1,
+          1,
+          THREE.RGBAFormat
+        );
+        t.needsUpdate = true;
+        return t;
       }
+      const aerial = createAerialFog(
+        atmo.ok ? atmo.aerialTex : dummyTex([0, 0, 0, 255])
+      );
+      const aerialU = aerial.uniforms;
+      aerialU.uAerialMaxU.value = atmo.ok ? atmo.aerialMaxUnits : 1;
+      aerialU.uAerialOn.value = atmo.ok ? 1 : 0;
+      const applyAerial = (mat) => aerial.apply(mat);
       if (atmo.ok) {
         record(
           'Aerial perspective LUT',
@@ -1007,30 +976,14 @@
 
       // Overcast veil: a translucent grey dome that fades in with real
       // cloud cover (the scattering model alone stays too blue).
-      const veilU = {
-        alpha: {value: 0},
-        top: {value: new THREE.Color('#79838c')},
-        bottom: {value: new THREE.Color('#a2abb3')}
-      };
+      const veilObj = createVeilMaterial();
+      const veilU = veilObj.u;
       const veil = new THREE.Mesh(
         new THREE.SphereGeometry(600, 24, 16),
-        new THREE.ShaderMaterial({
-          side: THREE.BackSide,
-          transparent: true,
-          depthWrite: false,
-          uniforms: veilU,
-          vertexShader:
-            'varying vec3 p; void main(){ p = position;' +
-            ' gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-          fragmentShader:
-            'varying vec3 p; uniform vec3 top; uniform vec3 bottom; uniform float alpha;' +
-            ' void main(){ float h = clamp(normalize(p).y * 1.4 + 0.25, 0.0, 1.0);' +
-            ' gl_FragColor = vec4(mix(bottom, top, h), alpha); }'
-        })
+        veilObj.material
       );
       veil.renderOrder = -1;
       scene.add(veil);
-      scene.fog = new THREE.FogExp2('#dceef7', 0.004);
 
       // ---------- terrain ----------
       function mulberry32(a) {
@@ -1145,24 +1098,21 @@
       // GGX standard materials: bark and foliage are near-diffuse
       // (roughness ~1), which the microfacet model represents honestly
       // instead of Lambert's zero specular.
-      const trunkMat = new THREE.MeshStandardMaterial({
+      const trunkMat = new THREE.MeshStandardNodeMaterial({
         color: '#6b4a33',
         roughness: 0.9,
         metalness: 0
       });
       const leafMats = [
-        new THREE.MeshStandardMaterial({color: '#2e5230', roughness: 1}),
-        new THREE.MeshStandardMaterial({color: '#3f6b3a', roughness: 1}),
-        new THREE.MeshStandardMaterial({color: '#4d7a35', roughness: 1})
+        new THREE.MeshStandardNodeMaterial({color: '#2e5230', roughness: 1}),
+        new THREE.MeshStandardNodeMaterial({color: '#3f6b3a', roughness: 1}),
+        new THREE.MeshStandardNodeMaterial({color: '#4d7a35', roughness: 1})
       ];
       const broadMats = [
-        new THREE.MeshStandardMaterial({color: '#4a7d33', roughness: 1}),
-        new THREE.MeshStandardMaterial({color: '#5d8a3c', roughness: 1})
+        new THREE.MeshStandardNodeMaterial({color: '#4a7d33', roughness: 1}),
+        new THREE.MeshStandardNodeMaterial({color: '#5d8a3c', roughness: 1})
       ];
-      [trunkMat, ...leafMats, ...broadMats].forEach((m) => {
-        csm.setupMaterial(m); // first: its onBeforeCompile gets chained
-        applyAerial(m);
-      });
+      [trunkMat, ...leafMats, ...broadMats].forEach((m) => applyAerial(m));
       const geoTrunk = new THREE.CylinderGeometry(0.13, 0.2, 1.1, 7);
       const geoCone1 = new THREE.ConeGeometry(1.15, 2.3, 10);
       const geoCone2 = new THREE.ConeGeometry(0.82, 1.8, 10);
@@ -1212,158 +1162,18 @@
       // fragment shader (slope and altitude with noise-jittered borders),
       // not per vertex, so faces stay crisp at any distance. Elevation in
       // metres is recovered in-shader by inverting the asinh compression.
-      const terrainUniforms = {
-        uNormalTex: {value: null},
-        uWorldSize: {value: WORLD},
-        uCenterElev: {value: 300},
-        uSnowy: {value: 0},
-        uSnowLine: {value: 2300},
-        uTime: {value: 0},
-        uWindMs: {value: 3},
-        uWindVec: {value: new THREE.Vector2(1, 0)},
-        uSunDirW: {value: new THREE.Vector3(0, 1, 0)},
-        uSunCol: {value: new THREE.Color(0, 0, 0)}
-      };
-      const TERRAIN_GLSL =
-        'uniform sampler2D uNormalTex;\n' +
-        'uniform float uWorldSize;\n' +
-        'uniform float uCenterElev;\n' +
-        'uniform float uSnowy;\n' +
-        'uniform float uSnowLine;\n' +
-        'uniform float uTime;\n' +
-        'uniform float uWindMs;\n' +
-        'uniform vec2 uWindVec;\n' +
-        'uniform vec3 uSunDirW;\n' +
-        'uniform vec3 uSunCol;\n' +
-        'varying float vWet;\n' +
-        'varying vec3 vWp;\n' +
-        'float gRough = 0.95;\n' +
-        'float thash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
-        'float tnoise(vec2 p){\n' +
-        '  vec2 i = floor(p); vec2 f = fract(p);\n' +
-        '  vec2 u = f * f * (3.0 - 2.0 * f);\n' +
-        '  return mix(mix(thash(i), thash(i + vec2(1.0, 0.0)), u.x),\n' +
-        '             mix(thash(i + vec2(0.0, 1.0)), thash(i + vec2(1.0, 1.0)), u.x), u.y);\n' +
-        '}\n' +
-        'float tfbm(vec2 p){ return 0.6 * tnoise(p) + 0.28 * tnoise(p * 2.7 + 19.0) + 0.12 * tnoise(p * 6.1 + 47.0); }\n' +
-        // The sea obeys oceanography, scaled honestly (1 unit = 57.14m).
-        // Pierson-Moskowitz fully developed sea: significant wave height
-        // Hs = 0.21 U^2/g, peak period Tp = 2*pi*U/(0.877g); each wave
-        // train moves at its true deep-water dispersion speed w = sqrt(gk)
-        // and tilts the normal by the real steepness pi*Hs/lambda.
-        'vec3 seaNormal(vec3 wp){\n' +
-        '  float U = max(uWindMs, 0.8);\n' +
-        '  float Hs = 0.21 * U * U / 9.81;\n' +
-        '  float Tp = 0.7305 * U;\n' +
-        '  float Lp = max(1.5614 * Tp * Tp, 4.0);\n' +
-        '  vec2 pm = wp.xz * 57.14;\n' +
-        '  vec2 d1 = normalize(uWindVec);\n' +
-        '  vec2 d2 = normalize(uWindVec + vec2(-uWindVec.y, uWindVec.x) * 0.6);\n' +
-        '  float k1 = 6.28318 / Lp;\n' +
-        '  float k2 = 6.28318 / (Lp * 0.45);\n' +
-        '  float s1 = 3.14159 * Hs / Lp;\n' +
-        '  float a1 = cos(dot(pm, d1) * k1 - uTime * sqrt(9.81 * k1));\n' +
-        '  float a2 = cos(dot(pm, d2) * k2 - uTime * sqrt(9.81 * k2) + 1.7);\n' +
-        '  float chop = (tnoise(pm * 0.05 + uTime * 0.15 * d1) - 0.5) * s1 * 1.2;\n' +
-        '  vec2 grad = d1 * (s1 * a1) + d2 * (s1 * 0.6 * a2) + vec2(chop);\n' +
-        '  return normalize(vec3(-grad.x, 1.0, -grad.y));\n' +
-        '}\n' +
-        // Sun glitter: Blinn lobe on the wave normals with Schlick
-        // fresnel; calm water gives a tight bright path, wind spreads it.
-        'vec3 seaSpec(vec3 wp){\n' +
-        '  vec3 n = seaNormal(wp);\n' +
-        '  vec3 V = normalize(cameraPosition - wp);\n' +
-        '  vec3 H = normalize(V + uSunDirW);\n' +
-        '  float gloss = mix(700.0, 60.0, clamp(uWindMs / 15.0, 0.0, 1.0));\n' +
-        '  float f = pow(clamp(1.0 - dot(V, n), 0.0, 1.0), 5.0) * 0.95 + 0.05;\n' +
-        '  return uSunCol * pow(max(dot(n, H), 0.0), gloss) * f * 6.0;\n' +
-        '}\n' +
-        // The surface normal comes from the baked DEM normal map (full
-        // tile resolution), NOT from screen-space derivatives of the
-        // interpolated mesh - that is what removes the faceted look.
-        'vec3 demNormal(vec2 xz){\n' +
-        '  return normalize(texture2D(uNormalTex, xz / uWorldSize + 0.5).xyz * 2.0 - 1.0);\n' +
-        '}\n' +
-        'vec3 terrainColor(vec3 wp, float wetF){\n' +
-        '  vec3 nW = demNormal(wp.xz);\n' +
-        '  float slope = 1.0 - nW.y;\n' +
-        '  float e = uCenterElev + 500.0 * sinh(wp.y / 16.0);\n' +
-        '  float n1 = tfbm(wp.xz * 0.11);\n' +
-        '  float n2 = tfbm(wp.xz * 0.6);\n' +
-        '  float n3 = tfbm(wp.xz * 3.3);\n' +
-        '  vec3 grass = mix(vec3(0.09, 0.21, 0.05), vec3(0.19, 0.33, 0.08), n1);\n' +
-        '  grass *= 0.85 + n3 * 0.3;\n' +
-        '  vec3 rock = mix(vec3(0.28, 0.25, 0.21), vec3(0.4, 0.37, 0.32), n2);\n' +
-        '  rock *= 0.82 + n3 * 0.36;\n' +
-        '  float rockF = smoothstep(0.2, 0.45, slope + (n2 - 0.5) * 0.08);\n' +
-        '  vec3 col = mix(grass, rock, rockF);\n' +
-        '  col = mix(col, rock, smoothstep(1600.0, 2400.0, e) * 0.92);\n' +
-        '  float snowLine = uSnowLine + (n1 - 0.5) * 500.0;\n' +
-        '  float snow = smoothstep(snowLine, snowLine + 700.0, e) * (1.0 - smoothstep(0.35, 0.6, slope));\n' +
-        '  snow = max(snow, uSnowy * (1.0 - smoothstep(0.25, 0.45, slope)) * 0.85);\n' +
-        '  col = mix(col, vec3(0.87, 0.9, 0.93), snow);\n' +
-        // Per-pixel microfacet roughness for the GGX BRDF: measured-ish
-        // values - vegetation ~0.95, rock ~0.88, snow much glossier
-        // (0.45, its forward-scattering sheen). Wet sea pixels keep
-        // roughness 1 so Cox-Munk seaSpec stays the one glitter model.
-        '  gRough = mix(mix(0.95, 0.88, rockF), 0.45, snow);\n' +
-        '  gRough = mix(gRough, 1.0, wetF);\n' +
-        '  vec3 sea = mix(vec3(0.05, 0.13, 0.2), vec3(0.07, 0.17, 0.25), n1);\n' +
-        // Whitecap coverage from Monahan & O'Muircheartaigh (1980):
-        // W = 3.84e-6 * U^3.41 - a real few percent at 10 m/s.
-        '  float U = max(uWindMs, 0.8);\n' +
-        '  float W = clamp(3.84e-6 * pow(U, 3.41), 0.0, 0.6);\n' +
-        '  vec2 pmc = wp.xz * 57.14 * 0.11;\n' +
-        '  float capN = tnoise(pmc + uTime * 0.25 * normalize(uWindVec) + 31.0);\n' +
-        '  sea = mix(sea, vec3(0.75, 0.8, 0.84), smoothstep(1.0 - W, 1.0 - W + 0.04, capN));\n' +
-        '  return mix(col, sea, wetF);\n' +
-        '}\n';
-      // MeshStandardMaterial is three's vendored implementation of the
-      // research BRDF (GGX + Smith height-correlated visibility after
-      // Karis 2013, Schlick fresnel, Burley diffuse) - the terrain gets
-      // the real microfacet model with per-pixel roughness, not Lambert.
-      const terrainMat = new THREE.MeshStandardMaterial({metalness: 0});
+      const terrainObj = createTerrainNodeMaterial(
+        dummyTex([127, 255, 127, 255]),
+        aerial
+      );
+      const terrainMat = terrainObj.material;
+      const terrainUniforms = terrainObj.uniforms;
+      terrainUniforms.uWorldSize.value = WORLD;
       record(
         'GGX microfacet BRDF (Karis 2013)',
         'per-pixel roughness · vegetation/rock/snow'
       );
       record('Lommel-Seeliger moon', 'lunar regolith photometry');
-      csm.setupMaterial(terrainMat);
-      const terrainCSMHook = terrainMat.onBeforeCompile;
-      terrainMat.onBeforeCompile = (shader, r) => {
-        terrainCSMHook(shader, r);
-        Object.assign(shader.uniforms, terrainUniforms);
-        shader.vertexShader = shader.vertexShader
-          .replace(
-            '#include <common>',
-            '#include <common>\nattribute float wet; varying float vWet; varying vec3 vWp;'
-          )
-          .replace(
-            '#include <begin_vertex>',
-            '#include <begin_vertex>\nvWet = wet; vWp = transformed;'
-          );
-        shader.fragmentShader = shader.fragmentShader
-          .replace('#include <common>', '#include <common>\n' + TERRAIN_GLSL)
-          .replace(
-            '#include <color_fragment>',
-            '#include <color_fragment>\ndiffuseColor.rgb = terrainColor(vWp, vWet);'
-          )
-          .replace(
-            '#include <normal_fragment_begin>',
-            '#include <normal_fragment_begin>\n' +
-              'vec3 wNrm = vWet > 0.5 ? seaNormal(vWp) : demNormal(vWp.xz);\n' +
-              'normal = normalize((viewMatrix * vec4(wNrm, 0.0)).xyz);'
-          )
-          .replace(
-            '#include <roughnessmap_fragment>',
-            'float roughnessFactor = gRough;'
-          )
-          .replace(
-            '#include <opaque_fragment>',
-            'outgoingLight += vWet * seaSpec(vWp);\n#include <opaque_fragment>'
-          );
-      };
-      applyAerial(terrainMat);
 
       // The DEM outresolves the mesh (~26 m ground truth vs ~0.9 units
       // per vertex), so shading reads the data directly: a world-space
@@ -1400,9 +1210,9 @@
         const tex = new THREE.DataTexture(arr, S, S, THREE.RGBAFormat);
         tex.minFilter = tex.magFilter = THREE.LinearFilter;
         tex.needsUpdate = true;
-        if (terrainUniforms.uNormalTex.value)
-          terrainUniforms.uNormalTex.value.dispose();
-        terrainUniforms.uNormalTex.value = tex;
+        if (terrainObj.normalTexNode.value.isDataTexture)
+          terrainObj.normalTexNode.value.dispose();
+        terrainObj.normalTexNode.value = tex;
       }
 
       function buildWorld() {
@@ -1510,24 +1320,11 @@
             break;
           }
         if (hasWater && waterNormalsTex) {
-          water = new Water(new THREE.PlaneGeometry(WORLD, WORLD), {
-            textureWidth: 512,
-            textureHeight: 512,
-            waterNormals: waterNormalsTex,
-            sunDirection: new THREE.Vector3(0, 1, 0),
-            sunColor: 0xffffff,
-            waterColor: 0x0a2431,
-            distortionScale: 1.4,
-            fog: true
-          });
-          water.rotation.x = -Math.PI / 2;
-          water.position.y = 16 * Math.asinh((0 - centerElev) / 500) - 0.15;
-          // Cox & Munk (1954): sun glitter is shaped by the sea-surface
-          // slope variance, mss = 0.003 + 0.00512*U. Patch the vendored
-          // shader's fixed Blinn lobe to follow it, mix in Monahan
-          // whitecaps, and break surf along the REAL shallows: a depth
-          // texture sampled from the terrarium bathymetry, with the
-          // McCowan criterion (waves break where H > 0.78d).
+          // Cox & Munk (1954): sun glitter shaped by the sea-surface
+          // slope variance; Monahan whitecaps; McCowan surf breaking
+          // where H > 0.78d - all carried at source level in the
+          // HorizonWaterMesh fork, against the REAL bathymetry sampled
+          // from the terrarium tiles into a depth texture.
           const DT = 128;
           const dArr = new Uint8Array(DT * DT);
           for (let dj = 0; dj < DT; dj++)
@@ -1546,62 +1343,23 @@
             }
           const depthTex = new THREE.DataTexture(dArr, DT, DT, THREE.RedFormat);
           depthTex.needsUpdate = true;
-          Object.assign(water.material.uniforms, {
-            shiny: {value: 200},
-            whitecapW: {value: 0},
-            windDirW: {value: new THREE.Vector2(1, 0)},
-            depthTex: {value: depthTex},
-            hsWave: {value: 0.5}
+          water = new HorizonWaterMesh(new THREE.PlaneGeometry(WORLD, WORLD), {
+            waterNormals: waterNormalsTex,
+            sunDirection: new THREE.Vector3(0, 1, 0),
+            sunColor: 0xffffff,
+            waterColor: 0x0a2431,
+            distortionScale: 1.4,
+            depthTex,
+            worldSize: WORLD,
+            resolutionScale: 0.5
           });
-          water.material.fragmentShader = water.material.fragmentShader
-            .replace(
-              'uniform vec3 waterColor;',
-              'uniform vec3 waterColor; uniform float shiny;' +
-                ' uniform float whitecapW; uniform vec2 windDirW;' +
-                ' uniform sampler2D depthTex; uniform float hsWave;'
-            )
-            .replace(
-              'sunLight( surfaceNormal, eyeDirection, 100.0, 2.0, 0.5, diffuseLight, specularLight );',
-              'sunLight( surfaceNormal, eyeDirection, shiny, shiny * 0.02 + 0.5, 0.5, diffuseLight, specularLight );'
-            )
-            .replace(
-              'vec3 outgoingLight = albedo;',
-              'float capN = texture2D( normalSampler, worldPosition.xz * 0.02 + windDirW * time * 0.012 ).g;\n' +
-                'float capMask = smoothstep( 1.0 - whitecapW - 0.04, 1.0 - whitecapW + 0.02, capN );\n' +
-                'float dpt = texture2D( depthTex, worldPosition.xz / 280.0 + 0.5 ).r * 40.0;\n' +
-                'float db = hsWave / 0.78;\n' +
-                'float shoal = smoothstep( db * 2.4, db * 0.6, dpt ) * smoothstep( 0.012, 0.05, dpt );\n' +
-                'float surfN = texture2D( normalSampler, worldPosition.xz * 0.05 + windDirW * time * 0.03 ).b;\n' +
-                'float surf = shoal * smoothstep( 0.35, 0.7, surfN + shoal * 0.25 );\n' +
-                'albedo = mix( albedo, vec3( 0.82, 0.86, 0.88 ) * ( 0.3 + max( sunDirection.y, 0.0 ) ), clamp( capMask * 0.9 + surf * 0.85, 0.0, 1.0 ) );\n' +
-                'vec3 outgoingLight = albedo;'
-            );
-          // Aerial perspective for the sea, via the Water shader's own
-          // worldPosition varying and eye uniform (its vertex stage has
-          // no `transformed`, so the generic hook cannot apply).
-          if (atmo.ok) {
-            Object.assign(water.material.uniforms, aerialU);
-            water.material.fragmentShader = water.material.fragmentShader
-              .replace(
-                '#include <fog_pars_fragment>',
-                '#include <fog_pars_fragment>\n' +
-                  'uniform sampler2D uAerialTex; uniform float uAerialMaxU;\n' +
-                  'uniform vec2 uSunAzV; uniform float uAerialExp;'
-              )
-              .replace(
-                '#include <fog_fragment>',
-                'vec3 aerDir = worldPosition.xyz - eye;\n' +
-                  'float aerD = length(aerDir);\n' +
-                  'vec2 aerH = normalize(aerDir.xz + vec2(1e-6));\n' +
-                  'float aerAz = acos(clamp(dot(aerH, uSunAzV), -1.0, 1.0)) / 3.14159265;\n' +
-                  'vec4 aer = texture2D(uAerialTex, vec2(aerAz, min(aerD / uAerialMaxU, 1.0)));\n' +
-                  'gl_FragColor.rgb = gl_FragColor.rgb * aer.a + aer.rgb * uAerialExp;\n' +
-                  '#include <fog_fragment>'
-              );
-          }
-          water.material.needsUpdate = true;
+          water.rotation.x = -Math.PI / 2;
+          water.position.y = 16 * Math.asinh((0 - centerElev) / 500) - 0.15;
+          // Aerial perspective + AgX for the sea via the shared hook.
+          applyAerial(water.material);
+          ground.add(water);
           record(
-            'three.js Water (vendored)',
+            'three.js WaterMesh (forked)',
             'planar reflections · Cox-Munk glitter · Monahan whitecaps'
           );
         }
@@ -1627,7 +1385,7 @@
       const polar = new THREE.Group();
       polar.add(celestial);
       scene.add(polar);
-      let starMat = null;
+      let starObj = null;
       fetch('./horizon/stars.json')
         .then((r) => r.json())
         .then((stars) => {
@@ -1652,44 +1410,17 @@
             color.push(col.r, col.g, col.b);
             size.push(THREE.MathUtils.clamp(7.5 - mag, 1.8, 7.5));
           }
-          const geo = new THREE.BufferGeometry();
-          geo.setAttribute(
-            'position',
-            new THREE.Float32BufferAttribute(pos, 3)
+          // Scintillation: Kolmogorov turbulence makes twinkle grow
+          // with airmass (~sec z), so horizon stars shimmer and zenith
+          // stars barely do; per-star phase from a PCG hash (Jarzynski
+          // & Olano 2020). Instanced sprites reproduce gl_PointSize -
+          // WebGPU has no point size.
+          starObj = createStarSprites(
+            new Float32Array(pos),
+            new Float32Array(color),
+            new Float32Array(size)
           );
-          geo.setAttribute('color', new THREE.Float32BufferAttribute(color, 3));
-          geo.setAttribute('size', new THREE.Float32BufferAttribute(size, 1));
-          // Scintillation: Kolmogorov turbulence makes twinkle grow with
-          // airmass (~sec z), so horizon stars shimmer and zenith stars
-          // barely do. Per-star phase from a PCG hash (Jarzynski &
-          // Olano 2020) on the position bits - the old sin-hash
-          // decorrelates across shader compilers at fp32.
-          starMat = new THREE.ShaderMaterial({
-            transparent: true,
-            depthWrite: false,
-            uniforms: {night: {value: 0}, time: {value: 0}},
-            vertexShader:
-              'attribute float size; uniform float time;' +
-              ' varying vec3 vc; varying float vtw;' +
-              ' uint pcg(uint v){ uint s = v * 747796405u + 2891336453u;' +
-              '  uint w = ((s >> ((s >> 28) + 4u)) ^ s) * 277803737u;' +
-              '  return (w >> 22) ^ w; }' +
-              ' void main(){ vc = color;' +
-              '  float alt = max(normalize((modelMatrix * vec4(position, 1.0)).xyz).y, 0.04);' +
-              '  float am = 1.0 / alt;' +
-              '  float ph = float(pcg(floatBitsToUint(position.x) ^ (floatBitsToUint(position.y) * 2654435769u)))' +
-              '    * 1.46291807e-9;' + // 2*pi / 2^32
-              '  vtw = 1.0 + clamp(0.06 * (am - 1.0), 0.0, 0.5) * sin(time * 9.0 + ph);' +
-              ' vec4 mv = modelViewMatrix * vec4(position, 1.0);' +
-              ' gl_PointSize = size * vtw; gl_Position = projectionMatrix * mv; }',
-            fragmentShader:
-              'uniform float night; varying vec3 vc; varying float vtw;' +
-              ' void main(){ float d = length(gl_PointCoord - 0.5);' +
-              ' if (d > 0.5) discard;' +
-              ' gl_FragColor = vec4(vc, night * vtw * smoothstep(0.5, 0.2, d)); }',
-            vertexColors: true
-          });
-          celestial.add(new THREE.Points(geo, starMat));
+          celestial.add(starObj.mesh);
           record(
             'Yale Bright Star Catalog',
             stars.length + ' stars (vendored)'
@@ -1717,12 +1448,12 @@
                 }
           const g = new THREE.BufferGeometry();
           g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-          constMat = new THREE.LineBasicMaterial({
-            color: '#7f9fc4',
+          constMat = new THREE.LineBasicNodeMaterial({
             transparent: true,
             opacity: 0,
             depthWrite: false
           });
+          aerial.applyFogColor(constMat, '#7f9fc4');
           celestial.add(new THREE.LineSegments(g, constMat));
           record(
             'd3-celestial constellations',
@@ -1736,32 +1467,11 @@
       // basis of McEwen's lunar-Lambert), not Lambert. That is why a
       // full moon renders flat like the real one instead of
       // limb-darkening like a billiard ball.
-      const moonU = {
-        sunDirM: {value: new THREE.Vector3(0, 1, 0)},
-        albM: {value: new THREE.Color('#cdd4e2')},
-        glowM: {value: new THREE.Color('#0c0f16')}
-      };
+      const moonObj = createMoonMaterial();
+      const moonU = moonObj.u;
       const moonDisc = new THREE.Mesh(
         new THREE.SphereGeometry(24, 24, 18),
-        new THREE.ShaderMaterial({
-          uniforms: moonU,
-          vertexShader:
-            'varying vec3 vN; varying vec3 vWpM; void main(){' +
-            ' vN = normalize(mat3(modelMatrix) * normal);' +
-            ' vWpM = (modelMatrix * vec4(position, 1.0)).xyz;' +
-            ' gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-          fragmentShader:
-            'uniform vec3 sunDirM; uniform vec3 albM; uniform vec3 glowM;' +
-            'varying vec3 vN; varying vec3 vWpM;' +
-            'void main(){' +
-            '  vec3 n = normalize(vN);' +
-            '  float mu0 = dot(n, sunDirM);' + // cos incidence
-            '  float mu = dot(n, normalize(cameraPosition - vWpM));' + // cos emission
-            '  float ls = mu0 > 0.0 ? mu0 / max(mu0 + mu, 1e-3) : 0.0;' +
-            // Lommel-Seeliger reflectance; x2 normalises the full-moon
-            // face back to the albedo.
-            '  gl_FragColor = vec4(albM * ls * 2.0 + glowM, 1.0); }'
-        })
+        moonObj.material
       );
       moonDisc.layers.set(2);
       scene.add(moonDisc);
@@ -1776,44 +1486,12 @@
         [0.98, 0.92, 0.8],
         [0.95, 0.9, 0.72]
       ];
-      const planetGeo = new THREE.BufferGeometry();
-      planetGeo.setAttribute(
-        'position',
-        new THREE.Float32BufferAttribute(
-          new Float32Array(PLANETS.length * 3),
-          3
-        )
+      const planetObj = createPlanetSprites(
+        new Float32Array(PLANETS.length * 3),
+        new Float32Array(PLANET_TINTS.flat()),
+        new Float32Array(PLANETS.length).fill(4)
       );
-      planetGeo.setAttribute(
-        'color',
-        new THREE.Float32BufferAttribute(PLANET_TINTS.flat(), 3)
-      );
-      planetGeo.setAttribute(
-        'size',
-        new THREE.Float32BufferAttribute(
-          new Float32Array(PLANETS.length).fill(4),
-          1
-        )
-      );
-      const planetMat = new THREE.ShaderMaterial({
-        transparent: true,
-        depthWrite: false,
-        uniforms: {night: {value: 0}},
-        vertexShader:
-          'attribute float size; varying vec3 vc;' +
-          ' void main(){ vc = color;' +
-          ' vec4 mv = modelViewMatrix * vec4(position, 1.0);' +
-          ' gl_PointSize = size; gl_Position = projectionMatrix * mv; }',
-        fragmentShader:
-          'uniform float night; varying vec3 vc;' +
-          ' void main(){ float d = length(gl_PointCoord - 0.5);' +
-          ' if (d > 0.5) discard;' +
-          ' gl_FragColor = vec4(vc, night * smoothstep(0.5, 0.2, d)); }',
-        vertexColors: true
-      });
-      const planetPoints = new THREE.Points(planetGeo, planetMat);
-      planetPoints.frustumCulled = false;
-      scene.add(planetPoints);
+      scene.add(planetObj.mesh);
 
       // Ephemeris cache, refreshed at 1Hz in the frame loop.
       const astro = {
@@ -1828,11 +1506,8 @@
       // Aurora: additive curtains over the poleward horizon, driven by
       // NOAA's OVATION oval (Kp heuristic as fallback). The oval's real
       // latitude sets the curtain's true elevation via uBase.
-      const auroraU = {
-        time: {value: 0},
-        strength: {value: 0},
-        uBase: {value: 60}
-      };
+      const auroraObj = createAuroraMaterial();
+      const auroraU = auroraObj.u;
       const aurora = new THREE.Mesh(
         new THREE.CylinderGeometry(
           760,
@@ -1844,29 +1519,7 @@
           Math.PI - Math.PI / 2.6,
           Math.PI / 1.3
         ),
-        new THREE.ShaderMaterial({
-          transparent: true,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-          blending: THREE.AdditiveBlending,
-          uniforms: auroraU,
-          vertexShader:
-            'varying vec2 u; varying float vy; void main(){ u = uv;' +
-            ' vy = (modelMatrix * vec4(position, 1.0)).y;' +
-            ' gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-          fragmentShader:
-            'uniform float time; uniform float strength; uniform float uBase;' +
-            ' varying vec2 u; varying float vy;' +
-            ' void main(){' +
-            ' float h = clamp((vy - uBase) / 720.0, 0.0, 1.0);' +
-            ' float w = sin(u.x * 38.0 + time * 0.9 + sin(u.x * 7.0 + time * 0.35) * 2.4)' +
-            '   * 0.5 + 0.5;' +
-            ' float w2 = sin(u.x * 61.0 - time * 0.6 + 2.1) * 0.5 + 0.5;' +
-            ' float band = pow(1.0 - h, 2.0) * smoothstep(0.08, 0.32, h);' +
-            ' float a = strength * band * (0.9 + 1.0 * w * w2);' +
-            ' vec3 col = mix(vec3(0.13, 0.95, 0.45), vec3(0.5, 0.25, 0.95), h * 1.3);' +
-            ' gl_FragColor = vec4(col * a, a); }'
-        })
+        auroraObj.material
       );
       aurora.position.y = 420;
       scene.add(aurora);
@@ -1878,51 +1531,11 @@
       //   the sun shining below 42 deg
       // - the 22 deg ice-crystal halo (red inner edge) whenever real
       //   cirrus is present, with parhelia (sundogs) at low sun
-      const opticsU = {
-        sunDir: {value: new THREE.Vector3(0, 1, 0)},
-        antisolar: {value: new THREE.Vector3(0, -1, 0)},
-        bow: {value: 0},
-        halo: {value: 0},
-        dogs: {value: 0}
-      };
+      const opticsObj = createOpticsMaterial();
+      const opticsU = opticsObj.u;
       const optics = new THREE.Mesh(
         new THREE.SphereGeometry(590, 32, 20),
-        new THREE.ShaderMaterial({
-          side: THREE.BackSide,
-          transparent: true,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-          uniforms: opticsU,
-          vertexShader:
-            'varying vec3 vDir; void main(){ vDir = position;' +
-            ' gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-          fragmentShader:
-            'uniform vec3 sunDir; uniform vec3 antisolar;' +
-            ' uniform float bow; uniform float halo; uniform float dogs;' +
-            ' varying vec3 vDir;' +
-            ' vec3 spectral(float h){' +
-            '  return clamp(vec3(' +
-            '    1.6 * h - 0.35,' +
-            '    1.0 - abs(2.4 * h - 1.25),' +
-            '    1.05 - 1.7 * h), 0.0, 1.0); }' +
-            ' void main(){' +
-            '  vec3 v = normalize(vDir);' +
-            '  float aA = degrees(acos(clamp(dot(v, antisolar), -1.0, 1.0)));' +
-            '  float aS = degrees(acos(clamp(dot(v, sunDir), -1.0, 1.0)));' +
-            '  vec3 col = vec3(0.0);' +
-            // primary bow: violet 40.6 inner -> red 42.4 outer
-            '  float b1 = smoothstep(40.4, 40.9, aA) * (1.0 - smoothstep(42.2, 42.6, aA));' +
-            '  col += spectral(1.0 - clamp((aA - 40.6) / 1.8, 0.0, 1.0)) * b1 * bow * 0.55;' +
-            // secondary: red 50.4 inner -> violet 53.2 outer, 43% brightness
-            '  float b2 = smoothstep(50.2, 50.8, aA) * (1.0 - smoothstep(52.8, 53.6, aA));' +
-            '  col += spectral(clamp((aA - 50.4) / 2.8, 0.0, 1.0)) * b2 * bow * 0.24;' +
-            // 22 deg halo, red inner edge fading to bluish white
-            '  float th = smoothstep(21.2, 21.9, aS) * (1.0 - smoothstep(22.5, 23.8, aS));' +
-            '  vec3 hcol = mix(vec3(1.0, 0.5, 0.35), vec3(0.85, 0.92, 1.0), clamp((aS - 21.8) / 1.6, 0.0, 1.0));' +
-            '  float dogBand = exp(-pow((v.y - sunDir.y) * 14.0, 2.0));' +
-            '  col += hcol * th * halo * (0.18 + dogs * dogBand * 0.6);' +
-            '  gl_FragColor = vec4(col, 1.0); }'
-        })
+        opticsObj.material
       );
       optics.renderOrder = 1;
       scene.add(optics);
@@ -1938,26 +1551,27 @@
       // across a silhouette. Only thin cirrus stays a 2D sheet, as in
       // the research.
       const cloudGroup = new THREE.Group();
-      const cirrusMat = new THREE.MeshBasicMaterial({
+      const cirrusMat = new THREE.MeshBasicNodeMaterial({
         color: '#ffffff',
         transparent: true,
         opacity: 0.15,
         depthWrite: false
       });
       applyAerial(cirrusMat);
-      const cloudSys = createCloudSystem(renderer);
-      record(
-        'Temporal cloud reconstruction',
-        'quarter-res march · 1/16 Bayer refresh · reprojection'
-      );
-      const cloudDepthRT = new THREE.WebGLRenderTarget(2, 2, {
-        depthTexture: new THREE.DepthTexture(2, 2)
+      let cloudSys = null; // built with its 3D noise on first demand
+      let cloudDepthRT = null;
+      const depthOnlyMat = new THREE.MeshBasicNodeMaterial({
+        colorWrite: false
       });
-      const depthOnlyMat = new THREE.MeshBasicMaterial({colorWrite: false});
       sizeCloudTargets = () => {
         const s = renderer.getDrawingBufferSize(new THREE.Vector2());
-        cloudDepthRT.setSize(s.x, s.y);
-        cloudSys.setSize(s.x, s.y);
+        // Recreate rather than setSize: RenderTarget.setSize does NOT
+        // resize an attached DepthTexture, and a stale depth attachment
+        // feeds NaN distances to the cloud march.
+        if (cloudDepthRT) cloudDepthRT.dispose();
+        cloudDepthRT = new THREE.RenderTarget(s.x, s.y, {depthBuffer: true});
+        cloudDepthRT.depthTexture = new THREE.DepthTexture(s.x, s.y);
+        if (cloudSys) cloudSys.setSize(s.x, s.y);
       };
       sizeCloudTargets();
       let cloudsActive = false;
@@ -1983,10 +1597,9 @@
       // and the observer in twilight or darkness.
       let satrec = null;
       let lastPassSaid = -1e9;
-      const iss = new THREE.Mesh(
-        new THREE.SphereGeometry(2.4, 8, 6),
-        new THREE.MeshBasicMaterial({color: '#f4f7ff', fog: false})
-      );
+      const issMat = new THREE.MeshBasicNodeMaterial({color: '#f4f7ff'});
+      aerial.applyTone(issMat); // fog: false in the classic build
+      const iss = new THREE.Mesh(new THREE.SphereGeometry(2.4, 8, 6), issMat);
       iss.visible = false;
       scene.add(iss);
       async function syncISS() {
@@ -2012,15 +1625,11 @@
 
       // Precipitation: one particle field, styled as rain or snow.
       const PRECIP_N = 1600;
-      const precipGeo = new THREE.BufferGeometry();
-      {
-        const p = [];
-        for (let i = 0; i < PRECIP_N; i++)
-          p.push((rand() - 0.5) * 90, rand() * 45, (rand() - 0.5) * 90);
-        precipGeo.setAttribute(
-          'position',
-          new THREE.Float32BufferAttribute(p, 3)
-        );
+      const precipArr = new Float32Array(PRECIP_N * 3);
+      for (let i = 0; i < PRECIP_N; i++) {
+        precipArr[i * 3] = (rand() - 0.5) * 90;
+        precipArr[i * 3 + 1] = rand() * 45;
+        precipArr[i * 3 + 2] = (rand() - 0.5) * 90;
       }
       const dot = document.createElement('canvas');
       dot.width = dot.height = 32;
@@ -2032,17 +1641,16 @@
         g.fillStyle = grad;
         g.fillRect(0, 0, 32, 32);
       }
-      const precipMat = new THREE.PointsMaterial({
-        color: '#bcd2e8',
-        size: 0.22,
-        map: new THREE.CanvasTexture(dot),
-        depthWrite: false,
-        transparent: true,
-        opacity: 0
-      });
-      const precip = new THREE.Points(precipGeo, precipMat);
-      precip.layers.set(4); // drawn in the post-cloud overlay pass
-      scene.add(precip);
+      // Instanced sprites reproduce PointsMaterial's size-attenuated
+      // points (WebGPU has no gl_PointSize).
+      const precipObj = createPrecipSprites(
+        precipArr,
+        new THREE.CanvasTexture(dot),
+        (rgb) => aerial.encodeFog(rgb)
+      );
+      const precipU = precipObj.u;
+      precipObj.mesh.layers.set(4); // drawn in the post-cloud overlay pass
+      scene.add(precipObj.mesh);
 
       // ---------- physical snow (Rapier, loaded only when it snows) ----------
       // The near-field weather box is human scale (roughly 1 unit = 1m),
@@ -2057,26 +1665,29 @@
       const DRIFT_CAP = 2400;
       const SNOW_EXT = 120;
       const tmpM4 = new THREE.Matrix4();
-      const driftSnowMat = new THREE.MeshStandardMaterial({
+      const driftSnowMat = new THREE.MeshStandardNodeMaterial({
         color: '#eef2f6',
         roughness: 0.5
       });
-      csm.setupMaterial(driftSnowMat);
       const driftMesh = new THREE.InstancedMesh(
         new THREE.IcosahedronGeometry(0.16, 0),
         driftSnowMat,
         DRIFT_CAP
       );
       driftMesh.count = 0;
+      driftMesh.visible = false; // count = 0 still draws on WebGPU
       driftMesh.frustumCulled = false;
       applyAerial(driftMesh.material);
       scene.add(driftMesh);
+      const flakeMat = new THREE.MeshBasicNodeMaterial();
+      aerial.applyFogColor(flakeMat, '#ffffff');
       const flakeMesh = new THREE.InstancedMesh(
         new THREE.IcosahedronGeometry(0.12, 0),
-        new THREE.MeshBasicMaterial({color: '#ffffff'}),
+        flakeMat,
         SNOW_N
       );
       flakeMesh.count = 0;
+      flakeMesh.visible = false; // count = 0 still draws on WebGPU
       flakeMesh.frustumCulled = false;
       flakeMesh.layers.set(4); // falls in front of the far cloud decks
       scene.add(flakeMesh);
@@ -2126,6 +1737,7 @@
           sim.countD = 0;
           sim.highWater = 0;
           driftMesh.count = 0;
+          driftMesh.visible = false;
           driftMesh.instanceMatrix.needsUpdate = true;
         };
         sim.spawn = (body) => {
@@ -2151,6 +1763,7 @@
           driftMesh.setMatrixAt(slot, tmpM4);
           sim.highWater = Math.max(sim.highWater, slot + 1);
           driftMesh.count = sim.highWater;
+          driftMesh.visible = sim.highWater > 0;
           driftMesh.instanceMatrix.needsUpdate = true;
         };
         sim.meltOldest = () => {
@@ -2417,9 +2030,9 @@
         const sun = astro.sun;
         const moon = astro.moon;
         moonDisc.scale.setScalar(astro.moonScale);
-        if (planetMat) {
-          const pp = planetGeo.attributes.position;
-          const ps = planetGeo.attributes.size;
+        {
+          const pp = planetObj.posAttr;
+          const ps = planetObj.sizeAttr;
           for (let i = 0; i < PLANETS.length; i++) {
             const pl = astro.planets[i];
             if (!pl) continue;
@@ -2431,12 +2044,12 @@
           ps.needsUpdate = true;
         }
         const sunVec = skyPoint(sun.alt, sun.az, 1);
-        // The CSM cascades carry the sun: true direction, transmitted
-        // colour and intensity mirrored from the data holder below.
-        csm.lightDirection
+        // The one real sun light carries the true direction; the CSM
+        // shadow node follows it.
+        sunLight.position
           .copy(skyPoint(Math.max(sun.alt, -0.12), sun.az, 1))
-          .negate()
-          .normalize();
+          .multiplyScalar(400);
+        sunLight.target.position.set(0, 0, 0);
         moonDisc.position.copy(skyPoint(moon.alt, moon.az, 1500));
         // Sun direction as seen at the moon disc (same geometry the old
         // directional light encoded), feeding the Lommel-Seeliger shader.
@@ -2470,11 +2083,6 @@
           // light on the terrain matches the sky it comes from.
           aerialU.uSunAzV.value.set(sunVec.x, sunVec.z).normalize();
           aerialU.uAerialExp.value = skyExposure;
-        } else {
-          skyU.sunPosition.value.copy(sunVec);
-          skyU.turbidity.value = 1.6 + state.aod * 14 + cloudy * 12 + dusk * 2;
-          skyU.mieCoefficient.value =
-            0.003 + state.aod * 0.012 + cloudy * 0.005;
         }
         veilU.alpha.value = cloudy * cloudy * 0.85 * day;
 
@@ -2483,11 +2091,11 @@
           .lerp(cDayBot, day)
           .lerp(cSetBot, dusk * 0.8)
           .lerp(cGray, cloudy * 0.7 * day);
-        scene.fog.color.copy(tmpB);
+        aerialU.uFogColor.value.copy(tmpB);
         // Koschmieder relation: extinction from the MEASURED visibility
         // (2% contrast at V). Fog codes need no special-casing - a foggy
         // hour reports a short visibility by itself.
-        scene.fog.density =
+        aerialU.uFogDensity.value =
           1.98 / (Math.max(state.visibility, 400) / 57.14) + cloudy * 0.001;
 
         // A real solar eclipse dims the direct light by its obscuration.
@@ -2508,9 +2116,12 @@
         if (atmo.ok) {
           if (t - lastIrrT > 1000) {
             lastIrrT = t;
-            const ir = atmo.readIrradiance();
-            if (ir[0] + ir[1] + ir[2] > 1e-7)
-              skyIrr.setRGB(ir[0], ir[1], ir[2]);
+            // Async staging read - no pipeline stall; it lands a frame
+            // or two later, which a 1 Hz ambient cannot notice.
+            atmo.readIrradiance().then((ir) => {
+              if (ir && ir[0] + ir[1] + ir[2] > 1e-7)
+                skyIrr.setRGB(ir[0], ir[1], ir[2]);
+            });
           }
           // The ambient term IS the sky: cosine-weighted irradiance
           // integrated from the sky-view LUT (read back at 1 Hz), in the
@@ -2550,13 +2161,13 @@
           ambient.color.copy(tmpB);
           ambient.groundColor.copy(tmpB).multiplyScalar(0.4);
         }
-        if (starMat) {
-          starMat.uniforms.night.value = nightSky * (1 - cloudy * 0.85);
-          starMat.uniforms.time.value = t / 1000;
+        if (starObj) {
+          starObj.u.night.value = nightSky * (1 - cloudy * 0.85);
+          starObj.u.time.value = t / 1000;
         }
         if (constMat) constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2;
         // Venus and Jupiter pierce twilight a little before the stars.
-        planetMat.uniforms.night.value =
+        planetObj.u.night.value =
           THREE.MathUtils.clamp(nightSky * 1.6, 0, 1) * (1 - cloudy * 0.85);
         moonDisc.visible = moon.alt > -0.05;
 
@@ -2564,19 +2175,18 @@
         // lobe, Monahan sets the whitecap fraction, Pierson-Moskowitz
         // scales the distortion - all from the one real wind speed.
         if (water) {
-          const wu = water.material.uniforms;
           const Ums = state.wind / 3.6;
-          wu.time.value += dt * (0.3 + Ums * 0.05);
-          wu.sunDirection.value.copy(sunVec);
-          wu.sunColor.value
+          water.timeU.value += dt * (0.3 + Ums * 0.05);
+          water.sunDirection.value.copy(sunVec);
+          water.sunColor.value
             .copy(sunLight.color)
             .multiplyScalar(sunLight.intensity);
-          wu.distortionScale.value = 0.6 + ((0.21 * Ums * Ums) / 9.81) * 2.5;
+          water.distortionScale.value = 0.6 + ((0.21 * Ums * Ums) / 9.81) * 2.5;
           const mss = 0.003 + 0.00512 * Ums;
-          wu.shiny.value = Math.max(2 / mss - 2, 30);
-          wu.whitecapW.value = Math.min(3.84e-6 * Math.pow(Ums, 3.41), 0.5);
-          wu.windDirW.value.set(windV.x, windV.z);
-          wu.hsWave.value = (0.21 * Ums * Ums) / 9.81;
+          water.shiny.value = Math.max(2 / mss - 2, 30);
+          water.whitecapW.value = Math.min(3.84e-6 * Math.pow(Ums, 3.41), 0.5);
+          water.windDirW.value.set(windV.x, windV.z);
+          water.hsWave.value = (0.21 * Ums * Ums) / 9.81;
         }
 
         // The real wind vectors, per level: meteorological direction is
@@ -2666,17 +2276,24 @@
         if ((cLow > 3 || cMid > 3) && !cloudTexPending) {
           cloudTexPending = true;
           setTimeout(() => {
-            const tex = generateCloudTextures();
-            cloudSys.shared.baseTex.value = tex.baseTex;
-            cloudSys.shared.detailTex.value = tex.detailTex;
+            const tex = generateCloudTexturesTSL();
+            cloudSys = createCloudSystemTSL(
+              renderer,
+              tex.baseTex,
+              tex.detailTex
+            );
+            sizeCloudTargets();
             record(
               'Nubis cloud noise (generated)',
               'Perlin-Worley 64³ + Worley 32³, tileable'
             );
+            record(
+              'Temporal cloud reconstruction',
+              'quarter-res march · 1/16 Bayer refresh · reprojection'
+            );
           }, 60);
         }
-        cloudsActive =
-          !!cloudSys.shared.baseTex.value && (cLow > 2 || cMid > 2);
+        cloudsActive = !!cloudSys && (cLow > 2 || cMid > 2);
         if (cloudsActive) {
           cloudSys.shared.sunDirW.value.copy(sunVec);
           cloudSys.shared.sunCol.value
@@ -2745,11 +2362,11 @@
         const rate = snowing
           ? THREE.MathUtils.clamp(state.snow / 2, 0.3, 1)
           : THREE.MathUtils.clamp(state.precip / 4, 0.25, 1);
-        precipMat.opacity = raining || snowing ? 0.35 + rate * 0.45 : 0;
-        precipMat.size = snowing ? 0.34 : 0.16;
-        precipMat.color.set(snowing ? '#ffffff' : '#a9c6e2');
+        precipU.opacity.value = raining || snowing ? 0.35 + rate * 0.45 : 0;
+        precipU.size.value = snowing ? 0.34 : 0.16;
+        precipU.color.value.set(snowing ? '#ffffff' : '#a9c6e2');
         if (raining || snowing) {
-          const p = precipGeo.attributes.position;
+          const p = precipObj.posAttr;
           const fall = (snowing ? 6 : 34) * (0.4 + rate * 0.6) * dt;
           // Advected along the true wind vector, not just eastward.
           const drift = state.wind * 0.05 * dt;
@@ -2848,6 +2465,7 @@
             }
           }
           flakeMesh.count = fi;
+          flakeMesh.visible = fi > 0;
           flakeMesh.instanceMatrix.needsUpdate = true;
           // Warm real temperatures erode the drifts, oldest first.
           if (state.temp > 1 && snowSim.countD) {
@@ -3065,12 +2683,7 @@
               ' falling';
         }
 
-        csm.lights.forEach((l) => {
-          l.color.copy(sunLight.color);
-          l.intensity = sunLight.intensity;
-        });
         camera.updateMatrixWorld();
-        csm.update();
 
         if (cloudsActive) {
           // Terrain depth prepass (cheap: colour writes off, override
