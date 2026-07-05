@@ -171,9 +171,39 @@ Scenes (all at Grindelwald unless noted):
     RAW (no implicit sRGB conversion); an A/B page's scene.background
     bleeds through semi-transparent composites differently per output
     colorspace - compare over black.
-  - Next: TSL Water/Sky with the Cox-Munk physics re-applied
-    (then compute in phase 3); moon/aurora/optics/star ShaderMaterials
-    → NodeMaterial equivalents; then the Horizon.html renderer switch,
-    full matrix, and DELETION of the WebGL-only code paths
-    (onBeforeCompile hooks, GLSL CSM trio, Sky.js/Water.js if fully
-    replaced).
+  - Water ported to `water-tsl.js` — DONE at the strongest A/B level:
+    full physics (Cox-Munk glitter, Monahan whitecaps, McCowan surf on
+    the bathymetry texture, distorted mirror reflection) renders
+    pixel-equivalent to the classic patched Water.js — mean abs diff
+    0.013/255, ZERO pixels above 25, at default mirror resolutions.
+    `HorizonWaterMesh` is a marked source fork of the vendored r185
+    `WaterMesh.js` (node graphs cannot be string-patched). The A/B
+    caught two real bugs on the way — both are the reason the
+    reference-first method exists:
+    - UPSTREAM three r185 `WaterMesh.js` writes
+      `noise.xzy.mul( 1.5, 1.0, 1.5 )`, but TSL `mul()` chains extra
+      args as scalar factors (×1.5×1.0×1.5 = ×2.25 uniformly) and
+      `normalize()` cancels a uniform scale — the wave-slope
+      anisotropy of classic Water.js silently vanishes and the sea
+      flattens (glitter/diffuse wrong; was 8.75/255 mean). The fork
+      uses `mul(vec3(1.5, 1.0, 1.5))`. Rule: NEVER pass multiple
+      scalars to a TSL operator expecting a vector — construct the
+      vector.
+    - reflector() uv is top-origin; the classic mirror uv is
+      bottom-origin, so the SAME distortion vector must be added with
+      V negated or the reflection warps the opposite way vertically
+      (only visible at content edges — a reflected box's waterline
+      grew a tail). With both fixes: dist=0 and full-distortion A/Bs
+      are both outlier-free.
+    - Also pinned: WebGPURenderer honors `flipY` for loaded image
+      textures exactly like WebGLRenderer (verified by a
+      flip-the-reference experiment: the classic render moved AWAY
+      from the TSL one when its texture was un-flipped) — no
+      orientation fix-ups needed for image textures, the earlier
+      QuadMesh/RT conventions are about render targets only.
+  - Next: moon/aurora/optics/star ShaderMaterials → NodeMaterial
+    equivalents (Sky.js needs no TSL port — the atmosphere-tsl dome
+    replaces it); then the Horizon.html renderer switch, full matrix,
+    and DELETION of the WebGL-only code paths (onBeforeCompile hooks,
+    GLSL CSM trio, Sky.js/Water.js, clouds.js GLSL, atmosphere.js
+    GLSL passes — the sunTransmittanceJS CPU mirror stays).
