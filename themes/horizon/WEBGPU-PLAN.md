@@ -457,10 +457,37 @@ Scenes (all at Grindelwald unless noted):
     >8 outliers), towering 0.33, Nelson 0.0070 (max 6), snow 0.48,
     aurora 0.0003. Sea horizon at Nelson and the alpine noon horizon
     render as crisp AA'd lines.
-  - Remaining phase 4: motion-vector history. The camera DOES
-    translate (intro height ease + free-flight KeyW), and the
-    reprojection currently uses a fixed 600-unit proxy point; proper
-    per-pixel motion needs the march to output its mean cloud depth
-    (second storage target / MRT on the WebGL side) and the
-    reprojection to use it. Take this as its own step with the
-    scripted-flight matrix scene as acceptance.
+- Phase 4, step 3 DONE - depth-aware cloud reprojection. The camera
+  translates (intro height ease, free-flight KeyW) and the fixed
+  600-unit proxy point parallaxed everything not at that distance.
+  - The march now outputs its CLOUD FRONT DEPTH alongside radiance:
+    the coarse ranging was split into its own `slabFront` Fn (still
+    runs exactly once per deck - marchSlab receives its result), the
+    reconstruction became a JS builder returning {col, front} nodes,
+    and the drivers route both outputs - the compute kernel stores
+    into a second StorageTexture (nearest-filtered: depth must not
+    blend across the cloud/sky sentinel edge), the raster driver
+    writes a 2-attachment MRT RenderTarget through an Fn returning a
+    TSL struct (buildMarch's If/toVar need an active build stack -
+    fine inside the kernel Fn, so only the raster driver needs the
+    struct wrapper; probed struct + mrt + per-attachment readback on
+    the WebGL2 backend first).
+  - Reprojection is Schneider's two-step: project the 600 proxy,
+    read the history's front depth there, reproject through that
+    distance. Rotation stays exact at any distance; sky pixels carry
+    a 30000 sentinel and degrade to direction-only (exact for sky);
+    reprojected pixels carry their front depth forward with their
+    colour.
+  - Acceptance, measured: moving-camera error vs a temporal-free
+    ground truth (the clouds page's truth=1 forces a full fresh
+    march every frame via the harness-only `_warm` export; identical
+    deterministic camera path and jitter) dropped from 10.35 mean
+    (fixed-600) to 3.95 (depth-aware), 2.6x, outlier fraction 0.29
+    to 0.18 - and visibly, the deck structures register against the
+    truth where the old code displaced them. Static regression:
+    clouds A/B 0.0374 (unchanged), theme stratus pinned 0.547
+    (unchanged within run tolerance).
+  - Phase 4 complete. The port is done: one TSL implementation of
+    every piece of physics, compute-driven on WebGPU, QuadMesh-driven
+    on the WebGL2 fallback, reference-validated per-texel and
+    matrix-validated cross-backend at every step.

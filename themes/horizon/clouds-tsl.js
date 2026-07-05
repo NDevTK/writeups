@@ -37,10 +37,12 @@ import {
   max,
   min,
   mix,
+  mrt,
   normalize,
   screenCoordinate,
   select,
   smoothstep,
+  struct,
   texture,
   texture3D,
   textureStore,
@@ -91,8 +93,9 @@ export function generateCloudTexturesTSL() {
   return {baseTex, detailTex};
 }
 
-function quarterTarget(w, h) {
+function quarterTarget(w, h, count = 1) {
   return new RenderTarget(w, h, {
+    count,
     type: HalfFloatType,
     minFilter: LinearFilter,
     magFilter: LinearFilter,
@@ -128,6 +131,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   const detailNode = texture3D(detailTex);
   // Swappable per-frame textures (node.value updated in render()).
   const histNode = texture(quarterTarget(2, 2).texture);
+  const histDepthNode = texture(quarterTarget(2, 2).texture);
   const depthNode = texture(new DepthTexture(2, 2));
   const cloudNode = texture(quarterTarget(2, 2).texture);
 
@@ -249,32 +253,49 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     return res;
   });
 
-  // One slab: coarse ranging then fine march with 4-tap Beer,
+  // Coarse ranging: distance to the first density along the ray in
+  // this slab, or -1. Split from the fine march (phase 4) because it
+  // doubles as the CLOUD FRONT DEPTH the depth-aware reprojection
+  // stores per pixel; marchSlab receives its result so the ranging
+  // still runs exactly once per deck.
+  const slabFront = Fn(([ro, rd, sceneD, yB, yT, cov, cTy, wO]) => {
+    const tStart = float(-1).toVar();
+    If(cov.greaterThan(0.02).and(rd.y.abs().greaterThan(1e-4)), () => {
+      const tA = yB.sub(ro.y).div(rd.y);
+      const tB = yT.sub(ro.y).div(rd.y);
+      const t0 = max(min(tA, tB), 0.0).toVar();
+      const t1 = min(max(tA, tB), min(2600.0, sceneD)).toVar();
+      If(t1.greaterThan(t0), () => {
+        const COARSE = 14;
+        const dtc = t1.sub(t0).div(COARSE);
+        const tc = t0.add(dtc.mul(0.5)).toVar();
+        Loop(COARSE, () => {
+          const pc = ro.add(rd.mul(tc));
+          const hc = clamp(pc.y.sub(yB).div(yT.sub(yB)), 0.0, 1.0);
+          If(densityCoarse(pc, hc, cov, cTy, wO).greaterThan(0.0), () => {
+            tStart.assign(max(tc.sub(dtc), t0));
+            Break();
+          });
+          tc.addAssign(dtc);
+        });
+      });
+    });
+    return tStart;
+  });
+
+  // One slab: fine march from the pre-ranged start with 4-tap Beer,
   // Beer-powder, dual-lobe HG; PREMULTIPLIED output with horizon fade.
   const marchSlab = Fn(
-    ([ro, rd, jit, sceneD, yB, yT, cov, cTy, sg, wO, phase]) => {
+    ([ro, rd, jit, sceneD, tStart, yB, yT, cov, cTy, sg, wO, phase]) => {
       const result = vec4(0).toVar();
-      If(cov.greaterThan(0.02).and(rd.y.abs().greaterThan(1e-4)), () => {
+      If(tStart.greaterThanEqual(0.0), () => {
         const tA = yB.sub(ro.y).div(rd.y);
         const tB = yT.sub(ro.y).div(rd.y);
         const t0 = max(min(tA, tB), 0.0).toVar();
         const t1 = min(max(tA, tB), min(2600.0, sceneD)).toVar();
-        If(t1.greaterThan(t0), () => {
+        If(t1.greaterThan(tStart), () => {
           const fade = exp(t0.mul(-0.0011));
-          const COARSE = 14;
-          const dtc = t1.sub(t0).div(COARSE);
-          const tStart = float(-1).toVar();
-          const tc = t0.add(dtc.mul(0.5)).toVar();
-          Loop(COARSE, () => {
-            const pc = ro.add(rd.mul(tc));
-            const hc = clamp(pc.y.sub(yB).div(yT.sub(yB)), 0.0, 1.0);
-            If(densityCoarse(pc, hc, cov, cTy, wO).greaterThan(0.0), () => {
-              tStart.assign(max(tc.sub(dtc), t0));
-              Break();
-            });
-            tc.addAssign(dtc);
-          });
-          If(tStart.greaterThanEqual(0.0), () => {
+          {
             const STEPS = 28;
             const dt = t1.sub(tStart).div(STEPS);
             const t = tStart.add(dt.mul(jit)).toVar();
@@ -319,18 +340,26 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
               t.addAssign(dt);
             });
             result.assign(vec4(L.mul(fade), T.oneMinus().mul(fade)));
-          });
+          }
         });
       });
       return result;
     }
   );
 
+  // No cloud on this ray: far sentinel, so the depth-aware
+  // reprojection degrades to direction-only (parallax -> 0), which
+  // is exact for the sky.
+  const FAR_CLOUD = 30000.0;
+
   // ---------- the reconstruction (quarter res) ----------
   // pix carries fragment-convention pixel CENTRES (x+0.5, y+0.5) -
   // exactly screenCoordinate.xy in the raster driver - so the Bayer
   // lattice and the per-pixel hash are bit-identical in both drivers.
-  const marchBody = Fn(([vUv, pix]) => {
+  // A JS builder (one call per driver), not an Fn: it returns TWO
+  // nodes - {col, front} - and the drivers route them to their dual
+  // outputs (MRT attachments / storage textures).
+  const buildMarch = (vUv, pix) => {
     const ndc = vec2(vUv.x.mul(2.0).sub(1.0), float(1.0).sub(vUv.y.mul(2.0)));
     const wf = invVP.mul(vec4(ndc, 1.0, 1.0));
     const rd = normalize(wf.xyz.div(wf.w).sub(camPos)).toVar();
@@ -352,9 +381,30 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
 
     const fresh = bayer.equal(frameI).or(warm.equal(1.0));
 
-    // Rotation-exact history reprojection (uv is top-origin: flip when
-    // converting the NDC projection back to texture coords).
-    const pClip = prevVP.mul(vec4(camPos.add(rd.mul(600.0)), 1.0));
+    // Depth-aware history reprojection (phase 4). The camera
+    // translates (intro ease, free flight), so a fixed proxy
+    // distance parallaxes wrongly for everything not at that
+    // distance. Two-step scheme (Schneider): estimate the previous
+    // uv with the proxy, read the CLOUD FRONT DEPTH the history
+    // stores there, then reproject through that distance. Rotation
+    // stays exact for any distance; sky pixels carry the FAR_CLOUD
+    // sentinel and degrade to direction-only. uv is top-origin: flip
+    // when converting the NDC projection back to texture coords.
+    const p0Clip = prevVP.mul(vec4(camPos.add(rd.mul(600.0)), 1.0));
+    const p0Ndc = p0Clip.xy.div(p0Clip.w);
+    const p0Uv = vec2(
+      p0Ndc.x.mul(0.5).add(0.5),
+      float(0.5).sub(p0Ndc.y.mul(0.5))
+    );
+    const ok0 = p0Clip.w
+      .greaterThan(0.0)
+      .and(p0Uv.x.greaterThanEqual(0.0))
+      .and(p0Uv.x.lessThanEqual(1.0))
+      .and(p0Uv.y.greaterThanEqual(0.0))
+      .and(p0Uv.y.lessThanEqual(1.0));
+    const d0 = select(ok0, histDepthNode.sample(p0Uv).r, float(600.0));
+    const dRef = clamp(d0, 50.0, FAR_CLOUD);
+    const pClip = prevVP.mul(vec4(camPos.add(rd.mul(dRef)), 1.0));
     const pNdc = pClip.xy.div(pClip.w);
     const pUv = vec2(pNdc.x.mul(0.5).add(0.5), float(0.5).sub(pNdc.y.mul(0.5)));
     const histOk = pClip.w
@@ -366,8 +416,11 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     const hist = histNode.sample(pUv).toVar();
 
     const result = vec4(0).toVar();
+    const front = float(FAR_CLOUD).toVar();
     If(fresh.not().and(histOk), () => {
       result.assign(hist);
+      // Carry the reprojected front depth forward with its colour.
+      front.assign(histDepthNode.sample(pUv).r);
     }).Else(() => {
       const sceneD = sceneDist(vUv, ndc).toVar();
       // Golden-ratio temporal jitter + exponential integration: the
@@ -375,11 +428,32 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       const jit = fract(blueNoiseAt(pix).add(frameI.mul(0.618034))).toVar();
       const cSun = dot(rd, shared.sunDirW);
       const phase = mix(hg(cSun, 0.6), hg(cSun, -0.3), 0.35).toVar();
+      const fLow = slabFront(
+        camPos,
+        rd,
+        sceneD,
+        uniformsLow.yBase,
+        uniformsLow.yTop,
+        uniformsLow.cov,
+        uniformsLow.cType,
+        uniformsLow.wOff
+      ).toVar();
+      const fMid = slabFront(
+        camPos,
+        rd,
+        sceneD,
+        uniformsMid.yBase,
+        uniformsMid.yTop,
+        uniformsMid.cov,
+        uniformsMid.cType,
+        uniformsMid.wOff
+      ).toVar();
       const A = marchSlab(
         camPos,
         rd,
         jit,
         sceneD,
+        fLow,
         uniformsLow.yBase,
         uniformsLow.yTop,
         uniformsLow.cov,
@@ -393,6 +467,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
         rd,
         jit,
         sceneD,
+        fMid,
         uniformsMid.yBase,
         uniformsMid.yTop,
         uniformsMid.cov,
@@ -408,9 +483,15 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       result.assign(
         select(histOk.and(warm.equal(0.0)), mix(hist, now, 0.08), now)
       );
+      front.assign(
+        min(
+          select(fLow.greaterThanEqual(0.0), fLow, FAR_CLOUD),
+          select(fMid.greaterThanEqual(0.0), fMid, FAR_CLOUD)
+        )
+      );
     });
-    return result;
-  });
+    return {col: result, front};
+  };
 
   // ---------- depth-aware composite (full res, over the canvas) ----------
   const compositeNode = Fn(() => {
@@ -464,7 +545,24 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   let marchMat = null;
   if (!useCompute) {
     marchMat = new MeshBasicNodeMaterial();
-    marchMat.colorNode = marchBody(uv(), screenCoordinate.xy);
+    // buildMarch's If/Loop/toVar calls need an active TSL build stack
+    // - fine inside the compute kernel's Fn, but a raster material
+    // node graph is assembled NOW, so wrap it in an Fn returning a
+    // struct (probed: struct + mrt + 2-attachment RT work on the
+    // WebGL2 backend) and route the members to the two attachments.
+    const MarchOut = struct({col: 'vec4', front: 'float'});
+    const marchStruct = Fn(([vUv, pix]) => {
+      const m = buildMarch(vUv, pix);
+      return MarchOut(m.col, m.front);
+    });
+    const built = marchStruct(uv(), screenCoordinate.xy).toVar();
+    marchMat.colorNode = built.get('col');
+    // Attachment 1 carries the cloud front depth for the depth-aware
+    // reprojection (names match rt.textures[i].name).
+    marchMat.mrtNode = mrt({
+      output: built.get('col'),
+      cfront: vec4(built.get('front'), 0.0, 0.0, 1.0)
+    });
     marchMat.toneMapped = false;
     // The march WRITES transmittance in alpha, and an OPAQUE node
     // material stomps output alpha to 1 (invisible over the black A/B
@@ -488,8 +586,9 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   compMat.depthTest = false;
   compMat.depthWrite = false;
 
-  // Ping-pong pair: {tex, fill()} - fill() marches into tex reading
-  // history from the OTHER buffer via histNode (swapped in render()).
+  // Ping-pong pair: {tex, depthTex, fill()} - fill() marches into
+  // both (radiance + cloud front depth), reading history from the
+  // OTHER buffer via histNode/histDepthNode (swapped in render()).
   let bufA = null;
   let bufB = null;
   const prevVPStore = new Matrix4();
@@ -499,23 +598,38 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       const tex = new StorageTexture(qw, qh);
       tex.type = HalfFloatType;
       tex.minFilter = tex.magFilter = LinearFilter;
+      // Depth reads must not blend across the cloud/sky sentinel
+      // edge: nearest.
+      const depthTex = new StorageTexture(qw, qh);
+      depthTex.type = HalfFloatType;
+      depthTex.minFilter = depthTex.magFilter = NearestFilter;
       const kernel = Fn(() => {
         const i = int(instanceIndex);
         const x = i.mod(qw);
         const y = i.div(qw);
         const vUv = vec2(float(x).add(0.5).div(qw), float(y).add(0.5).div(qh));
         const pix = vec2(float(x).add(0.5), float(y).add(0.5));
-        textureStore(tex, ivec2(x, y), marchBody(vUv, pix));
+        const m = buildMarch(vUv, pix);
+        textureStore(tex, ivec2(x, y), m.col);
+        textureStore(depthTex, ivec2(x, y), vec4(m.front, 0.0, 0.0, 1.0));
       })().compute(qw * qh);
       return {
         tex,
+        depthTex,
         fill: () => renderer.compute(kernel),
-        dispose: () => tex.dispose()
+        dispose: () => {
+          tex.dispose();
+          depthTex.dispose();
+        }
       };
     }
-    const rt = quarterTarget(qw, qh);
+    const rt = quarterTarget(qw, qh, 2);
+    rt.textures[0].name = 'output';
+    rt.textures[1].name = 'cfront';
+    rt.textures[1].minFilter = rt.textures[1].magFilter = NearestFilter;
     return {
-      tex: rt.texture,
+      tex: rt.textures[0],
+      depthTex: rt.textures[1],
       fill: () => {
         quad.material = marchMat;
         renderer.setRenderTarget(rt);
@@ -549,6 +663,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     );
     prevVP.value.copy(prevVPStore);
     histNode.value = bufB.tex;
+    histDepthNode.value = bufB.depthTex;
     bufA.fill();
     const t = bufA;
     bufA = bufB;
@@ -570,5 +685,17 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     renderer.autoClear = auto;
   }
 
-  return {uniformsLow, uniformsMid, shared, setSize, render, composite};
+  // _warm is exposed for the validation harness only: forcing it to
+  // 1 every frame makes every pixel march fresh - the temporal-free
+  // ground truth the moving-camera reprojection test compares
+  // against.
+  return {
+    uniformsLow,
+    uniformsMid,
+    shared,
+    setSize,
+    render,
+    composite,
+    _warm: warm
+  };
 }
