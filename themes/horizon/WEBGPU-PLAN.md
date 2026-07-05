@@ -514,12 +514,42 @@ Scenes (all at Grindelwald unless noted):
     alpha(lambda_um) = -0.023 + 0.292/lambda at the same 680/550/440
     nm the scattering coefficients use; the disc constant is now the
     CENTRAL intensity. Dome A/B unchanged (0.0004).
-  - NEXT (large, own commit series): Tessendorf FFT ocean for the
-    water - JONSWAP/TMA spectrum with Hasselmann directional
-    spreading, time-evolved via compute-shader FFT (storage-texture
-    butterfly passes; the WebGL2 fallback needs a fragment ping-pong
-    FFT or a reduced-resolution path), displacement + slope maps
-    feeding the existing Cox-Munk BRDF, and whitecaps from the
-    Jacobian folding criterion (Tessendorf 2001) replacing the
-    Monahan wind heuristic. Write the CPU reference spectrum/FFT
-    first per the standing policy.
+  - Tessendorf FFT ocean, step 1 DONE - spectrum, reference, and the
+    GPU FFT pipeline, reference-validated on BOTH backends.
+    - ocean-spectrum.js (single source for reference and runtime):
+      JONSWAP (Hasselmann et al. 1973 fetch relations) with the TMA
+      finite-depth factor (Bouws et al. 1985, Kitaigorodskii
+      scaling), Hasselmann/DHE (1980) directional spreading with the
+      measured power laws and lgamma normalisation, finite-depth
+      dispersion w^2 = g k tanh(kD) with the dw/dk Jacobian for the
+      S(w,theta) -> S(kx,kz) change of variables, seeded Box-Muller
+      h0(k). Physical sanity: Hs(U=12, F=120 km, D=60 m) = 4.02 m.
+    - ocean-reference.mjs (double precision): Hermitian evolution
+      h = h0(k)e^{iwt} + conj(h0(-k))e^{-iwt}, all 8 real fields
+      (h, choppy Dx/Dz, spectral slopes, the 3 Jacobian derivatives),
+      radix-2 IFFT; self-check max|Im| = 4.7e-15. Prints per-texel
+      values incl. the exact displaced-surface normal and
+      J = (1+lJxx)(1+lJzz)-(lJxz)^2.
+    - ocean-tsl.js: h0/omega + butterfly LUT built once on the CPU
+      (bit-reversal folded into pass 0, bottom-half twiddle signs
+      folded in); per frame evolve -> 2 x log2N butterfly passes over
+      two rgba32float chains (4 complex transforms packed as
+      h+iDx | Dz+iSx and Sz+iJxx | Jzz+iJxz) -> unpack to a
+      displacement map (lDx, h, lDz) and a derivative map
+      (n.x, n.z, J) with the EXACT normal from spectral tangents.
+      Project dual drivers throughout. Validated per-texel against
+      the reference at t=13.7 on real WebGPU AND the WebGL2 backend
+      (harness/tsl-ocean-num.html) - identical values on both.
+    - New measured conventions (harness/tsl-flip-probe3.html):
+      CPU DataTexture rows read STRAIGHT under .sample() on both
+      backends; QuadMesh MRT write + sample self-consistent on both
+      attachments; only the WebGL2 READBACK is row-flipped. Blit
+      fragment outputs clamp NEGATIVE rgb at zero (positives pass) -
+      numeric readbacks of signed data go through an fp32 affine
+      encode. And ivec2.toFloat() collapses to a scalar - convert
+      vectors with vec2()/vec3(), never .toFloat().
+  - NEXT (step 2): integrate into water-tsl - vertex displacement +
+    exact normals into the Cox-Munk BRDF, Jacobian-folding whitecaps
+    replacing the Monahan wind heuristic, cascade instantiation
+    (2 patch scales, k-space partitioned to avoid double-counting),
+    Nelson scene wiring + pinned matrix acceptance.

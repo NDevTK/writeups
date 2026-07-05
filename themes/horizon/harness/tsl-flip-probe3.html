@@ -1,0 +1,77 @@
+<!doctype html><html><head><script type="importmap">
+{
+  "imports": {
+    "three": "./writeups/themes/horizon/three.webgpu.min.js",
+    "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+    "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+  }
+}
+</script></head><body style="margin:0"><canvas id="gl"></canvas><script type="module">
+// Orientation micro-probe for the ocean FFT drivers, on either
+// backend (?wgpu=1 for WebGPU):
+//  A. DataTexture row order under .sample()
+//  B. MRT dual-attachment write (struct+mrt) -> .sample() self-check
+//  C. readRenderTargetPixelsAsync row order per attachment
+import * as T from 'three/webgpu';
+import {Fn, float, ivec2, mrt, screenCoordinate, struct, texture, uv, vec4} from 'three/tsl';
+const log = (s) => console.log('FLIP|' + s);
+try {
+  const r = new T.WebGPURenderer({canvas: document.getElementById('gl'), forceWebGL: !new URLSearchParams(location.search).get('wgpu'), antialias: false});
+  await r.init();
+  log('backend ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'));
+  r.setSize(64, 64);
+  const W = 64, H = 4;
+  const quad = new T.QuadMesh();
+
+  // A: DataTexture rows [10, 20, 30, 40] -> sampled at texel centres,
+  // dumped through a quad into a float RT, read back at both row
+  // conventions.
+  const data = new Float32Array(W * H * 4);
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) data[(j * W + i) * 4] = (j + 1) * 10;
+  const dt = new T.DataTexture(data, W, H, T.RGBAFormat, T.FloatType);
+  dt.minFilter = dt.magFilter = T.NearestFilter;
+  dt.needsUpdate = true;
+  const rt1 = new T.RenderTarget(W, H, {type: T.FloatType, depthBuffer: false});
+  const m1 = new T.MeshBasicNodeMaterial();
+  m1.colorNode = texture(dt).sample(uv()).add(vec4(0, screenCoordinate.y, 0, 1));
+  m1.transparent = true; m1.blending = T.NoBlending; m1.toneMapped = false;
+  quad.material = m1;
+  r.setRenderTarget(rt1); quad.render(r); r.setRenderTarget(null);
+  const a = await r.readRenderTargetPixelsAsync(rt1, 0, 0, W, H);
+  // report (sampledRowValue, screenY) for readback rows 0 and 3
+  log(`A rb-row0: data=${a[0].toFixed(0)} scrY=${a[1].toFixed(1)} | rb-row3: data=${a[(W * 3) * 4].toFixed(0)} scrY=${a[(W * 3) * 4 + 1].toFixed(1)}`);
+
+  // B: struct+mrt dual write of screen row id, then sample() both
+  // attachments back through another quad and compare with the row.
+  const Out = struct({a: 'vec4', b: 'vec4'});
+  const rtM = new T.RenderTarget(W, H, {count: 2, type: T.FloatType, depthBuffer: false});
+  rtM.textures[0].name = 'a'; rtM.textures[1].name = 'b';
+  const fn = Fn(([pix]) => Out(vec4(pix.y.toFloat(), 0, 0, 1), vec4(pix.y.toFloat().mul(100), 0, 0, 1)));
+  const mM = new T.MeshBasicNodeMaterial();
+  const o = fn(ivec2(screenCoordinate.xy)).toVar();
+  mM.colorNode = o.get('a');
+  mM.mrtNode = mrt({a: o.get('a'), b: o.get('b')});
+  mM.transparent = true; mM.blending = T.NoBlending; mM.toneMapped = false;
+  quad.material = mM;
+  r.setRenderTarget(rtM); quad.render(r); r.setRenderTarget(null);
+  // sample back: value at sampled texel row j should equal j (and j*100)
+  const m2 = new T.MeshBasicNodeMaterial();
+  m2.colorNode = vec4(
+    texture(rtM.textures[0]).sample(uv()).r,
+    texture(rtM.textures[1]).sample(uv()).r,
+    screenCoordinate.y,
+    1
+  );
+  m2.transparent = true; m2.blending = T.NoBlending; m2.toneMapped = false;
+  quad.material = m2;
+  r.setRenderTarget(rt1); quad.render(r); r.setRenderTarget(null);
+  const b = await r.readRenderTargetPixelsAsync(rt1, 0, 0, W, H);
+  log(`B rb-row0: att0=${b[0].toFixed(1)} att1=${b[1].toFixed(1)} scrY=${b[2].toFixed(1)} | rb-row3: att0=${b[W * 3 * 4].toFixed(1)} att1=${b[W * 3 * 4 + 1].toFixed(1)} scrY=${b[W * 3 * 4 + 2].toFixed(1)}`);
+
+  // C: direct readback of the MRT attachments.
+  const c0 = await r.readRenderTargetPixelsAsync(rtM, 0, 0, W, H, 0);
+  const c1 = await r.readRenderTargetPixelsAsync(rtM, 0, 0, W, H, 1);
+  log(`C att0 rb-row0=${c0[0].toFixed(1)} rb-row3=${c0[W * 3 * 4].toFixed(1)} | att1 rb-row0=${c1[0].toFixed(1)} rb-row3=${c1[W * 3 * 4].toFixed(1)}`);
+  log('DONE');
+} catch (e) { log('ERR ' + e.message + ' :: ' + (e.stack || '').split('\n')[1]); log('DONE'); }
+</script></body></html>
