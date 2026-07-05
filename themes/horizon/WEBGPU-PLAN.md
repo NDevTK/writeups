@@ -627,7 +627,27 @@ Scenes (all at Grindelwald unless noted):
     deck-confined profile and terrain rows at 0.006. Overcast now
     reads physically: direct sun extinguished under the deck,
     ambient-only terrain.
-  - Phase 5 CERTIFICATION (pre cloud shadows) - full pinned matrix with everything
+  - DONE: Hapke lunar photometry (Hapke 1981 IMSA, the 2002
+    H-function approximation, SHOE opposition surge, single-lobe
+    Henyey-Greenstein) with the canonical Helfenstein & Veverka
+    (1987) lunar parameters w = 0.21, B0 = 2.0, h = 0.07,
+    xi = -0.18; macroscopic roughness theta-bar omitted (sub-pixel
+    at the 6-px disc; documented, not hidden). Replaces
+    Lommel-Seeliger, whose curve has no opposition surge.
+    moon-reference.mjs integrates the disc: the phase curve
+    reproduces the observed lunar function (I/I_full = 0.082 at
+    g = 90 deg vs Rougier's ~0.08; 0.029 at 120 deg), and its
+    full-moon disc-centre value normalises the shader so the
+    calibrated full-moon brightness anchor holds. Cross-backend
+    moon page: bit-exact (0.0000, max 0).
+  - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
+    (octave clouds, limb darkening, FFT ocean + filtering, cloud
+    shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:
+    noon 0.0115, sunset 0.048, night 0.0009, stratus 0.73, towering
+    0.40, Nelson 0.0007, snow 0.33, aurora 0.0003 - all green, all
+    residuals the documented deck-confined fp-dither / point-sprite
+    profiles.
+  - Earlier certification (pre cloud shadows) - full pinned matrix with everything
     (octave clouds, limb darkening, FFT ocean + filtering), real
     WebGPU vs WebGL2 backend, mean abs /255: noon 0.0099, sunset
     0.040, night 0.0009, stratus 1.10 (the known deck fp-dither

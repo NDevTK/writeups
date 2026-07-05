@@ -22,6 +22,7 @@ import {
   exp,
   float,
   length,
+  log,
   max,
   mix,
   modelViewMatrix,
@@ -35,6 +36,7 @@ import {
   select,
   sin,
   smoothstep,
+  sqrt,
   texture,
   uint,
   uniform,
@@ -77,8 +79,11 @@ export function createVeilMaterial() {
   return {material, u};
 }
 
-// Lommel-Seeliger moon: mu0/(mu0+mu), x2 so the full-moon face
-// reads as the albedo. Flat disc at full phase, like the real moon.
+// The moon: Hapke photometry (see block comment below). The disc
+// stays flat at full phase like the real moon - the mu0/(mu0+mu)
+// Lommel-Seeliger backbone survives inside Hapke's IMSA - and the
+// brightness now follows the observed phase curve, opposition surge
+// included.
 export function createMoonMaterial() {
   const u = {
     sunDirM: uniform(new Vector3(0, 1, 0)),
@@ -86,11 +91,67 @@ export function createMoonMaterial() {
     glowM: uniform(new Color('#0c0f16'))
   };
   const material = new NodeMaterial();
+
+  // Hapke (1981) IMSA lunar photometry with the (2002) H-function
+  // approximation and the SHOE opposition surge; single-lobe
+  // Henyey-Greenstein; lunar parameters from Helfenstein & Veverka
+  // (1987): w = 0.21, B0 = 2.0, h = 0.07, xi = -0.18. Macroscopic
+  // roughness theta-bar is omitted - sub-pixel at the theme's 6-px
+  // disc (documented in moon-reference.mjs, whose disk-integrated
+  // curve reproduces the observed lunar phase function: 0.082 of
+  // full at g = 90 deg vs Rougier's ~0.08). Replaces Lommel-Seeliger,
+  // whose curve lacks the opposition surge entirely. Normalised by
+  // the full-moon disc-centre value (from the reference) times 0.5
+  // so the previously calibrated full-moon brightness is unchanged.
+  const W_SS = 0.21;
+  const B0 = 2.0;
+  const HW = 0.07;
+  const XI = -0.18;
+  const GAM = Math.sqrt(1 - W_SS);
+  const R0 = (1 - GAM) / (1 + GAM);
+  const R_FULL_CENTRE = 2.71872; // moon-reference.mjs
+  const hapkeH = (xRaw) => {
+    const x = clamp(xRaw, 1e-3, 1.0);
+    return float(1).div(
+      float(1).sub(
+        x.mul(W_SS).mul(
+          float(R0).add(
+            float(1)
+              .sub(x.mul(2 * R0))
+              .mul(0.5)
+              .mul(log(float(1).add(x).div(x)))
+          )
+        )
+      )
+    );
+  };
+
   const n = normalize(normalWorld);
+  const view = normalize(cameraPosition.sub(positionWorld));
   const mu0 = dot(n, u.sunDirM);
-  const mu = dot(n, normalize(cameraPosition.sub(positionWorld)));
-  const ls = select(mu0.greaterThan(0.0), mu0.div(max(mu0.add(mu), 1e-3)), 0.0);
-  material.colorNode = u.albM.mul(ls).mul(2.0).add(u.glowM);
+  const mu = dot(n, view);
+  // Phase angle at the moon: between the sun direction and the
+  // direction back to the observer. Only cos(g) is needed.
+  const cg = clamp(dot(u.sunDirM, view), -1.0, 1.0);
+  const tanHalfG = sqrt(
+    clamp(float(1).sub(cg).div(float(1).add(cg)), 0.0, 1e6)
+  );
+  const Bg = float(B0).div(float(1).add(tanHalfG.div(HW)));
+  const Pg = float(1 - XI * XI).div(
+    pow(max(float(1 + XI * XI).add(cg.mul(2 * XI)), 1e-4), 1.5)
+  );
+  const rHapke = mu0.div(max(mu0.add(mu), 1e-3)).mul(
+    Bg.add(1)
+      .mul(Pg)
+      .add(hapkeH(mu0).mul(hapkeH(mu)))
+      .sub(1)
+  );
+  const lunar = select(
+    mu0.greaterThan(0.0),
+    rHapke.mul(0.5 / R_FULL_CENTRE),
+    0.0
+  );
+  material.colorNode = u.albM.mul(lunar).mul(2.0).add(u.glowM);
   return {material, u};
 }
 
