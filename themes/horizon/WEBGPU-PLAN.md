@@ -317,8 +317,27 @@ Scenes (all at Grindelwald unless noted):
     Post-deletion harness check: noon 2.39 / night 0.34 / Nelson 0.22
     vs the pre-deletion build (temporal randomness only). There is
     now exactly ONE implementation of every piece of physics.
-  - NEXT: phase 3 — WebGPU backend + compute (LUT chain and cloud
-    march as compute passes; parameterise the d*2-1 clip-z assumption
-    in clouds-tsl sceneDist for WebGPU's 0..1 clip space; matrix on
-    BOTH backends). Then phase 4 polish (blue-noise jitter, sky-view
-    horizon-band fix, motion vectors).
+  - Phase 3 groundwork (real-WebGPU findings from this harness):
+    - Headless WebGPU EXISTS here: `--enable-unsafe-webgpu` gives a
+      Dawn/SwiftShader adapter+device (probe: vendor google, arch
+      swiftshader). No extra Vulkan flags needed.
+    - three r185 passes `swizzle` in GPUTextureViewDescriptor; this
+      chromium predates it and throws. Harness-only shim (strip the
+      property in a createView wrapper) — real current Chrome is fine.
+    - HARD WALL in this harness: Dawn readbacks
+      (readRenderTargetPixelsAsync -> mapAsync) abort with "A valid
+      external Instance reference no longer exists" / stall under both
+      --virtual-time-budget (virtual clock skips through GPU awaits
+      and exhausts the budget) and real-time --timeout runs. The full
+      theme reaches "WebGPU Device Lost". The dome pipeline runs
+      without errors on WebGPU but presents black. Verdict: the
+      REAL-WebGPU matrix needs a real browser/GPU (or a newer
+      headless chromium); the WebGL2-backend matrix stays the
+      harness-checkable path.
+    - Known code work for phase 3 regardless of harness: parameterise
+      the d*2-1 clip-z assumption in clouds-tsl sceneDist (WebGPU
+      clip z is 0..1); re-verify the QuadMesh/RT orientation
+      conventions on WebGPU proper (they were pinned on the WebGL
+      backend); then the compute ports (LUT chain, cloud march).
+    Then phase 4 polish (blue-noise jitter, sky-view horizon-band
+    fix, motion vectors).
