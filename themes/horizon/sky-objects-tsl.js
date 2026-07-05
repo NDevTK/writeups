@@ -2,6 +2,10 @@ import {
   AdditiveBlending,
   BackSide,
   Color,
+  DataTexture,
+  FloatType,
+  LinearFilter,
+  RGBAFormat,
   DoubleSide,
   InstancedBufferAttribute,
   InstancedMesh,
@@ -42,9 +46,11 @@ import {
   uniform,
   uv,
   vertexStage,
+  vec2,
   vec3,
   vec4
 } from 'three/tsl';
+import {buildBowLUT, buildHaloLUT} from './optics-lut.js';
 
 /**
  * Horizon's sky objects as TSL node materials (WebGPU project,
@@ -203,53 +209,52 @@ export function createOpticsMaterial() {
   material.transparent = true;
   material.depthWrite = false;
   material.blending = AdditiveBlending;
-  const spectral = Fn(([h]) => {
-    return clamp(
-      vec3(
-        h.mul(1.6).sub(0.35),
-        float(1.0).sub(h.mul(2.4).sub(1.25).abs()),
-        float(1.05).sub(h.mul(1.7))
-      ),
-      0.0,
-      1.0
-    );
-  });
+
+  // Physical radiance profiles (optics-lut.js, double precision at
+  // init, reference-checked by optics-reference.mjs): the 22-deg
+  // halo is the minimum-deviation caustic of the randomly rotating
+  // 60-deg ice prism with Warren dispersion and Fresnel
+  // transmittances; the bow LUT carries primary AND secondary from
+  // the Descartes deviation with the Fresnel chain - their
+  // brightness ratio and Alexander's dark band between them emerge
+  // from the physics (the band histograms to exactly zero). Both
+  // convolved with the limb-darkened sun disc. The old hand-tuned
+  // smoothstep bands and spectral ramp are deleted; the display
+  // gains (0.55 bow, halo's dog/base mix) keep their calibrated
+  // values, now scaling peak-normalised physical profiles.
+  const mkLutTex = (lut) => {
+    const t = new DataTexture(lut.data, lut.bins, 1, RGBAFormat, FloatType);
+    t.minFilter = t.magFilter = LinearFilter;
+    t.needsUpdate = true;
+    return t;
+  };
+  const haloLut = buildHaloLUT();
+  const bowLut = buildBowLUT();
+  const haloTexN = texture(mkLutTex(haloLut));
+  const bowTexN = texture(mkLutTex(bowLut));
+
   const DEG = 57.29577951308232;
   const v = normalize(positionLocal);
   const aA = acos(clamp(dot(v, u.antisolar), -1.0, 1.0)).mul(DEG);
   const aS = acos(clamp(dot(v, u.sunDir), -1.0, 1.0)).mul(DEG);
-  // primary bow: violet 40.6 inner -> red 42.4 outer
-  const b1 = smoothstep(40.4, 40.9, aA).mul(
-    smoothstep(42.2, 42.6, aA).oneMinus()
-  );
-  const c1 = spectral(clamp(aA.sub(40.6).div(1.8), 0.0, 1.0).oneMinus()).mul(
-    b1.mul(u.bow).mul(0.55)
-  );
-  // secondary: red 50.4 inner -> violet 53.2 outer, 43% brightness
-  const b2 = smoothstep(50.2, 50.8, aA).mul(
-    smoothstep(52.8, 53.6, aA).oneMinus()
-  );
-  const c2 = spectral(clamp(aA.sub(50.4).div(2.8), 0.0, 1.0)).mul(
-    b2.mul(u.bow).mul(0.24)
-  );
-  // 22-deg halo, red inner edge fading to bluish white; parhelia ride
-  // a gaussian band at the sun's own elevation
-  const th = smoothstep(21.2, 21.9, aS).mul(
-    smoothstep(22.5, 23.8, aS).oneMinus()
-  );
-  const hcol = mix(
-    vec3(1.0, 0.5, 0.35),
-    vec3(0.85, 0.92, 1.0),
-    clamp(aS.sub(21.8).div(1.6), 0.0, 1.0)
-  );
+  const bowSample = bowTexN.sample(
+    vec2(aA.sub(bowLut.thMinDeg).div(bowLut.thMaxDeg - bowLut.thMinDeg), 0.5)
+  ).rgb;
+  const haloSample = haloTexN.sample(
+    vec2(aS.sub(haloLut.thMinDeg).div(haloLut.thMaxDeg - haloLut.thMinDeg), 0.5)
+  ).rgb;
+  const cBow = bowSample.mul(u.bow).mul(0.55);
+  // Parhelia placement stays the documented gaussian band at the
+  // sun's own elevation (plate-crystal orientation statistics are
+  // out of scope); its radial profile is now the physical halo LUT.
   // exp(-x^2) written as a product - GLSL pow() is undefined for
-  // negative bases, and x goes negative below the sun
+  // negative bases, and x goes negative below the sun.
   const dx = v.y.sub(u.sunDir.y).mul(14.0);
   const dogBand = exp(dx.mul(dx).negate());
-  const c3 = hcol.mul(
-    th.mul(u.halo).mul(u.dogs.mul(dogBand).mul(0.6).add(0.18))
+  const cHalo = haloSample.mul(
+    u.halo.mul(u.dogs.mul(dogBand).mul(0.6).add(0.18))
   );
-  material.colorNode = c1.add(c2).add(c3);
+  material.colorNode = cBow.add(cHalo);
   material.opacityNode = 1.0;
   return {material, u};
 }

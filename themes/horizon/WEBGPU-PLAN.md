@@ -640,6 +640,38 @@ Scenes (all at Grindelwald unless noted):
     full-moon disc-centre value normalises the shader so the
     calibrated full-moon brightness anchor holds. Cross-backend
     moon page: bit-exact (0.0000, max 0).
+  - DONE: physical atmospheric-optics radiance profiles
+    (optics-lut.js, double precision at init, reference-first per
+    the standing policy - optics-reference.mjs prints the
+    landmarks). Replaces the hand-tuned smoothstep bands + spectral
+    ramp in createOpticsMaterial with two 256x1 float LUTs the
+    shader samples by angle:
+    - 22-deg halo: deviation histogram of a randomly rotating
+      60-deg ice prism (Warren dispersion n = 1.307/1.311/1.317),
+      weighted by aperture cos(x) and both Fresnel transmittances -
+      the 1/sqrt(D - Dmin) caustic at minimum deviation IS the
+      sharp red inner edge. After sun-disc convolution the channel
+      edges sit at 21.37/21.68/22.15 deg (the geometric
+      21.61/21.92/22.37 minus half the solar smearing), peaks
+      21.76/22.07/22.54 deg.
+    - Rainbows: Descartes deviation D(b) = 2(i-r) + k(pi-2r) for
+      k = 1,2 histogrammed over impact parameter with annulus
+      weight b and the Fresnel chain T R^k T (Hale & Querry
+      dispersion). Primary peaks at 42.28/41.79/41.10 deg,
+      secondary at 50.48/51.26/52.63 deg with the colour order
+      REVERSED, the secondary/primary ratio ~0.157 and Alexander's
+      dark band (44-49 deg histograms to exactly 0.0000) all EMERGE
+      from the Fresnel chain - none of it is tuned.
+    - Both profiles convolved with the 0.267-deg-radius sun disc
+      carrying the SAME Hestroffer & Magnan limb darkening the dome
+      renders. Airy supernumeraries are wave optics - out of scope,
+      documented in the header. Kept: the calibrated display gains
+      and the sundog azimuth gaussian (a placement heuristic,
+      documented as such). Cross-backend optics page: bit-exact
+      (mean 0.0000, max 0). Visual: halo shows the red inner edge
+      with dispersion falloff and sundogs; bow shows the red-outer
+      primary, the faint colour-reversed secondary, and the dark
+      band between them.
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:
