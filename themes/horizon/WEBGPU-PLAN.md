@@ -272,33 +272,43 @@ Scenes (all at Grindelwald unless noted):
       build (ground.remove on rebuild but no add - latent regression);
       the port restores `ground.add(water)`.
   - Validation matrix vs phase 1 (identical fixture URLs, mean abs
-    diff /255): noon 2.10, night 0.93, sunset 6.04 (residuals: tree
-    sway phase, cloud wisps, star twinkle), dome+veil under overcast
-    3.03 — but heavy-cloud scenes (stratus 26, towering 29) show the
-    LIVE cloud buffer brighter/washed on the WebGPU build. OPEN ISSUE,
-    heavily bisected, not yet root-caused:
-    - Deterministic warm-frame subsystem A/B is EXACT (mean 0.00) at
-      cumulus AND stratus configs, mid deck on/off, moving camera
-      (theme-like ease+yaw), dpr 1.5, interleaved shadow/RT passes -
-      the isolated temporal loop matches GL bit-for-bit-ish in every
-      constructed condition, 300-frame loops included.
-    - In the FULL THEME only: the live march buffer accumulates cloud
-      BELOW the ray horizon (impossible from a fresh march - downward
-      rays exit the slab) in a fresh-vs-history dither, i.e. history
-      REPROJECTION drags content in; the fresh 1/16 keeps cleaning it,
-      steady state stays contaminated => deck reads ~1.5x brighter.
-      March-side sceneDist verified correct (terrain silhouette),
-      history IS used (marker probe), fresh DOES fire (~1/16), blend
-      semantics/filters/prevVP bookkeeping identical to clouds.js,
-      uniforms dumped equal (amb within 10%), async irradiance
-      readback exonerated.
-    - Next lead: something in the theme frame makes prevVP/history
-      systematically mis-aimed for the QUARTER-res pass only in situ
-      (e.g. a per-frame projection/viewport state the harness does not
-      replicate). Instrument pUv-vUv displacement as a colour ramp in
-      situ; compare against p1 by patching the same vis into classic.
-  - After the cloud issue: full matrix re-run, THEN delete the
-    WebGL-only code paths (onBeforeCompile hooks, GLSL CSM trio,
-    Sky.js/Water.js, clouds.js GLSL passes, atmosphere.js GLSL passes
-    — the sunTransmittanceJS CPU mirror stays). Then phase 3 (WebGPU
-    backend + compute).
+    diff /255): noon 2.10, night 0.93, sunset 6.04, Nelson sea 1.21,
+    aurora 0.78, dome+veil under overcast 3.03 (residuals: tree sway
+    phase, star twinkle, cloud wisps). Heavy-cloud deck brightness
+    ROOT-CAUSED after a long hunt (deterministic subsystem A/Bs were
+    EXACT at every constructed config - cumulus/stratus, mid deck,
+    moving camera, dpr, interleaved passes, 300-frame loops):
+    - The whole residual pinned to ambCol: pinning the cloud lighting
+      uniforms equal in both builds collapses the stratus scene to
+      ratio 0.99. Two components, both fixed/attributed:
+      1. TRANSIENT (fixed): the async irradiance readback leaves the
+         initial skyIrr GUESS in place for the first frames; the cloud
+         history (8%/frame exponential blend, refresh every 16 frames)
+         BAKES that bright guess in and forgets it only over hundreds
+         of marched frames. Fix: cloud-system creation now waits for
+         `skyIrrReady` (first readback resolved). Rule: never let a
+         TEMPORAL-HISTORY system integrate lighting built on the
+         async-seed guess.
+      2. STEADY ~16%% (attributed): the classic GL irradiance pass
+         reads (0.0088, 0.0185, 0.0403) vs TSL (0.0103, 0.0209,
+         0.0444) at the same sky. The TSL irradiance LUT is validated
+         per-texel against atmo-reference.mjs (double precision); the
+         GL pass never was. The WebGPU build is the CORRECT one; the
+         residual stratus/towering means (~16/255, concentrated in the
+         deck) are the classic build's error, not the port's.
+    - Also fixed on the way: frame dt is now clamped >= 0 (rAF
+      timestamps are not guaranteed monotonic under every scheduler;
+      a negative dt drove exponential eases out of range - uSnowy went
+      negative in harness runs).
+    - Snow scene: component-validated (snow cover whitens, flakes,
+      precip sprites, deck = same code as stratus) but the full-scene
+      A/B is harness-limited: chromium's --virtual-time-budget clock
+      skips through async GPU readbacks and exhausts the budget in
+      seconds of wall time on this heavier build (a pinned-interval
+      injection does not stop it). Compare snow at component level or
+      on real hardware.
+  - NEXT (first move next session): delete the WebGL-only code paths
+    (onBeforeCompile hooks, GLSL CSM trio, Sky.js/Water.js, clouds.js
+    GLSL passes, atmosphere.js GLSL passes — keep sunTransmittanceJS
+    by moving the CPU mirror out of atmosphere.js first). Then
+    phase 3 (WebGPU backend + compute).

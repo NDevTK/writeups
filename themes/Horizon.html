@@ -973,6 +973,12 @@
       const skyIrr = new THREE.Color(0.05, 0.07, 0.1);
       const tmpC = new THREE.Color();
       let lastIrrT = -1e9;
+      // The irradiance readback is async on WebGPURenderer (no
+      // pipeline stall); until the first read resolves, skyIrr is a
+      // guess. Systems with TEMPORAL HISTORY (the cloud buffer) must
+      // not integrate lighting built on that guess - the 8%%/frame
+      // exponential blend takes hundreds of frames to forget it.
+      let skyIrrReady = !atmo.ok;
 
       // Overcast veil: a translucent grey dome that fades in with real
       // cloud cover (the scattering model alone stays too blue).
@@ -1962,7 +1968,10 @@
       let last = performance.now();
       function frame(t) {
         requestAnimationFrame(frame);
-        const dt = Math.min((t - last) / 1000, 0.1) * timeScale;
+        // Clamped BELOW too: rAF timestamps are not guaranteed
+        // monotonic under every scheduler, and a negative dt drives
+        // every exponential ease in the frame out of range.
+        const dt = THREE.MathUtils.clamp((t - last) / 1000, 0, 0.1) * timeScale;
         last = t;
         const d = now();
 
@@ -2119,8 +2128,10 @@
             // Async staging read - no pipeline stall; it lands a frame
             // or two later, which a 1 Hz ambient cannot notice.
             atmo.readIrradiance().then((ir) => {
-              if (ir && ir[0] + ir[1] + ir[2] > 1e-7)
+              if (ir && ir[0] + ir[1] + ir[2] > 1e-7) {
                 skyIrr.setRGB(ir[0], ir[1], ir[2]);
+                skyIrrReady = true;
+              }
             });
           }
           // The ambient term IS the sky: cosine-weighted irradiance
@@ -2273,7 +2284,7 @@
         };
         // Volumetric decks: real cover carves the density field, the
         // real wind advects it, the physically transmitted sun lights it.
-        if ((cLow > 3 || cMid > 3) && !cloudTexPending) {
+        if ((cLow > 3 || cMid > 3) && !cloudTexPending && skyIrrReady) {
           cloudTexPending = true;
           setTimeout(() => {
             const tex = generateCloudTexturesTSL();
