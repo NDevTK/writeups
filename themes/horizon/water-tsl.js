@@ -168,15 +168,23 @@ export class HorizonWaterMesh extends Mesh {
       reflect(this.sunDirection.negate(), surfaceNormal)
     );
     const direction = max(0.0, dot(eyeDirection, reflection));
+    // Cloud shadows (phase 5): the decks' Beer-Lambert transmittance
+    // dims the DIRECT sun terms only - the sky reflection is lit by
+    // the whole sky, not the sun ray.
+    const sunT = options.cloudShadow
+      ? options.cloudShadow.transmittance(positionWorld)
+      : float(1);
     // HORIZON: Cox-Munk-driven Blinn lobe - gloss and its energy
     // follow the per-pixel effective slope variance (classic patch:
     // pow(dir, shiny)*(shiny*0.02+0.5)).
     const specularLight = pow(direction, shiny)
       .mul(shiny.mul(0.02).add(0.5))
-      .mul(this.sunColor);
+      .mul(this.sunColor)
+      .mul(sunT);
     const diffuseLight = max(dot(this.sunDirection, surfaceNormal), 0.0)
       .mul(this.sunColor)
-      .mul(0.5);
+      .mul(0.5)
+      .mul(sunT);
 
     const distance = length(worldToEye);
     const distortion = surfaceNormal.xz

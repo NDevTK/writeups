@@ -164,6 +164,7 @@
       import {sunTransmittanceJS} from './horizon/sun-transmittance.js';
       import {createAtmosphereTSL} from './horizon/atmosphere-tsl.js';
       import {
+        createCloudShadowHook,
         createCloudSystemTSL,
         generateCloudTexturesTSL
       } from './horizon/clouds-tsl.js';
@@ -1181,9 +1182,20 @@
       const terrainMat = terrainObj.material;
       const terrainUniforms = terrainObj.uniforms;
       terrainUniforms.uWorldSize.value = WORLD;
+      // Cloud shadows (phase 5): Beer-Lambert through the SAME Nubis
+      // density the sky renders, multiplied into every sunlit
+      // material's received shadow. Until the lazy cloud system
+      // attaches, the hook is a zero map - full sun.
+      const cloudShadow = createCloudShadowHook();
+      cloudShadow.uniforms.uWorldSize.value = WORLD;
+      cloudShadow.applyTo(terrainMat);
       record(
         'GGX microfacet BRDF (Karis 2013)',
         'per-pixel roughness · vegetation/rock/snow'
+      );
+      record(
+        'Cloud shadow map',
+        'Beer-Lambert through the cloud decks (Schneider 2015)'
       );
       record('Lommel-Seeliger moon', 'lunar regolith photometry');
 
@@ -1406,7 +1418,11 @@
               depthTex,
               worldSize: WORLD,
               resolutionScale: 0.5,
-              ocean: {cascades: oceanCascades, metersPerUnit: 57.14}
+              ocean: {cascades: oceanCascades, metersPerUnit: 57.14},
+              // Deck shadows dim the DIRECT sun terms (glitter,
+              // diffuse) - not the sky reflection - via the shared
+              // Beer-Lambert transmittance.
+              cloudShadow
             }
           );
           water.rotation.x = -Math.PI / 2;
@@ -2166,11 +2182,17 @@
         const stMax = Math.max(st[0], st[1], st[2], 1e-4);
         sunLight.color.setRGB(st[0] / stMax, st[1] / stMax, st[2] / stMax);
         const stLum = 0.2126 * st[0] + 0.7152 * st[1] + 0.0722 * st[2];
+        // Direct-sun cloud attenuation is now per pixel (the cloud
+        // shadow map, Beer-Lambert through the actual decks); the
+        // only GLOBAL cloud factor left is the cirrus veil, as
+        // exp(-tau/sin(alt)) with tau_vis = 1 at full high cover
+        // (typical cirrostratus optical depth).
+        const cHighFrac = (state.cloudHigh ?? state.cloud * 0.3) / 100;
+        const cirrusT = Math.exp(
+          -cHighFrac / Math.max(Math.sin(sun.alt), 0.08)
+        );
         sunLight.intensity =
-          (0.18 + 2.4 * stLum) *
-          (day > 0 ? 1 : 0) *
-          (1 - cloudy * 0.55) *
-          (1 - 0.93 * ecl);
+          (0.18 + 2.4 * stLum) * (day > 0 ? 1 : 0) * cirrusT * (1 - 0.93 * ecl);
         const moonUp = moon.alt > 0 ? 0.07 * (1 - day) : 0;
         if (atmo.ok) {
           if (t - lastIrrT > 1000) {
@@ -2365,6 +2387,7 @@
               tex.baseTex,
               tex.detailTex
             );
+            cloudSys.attachShadow(cloudShadow);
             sizeCloudTargets();
             record(
               'Nubis cloud noise (generated)',
@@ -2421,6 +2444,10 @@
           mu.wOff.value.x += windVMid.x * w700 * 0.06 * dt;
           mu.wOff.value.y += windVMid.z * w700 * 0.06 * dt;
         }
+        // The cloud shadow map: refreshed with the advected field;
+        // zero (full sun) whenever the decks are inactive.
+        cloudShadow.update(sunVec, cloudsActive);
+        if (cloudsActive) cloudSys.updateShadow();
         driftLayer(
           cloudsHigh,
           cHigh,

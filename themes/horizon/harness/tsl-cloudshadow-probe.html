@@ -1,0 +1,65 @@
+<!doctype html><html><head><script type="importmap">
+{
+  "imports": {
+    "three": "./writeups/themes/horizon/three.webgpu.min.js",
+    "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+    "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+  }
+}
+</script></head><body style="margin:0"><canvas id="gl"></canvas><script>/* swizzle shim */ if (navigator.gpu && self.GPUTexture) { const ov = GPUTexture.prototype.createView; GPUTexture.prototype.createView = function (d) { if (d && 'swizzle' in d) { d = Object.assign({}, d); delete d.swizzle; } return ov.call(this, d); }; }</script><script type="module">
+// Cloud shadow map probe: fill the tau map with fixed deck uniforms
+// and read back statistics + display exp(-tau).
+import * as T from 'three/webgpu';
+import {texture, uv, vec4, exp} from 'three/tsl';
+import {createCloudShadowHook, createCloudSystemTSL, generateCloudTexturesTSL} from './writeups/themes/horizon/clouds-tsl.js';
+const log = (s) => console.log('CSP|' + s);
+try {
+  const r = new T.WebGPURenderer({canvas: document.getElementById('gl'), forceWebGL: !new URLSearchParams(location.search).get('wgpu'), antialias: false});
+  await r.init();
+  log('backend ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'));
+  r.setSize(300, 300);
+  const tex = generateCloudTexturesTSL();
+  const sys = createCloudSystemTSL(r, tex.baseTex, tex.detailTex);
+  const hook = createCloudShadowHook();
+  hook.uniforms.uWorldSize.value = 280;
+  sys.attachShadow(hook);
+  sys.uniformsLow.cov.value = 0.55;
+  sys.uniformsLow.yBase.value = 24;
+  sys.uniformsLow.yTop.value = 41;
+  sys.uniformsMid.cov.value = 0.2;
+  sys.uniformsMid.yBase.value = 55;
+  sys.uniformsMid.yTop.value = 61;
+  sys.updateShadow();
+  // read tau stats via a float blit (affine encode for safety)
+  const S = hook.size;
+  const rt = new T.RenderTarget(S, S, {type: T.FloatType, depthBuffer: false});
+  const quad = new T.QuadMesh();
+  const m = new T.MeshBasicNodeMaterial();
+  m.colorNode = texture(hook.tauNode.value).sample(uv()).mul(0.05).add(0.5);
+  m.transparent = true; m.blending = T.NoBlending; m.toneMapped = false;
+  quad.material = m;
+  r.setRenderTarget(rt); quad.render(r); r.setRenderTarget(null);
+  const px = await r.readRenderTargetPixelsAsync(rt, 0, 0, S, S);
+  let mn = 1e9, mx = -1e9, sum = 0, zeros = 0;
+  for (let i = 0; i < S * S; i++) {
+    const tau = (px[i * 4] - 0.5) / 0.05;
+    mn = Math.min(mn, tau); mx = Math.max(mx, tau); sum += tau;
+    if (tau < 0.05) zeros++;
+  }
+  log(`tauLow: min=${mn.toFixed(3)} max=${mx.toFixed(3)} mean=${(sum / S / S).toFixed(3)} clearFrac=${(zeros / S / S).toFixed(3)}`);
+  // display exp(-tau) for the capture
+  const disp = new T.MeshBasicNodeMaterial();
+  disp.colorNode = vec4(exp(texture(hook.tauNode.value).sample(uv()).xyz.negate()), 1);
+  disp.toneMapped = false;
+  window.__r = r; window.__THREE = T;
+  window.__capture = async (w, h) => {
+    const rt2 = new T.RenderTarget(w, h);
+    quad.material = disp;
+    r.setRenderTarget(rt2); quad.render(r); r.setRenderTarget(null);
+    const b = await r.readRenderTargetPixelsAsync(rt2, 0, 0, w, h);
+    rt2.dispose();
+    return b;
+  };
+  log('DONE');
+} catch (e) { log('ERR ' + e.message + ' :: ' + (e.stack || '').split('\n')[1]); log('DONE'); }
+</script></body></html>

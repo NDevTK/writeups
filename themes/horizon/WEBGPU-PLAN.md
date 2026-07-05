@@ -603,7 +603,31 @@ Scenes (all at Grindelwald unless noted):
       Cox-Munk lobe. Pinned Nelson gale: 0.0279 -> 0.0007 mean with
       ZERO samples over 8 - the best cross-backend number in the
       project. FFT ocean complete.
-  - Phase 5 CERTIFICATION - full pinned matrix with everything
+  - DONE: cloud shadows (Schneider 2015's cloud shadow map). Each
+    deck's vertical sigma-weighted optical depth - Beer-Lambert
+    through the SAME Nubis density the sky marches - fills a 2D map
+    per frame (project dual drivers); every sunlit material
+    multiplies its received CSM shadow by
+    exp(-tau / max(sunDir.y, 0.08)) sampled where the sun ray
+    crosses each deck's mid height (receivedShadowNode; the unlit
+    water dims its DIRECT sun terms - glitter, diffuse - through the
+    same transmittance, not its sky reflection). The flat
+    (1 - cloudy*0.55) global sun dim is REPLACED: decks shadow per
+    pixel, and the only global factor left is the cirrus veil as
+    exp(-tau/sin alt) with tau_vis = 1 at full high cover (typical
+    cirrostratus). Two measured fixes on the way: the shadow
+    integral must use the FULL eroded density (a coarse-only
+    integral left tau >= 0.42 in the VISUAL GAPS - the erosion's
+    clamp-to-zero is what clears them), and the raster fill needed
+    the Fn wrap (Loop/toVar with no active build stack - the ocean's
+    bug class). Validation: tau maps bit-comparable across backends
+    (identical stats, max 1 LSB); cumulus terrain signed diff vs the
+    old build has sd 11.5 range -43..+6 (patchy shadows + brighter
+    gaps, not a flat offset); pinned stratus 0.76 with the usual
+    deck-confined profile and terrain rows at 0.006. Overcast now
+    reads physically: direct sun extinguished under the deck,
+    ambient-only terrain.
+  - Phase 5 CERTIFICATION (pre cloud shadows) - full pinned matrix with everything
     (octave clouds, limb darkening, FFT ocean + filtering), real
     WebGPU vs WebGL2 backend, mean abs /255: noon 0.0099, sunset
     0.040, night 0.0009, stratus 1.10 (the known deck fp-dither

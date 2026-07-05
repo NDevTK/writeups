@@ -39,6 +39,7 @@ import {
   mix,
   mrt,
   normalize,
+  positionWorld,
   screenCoordinate,
   select,
   smoothstep,
@@ -102,6 +103,82 @@ function quarterTarget(w, h, count = 1) {
     depthBuffer: false,
     stencilBuffer: false
   });
+}
+
+/**
+ * Cloud shadows on the world (phase 5): Beer-Lambert through the SAME
+ * Nubis density field the sky renders - the deck's sun optical depth
+ * integrated vertically into a 2D map (Schneider 2015's cloud shadow
+ * map), applied per pixel to every sunlit material through three's
+ * receivedShadowNode hook, replacing the flat (1 - cloudy*k) global
+ * dim for the decks.
+ *
+ * The hook is standalone (materials are built before the lazy cloud
+ * system exists): it owns the map's texture node and the projection
+ * uniforms, and multiplies the received CSM shadow by
+ * exp(-tau / max(sunDir.y, 0.08)) per deck, sampled where the sun ray
+ * through the surface point crosses that deck's mid height. The map
+ * itself is filled by the cloud system (attachShadow) because the
+ * density lives there; until then it is a zero texture - full sun.
+ */
+export function createCloudShadowHook() {
+  const SIZE = 256;
+  const zero = new DataTexture(
+    new Uint8Array([0, 0, 0, 255]),
+    1,
+    1,
+    RGBAFormat
+  );
+  zero.needsUpdate = true;
+  const tauNode = texture(zero); // .value swaps to the filled map
+  const u = {
+    uSunDirW: uniform(new Vector3(0, 1, 0)),
+    uMidLow: uniform(31),
+    uMidMid: uniform(60),
+    uWorldSize: uniform(280),
+    uOn: uniform(0)
+  };
+  const transmittance = Fn(([worldPos]) => {
+    const res = float(1).toVar();
+    If(u.uOn.greaterThan(0.5), () => {
+      const sy = max(u.uSunDirW.y, 0.08);
+      const slant = sy.reciprocal();
+      const toUv = (p) => p.div(u.uWorldSize).add(0.5);
+      // Project along the sun ray to each deck's mid height; the map
+      // stores each deck's VERTICAL sigma*integral(density) in its
+      // own channel.
+      const oLow = u.uSunDirW.xz
+        .div(sy)
+        .mul(u.uMidLow.sub(worldPos.y))
+        .add(worldPos.xz);
+      const oMid = u.uSunDirW.xz
+        .div(sy)
+        .mul(u.uMidMid.sub(worldPos.y))
+        .add(worldPos.xz);
+      const tau = tauNode
+        .sample(toUv(oLow))
+        .x.add(tauNode.sample(toUv(oMid)).y);
+      res.assign(exp(tau.mul(slant).negate()));
+    });
+    return res;
+  });
+  return {
+    tauNode,
+    uniforms: u,
+    size: SIZE,
+    // For unlit materials (the water builds its sun terms itself):
+    // the Beer-Lambert transmittance at a world position.
+    transmittance,
+    applyTo(material) {
+      material.receivedShadowNode = Fn(([shadow]) =>
+        shadow.mul(transmittance(positionWorld))
+      );
+    },
+    update(sunDir, on) {
+      u.uSunDirW.value.copy(sunDir);
+      u.uOn.value = on ? 1 : 0;
+    }
+  };
 }
 
 export function createCloudSystemTSL(renderer, baseTex, detailTex) {
@@ -699,6 +776,73 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     renderer.autoClear = auto;
   }
 
+  // ---------- the cloud shadow map (phase 5) ----------
+  // Vertical sigma-weighted optical depth of each deck into the
+  // hook's 2D map, one channel per deck, refreshed with the frame
+  // (the field advects with wOff). Integrates the FULL eroded
+  // density - the same field the sky marches. (A coarse-only
+  // integral was measured to leave tau >= 0.42 in the VISUAL GAPS:
+  // the detail erosion's clamp-to-zero removes the coarse field's
+  // low-amplitude residue, so gaps only clear when the shadow
+  // integral erodes too.)
+  let shadowHook = null;
+  let shadowFill = null;
+  function attachShadow(hook) {
+    shadowHook = hook;
+    const S = hook.size;
+    const K = 8;
+    const deckTau = (wxz, d) => {
+      const dy = d.yTop.sub(d.yBase);
+      const acc = float(0).toVar();
+      Loop(K, ({i: s}) => {
+        const hh = float(s)
+          .add(0.5)
+          .mul(1 / K);
+        const p = vec3(wxz.x, d.yBase.add(hh.mul(dy)), wxz.y);
+        acc.addAssign(density(p, hh, d.cov, d.cType, d.wOff));
+      });
+      return acc.mul(dy.div(K)).mul(d.sigma);
+    };
+    const tauAt = (pix) => {
+      const wxz = vec2(pix)
+        .add(0.5)
+        .div(S)
+        .sub(0.5)
+        .mul(hook.uniforms.uWorldSize);
+      return vec4(deckTau(wxz, uniformsLow), deckTau(wxz, uniformsMid), 0, 1);
+    };
+    if (useCompute) {
+      const tex = new StorageTexture(S, S);
+      tex.type = HalfFloatType;
+      tex.minFilter = tex.magFilter = LinearFilter;
+      const kernel = Fn(() => {
+        const i = int(instanceIndex);
+        const xy = ivec2(i.mod(S), i.div(S));
+        textureStore(tex, xy, tauAt(xy));
+      })().compute(S * S);
+      hook.tauNode.value = tex;
+      shadowFill = () => renderer.compute(kernel);
+    } else {
+      const rt = quarterTarget(S, S);
+      const m = new MeshBasicNodeMaterial();
+      // Builders with Loop/toVar need an active TSL build stack -
+      // the compute kernel Fn provides one lazily, the raster
+      // material graph is assembled NOW (the ocean hit the same
+      // class of bug), so wrap in an Fn.
+      m.colorNode = Fn(() => tauAt(ivec2(screenCoordinate.xy)))();
+      m.transparent = true;
+      m.blending = NoBlending;
+      m.toneMapped = false;
+      hook.tauNode.value = rt.texture;
+      shadowFill = () => {
+        quad.material = m;
+        renderer.setRenderTarget(rt);
+        quad.render(renderer);
+        renderer.setRenderTarget(null);
+      };
+    }
+  }
+
   // _warm is exposed for the validation harness only: forcing it to
   // 1 every frame makes every pixel march fresh - the temporal-free
   // ground truth the moving-camera reprojection test compares
@@ -710,6 +854,15 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     setSize,
     render,
     composite,
+    attachShadow,
+    updateShadow() {
+      if (!shadowFill) return;
+      shadowHook.uniforms.uMidLow.value =
+        (uniformsLow.yBase.value + uniformsLow.yTop.value) / 2;
+      shadowHook.uniforms.uMidMid.value =
+        (uniformsMid.yBase.value + uniformsMid.yTop.value) / 2;
+      shadowFill();
+    },
     _warm: warm
   };
 }
