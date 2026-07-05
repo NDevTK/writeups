@@ -161,7 +161,7 @@
     <script src="./horizon/astronomy.browser.min.js"></script>
     <script type="module">
       import * as THREE from 'three';
-      import {sunTransmittanceJS} from './horizon/atmosphere.js';
+      import {sunTransmittanceJS} from './horizon/sun-transmittance.js';
       import {createAtmosphereTSL} from './horizon/atmosphere-tsl.js';
       import {
         createCloudSystemTSL,
@@ -937,7 +937,7 @@
       }
 
       // Aerial perspective (Hillaire 2020, sec. 5.2): the atmosphere
-      // BETWEEN the camera and every surface. atmosphere.js marches a
+      // BETWEEN the camera and every surface. atmosphere-tsl marches a
       // 64x32 LUT of inscattered radiance and mean transmittance over
       // (relative azimuth x distance), and every world material swaps
       // three.js' colour-only fog input for it - distant ridges turn
@@ -1549,7 +1549,7 @@
       // Clouds in the three layers the weather model actually reports
       // (open-meteo cloud_cover_low/mid/high): the low cumulus deck and
       // the mid altostratus deck march in ONE volumetric pass
-      // (clouds.js, after Schneider & Vos) with temporal reconstruction
+      // (clouds-tsl, after Schneider & Vos) with temporal reconstruction
       // exactly as shipped in Horizon Zero Dawn - a quarter-res buffer,
       // one 4x4 Bayer pixel marched per frame, the rest reprojected -
       // plus a terrain depth prepass so the march clips against the

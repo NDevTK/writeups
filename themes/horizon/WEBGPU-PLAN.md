@@ -307,8 +307,18 @@ Scenes (all at Grindelwald unless noted):
       seconds of wall time on this heavier build (a pinned-interval
       injection does not stop it). Compare snow at component level or
       on real hardware.
-  - NEXT (first move next session): delete the WebGL-only code paths
-    (onBeforeCompile hooks, GLSL CSM trio, Sky.js/Water.js, clouds.js
-    GLSL passes, atmosphere.js GLSL passes — keep sunTransmittanceJS
-    by moving the CPU mirror out of atmosphere.js first). Then
-    phase 3 (WebGPU backend + compute).
+  - LEGACY DELETION DONE — phase 2 complete. Removed: atmosphere.js,
+    clouds.js, Sky.js, Water.js, CSM.js, CSMShader.js,
+    three.module.min.js (the classic build; `three` now maps to the
+    webgpu build). Kept: CSMFrustum.js (imported by CSMShadowNode),
+    WaterMesh.js (provenance for the water-tsl fork),
+    cloud-noise.js / atmo-reference.mjs (single-source physics and
+    ground truth). sunTransmittanceJS moved to sun-transmittance.js.
+    Post-deletion harness check: noon 2.39 / night 0.34 / Nelson 0.22
+    vs the pre-deletion build (temporal randomness only). There is
+    now exactly ONE implementation of every piece of physics.
+  - NEXT: phase 3 — WebGPU backend + compute (LUT chain and cloud
+    march as compute passes; parameterise the d*2-1 clip-z assumption
+    in clouds-tsl sceneDist for WebGPU's 0..1 clip space; matrix on
+    BOTH backends). Then phase 4 polish (blue-noise jitter, sky-view
+    horizon-band fix, motion vectors).
