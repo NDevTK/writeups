@@ -192,7 +192,8 @@
         createMeteorMaterial,
         createContrailMaterial,
         createFlashMaterial,
-        createMilkyWayMaterial
+        createMilkyWayMaterial,
+        createNLCMaterial
       } from './horizon/sky-objects-tsl.js';
       import {adsbToScene, appleman} from './horizon/contrails.js';
       import {
@@ -216,6 +217,7 @@
         strobeOn
       } from './horizon/navlights.js';
       import {earthshineRatio} from './horizon/earthshine.js';
+      import {BETA_MIN_DEG, seasonEnvelope} from './horizon/nlc.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -2026,6 +2028,23 @@
         'Gaia DR3 integrated starlight',
         '1,811,709,771 sources · HEALPix-5 · Riello G-V · S10 on the zodiacal base'
       );
+      // Noctilucent clouds: the 83-km mesospheric shell, lit only
+      // where it still sees the sun while the ground stands in
+      // twilight (nlc.js - the published 6-16 deg window EMERGES
+      // from the shadow-cylinder geometry; the season/latitude
+      // envelope follows the DeLand/Fiedler climatology). A
+      // high-latitude summer visitor gets the silvery billows
+      // along the poleward twilight horizon; everyone else,
+      // honestly, gets nothing. ?nlc=1 forces the envelope for
+      // harness shots (geometry stays exact).
+      const nlcObj = createNLCMaterial();
+      const nlcU = nlcObj.u;
+      const nlcShell = new THREE.Mesh(
+        new THREE.SphereGeometry(930, 48, 24),
+        nlcObj.material
+      );
+      nlcShell.visible = false;
+      scene.add(nlcShell);
       // Meteor streaks: a small pool of quads on the star sphere,
       // spawned as a Poisson process at the REAL observed rate
       // (meteors.js: IMO 2026 working list rates through the
@@ -3558,6 +3577,28 @@
           // the r^-2.3 heliocentric factor is zodiacal-specific.
           mwU.night.value = zodiU.night.value;
           mwU.uTzen.value.copy(airglowU.uTzen.value);
+          // Noctilucent clouds: geometry in the shader (exact
+          // shadow cylinder); here only the sun direction, the
+          // 6-deg sky-brightness gate, the climatological
+          // season/latitude envelope, and tropospheric cloud
+          // cover. Day-of-year from the same clock as sidereal
+          // time.
+          {
+            const betaDeg = -(sun.alt / RAD);
+            const doy = Math.ceil(
+              (d - new Date(Date.UTC(d.getUTCFullYear(), 0, 0))) / 86400e3
+            );
+            const env = params.has('nlc')
+              ? +params.get('nlc')
+              : seasonEnvelope(doy, state.lat);
+            nlcU.uAmp.value =
+              env *
+              THREE.MathUtils.smoothstep(betaDeg, BETA_MIN_DEG, 7.5) *
+              (1 - cloudy * 0.95);
+            nlcU.uSunDirW.value.copy(skyPoint(sun.alt, sun.az, 1)).normalize();
+            nlcU.time.value = t / 1000;
+            nlcShell.visible = nlcU.uAmp.value > 0.001;
+          }
         }
         // Meteors: the observed rate right now is the sum over the
         // active showers of ZHR(lam_sun) x sin(radiant elevation)

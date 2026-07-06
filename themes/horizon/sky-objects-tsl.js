@@ -831,3 +831,90 @@ export function createMilkyWayMaterial() {
   material.opacityNode = u.night;
   return {material, u};
 }
+
+// Noctilucent clouds (nlc.js): the 83-km mesospheric ice shell,
+// lit only where it still sees the sun while the observer stands
+// in twilight darkness. The fragment mirrors nlc.js EXACTLY in
+// world kilometres - closed-form ray-shell distance, then the
+// Earth's shadow cylinder widened by the 30 km Rozenberg
+// screening height; the published 6-16 deg visibility window is
+// GEOMETRY here, not a gate. Display elements (documented): the
+// gravity-wave billow pattern (two sine octaves, ~35/90 km, the
+// observed NLC band scales, drifting at the ~40 m/s mesospheric
+// wind), the forward-scattering brightening toward the sun, the
+// slant-path thickening toward the horizon, and the silvery-blue
+// tint. uAmp carries the season/latitude envelope and the 6-deg
+// sky-brightness gate from the CPU.
+export function createNLCMaterial() {
+  const u = {
+    uSunDirW: uniform(new Vector3(1, 0, 0)),
+    uAmp: uniform(0),
+    time: uniform(0)
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = BackSide;
+  material.blending = AdditiveBlending;
+  const R = 6371.0088;
+  const H = 83;
+  const SCREEN = 30;
+  const d = normalize(positionWorld.sub(cameraPosition));
+  const dy = d.y;
+  // exact shell distance (km): sqrt(R^2 dy^2 + H(2R+H)) - R dy
+  const t = sqrt(
+    dy
+      .mul(dy)
+      .mul(R * R)
+      .add(H * (2 * R + H))
+  ).sub(dy.mul(R));
+  const P = vec3(d.x.mul(t), dy.mul(t).add(R), d.z.mul(t));
+  const along = dot(P, u.uSunDirW);
+  const perp2 = dot(P, P).sub(along.mul(along));
+  const lit = select(
+    along.greaterThanEqual(0.0),
+    float(1),
+    step((R + SCREEN) * (R + SCREEN), perp2)
+  );
+  // soften the shadow edge over ~60 km of perpendicular distance
+  const soft = select(
+    along.greaterThanEqual(0.0),
+    float(1),
+    smoothstep(
+      (R + SCREEN) * (R + SCREEN),
+      (R + SCREEN + 60) * (R + SCREEN + 60),
+      perp2
+    )
+  );
+  // billows: two sine octaves in shell-plane kilometres, drifting
+  const drift = u.time.mul(0.04); // 40 m/s in km/s
+  const w1 = sin(P.x.add(drift.mul(35)).mul((2 * Math.PI) / 35))
+    .mul(sin(P.z.mul((2 * Math.PI) / 47)))
+    .mul(0.5)
+    .add(0.5);
+  const w2 = sin(
+    P.x
+      .mul((2 * Math.PI) / 90)
+      .add(P.z.mul((2 * Math.PI) / 110))
+      .add(drift)
+  )
+    .mul(0.5)
+    .add(0.5);
+  const billow = w1.mul(0.6).add(w2.mul(0.4)).pow(1.6);
+  // forward scattering toward the sun + slant-path thickening
+  const fwd = dot(d, u.uSunDirW).mul(0.5).add(0.5).pow(2).mul(0.75).add(0.25);
+  const slant = clamp(t.div(H).div(9.0), 0.0, 1.0);
+  const horizonFade = smoothstep(0.0, 0.03, dy); // above horizon only
+  material.colorNode = vec3(0.62, 0.74, 0.9).mul(
+    lit
+      .mul(soft)
+      .mul(billow)
+      .mul(fwd)
+      .mul(slant)
+      .mul(horizonFade)
+      .mul(u.uAmp)
+      .mul(0.32)
+  );
+  material.opacityNode = float(1);
+  return {material, u};
+}

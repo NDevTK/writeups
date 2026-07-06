@@ -1743,6 +1743,34 @@ Scenes (all at Grindelwald unless noted):
       new uniform (the ratio, fed per frame from the same two
       vectors the shader already uses). ?eshine=N scales for
       harness shots.
+  - DONE: noctilucent clouds (nlc.js) - the 83-km mesospheric ice
+    shell, and the item's crown: the classical visibility window
+    is DERIVED, not gated. The exact construction - closed-form
+    ray-to-shell distance on the IUGG Earth (shared with
+    lightning.js), then the Earth's shadow cylinder widened by
+    Rozenberg's 30 km twilight screening - puts the last sunlit
+    patch toward the sunward horizon at 16.55 deg solar
+    depression: Gadsden & Schroeder's published "6-16 deg NLC
+    window" emerges from the geometry to within half a degree
+    (the 6-deg end stays as the documented sky-brightness gate).
+    Landmarks (gate set 25): shell distances at their closed
+    forms (zenith exactly h; horizon exactly sqrt(h(2R+h)));
+    zenith shadow boundary matching BOTH closed forms exactly -
+    solid Earth acos(R/(R+h)) = 9.20 deg (the textbook figure)
+    and screened acos((R+s)/(R+h)) = 7.35; sunward/antisolar
+    asymmetry at 12 deg; season envelope peaking exactly 22 days
+    after the observer's summer solstice (DeLand/Fiedler shape),
+    zero out of season/below 50 deg latitude, hemisphere flip
+    with year wrap exact. No live NLC feed exists, so
+    night-to-night variability is deliberately absent - in
+    season, at latitude, in the window, the climatological-mean
+    veil shows (documented display choice). Render: the TSL
+    fragment mirrors nlc.js exactly in world kilometres; the
+    billow pattern (~35/90 km gravity-wave scales drifting at
+    the mesospheric ~40 m/s), forward-scattering brightening,
+    slant-path thickening and silvery-blue tint are the
+    documented display elements. ?nlc=N forces the envelope
+    (geometry stays exact) for pinned shots.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
