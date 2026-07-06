@@ -1683,6 +1683,41 @@ Scenes (all at Grindelwald unless noted):
       navlights-reference.mjs is gate set 22 (4 landmarks).
       ?plane=N spawns deterministic mixed-altitude crossings for
       pinned shots.
+  - DONE: the Milky Way - Gaia DR3 integrated starlight, measured
+    star by star. No Pioneer table survives in machine-readable
+    form, so we went one better: TWO server-side ESA TAP
+    aggregations over the ENTIRE gaiadr3.gaia_source catalogue
+    (job ids + queries verbatim in milkyway-data.js) - G/BP/RP
+    flux sums per HEALPix level-5 cell for ALL sources, minus the
+    same sums for G < 5.5, because the theme draws the bright end
+    as individual Yale stars: the dome carries only light fainter
+    than the drawn catalogue, the very construction of the
+    Pioneer background maps. The counts sum to 1,811,709,771 -
+    the published DR3 total EXACTLY, asserted by the gate.
+    - milkyway.js (gate set 23, 5 landmarks): Gorski 2005 nested
+      pix2ang AND ang2pix - the round trip holds for ALL 12288
+      pixels, a landmark that immediately caught a real polar-cap
+      off-by-one (nr = jr, not jr+1) that spot checks had missed;
+      exact J2000 galactic rotation (l=0,b=0 -> RA 266.4050 Dec
+      -28.9362 textbook; NGP b=90; inverse exact); Riello 2021
+      G-V coefficients verbatim with the S10 unit closed by
+      construction (a lone V=10 star over 1 deg^2 -> s10 = 1 to
+      1e-9); whole-sky diffuse starlight G = -6.66 (classical
+      ~-6.7); plane/pole structure 207 vs 28.2 S10 - the pole
+      mean IN Toller's 20-40 band (the exact-NGP cell is
+      Poisson-dominated by undrawn 5.5-6.5 mag stars - 31 Com
+      sits on the pole - so only the ensemble is asserted, the
+      aurora lesson re-learned).
+    - Render: createMilkyWayMaterial bakes the exact per-cell
+      pipeline into a 512x256 equirect float texture in the
+      celestial frame (3-tap smoothing over the 1.8-deg cells is
+      the documented display smoothing; the BP-RP tint mapping is
+      the one documented display element), sampled on a dome
+      riding the star group with the SAME zlPerGreen base,
+      AGLOW_GAIN, night gate and zenith-transmittance extinction
+      as the zodiacal light - the galaxy/zodiacal contrast has NO
+      free parameter. milkyway-data.js is ~450 KB (4-sig-fig
+      fluxes; Pages gzips it to ~150 KB).
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

@@ -191,7 +191,8 @@
         createZodiacalMaterial,
         createMeteorMaterial,
         createContrailMaterial,
-        createFlashMaterial
+        createFlashMaterial,
+        createMilkyWayMaterial
       } from './horizon/sky-objects-tsl.js';
       import {adsbToScene, appleman} from './horizon/contrails.js';
       import {
@@ -2003,6 +2004,27 @@
         zodiObj.material
       );
       celestial.add(zodi);
+      // The Milky Way: Gaia DR3 integrated starlight - every one
+      // of the catalogue's 1,811,709,771 sources aggregated
+      // server-side at ESA into HEALPix cells, minus the bright
+      // end drawn as individual stars (milkyway.js: Gorski
+      // pixelisation, Riello G-V, S10 units). It rides the same
+      // celestial dome AND the same zlPerGreen photometric base
+      // as the zodiacal light, so the galaxy/zodiacal contrast
+      // carries no free parameter - at a dark site the summer
+      // Sagittarius band clearly outshines the cone, exactly as
+      // in Leinert's tables.
+      const mwObj = createMilkyWayMaterial();
+      const mwU = mwObj.u;
+      const mw = new THREE.Mesh(
+        new THREE.SphereGeometry(875, 48, 24),
+        mwObj.material
+      );
+      celestial.add(mw);
+      record(
+        'Gaia DR3 integrated starlight',
+        '1,811,709,771 sources · HEALPix-5 · Riello G-V · S10 on the zodiacal base'
+      );
       // Meteor streaks: a small pool of quads on the star sphere,
       // spawned as a Poisson process at the REAL observed rate
       // (meteors.js: IMO 2026 working list rates through the
@@ -3516,6 +3538,11 @@
           zodiU.uFs.value =
             1 + 0.1 * Math.sin(sunLam + Math.PI - ZL_OMEGA * RAD);
           zodiU.uTzen.value.copy(airglowU.uTzen.value);
+          // The galaxy shares the zodiacal gating and extinction
+          // (same night factor, same zenith transmittance) - only
+          // the r^-2.3 heliocentric factor is zodiacal-specific.
+          mwU.night.value = zodiU.night.value;
+          mwU.uTzen.value.copy(airglowU.uTzen.value);
         }
         // Meteors: the observed rate right now is the sum over the
         // active showers of ZHR(lam_sun) x sin(radiant elevation)

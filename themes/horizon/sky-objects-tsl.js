@@ -66,6 +66,8 @@ import {
 import {EYE_D_CM, SIGMA_MAX, youngSigma} from './scintillation.js';
 import {AGLOW_GAIN, LINES, R_EARTH} from './airglow.js';
 import {buildZodiacalGrid, OBLIQUITY, zlPerGreen} from './zodiacal.js';
+import {ang2pix, cellS10, CELL_AREA_DEG2} from './milkyway.js';
+import {MW_FBP, MW_FG, MW_FRP} from './milkyway-data.js';
 
 /**
  * Horizon's sky objects as TSL node materials (WebGPU project,
@@ -691,5 +693,116 @@ export function createFlashMaterial() {
   const glow = exp(r2.mul(-4));
   material.colorNode = vec3(0.82, 0.87, 1.0).mul(glow.mul(u.amp));
   material.opacityNode = float(1);
+  return {material, u};
+}
+
+// The Milky Way dome: Gaia DR3 integrated starlight
+// (milkyway.js / milkyway-data.js - every DR3 source aggregated
+// server-side at ESA, minus the G < 5.5 bright end the theme
+// draws as individual stars). The bake below runs the EXACT
+// per-cell pipeline (nested ang2pix -> Riello G-V -> S10) into an
+// equirect texture in the CELESTIAL frame the dome's object space
+// already is; a 3-tap smoothing pass softens the 1.8-deg HEALPix
+// cells (documented display smoothing on exact data). Photometry
+// rides the SAME zlPerGreen base and AGLOW_GAIN as the zodiacal
+// light, so the galaxy/zodiacal contrast carries no free
+// parameter; the colour tint from each cell's integrated BP-RP is
+// the one documented display mapping (bluish 0.6 -> warm 1.6).
+export function buildMilkyWayGrid(W, H) {
+  const lum = new Float32Array(W * H);
+  const tint = new Float32Array(W * H * 2); // bpRp packed later
+  for (let y = 0; y < H; y++) {
+    const dec = ((y + 0.5) / H - 0.5) * Math.PI;
+    for (let x = 0; x < W; x++) {
+      const ra = ((x + 0.5) / W) * 2 * Math.PI;
+      const pix = ang2pix(Math.sin(dec), ra);
+      const {s10, bpRp} = cellS10(
+        MW_FG[pix],
+        MW_FBP[pix],
+        MW_FRP[pix],
+        CELL_AREA_DEG2
+      );
+      lum[y * W + x] = s10;
+      tint[(y * W + x) * 2] = bpRp;
+    }
+  }
+  // separable 3-tap [1 2 1]/4, run twice: RA wraps, Dec clamps
+  const blur = (src) => {
+    const a = new Float32Array(src);
+    for (let pass = 0; pass < 2; pass++) {
+      for (let y = 0; y < H; y++) {
+        const row = new Float32Array(W);
+        for (let x = 0; x < W; x++) {
+          row[x] =
+            0.25 * a[y * W + ((x + W - 1) % W)] +
+            0.5 * a[y * W + x] +
+            0.25 * a[y * W + ((x + 1) % W)];
+        }
+        a.set(row, y * W);
+      }
+      for (let x = 0; x < W; x++) {
+        const col = new Float32Array(H);
+        for (let y = 0; y < H; y++) {
+          const y0 = Math.max(y - 1, 0);
+          const y1 = Math.min(y + 1, H - 1);
+          col[y] =
+            0.25 * a[y0 * W + x] + 0.5 * a[y * W + x] + 0.25 * a[y1 * W + x];
+        }
+        for (let y = 0; y < H; y++) a[y * W + x] = col[y];
+      }
+    }
+    return a;
+  };
+  const lumB = blur(lum);
+  const data = new Float32Array(W * H * 4);
+  for (let i = 0; i < W * H; i++) {
+    const c = Math.min(Math.max((tint[i * 2] - 0.6) / 1.0, 0), 1);
+    // bluish-white (0.6) -> warm (1.6) - display mapping
+    data[i * 4] = (0.82 + 0.18 * c) * lumB[i];
+    data[i * 4 + 1] = (0.9 - 0.02 * c) * lumB[i];
+    data[i * 4 + 2] = (1.0 - 0.28 * c) * lumB[i];
+    data[i * 4 + 3] = 1;
+  }
+  return data;
+}
+
+export function createMilkyWayMaterial() {
+  const u = {
+    night: uniform(0),
+    uScale: uniform(zlPerGreen()),
+    uTzen: uniform(new Vector3(0.94, 0.87, 0.72))
+  };
+  const W = 512;
+  const H = 256;
+  const tex = new DataTexture(
+    buildMilkyWayGrid(W, H),
+    W,
+    H,
+    RGBAFormat,
+    FloatType
+  );
+  tex.minFilter = tex.magFilter = LinearFilter;
+  tex.needsUpdate = true;
+  const mapNode = texture(tex);
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = BackSide;
+  material.blending = AdditiveBlending;
+  // Object space IS the celestial frame (the star convention:
+  // x = cosDec sinRA, y = sinDec, z = cosDec cosRA).
+  const d = normalize(positionLocal);
+  const dec = asin(clamp(d.y, -1, 1));
+  const ra = atan(d.x, d.z);
+  const uvm = vec2(
+    mod(ra.div(2 * Math.PI).add(1), 1),
+    dec.div(Math.PI).add(0.5)
+  );
+  const s = mapNode.sample(uvm);
+  const cosZ = clamp(normalize(positionWorld.sub(cameraPosition)).y, 0.0, 1.0);
+  const X = float(1).div(cosZ.add(exp(cosZ.mul(-11)).mul(0.025)));
+  const T = pow(vec3(u.uTzen), X);
+  material.colorNode = T.mul(s.rgb.mul(u.uScale).mul(AGLOW_GAIN));
+  material.opacityNode = u.night;
   return {material, u};
 }
