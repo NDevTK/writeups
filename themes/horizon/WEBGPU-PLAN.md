@@ -1505,6 +1505,55 @@ Scenes (all at Grindelwald unless noted):
     - Owner setup: create the free key at aisstream.io (GitHub
       sign-in), then `cd themes/horizon/worker && npx wrangler
       secret put AISSTREAM_KEY && npx wrangler deploy`.
+  - DONE (owner provisioning): horizon-live, the dedicated-IP
+    successor to the worker (themes/horizon/server) - the owner
+    chose a real server (GCP free-tier e2-micro) after the
+    deployed /ais answered an empty Dover Strait and every
+    worker-side failure traced to Cloudflare's SHARED egress IPs.
+    - Daemon (src/index.mjs, node >= 22, ZERO npm dependencies):
+      ONE persistent aisstream.io WebSocket with a GLOBAL
+      subscription (their design intent), ingested into a
+      last-position-per-MMSI table under a 1x1 degree spatial
+      grid - any visitor is answered from RAM; reconnect with
+      exponential backoff + a 180 s stale-feed watchdog (a valid
+      global subscription never goes quiet - which also makes a
+      dead key visible in /health within seconds, ending the
+      silent-key ambiguity the worker could not escape); /adsb by
+      readsb failover (adsb.lol -> adsb.fi -> airplanes.live, all
+      through the worker-gated normalize()) with a 15 s cache -
+      the clean IP reopens the rich feeds, VERIFIED live from
+      this box (adsb.lol answered first, 10 aircraft, cache hit
+      on repeat); /probe ported (incl. OpenSky - measure the
+      box's own IP before trusting it); /health engine stats.
+    - NOT an open CORS proxy (owner requirement): Origin
+      allowlist - only ALLOW_ORIGIN (default the GitHub Pages
+      origin) gets a CORS grant, foreign origins are refused 403,
+      absent Origin passes with NO grant; per-IP token-bucket
+      rate limit; GET/OPTIONS only; params validated; the
+      normalizers are IMPORTED from the worker source (the model
+      lives once).
+    - server-reference.mjs is gate set 20: grid ingest with cell
+      migration (old cell emptied AND deleted), latest-per-MMSI,
+      Class B on the same path, junk counted not stored; query on
+      the same aisBox geodesy with exact boundary inclusion,
+      internals stripped, limit honoured; prune with grid
+      cleanup; origin allowlist semantics; limiter budget/refill/
+      isolation - all under explicit clocks. Flat /opt deploy
+      layout (install.sh rewrites the worker import path)
+      verified by simulation.
+    - Ops: hardened systemd unit (DynamicUser, ProtectSystem=
+      strict, MemoryMax), Caddyfile for auto-TLS (sslip.io works
+      domainless), idempotent install.sh (NodeSource node 22 +
+      Caddy), README runbook with the GCP free-tier notes (IPv4
+      now billed separately; ~1 GB/mo free egress - payloads are
+      deliberately a few KB). Optional: Cloudflare orange-cloud
+      in FRONT for inbound shielding while outbound keeps the
+      clean IP - the best of both measured worlds.
+    - After the box exists: /probe from ITS IP decides upstream
+      order (and whether OpenSky rejoins); theme tested via
+      ?ais=/?adsb= overrides, then ADSB_PROXY/AIS_PROXY defaults
+      switch in Horizon.html and the worker retires or stays as
+      documented fallback.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

@@ -1,0 +1,26 @@
+# horizon-live systemd unit - hardened, unprivileged, restarts
+# forever. Install: see install.sh / README.md in this directory.
+[Unit]
+Description=Horizon theme live-data daemon (AIS + ADS-B)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/node /opt/horizon-live/index.mjs
+EnvironmentFile=/etc/horizon-live.env
+Restart=always
+RestartSec=3
+# No shell, no login user, nothing writable, minimal kernel surface.
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

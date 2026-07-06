@@ -1,0 +1,16 @@
+# TLS front for horizon-live. Caddy fetches and renews the
+# Let's Encrypt certificate on its own - point a DNS A record at
+# the box, put the hostname here, done. The daemon itself listens
+# on loopback only; Caddy is the only thing on 443.
+#
+# Install as /etc/caddy/Caddyfile (or merge into it), then:
+#   sudo systemctl reload caddy
+#
+# No domain? An sslip.io name works with zero DNS setup:
+#   live.<YOUR-IP-WITH-DASHES>.sslip.io
+# (e.g. live.203-0-113-7.sslip.io resolves to 203.0.113.7).
+
+live.example.com {
+	reverse_proxy 127.0.0.1:8127
+	encode gzip
+}
