@@ -2069,16 +2069,17 @@
         p.mesh.visible = true;
       }
 
-      // Live aircraft: the horizon-adsb Cloudflare worker
-      // (themes/horizon/worker) adds the CORS header no public
-      // ADS-B feed provides, proxying adsb.lol near the visitor.
-      // Cruise traffic claims contrail slots with its REAL
-      // position, altitude, track and speed; Schmidt-Appleman still
-      // decides whether the trail exists. Unreachable worker (not
-      // deployed yet, offline harness): the ambient traffic above
-      // stands in. ?adsb=URL overrides the proxy.
-      const ADSB_PROXY =
-        params.get('adsb') ?? 'https://horizon-adsb.ndevtk.workers.dev/adsb';
+      // Live aircraft: the horizon-live daemon (themes/horizon/
+      // server, on the owner's dedicated-IP box) proxies the
+      // readsb feeds no browser can reach - measured from its own
+      // IP: adsb.lol answers first, the rich feed Cloudflare
+      // egress never got. Cruise traffic claims contrail slots
+      // with its REAL position, altitude, track and speed;
+      // Schmidt-Appleman still decides whether the trail exists.
+      // Unreachable daemon (offline harness): the ambient traffic
+      // above stands in. ?adsb=URL overrides (e.g. the retired
+      // horizon-adsb worker, kept as documented fallback).
+      const ADSB_PROXY = params.get('adsb') ?? 'https://api.ndev.tk/adsb';
       let liveTraffic = null; // queue of unclaimed cruise snapshots
       const seenFlights = new Map(); // hex -> last spawn ms
       async function syncTraffic() {
@@ -2138,11 +2139,12 @@
         }
       }
 
-      // ---- Live ships: AIS via the same worker (/ais route).
-      // aisstream.io position reports around the visitor; the API
-      // key lives ONLY in the worker (aisstream's terms forbid
-      // exposing it to a browser, which a static site could never
-      // honour). Ships dead-reckon on the tide-following water
+      // ---- Live ships: AIS via the same daemon (/ais route).
+      // horizon-live holds ONE persistent global aisstream.io
+      // subscription (the API key lives only on the box -
+      // aisstream's terms forbid exposing it to a browser) and
+      // answers from its in-RAM picture: ~23k vessels resident
+      // when first deployed. Ships dead-reckon on the tide-following water
       // plane between reports and carry COLREGS navigation lights
       // after sunset (ships.js: Rule 21 arcs, Rule 22 ranges,
       // Annex I candela through Allard's law - beyond a light's
@@ -2153,8 +2155,7 @@
       // the lights and kinematics are the physics. ?ais=URL
       // overrides the proxy; ?ship=N spawns N deterministic
       // synthetic vessels for the offline harness.
-      const AIS_PROXY =
-        params.get('ais') ?? 'https://horizon-adsb.ndevtk.workers.dev/ais';
+      const AIS_PROXY = params.get('ais') ?? 'https://api.ndev.tk/ais';
       const SHIP_N = 8;
       const SHIP_LOA = 90 / 57.14; // scene units (90 m)
       const NAV_COLOR = {

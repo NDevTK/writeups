@@ -1549,11 +1549,24 @@ Scenes (all at Grindelwald unless noted):
       deliberately a few KB). Optional: Cloudflare orange-cloud
       in FRONT for inbound shielding while outbound keeps the
       clean IP - the best of both measured worlds.
-    - After the box exists: /probe from ITS IP decides upstream
-      order (and whether OpenSky rejoins); theme tested via
-      ?ais=/?adsb= overrides, then ADSB_PROXY/AIS_PROXY defaults
-      switch in Horizon.html and the worker retires or stays as
-      documented fallback.
+    - DEPLOYED at https://api.ndev.tk (GCP box behind
+      Cloudflare orange-cloud with an Origin CA cert, Full
+      strict - the 525 on first try was the Caddy-ACME
+      chicken-and-egg, solved exactly that way). Measured from
+      ITS IP via /probe: control 200, opensky-api 200/683 ms
+      (OpenSky IS back on a dedicated IP), adsb.lol 200 (serving
+      /adsb first, 10 aircraft over Heathrow), adsb.fi 200,
+      airplanes.live 200 - EVERYTHING answers; the shared-egress
+      thesis fully confirmed. /health on first full deploy:
+      23,344 ships resident in 917 grid cells, ~104 frames/s,
+      badFrames 0 (the ships:0 mystery was OUR Blob bug, fixed
+      and gated - the owner's key was fine all along); Dover
+      Strait answered with named vessels (ZIM VIETNAM 14.5 kt
+      hdg 017, GAS NOBLE, NAVIGATOR LUNA...). Origin lock holds
+      through Cloudflare: foreign origin 403, site origin exact
+      echo. ADSB_PROXY/AIS_PROXY defaults in Horizon.html now
+      point at api.ndev.tk; the horizon-adsb worker stays
+      deployed as documented fallback (?adsb=/?ais= overrides).
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
