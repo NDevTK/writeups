@@ -775,6 +775,57 @@ Scenes (all at Grindelwald unless noted):
         (Hs 8 m, Tp 16 s): the saturated breaker wedge fills the
         shallow corner and partial-Qb foam sits ON the crests in the
         mid-zone instead of painting a flat depth band.
+  - DONE: bathymetry depth texture upgraded to what the source data
+    supports - 512^2 float texels with linear filtering over the
+    16 km world (31 m/texel = the z12 terrarium resolution itself;
+    going higher would invent data). The old 128^2 8-bit
+    nearest-filtered texture quantised depth to 0.157 m steps in
+    125 m blocks and could not resolve the surf band at all. The
+    harness page's synthetic ramp matches (float + linear).
+  - DONE: Zirr & Kaplanyan 2016 procedural multiscale glints for the
+    snow (snow-glints.js pure-JS single source + glint-reference.mjs,
+    reference-first; terrain-tsl.js carries the node mirror).
+    - Model: RHO = 30k specular ice crystals per m^2, mirror facets
+      with a GGX orientation spread (alpha 0.35, FSPEC area
+      fraction 0.12, ice F0 0.018); a crystal glints when its normal
+      falls in the sun cone around the half vector,
+      p(h) = D(h)(n.h) Omega_g. The pixel footprint (fwidth,
+      metres) selects a two-level cell stack (bilinear cell weights,
+      fractional-level blend - the paper's spatial reconstruction);
+      each cell's count is Poisson(nbar) - the binomial's
+      large-RHO limit the paper invokes - drawn by inverse CDF on
+      ONE deterministic uniform from pcg3d(cell, level, h-bin)
+      (Jarzynski & Olano 2020). Above nbar = 3 the crystals are
+      sub-pixel and a matched mean/variance uniform stands in (the
+      paper's Gaussian regime). All hash inputs are kept
+      non-negative integers so JS, WGSL and GLSL agree bit-exactly.
+    - Energy conservation by construction: the glint factor is
+      sum(w N)/nbar_pix with E[factor] = 1, multiplying the exact
+      smooth facet lobe (GGX D projected-area normalised - the
+      reference integrates it to 1.00000 - height-correlated Smith
+      V, Schlick F). Reference statistics: factor mean 1.00 at
+      every scale with rel-sd 2.5 at a 4 cm footprint (that IS the
+      sparkle) dying to 0.017 at 8 m (converged to the smooth
+      lobe).
+    - tsl-glint-probe.html: GPU pcg3d lanes and Poisson counts equal
+      the CPU single source BIT FOR BIT on BOTH backends (0/64 hash,
+      0/128 count mismatches).
+    - Like the sea glitter, the glint rides the emissive path (not
+      CSM-shadowed - documented, consistent; energy only in direct
+      sun via uSunCol).
+    - Two port bugs the standalone probe could not catch (they were
+      in the zKey/level mixing the probe did not exercise), found by
+      an in-scene compile error (f32 \* u32): VECTOR .toInt()
+      collapses to a scalar - same measured class as the ocean's
+      ivec2.toFloat() - so the half-vector bin must be three SCALAR
+      floor().toInt() conversions; and an integer literal above 2^31
+      (2654435761) is unsafe in the shader generators - replaced by
+      1597334677 in both the JS single source and the node mirror.
+    - Scene validation: pinned overcast snow matrix scene A/B 0.328
+      mean (the certified deck profile; terrain rows 0.008-0.07);
+      sunny fresh-snow visual (temp=-2, snow=0.5, code=0) shows
+      surface-anchored sparkle points on the foreground slopes,
+      distinct from the falling flakes.
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:

@@ -8,21 +8,42 @@ import {
   cross,
   dot,
   exp,
+  exp2,
   float,
+  floor,
   fract,
+  fwidth,
+  int,
+  length,
+  log2,
   max,
   mix,
   normalize,
   positionWorld,
   pow,
+  select,
   sin,
   smoothstep,
+  sqrt,
   texture,
   transformNormalToView,
+  uint,
   uniform,
   vec2,
   vec3
 } from 'three/tsl';
+import {
+  ALPHA_G,
+  CELL0,
+  F0_ICE,
+  FSPEC,
+  LMAX,
+  HBIN,
+  N_GAUSS,
+  NBAR_MIN,
+  OMEGA_G,
+  RHO
+} from './snow-glints.js';
 
 /**
  * TSL port of Horizon's terrain material (WebGPU project, phase 2).
@@ -142,6 +163,138 @@ export function createTerrainNodeMaterial(normalMapTex, aerial) {
       .mul(6.0);
   });
 
+  // ---------- Zirr-Kaplanyan snow glints (see snow-glints.js) ----
+  // The counting model's node mirror. Every hash input is a
+  // non-negative integer, so pcg3d (uint32-exact on both backends)
+  // matches the CPU reference bit for bit; the probe page
+  // (harness/tsl-glint-probe.html) checks the integers directly.
+  const pcg3dX = (x, y, z) => {
+    let vx = x.mul(uint(1664525)).add(uint(1013904223));
+    let vy = y.mul(uint(1664525)).add(uint(1013904223));
+    let vz = z.mul(uint(1664525)).add(uint(1013904223));
+    vx = vx.add(vy.mul(vz));
+    vy = vy.add(vz.mul(vx));
+    vz = vz.add(vx.mul(vy));
+    vx = vx.bitXor(vx.shiftRight(uint(16)));
+    vy = vy.bitXor(vy.shiftRight(uint(16)));
+    vz = vz.bitXor(vz.shiftRight(uint(16)));
+    vx = vx.add(vy.mul(vz));
+    return vx; // only the first lane is consumed
+  };
+
+  // Poisson count by inverse CDF on one uniform (unrolled k <= 6,
+  // matching the reference's truncation); above N_GAUSS the crystals
+  // are sub-pixel and a matched mean/variance uniform stands in
+  // (the paper's Gaussian regime).
+  const countFromU = (u2, nbar) => {
+    let p = exp(nbar.negate());
+    let cdf = p;
+    let N = float(0);
+    for (let k = 1; k <= 6; k++) {
+      N = N.add(select(u2.greaterThan(cdf), 1.0, 0.0));
+      p = p.mul(nbar).div(k);
+      cdf = cdf.add(p);
+    }
+    const gauss = nbar.add(u2.sub(0.5).mul(sqrt(nbar.mul(12))));
+    return select(nbar.lessThanEqual(N_GAUSS), N, gauss);
+  };
+
+  const min2 = (a, b) => select(a.lessThan(b), a, b);
+
+  // The glint factor: E[factor] = 1, so it multiplies the analytic
+  // smooth facet lobe without changing its mean - near snow breaks
+  // into discrete sparkle, far snow converges to the smooth lobe.
+  const glintFactorNode = (pm, aM, hb, pHit) => {
+    const lf = clamp(log2(max(aM, CELL0).div(CELL0)), 0.0, LMAX);
+    const l0 = floor(lf);
+    const tl = fract(lf);
+    // hb components are SCALAR int nodes (vector .toInt() collapses
+    // to a scalar - measured; scalar conversions are exact).
+    const zKey = uint(hb[0].add(int(512)))
+      .mul(uint(73856093))
+      .bitXor(uint(hb[1].add(int(512))).mul(uint(19349663)))
+      .bitXor(uint(hb[2].add(int(512))).mul(uint(83492791)));
+    let sum = float(0);
+    let nbarPix = float(0);
+    for (let li = 0; li < 2; li++) {
+      const l = li === 0 ? l0 : min2(l0.add(1), LMAX);
+      const wl = li === 0 ? float(1).sub(tl) : tl;
+      const s = exp2(l).mul(CELL0);
+      const nbarCell = s.mul(s).mul(RHO).mul(pHit);
+      nbarPix = nbarPix.add(wl.mul(nbarCell));
+      const f = pm.div(s).sub(0.5);
+      const c = floor(f);
+      const b = f.sub(c);
+      const lKey = zKey.bitXor(uint(l.toInt()).mul(uint(1597334677)));
+      for (let j = 0; j < 2; j++) {
+        for (let i = 0; i < 2; i++) {
+          const w = wl
+            .mul(i ? b.x : float(1).sub(b.x))
+            .mul(j ? b.y : float(1).sub(b.y));
+          const hx = pcg3dX(
+            uint(c.x.toInt().add(int(i + 1048576))),
+            uint(c.y.toInt().add(int(j + 1048576))),
+            lKey
+          );
+          const u2 = hx.toFloat().mul(1 / 4294967296);
+          sum = sum.add(w.mul(countFromU(u2, nbarCell)));
+        }
+      }
+    }
+    return sum.div(max(nbarPix, NBAR_MIN));
+  };
+
+  // Smooth facet lobe (exact GGX D + height-correlated Smith V +
+  // Schlick F on ice), scaled by the crystal area fraction. The
+  // glint factor modulates it.
+  const snowGlint = Fn(([wp, nSnow]) => {
+    const V = normalize(cameraPosition.sub(wp));
+    const L = u.uSunDirW;
+    const H = normalize(V.add(L));
+    const nh = clamp(dot(nSnow, H), 0.0, 1.0);
+    const nv = clamp(dot(nSnow, V), 1e-4, 1.0);
+    const nl = clamp(dot(nSnow, L), 0.0, 1.0);
+    const a2 = ALPHA_G * ALPHA_G;
+    const t = nh
+      .mul(nh)
+      .mul(a2 - 1)
+      .add(1);
+    const D = t
+      .mul(t)
+      .mul(Math.PI / a2)
+      .reciprocal();
+    const lv = nl.mul(
+      sqrt(
+        nv
+          .mul(nv)
+          .mul(1 - a2)
+          .add(a2)
+      )
+    );
+    const ll = nv.mul(
+      sqrt(
+        nl
+          .mul(nl)
+          .mul(1 - a2)
+          .add(a2)
+      )
+    );
+    const Vis = float(0.5).div(max(lv.add(ll), 1e-9));
+    const F = pow(clamp(float(1).sub(dot(V, H)), 0.0, 1.0), 5.0)
+      .mul(1 - F0_ICE)
+      .add(F0_ICE);
+    const smooth2 = D.mul(Vis).mul(F).mul(nl).mul(FSPEC);
+    const pm = wp.xz.mul(57.14);
+    const aM = length(fwidth(pm));
+    const hb = [
+      floor(H.x.mul(HBIN)).toInt(),
+      floor(H.y.mul(HBIN)).toInt(),
+      floor(H.z.mul(HBIN)).toInt()
+    ];
+    const pHit = D.mul(nh).mul(OMEGA_G);
+    return u.uSunCol.mul(smooth2.mul(glintFactorNode(pm, aM, hb, pHit)));
+  });
+
   const wet = attribute('wet', 'float');
 
   // Shared pieces of the material decision (deduplicated by the graph).
@@ -200,8 +353,14 @@ export function createTerrainNodeMaterial(normalMapTex, aerial) {
   );
 
   // Glitter adds to the outgoing light exactly like the GLSL
-  // `outgoingLight += vWet * seaSpec(vWp)`.
-  const emissiveNode = seaSpec(positionWorld).mul(wet);
+  // `outgoingLight += vWet * seaSpec(vWp)`; snow adds the
+  // Zirr-Kaplanyan crystal sparkle on dry snowy pixels (like the sea
+  // glitter, the emissive path is not CSM-shadowed - documented,
+  // consistent with the existing model; glints only carry energy in
+  // direct sun via uSunCol).
+  const emissiveNode = seaSpec(positionWorld)
+    .mul(wet)
+    .add(snowGlint(positionWorld, nW).mul(snow).mul(wet.oneMinus()));
 
   const mat = new MeshStandardNodeMaterial({metalness: 0});
   mat.colorNode = colorNode;

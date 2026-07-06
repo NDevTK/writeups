@@ -74,13 +74,14 @@
           wn.minFilter = T.LinearFilter;
         }
 
-        // synthetic bathymetry ramp: shallow at -x, deep at +x (same data both pages)
+        // synthetic bathymetry ramp: shallow at -x, deep at +x
+        // (float + linear, matching the theme's depth texture)
         const D = 64;
-        const dArr = new Uint8Array(D * D);
+        const dArr = new Float32Array(D * D);
         for (let j = 0; j < D; j++)
-          for (let i = 0; i < D; i++)
-            dArr[j * D + i] = Math.min(255, (i / (D - 1)) * 255);
-        const depthTex = new T.DataTexture(dArr, D, D, T.RedFormat);
+          for (let i = 0; i < D; i++) dArr[j * D + i] = i / (D - 1);
+        const depthTex = new T.DataTexture(dArr, D, D, T.RedFormat, T.FloatType);
+        depthTex.minFilter = depthTex.magFilter = T.LinearFilter;
         depthTex.needsUpdate = true;
 
         const sunDir = new T.Vector3(0.5, 0.35, -0.8).normalize();

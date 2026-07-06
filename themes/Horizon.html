@@ -1459,8 +1459,13 @@
           // breaking - all carried at source level in the
           // HorizonWaterMesh fork, against the REAL bathymetry sampled
           // from the terrarium tiles into a depth texture.
-          const DT = 128;
-          const dArr = new Uint8Array(DT * DT);
+          // 512^2 float texels over the 16 km world = 31 m/texel -
+          // the z12 terrarium source resolution itself (the surf
+          // band is a few tens of metres; the old 128^2 8-bit
+          // nearest-sampled texture could not resolve it at all,
+          // and 0.157 m quantisation stepped the McCowan-era ramp).
+          const DT = 512;
+          const dArr = new Float32Array(DT * DT);
           let dSum = 0;
           let dCnt = 0;
           for (let dj = 0; dj < DT; dj++)
@@ -1475,13 +1480,16 @@
                 dSum += -e;
                 dCnt++;
               }
-              dArr[dj * DT + di] = THREE.MathUtils.clamp(
-                (-e / 40) * 255,
-                0,
-                255
-              );
+              dArr[dj * DT + di] = THREE.MathUtils.clamp(-e / 40, 0, 1);
             }
-          const depthTex = new THREE.DataTexture(dArr, DT, DT, THREE.RedFormat);
+          const depthTex = new THREE.DataTexture(
+            dArr,
+            DT,
+            DT,
+            THREE.RedFormat,
+            THREE.FloatType
+          );
+          depthTex.minFilter = depthTex.magFilter = THREE.LinearFilter;
           depthTex.needsUpdate = true;
           // Tessendorf FFT ocean cascades (phase 5): JONSWAP/TMA at
           // the real wind, TMA depth from the mean of the real
