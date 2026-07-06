@@ -58,6 +58,7 @@ import {
   Z_MIN
 } from './aurora-lut.js';
 import {EYE_D_CM, SIGMA_MAX, youngSigma} from './scintillation.js';
+import {AGLOW_GAIN, LINES, R_EARTH} from './airglow.js';
 
 /**
  * Horizon's sky objects as TSL node materials (WebGPU project,
@@ -259,6 +260,52 @@ export function createAuroraMaterial() {
   material.colorNode = col.mul(a);
   material.opacityNode = clamp(lut.r.add(lut.g).add(lut.b).mul(a), 0.0, 1.0);
   return {material, u, setE0};
+}
+
+// Nightglow dome (airglow.js): the PALACE line model's three
+// visible groups - the [OI] 557.7 nm green line (97 km), the
+// ionospheric [OI] red doublet (250 km) and Na D (92 km) - each
+// with its own van Rhijn horizon brightening (PALACE Eq. 3; thin
+// layers brighten toward the horizon, lower layers more), the
+// measured-F10.7 solar scaling folded into uLineI CPU-side
+// (PALACE Eq. 1), and the engine's OWN Hillaire zenith
+// transmittance raised to the Rozenberg airmass (PALACE Eq. 4/5
+// pattern) so extinction eats the ring right at the horizon. The
+// per-line structure is exact; AGLOW_GAIN is the one documented
+// exposure (same pattern as the aurora curtains).
+export function createAirglowMaterial() {
+  const u = {
+    night: uniform(0),
+    // lineStrengths(srf): luminance-weighted, green = 1 at 100 sfu.
+    uLineI: uniform(new Vector3(1, 0.221, 0.164)),
+    // Hillaire zenith transmittance (sunTransmittanceJS(1, mie)).
+    uTzen: uniform(new Vector3(0.94, 0.87, 0.72))
+  };
+  const C = LINES.map((l) => wavelengthToLinearSRGB(l.lam));
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = BackSide;
+  material.blending = AdditiveBlending;
+  const cosZ = clamp(normalize(positionWorld.sub(cameraPosition)).y, 0.0, 1.0);
+  const s2 = float(1).sub(cosZ.mul(cosZ));
+  const vr = (hKm) => {
+    const q = R_EARTH / (R_EARTH + hKm * 1e3);
+    return float(1).div(sqrt(float(1).sub(s2.mul(q * q))));
+  };
+  const X = float(1).div(cosZ.add(exp(cosZ.mul(-11)).mul(0.025)));
+  const T = pow(vec3(u.uTzen), X);
+  const col = vec3(...C[0])
+    .mul(u.uLineI.x.mul(vr(LINES[0].hKm)))
+    .add(vec3(...C[1]).mul(u.uLineI.y.mul(vr(LINES[1].hKm))))
+    .add(vec3(...C[2]).mul(u.uLineI.z.mul(vr(LINES[2].hKm))))
+    .mul(T)
+    .mul(AGLOW_GAIN);
+  // Additive blend multiplies colour by alpha once - night gates
+  // through the opacity alone.
+  material.colorNode = col;
+  material.opacityNode = u.night;
+  return {material, u};
 }
 
 // Rainbows at the Descartes angles + the 22-deg halo with sundogs,

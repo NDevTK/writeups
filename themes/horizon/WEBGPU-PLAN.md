@@ -1164,6 +1164,45 @@ Scenes (all at Grindelwald unless noted):
       pixel: v_RMS 14.3 m/s -> sigma x0.84, 297 Hz -> rate 5.9.
       Both feed the provenance panel via the new Hufnagel-Valley
       record. Night scene shot clean.
+  - DONE: nightglow (airglow.js + the sky dome in
+    sky-objects-tsl.js) - the night sky's own light, from PALACE
+    v1.0 (Noll et al. 2025, arXiv:2504.10683, the X-shooter-built
+    successor of the ESO Sky Model), driven by the MEASURED solar
+    radio flux:
+    - Lines (PALACE Tables 2/4 + Sect. 4 verbatim): [OI] 557.7 nm
+      163 R at 97 km (m_SCE +0.754), the ionospheric [OI]
+      630.0+636.4 nm doublet 164 R at 250 km (+1.432), Na D 36.5 R
+      at 92 km (+0.235) - the three dominant VISIBLE groups (OH's
+      715 kR live in the near-IR).
+    - Solar activity (PALACE Eq. 1, f0 = 1 annual mean):
+      1 + 0.01 m_SCE (srf - 100), srf from the NOAA SWPC F10.7 feed
+      (syncF107, trailing 27-day mean per PALACE's centred 27-day
+      regression basis; ?f107=N pins it). The reference printer
+      closes the loop between the two published models: scaling
+      163 R from 100 to 129 sfu lands within 4.5% of the ESO Sky
+      Model's 190 R reference.
+    - Geometry: per-line van Rhijn (Eq. 3, R = 6371 km) - exactly 1
+      at zenith, 5.8x on the horizon for 97 km, and provably WEAKER
+      (3.67x) for the 250 km red layer; extinction is the engine's
+      own Hillaire zenith transmittance (sunTransmittanceJS at the
+      live aerosol load) raised to the Rozenberg (1966) airmass
+      (Eq. 5; exactly 40 on the horizon) - the same T_ref^X pattern
+      PALACE itself uses (Eq. 4), so the ring dies right at the
+      horizon.
+    - Photometry: line weights are LUMINANCE-exact - energy
+      radiance (1 R = 1e10/4pi photons s^-1 m^-2 sr^-1, PALACE
+      Sect. 2) times CIE Y from the same Wyman/Sloan/Shirley fit
+      the aurora colours use (needed because
+      wavelengthToLinearSRGB peak-normalises, stripping V(lambda);
+      the first shot proved it - the red doublet painted the sky
+      orange until the luminance weights restored the real GREEN
+      dominance). Absolute check: 163 R of 557.7 nm is 3.1e-5
+      cd/m^2 = 17% of the canonical 21.9 mag/arcsec^2 moonless sky.
+      AGLOW_GAIN = 0.015 is the one documented exposure on the
+      exact relative structure (the aurora-curtain pattern). Night
+      scene shot clean: subtle green-tinted band above the
+      ridgeline over a near-black zenith, 8-14/255 linear.
+      airglow-reference.mjs is landmark set 14 in the gate.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

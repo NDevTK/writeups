@@ -182,12 +182,14 @@
       import {
         createVeilMaterial,
         createMoonMaterial,
+        createAirglowMaterial,
         createAuroraMaterial,
         createOpticsMaterial,
         createStarSprites,
         createPlanetSprites,
         createPrecipSprites
       } from './horizon/sky-objects-tsl.js';
+      import {lineStrengths} from './horizon/airglow.js';
       import {CSMShadowNode} from './horizon/CSMShadowNode.js';
 
       const params = new URL(location.href).searchParams;
@@ -965,6 +967,41 @@
           if (inside) return true;
         }
         return false;
+      }
+
+      // Solar 10.7 cm radio flux (NOAA SWPC): drives the airglow
+      // line intensities via PALACE Eq. 1. PALACE regressed on
+      // centred 27-day averages; live we take the trailing 27-day
+      // mean of the SWPC feed (~3 reports/day, newest first).
+      async function syncF107() {
+        if (params.has('f107')) {
+          airglowU.uLineI.value.fromArray(lineStrengths(+params.get('f107')));
+          return;
+        }
+        try {
+          const rows = await (
+            await fetch(
+              'https://services.swpc.noaa.gov/json/f107_cm_flux.json',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const fs = rows
+            .slice(0, 81)
+            .map((r) => +r.flux)
+            .filter((f) => f > 0);
+          if (!fs.length) return;
+          const srf = fs.reduce((a, b) => a + b, 0) / fs.length;
+          state.f107 = srf;
+          airglowU.uLineI.value.fromArray(lineStrengths(srf));
+          record(
+            'NOAA SWPC F10.7',
+            srf.toFixed(0) +
+              ' sfu (27-day mean) · airglow lines x' +
+              (1 + 0.00754 * (srf - 100)).toFixed(2)
+          );
+        } catch {
+          // The 100 sfu PALACE reference intensities stay.
+        }
       }
 
       async function syncKp() {
@@ -2003,6 +2040,18 @@
       aurora.position.y = 420;
       scene.add(aurora);
 
+      // Nightglow dome: the PALACE airglow line model (airglow.js) -
+      // the [OI] green line, red doublet and Na D with per-layer van
+      // Rhijn horizon brightening, measured-F10.7 solar scaling and
+      // the engine's own zenith transmittance for extinction.
+      const airglowObj = createAirglowMaterial();
+      const airglowU = airglowObj.u;
+      const airglow = new THREE.Mesh(
+        new THREE.SphereGeometry(770, 48, 24),
+        airglowObj.material
+      );
+      scene.add(airglow);
+
       // Atmospheric optics on one additive dome:
       // - primary and secondary rainbows at their Descartes angles (42.0
       //   and 51 deg around the antisolar point, reversed colours,
@@ -2676,6 +2725,12 @@
             18
           );
         }
+        // Nightglow: per-line solar scaling arrives via syncF107
+        // (uLineI); extinction rides the engine's own zenith
+        // transmittance at the current aerosol load; gated with the
+        // stars.
+        airglowU.night.value = nightSky * (1 - cloudy * 0.85);
+        airglowU.uTzen.value.fromArray(sunTransmittanceJS(1, mieScale));
         if (constMat) constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2;
         // Venus and Jupiter pierce twilight a little before the stars.
         planetObj.u.night.value =
@@ -3351,6 +3406,8 @@
         setInterval(syncAloft, 30 * 60 * 1000);
         syncForests();
         syncBrdf();
+        syncF107();
+        setInterval(syncF107, 6 * 60 * 60 * 1000);
         syncKp();
         setInterval(syncKp, 15 * 60 * 1000);
         syncOvation();
