@@ -66,6 +66,8 @@ import {
 import {EYE_D_CM, SIGMA_MAX, youngSigma} from './scintillation.js';
 import {AGLOW_GAIN, LINES, R_EARTH} from './airglow.js';
 import {buildZodiacalGrid, OBLIQUITY, zlPerGreen} from './zodiacal.js';
+import {ang2pix, cellS10, CELL_AREA_DEG2} from './milkyway.js';
+import {MW_FBP, MW_FG, MW_FRP} from './milkyway-data.js';
 
 /**
  * Horizon's sky objects as TSL node materials (WebGPU project,
@@ -109,7 +111,12 @@ export function createMoonMaterial() {
   const u = {
     sunDirM: uniform(new Vector3(0, 1, 0)),
     albM: uniform(new Color('#cdd4e2')),
-    glowM: uniform(new Color('#0c0f16'))
+    glowM: uniform(new Color('#0c0f16')),
+    // earthlight/sunlight illuminance ratio (earthshine.js: the
+    // Goode 2001 measured Earth albedo through the Lambert phase
+    // law at the exact complement of the lunar phase; ~8e-5 at
+    // new moon, 0 at full) - fed per frame by the theme
+    eshine: uniform(0)
   };
   const material = new NodeMaterial();
 
@@ -172,7 +179,27 @@ export function createMoonMaterial() {
     rHapke.mul(0.5 / R_FULL_CENTRE),
     0.0
   );
-  material.colorNode = u.albM.mul(lunar).mul(2.0).add(u.glowM);
+  // Earthshine: the dark limb is lit FROM the observer's own
+  // direction - true opposition geometry - so the SAME Hapke
+  // kernel applies with incidence along the view: mu0 = mu and
+  // g = 0, where the SHOE surge is fully on (B = B0) and the
+  // Henyey-Greenstein lobe takes its closed-form backscatter
+  // value P(0) = (1 - xi^2)/(1 + xi^2 + 2 xi)^1.5. u.eshine
+  // carries the earthlight/sunlight ratio; the whole disc gets
+  // the term (its contribution under the sunlit side is 1e-4 of
+  // the sunlight - invisible there, the ashen glow elsewhere).
+  const P0 = (1 - XI * XI) / Math.pow(1 + XI * XI + 2 * XI, 1.5);
+  const earthlit = select(
+    mu.greaterThan(0.0),
+    hapkeH(mu)
+      .mul(hapkeH(mu))
+      .add((B0 + 1) * P0 - 1)
+      .mul(0.5)
+      .mul(0.5 / R_FULL_CENTRE)
+      .mul(u.eshine),
+    0.0
+  );
+  material.colorNode = u.albM.mul(lunar.add(earthlit)).mul(2.0).add(u.glowM);
   return {material, u};
 }
 
@@ -690,6 +717,204 @@ export function createFlashMaterial() {
   const r2 = uv().sub(0.5).length().mul(2).clamp(0, 1).pow(2);
   const glow = exp(r2.mul(-4));
   material.colorNode = vec3(0.82, 0.87, 1.0).mul(glow.mul(u.amp));
+  material.opacityNode = float(1);
+  return {material, u};
+}
+
+// The Milky Way dome: Gaia DR3 integrated starlight
+// (milkyway.js / milkyway-data.js - every DR3 source aggregated
+// server-side at ESA, minus the G < 5.5 bright end the theme
+// draws as individual stars). The bake below runs the EXACT
+// per-cell pipeline (nested ang2pix -> Riello G-V -> S10) into an
+// equirect texture in the CELESTIAL frame the dome's object space
+// already is; a 3-tap smoothing pass softens the 1.8-deg HEALPix
+// cells (documented display smoothing on exact data). Photometry
+// rides the SAME zlPerGreen base and AGLOW_GAIN as the zodiacal
+// light, so the galaxy/zodiacal contrast carries no free
+// parameter; the colour tint from each cell's integrated BP-RP is
+// the one documented display mapping (bluish 0.6 -> warm 1.6).
+export function buildMilkyWayGrid(W, H) {
+  const lum = new Float32Array(W * H);
+  const tint = new Float32Array(W * H * 2); // bpRp packed later
+  for (let y = 0; y < H; y++) {
+    const dec = ((y + 0.5) / H - 0.5) * Math.PI;
+    for (let x = 0; x < W; x++) {
+      const ra = ((x + 0.5) / W) * 2 * Math.PI;
+      const pix = ang2pix(Math.sin(dec), ra);
+      const {s10, bpRp} = cellS10(
+        MW_FG[pix],
+        MW_FBP[pix],
+        MW_FRP[pix],
+        CELL_AREA_DEG2
+      );
+      lum[y * W + x] = s10;
+      tint[(y * W + x) * 2] = bpRp;
+    }
+  }
+  // separable 3-tap [1 2 1]/4, run twice: RA wraps, Dec clamps
+  const blur = (src) => {
+    const a = new Float32Array(src);
+    for (let pass = 0; pass < 2; pass++) {
+      for (let y = 0; y < H; y++) {
+        const row = new Float32Array(W);
+        for (let x = 0; x < W; x++) {
+          row[x] =
+            0.25 * a[y * W + ((x + W - 1) % W)] +
+            0.5 * a[y * W + x] +
+            0.25 * a[y * W + ((x + 1) % W)];
+        }
+        a.set(row, y * W);
+      }
+      for (let x = 0; x < W; x++) {
+        const col = new Float32Array(H);
+        for (let y = 0; y < H; y++) {
+          const y0 = Math.max(y - 1, 0);
+          const y1 = Math.min(y + 1, H - 1);
+          col[y] =
+            0.25 * a[y0 * W + x] + 0.5 * a[y * W + x] + 0.25 * a[y1 * W + x];
+        }
+        for (let y = 0; y < H; y++) a[y * W + x] = col[y];
+      }
+    }
+    return a;
+  };
+  const lumB = blur(lum);
+  const data = new Float32Array(W * H * 4);
+  for (let i = 0; i < W * H; i++) {
+    const c = Math.min(Math.max((tint[i * 2] - 0.6) / 1.0, 0), 1);
+    // bluish-white (0.6) -> warm (1.6) - display mapping
+    data[i * 4] = (0.82 + 0.18 * c) * lumB[i];
+    data[i * 4 + 1] = (0.9 - 0.02 * c) * lumB[i];
+    data[i * 4 + 2] = (1.0 - 0.28 * c) * lumB[i];
+    data[i * 4 + 3] = 1;
+  }
+  return data;
+}
+
+export function createMilkyWayMaterial() {
+  const u = {
+    night: uniform(0),
+    uScale: uniform(zlPerGreen()),
+    uTzen: uniform(new Vector3(0.94, 0.87, 0.72))
+  };
+  const W = 512;
+  const H = 256;
+  const tex = new DataTexture(
+    buildMilkyWayGrid(W, H),
+    W,
+    H,
+    RGBAFormat,
+    FloatType
+  );
+  tex.minFilter = tex.magFilter = LinearFilter;
+  tex.needsUpdate = true;
+  const mapNode = texture(tex);
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = BackSide;
+  material.blending = AdditiveBlending;
+  // Object space IS the celestial frame (the star convention:
+  // x = cosDec sinRA, y = sinDec, z = cosDec cosRA).
+  const d = normalize(positionLocal);
+  const dec = asin(clamp(d.y, -1, 1));
+  const ra = atan(d.x, d.z);
+  const uvm = vec2(
+    mod(ra.div(2 * Math.PI).add(1), 1),
+    dec.div(Math.PI).add(0.5)
+  );
+  const s = mapNode.sample(uvm);
+  const cosZ = clamp(normalize(positionWorld.sub(cameraPosition)).y, 0.0, 1.0);
+  const X = float(1).div(cosZ.add(exp(cosZ.mul(-11)).mul(0.025)));
+  const T = pow(vec3(u.uTzen), X);
+  material.colorNode = T.mul(s.rgb.mul(u.uScale).mul(AGLOW_GAIN));
+  material.opacityNode = u.night;
+  return {material, u};
+}
+
+// Noctilucent clouds (nlc.js): the 83-km mesospheric ice shell,
+// lit only where it still sees the sun while the observer stands
+// in twilight darkness. The fragment mirrors nlc.js EXACTLY in
+// world kilometres - closed-form ray-shell distance, then the
+// Earth's shadow cylinder widened by the 30 km Rozenberg
+// screening height; the published 6-16 deg visibility window is
+// GEOMETRY here, not a gate. Display elements (documented): the
+// gravity-wave billow pattern (two sine octaves, ~35/90 km, the
+// observed NLC band scales, drifting at the ~40 m/s mesospheric
+// wind), the forward-scattering brightening toward the sun, the
+// slant-path thickening toward the horizon, and the silvery-blue
+// tint. uAmp carries the season/latitude envelope and the 6-deg
+// sky-brightness gate from the CPU.
+export function createNLCMaterial() {
+  const u = {
+    uSunDirW: uniform(new Vector3(1, 0, 0)),
+    uAmp: uniform(0),
+    time: uniform(0)
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = BackSide;
+  material.blending = AdditiveBlending;
+  const R = 6371.0088;
+  const H = 83;
+  const SCREEN = 30;
+  const d = normalize(positionWorld.sub(cameraPosition));
+  const dy = d.y;
+  // exact shell distance (km): sqrt(R^2 dy^2 + H(2R+H)) - R dy
+  const t = sqrt(
+    dy
+      .mul(dy)
+      .mul(R * R)
+      .add(H * (2 * R + H))
+  ).sub(dy.mul(R));
+  const P = vec3(d.x.mul(t), dy.mul(t).add(R), d.z.mul(t));
+  const along = dot(P, u.uSunDirW);
+  const perp2 = dot(P, P).sub(along.mul(along));
+  const lit = select(
+    along.greaterThanEqual(0.0),
+    float(1),
+    step((R + SCREEN) * (R + SCREEN), perp2)
+  );
+  // soften the shadow edge over ~60 km of perpendicular distance
+  const soft = select(
+    along.greaterThanEqual(0.0),
+    float(1),
+    smoothstep(
+      (R + SCREEN) * (R + SCREEN),
+      (R + SCREEN + 60) * (R + SCREEN + 60),
+      perp2
+    )
+  );
+  // billows: two sine octaves in shell-plane kilometres, drifting
+  const drift = u.time.mul(0.04); // 40 m/s in km/s
+  const w1 = sin(P.x.add(drift.mul(35)).mul((2 * Math.PI) / 35))
+    .mul(sin(P.z.mul((2 * Math.PI) / 47)))
+    .mul(0.5)
+    .add(0.5);
+  const w2 = sin(
+    P.x
+      .mul((2 * Math.PI) / 90)
+      .add(P.z.mul((2 * Math.PI) / 110))
+      .add(drift)
+  )
+    .mul(0.5)
+    .add(0.5);
+  const billow = w1.mul(0.6).add(w2.mul(0.4)).pow(1.6);
+  // forward scattering toward the sun + slant-path thickening
+  const fwd = dot(d, u.uSunDirW).mul(0.5).add(0.5).pow(2).mul(0.75).add(0.25);
+  const slant = clamp(t.div(H).div(9.0), 0.0, 1.0);
+  const horizonFade = smoothstep(0.0, 0.03, dy); // above horizon only
+  material.colorNode = vec3(0.62, 0.74, 0.9).mul(
+    lit
+      .mul(soft)
+      .mul(billow)
+      .mul(fwd)
+      .mul(slant)
+      .mul(horizonFade)
+      .mul(u.uAmp)
+      .mul(0.32)
+  );
   material.opacityNode = float(1);
   return {material, u};
 }

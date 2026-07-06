@@ -1649,6 +1649,128 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
       UPDATE_BRANCH=claude/website-themes-discussion-jjh4yp in
       /etc/horizon-live.env to track the PR branch until #44
       merges, or leave main and deploys begin at merge.
+  - DONE: aircraft exterior lights (navlights.js) - the live
+    traffic layer now works around the clock. By day the ADS-B
+    aircraft lay Schmidt-Appleman contrails; after sunset they
+    carry what 14 CFR Part 25 CERTIFIES, the aviation twin of the
+    ships' COLREGS item:
+    - 25.1385/25.1389 arcs verbatim: red left / green right
+      forward position lights over 110 deg each (both reach dead
+      ahead), white tail light over the remaining 140 - tiling
+      the circle exactly (landmarked like Rule 21)
+    - the 25.1391 minimum-intensity table verbatim, BY ANGLE OFF
+      THE NOSE: 40 cd inside 10 deg, 30 to 20 deg, 5 to 110,
+      20 cd rear - so an aircraft flying straight at the camera
+      is 8x brighter than one crossing abeam, which is the real
+      night-sky look
+    - 25.1401 anti-collision strobes: 400 cd effective, 40-100
+      flashes/min - each aircraft's rate and phase deterministic
+      in its 24-bit ICAO hex, so the sky never blinks in unison
+      (landmark counts flashes/min for two hexes: in-band and
+      desynchronized)
+    - ONE Allard model with the ships (apparentLux imported;
+      visRangeM bisection meets it to 1e-9): a 40 cd position
+      light dies at 4.58 nm, the strobe carries to 8.92 - and
+      ranges are SLANT ranges (altitude included), so a jet 10 km
+      up overhead is 10 km away
+    - 91.209 lights from sunset to sunrise - the ships'
+      SUNSET_ELEV boundary reused
+    - Theme: applyTraffic now feeds TWO consumers - every valid
+      aircraft at ANY altitude (approach traffic low overhead is
+      the brightest sight of all) updates the 8-slot airLights
+      pool (dead-reckoning like ships, idempotent by hex), while
+      cruise-only traffic still queues for contrail slots.
+      navlights-reference.mjs is gate set 22 (4 landmarks).
+      ?plane=N spawns deterministic mixed-altitude crossings for
+      pinned shots.
+  - DONE: the Milky Way - Gaia DR3 integrated starlight, measured
+    star by star. No Pioneer table survives in machine-readable
+    form, so we went one better: TWO server-side ESA TAP
+    aggregations over the ENTIRE gaiadr3.gaia_source catalogue
+    (job ids + queries verbatim in milkyway-data.js) - G/BP/RP
+    flux sums per HEALPix level-5 cell for ALL sources, minus the
+    same sums for G < 5.5, because the theme draws the bright end
+    as individual Yale stars: the dome carries only light fainter
+    than the drawn catalogue, the very construction of the
+    Pioneer background maps. The counts sum to 1,811,709,771 -
+    the published DR3 total EXACTLY, asserted by the gate.
+    - milkyway.js (gate set 23, 5 landmarks): Gorski 2005 nested
+      pix2ang AND ang2pix - the round trip holds for ALL 12288
+      pixels, a landmark that immediately caught a real polar-cap
+      off-by-one (nr = jr, not jr+1) that spot checks had missed;
+      exact J2000 galactic rotation (l=0,b=0 -> RA 266.4050 Dec
+      -28.9362 textbook; NGP b=90; inverse exact); Riello 2021
+      G-V coefficients verbatim with the S10 unit closed by
+      construction (a lone V=10 star over 1 deg^2 -> s10 = 1 to
+      1e-9); whole-sky diffuse starlight G = -6.66 (classical
+      ~-6.7); plane/pole structure 207 vs 28.2 S10 - the pole
+      mean IN Toller's 20-40 band (the exact-NGP cell is
+      Poisson-dominated by undrawn 5.5-6.5 mag stars - 31 Com
+      sits on the pole - so only the ensemble is asserted, the
+      aurora lesson re-learned).
+    - Render: createMilkyWayMaterial bakes the exact per-cell
+      pipeline into a 512x256 equirect float texture in the
+      celestial frame (3-tap smoothing over the 1.8-deg cells is
+      the documented display smoothing; the BP-RP tint mapping is
+      the one documented display element), sampled on a dome
+      riding the star group with the SAME zlPerGreen base,
+      AGLOW_GAIN, night gate and zenith-transmittance extinction
+      as the zodiacal light - the galaxy/zodiacal contrast has NO
+      free parameter. milkyway-data.js is ~450 KB (4-sig-fig
+      fluxes; Pages gzips it to ~150 KB).
+  - DONE: earthshine (earthshine.js) - "the old moon in the new
+    moon's arms" completes the lunar photometry:
+    - the chain is closed-form and MEASURED at its anchor: the
+      Earth's phase from the Moon is the exact complement of the
+      Moon's phase from Earth (new moon = FULL Earth over the
+      thinnest crescent); the Earth's effective albedo is the Big
+      Bear programme's A* = 0.297 (Goode et al. 2001 - measured
+      by watching precisely the glow this item draws); Lambertian
+      sphere phase law at its exact nodes (f(pi/2) = 1/pi);
+      geometry on the shared IUGG radius (imported from
+      lightning.js - the model lives once)
+    - landmarks (gate set 24): full Earth from the Moon V =
+      -16.52 (published -17..-16.1), 33x the full Moon;
+      earthlight/sunlight = 8.16e-5 at new moon = A*(R_E/d)^2
+      exactly - the ashen side 10.2 mag below the sunlit surface
+      (the classical Danjon contrast); quarter = new/pi exactly;
+      full moon -> 0
+    - render: the dark limb is lit FROM the observer's direction
+      - TRUE OPPOSITION geometry - so createMoonMaterial applies
+      the SAME Hapke kernel with incidence along the view and
+      g = 0 (SHOE surge fully on, Henyey-Greenstein backscatter
+      P(0) in closed form): no separate photometric model, one
+      new uniform (the ratio, fed per frame from the same two
+      vectors the shader already uses). ?eshine=N scales for
+      harness shots.
+  - DONE: noctilucent clouds (nlc.js) - the 83-km mesospheric ice
+    shell, and the item's crown: the classical visibility window
+    is DERIVED, not gated. The exact construction - closed-form
+    ray-to-shell distance on the IUGG Earth (shared with
+    lightning.js), then the Earth's shadow cylinder widened by
+    Rozenberg's 30 km twilight screening - puts the last sunlit
+    patch toward the sunward horizon at 16.55 deg solar
+    depression: Gadsden & Schroeder's published "6-16 deg NLC
+    window" emerges from the geometry to within half a degree
+    (the 6-deg end stays as the documented sky-brightness gate).
+    Landmarks (gate set 25): shell distances at their closed
+    forms (zenith exactly h; horizon exactly sqrt(h(2R+h)));
+    zenith shadow boundary matching BOTH closed forms exactly -
+    solid Earth acos(R/(R+h)) = 9.20 deg (the textbook figure)
+    and screened acos((R+s)/(R+h)) = 7.35; sunward/antisolar
+    asymmetry at 12 deg; season envelope peaking exactly 22 days
+    after the observer's summer solstice (DeLand/Fiedler shape),
+    zero out of season/below 50 deg latitude, hemisphere flip
+    with year wrap exact. No live NLC feed exists, so
+    night-to-night variability is deliberately absent - in
+    season, at latitude, in the window, the climatological-mean
+    veil shows (documented display choice). Render: the TSL
+    fragment mirrors nlc.js exactly in world kilometres; the
+    billow pattern (~35/90 km gravity-wave scales drifting at
+    the mesospheric ~40 m/s), forward-scattering brightening,
+    slant-path thickening and silvery-blue tint are the
+    documented display elements. ?nlc=N forces the envelope
+    (geometry stays exact) for pinned shots.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
