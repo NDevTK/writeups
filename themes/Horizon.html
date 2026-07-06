@@ -187,9 +187,11 @@
         createOpticsMaterial,
         createStarSprites,
         createPlanetSprites,
-        createPrecipSprites
+        createPrecipSprites,
+        createZodiacalMaterial
       } from './horizon/sky-objects-tsl.js';
       import {lineStrengths} from './horizon/airglow.js';
+      import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {CSMShadowNode} from './horizon/CSMShadowNode.js';
 
       const params = new URL(location.href).searchParams;
@@ -210,11 +212,18 @@
       const RAD = Math.PI / 180;
       const days2000 = (d) => d.getTime() / 86400000 - 10957.5;
 
-      function sunEquatorial(d) {
+      // The sun's geocentric ecliptic longitude (radians) - the same
+      // NOAA low-precision series sunEquatorial builds on; the
+      // zodiacal light dome is anchored to it.
+      function sunEclipticLon(d) {
         const n = days2000(d);
         const L = (280.46 + 0.9856474 * n) % 360;
         const g = (357.528 + 0.9856003 * n) * RAD;
-        const lambda = (L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * RAD;
+        return (L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * RAD;
+      }
+
+      function sunEquatorial(d) {
+        const lambda = sunEclipticLon(d);
         const eps = 23.439 * RAD;
         return {
           ra: Math.atan2(Math.cos(eps) * Math.sin(lambda), Math.cos(lambda)),
@@ -1918,6 +1927,21 @@
       const polar = new THREE.Group();
       polar.add(celestial);
       scene.add(polar);
+      // Zodiacal light: the Leinert brightness map rides the SAME
+      // celestial dome as the stars, so the cone stands along the
+      // real ecliptic and the Gegenschein tracks the antisolar
+      // point (zodiacal.js; the shader rotates object-space
+      // directions into ecliptic coordinates).
+      const zodiObj = createZodiacalMaterial();
+      const zodiU = zodiObj.u;
+      // The photometric base (zlPerGreen) baked by the factory; the
+      // frame loop multiplies the live r^-2.3 onto it.
+      const zodiBase = zodiU.uScale.value;
+      const zodi = new THREE.Mesh(
+        new THREE.SphereGeometry(880, 48, 24),
+        zodiObj.material
+      );
+      celestial.add(zodi);
       let starObj = null;
       fetch('./horizon/stars.json')
         .then((r) => r.json())
@@ -2748,6 +2772,26 @@
         // stars.
         airglowU.night.value = nightSky * (1 - cloudy * 0.85);
         airglowU.uTzen.value.fromArray(sunTransmittanceJS(1, mieScale));
+        // Zodiacal light: anchored to the sun's ecliptic longitude,
+        // scaled by the Earth's REAL heliocentric distance (r^-2.3,
+        // ephemeris when the engine is loaded) and the Masana
+        // symmetry-plane sinusoid for |beta| >= 60 deg; same zenith
+        // transmittance, gated with the stars.
+        {
+          const dNow = now();
+          const sunLam = sunEclipticLon(dNow);
+          zodiU.night.value = nightSky * (1 - cloudy * 0.85);
+          zodiU.uSunLam.value = sunLam;
+          const AEg = window.Astronomy;
+          const rAU =
+            AEg && AEg.HelioDistance
+              ? AEg.HelioDistance(AEg.Body.Earth, dNow)
+              : 1;
+          zodiU.uScale.value = zodiBase * fR(rAU);
+          zodiU.uFs.value =
+            1 + 0.1 * Math.sin(sunLam + Math.PI - ZL_OMEGA * RAD);
+          zodiU.uTzen.value.copy(airglowU.uTzen.value);
+        }
         if (constMat) constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2;
         // Venus and Jupiter pierce twilight a little before the stars.
         planetObj.u.night.value =

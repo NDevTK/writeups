@@ -1227,6 +1227,47 @@ Scenes (all at Grindelwald unless noted):
       5-60 m mean is sub-percent on the spectrum; documented).
       NOTE the plan file is NOT prettier-managed - prettier escapes
       the math underscores; format code files only.
+  - DONE: zodiacal light (zodiacal.js + the celestial dome in
+    sky-objects-tsl.js) - scattered sunlight off the interplanetary
+    dust, the third and last major component of the moonless sky:
+    - Brightness: Leinert et al. 1998 (A&AS 127, 1) Table 17
+      VERBATIM - 19 x 10 helioecliptic grid at 500 nm in 1e-8 W
+      m^-2 sr^-1 um^-1, scraped from the journal's own HTML and
+      closed at beta = 90 with the paper's pole value (60 +- 3
+      S10sun x its own 1.28e-8 conversion = 77, held as a landmark).
+      Structure landmarks: the Gegenschein (230 at (180, 0)) is a
+      local maximum above the (135, 0) minimum of 179; monotonic
+      elongation and latitude declines. The five unobservable
+      sun-proximal cells fill by column extrapolation (daylight
+      there; never displayed).
+    - Geometry: the dome is a CHILD OF THE CELESTIAL GROUP, so the
+      cone stands on the real ecliptic and the Gegenschein rides
+      the antisolar point through the night. The shader rotates
+      object-space (equatorial) directions into ecliptic
+      coordinates by the obliquity - the exact TSL mirror of
+      eclipticOfDir(), which the reference roundtrips (sun built at
+      lam = 30 returns (30, 0) exactly; ecliptic pole at beta = 90).
+      The sun's ecliptic longitude comes from the SAME NOAA series
+      sunEquatorial always used (refactored, not duplicated).
+    - Modulation (Masana et al. 2021 eqs. 15-18): the Earth's REAL
+      heliocentric distance from the vendored ephemeris
+      (AE.HelioDistance) drives fR = r^-2.3 (+-4% over the year,
+      8.0% peri-to-aphelion held as a landmark), and the
+      symmetry-plane factor fS = 1 + 0.1 sin(LamE - 96 deg) breathes
+      the |beta| >= 60 sky by +-10% (eq. 17's own piecewise form).
+    - Photometry: table units convert to luminance through the
+      solar spectrum (5772 K Planck x the shared CIE-Y fit,
+      Gauss-Legendre) - landing the PUBLISHED surface brightnesses
+      untuned: ecliptic pole 23.24 V mag/arcsec^2 (~23.2), 
+      Gegenschein 22.05 (~22.0). The display cross-calibrates to
+      the airglow: one table unit = zlPerGreen() = 0.0224 of the
+      reference green line, so BOTH night-sky effects share the one
+      documented AGLOW_GAIN. Extinction is the shared zenith
+      transmittance to the Rozenberg airmass. Night scene shot
+      clean; the moonless sky now carries airglow + zodiacal light
+      at their true relative strengths (the ZL minimum really does
+      rival the green line - 22.9 vs ~23.3 mag/arcsec^2).
+      zodiacal-reference.mjs is landmark set 15 in the gate.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

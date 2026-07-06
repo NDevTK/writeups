@@ -5,6 +5,7 @@ import {
   DataTexture,
   FloatType,
   LinearFilter,
+  RedFormat,
   RGBAFormat,
   DoubleSide,
   InstancedBufferAttribute,
@@ -16,7 +17,10 @@ import {
 } from 'three/webgpu';
 import {
   Fn,
+  abs,
   acos,
+  asin,
+  atan,
   bitcast,
   instancedBufferAttribute,
   cameraPosition,
@@ -29,6 +33,7 @@ import {
   log,
   max,
   mix,
+  mod,
   modelViewMatrix,
   modelWorldMatrix,
   normalWorld,
@@ -41,6 +46,7 @@ import {
   sin,
   smoothstep,
   sqrt,
+  step,
   texture,
   uint,
   uniform,
@@ -59,6 +65,7 @@ import {
 } from './aurora-lut.js';
 import {EYE_D_CM, SIGMA_MAX, youngSigma} from './scintillation.js';
 import {AGLOW_GAIN, LINES, R_EARTH} from './airglow.js';
+import {buildZodiacalGrid, OBLIQUITY, zlPerGreen} from './zodiacal.js';
 
 /**
  * Horizon's sky objects as TSL node materials (WebGPU project,
@@ -304,6 +311,70 @@ export function createAirglowMaterial() {
   // Additive blend multiplies colour by alpha once - night gates
   // through the opacity alone.
   material.colorNode = col;
+  material.opacityNode = u.night;
+  return {material, u};
+}
+
+// Zodiacal light dome (zodiacal.js): Leinert et al. 1998 Table 17
+// resampled onto a regular helioecliptic grid, sampled per pixel
+// after an exact equatorial->ecliptic rotation of the CELESTIAL
+// object-space direction (the dome rides the star group, so the
+// cone tracks the real ecliptic through the night and the
+// Gegenschein sits at the antisolar point). The CPU feeds the sun's
+// ecliptic longitude, the Masana r^-2.3 heliocentric factor and
+// the +-10% symmetry-plane sinusoid (applied above 60 deg latitude,
+// eq. 17's own piecewise form); extinction is the shared zenith
+// transmittance to the Rozenberg airmass; photometry rides the
+// airglow's scale (zlPerGreen) under the SAME documented
+// AGLOW_GAIN.
+export function createZodiacalMaterial() {
+  const u = {
+    night: uniform(0),
+    uSunLam: uniform(0), // sun geocentric ecliptic longitude (rad)
+    uScale: uniform(zlPerGreen()), // x fR(r), CPU-fed per frame
+    uFs: uniform(1), // Masana fS sinusoid (|beta| >= 60 deg)
+    uTzen: uniform(new Vector3(0.94, 0.87, 0.72))
+  };
+  const W = 96;
+  const H = 48;
+  const tex = new DataTexture(
+    buildZodiacalGrid(W, H),
+    W,
+    H,
+    RedFormat,
+    FloatType
+  );
+  tex.minFilter = tex.magFilter = LinearFilter;
+  tex.needsUpdate = true;
+  const gridNode = texture(tex);
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = BackSide;
+  material.blending = AdditiveBlending;
+  // Object space IS the celestial (equatorial) frame; rotate about
+  // the equinox axis by the obliquity - the exact TSL mirror of
+  // zodiacal.js eclipticOfDir.
+  const d = normalize(positionLocal);
+  const cE = Math.cos(OBLIQUITY);
+  const sE = Math.sin(OBLIQUITY);
+  const ex = d.z;
+  const ey = d.x.mul(cE).add(d.y.mul(sE));
+  const ez = d.y.mul(cE).sub(d.x.mul(sE));
+  const lam = atan(ey, ex);
+  const beta = asin(clamp(ez, -1, 1));
+  // Fold the helioecliptic longitude to [0, pi].
+  const dl = abs(
+    mod(lam.sub(u.uSunLam).add(Math.PI * 3), Math.PI * 2).sub(Math.PI)
+  );
+  const val = gridNode.sample(
+    vec2(dl.div(Math.PI), abs(beta).div(Math.PI / 2))
+  ).r;
+  const fs = mix(float(1), u.uFs, step((60 * Math.PI) / 180, abs(beta)));
+  const cosZ = clamp(normalize(positionWorld.sub(cameraPosition)).y, 0.0, 1.0);
+  const X = float(1).div(cosZ.add(exp(cosZ.mul(-11)).mul(0.025)));
+  const T = pow(vec3(u.uTzen), X);
+  material.colorNode = T.mul(val.mul(u.uScale).mul(fs).mul(AGLOW_GAIN));
   material.opacityNode = u.night;
   return {material, u};
 }
