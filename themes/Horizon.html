@@ -190,7 +190,8 @@
         createPrecipSprites,
         createZodiacalMaterial,
         createMeteorMaterial,
-        createContrailMaterial
+        createContrailMaterial,
+        createFlashMaterial
       } from './horizon/sky-objects-tsl.js';
       import {adsbToScene, appleman} from './horizon/contrails.js';
       import {
@@ -202,6 +203,12 @@
         relBearing,
         SUNSET_ELEV
       } from './horizon/ships.js';
+      import {
+        apparentFlash,
+        flashAmplitude,
+        strikeBearing,
+        strokeSequence
+      } from './horizon/lightning.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -2320,6 +2327,113 @@
           // worker unreachable - the sea keeps its last ships
         }
       }
+
+      // ---- Live lightning: Blitzortung.org via the daemon's SSE
+      // stream (/lightning/stream - origin-scoped server-side:
+      // EventSource bypasses CORS, so the daemon's Origin
+      // allowlist IS the protection). Each pushed strike becomes
+      // a flash whose FLICKER IS THE PHYSICS (lightning.js): a
+      // Rakov-Uman stroke sequence - 15-20% single-stroke, mean
+      // multiplicity 3-5, ~60 ms interstroke intervals,
+      // continuing-current plateaus - viewed through Koschmieder
+      // extinction and the inverse square at the strike's true
+      // great-circle distance, hung at its true bearing. The glow
+      // quad itself is the documented display shape; the timing
+      // and brightness are measured + published physics. Data CC
+      // BY-SA Blitzortung.org (credited in the provenance panel).
+      // ?lightning=URL overrides the endpoint; ?strike=N spawns
+      // deterministic synthetic flashes for the offline harness.
+      const LIGHTNING_PROXY =
+        params.get('lightning') ?? 'https://api.ndev.tk/lightning';
+      const FLASH_N = 5;
+      const flashPool = [];
+      for (let i = 0; i < FLASH_N; i++) {
+        const fm = createFlashMaterial();
+        const mesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(90, 55),
+          fm.material
+        );
+        mesh.visible = false;
+        scene.add(mesh);
+        flashPool.push({
+          mesh,
+          u: fm.u,
+          active: false,
+          t: 0,
+          seq: null,
+          amp0: 0
+        });
+      }
+      let strikeCount = 0;
+      function spawnFlash(azDeg, distKm, rands) {
+        const p = flashPool.find((f) => !f.active) ?? flashPool[0];
+        p.seq = strokeSequence(rands);
+        p.amp0 = Math.min(apparentFlash(distKm), 4);
+        p.t = 0;
+        p.active = true;
+        const az = azDeg * RAD;
+        const R = 235;
+        p.mesh.position.set(
+          camera.position.x + Math.sin(az) * R,
+          38,
+          camera.position.z - Math.cos(az) * R
+        );
+        const s = THREE.MathUtils.clamp(60 / Math.max(distKm, 10), 0.5, 2.5);
+        p.mesh.scale.set(s, s, 1);
+        p.mesh.lookAt(camera.position);
+        p.mesh.visible = true;
+        strikeCount++;
+      }
+      const strikeOv = params.has('strike') ? +params.get('strike') : null;
+      if (strikeOv !== null) {
+        // Offline harness: deterministic flashes in the camera
+        // cone on a fixed cadence (fixed uniform table - no
+        // Math.random, pinned shots stay reproducible).
+        const RANDS = [
+          0.31, 0.62, 0.08, 0.77, 0.45, 0.91, 0.19, 0.54, 0.36, 0.83, 0.27, 0.7,
+          0.12, 0.6, 0.48, 0.95
+        ];
+        let k = 0;
+        setInterval(() => {
+          if (k >= strikeOv && strikeOv > 0) k = 0;
+          camera.getWorldDirection(mFlashDir);
+          const az =
+            (Math.atan2(mFlashDir.x, -mFlashDir.z) / RAD +
+              (((k * 37) % 60) - 30) +
+              360) %
+            360;
+          spawnFlash(az, 12 + ((k * 23) % 60), RANDS.slice(k % 8));
+          k++;
+        }, 1700);
+      } else if (typeof EventSource !== 'undefined') {
+        const src = () =>
+          LIGHTNING_PROXY +
+          '/stream?lat=' +
+          state.lat.toFixed(3) +
+          '&lon=' +
+          state.lon.toFixed(3) +
+          '&km=200';
+        const es = new EventSource(src());
+        es.onmessage = (ev) => {
+          try {
+            const s = JSON.parse(ev.data);
+            const az = strikeBearing({lat: state.lat, lon: state.lon}, s);
+            spawnFlash(
+              az,
+              s.km,
+              Array.from({length: 12}, () => Math.random())
+            );
+            record(
+              'Blitzortung.org lightning (CC BY-SA)',
+              strikeCount + ' strikes streamed · nearest ' + s.km + ' km'
+            );
+          } catch {
+            // heartbeat or malformed event
+          }
+        };
+        // EventSource reconnects itself; nothing else to manage.
+      }
+      const mFlashDir = new THREE.Vector3();
       const mV1 = new THREE.Vector3();
       const mV2 = new THREE.Vector3();
       const mV3 = new THREE.Vector3();
@@ -3426,6 +3540,21 @@
                   .multiplyScalar(0.4 + 3.6 * amp);
             }
           }
+        }
+        // Lightning: advance each live flash along its Rakov-Uman
+        // stroke sequence - the 60 Hz frame cadence resolves the
+        // ~60 ms interstroke flicker and the continuing-current
+        // glow directly; amp0 already carries Koschmieder + 1/d^2.
+        for (const p of flashPool) {
+          if (!p.active) continue;
+          p.t += dt;
+          if (p.t > p.seq.dur) {
+            p.active = false;
+            p.mesh.visible = false;
+            p.u.amp.value = 0;
+            continue;
+          }
+          p.u.amp.value = flashAmplitude(p.seq, p.t) * p.amp0 * 2.2;
         }
         if (constMat) constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2;
         // Venus and Jupiter pierce twilight a little before the stars.
