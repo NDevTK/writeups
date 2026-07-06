@@ -148,12 +148,17 @@ const realFetch = globalThis.fetch;
   let apiCalls = 0;
   let tokenCalls = 0;
   let sawAuth = false;
+  let sawUA = true;
   globalThis.fetch = async (u, init) => {
     if (String(u).includes('auth.opensky-network.org')) {
       tokenCalls++;
       return new Response('{}', {status: 200});
     }
     if ((init?.headers || {}).authorization) sawAuth = true;
+    if (
+      !((init?.headers || {})['user-agent'] || '').startsWith('horizon-adsb/')
+    )
+      sawUA = false;
     if (++apiCalls === 1) return new Response('shedding', {status: 503});
     return new Response(JSON.stringify(STATES), {
       headers: {'content-type': 'application/json'}
@@ -177,13 +182,14 @@ const realFetch = globalThis.fetch;
       apiCalls === 2 &&
       tokenCalls === 0 &&
       !sawAuth &&
+      sawUA &&
       res.headers.get('access-control-allow-origin') === '*' &&
       res.headers.get('x-adsb-source') === 'opensky' &&
       body.ac.length === 1 &&
       Math.abs(scene.y - yExp) < 1e-9 &&
       Math.abs(scene.vx - (400 * 0.514444) / 57.14) < 1e-9 &&
       Math.abs(scene.x) < 1e-9,
-    `503 then 200 on retry (${apiCalls} calls, no token traffic), CORS *, x-adsb-source ${res.headers.get('x-adsb-source')}; adsbToScene round-trip: FL360 east -> y ${scene.y.toFixed(2)}, vx ${scene.vx.toFixed(3)} u/s`
+    `503 then 200 on retry (${apiCalls} calls, no token traffic, UA set), CORS *, x-adsb-source ${res.headers.get('x-adsb-source')}; adsbToScene round-trip: FL360 east -> y ${scene.y.toFixed(2)}, vx ${scene.vx.toFixed(3)} u/s`
   );
 }
 
@@ -242,6 +248,49 @@ const realFetch = globalThis.fetch;
       bearers.at(-1) === 'Bearer tok2' &&
       tokenCalls === 2,
     `client-credentials form exact; 1 token POST serves 2 requests (Bearer tok1 both); 401 -> refreshed to tok2 and answered 200; x-adsb-source opensky-auth`
+  );
+}
+
+{
+  // /probe: the edge diagnostic answers offline with one entry
+  // per fixed target, mapping HTTP statuses and thrown timeouts
+  // alike into inspectable rows - a TimeoutError must come back
+  // as an error string, not a hang and not a crash.
+  globalThis.fetch = async (u, init) => {
+    const s = String(u);
+    if (s.includes('auth.opensky-network.org')) {
+      return new Response('{"error":"invalid_client"}', {status: 401});
+    }
+    if (s.includes('adsb.lol')) {
+      const e = new Error('operation timed out');
+      e.name = 'TimeoutError';
+      throw e;
+    }
+    if (s.includes('opensky-network.org')) {
+      return new Response(JSON.stringify(STATES), {
+        headers: {'content-type': 'application/json'}
+      });
+    }
+    return new Response('{"ac":[]}', {
+      headers: {'content-type': 'application/json'}
+    });
+  };
+  const res = await worker.fetch(new Request('https://x.test/probe'), {});
+  const j = await res.json();
+  globalThis.fetch = realFetch;
+  const by = Object.fromEntries(j.probe.map((r) => [r.name, r]));
+  check(
+    'probe endpoint',
+    res.status === 200 &&
+      j.probe.length === 6 &&
+      j.probe.every((r) => typeof r.ms === 'number') &&
+      by['opensky-api'].status === 200 &&
+      by['opensky-api'].aircraft === 3 &&
+      by['opensky-auth'].status === 401 &&
+      by['adsb.lol'].error === 'TimeoutError: operation timed out' &&
+      by['control'].status === 200 &&
+      res.headers.get('cache-control') === 'no-store',
+    `6 fixed targets; opensky-api 200/${by['opensky-api'].aircraft} states, opensky-auth 401 (reachable), adsb.lol -> "${by['adsb.lol'].error}", uncached`
   );
 }
 

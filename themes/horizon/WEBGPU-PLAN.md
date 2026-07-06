@@ -1424,9 +1424,27 @@ Scenes (all at Grindelwald unless noted):
       theme expects https://horizon-adsb.<subdomain>.workers.dev -
       ADSB_PROXY in Horizon.html assumes subdomain `ndevtk`; update
       it if the account's workers.dev subdomain differs. Each
-      upstream change needs a redeploy - the single-source OpenSky
-      build (above) is pending one as of this note, plus the two
-      `wrangler secret put` calls for authenticated credits.
+      upstream change needs a redeploy.
+    - OPEN (edge diagnosis in flight): the deployed single-source
+      build answers 502 in exactly ~17.3 s - the deterministic
+      fingerprint of one 4 s token timeout + three 4 s API
+      timeouts + retry sleeps - so the secrets ARE set and every
+      fetch to OpenSky times out from Cloudflare egress before
+      auth can matter. Suspects: OpenSky firewalling cloud ranges
+      (it protects per-IP anonymous credits), or a WAF tarpitting
+      UA-less bot traffic (workers send NO User-Agent by
+      default). Countermeasures shipped: an honest User-Agent on
+      every upstream fetch, and GET /probe - a fixed-target,
+      zero-parameter edge diagnostic that fans out to control
+      (open-meteo), opensky-api, opensky-auth (bogus-cred POST:
+      fast 401 = reachable, timeout = network block), adsb.lol,
+      adsb.fi and airplanes.live (readsb schema, itself behind
+      Cloudflare, verified from the box) with 6 s timeouts and
+      reports status/error-name/ms per target. One redeploy, then
+      GET /probe tells us who blocks, who tarpits, and who
+      answers from the edge - the winner becomes (or confirms)
+      the one source. adsb.one was scouted and dropped: it serves
+      a bot-challenge page even to a residential probe.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

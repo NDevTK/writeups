@@ -37,7 +37,8 @@
  * for minutes is worse than one that answers 502 in seconds.
  *
  * It is deliberately not an open proxy:
- *  - only GET/OPTIONS on the exact path /adsb
+ *  - only GET/OPTIONS on the exact paths /adsb and /probe (the
+ *    latter a fixed-target edge diagnostic, no parameters)
  *  - only the three numeric parameters lat/lon/dist, validated and
  *    clamped (dist <= 60 nm)
  *  - coordinates rounded to ~110 m so nearby visitors share one
@@ -54,6 +55,11 @@ const TOKEN_URL =
   'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
 const API = 'https://opensky-network.org/api/states/all';
 const FETCH_MS = 4000;
+
+// Identify honestly upstream. Workers send NO User-Agent by
+// default, and UA-less bot traffic is a classic WAF tarpit
+// trigger - possibly the whole story behind the measured hangs.
+const UA = 'horizon-adsb/1.0 (+https://github.com/NDevTK/writeups)';
 
 // Exact unit constants (international foot and knot) - the same
 // values contrails.js uses to undo the conversion scene-side.
@@ -125,7 +131,10 @@ async function getToken(env) {
   }
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
-    headers: {'content-type': 'application/x-www-form-urlencoded'},
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      'user-agent': UA
+    },
     body: new URLSearchParams({
       grant_type: 'client_credentials',
       client_id: env.OPENSKY_CLIENT_ID,
@@ -148,12 +157,76 @@ const CORS = {
   'cache-control': 'public, max-age=15'
 };
 
+// GET /probe - edge-side diagnosis, because "which ADS-B feed
+// works from Cloudflare egress" can ONLY be measured from the
+// edge (adsb.lol/adsb.fi tarpit it while answering residential
+// IPs sub-second; OpenSky timed out end-to-end on the deployed
+// worker). Fixed target list, zero parameters - not a proxy.
+// Every entry reports status or error name + elapsed ms, so one
+// deploy tells us who blocks, who tarpits, and who answers.
+export const PROBE_TARGETS = [
+  [
+    'control',
+    'https://api.open-meteo.com/v1/forecast?latitude=51.47&longitude=-0.45&current=temperature_2m'
+  ],
+  ['opensky-api', () => bboxUrl('51.470', '-0.450', 15)],
+  ['opensky-auth', TOKEN_URL],
+  ['adsb.lol', 'https://api.adsb.lol/v2/lat/51.47/lon/-0.45/dist/15'],
+  ['adsb.fi', 'https://opendata.adsb.fi/api/v2/lat/51.47/lon/-0.45/dist/15'],
+  ['airplanes.live', 'https://api.airplanes.live/v2/point/51.47/-0.45/15']
+];
+
+async function probeAll() {
+  return Promise.all(
+    PROBE_TARGETS.map(async ([name, target]) => {
+      const u = typeof target === 'function' ? target() : target;
+      const t0 = Date.now();
+      try {
+        const init = {
+          signal: AbortSignal.timeout(6000),
+          headers: {'user-agent': UA}
+        };
+        if (name === 'opensky-auth') {
+          // reachability only: bogus credentials -> a FAST 401
+          // from Keycloak proves the route; a timeout proves the
+          // block is at the network, where auth cannot help
+          init.method = 'POST';
+          init.headers['content-type'] = 'application/x-www-form-urlencoded';
+          init.body =
+            'grant_type=client_credentials&client_id=probe&client_secret=probe';
+        }
+        const res = await fetch(u, init);
+        let aircraft = null;
+        try {
+          const j = await res.json();
+          if (Array.isArray(j.ac)) aircraft = j.ac.length;
+          else if (Array.isArray(j.states)) aircraft = j.states.length;
+        } catch {
+          // non-JSON body - status alone is the datum
+        }
+        return {name, ms: Date.now() - t0, status: res.status, aircraft};
+      } catch (e) {
+        return {name, ms: Date.now() - t0, error: e.name + ': ' + e.message};
+      }
+    })
+  );
+}
+
 export default {
   async fetch(req, env) {
     if (req.method === 'OPTIONS') {
       return new Response(null, {headers: CORS});
     }
     const url = new URL(req.url);
+    if (req.method === 'GET' && url.pathname === '/probe') {
+      return new Response(JSON.stringify({probe: await probeAll()}, null, 1), {
+        headers: {
+          ...CORS,
+          'content-type': 'application/json',
+          'cache-control': 'no-store'
+        }
+      });
+    }
     if (req.method !== 'GET' || url.pathname !== '/adsb') {
       return new Response('not found', {status: 404, headers: CORS});
     }
@@ -178,7 +251,9 @@ export default {
       if (attempt) await new Promise((r) => setTimeout(r, 400));
       try {
         const res = await fetch(target, {
-          headers: token ? {authorization: 'Bearer ' + token} : {},
+          headers: token
+            ? {authorization: 'Bearer ' + token, 'user-agent': UA}
+            : {'user-agent': UA},
           cf: {
             cacheEverything: true,
             cacheTtlByStatus: {'200-299': 15, '400-599': 0}
