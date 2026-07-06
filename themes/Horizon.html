@@ -298,8 +298,35 @@
         kp: params.has('kp') ? +params.get('kp') : 0,
         auroraP: null, // OVATION oval probability 0..1, null = use Kp
         auroraLat: 68,
+        sea: null, // measured wave partitions (marine model), null = wind sea
         shake: 0
       };
+      // Pinned sea state (harness/debug): hsw/tpw/dww wind-sea Hs (m),
+      // peak Tp (s), met direction; hss/tps/dws the swell partition;
+      // hstot the total Hs if it differs from the two partitions.
+      if (params.has('hsw') || params.has('hss')) {
+        const wp = params.has('hsw')
+          ? {
+              hs: +params.get('hsw'),
+              tp: +(params.get('tpw') ?? 6),
+              dir: +(params.get('dww') ?? state.winddir)
+            }
+          : null;
+        const sp = params.has('hss')
+          ? {
+              hs: +params.get('hss'),
+              tp: +(params.get('tps') ?? 12),
+              dir: +(params.get('dws') ?? state.winddir)
+            }
+          : null;
+        state.sea = {
+          hs: params.has('hstot')
+            ? +params.get('hstot')
+            : Math.hypot(wp ? wp.hs : 0, sp ? sp.hs : 0),
+          wind: wp,
+          swell: sp
+        };
+      }
       const overridden = [
         'lat',
         'lon',
@@ -497,6 +524,91 @@
           );
         } catch {
           // Keep the temperate defaults.
+        }
+      }
+
+      // The real sea: measured wave partitions from the marine model
+      // (ECMWF WAM under open-meteo) - wind sea and swell each with
+      // significant height, PEAK period and direction - drive the FFT
+      // spectrum as a measured two-peak composition. Over land the
+      // partitions come back null and the fetch-limited wind-sea
+      // prediction stands (same spectrum builder, no data - predict).
+      const seaDirRad = (deg) => {
+        // Met convention: waves come FROM deg; the spectrum wants the
+        // world-XZ math angle they travel TOWARD (same convention as
+        // dirOf for the wind).
+        const a = (deg + 180) * RAD;
+        return Math.atan2(-Math.cos(a), Math.sin(a));
+      };
+      function seaParts() {
+        if (!state.sea) return null;
+        const parts = [];
+        const w = state.sea.wind;
+        const s = state.sea.swell;
+        if (w && w.hs > 0.01 && w.tp > 0.5) {
+          parts.push({
+            hs: w.hs,
+            tp: w.tp,
+            dir: seaDirRad(w.dir),
+            U10: Math.max(state.wind / 3.6, 1)
+          });
+        }
+        if (s && s.hs > 0.01 && s.tp > 0.5) {
+          parts.push({hs: s.hs, tp: s.tp, dir: seaDirRad(s.dir)});
+        }
+        return parts.length ? parts : null;
+      }
+      async function syncMarine() {
+        // Pinned sea, or pinned weather (a live sea would contradict
+        // the pinned wind): keep what the URL says.
+        if (params.has('hsw') || params.has('hss') || overridden) return;
+        try {
+          const m = await (
+            await fetch(
+              'https://marine-api.open-meteo.com/v1/marine?latitude=' +
+                state.lat +
+                '&longitude=' +
+                state.lon +
+                '&current=wave_height,wind_wave_height,wind_wave_peak_period,wind_wave_direction,swell_wave_height,swell_wave_peak_period,swell_wave_direction',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const c = m.current;
+          if (c && (c.wind_wave_height || c.swell_wave_height)) {
+            state.sea = {
+              hs: c.wave_height,
+              wind: {
+                hs: c.wind_wave_height,
+                tp: c.wind_wave_peak_period,
+                dir: c.wind_wave_direction
+              },
+              swell: {
+                hs: c.swell_wave_height,
+                tp: c.swell_wave_peak_period,
+                dir: c.swell_wave_direction
+              }
+            };
+            record(
+              'open-meteo marine',
+              'Hs ' +
+                c.wave_height +
+                ' m · wind sea ' +
+                c.wind_wave_height +
+                ' m @' +
+                c.wind_wave_peak_period +
+                ' s · swell ' +
+                c.swell_wave_height +
+                ' m @' +
+                c.swell_wave_peak_period +
+                ' s from ' +
+                c.swell_wave_direction +
+                '°'
+            );
+          } else {
+            state.sea = null;
+          }
+        } catch {
+          // Keep the wind-sea prediction.
         }
       }
 
@@ -1164,6 +1276,7 @@
       let oceanCascades = null; // FFT ocean (phase 5), built with water
       let oceanBuiltU = -1; // wind the spectrum was built at (m/s)
       let oceanBuiltDir = 0;
+      let oceanBuiltSeaKey = null; // measured partitions in the spectrum
       let oceanSeaDepth = 60;
       let oceanTime = 0; // REAL seconds - the dispersion is physical
       const waterNormalsTex = new THREE.TextureLoader().load(
@@ -1382,6 +1495,10 @@
           oceanSeaDepth = dCnt ? Math.max(dSum / dCnt, 5) : 60;
           oceanBuiltU = state.wind / 3.6;
           oceanBuiltDir = Math.atan2(windV.z, windV.x);
+          // Measured sea-state partitions (marine model) take over
+          // from the wind prediction when present.
+          const seaNow = seaParts();
+          oceanBuiltSeaKey = seaNow ? JSON.stringify(seaNow) : null;
           const OCEAN_SPLIT = (2 * Math.PI) / 25;
           oceanCascades = [
             createOceanFFT(renderer, {
@@ -1391,6 +1508,7 @@
               F: 150e3,
               D: oceanSeaDepth,
               windDir: oceanBuiltDir,
+              sea: seaNow ?? undefined,
               kMax: OCEAN_SPLIT,
               seed: 1337,
               lambda: 1.1
@@ -1402,6 +1520,7 @@
               F: 150e3,
               D: oceanSeaDepth,
               windDir: oceanBuiltDir,
+              sea: seaNow ?? undefined,
               kMin: OCEAN_SPLIT,
               seed: 7331,
               lambda: 1.1
@@ -1432,7 +1551,10 @@
           ground.add(water);
           record(
             'Tessendorf FFT ocean',
-            'JONSWAP/TMA cascades · exact spectral normals · Jacobian whitecaps'
+            (oceanBuiltSeaKey
+              ? 'measured marine partitions (wind sea + swell)'
+              : 'JONSWAP/TMA wind sea') +
+              ' · exact spectral normals · Jacobian whitecaps'
           );
         }
 
@@ -2272,7 +2394,24 @@
               Math.cos(dirNow - oceanBuiltDir)
             )
           );
-          if (Math.abs(Ums - oceanBuiltU) > 1.5 || dDir > 0.35) {
+          // Measured partitions rule when the marine model has them
+          // (they only move on the 15-minute sync); otherwise the
+          // wind-sea prediction with its drift gating.
+          const partsNow = seaParts();
+          const seaKey = partsNow ? JSON.stringify(partsNow) : null;
+          if (seaKey !== oceanBuiltSeaKey) {
+            if (partsNow) {
+              for (const c of oceanCascades) c.setSeaState(partsNow);
+            } else {
+              for (const c of oceanCascades) c.setWind(Ums, dirNow);
+              oceanBuiltU = Ums;
+              oceanBuiltDir = dirNow;
+            }
+            oceanBuiltSeaKey = seaKey;
+          } else if (
+            !partsNow &&
+            (Math.abs(Ums - oceanBuiltU) > 1.5 || dDir > 0.35)
+          ) {
             for (const c of oceanCascades) c.setWind(Ums, dirNow);
             oceanBuiltU = Ums;
             oceanBuiltDir = dirNow;
@@ -2282,16 +2421,17 @@
           water.sunColor.value
             .copy(sunLight.color)
             .multiplyScalar(sunLight.intensity);
-          water.distortionScale.value = 0.6 + ((0.21 * Ums * Ums) / 9.81) * 2.5;
+          // The MEASURED total Hs (marine model, includes secondary
+          // swells) sets the surf/breaking scale when present; the
+          // Pierson-Moskowitz wind estimate is the fallback.
+          const hsNow = state.sea?.hs ?? (0.21 * Ums * Ums) / 9.81;
+          water.distortionScale.value = 0.6 + hsNow * 2.5;
           const mss = 0.003 + 0.00512 * Ums;
-          const resolved = oceanCascades.reduce(
-            (s, c) => s + c.resolvedMss,
-            0
-          );
+          const resolved = oceanCascades.reduce((s, c) => s + c.resolvedMss, 0);
           water.mssSubgrid.value = Math.max(mss - resolved, 1e-4);
           water.foamW.value = Math.min(3.84e-6 * Math.pow(Ums, 3.41), 0.5);
           water.windDirW.value.set(windV.x, windV.z);
-          water.hsWave.value = (0.21 * Ums * Ums) / 9.81;
+          water.hsWave.value = hsNow;
         }
 
         // The real wind vectors, per level: meteorological direction is
@@ -2837,6 +2977,8 @@
         setInterval(syncWeather, 15 * 60 * 1000);
         syncAir();
         setInterval(syncAir, 30 * 60 * 1000);
+        syncMarine();
+        setInterval(syncMarine, 15 * 60 * 1000);
         syncAloft();
         setInterval(syncAloft, 30 * 60 * 1000);
         syncForests();

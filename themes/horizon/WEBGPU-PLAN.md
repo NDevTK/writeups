@@ -347,7 +347,7 @@ Scenes (all at Grindelwald unless noted):
     args, `ignoreAllDefaultArgs`, persistent context — all tried).
     The driver must `spawn()` the browser itself (plain flags:
     `--enable-unsafe-webgpu --no-sandbox --user-data-dir=…
-    --remote-debugging-port=…`) and attach with `connectOverCDP`.
+--remote-debugging-port=…`) and attach with `connectOverCDP`.
   - Compositor screenshots are blank for GPU surfaces under Xvfb, and
     WebGPU canvases recycle their texture on present (`toDataURL` /
     `drawImage` see stale frames). The ONLY reliable capture is an
@@ -407,7 +407,7 @@ Scenes (all at Grindelwald unless noted):
     filtered texture sampling and Loop/If inside kernels; DepthTexture
     sampling inside kernels. Also caught: WebGPU float readbacks
     narrower than 64 px come back 256-byte-row-padded (scrambled) -
-    keep probe/LUT widths at w*16 bytes % 256 == 0.
+    keep probe/LUT widths at w\*16 bytes % 256 == 0.
   - Subsystem A/B, compute (WebGPU) vs fragment (WebGL2): dome
     0.0017 (the only >8 outliers are a 2-px band at the sky-view
     horizon seam - linear filtering across the physical discontinuity
@@ -447,16 +447,16 @@ Scenes (all at Grindelwald unless noted):
     deterministic everywhere). Verified: exact permutation,
     neighbour-threshold separation 0.41 vs white noise's 1/3. Ranks
     ship 16-bit across R/G of a 64x64 nearest/repeat DataTexture;
-    marchBody's jit = fract(blueNoise(pix) + frameI * 0.618034) - the
+    marchBody's jit = fract(blueNoise(pix) + frameI \* 0.618034) - the
     golden-ratio sequence stays as the temporal decorrelator, blue
     noise replaces the white sin-hash spatially. hash12 deleted.
   - Full pinned matrix (WebGPU compute vs WebGL2 fragment, /255):
     noon 0.0062, sunset 0.067, night 0.0009, stratus 0.54 (was 0.84
     - the blue noise dithers cross-compiler fp differences at high
-    frequency and they cancel in the temporal average; 3.5x fewer
-    >8 outliers), towering 0.33, Nelson 0.0070 (max 6), snow 0.48,
-    aurora 0.0003. Sea horizon at Nelson and the alpine noon horizon
-    render as crisp AA'd lines.
+      frequency and they cancel in the temporal average; 3.5x fewer
+      > 8 outliers), towering 0.33, Nelson 0.0070 (max 6), snow 0.48,
+      > aurora 0.0003. Sea horizon at Nelson and the alpine noon horizon
+      > render as crisp AA'd lines.
 - Phase 4, step 3 DONE - depth-aware cloud reprojection. The camera
   translates (intro height ease, free-flight KeyW) and the fixed
   600-unit proxy point parallaxed everything not at that distance.
@@ -585,7 +585,7 @@ Scenes (all at Grindelwald unless noted):
     12% of daytime-page samples diverging cross-backend).
     - Each cascade's slope/Jacobian contribution fades by its
       MEASURED per-pixel minification: f = smoothstep(4, 1,
-      |fwidth(uv * N)|) - the same quantity a mip LOD would compute.
+      |fwidth(uv \* N)|) - the same quantity a mip LOD would compute.
       Scaling Gaussian slopes by f scales their variance by f^2, so
       the Blinn lobe's per-pixel effective variance
       mssEff = mssSubgrid + sum (1 - f_c^2) mss_c preserves TOTAL
@@ -612,7 +612,7 @@ Scenes (all at Grindelwald unless noted):
     crosses each deck's mid height (receivedShadowNode; the unlit
     water dims its DIRECT sun terms - glitter, diffuse - through the
     same transmittance, not its sky reflection). The flat
-    (1 - cloudy*0.55) global sun dim is REPLACED: decks shadow per
+    (1 - cloudy\*0.55) global sun dim is REPLACED: decks shadow per
     pixel, and the only global factor left is the cirrus veil as
     exp(-tau/sin alt) with tau_vis = 1 at full high cover (typical
     cirrostratus). Two measured fixes on the way: the shadow
@@ -672,6 +672,60 @@ Scenes (all at Grindelwald unless noted):
       with dispersion falloff and sundogs; bow shows the red-outer
       primary, the faint colour-reversed secondary, and the dark
       band between them.
+  - DONE: live sea state - the FFT spectrum driven by MEASURED wave
+    partitions from the open-meteo Marine API (ECMWF WAM): wind sea
+    and swell each with significant height, PEAK period and
+    direction (syncMarine, 15-min cadence, hsw/tpw/dww +
+    hss/tps/dws URL pins for the harness). Two research pieces and
+    one found bug:
+    - Partition spectra: JONSWAP shape at the measured Tp with the
+      DNV-RP-C205 sect. 3.5.5 peak enhancement gamma(Hs, Tp); the
+      Phillips constant of each partition comes from EXACT numeric
+      integration so partition variance is m0 = Hs^2/16 (Goda's
+      closed-form alpha approximation NOT used). The composed sea is
+      the Torsethaugen/Ochi-Hubble two-peak structure with measured
+      partitions. Spreading: Hasselmann 1980 for the wind sea (it is
+      wind-coupled), Mitsuyasu/Goda cos^{2s}(theta/2) with
+      s_max = 75 for swell (Hasselmann's s needs U10/c_p, which is
+      meaningless for waves that left their generation area). NO TMA
+      re-application to measured partitions: TMA turns a deep-water
+      PREDICTION into depth-limited form, but the marine model's
+      Hs/Tp already contain the site's depth physics - re-applying
+      phi measurably shifted a 14 s swell peak to 12.9 s. Finite-
+      depth dispersion still maps omega to local wavenumbers.
+      Over land the API returns nulls and the fetch-limited wind-sea
+      prediction stands - same spectrum builder, no separate path.
+    - FOUND AND FIXED: the h0 normalisation realised FOUR times the
+      spectral variance (Tessendorf's eq. 42 read literally -
+      measured 5.68 m realised Hs against 2.62 m of omega-integral
+      theory at U = 12). Now E[|h0|^2] = S dk^2 / 2 so the Hermitian
+      mode sum realises exactly m0 (Horvath 2015's normalisation
+      discussion); the reference prints theory vs realised (2.62 vs
+      2.84 m - the gap is Gaussian draw noise on a finite grid) and
+      the sea-state cascades realise 2.79 m against a measured
+      2.5 m total for the same reason (a 1 km periodic tile of
+      narrow swell holds few modes - sample variance, not error).
+    - Foam recalibrated for the physical amplitudes AND against the
+      shader's ACTUAL mask: ocean-reference.mjs bisects Jt so the
+      grid-mean of smoothstep(Jt, Jt - 0.175, J) equals Monahan
+      coverage (the old quantile calibration assumed a hard
+      threshold the shader never applied): Jt 0.4745 -> 0.7974,
+      transition width 0.35 -> 0.175 (proportional to the tighter
+      J range 0.470..1.707).
+    - Validation: spread integrals exactly 1 (lgamma norm); dense
+      k-plane quadrature recovers each partition Hs exactly
+      (1.499 / 2.000 m); swell peak lands at the measured 14 s;
+      per-texel GPU maps match the double-precision CPU reference
+      in sea mode on BOTH backends (tsl-ocean-num.html ?sea=1, fp32
+      agreement, WebGL2 scan finds the reference texel at the
+      documented row-flip); water-page cross-backend A/B in sea
+      mode mean 0.048/255 with 0.008% outliers. Pinned Nelson
+      wind-mode regression after the amplitude/foam changes:
+      0.0005 mean, ZERO samples over 8 (was 0.0007); sea-pinned
+      Nelson (hsw=1.2 tpw=5.5 + hss=2.5 tps=13): 0.0005 mean, zero
+      outliers, with the sea-vs-wind signal confined to the water
+      rows as expected (surf foam widens over the shallow bank at
+      the 2.8 m total sea).
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:

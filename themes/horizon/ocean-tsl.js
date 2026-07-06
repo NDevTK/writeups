@@ -34,7 +34,7 @@ import {
   vec3,
   vec4
 } from 'three/tsl';
-import {buildInitialSpectrum} from './ocean-spectrum.js';
+import {buildInitialSpectrum, calibrateSeaState} from './ocean-spectrum.js';
 
 /**
  * Tessendorf (2001) FFT ocean on the GPU (WebGPU project, phase 5).
@@ -77,7 +77,11 @@ export function createOceanFFT(renderer, opts = {}) {
     D: opts.D ?? 60,
     windDir: opts.windDir ?? 0,
     kMin: opts.kMin,
-    kMax: opts.kMax
+    kMax: opts.kMax,
+    // Measured sea-state mode: opts.sea = [{hs, tp, dir, U10?}]
+    // partitions (live marine data) override the fetch-limited
+    // wind-sea prediction.
+    partitions: opts.sea ? calibrateSeaState(opts.sea) : undefined
   };
   const seed = opts.seed ?? 1337;
   const useCompute = !!renderer.backend.isWebGPUBackend;
@@ -388,6 +392,14 @@ export function createOceanFFT(renderer, opts = {}) {
     setWind(U10, windDir) {
       params.U10 = U10;
       params.windDir = windDir;
+      params.partitions = undefined; // back to the wind-sea prediction
+      fillSpectrum();
+      h0Tex.needsUpdate = true;
+    },
+    // Measured partitions moved (fresh marine observation): same
+    // in-place rebuild as setWind.
+    setSeaState(sea) {
+      params.partitions = calibrateSeaState(sea);
       fillSpectrum();
       h0Tex.needsUpdate = true;
     },

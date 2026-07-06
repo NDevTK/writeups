@@ -9,7 +9,14 @@
 //  - spectral slopes      Sx =  i kx h,    Sz =  i kz h
 //  - Jacobian derivatives Jxx = (kx^2/k) h, Jzz = (kz^2/k) h,
 //    Jxz = (kx kz / k) h;  J = (1+l Jxx)(1+l Jzz) - (l Jxz)^2
-import {buildInitialSpectrum} from './ocean-spectrum.js';
+import {
+  buildInitialSpectrum,
+  calibrateSeaState,
+  cos2sSpread,
+  jonswapShape,
+  spectrumK,
+  tmaSpectrum
+} from './ocean-spectrum.js';
 
 const N = 256;
 const L = 450; // metres
@@ -20,15 +27,36 @@ const T = 13.7;
 
 const {h0, omega} = buildInitialSpectrum(N, L, PARAMS, SEED);
 
-// Significant wave height from the gridded variance (m0 = sum of
-// E[|h0|^2] = sum S dk^2; our h0 samples carry that expectation as
-// realised Gaussian draws - report both).
-{
-  let m0 = 0;
-  for (let i = 0; i < N * N; i++) {
-    m0 += h0[i * 2] * h0[i * 2] + h0[i * 2 + 1] * h0[i * 2 + 1];
+// Realised significant wave height: the surface variance is the sum
+// over k of |h0(k) + conj(h0(-k))|^2 (Parseval on the Hermitian
+// modes the FFT actually renders). It must match the omega-space
+// integral of the spectrum - the normalisation is E[|h0|^2] =
+// S dk^2 / 2 precisely so these agree (grid truncation and the
+// Gaussian draws put a few percent between them).
+function realisedHs(h0g, n) {
+  const cj = (i) => (n - i) % n;
+  let v = 0;
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const a = j * n + i;
+      const b = cj(j) * n + cj(i);
+      const hr = h0g[a * 2] + h0g[b * 2];
+      const hi = h0g[a * 2 + 1] - h0g[b * 2 + 1];
+      v += hr * hr + hi * hi;
+    }
   }
-  console.log('REF Hs(U=12) ~', (4 * Math.sqrt(m0)).toFixed(2), 'm');
+  return 4 * Math.sqrt(v);
+}
+{
+  let m0t = 0;
+  const dw = 1e-4;
+  for (let i = 1; i < 400000; i++) {
+    m0t += tmaSpectrum(i * dw, PARAMS.U10, PARAMS.F, PARAMS.D) * dw;
+  }
+  console.log(
+    `REF Hs(U=12): theory ${(4 * Math.sqrt(m0t)).toFixed(2)} m,` +
+      ` realised ${realisedHs(h0, N).toFixed(2)} m`
+  );
 }
 
 // ---- time evolution to the 8 real fields (packed 4 complex) ----
@@ -40,7 +68,7 @@ const conjIndex = (i) => (N - i) % N; // -k index on the shifted grid: k(i)=-k(N
 // mirror is itself modulo the grid); (N - i) % N maps 0 -> 0, which
 // pairs Nyquist with itself - the standard convention.
 
-function evolve(t) {
+function evolve(t, h0In = h0, omegaIn = omega) {
   // fields as complex grids
   const mk = () => new Float64Array(N * N * 2);
   const H = mk();
@@ -59,14 +87,18 @@ function evolve(t) {
       const k = Math.max(Math.hypot(kx, kz), 1e-6);
       const a = idx(i, j);
       const b = idx(conjIndex(i), conjIndex(j));
-      const w = omega[a] * t;
+      const w = omegaIn[a] * t;
       const c = Math.cos(w);
       const s = Math.sin(w);
       // h = h0(k) e^{iwt} + conj(h0(-k)) e^{-iwt}
       const hr =
-        h0[a * 2] * c - h0[a * 2 + 1] * s + (h0[b * 2] * c - h0[b * 2 + 1] * s);
+        h0In[a * 2] * c -
+        h0In[a * 2 + 1] * s +
+        (h0In[b * 2] * c - h0In[b * 2 + 1] * s);
       const hi =
-        h0[a * 2] * s + h0[a * 2 + 1] * c - (h0[b * 2] * s + h0[b * 2 + 1] * c);
+        h0In[a * 2] * s +
+        h0In[a * 2 + 1] * c -
+        (h0In[b * 2] * s + h0In[b * 2 + 1] * c);
       H[a * 2] = hr;
       H[a * 2 + 1] = hi;
       // multiply by -i kx/k: (r+ii)(-i q) = (i q) r ... -i*q*(hr+ i hi) = q hi - i q hr
@@ -180,10 +212,14 @@ const jxz = ifft2(F.Jxz);
   );
 }
 
-// Foam-threshold calibration: the folding criterion (foam where
-// J < Jt) gets its Jt by matching Monahan & O'Muircheartaigh (1980)
-// whitecap coverage W = 3.84e-6 U^3.41 at this wind - after that,
-// coverage at every other wind follows from the physics alone.
+// Foam-threshold calibration: the shader's mask is
+// smoothstep(Jt, Jt - FOAM_W, J) - foam grows as the Jacobian folds
+// below Jt. Calibrate Jt against THAT mask (not an idealised hard
+// threshold): bisect so the grid-mean masked coverage equals
+// Monahan & O'Muircheartaigh (1980) W = 3.84e-6 U^3.41 at this
+// wind - after that, coverage at every other wind follows from the
+// physics alone.
+const FOAM_W = 0.175;
 {
   const U = PARAMS.U10;
   const W = 3.84e-6 * Math.pow(U, 3.41);
@@ -193,12 +229,135 @@ const jxz = ifft2(F.Jxz);
       (1 + LAMBDA * jxx.re[a]) * (1 + LAMBDA * jzz.re[a]) -
       LAMBDA * LAMBDA * jxz.re[a] * jxz.re[a];
   }
-  Js.sort();
-  const Jt = Js[Math.max(Math.floor(W * N * N) - 1, 0)];
+  const smooth = (e0, e1, x) => {
+    const u = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1);
+    return u * u * (3 - 2 * u);
+  };
+  const coverage = (t) => {
+    let m = 0;
+    for (let a = 0; a < N * N; a++) m += smooth(t, t - FOAM_W, Js[a]);
+    return m / (N * N);
+  };
+  let lo = 0;
+  let hi = 2;
+  for (let it = 0; it < 60; it++) {
+    const mid = 0.5 * (lo + hi);
+    if (coverage(mid) < W) lo = mid;
+    else hi = mid;
+  }
+  const Jt = 0.5 * (lo + hi);
+  const sorted = Float64Array.from(Js).sort();
   console.log(
     `REF foam calibration: Monahan W(${U}) = ${(W * 100).toFixed(2)}%` +
-      ` -> Jt = ${Jt.toFixed(4)} (J range ${Js[0].toFixed(3)}..${Js[N * N - 1].toFixed(3)})`
+      ` -> Jt = ${Jt.toFixed(4)} at mask width ${FOAM_W}` +
+      ` (J range ${sorted[0].toFixed(3)}..${sorted[N * N - 1].toFixed(3)})`
   );
+}
+
+// ---- measured sea-state mode (live marine-API partitions) ----
+// A North-Sea-like state: wind sea Hs 1.5 m Tp 6 s toward +x under
+// U10 = 10 m/s, plus swell Hs 2.0 m Tp 14 s toward 60 deg. Checks:
+//  - cos^{2s} spreading integrates to 1 (the lgamma normalisation)
+//  - dense k-plane quadrature of spectrumK recovers each Hs exactly
+//    (total variance = sum of partition variances)
+//  - each partition's 1D spectrum peaks at its measured Tp
+//  - the production cascade pair realises the total Hs
+{
+  const D = 60;
+  const SEA = [
+    {hs: 1.5, tp: 6, dir: 0, U10: 10},
+    {hs: 2.0, tp: 14, dir: Math.PI / 3}
+  ];
+  const parts = calibrateSeaState(SEA);
+  console.log(
+    'REF sea gamma: wind',
+    parts[0].gamma.toFixed(3),
+    'swell',
+    parts[1].gamma.toFixed(3)
+  );
+  for (const s of [5, 25, 75]) {
+    let I = 0;
+    const M = 20000;
+    for (let i = 0; i < M; i++) {
+      const th = -Math.PI + ((i + 0.5) / M) * 2 * Math.PI;
+      I += (cos2sSpread(s, th) * 2 * Math.PI) / M;
+    }
+    console.log(`REF spread integral s=${s}: ${I.toFixed(6)}`);
+  }
+  // Dense quadrature over the k-plane, one partition at a time (each
+  // is independent; variances add).
+  for (const [name, one] of [
+    ['wind ', [parts[0]]],
+    ['swell', [parts[1]]]
+  ]) {
+    const P = {D, partitions: one};
+    const K = 4; // rad/m; wavelengths below 1.6 m carry ~0 variance here
+    const M = 3000;
+    const dkq = (2 * K) / M;
+    let m0 = 0;
+    for (let j = 0; j < M; j++) {
+      for (let i = 0; i < M; i++) {
+        m0 +=
+          spectrumK(dkq * (i - M / 2 + 0.5), dkq * (j - M / 2 + 0.5), P) *
+          dkq *
+          dkq;
+      }
+    }
+    console.log(
+      `REF sea m0 ${name}: 4 sqrt(m0) = ${(4 * Math.sqrt(m0)).toFixed(3)} m`
+    );
+  }
+  // Peak placement: the 1D omega spectrum of each partition must peak
+  // at its measured Tp.
+  for (const [name, p, tp] of [
+    ['wind ', parts[0], 6],
+    ['swell', parts[1], 14]
+  ]) {
+    let best = 0;
+    let bestW = 0;
+    for (let i = 1; i < 8000; i++) {
+      const w = i * 0.001;
+      const S = p.alpha * jonswapShape(w, p.wp, p.gamma);
+      if (S > best) {
+        best = S;
+        bestW = w;
+      }
+    }
+    console.log(
+      `REF sea peak ${name}: Tp ${((2 * Math.PI) / bestW).toFixed(2)} s (measured ${tp})`
+    );
+  }
+  // The production cascades (L = 1000 / 120 partitioned at 25 m)
+  // under this sea: realised Hs from the drawn h0 grids (variances
+  // add across the band-split cascades). Target: the total measured
+  // Hs = sqrt(1.5^2 + 2^2) = 2.5 m.
+  const SPLIT = (2 * Math.PI) / 25;
+  let vc = 0;
+  for (const [Lc, seedC, band] of [
+    [1000, 1337, {kMax: SPLIT}],
+    [120, 7331, {kMin: SPLIT}]
+  ]) {
+    const spec = buildInitialSpectrum(
+      256,
+      Lc,
+      {D, partitions: parts, ...band},
+      seedC
+    );
+    const hsC = realisedHs(spec.h0, 256);
+    vc += (hsC * hsC) / 16;
+  }
+  console.log(
+    `REF sea cascades: realised Hs = ${(4 * Math.sqrt(vc)).toFixed(3)} m (measured total 2.500)`
+  );
+  // Swell slope sanity: long waves carry little mss - print the two
+  // partitions' resolved slope variance for the bookkeeping notes.
+  for (const [name, one] of [
+    ['wind ', [parts[0]]],
+    ['swell', [parts[1]]]
+  ]) {
+    const spec = buildInitialSpectrum(256, 1000, {D, partitions: one}, 1337);
+    console.log(`REF sea mss ${name} (L=1000): ${spec.mss.toExponential(3)}`);
+  }
 }
 
 const pts = [
@@ -227,4 +386,33 @@ for (const [i, j] of pts) {
       ` Dz=${dz.re[a].toFixed(5)} Sx=${sx.re[a].toFixed(5)} Sz=${sz.re[a].toFixed(5)}` +
       ` nx=${(n[0] / nl).toFixed(5)} nz=${(n[2] / nl).toFixed(5)} J=${J.toFixed(5)}`
   );
+}
+
+// Per-texel ground truth for the SEA-STATE mode (tsl-ocean-num.html
+// ?sea=1 runs the same single L=450 full-band grid): the reference
+// partitions above, seed 1337, t = 13.7.
+{
+  const specS = buildInitialSpectrum(
+    N,
+    L,
+    {
+      D: 60,
+      partitions: calibrateSeaState([
+        {hs: 1.5, tp: 6, dir: 0, U10: 10},
+        {hs: 2.0, tp: 14, dir: Math.PI / 3}
+      ])
+    },
+    SEED
+  );
+  const FS = evolve(T, specS.h0, specS.omega);
+  const hS = ifft2(FS.H);
+  const dxS = ifft2(FS.Dx);
+  const dzS = ifft2(FS.Dz);
+  for (const [i, j] of pts) {
+    const a = idx(i, j);
+    console.log(
+      `REF sea t=${T} (${i},${j}): h=${hS.re[a].toFixed(5)}` +
+        ` Dx=${dxS.re[a].toFixed(5)} Dz=${dzS.re[a].toFixed(5)}`
+    );
+  }
 }

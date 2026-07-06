@@ -38,10 +38,11 @@ import {
  *    spectral slopes and Jacobian derivatives (maps carry combinable
  *    terms; normals of a sum are not sums of normals)
  *  - whitecaps from the Jacobian folding criterion (Tessendorf 2001,
- *    J < Jt), with Jt = 0.4745 calibrated so coverage matches
- *    Monahan & O'Muircheartaigh (1980) W = 3.84e-6 U^3.41 at
- *    U = 12 m/s (ocean-reference.mjs prints the percentile) - at
- *    every other wind, coverage follows from the physics
+ *    J < Jt): the mask is smoothstep(Jt, Jt - 0.175, J) and Jt =
+ *    0.7974 is calibrated against that EXACT mask so grid-mean
+ *    coverage matches Monahan & O'Muircheartaigh (1980)
+ *    W = 3.84e-6 U^3.41 at U = 12 m/s (ocean-reference.mjs bisects
+ *    it) - at every other wind, coverage follows from the physics
  *  - Cox & Munk (1954) glitter: the Blinn lobe's gloss follows the
  *    RESIDUAL slope variance - total wind mss minus what the FFT
  *    cascades resolve (Bruneton, Neyret & Holzschuch 2010) - via the
@@ -81,7 +82,7 @@ export class HorizonWaterMesh extends Mesh {
     // cascades resolve); the per-pixel effective mss adds back the
     // variance of whatever the pixel footprint filters out.
     this.mssSubgrid = uniform(0.01);
-    this.foamJ = uniform(0.4745); // folding threshold, see header
+    this.foamJ = uniform(0.7974); // folding threshold, see header
     this.foamW = uniform(0); // Monahan mean coverage, far-field foam
     this.windDirW = uniform(new Vector2(1, 0));
     this.hsWave = uniform(0.5);
@@ -236,7 +237,7 @@ export class HorizonWaterMesh extends Mesh {
       // distant gale sea keeps its aggregate whiteness.
       const capMask = mix(
         this.foamW,
-        smoothstep(this.foamJ, this.foamJ.sub(0.35), jacobian),
+        smoothstep(this.foamJ, this.foamJ.sub(0.175), jacobian),
         fFine
       );
       const dpt = depthTexNode
