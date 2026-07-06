@@ -1876,6 +1876,25 @@ Scenes (all at Grindelwald unless noted):
       glow, they do not blacken. Provenance line quotes zenith
       mag/arcsec^2, Bortle class and the contrast factor.
       ?lp=r overrides for harness shots.
+  - DONE: paraselenic optics - the moon gets the certified optics
+    dome. The classic winter-night sight (the 22-deg lunar halo
+    in cirrus) plus moon dogs and the rare moonbow, with NO new
+    optical physics: createOpticsMaterial (the gated Descartes
+    bows + halo + parhelia LUTs) instanced a second time and
+    anchored to the moon. What IS new and single-sourced:
+    moonphase.js - the disk-integrated Hapke phase curve
+    extracted from moon-reference (which now imports it, still
+    holding the 0.082-of-full-at-90-deg Rougier landmark, plus a
+    new coarse-grid consistency check at 0.01% drift) - scales
+    the dome by how much light the moon actually sends. Phase
+    angle at 1 Hz from the eclipse block's own sun-moon
+    elongation (exact to the ~1 deg lunar parallax, documented).
+    Same gating physics as the sun's dome: measured cirrus for
+    the halo, measured rain for the bow, low source for the
+    dogs; MOONOPT_GAIN (0.22) is the documented display anchor
+    across the eye's night adaptation, and the city washing
+    (lpVisBright) applies. Full-moon cirrus nights now ring the
+    moon exactly as the real sky does.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

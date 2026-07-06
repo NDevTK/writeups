@@ -221,6 +221,7 @@
       import {BETA_MIN_DEG, seasonEnvelope} from './horizon/nlc.js';
       import {parseTLEs, satMagnitude, sunlitEci} from './horizon/sats.js';
       import {lunarEclipse, solarEclipse} from './horizon/eclipses.js';
+      import {relPhase} from './horizon/moonphase.js';
       import {
         bortleClass,
         horizonGlow,
@@ -2890,6 +2891,26 @@
       );
       optics.renderOrder = 1;
       scene.add(optics);
+      // Paraselenic optics: the SAME certified halo/bow/dog dome,
+      // instanced again and anchored to the MOON. Intensity scales
+      // with how much light the moon actually sends - the shared
+      // Hapke disk-integrated phase curve (moonphase.js, held to
+      // Rougier's observations by moon-reference). Full-moon
+      // cirrus nights get the classic 22-deg lunar halo and moon
+      // dogs (paraselenae); rain under a bright moon gets the rare
+      // moonbow. MOONOPT_GAIN anchors the display level (the
+      // physical sun/moon illuminance ratio is ~4e5 and the eye's
+      // night adaptation closes most of it - documented, the
+      // AGLOW_GAIN precedent).
+      const MOONOPT_GAIN = 0.22;
+      const opticsMoonObj = createOpticsMaterial();
+      const opticsMoonU = opticsMoonObj.u;
+      const opticsMoon = new THREE.Mesh(
+        new THREE.SphereGeometry(592, 32, 20),
+        opticsMoonObj.material
+      );
+      opticsMoon.renderOrder = 1;
+      scene.add(opticsMoon);
 
       // Clouds in the three layers the weather model actually reports
       // (open-meteo cloud_cover_low/mid/high): the low cumulus deck and
@@ -3479,6 +3500,13 @@
             astro.eclipse = params.has('eclipse')
               ? +params.get('eclipse')
               : se.obsc;
+            // Moon phase brightness for the paraselenic optics:
+            // phase angle = 180 deg minus the sun-moon elongation
+            // (exact to the ~1 deg lunar parallax), through the
+            // shared disk-integrated Hapke curve at 1 Hz.
+            astro.moonRel = relPhase(
+              180 - Math.acos(THREE.MathUtils.clamp(cosSep, -1, 1)) / RAD
+            );
             if (astro.eclipse > 0.05 && !astro.eclipseSaid) {
               astro.eclipseSaid = true;
               say(
@@ -4423,6 +4451,32 @@
           0,
           1
         );
+        // The moon's dome: same gating physics (cirrus for the
+        // halo, rain for the bow, low source for the dogs), the
+        // source now the moon at its true phase brightness.
+        {
+          const moonVec2 = skyPoint(moon.alt, moon.az, 1);
+          opticsMoonU.sunDir.value.copy(moonVec2);
+          opticsMoonU.antisolar.value.copy(moonVec2).negate();
+          const moonOut =
+            (1 - day) *
+            THREE.MathUtils.clamp(1 - cloudy * 1.1, 0, 1) *
+            (astro.moonRel ?? 0) *
+            lpVisBright *
+            MOONOPT_GAIN;
+          opticsMoonU.bow.value =
+            raining && moon.alt > 0 && moon.alt < 0.733 ? moonOut : 0;
+          opticsMoonU.halo.value =
+            (cHigh / 100) *
+            (cHigh < 90 ? 1 : 0.5) *
+            moonOut *
+            (moon.alt > 0 ? 1 : 0);
+          opticsMoonU.dogs.value = THREE.MathUtils.clamp(
+            (0.44 - moon.alt) / 0.26,
+            0,
+            1
+          );
+        }
 
         // Deciduous phenology: Hopkins' bioclimatic law shifts the leaf
         // calendar ~4 days per degree of latitude and per 122m of
