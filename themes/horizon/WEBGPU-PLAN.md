@@ -945,6 +945,30 @@ Scenes (all at Grindelwald unless noted):
       holds across every level (6e-8); a known sinusoid lands on
       its analytic slope variance; no negative variances. Gate PASS
       at 8/8 references + 3/3 probes; noon smoke clean.
+  - DONE: radar-measured precipitation (radar.js single source +
+    radar-reference.mjs). The rain/snow intensity was the model's
+    POINT value from the forecast API; it now comes from the latest
+    RainViewer radar composite - an actual measurement - decoded at
+    the visitor:
+    - Their black-and-white tile scheme (color 0, smoothing and
+      snow colorisation off): red channel dBZ = (R & 127) - 32,
+      bit 7 flags snow, transparent = no radar coverage (probed:
+      CORS is open, catalog + tiles fetch from the browser).
+    - Z-R inversion: Marshall & Palmer (1948) Z = 200 R^1.6 for
+      rain, Sekhon & Srivastava (1970) Z = 1780 S^2.21 for the
+      snow-flagged pixels. Reference landmarks: exact round-trips,
+      the canonical 23 dBZ = 1.00 mm/h boundary, 40 dBZ = 11.5,
+      50 dBZ = 48.6; at equal dBZ snow reads a DRIER liquid
+      equivalent (steeper exponent). Web Mercator tile math checked
+      against the slippy-map landmarks; windowStats reproduces
+      analytic means on a synthetic tile exactly.
+    - syncRadar() every 10 min: one z8 tile at the visitor, canvas
+      decode, mean rates over the 16 km world footprint. Fresh
+      (< 25 min) covered radar replaces the model's precipitation
+      in the particle intensity; no coverage or offline keeps the
+      model silently. Pinned scenes are untouched (overridden gate
+      - the harness fetch stub). Gate PASS at 9/9 references + 3/3
+        probes; noon smoke clean.
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:
