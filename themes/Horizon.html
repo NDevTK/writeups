@@ -193,7 +193,8 @@
         createContrailMaterial,
         createFlashMaterial,
         createMilkyWayMaterial,
-        createNLCMaterial
+        createNLCMaterial,
+        createSkyglowMaterial
       } from './horizon/sky-objects-tsl.js';
       import {adsbToScene, appleman} from './horizon/contrails.js';
       import {
@@ -222,6 +223,7 @@
       import {lunarEclipse, solarEclipse} from './horizon/eclipses.js';
       import {
         bortleClass,
+        horizonGlow,
         pointVisibility,
         sampleRatio,
         skyMag
@@ -3033,10 +3035,35 @@
           ' \u00b7 star contrast \u00d7' +
           lpVis.toFixed(2)
       );
-      const lpGlowObj = createVeilMaterial();
-      lpGlowObj.material.blending = THREE.AdditiveBlending;
-      lpGlowObj.u.bottom.value.setRGB(0.42, 0.33, 0.18); // sodium/LED
-      lpGlowObj.u.top.value.setRGB(0.05, 0.045, 0.035);
+      // Anisotropic city dome: 16 azimuth weights from Walker's
+      // law over ring samples of the SAME measured grid (gated in
+      // skyglow-reference) - a coastal city glows toward the city
+      // and stays dark over the sea. Weights normalise around the
+      // local ratio so the overall amplitude stays anchored to
+      // the visitor's own zenith measurement.
+      const lpGlowObj = createSkyglowMaterial();
+      {
+        const g = [];
+        for (let i = 0; i < 16; i++)
+          g.push(
+            horizonGlow(
+              SKYGLOW,
+              SKYGLOW_W,
+              SKYGLOW_H,
+              state.lat,
+              state.lon,
+              i * 22.5
+            )
+          );
+        const mean = g.reduce((a, b) => a + b, 0) / 16;
+        for (let i = 0; i < 16; i++)
+          lpGlowObj.u.azData[i] = THREE.MathUtils.clamp(
+            (lpRatio + g[i]) / Math.max(lpRatio + mean, 1e-6),
+            0.4,
+            3
+          );
+        lpGlowObj.u.azTex.needsUpdate = true;
+      }
       const lpGlowAmp = THREE.MathUtils.clamp(
         Math.log10(1 + lpRatio) / 2.5,
         0,

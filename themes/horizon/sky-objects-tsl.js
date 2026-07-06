@@ -12,6 +12,7 @@ import {
   InstancedMesh,
   NodeMaterial,
   PlaneGeometry,
+  RepeatWrapping,
   SpriteNodeMaterial,
   Vector3
 } from 'three/webgpu';
@@ -915,6 +916,46 @@ export function createNLCMaterial() {
       .mul(u.uAmp)
       .mul(0.32)
   );
+  material.opacityNode = float(1);
+  return {material, u};
+}
+
+// The light-pollution dome (skyglow.js): a warm sodium/LED glow
+// whose HORIZON ANISOTROPY is measured - 16 azimuth weights,
+// computed at boot from Walker's law over ring samples of the
+// Falchi atlas grid, arrive as a wrapping 16x1 texture. A coastal
+// city glows toward the city and stays dark over the sea. The
+// vertical profile (strong at the horizon, fading with altitude)
+// and the warm tint are the documented display elements; the
+// amplitude and the azimuth structure are the measured part.
+export function createSkyglowMaterial() {
+  const az = new Float32Array(16).fill(1);
+  const azTex = new DataTexture(az, 16, 1, RedFormat, FloatType);
+  azTex.wrapS = RepeatWrapping;
+  azTex.minFilter = azTex.magFilter = LinearFilter;
+  azTex.needsUpdate = true;
+  const u = {
+    alpha: uniform(0),
+    tint: uniform(new Vector3(0.42, 0.33, 0.18)),
+    azTex,
+    azData: az
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = BackSide;
+  material.blending = AdditiveBlending;
+  const d = normalize(positionLocal);
+  // scene azimuth: 0 = north = -z, 90 = east = +x
+  const azFrac = atan(d.x, d.z.negate())
+    .div(2 * Math.PI)
+    .add(1)
+    .mod(1);
+  const w = texture(azTex).sample(vec2(azFrac, 0.5)).r;
+  // horizon-heavy vertical profile: the glow lives low
+  const h = clamp(d.y, 0.0, 1.0);
+  const prof = exp(h.mul(-5.5)).mul(0.85).add(0.15);
+  material.colorNode = vec3(u.tint).mul(w.mul(prof).mul(u.alpha));
   material.opacityNode = float(1);
   return {material, u};
 }
