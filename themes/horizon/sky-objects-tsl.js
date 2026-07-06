@@ -672,3 +672,24 @@ export function createPrecipSprites(positions, dotTex, encodeFog) {
   mesh.frustumCulled = false;
   return {mesh, u, posAttr};
 }
+
+// One lightning flash (lightning.js decides the stroke sequence
+// and the apparent brightness): a soft radial glow quad hung at
+// the strike's azimuth behind/inside the cloud base. uv-radial
+// falloff; `amp` carries the instantaneous Rakov-Uman flash
+// amplitude times the Koschmieder/inverse-square viewing factor -
+// the flicker rhythm IS the physics, this node only shapes the
+// glow. Cool-white channel tint (~30000 K).
+export function createFlashMaterial() {
+  const u = {amp: uniform(0)};
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = DoubleSide;
+  material.blending = AdditiveBlending;
+  const r2 = uv().sub(0.5).length().mul(2).clamp(0, 1).pow(2);
+  const glow = exp(r2.mul(-4));
+  material.colorNode = vec3(0.82, 0.87, 1.0).mul(glow.mul(u.amp));
+  material.opacityNode = float(1);
+  return {material, u};
+}

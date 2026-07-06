@@ -1567,6 +1567,49 @@ Scenes (all at Grindelwald unless noted):
       echo. ADSB_PROXY/AIS_PROXY defaults in Horizon.html now
       point at api.ndev.tk; the horizon-adsb worker stays
       deployed as documented fallback (?adsb=/?ais= overrides).
+  - DONE (live end-to-end): real-time lightning - Blitzortung.org
+    strikes flash on the horizon, the item the worker era had to
+    shelve because it needs a PERSISTENT socket. First use of the
+    daemon's client-facing push, and the owner asked the right
+    question at the right moment: EventSource/WebSocket BYPASS
+    CORS, so client streams are origin-scoped server-side - the
+    daemon's global Origin allowlist gate 403s foreign origins
+    before a stream opens (verified live), and that check is the
+    ONLY origin protection such endpoints can have.
+    - Feed: Blitzortung's community sockets (ws1/ws7/ws8,
+      subscribe {"a":111}), wire format LZW-compressed JSON -
+      protocol verified LIVE before a line was written (Florida
+      storm strikes decoded on first connect). The daemon's
+      decoder is gated by round-trip against a spec-built encoder
+      INCLUDING the KwKwK corner case; strikes land in the same
+      1-degree grid pattern as ships (ns -> ms time base, 15 min
+      retention), queried by EXACT haversine after a cell
+      prefilter. /lightning snapshot + /lightning/stream SSE
+      (25-s heartbeats, 30-min lifetime, SSE_MAX cap). Live
+      check: 106 strikes resident 12 s after boot; the Orlando
+      storm streamed 18 strikes in a 20 s listen window with
+      exact ranges. Data CC BY-SA, credited in the provenance
+      panel.
+    - Physics (lightning.js, gate set 21 - 5 landmarks): Rakov &
+      Uman 2003 flash structure - 15-20% single-stroke, mean
+      multiplicity 3-5 (median 3), ~60 ms geometric-mean
+      interstroke intervals, subsequent strokes ~0.4 of the
+      first, continuing current in 30-50% of flashes (20k-draw
+      statistics all inside the published bands); Koschmieder
+      T = exp(-3.912 d/V) with the exact-2%-at-V landmark;
+      haversine on the IUGG mean radius (equatorial degree
+      111.1949 km exact); apparent brightness T/d^2.
+    - Theme: SSE strikes become flash events whose FLICKER IS THE
+      PHYSICS - the 60 Hz frame loop evaluates the stroke
+      sequence directly (the ~60 ms restrikes and continuing-
+      current glow are frame-resolvable), amplitude carries
+      Koschmieder + inverse-square at the true distance, the glow
+      quad hangs at the true bearing (createFlashMaterial - the
+      radial shape is the one documented display element).
+      ?strike=N spawns deterministic synthetic flashes (fixed
+      uniform table, camera-cone azimuths) for pinned shots;
+      ?lightning=URL overrides the endpoint. EventSource
+      reconnects itself.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

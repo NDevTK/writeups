@@ -57,8 +57,15 @@ by `../server-reference.mjs` — reference set 20 in
   round-trip).
 - `GET /adsb?lat&lon&dist` — aircraft via readsb failover
   (adsb.lol → adsb.fi → airplanes.live), 15 s cache.
-- `GET /health` — AIS engine stats (ships resident, frames,
-  socket age).
+- `GET /lightning?lat&lon&km` — strikes of the last 10 minutes
+  within km (≤ 250) of the point, with ages and exact
+  great-circle distances (Blitzortung.org, CC BY-SA).
+- `GET /lightning/stream?lat&lon&km` — server-sent events:
+  strikes pushed the moment the network locates them.
+  EventSource bypasses CORS, so the Origin allowlist gate IS the
+  protection here — foreign origins get 403 before the stream
+  opens. Capped concurrent streams (`SSE_MAX`, default 25).
+- `GET /health` — AIS + lightning engine stats.
 - `GET /probe` — health + the fixed-target reachability
   diagnostic, run from the box's own IP.
 

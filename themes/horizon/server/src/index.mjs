@@ -54,6 +54,7 @@
 
 import http from 'node:http';
 import {aisBox, normalize, normalizeShip} from '../../worker/src/index.js';
+import {haversineKm} from '../../lightning.js';
 
 const AIS_WS = 'wss://stream.aisstream.io/v0/stream';
 const UA = 'horizon-live/1.0 (+https://github.com/NDevTK/writeups)';
@@ -167,6 +168,109 @@ export function query(st, lat, lon, dist, limit = 80) {
           hdg: s.hdg
         });
         if (out.length >= limit) return out;
+      }
+    }
+  }
+  return out;
+}
+
+// ---- Lightning (Blitzortung.org community network) -------------
+// Strikes stream over another persistent WebSocket; the wire
+// format is LZW-compressed JSON (their map client's scheme -
+// protocol verified live: subscribe with {"a":111}, frames decode
+// to {time (ns), lat, lon, ...}). Data CC BY-SA; the theme
+// credits Blitzortung.org in its provenance panel.
+const BLITZ_HOSTS = [
+  'wss://ws1.blitzortung.org',
+  'wss://ws7.blitzortung.org',
+  'wss://ws8.blitzortung.org'
+];
+
+// Their LZW: dictionary starts at code 256, entries are built as
+// previous-word + first-char, unknown codes mean word + word[0].
+// Exported and gated by a round-trip against a spec-built encoder.
+export function lzwDecode(b) {
+  const d = b.split('');
+  const e = {};
+  let c = d[0];
+  let f = c;
+  let g = 256;
+  const out = [c];
+  for (let i = 1; i < d.length; i++) {
+    const cc = d[i].charCodeAt(0);
+    const w = cc < 256 ? d[i] : (e[cc] ?? f + c);
+    out.push(w);
+    c = w.charAt(0);
+    e[g++] = f + c;
+    f = w;
+  }
+  return out.join('');
+}
+
+export function createStrikeState() {
+  return {
+    grid: new Map(), // "lat:lon" 1-degree cell -> [{t, lat, lon}]
+    count: 0,
+    total: 0,
+    lastStrike: 0,
+    connects: 0
+  };
+}
+
+// Ingest one decoded Blitzortung frame. Time arrives in
+// NANOSECONDS since epoch; stored in ms. Returns the stored
+// strike or null.
+export function ingestStrike(st, j, now = Date.now()) {
+  if (!j || typeof j.lat !== 'number' || typeof j.lon !== 'number') return null;
+  const s = {
+    t: typeof j.time === 'number' ? Math.round(j.time / 1e6) : now,
+    lat: j.lat,
+    lon: j.lon
+  };
+  const gk = gridKey(j.lat, j.lon);
+  let cell = st.grid.get(gk);
+  if (!cell) st.grid.set(gk, (cell = []));
+  cell.push(s);
+  st.count++;
+  st.total++;
+  st.lastStrike = now;
+  return s;
+}
+
+// Strikes older than maxAgeMs leave the picture (a flash matters
+// for minutes, not hours). Returns the number pruned.
+export function pruneStrikes(st, maxAgeMs = 15 * 60e3, now = Date.now()) {
+  let n = 0;
+  for (const [gk, cell] of st.grid) {
+    const keep = cell.filter((s) => now - s.t <= maxAgeMs);
+    n += cell.length - keep.length;
+    if (keep.length) st.grid.set(gk, keep);
+    else st.grid.delete(gk);
+  }
+  st.count -= n;
+  return n;
+}
+
+// Strikes within km of the point in the last sinceMs, EXACT
+// great-circle distances (haversine from lightning.js - the model
+// lives once) after a conservative grid-cell prefilter. Ages out,
+// so the client can replay timing faithfully.
+export function queryStrikes(st, lat, lon, km, sinceMs, now = Date.now()) {
+  const dLat = Math.ceil(km / 110) + 0; // 1 deg lat >= 110.57 km
+  const dLon = Math.ceil(
+    km / Math.max(111.32 * Math.cos((lat * Math.PI) / 180), 1)
+  );
+  const out = [];
+  for (let a = Math.floor(lat) - dLat; a <= Math.floor(lat) + dLat; a++) {
+    for (let o = Math.floor(lon) - dLon; o <= Math.floor(lon) + dLon; o++) {
+      const cell = st.grid.get(a + ':' + o);
+      if (!cell) continue;
+      for (const s of cell) {
+        if (now - s.t > sinceMs) continue;
+        const d = haversineKm(lat, lon, s.lat, s.lon);
+        if (d > km) continue;
+        out.push({ageMs: now - s.t, lat: s.lat, lon: s.lon, km: Math.round(d)});
+        if (out.length >= 200) return out;
       }
     }
   }
@@ -348,6 +452,89 @@ function runAisSocket(key, st, log) {
   setInterval(() => prune(st), 60e3).unref();
 }
 
+// Persistent Blitzortung socket: rotate hosts on reconnect,
+// subscribe on open, ingest strikes, fan out to SSE clients.
+function runBlitzSocket(st, clients, log) {
+  const bootT = Date.now();
+  let hostIdx = 0;
+  let ws = null;
+  let backoff = 1000;
+  const connect = () => {
+    let ended = false;
+    const reopen = () => {
+      if (ended) return;
+      ended = true;
+      backoff = Math.min(backoff * 2, 60e3);
+      hostIdx = (hostIdx + 1) % BLITZ_HOSTS.length;
+      log(`blitzortung socket down - next host in ${backoff / 1000}s`);
+      setTimeout(connect, backoff);
+    };
+    try {
+      ws = new WebSocket(BLITZ_HOSTS[hostIdx]);
+    } catch (e) {
+      log('blitzortung constructor failed: ' + e);
+      reopen();
+      return;
+    }
+    try {
+      ws.binaryType = 'arraybuffer';
+    } catch {
+      // decodeFrame handles views
+    }
+    ws.addEventListener('open', () => {
+      st.connects++;
+      backoff = 1000;
+      log('blitzortung socket open (' + BLITZ_HOSTS[hostIdx] + ')');
+      ws.send(JSON.stringify({a: 111}));
+    });
+    ws.addEventListener('message', (ev) => {
+      try {
+        const s = ingestStrike(st, JSON.parse(lzwDecode(decodeFrame(ev.data))));
+        if (!s) return;
+        for (const cl of clients) {
+          const d = haversineKm(cl.lat, cl.lon, s.lat, s.lon);
+          if (d <= cl.km) {
+            cl.res.write(
+              'data: ' +
+                JSON.stringify({lat: s.lat, lon: s.lon, km: Math.round(d)}) +
+                '\n\n'
+            );
+          }
+        }
+      } catch {
+        // malformed frame
+      }
+    });
+    ws.addEventListener('close', reopen, {once: true});
+    ws.addEventListener(
+      'error',
+      () => {
+        try {
+          ws.close();
+        } catch {
+          // triggers reopen either way
+        }
+        reopen();
+      },
+      {once: true}
+    );
+  };
+  connect();
+  setInterval(() => {
+    // The planet always has thunderstorms; a long-quiet socket is
+    // dead upstream.
+    if (st.connects > 0 && Date.now() - (st.lastStrike || bootT) > 300e3) {
+      log('blitzortung watchdog: silent 300 s - cycling');
+      try {
+        ws.close();
+      } catch {
+        // reopen fires regardless
+      }
+    }
+    pruneStrikes(st);
+  }, 60e3).unref();
+}
+
 function main() {
   const env = process.env;
   const PORT = Number(env.PORT || 8127);
@@ -363,6 +550,16 @@ function main() {
   const log = (m) => console.log(new Date().toISOString(), m);
   if (env.AISSTREAM_KEY) runAisSocket(env.AISSTREAM_KEY, st, log);
   else log('AISSTREAM_KEY unset - /ais will answer 503');
+  // Lightning needs no key - Blitzortung's community sockets are
+  // open (data CC BY-SA, credited by the theme). SSE clients are
+  // origin-scoped by the SAME allowlist gate as every route
+  // (WebSockets/EventSource bypass CORS, so the Origin check IS
+  // the protection) and capped: streams are the one resource a
+  // client can hold open.
+  const blitz = createStrikeState();
+  const sseClients = new Set();
+  const SSE_MAX = Number(env.SSE_MAX || 25);
+  runBlitzSocket(blitz, sseClients, log);
 
   const adsbCache = new Map(); // url -> {t, body}
   setInterval(() => {
@@ -412,11 +609,21 @@ function main() {
         uptimeMs: Date.now() - st.started,
         keySet: !!env.AISSTREAM_KEY
       };
+      const lightning = {
+        strikes: blitz.count,
+        cells: blitz.grid.size,
+        total: blitz.total,
+        lastStrikeAgoMs: blitz.lastStrike
+          ? Date.now() - blitz.lastStrike
+          : null,
+        connects: blitz.connects,
+        streams: sseClients.size
+      };
       if (url.pathname === '/health')
-        return json(200, {ais}, {'cache-control': 'no-store'});
+        return json(200, {ais, lightning}, {'cache-control': 'no-store'});
       return json(
         200,
-        {ais, probe: await probeAll()},
+        {ais, lightning, probe: await probeAll()},
         {'cache-control': 'no-store'}
       );
     }
@@ -441,6 +648,56 @@ function main() {
             st.frames + ' frames, ' + st.ships.size + ' ships resident'
         }
       );
+    }
+
+    if (url.pathname === '/lightning') {
+      const km = Math.min(Number(url.searchParams.get('km')) || 150, 250);
+      if (!(km > 0)) return send(400, 'bad request');
+      return json(
+        200,
+        {strikes: queryStrikes(blitz, lat, lon, km, 10 * 60e3)},
+        {
+          'cache-control': 'public, max-age=30',
+          'x-lightning-source': 'blitzortung.org'
+        }
+      );
+    }
+
+    if (url.pathname === '/lightning/stream') {
+      // Server-sent events: strikes near the point, pushed the
+      // moment Blitzortung locates them. EventSource always sends
+      // Origin, and the global allowlist gate above already 403'd
+      // anything foreign - this stream is origin-scoped by
+      // construction. Capped globally and renewed by the client's
+      // built-in reconnect (we end streams after 30 min).
+      const km = Math.min(Number(url.searchParams.get('km')) || 150, 250);
+      if (!(km > 0)) return send(400, 'bad request');
+      if (sseClients.size >= SSE_MAX) return send(503, 'stream capacity');
+      res.writeHead(
+        200,
+        head({
+          'content-type': 'text/event-stream',
+          'cache-control': 'no-store',
+          'x-lightning-source': 'blitzortung.org'
+        })
+      );
+      res.write(': horizon-live lightning stream\n\n');
+      const client = {res, lat, lon, km};
+      sseClients.add(client);
+      const hb = setInterval(() => {
+        try {
+          res.write(': hb\n\n');
+        } catch {
+          // closing below
+        }
+      }, 25e3);
+      const bye = setTimeout(() => res.end(), 30 * 60e3);
+      req.on('close', () => {
+        clearInterval(hb);
+        clearTimeout(bye);
+        sseClients.delete(client);
+      });
+      return;
     }
 
     if (url.pathname === '/adsb') {

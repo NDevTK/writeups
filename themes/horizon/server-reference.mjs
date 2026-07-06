@@ -22,14 +22,20 @@
 import {
   createAisState,
   createLimiter,
+  createStrikeState,
   decodeFrame,
   gridKey,
   ingest,
+  ingestStrike,
+  lzwDecode,
   originCheck,
   prune,
-  query
+  pruneStrikes,
+  query,
+  queryStrikes
 } from './server/src/index.mjs';
 import {aisBox} from './worker/src/index.js';
+import {haversineKm} from './lightning.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -130,6 +136,81 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       threw !== null &&
       threw.includes('undecodable'),
     `string passthrough exact; ArrayBuffer and Uint8Array utf8-decode exact; Blob-like object throws (-> badFrames), never a silent parse of "[object Blob]"`
+  );
+}
+
+{
+  // Blitzortung LZW: a spec-built ENCODER (initial dictionary =
+  // single chars, new entry = previous word + first char of
+  // current) provides ground truth; the daemon's decoder must
+  // invert it exactly - including the KwKwK corner case ("aaaa"),
+  // where the decoder meets a code it has not built yet.
+  const lzwEncode = (s) => {
+    const dict = new Map();
+    let g = 256;
+    let w = s[0];
+    const out = [];
+    const emit = (word) =>
+      out.push(word.length === 1 ? word : String.fromCharCode(dict.get(word)));
+    for (let i = 1; i < s.length; i++) {
+      const wc = w + s[i];
+      if (dict.has(wc)) w = wc;
+      else {
+        emit(w);
+        dict.set(wc, g++);
+        w = s[i];
+      }
+    }
+    emit(w);
+    return out.join('');
+  };
+  const strike =
+    '{"time":1783372802970770000,"lat":28.204296,"lon":-81.011173,"alt":0,"pol":0,"sig":[{"sta":1},{"sta":2}]}';
+  const kwk = 'aaaaaaaa';
+  const mixed = 'ababababab{"lat":1.5,"lat":1.5,"lat":1.5}';
+  const ok =
+    lzwDecode(lzwEncode(strike)) === strike &&
+    lzwDecode(lzwEncode(kwk)) === kwk &&
+    lzwDecode(lzwEncode(mixed)) === mixed &&
+    lzwEncode(strike).length < strike.length;
+  check(
+    'Blitzortung LZW',
+    ok,
+    `round trip exact on a strike frame (${strike.length} -> ${lzwEncode(strike).length} chars), on "aaaaaaaa" (KwKwK) and on repeated JSON`
+  );
+}
+
+{
+  // Strike engine: ns -> ms time base, grid insert, exact
+  // haversine radius query with age filter, prune with cell
+  // cleanup.
+  const st = createStrikeState();
+  const now = 1_800_000_000_000;
+  const a = ingestStrike(
+    st,
+    {time: (now - 60e3) * 1e6, lat: 46.6, lon: 8.0},
+    now
+  );
+  ingestStrike(st, {time: (now - 5 * 60e3) * 1e6, lat: 47.4, lon: 8.6}, now);
+  ingestStrike(st, {time: (now - 60e3) * 1e6, lat: 50.0, lon: 8.0}, now); // 378 km north
+  ingestStrike(st, {lat: 'x'}, now); // junk
+  const d2 = haversineKm(46.6, 8.0, 47.4, 8.6);
+  const both = queryStrikes(st, 46.6, 8.0, 150, 10 * 60e3, now);
+  const near = queryStrikes(st, 46.6, 8.0, 50, 10 * 60e3, now);
+  const fresh = queryStrikes(st, 46.6, 8.0, 150, 2 * 60e3, now);
+  const pruned = pruneStrikes(st, 4 * 60e3, now);
+  check(
+    'strike engine',
+    a.t === now - 60e3 &&
+      st.total === 3 &&
+      both.length === 2 &&
+      both.some((s) => s.km === Math.round(d2)) &&
+      near.length === 1 &&
+      near[0].ageMs === 60e3 &&
+      fresh.length === 1 &&
+      pruned === 1 &&
+      st.count === 2,
+    `ns -> ms exact; radius 150 km finds 2 of 3 (third at 378 km), the second at its exact haversine ${d2.toFixed(0)} km; 50 km -> 1; 2 min age filter -> 1; prune drops the 5-min-old strike (${pruned})`
   );
 }
 

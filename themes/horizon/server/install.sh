@@ -27,14 +27,15 @@ if ! command -v caddy >/dev/null; then
   apt-get update && apt-get install -y caddy
 fi
 
-# The daemon: one file, zero npm dependencies. It imports the
-# worker's normalizers, so ship both files preserving layout.
+# The daemon: zero npm dependencies. It imports the worker's
+# normalizers and the lightning geometry, so ship those files too.
 mkdir -p /opt/horizon-live/worker/src
 install -m 644 src/index.mjs /opt/horizon-live/index.mjs
 install -m 644 ../worker/src/index.js /opt/horizon-live/worker/src/index.js
-# The import path '../../worker/src/index.js' must keep resolving
-# from /opt/horizon-live/index.mjs - rewrite it for the flat deploy.
-sed -i "s#'../../worker/src/index.js'#'./worker/src/index.js'#" /opt/horizon-live/index.mjs
+install -m 644 ../lightning.js /opt/horizon-live/lightning.js
+# The '../../' import paths must keep resolving from
+# /opt/horizon-live/index.mjs - rewrite them for the flat deploy.
+sed -i "s#'../../worker/src/index.js'#'./worker/src/index.js'#;s#'../../lightning.js'#'./lightning.js'#" /opt/horizon-live/index.mjs
 
 # Environment (created once; never overwritten - your key lives here).
 if [ ! -f /etc/horizon-live.env ]; then
