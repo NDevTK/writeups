@@ -57,6 +57,7 @@ import {
   Z_MAX,
   Z_MIN
 } from './aurora-lut.js';
+import {EYE_D_CM, SIGMA_MAX, youngSigma} from './scintillation.js';
 
 /**
  * Horizon's sky objects as TSL node materials (WebGPU project,
@@ -373,10 +374,21 @@ const pcg = (v) => {
   return w.shiftRight(uint(22)).bitXor(w);
 };
 
-// Yale stars with Kolmogorov scintillation: twinkle amplitude grows
-// with airmass (~sec z), so horizon stars shimmer, zenith stars don't.
+// Yale stars with PHYSICAL scintillation (scintillation.js):
+// Young (1967)'s sigma for the naked eye grows as airmass^(7/4)
+// (0.255 at zenith - stars visibly twinkle even overhead - to the
+// log-normal clamp near the horizon), the intensity is the
+// mean-conserving log-normal exp(sigma s)/I0(sigma) (Dravins'
+// statistics; the Bessel normaliser makes the time-average of every
+// star EXACTLY its catalogue brightness - twinkle redistributes
+// light in time, it never brightens or dims), and the flicker rate
+// rides the measured 250 hPa jet (turbulence crossing speed -
+// documented display mapping of a kHz process). The size stays
+// fixed: scintillation is an intensity phenomenon; image wander is
+// sub-sprite at this scale.
 export function createStarSprites(positions, colors, sizes) {
-  const u = {night: uniform(0), time: uniform(0)};
+  const u = {night: uniform(0), time: uniform(0), twRate: uniform(9)};
+  const SIGMA_ZENITH = youngSigma(EYE_D_CM, 1);
   const {mesh} = makeSprites({
     positions,
     colors,
@@ -400,12 +412,21 @@ export function createStarSprites(positions, colors, sizes) {
           .toFloat()
           .mul(1.46291807e-9)
       );
-      const vtw = clamp(am.sub(1.0).mul(0.06), 0.0, 0.5)
-        .mul(sin(u.time.mul(9.0).add(ph)))
-        .add(1.0);
+      const sigma = clamp(pow(am, 1.75).mul(SIGMA_ZENITH), 0.0, SIGMA_MAX);
+      const s = sin(u.time.mul(u.twRate).add(ph));
+      // 5-term I0(sigma) - the exact normaliser of E[exp(sigma sin)]
+      // (see scintillation.js; rel err < 1e-6 on the clamped range).
+      const q = sigma.mul(sigma).mul(0.25);
+      const q2 = q.mul(q);
+      const i0 = float(1)
+        .add(q)
+        .add(q2.mul(0.25))
+        .add(q2.mul(q).mul(1 / 36))
+        .add(q2.mul(q2).mul(1 / 576));
+      const I = exp(sigma.mul(s)).div(i0);
       return {
-        sizeNode: sizeA.mul(vtw),
-        opacityNode: u.night.mul(vtw)
+        sizeNode: sizeA,
+        opacityNode: u.night.mul(I)
       };
     }
   });

@@ -2510,6 +2510,15 @@
         if (starObj) {
           starObj.u.night.value = nightSky * (1 - cloudy * 0.85);
           starObj.u.time.value = t / 1000;
+          // Twinkle rate rides the measured 250 hPa jet (turbulence
+          // crossing speed; display mapping of a kHz process):
+          // 20 km/h of jet ~ 1 rad/s, clamped to the perceptual
+          // window.
+          starObj.u.twRate.value = THREE.MathUtils.clamp(
+            (state.wind250 ?? state.wind * 3) / 20,
+            4,
+            18
+          );
         }
         if (constMat) constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2;
         // Venus and Jupiter pierce twilight a little before the stars.

@@ -10,8 +10,14 @@
 # Env:
 #   SHOOT_CHROME  Chrome for Testing binary (headed launch under Xvfb)
 #   BASE          harness server origin (default http://localhost:8901)
-# Nelson note: the planar-reflector water renders the scene twice and
-# crawls on SwiftShader Vulkan (~1.2 fps) - it gets a 900 s budget.
+#   SITE_DIR      fixture docroot - if set, a dead server is
+#                 restarted from here before each scene
+# Budget notes: the Nelson planar-reflector water renders the scene
+# twice and crawls on SwiftShader Vulkan (~1.2 fps); the snow and
+# aurora scenes carry full 90% cloud decks / curtain ray-march on
+# top of everything else - all three get 900 s. Every scene writes
+# its complete driver log to pin-<scene>.log so a crash (server
+# down, page error before PINSTOP, timeout) is never silent.
 cd "$(dirname "$0")"
 BASE=${BASE:-http://localhost:8901}
 declare -A SC=(
@@ -25,11 +31,26 @@ declare -A SC=(
   [aurora]='lat=64.13&lon=-21.9&time=2026-01-15T23:30&aurora=0.85&auroralat=67&cloud=5'
 )
 for k in noon sunset night stratus towering nelson snow aurora; do
-  budget=420; wait=360000
-  if [ $k = nelson ]; then budget=900; wait=780000; fi
+  if ! curl -sf -o /dev/null "$BASE/writeups/themes/Horizon-dbg.html"; then
+    if [ -n "$SITE_DIR" ]; then
+      echo "[$k] server down - restarting from $SITE_DIR"
+      (cd "$SITE_DIR" && setsid python3 -m http.server "${BASE##*:}" \
+        > /dev/null 2>&1 < /dev/null &)
+      sleep 2
+    fi
+    curl -sf -o /dev/null "$BASE/writeups/themes/Horizon-dbg.html" || {
+      echo "[$k] SERVER-DOWN - aborting sweep"
+      exit 1
+    }
+  fi
+  budget=600; wait=540000
+  case $k in nelson | snow | aurora) budget=900; wait=780000 ;; esac
   timeout $budget xvfb-run -a -s "-screen 0 1400x900x24" node shoot.mjs \
     "$BASE/writeups/themes/Horizon-dbg.html?${SC[$k]}&pin=1" \
-    "pin-$k.ppm" --wgpu --wait-console 'PINSTOP' --wait-ms $wait 2>&1 \
-    | grep -aE '\|(SHOT|PAGEERROR)\|' | sed "s/^/[$k] /"
+    "pin-$k.ppm" --wgpu --wait-console 'PINSTOP' --wait-ms $wait \
+    > "pin-$k.log" 2>&1
+  rc=$?
+  grep -aE '\|(SHOT|PAGEERROR)\|' "pin-$k.log" | sed "s/^/[$k] /"
+  grep -aq '|SHOT|' "pin-$k.log" || echo "[$k] NO-SHOT rc=$rc (pin-$k.log)"
 done
 echo PIN-SWEEP-DONE

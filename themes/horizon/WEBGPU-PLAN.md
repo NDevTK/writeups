@@ -22,10 +22,13 @@ browsers without WebGPU get a caption, not a fallback.
   compiles.
 - **Every phase ends validated.** Historically that meant the full
   pinned matrix plus a numeric A/B (two engines); with the
-  WebGPU-only build there is no A/B of any kind — a phase now ends
-  with its CPU double-precision reference green, its numeric probe
-  reading GPU texels back at the reference values, and the pinned
-  smoke matrix free of page errors.
+  WebGPU-only build there is no A/B of any kind — a phase ends with
+  its CPU double-precision reference green and its numeric probe
+  reading GPU texels back at the reference values (harness/
+  validate.sh). Full-matrix smoke sweeps are NOT part of the
+  per-item gate (owner direction 2026-07-06: stop verifying all
+  scenes) — shoot a single affected scene only when a change
+  plausibly breaks page load, and rely on PAGEERROR in that log.
 - **One phase per commit series, plan updated in the same push.** The
   Status section below is the hand-off between sessions.
 
@@ -1032,6 +1035,44 @@ Scenes (all at Grindelwald unless noted):
     Reykjavik's I = 75.4 (landmark in igrf-reference.mjs);
     syncGeomag feeds tan|I|. Gate PASS; full-length aurora smoke
     clean.
+  - DONE: star scintillation (Young 1967 + log-normal statistics +
+    jet-stream timescale). The old twinkle was an ad-hoc sine on
+    star size; replaced with the published model, one source
+    (scintillation.js) shared by the shader and the reference:
+    - Amplitude: Young (1967) sigma = 0.09 D^(-2/3) X^(7/4)
+      e^(-h/8km) (2 dt)^(-1/2) with the NAKED-EYE aperture D = 0.7
+      cm and photopic integration dt = 0.1 s - zenith sigma 0.255
+      (stars visibly twinkle even overhead), 10 cm scope at 1 s
+      sits at 0.014 (they barely do); the X^(7/4) airmass law is
+      asserted exactly and the horizon (X ~ 5-6) saturates the
+      SIGMA_MAX = 1.2 clamp - violent low-sky twinkle.
+    - Statistics: intensity is LOG-NORMAL (Dravins et al. 1997),
+      I = exp(sigma s) / I0(sigma) - the modified-Bessel normaliser
+      is the EXACT mean of exp(sigma sin), so every star's
+      time-averaged brightness is conserved at every airmass
+      (quadrature check 3e-14; the shader's 5-term I0 series is
+      within 3e-7 on the clamped range). Twinkling redistributes
+      light in time; it does not brighten the sky.
+    - Timescale: flicker rides turbulence blown across the line of
+      sight (Dravins II) - the display rate scales with the
+      MEASURED 250 hPa jet-stream wind already fetched for the
+      cloud decks (documented mapping, clamp 4-18 Hz), so a fast
+      jet overhead visibly speeds the twinkle. Modulates sprite
+      opacity (intensity), not size. scintillation-reference.mjs
+      is landmark set 11 in the gate.
+  - Smoke-matrix hardening (the capstone sweep exposed three silent
+    failure modes): sweep-pin.sh now writes each scene's FULL
+    driver log to pin-<scene>.log and prints an explicit NO-SHOT
+    line with the exit code when PINSTOP is never reached (the old
+    grep filter swallowed net::ERR_CONNECTION_REFUSED crashes -
+    five scenes "ran" against a dead fixture server and the log
+    showed nothing); it liveness-checks the server before every
+    scene and restarts it from SITE_DIR if down; and the snow /
+    aurora scenes join Nelson at the 900 s budget (90% cloud decks
+    + glints / curtain march on SwiftShader exceed 420 s - both
+    timed out silently at the old budget). The full-matrix rerun
+    was cut short by owner direction (see ground rules): the sweep
+    remains available on demand but is no longer a per-item gate.
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:
