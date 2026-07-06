@@ -94,3 +94,26 @@ console.log(
     if (lut[i * 4] > lut[(i - 1) * 4] + 1e-9) mono = false;
   console.log(`REF surf profile monotonic (deeper -> calmer): ${mono}`);
 }
+
+// The measured-tide depth chain (Horizon bakes SIGNED bathymetry
+// clamp(-e/40, -1, 1); water-tsl computes max(store*40 + tide, 0)):
+// equal to the true local depth max(tide - e, 0) for every bed
+// elevation within the +-40 m float range, at any tide - the surf
+// breakpoint migrates with the water level exactly.
+{
+  let worst = 0;
+  for (const e of [-35, -12, -3, -0.4, 0, 0.4, 2, 25]) {
+    for (const tide of [-2, -0.7, 0, 0.9, 1.8]) {
+      const store = Math.min(Math.max(-e / 40, -1), 1);
+      const d = Math.max(store * 40 + tide, 0);
+      worst = Math.max(worst, Math.abs(d - Math.max(tide - e, 0)));
+    }
+  }
+  console.log(
+    `REF tide depth chain: worst |d - max(tide-e,0)| = ${worst.toExponential(1)} over e in [-35,25] m, tide in [-2,1.8] m`
+  );
+  if (worst > 1e-12) {
+    console.log('TIDE DEPTH CHAIN FAILED');
+    process.exit(1);
+  }
+}

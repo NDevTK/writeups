@@ -98,6 +98,12 @@ export class HorizonWaterMesh extends Mesh {
     this.foamJ = uniform(0.7974); // folding threshold, see header
     this.foamW = uniform(0); // Monahan mean coverage, far-field foam
     this.hsWave = uniform(0.5);
+    // Measured sea level vs MSL (m): tides + surge. The bathymetry
+    // texture stores SIGNED depth vs MSL, so adding the tide before
+    // the bed clamp gives the TRUE local water depth - the surf
+    // breakpoint (Battjes-Janssen samples this) migrates with the
+    // tide exactly as depth-limited breaking demands.
+    this.tide = uniform(0);
     this.worldSize = uniform(options.worldSize ?? 280);
     const depthTexNode = texture(options.depthTex);
     this.depthTexNode = depthTexNode; // swap via .value on rebuild
@@ -272,7 +278,9 @@ export class HorizonWaterMesh extends Mesh {
       );
       const dpt = depthTexNode
         .sample(positionWorld.xz.div(this.worldSize).add(0.5))
-        .r.mul(40.0);
+        .r.mul(40.0)
+        .add(this.tide)
+        .max(0.0);
       // Depth-induced breaking (Battjes & Janssen 1978): the LUT's
       // probit channel is the crest threshold in sigma = Hs/4 units;
       // foam where the resolved FFT elevation tops it, so coverage

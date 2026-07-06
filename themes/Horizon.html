@@ -634,11 +634,23 @@
                 state.lat +
                 '&longitude=' +
                 state.lon +
-                '&current=wave_height,wind_wave_height,wind_wave_peak_period,wind_wave_direction,swell_wave_height,swell_wave_peak_period,swell_wave_direction',
+                '&current=wave_height,wind_wave_height,wind_wave_peak_period,wind_wave_direction,swell_wave_height,swell_wave_peak_period,swell_wave_direction,sea_level_height_msl',
               {credentials: 'omit'}
             )
           ).json();
           const c = m.current;
+          // The MEASURED tide (sea level vs MSL, tides + surge):
+          // lifts the water plane through the same asinh world
+          // mapping the terrain uses and deepens/shoals the surf
+          // zone's true depth. Independent of the wave fields -
+          // a flat calm still has a tide.
+          if (c && typeof c.sea_level_height_msl === 'number') {
+            state.tide = c.sea_level_height_msl;
+            record(
+              'open-meteo tide',
+              'sea level ' + c.sea_level_height_msl.toFixed(2) + ' m vs MSL'
+            );
+          }
           if (c && (c.wind_wave_height || c.swell_wave_height)) {
             state.sea = {
               hs: c.wave_height,
@@ -1798,7 +1810,12 @@
                 dSum += -e;
                 dCnt++;
               }
-              dArr[dj * DT + di] = THREE.MathUtils.clamp(-e / 40, 0, 1);
+              // SIGNED depth vs MSL (float texture): shoreline
+              // texels keep their real height above the water, so
+              // the measured tide can flood or expose them exactly
+              // (water-tsl adds the tide before clamping at the
+              // bed).
+              dArr[dj * DT + di] = THREE.MathUtils.clamp(-e / 40, -1, 1);
             }
           const depthTex = new THREE.DataTexture(
             dArr,
@@ -2801,6 +2818,18 @@
             ? (((ss?.hs ?? 0) > (sw?.hs ?? 0) ? ss?.tp : sw?.tp) ?? 6)
             : (2 * Math.PI) / peakOmega(Math.max(Ums, 1), 150e3);
           water.setSurf(hsNow, tpNow, oceanSeaDepth);
+          // The MEASURED tide: the water plane rides sea level
+          // through the same asinh compression the terrain uses,
+          // and the surf shader adds the same offset to the signed
+          // bathymetry - high water drowns the breakpoint sandbars,
+          // low water exposes them (Battjes-Janssen at the TRUE
+          // local depth).
+          const tideNow = params.has('tide')
+            ? +params.get('tide')
+            : (state.tide ?? 0);
+          water.tide.value = tideNow;
+          water.position.y =
+            16 * Math.asinh((tideNow - centerElev) / 500) - 0.15;
         }
 
         // The real wind vectors, per level: meteorological direction is

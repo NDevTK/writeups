@@ -1203,6 +1203,30 @@ Scenes (all at Grindelwald unless noted):
       scene shot clean: subtle green-tinted band above the
       ridgeline over a near-black zenith, 8-14/255 linear.
       airglow-reference.mjs is landmark set 14 in the gate.
+  - DONE: measured tide - the sea level itself is now data. The
+    Open-Meteo Marine sea_level_height_msl current value (tides +
+    surge vs MSL; verified live - a real 1.5 m half-day swing at
+    the Nelson test site) enters two places:
+    - The water plane rides sea level through the SAME asinh world
+      compression the terrain uses:
+      y = 16 asinh((tide - centerElev)/500) - 0.15.
+    - The Battjes-Janssen surf now breaks at the TRUE local depth:
+      the bathymetry bake stores SIGNED depth clamp(-e/40, -1, 1)
+      (float texture - shoreline texels keep their real height
+      above MSL instead of clamping to zero), and water-tsl
+      computes max(store*40 + tide, 0) before the surf LUT sample -
+      exactly max(tide - e, 0) for all |e| <= 40 m, held as a
+      surf-reference landmark. High water drowns the breakpoint
+      bars, low water exposes them, the McCowan/BJ criterion
+      untouched.
+    - syncMarine carries the new field (own provenance record;
+      independent of the wave partitions - a flat calm still has a
+      tide); ?tide=N pins it for the offline harness (pinned scenes
+      skip syncMarine, so the matrix stays deterministic at
+      tide 0). The TMA mean depth is left at MSL (a +-2 m tide on a
+      5-60 m mean is sub-percent on the spectrum; documented).
+      NOTE the plan file is NOT prettier-managed - prettier escapes
+      the math underscores; format code files only.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
