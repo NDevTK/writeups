@@ -1344,18 +1344,45 @@ Scenes (all at Grindelwald unless noted):
       on the limb-darkened disc (CORS-open and measured, but the
       eye-scale 0.53-deg disc makes even naked-eye groups
       sub-pixel - honest display says no); live ADS-B (CORS, above).
-  - DONE (deploy pending): live ADS-B aircraft via a Cloudflare
-    Worker (themes/horizon/worker). The owner green-lit workers,
-    which removes the CORS wall from the contrail item:
+  - DONE (deployed at https://horizon-adsb.ndevtk.workers.dev):
+    live ADS-B aircraft via a Cloudflare Worker
+    (themes/horizon/worker). The owner green-lit workers, which
+    removes the CORS wall from the contrail item:
     - horizon-adsb (src/index.js + wrangler.toml): an allowlisted
       proxy - GET /adsb?lat&lon&dist only, numeric-validated,
       dist <= 60 nm, coordinates rounded to ~110 m so nearby
-      visitors share a 15 s edge-cached upstream call to
-      api.adsb.lol. NOT an open proxy. Verified end-to-end with
-      `wrangler dev --local`: CORS header added, live traffic
-      flowing (a Condor A20N at FL360 over the test site, feed OAT
-      -53 degC - consistent with the measured 250 hPa air), 404/400
-      on anything else.
+      visitors share a 15 s edge-cached upstream call. NOT an open
+      proxy. Verified end-to-end with `wrangler dev --local`: CORS
+      header added, live traffic flowing (a Condor A20N at FL360
+      over the test site, feed OAT -53 degC - consistent with the
+      measured 250 hPa air; 38 aircraft over Heathrow on the
+      OpenSky-era recheck), 404/400 on anything else.
+    - Upstream reality (measured on the DEPLOYED worker, not just
+      locally): api.adsb.lol AND opendata.adsb.fi both refuse
+      Cloudflare-egress requests - the same queries answer from a
+      residential IP - so a readsb-only worker 502s in production.
+      Fix: OpenSky's anonymous REST API as the third upstream.
+      Its restrictive CORS never mattered behind a server-side
+      proxy (the original objection only applied to direct browser
+      fetches - the owner called this out). OpenSky takes a
+      bounding box (1 nm latitude = exactly 1/60 deg; longitude
+      widened by 1/cos lat) and speaks positional state vectors in
+      SI units, so the worker normalizes into the readsb shape
+      with the exact international foot and knot - the theme keeps
+      ONE parser. x-adsb-source names the serving feed per
+      response. OpenSky's anonymous tier sheds ~half of single
+      shots with 503s (probed 3 sites), so that entry retries
+      twice in-worker (400 ms apart) - the theme's once-a-minute
+      poll should not lose its whole minute to one shed request.
+    - worker-reference.mjs (gate set 18): the worker module runs
+      UNMODIFIED in node, so the gate exercises the real handler
+      offline - fetch stubbed with readsb-429 + opensky-503-then-
+      200 (exactly the measured production situation), asserting
+      the bbox math, the exact 10972.8 m -> 36000 ft /
+      205.7776 m/s -> 400 kt conversions, grounded/incomplete
+      vectors dropped, retry carried, CORS + x-adsb-source on the
+      response, adsbToScene round-trip, and the 404/400/OPTIONS
+      allowlist.
     - Theme: syncTraffic polls the worker each minute (only while
       Schmidt-Appleman says trails can exist), maps state vectors
       with adsbToScene (contrails.js: exact international foot/knot
@@ -1372,7 +1399,9 @@ Scenes (all at Grindelwald unless noted):
       deploy (needs `wrangler login` or CLOUDFLARE_API_TOKEN). The
       theme expects https://horizon-adsb.<subdomain>.workers.dev -
       ADSB_PROXY in Horizon.html assumes subdomain `ndevtk`; update
-      it if the account's workers.dev subdomain differs.
+      it if the account's workers.dev subdomain differs. Each
+      upstream change needs a redeploy - the OpenSky failover
+      (above) is pending one as of this note.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
