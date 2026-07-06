@@ -1004,6 +1004,23 @@ Scenes (all at Grindelwald unless noted):
       liveness signal for the import block. Gate PASS at 10/10
       references + 3/3 probes; aurora smoke clean with the IGRF
       record live.
+  - DONE: radar-driven Nubis coverage field. Schneider's system
+    drives its decks with 2D WEATHER MAPS; the port had collapsed
+    that to a scalar cover per deck. The map is back - and it is
+    MEASURED: syncRadar builds a 64^2 world-space coverage field
+    from the decoded dBZ window (precipitation at a texel means
+    cloud overhead; local rate maps to cover with the drizzle floor
+    as threshold, saturating toward 0.95 by 1 mm/h - the rate-to-
+    cover curve is the documented display mapping, the cell
+    PLACEMENT is measurement). coverAt() takes max(noise cover,
+    radar field) for the rain-bearing low deck only (per-deck rad
+    gate); the field is anchored to the deck's advection offset at
+    fetch and then drifts with the SAME wOff as the noise, so
+    measured cells ride the wind with the clouds they belong to.
+    The cloud shadow map integrates the same density, so shadows
+    and rain cells co-locate automatically. The default 1x1 zero
+    texture keeps every pinned scene identical; stratus smoke
+    clean; gate PASS.
   - DONE: field-aligned auroral rays (the IGRF item's follow-up -
     the inclination was computed and unused). Auroral rays run along
     B, so in the curtain plane they fan toward the MAGNETIC ZENITH:

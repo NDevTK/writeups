@@ -6,6 +6,7 @@ import {
   Color,
   Data3DTexture,
   DataTexture,
+  FloatType,
   DepthTexture,
   HalfFloatType,
   LinearFilter,
@@ -178,16 +179,19 @@ export function createCloudShadowHook() {
 }
 
 export function createCloudSystemTSL(renderer, baseTex, detailTex) {
-  const mkDeck = (cType, sigma) => ({
+  const mkDeck = (cType, sigma, rad) => ({
     cov: uniform(0),
     yBase: uniform(24),
     yTop: uniform(38),
     cType: uniform(cType),
     sigma: uniform(sigma),
+    // 1 = this deck accepts the measured radar coverage field (the
+    // rain-bearing low deck; precipitating cells live there).
+    rad: uniform(rad),
     wOff: uniform(new Vector2(0, 0))
   });
-  const uniformsLow = mkDeck(1, 0.9);
-  const uniformsMid = mkDeck(0.15, 0.45);
+  const uniformsLow = mkDeck(1, 0.9, 1);
+  const uniformsMid = mkDeck(0.15, 0.45, 0);
   const shared = {
     sunDirW: uniform(new Vector3(0, 1, 0)),
     sunCol: uniform(new Color(1, 1, 1)),
@@ -213,14 +217,37 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     c.add(clamp(v, a, b).sub(a).div(b.sub(a)).mul(d.sub(c)))
   );
 
+  // Measured radar coverage field (the Nubis WEATHER MAP, fed by
+  // data instead of authored): where the radar composite sees
+  // precipitation there IS cloud overhead, so the field lifts the
+  // LOCAL low-deck coverage toward its texel value. The field is
+  // anchored to the deck's advection offset at fetch time
+  // (uRadarOff) and then drifts with the SAME wOff the noise uses -
+  // measured cells ride the wind with the clouds they belong to.
+  // The default 1x1 zero texture keeps the pinned harness identical.
+  const radarZeroData = new Float32Array([0, 0, 0, 0]);
+  const radarTex = new DataTexture(radarZeroData, 1, 1, RGBAFormat, FloatType);
+  radarTex.minFilter = radarTex.magFilter = LinearFilter;
+  radarTex.needsUpdate = true;
+  const radarNode = texture(radarTex);
+  const uRadarWorld = uniform(280);
+  const uRadarOff = uniform(new Vector2(0, 0));
+
   // Weather map: zero-mean difference of two samples of the same
-  // stationary noise - the REAL reported cover is conserved.
-  const coverAt = Fn(([xz, cov, wOff]) => {
+  // stationary noise - the REAL reported cover is conserved; the
+  // measured radar field then takes the max.
+  const coverAt = Fn(([xz, cov, wOff, rad]) => {
     const q = xz.add(wOff).mul(0.0019);
     const wvar = baseNode
       .sample(vec3(q.x, 0.5, q.y))
       .g.sub(baseNode.sample(vec3(q.x.add(0.5), 0.13, q.y.add(0.5))).g);
-    return clamp(cov.add(wvar.mul(1.6).mul(cov).mul(cov.oneMinus())), 0.0, 1.0);
+    const covN = clamp(
+      cov.add(wvar.mul(1.6).mul(cov).mul(cov.oneMinus())),
+      0.0,
+      1.0
+    );
+    const pr = xz.add(wOff).sub(uRadarOff).div(uRadarWorld).add(0.5);
+    return max(covN, radarNode.sample(pr).r.mul(rad));
   });
 
   // Height gradients by cloud type (Nubis).
@@ -237,7 +264,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     );
   });
 
-  const densityCoarse = Fn(([p, h, cov, cType, wOff]) => {
+  const densityCoarse = Fn(([p, h, cov, cType, wOff, rad]) => {
     const uvw = vec3(
       p.x.add(wOff.x).mul(0.0055),
       p.y.mul(0.016),
@@ -246,14 +273,14 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     const nb = baseNode.sample(uvw);
     const wfbm = nb.g.mul(0.625).add(nb.b.mul(0.25)).add(nb.a.mul(0.125));
     const d = remapf(nb.r, wfbm.oneMinus().negate(), 1.0, 0.0, 1.0);
-    const covL = coverAt(p.xz, cov, wOff);
+    const covL = coverAt(p.xz, cov, wOff, rad);
     const d2 = remapf(d, covL.oneMinus(), 1.0, 0.0, 1.0).mul(covL);
     return d2.mul(heightProfile(h, cType));
   });
 
-  const density = Fn(([p, h, cov, cType, wOff]) => {
+  const density = Fn(([p, h, cov, cType, wOff, rad]) => {
     const res = float(0).toVar();
-    const d = densityCoarse(p, h, cov, cType, wOff);
+    const d = densityCoarse(p, h, cov, cType, wOff, rad);
     If(d.greaterThan(0.0), () => {
       const uvw = vec3(
         p.x.add(wOff.x).mul(0.0055),
@@ -331,7 +358,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   // doubles as the CLOUD FRONT DEPTH the depth-aware reprojection
   // stores per pixel; marchSlab receives its result so the ranging
   // still runs exactly once per deck.
-  const slabFront = Fn(([ro, rd, sceneD, yB, yT, cov, cTy, wO]) => {
+  const slabFront = Fn(([ro, rd, sceneD, yB, yT, cov, cTy, wO, rad]) => {
     const tStart = float(-1).toVar();
     If(cov.greaterThan(0.02).and(rd.y.abs().greaterThan(1e-4)), () => {
       const tA = yB.sub(ro.y).div(rd.y);
@@ -345,7 +372,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
         Loop(COARSE, () => {
           const pc = ro.add(rd.mul(tc));
           const hc = clamp(pc.y.sub(yB).div(yT.sub(yB)), 0.0, 1.0);
-          If(densityCoarse(pc, hc, cov, cTy, wO).greaterThan(0.0), () => {
+          If(densityCoarse(pc, hc, cov, cTy, wO, rad).greaterThan(0.0), () => {
             tStart.assign(max(tc.sub(dtc), t0));
             Break();
           });
@@ -359,7 +386,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   // One slab: fine march from the pre-ranged start with 4-tap Beer,
   // Beer-powder, dual-lobe HG; PREMULTIPLIED output with horizon fade.
   const marchSlab = Fn(
-    ([ro, rd, jit, sceneD, tStart, yB, yT, cov, cTy, sg, wO, phase]) => {
+    ([ro, rd, jit, sceneD, tStart, yB, yT, cov, cTy, sg, wO, rad, phase]) => {
       const result = vec4(0).toVar();
       If(tStart.greaterThanEqual(0.0), () => {
         const tA = yB.sub(ro.y).div(rd.y);
@@ -377,7 +404,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
             Loop(STEPS, () => {
               const p = ro.add(rd.mul(t)).toVar();
               const h = clamp(p.y.sub(yB).div(yT.sub(yB)), 0.0, 1.0);
-              const d = density(p, h, cov, cTy, wO);
+              const d = density(p, h, cov, cTy, wO, rad);
               If(d.greaterThan(0.01), () => {
                 // 4-tap Beer toward the sun.
                 const dts = clamp(
@@ -391,7 +418,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
                     shared.sunDirW.mul(dts.mul(float(s).add(1.0)))
                   );
                   const hs = clamp(ps.y.sub(yB).div(yT.sub(yB)), 0.0, 1.0);
-                  tauS.addAssign(density(ps, hs, cov, cTy, wO).mul(dts));
+                  tauS.addAssign(density(ps, hs, cov, cTy, wO, rad).mul(dts));
                 });
                 tauS.mulAssign(sg);
                 // Multiple scattering by attenuated octaves
@@ -522,7 +549,8 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
         uniformsLow.yTop,
         uniformsLow.cov,
         uniformsLow.cType,
-        uniformsLow.wOff
+        uniformsLow.wOff,
+        uniformsLow.rad
       ).toVar();
       const fMid = slabFront(
         camPos,
@@ -532,7 +560,8 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
         uniformsMid.yTop,
         uniformsMid.cov,
         uniformsMid.cType,
-        uniformsMid.wOff
+        uniformsMid.wOff,
+        uniformsMid.rad
       ).toVar();
       const A = marchSlab(
         camPos,
@@ -546,6 +575,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
         uniformsLow.cType,
         uniformsLow.sigma,
         uniformsLow.wOff,
+        uniformsLow.rad,
         phase
       ).toVar();
       const B = marchSlab(
@@ -560,6 +590,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
         uniformsMid.cType,
         uniformsMid.sigma,
         uniformsMid.wOff,
+        uniformsMid.rad,
         phase
       ).toVar();
       const now = vec4(
@@ -747,7 +778,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
           .add(0.5)
           .mul(1 / K);
         const p = vec3(wxz.x, d.yBase.add(hh.mul(dy)), wxz.y);
-        acc.addAssign(density(p, hh, d.cov, d.cType, d.wOff));
+        acc.addAssign(density(p, hh, d.cov, d.cType, d.wOff, d.rad));
       });
       return acc.mul(dy.div(K)).mul(d.sigma);
     };
@@ -783,6 +814,20 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     render,
     composite,
     attachShadow,
+    // Feed the measured radar coverage field: data is RM x RM RGBA
+    // float32 (R = mapped local coverage 0..1, zero border ring),
+    // spanning worldUnits of scene space centred on the origin,
+    // anchored to the low deck's CURRENT advection offset.
+    setRadarCover(data, rm, worldUnits) {
+      if (radarTex.image.width !== rm) {
+        radarTex.image = {data, width: rm, height: rm};
+      } else {
+        radarTex.image.data.set(data);
+      }
+      radarTex.needsUpdate = true;
+      uRadarWorld.value = worldUnits;
+      uRadarOff.value.copy(uniformsLow.wOff.value);
+    },
     updateShadow() {
       if (!shadowFill) return;
       shadowHook.uniforms.uMidLow.value =

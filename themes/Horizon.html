@@ -678,6 +678,37 @@
           );
           const s = windowStats(data, px, py, h);
           radarObs = {...s, time: f.time * 1000};
+          // The measured coverage field for the cloud decks (the
+          // Nubis weather map, from data): precip at a texel means
+          // cloud overhead - map the local rate onto a coverage
+          // value with the drizzle floor as threshold. Zero border
+          // ring so the field fades at the world edge.
+          const RM = 64;
+          const field = new Float32Array(RM * RM * 4);
+          const mppScene = metresPerPixel(state.lat, 8) / 57.14;
+          for (let jj = 0; jj < RM; jj++) {
+            for (let ii = 0; ii < RM; ii++) {
+              const k = (jj * RM + ii) * 4;
+              field[k + 3] = 1;
+              if (ii === 0 || jj === 0 || ii === RM - 1 || jj === RM - 1)
+                continue;
+              const xs = ((ii + 0.5) / RM - 0.5) * WORLD; // scene units
+              const zs = ((jj + 0.5) / RM - 0.5) * WORLD;
+              const pi = Math.round(px + xs / mppScene);
+              const pj = Math.round(py + zs / mppScene);
+              if (pi < 0 || pi > 255 || pj < 0 || pj > 255) continue;
+              const kk = (pj * 256 + pi) * 4;
+              if (data[kk + 3] === 0) continue;
+              const dec = decodeRed(data[kk]);
+              const rate = dec.snow ? snowRate(dec.dbz) : rainRate(dec.dbz);
+              // >0.05 mm/h (below drizzle nothing shows on radar
+              // reliably); saturate toward 0.95 local cover by 1 mm/h
+              field[k] = 0.95 * THREE.MathUtils.smoothstep(rate, 0.05, 1.0);
+            }
+          }
+          radarObs.field = field;
+          radarObs.fieldSize = RM;
+          if (cloudSys) cloudSys.setRadarCover(field, RM, WORLD);
           record(
             'RainViewer radar',
             (s.coverage > 0.05
@@ -2667,6 +2698,8 @@
               tex.detailTex
             );
             cloudSys.attachShadow(cloudShadow);
+            if (radarObs && radarObs.field)
+              cloudSys.setRadarCover(radarObs.field, radarObs.fieldSize, WORLD);
             sizeCloudTargets();
             record(
               'Nubis cloud noise (generated)',
