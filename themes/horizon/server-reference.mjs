@@ -32,7 +32,8 @@ import {
   prune,
   pruneStrikes,
   query,
-  queryStrikes
+  queryStrikes,
+  sseEvent
 } from './server/src/index.mjs';
 import {aisBox} from './worker/src/index.js';
 import {haversineKm} from './lightning.js';
@@ -228,6 +229,17 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       curl.ok &&
       curl.acao === null,
     `website origin -> exact CORS echo; foreign origin refused; no Origin passes with NO grant`
+  );
+}
+
+{
+  // SSE wire framing: the EventSource spec parses exactly this -
+  // an event line, one data line, a blank-line terminator.
+  const ev = sseEvent('strike', {km: 12});
+  check(
+    'SSE framing',
+    ev === 'event: strike\ndata: {"km":12}\n\n',
+    JSON.stringify(ev) + ' - spec-exact named event'
   );
 }
 

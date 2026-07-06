@@ -65,6 +65,12 @@ by `../server-reference.mjs` — reference set 20 in
   EventSource bypasses CORS, so the Origin allowlist gate IS the
   protection here — foreign origins get 403 before the stream
   opens. Capped concurrent streams (`SSE_MAX`, default 25).
+- `GET /stream?lat&lon&km&ais&adsb` — the unified live channel:
+  one origin-scoped EventSource carries `strike` events
+  immediately, `ais` ship deltas every 30 s from RAM, and `adsb`
+  aircraft every 20 s through the shared per-area cache (many
+  viewers in one place still cost one upstream request). Initial
+  ais/adsb push on connect. Same cap as above.
 - `GET /health` — AIS + lightning engine stats.
 - `GET /probe` — health + the fixed-target reachability
   diagnostic, run from the box's own IP.
@@ -72,3 +78,17 @@ by `../server-reference.mjs` — reference set 20 in
 Browser access is origin-locked to `ALLOW_ORIGIN` (the website —
 this is not an open CORS proxy); everything is rate-limited per
 IP.
+
+## Self-update (no manual deploys)
+
+`install.sh` also arms `horizon-live-update.timer`: every 5
+minutes `update.sh` fetches the watched branch (`UPDATE_BRANCH`
+in `/etc/horizon-live.env`, default `main` — merging to main IS
+the deploy trigger, same as GitHub Pages). If the server files
+changed, it checks out the new revision and runs the FULL
+reference gate (`harness/validate.sh`, CPU sets) **on this box**;
+only a PASS reinstalls and restarts, with the previous install
+kept at `/opt/horizon-live.prev` for instant rollback. A failing
+gate leaves the running version untouched and lands in
+`journalctl -u horizon-live-update`. Nothing deploys unverified —
+the same rule the repo itself lives by.

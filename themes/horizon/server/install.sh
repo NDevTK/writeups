@@ -52,8 +52,16 @@ ENV
 fi
 
 install -m 644 horizon-live.service /etc/systemd/system/horizon-live.service
+# Self-update machinery: a timer runs update.sh every 5 minutes;
+# it deploys a new revision ONLY after the reference gate passes
+# on this box (see update.sh; branch via UPDATE_BRANCH in
+# /etc/horizon-live.env, default main).
+install -m 755 update.sh /opt/horizon-live-update.sh
+install -m 644 horizon-live-update.service /etc/systemd/system/
+install -m 644 horizon-live-update.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now horizon-live
+systemctl enable --now horizon-live-update.timer
 systemctl restart horizon-live
 sleep 1
 systemctl --no-pager -l status horizon-live | head -6

@@ -1,0 +1,9 @@
+# One self-update pass (see update.sh). Root: it installs files
+# and restarts horizon-live. Triggered by horizon-live-update.timer.
+[Unit]
+Description=horizon-live self-update
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/horizon-live-update.sh
