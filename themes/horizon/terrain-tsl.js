@@ -1,6 +1,7 @@
 import {Color, MeshStandardNodeMaterial, Vector2, Vector3} from 'three/webgpu';
 import {
   Fn,
+  acos,
   attribute,
   cameraPosition,
   clamp,
@@ -44,6 +45,12 @@ import {
   OMEGA_G,
   RHO
 } from './snow-glints.js';
+import {G_DHOT, G_GEO, G_VOL, H_GEO, H_VOL, THETA_MAX, XI0} from './ross-li.js';
+
+// Black-sky cubic of the hotspot-corrected volume kernel: Lucht's
+// fit plus the Maignan-excess fit (both on the g0 + g1 t^2 + g2 t^3
+// basis, so the coefficients add).
+const G_VOL_M = G_VOL.map((g, i) => g + G_DHOT[i]);
 
 /**
  * TSL port of Horizon's terrain material (WebGPU project, phase 2).
@@ -88,7 +95,14 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     uWindMs: uniform(3),
     uWindVec: uniform(new Vector2(1, 0)),
     uSunDirW: uniform(new Vector3(0, 1, 0)),
-    uSunCol: uniform(new Color(0, 0, 0))
+    uSunCol: uniform(new Color(0, 0, 0)),
+    // Ross-Li vegetation BRDF (ross-li.js): fitted archetype kernel
+    // weights (f_iso, f_vol, f_geo, red band), the diffuse-skylight
+    // fraction of the current light rig, and the data gate (0 until
+    // a MOD09A1 fit succeeds).
+    uRossW: uniform(new Vector3(0, 0, 0)),
+    uRossMix: uniform(1),
+    uRossOn: uniform(0)
   };
 
   const thash = Fn(([p]) =>
@@ -310,11 +324,98 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     u.uSnowy.mul(smoothstep(0.25, 0.45, slope).oneMinus()).mul(0.85)
   );
 
+  // ---------- Ross-Li vegetation anisotropy (ross-li.js) ----------
+  // The MODIS operational BRDF (Lucht 2000 RTLSR) with the Maignan
+  // 2004 hotspot, weights from the BRDF archetype (Zhang/Jiao 2016)
+  // fitted to the pixel's own MOD09A1 multi-angular reflectance.
+  // The node is the exact TSL mirror of ross-li.js: the directional
+  // term is normalised by ITS black-sky albedo (Lucht cubic + the
+  // fitted hotspot-excess cubic) and the isotropic-sky term by the
+  // white-sky albedo, so each averages to 1 over the view
+  // hemisphere - the kernels redistribute the existing grass
+  // albedo with sun/view geometry (hotspot brightening opposite the
+  // sun, shadow-driven darkening into it) without changing it.
+  // Angles sit in the LOCAL frame of the LEADR mean normal and are
+  // clamped to the 75 deg kernel-fit domain.
+  const hPoly = (g, t) => t.mul(t).mul(t.mul(g[2]).add(g[1])).add(g[0]);
+  const rossA = Fn(() => {
+    const iso = u.uRossW.x;
+    const vol = u.uRossW.y;
+    const geo = u.uRossW.z;
+    const V = normalize(cameraPosition.sub(positionWorld));
+    const L = u.uSunDirW;
+    const cQ = Math.cos(THETA_MAX);
+    const cli = dot(nW, L);
+    const clv = dot(nW, V);
+    const cti = clamp(cli, cQ, 1);
+    const ctv = clamp(clv, cQ, 1);
+    const ti = acos(cti);
+    const tv = acos(ctv);
+    const sti = sin(ti);
+    const stv = sin(tv);
+    // Relative azimuth around the local normal; phi = 0 is
+    // backscatter (kernels are even in phi).
+    const lt = L.sub(nW.mul(cli));
+    const vt = V.sub(nW.mul(clv));
+    const cphi = clamp(
+      dot(lt, vt).div(max(length(lt).mul(length(vt)), 1e-4)),
+      -1,
+      1
+    );
+    const sphi2 = float(1).sub(cphi.mul(cphi));
+    // RossThick with the Maignan hotspot factor.
+    const cxi = clamp(cti.mul(ctv).add(sti.mul(stv).mul(cphi)), -1, 1);
+    const xi = acos(cxi);
+    const hot = float(1).add(float(1).div(xi.div(XI0).add(1)));
+    const kvol = float(Math.PI / 2)
+      .sub(xi)
+      .mul(cxi)
+      .add(sin(xi))
+      .mul(hot)
+      .div(cti.add(ctv))
+      .sub(Math.PI / 4);
+    // LiSparse-Reciprocal at h/b = 2, b/r = 1.
+    const tanI = sti.div(cti);
+    const tanV = stv.div(ctv);
+    const secI = cti.reciprocal();
+    const secV = ctv.reciprocal();
+    const secS = secI.add(secV);
+    const D2 = tanI
+      .mul(tanI)
+      .add(tanV.mul(tanV))
+      .sub(tanI.mul(tanV).mul(cphi).mul(2));
+    const tt = tanI.mul(tanV);
+    const cost = clamp(
+      sqrt(max(D2.add(tt.mul(tt).mul(sphi2)), 0))
+        .mul(2)
+        .div(secS),
+      -1,
+      1
+    );
+    const tO = acos(cost);
+    const O = tO.sub(sin(tO).mul(cost)).mul(secS).div(Math.PI);
+    const kgeo = O.sub(secS).add(cxi.add(1).mul(0.5).mul(secI).mul(secV));
+    // Direct beam: BRF over its own black-sky albedo.
+    const R = max(iso.add(vol.mul(kvol)).add(geo.mul(kgeo)), 0);
+    const bsaM = max(
+      iso.add(vol.mul(hPoly(G_VOL_M, ti))).add(geo.mul(hPoly(G_GEO, ti))),
+      1e-3
+    );
+    // Isotropic sky: the reciprocity HDRF over the white-sky albedo.
+    const skyN = max(
+      iso.add(vol.mul(hPoly(G_VOL, tv))).add(geo.mul(hPoly(G_GEO, tv))),
+      0
+    );
+    const wsa = max(iso.add(vol.mul(H_VOL)).add(geo.mul(H_GEO)), 1e-3);
+    const A = mix(R.div(bsaM), skyN.div(wsa), u.uRossMix);
+    return mix(float(1), A, u.uRossOn);
+  })();
+
   const colorNode = Fn(() => {
     const n3 = tfbm(positionWorld.xz.mul(3.3));
-    const grass = mix(vec3(0.09, 0.21, 0.05), vec3(0.19, 0.33, 0.08), n1).mul(
-      n3.mul(0.3).add(0.85)
-    );
+    const grass = mix(vec3(0.09, 0.21, 0.05), vec3(0.19, 0.33, 0.08), n1)
+      .mul(n3.mul(0.3).add(0.85))
+      .mul(rossA);
     const rock = mix(vec3(0.28, 0.25, 0.21), vec3(0.4, 0.37, 0.32), n2).mul(
       n3.mul(0.36).add(0.82)
     );

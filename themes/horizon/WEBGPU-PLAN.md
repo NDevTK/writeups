@@ -1073,6 +1073,74 @@ Scenes (all at Grindelwald unless noted):
     timed out silently at the old budget). The full-matrix rerun
     was cut short by owner direction (see ground rules): the sweep
     remains available on demand but is no longer a per-item gate.
+  - DONE: Ross-Li vegetation BRDF (the MODIS operational kernel
+    model, fitted to the visitor pixel's own satellite record). One
+    source, ross-li.js, mirrored exactly in the terrain TSL node:
+    - Kernels: RTLSR (Lucht, Schaaf & Strahler 2000) - RossThick
+      volume kernel + LiSparse-Reciprocal geometric kernel at the
+      operational h/b = 2, b/r = 1 - with the Maignan et al. 2004
+      hotspot factor (1 + (1 + xi/xi0)^-1), xi0 = 1.5 deg on the
+      scattering bracket. Landmarks: both base kernels vanish
+      exactly at nadir (f_iso IS the nadir BRF), reciprocity to
+      2e-16, hotspot factor exactly 2 at the antisolar point and
+      1.5 at xi0; Gauss-Legendre quadrature of the kernels
+      reproduces Lucht's white-sky integrals 0.189184 / -1.377622
+      to 4e-5 and exposes the published cubic black-sky fits'
+      honest residuals (worst archetype albedo error 3.5%, the
+      extreme-volume archetype at the 75 deg domain edge).
+    - Energy: the shader applies R / BSA_M(theta_i) for the direct
+      beam and HDRF_sky(theta_v) / WSA for the isotropic-sky part
+      (kernel reciprocity), blended by the rig's own
+      diffuse-skylight fraction (the blue-sky albedo weighting,
+      Roman et al. 2010) - each term averages to exactly 1 over the
+      view hemisphere (checked to 2e-15), so the Ross-Li shape
+      REDISTRIBUTES the existing grass albedo with sun/view
+      geometry and adds no energy. BSA_M extends Lucht's cubic with
+      a least-squares cubic of the Maignan-excess integral on the
+      same basis (G_DHOT, quadrature residual < 4e-4). Angles live
+      in the local LEADR-mean-normal frame, clamped to the 75 deg
+      kernel-fit domain.
+    - Weights: the six global BRDF archetypes of Zhang, Jiao et al.
+      2016 (Remote Sensing 8:1004, Table 1, red+NIR, verbatim; the
+      published AFX column re-derives from the published f-values
+      to 9e-4 - the table is used self-consistently). Per-pixel
+      MCD43A1 needs authenticated archives (ORNL lists it but
+      serves no data - probed dates/subset at multiple sites), so
+      the archetype is selected by the PUBLISHED
+      minimum-fitting-error rule (Jiao et al. 2014; the FY-2G
+      archetype albedo retrieval): syncBrdf() fetches the visitor
+      pixel's last 60 MOD09A1 composites (~16 months; archetype
+      papers fit multi-year records) with per-composite sun/view
+      geometry from the ORNL subset REST API (CORS confirmed for
+      the site origin), keeps only strictly-clear looks by the
+      published state-word QC (cloud, shadow, adjacency, high
+      aerosol/cirrus, snow, water all rejected - decoder asserted
+      on state words measured at the test pixel), and fits all six
+      scaled archetype shapes; argmin RMSE wins. Grindelwald
+      measured: 8 clear looks of 60, archetype A2, stable vs a
+      90-composite refit. MODIS raz is view-minus-solar azimuth of
+      the from-pixel directions, so raz = 0 IS backscatter
+      (kernels are even in phi; the near-backscatter composites in
+      the fetched series are visibly the bright ones). Identifiability
+      is a gate landmark: at the ten REAL Terra geometries measured
+      at the pixel, all 12 planted archetypes (both bands) are
+      recovered with exact scale. Fewer than 4 clear looks (ocean,
+      polar night, persistent cloud) -> Lambertian fallback,
+      recorded in the provenance panel either way. ?brdf=N pins an
+      archetype for the offline harness (shot clean with A2).
+      ross-li-reference.mjs is landmark set 12 in the gate.
+  - OPEN (environment, not code): today's fixture rig drops the
+    volumetric cloud decks and spams "2D view of 3D texture" Dawn
+    validation errors from the Nubis noise volumes - bisect-shot
+    d202bb5 (the certified phase-5 build), 289ab7c, a466700,
+    ad2270c and HEAD all reproduce it, while the SAME d202bb5 code
+    rendered clouds in its Jul 5 certification shots. Same pinned
+    Chrome binary, same shoot.mjs, no system Vulkan ICDs (bundled
+    SwiftShader), so the trigger is environmental drift in the
+    container, not any commit. References + GPU probes (the actual
+    correctness gate) are unaffected and green. Revisit if cloud
+    scenes need pixel inspection; the errors first appear when the
+    cloud compute pipeline spins up (~frame 200).
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:

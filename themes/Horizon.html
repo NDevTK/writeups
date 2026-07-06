@@ -170,6 +170,7 @@
       } from './horizon/clouds-tsl.js';
       import {createAerialFog} from './horizon/aerial-tsl.js';
       import {createTerrainNodeMaterial} from './horizon/terrain-tsl.js';
+      import {ARCHETYPES, fitArchetype, mod09Clear} from './horizon/ross-li.js';
       import {buildMomentPyramid, slopesFromHeights} from './horizon/leadr.js';
       import {metresPerPixel, tileAt, windowStats} from './horizon/radar.js';
       import {geomagneticLatitude, igrfField} from './horizon/igrf.js';
@@ -800,6 +801,116 @@
           buildWorld(); // replant where the real woods are
         } catch {
           forestPolys = null; // procedural scatter stays
+        }
+      }
+
+      // Surface BRDF: the visitor pixel's own multi-angular MODIS
+      // reflectance record (MOD09A1 8-day surface reflectance with
+      // per-composite sun/view geometry, ORNL subset REST API, 60
+      // composites = ~16 months of Terra cross-track sampling - the
+      // archetype papers fit multi-year records per location)
+      // selects one of the six global RTLSR BRDF archetypes (Zhang,
+      // Jiao et al. 2016) by the published minimum-fitting-error
+      // rule (Jiao et al. 2014). The terrain's vegetation then
+      // carries that archetype's Ross-Li anisotropy: hotspot
+      // brightening opposite the sun, shadow-driven darkening into
+      // it. Too few strictly-clear looks (ocean, polar night,
+      // persistent cloud - the state-word QC keeps only cloud-,
+      // shadow-, snow- and heavy-aerosol-free land) leaves the
+      // grass Lambertian, and says so.
+      async function syncBrdf() {
+        const key =
+          'horizon-brdf-' + state.lat.toFixed(2) + ',' + state.lon.toFixed(2);
+        const apply = (fit, n, cached) => {
+          const w = ARCHETYPES.red[fit.k];
+          terrainUniforms.uRossW.value.set(w.iso, w.vol, w.geo);
+          terrainUniforms.uRossOn.value = 1;
+          record(
+            'MODIS MOD09A1 BRDF' + (cached ? ' (cached)' : ''),
+            'archetype A' +
+              (fit.k + 1) +
+              ' red, ' +
+              n +
+              ' clear obs, rmse ' +
+              fit.rmse.toFixed(4)
+          );
+        };
+        // Debug override (the harness page is offline): ?brdf=N pins
+        // archetype A_N directly, N in 1..6.
+        if (params.has('brdf')) {
+          const k = THREE.MathUtils.clamp((+params.get('brdf') || 1) - 1, 0, 5);
+          apply({k, rmse: 0}, 0, false);
+          return;
+        }
+        try {
+          const hit = JSON.parse(localStorage.getItem(key));
+          // One MOD09A1 compositing period is 8 days.
+          if (hit && Date.now() - hit.t < 8 * 864e5) {
+            apply(hit.fit, hit.n, true);
+            return;
+          }
+        } catch {}
+        try {
+          const base = 'https://modis.ornl.gov/rst/api/v1/MOD09A1';
+          const q = 'latitude=' + state.lat + '&longitude=' + state.lon;
+          const dr = await (
+            await fetch(base + '/dates?' + q, {credentials: 'omit'})
+          ).json();
+          if (!Array.isArray(dr.dates)) return;
+          const md = dr.dates.map((d) => d.modis_date).slice(-60);
+          const obs = [];
+          // The subset endpoint caps one request at 10 composites.
+          for (let i = 0; i < md.length; i += 10) {
+            const span =
+              '&startDate=' +
+              md[i] +
+              '&endDate=' +
+              md[Math.min(i + 9, md.length - 1)];
+            const rs = await Promise.all(
+              ['b01', 'szen', 'vzen', 'raz', 'state_500m'].map((b) =>
+                fetch(
+                  base +
+                    '/subset?' +
+                    q +
+                    '&band=sur_refl_' +
+                    b +
+                    span +
+                    '&kmAboveBelow=0&kmLeftRight=0',
+                  {credentials: 'omit'}
+                ).then((r) => r.json())
+              )
+            );
+            for (let j = 0; j < rs[0].subset.length; j++) {
+              const [r, sz, vz, ra, st] = rs.map((x) => x.subset[j].data[0]);
+              const refl = r * 1e-4; // stored scale 0.0001
+              if (!mod09Clear(st) || refl <= 0 || refl > 1) continue;
+              obs.push({
+                r: refl,
+                ti: sz * 0.01 * RAD, // angles stored in 0.01 deg
+                tv: vz * 0.01 * RAD,
+                phi: ra * 0.01 * RAD
+              });
+            }
+          }
+          const fit = fitArchetype(obs, 'red');
+          if (!fit) {
+            // Too few clear looks: Lambertian stays - and the panel
+            // proves the source was consulted, not skipped.
+            record(
+              'MODIS MOD09A1 BRDF',
+              obs.length + ' clear obs of 60 - Lambertian fallback'
+            );
+            return;
+          }
+          apply(fit, obs.length, false);
+          try {
+            localStorage.setItem(
+              key,
+              JSON.stringify({t: Date.now(), fit, n: obs.length})
+            );
+          } catch {}
+        } catch {
+          // Lambertian grass stays.
         }
       }
 
@@ -2621,6 +2732,22 @@
           .multiplyScalar(
             sunLight.intensity * (sun.alt > 0.01 ? 1 : 0) * (1 - cloudy * 0.8)
           );
+        // Diffuse-skylight fraction for the Ross-Li blend (the
+        // blue-sky albedo weighting, Roman et al. 2010): the SAME
+        // two irradiances the rig lights the terrain with, as
+        // relative luminance - direct beam on the horizontal vs the
+        // hemisphere ambient.
+        {
+          const sc = terrainUniforms.uSunCol.value;
+          const ac = ambient.color;
+          const dirL =
+            (0.2126 * sc.r + 0.7152 * sc.g + 0.0722 * sc.b) *
+            Math.max(Math.sin(sun.alt), 0);
+          const difL =
+            ambient.intensity * (0.2126 * ac.r + 0.7152 * ac.g + 0.0722 * ac.b);
+          terrainUniforms.uRossMix.value =
+            dirL + difL > 0 ? difL / (difL + dirL) : 1;
+        }
 
         // Aurora: OVATION oval probability when available (Kp heuristic
         // otherwise), with the curtain elevation from the oval's true
@@ -3178,6 +3305,7 @@
         syncAloft();
         setInterval(syncAloft, 30 * 60 * 1000);
         syncForests();
+        syncBrdf();
         syncKp();
         setInterval(syncKp, 15 * 60 * 1000);
         syncOvation();
