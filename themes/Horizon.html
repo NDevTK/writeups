@@ -219,6 +219,7 @@
       import {earthshineRatio} from './horizon/earthshine.js';
       import {BETA_MIN_DEG, seasonEnvelope} from './horizon/nlc.js';
       import {parseTLEs, satMagnitude, sunlitEci} from './horizon/sats.js';
+      import {lunarEclipse, solarEclipse} from './horizon/eclipses.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -2636,6 +2637,9 @@
       }
       const mFlashDir = new THREE.Vector3();
       const eshV = new THREE.Vector3(); // earthshine phase temp
+      // Danjon L2 copper for the fully eclipsed moon (display
+      // level ~10% of the sunlit albedo, strongly reddened).
+      const eclCopper = new THREE.Color(0.3, 0.09, 0.04);
       const mV1 = new THREE.Vector3();
       const mV2 = new THREE.Vector3();
       const mV3 = new THREE.Vector3();
@@ -3368,36 +3372,77 @@
               const h = AE.Horizon(d, obs, eq.ra, eq.dec, 'normal');
               return {alt: h.altitude * RAD, az: h.azimuth * RAD};
             };
-            astro.sun = pos(AE.Body.Sun);
-            astro.moon = pos(AE.Body.Moon);
+            const eqSun = AE.Equator(AE.Body.Sun, d, obs, true, true);
+            const eqMoon = AE.Equator(AE.Body.Moon, d, obs, true, true);
+            const hSun = AE.Horizon(d, obs, eqSun.ra, eqSun.dec, 'normal');
+            const hMoon = AE.Horizon(d, obs, eqMoon.ra, eqMoon.dec, 'normal');
+            astro.sun = {alt: hSun.altitude * RAD, az: hSun.azimuth * RAD};
+            astro.moon = {alt: hMoon.altitude * RAD, az: hMoon.azimuth * RAD};
             // True apparent size: the moon disc scales with its real
             // distance (supermoon vs apogee is a visible ~7%).
             const distKm = AE.GeoMoon(d).Length() * AE.KM_PER_AU;
             astro.moonScale = (1500 * 1737) / distKm / 24;
-            // Solar eclipse: topocentric angular separation against the
-            // two real disc radii. Nonzero only when one is underway.
+            // Solar eclipse (eclipses.js): topocentric separation
+            // against the two TRUE disc radii - the sun's swings
+            // +-1.7% over the year, the whole difference between a
+            // total and an annular eclipse - and the light dims by
+            // the covered AREA (the exact lens integral), not the
+            // linear magnitude the first-pass code used. Reference-
+            // gated against Dallas 2024 and Galicia 2026-08-12.
             const cosSep =
               Math.sin(astro.sun.alt) * Math.sin(astro.moon.alt) +
               Math.cos(astro.sun.alt) *
                 Math.cos(astro.moon.alt) *
                 Math.cos(astro.sun.az - astro.moon.az);
-            const sepDeg =
-              Math.acos(THREE.MathUtils.clamp(cosSep, -1, 1)) / RAD;
-            const moonR = Math.asin(1737 / distKm) / RAD;
-            astro.eclipse = THREE.MathUtils.clamp(
-              (0.267 + moonR - sepDeg) / (2 * 0.267),
-              0,
-              1
+            const se = solarEclipse(
+              Math.acos(THREE.MathUtils.clamp(cosSep, -1, 1)),
+              eqSun.dist * AE.KM_PER_AU,
+              eqMoon.dist * AE.KM_PER_AU
             );
+            astro.eclipse = params.has('eclipse')
+              ? +params.get('eclipse')
+              : se.obsc;
             if (astro.eclipse > 0.05 && !astro.eclipseSaid) {
               astro.eclipseSaid = true;
               say(
-                'solar eclipse in progress · ~' +
+                (se.annular ? 'annular' : 'solar') +
+                  ' eclipse in progress · ' +
                   Math.round(astro.eclipse * 100) +
-                  '% obscured'
+                  '% of the photosphere covered · magnitude ' +
+                  se.mag.toFixed(2)
               );
             } else if (astro.eclipse < 0.01) {
               astro.eclipseSaid = false;
+            }
+            // Lunar eclipse (eclipses.js): the moon against the
+            // Danjon-enlarged umbra, from the same geocentric
+            // vectors; the copper darkening rides the umbral
+            // immersion in the moon-disc block below.
+            if (astro.moon.alt > -0.05) {
+              const sv = AE.GeoVector(AE.Body.Sun, d, true);
+              const mv = AE.GeoVector(AE.Body.Moon, d, true);
+              const sl = Math.hypot(sv.x, sv.y, sv.z);
+              const ml = Math.hypot(mv.x, mv.y, mv.z);
+              const cosA =
+                (-sv.x * mv.x - sv.y * mv.y - sv.z * mv.z) / (sl * ml);
+              astro.lunarEcl = lunarEclipse(
+                Math.acos(THREE.MathUtils.clamp(cosA, -1, 1)),
+                sl * AE.KM_PER_AU,
+                ml * AE.KM_PER_AU
+              );
+              if (astro.lunarEcl.inUmbra > 0.02 && !astro.lunarSaid) {
+                astro.lunarSaid = true;
+                say(
+                  'lunar eclipse · ' +
+                    Math.round(astro.lunarEcl.inUmbra * 100) +
+                    '% of the moon in the umbra · umbral magnitude ' +
+                    astro.lunarEcl.umbraMag.toFixed(2)
+                );
+              } else if (astro.lunarEcl.inUmbra < 0.01) {
+                astro.lunarSaid = false;
+              }
+            } else {
+              astro.lunarEcl = null;
             }
             for (let i = 0; i < PLANETS.length; i++) {
               const p = pos(AE.Body[PLANETS[i]]);
@@ -3459,6 +3504,24 @@
               THREE.MathUtils.clamp(moonU.sunDirM.value.dot(eshV), -1, 1)
             )
           ) * (params.has('eshine') ? +params.get('eshine') : 1);
+        // Lunar eclipse: the umbral immersion (exact lens geometry,
+        // eclipses.js) drives the copper darkening - inside the
+        // umbra the moon glows only with sunlight refracted through
+        // every terrestrial sunrise and sunset at once (Danjon's
+        // ashen red; the tint/level is the documented display
+        // mapping of a mid-scale L2 eclipse). The penumbra dims
+        // gently, as it really does.
+        {
+          const le = astro.lunarEcl;
+          const imm = le ? THREE.MathUtils.clamp(le.inUmbra, 0, 1) : 0;
+          const pen = le
+            ? THREE.MathUtils.clamp(le.penMag, 0, 1) * (1 - imm)
+            : 0;
+          moonU.albM.value
+            .setHex(0xcdd4e2)
+            .multiplyScalar(1 - 0.18 * pen)
+            .lerp(eclCopper, imm);
+        }
 
         polar.rotation.x = -(90 - state.lat) * RAD;
         celestial.rotation.y = -(gmst(d) + state.lon * RAD);
