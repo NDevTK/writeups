@@ -171,6 +171,8 @@
       import {createAerialFog} from './horizon/aerial-tsl.js';
       import {createTerrainNodeMaterial} from './horizon/terrain-tsl.js';
       import {ARCHETYPES, fitArchetype, mod09Clear} from './horizon/ross-li.js';
+      import {shadowRate, sigmaScale, vRms} from './horizon/cn2.js';
+      import {EYE_D_CM, youngSigma} from './horizon/scintillation.js';
       import {buildMomentPyramid, slopesFromHeights} from './horizon/leadr.js';
       import {metresPerPixel, tileAt, windowStats} from './horizon/radar.js';
       import {geomagneticLatitude, igrfField} from './horizon/igrf.js';
@@ -471,13 +473,22 @@
       async function syncAloft() {
         if (params.has('fl') || params.has('w250')) return;
         try {
+          // The full 500..50 hPa wind/height profile spans the ITU-R
+          // P.1621 5-20 km slab that drives the Hufnagel-Valley
+          // turbulence model (cn2.js) for the star scintillation.
+          const LV = [500, 400, 300, 250, 200, 150, 100, 70, 50];
           const w = await (
             await fetch(
               'https://api.open-meteo.com/v1/forecast?latitude=' +
                 state.lat +
                 '&longitude=' +
                 state.lon +
-                '&hourly=wind_speed_700hPa,wind_direction_700hPa,wind_speed_250hPa,wind_direction_250hPa,freezing_level_height&forecast_hours=1',
+                '&hourly=wind_speed_700hPa,wind_direction_700hPa,wind_direction_250hPa,freezing_level_height,' +
+                LV.map(
+                  (p) =>
+                    'wind_speed_' + p + 'hPa,geopotential_height_' + p + 'hPa'
+                ).join(',') +
+                '&forecast_hours=1',
               {credentials: 'omit'}
             )
           ).json();
@@ -501,6 +512,28 @@
               state.freezing +
               ' m'
           );
+          // Heights above ground (geopotential is AMSL), speeds in
+          // m/s; the RMS 5-20 km wind sets the HV profile, and the
+          // profile sets the twinkle depth and rate.
+          const pts = LV.map((p) => ({
+            h: h['geopotential_height_' + p + 'hPa'][0] - w.elevation,
+            v: h['wind_speed_' + p + 'hPa'][0] / 3.6
+          })).filter((q) => Number.isFinite(q.h) && Number.isFinite(q.v));
+          const v = vRms(pts);
+          if (v) {
+            state.cn2Scale = sigmaScale(v);
+            state.cn2Rate = shadowRate(pts, v);
+            record(
+              'Hufnagel-Valley Cn² (winds aloft)',
+              'RMS 5-20 km wind ' +
+                v.toFixed(1) +
+                ' m/s · sigma x' +
+                state.cn2Scale.toFixed(2) +
+                ' · shadow rate ' +
+                state.cn2Rate.toFixed(0) +
+                ' Hz'
+            );
+          }
         } catch {
           // Layers fall back to the surface wind.
         }
@@ -2621,12 +2654,24 @@
         if (starObj) {
           starObj.u.night.value = nightSky * (1 - cloudy * 0.85);
           starObj.u.time.value = t / 1000;
-          // Twinkle rate rides the measured 250 hPa jet (turbulence
-          // crossing speed; display mapping of a kHz process):
-          // 20 km/h of jet ~ 1 rad/s, clamped to the perceptual
-          // window.
+          // Winds-aloft turbulence (cn2.js): the measured pressure-
+          // level profile sets BOTH the twinkle depth (Young's
+          // zenith sigma scaled by the Hufnagel-Valley mu_5/6 ratio
+          // of the ITU-R RMS 5-20 km wind) and the flicker rate
+          // (Fresnel-shadow crossing rate, ~500 Hz physical,
+          // displayed at 1/50 - same documented-division pattern as
+          // before, now from the profile instead of the raw jet).
+          if (state.cn2Scale) {
+            starObj.u.sigZen.value = THREE.MathUtils.clamp(
+              youngSigma(EYE_D_CM, 1) * state.cn2Scale,
+              0.05,
+              0.6
+            );
+          }
           starObj.u.twRate.value = THREE.MathUtils.clamp(
-            (state.wind250 ?? state.wind * 3) / 20,
+            state.cn2Rate
+              ? state.cn2Rate / 50
+              : (state.wind250 ?? state.wind * 3) / 20,
             4,
             18
           );

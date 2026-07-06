@@ -374,21 +374,28 @@ const pcg = (v) => {
   return w.shiftRight(uint(22)).bitXor(w);
 };
 
-// Yale stars with PHYSICAL scintillation (scintillation.js):
-// Young (1967)'s sigma for the naked eye grows as airmass^(7/4)
-// (0.255 at zenith - stars visibly twinkle even overhead - to the
-// log-normal clamp near the horizon), the intensity is the
-// mean-conserving log-normal exp(sigma s)/I0(sigma) (Dravins'
-// statistics; the Bessel normaliser makes the time-average of every
-// star EXACTLY its catalogue brightness - twinkle redistributes
-// light in time, it never brightens or dims), and the flicker rate
-// rides the measured 250 hPa jet (turbulence crossing speed -
-// documented display mapping of a kHz process). The size stays
-// fixed: scintillation is an intensity phenomenon; image wander is
-// sub-sprite at this scale.
+// Yale stars with PHYSICAL scintillation (scintillation.js +
+// cn2.js): Young (1967)'s sigma for the naked eye grows as
+// airmass^(7/4) (0.255 at zenith - stars visibly twinkle even
+// overhead - to the log-normal clamp near the horizon), MODULATED
+// by the measured winds aloft: sigZen is Young's value times the
+// Hufnagel-Valley sigmaScale of the ITU-R RMS 5-20 km wind (a calm
+// upper atmosphere really does steady the stars; a screaming jet
+// really does churn them). The intensity is the mean-conserving
+// log-normal exp(sigma s)/I0(sigma) (Dravins' statistics; the
+// Bessel normaliser makes the time-average of every star EXACTLY
+// its catalogue brightness), and the flicker rate rides the
+// Fresnel-shadow crossing rate of the measured profile (cn2.js
+// shadowRate; documented display division of a ~500 Hz process).
+// The size stays fixed: scintillation is an intensity phenomenon;
+// image wander is sub-sprite at this scale.
 export function createStarSprites(positions, colors, sizes) {
-  const u = {night: uniform(0), time: uniform(0), twRate: uniform(9)};
-  const SIGMA_ZENITH = youngSigma(EYE_D_CM, 1);
+  const u = {
+    night: uniform(0),
+    time: uniform(0),
+    twRate: uniform(9),
+    sigZen: uniform(youngSigma(EYE_D_CM, 1))
+  };
   const {mesh} = makeSprites({
     positions,
     colors,
@@ -412,7 +419,7 @@ export function createStarSprites(positions, colors, sizes) {
           .toFloat()
           .mul(1.46291807e-9)
       );
-      const sigma = clamp(pow(am, 1.75).mul(SIGMA_ZENITH), 0.0, SIGMA_MAX);
+      const sigma = clamp(pow(am, 1.75).mul(u.sigZen), 0.0, SIGMA_MAX);
       const s = sin(u.time.mul(u.twRate).add(ph));
       // 5-term I0(sigma) - the exact normaliser of E[exp(sigma sin)]
       // (see scintillation.js; rel err < 1e-6 on the clamped range).

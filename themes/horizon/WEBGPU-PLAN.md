@@ -1129,6 +1129,41 @@ Scenes (all at Grindelwald unless noted):
       recorded in the provenance panel either way. ?brdf=N pins an
       archetype for the offline harness (shot clean with A2).
       ross-li-reference.mjs is landmark set 12 in the gate.
+  - DONE: winds-aloft Cn^2 drives the star scintillation (cn2.js;
+    completes the scintillation item's "documented display mapping"
+    debt). The Hufnagel-Valley optical-turbulence profile
+    (Hufnagel 1974; Valley 1980; parameterised form and wind rule
+    per ITU-R P.1621) is driven by the MEASURED upper-atmosphere
+    wind: v_RMS = sqrt((1/15km) int_5^20km V^2 dh) computed exactly
+    (piecewise-linear V^2 per panel) from the Open-Meteo 500..50
+    hPa wind speeds + geopotential heights that syncAloft now
+    fetches (heights referenced to the API's own site elevation).
+    - Landmarks (cn2-reference.mjs, gate set 13): the HV5/7 canon
+      re-derived from the moment integrals - r0 = 4.96 cm ("5") and
+      theta0 = 6.89 urad ("7") at 0.5 um with the canonical
+      v = 21 m/s, A = 1.7e-14 (the first web-checked source that
+      said v = 27 was wrong; the SPIE Field Guide's 21 lands both
+      named values); the instantaneous Rytov point-receiver index
+      sigma_I^2 = 2.25 k^(7/6) sec(Z)^(11/6) mu_{5/6} sits in the
+      weak regime at ~0.49, consistent with Young's 0.1 s-averaged
+      0.255; the ITU RMS-wind integral is exact on analytic
+      profiles and refuses profiles that do not span the slab;
+      the scintillation weighting Cn^2 h^(5/6) puts the mean
+      altitude in the jet (7.4 km) even though the ground layer has
+      the larger pointwise Cn^2, and the 30 m/s flying-shadow
+      crossing rate lands at ~500 Hz = the published milliseconds
+      shadow lifetime (Dravins et al. 1997 II).
+    - Display: sigZen (new star uniform) = Young's calibrated
+      zenith sigma x sigmaScale(v_RMS) = sqrt(mu_{5/6}(v)/
+      mu_{5/6}(21)) - a calm upper atmosphere steadies the stars, a
+      screaming jet churns them - clamped 0.05..0.6; twRate now
+      comes from the profile's Fresnel-shadow crossing rate
+      (W-weighted wind over W-weighted altitude) divided by 50
+      (documented display division of a ~500 Hz process; raw-jet
+      mapping stays as the no-data fallback). Measured at the test
+      pixel: v_RMS 14.3 m/s -> sigma x0.84, 297 Hz -> rate 5.9.
+      Both feed the provenance panel via the new Hufnagel-Valley
+      record. Night scene shot clean.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
