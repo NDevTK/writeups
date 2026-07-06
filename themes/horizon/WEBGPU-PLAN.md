@@ -1802,6 +1802,43 @@ Scenes (all at Grindelwald unless noted):
       sun below -0.05 rad, and brighter than mag 4.6 - typically
       a handful of moving points, which is what the real night
       sky shows. ?tles=URL overrides the proxy.
+  - DONE: eclipses done RIGHT (eclipses.js) - the first-pass
+    solar-eclipse code was exactly the kind of approximation this
+    project exists to remove, and lunar eclipses did not exist:
+    - the old code dimmed the light by the linear MAGNITUDE
+      (diameter fraction) with a fixed 0.267-deg sun. Replaced:
+      illuminance follows the covered AREA - the exact two-disc
+      lens integral (at magnitude 0.5 the true obscuration is
+      0.391: every partial phase was over-darkened by up to
+      ~28%) - and the sun's radius now comes from the true VSOP87
+      distance (its +-1.7% annual swing IS the total-vs-annular
+      distinction; the annular branch returns (r_m/r_s)^2).
+    - lunar eclipses: the classical geocentric shadow
+      construction with Danjon's 2% enlargement (the Almanac's
+      rule) - umbral/penumbral magnitudes and the exact umbral
+      AREA immersion, which drives a copper darkening of the
+      Hapke moon disc (Danjon L2 tint as the documented display
+      mapping; the penumbra dims gently, as it really does).
+    - eclipses-reference.mjs (gate set 27, 5 landmarks) validates
+      the EXACT chain the page runs (the vendored
+      astronomy-engine in node) against PUBLISHED history: the
+      lens integral at its closed forms + a deterministic grid
+      integration; Dallas 2024-04-08 TOTAL at 18:42 UT with
+      magnitude 1.013 (published 1.018) and FIRST CONTACT
+      bracketed to the published 17:23 UT; Galicia 2026-08-12 -
+      the eclipse five weeks from this commit - max obscuration
+      100.0% over 17:00-20:00 UT (our own ephemeris confirms the
+      totality); the 2026-03-03 total lunar eclipse peaking at
+      umbral magnitude 1.16 fully immersed, with the
+      Danjon-enlarged umbra spanning 2.70 moon radii (classical
+      ~2.7).
+    - Theme: astro block feeds eclipses.js from the SAME
+      AE.Equator results (sun distance now captured); the
+      existing dimming plumbing (direct 1-0.93f, ambient 1-0.85f)
+      consumes the new area obscuration unchanged; say() reports
+      obscuration + magnitude + annular; ?eclipse=f harness
+      override. On 2026-08-12 every visitor in the path gets the
+      real darkness at the real minute.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
