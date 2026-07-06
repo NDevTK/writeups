@@ -968,12 +968,26 @@
 
       // ---------- scene ----------
       const canvas = document.getElementById('gl');
-      // WebGPU when the browser has it; the SAME node materials run on
-      // the WebGL 2 backend otherwise - one implementation of every
-      // piece of physics either way.
-      const renderer = new THREE.WebGPURenderer({canvas, antialias: true});
+      // WebGPU-only build: every GPU pass is a compute kernel over
+      // storage textures (the WebGL2-backend raster drivers were
+      // deleted). Browsers without WebGPU get a plain caption.
+      if (!navigator.gpu) {
+        document.getElementById('caption').textContent =
+          'this wallpaper needs WebGPU - current Chrome, Edge, Firefox or Safari';
+        throw new Error('WebGPU unavailable');
+      }
+      const renderer = new THREE.WebGPURenderer({
+        canvas,
+        forceWebGL: false,
+        antialias: true
+      });
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
       await renderer.init();
+      if (!renderer.backend.isWebGPUBackend) {
+        document.getElementById('caption').textContent =
+          'this wallpaper needs WebGPU - the adapter request failed';
+        throw new Error('WebGPU adapter unavailable');
+      }
       // The renderer's own output transform stays identity: AgX (Sobotka;
       // Blender 4's default view transform - better hue preservation
       // toward clipping than ACES) and the sRGB encode are applied

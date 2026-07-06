@@ -60,13 +60,12 @@ import {
  *  - the dome samples the sky-view LUT and adds the sun disc through
  *    the transmittance LUT
  *
- * Runs identically on WebGPU and on WebGPURenderer's WebGL2 backend.
  * The LUT builders are coordinate-parameterised Fns - the single
- * definition of the physics - driven two ways (phase 3): on WebGPU
- * each LUT is a compute dispatch writing a StorageTexture (probe:
- * store-y == sample-v == readback-row, filtered sampling works inside
- * kernels); on the WebGL2 backend, which has no compute, the same Fn
- * renders through a QuadMesh pass exactly as in phase 2.
+ * definition of the physics - each dispatched as a compute kernel
+ * writing a StorageTexture (probe: store-y == sample-v ==
+ * readback-row, filtered sampling works inside kernels). WebGPU-only
+ * build: the QuadMesh render-target drivers were deleted with the
+ * WebGL2 backend.
  */
 
 const RB = 6360e3;
@@ -75,15 +74,6 @@ const MAX_DIST_M = 25700; // 450 scene units at 57.14 m/unit
 const SKY_H = 108; // sky-view LUT rows; the guarded split needs it
 
 export function createAtmosphereTSL(renderer) {
-  // Float render targets are required; on the WebGL2 backend that
-  // means EXT_color_buffer_float (same gate as the GLSL version).
-  try {
-    const gl = renderer.backend.gl;
-    if (gl && !gl.getExtension('EXT_color_buffer_float')) return {ok: false};
-  } catch {
-    /* WebGPU backend: float targets are core */
-  }
-
   const mieScale = uniform(1);
   const sunMu = uniform(0.5);
   const camH = uniform(300);
@@ -172,9 +162,9 @@ export function createAtmosphereTSL(renderer) {
     return m.mul(sqrt(m));
   });
 
-  // WebGPU: compute + storage textures. WebGL2 backend: QuadMesh
-  // passes into render targets. Same physics Fns drive both.
-  const useCompute = !!renderer.backend.isWebGPUBackend;
+  // Compute kernels over storage textures (WebGPU-only build; the
+  // QuadMesh render-target drivers were deleted with the WebGL2
+  // backend).
 
   function makeTarget(w, h, type) {
     const rt = new RenderTarget(w, h, {
@@ -194,14 +184,10 @@ export function createAtmosphereTSL(renderer) {
     return t;
   }
 
-  // {tex, w, h} per LUT, plus the driver-specific handle.
+  // {tex, w, h} per LUT.
   function makeLut(w, h, type) {
-    if (useCompute) {
-      const tex = makeStorage(w, h, type);
-      return {tex, w, h};
-    }
-    const rt = makeTarget(w, h, type);
-    return {tex: rt.texture, w, h, rt};
+    const tex = makeStorage(w, h, type);
+    return {tex, w, h};
   }
 
   const tLut = makeLut(256, 64);
@@ -544,14 +530,8 @@ export function createAtmosphereTSL(renderer) {
     return vec4(col.mul(exposure), 1.0);
   });
 
-  // Pass plumbing: QuadMesh, deliberately. Probes established the
-  // texture-coordinate conventions on WebGPURenderer's WebGL backend:
-  //   - readback rows and SCENE-geometry writes are GL bottom-origin
-  //   - QuadMesh writes AND texture().sample() reads are both V-flipped
-  // So QuadMesh-write + sample() is self-consistent for every GPU
-  // consumer (chained passes, the dome, the aerial hook in materials).
-  // Do NOT mix scene-geometry writes into this chain, and remember
-  // that numeric readbacks of these LUTs see flipped rows.
+  // QuadMesh remains only for the irradiance pass (a 1x1
+  // RenderTarget the async readback needs) and the readLut blit.
   const quad = new QuadMesh();
 
   function passMaterial(node) {
@@ -566,9 +546,8 @@ export function createAtmosphereTSL(renderer) {
     return m;
   }
 
-  // One compute invocation per texel; vUv matches the fragment path's
-  // uv() at texel centres, so both drivers evaluate the physics at
-  // identical coordinates.
+  // One compute invocation per texel; vUv at texel centres (the same
+  // coordinates the readLut blit's uv() sees).
   function makeKernel(fn, lut) {
     const {w, h} = lut;
     return Fn(() => {
@@ -580,19 +559,10 @@ export function createAtmosphereTSL(renderer) {
     })().compute(w * h);
   }
 
-  // Per-LUT fill: {run()} dispatching compute or rendering the quad.
+  // Per-LUT fill: dispatch the kernel.
   function makeFill(fn, lut) {
-    if (useCompute) {
-      const kernel = makeKernel(fn, lut);
-      return () => renderer.compute(kernel);
-    }
-    const mat = passMaterial(fn(uv()));
-    return () => {
-      quad.material = mat;
-      renderer.setRenderTarget(lut.rt);
-      quad.render(renderer);
-      renderer.setRenderTarget(null);
-    };
+    const kernel = makeKernel(fn, lut);
+    return () => renderer.compute(kernel);
   }
 
   const fillT = makeFill(transmittanceNode, tLut);
@@ -624,24 +594,20 @@ export function createAtmosphereTSL(renderer) {
       ms: msLut.tex,
       sky: skyLut.tex
     },
-    // Harness-only numeric readback of a LUT region. Under compute
-    // the LUTs are storage textures, not render targets - blit
-    // through a quad into a temp RT first. (All LUT widths keep
-    // w*16 bytes 256-aligned; narrower WebGPU readbacks come back
-    // row-padded.)
+    // Harness-only numeric readback of a LUT region: the LUTs are
+    // storage textures, not render targets - blit through a quad
+    // into a temp RT first. (All LUT widths keep w*16 bytes
+    // 256-aligned; narrower WebGPU readbacks come back row-padded.)
     async readLut(name, x, y, w, h) {
       const lut = {t: tLut, ms: msLut, sky: skyLut, aerial: aerialLut}[name];
-      let rt = lut.rt;
-      if (!rt) {
-        rt = makeTarget(lut.w, lut.h, FloatType);
-        const m = passMaterial(texture(lut.tex).sample(uv()));
-        quad.material = m;
-        renderer.setRenderTarget(rt);
-        quad.render(renderer);
-        renderer.setRenderTarget(null);
-      }
+      const rt = makeTarget(lut.w, lut.h, FloatType);
+      const m = passMaterial(texture(lut.tex).sample(uv()));
+      quad.material = m;
+      renderer.setRenderTarget(rt);
+      quad.render(renderer);
+      renderer.setRenderTarget(null);
       const px = await renderer.readRenderTargetPixelsAsync(rt, x, y, w, h);
-      if (!lut.rt) rt.dispose();
+      rt.dispose();
       return px;
     },
     // Called each frame: cheap sky-view raymarch for the current sun.

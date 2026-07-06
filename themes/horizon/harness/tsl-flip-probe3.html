@@ -16,7 +16,7 @@ import * as T from 'three/webgpu';
 import {Fn, float, ivec2, mrt, screenCoordinate, struct, texture, uv, vec4} from 'three/tsl';
 const log = (s) => console.log('FLIP|' + s);
 try {
-  const r = new T.WebGPURenderer({canvas: document.getElementById('gl'), forceWebGL: !new URLSearchParams(location.search).get('wgpu'), antialias: false});
+  const r = new T.WebGPURenderer({canvas: document.getElementById('gl'), forceWebGL: false, antialias: false});
   await r.init();
   log('backend ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'));
   r.setSize(64, 64);

@@ -26,36 +26,23 @@
       }
     </script>
     <script type="module">
-      import * as GL from 'three';
       import * as GPU from 'three/webgpu';
-      const V = 'gpu';
       try {
         const P = new URLSearchParams(location.search);
         const capW = +(P.get('cap') ?? 0.12),
           hsW = +(P.get('hs') ?? 1.2),
           shinyW = +(P.get('shiny') ?? 120),
           mirrorFull = P.get('mirror') === 'full',
-          noMip = P.get('nomip') === '1',
           distS = +(P.get('dist') ?? 1.4);
         const W = innerWidth,
           H = innerHeight;
-        const T = V === 'gl' ? GL : GPU;
-        const r =
-          V === 'gl'
-            ? new GL.WebGLRenderer({
-                canvas: document.getElementById('gl'),
-                antialias: false
-              })
-            : new GPU.WebGPURenderer({
-                canvas: document.getElementById('gl'),
-                forceWebGL: !new URLSearchParams(location.search).get(
-                  'wgpu'
-                ) /* wgpuParam */,
-                antialias: false
-              });
-        if (V === 'gpu') {
-          await r.init();
-        }
+        const T = GPU;
+        const r = new GPU.WebGPURenderer({
+          canvas: document.getElementById('gl'),
+          forceWebGL: false,
+          antialias: false
+        });
+        await r.init();
         r.setSize(W, H);
         const scene = new T.Scene();
         scene.background = new T.Color('#000000');
@@ -64,23 +51,19 @@
         cam.lookAt(0, 0, -40);
         cam.updateMatrixWorld();
 
-        const wn = await new T.TextureLoader().loadAsync(
-          './writeups/themes/horizon/waternormals.jpg'
-        );
-        wn.wrapS = wn.wrapT = T.RepeatWrapping;
-        if (P.get('flip') === '0') wn.flipY = false;
-        if (noMip) {
-          wn.generateMipmaps = false;
-          wn.minFilter = T.LinearFilter;
-        }
-
         // synthetic bathymetry ramp: shallow at -x, deep at +x
         // (float + linear, matching the theme's depth texture)
         const D = 64;
         const dArr = new Float32Array(D * D);
         for (let j = 0; j < D; j++)
           for (let i = 0; i < D; i++) dArr[j * D + i] = i / (D - 1);
-        const depthTex = new T.DataTexture(dArr, D, D, T.RedFormat, T.FloatType);
+        const depthTex = new T.DataTexture(
+          dArr,
+          D,
+          D,
+          T.RedFormat,
+          T.FloatType
+        );
         depthTex.minFilter = depthTex.magFilter = T.LinearFilter;
         depthTex.needsUpdate = true;
 
@@ -88,49 +71,7 @@
         const sunCol = P.get('sun') === '0' ? 0x000000 : 0xffffff;
         const geo = new T.PlaneGeometry(280, 280);
         let water;
-        if (V === 'gl') {
-          const {Water} = await import('./writeups/themes/horizon/Water.js');
-          water = new Water(geo, {
-            textureWidth: mirrorFull ? W : 512,
-            textureHeight: mirrorFull ? H : 512,
-            waterNormals: wn,
-            sunDirection: sunDir.clone(),
-            sunColor: sunCol,
-            waterColor: 0x0a2431,
-            distortionScale: distS,
-            fog: false
-          });
-          Object.assign(water.material.uniforms, {
-            shiny: {value: shinyW},
-            whitecapW: {value: capW},
-            windDirW: {value: new GL.Vector2(1, 0)},
-            depthTex: {value: depthTex},
-            hsWave: {value: hsW}
-          });
-          water.material.fragmentShader = water.material.fragmentShader
-            .replace(
-              'uniform vec3 waterColor;',
-              'uniform vec3 waterColor; uniform float shiny; uniform float whitecapW; uniform vec2 windDirW; uniform sampler2D depthTex; uniform float hsWave;'
-            )
-            .replace(
-              'sunLight( surfaceNormal, eyeDirection, 100.0, 2.0, 0.5, diffuseLight, specularLight );',
-              'sunLight( surfaceNormal, eyeDirection, shiny, shiny * 0.02 + 0.5, 0.5, diffuseLight, specularLight );'
-            )
-            .replace(
-              'vec3 outgoingLight = albedo;',
-              'float capN = texture2D( normalSampler, worldPosition.xz * 0.02 + windDirW * time * 0.012 ).g;\n' +
-                'float capMask = smoothstep( 1.0 - whitecapW - 0.04, 1.0 - whitecapW + 0.02, capN );\n' +
-                'float dpt = texture2D( depthTex, worldPosition.xz / 280.0 + 0.5 ).r * 40.0;\n' +
-                'float db = hsWave / 0.78;\n' +
-                'float shoal = smoothstep( db * 2.4, db * 0.6, dpt ) * smoothstep( 0.012, 0.05, dpt );\n' +
-                'float surfN = texture2D( normalSampler, worldPosition.xz * 0.05 + windDirW * time * 0.03 ).b;\n' +
-                'float surf = shoal * smoothstep( 0.35, 0.7, surfN + shoal * 0.25 );\n' +
-                'albedo = mix( albedo, vec3( 0.82, 0.86, 0.88 ) * ( 0.3 + max( sunDirection.y, 0.0 ) ), clamp( capMask * 0.9 + surf * 0.85, 0.0, 1.0 ) );\n' +
-                'vec3 outgoingLight = albedo;'
-            );
-          water.material.needsUpdate = true;
-          water.material.uniforms.time.value = 0.7;
-        } else {
+        {
           const {HorizonWaterMesh} =
             await import('./writeups/themes/horizon/water-tsl.js');
           const {createOceanFFT} =
@@ -212,11 +153,8 @@
         box.position.set(0, 9, -30);
         scene.add(box);
 
-        if (V === 'gl') r.render(scene, cam);
-        else {
-          await r.renderAsync(scene, cam);
-          await r.renderAsync(scene, cam);
-        }
+        await r.renderAsync(scene, cam);
+        await r.renderAsync(scene, cam);
         window.__r = r;
         window.__scene = scene;
         window.__cam = cam;

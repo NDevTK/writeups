@@ -1,7 +1,6 @@
 import {
   WebGLCoordinateSystem,
   CustomBlending,
-  NoBlending,
   OneFactor,
   OneMinusSrcAlphaFactor,
   Color,
@@ -37,13 +36,10 @@ import {
   max,
   min,
   mix,
-  mrt,
   normalize,
   positionWorld,
-  screenCoordinate,
   select,
   smoothstep,
-  struct,
   texture,
   texture3D,
   textureStore,
@@ -441,11 +437,10 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   const FAR_CLOUD = 30000.0;
 
   // ---------- the reconstruction (quarter res) ----------
-  // pix carries fragment-convention pixel CENTRES (x+0.5, y+0.5) -
-  // exactly screenCoordinate.xy in the raster driver - so the Bayer
-  // lattice and the per-pixel hash are bit-identical in both drivers.
-  // A JS builder (one call per driver), not an Fn: it returns TWO
-  // nodes - {col, front} - and the drivers route them to their dual
+  // pix carries fragment-convention pixel CENTRES (x+0.5, y+0.5), so
+  // the Bayer lattice and the per-pixel hash are stable per texel.
+  // A JS builder, not an Fn: it returns TWO nodes - {col, front} -
+  // routed by the march kernel to its dual
   // outputs (MRT attachments / storage textures).
   const buildMarch = (vUv, pix) => {
     const ndc = vec2(vUv.x.mul(2.0).sub(1.0), float(1.0).sub(vUv.y.mul(2.0)));
@@ -631,37 +626,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     return select(dMax.sub(dMin).greaterThan(250.0), nearC, acc.div(wsum));
   });
 
-  const quad = new QuadMesh();
-  const useCompute = !!renderer.backend.isWebGPUBackend;
-  let marchMat = null;
-  if (!useCompute) {
-    marchMat = new MeshBasicNodeMaterial();
-    // buildMarch's If/Loop/toVar calls need an active TSL build stack
-    // - fine inside the compute kernel's Fn, but a raster material
-    // node graph is assembled NOW, so wrap it in an Fn returning a
-    // struct (probed: struct + mrt + 2-attachment RT work on the
-    // WebGL2 backend) and route the members to the two attachments.
-    const MarchOut = struct({col: 'vec4', front: 'float'});
-    const marchStruct = Fn(([vUv, pix]) => {
-      const m = buildMarch(vUv, pix);
-      return MarchOut(m.col, m.front);
-    });
-    const built = marchStruct(uv(), screenCoordinate.xy).toVar();
-    marchMat.colorNode = built.get('col');
-    // Attachment 1 carries the cloud front depth for the depth-aware
-    // reprojection (names match rt.textures[i].name).
-    marchMat.mrtNode = mrt({
-      output: built.get('col'),
-      cfront: vec4(built.get('front'), 0.0, 0.0, 1.0)
-    });
-    marchMat.toneMapped = false;
-    // The march WRITES transmittance in alpha, and an OPAQUE node
-    // material stomps output alpha to 1 (invisible over the black A/B
-    // background, fatal over a real scene). transparent + NoBlending
-    // writes source RGBA verbatim.
-    marchMat.transparent = true;
-    marchMat.blending = NoBlending;
-  }
+  const quad = new QuadMesh(); // composite pass only
   const compMat = new MeshBasicNodeMaterial();
   compMat.colorNode = compositeNode();
   compMat.toneMapped = false;
@@ -685,49 +650,32 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   const prevVPStore = new Matrix4();
 
   function makeBuffer(qw, qh) {
-    if (useCompute) {
-      const tex = new StorageTexture(qw, qh);
-      tex.type = HalfFloatType;
-      tex.minFilter = tex.magFilter = LinearFilter;
-      // Depth reads must not blend across the cloud/sky sentinel
-      // edge: nearest.
-      const depthTex = new StorageTexture(qw, qh);
-      depthTex.type = HalfFloatType;
-      depthTex.minFilter = depthTex.magFilter = NearestFilter;
-      const kernel = Fn(() => {
-        const i = int(instanceIndex);
-        const x = i.mod(qw);
-        const y = i.div(qw);
-        const vUv = vec2(float(x).add(0.5).div(qw), float(y).add(0.5).div(qh));
-        const pix = vec2(float(x).add(0.5), float(y).add(0.5));
-        const m = buildMarch(vUv, pix);
-        textureStore(tex, ivec2(x, y), m.col);
-        textureStore(depthTex, ivec2(x, y), vec4(m.front, 0.0, 0.0, 1.0));
-      })().compute(qw * qh);
-      return {
-        tex,
-        depthTex,
-        fill: () => renderer.compute(kernel),
-        dispose: () => {
-          tex.dispose();
-          depthTex.dispose();
-        }
-      };
-    }
-    const rt = quarterTarget(qw, qh, 2);
-    rt.textures[0].name = 'output';
-    rt.textures[1].name = 'cfront';
-    rt.textures[1].minFilter = rt.textures[1].magFilter = NearestFilter;
+    const tex = new StorageTexture(qw, qh);
+    tex.type = HalfFloatType;
+    tex.minFilter = tex.magFilter = LinearFilter;
+    // Depth reads must not blend across the cloud/sky sentinel
+    // edge: nearest.
+    const depthTex = new StorageTexture(qw, qh);
+    depthTex.type = HalfFloatType;
+    depthTex.minFilter = depthTex.magFilter = NearestFilter;
+    const kernel = Fn(() => {
+      const i = int(instanceIndex);
+      const x = i.mod(qw);
+      const y = i.div(qw);
+      const vUv = vec2(float(x).add(0.5).div(qw), float(y).add(0.5).div(qh));
+      const pix = vec2(float(x).add(0.5), float(y).add(0.5));
+      const m = buildMarch(vUv, pix);
+      textureStore(tex, ivec2(x, y), m.col);
+      textureStore(depthTex, ivec2(x, y), vec4(m.front, 0.0, 0.0, 1.0));
+    })().compute(qw * qh);
     return {
-      tex: rt.textures[0],
-      depthTex: rt.textures[1],
-      fill: () => {
-        quad.material = marchMat;
-        renderer.setRenderTarget(rt);
-        quad.render(renderer);
-        renderer.setRenderTarget(null);
-      },
-      dispose: () => rt.dispose()
+      tex,
+      depthTex,
+      fill: () => renderer.compute(kernel),
+      dispose: () => {
+        tex.dispose();
+        depthTex.dispose();
+      }
     };
   }
 
@@ -811,36 +759,16 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
         .mul(hook.uniforms.uWorldSize);
       return vec4(deckTau(wxz, uniformsLow), deckTau(wxz, uniformsMid), 0, 1);
     };
-    if (useCompute) {
-      const tex = new StorageTexture(S, S);
-      tex.type = HalfFloatType;
-      tex.minFilter = tex.magFilter = LinearFilter;
-      const kernel = Fn(() => {
-        const i = int(instanceIndex);
-        const xy = ivec2(i.mod(S), i.div(S));
-        textureStore(tex, xy, tauAt(xy));
-      })().compute(S * S);
-      hook.tauNode.value = tex;
-      shadowFill = () => renderer.compute(kernel);
-    } else {
-      const rt = quarterTarget(S, S);
-      const m = new MeshBasicNodeMaterial();
-      // Builders with Loop/toVar need an active TSL build stack -
-      // the compute kernel Fn provides one lazily, the raster
-      // material graph is assembled NOW (the ocean hit the same
-      // class of bug), so wrap in an Fn.
-      m.colorNode = Fn(() => tauAt(ivec2(screenCoordinate.xy)))();
-      m.transparent = true;
-      m.blending = NoBlending;
-      m.toneMapped = false;
-      hook.tauNode.value = rt.texture;
-      shadowFill = () => {
-        quad.material = m;
-        renderer.setRenderTarget(rt);
-        quad.render(renderer);
-        renderer.setRenderTarget(null);
-      };
-    }
+    const tex = new StorageTexture(S, S);
+    tex.type = HalfFloatType;
+    tex.minFilter = tex.magFilter = LinearFilter;
+    const kernel = Fn(() => {
+      const i = int(instanceIndex);
+      const xy = ivec2(i.mod(S), i.div(S));
+      textureStore(tex, xy, tauAt(xy));
+    })().compute(S * S);
+    hook.tauNode.value = tex;
+    shadowFill = () => renderer.compute(kernel);
   }
 
   // _warm is exposed for the validation harness only: forcing it to

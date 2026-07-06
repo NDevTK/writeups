@@ -36,7 +36,7 @@
       try {
         const r = new T.WebGPURenderer({
           canvas: document.getElementById('gl'),
-          forceWebGL: !new URLSearchParams(location.search).get('wgpu'),
+          forceWebGL: false,
           antialias: false
         });
         await r.init();

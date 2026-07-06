@@ -1,9 +1,13 @@
 # Real-WebGPU validation harness
 
-Offline, deterministic A/B harness for `themes/Horizon.html` on
-`WebGPURenderer` — real WebGPU (Dawn) vs the WebGL2 backend of the
-same build. Every architectural choice here was forced by a measured
-failure; the full list and the current matrix numbers live in
+Offline, deterministic harness for `themes/Horizon.html` on
+`WebGPURenderer` — real WebGPU (Dawn) via SwiftShader Vulkan. The
+build is WebGPU-only (the WebGL2 backend - and with it A/B testing -
+was deleted); correctness rests on the CPU double-precision
+references (`../*-reference.mjs`) and the numeric probe pages that
+read GPU texels back against them; the pinned matrix is a
+smoke/visual run. Every architectural choice here was forced by a
+measured failure; the full list and the matrix history live in
 `../WEBGPU-PLAN.md` (section "Real-WebGPU harness").
 
 Pieces:
@@ -20,12 +24,13 @@ Pieces:
   — spawns Chrome for Testing itself (headed, under `xvfb-run`;
   Playwright-launched browsers break Dawn), attaches via
   `connectOverCDP`, captures through `window.__capture` /
-  `readRenderTargetPixelsAsync`, normalises readback row order
-  (WebGL bottom-origin, WebGPU top-origin), writes PPM. Needs
+  `readRenderTargetPixelsAsync`, normalises readback row order,
+  writes PPM. Needs
   `playwright-core` installed next to it and `SHOOT_CHROME` pointing
   at a Chrome for Testing binary
   (`npx @puppeteer/browsers install chrome@stable`).
-- `sweep-pin.sh` — the eight-scene pinned matrix, both backends.
+- `sweep-pin.sh` — the eight-scene pinned smoke matrix on WebGPU
+  (PAGEERROR detection + visual inspection).
 - `ppmdiff.py a.ppm b.ppm [diff.png]` — mean/max abs diff plus
   horizontal-band breakdown (PIL only).
 

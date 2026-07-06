@@ -20,16 +20,12 @@ import {
   int,
   ivec2,
   max,
-  mrt,
   screenCoordinate,
   sin,
   sqrt,
-  struct,
-  texture,
   textureLoad,
   textureStore,
   uniform,
-  uv,
   vec2,
   vec3,
   vec4
@@ -57,14 +53,10 @@ import {buildInitialSpectrum, calibrateSeaState} from './ocean-spectrum.js';
  *    material): (lambda Dx, h, lambda Dz, lambda Jxz) and
  *    (Sx, Sz, lambda Jxx, lambda Jzz)
  *
- * All passes are per-texel builders with the project's dual drivers:
- * compute + storage textures on WebGPU, struct/MRT QuadMesh passes on
- * the WebGL2 backend. Texel reads go through loadTexel(): exact
- * textureLoad on WebGPU; nearest .sample() at texel centres on the
- * WebGL2 backend, whose QuadMesh-write/sample() V-flip convention is
- * only self-consistent through samplers (raw texelFetch there reads
- * every pass's output flipped and scrambles the vertical
- * butterflies - measured, not theorised).
+ * All passes are per-texel builders driven as compute kernels over
+ * storage textures (WebGPU-only build; the WebGL2 raster drivers -
+ * struct/MRT QuadMesh passes with sampler-mediated texel reads -
+ * were deleted with the backend).
  */
 
 export function createOceanFFT(renderer, opts = {}) {
@@ -84,7 +76,6 @@ export function createOceanFFT(renderer, opts = {}) {
     partitions: opts.sea ? calibrateSeaState(opts.sea) : undefined
   };
   const seed = opts.seed ?? 1337;
-  const useCompute = !!renderer.backend.isWebGPUBackend;
 
   // Orientation, MEASURED on both backends (tsl-flip-probe3): CPU
   // DataTexture rows read straight under .sample() at texel centres,
@@ -152,84 +143,35 @@ export function createOceanFFT(renderer, opts = {}) {
   lutTex.minFilter = lutTex.magFilter = NearestFilter;
   lutTex.needsUpdate = true;
 
-  // ---------- dual-output pass plumbing ----------
-  const quad = new QuadMesh();
-  const PassOut = struct({a: 'vec4', b: 'vec4'});
+  // ---------- dual-output pass plumbing (compute kernels) ----------
+  const quad = new QuadMesh(); // readMap blit only
 
-  // Exact texel reads, per backend. On WebGPU textureLoad is the
-  // plain integer fetch. On the WebGL2 backend QuadMesh writes are
-  // V-flipped and only .sample() compensates (the project's pinned
-  // convention) - textureLoad/texelFetch there would read every
-  // chain pass flipped and scramble the vertical butterflies - so
-  // that driver reads through a NEAREST sample at texel centres,
-  // which is bit-exact for fetch purposes.
-  const loadTexel = useCompute
-    ? (tex, p) => textureLoad(tex, p)
-    : (tex, p, w = N, h = N) =>
-        // vec2(p), not p.toFloat(): toFloat() on an ivec2 collapses
-        // to a scalar and every coordinate degenerates (measured:
-        // constant columns).
-        texture(tex).sample(vec2(p).add(0.5).div(vec2(w, h)));
+  // Exact integer texel fetch.
+  const loadTexel = (tex, p) => textureLoad(tex, p);
 
   function makePair(type) {
-    if (useCompute) {
-      const mk = () => {
-        const t = new StorageTexture(N, N);
-        t.type = type;
-        t.minFilter = t.magFilter =
-          type === FloatType ? NearestFilter : LinearFilter;
-        if (type !== FloatType) t.wrapS = t.wrapT = RepeatWrapping;
-        return t;
-      };
-      return {a: mk(), b: mk()};
-    }
-    const rt = new RenderTarget(N, N, {
-      count: 2,
-      type,
-      minFilter: type === FloatType ? NearestFilter : LinearFilter,
-      magFilter: type === FloatType ? NearestFilter : LinearFilter,
-      depthBuffer: false,
-      stencilBuffer: false
-    });
-    rt.textures[0].name = 'a';
-    rt.textures[1].name = 'b';
-    if (type !== FloatType) {
-      rt.textures[0].wrapS = rt.textures[0].wrapT = RepeatWrapping;
-      rt.textures[1].wrapS = rt.textures[1].wrapT = RepeatWrapping;
-    }
-    return {a: rt.textures[0], b: rt.textures[1], rt};
+    const mk = () => {
+      const t = new StorageTexture(N, N);
+      t.type = type;
+      t.minFilter = t.magFilter =
+        type === FloatType ? NearestFilter : LinearFilter;
+      if (type !== FloatType) t.wrapS = t.wrapT = RepeatWrapping;
+      return t;
+    };
+    return {a: mk(), b: mk()};
   }
 
-  // builder(pix: ivec2) -> {a, b} vec4 nodes; one fill() per driver.
+  // builder(pix: ivec2) -> {a, b} vec4 nodes; one kernel per pass.
   function makeFill(builder, pair) {
-    if (useCompute) {
-      const kernel = Fn(() => {
-        const i = int(instanceIndex);
-        const x = i.mod(N);
-        const y = i.div(N);
-        const r = builder(ivec2(x, y));
-        textureStore(pair.a, ivec2(x, y), r.a);
-        textureStore(pair.b, ivec2(x, y), r.b);
-      })().compute(N * N);
-      return () => renderer.compute(kernel);
-    }
-    const m = new MeshBasicNodeMaterial();
-    const fn = Fn(([pix]) => {
-      const r = builder(pix);
-      return PassOut(r.a, r.b);
-    });
-    const o = fn(ivec2(screenCoordinate.xy)).toVar();
-    m.colorNode = o.get('a');
-    m.mrtNode = mrt({a: o.get('a'), b: o.get('b')});
-    m.transparent = true;
-    m.blending = NoBlending;
-    m.toneMapped = false;
-    return () => {
-      quad.material = m;
-      renderer.setRenderTarget(pair.rt);
-      quad.render(renderer);
-      renderer.setRenderTarget(null);
-    };
+    const kernel = Fn(() => {
+      const i = int(instanceIndex);
+      const x = i.mod(N);
+      const y = i.div(N);
+      const r = builder(ivec2(x, y));
+      textureStore(pair.a, ivec2(x, y), r.a);
+      textureStore(pair.b, ivec2(x, y), r.b);
+    })().compute(N * N);
+    return () => renderer.compute(kernel);
   }
 
   // ---------- evolve: h0 -> packed spectra at time t ----------
@@ -411,9 +353,7 @@ export function createOceanFFT(renderer, opts = {}) {
     // pattern as the atmosphere's readLut). The blit fragment output
     // clamps NEGATIVE rgb at 0 (measured: positives pass unclamped),
     // so the blit stores v * 0.25 + 8 and this undoes it - exact,
-    // since both are fp32 affine. Caveat: on the WebGL2 backend the
-    // request row is compensated, but multi-row regions come back
-    // with their rows in bottom-origin order.
+    // since both are fp32 affine.
     async readMap(which, x, y, w, h) {
       const tex = which === 'disp' ? maps.a : maps.b;
       const rt = new RenderTarget(N, N, {
@@ -431,9 +371,7 @@ export function createOceanFFT(renderer, opts = {}) {
       renderer.setRenderTarget(rt);
       quad.render(renderer);
       renderer.setRenderTarget(null);
-      // WebGL-backend readbacks are bottom-origin (harness truth).
-      const ry = useCompute ? y : N - y - h;
-      const px = await renderer.readRenderTargetPixelsAsync(rt, x, ry, w, h);
+      const px = await renderer.readRenderTargetPixelsAsync(rt, x, y, w, h);
       rt.dispose();
       for (let i2 = 0; i2 < px.length; i2++) px[i2] = (px[i2] - 8) * 4;
       return px;

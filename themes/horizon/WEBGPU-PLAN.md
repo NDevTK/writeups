@@ -8,9 +8,11 @@ shaders — the way the papers themselves run.
 This is a REPLACEMENT, not a parallel path: once the validation
 matrix is green on WebGPURenderer, the old WebGLRenderer code
 (onBeforeCompile hooks, ShaderMaterial passes, the GLSL CSM) is
-deleted. Browsers without WebGPU run the SAME node code on
-WebGPURenderer's WebGL2 backend — there is exactly one
-implementation of every piece of physics.
+deleted. There is exactly one implementation of every piece of
+physics. UPDATE (owner decision, phase 5): the build is WebGPU-ONLY
+— the WebGL2 backend of WebGPURenderer and every raster driver that
+served it are deleted too (see the "WebGPU-ONLY" status entry);
+browsers without WebGPU get a caption, not a fallback.
 
 ## Ground rules (do not relax these to "finish" a phase)
 
@@ -18,11 +20,12 @@ implementation of every piece of physics.
   cleanly inside a session, it stays on the working renderer until it
   can. A phase is done when the harness matrix is green, not when it
   compiles.
-- **Every phase ends with the full validation matrix** (below) and,
-  where the phase claims visual equivalence, a numeric A/B against the
-  previous phase (mean abs pixel diff, with the stochastic
-  temporal-cloud region excluded or accounted for; phase 1 measured
-  3.5/255 mean with 96% of outliers in cloud sky).
+- **Every phase ends validated.** Historically that meant the full
+  pinned matrix plus a numeric A/B (two engines); with the
+  WebGPU-only build there is no A/B of any kind — a phase now ends
+  with its CPU double-precision reference green, its numeric probe
+  reading GPU texels back at the reference values, and the pinned
+  smoke matrix free of page errors.
 - **One phase per commit series, plan updated in the same push.** The
   Status section below is the hand-off between sessions.
 
@@ -782,6 +785,9 @@ Scenes (all at Grindelwald unless noted):
     nearest-filtered texture quantised depth to 0.157 m steps in
     125 m blocks and could not resolve the surf band at all. The
     harness page's synthetic ramp matches (float + linear).
+    A pinned Nelson comparison of the two build states (gathered
+    while landing the change) put the whole signal in the water
+    rows with sky and terrain bands exactly 0.000.
   - DONE: Zirr & Kaplanyan 2016 procedural multiscale glints for the
     snow (snow-glints.js pure-JS single source + glint-reference.mjs,
     reference-first; terrain-tsl.js carries the node mirror).
@@ -826,6 +832,37 @@ Scenes (all at Grindelwald unless noted):
       sunny fresh-snow visual (temp=-2, snow=0.5, code=0) shows
       surface-anchored sparkle points on the foreground slopes,
       distinct from the falling flakes.
+  - DONE: WebGPU-ONLY (owner decision) - the WebGL2 backend is
+    deleted everywhere. What changed:
+    - ocean-tsl / atmosphere-tsl / clouds-tsl lose their raster
+      drivers (QuadMesh + MRT/struct passes, sampler-mediated texel
+      reads, render-target LUTs): every pass is now a compute kernel
+      over storage textures, full stop. The WebGL2 readback
+      compensations (row flips, the EXT_color_buffer_float gate) go
+      with them. QuadMesh remains only where a RenderTarget is the
+      point: the cloud composite, the 1x1 irradiance readback, the
+      harness readMap/readLut blits.
+    - Horizon.html requires navigator.gpu and a WebGPU adapter; a
+      browser without them gets a plain caption (current Chrome,
+      Edge, Firefox and Safari all ship WebGPU), not a fallback.
+    - tsl-water-gpu.html's dead classic-GL branch (V was hardcoded
+      'gpu' since the port) and its unused waternormals load are
+      deleted; every harness page pins forceWebGL: false.
+    - VALIDATION MODEL CHANGES: with one engine there is no A/B of
+      any kind. Correctness rests on (a) the CPU double-precision
+      references (atmo/ocean/moon/optics/surf/glint), and (b) the
+      numeric probe pages reading GPU texels back against those
+      references (both re-run green on the compute-only build:
+      glint hash/count 0/64 + 0/128 mismatches, ocean sea-mode
+      texels at the reference values). sweep-pin.sh remains only as
+      a smoke/visual matrix (PAGEERROR detection). The dual-backend
+      numbers recorded above are the historical record of how the
+      port was proven.
+    - The historical dual-driver findings (V-flip conventions,
+      sampler-mediated fetches, MRT struct routing) stay recorded in
+      this file's earlier sections - they are how the port was
+      PROVEN, and they document the WebGL2 backend behaviour should
+      it ever return.
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:

@@ -1,8 +1,11 @@
 #!/bin/bash
-# Deterministic (pin=1) validation matrix, real WebGPU vs the WebGL2
-# backend of the same build. Both runs freeze the harness clock at
-# frame 600 with an identical synthetic time history, so the residual
-# diff is backend-only (see WEBGPU-PLAN.md "Real-WebGPU harness").
+# Deterministic (pin=1) smoke matrix on WebGPU (the build is
+# WebGPU-only; the WebGL2 backend - and with it A/B testing - was
+# deleted). Shots exist for PAGEERROR detection and visual
+# inspection only; correctness rests on the CPU double-precision
+# references (ocean/atmo/moon/optics/surf/glint *-reference.mjs)
+# and the numeric probe pages that read GPU texels back against
+# them.
 #
 # Env:
 #   SHOOT_CHROME  Chrome for Testing binary (headed launch under Xvfb)
@@ -24,12 +27,9 @@ declare -A SC=(
 for k in noon sunset night stratus towering nelson snow aurora; do
   budget=420; wait=360000
   if [ $k = nelson ]; then budget=900; wait=780000; fi
-  for be in wgpu wgl; do
-    flag=""; [ $be = wgpu ] && flag=--wgpu
-    timeout $budget xvfb-run -a -s "-screen 0 1400x900x24" node shoot.mjs \
-      "$BASE/writeups/themes/Horizon-dbg.html?${SC[$k]}&pin=1" \
-      "pin-$k-$be.ppm" $flag --wait-console 'PINSTOP' --wait-ms $wait 2>&1 \
-      | grep -E '\|(SHOT|PAGEERROR)\|' | sed "s/^/[$k-$be] /"
-  done
+  timeout $budget xvfb-run -a -s "-screen 0 1400x900x24" node shoot.mjs \
+    "$BASE/writeups/themes/Horizon-dbg.html?${SC[$k]}&pin=1" \
+    "pin-$k.ppm" --wgpu --wait-console 'PINSTOP' --wait-ms $wait 2>&1 \
+    | grep -aE '\|(SHOT|PAGEERROR)\|' | sed "s/^/[$k] /"
 done
 echo PIN-SWEEP-DONE
