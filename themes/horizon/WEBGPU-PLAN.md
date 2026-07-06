@@ -1367,7 +1367,10 @@ Scenes (all at Grindelwald unless noted):
       before the next upstream gets a turn. The same queries
       answer sub-second from a residential IP. Decision (owner:
       "one good data source"): the readsb upstreams are DROPPED;
-      OpenSky is the single source. Its restrictive CORS never
+      OpenSky became the single source for one round (SUPERSEDED
+      by the edge measurement below - OpenSky network-drops CF
+      ranges too, which only /probe could see). Its restrictive
+      CORS never
       mattered behind a server-side proxy (the original objection
       only applied to direct browser fetches - the owner called
       this out). OpenSky takes a bounding box (1 nm latitude =
@@ -1376,7 +1379,8 @@ Scenes (all at Grindelwald unless noted):
       normalizes into the readsb shape with the exact
       international foot and knot - the theme keeps ONE parser.
       x-adsb-source names the mode per response.
-    - Making the one source GOOD: OpenSky's anonymous tier buckets
+    - (SUPERSEDED, kept as history) Making the OpenSky source
+      good: OpenSky's anonymous tier buckets
       400 daily credits per IP - Cloudflare's shared egress
       exhausts that pool, which is the measured ~50% 503 shedding.
       A registered API client gets 4000 credits/day on its OWN
@@ -1393,20 +1397,20 @@ Scenes (all at Grindelwald unless noted):
       why. Owner setup: create an API client on the OpenSky
       account page, then `npx wrangler secret put
       OPENSKY_CLIENT_ID` + `OPENSKY_CLIENT_SECRET` and redeploy.
-    - worker-reference.mjs (gate set 18): the worker module runs
-      UNMODIFIED in node, so the gate exercises the real handler
-      offline - fetch stubbed with the measured failure modes -
-      asserting the bbox math, the exact 10972.8 m -> 36000 ft /
-      205.7776 m/s -> 400 kt conversions, grounded/incomplete
-      vectors dropped, anonymous mode (503 shed carried by the
-      retry, zero token traffic), authenticated mode (exact
-      client-credentials form, ONE token POST serving two
-      requests, 401 -> refresh -> 200), CORS + x-adsb-source,
-      adsbToScene round-trip, and the 404/400/OPTIONS allowlist.
-      Live checks: the real handler run in node anonymously
-      served 22 normalized aircraft over Heathrow (a shed first
-      shot absorbed in 5.3 s); workerd (`wrangler dev --local`)
-      the same.
+    - worker-reference.mjs (gate set 18, airplanes.live build):
+      the worker module runs UNMODIFIED in node, so the gate
+      exercises the real handler offline - fetch stubbed with the
+      measured failure modes - asserting the /v2/point URL shape,
+      the strip to exactly the theme's seven fields with readsb
+      units UNTOUCHED, "ground"/incomplete vectors dropped, a 429
+      blip carried by the rate-respecting retry with the
+      User-Agent sent, CORS + x-adsb-source, the adsbToScene
+      round-trip, /probe mapping statuses and thrown timeouts
+      alike into inspectable rows, and the 404/400/OPTIONS
+      allowlist. Live checks: the real handler run in node served
+      14 aircraft over Heathrow / 3 alpine / 5 JFK from
+      airplanes.live; workerd (`wrangler dev --local`) 15 over
+      Heathrow with exactly the seven fields.
     - Theme: syncTraffic polls the worker each minute (only while
       Schmidt-Appleman says trails can exist), maps state vectors
       with adsbToScene (contrails.js: exact international foot/knot
@@ -1425,26 +1429,31 @@ Scenes (all at Grindelwald unless noted):
       ADSB_PROXY in Horizon.html assumes subdomain `ndevtk`; update
       it if the account's workers.dev subdomain differs. Each
       upstream change needs a redeploy.
-    - OPEN (edge diagnosis in flight): the deployed single-source
-      build answers 502 in exactly ~17.3 s - the deterministic
-      fingerprint of one 4 s token timeout + three 4 s API
-      timeouts + retry sleeps - so the secrets ARE set and every
-      fetch to OpenSky times out from Cloudflare egress before
-      auth can matter. Suspects: OpenSky firewalling cloud ranges
-      (it protects per-IP anonymous credits), or a WAF tarpitting
-      UA-less bot traffic (workers send NO User-Agent by
-      default). Countermeasures shipped: an honest User-Agent on
-      every upstream fetch, and GET /probe - a fixed-target,
-      zero-parameter edge diagnostic that fans out to control
-      (open-meteo), opensky-api, opensky-auth (bogus-cred POST:
-      fast 401 = reachable, timeout = network block), adsb.lol,
-      adsb.fi and airplanes.live (readsb schema, itself behind
-      Cloudflare, verified from the box) with 6 s timeouts and
-      reports status/error-name/ms per target. One redeploy, then
-      GET /probe tells us who blocks, who tarpits, and who
-      answers from the edge - the winner becomes (or confirms)
-      the one source. adsb.one was scouted and dropped: it serves
-      a bot-challenge page even to a residential probe.
+    - RESOLVED by edge measurement (GET /probe on the deployed
+      worker, 2026-07-06, three consistent runs): control 200 in
+      389 ms (egress healthy); opensky-api AND opensky-auth
+      TimeoutError at 6 s even with an honest User-Agent -
+      OpenSky network-drops Cloudflare ranges, so credentials can
+      NEVER help (the owner's OPENSKY_* worker secrets are now
+      unused and can be deleted); adsb.lol 429 in 869 ms and
+      adsb.fi 403 in 139 ms - fast deliberate refusals; and
+      airplanes.live 200 with 30-32 aircraft in 126-232 ms every
+      time. airplanes.live is itself served through Cloudflare,
+      so worker-to-it traffic is first-class. THE one source:
+      airplanes.live /v2/point/lat/lon/radius - readsb v2
+      natively (feet, knots), so no unit conversion even exists
+      to get wrong; the worker strips vectors to the seven fields
+      the theme reads (an order of magnitude smaller payload) and
+      respects the documented 1 req/s: rounded coords + 15 s edge
+      cache + the single retry spaced a full 1.1 s. /probe stays
+      in the worker as a permanent regression instrument. History
+      of the hunt, all measured: OpenSky's anonymous per-IP 400
+      credits/day explained the 503 shedding; the readsb feeds
+      tarpit CF egress (5/6 probes hung >15 s); adsb.one serves a
+      bot-challenge page even to a residential probe. The
+      earlier OAuth2 client-credentials build (Keycloak token
+      endpoint, per-isolate 30-min cache, 401 refresh) is in git
+      history at cfffb36 should OpenSky ever unblock Cloudflare.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
