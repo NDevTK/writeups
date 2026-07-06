@@ -1069,10 +1069,10 @@ Scenes (all at Grindelwald unless noted):
     showed nothing); it liveness-checks the server before every
     scene and restarts it from SITE_DIR if down; and the snow /
     aurora scenes join Nelson at the 900 s budget (90% cloud decks
-    + glints / curtain march on SwiftShader exceed 420 s - both
-    timed out silently at the old budget). The full-matrix rerun
-    was cut short by owner direction (see ground rules): the sweep
-    remains available on demand but is no longer a per-item gate.
+    - glints / curtain march on SwiftShader exceed 420 s - both
+      timed out silently at the old budget). The full-matrix rerun
+      was cut short by owner direction (see ground rules): the sweep
+      remains available on demand but is no longer a per-item gate.
   - DONE: Ross-Li vegetation BRDF (the MODIS operational kernel
     model, fitted to the visitor pixel's own satellite record). One
     source, ross-li.js, mirrored exactly in the terrain TSL node:
@@ -1258,7 +1258,7 @@ Scenes (all at Grindelwald unless noted):
     - Photometry: table units convert to luminance through the
       solar spectrum (5772 K Planck x the shared CIE-Y fit,
       Gauss-Legendre) - landing the PUBLISHED surface brightnesses
-      untuned: ecliptic pole 23.24 V mag/arcsec^2 (~23.2), 
+      untuned: ecliptic pole 23.24 V mag/arcsec^2 (~23.2),
       Gegenschein 22.05 (~22.0). The display cross-calibrates to
       the airglow: one table unit = zlPerGreen() = 0.0224 of the
       reference green line, so BOTH night-sky effects share the one
@@ -1279,8 +1279,8 @@ Scenes (all at Grindelwald unless noted):
       QUA/PER/GEM anchors). Radiant drift and the activity-profile
       slopes B come from Jenniskens 1994 (A&A 287, 990) via its
       machine-readable VizieR catalogue J/A+A/287/990 (tables 3a/3b
-      + the ReadMe notes: Quadrantids B = 1.8, Geminids asymmetric
-      0.39 up / 0.72 down).
+      - the ReadMe notes: Quadrantids B = 1.8, Geminids asymmetric
+        0.39 up / 0.72 down).
     - Model: ZHR(lam_sun) = ZHRmax 10^(-B|lam - lam_max|) (the
       catalogue's own Note 1) with per-branch B; radiant of date by
       the published drifts; observed rate ZHR sin(h_R) (the ZHR
@@ -1323,11 +1323,11 @@ Scenes (all at Grindelwald unless noted):
       triple point; their supercooled e_w/e_i ratio (1.60 at
       -50 degC) is WHY persistent contrails exist at all.
     - Measured drive: syncAloft now also fetches temperature_250hPa
-      + relative_humidity_250hPa and records the verdict (during
-      the build: -48.5 degC / 42% -> NO formation, T_LC -49.7 - a
-      knife-edge day, held as the reference's measured-case
-      landmark after the physics overruled the first guess). The
-      laid trails drift with the measured 250 hPa wind.
+      - relative_humidity_250hPa and records the verdict (during
+        the build: -48.5 degC / 42% -> NO formation, T_LC -49.7 - a
+        knife-edge day, held as the reference's measured-case
+        landmark after the physics overruled the first guess). The
+        laid trails drift with the measured 250 hPa wind.
     - Aircraft: NO CORS-open ADS-B feed exists - probed OpenSky
       (allow-origin locked to its own site), adsb.lol and adsb.fi
       (no CORS headers) - so the traffic is ambient display
@@ -1396,7 +1396,7 @@ Scenes (all at Grindelwald unless noted):
       4 s AbortSignal timeout - the tarpit measurement is exactly
       why. Owner setup: create an API client on the OpenSky
       account page, then `npx wrangler secret put
-      OPENSKY_CLIENT_ID` + `OPENSKY_CLIENT_SECRET` and redeploy.
+OPENSKY_CLIENT_ID` + `OPENSKY_CLIENT_SECRET` and redeploy.
     - worker-reference.mjs (gate set 18, airplanes.live build):
       the worker module runs UNMODIFIED in node, so the gate
       exercises the real handler offline - fetch stubbed with the
@@ -1478,19 +1478,19 @@ Scenes (all at Grindelwald unless noted):
     - Physics (ships.js): COLREGS 1972 verbatim - Rule 21 arcs
       (masthead 225 deg, sidelights 112.5 each, sternlight 135;
       side + stern tile the circle exactly), Rule 22 ranges for
-      >= 50 m vessels (6/3/3 nm), Annex I section 8 luminous
-      intensity I = 3.43e6 T D^2 K^-D (reproduces the published
-      table: 0.9 cd at 1 nm, 12 at 3, 94 at 6), Allard's law for
-      apparent illuminance - and the Annex I constant 3.43e6 IS
-      1852^2 to three figures, so at the rated range the eye
-      receives exactly the adopted 2e-7 lux threshold: the
-      regulation is Allard's law solved for I (landmarked to
-      1e-12). Rule 20(b) lights from sunset to sunrise = solar
-      altitude below -50 arcmin. ships-reference.mjs is gate set
-      18 (6 landmarks); the /ais route landmark joined set 19
-      (worker): stubbed aisstream socket, subscription carries
-      key + exact bbox, latest-per-MMSI, sentinels, 503 without a
-      key.
+      > = 50 m vessels (6/3/3 nm), Annex I section 8 luminous
+      > intensity I = 3.43e6 T D^2 K^-D (reproduces the published
+      > table: 0.9 cd at 1 nm, 12 at 3, 94 at 6), Allard's law for
+      > apparent illuminance - and the Annex I constant 3.43e6 IS
+      > 1852^2 to three figures, so at the rated range the eye
+      > receives exactly the adopted 2e-7 lux threshold: the
+      > regulation is Allard's law solved for I (landmarked to
+      > 1e-12). Rule 20(b) lights from sunset to sunrise = solar
+      > altitude below -50 arcmin. ships-reference.mjs is gate set
+      > 18 (6 landmarks); the /ais route landmark joined set 19
+      > (worker): stubbed aisstream socket, subscription carries
+      > key + exact bbox, latest-per-MMSI, sentinels, 503 without a
+      > key.
     - Theme: 8-slot ship pool on the tide-following water plane;
       syncShips polls /ais every 120 s (only when the DEM has
       sea), dead-reckons on SOG/COG between reports, hulls are
@@ -1504,7 +1504,7 @@ Scenes (all at Grindelwald unless noted):
       Math.random) for pinned shots.
     - Owner setup: create the free key at aisstream.io (GitHub
       sign-in), then `cd themes/horizon/worker && npx wrangler
-      secret put AISSTREAM_KEY && npx wrangler deploy`.
+secret put AISSTREAM_KEY && npx wrangler deploy`.
   - DONE (owner provisioning): horizon-live, the dedicated-IP
     successor to the worker (themes/horizon/server) - the owner
     chose a real server (GCP free-tier e2-micro) after the
