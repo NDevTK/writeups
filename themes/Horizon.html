@@ -189,8 +189,10 @@
         createPlanetSprites,
         createPrecipSprites,
         createZodiacalMaterial,
-        createMeteorMaterial
+        createMeteorMaterial,
+        createContrailMaterial
       } from './horizon/sky-objects-tsl.js';
+      import {appleman} from './horizon/contrails.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -501,7 +503,7 @@
                 state.lat +
                 '&longitude=' +
                 state.lon +
-                '&hourly=wind_speed_700hPa,wind_direction_700hPa,wind_direction_250hPa,freezing_level_height,' +
+                '&hourly=wind_speed_700hPa,wind_direction_700hPa,wind_direction_250hPa,freezing_level_height,temperature_250hPa,relative_humidity_250hPa,' +
                 LV.map(
                   (p) =>
                     'wind_speed_' + p + 'hPa,geopotential_height_' + p + 'hPa'
@@ -530,6 +532,37 @@
               state.freezing +
               ' m'
           );
+          // Schmidt-Appleman (contrails.js): the measured 250 hPa
+          // temperature and humidity decide whether contrails can
+          // exist right now, and whether they persist (ice
+          // supersaturation). The display's ambient traffic only
+          // draws what the criterion allows.
+          if (
+            typeof h.temperature_250hPa?.[0] === 'number' &&
+            typeof h.relative_humidity_250hPa?.[0] === 'number'
+          ) {
+            const t250 = h.temperature_250hPa[0];
+            const rh250 = h.relative_humidity_250hPa[0];
+            state.contrail = appleman(25000, t250, rh250 / 100);
+            record(
+              'Schmidt-Appleman contrails',
+              t250.toFixed(1) +
+                '°C / ' +
+                rh250 +
+                '% at 250 hPa → ' +
+                (state.contrail.forms
+                  ? state.contrail.persists
+                    ? 'PERSISTENT trails (RHi ' +
+                      state.contrail.rhi.toFixed(2) +
+                      ')'
+                    : 'short-lived trails (RHi ' +
+                      state.contrail.rhi.toFixed(2) +
+                      ')'
+                  : 'no formation (T_LC ' +
+                    state.contrail.tlc.toFixed(1) +
+                    '°C)')
+            );
+          }
           // Heights above ground (geopotential is AMSL), speeds in
           // m/s; the RMS 5-20 km wind sets the HV profile, and the
           // profile sets the twinkle depth and rate.
@@ -1967,6 +2000,48 @@
       }
       let meteorsRecorded = false;
       window.__meteors = meteorPool; // harness introspection
+
+      // Contrails: ambient cruise traffic whose trails exist ONLY
+      // when the measured 250 hPa air passes Schmidt-Appleman
+      // (state.contrail, syncAloft), and linger only when it is
+      // ice-supersaturated. ?contrail=1 forces short-lived, =2
+      // persistent (offline harness).
+      const CONTRAIL_N = 3;
+      const contrailPool = [];
+      for (let i = 0; i < CONTRAIL_N; i++) {
+        const co = createContrailMaterial();
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), co.material);
+        mesh.matrixAutoUpdate = false;
+        mesh.visible = false;
+        scene.add(mesh);
+        contrailPool.push({mesh, u: co.u, active: false, t: 0, life: 1});
+      }
+      const CT_LEN = 260; // path length, scene units
+      const CT_SPEED = 230 / 57.14; // jet ground speed, units/s
+      function spawnContrail(p, persists) {
+        const th = Math.random() * Math.PI * 2;
+        const dx = Math.cos(th);
+        const dz = Math.sin(th);
+        const off = (Math.random() - 0.5) * 150;
+        const y = 16 * Math.asinh((10500 - centerElev) / 500);
+        const cx = -dz * off;
+        const cz = dx * off;
+        const cross = CT_LEN / CT_SPEED;
+        p.u.cross.value = cross;
+        p.u.head.value = 0;
+        p.u.tau.value = persists ? 240 : 25;
+        p.u.spread.value = persists ? 1 : 0.15;
+        p.t = 0;
+        // Alive until the aircraft crosses AND the tail e-folds out.
+        p.life = cross + (persists ? 480 : 100);
+        p.active = true;
+        const X = new THREE.Vector3(dx, 0, dz).multiplyScalar(CT_LEN);
+        const Y = new THREE.Vector3(-dz, 0, dx).multiplyScalar(6);
+        const Z = new THREE.Vector3(0, 1, 0);
+        p.mesh.matrix.makeBasis(X, Y, Z);
+        p.mesh.matrix.setPosition(cx, y, cz);
+        p.mesh.visible = true;
+      }
       const mV1 = new THREE.Vector3();
       const mV2 = new THREE.Vector3();
       const mV3 = new THREE.Vector3();
@@ -2971,6 +3046,47 @@
                     p.dur.toFixed(2)
                 );
               p.u.night.value = mNight;
+            }
+          }
+        }
+        // Contrails: only what the measured criterion allows.
+        // Cruise level stays sunlit until the sun is ~8 deg below
+        // the ground horizon; cloud cover hides the trails from
+        // below like it hides the stars.
+        {
+          const ctOv = params.has('contrail') ? +params.get('contrail') : null;
+          const ct =
+            ctOv !== null
+              ? {forms: ctOv > 0, persists: ctOv > 1}
+              : (state.contrail ?? {forms: false, persists: false});
+          const dayHigh =
+            THREE.MathUtils.clamp((sun.alt / RAD + 8) / 8, 0, 1) *
+            (1 - cloudy * 0.9);
+          const drift = (state.wind250 ?? 0) / 3.6 / 57.14;
+          for (const p of contrailPool) {
+            if (p.active) {
+              p.t += dt;
+              p.u.head.value = Math.min(p.t / p.u.cross.value, 1);
+              p.u.day.value = dayHigh;
+              p.u.tint.value.copy(sunLight.color);
+              // The laid trail drifts with the measured 250 hPa wind.
+              p.mesh.matrix.elements[12] += windVHigh.x * drift * dt;
+              p.mesh.matrix.elements[14] += windVHigh.z * drift * dt;
+              if (p.t > p.life) {
+                p.active = false;
+                p.mesh.visible = false;
+              }
+            } else if (
+              ct.forms &&
+              dayHigh > 0.02 &&
+              // Ambient-traffic cadence (documented display choice:
+              // a new transit every ~75 s); the harness override
+              // spawns fast so a pinned shot catches one.
+              Math.random() < dt / (ctOv !== null ? 4 : 75)
+            ) {
+              spawnContrail(p, !!ct.persists);
+              p.u.day.value = dayHigh;
+              p.u.tint.value.copy(sunLight.color);
             }
           }
         }

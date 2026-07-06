@@ -1308,6 +1308,42 @@ Scenes (all at Grindelwald unless noted):
       but off-frame - the pinned shot then caught one in frame,
       head and train visible. Spawns consume Math.random, which the
       pin harness seeds - pinned scenes stay deterministic.
+  - DONE: contrails by Schmidt-Appleman (contrails.js) - whether
+    today's sky can hold a contrail at all is now a MEASUREMENT:
+    - Physics: Schumann 1996's formulation. The exhaust mixing line
+      G = EI_H2O cp P / (eps Q (1 - eta)) (kerosene EI 1.223,
+      Q = 43.2 MJ/kg, eta = 0.3); formation when the line reaches
+      liquid saturation - Schumann's closed-form threshold T_LM(G)
+      is held to the EXACT tangency solve de_w/dT = G by Newton
+      (worst 0.03 K over 200-350 hPa; landmark), with T_LC(U) for
+      ambient humidity solved likewise and anchored by the exact
+      closed forms at U = 0 and 1. Persistence = ice
+      supersaturation, RHi = U e_w/e_i > 1. Saturation pressures
+      are Murphy & Koop 2005 eqs. 7/10, anchored at the 611.657 Pa
+      triple point; their supercooled e_w/e_i ratio (1.60 at
+      -50 degC) is WHY persistent contrails exist at all.
+    - Measured drive: syncAloft now also fetches temperature_250hPa
+      + relative_humidity_250hPa and records the verdict (during
+      the build: -48.5 degC / 42% -> NO formation, T_LC -49.7 - a
+      knife-edge day, held as the reference's measured-case
+      landmark after the physics overruled the first guess). The
+      laid trails drift with the measured 250 hPa wind.
+    - Aircraft: NO CORS-open ADS-B feed exists - probed OpenSky
+      (allow-origin locked to its own site), adsb.lol and adsb.fi
+      (no CORS headers) - so the traffic is ambient display
+      furniture (a transit every ~75 s, documented) whose trails
+      exist ONLY when the criterion says so and linger (tau 240 s,
+      spreading) only under ice supersaturation vs seconds-scale
+      stubs (tau 25 s). Cruise level stays lit until the sun is
+      ~8 deg below the ground horizon (sunset contrail glow); cloud
+      cover hides trails like it hides stars. ?contrail=0/1/2 pins
+      the regime with a fast harness spawn cadence; noon scene shot
+      clean with two sunlit trails mid-flight.
+      contrails-reference.mjs is landmark set 17 in the gate.
+    - Scouted and rejected this round: SWPC solar-regions sunspots
+      on the limb-darkened disc (CORS-open and measured, but the
+      eye-scale 0.53-deg disc makes even naked-eye groups
+      sub-pixel - honest display says no); live ADS-B (CORS, above).
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

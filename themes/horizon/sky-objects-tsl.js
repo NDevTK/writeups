@@ -408,6 +408,44 @@ export function createMeteorMaterial() {
   return {material, u};
 }
 
+// One contrail (contrails.js decides IF it exists and whether it
+// lingers): a quad laid along a cruise-level flight path. uv.x runs
+// along the path; `head` (0..1) is the aircraft position, so the
+// segment behind it has age (head - x) * cross seconds and fades
+// with the e-folding time tau - seconds for a dry-day stub,
+// minutes for an ice-supersaturated sky. `spread` widens the old
+// trail (dividing the amplitude to conserve the optical mass) the
+// way persistent contrails relax into cirrus. Lit by the sun tint,
+// gated by `day` (cruise altitude stays sunlit well after ground
+// sunset).
+export function createContrailMaterial() {
+  const u = {
+    day: uniform(0),
+    head: uniform(0),
+    tau: uniform(25),
+    cross: uniform(70),
+    spread: uniform(0),
+    tint: uniform(new Color(1, 1, 1))
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = DoubleSide;
+  const x = uv().x;
+  const age = max(u.head.sub(x), 0.0).mul(u.cross);
+  const laid = smoothstep(u.head.add(0.004), u.head.sub(0.004), x);
+  const grow = float(1).add(age.div(u.tau).mul(u.spread).mul(3.0));
+  const lat = exp(uv().y.sub(0.5).mul(7).div(grow).pow(2).negate());
+  const a = laid
+    .mul(exp(age.div(u.tau).negate()))
+    .mul(lat)
+    .div(grow)
+    .mul(u.day);
+  material.colorNode = u.tint;
+  material.opacityNode = a.mul(0.85);
+  return {material, u};
+}
+
 // Rainbows at the Descartes angles + the 22-deg halo with sundogs,
 // on one additive dome.
 export function createOpticsMaterial() {
