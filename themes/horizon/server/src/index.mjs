@@ -66,10 +66,24 @@ export function createAisState() {
     ships: new Map(), // mmsi -> normalized ship + {gk, t}
     grid: new Map(), // "lat:lon" 1-degree cell -> Set<mmsi>
     frames: 0,
+    badFrames: 0, // arrived but failed decode/parse - a nonzero
+    // count with zero frames means a WIRE problem, not a key one
     lastFrame: 0,
     connects: 0,
     started: Date.now()
   };
+}
+
+// WebSocket frames arrive as strings (text frames) or binary
+// (ArrayBuffer once binaryType is set - node's undici otherwise
+// defaults to Blob, whose String() is "[object Blob]" and parses
+// as NOTHING; that failure mode is exactly why this helper exists
+// and is gated). Accepts string, ArrayBuffer and views.
+export function decodeFrame(data) {
+  if (typeof data === 'string') return data;
+  if (data instanceof ArrayBuffer) return new TextDecoder().decode(data);
+  if (ArrayBuffer.isView(data)) return new TextDecoder().decode(data);
+  throw new Error('undecodable frame: ' + Object.prototype.toString.call(data));
 }
 
 export function gridKey(lat, lon) {
@@ -290,11 +304,17 @@ function runAisSocket(key, st, log) {
         })
       );
     });
+    try {
+      ws.binaryType = 'arraybuffer'; // never Blob (see decodeFrame)
+    } catch {
+      // runtime without binaryType - decodeFrame handles views
+    }
     ws.addEventListener('message', (ev) => {
       try {
-        ingest(st, JSON.parse(String(ev.data)));
-      } catch {
-        // malformed frame
+        ingest(st, JSON.parse(decodeFrame(ev.data)));
+      } catch (e) {
+        st.badFrames++;
+        if (st.badFrames === 1) log('first bad frame: ' + e);
       }
     });
     ws.addEventListener('close', reopen, {once: true});
@@ -316,7 +336,7 @@ function runAisSocket(key, st, log) {
   // dead upstream (a valid global subscription never goes quiet
   // that long - the world's oceans do not empty).
   setInterval(() => {
-    if (st.connects > 0 && Date.now() - st.lastFrame > 180e3) {
+    if (st.connects > 0 && Date.now() - (st.lastFrame || st.started) > 180e3) {
       log('ais watchdog: no frames for 180 s - cycling the socket');
       try {
         ws.close();
@@ -386,9 +406,11 @@ function main() {
         ships: st.ships.size,
         cells: st.grid.size,
         frames: st.frames,
+        badFrames: st.badFrames,
         lastFrameAgoMs: st.lastFrame ? Date.now() - st.lastFrame : null,
         connects: st.connects,
-        uptimeMs: Date.now() - st.started
+        uptimeMs: Date.now() - st.started,
+        keySet: !!env.AISSTREAM_KEY
       };
       if (url.pathname === '/health')
         return json(200, {ais}, {'cache-control': 'no-store'});

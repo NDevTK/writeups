@@ -22,6 +22,7 @@
 import {
   createAisState,
   createLimiter,
+  decodeFrame,
   gridKey,
   ingest,
   originCheck,
@@ -103,6 +104,32 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     'prune',
     n === 1 && st.ships.size === 1 && st.ships.has(2) && st.grid.size === 1,
     `at t0+103 with 100 ms max age: ship 1 (heard t0+2, age 101) pruned with its cell, ship 2 (t0+3, age exactly 100) kept`
+  );
+}
+
+{
+  // Frame decoding: WebSocket messages arrive as text OR binary.
+  // node's undici delivers binary as Blob by default, whose
+  // String() is "[object Blob]" - a silent zero-frames failure
+  // mode indistinguishable from a dead key. decodeFrame accepts
+  // string/ArrayBuffer/views exactly and THROWS on anything else
+  // (counted as badFrames in /health, never swallowed silently).
+  const json = '{"MessageType":"PositionReport"}';
+  const buf = new TextEncoder().encode(json);
+  let threw = null;
+  try {
+    decodeFrame({});
+  } catch (e) {
+    threw = String(e);
+  }
+  check(
+    'frame decode',
+    decodeFrame(json) === json &&
+      decodeFrame(buf.buffer) === json &&
+      decodeFrame(buf) === json &&
+      threw !== null &&
+      threw.includes('undecodable'),
+    `string passthrough exact; ArrayBuffer and Uint8Array utf8-decode exact; Blob-like object throws (-> badFrames), never a silent parse of "[object Blob]"`
   );
 }
 
