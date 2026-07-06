@@ -379,6 +379,35 @@ export function createZodiacalMaterial() {
   return {material, u};
 }
 
+// One meteor streak (meteors.js drives the statistics): a quad laid
+// along the great-circle path on the star sphere. uv.x runs
+// head-to-tail along the path; `life` sweeps 0..1 moving the bright
+// head down the quad with an exponential luminous train behind it
+// (the classic visual meteor: a point of light drawing a fading
+// line), a lateral Gaussian keeps the streak thin, and `amp`
+// carries the drawn magnitude. Additive; gated by the same night
+// factor as the stars.
+export function createMeteorMaterial() {
+  const u = {night: uniform(0), life: uniform(0), amp: uniform(0)};
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = DoubleSide;
+  material.blending = AdditiveBlending;
+  const x = uv().x;
+  const behind = u.life.sub(x);
+  const head = exp(behind.mul(-14).abs().mul(-1)); // sharp head
+  const train = select(behind.greaterThan(0.0), exp(behind.mul(-6)), float(0));
+  const lat = exp(uv().y.sub(0.5).mul(5).pow(2).mul(-1));
+  // End-of-life fade (life runs to 1.2 so the train clears).
+  const fade = clamp(float(1.2).sub(u.life).mul(3), 0.0, 1.0);
+  material.colorNode = vec3(0.85, 0.92, 1.0).mul(
+    head.add(train.mul(0.6)).mul(lat).mul(u.amp).mul(fade)
+  );
+  material.opacityNode = u.night;
+  return {material, u};
+}
+
 // Rainbows at the Descartes angles + the 22-deg halo with sundogs,
 // on one additive dome.
 export function createOpticsMaterial() {

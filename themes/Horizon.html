@@ -188,10 +188,17 @@
         createStarSprites,
         createPlanetSprites,
         createPrecipSprites,
-        createZodiacalMaterial
+        createZodiacalMaterial,
+        createMeteorMaterial
       } from './horizon/sky-objects-tsl.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
+      import {
+        activeShowers,
+        drawMagnitude,
+        hourlyRate,
+        radiantAt
+      } from './horizon/meteors.js';
       import {CSMShadowNode} from './horizon/CSMShadowNode.js';
 
       const params = new URL(location.href).searchParams;
@@ -1942,6 +1949,99 @@
         zodiObj.material
       );
       celestial.add(zodi);
+      // Meteor streaks: a small pool of quads on the star sphere,
+      // spawned as a Poisson process at the REAL observed rate
+      // (meteors.js: IMO 2026 working list rates through the
+      // Jenniskens 1994 activity profiles and the sin(h_R) zenith
+      // correction). A Perseid-maximum sky yields a meteor every
+      // ~40 s with the radiant high - real rates, not fireworks.
+      const METEOR_N = 5;
+      const meteorPool = [];
+      for (let i = 0; i < METEOR_N; i++) {
+        const mo = createMeteorMaterial();
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mo.material);
+        mesh.matrixAutoUpdate = false;
+        mesh.visible = false;
+        celestial.add(mesh);
+        meteorPool.push({mesh, u: mo.u, active: false, t: 0, dur: 1});
+      }
+      let meteorsRecorded = false;
+      window.__meteors = meteorPool; // harness introspection
+      const mV1 = new THREE.Vector3();
+      const mV2 = new THREE.Vector3();
+      const mV3 = new THREE.Vector3();
+      const mV4 = new THREE.Vector3();
+      // Spawn one meteor of shower s (radiant ra/dec in degrees).
+      function spawnMeteor(slot, s, rad) {
+        const vr = mV1.set(
+          Math.cos(rad.dec * RAD) * Math.sin(rad.ra * RAD),
+          Math.sin(rad.dec * RAD),
+          Math.cos(rad.dec * RAD) * Math.cos(rad.ra * RAD)
+        );
+        // Random sky point 10-100 deg from the radiant, above the
+        // local horizon (world y through the celestial rotation).
+        // The ?meteor harness override also biases spawns into the
+        // camera cone so a pinned shot can catch one - the natural
+        // path stays all-sky.
+        const biased = params.has('meteor');
+        if (biased) camera.getWorldDirection(mV4);
+        let w = null;
+        for (let tries = 0; tries < (biased ? 40 : 8) && !w; tries++) {
+          const zc = Math.random() * 2 - 1;
+          const ph = Math.random() * 2 * Math.PI;
+          const rr = Math.sqrt(1 - zc * zc);
+          mV2.set(rr * Math.cos(ph), zc, rr * Math.sin(ph));
+          const cosD = mV2.dot(vr);
+          if (cosD > 0.985 || cosD < -0.17) continue; // 10..100 deg
+          mV3.copy(mV2).applyMatrix4(celestial.matrixWorld);
+          if (mV3.y < 0.12) continue; // below/near horizon
+          if (biased && mV3.normalize().dot(mV4) < 0.6) continue;
+          w = mV2;
+        }
+        if (!w) return false;
+        const sinD = Math.sqrt(1 - Math.min(w.dot(vr) ** 2, 1));
+        // Great-circle tangent at w pointing AWAY from the radiant.
+        const t = mV3
+          .copy(vr)
+          .addScaledVector(w, -w.dot(vr))
+          .normalize()
+          .negate();
+        // Display kinematics: streak length foreshortens with
+        // sin(D) and scales with the shower's entry speed; angular
+        // rate ~ 20 deg/s x (V/72) x sin(D) (documented mapping of
+        // the true ~radians/s sky speeds).
+        const Ldeg = (2 + 14 * sinD * (s.v / 72)) * (0.7 + 0.6 * Math.random());
+        const wdeg = Math.max(20 * (s.v / 72) * sinD, 5);
+        const Lr = Ldeg * RAD;
+        const B = mV4
+          .copy(w)
+          .multiplyScalar(Math.cos(Lr))
+          .addScaledVector(t, Math.sin(Lr));
+        // Quad basis: X along the chord, Y lateral, Z radial.
+        const R = 868;
+        const ax = mV1.copy(B).sub(w); // reuse mV1 (vr done)
+        const cx = mV2.copy(w).add(B).multiplyScalar(0.5).normalize();
+        const ay = mV3.copy(cx).cross(ax).normalize();
+        const m = drawMagnitude(s.r, 1 - Math.random());
+        const p = meteorPool[slot];
+        const wid = (m < 0 ? 3.5 : 2.2) * RAD * R;
+        p.mesh.matrix.makeBasis(
+          ax.clone().multiplyScalar(R),
+          ay.multiplyScalar(wid),
+          cx.clone()
+        );
+        p.mesh.matrix.setPosition(cx.multiplyScalar(R));
+        p.mesh.visible = true;
+        p.active = true;
+        p.t = 0;
+        p.dur = Ldeg / wdeg; // seconds head-travel
+        // Display amplitude from the drawn magnitude (a mag-4.5
+        // meteor is plainly visible - the eye is drawn to motion;
+        // brighter = exponentially stronger per Pogson, capped).
+        p.u.amp.value = Math.min(0.5 * Math.pow(10, 0.4 * (4.5 - m)), 3);
+        return true;
+      }
+
       let starObj = null;
       fetch('./horizon/stars.json')
         .then((r) => r.json())
@@ -2777,9 +2877,9 @@
         // ephemeris when the engine is loaded) and the Masana
         // symmetry-plane sinusoid for |beta| >= 60 deg; same zenith
         // transmittance, gated with the stars.
+        const dNow = now();
+        const sunLam = sunEclipticLon(dNow);
         {
-          const dNow = now();
-          const sunLam = sunEclipticLon(dNow);
           zodiU.night.value = nightSky * (1 - cloudy * 0.85);
           zodiU.uSunLam.value = sunLam;
           const AEg = window.Astronomy;
@@ -2791,6 +2891,88 @@
           zodiU.uFs.value =
             1 + 0.1 * Math.sin(sunLam + Math.PI - ZL_OMEGA * RAD);
           zodiU.uTzen.value.copy(airglowU.uTzen.value);
+        }
+        // Meteors: the observed rate right now is the sum over the
+        // active showers of ZHR(lam_sun) x sin(radiant elevation)
+        // (meteors.js). Poisson spawning; ?meteor=N forces N/h for
+        // the offline harness.
+        {
+          const mNight = nightSky * (1 - cloudy * 0.85);
+          let total = 0;
+          const act = [];
+          if (mNight > 0.05) {
+            const lamDeg = (((sunLam / RAD) % 360) + 360) % 360;
+            for (const {s, zhr} of activeShowers(lamDeg)) {
+              const rad = radiantAt(s, lamDeg);
+              const aa = altAz(
+                {ra: rad.ra * RAD, dec: rad.dec * RAD},
+                dNow,
+                state.lat,
+                state.lon
+              );
+              const hr = hourlyRate(zhr, aa.alt);
+              if (hr > 0.3) {
+                total += hr;
+                act.push({s, rad, cum: total});
+              }
+            }
+            if (params.has('meteor') && act.length === 0) {
+              // Harness override: a synthetic shower with the
+              // radiant at the local zenith.
+              const lst = gmst(dNow) + state.lon * RAD;
+              total = +params.get('meteor') || 60;
+              act.push({
+                s: {v: 59, r: 2.2},
+                rad: {ra: lst / RAD, dec: state.lat},
+                cum: total
+              });
+            } else if (params.has('meteor') && total > 0) {
+              total = +params.get('meteor') || 60;
+              act[act.length - 1].cum = total;
+            }
+            if (!meteorsRecorded && act.length && !params.has('meteor')) {
+              meteorsRecorded = true;
+              record(
+                'IMO 2026 + Jenniskens 1994 meteors',
+                act
+                  .map(
+                    (a, i) =>
+                      (a.s.code ?? 'x') +
+                      ' ' +
+                      (a.cum - (i ? act[i - 1].cum : 0)).toFixed(1) +
+                      '/h'
+                  )
+                  .join(' · ')
+              );
+            }
+          }
+          for (const p of meteorPool) {
+            if (p.active) {
+              p.t += dt;
+              p.u.life.value = (p.t / p.dur) * 1.2;
+              p.u.night.value = mNight;
+              if (p.t > p.dur * 1.2) {
+                p.active = false;
+                p.mesh.visible = false;
+              }
+            } else if (total > 0 && Math.random() < (total * dt) / 3600) {
+              const pick = Math.random() * total;
+              const a = act.find((x) => pick <= x.cum) ?? act[act.length - 1];
+              const ok = spawnMeteor(meteorPool.indexOf(p), a.s, a.rad);
+              if (params.has('meteor'))
+                console.log(
+                  'METEOR|' +
+                    (ok ? 'spawn' : 'reject') +
+                    '|night ' +
+                    mNight.toFixed(2) +
+                    '|amp ' +
+                    p.u.amp.value.toFixed(3) +
+                    '|dur ' +
+                    p.dur.toFixed(2)
+                );
+              p.u.night.value = mNight;
+            }
+          }
         }
         if (constMat) constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2;
         // Venus and Jupiter pierce twilight a little before the stars.

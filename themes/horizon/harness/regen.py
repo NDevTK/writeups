@@ -75,6 +75,17 @@ CAPTURE = """
       window.__capture = async (w, h) => {
         const cap = (s) => console.log('CAP|' + s);
         cap('start');
+        if (window.__meteors) {
+          const st = window.__meteors.map((p) => {
+            if (!p.mesh.visible) return 'off';
+            const v = new THREE.Vector3().setFromMatrixPosition(p.mesh.matrixWorld);
+            const n = v.clone().project(camera);
+            return 'life ' + p.u.life.value.toFixed(2) + ' amp ' + p.u.amp.value.toFixed(3) +
+              ' night ' + p.u.night.value.toFixed(2) +
+              ' ndc ' + n.x.toFixed(2) + ',' + n.y.toFixed(2) + ',' + n.z.toFixed(3);
+          });
+          cap('meteors ' + st.join(' | '));
+        }
         const rt = new THREE.RenderTarget(w, h);
         camera.updateMatrixWorld();
         if (cloudsActive) {

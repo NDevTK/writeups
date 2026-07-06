@@ -1268,6 +1268,46 @@ Scenes (all at Grindelwald unless noted):
       at their true relative strengths (the ZL minimum really does
       rival the green line - 22.9 vs ~23.3 mag/arcsec^2).
       zodiacal-reference.mjs is landmark set 15 in the gate.
+  - DONE: meteor showers (meteors.js + a five-slot streak pool in
+    the celestial group) - the sky now produces meteors at the REAL
+    observed rates:
+    - Catalogue: the IMO Meteor Shower Calendar 2026 Table 5
+      (Working List of Visual Meteor Showers) VERBATIM for the
+      twelve principal showers - peak solar longitude, radiant,
+      V_inf, population index r, peak ZHR (extracted column by
+      column from the calendar PDF, row alignment verified on the
+      QUA/PER/GEM anchors). Radiant drift and the activity-profile
+      slopes B come from Jenniskens 1994 (A&A 287, 990) via its
+      machine-readable VizieR catalogue J/A+A/287/990 (tables 3a/3b
+      + the ReadMe notes: Quadrantids B = 1.8, Geminids asymmetric
+      0.39 up / 0.72 down).
+    - Model: ZHR(lam_sun) = ZHRmax 10^(-B|lam - lam_max|) (the
+      catalogue's own Note 1) with per-branch B; radiant of date by
+      the published drifts; observed rate ZHR sin(h_R) (the ZHR
+      definition unwound, Koschack & Rendtel 1990); magnitudes from
+      the population-index law by inverse CDF (per-magnitude count
+      ratio EXACTLY r). Landmarks (set 16): the IMO 2026 peak DATES
+      land on the IMO lam_max values through the theme's own NOAA
+      solar-longitude series (two published chains meeting within a
+      day); the Quadrantid FWHM is 7.9 h (famously hours) vs the
+      Perseids' 3.0 days; Aug 13 is led by PER at exactly 100/h and
+      Dec 14 by GEM; the zenith correction and magnitude law are
+      exact.
+    - Display: Poisson spawning at the live rate (a Perseid-maximum
+      zenith radiant yields a meteor every ~40 s - real rates, not
+      fireworks); each meteor is a quad on the star sphere along
+      the great circle AWAY from the radiant (foreshortened by
+      sin(D), speed scaled by V_inf - the documented display
+      mapping), with a sharp head sweeping down the quad and an
+      exponential train pointing back at the radiant; Pogson
+      amplitude from the drawn magnitude. ?meteor=N forces N/h with
+      a synthetic zenith radiant AND biases spawns into the camera
+      cone (harness only - the natural path is all-sky); the
+      capture dump (regen.py) prints each slot's life/amp/NDC, which
+      is how the first "missing" streaks were shown to be healthy
+      but off-frame - the pinned shot then caught one in frame,
+      head and train visible. Spawns consume Math.random, which the
+      pin harness seeds - pinned scenes stay deterministic.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
