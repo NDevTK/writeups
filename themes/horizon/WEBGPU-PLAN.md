@@ -1737,12 +1737,12 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
       full moon -> 0
     - render: the dark limb is lit FROM the observer's direction
       - TRUE OPPOSITION geometry - so createMoonMaterial applies
-      the SAME Hapke kernel with incidence along the view and
-      g = 0 (SHOE surge fully on, Henyey-Greenstein backscatter
-      P(0) in closed form): no separate photometric model, one
-      new uniform (the ratio, fed per frame from the same two
-      vectors the shader already uses). ?eshine=N scales for
-      harness shots.
+        the SAME Hapke kernel with incidence along the view and
+        g = 0 (SHOE surge fully on, Henyey-Greenstein backscatter
+        P(0) in closed form): no separate photometric model, one
+        new uniform (the ratio, fed per frame from the same two
+        vectors the shader already uses). ?eshine=N scales for
+        harness shots.
   - DONE: noctilucent clouds (nlc.js) - the 83-km mesospheric ice
     shell, and the item's crown: the classical visibility window
     is DERIVED, not gated. The exact construction - closed-form
