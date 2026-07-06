@@ -170,6 +170,7 @@
       } from './horizon/clouds-tsl.js';
       import {createAerialFog} from './horizon/aerial-tsl.js';
       import {createTerrainNodeMaterial} from './horizon/terrain-tsl.js';
+      import {buildMomentPyramid, slopesFromHeights} from './horizon/leadr.js';
       import {HorizonWaterMesh} from './horizon/water-tsl.js';
       import {createOceanFFT} from './horizon/ocean-tsl.js';
       import {peakOmega} from './horizon/ocean-spectrum.js';
@@ -1299,10 +1300,15 @@
       // fragment shader (slope and altitude with noise-jittered borders),
       // not per vertex, so faces stay crisp at any distance. Elevation in
       // metres is recovered in-shader by inverting the asinh compression.
-      const terrainObj = createTerrainNodeMaterial(
-        dummyTex([127, 255, 127, 255]),
-        aerial
+      const flatMoments = new THREE.DataTexture(
+        new Float32Array([0, 0, 0, 0]),
+        1,
+        1,
+        THREE.RGBAFormat,
+        THREE.FloatType
       );
+      flatMoments.needsUpdate = true;
+      const terrainObj = createTerrainNodeMaterial(flatMoments, aerial);
       const terrainMat = terrainObj.material;
       const terrainUniforms = terrainObj.uniforms;
       terrainUniforms.uWorldSize.value = WORLD;
@@ -1324,43 +1330,45 @@
       record('Lommel-Seeliger moon', 'lunar regolith photometry');
 
       // The DEM outresolves the mesh (~26 m ground truth vs ~0.9 units
-      // per vertex), so shading reads the data directly: a world-space
-      // normal map baked from the same sample() surface by central
-      // differences - the standard heightfield-to-normal-map pipeline.
-      // The mesh only carries the silhouette; every lit pixel gets the
-      // real hillside orientation.
-      function bakeTerrainNormals() {
-        const S = 768;
+      // per vertex), so shading reads the data directly - as LEADR
+      // slope moments (leadr.js): a double-precision box pyramid of
+      // (E[sx], E[sz], E[sx^2], E[sz^2]) from the same sample()
+      // surface. The trilinear auto-LOD sample gives every lit pixel
+      // the footprint's MEAN hillside orientation and the slope
+      // variance that inflates the specular lobes - the mipless
+      // 8-bit normal map this replaces aliased both. 512^2 base
+      // matches the ~26 m source data over the 16 km world.
+      function bakeTerrainMoments() {
+        const S = 512;
         const step = WORLD / (S - 1);
-        const hs = new Float32Array(S * S);
+        const hs = new Float64Array(S * S);
         for (let j = 0; j < S; j++)
           for (let i = 0; i < S; i++)
             hs[j * S + i] = sample(
               (i / (S - 1) - 0.5) * WORLD,
               (j / (S - 1) - 0.5) * WORLD
             ).y;
-        const arr = new Uint8Array(S * S * 4);
-        for (let j = 0; j < S; j++)
-          for (let i = 0; i < S; i++) {
-            const iL = Math.max(i - 1, 0);
-            const iR = Math.min(i + 1, S - 1);
-            const jU = Math.max(j - 1, 0);
-            const jD = Math.min(j + 1, S - 1);
-            const dx = (hs[j * S + iR] - hs[j * S + iL]) / ((iR - iL) * step);
-            const dz = (hs[jD * S + i] - hs[jU * S + i]) / ((jD - jU) * step);
-            const l = Math.hypot(dx, 1, dz);
-            const k = (j * S + i) * 4;
-            arr[k] = (-dx / l) * 127.5 + 127.5;
-            arr[k + 1] = (1 / l) * 127.5 + 127.5;
-            arr[k + 2] = (-dz / l) * 127.5 + 127.5;
-            arr[k + 3] = 255;
-          }
-        const tex = new THREE.DataTexture(arr, S, S, THREE.RGBAFormat);
-        tex.minFilter = tex.magFilter = THREE.LinearFilter;
+        const {sx, sz} = slopesFromHeights(hs, S, step);
+        const pyr = buildMomentPyramid(sx, sz, S);
+        const tex = new THREE.DataTexture(
+          pyr.levels[0].data,
+          S,
+          S,
+          THREE.RGBAFormat,
+          THREE.FloatType
+        );
+        tex.generateMipmaps = false;
+        tex.mipmaps = pyr.levels.map((l) => ({
+          data: l.data,
+          width: l.size,
+          height: l.size
+        }));
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        tex.magFilter = THREE.LinearFilter;
         tex.needsUpdate = true;
-        if (terrainObj.normalTexNode.value.isDataTexture)
-          terrainObj.normalTexNode.value.dispose();
-        terrainObj.normalTexNode.value = tex;
+        if (terrainObj.momentsTexNode.value.isDataTexture)
+          terrainObj.momentsTexNode.value.dispose();
+        terrainObj.momentsTexNode.value = tex;
       }
 
       function buildWorld() {
@@ -1382,7 +1390,7 @@
         }
         terrainUniforms.uCenterElev.value = centerElev;
         viewSign = state.lat < 0 ? -1 : 1;
-        bakeTerrainNormals();
+        bakeTerrainMoments();
 
         const geo = new THREE.PlaneGeometry(WORLD, WORLD, 320, 320);
         geo.rotateX(-Math.PI / 2);

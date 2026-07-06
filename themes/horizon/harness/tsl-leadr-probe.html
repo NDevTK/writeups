@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body style="margin: 0; overflow: hidden">
+    <canvas id="gl"></canvas>
+    <script>
+      /* swizzle shim */ if (navigator.gpu && self.GPUTexture) {
+        const ov = GPUTexture.prototype.createView;
+        GPUTexture.prototype.createView = function (d) {
+          if (d && 'swizzle' in d) {
+            d = Object.assign({}, d);
+            delete d.swizzle;
+          }
+          return ov.call(this, d);
+        };
+      }
+    </script>
+    <script type="module">
+      // LEADR storage probe: (A) does a float32 DataTexture with
+      // HAND-BUILT .mipmaps upload all levels, (B) does linear filtering
+      // (including trilinear across the provided mips) work on it, and
+      // (C) does textureLod read back the CPU values exactly per level.
+      // The LEADR moment pyramid needs all three.
+      import * as T from 'three/webgpu';
+      import {
+        Fn,
+        float,
+        ivec2,
+        screenCoordinate,
+        texture,
+        vec2,
+        vec4
+      } from 'three/tsl';
+      const log = (s) => console.log('LEADR|' + s);
+      try {
+        const r = new T.WebGPURenderer({
+          canvas: document.getElementById('gl'),
+          forceWebGL: false,
+          antialias: false
+        });
+        await r.init();
+        log('backend ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'other'));
+        r.setSize(64, 64);
+        const W = 64,
+          H = 4;
+
+        // 8x8 base with distinct per-level constants baked by hand:
+        // level L texel value = 100*(L+1) + x. Means across levels then
+        // differ measurably and each LOD read has a known truth.
+        const N0 = 8;
+        const mk = (n, L) => {
+          const a = new Float32Array(n * n * 4);
+          for (let y = 0; y < n; y++)
+            for (let x = 0; x < n; x++) {
+              const k = (y * n + x) * 4;
+              a[k] = 100 * (L + 1) + x;
+              a[k + 1] = 0.5;
+              a[k + 2] = 0;
+              a[k + 3] = 1;
+            }
+          return a;
+        };
+        const tex0 = new T.DataTexture(
+          mk(N0, 0),
+          N0,
+          N0,
+          T.RGBAFormat,
+          T.FloatType
+        );
+        tex0.generateMipmaps = false;
+        tex0.mipmaps = [
+          {data: mk(N0, 0), width: N0, height: N0},
+          {data: mk(4, 1), width: 4, height: 4},
+          {data: mk(2, 2), width: 2, height: 2},
+          {data: mk(1, 3), width: 1, height: 1}
+        ];
+        tex0.minFilter = T.LinearMipmapLinearFilter;
+        tex0.magFilter = T.LinearFilter;
+        tex0.needsUpdate = true;
+        const texN = texture(tex0);
+
+        const quad = new T.QuadMesh();
+        const m = new T.MeshBasicNodeMaterial();
+        m.colorNode = Fn(() => {
+          const x = ivec2(screenCoordinate.xy).x.toFloat();
+          // column 0..: LOD 0 at texel centre 1.5 -> 101.5? level0 value at
+          // x=1..2 midpoint: sample at u=(2)/8 between texels 1,2 -> 101.5.
+          const lod0 = texN.sample(vec2(0.25, 0.3125)).level(0).r; // texel x=1.5
+          const lod1 = texN.sample(vec2(0.375, 0.375)).level(1).r; // 4x4, texel x=1
+          const lod15 = texN.sample(vec2(0.375, 0.375)).level(1.5).r;
+          const auto = texN.sample(vec2(x.div(64), 0.5)).r;
+          return vec4(lod0, lod1, lod15, auto);
+        })();
+        m.transparent = true;
+        m.blending = T.NoBlending;
+        m.toneMapped = false;
+        quad.material = m;
+        const rt = new T.RenderTarget(W, H, {
+          type: T.FloatType,
+          depthBuffer: false
+        });
+        r.setRenderTarget(rt);
+        quad.render(r);
+        r.setRenderTarget(null);
+        const a = await r.readRenderTargetPixelsAsync(rt, 0, 0, W, H);
+
+        // truths: lod0 at u=0.25 on the 8-wide ramp 100..107 = 100 + (0.25*8-0.5)=101.5
+        // lod1 at u=0.375 on 4-wide ramp 200..203 = 200 + (0.375*4-0.5)=201.0
+        // lod1.5 = mix(lod1@201.0, lod2@(300+(0.375*2-0.5)=300.25), 0.5) = 250.625
+        const e0 = Math.abs(a[0] - 101.5);
+        const e1 = Math.abs(a[1] - 201.0);
+        const e15 = Math.abs(a[2] - 250.625);
+        log(
+          `lod0 ${a[0].toFixed(3)} (101.5) lod1 ${a[1].toFixed(3)} (201.0) lod1.5 ${a[2].toFixed(3)} (250.625)`
+        );
+        log(
+          `MIPS ${e0 < 1e-3 && e1 < 1e-3 ? 'PASS' : 'FAIL'} (hand-built float32 mip upload + LOD reads)`
+        );
+        log(
+          `TRILINEAR ${e15 < 1e-3 ? 'PASS' : 'FAIL'} (float32 filterable across levels)`
+        );
+        log('DONE');
+      } catch (e) {
+        log('ERR ' + e.message + ' :: ' + (e.stack || '').split('\n')[1]);
+        log('DONE');
+      }
+    </script>
+  </body>
+</html>

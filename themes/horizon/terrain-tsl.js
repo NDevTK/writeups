@@ -50,8 +50,16 @@ import {
  *
  * This is the SAME physics as the GLSL onBeforeCompile version in
  * Horizon.html, expressed as node code for WebGPURenderer:
- *  - per-pixel grass/rock/snow/sea from the DEM normal map and the
- *    inverted asinh elevation, noise-jittered borders
+ *  - per-pixel grass/rock/snow/sea from the DEM slope moments and
+ *    the inverted asinh elevation, noise-jittered borders
+ *  - LEADR filtering (Dupuy et al. 2013): the terrain reads a
+ *    CPU-built slope-moment pyramid (leadr.js) instead of a normal
+ *    map. The trilinear auto-LOD sample gives the footprint's MEAN
+ *    slope (the filtered shading normal - normals do not average,
+ *    slopes do) and its central variance, which inflates every
+ *    microfacet lobe: alpha_eff^2 = alpha^2 + 2 sigma^2 for the
+ *    body GGX and for the snow-glint lobe alike, so distant ridges
+ *    neither alias nor lose their specular energy
  *  - Pierson-Moskowitz sea normals from the real wind (Hs = 0.21 U^2/g,
  *    Tp = 0.7305 U, deep-water dispersion) with Blinn glitter and
  *    Schlick fresnel; Monahan & O'Muircheartaigh whitecap fraction
@@ -60,14 +68,17 @@ import {
  *    the Hillaire aerial LUT, then Koschmieder fog on the MEASURED
  *    visibility
  *
- * The node graph deduplicates shared subexpressions (demNormal, snow,
- * slope) across colorNode / roughnessNode / normalNode, so splitting
- * the single GLSL terrainColor() into separate nodes loses nothing.
+ * The node graph deduplicates shared subexpressions (the moments
+ * sample, snow, slope) across colorNode / roughnessNode /
+ * normalNode, so splitting the single GLSL terrainColor() into
+ * separate nodes loses nothing.
  */
 
-export function createTerrainNodeMaterial(normalMapTex, aerial) {
+export function createTerrainNodeMaterial(momentsTex, aerial) {
   // TextureNodes are part of the graph; rebakes swap via node.value.
-  const normalTexNode = texture(normalMapTex);
+  // momentsTex: RGBA32F (E[sx], E[sz], E[sx^2], E[sz^2]) with
+  // hand-built mips (leadr.js pyramid), trilinear filtering.
+  const momentsTexNode = texture(momentsTex);
   const u = {
     uWorldSize: uniform(280),
     uCenterElev: uniform(300),
@@ -101,13 +112,6 @@ export function createTerrainNodeMaterial(normalMapTex, aerial) {
       .add(tnoise(p.mul(2.7).add(19)).mul(0.28))
       .add(tnoise(p.mul(6.1).add(47)).mul(0.12))
   );
-
-  // The baked DEM normal map: every lit pixel gets the real hillside
-  // orientation (the mesh only carries the silhouette).
-  const demNormal = Fn(([xz]) => {
-    const t = normalTexNode.sample(xz.div(u.uWorldSize).add(0.5));
-    return normalize(t.xyz.mul(2).sub(1));
-  });
 
   // Pierson-Moskowitz fully developed sea, identical constants to the
   // GLSL: two wave trains at their true deep-water dispersion speeds,
@@ -246,39 +250,22 @@ export function createTerrainNodeMaterial(normalMapTex, aerial) {
 
   // Smooth facet lobe (exact GGX D + height-correlated Smith V +
   // Schlick F on ice), scaled by the crystal area fraction. The
-  // glint factor modulates it.
-  const snowGlint = Fn(([wp, nSnow]) => {
+  // glint factor modulates it. The crystal orientation spread
+  // widens by the LEADR footprint slope variance - distant snow's
+  // glint lobe carries the unresolved terrain slopes too.
+  const snowGlint = Fn(([wp, nSnow, sig2G]) => {
     const V = normalize(cameraPosition.sub(wp));
     const L = u.uSunDirW;
     const H = normalize(V.add(L));
     const nh = clamp(dot(nSnow, H), 0.0, 1.0);
     const nv = clamp(dot(nSnow, V), 1e-4, 1.0);
     const nl = clamp(dot(nSnow, L), 0.0, 1.0);
-    const a2 = ALPHA_G * ALPHA_G;
-    const t = nh
-      .mul(nh)
-      .mul(a2 - 1)
-      .add(1);
-    const D = t
-      .mul(t)
-      .mul(Math.PI / a2)
-      .reciprocal();
-    const lv = nl.mul(
-      sqrt(
-        nv
-          .mul(nv)
-          .mul(1 - a2)
-          .add(a2)
-      )
-    );
-    const ll = nv.mul(
-      sqrt(
-        nl
-          .mul(nl)
-          .mul(1 - a2)
-          .add(a2)
-      )
-    );
+    const a2 = float(ALPHA_G * ALPHA_G).add(sig2G.mul(2.0));
+    const t = nh.mul(nh).mul(a2.sub(1)).add(1);
+    const D = a2.div(t.mul(t).mul(Math.PI));
+    const oneMa2 = float(1).sub(a2);
+    const lv = nl.mul(sqrt(nv.mul(nv).mul(oneMa2).add(a2)));
+    const ll = nv.mul(sqrt(nl.mul(nl).mul(oneMa2).add(a2)));
     const Vis = float(0.5).div(max(lv.add(ll), 1e-9));
     const F = pow(clamp(float(1).sub(dot(V, H)), 0.0, 1.0), 5.0)
       .mul(1 - F0_ICE)
@@ -297,8 +284,17 @@ export function createTerrainNodeMaterial(normalMapTex, aerial) {
 
   const wet = attribute('wet', 'float');
 
-  // Shared pieces of the material decision (deduplicated by the graph).
-  const nW = demNormal(positionWorld.xz);
+  // Shared pieces of the material decision (deduplicated by the
+  // graph). ONE trilinear moments sample per fragment: mean slope ->
+  // the LEADR-filtered world normal; central variance -> the lobe
+  // inflation shared by the body GGX and the glints.
+  const mom = momentsTexNode.sample(
+    positionWorld.xz.div(u.uWorldSize).add(0.5)
+  );
+  const nW = normalize(vec3(mom.r.negate(), 1.0, mom.g.negate()));
+  const sig2 = max(mom.b.sub(mom.r.mul(mom.r)), 0.0)
+    .add(max(mom.a.sub(mom.g.mul(mom.g)), 0.0))
+    .mul(0.5);
   const slope = float(1).sub(nW.y);
   // e = centerElev + 500*sinh(y/16), sinh via exponentials.
   const yy = positionWorld.y.div(16);
@@ -343,9 +339,13 @@ export function createTerrainNodeMaterial(normalMapTex, aerial) {
   })();
 
   // Per-pixel GGX roughness: vegetation ~0.95, rock ~0.88, snow 0.45
-  // (its real forward sheen); wet sea pixels keep roughness 1 so the
-  // Blinn seaSpec stays the one glitter model.
-  const roughnessNode = mix(mix(mix(0.95, 0.88, rockF), 0.45, snow), 1.0, wet);
+  // (its real forward sheen), LEADR-inflated by the footprint slope
+  // variance; wet sea pixels keep roughness 1 so the Blinn seaSpec
+  // stays the one glitter model.
+  const rBase = mix(mix(0.95, 0.88, rockF), 0.45, snow);
+  const aBase = rBase.mul(rBase);
+  const aEff = sqrt(aBase.mul(aBase).add(sig2.mul(2.0)));
+  const roughnessNode = mix(clamp(sqrt(aEff), 0.0, 1.0), 1.0, wet);
 
   // World normal: waves on wet pixels, the DEM normal map elsewhere.
   const normalNode = transformNormalToView(
@@ -360,7 +360,7 @@ export function createTerrainNodeMaterial(normalMapTex, aerial) {
   // direct sun via uSunCol).
   const emissiveNode = seaSpec(positionWorld)
     .mul(wet)
-    .add(snowGlint(positionWorld, nW).mul(snow).mul(wet.oneMinus()));
+    .add(snowGlint(positionWorld, nW, sig2).mul(snow).mul(wet.oneMinus()));
 
   const mat = new MeshStandardNodeMaterial({metalness: 0});
   mat.colorNode = colorNode;
@@ -370,5 +370,5 @@ export function createTerrainNodeMaterial(normalMapTex, aerial) {
   // Aerial perspective + Koschmieder: the ONE shared hook from
   // aerial-tsl.js, same graph every world material uses.
   aerial.apply(mat);
-  return {material: mat, uniforms: u, normalTexNode};
+  return {material: mat, uniforms: u, momentsTexNode};
 }

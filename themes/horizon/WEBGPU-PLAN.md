@@ -917,6 +917,34 @@ Scenes (all at Grindelwald unless noted):
       exposure for the folded chains.
     - aurora-reference.mjs joins validate.sh (16 landmarks; gate
       PASS at 7/7 references + 3/3 probes).
+  - DONE: LEADR terrain filtering (Dupuy, Heitz, Iehl, Poulin &
+    Neyret 2013; leadr.js single source + leadr-reference.mjs).
+    Replaces the mipless 8-bit DEM normal map - which aliased both
+    the lighting and every specular term at distance - with a
+    CPU double-precision box pyramid of slope moments
+    (E[sx], E[sz], E[sx^2], E[sz^2]) uploaded as hand-built float32
+    mips (tsl-leadr-probe.html: upload, per-level LOD reads and
+    trilinear filtering all exact on the WebGPU stack - probed
+    BEFORE the design committed to raw fp32 moments).
+    - Normals do not average; slopes do. The trilinear auto-LOD
+      sample gives the footprint's MEAN slope (the filtered shading
+      normal) and its central variance, which inflates every
+      microfacet lobe: alpha_eff^2 = alpha^2 + 2 sigma^2 for the
+      body GGX roughness AND for the snow-glint lobe (distant snow's
+      sparkle widens by the unresolved terrain slopes - the same
+      variance-preservation principle as the ocean's Bruneton
+      bookkeeping, now on land). One moments sample per fragment
+      feeds normal, roughness and glints.
+    - The covariance E[sx sz] is NOT stored: every BRDF in the
+      pipeline is isotropic, so only the variance trace enters
+      shading (documented; storing it would only feed an
+      anisotropic lobe we do not have). 512^2 base matches the
+      ~26 m z12 source data over the 16 km world.
+    - leadr-reference.mjs: pyramid equals the direct footprint
+      average at fp32 epsilon (4e-9); the law of total variance
+      holds across every level (6e-8); a known sinusoid lands on
+      its analytic slope variance; no negative variances. Gate PASS
+      at 8/8 references + 3/3 probes; noon smoke clean.
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:
