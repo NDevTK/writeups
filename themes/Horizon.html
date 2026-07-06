@@ -220,6 +220,13 @@
       import {BETA_MIN_DEG, seasonEnvelope} from './horizon/nlc.js';
       import {parseTLEs, satMagnitude, sunlitEci} from './horizon/sats.js';
       import {lunarEclipse, solarEclipse} from './horizon/eclipses.js';
+      import {
+        bortleClass,
+        pointVisibility,
+        sampleRatio,
+        skyMag
+      } from './horizon/skyglow.js';
+      import {SKYGLOW, SKYGLOW_H, SKYGLOW_W} from './horizon/skyglow-data.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -2999,6 +3006,49 @@
           // keep the previous fleet; SGP4 holds for days
         }
       }
+      // ---- Light pollution (skyglow.js): the visitor's MEASURED
+      // artificial skyglow from the Falchi et al. 2016 World Atlas
+      // (VIIRS + Garstang modelling, SQM-validated; CC BY-NC,
+      // cited in the provenance panel). Celestial sources wash by
+      // CONTRAST - exactly 1/(1 + r) - which is why a Manhattan
+      // visitor sees a handful of stars and no galaxy, and a
+      // Namibian one sees the theme at full depth. Bright compact
+      // sources (planets, meteor heads) penetrate as 1/sqrt(1+r)
+      // (documented display split of the same law). The warm city
+      // dome is the one documented display element (sodium/LED
+      // tint; amplitude from the same measured ratio).
+      // ?lp=r overrides the ratio for harness shots.
+      const lpRatio = params.has('lp')
+        ? +params.get('lp')
+        : sampleRatio(SKYGLOW, SKYGLOW_W, SKYGLOW_H, state.lat, state.lon);
+      const lpVis = pointVisibility(lpRatio);
+      const lpVisBright = 1 / Math.sqrt(1 + lpRatio);
+      const lpMag = skyMag(lpRatio);
+      record(
+        'Falchi 2016 skyglow atlas',
+        'zenith ' +
+          lpMag.toFixed(2) +
+          ' mag/arcsec\u00b2 \u00b7 Bortle ' +
+          bortleClass(lpMag) +
+          ' \u00b7 star contrast \u00d7' +
+          lpVis.toFixed(2)
+      );
+      const lpGlowObj = createVeilMaterial();
+      lpGlowObj.material.blending = THREE.AdditiveBlending;
+      lpGlowObj.u.bottom.value.setRGB(0.42, 0.33, 0.18); // sodium/LED
+      lpGlowObj.u.top.value.setRGB(0.05, 0.045, 0.035);
+      const lpGlowAmp = THREE.MathUtils.clamp(
+        Math.log10(1 + lpRatio) / 2.5,
+        0,
+        1
+      );
+      const lpGlow = new THREE.Mesh(
+        new THREE.SphereGeometry(905, 32, 16),
+        lpGlowObj.material
+      );
+      lpGlow.visible = lpGlowAmp > 0.01;
+      scene.add(lpGlow);
+
       const SAT_DOT_N = 12;
       const satDots = [];
       {
@@ -3635,7 +3685,7 @@
           ambient.groundColor.copy(tmpB).multiplyScalar(0.4);
         }
         if (starObj) {
-          starObj.u.night.value = nightSky * (1 - cloudy * 0.85);
+          starObj.u.night.value = nightSky * (1 - cloudy * 0.85) * lpVis;
           starObj.u.time.value = t / 1000;
           // Winds-aloft turbulence (cn2.js): the measured pressure-
           // level profile sets BOTH the twinkle depth (Young's
@@ -3663,7 +3713,7 @@
         // (uLineI); extinction rides the engine's own zenith
         // transmittance at the current aerosol load; gated with the
         // stars.
-        airglowU.night.value = nightSky * (1 - cloudy * 0.85);
+        airglowU.night.value = nightSky * (1 - cloudy * 0.85) * lpVis;
         airglowU.uTzen.value.fromArray(sunTransmittanceJS(1, mieScale));
         // Zodiacal light: anchored to the sun's ecliptic longitude,
         // scaled by the Earth's REAL heliocentric distance (r^-2.3,
@@ -3673,7 +3723,7 @@
         const dNow = now();
         const sunLam = sunEclipticLon(dNow);
         {
-          zodiU.night.value = nightSky * (1 - cloudy * 0.85);
+          zodiU.night.value = nightSky * (1 - cloudy * 0.85) * lpVis;
           zodiU.uSunLam.value = sunLam;
           const AEg = window.Astronomy;
           const rAU =
@@ -3717,7 +3767,7 @@
         // (meteors.js). Poisson spawning; ?meteor=N forces N/h for
         // the offline harness.
         {
-          const mNight = nightSky * (1 - cloudy * 0.85);
+          const mNight = nightSky * (1 - cloudy * 0.85) * lpVisBright;
           let total = 0;
           const act = [];
           if (mNight > 0.05) {
@@ -3982,10 +4032,18 @@
           }
           p.u.amp.value = flashAmplitude(p.seq, p.t) * p.amp0 * 2.2;
         }
-        if (constMat) constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2;
+        if (constMat)
+          constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2 * lpVis;
+        // The measured city glow rises as the sky darkens and even
+        // lights the cloud undersides a touch (real urban overcast
+        // glows warm rather than black).
+        lpGlowObj.u.alpha.value =
+          lpGlowAmp * nightSky * 0.22 * (1 + cloudy * 0.8);
         // Venus and Jupiter pierce twilight a little before the stars.
         planetObj.u.night.value =
-          THREE.MathUtils.clamp(nightSky * 1.6, 0, 1) * (1 - cloudy * 0.85);
+          THREE.MathUtils.clamp(nightSky * 1.6, 0, 1) *
+          (1 - cloudy * 0.85) *
+          lpVisBright;
         moonDisc.visible = moon.alt > -0.05;
 
         // The Water plane: the FFT ocean advances on REAL seconds

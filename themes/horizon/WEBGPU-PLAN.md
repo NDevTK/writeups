@@ -1839,6 +1839,43 @@ Scenes (all at Grindelwald unless noted):
       obscuration + magnitude + annular; ?eclipse=f harness
       override. On 2026-08-12 every visitor in the path gets the
       real darkness at the real minute.
+  - DONE: light pollution (skyglow.js) - the biggest honesty gap
+    left in the night sky: the theme rendered the same pristine
+    Gaia galaxy over Manhattan as over the Atacama. Now the
+    visitor's night sky is set by their MEASURED artificial
+    skyglow:
+    - data: the World Atlas of Artificial Night Sky Brightness
+      itself (Falchi et al. 2016, Science Advances; DOI
+      10.5880/GFZ.1.4.2016.001, CC BY-NC) - the 653 MB source
+      GeoTIFF (30 arcsec, float32 mcd/m^2) downloaded from GFZ
+      and downsampled to a 0.5-deg grid (720 x 290, mean in
+      LINEAR brightness, byte log-quantised: skyglow-data.js,
+      ~270 KB). Site checks at FULL resolution before
+      downsampling reproduced the published values: Las Vegas
+      17.26, London 17.63, Mauna Kea 21.98, mid-Pacific 22.00
+      mag/arcsec^2.
+    - physics: the paper's own scale (natural = 0.174 mcd/m^2 =
+      22.00 mag/arcsec^2; total = 22 - 2.5 log10(1+r)); celestial
+      sources wash by CONTRAST, exactly 1/(1+r); horizon
+      anisotropy machinery via Walker's law (1977: d^-2.5) ring
+      samples of the same grid (gated; dome anisotropy wiring is
+      the noted follow-up). Conventional SQM->Bortle mapping for
+      the provenance line.
+    - skyglow-reference.mjs (gate set 28): quantisation
+      round-trip over all 256 byte values; the scale's closed
+      forms; Bortle breakpoints; the geography of light in four
+      grid samples (Vegas/London city cells < 19.5, mid-Pacific
+      exactly 22.00, Atacama dark, beyond coverage 0); Walker's
+      law exact (25 vs 100 km = 4^2.5 = 32).
+    - theme: boot-time sample at the visitor -> star field,
+      constellations, Milky Way, zodiacal and airglow scale by
+      1/(1+r); planets and meteor heads (bright compact sources)
+      by 1/sqrt(1+r) (documented split); a warm sodium/LED veil
+      dome (createVeilMaterial reused additively) rises with
+      darkness and brightens under overcast - real urban clouds
+      glow, they do not blacken. Provenance line quotes zenith
+      mag/arcsec^2, Bortle class and the contrast factor.
+      ?lp=r overrides for harness shots.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
