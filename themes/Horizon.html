@@ -215,6 +215,7 @@
         positionIntensity,
         strobeOn
       } from './horizon/navlights.js';
+      import {earthshineRatio} from './horizon/earthshine.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -2614,6 +2615,7 @@
         // EventSource reconnects itself; nothing else to manage.
       }
       const mFlashDir = new THREE.Vector3();
+      const eshV = new THREE.Vector3(); // earthshine phase temp
       const mV1 = new THREE.Vector3();
       const mV2 = new THREE.Vector3();
       const mV3 = new THREE.Vector3();
@@ -3376,6 +3378,19 @@
           .copy(skyPoint(sun.alt, sun.az, 200))
           .sub(moonDisc.position)
           .normalize();
+        // Earthshine: the ashen light on the dark limb, from the
+        // MEASURED Earth albedo (earthshine.js, Goode 2001). The
+        // lunar phase angle comes from the same two vectors the
+        // Hapke shader uses; the ratio peaks (~8e-5) at new moon
+        // - full Earth over the thinnest crescent - and dies at
+        // full moon. ?eshine=N scales it for harness shots.
+        eshV.copy(moonDisc.position).negate().normalize();
+        moonU.eshine.value =
+          earthshineRatio(
+            Math.acos(
+              THREE.MathUtils.clamp(moonU.sunDirM.value.dot(eshV), -1, 1)
+            )
+          ) * (params.has('eshine') ? +params.get('eshine') : 1);
 
         polar.rotation.x = -(90 - state.lat) * RAD;
         celestial.rotation.y = -(gmst(d) + state.lon * RAD);

@@ -111,7 +111,12 @@ export function createMoonMaterial() {
   const u = {
     sunDirM: uniform(new Vector3(0, 1, 0)),
     albM: uniform(new Color('#cdd4e2')),
-    glowM: uniform(new Color('#0c0f16'))
+    glowM: uniform(new Color('#0c0f16')),
+    // earthlight/sunlight illuminance ratio (earthshine.js: the
+    // Goode 2001 measured Earth albedo through the Lambert phase
+    // law at the exact complement of the lunar phase; ~8e-5 at
+    // new moon, 0 at full) - fed per frame by the theme
+    eshine: uniform(0)
   };
   const material = new NodeMaterial();
 
@@ -174,7 +179,27 @@ export function createMoonMaterial() {
     rHapke.mul(0.5 / R_FULL_CENTRE),
     0.0
   );
-  material.colorNode = u.albM.mul(lunar).mul(2.0).add(u.glowM);
+  // Earthshine: the dark limb is lit FROM the observer's own
+  // direction - true opposition geometry - so the SAME Hapke
+  // kernel applies with incidence along the view: mu0 = mu and
+  // g = 0, where the SHOE surge is fully on (B = B0) and the
+  // Henyey-Greenstein lobe takes its closed-form backscatter
+  // value P(0) = (1 - xi^2)/(1 + xi^2 + 2 xi)^1.5. u.eshine
+  // carries the earthlight/sunlight ratio; the whole disc gets
+  // the term (its contribution under the sunlit side is 1e-4 of
+  // the sunlight - invisible there, the ashen glow elsewhere).
+  const P0 = (1 - XI * XI) / Math.pow(1 + XI * XI + 2 * XI, 1.5);
+  const earthlit = select(
+    mu.greaterThan(0.0),
+    hapkeH(mu)
+      .mul(hapkeH(mu))
+      .add((B0 + 1) * P0 - 1)
+      .mul(0.5)
+      .mul(0.5 / R_FULL_CENTRE)
+      .mul(u.eshine),
+    0.0
+  );
+  material.colorNode = u.albM.mul(lunar.add(earthlit)).mul(2.0).add(u.glowM);
   return {material, u};
 }
 

@@ -1718,6 +1718,31 @@ Scenes (all at Grindelwald unless noted):
       as the zodiacal light - the galaxy/zodiacal contrast has NO
       free parameter. milkyway-data.js is ~450 KB (4-sig-fig
       fluxes; Pages gzips it to ~150 KB).
+  - DONE: earthshine (earthshine.js) - "the old moon in the new
+    moon's arms" completes the lunar photometry:
+    - the chain is closed-form and MEASURED at its anchor: the
+      Earth's phase from the Moon is the exact complement of the
+      Moon's phase from Earth (new moon = FULL Earth over the
+      thinnest crescent); the Earth's effective albedo is the Big
+      Bear programme's A* = 0.297 (Goode et al. 2001 - measured
+      by watching precisely the glow this item draws); Lambertian
+      sphere phase law at its exact nodes (f(pi/2) = 1/pi);
+      geometry on the shared IUGG radius (imported from
+      lightning.js - the model lives once)
+    - landmarks (gate set 24): full Earth from the Moon V =
+      -16.52 (published -17..-16.1), 33x the full Moon;
+      earthlight/sunlight = 8.16e-5 at new moon = A*(R_E/d)^2
+      exactly - the ashen side 10.2 mag below the sunlit surface
+      (the classical Danjon contrast); quarter = new/pi exactly;
+      full moon -> 0
+    - render: the dark limb is lit FROM the observer's direction
+      - TRUE OPPOSITION geometry - so createMoonMaterial applies
+      the SAME Hapke kernel with incidence along the view and
+      g = 0 (SHOE surge fully on, Henyey-Greenstein backscatter
+      P(0) in closed form): no separate photometric model, one
+      new uniform (the ratio, fed per frame from the same two
+      vectors the shader already uses). ?eshine=N scales for
+      harness shots.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
