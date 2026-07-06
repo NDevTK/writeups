@@ -171,6 +171,8 @@
       import {createAerialFog} from './horizon/aerial-tsl.js';
       import {createTerrainNodeMaterial} from './horizon/terrain-tsl.js';
       import {buildMomentPyramid, slopesFromHeights} from './horizon/leadr.js';
+      import {metresPerPixel, tileAt, windowStats} from './horizon/radar.js';
+      import {geomagneticLatitude, igrfField} from './horizon/igrf.js';
       import {HorizonWaterMesh} from './horizon/water-tsl.js';
       import {createOceanFFT} from './horizon/ocean-tsl.js';
       import {peakOmega} from './horizon/ocean-spectrum.js';
@@ -560,6 +562,27 @@
         }
         return parts.length ? parts : null;
       }
+      // Geomagnetic frame at the visitor (IGRF-14, igrf.js):
+      // declination steers the aurora curtain azimuth, geomagnetic
+      // latitude organises the Kp oval fallback. Pure computation -
+      // refresh whenever the location may have moved.
+      function syncGeomag() {
+        const year = Date.now() / 31557600000 + 1970; // decimal year
+        const f = igrfField(state.lat, state.lon, 0, year);
+        state.magD = f.d;
+        state.gmLat = geomagneticLatitude(state.lat, state.lon, year);
+        record(
+          'IGRF-14 geomagnetism',
+          'declination ' +
+            f.d.toFixed(1) +
+            '° · inclination ' +
+            f.i.toFixed(1) +
+            '° · geomagnetic lat ' +
+            state.gmLat.toFixed(1) +
+            '°'
+        );
+      }
+
       async function syncMarine() {
         // Pinned sea, or pinned weather (a live sea would contradict
         // the pinned wind): keep what the URL says.
@@ -2564,9 +2587,16 @@
           auroraP = state.auroraP;
           ovalDeg = Math.abs(state.auroraLat) - Math.abs(state.lat);
         } else {
+          // The oval is organised by GEOMAGNETIC latitude (IGRF-14
+          // dipole axis), not geographic - Alaska at 61 N geographic
+          // sits under the oval; Hamburg at 53.5 N does not.
           auroraP =
             THREE.MathUtils.clamp((state.kp - 4) / 4, 0, 1) *
-            THREE.MathUtils.clamp((Math.abs(state.lat) - 46) / 14, 0, 1);
+            THREE.MathUtils.clamp(
+              (Math.abs(state.gmLat ?? state.lat) - 46) / 14,
+              0,
+              1
+            );
           ovalDeg = 8;
         }
         const ovalKm = Math.max(ovalDeg, 0) * 111;
@@ -2587,7 +2617,14 @@
         const yAurora = Math.tan(THREE.MathUtils.clamp(elevA, 0.06, 1.1)) * 760;
         auroraU.uBase.value = yAurora - 160;
         aurora.position.y = yAurora + 200;
-        aurora.rotation.y = state.lat < 0 ? Math.PI : 0;
+        // The curtain centres on MAGNETIC north (south), not true:
+        // auroral arcs run along geomagnetic east-west, so the
+        // whole band swings by the local IGRF declination (+D means
+        // magnetic north lies east of true north; east is +x, and
+        // positive rotation.y carries the north-placed curtain
+        // west, hence the minus).
+        aurora.rotation.y =
+          (state.lat < 0 ? Math.PI : 0) - (state.magD ?? 0) * RAD;
 
         // Three cloud layers from the model's real per-layer covers.
         // Cumulus base at the real lifting condensation level (Espy:
@@ -3085,6 +3122,7 @@
         requestAnimationFrame(frame);
         await syncWeather();
         setInterval(syncWeather, 15 * 60 * 1000);
+        syncGeomag();
         syncAir();
         setInterval(syncAir, 30 * 60 * 1000);
         syncMarine();

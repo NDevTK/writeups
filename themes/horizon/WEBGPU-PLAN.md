@@ -969,6 +969,41 @@ Scenes (all at Grindelwald unless noted):
       model silently. Pinned scenes are untouched (overridden gate
       - the harness fetch stub). Gate PASS at 9/9 references + 3/3
         probes; noon smoke clean.
+  - DONE: IGRF-14 geomagnetism for the aurora geometry (igrf.js
+    single source + igrf-reference.mjs). The curtain pointed TRUE
+    north; auroral arcs run along GEOMAGNETIC east-west and the oval
+    is organised by geomagnetic latitude:
+    - The full IGRF-14 model (IAGA 2024): all 195 Schmidt
+      semi-normalised coefficients to degree 13 at epoch 2025.0 plus
+      secular variation, extracted verbatim from NOAA's
+      igrf14coeffs.txt; geomag70's geodetic (WGS84) conversion; the
+      standard B_r/B_theta/B_phi sums.
+    - The analytic gate caught TWO real recursion bugs before any
+      external anchor was consulted: the Schmidt diagonal factor
+      sqrt((2m-1)/2m) must start at m = 2 (P11 = sin theta exactly),
+      and the off-diagonal recursion needed the
+      [(2n-1) ct P - sqrt((n-1)^2-m^2) P] / sqrt(n^2-m^2) Schmidt
+      form (the first attempt used a different normalisation the
+      dipole-dominated field almost masked - hand-written P_n^m for
+      n <= 3 exposed it at 0.39 absolute). After the fixes:
+      hand forms at 1e-16, tilted-dipole identity at 0.0 nT, the
+      published 2025 geomagnetic pole (80.9 N 72.7 W), and real
+      declinations everywhere (Grindelwald +3.5, Reykjavik -11.1,
+      Nelson +23.0, equatorial-Atlantic inclination -30).
+    - Theme: syncGeomag() computes declination + geomagnetic
+      latitude at the visitor; the curtain azimuth swings by -D
+      (magnetic north), the Kp oval fallback runs on geomagnetic
+      latitude (Alaska at 61 N geographic is IN the oval, Hamburg at
+      53.5 N is not). In-scene record confirms the live values.
+    - ALSO FIXED here: the radar.js import in Horizon.html had not
+      landed (the edit anchored on a stale import block and
+      syncRadar's try/catch swallowed the ReferenceError - the
+      radar feature was silently dead). Lesson recorded: a caught
+      exception can hide a missing import; the smoke grep now
+      includes PAGEERROR and the geomag record() line serves as the
+      liveness signal for the import block. Gate PASS at 10/10
+      references + 3/3 probes; aurora smoke clean with the IGRF
+      record live.
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:
