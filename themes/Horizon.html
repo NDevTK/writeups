@@ -193,6 +193,15 @@
         createContrailMaterial
       } from './horizon/sky-objects-tsl.js';
       import {adsbToScene, appleman} from './horizon/contrails.js';
+      import {
+        aisToScene,
+        apparentLux,
+        lightArcs,
+        luminousIntensity,
+        RANGE_NM,
+        relBearing,
+        SUNSET_ELEV
+      } from './horizon/ships.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -2128,6 +2137,188 @@
           liveTraffic = null; // ambient traffic stands in
         }
       }
+
+      // ---- Live ships: AIS via the same worker (/ais route).
+      // aisstream.io position reports around the visitor; the API
+      // key lives ONLY in the worker (aisstream's terms forbid
+      // exposing it to a browser, which a static site could never
+      // honour). Ships dead-reckon on the tide-following water
+      // plane between reports and carry COLREGS navigation lights
+      // after sunset (ships.js: Rule 21 arcs, Rule 22 ranges,
+      // Annex I candela through Allard's law - beyond a light's
+      // rated range the eye receives less than the adopted 2e-7
+      // lux threshold and the light goes out, exactly as the
+      // regulation is constructed). The hull itself is display
+      // furniture (reports carry no dimensions - a 90 m default);
+      // the lights and kinematics are the physics. ?ais=URL
+      // overrides the proxy; ?ship=N spawns N deterministic
+      // synthetic vessels for the offline harness.
+      const AIS_PROXY =
+        params.get('ais') ?? 'https://horizon-adsb.ndevtk.workers.dev/ais';
+      const SHIP_N = 8;
+      const SHIP_LOA = 90 / 57.14; // scene units (90 m)
+      const NAV_COLOR = {
+        masthead: '#ffffff',
+        stern: '#ffffff',
+        port: '#ff2418',
+        starboard: '#19e34d'
+      };
+      const NAV_RANGE = {
+        masthead: 'masthead',
+        stern: 'stern',
+        port: 'side',
+        starboard: 'side'
+      };
+      const shipPool = [];
+      {
+        const hullGeo = new THREE.BoxGeometry(0.25, 0.14, SHIP_LOA);
+        const supGeo = new THREE.BoxGeometry(0.21, 0.21, 0.32);
+        const dotGeo = new THREE.SphereGeometry(0.085, 8, 6);
+        const hullMat = new THREE.MeshStandardNodeMaterial({
+          color: '#252b30',
+          roughness: 0.9
+        });
+        const supMat = new THREE.MeshStandardNodeMaterial({
+          color: '#77828c',
+          roughness: 0.9
+        });
+        applyAerial(hullMat);
+        applyAerial(supMat);
+        for (let i = 0; i < SHIP_N; i++) {
+          const g = new THREE.Group(); // bow points local -z
+          const hull = new THREE.Mesh(hullGeo, hullMat);
+          hull.position.y = 0.05;
+          const sup = new THREE.Mesh(supGeo, supMat);
+          sup.position.set(0, 0.2, SHIP_LOA * 0.32); // aft house
+          g.add(hull, sup);
+          const lights = {};
+          for (const [k, px, py, pz] of [
+            ['masthead', 0, 0.42, -SHIP_LOA * 0.2],
+            ['port', -0.15, 0.2, -SHIP_LOA * 0.1],
+            ['starboard', 0.15, 0.2, -SHIP_LOA * 0.1],
+            ['stern', 0, 0.18, SHIP_LOA * 0.49]
+          ]) {
+            const m = new THREE.MeshBasicNodeMaterial({color: NAV_COLOR[k]});
+            aerial.applyTone(m);
+            const dot = new THREE.Mesh(dotGeo, m);
+            dot.position.set(px, py, pz);
+            dot.visible = false;
+            lights[k] = dot;
+            g.add(dot);
+          }
+          g.visible = false;
+          scene.add(g);
+          shipPool.push({
+            g,
+            lights,
+            mmsi: null,
+            name: '',
+            x: 0,
+            z: 0,
+            vx: 0,
+            vz: 0,
+            hdg: 0,
+            seen: 0,
+            active: false
+          });
+        }
+        record(
+          'COLREGS navigation lights',
+          'Rule 21 arcs · Annex I candela · Allard visibility'
+        );
+      }
+      const shipOv = params.has('ship') ? +params.get('ship') : null;
+      const shipCamDir = new THREE.Vector3();
+      async function syncShips() {
+        if (shipOv !== null) {
+          // Offline harness: deterministic stations fanned across
+          // the camera's view (no fetch, no Math.random - pinned
+          // shots stay reproducible).
+          camera.getWorldDirection(shipCamDir);
+          shipCamDir.y = 0;
+          shipCamDir.normalize();
+          const px = -shipCamDir.z;
+          const pz = shipCamDir.x;
+          for (let i = 0; i < Math.min(shipOv, SHIP_N); i++) {
+            const s = shipPool[i];
+            const ahead = 55 + i * 20;
+            const side = (i - (Math.min(shipOv, SHIP_N) - 1) / 2) * 26;
+            Object.assign(s, {
+              mmsi: 1000000 + i,
+              name: 'HARNESS' + i,
+              x: camera.position.x + shipCamDir.x * ahead + px * side,
+              z: camera.position.z + shipCamDir.z * ahead + pz * side,
+              hdg: (30 + i * 47) % 360,
+              seen: Date.now(),
+              active: true
+            });
+            const tr = s.hdg * RAD;
+            const sp = (12 * 0.514444) / 57.14; // 12 kt
+            s.vx = sp * Math.sin(tr);
+            s.vz = -sp * Math.cos(tr);
+          }
+          return;
+        }
+        if (!water) return; // no sea in this DEM - no ships
+        try {
+          const r = await (
+            await fetch(
+              AIS_PROXY +
+                '?lat=' +
+                state.lat.toFixed(3) +
+                '&lon=' +
+                state.lon.toFixed(3) +
+                '&dist=8',
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (!Array.isArray(r.ships)) return;
+          const ref = {
+            lat: state.lat,
+            lon: state.lon,
+            halfM: DEM_HALF_M,
+            world: WORLD,
+            mpu: 57.14
+          };
+          const now_ = Date.now();
+          const names = [];
+          for (const ship of r.ships) {
+            const sc = aisToScene(ship, ref);
+            if (Math.abs(sc.x) > 150 || Math.abs(sc.z) > 150) continue;
+            const slot =
+              shipPool.find((s) => s.active && s.mmsi === ship.mmsi) ??
+              shipPool.find((s) => !s.active);
+            if (!slot) break;
+            Object.assign(slot, {
+              mmsi: ship.mmsi,
+              name: ship.name,
+              x: sc.x,
+              z: sc.z,
+              vx: sc.vx,
+              vz: sc.vz,
+              hdg: ship.hdg ?? ship.cog ?? 0,
+              seen: now_,
+              active: true
+            });
+            names.push(
+              (ship.name || ship.mmsi) + ' ' + Math.round(ship.sog) + ' kt'
+            );
+          }
+          for (const s of shipPool)
+            if (s.active && now_ - s.seen > 360e3) {
+              s.active = false;
+              s.g.visible = false;
+            }
+          if (names.length)
+            record(
+              'AIS live ships (worker)',
+              names.slice(0, 4).join(' · ') +
+                (names.length > 4 ? ' +' + (names.length - 4) : '')
+            );
+        } catch {
+          // worker unreachable - the sea keeps its last ships
+        }
+      }
       const mV1 = new THREE.Vector3();
       const mV2 = new THREE.Vector3();
       const mV3 = new THREE.Vector3();
@@ -3182,6 +3373,59 @@
             }
           }
         }
+        // Ships: dead-reckon on SOG/COG between AIS reports.
+        // Lights obey COLREGS end to end: carried only from
+        // sunset to sunrise (Rule 20(b), solar altitude below
+        // -50'), each shown only inside its Rule 21 arc for the
+        // CURRENT relative bearing of the camera, brightness from
+        // the Annex I candela through Allard's law at the actual
+        // distance - so a 3 nm sidelight fades out at exactly the
+        // range the regulation rates it for.
+        {
+          const shipLightsOn = sun.alt / RAD < SUNSET_ELEV;
+          for (const s of shipPool) {
+            if (!s.active) continue;
+            s.x += s.vx * dt;
+            s.z += s.vz * dt;
+            if (Math.abs(s.x) > 160 || Math.abs(s.z) > 160) {
+              s.active = false;
+              s.g.visible = false;
+              continue;
+            }
+            s.g.visible = true;
+            s.g.position.set(s.x, water ? water.position.y : 0, s.z);
+            s.g.rotation.y = -s.hdg * RAD;
+            const rel = relBearing(s.hdg, s, {
+              x: camera.position.x,
+              z: camera.position.z
+            });
+            const arcs = lightArcs(rel);
+            const dM =
+              Math.hypot(camera.position.x - s.x, camera.position.z - s.z) *
+              57.14;
+            for (const k in s.lights) {
+              const dot = s.lights[k];
+              if (!shipLightsOn || !arcs[k]) {
+                dot.visible = false;
+                continue;
+              }
+              const E = apparentLux(
+                luminousIntensity(RANGE_NM[NAV_RANGE[k]]),
+                Math.max(dM, 30)
+              );
+              const amp = THREE.MathUtils.clamp(
+                Math.log10(E / 2e-7) / 2.5,
+                0,
+                1
+              );
+              dot.visible = amp > 0;
+              if (dot.visible)
+                dot.material.color
+                  .set(NAV_COLOR[k])
+                  .multiplyScalar(0.4 + 3.6 * amp);
+            }
+          }
+        }
         if (constMat) constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2;
         // Venus and Jupiter pierce twilight a little before the stars.
         planetObj.u.night.value =
@@ -3871,6 +4115,8 @@
         syncBrdf();
         syncTraffic();
         setInterval(syncTraffic, 60 * 1000);
+        syncShips();
+        setInterval(syncShips, 120 * 1000);
         syncF107();
         setInterval(syncF107, 6 * 60 * 60 * 1000);
         syncKp();

@@ -1454,6 +1454,57 @@ Scenes (all at Grindelwald unless noted):
       earlier OAuth2 client-credentials build (Keycloak token
       endpoint, per-isolate 30-min cache, 401 refresh) is in git
       history at cfffb36 should OpenSky ever unblock Cloudflare.
+  - DONE (deploy + key pending): live AIS ships on the FFT ocean
+    (ships.js + worker /ais route) - the worker pattern's second
+    payoff, and the first use of its OTHER superpower: a static
+    GitHub Pages site can never hold a secret, but a worker can.
+    - Source: aisstream.io - global community AIS over WebSocket,
+      free API key, terms explicitly forbid browser exposure (so
+      the key lives in `npx wrangler secret put AISSTREAM_KEY`).
+      /ais opens an outbound socket, subscribes the visitor's
+      bounding box (subscription must arrive within 3 s - sent on
+      open), collects PositionReports for a 2.5 s window, closes,
+      answers plain JSON stripped to seven fields with ITU-R
+      M.1371 sentinels mapped (Sog 102.3 -> 0, Cog 360 / heading
+      511 -> null), 60 s manual edge cache per rounded coordinate
+      (few concurrent sockets on the free tier - the cache IS the
+      budget). Bad-key reality (measured): aisstream keeps the
+      socket open and sends NOTHING - indistinguishable from an
+      empty sea - so the documented error-frame path is handled
+      but verification needs a real key over a busy lane (Dover
+      Strait) after deploy. WS mechanics verified in node AND
+      workerd against the live server (connect + subscribe +
+      window + clean close, /adsb unaffected).
+    - Physics (ships.js): COLREGS 1972 verbatim - Rule 21 arcs
+      (masthead 225 deg, sidelights 112.5 each, sternlight 135;
+      side + stern tile the circle exactly), Rule 22 ranges for
+      >= 50 m vessels (6/3/3 nm), Annex I section 8 luminous
+      intensity I = 3.43e6 T D^2 K^-D (reproduces the published
+      table: 0.9 cd at 1 nm, 12 at 3, 94 at 6), Allard's law for
+      apparent illuminance - and the Annex I constant 3.43e6 IS
+      1852^2 to three figures, so at the rated range the eye
+      receives exactly the adopted 2e-7 lux threshold: the
+      regulation is Allard's law solved for I (landmarked to
+      1e-12). Rule 20(b) lights from sunset to sunrise = solar
+      altitude below -50 arcmin. ships-reference.mjs is gate set
+      18 (6 landmarks); the /ais route landmark joined set 19
+      (worker): stubbed aisstream socket, subscription carries
+      key + exact bbox, latest-per-MMSI, sentinels, 503 without a
+      key.
+    - Theme: 8-slot ship pool on the tide-following water plane;
+      syncShips polls /ais every 120 s (only when the DEM has
+      sea), dead-reckons on SOG/COG between reports, hulls are
+      documented display furniture (90 m default - position
+      reports carry no dimensions); each nav light shows only
+      inside its Rule 21 arc for the camera's CURRENT relative
+      bearing, brightness Allard at actual distance (a 3 nm
+      sidelight dies at 3 nm exactly), provenance panel lists
+      callsigns + speeds. ?ais=URL overrides the proxy; ?ship=N
+      spawns deterministic synthetic vessels (no fetch, no
+      Math.random) for pinned shots.
+    - Owner setup: create the free key at aisstream.io (GitHub
+      sign-in), then `cd themes/horizon/worker && npx wrangler
+      secret put AISSTREAM_KEY && npx wrangler deploy`.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

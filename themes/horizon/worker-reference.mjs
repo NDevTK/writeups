@@ -20,10 +20,15 @@
 //  - /probe: the edge diagnostic that picked the feed answers
 //    offline, mapping HTTP statuses and thrown timeouts alike
 //    into inspectable rows
+//  - /ais: the real handler through a stubbed aisstream.io
+//    WebSocket - subscription carries the secret key + exact
+//    bounding box, latest report per MMSI wins, ITU-R M.1371
+//    sentinels map to null/0, no key -> 503
 //  - allowlist: wrong path 404, out-of-range coords 400, OPTIONS
 //    preflight carries the CORS allow headers
-import worker, {normalize, pointUrl} from './worker/src/index.js';
+import worker, {aisBox, normalize, pointUrl} from './worker/src/index.js';
 import {adsbToScene} from './contrails.js';
+import {aisToScene} from './ships.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -190,6 +195,106 @@ const realFetch = globalThis.fetch;
       by['control'].status === 429 &&
       res.headers.get('cache-control') === 'no-store',
     `6 fixed targets; airplanes.live 200/${by['airplanes.live'].aircraft} ac, opensky-api -> "${by['opensky-api'].error}", opensky-auth 401, uncached`
+  );
+}
+
+{
+  // /ais end-to-end through a stubbed WebSocket that behaves
+  // exactly like aisstream.io: open -> subscription expected ->
+  // PositionReports stream -> close. Asserts the subscription
+  // carries the SECRET key and the exact bounding box, that the
+  // latest report per MMSI wins, that ITU-R M.1371 sentinels map
+  // to null/0, and that the normalized ship feeds the theme's
+  // aisToScene mapping unchanged.
+  const REPORT = (over = {}) => ({
+    MessageType: 'PositionReport',
+    MetaData: {MMSI: 211234560, ShipName: 'EDELWEISS  ', ...over.meta},
+    Message: {
+      PositionReport: {
+        UserID: over.mmsi ?? 211234560,
+        Latitude: over.lat ?? 46.62,
+        Longitude: over.lon ?? 8.04,
+        Sog: over.sog ?? 10,
+        Cog: over.cog ?? 90,
+        TrueHeading: over.hdg ?? 87,
+        NavigationalStatus: 0
+      }
+    }
+  });
+  let sub = null;
+  const realWS = globalThis.WebSocket;
+  globalThis.WebSocket = class extends EventTarget {
+    constructor() {
+      super();
+      setTimeout(() => this.dispatchEvent(new Event('open')), 0);
+    }
+    send(s) {
+      sub = JSON.parse(s);
+      const say = (o) =>
+        this.dispatchEvent(
+          new MessageEvent('message', {data: JSON.stringify(o)})
+        );
+      setTimeout(() => {
+        say(REPORT({lat: 46.6})); // stale position...
+        say(REPORT({lat: 46.63})); // ...same MMSI, latest wins
+        say(
+          REPORT({
+            mmsi: 269057000,
+            meta: {ShipName: 'VERENA'},
+            sog: 102.3, // not available -> 0
+            cog: 360, // not available -> null
+            hdg: 511 // not available -> null
+          })
+        );
+        say({MessageType: 'ShipStaticData', Message: {}}); // ignored
+        this.dispatchEvent(new Event('close')); // ends the window
+      }, 0);
+    }
+    close() {}
+  };
+  const env = {AISSTREAM_KEY: 'sekret'};
+  const res = await worker.fetch(
+    new Request('https://x.test/ais?lat=46.62&lon=8.04&dist=8'),
+    env
+  );
+  const noKey = await worker.fetch(
+    new Request('https://x.test/ais?lat=46.62&lon=8.04'),
+    {}
+  );
+  const bad = await worker.fetch(
+    new Request('https://x.test/ais?lat=999&lon=0'),
+    env
+  );
+  globalThis.WebSocket = realWS;
+  const j = await res.json();
+  const byM = Object.fromEntries(j.ships.map((s) => [s.mmsi, s]));
+  const box = aisBox(46.62, 8.04, 8);
+  const scene = aisToScene(byM[211234560], {
+    lat: 46.62,
+    lon: 8.04,
+    halfM: 8000,
+    world: 280,
+    mpu: 57.14
+  });
+  check(
+    '/ais route',
+    res.status === 200 &&
+      res.headers.get('x-ais-source') === 'aisstream.io' &&
+      res.headers.get('access-control-allow-origin') === '*' &&
+      sub.APIKey === 'sekret' &&
+      JSON.stringify(sub.BoundingBoxes) === JSON.stringify([box]) &&
+      JSON.stringify(sub.FilterMessageTypes) ===
+        JSON.stringify(['PositionReport']) &&
+      j.ships.length === 2 &&
+      byM[211234560].lat === 46.63 &&
+      byM[211234560].name === 'EDELWEISS' &&
+      byM[269057000].sog === 0 &&
+      byM[269057000].cog === null &&
+      byM[269057000].hdg === null &&
+      Math.abs(scene.vx - (10 * 0.514444) / 57.14) < 1e-12 &&
+      noKey.status === 503 &&
+      bad.status === 400,
+    `subscription carries key + exact box; latest-per-MMSI wins (lat ${byM[211234560].lat}); sentinels 102.3/360/511 -> 0/null/null; aisToScene vx ${scene.vx.toFixed(4)} u/s; no key -> 503, lat=999 -> 400`
   );
 }
 
