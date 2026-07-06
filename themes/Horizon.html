@@ -570,7 +570,11 @@
         const year = Date.now() / 31557600000 + 1970; // decimal year
         const f = igrfField(state.lat, state.lon, 0, year);
         state.magD = f.d;
+        state.magI = f.i;
         state.gmLat = geomagneticLatitude(state.lat, state.lon, year);
+        // Field-aligned rays: the curtain shader fans its rays
+        // toward the magnetic zenith with tan|I|.
+        auroraU.uTanI.value = Math.max(Math.tan(Math.abs(f.i) * RAD), 0.5);
         record(
           'IGRF-14 geomagnetism',
           'declination ' +

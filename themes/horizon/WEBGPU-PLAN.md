@@ -1004,6 +1004,17 @@ Scenes (all at Grindelwald unless noted):
       liveness signal for the import block. Gate PASS at 10/10
       references + 3/3 probes; aurora smoke clean with the IGRF
       record live.
+  - DONE: field-aligned auroral rays (the IGRF item's follow-up -
+    the inclination was computed and unused). Auroral rays run along
+    B, so in the curtain plane they fan toward the MAGNETIC ZENITH:
+    the ray/wave coordinate is sheared by -y sin(beta) / tan|I| over
+    the arc length - the exact projection of the field line onto the
+    curtain surface, one formula for both hemispheres (symmetric in
+    |beta|; the southern curtain is the mirrored mesh). Vertical at
+    the magnetic-meridian centre, 13.7 deg at the arc edge for
+    Reykjavik's I = 75.4 (landmark in igrf-reference.mjs);
+    syncGeomag feeds tan|I|. Gate PASS; full-length aurora smoke
+    clean.
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:

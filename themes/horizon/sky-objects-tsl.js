@@ -182,8 +182,17 @@ export function createAuroraMaterial() {
   const u = {
     time: uniform(0),
     strength: uniform(0),
-    uBase: uniform(60)
+    uBase: uniform(60),
+    // tan(|inclination|) from IGRF at the visitor: auroral rays run
+    // along B, so in the curtain plane they fan toward the MAGNETIC
+    // ZENITH - vertical at the magnetic-meridian centre, leaning by
+    // atan(sin(beta)/tan I) at azimuth beta along the arc (the exact
+    // projection of the field line onto the curtain surface).
+    uTanI: uniform(3.73)
   };
+  // Must match the curtain mesh (open CylinderGeometry in the theme).
+  const ARC = Math.PI / 1.3;
+  const RADIUS = 760;
   const lutData = new Float32Array(128 * 4);
   const lutTex = new DataTexture(lutData, 128, 1, RGBAFormat, FloatType);
   lutTex.minFilter = lutTex.magFilter = LinearFilter;
@@ -218,15 +227,27 @@ export function createAuroraMaterial() {
   // 320 km (red 630.0 territory).
   const zKm = mix(92.0, 320.0, h);
   const lut = lutNode.sample(vec2(zKm.sub(Z_MIN).div(Z_MAX - Z_MIN), 0.5));
+  // Field-aligned rays: shear the ray/wave coordinate so columns
+  // follow the projected field line - tops converge on the magnetic
+  // zenith. Shear in arc-uv units: -y sin(beta) / (tan I * arc
+  // length); symmetric in |beta|, so one formula serves both
+  // hemispheres (the southern curtain is the mirrored mesh).
+  const beta = ux.sub(0.5).mul(ARC);
+  const uxRay = ux.sub(
+    positionWorld.y
+      .sub(u.uBase)
+      .mul(sin(beta))
+      .div(u.uTanI.mul(RADIUS * ARC))
+  );
   const w = sin(
-    ux
+    uxRay
       .mul(38.0)
       .add(u.time.mul(0.9))
-      .add(sin(ux.mul(7.0).add(u.time.mul(0.35))).mul(2.4))
+      .add(sin(uxRay.mul(7.0).add(u.time.mul(0.35))).mul(2.4))
   )
     .mul(0.5)
     .add(0.5);
-  const w2 = sin(ux.mul(61.0).sub(u.time.mul(0.6)).add(2.1))
+  const w2 = sin(uxRay.mul(61.0).sub(u.time.mul(0.6)).add(2.1))
     .mul(0.5)
     .add(0.5);
   const a = u.strength.mul(w.mul(w2).add(0.9));

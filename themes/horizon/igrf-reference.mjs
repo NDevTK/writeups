@@ -79,6 +79,20 @@ const YEAR = 2026.5;
 }
 
 {
+  // Field-aligned ray fan (the curtain shader's shear): tilt from
+  // vertical at azimuth beta along the arc is atan(sin beta / tan I)
+  // - the projection of the field line onto the curtain surface.
+  const I = igrfField(64.13, -21.9, 0, YEAR).i;
+  const tilt = (b) =>
+    (Math.atan(Math.sin(b) / Math.tan((Math.abs(I) * Math.PI) / 180)) * 180) /
+    Math.PI;
+  console.log(
+    `REF ray fan (Reykjavik, I ${I.toFixed(1)}): tilt 0 at centre,` +
+      ` ${tilt(Math.PI / 2.6).toFixed(1)} deg at the arc edge`
+  );
+}
+
+{
   const pts = [
     ['Reykjavik', 64.13, -21.9],
     ['Grindelwald', 46.62, 8.04],
