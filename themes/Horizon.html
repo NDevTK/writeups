@@ -209,6 +209,11 @@
         strikeBearing,
         strokeSequence
       } from './horizon/lightning.js';
+      import {
+        lightArcsAir,
+        positionIntensity,
+        strobeOn
+      } from './horizon/navlights.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -2131,15 +2136,19 @@
             typeof ac.lon !== 'number' ||
             typeof ac.gs !== 'number' ||
             typeof ac.track !== 'number' ||
-            typeof ac.alt_baro !== 'number' ||
-            ac.alt_baro < 26000 || // cruise only: ~8 km up
-            seenFlights.has(ac.hex)
+            typeof ac.alt_baro !== 'number'
           )
             continue;
           const s = adsbToScene(ac, ref);
           if (Math.abs(s.x) > 220 || Math.abs(s.z) > 220) continue;
           s.flight = (ac.flight ?? ac.hex ?? '').trim();
           s.hex = ac.hex;
+          // EVERY real aircraft (any altitude) carries its FAR
+          // exterior lights after sunset - approach and departure
+          // traffic low overhead is the brightest of all
+          updateAirLight(ac.hex, s, ac.track, now_);
+          if (ac.alt_baro < 26000 || seenFlights.has(ac.hex)) continue;
+          // cruise only (~8 km up) claims contrail slots
           liveTraffic.push(s);
           names.push(s.flight + ' FL' + Math.round(ac.alt_baro / 100));
         }
@@ -2149,6 +2158,122 @@
             names.slice(0, 4).join(' · ') +
               (names.length > 4 ? ' +' + (names.length - 4) : '')
           );
+      }
+
+      // ---- Aircraft exterior lights (navlights.js): after
+      // sunset every live aircraft carries what 14 CFR Part 25
+      // certifies - red/green forward position lights (110 deg
+      // arcs, the 25.1391 intensity table: 40/30/5 cd by angle
+      // off the nose), the white 140-deg tail light (20 cd), and
+      // 25.1401 anti-collision strobes (400 cd effective, 40-100
+      // flashes/min, phase spread by ICAO hex so the sky never
+      // blinks in unison). Brightness through the SAME Allard law
+      // as the ships at the true SLANT range - a jet ten
+      // kilometres up is ten kilometres away even overhead, and a
+      // 40 cd position light really does vanish beyond ~4.6 nm.
+      // ?plane=N spawns deterministic synthetic aircraft for the
+      // offline harness.
+      const AIRLIGHT_N = 8;
+      const airLights = [];
+      {
+        const dotGeo = new THREE.SphereGeometry(0.07, 8, 6);
+        const strobeGeo = new THREE.SphereGeometry(0.11, 8, 6);
+        const AIR_COLOR = {
+          red: '#ff2418',
+          green: '#19e34d',
+          tail: '#ffffff',
+          strobe: '#f4f7ff'
+        };
+        for (let i = 0; i < AIRLIGHT_N; i++) {
+          const g = new THREE.Group(); // nose points local -z
+          const lights = {};
+          for (const [k, px, py, pz, geo] of [
+            ['red', -0.31, 0, -0.05, dotGeo], // left wingtip
+            ['green', 0.31, 0, -0.05, dotGeo], // right wingtip
+            ['tail', 0, 0.05, 0.35, dotGeo],
+            ['strobe', 0, 0.02, 0, strobeGeo]
+          ]) {
+            const m = new THREE.MeshBasicNodeMaterial({color: AIR_COLOR[k]});
+            aerial.applyTone(m);
+            const dot = new THREE.Mesh(geo, m);
+            dot.position.set(px, py, pz);
+            dot.visible = false;
+            dot.userData.base = AIR_COLOR[k];
+            lights[k] = dot;
+            g.add(dot);
+          }
+          g.visible = false;
+          scene.add(g);
+          airLights.push({
+            g,
+            lights,
+            hex: null,
+            x: 0,
+            z: 0,
+            y: 0,
+            vx: 0,
+            vz: 0,
+            track: 0,
+            altM: 0,
+            seen: 0,
+            active: false
+          });
+        }
+        record(
+          '14 CFR 25 aircraft lights',
+          '25.1385 arcs · 25.1391 candela · 25.1401 strobes · Allard slant range'
+        );
+      }
+      function updateAirLight(hex, s, track, now_) {
+        const slot =
+          airLights.find((a) => a.active && a.hex === hex) ??
+          airLights.find((a) => !a.active);
+        if (!slot) return;
+        Object.assign(slot, {
+          hex,
+          x: s.x,
+          z: s.z,
+          y: s.y,
+          vx: s.vx,
+          vz: s.vz,
+          track,
+          altM: s.altM,
+          seen: now_,
+          active: true
+        });
+      }
+      const planeOv = params.has('plane') ? +params.get('plane') : null;
+      if (planeOv !== null) {
+        // Offline harness: deterministic crossings at mixed
+        // altitudes (an approach at 900 m, cruise above), fixed
+        // table, refreshed so they never expire.
+        const seed = () => {
+          camera.getWorldDirection(mFlashDir);
+          mFlashDir.y = 0;
+          mFlashDir.normalize();
+          const px = -mFlashDir.z;
+          const pz = mFlashDir.x;
+          for (let i = 0; i < Math.min(planeOv, AIRLIGHT_N); i++) {
+            const ahead = 60 + i * 25;
+            const side = (i - 1) * 30;
+            const altM = i === 0 ? 900 : 3000 + i * 1500;
+            updateAirLight(
+              'aa' + i,
+              {
+                x: camera.position.x + mFlashDir.x * ahead + px * side,
+                z: camera.position.z + mFlashDir.z * ahead + pz * side,
+                y: 16 * Math.asinh((altM - centerElev) / 500),
+                vx: ((i % 2 ? -1 : 1) * (140 * 0.514444)) / 57.14,
+                vz: 0,
+                altM
+              },
+              i % 2 ? 270 : 90,
+              Date.now()
+            );
+          }
+        };
+        setInterval(seed, 3000);
+        setTimeout(seed, 500);
       }
 
       // ---- Live ships: AIS via the same daemon (/ais route).
@@ -3572,6 +3697,79 @@
                   .set(NAV_COLOR[k])
                   .multiplyScalar(0.4 + 3.6 * amp);
             }
+          }
+        }
+        // Aircraft lights: dead-reckon on track/ground speed;
+        // 14 CFR from end to end - lighted sunset to sunrise
+        // (91.209, the same -50' boundary as the ships), each
+        // position light only inside its 25.1385 arc at the
+        // 25.1391 candela for the camera's angle off the nose,
+        // strobes on the certified 25.1401 schedule - all through
+        // Allard's law at the true SLANT range.
+        {
+          const airOn = sun.alt / RAD < SUNSET_ELEV;
+          const tSec = t / 1000;
+          for (const a of airLights) {
+            if (!a.active) continue;
+            a.x += a.vx * dt;
+            a.z += a.vz * dt;
+            if (
+              (planeOv === null && Date.now() - a.seen > 300e3) ||
+              Math.abs(a.x) > 230 ||
+              Math.abs(a.z) > 230
+            ) {
+              a.active = false;
+              a.g.visible = false;
+              continue;
+            }
+            if (!airOn) {
+              a.g.visible = false;
+              continue;
+            }
+            a.g.visible = true;
+            a.g.position.set(a.x, a.y, a.z);
+            a.g.rotation.y = -a.track * RAD;
+            const rel = relBearing(a.track, a, {
+              x: camera.position.x,
+              z: camera.position.z
+            });
+            const arcs = lightArcsAir(rel);
+            const horizM =
+              Math.hypot(camera.position.x - a.x, camera.position.z - a.z) *
+              57.14;
+            const slantM = Math.max(
+              Math.hypot(horizM, Math.max(a.altM - centerElev, 0)),
+              200
+            );
+            const posI = positionIntensity(rel);
+            for (const k of ['red', 'green', 'tail']) {
+              const dot = a.lights[k];
+              if (!arcs[k]) {
+                dot.visible = false;
+                continue;
+              }
+              const amp = THREE.MathUtils.clamp(
+                Math.log10(apparentLux(posI, slantM) / 2e-7) / 2.5,
+                0,
+                1
+              );
+              dot.visible = amp > 0;
+              if (dot.visible)
+                dot.material.color
+                  .set(dot.userData.base)
+                  .multiplyScalar(0.4 + 3.2 * amp);
+            }
+            const sAmp = THREE.MathUtils.clamp(
+              Math.log10(apparentLux(400, slantM) / 2e-7) / 2.5,
+              0,
+              1
+            );
+            const strobe = a.lights.strobe;
+            strobe.visible = sAmp > 0 && strobeOn(a.hex, tSec);
+            if (strobe.visible)
+              strobe.material.color
+                .set(strobe.userData.base)
+                .multiplyScalar(1 + 5 * sAmp);
           }
         }
         // Lightning: advance each live flash along its Rakov-Uman

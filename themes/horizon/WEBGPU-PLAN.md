@@ -1649,6 +1649,40 @@ Scenes (all at Grindelwald unless noted):
       UPDATE_BRANCH=claude/website-themes-discussion-jjh4yp in
       /etc/horizon-live.env to track the PR branch until #44
       merges, or leave main and deploys begin at merge.
+  - DONE: aircraft exterior lights (navlights.js) - the live
+    traffic layer now works around the clock. By day the ADS-B
+    aircraft lay Schmidt-Appleman contrails; after sunset they
+    carry what 14 CFR Part 25 CERTIFIES, the aviation twin of the
+    ships' COLREGS item:
+    - 25.1385/25.1389 arcs verbatim: red left / green right
+      forward position lights over 110 deg each (both reach dead
+      ahead), white tail light over the remaining 140 - tiling
+      the circle exactly (landmarked like Rule 21)
+    - the 25.1391 minimum-intensity table verbatim, BY ANGLE OFF
+      THE NOSE: 40 cd inside 10 deg, 30 to 20 deg, 5 to 110,
+      20 cd rear - so an aircraft flying straight at the camera
+      is 8x brighter than one crossing abeam, which is the real
+      night-sky look
+    - 25.1401 anti-collision strobes: 400 cd effective, 40-100
+      flashes/min - each aircraft's rate and phase deterministic
+      in its 24-bit ICAO hex, so the sky never blinks in unison
+      (landmark counts flashes/min for two hexes: in-band and
+      desynchronized)
+    - ONE Allard model with the ships (apparentLux imported;
+      visRangeM bisection meets it to 1e-9): a 40 cd position
+      light dies at 4.58 nm, the strobe carries to 8.92 - and
+      ranges are SLANT ranges (altitude included), so a jet 10 km
+      up overhead is 10 km away
+    - 91.209 lights from sunset to sunrise - the ships'
+      SUNSET_ELEV boundary reused
+    - Theme: applyTraffic now feeds TWO consumers - every valid
+      aircraft at ANY altitude (approach traffic low overhead is
+      the brightest sight of all) updates the 8-slot airLights
+      pool (dead-reckoning like ships, idempotent by hex), while
+      cruise-only traffic still queues for contrail slots.
+      navlights-reference.mjs is gate set 22 (4 landmarks).
+      ?plane=N spawns deterministic mixed-altitude crossings for
+      pinned shots.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
