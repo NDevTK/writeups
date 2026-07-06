@@ -23,7 +23,16 @@
  * the ADSB_PROXY constant in Horizon.html (override with ?adsb=).
  */
 
-const UPSTREAM = 'https://api.adsb.lol/v2';
+// Both feeds speak the same readsb v2 schema ({ac: [...]});
+// adsb.lol intermittently 429s Cloudflare-egress requests (measured
+// on the first deploy), so the worker fails over in order and only
+// caches successes.
+const UPSTREAMS = [
+  (lat, lon, d) =>
+    'https://api.adsb.lol/v2/lat/' + lat + '/lon/' + lon + '/dist/' + d,
+  (lat, lon, d) =>
+    'https://opendata.adsb.fi/api/v2/lat/' + lat + '/lon/' + lon + '/dist/' + d
+];
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -46,19 +55,28 @@ export default {
     if (!(lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180 && dist > 0)) {
       return new Response('bad request', {status: 400, headers: CORS});
     }
-    const upstream =
-      UPSTREAM +
-      '/lat/' +
-      lat.toFixed(3) +
-      '/lon/' +
-      lon.toFixed(3) +
-      '/dist/' +
-      Math.round(dist);
-    const res = await fetch(upstream, {
-      cf: {cacheTtl: 15, cacheEverything: true}
-    });
-    return new Response(res.body, {
-      status: res.status,
+    for (const mk of UPSTREAMS) {
+      try {
+        const res = await fetch(
+          mk(lat.toFixed(3), lon.toFixed(3), Math.round(dist)),
+          {
+            cf: {
+              cacheEverything: true,
+              cacheTtlByStatus: {'200-299': 15, '400-599': 0}
+            }
+          }
+        );
+        if (res.ok) {
+          return new Response(res.body, {
+            headers: {...CORS, 'content-type': 'application/json'}
+          });
+        }
+      } catch {
+        // try the next feed
+      }
+    }
+    return new Response('{"ac":[],"upstream":"unavailable"}', {
+      status: 502,
       headers: {...CORS, 'content-type': 'application/json'}
     });
   }
