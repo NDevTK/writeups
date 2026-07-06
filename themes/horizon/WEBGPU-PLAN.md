@@ -1610,6 +1610,45 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
       uniform table, camera-cone azimuths) for pinned shots;
       ?lightning=URL overrides the endpoint. EventSource
       reconnects itself.
+  - DONE: the unified live channel + gate-checked self-deploys -
+    the two pieces the owner picked after the daemon proved out
+    (200 GB/mo egress confirmed comfortable: ~130 MB/mo per
+    always-on viewer BEFORE Cloudflare's edge cache absorbs
+    repeats).
+    - /stream (daemon): ONE origin-scoped EventSource per viewer
+      multiplexes named events - `strike` the instant Blitzortung
+      locates one, `ais` ship deltas every 30 s from the in-RAM
+      global picture, `adsb` aircraft every 20 s through the
+      shared per-area cache (many viewers in one place still cost
+      ONE upstream request; the readsb rate budget is managed in
+      one place, server-side). Initial ais/adsb push on connect;
+      25 s heartbeats; 30 min lifetime onto EventSource's
+      auto-reconnect; SSE_MAX cap shared with the legacy
+      /lightning/stream (kept for one deploy cycle). sseEvent()
+      framing is spec-exact and landmarked. Live smoke on the
+      real upstreams: one 25 s connection carried 52 strikes
+      (Florida storm), 2 adsb pushes (14 aircraft) and the ais
+      event. Aircraft now appear within ~20 s of reality instead
+      of up to 60 s - a contrail starts where the plane IS.
+    - Theme: syncTraffic/syncShips refactored into fetch +
+      applyTraffic/applyShips; the unified EventSource feeds the
+      SAME apply functions (idempotent by hex/MMSI), the polls
+      stay armed as documented fallback. ?live=URL overrides the
+      stream base.
+    - Self-update (server/update.sh + systemd timer, armed by
+      install.sh): every 5 min the box fetches UPDATE_BRANCH
+      (default main - merging to main IS the deploy trigger,
+      matching Pages), and if server files changed it runs the
+      FULL reference gate ON THE BOX (validate.sh CPU sets -
+      plain node, which is the whole point of the gate) before
+      reinstalling; the previous install is kept at
+      /opt/horizon-live.prev for instant rollback and a failing
+      gate leaves the running version untouched (remembered, so
+      no retry spam). Nothing deploys unverified - ops now obeys
+      the same law as the code. Owner note: set
+      UPDATE_BRANCH=claude/website-themes-discussion-jjh4yp in
+      /etc/horizon-live.env to track the PR branch until #44
+      merges, or leave main and deploys begin at merge.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

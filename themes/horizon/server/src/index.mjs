@@ -277,6 +277,13 @@ export function queryStrikes(st, lat, lon, km, sinceMs, now = Date.now()) {
   return out;
 }
 
+// One server-sent event, exactly framed (the wire format the
+// EventSource spec parses: an event name line, one data line,
+// blank-line terminator). Exported for the reference gate.
+export function sseEvent(name, obj) {
+  return 'event: ' + name + '\ndata: ' + JSON.stringify(obj) + '\n\n';
+}
+
 // ---- Origin allowlist + per-IP rate limit ----------------------
 
 // Browser requests carry Origin; only the website's origin gets
@@ -494,10 +501,13 @@ function runBlitzSocket(st, clients, log) {
         for (const cl of clients) {
           const d = haversineKm(cl.lat, cl.lon, s.lat, s.lon);
           if (d <= cl.km) {
+            const payload = {lat: s.lat, lon: s.lon, km: Math.round(d)};
+            // named event on the multiplexed /stream, bare data
+            // on the legacy /lightning/stream
             cl.res.write(
-              'data: ' +
-                JSON.stringify({lat: s.lat, lon: s.lon, km: Math.round(d)}) +
-                '\n\n'
+              cl.named
+                ? sseEvent('strike', payload)
+                : 'data: ' + JSON.stringify(payload) + '\n\n'
             );
           }
         }
@@ -561,11 +571,42 @@ function main() {
   const SSE_MAX = Number(env.SSE_MAX || 25);
   runBlitzSocket(blitz, sseClients, log);
 
-  const adsbCache = new Map(); // url -> {t, body}
+  const adsbCache = new Map(); // area key -> {t, body, src}
   setInterval(() => {
     const now = Date.now();
     for (const [k, v] of adsbCache) if (now - v.t > 30e3) adsbCache.delete(k);
   }, 30e3).unref();
+  // Aircraft near a point via the readsb failover chain, shared
+  // by GET /adsb and the /stream pushes - the 15 s per-area cache
+  // means many viewers in one place cost ONE upstream request,
+  // and stream pushes never exceed the feeds' documented rates.
+  async function fetchAdsb(lat, lon, dist) {
+    const la = lat.toFixed(3);
+    const lo = lon.toFixed(3);
+    const d = Math.round(dist);
+    const ck = la + '/' + lo + '/' + d;
+    const hit = adsbCache.get(ck);
+    if (hit && Date.now() - hit.t < 15e3) {
+      return {body: hit.body, src: hit.src + ' (cached)'};
+    }
+    for (const mk of ADSB_UPSTREAMS) {
+      const u = mk(la, lo, d);
+      try {
+        const r = await fetch(u, {
+          signal: AbortSignal.timeout(FETCH_MS),
+          headers: {'user-agent': UA}
+        });
+        if (!r.ok) continue;
+        const body = {ac: normalize(await r.json())};
+        const src = new URL(u).hostname;
+        adsbCache.set(ck, {t: Date.now(), body, src});
+        return {body, src};
+      } catch {
+        // timeout or malformed - next upstream
+      }
+    }
+    return null;
+  }
 
   const server = http.createServer(async (req, res) => {
     const ip = TRUST
@@ -703,36 +744,77 @@ function main() {
     if (url.pathname === '/adsb') {
       const dist = Math.min(Number(url.searchParams.get('dist')) || 15, 60);
       if (!(dist > 0)) return send(400, 'bad request');
-      const la = lat.toFixed(3);
-      const lo = lon.toFixed(3);
-      const d = Math.round(dist);
-      const ck = la + '/' + lo + '/' + d;
-      const hit = adsbCache.get(ck);
-      if (hit && Date.now() - hit.t < 15e3)
-        return json(200, hit.body, {
-          'cache-control': 'public, max-age=15',
-          'x-adsb-source': hit.src + ' (cached)'
-        });
-      for (const mk of ADSB_UPSTREAMS) {
-        const u = mk(la, lo, d);
-        try {
-          const r = await fetch(u, {
-            signal: AbortSignal.timeout(FETCH_MS),
-            headers: {'user-agent': UA}
-          });
-          if (!r.ok) continue;
-          const body = {ac: normalize(await r.json())};
-          const src = new URL(u).hostname;
-          adsbCache.set(ck, {t: Date.now(), body, src});
-          return json(200, body, {
-            'cache-control': 'public, max-age=15',
-            'x-adsb-source': src
-          });
-        } catch {
-          // timeout or malformed - next upstream
+      const got = await fetchAdsb(lat, lon, dist);
+      if (!got) return json(502, {ac: [], upstream: 'unavailable'});
+      return json(200, got.body, {
+        'cache-control': 'public, max-age=15',
+        'x-adsb-source': got.src
+      });
+    }
+
+    if (url.pathname === '/stream') {
+      // The unified live channel: ONE origin-scoped EventSource
+      // per viewer carries everything time-sensitive as named
+      // events - `strike` the moment Blitzortung locates one,
+      // `ais` ship deltas every 30 s from the in-RAM picture,
+      // `adsb` aircraft every 20 s through the shared per-area
+      // cache (many viewers in one place still cost one upstream
+      // request). Initial ais/adsb push on connect so the page
+      // paints immediately. Origin scoping: EventSource bypasses
+      // CORS, so the global allowlist gate above IS the
+      // protection - foreign origins were 403'd before this line.
+      const km = Math.min(Number(url.searchParams.get('km')) || 150, 250);
+      const aisDist = Math.min(Number(url.searchParams.get('ais')) || 8, 30);
+      const adsbDist = Math.min(Number(url.searchParams.get('adsb')) || 15, 60);
+      if (sseClients.size >= SSE_MAX) return send(503, 'stream capacity');
+      res.writeHead(
+        200,
+        head({
+          'content-type': 'text/event-stream',
+          'cache-control': 'no-store'
+        })
+      );
+      res.write(': horizon-live unified stream\n\n');
+      const client = {res, lat, lon, km, named: true};
+      sseClients.add(client);
+      const pushAis = () => {
+        if (env.AISSTREAM_KEY) {
+          try {
+            res.write(sseEvent('ais', {ships: query(st, lat, lon, aisDist)}));
+          } catch {
+            // closing below
+          }
         }
-      }
-      return json(502, {ac: [], upstream: 'unavailable'});
+      };
+      const pushAdsb = async () => {
+        const got = await fetchAdsb(lat, lon, adsbDist);
+        if (!got) return;
+        try {
+          res.write(sseEvent('adsb', got.body));
+        } catch {
+          // closing below
+        }
+      };
+      pushAis();
+      pushAdsb();
+      const iAis = setInterval(pushAis, 30e3);
+      const iAdsb = setInterval(pushAdsb, 20e3);
+      const hb = setInterval(() => {
+        try {
+          res.write(': hb\n\n');
+        } catch {
+          // closing below
+        }
+      }, 25e3);
+      const bye = setTimeout(() => res.end(), 30 * 60e3);
+      req.on('close', () => {
+        clearInterval(iAis);
+        clearInterval(iAdsb);
+        clearInterval(hb);
+        clearTimeout(bye);
+        sseClients.delete(client);
+      });
+      return;
     }
 
     return send(404, 'not found');

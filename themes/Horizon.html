@@ -2104,46 +2104,51 @@
             )
           ).json();
           if (!Array.isArray(r.ac)) return;
-          const ref = {
-            lat: state.lat,
-            lon: state.lon,
-            halfM: DEM_HALF_M,
-            world: WORLD,
-            centerElev,
-            mpu: 57.14
-          };
-          const now_ = Date.now();
-          for (const [hex, t] of seenFlights)
-            if (now_ - t > 600e3) seenFlights.delete(hex);
-          liveTraffic = [];
-          const names = [];
-          for (const ac of r.ac) {
-            if (
-              typeof ac.lat !== 'number' ||
-              typeof ac.lon !== 'number' ||
-              typeof ac.gs !== 'number' ||
-              typeof ac.track !== 'number' ||
-              typeof ac.alt_baro !== 'number' ||
-              ac.alt_baro < 26000 || // cruise only: ~8 km up
-              seenFlights.has(ac.hex)
-            )
-              continue;
-            const s = adsbToScene(ac, ref);
-            if (Math.abs(s.x) > 220 || Math.abs(s.z) > 220) continue;
-            s.flight = (ac.flight ?? ac.hex ?? '').trim();
-            s.hex = ac.hex;
-            liveTraffic.push(s);
-            names.push(s.flight + ' FL' + Math.round(ac.alt_baro / 100));
-          }
-          if (names.length)
-            record(
-              'ADS-B live aircraft (worker)',
-              names.slice(0, 4).join(' · ') +
-                (names.length > 4 ? ' +' + (names.length - 4) : '')
-            );
+          applyTraffic(r.ac);
         } catch {
           liveTraffic = null; // ambient traffic stands in
         }
+      }
+      // Apply one aircraft list (from the 60 s poll OR a pushed
+      // `adsb` stream event - both carry the same schema).
+      function applyTraffic(acList) {
+        const ref = {
+          lat: state.lat,
+          lon: state.lon,
+          halfM: DEM_HALF_M,
+          world: WORLD,
+          centerElev,
+          mpu: 57.14
+        };
+        const now_ = Date.now();
+        for (const [hex, t] of seenFlights)
+          if (now_ - t > 600e3) seenFlights.delete(hex);
+        liveTraffic = [];
+        const names = [];
+        for (const ac of acList) {
+          if (
+            typeof ac.lat !== 'number' ||
+            typeof ac.lon !== 'number' ||
+            typeof ac.gs !== 'number' ||
+            typeof ac.track !== 'number' ||
+            typeof ac.alt_baro !== 'number' ||
+            ac.alt_baro < 26000 || // cruise only: ~8 km up
+            seenFlights.has(ac.hex)
+          )
+            continue;
+          const s = adsbToScene(ac, ref);
+          if (Math.abs(s.x) > 220 || Math.abs(s.z) > 220) continue;
+          s.flight = (ac.flight ?? ac.hex ?? '').trim();
+          s.hex = ac.hex;
+          liveTraffic.push(s);
+          names.push(s.flight + ' FL' + Math.round(ac.alt_baro / 100));
+        }
+        if (names.length)
+          record(
+            'ADS-B live aircraft (daemon)',
+            names.slice(0, 4).join(' · ') +
+              (names.length > 4 ? ' +' + (names.length - 4) : '')
+          );
       }
 
       // ---- Live ships: AIS via the same daemon (/ais route).
@@ -2281,70 +2286,76 @@
             )
           ).json();
           if (!Array.isArray(r.ships)) return;
-          const ref = {
-            lat: state.lat,
-            lon: state.lon,
-            halfM: DEM_HALF_M,
-            world: WORLD,
-            mpu: 57.14
-          };
-          const now_ = Date.now();
-          const names = [];
-          for (const ship of r.ships) {
-            const sc = aisToScene(ship, ref);
-            if (Math.abs(sc.x) > 150 || Math.abs(sc.z) > 150) continue;
-            const slot =
-              shipPool.find((s) => s.active && s.mmsi === ship.mmsi) ??
-              shipPool.find((s) => !s.active);
-            if (!slot) break;
-            Object.assign(slot, {
-              mmsi: ship.mmsi,
-              name: ship.name,
-              x: sc.x,
-              z: sc.z,
-              vx: sc.vx,
-              vz: sc.vz,
-              hdg: ship.hdg ?? ship.cog ?? 0,
-              seen: now_,
-              active: true
-            });
-            names.push(
-              (ship.name || ship.mmsi) + ' ' + Math.round(ship.sog) + ' kt'
-            );
-          }
-          for (const s of shipPool)
-            if (s.active && now_ - s.seen > 360e3) {
-              s.active = false;
-              s.g.visible = false;
-            }
-          if (names.length)
-            record(
-              'AIS live ships (worker)',
-              names.slice(0, 4).join(' · ') +
-                (names.length > 4 ? ' +' + (names.length - 4) : '')
-            );
+          applyShips(r.ships);
         } catch {
-          // worker unreachable - the sea keeps its last ships
+          // daemon unreachable - the sea keeps its last ships
         }
       }
+      // Apply one ship list (from the 120 s poll OR a pushed
+      // `ais` stream event - both carry the same schema).
+      // Idempotent by MMSI, so the two paths coexist safely.
+      function applyShips(shipList) {
+        const ref = {
+          lat: state.lat,
+          lon: state.lon,
+          halfM: DEM_HALF_M,
+          world: WORLD,
+          mpu: 57.14
+        };
+        const now_ = Date.now();
+        const names = [];
+        for (const ship of shipList) {
+          const sc = aisToScene(ship, ref);
+          if (Math.abs(sc.x) > 150 || Math.abs(sc.z) > 150) continue;
+          const slot =
+            shipPool.find((s) => s.active && s.mmsi === ship.mmsi) ??
+            shipPool.find((s) => !s.active);
+          if (!slot) break;
+          Object.assign(slot, {
+            mmsi: ship.mmsi,
+            name: ship.name,
+            x: sc.x,
+            z: sc.z,
+            vx: sc.vx,
+            vz: sc.vz,
+            hdg: ship.hdg ?? ship.cog ?? 0,
+            seen: now_,
+            active: true
+          });
+          names.push(
+            (ship.name || ship.mmsi) + ' ' + Math.round(ship.sog) + ' kt'
+          );
+        }
+        for (const s of shipPool)
+          if (s.active && now_ - s.seen > 360e3) {
+            s.active = false;
+            s.g.visible = false;
+          }
+        if (names.length)
+          record(
+            'AIS live ships (daemon)',
+            names.slice(0, 4).join(' · ') +
+              (names.length > 4 ? ' +' + (names.length - 4) : '')
+          );
+      }
 
-      // ---- Live lightning: Blitzortung.org via the daemon's SSE
-      // stream (/lightning/stream - origin-scoped server-side:
-      // EventSource bypasses CORS, so the daemon's Origin
-      // allowlist IS the protection). Each pushed strike becomes
-      // a flash whose FLICKER IS THE PHYSICS (lightning.js): a
-      // Rakov-Uman stroke sequence - 15-20% single-stroke, mean
-      // multiplicity 3-5, ~60 ms interstroke intervals,
-      // continuing-current plateaus - viewed through Koschmieder
-      // extinction and the inverse square at the strike's true
-      // great-circle distance, hung at its true bearing. The glow
-      // quad itself is the documented display shape; the timing
-      // and brightness are measured + published physics. Data CC
+      // ---- Live lightning: Blitzortung.org over the daemon's
+      // UNIFIED stream (/stream - one origin-scoped EventSource
+      // carries strike + ais + adsb named events; EventSource
+      // bypasses CORS, so the daemon's Origin allowlist IS the
+      // protection). Each pushed strike becomes a flash whose
+      // FLICKER IS THE PHYSICS (lightning.js): a Rakov-Uman
+      // stroke sequence - 15-20% single-stroke, mean multiplicity
+      // 3-5, ~60 ms interstroke intervals, continuing-current
+      // plateaus - viewed through Koschmieder extinction and the
+      // inverse square at the strike's true great-circle
+      // distance, hung at its true bearing. The glow quad itself
+      // is the documented display shape; the timing and
+      // brightness are measured + published physics. Data CC
       // BY-SA Blitzortung.org (credited in the provenance panel).
-      // ?lightning=URL overrides the endpoint; ?strike=N spawns
+      // ?live=URL overrides the stream base; ?strike=N spawns
       // deterministic synthetic flashes for the offline harness.
-      const LIGHTNING_PROXY =
-        params.get('lightning') ?? 'https://api.ndev.tk/lightning';
+      const LIVE_STREAM = params.get('live') ?? 'https://api.ndev.tk/stream';
       const FLASH_N = 5;
       const flashPool = [];
       for (let i = 0; i < FLASH_N; i++) {
@@ -2406,15 +2417,21 @@
           k++;
         }, 1700);
       } else if (typeof EventSource !== 'undefined') {
-        const src = () =>
-          LIGHTNING_PROXY +
-          '/stream?lat=' +
-          state.lat.toFixed(3) +
-          '&lon=' +
-          state.lon.toFixed(3) +
-          '&km=200';
-        const es = new EventSource(src());
-        es.onmessage = (ev) => {
+        // One connection, three layers: strikes flash the moment
+        // Blitzortung locates them; ship and aircraft deltas ride
+        // the same channel (30 s / 20 s server cadence), applied
+        // through the SAME functions the polling fallback uses -
+        // the polls stay armed as belt and braces, application is
+        // idempotent by MMSI/hex.
+        const es = new EventSource(
+          LIVE_STREAM +
+            '?lat=' +
+            state.lat.toFixed(3) +
+            '&lon=' +
+            state.lon.toFixed(3) +
+            '&km=200&ais=8&adsb=15'
+        );
+        es.addEventListener('strike', (ev) => {
           try {
             const s = JSON.parse(ev.data);
             const az = strikeBearing({lat: state.lat, lon: state.lon}, s);
@@ -2428,9 +2445,25 @@
               strikeCount + ' strikes streamed · nearest ' + s.km + ' km'
             );
           } catch {
-            // heartbeat or malformed event
+            // malformed event
           }
-        };
+        });
+        es.addEventListener('ais', (ev) => {
+          try {
+            const j = JSON.parse(ev.data);
+            if (Array.isArray(j.ships)) applyShips(j.ships);
+          } catch {
+            // malformed event
+          }
+        });
+        es.addEventListener('adsb', (ev) => {
+          try {
+            const j = JSON.parse(ev.data);
+            if (Array.isArray(j.ac)) applyTraffic(j.ac);
+          } catch {
+            // malformed event
+          }
+        });
         // EventSource reconnects itself; nothing else to manage.
       }
       const mFlashDir = new THREE.Vector3();

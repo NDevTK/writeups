@@ -1,0 +1,12 @@
+# Poll the repo every 5 minutes; the update script exits in
+# milliseconds when nothing changed. Installed by install.sh.
+[Unit]
+Description=horizon-live self-update poll
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target
