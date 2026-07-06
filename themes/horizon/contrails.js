@@ -127,3 +127,28 @@ export function appleman(P, tC, U, eta = 0.3) {
   const rhi = (U * eLiq(TK)) / eIce(TK);
   return {forms: tC <= tlc, persists: rhi > 1, tlc, rhi, G};
 }
+
+// ---- Live-aircraft mapping (the Cloudflare worker feeds adsb.lol
+// state vectors; see worker/src/index.js) ------------------------
+// Exact unit constants: international foot and knot.
+export const FT_M = 0.3048;
+export const KT_MS = 0.514444;
+
+// Map one ADS-B state vector into the scene: equirectangular
+// offsets from the reference (the same mapping the theme uses for
+// its OSM and DEM layers), the asinh altitude compression, and the
+// track/groundspeed as a scene-space velocity. ref = {lat, lon,
+// halfM, world, centerElev, mpu} with mpu = metres per scene unit.
+export function adsbToScene(ac, ref) {
+  const mLat = 111320;
+  const mLon = Math.max(mLat * Math.cos((ref.lat * Math.PI) / 180), 1e-6);
+  const dLat = ref.halfM / mLat;
+  const dLon = ref.halfM / mLon;
+  const x = ((ac.lon - ref.lon) / (2 * dLon)) * ref.world;
+  const z = (-(ac.lat - ref.lat) / (2 * dLat)) * ref.world;
+  const altM = ac.alt_baro * FT_M;
+  const y = 16 * Math.asinh((altM - ref.centerElev) / 500);
+  const sp = (ac.gs * KT_MS) / ref.mpu; // scene units per second
+  const tr = (ac.track * Math.PI) / 180;
+  return {x, z, y, vx: sp * Math.sin(tr), vz: -sp * Math.cos(tr), sp, altM};
+}

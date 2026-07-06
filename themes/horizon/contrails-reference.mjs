@@ -15,9 +15,12 @@
 //  - the criterion reproduces the classic phase diagram: colder or
 //    moister means contrails; persistence only with RHi > 1
 import {
+  adsbToScene,
   appleman,
   eIce,
   eLiq,
+  FT_M,
+  KT_MS,
   slopeG,
   tlcAt,
   tlmApprox,
@@ -104,6 +107,45 @@ const check = (name, ok, detail) => {
     'measured case',
     !today.forms && today.tlc < -48.5 && humid.forms,
     `-48.5 degC / 42% -> NO trail (T_LC ${today.tlc.toFixed(1)}); at saturation it would (T_LC ${humid.tlc.toFixed(1)})`
+  );
+}
+
+{
+  // Live-aircraft mapping (the Cloudflare worker feed): exact unit
+  // constants; an aircraft AT the reference point maps to the
+  // scene origin at the asinh-compressed altitude; a due-east
+  // track moves +x only at the exact converted ground speed; the
+  // equirectangular offsets are symmetric.
+  const ref = {
+    lat: 46.62,
+    lon: 8.04,
+    halfM: 8000,
+    world: 280,
+    centerElev: 300,
+    mpu: 57.14
+  };
+  const at = adsbToScene(
+    {lat: 46.62, lon: 8.04, alt_baro: 36000, gs: 420, track: 90},
+    ref
+  );
+  const yExp = 16 * Math.asinh((36000 * 0.3048 - 300) / 500);
+  const spExp = (420 * 0.514444) / 57.14;
+  const north = adsbToScene(
+    {lat: 46.62 + 8000 / 111320, lon: 8.04, alt_baro: 36000, gs: 420, track: 0},
+    ref
+  );
+  check(
+    'ADS-B mapping',
+    Math.abs(at.x) < 1e-9 &&
+      Math.abs(at.z) < 1e-9 &&
+      Math.abs(at.y - yExp) < 1e-12 &&
+      Math.abs(at.vx - spExp) < 1e-12 &&
+      Math.abs(at.vz) < 1e-9 &&
+      Math.abs(north.z - -140) < 1e-9 &&
+      Math.abs(north.vz - -spExp) < 1e-12 &&
+      FT_M === 0.3048 &&
+      KT_MS === 0.514444,
+    `origin exact; FL360 -> y ${at.y.toFixed(2)}; 420 kt east -> vx ${at.vx.toFixed(3)} u/s; +8 km north -> z ${north.z.toFixed(1)} (half-world)`
   );
 }
 

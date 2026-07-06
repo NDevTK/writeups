@@ -1344,6 +1344,35 @@ Scenes (all at Grindelwald unless noted):
       on the limb-darkened disc (CORS-open and measured, but the
       eye-scale 0.53-deg disc makes even naked-eye groups
       sub-pixel - honest display says no); live ADS-B (CORS, above).
+  - DONE (deploy pending): live ADS-B aircraft via a Cloudflare
+    Worker (themes/horizon/worker). The owner green-lit workers,
+    which removes the CORS wall from the contrail item:
+    - horizon-adsb (src/index.js + wrangler.toml): an allowlisted
+      proxy - GET /adsb?lat&lon&dist only, numeric-validated,
+      dist <= 60 nm, coordinates rounded to ~110 m so nearby
+      visitors share a 15 s edge-cached upstream call to
+      api.adsb.lol. NOT an open proxy. Verified end-to-end with
+      `wrangler dev --local`: CORS header added, live traffic
+      flowing (a Condor A20N at FL360 over the test site, feed OAT
+      -53 degC - consistent with the measured 250 hPa air), 404/400
+      on anything else.
+    - Theme: syncTraffic polls the worker each minute (only while
+      Schmidt-Appleman says trails can exist), maps state vectors
+      with adsbToScene (contrails.js: exact international foot/knot
+      constants, the theme's own equirectangular + asinh mapping;
+      landmark set: origin/altitude/velocity exact, +8 km north =
+      half-world) and queues cruise aircraft (>= FL260, inside the
+      world, deduplicated by hex for 10 min). Free contrail slots
+      claim REAL aircraft first - real position, real altitude,
+      real track and ground speed, callsign in the provenance
+      record - with the ambient traffic as documented fallback
+      (worker not deployed, offline harness, no coverage).
+      ?adsb=URL overrides the proxy origin.
+    - DEPLOY (owner): cd themes/horizon/worker && npx wrangler
+      deploy (needs `wrangler login` or CLOUDFLARE_API_TOKEN). The
+      theme expects https://horizon-adsb.<subdomain>.workers.dev -
+      ADSB_PROXY in Horizon.html assumes subdomain `ndevtk`; update
+      it if the account's workers.dev subdomain differs.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

@@ -192,7 +192,7 @@
         createMeteorMaterial,
         createContrailMaterial
       } from './horizon/sky-objects-tsl.js';
-      import {appleman} from './horizon/contrails.js';
+      import {adsbToScene, appleman} from './horizon/contrails.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -2018,15 +2018,31 @@
       }
       const CT_LEN = 260; // path length, scene units
       const CT_SPEED = 230 / 57.14; // jet ground speed, units/s
-      function spawnContrail(p, persists) {
-        const th = Math.random() * Math.PI * 2;
-        const dx = Math.cos(th);
-        const dz = Math.sin(th);
-        const off = (Math.random() - 0.5) * 150;
-        const y = 16 * Math.asinh((10500 - centerElev) / 500);
-        const cx = -dz * off;
-        const cz = dx * off;
-        const cross = CT_LEN / CT_SPEED;
+      // live = an ADS-B snapshot from adsbToScene (real position,
+      // altitude, velocity); absent = ambient traffic.
+      function spawnContrail(p, persists, live) {
+        let dx, dz, cx, cz, y, speed;
+        if (live) {
+          const sp = Math.hypot(live.vx, live.vz);
+          dx = live.vx / sp;
+          dz = live.vz / sp;
+          // Quad runs from the aircraft's current position forward
+          // along its real track at its real ground speed.
+          cx = live.x + dx * (CT_LEN / 2);
+          cz = live.z + dz * (CT_LEN / 2);
+          y = live.y;
+          speed = sp;
+        } else {
+          const th = Math.random() * Math.PI * 2;
+          dx = Math.cos(th);
+          dz = Math.sin(th);
+          const off = (Math.random() - 0.5) * 150;
+          cx = -dz * off;
+          cz = dx * off;
+          y = 16 * Math.asinh((10500 - centerElev) / 500);
+          speed = CT_SPEED;
+        }
+        const cross = CT_LEN / speed;
         p.u.cross.value = cross;
         p.u.head.value = 0;
         p.u.tau.value = persists ? 240 : 25;
@@ -2035,12 +2051,82 @@
         // Alive until the aircraft crosses AND the tail e-folds out.
         p.life = cross + (persists ? 480 : 100);
         p.active = true;
+        p.flight = live ? live.flight : null;
         const X = new THREE.Vector3(dx, 0, dz).multiplyScalar(CT_LEN);
         const Y = new THREE.Vector3(-dz, 0, dx).multiplyScalar(6);
         const Z = new THREE.Vector3(0, 1, 0);
         p.mesh.matrix.makeBasis(X, Y, Z);
         p.mesh.matrix.setPosition(cx, y, cz);
         p.mesh.visible = true;
+      }
+
+      // Live aircraft: the horizon-adsb Cloudflare worker
+      // (themes/horizon/worker) adds the CORS header no public
+      // ADS-B feed provides, proxying adsb.lol near the visitor.
+      // Cruise traffic claims contrail slots with its REAL
+      // position, altitude, track and speed; Schmidt-Appleman still
+      // decides whether the trail exists. Unreachable worker (not
+      // deployed yet, offline harness): the ambient traffic above
+      // stands in. ?adsb=URL overrides the proxy.
+      const ADSB_PROXY =
+        params.get('adsb') ?? 'https://horizon-adsb.ndevtk.workers.dev/adsb';
+      let liveTraffic = null; // queue of unclaimed cruise snapshots
+      const seenFlights = new Map(); // hex -> last spawn ms
+      async function syncTraffic() {
+        if (!state.contrail?.forms && !params.has('contrail')) return;
+        try {
+          const r = await (
+            await fetch(
+              ADSB_PROXY +
+                '?lat=' +
+                state.lat.toFixed(3) +
+                '&lon=' +
+                state.lon.toFixed(3) +
+                '&dist=15',
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (!Array.isArray(r.ac)) return;
+          const ref = {
+            lat: state.lat,
+            lon: state.lon,
+            halfM: DEM_HALF_M,
+            world: WORLD,
+            centerElev,
+            mpu: 57.14
+          };
+          const now_ = Date.now();
+          for (const [hex, t] of seenFlights)
+            if (now_ - t > 600e3) seenFlights.delete(hex);
+          liveTraffic = [];
+          const names = [];
+          for (const ac of r.ac) {
+            if (
+              typeof ac.lat !== 'number' ||
+              typeof ac.lon !== 'number' ||
+              typeof ac.gs !== 'number' ||
+              typeof ac.track !== 'number' ||
+              typeof ac.alt_baro !== 'number' ||
+              ac.alt_baro < 26000 || // cruise only: ~8 km up
+              seenFlights.has(ac.hex)
+            )
+              continue;
+            const s = adsbToScene(ac, ref);
+            if (Math.abs(s.x) > 220 || Math.abs(s.z) > 220) continue;
+            s.flight = (ac.flight ?? ac.hex ?? '').trim();
+            s.hex = ac.hex;
+            liveTraffic.push(s);
+            names.push(s.flight + ' FL' + Math.round(ac.alt_baro / 100));
+          }
+          if (names.length)
+            record(
+              'ADS-B live aircraft (worker)',
+              names.slice(0, 4).join(' · ') +
+                (names.length > 4 ? ' +' + (names.length - 4) : '')
+            );
+        } catch {
+          liveTraffic = null; // ambient traffic stands in
+        }
       }
       const mV1 = new THREE.Vector3();
       const mV2 = new THREE.Vector3();
@@ -3076,17 +3162,23 @@
                 p.active = false;
                 p.mesh.visible = false;
               }
-            } else if (
-              ct.forms &&
-              dayHigh > 0.02 &&
-              // Ambient-traffic cadence (documented display choice:
-              // a new transit every ~75 s); the harness override
-              // spawns fast so a pinned shot catches one.
-              Math.random() < dt / (ctOv !== null ? 4 : 75)
-            ) {
-              spawnContrail(p, !!ct.persists);
-              p.u.day.value = dayHigh;
-              p.u.tint.value.copy(sunLight.color);
+            } else if (ct.forms && dayHigh > 0.02) {
+              // REAL aircraft claim free slots first (live ADS-B
+              // via the worker); otherwise the ambient-traffic
+              // cadence (documented display choice: a new transit
+              // every ~75 s; the harness override spawns fast so a
+              // pinned shot catches one).
+              const live = liveTraffic?.length ? liveTraffic.shift() : null;
+              if (live) {
+                seenFlights.set(live.hex, Date.now());
+                spawnContrail(p, !!ct.persists, live);
+                p.u.day.value = dayHigh;
+                p.u.tint.value.copy(sunLight.color);
+              } else if (Math.random() < dt / (ctOv !== null ? 4 : 75)) {
+                spawnContrail(p, !!ct.persists);
+                p.u.day.value = dayHigh;
+                p.u.tint.value.copy(sunLight.color);
+              }
             }
           }
         }
@@ -3777,6 +3869,8 @@
         setInterval(syncAloft, 30 * 60 * 1000);
         syncForests();
         syncBrdf();
+        syncTraffic();
+        setInterval(syncTraffic, 60 * 1000);
         syncF107();
         setInterval(syncF107, 6 * 60 * 60 * 1000);
         syncKp();

@@ -1,0 +1,10 @@
+# horizon-adsb: the CORS proxy for live ADS-B aircraft (see
+# src/index.js). Deploy from this directory:
+#   npx wrangler deploy
+# and the theme will find it at
+#   https://horizon-adsb.<your-subdomain>.workers.dev
+# (update ADSB_PROXY in Horizon.html if the subdomain differs).
+name = "horizon-adsb"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+workers_dev = true
