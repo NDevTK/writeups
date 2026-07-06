@@ -246,7 +246,22 @@ const realFetch = globalThis.fetch;
             hdg: 511 // not available -> null
           })
         );
-        say({MessageType: 'ShipStaticData', Message: {}}); // ignored
+        say({
+          // Class B (leisure/small craft) rides the same parser
+          MessageType: 'StandardClassBPositionReport',
+          MetaData: {MMSI: 232003244, ShipName: 'DINGHY'},
+          Message: {
+            StandardClassBPositionReport: {
+              UserID: 232003244,
+              Latitude: 46.64,
+              Longitude: 8.05,
+              Sog: 6,
+              Cog: 120,
+              TrueHeading: 118
+            }
+          }
+        });
+        say({MessageType: 'ShipStaticData', Message: {}}); // counted, not a ship
         this.dispatchEvent(new Event('close')); // ends the window
       }, 0);
     }
@@ -280,21 +295,24 @@ const realFetch = globalThis.fetch;
     '/ais route',
     res.status === 200 &&
       res.headers.get('x-ais-source') === 'aisstream.io' &&
+      res.headers.get('x-ais-frames') === '5' &&
       res.headers.get('access-control-allow-origin') === '*' &&
       sub.APIKey === 'sekret' &&
       JSON.stringify(sub.BoundingBoxes) === JSON.stringify([box]) &&
       JSON.stringify(sub.FilterMessageTypes) ===
-        JSON.stringify(['PositionReport']) &&
-      j.ships.length === 2 &&
+        JSON.stringify(['PositionReport', 'StandardClassBPositionReport']) &&
+      j.ships.length === 3 &&
       byM[211234560].lat === 46.63 &&
       byM[211234560].name === 'EDELWEISS' &&
       byM[269057000].sog === 0 &&
       byM[269057000].cog === null &&
       byM[269057000].hdg === null &&
+      byM[232003244].hdg === 118 &&
+      byM[232003244].sog === 6 &&
       Math.abs(scene.vx - (10 * 0.514444) / 57.14) < 1e-12 &&
       noKey.status === 503 &&
       bad.status === 400,
-    `subscription carries key + exact box; latest-per-MMSI wins (lat ${byM[211234560].lat}); sentinels 102.3/360/511 -> 0/null/null; aisToScene vx ${scene.vx.toFixed(4)} u/s; no key -> 503, lat=999 -> 400`
+    `subscription carries key + exact box, Class A + B filters; 5 frames counted; latest-per-MMSI wins (lat ${byM[211234560].lat}); sentinels 102.3/360/511 -> 0/null/null; Class B parsed (hdg ${byM[232003244].hdg}); aisToScene vx ${scene.vx.toFixed(4)} u/s; no key -> 503, lat=999 -> 400`
   );
 }
 

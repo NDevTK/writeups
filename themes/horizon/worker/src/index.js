@@ -106,7 +106,8 @@ export function normalize(j) {
 
 // ---- AIS ships (aisstream.io over WebSocket) -------------------
 const AIS_WS = 'wss://stream.aisstream.io/v0/stream';
-const AIS_WINDOW_MS = 2500;
+const AIS_WINDOW_MS = 2500; // batching time after the FIRST frame
+const AIS_CAP_MS = 8000; // hard cap waiting on a quiet sea
 
 // One AIS position report -> the six fields the theme reads.
 // AIS sentinel values per ITU-R M.1371: Sog 102.3 kt = not
@@ -180,34 +181,44 @@ async function connectWS(url) {
   return ws;
 }
 
-// Subscribe to the box and collect PositionReports for a fixed
-// window (aisstream closes the socket itself if no subscription
-// arrives within 3 s - ours goes out on open). Latest report per
-// MMSI wins.
+// Subscribe to the box and collect position reports - Class A
+// (PositionReport) and Class B (StandardClassBPositionReport,
+// same fields) alike. aisstream closes the socket itself if no
+// subscription arrives within 3 s; ours goes out on open. The
+// window adapts: hard cap AIS_CAP_MS, but once the FIRST frame
+// arrives only AIS_WINDOW_MS more is spent batching - a busy
+// strait answers fast, a genuinely quiet sea waits out the cap
+// once and then sits in the edge cache. Latest report per MMSI
+// wins. Returns {ships, frames}: frames counts EVERY message
+// received, so a silent refused key (measured aisstream
+// behaviour) is distinguishable from an empty sea downstream.
 async function collectShips(key, lat, lon, dist) {
   const ws = await connectWS(AIS_WS);
   const ships = new Map();
-  let refused = null; // aisstream answers a bad subscription with
-  // an {error: ...} frame and closes - an empty sea must not be
-  // conflated with a refused key
+  let refused = null;
+  let frames = 0;
   try {
     ws.send(
       JSON.stringify({
         APIKey: key,
         BoundingBoxes: [aisBox(lat, lon, dist)],
-        FilterMessageTypes: ['PositionReport']
+        FilterMessageTypes: ['PositionReport', 'StandardClassBPositionReport']
       })
     );
     await new Promise((resolve) => {
-      const t = setTimeout(resolve, AIS_WINDOW_MS);
+      const cap = setTimeout(resolve, AIS_CAP_MS);
+      let batch = null;
       const done = () => {
-        clearTimeout(t);
+        clearTimeout(cap);
+        clearTimeout(batch);
         resolve();
       };
       ws.addEventListener('close', done, {once: true});
       ws.addEventListener('error', done, {once: true});
       ws.addEventListener('message', (ev) => {
         try {
+          frames++;
+          if (!batch) batch = setTimeout(done, AIS_WINDOW_MS);
           const m = JSON.parse(
             typeof ev.data === 'string'
               ? ev.data
@@ -218,8 +229,12 @@ async function collectShips(key, lat, lon, dist) {
             done();
             return;
           }
-          const p = m && m.Message && m.Message.PositionReport;
-          if (!p || m.MessageType !== 'PositionReport') return;
+          const p =
+            m &&
+            m.Message &&
+            (m.Message.PositionReport ||
+              m.Message.StandardClassBPositionReport);
+          if (!p) return;
           if (typeof p.Latitude !== 'number' || typeof p.Longitude !== 'number')
             return;
           ships.set(p.UserID, normalizeShip(m.MetaData, p));
@@ -239,7 +254,7 @@ async function collectShips(key, lat, lon, dist) {
   if (refused && ships.size === 0) {
     throw new Error('aisstream refused: ' + refused);
   }
-  return [...ships.values()];
+  return {ships: [...ships.values()], frames};
 }
 
 const CORS = {
@@ -346,7 +361,7 @@ export default {
         if (hit) return hit;
       }
       try {
-        const ships = await collectShips(
+        const {ships, frames} = await collectShips(
           env.AISSTREAM_KEY,
           Number(lat.toFixed(3)),
           Number(lon.toFixed(3)),
@@ -357,16 +372,25 @@ export default {
             ...CORS,
             'content-type': 'application/json',
             'cache-control': 'public, max-age=60',
-            'x-ais-source': 'aisstream.io'
+            'x-ais-source': 'aisstream.io',
+            // Diagnosis without a redeploy: frames counts EVERY
+            // message the subscription delivered. 0 frames with 0
+            // ships = the key or subscription is dead (aisstream
+            // goes silent on a bad key - measured); many frames
+            // with 0 ships = a parsing regression on our side.
+            'x-ais-frames': String(frames)
           }
         });
         if (edge) await edge.put(key, res.clone());
         return res;
-      } catch {
-        return new Response('{"ships":[],"upstream":"unavailable"}', {
-          status: 502,
-          headers: {...CORS, 'content-type': 'application/json'}
-        });
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ships: [], upstream: 'unavailable', why: String(e)}),
+          {
+            status: 502,
+            headers: {...CORS, 'content-type': 'application/json'}
+          }
+        );
       }
     }
     if (req.method === 'GET' && url.pathname === '/probe') {
