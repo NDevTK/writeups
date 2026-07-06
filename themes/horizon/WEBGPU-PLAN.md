@@ -1771,6 +1771,37 @@ Scenes (all at Grindelwald unless noted):
     slant-path thickening and silvery-blue tint are the
     documented display elements. ?nlc=N forces the envelope
     (geometry stays exact) for pinned shots.
+  - DONE: the naked-eye satellite fleet (sats.js) - the ISS's
+    visibility physics generalised to CelesTrak's curated
+    `visual` group (157 objects when fetched), Starlink trains
+    and all:
+    - daemon /tles route: CelesTrak GP data cached 6 h in memory
+      (their own request of clients), stale-served through
+      outages (TLEs hold for days), origin-locked like every
+      route - verified live (157 sets, cache hit on repeat)
+    - sats.js (gate set 26, 4 landmarks): TLE parsing gated by
+      the format's OWN integrity check (the modulo-10 checksum -
+      a one-digit corruption drops the set); Vallado's
+      cylindrical shadow with the boundary exactly at R_eq; the
+      McCants standard-magnitude law (m_std at 1000 km half
+      phase; +5 mag at 10x range exactly; full phase 2.5 log10
+      pi brighter) on the Lambert phase law IMPORTED from
+      earthshine.js - one phase law now serves the moon,
+      earthshine and satellites; and the vendored satellite.js
+      (Vallado's SGP4 - it runs unmodified in node, so the gate
+      drives the REAL propagator) holds a real 1963 element set
+      inside its own orbit band computed from the set's n and e.
+      Intrinsic magnitudes are not distributed with GP data: the
+      naked-eye class default 4.0 is the documented display
+      choice; every pass's GEOMETRY is exact.
+    - Theme: syncFleet (6 h, checksummed, ISS excluded - its
+      certified path stays); 12-dot pool; per frame SGP4
+      refreshes round-robin (8/frame, ~10 us each) with
+      velocity extrapolation between refreshes (<10 ms drift);
+      drawn only above the horizon, outside the shadow cylinder,
+      sun below -0.05 rad, and brighter than mag 4.6 - typically
+      a handful of moving points, which is what the real night
+      sky shows. ?tles=URL overrides the proxy.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

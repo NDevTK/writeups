@@ -571,6 +571,7 @@ function main() {
   const SSE_MAX = Number(env.SSE_MAX || 25);
   runBlitzSocket(blitz, sseClients, log);
 
+  let tlesCache = {t: 0, body: null}; // CelesTrak visual group
   const adsbCache = new Map(); // area key -> {t, body, src}
   setInterval(() => {
     const now = Date.now();
@@ -638,6 +639,45 @@ function main() {
         'content-type': 'application/json',
         ...extra
       });
+
+    if (url.pathname === '/tles') {
+      // CelesTrak's visual group (the ~150 naked-eye satellites)
+      // for the theme's SGP4 fleet. CelesTrak asks clients to
+      // fetch element sets at most every few hours - the 6 h
+      // in-memory cache honours that whatever the visitor count,
+      // and a stale copy serves through upstream outages (TLEs
+      // stay accurate for days).
+      if (tlesCache.body && Date.now() - tlesCache.t < 6 * 3600e3) {
+        return send(200, tlesCache.body, {
+          'content-type': 'text/plain',
+          'cache-control': 'public, max-age=21600',
+          'x-tle-source': 'celestrak.org (cached)'
+        });
+      }
+      try {
+        const r = await fetch(
+          'https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=tle',
+          {signal: AbortSignal.timeout(15000), headers: {'user-agent': UA}}
+        );
+        if (!r.ok) throw new Error('celestrak ' + r.status);
+        const body = await r.text();
+        tlesCache = {t: Date.now(), body};
+        return send(200, body, {
+          'content-type': 'text/plain',
+          'cache-control': 'public, max-age=21600',
+          'x-tle-source': 'celestrak.org'
+        });
+      } catch {
+        if (tlesCache.body) {
+          return send(200, tlesCache.body, {
+            'content-type': 'text/plain',
+            'cache-control': 'public, max-age=3600',
+            'x-tle-source': 'celestrak.org (stale)'
+          });
+        }
+        return send(502, 'tles unavailable');
+      }
+    }
 
     if (url.pathname === '/health' || url.pathname === '/probe') {
       const ais = {

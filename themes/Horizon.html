@@ -218,6 +218,7 @@
       } from './horizon/navlights.js';
       import {earthshineRatio} from './horizon/earthshine.js';
       import {BETA_MIN_DEG, seasonEnvelope} from './horizon/nlc.js';
+      import {parseTLEs, satMagnitude, sunlitEci} from './horizon/sats.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -2960,6 +2961,54 @@
         }
       }
 
+      // The naked-eye fleet: CelesTrak's `visual` group (the
+      // curated ~150 brightest satellites) via the daemon's /tles
+      // route (6 h cache - CelesTrak's own request), each
+      // propagated with the SAME SGP4 as the ISS and shown under
+      // the SAME visibility physics: above the horizon, outside
+      // Vallado's shadow cylinder, sky dark. Brightness from the
+      // McCants magnitude law (sats.js) on the Lambert phase law
+      // shared with earthshine; sets are checksum-verified before
+      // a single element is trusted. The ISS keeps its own path
+      // and is excluded here. ?tles=URL overrides the proxy.
+      const TLE_PROXY = params.get('tles') ?? 'https://api.ndev.tk/tles';
+      let satFleet = [];
+      async function syncFleet() {
+        try {
+          const text = await (
+            await fetch(TLE_PROXY, {credentials: 'omit'})
+          ).text();
+          const sets = parseTLEs(text).filter((s) => s.norad !== 25544);
+          if (!sets.length || !window.satellite) return;
+          satFleet = sets.map((s) => ({
+            name: s.name,
+            satrec: satellite.twoline2satrec(s.l1, s.l2),
+            r: null,
+            v: null,
+            t0: 0
+          }));
+          record(
+            'CelesTrak visual group',
+            satFleet.length + ' naked-eye satellites · SGP4 · checksummed'
+          );
+        } catch {
+          // keep the previous fleet; SGP4 holds for days
+        }
+      }
+      const SAT_DOT_N = 12;
+      const satDots = [];
+      {
+        const geo = new THREE.SphereGeometry(1.6, 8, 6);
+        for (let i = 0; i < SAT_DOT_N; i++) {
+          const m = new THREE.MeshBasicNodeMaterial({color: '#f2f5ff'});
+          aerial.applyTone(m);
+          const mesh = new THREE.Mesh(geo, m);
+          mesh.visible = false;
+          scene.add(mesh);
+          satDots.push(mesh);
+        }
+      }
+
       // Precipitation: one particle field, styled as rain or snow.
       const PRECIP_N = 1600;
       const precipArr = new Float32Array(PRECIP_N * 3);
@@ -4362,6 +4411,82 @@
           }
         }
 
+        // The fleet: every naked-eye satellite above the horizon,
+        // under the ISS's exact visibility physics (sats.js:
+        // Vallado shadow cylinder, McCants magnitude on the
+        // shared Lambert law). SGP4 refreshes round-robin (8 per
+        // frame, each ~10 us); between refreshes positions ride
+        // the stored velocity - under 10 ms of drift.
+        {
+          let dotI = 0;
+          if (satFleet.length && window.satellite && sun.alt < -0.05) {
+            const sEq2 = sunEquatorial(d);
+            const sHat = {
+              x: Math.cos(sEq2.dec) * Math.cos(sEq2.ra),
+              y: Math.cos(sEq2.dec) * Math.sin(sEq2.ra),
+              z: Math.sin(sEq2.dec)
+            };
+            const gmstNow = satellite.gstime(d);
+            const obsGd = {
+              latitude: state.lat * RAD,
+              longitude: state.lon * RAD,
+              height: centerElev / 1000
+            };
+            const obsEci = satellite.ecfToEci(
+              satellite.geodeticToEcf(obsGd),
+              gmstNow
+            );
+            const nowMs = d.getTime();
+            let refreshed = 0;
+            for (const f of satFleet) {
+              if (refreshed < 8 && nowMs - f.t0 > 10000) {
+                refreshed++;
+                f.t0 = nowMs;
+                const pv = satellite.propagate(f.satrec, d);
+                if (pv.position && pv.velocity) {
+                  f.r = pv.position;
+                  f.v = pv.velocity;
+                } else {
+                  f.r = null; // decayed or bad set - never drawn
+                }
+              }
+              if (!f.r || dotI >= SAT_DOT_N) continue;
+              const dtE = (nowMs - f.t0) / 1000;
+              const P = {
+                x: f.r.x + f.v.x * dtE,
+                y: f.r.y + f.v.y * dtE,
+                z: f.r.z + f.v.z * dtE
+              };
+              if (!sunlitEci(P, sHat)) continue;
+              const lk = satellite.ecfToLookAngles(
+                obsGd,
+                satellite.eciToEcf(P, gmstNow)
+              );
+              if (lk.elevation < 0.09) continue;
+              const tox = obsEci.x - P.x;
+              const toy = obsEci.y - P.y;
+              const toz = obsEci.z - P.z;
+              const tl = Math.hypot(tox, toy, toz);
+              const beta = Math.acos(
+                THREE.MathUtils.clamp(
+                  (tox * sHat.x + toy * sHat.y + toz * sHat.z) / tl,
+                  -1,
+                  1
+                )
+              );
+              const m = satMagnitude(lk.rangeSat, beta);
+              if (m > 4.6) continue; // below the naked eye
+              const dot = satDots[dotI++];
+              dot.visible = true;
+              dot.position.copy(skyPoint(lk.elevation, lk.azimuth, 820));
+              dot.scale.setScalar(
+                THREE.MathUtils.clamp(2.3 - 0.38 * m, 0.55, 3.2)
+              );
+            }
+          }
+          for (; dotI < SAT_DOT_N; dotI++) satDots[dotI].visible = false;
+        }
+
         let shakeX = 0;
         let shakeY = 0;
         if (state.shake > 0.005 && !reduceMotion) {
@@ -4569,6 +4694,8 @@
         setInterval(syncOvation, 30 * 60 * 1000);
         syncISS();
         setInterval(syncISS, 6 * 60 * 60 * 1000);
+        syncFleet();
+        setInterval(syncFleet, 6 * 60 * 60 * 1000);
         if (params.get('dem') !== '0') {
           try {
             demData = await fetchDEMTiles(state.lat, state.lon);
