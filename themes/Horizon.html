@@ -172,6 +172,7 @@
       import {createTerrainNodeMaterial} from './horizon/terrain-tsl.js';
       import {HorizonWaterMesh} from './horizon/water-tsl.js';
       import {createOceanFFT} from './horizon/ocean-tsl.js';
+      import {peakOmega} from './horizon/ocean-spectrum.js';
       import {
         createVeilMaterial,
         createMoonMaterial,
@@ -1279,10 +1280,6 @@
       let oceanBuiltSeaKey = null; // measured partitions in the spectrum
       let oceanSeaDepth = 60;
       let oceanTime = 0; // REAL seconds - the dispersion is physical
-      const waterNormalsTex = new THREE.TextureLoader().load(
-        './horizon/waternormals.jpg'
-      );
-      waterNormalsTex.wrapS = waterNormalsTex.wrapT = THREE.RepeatWrapping;
 
       // Terrain material: grass/rock/snow/sea decided per PIXEL in the
       // fragment shader (slope and altitude with noise-jittered borders),
@@ -1456,10 +1453,10 @@
             hasWater = true;
             break;
           }
-        if (hasWater && waterNormalsTex) {
+        if (hasWater) {
           // Cox & Munk (1954): sun glitter shaped by the sea-surface
-          // slope variance; Monahan whitecaps; McCowan surf breaking
-          // where H > 0.78d - all carried at source level in the
+          // slope variance; Monahan whitecaps; Battjes-Janssen surf
+          // breaking - all carried at source level in the
           // HorizonWaterMesh fork, against the REAL bathymetry sampled
           // from the terrarium tiles into a depth texture.
           const DT = 128;
@@ -1529,7 +1526,6 @@
           water = new HorizonWaterMesh(
             new THREE.PlaneGeometry(WORLD, WORLD, 192, 192),
             {
-              waterNormals: waterNormalsTex,
               sunDirection: new THREE.Vector3(0, 1, 0),
               sunColor: 0xffffff,
               waterColor: 0x0a2431,
@@ -2385,7 +2381,6 @@
         // inside the material.
         if (water && oceanCascades) {
           const Ums = state.wind / 3.6;
-          water.timeU.value += dt * (0.3 + Ums * 0.05);
           oceanTime += dt;
           const dirNow = Math.atan2(windV.z, windV.x);
           const dDir = Math.abs(
@@ -2430,8 +2425,17 @@
           const resolved = oceanCascades.reduce((s, c) => s + c.resolvedMss, 0);
           water.mssSubgrid.value = Math.max(mss - resolved, 1e-4);
           water.foamW.value = Math.min(3.84e-6 * Math.pow(Ums, 3.41), 0.5);
-          water.windDirW.value.set(windV.x, windV.z);
           water.hsWave.value = hsNow;
+          // Battjes-Janssen surf profile: peak period from the
+          // DOMINANT measured partition, or the fetch-limited
+          // JONSWAP peak when the sea is wind-predicted - the same
+          // spectrum the cascades realise (setSurf gates on change).
+          const sw = state.sea?.wind;
+          const ss = state.sea?.swell;
+          const tpNow = state.sea
+            ? (((ss?.hs ?? 0) > (sw?.hs ?? 0) ? ss?.tp : sw?.tp) ?? 6)
+            : (2 * Math.PI) / peakOmega(Math.max(Ums, 1), 150e3);
+          water.setSurf(hsNow, tpNow, oceanSeaDepth);
         }
 
         // The real wind vectors, per level: meteorological direction is

@@ -174,7 +174,6 @@
           ];
           for (const c of cascades) c.update(13.7);
           water = new HorizonWaterMesh(geo, {
-            waterNormals: wn,
             sunDirection: sunDir.clone(),
             sunColor: sunCol,
             waterColor: 0x0a2431,
@@ -192,9 +191,15 @@
             1e-4
           );
           water.foamW.value = Math.min(3.84e-6 * Math.pow(U10, 3.41), 0.5);
-          water.windDirW.value.set(1, 0);
           water.hsWave.value = hsW;
-          water.timeU.value = 0.7;
+          const {peakOmega} =
+            await import('./writeups/themes/horizon/ocean-spectrum.js');
+          const tp = sea
+            ? sea[1].hs > sea[0].hs
+              ? sea[1].tp
+              : sea[0].tp
+            : (2 * Math.PI) / peakOmega(U10, 150e3);
+          water.setSurf(hsW, tp, 60);
         }
         water.rotation.x = -Math.PI / 2;
         scene.add(water);

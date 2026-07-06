@@ -1,4 +1,13 @@
-import {Color, Mesh, NodeMaterial, Vector2, Vector3} from 'three/webgpu';
+import {
+  Color,
+  DataTexture,
+  FloatType,
+  LinearFilter,
+  Mesh,
+  NodeMaterial,
+  RGBAFormat,
+  Vector3
+} from 'three/webgpu';
 import {
   Fn,
   cameraPosition,
@@ -24,6 +33,7 @@ import {
   vec3,
   vertexStage
 } from 'three/tsl';
+import {buildSurfLUT} from './surf.js';
 
 /**
  * Horizon's sea as a TSL node material (WebGPU project, phase 2;
@@ -47,8 +57,13 @@ import {
  *    RESIDUAL slope variance - total wind mss minus what the FFT
  *    cascades resolve (Bruneton, Neyret & Holzschuch 2010) - via the
  *    shiny uniform the theme computes
- *  - McCowan surf: waves break where H > 0.78 d against the REAL
- *    terrarium bathymetry (depth texture), foam along the shallows
+ *  - Battjes & Janssen (1978) surf on the REAL terrarium bathymetry:
+ *    setSurf(hs, tp, depthRef) bakes a double-precision depth LUT
+ *    (surf.js - Miche cap, Battjes & Stive 1985 gamma, linear
+ *    shoaling, the implicit Qb equation) and the shader places that
+ *    breaking fraction on the ACTUAL FFT crests: foam where the
+ *    resolved elevation exceeds z(d) sigma (probit channel), so
+ *    coverage is exactly Qb and the surf rides the waves that break
  *  - deterministic time uniforms (the caller advances them - also
  *    what makes A/B tests exact)
  *  - the shared aerial-perspective + Koschmieder hook applies as the
@@ -63,7 +78,6 @@ export class HorizonWaterMesh extends Mesh {
     this.resolutionScale =
       options.resolutionScale !== undefined ? options.resolutionScale : 0.5;
 
-    this.waterNormals = texture(options.waterNormals);
     this.alpha = uniform(options.alpha !== undefined ? options.alpha : 1.0);
     this.sunColor = uniform(new Color(options.sunColor ?? 0xffffff));
     this.sunDirection = uniform(
@@ -76,19 +90,34 @@ export class HorizonWaterMesh extends Mesh {
       options.distortionScale !== undefined ? options.distortionScale : 20.0
     );
 
-    // HORIZON uniforms (same names/semantics as the classic patch).
-    this.timeU = uniform(0);
+    // HORIZON uniforms.
     // Sub-grid slope variance (total wind mss minus what the
     // cascades resolve); the per-pixel effective mss adds back the
     // variance of whatever the pixel footprint filters out.
     this.mssSubgrid = uniform(0.01);
     this.foamJ = uniform(0.7974); // folding threshold, see header
     this.foamW = uniform(0); // Monahan mean coverage, far-field foam
-    this.windDirW = uniform(new Vector2(1, 0));
     this.hsWave = uniform(0.5);
     this.worldSize = uniform(options.worldSize ?? 280);
     const depthTexNode = texture(options.depthTex);
     this.depthTexNode = depthTexNode; // swap via .value on rebuild
+
+    // Battjes-Janssen surf LUT over depth (see setSurf below):
+    // R = Qb, G = crest threshold z in units of sigma = Hs/4.
+    this._surfData = new Float32Array(256 * 4);
+    for (let i = 0; i < 256; i++) this._surfData[i * 4 + 1] = 4; // off
+    const surfTex = new DataTexture(
+      this._surfData,
+      256,
+      1,
+      RGBAFormat,
+      FloatType
+    );
+    surfTex.minFilter = surfTex.magFilter = LinearFilter;
+    surfTex.needsUpdate = true;
+    this._surfTex = surfTex;
+    this._surfKey = '';
+    const surfTexNode = texture(surfTex);
 
     // ---------- FFT ocean cascades (phase 5) ----------
     // The plane is rotated x = -pi/2: local (x, y) -> world (x, -y),
@@ -137,6 +166,7 @@ export class HorizonWaterMesh extends Mesh {
     let sumJxx = float(0);
     let sumJzz = float(0);
     let sumJxz = float(0);
+    let sumEta = float(0); // resolved elevation (m), for the surf crests
     let mssEff = this.mssSubgrid;
     let fFine = float(1); // finest cascade's fade, for the foam
     for (const {disp, deriv, invL, mss, mapSize} of cascadeNodes) {
@@ -149,7 +179,9 @@ export class HorizonWaterMesh extends Mesh {
       sumSz = sumSz.add(d4.y.mul(f));
       sumJxx = sumJxx.add(d4.z.mul(f));
       sumJzz = sumJzz.add(d4.w.mul(f));
-      sumJxz = sumJxz.add(disp.sample(uvC).w.mul(f));
+      const dc = disp.sample(uvC);
+      sumJxz = sumJxz.add(dc.w.mul(f));
+      sumEta = sumEta.add(dc.y.mul(f));
       mssEff = mssEff.add(float(1).sub(f.mul(f)).mul(mss));
     }
     const tanX = vec3(float(1).add(sumJxx), sumSx, sumJxz);
@@ -228,9 +260,7 @@ export class HorizonWaterMesh extends Mesh {
       // HORIZON: whitecaps from the Jacobian folding criterion
       // (Tessendorf 2001) - foam where the horizontal displacement
       // folds the surface (J below the Monahan-calibrated threshold)
-      // - plus McCowan surf on the real bathymetry (the shoal ramp
-      // is written as oneMinus of an ordered smoothstep because
-      // reversed-edge smoothstep is undefined per spec).
+      // - plus Battjes-Janssen surf on the real bathymetry.
       // Folding foam where resolved; where minification fades the
       // fine cascade out, converge to the Monahan MEAN coverage (the
       // same statistic the folding threshold was calibrated to) so a
@@ -243,14 +273,20 @@ export class HorizonWaterMesh extends Mesh {
       const dpt = depthTexNode
         .sample(positionWorld.xz.div(this.worldSize).add(0.5))
         .r.mul(40.0);
-      const db = this.hsWave.div(0.78);
-      const shoal = smoothstep(db.mul(0.6), db.mul(2.4), dpt)
-        .oneMinus()
-        .mul(smoothstep(0.012, 0.05, dpt));
-      const surfN = this.waterNormals.sample(
-        positionWorld.xz.mul(0.05).add(this.windDirW.mul(this.timeU.mul(0.03)))
-      ).b;
-      const surf = shoal.mul(smoothstep(0.35, 0.7, surfN.add(shoal.mul(0.25))));
+      // Depth-induced breaking (Battjes & Janssen 1978): the LUT's
+      // probit channel is the crest threshold in sigma = Hs/4 units;
+      // foam where the resolved FFT elevation tops it, so coverage
+      // is EXACTLY the breaking fraction Qb(depth) and the surf sits
+      // on the crests that break. The narrow transition band around
+      // the threshold is symmetric, preserving coverage to first
+      // order; the shoreline guard keeps foam off the beach edge
+      // texels.
+      const sigma = this.hsWave.mul(0.25).max(1e-3);
+      const zThr = surfTexNode.sample(vec2(dpt.div(40.0), 0.5)).g.mul(sigma);
+      const wS = sigma.mul(0.15).max(0.02);
+      const surf = smoothstep(zThr.sub(wS), zThr.add(wS), sumEta).mul(
+        smoothstep(0.012, 0.05, dpt)
+      );
       const foam = vec3(0.82, 0.86, 0.88).mul(
         max(this.sunDirection.y, 0.0).add(0.3)
       );
@@ -260,5 +296,18 @@ export class HorizonWaterMesh extends Mesh {
         clamp(capMask.mul(0.9).add(surf.mul(0.85)), 0.0, 1.0)
       );
     })();
+  }
+
+  // Bake the Battjes-Janssen depth profile for the current sea state
+  // (hs = total significant height m, tp = peak period s, depthRef =
+  // the depth hs is referenced at - the spectrum's TMA depth). Cheap
+  // (256 Newton solves) but gated so per-frame calls only rebuild
+  // when the state actually moved.
+  setSurf(hs, tp, depthRef) {
+    const key = hs.toFixed(3) + '|' + tp.toFixed(2) + '|' + depthRef.toFixed(1);
+    if (key === this._surfKey) return;
+    this._surfKey = key;
+    this._surfData.set(buildSurfLUT({hs, tp, depthRef}));
+    this._surfTex.needsUpdate = true;
   }
 }

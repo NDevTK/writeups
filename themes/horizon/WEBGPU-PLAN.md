@@ -726,6 +726,55 @@ Scenes (all at Grindelwald unless noted):
       outliers, with the sea-vs-wind signal confined to the water
       rows as expected (surf foam widens over the shallow bank at
       the 2.8 m total sea).
+  - DONE: Battjes-Janssen depth-induced breaking (surf.js single
+    source + surf-reference.mjs, reference-first). Replaces the
+    McCowan H > 0.78 d smoothstep heuristic AND the dead surf
+    "patchiness" modulation (measured: the waternormals blue channel
+    is >= 0.88 everywhere, so its smoothstep(0.35, 0.7, b) mask was
+    identically 1 - a no-op since the classic build).
+    - Physics, computed in double precision per frame into a 256 x 1
+      depth LUT the shader samples on the real terrarium bathymetry:
+      the B&J 1978 breaking fraction (1 - Qb)/ln Qb = -(Hrms/Hm)^2
+      solved by geometric bisection (residuals at machine zero;
+      Qb(0.5) = 0.0198, the canonical ~0.02); the Miche-type cap
+      Hm = (0.88/k) tanh(gamma k d / 0.88); the Battjes & Stive 1985
+      recalibrated gamma = 0.5 + 0.4 tanh(33 s0) from offshore
+      steepness; linear shoaling of Hrms via exact-cg energy flux,
+      bounded by Hm (the clipped-Rayleigh model's own consistency
+      bound); k(omega, d) by Newton on the exact finite-depth
+      dispersion (no Hunt/Eckart explicit fit - reference matches
+      wave tables: T = 10 s, d = 10 m -> L = 92.4 m vs 92.3).
+      Documented scope: pointwise Qb over the depth field - the full
+      energy-balance ODE along rays (SWAN territory) is out.
+    - Crest-located foam: the LUT's second channel is
+      z(d) = probit(1 - Qb) (Wichura's AS 241, machine precision;
+      coverage roundtrip 1e-13), and the shader masks where the
+      RESOLVED FFT elevation exceeds z sigma with sigma = Hs/4 -
+      coverage is exactly Qb(depth) by the Gaussian-sea definition
+      and the surf rides the actual breaking crests instead of
+      painting a flat depth band. Peak period: the dominant measured
+      partition's Tp, or the fetch-limited JONSWAP peak
+      (peakOmega) in wind mode - the same spectrum the cascades
+      realise.
+    - Dead interface deleted with the heuristic: the water
+      material's waterNormals / timeU / windDirW uniforms fed
+      nothing after the FFT port (normals and time come from the
+      cascades); the theme and harness page stop feeding them.
+    - Validation: surf-reference.mjs prints the published landmarks
+      (Qb magnitudes + machine residuals, wave-table dispersion,
+      Battjes-Stive gammas, probit quantiles, monotonic Qb(d)
+      profile with the 2.5 m / 13 s surf zone confined to d < ~7 m);
+      water-page cross-backend A/B unchanged-green (0.048 mean,
+      backends read the same CPU LUT); pinned sea Nelson A/B 0.0005
+      mean with zero outliers. The pinned Nelson bay itself is
+      bit-identical before/after: its 128^2 depth texture
+      (125 m/texel over 16 km) resolves no pixels inside the surf
+      band, so BOTH the old heuristic and Qb are exactly zero there
+      - a scene/bathymetry-resolution limit (pre-existing), not a
+        model one. Visual on the harness depth ramp at a storm sea
+        (Hs 8 m, Tp 16 s): the saturated breaker wedge fills the
+        shallow corner and partial-Qb foam sits ON the crests in the
+        mid-zone instead of painting a flat depth band.
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:
