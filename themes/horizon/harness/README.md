@@ -29,6 +29,10 @@ Pieces:
   `playwright-core` installed next to it and `SHOOT_CHROME` pointing
   at a Chrome for Testing binary
   (`npx @puppeteer/browsers install chrome@stable`).
+- `validate.sh` — the reference-first gate and the ONE correctness
+  entrypoint: all six CPU double-precision references, then the
+  GPU-vs-reference probes asserting texels at the reference values.
+  Nothing compares one render against another.
 - `sweep-pin.sh` — the eight-scene pinned smoke matrix on WebGPU
   (PAGEERROR detection + visual inspection).
 - `ppmdiff.py a.ppm b.ppm [diff.png]` — mean/max abs diff plus

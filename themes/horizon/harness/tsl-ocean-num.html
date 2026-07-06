@@ -26,10 +26,11 @@
       }
     </script>
     <script type="module">
-      // Per-texel FFT-ocean check against ocean-reference.mjs (run the
-      // reference with `node` for expected values): same N/L/params/seed/
-      // lambda/t. Prints h, Dx, Dz (disp map / lambda), n-derived slope
-      // check and J at the reference points.
+      // Per-texel FFT-ocean gate against ocean-reference.mjs: same
+      // N/L/params/seed/lambda/t. The expected values below are the
+      // double-precision reference's 'REF t=13.7' / 'REF sea t=13.7'
+      // lines; the GPU maps must land on them at fp32 tolerance -
+      // ground-truth validation, no second renderer involved.
       import * as T from 'three/webgpu';
       import {createOceanFFT} from './writeups/themes/horizon/ocean-tsl.js';
       const log = (s) => console.log('OCEAN|' + s);
@@ -65,13 +66,23 @@
           lambda: LAMBDA
         });
         ocean.update(13.7);
-        const pts = [
-          [0, 0],
-          [37, 81],
-          [128, 200],
-          [255, 13]
-        ];
-        for (const [i, j] of pts) {
+        // [i, j, h, Dx, Dz] from ocean-reference.mjs.
+        const EXP = seaMode
+          ? [
+              [0, 0, 0.35933, 0.54697, 0.83656],
+              [37, 81, 0.30592, -0.29644, -0.94486],
+              [128, 200, -0.49547, -0.13915, -0.21753],
+              [255, 13, -0.28231, 0.11266, 0.14675]
+            ]
+          : [
+              [0, 0, 1.19279, 0.01599, 0.4124],
+              [37, 81, 0.60189, 0.36917, -0.02282],
+              [128, 200, -0.7136, -0.79298, -0.63373],
+              [255, 13, 0.30142, -0.3038, -0.08177]
+            ];
+        const TOL = 5e-3; // fp32 through a full FFT chain
+        let bad = 0;
+        for (const [i, j, hE, dxE, dzE] of EXP) {
           const d = await ocean.readMap('disp', i, j, 1, 1);
           const v = await ocean.readMap('deriv', i, j, 1, 1);
           // maps carry combinable terms; rebuild n and J like the material
@@ -87,10 +98,19 @@
             tz[0] * tx[1] - tz[1] * tx[0]
           ];
           const nl = Math.hypot(...n);
+          const dh = Math.abs(d[1] - hE);
+          const ddx = Math.abs(d[0] / LAMBDA - dxE);
+          const ddz = Math.abs(d[2] / LAMBDA - dzE);
+          if (dh > TOL || ddx > TOL || ddz > TOL) bad++;
           log(
-            `(${i},${j}): h=${d[1].toFixed(4)} Dx=${(d[0] / LAMBDA).toFixed(4)} Dz=${(d[2] / LAMBDA).toFixed(4)} nx=${(n[0] / nl).toFixed(4)} nz=${(n[2] / nl).toFixed(4)} J=${J.toFixed(4)}`
+            `(${i},${j}): h=${d[1].toFixed(4)} Dx=${(d[0] / LAMBDA).toFixed(4)} Dz=${(d[2] / LAMBDA).toFixed(4)} nx=${(n[0] / nl).toFixed(4)} nz=${(n[2] / nl).toFixed(4)} J=${J.toFixed(4)} |dref|=${Math.max(dh, ddx, ddz).toExponential(1)}`
           );
         }
+        log(
+          bad === 0
+            ? 'TEXELS PASS (at the double-precision reference, fp32 tol)'
+            : 'TEXELS FAIL (' + bad + ' points off the reference)'
+        );
         // Full-column scan: locate the reference h(37,81) in the map
         // (wind 0.60189 / sea 0.30592).
         const col = await ocean.readMap('disp', 37, 0, 1, 256);

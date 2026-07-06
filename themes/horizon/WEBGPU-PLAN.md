@@ -863,6 +863,17 @@ Scenes (all at Grindelwald unless noted):
       this file's earlier sections - they are how the port was
       PROVEN, and they document the WebGL2 backend behaviour should
       it ever return.
+  - DONE: harness/validate.sh - the reference-first gate, the
+    project's ONE correctness entrypoint. Step 1 runs all six CPU
+    double-precision references (ocean 26 landmarks, atmo 9, moon 7,
+    optics 11, surf 23, glint 17); step 2 shoots the
+    GPU-vs-reference probes and asserts texels AT the reference
+    values (tsl-ocean-num.html is now a self-checking gate in both
+    wind and measured-sea modes, fp32 tolerance 5e-3 through the
+    full FFT chain; the glint probe asserts bit-exact hash/counts).
+    Nothing in the gate compares one render against another.
+    First full run on the WebGPU-only build: VALIDATE PASS
+    (6/6 references, 3/3 probes).
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:
