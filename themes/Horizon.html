@@ -2512,6 +2512,13 @@
         auroraU.strength.value =
           auroraP * nightSky * (1 - cloudy * 0.7) * (elevA > 0.035 ? 1 : 0);
         auroraU.time.value = t / 1000;
+        // Characteristic energy for the emission LUT: the public
+        // OVATION product carries probability, not spectra, so this
+        // is a documented display mapping - stronger ovals as harder
+        // precipitation (nightside diffuse/discrete range 1-6 keV);
+        // the ALTITUDE PROFILES per E0 are exact physics
+        // (aurora-lut.js). setE0 gates its own rebuilds.
+        auroraObj.setE0(1.5 + 4.5 * auroraP);
         const yAurora = Math.tan(THREE.MathUtils.clamp(elevA, 0.06, 1.1)) * 760;
         auroraU.uBase.value = yAurora - 160;
         aurora.position.y = yAurora + 200;

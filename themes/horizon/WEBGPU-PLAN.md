@@ -874,6 +874,49 @@ Scenes (all at Grindelwald unless noted):
     Nothing in the gate compares one render against another.
     First full run on the WebGPU-only build: VALIDATE PASS
     (6/6 references, 3/3 probes).
+  - DONE: physical aurora (aurora-lut.js single source +
+    aurora-reference.mjs, reference-first). Replaces the hand-tuned
+    curtain gradient (invented green-to-purple ramp, pow-band
+    vertical profile) with the emission physics, driven by the
+    OVATION/Kp data the theme already fetches:
+    - Upper atmosphere: the CIRA-72 Mean Reference Atmosphere as
+      tabulated in the AFGL Handbook of Geophysics (1985) tables
+      14-7/14-9, embedded 90-400 km (T, N2, O2, O, Ar; the shared
+      120 km row pins the column alignment; derived rho within 10%
+      of USSA76 at 100/200 km). Column mass integrates the
+      piecewise-exponential profile analytically.
+    - Deposition: Fang et al. (2010, GRL) parameterization of
+      isotropic monoenergetic electron impact ionization with their
+      table-1 Pij verbatim, integrated over a Maxwellian of
+      characteristic energy E0 by log-E quadrature. Reference:
+      ionization peaks sweep 230 -> 90 km as E0 hardens 0.1 -> 30
+      keV, monotonically; the sub-unity isotropic energy integral is
+      the real backscattered albedo.
+    - Lines: 427.8 nm N2+ follows the Rees (1989) N2 ionization
+      share. 557.7 nm O(1S) ALSO follows the N2 share - its source
+      at the emission peak is the N2(A3Sigma) energy-transfer chain,
+      which is why photometric 5577/4278 is famously near-constant.
+      (The first cut weighted green by the atomic-oxygen FRACTION,
+      which is ~1% at 100 km: the curtain rendered blue - the
+      visual caught a real physics error, fixed at the source term,
+      not the gains.) 630.0 nm O(1D) keeps the oxygen share.
+      O(1S)/O(1D) collisional quenching (Streit et al. 1976 rates).
+      Untuned results: green peak 108 km at E0 = 3 keV (the textbook
+      lower border), red 630.0 confined above ~200 km (survival
+      0.12 at 200 km, 0.82 at 300 km), red/green column ratio 0.41
+      soft vs ~0 hard - type-d red aurora emerges for soft
+      precipitation. Line colors from the Wyman-Sloan-Shirley CIE
+      fits (557.7 green, 630.0 red, 427.8 violet-blue).
+    - The curtain samples the altitude LUT (fragment height -> 92 to
+      320 km emission altitude); E0 = 1.5 + 4.5 \* ovalP keV is the
+      documented display mapping (the public OVATION product has no
+      spectra); setE0 gates in-place LUT rebuilds. Curtain waving
+      stays the documented shape heuristic. Display gains: the blue
+      gain carries the OBSERVED I(5577)/I(4278) ~ 5.5 (green and
+      blue share the N2 profile shape); red 2.0 and green 1.0 are
+      exposure for the folded chains.
+    - aurora-reference.mjs joins validate.sh (16 landmarks; gate
+      PASS at 7/7 references + 3/3 probes).
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:

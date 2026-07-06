@@ -24,7 +24,7 @@ REFDIR=${REFDIR:-..} # where the *-reference.mjs live
 fail=0
 
 echo "== CPU references (double precision, ground truth) =="
-for name in ocean atmo moon optics surf glint; do
+for name in ocean atmo moon optics surf glint aurora; do
   ref="$REFDIR/$name-reference.mjs"
   if [ ! -f "$ref" ]; then echo "[FAIL] $name-reference.mjs missing"; fail=1; continue; fi
   if out=$(node "$ref" 2>&1); then

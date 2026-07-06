@@ -51,6 +51,12 @@ import {
   vec4
 } from 'three/tsl';
 import {buildBowLUT, buildHaloLUT} from './optics-lut.js';
+import {
+  buildAuroraLUT,
+  wavelengthToLinearSRGB,
+  Z_MAX,
+  Z_MIN
+} from './aurora-lut.js';
 
 /**
  * Horizon's sky objects as TSL node materials (WebGPU project,
@@ -162,12 +168,44 @@ export function createMoonMaterial() {
 }
 
 // Additive aurora curtains; the oval's real latitude enters as uBase.
+// The vertical structure and color are PHYSICAL (aurora-lut.js):
+// Fang et al. 2010 electron deposition through the CIRA-72 mean
+// atmosphere, line profiles for 630.0 / 557.7 / 427.8 nm with O(1D)
+// quenching, sampled by the fragment's emission altitude. The
+// characteristic energy E0 (from the precipitation data) rebuilds
+// the LUT in place; the sine curtain waving stays as the documented
+// shape heuristic (curtain fluid dynamics are out of scope). What
+// the physics gives untuned: green lower border near 100 km, the
+// purple N2+ fringe below it, red 630.0 tops above 200 km that take
+// over as precipitation softens.
 export function createAuroraMaterial() {
   const u = {
     time: uniform(0),
     strength: uniform(0),
     uBase: uniform(60)
   };
+  const lutData = new Float32Array(128 * 4);
+  const lutTex = new DataTexture(lutData, 128, 1, RGBAFormat, FloatType);
+  lutTex.minFilter = lutTex.magFilter = LinearFilter;
+  const lutNode = texture(lutTex);
+  let builtE0 = 0;
+  const setE0 = (e0) => {
+    const e = Math.min(Math.max(e0, 0.3), 20);
+    if (Math.abs(e - builtE0) < builtE0 * 0.05) return;
+    builtE0 = e;
+    lutData.set(buildAuroraLUT(e).data);
+    lutTex.needsUpdate = true;
+  };
+  setE0(3);
+  // Monochromatic line colors (CIE fits, linear sRGB) with
+  // calibrated display gains. Green and blue share the N2 profile
+  // shape, so the blue gain carries the OBSERVED photometric ratio
+  // I(5577)/I(4278) ~ 5.5 (Rees 1989); the red gain is exposure for
+  // the folded O(1D) chain.
+  const C630 = wavelengthToLinearSRGB(630.0).map((v) => v * 2.0);
+  const C5577 = wavelengthToLinearSRGB(557.7).map((v) => v * 1.0);
+  const C4278 = wavelengthToLinearSRGB(427.8).map((v) => v * (1 / 5.5));
+
   const material = new NodeMaterial();
   material.transparent = true;
   material.depthWrite = false;
@@ -175,6 +213,11 @@ export function createAuroraMaterial() {
   material.blending = AdditiveBlending;
   const ux = uv().x;
   const h = clamp(positionWorld.y.sub(u.uBase).div(720.0), 0.0, 1.0);
+  // The curtain's vertical span maps to emission altitude: base at
+  // 92 km (below the green border so the N2+ fringe shows), top at
+  // 320 km (red 630.0 territory).
+  const zKm = mix(92.0, 320.0, h);
+  const lut = lutNode.sample(vec2(zKm.sub(Z_MIN).div(Z_MAX - Z_MIN), 0.5));
   const w = sin(
     ux
       .mul(38.0)
@@ -186,12 +229,14 @@ export function createAuroraMaterial() {
   const w2 = sin(ux.mul(61.0).sub(u.time.mul(0.6)).add(2.1))
     .mul(0.5)
     .add(0.5);
-  const band = pow(h.oneMinus(), 2.0).mul(smoothstep(0.08, 0.32, h));
-  const a = u.strength.mul(band).mul(w.mul(w2).add(0.9));
-  const col = mix(vec3(0.13, 0.95, 0.45), vec3(0.5, 0.25, 0.95), h.mul(1.3));
+  const a = u.strength.mul(w.mul(w2).add(0.9));
+  const col = vec3(...C630)
+    .mul(lut.r)
+    .add(vec3(...C5577).mul(lut.g))
+    .add(vec3(...C4278).mul(lut.b));
   material.colorNode = col.mul(a);
-  material.opacityNode = a;
-  return {material, u};
+  material.opacityNode = clamp(lut.r.add(lut.g).add(lut.b).mul(a), 0.0, 1.0);
+  return {material, u, setE0};
 }
 
 // Rainbows at the Descartes angles + the 22-deg halo with sundogs,
