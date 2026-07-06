@@ -1,0 +1,4153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Horizon</title>
+    <!--
+      A 3D landscape where everything shown is real state:
+      - the terrain is your terrain: real elevations around the visitor's
+        location (AWS terrarium elevation tiles at ~30-90m resolution,
+        falling back to the open-meteo elevation API), with sea rendered
+        where the sea actually is; shading reads the DEM directly - a
+        world-space normal map baked from the heightfield at close to
+        full tile resolution lights every pixel with the real hillside
+        orientation (the mesh only carries the silhouette)
+      - a multiple-scattering atmosphere after Hillaire (2020):
+        transmittance, multiple-scattering and per-frame sky-view LUTs
+        with Rayleigh, Mie (scaled by the measured AOD) and ozone
+        profiles, so twilight structure emerges from the raymarch; an
+        aerial-perspective LUT applies the same scattering to the air
+        BETWEEN camera and terrain, so distant ridges blue out by
+        physics; the sun's terrain light carries its true transmitted
+        colour; sun position from astronomy-engine (VSOP87/ELP
+        truncations, topocentric, refraction-corrected); Preetham as
+        fallback
+      - the actual night sky (Yale Bright Star Catalog: 2887 stars with
+        real positions, magnitudes and colour temperatures) rotated for
+        the latitude and the current sidereal time; the five naked-eye
+        planets at their ephemeris positions and magnitudes; the moon
+        shows its real phase (lit from the sun's true direction) and its
+        real apparent size for today's Earth-Moon distance
+      - fog obeys the Koschmieder relation on the MEASURED visibility;
+        sun glitter follows Cox & Munk (1954) slope statistics; cloud
+        cover renders in the model's real low/mid/high layers, each deck
+        riding its own real wind (surface, 700hPa, 250hPa jet); the low
+        cumulus deck AND the mid altostratus deck are raymarched
+        volumetric cloudscapes after Schneider & Vos (SIGGRAPH 2015):
+        Perlin-Worley density carved by the real cover at the real LCL,
+        a zero-mean weather map varying that cover across the sky
+        without changing it, stratus/cumulus/cumulonimbus height
+        profiles picked by the reported WMO code, adaptive
+        coarse-to-fine marching, Beer-powder sun lighting, dual-lobe
+        Henyey-Greenstein phase - reconstructed temporally exactly as
+        shipped in HZD (quarter-res buffer, 1-of-16 Bayer refresh,
+        reprojection, golden-ratio jitter integration) with a terrain
+        depth prepass so cloud passes IN FRONT of far ridges, and
+        nearest-depth upsampling (Jansen & Bavoil 2010) keeping
+        silhouettes clean (only thin cirrus stays 2D, as in the
+        research)
+      - the snowline tracks the real freezing level; the treeline follows
+        Körner & Paulsen (2004); deciduous leaves follow Hopkins' law
+        (real date, latitude and elevation), so autumn arrives when it
+        actually does; surf breaks along the real shallows (McCowan
+        H > 0.78d on the terrarium bathymetry)
+      - atmospheric optics appear only under their true conditions:
+        Descartes rainbows (42/51 deg) opposite a low sun during real
+        rain, the 22 deg cirrus halo with low-sun parhelia, star twinkle
+        growing with airmass, and real solar eclipses dimming the scene
+      - live weather (open-meteo + geojs, both keyless): cloud cover,
+        rain, snow, fog, wind-driven sway; fresh snow whitens the ground
+        only when it is actually freezing where you are
+      - the sea follows oceanography: Pierson-Moskowitz wave height and
+        period from the real wind, deep-water dispersion, whitecap
+        fraction from Monahan & O'Muircheartaigh, fresnel sun glitter
+      - clouds ride the true wind vector at the real lifting condensation
+        level; trees are spring-dampers forced by real mean wind and gusts
+      - USGS M4.5+ earthquakes arrive at their true seismic travel times
+        (P then S), attenuated by real distance
+      - aurora follows NOAA's OVATION forecast oval: its real latitude
+        sets the curtain's elevation in the sky (Kp heuristic fallback)
+      - the ISS crosses the sky via SGP4-propagated live elements, drawn
+        only during genuinely visible passes
+      - when it snows, flakes are rigid bodies in a real physics engine
+        (vendored Rapier): air drag, real wind force, collision with a
+        heightfield of the local terrain and with settled flakes, so
+        drifts accumulate while the page is open and melt when the real
+        temperature rises
+      - sky turbidity and haze come from measured air quality (open-meteo
+        AOD and PM2.5); trees stand inside the real OSM forest polygons
+        around you; the sea is a reflecting three.js Water plane whose
+        wave energy follows the real sea state; constellation figures
+        (d3-celestial data) ride the same sidereal dome as the stars
+      - a data panel (the ✦ wallpaper control, ?debug=1, or the D key)
+        lists every live source with its last real value
+
+      Standalone debug overrides (query params, e.g. Horizon.html?time=...):
+        lat, lon, time (ISO), cloud (0-100), wind (km/h), winddir (deg),
+        gust (km/h), precip (mm), snow (cm), temp (C), dew (C), aod,
+        pm25, vis (m), cloudlow/cloudmid/cloudhigh (0-100), code (WMO
+        weather code), quake (magnitude), kp (0-9), aurora (0-1),
+        auroralat (deg), dem=0 (skip real terrain), debug=1
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0a0e1d;
+      }
+      #gl {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      #caption {
+        position: fixed;
+        left: 14px;
+        bottom: 12px;
+        color: rgba(255, 255, 255, 0.75);
+        font:
+          12px/1.5 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+        transition: opacity 1.2s ease;
+      }
+      #panel {
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        max-width: 380px;
+        max-height: 80vh;
+        overflow-y: auto;
+        padding: 12px 14px;
+        border-radius: 10px;
+        background: rgba(10, 14, 24, 0.82);
+        backdrop-filter: blur(6px);
+        color: rgba(230, 237, 243, 0.92);
+        font:
+          11px/1.6 ui-monospace,
+          'Cascadia Mono',
+          Consolas,
+          monospace;
+        white-space: pre-wrap;
+      }
+      #panel b {
+        color: #7ee2a8;
+      }
+      #panel .age {
+        color: rgba(230, 237, 243, 0.45);
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./horizon/three.webgpu.min.js",
+          "three/webgpu": "./horizon/three.webgpu.min.js",
+          "three/tsl": "./horizon/three.tsl.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="gl"></canvas>
+    <div id="caption"></div>
+    <div id="panel" hidden></div>
+    <script src="./horizon/satellite.min.js"></script>
+    <script src="./horizon/astronomy.browser.min.js"></script>
+    <script type="module">
+      import * as THREE from 'three';
+      import {sunTransmittanceJS} from './horizon/sun-transmittance.js';
+      import {createAtmosphereTSL} from './horizon/atmosphere-tsl.js';
+      import {
+        createCloudShadowHook,
+        createCloudSystemTSL,
+        generateCloudTexturesTSL
+      } from './horizon/clouds-tsl.js';
+      import {createAerialFog} from './horizon/aerial-tsl.js';
+      import {createTerrainNodeMaterial} from './horizon/terrain-tsl.js';
+      import {ARCHETYPES, fitArchetype, mod09Clear} from './horizon/ross-li.js';
+      import {shadowRate, sigmaScale, vRms} from './horizon/cn2.js';
+      import {EYE_D_CM, youngSigma} from './horizon/scintillation.js';
+      import {buildMomentPyramid, slopesFromHeights} from './horizon/leadr.js';
+      import {metresPerPixel, tileAt, windowStats} from './horizon/radar.js';
+      import {geomagneticLatitude, igrfField} from './horizon/igrf.js';
+      import {HorizonWaterMesh} from './horizon/water-tsl.js';
+      import {createOceanFFT} from './horizon/ocean-tsl.js';
+      import {peakOmega} from './horizon/ocean-spectrum.js';
+      import {
+        createVeilMaterial,
+        createMoonMaterial,
+        createAirglowMaterial,
+        createAuroraMaterial,
+        createOpticsMaterial,
+        createStarSprites,
+        createPlanetSprites,
+        createPrecipSprites,
+        createZodiacalMaterial,
+        createMeteorMaterial,
+        createContrailMaterial
+      } from './horizon/sky-objects-tsl.js';
+      import {adsbToScene, appleman} from './horizon/contrails.js';
+      import {
+        aisToScene,
+        apparentLux,
+        lightArcs,
+        luminousIntensity,
+        RANGE_NM,
+        relBearing,
+        SUNSET_ELEV
+      } from './horizon/ships.js';
+      import {lineStrengths} from './horizon/airglow.js';
+      import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
+      import {
+        activeShowers,
+        drawMagnitude,
+        hourlyRate,
+        radiantAt
+      } from './horizon/meteors.js';
+      import {CSMShadowNode} from './horizon/CSMShadowNode.js';
+
+      const params = new URL(location.href).searchParams;
+      const reduceMotion = matchMedia(
+        '(prefers-reduced-motion: reduce)'
+      ).matches;
+      const timeScale = reduceMotion ? 0.25 : 1;
+
+      // ---------- real time (with optional ?time= override) ----------
+      const t0 = performance.now();
+      const timeBase = params.has('time')
+        ? new Date(params.get('time')).getTime()
+        : 0;
+      const now = () =>
+        timeBase ? new Date(timeBase + (performance.now() - t0)) : new Date();
+
+      // ---------- astronomy (NOAA/Almanac low-precision, ~0.1 deg) ----------
+      const RAD = Math.PI / 180;
+      const days2000 = (d) => d.getTime() / 86400000 - 10957.5;
+
+      // The sun's geocentric ecliptic longitude (radians) - the same
+      // NOAA low-precision series sunEquatorial builds on; the
+      // zodiacal light dome is anchored to it.
+      function sunEclipticLon(d) {
+        const n = days2000(d);
+        const L = (280.46 + 0.9856474 * n) % 360;
+        const g = (357.528 + 0.9856003 * n) * RAD;
+        return (L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * RAD;
+      }
+
+      function sunEquatorial(d) {
+        const lambda = sunEclipticLon(d);
+        const eps = 23.439 * RAD;
+        return {
+          ra: Math.atan2(Math.cos(eps) * Math.sin(lambda), Math.cos(lambda)),
+          dec: Math.asin(Math.sin(eps) * Math.sin(lambda))
+        };
+      }
+
+      function moonEquatorial(d) {
+        const n = days2000(d);
+        const L = (218.316 + 13.176396 * n) * RAD;
+        const M = (134.963 + 13.064993 * n) * RAD;
+        const F = (93.272 + 13.22935 * n) * RAD;
+        const lambda = L + 6.289 * RAD * Math.sin(M);
+        const beta = 5.128 * RAD * Math.sin(F);
+        const eps = 23.439 * RAD;
+        return {
+          ra: Math.atan2(
+            Math.sin(lambda) * Math.cos(eps) - Math.tan(beta) * Math.sin(eps),
+            Math.cos(lambda)
+          ),
+          dec: Math.asin(
+            Math.sin(beta) * Math.cos(eps) +
+              Math.cos(beta) * Math.sin(eps) * Math.sin(lambda)
+          )
+        };
+      }
+
+      // Greenwich mean sidereal time, radians.
+      const gmst = (d) =>
+        ((18.697374558 + 24.06570982441908 * days2000(d)) % 24) * 15 * RAD;
+
+      // Equatorial -> local horizontal (altitude/azimuth from north, cw).
+      function altAz(eq, d, lat, lon) {
+        const lst = gmst(d) + lon * RAD;
+        const H = lst - eq.ra;
+        const phi = lat * RAD;
+        const alt = Math.asin(
+          Math.sin(phi) * Math.sin(eq.dec) +
+            Math.cos(phi) * Math.cos(eq.dec) * Math.cos(H)
+        );
+        const az = Math.atan2(
+          Math.sin(H),
+          Math.cos(H) * Math.sin(phi) - Math.tan(eq.dec) * Math.cos(phi)
+        );
+        return {alt, az: az + Math.PI}; // 0 = north, clockwise via east
+      }
+
+      // Alt/az onto the sky dome. East = +x, north = -z, up = +y.
+      const skyPoint = (alt, az, r) =>
+        new THREE.Vector3(
+          r * Math.cos(alt) * Math.sin(az),
+          r * Math.sin(alt),
+          -r * Math.cos(alt) * Math.cos(az)
+        );
+
+      const haversineKm = (lat1, lon1, lat2, lon2) => {
+        const a =
+          Math.sin(((lat2 - lat1) * RAD) / 2) ** 2 +
+          Math.cos(lat1 * RAD) *
+            Math.cos(lat2 * RAD) *
+            Math.sin(((lon2 - lon1) * RAD) / 2) ** 2;
+        return 12742 * Math.asin(Math.sqrt(a));
+      };
+
+      // ---------- state from the real world ----------
+      const state = {
+        lat: params.has('lat') ? +params.get('lat') : 51.48,
+        lon: params.has('lon') ? +params.get('lon') : 0,
+        place: '',
+        cloud: params.has('cloud') ? +params.get('cloud') : 20,
+        wind: params.has('wind') ? +params.get('wind') : 8,
+        precip: params.has('precip') ? +params.get('precip') : 0,
+        snow: params.has('snow') ? +params.get('snow') : 0,
+        temp: params.has('temp') ? +params.get('temp') : 14,
+        winddir: params.has('winddir') ? +params.get('winddir') : 250,
+        gust: params.has('gust') ? +params.get('gust') : 12,
+        dew: params.has('dew') ? +params.get('dew') : 8,
+        aod: params.has('aod') ? +params.get('aod') : 0.12,
+        pm25: params.has('pm25') ? +params.get('pm25') : 6,
+        cloudLow: params.has('cloudlow') ? +params.get('cloudlow') : null,
+        cloudMid: params.has('cloudmid') ? +params.get('cloudmid') : null,
+        cloudHigh: params.has('cloudhigh') ? +params.get('cloudhigh') : null,
+        visibility: params.has('vis') ? +params.get('vis') : 30000,
+        wind700: params.has('w700') ? +params.get('w700') : null,
+        dir700: params.has('d700') ? +params.get('d700') : null,
+        wind250: params.has('w250') ? +params.get('w250') : null,
+        dir250: params.has('d250') ? +params.get('d250') : null,
+        freezing: params.has('fl') ? +params.get('fl') : null,
+        code: params.has('code') ? +params.get('code') : 1,
+        kp: params.has('kp') ? +params.get('kp') : 0,
+        auroraP: null, // OVATION oval probability 0..1, null = use Kp
+        auroraLat: 68,
+        sea: null, // measured wave partitions (marine model), null = wind sea
+        shake: 0
+      };
+      // Pinned sea state (harness/debug): hsw/tpw/dww wind-sea Hs (m),
+      // peak Tp (s), met direction; hss/tps/dws the swell partition;
+      // hstot the total Hs if it differs from the two partitions.
+      if (params.has('hsw') || params.has('hss')) {
+        const wp = params.has('hsw')
+          ? {
+              hs: +params.get('hsw'),
+              tp: +(params.get('tpw') ?? 6),
+              dir: +(params.get('dww') ?? state.winddir)
+            }
+          : null;
+        const sp = params.has('hss')
+          ? {
+              hs: +params.get('hss'),
+              tp: +(params.get('tps') ?? 12),
+              dir: +(params.get('dws') ?? state.winddir)
+            }
+          : null;
+        state.sea = {
+          hs: params.has('hstot')
+            ? +params.get('hstot')
+            : Math.hypot(wp ? wp.hs : 0, sp ? sp.hs : 0),
+          wind: wp,
+          swell: sp
+        };
+      }
+      const overridden = [
+        'lat',
+        'lon',
+        'cloud',
+        'wind',
+        'precip',
+        'snow',
+        'temp',
+        'winddir',
+        'gust',
+        'dew',
+        'code'
+      ].some((k) => params.has(k));
+
+      const caption = document.getElementById('caption');
+      let captionTimer = 0;
+      function say(text, sticky) {
+        caption.textContent = text;
+        caption.style.opacity = 1;
+        clearTimeout(captionTimer);
+        if (!sticky)
+          captionTimer = setTimeout(() => (caption.style.opacity = 0), 12000);
+      }
+
+      // Every live data source records what it last delivered, so the
+      // panel (the site's ✦ wallpaper toggle, or ?debug=1, or the D key)
+      // can prove nothing here is invented.
+      const sources = {};
+      function record(name, value) {
+        sources[name] = {value: String(value), at: Date.now()};
+      }
+
+      const WMO = {
+        0: 'clear',
+        1: 'mostly clear',
+        2: 'partly cloudy',
+        3: 'overcast',
+        45: 'fog',
+        48: 'rime fog',
+        51: 'drizzle',
+        53: 'drizzle',
+        55: 'drizzle',
+        61: 'light rain',
+        63: 'rain',
+        65: 'heavy rain',
+        71: 'light snow',
+        73: 'snow',
+        75: 'heavy snow',
+        77: 'snow grains',
+        80: 'showers',
+        81: 'showers',
+        82: 'heavy showers',
+        85: 'snow showers',
+        86: 'snow showers',
+        95: 'thunderstorm',
+        96: 'thunderstorm',
+        99: 'thunderstorm'
+      };
+
+      async function syncWeather() {
+        if (overridden) return;
+        try {
+          const geo = await (
+            await fetch('https://get.geojs.io/v1/ip/geo.json', {
+              credentials: 'omit'
+            })
+          ).json();
+          state.lat = +geo.latitude;
+          state.lon = +geo.longitude;
+          state.place = geo.city || geo.country || '';
+          record(
+            'geojs.io IP location',
+            state.lat.toFixed(2) +
+              ', ' +
+              state.lon.toFixed(2) +
+              ' · ' +
+              state.place
+          );
+        } catch {
+          // Keep the Greenwich fallback.
+        }
+        try {
+          const w = await (
+            await fetch(
+              'https://api.open-meteo.com/v1/forecast?latitude=' +
+                state.lat +
+                '&longitude=' +
+                state.lon +
+                '&current=weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,dew_point_2m',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const c = w.current;
+          state.code = c.weather_code;
+          state.cloud = c.cloud_cover;
+          state.cloudLow = c.cloud_cover_low;
+          state.cloudMid = c.cloud_cover_mid;
+          state.cloudHigh = c.cloud_cover_high;
+          state.visibility = c.visibility || state.visibility;
+          state.precip = c.precipitation;
+          state.snow = c.snowfall;
+          state.wind = c.wind_speed_10m;
+          state.winddir = c.wind_direction_10m;
+          state.gust = c.wind_gusts_10m;
+          state.temp = c.temperature_2m;
+          state.dew = c.dew_point_2m;
+          record(
+            'open-meteo current',
+            (WMO[state.code] || state.code) +
+              ' · ' +
+              state.temp +
+              '°C · wind ' +
+              state.wind +
+              ' km/h from ' +
+              state.winddir +
+              '° gust ' +
+              state.gust +
+              ' · cloud ' +
+              state.cloud +
+              '% · dew ' +
+              state.dew +
+              '°C'
+          );
+          say(
+            (state.place ? state.place + ' · ' : '') +
+              (WMO[state.code] || 'weather code ' + state.code) +
+              ' · this scene mirrors your sky and terrain'
+          );
+        } catch {
+          say('weather unavailable · showing a calm day');
+        }
+      }
+
+      // Winds aloft and the freezing level: mid clouds ride the 700hPa
+      // wind, cirrus rides the 250hPa jet, and the snowline on the peaks
+      // follows the real 0°C isotherm.
+      async function syncAloft() {
+        if (params.has('fl') || params.has('w250')) return;
+        try {
+          // The full 500..50 hPa wind/height profile spans the ITU-R
+          // P.1621 5-20 km slab that drives the Hufnagel-Valley
+          // turbulence model (cn2.js) for the star scintillation.
+          const LV = [500, 400, 300, 250, 200, 150, 100, 70, 50];
+          const w = await (
+            await fetch(
+              'https://api.open-meteo.com/v1/forecast?latitude=' +
+                state.lat +
+                '&longitude=' +
+                state.lon +
+                '&hourly=wind_speed_700hPa,wind_direction_700hPa,wind_direction_250hPa,freezing_level_height,temperature_250hPa,relative_humidity_250hPa,' +
+                LV.map(
+                  (p) =>
+                    'wind_speed_' + p + 'hPa,geopotential_height_' + p + 'hPa'
+                ).join(',') +
+                '&forecast_hours=1',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const h = w.hourly;
+          state.wind700 = h.wind_speed_700hPa[0];
+          state.dir700 = h.wind_direction_700hPa[0];
+          state.wind250 = h.wind_speed_250hPa[0];
+          state.dir250 = h.wind_direction_250hPa[0];
+          state.freezing = h.freezing_level_height[0];
+          record(
+            'open-meteo winds aloft',
+            '700hPa ' +
+              state.wind700 +
+              ' km/h @' +
+              state.dir700 +
+              '° · 250hPa jet ' +
+              state.wind250 +
+              ' km/h @' +
+              state.dir250 +
+              '° · freezing level ' +
+              state.freezing +
+              ' m'
+          );
+          // Schmidt-Appleman (contrails.js): the measured 250 hPa
+          // temperature and humidity decide whether contrails can
+          // exist right now, and whether they persist (ice
+          // supersaturation). The display's ambient traffic only
+          // draws what the criterion allows.
+          if (
+            typeof h.temperature_250hPa?.[0] === 'number' &&
+            typeof h.relative_humidity_250hPa?.[0] === 'number'
+          ) {
+            const t250 = h.temperature_250hPa[0];
+            const rh250 = h.relative_humidity_250hPa[0];
+            state.contrail = appleman(25000, t250, rh250 / 100);
+            record(
+              'Schmidt-Appleman contrails',
+              t250.toFixed(1) +
+                '°C / ' +
+                rh250 +
+                '% at 250 hPa → ' +
+                (state.contrail.forms
+                  ? state.contrail.persists
+                    ? 'PERSISTENT trails (RHi ' +
+                      state.contrail.rhi.toFixed(2) +
+                      ')'
+                    : 'short-lived trails (RHi ' +
+                      state.contrail.rhi.toFixed(2) +
+                      ')'
+                  : 'no formation (T_LC ' +
+                    state.contrail.tlc.toFixed(1) +
+                    '°C)')
+            );
+          }
+          // Heights above ground (geopotential is AMSL), speeds in
+          // m/s; the RMS 5-20 km wind sets the HV profile, and the
+          // profile sets the twinkle depth and rate.
+          const pts = LV.map((p) => ({
+            h: h['geopotential_height_' + p + 'hPa'][0] - w.elevation,
+            v: h['wind_speed_' + p + 'hPa'][0] / 3.6
+          })).filter((q) => Number.isFinite(q.h) && Number.isFinite(q.v));
+          const v = vRms(pts);
+          if (v) {
+            state.cn2Scale = sigmaScale(v);
+            state.cn2Rate = shadowRate(pts, v);
+            record(
+              'Hufnagel-Valley Cn² (winds aloft)',
+              'RMS 5-20 km wind ' +
+                v.toFixed(1) +
+                ' m/s · sigma x' +
+                state.cn2Scale.toFixed(2) +
+                ' · shadow rate ' +
+                state.cn2Rate.toFixed(0) +
+                ' Hz'
+            );
+          }
+        } catch {
+          // Layers fall back to the surface wind.
+        }
+      }
+
+      // Real aerosols: the scattering sky's turbidity and the haze come
+      // from measured air quality, not guesses.
+      async function syncAir() {
+        if (params.has('aod') || params.has('pm25')) return;
+        try {
+          const a = await (
+            await fetch(
+              'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' +
+                state.lat +
+                '&longitude=' +
+                state.lon +
+                '&current=aerosol_optical_depth,pm2_5',
+              {credentials: 'omit'}
+            )
+          ).json();
+          state.aod = a.current.aerosol_optical_depth ?? state.aod;
+          state.pm25 = a.current.pm2_5 ?? state.pm25;
+          record(
+            'open-meteo air quality',
+            'AOD ' + state.aod + ' · PM2.5 ' + state.pm25 + ' µg/m³'
+          );
+        } catch {
+          // Keep the temperate defaults.
+        }
+      }
+
+      // The real sea: measured wave partitions from the marine model
+      // (ECMWF WAM under open-meteo) - wind sea and swell each with
+      // significant height, PEAK period and direction - drive the FFT
+      // spectrum as a measured two-peak composition. Over land the
+      // partitions come back null and the fetch-limited wind-sea
+      // prediction stands (same spectrum builder, no data - predict).
+      const seaDirRad = (deg) => {
+        // Met convention: waves come FROM deg; the spectrum wants the
+        // world-XZ math angle they travel TOWARD (same convention as
+        // dirOf for the wind).
+        const a = (deg + 180) * RAD;
+        return Math.atan2(-Math.cos(a), Math.sin(a));
+      };
+      function seaParts() {
+        if (!state.sea) return null;
+        const parts = [];
+        const w = state.sea.wind;
+        const s = state.sea.swell;
+        if (w && w.hs > 0.01 && w.tp > 0.5) {
+          parts.push({
+            hs: w.hs,
+            tp: w.tp,
+            dir: seaDirRad(w.dir),
+            U10: Math.max(state.wind / 3.6, 1)
+          });
+        }
+        if (s && s.hs > 0.01 && s.tp > 0.5) {
+          parts.push({hs: s.hs, tp: s.tp, dir: seaDirRad(s.dir)});
+        }
+        return parts.length ? parts : null;
+      }
+      // Geomagnetic frame at the visitor (IGRF-14, igrf.js):
+      // declination steers the aurora curtain azimuth, geomagnetic
+      // latitude organises the Kp oval fallback. Pure computation -
+      // refresh whenever the location may have moved.
+      function syncGeomag() {
+        const year = Date.now() / 31557600000 + 1970; // decimal year
+        const f = igrfField(state.lat, state.lon, 0, year);
+        state.magD = f.d;
+        state.magI = f.i;
+        state.gmLat = geomagneticLatitude(state.lat, state.lon, year);
+        // Field-aligned rays: the curtain shader fans its rays
+        // toward the magnetic zenith with tan|I|.
+        auroraU.uTanI.value = Math.max(Math.tan(Math.abs(f.i) * RAD), 0.5);
+        record(
+          'IGRF-14 geomagnetism',
+          'declination ' +
+            f.d.toFixed(1) +
+            '° · inclination ' +
+            f.i.toFixed(1) +
+            '° · geomagnetic lat ' +
+            state.gmLat.toFixed(1) +
+            '°'
+        );
+      }
+
+      async function syncMarine() {
+        // Pinned sea, or pinned weather (a live sea would contradict
+        // the pinned wind): keep what the URL says.
+        if (params.has('hsw') || params.has('hss') || overridden) return;
+        try {
+          const m = await (
+            await fetch(
+              'https://marine-api.open-meteo.com/v1/marine?latitude=' +
+                state.lat +
+                '&longitude=' +
+                state.lon +
+                '&current=wave_height,wind_wave_height,wind_wave_peak_period,wind_wave_direction,swell_wave_height,swell_wave_peak_period,swell_wave_direction,sea_level_height_msl',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const c = m.current;
+          // The MEASURED tide (sea level vs MSL, tides + surge):
+          // lifts the water plane through the same asinh world
+          // mapping the terrain uses and deepens/shoals the surf
+          // zone's true depth. Independent of the wave fields -
+          // a flat calm still has a tide.
+          if (c && typeof c.sea_level_height_msl === 'number') {
+            state.tide = c.sea_level_height_msl;
+            record(
+              'open-meteo tide',
+              'sea level ' + c.sea_level_height_msl.toFixed(2) + ' m vs MSL'
+            );
+          }
+          if (c && (c.wind_wave_height || c.swell_wave_height)) {
+            state.sea = {
+              hs: c.wave_height,
+              wind: {
+                hs: c.wind_wave_height,
+                tp: c.wind_wave_peak_period,
+                dir: c.wind_wave_direction
+              },
+              swell: {
+                hs: c.swell_wave_height,
+                tp: c.swell_wave_peak_period,
+                dir: c.swell_wave_direction
+              }
+            };
+            record(
+              'open-meteo marine',
+              'Hs ' +
+                c.wave_height +
+                ' m · wind sea ' +
+                c.wind_wave_height +
+                ' m @' +
+                c.wind_wave_peak_period +
+                ' s · swell ' +
+                c.swell_wave_height +
+                ' m @' +
+                c.swell_wave_peak_period +
+                ' s from ' +
+                c.swell_wave_direction +
+                '°'
+            );
+          } else {
+            state.sea = null;
+          }
+        } catch {
+          // Keep the wind-sea prediction.
+        }
+      }
+
+      // MEASURED precipitation: the latest RainViewer radar composite
+      // decoded at the visitor (radar.js - their black-and-white dBZ
+      // tile scheme; Marshall & Palmer 1948 Z-R for rain, Sekhon &
+      // Srivastava 1970 for the snow-flagged pixels). Radar is a
+      // measurement with ~10-minute latency; when fresh it replaces
+      // the model's point value. No coverage or offline: the model
+      // stands silently.
+      let radarObs = null; // {rain, snow, coverage, snowFrac, time}
+      async function syncRadar() {
+        if (overridden) return;
+        try {
+          const cat = await (
+            await fetch('https://api.rainviewer.com/public/weather-maps.json', {
+              credentials: 'omit'
+            })
+          ).json();
+          const frames = cat.radar && cat.radar.past;
+          if (!frames || !frames.length) return;
+          const f = frames[frames.length - 1];
+          const {tx, ty, px, py} = tileAt(state.lat, state.lon, 8);
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.src =
+            cat.host + f.path + '/256/8/' + tx + '/' + ty + '/0/0_0.png';
+          await img.decode();
+          const cv = document.createElement('canvas');
+          cv.width = cv.height = 256;
+          const cx = cv.getContext('2d', {willReadFrequently: true});
+          cx.drawImage(img, 0, 0);
+          const data = cx.getImageData(0, 0, 256, 256).data;
+          // window sized to the 16 km world footprint
+          const h = Math.max(
+            Math.round(8000 / metresPerPixel(state.lat, 8)),
+            1
+          );
+          const s = windowStats(data, px, py, h);
+          radarObs = {...s, time: f.time * 1000};
+          // The measured coverage field for the cloud decks (the
+          // Nubis weather map, from data): precip at a texel means
+          // cloud overhead - map the local rate onto a coverage
+          // value with the drizzle floor as threshold. Zero border
+          // ring so the field fades at the world edge.
+          const RM = 64;
+          const field = new Float32Array(RM * RM * 4);
+          const mppScene = metresPerPixel(state.lat, 8) / 57.14;
+          for (let jj = 0; jj < RM; jj++) {
+            for (let ii = 0; ii < RM; ii++) {
+              const k = (jj * RM + ii) * 4;
+              field[k + 3] = 1;
+              if (ii === 0 || jj === 0 || ii === RM - 1 || jj === RM - 1)
+                continue;
+              const xs = ((ii + 0.5) / RM - 0.5) * WORLD; // scene units
+              const zs = ((jj + 0.5) / RM - 0.5) * WORLD;
+              const pi = Math.round(px + xs / mppScene);
+              const pj = Math.round(py + zs / mppScene);
+              if (pi < 0 || pi > 255 || pj < 0 || pj > 255) continue;
+              const kk = (pj * 256 + pi) * 4;
+              if (data[kk + 3] === 0) continue;
+              const dec = decodeRed(data[kk]);
+              const rate = dec.snow ? snowRate(dec.dbz) : rainRate(dec.dbz);
+              // >0.05 mm/h (below drizzle nothing shows on radar
+              // reliably); saturate toward 0.95 local cover by 1 mm/h
+              field[k] = 0.95 * THREE.MathUtils.smoothstep(rate, 0.05, 1.0);
+            }
+          }
+          radarObs.field = field;
+          radarObs.fieldSize = RM;
+          if (cloudSys) cloudSys.setRadarCover(field, RM, WORLD);
+          record(
+            'RainViewer radar',
+            (s.coverage > 0.05
+              ? 'rain ' +
+                s.rain.toFixed(2) +
+                ' mm/h · snow ' +
+                s.snow.toFixed(2) +
+                ' mm/h liq · ' +
+                Math.round(s.snowFrac * 100) +
+                '% snow px'
+              : 'no radar coverage here') +
+              ' · ' +
+              Math.round((Date.now() - radarObs.time) / 60000) +
+              ' min old'
+          );
+        } catch {
+          // Keep the model's precipitation.
+        }
+      }
+
+      // Real forests: OSM wood/forest polygons around the visitor decide
+      // where trees stand (scene-space polygons, cached per location).
+      let forestPolys = null;
+      async function syncForests() {
+        const key =
+          'horizon-forest-' + state.lat.toFixed(2) + ',' + state.lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) {
+            forestPolys = JSON.parse(hit);
+            record(
+              'OSM Overpass forests (cached)',
+              forestPolys.length + ' wood polygons'
+            );
+            buildWorld();
+            return;
+          }
+        } catch {}
+        try {
+          const mLat = 111320;
+          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+          const dLat = DEM_HALF_M / mLat;
+          const dLon = DEM_HALF_M / mLon;
+          const bbox =
+            (state.lat - dLat).toFixed(4) +
+            ',' +
+            (state.lon - dLon).toFixed(4) +
+            ',' +
+            (state.lat + dLat).toFixed(4) +
+            ',' +
+            (state.lon + dLon).toFixed(4);
+          const q =
+            '[out:json][timeout:25];(way[natural=wood](' +
+            bbox +
+            ');way[landuse=forest](' +
+            bbox +
+            '););out geom 120;';
+          // The mail.ru mirror is faster (Surveillance.html uses it too);
+          // the main overpass-api.de instance is the fallback.
+          let osm = null;
+          for (const host of [
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+            'https://overpass-api.de/api/interpreter'
+          ]) {
+            try {
+              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
+                credentials: 'omit'
+              });
+              if (!r.ok) throw new Error(r.status);
+              osm = await r.json();
+              break;
+            } catch {
+              // Try the next mirror.
+            }
+          }
+          if (!osm) throw new Error('overpass unavailable');
+          forestPolys = osm.elements
+            .filter((w) => w.geometry && w.geometry.length > 3)
+            .map((w) =>
+              w.geometry.map((g) => [
+                +(((g.lon - state.lon) / (2 * dLon)) * WORLD).toFixed(1),
+                +((-(g.lat - state.lat) / (2 * dLat)) * WORLD).toFixed(1)
+              ])
+            );
+          record('OSM Overpass forests', forestPolys.length + ' wood polygons');
+          try {
+            localStorage.setItem(key, JSON.stringify(forestPolys));
+          } catch {}
+          buildWorld(); // replant where the real woods are
+        } catch {
+          forestPolys = null; // procedural scatter stays
+        }
+      }
+
+      // Surface BRDF: the visitor pixel's own multi-angular MODIS
+      // reflectance record (MOD09A1 8-day surface reflectance with
+      // per-composite sun/view geometry, ORNL subset REST API, 60
+      // composites = ~16 months of Terra cross-track sampling - the
+      // archetype papers fit multi-year records per location)
+      // selects one of the six global RTLSR BRDF archetypes (Zhang,
+      // Jiao et al. 2016) by the published minimum-fitting-error
+      // rule (Jiao et al. 2014). The terrain's vegetation then
+      // carries that archetype's Ross-Li anisotropy: hotspot
+      // brightening opposite the sun, shadow-driven darkening into
+      // it. Too few strictly-clear looks (ocean, polar night,
+      // persistent cloud - the state-word QC keeps only cloud-,
+      // shadow-, snow- and heavy-aerosol-free land) leaves the
+      // grass Lambertian, and says so.
+      async function syncBrdf() {
+        const key =
+          'horizon-brdf-' + state.lat.toFixed(2) + ',' + state.lon.toFixed(2);
+        const apply = (fit, n, cached) => {
+          const w = ARCHETYPES.red[fit.k];
+          terrainUniforms.uRossW.value.set(w.iso, w.vol, w.geo);
+          terrainUniforms.uRossOn.value = 1;
+          record(
+            'MODIS MOD09A1 BRDF' + (cached ? ' (cached)' : ''),
+            'archetype A' +
+              (fit.k + 1) +
+              ' red, ' +
+              n +
+              ' clear obs, rmse ' +
+              fit.rmse.toFixed(4)
+          );
+        };
+        // Debug override (the harness page is offline): ?brdf=N pins
+        // archetype A_N directly, N in 1..6.
+        if (params.has('brdf')) {
+          const k = THREE.MathUtils.clamp((+params.get('brdf') || 1) - 1, 0, 5);
+          apply({k, rmse: 0}, 0, false);
+          return;
+        }
+        try {
+          const hit = JSON.parse(localStorage.getItem(key));
+          // One MOD09A1 compositing period is 8 days.
+          if (hit && Date.now() - hit.t < 8 * 864e5) {
+            apply(hit.fit, hit.n, true);
+            return;
+          }
+        } catch {}
+        try {
+          const base = 'https://modis.ornl.gov/rst/api/v1/MOD09A1';
+          const q = 'latitude=' + state.lat + '&longitude=' + state.lon;
+          const dr = await (
+            await fetch(base + '/dates?' + q, {credentials: 'omit'})
+          ).json();
+          if (!Array.isArray(dr.dates)) return;
+          const md = dr.dates.map((d) => d.modis_date).slice(-60);
+          const obs = [];
+          // The subset endpoint caps one request at 10 composites.
+          for (let i = 0; i < md.length; i += 10) {
+            const span =
+              '&startDate=' +
+              md[i] +
+              '&endDate=' +
+              md[Math.min(i + 9, md.length - 1)];
+            const rs = await Promise.all(
+              ['b01', 'szen', 'vzen', 'raz', 'state_500m'].map((b) =>
+                fetch(
+                  base +
+                    '/subset?' +
+                    q +
+                    '&band=sur_refl_' +
+                    b +
+                    span +
+                    '&kmAboveBelow=0&kmLeftRight=0',
+                  {credentials: 'omit'}
+                ).then((r) => r.json())
+              )
+            );
+            for (let j = 0; j < rs[0].subset.length; j++) {
+              const [r, sz, vz, ra, st] = rs.map((x) => x.subset[j].data[0]);
+              const refl = r * 1e-4; // stored scale 0.0001
+              if (!mod09Clear(st) || refl <= 0 || refl > 1) continue;
+              obs.push({
+                r: refl,
+                ti: sz * 0.01 * RAD, // angles stored in 0.01 deg
+                tv: vz * 0.01 * RAD,
+                phi: ra * 0.01 * RAD
+              });
+            }
+          }
+          const fit = fitArchetype(obs, 'red');
+          if (!fit) {
+            // Too few clear looks: Lambertian stays - and the panel
+            // proves the source was consulted, not skipped.
+            record(
+              'MODIS MOD09A1 BRDF',
+              obs.length + ' clear obs of 60 - Lambertian fallback'
+            );
+            return;
+          }
+          apply(fit, obs.length, false);
+          try {
+            localStorage.setItem(
+              key,
+              JSON.stringify({t: Date.now(), fit, n: obs.length})
+            );
+          } catch {}
+        } catch {
+          // Lambertian grass stays.
+        }
+      }
+
+      function inForest(x, z) {
+        if (!forestPolys || !forestPolys.length) return true;
+        for (const poly of forestPolys) {
+          let inside = false;
+          for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+            const xi = poly[i][0];
+            const zi = poly[i][1];
+            const xj = poly[j][0];
+            const zj = poly[j][1];
+            if (
+              zi > z !== zj > z &&
+              x < ((xj - xi) * (z - zi)) / (zj - zi) + xi
+            )
+              inside = !inside;
+          }
+          if (inside) return true;
+        }
+        return false;
+      }
+
+      // Solar 10.7 cm radio flux (NOAA SWPC): drives the airglow
+      // line intensities via PALACE Eq. 1. PALACE regressed on
+      // centred 27-day averages; live we take the trailing 27-day
+      // mean of the SWPC feed (~3 reports/day, newest first).
+      async function syncF107() {
+        if (params.has('f107')) {
+          airglowU.uLineI.value.fromArray(lineStrengths(+params.get('f107')));
+          return;
+        }
+        try {
+          const rows = await (
+            await fetch(
+              'https://services.swpc.noaa.gov/json/f107_cm_flux.json',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const fs = rows
+            .slice(0, 81)
+            .map((r) => +r.flux)
+            .filter((f) => f > 0);
+          if (!fs.length) return;
+          const srf = fs.reduce((a, b) => a + b, 0) / fs.length;
+          state.f107 = srf;
+          airglowU.uLineI.value.fromArray(lineStrengths(srf));
+          record(
+            'NOAA SWPC F10.7',
+            srf.toFixed(0) +
+              ' sfu (27-day mean) · airglow lines x' +
+              (1 + 0.00754 * (srf - 100)).toFixed(2)
+          );
+        } catch {
+          // The 100 sfu PALACE reference intensities stay.
+        }
+      }
+
+      async function syncKp() {
+        if (params.has('kp')) return;
+        try {
+          const rows = await (
+            await fetch(
+              'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json',
+              {credentials: 'omit'}
+            )
+          ).json();
+          state.kp = +rows[rows.length - 1].estimated_kp || 0;
+          record('NOAA SWPC planetary K-index', state.kp.toFixed(2));
+        } catch {
+          state.kp = 0;
+        }
+      }
+
+      // NOAA's OVATION model: the actual forecast auroral oval. We take
+      // the strongest probability near our meridian on our hemisphere,
+      // and where it sits decides the curtain's true elevation in the
+      // sky (overhead if the oval reaches our latitude).
+      async function syncOvation() {
+        if (params.has('aurora')) {
+          state.auroraP = +params.get('aurora');
+          state.auroraLat = params.has('auroralat')
+            ? +params.get('auroralat')
+            : state.lat + 6;
+          return;
+        }
+        try {
+          const o = await (
+            await fetch(
+              'https://services.swpc.noaa.gov/json/ovation_aurora_latest.json',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const myLon = ((state.lon % 360) + 360) % 360;
+          const south = state.lat < 0;
+          let best = 0;
+          let bestLat = south ? -68 : 68;
+          for (const [lon, la, val] of o.coordinates) {
+            if (south ? la > -40 : la < 40) continue;
+            let dl = Math.abs(lon - myLon);
+            if (dl > 180) dl = 360 - dl;
+            if (dl > 3) continue;
+            if (val > best) {
+              best = val;
+              bestLat = la;
+            }
+          }
+          state.auroraP = best / 100;
+          state.auroraLat = bestLat;
+          record(
+            'NOAA OVATION aurora oval',
+            best + '% at lat ' + bestLat + '° on this meridian'
+          );
+        } catch {
+          state.auroraP = null; // fall back to the Kp heuristic
+        }
+      }
+
+      const seenQuakes = new Set();
+      let firstQuakePoll = true;
+      async function pollQuakes() {
+        try {
+          const q = await (
+            await fetch(
+              'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson',
+              {credentials: 'omit'}
+            )
+          ).json();
+          for (const f of q.features) {
+            if (seenQuakes.has(f.id)) continue;
+            seenQuakes.add(f.id);
+            if (firstQuakePoll) continue; // only rumble live events
+            // Real distance decides how hard it shakes here - and real
+            // seismology decides WHEN. Waves are not instant: P-waves
+            // average ~7.8 km/s and the stronger S-waves ~4.4 km/s, so
+            // each arrival is scheduled at its true travel time (unless
+            // feed latency means it already passed).
+            const [qlon, qlat] = f.geometry.coordinates;
+            const km = haversineKm(state.lat, state.lon, qlat, qlon);
+            const atten = Math.max(Math.exp(-km / 2500), 0.04);
+            const mag = f.properties.mag;
+            const elapsed = (Date.now() - f.properties.time) / 1000;
+            const pDelay = km / 7.8 - elapsed;
+            const sDelay = km / 4.4 - elapsed;
+            if (sDelay < -120) continue; // shaking here is long over
+            const jolt = (amp) => {
+              state.shake = Math.max(
+                state.shake,
+                Math.min((mag - 4) * 0.5 * atten * amp, 1.2)
+              );
+            };
+            if (pDelay > 0) setTimeout(() => jolt(0.35), pDelay * 1000);
+            if (sDelay > 0) setTimeout(() => jolt(1), sDelay * 1000);
+            else jolt(1);
+            say(
+              'M' +
+                mag.toFixed(1) +
+                ' earthquake · ' +
+                Math.round(km).toLocaleString('en') +
+                ' km away · ' +
+                (sDelay > 5
+                  ? 'S-wave arrives in ' + Math.round(sDelay) + 's · '
+                  : '') +
+                f.properties.place
+            );
+          }
+          firstQuakePoll = false;
+          record('USGS M4.5+ quake feed', q.features.length + ' events today');
+        } catch {
+          // Silent: quakes are garnish, not the meal.
+        }
+      }
+
+      // ---------- real terrain (open-meteo elevation, Copernicus DEM) ----------
+      // 24x24 real elevations spanning 16km around the visitor, cached per
+      // rounded location. The mesh gets macro relief from the DEM and only
+      // fine detail from noise, so the landscape is recognisably *yours*.
+      const DEM_N = 24;
+      const DEM_HALF_M = 8000;
+      const WORLD = 280; // scene units across; ~57 m per unit
+
+      // Primary source: AWS terrarium tiles (Mapzen open data). Elevation
+      // is PNG-encoded as (R*256 + G + B/256) - 32768, CORS-open, so a
+      // stitched canvas gives ~30-90m real elevations in a few requests.
+      // Kept at full pixel resolution (no downsampled cache: the browser's
+      // HTTP cache already holds the tiles themselves).
+      async function fetchDEMTiles(lat, lon) {
+        const z = Math.max(
+          8,
+          Math.min(
+            13,
+            Math.round(Math.log2((40075000 * Math.cos(lat * RAD)) / 8000))
+          )
+        );
+        const world = 2 ** z * 256; // global pixels at this zoom
+        const px = (lo) => ((lo + 180) / 360) * world;
+        const py = (la) => {
+          const r = la * RAD;
+          return (
+            ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) *
+            world
+          );
+        };
+        const mLat = 111320;
+        const mLon = Math.max(111320 * Math.cos(lat * RAD), 1e-6);
+        const dLat = DEM_HALF_M / mLat;
+        const dLon = DEM_HALF_M / mLon;
+        const x0 = Math.floor(px(lon - dLon) / 256);
+        const x1 = Math.floor(px(lon + dLon) / 256);
+        const y0 = Math.floor(py(lat + dLat) / 256);
+        const y1 = Math.floor(py(lat - dLat) / 256);
+        if ((x1 - x0 + 1) * (y1 - y0 + 1) > 12)
+          throw new Error('tile span too large');
+        const canvas = document.createElement('canvas');
+        canvas.width = (x1 - x0 + 1) * 256;
+        canvas.height = (y1 - y0 + 1) * 256;
+        const ctx = canvas.getContext('2d', {willReadFrequently: true});
+        const jobs = [];
+        for (let ty = y0; ty <= y1; ty++)
+          for (let tx = x0; tx <= x1; tx++)
+            jobs.push(
+              new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                  ctx.drawImage(img, (tx - x0) * 256, (ty - y0) * 256);
+                  resolve();
+                };
+                img.onerror = reject;
+                img.src =
+                  'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/' +
+                  z +
+                  '/' +
+                  tx +
+                  '/' +
+                  ty +
+                  '.png';
+              })
+            );
+        await Promise.all(jobs);
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        const elev = new Float32Array(canvas.width * canvas.height);
+        for (let k = 0; k < elev.length; k++)
+          elev[k] =
+            data[k * 4] * 256 + data[k * 4 + 1] + data[k * 4 + 2] / 256 - 32768;
+        record(
+          'AWS terrarium DEM tiles',
+          jobs.length +
+            ' tiles at z' +
+            z +
+            ' · ' +
+            canvas.width +
+            'x' +
+            canvas.height +
+            ' px'
+        );
+        return {
+          kind: 'img',
+          w: canvas.width,
+          h: canvas.height,
+          elev,
+          ox: x0 * 256,
+          oy: y0 * 256,
+          worldPx: world,
+          lat,
+          lon,
+          dLat,
+          dLon
+        };
+      }
+
+      async function fetchDEM(lat, lon) {
+        const key = 'horizon-dem-om-' + lat.toFixed(2) + ',' + lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) return JSON.parse(hit);
+        } catch {}
+        const mLat = 111320;
+        const mLon = Math.max(111320 * Math.cos(lat * RAD), 1e-6);
+        const lats = [];
+        const lons = [];
+        for (let j = 0; j < DEM_N; j++)
+          for (let i = 0; i < DEM_N; i++) {
+            lats.push(
+              (lat + ((j / (DEM_N - 1) - 0.5) * 2 * DEM_HALF_M) / mLat).toFixed(
+                4
+              )
+            );
+            lons.push(
+              (lon + ((i / (DEM_N - 1) - 0.5) * 2 * DEM_HALF_M) / mLon).toFixed(
+                4
+              )
+            );
+          }
+        const grid = [];
+        for (let o = 0; o < DEM_N * DEM_N; o += 96) {
+          const r = await fetch(
+            'https://api.open-meteo.com/v1/elevation?latitude=' +
+              lats.slice(o, o + 96).join(',') +
+              '&longitude=' +
+              lons.slice(o, o + 96).join(','),
+            {credentials: 'omit'}
+          );
+          if (!r.ok) throw new Error(r.status);
+          grid.push(...(await r.json()).elevation);
+        }
+        const dem = {n: DEM_N, grid};
+        record(
+          'open-meteo elevation API',
+          DEM_N + 'x' + DEM_N + ' grid (fallback)'
+        );
+        try {
+          localStorage.setItem(key, JSON.stringify(dem));
+        } catch {}
+        return dem;
+      }
+
+      // ---------- scene ----------
+      const canvas = document.getElementById('gl');
+      // WebGPU-only build: every GPU pass is a compute kernel over
+      // storage textures (the WebGL2-backend raster drivers were
+      // deleted). Browsers without WebGPU get a plain caption.
+      if (!navigator.gpu) {
+        document.getElementById('caption').textContent =
+          'this wallpaper needs WebGPU - current Chrome, Edge, Firefox or Safari';
+        throw new Error('WebGPU unavailable');
+      }
+      const renderer = new THREE.WebGPURenderer({
+        canvas,
+        forceWebGL: false,
+        antialias: true
+      });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+      await renderer.init();
+      if (!renderer.backend.isWebGPUBackend) {
+        document.getElementById('caption').textContent =
+          'this wallpaper needs WebGPU - the adapter request failed';
+        throw new Error('WebGPU adapter unavailable');
+      }
+      // The renderer's own output transform stays identity: AgX (Sobotka;
+      // Blender 4's default view transform - better hue preservation
+      // toward clipping than ACES) and the sRGB encode are applied
+      // per-material by the shared output hooks in aerial-tsl, in the
+      // same order the classic chunk pipeline ran them, so raw-output
+      // passes (the atmosphere dome, the sky objects, the cloud
+      // composite) stay raw exactly as they shipped.
+      renderer.toneMapping = THREE.NoToneMapping;
+      renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+      camera.layers.enable(2);
+
+      // Cascaded shadow maps (vendored three.js CSMShadowNode: practical
+      // split scheme after Zhang et al. 2006) as a shadow node on ONE
+      // real sun light - cascades split the shadow frustum without
+      // mirrored cascade lights. Its colour/intensity come from the CPU
+      // transmittance mirror each frame.
+      const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+      sunLight.castShadow = true;
+      const shadowRes = innerWidth < 800 ? 1024 : 2048;
+      sunLight.shadow.mapSize.set(shadowRes, shadowRes);
+      sunLight.shadow.bias = -0.0004;
+      sunLight.shadow.normalBias = 1.5;
+      sunLight.shadow.camera.near = 1;
+      sunLight.shadow.camera.far = 800;
+      const csm = new CSMShadowNode(sunLight, {
+        cascades: 3,
+        maxFar: 460,
+        mode: 'practical',
+        lightMargin: 150
+      });
+      csm.fade = true;
+      sunLight.shadow.shadowNode = csm;
+      scene.add(sunLight);
+      scene.add(sunLight.target);
+      record('Cascaded shadow maps', '3 cascades · practical splits (CSM)');
+
+      let sizeCloudTargets = null;
+      function resize() {
+        renderer.setSize(innerWidth, innerHeight);
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        // The CSM shadow node binds its camera on first render.
+        if (csm.camera) csm.updateFrustums();
+        if (sizeCloudTargets) sizeCloudTargets();
+      }
+      addEventListener('resize', resize);
+      resize();
+
+      // Ambient is a hemisphere fed by the REAL sky: the atmosphere pass
+      // integrates its own sky-view LUT (cosine-weighted) and the result
+      // is read back at 1 Hz - twilight blues, overcast greys and sunset
+      // warmth arrive from the raymarch, not from a tuned formula. The
+      // ground half is that irradiance bounced off an estimated terrain
+      // albedo (0.25 grass/rock, 0.7 snow - the one disclosed estimate).
+      const ambient = new THREE.HemisphereLight(0xffffff, 0x404038, 0.5);
+      scene.add(ambient);
+
+      // The sky: Hillaire (2020) multiple-scattering atmosphere -
+      // transmittance, multiple-scattering and per-frame sky-view LUTs
+      // with Rayleigh, Mie (scaled by measured AOD) and ozone profiles.
+      // Twilight arch and the Belt of Venus emerge from the raymarch
+      // instead of being painted.
+      const atmo = createAtmosphereTSL(renderer);
+      if (atmo.ok) {
+        scene.add(atmo.mesh);
+        record(
+          'Hillaire (2020) atmosphere',
+          'multiple-scattering LUTs · ozone · AOD-scaled Mie'
+        );
+      } else {
+        record('atmosphere unavailable', 'no float render targets');
+      }
+
+      // Aerial perspective (Hillaire 2020, sec. 5.2): the atmosphere
+      // BETWEEN the camera and every surface. atmosphere-tsl marches a
+      // 64x32 LUT of inscattered radiance and mean transmittance over
+      // (relative azimuth x distance), and every world material swaps
+      // three.js' colour-only fog input for it - distant ridges turn
+      // blue by scattering physics, then the Koschmieder haze (which
+      // carries the MEASURED visibility) applies on top.
+      function dummyTex(bytes) {
+        const t = new THREE.DataTexture(
+          new Uint8Array(bytes),
+          1,
+          1,
+          THREE.RGBAFormat
+        );
+        t.needsUpdate = true;
+        return t;
+      }
+      const aerial = createAerialFog(
+        atmo.ok ? atmo.aerialTex : dummyTex([0, 0, 0, 255])
+      );
+      const aerialU = aerial.uniforms;
+      aerialU.uAerialMaxU.value = atmo.ok ? atmo.aerialMaxUnits : 1;
+      aerialU.uAerialOn.value = atmo.ok ? 1 : 0;
+      const applyAerial = (mat) => aerial.apply(mat);
+      if (atmo.ok) {
+        record(
+          'Aerial perspective LUT',
+          'per-pixel inscatter + transmittance on every material'
+        );
+        record(
+          'Sky-irradiance ambient',
+          'hemisphere light integrated from the sky-view LUT'
+        );
+      }
+      const skyIrr = new THREE.Color(0.05, 0.07, 0.1);
+      const tmpC = new THREE.Color();
+      let lastIrrT = -1e9;
+      // The irradiance readback is async on WebGPURenderer (no
+      // pipeline stall); until the first read resolves, skyIrr is a
+      // guess. Systems with TEMPORAL HISTORY (the cloud buffer) must
+      // not integrate lighting built on that guess - the 8%%/frame
+      // exponential blend takes hundreds of frames to forget it.
+      let skyIrrReady = !atmo.ok;
+
+      // Overcast veil: a translucent grey dome that fades in with real
+      // cloud cover (the scattering model alone stays too blue).
+      const veilObj = createVeilMaterial();
+      const veilU = veilObj.u;
+      const veil = new THREE.Mesh(
+        new THREE.SphereGeometry(600, 24, 16),
+        veilObj.material
+      );
+      veil.renderOrder = -1;
+      scene.add(veil);
+
+      // ---------- terrain ----------
+      function mulberry32(a) {
+        return () => {
+          a |= 0;
+          a = (a + 0x6d2b79f5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      const rand = mulberry32(20260704);
+      const gridN = 48;
+      const grid = Array.from({length: gridN * gridN}, rand);
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const smooth = (t) => t * t * (3 - 2 * t);
+      function noise2(x, y) {
+        const xi = Math.floor(x),
+          yi = Math.floor(y);
+        const g = (ix, iy) =>
+          grid[
+            (((iy % gridN) + gridN) % gridN) * gridN +
+              (((ix % gridN) + gridN) % gridN)
+          ];
+        const tx = smooth(x - xi),
+          ty = smooth(y - yi);
+        return lerp(
+          lerp(g(xi, yi), g(xi + 1, yi), tx),
+          lerp(g(xi, yi + 1), g(xi + 1, yi + 1), tx),
+          ty
+        );
+      }
+      const fbm = (x, y) =>
+        0.55 * noise2(x, y) +
+        0.27 * noise2(x * 2.1 + 13, y * 2.1 + 7) +
+        0.13 * noise2(x * 4.3 + 41, y * 4.3 + 3) +
+        0.05 * noise2(x * 8.9 + 5, y * 8.9 + 59);
+
+      // Fallback height model when the DEM is unavailable: domain-warped
+      // fBm, in real metres so the colouring logic stays unified.
+      function proceduralElev(x, z) {
+        const wx = x / 90 + 1.7 * fbm(x / 60 + 31, z / 60 + 17);
+        const wz = z / 90 + 1.7 * fbm(x / 60 + 3, z / 60 + 47);
+        const ridged = 1 - Math.abs(2 * fbm(wx, wz) - 1);
+        return 90 + 700 * ridged * ridged + 260 * fbm(x / 40, z / 40);
+      }
+
+      let demData = null; // full-res tile image or {n, grid} API fallback
+      function demElev(x, z) {
+        if (demData.kind === 'img') {
+          // Scene x/z -> lat/lon -> mercator pixel, bilinear on the tiles.
+          const la = demData.lat - (z / WORLD) * 2 * demData.dLat;
+          const lo = demData.lon + (x / WORLD) * 2 * demData.dLon;
+          const r = la * RAD;
+          const gx = THREE.MathUtils.clamp(
+            ((lo + 180) / 360) * demData.worldPx - demData.ox,
+            0,
+            demData.w - 1.001
+          );
+          const gy = THREE.MathUtils.clamp(
+            ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) *
+              demData.worldPx -
+              demData.oy,
+            0,
+            demData.h - 1.001
+          );
+          const i = Math.floor(gx);
+          const j = Math.floor(gy);
+          const e = demData.elev;
+          const w = demData.w;
+          return lerp(
+            lerp(e[j * w + i], e[j * w + i + 1], gx - i),
+            lerp(e[(j + 1) * w + i], e[(j + 1) * w + i + 1], gx - i),
+            gy - j
+          );
+        }
+        // x east, z south, in scene units -> bilinear over the DEM grid.
+        const N = demData.n;
+        const u = THREE.MathUtils.clamp(x / WORLD + 0.5, 0, 1) * (N - 1);
+        const v = THREE.MathUtils.clamp(1 - (z / WORLD + 0.5), 0, 1) * (N - 1);
+        const i = Math.min(Math.floor(u), N - 2);
+        const j = Math.min(Math.floor(v), N - 2);
+        const g = demData.grid;
+        const e00 = g[j * N + i];
+        const e10 = g[j * N + i + 1];
+        const e01 = g[(j + 1) * N + i];
+        const e11 = g[(j + 1) * N + i + 1];
+        return lerp(lerp(e00, e10, u - i), lerp(e01, e11, u - i), v - j);
+      }
+
+      let centerElev = 300;
+      function sample(x, z) {
+        const e = demData ? demElev(x, z) : proceduralElev(x, z);
+        const water = demData && e <= 0.3;
+        // Real metres compressed onto the scene: asinh keeps flatlands
+        // honest while alpine relief still towers.
+        let y = 16 * Math.asinh((e - centerElev) / 500);
+        if (water) y = 16 * Math.asinh((0 - centerElev) / 500) - 0.6;
+        else {
+          // With 30m tile data the noise is only seasoning; the coarse
+          // fallbacks need more of it to avoid reading as blobs.
+          const micro = demData && demData.kind === 'img' ? 0.5 : 1.6;
+          y += micro * (fbm(x / 7, z / 7) - 0.5);
+        }
+        return {e, y, water};
+      }
+
+      const ground = new THREE.Group();
+      scene.add(ground);
+      // Tree archetypes (shared geometry, per-tree scale): conifers for
+      // the subalpine band, broadleaves lower down.
+      // GGX standard materials: bark and foliage are near-diffuse
+      // (roughness ~1), which the microfacet model represents honestly
+      // instead of Lambert's zero specular.
+      const trunkMat = new THREE.MeshStandardNodeMaterial({
+        color: '#6b4a33',
+        roughness: 0.9,
+        metalness: 0
+      });
+      const leafMats = [
+        new THREE.MeshStandardNodeMaterial({color: '#2e5230', roughness: 1}),
+        new THREE.MeshStandardNodeMaterial({color: '#3f6b3a', roughness: 1}),
+        new THREE.MeshStandardNodeMaterial({color: '#4d7a35', roughness: 1})
+      ];
+      const broadMats = [
+        new THREE.MeshStandardNodeMaterial({color: '#4a7d33', roughness: 1}),
+        new THREE.MeshStandardNodeMaterial({color: '#5d8a3c', roughness: 1})
+      ];
+      [trunkMat, ...leafMats, ...broadMats].forEach((m) => applyAerial(m));
+      const geoTrunk = new THREE.CylinderGeometry(0.13, 0.2, 1.1, 7);
+      const geoCone1 = new THREE.ConeGeometry(1.15, 2.3, 10);
+      const geoCone2 = new THREE.ConeGeometry(0.82, 1.8, 10);
+      // Broadleaf crowns: an indexed sphere displaced by a smooth
+      // position-hashed field (same offset for co-located verts, so
+      // averaged normals stay smooth), instead of a faceted icosahedron.
+      const geoCanopy = new THREE.SphereGeometry(1.25, 14, 10);
+      {
+        const cp = geoCanopy.attributes.position;
+        const cv = new THREE.Vector3();
+        for (let i = 0; i < cp.count; i++) {
+          cv.fromBufferAttribute(cp, i);
+          const s =
+            1 +
+            0.16 *
+              Math.sin(cv.x * 4.7) *
+              Math.sin(cv.y * 3.9 + 1.3) *
+              Math.sin(cv.z * 5.1 + 2.1);
+          cp.setXYZ(i, cv.x * s, cv.y * s, cv.z * s);
+        }
+        geoCanopy.computeVertexNormals();
+      }
+      // Deciduous phenology bases (Hopkins' law shifts the calendar).
+      const broadBases = broadMats.map((m) => m.color.clone());
+      const cBare = new THREE.Color('#6f5b46');
+      const cSpring = new THREE.Color('#7cbf5d');
+      const cAutumn = new THREE.Color('#b95f24');
+      // Climatic treeline vs latitude, after Körner & Paulsen (2004).
+      function treelineM(lat) {
+        const a = Math.abs(lat);
+        return a < 30
+          ? 3500 + (30 - a) * 13
+          : Math.max(3500 - 92 * (a - 30), 0);
+      }
+      let trees = [];
+      let camBaseY = 6;
+      let viewSign = 1; // +1: camera looks south (north hemisphere)
+      let snowSim = null; // Rapier world, booted the first time it snows
+      let snowLoading = false;
+      let water = null; // three.js Water plane, built when the DEM has sea
+      let oceanCascades = null; // FFT ocean (phase 5), built with water
+      let oceanBuiltU = -1; // wind the spectrum was built at (m/s)
+      let oceanBuiltDir = 0;
+      let oceanBuiltSeaKey = null; // measured partitions in the spectrum
+      let oceanSeaDepth = 60;
+      let oceanTime = 0; // REAL seconds - the dispersion is physical
+
+      // Terrain material: grass/rock/snow/sea decided per PIXEL in the
+      // fragment shader (slope and altitude with noise-jittered borders),
+      // not per vertex, so faces stay crisp at any distance. Elevation in
+      // metres is recovered in-shader by inverting the asinh compression.
+      const flatMoments = new THREE.DataTexture(
+        new Float32Array([0, 0, 0, 0]),
+        1,
+        1,
+        THREE.RGBAFormat,
+        THREE.FloatType
+      );
+      flatMoments.needsUpdate = true;
+      const terrainObj = createTerrainNodeMaterial(flatMoments, aerial);
+      const terrainMat = terrainObj.material;
+      const terrainUniforms = terrainObj.uniforms;
+      terrainUniforms.uWorldSize.value = WORLD;
+      // Cloud shadows (phase 5): Beer-Lambert through the SAME Nubis
+      // density the sky renders, multiplied into every sunlit
+      // material's received shadow. Until the lazy cloud system
+      // attaches, the hook is a zero map - full sun.
+      const cloudShadow = createCloudShadowHook();
+      cloudShadow.uniforms.uWorldSize.value = WORLD;
+      cloudShadow.applyTo(terrainMat);
+      record(
+        'GGX microfacet BRDF (Karis 2013)',
+        'per-pixel roughness · vegetation/rock/snow'
+      );
+      record(
+        'Cloud shadow map',
+        'Beer-Lambert through the cloud decks (Schneider 2015)'
+      );
+      record('Lommel-Seeliger moon', 'lunar regolith photometry');
+
+      // The DEM outresolves the mesh (~26 m ground truth vs ~0.9 units
+      // per vertex), so shading reads the data directly - as LEADR
+      // slope moments (leadr.js): a double-precision box pyramid of
+      // (E[sx], E[sz], E[sx^2], E[sz^2]) from the same sample()
+      // surface. The trilinear auto-LOD sample gives every lit pixel
+      // the footprint's MEAN hillside orientation and the slope
+      // variance that inflates the specular lobes - the mipless
+      // 8-bit normal map this replaces aliased both. 512^2 base
+      // matches the ~26 m source data over the 16 km world.
+      function bakeTerrainMoments() {
+        const S = 512;
+        const step = WORLD / (S - 1);
+        const hs = new Float64Array(S * S);
+        for (let j = 0; j < S; j++)
+          for (let i = 0; i < S; i++)
+            hs[j * S + i] = sample(
+              (i / (S - 1) - 0.5) * WORLD,
+              (j / (S - 1) - 0.5) * WORLD
+            ).y;
+        const {sx, sz} = slopesFromHeights(hs, S, step);
+        const pyr = buildMomentPyramid(sx, sz, S);
+        const tex = new THREE.DataTexture(
+          pyr.levels[0].data,
+          S,
+          S,
+          THREE.RGBAFormat,
+          THREE.FloatType
+        );
+        tex.generateMipmaps = false;
+        tex.mipmaps = pyr.levels.map((l) => ({
+          data: l.data,
+          width: l.size,
+          height: l.size
+        }));
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        tex.needsUpdate = true;
+        if (terrainObj.momentsTexNode.value.isDataTexture)
+          terrainObj.momentsTexNode.value.dispose();
+        terrainObj.momentsTexNode.value = tex;
+      }
+
+      function buildWorld() {
+        ground.clear();
+        trees = [];
+        if (demData) {
+          // Average the real elevation in a small ring around the scene
+          // centre (grid-layout agnostic).
+          let sum = 0;
+          let cnt = 0;
+          for (let dx = -12; dx <= 12; dx += 6)
+            for (let dz = -12; dz <= 12; dz += 6) {
+              sum += demElev(dx, dz);
+              cnt++;
+            }
+          centerElev = Math.max(sum / cnt, 0.3);
+        } else {
+          centerElev = 300;
+        }
+        terrainUniforms.uCenterElev.value = centerElev;
+        viewSign = state.lat < 0 ? -1 : 1;
+        bakeTerrainMoments();
+
+        const geo = new THREE.PlaneGeometry(WORLD, WORLD, 320, 320);
+        geo.rotateX(-Math.PI / 2);
+        const pos = geo.attributes.position;
+        const wet = new Float32Array(pos.count);
+        for (let i = 0; i < pos.count; i++) {
+          const s = sample(pos.getX(i), pos.getZ(i));
+          pos.setY(i, s.y);
+          wet[i] = s.water ? 1 : 0;
+        }
+        geo.computeVertexNormals();
+        geo.setAttribute('wet', new THREE.BufferAttribute(wet, 1));
+        const terrain = new THREE.Mesh(geo, terrainMat);
+        terrain.castShadow = true;
+        terrain.receiveShadow = true;
+        terrain.layers.enable(3); // cloud depth prepass
+        ground.add(terrain);
+
+        // Trees: inside the real OSM woods when we have them, below the
+        // real tree line, off cliffs, out of the sea, and not on top of
+        // either camera spot (it can face both ways).
+        const tl = treelineM(state.lat);
+        for (let i = 0; i < 1800 && trees.length < 140; i++) {
+          const x = (rand() - 0.5) * (WORLD - 40);
+          const z = (rand() - 0.5) * (WORLD - 40);
+          const s0 = sample(x, z);
+          if (s0.water || s0.e > tl) continue;
+          if (!inForest(x, z)) continue;
+          // Real forests stand on ~35° alpine slopes; the asinh height
+          // compression roughly doubles scene gradients, hence 4.5.
+          const grade =
+            Math.abs(sample(x + 2, z).y - sample(x - 2, z).y) +
+            Math.abs(sample(x, z + 2).y - sample(x, z - 2).y);
+          if (grade > 4.5) continue;
+          if (Math.hypot(x, z - 26) < 24 || Math.hypot(x, z + 26) < 24)
+            continue;
+          const sc = 0.8 + rand() * 1.4;
+          // Conifers own the subalpine belt below the climatic treeline.
+          const conifer = s0.e > tl - 700 || rand() < 0.4;
+          const tree = new THREE.Group();
+          const trunk = new THREE.Mesh(geoTrunk, trunkMat);
+          trunk.position.y = 0.55;
+          trunk.castShadow = true;
+          tree.add(trunk);
+          if (conifer) {
+            const mat = leafMats[Math.floor(rand() * leafMats.length)];
+            const c1 = new THREE.Mesh(geoCone1, mat);
+            c1.position.y = 1.7;
+            const c2 = new THREE.Mesh(geoCone2, mat);
+            c2.position.y = 3.1;
+            c1.castShadow = c2.castShadow = true;
+            c1.receiveShadow = true;
+            tree.add(c1, c2);
+          } else {
+            const canopy = new THREE.Mesh(
+              geoCanopy,
+              broadMats[Math.floor(rand() * broadMats.length)]
+            );
+            canopy.position.y = 2.2;
+            canopy.scale.y = 0.82;
+            canopy.castShadow = canopy.receiveShadow = true;
+            tree.add(canopy);
+          }
+          tree.scale.setScalar(sc);
+          tree.position.set(x, s0.y, z);
+          tree.userData = {phase: rand() * Math.PI * 2, a: 0, v: 0};
+          trees.push(tree);
+          ground.add(tree);
+        }
+
+        // The sea: three.js Water (planar reflections) riding at real sea
+        // level wherever the DEM says there is water.
+        if (water) {
+          ground.remove(water);
+          water.geometry.dispose();
+          water.material.dispose();
+          water = null;
+        }
+        let hasWater = false;
+        for (let i = 0; i < wet.length; i++)
+          if (wet[i]) {
+            hasWater = true;
+            break;
+          }
+        if (hasWater) {
+          // Cox & Munk (1954): sun glitter shaped by the sea-surface
+          // slope variance; Monahan whitecaps; Battjes-Janssen surf
+          // breaking - all carried at source level in the
+          // HorizonWaterMesh fork, against the REAL bathymetry sampled
+          // from the terrarium tiles into a depth texture.
+          // 512^2 float texels over the 16 km world = 31 m/texel -
+          // the z12 terrarium source resolution itself (the surf
+          // band is a few tens of metres; the old 128^2 8-bit
+          // nearest-sampled texture could not resolve it at all,
+          // and 0.157 m quantisation stepped the McCowan-era ramp).
+          const DT = 512;
+          const dArr = new Float32Array(DT * DT);
+          let dSum = 0;
+          let dCnt = 0;
+          for (let dj = 0; dj < DT; dj++)
+            for (let di = 0; di < DT; di++) {
+              const e = demData
+                ? demElev(
+                    (di / (DT - 1) - 0.5) * WORLD,
+                    (dj / (DT - 1) - 0.5) * WORLD
+                  )
+                : 1;
+              if (e < 0) {
+                dSum += -e;
+                dCnt++;
+              }
+              // SIGNED depth vs MSL (float texture): shoreline
+              // texels keep their real height above the water, so
+              // the measured tide can flood or expose them exactly
+              // (water-tsl adds the tide before clamping at the
+              // bed).
+              dArr[dj * DT + di] = THREE.MathUtils.clamp(-e / 40, -1, 1);
+            }
+          const depthTex = new THREE.DataTexture(
+            dArr,
+            DT,
+            DT,
+            THREE.RedFormat,
+            THREE.FloatType
+          );
+          depthTex.minFilter = depthTex.magFilter = THREE.LinearFilter;
+          depthTex.needsUpdate = true;
+          // Tessendorf FFT ocean cascades (phase 5): JONSWAP/TMA at
+          // the real wind, TMA depth from the mean of the real
+          // bathymetry, k-space partitioned at lambda = 25 m so the
+          // two patch scales never double-count energy. The spectrum
+          // rebuilds in place when the wind moves materially (same
+          // gating pattern as the aerosol LUTs).
+          oceanSeaDepth = dCnt ? Math.max(dSum / dCnt, 5) : 60;
+          oceanBuiltU = state.wind / 3.6;
+          oceanBuiltDir = Math.atan2(windV.z, windV.x);
+          // Measured sea-state partitions (marine model) take over
+          // from the wind prediction when present.
+          const seaNow = seaParts();
+          oceanBuiltSeaKey = seaNow ? JSON.stringify(seaNow) : null;
+          const OCEAN_SPLIT = (2 * Math.PI) / 25;
+          oceanCascades = [
+            createOceanFFT(renderer, {
+              N: 256,
+              L: 1000,
+              U10: oceanBuiltU,
+              F: 150e3,
+              D: oceanSeaDepth,
+              windDir: oceanBuiltDir,
+              sea: seaNow ?? undefined,
+              kMax: OCEAN_SPLIT,
+              seed: 1337,
+              lambda: 1.1
+            }),
+            createOceanFFT(renderer, {
+              N: 256,
+              L: 120,
+              U10: oceanBuiltU,
+              F: 150e3,
+              D: oceanSeaDepth,
+              windDir: oceanBuiltDir,
+              sea: seaNow ?? undefined,
+              kMin: OCEAN_SPLIT,
+              seed: 7331,
+              lambda: 1.1
+            })
+          ];
+          water = new HorizonWaterMesh(
+            new THREE.PlaneGeometry(WORLD, WORLD, 192, 192),
+            {
+              sunDirection: new THREE.Vector3(0, 1, 0),
+              sunColor: 0xffffff,
+              waterColor: 0x0a2431,
+              distortionScale: 1.4,
+              depthTex,
+              worldSize: WORLD,
+              resolutionScale: 0.5,
+              ocean: {cascades: oceanCascades, metersPerUnit: 57.14},
+              // Deck shadows dim the DIRECT sun terms (glitter,
+              // diffuse) - not the sky reflection - via the shared
+              // Beer-Lambert transmittance.
+              cloudShadow
+            }
+          );
+          water.rotation.x = -Math.PI / 2;
+          water.position.y = 16 * Math.asinh((0 - centerElev) / 500) - 0.15;
+          // Aerial perspective + AgX for the sea via the shared hook.
+          applyAerial(water.material);
+          ground.add(water);
+          record(
+            'Tessendorf FFT ocean',
+            (oceanBuiltSeaKey
+              ? 'measured marine partitions (wind sea + swell)'
+              : 'JONSWAP/TMA wind sea') +
+              ' · exact spectral normals · Jacobian whitecaps'
+          );
+        }
+
+        camBaseY = sample(0, -26 * viewSign).y + 5;
+        // New terrain invalidates the physics heightfield and any drifts.
+        if (snowSim) {
+          snowSim.rebuildTerrain();
+          snowSim.clearDrifts();
+        }
+      }
+      buildWorld();
+
+      // Camera yaw: equatorward by default (that is where the sun arc
+      // lives), but pan poleward at night when a real aurora is on. The
+      // first frame snaps; only live changes pan.
+      let yaw = state.lat < 0 ? Math.PI : 0;
+      let yawInit = false;
+
+      // Stars: the real sky (Yale Bright Star Catalog), spun by sidereal
+      // time around a pole tilted to the latitude.
+      const celestial = new THREE.Group();
+      const polar = new THREE.Group();
+      polar.add(celestial);
+      scene.add(polar);
+      // Zodiacal light: the Leinert brightness map rides the SAME
+      // celestial dome as the stars, so the cone stands along the
+      // real ecliptic and the Gegenschein tracks the antisolar
+      // point (zodiacal.js; the shader rotates object-space
+      // directions into ecliptic coordinates).
+      const zodiObj = createZodiacalMaterial();
+      const zodiU = zodiObj.u;
+      // The photometric base (zlPerGreen) baked by the factory; the
+      // frame loop multiplies the live r^-2.3 onto it.
+      const zodiBase = zodiU.uScale.value;
+      const zodi = new THREE.Mesh(
+        new THREE.SphereGeometry(880, 48, 24),
+        zodiObj.material
+      );
+      celestial.add(zodi);
+      // Meteor streaks: a small pool of quads on the star sphere,
+      // spawned as a Poisson process at the REAL observed rate
+      // (meteors.js: IMO 2026 working list rates through the
+      // Jenniskens 1994 activity profiles and the sin(h_R) zenith
+      // correction). A Perseid-maximum sky yields a meteor every
+      // ~40 s with the radiant high - real rates, not fireworks.
+      const METEOR_N = 5;
+      const meteorPool = [];
+      for (let i = 0; i < METEOR_N; i++) {
+        const mo = createMeteorMaterial();
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mo.material);
+        mesh.matrixAutoUpdate = false;
+        mesh.visible = false;
+        celestial.add(mesh);
+        meteorPool.push({mesh, u: mo.u, active: false, t: 0, dur: 1});
+      }
+      let meteorsRecorded = false;
+      window.__meteors = meteorPool; // harness introspection
+
+      // Contrails: ambient cruise traffic whose trails exist ONLY
+      // when the measured 250 hPa air passes Schmidt-Appleman
+      // (state.contrail, syncAloft), and linger only when it is
+      // ice-supersaturated. ?contrail=1 forces short-lived, =2
+      // persistent (offline harness).
+      const CONTRAIL_N = 3;
+      const contrailPool = [];
+      for (let i = 0; i < CONTRAIL_N; i++) {
+        const co = createContrailMaterial();
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), co.material);
+        mesh.matrixAutoUpdate = false;
+        mesh.visible = false;
+        scene.add(mesh);
+        contrailPool.push({mesh, u: co.u, active: false, t: 0, life: 1});
+      }
+      const CT_LEN = 260; // path length, scene units
+      const CT_SPEED = 230 / 57.14; // jet ground speed, units/s
+      // live = an ADS-B snapshot from adsbToScene (real position,
+      // altitude, velocity); absent = ambient traffic.
+      function spawnContrail(p, persists, live) {
+        let dx, dz, cx, cz, y, speed;
+        if (live) {
+          const sp = Math.hypot(live.vx, live.vz);
+          dx = live.vx / sp;
+          dz = live.vz / sp;
+          // Quad runs from the aircraft's current position forward
+          // along its real track at its real ground speed.
+          cx = live.x + dx * (CT_LEN / 2);
+          cz = live.z + dz * (CT_LEN / 2);
+          y = live.y;
+          speed = sp;
+        } else {
+          const th = Math.random() * Math.PI * 2;
+          dx = Math.cos(th);
+          dz = Math.sin(th);
+          const off = (Math.random() - 0.5) * 150;
+          cx = -dz * off;
+          cz = dx * off;
+          y = 16 * Math.asinh((10500 - centerElev) / 500);
+          speed = CT_SPEED;
+        }
+        const cross = CT_LEN / speed;
+        p.u.cross.value = cross;
+        p.u.head.value = 0;
+        p.u.tau.value = persists ? 240 : 25;
+        p.u.spread.value = persists ? 1 : 0.15;
+        p.t = 0;
+        // Alive until the aircraft crosses AND the tail e-folds out.
+        p.life = cross + (persists ? 480 : 100);
+        p.active = true;
+        p.flight = live ? live.flight : null;
+        const X = new THREE.Vector3(dx, 0, dz).multiplyScalar(CT_LEN);
+        const Y = new THREE.Vector3(-dz, 0, dx).multiplyScalar(6);
+        const Z = new THREE.Vector3(0, 1, 0);
+        p.mesh.matrix.makeBasis(X, Y, Z);
+        p.mesh.matrix.setPosition(cx, y, cz);
+        p.mesh.visible = true;
+      }
+
+      // Live aircraft: the horizon-adsb Cloudflare worker
+      // (themes/horizon/worker) adds the CORS header no public
+      // ADS-B feed provides, proxying adsb.lol near the visitor.
+      // Cruise traffic claims contrail slots with its REAL
+      // position, altitude, track and speed; Schmidt-Appleman still
+      // decides whether the trail exists. Unreachable worker (not
+      // deployed yet, offline harness): the ambient traffic above
+      // stands in. ?adsb=URL overrides the proxy.
+      const ADSB_PROXY =
+        params.get('adsb') ?? 'https://horizon-adsb.ndevtk.workers.dev/adsb';
+      let liveTraffic = null; // queue of unclaimed cruise snapshots
+      const seenFlights = new Map(); // hex -> last spawn ms
+      async function syncTraffic() {
+        if (!state.contrail?.forms && !params.has('contrail')) return;
+        try {
+          const r = await (
+            await fetch(
+              ADSB_PROXY +
+                '?lat=' +
+                state.lat.toFixed(3) +
+                '&lon=' +
+                state.lon.toFixed(3) +
+                '&dist=15',
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (!Array.isArray(r.ac)) return;
+          const ref = {
+            lat: state.lat,
+            lon: state.lon,
+            halfM: DEM_HALF_M,
+            world: WORLD,
+            centerElev,
+            mpu: 57.14
+          };
+          const now_ = Date.now();
+          for (const [hex, t] of seenFlights)
+            if (now_ - t > 600e3) seenFlights.delete(hex);
+          liveTraffic = [];
+          const names = [];
+          for (const ac of r.ac) {
+            if (
+              typeof ac.lat !== 'number' ||
+              typeof ac.lon !== 'number' ||
+              typeof ac.gs !== 'number' ||
+              typeof ac.track !== 'number' ||
+              typeof ac.alt_baro !== 'number' ||
+              ac.alt_baro < 26000 || // cruise only: ~8 km up
+              seenFlights.has(ac.hex)
+            )
+              continue;
+            const s = adsbToScene(ac, ref);
+            if (Math.abs(s.x) > 220 || Math.abs(s.z) > 220) continue;
+            s.flight = (ac.flight ?? ac.hex ?? '').trim();
+            s.hex = ac.hex;
+            liveTraffic.push(s);
+            names.push(s.flight + ' FL' + Math.round(ac.alt_baro / 100));
+          }
+          if (names.length)
+            record(
+              'ADS-B live aircraft (worker)',
+              names.slice(0, 4).join(' · ') +
+                (names.length > 4 ? ' +' + (names.length - 4) : '')
+            );
+        } catch {
+          liveTraffic = null; // ambient traffic stands in
+        }
+      }
+
+      // ---- Live ships: AIS via the same worker (/ais route).
+      // aisstream.io position reports around the visitor; the API
+      // key lives ONLY in the worker (aisstream's terms forbid
+      // exposing it to a browser, which a static site could never
+      // honour). Ships dead-reckon on the tide-following water
+      // plane between reports and carry COLREGS navigation lights
+      // after sunset (ships.js: Rule 21 arcs, Rule 22 ranges,
+      // Annex I candela through Allard's law - beyond a light's
+      // rated range the eye receives less than the adopted 2e-7
+      // lux threshold and the light goes out, exactly as the
+      // regulation is constructed). The hull itself is display
+      // furniture (reports carry no dimensions - a 90 m default);
+      // the lights and kinematics are the physics. ?ais=URL
+      // overrides the proxy; ?ship=N spawns N deterministic
+      // synthetic vessels for the offline harness.
+      const AIS_PROXY =
+        params.get('ais') ?? 'https://horizon-adsb.ndevtk.workers.dev/ais';
+      const SHIP_N = 8;
+      const SHIP_LOA = 90 / 57.14; // scene units (90 m)
+      const NAV_COLOR = {
+        masthead: '#ffffff',
+        stern: '#ffffff',
+        port: '#ff2418',
+        starboard: '#19e34d'
+      };
+      const NAV_RANGE = {
+        masthead: 'masthead',
+        stern: 'stern',
+        port: 'side',
+        starboard: 'side'
+      };
+      const shipPool = [];
+      {
+        const hullGeo = new THREE.BoxGeometry(0.25, 0.14, SHIP_LOA);
+        const supGeo = new THREE.BoxGeometry(0.21, 0.21, 0.32);
+        const dotGeo = new THREE.SphereGeometry(0.085, 8, 6);
+        const hullMat = new THREE.MeshStandardNodeMaterial({
+          color: '#252b30',
+          roughness: 0.9
+        });
+        const supMat = new THREE.MeshStandardNodeMaterial({
+          color: '#77828c',
+          roughness: 0.9
+        });
+        applyAerial(hullMat);
+        applyAerial(supMat);
+        for (let i = 0; i < SHIP_N; i++) {
+          const g = new THREE.Group(); // bow points local -z
+          const hull = new THREE.Mesh(hullGeo, hullMat);
+          hull.position.y = 0.05;
+          const sup = new THREE.Mesh(supGeo, supMat);
+          sup.position.set(0, 0.2, SHIP_LOA * 0.32); // aft house
+          g.add(hull, sup);
+          const lights = {};
+          for (const [k, px, py, pz] of [
+            ['masthead', 0, 0.42, -SHIP_LOA * 0.2],
+            ['port', -0.15, 0.2, -SHIP_LOA * 0.1],
+            ['starboard', 0.15, 0.2, -SHIP_LOA * 0.1],
+            ['stern', 0, 0.18, SHIP_LOA * 0.49]
+          ]) {
+            const m = new THREE.MeshBasicNodeMaterial({color: NAV_COLOR[k]});
+            aerial.applyTone(m);
+            const dot = new THREE.Mesh(dotGeo, m);
+            dot.position.set(px, py, pz);
+            dot.visible = false;
+            lights[k] = dot;
+            g.add(dot);
+          }
+          g.visible = false;
+          scene.add(g);
+          shipPool.push({
+            g,
+            lights,
+            mmsi: null,
+            name: '',
+            x: 0,
+            z: 0,
+            vx: 0,
+            vz: 0,
+            hdg: 0,
+            seen: 0,
+            active: false
+          });
+        }
+        record(
+          'COLREGS navigation lights',
+          'Rule 21 arcs · Annex I candela · Allard visibility'
+        );
+      }
+      const shipOv = params.has('ship') ? +params.get('ship') : null;
+      const shipCamDir = new THREE.Vector3();
+      async function syncShips() {
+        if (shipOv !== null) {
+          // Offline harness: deterministic stations fanned across
+          // the camera's view (no fetch, no Math.random - pinned
+          // shots stay reproducible).
+          camera.getWorldDirection(shipCamDir);
+          shipCamDir.y = 0;
+          shipCamDir.normalize();
+          const px = -shipCamDir.z;
+          const pz = shipCamDir.x;
+          for (let i = 0; i < Math.min(shipOv, SHIP_N); i++) {
+            const s = shipPool[i];
+            const ahead = 55 + i * 20;
+            const side = (i - (Math.min(shipOv, SHIP_N) - 1) / 2) * 26;
+            Object.assign(s, {
+              mmsi: 1000000 + i,
+              name: 'HARNESS' + i,
+              x: camera.position.x + shipCamDir.x * ahead + px * side,
+              z: camera.position.z + shipCamDir.z * ahead + pz * side,
+              hdg: (30 + i * 47) % 360,
+              seen: Date.now(),
+              active: true
+            });
+            const tr = s.hdg * RAD;
+            const sp = (12 * 0.514444) / 57.14; // 12 kt
+            s.vx = sp * Math.sin(tr);
+            s.vz = -sp * Math.cos(tr);
+          }
+          return;
+        }
+        if (!water) return; // no sea in this DEM - no ships
+        try {
+          const r = await (
+            await fetch(
+              AIS_PROXY +
+                '?lat=' +
+                state.lat.toFixed(3) +
+                '&lon=' +
+                state.lon.toFixed(3) +
+                '&dist=8',
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (!Array.isArray(r.ships)) return;
+          const ref = {
+            lat: state.lat,
+            lon: state.lon,
+            halfM: DEM_HALF_M,
+            world: WORLD,
+            mpu: 57.14
+          };
+          const now_ = Date.now();
+          const names = [];
+          for (const ship of r.ships) {
+            const sc = aisToScene(ship, ref);
+            if (Math.abs(sc.x) > 150 || Math.abs(sc.z) > 150) continue;
+            const slot =
+              shipPool.find((s) => s.active && s.mmsi === ship.mmsi) ??
+              shipPool.find((s) => !s.active);
+            if (!slot) break;
+            Object.assign(slot, {
+              mmsi: ship.mmsi,
+              name: ship.name,
+              x: sc.x,
+              z: sc.z,
+              vx: sc.vx,
+              vz: sc.vz,
+              hdg: ship.hdg ?? ship.cog ?? 0,
+              seen: now_,
+              active: true
+            });
+            names.push(
+              (ship.name || ship.mmsi) + ' ' + Math.round(ship.sog) + ' kt'
+            );
+          }
+          for (const s of shipPool)
+            if (s.active && now_ - s.seen > 360e3) {
+              s.active = false;
+              s.g.visible = false;
+            }
+          if (names.length)
+            record(
+              'AIS live ships (worker)',
+              names.slice(0, 4).join(' · ') +
+                (names.length > 4 ? ' +' + (names.length - 4) : '')
+            );
+        } catch {
+          // worker unreachable - the sea keeps its last ships
+        }
+      }
+      const mV1 = new THREE.Vector3();
+      const mV2 = new THREE.Vector3();
+      const mV3 = new THREE.Vector3();
+      const mV4 = new THREE.Vector3();
+      // Spawn one meteor of shower s (radiant ra/dec in degrees).
+      function spawnMeteor(slot, s, rad) {
+        const vr = mV1.set(
+          Math.cos(rad.dec * RAD) * Math.sin(rad.ra * RAD),
+          Math.sin(rad.dec * RAD),
+          Math.cos(rad.dec * RAD) * Math.cos(rad.ra * RAD)
+        );
+        // Random sky point 10-100 deg from the radiant, above the
+        // local horizon (world y through the celestial rotation).
+        // The ?meteor harness override also biases spawns into the
+        // camera cone so a pinned shot can catch one - the natural
+        // path stays all-sky.
+        const biased = params.has('meteor');
+        if (biased) camera.getWorldDirection(mV4);
+        let w = null;
+        for (let tries = 0; tries < (biased ? 40 : 8) && !w; tries++) {
+          const zc = Math.random() * 2 - 1;
+          const ph = Math.random() * 2 * Math.PI;
+          const rr = Math.sqrt(1 - zc * zc);
+          mV2.set(rr * Math.cos(ph), zc, rr * Math.sin(ph));
+          const cosD = mV2.dot(vr);
+          if (cosD > 0.985 || cosD < -0.17) continue; // 10..100 deg
+          mV3.copy(mV2).applyMatrix4(celestial.matrixWorld);
+          if (mV3.y < 0.12) continue; // below/near horizon
+          if (biased && mV3.normalize().dot(mV4) < 0.6) continue;
+          w = mV2;
+        }
+        if (!w) return false;
+        const sinD = Math.sqrt(1 - Math.min(w.dot(vr) ** 2, 1));
+        // Great-circle tangent at w pointing AWAY from the radiant.
+        const t = mV3
+          .copy(vr)
+          .addScaledVector(w, -w.dot(vr))
+          .normalize()
+          .negate();
+        // Display kinematics: streak length foreshortens with
+        // sin(D) and scales with the shower's entry speed; angular
+        // rate ~ 20 deg/s x (V/72) x sin(D) (documented mapping of
+        // the true ~radians/s sky speeds).
+        const Ldeg = (2 + 14 * sinD * (s.v / 72)) * (0.7 + 0.6 * Math.random());
+        const wdeg = Math.max(20 * (s.v / 72) * sinD, 5);
+        const Lr = Ldeg * RAD;
+        const B = mV4
+          .copy(w)
+          .multiplyScalar(Math.cos(Lr))
+          .addScaledVector(t, Math.sin(Lr));
+        // Quad basis: X along the chord, Y lateral, Z radial.
+        const R = 868;
+        const ax = mV1.copy(B).sub(w); // reuse mV1 (vr done)
+        const cx = mV2.copy(w).add(B).multiplyScalar(0.5).normalize();
+        const ay = mV3.copy(cx).cross(ax).normalize();
+        const m = drawMagnitude(s.r, 1 - Math.random());
+        const p = meteorPool[slot];
+        const wid = (m < 0 ? 3.5 : 2.2) * RAD * R;
+        p.mesh.matrix.makeBasis(
+          ax.clone().multiplyScalar(R),
+          ay.multiplyScalar(wid),
+          cx.clone()
+        );
+        p.mesh.matrix.setPosition(cx.multiplyScalar(R));
+        p.mesh.visible = true;
+        p.active = true;
+        p.t = 0;
+        p.dur = Ldeg / wdeg; // seconds head-travel
+        // Display amplitude from the drawn magnitude (a mag-4.5
+        // meteor is plainly visible - the eye is drawn to motion;
+        // brighter = exponentially stronger per Pogson, capped).
+        p.u.amp.value = Math.min(0.5 * Math.pow(10, 0.4 * (4.5 - m)), 3);
+        return true;
+      }
+
+      let starObj = null;
+      fetch('./horizon/stars.json')
+        .then((r) => r.json())
+        .then((stars) => {
+          const pos = [];
+          const color = [];
+          const size = [];
+          const col = new THREE.Color();
+          for (const [ra, dec, mag, kelvin] of stars) {
+            const raR = ra * RAD;
+            const decR = dec * RAD;
+            pos.push(
+              900 * Math.cos(decR) * Math.sin(raR),
+              900 * Math.sin(decR),
+              900 * Math.cos(decR) * Math.cos(raR)
+            );
+            const t = THREE.MathUtils.clamp((kelvin - 3000) / 9000, 0, 1);
+            col.setRGB(
+              1 - t * 0.25,
+              0.88 - Math.abs(t - 0.45) * 0.2,
+              0.72 + t * 0.28
+            );
+            color.push(col.r, col.g, col.b);
+            size.push(THREE.MathUtils.clamp(7.5 - mag, 1.8, 7.5));
+          }
+          // Scintillation: Kolmogorov turbulence makes twinkle grow
+          // with airmass (~sec z), so horizon stars shimmer and zenith
+          // stars barely do; per-star phase from a PCG hash (Jarzynski
+          // & Olano 2020). Instanced sprites reproduce gl_PointSize -
+          // WebGPU has no point size.
+          starObj = createStarSprites(
+            new Float32Array(pos),
+            new Float32Array(color),
+            new Float32Array(size)
+          );
+          celestial.add(starObj.mesh);
+          record(
+            'Yale Bright Star Catalog',
+            stars.length + ' stars (vendored)'
+          );
+        });
+
+      // Constellation figures (d3-celestial dataset): faint real lines
+      // riding the same sidereal dome as the stars.
+      let constMat = null;
+      fetch('./horizon/constellations.lines.json')
+        .then((r) => r.json())
+        .then((geo) => {
+          const pts = [];
+          for (const f of geo.features)
+            for (const line of f.geometry.coordinates)
+              for (let i = 0; i < line.length - 1; i++)
+                for (const p of [line[i], line[i + 1]]) {
+                  const ra = (((p[0] % 360) + 360) % 360) * RAD;
+                  const dec = p[1] * RAD;
+                  pts.push(
+                    870 * Math.cos(dec) * Math.sin(ra),
+                    870 * Math.sin(dec),
+                    870 * Math.cos(dec) * Math.cos(ra)
+                  );
+                }
+          const g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+          constMat = new THREE.LineBasicNodeMaterial({
+            transparent: true,
+            opacity: 0,
+            depthWrite: false
+          });
+          aerial.applyFogColor(constMat, '#7f9fc4');
+          celestial.add(new THREE.LineSegments(g, constMat));
+          record(
+            'd3-celestial constellations',
+            geo.features.length + ' figures (vendored)'
+          );
+        });
+
+      // The moon: a sphere lit from the sun's REAL direction, so the
+      // phase is always correct - and shaded by the Lommel-Seeliger
+      // photometric function (the standard lunar regolith model, the
+      // basis of McEwen's lunar-Lambert), not Lambert. That is why a
+      // full moon renders flat like the real one instead of
+      // limb-darkening like a billiard ball.
+      const moonObj = createMoonMaterial();
+      const moonU = moonObj.u;
+      const moonDisc = new THREE.Mesh(
+        new THREE.SphereGeometry(24, 24, 18),
+        moonObj.material
+      );
+      moonDisc.layers.set(2);
+      scene.add(moonDisc);
+
+      // Naked-eye planets at their true ephemeris positions, sized by
+      // real apparent magnitude, tinted like the eye sees them.
+      const PLANETS = ['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn'];
+      const PLANET_TINTS = [
+        [0.9, 0.85, 0.78],
+        [1, 0.98, 0.9],
+        [1, 0.62, 0.44],
+        [0.98, 0.92, 0.8],
+        [0.95, 0.9, 0.72]
+      ];
+      const planetObj = createPlanetSprites(
+        new Float32Array(PLANETS.length * 3),
+        new Float32Array(PLANET_TINTS.flat()),
+        new Float32Array(PLANETS.length).fill(4)
+      );
+      scene.add(planetObj.mesh);
+
+      // Ephemeris cache, refreshed at 1Hz in the frame loop.
+      const astro = {
+        at: -1e9,
+        sun: {alt: 0.5, az: Math.PI},
+        moon: {alt: -1, az: 0},
+        moonScale: 0.28,
+        planets: [],
+        recorded: false
+      };
+
+      // Aurora: additive curtains over the poleward horizon, driven by
+      // NOAA's OVATION oval (Kp heuristic as fallback). The oval's real
+      // latitude sets the curtain's true elevation via uBase.
+      const auroraObj = createAuroraMaterial();
+      const auroraU = auroraObj.u;
+      const aurora = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          760,
+          760,
+          720,
+          64,
+          1,
+          true,
+          Math.PI - Math.PI / 2.6,
+          Math.PI / 1.3
+        ),
+        auroraObj.material
+      );
+      aurora.position.y = 420;
+      scene.add(aurora);
+
+      // Nightglow dome: the PALACE airglow line model (airglow.js) -
+      // the [OI] green line, red doublet and Na D with per-layer van
+      // Rhijn horizon brightening, measured-F10.7 solar scaling and
+      // the engine's own zenith transmittance for extinction.
+      const airglowObj = createAirglowMaterial();
+      const airglowU = airglowObj.u;
+      const airglow = new THREE.Mesh(
+        new THREE.SphereGeometry(770, 48, 24),
+        airglowObj.material
+      );
+      scene.add(airglow);
+
+      // Atmospheric optics on one additive dome:
+      // - primary and secondary rainbows at their Descartes angles (42.0
+      //   and 51 deg around the antisolar point, reversed colours,
+      //   Alexander's dark band between) - only when real rain falls with
+      //   the sun shining below 42 deg
+      // - the 22 deg ice-crystal halo (red inner edge) whenever real
+      //   cirrus is present, with parhelia (sundogs) at low sun
+      const opticsObj = createOpticsMaterial();
+      const opticsU = opticsObj.u;
+      const optics = new THREE.Mesh(
+        new THREE.SphereGeometry(590, 32, 20),
+        opticsObj.material
+      );
+      optics.renderOrder = 1;
+      scene.add(optics);
+
+      // Clouds in the three layers the weather model actually reports
+      // (open-meteo cloud_cover_low/mid/high): the low cumulus deck and
+      // the mid altostratus deck march in ONE volumetric pass
+      // (clouds-tsl, after Schneider & Vos) with temporal reconstruction
+      // exactly as shipped in Horizon Zero Dawn - a quarter-res buffer,
+      // one 4x4 Bayer pixel marched per frame, the rest reprojected -
+      // plus a terrain depth prepass so the march clips against the
+      // real ridges and the depth-aware upsample never bleeds cloud
+      // across a silhouette. Only thin cirrus stays a 2D sheet, as in
+      // the research.
+      const cloudGroup = new THREE.Group();
+      const cirrusMat = new THREE.MeshBasicNodeMaterial({
+        color: '#ffffff',
+        transparent: true,
+        opacity: 0.15,
+        depthWrite: false
+      });
+      applyAerial(cirrusMat);
+      let cloudSys = null; // built with its 3D noise on first demand
+      let cloudDepthRT = null;
+      const depthOnlyMat = new THREE.MeshBasicNodeMaterial({
+        colorWrite: false
+      });
+      sizeCloudTargets = () => {
+        const s = renderer.getDrawingBufferSize(new THREE.Vector2());
+        // Recreate rather than setSize: RenderTarget.setSize does NOT
+        // resize an attached DepthTexture, and a stale depth attachment
+        // feeds NaN distances to the cloud march.
+        if (cloudDepthRT) cloudDepthRT.dispose();
+        cloudDepthRT = new THREE.RenderTarget(s.x, s.y, {depthBuffer: true});
+        cloudDepthRT.depthTexture = new THREE.DepthTexture(s.x, s.y);
+        if (cloudSys) cloudSys.setSize(s.x, s.y);
+      };
+      sizeCloudTargets();
+      let cloudsActive = false;
+      let cloudTexPending = false;
+      const cloudsHigh = [];
+      for (let i = 0; i < 7; i++) {
+        const sheet = new THREE.Mesh(
+          new THREE.PlaneGeometry(80 + rand() * 50, 9 + rand() * 8),
+          cirrusMat
+        );
+        sheet.rotation.x = -Math.PI / 2;
+        sheet.rotation.z = rand() * Math.PI;
+        sheet.position.set((rand() - 0.5) * 480, 90, (rand() - 0.5) * 480);
+        sheet.userData.jitter = rand() * 6;
+        cloudsHigh.push(sheet);
+        cloudGroup.add(sheet);
+      }
+      scene.add(cloudGroup);
+
+      // The ISS: real orbital mechanics. Current elements from
+      // wheretheiss.at, propagated locally with SGP4 (satellite.js), shown
+      // only during genuinely visible passes: above the horizon, sunlit,
+      // and the observer in twilight or darkness.
+      let satrec = null;
+      let lastPassSaid = -1e9;
+      const issMat = new THREE.MeshBasicNodeMaterial({color: '#f4f7ff'});
+      aerial.applyTone(issMat); // fog: false in the classic build
+      const iss = new THREE.Mesh(new THREE.SphereGeometry(2.4, 8, 6), issMat);
+      iss.visible = false;
+      scene.add(iss);
+      async function syncISS() {
+        try {
+          const tle = await (
+            await fetch('https://api.wheretheiss.at/v1/satellites/25544/tles', {
+              credentials: 'omit'
+            })
+          ).json();
+          satrec = satellite.twoline2satrec(tle.line1, tle.line2);
+          record(
+            'ISS TLE (wheretheiss.at)',
+            'epoch ' +
+              satrec.epochyr +
+              '/' +
+              satrec.epochdays.toFixed(2) +
+              ' · SGP4'
+          );
+        } catch {
+          // Keep any previous elements; SGP4 stays accurate for days.
+        }
+      }
+
+      // Precipitation: one particle field, styled as rain or snow.
+      const PRECIP_N = 1600;
+      const precipArr = new Float32Array(PRECIP_N * 3);
+      for (let i = 0; i < PRECIP_N; i++) {
+        precipArr[i * 3] = (rand() - 0.5) * 90;
+        precipArr[i * 3 + 1] = rand() * 45;
+        precipArr[i * 3 + 2] = (rand() - 0.5) * 90;
+      }
+      const dot = document.createElement('canvas');
+      dot.width = dot.height = 32;
+      {
+        const g = dot.getContext('2d');
+        const grad = g.createRadialGradient(16, 16, 2, 16, 16, 15);
+        grad.addColorStop(0, 'rgba(255,255,255,1)');
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, 32, 32);
+      }
+      // Instanced sprites reproduce PointsMaterial's size-attenuated
+      // points (WebGPU has no gl_PointSize).
+      const precipObj = createPrecipSprites(
+        precipArr,
+        new THREE.CanvasTexture(dot),
+        (rgb) => aerial.encodeFog(rgb)
+      );
+      const precipU = precipObj.u;
+      precipObj.mesh.layers.set(4); // drawn in the post-cloud overlay pass
+      scene.add(precipObj.mesh);
+
+      // ---------- physical snow (Rapier, loaded only when it snows) ----------
+      // The near-field weather box is human scale (roughly 1 unit = 1m),
+      // unlike the 57 m/unit map scale. Flakes are rigid bodies in a real
+      // physics engine: gravity against air drag (linear damping gives the
+      // ~1.4 m/s terminal velocity), pushed by the real wind, colliding
+      // with a heightfield of the actual local terrain AND with every
+      // flake already settled - so drifts grow on the real topography for
+      // as long as the page stays open, and melt when the real
+      // temperature says so.
+      const SNOW_N = 240;
+      const DRIFT_CAP = 2400;
+      const SNOW_EXT = 120;
+      const tmpM4 = new THREE.Matrix4();
+      const driftSnowMat = new THREE.MeshStandardNodeMaterial({
+        color: '#eef2f6',
+        roughness: 0.5
+      });
+      const driftMesh = new THREE.InstancedMesh(
+        new THREE.IcosahedronGeometry(0.16, 0),
+        driftSnowMat,
+        DRIFT_CAP
+      );
+      driftMesh.count = 0;
+      driftMesh.visible = false; // count = 0 still draws on WebGPU
+      driftMesh.frustumCulled = false;
+      applyAerial(driftMesh.material);
+      scene.add(driftMesh);
+      const flakeMat = new THREE.MeshBasicNodeMaterial();
+      aerial.applyFogColor(flakeMat, '#ffffff');
+      const flakeMesh = new THREE.InstancedMesh(
+        new THREE.IcosahedronGeometry(0.12, 0),
+        flakeMat,
+        SNOW_N
+      );
+      flakeMesh.count = 0;
+      flakeMesh.visible = false; // count = 0 still draws on WebGPU
+      flakeMesh.frustumCulled = false;
+      flakeMesh.layers.set(4); // falls in front of the far cloud decks
+      scene.add(flakeMesh);
+
+      async function initSnowSim() {
+        snowLoading = true;
+        const RAPIER = await import('./horizon/rapier.es.js');
+        await RAPIER.init();
+        const world = new RAPIER.World({x: 0, y: -3, z: 0});
+        const sim = {
+          world,
+          bodies: [],
+          drifts: new Array(DRIFT_CAP).fill(null),
+          head: 0,
+          countD: 0,
+          highWater: 0,
+          melt: 0
+        };
+        sim.rebuildTerrain = () => {
+          if (sim.terrain) world.removeCollider(sim.terrain, false);
+          const HF = 60;
+          const heights = new Float32Array((HF + 1) * (HF + 1));
+          for (let r = 0; r <= HF; r++)
+            for (let c = 0; c <= HF; c++)
+              heights[r * (HF + 1) + c] = sample(
+                (r / HF - 0.5) * SNOW_EXT, // rows run along +x (verified)
+                (c / HF - 0.5) * SNOW_EXT
+              ).y;
+          sim.terrain = world.createCollider(
+            RAPIER.ColliderDesc.heightfield(HF, HF, heights, {
+              x: SNOW_EXT,
+              y: 1,
+              z: SNOW_EXT
+            })
+          );
+        };
+        sim.clearDrifts = () => {
+          for (let i = 0; i < DRIFT_CAP; i++) {
+            if (sim.drifts[i]) {
+              world.removeCollider(sim.drifts[i], false);
+              sim.drifts[i] = null;
+            }
+            tmpM4.makeScale(0, 0, 0);
+            driftMesh.setMatrixAt(i, tmpM4);
+          }
+          sim.head = 0;
+          sim.countD = 0;
+          sim.highWater = 0;
+          driftMesh.count = 0;
+          driftMesh.visible = false;
+          driftMesh.instanceMatrix.needsUpdate = true;
+        };
+        sim.spawn = (body) => {
+          body.setTranslation(
+            {
+              x: (Math.random() - 0.5) * 80,
+              y: camBaseY + 26 + Math.random() * 10,
+              z: (Math.random() - 0.5) * 80
+            },
+            true
+          );
+          body.setLinvel({x: 0, y: -1, z: 0}, true);
+        };
+        sim.deposit = (p) => {
+          const slot = sim.head;
+          sim.head = (sim.head + 1) % DRIFT_CAP;
+          if (sim.drifts[slot]) world.removeCollider(sim.drifts[slot], false);
+          else sim.countD++;
+          sim.drifts[slot] = world.createCollider(
+            RAPIER.ColliderDesc.ball(0.14).setTranslation(p.x, p.y, p.z)
+          );
+          tmpM4.makeScale(1, 0.72, 1).setPosition(p.x, p.y, p.z);
+          driftMesh.setMatrixAt(slot, tmpM4);
+          sim.highWater = Math.max(sim.highWater, slot + 1);
+          driftMesh.count = sim.highWater;
+          driftMesh.visible = sim.highWater > 0;
+          driftMesh.instanceMatrix.needsUpdate = true;
+        };
+        sim.meltOldest = () => {
+          for (let i = 0; i < DRIFT_CAP; i++) {
+            const slot = (sim.head + i) % DRIFT_CAP; // oldest surviving
+            if (!sim.drifts[slot]) continue;
+            world.removeCollider(sim.drifts[slot], false);
+            sim.drifts[slot] = null;
+            sim.countD--;
+            tmpM4.makeScale(0, 0, 0);
+            driftMesh.setMatrixAt(slot, tmpM4);
+            driftMesh.instanceMatrix.needsUpdate = true;
+            return;
+          }
+        };
+        sim.rebuildTerrain();
+        for (let i = 0; i < SNOW_N; i++) {
+          const body = world.createRigidBody(
+            // Locked rotations: flakes must not roll away downwind on
+            // landing (validated: rolling leaked 95% of deposits).
+            RAPIER.RigidBodyDesc.dynamic().setLinearDamping(2.1).lockRotations()
+          );
+          world.createCollider(
+            RAPIER.ColliderDesc.ball(0.12).setRestitution(0.02).setFriction(1),
+            body
+          );
+          sim.spawn(body);
+          sim.bodies.push(body);
+        }
+        snowSim = sim;
+        record(
+          'Rapier physics engine (vendored)',
+          SNOW_N + ' snow bodies · heightfield of the local terrain'
+        );
+      }
+
+      // ---------- colour ramps for light/fog ----------
+      const cDayBot = new THREE.Color('#dceef7');
+      const cSetBot = new THREE.Color('#f2a65e');
+      const cNightBot = new THREE.Color('#141c33');
+      const cGray = new THREE.Color('#9aa4ad');
+      const tmpB = new THREE.Color();
+      const windV = new THREE.Vector3(1, 0, 0);
+      const windVMid = new THREE.Vector3(1, 0, 0);
+      const windVHigh = new THREE.Vector3(1, 0, 0);
+      const treeAxis = new THREE.Vector3(0, 0, 1);
+      const tmpP = new THREE.Color();
+
+      // ---------- data panel (✦ toggle / ?debug=1 / D key) ----------
+      const panel = document.getElementById('panel');
+      const live = {};
+      let panelOn = params.get('debug') === '1';
+      panel.hidden = !panelOn;
+      function refreshPanel() {
+        if (panel.hidden) return;
+        panel.replaceChildren();
+        const title = document.createElement('b');
+        title.textContent = 'HORIZON · every value below is real\n\n';
+        panel.appendChild(title);
+        for (const [k, v] of Object.entries(live)) {
+          const line = document.createElement('div');
+          line.textContent = k + ': ' + v;
+          panel.appendChild(line);
+        }
+        const hdr = document.createElement('b');
+        hdr.textContent = '\nlive sources\n';
+        panel.appendChild(hdr);
+        for (const [k, s] of Object.entries(sources)) {
+          const line = document.createElement('div');
+          line.textContent = '· ' + k + ' — ' + s.value;
+          const age = document.createElement('span');
+          age.className = 'age';
+          age.textContent =
+            ' (' + Math.round((Date.now() - s.at) / 1000) + 's ago)';
+          line.appendChild(age);
+          panel.appendChild(line);
+        }
+      }
+      setInterval(refreshPanel, 1000);
+      function setPanel(on) {
+        panelOn = on;
+        panel.hidden = !on;
+        refreshPanel();
+      }
+      addEventListener('keydown', (e) => {
+        // 'd' strafes once the free camera is engaged; use ?debug=1 or
+        // the shaderwall toggle for the panel then.
+        if (e.key === 'd' && !freeCam.on) setPanel(!panelOn);
+      });
+      // Announce support for the site's ✦ wallpaper control.
+      if (window.parent !== window) {
+        parent.postMessage(
+          {type: 'shaderwall', state: 'hidden'},
+          location.origin
+        );
+      }
+
+      // ---------- free camera ----------
+      // Drag to look, WASD/arrows to fly (Shift for speed, R/F for
+      // altitude), wheel to dolly. Until the first interaction the
+      // camera keeps its cinematic auto spot (and pans poleward for
+      // aurora); afterwards the view is yours. Height stays clamped to
+      // the real terrain, bounds to the loaded DEM.
+      const freeCam = {
+        on: false,
+        yaw: 0,
+        pitch: 0.015,
+        dolly: 0,
+        pos: new THREE.Vector3(),
+        keys: new Set()
+      };
+      function engageFreeCam() {
+        if (freeCam.on) return;
+        freeCam.on = true;
+        freeCam.pos.copy(camera.position);
+        freeCam.yaw = yaw;
+        freeCam.pitch = 0.015;
+      }
+      {
+        let dragId = -1;
+        let lastPX = 0;
+        let lastPY = 0;
+        canvas.addEventListener('pointerdown', (e) => {
+          dragId = e.pointerId;
+          lastPX = e.clientX;
+          lastPY = e.clientY;
+          // Capture can throw for an already-released pointer; the drag
+          // still works without it.
+          try {
+            canvas.setPointerCapture(e.pointerId);
+          } catch {}
+          engageFreeCam();
+        });
+        canvas.addEventListener('pointermove', (e) => {
+          if (e.pointerId !== dragId) return;
+          freeCam.yaw -= (e.clientX - lastPX) * 0.0032;
+          freeCam.pitch += (e.clientY - lastPY) * 0.0032;
+          freeCam.pitch = THREE.MathUtils.clamp(freeCam.pitch, -1.35, 1.35);
+          lastPX = e.clientX;
+          lastPY = e.clientY;
+        });
+        addEventListener('pointerup', (e) => {
+          if (e.pointerId === dragId) dragId = -1;
+        });
+        canvas.addEventListener(
+          'wheel',
+          (e) => {
+            engageFreeCam();
+            freeCam.dolly -= e.deltaY * 0.02;
+            e.preventDefault();
+          },
+          {passive: false}
+        );
+        const moveCodes = [
+          'KeyW',
+          'KeyA',
+          'KeyS',
+          'KeyD',
+          'KeyR',
+          'KeyF',
+          'ArrowUp',
+          'ArrowDown',
+          'ArrowLeft',
+          'ArrowRight',
+          'ShiftLeft',
+          'ShiftRight'
+        ];
+        addEventListener('keydown', (e) => {
+          if (freeCam.on && moveCodes.includes(e.code))
+            freeCam.keys.add(e.code);
+        });
+        addEventListener('keyup', (e) => {
+          freeCam.keys.delete(e.code);
+        });
+      }
+
+      // ---------- pointer parallax (forwarded by footer.js) ----------
+      const look = {x: 0, y: 0};
+      addEventListener('message', (e) => {
+        if (e.origin !== location.origin) return;
+        const d = e.data || {};
+        if (d.type === 'wallpaper-pointer' && !reduceMotion) {
+          look.x = (d.x - 0.5) * 2;
+          look.y = (d.y - 0.5) * 2;
+        }
+        if (d.type === 'shaderwall' && d.action === 'toggle') {
+          setPanel(!panelOn);
+          parent.postMessage(
+            {type: 'shaderwall', state: panelOn ? 'shown' : 'hidden'},
+            location.origin
+          );
+        }
+      });
+
+      // ---------- main loop ----------
+      let last = performance.now();
+      function frame(t) {
+        requestAnimationFrame(frame);
+        // Clamped BELOW too: rAF timestamps are not guaranteed
+        // monotonic under every scheduler, and a negative dt drives
+        // every exponential ease in the frame out of range.
+        const dt = THREE.MathUtils.clamp((t - last) / 1000, 0, 0.1) * timeScale;
+        last = t;
+        const d = now();
+
+        // Ephemerides: astronomy-engine (VSOP87/ELP truncations,
+        // topocentric, refraction-corrected) at 1Hz; the hand-rolled
+        // low-precision formulas remain as offline fallback.
+        if (t - astro.at > 1000) {
+          astro.at = t;
+          if (window.Astronomy) {
+            const AE = window.Astronomy;
+            const obs = new AE.Observer(state.lat, state.lon, centerElev);
+            const pos = (body) => {
+              const eq = AE.Equator(body, d, obs, true, true);
+              const h = AE.Horizon(d, obs, eq.ra, eq.dec, 'normal');
+              return {alt: h.altitude * RAD, az: h.azimuth * RAD};
+            };
+            astro.sun = pos(AE.Body.Sun);
+            astro.moon = pos(AE.Body.Moon);
+            // True apparent size: the moon disc scales with its real
+            // distance (supermoon vs apogee is a visible ~7%).
+            const distKm = AE.GeoMoon(d).Length() * AE.KM_PER_AU;
+            astro.moonScale = (1500 * 1737) / distKm / 24;
+            // Solar eclipse: topocentric angular separation against the
+            // two real disc radii. Nonzero only when one is underway.
+            const cosSep =
+              Math.sin(astro.sun.alt) * Math.sin(astro.moon.alt) +
+              Math.cos(astro.sun.alt) *
+                Math.cos(astro.moon.alt) *
+                Math.cos(astro.sun.az - astro.moon.az);
+            const sepDeg =
+              Math.acos(THREE.MathUtils.clamp(cosSep, -1, 1)) / RAD;
+            const moonR = Math.asin(1737 / distKm) / RAD;
+            astro.eclipse = THREE.MathUtils.clamp(
+              (0.267 + moonR - sepDeg) / (2 * 0.267),
+              0,
+              1
+            );
+            if (astro.eclipse > 0.05 && !astro.eclipseSaid) {
+              astro.eclipseSaid = true;
+              say(
+                'solar eclipse in progress · ~' +
+                  Math.round(astro.eclipse * 100) +
+                  '% obscured'
+              );
+            } else if (astro.eclipse < 0.01) {
+              astro.eclipseSaid = false;
+            }
+            for (let i = 0; i < PLANETS.length; i++) {
+              const p = pos(AE.Body[PLANETS[i]]);
+              const mag = AE.Illumination(AE.Body[PLANETS[i]], d).mag;
+              astro.planets[i] = {alt: p.alt, az: p.az, mag};
+            }
+            if (!astro.recorded) {
+              astro.recorded = true;
+              record(
+                'astronomy-engine (vendored)',
+                'VSOP87/ELP · topocentric · refraction · 5 planets'
+              );
+            }
+          } else {
+            astro.sun = altAz(sunEquatorial(d), d, state.lat, state.lon);
+            astro.moon = altAz(moonEquatorial(d), d, state.lat, state.lon);
+          }
+        }
+        const sun = astro.sun;
+        const moon = astro.moon;
+        moonDisc.scale.setScalar(astro.moonScale);
+        {
+          const pp = planetObj.posAttr;
+          const ps = planetObj.sizeAttr;
+          for (let i = 0; i < PLANETS.length; i++) {
+            const pl = astro.planets[i];
+            if (!pl) continue;
+            const v = skyPoint(pl.alt, pl.az, 860);
+            pp.setXYZ(i, v.x, v.y, v.z);
+            ps.setX(i, THREE.MathUtils.clamp(6 - pl.mag * 1.4, 2, 9.5));
+          }
+          pp.needsUpdate = true;
+          ps.needsUpdate = true;
+        }
+        const sunVec = skyPoint(sun.alt, sun.az, 1);
+        // The one real sun light carries the true direction; the CSM
+        // shadow node follows it.
+        sunLight.position
+          .copy(skyPoint(Math.max(sun.alt, -0.12), sun.az, 1))
+          .multiplyScalar(400);
+        sunLight.target.position.set(0, 0, 0);
+        moonDisc.position.copy(skyPoint(moon.alt, moon.az, 1500));
+        // Sun direction as seen at the moon disc (same geometry the old
+        // directional light encoded), feeding the Lommel-Seeliger shader.
+        moonU.sunDirM.value
+          .copy(skyPoint(sun.alt, sun.az, 200))
+          .sub(moonDisc.position)
+          .normalize();
+
+        polar.rotation.x = -(90 - state.lat) * RAD;
+        celestial.rotation.y = -(gmst(d) + state.lon * RAD);
+
+        const day = THREE.MathUtils.clamp((sun.alt / RAD + 6) / 24, 0, 1);
+        const dusk = 1 - Math.abs(day - 0.5) * 2;
+        const cloudy = state.cloud / 100;
+        // Stars belong to dusk, not daylight: the night sky fades in only
+        // once the sun is truly below the horizon (civil to nautical
+        // twilight, -3 to -9 deg).
+        const nightSky = THREE.MathUtils.clamp(-(sun.alt / RAD + 3) / 6, 0, 1);
+
+        // The sky: aerosols scale the Mie profile physically (AOD 0.12 as
+        // the temperate baseline); the grey veil handles overcast.
+        const mieScale = THREE.MathUtils.clamp(state.aod / 0.12, 0.25, 8);
+        if (atmo.ok) {
+          const skyExposure = 24 / (0.2 + 0.8 * day);
+          // The camera's REAL altitude (inverting the asinh height
+          // compression) feeds the sky and aerial LUTs, so flying up
+          // physically lowers the horizon and thins the haze.
+          const eCam = centerElev + 500 * Math.sinh(camera.position.y / 16);
+          atmo.update(sunVec, mieScale, Math.max(eCam, 50), skyExposure);
+          // Aerial perspective shares the dome's exposure so inscattered
+          // light on the terrain matches the sky it comes from.
+          aerialU.uSunAzV.value.set(sunVec.x, sunVec.z).normalize();
+          aerialU.uAerialExp.value = skyExposure;
+        }
+        veilU.alpha.value = cloudy * cloudy * 0.85 * day;
+
+        tmpB
+          .copy(cNightBot)
+          .lerp(cDayBot, day)
+          .lerp(cSetBot, dusk * 0.8)
+          .lerp(cGray, cloudy * 0.7 * day);
+        aerialU.uFogColor.value.copy(tmpB);
+        // Koschmieder relation: extinction from the MEASURED visibility
+        // (2% contrast at V). Fog codes need no special-casing - a foggy
+        // hour reports a short visibility by itself.
+        aerialU.uFogDensity.value =
+          1.98 / (Math.max(state.visibility, 400) / 57.14) + cloudy * 0.001;
+
+        // A real solar eclipse dims the direct light by its obscuration.
+        const ecl = astro.eclipse || 0;
+        // The sun's light on the world carries its true transmitted
+        // colour: the CPU mirror of the transmittance integral reddens
+        // low sun physically instead of by hue heuristic.
+        const st = sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieScale);
+        const stMax = Math.max(st[0], st[1], st[2], 1e-4);
+        sunLight.color.setRGB(st[0] / stMax, st[1] / stMax, st[2] / stMax);
+        const stLum = 0.2126 * st[0] + 0.7152 * st[1] + 0.0722 * st[2];
+        // Direct-sun cloud attenuation is now per pixel (the cloud
+        // shadow map, Beer-Lambert through the actual decks); the
+        // only GLOBAL cloud factor left is the cirrus veil, as
+        // exp(-tau/sin(alt)) with tau_vis = 1 at full high cover
+        // (typical cirrostratus optical depth).
+        const cHighFrac = (state.cloudHigh ?? state.cloud * 0.3) / 100;
+        const cirrusT = Math.exp(
+          -cHighFrac / Math.max(Math.sin(sun.alt), 0.08)
+        );
+        sunLight.intensity =
+          (0.18 + 2.4 * stLum) * (day > 0 ? 1 : 0) * cirrusT * (1 - 0.93 * ecl);
+        const moonUp = moon.alt > 0 ? 0.07 * (1 - day) : 0;
+        if (atmo.ok) {
+          if (t - lastIrrT > 1000) {
+            lastIrrT = t;
+            // Async staging read - no pipeline stall; it lands a frame
+            // or two later, which a 1 Hz ambient cannot notice.
+            atmo.readIrradiance().then((ir) => {
+              if (ir && ir[0] + ir[1] + ir[2] > 1e-7) {
+                skyIrr.setRGB(ir[0], ir[1], ir[2]);
+                skyIrrReady = true;
+              }
+            });
+          }
+          // The ambient term IS the sky: cosine-weighted irradiance
+          // integrated from the sky-view LUT (read back at 1 Hz), in the
+          // dome's own eye-adaptation exposure - twilight blues, sunset
+          // warmth and dusk falloff arrive from the raymarch, not from a
+          // tuned curve. One calibration constant maps LUT radiance into
+          // three's light units (the sun's intensity mapping already
+          // does the same). The LUT is clear-sky and sunlit only, so the
+          // measured cloud dimming, the eclipse obscuration and a small
+          // moonlit-sky term apply here.
+          const expo = 24 / (0.2 + 0.8 * day);
+          const dim = (1 - 0.85 * ecl) * (1 - cloudy * 0.3);
+          ambient.intensity = 1;
+          // 1.1 puts the clear-sky diffuse fraction at ~20% of direct,
+          // the measured real-world ratio.
+          ambient.color.copy(skyIrr).multiplyScalar(expo * 1.1 * dim);
+          tmpC.setRGB(0.05, 0.055, 0.075).multiplyScalar(moonUp * 14);
+          ambient.color.add(tmpC);
+          // Ground half: sky plus direct sun bounced off the terrain
+          // albedo (0.25 grass/rock to 0.7 snow).
+          const alb = 0.25 + 0.45 * terrainUniforms.uSnowy.value;
+          tmpC
+            .copy(sunLight.color)
+            .multiplyScalar(
+              sunLight.intensity * Math.max(Math.sin(sun.alt), 0) * 0.55
+            )
+            .add(ambient.color);
+          ambient.groundColor.copy(tmpC).multiplyScalar(alb);
+        } else {
+          // Preetham fallback keeps the tuned formula.
+          ambient.intensity =
+            (0.12 +
+              day * 0.3 * (1 - cloudy * 0.3) +
+              cloudy * day * 0.12 +
+              moonUp) *
+            (1 - 0.8 * ecl);
+          ambient.color.copy(tmpB);
+          ambient.groundColor.copy(tmpB).multiplyScalar(0.4);
+        }
+        if (starObj) {
+          starObj.u.night.value = nightSky * (1 - cloudy * 0.85);
+          starObj.u.time.value = t / 1000;
+          // Winds-aloft turbulence (cn2.js): the measured pressure-
+          // level profile sets BOTH the twinkle depth (Young's
+          // zenith sigma scaled by the Hufnagel-Valley mu_5/6 ratio
+          // of the ITU-R RMS 5-20 km wind) and the flicker rate
+          // (Fresnel-shadow crossing rate, ~500 Hz physical,
+          // displayed at 1/50 - same documented-division pattern as
+          // before, now from the profile instead of the raw jet).
+          if (state.cn2Scale) {
+            starObj.u.sigZen.value = THREE.MathUtils.clamp(
+              youngSigma(EYE_D_CM, 1) * state.cn2Scale,
+              0.05,
+              0.6
+            );
+          }
+          starObj.u.twRate.value = THREE.MathUtils.clamp(
+            state.cn2Rate
+              ? state.cn2Rate / 50
+              : (state.wind250 ?? state.wind * 3) / 20,
+            4,
+            18
+          );
+        }
+        // Nightglow: per-line solar scaling arrives via syncF107
+        // (uLineI); extinction rides the engine's own zenith
+        // transmittance at the current aerosol load; gated with the
+        // stars.
+        airglowU.night.value = nightSky * (1 - cloudy * 0.85);
+        airglowU.uTzen.value.fromArray(sunTransmittanceJS(1, mieScale));
+        // Zodiacal light: anchored to the sun's ecliptic longitude,
+        // scaled by the Earth's REAL heliocentric distance (r^-2.3,
+        // ephemeris when the engine is loaded) and the Masana
+        // symmetry-plane sinusoid for |beta| >= 60 deg; same zenith
+        // transmittance, gated with the stars.
+        const dNow = now();
+        const sunLam = sunEclipticLon(dNow);
+        {
+          zodiU.night.value = nightSky * (1 - cloudy * 0.85);
+          zodiU.uSunLam.value = sunLam;
+          const AEg = window.Astronomy;
+          const rAU =
+            AEg && AEg.HelioDistance
+              ? AEg.HelioDistance(AEg.Body.Earth, dNow)
+              : 1;
+          zodiU.uScale.value = zodiBase * fR(rAU);
+          zodiU.uFs.value =
+            1 + 0.1 * Math.sin(sunLam + Math.PI - ZL_OMEGA * RAD);
+          zodiU.uTzen.value.copy(airglowU.uTzen.value);
+        }
+        // Meteors: the observed rate right now is the sum over the
+        // active showers of ZHR(lam_sun) x sin(radiant elevation)
+        // (meteors.js). Poisson spawning; ?meteor=N forces N/h for
+        // the offline harness.
+        {
+          const mNight = nightSky * (1 - cloudy * 0.85);
+          let total = 0;
+          const act = [];
+          if (mNight > 0.05) {
+            const lamDeg = (((sunLam / RAD) % 360) + 360) % 360;
+            for (const {s, zhr} of activeShowers(lamDeg)) {
+              const rad = radiantAt(s, lamDeg);
+              const aa = altAz(
+                {ra: rad.ra * RAD, dec: rad.dec * RAD},
+                dNow,
+                state.lat,
+                state.lon
+              );
+              const hr = hourlyRate(zhr, aa.alt);
+              if (hr > 0.3) {
+                total += hr;
+                act.push({s, rad, cum: total});
+              }
+            }
+            if (params.has('meteor') && act.length === 0) {
+              // Harness override: a synthetic shower with the
+              // radiant at the local zenith.
+              const lst = gmst(dNow) + state.lon * RAD;
+              total = +params.get('meteor') || 60;
+              act.push({
+                s: {v: 59, r: 2.2},
+                rad: {ra: lst / RAD, dec: state.lat},
+                cum: total
+              });
+            } else if (params.has('meteor') && total > 0) {
+              total = +params.get('meteor') || 60;
+              act[act.length - 1].cum = total;
+            }
+            if (!meteorsRecorded && act.length && !params.has('meteor')) {
+              meteorsRecorded = true;
+              record(
+                'IMO 2026 + Jenniskens 1994 meteors',
+                act
+                  .map(
+                    (a, i) =>
+                      (a.s.code ?? 'x') +
+                      ' ' +
+                      (a.cum - (i ? act[i - 1].cum : 0)).toFixed(1) +
+                      '/h'
+                  )
+                  .join(' · ')
+              );
+            }
+          }
+          for (const p of meteorPool) {
+            if (p.active) {
+              p.t += dt;
+              p.u.life.value = (p.t / p.dur) * 1.2;
+              p.u.night.value = mNight;
+              if (p.t > p.dur * 1.2) {
+                p.active = false;
+                p.mesh.visible = false;
+              }
+            } else if (total > 0 && Math.random() < (total * dt) / 3600) {
+              const pick = Math.random() * total;
+              const a = act.find((x) => pick <= x.cum) ?? act[act.length - 1];
+              const ok = spawnMeteor(meteorPool.indexOf(p), a.s, a.rad);
+              if (params.has('meteor'))
+                console.log(
+                  'METEOR|' +
+                    (ok ? 'spawn' : 'reject') +
+                    '|night ' +
+                    mNight.toFixed(2) +
+                    '|amp ' +
+                    p.u.amp.value.toFixed(3) +
+                    '|dur ' +
+                    p.dur.toFixed(2)
+                );
+              p.u.night.value = mNight;
+            }
+          }
+        }
+        // Contrails: only what the measured criterion allows.
+        // Cruise level stays sunlit until the sun is ~8 deg below
+        // the ground horizon; cloud cover hides the trails from
+        // below like it hides the stars.
+        {
+          const ctOv = params.has('contrail') ? +params.get('contrail') : null;
+          const ct =
+            ctOv !== null
+              ? {forms: ctOv > 0, persists: ctOv > 1}
+              : (state.contrail ?? {forms: false, persists: false});
+          const dayHigh =
+            THREE.MathUtils.clamp((sun.alt / RAD + 8) / 8, 0, 1) *
+            (1 - cloudy * 0.9);
+          const drift = (state.wind250 ?? 0) / 3.6 / 57.14;
+          for (const p of contrailPool) {
+            if (p.active) {
+              p.t += dt;
+              p.u.head.value = Math.min(p.t / p.u.cross.value, 1);
+              p.u.day.value = dayHigh;
+              p.u.tint.value.copy(sunLight.color);
+              // The laid trail drifts with the measured 250 hPa wind.
+              p.mesh.matrix.elements[12] += windVHigh.x * drift * dt;
+              p.mesh.matrix.elements[14] += windVHigh.z * drift * dt;
+              if (p.t > p.life) {
+                p.active = false;
+                p.mesh.visible = false;
+              }
+            } else if (ct.forms && dayHigh > 0.02) {
+              // REAL aircraft claim free slots first (live ADS-B
+              // via the worker); otherwise the ambient-traffic
+              // cadence (documented display choice: a new transit
+              // every ~75 s; the harness override spawns fast so a
+              // pinned shot catches one).
+              const live = liveTraffic?.length ? liveTraffic.shift() : null;
+              if (live) {
+                seenFlights.set(live.hex, Date.now());
+                spawnContrail(p, !!ct.persists, live);
+                p.u.day.value = dayHigh;
+                p.u.tint.value.copy(sunLight.color);
+              } else if (Math.random() < dt / (ctOv !== null ? 4 : 75)) {
+                spawnContrail(p, !!ct.persists);
+                p.u.day.value = dayHigh;
+                p.u.tint.value.copy(sunLight.color);
+              }
+            }
+          }
+        }
+        // Ships: dead-reckon on SOG/COG between AIS reports.
+        // Lights obey COLREGS end to end: carried only from
+        // sunset to sunrise (Rule 20(b), solar altitude below
+        // -50'), each shown only inside its Rule 21 arc for the
+        // CURRENT relative bearing of the camera, brightness from
+        // the Annex I candela through Allard's law at the actual
+        // distance - so a 3 nm sidelight fades out at exactly the
+        // range the regulation rates it for.
+        {
+          const shipLightsOn = sun.alt / RAD < SUNSET_ELEV;
+          for (const s of shipPool) {
+            if (!s.active) continue;
+            s.x += s.vx * dt;
+            s.z += s.vz * dt;
+            if (Math.abs(s.x) > 160 || Math.abs(s.z) > 160) {
+              s.active = false;
+              s.g.visible = false;
+              continue;
+            }
+            s.g.visible = true;
+            s.g.position.set(s.x, water ? water.position.y : 0, s.z);
+            s.g.rotation.y = -s.hdg * RAD;
+            const rel = relBearing(s.hdg, s, {
+              x: camera.position.x,
+              z: camera.position.z
+            });
+            const arcs = lightArcs(rel);
+            const dM =
+              Math.hypot(camera.position.x - s.x, camera.position.z - s.z) *
+              57.14;
+            for (const k in s.lights) {
+              const dot = s.lights[k];
+              if (!shipLightsOn || !arcs[k]) {
+                dot.visible = false;
+                continue;
+              }
+              const E = apparentLux(
+                luminousIntensity(RANGE_NM[NAV_RANGE[k]]),
+                Math.max(dM, 30)
+              );
+              const amp = THREE.MathUtils.clamp(
+                Math.log10(E / 2e-7) / 2.5,
+                0,
+                1
+              );
+              dot.visible = amp > 0;
+              if (dot.visible)
+                dot.material.color
+                  .set(NAV_COLOR[k])
+                  .multiplyScalar(0.4 + 3.6 * amp);
+            }
+          }
+        }
+        if (constMat) constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2;
+        // Venus and Jupiter pierce twilight a little before the stars.
+        planetObj.u.night.value =
+          THREE.MathUtils.clamp(nightSky * 1.6, 0, 1) * (1 - cloudy * 0.85);
+        moonDisc.visible = moon.alt > -0.05;
+
+        // The Water plane: the FFT ocean advances on REAL seconds
+        // (finite-depth dispersion is physical), the spectrum rebuilds
+        // in place when the wind moves materially, the Cox-Munk
+        // glitter lobe gets the RESIDUAL slope variance - total wind
+        // mss minus what the cascades resolve (Bruneton et al. 2010) -
+        // and whitecap coverage now emerges from the folding Jacobian
+        // inside the material.
+        if (water && oceanCascades) {
+          const Ums = state.wind / 3.6;
+          oceanTime += dt;
+          const dirNow = Math.atan2(windV.z, windV.x);
+          const dDir = Math.abs(
+            Math.atan2(
+              Math.sin(dirNow - oceanBuiltDir),
+              Math.cos(dirNow - oceanBuiltDir)
+            )
+          );
+          // Measured partitions rule when the marine model has them
+          // (they only move on the 15-minute sync); otherwise the
+          // wind-sea prediction with its drift gating.
+          const partsNow = seaParts();
+          const seaKey = partsNow ? JSON.stringify(partsNow) : null;
+          if (seaKey !== oceanBuiltSeaKey) {
+            if (partsNow) {
+              for (const c of oceanCascades) c.setSeaState(partsNow);
+            } else {
+              for (const c of oceanCascades) c.setWind(Ums, dirNow);
+              oceanBuiltU = Ums;
+              oceanBuiltDir = dirNow;
+            }
+            oceanBuiltSeaKey = seaKey;
+          } else if (
+            !partsNow &&
+            (Math.abs(Ums - oceanBuiltU) > 1.5 || dDir > 0.35)
+          ) {
+            for (const c of oceanCascades) c.setWind(Ums, dirNow);
+            oceanBuiltU = Ums;
+            oceanBuiltDir = dirNow;
+          }
+          for (const c of oceanCascades) c.update(oceanTime);
+          water.sunDirection.value.copy(sunVec);
+          water.sunColor.value
+            .copy(sunLight.color)
+            .multiplyScalar(sunLight.intensity);
+          // The MEASURED total Hs (marine model, includes secondary
+          // swells) sets the surf/breaking scale when present; the
+          // Pierson-Moskowitz wind estimate is the fallback.
+          const hsNow = state.sea?.hs ?? (0.21 * Ums * Ums) / 9.81;
+          water.distortionScale.value = 0.6 + hsNow * 2.5;
+          const mss = 0.003 + 0.00512 * Ums;
+          const resolved = oceanCascades.reduce((s, c) => s + c.resolvedMss, 0);
+          water.mssSubgrid.value = Math.max(mss - resolved, 1e-4);
+          water.foamW.value = Math.min(3.84e-6 * Math.pow(Ums, 3.41), 0.5);
+          water.hsWave.value = hsNow;
+          // Battjes-Janssen surf profile: peak period from the
+          // DOMINANT measured partition, or the fetch-limited
+          // JONSWAP peak when the sea is wind-predicted - the same
+          // spectrum the cascades realise (setSurf gates on change).
+          const sw = state.sea?.wind;
+          const ss = state.sea?.swell;
+          const tpNow = state.sea
+            ? (((ss?.hs ?? 0) > (sw?.hs ?? 0) ? ss?.tp : sw?.tp) ?? 6)
+            : (2 * Math.PI) / peakOmega(Math.max(Ums, 1), 150e3);
+          water.setSurf(hsNow, tpNow, oceanSeaDepth);
+          // The MEASURED tide: the water plane rides sea level
+          // through the same asinh compression the terrain uses,
+          // and the surf shader adds the same offset to the signed
+          // bathymetry - high water drowns the breakpoint sandbars,
+          // low water exposes them (Battjes-Janssen at the TRUE
+          // local depth).
+          const tideNow = params.has('tide')
+            ? +params.get('tide')
+            : (state.tide ?? 0);
+          water.tide.value = tideNow;
+          water.position.y =
+            16 * Math.asinh((tideNow - centerElev) / 500) - 0.15;
+        }
+
+        // The real wind vectors, per level: meteorological direction is
+        // where wind comes FROM; the scene advects along where it blows.
+        const dirOf = (deg, out) => {
+          const a = (deg + 180) * RAD;
+          out.set(Math.sin(a), 0, -Math.cos(a));
+        };
+        dirOf(state.winddir, windV);
+        dirOf(state.dir700 ?? state.winddir, windVMid);
+        dirOf(state.dir250 ?? state.winddir, windVHigh);
+
+        // The snowline on the peaks tracks the real freezing level (snow
+        // lingers a little below the instantaneous 0°C isotherm).
+        terrainUniforms.uSnowLine.value +=
+          ((state.freezing != null
+            ? THREE.MathUtils.clamp(state.freezing - 300, 600, 5500)
+            : 2300) -
+            terrainUniforms.uSnowLine.value) *
+          Math.min(dt, 1);
+
+        // Sea-state uniforms: real wind feeds the wave model.
+        terrainUniforms.uTime.value = t / 1000;
+        terrainUniforms.uWindMs.value = state.wind / 3.6;
+        terrainUniforms.uWindVec.value.set(windV.x, windV.z);
+        terrainUniforms.uSunDirW.value.copy(sunVec);
+        terrainUniforms.uSunCol.value
+          .copy(sunLight.color)
+          .multiplyScalar(
+            sunLight.intensity * (sun.alt > 0.01 ? 1 : 0) * (1 - cloudy * 0.8)
+          );
+        // Diffuse-skylight fraction for the Ross-Li blend (the
+        // blue-sky albedo weighting, Roman et al. 2010): the SAME
+        // two irradiances the rig lights the terrain with, as
+        // relative luminance - direct beam on the horizontal vs the
+        // hemisphere ambient.
+        {
+          const sc = terrainUniforms.uSunCol.value;
+          const ac = ambient.color;
+          const dirL =
+            (0.2126 * sc.r + 0.7152 * sc.g + 0.0722 * sc.b) *
+            Math.max(Math.sin(sun.alt), 0);
+          const difL =
+            ambient.intensity * (0.2126 * ac.r + 0.7152 * ac.g + 0.0722 * ac.b);
+          terrainUniforms.uRossMix.value =
+            dirL + difL > 0 ? difL / (difL + dirL) : 1;
+        }
+
+        // Aurora: OVATION oval probability when available (Kp heuristic
+        // otherwise), with the curtain elevation from the oval's true
+        // distance - Earth curvature included, ~150km emission height.
+        let auroraP;
+        let ovalDeg;
+        if (state.auroraP !== null) {
+          auroraP = state.auroraP;
+          ovalDeg = Math.abs(state.auroraLat) - Math.abs(state.lat);
+        } else {
+          // The oval is organised by GEOMAGNETIC latitude (IGRF-14
+          // dipole axis), not geographic - Alaska at 61 N geographic
+          // sits under the oval; Hamburg at 53.5 N does not.
+          auroraP =
+            THREE.MathUtils.clamp((state.kp - 4) / 4, 0, 1) *
+            THREE.MathUtils.clamp(
+              (Math.abs(state.gmLat ?? state.lat) - 46) / 14,
+              0,
+              1
+            );
+          ovalDeg = 8;
+        }
+        const ovalKm = Math.max(ovalDeg, 0) * 111;
+        const elevA = Math.atan2(
+          150 - (ovalKm * ovalKm) / 12742,
+          Math.max(ovalKm, 60)
+        );
+        auroraU.strength.value =
+          auroraP * nightSky * (1 - cloudy * 0.7) * (elevA > 0.035 ? 1 : 0);
+        auroraU.time.value = t / 1000;
+        // Characteristic energy for the emission LUT: the public
+        // OVATION product carries probability, not spectra, so this
+        // is a documented display mapping - stronger ovals as harder
+        // precipitation (nightside diffuse/discrete range 1-6 keV);
+        // the ALTITUDE PROFILES per E0 are exact physics
+        // (aurora-lut.js). setE0 gates its own rebuilds.
+        auroraObj.setE0(1.5 + 4.5 * auroraP);
+        const yAurora = Math.tan(THREE.MathUtils.clamp(elevA, 0.06, 1.1)) * 760;
+        auroraU.uBase.value = yAurora - 160;
+        aurora.position.y = yAurora + 200;
+        // The curtain centres on MAGNETIC north (south), not true:
+        // auroral arcs run along geomagnetic east-west, so the
+        // whole band swings by the local IGRF declination (+D means
+        // magnetic north lies east of true north; east is +x, and
+        // positive rotation.y carries the north-placed curtain
+        // west, hence the minus).
+        aurora.rotation.y =
+          (state.lat < 0 ? Math.PI : 0) - (state.magD ?? 0) * RAD;
+
+        // Three cloud layers from the model's real per-layer covers.
+        // Cumulus base at the real lifting condensation level (Espy:
+        // ~125m per degree of dew point spread), clamped above the
+        // camera because the asinh height compression squeezes low
+        // decks harder than the terrain they sit over.
+        const cLow = state.cloudLow ?? state.cloud * 0.7;
+        const cMid = state.cloudMid ?? state.cloud * 0.5;
+        const cHigh = state.cloudHigh ?? state.cloud * 0.3;
+        const lcl = Math.max(125 * (state.temp - state.dew), 150);
+        const yCloud = Math.max(16 * Math.asinh(lcl / 500) + 8, camBaseY + 26);
+        // Each deck rides its own real wind: surface, 700hPa, 250hPa jet.
+        const driftLayer = (arr, cover, y, wv, speed) => {
+          const showN = Math.round((cover / 100) * arr.length);
+          arr.forEach((c, i) => {
+            c.visible = i < showN;
+            c.position.x += wv.x * speed * 0.06 * dt;
+            c.position.z += wv.z * speed * 0.06 * dt;
+            c.position.y +=
+              (y + c.userData.jitter - c.position.y) * Math.min(dt, 1);
+            if (c.position.x > 260) c.position.x = -260;
+            if (c.position.x < -260) c.position.x = 260;
+            if (c.position.z > 260) c.position.z = -260;
+            if (c.position.z < -260) c.position.z = 260;
+          });
+        };
+        // Volumetric decks: real cover carves the density field, the
+        // real wind advects it, the physically transmitted sun lights it.
+        if ((cLow > 3 || cMid > 3) && !cloudTexPending && skyIrrReady) {
+          cloudTexPending = true;
+          setTimeout(() => {
+            const tex = generateCloudTexturesTSL();
+            cloudSys = createCloudSystemTSL(
+              renderer,
+              tex.baseTex,
+              tex.detailTex
+            );
+            cloudSys.attachShadow(cloudShadow);
+            if (radarObs && radarObs.field)
+              cloudSys.setRadarCover(radarObs.field, radarObs.fieldSize, WORLD);
+            sizeCloudTargets();
+            record(
+              'Nubis cloud noise (generated)',
+              'Perlin-Worley 64³ + Worley 32³, tileable'
+            );
+            record(
+              'Temporal cloud reconstruction',
+              'quarter-res march · 1/16 Bayer refresh · reprojection'
+            );
+          }, 60);
+        }
+        cloudsActive = !!cloudSys && (cLow > 2 || cMid > 2);
+        if (cloudsActive) {
+          cloudSys.shared.sunDirW.value.copy(sunVec);
+          cloudSys.shared.sunCol.value
+            .copy(sunLight.color)
+            .multiplyScalar(Math.max(sunLight.intensity, 0.02) * 0.55);
+          // Cloud ambient is the same integrated sky the terrain gets.
+          if (atmo.ok)
+            cloudSys.shared.ambCol.value
+              .copy(ambient.color)
+              .multiplyScalar(0.6);
+          else
+            cloudSys.shared.ambCol.value
+              .copy(tmpB)
+              .multiplyScalar(0.22 + day * 0.5);
+
+          const lu = cloudSys.uniformsLow;
+          lu.cov.value =
+            cLow > 2 ? THREE.MathUtils.clamp(cLow / 100, 0, 0.95) : 0;
+          // Cloud TYPE from the reported WMO code: overcast, fog and
+          // drizzle/steady-rain codes mean a flat stratiform sheet,
+          // shower and thunderstorm codes mean towering convection,
+          // anything else is fair-weather cumulus. The deck's thickness
+          // follows the type.
+          const wmo = state.code || 0;
+          const cTypeT =
+            wmo >= 80 ? 1.85 : wmo === 3 || (wmo >= 45 && wmo <= 67) ? 0.15 : 1;
+          lu.cType.value += (cTypeT - lu.cType.value) * Math.min(dt * 0.5, 1);
+          lu.yBase.value = yCloud;
+          lu.yTop.value = yCloud + 8 + lu.cType.value * 9;
+          lu.wOff.value.x += windV.x * state.wind * 0.06 * dt;
+          lu.wOff.value.y += windV.z * state.wind * 0.06 * dt;
+
+          // Mid deck: altostratus at the 700 hPa level - stratiform
+          // profile, lower liquid water content, advected by the REAL
+          // wind at its own altitude.
+          const mu = cloudSys.uniformsMid;
+          mu.cov.value =
+            cMid > 2 ? THREE.MathUtils.clamp(cMid / 100, 0, 0.95) : 0;
+          mu.yBase.value = Math.max(16 * Math.asinh(8), yCloud + 16);
+          mu.yTop.value = mu.yBase.value + 6;
+          const w700 = state.wind700 ?? state.wind;
+          mu.wOff.value.x += windVMid.x * w700 * 0.06 * dt;
+          mu.wOff.value.y += windVMid.z * w700 * 0.06 * dt;
+        }
+        // The cloud shadow map: refreshed with the advected field;
+        // zero (full sun) whenever the decks are inactive.
+        cloudShadow.update(sunVec, cloudsActive);
+        if (cloudsActive) cloudSys.updateShadow();
+        driftLayer(
+          cloudsHigh,
+          cHigh,
+          Math.max(16 * Math.asinh(16), yCloud + 26),
+          windVHigh,
+          state.wind250 ?? state.wind
+        );
+        cirrusMat.opacity = 0.05 + day * 0.12;
+
+        // Ground snow cover reacts live to the real temperature.
+        const snowyGround =
+          state.temp <= 0.5 && (state.snow > 0 || state.code >= 71) ? 1 : 0;
+        terrainUniforms.uSnowy.value +=
+          (snowyGround - terrainUniforms.uSnowy.value) * Math.min(dt, 1);
+
+        const snowing =
+          state.snow > 0 ||
+          (state.code >= 71 &&
+            state.code <= 86 &&
+            ![80, 81, 82].includes(state.code));
+        // Radar measurement over model value when fresh and covered.
+        const radarFresh =
+          radarObs &&
+          Date.now() - radarObs.time < 25 * 60 * 1000 &&
+          radarObs.coverage > 0.05;
+        const precipMeas = radarFresh
+          ? radarObs.rain + radarObs.snow
+          : state.precip;
+        const raining = !snowing && (precipMeas > 0.02 || state.code >= 51);
+        const rate = snowing
+          ? THREE.MathUtils.clamp(
+              radarFresh ? radarObs.snow * 1.2 : state.snow / 2,
+              0.3,
+              1
+            )
+          : THREE.MathUtils.clamp(precipMeas / 4, 0.25, 1);
+        precipU.opacity.value = raining || snowing ? 0.35 + rate * 0.45 : 0;
+        precipU.size.value = snowing ? 0.34 : 0.16;
+        precipU.color.value.set(snowing ? '#ffffff' : '#a9c6e2');
+        if (raining || snowing) {
+          const p = precipObj.posAttr;
+          const fall = (snowing ? 6 : 34) * (0.4 + rate * 0.6) * dt;
+          // Advected along the true wind vector, not just eastward.
+          const drift = state.wind * 0.05 * dt;
+          for (let i = 0; i < PRECIP_N; i++) {
+            let y = p.getY(i) - fall;
+            const wob = snowing ? Math.sin(t / 900 + i) * 0.02 : 0;
+            let x = p.getX(i) + windV.x * drift + wob;
+            let z = p.getZ(i) + windV.z * drift;
+            if (y < 0) y += 45;
+            if (x > 45) x -= 90;
+            if (x < -45) x += 90;
+            if (z > 45) z -= 90;
+            if (z < -45) z += 90;
+            p.setY(i, y);
+            p.setX(i, x);
+            p.setZ(i, z);
+          }
+          p.needsUpdate = true;
+        }
+
+        // Atmospheric optics, gated by the real conditions: bows need
+        // rain with the sun shining below the Descartes angle; the halo
+        // needs real cirrus; parhelia strengthen at low sun.
+        opticsU.sunDir.value.copy(sunVec);
+        opticsU.antisolar.value.copy(sunVec).negate();
+        const sunOut = day * THREE.MathUtils.clamp(1 - cloudy * 1.1, 0, 1);
+        opticsU.bow.value =
+          raining && sun.alt > 0 && sun.alt < 0.733 ? sunOut : 0;
+        opticsU.halo.value =
+          (cHigh / 100) *
+          (cHigh < 90 ? 1 : 0.5) *
+          sunOut *
+          (sun.alt > 0 ? 1 : 0);
+        opticsU.dogs.value = THREE.MathUtils.clamp(
+          (0.44 - sun.alt) / 0.26,
+          0,
+          1
+        );
+
+        // Deciduous phenology: Hopkins' bioclimatic law shifts the leaf
+        // calendar ~4 days per degree of latitude and per 122m of
+        // elevation; the southern hemisphere is half a year out of phase.
+        let doy = (d.getTime() - Date.UTC(d.getUTCFullYear(), 0, 0)) / 86400000;
+        if (state.lat < 0) doy = (doy + 182.5) % 365;
+        const hop = 4 * (Math.abs(state.lat) - 39) + centerElev / 30.5;
+        const leafOut = 105 + hop;
+        const senesce = 265 - hop;
+        const frac = (x, a, b) =>
+          THREE.MathUtils.clamp((x - a) / (b - a), 0, 1);
+        const spring = frac(doy, leafOut, leafOut + 18);
+        const mature = frac(doy, leafOut + 18, leafOut + 45);
+        const fall = frac(doy, senesce, senesce + 20);
+        const drop = frac(doy, senesce + 25, senesce + 45);
+        broadMats.forEach((m, i) => {
+          m.color
+            .copy(cBare)
+            .lerp(cSpring, spring)
+            .lerp(broadBases[i], spring * mature)
+            .lerp(cAutumn, fall)
+            .lerp(cBare, drop);
+        });
+
+        // Physical snow: lazily boot Rapier the first time it really
+        // snows, then step the world once per frame.
+        if (snowing && !snowSim && !snowLoading && !reduceMotion) initSnowSim();
+        if (snowSim) {
+          snowSim.world.step();
+          let fi = 0;
+          for (const body of snowSim.bodies) {
+            // The real wind pushes every airborne flake.
+            body.resetForces(true);
+            body.addForce(
+              {
+                x: windV.x * state.wind * 0.0004,
+                y: 0,
+                z: windV.z * state.wind * 0.0004
+              },
+              true
+            );
+            const p = body.translation();
+            // Settled = genuinely at rest. The per-frame wind force keeps
+            // bodies formally awake, so ask the velocity, not sleep state.
+            const v = body.linvel();
+            const settled =
+              body.isSleeping() ||
+              Math.hypot(v.x, v.y, v.z) < 0.07 ||
+              p.y < sample(p.x, p.z).y + 0.05;
+            if (settled) {
+              if (snowing) snowSim.deposit(p);
+              snowSim.spawn(body);
+            } else if (Math.abs(p.x) > 130 || Math.abs(p.z) > 130) {
+              snowSim.spawn(body); // blown out of the near field
+            } else if (snowing) {
+              tmpM4.makeScale(1, 1, 1).setPosition(p.x, p.y, p.z);
+              flakeMesh.setMatrixAt(fi++, tmpM4);
+            }
+          }
+          flakeMesh.count = fi;
+          flakeMesh.visible = fi > 0;
+          flakeMesh.instanceMatrix.needsUpdate = true;
+          // Warm real temperatures erode the drifts, oldest first.
+          if (state.temp > 1 && snowSim.countD) {
+            snowSim.melt += dt * (state.temp - 1) * 1.5;
+            while (snowSim.melt > 1 && snowSim.countD) {
+              snowSim.melt -= 1;
+              snowSim.meltOldest();
+            }
+          }
+        }
+
+        // Trees: an underdamped spring-damper per tree, forced by the
+        // real mean wind and the real gust spread, leaning along the
+        // true wind direction.
+        const meanLean = Math.min(state.wind / 130, 0.5);
+        const gustAmp = Math.min(
+          Math.max(state.gust - state.wind, 0) / 90,
+          0.6
+        );
+        treeAxis.set(windV.z, 0, -windV.x);
+        for (const tree of trees) {
+          const u = tree.userData;
+          const forcing =
+            meanLean +
+            gustAmp *
+              (0.6 *
+                Math.sin(t * 0.0011 + u.phase) *
+                Math.sin(t * 0.00043 + u.phase * 2.7) +
+                0.4 * Math.sin(t * 0.0027 + u.phase * 1.3));
+          u.v += (14 * (forcing - u.a) - 4.2 * u.v) * dt;
+          u.a += u.v * dt;
+          tree.setRotationFromAxisAngle(treeAxis, u.a);
+        }
+
+        // ISS: SGP4-propagated position; drawn only when the pass is
+        // genuinely visible (above horizon, sunlit against a dark sky).
+        if (satrec && window.satellite) {
+          const pv = satellite.propagate(satrec, d);
+          if (pv.position) {
+            const lk = satellite.ecfToLookAngles(
+              {
+                latitude: state.lat * RAD,
+                longitude: state.lon * RAD,
+                height: centerElev / 1000
+              },
+              satellite.eciToEcf(pv.position, satellite.gstime(d))
+            );
+            // Cylindrical Earth-shadow test in the equatorial frame.
+            const sEq = sunEquatorial(d);
+            const sx = Math.cos(sEq.dec) * Math.cos(sEq.ra);
+            const sy = Math.cos(sEq.dec) * Math.sin(sEq.ra);
+            const sz = Math.sin(sEq.dec);
+            const r = pv.position;
+            const dp = r.x * sx + r.y * sy + r.z * sz;
+            const perp = Math.hypot(
+              r.x - dp * sx,
+              r.y - dp * sy,
+              r.z - dp * sz
+            );
+            const sunlit = dp > 0 || perp > 6371;
+            iss.visible = lk.elevation > 0.09 && sunlit && sun.alt < -0.05;
+            if (iss.visible) {
+              iss.position.copy(skyPoint(lk.elevation, lk.azimuth, 820));
+              if (t - lastPassSaid > 900000) {
+                lastPassSaid = t;
+                say(
+                  'ISS pass · ' +
+                    Math.round(lk.rangeSat) +
+                    ' km away · real orbit via SGP4'
+                );
+              }
+            }
+          }
+        }
+
+        let shakeX = 0;
+        let shakeY = 0;
+        if (state.shake > 0.005 && !reduceMotion) {
+          shakeX = (Math.random() - 0.5) * state.shake;
+          shakeY = (Math.random() - 0.5) * state.shake * 0.6;
+          state.shake *= Math.pow(0.35, dt);
+        }
+
+        if (freeCam.on) {
+          // Free flight: yaw/pitch from drag, movement from keys and
+          // wheel, height clamped to the real terrain.
+          const cp = Math.cos(freeCam.pitch);
+          const fx = Math.sin(freeCam.yaw) * cp;
+          const fy = -Math.sin(freeCam.pitch);
+          const fz = Math.cos(freeCam.yaw) * cp;
+          const rx = Math.cos(freeCam.yaw);
+          const rz = -Math.sin(freeCam.yaw);
+          const k = freeCam.keys;
+          const fast = k.has('ShiftLeft') || k.has('ShiftRight') ? 3 : 1;
+          const sp = 12 * fast * dt;
+          let mx = 0;
+          let my = 0;
+          let mz = 0;
+          if (k.has('KeyW') || k.has('ArrowUp')) {
+            mx += fx * sp;
+            my += fy * sp;
+            mz += fz * sp;
+          }
+          if (k.has('KeyS') || k.has('ArrowDown')) {
+            mx -= fx * sp;
+            my -= fy * sp;
+            mz -= fz * sp;
+          }
+          if (k.has('KeyD') || k.has('ArrowRight')) {
+            mx += rx * sp;
+            mz += rz * sp;
+          }
+          if (k.has('KeyA') || k.has('ArrowLeft')) {
+            mx -= rx * sp;
+            mz -= rz * sp;
+          }
+          if (k.has('KeyR')) my += sp;
+          if (k.has('KeyF')) my -= sp;
+          // Wheel dolly eases out along the view direction.
+          const dol = freeCam.dolly * Math.min(dt * 8, 1);
+          freeCam.dolly -= dol;
+          mx += fx * dol;
+          my += fy * dol;
+          mz += fz * dol;
+          freeCam.pos.x = THREE.MathUtils.clamp(freeCam.pos.x + mx, -130, 130);
+          freeCam.pos.z = THREE.MathUtils.clamp(freeCam.pos.z + mz, -130, 130);
+          const ground = sample(freeCam.pos.x, freeCam.pos.z).y + 1.6;
+          freeCam.pos.y = THREE.MathUtils.clamp(freeCam.pos.y + my, ground, 95);
+          camera.position.set(
+            freeCam.pos.x + shakeX,
+            freeCam.pos.y + shakeY,
+            freeCam.pos.z
+          );
+          camera.lookAt(
+            freeCam.pos.x + fx,
+            freeCam.pos.y + fy,
+            freeCam.pos.z + fz
+          );
+        } else {
+          const equatorYaw = state.lat < 0 ? Math.PI : 0;
+          const auroraOn = auroraU.strength.value > 0.04;
+          const targetYaw = auroraOn ? Math.PI - equatorYaw : equatorYaw;
+          if (!yawInit) {
+            yaw = targetYaw;
+            yawInit = true;
+          }
+          yaw += (targetYaw - yaw) * Math.min(dt * 0.4, 1);
+          const vx = Math.sin(yaw);
+          const vz = Math.cos(yaw);
+          const camZ = -26 * vz;
+          const camX = -26 * vx;
+          // Clear the immediate foreground so the camera never sits with
+          // its face in a hillside.
+          const baseY =
+            Math.max(
+              sample(camX, camZ).y,
+              sample(camX + 5, camZ).y,
+              sample(camX - 5, camZ).y,
+              sample(camX, camZ + 5).y,
+              sample(camX, camZ - 5).y
+            ) + 4.5;
+          camBaseY += (baseY - camBaseY) * Math.min(dt * 2, 1);
+
+          camera.position.set(
+            camX + look.x * 3 + shakeX,
+            camBaseY + look.y * -1.2 + shakeY,
+            camZ
+          );
+          camera.lookAt(
+            camX + vx * 66 + look.x * 8,
+            camBaseY + 1 + look.y * -5,
+            camZ + vz * 66
+          );
+        }
+
+        if (!panel.hidden) {
+          const Ums = state.wind / 3.6;
+          live['sun (computed)'] =
+            (sun.alt / RAD).toFixed(1) +
+            '° alt · ' +
+            ((((sun.az / RAD) % 360) + 360) % 360).toFixed(0) +
+            '° az';
+          live['moon (computed)'] = (moon.alt / RAD).toFixed(1) + '° alt';
+          live['sea state'] =
+            'Hs ' +
+            ((0.21 * Ums * Ums) / 9.81).toFixed(2) +
+            ' m · Tp ' +
+            (0.7305 * Ums).toFixed(1) +
+            ' s (Pierson-Moskowitz) · mss ' +
+            (0.003 + 0.00512 * Ums).toFixed(4) +
+            ' (Cox-Munk) · whitecaps ' +
+            (3.84e-4 * Math.pow(Ums, 3.41)).toFixed(2) +
+            '% (Monahan)';
+          live['visibility (Koschmieder fog)'] =
+            (state.visibility / 1000).toFixed(1) + ' km measured';
+          live['snowline (freezing level)'] =
+            Math.round(terrainUniforms.uSnowLine.value) + ' m';
+          live['treeline (Körner & Paulsen)'] =
+            Math.round(treelineM(state.lat)) + ' m';
+          live['optics'] =
+            'bow ' +
+            opticsU.bow.value.toFixed(2) +
+            ' · halo ' +
+            opticsU.halo.value.toFixed(2) +
+            ' · eclipse ' +
+            ((astro.eclipse || 0) * 100).toFixed(0) +
+            '%';
+          live['aurora curtain'] =
+            auroraU.strength.value.toFixed(2) + ' strength';
+          if (snowSim)
+            live['snow (Rapier)'] =
+              snowSim.countD +
+              ' drift deposits · ' +
+              flakeMesh.count +
+              ' falling';
+        }
+
+        camera.updateMatrixWorld();
+
+        if (cloudsActive) {
+          // Terrain depth prepass (cheap: colour writes off, override
+          // material): gives the cloud march its scene depth and the
+          // composite its bilateral weights.
+          const mask = camera.layers.mask;
+          scene.overrideMaterial = depthOnlyMat;
+          camera.layers.mask = 1 << 3;
+          renderer.setRenderTarget(cloudDepthRT);
+          renderer.render(scene, camera);
+          renderer.setRenderTarget(null);
+          camera.layers.mask = mask;
+          scene.overrideMaterial = null;
+          cloudSys.render(camera, cloudDepthRT.depthTexture);
+        }
+        renderer.render(scene, camera);
+        if (cloudsActive) cloudSys.composite();
+        // Precipitation overlays the composite (rain and snow fall in
+        // FRONT of the far cloud decks), still depth-tested against the
+        // scene via the preserved depth buffer.
+        {
+          const mask = camera.layers.mask;
+          camera.layers.mask = 1 << 4;
+          renderer.autoClear = false;
+          renderer.render(scene, camera);
+          renderer.autoClear = true;
+          camera.layers.mask = mask;
+        }
+      }
+
+      (async () => {
+        if (document.prerendering) {
+          await new Promise((resolve) =>
+            document.addEventListener('prerenderingchange', resolve, {
+              once: true
+            })
+          );
+        }
+        requestAnimationFrame(frame);
+        await syncWeather();
+        setInterval(syncWeather, 15 * 60 * 1000);
+        syncGeomag();
+        syncAir();
+        setInterval(syncAir, 30 * 60 * 1000);
+        syncMarine();
+        setInterval(syncMarine, 15 * 60 * 1000);
+        syncRadar();
+        setInterval(syncRadar, 10 * 60 * 1000);
+        syncAloft();
+        setInterval(syncAloft, 30 * 60 * 1000);
+        syncForests();
+        syncBrdf();
+        syncTraffic();
+        setInterval(syncTraffic, 60 * 1000);
+        syncShips();
+        setInterval(syncShips, 120 * 1000);
+        syncF107();
+        setInterval(syncF107, 6 * 60 * 60 * 1000);
+        syncKp();
+        setInterval(syncKp, 15 * 60 * 1000);
+        syncOvation();
+        setInterval(syncOvation, 30 * 60 * 1000);
+        syncISS();
+        setInterval(syncISS, 6 * 60 * 60 * 1000);
+        if (params.get('dem') !== '0') {
+          try {
+            demData = await fetchDEMTiles(state.lat, state.lon);
+            buildWorld();
+          } catch {
+            try {
+              demData = await fetchDEM(state.lat, state.lon);
+              buildWorld();
+            } catch {
+              // Keep the procedural fallback silently.
+            }
+          }
+        }
+        if (params.has('quake')) {
+          setTimeout(() => {
+            state.shake = Math.min((+params.get('quake') - 4) * 0.5, 1.2);
+            say('M' + params.get('quake') + ' earthquake · debug override');
+          }, 1500);
+        } else {
+          pollQuakes();
+          setInterval(pollQuakes, 5 * 60 * 1000);
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,168 @@
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./writeups/themes/horizon/three.module.min.js",
+          "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body style="margin: 0; overflow: hidden">
+    <canvas id="gl"></canvas>
+    <script>
+      /* swizzle shim */ if (navigator.gpu && self.GPUTexture) {
+        const ov = GPUTexture.prototype.createView;
+        GPUTexture.prototype.createView = function (d) {
+          if (d && 'swizzle' in d) {
+            d = Object.assign({}, d);
+            delete d.swizzle;
+          }
+          return ov.call(this, d);
+        };
+      }
+    </script>
+    <script type="module">
+      import * as GPU from 'three/webgpu';
+      try {
+        const P = new URLSearchParams(location.search);
+        const capW = +(P.get('cap') ?? 0.12),
+          hsW = +(P.get('hs') ?? 1.2),
+          shinyW = +(P.get('shiny') ?? 120),
+          mirrorFull = P.get('mirror') === 'full',
+          distS = +(P.get('dist') ?? 1.4);
+        const W = innerWidth,
+          H = innerHeight;
+        const T = GPU;
+        const r = new GPU.WebGPURenderer({
+          canvas: document.getElementById('gl'),
+          forceWebGL: false,
+          antialias: false
+        });
+        await r.init();
+        r.setSize(W, H);
+        const scene = new T.Scene();
+        scene.background = new T.Color('#000000');
+        const cam = new T.PerspectiveCamera(55, W / H, 0.1, 2000);
+        cam.position.set(0, 6, 30);
+        cam.lookAt(0, 0, -40);
+        cam.updateMatrixWorld();
+
+        // synthetic bathymetry ramp: shallow at -x, deep at +x
+        // (float + linear, matching the theme's depth texture)
+        const D = 64;
+        const dArr = new Float32Array(D * D);
+        for (let j = 0; j < D; j++)
+          for (let i = 0; i < D; i++) dArr[j * D + i] = i / (D - 1);
+        const depthTex = new T.DataTexture(
+          dArr,
+          D,
+          D,
+          T.RedFormat,
+          T.FloatType
+        );
+        depthTex.minFilter = depthTex.magFilter = T.LinearFilter;
+        depthTex.needsUpdate = true;
+
+        const sunDir = new T.Vector3(0.5, 0.35, -0.8).normalize();
+        const sunCol = P.get('sun') === '0' ? 0x000000 : 0xffffff;
+        const geo = new T.PlaneGeometry(280, 280);
+        let water;
+        {
+          const {HorizonWaterMesh} =
+            await import('./writeups/themes/horizon/water-tsl.js');
+          const {createOceanFFT} =
+            await import('./writeups/themes/horizon/ocean-tsl.js');
+          const SPLIT = (2 * Math.PI) / 25;
+          const U10 = +(P.get('u') ?? 12);
+          // ?sea=hsw,tpw,dww,hss,tps,dws - measured-partition mode (dirs in
+          // math radians here; the theme converts met degrees itself).
+          let sea;
+          if (P.get('sea')) {
+            const [a, b, c, d, e, f] = P.get('sea').split(',').map(Number);
+            sea = [
+              {hs: a, tp: b, dir: c, U10},
+              {hs: d, tp: e, dir: f}
+            ];
+          }
+          const cascades = [
+            createOceanFFT(r, {
+              N: 256,
+              L: 1000,
+              U10,
+              F: 150e3,
+              D: 60,
+              windDir: 0,
+              sea,
+              kMax: SPLIT,
+              seed: 1337,
+              lambda: 1.1
+            }),
+            createOceanFFT(r, {
+              N: 256,
+              L: 120,
+              U10,
+              F: 150e3,
+              D: 60,
+              windDir: 0,
+              sea,
+              kMin: SPLIT,
+              seed: 7331,
+              lambda: 1.1
+            })
+          ];
+          for (const c of cascades) c.update(13.7);
+          water = new HorizonWaterMesh(geo, {
+            sunDirection: sunDir.clone(),
+            sunColor: sunCol,
+            waterColor: 0x0a2431,
+            distortionScale: distS,
+            depthTex,
+            worldSize: 280,
+            resolutionScale: mirrorFull ? 1 : 512 / Math.max(W, H),
+            ocean: {cascades, metersPerUnit: 57.14}
+          });
+          water.mssSubgrid.value = Math.max(
+            0.003 +
+              0.00512 * U10 -
+              cascades[0].resolvedMss -
+              cascades[1].resolvedMss,
+            1e-4
+          );
+          water.foamW.value = Math.min(3.84e-6 * Math.pow(U10, 3.41), 0.5);
+          water.hsWave.value = hsW;
+          const {peakOmega} =
+            await import('./writeups/themes/horizon/ocean-spectrum.js');
+          const tp = sea
+            ? sea[1].hs > sea[0].hs
+              ? sea[1].tp
+              : sea[0].tp
+            : (2 * Math.PI) / peakOmega(U10, 150e3);
+          water.setSurf(hsW, tp, 60);
+        }
+        water.rotation.x = -Math.PI / 2;
+        scene.add(water);
+
+        const box = new T.Mesh(
+          new T.BoxGeometry(10, 10, 10),
+          new T.MeshBasicMaterial({color: 0xff0000})
+        );
+        box.position.set(0, 9, -30);
+        scene.add(box);
+
+        await r.renderAsync(scene, cam);
+        await r.renderAsync(scene, cam);
+        window.__r = r;
+        window.__scene = scene;
+        window.__cam = cam;
+        window.__THREE = T;
+        console.log(V + ' water frame done');
+      } catch (e) {
+        console.log('ERR', e.message);
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body style="margin: 0; overflow: hidden">
+    <canvas id="gl"></canvas>
+    <script>
+      /* swizzle shim */ if (navigator.gpu && self.GPUTexture) {
+        const ov = GPUTexture.prototype.createView;
+        GPUTexture.prototype.createView = function (d) {
+          if (d && 'swizzle' in d) {
+            d = Object.assign({}, d);
+            delete d.swizzle;
+          }
+          return ov.call(this, d);
+        };
+      }
+    </script>
+    <script type="module">
+      // Glint-hash probe: the GPU's pcg3d lane and Poisson counts must
+      // equal the CPU single source (snow-glints.js) BIT FOR BIT - the
+      // hash is uint32-exact, so any mismatch is a port bug. Runs on
+      // either backend (?wgpu=1 for WebGPU); self-checking.
+      import * as T from 'three/webgpu';
+      import {
+        Fn,
+        exp,
+        float,
+        ivec2,
+        screenCoordinate,
+        select,
+        sqrt,
+        uint,
+        vec4
+      } from 'three/tsl';
+      import {
+        pcg3d,
+        poissonCount
+      } from './writeups/themes/horizon/snow-glints.js';
+      const log = (s) => console.log('GLINT|' + s);
+      try {
+        const r = new T.WebGPURenderer({
+          canvas: document.getElementById('gl'),
+          forceWebGL: false,
+          antialias: false
+        });
+        await r.init();
+        log('backend ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'));
+        r.setSize(64, 64);
+        const W = 64,
+          H = 4;
+
+        const pcg3dX = (x, y, z) => {
+          let vx = x.mul(uint(1664525)).add(uint(1013904223));
+          let vy = y.mul(uint(1664525)).add(uint(1013904223));
+          let vz = z.mul(uint(1664525)).add(uint(1013904223));
+          vx = vx.add(vy.mul(vz));
+          vy = vy.add(vz.mul(vx));
+          vz = vz.add(vx.mul(vy));
+          vx = vx.bitXor(vx.shiftRight(uint(16)));
+          vy = vy.bitXor(vy.shiftRight(uint(16)));
+          vz = vz.bitXor(vz.shiftRight(uint(16)));
+          vx = vx.add(vy.mul(vz));
+          return vx;
+        };
+        const countFromU = (u2, nbar) => {
+          let p = exp(nbar.negate());
+          let cdf = p;
+          let N = float(0);
+          for (let k = 1; k <= 6; k++) {
+            N = N.add(select(u2.greaterThan(cdf), 1.0, 0.0));
+            p = p.mul(nbar).div(k);
+            cdf = cdf.add(p);
+          }
+          const gauss = nbar.add(u2.sub(0.5).mul(sqrt(nbar.mul(12))));
+          return select(nbar.lessThanEqual(3), N, gauss);
+        };
+
+        const quad = new T.QuadMesh();
+        const m = new T.MeshBasicNodeMaterial();
+        m.colorNode = Fn(() => {
+          const x = uint(ivec2(screenCoordinate.xy).x);
+          const h = pcg3dX(x, uint(17), uint(4242));
+          // uint32 exceeds fp32: split hi/lo 16-bit halves (both exact).
+          const hi = h.shiftRight(uint(16)).toFloat();
+          const lo = h.bitAnd(uint(0xffff)).toFloat();
+          const u2 = h.toFloat().mul(1 / 4294967296);
+          return vec4(
+            hi,
+            lo,
+            countFromU(u2, float(0.5)),
+            countFromU(u2, float(2.5))
+          );
+        })();
+        m.transparent = true;
+        m.blending = T.NoBlending;
+        m.toneMapped = false;
+        quad.material = m;
+        const rt = new T.RenderTarget(W, H, {
+          type: T.FloatType,
+          depthBuffer: false
+        });
+        r.setRenderTarget(rt);
+        quad.render(r);
+        r.setRenderTarget(null);
+        const a = await r.readRenderTargetPixelsAsync(rt, 0, 0, W, H);
+
+        let bad = 0;
+        let badC = 0;
+        for (let x = 0; x < W; x++) {
+          const gpu = a[x * 4] * 65536 + a[x * 4 + 1];
+          const ref = pcg3d(x, 17, 4242)[0];
+          if (gpu !== ref) {
+            bad++;
+            if (bad <= 3) log(`hash x=${x}: gpu ${gpu} ref ${ref}`);
+          }
+          const u2 = ref / 4294967296;
+          if (a[x * 4 + 2] !== poissonCount(u2, 0.5)) badC++;
+          if (a[x * 4 + 3] !== poissonCount(u2, 2.5)) badC++;
+        }
+        log(`hash mismatches ${bad}/64, count mismatches ${badC}/128`);
+        log(
+          bad === 0 ? 'HASH PASS (bit-exact vs CPU single source)' : 'HASH FAIL'
+        );
+        log(
+          badC === 0 ? 'COUNT PASS' : 'COUNT DIVERGES (fp boundary, inspect)'
+        );
+        log('DONE');
+      } catch (e) {
+        log('ERR ' + e.message + ' :: ' + (e.stack || '').split('\n')[1]);
+        log('DONE');
+      }
+    </script>
+  </body>
+</html>
