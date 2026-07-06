@@ -36,13 +36,14 @@
  * relative_humidity_250hPa at the visitor (the 250 hPa surface is
  * jet cruise level), and the aircraft themselves are live ADS-B
  * traffic around the visitor via the horizon-adsb Cloudflare
- * worker (worker/src/index.js: adsb.lol / adsb.fi readsb feeds
- * with OpenSky state vectors normalized in as the fallback - no
- * public feed is browser-reachable directly, so the worker adds
- * the CORS header). Ambient Poisson traffic only fills in when
- * the feed has nothing overhead. The PHYSICS decides whether any
- * aircraft's trail exists at all and whether it lingers, which is
- * what makes today's sky look like today's sky.
+ * worker (worker/src/index.js: OpenSky state vectors normalized
+ * to this schema - one good source, authenticated when the owner
+ * sets the API secrets; no public feed is browser-reachable
+ * directly, so the worker adds the CORS header). Ambient Poisson
+ * traffic only fills in when the feed has nothing overhead. The
+ * PHYSICS decides whether any aircraft's trail exists at all and
+ * whether it lingers, which is what makes today's sky look like
+ * today's sky.
  */
 
 // Murphy & Koop (2005) eq. (7): saturation vapour pressure over

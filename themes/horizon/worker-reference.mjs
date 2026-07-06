@@ -2,9 +2,10 @@
 // worker-reference.mjs). The worker module runs unmodified in node
 // (same V8; Response/Request are global since node 18), so this
 // gate exercises the REAL handler offline: global fetch is stubbed
-// with a recorded OpenSky state-vector payload and failing readsb
-// upstreams, exactly the situation measured on the deployed worker
-// (both community feeds refuse Cloudflare egress).
+// with recorded OpenSky payloads and the measured failure modes
+// (anonymous 503 shedding, expired-token 401s). One upstream by
+// design - the readsb community feeds tarpit Cloudflare egress
+// (measured: 5 of 6 probes hung past 15 s) and were dropped.
 // Landmarks:
 //  - OpenSky bounding box: 1 nm of latitude is exactly 1/60 degree;
 //    longitude widens by 1/cos(lat); the box is centred on the query
@@ -12,12 +13,17 @@
 //    readsb shape with the EXACT international foot and knot
 //    (10972.8 m -> 36000 ft, 205.7776 m/s -> 400 kt), grounded and
 //    incomplete vectors are dropped, callsigns are trimmed
-//  - end-to-end: with readsb down, the handler answers 200 from
-//    opensky with CORS + x-adsb-source, and the normalized aircraft
-//    feeds adsbToScene (contrails.js) unchanged - one parser
-//  - allowlist: wrong path 404, non-numeric coords 400, OPTIONS
+//  - anonymous mode: no secrets -> no token call, first shot shed
+//    with 503 (measured ~half of single shots), the in-worker
+//    retry carries it; CORS + x-adsb-source on the response and
+//    the aircraft feed adsbToScene (contrails.js) unchanged
+//  - authenticated mode: client-credentials form POST to the
+//    Keycloak token endpoint, Bearer header on the API call,
+//    token cached across invocations (ONE token fetch for two
+//    requests), 401 -> refresh once and carry on
+//  - allowlist: wrong path 404, out-of-range coords 400, OPTIONS
 //    preflight carries the CORS allow headers
-import worker, {UPSTREAMS} from './worker/src/index.js';
+import worker, {bboxUrl, normalize, resetToken} from './worker/src/index.js';
 import {adsbToScene} from './contrails.js';
 
 let fail = 0;
@@ -26,10 +32,8 @@ const check = (name, ok, detail) => {
   if (!ok) fail++;
 };
 
-const opensky = UPSTREAMS.find((u) => u.name === 'opensky');
-
 {
-  const u = new URL(opensky.url('46.620', '8.040', 15));
+  const u = new URL(bboxUrl('46.620', '8.040', 15));
   const g = (k) => Number(u.searchParams.get(k));
   const dLat = 15 / 60;
   const dLon = 15 / (60 * Math.cos((46.62 * Math.PI) / 180));
@@ -114,7 +118,7 @@ const STATES = {
 };
 
 {
-  const ac = opensky.norm(STATES);
+  const ac = normalize(STATES);
   const a = ac[0];
   check(
     'normalization',
@@ -130,28 +134,32 @@ const STATES = {
   );
 }
 
+const REQ = () =>
+  new Request('https://horizon-adsb.test/adsb?lat=46.62&lon=8.04&dist=15');
+const realFetch = globalThis.fetch;
+
 {
-  // End-to-end with the measured outage: readsb upstreams 429
-  // (Cloudflare egress refused) and OpenSky sheds the FIRST call
-  // with a 503 (its anonymous tier drops about half of single
-  // shots - probed), so the in-worker retry must carry it. The
-  // handler must return 200 JSON with CORS and name its source;
-  // the aircraft must feed the theme's adsbToScene mapping
-  // unchanged.
-  const realFetch = globalThis.fetch;
-  let openskyCalls = 0;
-  globalThis.fetch = async (u) => {
-    if (String(u).startsWith('https://opensky-network.org/')) {
-      if (++openskyCalls === 1) return new Response('shedding', {status: 503});
-      return new Response(JSON.stringify(STATES), {
-        headers: {'content-type': 'application/json'}
-      });
+  // Anonymous mode (no secrets): no token traffic; OpenSky sheds
+  // the FIRST call with a 503 (the measured behaviour of the
+  // anonymous tier - about half of single shots), so the
+  // in-worker retry must carry it. The normalized aircraft must
+  // feed the theme's adsbToScene mapping unchanged.
+  resetToken();
+  let apiCalls = 0;
+  let tokenCalls = 0;
+  let sawAuth = false;
+  globalThis.fetch = async (u, init) => {
+    if (String(u).includes('auth.opensky-network.org')) {
+      tokenCalls++;
+      return new Response('{}', {status: 200});
     }
-    return new Response('rate limited', {status: 429});
+    if ((init?.headers || {}).authorization) sawAuth = true;
+    if (++apiCalls === 1) return new Response('shedding', {status: 503});
+    return new Response(JSON.stringify(STATES), {
+      headers: {'content-type': 'application/json'}
+    });
   };
-  const res = await worker.fetch(
-    new Request('https://horizon-adsb.test/adsb?lat=46.62&lon=8.04&dist=15')
-  );
+  const res = await worker.fetch(REQ(), {});
   const body = await res.json();
   globalThis.fetch = realFetch;
   const scene = adsbToScene(body.ac[0], {
@@ -164,26 +172,88 @@ const STATES = {
   });
   const yExp = 16 * Math.asinh((36000 * 0.3048 - 300) / 500);
   check(
-    'handler failover',
+    'anonymous mode',
     res.status === 200 &&
-      openskyCalls === 2 &&
+      apiCalls === 2 &&
+      tokenCalls === 0 &&
+      !sawAuth &&
       res.headers.get('access-control-allow-origin') === '*' &&
       res.headers.get('x-adsb-source') === 'opensky' &&
       body.ac.length === 1 &&
       Math.abs(scene.y - yExp) < 1e-9 &&
       Math.abs(scene.vx - (400 * 0.514444) / 57.14) < 1e-9 &&
       Math.abs(scene.x) < 1e-9,
-    `readsb 429 -> opensky 503 then 200 on retry (${openskyCalls} calls), CORS *, x-adsb-source ${res.headers.get('x-adsb-source')}; adsbToScene round-trip: FL360 east -> y ${scene.y.toFixed(2)}, vx ${scene.vx.toFixed(3)} u/s`
+    `503 then 200 on retry (${apiCalls} calls, no token traffic), CORS *, x-adsb-source ${res.headers.get('x-adsb-source')}; adsbToScene round-trip: FL360 east -> y ${scene.y.toFixed(2)}, vx ${scene.vx.toFixed(3)} u/s`
   );
 }
 
 {
-  const nf = await worker.fetch(new Request('https://x.test/other'));
+  // Authenticated mode: client-credentials form POST, Bearer on
+  // the API call, ONE token fetch serving two requests (the
+  // 30-minute cache), and a server-side 401 refreshed exactly
+  // once without losing the request.
+  resetToken();
+  const env = {OPENSKY_CLIENT_ID: 'horizon', OPENSKY_CLIENT_SECRET: 's3cret'};
+  let tokenCalls = 0;
+  let apiCalls = 0;
+  let goodForm = false;
+  const bearers = [];
+  let expire401 = false;
+  globalThis.fetch = async (u, init) => {
+    if (String(u).includes('auth.opensky-network.org')) {
+      tokenCalls++;
+      const p = new URLSearchParams(String(init.body));
+      goodForm =
+        init.method === 'POST' &&
+        p.get('grant_type') === 'client_credentials' &&
+        p.get('client_id') === 'horizon' &&
+        p.get('client_secret') === 's3cret';
+      return new Response(
+        JSON.stringify({access_token: 'tok' + tokenCalls, expires_in: 1800}),
+        {headers: {'content-type': 'application/json'}}
+      );
+    }
+    apiCalls++;
+    bearers.push((init?.headers || {}).authorization || null);
+    if (expire401) {
+      expire401 = false;
+      return new Response('expired', {status: 401});
+    }
+    return new Response(JSON.stringify(STATES), {
+      headers: {'content-type': 'application/json'}
+    });
+  };
+  const r1 = await worker.fetch(REQ(), env);
+  const r2 = await worker.fetch(REQ(), env); // cached token, no new POST
+  const cachedOk = tokenCalls === 1 && apiCalls === 2;
+  expire401 = true; // third request: server rejects tok1 once
+  const r3 = await worker.fetch(REQ(), env);
+  globalThis.fetch = realFetch;
+  check(
+    'authenticated mode',
+    goodForm &&
+      cachedOk &&
+      r1.status === 200 &&
+      r2.status === 200 &&
+      r3.status === 200 &&
+      r1.headers.get('x-adsb-source') === 'opensky-auth' &&
+      bearers[0] === 'Bearer tok1' &&
+      bearers[1] === 'Bearer tok1' &&
+      bearers.at(-1) === 'Bearer tok2' &&
+      tokenCalls === 2,
+    `client-credentials form exact; 1 token POST serves 2 requests (Bearer tok1 both); 401 -> refreshed to tok2 and answered 200; x-adsb-source opensky-auth`
+  );
+}
+
+{
+  const nf = await worker.fetch(new Request('https://x.test/other'), {});
   const bad = await worker.fetch(
-    new Request('https://x.test/adsb?lat=999&lon=0')
+    new Request('https://x.test/adsb?lat=999&lon=0'),
+    {}
   );
   const pre = await worker.fetch(
-    new Request('https://x.test/adsb', {method: 'OPTIONS'})
+    new Request('https://x.test/adsb', {method: 'OPTIONS'}),
+    {}
   );
   check(
     'allowlist',
