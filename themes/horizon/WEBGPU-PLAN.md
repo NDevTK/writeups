@@ -1839,6 +1839,85 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
       obscuration + magnitude + annular; ?eclipse=f harness
       override. On 2026-08-12 every visitor in the path gets the
       real darkness at the real minute.
+  - DONE: light pollution (skyglow.js) - the biggest honesty gap
+    left in the night sky: the theme rendered the same pristine
+    Gaia galaxy over Manhattan as over the Atacama. Now the
+    visitor's night sky is set by their MEASURED artificial
+    skyglow:
+    - data: the World Atlas of Artificial Night Sky Brightness
+      itself (Falchi et al. 2016, Science Advances; DOI
+      10.5880/GFZ.1.4.2016.001, CC BY-NC) - the 653 MB source
+      GeoTIFF (30 arcsec, float32 mcd/m^2) downloaded from GFZ
+      and downsampled to a 0.5-deg grid (720 x 290, mean in
+      LINEAR brightness, byte log-quantised: skyglow-data.js,
+      ~270 KB). Site checks at FULL resolution before
+      downsampling reproduced the published values: Las Vegas
+      17.26, London 17.63, Mauna Kea 21.98, mid-Pacific 22.00
+      mag/arcsec^2.
+    - physics: the paper's own scale (natural = 0.174 mcd/m^2 =
+      22.00 mag/arcsec^2; total = 22 - 2.5 log10(1+r)); celestial
+      sources wash by CONTRAST, exactly 1/(1+r); horizon
+      anisotropy machinery via Walker's law (1977: d^-2.5) ring
+      samples of the same grid (gated; dome anisotropy wiring is
+      the noted follow-up). Conventional SQM->Bortle mapping for
+      the provenance line.
+    - skyglow-reference.mjs (gate set 28): quantisation
+      round-trip over all 256 byte values; the scale's closed
+      forms; Bortle breakpoints; the geography of light in four
+      grid samples (Vegas/London city cells < 19.5, mid-Pacific
+      exactly 22.00, Atacama dark, beyond coverage 0); Walker's
+      law exact (25 vs 100 km = 4^2.5 = 32).
+    - theme: boot-time sample at the visitor -> star field,
+      constellations, Milky Way, zodiacal and airglow scale by
+      1/(1+r); planets and meteor heads (bright compact sources)
+      by 1/sqrt(1+r) (documented split); a warm sodium/LED veil
+      dome (createVeilMaterial reused additively) rises with
+      darkness and brightens under overcast - real urban clouds
+      glow, they do not blacken. Provenance line quotes zenith
+      mag/arcsec^2, Bortle class and the contrast factor.
+      ?lp=r overrides for harness shots.
+  - DONE: paraselenic optics - the moon gets the certified optics
+    dome. The classic winter-night sight (the 22-deg lunar halo
+    in cirrus) plus moon dogs and the rare moonbow, with NO new
+    optical physics: createOpticsMaterial (the gated Descartes
+    bows + halo + parhelia LUTs) instanced a second time and
+    anchored to the moon. What IS new and single-sourced:
+    moonphase.js - the disk-integrated Hapke phase curve
+    extracted from moon-reference (which now imports it, still
+    holding the 0.082-of-full-at-90-deg Rougier landmark, plus a
+    new coarse-grid consistency check at 0.01% drift) - scales
+    the dome by how much light the moon actually sends. Phase
+    angle at 1 Hz from the eclipse block's own sun-moon
+    elongation (exact to the ~1 deg lunar parallax, documented).
+    Same gating physics as the sun's dome: measured cirrus for
+    the halo, measured rain for the bow, low source for the
+    dogs; MOONOPT_GAIN (0.22) is the documented display anchor
+    across the eye's night adaptation, and the city washing
+    (lpVisBright) applies. Full-moon cirrus nights now ring the
+    moon exactly as the real sky does.
+  - DONE: security review (owner-directed). The Cloudflare worker
+    code is DELETED (themes/horizon/worker + worker-reference.mjs
+    - git history holds it): the daemon is the EventSource server
+    proper, not a bolt-on, so the schema normalizers (readsb
+    strip, ITU-R M.1371 sentinels, aisBox geodesy) moved into
+    server/src/index.mjs and their landmarks into
+    server-reference.mjs ('normalizers (ex-worker)' - the gate
+    never lost them; validate.sh runs 27 sets). The legacy
+    /lightning/stream route is gone (the unified /stream carries
+    strikes). "why" leak: audited - the daemon never exposed
+    error internals (that leak lived only in the deleted worker's
+    /ais 502 body); all daemon error bodies are generic, gated by
+    the server set. Every response now carries
+    content-security-policy: sandbox + x-content-type-options:
+    nosniff (SEC_HEADERS, spread first in head(); new 'security
+    headers' landmark asserts exactly these two). Caddy-level
+    origin list: answered in server/README.md - the daemon check
+    is authoritative because it is pure, exported and
+    reference-gated (and guards loopback); Caddyfile.example
+    gained an OPTIONAL commented belt-and-braces matcher that
+    only sheds foreign-Origin load at the edge. install.sh stops
+    shipping the worker and removes /opt/horizon-live/worker;
+    update.sh no longer watches the deleted path.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot

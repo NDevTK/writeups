@@ -35,11 +35,10 @@
  * Ingredients are MEASURED: Open-Meteo's temperature_250hPa and
  * relative_humidity_250hPa at the visitor (the 250 hPa surface is
  * jet cruise level), and the aircraft themselves are live ADS-B
- * traffic around the visitor via the horizon-adsb Cloudflare
- * worker (worker/src/index.js: airplanes.live readsb vectors,
- * stripped to the fields this module reads - the one source that
- * MEASURABLY answers from Cloudflare's edge; no public feed is
- * browser-reachable directly, so the worker adds the CORS
+ * traffic around the visitor via the horizon-live daemon
+ * (server/src/index.mjs: readsb vectors by measured failover,
+ * stripped to the fields this module reads; no public feed is
+ * browser-reachable directly, so the daemon adds the CORS
  * header). Ambient Poisson traffic only fills in when the feed
  * has nothing overhead. The PHYSICS decides whether any
  * aircraft's trail exists at all and whether it lingers, which
@@ -132,8 +131,8 @@ export function appleman(P, tC, U, eta = 0.3) {
   return {forms: tC <= tlc, persists: rhi > 1, tlc, rhi, G};
 }
 
-// ---- Live-aircraft mapping (the Cloudflare worker feeds adsb.lol
-// state vectors; see worker/src/index.js) ------------------------
+// ---- Live-aircraft mapping (the horizon-live daemon feeds readsb
+// state vectors; see server/src/index.mjs) -----------------------
 // Exact unit constants: international foot and knot.
 export const FT_M = 0.3048;
 export const KT_MS = 0.514444;

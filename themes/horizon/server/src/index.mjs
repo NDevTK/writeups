@@ -5,8 +5,8 @@
  * e2-micro fits: the global AIS picture is tens of MB and
  * aisstream's stated ~300 msg/s is trivial for node).
  *
- * Why a daemon instead of the Cloudflare Worker
- * (themes/horizon/worker): every failure measured on the worker
+ * Why a daemon instead of the (retired, deleted) Cloudflare
+ * worker: every failure measured on the worker
  * had one root cause - Cloudflare's SHARED egress IPs look like
  * abuse upstream (adsb.lol tarpits them, adsb.fi 403s, OpenSky
  * drops them at the network; the same queries answer sub-second
@@ -33,7 +33,7 @@
  *    health checks) pass but receive no CORS grant.
  *  - per-IP token bucket (RATE_PER_MIN, default 60/min)
  *  - GET/OPTIONS only, exact paths, numeric params validated and
- *    clamped - same allowlist discipline as the worker
+ *    clamped
  *  - zero npm dependencies: node >= 22 built-ins only (http
  *    server + global WebSocket client) - nothing to audit
  *
@@ -46,15 +46,79 @@
  *   TRUST_PROXY    1 = take client IP from X-Forwarded-For
  *                  (default 1 - Caddy fronts this daemon)
  *
- * The pure pieces (grid ingest/query/prune, origin check, rate
- * limiter) are exported for the reference gate
- * (../../server-reference.mjs); the schema normalizers are
- * imported from the worker source - the model lives once.
+ * The pure pieces (schema normalizers, grid ingest/query/prune,
+ * origin check, rate limiter, security headers) are exported for
+ * the reference gate (../../server-reference.mjs).
  */
 
 import http from 'node:http';
-import {aisBox, normalize, normalizeShip} from '../../worker/src/index.js';
 import {haversineKm} from '../../lightning.js';
+
+// Schema normalizers - moved here when the Cloudflare worker was
+// retired and deleted (the daemon superseded it; git history
+// holds the worker). All three remain reference-gated in
+// server-reference.mjs.
+
+// Strip readsb state vectors to the seven fields the theme reads
+// (alt_baro stays in FEET, gs in KNOTS - the theme owns the exact
+// conversions). Grounded (alt_baro === "ground") and incomplete
+// vectors are dropped.
+export function normalize(j) {
+  return (Array.isArray(j.ac) ? j.ac : [])
+    .filter(
+      (a) =>
+        typeof a.lat === 'number' &&
+        typeof a.lon === 'number' &&
+        typeof a.alt_baro === 'number' &&
+        typeof a.gs === 'number' &&
+        typeof a.track === 'number'
+    )
+    .map((a) => ({
+      hex: a.hex,
+      flight: ((a.flight || '') + '').trim(),
+      lat: a.lat,
+      lon: a.lon,
+      alt_baro: a.alt_baro,
+      gs: a.gs,
+      track: a.track
+    }));
+}
+
+// One AIS position report -> the six fields the theme reads.
+// ITU-R M.1371 sentinels: Sog 102.3 kt, Cog 360, TrueHeading 511
+// all mean "not available".
+export function normalizeShip(meta, p) {
+  return {
+    mmsi: p.UserID,
+    name: String((meta && meta.ShipName) || '').trim(),
+    lat: p.Latitude,
+    lon: p.Longitude,
+    sog: typeof p.Sog === 'number' && p.Sog < 102.3 ? p.Sog : 0,
+    cog: typeof p.Cog === 'number' && p.Cog < 360 ? p.Cog : null,
+    hdg:
+      typeof p.TrueHeading === 'number' && p.TrueHeading !== 511
+        ? p.TrueHeading
+        : null
+  };
+}
+
+// Centre + radius (nm) -> bounding box: 1 nm of latitude is
+// exactly 1/60 degree; longitude widens by 1/cos(lat), clamped
+// away from the poles.
+export function aisBox(lat, lon, d) {
+  const dLat = d / 60;
+  const dLon = d / (60 * Math.max(Math.cos((lat * Math.PI) / 180), 0.01));
+  return [
+    [Math.max(lat - dLat, -90), Math.max(lon - dLon, -180)],
+    [Math.min(lat + dLat, 90), Math.min(lon + dLon, 180)]
+  ];
+}
+
+// Applied to every HTTP response (gated in server-reference).
+export const SEC_HEADERS = {
+  'content-security-policy': 'sandbox',
+  'x-content-type-options': 'nosniff'
+};
 
 const AIS_WS = 'wss://stream.aisstream.io/v0/stream';
 const UA = 'horizon-live/1.0 (+https://github.com/NDevTK/writeups)';
@@ -143,8 +207,8 @@ export function prune(st, maxAgeMs = 20 * 60e3, now = Date.now()) {
 }
 
 // Answer a visitor query from RAM: the same centre+radius ->
-// bounding box geodesy as the worker (aisBox - the model lives
-// once), walked over the grid cells the box overlaps. Strips the
+// bounding box geodesy as the /ais route (aisBox - the model
+// lives once), walked over the grid cells the box overlaps. Strips the
 // internal fields; payloads stay tiny (egress is the metered
 // resource on a free-tier box).
 export function query(st, lat, lon, dist, limit = 80) {
@@ -325,7 +389,7 @@ export function createLimiter(perMin = 60) {
 
 // ---- Aircraft: readsb failover from a clean IP -----------------
 // All three speak readsb v2 ({ac:[...]}, feet/knots) and feed the
-// worker-gated normalize(). Order preferred by data richness;
+// reference-gated normalize(). Order preferred by data richness;
 // /probe on the deployed box decides if the order should change.
 const ADSB_UPSTREAMS = [
   (lat, lon, d) =>
@@ -501,13 +565,8 @@ function runBlitzSocket(st, clients, log) {
         for (const cl of clients) {
           const d = haversineKm(cl.lat, cl.lon, s.lat, s.lon);
           if (d <= cl.km) {
-            const payload = {lat: s.lat, lon: s.lon, km: Math.round(d)};
-            // named event on the multiplexed /stream, bare data
-            // on the legacy /lightning/stream
             cl.res.write(
-              cl.named
-                ? sseEvent('strike', payload)
-                : 'data: ' + JSON.stringify(payload) + '\n\n'
+              sseEvent('strike', {lat: s.lat, lon: s.lon, km: Math.round(d)})
             );
           }
         }
@@ -616,6 +675,11 @@ function main() {
       : req.socket.remoteAddress;
     const oc = originCheck(req.headers.origin, ALLOW);
     const head = (extra = {}) => ({
+      // Defence in depth on EVERY response: the API serves JSON/
+      // text only - CSP sandbox neutralises it if anything ever
+      // coaxes a browser into rendering a response as a document,
+      // and nosniff pins the declared content types.
+      ...SEC_HEADERS,
       ...(oc.acao
         ? {
             'access-control-allow-origin': oc.acao,
@@ -744,43 +808,6 @@ function main() {
       );
     }
 
-    if (url.pathname === '/lightning/stream') {
-      // Server-sent events: strikes near the point, pushed the
-      // moment Blitzortung locates them. EventSource always sends
-      // Origin, and the global allowlist gate above already 403'd
-      // anything foreign - this stream is origin-scoped by
-      // construction. Capped globally and renewed by the client's
-      // built-in reconnect (we end streams after 30 min).
-      const km = Math.min(Number(url.searchParams.get('km')) || 150, 250);
-      if (!(km > 0)) return send(400, 'bad request');
-      if (sseClients.size >= SSE_MAX) return send(503, 'stream capacity');
-      res.writeHead(
-        200,
-        head({
-          'content-type': 'text/event-stream',
-          'cache-control': 'no-store',
-          'x-lightning-source': 'blitzortung.org'
-        })
-      );
-      res.write(': horizon-live lightning stream\n\n');
-      const client = {res, lat, lon, km};
-      sseClients.add(client);
-      const hb = setInterval(() => {
-        try {
-          res.write(': hb\n\n');
-        } catch {
-          // closing below
-        }
-      }, 25e3);
-      const bye = setTimeout(() => res.end(), 30 * 60e3);
-      req.on('close', () => {
-        clearInterval(hb);
-        clearTimeout(bye);
-        sseClients.delete(client);
-      });
-      return;
-    }
-
     if (url.pathname === '/adsb') {
       const dist = Math.min(Number(url.searchParams.get('dist')) || 15, 60);
       if (!(dist > 0)) return send(400, 'bad request');
@@ -793,7 +820,9 @@ function main() {
     }
 
     if (url.pathname === '/stream') {
-      // The unified live channel: ONE origin-scoped EventSource
+      // The unified live channel - the daemon's ONE push server
+      // (the per-feature legacy stream was removed): ONE
+      // origin-scoped EventSource
       // per viewer carries everything time-sensitive as named
       // events - `strike` the moment Blitzortung locates one,
       // `ais` ship deltas every 30 s from the in-RAM picture,
@@ -815,7 +844,7 @@ function main() {
         })
       );
       res.write(': horizon-live unified stream\n\n');
-      const client = {res, lat, lon, km, named: true};
+      const client = {res, lat, lon, km};
       sseClients.add(client);
       const pushAis = () => {
         if (env.AISSTREAM_KEY) {

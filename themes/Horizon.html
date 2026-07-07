@@ -193,7 +193,8 @@
         createContrailMaterial,
         createFlashMaterial,
         createMilkyWayMaterial,
-        createNLCMaterial
+        createNLCMaterial,
+        createSkyglowMaterial
       } from './horizon/sky-objects-tsl.js';
       import {adsbToScene, appleman} from './horizon/contrails.js';
       import {
@@ -220,6 +221,15 @@
       import {BETA_MIN_DEG, seasonEnvelope} from './horizon/nlc.js';
       import {parseTLEs, satMagnitude, sunlitEci} from './horizon/sats.js';
       import {lunarEclipse, solarEclipse} from './horizon/eclipses.js';
+      import {relPhase} from './horizon/moonphase.js';
+      import {
+        bortleClass,
+        horizonGlow,
+        pointVisibility,
+        sampleRatio,
+        skyMag
+      } from './horizon/skyglow.js';
+      import {SKYGLOW, SKYGLOW_H, SKYGLOW_W} from './horizon/skyglow-data.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -2133,8 +2143,8 @@
       // with its REAL position, altitude, track and speed;
       // Schmidt-Appleman still decides whether the trail exists.
       // Unreachable daemon (offline harness): the ambient traffic
-      // above stands in. ?adsb=URL overrides (e.g. the retired
-      // horizon-adsb worker, kept as documented fallback).
+      // above stands in. ?adsb=URL overrides (the harness points
+      // it at fixture vectors).
       const ADSB_PROXY = params.get('adsb') ?? 'https://api.ndev.tk/adsb';
       let liveTraffic = null; // queue of unclaimed cruise snapshots
       const seenFlights = new Map(); // hex -> last spawn ms
@@ -2881,6 +2891,26 @@
       );
       optics.renderOrder = 1;
       scene.add(optics);
+      // Paraselenic optics: the SAME certified halo/bow/dog dome,
+      // instanced again and anchored to the MOON. Intensity scales
+      // with how much light the moon actually sends - the shared
+      // Hapke disk-integrated phase curve (moonphase.js, held to
+      // Rougier's observations by moon-reference). Full-moon
+      // cirrus nights get the classic 22-deg lunar halo and moon
+      // dogs (paraselenae); rain under a bright moon gets the rare
+      // moonbow. MOONOPT_GAIN anchors the display level (the
+      // physical sun/moon illuminance ratio is ~4e5 and the eye's
+      // night adaptation closes most of it - documented, the
+      // AGLOW_GAIN precedent).
+      const MOONOPT_GAIN = 0.22;
+      const opticsMoonObj = createOpticsMaterial();
+      const opticsMoonU = opticsMoonObj.u;
+      const opticsMoon = new THREE.Mesh(
+        new THREE.SphereGeometry(592, 32, 20),
+        opticsMoonObj.material
+      );
+      opticsMoon.renderOrder = 1;
+      scene.add(opticsMoon);
 
       // Clouds in the three layers the weather model actually reports
       // (open-meteo cloud_cover_low/mid/high): the low cumulus deck and
@@ -2999,6 +3029,74 @@
           // keep the previous fleet; SGP4 holds for days
         }
       }
+      // ---- Light pollution (skyglow.js): the visitor's MEASURED
+      // artificial skyglow from the Falchi et al. 2016 World Atlas
+      // (VIIRS + Garstang modelling, SQM-validated; CC BY-NC,
+      // cited in the provenance panel). Celestial sources wash by
+      // CONTRAST - exactly 1/(1 + r) - which is why a Manhattan
+      // visitor sees a handful of stars and no galaxy, and a
+      // Namibian one sees the theme at full depth. Bright compact
+      // sources (planets, meteor heads) penetrate as 1/sqrt(1+r)
+      // (documented display split of the same law). The warm city
+      // dome is the one documented display element (sodium/LED
+      // tint; amplitude from the same measured ratio).
+      // ?lp=r overrides the ratio for harness shots.
+      const lpRatio = params.has('lp')
+        ? +params.get('lp')
+        : sampleRatio(SKYGLOW, SKYGLOW_W, SKYGLOW_H, state.lat, state.lon);
+      const lpVis = pointVisibility(lpRatio);
+      const lpVisBright = 1 / Math.sqrt(1 + lpRatio);
+      const lpMag = skyMag(lpRatio);
+      record(
+        'Falchi 2016 skyglow atlas',
+        'zenith ' +
+          lpMag.toFixed(2) +
+          ' mag/arcsec\u00b2 \u00b7 Bortle ' +
+          bortleClass(lpMag) +
+          ' \u00b7 star contrast \u00d7' +
+          lpVis.toFixed(2)
+      );
+      // Anisotropic city dome: 16 azimuth weights from Walker's
+      // law over ring samples of the SAME measured grid (gated in
+      // skyglow-reference) - a coastal city glows toward the city
+      // and stays dark over the sea. Weights normalise around the
+      // local ratio so the overall amplitude stays anchored to
+      // the visitor's own zenith measurement.
+      const lpGlowObj = createSkyglowMaterial();
+      {
+        const g = [];
+        for (let i = 0; i < 16; i++)
+          g.push(
+            horizonGlow(
+              SKYGLOW,
+              SKYGLOW_W,
+              SKYGLOW_H,
+              state.lat,
+              state.lon,
+              i * 22.5
+            )
+          );
+        const mean = g.reduce((a, b) => a + b, 0) / 16;
+        for (let i = 0; i < 16; i++)
+          lpGlowObj.u.azData[i] = THREE.MathUtils.clamp(
+            (lpRatio + g[i]) / Math.max(lpRatio + mean, 1e-6),
+            0.4,
+            3
+          );
+        lpGlowObj.u.azTex.needsUpdate = true;
+      }
+      const lpGlowAmp = THREE.MathUtils.clamp(
+        Math.log10(1 + lpRatio) / 2.5,
+        0,
+        1
+      );
+      const lpGlow = new THREE.Mesh(
+        new THREE.SphereGeometry(905, 32, 16),
+        lpGlowObj.material
+      );
+      lpGlow.visible = lpGlowAmp > 0.01;
+      scene.add(lpGlow);
+
       const SAT_DOT_N = 12;
       const satDots = [];
       {
@@ -3402,6 +3500,13 @@
             astro.eclipse = params.has('eclipse')
               ? +params.get('eclipse')
               : se.obsc;
+            // Moon phase brightness for the paraselenic optics:
+            // phase angle = 180 deg minus the sun-moon elongation
+            // (exact to the ~1 deg lunar parallax), through the
+            // shared disk-integrated Hapke curve at 1 Hz.
+            astro.moonRel = relPhase(
+              180 - Math.acos(THREE.MathUtils.clamp(cosSep, -1, 1)) / RAD
+            );
             if (astro.eclipse > 0.05 && !astro.eclipseSaid) {
               astro.eclipseSaid = true;
               say(
@@ -3635,7 +3740,7 @@
           ambient.groundColor.copy(tmpB).multiplyScalar(0.4);
         }
         if (starObj) {
-          starObj.u.night.value = nightSky * (1 - cloudy * 0.85);
+          starObj.u.night.value = nightSky * (1 - cloudy * 0.85) * lpVis;
           starObj.u.time.value = t / 1000;
           // Winds-aloft turbulence (cn2.js): the measured pressure-
           // level profile sets BOTH the twinkle depth (Young's
@@ -3663,7 +3768,7 @@
         // (uLineI); extinction rides the engine's own zenith
         // transmittance at the current aerosol load; gated with the
         // stars.
-        airglowU.night.value = nightSky * (1 - cloudy * 0.85);
+        airglowU.night.value = nightSky * (1 - cloudy * 0.85) * lpVis;
         airglowU.uTzen.value.fromArray(sunTransmittanceJS(1, mieScale));
         // Zodiacal light: anchored to the sun's ecliptic longitude,
         // scaled by the Earth's REAL heliocentric distance (r^-2.3,
@@ -3673,7 +3778,7 @@
         const dNow = now();
         const sunLam = sunEclipticLon(dNow);
         {
-          zodiU.night.value = nightSky * (1 - cloudy * 0.85);
+          zodiU.night.value = nightSky * (1 - cloudy * 0.85) * lpVis;
           zodiU.uSunLam.value = sunLam;
           const AEg = window.Astronomy;
           const rAU =
@@ -3717,7 +3822,7 @@
         // (meteors.js). Poisson spawning; ?meteor=N forces N/h for
         // the offline harness.
         {
-          const mNight = nightSky * (1 - cloudy * 0.85);
+          const mNight = nightSky * (1 - cloudy * 0.85) * lpVisBright;
           let total = 0;
           const act = [];
           if (mNight > 0.05) {
@@ -3823,7 +3928,7 @@
               }
             } else if (ct.forms && dayHigh > 0.02) {
               // REAL aircraft claim free slots first (live ADS-B
-              // via the worker); otherwise the ambient-traffic
+              // via the daemon); otherwise the ambient-traffic
               // cadence (documented display choice: a new transit
               // every ~75 s; the harness override spawns fast so a
               // pinned shot catches one).
@@ -3982,10 +4087,18 @@
           }
           p.u.amp.value = flashAmplitude(p.seq, p.t) * p.amp0 * 2.2;
         }
-        if (constMat) constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2;
+        if (constMat)
+          constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2 * lpVis;
+        // The measured city glow rises as the sky darkens and even
+        // lights the cloud undersides a touch (real urban overcast
+        // glows warm rather than black).
+        lpGlowObj.u.alpha.value =
+          lpGlowAmp * nightSky * 0.22 * (1 + cloudy * 0.8);
         // Venus and Jupiter pierce twilight a little before the stars.
         planetObj.u.night.value =
-          THREE.MathUtils.clamp(nightSky * 1.6, 0, 1) * (1 - cloudy * 0.85);
+          THREE.MathUtils.clamp(nightSky * 1.6, 0, 1) *
+          (1 - cloudy * 0.85) *
+          lpVisBright;
         moonDisc.visible = moon.alt > -0.05;
 
         // The Water plane: the FFT ocean advances on REAL seconds
@@ -4338,6 +4451,32 @@
           0,
           1
         );
+        // The moon's dome: same gating physics (cirrus for the
+        // halo, rain for the bow, low source for the dogs), the
+        // source now the moon at its true phase brightness.
+        {
+          const moonVec2 = skyPoint(moon.alt, moon.az, 1);
+          opticsMoonU.sunDir.value.copy(moonVec2);
+          opticsMoonU.antisolar.value.copy(moonVec2).negate();
+          const moonOut =
+            (1 - day) *
+            THREE.MathUtils.clamp(1 - cloudy * 1.1, 0, 1) *
+            (astro.moonRel ?? 0) *
+            lpVisBright *
+            MOONOPT_GAIN;
+          opticsMoonU.bow.value =
+            raining && moon.alt > 0 && moon.alt < 0.733 ? moonOut : 0;
+          opticsMoonU.halo.value =
+            (cHigh / 100) *
+            (cHigh < 90 ? 1 : 0.5) *
+            moonOut *
+            (moon.alt > 0 ? 1 : 0);
+          opticsMoonU.dogs.value = THREE.MathUtils.clamp(
+            (0.44 - moon.alt) / 0.26,
+            0,
+            1
+          );
+        }
 
         // Deciduous phenology: Hopkins' bioclimatic law shifts the leaf
         // calendar ~4 days per degree of latitude and per 122m of

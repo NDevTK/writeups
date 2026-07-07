@@ -1,15 +1,15 @@
 // Reference printer for the horizon-live daemon (node
-// server-reference.mjs). The daemon (server/src/index.mjs) is the
-// worker's successor on a dedicated-IP box; its schema
-// normalizers are IMPORTED from the worker source (the model
-// lives once, and stays gated by worker-reference.mjs). This set
-// gates the daemon's own pure pieces:
+// server-reference.mjs). The daemon (server/src/index.mjs) owns
+// everything now - the Cloudflare worker it superseded has been
+// DELETED (git history holds it), and its schema normalizers and
+// their landmarks moved here. This set gates the daemon's pure
+// pieces:
 //  - the AIS engine: ingest into the 1-degree spatial grid with
 //    latest-per-MMSI, cell migration when a ship crosses a grid
 //    boundary (old cell emptied AND deleted), Class B frames on
 //    the same path, junk frames counted but not ingested
-//  - query: the same aisBox geodesy as the worker, exact boundary
-//    inclusion, internal fields stripped, limit honoured
+//  - query: the same aisBox geodesy as the /ais route, exact
+//    boundary inclusion, internal fields stripped, limit honoured
 //  - prune: stale ships dropped with their grid entries, fresh
 //    ships kept
 //  - origin allowlist: the website origin gets its exact CORS
@@ -31,11 +31,15 @@ import {
   originCheck,
   prune,
   pruneStrikes,
+  aisBox,
+  normalize,
+  normalizeShip,
   query,
   queryStrikes,
+  SEC_HEADERS,
   sseEvent
 } from './server/src/index.mjs';
-import {aisBox} from './worker/src/index.js';
+
 import {haversineKm} from './lightning.js';
 
 let fail = 0;
@@ -82,8 +86,8 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     `5 frames -> 2 ships (latest-per-MMSI, junk counted not stored); cell migration 46:8 -> 47:8 (old cell deleted); Class B ingested, name trimmed`
   );
 
-  // Query: same geodesy as the worker's aisBox, exact boundary
-  // inclusion, internals stripped.
+  // Query: same geodesy as the /ais route's aisBox, exact
+  // boundary inclusion, internals stripped.
   const box = aisBox(47.3, 9.0, 30);
   const hits = query(st, 47.3, 9.0, 30);
   const one = query(st, 47.3, 9.0, 30, 1);
@@ -229,6 +233,67 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       curl.ok &&
       curl.acao === null,
     `website origin -> exact CORS echo; foreign origin refused; no Origin passes with NO grant`
+  );
+}
+
+{
+  // Absorbed from the retired worker's gate when the worker was
+  // deleted - the normalizers now live in the daemon. readsb
+  // strip: seven fields, units untouched, "ground"/incomplete
+  // dropped; AIS sentinels (ITU-R M.1371) to 0/null/null; the
+  // aisBox geodesy (1 nm latitude = exactly 1/60 deg).
+  const ac = normalize({
+    ac: [
+      {
+        hex: 'a',
+        flight: 'BAW1 ',
+        lat: 1,
+        lon: 2,
+        alt_baro: 36000,
+        gs: 400,
+        track: 90,
+        ias: 9,
+        squawk: 'x'
+      },
+      {hex: 'b', lat: 1, lon: 2, alt_baro: 'ground', gs: 5, track: 0},
+      {hex: 'c', lat: 1, lon: 2, alt_baro: 8000, gs: 100}
+    ]
+  });
+  const ship = normalizeShip(
+    {ShipName: 'VERENA  '},
+    {
+      UserID: 1,
+      Latitude: 3,
+      Longitude: 4,
+      Sog: 102.3,
+      Cog: 360,
+      TrueHeading: 511
+    }
+  );
+  const box = aisBox(46.62, 8.04, 15);
+  check(
+    'normalizers (ex-worker)',
+    ac.length === 1 &&
+      Object.keys(ac[0]).length === 7 &&
+      ac[0].flight === 'BAW1' &&
+      !('ias' in ac[0]) &&
+      ship.sog === 0 &&
+      ship.cog === null &&
+      ship.hdg === null &&
+      ship.name === 'VERENA' &&
+      Math.abs(box[1][0] - box[0][0] - 0.5) < 1e-12 &&
+      Math.abs((box[0][1] + box[1][1]) / 2 - 8.04) < 1e-12,
+    `readsb strip 3 -> 1 with 7 fields; AIS sentinels 102.3/360/511 -> 0/null/null, name trimmed; 15 nm box spans exactly 0.500 deg of latitude, centred`
+  );
+}
+
+{
+  check(
+    'security headers',
+    SEC_HEADERS['content-security-policy'] === 'sandbox' &&
+      SEC_HEADERS['x-content-type-options'] === 'nosniff' &&
+      Object.keys(SEC_HEADERS).length === 2,
+    `every response carries content-security-policy: sandbox + x-content-type-options: nosniff - a JSON/SSE API that can never be coaxed into rendering as a document`
   );
 }
 

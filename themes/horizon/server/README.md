@@ -1,20 +1,19 @@
 # horizon-live
 
 The Horizon theme's live-data daemon for a small always-on box
-with its own IP address. Successor to the Cloudflare Worker in
-`../worker` — every upstream failure measured there (adsb.lol
-tarpit, adsb.fi 403, OpenSky network drop, the shared anonymous
-credit pools) had the same root cause: Cloudflare's shared egress
-IPs. A dedicated IP reopens the whole upstream menu, and a
-resident process holds the ONE persistent global aisstream.io
-socket the free tier is designed around, answering every visitor
-from RAM.
+with its own IP address. It superseded (and absorbed) a
+Cloudflare Worker whose code has since been deleted — every
+upstream failure measured there (adsb.lol tarpit, adsb.fi 403,
+OpenSky network drop, the shared anonymous credit pools) had the
+same root cause: Cloudflare's shared egress IPs. A dedicated IP
+reopens the whole upstream menu, and a resident process holds the
+ONE persistent global aisstream.io socket the free tier is
+designed around, answering every visitor from RAM.
 
 Design and security posture live in the header of
-`src/index.mjs`. The physics/schema layer is imported from the
-worker source (the model lives once); the daemon's own pure
-pieces (spatial grid, origin allowlist, rate limiter) are gated
-by `../server-reference.mjs` — reference set 20 in
+`src/index.mjs`. The daemon's pure pieces (schema normalizers,
+spatial grid, origin allowlist, rate limiter, security headers)
+are gated by `../server-reference.mjs` — the `server` set in
 `../harness/validate.sh`.
 
 ## Deploy (GCP free tier)
@@ -60,17 +59,15 @@ by `../server-reference.mjs` — reference set 20 in
 - `GET /lightning?lat&lon&km` — strikes of the last 10 minutes
   within km (≤ 250) of the point, with ages and exact
   great-circle distances (Blitzortung.org, CC BY-SA).
-- `GET /lightning/stream?lat&lon&km` — server-sent events:
-  strikes pushed the moment the network locates them.
-  EventSource bypasses CORS, so the Origin allowlist gate IS the
-  protection here — foreign origins get 403 before the stream
-  opens. Capped concurrent streams (`SSE_MAX`, default 25).
-- `GET /stream?lat&lon&km&ais&adsb` — the unified live channel:
-  one origin-scoped EventSource carries `strike` events
-  immediately, `ais` ship deltas every 30 s from RAM, and `adsb`
-  aircraft every 20 s through the shared per-area cache (many
-  viewers in one place still cost one upstream request). Initial
-  ais/adsb push on connect. Same cap as above.
+- `GET /stream?lat&lon&km&ais&adsb` — the live channel: one
+  origin-scoped EventSource carries `strike` events the moment
+  the network locates them, `ais` ship deltas every 30 s from
+  RAM, and `adsb` aircraft every 20 s through the shared per-area
+  cache (many viewers in one place still cost one upstream
+  request). Initial ais/adsb push on connect. EventSource
+  bypasses CORS, so the Origin allowlist gate IS the protection
+  here — foreign origins get 403 before the stream opens. Capped
+  concurrent streams (`SSE_MAX`, default 25).
 - `GET /health` — AIS + lightning engine stats.
 - `GET /probe` — health + the fixed-target reachability
   diagnostic, run from the box's own IP.
@@ -78,6 +75,27 @@ by `../server-reference.mjs` — reference set 20 in
 Browser access is origin-locked to `ALLOW_ORIGIN` (the website —
 this is not an open CORS proxy); everything is rate-limited per
 IP.
+
+## Security posture
+
+- Every response carries `content-security-policy: sandbox` and
+  `x-content-type-options: nosniff`: even if a response were ever
+  opened as a document, it runs in a null origin with scripts,
+  forms and plugins disabled, and nothing is content-sniffed into
+  a scriptable type. Reference-gated (`security headers` landmark
+  in `../server-reference.mjs`).
+- Error responses are generic (`bad gateway`, `not found`, …) —
+  no upstream error text, stack traces or internal state ever
+  reaches a client. Diagnostics go to the journal and `/health`.
+- Why the origin allowlist lives in the daemon, not in Caddy: the
+  daemon's check is pure, exported and reference-gated — the gate
+  proves exact-echo/403/no-grant behaviour on every deploy, which
+  a Caddyfile can't offer, and the protection survives a Caddy
+  swap or misconfiguration (it also guards direct `:8127`
+  loopback access). Caddy MAY additionally pre-filter as
+  belt-and-braces to shed foreign-origin load before it reaches
+  node — `Caddyfile.example` shows the optional matcher — but the
+  daemon check is the one that counts and stays.
 
 ## Self-update (no manual deploys)
 
