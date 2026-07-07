@@ -2121,3 +2121,27 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     glitter lobe, moderate sea with a broadened dimmer lobe, gale
     sea whitecapped to ~32% Monahan coverage - physical across the
     range.
+
+- DONE (phase 1 of the green flash): refraction.js +
+  refraction-reference.mjs (gate set 33, 4 landmarks) - the
+  gated physics core. Ciddor (1996) refractivity of air (full
+  CIPM densities + compressibility; matches the NIST 633 nm
+  check value to 2e-10 and the independent Birch & Downs Edlen
+  to 8e-10) and an exact ray tracer for a spherically stratified
+  atmosphere (dR = -tan z dn/n in height parametrisation, Snell
+  invariant, tangent-point split for below-horizontal rays from
+  elevated observers, s^2 substitution regularising the horizon
+  singularity analytically). Held to closed forms: zenith
+  exactly 0, R(45) = (n0-1)tan z to 0.15", Bennett at 10 deg to
+  3%, horizon 33.0 arcmin (ICAO 15 C), green rim 14.2" above red
+  (dispersion tracks dn/(n-1) to 8.5%), setting-sun flattening
+  0.835 (published ~5/6), apparent/true roundtrip 7e-12. Debug
+  trail: a barometric double-negative in the ICAO fixture and a
+  clamped bottom stencil were both caught by the closed-form
+  landmarks. NEXT TURN (phase 2): feed the MEASURED low-level
+  T/RH profile (extend syncAloft pressure levels), CPU-side
+  sunRefraction at ~1 Hz -> per-wavelength apparent sun
+  directions + flatten uniform into the atmosphere-tsl sun disc
+  (per-channel discs = the green rim), moon displacement +
+  flattening, and the -50 arcmin event convention stays for
+  TIMING (documented).
