@@ -34,9 +34,11 @@ rm -rf /opt/horizon-live/worker
 install -m 644 src/index.mjs /opt/horizon-live/index.mjs
 install -m 644 ../lightning.js /opt/horizon-live/lightning.js
 install -m 644 ../solarwind.js /opt/horizon-live/solarwind.js
+install -m 644 ../metar.js /opt/horizon-live/metar.js
 # The '../../' import paths must keep resolving from
-# /opt/horizon-live/index.mjs - rewrite them for the flat deploy.
-sed -i "s#'../../lightning.js'#'./lightning.js'#; s#'../../solarwind.js'#'./solarwind.js'#" /opt/horizon-live/index.mjs
+# /opt/horizon-live/index.mjs - rewrite them for the flat deploy
+# (metar.js's own './lightning.js' import already resolves there).
+sed -i "s#'../../lightning.js'#'./lightning.js'#; s#'../../solarwind.js'#'./solarwind.js'#; s#'../../metar.js'#'./metar.js'#" /opt/horizon-live/index.mjs
 
 # Environment (created once; never overwritten - your key lives here).
 if [ ! -f /etc/horizon-live.env ]; then

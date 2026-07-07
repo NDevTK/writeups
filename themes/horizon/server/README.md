@@ -68,6 +68,11 @@ are gated by `../server-reference.mjs` — the `server` set in
   bypasses CORS, so the Origin allowlist gate IS the protection
   here — foreign origins get 403 before the stream opens. Capped
   concurrent streams (`SSE_MAX`, default 25).
+- `GET /metar?lat&lon` — aerodrome observations near the point
+  (aviationweather.gov decodes them but sends no CORS header):
+  measured cloud-layer bases, covers, visibility and present
+  weather, stripped to the fields the theme reads
+  (`normalizeMetars`, gated) with a 10-minute per-area cache.
 - `GET /solarwind` — the aurora's measured driver: DSCOVR/ACE
   solar wind at L1, already propagated to the bow shock by SWPC
   (the `propagated_time_tag` is a real physical lead time of tens

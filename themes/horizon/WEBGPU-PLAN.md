@@ -1144,7 +1144,7 @@ Scenes (all at Grindelwald unless noted):
       v = 21 m/s, A = 1.7e-14 (the first web-checked source that
       said v = 27 was wrong; the SPIE Field Guide's 21 lands both
       named values); the instantaneous Rytov point-receiver index
-      sigma_I^2 = 2.25 k^(7/6) sec(Z)^(11/6) mu_{5/6} sits in the
+      sigma*I^2 = 2.25 k^(7/6) sec(Z)^(11/6) mu*{5/6} sits in the
       weak regime at ~0.49, consistent with Young's 0.1 s-averaged
       0.255; the ITU RMS-wind integral is exact on analytic
       profiles and refuses profiles that do not span the slab;
@@ -1154,8 +1154,8 @@ Scenes (all at Grindelwald unless noted):
       crossing rate lands at ~500 Hz = the published milliseconds
       shadow lifetime (Dravins et al. 1997 II).
     - Display: sigZen (new star uniform) = Young's calibrated
-      zenith sigma x sigmaScale(v_RMS) = sqrt(mu_{5/6}(v)/
-      mu_{5/6}(21)) - a calm upper atmosphere steadies the stars, a
+      zenith sigma x sigmaScale(v*RMS) = sqrt(mu*{5/6}(v)/
+      mu\_{5/6}(21)) - a calm upper atmosphere steadies the stars, a
       screaming jet churns them - clamped 0.05..0.6; twRate now
       comes from the profile's Fresnel-shadow crossing rate
       (W-weighted wind over W-weighted altitude) divided by 50
@@ -1214,7 +1214,7 @@ Scenes (all at Grindelwald unless noted):
       the bathymetry bake stores SIGNED depth clamp(-e/40, -1, 1)
       (float texture - shoreline texels keep their real height
       above MSL instead of clamping to zero), and water-tsl
-      computes max(store*40 + tide, 0) before the surf LUT sample -
+      computes max(store\*40 + tide, 0) before the surf LUT sample -
       exactly max(tide - e, 0) for all |e| <= 40 m, held as a
       surf-reference landmark. High water drowns the breakpoint
       bars, low water exposes them, the McCowan/BJ criterion
@@ -1347,163 +1347,139 @@ Scenes (all at Grindelwald unless noted):
   - DONE (deployed at https://horizon-adsb.ndevtk.workers.dev):
     live ADS-B aircraft via a Cloudflare Worker
     (themes/horizon/worker). The owner green-lit workers, which
-    removes the CORS wall from the contrail item:
-    - horizon-adsb (src/index.js + wrangler.toml): an allowlisted
-      proxy - GET /adsb?lat&lon&dist only, numeric-validated,
-      dist <= 60 nm, coordinates rounded to ~110 m so nearby
-      visitors share a 15 s edge-cached upstream call. NOT an open
-      proxy. Verified end-to-end with `wrangler dev --local`: CORS
-      header added, live traffic flowing (a Condor A20N at FL360
-      over the test site, feed OAT -53 degC - consistent with the
-      measured 250 hPa air; 38 aircraft over Heathrow on the
-      OpenSky-era recheck), 404/400 on anything else.
-    - Upstream reality (measured on the DEPLOYED worker, not just
-      locally, over two rounds): api.adsb.lol AND opendata.adsb.fi
-      don't just refuse Cloudflare-egress requests - they TARPIT
-      them. Round 1 read as hard 429s; round 2 (after the failover
-      build deployed) measured 5 of 6 probes hanging past 15 s
-      with one sub-second 32-aircraft success - so ANY failover
-      chain through the readsb feeds stalls the whole request
-      before the next upstream gets a turn. The same queries
-      answer sub-second from a residential IP. Decision (owner:
-      "one good data source"): the readsb upstreams are DROPPED;
-      OpenSky became the single source for one round (SUPERSEDED
-      by the edge measurement below - OpenSky network-drops CF
-      ranges too, which only /probe could see). Its restrictive
-      CORS never
-      mattered behind a server-side proxy (the original objection
-      only applied to direct browser fetches - the owner called
-      this out). OpenSky takes a bounding box (1 nm latitude =
-      exactly 1/60 deg; longitude widened by 1/cos lat) and speaks
-      positional state vectors in SI units, so the worker
-      normalizes into the readsb shape with the exact
-      international foot and knot - the theme keeps ONE parser.
-      x-adsb-source names the mode per response.
-    - (SUPERSEDED, kept as history) Making the OpenSky source
-      good: OpenSky's anonymous tier buckets
-      400 daily credits per IP - Cloudflare's shared egress
-      exhausts that pool, which is the measured ~50% 503 shedding.
-      A registered API client gets 4000 credits/day on its OWN
-      account (docs: openskynetwork.github.io/opensky-api); the
-      15 nm box is far under the 25 sq deg 1-credit tier, and the
-      15 s edge cache spends the budget frugally. The worker does
-      OAuth2 client-credentials against the OpenSky Keycloak
-      (endpoint verified live: invalid_client 401 for bogus
-      creds), caches the 30-minute Bearer token per isolate,
-      refreshes once on a server-side 401, and falls back to
-      anonymous (with 2 shed-absorbing retries, 400 ms apart) when
-      the secrets are absent. Every upstream fetch carries a hard
-      4 s AbortSignal timeout - the tarpit measurement is exactly
-      why. Owner setup: create an API client on the OpenSky
-      account page, then `npx wrangler secret put
-OPENSKY_CLIENT_ID` + `OPENSKY_CLIENT_SECRET` and redeploy.
-    - worker-reference.mjs (gate set 18, airplanes.live build):
-      the worker module runs UNMODIFIED in node, so the gate
-      exercises the real handler offline - fetch stubbed with the
-      measured failure modes - asserting the /v2/point URL shape,
-      the strip to exactly the theme's seven fields with readsb
-      units UNTOUCHED, "ground"/incomplete vectors dropped, a 429
-      blip carried by the rate-respecting retry with the
-      User-Agent sent, CORS + x-adsb-source, the adsbToScene
-      round-trip, /probe mapping statuses and thrown timeouts
-      alike into inspectable rows, and the 404/400/OPTIONS
-      allowlist. Live checks: the real handler run in node served
-      14 aircraft over Heathrow / 3 alpine / 5 JFK from
-      airplanes.live; workerd (`wrangler dev --local`) 15 over
-      Heathrow with exactly the seven fields.
-    - Theme: syncTraffic polls the worker each minute (only while
-      Schmidt-Appleman says trails can exist), maps state vectors
-      with adsbToScene (contrails.js: exact international foot/knot
-      constants, the theme's own equirectangular + asinh mapping;
-      landmark set: origin/altitude/velocity exact, +8 km north =
-      half-world) and queues cruise aircraft (>= FL260, inside the
-      world, deduplicated by hex for 10 min). Free contrail slots
-      claim REAL aircraft first - real position, real altitude,
-      real track and ground speed, callsign in the provenance
-      record - with the ambient traffic as documented fallback
-      (worker not deployed, offline harness, no coverage).
-      ?adsb=URL overrides the proxy origin.
-    - DEPLOY (owner): cd themes/horizon/worker && npx wrangler
-      deploy (needs `wrangler login` or CLOUDFLARE_API_TOKEN). The
-      theme expects https://horizon-adsb.<subdomain>.workers.dev -
-      ADSB_PROXY in Horizon.html assumes subdomain `ndevtk`; update
-      it if the account's workers.dev subdomain differs. Each
-      upstream change needs a redeploy.
-    - RESOLVED by edge measurement (GET /probe on the deployed
-      worker, 2026-07-06, three consistent runs): control 200 in
-      389 ms (egress healthy); opensky-api AND opensky-auth
-      TimeoutError at 6 s even with an honest User-Agent -
-      OpenSky network-drops Cloudflare ranges, so credentials can
-      NEVER help (the owner's OPENSKY_* worker secrets are now
-      unused and can be deleted); adsb.lol 429 in 869 ms and
-      adsb.fi 403 in 139 ms - fast deliberate refusals; and
-      airplanes.live 200 with 30-32 aircraft in 126-232 ms every
-      time. airplanes.live is itself served through Cloudflare,
-      so worker-to-it traffic is first-class. THE one source:
-      airplanes.live /v2/point/lat/lon/radius - readsb v2
-      natively (feet, knots), so no unit conversion even exists
-      to get wrong; the worker strips vectors to the seven fields
-      the theme reads (an order of magnitude smaller payload) and
-      respects the documented 1 req/s: rounded coords + 15 s edge
-      cache + the single retry spaced a full 1.1 s. /probe stays
-      in the worker as a permanent regression instrument. History
-      of the hunt, all measured: OpenSky's anonymous per-IP 400
-      credits/day explained the 503 shedding; the readsb feeds
-      tarpit CF egress (5/6 probes hung >15 s); adsb.one serves a
-      bot-challenge page even to a residential probe. The
-      earlier OAuth2 client-credentials build (Keycloak token
-      endpoint, per-isolate 30-min cache, 401 refresh) is in git
-      history at cfffb36 should OpenSky ever unblock Cloudflare.
+    removes the CORS wall from the contrail item: - horizon-adsb (src/index.js + wrangler.toml): an allowlisted
+    proxy - GET /adsb?lat&lon&dist only, numeric-validated,
+    dist <= 60 nm, coordinates rounded to ~110 m so nearby
+    visitors share a 15 s edge-cached upstream call. NOT an open
+    proxy. Verified end-to-end with `wrangler dev --local`: CORS
+    header added, live traffic flowing (a Condor A20N at FL360
+    over the test site, feed OAT -53 degC - consistent with the
+    measured 250 hPa air; 38 aircraft over Heathrow on the
+    OpenSky-era recheck), 404/400 on anything else. - Upstream reality (measured on the DEPLOYED worker, not just
+    locally, over two rounds): api.adsb.lol AND opendata.adsb.fi
+    don't just refuse Cloudflare-egress requests - they TARPIT
+    them. Round 1 read as hard 429s; round 2 (after the failover
+    build deployed) measured 5 of 6 probes hanging past 15 s
+    with one sub-second 32-aircraft success - so ANY failover
+    chain through the readsb feeds stalls the whole request
+    before the next upstream gets a turn. The same queries
+    answer sub-second from a residential IP. Decision (owner:
+    "one good data source"): the readsb upstreams are DROPPED;
+    OpenSky became the single source for one round (SUPERSEDED
+    by the edge measurement below - OpenSky network-drops CF
+    ranges too, which only /probe could see). Its restrictive
+    CORS never
+    mattered behind a server-side proxy (the original objection
+    only applied to direct browser fetches - the owner called
+    this out). OpenSky takes a bounding box (1 nm latitude =
+    exactly 1/60 deg; longitude widened by 1/cos lat) and speaks
+    positional state vectors in SI units, so the worker
+    normalizes into the readsb shape with the exact
+    international foot and knot - the theme keeps ONE parser.
+    x-adsb-source names the mode per response. - (SUPERSEDED, kept as history) Making the OpenSky source
+    good: OpenSky's anonymous tier buckets
+    400 daily credits per IP - Cloudflare's shared egress
+    exhausts that pool, which is the measured ~50% 503 shedding.
+    A registered API client gets 4000 credits/day on its OWN
+    account (docs: openskynetwork.github.io/opensky-api); the
+    15 nm box is far under the 25 sq deg 1-credit tier, and the
+    15 s edge cache spends the budget frugally. The worker does
+    OAuth2 client-credentials against the OpenSky Keycloak
+    (endpoint verified live: invalid*client 401 for bogus
+    creds), caches the 30-minute Bearer token per isolate,
+    refreshes once on a server-side 401, and falls back to
+    anonymous (with 2 shed-absorbing retries, 400 ms apart) when
+    the secrets are absent. Every upstream fetch carries a hard
+    4 s AbortSignal timeout - the tarpit measurement is exactly
+    why. Owner setup: create an API client on the OpenSky
+    account page, then `npx wrangler secret put
+OPENSKY_CLIENT_ID` + `OPENSKY_CLIENT_SECRET` and redeploy. - worker-reference.mjs (gate set 18, airplanes.live build):
+    the worker module runs UNMODIFIED in node, so the gate
+    exercises the real handler offline - fetch stubbed with the
+    measured failure modes - asserting the /v2/point URL shape,
+    the strip to exactly the theme's seven fields with readsb
+    units UNTOUCHED, "ground"/incomplete vectors dropped, a 429
+    blip carried by the rate-respecting retry with the
+    User-Agent sent, CORS + x-adsb-source, the adsbToScene
+    round-trip, /probe mapping statuses and thrown timeouts
+    alike into inspectable rows, and the 404/400/OPTIONS
+    allowlist. Live checks: the real handler run in node served
+    14 aircraft over Heathrow / 3 alpine / 5 JFK from
+    airplanes.live; workerd (`wrangler dev --local`) 15 over
+    Heathrow with exactly the seven fields. - Theme: syncTraffic polls the worker each minute (only while
+    Schmidt-Appleman says trails can exist), maps state vectors
+    with adsbToScene (contrails.js: exact international foot/knot
+    constants, the theme's own equirectangular + asinh mapping;
+    landmark set: origin/altitude/velocity exact, +8 km north =
+    half-world) and queues cruise aircraft (>= FL260, inside the
+    world, deduplicated by hex for 10 min). Free contrail slots
+    claim REAL aircraft first - real position, real altitude,
+    real track and ground speed, callsign in the provenance
+    record - with the ambient traffic as documented fallback
+    (worker not deployed, offline harness, no coverage).
+    ?adsb=URL overrides the proxy origin. - DEPLOY (owner): cd themes/horizon/worker && npx wrangler
+    deploy (needs `wrangler login` or CLOUDFLARE_API_TOKEN). The
+    theme expects https://horizon-adsb.<subdomain>.workers.dev -
+    ADSB_PROXY in Horizon.html assumes subdomain `ndevtk`; update
+    it if the account's workers.dev subdomain differs. Each
+    upstream change needs a redeploy. - RESOLVED by edge measurement (GET /probe on the deployed
+    worker, 2026-07-06, three consistent runs): control 200 in
+    389 ms (egress healthy); opensky-api AND opensky-auth
+    TimeoutError at 6 s even with an honest User-Agent -
+    OpenSky network-drops Cloudflare ranges, so credentials can
+    NEVER help (the owner's OPENSKY*\* worker secrets are now
+    unused and can be deleted); adsb.lol 429 in 869 ms and
+    adsb.fi 403 in 139 ms - fast deliberate refusals; and
+    airplanes.live 200 with 30-32 aircraft in 126-232 ms every
+    time. airplanes.live is itself served through Cloudflare,
+    so worker-to-it traffic is first-class. THE one source:
+    airplanes.live /v2/point/lat/lon/radius - readsb v2
+    natively (feet, knots), so no unit conversion even exists
+    to get wrong; the worker strips vectors to the seven fields
+    the theme reads (an order of magnitude smaller payload) and
+    respects the documented 1 req/s: rounded coords + 15 s edge
+    cache + the single retry spaced a full 1.1 s. /probe stays
+    in the worker as a permanent regression instrument. History
+    of the hunt, all measured: OpenSky's anonymous per-IP 400
+    credits/day explained the 503 shedding; the readsb feeds
+    tarpit CF egress (5/6 probes hung >15 s); adsb.one serves a
+    bot-challenge page even to a residential probe. The
+    earlier OAuth2 client-credentials build (Keycloak token
+    endpoint, per-isolate 30-min cache, 401 refresh) is in git
+    history at cfffb36 should OpenSky ever unblock Cloudflare.
   - DONE (deploy + key pending): live AIS ships on the FFT ocean
     (ships.js + worker /ais route) - the worker pattern's second
     payoff, and the first use of its OTHER superpower: a static
-    GitHub Pages site can never hold a secret, but a worker can.
-    - Source: aisstream.io - global community AIS over WebSocket,
-      free API key, terms explicitly forbid browser exposure (so
-      the key lives in `npx wrangler secret put AISSTREAM_KEY`).
-      /ais opens an outbound socket, subscribes the visitor's
-      bounding box (subscription must arrive within 3 s - sent on
-      open), collects PositionReports for a 2.5 s window, closes,
-      answers plain JSON stripped to seven fields with ITU-R
-      M.1371 sentinels mapped (Sog 102.3 -> 0, Cog 360 / heading
-      511 -> null), 60 s manual edge cache per rounded coordinate
-      (few concurrent sockets on the free tier - the cache IS the
-      budget). Bad-key reality (measured): aisstream keeps the
-      socket open and sends NOTHING - indistinguishable from an
-      empty sea - so the documented error-frame path is handled
-      but verification needs a real key over a busy lane (Dover
-      Strait) after deploy. WS mechanics verified in node AND
-      workerd against the live server (connect + subscribe +
-      window + clean close, /adsb unaffected).
-    - Physics (ships.js): COLREGS 1972 verbatim - Rule 21 arcs
-      (masthead 225 deg, sidelights 112.5 each, sternlight 135;
-      side + stern tile the circle exactly), Rule 22 ranges for
-      > = 50 m vessels (6/3/3 nm), Annex I section 8 luminous
-      > intensity I = 3.43e6 T D^2 K^-D (reproduces the published
-      > table: 0.9 cd at 1 nm, 12 at 3, 94 at 6), Allard's law for
-      > apparent illuminance - and the Annex I constant 3.43e6 IS
-      > 1852^2 to three figures, so at the rated range the eye
-      > receives exactly the adopted 2e-7 lux threshold: the
-      > regulation is Allard's law solved for I (landmarked to
-      > 1e-12). Rule 20(b) lights from sunset to sunrise = solar
-      > altitude below -50 arcmin. ships-reference.mjs is gate set
-      > 18 (6 landmarks); the /ais route landmark joined set 19
-      > (worker): stubbed aisstream socket, subscription carries
-      > key + exact bbox, latest-per-MMSI, sentinels, 503 without a
-      > key.
-    - Theme: 8-slot ship pool on the tide-following water plane;
-      syncShips polls /ais every 120 s (only when the DEM has
-      sea), dead-reckons on SOG/COG between reports, hulls are
-      documented display furniture (90 m default - position
-      reports carry no dimensions); each nav light shows only
-      inside its Rule 21 arc for the camera's CURRENT relative
-      bearing, brightness Allard at actual distance (a 3 nm
-      sidelight dies at 3 nm exactly), provenance panel lists
-      callsigns + speeds. ?ais=URL overrides the proxy; ?ship=N
-      spawns deterministic synthetic vessels (no fetch, no
-      Math.random) for pinned shots.
-    - Owner setup: create the free key at aisstream.io (GitHub
-      sign-in), then `cd themes/horizon/worker && npx wrangler
+    GitHub Pages site can never hold a secret, but a worker can. - Source: aisstream.io - global community AIS over WebSocket,
+    free API key, terms explicitly forbid browser exposure (so
+    the key lives in `npx wrangler secret put AISSTREAM_KEY`).
+    /ais opens an outbound socket, subscribes the visitor's
+    bounding box (subscription must arrive within 3 s - sent on
+    open), collects PositionReports for a 2.5 s window, closes,
+    answers plain JSON stripped to seven fields with ITU-R
+    M.1371 sentinels mapped (Sog 102.3 -> 0, Cog 360 / heading
+    511 -> null), 60 s manual edge cache per rounded coordinate
+    (few concurrent sockets on the free tier - the cache IS the
+    budget). Bad-key reality (measured): aisstream keeps the
+    socket open and sends NOTHING - indistinguishable from an
+    empty sea - so the documented error-frame path is handled
+    but verification needs a real key over a busy lane (Dover
+    Strait) after deploy. WS mechanics verified in node AND
+    workerd against the live server (connect + subscribe +
+    window + clean close, /adsb unaffected). - Physics (ships.js): COLREGS 1972 verbatim - Rule 21 arcs
+    (masthead 225 deg, sidelights 112.5 each, sternlight 135;
+    side + stern tile the circle exactly), Rule 22 ranges for > = 50 m vessels (6/3/3 nm), Annex I section 8 luminous > intensity I = 3.43e6 T D^2 K^-D (reproduces the published > table: 0.9 cd at 1 nm, 12 at 3, 94 at 6), Allard's law for > apparent illuminance - and the Annex I constant 3.43e6 IS > 1852^2 to three figures, so at the rated range the eye > receives exactly the adopted 2e-7 lux threshold: the > regulation is Allard's law solved for I (landmarked to > 1e-12). Rule 20(b) lights from sunset to sunrise = solar > altitude below -50 arcmin. ships-reference.mjs is gate set > 18 (6 landmarks); the /ais route landmark joined set 19 > (worker): stubbed aisstream socket, subscription carries > key + exact bbox, latest-per-MMSI, sentinels, 503 without a > key. - Theme: 8-slot ship pool on the tide-following water plane;
+    syncShips polls /ais every 120 s (only when the DEM has
+    sea), dead-reckons on SOG/COG between reports, hulls are
+    documented display furniture (90 m default - position
+    reports carry no dimensions); each nav light shows only
+    inside its Rule 21 arc for the camera's CURRENT relative
+    bearing, brightness Allard at actual distance (a 3 nm
+    sidelight dies at 3 nm exactly), provenance panel lists
+    callsigns + speeds. ?ais=URL overrides the proxy; ?ship=N
+    spawns deterministic synthetic vessels (no fetch, no
+    Math.random) for pinned shots. - Owner setup: create the free key at aisstream.io (GitHub
+    sign-in), then `cd themes/horizon/worker && npx wrangler
 secret put AISSTREAM_KEY && npx wrangler deploy`.
   - DONE (owner provisioning): horizon-live, the dedicated-IP
     successor to the worker (themes/horizon/server) - the owner
@@ -1724,14 +1700,14 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
       Earth's phase from the Moon is the exact complement of the
       Moon's phase from Earth (new moon = FULL Earth over the
       thinnest crescent); the Earth's effective albedo is the Big
-      Bear programme's A* = 0.297 (Goode et al. 2001 - measured
+      Bear programme's A\* = 0.297 (Goode et al. 2001 - measured
       by watching precisely the glow this item draws); Lambertian
       sphere phase law at its exact nodes (f(pi/2) = 1/pi);
       geometry on the shared IUGG radius (imported from
       lightning.js - the model lives once)
     - landmarks (gate set 24): full Earth from the Moon V =
       -16.52 (published -17..-16.1), 33x the full Moon;
-      earthlight/sunlight = 8.16e-5 at new moon = A*(R_E/d)^2
+      earthlight/sunlight = 8.16e-5 at new moon = A\*(R_E/d)^2
       exactly - the ashen side 10.2 mag below the sunlit surface
       (the classical Danjon contrast); quarter = new/pi exactly;
       full moon -> 0
@@ -1988,8 +1964,8 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     ?demtiles=URL endpoint override (infrastructure param, kept
     across relocations) lets the offline harness serve
     deterministic terrarium tiles; ?roam=0 pins the box.
-    window.__roam harness introspection (same precedent as
-    __meteors). Verified in real Chromium (WebGPU/Xvfb) with a
+    window.**roam harness introspection (same precedent as
+    **meteors). Verified in real Chromium (WebGPU/Xvfb) with a
     local synthetic-tile server: flew the free camera past the
     4 km ring - fetch, buildWorld swap, camera rewrite to origin,
     URL rewrite and panel provenance all firing (smoke needed a
@@ -2006,7 +1982,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
        value noise ON THE EARTH SPHERE at the historic 400 m base
        wavelength (MICRO_M === 7*MPU exactly). 3D-on-the-sphere
        because any 2D unrolling shears somewhere (lon*cos(lat)
-       drifts lonRad*sin(lat) metres of texture per metre walked
+       drifts lonRad\*sin(lat) metres of texture per metre walked
        north - 21:1 streaks at 170E). Trees moved from a
        scene-space RNG to roam.treeCandidates: fixed geodetic
        cells (150 m), one hash-deterministic candidate each
@@ -2078,6 +2054,33 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     clamped at the designed full-curtain level. The provenance
     panel now says "strikes the magnetosphere in N min" - the
     wallpaper knows before the sky does.
+  - DONE: METAR - aerodromes MEASURE the sky, and the nearest
+    fresh report now outranks the model where it can see. New
+    single source metar.js (daemon + theme + reference; shipped
+    beside the daemon like lightning.js/solarwind.js) +
+    metar-reference.mjs (gate set 32, 4 landmarks): FMH-1 okta
+    band midpoints (sky-clear codes exactly 0, VV exactly 8/8),
+    WMO etage split at 2/7 km with the exact international foot -
+    the live-captured Glasgow fixture (FEW013 BKN025 OVC030)
+    decodes to 100% low cover with a 396.24 m measured base -
+    visibility by the exact statute mile with the API's "N+"
+    documented as an at-least floor, nearest-FRESH station
+    selection (staleness disqualifies before distance ranks), and
+    the readsb-style normalizer. Daemon: GET /metar?lat&lon -
+    aviationweather.gov decodes reports but sends no CORS header,
+    so the daemon proxies with a 10-min per-area cache; VERIFIED
+    LIVE in this container (Glasgow's layered ob served through
+    the route). Theme: syncMetar every 10 min (?metar=URL
+    override, kept across relocations; roam clears the station on
+    re-anchor and re-syncs on settle); a fresh (<90 min) nearby
+    (<60 km) station replaces the Espy LCL ESTIMATE with the
+    ceilometer's MEASURED deck base, the model's low cover with
+    the measured okta fraction, and the model visibility with the
+    transmissometer reading (Koschmieder haze). DELIBERATE SCOPE:
+    mid/high decks stay with the model - automated ceilometers
+    are blind above a few km, and overriding cirrus with an AUTO
+    station's silence would erase real measured-model cloud.
+    Present weather (wxString) is recorded as provenance only.
   - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
     drift now also manifests as a PER-FRAME uncaught TypeError -
     GPUTexture.createView rejects the `swizzle` field three's

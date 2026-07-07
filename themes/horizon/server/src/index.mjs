@@ -58,6 +58,7 @@
 import http from 'node:http';
 import {haversineKm} from '../../lightning.js';
 import {parseHemiPower, parsePropagated} from '../../solarwind.js';
+import {normalizeMetars} from '../../metar.js';
 
 // Schema normalizers - moved here when the Cloudflare worker was
 // retired and deleted (the daemon superseded it; git history
@@ -706,9 +707,12 @@ function main() {
 
   let tlesCache = {t: 0, body: null}; // CelesTrak visual group
   const adsbCache = new Map(); // area key -> {t, body, src}
+  const metarCache = new Map(); // area key -> {t, body}
   setInterval(() => {
     const now = Date.now();
     for (const [k, v] of adsbCache) if (now - v.t > 30e3) adsbCache.delete(k);
+    for (const [k, v] of metarCache)
+      if (now - v.t > 20 * 60e3) metarCache.delete(k);
   }, 30e3).unref();
   // Aircraft near a point via the readsb failover chain, shared
   // by GET /adsb and the /stream pushes - the 15 s per-area cache
@@ -903,6 +907,48 @@ function main() {
           'x-lightning-source': 'blitzortung.org'
         }
       );
+    }
+
+    if (url.pathname === '/metar') {
+      // Aerodrome observations near the point: aviationweather.gov
+      // decodes the reports but sends no CORS header, so the
+      // daemon proxies - stripped to the fields the theme reads
+      // (normalizeMetars, gated) with a 10-minute per-area cache
+      // (reports refresh half-hourly; many viewers in one place
+      // cost one upstream request).
+      const ck = lat.toFixed(1) + '/' + lon.toFixed(1);
+      const hit = metarCache.get(ck);
+      if (hit && Date.now() - hit.t < 10 * 60e3) {
+        return json(200, hit.body, {
+          'cache-control': 'public, max-age=300',
+          'x-metar-source': 'aviationweather.gov (cached)'
+        });
+      }
+      try {
+        const d = 0.6;
+        const u =
+          'https://aviationweather.gov/api/data/metar?format=json&bbox=' +
+          (lat - d).toFixed(2) +
+          ',' +
+          (lon - d).toFixed(2) +
+          ',' +
+          (lat + d).toFixed(2) +
+          ',' +
+          (lon + d).toFixed(2);
+        const r = await fetch(u, {
+          signal: AbortSignal.timeout(FETCH_MS),
+          headers: {'user-agent': UA}
+        });
+        if (!r.ok) throw new Error(r.status);
+        const body = {metars: normalizeMetars(await r.json())};
+        metarCache.set(ck, {t: Date.now(), body});
+        return json(200, body, {
+          'cache-control': 'public, max-age=300',
+          'x-metar-source': 'aviationweather.gov'
+        });
+      } catch {
+        return json(502, {metars: [], upstream: 'unavailable'});
+      }
     }
 
     if (url.pathname === '/adsb') {
