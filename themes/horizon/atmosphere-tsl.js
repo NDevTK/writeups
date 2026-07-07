@@ -79,6 +79,12 @@ export function createAtmosphereTSL(renderer) {
   const camH = uniform(300);
   const exposure = uniform(28);
   const sunDirW = uniform(new Vector3(0, 1, 0));
+  // Refraction of the drawn disc (refraction.js on the CPU): the
+  // red and blue channels' own apparent directions and the shared
+  // vertical flattening. Defaults draw an undispersed round disc.
+  const sunDirR = uniform(new Vector3(0, 1, 0));
+  const sunDirB = uniform(new Vector3(0, 1, 0));
+  const sunFlat = uniform(1);
 
   const rayleighS = vec3(5.802e-6, 13.558e-6, 33.1e-6);
   const ozoneA = vec3(0.65e-6, 1.881e-6, 0.085e-6);
@@ -516,13 +522,39 @@ export function createAtmosphereTSL(renderer) {
     // a(lambda_um) = -0.023 + 0.292 / lambda, at the same 680/550/440
     // nm the scattering coefficients use. mu = cos of the angular
     // offset from disc centre normalised to the disc radius; the 120
-    // constant is now the CENTRAL intensity.
-    const cSun = dot(v, sunDirW);
-    If(cSun.greaterThan(0.9999893), () => {
+    // constant is the CENTRAL intensity.
+    //
+    // Atmospheric refraction splits and squashes the disc
+    // (refraction.js, ray-traced through the MEASURED profile on
+    // the CPU): each channel carries its own apparent direction -
+    // the green rim IS the gap between them, widening when the
+    // profile magnifies it (the green flash's approach) - and all
+    // three share the vertical flattening ratio (the setting sun's
+    // published ~5/6 squash). The angular offset from each centre
+    // is decomposed against the local vertical and its vertical
+    // component divided by the flatten factor; clamp keeps the
+    // limb law's exact zero at the (elliptical) edge, as before.
+    const cSunG = dot(v, sunDirW);
+    If(cSunG.greaterThan(0.9998), () => {
       const sin2R = 1 - 0.9999893 * 0.9999893;
-      const s2 = clamp(cSun.mul(cSun).oneMinus().div(sin2R), 0.0, 1.0);
-      const muD = sqrt(s2.oneMinus());
-      const limb = pow(vec3(muD), vec3(0.4064, 0.5079, 0.6406));
+      const chanMu = (dir) => {
+        const cS = dot(v, dir);
+        const up = normalize(
+          vec3(0.0, 1.0, 0.0)
+            .sub(dir.mul(dir.y))
+            .add(vec3(0.0, 0.0, 1e-9))
+        );
+        const off = v.sub(dir.mul(cS));
+        const ov = dot(off, up).div(sunFlat);
+        const rest = off.sub(up.mul(dot(off, up)));
+        const s2 = clamp(ov.mul(ov).add(dot(rest, rest)).div(sin2R), 0.0, 1.0);
+        return sqrt(s2.oneMinus());
+      };
+      const limb = vec3(
+        pow(chanMu(sunDirR), 0.4064),
+        pow(chanMu(sunDirW), 0.5079),
+        pow(chanMu(sunDirB), 0.6406)
+      );
       col.addAssign(
         tTexNode.sample(tParamsToUv(r, v.y)).rgb.mul(limb).mul(120.0)
       );
@@ -586,7 +618,12 @@ export function createAtmosphereTSL(renderer) {
     ok: true,
     mesh,
     aerialTex: aerialLut.tex,
-    aerialMaxUnits: MAX_DIST_M / 57.14,
+    // Exact metres-per-scene-unit (roam.js MPU = 16000/280): the
+    // old 57.14 literal was 50 ppm off the mapping's own constant.
+    aerialMaxUnits: MAX_DIST_M / (400 / 7),
+    // Refraction of the drawn disc: per-channel apparent
+    // directions + vertical flattening (set from refraction.js).
+    sunDisc: {dirR: sunDirR, dirB: sunDirB, flatten: sunFlat},
     // Exposed for the validation harness (orientation / content
     // checks against the GLSL reference).
     luts: {

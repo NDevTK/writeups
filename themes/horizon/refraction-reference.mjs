@@ -13,6 +13,7 @@
 //    apparent/true fixed-point roundtrip
 import {
   ARCSEC,
+  buildProfile,
   DEG,
   apparentAltitude,
   ciddorN,
@@ -120,6 +121,66 @@ const check = (name, ok, detail) => {
       Number.isFinite(below) &&
       below > at0,
     `apparent/true roundtrip ${err.toExponential(1)} rad; setting sun flattened to ${setting.flatten.toFixed(3)} (published ~5/6), rim ${rimSet.toFixed(1)}" vs ${rimHigh.toFixed(1)}" at +2°; below-horizontal ray (300 m observer) finite and larger (${((below / DEG) * 60).toFixed(1)}')`
+  );
+}
+
+{
+  // The theme's node-count knob: N = 400 must sit within 0.5" of
+  // reference-grade N = 1600 at the worst case (the horizon ray),
+  // so the per-second sunset updates are exact to a few per cent
+  // of the rim at a quarter of the cost.
+  const prof = standardProfile();
+  let worst = 0;
+  for (const alt of [0, -0.3 * DEG, 2 * DEG]) {
+    for (const lam of [0.44, 0.55, 0.68]) {
+      const d =
+        Math.abs(
+          refractionRad(alt, prof, lam, 30, 400) -
+            refractionRad(alt, prof, lam, 30, 1600)
+        ) / ARCSEC;
+      worst = Math.max(worst, d);
+    }
+  }
+  check(
+    'node-count convergence',
+    worst < 0.5,
+    `N=400 vs N=1600 worst difference ${worst.toFixed(3)}" across altitudes and wavelengths - the theme's live knob is pinned`
+  );
+}
+
+{
+  // The measured-profile builder: unsorted pressure-level triples
+  // plus a surface observation. The surface entry's pressure must
+  // follow hydrostatically from the first level (closed form
+  // through the layer-mean temperature), sampling must be
+  // monotone in p, and refraction through a plausible measured
+  // profile lands near the standard atmosphere's.
+  const levels = [
+    {pPa: 85000, hM: 1457, tC: 7.5, rh: 0.55},
+    {pPa: 100000, hM: 110, tC: 16.2, rh: 0.7},
+    {pPa: 92500, hM: 766, tC: 12.1, rh: 0.6},
+    {pPa: 70000, hM: 3012, tC: -3.2, rh: 0.4},
+    {pPa: 50000, hM: 5574, tC: -17.9, rh: 0.3},
+    {pPa: 30000, hM: 9160, tC: -44.6, rh: 0.2},
+    {pPa: 20000, hM: 11784, tC: -56.4, rh: 0.1}
+  ];
+  const prof = buildProfile(levels, {hM: 5, tC: 17.1, rh: 0.72});
+  const tMean = ((17.1 + 16.2) / 2 + 273.15) * 8.31451;
+  const pSurf = 100000 * Math.exp((110 - 5) / (tMean / (0.0289644 * 9.80665)));
+  const s0 = prof.at(5);
+  const mono =
+    prof.at(5).pPa > prof.at(500).pPa &&
+    prof.at(500).pPa > prof.at(5000).pPa &&
+    prof.at(5000).pPa > prof.at(20000).pPa;
+  const rh = (refractionRad(0, prof, 0.55, 5) / DEG) * 60;
+  check(
+    'measured profile builder',
+    Math.abs(s0.pPa - pSurf) < 1e-6 &&
+      s0.tC === 17.1 &&
+      mono &&
+      rh > 30 &&
+      rh < 38,
+    `surface closed hydrostatically (${s0.pPa.toFixed(0)} Pa exactly as the closed form); pressure monotone through the column; horizon refraction ${rh.toFixed(2)}' through the measured-style profile`
   );
 }
 

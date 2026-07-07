@@ -201,7 +201,13 @@ export function standardProfile() {
 // lambdaUm, through the profile. Composite Simpson over the local
 // zenith angle; r(z) from the Snell invariant by Newton at every
 // node; dn/dr by central difference over the profile (10 m step).
-export function refractionRad(appAltRad, profile, lambdaUm, obsHm = 0) {
+export function refractionRad(
+  appAltRad,
+  profile,
+  lambdaUm,
+  obsHm = 0,
+  N = 800
+) {
   const nOf = (h) => {
     const s = profile.at(h);
     return ciddorN(lambdaUm, s.tC, s.pPa, s.rh ?? 0);
@@ -260,7 +266,8 @@ export function refractionRad(appAltRad, profile, lambdaUm, obsHm = 0) {
   const leg = (hEnd) => {
     if (hEnd <= hAnchor) return 0;
     const sMax = Math.sqrt(hEnd - hAnchor);
-    const N = 800; // even
+    // N (even) is a caller knob: 800 for reference-grade, the theme uses
+    // less after the gate pins the error (see refraction-reference).
     const ds = sMax / N;
     let sum = 0;
     for (let k = 0; k <= N; k++) {
@@ -292,10 +299,16 @@ export function refractionRad(appAltRad, profile, lambdaUm, obsHm = 0) {
 // Apparent altitude for a TRUE (geometric) altitude: solves
 // a = a_true + R(a) by fixed point (converges in a few rounds -
 // dR/da is a few percent at the horizon).
-export function apparentAltitude(trueAltRad, profile, lambdaUm, obsHm = 0) {
+export function apparentAltitude(
+  trueAltRad,
+  profile,
+  lambdaUm,
+  obsHm = 0,
+  N = 800
+) {
   let a = trueAltRad;
   for (let i = 0; i < 6; i++) {
-    const next = trueAltRad + refractionRad(a, profile, lambdaUm, obsHm);
+    const next = trueAltRad + refractionRad(a, profile, lambdaUm, obsHm, N);
     if (Math.abs(next - a) < 1e-9) return next;
     a = next;
   }
@@ -308,21 +321,23 @@ export function apparentAltitude(trueAltRad, profile, lambdaUm, obsHm = 0) {
 // d(apparent)/d(true) across the disc, evaluated at the green
 // wavelength (the dispersion of the flattening itself is second
 // order).
-export function sunRefraction(trueAltRad, profile, obsHm = 0) {
+export function sunRefraction(trueAltRad, profile, obsHm = 0, N = 800) {
   const app = LAMBDAS_UM.map((l) =>
-    apparentAltitude(trueAltRad, profile, l, obsHm)
+    apparentAltitude(trueAltRad, profile, l, obsHm, N)
   );
   const up = apparentAltitude(
     trueAltRad + SUN_DISC_RAD,
     profile,
     LAMBDAS_UM[1],
-    obsHm
+    obsHm,
+    N
   );
   const dn = apparentAltitude(
     trueAltRad - SUN_DISC_RAD,
     profile,
     LAMBDAS_UM[1],
-    obsHm
+    obsHm,
+    N
   );
   return {
     appR: app[0],
