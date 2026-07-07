@@ -1898,27 +1898,167 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   - DONE: security review (owner-directed). The Cloudflare worker
     code is DELETED (themes/horizon/worker + worker-reference.mjs
     - git history holds it): the daemon is the EventSource server
-      proper, not a bolt-on, so the schema normalizers (readsb
-      strip, ITU-R M.1371 sentinels, aisBox geodesy) moved into
-      server/src/index.mjs and their landmarks into
-      server-reference.mjs ('normalizers (ex-worker)' - the gate
-      never lost them; validate.sh runs 27 sets). The legacy
-      /lightning/stream route is gone (the unified /stream carries
-      strikes). "why" leak: audited - the daemon never exposed
-      error internals (that leak lived only in the deleted worker's
-      /ais 502 body); all daemon error bodies are generic, gated by
-      the server set. Every response now carries
-      content-security-policy: sandbox + x-content-type-options:
-      nosniff (SEC_HEADERS, spread first in head(); new 'security
-      headers' landmark asserts exactly these two). Caddy-level
-      origin list: answered in server/README.md - the daemon check
-      is authoritative because it is pure, exported and
-      reference-gated (and guards loopback); Caddyfile.example
-      gained an OPTIONAL commented belt-and-braces matcher that
-      only sheds foreign-Origin load at the edge. install.sh stops
-      shipping the worker and removes /opt/horizon-live/worker;
-      update.sh no longer watches the deleted path.
-  - OPEN (environment, not code): today's fixture rig drops the
+    proper, not a bolt-on, so the schema normalizers (readsb
+    strip, ITU-R M.1371 sentinels, aisBox geodesy) moved into
+    server/src/index.mjs and their landmarks into
+    server-reference.mjs ('normalizers (ex-worker)' - the gate
+    never lost them; validate.sh runs 27 sets). The legacy
+    /lightning/stream route is gone (the unified /stream carries
+    strikes). "why" leak: audited - the daemon never exposed
+    error internals (that leak lived only in the deleted worker's
+    /ais 502 body); all daemon error bodies are generic, gated by
+    the server set. Every response now carries
+    content-security-policy: sandbox + x-content-type-options:
+    nosniff (SEC_HEADERS, spread first in head(); new 'security
+    headers' landmark asserts exactly these two). Caddy-level
+    origin list: answered in server/README.md - the daemon check
+    is authoritative because it is pure, exported and
+    reference-gated (and guards loopback); Caddyfile.example
+    gained an OPTIONAL commented belt-and-braces matcher that
+    only sheds foreign-Origin load at the edge. install.sh stops
+    shipping the worker and removes /opt/horizon-live/worker;
+    update.sh no longer watches the deleted path.
+  - DONE: explore - the wallpaper stops being one fixed viewpoint
+    (owner: "limited view, no option to explore; some places have
+    more data sources and frontier research than others"). New
+    single source explore.js + explore-reference.mjs (gate set 28,
+    4 landmarks): DESTINATIONS is a menu of documented measured
+    superlatives - Dover Strait (busiest lane: COLREGS ships +
+    contrails), Tromso (IGRF-14 gmLat 67.5 deg, the one entry in
+    the 64-70 deg auroral zone - landmarked), Cerro Paranal
+    (floors the shipped Falchi atlas exactly: ratio 0 -> 22.00
+    mag/arcsec^2 -> Bortle 1, landmarked as the ensemble's dark
+    pole with Singapore Strait the bright pole at Bortle 7), Lake
+    Maracaibo (Albrecht et al. 2016 LIS/OTD: 233 fl/km^2/yr,
+    Blitzortung live), Grindelwald (relief), Galicia 43N 8W (the
+    exact point eclipses-reference proves at 100.0% obscuration
+    2026-08-12), Mauna Kea. Each menu row is ANNOTATED by the
+    repo's own gated models (Falchi Bortle/mag + IGRF gmLat), not
+    prose - and so is every open-meteo geocoder search result
+    (search anywhere by name; new remote API, recorded in the
+    provenance panel). Relocation is a clean re-boot via
+    relocateURL (landmarked hygiene): weather pins die,
+    infrastructure params (debug/dem/adsb/ais/live/tles) survive,
+    4 dp coords + place label. KEY SEMANTIC FIX: lat/lon left the
+    `overridden` pin list (now WEATHER_PINS, exported from
+    explore.js - the theme imports it, single source): a pinned
+    LOCATION now loads that place's REAL weather/sea/radar; it
+    only skips the IP geolocation. Harness pins are unaffected
+    (every pinned scene also pins cloud/code). UI: G key /
+    double-click / ?explore=1, Escape closes; typing guards so
+    the search box never trips the D-panel or free-cam keys.
+    Verified in real Chromium (WebGPU, Xvfb): overlay builds 9
+    rows with annotations byte-identical to the reference values,
+    G toggles, guards hold; only the documented environmental
+    Dawn texture spam (OPEN below) in the log.
+  - DONE: roam - terrain streaming under the free camera (the
+    explore item's completion: the world stops being one fixed
+    16 km diorama). Architecture: NOT a tile mosaic - the
+    equirectangular box RE-ANCHORS. New single source roam.js +
+    roam-reference.mjs (gate set 29, 5 landmarks): geoToScene/
+    sceneToGeo are the theme's mapping and its algebraic inverse
+    (landmarked bit-equal to ships.aisToScene AND
+    contrails.adsbToScene at 4 anchors - the model lives once;
+    roundtrip 6.9e-12 units), yOfElev/elevOfY carry the camera's
+    absolute altitude across the asinh datum change (1000 random
+    datum swaps drift 1.4e-12 m), roamDecision is the trigger
+    state machine (fire at ROAM_TRIGGER_M = DEM_HALF_M/2 = 4 km,
+    so real data always outruns the fetch; wait/cooldown/retry
+    landmarked), and a 300-hop random walk lands the camera on
+    the exact origin every swap with hop distances matching
+    haversine to the documented 0.113% m/deg convention.
+    EXACTNESS FIX absorbed: DEM_HALF_M/WORLD/MPU now live in
+    roam.js and the theme's former hand-typed 57.14 m/unit (a
+    50 ppm approximation of its own 16000/280) is replaced by
+    exact MPU everywhere (ship/aircraft kinematics, water
+    metersPerUnit, COLREGS/CFR slant ranges, radar scene scale).
+    Theme integration: maybeRoam() in the free-cam frame path;
+    reanchor() fetches the new box (fetchDEMTiles -> fetchDEM
+    fallback), swaps via the SAME buildWorld() boot uses, rewrites
+    the camera exactly, clears the live pools (stale scene
+    frames), reconnects the /stream EventSource (initial ais/adsb
+    snapshot repopulates in seconds), re-runs the cheap syncs +
+    computeSkyglow() (the Falchi block is now a re-runnable
+    function), and history.replaceState's the URL through the
+    gated relocateURL - reload keeps the walked-to spot;
+    pinnedLoc flips true so IP geolocation never snaps you home.
+    Leak work for repeated rebuilds: previous terrain geometry
+    disposed, ocean FFT cascades got a dispose() (2 data + 6
+    storage textures each), water depth texture freed.
+    ?demtiles=URL endpoint override (infrastructure param, kept
+    across relocations) lets the offline harness serve
+    deterministic terrarium tiles; ?roam=0 pins the box.
+    window.__roam harness introspection (same precedent as
+    __meteors). Verified in real Chromium (WebGPU/Xvfb) with a
+    local synthetic-tile server: flew the free camera past the
+    4 km ring - fetch, buildWorld swap, camera rewrite to origin,
+    URL rewrite and panel provenance all firing (smoke needed a
+    fixture-side GPUTexture.createView swizzle shim - see the
+    updated OPEN note).
+  - DONE: quality hardening pass (owner-directed: "before
+    continuing with frontier research/data sources spend time for
+    client and server to ensure it's a high standard") - the four
+    gaps named in the roam design review, closed:
+    1. EARTH-ANCHORED DRESSING (the approximation that mattered):
+       micro-relief moved from scene-space fbm(x/7) to
+       roam.microRelief - the theme's exact octave weights
+       (0.55/0.27/0.13/0.05 at 1/2.1/4.3/8.9) over period-free 3D
+       value noise ON THE EARTH SPHERE at the historic 400 m base
+       wavelength (MICRO_M === 7*MPU exactly). 3D-on-the-sphere
+       because any 2D unrolling shears somewhere (lon*cos(lat)
+       drifts lonRad*sin(lat) metres of texture per metre walked
+       north - 21:1 streaks at 170E). Trees moved from a
+       scene-space RNG to roam.treeCandidates: fixed geodetic
+       cells (150 m), one hash-deterministic candidate each
+       (position jitter, species, size, sway phase), cos(lat)
+       acceptance holds areal density flat, hash-sorted so the
+       140-tree display budget picks a deterministic, spatially
+       unbiased subset. OSM forest polygons now stored GEODETIC
+       and projected per box (the old scene-space rings were
+       orphaned by every hop). Landmarked: 200 overlap points
+       agree to 0.0 across a 2.8 km re-anchor; 6435 shared tree
+       candidates bit-exact (position + uniforms); density 44.5
+       vs 44.4 /km² at 0/60 deg; MICRO_M identity.
+    2. SETTLE-GATED SYNCS: a hop re-anchors terrain, the stream
+       and the pure local models (skyglow, IGRF) immediately, but
+       the eight API re-syncs wait for the camera to REST
+       (ROAM_SETTLE_MS = 4 s) with ROAM_FORCE_HOPS = 3 as the
+       staleness backstop for a pilot who never stops - no more
+       ~1 req/s against third parties during a long flight.
+       settleDue landmarked.
+    3. FOREST RACE: syncForests no longer triggers a full
+       buildWorld - placeTrees() (extracted, re-runnable)
+       re-dresses the standing terrain when polygons arrive, and
+       geodetic storage means late data can never land in the
+       wrong box.
+    4. ROAM URL SEMANTICS: roam is the same session walking, so
+       roamURL keeps EVERY param (time and weather pins included -
+       the deliberate opposite of explore's fresh-start
+       relocateURL) and only moves the coordinates, dropping the
+       stale place label. Landmarked; reload mid-walk now
+       reproduces the session exactly.
+    SERVER (same pass): SSE backpressure - a stalled client
+    (zero TCP window) used to buffer events in daemon RAM without
+    bound for its 30-minute lifetime, and one broken client's
+    write throw ABORTED the strike fanout loop for every client
+    after it (real bug). Now: per-client write isolation in the
+    fanout + overBackpressure(SSE_BUFFER_MAX = 256 KiB) drops
+    slow readers on every write path (strike/ais/adsb/heartbeat);
+    EventSource reconnects healthy clients. New 'SSE backpressure'
+    landmark (boundary exact, 36x the largest real ais frame,
+    6.6 MB worst case across SSE_MAX). Gate now 30 sets: roam 9
+    landmarks, server 12.
+  - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
+    drift now also manifests as a PER-FRAME uncaught TypeError -
+    GPUTexture.createView rejects the `swizzle` field three's
+    texture views pass (the bundled chromium-1194's WebGPU
+    dictionary vs this three build) - which aborts frame() before
+    any scene logic runs in the fixture rig (event-driven UI
+    still works, which is why the explore smoke passed). The roam
+    smoke installs a fixture-side createView shim that strips the
+    field (identity swizzle, never shipped); a matching
+    SHOOT_CHROME remains the real fix for pixel work.
+    Original note: today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
     d202bb5 (the certified phase-5 build), 289ab7c, a466700,

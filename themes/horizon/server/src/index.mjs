@@ -32,6 +32,9 @@
  *    use the API from a browser. Requests without Origin (curl,
  *    health checks) pass but receive no CORS grant.
  *  - per-IP token bucket (RATE_PER_MIN, default 60/min)
+ *  - SSE backpressure: a stalled stream client is disconnected
+ *    once its socket buffer exceeds SSE_BUFFER_MAX (256 KiB) -
+ *    slow readers cannot grow this process's memory
  *  - GET/OPTIONS only, exact paths, numeric params validated and
  *    clamped
  *  - zero npm dependencies: node >= 22 built-ins only (http
@@ -47,8 +50,9 @@
  *                  (default 1 - Caddy fronts this daemon)
  *
  * The pure pieces (schema normalizers, grid ingest/query/prune,
- * origin check, rate limiter, security headers) are exported for
- * the reference gate (../../server-reference.mjs).
+ * origin check, rate limiter, security headers, backpressure
+ * predicate) are exported for the reference gate
+ * (../../server-reference.mjs).
  */
 
 import http from 'node:http';
@@ -348,6 +352,19 @@ export function sseEvent(name, obj) {
   return 'event: ' + name + '\ndata: ' + JSON.stringify(obj) + '\n\n';
 }
 
+// SSE backpressure: a stalled client (zero TCP window, hostile or
+// just asleep) would otherwise buffer events in THIS process's RAM
+// without bound for its whole 30-minute stream lifetime - on a
+// 1 GB e2-micro that is the resource that actually runs out. Once
+// a client's socket buffer exceeds SSE_BUFFER_MAX it is
+// disconnected (EventSource reconnects healthy clients on its
+// own). 256 KiB holds minutes of the busiest real fanout, and is
+// orders of magnitude above any single event.
+export const SSE_BUFFER_MAX = 262144;
+export function overBackpressure(buffered, max = SSE_BUFFER_MAX) {
+  return buffered > max;
+}
+
 // ---- Origin allowlist + per-IP rate limit ----------------------
 
 // Browser requests carry Origin; only the website's origin gets
@@ -565,9 +582,23 @@ function runBlitzSocket(st, clients, log) {
         for (const cl of clients) {
           const d = haversineKm(cl.lat, cl.lon, s.lat, s.lon);
           if (d <= cl.km) {
-            cl.res.write(
-              sseEvent('strike', {lat: s.lat, lon: s.lon, km: Math.round(d)})
-            );
+            // Per-client isolation: one broken or stalled client
+            // must never abort the fanout to the rest, and a
+            // client over the backpressure budget is dropped (its
+            // close handler cleans up; EventSource reconnects).
+            try {
+              if (overBackpressure(cl.res.writableLength)) cl.res.destroy();
+              else
+                cl.res.write(
+                  sseEvent('strike', {
+                    lat: s.lat,
+                    lon: s.lon,
+                    km: Math.round(d)
+                  })
+                );
+            } catch {
+              // close handler cleans up
+            }
           }
         }
       } catch {
@@ -846,35 +877,32 @@ function main() {
       res.write(': horizon-live unified stream\n\n');
       const client = {res, lat, lon, km};
       sseClients.add(client);
+      // Every periodic write goes through the same backpressure
+      // gate as the strike fanout: a stalled client is dropped
+      // before it can grow this process's memory.
+      const guardedWrite = (chunk) => {
+        try {
+          if (overBackpressure(res.writableLength)) res.destroy();
+          else res.write(chunk);
+        } catch {
+          // closing below
+        }
+      };
       const pushAis = () => {
         if (env.AISSTREAM_KEY) {
-          try {
-            res.write(sseEvent('ais', {ships: query(st, lat, lon, aisDist)}));
-          } catch {
-            // closing below
-          }
+          guardedWrite(sseEvent('ais', {ships: query(st, lat, lon, aisDist)}));
         }
       };
       const pushAdsb = async () => {
         const got = await fetchAdsb(lat, lon, adsbDist);
         if (!got) return;
-        try {
-          res.write(sseEvent('adsb', got.body));
-        } catch {
-          // closing below
-        }
+        guardedWrite(sseEvent('adsb', got.body));
       };
       pushAis();
       pushAdsb();
       const iAis = setInterval(pushAis, 30e3);
       const iAdsb = setInterval(pushAdsb, 20e3);
-      const hb = setInterval(() => {
-        try {
-          res.write(': hb\n\n');
-        } catch {
-          // closing below
-        }
-      }, 25e3);
+      const hb = setInterval(() => guardedWrite(': hb\n\n'), 25e3);
       const bye = setTimeout(() => res.end(), 30 * 60e3);
       req.on('close', () => {
         clearInterval(iAis);

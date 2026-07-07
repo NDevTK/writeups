@@ -82,13 +82,30 @@
         (d3-celestial data) ride the same sidereal dome as the stars
       - a data panel (the ✦ wallpaper control, ?debug=1, or the D key)
         lists every live source with its last real value
+      - explore (the G key, double-click, or ?explore=1): the measured
+        world is not uniformly rich, so explore.js curates destinations
+        that are documented superlatives (each promise cited, each
+        annotated by the repo's own Falchi-atlas and IGRF-14 models),
+        and the open-meteo geocoder reaches any other place by name.
+        Relocating sets only lat/lon/place - never a weather pin - so
+        the destination's REAL sky, sea, ships and storms load.
+      - roam (just fly): the free camera streams terrain. 4 km from
+        the anchor the world re-anchors on your geodetic position
+        (roam.js - exact inverse mapping and altitude-datum carry,
+        reference-gated), the live stream/polls/skyglow re-anchor
+        with it, and the URL follows so a reload keeps the spot.
+        ?roam=0 disables.
 
       Standalone debug overrides (query params, e.g. Horizon.html?time=...):
-        lat, lon, time (ISO), cloud (0-100), wind (km/h), winddir (deg),
+        lat, lon (relocate - live data still loads there), place (label),
+        explore=1 (open the destination menu), time (ISO), cloud (0-100),
+        wind (km/h), winddir (deg),
         gust (km/h), precip (mm), snow (cm), temp (C), dew (C), aod,
         pm25, vis (m), cloudlow/cloudmid/cloudhigh (0-100), code (WMO
         weather code), quake (magnitude), kp (0-9), aurora (0-1),
-        auroralat (deg), dem=0 (skip real terrain), debug=1
+        auroralat (deg), dem=0 (skip real terrain), demtiles=URL
+        (terrarium tile endpoint override), roam=0 (pin the box),
+        debug=1
     -->
     <style>
       html,
@@ -142,6 +159,54 @@
       #panel .age {
         color: rgba(230, 237, 243, 0.45);
       }
+      #explore {
+        position: fixed;
+        left: 14px;
+        bottom: 44px;
+        width: min(420px, calc(100vw - 28px));
+        max-height: 72vh;
+        overflow-y: auto;
+        padding: 12px 14px;
+        border-radius: 10px;
+        background: rgba(10, 14, 24, 0.86);
+        backdrop-filter: blur(6px);
+        color: rgba(230, 237, 243, 0.92);
+        font:
+          11px/1.55 ui-monospace,
+          'Cascadia Mono',
+          Consolas,
+          monospace;
+      }
+      #explore b {
+        color: #7ee2a8;
+      }
+      #explore input {
+        width: 100%;
+        box-sizing: border-box;
+        margin: 6px 0 8px;
+        padding: 5px 8px;
+        border: 1px solid rgba(230, 237, 243, 0.25);
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.35);
+        color: inherit;
+        font: inherit;
+        outline: none;
+      }
+      #explore .dest {
+        padding: 5px 6px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #explore .dest:hover {
+        background: rgba(126, 226, 168, 0.12);
+      }
+      #explore .why {
+        color: rgba(230, 237, 243, 0.55);
+      }
+      #explore .note {
+        color: #7ee2a8;
+        opacity: 0.85;
+      }
     </style>
     <script type="importmap">
       {
@@ -157,6 +222,7 @@
     <canvas id="gl"></canvas>
     <div id="caption"></div>
     <div id="panel" hidden></div>
+    <div id="explore" hidden></div>
     <script src="./horizon/satellite.min.js"></script>
     <script src="./horizon/astronomy.browser.min.js"></script>
     <script type="module">
@@ -230,6 +296,28 @@
         skyMag
       } from './horizon/skyglow.js';
       import {SKYGLOW, SKYGLOW_H, SKYGLOW_W} from './horizon/skyglow-data.js';
+      import {
+        DESTINATIONS,
+        WEATHER_PINS,
+        annotate,
+        relocateURL
+      } from './horizon/explore.js';
+      import {
+        DEM_HALF_M,
+        MPU,
+        WORLD,
+        elevOfY,
+        geoToScene,
+        microRelief,
+        roamDecision,
+        roamURL,
+        ROAM_COOLDOWN_MS,
+        ROAM_RETRY_MS,
+        sceneToGeo,
+        settleDue,
+        treeCandidates,
+        yOfElev
+      } from './horizon/roam.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -338,7 +426,7 @@
       const state = {
         lat: params.has('lat') ? +params.get('lat') : 51.48,
         lon: params.has('lon') ? +params.get('lon') : 0,
-        place: '',
+        place: params.get('place') ?? '',
         cloud: params.has('cloud') ? +params.get('cloud') : 20,
         wind: params.has('wind') ? +params.get('wind') : 8,
         precip: params.has('precip') ? +params.get('precip') : 0,
@@ -391,19 +479,16 @@
           swell: sp
         };
       }
-      const overridden = [
-        'lat',
-        'lon',
-        'cloud',
-        'wind',
-        'precip',
-        'snow',
-        'temp',
-        'winddir',
-        'gust',
-        'dew',
-        'code'
-      ].some((k) => params.has(k));
+      // Weather pins freeze the sky (harness/debug; the list lives in
+      // explore.js - the model lives once). A pinned LOCATION is not a
+      // pin on the weather: ?lat&lon (the explore system, or a hand
+      // URL) still loads that place's real conditions - it only stops
+      // the IP geolocation from overriding where to stand.
+      const overridden = WEATHER_PINS.some((k) => params.has(k));
+      // let, not const: roaming re-anchors the view away from the
+      // IP location mid-session and must stop geolocation from
+      // snapping it back on the next weather refresh.
+      let pinnedLoc = params.has('lat') || params.has('lon');
 
       const caption = document.getElementById('caption');
       let captionTimer = 0;
@@ -452,25 +537,36 @@
 
       async function syncWeather() {
         if (overridden) return;
-        try {
-          const geo = await (
-            await fetch('https://get.geojs.io/v1/ip/geo.json', {
-              credentials: 'omit'
-            })
-          ).json();
-          state.lat = +geo.latitude;
-          state.lon = +geo.longitude;
-          state.place = geo.city || geo.country || '';
+        if (pinnedLoc) {
           record(
-            'geojs.io IP location',
+            'relocated view',
             state.lat.toFixed(2) +
               ', ' +
               state.lon.toFixed(2) +
-              ' · ' +
-              state.place
+              (state.place ? ' · ' + state.place : '') +
+              ' · live data for the destination'
           );
-        } catch {
-          // Keep the Greenwich fallback.
+        } else {
+          try {
+            const geo = await (
+              await fetch('https://get.geojs.io/v1/ip/geo.json', {
+                credentials: 'omit'
+              })
+            ).json();
+            state.lat = +geo.latitude;
+            state.lon = +geo.longitude;
+            state.place = geo.city || geo.country || '';
+            record(
+              'geojs.io IP location',
+              state.lat.toFixed(2) +
+                ', ' +
+                state.lon.toFixed(2) +
+                ' · ' +
+                state.place
+            );
+          } catch {
+            // Keep the Greenwich fallback.
+          }
         }
         try {
           const w = await (
@@ -517,7 +613,9 @@
           say(
             (state.place ? state.place + ' · ' : '') +
               (WMO[state.code] || 'weather code ' + state.code) +
-              ' · this scene mirrors your sky and terrain'
+              (pinnedLoc
+                ? ' · live view of this place · G to explore'
+                : ' · this scene mirrors your sky and terrain')
           );
         } catch {
           say('weather unavailable · showing a calm day');
@@ -819,7 +917,7 @@
           // ring so the field fades at the world edge.
           const RM = 64;
           const field = new Float32Array(RM * RM * 4);
-          const mppScene = metresPerPixel(state.lat, 8) / 57.14;
+          const mppScene = metresPerPixel(state.lat, 8) / MPU;
           for (let jj = 0; jj < RM; jj++) {
             for (let ii = 0; ii < RM; ii++) {
               const k = (jj * RM + ii) * 4;
@@ -865,19 +963,26 @@
 
       // Real forests: OSM wood/forest polygons around the visitor decide
       // where trees stand (scene-space polygons, cached per location).
-      let forestPolys = null;
+      // OSM wood polygons, stored GEODETIC ([lat, lon] rings) so a
+      // roam re-anchor cannot orphan them; placeTrees() projects
+      // them onto whatever box is current (forestScene).
+      let forestGeo = null;
+      let forestScene = null;
       async function syncForests() {
         const key =
-          'horizon-forest-' + state.lat.toFixed(2) + ',' + state.lon.toFixed(2);
+          'horizon-forest-geo-' +
+          state.lat.toFixed(2) +
+          ',' +
+          state.lon.toFixed(2);
         try {
           const hit = localStorage.getItem(key);
           if (hit) {
-            forestPolys = JSON.parse(hit);
+            forestGeo = JSON.parse(hit);
             record(
               'OSM Overpass forests (cached)',
-              forestPolys.length + ' wood polygons'
+              forestGeo.length + ' wood polygons'
             );
-            buildWorld();
+            if (worldBuilt) placeTrees();
             return;
           }
         } catch {}
@@ -919,21 +1024,23 @@
             }
           }
           if (!osm) throw new Error('overpass unavailable');
-          forestPolys = osm.elements
+          // Stored geodetic (4 dp ~= 11 m, finer than the 30 m DEM):
+          // the rings survive any number of re-anchors and are
+          // projected per box in placeTrees().
+          forestGeo = osm.elements
             .filter((w) => w.geometry && w.geometry.length > 3)
             .map((w) =>
-              w.geometry.map((g) => [
-                +(((g.lon - state.lon) / (2 * dLon)) * WORLD).toFixed(1),
-                +((-(g.lat - state.lat) / (2 * dLat)) * WORLD).toFixed(1)
-              ])
+              w.geometry.map((g) => [+g.lat.toFixed(4), +g.lon.toFixed(4)])
             );
-          record('OSM Overpass forests', forestPolys.length + ' wood polygons');
+          record('OSM Overpass forests', forestGeo.length + ' wood polygons');
           try {
-            localStorage.setItem(key, JSON.stringify(forestPolys));
+            localStorage.setItem(key, JSON.stringify(forestGeo));
           } catch {}
-          buildWorld(); // replant where the real woods are
+          // Replant where the real woods are - trees only, the
+          // standing terrain is untouched.
+          if (worldBuilt) placeTrees();
         } catch {
-          forestPolys = null; // procedural scatter stays
+          forestGeo = null; // procedural scatter stays
         }
       }
 
@@ -1048,8 +1155,8 @@
       }
 
       function inForest(x, z) {
-        if (!forestPolys || !forestPolys.length) return true;
-        for (const poly of forestPolys) {
+        if (!forestScene || !forestScene.length) return true;
+        for (const poly of forestScene) {
           let inside = false;
           for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
             const xi = poly[i][0];
@@ -1222,14 +1329,22 @@
       // rounded location. The mesh gets macro relief from the DEM and only
       // fine detail from noise, so the landscape is recognisably *yours*.
       const DEM_N = 24;
-      const DEM_HALF_M = 8000;
-      const WORLD = 280; // scene units across; ~57 m per unit
+      // DEM_HALF_M (8000 m), WORLD (280 units) and the exact
+      // metres-per-unit MPU are imported from roam.js - the roam
+      // system re-anchors this same box as the free camera walks,
+      // so the constants live (and are gated) at one source.
 
       // Primary source: AWS terrarium tiles (Mapzen open data). Elevation
       // is PNG-encoded as (R*256 + G + B/256) - 32768, CORS-open, so a
       // stitched canvas gives ~30-90m real elevations in a few requests.
       // Kept at full pixel resolution (no downsampled cache: the browser's
       // HTTP cache already holds the tiles themselves).
+      // ?demtiles=URL overrides the endpoint (same z/x/y.png scheme) -
+      // an infrastructure param like ?adsb/?ais: the offline harness
+      // serves deterministic tiles through it to exercise roam.
+      const DEM_TILES =
+        params.get('demtiles') ??
+        'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
       async function fetchDEMTiles(lat, lon) {
         const z = Math.max(
           8,
@@ -1273,14 +1388,7 @@
                   resolve();
                 };
                 img.onerror = reject;
-                img.src =
-                  'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/' +
-                  z +
-                  '/' +
-                  tx +
-                  '/' +
-                  ty +
-                  '.png';
+                img.src = DEM_TILES + '/' + z + '/' + tx + '/' + ty + '.png';
               })
             );
         await Promise.all(jobs);
@@ -1605,6 +1713,10 @@
       }
 
       let centerElev = 300;
+      // The dressing anchor: pinned to the box the terrain was BUILT
+      // from (buildWorld sets it), so per-frame sample() calls stay
+      // consistent with the mesh even while a re-anchor is in flight.
+      let dressAnchor = {lat: 51.48, lon: 0};
       function sample(x, z) {
         const e = demData ? demElev(x, z) : proceduralElev(x, z);
         const water = demData && e <= 0.3;
@@ -1614,9 +1726,12 @@
         if (water) y = 16 * Math.asinh((0 - centerElev) / 500) - 0.6;
         else {
           // With 30m tile data the noise is only seasoning; the coarse
-          // fallbacks need more of it to avoid reading as blobs.
+          // fallbacks need more of it to avoid reading as blobs. The
+          // noise is EARTH-anchored (roam.js microRelief, same 400 m
+          // wavelength): the same hillside dresses the same from any
+          // roam box - overlap agreement is a gated landmark.
           const micro = demData && demData.kind === 'img' ? 0.5 : 1.6;
-          y += micro * (fbm(x / 7, z / 7) - 0.5);
+          y += micro * (microRelief(x, z, dressAnchor) - 0.5);
         }
         return {e, y, water};
       }
@@ -1765,9 +1880,89 @@
         terrainObj.momentsTexNode.value = tex;
       }
 
+      let terrainMesh = null;
+      let worldBuilt = false;
+      // Trees: Earth-anchored candidates (roam.js treeCandidates) -
+      // the same wood grows the same trees from any roam box, with
+      // the same species, size and sway phase (gated overlap
+      // landmark) - filtered by the theme's physical tests: inside
+      // the real OSM woods when we have them, below the real tree
+      // line, off cliffs, out of the sea, and off both camera
+      // spots. Re-runnable on its own: fresh forest polygons
+      // re-dress the standing terrain without a full rebuild.
+      function placeTrees() {
+        for (const t of trees) ground.remove(t);
+        trees = [];
+        // Forest polygons are stored geodetic; project them onto
+        // the CURRENT box for the point-in-polygon test.
+        forestScene = forestGeo
+          ? forestGeo.map((poly) =>
+              poly.map(([la, lo]) => {
+                const s = geoToScene(la, lo, dressAnchor);
+                return [s.x, s.z];
+              })
+            )
+          : null;
+        const tl = treelineM(state.lat);
+        for (const c of treeCandidates(dressAnchor)) {
+          if (trees.length >= 140) break;
+          const {x, z} = c;
+          const s0 = sample(x, z);
+          if (s0.water || s0.e > tl) continue;
+          if (!inForest(x, z)) continue;
+          // Real forests stand on ~35° alpine slopes; the asinh height
+          // compression roughly doubles scene gradients, hence 4.5.
+          const grade =
+            Math.abs(sample(x + 2, z).y - sample(x - 2, z).y) +
+            Math.abs(sample(x, z + 2).y - sample(x, z - 2).y);
+          if (grade > 4.5) continue;
+          if (Math.hypot(x, z - 26) < 24 || Math.hypot(x, z + 26) < 24)
+            continue;
+          const sc = 0.8 + c.r[0] * 1.4;
+          // Conifers own the subalpine belt below the climatic treeline.
+          const conifer = s0.e > tl - 700 || c.r[1] < 0.4;
+          const tree = new THREE.Group();
+          const trunk = new THREE.Mesh(geoTrunk, trunkMat);
+          trunk.position.y = 0.55;
+          trunk.castShadow = true;
+          tree.add(trunk);
+          if (conifer) {
+            const mat = leafMats[Math.floor(c.r[2] * leafMats.length)];
+            const c1 = new THREE.Mesh(geoCone1, mat);
+            c1.position.y = 1.7;
+            const c2 = new THREE.Mesh(geoCone2, mat);
+            c2.position.y = 3.1;
+            c1.castShadow = c2.castShadow = true;
+            c1.receiveShadow = true;
+            tree.add(c1, c2);
+          } else {
+            const canopy = new THREE.Mesh(
+              geoCanopy,
+              broadMats[Math.floor(c.r[2] * broadMats.length)]
+            );
+            canopy.position.y = 2.2;
+            canopy.scale.y = 0.82;
+            canopy.castShadow = canopy.receiveShadow = true;
+            tree.add(canopy);
+          }
+          tree.scale.setScalar(sc);
+          tree.position.set(x, s0.y, z);
+          tree.userData = {phase: c.r[3] * Math.PI * 2, a: 0, v: 0};
+          trees.push(tree);
+          ground.add(tree);
+        }
+      }
       function buildWorld() {
+        // Roam rebuilds repeatedly: free the previous terrain
+        // geometry (trees share cached geometries/materials and
+        // need no disposal; ground.clear() drops the references).
+        if (terrainMesh) terrainMesh.geometry.dispose();
         ground.clear();
         trees = [];
+        // Pin the dressing to the box being built: per-frame
+        // sample() calls stay consistent with this mesh even while
+        // the next re-anchor's fetch is in flight.
+        dressAnchor = {lat: state.lat, lon: state.lon};
         if (demData) {
           // Average the real elevation in a small ring around the scene
           // centre (grid-layout agnostic).
@@ -1802,66 +1997,25 @@
         terrain.receiveShadow = true;
         terrain.layers.enable(3); // cloud depth prepass
         ground.add(terrain);
+        terrainMesh = terrain;
 
-        // Trees: inside the real OSM woods when we have them, below the
-        // real tree line, off cliffs, out of the sea, and not on top of
-        // either camera spot (it can face both ways).
-        const tl = treelineM(state.lat);
-        for (let i = 0; i < 1800 && trees.length < 140; i++) {
-          const x = (rand() - 0.5) * (WORLD - 40);
-          const z = (rand() - 0.5) * (WORLD - 40);
-          const s0 = sample(x, z);
-          if (s0.water || s0.e > tl) continue;
-          if (!inForest(x, z)) continue;
-          // Real forests stand on ~35° alpine slopes; the asinh height
-          // compression roughly doubles scene gradients, hence 4.5.
-          const grade =
-            Math.abs(sample(x + 2, z).y - sample(x - 2, z).y) +
-            Math.abs(sample(x, z + 2).y - sample(x, z - 2).y);
-          if (grade > 4.5) continue;
-          if (Math.hypot(x, z - 26) < 24 || Math.hypot(x, z + 26) < 24)
-            continue;
-          const sc = 0.8 + rand() * 1.4;
-          // Conifers own the subalpine belt below the climatic treeline.
-          const conifer = s0.e > tl - 700 || rand() < 0.4;
-          const tree = new THREE.Group();
-          const trunk = new THREE.Mesh(geoTrunk, trunkMat);
-          trunk.position.y = 0.55;
-          trunk.castShadow = true;
-          tree.add(trunk);
-          if (conifer) {
-            const mat = leafMats[Math.floor(rand() * leafMats.length)];
-            const c1 = new THREE.Mesh(geoCone1, mat);
-            c1.position.y = 1.7;
-            const c2 = new THREE.Mesh(geoCone2, mat);
-            c2.position.y = 3.1;
-            c1.castShadow = c2.castShadow = true;
-            c1.receiveShadow = true;
-            tree.add(c1, c2);
-          } else {
-            const canopy = new THREE.Mesh(
-              geoCanopy,
-              broadMats[Math.floor(rand() * broadMats.length)]
-            );
-            canopy.position.y = 2.2;
-            canopy.scale.y = 0.82;
-            canopy.castShadow = canopy.receiveShadow = true;
-            tree.add(canopy);
-          }
-          tree.scale.setScalar(sc);
-          tree.position.set(x, s0.y, z);
-          tree.userData = {phase: rand() * Math.PI * 2, a: 0, v: 0};
-          trees.push(tree);
-          ground.add(tree);
-        }
+        placeTrees();
 
         // The sea: three.js Water (planar reflections) riding at real sea
-        // level wherever the DEM says there is water.
+        // level wherever the DEM says there is water. Roam rebuilds
+        // per coastline, so the previous build's GPU residents (FFT
+        // cascade textures, the signed-depth texture) are freed, not
+        // just dropped.
         if (water) {
           ground.remove(water);
           water.geometry.dispose();
           water.material.dispose();
+          water.userData.depthTex?.dispose();
           water = null;
+        }
+        if (oceanCascades) {
+          for (const c of oceanCascades) c.dispose();
+          oceanCascades = null;
         }
         let hasWater = false;
         for (let i = 0; i < wet.length; i++)
@@ -1962,7 +2116,7 @@
               depthTex,
               worldSize: WORLD,
               resolutionScale: 0.5,
-              ocean: {cascades: oceanCascades, metersPerUnit: 57.14},
+              ocean: {cascades: oceanCascades, metersPerUnit: MPU},
               // Deck shadows dim the DIRECT sun terms (glitter,
               // diffuse) - not the sky reflection - via the shared
               // Beer-Lambert transmittance.
@@ -1970,6 +2124,7 @@
             }
           );
           water.rotation.x = -Math.PI / 2;
+          water.userData.depthTex = depthTex; // freed on the next rebuild
           water.position.y = 16 * Math.asinh((0 - centerElev) / 500) - 0.15;
           // Aerial perspective + AgX for the sea via the shared hook.
           applyAerial(water.material);
@@ -1989,6 +2144,7 @@
           snowSim.rebuildTerrain();
           snowSim.clearDrifts();
         }
+        worldBuilt = true;
       }
       buildWorld();
 
@@ -2092,7 +2248,7 @@
         contrailPool.push({mesh, u: co.u, active: false, t: 0, life: 1});
       }
       const CT_LEN = 260; // path length, scene units
-      const CT_SPEED = 230 / 57.14; // jet ground speed, units/s
+      const CT_SPEED = 230 / MPU; // jet ground speed, units/s
       // live = an ADS-B snapshot from adsbToScene (real position,
       // altitude, velocity); absent = ambient traffic.
       function spawnContrail(p, persists, live) {
@@ -2177,7 +2333,7 @@
           halfM: DEM_HALF_M,
           world: WORLD,
           centerElev,
-          mpu: 57.14
+          mpu: MPU
         };
         const now_ = Date.now();
         for (const [hex, t] of seenFlights)
@@ -2317,7 +2473,7 @@
                 x: camera.position.x + mFlashDir.x * ahead + px * side,
                 z: camera.position.z + mFlashDir.z * ahead + pz * side,
                 y: 16 * Math.asinh((altM - centerElev) / 500),
-                vx: ((i % 2 ? -1 : 1) * (140 * 0.514444)) / 57.14,
+                vx: ((i % 2 ? -1 : 1) * (140 * 0.514444)) / MPU,
                 vz: 0,
                 altM
               },
@@ -2348,7 +2504,7 @@
       // synthetic vessels for the offline harness.
       const AIS_PROXY = params.get('ais') ?? 'https://api.ndev.tk/ais';
       const SHIP_N = 8;
-      const SHIP_LOA = 90 / 57.14; // scene units (90 m)
+      const SHIP_LOA = 90 / MPU; // scene units (90 m)
       const NAV_COLOR = {
         masthead: '#ffffff',
         stern: '#ffffff',
@@ -2445,7 +2601,7 @@
               active: true
             });
             const tr = s.hdg * RAD;
-            const sp = (12 * 0.514444) / 57.14; // 12 kt
+            const sp = (12 * 0.514444) / MPU; // 12 kt
             s.vx = sp * Math.sin(tr);
             s.vz = -sp * Math.cos(tr);
           }
@@ -2479,7 +2635,7 @@
           lon: state.lon,
           halfM: DEM_HALF_M,
           world: WORLD,
-          mpu: 57.14
+          mpu: MPU
         };
         const now_ = Date.now();
         const names = [];
@@ -2574,6 +2730,7 @@
         p.mesh.visible = true;
         strikeCount++;
       }
+      let liveES = null;
       const strikeOv = params.has('strike') ? +params.get('strike') : null;
       if (strikeOv !== null) {
         // Offline harness: deterministic flashes in the camera
@@ -2596,13 +2753,21 @@
           k++;
         }, 1700);
       } else if (typeof EventSource !== 'undefined') {
-        // One connection, three layers: strikes flash the moment
-        // Blitzortung locates them; ship and aircraft deltas ride
-        // the same channel (30 s / 20 s server cadence), applied
-        // through the SAME functions the polling fallback uses -
-        // the polls stay armed as belt and braces, application is
-        // idempotent by MMSI/hex.
-        const es = new EventSource(
+        connectStream();
+      }
+      // One connection, three layers: strikes flash the moment
+      // Blitzortung locates them; ship and aircraft deltas ride
+      // the same channel (30 s / 20 s server cadence), applied
+      // through the SAME functions the polling fallback uses -
+      // the polls stay armed as belt and braces, application is
+      // idempotent by MMSI/hex. The subscription is a lat/lon
+      // point, so roaming re-anchors it: connectStream() again
+      // closes the old channel and opens one at the new anchor
+      // (the server pushes an initial ais/adsb snapshot on
+      // connect, repopulating the cleared pools within seconds).
+      function connectStream() {
+        if (liveES) liveES.close();
+        liveES = new EventSource(
           LIVE_STREAM +
             '?lat=' +
             state.lat.toFixed(3) +
@@ -2610,7 +2775,7 @@
             state.lon.toFixed(3) +
             '&km=200&ais=8&adsb=15'
         );
-        es.addEventListener('strike', (ev) => {
+        liveES.addEventListener('strike', (ev) => {
           try {
             const s = JSON.parse(ev.data);
             const az = strikeBearing({lat: state.lat, lon: state.lon}, s);
@@ -2627,7 +2792,7 @@
             // malformed event
           }
         });
-        es.addEventListener('ais', (ev) => {
+        liveES.addEventListener('ais', (ev) => {
           try {
             const j = JSON.parse(ev.data);
             if (Array.isArray(j.ships)) applyShips(j.ships);
@@ -2635,7 +2800,7 @@
             // malformed event
           }
         });
-        es.addEventListener('adsb', (ev) => {
+        liveES.addEventListener('adsb', (ev) => {
           try {
             const j = JSON.parse(ev.data);
             if (Array.isArray(j.ac)) applyTraffic(j.ac);
@@ -3041,29 +3206,42 @@
       // dome is the one documented display element (sodium/LED
       // tint; amplitude from the same measured ratio).
       // ?lp=r overrides the ratio for harness shots.
-      const lpRatio = params.has('lp')
-        ? +params.get('lp')
-        : sampleRatio(SKYGLOW, SKYGLOW_W, SKYGLOW_H, state.lat, state.lon);
-      const lpVis = pointVisibility(lpRatio);
-      const lpVisBright = 1 / Math.sqrt(1 + lpRatio);
-      const lpMag = skyMag(lpRatio);
-      record(
-        'Falchi 2016 skyglow atlas',
-        'zenith ' +
-          lpMag.toFixed(2) +
-          ' mag/arcsec\u00b2 \u00b7 Bortle ' +
-          bortleClass(lpMag) +
-          ' \u00b7 star contrast \u00d7' +
-          lpVis.toFixed(2)
-      );
       // Anisotropic city dome: 16 azimuth weights from Walker's
       // law over ring samples of the SAME measured grid (gated in
       // skyglow-reference) - a coastal city glows toward the city
       // and stays dark over the sea. Weights normalise around the
       // local ratio so the overall amplitude stays anchored to
-      // the visitor's own zenith measurement.
+      // the visitor's own zenith measurement. All of it is a pure
+      // local sample of the shipped atlas, so roaming just
+      // re-samples: computeSkyglow() runs at boot AND at every
+      // re-anchor.
       const lpGlowObj = createSkyglowMaterial();
-      {
+      const lpGlow = new THREE.Mesh(
+        new THREE.SphereGeometry(905, 32, 16),
+        lpGlowObj.material
+      );
+      scene.add(lpGlow);
+      let lpRatio = 0;
+      let lpVis = 1;
+      let lpVisBright = 1;
+      let lpMag = 22;
+      let lpGlowAmp = 0;
+      function computeSkyglow() {
+        lpRatio = params.has('lp')
+          ? +params.get('lp')
+          : sampleRatio(SKYGLOW, SKYGLOW_W, SKYGLOW_H, state.lat, state.lon);
+        lpVis = pointVisibility(lpRatio);
+        lpVisBright = 1 / Math.sqrt(1 + lpRatio);
+        lpMag = skyMag(lpRatio);
+        record(
+          'Falchi 2016 skyglow atlas',
+          'zenith ' +
+            lpMag.toFixed(2) +
+            ' mag/arcsec\u00b2 \u00b7 Bortle ' +
+            bortleClass(lpMag) +
+            ' \u00b7 star contrast \u00d7' +
+            lpVis.toFixed(2)
+        );
         const g = [];
         for (let i = 0; i < 16; i++)
           g.push(
@@ -3084,18 +3262,10 @@
             3
           );
         lpGlowObj.u.azTex.needsUpdate = true;
+        lpGlowAmp = THREE.MathUtils.clamp(Math.log10(1 + lpRatio) / 2.5, 0, 1);
+        lpGlow.visible = lpGlowAmp > 0.01;
       }
-      const lpGlowAmp = THREE.MathUtils.clamp(
-        Math.log10(1 + lpRatio) / 2.5,
-        0,
-        1
-      );
-      const lpGlow = new THREE.Mesh(
-        new THREE.SphereGeometry(905, 32, 16),
-        lpGlowObj.material
-      );
-      lpGlow.visible = lpGlowAmp > 0.01;
-      scene.add(lpGlow);
+      computeSkyglow();
 
       const SAT_DOT_N = 12;
       const satDots = [];
@@ -3338,8 +3508,9 @@
       }
       addEventListener('keydown', (e) => {
         // 'd' strafes once the free camera is engaged; use ?debug=1 or
-        // the shaderwall toggle for the panel then.
-        if (e.key === 'd' && !freeCam.on) setPanel(!panelOn);
+        // the shaderwall toggle for the panel then. Typing in the
+        // explore search box never toggles anything.
+        if (e.key === 'd' && !freeCam.on && !typing(e)) setPanel(!panelOn);
       });
       // Announce support for the site's ✦ wallpaper control.
       if (window.parent !== window) {
@@ -3348,6 +3519,150 @@
           location.origin
         );
       }
+
+      // ---------- explore (G / double-click / ?explore=1) ----------
+      // The wallpaper is one viewpoint on a world whose measured
+      // richness is uneven - explore.js curates the documented
+      // superlatives (each promise cited, each annotated by the
+      // repo's own Falchi-atlas and IGRF-14 models), and the
+      // open-meteo geocoder reaches everywhere else by name (its
+      // results get the same annotations). Relocation navigates to
+      // a pin-free URL (relocateURL, reference-gated): a clean
+      // re-boot in which every live source re-anchors and fetches
+      // the destination's REAL now.
+      const explore = document.getElementById('explore');
+      let exploreOn = false;
+      const typing = (e) => e.target && e.target.tagName === 'INPUT';
+      function relocate(dest) {
+        location.search = relocateURL(location.search, dest);
+      }
+      const fmtLL = (lat, lon) =>
+        Math.abs(lat).toFixed(2) +
+        (lat < 0 ? '°S ' : '°N ') +
+        Math.abs(lon).toFixed(2) +
+        (lon < 0 ? '°W' : '°E');
+      const noteFor = (lat, lon) => {
+        const a = annotate({lat, lon});
+        return (
+          'Bortle ' +
+          a.bortle +
+          ' · ' +
+          a.mag.toFixed(1) +
+          ' mag/as² · gmLat ' +
+          Math.round(a.gmLat) +
+          '°'
+        );
+      };
+      function destRow(title, note, why, go) {
+        const row = document.createElement('div');
+        row.className = 'dest';
+        const head = document.createElement('div');
+        head.textContent = title;
+        if (note) {
+          const n = document.createElement('span');
+          n.className = 'note';
+          n.textContent = '  ' + note;
+          head.appendChild(n);
+        }
+        row.appendChild(head);
+        if (why) {
+          const w = document.createElement('div');
+          w.className = 'why';
+          w.textContent = why;
+          row.appendChild(w);
+        }
+        row.addEventListener('click', go);
+        return row;
+      }
+      let searchSeq = 0;
+      function buildExplore() {
+        explore.replaceChildren();
+        const title = document.createElement('b');
+        title.textContent = 'EXPLORE · measured places, live data\n';
+        explore.appendChild(title);
+        const input = document.createElement('input');
+        input.placeholder = 'search anywhere on Earth…';
+        explore.appendChild(input);
+        const results = document.createElement('div');
+        explore.appendChild(results);
+        input.addEventListener('input', () => {
+          const q = input.value.trim();
+          const seq = ++searchSeq;
+          if (q.length < 2) {
+            results.replaceChildren();
+            return;
+          }
+          setTimeout(async () => {
+            if (seq !== searchSeq) return;
+            try {
+              const g = await (
+                await fetch(
+                  'https://geocoding-api.open-meteo.com/v1/search?count=6&language=en&format=json&name=' +
+                    encodeURIComponent(q),
+                  {credentials: 'omit'}
+                )
+              ).json();
+              if (seq !== searchSeq) return;
+              record(
+                'open-meteo geocoder',
+                q + ' → ' + (g.results?.length ?? 0) + ' places'
+              );
+              results.replaceChildren();
+              for (const r of g.results ?? []) {
+                results.appendChild(
+                  destRow(
+                    r.name +
+                      (r.admin1 ? ', ' + r.admin1 : '') +
+                      (r.country ? ' · ' + r.country : ''),
+                    noteFor(r.latitude, r.longitude),
+                    fmtLL(r.latitude, r.longitude),
+                    () =>
+                      relocate({
+                        name: r.name,
+                        lat: r.latitude,
+                        lon: r.longitude
+                      })
+                  )
+                );
+              }
+            } catch {
+              // Offline: the curated list below still works.
+            }
+          }, 350);
+        });
+        if (pinnedLoc) {
+          explore.appendChild(
+            destRow(
+              '⌂ your sky',
+              '',
+              'return home - the IP location decides again',
+              () => relocate(null)
+            )
+          );
+        }
+        for (const d of DESTINATIONS) {
+          explore.appendChild(
+            destRow(
+              d.name + ' · ' + fmtLL(d.lat, d.lon),
+              noteFor(d.lat, d.lon),
+              d.why + ' (' + d.cite + ')',
+              () => relocate(d)
+            )
+          );
+        }
+      }
+      function setExplore(on) {
+        exploreOn = on;
+        explore.hidden = !on;
+        if (on) buildExplore();
+      }
+      addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') setExplore(false);
+        if (typing(e)) return;
+        if (e.key === 'g') setExplore(!exploreOn);
+      });
+      canvas.addEventListener('dblclick', () => setExplore(!exploreOn));
+      if (params.get('explore') === '1') setExplore(true);
 
       // ---------- free camera ----------
       // Drag to look, WASD/arrows to fly (Shift for speed, R/F for
@@ -3420,13 +3735,152 @@
           'ShiftRight'
         ];
         addEventListener('keydown', (e) => {
-          if (freeCam.on && moveCodes.includes(e.code))
+          if (freeCam.on && moveCodes.includes(e.code) && !typing(e))
             freeCam.keys.add(e.code);
         });
         addEventListener('keyup', (e) => {
           freeCam.keys.delete(e.code);
         });
       }
+
+      // ---------- roam: terrain streaming under the free camera ----------
+      // The world is one re-anchorable box (roam.js): fly
+      // ROAM_TRIGGER_M metres from the anchor and the theme
+      // fetches a fresh DEM box centred on the camera's geodetic
+      // position, swaps it in with buildWorld() (the same call
+      // boot uses), and rewrites the camera EXACTLY - its
+      // geodetic point becomes the new origin (sceneToGeo /
+      // geoToScene are algebraic inverses, gated) and its
+      // absolute altitude survives the asinh datum change
+      // (elevOfY/yOfElev, gated). Every point-anchored live
+      // source then re-anchors: the /stream EventSource
+      // reconnects (initial ais/adsb snapshot repopulates the
+      // cleared pools), the cheap syncs re-fetch, the skyglow
+      // atlas re-samples, and the URL is rewritten through the
+      // same gated relocateURL the explore menu uses - reloading
+      // keeps the spot you walked to. Forest polygons and BRDF
+      // arrive async and dress the NEXT rebuild, exactly as at
+      // boot. ?roam=0 disables (harness shots never roam - the
+      // camera starts well inside the trigger ring).
+      const roam = {pending: false, notBefore: 0};
+      function clearLivePools() {
+        // Scene positions are relative to the old anchor; the
+        // objects themselves live on (same MMSI/hex) and re-apply
+        // idempotently from the next stream event or poll.
+        liveTraffic = null;
+        seenFlights.clear();
+        for (const a of airLights) {
+          a.active = false;
+          a.g.visible = false;
+        }
+        for (const s of shipPool) {
+          s.active = false;
+          s.g.visible = false;
+        }
+        for (const p of contrailPool) {
+          p.active = false;
+          p.mesh.visible = false;
+        }
+        for (const f of flashPool) {
+          f.active = false;
+          f.mesh.visible = false;
+        }
+      }
+      async function reanchor() {
+        roam.pending = true;
+        const geo = sceneToGeo(freeCam.pos.x, freeCam.pos.z, {
+          lat: state.lat,
+          lon: state.lon
+        });
+        try {
+          let dem;
+          try {
+            dem = await fetchDEMTiles(geo.lat, geo.lon);
+          } catch {
+            dem = await fetchDEM(geo.lat, geo.lon);
+          }
+          const altM = elevOfY(freeCam.pos.y, centerElev);
+          demData = dem;
+          state.lat = geo.lat;
+          state.lon = geo.lon;
+          state.place = '';
+          pinnedLoc = true; // geolocation must not snap us home
+          buildWorld(); // new centerElev, moments, water, trees
+          freeCam.pos.x = 0;
+          freeCam.pos.z = 0;
+          freeCam.pos.y = Math.max(
+            yOfElev(altM, centerElev),
+            sample(0, 0).y + 1.6
+          );
+          clearLivePools();
+          // Immediate: the point subscription and the pure local
+          // models. The API re-syncs wait for the camera to settle
+          // (settleDue below) - re-anchoring terrain every hop is
+          // free for upstreams, re-fetching eight sources per hop
+          // is not.
+          if (liveES) connectStream();
+          computeSkyglow();
+          syncGeomag();
+          roamDirty = true;
+          hopsSinceSync++;
+          // Roam is the same session walking: every param survives
+          // (pins included - unlike explore, which starts fresh),
+          // only the coordinates move. Gated in roam-reference.
+          history.replaceState(
+            null,
+            '',
+            roamURL(location.search, state.lat, state.lon)
+          );
+          const label =
+            Math.abs(state.lat).toFixed(3) +
+            (state.lat < 0 ? '°S ' : '°N ') +
+            Math.abs(state.lon).toFixed(3) +
+            (state.lon < 0 ? '°W' : '°E');
+          record('roam re-anchor', label + ' · live data re-anchored');
+          say('roamed to ' + label);
+          roam.notBefore = performance.now() + ROAM_COOLDOWN_MS;
+        } catch {
+          // Offline or unmappable (polar mercator): hold this box
+          // - the camera stays clamped to real data - retry later.
+          roam.notBefore = performance.now() + ROAM_RETRY_MS;
+        } finally {
+          roam.pending = false;
+        }
+      }
+      // The settle-gated re-syncs: everything anchored to a point
+      // that costs an upstream request. Runs once the camera rests
+      // (or after ROAM_FORCE_HOPS hops for a pilot who never stops).
+      let roamDirty = false;
+      let hopsSinceSync = 0;
+      let lastMoveMs = 0;
+      function runRoamSyncs() {
+        roamDirty = false;
+        hopsSinceSync = 0;
+        syncWeather();
+        syncMarine();
+        syncRadar();
+        syncAloft();
+        syncForests();
+        syncBrdf();
+        syncShips();
+        syncTraffic();
+      }
+      function maybeRoam(now, moved) {
+        if (moved) lastMoveMs = now;
+        if (!demData || params.get('roam') === '0') return;
+        const distM = Math.hypot(freeCam.pos.x, freeCam.pos.z) * MPU;
+        if (roamDecision(distM, roam, now) === 'go') reanchor();
+        if (settleDue(roamDirty, now - lastMoveMs, hopsSinceSync))
+          runRoamSyncs();
+      }
+      // Harness introspection (same precedent as __meteors).
+      window.__roam = {
+        freeCam,
+        roam,
+        get anchor() {
+          return {lat: state.lat, lon: state.lon};
+        }
+      };
 
       // ---------- pointer parallax (forwarded by footer.js) ----------
       const look = {x: 0, y: 0};
@@ -3666,7 +4120,7 @@
         // (2% contrast at V). Fog codes need no special-casing - a foggy
         // hour reports a short visibility by itself.
         aerialU.uFogDensity.value =
-          1.98 / (Math.max(state.visibility, 400) / 57.14) + cloudy * 0.001;
+          1.98 / (Math.max(state.visibility, 400) / MPU) + cloudy * 0.001;
 
         // A real solar eclipse dims the direct light by its obscuration.
         const ecl = astro.eclipse || 0;
@@ -3912,7 +4366,7 @@
           const dayHigh =
             THREE.MathUtils.clamp((sun.alt / RAD + 8) / 8, 0, 1) *
             (1 - cloudy * 0.9);
-          const drift = (state.wind250 ?? 0) / 3.6 / 57.14;
+          const drift = (state.wind250 ?? 0) / 3.6 / MPU;
           for (const p of contrailPool) {
             if (p.active) {
               p.t += dt;
@@ -3975,7 +4429,7 @@
             const arcs = lightArcs(rel);
             const dM =
               Math.hypot(camera.position.x - s.x, camera.position.z - s.z) *
-              57.14;
+              MPU;
             for (const k in s.lights) {
               const dot = s.lights[k];
               if (!shipLightsOn || !arcs[k]) {
@@ -4036,7 +4490,7 @@
             const arcs = lightArcsAir(rel);
             const horizM =
               Math.hypot(camera.position.x - a.x, camera.position.z - a.z) *
-              57.14;
+              MPU;
             const slantM = Math.max(
               Math.hypot(horizM, Math.max(a.altM - centerElev, 0)),
               200
@@ -4742,6 +5196,10 @@
           freeCam.pos.z = THREE.MathUtils.clamp(freeCam.pos.z + mz, -130, 130);
           const ground = sample(freeCam.pos.x, freeCam.pos.z).y + 1.6;
           freeCam.pos.y = THREE.MathUtils.clamp(freeCam.pos.y + my, ground, 95);
+          // Past the trigger ring the world re-anchors under you
+          // (roam block above); the clamp only ever bites while a
+          // fetch is pending or failed - always inside real data.
+          maybeRoam(t, mx !== 0 || my !== 0 || mz !== 0);
           camera.position.set(
             freeCam.pos.x + shakeX,
             freeCam.pos.y + shakeY,
