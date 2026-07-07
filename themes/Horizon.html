@@ -105,7 +105,7 @@
         weather code), quake (magnitude), kp (0-9), aurora (0-1),
         auroralat (deg), dem=0 (skip real terrain), demtiles=URL
         (terrarium tile endpoint override), roam=0 (pin the box),
-        debug=1
+        space=URL (solar-wind endpoint override), debug=1
     -->
     <style>
       html,
@@ -318,6 +318,7 @@
         treeCandidates,
         yOfElev
       } from './horizon/roam.js';
+      import {hpScale} from './horizon/solarwind.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -450,6 +451,8 @@
         kp: params.has('kp') ? +params.get('kp') : 0,
         auroraP: null, // OVATION oval probability 0..1, null = use Kp
         auroraLat: 68,
+        hpNow: null, // OVATION hemispheric power, GW (live, 5 min)
+        hpAtGrid: null, // ...as it was when the oval grid was fetched
         sea: null, // measured wave partitions (marine model), null = wind sea
         shake: 0
       };
@@ -1260,12 +1263,72 @@
           }
           state.auroraP = best / 100;
           state.auroraLat = bestLat;
+          // Rebase the live hemispheric-power scaling: this grid
+          // embodies HP as of NOW, so the ratio restarts at 1.
+          state.hpAtGrid = state.hpNow;
           record(
             'NOAA OVATION aurora oval',
             best + '% at lat ' + bestLat + '° on this meridian'
           );
         } catch {
           state.auroraP = null; // fall back to the Kp heuristic
+        }
+      }
+
+      // The aurora's driver, measured 1.5 million km upwind:
+      // DSCOVR/ACE at L1 via the horizon-live daemon (/solarwind
+      // + the `space` stream event) - solar wind speed and IMF
+      // By/Bz already propagated to the bow shock by SWPC, the
+      // Newell 2007 coupling computed by the gated solarwind.js,
+      // and OVATION's hemispheric power (GW, 5-minute cadence).
+      // Between 30-minute oval refreshes the curtain scales by
+      // HP(now)/HP(at grid) - emission is linear in precipitating
+      // power for a fixed spectrum (Rees 1989 ch. 3), and this is
+      // the measured evolution of the SAME model that draws the
+      // oval. The propagated time is a real physical lead: the
+      // panel can say what the sky will do before it does it.
+      const SPACE_PROXY =
+        params.get('space') ?? 'https://api.ndev.tk/solarwind';
+      function applySpace(j) {
+        if (j.hp) {
+          state.hpNow = state.lat < 0 ? j.hp.south : j.hp.north;
+          record(
+            'OVATION hemispheric power',
+            j.hp.north +
+              ' GW N / ' +
+              j.hp.south +
+              ' GW S' +
+              (state.hpAtGrid
+                ? ' · curtain ×' +
+                  hpScale(state.hpNow, state.hpAtGrid).toFixed(2) +
+                  ' since the oval grid'
+                : '')
+          );
+        }
+        if (j.wind) {
+          const lead = (Date.parse(j.wind.propagatedTime) - Date.now()) / 60000;
+          record(
+            'DSCOVR/ACE solar wind (L1)',
+            j.wind.speed.toFixed(0) +
+              ' km/s · Bz ' +
+              (j.wind.bz > 0 ? '+' : '') +
+              j.wind.bz.toFixed(1) +
+              ' nT · Newell coupling ' +
+              Math.round(j.wind.coupling) +
+              (Number.isFinite(lead) && lead > 0
+                ? ' · strikes the magnetosphere in ' + lead.toFixed(0) + ' min'
+                : ' · driving the magnetosphere now')
+          );
+        }
+      }
+      async function syncSpace() {
+        try {
+          const j = await (
+            await fetch(SPACE_PROXY, {credentials: 'omit'})
+          ).json();
+          applySpace(j);
+        } catch {
+          // Stream event or the next poll refreshes it.
         }
       }
 
@@ -2804,6 +2867,13 @@
           try {
             const j = JSON.parse(ev.data);
             if (Array.isArray(j.ac)) applyTraffic(j.ac);
+          } catch {
+            // malformed event
+          }
+        });
+        liveES.addEventListener('space', (ev) => {
+          try {
+            applySpace(JSON.parse(ev.data));
           } catch {
             // malformed event
           }
@@ -4705,8 +4775,20 @@
           150 - (ovalKm * ovalKm) / 12742,
           Math.max(ovalKm, 60)
         );
+        // Live hemispheric power scales the curtain between oval
+        // refreshes (linear in precipitating power, gated hpScale;
+        // rebased to 1 whenever a fresh grid lands). Pinned aurora
+        // stays pinned; the product is clamped at the full-curtain
+        // display level the theme was designed around.
+        const hpK =
+          params.has('aurora') || state.auroraP === null
+            ? 1
+            : hpScale(state.hpNow, state.hpAtGrid);
         auroraU.strength.value =
-          auroraP * nightSky * (1 - cloudy * 0.7) * (elevA > 0.035 ? 1 : 0);
+          Math.min(auroraP * hpK, 1) *
+          nightSky *
+          (1 - cloudy * 0.7) *
+          (elevA > 0.035 ? 1 : 0);
         auroraU.time.value = t / 1000;
         // Characteristic energy for the emission LUT: the public
         // OVATION product carries probability, not spectra, so this
@@ -5352,6 +5434,8 @@
         setInterval(syncKp, 15 * 60 * 1000);
         syncOvation();
         setInterval(syncOvation, 30 * 60 * 1000);
+        syncSpace();
+        setInterval(syncSpace, 5 * 60 * 1000);
         syncISS();
         setInterval(syncISS, 6 * 60 * 60 * 1000);
         syncFleet();

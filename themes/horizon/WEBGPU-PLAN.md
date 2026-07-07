@@ -2037,17 +2037,47 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
        relocateURL) and only moves the coordinates, dropping the
        stale place label. Landmarked; reload mid-walk now
        reproduces the session exactly.
-       SERVER (same pass): SSE backpressure - a stalled client
-       (zero TCP window) used to buffer events in daemon RAM without
-       bound for its 30-minute lifetime, and one broken client's
-       write throw ABORTED the strike fanout loop for every client
-       after it (real bug). Now: per-client write isolation in the
-       fanout + overBackpressure(SSE_BUFFER_MAX = 256 KiB) drops
-       slow readers on every write path (strike/ais/adsb/heartbeat);
-       EventSource reconnects healthy clients. New 'SSE backpressure'
-       landmark (boundary exact, 36x the largest real ais frame,
-       6.6 MB worst case across SSE_MAX). Gate now 30 sets: roam 9
-       landmarks, server 12.
+    SERVER (same pass): SSE backpressure - a stalled client
+    (zero TCP window) used to buffer events in daemon RAM without
+    bound for its 30-minute lifetime, and one broken client's
+    write throw ABORTED the strike fanout loop for every client
+    after it (real bug). Now: per-client write isolation in the
+    fanout + overBackpressure(SSE_BUFFER_MAX = 256 KiB) drops
+    slow readers on every write path (strike/ais/adsb/heartbeat);
+    EventSource reconnects healthy clients. New 'SSE backpressure'
+    landmark (boundary exact, 36x the largest real ais frame,
+    6.6 MB worst case across SSE_MAX). Gate now 30 sets: roam 9
+    landmarks, server 12.
+  - DONE: solar-wind aurora - the curtain's driver becomes a
+    MEASUREMENT taken 1.5 million km upwind. New single source
+    solarwind.js (daemon + theme + reference; install.sh ships it
+    beside the daemon like lightning.js) + solarwind-reference.mjs
+    (gate set 31, 4 landmarks): Newell et al. 2007 coupling
+    dPhi/dt = v^(4/3) B_T^(2/3) sin^(8/3)(theta_c/2) held to its
+    own closed form (northward IMF EXACTLY zero - the merging
+    valve; 4/3 and 2/3 exponents by scaling law; clock-angle
+    symmetry; storm/quiet 8.2x), wire parsers for both SWPC
+    formats against fixtures captured LIVE from the real
+    endpoints 2026-07-07 (column-shuffled variant proves
+    name-keyed parsing; +null==0 gap bug caught by the null-row
+    fixture), hpScale rebase clamped [0.25, 4]. Daemon: one 60 s
+    poll of SWPC's propagated-solar-wind (DSCOVR/ACE at L1,
+    propagated_time_tag = the real ballistic lead) + OVATION
+    hemispheric power serves every visitor - GET /solarwind and
+    the `space` event on /stream (60 s + on connect), /health
+    grows a space block. VERIFIED LIVE in this container: local
+    daemon served wind sampled 02:20 UT arriving at the bow shock
+    03:07:43 (47 min of genuine foreknowledge), coupling 1736,
+    HP 14/15 GW. Theme: applySpace via stream event + 5 min poll
+    (?space=URL override, kept across relocations); the curtain
+    scales by hpScale(HP now / HP at grid) between 30-min OVATION
+    refreshes - emission is linear in precipitating power for a
+    fixed spectrum (Rees 1989 ch. 3), and this is the measured
+    evolution of the SAME model that draws the oval, rebased to 1
+    at every fresh grid; pinned ?aurora stays pinned; product
+    clamped at the designed full-curtain level. The provenance
+    panel now says "strikes the magnetosphere in N min" - the
+    wallpaper knows before the sky does.
   - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
     drift now also manifests as a PER-FRAME uncaught TypeError -
     GPUTexture.createView rejects the `swizzle` field three's
