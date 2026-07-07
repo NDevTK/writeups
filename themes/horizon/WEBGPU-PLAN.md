@@ -1918,6 +1918,39 @@ Scenes (all at Grindelwald unless noted):
     only sheds foreign-Origin load at the edge. install.sh stops
     shipping the worker and removes /opt/horizon-live/worker;
     update.sh no longer watches the deleted path.
+  - DONE: explore - the wallpaper stops being one fixed viewpoint
+    (owner: "limited view, no option to explore; some places have
+    more data sources and frontier research than others"). New
+    single source explore.js + explore-reference.mjs (gate set 28,
+    4 landmarks): DESTINATIONS is a menu of documented measured
+    superlatives - Dover Strait (busiest lane: COLREGS ships +
+    contrails), Tromso (IGRF-14 gmLat 67.5 deg, the one entry in
+    the 64-70 deg auroral zone - landmarked), Cerro Paranal
+    (floors the shipped Falchi atlas exactly: ratio 0 -> 22.00
+    mag/arcsec^2 -> Bortle 1, landmarked as the ensemble's dark
+    pole with Singapore Strait the bright pole at Bortle 7), Lake
+    Maracaibo (Albrecht et al. 2016 LIS/OTD: 233 fl/km^2/yr,
+    Blitzortung live), Grindelwald (relief), Galicia 43N 8W (the
+    exact point eclipses-reference proves at 100.0% obscuration
+    2026-08-12), Mauna Kea. Each menu row is ANNOTATED by the
+    repo's own gated models (Falchi Bortle/mag + IGRF gmLat), not
+    prose - and so is every open-meteo geocoder search result
+    (search anywhere by name; new remote API, recorded in the
+    provenance panel). Relocation is a clean re-boot via
+    relocateURL (landmarked hygiene): weather pins die,
+    infrastructure params (debug/dem/adsb/ais/live/tles) survive,
+    4 dp coords + place label. KEY SEMANTIC FIX: lat/lon left the
+    `overridden` pin list (now WEATHER_PINS, exported from
+    explore.js - the theme imports it, single source): a pinned
+    LOCATION now loads that place's REAL weather/sea/radar; it
+    only skips the IP geolocation. Harness pins are unaffected
+    (every pinned scene also pins cloud/code). UI: G key /
+    double-click / ?explore=1, Escape closes; typing guards so
+    the search box never trips the D-panel or free-cam keys.
+    Verified in real Chromium (WebGPU, Xvfb): overlay builds 9
+    rows with annotations byte-identical to the reference values,
+    G toggles, guards hold; only the documented environmental
+    Dawn texture spam (OPEN below) in the log.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
