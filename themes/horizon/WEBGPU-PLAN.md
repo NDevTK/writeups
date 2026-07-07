@@ -1898,26 +1898,26 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   - DONE: security review (owner-directed). The Cloudflare worker
     code is DELETED (themes/horizon/worker + worker-reference.mjs
     - git history holds it): the daemon is the EventSource server
-    proper, not a bolt-on, so the schema normalizers (readsb
-    strip, ITU-R M.1371 sentinels, aisBox geodesy) moved into
-    server/src/index.mjs and their landmarks into
-    server-reference.mjs ('normalizers (ex-worker)' - the gate
-    never lost them; validate.sh runs 27 sets). The legacy
-    /lightning/stream route is gone (the unified /stream carries
-    strikes). "why" leak: audited - the daemon never exposed
-    error internals (that leak lived only in the deleted worker's
-    /ais 502 body); all daemon error bodies are generic, gated by
-    the server set. Every response now carries
-    content-security-policy: sandbox + x-content-type-options:
-    nosniff (SEC_HEADERS, spread first in head(); new 'security
-    headers' landmark asserts exactly these two). Caddy-level
-    origin list: answered in server/README.md - the daemon check
-    is authoritative because it is pure, exported and
-    reference-gated (and guards loopback); Caddyfile.example
-    gained an OPTIONAL commented belt-and-braces matcher that
-    only sheds foreign-Origin load at the edge. install.sh stops
-    shipping the worker and removes /opt/horizon-live/worker;
-    update.sh no longer watches the deleted path.
+      proper, not a bolt-on, so the schema normalizers (readsb
+      strip, ITU-R M.1371 sentinels, aisBox geodesy) moved into
+      server/src/index.mjs and their landmarks into
+      server-reference.mjs ('normalizers (ex-worker)' - the gate
+      never lost them; validate.sh runs 27 sets). The legacy
+      /lightning/stream route is gone (the unified /stream carries
+      strikes). "why" leak: audited - the daemon never exposed
+      error internals (that leak lived only in the deleted worker's
+      /ais 502 body); all daemon error bodies are generic, gated by
+      the server set. Every response now carries
+      content-security-policy: sandbox + x-content-type-options:
+      nosniff (SEC_HEADERS, spread first in head(); new 'security
+      headers' landmark asserts exactly these two). Caddy-level
+      origin list: answered in server/README.md - the daemon check
+      is authoritative because it is pure, exported and
+      reference-gated (and guards loopback); Caddyfile.example
+      gained an OPTIONAL commented belt-and-braces matcher that
+      only sheds foreign-Origin load at the edge. install.sh stops
+      shipping the worker and removes /opt/horizon-live/worker;
+      update.sh no longer watches the deleted path.
   - OPEN (environment, not code): today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
