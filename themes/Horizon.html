@@ -2143,8 +2143,8 @@
       // with its REAL position, altitude, track and speed;
       // Schmidt-Appleman still decides whether the trail exists.
       // Unreachable daemon (offline harness): the ambient traffic
-      // above stands in. ?adsb=URL overrides (e.g. the retired
-      // horizon-adsb worker, kept as documented fallback).
+      // above stands in. ?adsb=URL overrides (the harness points
+      // it at fixture vectors).
       const ADSB_PROXY = params.get('adsb') ?? 'https://api.ndev.tk/adsb';
       let liveTraffic = null; // queue of unclaimed cruise snapshots
       const seenFlights = new Map(); // hex -> last spawn ms
@@ -3928,7 +3928,7 @@
               }
             } else if (ct.forms && dayHigh > 0.02) {
               // REAL aircraft claim free slots first (live ADS-B
-              // via the worker); otherwise the ambient-traffic
+              // via the daemon); otherwise the ambient-traffic
               // cadence (documented display choice: a new transit
               // every ~75 s; the harness override spawns fast so a
               // pinned shot catches one).

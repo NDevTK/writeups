@@ -13,4 +13,17 @@
 live.example.com {
 	reverse_proxy 127.0.0.1:8127
 	encode gzip
+
+	# OPTIONAL belt-and-braces: shed foreign-Origin browser traffic
+	# at the edge before it reaches node. The daemon performs the
+	# authoritative, reference-gated origin check either way (and
+	# must - this matcher can't be gated and doesn't guard direct
+	# loopback access), so uncommenting this only saves the proxy
+	# hop for rejected requests. Keep the list in lockstep with
+	# ALLOW_ORIGIN in /etc/horizon-live.env.
+	#@foreignOrigin {
+	#	header Origin *
+	#	not header Origin https://ndevtk.github.io
+	#}
+	#respond @foreignOrigin 403
 }

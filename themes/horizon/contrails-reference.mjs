@@ -111,7 +111,7 @@ const check = (name, ok, detail) => {
 }
 
 {
-  // Live-aircraft mapping (the Cloudflare worker feed): exact unit
+  // Live-aircraft mapping (the horizon-live daemon feed): exact unit
   // constants; an aircraft AT the reference point maps to the
   // scene origin at the asinh-compressed altitude; a due-east
   // track moves +x only at the exact converted ground speed; the

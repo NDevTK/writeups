@@ -4,9 +4,9 @@
  * (ships-reference.mjs).
  *
  * The vessels are MEASURED: live AIS position reports around the
- * visitor via the horizon-adsb Cloudflare worker (/ais route:
- * aisstream.io over WebSocket, the API key held as a worker
- * secret - their terms forbid exposing it to browsers, which a
+ * visitor via the horizon-live daemon (/ais route: aisstream.io
+ * over the daemon's persistent WebSocket, the API key held on the
+ * box - their terms forbid exposing it to browsers, which a
  * static site could never honour). What this module owns is the
  * PHYSICS of seeing a ship:
  *
@@ -36,7 +36,7 @@
  *    the standard refraction + semidiameter horizon.
  *
  * Kinematics: AIS SOG is in knots over ground, COG/heading in
- * degrees true (ITU-R M.1371 sentinels handled worker-side).
+ * degrees true (ITU-R M.1371 sentinels handled daemon-side).
  * The scene mapping mirrors the aircraft path (equirectangular
  * offsets, exact international knot).
  */
