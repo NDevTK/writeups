@@ -87,6 +87,11 @@ IP.
 - Error responses are generic (`bad gateway`, `not found`, …) —
   no upstream error text, stack traces or internal state ever
   reaches a client. Diagnostics go to the journal and `/health`.
+- SSE backpressure: a stalled stream client (zero TCP window) is
+  disconnected once its socket buffer exceeds `SSE_BUFFER_MAX`
+  (256 KiB, reference-gated) — slow readers cannot grow the
+  daemon's memory, and one broken client can never abort the
+  strike fanout to the rest (per-client write isolation).
 - Why the origin allowlist lives in the daemon, not in Caddy: the
   daemon's check is pure, exported and reference-gated — the gate
   proves exact-echo/403/no-grant behaviour on every deploy, which

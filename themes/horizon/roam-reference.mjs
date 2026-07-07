@@ -14,12 +14,20 @@ import {
   WORLD,
   MPU,
   M_LAT,
+  MICRO_M,
   ROAM_TRIGGER_M,
+  ROAM_SETTLE_MS,
+  ROAM_FORCE_HOPS,
+  TREE_CELL_M,
   geoToScene,
   sceneToGeo,
   yOfElev,
   elevOfY,
-  roamDecision
+  microRelief,
+  roamDecision,
+  roamURL,
+  settleDue,
+  treeCandidates
 } from './roam.js';
 import {aisToScene, KT_MS} from './ships.js';
 import {adsbToScene} from './contrails.js';
@@ -193,6 +201,121 @@ const REF = (lat, lon) => ({
       margin === ROAM_TRIGGER_M &&
       130 * MPU < DEM_HALF_M,
     `stay below ${ROAM_TRIGGER_M} m, go at it, wait while pending, cooldown until notBefore; ${margin} m of data beyond the trigger; clamp ${(130 * MPU).toFixed(0)} m < box ${DEM_HALF_M} m`
+  );
+}
+
+{
+  // Earth-anchored micro-relief: the SAME geodetic point must
+  // dress the same from ANY box. Two anchors 3 km apart render an
+  // overlapping strip - the noise there agrees to the roundtrip
+  // epsilon, its wavelength is the theme's historic 400 m
+  // (MICRO_M === 7*MPU exactly), and the field actually varies
+  // (mean near 0.5, spread over the box).
+  const A = {lat: 46.62, lon: 8.04};
+  const gB = sceneToGeo(35, 35, A); // ~2.8 km away
+  const B = {lat: gB.lat, lon: gB.lon};
+  let worst = 0;
+  const vals = [];
+  for (let k = 0; k < 200; k++) {
+    const x = ((k * 37) % 100) - 50;
+    const z = ((k * 61) % 100) - 50;
+    const g = sceneToGeo(x, z, A);
+    const sB = geoToScene(g.lat, g.lon, B);
+    const rA = microRelief(x, z, A);
+    const rB = microRelief(sB.x, sB.z, B);
+    worst = Math.max(worst, Math.abs(rA - rB));
+    vals.push(rA);
+  }
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const spread = Math.max(...vals) - Math.min(...vals);
+  check(
+    'earth-anchored micro-relief',
+    worst < 1e-9 &&
+      MICRO_M === 7 * MPU &&
+      vals.every((v) => v >= 0 && v <= 1) &&
+      Math.abs(mean - 0.5) < 0.1 &&
+      spread > 0.3,
+    `200 overlap points agree to ${worst.toExponential(1)} across a 2.8 km re-anchor; MICRO_M = 7*MPU = ${MICRO_M} m exactly; range [0,1], mean ${mean.toFixed(3)}, spread ${spread.toFixed(2)}`
+  );
+}
+
+{
+  // Earth-anchored trees: candidates are keyed by fixed geodetic
+  // cells, so two overlapping boxes grow IDENTICAL trees where
+  // they overlap (bit-exact positions and per-tree uniforms), the
+  // set is deterministic, everything respects the box margin, and
+  // the cos(lat) acceptance holds areal density flat: candidates
+  // per km² at 60° match the equator.
+  const A = {lat: 46.62, lon: 8.04};
+  const gB = sceneToGeo(30, 30, A);
+  const B = {lat: gB.lat, lon: gB.lon};
+  const setA = treeCandidates(A);
+  const setB = treeCandidates(B);
+  const idx = (list) => new Map(list.map((c) => [c.lat + ':' + c.lon, c]));
+  const mapB = idx(setB);
+  let shared = 0;
+  let exact = true;
+  for (const c of setA) {
+    const m = mapB.get(c.lat + ':' + c.lon);
+    if (!m) continue;
+    shared++;
+    if (m.key !== c.key || m.r.some((v, i) => v !== c.r[i])) exact = false;
+  }
+  const again = treeCandidates(A);
+  const deterministic =
+    again.length === setA.length &&
+    again.every((c, i) => c.lat === setA[i].lat && c.lon === setA[i].lon);
+  const lim = (WORLD - 40) / 2;
+  const inBox = setA.every((c) => Math.abs(c.x) <= lim && Math.abs(c.z) <= lim);
+  const areaKm2 = ((2 * lim * MPU) / 1000) ** 2;
+  const d0 = treeCandidates({lat: 0, lon: 0}).length / areaKm2;
+  const d60 = treeCandidates({lat: 60, lon: 0}).length / areaKm2;
+  check(
+    'earth-anchored trees',
+    shared > 100 &&
+      exact &&
+      deterministic &&
+      inBox &&
+      Math.abs(d60 / d0 - 1) < 0.1,
+    `${shared} candidates shared across a 2.4 km re-anchor, all bit-exact (position + uniforms); deterministic; margin held; density ${d0.toFixed(1)} vs ${d60.toFixed(1)} per km² at 0°/60° (cos acceptance)`
+  );
+}
+
+{
+  // roam URL: the same session walking - EVERYTHING survives
+  // (weather pins, time pin, infra) except the stale place label;
+  // only the coordinates move (4 dp). Idempotent. This is the
+  // deliberate opposite of explore's relocateURL, which drops
+  // pins because a destination means that place's real now.
+  const s = '?cloud=90&time=2026-01-01T00:00&debug=1&lat=1&lon=2&place=Old';
+  const once = roamURL(s, 46.5822, 8.04);
+  const twice = roamURL(once, 46.5822, 8.04);
+  const p = new URLSearchParams(once);
+  check(
+    'roam URL',
+    p.get('lat') === '46.5822' &&
+      p.get('lon') === '8.0400' &&
+      p.get('cloud') === '90' &&
+      p.get('time') === '2026-01-01T00:00' &&
+      p.get('debug') === '1' &&
+      !p.has('place') &&
+      once === twice,
+    `coords -> 46.5822/8.0400; cloud/time/debug pins survive the walk; place dropped; idempotent`
+  );
+}
+
+{
+  // Settle gate: terrain re-anchors per hop but API re-syncs wait
+  // for the camera to rest (ROAM_SETTLE_MS) - unless the pilot
+  // never stops, where ROAM_FORCE_HOPS caps the staleness.
+  check(
+    'settle gate',
+    settleDue(false, 1e9, 1e9) === false &&
+      settleDue(true, ROAM_SETTLE_MS - 1, 0) === false &&
+      settleDue(true, ROAM_SETTLE_MS, 0) === true &&
+      settleDue(true, 0, ROAM_FORCE_HOPS - 1) === false &&
+      settleDue(true, 0, ROAM_FORCE_HOPS) === true,
+    `clean never fires; fires at ${ROAM_SETTLE_MS} ms idle or ${ROAM_FORCE_HOPS} hops while moving`
   );
 }
 

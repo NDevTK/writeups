@@ -34,9 +34,11 @@ import {
   aisBox,
   normalize,
   normalizeShip,
+  overBackpressure,
   query,
   queryStrikes,
   SEC_HEADERS,
+  SSE_BUFFER_MAX,
   sseEvent
 } from './server/src/index.mjs';
 
@@ -305,6 +307,35 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     'SSE framing',
     ev === 'event: strike\ndata: {"km":12}\n\n',
     JSON.stringify(ev) + ' - spec-exact named event'
+  );
+}
+
+{
+  // SSE backpressure: a stalled client is dropped once its socket
+  // buffer exceeds SSE_BUFFER_MAX - never at or below it. The
+  // budget sits far above any single event (a full 80-ship ais
+  // frame is a few KB) and far below what a 1 GB box can afford
+  // times SSE_MAX concurrent streams.
+  const bigEvent = sseEvent('ais', {
+    ships: Array.from({length: 80}, () => ({
+      lat: 51.123456,
+      lon: 1.123456,
+      sog: 12.3,
+      cog: 234.5,
+      hdg: 234,
+      mmsi: 235123456,
+      name: 'LONGISH SHIP NAME'
+    }))
+  }).length;
+  check(
+    'SSE backpressure',
+    overBackpressure(SSE_BUFFER_MAX) === false &&
+      overBackpressure(SSE_BUFFER_MAX + 1) === true &&
+      overBackpressure(0) === false &&
+      overBackpressure(SSE_BUFFER_MAX, 100) === true &&
+      SSE_BUFFER_MAX >= 20 * bigEvent &&
+      SSE_BUFFER_MAX * 25 <= 64e6,
+    `drop strictly above ${SSE_BUFFER_MAX} B; ${Math.floor(SSE_BUFFER_MAX / bigEvent)}x the largest real event (${bigEvent} B); worst case ${((SSE_BUFFER_MAX * 25) / 1e6).toFixed(1)} MB across SSE_MAX streams`
   );
 }
 

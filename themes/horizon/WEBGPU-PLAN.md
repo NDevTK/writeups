@@ -1995,6 +1995,59 @@ Scenes (all at Grindelwald unless noted):
     URL rewrite and panel provenance all firing (smoke needed a
     fixture-side GPUTexture.createView swizzle shim - see the
     updated OPEN note).
+  - DONE: quality hardening pass (owner-directed: "before
+    continuing with frontier research/data sources spend time for
+    client and server to ensure it's a high standard") - the four
+    gaps named in the roam design review, closed:
+    1. EARTH-ANCHORED DRESSING (the approximation that mattered):
+       micro-relief moved from scene-space fbm(x/7) to
+       roam.microRelief - the theme's exact octave weights
+       (0.55/0.27/0.13/0.05 at 1/2.1/4.3/8.9) over period-free 3D
+       value noise ON THE EARTH SPHERE at the historic 400 m base
+       wavelength (MICRO_M === 7*MPU exactly). 3D-on-the-sphere
+       because any 2D unrolling shears somewhere (lon*cos(lat)
+       drifts lonRad*sin(lat) metres of texture per metre walked
+       north - 21:1 streaks at 170E). Trees moved from a
+       scene-space RNG to roam.treeCandidates: fixed geodetic
+       cells (150 m), one hash-deterministic candidate each
+       (position jitter, species, size, sway phase), cos(lat)
+       acceptance holds areal density flat, hash-sorted so the
+       140-tree display budget picks a deterministic, spatially
+       unbiased subset. OSM forest polygons now stored GEODETIC
+       and projected per box (the old scene-space rings were
+       orphaned by every hop). Landmarked: 200 overlap points
+       agree to 0.0 across a 2.8 km re-anchor; 6435 shared tree
+       candidates bit-exact (position + uniforms); density 44.5
+       vs 44.4 /km² at 0/60 deg; MICRO_M identity.
+    2. SETTLE-GATED SYNCS: a hop re-anchors terrain, the stream
+       and the pure local models (skyglow, IGRF) immediately, but
+       the eight API re-syncs wait for the camera to REST
+       (ROAM_SETTLE_MS = 4 s) with ROAM_FORCE_HOPS = 3 as the
+       staleness backstop for a pilot who never stops - no more
+       ~1 req/s against third parties during a long flight.
+       settleDue landmarked.
+    3. FOREST RACE: syncForests no longer triggers a full
+       buildWorld - placeTrees() (extracted, re-runnable)
+       re-dresses the standing terrain when polygons arrive, and
+       geodetic storage means late data can never land in the
+       wrong box.
+    4. ROAM URL SEMANTICS: roam is the same session walking, so
+       roamURL keeps EVERY param (time and weather pins included -
+       the deliberate opposite of explore's fresh-start
+       relocateURL) and only moves the coordinates, dropping the
+       stale place label. Landmarked; reload mid-walk now
+       reproduces the session exactly.
+    SERVER (same pass): SSE backpressure - a stalled client
+    (zero TCP window) used to buffer events in daemon RAM without
+    bound for its 30-minute lifetime, and one broken client's
+    write throw ABORTED the strike fanout loop for every client
+    after it (real bug). Now: per-client write isolation in the
+    fanout + overBackpressure(SSE_BUFFER_MAX = 256 KiB) drops
+    slow readers on every write path (strike/ais/adsb/heartbeat);
+    EventSource reconnects healthy clients. New 'SSE backpressure'
+    landmark (boundary exact, 36x the largest real ais frame,
+    6.6 MB worst case across SSE_MAX). Gate now 30 sets: roam 9
+    landmarks, server 12.
   - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
     drift now also manifests as a PER-FRAME uncaught TypeError -
     GPUTexture.createView rejects the `swizzle` field three's

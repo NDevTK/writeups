@@ -308,10 +308,14 @@
         WORLD,
         elevOfY,
         geoToScene,
+        microRelief,
         roamDecision,
+        roamURL,
         ROAM_COOLDOWN_MS,
         ROAM_RETRY_MS,
         sceneToGeo,
+        settleDue,
+        treeCandidates,
         yOfElev
       } from './horizon/roam.js';
       import {lineStrengths} from './horizon/airglow.js';
@@ -959,19 +963,26 @@
 
       // Real forests: OSM wood/forest polygons around the visitor decide
       // where trees stand (scene-space polygons, cached per location).
-      let forestPolys = null;
+      // OSM wood polygons, stored GEODETIC ([lat, lon] rings) so a
+      // roam re-anchor cannot orphan them; placeTrees() projects
+      // them onto whatever box is current (forestScene).
+      let forestGeo = null;
+      let forestScene = null;
       async function syncForests() {
         const key =
-          'horizon-forest-' + state.lat.toFixed(2) + ',' + state.lon.toFixed(2);
+          'horizon-forest-geo-' +
+          state.lat.toFixed(2) +
+          ',' +
+          state.lon.toFixed(2);
         try {
           const hit = localStorage.getItem(key);
           if (hit) {
-            forestPolys = JSON.parse(hit);
+            forestGeo = JSON.parse(hit);
             record(
               'OSM Overpass forests (cached)',
-              forestPolys.length + ' wood polygons'
+              forestGeo.length + ' wood polygons'
             );
-            buildWorld();
+            if (worldBuilt) placeTrees();
             return;
           }
         } catch {}
@@ -1013,21 +1024,23 @@
             }
           }
           if (!osm) throw new Error('overpass unavailable');
-          forestPolys = osm.elements
+          // Stored geodetic (4 dp ~= 11 m, finer than the 30 m DEM):
+          // the rings survive any number of re-anchors and are
+          // projected per box in placeTrees().
+          forestGeo = osm.elements
             .filter((w) => w.geometry && w.geometry.length > 3)
             .map((w) =>
-              w.geometry.map((g) => [
-                +(((g.lon - state.lon) / (2 * dLon)) * WORLD).toFixed(1),
-                +((-(g.lat - state.lat) / (2 * dLat)) * WORLD).toFixed(1)
-              ])
+              w.geometry.map((g) => [+g.lat.toFixed(4), +g.lon.toFixed(4)])
             );
-          record('OSM Overpass forests', forestPolys.length + ' wood polygons');
+          record('OSM Overpass forests', forestGeo.length + ' wood polygons');
           try {
-            localStorage.setItem(key, JSON.stringify(forestPolys));
+            localStorage.setItem(key, JSON.stringify(forestGeo));
           } catch {}
-          buildWorld(); // replant where the real woods are
+          // Replant where the real woods are - trees only, the
+          // standing terrain is untouched.
+          if (worldBuilt) placeTrees();
         } catch {
-          forestPolys = null; // procedural scatter stays
+          forestGeo = null; // procedural scatter stays
         }
       }
 
@@ -1142,8 +1155,8 @@
       }
 
       function inForest(x, z) {
-        if (!forestPolys || !forestPolys.length) return true;
-        for (const poly of forestPolys) {
+        if (!forestScene || !forestScene.length) return true;
+        for (const poly of forestScene) {
           let inside = false;
           for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
             const xi = poly[i][0];
@@ -1700,6 +1713,10 @@
       }
 
       let centerElev = 300;
+      // The dressing anchor: pinned to the box the terrain was BUILT
+      // from (buildWorld sets it), so per-frame sample() calls stay
+      // consistent with the mesh even while a re-anchor is in flight.
+      let dressAnchor = {lat: 51.48, lon: 0};
       function sample(x, z) {
         const e = demData ? demElev(x, z) : proceduralElev(x, z);
         const water = demData && e <= 0.3;
@@ -1709,9 +1726,12 @@
         if (water) y = 16 * Math.asinh((0 - centerElev) / 500) - 0.6;
         else {
           // With 30m tile data the noise is only seasoning; the coarse
-          // fallbacks need more of it to avoid reading as blobs.
+          // fallbacks need more of it to avoid reading as blobs. The
+          // noise is EARTH-anchored (roam.js microRelief, same 400 m
+          // wavelength): the same hillside dresses the same from any
+          // roam box - overlap agreement is a gated landmark.
           const micro = demData && demData.kind === 'img' ? 0.5 : 1.6;
-          y += micro * (fbm(x / 7, z / 7) - 0.5);
+          y += micro * (microRelief(x, z, dressAnchor) - 0.5);
         }
         return {e, y, water};
       }
@@ -1861,6 +1881,77 @@
       }
 
       let terrainMesh = null;
+      let worldBuilt = false;
+      // Trees: Earth-anchored candidates (roam.js treeCandidates) -
+      // the same wood grows the same trees from any roam box, with
+      // the same species, size and sway phase (gated overlap
+      // landmark) - filtered by the theme's physical tests: inside
+      // the real OSM woods when we have them, below the real tree
+      // line, off cliffs, out of the sea, and off both camera
+      // spots. Re-runnable on its own: fresh forest polygons
+      // re-dress the standing terrain without a full rebuild.
+      function placeTrees() {
+        for (const t of trees) ground.remove(t);
+        trees = [];
+        // Forest polygons are stored geodetic; project them onto
+        // the CURRENT box for the point-in-polygon test.
+        forestScene = forestGeo
+          ? forestGeo.map((poly) =>
+              poly.map(([la, lo]) => {
+                const s = geoToScene(la, lo, dressAnchor);
+                return [s.x, s.z];
+              })
+            )
+          : null;
+        const tl = treelineM(state.lat);
+        for (const c of treeCandidates(dressAnchor)) {
+          if (trees.length >= 140) break;
+          const {x, z} = c;
+          const s0 = sample(x, z);
+          if (s0.water || s0.e > tl) continue;
+          if (!inForest(x, z)) continue;
+          // Real forests stand on ~35° alpine slopes; the asinh height
+          // compression roughly doubles scene gradients, hence 4.5.
+          const grade =
+            Math.abs(sample(x + 2, z).y - sample(x - 2, z).y) +
+            Math.abs(sample(x, z + 2).y - sample(x, z - 2).y);
+          if (grade > 4.5) continue;
+          if (Math.hypot(x, z - 26) < 24 || Math.hypot(x, z + 26) < 24)
+            continue;
+          const sc = 0.8 + c.r[0] * 1.4;
+          // Conifers own the subalpine belt below the climatic treeline.
+          const conifer = s0.e > tl - 700 || c.r[1] < 0.4;
+          const tree = new THREE.Group();
+          const trunk = new THREE.Mesh(geoTrunk, trunkMat);
+          trunk.position.y = 0.55;
+          trunk.castShadow = true;
+          tree.add(trunk);
+          if (conifer) {
+            const mat = leafMats[Math.floor(c.r[2] * leafMats.length)];
+            const c1 = new THREE.Mesh(geoCone1, mat);
+            c1.position.y = 1.7;
+            const c2 = new THREE.Mesh(geoCone2, mat);
+            c2.position.y = 3.1;
+            c1.castShadow = c2.castShadow = true;
+            c1.receiveShadow = true;
+            tree.add(c1, c2);
+          } else {
+            const canopy = new THREE.Mesh(
+              geoCanopy,
+              broadMats[Math.floor(c.r[2] * broadMats.length)]
+            );
+            canopy.position.y = 2.2;
+            canopy.scale.y = 0.82;
+            canopy.castShadow = canopy.receiveShadow = true;
+            tree.add(canopy);
+          }
+          tree.scale.setScalar(sc);
+          tree.position.set(x, s0.y, z);
+          tree.userData = {phase: c.r[3] * Math.PI * 2, a: 0, v: 0};
+          trees.push(tree);
+          ground.add(tree);
+        }
+      }
       function buildWorld() {
         // Roam rebuilds repeatedly: free the previous terrain
         // geometry (trees share cached geometries/materials and
@@ -1868,6 +1959,10 @@
         if (terrainMesh) terrainMesh.geometry.dispose();
         ground.clear();
         trees = [];
+        // Pin the dressing to the box being built: per-frame
+        // sample() calls stay consistent with this mesh even while
+        // the next re-anchor's fetch is in flight.
+        dressAnchor = {lat: state.lat, lon: state.lon};
         if (demData) {
           // Average the real elevation in a small ring around the scene
           // centre (grid-layout agnostic).
@@ -1904,57 +1999,7 @@
         ground.add(terrain);
         terrainMesh = terrain;
 
-        // Trees: inside the real OSM woods when we have them, below the
-        // real tree line, off cliffs, out of the sea, and not on top of
-        // either camera spot (it can face both ways).
-        const tl = treelineM(state.lat);
-        for (let i = 0; i < 1800 && trees.length < 140; i++) {
-          const x = (rand() - 0.5) * (WORLD - 40);
-          const z = (rand() - 0.5) * (WORLD - 40);
-          const s0 = sample(x, z);
-          if (s0.water || s0.e > tl) continue;
-          if (!inForest(x, z)) continue;
-          // Real forests stand on ~35° alpine slopes; the asinh height
-          // compression roughly doubles scene gradients, hence 4.5.
-          const grade =
-            Math.abs(sample(x + 2, z).y - sample(x - 2, z).y) +
-            Math.abs(sample(x, z + 2).y - sample(x, z - 2).y);
-          if (grade > 4.5) continue;
-          if (Math.hypot(x, z - 26) < 24 || Math.hypot(x, z + 26) < 24)
-            continue;
-          const sc = 0.8 + rand() * 1.4;
-          // Conifers own the subalpine belt below the climatic treeline.
-          const conifer = s0.e > tl - 700 || rand() < 0.4;
-          const tree = new THREE.Group();
-          const trunk = new THREE.Mesh(geoTrunk, trunkMat);
-          trunk.position.y = 0.55;
-          trunk.castShadow = true;
-          tree.add(trunk);
-          if (conifer) {
-            const mat = leafMats[Math.floor(rand() * leafMats.length)];
-            const c1 = new THREE.Mesh(geoCone1, mat);
-            c1.position.y = 1.7;
-            const c2 = new THREE.Mesh(geoCone2, mat);
-            c2.position.y = 3.1;
-            c1.castShadow = c2.castShadow = true;
-            c1.receiveShadow = true;
-            tree.add(c1, c2);
-          } else {
-            const canopy = new THREE.Mesh(
-              geoCanopy,
-              broadMats[Math.floor(rand() * broadMats.length)]
-            );
-            canopy.position.y = 2.2;
-            canopy.scale.y = 0.82;
-            canopy.castShadow = canopy.receiveShadow = true;
-            tree.add(canopy);
-          }
-          tree.scale.setScalar(sc);
-          tree.position.set(x, s0.y, z);
-          tree.userData = {phase: rand() * Math.PI * 2, a: 0, v: 0};
-          trees.push(tree);
-          ground.add(tree);
-        }
+        placeTrees();
 
         // The sea: three.js Water (planar reflections) riding at real sea
         // level wherever the DEM says there is water. Roam rebuilds
@@ -2099,6 +2144,7 @@
           snowSim.rebuildTerrain();
           snowSim.clearDrifts();
         }
+        worldBuilt = true;
       }
       buildWorld();
 
@@ -3767,21 +3813,23 @@
             sample(0, 0).y + 1.6
           );
           clearLivePools();
+          // Immediate: the point subscription and the pure local
+          // models. The API re-syncs wait for the camera to settle
+          // (settleDue below) - re-anchoring terrain every hop is
+          // free for upstreams, re-fetching eight sources per hop
+          // is not.
           if (liveES) connectStream();
           computeSkyglow();
           syncGeomag();
-          syncWeather();
-          syncMarine();
-          syncRadar();
-          syncAloft();
-          syncForests();
-          syncBrdf();
-          syncShips();
-          syncTraffic();
+          roamDirty = true;
+          hopsSinceSync++;
+          // Roam is the same session walking: every param survives
+          // (pins included - unlike explore, which starts fresh),
+          // only the coordinates move. Gated in roam-reference.
           history.replaceState(
             null,
             '',
-            relocateURL(location.search, {lat: state.lat, lon: state.lon})
+            roamURL(location.search, state.lat, state.lon)
           );
           const label =
             Math.abs(state.lat).toFixed(3) +
@@ -3799,10 +3847,31 @@
           roam.pending = false;
         }
       }
-      function maybeRoam() {
+      // The settle-gated re-syncs: everything anchored to a point
+      // that costs an upstream request. Runs once the camera rests
+      // (or after ROAM_FORCE_HOPS hops for a pilot who never stops).
+      let roamDirty = false;
+      let hopsSinceSync = 0;
+      let lastMoveMs = 0;
+      function runRoamSyncs() {
+        roamDirty = false;
+        hopsSinceSync = 0;
+        syncWeather();
+        syncMarine();
+        syncRadar();
+        syncAloft();
+        syncForests();
+        syncBrdf();
+        syncShips();
+        syncTraffic();
+      }
+      function maybeRoam(now, moved) {
+        if (moved) lastMoveMs = now;
         if (!demData || params.get('roam') === '0') return;
         const distM = Math.hypot(freeCam.pos.x, freeCam.pos.z) * MPU;
-        if (roamDecision(distM, roam, performance.now()) === 'go') reanchor();
+        if (roamDecision(distM, roam, now) === 'go') reanchor();
+        if (settleDue(roamDirty, now - lastMoveMs, hopsSinceSync))
+          runRoamSyncs();
       }
       // Harness introspection (same precedent as __meteors).
       window.__roam = {
@@ -5130,7 +5199,7 @@
           // Past the trigger ring the world re-anchors under you
           // (roam block above); the clamp only ever bites while a
           // fetch is pending or failed - always inside real data.
-          maybeRoam();
+          maybeRoam(t, mx !== 0 || my !== 0 || mz !== 0);
           camera.position.set(
             freeCam.pos.x + shakeX,
             freeCam.pos.y + shakeY,
