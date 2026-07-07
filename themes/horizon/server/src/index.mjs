@@ -57,6 +57,7 @@
 
 import http from 'node:http';
 import {haversineKm} from '../../lightning.js';
+import {parseHemiPower, parsePropagated} from '../../solarwind.js';
 
 // Schema normalizers - moved here when the Cloudflare worker was
 // retired and deleted (the daemon superseded it; git history
@@ -661,6 +662,48 @@ function main() {
   const SSE_MAX = Number(env.SSE_MAX || 25);
   runBlitzSocket(blitz, sseClients, log);
 
+  // Space weather: DSCOVR/ACE solar wind at L1 (already propagated
+  // to the bow shock by SWPC - the propagated_time_tag IS the
+  // physical lead time) plus the OVATION hemispheric power. ONE
+  // 60 s poll of two small CDN files serves every visitor; the
+  // Newell coupling is computed in the shared solarwind.js (the
+  // model lives once, gated by solarwind-reference).
+  const SWPC_WIND =
+    'https://services.swpc.noaa.gov/products/geospace/propagated-solar-wind-1-hour.json';
+  const SWPC_HP =
+    'https://services.swpc.noaa.gov/text/aurora-nowcast-hemi-power.txt';
+  const space = {at: 0, wind: null, hp: null, fetches: 0, errors: 0};
+  async function pollSpace() {
+    try {
+      const opt = {
+        signal: AbortSignal.timeout(FETCH_MS),
+        headers: {'user-agent': UA}
+      };
+      const [w, h] = await Promise.all([
+        fetch(SWPC_WIND, opt).then((r) =>
+          r.ok ? r.json() : Promise.reject(new Error('wind ' + r.status))
+        ),
+        fetch(SWPC_HP, opt).then((r) =>
+          r.ok ? r.text() : Promise.reject(new Error('hp ' + r.status))
+        )
+      ]);
+      const wind = parsePropagated(w);
+      const hp = parseHemiPower(h);
+      if (wind) space.wind = wind;
+      if (hp) space.hp = hp;
+      if (wind || hp) space.at = Date.now();
+      space.fetches++;
+    } catch {
+      space.errors++; // stale copy keeps serving; next poll retries
+    }
+  }
+  pollSpace();
+  setInterval(pollSpace, 60e3).unref();
+  const spaceBody = () =>
+    space.wind || space.hp
+      ? {wind: space.wind, hp: space.hp, at: space.at}
+      : null;
+
   let tlesCache = {t: 0, body: null}; // CelesTrak visual group
   const adsbCache = new Map(); // area key -> {t, body, src}
   setInterval(() => {
@@ -774,6 +817,17 @@ function main() {
       }
     }
 
+    if (url.pathname === '/solarwind') {
+      // No coordinates: the solar wind is one number pair for the
+      // whole planet. 503 only before the first successful poll.
+      const body = spaceBody();
+      if (!body) return json(503, {error: 'no data yet'});
+      return json(200, body, {
+        'cache-control': 'public, max-age=60',
+        'x-space-source': 'NOAA SWPC (DSCOVR/ACE L1 + OVATION)'
+      });
+    }
+
     if (url.pathname === '/health' || url.pathname === '/probe') {
       const ais = {
         ships: st.ships.size,
@@ -795,11 +849,23 @@ function main() {
         connects: blitz.connects,
         streams: sseClients.size
       };
+      const spaceHealth = {
+        haveWind: !!space.wind,
+        haveHp: !!space.hp,
+        coupling: space.wind ? Math.round(space.wind.coupling) : null,
+        ageMs: space.at ? Date.now() - space.at : null,
+        fetches: space.fetches,
+        errors: space.errors
+      };
       if (url.pathname === '/health')
-        return json(200, {ais, lightning}, {'cache-control': 'no-store'});
+        return json(
+          200,
+          {ais, lightning, space: spaceHealth},
+          {'cache-control': 'no-store'}
+        );
       return json(
         200,
-        {ais, lightning, probe: await probeAll()},
+        {ais, lightning, space: spaceHealth, probe: await probeAll()},
         {'cache-control': 'no-store'}
       );
     }
@@ -898,15 +964,22 @@ function main() {
         if (!got) return;
         guardedWrite(sseEvent('adsb', got.body));
       };
+      const pushSpace = () => {
+        const body = spaceBody();
+        if (body) guardedWrite(sseEvent('space', body));
+      };
       pushAis();
       pushAdsb();
+      pushSpace();
       const iAis = setInterval(pushAis, 30e3);
       const iAdsb = setInterval(pushAdsb, 20e3);
+      const iSpace = setInterval(pushSpace, 60e3);
       const hb = setInterval(() => guardedWrite(': hb\n\n'), 25e3);
       const bye = setTimeout(() => res.end(), 30 * 60e3);
       req.on('close', () => {
         clearInterval(iAis);
         clearInterval(iAdsb);
+        clearInterval(iSpace);
         clearInterval(hb);
         clearTimeout(bye);
         sseClients.delete(client);

@@ -68,7 +68,15 @@ are gated by `../server-reference.mjs` — the `server` set in
   bypasses CORS, so the Origin allowlist gate IS the protection
   here — foreign origins get 403 before the stream opens. Capped
   concurrent streams (`SSE_MAX`, default 25).
-- `GET /health` — AIS + lightning engine stats.
+- `GET /solarwind` — the aurora's measured driver: DSCOVR/ACE
+  solar wind at L1, already propagated to the bow shock by SWPC
+  (the `propagated_time_tag` is a real physical lead time of tens
+  of minutes), with the Newell 2007 coupling function computed by
+  the shared, gated `solarwind.js`, plus the OVATION hemispheric
+  power (GW). One 60 s poll serves every visitor. Also pushed as
+  the `space` event on `/stream` (60 s cadence, initial push on
+  connect).
+- `GET /health` — AIS + lightning + space-weather engine stats.
 - `GET /probe` — health + the fixed-target reachability
   diagnostic, run from the box's own IP.
 

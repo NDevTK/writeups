@@ -53,6 +53,7 @@ export const KEEP_PARAMS = [
   'ais',
   'live',
   'tles',
+  'space',
   'roam'
 ];
 

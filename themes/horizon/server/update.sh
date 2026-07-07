@@ -35,7 +35,8 @@ LAST=$(cat "$STATE" 2>/dev/null || echo none)
 CUR=$(git rev-parse HEAD)
 CHANGED=$(git diff --name-only "$CUR" "$NEW" -- \
   themes/horizon/server \
-  themes/horizon/lightning.js themes/horizon/'*-reference.mjs' \
+  themes/horizon/lightning.js themes/horizon/solarwind.js \
+  themes/horizon/'*-reference.mjs' \
   themes/horizon/harness/validate.sh 2>/dev/null || echo forced)
 git checkout --quiet "$NEW"
 if [ -z "$CHANGED" ]; then
