@@ -45,7 +45,16 @@ export const WEATHER_PINS = [
 // Params that survive a relocation: infrastructure only (the
 // debug panel, the DEM opt-out, endpoint overrides). Everything
 // else is a pin or a stale place and dies with the old view.
-export const KEEP_PARAMS = ['debug', 'dem', 'adsb', 'ais', 'live', 'tles'];
+export const KEEP_PARAMS = [
+  'debug',
+  'dem',
+  'demtiles',
+  'adsb',
+  'ais',
+  'live',
+  'tles',
+  'roam'
+];
 
 // The measured superlatives. `why` is what the visitor is
 // promised; `cite` is the measurement behind the promise.

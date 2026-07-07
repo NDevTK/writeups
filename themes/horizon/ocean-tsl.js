@@ -349,6 +349,17 @@ export function createOceanFFT(renderer, opts = {}) {
       uTime.value = tSeconds;
       for (const fill of fills) fill();
     },
+    // Roaming rebuilds the ocean per coastline: free the GPU
+    // residents (2 data + 6 storage textures) when a cascade is
+    // replaced. Kernels and the blit quad go with the references.
+    dispose() {
+      h0Tex.dispose();
+      lutTex.dispose();
+      for (const pair of [spectra, pong, maps]) {
+        pair.a.dispose();
+        pair.b.dispose();
+      }
+    },
     // Harness-only numeric readback (blit through a float RT, same
     // pattern as the atmosphere's readLut). The blit fragment output
     // clamps NEGATIVE rgb at 0 (measured: positives pass unclamped),

@@ -1951,7 +1951,61 @@ Scenes (all at Grindelwald unless noted):
     rows with annotations byte-identical to the reference values,
     G toggles, guards hold; only the documented environmental
     Dawn texture spam (OPEN below) in the log.
-  - OPEN (environment, not code): today's fixture rig drops the
+  - DONE: roam - terrain streaming under the free camera (the
+    explore item's completion: the world stops being one fixed
+    16 km diorama). Architecture: NOT a tile mosaic - the
+    equirectangular box RE-ANCHORS. New single source roam.js +
+    roam-reference.mjs (gate set 29, 5 landmarks): geoToScene/
+    sceneToGeo are the theme's mapping and its algebraic inverse
+    (landmarked bit-equal to ships.aisToScene AND
+    contrails.adsbToScene at 4 anchors - the model lives once;
+    roundtrip 6.9e-12 units), yOfElev/elevOfY carry the camera's
+    absolute altitude across the asinh datum change (1000 random
+    datum swaps drift 1.4e-12 m), roamDecision is the trigger
+    state machine (fire at ROAM_TRIGGER_M = DEM_HALF_M/2 = 4 km,
+    so real data always outruns the fetch; wait/cooldown/retry
+    landmarked), and a 300-hop random walk lands the camera on
+    the exact origin every swap with hop distances matching
+    haversine to the documented 0.113% m/deg convention.
+    EXACTNESS FIX absorbed: DEM_HALF_M/WORLD/MPU now live in
+    roam.js and the theme's former hand-typed 57.14 m/unit (a
+    50 ppm approximation of its own 16000/280) is replaced by
+    exact MPU everywhere (ship/aircraft kinematics, water
+    metersPerUnit, COLREGS/CFR slant ranges, radar scene scale).
+    Theme integration: maybeRoam() in the free-cam frame path;
+    reanchor() fetches the new box (fetchDEMTiles -> fetchDEM
+    fallback), swaps via the SAME buildWorld() boot uses, rewrites
+    the camera exactly, clears the live pools (stale scene
+    frames), reconnects the /stream EventSource (initial ais/adsb
+    snapshot repopulates in seconds), re-runs the cheap syncs +
+    computeSkyglow() (the Falchi block is now a re-runnable
+    function), and history.replaceState's the URL through the
+    gated relocateURL - reload keeps the walked-to spot;
+    pinnedLoc flips true so IP geolocation never snaps you home.
+    Leak work for repeated rebuilds: previous terrain geometry
+    disposed, ocean FFT cascades got a dispose() (2 data + 6
+    storage textures each), water depth texture freed.
+    ?demtiles=URL endpoint override (infrastructure param, kept
+    across relocations) lets the offline harness serve
+    deterministic terrarium tiles; ?roam=0 pins the box.
+    window.__roam harness introspection (same precedent as
+    __meteors). Verified in real Chromium (WebGPU/Xvfb) with a
+    local synthetic-tile server: flew the free camera past the
+    4 km ring - fetch, buildWorld swap, camera rewrite to origin,
+    URL rewrite and panel provenance all firing (smoke needed a
+    fixture-side GPUTexture.createView swizzle shim - see the
+    updated OPEN note).
+  - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
+    drift now also manifests as a PER-FRAME uncaught TypeError -
+    GPUTexture.createView rejects the `swizzle` field three's
+    texture views pass (the bundled chromium-1194's WebGPU
+    dictionary vs this three build) - which aborts frame() before
+    any scene logic runs in the fixture rig (event-driven UI
+    still works, which is why the explore smoke passed). The roam
+    smoke installs a fixture-side createView shim that strips the
+    field (identity swizzle, never shipped); a matching
+    SHOOT_CHROME remains the real fix for pixel work.
+    Original note: today's fixture rig drops the
     volumetric cloud decks and spams "2D view of 3D texture" Dawn
     validation errors from the Nubis noise volumes - bisect-shot
     d202bb5 (the certified phase-5 build), 289ab7c, a466700,
