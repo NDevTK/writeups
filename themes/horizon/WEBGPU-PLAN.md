@@ -2121,3 +2121,51 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     glitter lobe, moderate sea with a broadened dimmer lobe, gale
     sea whitecapped to ~32% Monahan coverage - physical across the
     range.
+
+- DONE (phase 1 of the green flash): refraction.js +
+  refraction-reference.mjs (gate set 33, 4 landmarks) - the
+  gated physics core. Ciddor (1996) refractivity of air (full
+  CIPM densities + compressibility; matches the NIST 633 nm
+  check value to 2e-10 and the independent Birch & Downs Edlen
+  to 8e-10) and an exact ray tracer for a spherically stratified
+  atmosphere (dR = -tan z dn/n in height parametrisation, Snell
+  invariant, tangent-point split for below-horizontal rays from
+  elevated observers, s^2 substitution regularising the horizon
+  singularity analytically). Held to closed forms: zenith
+  exactly 0, R(45) = (n0-1)tan z to 0.15", Bennett at 10 deg to
+  3%, horizon 33.0 arcmin (ICAO 15 C), green rim 14.2" above red
+  (dispersion tracks dn/(n-1) to 8.5%), setting-sun flattening
+  0.835 (published ~5/6), apparent/true roundtrip 7e-12. Debug
+  trail: a barometric double-negative in the ICAO fixture and a
+  clamped bottom stencil were both caught by the closed-form
+  landmarks. PHASE 2 (DONE): the drawn sun and moon are refracted
+  through the MEASURED column. syncAloft also fetches the low
+  pressure levels (temperature/relative_humidity at 1000..200 hPa
+  + low geopotentials, still one request) and builds
+  state.profile via the gated buildProfile, closed at the ground
+  by the surface temperature and the exact dew-point rh (Murphy &
+  Koop). Frame loop: a paced CPU ray trace (N = 400, pinned
+  within 0.5" of N = 1600 by the new 'node-count convergence'
+  landmark; recompute every 0.02 deg of true altitude when low,
+  0.5 deg high - ~10 ms per update, sunsets only) yields the
+  green-channel apparent altitude that now drives sunVec (sky,
+  water, aerial - the whole scene sees the LIFTED sun: sunset
+  genuinely happens minutes later, from geometry), plus
+  per-channel apparent directions + the flattening ratio into new
+  atmosphere-tsl uniforms (sunDisc: dirR/dirB/flatten). The
+  shader draws three monochrome Hestroffer-Magnan discs, each
+  squashed vertically about its own centre - the green rim IS the
+  gap between them, widening whenever the measured profile
+  magnifies it: the green flash, when the real atmosphere serves
+  one. The moon takes the same lift and squash (its rim
+  dispersion sits below the eye's threshold at lunar brightness -
+  documented scope), and the paraselenic optics dome anchors on
+  the DRAWN moon. Below the grazing ray the displacement holds
+  its limit so twilight geometry stays continuous; the ICAO
+  standard atmosphere stands in offline; the -50 arcmin EVENT
+  conventions (ships.js etc.) deliberately stay - this is the
+  drawn sun, not the almanac. Also absorbed: atmosphere-tsl's
+  aerialMaxUnits used the 57.14 literal - now exact 400/7. A new
+  'measured profile builder' landmark holds the surface
+  hydrostatic closure to its closed form. Gate 36 sets,
+  refraction at 6 landmarks.

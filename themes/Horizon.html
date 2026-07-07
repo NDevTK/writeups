@@ -263,7 +263,14 @@
         createNLCMaterial,
         createSkyglowMaterial
       } from './horizon/sky-objects-tsl.js';
-      import {adsbToScene, appleman} from './horizon/contrails.js';
+      import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
+      import {
+        apparentAltitude,
+        buildProfile,
+        standardProfile,
+        SUN_DISC_RAD,
+        sunRefraction
+      } from './horizon/refraction.js';
       import {
         aisToScene,
         apparentLux,
@@ -456,6 +463,7 @@
         hpNow: null, // OVATION hemispheric power, GW (live, 5 min)
         hpAtGrid: null, // ...as it was when the oval grid was fetched
         metar: null, // nearest fresh aerodrome observation (metar.js)
+        profile: null, // measured refraction column (refraction.js)
         sea: null, // measured wave partitions (marine model), null = wind sea
         shake: 0
       };
@@ -638,6 +646,12 @@
           // P.1621 5-20 km slab that drives the Hufnagel-Valley
           // turbulence model (cn2.js) for the star scintillation.
           const LV = [500, 400, 300, 250, 200, 150, 100, 70, 50];
+          // The refraction column (refraction.js): temperature and
+          // humidity at the LOW pressure levels too - the setting
+          // sun's rays live in the bottom kilometres the Cn2 slab
+          // never needed. Geopotential heights for the low levels
+          // only (the upper ones ride the LV request above).
+          const PLV = [1000, 950, 925, 900, 850, 700, 500, 300, 200];
           const w = await (
             await fetch(
               'https://api.open-meteo.com/v1/forecast?latitude=' +
@@ -649,6 +663,15 @@
                   (p) =>
                     'wind_speed_' + p + 'hPa,geopotential_height_' + p + 'hPa'
                 ).join(',') +
+                ',' +
+                PLV.map(
+                  (p) =>
+                    'temperature_' + p + 'hPa,relative_humidity_' + p + 'hPa'
+                ).join(',') +
+                ',' +
+                [1000, 950, 925, 900, 850, 700]
+                  .map((p) => 'geopotential_height_' + p + 'hPa')
+                  .join(',') +
                 '&forecast_hours=1',
               {credentials: 'omit'}
             )
@@ -724,6 +747,44 @@
                 ' · shadow rate ' +
                 state.cn2Rate.toFixed(0) +
                 ' Hz'
+            );
+          }
+          // The measured refraction column: (p, h, T, rh) triples
+          // straight off the pressure levels (no hydrostatic
+          // assumption at the nodes - buildProfile is gated),
+          // closed at the ground by the current surface
+          // temperature and dew point. Levels the model
+          // extrapolates below the terrain are dropped.
+          const elevM = Number.isFinite(w.elevation) ? w.elevation : 0;
+          const lv = PLV.map((p) => ({
+            pPa: p * 100,
+            hM: h['geopotential_height_' + p + 'hPa']?.[0],
+            tC: h['temperature_' + p + 'hPa']?.[0],
+            rh: (h['relative_humidity_' + p + 'hPa']?.[0] ?? 0) / 100
+          })).filter(
+            (q) =>
+              Number.isFinite(q.hM) && Number.isFinite(q.tC) && q.hM > elevM + 1
+          );
+          if (lv.length >= 4) {
+            const rhSurf = Math.min(
+              eLiq(state.dew + 273.15) / eLiq(state.temp + 273.15),
+              1
+            );
+            state.profile = buildProfile(lv, {
+              hM: elevM,
+              tC: state.temp,
+              rh: rhSurf
+            });
+            record(
+              'refraction column (pressure levels)',
+              lv.length +
+                ' measured levels to ' +
+                Math.round(lv[lv.length - 1].hM / 1000) +
+                ' km · surface ' +
+                state.temp +
+                '°C rh ' +
+                (rhSurf * 100).toFixed(0) +
+                '%'
             );
           }
         } catch {
@@ -4034,6 +4095,22 @@
         }
       });
 
+      // ---------- refraction cache (the drawn sun and moon) ----------
+      // The ray tracer runs on the CPU at a paced cadence (see the
+      // frame block); everything between recomputes reads this.
+      let stdProf = null;
+      const stdProfileFallback = () => (stdProf ??= standardProfile());
+      const refr = {
+        prof: null,
+        alt: 1e9,
+        obsH: 0,
+        sun: null,
+        graze: null,
+        moonAlt: null,
+        moonApp: 0,
+        moonFlat: 1
+      };
+
       // ---------- main loop ----------
       let last = performance.now();
       function frame(t) {
@@ -4170,14 +4247,100 @@
           pp.needsUpdate = true;
           ps.needsUpdate = true;
         }
-        const sunVec = skyPoint(sun.alt, sun.az, 1);
+        // Atmospheric refraction lifts, flattens and disperses the
+        // drawn sun (refraction.js: Ciddor + the exact bending
+        // integral through the MEASURED pressure-level column; the
+        // ICAO standard atmosphere stands in until it arrives).
+        // Ray-traced on the CPU at a paced cadence - every 0.02
+        // deg of true altitude when the sun is low (it moves that
+        // far in ~5 s), every 0.5 deg high up where refraction is
+        // arcseconds-flat - and cached between. Below the grazing
+        // ray the whole family keeps the graze displacement (its
+        // limit), so twilight geometry stays continuous. Event
+        // conventions (the -50 arcmin sunset of ships.js etc.)
+        // deliberately stay on the standard convention - this is
+        // the DRAWN sun.
+        const profNow = state.profile ?? stdProfileFallback();
+        const camAltM = elevOfY(camera.position.y, centerElev);
+        if (
+          profNow !== refr.prof ||
+          Math.abs(sun.alt - refr.alt) > (sun.alt < 0.175 ? 3.5e-4 : 8.7e-3) ||
+          Math.abs(camAltM - refr.obsH) > 200
+        ) {
+          refr.prof = profNow;
+          refr.alt = sun.alt;
+          refr.obsH = camAltM;
+          if (sun.alt > -0.06) {
+            refr.sun = sunRefraction(sun.alt, profNow, camAltM, 400);
+            refr.graze = refr.sun.appG - sun.alt;
+          } else {
+            refr.sun = null; // sun deep below: constant graze shift
+          }
+          refr.moonAlt = null; // moon re-derives on its own pace
+        }
+        const sunApp = refr.sun
+          ? refr.sun.appG
+          : sun.alt + (refr.graze ?? 0.0093);
+        const sunVec = skyPoint(sunApp, sun.az, 1);
+        if (atmo.ok) {
+          const d = atmo.sunDisc;
+          if (refr.sun) {
+            d.dirR.value.copy(skyPoint(refr.sun.appR, sun.az, 1));
+            d.dirB.value.copy(skyPoint(refr.sun.appB, sun.az, 1));
+            d.flatten.value = refr.sun.flatten;
+          } else {
+            d.dirR.value.copy(sunVec);
+            d.dirB.value.copy(sunVec);
+            d.flatten.value = 1;
+          }
+        }
         // The one real sun light carries the true direction; the CSM
         // shadow node follows it.
         sunLight.position
           .copy(skyPoint(Math.max(sun.alt, -0.12), sun.az, 1))
           .multiplyScalar(400);
         sunLight.target.position.set(0, 0, 0);
-        moonDisc.position.copy(skyPoint(moon.alt, moon.az, 1500));
+        // The moon takes the same measured lift and squash (its rim
+        // dispersion sits far below the eye's threshold at lunar
+        // brightness - documented scope; SUN_DISC_RAD is the
+        // derivative-sampling span, second-order vs the moon's own
+        // radius).
+        if (
+          refr.moonAlt === null ||
+          Math.abs(moon.alt - refr.moonAlt) >
+            (moon.alt < 0.175 ? 3.5e-4 : 8.7e-3)
+        ) {
+          refr.moonAlt = moon.alt;
+          if (moon.alt > -0.06) {
+            refr.moonApp = apparentAltitude(
+              moon.alt,
+              profNow,
+              0.55,
+              camAltM,
+              400
+            );
+            const u = apparentAltitude(
+              moon.alt + SUN_DISC_RAD,
+              profNow,
+              0.55,
+              camAltM,
+              400
+            );
+            const dn = apparentAltitude(
+              moon.alt - SUN_DISC_RAD,
+              profNow,
+              0.55,
+              camAltM,
+              400
+            );
+            refr.moonFlat = Math.min((u - dn) / (2 * SUN_DISC_RAD), 1);
+          } else {
+            refr.moonApp = moon.alt + (refr.graze ?? 0.0093);
+            refr.moonFlat = 1;
+          }
+        }
+        moonDisc.position.copy(skyPoint(refr.moonApp, moon.az, 1500));
+        moonDisc.scale.y = astro.moonScale * refr.moonFlat;
         // Sun direction as seen at the moon disc (same geometry the old
         // directional light encoded), feeding the Lommel-Seeliger shader.
         moonU.sunDirM.value
@@ -5076,7 +5239,9 @@
         // halo, rain for the bow, low source for the dogs), the
         // source now the moon at its true phase brightness.
         {
-          const moonVec2 = skyPoint(moon.alt, moon.az, 1);
+          // Anchored at the DRAWN (refracted) moon so the halo ring
+          // stays centred on the disc the visitor sees.
+          const moonVec2 = skyPoint(refr.moonApp, moon.az, 1);
           opticsMoonU.sunDir.value.copy(moonVec2);
           opticsMoonU.antisolar.value.copy(moonVec2).negate();
           const moonOut =
