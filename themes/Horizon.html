@@ -105,7 +105,8 @@
         weather code), quake (magnitude), kp (0-9), aurora (0-1),
         auroralat (deg), dem=0 (skip real terrain), demtiles=URL
         (terrarium tile endpoint override), roam=0 (pin the box),
-        space=URL (solar-wind endpoint override), debug=1
+        space=URL (solar-wind endpoint override), metar=URL (aerodrome
+        observation endpoint override), debug=1
     -->
     <style>
       html,
@@ -319,6 +320,7 @@
         yOfElev
       } from './horizon/roam.js';
       import {hpScale} from './horizon/solarwind.js';
+      import {etageCovers, pickStation, visibilityM} from './horizon/metar.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -453,6 +455,7 @@
         auroraLat: 68,
         hpNow: null, // OVATION hemispheric power, GW (live, 5 min)
         hpAtGrid: null, // ...as it was when the oval grid was fetched
+        metar: null, // nearest fresh aerodrome observation (metar.js)
         sea: null, // measured wave partitions (marine model), null = wind sea
         shake: 0
       };
@@ -1329,6 +1332,65 @@
           applySpace(j);
         } catch {
           // Stream event or the next poll refreshes it.
+        }
+      }
+
+      // Aerodrome observations: the nearest fresh METAR is a
+      // MEASUREMENT of the sky - ceilometer cloud bases, layer
+      // covers, transmissometer visibility - and it outranks the
+      // model where it can see (the same rule the radar layer
+      // follows). Scope is deliberate: METAR governs the LOW
+      // etage (measured deck base + cover) and the visibility;
+      // automated ceilometers are blind above a few km, so the
+      // mid and high decks stay with the model. Via the daemon
+      // (/metar - aviationweather.gov sends no CORS header).
+      const METAR_PROXY = params.get('metar') ?? 'https://api.ndev.tk/metar';
+      async function syncMetar() {
+        if (overridden) return;
+        try {
+          const r = await (
+            await fetch(
+              METAR_PROXY +
+                '?lat=' +
+                state.lat.toFixed(3) +
+                '&lon=' +
+                state.lon.toFixed(3),
+              {credentials: 'omit'}
+            )
+          ).json();
+          const s = pickStation(
+            r.metars,
+            state.lat,
+            state.lon,
+            Date.now() / 1000
+          );
+          if (!s) {
+            state.metar = null;
+            return;
+          }
+          const e = etageCovers(s.clouds);
+          state.metar = {
+            at: Date.now(),
+            id: s.id,
+            km: s.km,
+            low: e.low,
+            baseM: e.baseM,
+            visM: visibilityM(s.visib),
+            wx: s.wx
+          };
+          record(
+            'METAR ' + s.id + ' (' + s.km.toFixed(0) + ' km)',
+            (s.cover ?? 'sky') +
+              (e.baseM !== null
+                ? ' · measured base ' + Math.round(e.baseM) + ' m'
+                : '') +
+              (state.metar.visM !== null
+                ? ' · vis ' + (state.metar.visM / 1000).toFixed(1) + ' km'
+                : '') +
+              (s.wx ? ' · ' + s.wx : '')
+          );
+        } catch {
+          // The model stands.
         }
       }
 
@@ -3874,6 +3936,7 @@
           state.lat = geo.lat;
           state.lon = geo.lon;
           state.place = '';
+          state.metar = null; // the old station no longer speaks for here
           pinnedLoc = true; // geolocation must not snap us home
           buildWorld(); // new centerElev, moments, water, trees
           freeCam.pos.x = 0;
@@ -3934,6 +3997,7 @@
         syncBrdf();
         syncShips();
         syncTraffic();
+        syncMetar();
       }
       function maybeRoam(now, moved) {
         if (moved) lastMoveMs = now;
@@ -4188,9 +4252,16 @@
         aerialU.uFogColor.value.copy(tmpB);
         // Koschmieder relation: extinction from the MEASURED visibility
         // (2% contrast at V). Fog codes need no special-casing - a foggy
-        // hour reports a short visibility by itself.
+        // hour reports a short visibility by itself. A fresh nearby
+        // METAR's transmissometer reading outranks the model value.
+        const visEff =
+          state.metar &&
+          Date.now() - state.metar.at < 90 * 60e3 &&
+          state.metar.visM !== null
+            ? state.metar.visM
+            : state.visibility;
         aerialU.uFogDensity.value =
-          1.98 / (Math.max(state.visibility, 400) / MPU) + cloudy * 0.001;
+          1.98 / (Math.max(visEff, 400) / MPU) + cloudy * 0.001;
 
         // A real solar eclipse dims the direct light by its obscuration.
         const ecl = astro.eclipse || 0;
@@ -4810,15 +4881,29 @@
           (state.lat < 0 ? Math.PI : 0) - (state.magD ?? 0) * RAD;
 
         // Three cloud layers from the model's real per-layer covers.
-        // Cumulus base at the real lifting condensation level (Espy:
-        // ~125m per degree of dew point spread), clamped above the
-        // camera because the asinh height compression squeezes low
-        // decks harder than the terrain they sit over.
-        const cLow = state.cloudLow ?? state.cloud * 0.7;
+        // A fresh nearby METAR outranks the model where it can see:
+        // its ceilometer MEASURED the low deck's base and cover, so
+        // those replace the Espy LCL estimate (~125m per degree of
+        // dew point spread) and the model's low cover; automated
+        // ceilometers are blind above a few km, so the mid and high
+        // decks stay with the model. Clamped above the camera
+        // because the asinh height compression squeezes low decks
+        // harder than the terrain they sit over.
+        const mzr =
+          state.metar && Date.now() - state.metar.at < 90 * 60e3
+            ? state.metar
+            : null;
+        const cLow = mzr ? mzr.low : (state.cloudLow ?? state.cloud * 0.7);
         const cMid = state.cloudMid ?? state.cloud * 0.5;
         const cHigh = state.cloudHigh ?? state.cloud * 0.3;
-        const lcl = Math.max(125 * (state.temp - state.dew), 150);
-        const yCloud = Math.max(16 * Math.asinh(lcl / 500) + 8, camBaseY + 26);
+        const baseAgl =
+          mzr && mzr.baseM !== null
+            ? mzr.baseM // ceilometer measurement
+            : Math.max(125 * (state.temp - state.dew), 150); // Espy LCL
+        const yCloud = Math.max(
+          16 * Math.asinh(baseAgl / 500) + 8,
+          camBaseY + 26
+        );
         // Each deck rides its own real wind: surface, 700hPa, 250hPa jet.
         const driftLayer = (arr, cover, y, wv, speed) => {
           const showN = Math.round((cover / 100) * arr.length);
@@ -5435,6 +5520,8 @@
         syncOvation();
         setInterval(syncOvation, 30 * 60 * 1000);
         syncSpace();
+        syncMetar();
+        setInterval(syncMetar, 10 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
         syncISS();
         setInterval(syncISS, 6 * 60 * 60 * 1000);

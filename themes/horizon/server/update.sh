@@ -36,6 +36,7 @@ CUR=$(git rev-parse HEAD)
 CHANGED=$(git diff --name-only "$CUR" "$NEW" -- \
   themes/horizon/server \
   themes/horizon/lightning.js themes/horizon/solarwind.js \
+  themes/horizon/metar.js \
   themes/horizon/'*-reference.mjs' \
   themes/horizon/harness/validate.sh 2>/dev/null || echo forced)
 git checkout --quiet "$NEW"
