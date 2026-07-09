@@ -57,6 +57,7 @@ export const KEEP_PARAMS = [
   'metar',
   'smoke',
   'aerosol',
+  'lights',
   'roam'
 ];
 

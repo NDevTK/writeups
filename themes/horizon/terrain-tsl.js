@@ -1,4 +1,12 @@
-import {Color, MeshStandardNodeMaterial, Vector2, Vector3} from 'three/webgpu';
+import {
+  Color,
+  DataTexture,
+  FloatType,
+  MeshStandardNodeMaterial,
+  RedFormat,
+  Vector2,
+  Vector3
+} from 'three/webgpu';
 import {
   Fn,
   acos,
@@ -102,7 +110,15 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     // a MOD09A1 fit succeeds).
     uRossW: uniform(new Vector3(0, 0, 0)),
     uRossMix: uniform(1),
-    uRossOn: uniform(0)
+    uRossOn: uniform(0),
+    // Black Marble measured night lights (nightlights.js): a
+    // radiance field (nW/(cm^2 sr), linear) over the roam box, the
+    // night factor, the exposure-matched gain and the gated
+    // 2700 K Planckian lamp tint.
+    uLightsOn: uniform(0),
+    uLightsNight: uniform(0),
+    uLightsGain: uniform(0.035),
+    uLightsTint: uniform(new Vector3(1, 0.417, 0.1))
   };
 
   const thash = Fn(([p]) =>
@@ -459,9 +475,36 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
   // glitter, the emissive path is not CSM-shadowed - documented,
   // consistent with the existing model; glints only carry energy in
   // direct sun via uSunCol).
+  // Black Marble night lights: measured DNB radiance over the box
+  // (linear nW/(cm^2 sr), row 0 = south edge), exposure-matched by
+  // ONE gain like every other emissive, tinted by the gated 2700 K
+  // Planckian white point, gated by darkness. Where the data says
+  // dark, the ground stays dark - towns glow only where they are.
+  const lightsZero = new DataTexture(
+    new Float32Array([0]),
+    1,
+    1,
+    RedFormat,
+    FloatType
+  );
+  lightsZero.needsUpdate = true;
+  const lightsTexNode = texture(lightsZero);
+  const nightLights = lightsTexNode
+    .sample(
+      vec2(
+        positionWorld.x.div(u.uWorldSize).add(0.5),
+        float(0.5).sub(positionWorld.z.div(u.uWorldSize))
+      )
+    )
+    .r.mul(u.uLightsGain)
+    .mul(u.uLightsNight)
+    .mul(u.uLightsOn)
+    .mul(u.uLightsTint);
+
   const emissiveNode = seaSpec(positionWorld)
     .mul(wet)
-    .add(snowGlint(positionWorld, nW, sig2).mul(snow).mul(wet.oneMinus()));
+    .add(snowGlint(positionWorld, nW, sig2).mul(snow).mul(wet.oneMinus()))
+    .add(nightLights);
 
   const mat = new MeshStandardNodeMaterial({metalness: 0});
   mat.colorNode = colorNode;
@@ -471,5 +514,5 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
   // Aerial perspective + Koschmieder: the ONE shared hook from
   // aerial-tsl.js, same graph every world material uses.
   aerial.apply(mat);
-  return {material: mat, uniforms: u, momentsTexNode};
+  return {material: mat, uniforms: u, momentsTexNode, lightsTexNode};
 }
