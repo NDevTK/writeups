@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "../three.webgpu.min.js",
+          "three/webgpu": "../three.webgpu.min.js",
+          "three/tsl": "../three.tsl.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body style="margin: 0; overflow: hidden; background: #9db8cc">
+    <script>
+      /* swizzle shim (older bundled Chrome) */ if (
+        navigator.gpu &&
+        self.GPUTexture
+      ) {
+        const ov = GPUTexture.prototype.createView;
+        GPUTexture.prototype.createView = function (d) {
+          if (d && 'swizzle' in d) {
+            d = Object.assign({}, d);
+            delete d.swizzle;
+          }
+          return ov.call(this, d);
+        };
+      }
+    </script>
+    <script type="module">
+      // Asset viewer - the vessel design loop. Renders the shared
+      // vessels.js fleet (the SAME module the theme ships) in
+      // isolation on a flat sea, so the shapes are judged and
+      // iterated on visually. ?cls=cargo shows one class large;
+      // ?az=deg&el=deg orbit the camera; ?len=&beam= override the
+      // measured size. Serve the repo root and open
+      // /themes/horizon/harness/asset-viewer.html.
+      import * as THREE from 'three/webgpu';
+      import {buildVessel} from '../vessels.js';
+      import {typeClass} from '../ships.js';
+
+      const q = new URLSearchParams(location.search);
+      const renderer = new THREE.WebGPURenderer({antialias: true});
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(1);
+      document.body.appendChild(renderer.domElement);
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color('#b9cede');
+      scene.fog = new THREE.Fog('#b9cede', 2200, 7000);
+      const camera = new THREE.PerspectiveCamera(
+        35,
+        innerWidth / innerHeight,
+        0.5,
+        4000
+      );
+
+      const sun = new THREE.DirectionalLight('#fff4e0', 4.5);
+      sun.position.set(240, 460, 520);
+      scene.add(sun);
+      scene.add(new THREE.HemisphereLight('#cfe0ee', '#48607a', 2.2));
+
+      const sea = new THREE.Mesh(
+        new THREE.PlaneGeometry(8000, 8000),
+        new THREE.MeshStandardMaterial({color: '#28516b', roughness: 0.55})
+      );
+      sea.rotation.x = -Math.PI / 2;
+      scene.add(sea);
+
+      const mk = (color, roughness = 0.85) =>
+        new THREE.MeshStandardMaterial({color, roughness});
+      const mats = {
+        hullA: mk('#3a444d'),
+        hullB: mk('#6e3a2c'),
+        sup: mk('#8a949e'),
+        white: mk('#dfe3e7', 0.7),
+        deck: mk('#4b5157'),
+        funnel: mk('#c8402f'),
+        sail: new THREE.MeshStandardMaterial({
+          color: '#f2efe6',
+          roughness: 0.9,
+          side: THREE.DoubleSide
+        }),
+        boxes: [
+          '#a4553d',
+          '#3f7392',
+          '#7b9245',
+          '#b09a3e',
+          '#6a5488',
+          '#8a8f96'
+        ].map((c) => mk(c))
+      };
+
+      // The measured fleet - one of each silhouette class.
+      const FLEET = [
+        ['cargo', 70, 240, 32, 566001],
+        ['tanker', 80, 180, 28, 566002],
+        ['passenger', 60, 140, 22, 566003],
+        ['fishing', 30, 24, 7, 566004],
+        ['sailing', 36, 14, 4, 566005],
+        ['tug', 52, 30, 10, 566006],
+        ['other', 0, 90, 14, 566007],
+        ['cargo2', 71, 160, 24, 566008]
+      ];
+      const only = q.get('cls');
+      const shown = only ? FLEET.filter(([n]) => n.startsWith(only)) : FLEET;
+      let x = 0;
+      const xs = [];
+      for (const [, t, len, beam, mmsi] of shown) {
+        const g = new THREE.Group();
+        const L = +q.get('len') || len;
+        const B = +q.get('beam') || beam;
+        buildVessel(g, L, B, typeClass(t), mats, mmsi, 1);
+        x += (L * 0.75) / 2 + 25;
+        g.position.set(x, 0, 0);
+        xs.push(x);
+        x += (L * 0.75) / 2 + 25;
+        g.rotation.y = ((+q.get('yaw') || -32) * Math.PI) / 180;
+        scene.add(g);
+      }
+      const mid = (xs[0] + xs[xs.length - 1]) / 2 || 0;
+      const az = ((+q.get('az') || 205) * Math.PI) / 180;
+      const el = ((+q.get('el') || 12) * Math.PI) / 180;
+      const d = +q.get('d') || (only ? 300 : Math.max(x * 0.62, 400));
+      camera.position.set(
+        mid + d * Math.cos(el) * Math.sin(az),
+        Math.max(d * Math.sin(el), 3),
+        d * Math.cos(el) * Math.cos(az)
+      );
+      camera.lookAt(mid, 8, 0);
+
+      await renderer.init();
+      // shoot.mjs capture hooks (composited screenshots are blank
+      // for WebGPU surfaces - the readback path is the camera).
+      window.__r = renderer;
+      window.__scene = scene;
+      window.__cam = camera;
+      window.__THREE = THREE;
+      let frames = 0;
+      renderer.setAnimationLoop(() => {
+        renderer.render(scene, camera);
+        if (++frames === 5) console.log('DONE');
+      });
+    </script>
+  </body>
+</html>

@@ -361,6 +361,7 @@
         attribute as tslAttribute,
         uniform as tslUniform
       } from 'three/tsl';
+      import {buildVessel} from './horizon/vessels.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -2988,19 +2989,32 @@
       const shipMats = {};
       const dotGeo = new THREE.SphereGeometry(0.085, 8, 6);
       {
-        const mk = (color) => {
+        // The palette the asset viewer was tuned with
+        // (harness/asset-viewer.html) - same values, aerial-hooked.
+        const mk = (color, rough = 0.85) => {
           const m = new THREE.MeshStandardNodeMaterial({
             color,
-            roughness: 0.9
+            roughness: rough
           });
           applyAerial(m);
           return m;
         };
-        shipMats.hullA = mk('#252b30');
-        shipMats.hullB = mk('#4a2320'); // oxide red, the other paint
-        shipMats.sup = mk('#77828c');
-        shipMats.white = mk('#c9cdd2'); // passenger superstructure
-        shipMats.deck = mk('#5c6066'); // hatches / trunk / gantries
+        shipMats.hullA = mk('#3a444d');
+        shipMats.hullB = mk('#6e3a2c'); // oxide red, the other paint
+        shipMats.sup = mk('#8a949e');
+        shipMats.white = mk('#dfe3e7', 0.7);
+        shipMats.deck = mk('#4b5157');
+        shipMats.funnel = mk('#c8402f');
+        shipMats.sail = mk('#f2efe6');
+        shipMats.sail.side = THREE.DoubleSide;
+        shipMats.boxes = [
+          '#a4553d',
+          '#3f7392',
+          '#7b9245',
+          '#b09a3e',
+          '#6a5488',
+          '#8a8f96'
+        ].map((c) => mk(c));
       }
       // Build one vessel from its MEASURED identity: AIS message 5
       // length/beam scale the hull exactly, the M.1371 type picks
@@ -3022,104 +3036,20 @@
         const L = lenM * U;
         const B = Math.max(beamM, 3) * U;
         const hM = (m) => m * U;
-        const box = (w, h, len, mat, x, y, z) => {
-          const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, len), mat);
-          m.position.set(x, y, z);
-          slot.g.add(m);
-          return m;
-        };
-        // Above-water hull: freeboard scales with length.
-        const hullH = hM(Math.min(Math.max(0.045 * lenM, 1.5), 12));
-        box(
-          B,
-          hullH,
-          L,
-          slot.mmsi % 2 ? shipMats.hullB : shipMats.hullA,
-          0,
-          hullH * 0.35,
-          0
+        // The geometry lives ONCE in vessels.js - a real plan-form
+        // hull (flared bow, elliptical transom) and class-specific
+        // arrangement, designed against screenshots in the asset
+        // viewer (harness/asset-viewer.html) and shipped
+        // identically here.
+        const {deckY} = buildVessel(
+          slot.g,
+          lenM,
+          beamM,
+          cls,
+          shipMats,
+          slot.mmsi | 0,
+          U
         );
-        const deckY = hullH * 0.85;
-        if (cls === 'cargo' || cls === 'hsc') {
-          const hH = hM(Math.min(Math.max(0.1 * lenM, 5), 25));
-          box(B * 0.9, hH, L * 0.12, shipMats.sup, 0, deckY + hH / 2, L * 0.36);
-          const bH = hM(Math.min(Math.max(0.06 * lenM, 2.5), 14));
-          for (const zc of [-0.3, -0.08, 0.14])
-            box(
-              B * 0.82,
-              bH,
-              L * 0.18,
-              shipMats.deck,
-              0,
-              deckY + bH / 2,
-              L * zc
-            );
-        } else if (cls === 'tanker') {
-          const hH = hM(Math.min(Math.max(0.09 * lenM, 5), 22));
-          box(B * 0.9, hH, L * 0.12, shipMats.sup, 0, deckY + hH / 2, L * 0.36);
-          box(
-            B * 0.45,
-            hM(2),
-            L * 0.6,
-            shipMats.deck,
-            0,
-            deckY + hM(1),
-            -L * 0.05
-          );
-          box(B * 0.6, hM(4), L * 0.05, shipMats.deck, 0, deckY + hM(2), 0);
-        } else if (cls === 'passenger') {
-          const hH = hM(Math.min(Math.max(0.13 * lenM, 6), 32));
-          box(
-            B * 0.86,
-            hH,
-            L * 0.68,
-            shipMats.white,
-            0,
-            deckY + hH / 2,
-            L * 0.02
-          );
-          box(
-            B * 0.6,
-            hH * 0.4,
-            L * 0.3,
-            shipMats.white,
-            0,
-            deckY + hH * 1.2,
-            0
-          );
-        } else if (cls === 'fishing') {
-          box(
-            B * 0.8,
-            hM(4),
-            L * 0.22,
-            shipMats.sup,
-            0,
-            deckY + hM(2),
-            -L * 0.18
-          );
-          box(
-            B * 0.12,
-            hM(6),
-            B * 0.12,
-            shipMats.deck,
-            0,
-            deckY + hM(3),
-            L * 0.3
-          );
-        } else if (cls === 'sailing') {
-          box(
-            B * 0.1,
-            hM(1.3 * lenM),
-            B * 0.1,
-            shipMats.deck,
-            0,
-            deckY + hM(0.65 * lenM),
-            -L * 0.1
-          );
-        } else {
-          const hH = hM(Math.min(Math.max(0.09 * lenM, 3), 12));
-          box(B * 0.75, hH, L * 0.3, shipMats.sup, 0, deckY + hH / 2, L * 0.15);
-        }
         // COLREGS lights from the measured plan (metres -> units).
         const plan = lightPlan(lenM, beamM, cls);
         slot.lightList = [];
