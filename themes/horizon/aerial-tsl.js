@@ -1,6 +1,7 @@
 import {AgXToneMapping, Color, SRGBColorSpace, Vector2} from 'three/webgpu';
 import {
   Fn,
+  atan,
   cameraPosition,
   color,
   dot,
@@ -78,7 +79,18 @@ export function createAerialFog(aerialLutTex) {
     const dir = positionWorld.sub(cameraPosition);
     const d = dir.length();
     const aerH = normalize(dir.xz.add(vec2(1e-6, 1e-6)));
-    const aerAz = dot(aerH, u.uSunAzV).clamp(-1, 1).acos().div(3.14159265);
+    // SIGNED relative azimuth over the full circle (the LUT carries
+    // the cloud volumetric shadow, which is not azimuthally
+    // symmetric): atan(cross, dot) is the counterclockwise angle
+    // from the sun azimuth - the same convention the LUT fill
+    // rotates by (roundtrip gated in atmo-reference.mjs). u = 0.5
+    // faces the sun; the clamp seam sits at the anti-sun azimuth.
+    const aerAz = atan(
+      u.uSunAzV.x.mul(aerH.y).sub(u.uSunAzV.y.mul(aerH.x)),
+      dot(aerH, u.uSunAzV)
+    )
+      .div(2.0 * 3.14159265)
+      .add(0.5);
     const aer = aerialTexNode.sample(
       vec2(aerAz, min(d.div(u.uAerialMaxU), 1.0))
     );

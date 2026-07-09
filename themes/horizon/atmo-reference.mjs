@@ -248,3 +248,150 @@ console.log('REF sky(30,20):', fmt(sky(30, 20)));
 // limits (below: ground at the tangent distance; above: full path).
 console.log('REF sky(30,53):', fmt(sky(30, 53)));
 console.log('REF sky(30,54):', fmt(sky(30, 54)));
+
+// ---- aerial march with volumetric shadow (crepuscular rays) ----
+// Mirrors atmosphere-tsl's marchAerial20: a horizontal 20-step
+// march at camera height over the full SIGNED azimuth circle,
+// where chi(t) - the cloud shadow map's sun visibility at the
+// marched point - multiplies the DIRECT single-scatter term only
+// (Hillaire 2020's aerial perspective with volumetric shadow;
+// multiple scattering stays unshadowed).
+const AER_MAX = 25700;
+const aer = (uAz, uDist, chi, mode) => {
+  // mode: 'full' (the engine), 'nodirect' (ambient only),
+  // 'directonly' (per-step direct contributions, for linearity)
+  const az = (uAz - 0.5) * 2 * Math.PI;
+  const dEnd = uDist * AER_MAX;
+  const r = Rb + 300;
+  const steps = 20;
+  const dt = dEnd / steps;
+  const sunS = Math.sqrt(Math.max(1 - sunMu * sunMu, 0));
+  const cSun = Math.cos(az) * sunS;
+  const T = [1, 1, 1];
+  const L = [0, 0, 0];
+  const D = []; // per-step direct contributions (directonly)
+  for (let s = 0; s < steps; s++) {
+    const ti = (s + 0.5) * dt;
+    const ri = Math.sqrt(r * r + ti * ti);
+    const h = ri - Rb;
+    const dd = dens(h);
+    const sR = rayS.map((rr) => rr * dd[0]);
+    const sM = mieS.map((ss) => ss * dd[1]);
+    const e = ext(h);
+    const muSi = Math.min(Math.max((r * sunMu + ti * cSun) / ri, -1), 1);
+    const Ts = sunT(ri, muSi);
+    const psi = psiMS(ri, muSi);
+    const x = chi ? chi(ti) : 1;
+    const Ds = [0, 0, 0];
+    for (let c = 0; c < 3; c++) {
+      const dir = (sR[c] * phaseR(cSun) + sM[c] * phaseM(cSun)) * Ts[c];
+      const amb = (sR[c] + sM[c]) * psi[c];
+      const S =
+        mode === 'nodirect' ? amb : mode === 'directonly' ? dir : dir * x + amb;
+      const st = Math.exp(-e[c] * dt);
+      const add = (T[c] * (S - S * st)) / Math.max(e[c], 1e-9);
+      if (mode === 'directonly') Ds[c] = add;
+      else L[c] += add;
+      T[c] *= st;
+    }
+    if (mode === 'directonly') D.push(Ds);
+  }
+  return mode === 'directonly' ? D : L;
+};
+
+let aerFail = 0;
+const aerCheck = (name, ok, detail) => {
+  console.log(`${ok ? 'REF' : 'FAIL'} ${name}: ${detail}`);
+  if (!ok) aerFail++;
+};
+
+{
+  // chi = 1 must be EXACTLY the unshadowed march, chi = 0 exactly
+  // the ambient-only march - together they pin that the shadow
+  // multiplies the direct term and nothing else.
+  let worst = 0;
+  for (const [u, v] of [
+    [0.5, 1],
+    [0.25, 0.5],
+    [0.9, 0.75]
+  ]) {
+    const lit = aer(u, v, () => 1, 'full');
+    const un = aer(u, v, null, 'full');
+    const dark = aer(u, v, () => 0, 'full');
+    const amb = aer(u, v, null, 'nodirect');
+    for (let c = 0; c < 3; c++)
+      worst = Math.max(
+        worst,
+        Math.abs(lit[c] - un[c]),
+        Math.abs(dark[c] - amb[c])
+      );
+  }
+  aerCheck(
+    'aerial shadow bounds',
+    worst === 0,
+    `chi=1 IS the unshadowed march and chi=0 IS the ambient-only march (exact, 3 texels x 3 channels): the shadow touches only the direct term`
+  );
+}
+
+{
+  // Linearity restatement: the march is linear in per-step chi, so
+  // for ANY chi, L(chi) = L(0) + sum_s chi_s * D_s with D_s
+  // harvested from an independent direct-only pass. Check a hard
+  // half-lit chi (a cloud bank covering the near half of the ray).
+  const u = 0.35;
+  const v = 0.8;
+  const half = AER_MAX * v * 0.5;
+  const chi = (t) => (t < half ? 0 : 1);
+  const got = aer(u, v, chi, 'full');
+  const amb = aer(u, v, null, 'nodirect');
+  const D = aer(u, v, null, 'directonly');
+  const dt = (v * AER_MAX) / 20;
+  const want = [0, 1, 2].map(
+    (c) =>
+      amb[c] + D.reduce((a, Ds, s) => a + (chi((s + 0.5) * dt) ? Ds[c] : 0), 0)
+  );
+  const worst = Math.max(
+    ...[0, 1, 2].map(
+      (c) => Math.abs(got[c] - want[c]) / Math.max(want[c], 1e-12)
+    )
+  );
+  aerCheck(
+    'aerial shadow linearity',
+    worst < 1e-12,
+    `half-lit ray equals ambient + the lit steps' direct contributions (independent pass) to ${worst.toExponential(1)}`
+  );
+}
+
+{
+  // Azimuth convention roundtrip: the LUT fill rotates the sun
+  // azimuth vector by az (counterclockwise in the xz basis); the
+  // sampler reads az back as atan(cross, dot). Mirrors of both
+  // formulas must invert each other over the full circle for any
+  // sun azimuth - a sign slip here would mirror every shaft.
+  let worst = 0;
+  for (let k = 0; k < 24; k++) {
+    const az = -Math.PI + ((k + 0.5) / 24) * 2 * Math.PI;
+    for (const t of [0.3, 2.1, 4.4]) {
+      const s = [Math.cos(t), Math.sin(t)];
+      const d = [
+        s[0] * Math.cos(az) - s[1] * Math.sin(az),
+        s[0] * Math.sin(az) + s[1] * Math.cos(az)
+      ];
+      const back = Math.atan2(
+        s[0] * d[1] - s[1] * d[0],
+        s[0] * d[0] + s[1] * d[1]
+      );
+      worst = Math.max(worst, Math.abs(back - az));
+    }
+  }
+  aerCheck(
+    'aerial azimuth roundtrip',
+    worst < 1e-12,
+    `fill rotation and sampler atan(cross, dot) invert each other to ${worst.toExponential(1)} over the full signed circle (72 cases)`
+  );
+}
+
+console.log('REF aerial(0.5,1.0):', fmt(aer(0.5, 1, null, 'full')));
+console.log('REF aerial(0.25,0.5):', fmt(aer(0.25, 0.5, null, 'full')));
+console.log('REF aerial(0.0,1.0):', fmt(aer(0, 1, null, 'full')));
+if (aerFail) process.exit(1);
