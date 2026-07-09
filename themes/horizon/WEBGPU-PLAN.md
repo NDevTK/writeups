@@ -2211,6 +2211,47 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     sky): expect hazier, warmer horizons under real air - measured
     tau is 5-30x the paper default - and dust/smoke events to
     read as coloured, absorbing skies.
+- DONE: crepuscular rays - Hillaire's volumetric shadow in the
+  aerial perspective (Jul 9). The cloud shadow map (Schneider
+  2015 Beer-Lambert through the decks, shipped in phase 5) so far
+  shadowed only SURFACES; the haze between the camera and the
+  terrain ignored it, so cloud banks never threw visible beams.
+  Now the aerial-perspective march multiplies its DIRECT
+  single-scatter term per step by the shadow map's transmittance
+  at the marched point (chi(t)) - exactly Hillaire (2020)'s
+  aerial perspective with volumetric shadow; multiple scattering
+  stays unshadowed per the paper. Structural change the shadow
+  forced: the aerial LUT went 64x32 half-circle -> 128x32 FULL
+  circle with SIGNED azimuth (clouds are not azimuthally
+  symmetric - the old |relAz| fold would have mirrored every
+  shaft across the sun line); the seam sits at the anti-sun
+  azimuth where in-scatter varies slowest, and aerial-tsl's
+  sampler reads the signed angle back via atan(cross, dot).
+  Gated in atmo-reference.mjs (atmo set grew 10 -> 16 lines):
+  (1) chi=1 IS the unshadowed march and chi=0 IS the
+  ambient-only march, exact - the shadow touches only the direct
+  term; (2) linearity restatement - a half-lit ray equals
+  ambient + the lit steps' direct contributions harvested from
+  an independent pass (1.8e-15); (3) fill-rotation vs sampler
+  atan(cross, dot) roundtrip over the full signed circle
+  (2.2e-16) - a sign slip would mirror every shaft; plus three
+  REF aerial texel pins. Scope, stated honestly: the 2D LUT
+  collapses elevation, so chi is sampled at the ground datum
+  along the ray - the shafts line up with the terrain's own
+  per-pixel cloud shadow by construction; the sky DOME march
+  stays unshadowed (a shaft's shadow covers only the first 16 km
+  of a dome ray, which converges to unshadowed at the dome's
+  distances - and dome shafts would need the same full-circle
+  treatment on the 192x108 sky LUT, a possible follow-up).
+  Wiring: the cloud shadow hook is created BEFORE the atmosphere
+  so its transmittance node compiles into the aerial compute
+  kernel; camera scene position + sun azimuth uniforms feed the
+  march (set before update()). Browser smoke with the cloud
+  system ACTIVE (cloud=60): kernel compiles, frame loop alive,
+  no new shader errors - the "2D view of 3D texture" Dawn spam
+  under heavy cloud reproduces IDENTICALLY on a clean HEAD
+  worktree (156 vs 158 messages), i.e. the documented
+  environmental drift below, not this change.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

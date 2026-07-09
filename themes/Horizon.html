@@ -1847,12 +1847,24 @@
       const ambient = new THREE.HemisphereLight(0xffffff, 0x404038, 0.5);
       scene.add(ambient);
 
+      // Cloud shadows (phase 5): Beer-Lambert through the SAME Nubis
+      // density the sky renders, multiplied into every sunlit
+      // material's received shadow AND into the aerial march's
+      // direct term (crepuscular rays). Created BEFORE the
+      // atmosphere so its transmittance node can compile into the
+      // aerial LUT kernel; until the lazy cloud system attaches, the
+      // hook is a zero map - full sun.
+      const cloudShadow = createCloudShadowHook();
+      cloudShadow.uniforms.uWorldSize.value = WORLD;
+
       // The sky: Hillaire (2020) multiple-scattering atmosphere -
       // transmittance, multiple-scattering and per-frame sky-view LUTs
       // with Rayleigh, measured-aerosol Mie and ozone profiles.
       // Twilight arch and the Belt of Venus emerge from the raymarch
-      // instead of being painted.
-      const atmo = createAtmosphereTSL(renderer);
+      // instead of being painted. The aerial-perspective march
+      // carries Hillaire's volumetric shadow through the cloud
+      // shadow hook - the haze itself shows the beams.
+      const atmo = createAtmosphereTSL(renderer, cloudShadow);
       if (atmo.ok) {
         scene.add(atmo.mesh);
         record(
@@ -2073,12 +2085,6 @@
       const terrainMat = terrainObj.material;
       const terrainUniforms = terrainObj.uniforms;
       terrainUniforms.uWorldSize.value = WORLD;
-      // Cloud shadows (phase 5): Beer-Lambert through the SAME Nubis
-      // density the sky renders, multiplied into every sunlit
-      // material's received shadow. Until the lazy cloud system
-      // attaches, the hook is a zero map - full sun.
-      const cloudShadow = createCloudShadowHook();
-      cloudShadow.uniforms.uWorldSize.value = WORLD;
       cloudShadow.applyTo(terrainMat);
       record(
         'GGX microfacet BRDF (Karis 2013)',
@@ -2087,6 +2093,10 @@
       record(
         'Cloud shadow map',
         'Beer-Lambert through the cloud decks (Schneider 2015)'
+      );
+      record(
+        'Crepuscular rays',
+        'volumetric cloud shadow in the aerial in-scatter (Hillaire 2020)'
       );
       record('Lommel-Seeliger moon', 'lunar regolith photometry');
 
@@ -4592,6 +4602,14 @@
           // compression) feeds the sky and aerial LUTs, so flying up
           // physically lowers the horizon and thins the haze.
           const eCam = centerElev + 500 * Math.sinh(camera.position.y / 16);
+          // Crepuscular rays: the aerial march places its cloud
+          // shadow samples from the camera's scene position and the
+          // sun azimuth (set BEFORE update - fillAerial runs there).
+          atmo.aerialShadow.camXZ.value.set(
+            camera.position.x,
+            camera.position.z
+          );
+          atmo.aerialShadow.sunAz.value.set(sunVec.x, sunVec.z).normalize();
           atmo.update(sunVec, mieRad, Math.max(eCam, 50), skyExposure);
           // Aerial perspective shares the dome's exposure so inscattered
           // light on the terrain matches the sky it comes from.
