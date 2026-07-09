@@ -273,6 +273,10 @@
         sunRefraction
       } from './horizon/refraction.js';
       import {
+        demElev as demElevOf,
+        sampleDem
+      } from './horizon/terrain-sample.js';
+      import {
         aisToScene,
         apparentLux,
         lightArcs,
@@ -1895,47 +1899,10 @@
       }
 
       let demData = null; // full-res tile image or {n, grid} API fallback
-      function demElev(x, z) {
-        if (demData.kind === 'img') {
-          // Scene x/z -> lat/lon -> mercator pixel, bilinear on the tiles.
-          const la = demData.lat - (z / WORLD) * 2 * demData.dLat;
-          const lo = demData.lon + (x / WORLD) * 2 * demData.dLon;
-          const r = la * RAD;
-          const gx = THREE.MathUtils.clamp(
-            ((lo + 180) / 360) * demData.worldPx - demData.ox,
-            0,
-            demData.w - 1.001
-          );
-          const gy = THREE.MathUtils.clamp(
-            ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) *
-              demData.worldPx -
-              demData.oy,
-            0,
-            demData.h - 1.001
-          );
-          const i = Math.floor(gx);
-          const j = Math.floor(gy);
-          const e = demData.elev;
-          const w = demData.w;
-          return lerp(
-            lerp(e[j * w + i], e[j * w + i + 1], gx - i),
-            lerp(e[(j + 1) * w + i], e[(j + 1) * w + i + 1], gx - i),
-            gy - j
-          );
-        }
-        // x east, z south, in scene units -> bilinear over the DEM grid.
-        const N = demData.n;
-        const u = THREE.MathUtils.clamp(x / WORLD + 0.5, 0, 1) * (N - 1);
-        const v = THREE.MathUtils.clamp(1 - (z / WORLD + 0.5), 0, 1) * (N - 1);
-        const i = Math.min(Math.floor(u), N - 2);
-        const j = Math.min(Math.floor(v), N - 2);
-        const g = demData.grid;
-        const e00 = g[j * N + i];
-        const e10 = g[j * N + i + 1];
-        const e01 = g[(j + 1) * N + i];
-        const e11 = g[(j + 1) * N + i + 1];
-        return lerp(lerp(e00, e10, u - i), lerp(e01, e11, u - i), v - j);
-      }
+      // The DEM sampler lives in terrain-sample.js now (gated, and
+      // shared with the terrain worker - the model lives once);
+      // this wrapper just binds the module state.
+      const demElev = (x, z) => demElevOf(demData, x, z, WORLD);
 
       let centerElev = 300;
       // The dressing anchor: pinned to the box the terrain was BUILT
@@ -1943,22 +1910,16 @@
       // consistent with the mesh even while a re-anchor is in flight.
       let dressAnchor = {lat: 51.48, lon: 0};
       function sample(x, z) {
-        const e = demData ? demElev(x, z) : proceduralElev(x, z);
-        const water = demData && e <= 0.3;
-        // Real metres compressed onto the scene: asinh keeps flatlands
-        // honest while alpine relief still towers.
-        let y = 16 * Math.asinh((e - centerElev) / 500);
-        if (water) y = 16 * Math.asinh((0 - centerElev) / 500) - 0.6;
-        else {
-          // With 30m tile data the noise is only seasoning; the coarse
-          // fallbacks need more of it to avoid reading as blobs. The
-          // noise is EARTH-anchored (roam.js microRelief, same 400 m
-          // wavelength): the same hillside dresses the same from any
-          // roam box - overlap agreement is a gated landmark.
-          const micro = demData && demData.kind === 'img' ? 0.5 : 1.6;
-          y += micro * (microRelief(x, z, dressAnchor) - 0.5);
+        if (demData) {
+          return sampleDem(demData, x, z, centerElev, dressAnchor, WORLD);
         }
-        return {e, y, water};
+        // Procedural fallback (offline harness, DEM unreachable):
+        // same datum and Earth-anchored seasoning, never water.
+        const e = proceduralElev(x, z);
+        const y =
+          16 * Math.asinh((e - centerElev) / 500) +
+          1.6 * (microRelief(x, z, dressAnchor) - 0.5);
+        return {e, y, water: false};
       }
 
       const ground = new THREE.Group();
@@ -2072,27 +2033,30 @@
       // variance that inflates the specular lobes - the mipless
       // 8-bit normal map this replaces aliased both. 512^2 base
       // matches the ~26 m source data over the 16 km world.
-      function bakeTerrainMoments() {
+      function bakeTerrainMoments(pre) {
         const S = 512;
-        const step = WORLD / (S - 1);
-        const hs = new Float64Array(S * S);
-        for (let j = 0; j < S; j++)
-          for (let i = 0; i < S; i++)
-            hs[j * S + i] = sample(
-              (i / (S - 1) - 0.5) * WORLD,
-              (j / (S - 1) - 0.5) * WORLD
-            ).y;
-        const {sx, sz} = slopesFromHeights(hs, S, step);
-        const pyr = buildMomentPyramid(sx, sz, S);
+        let levels = pre;
+        if (!levels) {
+          const step = WORLD / (S - 1);
+          const hs = new Float64Array(S * S);
+          for (let j = 0; j < S; j++)
+            for (let i = 0; i < S; i++)
+              hs[j * S + i] = sample(
+                (i / (S - 1) - 0.5) * WORLD,
+                (j / (S - 1) - 0.5) * WORLD
+              ).y;
+          const {sx, sz} = slopesFromHeights(hs, S, step);
+          levels = buildMomentPyramid(sx, sz, S).levels;
+        }
         const tex = new THREE.DataTexture(
-          pyr.levels[0].data,
+          levels[0].data,
           S,
           S,
           THREE.RGBAFormat,
           THREE.FloatType
         );
         tex.generateMipmaps = false;
-        tex.mipmaps = pyr.levels.map((l) => ({
+        tex.mipmaps = levels.map((l) => ({
           data: l.data,
           width: l.size,
           height: l.size
@@ -2177,7 +2141,7 @@
           ground.add(tree);
         }
       }
-      function buildWorld() {
+      function buildWorld(pre) {
         // Roam rebuilds repeatedly: free the previous terrain
         // geometry (trees share cached geometries/materials and
         // need no disposal; ground.clear() drops the references).
@@ -2204,16 +2168,29 @@
         }
         terrainUniforms.uCenterElev.value = centerElev;
         viewSign = state.lat < 0 ? -1 : 1;
-        bakeTerrainMoments();
+        bakeTerrainMoments(pre && pre.levels);
 
-        const geo = new THREE.PlaneGeometry(WORLD, WORLD, 320, 320);
-        geo.rotateX(-Math.PI / 2);
+        // The worker path hands back the vertex surface for the
+        // very lattice it was given (pre.geo) - no ordering
+        // assumptions; the sync path samples as always.
+        let geo = pre && pre.geo;
+        if (!geo) {
+          geo = new THREE.PlaneGeometry(WORLD, WORLD, 320, 320);
+          geo.rotateX(-Math.PI / 2);
+        }
         const pos = geo.attributes.position;
         const wet = new Float32Array(pos.count);
-        for (let i = 0; i < pos.count; i++) {
-          const s = sample(pos.getX(i), pos.getZ(i));
-          pos.setY(i, s.y);
-          wet[i] = s.water ? 1 : 0;
+        if (pre && pre.meshY) {
+          for (let i = 0; i < pos.count; i++) {
+            pos.setY(i, pre.meshY[i]);
+            wet[i] = pre.meshWet[i];
+          }
+        } else {
+          for (let i = 0; i < pos.count; i++) {
+            const s = sample(pos.getX(i), pos.getZ(i));
+            pos.setY(i, s.y);
+            wet[i] = s.water ? 1 : 0;
+          }
         }
         geo.computeVertexNormals();
         geo.setAttribute('wet', new THREE.BufferAttribute(wet, 1));
@@ -2260,28 +2237,35 @@
           // nearest-sampled texture could not resolve it at all,
           // and 0.157 m quantisation stepped the McCowan-era ramp).
           const DT = 512;
-          const dArr = new Float32Array(DT * DT);
+          let dArr;
           let dSum = 0;
           let dCnt = 0;
-          for (let dj = 0; dj < DT; dj++)
-            for (let di = 0; di < DT; di++) {
-              const e = demData
-                ? demElev(
-                    (di / (DT - 1) - 0.5) * WORLD,
-                    (dj / (DT - 1) - 0.5) * WORLD
-                  )
-                : 1;
-              if (e < 0) {
-                dSum += -e;
-                dCnt++;
+          if (pre && pre.depth) {
+            dArr = pre.depth;
+            dSum = pre.dSum;
+            dCnt = pre.dCnt;
+          } else {
+            dArr = new Float32Array(DT * DT);
+            for (let dj = 0; dj < DT; dj++)
+              for (let di = 0; di < DT; di++) {
+                const e = demData
+                  ? demElev(
+                      (di / (DT - 1) - 0.5) * WORLD,
+                      (dj / (DT - 1) - 0.5) * WORLD
+                    )
+                  : 1;
+                if (e < 0) {
+                  dSum += -e;
+                  dCnt++;
+                }
+                // SIGNED depth vs MSL (float texture): shoreline
+                // texels keep their real height above the water, so
+                // the measured tide can flood or expose them
+                // exactly (water-tsl adds the tide before clamping
+                // at the bed).
+                dArr[dj * DT + di] = THREE.MathUtils.clamp(-e / 40, -1, 1);
               }
-              // SIGNED depth vs MSL (float texture): shoreline
-              // texels keep their real height above the water, so
-              // the measured tide can flood or expose them exactly
-              // (water-tsl adds the tide before clamping at the
-              // bed).
-              dArr[dj * DT + di] = THREE.MathUtils.clamp(-e / 40, -1, 1);
-            }
+          }
           const depthTex = new THREE.DataTexture(
             dArr,
             DT,
@@ -3994,6 +3978,78 @@
       // arrive async and dress the NEXT rebuild, exactly as at
       // boot. ?roam=0 disables (harness shots never roam - the
       // camera starts well inside the trigger ring).
+      // The terrain worker: the hop's heavy bakes (LEADR moments,
+      // mesh surface, bathymetry - the SAME gated modules, see
+      // terrain-worker.js) run off the main thread while the old
+      // world keeps rendering. Any failure - no module workers,
+      // a crash, a hung job - falls back to the synchronous path
+      // forever after; the hop still happens, just with the old
+      // hitch.
+      let terrainWorker = null;
+      let terrainJobId = 0;
+      let terrainWorkerUsed = 0;
+      function prepareTerrain(dem, anchor) {
+        // Harvest the lattice from the geometry the swap will use -
+        // no vertex-ordering assumptions cross the thread boundary.
+        const geo = new THREE.PlaneGeometry(WORLD, WORLD, 320, 320);
+        geo.rotateX(-Math.PI / 2);
+        const pos = geo.attributes.position;
+        const xz = new Float32Array(pos.count * 2);
+        for (let i = 0; i < pos.count; i++) {
+          xz[2 * i] = pos.getX(i);
+          xz[2 * i + 1] = pos.getZ(i);
+        }
+        // The datum the worker bakes with is the same 25-point ring
+        // buildWorld derives (identical inputs, identical doubles).
+        let sum = 0;
+        let cnt = 0;
+        for (let dx = -12; dx <= 12; dx += 6)
+          for (let dz = -12; dz <= 12; dz += 6) {
+            sum += demElevOf(dem, dx, dz, WORLD);
+            cnt++;
+          }
+        const center = Math.max(sum / cnt, 0.3);
+        return new Promise((resolve) => {
+          if (!terrainWorker && terrainWorker !== false) {
+            try {
+              terrainWorker = new Worker(
+                new URL('./horizon/terrain-worker.js', location.href),
+                {type: 'module'}
+              );
+              terrainWorker.addEventListener('error', () => {
+                terrainWorker = false; // sync path from here on
+              });
+            } catch {
+              terrainWorker = false;
+            }
+          }
+          if (!terrainWorker) return resolve({geo});
+          const id = ++terrainJobId;
+          const bail = setTimeout(() => resolve({geo}), 8000);
+          const onMsg = (ev) => {
+            if (!ev.data || ev.data.id !== id) return;
+            terrainWorker.removeEventListener('message', onMsg);
+            clearTimeout(bail);
+            terrainWorkerUsed++;
+            resolve({geo, ...ev.data});
+          };
+          terrainWorker.addEventListener('message', onMsg);
+          terrainWorker.postMessage(
+            {
+              id,
+              dem,
+              centerElev: center,
+              anchor: {lat: anchor.lat, lon: anchor.lon},
+              world: WORLD,
+              xz,
+              S: 512,
+              DT: 512
+            },
+            [xz.buffer]
+          );
+        });
+      }
+
       const roam = {pending: false, notBefore: 0};
       function clearLivePools() {
         // Scene positions are relative to the old anchor; the
@@ -4031,19 +4087,32 @@
           } catch {
             dem = await fetchDEM(geo.lat, geo.lon);
           }
+          // Heavy bakes off-thread: the frame loop keeps flying over
+          // the OLD world while the new one is computed; the swap
+          // below is milliseconds.
+          const pre = await prepareTerrain(dem, geo);
           const altM = elevOfY(freeCam.pos.y, centerElev);
+          // Exact continuity: the camera kept moving through the
+          // fetch and the bake - rewrite from where it IS, not from
+          // where the hop was triggered (which used to teleport it
+          // back to the anchor).
+          const camGeo = sceneToGeo(freeCam.pos.x, freeCam.pos.z, {
+            lat: state.lat,
+            lon: state.lon
+          });
           demData = dem;
           state.lat = geo.lat;
           state.lon = geo.lon;
           state.place = '';
           state.metar = null; // the old station no longer speaks for here
           pinnedLoc = true; // geolocation must not snap us home
-          buildWorld(); // new centerElev, moments, water, trees
-          freeCam.pos.x = 0;
-          freeCam.pos.z = 0;
+          buildWorld(pre); // new centerElev, moments, water, trees
+          const np = geoToScene(camGeo.lat, camGeo.lon, geo);
+          freeCam.pos.x = THREE.MathUtils.clamp(np.x, -130, 130);
+          freeCam.pos.z = THREE.MathUtils.clamp(np.z, -130, 130);
           freeCam.pos.y = Math.max(
             yOfElev(altM, centerElev),
-            sample(0, 0).y + 1.6
+            sample(freeCam.pos.x, freeCam.pos.z).y + 1.6
           );
           clearLivePools();
           // Immediate: the point subscription and the pure local
@@ -4112,6 +4181,9 @@
       window.__roam = {
         freeCam,
         roam,
+        get workerUsed() {
+          return terrainWorkerUsed;
+        },
         get anchor() {
           return {lat: state.lat, lon: state.lon};
         }
