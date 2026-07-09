@@ -111,6 +111,43 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     `30 nm at 47.3N finds both ships, internals stripped; limit=1 honoured; empty ocean empty; ship at 29.9 of 30 nm north still inside`
   );
 
+  // Static data (message 5): the measured vessel merged into the
+  // query answer - type, length = A+B, beam = C+D, draught in
+  // metres (aisstream decodes it), name filling a blank position
+  // name. A static frame is not a position (returns false).
+  const took = ingest(
+    st,
+    {
+      MessageType: 'ShipStaticData',
+      Message: {
+        ShipStaticData: {
+          UserID: 2,
+          Name: 'EVER GIVEN ',
+          Type: 70,
+          Dimension: {A: 160, B: 80, C: 18, D: 14},
+          MaximumStaticDraught: 13.2
+        }
+      }
+    },
+    t0 + 5
+  );
+  const merged = query(st, 47.5, 9.5, 8).find((s) => s.mmsi === 2);
+  const bare = query(st, 47.3, 9.0, 30).find((s) => s.mmsi === 1);
+  check(
+    'static data merge',
+    took === false &&
+      st.statics.size === 1 &&
+      merged &&
+      merged.type === 70 &&
+      merged.len === 240 &&
+      merged.beam === 32 &&
+      merged.draught === 13.2 &&
+      merged.name === 'DINGHY' &&
+      bare &&
+      !('len' in bare),
+    `message 5 for MMSI 2 -> type 70 cargo, 240 x 32 m draught 13.2 merged into its query row (position name wins); MMSI 1 without statics carries no dimension fields`
+  );
+
   // Prune: ship 1 last heard t0+2, ship 2 at t0+3.
   const n = prune(st, 100, t0 + 103);
   check(

@@ -21,7 +21,7 @@
  * choice, computed (and gated) rather than eyeballed.
  */
 
-import {sceneToGeo} from './roam.js';
+import {geoToScene, hash3, sceneToGeo} from './roam.js';
 
 export const NL_Z = 8; // GoogleMapsCompatible_Level8 (native max)
 export const NL_LAYER =
@@ -340,3 +340,51 @@ export function xyToLinearSrgb(x, y) {
 // choice, stated, not physics).
 export const LAMP_CCT = 2700;
 export const LAMP_TINT = xyToLinearSrgb(...planckianXY(LAMP_CCT));
+
+// ---- individual lamps: the sources, not just the glow ----------
+// The measured radiance says how MUCH light each 500 m cell
+// emits; the lamps make it point sources the eye can resolve.
+// Same Earth-anchored construction as roam's trees: fixed
+// geodetic cells (LAMP_CELL_M of latitude a side, narrowing
+// east-west as cos(lat)), one deterministic candidate per cell
+// (roam.hash3 - the shared avalanche hash), accepted with
+// probability cos(lat) x min(rad / LAMP_FULL, 1), so areal lamp
+// density is UNIFORM per square metre and LINEAR in the measured
+// radiance. The same town lights the same lamps from any anchor.
+export const LAMP_CELL_M = 120;
+export const LAMP_FULL = 15; // nW/(cm^2 sr): every cell lit
+export const LAMP_MIN = 0.35; // below ~3x the airglow floor: none
+
+export function lampCandidates(radAt, anchor, world, cap = 4000) {
+  const M_LAT = 111320;
+  const dCell = LAMP_CELL_M / M_LAT;
+  const half = ((world / 2) * (400 / 7)) / M_LAT;
+  const halfLon =
+    ((world / 2) * (400 / 7)) /
+    Math.max(M_LAT * Math.cos((anchor.lat * Math.PI) / 180), 1e-6);
+  const i0 = Math.floor((anchor.lat - half) / dCell);
+  const i1 = Math.ceil((anchor.lat + half) / dCell);
+  const j0 = Math.floor((anchor.lon - halfLon) / dCell);
+  const j1 = Math.ceil((anchor.lon + halfLon) / dCell);
+  const lim = world / 2 - 1;
+  const out = [];
+  for (let i = i0; i <= i1; i++) {
+    for (let j = j0; j <= j1; j++) {
+      const lat = (i + hash3(i, j, 11)) * dCell;
+      const lon = (j + hash3(i, j, 12)) * dCell;
+      const rad = radAt(lat, lon);
+      if (!(rad >= LAMP_MIN)) continue;
+      const key = hash3(i, j, 10);
+      const p = Math.cos((lat * Math.PI) / 180) * Math.min(rad / LAMP_FULL, 1);
+      if (key >= p) continue;
+      const s = geoToScene(lat, lon, anchor);
+      if (Math.abs(s.x) > lim || Math.abs(s.z) > lim) continue;
+      out.push({x: s.x, z: s.z, lat, lon, rad, key});
+    }
+  }
+  // Sorted by hash before the display budget (same rule as roam's
+  // trees): capping keeps a spatially unbiased, deterministic
+  // subset instead of the box's south-west corner.
+  out.sort((a, b) => a.key - b.key || a.lat - b.lat || a.lon - b.lon);
+  return out.slice(0, cap);
+}

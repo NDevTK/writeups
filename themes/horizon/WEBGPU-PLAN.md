@@ -2320,6 +2320,53 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   single-lit-pixel weight through the Earth-anchor roundtrip; the
   lamp locus vs published CIE coordinates. ?lights=0 disables;
   ?lights=URL overrides the tile endpoint ({d}/{z}/{r}/{c}).
+- DONE: owner feedback round - "boats are generic" and "no light
+  sources" (Jul 9). Two fixes, one PR.
+  MEASURED VESSELS: the hull comment admitted it ("display
+  furniture... reports carry no dimensions") - but AIS message 5
+  carries them; the daemon just never subscribed. Now
+  ShipStaticData joins the aisstream subscription; normalizeStatic
+  (gated) reads the M.1371 type and the REAL dimensions (A+B
+  length, C+D beam from the antenna offsets, draught in metres),
+  a statics table rides the resident picture (6-min repeats,
+  24 h own-clock prune) and query() merges type/len/beam/draught
+  into /ais and the stream events. The theme scales each hull to
+  its measured length/beam, picks the silhouette by type class
+  (cargo hatches, tanker trunk, white passenger decks, fishing
+  wheelhouse+gantry, sailing mast, tug house - typeClass, gated)
+  and rebuilds only when identity changes. The COLREGS lights got
+  EXACTER with real lengths: lightPlan (gated) implements Rule 23
+  (second masthead abaft and higher on >= 50 m power vessels),
+  Rule 25(b) (sailing = NO masthead), Rule 22 in full (ranges by
+  length band - a 15 m boat's masthead is 3 nm, not 6) and
+  Annex I 2(a)/3(a) heights and separations from the measured
+  beam/length; each light now carries its own range through the
+  Allard fade. Landmarks: server set +1 (static merge fixture),
+  ships set +2 (type table; the 240 m/30 m/8 m/sailing plans
+  against the regulation text). The ?ship=N harness fleet is one
+  vessel of each class, measured-sized.
+  LIGHT SOURCES: Black Marble gave the glow; now it gives the
+  LAMPS. nightlights.js lampCandidates seeds Earth-anchored point
+  sources exactly like roam's trees (the shared hash3 - exported
+  - on absolute geodetic cells, cos(lat) acceptance for uniform
+    areal density, hash-sorted display budget), with acceptance
+    LINEAR in the measured radiance (LAMP_FULL 15 nW/(cm^2 sr) =
+    every 120 m cell lit) and none below ~3x the airglow floor.
+    The theme drops them on the terrain surface (never on water -
+    the 500 m data bleeds over shorelines), warm additive points
+    through the shared AgX+fog encode, brightness following
+    measured radiance, gated by the same civil-twilight ramp as
+    the emissive glow, rebuilt on roam re-anchor. Landmark:
+    deterministic twice; every overlap lamp from a second anchor
+    geodetically identical; count matches the areal-density
+    binomial expectation; dark field -> no lamps. Browser smoke
+    with the captured tile served locally through ?lights=: the
+    full pipeline (fetch -> decode -> field -> lamps -> compiled
+    point cloud) runs with the panel recording the lamp count -
+    which also live-verified the previous entry's texture path.
+    (Bug found by the smoke: a local variable named `sample`
+    shadowed the terrain sampler - renamed, and the sync's catch
+    now logs to console under ?debug=1 instead of swallowing.)
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

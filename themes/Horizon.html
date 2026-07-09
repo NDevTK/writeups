@@ -288,10 +288,11 @@
         aisToScene,
         apparentLux,
         lightArcs,
+        lightPlan,
         luminousIntensity,
-        RANGE_NM,
         relBearing,
-        SUNSET_ELEV
+        SUNSET_ELEV,
+        typeClass
       } from './horizon/ships.js';
       import {
         apparentFlash,
@@ -348,12 +349,18 @@
         TAU_MIN
       } from './horizon/aerosol.js';
       import {
+        LAMP_FULL,
         LAMP_TINT,
+        lampCandidates,
         NL_LAYER,
         NL_Z,
         lightsField,
         pixelOf
       } from './horizon/nightlights.js';
+      import {
+        attribute as tslAttribute,
+        uniform as tslUniform
+      } from 'three/tsl';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -1554,6 +1561,9 @@
           NL_LAYER +
           '/default/{d}/GoogleMapsCompatible_Level8/{z}/{r}/{c}.png';
       let lightsSeq = 0;
+      let lampPts = null;
+      let lampMat = null;
+      let lampNightU = null;
       async function syncLights() {
         if (params.get('lights') === '0' || !terrainObj) return;
         const seq = ++lightsSeq; // a roam hop restarts the fetch
@@ -1607,14 +1617,14 @@
             cx.drawImage(img, 0, 0);
             px.set(k, cx.getImageData(0, 0, 256, 256).data);
           }
-          const sample = (ix, iy) => {
+          const pxAt = (ix, iy) => {
             const d = px.get(Math.floor(iy / 256) + '/' + Math.floor(ix / 256));
             if (!d) return null;
             const o = ((iy & 255) * 256 + (ix & 255)) * 4;
             return [d[o], d[o + 1], d[o + 2], d[o + 3]];
           };
           const N = 96;
-          const f = lightsField(sample, anchor, WORLD, N);
+          const f = lightsField(pxAt, anchor, WORLD, N);
           const tex = new THREE.DataTexture(
             f.data,
             N,
@@ -1628,16 +1638,74 @@
           terrainObj.lightsTexNode.value = tex;
           if (old && old.image && old.image.width > 1) old.dispose();
           terrainUniforms.uLightsOn.value = 1;
+          // The SOURCES, not just the glow: Earth-anchored lamp
+          // points (nightlights.js, gated - roam's shared hash on
+          // geodetic cells, density linear in measured radiance),
+          // dropped onto the terrain surface, never on water.
+          const radAtGeo = (lat, lon) => {
+            const s = geoToScene(lat, lon, anchor);
+            const gi = Math.round((s.x / WORLD + 0.5) * N - 0.5);
+            const gj = Math.round((0.5 - s.z / WORLD) * N - 0.5);
+            return gi < 0 || gi >= N || gj < 0 || gj >= N
+              ? 0
+              : f.data[gj * N + gi];
+          };
+          const lamps = lampCandidates(radAtGeo, anchor, WORLD).filter(
+            (L) => !sample(L.x, L.z).water
+          );
+          const pos = new Float32Array(lamps.length * 3);
+          const col = new Float32Array(lamps.length * 3);
+          lamps.forEach((L, k) => {
+            pos[3 * k] = L.x;
+            pos[3 * k + 1] = sample(L.x, L.z).y + 0.12;
+            pos[3 * k + 2] = L.z;
+            // Brightness follows the measured radiance (sqrt for
+            // the eye's crushed response to point sources).
+            const b = 0.35 + 0.65 * Math.sqrt(Math.min(L.rad / LAMP_FULL, 1));
+            col[3 * k] = LAMP_TINT[0] * b;
+            col[3 * k + 1] = LAMP_TINT[1] * b;
+            col[3 * k + 2] = LAMP_TINT[2] * b;
+          });
+          const lg = new THREE.BufferGeometry();
+          lg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+          lg.setAttribute('color', new THREE.BufferAttribute(col, 3));
+          if (!lampMat) {
+            // Additive warm points through the shared AgX + fog
+            // encode - lamps dim with distance haze like every
+            // other emitter; at day the night gate multiplies them
+            // to black, which adds nothing.
+            lampNightU = tslUniform(0);
+            lampMat = new THREE.PointsNodeMaterial({
+              transparent: true,
+              depthWrite: false,
+              blending: THREE.AdditiveBlending
+            });
+            lampMat.size = 2.2;
+            lampMat.sizeAttenuation = false;
+            lampMat.colorNode = aerial.encodeFog(
+              tslAttribute('color').mul(lampNightU)
+            );
+          }
+          if (lampPts) {
+            scene.remove(lampPts);
+            lampPts.geometry.dispose();
+          }
+          lampPts = new THREE.Points(lg, lampMat);
+          lampPts.frustumCulled = false;
+          scene.add(lampPts);
           record(
             'VIIRS Black Marble ' + day,
             'max ' +
               f.max.toFixed(1) +
               ' · mean ' +
               f.mean.toFixed(2) +
-              ' nW/cm²/sr over the box'
+              ' nW/cm²/sr · ' +
+              lamps.length +
+              ' lamps'
           );
-        } catch {
+        } catch (e) {
           // The ground stays dark - the truthful default.
+          if (params.has('debug')) console.warn('lights: ' + e.message);
         }
       }
 
@@ -2899,68 +2967,211 @@
       // Annex I candela through Allard's law - beyond a light's
       // rated range the eye receives less than the adopted 2e-7
       // lux threshold and the light goes out, exactly as the
-      // regulation is constructed). The hull itself is display
-      // furniture (reports carry no dimensions - a 90 m default);
-      // the lights and kinematics are the physics. ?ais=URL
-      // overrides the proxy; ?ship=N spawns N deterministic
-      // synthetic vessels for the offline harness.
+      // regulation is constructed). The hulls are MEASURED too:
+      // the daemon merges AIS message 5 (real length/beam from
+      // the A/B/C/D antenna offsets, M.1371 type, draught), the
+      // silhouette follows the type class and the light plan
+      // follows the dimensions (Rule 23's second masthead at
+      // >= 50 m, Rule 25(b)'s no-masthead sailing rig, Annex I
+      // heights - ships.js, gated). ?ais=URL overrides the proxy;
+      // ?ship=N spawns N deterministic vessels (one per class)
+      // for the offline harness.
       const AIS_PROXY = params.get('ais') ?? 'https://api.ndev.tk/ais';
       const SHIP_N = 8;
-      const SHIP_LOA = 90 / MPU; // scene units (90 m)
       const NAV_COLOR = {
         masthead: '#ffffff',
         stern: '#ffffff',
         port: '#ff2418',
         starboard: '#19e34d'
       };
-      const NAV_RANGE = {
-        masthead: 'masthead',
-        stern: 'stern',
-        port: 'side',
-        starboard: 'side'
-      };
       const shipPool = [];
+      const shipMats = {};
+      const dotGeo = new THREE.SphereGeometry(0.085, 8, 6);
       {
-        const hullGeo = new THREE.BoxGeometry(0.25, 0.14, SHIP_LOA);
-        const supGeo = new THREE.BoxGeometry(0.21, 0.21, 0.32);
-        const dotGeo = new THREE.SphereGeometry(0.085, 8, 6);
-        const hullMat = new THREE.MeshStandardNodeMaterial({
-          color: '#252b30',
-          roughness: 0.9
-        });
-        const supMat = new THREE.MeshStandardNodeMaterial({
-          color: '#77828c',
-          roughness: 0.9
-        });
-        applyAerial(hullMat);
-        applyAerial(supMat);
+        const mk = (color) => {
+          const m = new THREE.MeshStandardNodeMaterial({
+            color,
+            roughness: 0.9
+          });
+          applyAerial(m);
+          return m;
+        };
+        shipMats.hullA = mk('#252b30');
+        shipMats.hullB = mk('#4a2320'); // oxide red, the other paint
+        shipMats.sup = mk('#77828c');
+        shipMats.white = mk('#c9cdd2'); // passenger superstructure
+        shipMats.deck = mk('#5c6066'); // hatches / trunk / gantries
+      }
+      // Build one vessel from its MEASURED identity: AIS message 5
+      // length/beam scale the hull exactly, the M.1371 type picks
+      // the silhouette, and the COLREGS light plan (ships.js,
+      // gated) places the lights - two mastheads on >= 50 m power
+      // vessels (Rule 23), none on sailing vessels (Rule 25(b)),
+      // Annex I heights/separations from the real dimensions.
+      // Without a static report yet: a 90 x 14 m 'other'.
+      function buildShip(slot, lenM, beamM, cls) {
+        const key = cls + '/' + lenM + '/' + beamM + '/' + (slot.mmsi % 2);
+        if (slot.dims === key) return;
+        slot.dims = key;
+        for (const c of [...slot.g.children]) {
+          slot.g.remove(c);
+          if (c.geometry && c.geometry !== dotGeo) c.geometry.dispose();
+          if (c.userData.dotMat) c.material.dispose();
+        }
+        const U = 1 / MPU; // metres -> scene units
+        const L = lenM * U;
+        const B = Math.max(beamM, 3) * U;
+        const hM = (m) => m * U;
+        const box = (w, h, len, mat, x, y, z) => {
+          const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, len), mat);
+          m.position.set(x, y, z);
+          slot.g.add(m);
+          return m;
+        };
+        // Above-water hull: freeboard scales with length.
+        const hullH = hM(Math.min(Math.max(0.045 * lenM, 1.5), 12));
+        box(
+          B,
+          hullH,
+          L,
+          slot.mmsi % 2 ? shipMats.hullB : shipMats.hullA,
+          0,
+          hullH * 0.35,
+          0
+        );
+        const deckY = hullH * 0.85;
+        if (cls === 'cargo' || cls === 'hsc') {
+          const hH = hM(Math.min(Math.max(0.1 * lenM, 5), 25));
+          box(B * 0.9, hH, L * 0.12, shipMats.sup, 0, deckY + hH / 2, L * 0.36);
+          const bH = hM(Math.min(Math.max(0.06 * lenM, 2.5), 14));
+          for (const zc of [-0.3, -0.08, 0.14])
+            box(
+              B * 0.82,
+              bH,
+              L * 0.18,
+              shipMats.deck,
+              0,
+              deckY + bH / 2,
+              L * zc
+            );
+        } else if (cls === 'tanker') {
+          const hH = hM(Math.min(Math.max(0.09 * lenM, 5), 22));
+          box(B * 0.9, hH, L * 0.12, shipMats.sup, 0, deckY + hH / 2, L * 0.36);
+          box(
+            B * 0.45,
+            hM(2),
+            L * 0.6,
+            shipMats.deck,
+            0,
+            deckY + hM(1),
+            -L * 0.05
+          );
+          box(B * 0.6, hM(4), L * 0.05, shipMats.deck, 0, deckY + hM(2), 0);
+        } else if (cls === 'passenger') {
+          const hH = hM(Math.min(Math.max(0.13 * lenM, 6), 32));
+          box(
+            B * 0.86,
+            hH,
+            L * 0.68,
+            shipMats.white,
+            0,
+            deckY + hH / 2,
+            L * 0.02
+          );
+          box(
+            B * 0.6,
+            hH * 0.4,
+            L * 0.3,
+            shipMats.white,
+            0,
+            deckY + hH * 1.2,
+            0
+          );
+        } else if (cls === 'fishing') {
+          box(
+            B * 0.8,
+            hM(4),
+            L * 0.22,
+            shipMats.sup,
+            0,
+            deckY + hM(2),
+            -L * 0.18
+          );
+          box(
+            B * 0.12,
+            hM(6),
+            B * 0.12,
+            shipMats.deck,
+            0,
+            deckY + hM(3),
+            L * 0.3
+          );
+        } else if (cls === 'sailing') {
+          box(
+            B * 0.1,
+            hM(1.3 * lenM),
+            B * 0.1,
+            shipMats.deck,
+            0,
+            deckY + hM(0.65 * lenM),
+            -L * 0.1
+          );
+        } else {
+          const hH = hM(Math.min(Math.max(0.09 * lenM, 3), 12));
+          box(B * 0.75, hH, L * 0.3, shipMats.sup, 0, deckY + hH / 2, L * 0.15);
+        }
+        // COLREGS lights from the measured plan (metres -> units).
+        const plan = lightPlan(lenM, beamM, cls);
+        slot.lightList = [];
+        const addDot = (arc, range, x, y, z) => {
+          const mat = new THREE.MeshBasicNodeMaterial({color: NAV_COLOR[arc]});
+          aerial.applyTone(mat);
+          const dot = new THREE.Mesh(dotGeo, mat);
+          dot.userData.dotMat = true;
+          dot.position.set(x, y, z);
+          dot.visible = false;
+          slot.g.add(dot);
+          slot.lightList.push({arc, range, dot});
+        };
+        for (const mh of plan.mastheads)
+          addDot(
+            'masthead',
+            plan.ranges.masthead,
+            0,
+            deckY + hM(mh.y),
+            hM(mh.z)
+          );
+        addDot(
+          'port',
+          plan.ranges.side,
+          -B / 2,
+          deckY + hM(plan.sideY),
+          -L * 0.1
+        );
+        addDot(
+          'starboard',
+          plan.ranges.side,
+          B / 2,
+          deckY + hM(plan.sideY),
+          -L * 0.1
+        );
+        addDot(
+          'stern',
+          plan.ranges.stern,
+          0,
+          deckY + hM(plan.sternY),
+          L * 0.49
+        );
+      }
+      {
         for (let i = 0; i < SHIP_N; i++) {
           const g = new THREE.Group(); // bow points local -z
-          const hull = new THREE.Mesh(hullGeo, hullMat);
-          hull.position.y = 0.05;
-          const sup = new THREE.Mesh(supGeo, supMat);
-          sup.position.set(0, 0.2, SHIP_LOA * 0.32); // aft house
-          g.add(hull, sup);
-          const lights = {};
-          for (const [k, px, py, pz] of [
-            ['masthead', 0, 0.42, -SHIP_LOA * 0.2],
-            ['port', -0.15, 0.2, -SHIP_LOA * 0.1],
-            ['starboard', 0.15, 0.2, -SHIP_LOA * 0.1],
-            ['stern', 0, 0.18, SHIP_LOA * 0.49]
-          ]) {
-            const m = new THREE.MeshBasicNodeMaterial({color: NAV_COLOR[k]});
-            aerial.applyTone(m);
-            const dot = new THREE.Mesh(dotGeo, m);
-            dot.position.set(px, py, pz);
-            dot.visible = false;
-            lights[k] = dot;
-            g.add(dot);
-          }
           g.visible = false;
           scene.add(g);
           shipPool.push({
             g,
-            lights,
+            lightList: [],
+            dims: '',
             mmsi: null,
             name: '',
             x: 0,
@@ -2974,7 +3185,11 @@
         }
         record(
           'COLREGS navigation lights',
-          'Rule 21 arcs · Annex I candela · Allard visibility'
+          'Rule 21 arcs · Rule 23/25 by measured length · Annex I heights · Allard visibility'
+        );
+        record(
+          'Measured vessels',
+          'AIS message 5 · real length/beam hulls · M.1371 type silhouettes'
         );
       }
       const shipOv = params.has('ship') ? +params.get('ship') : null;
@@ -2989,6 +3204,18 @@
           shipCamDir.normalize();
           const px = -shipCamDir.z;
           const pz = shipCamDir.x;
+          // One of each silhouette class, measured-sized: the
+          // harness fleet exercises every hull the types produce.
+          const FLEET = [
+            [70, 240, 32], // cargo
+            [80, 180, 28], // tanker
+            [60, 140, 22], // passenger
+            [30, 24, 7], // fishing
+            [36, 14, 4], // sailing
+            [52, 30, 10], // tug
+            [0, 90, 14], // unknown -> other
+            [71, 160, 24] // cargo again, odd mmsi paint
+          ];
           for (let i = 0; i < Math.min(shipOv, SHIP_N); i++) {
             const s = shipPool[i];
             const ahead = 55 + i * 20;
@@ -3002,6 +3229,8 @@
               seen: Date.now(),
               active: true
             });
+            const [ft, fl, fb] = FLEET[i % FLEET.length];
+            buildShip(s, fl, fb, typeClass(ft));
             const tr = s.hdg * RAD;
             const sp = (12 * 0.514444) / MPU; // 12 kt
             s.vx = sp * Math.sin(tr);
@@ -3059,8 +3288,24 @@
             seen: now_,
             active: true
           });
+          // The measured vessel: message-5 dimensions scale the
+          // hull; the type picks the silhouette. Before a static
+          // report arrives the defaults are class-sized.
+          const cls = ship.type ? typeClass(ship.type) : 'other';
+          const small = cls === 'sailing' || cls === 'pleasure';
+          buildShip(
+            slot,
+            ship.len || (small ? 12 : 90),
+            ship.beam || (small ? 4 : 14),
+            cls
+          );
           names.push(
-            (ship.name || ship.mmsi) + ' ' + Math.round(ship.sog) + ' kt'
+            (ship.name || ship.mmsi) +
+              (ship.len ? ' ' + ship.len + 'm' : '') +
+              (ship.type ? ' ' + typeClass(ship.type) : '') +
+              ' ' +
+              Math.round(ship.sog) +
+              ' kt'
           );
         }
         for (const s of shipPool)
@@ -4362,6 +4607,13 @@
         syncMetar();
         syncSmoke();
         syncAerosol();
+        // The lamp cloud is anchored to the OLD box - drop it now,
+        // syncLights rebuilds it Earth-anchored on the new one.
+        if (lampPts) {
+          scene.remove(lampPts);
+          lampPts.geometry.dispose();
+          lampPts = null;
+        }
         syncLights();
       }
       function maybeRoam(now, moved) {
@@ -5065,16 +5317,15 @@
             const dM =
               Math.hypot(camera.position.x - s.x, camera.position.z - s.z) *
               MPU;
-            for (const k in s.lights) {
-              const dot = s.lights[k];
-              if (!shipLightsOn || !arcs[k]) {
+            // Each light carries ITS OWN Rule 22 range now (from
+            // the measured length via lightPlan) - a 15 m boat's
+            // 3 nm masthead fades sooner than a freighter's 6 nm.
+            for (const {arc, range, dot} of s.lightList) {
+              if (!shipLightsOn || !arcs[arc]) {
                 dot.visible = false;
                 continue;
               }
-              const E = apparentLux(
-                luminousIntensity(RANGE_NM[NAV_RANGE[k]]),
-                Math.max(dM, 30)
-              );
+              const E = apparentLux(luminousIntensity(range), Math.max(dM, 30));
               const amp = THREE.MathUtils.clamp(
                 Math.log10(E / 2e-7) / 2.5,
                 0,
@@ -5083,7 +5334,7 @@
               dot.visible = amp > 0;
               if (dot.visible)
                 dot.material.color
-                  .set(NAV_COLOR[k])
+                  .set(NAV_COLOR[arc])
                   .multiplyScalar(0.4 + 3.6 * amp);
             }
           }
@@ -5292,12 +5543,16 @@
         terrainUniforms.uWindMs.value = state.wind / 3.6;
         // Night lights fade in through civil twilight (streetlights
         // lead the stars); the camera sits under the decks with
-        // them, so no cloud dimming applies.
-        terrainUniforms.uLightsNight.value = THREE.MathUtils.clamp(
+        // them, so no cloud dimming applies. The lamp points share
+        // the gate.
+        const lightsNight = THREE.MathUtils.clamp(
           -(sun.alt / RAD + 0.5) / 5,
           0,
           1
         );
+        terrainUniforms.uLightsNight.value = lightsNight;
+        if (lampNightU) lampNightU.value = lightsNight;
+        if (lampPts) lampPts.visible = lightsNight > 0;
         terrainUniforms.uWindVec.value.set(windV.x, windV.z);
         terrainUniforms.uSunDirW.value.copy(sunVec);
         terrainUniforms.uSunCol.value

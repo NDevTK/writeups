@@ -111,6 +111,30 @@ export function normalizeShip(meta, p) {
   };
 }
 
+// One AIS static-data report (message 5) -> the measured vessel:
+// ITU-R M.1371 ship type (code table in ships.js) and the REAL
+// dimensions - A/B metres to bow/stern and C/D to port/starboard
+// from the reference point, so length = A+B, beam = C+D (0 =
+// not available). Draught arrives already decoded in metres.
+export function normalizeStatic(s) {
+  const d = s.Dimension || {};
+  const len = (d.A || 0) + (d.B || 0);
+  const beam = (d.C || 0) + (d.D || 0);
+  return {
+    mmsi: s.UserID,
+    name: String(s.Name || '').trim(),
+    type: typeof s.Type === 'number' ? s.Type : 0,
+    len: len > 0 && len < 500 ? len : 0,
+    beam: beam > 0 && beam < 80 ? beam : 0,
+    draught:
+      typeof s.MaximumStaticDraught === 'number' &&
+      s.MaximumStaticDraught > 0 &&
+      s.MaximumStaticDraught < 30
+        ? s.MaximumStaticDraught
+        : 0
+  };
+}
+
 // Centre + radius (nm) -> bounding box: 1 nm of latitude is
 // exactly 1/60 degree; longitude widens by 1/cos(lat), clamped
 // away from the poles.
@@ -138,6 +162,7 @@ const FETCH_MS = 4000;
 export function createAisState() {
   return {
     ships: new Map(), // mmsi -> normalized ship + {gk, t}
+    statics: new Map(), // mmsi -> normalized static data + {t}
     grid: new Map(), // "lat:lon" 1-degree cell -> Set<mmsi>
     frames: 0,
     badFrames: 0, // arrived but failed decode/parse - a nonzero
@@ -170,6 +195,16 @@ export function gridKey(lat, lon) {
 export function ingest(st, m, now = Date.now()) {
   st.frames++;
   st.lastFrame = now;
+  // Static data (message 5): the vessel's MEASURED identity -
+  // type, real length/beam from the A/B/C/D offsets, draught.
+  // Class A transmits it every 6 minutes; latest wins.
+  const sd = m && m.Message && m.Message.ShipStaticData;
+  if (sd && typeof sd.UserID === 'number') {
+    const stat = normalizeStatic(sd);
+    stat.t = now;
+    st.statics.set(stat.mmsi, stat);
+    return false; // not a position - the caller counts positions
+  }
   const p =
     m &&
     m.Message &&
@@ -212,6 +247,10 @@ export function prune(st, maxAgeMs = 20 * 60e3, now = Date.now()) {
       n++;
     }
   }
+  // Statics age out on their own clock (message 5 repeats every
+  // 6 min from Class A; a day of silence means gone for good).
+  for (const [mmsi, s] of st.statics)
+    if (now - s.t > 24 * 3600e3) st.statics.delete(mmsi);
   return n;
 }
 
@@ -231,14 +270,23 @@ export function query(st, lat, lon, dist, limit = 80) {
         const s = st.ships.get(mmsi);
         if (!s) continue;
         if (s.lat < la0 || s.lat > la1 || s.lon < lo0 || s.lon > lo1) continue;
+        // Merge the vessel's measured identity (message 5) when
+        // the picture holds one: type, real length/beam, draught.
+        const sd = st.statics.get(mmsi);
         out.push({
           mmsi: s.mmsi,
-          name: s.name,
+          name: s.name || (sd && sd.name) || '',
           lat: s.lat,
           lon: s.lon,
           sog: s.sog,
           cog: s.cog,
-          hdg: s.hdg
+          hdg: s.hdg,
+          ...(sd && {
+            type: sd.type,
+            len: sd.len,
+            beam: sd.beam,
+            draught: sd.draught
+          })
         });
         if (out.length >= limit) return out;
       }
@@ -497,7 +545,11 @@ function runAisSocket(key, st, log) {
               [90, 180]
             ]
           ],
-          FilterMessageTypes: ['PositionReport', 'StandardClassBPositionReport']
+          FilterMessageTypes: [
+            'PositionReport',
+            'StandardClassBPositionReport',
+            'ShipStaticData'
+          ]
         })
       );
     });
@@ -948,6 +1000,7 @@ function main() {
     if (url.pathname === '/health' || url.pathname === '/probe') {
       const ais = {
         ships: st.ships.size,
+        statics: st.statics.size,
         cells: st.grid.size,
         frames: st.frames,
         badFrames: st.badFrames,
