@@ -106,7 +106,8 @@
         auroralat (deg), dem=0 (skip real terrain), demtiles=URL
         (terrarium tile endpoint override), roam=0 (pin the box),
         space=URL (solar-wind endpoint override), metar=URL (aerodrome
-        observation endpoint override), debug=1
+        observation endpoint override), smoke=URL (HMS plume endpoint
+        override), debug=1
     -->
     <style>
       html,
@@ -464,6 +465,7 @@
         hpAtGrid: null, // ...as it was when the oval grid was fetched
         metar: null, // nearest fresh aerodrome observation (metar.js)
         profile: null, // measured refraction column (refraction.js)
+        smoke: null, // analyst-verified wildfire plume overhead (smoke.js)
         sea: null, // measured wave partitions (marine model), null = wind sea
         shake: 0
       };
@@ -1452,6 +1454,43 @@
           );
         } catch {
           // The model stands.
+        }
+      }
+
+      // Wildfire smoke: NOAA HMS analysts draw verified plume
+      // polygons from satellite imagery (North America - null
+      // elsewhere is the truthful answer). The daemon holds the
+      // daily file; the panel records the verdict and state.smoke
+      // carries the published class concentration (Ruminski et
+      // al. 2006: 5/16/27 ug/m^3). The CAMS AOD the sky already
+      // uses is quantitative and includes smoke - the absorbing-
+      // aerosol render hook waits on the Mie-absorption question
+      // logged in WEBGPU-PLAN.md.
+      const SMOKE_PROXY = params.get('smoke') ?? 'https://api.ndev.tk/smoke';
+      async function syncSmoke() {
+        try {
+          const j = await (
+            await fetch(
+              SMOKE_PROXY +
+                '?lat=' +
+                state.lat.toFixed(3) +
+                '&lon=' +
+                state.lon.toFixed(3),
+              {credentials: 'omit'}
+            )
+          ).json();
+          state.smoke = j.smoke ?? null;
+          if (state.smoke) {
+            record(
+              'NOAA HMS wildfire smoke',
+              state.smoke.density +
+                ' plume overhead (analyst-verified) · class ~' +
+                state.smoke.ugm3 +
+                ' µg/m³'
+            );
+          }
+        } catch {
+          // No verdict; the measured AOD stands alone.
         }
       }
 
@@ -4059,6 +4098,7 @@
         syncShips();
         syncTraffic();
         syncMetar();
+        syncSmoke();
       }
       function maybeRoam(now, moved) {
         if (moved) lastMoveMs = now;
@@ -5687,6 +5727,8 @@
         syncSpace();
         syncMetar();
         setInterval(syncMetar, 10 * 60 * 1000);
+        syncSmoke();
+        setInterval(syncSmoke, 30 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
         syncISS();
         setInterval(syncISS, 6 * 60 * 60 * 1000);

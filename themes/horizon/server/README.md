@@ -73,6 +73,10 @@ are gated by `../server-reference.mjs` — the `server` set in
   measured cloud-layer bases, covers, visibility and present
   weather, stripped to the fields the theme reads
   (`normalizeMetars`, gated) with a 10-minute per-area cache.
+- `GET /smoke?lat&lon` — the analyst-verified wildfire plume over
+  the point: NOAA HMS daily polygons (North America), fetched
+  hourly, decoded by the gated `smoke.js`, answered from RAM with
+  the published class concentration.
 - `GET /solarwind` — the aurora's measured driver: DSCOVR/ACE
   solar wind at L1, already propagated to the bow shock by SWPC
   (the `propagated_time_tag` is a real physical lead time of tens
