@@ -2081,28 +2081,67 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     are blind above a few km, and overriding cirrus with an AUTO
     station's silence would erase real measured-model cloud.
     Present weather (wxString) is recorded as provenance only.
-  - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
-    drift now also manifests as a PER-FRAME uncaught TypeError -
-    GPUTexture.createView rejects the `swizzle` field three's
-    texture views pass (the bundled chromium-1194's WebGPU
-    dictionary vs this three build) - which aborts frame() before
-    any scene logic runs in the fixture rig (event-driven UI
-    still works, which is why the explore smoke passed). The roam
-    smoke installs a fixture-side createView shim that strips the
-    field (identity swizzle, never shipped); a matching
-    SHOOT_CHROME remains the real fix for pixel work.
-    Original note: today's fixture rig drops the
-    volumetric cloud decks and spams "2D view of 3D texture" Dawn
-    validation errors from the Nubis noise volumes - bisect-shot
-    d202bb5 (the certified phase-5 build), 289ab7c, a466700,
-    ad2270c and HEAD all reproduce it, while the SAME d202bb5 code
-    rendered clouds in its Jul 5 certification shots. Same pinned
-    Chrome binary, same shoot.mjs, no system Vulkan ICDs (bundled
-    SwiftShader), so the trigger is environmental drift in the
-    container, not any commit. References + GPU probes (the actual
-    correctness gate) are unaffected and green. Revisit if cloud
-    scenes need pixel inspection; the errors first appear when the
-    cloud compute pipeline spins up (~frame 200).
+  - DONE: wildfire smoke - NOAA HMS, the analyst-verified plume
+    layer. New single source smoke.js (daemon + theme + reference;
+    shipped beside the daemon) + smoke-reference.mjs (gate set 37,
+    3 landmarks): the KML parser held to a VERBATIM fixture cut
+    from the live daily file (150 plumes parsed, density counts
+    49/46/55 matching the raw grep exactly), interior probes of the
+    real plumes hitting their published class concentrations
+    (Ruminski et al. 2006: light/medium/heavy = 5/16/27 ug/m^3),
+    and geometry discipline (heavy outranks light in overlaps; a
+    concave U-notch is OUTSIDE - the even-odd test; the development
+    probe that landed a concave plume's centroid outside its own
+    ring is why that landmark exists). Daemon: hourly fetch of the
+    ~200 KB daily KML (yesterday's file stands in early UTC),
+    parsed to RAM, GET /smoke?lat&lon answers with the plume class
+    or null (HMS is a North America product - null elsewhere is
+    the truthful answer); /health grows a smoke block. Theme:
+    syncSmoke every 30 min (?smoke=URL override, kept across
+    relocations, re-synced on roam settle); the provenance panel
+    reports "heavy plume overhead (analyst-verified) · class ~27
+    ug/m^3"; state.smoke carries the class for the render hook.
+    DELIBERATE SCOPE: no render change this item - the CAMS AOD
+    the sky already uses is quantitative and includes smoke; HMS
+    adds the analyst's TYPE verdict, whose honest render
+    consequence is the aerosol's single-scattering albedo (biomass
+    smoke absorbs more), and that hook waits on the OPEN question
+    below.
+- OPEN (radiative constants, needs GPU recertification):
+  atmosphere-tsl's MIE_A0 = 4.4e-6 reads as Mie ABSORPTION and
+  extinction is computed as MIE_S0 + MIE_A0 = 8.4e-6 - but
+  Hillaire (2020) gives Mie scattering 3.996e-6 and EXTINCTION
+  4.440e-6, i.e. absorption 4.44e-7: the code's absorption looks
+  10x the paper's (SSA 0.48 vs the paper's 0.9). It is
+  self-consistent with the certified GLSL reference (same
+  constant ported), so renders match each other - but the
+  constant should be re-derived against the paper and, if
+  corrected, the sky recertified against the pinned matrix with
+  a proper SHOOT_CHROME. The smoke SSA hook (analyst-verified
+  plume -> biomass-burning single-scattering albedo, AERONET
+  climatology) lands in the same edit once settled.
+- OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
+  drift now also manifests as a PER-FRAME uncaught TypeError -
+  GPUTexture.createView rejects the `swizzle` field three's
+  texture views pass (the bundled chromium-1194's WebGPU
+  dictionary vs this three build) - which aborts frame() before
+  any scene logic runs in the fixture rig (event-driven UI
+  still works, which is why the explore smoke passed). The roam
+  smoke installs a fixture-side createView shim that strips the
+  field (identity swizzle, never shipped); a matching
+  SHOOT_CHROME remains the real fix for pixel work.
+  Original note: today's fixture rig drops the
+  volumetric cloud decks and spams "2D view of 3D texture" Dawn
+  validation errors from the Nubis noise volumes - bisect-shot
+  d202bb5 (the certified phase-5 build), 289ab7c, a466700,
+  ad2270c and HEAD all reproduce it, while the SAME d202bb5 code
+  rendered clouds in its Jul 5 certification shots. Same pinned
+  Chrome binary, same shoot.mjs, no system Vulkan ICDs (bundled
+  SwiftShader), so the trigger is environmental drift in the
+  container, not any commit. References + GPU probes (the actual
+  correctness gate) are unaffected and green. Revisit if cloud
+  scenes need pixel inspection; the errors first appear when the
+  cloud compute pipeline spins up (~frame 200).
   - Phase 5 FINAL CERTIFICATION - full pinned matrix with EVERYTHING
     (octave clouds, limb darkening, FFT ocean + filtering, cloud
     shadows, Hapke moon), real WebGPU vs WebGL2, mean abs /255:

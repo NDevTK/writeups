@@ -59,6 +59,7 @@ import http from 'node:http';
 import {haversineKm} from '../../lightning.js';
 import {parseHemiPower, parsePropagated} from '../../solarwind.js';
 import {normalizeMetars} from '../../metar.js';
+import {parseHmsKml, smokeAt} from '../../smoke.js';
 
 // Schema normalizers - moved here when the Cloudflare worker was
 // retired and deleted (the daemon superseded it; git history
@@ -705,6 +706,46 @@ function main() {
       ? {wind: space.wind, hp: space.hp, at: space.at}
       : null;
 
+  // Wildfire smoke: NOAA HMS - analysts drawing verified plumes
+  // from satellite imagery, one daily KML (~200 KB in season).
+  // Fetched hourly, parsed by the gated smoke.js, answered from
+  // RAM; early in the UTC day today's file may not exist yet, so
+  // yesterday's stands in.
+  const smokeState = {at: 0, day: '', polys: [], fetches: 0, errors: 0};
+  async function pollSmoke() {
+    for (const back of [0, 1]) {
+      const t = new Date(Date.now() - back * 86400e3);
+      const y = t.getUTCFullYear();
+      const mo = String(t.getUTCMonth() + 1).padStart(2, '0');
+      const da = String(t.getUTCDate()).padStart(2, '0');
+      const day = '' + y + mo + da;
+      try {
+        const r = await fetch(
+          'https://satepsanone.nesdis.noaa.gov/pub/FIRE/web/HMS/Smoke_Polygons/KML/' +
+            y +
+            '/' +
+            mo +
+            '/hms_smoke' +
+            day +
+            '.kml',
+          {signal: AbortSignal.timeout(FETCH_MS), headers: {'user-agent': UA}}
+        );
+        if (!r.ok) throw new Error('hms ' + r.status);
+        const polys = parseHmsKml(await r.text());
+        if (!polys.length && back === 0) continue; // too early UTC
+        smokeState.polys = polys;
+        smokeState.day = day;
+        smokeState.at = Date.now();
+        smokeState.fetches++;
+        return;
+      } catch {
+        smokeState.errors++;
+      }
+    }
+  }
+  pollSmoke();
+  setInterval(pollSmoke, 3600e3).unref();
+
   let tlesCache = {t: 0, body: null}; // CelesTrak visual group
   const adsbCache = new Map(); // area key -> {t, body, src}
   const metarCache = new Map(); // area key -> {t, body}
@@ -853,6 +894,13 @@ function main() {
         connects: blitz.connects,
         streams: sseClients.size
       };
+      const smokeHealth = {
+        plumes: smokeState.polys.length,
+        day: smokeState.day,
+        ageMs: smokeState.at ? Date.now() - smokeState.at : null,
+        fetches: smokeState.fetches,
+        errors: smokeState.errors
+      };
       const spaceHealth = {
         haveWind: !!space.wind,
         haveHp: !!space.hp,
@@ -864,12 +912,18 @@ function main() {
       if (url.pathname === '/health')
         return json(
           200,
-          {ais, lightning, space: spaceHealth},
+          {ais, lightning, space: spaceHealth, smoke: smokeHealth},
           {'cache-control': 'no-store'}
         );
       return json(
         200,
-        {ais, lightning, space: spaceHealth, probe: await probeAll()},
+        {
+          ais,
+          lightning,
+          space: spaceHealth,
+          smoke: smokeHealth,
+          probe: await probeAll()
+        },
         {'cache-control': 'no-store'}
       );
     }
@@ -905,6 +959,23 @@ function main() {
         {
           'cache-control': 'public, max-age=30',
           'x-lightning-source': 'blitzortung.org'
+        }
+      );
+    }
+
+    if (url.pathname === '/smoke') {
+      // The analyst-verified plume over the point (HMS is a North
+      // America product - null elsewhere is the truthful answer).
+      return json(
+        200,
+        {
+          smoke: smokeAt(smokeState.polys, lat, lon),
+          plumes: smokeState.polys.length,
+          day: smokeState.day
+        },
+        {
+          'cache-control': 'public, max-age=600',
+          'x-smoke-source': 'NOAA HMS (analyst-verified)'
         }
       );
     }
