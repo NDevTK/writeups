@@ -95,6 +95,10 @@
         and the open-meteo geocoder reaches any other place by name.
         Relocating sets only lat/lon/place - never a weather pin - so
         the destination's REAL sky, sea, ships and storms load.
+      - real inland water: OSM natural=water polygons (relations
+        stitched, surface at the measured median-shore DEM level) put
+        Lake Thun where Lake Thun is - the sea rule alone never could;
+        lake vessels float at the lake's own level
       - roam (just fly): the free camera streams terrain. 4 km from
         the anchor the world re-anchors on your geodetic position
         (roam.js - exact inverse mapping and altitude-datum carry,
@@ -115,7 +119,7 @@
         observation endpoint override), smoke=URL (HMS plume endpoint
         override), aerosol=URL (measured-aerosol endpoint override),
         lights=0|URL (Black Marble night lights off / tile endpoint
-        override), debug=1
+        override), water=0 (skip OSM lakes), debug=1
     -->
     <style>
       html,
@@ -362,6 +366,7 @@
         uniform as tslUniform
       } from 'three/tsl';
       import {buildVessel} from './horizon/vessels.js';
+      import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -1143,6 +1148,110 @@
           if (worldBuilt) placeTrees();
         } catch {
           forestGeo = null; // procedural scatter stays
+        }
+      }
+
+      // Real inland water: OSM natural=water polygons through the
+      // SAME Overpass endpoints - the terrain's sea rule (0.3 m)
+      // can never see a lake, so Interlaken rendered as a town
+      // between two grass basins. Big lakes arrive as relations
+      // split across dozens of boundary ways; lakes.js (gated)
+      // stitches the rings, measures each lake's surface from the
+      // median shoreline DEM, and rasterises a wet mask the
+      // terrain sampler reads in O(1). Stored geodetic like the
+      // forests, so re-anchors just re-project. ?water=0 disables.
+      let lakesGeo = null;
+      let lakesMask = null;
+      async function syncWater() {
+        if (params.get('water') === '0') return;
+        const key =
+          'horizon-water-geo-' +
+          state.lat.toFixed(2) +
+          ',' +
+          state.lon.toFixed(2);
+        const adopt = async () => {
+          // Late arrival with the world standing: the mesh baked
+          // its wet vertices without the lakes - rebuild once
+          // through the normal pipeline (worker off-thread).
+          if (worldBuilt && demData && !lakesMask && !roam.pending) {
+            const pre = await prepareTerrain(demData, {
+              lat: state.lat,
+              lon: state.lon
+            });
+            buildWorld(pre);
+          }
+        };
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) {
+            lakesGeo = JSON.parse(hit);
+            record(
+              'OSM Overpass water (cached)',
+              lakesGeo.length +
+                ' lakes' +
+                (lakesGeo[0] && lakesGeo[0].name
+                  ? ' · ' + lakesGeo[0].name
+                  : '')
+            );
+            await adopt();
+            return;
+          }
+        } catch {}
+        try {
+          const mLat = 111320;
+          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+          const dLat = DEM_HALF_M / mLat;
+          const dLon = DEM_HALF_M / mLon;
+          const bbox =
+            (state.lat - dLat).toFixed(4) +
+            ',' +
+            (state.lon - dLon).toFixed(4) +
+            ',' +
+            (state.lat + dLat).toFixed(4) +
+            ',' +
+            (state.lon + dLon).toFixed(4);
+          const q =
+            '[out:json][timeout:30];(way[natural=water](' +
+            bbox +
+            ');relation[natural=water](' +
+            bbox +
+            '););out geom 80;';
+          let osm = null;
+          for (const host of [
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+            'https://overpass-api.de/api/interpreter'
+          ]) {
+            try {
+              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
+                credentials: 'omit'
+              });
+              if (!r.ok) throw new Error(r.status);
+              osm = await r.json();
+              break;
+            } catch {
+              // Try the next mirror.
+            }
+          }
+          if (!osm) throw new Error('overpass unavailable');
+          // parseWater stitches relation rings and thins shorelines
+          // (gated); biggest lakes first so the panel names one.
+          lakesGeo = parseWater(osm).sort(
+            (a, b) =>
+              b.rings.reduce((s, r) => s + r.length, 0) -
+              a.rings.reduce((s, r) => s + r.length, 0)
+          );
+          record(
+            'OSM Overpass water',
+            lakesGeo.length +
+              ' lakes' +
+              (lakesGeo[0] && lakesGeo[0].name ? ' · ' + lakesGeo[0].name : '')
+          );
+          try {
+            localStorage.setItem(key, JSON.stringify(lakesGeo));
+          } catch {}
+          await adopt();
+        } catch {
+          lakesGeo = null; // the sea rule stands alone
         }
       }
 
@@ -2174,7 +2283,15 @@
       let dressAnchor = {lat: 51.48, lon: 0};
       function sample(x, z) {
         if (demData) {
-          return sampleDem(demData, x, z, centerElev, dressAnchor, WORLD);
+          return sampleDem(
+            demData,
+            x,
+            z,
+            centerElev,
+            dressAnchor,
+            WORLD,
+            lakesMask
+          );
         }
         // Procedural fallback (offline harness, DEM unreachable):
         // same datum and Earth-anchored seasoning, never water.
@@ -2414,6 +2531,15 @@
         // sample() calls stay consistent with this mesh even while
         // the next re-anchor's fetch is in flight.
         dressAnchor = {lat: state.lat, lon: state.lon};
+        // The lake wet mask rides the same pin: prepared off-thread
+        // when the worker ran, rebuilt here otherwise.
+        lakesMask =
+          (pre && pre.lakes) ||
+          (lakesGeo && demData
+            ? lakeMask(lakesGeo, dressAnchor, WORLD, 192, (x, z) =>
+                demElevOf(demData, x, z, WORLD)
+              )
+            : null);
         if (demData) {
           // Average the real elevation in a small ring around the scene
           // centre (grid-layout agnostic).
@@ -3168,7 +3294,7 @@
           }
           return;
         }
-        if (!water) return; // no sea in this DEM - no ships
+        if (!water && !lakesMask) return; // no sea, no lakes - no ships
         try {
           const r = await (
             await fetch(
@@ -4377,6 +4503,14 @@
             cnt++;
           }
         const center = Math.max(sum / cnt, 0.3);
+        // The lake wet mask for THIS box (lakes.js, gated): built
+        // from the new DEM + anchor so worker and main thread bake
+        // the same water.
+        const lakes = lakesGeo
+          ? lakeMask(lakesGeo, anchor, WORLD, 192, (x, z) =>
+              demElevOf(dem, x, z, WORLD)
+            )
+          : null;
         return new Promise((resolve) => {
           if (!terrainWorker && terrainWorker !== false) {
             try {
@@ -4391,15 +4525,15 @@
               terrainWorker = false;
             }
           }
-          if (!terrainWorker) return resolve({geo});
+          if (!terrainWorker) return resolve({geo, lakes});
           const id = ++terrainJobId;
-          const bail = setTimeout(() => resolve({geo}), 8000);
+          const bail = setTimeout(() => resolve({geo, lakes}), 8000);
           const onMsg = (ev) => {
             if (!ev.data || ev.data.id !== id) return;
             terrainWorker.removeEventListener('message', onMsg);
             clearTimeout(bail);
             terrainWorkerUsed++;
-            resolve({geo, ...ev.data});
+            resolve({geo, lakes, ...ev.data});
           };
           terrainWorker.addEventListener('message', onMsg);
           terrainWorker.postMessage(
@@ -4411,7 +4545,8 @@
               world: WORLD,
               xz,
               S: 512,
-              DT: 512
+              DT: 512,
+              lakes
             },
             [xz.buffer]
           );
@@ -4537,6 +4672,7 @@
         syncMetar();
         syncSmoke();
         syncAerosol();
+        syncWater();
         // The lamp cloud is anchored to the OLD box - drop it now,
         // syncLights rebuilds it Earth-anchored on the new one.
         if (lampPts) {
@@ -5237,7 +5373,15 @@
               continue;
             }
             s.g.visible = true;
-            s.g.position.set(s.x, water ? water.position.y : 0, s.z);
+            // Lake vessels float at the lake's MEASURED level (the
+            // BLS steamers on Thunersee carry AIS too); sea ships
+            // stay on the tide-following plane.
+            const lakeIdx = lakesMask ? lakeAt(lakesMask, s.x, s.z) : -1;
+            s.g.position.set(
+              s.x,
+              lakeIdx >= 0 ? sample(s.x, s.z).y : water ? water.position.y : 0,
+              s.z
+            );
             s.g.rotation.y = -s.hdg * RAD;
             const rel = relBearing(s.hdg, s, {
               x: camera.position.x,
@@ -6215,6 +6359,7 @@
         setInterval(syncSmoke, 30 * 60 * 1000);
         syncAerosol();
         setInterval(syncAerosol, 30 * 60 * 1000);
+        syncWater();
         syncLights();
         setInterval(syncLights, 6 * 60 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);

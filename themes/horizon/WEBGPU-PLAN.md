@@ -2394,6 +2394,39 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   about it - dimensions, type, light plan - was already gated in
   the previous entry. Viewer + workflow documented in
   harness/README.md.
+- DONE: real inland water (Jul 9, owner: "data sources we are not
+  integrating with or making proper assets is not progress"). The
+  terrain's sea rule (elevation <= 0.3 m) could never see a lake:
+  Interlaken rendered as a town between two grass basins, in a
+  theme that already knew the town's lights and ships. Fixed with
+  OSM natural=water through the SAME Overpass endpoints the
+  forests use - integrated END TO END, not plumbed: lakes.js
+  (gated, 5 landmarks) stitches relation boundary rings by exact
+  endpoint matching (Thunersee arrives as 42 outer ways; the LIVE
+  captured Brienzersee relation is the fixture, thinned
+  interior-only so endpoints survive), thins shorelines to the
+  mask texel, measures each lake's SURFACE LEVEL as the median
+  shoreline DEM (the shore is at lake level by definition), and
+  scanline-rasterises even-odd into an O(1) wet mask - gated
+  against the pointwise even-odd test (smoke.js inRing, one
+  polygon model) across the grid, islands staying dry.
+  terrain-sample.sampleDem gained the mask: inside a lake the
+  surface is water, FLAT at the measured level through the same
+  asinh datum + settle as the sea; the sea rule answers first,
+  untouched (terrain-sample set still green unchanged). Threaded
+  everywhere the sampler runs: the terrain worker job carries the
+  mask (built in prepareTerrain from the NEW box's DEM + anchor,
+  so worker and main thread bake identical water), trees and
+  lamps skip lake cells automatically through sample().water,
+  ships FLOAT at the lake's own level (the BLS steamers on
+  Thunersee carry AIS), and the no-sea guard now admits lake-only
+  boxes. Late Overpass arrival rebuilds the standing world once
+  through the normal worker pipeline. Cached geodetic per
+  location like the forests; ?water=0 disables; KEEP_PARAMS
+  carries 'water'. Gate 43 -> 44 sets. Browser smoke: local flat
+  DEM + the real fixture primed into the cache, booted
+  mid-Brienzersee - panel records "2 lakes - Brienzersee", the
+  wet-mask rebuild runs through the worker, frame loop alive.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

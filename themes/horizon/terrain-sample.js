@@ -77,12 +77,28 @@ export function demElev(dem, x, z, world) {
 
 // The scene surface at x/z: real metres asinh-compressed around
 // the box datum, the sea rule, and the Earth-anchored seasoning.
-export function sampleDem(dem, x, z, centerElev, anchor, world) {
+export function sampleDem(dem, x, z, centerElev, anchor, world, lakes) {
   const e = demElev(dem, x, z, world);
-  const water = e <= WATER_E;
+  let water = e <= WATER_E;
+  let waterE = 0; // the sea sits at the datum
+  // Real inland water (lakes.js): the OSM wet mask puts a FLAT
+  // surface at the lake's measured level - the sea rule alone can
+  // never see a lake above 0.3 m.
+  if (!water && lakes) {
+    const {grid, n, world: lw, elevs} = lakes;
+    const i = Math.floor(((x + lw / 2) / lw) * n);
+    const j = Math.floor(((z + lw / 2) / lw) * n);
+    if (i >= 0 && i < n && j >= 0 && j < n) {
+      const li = grid[j * n + i];
+      if (li >= 0) {
+        water = true;
+        waterE = elevs[li];
+      }
+    }
+  }
   let y = 16 * Math.asinh((e - centerElev) / 500);
   if (water) {
-    y = 16 * Math.asinh((0 - centerElev) / 500) + WATER_Y_OFF;
+    y = 16 * Math.asinh((waterE - centerElev) / 500) + WATER_Y_OFF;
   } else {
     const micro = dem.kind === 'img' ? MICRO_IMG : MICRO_GRID;
     y += micro * (microRelief(x, z, anchor) - 0.5);
