@@ -2367,6 +2367,33 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     (Bug found by the smoke: a local variable named `sample`
     shadowed the terrain sampler - renamed, and the sync's catch
     now logs to console under ?debug=1 instead of swallowing.)
+- DONE: asset design loop + designed vessels (Jul 9, owner: "great
+  looking assets have to be designed (maybe using tools to
+  help)"). The tool: harness/asset-viewer.html renders the fleet
+  in isolation and shoot.mjs's readback path takes the pictures -
+  geometry is now designed against ACTUAL RENDERS (the loop
+  caught its own rig lesson immediately: composited screenshots
+  are blank for WebGPU surfaces; the readback camera is the only
+  camera). The assets: vessels.js - ONE shared module the viewer
+  and the theme both import, so what was designed is what ships.
+  Hulls are real plan-forms now (flared bow taper, parallel
+  midbody, elliptical transom - an extruded Shape, not a box)
+  scaled to the measured AIS length/beam; arrangements by class:
+  container bays in per-ship deterministic colours (roam.hash3 on
+  the mmsi) with an island bridge + funnel seated ON the house,
+  tanker centre walkway + midship manifold + aft island,
+  passenger decks stepping back in four white tiers with a raked
+  funnel, trawler wheelhouse + A-gantry + boom, sailing rig with
+  mast, boom and a SET MAINSAIL, compact tug/other house. Three
+  design iterations via screenshots (fleet + per-class close-ups)
+  fixed: fog swallowing the stage, sun behind the fleet, funnels
+  drowned inside deckhouses, murky container palette. The theme's
+  buildShip now just calls buildVessel + hangs the gated COLREGS
+  light plan on the result; the old inline boxes are deleted.
+  Geometry is display furniture (not gated); everything measured
+  about it - dimensions, type, light plan - was already gated in
+  the previous entry. Viewer + workflow documented in
+  harness/README.md.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

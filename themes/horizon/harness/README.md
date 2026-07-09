@@ -42,3 +42,18 @@ Fixture site layout (not in the repo; rebuild per WEBGPU-PLAN.md):
 `site/` mirrors the published site with `/tiles/{z}/{x}/{y}.png`
 terrarium fixtures and `osm-fixtures.js`, served by
 `python3 -m http.server 8901`.
+
+## Asset viewer (design loop)
+
+`asset-viewer.html` renders the shared `../vessels.js` fleet (the
+SAME module the theme ships) in isolation, so asset geometry is
+designed against actual renders instead of imagination:
+
+    python3 -m http.server 8901   # from the repo root
+    xvfb-run -a node shoot.mjs \
+      "http://localhost:8901/themes/horizon/harness/asset-viewer.html" \
+      out.ppm --wgpu --wait-console DONE
+
+`?cls=cargo` isolates one class; `?az/el/d/yaw` orbit; `?len/beam`
+override the measured size. Composited screenshots are blank for
+WebGPU surfaces - shoot.mjs's readback path is the camera.
