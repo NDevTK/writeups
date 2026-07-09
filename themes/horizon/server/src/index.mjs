@@ -60,6 +60,8 @@ import {haversineKm} from '../../lightning.js';
 import {parseHemiPower, parsePropagated} from '../../solarwind.js';
 import {normalizeMetars} from '../../metar.js';
 import {parseHmsKml, smokeAt} from '../../smoke.js';
+import {parseGrib2} from '../../grib2.js';
+import {aerosolProducts} from '../../aerosol.js';
 
 // Schema normalizers - moved here when the Cloudflare worker was
 // retired and deleted (the daemon superseded it; git history
@@ -749,12 +751,82 @@ function main() {
   let tlesCache = {t: 0, body: null}; // CelesTrak visual group
   const adsbCache = new Map(); // area key -> {t, body, src}
   const metarCache = new Map(); // area key -> {t, body}
+  const aerosolCache = new Map(); // 0.25-deg cell key -> {t, body}
   setInterval(() => {
     const now = Date.now();
     for (const [k, v] of adsbCache) if (now - v.t > 30e3) adsbCache.delete(k);
     for (const [k, v] of metarCache)
       if (now - v.t > 20 * 60e3) metarCache.delete(k);
+    for (const [k, v] of aerosolCache)
+      if (now - v.t > 90 * 60e3) aerosolCache.delete(k);
   }, 30e3).unref();
+
+  // Measured aerosol radiative properties: GEFS-Aerosols (NOAA's
+  // operational GOCART coupling) via the NOMADS grib filter - the
+  // supported subsetting path since OpenDAP retired (SCN 25-81).
+  // A request covers ONE 0.25-deg cell (a 0.5-deg box, ~6 KB of
+  // GRIB2), decoded by the gated grib2.js and censused by the
+  // gated aerosol.js; per-cell answers are cached for 45 min
+  // (the product is 3-hourly), failures for 5 min, so many
+  // viewers in one place cost one upstream request.
+  const aerosolState = {fetches: 0, errors: 0, cycle: ''};
+  async function fetchAerosol(lat, lon) {
+    const cla = Math.max(-90, Math.min(90, Math.round(lat * 4) / 4));
+    const clo = (((Math.round(lon * 4) / 4) % 360) + 360) % 360;
+    const key = cla + '/' + clo;
+    const hit = aerosolCache.get(key);
+    if (hit && Date.now() - hit.t < (hit.body ? 45 : 5) * 60e3) return hit.body;
+    const bottom = Math.max(-90, Math.min(cla - 0.25, 89.5));
+    const left = Math.max(0, Math.min(clo - 0.25, 359.5));
+    // Latest cycle at least 5 h old (publish latency), then older.
+    const CYC = 21600e3;
+    const newest = Math.floor((Date.now() - 5 * 3600e3) / CYC) * CYC;
+    for (let k = 0; k < 3; k++) {
+      const ct = newest - k * CYC;
+      const d = new Date(ct);
+      const ymd =
+        d.getUTCFullYear() +
+        String(d.getUTCMonth() + 1).padStart(2, '0') +
+        String(d.getUTCDate()).padStart(2, '0');
+      const hh = String(d.getUTCHours()).padStart(2, '0');
+      const fhr = Math.max(
+        0,
+        Math.min(120, Math.round((Date.now() - ct) / 10800e3) * 3)
+      );
+      const u =
+        'https://nomads.ncep.noaa.gov/cgi-bin/filter_gefs_chem_0p25.pl' +
+        `?dir=%2Fgefs.${ymd}%2F${hh}%2Fchem%2Fpgrb2ap25` +
+        `&file=gefs.chem.t${hh}z.a2d_0p25.f${String(fhr).padStart(3, '0')}.grib2` +
+        '&var_AOTK=on&var_SCTAOTK=on&var_ASYSFK=on&var_SSALBK=on&all_lev=on' +
+        `&subregion=&leftlon=${left}&rightlon=${left + 0.5}` +
+        `&toplat=${bottom + 0.5}&bottomlat=${bottom}`;
+      try {
+        aerosolState.fetches++;
+        const r = await fetch(u, {
+          signal: AbortSignal.timeout(15e3),
+          headers: {'user-agent': UA}
+        });
+        if (!r.ok) continue; // cycle not published yet - older one
+        const buf = new Uint8Array(await r.arrayBuffer());
+        const products = aerosolProducts(parseGrib2(buf), cla, clo);
+        if (!products) continue;
+        const cycle = `${d.toISOString().slice(0, 13)}:00Z`;
+        aerosolState.cycle = cycle + '+' + fhr;
+        const body = {
+          products,
+          cycle,
+          fhr,
+          cell: {lat: cla, lon: clo > 180 ? clo - 360 : clo}
+        };
+        aerosolCache.set(key, {t: Date.now(), body});
+        return body;
+      } catch {
+        aerosolState.errors++;
+      }
+    }
+    aerosolCache.set(key, {t: Date.now(), body: null});
+    return null;
+  }
   // Aircraft near a point via the readsb failover chain, shared
   // by GET /adsb and the /stream pushes - the 15 s per-area cache
   // means many viewers in one place cost ONE upstream request,
@@ -909,10 +981,22 @@ function main() {
         fetches: space.fetches,
         errors: space.errors
       };
+      const aerosolHealth = {
+        cells: aerosolCache.size,
+        cycle: aerosolState.cycle,
+        fetches: aerosolState.fetches,
+        errors: aerosolState.errors
+      };
       if (url.pathname === '/health')
         return json(
           200,
-          {ais, lightning, space: spaceHealth, smoke: smokeHealth},
+          {
+            ais,
+            lightning,
+            space: spaceHealth,
+            smoke: smokeHealth,
+            aerosol: aerosolHealth
+          },
           {'cache-control': 'no-store'}
         );
       return json(
@@ -922,6 +1006,7 @@ function main() {
           lightning,
           space: spaceHealth,
           smoke: smokeHealth,
+          aerosol: aerosolHealth,
           probe: await probeAll()
         },
         {'cache-control': 'no-store'}
@@ -1020,6 +1105,19 @@ function main() {
       } catch {
         return json(502, {metars: [], upstream: 'unavailable'});
       }
+    }
+
+    if (url.pathname === '/aerosol') {
+      // Measured aerosol radiative properties for the cell over
+      // the point: total AOT at five optical bands, scattering
+      // AOT, single-scattering albedo, asymmetry, and the
+      // dust/sea-salt/sulphate/organic/black-carbon split.
+      const body = await fetchAerosol(lat, lon);
+      if (!body) return json(502, {products: null, upstream: 'unavailable'});
+      return json(200, body, {
+        'cache-control': 'public, max-age=900',
+        'x-aerosol-source': 'NOMADS GEFS-Aerosols (GOCART)'
+      });
     }
 
     if (url.pathname === '/adsb') {

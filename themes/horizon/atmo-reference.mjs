@@ -4,9 +4,14 @@
 const Rb = 6360e3,
   Rt = 6460e3;
 const rayS = [5.802e-6, 13.558e-6, 33.1e-6];
+// Per-channel Mie uniforms (aerosol.js can set a measured channel
+// set); the REFERENCE runs the Hillaire (2020) defaults, so the
+// texel values below are the paper's sky.
 const mieS0 = 3.996e-6,
-  mieA0 = 4.44e-7,
-  MIE = 1;
+  mieA0 = 4.44e-7;
+const mieS = [mieS0, mieS0, mieS0];
+const mieA = [mieA0, mieA0, mieA0];
+const G = 0.8;
 const ozA = [0.65e-6, 1.881e-6, 0.085e-6];
 
 // Radiative-constant landmark (Hillaire 2020, table 1): Mie
@@ -34,7 +39,7 @@ const dens = (h) => [
 const ext = (h) => {
   const d = dens(h);
   return rayS.map(
-    (r, c) => r * d[0] + (mieS0 + mieA0) * MIE * d[1] + ozA[c] * d[2]
+    (r, c) => r * d[0] + (mieS[c] + mieA[c]) * d[1] + ozA[c] * d[2]
   );
 };
 const raySphere = (r, mu, R) => {
@@ -57,11 +62,10 @@ const tUv = (r, mu) => {
 };
 const phaseR = (c) => (3 / (16 * Math.PI)) * (1 + c * c);
 const phaseM = (c) => {
-  const g = 0.8,
-    g2 = g * g;
+  const g2 = G * G;
   return (
     ((3 / (8 * Math.PI)) * ((1 - g2) * (1 + c * c))) /
-    ((2 + g2) * Math.pow(1 + g2 - 2 * g * c, 1.5))
+    ((2 + g2) * Math.pow(1 + g2 - 2 * G * c, 1.5))
   );
 };
 
@@ -139,7 +143,7 @@ for (let j = 0; j < MW; j++)
         const ri = Math.sqrt(r * r + ti * ti + 2 * r * ti * mu);
         const h = ri - Rb;
         const dd = dens(h);
-        const scat = rayS.map((rr) => rr * dd[0] + mieS0 * MIE * dd[1]);
+        const scat = rayS.map((rr, cc) => rr * dd[0] + mieS[cc] * dd[1]);
         const e = ext(h);
         const muSi = Math.min(Math.max((r * muS + ti * cSun) / ri, -1), 1);
         const Ts = sunT(ri, muSi);
@@ -212,15 +216,15 @@ const sky = (i, j) => {
     const h = ri - Rb;
     const dd = dens(h);
     const sR = rayS.map((rr) => rr * dd[0]);
-    const sM = mieS0 * MIE * dd[1];
+    const sM = mieS.map((ss) => ss * dd[1]);
     const e = ext(h);
     const muSi = Math.min(Math.max((r * sunMu + ti * cSun) / ri, -1), 1);
     const Ts = sunT(ri, muSi);
     const psi = psiMS(ri, muSi);
     for (let c = 0; c < 3; c++) {
       const S =
-        (sR[c] * phaseR(cSun) + sM * phaseM(cSun)) * Ts[c] +
-        (sR[c] + sM) * psi[c];
+        (sR[c] * phaseR(cSun) + sM[c] * phaseM(cSun)) * Ts[c] +
+        (sR[c] + sM[c]) * psi[c];
       const st = Math.exp(-e[c] * dt);
       L[c] += (T[c] * (S - S * st)) / Math.max(e[c], 1e-9);
       T[c] *= st;
