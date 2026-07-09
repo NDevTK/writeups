@@ -88,8 +88,11 @@ export function createAtmosphereTSL(renderer) {
 
   const rayleighS = vec3(5.802e-6, 13.558e-6, 33.1e-6);
   const ozoneA = vec3(0.65e-6, 1.881e-6, 0.085e-6);
+  // Hillaire (2020) Mie radiative constants: scattering 3.996e-6,
+  // extinction 4.440e-6 (= sigma_s / 0.9, Bruneton's convention), so
+  // absorption is 4.44e-7 and the single-scattering albedo is 0.9.
   const MIE_S0 = 3.996e-6;
-  const MIE_A0 = 4.4e-6;
+  const MIE_A0 = 4.44e-7;
 
   // x: rayleigh, y: mie, z: ozone (tent at 25 km).
   const densities = Fn(([h]) =>

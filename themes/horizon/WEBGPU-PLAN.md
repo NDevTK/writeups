@@ -2135,19 +2135,31 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   position through the same gated geoToScene - exact continuity.
   window.\_\_roam.workerUsed for the harness; verified in the
   browser smoke (hop through the worker path).
-- OPEN (radiative constants, needs GPU recertification):
-  atmosphere-tsl's MIE_A0 = 4.4e-6 reads as Mie ABSORPTION and
-  extinction is computed as MIE_S0 + MIE_A0 = 8.4e-6 - but
+- DONE (radiative constants): MIE_A0 corrected 4.4e-6 -> 4.44e-7.
   Hillaire (2020) gives Mie scattering 3.996e-6 and EXTINCTION
-  4.440e-6, i.e. absorption 4.44e-7: the code's absorption looks
-  10x the paper's (SSA 0.48 vs the paper's 0.9). It is
-  self-consistent with the certified GLSL reference (same
-  constant ported), so renders match each other - but the
-  constant should be re-derived against the paper and, if
-  corrected, the sky recertified against the pinned matrix with
-  a proper SHOOT_CHROME. The smoke SSA hook (analyst-verified
-  plume -> biomass-burning single-scattering albedo, AERONET
-  climatology) lands in the same edit once settled.
+  4.440e-6 = sigma_s / 0.9 (Bruneton's convention); the original
+  port read the extinction-minus-scattering as 4.4e-6 - a slipped
+  decimal carried self-consistently by every mirror, giving Mie
+  SSA 0.48 instead of the paper's 0.9 (haze absorbed 10x too
+  much). All three mirrors moved in the same edit - the TSL
+  extinction (atmosphere-tsl.js), the CPU sun-colour integral
+  (sun-transmittance.js), and the double-precision reference
+  (atmo-reference.mjs) - so the reference-vs-engine relationship
+  is unchanged and the gate re-derives every REF texel from the
+  corrected constant. New landmark in atmo-reference.mjs pins it:
+  sigma_s/(sigma_s+sigma_a) = 0.9 to 1e-12 and sigma_t = 4.440e-6
+  (exit 1 on drift), so the constant can never silently regress.
+  Measured effect on the sun's transmitted light (mieScale 1,
+  red channel): alt 1 deg 0.2132 -> 0.2482 (+16%), alt 0.2 deg
+  0.1144 -> 0.1511 (+32%) - the low sun and horizon sky brighten
+  toward the paper's intent, high sun barely moves (alt 30 deg
+  +0.6%). No pinned GPU texel matrix exists for the sky (the
+  fixture rig cannot shoot it - environment OPEN below), so
+  on-screen judgement is the owner's live browser; the numeric
+  chain is gated. The smoke SSA hook (analyst-verified plume ->
+  biomass-burning single-scattering albedo) stays deferred until
+  a citable climatology value is settled - published AERONET
+  spreads are wide and we do not invent constants.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

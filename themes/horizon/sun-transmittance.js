@@ -27,7 +27,9 @@ export function sunTransmittanceJS(cosZenith, mieScale) {
     tm += Math.exp(-h / 1200) * dt;
     to += Math.max(0, 1 - Math.abs(h - 25e3) / 15e3) * dt;
   }
-  const mie = (3.996e-6 + 4.4e-6) * mieScale * tm;
+  // Mie extinction 4.440e-6 = scattering 3.996e-6 + absorption
+  // 4.44e-7 (Hillaire 2020, SSA 0.9) - same split as the shader.
+  const mie = (3.996e-6 + 4.44e-7) * mieScale * tm;
   return [
     Math.exp(-(5.802e-6 * tr + mie + 0.65e-6 * to)),
     Math.exp(-(13.558e-6 * tr + mie + 1.881e-6 * to)),

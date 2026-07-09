@@ -5,9 +5,26 @@ const Rb = 6360e3,
   Rt = 6460e3;
 const rayS = [5.802e-6, 13.558e-6, 33.1e-6];
 const mieS0 = 3.996e-6,
-  mieA0 = 4.4e-6,
+  mieA0 = 4.44e-7,
   MIE = 1;
 const ozA = [0.65e-6, 1.881e-6, 0.085e-6];
+
+// Radiative-constant landmark (Hillaire 2020, table 1): Mie
+// scattering 3.996e-6 with EXTINCTION 4.440e-6 = sigma_s / 0.9
+// (Bruneton's convention), i.e. absorption 4.44e-7 and a
+// single-scattering albedo of exactly 0.9. The original port
+// carried 4.4e-6 as the ABSORPTION (SSA 0.48) - this pins every
+// mirror (shader, CPU transmittance, this reference) to the paper.
+{
+  const ssa = mieS0 / (mieS0 + mieA0);
+  const ok =
+    Math.abs(ssa - 0.9) < 1e-12 &&
+    Math.abs((mieS0 + mieA0) / 4.44e-6 - 1) < 1e-12;
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} mie SSA: sigma_s ${mieS0.toExponential(4)} / sigma_t ${(mieS0 + mieA0).toExponential(4)} = ${ssa.toFixed(12)} (Hillaire 2020: 0.9 exactly)`
+  );
+  if (!ok) process.exit(1);
+}
 
 const dens = (h) => [
   Math.exp(-h / 8000),
