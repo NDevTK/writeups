@@ -4602,14 +4602,16 @@
           // compression) feeds the sky and aerial LUTs, so flying up
           // physically lowers the horizon and thins the haze.
           const eCam = centerElev + 500 * Math.sinh(camera.position.y / 16);
-          // Crepuscular rays: the aerial march places its cloud
-          // shadow samples from the camera's scene position and the
-          // sun azimuth (set BEFORE update - fillAerial runs there).
+          // Crepuscular rays: the sky and aerial marches place
+          // their cloud shadow samples from the camera's scene
+          // position, the sun azimuth and the box's elevation
+          // datum (set BEFORE update - the fills run there).
           atmo.aerialShadow.camXZ.value.set(
             camera.position.x,
             camera.position.z
           );
           atmo.aerialShadow.sunAz.value.set(sunVec.x, sunVec.z).normalize();
+          atmo.aerialShadow.elev0.value = centerElev;
           atmo.update(sunVec, mieRad, Math.max(eCam, 50), skyExposure);
           // Aerial perspective shares the dome's exposure so inscattered
           // light on the terrain matches the sky it comes from.
