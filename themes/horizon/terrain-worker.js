@@ -22,7 +22,7 @@ import {buildMomentPyramid, slopesFromHeights} from './leadr.js';
 import {demElev, sampleDem} from './terrain-sample.js';
 
 self.onmessage = (ev) => {
-  const {id, dem, centerElev, anchor, world, xz, S, DT} = ev.data;
+  const {id, dem, centerElev, anchor, world, xz, S, DT, lakes} = ev.data;
 
   // LEADR slope-moment heights.
   const step = world / (S - 1);
@@ -35,7 +35,8 @@ self.onmessage = (ev) => {
         (j / (S - 1) - 0.5) * world,
         centerElev,
         anchor,
-        world
+        world,
+        lakes
       ).y;
     }
   }
@@ -53,7 +54,8 @@ self.onmessage = (ev) => {
       xz[2 * k + 1],
       centerElev,
       anchor,
-      world
+      world,
+      lakes
     );
     meshY[k] = s.y;
     meshWet[k] = s.water ? 1 : 0;
