@@ -18,10 +18,13 @@ import {
   apparentLux,
   KT_MS,
   lightArcs,
+  lightPlan,
   luminousIntensity,
   RANGE_NM,
+  rangesFor,
   relBearing,
-  SUNSET_ELEV
+  SUNSET_ELEV,
+  typeClass
 } from './ships.js';
 import {KT_MS as KT_MS_AIR} from './contrails.js';
 
@@ -151,6 +154,75 @@ const check = (name, ok, detail) => {
     'Rule 20(b) boundary',
     Math.abs(SUNSET_ELEV - -0.8333333333333334) < 1e-12,
     `lights from sunset to sunrise: solar altitude below ${SUNSET_ELEV.toFixed(4)} deg (-50 arcmin: 34' refraction + 16' semidiameter)`
+  );
+}
+
+{
+  // ITU-R M.1371 type codes -> silhouette classes: family by
+  // first digit, specific craft at 30-37 and 52.
+  const ok =
+    typeClass(70) === 'cargo' &&
+    typeClass(79) === 'cargo' &&
+    typeClass(84) === 'tanker' &&
+    typeClass(60) === 'passenger' &&
+    typeClass(30) === 'fishing' &&
+    typeClass(36) === 'sailing' &&
+    typeClass(37) === 'pleasure' &&
+    typeClass(52) === 'tug' &&
+    typeClass(31) === 'tug' &&
+    typeClass(41) === 'hsc' &&
+    typeClass(0) === 'other' &&
+    typeClass(90) === 'other';
+  check(
+    'M.1371 type classes',
+    ok,
+    `70s cargo, 80s tanker, 60s passenger, 30 fishing, 36 sailing, 37 pleasure, 31/32/52 tug, 40s HSC, unknown/other -> other`
+  );
+}
+
+{
+  // The measured light plan, COLREGS made concrete. 240 x 32 m
+  // cargo (Rule 23(a) + Annex I 2(a)/3(a)): TWO mastheads, the
+  // forward at min(6..12, beam-capped) = 12 m (beam 32 caps at
+  // 12), the after 4.5 m higher, separated by min(len/2, 100) =
+  // 100 m, forward light within a quarter length of the stem;
+  // Rule 22(a) ranges 6/3/3.
+  const big = lightPlan(240, 32, 'cargo');
+  const sepBig = big.mastheads[1].z - big.mastheads[0].z;
+  const stemBig = big.mastheads[0].z - -120;
+  // 30 m fisherman: ONE masthead (under 50 m), Rule 22(b) ranges
+  // 5/2/2; an 8 m launch: 2/1/2; a 15 m boat's masthead range 3.
+  const mid = lightPlan(30, 7, 'fishing');
+  const small = rangesFor(8);
+  const fifteen = rangesFor(15);
+  // Rule 25(b): a sailing vessel carries NO masthead light.
+  const sail = lightPlan(14, 4, 'sailing');
+  const ok =
+    big.mastheads.length === 2 &&
+    big.mastheads[0].y === 12 &&
+    big.mastheads[1].y === 16.5 &&
+    sepBig === 100 &&
+    stemBig >= 0 &&
+    stemBig <= 60 &&
+    big.ranges.masthead === 6 &&
+    // Annex I 2(g) is a MAXIMUM: sidelights not above 3/4 of the
+    // forward masthead height (the plan places them at 0.6).
+    Math.abs(big.sideY - 7.2) < 1e-12 &&
+    big.sideY <= 0.75 * big.mastheads[0].y &&
+    mid.mastheads.length === 1 &&
+    mid.mastheads[0].y === 7 &&
+    mid.ranges.masthead === 5 &&
+    mid.ranges.side === 2 &&
+    small.masthead === 2 &&
+    small.side === 1 &&
+    small.stern === 2 &&
+    fifteen.masthead === 3 &&
+    sail.mastheads.length === 0 &&
+    sail.ranges.side === 2;
+  check(
+    'measured light plan',
+    ok,
+    `240 m cargo: two mastheads 12/16.5 m, 100 m apart, forward within L/4 of the stem, 6/3/3 nm; 30 m fisher: one masthead at beam height 7 m, 5/2/2; 8 m launch 2/1/2; 15 m masthead 3 nm; sailing = no masthead (Rule 25(b))`
   );
 }
 

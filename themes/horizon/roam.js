@@ -113,7 +113,9 @@ export const MICRO_M = 400;
 
 // Deterministic integer hash -> [0,1) (the same avalanche family
 // as the theme's mulberry32, applied to a 3D lattice point).
-function hash3(x, y, z) {
+// Exported: nightlights.js seeds its Earth-anchored lamps from
+// the SAME hash, so all deterministic dressing shares one model.
+export function hash3(x, y, z) {
   let a =
     (Math.imul(x | 0, 374761393) ^
       Math.imul(y | 0, 668265263) ^

@@ -14,7 +14,10 @@
 import {inflateSync} from 'node:zlib';
 import {
   DNB_BINS,
+  LAMP_FULL,
+  LAMP_MIN,
   LAMP_TINT,
+  lampCandidates,
   lightsField,
   pixelOf,
   planckianXY,
@@ -264,6 +267,52 @@ const tile = decodePng(
       t[2] > 0.03 &&
       t[2] < 0.25,
     `Kang locus hits published 2700 K (${x27.toFixed(4)}, ${y27.toFixed(4)}) and 6500 K points to 3e-3; linear tint [1, ${t[1].toFixed(3)}, ${t[2].toFixed(3)}] - warm, red-led, normalised`
+  );
+}
+
+{
+  // The lamps: deterministic, Earth-anchored (roam's shared hash3
+  // on absolute geodetic cells - the same town lights the same
+  // lamps from ANY anchor), density linear in measured radiance.
+  const A = {lat: 46.7, lon: 7.6};
+  const gB = sceneToGeo(60, -40, A);
+  const B = {lat: gB.lat, lon: gB.lon};
+  const flat = () => 7.5; // half of LAMP_FULL everywhere
+  // Uncapped candidate sets: the display budget (cap) is the
+  // theme's - the CANDIDATES are the Earth-anchored model.
+  const l1 = lampCandidates(flat, A, 280, 1e9);
+  const l2 = lampCandidates(flat, A, 280, 1e9);
+  const lB = lampCandidates(flat, B, 280, 1e9);
+  const same =
+    l1.length === l2.length &&
+    l1.every((p, k) => p.lat === l2[k].lat && p.lon === l2[k].lon);
+  // Anchor independence: every lamp of B that geodetically falls
+  // inside A's box must be one of A's lamps, exactly.
+  const setA = new Set(l1.map((p) => p.lat + '/' + p.lon));
+  let missing = 0;
+  let shared = 0;
+  for (const p of lB) {
+    const s = geoToScene(p.lat, p.lon, A);
+    if (Math.abs(s.x) > 139 || Math.abs(s.z) > 139) continue;
+    shared++;
+    if (!setA.has(p.lat + '/' + p.lon)) missing++;
+  }
+  // Density is AREAL: the cos(lat) acceptance exactly compensates
+  // the east-west narrowing of the geodetic cells, so the count
+  // over a (16 km)^2 box is area/cell^2 x rad/LAMP_FULL,
+  // latitude-free. Binomial noise over the iterated (wider)
+  // lattice: n = cells/cos, p = cos x 0.5.
+  const all = l1;
+  const cells = (16000 / 120) ** 2;
+  const expect = cells * (7.5 / LAMP_FULL);
+  const cosA = Math.cos((46.7 * Math.PI) / 180);
+  const sigma = Math.sqrt((cells / cosA) * (cosA * 0.5) * (1 - cosA * 0.5));
+  const densOk = Math.abs(all.length - expect) < 6 * sigma;
+  const dark = lampCandidates(() => LAMP_MIN * 0.9, A, 280);
+  check(
+    'earth-anchored lamps',
+    same && missing === 0 && shared > 500 && densOk && dark.length === 0,
+    `deterministic twice; ${shared} overlap lamps from a second anchor all identical geodetically; count ${all.length} vs expected ${expect.toFixed(0)} (binomial, cos(lat) x rad/${LAMP_FULL}); below ${LAMP_MIN} nW no lamps`
   );
 }
 

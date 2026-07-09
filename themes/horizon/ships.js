@@ -53,6 +53,75 @@ export const SUNSET_ELEV = -50 / 60;
 // luminous ranges in nautical miles.
 export const RANGE_NM = {masthead: 6, side: 3, stern: 3};
 
+// Rule 22 in full - minimum luminous ranges (nm) by vessel
+// length: (a) >= 50 m: masthead 6, side 3, stern 3; (b) >= 12 m
+// but < 50 m: masthead 5 (3 if under 20 m), side 2, stern 2;
+// (c) < 12 m: masthead 2, side 1, stern 2.
+export function rangesFor(lenM) {
+  if (lenM >= 50) return {masthead: 6, side: 3, stern: 3};
+  if (lenM >= 12) return {masthead: lenM >= 20 ? 5 : 3, side: 2, stern: 2};
+  return {masthead: 2, side: 1, stern: 2};
+}
+
+// ITU-R M.1371 ship-type code (AIS message 5 "Type") -> the
+// silhouette class the theme draws. First digit is the family;
+// 30-37 are specific craft.
+export function typeClass(t) {
+  if (t === 30) return 'fishing';
+  if (t === 31 || t === 32 || t === 52) return 'tug';
+  if (t === 36) return 'sailing';
+  if (t === 37) return 'pleasure';
+  const d = Math.floor((t || 0) / 10);
+  if (d === 4) return 'hsc';
+  if (d === 6) return 'passenger';
+  if (d === 7) return 'cargo';
+  if (d === 8) return 'tanker';
+  return 'other';
+}
+
+/**
+ * The vessel's light plan from its MEASURED length and beam -
+ * COLREGS made concrete:
+ *  - Rule 23(a): power-driven vessels carry a forward masthead
+ *    light, and a second one abaft and higher when >= 50 m.
+ *  - Rule 25(b): sailing vessels underway carry sidelights and
+ *    sternlight ONLY - no masthead light.
+ *  - Annex I 2(a): forward masthead height >= 6 m above the hull
+ *    (>= the beam if broader, need not exceed 12 m); the after
+ *    masthead at least 4.5 m vertically higher.
+ *  - Annex I 3(a): horizontal separation of the mastheads at
+ *    least half the vessel's length (need not exceed 100 m); the
+ *    forward light no more than a quarter length from the stem.
+ *  - Rule 22 ranges via rangesFor.
+ * Ship frame: metres, bow at z = -len/2, +y up. Returns
+ * {mastheads: [{y, z}...], sideY, sternY, ranges}.
+ */
+export function lightPlan(lenM, beamM, cls) {
+  const len = Math.max(lenM || 0, 6);
+  const beam = Math.max(beamM || 0, 2);
+  const ranges = rangesFor(len);
+  // Sailing (Rule 25(b)): no masthead light; side/stern heights
+  // are display placement near deck level (the regulation fixes
+  // the arcs and ranges, not a sailing hull's geometry).
+  if (cls === 'sailing')
+    return {
+      mastheads: [],
+      sideY: Math.min(0.15 * len, 3),
+      sternY: Math.min(0.1 * len, 2),
+      ranges
+    };
+  const h1 = Math.min(Math.max(6, beam), 12);
+  const zFwd = -len / 2 + Math.min(len / 4, len * 0.2);
+  const mastheads = [{y: h1, z: zFwd}];
+  if (len >= 50) {
+    const sep = Math.min(Math.max(len / 2, 0), 100);
+    mastheads.push({y: h1 + 4.5, z: zFwd + sep});
+  }
+  // Annex I 2(g): sidelights not above three quarters of the
+  // forward masthead height.
+  return {mastheads, sideY: 0.6 * h1, sternY: 0.4 * h1, ranges};
+}
+
 // Annex I section 8: luminous intensity (candela) for a light
 // required to be visible at D nautical miles. T = 2e-7 lux
 // threshold, K = 0.8 atmospheric transmissivity.
