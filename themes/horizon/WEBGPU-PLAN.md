@@ -2280,6 +2280,46 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   note: the shadow map still covers the 16 km world box, so
   dome beams come from the clouds overhead - which is where
   crepuscular rays live.
+- DONE: Black Marble night lights - the ground under the skyglow
+  (Jul 9). The Falchi atlas the sky already uses is DERIVED from
+  VIIRS DNB radiances; this puts the source on the terrain, so
+  valley towns glow exactly where the sky above them does. Feed:
+  GIBS WMTS (keyless, CORS \* confirmed), layer
+  VIIRS_SNPP_GapFilled_BRDF_Corrected_DayNightBand_Radiance - the
+  DAILY gap-filled BRDF-corrected moonlight-removed VNP46A2
+  science product (Roman et al. 2018, RSE 210), published ~2 days
+  behind (the sync walks back to the newest available day). The
+  tiles are palettized PNGs whose PUBLISHED GIBS colormap is an
+  exact data-to-gray table in nW/(cm^2 sr): nightlights.js embeds
+  the 180-bin table and inverts pixels to CALIBRATED radiance -
+  town brightness is measured and linear, not painted. One
+  demonstrable typo in NASA's published table (gray 166's upper
+  edge printed 100.0 amid a 0.1-wide ramp whose next bin starts
+  at 10.0) is corrected and documented; the contiguity landmark
+  would fail otherwise. Field build: NaN-aware bilinear on
+  RADIANCE (never on the non-linear gray), sampled through
+  roam.sceneToGeo - the same gated Earth anchoring as the
+  terrain, so lights sit on the towns through explore and roam
+  hops (re-anchor refetches; a hop mid-fetch is sequence-guarded).
+  Render: a 96x96 float radiance texture over the box feeds a new
+  terrain emissive term - linear radiance x ONE exposure-matched
+  gain (like every other emissive) x a 2700 K Planckian lamp
+  tint computed from the Kang et al. (2002) locus approximation
+  (a documented rendering choice - DNB is panchromatic - with the
+  locus GATED against published CIE Planckian points), fading in
+  through civil twilight. Gate grew 41 -> 42 sets
+  (nightlights-reference.mjs, 5 landmarks): the LIVE captured
+  Bernese-Oberland tile decoded by a reference-only PNG reader
+  (palette + tRNS, all five filters) onto Pillow ground-truth
+  pins - Bern saturates the scale at >= 38.2 nW/(cm^2 sr), Thun
+  ~37, Interlaken mid-scale, dark Alps at the 0.1-0.2 airglow
+  floor, plus a full 256-px row through the Bern conurbation;
+  colormap monotone/contiguous with every gray inverting into its
+  own bin; the mercator pixel mapping against an independent
+  restatement; the field bilinear against an independently placed
+  single-lit-pixel weight through the Earth-anchor roundtrip; the
+  lamp locus vs published CIE coordinates. ?lights=0 disables;
+  ?lights=URL overrides the tile endpoint ({d}/{z}/{r}/{c}).
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

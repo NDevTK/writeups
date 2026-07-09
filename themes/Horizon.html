@@ -78,7 +78,11 @@
         temperature rises
       - sky haze is measured air: GEFS-Aerosols spectral extinction,
         single-scattering albedo and asymmetry per channel (CAMS total
-        AOD as fallback); trees stand inside the real OSM forest polygons
+        AOD as fallback); at night the terrain carries NASA Black
+        Marble measured city lights (daily VNP46A2 radiances - the
+        same VIIRS data the Falchi skyglow derives from, so towns
+        glow exactly where the sky above them does); trees stand
+        inside the real OSM forest polygons
         around you; the sea is a reflecting three.js Water plane whose
         wave energy follows the real sea state; constellation figures
         (d3-celestial data) ride the same sidereal dome as the stars
@@ -110,7 +114,8 @@
         space=URL (solar-wind endpoint override), metar=URL (aerodrome
         observation endpoint override), smoke=URL (HMS plume endpoint
         override), aerosol=URL (measured-aerosol endpoint override),
-        debug=1
+        lights=0|URL (Black Marble night lights off / tile endpoint
+        override), debug=1
     -->
     <style>
       html,
@@ -342,6 +347,13 @@
         TAU_MAX,
         TAU_MIN
       } from './horizon/aerosol.js';
+      import {
+        LAMP_TINT,
+        NL_LAYER,
+        NL_Z,
+        lightsField,
+        pixelOf
+      } from './horizon/nightlights.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -1525,6 +1537,110 @@
         }
       }
 
+      // The ground under the skyglow: NASA Black Marble measured
+      // night lights (VNP46A2 - daily, gap-filled, BRDF-corrected,
+      // moonlight-removed; Roman et al. 2018). The Falchi atlas
+      // the SKY already uses is derived from these very DNB
+      // radiances - this puts the source on the ground, so the
+      // valley towns glow exactly where the sky above them does.
+      // GIBS WMTS serves the tiles keyless with CORS *, and the
+      // published colormap inverts to CALIBRATED radiance
+      // (nightlights.js, gated) - town brightness is measured and
+      // linear, not painted. ?lights=0 disables, ?lights=URL
+      // overrides the tile endpoint ({d}/{z}/{r}/{c}).
+      const LIGHTS_TILES =
+        params.get('lights') ??
+        'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/' +
+          NL_LAYER +
+          '/default/{d}/GoogleMapsCompatible_Level8/{z}/{r}/{c}.png';
+      let lightsSeq = 0;
+      async function syncLights() {
+        if (params.get('lights') === '0' || !terrainObj) return;
+        const seq = ++lightsSeq; // a roam hop restarts the fetch
+        try {
+          const anchor = {lat: state.lat, lon: state.lon};
+          const need = new Map();
+          for (const [sx, sz] of [
+            [-1, -1],
+            [1, -1],
+            [-1, 1],
+            [1, 1]
+          ]) {
+            const g = sceneToGeo((sx * WORLD) / 2, (sz * WORLD) / 2, anchor);
+            const p = pixelOf(g.lat, g.lon);
+            const c = Math.floor(p.px / 256);
+            const r = Math.floor(p.py / 256);
+            need.set(r + '/' + c, [r, c]);
+          }
+          // The daily product publishes a couple of days behind -
+          // newest available day wins.
+          let imgs = null;
+          let day = '';
+          for (let back = 2; back <= 8 && !imgs; back++) {
+            const d = new Date(Date.now() - back * 86400e3)
+              .toISOString()
+              .slice(0, 10);
+            try {
+              const loaded = await Promise.all(
+                [...need.values()].map(([r, c]) => {
+                  const img = new Image();
+                  img.crossOrigin = 'anonymous';
+                  img.src = LIGHTS_TILES.replace('{d}', d)
+                    .replace('{z}', NL_Z)
+                    .replace('{r}', r)
+                    .replace('{c}', c);
+                  return img.decode().then(() => img);
+                })
+              );
+              imgs = new Map([...need.keys()].map((k, i) => [k, loaded[i]]));
+              day = d;
+            } catch {
+              // that day not published (or a gap) - go older
+            }
+          }
+          if (!imgs || seq !== lightsSeq) return;
+          const px = new Map();
+          for (const [k, img] of imgs) {
+            const cv = document.createElement('canvas');
+            cv.width = cv.height = 256;
+            const cx = cv.getContext('2d', {willReadFrequently: true});
+            cx.drawImage(img, 0, 0);
+            px.set(k, cx.getImageData(0, 0, 256, 256).data);
+          }
+          const sample = (ix, iy) => {
+            const d = px.get(Math.floor(iy / 256) + '/' + Math.floor(ix / 256));
+            if (!d) return null;
+            const o = ((iy & 255) * 256 + (ix & 255)) * 4;
+            return [d[o], d[o + 1], d[o + 2], d[o + 3]];
+          };
+          const N = 96;
+          const f = lightsField(sample, anchor, WORLD, N);
+          const tex = new THREE.DataTexture(
+            f.data,
+            N,
+            N,
+            THREE.RedFormat,
+            THREE.FloatType
+          );
+          tex.minFilter = tex.magFilter = THREE.LinearFilter;
+          tex.needsUpdate = true;
+          const old = terrainObj.lightsTexNode.value;
+          terrainObj.lightsTexNode.value = tex;
+          if (old && old.image && old.image.width > 1) old.dispose();
+          terrainUniforms.uLightsOn.value = 1;
+          record(
+            'VIIRS Black Marble ' + day,
+            'max ' +
+              f.max.toFixed(1) +
+              ' · mean ' +
+              f.mean.toFixed(2) +
+              ' nW/cm²/sr over the box'
+          );
+        } catch {
+          // The ground stays dark - the truthful default.
+        }
+      }
+
       // Wildfire smoke: NOAA HMS analysts draw verified plume
       // polygons from satellite imagery (North America - null
       // elsewhere is the truthful answer). The daemon holds the
@@ -2086,6 +2202,7 @@
       const terrainUniforms = terrainObj.uniforms;
       terrainUniforms.uWorldSize.value = WORLD;
       cloudShadow.applyTo(terrainMat);
+      terrainUniforms.uLightsTint.value.fromArray(LAMP_TINT);
       record(
         'GGX microfacet BRDF (Karis 2013)',
         'per-pixel roughness · vegetation/rock/snow'
@@ -4245,6 +4362,7 @@
         syncMetar();
         syncSmoke();
         syncAerosol();
+        syncLights();
       }
       function maybeRoam(now, moved) {
         if (moved) lastMoveMs = now;
@@ -5172,6 +5290,14 @@
         // Sea-state uniforms: real wind feeds the wave model.
         terrainUniforms.uTime.value = t / 1000;
         terrainUniforms.uWindMs.value = state.wind / 3.6;
+        // Night lights fade in through civil twilight (streetlights
+        // lead the stars); the camera sits under the decks with
+        // them, so no cloud dimming applies.
+        terrainUniforms.uLightsNight.value = THREE.MathUtils.clamp(
+          -(sun.alt / RAD + 0.5) / 5,
+          0,
+          1
+        );
         terrainUniforms.uWindVec.value.set(windV.x, windV.z);
         terrainUniforms.uSunDirW.value.copy(sunVec);
         terrainUniforms.uSunCol.value
@@ -5904,6 +6030,8 @@
         setInterval(syncSmoke, 30 * 60 * 1000);
         syncAerosol();
         setInterval(syncAerosol, 30 * 60 * 1000);
+        syncLights();
+        setInterval(syncLights, 6 * 60 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
         syncISS();
         setInterval(syncISS, 6 * 60 * 60 * 1000);
