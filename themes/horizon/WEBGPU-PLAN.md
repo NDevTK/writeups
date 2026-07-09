@@ -2252,6 +2252,34 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   under heavy cloud reproduces IDENTICALLY on a clean HEAD
   worktree (156 vs 158 messages), i.e. the documented
   environmental drift below, not this change.
+- DONE: crepuscular rays phase 2 - the sky dome joins (Jul 9).
+  The follow-up queued in the phase-1 entry: the SKY-VIEW march
+  now carries the same volumetric shadow as the aerial one, so
+  the beams fan across the sky from cloud gaps, not only through
+  the terrain haze. One march factory serves both LUTs (the
+  aerial march was the special case se=0, ce=1 all along - the
+  unification is a deletion, not a fork). Sky-view LUT went
+  192x108 half-circle -> 384x108 FULL signed circle (the old
+  texel pitch kept; the seam at the anti-sun azimuth); the dome
+  sampler reads the signed angle with the same gated
+  atan(cross, dot); the irradiance integral's 8 azimuth samples
+  now span the full circle, so the shadowed sky darkens the
+  hemisphere ambient correctly. Shadow samples are HEIGHT-AWARE
+  everywhere now: scene y from the theme's exact asinh altitude
+  datum (identity landmark against roam.yOfElev - one datum, one
+  model), so a ray above the decks reads full sun and a camera
+  flying over the clouds sees no ground shafts (this supersedes
+  phase 1's ground-datum sampling for the aerial march too).
+  Landmarks (atmo set 16 -> 19 lines): full-circle back-compat -
+  the six old half-circle sky pins and their MIRRORS reproduce to
+  2.2e-16 (the remap provably changes nothing for a symmetric
+  sky; REF pins re-indexed 192+i, same values to the digit); sky
+  shadow bounds (chi=1 IS unshadowed, chi=0 IS ambient-only,
+  exact); the datum identity. Cost: fillSky doubles its texels
+  (384 wide) - per frame like before, fine on real GPUs. Scope
+  note: the shadow map still covers the 16 km world box, so
+  dome beams come from the clouds overhead - which is where
+  crepuscular rays live.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

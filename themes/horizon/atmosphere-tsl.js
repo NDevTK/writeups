@@ -18,6 +18,8 @@ import {
   If,
   Loop,
   abs,
+  asinh,
+  atan,
   clamp,
   cos,
   dot,
@@ -52,17 +54,19 @@ import {
  *  - transmittance LUT 256x64, built once (40-step optical depth)
  *  - multiple-scattering LUT 32x32: 64 spherical-Fibonacci directions,
  *    20-step marches, ground bounce, Psi_ms = L2 / (1 - f_ms)
- *  - sky-view LUT 192x108 per frame (32 steps, sqrt-warped elevation
- *    split at the true horizon)
+ *  - sky-view LUT 384x108 per frame (32 steps, sqrt-warped elevation
+ *    split at the true horizon; full SIGNED azimuth circle)
  *  - aerial-perspective LUT 128x32 (SIGNED relative azimuth over the
- *    full circle x distance, 20 steps) for the per-material fog
- *    hook, with Hillaire's volumetric shadow: the DIRECT
- *    single-scatter term is multiplied per step by the cloud shadow
- *    map's Beer-Lambert transmittance at the marched point
- *    (crepuscular rays; multiple scattering stays unshadowed). The
- *    full circle exists BECAUSE of the shadow - clouds are not
- *    azimuthally symmetric; the seam sits at the anti-sun azimuth
- *    where in-scatter varies slowest.
+ *    full circle x distance, 20 steps) for the per-material fog hook
+ *  - BOTH per-frame marches carry Hillaire's volumetric shadow: the
+ *    DIRECT single-scatter term is multiplied per step by the cloud
+ *    shadow map's Beer-Lambert transmittance at the marched point
+ *    (crepuscular rays in the sky AND in the terrain haze; multiple
+ *    scattering stays unshadowed). The full circles exist BECAUSE
+ *    of the shadow - clouds are not azimuthally symmetric; the
+ *    seams sit at the anti-sun azimuth where in-scatter varies
+ *    slowest. Shadow samples map to the scene through the exact
+ *    asinh altitude datum, so rays above the decks read full sun.
  *  - 1x1 cosine-weighted sky irradiance for the hemisphere ambient
  *    (read back asynchronously - no pipeline stall)
  *  - the dome samples the sky-view LUT and adds the sun disc through
@@ -222,7 +226,12 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
 
   const tLut = makeLut(256, 64);
   const msLut = makeLut(32, 32);
-  const skyLut = makeLut(192, SKY_H);
+  // Full SIGNED azimuth circle (384 = the old 192 half-circle
+  // texel pitch kept): the volumetric cloud shadow is not
+  // azimuthally symmetric, so the sky-view LUT carries both sides
+  // of the sun line. u = 0.5 faces the sun; the clamp seam sits at
+  // the anti-sun azimuth.
+  const skyLut = makeLut(384, SKY_H);
   const aerialLut = makeLut(128, 32);
   // The irradiance readback needs a RenderTarget on both backends
   // (readRenderTargetPixelsAsync is the async staging read); it is a
@@ -346,17 +355,38 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     return vec4(psi, 1.0);
   });
 
-  // Shared single-scattering march used by sky-view and aerial (step
-  // count is a compile-time constant, hence the factory).
-  const makeMarchSky = (steps) =>
-    Fn(([r, dir, dEnd]) => {
+  // ---------- shared march with volumetric shadow ----------
+  // ONE single-scattering march serves the sky-view and aerial LUTs
+  // (step count is the compile-time constant): a ray from camera
+  // height at SIGNED azimuth az from the sun and elevation
+  // (se, ce), where chi(t) - the cloud shadow map's Beer-Lambert
+  // transmittance at the marched point - multiplies the DIRECT
+  // single-scatter term only (Hillaire 2020's volumetric shadow;
+  // multiple scattering stays unshadowed). The marched point maps
+  // to the scene through the sun-azimuth rotation (roundtrip
+  // gated), the horizontal arc ti*ce (curvature over the 16 km
+  // shadow range is metres - far under the map texel), and the
+  // theme's exact asinh altitude datum (roam.js yOfElev, gated).
+  // Mirrored in atmo-reference.mjs.
+  const aerialCamXZ = uniform(new Vector2(0, 0));
+  const aerialSunAz = uniform(new Vector2(1, 0));
+  const shadowElev0 = uniform(0); // the box's elevation datum (m)
+  const makeMarch = (steps) =>
+    Fn(([r, az, se, ce, dEnd]) => {
       const dt = dEnd.div(steps);
       const T = vec3(1).toVar();
       const L = vec3(0).toVar();
-      const mu = dir.y;
+      const mu = se;
       const sunS = sqrt(max(sunMu.mul(sunMu).oneMinus(), 0.0));
-      const sunDir = vec3(sunS, sunMu, 0.0);
-      const cSun = dot(dir, sunDir);
+      const cSun = ce.mul(cos(az)).mul(sunS).add(se.mul(sunMu));
+      // Scene-plane direction of this azimuth: the sun's azimuth
+      // vector rotated by az (counterclockwise in the xz basis -
+      // the same convention aerial-tsl's atan(cross, dot) reads
+      // back; roundtrip gated).
+      const sceneDir = vec2(
+        aerialSunAz.x.mul(cos(az)).sub(aerialSunAz.y.mul(sin(az))),
+        aerialSunAz.x.mul(sin(az)).add(aerialSunAz.y.mul(cos(az)))
+      );
       Loop(steps, ({i: s}) => {
         const ti = float(s).add(0.5).mul(dt);
         const ri = sqrt(
@@ -369,10 +399,24 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         const ext = extinction(h);
         const muSi = clamp(r.mul(sunMu).add(ti.mul(cSun)).div(ri), -1.0, 1.0);
         const Ts = sunT(ri, muSi);
+        // chi: sun visibility through the cloud decks at the
+        // marched point - scene xz from the horizontal arc, scene
+        // y from the altitude datum (a ray above the decks reads
+        // full sun; the hook's mid-plane projection handles any y).
+        const chi = cloudShadow
+          ? (() => {
+              const p = aerialCamXZ.add(
+                sceneDir.mul(ti.mul(ce).mul(SCENE_PER_M))
+              );
+              const y = asinh(h.sub(shadowElev0).div(500)).mul(16);
+              return cloudShadow.transmittance(vec3(p.x, y, p.y));
+            })()
+          : float(1);
         const S = scatR
           .mul(phaseR(cSun))
           .add(scatM.mul(phaseM(cSun)))
           .mul(Ts)
+          .mul(chi)
           .add(scatR.add(scatM).mul(psiMS(ri, muSi)));
         const stepT = exp(ext.mul(dt).negate());
         L.addAssign(T.mul(S.sub(S.mul(stepT))).div(max(ext, vec3(1e-9))));
@@ -380,62 +424,8 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       });
       return vec4(L, dot(T, vec3(1 / 3, 1 / 3, 1 / 3)));
     });
-  const marchSky32 = makeMarchSky(32);
-
-  // ---------- aerial march with volumetric shadow ----------
-  // The horizontal march at camera height along the SIGNED azimuth
-  // from the sun: identical physics to makeMarchSky with dir.y = 0,
-  // plus chi(t) - the cloud shadow map's Beer-Lambert transmittance
-  // at the marched point - on the DIRECT single-scatter term only
-  // (Hillaire 2020's aerial perspective with volumetric shadow;
-  // multiple scattering stays unshadowed). Mirrored and gated in
-  // atmo-reference.mjs.
-  const aerialCamXZ = uniform(new Vector2(0, 0));
-  const aerialSunAz = uniform(new Vector2(1, 0));
-  const marchAerial20 = Fn(([r, az, dEnd]) => {
-    const steps = 20;
-    const dt = dEnd.div(steps);
-    const T = vec3(1).toVar();
-    const L = vec3(0).toVar();
-    const sunS = sqrt(max(sunMu.mul(sunMu).oneMinus(), 0.0));
-    const cSun = cos(az).mul(sunS);
-    // Scene-plane direction of this azimuth: the sun's azimuth
-    // vector rotated by az (counterclockwise in the xz basis - the
-    // same convention aerial-tsl's atan(cross, dot) reads back;
-    // roundtrip gated).
-    const sceneDir = vec2(
-      aerialSunAz.x.mul(cos(az)).sub(aerialSunAz.y.mul(sin(az))),
-      aerialSunAz.x.mul(sin(az)).add(aerialSunAz.y.mul(cos(az)))
-    );
-    Loop(steps, ({i: s}) => {
-      const ti = float(s).add(0.5).mul(dt);
-      const ri = sqrt(r.mul(r).add(ti.mul(ti)));
-      const h = ri.sub(RB);
-      const dens = densities(h);
-      const scatR = rayleighS.mul(dens.x);
-      const scatM = mieScat.mul(dens.y);
-      const ext = extinction(h);
-      const muSi = clamp(r.mul(sunMu).add(ti.mul(cSun)).div(ri), -1.0, 1.0);
-      const Ts = sunT(ri, muSi);
-      // chi: sun visibility through the cloud decks at the marched
-      // point (ground datum - the 2D LUT collapses elevation; the
-      // shafts line up with the terrain's own per-pixel shadow).
-      const p = aerialCamXZ.add(sceneDir.mul(ti.mul(SCENE_PER_M)));
-      const chi = cloudShadow
-        ? cloudShadow.transmittance(vec3(p.x, 0.0, p.y))
-        : float(1);
-      const S = scatR
-        .mul(phaseR(cSun))
-        .add(scatM.mul(phaseM(cSun)))
-        .mul(Ts)
-        .mul(chi)
-        .add(scatR.add(scatM).mul(psiMS(ri, muSi)));
-      const stepT = exp(ext.mul(dt).negate());
-      L.addAssign(T.mul(S.sub(S.mul(stepT))).div(max(ext, vec3(1e-9))));
-      T.mulAssign(stepT);
-    });
-    return vec4(L, dot(T, vec3(1 / 3, 1 / 3, 1 / 3)));
-  });
+  const marchSky32 = makeMarch(32);
+  const marchAerial20 = makeMarch(20);
 
   // Sky-view vertical mapping, Bruneton-style guarded split (phase 4
   // horizon-band fix). Sky radiance is DISCONTINUOUS at the horizon
@@ -493,12 +483,14 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       .negate();
     const hAngle = horizon.clamp(-1, 1).asin();
     const elev = elevFromSkyV(vUv.y, hAngle);
-    const relAz = vUv.x.mul(3.14159265);
+    // Full-circle SIGNED azimuth: u = 0.5 faces the sun, the seam
+    // (u = 0/1) is the anti-sun azimuth (same convention as the
+    // aerial LUT - the cloud shadow is not azimuthally symmetric).
+    const az = vUv.x.sub(0.5).mul(2.0 * 3.14159265);
     const se = sin(elev);
     const ce = cos(elev);
-    const dir = vec3(ce.mul(cos(relAz)), se, ce.mul(sin(relAz)));
-    const dGround = raySphere(r, dir.y, float(RB));
-    const dTop = raySphere(r, dir.y, float(RT));
+    const dGround = raySphere(r, se, float(RB));
+    const dTop = raySphere(r, se, float(RT));
     // Ray class by texture half; the tangent distance is the exact
     // disc==0 fallback for the below-boundary row.
     const dTangent = sqrt(max(r.mul(r).sub(RB * RB), 0.0));
@@ -510,17 +502,18 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       ),
       0.0
     );
-    return marchSky32(r, dir, dEnd);
+    return marchSky32(r, az, se, ce, dEnd);
   });
 
   // ---------- aerial perspective (per frame) ----------
   const aerialNode = Fn(([vUv]) => {
     // Full-circle SIGNED azimuth: u = 0.5 faces the sun, the seam
-    // (u = 0/1) is the anti-sun azimuth.
+    // (u = 0/1) is the anti-sun azimuth. A horizontal ray:
+    // se = 0, ce = 1.
     const az = vUv.x.sub(0.5).mul(2.0 * 3.14159265);
     const dist = vUv.y.mul(MAX_DIST_M);
     const r = float(RB).add(max(camH, 1.0));
-    return marchAerial20(r, az, dist);
+    return marchAerial20(r, az, float(0), float(1), dist);
   });
 
   // ---------- cosine-weighted sky irradiance (per frame, 1x1) ----------
@@ -543,6 +536,9 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       // cos(theta_zenith) = sin(elev); d-omega = cos(elev) d-elev d-az
       const w = sin(elev).mul(cos(elev)).toVar();
       Loop(8, ({i: ia}) => {
+        // ax spans the FULL signed circle now (u = 0.5 faces the
+        // sun) - the mean over 8 azimuths is the same integral,
+        // and the shadowed sky darkens the ambient correctly.
         const ax = float(ia)
           .add(0.5)
           .mul(1 / 8);
@@ -564,8 +560,11 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     const elev = v.y.clamp(-1, 1).asin();
     const sunH = normalize(sunDirW.xz.add(vec2(1e-6, 1e-6)));
     const vH = normalize(v.xz.add(vec2(1e-6, 1e-6)));
-    const relAz = dot(sunH, vH).clamp(-1, 1).acos();
-    const ux = relAz.div(3.14159265);
+    // SIGNED azimuth over the full circle - atan(cross, dot), the
+    // same convention the LUT fill rotates by (roundtrip gated).
+    const ux = atan(sunH.x.mul(vH.y).sub(sunH.y.mul(vH.x)), dot(sunH, vH))
+      .div(2.0 * 3.14159265)
+      .add(0.5);
     // The horizon is a true radiance discontinuity (the guarded LUT
     // split stores its one-sided limits in the two seam rows). A
     // pixel straddling it should show the box-filter integral of
@@ -698,10 +697,11 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // Exact metres-per-scene-unit (roam.js MPU = 16000/280): the
     // old 57.14 literal was 50 ppm off the mapping's own constant.
     aerialMaxUnits: MAX_DIST_M / (400 / 7),
-    // Crepuscular rays: the aerial march needs the camera's scene
-    // position and the sun's azimuth vector to place its shadow
-    // samples (set per frame next to the fog hook's uSunAzV).
-    aerialShadow: {camXZ: aerialCamXZ, sunAz: aerialSunAz},
+    // Crepuscular rays: the shadowed marches need the camera's
+    // scene position, the sun's azimuth vector and the box's
+    // elevation datum to place their shadow samples (set per frame
+    // next to the fog hook's uSunAzV).
+    aerialShadow: {camXZ: aerialCamXZ, sunAz: aerialSunAz, elev0: shadowElev0},
     // Refraction of the drawn disc: per-channel apparent
     // directions + vertical flattening (set from refraction.js).
     sunDisc: {dirR: sunDirR, dirB: sunDirB, flatten: sunFlat},

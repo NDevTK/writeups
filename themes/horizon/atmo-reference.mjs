@@ -1,6 +1,8 @@
 // Double-precision JS reference of the Hillaire chain (node atmo-reference.mjs).
 // Mirrors the GLSL/TSL exactly (LUT sizes, bilinear sampling) - the ground
 // truth every GPU port is validated against. See WEBGPU-PLAN.md.
+import {yOfElev} from './roam.js';
+
 const Rb = 6360e3,
   Rt = 6460e3;
 const rayS = [5.802e-6, 13.558e-6, 33.1e-6];
@@ -173,13 +175,15 @@ for (let j = 0; j < MW; j++)
 const psiMS = (r, mu) =>
   bilinear(msLut, MW, MW, mu * 0.5 + 0.5, (r - Rb) / (Rt - Rb));
 
-// sky-view at selected texels, 192x108, camH=300, sunMu given
+// sky-view at selected texels - 384x108 (full SIGNED azimuth
+// circle, u = 0.5 faces the sun), camH=300, sunMu given. chi(ti)
+// is the cloud shadow's sun visibility on the DIRECT term
+// (Hillaire's volumetric shadow); mode as in aer() below.
 const sunMu = 0.28 / Math.hypot(0.94, 0.28); // matches the A/B pages' normalize
-const SW = 192,
+const SW = 384,
   SH = 108;
-const sky = (i, j) => {
-  const ux = (i + 0.5) / SW,
-    uyv = (j + 0.5) / SH;
+const skyElev = (j) => {
+  const uyv = (j + 0.5) / SH;
   const r = Rb + 300;
   const horizon = -Math.sqrt(Math.max(r * r - Rb * Rb, 0)) / r;
   const hA = Math.asin(Math.min(Math.max(horizon, -1), 1));
@@ -187,21 +191,21 @@ const sky = (i, j) => {
   // half-texel guards at the v=0.5 horizon seam, ray class by half.
   const guard = 0.5 / SH,
     span = 0.5 - 1 / SH;
-  let elev;
   if (uyv < 0.5) {
     const s = Math.min(Math.max((0.5 - guard - uyv) / span, 0), 1);
-    elev = hA - s * s * (hA + Math.PI / 2);
-  } else {
-    const s = Math.min(Math.max((uyv - 0.5 - guard) / span, 0), 1);
-    elev = hA + s * s * (Math.PI / 2 - hA);
+    return hA - s * s * (hA + Math.PI / 2);
   }
-  const relAz = ux * Math.PI;
+  const s = Math.min(Math.max((uyv - 0.5 - guard) / span, 0), 1);
+  return hA + s * s * (Math.PI / 2 - hA);
+};
+const skyAt = (az, j, chi, mode) => {
+  const uyv = (j + 0.5) / SH;
+  const r = Rb + 300;
+  const elev = skyElev(j);
   const se = Math.sin(elev),
     ce = Math.cos(elev);
-  const dir = [ce * Math.cos(relAz), se, ce * Math.sin(relAz)];
   const sunS = Math.sqrt(Math.max(1 - sunMu * sunMu, 0));
-  const sd = [sunS, sunMu, 0];
-  const mu = dir[1];
+  const mu = se;
   const dG = raySphere(r, mu, Rb),
     dT = raySphere(r, mu, Rt);
   const dTan = Math.sqrt(Math.max(r * r - Rb * Rb, 0));
@@ -209,7 +213,7 @@ const sky = (i, j) => {
   const dt = dEnd / 32;
   const T = [1, 1, 1],
     L = [0, 0, 0];
-  const cSun = dir[0] * sd[0] + dir[1] * sd[1] + dir[2] * sd[2];
+  const cSun = ce * Math.cos(az) * sunS + se * sunMu;
   for (let s = 0; s < 32; s++) {
     const ti = (s + 0.5) * dt;
     const ri = Math.sqrt(r * r + ti * ti + 2 * r * ti * mu);
@@ -221,10 +225,11 @@ const sky = (i, j) => {
     const muSi = Math.min(Math.max((r * sunMu + ti * cSun) / ri, -1), 1);
     const Ts = sunT(ri, muSi);
     const psi = psiMS(ri, muSi);
+    const x = chi ? chi(ti) : 1;
     for (let c = 0; c < 3; c++) {
-      const S =
-        (sR[c] * phaseR(cSun) + sM[c] * phaseM(cSun)) * Ts[c] +
-        (sR[c] + sM[c]) * psi[c];
+      const dir = (sR[c] * phaseR(cSun) + sM[c] * phaseM(cSun)) * Ts[c];
+      const amb = (sR[c] + sM[c]) * psi[c];
+      const S = mode === 'nodirect' ? amb : dir * x + amb;
       const st = Math.exp(-e[c] * dt);
       L[c] += (T[c] * (S - S * st)) / Math.max(e[c], 1e-9);
       T[c] *= st;
@@ -232,6 +237,8 @@ const sky = (i, j) => {
   }
   return L;
 };
+const sky = (i, j, chi, mode) =>
+  skyAt(((i + 0.5) / SW - 0.5) * 2 * Math.PI, j, chi, mode);
 
 const fmt = (a) => a.map((v) => v.toExponential(4)).join();
 console.log('REF ms(16,8):', fmt(bilinearAt(16, 8)));
@@ -240,14 +247,88 @@ function bilinearAt(i, j) {
 }
 console.log('REF ms(20,0):', fmt(bilinearAt(20, 0)));
 console.log('REF ms(28,16):', fmt(bilinearAt(28, 16)));
-console.log('REF sky(30,80):', fmt(sky(30, 80)));
-console.log('REF sky(96,60):', fmt(sky(96, 60)));
-console.log('REF sky(5,90):', fmt(sky(5, 90)));
-console.log('REF sky(30,20):', fmt(sky(30, 20)));
+
+{
+  // Full-circle back-compat: the new signed mapping at the old
+  // half-circle pins. i_new = 192 + i_old lands on the SAME
+  // physical azimuth ((i_old + 0.5)/192 * pi), so the six pinned
+  // texels must reproduce the old-mapping march (recomputed here
+  // with the old arithmetic) to fp; and the unshadowed sky is
+  // even in azimuth, so the mirror texel i = 191 - i_old must
+  // match too - a broken signed mapping shows up immediately.
+  let worst = 0;
+  for (const [io, j] of [
+    [30, 80],
+    [96, 60],
+    [5, 90],
+    [30, 20],
+    [30, 53],
+    [30, 54]
+  ]) {
+    const neu = sky(192 + io, j);
+    const old = skyAt(((io + 0.5) / 192) * Math.PI, j);
+    const mir = sky(191 - io, j);
+    for (let c = 0; c < 3; c++)
+      worst = Math.max(
+        worst,
+        Math.abs(neu[c] / old[c] - 1),
+        Math.abs(mir[c] / neu[c] - 1)
+      );
+  }
+  const ok = worst < 1e-12;
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} sky full circle: signed-azimuth texels reproduce the half-circle pins and their mirrors to ${worst.toExponential(1)} (6 texels x 3 channels)`
+  );
+  if (!ok) process.exit(1);
+}
+
+{
+  // The sky march carries the same volumetric shadow as the
+  // aerial one: chi=1 IS the unshadowed march (exact) and chi=0
+  // IS the ambient-only march - on a sky texel near the horizon
+  // where the direct term dominates.
+  const one = sky(222, 56, () => 1);
+  const un = sky(222, 56);
+  const dark = sky(222, 56, () => 0);
+  const amb = sky(222, 56, null, 'nodirect');
+  const ok =
+    one.every((v, c) => v === un[c]) && dark.every((v, c) => v === amb[c]);
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} sky shadow bounds: chi=1 IS the unshadowed march and chi=0 IS the ambient-only march (exact) - the dome's beams are the direct term`
+  );
+  if (!ok) process.exit(1);
+}
+
+{
+  // The kernel's altitude-datum mapping for shadow samples is the
+  // THEME's exact asinh compression (roam.js yOfElev, gated
+  // there): 16 * asinh((h - elev0)/500) - one datum, one model.
+  let worst = 0;
+  for (const [h, e0] of [
+    [300, 0],
+    [1720, 1034],
+    [8000, 46],
+    [0, 300]
+  ])
+    worst = Math.max(
+      worst,
+      Math.abs(16 * Math.asinh((h - e0) / 500) - yOfElev(h, e0))
+    );
+  const ok = worst === 0;
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} shadow altitude datum: the march's y formula IS roam.yOfElev (identity at 4 altitudes)`
+  );
+  if (!ok) process.exit(1);
+}
+
+console.log('REF sky(222,80):', fmt(sky(222, 80)));
+console.log('REF sky(288,60):', fmt(sky(288, 60)));
+console.log('REF sky(197,90):', fmt(sky(197, 90)));
+console.log('REF sky(222,20):', fmt(sky(222, 20)));
 // The guard rows either side of the horizon seam: the one-sided
 // limits (below: ground at the tangent distance; above: full path).
-console.log('REF sky(30,53):', fmt(sky(30, 53)));
-console.log('REF sky(30,54):', fmt(sky(30, 54)));
+console.log('REF sky(222,53):', fmt(sky(222, 53)));
+console.log('REF sky(222,54):', fmt(sky(222, 54)));
 
 // ---- aerial march with volumetric shadow (crepuscular rays) ----
 // Mirrors atmosphere-tsl's marchAerial20: a horizontal 20-step
