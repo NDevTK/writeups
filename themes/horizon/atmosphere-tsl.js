@@ -74,7 +74,17 @@ const MAX_DIST_M = 25700; // 450 scene units at 57.14 m/unit
 const SKY_H = 108; // sky-view LUT rows; the guarded split needs it
 
 export function createAtmosphereTSL(renderer) {
-  const mieScale = uniform(1);
+  // Mie radiative properties as uniforms (aerosol.js): per-channel
+  // scattering and absorption coefficients at profile h = 0 (1/m)
+  // and the phase asymmetry. Defaults are Hillaire (2020)'s exact
+  // constants (scattering 3.996e-6, extinction 4.440e-6 = sigma_s
+  // / 0.9, g 0.8); with a live /aerosol answer the theme sets the
+  // MEASURED GEFS-Aerosols channel set instead (the gated
+  // aerosol-reference.mjs proves the measured path degenerates to
+  // these defaults for paper-standard air).
+  const mieScat = uniform(new Vector3(3.996e-6, 3.996e-6, 3.996e-6));
+  const mieAbs = uniform(new Vector3(4.44e-7, 4.44e-7, 4.44e-7));
+  const mieG = uniform(0.8);
   const sunMu = uniform(0.5);
   const camH = uniform(300);
   const exposure = uniform(28);
@@ -88,11 +98,6 @@ export function createAtmosphereTSL(renderer) {
 
   const rayleighS = vec3(5.802e-6, 13.558e-6, 33.1e-6);
   const ozoneA = vec3(0.65e-6, 1.881e-6, 0.085e-6);
-  // Hillaire (2020) Mie radiative constants: scattering 3.996e-6,
-  // extinction 4.440e-6 (= sigma_s / 0.9, Bruneton's convention), so
-  // absorption is 4.44e-7 and the single-scattering albedo is 0.9.
-  const MIE_S0 = 3.996e-6;
-  const MIE_A0 = 4.44e-7;
 
   // x: rayleigh, y: mie, z: ozone (tent at 25 km).
   const densities = Fn(([h]) =>
@@ -107,7 +112,7 @@ export function createAtmosphereTSL(renderer) {
     const d = densities(h);
     return rayleighS
       .mul(d.x)
-      .add(d.y.mul(MIE_S0 + MIE_A0).mul(mieScale))
+      .add(mieScat.add(mieAbs).mul(d.y))
       .add(ozoneA.mul(d.z));
   });
 
@@ -158,12 +163,16 @@ export function createAtmosphereTSL(renderer) {
       .add(1.0)
       .mul(3.0 / (16.0 * 3.14159265))
   );
+  // Henyey-Greenstein x Cornette-Shanks with the MEASURED asymmetry
+  // (GEFS-Aerosols ASYSFK uniform; 0.8 when no measurement).
   const phaseM = Fn(([c]) => {
-    const g = 0.8;
-    const g2 = g * g;
-    return float((3.0 / (8.0 * 3.14159265)) * ((1.0 - g2) / (2.0 + g2)))
+    const g2 = mieG.mul(mieG);
+    return g2
+      .oneMinus()
+      .div(g2.add(2.0))
+      .mul(3.0 / (8.0 * 3.14159265))
       .mul(c.mul(c).add(1.0))
-      .div(pow15(float(1.0 + g2).sub(c.mul(2.0 * g))));
+      .div(pow15(g2.add(1.0).sub(c.mul(mieG).mul(2.0))));
   });
   // x^1.5 without pow's undefined-for-negative edge.
   const pow15 = Fn(([x]) => {
@@ -292,9 +301,7 @@ export function createAtmosphereTSL(renderer) {
         );
         const h = ri.sub(RB);
         const dens = densities(h);
-        const scat = rayleighS
-          .mul(dens.x)
-          .add(dens.y.mul(MIE_S0).mul(mieScale));
+        const scat = rayleighS.mul(dens.x).add(mieScat.mul(dens.y));
         const ext = extinction(h);
         const muSi = clamp(r.mul(muS).add(ti.mul(cSun)).div(ri), -1.0, 1.0);
         const Ts = sunT(ri, muSi);
@@ -346,7 +353,7 @@ export function createAtmosphereTSL(renderer) {
         const h = ri.sub(RB);
         const dens = densities(h);
         const scatR = rayleighS.mul(dens.x);
-        const scatM = vec3(dens.y.mul(MIE_S0).mul(mieScale));
+        const scatM = mieScat.mul(dens.y);
         const ext = extinction(h);
         const muSi = clamp(r.mul(sunMu).add(ti.mul(cSun)).div(ri), -1.0, 1.0);
         const Ts = sunT(ri, muSi);
@@ -615,7 +622,7 @@ export function createAtmosphereTSL(renderer) {
   mesh.renderOrder = -3;
 
   let lutsBuilt = false;
-  let lastMie = -1;
+  let lastMie = '';
 
   return {
     ok: true,
@@ -655,18 +662,29 @@ export function createAtmosphereTSL(renderer) {
     // reproduction, not physics): twilight is genuinely darker, but
     // not pitch black.
     update(sunDir, mie, camHMetres, expo) {
-      mieScale.value = mie;
+      // mie = {scat: [r,g,b], abs: [r,g,b], g} (1/m at h = 0) from
+      // aerosol.js mieCoefficients - measured when /aerosol
+      // answers, the Hillaire defaults calibrated to the measured
+      // total AOD otherwise.
+      if (mie) {
+        mieScat.value.fromArray(mie.scat);
+        mieAbs.value.fromArray(mie.abs);
+        mieG.value = mie.g;
+      }
       sunMu.value = sunDir.y;
       camH.value = camHMetres;
       sunDirW.value.copy(sunDir);
       if (expo) exposure.value = expo;
-      // Aerosols change slowly; rebuild the static LUTs only when the
-      // measured AOD moves.
-      if (!lutsBuilt || Math.abs(mie - lastMie) > 0.05) {
+      // Aerosols change on sync cadence, not per frame; rebuild the
+      // static LUTs only when the radiative set actually moves.
+      const mieKey = mie
+        ? mie.scat.join() + '|' + mie.abs.join() + '|' + mie.g
+        : lastMie;
+      if (!lutsBuilt || mieKey !== lastMie) {
         fillT();
         fillMs();
         lutsBuilt = true;
-        lastMie = mie;
+        lastMie = mieKey;
       }
       fillSky();
       fillAerial();

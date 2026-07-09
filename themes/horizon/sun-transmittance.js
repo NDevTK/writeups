@@ -3,7 +3,12 @@
 // reddening included) without a per-frame GPU readback. Kept in
 // double precision alongside the TSL LUT chain; atmo-reference.mjs is
 // the ground truth both are held to.
-export function sunTransmittanceJS(cosZenith, mieScale) {
+//
+// mie = {scat: [r,g,b], abs: [r,g,b]} - the same per-channel
+// coefficients (1/m at profile h = 0) the shader uniforms carry,
+// from aerosol.js (measured GEFS-Aerosols channel set, or the
+// Hillaire defaults calibrated to the measured total AOD).
+export function sunTransmittanceJS(cosZenith, mie) {
   const Rb = 6360e3;
   const Rt = 6460e3;
   const r = Rb + 300;
@@ -27,12 +32,10 @@ export function sunTransmittanceJS(cosZenith, mieScale) {
     tm += Math.exp(-h / 1200) * dt;
     to += Math.max(0, 1 - Math.abs(h - 25e3) / 15e3) * dt;
   }
-  // Mie extinction 4.440e-6 = scattering 3.996e-6 + absorption
-  // 4.44e-7 (Hillaire 2020, SSA 0.9) - same split as the shader.
-  const mie = (3.996e-6 + 4.44e-7) * mieScale * tm;
+  const mieExt = (c) => (mie.scat[c] + mie.abs[c]) * tm;
   return [
-    Math.exp(-(5.802e-6 * tr + mie + 0.65e-6 * to)),
-    Math.exp(-(13.558e-6 * tr + mie + 1.881e-6 * to)),
-    Math.exp(-(33.1e-6 * tr + mie + 0.085e-6 * to))
+    Math.exp(-(5.802e-6 * tr + mieExt(0) + 0.65e-6 * to)),
+    Math.exp(-(13.558e-6 * tr + mieExt(1) + 1.881e-6 * to)),
+    Math.exp(-(33.1e-6 * tr + mieExt(2) + 0.085e-6 * to))
   ];
 }

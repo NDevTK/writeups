@@ -77,6 +77,17 @@ are gated by `../server-reference.mjs` — the `server` set in
   the point: NOAA HMS daily polygons (North America), fetched
   hourly, decoded by the gated `smoke.js`, answered from RAM with
   the published class concentration.
+- `GET /aerosol?lat&lon` — measured aerosol radiative properties
+  for the 0.25° cell over the point: GEFS-Aerosols (NOAA's
+  operational GOCART coupling) total optical thickness at five
+  optical bands, scattering optical thickness, single-scattering
+  albedo, asymmetry, and the dust/sea-salt/sulphate/organic/
+  black-carbon split. Fetched as a ~6 KB GRIB2 subset from the
+  NOMADS grib filter (the supported subsetting path since OpenDAP
+  retired, SCN 25-81), decoded by the gated `grib2.js`, censused
+  by the gated `aerosol.js`; per-cell answers cached 45 min
+  (3-hourly product), failures 5 min, cycle fallback when the
+  newest run is not yet published.
 - `GET /solarwind` — the aurora's measured driver: DSCOVR/ACE
   solar wind at L1, already propagated to the bow shock by SWPC
   (the `propagated_time_tag` is a real physical lead time of tens
@@ -85,7 +96,8 @@ are gated by `../server-reference.mjs` — the `server` set in
   power (GW). One 60 s poll serves every visitor. Also pushed as
   the `space` event on `/stream` (60 s cadence, initial push on
   connect).
-- `GET /health` — AIS + lightning + space-weather engine stats.
+- `GET /health` — AIS + lightning + space-weather + smoke +
+  aerosol engine stats.
 - `GET /probe` — health + the fixed-target reachability
   diagnostic, run from the box's own IP.
 

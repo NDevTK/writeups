@@ -15,7 +15,8 @@
         orientation (the mesh only carries the silhouette)
       - a multiple-scattering atmosphere after Hillaire (2020):
         transmittance, multiple-scattering and per-frame sky-view LUTs
-        with Rayleigh, Mie (scaled by the measured AOD) and ozone
+        with Rayleigh, measured-aerosol Mie (GEFS-Aerosols spectral
+        extinction, albedo and asymmetry; CAMS AOD fallback) and ozone
         profiles, so twilight structure emerges from the raymarch; an
         aerial-perspective LUT applies the same scattering to the air
         BETWEEN camera and terrain, so distant ridges blue out by
@@ -75,8 +76,9 @@
         heightfield of the local terrain and with settled flakes, so
         drifts accumulate while the page is open and melt when the real
         temperature rises
-      - sky turbidity and haze come from measured air quality (open-meteo
-        AOD and PM2.5); trees stand inside the real OSM forest polygons
+      - sky haze is measured air: GEFS-Aerosols spectral extinction,
+        single-scattering albedo and asymmetry per channel (CAMS total
+        AOD as fallback); trees stand inside the real OSM forest polygons
         around you; the sea is a reflecting three.js Water plane whose
         wave energy follows the real sea state; constellation figures
         (d3-celestial data) ride the same sidereal dome as the stars
@@ -107,7 +109,8 @@
         (terrarium tile endpoint override), roam=0 (pin the box),
         space=URL (solar-wind endpoint override), metar=URL (aerodrome
         observation endpoint override), smoke=URL (HMS plume endpoint
-        override), debug=1
+        override), aerosol=URL (measured-aerosol endpoint override),
+        debug=1
     -->
     <style>
       html,
@@ -333,6 +336,12 @@
       } from './horizon/roam.js';
       import {hpScale} from './horizon/solarwind.js';
       import {etageCovers, pickStation, visibilityM} from './horizon/metar.js';
+      import {
+        channelSet,
+        mieCoefficients,
+        TAU_MAX,
+        TAU_MIN
+      } from './horizon/aerosol.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -1461,15 +1470,72 @@
         }
       }
 
+      // Measured aerosol RADIATIVE properties: GEFS-Aerosols
+      // (NOAA's operational GOCART coupling) publishes, per
+      // 0.25-deg cell, total optical thickness at five optical
+      // bands, scattering optical thickness, single-scattering
+      // albedo, asymmetry, and the dust/sea-salt/sulphate/
+      // organic/black-carbon split. The daemon decodes the NOMADS
+      // GRIB2 subset (gated grib2.js) and the gated aerosol.js
+      // turns it into the sky's per-channel Mie coefficients -
+      // the one gray knob (total AOD) becomes measured spectral
+      // extinction, measured albedo and measured phase asymmetry.
+      const AEROSOL_PROXY =
+        params.get('aerosol') ?? 'https://api.ndev.tk/aerosol';
+      async function syncAerosol() {
+        if (overridden || params.has('aod')) return;
+        try {
+          const r = await (
+            await fetch(
+              AEROSOL_PROXY +
+                '?lat=' +
+                state.lat.toFixed(3) +
+                '&lon=' +
+                state.lon.toFixed(3),
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (!r.products) return;
+          const set = channelSet(r.products);
+          state.aerosol = {at: Date.now(), set, cycle: r.cycle, fhr: r.fhr};
+          const f = set.fractions;
+          const pct = (k) => Math.round((f[k] ?? 0) * 100);
+          record(
+            'GEFS-Aerosols ' + r.cycle.slice(0, 13) + 'z+' + r.fhr,
+            'tau550 ' +
+              set.tau[1].toFixed(3) +
+              ' · SSA ' +
+              set.ssa[1].toFixed(2) +
+              ' · g ' +
+              set.g.toFixed(2) +
+              ' · du/ss/su/om/bc ' +
+              pct('dust') +
+              '/' +
+              pct('seaSalt') +
+              '/' +
+              pct('sulfate') +
+              '/' +
+              pct('organic') +
+              '/' +
+              pct('blackCarbon') +
+              '%'
+          );
+        } catch {
+          // The CAMS total AOD stands.
+        }
+      }
+
       // Wildfire smoke: NOAA HMS analysts draw verified plume
       // polygons from satellite imagery (North America - null
       // elsewhere is the truthful answer). The daemon holds the
       // daily file; the panel records the verdict and state.smoke
       // carries the published class concentration (Ruminski et
-      // al. 2006: 5/16/27 ug/m^3). The CAMS AOD the sky already
-      // uses is quantitative and includes smoke - the absorbing-
-      // aerosol render hook waits on the Mie-absorption question
-      // logged in WEBGPU-PLAN.md.
+      // al. 2006: 5/16/27 ug/m^3). The RENDER side of smoke is
+      // measured, not invented: GEFS-Aerosols' organic-matter and
+      // black-carbon columns (syncAerosol) darken the sky's
+      // measured single-scattering albedo wherever a plume
+      // actually absorbs - HMS stays the analyst-verified
+      // provenance layer.
       const SMOKE_PROXY = params.get('smoke') ?? 'https://api.ndev.tk/smoke';
       async function syncSmoke() {
         try {
@@ -1783,7 +1849,7 @@
 
       // The sky: Hillaire (2020) multiple-scattering atmosphere -
       // transmittance, multiple-scattering and per-frame sky-view LUTs
-      // with Rayleigh, Mie (scaled by measured AOD) and ozone profiles.
+      // with Rayleigh, measured-aerosol Mie and ozone profiles.
       // Twilight arch and the Belt of Venus emerge from the raymarch
       // instead of being painted.
       const atmo = createAtmosphereTSL(renderer);
@@ -1791,7 +1857,7 @@
         scene.add(atmo.mesh);
         record(
           'Hillaire (2020) atmosphere',
-          'multiple-scattering LUTs · ozone · AOD-scaled Mie'
+          'multiple-scattering LUTs · ozone · measured-aerosol Mie'
         );
       } else {
         record('atmosphere unavailable', 'no float render targets');
@@ -4168,6 +4234,7 @@
         syncTraffic();
         syncMetar();
         syncSmoke();
+        syncAerosol();
       }
       function maybeRoam(now, moved) {
         if (moved) lastMoveMs = now;
@@ -4502,16 +4569,30 @@
         // twilight, -3 to -9 deg).
         const nightSky = THREE.MathUtils.clamp(-(sun.alt / RAD + 3) / 6, 0, 1);
 
-        // The sky: aerosols scale the Mie profile physically (AOD 0.12 as
-        // the temperate baseline); the grey veil handles overcast.
-        const mieScale = THREE.MathUtils.clamp(state.aod / 0.12, 0.25, 8);
+        // The sky's Mie term: the MEASURED GEFS-Aerosols channel
+        // set when the daemon answers (per-channel extinction by
+        // Angstrom interpolation of five measured bands, measured
+        // SSA and phase asymmetry), else the Hillaire defaults
+        // (flat spectrum, SSA 0.9, g 0.8) calibrated to the
+        // measured CAMS total AOD. Both paths run the same gated
+        // profile calibration: the column above the terrain
+        // integrates to the measured optical depth EXACTLY (the
+        // old AOD/0.12 normalisation - the paper's very clean
+        // default air passed off as the global mean - is gone).
+        const aeroFresh =
+          state.aerosol && Date.now() - state.aerosol.at < 6 * 3600e3;
+        const aodC = THREE.MathUtils.clamp(state.aod, TAU_MIN, TAU_MAX);
+        const mieSet = aeroFresh
+          ? state.aerosol.set
+          : {tau: [aodC, aodC, aodC], ssa: [0.9, 0.9, 0.9], g: 0.8};
+        const mieRad = mieCoefficients(mieSet, centerElev);
         if (atmo.ok) {
           const skyExposure = 24 / (0.2 + 0.8 * day);
           // The camera's REAL altitude (inverting the asinh height
           // compression) feeds the sky and aerial LUTs, so flying up
           // physically lowers the horizon and thins the haze.
           const eCam = centerElev + 500 * Math.sinh(camera.position.y / 16);
-          atmo.update(sunVec, mieScale, Math.max(eCam, 50), skyExposure);
+          atmo.update(sunVec, mieRad, Math.max(eCam, 50), skyExposure);
           // Aerial perspective shares the dome's exposure so inscattered
           // light on the terrain matches the sky it comes from.
           aerialU.uSunAzV.value.set(sunVec.x, sunVec.z).normalize();
@@ -4543,7 +4624,7 @@
         // The sun's light on the world carries its true transmitted
         // colour: the CPU mirror of the transmittance integral reddens
         // low sun physically instead of by hue heuristic.
-        const st = sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieScale);
+        const st = sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieRad);
         const stMax = Math.max(st[0], st[1], st[2], 1e-4);
         sunLight.color.setRGB(st[0] / stMax, st[1] / stMax, st[2] / stMax);
         const stLum = 0.2126 * st[0] + 0.7152 * st[1] + 0.0722 * st[2];
@@ -4639,7 +4720,7 @@
         // transmittance at the current aerosol load; gated with the
         // stars.
         airglowU.night.value = nightSky * (1 - cloudy * 0.85) * lpVis;
-        airglowU.uTzen.value.fromArray(sunTransmittanceJS(1, mieScale));
+        airglowU.uTzen.value.fromArray(sunTransmittanceJS(1, mieRad));
         // Zodiacal light: anchored to the sun's ecliptic longitude,
         // scaled by the Earth's REAL heliocentric distance (r^-2.3,
         // ephemeris when the engine is loaded) and the Masana
@@ -5801,6 +5882,8 @@
         setInterval(syncMetar, 10 * 60 * 1000);
         syncSmoke();
         setInterval(syncSmoke, 30 * 60 * 1000);
+        syncAerosol();
+        setInterval(syncAerosol, 30 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
         syncISS();
         setInterval(syncISS, 6 * 60 * 60 * 1000);

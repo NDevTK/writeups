@@ -2160,6 +2160,57 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   biomass-burning single-scattering albedo) stays deferred until
   a citable climatology value is settled - published AERONET
   spreads are wide and we do not invent constants.
+- DONE: measured aerosols - the sky's Mie term stops being one
+  gray knob (Jul 9). GEFS-Aerosols (NOAA's operational GOCART
+  coupling, Bhattacharjee et al. 2023 WAF) publishes per 0.25-deg
+  cell, 3-hourly: total AOT at 340/440/555/645/859 nm, scattering
+  AOT at 555, SSA + asymmetry at 340, and per-species AOT +
+  scattering AOT at 555 for dust/sea-salt/sulphate/organic/black
+  carbon - the RADIATIVE properties themselves, measured, so no
+  OPAC climatology transcription and no invented mixing rules.
+  Chain: NOMADS grib filter (the supported subsetting path since
+  OpenDAP retired, SCN 25-81) -> grib2.js, a minimal certified
+  GRIB2 decoder (GDT 3.0, PDT 4.0/4.48, DRT 5.0 simple packing +
+  bitmap, sign-magnitude integers) gated against an ecCodes
+  2.47.3 ground-truth decode of a LIVE captured subset
+  (grib2-fixture.mjs, 20 messages, every texel to 1e-12, one full
+  81-value grid) plus synthetic spec-built messages (negative
+  scales, bitmap holes, 0-bit constant fields, 0/360 folding) ->
+  aerosol.js: census + channel set at the theme's 680/550/440
+  (tau by piecewise Angstrom 1929 log-log interpolation - exact
+  on any power law, gated; SSA from the TWO measured anchors
+  linearly in ln lambda, the same bridging AERONET applies; g =
+  the measured 340 nm ASYSFK, replacing the hardcoded 0.8) ->
+  mieCoefficients calibrates the Hillaire exp(-h/1200) profile so
+  the column above the LOCAL terrain equals measured tau exactly
+  (algebraic identity, gated). KEY landmark: a flat tau =
+  4.44e-6 x 1200 SSA-0.9 column returns EXACTLY 3.996e-6/4.44e-7
+  - the measured path degenerates to Hillaire (2020) for
+    paper-standard air. Daemon: /aerosol?lat&lon (one ~6 KB subset
+    per 0.25-deg cell, 45 min cache, cycle fallback, health block);
+    live-verified end-to-end on the real feed (Grindelwald cell,
+    12z+9: tau550 0.0385, SSA 0.891, g 0.710, sulphate+organic
+    dominated, black carbon SSA 0.213). Renderer: atmosphere-tsl
+    Mie went vec3 - mieScat/mieAbs/mieG uniforms in extinction,
+    in-scatter and the (now measured-g) Cornette-Shanks phase; LUT
+    rebuild keyed on the radiative set; sun-transmittance.js takes
+    the same per-channel coefficients (both callers updated);
+    atmo-reference.mjs mirrors the per-channel structure with
+    paper defaults - REF texels verified IDENTICAL before/after
+    the refactor. Fallback when /aerosol is silent: the paper's
+    SSA/g calibrated to the measured CAMS total AOD through the
+    SAME gated path - which also retires the old aod/0.12
+    normalisation (the paper's very clean default air passed off
+    as the global mean; tau is now the physical column). This
+    CLOSES the deferred smoke-SSA question with measured data
+    instead of a picked constant: organic-matter and black-carbon
+    columns darken the measured SSA wherever a plume actually
+    absorbs; HMS stays the analyst-verified provenance layer. Gate
+    grew 39 -> 41 sets (grib2, aerosol). Visual judgement stays
+    with the owner's live browser (fixture rig cannot shoot the
+    sky): expect hazier, warmer horizons under real air - measured
+    tau is 5-30x the paper default - and dust/smoke events to
+    read as coloured, absorbing skies.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
