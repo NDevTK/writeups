@@ -2107,6 +2107,34 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     consequence is the aerosol's single-scattering albedo (biomass
     smoke absorbs more), and that hook waits on the OPEN question
     below.
+- DONE: the roam hitch - the hop's heavy bakes moved off the
+  main thread (the last open quality item from the roam design
+  review). The inline demElev/sample math was EXTRACTED into
+  terrain-sample.js (single source: theme + worker + reference -
+  it had been ungated inline code since the DEM feature landed)
+  and terrain-sample-reference.mjs joins the gate (set 39, 4
+  landmarks): the mercator pixel mapping reproduced independently
+  and bilinear held EXACT on a linear-in-pixel field; grid-kind
+  corners/centre/clamp exact; the sea rule and asinh datum with
+  the micro-relief IDENTITY against roam.microRelief; and anchor
+  independence at the full sample() level (the roam overlap
+  property survives the composition). terrain-worker.js (module
+  worker, same gated modules, no model of its own) computes the
+  LEADR moments pyramid, the 321^2 mesh surface for the exact
+  vertex lattice the main thread harvested (no vertex-ordering
+  assumptions cross the thread boundary - the xz array travels
+  with the job), and the 512^2 signed bathymetry + TMA depth
+  accumulators; everything returns as transferables.
+  buildWorld(pre) consumes the precomputed grids when present and
+  samples synchronously when not - boot, the procedural fallback
+  and any worker failure (no module workers, crash, hung job ->
+  8 s bail) use the same single body. BONUS EXACTNESS FIX: the
+  camera used to teleport back to the anchor point at the swap,
+  discarding the distance flown during the fetch (tens of units
+  at full speed); it now rewrites from its CURRENT geodetic
+  position through the same gated geoToScene - exact continuity.
+  window.\_\_roam.workerUsed for the harness; verified in the
+  browser smoke (hop through the worker path).
 - OPEN (radiative constants, needs GPU recertification):
   atmosphere-tsl's MIE_A0 = 4.4e-6 reads as Mie ABSORPTION and
   extinction is computed as MIE_S0 + MIE_A0 = 8.4e-6 - but
