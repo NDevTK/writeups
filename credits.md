@@ -14,6 +14,13 @@ title: Credits
   </ul>
 </div>
 
+# Themes
+
+- `Surveillance.html` Leaflet and © OpenStreetMap contributors and © CARTO
+- `Grove.html` pixi.js (MIT)
+- `Horizon.html` Three.js Authors (MIT) and Don Cross <https://github.com/cosinekitty/astronomy> (MIT) and others.  
+  Some themes were created by AI models such as Opus 4.8 and Fable 5. If you made a similar project it's likely your code influenced it.
+
 # Fonts
 
 - `Shantell Sans` used in `Comic`, Copyright 2022 The Shantell Sans Project Authors (<https://github.com/arrowtype/shantell-sans>)

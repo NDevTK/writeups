@@ -327,6 +327,9 @@ themes.onchange = async () => {
       AIWarning();
       break;
   }
+  let typeWarn = themes.value.endsWith('.html')
+    ? ' May use external services'
+    : '';
   // Consent!
   if (
     !themes.value.endsWith('.tmp') &&
@@ -334,7 +337,8 @@ themes.onchange = async () => {
     confirm(
       'Allow the ' +
         themes.value +
-        ' theme preference to be saved to localStorage?'
+        ' theme preference to be saved to localStorage?' +
+        typeWarn
     )
   ) {
     localStorage.setItem('theme', themes.value);
