@@ -46,6 +46,8 @@
       import {LANDUSE_FIXTURE} from '../landuse-fixture.mjs';
       import {parseWaterways, riversGeometry} from '../rivers.js';
       import {RIVERS_FIXTURE} from '../rivers-fixture.mjs';
+      import {parseRailways, railsGeometry} from '../rails.js';
+      import {RAILS_FIXTURE} from '../rails-fixture.mjs';
 
       const q = new URLSearchParams(location.search);
       const renderer = new THREE.WebGPURenderer({antialias: true});
@@ -195,6 +197,30 @@
             roughness: 0.25 // water sheen
           });
           scene.add(new THREE.Mesh(vgeo, vmat));
+        }
+        // The railways (rails.js - same gated builder, beds at the
+        // MEASURED gauge widths): the BOB, the standard-gauge Thun
+        // line and the Harderbahn thread the stage. ?rails=0 hides.
+        if (q.get('rails') !== '0') {
+          const kg = railsGeometry(
+            parseRailways(RAILS_FIXTURE),
+            anchor,
+            () => 0.09, // above the rivers, under the roads
+            7 / 400,
+            1e9
+          );
+          const kgeo = new THREE.BufferGeometry();
+          kgeo.setAttribute(
+            'position',
+            new THREE.BufferAttribute(kg.position, 3)
+          );
+          kgeo.setAttribute('normal', new THREE.BufferAttribute(kg.normal, 3));
+          kgeo.setAttribute('color', new THREE.BufferAttribute(kg.color, 3));
+          const kmat = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: 0.9
+          });
+          scene.add(new THREE.Mesh(kgeo, kmat));
         }
         // The street network under the town (roads.js, same fixture
         // area), ribbons lifted a hair off the flat stage.
