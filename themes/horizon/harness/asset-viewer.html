@@ -40,6 +40,8 @@
       import {typeClass} from '../ships.js';
       import {buildingsGeometry, parseBuildings} from '../buildings.js';
       import {BUILDINGS_FIXTURE} from '../buildings-fixture.mjs';
+      import {parseRoads, roadsGeometry} from '../roads.js';
+      import {ROADS_FIXTURE} from '../roads-fixture.mjs';
 
       const q = new URLSearchParams(location.search);
       const renderer = new THREE.WebGPURenderer({antialias: true});
@@ -117,6 +119,29 @@
           roughness: 0.9
         });
         scene.add(new THREE.Mesh(geo, mat));
+        // The street network under the town (roads.js, same fixture
+        // area), ribbons lifted a hair off the flat stage.
+        if (q.get('roads') !== '0') {
+          const rg = roadsGeometry(
+            parseRoads(ROADS_FIXTURE),
+            anchor,
+            () => 0.012,
+            7 / 400,
+            1e9
+          );
+          const rgeo = new THREE.BufferGeometry();
+          rgeo.setAttribute(
+            'position',
+            new THREE.BufferAttribute(rg.position, 3)
+          );
+          rgeo.setAttribute('normal', new THREE.BufferAttribute(rg.normal, 3));
+          rgeo.setAttribute('color', new THREE.BufferAttribute(rg.color, 3));
+          const rmat = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: 0.95
+          });
+          scene.add(new THREE.Mesh(rgeo, rmat));
+        }
         // Frame what was actually built: aim at the geometry's
         // bounding box, back off proportionally (?d overrides).
         let x0 = 0;
@@ -140,7 +165,9 @@
         const az = ((+q.get('az') || 205) * Math.PI) / 180;
         const el = ((+q.get('el') || 18) * Math.PI) / 180;
         const d = +q.get('d') || Math.max(x1 - x0, z1 - z0, 0.5) * 0.85;
-        camera.near = 0.02;
+        // near scales with distance: the road ribbons ride 0.7 m
+        // above the stage and need the depth precision.
+        camera.near = Math.max(0.02, d * 0.01);
         camera.updateProjectionMatrix();
         camera.position.set(
           cx + d * Math.cos(el) * Math.sin(az),

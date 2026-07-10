@@ -2467,6 +2467,43 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   ?asset=buildings (theme-exact U = 7/400, auto-framing on the
   built bounding box, ?n= nearest-N close-ups). Gate 44 -> 45
   sets.
+- DONE: real roads (Jul 10, the environment series after
+  buildings - the towns had their shapes but nothing connected
+  them). OSM way[highway] through the SAME Overpass mirrors,
+  designed in the asset viewer before wiring: roads.js is pure JS
+  geometry gated at 5 landmarks - the OSM WIDTH ladder mirroring
+  the height ladder (width tag in either decimal form > lanes x
+  3.5 m, the OSM/AASHTO default lane > per-type defaults > 4 m;
+  the captured census: width tagged on 38 of 400 Interlaken ways,
+  lanes on 138), surface provenance (the tagged surface picks the
+  albedo - 320 of 400 ways carry one - untagged paved classes
+  read asphalt, track/path bare ground), densify/thin held exact
+  (gap <= max, interior spacing >= min, endpoints and original
+  vertices never moved), the LIVE 400-way Interlaken fixture
+  (geometry thinned to >= 6 m interior, endpoints exact for
+  connectivity), and ribbon geometry held by the EXACTNESS
+  identity: on a straight flat road the triangle areas sum to
+  length x ladder-width to float32 storage precision (1e-6 - the
+  gate documents that the bound is the Float32Array, not the
+  math), normals exactly up; water CUTS a road into strips, and
+  the same road carrying OSM's bridge tag SPANS the wet gap on a
+  straight grade between its shores (both behaviors in one
+  landmark, asymmetric 4->8 m shores). Class-ranked display cap
+  keeps the network's spine (motorway first, then by length).
+  Theme wiring end to end: syncRoads (both mirrors, geodetic
+  localStorage cache per anchor), placeRoads seats ribbons on
+  sample() ground + 2 m clearance for the coarse render mesh
+  (ribbon follows sample() every 15 m; the mesh interpolates 50 m
+  cells) with polygonOffset, aerial-wrapped vertex colors,
+  receiveShadow; rebuilt per box in buildWorld, re-synced on roam
+  settle and boot; ?roads=0 disables; KEEP_PARAMS carries
+  'roads'. The asset viewer's buildings stage now draws the
+  street network under the town (?roads=0 to isolate) - the
+  design loop caught the near-plane precision issue (near now
+  scales with framing distance). Debug trail: the ribbon area
+  identity first gated at 1e-9 and failed at 3.1e-8 - float32
+  vertex storage, tolerance moved to the documented 1e-6, the
+  double-precision math itself exact. Gate 45 -> 46 sets.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
