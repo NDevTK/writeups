@@ -48,6 +48,8 @@
       import {RIVERS_FIXTURE} from '../rivers-fixture.mjs';
       import {parseRailways, railsGeometry} from '../rails.js';
       import {RAILS_FIXTURE} from '../rails-fixture.mjs';
+      import {consistOf} from '../trains.js';
+      import {buildTrain} from '../rollingstock.js';
 
       const q = new URLSearchParams(location.search);
       const renderer = new THREE.WebGPURenderer({antialias: true});
@@ -100,9 +102,58 @@
         ].map((c) => mk(c))
       };
 
-      // ?asset=buildings: the LIVE Interlaken fixture through the
-      // same buildings.js the theme ships (metres, flat ground).
-      if (q.get('asset') === 'buildings') {
+      // ?asset=trains: one consist per category family through the
+      // same trains.js/rollingstock.js the theme ships (metres).
+      if (q.get('asset') === 'trains') {
+        sea.material.color.set('#82868b'); // ballast stage
+        sun.position.set(-320, 380, -420);
+        const tmats = {
+          icBody: mk('#e6e7e9', 0.55),
+          regBody: mk('#a5291f', 0.6), // Swiss regional red
+          win: mk('#141a20', 0.3),
+          roof: mk('#686d72', 0.7),
+          cab: mk('#22272d', 0.5)
+        };
+        const LINEUP = [
+          ['IC', 'SBB'],
+          ['ICE', 'SBB'],
+          ['RE', 'BLS-bls'],
+          ['R', 'ZB'],
+          ['R', 'BOB'],
+          ['PE', 'ZB']
+        ];
+        let x = 0;
+        const xs = [];
+        for (const [cat, op] of LINEUP) {
+          const g = new THREE.Group();
+          buildTrain(g, cat, consistOf(cat, op), tmats, 1);
+          x += 8;
+          g.position.set(x, 0, 0);
+          xs.push(x);
+          x += 8;
+          scene.add(g);
+        }
+        const mid = (xs[0] + xs[xs.length - 1]) / 2;
+        const az = ((+q.get('az') || 235) * Math.PI) / 180;
+        const el = ((+q.get('el') || 14) * Math.PI) / 180;
+        const d = +q.get('d') || 190;
+        camera.position.set(
+          mid + d * Math.cos(el) * Math.sin(az),
+          Math.max(d * Math.sin(el), 3),
+          d * Math.cos(el) * Math.cos(az)
+        );
+        camera.lookAt(mid, 3, 0);
+        await renderer.init();
+        window.__r = renderer;
+        window.__scene = scene;
+        window.__cam = camera;
+        window.__THREE = THREE;
+        let tframes = 0;
+        renderer.setAnimationLoop(() => {
+          renderer.render(scene, camera);
+          if (++tframes === 5) console.log('DONE');
+        });
+      } else if (q.get('asset') === 'buildings') {
         sea.material.color.set('#5d7a52'); // grass stage
         sun.position.set(-320, 380, -420); // camera side (az 205)
         const anchor = {lat: 46.6863, lon: 7.8632};

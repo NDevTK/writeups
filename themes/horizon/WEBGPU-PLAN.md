@@ -2608,6 +2608,50 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   48 -> 49 sets. Browser smoke, five layers now: 177/177
   buildings, 319/319 roads, 88/116 landuse, 185/189 watercourses,
   192/196 railways on the DEM world, one known warning class.
+- DONE: real trains on the real timetable (Jul 10, owner: "public
+  transport normally has tracking or schedules (includes metadata
+  like what type of train etc)" + "location specific APIs should
+  only get called while viewing their scope"). The railways got
+  their TRAFFIC: the Swiss open transport API
+  (transport.opendata.ch - keyless, CORS-open) publishes station
+  boards with each departure's category (IC/ICE/RE/R/PE), number,
+  operator (SBB, BLS, ZB, BOB), REAL-TIME DELAY, and the passList
+  of stops it calls at (WGS84 coordinates + arrival/departure
+  timestamps). trains.js (pure, gated at 5 landmarks): parseBoard
+  (delay minutes shift the published stop times exactly - the
+  real-time layer; stops without coordinates dropped; bus/boat
+  filtered - boats already arrive via AIS), trainAt (WHERE IS IT
+  NOW: dwelling at a stop between arr and dep, else the exact
+  linear fraction between the bracketing stops - the timetable's
+  own fixes, the AIS ships' dead-reckoning honesty on rails; null
+  outside the journey window), consistOf (category -> car count,
+  operator gauge -> stock dimensions: the narrow ops run 18 x
+  2.65 m cars, the standard net 25 x 2.85 m - documented defaults
+  where the API publishes no formation), and the PROVIDER
+  REGISTRY: PROVIDERS entries own a coverage bbox and their URL
+  builders; providerFor(lat, lon) resolves which (if any) speaks
+  for a point - a location-scoped API is NEVER CALLED outside its
+  scope (gate landmark: Interlaken and border Basel resolve the
+  Swiss provider, Paris and New York resolve none), so the
+  registry can grow without idle traffic. The LIVE fixture: 14
+  real Interlaken Ost departures (6 BOB regionals, 3 SBB ICs, an
+  ICE, ZB regionals, a BLS RE, the GoldenPass PE). rollingstock.js
+  (vessels.js mould - three import allowed, never node-imported):
+  buildTrain turns a consist into car bodies + window band + roof
+  - bogies + cab faces, IC family light-bodied, regional/narrow
+    the red of Swiss regional stock; designed in the viewer's new
+    ?asset=trains lineup (2 iterations: window band proportions,
+    stage albedo). Theme: syncTrains (provider-scoped: locations ->
+    nearest station id -> stationboard, 90 s poll for the delays,
+    roam re-sync; panel records station, departure count and the
+    next train's label/destination/operator), frame loop draws each
+    live journey at trainAt(now) seated at rail-bed clearance,
+    heading along its current leg, pool pruned as boards roll over;
+    ?trains=0; KEEP_PARAMS carries 'trains'. Coverage is the
+    provider's: no board, no trains invented. Gate 49 -> 50 sets.
+    Browser smoke: five placed layers unchanged, trains code silent
+    in the sandbox (no provider reachable - the truthful default),
+    one known warning class.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

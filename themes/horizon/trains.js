@@ -1,0 +1,210 @@
+/**
+ * trains.js - real trains on the real timetable. The railways
+ * (rails.js) gave the towns their lines; the Swiss open transport
+ * API (transport.opendata.ch - keyless, CORS-open) gives the
+ * lines their TRAFFIC: station boards with each departure's
+ * category (IC/ICE/RE/R/PE), number, operator (SBB, BLS, ZB,
+ * BOB), real-time delay, and the passList of stops it calls at -
+ * WGS84 coordinates with arrival/departure timestamps. Pure JS,
+ * gated:
+ *  - parseBoard: departures -> journeys; stops without coordinates
+ *    or times dropped; per-stop delay minutes applied to the
+ *    published times (the real-time layer); road/water modes
+ *    (bus, boat) filtered - boats already arrive via AIS.
+ *  - trainAt: WHERE IS IT NOW - dwelling at a stop between its
+ *    arrival and departure, else linearly between the two stops
+ *    that bracket now (the timetable's own fixes - the same
+ *    dead-reckoning honesty as the AIS ships), null before the
+ *    first departure or after the last arrival.
+ *  - consistOf: the metadata -> a documented consist: car count
+ *    by category (the API does not publish formations), car
+ *    dimensions by the operator's gauge - the narrow-gauge
+ *    operators (BOB, ZB, WAB...) run ~18 x 2.65 m stock, the
+ *    standard network ~25 x 2.85 m.
+ * Coverage is the provider's: PROVIDERS registers each regional
+ * API with its coverage bbox, and providerFor answers which one
+ * (if any) speaks for a point - location-specific APIs are only
+ * ever CALLED while the view is inside their scope, so the
+ * registry can grow without idle traffic. Where no provider
+ * covers, no trains are invented.
+ */
+
+// The provider registry: each entry owns a coverage bbox
+// [latMin, lonMin, latMax, lonMax] and builds its own request
+// URLs. Only the provider whose scope contains the anchor is
+// ever called. First entry: the Swiss open transport API
+// (transport.opendata.ch - keyless, CORS-open), whose network is
+// Switzerland plus its border stations.
+export const PROVIDERS = [
+  {
+    name: 'transport.opendata.ch',
+    bbox: [45.6, 5.8, 47.95, 10.7],
+    locationsURL: (lat, lon) =>
+      'https://transport.opendata.ch/v1/locations?type=station&x=' +
+      lat.toFixed(5) +
+      '&y=' +
+      lon.toFixed(5),
+    boardURL: (id) =>
+      'https://transport.opendata.ch/v1/stationboard?limit=10&id=' +
+      encodeURIComponent(id)
+  }
+];
+
+export function providerFor(lat, lon) {
+  for (const p of PROVIDERS) {
+    const [a0, o0, a1, o1] = p.bbox;
+    if (lat >= a0 && lat <= a1 && lon >= o0 && lon <= o1) return p;
+  }
+  return null;
+}
+
+// Rail categories the boards publish (road/water filtered out).
+const RAIL_CATS = new Set([
+  'IC',
+  'ICE',
+  'ICN',
+  'EC',
+  'EN',
+  'IR',
+  'RE',
+  'R',
+  'S',
+  'SN',
+  'PE',
+  'RJ',
+  'RJX',
+  'TGV',
+  'ARZ',
+  'EXT',
+  'FUN',
+  'T'
+]);
+
+// Cars per category - typical Swiss formations, documented
+// defaults where the API publishes none.
+export const CONSIST_CARS = {
+  ICE: 8,
+  IC: 8,
+  ICN: 7,
+  EC: 8,
+  EN: 8,
+  RJ: 8,
+  RJX: 8,
+  TGV: 8,
+  IR: 6,
+  RE: 5,
+  PE: 5,
+  ARZ: 5,
+  EXT: 5,
+  R: 4,
+  S: 4,
+  SN: 4,
+  T: 2,
+  FUN: 1
+};
+export const DEFAULT_CARS = 3;
+
+// The metre-gauge and rack operators run shorter, narrower stock.
+export const NARROW_OPS = new Set([
+  'BOB',
+  'ZB',
+  'WAB',
+  'BLM',
+  'JB',
+  'SPB',
+  'MOB',
+  'MGB',
+  'RhB',
+  'HB'
+]);
+export const CAR_STD = {len: 25, w: 2.85, h: 4};
+export const CAR_NARROW = {len: 18, w: 2.65, h: 3.6};
+
+export function consistOf(category, operator) {
+  const op = String(operator || '').replace(/-.*$/, ''); // 'BLS-bls'
+  const dims = NARROW_OPS.has(op) ? CAR_NARROW : CAR_STD;
+  return {
+    cars: CONSIST_CARS[category] ?? DEFAULT_CARS,
+    ...dims,
+    narrow: NARROW_OPS.has(op)
+  };
+}
+
+const ms = (iso) => (iso ? Date.parse(iso) : NaN);
+
+/**
+ * A station board -> journeys [{cat, number, operator, to, label,
+ * consist, stops: [{lat, lon, arrMs, depMs}]}]. Delay minutes are
+ * ADDED to the published stop times (the real-time layer); stops
+ * without a coordinate or any time are dropped; journeys need two
+ * placed stops to ever be drawn.
+ */
+export function parseBoard(json) {
+  const out = [];
+  for (const e of (json && json.stationboard) || []) {
+    if (!RAIL_CATS.has(e.category)) continue; // bus/boat/unknown
+    const stops = [];
+    for (const p of e.passList || []) {
+      const c = (p.station && p.station.coordinate) || {};
+      if (!Number.isFinite(c.x) || !Number.isFinite(c.y)) continue;
+      const late = (Number.isFinite(p.delay) ? p.delay : 0) * 60000;
+      const arr = ms(p.arrival);
+      const dep = ms(p.departure);
+      if (!Number.isFinite(arr) && !Number.isFinite(dep)) continue;
+      stops.push({
+        lat: c.x,
+        lon: c.y,
+        name: (p.station && p.station.name) || '',
+        arrMs: (Number.isFinite(arr) ? arr : dep) + late,
+        depMs: (Number.isFinite(dep) ? dep : arr) + late
+      });
+    }
+    if (stops.length < 2) continue;
+    out.push({
+      cat: e.category,
+      number: e.number || '',
+      operator: e.operator || '',
+      to: e.to || '',
+      label: (e.category || '') + (e.number ? ' ' + e.number : ''),
+      consist: consistOf(e.category, e.operator),
+      stops
+    });
+  }
+  return out;
+}
+
+/**
+ * WHERE IS IT NOW: null before the first departure or after the
+ * last arrival; AT a stop while dwelling (arr <= now <= dep);
+ * linearly between the bracketing stops otherwise, with the
+ * heading of that leg. Positions are the timetable's own fixes -
+ * interpolation between real stops at real (delay-shifted) times.
+ */
+export function trainAt(journey, nowMs) {
+  const s = journey.stops;
+  if (nowMs < s[0].depMs || nowMs > s[s.length - 1].arrMs) return null;
+  for (let i = 0; i < s.length; i++) {
+    if (nowMs <= s[i].depMs && nowMs >= s[i].arrMs) {
+      // dwelling: heading of the NEXT leg (or the previous at the end)
+      const o = s[i + 1] || s[i - 1];
+      return {
+        lat: s[i].lat,
+        lon: s[i].lon,
+        hdgTo: o ? {lat: o.lat, lon: o.lon} : null,
+        at: s[i].name,
+        moving: false
+      };
+    }
+    if (i + 1 < s.length && nowMs > s[i].depMs && nowMs < s[i + 1].arrMs) {
+      const f = (nowMs - s[i].depMs) / (s[i + 1].arrMs - s[i].depMs);
+      return {
+        lat: s[i].lat + (s[i + 1].lat - s[i].lat) * f,
+        lon: s[i].lon + (s[i + 1].lon - s[i].lon) * f,
+        hdgTo: {lat: s[i + 1].lat, lon: s[i + 1].lon},
+        at: '',
+        moving: true
+      };
+    }
+  }
+  return null;
+}

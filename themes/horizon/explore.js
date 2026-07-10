@@ -64,6 +64,7 @@ export const KEEP_PARAMS = [
   'landuse',
   'rivers',
   'rails',
+  'trains',
   'roam'
 ];
 

@@ -119,7 +119,13 @@
         surface takes over; railways run their real lines - beds at
         the MEASURED OSM gauge (tracks x (gauge + ballast
         shoulders)), tunnels skipped, tagged rail bridges decking
-        over the rivers they span
+        over the rivers they span; and where a registered transit
+        provider covers the view (Swiss open transport API first -
+        location-scoped, never called outside its coverage), real
+        trains run the lines on their real timetable: category,
+        number, operator and live delay from the station board,
+        positions interpolated between the stops each train
+        reports at its delay-shifted times
       - roam (just fly): the free camera streams terrain. 4 km from
         the anchor the world re-anchors on your geodetic position
         (roam.js - exact inverse mapping and altitude-datum carry,
@@ -143,7 +149,7 @@
         override), water=0 (skip OSM lakes), buildings=0 (skip OSM
         buildings), roads=0 (skip OSM roads), landuse=0 (skip OSM
         ground cover), rivers=0 (skip OSM waterways), rails=0 (skip
-        OSM railways), debug=1
+        OSM railways), trains=0 (skip live trains), debug=1
     -->
     <style>
       html,
@@ -395,6 +401,8 @@
       import {landTint, parseLanduse} from './horizon/landuse.js';
       import {parseWaterways, riversGeometry} from './horizon/rivers.js';
       import {parseRailways, railsGeometry} from './horizon/rails.js';
+      import {parseBoard, providerFor, trainAt} from './horizon/trains.js';
+      import {buildTrain} from './horizon/rollingstock.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -1632,6 +1640,62 @@
           if (worldBuilt) placeRails();
         } catch {
           railsGeo = null; // no invented tracks
+        }
+      }
+
+      // Real trains on the real timetable: where a REGISTERED
+      // transit provider covers the view (trains.js PROVIDERS -
+      // location-scoped, an out-of-scope provider is never even
+      // called), the nearest station's live board drives trains
+      // with their real metadata: category, number, operator,
+      // real-time delay. Positions are the timetable's own fixes -
+      // interpolated between the stops each train reports, at its
+      // delay-shifted times - the AIS ships' dead-reckoning
+      // honesty on rails. ?trains=0 disables.
+      let trainJourneys = [];
+      const trainPool = new Map(); // journey key -> consist group
+      let trainMats = null;
+      let trainsSeq = 0;
+      async function syncTrains() {
+        if (params.get('trains') === '0') return;
+        const prov = providerFor(state.lat, state.lon);
+        if (!prov) return; // outside every provider's scope: no call
+        const seq = ++trainsSeq;
+        try {
+          const loc = await (
+            await fetch(prov.locationsURL(state.lat, state.lon), {
+              credentials: 'omit'
+            })
+          ).json();
+          const st = ((loc && loc.stations) || []).find(
+            (s) => s.id && s.coordinate && Number.isFinite(s.coordinate.x)
+          );
+          if (!st || seq !== trainsSeq) return;
+          const board = await (
+            await fetch(prov.boardURL(st.id), {credentials: 'omit'})
+          ).json();
+          if (seq !== trainsSeq) return;
+          trainJourneys = parseBoard(board);
+          const first = trainJourneys[0];
+          record(
+            prov.name + ' station board',
+            (st.name || '?') +
+              ' · ' +
+              trainJourneys.length +
+              ' departures' +
+              (first
+                ? ' · next ' +
+                  first.label +
+                  ' → ' +
+                  first.to +
+                  ' (' +
+                  first.operator +
+                  ')'
+                : '')
+          );
+        } catch (e) {
+          // No board, no trains - the truthful default.
+          if (params.has('debug')) console.warn('trains: ' + e.message);
         }
       }
 
@@ -5293,6 +5357,7 @@
         syncRivers();
         syncRails();
         syncLanduse();
+        syncTrains();
         // The lamp cloud is anchored to the OLD box - drop it now,
         // syncLights rebuilds it Earth-anchored on the new one.
         if (lampPts) {
@@ -6031,6 +6096,71 @@
                   .set(NAV_COLOR[arc])
                   .multiplyScalar(0.4 + 3.6 * amp);
             }
+          }
+        }
+        // Trains: each live journey drawn at the position its OWN
+        // timetable reports right now (trains.js trainAt - real
+        // stops, real delay-shifted times), the consist from its
+        // published category and operator. Journeys outside their
+        // window (not departed / arrived) or off the box are
+        // hidden; the pool prunes boards that rolled over.
+        if (trainJourneys.length && params.get('trains') !== '0') {
+          if (!trainMats) {
+            const mk = (color, rough) => {
+              const m = new THREE.MeshStandardNodeMaterial({
+                color,
+                roughness: rough
+              });
+              applyAerial(m);
+              return m;
+            };
+            // The asset-viewer palette (?asset=trains), aerial-hooked.
+            trainMats = {
+              icBody: mk('#e6e7e9', 0.55),
+              regBody: mk('#a5291f', 0.6),
+              win: mk('#141a20', 0.3),
+              roof: mk('#686d72', 0.7),
+              cab: mk('#22272d', 0.5)
+            };
+          }
+          const nowMs = Date.now();
+          for (const j of trainJourneys) {
+            const key = j.label + '@' + j.stops[0].depMs;
+            let g = trainPool.get(key);
+            const p = trainAt(j, nowMs);
+            if (!p) {
+              if (g) g.visible = false;
+              continue;
+            }
+            const sc = geoToScene(p.lat, p.lon, dressAnchor);
+            if (Math.abs(sc.x) > 140 || Math.abs(sc.z) > 140) {
+              if (g) g.visible = false;
+              continue;
+            }
+            if (!g) {
+              g = new THREE.Group();
+              buildTrain(g, j.cat, j.consist, trainMats, 1 / MPU);
+              scene.add(g);
+              trainPool.set(key, g);
+            }
+            g.visible = true;
+            // Seated at rail-bed height; over water (a rail bridge)
+            // the deck rides the same clearance above the surface.
+            g.position.set(sc.x, sample(sc.x, sc.z).y + 1.8 / MPU, sc.z);
+            if (p.hdgTo) {
+              const t2 = geoToScene(p.hdgTo.lat, p.hdgTo.lon, dressAnchor);
+              g.rotation.y = Math.atan2(t2.x - sc.x, t2.z - sc.z);
+            }
+          }
+          if (trainPool.size > 24) {
+            const live = new Set(
+              trainJourneys.map((j) => j.label + '@' + j.stops[0].depMs)
+            );
+            for (const [k, g] of trainPool)
+              if (!live.has(k)) {
+                scene.remove(g);
+                trainPool.delete(k);
+              }
           }
         }
         // Aircraft lights: dead-reckon on track/ground speed;
@@ -6986,6 +7116,8 @@
         syncRivers();
         syncRails();
         syncLanduse();
+        syncTrains();
+        setInterval(syncTrains, 90 * 1000);
         syncLights();
         setInterval(syncLights, 6 * 60 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
