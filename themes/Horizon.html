@@ -190,7 +190,7 @@
         discharge=0 (pin river widths to the ladder), snowcover=0|URL
         (measured snow off / tile endpoint override), soil=0 (pin
         bare-soil tints dry), rainbow=0 (skip the
-        Airy rainbow), debug=1
+        Airy rainbow), halos=0 (skip the ice halo), debug=1
     -->
     <style>
       html,
@@ -346,7 +346,8 @@
         createMilkyWayMaterial,
         createNLCMaterial,
         createSkyglowMaterial,
-        createRainbowMaterial
+        createRainbowMaterial,
+        createHaloMaterial
       } from './horizon/sky-objects-tsl.js';
       import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
       import {
@@ -354,6 +355,12 @@
         rainbowProfile,
         waterIndex
       } from './horizon/rainbow.js';
+      import {
+        haloProfile,
+        ICE_N,
+        parhelionProfile,
+        prismDmin
+      } from './horizon/halos.js';
       import {
         apparentAltitude,
         buildProfile,
@@ -807,8 +814,9 @@
         } catch {
           say('weather unavailable · showing a calm day');
         }
-        // the measured rain and cover re-lay the bow
+        // the measured rain and cover re-lay the bow and the halo
         applyRainbow();
+        applyHalos();
       }
 
       // Winds aloft and the freezing level: mid clouds ride the 700hPa
@@ -5570,6 +5578,59 @@
       );
       rainbowMesh.visible = false;
       scene.add(rainbowMesh);
+      // The ice halo and the sundogs: the same dome pattern on
+      // the SUN side (halos.js - Warren-Brandt ice, prism
+      // minimum deviation, Bravais skew rays). The ring LUT is
+      // static physics; the sundog LUT follows the solar
+      // elevation in the frame loop; the amplitude follows the
+      // measured HIGH cloud - the cirrus deck that makes halos -
+      // through the direct beam of the lower decks. ?halos=0
+      // disables.
+      const haloObj = createHaloMaterial();
+      {
+        const hp = haloProfile();
+        for (let i = 0; i < hp.n; i++) {
+          haloObj.u.ringData[4 * i] = hp.data[3 * i];
+          haloObj.u.ringData[4 * i + 1] = hp.data[3 * i + 1];
+          haloObj.u.ringData[4 * i + 2] = hp.data[3 * i + 2];
+          haloObj.u.ringData[4 * i + 3] = 1;
+        }
+        haloObj.u.ring.needsUpdate = true;
+        haloObj.u.g0.value = hp.g0;
+        haloObj.u.g1.value = hp.g1;
+      }
+      const haloMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(902, 48, 24),
+        haloObj.material
+      );
+      haloMesh.visible = false;
+      scene.add(haloMesh);
+      let haloAmp = 0;
+      let haloParAlt = null;
+      function applyHalos() {
+        haloAmp = 0;
+        if (params.get('halos') === '0') {
+          haloMesh.visible = false;
+          return;
+        }
+        const hi = state.cloudHigh ?? 0;
+        haloAmp =
+          0.45 *
+          Math.min(hi / 50, 1) *
+          (1 - (state.cloudLow ?? 0) / 100) *
+          (1 - (0.7 * (state.cloudMid ?? 0)) / 100);
+        if (haloAmp > 0.01)
+          record(
+            'ice halo & sundogs',
+            '22\u00b0 ring at ' +
+              ((prismDmin(ICE_N[0]) * 180) / Math.PI).toFixed(1) +
+              '-' +
+              ((prismDmin(ICE_N[2]) * 180) / Math.PI).toFixed(1) +
+              '\u00b0 (Warren-Brandt ice) \u00b7 sundogs by Bravais \u00b7 cirrus ' +
+              Math.round(hi) +
+              '%'
+          );
+      }
       let rainbowAmp = 0;
       let rainbowGammaR = descartes(waterIndex(0.68), 1).gamma;
       const RAINBOW_PEAK5 = rainbowProfile(5).peak; // brightness datum
@@ -6958,6 +7019,33 @@
         } else {
           rainbowMesh.visible = false;
         }
+        // The halo hugs the sun: the ring LUT is static physics,
+        // the sundog LUT re-solves Bravais when the sun has moved
+        // 0.2 deg, and past ~61 deg elevation the dogs are gone
+        // (the LUT empties itself).
+        if (haloAmp > 0) {
+          haloObj.u.sunDir.value.copy(skyPoint(sun.alt, sun.az, 1)).normalize();
+          haloObj.u.sunAlt.value = sun.alt;
+          if (haloParAlt === null || Math.abs(sun.alt - haloParAlt) > 0.0035) {
+            haloParAlt = sun.alt;
+            const pp = parhelionProfile(Math.max(sun.alt, 0));
+            for (let i = 0; i < pp.n; i++) {
+              haloObj.u.parData[4 * i] = pp.data[3 * i];
+              haloObj.u.parData[4 * i + 1] = pp.data[3 * i + 1];
+              haloObj.u.parData[4 * i + 2] = pp.data[3 * i + 2];
+              haloObj.u.parData[4 * i + 3] = 1;
+            }
+            haloObj.u.par.needsUpdate = true;
+            haloObj.u.a0.value = pp.a0;
+            haloObj.u.a1.value = pp.a1;
+            haloObj.u.parOn.value = pp.any ? 1 : 0;
+          }
+          const up = THREE.MathUtils.smoothstep(sun.alt, -0.005, 0.01);
+          haloObj.u.alpha.value = haloAmp * up;
+          haloMesh.visible = haloObj.u.alpha.value > 0.005;
+        } else {
+          haloMesh.visible = false;
+        }
         // Meteors: the observed rate right now is the sum over the
         // active showers of ZHR(lam_sun) x sin(radiant elevation)
         // (meteors.js). Poisson spawning; ?meteor=N forces N/h for
@@ -8254,8 +8342,10 @@
         requestAnimationFrame(frame);
         await syncWeather();
         // overridden harness weather never reaches syncWeather's
-        // own call - lay the bow from whatever state holds now
+        // own call - lay the bow and halo from whatever state
+        // holds now
         applyRainbow();
+        applyHalos();
         setInterval(syncWeather, 15 * 60 * 1000);
         syncGeomag();
         syncAir();

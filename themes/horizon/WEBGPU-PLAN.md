@@ -3129,6 +3129,39 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   low enough that the bow clears the horizon; re-laid on every
   weather poll; panel records 'Airy rainbow - primary 42.4 deg,
   drops O 1.1 mm (Marshall-Palmer, 3 mm/h)'. Gate 57 sets.
+- DONE: the 22-degree ice halo and the sundogs (Jul 10, the
+  rainbow's sibling - ice prisms sunward where the rain was
+  antisolar). halos.js: ice index from Warren & Brandt (2008),
+  the compilation's own rows at the atmosphere's RGB (1.3073/
+  1.3110/1.3163); the halo as minimum deviation through the
+  hexagonal 60-degree prism, D = 2 asin(n sin(A/2)) - A -
+  21.66 deg red to 22.34 blue, the red inner edge; sundogs by
+  Bravais (1847) skew-ray optics - n' = sqrt(n^2 - sin^2 h)/
+  cos h, so the dogs sit ON the halo at sunrise (n'(0) = n
+  exactly), migrate outward as the sun climbs, and die at the
+  closed-form cutoff asin(sqrt((4 - n^2)/3)) = 60.9 deg - the
+  documented sundog death near 61; the profile is the
+  minimum-deviation caustic (1/sqrt(D - Dmin), dark inside -
+  every photograph's sharp inner edge), solar-disk smeared with
+  the rainbow's own kernel, Fresnel-weighted through the same
+  gated fresnelWater. The 46-degree halo's closed point is
+  gated (45.9 deg) but the bow is OMITTED from the drawn
+  profile: its real faintness comes from ray-path statistics
+  Fresnel alone does not carry, and the gate proved it (a
+  Fresnel-only 46 came out at 86% of the 22 - mistuned physics
+  is worse than none). Landmarks (6): the verbatim rows; prism
+  closed points with the stationarity identity |D'(i_m)| = 0;
+  Bravais exact at 0 and at the cutoff; the caustic's exact
+  1/sqrt ratio; the profile's red inner edge, dark-inside/
+  soft-outside; sundogs end-to-end (ON the halo at the horizon
+  to 1e-12, red toward the sun at 25 deg, the LUT empty at 65).
+  Theme: a second dome overlay (ring LUT static physics; the
+  sundog LUT re-solves Bravais when the sun moves 0.2 deg;
+  plates' documented ~1.5 deg wobble as the vertical envelope);
+  amplitude follows the MEASURED high cloud through the direct
+  beam of the lower decks - the cirrus deck the theme already
+  polls finally has its signature. Gate 58 sets; smoke shows the
+  bow and the halo standing in one sky.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
