@@ -189,7 +189,8 @@
         turbines), peaks=0 (skip summit labels),
         discharge=0 (pin river widths to the ladder), snowcover=0|URL
         (measured snow off / tile endpoint override), soil=0 (pin
-        bare-soil tints dry), debug=1
+        bare-soil tints dry), rainbow=0 (skip the
+        Airy rainbow), debug=1
     -->
     <style>
       html,
@@ -344,9 +345,15 @@
         createFlashMaterial,
         createMilkyWayMaterial,
         createNLCMaterial,
-        createSkyglowMaterial
+        createSkyglowMaterial,
+        createRainbowMaterial
       } from './horizon/sky-objects-tsl.js';
       import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
+      import {
+        descartes,
+        rainbowProfile,
+        waterIndex
+      } from './horizon/rainbow.js';
       import {
         apparentAltitude,
         buildProfile,
@@ -800,6 +807,8 @@
         } catch {
           say('weather unavailable · showing a calm day');
         }
+        // the measured rain and cover re-lay the bow
+        applyRainbow();
       }
 
       // Winds aloft and the freezing level: mid clouds ride the 700hPa
@@ -5543,6 +5552,68 @@
         lpGlowObj.material
       );
       scene.add(lpGlow);
+
+      // The rainbow: Airy's theory on the measured rain
+      // (rainbow.js computes the RGB profile - Descartes
+      // geometry on the Daimon-Masumura dispersion, Airy
+      // diffraction on the Marshall-Palmer drop of the measured
+      // rain rate, Fresnel bow strengths, solar-disk smearing -
+      // and the dome overlay samples it by angle from the
+      // antisolar point). Every gate is measured: rain at the
+      // anchor (state.precip), direct beam through the measured
+      // cloud cover, the sun up but low enough that the bow
+      // still clears the horizon. ?rainbow=0 disables.
+      const rainbowObj = createRainbowMaterial();
+      const rainbowMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(903, 48, 24),
+        rainbowObj.material
+      );
+      rainbowMesh.visible = false;
+      scene.add(rainbowMesh);
+      let rainbowAmp = 0;
+      let rainbowGammaR = descartes(waterIndex(0.68), 1).gamma;
+      const RAINBOW_PEAK5 = rainbowProfile(5).peak; // brightness datum
+      function applyRainbow() {
+        rainbowAmp = 0;
+        const R = state.precip ?? 0;
+        if (
+          params.get('rainbow') === '0' ||
+          !(R > 0) ||
+          (state.snow ?? 0) > 0
+        ) {
+          rainbowMesh.visible = false;
+          return;
+        }
+        const prof = rainbowProfile(R);
+        for (let i = 0; i < prof.n; i++) {
+          rainbowObj.u.lutData[4 * i] = prof.data[3 * i];
+          rainbowObj.u.lutData[4 * i + 1] = prof.data[3 * i + 1];
+          rainbowObj.u.lutData[4 * i + 2] = prof.data[3 * i + 2];
+          rainbowObj.u.lutData[4 * i + 3] = 1;
+        }
+        rainbowObj.u.lut.needsUpdate = true;
+        rainbowObj.u.g0.value = prof.g0;
+        rainbowObj.u.g1.value = prof.g1;
+        // direct beam through the measured cover, drop-size
+        // brightness relative to the 5 mm/h datum (the review's
+        // (a^7/lambda)^(1/3) law), ONE display gain like every
+        // other emissive.
+        rainbowAmp =
+          0.5 *
+          (1 - (state.cloud ?? 0) / 100) *
+          THREE.MathUtils.clamp(prof.peak / RAINBOW_PEAK5, 0.25, 1.6);
+        if (rainbowAmp > 0.01)
+          record(
+            'Airy rainbow',
+            'primary ' +
+              ((rainbowGammaR * 180) / Math.PI).toFixed(1) +
+              '\u00b0 \u00b7 drops \u00d8' +
+              (2 * prof.aMm).toFixed(1) +
+              ' mm (Marshall-Palmer, ' +
+              R +
+              ' mm/h) \u00b7 Airy supernumeraries'
+          );
+      }
       let lpRatio = 0;
       let lpVis = 1;
       let lpVisBright = 1;
@@ -6869,6 +6940,24 @@
             nlcShell.visible = nlcU.uAmp.value > 0.001;
           }
         }
+        // The rainbow rides the antisolar point: lit while rain
+        // is measured, the sun is up, and the bow's radius still
+        // clears the horizon (it sinks as the sun climbs -
+        // gamma_R minus the solar altitude is what remains).
+        if (rainbowAmp > 0) {
+          const sv = skyPoint(sun.alt, sun.az, 1).normalize();
+          rainbowObj.u.antisun.value.copy(sv).negate();
+          const up = THREE.MathUtils.smoothstep(sun.alt, -0.005, 0.01);
+          const clear = THREE.MathUtils.smoothstep(
+            rainbowGammaR - sun.alt,
+            0,
+            0.08
+          );
+          rainbowObj.u.alpha.value = rainbowAmp * up * clear;
+          rainbowMesh.visible = rainbowObj.u.alpha.value > 0.005;
+        } else {
+          rainbowMesh.visible = false;
+        }
         // Meteors: the observed rate right now is the sum over the
         // active showers of ZHR(lam_sun) x sin(radiant elevation)
         // (meteors.js). Poisson spawning; ?meteor=N forces N/h for
@@ -8164,6 +8253,9 @@
         }
         requestAnimationFrame(frame);
         await syncWeather();
+        // overridden harness weather never reaches syncWeather's
+        // own call - lay the bow from whatever state holds now
+        applyRainbow();
         setInterval(syncWeather, 15 * 60 * 1000);
         syncGeomag();
         syncAir();

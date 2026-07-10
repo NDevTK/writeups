@@ -3099,6 +3099,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   in it, rotors spin and wake in it, and the lake glitter
   widens, elongates and leans with it. Gate 56 sets; Interlaken
   smoke clean.
+- DONE: the rainbow, by Airy's theory on measured rain (Jul 10,
+  the frontier lane). rainbow.js follows the sources end to end:
+  Daimon & Masumura (2007) Sellmeier dispersion of water (eight
+  measured coefficients verbatim, 21.5 C); Descartes geometry in
+  the closed forms of Adam's Physics Reports 356 review (x0^2 =
+  ((k+1)^2 - N^2)/((k+1)^2 - 1); the review's own anchors hold -
+  N = 1.3318 -> 42.3 deg, N = 1.3435 -> 40.6 deg, n = 4/3
+  secondary -> 51 deg); Airy (1838) diffraction with xi =
+  (2 k_w^2 a^2 / D'')^(1/3) (D - Dmin), the Airy function
+  implemented from the A&S series/asymptotics and gated at
+  Ai(0), Ai(1), the first zero and the primary-peak abscissa;
+  bow strengths from the exact Fresnel path factor
+  (1-rho)^2 rho^k through the SAME fresnelWater the Cox-Munk
+  glitter uses; drops from Marshall & Palmer (1948) - the very
+  paper the radar's Z-R already inverts - D0 = 3.67/Lambda,
+  Lambda = 4.1 R^-0.21; solar-disk smearing (chord-weighted
+  0.266 deg). Landmarks (6): dispersion checkpoints; Descartes
+  closed forms with D'(x0) = 0 to 1e-12; Airy vs A&S; MP exact
+  at 1 mm/h; THE BOW - red primary 42.11 deg with blue inside
+  (colour order), secondary reversed at 50.8/53.1, Alexander's
+  dark band at 0.0% of peak, secondary/primary 0.37 matching the
+  Fresnel path ratio 0.35; and the supernumerary signature -
+  fringes 0.81 deg apart in drizzle, 0.56 in a downpour
+  ((k a)^(-2/3), invisible to geometric optics). Theme: a dome
+  overlay (sky-objects-tsl) samples the CPU-computed RGB profile
+  by angle from the antisolar point; gates all measured - rain
+  at the anchor, direct beam through the measured cover, the sun
+  low enough that the bow clears the horizon; re-laid on every
+  weather poll; panel records 'Airy rainbow - primary 42.4 deg,
+  drops O 1.1 mm (Marshall-Palmer, 3 mm/h)'. Gate 57 sets.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
