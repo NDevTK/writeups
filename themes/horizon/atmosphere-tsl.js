@@ -104,6 +104,12 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   const sunMu = uniform(0.5);
   const camH = uniform(300);
   const exposure = uniform(28);
+  // Hillaire (2020) terminates ground-hitting sky-view rays with a
+  // Lambertian ground bounce; the albedo is FED by the theme, not
+  // painted - Payne (1972) open-ocean broadband 0.06 where the box
+  // has sea, 0 otherwise (a land value needs its own citation, so
+  // inland horizons keep the pure in-scatter until then).
+  const groundAlb = uniform(new Vector3(0, 0, 0));
   const sunDirW = uniform(new Vector3(0, 1, 0));
   // Refraction of the drawn disc (refraction.js on the CPU): the
   // red and blue channels' own apparent directions and the shared
@@ -371,8 +377,14 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   const aerialCamXZ = uniform(new Vector2(0, 0));
   const aerialSunAz = uniform(new Vector2(1, 0));
   const shadowElev0 = uniform(0); // the box's elevation datum (m)
-  const makeMarch = (steps) =>
-    Fn(([r, az, se, ce, dEnd]) => {
+  // withGround: Hillaire's terminal ground bounce for sky-view rays
+  // that end ON the virtual ground (L += T x albedo/pi x NdotL x
+  // T_sun at the hit) - the aerial march never takes it, scene
+  // geometry provides that ground.
+  const makeMarch = (steps, withGround = false) =>
+    Fn((args) => {
+      const [r, az, se, ce, dEnd] = args;
+      const gHit = withGround ? args[5] : null;
       const dt = dEnd.div(steps);
       const T = vec3(1).toVar();
       const L = vec3(0).toVar();
@@ -422,9 +434,26 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         L.addAssign(T.mul(S.sub(S.mul(stepT))).div(max(ext, vec3(1e-9))));
         T.mulAssign(stepT);
       });
+      if (gHit) {
+        // The ground point's up vector dotted with the sun IS the
+        // path muS expression at ti = dEnd (both are dot(P-hat,
+        // sun)) - so NdotL and the transmittance-to-sun reuse the
+        // march's own formulas exactly.
+        const rG = sqrt(
+          r.mul(r).add(dEnd.mul(dEnd)).add(r.mul(dEnd).mul(mu).mul(2.0))
+        );
+        const muG = clamp(r.mul(sunMu).add(dEnd.mul(cSun)).div(rG), -1.0, 1.0);
+        L.addAssign(
+          T.mul(sunT(rG, muG))
+            .mul(groundAlb)
+            .mul(max(muG, 0.0))
+            .mul(1 / Math.PI)
+            .mul(gHit)
+        );
+      }
       return vec4(L, dot(T, vec3(1 / 3, 1 / 3, 1 / 3)));
     });
-  const marchSky32 = makeMarch(32);
+  const marchSky32 = makeMarch(32, true);
   const marchAerial20 = makeMarch(20);
 
   // Sky-view vertical mapping, Bruneton-style guarded split (phase 4
@@ -502,7 +531,15 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       ),
       0.0
     );
-    return marchSky32(r, az, se, ce, dEnd);
+    // Below-horizon rows whose ray genuinely reaches the ground
+    // take Hillaire's terminal ground bounce; the tangent
+    // fallback and every above-horizon row do not.
+    const gHit = select(
+      vUv.y.lessThan(0.5).and(dGround.greaterThan(0.0)),
+      float(1.0),
+      float(0.0)
+    );
+    return marchSky32(r, az, se, ce, dEnd, gHit);
   });
 
   // ---------- aerial perspective (per frame) ----------
@@ -747,7 +784,10 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // exposure models the eye's photopic adaptation (tone
     // reproduction, not physics): twilight is genuinely darker, but
     // not pitch black.
-    update(sunDir, mie, camHMetres, expo) {
+    update(sunDir, mie, camHMetres, expo, groundAlbedo) {
+      // The terminal ground bounce's albedo (scalar, broadband):
+      // the theme feeds Payne (1972) 0.06 when the box has sea.
+      if (groundAlbedo != null) groundAlb.value.setScalar(groundAlbedo);
       // mie = {scat: [r,g,b], abs: [r,g,b], g} (1/m at h = 0) from
       // aerosol.js mieCoefficients - measured when /aerosol
       // answers, the Hillaire defaults calibrated to the measured

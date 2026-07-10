@@ -7165,7 +7165,17 @@
           );
           atmo.aerialShadow.sunAz.value.set(sunVec.x, sunVec.z).normalize();
           atmo.aerialShadow.elev0.value = centerElev;
-          atmo.update(sunVec, mieRad, Math.max(eCam, 50), skyExposure);
+          // The dome's terminal ground bounce (Hillaire 2020): fed
+          // Payne (1972) open-ocean broadband albedo 0.06 where the
+          // box has sea, 0 inland (a land albedo needs its own
+          // citation before inland horizons change).
+          atmo.update(
+            sunVec,
+            mieRad,
+            Math.max(eCam, 50),
+            skyExposure,
+            water ? 0.06 : 0
+          );
           // Aerial perspective shares the dome's exposure so inscattered
           // light on the terrain matches the sky it comes from.
           aerialU.uSunAzV.value.set(sunVec.x, sunVec.z).normalize();

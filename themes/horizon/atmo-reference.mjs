@@ -198,7 +198,7 @@ const skyElev = (j) => {
   const s = Math.min(Math.max((uyv - 0.5 - guard) / span, 0), 1);
   return hA + s * s * (Math.PI / 2 - hA);
 };
-const skyAt = (az, j, chi, mode) => {
+const skyAt = (az, j, chi, mode, gAlb = 0) => {
   const uyv = (j + 0.5) / SH;
   const r = Rb + 300;
   const elev = skyElev(j);
@@ -234,6 +234,18 @@ const skyAt = (az, j, chi, mode) => {
       L[c] += (T[c] * (S - S * st)) / Math.max(e[c], 1e-9);
       T[c] *= st;
     }
+  }
+  // Hillaire's terminal ground bounce, ONLY for below-horizon rays
+  // that genuinely reach the ground (never the tangent fallback):
+  // L += T x T_sun(ground) x albedo/pi x NdotL, where NdotL is the
+  // march's own muS expression evaluated at t = dEnd (both are
+  // dot(P-hat, sun)). gAlb = 0 leaves every texel bit-identical.
+  if (gAlb > 0 && uyv < 0.5 && dG > 0) {
+    const rG = Math.sqrt(r * r + dEnd * dEnd + 2 * r * dEnd * mu);
+    const muG = Math.min(Math.max((r * sunMu + dEnd * cSun) / rG, -1), 1);
+    const TsG = sunT(rG, muG);
+    for (let c = 0; c < 3; c++)
+      L[c] += (T[c] * TsG[c] * gAlb * Math.max(muG, 0)) / Math.PI;
   }
   return L;
 };
@@ -476,3 +488,59 @@ console.log('REF aerial(0.5,1.0):', fmt(aer(0.5, 1, null, 'full')));
 console.log('REF aerial(0.25,0.5):', fmt(aer(0.25, 0.5, null, 'full')));
 console.log('REF aerial(0.0,1.0):', fmt(aer(0, 1, null, 'full')));
 if (aerFail) process.exit(1);
+
+{
+  // The terminal ground bounce (Hillaire 2020) at its closed
+  // points. For a below-horizon texel: the WITH-bounce march minus
+  // the plain march must equal T x T_sun(ground) x albedo/pi x
+  // NdotL exactly (the identity of the added term), it must scale
+  // LINEARLY in the albedo (0.12 gives exactly twice 0.06), and an
+  // ABOVE-horizon texel must be bit-identical with the bounce on -
+  // the ground-hit gate never leaks upward.
+  const jBelow = 2; // deep below-horizon row (dGround > 0)
+  const jAbove = SH - 3; // high above-horizon row
+  const az = 0.35;
+  const base = skyAt(az, jBelow, null, 'full');
+  const b06 = skyAt(az, jBelow, null, 'full', 0.06);
+  const b12 = skyAt(az, jBelow, null, 'full', 0.12);
+  // recompute the term's closed form independently
+  const r0 = Rb + 300;
+  const elev = skyElev(jBelow);
+  const se = Math.sin(elev);
+  const ce = Math.cos(elev);
+  const sunS = Math.sqrt(Math.max(1 - sunMu * sunMu, 0));
+  const cSun = ce * Math.cos(az) * sunS + se * sunMu;
+  const dEnd = raySphere(r0, se, Rb);
+  const rG = Math.sqrt(r0 * r0 + dEnd * dEnd + 2 * r0 * dEnd * se);
+  const muG = Math.min(Math.max((r0 * sunMu + dEnd * cSun) / rG, -1), 1);
+  const TsG = sunT(rG, muG);
+  // transmittance along the WHOLE ground path from the plain march
+  const dt = dEnd / 32;
+  const Tpath = [1, 1, 1];
+  for (let s = 0; s < 32; s++) {
+    const ti = (s + 0.5) * dt;
+    const ri = Math.sqrt(r0 * r0 + ti * ti + 2 * r0 * ti * se);
+    const e = ext(ri - Rb);
+    for (let c = 0; c < 3; c++) Tpath[c] *= Math.exp(-e[c] * dt);
+  }
+  let worstId = 0;
+  let worstLin = 0;
+  for (let c = 0; c < 3; c++) {
+    const want = (Tpath[c] * TsG[c] * 0.06 * Math.max(muG, 0)) / Math.PI;
+    const got = b06[c] - base[c];
+    worstId = Math.max(worstId, Math.abs(got - want) / Math.max(want, 1e-12));
+    worstLin = Math.max(
+      worstLin,
+      Math.abs(b12[c] - base[c] - 2 * got) / Math.max(got, 1e-12)
+    );
+  }
+  const above0 = skyAt(az, jAbove, null, 'full');
+  const above6 = skyAt(az, jAbove, null, 'full', 0.06);
+  const aboveSame = above0.every((v, c) => v === above6[c]);
+  const ok =
+    worstId < 1e-12 && worstLin < 1e-12 && aboveSame && b06[0] > base[0];
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} ground bounce: below-horizon texel gains EXACTLY T x T_sun x albedo/pi x NdotL (identity to ${worstId.toExponential(1)}), linear in albedo to ${worstLin.toExponential(1)}, above-horizon texels bit-identical - Hillaire's terminal term, Payne's 0.06 fed by the theme where the box has sea`
+  );
+  if (!ok) process.exit(1);
+}
