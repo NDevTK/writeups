@@ -69,6 +69,7 @@ export const KEEP_PARAMS = [
   'peaks',
   'discharge',
   'snowcover',
+  'soil',
   'roam'
 ];
 

@@ -136,7 +136,7 @@ export function parseLanduse(json, minSpanM = 60, cap = 400) {
  * largest first). Returns null when nothing painted - the caller
  * keeps the base grass.
  */
-export function landTint(polys, anchor, world, n) {
+export function landTint(polys, anchor, world, n, soilFactor = 1) {
   const data = new Float32Array(n * n * 4);
   const half = world / 2;
   let painted = 0;
@@ -183,11 +183,12 @@ export function landTint(polys, anchor, world, n) {
           n - 1,
           Math.floor(((xs[k + 1] + half) / world) * n - 0.5)
         );
+        const f = SOIL_CLASSES.has(p.cls) ? soilFactor : 1;
         for (let i = i0; i <= i1; i++) {
           const o = (row * n + i) * 4;
-          data[o] = p.albedo[0];
-          data[o + 1] = p.albedo[1];
-          data[o + 2] = p.albedo[2];
+          data[o] = p.albedo[0] * f;
+          data[o + 1] = p.albedo[1] * f;
+          data[o + 2] = p.albedo[2] * f;
           data[o + 3] = 1;
           hit = true;
         }
@@ -196,6 +197,41 @@ export function landTint(polys, anchor, world, n) {
     if (hit) painted++;
   }
   return painted ? {data, n, world, painted} : null;
+}
+
+// ---- Wet soil darkens: Lobell & Asner (2002, SSSAJ 66) ----
+// Their laboratory result: soil reflectance falls EXPONENTIALLY
+// with moisture expressed as degree of saturation, similarly
+// across soil types - R = b + a exp(-c theta_sat) - and in the
+// visible band the decay saturates by ~0.20 m3/m3 volumetric.
+// Two documented parameters close the per-soil unknowns: the
+// classic visible-band figure that saturated soil reflects about
+// HALF of dry (SAT_RATIO), and a typical loam porosity to convert
+// the forecast's volumetric moisture to degree of saturation. The
+// decay constant is DERIVED from the paper's saturation point:
+// exp(-c * 0.20/porosity) = 1/20 (95% of the decay spent there).
+export const SOIL_POROSITY = 0.45;
+export const SOIL_SAT_RATIO = 0.5;
+export const SOIL_C = Math.log(20) / (0.2 / SOIL_POROSITY);
+
+// The bare-soil classes the darkening applies to - vegetated
+// tints (meadow, grass, forest) hide their soil under canopy.
+export const SOIL_CLASSES = new Set([
+  'farmland',
+  'farmyard',
+  'allotments',
+  'quarry',
+  'sand',
+  'beach'
+]);
+
+// Volumetric topsoil moisture (m3/m3, the forecast's
+// soil_moisture_0_to_1cm) -> albedo factor. Dry ground is 1;
+// missing data is 1 - nothing invented.
+export function soilDarkening(theta) {
+  if (!Number.isFinite(theta) || theta <= 0) return 1;
+  const sat = Math.min(1, theta / SOIL_POROSITY);
+  return SOIL_SAT_RATIO + (1 - SOIL_SAT_RATIO) * Math.exp(-SOIL_C * sat);
 }
 
 // The pointwise probe the raster is gated against (and the smoke

@@ -2838,6 +2838,38 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   debug-mode offline-fetch warnings of trains/discharge joined
   the smoke's known-offline filter - by-design messages, not
   defects).
+- DONE: wet soil darkens (Jul 10 - the coupling class: two
+  measured systems interacting. The landuse tints painted the
+  fields one dry albedo forever; real fields darken after real
+  rain). Source: the SAME open-meteo forecast family already
+  serving weather/marine/air-quality publishes
+  soil_moisture_0_to_1cm (m³/m³, the reactive top centimetre -
+  the layer the eye actually sees wet). Research: Lobell & Asner
+  (2002, SSSAJ 66:722) - laboratory result that soil reflectance
+  falls EXPONENTIALLY with moisture expressed as DEGREE OF
+  SATURATION, similarly across soil types, R = b + a exp(-c
+  theta_sat), with the visible band saturating by ~0.20 m³/m³
+  volumetric. Two documented parameters close the per-soil
+  unknowns (their four soils differ; no single published
+  constant): the classic visible-band figure that saturated soil
+  reflects about HALF of dry, and loam porosity 0.45 for the
+  volumetric -> saturation conversion; the decay constant is
+  DERIVED from the paper's saturation point rather than picked -
+  exp(-c x 0.20/porosity) = 1/20, c = 6.74. landuse.js:
+  soilDarkening (dry = 1, monotone, saturated floor, factor 1
+  whenever data cannot speak), SOIL_CLASSES (farmland, farmyard,
+  allotments, quarry, sand, beach - vegetated tints stand, canopy
+  hides soil), landTint gained the soilFactor param applied at
+  paint time. Gate 5 -> 6 landmarks: the exponential exact, the
+  derivation identity held to 1e-12, and through the painter - a
+  farmland texel darkens by exactly the factor (float32 fround)
+  while a meadow texel stands. At the LIVE capture (Interlaken,
+  0.108 m³/m³ that morning) the fields render x0.599 - visibly
+  damp ground, measured. Theme: syncSoil (current hour from the
+  hourly series, 3 h refresh, roam re-sync), placeLanduse repaints
+  through the factor; panel records theta and the tint; ?soil=0
+  pins dry; KEEP_PARAMS carries 'soil'. Gate 53 sets (landuse
+  5 -> 6 landmarks); browser smoke clean.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
