@@ -185,7 +185,8 @@
         buildings), roads=0 (skip OSM roads), landuse=0 (skip OSM
         ground cover), rivers=0 (skip OSM waterways), rails=0 (skip
         OSM railways), trains=0 (skip live trains), aerialways=0
-        (skip OSM cable cars), peaks=0 (skip summit labels),
+        (skip OSM cable cars), turbines=0 (skip OSM wind
+        turbines), peaks=0 (skip summit labels),
         discharge=0 (pin river widths to the ladder), snowcover=0|URL
         (measured snow off / tile endpoint override), soil=0 (pin
         bare-soil tints dry), debug=1
@@ -471,6 +472,13 @@
         STATION_M
       } from './horizon/aerialways.js';
       import {labelText, parsePeaks, selectPeaks} from './horizon/peaks.js';
+      import {
+        hubWind,
+        parseTurbines,
+        rotorOmega,
+        YAW_DEG_S
+      } from './horizon/turbines.js';
+      import {buildWindmill} from './horizon/windmills.js';
       import {snowField, SNOW_LAYER, SNOW_Z} from './horizon/snowcover.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
@@ -735,7 +743,8 @@
                 state.lat +
                 '&longitude=' +
                 state.lon +
-                '&current=weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,dew_point_2m',
+                '&current=weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,dew_point_2m' +
+                '&hourly=wind_speed_80m,wind_speed_120m&forecast_hours=1',
               {credentials: 'omit'}
             )
           ).json();
@@ -755,6 +764,11 @@
           state.gust = c.wind_gusts_10m;
           state.temp = c.temperature_2m;
           state.dew = c.dew_point_2m;
+          // Hub-height winds for the turbines: the forecast
+          // model's own 80/120 m levels (turbines.js
+          // interpolates on ln z between them).
+          state.wind80 = w.hourly?.wind_speed_80m?.[0] ?? null;
+          state.wind120 = w.hourly?.wind_speed_120m?.[0] ?? null;
           record(
             'open-meteo current',
             (WMO[state.code] || state.code) +
@@ -2054,6 +2068,81 @@
           if (worldBuilt) placeAerialways();
         } catch {
           aerialGeo = null; // no invented cables
+        }
+      }
+
+      // Wind turbines (power=generator + generator:source=wind):
+      // real installations with their real model tags, spun by
+      // the measured wind under the manufacturers' published
+      // operating envelopes (turbines.js). Geodetic per anchor;
+      // ?turbines=0 disables.
+      let turbinesGeo = null;
+      async function syncTurbines() {
+        if (params.get('turbines') === '0') return;
+        const key =
+          'horizon-turbines-geo-' +
+          state.lat.toFixed(2) +
+          ',' +
+          state.lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) {
+            turbinesGeo = JSON.parse(hit);
+            record(
+              'OSM Overpass wind turbines (cached)',
+              turbinesGeo.length + ' turbines'
+            );
+            if (worldBuilt) placeTurbines();
+            return;
+          }
+        } catch {}
+        try {
+          const mLat = 111320;
+          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+          const dLat = DEM_HALF_M / mLat;
+          const dLon = DEM_HALF_M / mLon;
+          const bbox =
+            (state.lat - dLat).toFixed(4) +
+            ',' +
+            (state.lon - dLon).toFixed(4) +
+            ',' +
+            (state.lat + dLat).toFixed(4) +
+            ',' +
+            (state.lon + dLon).toFixed(4);
+          const q =
+            '[out:json][timeout:30];(node["power"="generator"]["generator:source"="wind"](' +
+            bbox +
+            ');way["power"="generator"]["generator:source"="wind"](' +
+            bbox +
+            '););out center 200;';
+          let osm = null;
+          for (const host of [
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+            'https://overpass-api.de/api/interpreter'
+          ]) {
+            try {
+              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
+                credentials: 'omit'
+              });
+              if (!r.ok) throw new Error(r.status);
+              osm = await r.json();
+              break;
+            } catch {
+              // Try the next mirror.
+            }
+          }
+          if (!osm) throw new Error('overpass unavailable');
+          turbinesGeo = parseTurbines(osm);
+          record(
+            'OSM Overpass wind turbines',
+            turbinesGeo.length + ' turbines'
+          );
+          try {
+            localStorage.setItem(key, JSON.stringify(turbinesGeo));
+          } catch {}
+          if (worldBuilt) placeTurbines();
+        } catch {
+          turbinesGeo = null; // no invented turbines
         }
       }
 
@@ -3707,6 +3796,65 @@
           g.placed + ' of ' + railsGeo.length + ' ways on this box'
         );
       }
+      // Wind turbines: the shared windmills.js silhouettes at
+      // the spec ladder's measured sizes, yawed into the wind
+      // and spun by the frame loop below.
+      let turbinesGroup = null;
+      let turbineMats = null;
+      const turbineRigs = []; // {yaw, rotor, spec, yawA}
+      function placeTurbines() {
+        turbineRigs.length = 0;
+        if (turbinesGroup) {
+          ground.remove(turbinesGroup);
+          turbinesGroup.traverse((o) => o.geometry && o.geometry.dispose());
+          turbinesGroup = null;
+        }
+        if (
+          !turbinesGeo ||
+          !turbinesGeo.length ||
+          params.get('turbines') === '0'
+        )
+          return;
+        if (!turbineMats) {
+          const mk = (color, roughness) => {
+            const m = new THREE.MeshStandardNodeMaterial({color, roughness});
+            applyAerial(m);
+            return m;
+          };
+          // the asset-viewer palette (?asset=windmills)
+          turbineMats = {body: mk('#d5d8d9', 0.55), dark: mk('#3c4146', 0.6)};
+        }
+        turbinesGroup = new THREE.Group();
+        let placed = 0;
+        for (const t of turbinesGeo) {
+          const sc = geoToScene(t.lat, t.lon, dressAnchor);
+          if (Math.max(Math.abs(sc.x), Math.abs(sc.z)) > WORLD / 2) continue;
+          const smp = sample(sc.x, sc.z);
+          if (smp.water) continue; // no turbines in the lake
+          const g = new THREE.Group();
+          g.position.set(sc.x, smp.y, sc.z);
+          const rig = buildWindmill(g, t.spec, turbineMats, 1 / MPU);
+          rig.rotor.rotation.z = placed * 2.4; // dephased blades
+          turbinesGroup.add(g);
+          turbineRigs.push({
+            yaw: rig.yaw,
+            rotor: rig.rotor,
+            spec: t.spec,
+            yawA: null
+          });
+          placed++;
+        }
+        if (!placed) {
+          turbinesGroup = null;
+          return;
+        }
+        ground.add(turbinesGroup);
+        record(
+          'wind turbines placed',
+          placed + ' of ' + turbinesGeo.length + ' on this box'
+        );
+      }
+
       // Cable cars: pylons at the real support nodes, spans hung
       // on the exact catenary between them (interior supports
       // 12 m over the sampled ground, end stations 6 m), cabins
@@ -3966,6 +4114,7 @@
         placeRivers();
         placeRails();
         placeAerialways();
+        placeTurbines();
         placePeaks();
         placeLanduse();
 
@@ -6075,6 +6224,7 @@
         syncDischarge();
         syncRails();
         syncAerialways();
+        syncTurbines();
         syncPeaks();
         syncLanduse();
         syncSoil();
@@ -7593,6 +7743,33 @@
           }
         }
 
+        // Wind turbines: nacelles slew into the measured wind at
+        // the published 0.5 deg/s yaw rate, rotors run the
+        // variable-speed law at the hub-height wind (the
+        // forecast's own 80/120 m levels on the log profile),
+        // clockwise seen from upwind as every sheet states.
+        if (turbineRigs.length) {
+          const target = Math.atan2(-windV.x, -windV.z);
+          const maxYaw = YAW_DEG_S * RAD * dt;
+          for (const r of turbineRigs) {
+            if (r.yawA === null) r.yawA = target; // born facing it
+            let dy = target - r.yawA;
+            dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
+            r.yawA += Math.abs(dy) < maxYaw ? dy : Math.sign(dy) * maxYaw;
+            r.yaw.rotation.y = r.yawA;
+            const v =
+              state.wind80 != null
+                ? hubWind(
+                    state.wind / 3.6,
+                    state.wind80 / 3.6,
+                    (state.wind120 ?? state.wind80) / 3.6,
+                    r.spec.hub
+                  )
+                : state.wind / 3.6;
+            r.rotor.rotation.z -= rotorOmega(r.spec, v) * dt;
+          }
+        }
+
         // ISS: SGP4-propagated position; drawn only when the pass is
         // genuinely visible (above horizon, sunlit against a dark sky).
         if (satrec && window.satellite) {
@@ -7934,6 +8111,7 @@
         setInterval(syncDischarge, 6 * 60 * 60 * 1000);
         syncRails();
         syncAerialways();
+        syncTurbines();
         syncPeaks();
         syncLanduse();
         syncSoil();
