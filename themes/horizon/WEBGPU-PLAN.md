@@ -3467,6 +3467,15 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   same family as the swizzle rejection. NEXT: check Nelson
   (?lat=-41.27&lon=173.28) on real hardware - if the cone is
   absent there, this moves to the environment column for good.
+  CAVEAT (Jul 10, latest): the in-page Raycaster itself returned
+  a physically impossible result at Rotterdam - a HORIZONTAL ray
+  from y=3.9 "hitting" the flat y=-0.33 water plane at d=26, the
+  same d at every altitude from +1 to -8 deg, while that plane's
+  own vertex scan is clean (a rotated +-140 plane, no spike).
+  Every /eval raycast conclusion on this stack (parts of the
+  cone trail, the band diagnosis) is therefore suspect; the band
+  question stays OPEN and the real-hardware look is the only
+  trustworthy next step for the cone.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
