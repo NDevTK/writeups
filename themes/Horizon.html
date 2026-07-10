@@ -48,6 +48,12 @@
         nearest-depth upsampling (Jansen & Bavoil 2010) keeping
         silhouettes clean (only thin cirrus stays 2D, as in the
         research)
+      - snow is MEASURED where a satellite saw it: the daily MODIS
+        NDSI snow product (GIBS, the same keyless WMTS as the night
+        lights) drives the terrain's snow through the published
+        colormap inverted verbatim and the Salomonson & Appel (2004)
+        fractional-cover regression - July glaciers included; under
+        cloud or night the freezing-level rule below stands in
       - the snowline tracks the real freezing level; the treeline follows
         Körner & Paulsen (2004); deciduous leaves follow Hopkins' law
         (real date, latitude and elevation), so autumn arrives when it
@@ -171,7 +177,8 @@
         ground cover), rivers=0 (skip OSM waterways), rails=0 (skip
         OSM railways), trains=0 (skip live trains), aerialways=0
         (skip OSM cable cars), peaks=0 (skip summit labels),
-        discharge=0 (pin river widths to the ladder), debug=1
+        discharge=0 (pin river widths to the ladder), snowcover=0|URL
+        (measured snow off / tile endpoint override), debug=1
     -->
     <style>
       html,
@@ -445,6 +452,7 @@
         STATION_M
       } from './horizon/aerialways.js';
       import {labelText, parsePeaks, selectPeaks} from './horizon/peaks.js';
+      import {snowField, SNOW_LAYER, SNOW_Z} from './horizon/snowcover.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -1615,6 +1623,108 @@
           if (worldBuilt) placeRivers();
         } catch {
           riversGeo = null; // the polygon water stands alone
+        }
+      }
+
+      // MEASURED snow cover: the freezing-level snowline was the
+      // theme's oldest surviving heuristic. GIBS serves the daily
+      // MODIS NDSI snow product over the same keyless WMTS as the
+      // Black Marble lights; snowcover.js (gated) inverts the
+      // published colormap verbatim and turns NDSI into fractional
+      // cover through the Salomonson & Appel (2004) regression.
+      // Where the satellite saw ground the measurement drives the
+      // terrain's snow; under cloud/night the heuristic stands.
+      // ?snowcover=0 keeps the heuristic everywhere.
+      const SNOW_TILES =
+        params.get('snowcover') ??
+        'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/' +
+          SNOW_LAYER +
+          '/default/{d}/GoogleMapsCompatible_Level8/{z}/{r}/{c}.png';
+      let snowCovSeq = 0;
+      async function syncSnowCover() {
+        if (params.get('snowcover') === '0' || !terrainObj) return;
+        const seq = ++snowCovSeq;
+        try {
+          const anchor = {lat: state.lat, lon: state.lon};
+          const need = new Map();
+          for (const [sx, sz] of [
+            [-1, -1],
+            [1, -1],
+            [-1, 1],
+            [1, 1]
+          ]) {
+            const g = sceneToGeo((sx * WORLD) / 2, (sz * WORLD) / 2, anchor);
+            const p = pixelOf(g.lat, g.lon, SNOW_Z);
+            const c = Math.floor(p.px / 256);
+            const r = Math.floor(p.py / 256);
+            need.set(r + '/' + c, [r, c]);
+          }
+          // Terra passes in the morning; the product publishes a
+          // day or so behind - newest available day wins.
+          let imgs = null;
+          let day = '';
+          for (let back = 1; back <= 8 && !imgs; back++) {
+            const d = new Date(Date.now() - back * 86400e3)
+              .toISOString()
+              .slice(0, 10);
+            try {
+              const loaded = await Promise.all(
+                [...need.values()].map(([r, c]) => {
+                  const img = new Image();
+                  img.crossOrigin = 'anonymous';
+                  img.src = SNOW_TILES.replace('{d}', d)
+                    .replace('{z}', SNOW_Z)
+                    .replace('{r}', r)
+                    .replace('{c}', c);
+                  return img.decode().then(() => img);
+                })
+              );
+              imgs = new Map([...need.keys()].map((k, i) => [k, loaded[i]]));
+              day = d;
+            } catch {
+              // that day not published - go older
+            }
+          }
+          if (!imgs || seq !== snowCovSeq) return;
+          const px = new Map();
+          for (const [k, img] of imgs) {
+            const cv = document.createElement('canvas');
+            cv.width = cv.height = 256;
+            const cx = cv.getContext('2d', {willReadFrequently: true});
+            cx.drawImage(img, 0, 0);
+            px.set(k, cx.getImageData(0, 0, 256, 256).data);
+          }
+          const pxAt = (ix, iy) => {
+            const d = px.get(Math.floor(iy / 256) + '/' + Math.floor(ix / 256));
+            if (!d) return null;
+            const o = ((iy & 255) * 256 + (ix & 255)) * 4;
+            return [d[o], d[o + 1], d[o + 2], d[o + 3]];
+          };
+          const N = 96;
+          const f = snowField(pxAt, anchor, WORLD, N);
+          const tex = new THREE.DataTexture(
+            f.data,
+            N,
+            N,
+            THREE.RedFormat,
+            THREE.FloatType
+          );
+          tex.minFilter = tex.magFilter = THREE.NearestFilter;
+          tex.needsUpdate = true;
+          const old = terrainObj.snowTexNode.value;
+          terrainObj.snowTexNode.value = tex;
+          if (old && old.image && old.image.width > 1) old.dispose();
+          terrainUniforms.uSnowCovOn.value = 1;
+          record(
+            'MODIS NDSI snow cover ' + day,
+            Math.round(f.known * 100) +
+              '% of the box seen · mean cover ' +
+              Math.round(f.snowy * 100) +
+              '% there · Salomonson-Appel FSC'
+          );
+        } catch (e) {
+          // The heuristic snowline stands - the truthful fallback.
+          if (params.has('debug')) console.warn('snowcover: ' + e.message);
         }
       }
 
@@ -5837,6 +5947,10 @@
         syncPeaks();
         syncLanduse();
         syncTrains();
+        // The snow field is anchored to the OLD box too - stand
+        // the heuristic back up until the new box's field lands.
+        terrainUniforms.uSnowCovOn.value = 0;
+        syncSnowCover();
         // The lamp cloud is anchored to the OLD box - drop it now,
         // syncLights rebuilds it Earth-anchored on the new one.
         if (lampPts) {
@@ -7667,6 +7781,8 @@
         setInterval(syncTrains, 90 * 1000);
         syncLights();
         setInterval(syncLights, 6 * 60 * 60 * 1000);
+        syncSnowCover();
+        setInterval(syncSnowCover, 6 * 60 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
         syncISS();
         setInterval(syncISS, 6 * 60 * 60 * 1000);

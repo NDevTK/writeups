@@ -118,6 +118,7 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     // 2700 K Planckian lamp tint.
     uLightsOn: uniform(0),
     uLandOn: uniform(0),
+    uSnowCovOn: uniform(0),
     uLightsNight: uniform(0),
     uLightsGain: uniform(0.035),
     uLightsTint: uniform(new Vector3(1, 0.417, 0.1))
@@ -335,10 +336,32 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
   const n2 = tfbm(positionWorld.xz.mul(0.6));
   const rockF = smoothstep(0.2, 0.45, slope.add(n2.sub(0.5).mul(0.08)));
   const snowLine = u.uSnowLine.add(n1.sub(0.5).mul(500));
+  // MEASURED snow cover (snowcover.js): R = fractional snow cover
+  // where the satellite saw ground, -1 where it did not (cloud,
+  // night, water). Where measured, the FSC REPLACES the
+  // freezing-level elevation gate; the slope shedding (where snow
+  // physically sticks) and the live-snowfall term stand in both
+  // regimes - yesterday's satellite pass cannot see today's fall.
+  const snowZero = new DataTexture(
+    new Float32Array([-1]),
+    1,
+    1,
+    RedFormat,
+    FloatType
+  );
+  snowZero.needsUpdate = true;
+  const snowTexNode = texture(snowZero);
+  const fsc = snowTexNode.sample(
+    vec2(
+      positionWorld.x.div(u.uWorldSize).add(0.5),
+      float(0.5).sub(positionWorld.z.div(u.uWorldSize))
+    )
+  ).r;
+  const fscKnown = smoothstep(-0.5, -0.4, fsc).mul(u.uSnowCovOn);
+  const elevGate = smoothstep(snowLine, snowLine.add(700), eM);
+  const snowBase = mix(elevGate, clamp(fsc, 0.0, 1.0), fscKnown);
   const snow = max(
-    smoothstep(snowLine, snowLine.add(700), eM).mul(
-      smoothstep(0.35, 0.6, slope).oneMinus()
-    ),
+    snowBase.mul(smoothstep(0.35, 0.6, slope).oneMinus()),
     u.uSnowy.mul(smoothstep(0.25, 0.45, slope).oneMinus()).mul(0.85)
   );
 
@@ -543,6 +566,7 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     uniforms: u,
     momentsTexNode,
     lightsTexNode,
-    landTexNode
+    landTexNode,
+    snowTexNode
   };
 }
