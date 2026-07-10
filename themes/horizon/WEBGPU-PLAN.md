@@ -3195,6 +3195,38 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the gate list all along. Gate 58 sets (optics 4 asserting);
   rain smoke shows ONE bow, the LUT record carrying its
   measured drop size.
+- DONE: real comets from the MPC's own element sets (Jul 10,
+  data + frontier - exact orbital mechanics on a live source).
+  comets.js: the Minor Planet Center's Soft00Cmt export (963
+  comets, CORS-open - the browser fetches it directly, cached a
+  day) parses to perihelion epoch/q/e/angles/photometric g,k;
+  propagation is the universal-variable Kepler solver (Vallado
+  Alg. 8 / Danby 6.9) - ONE formulation through the Stumpff
+  functions for elliptic, near-parabolic and hyperbolic orbits,
+  started from perihelion where the equation collapses to
+  sqrt(mu) dt = e chi^3 S + q chi; brightness by the standard
+  m1 = g + 5 log Delta + 2.5 k log r. Landmarks (5): Stumpff
+  closed points (C(pi^2) = 2/pi^2 exactly); universal Kepler at
+  its exact limits - the circle holds r = a to 1e-12 with the
+  mean motion's own angle, BARKER'S EQUATION satisfied to 3e-16
+  at e = 1, time reversal exact, the vis-viva energy integral
+  held on ellipse, parabola and the e = 6.14 hyperbola; the MPC
+  lines parse verbatim; PROPAGATION AGAINST JPL HORIZONS with
+  same-day element sets - Hale-Bopp (29 years past perihelion,
+  50.9 AU out) to 2.1e-3 AU, the INTERSTELLAR 3I/ATLAS (e =
+  6.14) to 4.8e-3 AU, short-period Lagerkvist to 4.0e-3 AU -
+  three orbit regimes, one solver, independent ephemeris; the
+  magnitude law at its closed points with the filter pipeline.
+  Theme: propagated once a minute beside the planets (ecliptic
+  <-> equatorial by the J2000 obliquity, Earth from the same
+  astronomy-engine ephemeris, alt/az through the same AE.Horizon
+  path); the brightest comet above magnitude 6.5 gets a head
+  sprite through the planets' own brightness law and an
+  anti-sunward tail faded by the DIFFUSE-source contrast law
+  (lpVis - tails wash out before heads). Most nights nothing
+  shows - rare-event content like the eclipses; the panel
+  records name/mag/r/Delta whenever one is up. ?comet=g forces
+  a synthetic perihelion comet for the harness. Gate 59 sets.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
