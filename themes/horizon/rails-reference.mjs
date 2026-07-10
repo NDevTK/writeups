@@ -8,13 +8,27 @@
 //    identity holds through the rails path at the gauge width
 //  - the bridge tag CARRIES: a rail bridge spans wet ground on
 //    the shared straight grade (the Aare rail bridges are real)
+//  - map-matching (nearest-arc projection): exact closed-form
+//    foot points on interior and endpoint, the gate excludes,
+//    the nearest of two arcs wins across grid cells, the arc
+//    direction is unit - a train is rail-constrained, its fix
+//    is not
+//  - route-based map matching: Dijkstra over the drawn graph
+//    walks the L exactly (arc lengths, the corner at its length
+//    fraction, per-segment track bearings), one-arc legs go
+//    direct, disconnected components return null - a leg the
+//    network cannot carry is never invented
 import {
   parseRailways,
   RAIL_COLOR,
   RAIL_WIDTH,
+  railIndex,
+  railRoute,
   railsGeometry,
   railWidthOf,
-  SHOULDER_M
+  routePoint,
+  SHOULDER_M,
+  snapToRail
 } from './rails.js';
 import {densify, thin} from './roads.js';
 import {RAILS_FIXTURE} from './rails-fixture.mjs';
@@ -171,6 +185,113 @@ const rails = parseRailways(RAILS_FIXTURE);
       spanned.count === dry.count &&
       grade,
     `untagged, the wet middle cuts the line (${cut.count} of ${dry.count} vertices); tagged bridge=yes it spans on the straight 3->6 m grade - the Aare rail bridges really cross`
+  );
+}
+
+{
+  // Map-matching at its closed points. One horizontal arc from
+  // (0,0) to (10,0), one vertical from (20,-5) to (20,5):
+  //  - (3, 2) projects to the interior foot (3, 0) at d = 2,
+  //    direction exactly +x
+  //  - (-4, 3) clamps to the endpoint (0, 0) at d = 5 (3-4-5)
+  //  - (19, 0) is 1 from the vertical arc and 9 from the
+  //    horizontal - the nearest arc wins even in another cell
+  //  - a 0.5 gate excludes the (3, 2) fix entirely
+  const idx = railIndex(
+    [
+      [
+        [0, 0],
+        [10, 0]
+      ],
+      [
+        [20, -5],
+        [20, 5]
+      ]
+    ],
+    4
+  );
+  const interior = snapToRail(idx, 3, 2, 60);
+  const endpoint = snapToRail(idx, -4, 3, 60);
+  const nearest = snapToRail(idx, 19, 0, 60);
+  const gated = snapToRail(idx, 3, 2, 0.5);
+  const ok =
+    interior &&
+    Math.abs(interior.x - 3) < 1e-12 &&
+    Math.abs(interior.z) < 1e-12 &&
+    Math.abs(interior.d - 2) < 1e-12 &&
+    Math.abs(interior.dx - 1) < 1e-12 &&
+    Math.abs(interior.dz) < 1e-12 &&
+    endpoint &&
+    Math.abs(endpoint.x) < 1e-12 &&
+    Math.abs(endpoint.z) < 1e-12 &&
+    Math.abs(endpoint.d - 5) < 1e-12 &&
+    nearest &&
+    Math.abs(nearest.x - 20) < 1e-12 &&
+    Math.abs(nearest.d - 1) < 1e-12 &&
+    Math.abs(Math.hypot(nearest.dx, nearest.dz) - 1) < 1e-12 &&
+    gated === null;
+  check(
+    'map-matching nearest arc',
+    ok,
+    `interior foot (3,0) at d=2 with unit +x direction; endpoint clamp (0,0) at the exact 3-4-5 distance; the vertical arc wins at (19,0) across cells (d=1 vs 9); the 0.5 gate returns null - no invented track`
+  );
+}
+
+{
+  // Route-based map matching on an L of two ways sharing their
+  // junction node (as OSM junctions do): (1,-2) and (12,8) project
+  // to (1,0) and (10,8); the routed leg is (1,0)-(10,0)-(10,8),
+  // length exactly 17. routePoint walks it by arc length: f = 9/17
+  // lands ON the corner, past it the bearing turns +z. One-arc legs
+  // route directly; two disconnected arcs return null.
+  const idx = railIndex(
+    [
+      [
+        [0, 0],
+        [10, 0]
+      ],
+      [
+        [10, 0],
+        [10, 10]
+      ]
+    ],
+    4
+  );
+  const rt = railRoute(idx, 1, -2, 12, 8, 60);
+  const corner = rt && routePoint(rt, 9 / 17);
+  const after = rt && routePoint(rt, 12 / 17);
+  const start = rt && routePoint(rt, 0);
+  const direct = railRoute(idx, 2, 1, 7, -1, 60);
+  const apart = railIndex(
+    [
+      [
+        [0, 0],
+        [10, 0]
+      ],
+      [
+        [0, 50],
+        [10, 50]
+      ]
+    ],
+    4
+  );
+  const none = railRoute(apart, 1, 0, 9, 50, 60);
+  const ok =
+    rt &&
+    Math.abs(rt.len - 17) < 1e-9 &&
+    Math.abs(corner.x - 10) < 1e-9 &&
+    Math.abs(corner.z) < 1e-9 &&
+    Math.abs(start.dx - 1) < 1e-12 &&
+    Math.abs(after.x - 10) < 1e-9 &&
+    Math.abs(after.z - 3) < 1e-9 &&
+    Math.abs(after.dz - 1) < 1e-12 &&
+    direct &&
+    Math.abs(direct.len - 5) < 1e-9 &&
+    none === null;
+  check(
+    'route-based map matching',
+    ok,
+    `the L routes (1,0)-(10,0)-(10,8) at length 17 exactly; f=9/17 sits ON the junction, f=12/17 is 3 up the second arc heading +z; a one-arc leg goes direct (len 5); disconnected arcs -> null (no invented route)`
   );
 }
 

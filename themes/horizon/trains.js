@@ -259,7 +259,7 @@ export function decodePolyline(str, precision = 5) {
   const out = [];
   let lat = 0;
   let lon = 0;
-  for (let i = 0; i < str.length;) {
+  for (let i = 0; i < str.length; ) {
     for (const which of [0, 1]) {
       let shift = 0;
       let result = 0;
@@ -455,12 +455,18 @@ export function trainAt(journey, nowMs) {
         const p = pathPoint(journey.path, f);
         return {lat: p.lat, lon: p.lon, hdgTo: p.hdgTo, at: '', moving: true};
       }
+      // The leg and its time fraction ride along so a caller with a
+      // rail network can route the leg instead of flying the chord
+      // (rails.js railRoute - route-based map matching).
       return {
         lat: s[i].lat + (s[i + 1].lat - s[i].lat) * f,
         lon: s[i].lon + (s[i + 1].lon - s[i].lon) * f,
         hdgTo: {lat: s[i + 1].lat, lon: s[i + 1].lon},
         at: '',
-        moving: true
+        moving: true,
+        f,
+        legFrom: {lat: s[i].lat, lon: s[i].lon},
+        legTo: {lat: s[i + 1].lat, lon: s[i + 1].lon}
       };
     }
   }

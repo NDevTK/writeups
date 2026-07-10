@@ -3333,6 +3333,79 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   midpoint sun through the same ephemeris; panel records GHI,
   kt and the Erbs factor; ?ghi=W harness override. Gate 60
   sets.
+- DONE: visual verification, for real (Jul 10 - "without viewing
+  them your not doing anything useful"). The theme can now be
+  SEEN under the harness: (a) ?debug=1 exposes **r/**scene/
+  **cam/**THREE/**astro and window.**capture(w,h) - the frame
+  loop services capture requests itself, repeating its own pass
+  sequence (main render, cloud composite, precipitation overlay)
+  into an offscreen target and reading it back through three;
+  a concurrent external render breaks the backend, and canvas
+  snapshots never see a WebGPU surface (texture recycled on
+  present). (b) The readback initially hung FOREVER: under
+  Xvfb/SwiftShader there is no vsync backpressure, so an
+  unthrottled rAF loop runs ~30 s of GPU work ahead and every
+  mapAsync waits behind the backlog - measured by pausing rAF
+  and watching the map resolve exactly when the queue drained
+  (32 s). The driver (scratchpad view.mjs) paces rAF at ~3 fps
+  and holds the loop during readback. (c) view.mjs routes every
+  external request through server-side curl (the environment's
+  agent proxy) with an on-disk cache, so the offline browser
+  runs the theme fully LIVE - real DEM, weather, satellite
+  irradiance, Overpass, GIBS, MPC, VBB radar. (d) ?look=az,alt
+  and the runtime \_\_look override aim the default camera (a bow
+  is antisolar, a halo circumsolar); yaw snaps when pinned.
+  VIEWED and verified: Interlaken overcast noon (real ridge
+  lines, peak labels), Mont Crosin farm (20 live turbines,
+  rotor stars yawed to the westerly; one "artifact" line proved
+  to be a REAL near turbine tower seen edge-on to its rotor),
+  the double rainbow with Alexander's dark band emerging from
+  the Airy LUT, the 22-deg halo ring + both parhelia (interior
+  saturation is the aureole through 85% cirrus - the LUT's dark
+  hole is exact, zero below 21.8 deg), the twilight comet with
+  its anti-sunward tail over the Burgfeldstand ridge, the
+  Milky Way's Sagittarius band at local midnight, Black Marble
+  town lamps, live VBB trains in Berlin.
+- DONE: the moon stops punching a hole in the day sky (Jul 10,
+  FOUND BY LOOKING - the Berlin shot showed the waning crescent
+  as a dark blob at 4.6 deg alt). The disc is above every metre
+  of air on the ray, so the dome's in-scatter belongs ON it:
+  atmosphere-tsl's domeColor LUT sampling extracted into a
+  shared skySampleFor(v) (the dome now consumes it too - one
+  code path, no divergence) and exposed as skyRadiance;
+  createMoonMaterial adds it over the Hapke surface. The disc
+  stays opaque, so lunar occultations of stars still occlude.
+  By day the dark limb now carries the sky's own radiance (a 4%
+  crescent 5 deg up in haze is invisible, as in nature); by
+  night the sample is starlight-dark and nothing changes.
+- DONE: trains ride their rails (Jul 10, the user's own eyes -
+  "You have trains in the grass"). Berlin showed two S-Bahn
+  consists on plain meadow: trainAt flies the straight CHORD
+  between stops (hundreds of metres off through curves) and the
+  drawn network never constrained it. rails.js now owns
+  map-matching: railIndex builds the segment grid AND the rail
+  graph (OSM junctions share node coordinates, so quantized
+  endpoints merge into vertices); snapToRail is nearest-arc
+  projection (closed-form foot, gated); railRoute is
+  route-based map matching - Dijkstra over the drawn graph
+  between the two stop projections, exact mid-arc endpoint
+  handling, a route longer than 3x the chord means missing
+  links (null, no invented detours); routePoint walks the
+  routed polyline by arc length with the local track bearing.
+  trainAt exposes its leg + time fraction; the theme's ladder:
+  published shape > routed leg (constant speed ON the real
+  geometry, heading = track bearing) > nearest-arc snap of the
+  chord position (100 m, the GPS-error case - legs whose far
+  stop is outside the drawn box cannot route) > HIDDEN (tunnel
+  or a way the 300-cap dropped - a train through the grass
+  would be inventing track; the panel counts both:
+  "trains (map-matched): N on drawn rails - M off-network
+  hidden"). Landmarks (2 new in rails-reference): nearest-arc
+  at its closed points (interior foot, 3-4-5 endpoint clamp,
+  cross-cell nearest, gate null); the L-network route (length
+  exactly 17, the junction at f = 9/17, per-segment bearings,
+  one-arc legs direct, disconnected components null). Gate 60
+  sets + 3 GPU probes PASS.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

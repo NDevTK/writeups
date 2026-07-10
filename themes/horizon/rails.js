@@ -75,3 +75,237 @@ export function parseRailways(json, cap = 300, minLenM = 50) {
 // The geometry IS the roads' gated ribbon builder (see rivers.js
 // for the same reuse) - one exactness gate, three consumers.
 export const railsGeometry = roadsGeometry;
+
+/**
+ * Map-matching: a train is rail-constrained by definition, but its
+ * reported fix is not - radar positions carry GPS-grade error and
+ * timetable interpolation cuts curve chords - so the drawn train
+ * snaps to the drawn network by nearest-arc projection (the
+ * standard light form of map-matching; with one sparse rail
+ * corridor per neighbourhood the nearest arc IS the right arc).
+ * A fix matching NO drawn arc within the gate stays unmatched -
+ * the train is in a tunnel or on a way the cap dropped, and
+ * drawing it on the grass would be inventing track.
+ *
+ * railIndex bins segments into a uniform grid so the per-frame
+ * query touches only nearby arcs. Coordinates are the caller's
+ * (the theme passes scene units); gate and cell share them.
+ */
+export function railIndex(polys, cell = 4) {
+  const segs = [];
+  for (const pts of polys) {
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const [ax, az] = pts[i];
+      const [bx, bz] = pts[i + 1];
+      if (ax === bx && az === bz) continue;
+      segs.push([ax, az, bx, bz]);
+    }
+  }
+  const grid = new Map();
+  segs.forEach((s, i) => {
+    const x0 = Math.floor(Math.min(s[0], s[2]) / cell);
+    const x1 = Math.floor(Math.max(s[0], s[2]) / cell);
+    const z0 = Math.floor(Math.min(s[1], s[3]) / cell);
+    const z1 = Math.floor(Math.max(s[1], s[3]) / cell);
+    for (let cx = x0; cx <= x1; cx++) {
+      for (let cz = z0; cz <= z1; cz++) {
+        const k = cx + ':' + cz;
+        let list = grid.get(k);
+        if (!list) grid.set(k, (list = []));
+        list.push(i);
+      }
+    }
+  });
+  // The graph over the same arcs: OSM junctions share their node
+  // coordinates exactly, so quantized endpoints merge into graph
+  // vertices; each segment becomes an edge of its true length.
+  const Q = 1e-6;
+  const nid = (x, z) => Math.round(x / Q) + ':' + Math.round(z / Q);
+  const nodes = new Map(); // id -> [x, z]
+  const adj = new Map(); // id -> [{to, len, seg}]
+  segs.forEach((s, i) => {
+    const a = nid(s[0], s[1]);
+    const b = nid(s[2], s[3]);
+    if (!nodes.has(a)) nodes.set(a, [s[0], s[1]]);
+    if (!nodes.has(b)) nodes.set(b, [s[2], s[3]]);
+    const len = Math.hypot(s[2] - s[0], s[3] - s[1]);
+    if (!adj.has(a)) adj.set(a, []);
+    if (!adj.has(b)) adj.set(b, []);
+    adj.get(a).push({to: b, len, seg: i});
+    adj.get(b).push({to: a, len, seg: i});
+  });
+  return {segs, grid, cell, nodes, adj, nid};
+}
+
+/**
+ * Nearest-arc projection of (x, z) onto the indexed network:
+ * closed-form point-to-segment (t clamped to the arc), gated at
+ * `gate` in the index's own units. Returns the foot point, the
+ * arc's unit direction and the distance, or null past the gate.
+ */
+/**
+ * Route-based map matching (the timetable form of Newson & Krumm's
+ * problem): a moving train's two known truths are its stops and its
+ * network - the straight chord between stops is neither, cutting
+ * hundreds of metres across city blocks. railRoute runs Dijkstra
+ * over the drawn rail graph between the two stop projections and
+ * returns the routed polyline with its arc length; the caller
+ * positions the train BY LENGTH along it (the same constant-speed
+ * assumption the chord made, now on the real geometry). Endpoints
+ * attach through nearest-arc projection within `gate`; a route
+ * longer than `maxDetour` times the chord means the drawn network
+ * is missing links for this leg - null, the caller falls back.
+ */
+export function railRoute(idx, ax, az, bx, bz, gate, maxDetour = 3) {
+  const A = snapToRail(idx, ax, az, gate);
+  const B = snapToRail(idx, bx, bz, gate);
+  if (!A || !B) return null;
+  const segOf = (p) => {
+    // recover which arc the foot lies on (nearest arc again, but
+    // keeping the index this time)
+    let best = null;
+    idx.segs.forEach((s, i) => {
+      const vx = s[2] - s[0];
+      const vz = s[3] - s[1];
+      const t = Math.max(
+        0,
+        Math.min(
+          1,
+          ((p.x - s[0]) * vx + (p.z - s[1]) * vz) / (vx * vx + vz * vz)
+        )
+      );
+      const d = Math.hypot(p.x - (s[0] + t * vx), p.z - (s[1] + t * vz));
+      if (!best || d < best.d) best = {i, t, d};
+    });
+    return best;
+  };
+  const sa = segOf(A);
+  const sb = segOf(B);
+  if (!sa || !sb) return null;
+  const chord = Math.hypot(bx - ax, bz - az);
+  const mkPts = (pts) => {
+    let len = 0;
+    for (let i = 1; i < pts.length; i++)
+      len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    return {pts, len};
+  };
+  if (sa.i === sb.i) {
+    // both feet on one arc: the route is the arc between them
+    return mkPts([
+      [A.x, A.z],
+      [B.x, B.z]
+    ]);
+  }
+  // Dijkstra from the two endpoints of A's arc, seeded with the
+  // partial lengths from the foot point.
+  const s0 = idx.segs[sa.i];
+  const s1 = idx.segs[sb.i];
+  const la = Math.hypot(s0[2] - s0[0], s0[3] - s0[1]);
+  const lb = Math.hypot(s1[2] - s1[0], s1[3] - s1[1]);
+  const a0 = idx.nid(s0[0], s0[1]);
+  const a1 = idx.nid(s0[2], s0[3]);
+  const b0 = idx.nid(s1[0], s1[1]);
+  const b1 = idx.nid(s1[2], s1[3]);
+  const dist = new Map([
+    [a0, sa.t * la],
+    [a1, (1 - sa.t) * la]
+  ]);
+  const prev = new Map();
+  const done = new Set();
+  const limit = chord * maxDetour + la + lb;
+  // Settle the whole reachable ball of radius `limit`; then close
+  // through WHICHEVER end of B's arc gives the shorter total - the
+  // first-popped end is not necessarily it (the exact treatment of
+  // a mid-arc target).
+  while (true) {
+    let u = null;
+    let du = Infinity;
+    for (const [k, v] of dist) {
+      if (!done.has(k) && v < du) {
+        u = k;
+        du = v;
+      }
+    }
+    if (u === null || du > limit) break;
+    done.add(u);
+    for (const e of idx.adj.get(u) || []) {
+      const nd = du + e.len;
+      if (nd < (dist.get(e.to) ?? Infinity)) {
+        dist.set(e.to, nd);
+        prev.set(e.to, u);
+      }
+    }
+  }
+  const t0 = (dist.get(b0) ?? Infinity) + sb.t * lb;
+  const t1 = (dist.get(b1) ?? Infinity) + (1 - sb.t) * lb;
+  const total = Math.min(t0, t1);
+  if (!(total <= limit)) return null;
+  const pts = [[B.x, B.z]];
+  let n = t0 <= t1 ? b0 : b1;
+  while (n) {
+    pts.push(idx.nodes.get(n));
+    n = prev.get(n);
+  }
+  pts.push([A.x, A.z]);
+  pts.reverse();
+  return mkPts(pts);
+}
+
+/**
+ * The point at length fraction f along a routed polyline, with the
+ * local unit direction (the track bearing there).
+ */
+export function routePoint(route, f) {
+  const pts = route.pts;
+  let want = Math.max(0, Math.min(1, f)) * route.len;
+  for (let i = 1; i < pts.length; i++) {
+    const dx = pts[i][0] - pts[i - 1][0];
+    const dz = pts[i][1] - pts[i - 1][1];
+    const l = Math.hypot(dx, dz);
+    if (want <= l || i === pts.length - 1) {
+      const t = l > 0 ? want / l : 0;
+      return {
+        x: pts[i - 1][0] + dx * Math.min(t, 1),
+        z: pts[i - 1][1] + dz * Math.min(t, 1),
+        dx: l > 0 ? dx / l : 1,
+        dz: l > 0 ? dz / l : 0
+      };
+    }
+    want -= l;
+  }
+  return {x: pts[0][0], z: pts[0][1], dx: 1, dz: 0};
+}
+
+export function snapToRail(idx, x, z, gate) {
+  const c = idx.cell;
+  const r = Math.max(1, Math.ceil(gate / c));
+  const cx0 = Math.floor(x / c);
+  const cz0 = Math.floor(z / c);
+  let best = null;
+  const seen = new Set();
+  for (let dx = -r; dx <= r; dx++) {
+    for (let dz = -r; dz <= r; dz++) {
+      const list = idx.grid.get(cx0 + dx + ':' + (cz0 + dz));
+      if (!list) continue;
+      for (const i of list) {
+        if (seen.has(i)) continue;
+        seen.add(i);
+        const [ax, az, bx, bz] = idx.segs[i];
+        const vx = bx - ax;
+        const vz = bz - az;
+        const t = Math.max(
+          0,
+          Math.min(1, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz))
+        );
+        const qx = ax + t * vx;
+        const qz = az + t * vz;
+        const d = Math.hypot(x - qx, z - qz);
+        if (d <= gate && (!best || d < best.d)) {
+          const L = Math.hypot(vx, vz);
+          best = {x: qx, z: qz, dx: vx / L, dz: vz / L, d};
+        }
+      }
+    }
+  }
+  return best;
+}
