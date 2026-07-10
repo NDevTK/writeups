@@ -102,6 +102,7 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     uSnowLine: uniform(2300),
     uTime: uniform(0),
     uWindMs: uniform(3),
+    uWind125: uniform(3),
     uWindVec: uniform(new Vector2(1, 0)),
     uSunDirW: uniform(new Vector3(0, 1, 0)),
     uSunCol: uniform(new Color(0, 0, 0)),
@@ -184,20 +185,77 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     return normalize(vec3(grad.x.negate(), 1.0, grad.y.negate()));
   });
 
-  // Sun glitter: Blinn lobe on the wave normals with Schlick fresnel;
-  // calm water gives a tight bright path, wind spreads it.
+  // Sun glitter: Cox & Munk (1954) - the node mirror of
+  // coxmunk.js (same expressions, held by its reference): the
+  // facet that mirrors the sun into the eye lands in the
+  // MEASURED slope pdf - upwind/crosswind variances linear in
+  // the live 12.5 m wind, Gram-Charlier skewness leaning the
+  // waves downwind - through the Breon/MERIS radiance factor
+  // rhoF p / (4 cosThetaV cos^4 beta). No tuned lobe: the
+  // glitter's width, ellipse and asymmetry are the published
+  // law.
   const seaSpec = Fn(([wp]) => {
-    const n = seaNormal(wp);
+    const U = clamp(u.uWind125, 1.0, 14.0);
+    const mu = U.mul(3.16e-3);
+    const mc = U.mul(1.92e-3).add(3.0e-3);
     const V = normalize(cameraPosition.sub(wp));
-    const H = normalize(V.add(u.uSunDirW));
-    const gloss = mix(700.0, 60.0, clamp(u.uWindMs.div(15.0), 0.0, 1.0));
-    const f = pow(clamp(float(1).sub(dot(V, n)), 0.0, 1.0), 5.0)
-      .mul(0.95)
-      .add(0.05);
-    return u.uSunCol
-      .mul(pow(max(dot(n, H), 0.0), gloss))
-      .mul(f)
-      .mul(6.0);
+    const S = u.uSunDirW;
+    const H = normalize(V.add(S));
+    const hy = max(H.y, 1e-3);
+    const upw = normalize(u.uWindVec).negate(); // upwind axis, xz
+    const sx = H.x.negate().div(hy);
+    const sz = H.z.negate().div(hy);
+    const su = sx.mul(upw.x).add(sz.mul(upw.y));
+    const sc = sx.negate().mul(upw.y).add(sz.mul(upw.x));
+    const un = su.div(sqrt(mu));
+    const cn = sc.div(sqrt(mc));
+    const u2 = un.mul(un);
+    const c2 = cn.mul(cn);
+    const c12 = float(0.01).sub(U.mul(0.0086));
+    const c30 = float(0.04).sub(U.mul(0.033));
+    const bracket = float(1.0)
+      .sub(c12.mul(un).mul(c2.sub(1.0)).mul(0.5))
+      .sub(c30.mul(u2.mul(un).sub(un.mul(3.0))).div(6.0))
+      .add(
+        u2
+          .mul(u2)
+          .sub(u2.mul(6.0))
+          .add(3.0)
+          .mul(0.23 / 24)
+      )
+      .add(
+        u2
+          .sub(1.0)
+          .mul(c2.sub(1.0))
+          .mul(0.12 / 4)
+      )
+      .add(
+        c2
+          .mul(c2)
+          .sub(c2.mul(6.0))
+          .add(3.0)
+          .mul(0.4 / 24)
+      );
+    const p = max(bracket, 0.0)
+      .mul(exp(u2.add(c2).mul(-0.5)))
+      .div(sqrt(mu.mul(mc)).mul(2 * Math.PI));
+    // unpolarised Fresnel of water, n = 1.34
+    const cosw = clamp(dot(S, H), 0.0, 1.0);
+    const ct = sqrt(
+      max(
+        float(1.0).sub(
+          float(1.0)
+            .sub(cosw.mul(cosw))
+            .div(1.34 * 1.34)
+        ),
+        0.0
+      )
+    );
+    const rs = cosw.sub(ct.mul(1.34)).div(cosw.add(ct.mul(1.34)));
+    const rp = cosw.mul(1.34).sub(ct).div(cosw.mul(1.34).add(ct));
+    const rhoF = rs.mul(rs).add(rp.mul(rp)).mul(0.5);
+    const geom = hy.mul(hy).mul(hy).mul(hy).mul(max(V.y, 0.05)).mul(4.0);
+    return u.uSunCol.mul(rhoF.mul(p).div(geom)).mul(smoothstep(0.0, 0.02, S.y));
   });
 
   // ---------- Zirr-Kaplanyan snow glints (see snow-glints.js) ----

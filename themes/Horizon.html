@@ -7386,9 +7386,22 @@
             terrainUniforms.uSnowLine.value) *
           Math.min(dt, 1);
 
-        // Sea-state uniforms: real wind feeds the wave model.
+        // Sea-state uniforms: real wind feeds the wave model. The
+        // Cox-Munk glitter takes the wind at the paper's own
+        // 12.5 m mast height - the forecast model's 80/120 m
+        // levels log-interpolated down (turbines.js hubWind), the
+        // 10 m wind standing in until the levels arrive.
         terrainUniforms.uTime.value = t / 1000;
         terrainUniforms.uWindMs.value = state.wind / 3.6;
+        terrainUniforms.uWind125.value =
+          state.wind80 != null
+            ? hubWind(
+                state.wind / 3.6,
+                state.wind80 / 3.6,
+                (state.wind120 ?? state.wind80) / 3.6,
+                12.5
+              )
+            : state.wind / 3.6;
         // Night lights fade in through civil twilight (streetlights
         // lead the stars); the camera sits under the decks with
         // them, so no cloud dimming applies. The lamp points share

@@ -3067,6 +3067,38 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   Berlin smoke (radar stubbed with the captured frame) records
   '16 vehicles tracked - RE8 -> Elsterwerda (ODEG)'. Gate 55
   sets.
+- DONE: Cox & Munk (1954) sun glitter on the lakes (Jul 10, the
+  frontier lane - the LAST tuned lobe in the water path replaced
+  by the published law). The wet-pixel glitter was a Blinn
+  exponent mix(700, 60, U/15); it is now the slope-statistics
+  model Cox & Munk measured from aerial photographs of the sun's
+  glitter - the standard of ocean optical remote sensing since.
+  coxmunk.js carries the laws as reproduced verbatim in Capelle
+  et al. 2023 (the IASI revisit, eq. 9-12): upwind mss 3.16e-3 U,
+  crosswind 3e-3 + 1.92e-3 U (wind at the paper's own 12.5 m
+  mast, clamped to its 1-14 m/s data range), the Gram-Charlier
+  expansion with measured skewness C12 = 0.01 - 0.0086 U,
+  C30 = 0.04 - 0.033 U (waves lean downwind) and peakedness
+  0.23/0.12/0.40, exact unpolarised Fresnel (n = 1.34), and the
+  Breon/MERIS radiance factor rhoF p / (4 cosThetaV cos^4 beta).
+  Landmarks (5): the regressions exact at their anchors with the
+  separately fitted total consistent inside the paper's own
+  +-0.004; the Gram-Charlier structure held by MOMENT IDENTITIES
+  (Hermite orthogonality: normalisation and both second moments
+  untouched by the corrections, the normalised upwind third
+  moment = -C30 exactly - recovered numerically to 0.289 vs
+  0.290); Fresnel closed points incl. Brewster's rs^2/2; the
+  mirror-geometry closed form exact and the photographed
+  observable - wind WIDENS the glitter (peak falls, off-specular
+  brightens); the anisotropy (along-wind slopes likelier than
+  across, downwind lean likelier than up). terrain-tsl mirrors
+  the same expressions on wet pixels (uWind125 uniform); the
+  theme feeds it the 12.5 m wind log-interpolated from the
+  forecast model's own 80/120 m levels (turbines.js hubWind).
+  One scene now shares one wind: trees sway in it, cabins swing
+  in it, rotors spin and wake in it, and the lake glitter
+  widens, elongates and leans with it. Gate 56 sets; Interlaken
+  smoke clean.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
