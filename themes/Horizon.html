@@ -8678,6 +8678,21 @@
             camBaseY + 1 + look.y * -5 + Math.sin(lookAlt) * 66,
             camZ + Math.cos(lookAlt) * vz * 66
           );
+          // Harness pose override (?debug=1): place the camera AT a
+          // point with a compass az / alt view - close framing for
+          // visual verification (a train fills the frame instead of
+          // being a 1.5 km speck from the default vantage).
+          if (params.has('debug') && window.__pose) {
+            const p = window.__pose;
+            camera.position.set(p.x, p.y, p.z);
+            const pAz = p.az * RAD;
+            const pAlt = (p.alt || 0) * RAD;
+            camera.lookAt(
+              p.x + Math.cos(pAlt) * Math.sin(pAz),
+              p.y + Math.sin(pAlt),
+              p.z - Math.cos(pAlt) * Math.cos(pAz)
+            );
+          }
         }
 
         if (!panel.hidden) {
