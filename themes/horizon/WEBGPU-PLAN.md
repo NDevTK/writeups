@@ -2744,6 +2744,30 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   185/189 watercourses, 192/196 railways, 3/44 aerial
   installations (the rest lie outside the 16 km box - honest),
   one known warning class.
+- DONE: real summit labels (Jul 10 - the Jungfrau panorama is
+  famous BECAUSE its peaks have names). OSM natural=peak nodes
+  through the SAME mirrors carry the two facts a panorama label
+  needs: the name and the surveyed elevation. peaks.js (pure,
+  gated at 4 landmarks): parsePeaks handles the ele tag's wild
+  forms ('4048.8', '3 970', comma decimals) - nameless peaks
+  cannot be labelled and are dropped, elevation-less ones keep a
+  name-only label; selectPeaks is the cartographic declutter rule
+  (elevation-ranked greedy with minimum separation) and the LIVE
+  400-peak fixture holds its own case in point: the Jungfrau is
+  labelled while "Wengen Jungfrau" (4085 m, ~300 m away) is not,
+  every kept pair >= 1.8 km apart; the fixture carries the
+  4000ers at their surveyed metres (Finsteraarhorn 4274, Jungfrau
+  4158, Mönch 4107); labelText renders 'Jungfrau · 4158 m' at tag
+  precision. Theme: syncPeaks (both mirrors, geodetic cache per
+  anchor), placePeaks selects 12 in-box summits and pins each
+  label as a small canvas sprite just over the RENDERED summit
+  (constant screen size, sizeAttenuation off) - annotations, not
+  scenery: they deliberately skip the aerial haze (a label that
+  fades like rock defeats its reason to exist); ?peaks=0;
+  KEEP_PARAMS carries 'peaks'; panel records count and the
+  highest label. Gate 51 -> 52 sets. Browser smoke, EIGHT layers:
+  the seven placed layers unchanged plus 12 of 59 summits
+  labelled on the box, one known warning class.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

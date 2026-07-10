@@ -129,7 +129,10 @@
         their real lines too - OSM aerialway ways whose nodes are
         the actual pylons, every span on the exact catenary (Newton
         on the cosh sag identity, never the parabola), cabins at
-        deterministic positions; everywhere else the
+        deterministic positions; the summits carry their NAMES -
+        OSM natural=peak nodes with surveyed elevations, labelled
+        panorama-style ('Jungfrau · 4158 m') under the gated
+        elevation-ranked declutter rule; everywhere else the
         worldwide GTFS aggregator (transitous.org) answers instead -
         every rail leg operating in the box right now, followed
         along the polyline of its ACTUAL route by arc length, with
@@ -163,7 +166,7 @@
         buildings), roads=0 (skip OSM roads), landuse=0 (skip OSM
         ground cover), rivers=0 (skip OSM waterways), rails=0 (skip
         OSM railways), trains=0 (skip live trains), aerialways=0
-        (skip OSM cable cars), debug=1
+        (skip OSM cable cars), peaks=0 (skip summit labels), debug=1
     -->
     <style>
       html,
@@ -431,6 +434,7 @@
         PYLON_M,
         STATION_M
       } from './horizon/aerialways.js';
+      import {labelText, parsePeaks, selectPeaks} from './horizon/peaks.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -1668,6 +1672,72 @@
           if (worldBuilt) placeRails();
         } catch {
           railsGeo = null; // no invented tracks
+        }
+      }
+
+      // Real summit labels: OSM natural=peak nodes via the same
+      // mirrors - name + surveyed elevation, decluttered by the
+      // gated elevation-ranked separation rule (peaks.js). Cached
+      // geodetic per anchor; ?peaks=0 disables.
+      let peaksGeo = null;
+      async function syncPeaks() {
+        if (params.get('peaks') === '0') return;
+        const key =
+          'horizon-peaks-geo-' +
+          state.lat.toFixed(2) +
+          ',' +
+          state.lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) {
+            peaksGeo = JSON.parse(hit);
+            record('OSM Overpass peaks (cached)', peaksGeo.length + ' summits');
+            if (worldBuilt) placePeaks();
+            return;
+          }
+        } catch {}
+        try {
+          const mLat = 111320;
+          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+          const dLat = DEM_HALF_M / mLat;
+          const dLon = DEM_HALF_M / mLon;
+          const bbox =
+            (state.lat - dLat).toFixed(4) +
+            ',' +
+            (state.lon - dLon).toFixed(4) +
+            ',' +
+            (state.lat + dLat).toFixed(4) +
+            ',' +
+            (state.lon + dLon).toFixed(4);
+          const q =
+            '[out:json][timeout:30];node[natural=peak][name](' +
+            bbox +
+            ');out 400;';
+          let osm = null;
+          for (const host of [
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+            'https://overpass-api.de/api/interpreter'
+          ]) {
+            try {
+              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
+                credentials: 'omit'
+              });
+              if (!r.ok) throw new Error(r.status);
+              osm = await r.json();
+              break;
+            } catch {
+              // Try the next mirror.
+            }
+          }
+          if (!osm) throw new Error('overpass unavailable');
+          peaksGeo = parsePeaks(osm);
+          record('OSM Overpass peaks', peaksGeo.length + ' summits');
+          try {
+            localStorage.setItem(key, JSON.stringify(peaksGeo));
+          } catch {}
+          if (worldBuilt) placePeaks();
+        } catch {
+          peaksGeo = null; // the ridgeline keeps its silence
         }
       }
 
@@ -3469,6 +3539,74 @@
           placed + ' of ' + aerialGeo.length + ' installations on this box'
         );
       }
+      // Summit labels: the gated declutter selection, each label a
+      // small canvas sprite ('Jungfrau · 4158 m') pinned just over
+      // the RENDERED summit (the terrain the visitor actually
+      // sees), constant size on screen. Annotations, not scenery -
+      // they skip the aerial haze on purpose (a label that fades
+      // like rock defeats its reason to exist).
+      let peakGroup = null;
+      function placePeaks() {
+        if (peakGroup) {
+          scene.remove(peakGroup);
+          peakGroup.traverse((o) => {
+            if (o.material && o.material.map) o.material.map.dispose();
+            if (o.material) o.material.dispose();
+          });
+          peakGroup = null;
+        }
+        if (!peaksGeo || !peaksGeo.length || params.get('peaks') === '0')
+          return;
+        const inBox = [];
+        for (const p of peaksGeo) {
+          const s = geoToScene(p.lat, p.lon, dressAnchor);
+          if (Math.abs(s.x) <= 138 && Math.abs(s.z) <= 138)
+            inBox.push({...p, x: s.x, z: s.z});
+        }
+        const sel = selectPeaks(inBox, 12, 1800);
+        if (!sel.length) return;
+        peakGroup = new THREE.Group();
+        for (const p of sel) {
+          const text = labelText(p);
+          const cv = document.createElement('canvas');
+          const ctx = cv.getContext('2d');
+          ctx.font = '28px system-ui, sans-serif';
+          const w = Math.ceil(ctx.measureText(text).width) + 16;
+          cv.width = w;
+          cv.height = 40;
+          const c2 = cv.getContext('2d');
+          c2.font = '28px system-ui, sans-serif';
+          c2.textBaseline = 'middle';
+          c2.shadowColor = 'rgba(8,12,18,0.9)';
+          c2.shadowBlur = 5;
+          c2.fillStyle = 'rgba(238,242,246,0.92)';
+          c2.fillText(text, 8, 21);
+          const tex = new THREE.CanvasTexture(cv);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          const mat = new THREE.SpriteNodeMaterial({
+            map: tex,
+            transparent: true,
+            depthWrite: false
+          });
+          const spr = new THREE.Sprite(mat);
+          // constant screen size: sizeAttenuation off, scaled to
+          // the texture's aspect
+          mat.sizeAttenuation = false;
+          spr.scale.set(0.045 * (w / 40), 0.045, 1);
+          spr.position.set(p.x, sample(p.x, p.z).y + 0.9, p.z);
+          spr.renderOrder = 9;
+          peakGroup.add(spr);
+        }
+        scene.add(peakGroup);
+        record(
+          'OSM peaks labelled',
+          sel.length +
+            ' of ' +
+            inBox.length +
+            ' summits on this box · highest ' +
+            labelText(sel[0])
+        );
+      }
       function buildWorld(pre) {
         // Roam rebuilds repeatedly: free the previous terrain
         // geometry (trees share cached geometries/materials and
@@ -3544,6 +3682,7 @@
         placeRivers();
         placeRails();
         placeAerialways();
+        placePeaks();
         placeLanduse();
 
         // The sea: three.js Water (planar reflections) riding at real sea
@@ -5633,6 +5772,7 @@
         syncRivers();
         syncRails();
         syncAerialways();
+        syncPeaks();
         syncLanduse();
         syncTrains();
         // The lamp cloud is anchored to the OLD box - drop it now,
@@ -7457,6 +7597,7 @@
         syncRivers();
         syncRails();
         syncAerialways();
+        syncPeaks();
         syncLanduse();
         syncTrains();
         setInterval(syncTrains, 90 * 1000);
