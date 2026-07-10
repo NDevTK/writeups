@@ -959,3 +959,43 @@ export function createSkyglowMaterial() {
   material.opacityNode = float(1);
   return {material, u};
 }
+
+/**
+ * The rainbow overlay (rainbow.js computes the physics): a 1-D
+ * RGB profile over the angle from the ANTISOLAR point, Airy
+ * theory on the Marshall-Palmer drop of the measured rain,
+ * uploaded as a LUT. The dome just measures each view ray's
+ * angle off the antisolar axis and samples - primary, Alexander's
+ * dark band, secondary and the supernumerary fringes are all IN
+ * the profile. Additive, depth-tested (terrain occludes the low
+ * arc), faded by the caller's alpha (sun, rain and cloud gates
+ * live in the theme).
+ */
+export function createRainbowMaterial(n = 512) {
+  const lutData = new Float32Array(n * 4);
+  const lut = new DataTexture(lutData, n, 1, RGBAFormat, FloatType);
+  lut.minFilter = lut.magFilter = LinearFilter;
+  lut.needsUpdate = true;
+  const u = {
+    alpha: uniform(0),
+    antisun: uniform(new Vector3(0, -1, 0)),
+    g0: uniform((37 * Math.PI) / 180),
+    g1: uniform((55 * Math.PI) / 180),
+    lut,
+    lutData
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = BackSide;
+  material.blending = AdditiveBlending;
+  const d = normalize(positionLocal);
+  const g = acos(clamp(dot(d, u.antisun), -1.0, 1.0));
+  const frac = clamp(g.sub(u.g0).div(u.g1.sub(u.g0)), 0.0, 1.0);
+  const c = texture(u.lut).sample(vec2(frac, 0.5));
+  // the LUT ends at zero on both flanks; the hard clamp edges
+  // never show
+  material.colorNode = c.rgb.mul(u.alpha);
+  material.opacityNode = float(1);
+  return {material, u};
+}
