@@ -3003,6 +3003,42 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   Mont Crosin (3 models, 16 JUV refs). Gate 54 sets (turbines: 6
   landmarks - ladder, law, storm control, ENERCON's published
   curve closing the constants, log-profile anchors, fixture).
+- DONE: wind-farm wakes - the farm robs itself (Jul 10, frontier
+  research on the data shipped hours earlier). wakes.js follows
+  the industry PARK scheme from its sources: Jensen (1983,
+  Risoe-M-2411) top-hat wake expanding at r0 + k s with the
+  momentum initial reduction (1 - Ct) = (V/U0)^2; Katic,
+  Hoejstrup & Jensen (1986, EWEC Rome) partial shadowing by the
+  exact circle-circle lens and root-sum-square superposition;
+  WAsP's land decay k = 0.075. Thrust is published data end to
+  end: Vestas prints the V112's full Ct table in the General
+  Specification (table 12-2 - the 1.225 kg/m^3 column carried
+  verbatim, 45 rows), and the other pitch-regulated models ride
+  that curve on the non-dimensional v / v_rated axis of their
+  own sheets' rated winds. The E-82's storm control tapers its
+  thrust across the same published 28-34 window as its speed.
+  The gate holds the transfer against a THEOREM, not a feeling:
+  inverting ENERCON's own published Cp curve through
+  one-dimensional momentum theory (Cp = 4a(1-a)^2 on a <= 1/3,
+  Ct = 4a(1-a)) is a strict lower bound on true thrust - losses
+  only lower Cp at fixed induction - and the transferred curve
+  clears that floor at every published row, converging above
+  rated where the loss share vanishes (within 22% by 20 m/s).
+  An earlier draft used the inversion DIRECTLY as the E-82's
+  thrust; the gate's own cross-check exposed the bias (Cp 0.50
+  inverts to 0.62 against the V112's published 0.80 in the same
+  regime) and the design changed - the reference-first loop
+  working as intended. Landmarks (6): the published curve
+  verbatim/monotone/physical; the floor theorem; Jensen closed
+  points (initial reduction exact, deficit exactly /4 where the
+  wake doubles, s^-2 far field); the lens at its closed forms
+  (equal circles at one radius = (2pi/3 - sqrt(3)/2)/pi exactly);
+  sqrt(2) superposition; the live Juvent farm (west wind 8 m/s:
+  6 of 19 waked, deepest at 74% of free wind, calm lays none).
+  Theme: farm factors in METRES (the asinh-warped scene Y is not
+  a length), recomputed per weather poll, rotors visibly slower
+  deep in the farm; panel records 'Jensen wind-farm wakes - N of
+  M waked, deepest -P%'. Gate 55 sets.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
