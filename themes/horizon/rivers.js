@@ -81,3 +81,38 @@ export function parseWaterways(json, cap = 300, minLenM = 50) {
 // under the water name so call sites read honestly. groundY null
 // (lake, sea) breaks the ribbon at the shore.
 export const riversGeometry = roadsGeometry;
+
+// ---- Hydraulic geometry: the MEASURED flow drives the width ----
+// Leopold & Maddock (1953, USGS Professional Paper 252):
+// at-a-station hydraulic geometry - a river cross-section widens
+// with discharge as w = a Q^b, their canonical at-a-station width
+// exponent b ~= 0.26. Applied as a RATIO against the recent
+// reference flow, the tag/ladder width stays the calibration and
+// today's GloFAS discharge moves it: w_today = w_ladder x
+// (Q_today / Q_ref)^0.26.
+export const B_AT_A_STATION = 0.26;
+
+// The reference flow: the median of the recent daily record (the
+// same source, so the ratio is internally consistent). Null when
+// the record is too short to mean anything.
+export function refDischarge(series, minDays = 14) {
+  const vals = (series || []).filter((v) => Number.isFinite(v) && v > 0);
+  if (vals.length < minDays) return null;
+  const s = vals.slice().sort((a, b) => a - b);
+  return s[(s.length - 1) >> 1];
+}
+
+// Today's width multiplier. No data (or nonsense) means factor 1:
+// the ladder width stands unchanged - nothing is invented. The
+// clamp keeps a drought or a flood within believable render
+// bounds without touching the exponent.
+export function dischargeFactor(qNow, qRef, b = B_AT_A_STATION) {
+  if (
+    !Number.isFinite(qNow) ||
+    !Number.isFinite(qRef) ||
+    qNow <= 0 ||
+    qRef <= 0
+  )
+    return 1;
+  return Math.min(2, Math.max(0.5, Math.pow(qNow / qRef, b)));
+}

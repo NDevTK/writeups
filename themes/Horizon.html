@@ -116,7 +116,11 @@
         real too - OSM waterway ways thread the Aare and the alpine
         streams down the valleys (tunnelled reaches skipped), and a
         stream reaching a lake stops at the shore where the polygon
-        surface takes over; railways run their real lines - beds at
+        surface takes over, and the widths BREATHE with the real
+        flow - GloFAS daily discharge against its 92-day median
+        through Leopold & Maddock's at-a-station hydraulic geometry
+        (w ~ Q^0.26), so the Aare widens in flood and narrows in
+        drought; railways run their real lines - beds at
         the MEASURED OSM gauge (tracks x (gauge + ballast
         shoulders)), tunnels skipped, tagged rail bridges decking
         over the rivers they span; and where a registered transit
@@ -166,7 +170,8 @@
         buildings), roads=0 (skip OSM roads), landuse=0 (skip OSM
         ground cover), rivers=0 (skip OSM waterways), rails=0 (skip
         OSM railways), trains=0 (skip live trains), aerialways=0
-        (skip OSM cable cars), peaks=0 (skip summit labels), debug=1
+        (skip OSM cable cars), peaks=0 (skip summit labels),
+        discharge=0 (pin river widths to the ladder), debug=1
     -->
     <style>
       html,
@@ -416,7 +421,12 @@
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
       import {parseRoads, roadsGeometry} from './horizon/roads.js';
       import {landTint, parseLanduse} from './horizon/landuse.js';
-      import {parseWaterways, riversGeometry} from './horizon/rivers.js';
+      import {
+        dischargeFactor,
+        parseWaterways,
+        refDischarge,
+        riversGeometry
+      } from './horizon/rivers.js';
       import {parseRailways, railsGeometry} from './horizon/rails.js';
       import {
         BOAT_CATS,
@@ -1605,6 +1615,52 @@
           if (worldBuilt) placeRivers();
         } catch {
           riversGeo = null; // the polygon water stands alone
+        }
+      }
+
+      // Measured river flow: GloFAS (Open-Meteo Flood API, keyless,
+      // global) publishes daily discharge for the nearest river
+      // cell. Today's flow against the recent median drives the
+      // rendered river WIDTHS through Leopold & Maddock (1953)
+      // at-a-station hydraulic geometry, w ~ Q^0.26 (rivers.js,
+      // gated) - the Aare widens in flood and narrows in drought
+      // because the data says so. ?discharge=0 pins the ladder
+      // widths.
+      let riverFlow = null;
+      async function syncDischarge() {
+        if (params.get('discharge') === '0') return;
+        try {
+          const j = await (
+            await fetch(
+              'https://flood-api.open-meteo.com/v1/flood?latitude=' +
+                state.lat.toFixed(4) +
+                '&longitude=' +
+                state.lon.toFixed(4) +
+                '&daily=river_discharge&past_days=92&forecast_days=1',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const series = (j.daily && j.daily.river_discharge) || [];
+          const finite = series.filter((v) => Number.isFinite(v) && v > 0);
+          const qNow = finite[finite.length - 1];
+          const qRef = refDischarge(series);
+          const factor = dischargeFactor(qNow, qRef);
+          riverFlow = {qNow, qRef, factor};
+          record(
+            'GloFAS river discharge',
+            qRef == null
+              ? 'record too short - ladder widths stand'
+              : qNow.toFixed(1) +
+                  ' m³/s today · 92-day median ' +
+                  qRef.toFixed(1) +
+                  ' · width ×' +
+                  factor.toFixed(2) +
+                  ' (Leopold-Maddock Q^0.26)'
+          );
+          if (worldBuilt) placeRivers();
+        } catch (e) {
+          riverFlow = null; // ladder widths stand - nothing invented
+          if (params.has('debug')) console.warn('discharge: ' + e.message);
         }
       }
 
@@ -3360,7 +3416,12 @@
           const s = sample(x, z);
           return s.water ? null : s.y + 1.5 / MPU;
         };
-        const g = riversGeometry(riversGeo, dressAnchor, groundY, 1 / MPU, 140);
+        // Today's measured flow scales the ladder widths through
+        // the gated hydraulic geometry (factor 1 without data).
+        const f = riverFlow ? riverFlow.factor : 1;
+        const flowed =
+          f === 1 ? riversGeo : riversGeo.map((r) => ({...r, wM: r.wM * f}));
+        const g = riversGeometry(flowed, dressAnchor, groundY, 1 / MPU, 140);
         if (!g.placed) return;
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
@@ -5770,6 +5831,7 @@
         syncBuildings();
         syncRoads();
         syncRivers();
+        syncDischarge();
         syncRails();
         syncAerialways();
         syncPeaks();
@@ -7595,6 +7657,8 @@
         syncBuildings();
         syncRoads();
         syncRivers();
+        syncDischarge();
+        setInterval(syncDischarge, 6 * 60 * 60 * 1000);
         syncRails();
         syncAerialways();
         syncPeaks();

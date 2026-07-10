@@ -2768,6 +2768,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   highest label. Gate 51 -> 52 sets. Browser smoke, EIGHT layers:
   the seven placed layers unchanged plus 12 of 59 summits
   labelled on the box, one known warning class.
+- DONE: measured river flow (Jul 10, owner: source integration +
+  asset design + frontier research in one - and an explicit
+  revert first: a shared-sky presence prototype was judged not
+  progress and rolled back clean to HEAD before this). GloFAS
+  (the Open-Meteo Flood API - keyless, global, the same family
+  the theme's weather/marine/air-quality already use
+  browser-side) publishes daily river discharge for the nearest
+  river cell. Today's flow against the recent record now drives
+  the rendered river WIDTHS through Leopold & Maddock (1953,
+  USGS Professional Paper 252) at-a-station hydraulic geometry:
+  a cross-section widens with discharge as w = a Q^b, canonical
+  at-a-station width exponent b = 0.26, applied as a RATIO so
+  the OSM ladder width stays the calibration - w_today =
+  w_ladder x (Q_today / Q_ref)^0.26 with Q_ref the 92-day median
+  of the SAME source (internally consistent). rivers.js gained
+  refDischarge (median, null under 14 valid days) and
+  dischargeFactor (exact power law, clamped [0.5, 2], factor 1
+  whenever the data cannot speak - nothing invented), gate 4 -> 6
+  landmarks: the law held exact against Math.pow with unity at
+  reference and guarded edges, and the LIVE 93-day GloFAS capture
+  at the Interlaken cell recomputing its own median (34.65 m3/s)
+  and the capture day's factor (26.16 m3/s -> x0.930: the Aare a
+  touch narrower that day, by the paper's own law). Theme:
+  syncDischarge (one fetch per anchor, 6 h refresh, roam
+  re-sync), placeRivers scales the ladder widths by the factor
+  before the shared ribbon builder; panel records today's flow,
+  the median and the width factor; ?discharge=0 pins the ladder;
+  KEEP_PARAMS carries 'discharge'. Gate 52 sets (rivers 4 -> 6
+  landmarks); browser smoke unchanged and clean (offline the
+  factor is 1 - the truthful default).
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
