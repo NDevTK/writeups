@@ -2903,6 +2903,29 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   stage includes the church; the reshoot shows the town's
   roofscape reorganised along the true footprint axes. Gate 53
   sets (buildings 5 -> 7 landmarks); browser smoke clean.
+- DONE: cabins pendulum in the measured wind (Jul 10, the
+  coupling lane - the gusts that already sway the trees now swing
+  the cable cars). A suspended cabin IS a pendulum: statics from
+  the drag equation balanced against gravity, tan(lean) =
+  0.5 rho v^2 Cd A / (m g), leaning the hanger along the TRUE
+  wind direction; dynamics from the pendulum's own natural
+  frequency omega = sqrt(g/L) - gusts cycle the lean between the
+  mean-wind and gust-wind deflections at that frequency, phase
+  decorrelated per cabin via the deterministic fractions. The
+  documented cabin closes the untagged unknowns: an 8-seat
+  monocable gondola (600 kg tare, 2.6 m^2 frontal, Cd 1.1 bluff
+  body, 2.5 m hanger arm); air density thins with the anchor's
+  elevation on the 8.4 km scale height. aerialways.js gained
+  CABIN/windAngle/cabinSwing, gate 4 -> 5 landmarks: the statics
+  identity exact to 1e-15, the density-altitude ratio exactly
+  exp(-1) at one scale height, omega exact, the gust cycle
+  bounded by (and sweeping) the [mean, gust] lean interval, calm
+  hanging plumb. Theme: placeAerialways registers each cabin with
+  its hang point and phase; the frame loop swings them about the
+  SAME treeAxis/windV pair the tree spring-dampers use - one wind,
+  every consumer. Hanger length corrected from the old ad hoc
+  1.7 m offset to the documented 2.5 m arm. Gate 53 sets
+  (aerialways 4 -> 5 landmarks); browser smoke clean.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

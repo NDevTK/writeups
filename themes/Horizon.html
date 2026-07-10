@@ -70,7 +70,10 @@
         period from the real wind, deep-water dispersion, whitecap
         fraction from Monahan & O'Muircheartaigh, fresnel sun glitter
       - clouds ride the true wind vector at the real lifting condensation
-        level; trees are spring-dampers forced by real mean wind and gusts
+        level; trees are spring-dampers forced by real mean wind and
+        gusts, and the cable-car cabins pendulum in the same air -
+        drag/gravity statics for the lean, gusts cycling it at the
+        hanger's own sqrt(g/L) frequency
       - USGS M4.5+ earthquakes arrive at their true seismic travel times
         (P then S), attenuated by real distance
       - aurora follows NOAA's OVATION forecast oval: its real latitude
@@ -454,7 +457,9 @@
       } from './horizon/trains.js';
       import {buildTrain} from './horizon/rollingstock.js';
       import {
+        CABIN,
         cabinFractions,
+        cabinSwing,
         catenaryPoints,
         parseAerialways,
         PYLON_M,
@@ -3665,12 +3670,14 @@
       // at deterministic hash fractions along the line. Lines
       // render 1 px at any distance - what a distant cable is.
       let aerialGroup = null;
+      const aerialCabins = []; // {m, hang, phase} - swung per frame
       let cableMat = null;
       let pylonMat = null;
       let cabinMat = null;
       const pylonGeo = new THREE.CylinderGeometry(0.006, 0.009, 1, 5);
       const cabinGeo = new THREE.BoxGeometry(0.045, 0.05, 0.055);
       function placeAerialways() {
+        aerialCabins.length = 0;
         if (aerialGroup) {
           ground.remove(aerialGroup);
           aerialGroup.traverse((o) => {
@@ -3755,8 +3762,11 @@
             const k = Math.min(9, Math.floor(t * 10));
             const q = span[k];
             const cab = new THREE.Mesh(cabinGeo, cabinMat);
-            cab.position.set(q[0], q[1] - 0.03, q[2]);
+            cab.position.set(q[0], q[1] - CABIN.arm / MPU, q[2]);
             aerialGroup.add(cab);
+            // The frame loop swings each cabin as a pendulum in
+            // the measured wind (aerialways.js, gated).
+            aerialCabins.push({m: cab, hang: q, phase: f * Math.PI * 2});
           }
           placed++;
         }
@@ -7493,6 +7503,32 @@
           u.v += (14 * (forcing - u.a) - 4.2 * u.v) * dt;
           u.a += u.v * dt;
           tree.setRotationFromAxisAngle(treeAxis, u.a);
+        }
+
+        // Cable cabins: pendulums in the SAME measured wind that
+        // sways the trees - the drag/gravity statics set the lean,
+        // gusts cycle it at the pendulum's own sqrt(g/L) frequency
+        // (aerialways.js, gated). treeAxis already points along
+        // the true wind's perpendicular this frame.
+        if (aerialCabins.length) {
+          const armU = CABIN.arm / MPU;
+          const tS = t / 1000;
+          for (const c of aerialCabins) {
+            const th = cabinSwing(
+              state.wind / 3.6,
+              state.gust / 3.6,
+              centerElev,
+              tS,
+              c.phase
+            );
+            const s = Math.sin(th) * armU;
+            c.m.position.set(
+              c.hang[0] + windV.x * s,
+              c.hang[1] - Math.cos(th) * armU,
+              c.hang[2] + windV.z * s
+            );
+            c.m.setRotationFromAxisAngle(treeAxis, th);
+          }
         }
 
         // ISS: SGP4-propagated position; drawn only when the pass is

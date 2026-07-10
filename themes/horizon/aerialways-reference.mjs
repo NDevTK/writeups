@@ -9,11 +9,16 @@
 //    names, pylon lines verbatim
 //  - cabins: deterministic hash positions, counts by kind
 import {
+  CABIN,
   cabinFractions,
+  cabinSwing,
   catenaryPoints,
+  G_MS2,
   parseAerialways,
+  PEND_W,
   SAG_FRAC,
-  solveCatenaryA
+  solveCatenaryA,
+  windAngle
 } from './aerialways.js';
 import {AERIAL_FIXTURE} from './aerialways-fixture.mjs';
 
@@ -117,6 +122,42 @@ const ways = parseAerialways(AERIAL_FIXTURE);
     'cabin positions',
     ok,
     `cable car 2 cars, a 2.2 km gondola ${gd.length} cabins at deterministic hash fractions`
+  );
+}
+
+{
+  // The pendulum: the drag/gravity statics identity exact, the
+  // density altitude exact on the scale height, the natural
+  // frequency from sqrt(g/L), the gust cycle bounded by the mean
+  // and gust deflections, calm hangs plumb.
+  const v = 20; // m/s
+  const want = (0.5 * 1.225 * v * v * CABIN.Cd * CABIN.A) / (CABIN.m * G_MS2);
+  const statics = Math.abs(Math.tan(windAngle(v, 0)) - want) < 1e-15;
+  const dens =
+    Math.abs(
+      Math.tan(windAngle(v, 8400)) / Math.tan(windAngle(v, 0)) - Math.exp(-1)
+    ) < 1e-12;
+  const a0 = windAngle(8, 600);
+  const a1 = windAngle(16, 600);
+  let inBounds = true;
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let t = 0; t < 20; t += 0.1) {
+    const th = cabinSwing(8, 16, 600, t, 1.3);
+    if (th < a0 - 1e-12 || th > a1 + 1e-12) inBounds = false;
+    lo = Math.min(lo, th);
+    hi = Math.max(hi, th);
+  }
+  check(
+    'cabin pendulum',
+    statics &&
+      dens &&
+      Math.abs(PEND_W - Math.sqrt(G_MS2 / CABIN.arm)) < 1e-15 &&
+      windAngle(0, 0) === 0 &&
+      cabinSwing(0, 0, 0, 5, 0) === 0 &&
+      inBounds &&
+      hi - lo > (a1 - a0) * 0.9,
+    `tan(lean) = drag/weight exactly (${((want * 180) / Math.PI).toFixed(1)}deg-scale at 20 m/s); density altitude exp(-h/8400) exact; omega = sqrt(g/${CABIN.arm}); the gust cycle sweeps [mean, gust] lean and calm hangs plumb`
   );
 }
 
