@@ -2545,6 +2545,39 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   Gate 46 -> 47 sets. Browser smoke: 177/177 buildings, 319/319
   roads, 88/116 landuse polygons painted on the DEM world, one
   known warning class.
+- DONE: real watercourses (Jul 10, the environment series after
+  ground cover - the lakes module puts polygon water where OSM
+  draws riverbanks, but most of the network is LINEAR: the Aare's
+  arms, the Lütschine, every alpine stream were invisible). OSM
+  waterway=river/stream/canal/drain/ditch through the SAME
+  Overpass mirrors, and the geometry through the ROADS' gated
+  ribbon builder - riversGeometry IS roadsGeometry re-exported
+  (the exactness identity, terrain following and water
+  strip-breaking are gated once and shared, per the standing
+  reuse directive). rivers.js owns only what is water-specific,
+  gated at 4 landmarks: the waterway width ladder (width tag >
+  type defaults > 2 m; the census: width tagged on 6 of 300
+  captured ways), parse rules on the LIVE 300-way fixture
+  (tunnelled reaches SKIPPED - 70 of 300, an underground
+  watercourse is invisible by definition; the Aare present by
+  name; rivers class-ranked before streams), the shared-builder
+  area identity asserted through the rivers path (length x
+  ladder-width to float32, water albedo on every vertex), and
+  stops-at-the-shore: where groundY says polygon water the ribbon
+  ENDS at the shore vertex and the lake surface takes over - one
+  water, two sources, no double-draw (bridge=false always: water
+  never bridges water). Theme wiring: syncRivers (both mirrors,
+  geodetic cache per anchor), placeRivers seats ribbons at 1.5 m
+  over the render mesh - deliberately UNDER the roads' 2 m so a
+  tagged road bridge crosses ABOVE the river it spans - roughness
+  0.22 water sheen (the full reflector pass stays the lakes'),
+  aerial-wrapped, rebuilt per box, re-synced on roam settle and
+  boot; ?rivers=0; KEEP_PARAMS carries 'rivers'. The asset
+  viewer's town stage threads the fixture's watercourses between
+  the ground cover and the roads - the shot shows the real Aare
+  sweep with its canal branch. Gate 47 -> 48 sets. Browser smoke:
+  177/177 buildings, 319/319 roads, 88/116 landuse, 185/189
+  watercourses on the DEM world, one known warning class.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

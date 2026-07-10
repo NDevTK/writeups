@@ -44,6 +44,8 @@
       import {ROADS_FIXTURE} from '../roads-fixture.mjs';
       import {landTint, parseLanduse} from '../landuse.js';
       import {LANDUSE_FIXTURE} from '../landuse-fixture.mjs';
+      import {parseWaterways, riversGeometry} from '../rivers.js';
+      import {RIVERS_FIXTURE} from '../rivers-fixture.mjs';
 
       const q = new URLSearchParams(location.search);
       const renderer = new THREE.WebGPURenderer({antialias: true});
@@ -170,6 +172,30 @@
           roughness: 0.9
         });
         scene.add(new THREE.Mesh(geo, mat));
+        // The watercourses (rivers.js - the same gated ribbon
+        // builder as the roads, water albedo): the Aare and the
+        // alpine streams thread the stage. ?rivers=0 hides.
+        if (q.get('rivers') !== '0') {
+          const vg = riversGeometry(
+            parseWaterways(RIVERS_FIXTURE),
+            anchor,
+            () => 0.075, // between the ground cover and the roads
+            7 / 400,
+            1e9
+          );
+          const vgeo = new THREE.BufferGeometry();
+          vgeo.setAttribute(
+            'position',
+            new THREE.BufferAttribute(vg.position, 3)
+          );
+          vgeo.setAttribute('normal', new THREE.BufferAttribute(vg.normal, 3));
+          vgeo.setAttribute('color', new THREE.BufferAttribute(vg.color, 3));
+          const vmat = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: 0.25 // water sheen
+          });
+          scene.add(new THREE.Mesh(vgeo, vmat));
+        }
         // The street network under the town (roads.js, same fixture
         // area), ribbons lifted a hair off the flat stage.
         if (q.get('roads') !== '0') {

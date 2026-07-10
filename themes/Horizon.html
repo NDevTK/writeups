@@ -112,7 +112,11 @@
         and the ground itself carries the real cover - OSM landuse
         polygons tint the grass where farmland, meadows, residential
         blocks and bare rock actually are (unknown classes stay
-        base grass, mountains and snow untouched)
+        base grass, mountains and snow untouched); linear water is
+        real too - OSM waterway ways thread the Aare and the alpine
+        streams down the valleys (tunnelled reaches skipped), and a
+        stream reaching a lake stops at the shore where the polygon
+        surface takes over
       - roam (just fly): the free camera streams terrain. 4 km from
         the anchor the world re-anchors on your geodetic position
         (roam.js - exact inverse mapping and altitude-datum carry,
@@ -135,7 +139,7 @@
         lights=0|URL (Black Marble night lights off / tile endpoint
         override), water=0 (skip OSM lakes), buildings=0 (skip OSM
         buildings), roads=0 (skip OSM roads), landuse=0 (skip OSM
-        ground cover), debug=1
+        ground cover), rivers=0 (skip OSM waterways), debug=1
     -->
     <style>
       html,
@@ -385,6 +389,7 @@
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
       import {parseRoads, roadsGeometry} from './horizon/roads.js';
       import {landTint, parseLanduse} from './horizon/landuse.js';
+      import {parseWaterways, riversGeometry} from './horizon/rivers.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -1484,6 +1489,77 @@
           if (worldBuilt) placeLanduse();
         } catch {
           landGeo = null; // base grass is the truthful unknown
+        }
+      }
+
+      // Real watercourses: OSM waterway ways via the same mirrors -
+      // the linear water the riverbank polygons miss (rivers.js,
+      // gated; geometry through the roads' gated ribbon builder).
+      // Tunnelled reaches are skipped; a stream reaching a lake or
+      // the sea stops at the shore and the polygon surface takes
+      // over. Cached geodetic per anchor; ?rivers=0 disables.
+      let riversGeo = null;
+      async function syncRivers() {
+        if (params.get('rivers') === '0') return;
+        const key =
+          'horizon-rivers-geo-' +
+          state.lat.toFixed(2) +
+          ',' +
+          state.lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) {
+            riversGeo = JSON.parse(hit);
+            record(
+              'OSM Overpass waterways (cached)',
+              riversGeo.length + ' watercourses'
+            );
+            if (worldBuilt) placeRivers();
+            return;
+          }
+        } catch {}
+        try {
+          const mLat = 111320;
+          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+          const dLat = DEM_HALF_M / mLat;
+          const dLon = DEM_HALF_M / mLon;
+          const bbox =
+            (state.lat - dLat).toFixed(4) +
+            ',' +
+            (state.lon - dLon).toFixed(4) +
+            ',' +
+            (state.lat + dLat).toFixed(4) +
+            ',' +
+            (state.lon + dLon).toFixed(4);
+          const q =
+            '[out:json][timeout:30];way[waterway~"^(river|stream|canal|drain|ditch)$"](' +
+            bbox +
+            ');out geom 600;';
+          let osm = null;
+          for (const host of [
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+            'https://overpass-api.de/api/interpreter'
+          ]) {
+            try {
+              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
+                credentials: 'omit'
+              });
+              if (!r.ok) throw new Error(r.status);
+              osm = await r.json();
+              break;
+            } catch {
+              // Try the next mirror.
+            }
+          }
+          if (!osm) throw new Error('overpass unavailable');
+          riversGeo = parseWaterways(osm);
+          record('OSM Overpass waterways', riversGeo.length + ' watercourses');
+          try {
+            localStorage.setItem(key, JSON.stringify(riversGeo));
+          } catch {}
+          if (worldBuilt) placeRivers();
+        } catch {
+          riversGeo = null; // the polygon water stands alone
         }
       }
 
@@ -2895,6 +2971,50 @@
           t.painted + ' of ' + landGeo.length + ' polygons on this box'
         );
       }
+      // Watercourses: water-albedo ribbons through the same gated
+      // builder as the roads, seated 1.5 m over the render mesh -
+      // just under the roads' 2 m, so a tagged road bridge crosses
+      // ABOVE the river it spans. Lakes and the sea break them at
+      // the shore (sample().water -> null).
+      let riverMesh = null;
+      let riverMat = null;
+      function placeRivers() {
+        if (riverMesh) {
+          ground.remove(riverMesh);
+          riverMesh.geometry.dispose();
+          riverMesh = null;
+        }
+        if (!riversGeo || !riversGeo.length || params.get('rivers') === '0')
+          return;
+        const groundY = (x, z) => {
+          const s = sample(x, z);
+          return s.water ? null : s.y + 1.5 / MPU;
+        };
+        const g = riversGeometry(riversGeo, dressAnchor, groundY, 1 / MPU, 140);
+        if (!g.placed) return;
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(g.color, 3));
+        if (!riverMat) {
+          riverMat = new THREE.MeshStandardNodeMaterial({
+            vertexColors: true,
+            roughness: 0.22, // water sheen without a reflector pass
+            metalness: 0,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2
+          });
+          applyAerial(riverMat);
+        }
+        riverMesh = new THREE.Mesh(geo, riverMat);
+        riverMesh.receiveShadow = true;
+        ground.add(riverMesh);
+        record(
+          'OSM waterways placed',
+          g.placed + ' of ' + riversGeo.length + ' watercourses on this box'
+        );
+      }
       function buildWorld(pre) {
         // Roam rebuilds repeatedly: free the previous terrain
         // geometry (trees share cached geometries/materials and
@@ -2967,6 +3087,7 @@
         placeTrees();
         placeBuildings();
         placeRoads();
+        placeRivers();
         placeLanduse();
 
         // The sea: three.js Water (planar reflections) riding at real sea
@@ -5053,6 +5174,7 @@
         syncWater();
         syncBuildings();
         syncRoads();
+        syncRivers();
         syncLanduse();
         // The lamp cloud is anchored to the OLD box - drop it now,
         // syncLights rebuilds it Earth-anchored on the new one.
@@ -6744,6 +6866,7 @@
         syncWater();
         syncBuildings();
         syncRoads();
+        syncRivers();
         syncLanduse();
         syncLights();
         setInterval(syncLights, 6 * 60 * 60 * 1000);
