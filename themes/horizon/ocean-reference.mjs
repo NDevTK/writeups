@@ -416,3 +416,32 @@ for (const [i, j] of pts) {
     );
   }
 }
+
+{
+  // The calm limit: with no wind there is no wind sea - the
+  // spectrum vanishes IDENTICALLY (physics, not a clamp). U10 = 0
+  // used to ride into peakOmega's 1/U10 as Infinity and fill h0
+  // with 0 x Inf = NaN; the GPU rendered the NaN vertex as a
+  // 400 m cone in a dead-calm Nelson harbour (found by LOOKING).
+  // Every h0 texel and the resolved mss must be exactly zero and
+  // finite.
+  const calm = buildInitialSpectrum(
+    64,
+    250,
+    {U10: 0, F: 50000, D: 12, windDir: 0},
+    7
+  );
+  let bad = 0;
+  let nonzero = 0;
+  for (let i = 0; i < calm.h0.length; i++) {
+    if (!Number.isFinite(calm.h0[i])) bad++;
+    else if (calm.h0[i] !== 0) nonzero++;
+  }
+  if (bad || nonzero || calm.mss !== 0)
+    throw new Error(
+      `calm limit broken: ${bad} non-finite, ${nonzero} nonzero, mss ${calm.mss}`
+    );
+  console.log(
+    'REF calm limit: U10 = 0 -> every h0 texel exactly 0 and finite, mss = 0 - a dead-calm sea is FLAT, never NaN'
+  );
+}
