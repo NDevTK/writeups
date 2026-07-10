@@ -100,6 +100,36 @@ export function catenaryPoints(p0, p1, n = 12, sagFrac = SAG_FRAC) {
   return out;
 }
 
+// ---- The cabin pendulum: measured wind swings real cabins ----
+// A suspended cabin IS a pendulum. Statics: the drag equation
+// balanced against gravity - tan(theta) = 0.5 rho v^2 Cd A/(m g)
+// - leans the hanger along the wind; dynamics: gusts excite it at
+// the pendulum's OWN natural frequency omega = sqrt(g/L). The
+// documented cabin is an 8-seat monocable gondola: 600 kg tare,
+// 2.6 m^2 frontal area, Cd 1.1 (bluff body), 2.5 m hanger arm;
+// air density thins with altitude on the 8.4 km scale height.
+export const CABIN = {m: 600, A: 2.6, Cd: 1.1, arm: 2.5};
+export const G_MS2 = 9.81;
+export const PEND_W = Math.sqrt(G_MS2 / CABIN.arm); // rad/s
+
+// The static lean under a steady wind (m/s) at elevation (m).
+export function windAngle(vMs, elevM = 0) {
+  if (!Number.isFinite(vMs) || vMs <= 0) return 0;
+  const rho = 1.225 * Math.exp(-Math.max(elevM, 0) / 8400);
+  return Math.atan(
+    (0.5 * rho * vMs * vMs * CABIN.Cd * CABIN.A) / (CABIN.m * G_MS2)
+  );
+}
+
+// The swing at time t: the mean-wind lean, plus the gust-lull
+// cycle riding the pendulum's own frequency between the mean and
+// gust deflections; per-cabin phase decorrelates a line of them.
+export function cabinSwing(vMeanMs, vGustMs, elevM, tSec, phase = 0) {
+  const a0 = windAngle(vMeanMs, elevM);
+  const a1 = windAngle(Math.max(vGustMs || 0, vMeanMs || 0), elevM);
+  return a0 + (a1 - a0) * (0.5 + 0.5 * Math.sin(PEND_W * tSec + phase));
+}
+
 /**
  * Deterministic cabin positions for one installation: gondolas
  * circulate a cabin roughly every spacing metres, a cable car
