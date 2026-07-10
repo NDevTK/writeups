@@ -125,7 +125,11 @@
         trains run the lines on their real timetable: category,
         number, operator and live delay from the station board,
         positions interpolated between the stops each train
-        reports at its delay-shifted times; everywhere else the
+        reports at its delay-shifted times; the cable cars hang
+        their real lines too - OSM aerialway ways whose nodes are
+        the actual pylons, every span on the exact catenary (Newton
+        on the cosh sag identity, never the parabola), cabins at
+        deterministic positions; everywhere else the
         worldwide GTFS aggregator (transitous.org) answers instead -
         every rail leg operating in the box right now, followed
         along the polyline of its ACTUAL route by arc length, with
@@ -158,7 +162,8 @@
         override), water=0 (skip OSM lakes), buildings=0 (skip OSM
         buildings), roads=0 (skip OSM roads), landuse=0 (skip OSM
         ground cover), rivers=0 (skip OSM waterways), rails=0 (skip
-        OSM railways), trains=0 (skip live trains), debug=1
+        OSM railways), trains=0 (skip live trains), aerialways=0
+        (skip OSM cable cars), debug=1
     -->
     <style>
       html,
@@ -419,6 +424,13 @@
         trainAt
       } from './horizon/trains.js';
       import {buildTrain} from './horizon/rollingstock.js';
+      import {
+        cabinFractions,
+        catenaryPoints,
+        parseAerialways,
+        PYLON_M,
+        STATION_M
+      } from './horizon/aerialways.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -1656,6 +1668,80 @@
           if (worldBuilt) placeRails();
         } catch {
           railsGeo = null; // no invented tracks
+        }
+      }
+
+      // Real cable cars: OSM way[aerialway] via the same mirrors -
+      // the way nodes ARE the pylon positions, and each span hangs
+      // on the TRUE catenary (aerialways.js, gated: Newton on the
+      // cosh sag identity, asinh vertex form for unequal support
+      // heights - not the parabola approximation). Cached geodetic
+      // per anchor; ?aerialways=0 disables.
+      let aerialGeo = null;
+      async function syncAerialways() {
+        if (params.get('aerialways') === '0') return;
+        const key =
+          'horizon-aerialways-geo-' +
+          state.lat.toFixed(2) +
+          ',' +
+          state.lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) {
+            aerialGeo = JSON.parse(hit);
+            record(
+              'OSM Overpass aerialways (cached)',
+              aerialGeo.length + ' installations'
+            );
+            if (worldBuilt) placeAerialways();
+            return;
+          }
+        } catch {}
+        try {
+          const mLat = 111320;
+          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+          const dLat = DEM_HALF_M / mLat;
+          const dLon = DEM_HALF_M / mLon;
+          const bbox =
+            (state.lat - dLat).toFixed(4) +
+            ',' +
+            (state.lon - dLon).toFixed(4) +
+            ',' +
+            (state.lat + dLat).toFixed(4) +
+            ',' +
+            (state.lon + dLon).toFixed(4);
+          const q =
+            '[out:json][timeout:30];way[aerialway~"^(cable_car|gondola|mixed_lift|chair_lift)$"](' +
+            bbox +
+            ');out geom 100;';
+          let osm = null;
+          for (const host of [
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+            'https://overpass-api.de/api/interpreter'
+          ]) {
+            try {
+              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
+                credentials: 'omit'
+              });
+              if (!r.ok) throw new Error(r.status);
+              osm = await r.json();
+              break;
+            } catch {
+              // Try the next mirror.
+            }
+          }
+          if (!osm) throw new Error('overpass unavailable');
+          aerialGeo = parseAerialways(osm);
+          record(
+            'OSM Overpass aerialways',
+            aerialGeo.length + ' installations'
+          );
+          try {
+            localStorage.setItem(key, JSON.stringify(aerialGeo));
+          } catch {}
+          if (worldBuilt) placeAerialways();
+        } catch {
+          aerialGeo = null; // no invented cables
         }
       }
 
@@ -3272,6 +3358,117 @@
           g.placed + ' of ' + railsGeo.length + ' ways on this box'
         );
       }
+      // Cable cars: pylons at the real support nodes, spans hung
+      // on the exact catenary between them (interior supports
+      // 12 m over the sampled ground, end stations 6 m), cabins
+      // at deterministic hash fractions along the line. Lines
+      // render 1 px at any distance - what a distant cable is.
+      let aerialGroup = null;
+      let cableMat = null;
+      let pylonMat = null;
+      let cabinMat = null;
+      const pylonGeo = new THREE.CylinderGeometry(0.006, 0.009, 1, 5);
+      const cabinGeo = new THREE.BoxGeometry(0.045, 0.05, 0.055);
+      function placeAerialways() {
+        if (aerialGroup) {
+          ground.remove(aerialGroup);
+          aerialGroup.traverse((o) => {
+            if (
+              o.geometry &&
+              o.geometry !== pylonGeo &&
+              o.geometry !== cabinGeo
+            )
+              o.geometry.dispose();
+          });
+          aerialGroup = null;
+        }
+        if (!aerialGeo || !aerialGeo.length || params.get('aerialways') === '0')
+          return;
+        if (!cableMat) {
+          cableMat = new THREE.LineBasicNodeMaterial({color: '#1c1e20'});
+          pylonMat = new THREE.MeshStandardNodeMaterial({
+            color: '#5c6166',
+            roughness: 0.6,
+            metalness: 0.4
+          });
+          cabinMat = new THREE.MeshStandardNodeMaterial({
+            color: '#8a2020',
+            roughness: 0.5
+          });
+          applyAerial(pylonMat);
+          applyAerial(cabinMat);
+        }
+        aerialGroup = new THREE.Group();
+        let placed = 0;
+        for (const w of aerialGeo) {
+          // Supports: project each pylon node onto the terrain.
+          const sup = [];
+          let ok = true;
+          for (let i = 0; i < w.pts.length; i++) {
+            const s = geoToScene(w.pts[i][0], w.pts[i][1], dressAnchor);
+            if (Math.abs(s.x) > 140 || Math.abs(s.z) > 140) {
+              ok = false;
+              break;
+            }
+            const g = sample(s.x, s.z);
+            const hM = i === 0 || i === w.pts.length - 1 ? STATION_M : PYLON_M;
+            sup.push([s.x, g.y + hM / MPU, s.z]);
+          }
+          if (!ok || sup.length < 2) continue;
+          // The cable: every span on its own catenary.
+          const cablePts = [];
+          for (let i = 0; i + 1 < sup.length; i++) {
+            const span = catenaryPoints(sup[i], sup[i + 1], 10);
+            for (let k = 0; k + 1 < span.length; k++)
+              cablePts.push(...span[k], ...span[k + 1]);
+          }
+          const cg = new THREE.BufferGeometry();
+          cg.setAttribute(
+            'position',
+            new THREE.BufferAttribute(new Float32Array(cablePts), 3)
+          );
+          aerialGroup.add(new THREE.LineSegments(cg, cableMat));
+          // Pylons (interior supports) and the cabins.
+          for (let i = 0; i < sup.length; i++) {
+            const hM = i === 0 || i === sup.length - 1 ? STATION_M : PYLON_M;
+            const p = new THREE.Mesh(pylonGeo, pylonMat);
+            p.scale.y = hM / MPU;
+            p.position.set(sup[i][0], sup[i][1] - hM / MPU / 2, sup[i][2]);
+            aerialGroup.add(p);
+          }
+          let lineLen = 0;
+          const cum = [0];
+          for (let i = 0; i + 1 < sup.length; i++) {
+            lineLen += Math.hypot(
+              sup[i + 1][0] - sup[i][0],
+              sup[i + 1][2] - sup[i][2]
+            );
+            cum.push(lineLen);
+          }
+          for (const f of cabinFractions(w, lineLen * MPU)) {
+            const want = f * lineLen;
+            let i = 0;
+            while (i + 1 < cum.length - 1 && cum[i + 1] < want) i++;
+            const t = (want - cum[i]) / Math.max(cum[i + 1] - cum[i], 1e-9);
+            const span = catenaryPoints(sup[i], sup[i + 1], 10);
+            const k = Math.min(9, Math.floor(t * 10));
+            const q = span[k];
+            const cab = new THREE.Mesh(cabinGeo, cabinMat);
+            cab.position.set(q[0], q[1] - 0.03, q[2]);
+            aerialGroup.add(cab);
+          }
+          placed++;
+        }
+        if (!placed) {
+          aerialGroup = null;
+          return;
+        }
+        ground.add(aerialGroup);
+        record(
+          'OSM aerialways placed',
+          placed + ' of ' + aerialGeo.length + ' installations on this box'
+        );
+      }
       function buildWorld(pre) {
         // Roam rebuilds repeatedly: free the previous terrain
         // geometry (trees share cached geometries/materials and
@@ -3346,6 +3543,7 @@
         placeRoads();
         placeRivers();
         placeRails();
+        placeAerialways();
         placeLanduse();
 
         // The sea: three.js Water (planar reflections) riding at real sea
@@ -5434,6 +5632,7 @@
         syncRoads();
         syncRivers();
         syncRails();
+        syncAerialways();
         syncLanduse();
         syncTrains();
         // The lamp cloud is anchored to the OLD box - drop it now,
@@ -7257,6 +7456,7 @@
         syncRoads();
         syncRivers();
         syncRails();
+        syncAerialways();
         syncLanduse();
         syncTrains();
         setInterval(syncTrains, 90 * 1000);
