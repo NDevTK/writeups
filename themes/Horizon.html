@@ -108,7 +108,11 @@
         lights say the town is lit; the street network is real too -
         OSM highway ways as ribbons of their tagged width (width >
         lanes x 3.5 m > per-type defaults) and tagged surface
-        albedo, cut by water except where a tagged bridge spans it
+        albedo, cut by water except where a tagged bridge spans it;
+        and the ground itself carries the real cover - OSM landuse
+        polygons tint the grass where farmland, meadows, residential
+        blocks and bare rock actually are (unknown classes stay
+        base grass, mountains and snow untouched)
       - roam (just fly): the free camera streams terrain. 4 km from
         the anchor the world re-anchors on your geodetic position
         (roam.js - exact inverse mapping and altitude-datum carry,
@@ -130,7 +134,8 @@
         override), aerosol=URL (measured-aerosol endpoint override),
         lights=0|URL (Black Marble night lights off / tile endpoint
         override), water=0 (skip OSM lakes), buildings=0 (skip OSM
-        buildings), roads=0 (skip OSM roads), debug=1
+        buildings), roads=0 (skip OSM roads), landuse=0 (skip OSM
+        ground cover), debug=1
     -->
     <style>
       html,
@@ -379,6 +384,7 @@
       import {buildVessel} from './horizon/vessels.js';
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
       import {parseRoads, roadsGeometry} from './horizon/roads.js';
+      import {landTint, parseLanduse} from './horizon/landuse.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -1402,6 +1408,82 @@
           if (worldBuilt) placeRoads();
         } catch {
           roadsGeo = null; // the ground keeps its own colors
+        }
+      }
+
+      // Real ground cover: OSM landuse/natural polygons via the
+      // same mirrors tint the terrain's grass albedo where the
+      // farmland, meadows, residential blocks and bare rock
+      // actually are (landuse.js, gated - raster vs pointwise
+      // even-odd, paint order, shader row orientation). Cached
+      // geodetic per anchor; roams re-project. ?landuse=0
+      // disables; unknown classes stay base grass.
+      let landGeo = null;
+      async function syncLanduse() {
+        if (params.get('landuse') === '0') return;
+        const key =
+          'horizon-landuse-geo-' +
+          state.lat.toFixed(2) +
+          ',' +
+          state.lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) {
+            landGeo = JSON.parse(hit);
+            record(
+              'OSM Overpass landuse (cached)',
+              landGeo.length + ' polygons'
+            );
+            if (worldBuilt) placeLanduse();
+            return;
+          }
+        } catch {}
+        try {
+          const mLat = 111320;
+          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+          const dLat = DEM_HALF_M / mLat;
+          const dLon = DEM_HALF_M / mLon;
+          const bbox =
+            (state.lat - dLat).toFixed(4) +
+            ',' +
+            (state.lon - dLon).toFixed(4) +
+            ',' +
+            (state.lat + dLat).toFixed(4) +
+            ',' +
+            (state.lon + dLon).toFixed(4);
+          const q =
+            '[out:json][timeout:30];(way[landuse](' +
+            bbox +
+            ');relation[landuse](' +
+            bbox +
+            ');way[natural~"^(grassland|sand|beach|scree|bare_rock)$"](' +
+            bbox +
+            '););out geom 400;';
+          let osm = null;
+          for (const host of [
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+            'https://overpass-api.de/api/interpreter'
+          ]) {
+            try {
+              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
+                credentials: 'omit'
+              });
+              if (!r.ok) throw new Error(r.status);
+              osm = await r.json();
+              break;
+            } catch {
+              // Try the next mirror.
+            }
+          }
+          if (!osm) throw new Error('overpass unavailable');
+          landGeo = parseLanduse(osm);
+          record('OSM Overpass landuse', landGeo.length + ' polygons');
+          try {
+            localStorage.setItem(key, JSON.stringify(landGeo));
+          } catch {}
+          if (worldBuilt) placeLanduse();
+        } catch {
+          landGeo = null; // base grass is the truthful unknown
         }
       }
 
@@ -2784,6 +2866,35 @@
           g.placed + ' of ' + roadsGeo.length + ' ways on this box'
         );
       }
+      // Ground cover: rasterise the landuse polygons onto THIS box
+      // (landuse.js, gated) and hand the terrain shader its tint
+      // field - same swap pattern as the night-lights texture.
+      function placeLanduse() {
+        if (!landGeo || !landGeo.length || params.get('landuse') === '0')
+          return;
+        const t = landTint(landGeo, dressAnchor, WORLD, 192);
+        if (!t) {
+          terrainUniforms.uLandOn.value = 0;
+          return;
+        }
+        const tex = new THREE.DataTexture(
+          t.data,
+          t.n,
+          t.n,
+          THREE.RGBAFormat,
+          THREE.FloatType
+        );
+        tex.minFilter = tex.magFilter = THREE.LinearFilter;
+        tex.needsUpdate = true;
+        const old = terrainObj.landTexNode.value;
+        terrainObj.landTexNode.value = tex;
+        if (old && old.image && old.image.width > 1) old.dispose();
+        terrainUniforms.uLandOn.value = 1;
+        record(
+          'OSM landuse painted',
+          t.painted + ' of ' + landGeo.length + ' polygons on this box'
+        );
+      }
       function buildWorld(pre) {
         // Roam rebuilds repeatedly: free the previous terrain
         // geometry (trees share cached geometries/materials and
@@ -2856,6 +2967,7 @@
         placeTrees();
         placeBuildings();
         placeRoads();
+        placeLanduse();
 
         // The sea: three.js Water (planar reflections) riding at real sea
         // level wherever the DEM says there is water. Roam rebuilds
@@ -4941,6 +5053,7 @@
         syncWater();
         syncBuildings();
         syncRoads();
+        syncLanduse();
         // The lamp cloud is anchored to the OLD box - drop it now,
         // syncLights rebuilds it Earth-anchored on the new one.
         if (lampPts) {
@@ -6631,6 +6744,7 @@
         syncWater();
         syncBuildings();
         syncRoads();
+        syncLanduse();
         syncLights();
         setInterval(syncLights, 6 * 60 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
