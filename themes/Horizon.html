@@ -457,6 +457,7 @@
         BOAT_CATS,
         BOAT_DIMS,
         parseBoard,
+        parseRadar,
         parseTrips,
         providerFor,
         trainAt
@@ -2197,6 +2198,38 @@
                   ? ' · ' + boatJourneys.length + ' ferries'
                   : '') +
                 (first ? ' · ' + first.label + ' → ' + first.to : '')
+            );
+            return;
+          }
+          if (prov.kind === 'radar') {
+            // The HAFAS radar: every vehicle MOVING in the box
+            // right now, with its line's real metadata and its
+            // realtime-adjusted stopovers - actual tracking.
+            // Ferries take the boats path; buses never parse.
+            const frame = await (
+              await fetch(prov.radarURL(state.lat, state.lon), {
+                credentials: 'omit'
+              })
+            ).json();
+            if (seq !== trainsSeq) return;
+            const all = parseRadar(frame);
+            trainJourneys = all.filter((j) => !BOAT_CATS.has(j.cat));
+            boatJourneys = all.filter((j) => BOAT_CATS.has(j.cat));
+            const first = trainJourneys[0];
+            record(
+              prov.name + ' radar',
+              trainJourneys.length +
+                ' vehicles tracked' +
+                (boatJourneys.length
+                  ? ' \u00b7 ' + boatJourneys.length + ' ferries'
+                  : '') +
+                (first
+                  ? ' \u00b7 ' +
+                    first.label +
+                    ' \u2192 ' +
+                    first.to +
+                    (first.operator ? ' (' + first.operator + ')' : '')
+                  : '')
             );
             return;
           }
