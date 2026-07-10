@@ -2870,6 +2870,39 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   through the factor; panel records theta and the tint; ?soil=0
   pins dry; KEEP_PARAMS carries 'soil'. Gate 53 sets (landuse
   5 -> 6 landmarks); browser smoke clean.
+- DONE: measured ridges and the church spires (Jul 10, the asset
+  lane - every added vertex traceable to a tag or a theorem). The
+  gable decision was a vertex-count heuristic (ring <= 6) and the
+  ridge itself only built for exact quads - an L-shaped house
+  vertex-counted as "rectangular" while a true rectangle with one
+  surveyed notch fell to a flat cap. Now the decision is
+  MEASURED: buildings.js gained convexHull (Andrew monotone
+  chain) and minAreaRect - the minimum-area enclosing rectangle
+  by rotating calipers, EXACT by the Freeman & Shapira (1975)
+  theorem that the optimum shares a side with a hull edge, so
+  testing hull edge directions is complete, not a search. A
+  house-family footprint takes a ridge iff its true area fills >=
+  80% of its own rectangle; the ridge rides the rectangle's
+  measured long axis with the real 0.4 m eave overhang past the
+  walls (roof orders re-hand-checked for outward normals under
+  the general axis pair). On the LIVE fixture the census moved
+  honestly: 31 -> 48 gabled - 17 near-rectangular houses with 5+
+  surveyed vertices now carry correctly oriented ridges. And the
+  churches got their spires: building=church/chapel raises a
+  slate pyramid over a gable end (the END is untagged anywhere -
+  a deterministic pick via the shared hash, the same convention
+  as the facade tints), base a quarter of the measured short
+  axis, height max(1.1 h, 8 m). A REAL church joined the fixture
+  for it: the Evangelisch-Reformierte Kirche Unterseen, 9 surveyed
+  nodes, 1.4 km from the anchor. Gate 5 -> 7 landmarks: the
+  rotated 40 x 25 rectangle recovers its area to 0.0e+0 with its
+  true axis and the L fills 55% (< 80, stays flat); the notched
+  6-vertex house - the OLD rule's blind spot - rides a real
+  sloped ridge, and the live church raises its spire 31.8 m over
+  ground with nothing anywhere facing down. Viewer: the town
+  stage includes the church; the reshoot shows the town's
+  roofscape reorganised along the true footprint axes. Gate 53
+  sets (buildings 5 -> 7 landmarks); browser smoke clean.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

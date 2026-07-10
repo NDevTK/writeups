@@ -3159,3 +3159,30 @@ export const BUILDINGS_FIXTURE = {
     }
   ]
 };
+
+// A REAL church for the spire landmark (captured 2026-07-10,
+// same mirror): the Evangelisch-Reformierte Kirche Unterseen,
+// a clean 9-node footprint 1.4 km from the anchor.
+export const CHURCH_FIXTURE = {
+  elements: [
+    {
+      type: 'way',
+      id: 184035544,
+      geometry: [
+        {lat: 46.687503, lon: 7.849447},
+        {lat: 46.687541, lon: 7.849297},
+        {lat: 46.687777, lon: 7.849423},
+        {lat: 46.687729, lon: 7.849616},
+        {lat: 46.68752, lon: 7.849504},
+        {lat: 46.687513, lon: 7.849528},
+        {lat: 46.687468, lon: 7.849504},
+        {lat: 46.687485, lon: 7.849437},
+        {lat: 46.687503, lon: 7.849447}
+      ],
+      tags: {
+        building: 'church',
+        name: 'Evangelisch-Reformierte Kirche Unterseen'
+      }
+    }
+  ]
+};

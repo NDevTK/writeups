@@ -39,7 +39,10 @@
       import {buildVessel} from '../vessels.js';
       import {typeClass} from '../ships.js';
       import {buildingsGeometry, parseBuildings} from '../buildings.js';
-      import {BUILDINGS_FIXTURE} from '../buildings-fixture.mjs';
+      import {
+        BUILDINGS_FIXTURE,
+        CHURCH_FIXTURE
+      } from '../buildings-fixture.mjs';
       import {parseRoads, roadsGeometry} from '../roads.js';
       import {ROADS_FIXTURE} from '../roads-fixture.mjs';
       import {landTint, parseLanduse} from '../landuse.js';
@@ -206,7 +209,12 @@
             scene.add(landPlane);
           }
         }
-        let builds = parseBuildings(BUILDINGS_FIXTURE);
+        let builds = parseBuildings({
+          elements: [
+            ...BUILDINGS_FIXTURE.elements,
+            ...CHURCH_FIXTURE.elements // the Unterseen spire
+          ]
+        });
         if (+q.get('n')) builds = builds.slice(0, +q.get('n')); // nearest-first
         const g = buildingsGeometry(
           builds,

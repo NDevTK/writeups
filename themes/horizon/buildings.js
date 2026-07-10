@@ -66,6 +66,102 @@ const GABLED = new Set([
   'church'
 ]);
 
+// Andrew monotone-chain convex hull of [x, y] points (CCW).
+export function convexHull(pts) {
+  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length <= 2) return p;
+  const cross = (o, a, b) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [];
+  for (const q of p) {
+    while (
+      lo.length >= 2 &&
+      cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0
+    )
+      lo.pop();
+    lo.push(q);
+  }
+  const hi = [];
+  for (let i = p.length - 1; i >= 0; i--) {
+    const q = p[i];
+    while (
+      hi.length >= 2 &&
+      cross(hi[hi.length - 2], hi[hi.length - 1], q) <= 0
+    )
+      hi.pop();
+    hi.push(q);
+  }
+  lo.pop();
+  hi.pop();
+  return lo.concat(hi);
+}
+
+/**
+ * Minimum-area enclosing rectangle by rotating calipers. Freeman
+ * & Shapira (1975): the minimum-area rectangle enclosing a convex
+ * polygon has a side COLLINEAR with one of its edges - so testing
+ * every hull edge direction is EXACT, not a search. Returns
+ * {cx, cy, ux, uy, L, W, area}: centre, unit LONG axis, long and
+ * short extents.
+ */
+export function minAreaRect(pts) {
+  const hull = convexHull(pts);
+  if (hull.length < 3) {
+    const [a, b] = [hull[0], hull[hull.length - 1] || hull[0]];
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const l = Math.hypot(dx, dy) || 1;
+    return {
+      cx: (a[0] + b[0]) / 2,
+      cy: (a[1] + b[1]) / 2,
+      ux: dx / l,
+      uy: dy / l,
+      L: Math.hypot(dx, dy),
+      W: 0,
+      area: 0
+    };
+  }
+  let best = null;
+  for (let i = 0; i < hull.length; i++) {
+    const [ax, ay] = hull[i];
+    const [bx, by] = hull[(i + 1) % hull.length];
+    const el = Math.hypot(bx - ax, by - ay);
+    if (!el) continue;
+    const ux = (bx - ax) / el;
+    const uy = (by - ay) / el;
+    let u0 = Infinity;
+    let u1 = -Infinity;
+    let v0 = Infinity;
+    let v1 = -Infinity;
+    for (const [x, y] of hull) {
+      const u = x * ux + y * uy;
+      const v = -x * uy + y * ux;
+      u0 = Math.min(u0, u);
+      u1 = Math.max(u1, u);
+      v0 = Math.min(v0, v);
+      v1 = Math.max(v1, v);
+    }
+    const area = (u1 - u0) * (v1 - v0);
+    if (!best || area < best.area) {
+      const cu = (u0 + u1) / 2;
+      const cv = (v0 + v1) / 2;
+      const du = u1 - u0;
+      const dv = v1 - v0;
+      const long = du >= dv;
+      best = {
+        cx: cu * ux - cv * uy,
+        cy: cu * uy + cv * ux,
+        ux: long ? ux : -uy,
+        uy: long ? uy : ux,
+        L: Math.max(du, dv),
+        W: Math.min(du, dv),
+        area
+      };
+    }
+  }
+  return best;
+}
+
 // Shoelace area of a geodetic ring, in m^2 (equirectangular).
 export function areaM2(ring) {
   const mLat = 111320;
@@ -97,6 +193,19 @@ export function parseBuildings(json, cap = 400, minAreaM2 = 25) {
     const area = areaM2(ring);
     if (area < minAreaM2) continue;
     const tags = el.tags || {};
+    // The ridge decision is MEASURED, not vertex-counted: the
+    // footprint's minimum-area rectangle (rotating calipers,
+    // exact) against its true area. A near-rectangular house -
+    // whatever its vertex count - fills >= 80% of its rectangle
+    // and takes a ridge; an L-shape does not.
+    const mLat = 111320;
+    const mLon = mLat * Math.cos((ring[0][0] * Math.PI) / 180);
+    const local = ring.map(([la, lo]) => [
+      (lo - ring[0][1]) * mLon,
+      (la - ring[0][0]) * mLat
+    ]);
+    const obb = minAreaRect(local);
+    const fill = obb.area > 0 ? area / obb.area : 0;
     out.push({
       id: el.id,
       ring,
@@ -105,7 +214,11 @@ export function parseBuildings(json, cap = 400, minAreaM2 = 25) {
       // typed as a house family at all -> tiled roof tone even
       // when the footprint is too complex for a ridge
       house: GABLED.has(tags.building),
-      gabled: GABLED.has(tags.building) && ring.length <= 6
+      gabled: GABLED.has(tags.building) && fill >= 0.8,
+      // churches and chapels carry their spire (a documented
+      // designed asset on the real tag, like the vessel
+      // silhouettes) at a deterministic gable end
+      spire: tags.building === 'church' || tags.building === 'chapel'
     });
   }
   // centroid-of-centroids -> nearest first, then the display cap
@@ -272,30 +385,39 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
       tri(a0, b0, b1, facade, glow);
       tri(a0, b1, a1, facade, glow);
     }
-    // Roof: gabled ridge for near-rectangular small-house types,
-    // ear-clipped flat cap otherwise.
-    if (b.gabled && pts.length === 4) {
-      // ridge along the longer axis' midpoints
-      const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
-      const len = (p, q) => Math.hypot(q[0] - p[0], q[1] - p[1]);
-      const e01 = len(pts[0], pts[1]);
-      const e12 = len(pts[1], pts[2]);
-      // ridge connects midpoints of the two SHORT edges
-      const [s1, s2, l1, l2] =
-        e01 < e12
-          ? [mid(pts[0], pts[1]), mid(pts[2], pts[3]), [0, 1], [2, 3]]
-          : [mid(pts[1], pts[2]), mid(pts[3], pts[0]), [1, 2], [3, 0]];
-      const gH = Math.min(0.35 * Math.min(e01, e12), 4.5 * U);
-      const r1 = [s1[0], top + gH, s1[1]];
-      const r2 = [s2[0], top + gH, s2[1]];
-      const q = (i) => [pts[i][0], top, pts[i][1]];
-      // two roof planes + two gable triangles
-      tri(q(l1[1]), q(l2[0]), r2, ROOF, glow);
-      tri(q(l1[1]), r2, r1, ROOF, glow);
-      tri(q(l2[1]), q(l1[0]), r1, ROOF, glow);
-      tri(q(l2[1]), r1, r2, ROOF, glow);
-      tri(q(l1[0]), q(l1[1]), r1, facade, glow);
-      tri(q(l2[0]), q(l2[1]), r2, facade, glow);
+    // Roof: the ridge rides the footprint's MEASURED minimum-area
+    // rectangle (rotating calipers - exact by Freeman & Shapira),
+    // so a near-rectangular house takes a correctly ORIENTED
+    // ridge whatever its vertex count, with the real 0.4 m eave
+    // overhang past the walls; ear-clipped flat cap otherwise.
+    const obb = minAreaRect(pts);
+    let gH = 0;
+    if (b.gabled && obb && obb.W > 0) {
+      const EAVE = 0.4 * U;
+      const hl = obb.L / 2 + EAVE;
+      const hw = obb.W / 2 + EAVE;
+      const px = -obb.uy; // perpendicular unit axis
+      const py = obb.ux;
+      gH = Math.min(0.35 * (obb.W + 2 * EAVE), 4.5 * U);
+      const P3 = (du, dv, y) => [
+        obb.cx + obb.ux * du + px * dv,
+        y,
+        obb.cy + obb.uy * du + py * dv
+      ];
+      const A = P3(-hl, -hw, top);
+      const B = P3(hl, -hw, top);
+      const C = P3(hl, hw, top);
+      const D = P3(-hl, hw, top);
+      const R1 = P3(-hl, 0, top + gH);
+      const R2 = P3(hl, 0, top + gH);
+      // two roof planes + two gable triangles (orders hand-checked
+      // for outward normals under the axis convention)
+      tri(A, R2, B, ROOF, glow);
+      tri(A, R1, R2, ROOF, glow);
+      tri(C, R1, D, ROOF, glow);
+      tri(C, R2, R1, ROOF, glow);
+      tri(A, D, R1, facade, glow);
+      tri(C, B, R2, facade, glow);
     } else {
       // earClip emits shoelace-positive triangles - clockwise seen
       // from +y in x-z coords - so emit REVERSED for an up normal.
@@ -309,6 +431,34 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
           glow
         );
       }
+    }
+    // The spire: churches and chapels raise one over a gable end.
+    // The END is not tagged anywhere - a deterministic pick via
+    // the shared hash, the same convention as the facade tints.
+    if (b.spire && obb && obb.W > 0) {
+      const e = hash3(b.id | 0, 1, 7) < 0.5 ? -1 : 1;
+      const s2 = 0.25 * obb.W; // half the base side
+      const y0 = top + gH;
+      const spireH = Math.max(1.1 * b.h, 8) * U;
+      const px = -obb.uy;
+      const py = obb.ux;
+      const qcx = obb.cx + obb.ux * e * (obb.L / 2 - s2);
+      const qcy = obb.cy + obb.uy * e * (obb.L / 2 - s2);
+      const S = (du, dv) => [
+        qcx + obb.ux * du + px * dv,
+        y0,
+        qcy + obb.uy * du + py * dv
+      ];
+      const q1 = S(-s2, -s2);
+      const q2 = S(s2, -s2);
+      const q3 = S(s2, s2);
+      const q4 = S(-s2, s2);
+      const apex = [qcx, y0 + spireH, qcy];
+      const SPIRE = [0.24, 0.23, 0.26]; // slate
+      tri(q2, q1, apex, SPIRE, glow);
+      tri(q3, q2, apex, SPIRE, glow);
+      tri(q4, q3, apex, SPIRE, glow);
+      tri(q1, q4, apex, SPIRE, glow);
     }
     placed++;
   }
