@@ -2427,6 +2427,46 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   DEM + the real fixture primed into the cache, booted
   mid-Brienzersee - panel records "2 lakes - Brienzersee", the
   wet-mask rebuild runs through the worker, frame loop alive.
+- DONE: real buildings (Jul 9, the environment series after lakes -
+  towns were lamp points floating on empty grass). OSM
+  way[building] through the SAME Overpass mirrors the forests and
+  lakes use, designed in the asset-viewer loop before wiring:
+  buildings.js is PURE JS geometry (no renderer import), gated at 5
+  landmarks - the OSM height ladder (height tag in either decimal
+  form > building:levels x 3 m per Simple 3D Buildings > per-type
+  defaults > 9 m; the captured census says the ladder matters:
+  height tagged on 1 of 400 Interlaken buildings, levels on 20),
+  shoelace footprint area exact on a surveyed rectangle,
+  ear-clipping triangulation held by the EXACTNESS identity
+  (triangle areas sum to the polygon area, convex + concave, both
+  windings), the LIVE captured 180-footprint Interlaken fixture
+  parsing with the documented defaults doing the work, and the
+  merged geometry watertight: bases sunk 2 m for slope seating,
+  wall normals horizontal and outward (winding normalised),
+  gabled ridges along the long axis for near-rectangular
+  house-family footprints, flat caps ear-clipped, NOTHING facing
+  down - that landmark caught a real bug (earClip emits
+  shoelace-positive = clockwise-from-above triangles; unreversed,
+  every flat roof faced down and was culled invisible - the
+  viewer shot showed walls with no tops, the strengthened gate
+  now holds it), glow riding every vertex, buildings in water
+  skipped entirely. Facade tints deterministic via roam's shared
+  hash on the OSM id; house-family types keep the tiled-roof tone
+  even when their footprint is too complex for a ridge (the tag
+  speaks, not a guess). Theme wiring end to end: syncBuildings
+  (both mirrors, geodetic localStorage cache per anchor like
+  water/forests), placeBuildings seats the merged mesh on
+  sample() ground (never in water), and the walls' emissiveNode
+  is the town's MEASURED Black Marble radiance - placeBuildings
+  re-runs when syncLights lands, so the glow attribute samples
+  the same lightsField the lamps and terrain glow use, with the
+  lamps' tint and eye-response sqrt, gated to night by the same
+  solar-altitude ramp (bldNightU). Roam re-anchors re-project
+  through the pinned dressAnchor; ?buildings=0 disables;
+  KEEP_PARAMS carries 'buildings'. The asset viewer grew
+  ?asset=buildings (theme-exact U = 7/400, auto-framing on the
+  built bounding box, ?n= nearest-N close-ups). Gate 44 -> 45
+  sets.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

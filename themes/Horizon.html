@@ -99,6 +99,13 @@
         stitched, surface at the measured median-shore DEM level) put
         Lake Thun where Lake Thun is - the sea rule alone never could;
         lake vessels float at the lake's own level
+      - real towns: OSM building footprints extruded to their tagged
+        heights (the Simple 3D Buildings ladder: height tag, then
+        levels x 3 m, then per-type defaults), gabled roofs on the
+        house families, seated on the sampled terrain and never in
+        water; after dark the walls emit the town's measured Black
+        Marble radiance, so windows warm exactly where the night
+        lights say the town is lit
       - roam (just fly): the free camera streams terrain. 4 km from
         the anchor the world re-anchors on your geodetic position
         (roam.js - exact inverse mapping and altitude-datum carry,
@@ -119,7 +126,8 @@
         observation endpoint override), smoke=URL (HMS plume endpoint
         override), aerosol=URL (measured-aerosol endpoint override),
         lights=0|URL (Black Marble night lights off / tile endpoint
-        override), water=0 (skip OSM lakes), debug=1
+        override), water=0 (skip OSM lakes), buildings=0 (skip OSM
+        buildings), debug=1
     -->
     <style>
       html,
@@ -366,6 +374,7 @@
         uniform as tslUniform
       } from 'three/tsl';
       import {buildVessel} from './horizon/vessels.js';
+      import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -1255,6 +1264,77 @@
         }
       }
 
+      // Real buildings: OSM way[building] footprints via the same
+      // Overpass mirrors, extruded by the tagged OSM height ladder
+      // (buildings.js, gated end to end), window-lit after dark by
+      // the town's MEASURED Black Marble radiance. Footprints are
+      // stored geodetic and cached per anchor like the lakes and
+      // forests; every re-anchor re-projects. ?buildings=0 disables.
+      let buildsGeo = null;
+      async function syncBuildings() {
+        if (params.get('buildings') === '0') return;
+        const key =
+          'horizon-buildings-geo-' +
+          state.lat.toFixed(2) +
+          ',' +
+          state.lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) {
+            buildsGeo = JSON.parse(hit);
+            record(
+              'OSM Overpass buildings (cached)',
+              buildsGeo.length + ' footprints'
+            );
+            if (worldBuilt) placeBuildings();
+            return;
+          }
+        } catch {}
+        try {
+          const mLat = 111320;
+          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+          const dLat = DEM_HALF_M / mLat;
+          const dLon = DEM_HALF_M / mLon;
+          const bbox =
+            (state.lat - dLat).toFixed(4) +
+            ',' +
+            (state.lon - dLon).toFixed(4) +
+            ',' +
+            (state.lat + dLat).toFixed(4) +
+            ',' +
+            (state.lon + dLon).toFixed(4);
+          const q =
+            '[out:json][timeout:30];way[building](' + bbox + ');out geom 600;';
+          let osm = null;
+          for (const host of [
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+            'https://overpass-api.de/api/interpreter'
+          ]) {
+            try {
+              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
+                credentials: 'omit'
+              });
+              if (!r.ok) throw new Error(r.status);
+              osm = await r.json();
+              break;
+            } catch {
+              // Try the next mirror.
+            }
+          }
+          if (!osm) throw new Error('overpass unavailable');
+          // parseBuildings dedupes rings, applies the height ladder
+          // and keeps the footprints nearest the town centre (gated).
+          buildsGeo = parseBuildings(osm);
+          record('OSM Overpass buildings', buildsGeo.length + ' footprints');
+          try {
+            localStorage.setItem(key, JSON.stringify(buildsGeo));
+          } catch {}
+          if (worldBuilt) placeBuildings();
+        } catch {
+          buildsGeo = null; // towns stay lamp-lit ground
+        }
+      }
+
       // Surface BRDF: the visitor pixel's own multi-angular MODIS
       // reflectance record (MOD09A1 8-day surface reflectance with
       // per-composite sun/view geometry, ORNL subset REST API, 60
@@ -1803,6 +1883,17 @@
           lampPts = new THREE.Points(lg, lampMat);
           lampPts.frustumCulled = false;
           scene.add(lampPts);
+          // The town's walls sample the SAME measured field for
+          // their window glow - re-seat the standing buildings so
+          // the attribute picks up the fresh radiances.
+          bldGlowAt = (x, z) => {
+            const gi = Math.round((x / WORLD + 0.5) * N - 0.5);
+            const gj = Math.round((0.5 - z / WORLD) * N - 0.5);
+            return gi < 0 || gi >= N || gj < 0 || gj >= N
+              ? 0
+              : Math.min(f.data[gj * N + gi] / LAMP_FULL, 1);
+          };
+          if (worldBuilt) placeBuildings();
           record(
             'VIIRS Black Marble ' + day,
             'max ' +
@@ -2520,6 +2611,66 @@
           ground.add(tree);
         }
       }
+      // Buildings: the town's real shape. Real OSM footprints are
+      // projected through the shared Earth anchoring and seated on
+      // the sampled terrain (never in water); after dark the walls
+      // emit the town's MEASURED Black Marble radiance - windows
+      // warm exactly where the night lights say the town is lit,
+      // with the lamps' own tint and eye-response mapping.
+      let bldMesh = null;
+      let bldMat = null;
+      let bldNightU = null;
+      let bldGlowAt = null; // scene (x,z) -> measured radiance [0..1]
+      function placeBuildings() {
+        if (bldMesh) {
+          ground.remove(bldMesh);
+          bldMesh.geometry.dispose();
+          bldMesh = null;
+        }
+        if (!buildsGeo || !buildsGeo.length || params.get('buildings') === '0')
+          return;
+        const groundY = (x, z) => {
+          const s = sample(x, z);
+          return s.water ? null : s.y;
+        };
+        const glowAt = (x, z) => (bldGlowAt ? Math.sqrt(bldGlowAt(x, z)) : 0);
+        const g = buildingsGeometry(
+          buildsGeo,
+          dressAnchor,
+          groundY,
+          glowAt,
+          1 / MPU,
+          WORLD / 2
+        );
+        if (!g.placed) return;
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(g.color, 3));
+        geo.setAttribute('glow', new THREE.BufferAttribute(g.glow, 1));
+        if (!bldMat) {
+          bldNightU = tslUniform(0);
+          bldMat = new THREE.MeshStandardNodeMaterial({
+            vertexColors: true,
+            roughness: 0.9,
+            metalness: 0
+          });
+          bldMat.emissiveNode = tslUniform(
+            new THREE.Color(LAMP_TINT[0], LAMP_TINT[1], LAMP_TINT[2])
+          )
+            .mul(tslAttribute('glow'))
+            .mul(bldNightU)
+            .mul(0.6);
+          applyAerial(bldMat);
+        }
+        bldMesh = new THREE.Mesh(geo, bldMat);
+        bldMesh.castShadow = bldMesh.receiveShadow = true;
+        ground.add(bldMesh);
+        record(
+          'OSM buildings placed',
+          g.placed + ' of ' + buildsGeo.length + ' footprints on this box'
+        );
+      }
       function buildWorld(pre) {
         // Roam rebuilds repeatedly: free the previous terrain
         // geometry (trees share cached geometries/materials and
@@ -2590,6 +2741,7 @@
         terrainMesh = terrain;
 
         placeTrees();
+        placeBuildings();
 
         // The sea: three.js Water (planar reflections) riding at real sea
         // level wherever the DEM says there is water. Roam rebuilds
@@ -4673,6 +4825,7 @@
         syncSmoke();
         syncAerosol();
         syncWater();
+        syncBuildings();
         // The lamp cloud is anchored to the OLD box - drop it now,
         // syncLights rebuilds it Earth-anchored on the new one.
         if (lampPts) {
@@ -5627,6 +5780,7 @@
         terrainUniforms.uLightsNight.value = lightsNight;
         if (lampNightU) lampNightU.value = lightsNight;
         if (lampPts) lampPts.visible = lightsNight > 0;
+        if (bldNightU) bldNightU.value = lightsNight;
         terrainUniforms.uWindVec.value.set(windV.x, windV.z);
         terrainUniforms.uSunDirW.value.copy(sunVec);
         terrainUniforms.uSunCol.value
@@ -6360,6 +6514,7 @@
         syncAerosol();
         setInterval(syncAerosol, 30 * 60 * 1000);
         syncWater();
+        syncBuildings();
         syncLights();
         setInterval(syncLights, 6 * 60 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
@@ -6371,12 +6526,14 @@
           try {
             demData = await fetchDEMTiles(state.lat, state.lon);
             buildWorld();
-          } catch {
+          } catch (e) {
+            if (params.has('debug')) console.warn('dem tiles: ' + e.message);
             try {
               demData = await fetchDEM(state.lat, state.lon);
               buildWorld();
-            } catch {
-              // Keep the procedural fallback silently.
+            } catch (e2) {
+              // Keep the procedural fallback (but say why in debug).
+              if (params.has('debug')) console.warn('dem: ' + e2.message);
             }
           }
         }

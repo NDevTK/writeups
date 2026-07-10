@@ -38,6 +38,8 @@
       import * as THREE from 'three/webgpu';
       import {buildVessel} from '../vessels.js';
       import {typeClass} from '../ships.js';
+      import {buildingsGeometry, parseBuildings} from '../buildings.js';
+      import {BUILDINGS_FIXTURE} from '../buildings-fixture.mjs';
 
       const q = new URLSearchParams(location.search);
       const renderer = new THREE.WebGPURenderer({antialias: true});
@@ -90,56 +92,128 @@
         ].map((c) => mk(c))
       };
 
-      // The measured fleet - one of each silhouette class.
-      const FLEET = [
-        ['cargo', 70, 240, 32, 566001],
-        ['tanker', 80, 180, 28, 566002],
-        ['passenger', 60, 140, 22, 566003],
-        ['fishing', 30, 24, 7, 566004],
-        ['sailing', 36, 14, 4, 566005],
-        ['tug', 52, 30, 10, 566006],
-        ['other', 0, 90, 14, 566007],
-        ['cargo2', 71, 160, 24, 566008]
-      ];
-      const only = q.get('cls');
-      const shown = only ? FLEET.filter(([n]) => n.startsWith(only)) : FLEET;
-      let x = 0;
-      const xs = [];
-      for (const [, t, len, beam, mmsi] of shown) {
-        const g = new THREE.Group();
-        const L = +q.get('len') || len;
-        const B = +q.get('beam') || beam;
-        buildVessel(g, L, B, typeClass(t), mats, mmsi, 1);
-        x += (L * 0.75) / 2 + 25;
-        g.position.set(x, 0, 0);
-        xs.push(x);
-        x += (L * 0.75) / 2 + 25;
-        g.rotation.y = ((+q.get('yaw') || -32) * Math.PI) / 180;
-        scene.add(g);
+      // ?asset=buildings: the LIVE Interlaken fixture through the
+      // same buildings.js the theme ships (metres, flat ground).
+      if (q.get('asset') === 'buildings') {
+        sea.material.color.set('#5d7a52'); // grass stage
+        sun.position.set(-320, 380, -420); // camera side (az 205)
+        let builds = parseBuildings(BUILDINGS_FIXTURE);
+        if (+q.get('n')) builds = builds.slice(0, +q.get('n')); // nearest-first
+        const anchor = {lat: 46.6863, lon: 7.8632};
+        const g = buildingsGeometry(
+          builds,
+          anchor,
+          () => 0,
+          () => +q.get('glow') || 0,
+          7 / 400, // theme-exact scale: footprints land in scene units
+          1e9
+        );
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(g.color, 3));
+        const mat = new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.9
+        });
+        scene.add(new THREE.Mesh(geo, mat));
+        // Frame what was actually built: aim at the geometry's
+        // bounding box, back off proportionally (?d overrides).
+        let x0 = 0;
+        let x1 = 0;
+        let z0 = 0;
+        let z1 = 0;
+        let y1 = 1;
+        if (g.count) {
+          x0 = z0 = Infinity;
+          x1 = z1 = -Infinity;
+          for (let i = 0; i < g.count; i++) {
+            x0 = Math.min(x0, g.position[3 * i]);
+            x1 = Math.max(x1, g.position[3 * i]);
+            z0 = Math.min(z0, g.position[3 * i + 2]);
+            z1 = Math.max(z1, g.position[3 * i + 2]);
+            y1 = Math.max(y1, g.position[3 * i + 1]);
+          }
+        }
+        const cx = (x0 + x1) / 2;
+        const cz = (z0 + z1) / 2;
+        const az = ((+q.get('az') || 205) * Math.PI) / 180;
+        const el = ((+q.get('el') || 18) * Math.PI) / 180;
+        const d = +q.get('d') || Math.max(x1 - x0, z1 - z0, 0.5) * 0.85;
+        camera.near = 0.02;
+        camera.updateProjectionMatrix();
+        camera.position.set(
+          cx + d * Math.cos(el) * Math.sin(az),
+          Math.max(d * Math.sin(el), y1 * 0.6),
+          cz + d * Math.cos(el) * Math.cos(az)
+        );
+        camera.lookAt(cx, y1 * 0.4, cz);
+        await renderer.init();
+        window.__r = renderer;
+        window.__scene = scene;
+        window.__cam = camera;
+        window.__THREE = THREE;
+        let bframes = 0;
+        renderer.setAnimationLoop(() => {
+          renderer.render(scene, camera);
+          if (++bframes === 5) console.log('DONE');
+        });
+      } else {
+        await fleetMode();
       }
-      const mid = (xs[0] + xs[xs.length - 1]) / 2 || 0;
-      const az = ((+q.get('az') || 205) * Math.PI) / 180;
-      const el = ((+q.get('el') || 12) * Math.PI) / 180;
-      const d = +q.get('d') || (only ? 300 : Math.max(x * 0.62, 400));
-      camera.position.set(
-        mid + d * Math.cos(el) * Math.sin(az),
-        Math.max(d * Math.sin(el), 3),
-        d * Math.cos(el) * Math.cos(az)
-      );
-      camera.lookAt(mid, 8, 0);
 
-      await renderer.init();
-      // shoot.mjs capture hooks (composited screenshots are blank
-      // for WebGPU surfaces - the readback path is the camera).
-      window.__r = renderer;
-      window.__scene = scene;
-      window.__cam = camera;
-      window.__THREE = THREE;
-      let frames = 0;
-      renderer.setAnimationLoop(() => {
-        renderer.render(scene, camera);
-        if (++frames === 5) console.log('DONE');
-      });
+      // The measured fleet - one of each silhouette class.
+      async function fleetMode() {
+        const FLEET = [
+          ['cargo', 70, 240, 32, 566001],
+          ['tanker', 80, 180, 28, 566002],
+          ['passenger', 60, 140, 22, 566003],
+          ['fishing', 30, 24, 7, 566004],
+          ['sailing', 36, 14, 4, 566005],
+          ['tug', 52, 30, 10, 566006],
+          ['other', 0, 90, 14, 566007],
+          ['cargo2', 71, 160, 24, 566008]
+        ];
+        const only = q.get('cls');
+        const shown = only ? FLEET.filter(([n]) => n.startsWith(only)) : FLEET;
+        let x = 0;
+        const xs = [];
+        for (const [, t, len, beam, mmsi] of shown) {
+          const g = new THREE.Group();
+          const L = +q.get('len') || len;
+          const B = +q.get('beam') || beam;
+          buildVessel(g, L, B, typeClass(t), mats, mmsi, 1);
+          x += (L * 0.75) / 2 + 25;
+          g.position.set(x, 0, 0);
+          xs.push(x);
+          x += (L * 0.75) / 2 + 25;
+          g.rotation.y = ((+q.get('yaw') || -32) * Math.PI) / 180;
+          scene.add(g);
+        }
+        const mid = (xs[0] + xs[xs.length - 1]) / 2 || 0;
+        const az = ((+q.get('az') || 205) * Math.PI) / 180;
+        const el = ((+q.get('el') || 12) * Math.PI) / 180;
+        const d = +q.get('d') || (only ? 300 : Math.max(x * 0.62, 400));
+        camera.position.set(
+          mid + d * Math.cos(el) * Math.sin(az),
+          Math.max(d * Math.sin(el), 3),
+          d * Math.cos(el) * Math.cos(az)
+        );
+        camera.lookAt(mid, 8, 0);
+
+        await renderer.init();
+        // shoot.mjs capture hooks (composited screenshots are blank
+        // for WebGPU surfaces - the readback path is the camera).
+        window.__r = renderer;
+        window.__scene = scene;
+        window.__cam = camera;
+        window.__THREE = THREE;
+        let frames = 0;
+        renderer.setAnimationLoop(() => {
+          renderer.render(scene, camera);
+          if (++frames === 5) console.log('DONE');
+        });
+      }
     </script>
   </body>
 </html>
