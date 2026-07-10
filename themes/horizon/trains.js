@@ -51,6 +51,33 @@ export const PROVIDERS = [
       encodeURIComponent(id)
   },
   {
+    // Berlin-Brandenburg: the VBB HAFAS radar
+    // (v6.vbb.transport.rest - keyless, CORS-open) reports every
+    // vehicle MOVING inside a box: its live position plus the
+    // line's real metadata (name, product, operator) and the
+    // realtime-adjusted stopovers trainAt interpolates - actual
+    // vehicle TRACKING, not just a board. The DB instance of the
+    // same family stays unregistered: it answered 503 on every
+    // probe (2026-07-10).
+    name: 'v6.vbb.transport.rest',
+    kind: 'radar',
+    bbox: [51.3, 11.2, 53.7, 14.9],
+    radarURL: (lat, lon) => {
+      const d = 0.075; // ~8 km - the visible box
+      return (
+        'https://v6.vbb.transport.rest/radar?north=' +
+        (lat + d).toFixed(4) +
+        '&west=' +
+        (lon - d).toFixed(4) +
+        '&south=' +
+        (lat - d).toFixed(4) +
+        '&east=' +
+        (lon + d).toFixed(4) +
+        '&results=120&duration=600&frames=0&polylines=false'
+      );
+    }
+  },
+  {
     // The worldwide fallback: transitous.org aggregates public
     // GTFS feeds globally (keyless, CORS-open). Its scope IS the
     // world; national boards richer in metadata stay ahead of it
@@ -159,6 +186,71 @@ export const MODE_CAT = {
   FERRY: 'BAT'
 };
 
+// HAFAS products (the radar providers) -> board categories, the
+// same single consist ladder. Underground stays absent for the
+// same reason as in MODE_CAT - drawing a metro on the surface
+// would be inventing; buses are road traffic, not consists.
+export const PRODUCT_CAT = {
+  express: 'IC',
+  regional: 'RE',
+  suburban: 'S',
+  tram: 'T',
+  ferry: 'BAT'
+};
+
+/**
+ * A HAFAS radar frame -> the SAME journey shape as the boards.
+ * Each movement carries its line's real metadata and its
+ * remaining stopovers; the arrival/departure fields are already
+ * realtime-adjusted upstream (plannedArrival keeps the schedule),
+ * so trainAt's interpolation IS the delay-shifted one. The
+ * movement's own live fix rides along untouched (`fix`) - the
+ * gate holds the interpolation against it. The line's published
+ * productName (S, RE, ICE...) picks the consist when the ladder
+ * knows it; the product class decides otherwise.
+ */
+export function parseRadar(json) {
+  const out = [];
+  for (const m of (json && json.movements) || []) {
+    const line = m.line || {};
+    const cat0 = PRODUCT_CAT[line.product];
+    if (!cat0) continue;
+    const pn = String(line.productName || '').toUpperCase();
+    const cat = CONSIST_CARS[pn] != null || BOAT_CATS.has(pn) ? pn : cat0;
+    const stops = [];
+    for (const p of m.nextStopovers || []) {
+      const loc = (p.stop && p.stop.location) || {};
+      if (!Number.isFinite(loc.latitude) || !Number.isFinite(loc.longitude))
+        continue;
+      const arr = ms(p.arrival || p.plannedArrival);
+      const dep = ms(p.departure || p.plannedDeparture);
+      if (!Number.isFinite(arr) && !Number.isFinite(dep)) continue;
+      stops.push({
+        lat: loc.latitude,
+        lon: loc.longitude,
+        name: (p.stop && p.stop.name) || '',
+        arrMs: Number.isFinite(arr) ? arr : dep,
+        depMs: Number.isFinite(dep) ? dep : arr
+      });
+    }
+    if (stops.length < 2) continue;
+    const loc = m.location || {};
+    out.push({
+      cat,
+      number: '',
+      operator: (line.operator && line.operator.name) || '',
+      to: m.direction || '',
+      label: line.name || cat,
+      consist: consistOf(cat, ''),
+      stops,
+      fix: Number.isFinite(loc.latitude)
+        ? {lat: loc.latitude, lon: loc.longitude}
+        : null
+    });
+  }
+  return out;
+}
+
 // Standard encoded-polyline decoder (the Google algorithm the
 // GTFS world shares; transitous emits precision 5). Gated against
 // the canonical documented example.
@@ -167,7 +259,7 @@ export function decodePolyline(str, precision = 5) {
   const out = [];
   let lat = 0;
   let lon = 0;
-  for (let i = 0; i < str.length;) {
+  for (let i = 0; i < str.length; ) {
     for (const which of [0, 1]) {
       let shift = 0;
       let result = 0;

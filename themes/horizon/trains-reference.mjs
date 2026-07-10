@@ -7,6 +7,9 @@
 //    between the bracketing stops, null outside the journey
 //  - the real-time layer: delay minutes shift the stop times
 //    exactly; road/water modes never become trains
+//  - the LIVE VBB radar frame: tracked vehicles with their line
+//    metadata, and the interpolation held against the radar's
+//    OWN live fix at capture time
 import {
   BOAT_CATS,
   BOAT_DIMS,
@@ -17,12 +20,15 @@ import {
   decodePolyline,
   DEFAULT_CARS,
   parseBoard,
+  parseRadar,
   parseTrips,
   pathPoint,
+  PRODUCT_CAT,
   providerFor,
   trainAt
 } from './trains.js';
 import {BOARD_FIXTURE, BOAT_FIXTURE, TRIPS_FIXTURE} from './trains-fixture.mjs';
+import {CAPTURE_MS, RADAR_FIXTURE} from './radar-fixture.mjs';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -323,6 +329,73 @@ const journeys = parseBoard(BOARD_FIXTURE);
     'live transitous legs',
     ok,
     `${legs.length} Frankfurt rail legs (${[...cats].join('/')}), ${rt} real-time, every one carrying its decoded route shape; ${ice ? ice.label : '?'} mid-leg rides ON its polyline`
+  );
+}
+
+{
+  // The LIVE VBB radar frame (central Berlin, 07:45 CEST): every
+  // tracked vehicle parses with its published line metadata -
+  // the ODEG RE8 by name and operator, S-Bahn on the S consist,
+  // trams on T - while the 4 captured buses never become trains
+  // (PRODUCT_CAT has no road modes). And the tracking check:
+  // the RE8 was DWELLING at Potsdamer Platz when the frame was
+  // captured, so trainAt at capture time must land on the
+  // radar's own live fix.
+  const js = parseRadar(RADAR_FIXTURE);
+  const re8 = js.find((j) => j.label === 'RE8');
+  const sCount = js.filter((j) => j.cat === 'S').length;
+  const tCount = js.filter((j) => j.cat === 'T').length;
+  const at = re8 && trainAt(re8, CAPTURE_MS);
+  const mLat = 111320;
+  const offM =
+    at && re8.fix
+      ? Math.hypot(
+          (at.lat - re8.fix.lat) * mLat,
+          (at.lon - re8.fix.lon) *
+            mLat *
+            Math.cos((re8.fix.lat * Math.PI) / 180)
+        )
+      : Infinity;
+  const ok =
+    js.length === 16 &&
+    RADAR_FIXTURE.movements.length === 20 &&
+    re8 &&
+    re8.cat === 'RE' &&
+    re8.operator === 'ODEG Ostdeutsche Eisenbahn GmbH' &&
+    sCount === 12 &&
+    tCount === 3 &&
+    js.every((j) => j.stops.length >= 2 && j.fix) &&
+    PRODUCT_CAT.bus === undefined &&
+    at &&
+    !at.moving &&
+    offM < 100;
+  check(
+    'live VBB radar frame',
+    ok,
+    `20 captured movements -> ${js.length} tracked vehicles (RE8 ODEG + ${sCount} S-Bahn + ${tCount} trams; 4 buses dropped); the dwelling RE8 interpolates to ${offM.toFixed(1)} m of the radar's own live fix`
+  );
+}
+
+{
+  // The registry's new scope: Berlin answers to the VBB radar
+  // (richer than the world fallback), Interlaken still to the
+  // Swiss board, the mid-Pacific to transitous - and the DB
+  // instance that answered 503 is NOT registered.
+  const berlin = providerFor(52.52, 13.4);
+  const swiss = providerFor(46.69, 7.87);
+  const pacific = providerFor(0, -150);
+  const ok =
+    berlin &&
+    berlin.kind === 'radar' &&
+    berlin.name === 'v6.vbb.transport.rest' &&
+    swiss &&
+    swiss.kind === 'board' &&
+    pacific &&
+    pacific.kind === 'trips';
+  check(
+    'provider scoping',
+    ok,
+    `Berlin -> ${berlin.name} (radar), Interlaken -> ${swiss.name} (board), mid-Pacific -> ${pacific.name} (world trips); the dead DB instance stays out`
   );
 }
 

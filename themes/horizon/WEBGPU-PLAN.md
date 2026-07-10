@@ -3039,6 +3039,34 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   a length), recomputed per weather poll, rotors visibly slower
   deep in the farm; panel records 'Jensen wind-farm wakes - N of
   M waked, deepest -P%'. Gate 55 sets.
+- DONE: VBB radar provider - live vehicle TRACKING for
+  Berlin-Brandenburg (Jul 10, the data-source lane; the user's
+  nudge to try a different endpoint). The DB instances
+  (v5/v6.db.transport.rest) still answer 503 on every probe, but
+  the VBB instance of the same HAFAS family is up, keyless and
+  CORS-open - and its /radar endpoint beats a station board: it
+  reports every vehicle MOVING in a box with its live position,
+  line metadata (name, product, operator) and realtime-adjusted
+  stopovers. trains.js: PROVIDERS gains the radar entry (bbox
+  Berlin-Brandenburg, between the Swiss board and the transitous
+  world fallback), PRODUCT_CAT maps HAFAS products onto the one
+  consist ladder (underground still deliberately absent, buses
+  never parse, ferries take the boats path), parseRadar emits
+  the SAME journey shape the boards do - so trainAt, the pools
+  and the liveries all serve a third provider kind unchanged.
+  Each movement's own live fix rides along untouched, and the
+  gate holds the interpolation against it: in the captured
+  frame (central Berlin, 07:45 CEST - 20 verbatim movements:
+  the ODEG RE8, 12 S-Bahn, 3 trams, 4 buses) the RE8 was
+  dwelling at Potsdamer Platz and trainAt at capture time lands
+  0.0 m from the radar's reported position - tracking and
+  timetable agreeing through the parser. Trains 9 -> 11
+  landmarks (the frame + provider scoping: Berlin -> radar,
+  Interlaken -> Swiss board, mid-Pacific -> transitous, the
+  dead DB endpoint stays out). Theme: a third syncTrains branch;
+  Berlin smoke (radar stubbed with the captured frame) records
+  '16 vehicles tracked - RE8 -> Elsterwerda (ODEG)'. Gate 55
+  sets.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
