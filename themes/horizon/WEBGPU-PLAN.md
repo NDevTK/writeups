@@ -2652,6 +2652,33 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     Browser smoke: five placed layers unchanged, trains code silent
     in the sandbox (no provider reachable - the truthful default),
     one known warning class.
+- DONE: scheduled lake boats (Jul 10, closing the loop the trains
+  PR opened - the BLS steamers carry AIS but terrestrial coverage
+  on the lakes is spotty; the SAME Swiss boards know them by
+  SCHEDULE). The pier stations publish category BAT sailings
+  (Interlaken Ost (See): BLS-brs to Brienz, each with its
+  passList of pier coordinates and times), and the locations
+  response carries an `icon` field - so the ONE existing
+  locations call names both the nearest rail station and the
+  nearest pier; only one extra board fetch, still provider-scoped.
+  trains.js: parseBoard gained a category-set parameter (rail by
+  default, BOAT_CATS parses the sailings; buses stay filtered),
+  BOAT_DIMS documents the BLS motorship default the boards do not
+  publish. Gate 6 landmarks now: the LIVE pier fixture parses 5
+  BLS-brs sailings with placed piers through the SAME parser and
+  interpolation the trains use, and the rail parse of the pier
+  board yields 0 - one parser, two modes, no cross-talk. Theme:
+  syncTrains fetches the pier board when a pier exists,
+  boatJourneys render through the GATED vessels.js passenger hull
+  (buildVessel - the same designed asset the AIS fleet uses),
+  floated at the lake's measured level by the same lake logic as
+  the AIS ships, positioned by trainAt at the delay-shifted
+  times. DEDUP RULE: an active AIS vessel within 300 m WINS and
+  the scheduled boat hides - a measured position beats a
+  schedule, nothing double-draws. Panel records the pier, sailing
+  count and next departure. ?trains=0 governs both modes. Gate
+  set count unchanged (50) - the trains set grew 5 -> 6
+  landmarks. Browser smoke unchanged and clean.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
