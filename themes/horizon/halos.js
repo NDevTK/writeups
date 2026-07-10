@@ -18,11 +18,10 @@
  *    21.8 degrees for red, growing with n so the inner edge is
  *    red (Greenler, "Rainbows, Halos, and Glories"). The
  *    46-degree halo obeys the same law through the 90-degree
- *    basal prism (prismDmin carries it, and the gate checks its
- *    closed point), but its real faintness comes from ray-path
- *    statistics that Fresnel throughput alone does not carry -
- *    so it is OMITTED from the drawn profile rather than
- *    mistuned.
+ *    basal prism - and its real faintness EMERGES from the
+ *    crystal Monte Carlo below (mcHalo): random orientations
+ *    over SO(3), flux-correct face entry, the actual hexagonal
+ *    geometry - exactly Greenler's computation, gated.
  *  - The sundogs: plate crystals hang c-axis vertical, so an
  *    inclined sun ray crosses the same 60-degree prism on a
  *    skew path. Bravais (1847): a skew ray refracts as if the
@@ -116,6 +115,191 @@ export function caustic(dD) {
     wsum += w;
   }
   return acc / wsum;
+}
+
+// ---- Greenler's Monte Carlo: random hexagonal ice prisms ----
+// Deterministic PRNG (mulberry32) so the histogram - and the
+// gate's landmarks on it - are bit-reproducible.
+export function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Uniform random rotation (Shoemake's quaternion method) applied
+// to a vector: v' = q v q*.
+function randomRotate(v, rng) {
+  const u1 = rng();
+  const u2 = rng();
+  const u3 = rng();
+  const s1 = Math.sqrt(1 - u1);
+  const s2 = Math.sqrt(u1);
+  const qx = s1 * Math.sin(2 * Math.PI * u2);
+  const qy = s1 * Math.cos(2 * Math.PI * u2);
+  const qz = s2 * Math.sin(2 * Math.PI * u3);
+  const qw = s2 * Math.cos(2 * Math.PI * u3);
+  // rotate v by quaternion (x,y,z,w)
+  const tx = 2 * (qy * v.z - qz * v.y);
+  const ty = 2 * (qz * v.x - qx * v.z);
+  const tz = 2 * (qx * v.y - qy * v.x);
+  return {
+    x: v.x + qw * tx + (qy * tz - qz * ty),
+    y: v.y + qw * ty + (qz * tx - qx * tz),
+    z: v.z + qw * tz + (qx * ty - qy * tx)
+  };
+}
+
+// The hexagonal prism, crystal frame: c-axis = z, side length
+// a = 1, aspect c/a = 1 (the compact "blocky" crystal of the
+// classical random-orientation halo model - a documented model
+// parameter). Six side faces (apothem sqrt(3)/2), two basals.
+const APOTHEM = Math.sqrt(3) / 2;
+const HEX_C = 1; // c/a aspect
+const FACES = (() => {
+  const f = [];
+  for (let k = 0; k < 6; k++) {
+    const phi = (k * Math.PI) / 3;
+    f.push({
+      n: {x: Math.cos(phi), y: Math.sin(phi), z: 0},
+      d: APOTHEM,
+      area: 1 * HEX_C // side width a=1 x height c
+    });
+  }
+  f.push({n: {x: 0, y: 0, z: 1}, d: HEX_C / 2, area: (3 * APOTHEM) / 2});
+  f.push({n: {x: 0, y: 0, z: -1}, d: HEX_C / 2, area: (3 * APOTHEM) / 2});
+  return f;
+})();
+const AREA_MAX = Math.max(...FACES.map((f) => f.area));
+
+const dot3 = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+
+// Vector Snell refraction through a face with OUTWARD normal nrm,
+// from index n1 into n2; null on total internal reflection.
+// Returns {dir, T} with the polarisation-averaged Fresnel
+// transmittance (fresnelWater generalises: it is Fresnel for any
+// pair via the relative index).
+function refract(d, nrm, n1, n2) {
+  const cosi = -dot3(d, nrm); // entering: d against the normal
+  const eta = n1 / n2;
+  const k = 1 - eta * eta * (1 - cosi * cosi);
+  if (k <= 0) return null; // TIR
+  const cost = Math.sqrt(k);
+  const dir = {
+    x: eta * d.x + (eta * cosi - cost) * nrm.x,
+    y: eta * d.y + (eta * cosi - cost) * nrm.y,
+    z: eta * d.z + (eta * cosi - cost) * nrm.z
+  };
+  // unpolarised Fresnel with the relative index
+  const rel = n2 / n1;
+  const rs = (cosi - rel * cost) / (cosi + rel * cost);
+  const rp = (rel * cosi - cost) / (rel * cosi + cost);
+  return {dir, T: 1 - (rs * rs + rp * rp) / 2};
+}
+
+// A point uniform on face f (crystal frame, ON the face plane).
+function facePoint(f, rng) {
+  if (f.n.z !== 0) {
+    // basal hexagon: rejection from the bounding box
+    for (;;) {
+      const x = (rng() * 2 - 1) * 1;
+      const y = (rng() * 2 - 1) * APOTHEM;
+      // inside the hexagon (flat-top orientation: apothem along
+      // the six side normals)
+      if (
+        Math.abs(y) <= APOTHEM &&
+        Math.abs(y + Math.sqrt(3) * x) <= 2 * APOTHEM &&
+        Math.abs(y - Math.sqrt(3) * x) <= 2 * APOTHEM
+      ) {
+        return {x, y, z: f.n.z * (HEX_C / 2)};
+      }
+    }
+  }
+  // side rectangle: width a = 1 along the face tangent, height c
+  const t = {x: -f.n.y, y: f.n.x, z: 0};
+  const u = rng() - 0.5;
+  const v = (rng() - 0.5) * HEX_C;
+  return {
+    x: f.n.x * f.d + t.x * u,
+    y: f.n.y * f.d + t.y * u,
+    z: v
+  };
+}
+
+/**
+ * ONE crystal transit (Greenler's Monte Carlo step): a random
+ * orientation (uniform over SO(3) - the sun is rotated instead
+ * of the crystal, same thing), flux-correct entry-face selection
+ * (rejection on projected area), a uniform entry point, Snell
+ * in, the convex-prism exit face, Snell out. Returns
+ * {dev (radians), T} for the 2-refraction transit, or null (no
+ * entry face accepted this trial, or TIR at the exit - the
+ * internally reflected families make OTHER arcs, documented out
+ * of scope). n = 1 must return dev = 0 exactly - the gate holds
+ * that null test.
+ */
+export function traceCrystal(n, rng) {
+  const d = randomRotate({x: 0, y: 0, z: 1}, rng); // sun in crystal frame
+  // rejection-select the entry face by projected area
+  const f = FACES[Math.floor(rng() * 8)];
+  const proj = -dot3(d, f.n);
+  if (proj <= 0) return null;
+  if (rng() * AREA_MAX > f.area * proj) return null;
+  const rin = refract(d, f.n, 1, n);
+  if (!rin) return null;
+  const p0 = facePoint(f, rng);
+  // exit: nearest forward face plane (convex prism), skip entry
+  let tMin = Infinity;
+  let fOut = null;
+  for (const g of FACES) {
+    if (g === f) continue;
+    const dn = dot3(rin.dir, g.n);
+    if (dn <= 1e-12) continue;
+    const t = (g.d - dot3(p0, g.n)) / dn;
+    if (t > 1e-9 && t < tMin) {
+      tMin = t;
+      fOut = g;
+    }
+  }
+  if (!fOut) return null;
+  const rout = refract(
+    rin.dir,
+    {x: -fOut.n.x, y: -fOut.n.y, z: -fOut.n.z},
+    n,
+    1
+  );
+  if (!rout) return null; // TIR at the exit
+  const cosDev = Math.min(Math.max(dot3(d, rout.dir), -1), 1);
+  return {dev: Math.acos(cosDev), T: rin.T * rout.T};
+}
+
+/**
+ * The full random-orientation histogram: every 2-refraction
+ * transit of SAMPLES crystals per channel, binned by deviation.
+ * The 22-degree halo (side-side, 60-deg wedge) and the
+ * 46-degree halo (side-basal, 90-deg wedge) both EMERGE, with
+ * their relative strengths set by the geometry and Fresnel - the
+ * statistics the caustic model could not carry. Deterministic
+ * (seeded), so the gate can hold exact facts about the output.
+ */
+export function mcHalo(nRGB = ICE_N, samples = 400000, seed = 1337) {
+  const g0 = (15 * Math.PI) / 180;
+  const g1 = (52 * Math.PI) / 180;
+  const bins = 512;
+  const data = new Float64Array(bins * 3);
+  for (let ch = 0; ch < nRGB.length; ch++) {
+    const rng = mulberry32(seed + ch);
+    for (let i = 0; i < samples; i++) {
+      const hit = traceCrystal(nRGB[ch], rng);
+      if (!hit) continue;
+      const b = Math.floor(((hit.dev - g0) / (g1 - g0)) * bins);
+      if (b >= 0 && b < bins) data[b * 3 + ch] += hit.T;
+    }
+  }
+  return {g0, g1, bins, data};
 }
 
 /**
