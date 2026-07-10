@@ -3437,6 +3437,34 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   end-on (an aircraft flying at the camera projects its trail as
   a vertical streak); the pre-dawn tan is green vegetation under
   the warm dawn-sky ambient with the documented adaptation lift.
+- DONE (ONE ground albedo: MS LUT unified with the terminal
+  bounce, Jul 10 latest): research pass on Hillaire (2020)
+  turned up that the multiple-scattering LUT's ground
+  contribution hardcoded an UNCITED 0.3 - applied over open
+  ocean too - while the paper's model has a single ground_albedo
+  parameter shared by the MS transfer (eq. 5-7's ground term)
+  and any ray-march ground termination; Hillaire's own reference
+  implementation (sebh/UnrealEngineSkyAtmosphere,
+  SkyAtmosphereCommon.cpp) defaults info.ground_albedo to ZERO
+  and exposes it as an input. Now the MS LUT's ground term reads
+  the SAME groundAlb uniform as the sky-view terminal bounce:
+  Payne (1972) 0.06 where the box has sea (the ocean MS horizon
+  no longer borrows a value three grades too bright), 0 inland
+  until a measured land albedo earns its citation - the open
+  research is the MODIS path (MOD09A1 bands 1/4/3 sit near the
+  atmosphere's 680/550/440 nm channels; Lucht 2000's white-sky
+  kernel integrals are already in ross-li.js, but the published
+  archetype weights cover red/NIR only, so a per-band RGB
+  white-sky albedo needs either per-band shape retrievals or a
+  cited narrowband set before it can feed this uniform). The MS
+  fill re-dispatches when the fed albedo changes (its rebuild
+  key carries the albedo alongside the aerosol set).
+  atmo-reference mirrors it: buildMs(gAlb) parameterised, new
+  landmark holds psi EXACTLY linear in the fed albedo texel by
+  texel (1.7e-15), gains non-negative everywhere and strictly
+  positive at ground/high-sun; downstream sky-view landmarks run
+  at the 0.06 sea feed. Full gate green (57 reference sets +
+  ocean-wind/ocean-sea/glints).
 - DONE (aircraft lights: visual proof + exact Allard slant, Jul
   10 latest): the daemon's ADS-B upstream came back, so the
   planes finally met the ships/trains visual standard - at Sao
