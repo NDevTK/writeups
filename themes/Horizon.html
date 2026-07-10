@@ -114,7 +114,9 @@
         house families, seated on the sampled terrain and never in
         water; after dark the walls emit the town's measured Black
         Marble radiance, so windows warm exactly where the night
-        lights say the town is lit; the street network is real too -
+        lights say the town is lit, and snow lies on the roofs
+        exactly as it lies on the ground beside them - the measured
+        satellite cover or the live snowfall, roof surfaces only; the street network is real too -
         OSM highway ways as ribbons of their tagged width (width >
         lanes x 3.5 m > per-type defaults) and tagged surface
         albedo, cut by water except where a tagged bridge spans it;
@@ -430,7 +432,9 @@
       } from './horizon/nightlights.js';
       import {
         attribute as tslAttribute,
-        uniform as tslUniform
+        mix as tslMix,
+        uniform as tslUniform,
+        vec3 as tslVec3
       } from 'three/tsl';
       import {buildVessel} from './horizon/vessels.js';
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
@@ -1774,6 +1778,16 @@
           terrainObj.snowTexNode.value = tex;
           if (old && old.image && old.image.width > 1) old.dispose();
           terrainUniforms.uSnowCovOn.value = 1;
+          // The town's roofs read the SAME measured field - re-seat
+          // the buildings so their snow attribute picks it up.
+          bldSnowAt = (x, z) => {
+            const gi = Math.round((x / WORLD + 0.5) * N - 0.5);
+            const gj = Math.round((0.5 - z / WORLD) * N - 0.5);
+            if (gi < 0 || gi >= N || gj < 0 || gj >= N) return 0;
+            const v = f.data[gj * N + gi];
+            return v > 0 ? v : 0;
+          };
+          if (worldBuilt) placeBuildings();
           record(
             'MODIS NDSI snow cover ' + day,
             Math.round(f.known * 100) +
@@ -3444,6 +3458,8 @@
       let bldMat = null;
       let bldNightU = null;
       let bldGlowAt = null; // scene (x,z) -> measured radiance [0..1]
+      let bldSnowAt = null; // scene (x,z) -> measured FSC [0..1]
+      let bldSnowU = null; // live-snowfall term (the terrain's uSnowy)
       function placeBuildings() {
         if (bldMesh) {
           ground.remove(bldMesh);
@@ -3471,13 +3487,37 @@
         geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
         geo.setAttribute('color', new THREE.BufferAttribute(g.color, 3));
         geo.setAttribute('glow', new THREE.BufferAttribute(g.glow, 1));
+        geo.setAttribute('roof', new THREE.BufferAttribute(g.roof, 1));
+        // Measured snow per vertex: the same FSC field the terrain
+        // reads, sampled at each building vertex (0 until the
+        // satellite answers).
+        const rsnow = new Float32Array(g.count);
+        if (bldSnowAt)
+          for (let i = 0; i < g.count; i++)
+            rsnow[i] = bldSnowAt(g.position[3 * i], g.position[3 * i + 2]);
+        geo.setAttribute('rsnow', new THREE.BufferAttribute(rsnow, 1));
         if (!bldMat) {
           bldNightU = tslUniform(0);
+          bldSnowU = tslUniform(0);
           bldMat = new THREE.MeshStandardNodeMaterial({
             vertexColors: true,
             roughness: 0.9,
             metalness: 0
           });
+          // Snow lies on the roofs exactly as it lies on the
+          // ground beside them: the measured FSC (rsnow) OR the
+          // live-snowfall term the terrain uses (bldSnowU),
+          // whichever says more - and ONLY on the roof-flagged
+          // surfaces (walls, gables and spires stay bare). The
+          // snow albedo is the terrain's own.
+          bldMat.colorNode = tslMix(
+            tslAttribute('color'),
+            tslVec3(0.87, 0.9, 0.93),
+            tslAttribute('roof')
+              .mul(tslAttribute('rsnow').max(bldSnowU))
+              .clamp(0, 1)
+              .mul(0.95)
+          );
           bldMat.emissiveNode = tslUniform(
             new THREE.Color(LAMP_TINT[0], LAMP_TINT[1], LAMP_TINT[2])
           )
@@ -7317,6 +7357,7 @@
           state.temp <= 0.5 && (state.snow > 0 || state.code >= 71) ? 1 : 0;
         terrainUniforms.uSnowy.value +=
           (snowyGround - terrainUniforms.uSnowy.value) * Math.min(dt, 1);
+        if (bldSnowU) bldSnowU.value = terrainUniforms.uSnowy.value;
 
         const snowing =
           state.snow > 0 ||
