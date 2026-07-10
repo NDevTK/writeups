@@ -1028,3 +1028,326 @@ export const BOARD_FIXTURE = {
     }
   ]
 };
+
+// Captured the same day from the PIER station next door
+// (Interlaken Ost (See), icon "ship" in the locations
+// response): the BLS Brienzersee sailings - category BAT,
+// operator BLS-brs, each with its passList of pier
+// coordinates and times. The boats the AIS coverage gap
+// misses arrive by schedule instead.
+export const BOAT_FIXTURE = {
+  station: {
+    name: 'Interlaken Ost (See)',
+    coordinate: {type: 'WGS84', x: 46.691688, y: 7.869171}
+  },
+  stationboard: [
+    {
+      category: 'BAT',
+      number: '59',
+      operator: 'BLS-brs',
+      to: 'Brienz (See)',
+      name: '000059',
+      stop: {departure: '2026-07-10T09:07:00+0200', delay: null},
+      passList: [
+        {
+          station: {name: null, coordinate: {x: null, y: null}},
+          arrival: null,
+          departure: '2026-07-10T09:07:00+0200',
+          delay: null
+        },
+        {
+          station: {name: 'Bönigen', coordinate: {x: 46.68938, y: 7.898043}},
+          arrival: '2026-07-10T09:25:00+0200',
+          departure: '2026-07-10T09:25:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Ringgenberg (See)',
+            coordinate: {x: 46.701361, y: 7.898407}
+          },
+          arrival: '2026-07-10T09:33:00+0200',
+          departure: '2026-07-10T09:33:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Niederried (See)',
+            coordinate: {x: 46.717735, y: 7.932305}
+          },
+          arrival: '2026-07-10T09:43:00+0200',
+          departure: '2026-07-10T09:43:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Iseltwald (See)',
+            coordinate: {x: 46.711816, y: 7.962539}
+          },
+          arrival: '2026-07-10T09:51:00+0200',
+          departure: '2026-07-10T09:52:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Giessbach See',
+            coordinate: {x: 46.734813, y: 8.019454}
+          },
+          arrival: '2026-07-10T10:09:00+0200',
+          departure: '2026-07-10T10:09:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Brienz (See)',
+            coordinate: {x: 46.753786, y: 8.038388}
+          },
+          arrival: '2026-07-10T10:20:00+0200',
+          departure: null,
+          delay: null
+        }
+      ]
+    },
+    {
+      category: 'BAT',
+      number: '63',
+      operator: 'BLS-brs',
+      to: 'Brienz (See)',
+      name: '000063',
+      stop: {departure: '2026-07-10T11:07:00+0200', delay: null},
+      passList: [
+        {
+          station: {name: null, coordinate: {x: null, y: null}},
+          arrival: null,
+          departure: '2026-07-10T11:07:00+0200',
+          delay: null
+        },
+        {
+          station: {name: 'Bönigen', coordinate: {x: 46.68938, y: 7.898043}},
+          arrival: '2026-07-10T11:25:00+0200',
+          departure: '2026-07-10T11:25:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Ringgenberg (See)',
+            coordinate: {x: 46.701361, y: 7.898407}
+          },
+          arrival: '2026-07-10T11:33:00+0200',
+          departure: '2026-07-10T11:33:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Iseltwald (See)',
+            coordinate: {x: 46.711816, y: 7.962539}
+          },
+          arrival: '2026-07-10T11:51:00+0200',
+          departure: '2026-07-10T11:52:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Giessbach See',
+            coordinate: {x: 46.734813, y: 8.019454}
+          },
+          arrival: '2026-07-10T12:09:00+0200',
+          departure: '2026-07-10T12:09:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Brienz (See)',
+            coordinate: {x: 46.753786, y: 8.038388}
+          },
+          arrival: '2026-07-10T12:20:00+0200',
+          departure: null,
+          delay: null
+        }
+      ]
+    },
+    {
+      category: 'BAT',
+      number: '65',
+      operator: 'BLS-brs',
+      to: 'Brienz (See)',
+      name: '000065',
+      stop: {departure: '2026-07-10T12:07:00+0200', delay: null},
+      passList: [
+        {
+          station: {name: null, coordinate: {x: null, y: null}},
+          arrival: null,
+          departure: '2026-07-10T12:07:00+0200',
+          delay: null
+        },
+        {
+          station: {name: 'Bönigen', coordinate: {x: 46.68938, y: 7.898043}},
+          arrival: '2026-07-10T12:25:00+0200',
+          departure: '2026-07-10T12:25:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Iseltwald (See)',
+            coordinate: {x: 46.711816, y: 7.962539}
+          },
+          arrival: '2026-07-10T12:45:00+0200',
+          departure: '2026-07-10T12:46:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Oberried am Brienzersee (See)',
+            coordinate: {x: 46.73658, y: 7.96278}
+          },
+          arrival: '2026-07-10T12:56:00+0200',
+          departure: '2026-07-10T12:56:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Giessbach See',
+            coordinate: {x: 46.734813, y: 8.019454}
+          },
+          arrival: '2026-07-10T13:09:00+0200',
+          departure: '2026-07-10T13:09:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Brienz (See)',
+            coordinate: {x: 46.753786, y: 8.038388}
+          },
+          arrival: '2026-07-10T13:20:00+0200',
+          departure: null,
+          delay: null
+        }
+      ]
+    },
+    {
+      category: 'BAT',
+      number: '69',
+      operator: 'BLS-brs',
+      to: 'Brienz (See)',
+      name: '000069',
+      stop: {departure: '2026-07-10T14:07:00+0200', delay: null},
+      passList: [
+        {
+          station: {name: null, coordinate: {x: null, y: null}},
+          arrival: null,
+          departure: '2026-07-10T14:07:00+0200',
+          delay: null
+        },
+        {
+          station: {name: 'Bönigen', coordinate: {x: 46.68938, y: 7.898043}},
+          arrival: '2026-07-10T14:25:00+0200',
+          departure: '2026-07-10T14:25:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Ringgenberg (See)',
+            coordinate: {x: 46.701361, y: 7.898407}
+          },
+          arrival: '2026-07-10T14:33:00+0200',
+          departure: '2026-07-10T14:33:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Iseltwald (See)',
+            coordinate: {x: 46.711816, y: 7.962539}
+          },
+          arrival: '2026-07-10T14:51:00+0200',
+          departure: '2026-07-10T14:52:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Giessbach See',
+            coordinate: {x: 46.734813, y: 8.019454}
+          },
+          arrival: '2026-07-10T15:09:00+0200',
+          departure: '2026-07-10T15:09:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Brienz (See)',
+            coordinate: {x: 46.753786, y: 8.038388}
+          },
+          arrival: '2026-07-10T15:20:00+0200',
+          departure: null,
+          delay: null
+        }
+      ]
+    },
+    {
+      category: 'BAT',
+      number: '73',
+      operator: 'BLS-brs',
+      to: 'Brienz (See)',
+      name: '000073',
+      stop: {departure: '2026-07-10T16:07:00+0200', delay: null},
+      passList: [
+        {
+          station: {name: null, coordinate: {x: null, y: null}},
+          arrival: null,
+          departure: '2026-07-10T16:07:00+0200',
+          delay: null
+        },
+        {
+          station: {name: 'Bönigen', coordinate: {x: 46.68938, y: 7.898043}},
+          arrival: '2026-07-10T16:25:00+0200',
+          departure: '2026-07-10T16:25:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Ringgenberg (See)',
+            coordinate: {x: 46.701361, y: 7.898407}
+          },
+          arrival: '2026-07-10T16:33:00+0200',
+          departure: '2026-07-10T16:33:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Niederried (See)',
+            coordinate: {x: 46.717735, y: 7.932305}
+          },
+          arrival: '2026-07-10T16:43:00+0200',
+          departure: '2026-07-10T16:43:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Iseltwald (See)',
+            coordinate: {x: 46.711816, y: 7.962539}
+          },
+          arrival: '2026-07-10T16:51:00+0200',
+          departure: '2026-07-10T16:52:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Giessbach See',
+            coordinate: {x: 46.734813, y: 8.019454}
+          },
+          arrival: '2026-07-10T17:09:00+0200',
+          departure: '2026-07-10T17:09:00+0200',
+          delay: null
+        },
+        {
+          station: {
+            name: 'Brienz (See)',
+            coordinate: {x: 46.753786, y: 8.038388}
+          },
+          arrival: '2026-07-10T17:20:00+0200',
+          departure: null,
+          delay: null
+        }
+      ]
+    }
+  ]
+};

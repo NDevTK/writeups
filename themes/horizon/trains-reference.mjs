@@ -8,6 +8,8 @@
 //  - the real-time layer: delay minutes shift the stop times
 //    exactly; road/water modes never become trains
 import {
+  BOAT_CATS,
+  BOAT_DIMS,
   CAR_NARROW,
   CAR_STD,
   CONSIST_CARS,
@@ -17,7 +19,7 @@ import {
   providerFor,
   trainAt
 } from './trains.js';
-import {BOARD_FIXTURE} from './trains-fixture.mjs';
+import {BOARD_FIXTURE, BOAT_FIXTURE} from './trains-fixture.mjs';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -175,7 +177,33 @@ const journeys = parseBoard(BOARD_FIXTURE);
   check(
     'delay and mode filter',
     ok,
-    'a 5-minute delay shifts the stop times by exactly 300000 ms; the bus on the same board is filtered - boats already arrive via AIS'
+    'a 5-minute delay shifts the stop times by exactly 300000 ms; the bus on the same board is filtered (boats parse separately via BOAT_CATS)'
+  );
+}
+
+{
+  // The LIVE pier board: the BLS Brienzersee sailings parse as
+  // BOATS (category BAT, the piers placed and timed) through the
+  // SAME parser and interpolation the trains use - and the rail
+  // parse of the same board yields nothing (one board, two modes,
+  // no cross-talk). Where AIS misses the lake steamers, the
+  // timetable still knows them.
+  const boats = parseBoard(BOAT_FIXTURE, BOAT_CATS);
+  const rail = parseBoard(BOAT_FIXTURE);
+  const ok =
+    boats.length >= 4 &&
+    boats.every((b) => b.cat === 'BAT' && b.operator === 'BLS-brs') &&
+    boats.every((b) => b.stops.length >= 4) &&
+    boats.every((b) =>
+      b.stops.every((s) => Number.isFinite(s.lat) && Number.isFinite(s.depMs))
+    ) &&
+    rail.length === 0 &&
+    BOAT_DIMS.len > 20 &&
+    BOAT_DIMS.beam > 4;
+  check(
+    'live pier board (boats)',
+    ok,
+    `${boats.length} BLS-brs sailings with placed piers via parseBoard(.., BOAT_CATS); the rail parse of the pier board yields 0 - one parser, two modes`
   );
 }
 
