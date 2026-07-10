@@ -3162,6 +3162,39 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   beam of the lower decks - the cirrus deck the theme already
   polls finally has its signature. Gate 58 sets; smoke shows the
   bow and the halo standing in one sky.
+- DONE: atmospheric-optics CONSOLIDATION - one system again
+  (Jul 10). The Jul 10 rainbow and halo features were built
+  without noticing the theme ALREADY carried a certified
+  optics dome (optics-lut.js + createOpticsMaterial: Monte-Carlo
+  halo histogram, geometric Descartes bow histogram with the
+  emergent Fresnel ratio and Alexander band, limb-darkened solar
+  convolution, and BOTH sun and moon instances - paraselenae and
+  moonbows with Hapke phase brightness). For two merges the sky
+  drew two bows and two halos at slightly different radii. The
+  fix keeps the best of both: rainbow.js and halos.js remain as
+  the pure-physics LIBRARIES (their 12 landmarks unchanged) and
+  optics-lut.js now composes them - the bow LUT is rebuilt from
+  AIRY theory (supernumeraries the geometric histogram
+  documented as out of scope, drop radius from Marshall-Palmer
+  on the measured rain, re-laid on weather polls for both the
+  sun dome and the moonbow); the halo keeps its superior
+  Monte-Carlo histogram but on the Warren & Brandt 2008 rows;
+  the sundogs drop the old fixed gaussian band ("plate-crystal
+  orientation statistics out of scope") for the Bravais LUT -
+  migration, dispersion and the ~61-degree death are now the
+  physics', and the old (0.44 - alt)/0.26 display ramp is
+  deleted. My duplicate dome meshes, materials and theme blocks
+  are removed; the water index moved from Hale & Querry to
+  Daimon & Masumura through the library. optics-reference.mjs
+  grew from a printer into an asserting gate (4 landmarks:
+  Warren-Brandt halo edges, the Airy bow with colour order/
+  reversed secondary/band/Fresnel ratio, supernumerary
+  tightening THROUGH the LUT, the dog LUT's migration and
+  cutoff). Lesson recorded: grep the codebase for the
+  phenomenon BEFORE building it - the 'optics' set name was in
+  the gate list all along. Gate 58 sets (optics 4 asserting);
+  rain smoke shows ONE bow, the LUT record carrying its
+  measured drop size.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
