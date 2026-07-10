@@ -64,6 +64,36 @@ export function pointVisibility(r) {
   return 1 / (1 + r);
 }
 
+// ---- Clouds amplify skyglow: Kyba et al. (2011, PLoS ONE 6,
+// e17307) ----. Overcast multiplies zenith sky luminance by a
+// MEASURED 10.1 inside Berlin and 2.8 at 32 km out - the
+// amplification grows with how much artificial light is overhead,
+// which is exactly what the Falchi ratio measures. The two
+// published anchors are log-interpolated in the ratio (the
+// assigned anchor ratios below are the documented closure: a
+// bright urban core ~20, the city edge ~3 on the Falchi scale),
+// clamped to the measured range and to >= 1 (a pristine sky has
+// nothing to amplify - the rendered clouds already occlude its
+// stars directly). Partial cover scales linearly with cloud
+// fraction (the paper's okta bins rise monotonically).
+export const KYBA_URBAN = {ratio: 20, amp: 10.1}; // central Berlin
+export const KYBA_EDGE = {ratio: 3, amp: 2.8}; // 32 km out
+export function cloudAmp(ratio, cloudFrac) {
+  const c = Math.min(Math.max(cloudFrac ?? 0, 0), 1);
+  if (!(ratio > 0) || c === 0) return 1;
+  const slope =
+    (KYBA_URBAN.amp - KYBA_EDGE.amp) /
+    (Math.log10(KYBA_URBAN.ratio) - Math.log10(KYBA_EDGE.ratio));
+  const overcast = Math.min(
+    Math.max(
+      KYBA_EDGE.amp + slope * (Math.log10(ratio) - Math.log10(KYBA_EDGE.ratio)),
+      1
+    ),
+    KYBA_URBAN.amp
+  );
+  return 1 + (overcast - 1) * c;
+}
+
 // Conventional SQM -> Bortle class mapping (the widely used
 // table; Bortle's 2001 scale is descriptive, this is the
 // documented convention).

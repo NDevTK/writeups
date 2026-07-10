@@ -385,6 +385,7 @@
       import {relPhase} from './horizon/moonphase.js';
       import {
         bortleClass,
+        cloudAmp,
         horizonGlow,
         pointVisibility,
         sampleRatio,
@@ -741,6 +742,8 @@
           const c = w.current;
           state.code = c.weather_code;
           state.cloud = c.cloud_cover;
+          // the measured cover re-scales the skyglow (Kyba 2011)
+          applyCloudSkyglow();
           state.cloudLow = c.cloud_cover_low;
           state.cloudMid = c.cloud_cover_mid;
           state.cloudHigh = c.cloud_cover_high;
@@ -5315,18 +5318,7 @@
         lpRatio = params.has('lp')
           ? +params.get('lp')
           : sampleRatio(SKYGLOW, SKYGLOW_W, SKYGLOW_H, state.lat, state.lon);
-        lpVis = pointVisibility(lpRatio);
-        lpVisBright = 1 / Math.sqrt(1 + lpRatio);
-        lpMag = skyMag(lpRatio);
-        record(
-          'Falchi 2016 skyglow atlas',
-          'zenith ' +
-            lpMag.toFixed(2) +
-            ' mag/arcsec\u00b2 \u00b7 Bortle ' +
-            bortleClass(lpMag) +
-            ' \u00b7 star contrast \u00d7' +
-            lpVis.toFixed(2)
-        );
+        applyCloudSkyglow();
         const g = [];
         for (let i = 0; i < 16; i++)
           g.push(
@@ -5347,8 +5339,37 @@
             3
           );
         lpGlowObj.u.azTex.needsUpdate = true;
-        lpGlowAmp = THREE.MathUtils.clamp(Math.log10(1 + lpRatio) / 2.5, 0, 1);
-        lpGlow.visible = lpGlowAmp > 0.01;
+      }
+      // The LIVE sky over the atlas: clouds amplify the artificial
+      // glow (Kyba et al. 2011, gated in skyglow.js - overcast
+      // multiplied Berlin's zenith by a measured 10.1). Re-applied
+      // whenever the measured cloud cover changes, so an overcast
+      // night over a town is visibly brighter than a clear one and
+      // the stars fade under it exactly as the contrast says.
+      function applyCloudSkyglow() {
+        const amp = cloudAmp(lpRatio, (state.cloud ?? 0) / 100);
+        const rEff = lpRatio * amp;
+        lpVis = pointVisibility(rEff);
+        lpVisBright = 1 / Math.sqrt(1 + rEff);
+        lpMag = skyMag(rEff);
+        lpGlowAmp = THREE.MathUtils.clamp(Math.log10(1 + rEff) / 2.5, 0, 1);
+        if (lpGlow) lpGlow.visible = lpGlowAmp > 0.01;
+        record(
+          'Falchi 2016 skyglow atlas',
+          'zenith ' +
+            lpMag.toFixed(2) +
+            ' mag/arcsec\u00b2 \u00b7 Bortle ' +
+            bortleClass(lpMag) +
+            ' \u00b7 star contrast \u00d7' +
+            lpVis.toFixed(2) +
+            (amp > 1.01
+              ? ' \u00b7 \u00d7' +
+                amp.toFixed(1) +
+                ' under ' +
+                Math.round(state.cloud) +
+                '% cloud (Kyba 2011)'
+              : '')
+        );
       }
       computeSkyglow();
 

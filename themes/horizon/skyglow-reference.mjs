@@ -26,7 +26,10 @@ import {
   pointVisibility,
   sampleRatio,
   skyMag,
-  WALKER_EXP
+  WALKER_EXP,
+  cloudAmp,
+  KYBA_EDGE,
+  KYBA_URBAN
 } from './skyglow.js';
 import {SKYGLOW, SKYGLOW_H, SKYGLOW_W} from './skyglow-data.js';
 
@@ -110,6 +113,36 @@ const check = (name, ok, detail) => {
       east > 10 * (west + 1e-12) &&
       Math.abs(near / far - Math.pow(4, 2.5)) < 1e-12,
     `city due east: glow(90 deg) = ${east.toFixed(2)} vs glow(270) = ${west.toFixed(4)}; 25 km vs 100 km attenuation ratio 4^2.5 = ${(near / far).toFixed(1)} exactly`
+  );
+}
+
+{
+  // Clouds amplify skyglow (Kyba et al. 2011): both published
+  // anchors exact at full overcast, clear skies untouched,
+  // monotone in ratio and cover, clamped to the measured range,
+  // pristine skies never amplified - and the magnitude identity:
+  // the amplified zenith brightens by exactly
+  // 2.5 log10((1 + rA)/(1 + r)) mag through the module's own
+  // skyMag.
+  const urban = cloudAmp(KYBA_URBAN.ratio, 1);
+  const edge = cloudAmp(KYBA_EDGE.ratio, 1);
+  const r = 40;
+  const A = cloudAmp(r, 1);
+  const dMag = skyMag(r) - skyMag(r * A);
+  const wantD = 2.5 * Math.log10((1 + r * A) / (1 + r));
+  const ok =
+    Math.abs(urban - KYBA_URBAN.amp) < 1e-12 &&
+    Math.abs(edge - KYBA_EDGE.amp) < 1e-12 &&
+    cloudAmp(20, 0) === 1 &&
+    cloudAmp(0.01, 1) === 1 &&
+    cloudAmp(1000, 1) === KYBA_URBAN.amp &&
+    cloudAmp(10, 0.5) > cloudAmp(10, 0.2) &&
+    cloudAmp(15, 1) > cloudAmp(5, 1) &&
+    Math.abs(dMag - wantD) < 1e-12;
+  check(
+    'Kyba cloud amplification',
+    ok,
+    `overcast x${KYBA_URBAN.amp} at the urban anchor and x${KYBA_EDGE.amp} at the edge anchor exactly; clear = 1, pristine never amplified, clamps hold; the amplified zenith brightens by the exact magnitude identity`
   );
 }
 
