@@ -1927,7 +1927,10 @@
           const q =
             '[out:json][timeout:30];way[railway~"^(rail|narrow_gauge|funicular|light_rail|tram)$"](' +
             bbox +
-            ');out geom 600;';
+            // 2000: a Zurich-sized box holds 600+ ways and the old
+            // cap returned an ARBITRARY subset - drawn lines ended
+            // mid-field and trains rode invisible rails.
+            ');out geom 2000;';
           let osm = null;
           for (const host of [
             'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
