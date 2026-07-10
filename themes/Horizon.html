@@ -7485,6 +7485,10 @@
         // range the regulation rates it for.
         {
           const shipLightsOn = sun.alt / RAD < SUNSET_ELEV;
+          if (params.has('debug'))
+            window.__ships = shipPool
+              .filter((s) => s.active)
+              .map((s) => ({x: s.x, y: s.g.position.y, z: s.z, label: s.name}));
           for (const s of shipPool) {
             if (!s.active) continue;
             s.x += s.vx * dt;
@@ -7771,6 +7775,18 @@
         {
           const airOn = sun.alt / RAD < SUNSET_ELEV;
           const tSec = t / 1000;
+          // Harness: live dead-reckoned aircraft positions
+          // (?debug=1), like __trains - the shot driver aims here.
+          if (params.has('debug'))
+            window.__planes = airLights
+              .filter((a) => a.active)
+              .map((a) => ({
+                x: a.x,
+                y: a.y,
+                z: a.z,
+                label: a.hex,
+                altM: a.altM
+              }));
           for (const a of airLights) {
             if (!a.active) continue;
             a.x += a.vx * dt;

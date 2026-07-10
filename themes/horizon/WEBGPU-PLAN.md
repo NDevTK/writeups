@@ -3419,6 +3419,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   along-track speed scaling, never track placement). Not built
   yet: needs its own reference landmarks (exit-node argmin on a
   forked network, the tail bound) before it can gate.
+- DONE: the visual QA pass, round two (Jul 10 evening - "same
+  standard as boats and planes, need to show stuff happening").
+  Ships and planes joined the seen-not-asserted club: the daemon
+  (api.ndev.tk) IS reachable through the environment's proxy -
+  the earlier NET-FAIL was the harness shim waiting for a
+  bounded body on the unbounded /stream SSE; the plain /adsb and
+  /ais poll endpoints answer fine. VIEWED: live AIS vessels off
+  the Maasvlakte (a real 57 m coaster's hull + superstructure,
+  M.1371 silhouette); five concurrent Zurich trains in one radar
+  frame; 10-frame animations of the S 24 and S 11 sliding along
+  their (now fully drawn) lines; Nelson pre-dawn - dawn arch,
+  Venus, 1,689 measured Black Marble lamps speckling the town,
+  Tasman Bay reflecting the dawn. Three suspected artifacts
+  RESOLVED AS CORRECT by investigation: the ground speckles are
+  the lamps; the dashed vertical sky lines are contrails seen
+  end-on (an aircraft flying at the camera projects its trail as
+  a vertical streak); the pre-dawn tan is green vegetation under
+  the warm dawn-sky ambient with the documented adaptation lift.
+- OPEN (visual QA finds, Jul 10): (a) the Maasvlakte NOON sea -
+  the ship floats on a flat grey expanse with a hard seam
+  against a near-black far band; grey = the reflector under the
+  overcast white sky (plausibly right), but the black band at
+  noon needs a raycast diagnosis (/eval + Raycaster through the
+  seam pixels) before any fix; at Nelson pre-dawn the same dark
+  open sea IS correct (water mirroring a dark sky). (b) Nelson
+  Cathedral on Pikimai/Church Hill extrudes as a needle ~10x its
+  neighbours - a real building, degenerate proportions; check
+  the Simple-3D height ladder against its tags (tower height on
+  a small footprint part?). Both need the harness eval/raycast
+  round before code changes.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
