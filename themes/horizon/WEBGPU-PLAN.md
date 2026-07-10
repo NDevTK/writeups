@@ -3437,6 +3437,37 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   end-on (an aircraft flying at the camera projects its trail as
   a vertical streak); the pre-dawn tan is green vegetation under
   the warm dawn-sky ambient with the documented adaptation lift.
+- DONE (aircraft lights: visual proof + exact Allard slant, Jul
+  10 latest): the daemon's ADS-B upstream came back, so the
+  planes finally met the ships/trains visual standard - at Sao
+  Paulo GRU (20:10 local, dark, 12 live aircraft) the viewer
+  chased hex e48014 at 960 m from 8 units abeam: the green
+  25.1385 starboard nav light tracks across ten frames (~29
+  px/frame, constant row) and frame 5 catches the white 25.1401
+  anticollision strobe mid-flash; stills, zooms and two GIFs
+  delivered. Chasing the HIGH plane (e4952f, 3,353 m) exposed a
+  real modelling gap: the slant range fed to Allard's law took
+  the vertical leg as altM - centerElev - a GROUND observer
+  assumption, so a camera flown to the plane's own altitude
+  still saw arc-edge candela dimmed by a phantom
+  ground-to-cruise leg. Fixed exactly: vertical leg is now
+  |altM - observer altitude| with the observer's altitude from
+  the same asinh inversion that feeds the LUTs; a ground camera
+  reproduces the old value bit-for-bit (commit 29f3563, full
+  gate green - 61 reference sets + ocean-wind/ocean-sea/glints
+  GPU probes). The high plane STAYED dark after the fix and
+  that is CORRECT: its light meshes are confirmed on in scene
+  state (tail + strobe visible=true via /eval) while the frame
+  shows no stars either - the camera sits inside GRU's live 25%
+  cloud deck at 3.4 km and the Nubis march extinguishes
+  everything on that sight line; the 960 m plane below the deck
+  renders its lights fine through the identical path. Two
+  harness lessons: the gate's GPU probes need
+  BASE=http://localhost:8903 (the harness-dir server - the 8901
+  repo-root default 404s and all three probes "fail" without
+  touching a shader), and view-serve's on-disk livecache keys
+  ADS-B polls by URL, so a reloaded session replays the SAME
+  aircraft forever - fresh traffic needs a cache clear.
 - DONE (the black horizon band, Jul 10 latest - diagnosed from
   the CODE, built, merged b9c2272, visually confirmed): the band
   below the horizon at every anchor was the dome's below-horizon
