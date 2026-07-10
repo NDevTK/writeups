@@ -60,6 +60,7 @@ export const KEEP_PARAMS = [
   'lights',
   'water',
   'buildings',
+  'roads',
   'roam'
 ];
 

@@ -105,7 +105,10 @@
         house families, seated on the sampled terrain and never in
         water; after dark the walls emit the town's measured Black
         Marble radiance, so windows warm exactly where the night
-        lights say the town is lit
+        lights say the town is lit; the street network is real too -
+        OSM highway ways as ribbons of their tagged width (width >
+        lanes x 3.5 m > per-type defaults) and tagged surface
+        albedo, cut by water except where a tagged bridge spans it
       - roam (just fly): the free camera streams terrain. 4 km from
         the anchor the world re-anchors on your geodetic position
         (roam.js - exact inverse mapping and altitude-datum carry,
@@ -127,7 +130,7 @@
         override), aerosol=URL (measured-aerosol endpoint override),
         lights=0|URL (Black Marble night lights off / tile endpoint
         override), water=0 (skip OSM lakes), buildings=0 (skip OSM
-        buildings), debug=1
+        buildings), roads=0 (skip OSM roads), debug=1
     -->
     <style>
       html,
@@ -375,6 +378,7 @@
       } from 'three/tsl';
       import {buildVessel} from './horizon/vessels.js';
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
+      import {parseRoads, roadsGeometry} from './horizon/roads.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -1332,6 +1336,72 @@
           if (worldBuilt) placeBuildings();
         } catch {
           buildsGeo = null; // towns stay lamp-lit ground
+        }
+      }
+
+      // Real roads: OSM way[highway] via the same mirrors - the
+      // street network the buildings stand on. Widths from the
+      // gated OSM width ladder, albedo from the tagged surface,
+      // bridges spanning water on a straight grade (roads.js,
+      // gated end to end). Cached geodetic per anchor; roams
+      // re-project. ?roads=0 disables.
+      let roadsGeo = null;
+      async function syncRoads() {
+        if (params.get('roads') === '0') return;
+        const key =
+          'horizon-roads-geo-' +
+          state.lat.toFixed(2) +
+          ',' +
+          state.lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) {
+            roadsGeo = JSON.parse(hit);
+            record('OSM Overpass roads (cached)', roadsGeo.length + ' ways');
+            if (worldBuilt) placeRoads();
+            return;
+          }
+        } catch {}
+        try {
+          const mLat = 111320;
+          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+          const dLat = DEM_HALF_M / mLat;
+          const dLon = DEM_HALF_M / mLon;
+          const bbox =
+            (state.lat - dLat).toFixed(4) +
+            ',' +
+            (state.lon - dLon).toFixed(4) +
+            ',' +
+            (state.lat + dLat).toFixed(4) +
+            ',' +
+            (state.lon + dLon).toFixed(4);
+          const q =
+            '[out:json][timeout:30];way[highway](' + bbox + ');out geom 800;';
+          let osm = null;
+          for (const host of [
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+            'https://overpass-api.de/api/interpreter'
+          ]) {
+            try {
+              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
+                credentials: 'omit'
+              });
+              if (!r.ok) throw new Error(r.status);
+              osm = await r.json();
+              break;
+            } catch {
+              // Try the next mirror.
+            }
+          }
+          if (!osm) throw new Error('overpass unavailable');
+          roadsGeo = parseRoads(osm);
+          record('OSM Overpass roads', roadsGeo.length + ' ways');
+          try {
+            localStorage.setItem(key, JSON.stringify(roadsGeo));
+          } catch {}
+          if (worldBuilt) placeRoads();
+        } catch {
+          roadsGeo = null; // the ground keeps its own colors
         }
       }
 
@@ -2671,6 +2741,49 @@
           g.placed + ' of ' + buildsGeo.length + ' footprints on this box'
         );
       }
+      // Roads: ribbons of the measured width seated on the sampled
+      // terrain, 2 m of clearance for the coarse render mesh (the
+      // ribbon follows sample() every 15 m; the mesh interpolates
+      // 50 m cells). Water cuts a road; tagged bridges span it.
+      let roadMesh = null;
+      let roadMat = null;
+      function placeRoads() {
+        if (roadMesh) {
+          ground.remove(roadMesh);
+          roadMesh.geometry.dispose();
+          roadMesh = null;
+        }
+        if (!roadsGeo || !roadsGeo.length || params.get('roads') === '0')
+          return;
+        const groundY = (x, z) => {
+          const s = sample(x, z);
+          return s.water ? null : s.y + 2 / MPU;
+        };
+        const g = roadsGeometry(roadsGeo, dressAnchor, groundY, 1 / MPU, 140);
+        if (!g.placed) return;
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(g.color, 3));
+        if (!roadMat) {
+          roadMat = new THREE.MeshStandardNodeMaterial({
+            vertexColors: true,
+            roughness: 0.95,
+            metalness: 0,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2
+          });
+          applyAerial(roadMat);
+        }
+        roadMesh = new THREE.Mesh(geo, roadMat);
+        roadMesh.receiveShadow = true;
+        ground.add(roadMesh);
+        record(
+          'OSM roads placed',
+          g.placed + ' of ' + roadsGeo.length + ' ways on this box'
+        );
+      }
       function buildWorld(pre) {
         // Roam rebuilds repeatedly: free the previous terrain
         // geometry (trees share cached geometries/materials and
@@ -2742,6 +2855,7 @@
 
         placeTrees();
         placeBuildings();
+        placeRoads();
 
         // The sea: three.js Water (planar reflections) riding at real sea
         // level wherever the DEM says there is water. Roam rebuilds
@@ -4826,6 +4940,7 @@
         syncAerosol();
         syncWater();
         syncBuildings();
+        syncRoads();
         // The lamp cloud is anchored to the OLD box - drop it now,
         // syncLights rebuilds it Earth-anchored on the new one.
         if (lampPts) {
@@ -6515,6 +6630,7 @@
         setInterval(syncAerosol, 30 * 60 * 1000);
         syncWater();
         syncBuildings();
+        syncRoads();
         syncLights();
         setInterval(syncLights, 6 * 60 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
