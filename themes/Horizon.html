@@ -7825,8 +7825,15 @@
             const horizM =
               Math.hypot(camera.position.x - a.x, camera.position.z - a.z) *
               MPU;
+            // Allard's d is observer-to-light, so the vertical leg
+            // uses the camera's REAL altitude (same asinh inversion
+            // as the LUTs) - a ground observer keeps the old value,
+            // a flown-up camera alongside a plane no longer sees it
+            // dimmed by a phantom ground-to-cruise leg.
+            const obsAltM =
+              centerElev + 500 * Math.sinh(camera.position.y / 16);
             const slantM = Math.max(
-              Math.hypot(horizM, Math.max(a.altM - centerElev, 0)),
+              Math.hypot(horizM, Math.abs(a.altM - obsAltM)),
               200
             );
             const posI = positionIntensity(rel);
