@@ -215,6 +215,13 @@ export function spectrumK(kx, kz, params) {
     }
     return (sum * dwdk) / k;
   }
+  // The calm limit is exact physics, not a clamp: with no wind
+  // there is no wind sea - S vanishes identically. Without the
+  // guard U10 = 0 rides into peakOmega's 1/U10 and the JONSWAP
+  // exponents as Infinity, 0 x Inf = NaN fills h0, and the GPU
+  // renders the NaN vertex as garbage (measured: a dead-calm
+  // Nelson dawn grew a 400 m cone out of the harbour).
+  if (!(U10 > 0)) return 0;
   const S = tmaSpectrum(w, U10, F, D);
   if (S <= 0) return 0;
   const wp = peakOmega(U10, F);
