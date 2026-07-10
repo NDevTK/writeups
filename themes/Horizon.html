@@ -349,7 +349,7 @@
       } from './horizon/sky-objects-tsl.js';
       import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
       import {mpDropRadiusMm} from './horizon/rainbow.js';
-      import {parseSoft00, visibleComets} from './horizon/comets.js';
+      import {parseSoft00, syndyne, visibleComets} from './horizon/comets.js';
       import {buildBowLUT, buildDogLUT} from './horizon/optics-lut.js';
       import {
         apparentAltitude,
@@ -5360,6 +5360,41 @@
       cometTail.visible = false;
       cometTail.renderOrder = 1;
       scene.add(cometTail);
+      // The DUST tail: the Finson-Probstein beta = 0.3 syndyne
+      // (grains released over the last two months, zero ejection
+      // velocity - the FP model), drawn as a strip through the
+      // grains' own sky positions. It curves behind the orbit
+      // exactly as photographs show; the straight quad above is
+      // the ION tail (solar-wind carried, effectively radial).
+      const DUST_TAUS = [2, 5, 10, 18, 28, 42, 60];
+      const cometDustGeo = new THREE.BufferGeometry();
+      cometDustGeo.setAttribute(
+        'position',
+        new THREE.BufferAttribute(
+          new Float32Array((DUST_TAUS.length + 1) * 2 * 3),
+          3
+        )
+      );
+      {
+        const idx = [];
+        for (let i = 0; i < DUST_TAUS.length; i++) {
+          const a = 2 * i;
+          idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        }
+        cometDustGeo.setIndex(idx);
+      }
+      const cometDustMat = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(1.0, 0.92, 0.78),
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      const cometDust = new THREE.Mesh(cometDustGeo, cometDustMat);
+      cometDust.visible = false;
+      cometDust.renderOrder = 1;
+      scene.add(cometDust);
       let cometEls = null;
       async function syncComets() {
         if (params.get('comets') === '0') return;
@@ -6646,6 +6681,16 @@
                   return {alt: h.altitude * RAD, az: h.azimuth * RAD};
                 };
                 const sTail = 0.12 / c.r; // a step out along the radial
+                // the dust: each grain of the beta = 0.3 syndyne
+                // placed at ITS own sky position (comets.js
+                // syndyne - Finson-Probstein, gated)
+                const dust = syndyne(c.el, jd, 0.3, DUST_TAUS).map((g) =>
+                  place({
+                    x: g.x - obsEcl.x,
+                    y: g.y - obsEcl.y,
+                    z: g.z - obsEcl.z
+                  })
+                );
                 astro.comet = {
                   name: c.name,
                   mag: c.mag,
@@ -6654,7 +6699,8 @@
                     x: c.geo.x + c.helio.x * sTail,
                     y: c.geo.y + c.helio.y * sTail,
                     z: c.geo.z + c.helio.z * sTail
-                  })
+                  }),
+                  dust
                 };
                 record(
                   'MPC comet',
@@ -6741,10 +6787,43 @@
               cometTailMat.opacity =
                 planetObj.u.night.value * lpVis * bright * 0.35;
               cometTail.visible = cometTailMat.opacity > 0.004;
+              // the dust strip through the syndyne's sky points,
+              // widening with grain age (older dust has spread)
+              if (c.dust && c.dust.length === DUST_TAUS.length) {
+                const da = cometDustGeo.attributes.position;
+                let prev = v;
+                for (let i = 0; i <= DUST_TAUS.length; i++) {
+                  const pt =
+                    i === 0
+                      ? v
+                      : skyPoint(c.dust[i - 1].alt, c.dust[i - 1].az, 858);
+                  const nxt =
+                    i < DUST_TAUS.length
+                      ? skyPoint(c.dust[i].alt, c.dust[i].az, 858)
+                      : pt;
+                  const seg = nxt.clone().sub(i === 0 ? pt : prev);
+                  if (seg.lengthSq() < 1e-8) seg.copy(dir);
+                  const sd = seg
+                    .normalize()
+                    .cross(pt.clone().normalize())
+                    .setLength(1.2 + i * 0.9);
+                  da.setXYZ(2 * i, pt.x - sd.x, pt.y - sd.y, pt.z - sd.z);
+                  da.setXYZ(2 * i + 1, pt.x + sd.x, pt.y + sd.y, pt.z + sd.z);
+                  prev = pt;
+                }
+                da.needsUpdate = true;
+                cometDustGeo.computeBoundingSphere();
+                cometDustMat.opacity =
+                  planetObj.u.night.value * lpVis * bright * 0.3;
+                cometDust.visible = cometDustMat.opacity > 0.004;
+              } else {
+                cometDust.visible = false;
+              }
             }
           } else {
             cs.setX(0, 0);
             cometTail.visible = false;
+            cometDust.visible = false;
           }
           cp.needsUpdate = true;
           cs.needsUpdate = true;
