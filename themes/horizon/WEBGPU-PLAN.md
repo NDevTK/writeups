@@ -2679,6 +2679,39 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   count and next departure. ?trains=0 governs both modes. Gate
   set count unchanged (50) - the trains set grew 5 -> 6
   landmarks. Browser smoke unchanged and clean.
+- DONE: worldwide trains via transitous.org (Jul 10, growing the
+  provider registry - the community DB API answered 503 on both
+  versions, so the SECOND registry entry became the better one:
+  transitous.org aggregates public GTFS feeds worldwide, keyless
+  and CORS-open, and its api/v6/map/trips answers a box + time
+  window with every leg operating there RIGHT THEN - mode, line
+  name (ICE 698), real-time-adjusted departure/arrival with a
+  realTime flag, the from/to stops, and the encoded POLYLINE of
+  the actual route shape). trains.js grew (gate 6 -> 9
+  landmarks): decodePolyline held EXACT against the canonical
+  documented reference polyline (the shared GTFS encoding);
+  pathPoint - a point at LENGTH fraction f along a geodetic path,
+  by cumulative arc length not vertex count (landmark: f = 0.5 on
+  a 300 m + 100 m L sits exactly 200 m up the first leg);
+  parseTrips -> the SAME journey shape the boards produce (one
+  consist ladder, one livery family, one renderer), MODE_CAT
+  mapping GTFS modes to board categories with underground modes
+  deliberately absent (drawing a metro on the surface would be
+  inventing) and FERRY routed to the boats path; trainAt follows
+  a journey carrying its route shape ALONG THE SHAPE by arc
+  length instead of the straight line (the LIVE 57-leg Frankfurt
+  fixture holds ICE 698 mid-leg ON its own polyline). The
+  registry: transitous kind 'trips' with the WORLD as its bbox,
+  ordered AFTER the Swiss national board (richer metadata wins
+  where both cover); the scope landmark now proves Paris and New
+  York fall through to the aggregator while Interlaken stays
+  Swiss - one provider per view, never more. Theme: syncTrains
+  branches on provider.kind - the trips flow is ONE box query
+  (~8 km, 15-minute window) parsed and split rail/ferry; panel
+  records leg count, real-time share and the next departure.
+  Renderers unchanged - the shared journey shape did the work.
+  Gate 50 sets (trains 6 -> 9 landmarks); browser smoke unchanged
+  and clean.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
