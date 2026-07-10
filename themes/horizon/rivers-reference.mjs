@@ -8,15 +8,18 @@
 //  - a watercourse reaching polygon water stops at the shore
 //    (the shared strip-breaking, asserted through THIS path)
 import {
+  B_AT_A_STATION,
   DEFAULT_WATER_WIDTH,
+  dischargeFactor,
   parseWaterways,
+  refDischarge,
   RIVER_COLOR,
   riversGeometry,
   riverWidthOf,
   WATER_WIDTH
 } from './rivers.js';
 import {densify, thin} from './roads.js';
-import {RIVERS_FIXTURE} from './rivers-fixture.mjs';
+import {DISCHARGE_FIXTURE, RIVERS_FIXTURE} from './rivers-fixture.mjs';
 import {geoToScene} from './roam.js';
 
 let fail = 0;
@@ -161,6 +164,49 @@ const rivers = parseWaterways(RIVERS_FIXTURE);
     'stops at the shore',
     half.count > 0 && half.count < dry.count && maxX <= 0 + 15 * U + 1e-9,
     `the eastern half in a lake: ${dry.count} -> ${half.count} vertices, the ribbon's last vertex at x = ${maxX.toFixed(3)} (the shore), the lake surface takes over`
+  );
+}
+
+{
+  // Hydraulic geometry (Leopold & Maddock 1953): the width factor
+  // IS (Q/Qref)^b with the canonical at-a-station exponent 0.26 -
+  // exact against Math.pow, unity at reference flow, clamped at
+  // believable bounds, and 1 (nothing invented) on missing data.
+  const ok =
+    B_AT_A_STATION === 0.26 &&
+    dischargeFactor(2, 1) === Math.pow(2, 0.26) &&
+    dischargeFactor(1, 2) === Math.pow(0.5, 0.26) &&
+    dischargeFactor(34.65, 34.65) === 1 &&
+    dischargeFactor(1e9, 1) === 2 &&
+    dischargeFactor(1e-9, 1) === 0.5 &&
+    dischargeFactor(NaN, 30) === 1 &&
+    dischargeFactor(30, 0) === 1 &&
+    refDischarge([1, 2, 3]) === null;
+  check(
+    'hydraulic geometry',
+    ok,
+    `w ~ Q^${B_AT_A_STATION} (Leopold & Maddock at-a-station), exact to Math.pow, unity at reference, clamped [0.5, 2], factor 1 whenever the data cannot speak`
+  );
+}
+
+{
+  // The LIVE GloFAS record: 93 days at the Interlaken cell - the
+  // median recomputes to the captured 34.65 m3/s, and the day of
+  // capture (26.16, a below-median summer flow) yields a width
+  // factor just under 1, exactly the power law's answer.
+  const q = DISCHARGE_FIXTURE.daily.river_discharge;
+  const ref = refDischarge(q);
+  const today = q[q.length - 1];
+  const f = dischargeFactor(today, ref);
+  check(
+    'live GloFAS discharge',
+    q.length === 93 &&
+      ref === 34.65 &&
+      today === 26.16 &&
+      f === Math.pow(26.16 / 34.65, 0.26) &&
+      f > 0.9 &&
+      f < 1,
+    `93 days -> median ${ref} m3/s; capture day ${today} -> width x${f.toFixed(3)} - the Aare a touch narrower that day, by the paper's own law`
   );
 }
 
