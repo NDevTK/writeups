@@ -3248,6 +3248,30 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   through the beta = 0.3 syndyne's own sky positions (grains 2
   to 60 days old, widening with age), both faded by the
   diffuse-source contrast law. Gate 59 sets (comets 7).
+- DONE: the dust FAN + the force-free limit (Jul 10, comets
+  polish). The single beta = 0.3 syndyne became the family the
+  Finson-Probstein diagram actually describes: three syndynes
+  (beta 0.1/0.3/0.6) drawn as overlapping strips - the tail's
+  width on the sky IS the grain-size family, not a drawn shape.
+  keplerFromState gained the exact mu = 0 branch (a beta = 1
+  grain: radiation pressure cancels gravity, straight-line
+  motion). Landmark (comets 7 -> 8): the fan's ordering - at
+  fixed 20-day age the anti-sunward displacement grows STRICTLY
+  with beta across 0.05/0.1/0.3/0.6/1.0 (beta 1 carrying 20x
+  beta 0.05), and every grain collapses onto the head at age
+  zero; the FP sheet's whole geometry in one check.
+- PARKED honestly (Jul 10, both after real source checks): lake
+  ice - MODIS NDSI statically masks inland water (our own
+  FLAG_RGB rows 237/239 prove it), so freeze is NOT measurable
+  through the snow pipeline, and Stefan's law without a
+  depth-aware onset would freeze Lake Thun (which does not
+  freeze); measured-imagery ground albedo (GIBS 8-day surface
+  reflectance / HLS NBAR) - the display stretch is not citably
+  documented for quantitative inversion, HLS carries clouds with
+  no mask layer, and the Ross-Li kernels were FITTED from the
+  same MOD09 measurements, so blending both would double-count
+  one dataset. Both need better sources, not more cleverness.
+  DB transport.rest re-probed Jul 10: now fully dark (no route).
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

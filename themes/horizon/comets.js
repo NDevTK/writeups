@@ -163,6 +163,18 @@ export function keplerUniversal(q, e, dtDays, mu = MU_SUN) {
  * state flies these equations at mu(1 - beta).
  */
 export function keplerFromState(r0v, v0v, dtDays, mu = MU_SUN) {
+  if (mu <= 1e-12) {
+    // the force-free limit (a beta = 1 grain: radiation pressure
+    // cancels gravity exactly) - straight-line motion, exact
+    return {
+      pos: {
+        x: r0v.x + v0v.x * dtDays,
+        y: r0v.y + v0v.y * dtDays,
+        z: r0v.z + v0v.z * dtDays
+      },
+      vel: {x: v0v.x, y: v0v.y, z: v0v.z}
+    };
+  }
   const r0 = Math.hypot(r0v.x, r0v.y, r0v.z);
   const v02 = v0v.x * v0v.x + v0v.y * v0v.y + v0v.z * v0v.z;
   const rv = r0v.x * v0v.x + r0v.y * v0v.y + r0v.z * v0v.z;
