@@ -2504,6 +2504,47 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   identity first gated at 1e-9 and failed at 3.1e-8 - float32
   vertex storage, tolerance moved to the documented 1e-6, the
   double-precision math itself exact. Gate 45 -> 46 sets.
+- DONE: real ground cover (Jul 10, the environment series after
+  roads - the terrain painted one grass everywhere low and dry).
+  OSM landuse + ground-cover naturals (grassland, sand, beach,
+  scree, bare_rock) through the SAME Overpass mirrors: landuse.js
+  (pure JS, gated at 5 landmarks) - the class -> linear-albedo
+  table with unknown classes dropped (base grass is the truthful
+  unknown), ways parsed directly and relations stitched via the
+  LAKES' gated endpoint matching (shared code, not re-derived;
+  synthetic 4-segment shuffled/reversed relation landmark since
+  the captured bbox holds none), rings thinned by the lakes'
+  gated decimate, and landTint scanline-rasterising even-odd into
+  an n x n RGBA field (rgb = class albedo, a = coverage) painted
+  LARGEST FIRST so small parcels win their texels (paint-order
+  landmark: a meadow inside farmland keeps its centre). The
+  raster is gated against the pointwise even-odd test (smoke.js
+  inRing) AND against the terrain shader's row orientation - a
+  north-half square must paint only the upper texture rows,
+  because the shader samples v = 0.5 - z/world (the flip lives in
+  landTint at write time, held by the gate). The LIVE fixture:
+  125 captured Interlaken polygons (14 classes, census in the
+  fixture header), 88 painting the box at 2% texel share - the
+  gate documents that 2% is the honest number (the capture bbox
+  is ~3.3 km of the 16 km box). terrain-tsl.js grew landTexNode +
+  uLandOn beside the night-lights texture: the tint mixes into
+  the GRASS albedo only (0.85 strength), through the same detail
+  fbm and measured Ross-Li factor, so rock faces, snow and the
+  sea never read it and lighting stays the model's. Horizon:
+  syncLanduse (both mirrors, geodetic cache per anchor),
+  placeLanduse re-rasterises per box and swaps the DataTexture
+  exactly like the lights path; ?landuse=0; KEEP_PARAMS carries
+  'landuse'. The asset viewer's town stage paints the same field
+  under the buildings/roads (canvas overlay, stage-only layer
+  separation 0.05/0.1 after a z-fight against the 8000-unit
+  backdrop plane - the THEME blends in-shader and cannot fight).
+  Float32 tolerance lesson re-applied at the paint-order landmark
+  (0.13 stored as 0.12999999...). Debug trail: the live-fixture
+  landmark first demanded >10% texel share and failed at 2% -
+  arithmetic, not code: the capture bbox is 4% of the box area.
+  Gate 46 -> 47 sets. Browser smoke: 177/177 buildings, 319/319
+  roads, 88/116 landuse polygons painted on the DEM world, one
+  known warning class.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

@@ -4,6 +4,7 @@ import {
   FloatType,
   MeshStandardNodeMaterial,
   RedFormat,
+  RGBAFormat,
   Vector2,
   Vector3
 } from 'three/webgpu';
@@ -116,6 +117,7 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     // night factor, the exposure-matched gain and the gated
     // 2700 K Planckian lamp tint.
     uLightsOn: uniform(0),
+    uLandOn: uniform(0),
     uLightsNight: uniform(0),
     uLightsGain: uniform(0.035),
     uLightsTint: uniform(new Vector3(1, 0.417, 0.1))
@@ -427,9 +429,31 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     return mix(float(1), A, u.uRossOn);
   })();
 
+  // Real ground cover (landuse.js): rgb = the OSM class albedo,
+  // a = coverage. Mixed into the GRASS albedo only - rock faces,
+  // snow and the sea never read it - through the same detail
+  // noise and measured Ross-Li factor, so lighting stays the
+  // model's. Default 1x1 a=0: base grass until data arrives.
+  const landZero = new DataTexture(
+    new Float32Array([0, 0, 0, 0]),
+    1,
+    1,
+    RGBAFormat,
+    FloatType
+  );
+  landZero.needsUpdate = true;
+  const landTexNode = texture(landZero);
+
   const colorNode = Fn(() => {
     const n3 = tfbm(positionWorld.xz.mul(3.3));
-    const grass = mix(vec3(0.09, 0.21, 0.05), vec3(0.19, 0.33, 0.08), n1)
+    const land = landTexNode.sample(
+      vec2(
+        positionWorld.x.div(u.uWorldSize).add(0.5),
+        float(0.5).sub(positionWorld.z.div(u.uWorldSize))
+      )
+    );
+    const grass0 = mix(vec3(0.09, 0.21, 0.05), vec3(0.19, 0.33, 0.08), n1);
+    const grass = mix(grass0, land.rgb, land.a.mul(u.uLandOn).mul(0.85))
       .mul(n3.mul(0.3).add(0.85))
       .mul(rossA);
     const rock = mix(vec3(0.28, 0.25, 0.21), vec3(0.4, 0.37, 0.32), n2).mul(
@@ -514,5 +538,11 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
   // Aerial perspective + Koschmieder: the ONE shared hook from
   // aerial-tsl.js, same graph every world material uses.
   aerial.apply(mat);
-  return {material: mat, uniforms: u, momentsTexNode, lightsTexNode};
+  return {
+    material: mat,
+    uniforms: u,
+    momentsTexNode,
+    lightsTexNode,
+    landTexNode
+  };
 }

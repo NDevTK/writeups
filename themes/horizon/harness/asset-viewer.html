@@ -42,6 +42,8 @@
       import {BUILDINGS_FIXTURE} from '../buildings-fixture.mjs';
       import {parseRoads, roadsGeometry} from '../roads.js';
       import {ROADS_FIXTURE} from '../roads-fixture.mjs';
+      import {landTint, parseLanduse} from '../landuse.js';
+      import {LANDUSE_FIXTURE} from '../landuse-fixture.mjs';
 
       const q = new URLSearchParams(location.search);
       const renderer = new THREE.WebGPURenderer({antialias: true});
@@ -99,9 +101,58 @@
       if (q.get('asset') === 'buildings') {
         sea.material.color.set('#5d7a52'); // grass stage
         sun.position.set(-320, 380, -420); // camera side (az 205)
+        const anchor = {lat: 46.6863, lon: 7.8632};
+        // The real ground cover under the town (landuse.js): paint
+        // the tint field into a canvas over the stage grass, the
+        // same 280-unit box the theme rasterises. ?landuse=0 hides.
+        if (q.get('landuse') !== '0') {
+          const t = landTint(parseLanduse(LANDUSE_FIXTURE), anchor, 280, 192);
+          if (t) {
+            const cv = document.createElement('canvas');
+            cv.width = cv.height = t.n;
+            const cx = cv.getContext('2d');
+            const img = cx.createImageData(t.n, t.n);
+            const g = (v) => Math.round(255 * Math.sqrt(v)); // ~sRGB
+            for (let k = 0; k < t.n * t.n; k++) {
+              const a = t.data[4 * k + 3];
+              if (a) {
+                img.data[4 * k] = g(t.data[4 * k]);
+                img.data[4 * k + 1] = g(t.data[4 * k + 1]);
+                img.data[4 * k + 2] = g(t.data[4 * k + 2]);
+                img.data[4 * k + 3] = 235;
+              } else {
+                img.data[4 * k] = 93; // the stage grass
+                img.data[4 * k + 1] = 122;
+                img.data[4 * k + 2] = 82;
+                img.data[4 * k + 3] = 255;
+              }
+            }
+            // canvas row 0 renders at +v = the plane's far (north)
+            // edge after the -PI/2 rotation; the tint's row 0 is
+            // SOUTH - flip while blitting.
+            const flip = cx.createImageData(t.n, t.n);
+            for (let j = 0; j < t.n; j++)
+              flip.data.set(
+                img.data.subarray(j * t.n * 4, (j + 1) * t.n * 4),
+                (t.n - 1 - j) * t.n * 4
+              );
+            cx.putImageData(flip, 0, 0);
+            const tex = new THREE.CanvasTexture(cv);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.magFilter = THREE.LinearFilter;
+            const landPlane = new THREE.Mesh(
+              new THREE.PlaneGeometry(280, 280),
+              new THREE.MeshStandardMaterial({map: tex, roughness: 1})
+            );
+            landPlane.rotation.x = -Math.PI / 2;
+            // stage-only clearance over the 8000-unit backdrop
+            // (the THEME blends this in the terrain shader itself)
+            landPlane.position.y = 0.05;
+            scene.add(landPlane);
+          }
+        }
         let builds = parseBuildings(BUILDINGS_FIXTURE);
         if (+q.get('n')) builds = builds.slice(0, +q.get('n')); // nearest-first
-        const anchor = {lat: 46.6863, lon: 7.8632};
         const g = buildingsGeometry(
           builds,
           anchor,
@@ -125,7 +176,7 @@
           const rg = roadsGeometry(
             parseRoads(ROADS_FIXTURE),
             anchor,
-            () => 0.012,
+            () => 0.1, // above the stage ground layers
             7 / 400,
             1e9
           );
