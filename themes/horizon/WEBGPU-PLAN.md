@@ -3443,12 +3443,30 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   overcast white sky (plausibly right), but the black band at
   noon needs a raycast diagnosis (/eval + Raycaster through the
   seam pixels) before any fix; at Nelson pre-dawn the same dark
-  open sea IS correct (water mirroring a dark sky). (b) Nelson
-  Cathedral on Pikimai/Church Hill extrudes as a needle ~10x its
-  neighbours - a real building, degenerate proportions; check
-  the Simple-3D height ladder against its tags (tower height on
-  a small footprint part?). Both need the harness eval/raycast
-  round before code changes.
+  open sea IS correct (water mirroring a dark sky). The same
+  black band frames Nelson's Tasman Bay by day - likely the
+  world-edge strip beyond the water plane's extent (the dome's
+  below-horizon rows), one diagnosis for both.
+- OPEN -> INVESTIGATED (the Nelson cone, Jul 10 late): NOT the
+  cathedral. The full forensic trail, every step measured
+  through the viewer's /eval: not a building (no tagged height
+  over 25 m in the box); not a tree instance (no InstancedMesh
+  scale outliers); not the FFT ocean (a real calm-limit NaN bug
+  was found and fixed on the way - see the calm-limit DONE - but
+  the cone survived it); not vessels, not any of the ~68
+  top-level objects (visibility bisect); it dies EXACTLY when
+  the terrain mesh (ground child 0) hides. Yet the terrain's CPU
+  state is provably clean: position max 24.49 units (the real
+  Bryant Range corner), every index in range, no positionNode,
+  no morphs, no children - and a forced attribute re-upload
+  (needsUpdate) does NOT clear it. The real terrarium tiles for
+  the box are clean (refetched and decoded: max 1210 m).
+  Conclusion: the draw call renders one garbage vertex that
+  exists nowhere in JS-visible state - a backend-level vertex
+  buffer corruption on THIS container's SwiftShader/Dawn stack,
+  same family as the swizzle rejection. NEXT: check Nelson
+  (?lat=-41.27&lon=173.28) on real hardware - if the cone is
+  absent there, this moves to the environment column for good.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
