@@ -167,7 +167,7 @@ export function decodePolyline(str, precision = 5) {
   const out = [];
   let lat = 0;
   let lon = 0;
-  for (let i = 0; i < str.length; ) {
+  for (let i = 0; i < str.length;) {
     for (const which of [0, 1]) {
       let shift = 0;
       let result = 0;
