@@ -3437,29 +3437,38 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   end-on (an aircraft flying at the camera projects its trail as
   a vertical streak); the pre-dawn tan is green vegetation under
   the warm dawn-sky ambient with the documented adaptation lift.
-- OPEN -> DIAGNOSED, ready to build (the black horizon band,
-  Jul 10 latest - diagnosed from the CODE this time, no raycast
-  involved): the band below the horizon at every anchor is the
-  dome's below-horizon LUT rows, and atmosphere-tsl's makeMarch
-  accumulates IN-SCATTER ONLY - Hillaire (2020) terminates the
+- DONE (the black horizon band, Jul 10 latest - diagnosed from
+  the CODE, built, merged b9c2272, visually confirmed): the band
+  below the horizon at every anchor was the dome's below-horizon
+  LUT rows, and atmosphere-tsl's makeMarch accumulated
+  IN-SCATTER ONLY - Hillaire (2020) terminates the
   ground-hitting sky-view rays with the ground bounce the march
-  omits: L += T(dGround) x (albedo/pi) x NdotL x T_sun(ground).
+  omitted: L += T(dGround) x (albedo/pi) x NdotL x T_sun(ground).
   With no bounce, a steep below-horizon ray carries only its
   short path's in-scatter -> near-black at noon; at night the
   band is invisible (dark anyway), which is exactly the observed
   behaviour (Rotterdam noon, daylit Tasman Bay; fine at Nelson
   pre-dawn; the Maasvlakte grey/black seam is the reflector edge
-  meeting this band). BUILD PLAN: (1) makeMarch grows a
+  meeting this band). BUILT AS PLANNED: (1) makeMarch grew a
   ground-hit flag + groundAlbedo uniform, applied only in
-  skyviewNode's below-horizon branch (the aerial march must NOT
+  skyviewNode's below-horizon branch (the aerial march does NOT
   add it - scene geometry provides that ground); (2) the albedo
   is FED, not painted: Payne (1972) open-ocean broadband 0.06
-  where the box edge is sea; the land value needs its own
-  citation before inland boxes change; (3) atmo-reference
-  mirrors the term with a closed-point landmark (below-horizon
-  noon texel equals the T x NdotL x albedo/pi identity) and the
-  GPU-vs-reference texel probes hold both sides together; (4)
-  visual before/after at the Maasvlakte anchor.
+  where the box edge is sea; the land value still needs its own
+  citation before inland boxes change (the MS-LUT reference's
+  0.3 is the natural candidate); (3) atmo-reference mirrors the
+  term with closed-point landmarks (identity at zero albedo,
+  linear in albedo, above-horizon rows bit-identical) and the
+  gate held 61 reference sets + 3 GPU probes green; (4) visual
+  before/after at the Maasvlakte anchor CONFIRMED through the
+  viewer: same ship-chase pose (camera 2.2 units over a live AIS
+  vessel, 12.5 deg down), the wedge between the sky horizon and
+  the ocean plane edge went from near-black to a lit haze tone
+  continuous with the sea. Harness lesson from the shoot: /pose
+  y is SCENE units under the asinh height compression (real
+  altitude = centerElev + 500\*sinh(y/16)), so y=350 is above the
+  atmosphere (black frame) and y=60 is a 10 km aerial view -
+  keep posed cameras in single-digit y for eye-level shots.
 - OPEN -> INVESTIGATED (the Nelson cone, Jul 10 late): NOT the
   cathedral. The full forensic trail, every step measured
   through the viewer's /eval: not a building (no tagged height
