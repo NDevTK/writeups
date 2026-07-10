@@ -392,11 +392,27 @@ const ms = (iso) => (iso ? Date.parse(iso) : NaN);
  */
 export function parseBoard(json, cats = RAIL_CATS) {
   const out = [];
+  // The API nulls out the board's OWN station in each departure's
+  // passList (it is the row you asked about: station.name and its
+  // coordinates come back null), so the origin stop would drop for
+  // missing coordinates - and a train DEPARTING the board's
+  // station toward one more stop would collapse below the two-stop
+  // minimum and never draw. The root `station` carries the missing
+  // coordinates; substitute them for exactly that anonymous row.
+  // A NAMED stop with broken coordinates still drops - its
+  // position would be invented.
+  const own = (json && json.station && json.station.coordinate) || {};
+  const ownName = (json && json.station && json.station.name) || '';
   for (const e of (json && json.stationboard) || []) {
     if (!cats.has(e.category)) continue; // other modes/unknown
     const stops = [];
     for (const p of e.passList || []) {
-      const c = (p.station && p.station.coordinate) || {};
+      let c = (p.station && p.station.coordinate) || {};
+      let nm = (p.station && p.station.name) || '';
+      if (!Number.isFinite(c.x) && !nm) {
+        c = own;
+        nm = ownName;
+      }
       if (!Number.isFinite(c.x) || !Number.isFinite(c.y)) continue;
       const late = (Number.isFinite(p.delay) ? p.delay : 0) * 60000;
       const arr = ms(p.arrival);
@@ -405,7 +421,7 @@ export function parseBoard(json, cats = RAIL_CATS) {
       stops.push({
         lat: c.x,
         lon: c.y,
-        name: (p.station && p.station.name) || '',
+        name: nm,
         arrMs: (Number.isFinite(arr) ? arr : dep) + late,
         depMs: (Number.isFinite(dep) ? dep : arr) + late
       });

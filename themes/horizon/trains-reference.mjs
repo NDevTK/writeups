@@ -96,6 +96,63 @@ const journeys = parseBoard(BOARD_FIXTURE);
 }
 
 {
+  // The anonymous origin row: the API nulls the board's OWN
+  // station in every passList (name AND coordinates), so without
+  // the root-station substitution each journey would lose its
+  // first stop - and a departure toward ONE more stop would never
+  // draw at all. The captured IC 61 must now START at Interlaken
+  // Ost's own coordinates at its 04:56 departure, and a moment
+  // after departure interpolates on the Ost -> West leg (it used
+  // to be null there). A NAMED stop with broken coordinates still
+  // drops - substituting a position for it would be inventing.
+  const ic61 = journeys.find((j) => j.cat === 'IC' && j.number === '61');
+  const dep = Date.parse('2026-07-10T04:56:00+0200');
+  const p = ic61 && trainAt(ic61, dep + 60000);
+  const broken = parseBoard({
+    station: BOARD_FIXTURE.station,
+    stationboard: [
+      {
+        category: 'IC',
+        number: '1',
+        operator: 'SBB',
+        to: 'X',
+        stop: {departure: '2026-07-10T04:56:00+0200', delay: 0},
+        passList: [
+          {
+            station: {name: 'Somewhere', coordinate: {x: null, y: null}},
+            arrival: null,
+            departure: '2026-07-10T04:56:00+0200',
+            delay: 0
+          },
+          {
+            station: {name: 'Spiez', coordinate: {x: 46.686389, y: 7.680098}},
+            arrival: '2026-07-10T05:17:00+0200',
+            departure: null,
+            delay: 0
+          }
+        ]
+      }
+    ]
+  });
+  const ok =
+    ic61 &&
+    ic61.stops[0].name === 'Interlaken Ost' &&
+    Math.abs(ic61.stops[0].lat - 46.690492) < 1e-9 &&
+    Math.abs(ic61.stops[0].lon - 7.868992) < 1e-9 &&
+    ic61.stops[0].depMs === dep &&
+    p &&
+    p.moving &&
+    p.hdgTo &&
+    Math.abs(p.hdgTo.lat - 46.682623) < 1e-9 &&
+    broken.length === 0;
+  check(
+    'anonymous origin row',
+    ok,
+    `IC 61 starts AT Interlaken Ost (46.690492, 7.868992) at its 04:56 departure - the root station fills the API's nulled own-station row - and interpolates on the Ost -> West leg one minute out; a NAMED stop with null coordinates still drops the journey`
+  );
+}
+
+{
   // Interpolation exactness on a synthetic three-stop journey.
   const j = {
     stops: [
