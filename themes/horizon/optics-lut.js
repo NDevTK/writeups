@@ -4,12 +4,15 @@
  * (optics-reference.mjs). Computed in double precision; the pure
  * physics lives in the library modules and is composed here:
  *
- *  - 22-degree halo: refraction through the 60-degree prism of a
- *    randomly rotating hexagonal ice crystal. For uniform rotation
- *    the emergent-deviation density is the histogram of D(x) over
- *    entrance angle x, weighted by the projected aperture cos(x) and
- *    the two refraction Fresnel transmittances - the 1/sqrt(D - Dmin)
- *    caustic at minimum deviation IS the halo's sharp inner edge.
+ *  - Halos: GREENLER'S MONTE CARLO (halos.js mcHalo) - hexagonal
+ *    ice prisms at uniform random orientation (Shoemake
+ *    quaternions), flux-correct face entry, the actual crystal
+ *    geometry, Snell + Fresnel per interface. The 22-degree halo
+ *    (side-side, 60-deg wedge) and the 46-degree halo
+ *    (side-basal, 90-deg wedge) both EMERGE from one tracer,
+ *    with their relative strength (~0.2) set by orientation
+ *    statistics and Fresnel - the number a throughput-only model
+ *    got wrong (0.86) and this composition's gate now pins.
  *    Ice dispersion: Warren & Brandt (2008), the revised
  *    compilation's own rows at the theme's 680/550/440 nm
  *    (halos.js ICE_N: 1.3073/1.3110/1.3163) - minimum deviations
@@ -35,7 +38,7 @@
  * renders (alpha = 0.4064 / 0.5079 / 0.6406 per channel).
  */
 
-import {ICE_N, parhelionProfile} from './halos.js';
+import {ICE_N, mcHalo, parhelionProfile} from './halos.js';
 import {
   airy,
   bowFresnel,
@@ -102,47 +105,26 @@ function fresnelR(ci, n1, n2) {
 }
 
 /**
- * 22-degree halo profile over theta in [thMin, thMax] (radians from
- * the sun), per RGB channel, peak-normalised.
+ * Halo profile over theta in [15, 52] degrees from the sun, per
+ * RGB channel: Greenler's crystal Monte Carlo (halos.js mcHalo -
+ * deterministic seed, so this LUT is reproducible), limb-darkened
+ * sun convolution, peak-normalised. The 22 and the 46 both live
+ * here at their EMERGENT relative strengths.
  */
-export function buildHaloLUT(bins = 256) {
-  const thMin = (15 * Math.PI) / 180;
-  const thMax = (35 * Math.PI) / 180;
-  const dTheta = (thMax - thMin) / bins;
-  const prof = new Float64Array(bins * 3);
-  const A = Math.PI / 3; // 60-degree prism
-  const SAMPLES = 200000;
-  for (let c = 0; c < 3; c++) {
-    const n = N_ICE[c];
-    for (let s = 0; s < SAMPLES; s++) {
-      // entrance angle from grazing to normal; uniform x with
-      // aperture weight cos(x) is the uniform-rotation measure.
-      const x = ((s + 0.5) / SAMPLES) * (Math.PI / 2);
-      const sr1 = Math.sin(x) / n;
-      const r1 = Math.asin(sr1);
-      const r2 = A - r1;
-      const sx2 = n * Math.sin(r2);
-      if (sx2 >= 1) continue; // internally reflected out of path
-      const x2 = Math.asin(sx2);
-      const D = x + x2 - A;
-      const i = Math.floor((D - thMin) / dTheta);
-      if (i < 0 || i >= bins) continue;
-      const T1 = 1 - fresnelR(Math.cos(x), 1, n);
-      const T2 = 1 - fresnelR(Math.cos(r2), n, 1);
-      prof[i * 3 + c] += Math.cos(x) * T1 * T2;
-    }
-  }
-  const conv = sunConvolve(prof, bins, dTheta);
+export function buildHaloLUT(samples = 400000) {
+  const mc = mcHalo(ICE_N, samples, 1337);
+  const dTheta = (mc.g1 - mc.g0) / mc.bins;
+  const conv = sunConvolve(mc.data, mc.bins, dTheta);
   let peak = 0;
   for (const v of conv) peak = Math.max(peak, v);
-  const out = new Float32Array(bins * 4);
-  for (let i = 0; i < bins; i++) {
+  const out = new Float32Array(mc.bins * 4);
+  for (let i = 0; i < mc.bins; i++) {
     out[i * 4] = conv[i * 3] / peak;
     out[i * 4 + 1] = conv[i * 3 + 1] / peak;
     out[i * 4 + 2] = conv[i * 3 + 2] / peak;
     out[i * 4 + 3] = 1;
   }
-  return {data: out, bins, thMinDeg: 15, thMaxDeg: 35};
+  return {data: out, bins: mc.bins, thMinDeg: 15, thMaxDeg: 52};
 }
 
 /**

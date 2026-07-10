@@ -3272,6 +3272,33 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   same MOD09 measurements, so blending both would double-count
   one dataset. Both need better sources, not more cleverness.
   DB transport.rest re-probed Jul 10: now fully dark (no route).
+- DONE: Greenler's crystal Monte Carlo - the 46-degree halo
+  earns its honest brightness (Jul 10). halos.js gained the full
+  3D random-orientation tracer the caustic model stood in for:
+  hexagonal ice prisms (compact c/a = 1, the classical
+  random-orientation model's documented parameter) at uniform
+  SO(3) orientations (Shoemake quaternions), flux-correct entry
+  face selection (rejection on projected area - unbiased),
+  uniform entry point ON the face, vector Snell in, the convex
+  prism's own exit face, Fresnel at both interfaces, TIR
+  transits discarded (internally reflected families make OTHER
+  arcs, documented out of scope). Deterministic (seeded
+  mulberry32) so the gate holds exact facts about the output.
+  Every 2-refraction path lands in ONE histogram: the 22-degree
+  halo (side-side, 60-deg wedge) and the 46-degree halo
+  (side-basal, 90-deg wedge) both EMERGE - and the 46 comes out
+  at 0.23 of the 22, the orientation-plus-Fresnel statistics the
+  throughput-only model put at 0.86 (which is why it was omitted
+  then; now it is drawn at the crystal's own number). Landmarks
+  (halos 6 -> 7): the n = 1 NULL TEST (an index-free crystal is
+  optically nothing - every transit exits undeviated, max
+  deviation 5e-8 rad of float noise), bit-identical seeded
+  histograms, both halos at their minimum-deviation edges, the
+  emergent ratio pinned to (0.05, 0.45). optics-lut's
+  buildHaloLUT now wraps mcHalo (3x400k transits, ~250 ms at
+  init) + the limb-darkened sun convolution; the dome window
+  widened to 15-52 deg; the sundog Bravais LUT unchanged. Gate
+  59 sets.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

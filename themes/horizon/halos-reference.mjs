@@ -19,13 +19,16 @@ import {
   caustic,
   haloProfile,
   ICE_N,
+  mcHalo,
+  mulberry32,
   parhelion,
   parhelionProfile,
   PRISM_60,
   PRISM_90,
   prismDmin,
   prismIncidence,
-  sundogCutoff
+  sundogCutoff,
+  traceCrystal
 } from './halos.js';
 
 let fail = 0;
@@ -182,6 +185,63 @@ const RAD = Math.PI / 180;
     'sundogs',
     ok,
     `at the horizon the dogs sit ON the halo (azimuth = ${(ph0.az * DEG).toFixed(2)} deg exactly); at 25 deg elevation red has moved to ${(p25r.az * DEG).toFixed(1)} deg, blue to ${(p25b.az * DEG).toFixed(1)} (red toward the sun); at 65 deg the profile is empty - the cutoff`
+  );
+}
+
+{
+  // Greenler's Monte Carlo: the null test first - at n = 1 the
+  // crystal is optically nothing and EVERY transit exits
+  // undeviated (float noise only). Then determinism (same seed,
+  // identical histogram), and the emergent structure: the 22 and
+  // the 46 both stand at their minimum-deviation edges, and the
+  // 46 comes out FAINT (the orientation + Fresnel statistics the
+  // throughput-only model missed - it said 0.86; the crystal
+  // says ~0.2).
+  const rng = mulberry32(7);
+  let maxDev = 0;
+  let hits = 0;
+  for (let i = 0; i < 30000; i++) {
+    const h = traceCrystal(1.0, rng);
+    if (h) {
+      hits++;
+      if (h.dev > maxDev) maxDev = h.dev;
+    }
+  }
+  const a = mcHalo(ICE_N, 150000, 1337);
+  const b = mcHalo(ICE_N, 150000, 1337);
+  let same = true;
+  for (let i = 0; i < a.data.length; i++) {
+    if (a.data[i] !== b.data[i]) same = false;
+  }
+  const DEG = 180 / Math.PI;
+  const g = (i) => (a.g0 + ((a.g1 - a.g0) * (i + 0.5)) / a.bins) * DEG;
+  const peakIn = (lo, hi) => {
+    let bi = 0;
+    let bv = -1;
+    for (let i = 0; i < a.bins; i++) {
+      if (g(i) < lo || g(i) > hi) continue;
+      if (a.data[i * 3] > bv) {
+        bv = a.data[i * 3];
+        bi = i;
+      }
+    }
+    return {g: g(bi), v: bv};
+  };
+  const p22 = peakIn(20, 25);
+  const p46 = peakIn(43, 50);
+  const ratio = p46.v / p22.v;
+  const ok =
+    hits > 5000 &&
+    maxDev < 1e-6 &&
+    same &&
+    Math.abs(p22.g - 21.8) < 0.4 &&
+    Math.abs(p46.g - 45.6) < 0.8 &&
+    ratio > 0.05 &&
+    ratio < 0.45;
+  check(
+    "Greenler's Monte Carlo",
+    ok,
+    `n = 1 null test: ${hits} transits, max deviation ${maxDev.toExponential(1)} rad; seeded histogram bit-identical; red 22 at ${p22.g.toFixed(2)} deg, red 46 at ${p46.g.toFixed(2)} deg, EMERGENT 46/22 ratio ${ratio.toFixed(2)} - the statistics Fresnel throughput alone put at 0.86`
   );
 }
 
