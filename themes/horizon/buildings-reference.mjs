@@ -10,13 +10,15 @@
 import {
   areaM2,
   buildingsGeometry,
+  convexHull,
   DEFAULT_HEIGHT,
   earClip,
   heightOf,
   LEVEL_M,
+  minAreaRect,
   parseBuildings
 } from './buildings.js';
-import {BUILDINGS_FIXTURE} from './buildings-fixture.mjs';
+import {BUILDINGS_FIXTURE, CHURCH_FIXTURE} from './buildings-fixture.mjs';
 import {geoToScene} from './roam.js';
 
 let fail = 0;
@@ -194,6 +196,128 @@ const builds = parseBuildings(BUILDINGS_FIXTURE);
       drowned.placed === 0 &&
       drowned.count === 0,
     `${set.length} buildings (gabled + flat among them) -> ${g.count} vertices: bases at ground-2m, tops within height+gable, ${horiz} horizontal wall normals, ${up} straight-up roof normals, none facing down, glow carried; on water nothing is placed`
+  );
+}
+
+{
+  // Minimum-area rectangle by rotating calipers - EXACT by the
+  // Freeman & Shapira (1975) theorem (the optimum shares a side
+  // with a hull edge): a 40 x 25 rectangle rotated to an awkward
+  // angle recovers its own area, extents and axis; an L-shape
+  // fills well under the 0.8 ridge threshold; the hull ignores an
+  // interior point.
+  const th = (33 * Math.PI) / 180;
+  const rot = ([x, y]) => [
+    x * Math.cos(th) - y * Math.sin(th),
+    x * Math.sin(th) + y * Math.cos(th)
+  ];
+  const rect = [
+    [0, 0],
+    [40, 0],
+    [40, 25],
+    [0, 25]
+  ].map(rot);
+  const r = minAreaRect(rect);
+  const axisDot = Math.abs(r.ux * Math.cos(th) + r.uy * Math.sin(th));
+  const L = [
+    [0, 0],
+    [40, 0],
+    [40, 10],
+    [10, 10],
+    [10, 25],
+    [0, 25]
+  ];
+  const lRect = minAreaRect(L);
+  const lArea = 40 * 10 + 10 * 15; // the L's true area, 550
+  const hull = convexHull([
+    [0, 0],
+    [10, 0],
+    [10, 10],
+    [0, 10],
+    [5, 5]
+  ]);
+  check(
+    'minimum-area rectangle',
+    Math.abs(r.area - 1000) < 1e-9 &&
+      Math.abs(r.L - 40) < 1e-9 &&
+      Math.abs(r.W - 25) < 1e-9 &&
+      Math.abs(axisDot - 1) < 1e-12 &&
+      lArea / lRect.area < 0.8 &&
+      hull.length === 4,
+    `a 33deg-rotated 40 x 25 recovers area 1000 to ${Math.abs(r.area - 1000).toExponential(1)} with its true axis; the L fills ${((lArea / lRect.area) * 100).toFixed(0)}% (< 80, stays flat); the hull drops the interior point`
+  );
+}
+
+{
+  // The measured ridge and the spire: a 6-vertex near-rectangular
+  // house (a notch the OLD vertex-count rule pretended away and
+  // the quad-only builder then dropped to a FLAT cap) now takes a
+  // real sloped ridge; the LIVE Unterseen church (9 real nodes)
+  // raises its spire above ridge height; nothing anywhere faces
+  // down.
+  const anchor = {lat: 46.6863, lon: 7.8632};
+  const U = 7 / 400;
+  const mLat = 111320;
+  const mLon = mLat * Math.cos((46.6863 * Math.PI) / 180);
+  const g2m = (dx, dy) => [46.6863 + dy / mLat, 7.8632 + dx / mLon];
+  const notched = {
+    type: 'way',
+    id: 77,
+    tags: {building: 'house'},
+    geometry: [
+      g2m(0, 0),
+      g2m(14, 0),
+      g2m(14, 8),
+      g2m(6, 8),
+      g2m(6, 7.2),
+      g2m(0, 7.2),
+      g2m(0, 0)
+    ].map(([lat, lon]) => ({lat, lon}))
+  };
+  const parsed = parseBuildings({elements: [notched]});
+  const hg = buildingsGeometry(
+    parsed,
+    anchor,
+    () => 10,
+    () => 0,
+    U,
+    1e9
+  );
+  let sloped = 0;
+  let down = 0;
+  for (let i = 0; i < hg.count; i++) {
+    const ny = hg.normal[3 * i + 1];
+    if (ny > 0.05 && ny < 0.95) sloped++;
+    if (ny < -1e-6) down++;
+  }
+  const church = parseBuildings(CHURCH_FIXTURE);
+  const cg = buildingsGeometry(
+    church,
+    anchor,
+    () => 10,
+    () => 0,
+    U,
+    1e9
+  );
+  let cMax = -Infinity;
+  let cDown = 0;
+  for (let i = 0; i < cg.count; i++) {
+    cMax = Math.max(cMax, cg.position[3 * i + 1]);
+    if (cg.normal[3 * i + 1] < -1e-6) cDown++;
+  }
+  const ridgeTop = 10 + church[0].h * U + 4.5 * U; // walls + max gable
+  check(
+    'measured ridge and the spire',
+    parsed[0].gabled &&
+      sloped >= 12 &&
+      down === 0 &&
+      church.length === 1 &&
+      church[0].spire &&
+      church[0].h === 13 &&
+      cg.placed === 1 &&
+      cMax > ridgeTop + 6 * U &&
+      cDown === 0,
+    `the notched 6-vertex house rides a real ridge (${sloped} sloped roof normals, none down); the Unterseen church (13 m ladder height) raises its spire ${((cMax - 10) / U).toFixed(1)} m over the ground, well above its ridge`
   );
 }
 
