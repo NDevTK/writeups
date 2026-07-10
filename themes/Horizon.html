@@ -479,6 +479,7 @@
         YAW_DEG_S
       } from './horizon/turbines.js';
       import {buildWindmill} from './horizon/windmills.js';
+      import {farmFactors} from './horizon/wakes.js';
       import {snowField, SNOW_LAYER, SNOW_Z} from './horizon/snowcover.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
@@ -769,6 +770,8 @@
           // interpolates on ln z between them).
           state.wind80 = w.hourly?.wind_speed_80m?.[0] ?? null;
           state.wind120 = w.hourly?.wind_speed_120m?.[0] ?? null;
+          // the measured wind re-lays the farm wakes
+          applyWakes();
           record(
             'open-meteo current',
             (WMO[state.code] || state.code) +
@@ -3840,6 +3843,12 @@
             yaw: rig.yaw,
             rotor: rig.rotor,
             spec: t.spec,
+            // metres for the wake geometry (the scene's
+            // asinh-warped Y is not a length)
+            mx: sc.x * MPU,
+            mz: sc.z * MPU,
+            my: elevOfY(smp.y, centerElev) + t.spec.hub,
+            wake: 1,
             yawA: null
           });
           placed++;
@@ -3853,6 +3862,49 @@
           'wind turbines placed',
           placed + ' of ' + turbinesGeo.length + ' on this box'
         );
+        applyWakes();
+      }
+
+      // The farm robs itself (wakes.js - the Jensen/Katic PARK
+      // model on the published V112 thrust curve): each turbine's
+      // effective wind is its free hub wind times its farm
+      // factor, recomputed whenever the measured wind (speed or
+      // direction) changes.
+      function turbineHubWind(spec) {
+        return state.wind80 != null
+          ? hubWind(
+              state.wind / 3.6,
+              state.wind80 / 3.6,
+              (state.wind120 ?? state.wind80) / 3.6,
+              spec.hub
+            )
+          : state.wind / 3.6;
+      }
+      function applyWakes() {
+        if (!turbineRigs.length) return;
+        const a = (state.winddir + 180) * RAD;
+        const f = farmFactors(
+          turbineRigs.map((r) => ({x: r.mx, y: r.my, z: r.mz, spec: r.spec})),
+          {x: Math.sin(a), z: -Math.cos(a)},
+          (i) => turbineHubWind(turbineRigs[i].spec)
+        );
+        let waked = 0;
+        let worst = 1;
+        for (let i = 0; i < f.length; i++) {
+          turbineRigs[i].wake = f[i];
+          if (f[i] < 0.999) waked++;
+          worst = Math.min(worst, f[i]);
+        }
+        if (waked)
+          record(
+            'Jensen wind-farm wakes',
+            waked +
+              ' of ' +
+              turbineRigs.length +
+              ' turbines waked \u00b7 deepest -' +
+              Math.round((1 - worst) * 100) +
+              '% wind (Katic 1986, k 0.075)'
+          );
       }
 
       // Cable cars: pylons at the real support nodes, spans hung
@@ -7757,15 +7809,7 @@
             dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
             r.yawA += Math.abs(dy) < maxYaw ? dy : Math.sign(dy) * maxYaw;
             r.yaw.rotation.y = r.yawA;
-            const v =
-              state.wind80 != null
-                ? hubWind(
-                    state.wind / 3.6,
-                    state.wind80 / 3.6,
-                    (state.wind120 ?? state.wind80) / 3.6,
-                    r.spec.hub
-                  )
-                : state.wind / 3.6;
+            const v = turbineHubWind(r.spec) * (r.wake || 1);
             r.rotor.rotation.z -= rotorOmega(r.spec, v) * dt;
           }
         }
