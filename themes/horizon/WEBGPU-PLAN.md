@@ -2946,6 +2946,33 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   them. Nothing new is invented: one snow state, three consumers
   (terrain, physics drifts, now the roofs). Gate 53 sets
   (buildings landmark strengthened in place); browser smoke clean.
+- DONE: clouds amplify the skyglow (Jul 10, the coupling lane -
+  the live cloud cover and the Falchi atlas meet). Kyba, Ruhtz,
+  Fischer & Hölker (2011, PLoS ONE 6:e17307) measured it:
+  overcast multiplies zenith sky luminance by 10.1 inside Berlin
+  and 2.8 at 32 km out - the amplification grows with how much
+  artificial light is overhead, which is exactly what the Falchi
+  ratio already measures per anchor. skyglow.js gained cloudAmp:
+  the two published anchors log-interpolated in the ratio (the
+  assigned anchor ratios ~20 urban core / ~3 city edge are the
+  documented closure), clamped to the measured range and to >= 1
+  (a pristine sky has nothing to amplify - the rendered clouds
+  already occlude its stars directly), partial cover linear in
+  cloud fraction (the paper's okta bins rise monotonically). Gate
+  landmark (skyglow 4 -> 5): both anchors exact to 1e-12, clear =
+  1, pristine never amplified, clamps hold, monotone both ways,
+  and the magnitude identity - the amplified zenith brightens by
+  exactly 2.5 log10((1+rA)/(1+r)) through the module's own
+  skyMag. Theme: computeSkyglow now computes the STATIC parts
+  (atlas sample, azimuthal glow pattern) and the new
+  applyCloudSkyglow derives everything live - star contrast,
+  zenith mag, Bortle, horizon-glow amplitude - from the AMPLIFIED
+  ratio, re-run on every weather poll as the measured cover
+  changes; the panel shows the factor ('x7.3 under 90% cloud
+  (Kyba 2011)'). An overcast night over a town is now visibly
+  brighter than a clear one, and the stars fade under it exactly
+  as the contrast ratio says. Gate 53 sets (skyglow 4 -> 5
+  landmarks); browser smoke clean.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
