@@ -116,7 +116,10 @@
         real too - OSM waterway ways thread the Aare and the alpine
         streams down the valleys (tunnelled reaches skipped), and a
         stream reaching a lake stops at the shore where the polygon
-        surface takes over
+        surface takes over; railways run their real lines - beds at
+        the MEASURED OSM gauge (tracks x (gauge + ballast
+        shoulders)), tunnels skipped, tagged rail bridges decking
+        over the rivers they span
       - roam (just fly): the free camera streams terrain. 4 km from
         the anchor the world re-anchors on your geodetic position
         (roam.js - exact inverse mapping and altitude-datum carry,
@@ -139,7 +142,8 @@
         lights=0|URL (Black Marble night lights off / tile endpoint
         override), water=0 (skip OSM lakes), buildings=0 (skip OSM
         buildings), roads=0 (skip OSM roads), landuse=0 (skip OSM
-        ground cover), rivers=0 (skip OSM waterways), debug=1
+        ground cover), rivers=0 (skip OSM waterways), rails=0 (skip
+        OSM railways), debug=1
     -->
     <style>
       html,
@@ -390,6 +394,7 @@
       import {parseRoads, roadsGeometry} from './horizon/roads.js';
       import {landTint, parseLanduse} from './horizon/landuse.js';
       import {parseWaterways, riversGeometry} from './horizon/rivers.js';
+      import {parseRailways, railsGeometry} from './horizon/rails.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -1560,6 +1565,73 @@
           if (worldBuilt) placeRivers();
         } catch {
           riversGeo = null; // the polygon water stands alone
+        }
+      }
+
+      // Real railways: OSM railway ways via the same mirrors, beds
+      // at the MEASURED gauge width (rails.js, gated; geometry via
+      // the roads' gated ribbon builder). Tunnelled reaches are
+      // skipped; tagged rail bridges span water. Cached geodetic
+      // per anchor; ?rails=0 disables.
+      let railsGeo = null;
+      async function syncRails() {
+        if (params.get('rails') === '0') return;
+        const key =
+          'horizon-rails-geo-' +
+          state.lat.toFixed(2) +
+          ',' +
+          state.lon.toFixed(2);
+        try {
+          const hit = localStorage.getItem(key);
+          if (hit) {
+            railsGeo = JSON.parse(hit);
+            record('OSM Overpass railways (cached)', railsGeo.length + ' ways');
+            if (worldBuilt) placeRails();
+            return;
+          }
+        } catch {}
+        try {
+          const mLat = 111320;
+          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+          const dLat = DEM_HALF_M / mLat;
+          const dLon = DEM_HALF_M / mLon;
+          const bbox =
+            (state.lat - dLat).toFixed(4) +
+            ',' +
+            (state.lon - dLon).toFixed(4) +
+            ',' +
+            (state.lat + dLat).toFixed(4) +
+            ',' +
+            (state.lon + dLon).toFixed(4);
+          const q =
+            '[out:json][timeout:30];way[railway~"^(rail|narrow_gauge|funicular|light_rail|tram)$"](' +
+            bbox +
+            ');out geom 600;';
+          let osm = null;
+          for (const host of [
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+            'https://overpass-api.de/api/interpreter'
+          ]) {
+            try {
+              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
+                credentials: 'omit'
+              });
+              if (!r.ok) throw new Error(r.status);
+              osm = await r.json();
+              break;
+            } catch {
+              // Try the next mirror.
+            }
+          }
+          if (!osm) throw new Error('overpass unavailable');
+          railsGeo = parseRailways(osm);
+          record('OSM Overpass railways', railsGeo.length + ' ways');
+          try {
+            localStorage.setItem(key, JSON.stringify(railsGeo));
+          } catch {}
+          if (worldBuilt) placeRails();
+        } catch {
+          railsGeo = null; // no invented tracks
         }
       }
 
@@ -3015,6 +3087,49 @@
           g.placed + ' of ' + riversGeo.length + ' watercourses on this box'
         );
       }
+      // Railways: ballast ribbons through the shared gated builder
+      // at 1.8 m clearance - above the rivers' 1.5 m (rail bridges
+      // deck over the water they span) and under the roads' 2 m
+      // (road overpasses stay on top).
+      let railMesh = null;
+      let railMat = null;
+      function placeRails() {
+        if (railMesh) {
+          ground.remove(railMesh);
+          railMesh.geometry.dispose();
+          railMesh = null;
+        }
+        if (!railsGeo || !railsGeo.length || params.get('rails') === '0')
+          return;
+        const groundY = (x, z) => {
+          const s = sample(x, z);
+          return s.water ? null : s.y + 1.8 / MPU;
+        };
+        const g = railsGeometry(railsGeo, dressAnchor, groundY, 1 / MPU, 140);
+        if (!g.placed) return;
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(g.color, 3));
+        if (!railMat) {
+          railMat = new THREE.MeshStandardNodeMaterial({
+            vertexColors: true,
+            roughness: 0.92,
+            metalness: 0,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2
+          });
+          applyAerial(railMat);
+        }
+        railMesh = new THREE.Mesh(geo, railMat);
+        railMesh.receiveShadow = true;
+        ground.add(railMesh);
+        record(
+          'OSM railways placed',
+          g.placed + ' of ' + railsGeo.length + ' ways on this box'
+        );
+      }
       function buildWorld(pre) {
         // Roam rebuilds repeatedly: free the previous terrain
         // geometry (trees share cached geometries/materials and
@@ -3088,6 +3203,7 @@
         placeBuildings();
         placeRoads();
         placeRivers();
+        placeRails();
         placeLanduse();
 
         // The sea: three.js Water (planar reflections) riding at real sea
@@ -5175,6 +5291,7 @@
         syncBuildings();
         syncRoads();
         syncRivers();
+        syncRails();
         syncLanduse();
         // The lamp cloud is anchored to the OLD box - drop it now,
         // syncLights rebuilds it Earth-anchored on the new one.
@@ -6867,6 +6984,7 @@
         syncBuildings();
         syncRoads();
         syncRivers();
+        syncRails();
         syncLanduse();
         syncLights();
         setInterval(syncLights, 6 * 60 * 60 * 1000);

@@ -2578,6 +2578,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   sweep with its canal branch. Gate 47 -> 48 sets. Browser smoke:
   177/177 buildings, 319/319 roads, 88/116 landuse, 185/189
   watercourses on the DEM world, one known warning class.
+- DONE: real railways (Jul 10, the environment series - around
+  Interlaken the rail network IS the landscape: the standard-gauge
+  Thun line, the metre-gauge Berner Oberland-Bahn, 800 mm rack
+  lines, the Harderbahn funicular). OSM way[railway] through the
+  SAME mirrors, geometry through the SAME gated ribbon builder
+  (railsGeometry IS roadsGeometry - one exactness gate, three
+  consumers now). rails.js owns only the rail-specific knowledge,
+  gated at 4 landmarks: the width ladder MEASURED from the gauge
+  tag - the captured census tags gauge on 288 of 300 ways (1000 mm
+  x140, 1435 x117, 800 x31), so bed width = tracks x (gauge +
+  2.6 m ballast shoulders), falling to tracks x 4 m, then type
+  defaults; the LIVE 203-way fixture (all three gauges' beds
+  present as distinct widths, the Harderbahn by name, every
+  tunnelled reach skipped - 14 tagged, the Alps route trains
+  underground); the shared-builder area identity through the rails
+  path at the MEASURED metre-gauge bed; and the bridge CARRY - the
+  same line tagged bridge=yes spans an asymmetric wet gap on the
+  straight grade while untagged it cuts at the shore (the Aare
+  rail bridges are real; a fixture-count lesson: of 24 tagged
+  bridges most are short decks under the stub floors, 6 long ones
+  survive - the landmark documents that). Theme: syncRails (both
+  mirrors, geodetic cache per anchor), placeRails at 1.8 m
+  clearance - above the rivers' 1.5 m (rail decks over water) and
+  under the roads' 2 m (road overpasses on top) - ballast albedo,
+  aerial-wrapped, per-box rebuild, roam + boot syncs; ?rails=0;
+  KEEP_PARAMS carries 'rails'. Viewer stage threads the network -
+  the shot shows Interlaken West's real station-yard fan. Gate
+  48 -> 49 sets. Browser smoke, five layers now: 177/177
+  buildings, 319/319 roads, 88/116 landuse, 185/189 watercourses,
+  192/196 railways on the DEM world, one known warning class.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
