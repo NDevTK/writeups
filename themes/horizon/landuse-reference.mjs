@@ -10,7 +10,16 @@
 //    texels, the large one keeps the rest
 //  - the LIVE Interlaken fixture parses to the real ground cover
 //    and paints the box
-import {CLASS_ALBEDO, landTint, parseLanduse, tintAt} from './landuse.js';
+import {
+  CLASS_ALBEDO,
+  landTint,
+  parseLanduse,
+  SOIL_C,
+  SOIL_POROSITY,
+  SOIL_SAT_RATIO,
+  soilDarkening,
+  tintAt
+} from './landuse.js';
 import {LANDUSE_FIXTURE} from './landuse-fixture.mjs';
 import {geoToScene} from './roam.js';
 import {inRing} from './smoke.js';
@@ -214,6 +223,75 @@ const WORLD = 280;
       share > 0.015 &&
       share < 0.2,
     `${polys.length} polygons (${cls.size} classes), ${tint.painted} painted onto the box, ${(share * 100).toFixed(0)}% of texels covered`
+  );
+}
+
+{
+  // Wet soil darkens (Lobell & Asner 2002): the exponential form
+  // exact - dry ground 1, the decay constant DERIVED from the
+  // paper's visible-band saturation point (95% of the decay spent
+  // by 0.20 m3/m3), the saturated floor at the documented half,
+  // monotone throughout, and factor 1 whenever the data cannot
+  // speak. Painted through landTint: a farmland texel darkens by
+  // exactly the factor, a meadow texel (canopy over its soil)
+  // does not.
+  const f02 = soilDarkening(0.2);
+  const wantAt02 =
+    SOIL_SAT_RATIO +
+    (1 - SOIL_SAT_RATIO) * Math.exp(-SOIL_C * (0.2 / SOIL_POROSITY));
+  const mono =
+    soilDarkening(0.05) > soilDarkening(0.1) &&
+    soilDarkening(0.1) > soilDarkening(0.2) &&
+    soilDarkening(0.2) > soilDarkening(0.45);
+  const anchor2 = {lat: 46.6863, lon: 7.8632};
+  const sq = (halfM) => {
+    const dLat = halfM / 111320;
+    const dLon = halfM / (111320 * Math.cos((46.6863 * Math.PI) / 180));
+    return [
+      [46.6863 - dLat, 7.8632 - dLon],
+      [46.6863 - dLat, 7.8632 + dLon],
+      [46.6863 + dLat, 7.8632 + dLon],
+      [46.6863 + dLat, 7.8632 - dLon]
+    ];
+  };
+  const mkWay = (id, ring, tags) => ({
+    type: 'way',
+    id,
+    geometry: [...ring, ring[0]].map(([lat, lon]) => ({lat, lon})),
+    tags
+  });
+  const polys2 = parseLanduse({
+    elements: [
+      mkWay(1, sq(500), {landuse: 'farmland'}),
+      mkWay(2, sq(120), {landuse: 'meadow'})
+    ]
+  });
+  const wet = landTint(polys2, anchor2, 280, 192, soilDarkening(0.108));
+  const centreMeadow = tintAt(wet, 0, 0);
+  const ringFarm = tintAt(wet, 0, 5);
+  const fNow = soilDarkening(0.108);
+  const farmOk =
+    ringFarm &&
+    ringFarm.every(
+      (v, k) =>
+        Math.abs(v - Math.fround(CLASS_ALBEDO.farmland[k] * fNow)) < 1e-7
+    );
+  const meadowOk =
+    centreMeadow &&
+    centreMeadow.every(
+      (v, k) => Math.abs(v - Math.fround(CLASS_ALBEDO.meadow[k])) < 1e-7
+    );
+  check(
+    'wet soil darkens',
+    Math.abs(f02 - wantAt02) < 1e-15 &&
+      Math.abs(Math.exp(-SOIL_C * (0.2 / SOIL_POROSITY)) - 0.05) < 1e-12 &&
+      mono &&
+      soilDarkening(0) === 1 &&
+      soilDarkening(NaN) === 1 &&
+      soilDarkening(9) > SOIL_SAT_RATIO &&
+      farmOk &&
+      meadowOk,
+    `Lobell-Asner exponential exact; c = ${SOIL_C.toFixed(2)} derived from the paper's 0.20 m3/m3 visible saturation; at the live capture's 0.108 m3/m3 the farmland texel darkens by x${fNow.toFixed(3)} while the meadow (canopy) stands`
   );
 }
 

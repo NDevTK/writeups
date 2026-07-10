@@ -118,7 +118,11 @@
         and the ground itself carries the real cover - OSM landuse
         polygons tint the grass where farmland, meadows, residential
         blocks and bare rock actually are (unknown classes stay
-        base grass, mountains and snow untouched); linear water is
+        base grass, mountains and snow untouched) - and the bare
+        soils DARKEN with the measured topsoil moisture (Lobell &
+        Asner 2002: reflectance falls exponentially with degree of
+        saturation), so the fields dry pale and rain leaves them
+        dark; linear water is
         real too - OSM waterway ways thread the Aare and the alpine
         streams down the valleys (tunnelled reaches skipped), and a
         stream reaching a lake stops at the shore where the polygon
@@ -178,7 +182,8 @@
         OSM railways), trains=0 (skip live trains), aerialways=0
         (skip OSM cable cars), peaks=0 (skip summit labels),
         discharge=0 (pin river widths to the ladder), snowcover=0|URL
-        (measured snow off / tile endpoint override), debug=1
+        (measured snow off / tile endpoint override), soil=0 (pin
+        bare-soil tints dry), debug=1
     -->
     <style>
       html,
@@ -427,7 +432,11 @@
       import {buildVessel} from './horizon/vessels.js';
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
       import {parseRoads, roadsGeometry} from './horizon/roads.js';
-      import {landTint, parseLanduse} from './horizon/landuse.js';
+      import {
+        landTint,
+        parseLanduse,
+        soilDarkening
+      } from './horizon/landuse.js';
       import {
         dischargeFactor,
         parseWaterways,
@@ -1623,6 +1632,51 @@
           if (worldBuilt) placeRivers();
         } catch {
           riversGeo = null; // the polygon water stands alone
+        }
+      }
+
+      // Measured topsoil moisture: the same open-meteo forecast
+      // family serves soil_moisture_0_to_1cm (m³/m³). Wet ground
+      // is DARKER ground - Lobell & Asner (2002): soil reflectance
+      // falls exponentially with degree of saturation (landuse.js,
+      // gated) - so the bare-soil landuse tints (farmland,
+      // farmyard, allotments...) darken after real rain and pale
+      // as the ground dries. Vegetated tints stand: canopy hides
+      // soil. ?soil=0 pins dry.
+      let soilTheta = null;
+      async function syncSoil() {
+        if (params.get('soil') === '0') return;
+        try {
+          const j = await (
+            await fetch(
+              'https://api.open-meteo.com/v1/forecast?latitude=' +
+                state.lat.toFixed(4) +
+                '&longitude=' +
+                state.lon.toFixed(4) +
+                '&hourly=soil_moisture_0_to_1cm&forecast_days=1',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const times = (j.hourly && j.hourly.time) || [];
+          const vals = (j.hourly && j.hourly.soil_moisture_0_to_1cm) || [];
+          const hour = new Date().toISOString().slice(0, 13) + ':00';
+          let i = times.indexOf(hour);
+          if (i < 0) i = 0;
+          const v = vals[i];
+          soilTheta = Number.isFinite(v) ? v : null;
+          if (soilTheta != null) {
+            record(
+              'ERA5 topsoil moisture',
+              soilTheta.toFixed(3) +
+                ' m³/m³ (0-1 cm) · bare-soil tint ×' +
+                soilDarkening(soilTheta).toFixed(2) +
+                ' (Lobell-Asner)'
+            );
+            if (worldBuilt) placeLanduse();
+          }
+        } catch (e) {
+          soilTheta = null; // dry albedo stands - nothing invented
+          if (params.has('debug')) console.warn('soil: ' + e.message);
         }
       }
 
@@ -3484,7 +3538,13 @@
       function placeLanduse() {
         if (!landGeo || !landGeo.length || params.get('landuse') === '0')
           return;
-        const t = landTint(landGeo, dressAnchor, WORLD, 192);
+        const t = landTint(
+          landGeo,
+          dressAnchor,
+          WORLD,
+          192,
+          soilDarkening(soilTheta)
+        );
         if (!t) {
           terrainUniforms.uLandOn.value = 0;
           return;
@@ -5946,6 +6006,7 @@
         syncAerialways();
         syncPeaks();
         syncLanduse();
+        syncSoil();
         syncTrains();
         // The snow field is anchored to the OLD box too - stand
         // the heuristic back up until the new box's field lands.
@@ -7777,6 +7838,8 @@
         syncAerialways();
         syncPeaks();
         syncLanduse();
+        syncSoil();
+        setInterval(syncSoil, 3 * 60 * 60 * 1000);
         syncTrains();
         setInterval(syncTrains, 90 * 1000);
         syncLights();
