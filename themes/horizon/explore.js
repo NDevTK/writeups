@@ -68,6 +68,7 @@ export const KEEP_PARAMS = [
   'aerialways',
   'peaks',
   'discharge',
+  'snowcover',
   'roam'
 ];
 

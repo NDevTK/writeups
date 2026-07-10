@@ -2798,6 +2798,46 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   KEEP_PARAMS carries 'discharge'. Gate 52 sets (rivers 4 -> 6
   landmarks); browser smoke unchanged and clean (offline the
   factor is 1 - the truthful default).
+- DONE: measured snow cover (Jul 10 - retiring the theme's oldest
+  surviving heuristic: the snowline inferred snow from the
+  freezing level; NASA GIBS serves the daily MEASURED answer over
+  the same keyless WMTS the Black Marble lights use). Layer
+  MODIS_Terra_NDSI_Snow_Cover (the standard MODIS snow product -
+  NDSI scaled 1..100 per pixel); snowcover.js (pure, gated at 4
+  landmarks): the published GIBS colormap embedded VERBATIM
+  (v1.3, fetched at capture; the ramp is NOT a formula - banded
+  green, cycling blue, red at 100 - so the exact table IS the
+  inversion; landmark holds rows 1/50/100 verbatim, 100 injective
+  keys, and the transparent flag classes cloud 250 / night 211 /
+  water 237/239 / no-data tellable by RGB at alpha 0); NDSI ->
+  fractional snow cover through Salomonson & Appel (2004, RSE
+  89): FSC = -0.01 + 1.45 NDSI, the printed coefficients held
+  exact with the physical clamps; the LIVE tile fixture (GIBS z8
+  r90 c133, 2026-07-08 - the Jungfrau in July): sampled glacier
+  pixels classify as measured snow, valley pixels as measured
+  bare ground, cloud and the lakes as their flags, 3708 snow
+  pixels on the tile in a month the freezing-level rule can only
+  guess at; and the snowField raster (sceneToGeo + the night
+  lights' gated pixelOf) exact per cell with unknown (-1)
+  propagated and the shader row orientation held (float32
+  fround() on the expectation - the storage lesson, fourth
+  appearance). terrain-tsl: snowTexNode + uSnowCovOn beside the
+  lights and landuse textures; where the satellite saw ground the
+  FSC REPLACES the freezing-level elevation gate, while the slope
+  shedding (where snow physically sticks) and the live-snowfall
+  uSnowy term stand in both regimes - yesterday's pass cannot see
+  today's fall - and under cloud/night the heuristic stands
+  (fscKnown smoothstep on the -1 sentinel). Horizon:
+  syncSnowCover walks back up to 8 days for the newest published
+  Terra day (4 corner tiles, canvas decode, N=96 field,
+  NearestFilter - FSC must not bilinear across a cloud edge),
+  drops to the heuristic on re-anchor until the new box's field
+  lands, 6 h refresh; panel records the day, the seen share and
+  the mean cover; ?snowcover=0|URL; KEEP_PARAMS carries
+  'snowcover'. Gate 52 -> 53 sets. Browser smoke clean (the
+  debug-mode offline-fetch warnings of trains/discharge joined
+  the smoke's known-offline filter - by-design messages, not
+  defects).
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
