@@ -3299,6 +3299,40 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   init) + the limb-darkened sun convolution; the dome window
   widened to 15-52 deg; the sundog Bravais LUT unchanged. Gate
   59 sets.
+- DONE: the daylight, measured (Jul 10, the data sweep's find -
+  the sweep also re-probed the HAFAS family: only BVG lives, and
+  VBB's bbox already covers it). Open-Meteo's satellite
+  radiation API (keyless, CORS-open) serves the geostationary
+  constellations' OBSERVED global horizontal irradiance at the
+  anchor, hourly, fresh to the hour. clearness.js turns it into
+  the scene's ambient response through two classics: Haurwitz
+  (1945) closed-form clear sky (GHI = 1098 cos Z e^(-0.057/
+  cos Z)) gives the clearness index kt = measured/clear - the
+  whole-sky transmittance the satellite actually saw; Erbs,
+  Klein & Duffie (1982) splits it into the DIFFUSE fraction,
+  because the scene's direct sun already dims per pixel
+  (Beer-Lambert through the drawn decks) and only the AMBIENT
+  should follow the measurement. ambientFactor = kd(kt) kt
+  normalised at the correlation's own clear anchor (kt = 0.8,
+  its own kd there - so ambientFactor(0.8) = 1 identically and
+  a clear sky leaves the calibrated scene untouched). The real,
+  documented thin-overcast BRIGHTENING (diffuse under a bright
+  deck exceeds clear-sky diffuse, x2+) comes out of the
+  correlation instead of being impossible under the old
+  (1 - cloudy 0.3) heuristic - which stays as the fallback when
+  the satellite is silent (poles, stale hours, low sun: kt is
+  null below cos Z = 0.1 where Haurwitz vanishes). Landmarks
+  (4): Haurwitz closed points; Erbs verbatim INCLUDING the
+  published coefficients' own near-continuity at both branch
+  boundaries (0 at 0.22, 2.7e-4 at 0.80 - facts of the paper,
+  not of our code); the exact ratio/anchor identities and
+  clamps; the live capture (pickHour takes the 13:00 row, 801
+  W/m^2, kt 0.93 at the declination geometry - a clear Bernese
+  afternoon corroborated by its own 895 peak). Theme: polled
+  each 15 min, kt computed once a minute at the picked hour's
+  midpoint sun through the same ephemeris; panel records GHI,
+  kt and the Erbs factor; ?ghi=W harness override. Gate 60
+  sets.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

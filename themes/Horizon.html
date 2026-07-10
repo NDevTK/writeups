@@ -190,7 +190,8 @@
         discharge=0 (pin river widths to the ladder), snowcover=0|URL
         (measured snow off / tile endpoint override), soil=0 (pin
         bare-soil tints dry), comets=0 (skip MPC
-        comets), comet=g (synthetic comet for the harness), debug=1
+        comets), comet=g (synthetic comet for the harness), irr=0
+        (skip satellite irradiance), ghi=W (override it), debug=1
     -->
     <style>
       html,
@@ -350,6 +351,11 @@
       import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
       import {mpDropRadiusMm} from './horizon/rainbow.js';
       import {parseSoft00, syndyne, visibleComets} from './horizon/comets.js';
+      import {
+        ambientFactor,
+        clearnessIndex,
+        pickHour
+      } from './horizon/clearness.js';
       import {buildBowLUT, buildDogLUT} from './horizon/optics-lut.js';
       import {
         apparentAltitude,
@@ -5437,6 +5443,40 @@
         }
       }
 
+      // The daylight, measured: the geostationary constellation's
+      // observed global horizontal irradiance at the anchor
+      // (Open-Meteo satellite radiation API - keyless,
+      // CORS-open). The 1 Hz astro block turns the latest hour
+      // into the clearness index against the Haurwitz clear sky
+      // and the Erbs diffuse split (clearness.js, gated) - the
+      // ambient's cloud response follows the MEASUREMENT, with
+      // the cover heuristic as fallback. ?irr=0 disables;
+      // ?ghi=W overrides for the harness.
+      async function syncInsolation() {
+        if (params.get('irr') === '0' || params.has('ghi')) return;
+        try {
+          const r = await (
+            await fetch(
+              'https://satellite-api.open-meteo.com/v1/archive?latitude=' +
+                state.lat +
+                '&longitude=' +
+                state.lon +
+                '&hourly=shortwave_radiation&forecast_days=1',
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (r && r.hourly && r.hourly.time) {
+            state.ghiSeries = {
+              time: r.hourly.time,
+              vals: r.hourly.shortwave_radiation,
+              at: Date.now()
+            };
+          }
+        } catch {
+          // the heuristic fallback stands
+        }
+      }
+
       // Ephemeris cache, refreshed at 1Hz in the frame loop.
       const astro = {
         at: -1e9,
@@ -6723,6 +6763,49 @@
                 );
               }
             }
+            // Measured daylight: the satellite's own GHI against
+            // the Haurwitz clear sky at the picked hour's
+            // midpoint sun, split by Erbs - the ambient's
+            // measured scale (clearness.js).
+            if (
+              (state.ghiSeries || params.has('ghi')) &&
+              t - (astro.ktAt ?? -1e9) > 60000
+            ) {
+              astro.ktAt = t;
+              state.ktAmbient = null;
+              let ghi = null;
+              let cosZ = null;
+              if (params.has('ghi')) {
+                ghi = +params.get('ghi');
+                cosZ = Math.sin(Math.max(astro.sun.alt, 0));
+              } else if (Date.now() - state.ghiSeries.at < 3 * 3600e3) {
+                const h = pickHour(
+                  state.ghiSeries.time,
+                  state.ghiSeries.vals,
+                  Date.now()
+                );
+                if (h) {
+                  ghi = h.ghi;
+                  const dm = new Date(h.ms + 1800e3);
+                  const eqm = AE.Equator(AE.Body.Sun, dm, obs, true, true);
+                  const hm = AE.Horizon(dm, obs, eqm.ra, eqm.dec, 'normal');
+                  cosZ = Math.sin(Math.max(hm.altitude * RAD, 0));
+                }
+              }
+              const kt = ghi != null ? clearnessIndex(ghi, cosZ) : null;
+              if (kt != null) {
+                state.ktAmbient = ambientFactor(kt);
+                record(
+                  'satellite irradiance',
+                  ghi.toFixed(0) +
+                    ' W/m\u00b2 \u00b7 kt ' +
+                    kt.toFixed(2) +
+                    ' (Haurwitz clear sky) \u00b7 diffuse \u00d7' +
+                    state.ktAmbient.toFixed(2) +
+                    ' (Erbs)'
+                );
+              }
+            }
             if (!astro.recorded) {
               astro.recorded = true;
               record(
@@ -7089,7 +7172,12 @@
           // measured cloud dimming, the eclipse obscuration and a small
           // moonlit-sky term apply here.
           const expo = 24 / (0.2 + 0.8 * day);
-          const dim = (1 - 0.85 * ecl) * (1 - cloudy * 0.3);
+          // the measured sky where the satellite saw one (the
+          // Erbs-scaled clearness index), the cover heuristic
+          // otherwise
+          const dimCloud =
+            state.ktAmbient != null ? state.ktAmbient : 1 - cloudy * 0.3;
+          const dim = (1 - 0.85 * ecl) * dimCloud;
           ambient.intensity = 1;
           // 1.1 puts the clear-sky diffuse fraction at ~20% of direct,
           // the measured real-world ratio.
@@ -8514,6 +8602,8 @@
         // own call - lay the bow LUT from whatever state holds now
         refreshBowLUT();
         syncComets();
+        syncInsolation();
+        setInterval(syncInsolation, 15 * 60 * 1000);
         setInterval(syncWeather, 15 * 60 * 1000);
         syncGeomag();
         syncAir();
