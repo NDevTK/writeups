@@ -9,8 +9,9 @@
  * gated:
  *  - parseBoard: departures -> journeys; stops without coordinates
  *    or times dropped; per-stop delay minutes applied to the
- *    published times (the real-time layer); road/water modes
- *    (bus, boat) filtered - boats already arrive via AIS.
+ *    published times (the real-time layer); the category set
+ *    picks the MODE - rail by default, BOAT_CATS parses the lake
+ *    sailings from the pier boards (buses stay filtered).
  *  - trainAt: WHERE IS IT NOW - dwelling at a stop between its
  *    arrival and departure, else linearly between the two stops
  *    that bracket now (the timetable's own fixes - the same
@@ -59,7 +60,7 @@ export function providerFor(lat, lon) {
 }
 
 // Rail categories the boards publish (road/water filtered out).
-const RAIL_CATS = new Set([
+export const RAIL_CATS = new Set([
   'IC',
   'ICE',
   'ICN',
@@ -104,6 +105,14 @@ export const CONSIST_CARS = {
 };
 export const DEFAULT_CARS = 3;
 
+// The scheduled BOATS on the same boards (category BAT at the
+// pier stations): where AIS coverage misses the lake steamers,
+// the timetable still knows them. Dimensions are the documented
+// default for the BLS lake motorships (boards publish no vessel
+// size); rendering reuses the gated vessels.js passenger hull.
+export const BOAT_CATS = new Set(['BAT']);
+export const BOAT_DIMS = {len: 48, beam: 9};
+
 // The metre-gauge and rack operators run shorter, narrower stock.
 export const NARROW_OPS = new Set([
   'BOB',
@@ -139,10 +148,10 @@ const ms = (iso) => (iso ? Date.parse(iso) : NaN);
  * without a coordinate or any time are dropped; journeys need two
  * placed stops to ever be drawn.
  */
-export function parseBoard(json) {
+export function parseBoard(json, cats = RAIL_CATS) {
   const out = [];
   for (const e of (json && json.stationboard) || []) {
-    if (!RAIL_CATS.has(e.category)) continue; // bus/boat/unknown
+    if (!cats.has(e.category)) continue; // other modes/unknown
     const stops = [];
     for (const p of e.passList || []) {
       const c = (p.station && p.station.coordinate) || {};

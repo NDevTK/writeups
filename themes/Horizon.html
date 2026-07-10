@@ -125,7 +125,11 @@
         trains run the lines on their real timetable: category,
         number, operator and live delay from the station board,
         positions interpolated between the stops each train
-        reports at its delay-shifted times
+        reports at its delay-shifted times - and the PIER station's
+        board does the same for the lake steamers (category BAT):
+        where AIS coverage misses them the schedule floats them at
+        the lake's measured level, an active AIS vessel nearby
+        always winning (a measured position beats a schedule)
       - roam (just fly): the free camera streams terrain. 4 km from
         the anchor the world re-anchors on your geodetic position
         (roam.js - exact inverse mapping and altitude-datum carry,
@@ -401,7 +405,13 @@
       import {landTint, parseLanduse} from './horizon/landuse.js';
       import {parseWaterways, riversGeometry} from './horizon/rivers.js';
       import {parseRailways, railsGeometry} from './horizon/rails.js';
-      import {parseBoard, providerFor, trainAt} from './horizon/trains.js';
+      import {
+        BOAT_CATS,
+        BOAT_DIMS,
+        parseBoard,
+        providerFor,
+        trainAt
+      } from './horizon/trains.js';
       import {buildTrain} from './horizon/rollingstock.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
@@ -1653,7 +1663,9 @@
       // delay-shifted times - the AIS ships' dead-reckoning
       // honesty on rails. ?trains=0 disables.
       let trainJourneys = [];
+      let boatJourneys = [];
       const trainPool = new Map(); // journey key -> consist group
+      const boatPool = new Map(); // sailing key -> vessel group
       let trainMats = null;
       let trainsSeq = 0;
       async function syncTrains() {
@@ -1667,9 +1679,14 @@
               credentials: 'omit'
             })
           ).json();
-          const st = ((loc && loc.stations) || []).find(
+          const stations = ((loc && loc.stations) || []).filter(
             (s) => s.id && s.coordinate && Number.isFinite(s.coordinate.x)
           );
+          // ONE locations call names both worlds: the nearest rail
+          // station and - where one exists - the nearest PIER (the
+          // lake sailings live on its board as category BAT).
+          const st = stations.find((s) => s.icon === 'train') || stations[0];
+          const pier = stations.find((s) => s.icon === 'ship');
           if (!st || seq !== trainsSeq) return;
           const board = await (
             await fetch(prov.boardURL(st.id), {credentials: 'omit'})
@@ -1693,6 +1710,31 @@
                   ')'
                 : '')
           );
+          if (pier) {
+            const seaBoard = await (
+              await fetch(prov.boardURL(pier.id), {credentials: 'omit'})
+            ).json();
+            if (seq !== trainsSeq) return;
+            boatJourneys = parseBoard(seaBoard, BOAT_CATS);
+            const b0 = boatJourneys[0];
+            if (boatJourneys.length)
+              record(
+                prov.name + ' pier board',
+                (pier.name || '?') +
+                  ' · ' +
+                  boatJourneys.length +
+                  ' sailings' +
+                  (b0
+                    ? ' · next ' +
+                      b0.label +
+                      ' → ' +
+                      b0.to +
+                      ' (' +
+                      b0.operator +
+                      ')'
+                    : '')
+              );
+          }
         } catch (e) {
           // No board, no trains - the truthful default.
           if (params.has('debug')) console.warn('trains: ' + e.message);
@@ -6160,6 +6202,70 @@
               if (!live.has(k)) {
                 scene.remove(g);
                 trainPool.delete(k);
+              }
+          }
+        }
+        // Scheduled boats: the pier board's sailings, positioned by
+        // the SAME timetable interpolation, floated at the lake's
+        // measured level through the gated vessels.js passenger
+        // hull. An active AIS vessel nearby WINS - a measured
+        // position beats a schedule, so nothing double-draws.
+        if (boatJourneys.length && params.get('trains') !== '0') {
+          const nowMs = Date.now();
+          for (const j of boatJourneys) {
+            const key = j.label + '@' + j.stops[0].depMs;
+            let g = boatPool.get(key);
+            const p = trainAt(j, nowMs);
+            if (!p) {
+              if (g) g.visible = false;
+              continue;
+            }
+            const sc = geoToScene(p.lat, p.lon, dressAnchor);
+            const ais = shipPool.some(
+              (s) => s.active && Math.hypot(s.x - sc.x, s.z - sc.z) * MPU < 300
+            );
+            if (Math.abs(sc.x) > 140 || Math.abs(sc.z) > 140 || ais) {
+              if (g) g.visible = false;
+              continue;
+            }
+            if (!g) {
+              g = new THREE.Group();
+              buildVessel(
+                g,
+                BOAT_DIMS.len,
+                BOAT_DIMS.beam,
+                'passenger',
+                shipMats,
+                parseInt(j.number, 10) || 590000,
+                1 / MPU
+              );
+              scene.add(g);
+              boatPool.set(key, g);
+            }
+            g.visible = true;
+            const lakeIdx = lakesMask ? lakeAt(lakesMask, sc.x, sc.z) : -1;
+            g.position.set(
+              sc.x,
+              lakeIdx >= 0
+                ? sample(sc.x, sc.z).y
+                : water
+                  ? water.position.y
+                  : 0,
+              sc.z
+            );
+            if (p.hdgTo) {
+              const t2 = geoToScene(p.hdgTo.lat, p.hdgTo.lon, dressAnchor);
+              g.rotation.y = Math.atan2(t2.x - sc.x, t2.z - sc.z);
+            }
+          }
+          if (boatPool.size > 16) {
+            const live = new Set(
+              boatJourneys.map((j) => j.label + '@' + j.stops[0].depMs)
+            );
+            for (const [k, g] of boatPool)
+              if (!live.has(k)) {
+                scene.remove(g);
+                boatPool.delete(k);
               }
           }
         }
