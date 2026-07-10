@@ -3406,6 +3406,19 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- OPEN: cross-boundary legs over-hide. A leg whose FAR stop is
+  outside the drawn box cannot route (nothing to attach to), and
+  when its chord also bows far off the line - Interlaken West ->
+  Spiez cuts across Lake Thun - the 100 m snap correctly refuses,
+  so an IC rolling ON drawn in-box rails hides for most of the
+  leg. The exact extension is A\* to an off-graph target: route
+  from the near stop's projection minimizing g(n) + euclid(n,
+  farStop) over the drawn graph - the argmin boundary node is the
+  route's true exit, the in-box partial path is real geometry,
+  and only the outside tail's length is approximated (affecting
+  along-track speed scaling, never track placement). Not built
+  yet: needs its own reference landmarks (exit-node argmin on a
+  forked network, the tail bound) before it can gate.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

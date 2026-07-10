@@ -7560,6 +7560,9 @@
           const nowMs = Date.now();
           let onRails = 0;
           let offNet = 0;
+          // Harness: visible train positions (?debug=1), so the
+          // shot driver can aim the camera at a drawn train.
+          const dbgTrains = params.has('debug') ? [] : null;
           for (const j of trainJourneys) {
             const key = j.label + '@' + j.stops[0].depMs;
             let g = trainPool.get(key);
@@ -7664,7 +7667,16 @@
               const t2 = geoToScene(p.hdgTo.lat, p.hdgTo.lon, dressAnchor);
               g.rotation.y = Math.atan2(t2.x - sc.x, t2.z - sc.z);
             }
+            if (dbgTrains)
+              dbgTrains.push({
+                x: sc.x,
+                y: g.position.y,
+                z: sc.z,
+                label: j.label,
+                moving: !!p.moving
+              });
           }
+          if (dbgTrains) window.__trains = dbgTrains;
           if (railSnapIdx)
             live['trains (map-matched)'] =
               onRails +
