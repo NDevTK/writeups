@@ -47,7 +47,12 @@ export function railWidthOf(tags = {}) {
  * reaches and unknown types are dropped; the bridge tag rides
  * through so decks span water; longest lines first under the cap.
  */
-export function parseRailways(json, cap = 300, minLenM = 50) {
+// cap 1200 / floor 20 m: the old 300-longest cap and 50 m floor
+// dropped the switch throats and connectors that make a network -
+// drawn lines ended mid-field (and the route graph needed healing
+// across the holes). A city box draws whole now; sub-20 m stubs
+// remain sub-pixel noise.
+export function parseRailways(json, cap = 1200, minLenM = 20) {
   const out = [];
   for (const el of (json && json.elements) || []) {
     if (el.type !== 'way' || !el.geometry || el.geometry.length < 2) continue;
