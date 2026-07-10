@@ -113,12 +113,15 @@ export function stumpffS(z) {
  * Universal Kepler from PERIHELION: solve
  * sqrt(mu) dt = e chi^3 S(z) + q chi (z = alpha chi^2,
  * alpha = (1 - e)/q) for chi by Newton (dt in days), then the
- * f/g functions give the perifocal position. Returns
- * {x, y (perifocal, AU), r}.
+ * f/g functions give the perifocal position and (through their
+ * derivatives) the velocity. Returns {x, y (perifocal, AU), r,
+ * vx, vy (AU/day)}. mu is a parameter: dust under radiation
+ * pressure flies the SAME equations at mu(1 - beta)
+ * (Finson & Probstein 1968).
  */
-export function keplerUniversal(q, e, dtDays) {
+export function keplerUniversal(q, e, dtDays, mu = MU_SUN) {
   const alpha = (1 - e) / q;
-  const smu = Math.sqrt(MU_SUN);
+  const smu = Math.sqrt(mu);
   const target = smu * dtDays;
   // Newton with a parabolic-guess start (Barker-like scale)
   let chi =
@@ -139,13 +142,74 @@ export function keplerUniversal(q, e, dtDays) {
   const z = alpha * chi * chi;
   const C = stumpffC(z);
   const S = stumpffS(z);
-  // f and g from perihelion (r0 = q, vr0 = 0)
+  // f and g from perihelion (r0 = q, vr0 = 0), with their
+  // derivatives for the velocity
   const f = 1 - ((chi * chi) / q) * C;
   const g = dtDays - (chi * chi * chi * S) / smu;
-  const v0 = Math.sqrt((MU_SUN * (1 + e)) / q); // perihelion speed
+  const v0 = Math.sqrt((mu * (1 + e)) / q); // perihelion speed
   const x = f * q;
   const y = g * v0;
-  return {x, y, r: Math.hypot(x, y)};
+  const r = Math.hypot(x, y);
+  const fdot = (smu / (r * q)) * chi * (z * S - 1) * 1;
+  const gdot = 1 - ((chi * chi) / r) * C;
+  return {x, y, r, vx: fdot * q, vy: gdot * v0};
+}
+
+/**
+ * Universal Kepler from an ARBITRARY state (Vallado, Algorithm
+ * 8 in full): position r0 and velocity v0 (any frame), time of
+ * flight dt, gravitational parameter mu. Returns {pos, vel}.
+ * This is what the DUST needs: a grain released at the comet's
+ * state flies these equations at mu(1 - beta).
+ */
+export function keplerFromState(r0v, v0v, dtDays, mu = MU_SUN) {
+  const r0 = Math.hypot(r0v.x, r0v.y, r0v.z);
+  const v02 = v0v.x * v0v.x + v0v.y * v0v.y + v0v.z * v0v.z;
+  const rv = r0v.x * v0v.x + r0v.y * v0v.y + r0v.z * v0v.z;
+  const smu = Math.sqrt(mu);
+  const alpha = 2 / r0 - v02 / mu; // 1/a (signed)
+  let chi = Math.abs(alpha) > 1e-9 ? smu * dtDays * alpha : 0;
+  if (chi === 0) {
+    // near-parabolic start (Vallado's recommendation)
+    chi = Math.sign(dtDays) * Math.cbrt(Math.abs(6 * smu * dtDays)) * 0.5;
+    if (chi === 0) chi = 1e-8;
+  }
+  for (let it = 0; it < 80; it++) {
+    const z = alpha * chi * chi;
+    const C = stumpffC(z);
+    const S = stumpffS(z);
+    const F =
+      (rv / smu) * chi * chi * C +
+      (1 - r0 * alpha) * chi * chi * chi * S +
+      r0 * chi -
+      smu * dtDays;
+    const dF =
+      chi * chi * C + (rv / smu) * chi * (1 - z * S) + r0 * (1 - z * C);
+    const step = F / dF;
+    chi -= step;
+    if (Math.abs(step) < 1e-13 * Math.max(1, Math.abs(chi))) break;
+  }
+  const z = alpha * chi * chi;
+  const C = stumpffC(z);
+  const S = stumpffS(z);
+  const f = 1 - ((chi * chi) / r0) * C;
+  const g = dtDays - (chi * chi * chi * S) / smu;
+  const pos = {
+    x: f * r0v.x + g * v0v.x,
+    y: f * r0v.y + g * v0v.y,
+    z: f * r0v.z + g * v0v.z
+  };
+  const r = Math.hypot(pos.x, pos.y, pos.z);
+  const fdot = (smu / (r * r0)) * chi * (z * S - 1);
+  const gdot = 1 - ((chi * chi) / r) * C;
+  return {
+    pos,
+    vel: {
+      x: fdot * r0v.x + gdot * v0v.x,
+      y: fdot * r0v.y + gdot * v0v.y,
+      z: fdot * r0v.z + gdot * v0v.z
+    }
+  };
 }
 
 /**
@@ -155,6 +219,7 @@ export function keplerUniversal(q, e, dtDays) {
  */
 export function cometState(el, jd) {
   const pf = keplerUniversal(el.q, el.e, jd - el.tp);
+  const pv = {vx: pf.vx, vy: pf.vy};
   const co = Math.cos(el.peri);
   const so = Math.sin(el.peri);
   const cO = Math.cos(el.node);
@@ -172,8 +237,35 @@ export function cometState(el, jd) {
     x: pf.x * px + pf.y * qx,
     y: pf.x * py + pf.y * qy,
     z: pf.x * pz + pf.y * qz,
-    r: pf.r
+    r: pf.r,
+    vx: pv.vx * px + pv.vy * qx,
+    vy: pv.vx * py + pv.vy * qy,
+    vz: pv.vx * pz + pv.vy * qz
   };
+}
+
+/**
+ * Finson & Probstein (1968) syndyne: dust of radiation-pressure
+ * parameter beta released with ZERO ejection velocity (the FP
+ * model) at emission ages tausDays before jd. Each grain leaves
+ * with the comet's own state at emission and flies the universal
+ * equations under mu(1 - beta). Returns the grains' heliocentric
+ * ecliptic positions now, oldest last. beta = 0 reproduces the
+ * comet itself - the gate holds that exactly.
+ */
+export function syndyne(el, jd, beta, tausDays) {
+  const out = [];
+  for (const tau of tausDays) {
+    const e0 = cometState(el, jd - tau);
+    const k = keplerFromState(
+      {x: e0.x, y: e0.y, z: e0.z},
+      {x: e0.vx, y: e0.vy, z: e0.vz},
+      tau,
+      MU_SUN * (1 - beta)
+    );
+    out.push(k.pos);
+  }
+  return out;
 }
 
 /**
@@ -205,6 +297,7 @@ export function visibleComets(elements, jd, obs, magLimit = 9) {
     if (!Number.isFinite(mag) || mag > magLimit) continue;
     out.push({
       name: el.name,
+      el,
       mag,
       r: h.r,
       delta,

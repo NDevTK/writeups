@@ -14,16 +14,24 @@
 //    same-day element sets, independent ephemeris
 //  - the magnitude law at its closed points (1 AU / 1 AU gives
 //    g exactly; each factor's own slope)
+//  - the Finson-Probstein dust: the general-state solver's group
+//    property and conservation laws, the beta = 0 grain riding
+//    the comet exactly, the leading-order radiation-pressure
+//    displacement (1/2 beta mu tau^2 / r^2, anti-sunward), and
+//    the syndyne's lag behind the orbital motion - the curve
+//    every dust tail photograph shows
 import {
   cometMagnitude,
   cometState,
   GAUSS_K,
   jdOf,
+  keplerFromState,
   keplerUniversal,
   MU_SUN,
   parseSoft00,
   stumpffC,
   stumpffS,
+  syndyne,
   visibleComets
 } from './comets.js';
 import {
@@ -196,6 +204,83 @@ const check = (name, ok, detail) => {
     'magnitude law and filter',
     ok,
     `m(1 AU, 1 AU) = g exactly; doubling Delta adds ${dDelta.toFixed(3)} mag, doubling r adds ${dR.toFixed(3)} (the 2.5k slope); today's three all filter out below mag 6, the synthetic perihelion comet comes through at ${bright[0].mag.toFixed(1)}`
+  );
+}
+
+{
+  // The general-state solver (the dust's engine): the group
+  // property (40 d then 60 d equals 100 d in one step) to
+  // machine precision; specific energy and angular momentum
+  // conserved along the flight; the perihelion solver's own
+  // velocity is exact there (v_peri = sqrt(mu(1+e)/q)).
+  const r0 = {x: 1.1, y: 0.2, z: 0.05};
+  const v0 = {x: -0.004, y: 0.016, z: 0.001};
+  const a = keplerFromState(r0, v0, 40);
+  const b = keplerFromState(a.pos, a.vel, 60);
+  const c = keplerFromState(r0, v0, 100);
+  const gErr = Math.hypot(
+    b.pos.x - c.pos.x,
+    b.pos.y - c.pos.y,
+    b.pos.z - c.pos.z
+  );
+  const en = (p, v) =>
+    (v.x * v.x + v.y * v.y + v.z * v.z) / 2 -
+    MU_SUN / Math.hypot(p.x, p.y, p.z);
+  const eErr = Math.abs(en(c.pos, c.vel) - en(r0, v0));
+  const hx0 = r0.y * v0.z - r0.z * v0.y;
+  const hx1 = c.pos.y * c.vel.z - c.pos.z * c.vel.y;
+  const pf = keplerUniversal(0.9, 0.6, 0);
+  const vperi = Math.hypot(pf.vx, pf.vy);
+  const ok =
+    gErr < 1e-12 &&
+    eErr < 1e-15 &&
+    Math.abs(hx1 - hx0) < 1e-14 &&
+    Math.abs(vperi - Math.sqrt((MU_SUN * 1.6) / 0.9)) < 1e-12;
+  check(
+    'general-state solver',
+    ok,
+    `group property to ${gErr.toExponential(1)}; energy drift ${eErr.toExponential(1)}, angular momentum drift ${Math.abs(hx1 - hx0).toExponential(1)}; perihelion speed = sqrt(mu(1+e)/q) exactly`
+  );
+}
+
+{
+  // Finson-Probstein dust. beta = 0 is the comet itself, exactly
+  // and for every age. Small beta, short age: the grain falls
+  // behind the comet by the leading-order radiation-pressure
+  // displacement (1/2) beta mu tau^2 / r^2, directed
+  // anti-sunward. Long ages: the syndyne LAGS the orbital
+  // motion - the dust tail curves behind the comet's track, the
+  // shape every photograph shows.
+  const els = parseSoft00(MPC_LINES.join('\n'));
+  const lk = els[2]; // the short-period elliptic, r ~ 2.6 AU
+  const jd = HORIZONS_JD;
+  const c0 = cometState(lk, jd);
+  const zero = syndyne(lk, jd, 0, [3, 30, 90]);
+  const zErr = Math.max(
+    ...zero.map((p) => Math.hypot(p.x - c0.x, p.y - c0.y, p.z - c0.z))
+  );
+  const beta = 1e-4;
+  const tau = 2;
+  const g1 = syndyne(lk, jd, beta, [tau])[0];
+  const dx = {x: g1.x - c0.x, y: g1.y - c0.y, z: g1.z - c0.z};
+  const dLen = Math.hypot(dx.x, dx.y, dx.z);
+  const want = (0.5 * beta * MU_SUN * tau * tau) / (c0.r * c0.r);
+  const outward = (dx.x * c0.x + dx.y * c0.y + dx.z * c0.z) / (dLen * c0.r);
+  const gFar = syndyne(lk, jd, 0.3, [40])[0];
+  const dFar = {x: gFar.x - c0.x, y: gFar.y - c0.y, z: gFar.z - c0.z};
+  const vLen = Math.hypot(c0.vx, c0.vy, c0.vz);
+  const lag =
+    (dFar.x * c0.vx + dFar.y * c0.vy + dFar.z * c0.vz) /
+    (Math.hypot(dFar.x, dFar.y, dFar.z) * vLen);
+  const ok =
+    zErr < 1e-12 &&
+    Math.abs(dLen / want - 1) < 0.01 &&
+    outward > 0.99 &&
+    lag < -0.05;
+  check(
+    'Finson-Probstein dust',
+    ok,
+    `beta = 0 rides the comet to ${zErr.toExponential(1)} AU at every age; a young small-beta grain sits ${dLen.toExponential(2)} AU anti-sunward vs the closed-form (1/2) beta mu tau^2/r^2 = ${want.toExponential(2)} (ratio ${(dLen / want).toFixed(4)}, direction cos ${outward.toFixed(3)}); the beta = 0.3, 40-day grain trails the orbital motion (cos ${lag.toFixed(2)}) - the tail's curve`
   );
 }
 

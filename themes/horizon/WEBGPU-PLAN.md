@@ -3227,6 +3227,27 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   shows - rare-event content like the eclipses; the panel
   records name/mag/r/Delta whenever one is up. ?comet=g forces
   a synthetic perihelion comet for the harness. Gate 59 sets.
+- DONE: the dust tail, by Finson & Probstein (Jul 10 - closing
+  the comet feature's own documented gap, "dust lag is not
+  modelled"). comets.js gained velocities through the f'/g'
+  functions (perihelion speed sqrt(mu(1+e)/q) exact), the
+  general-state universal solver (Vallado Alg. 8 in full -
+  group property 40 d + 60 d = 100 d to 3e-16, energy and
+  angular momentum drift exactly zero), and syndyne(): dust of
+  radiation-pressure parameter beta released with zero ejection
+  velocity (the FP 1968 model) flies the SAME universal
+  equations under mu(1 - beta) from the comet's own state at
+  emission. Landmarks (comets 5 -> 7): beta = 0 rides the comet
+  to 5e-16 AU at every age; a young small-beta grain sits
+  anti-sunward by the closed-form leading order
+  (1/2) beta mu tau^2 / r^2 (ratio 1.0003, direction cosine
+  1.000); the beta = 0.3, 40-day grain TRAILS the orbital
+  motion - the curve every dust-tail photograph shows. Theme:
+  two tails now - the straight bluish ION tail (solar-wind
+  carried, effectively radial) and the curved warm DUST strip
+  through the beta = 0.3 syndyne's own sky positions (grains 2
+  to 60 days old, widening with age), both faded by the
+  diffuse-source contrast law. Gate 59 sets (comets 7).
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
