@@ -53,6 +53,8 @@
       import {RAILS_FIXTURE} from '../rails-fixture.mjs';
       import {consistOf} from '../trains.js';
       import {buildTrain} from '../rollingstock.js';
+      import {rotorOmega, specOf} from '../turbines.js';
+      import {buildWindmill} from '../windmills.js';
 
       const q = new URLSearchParams(location.search);
       const renderer = new THREE.WebGPURenderer({antialias: true});
@@ -105,9 +107,67 @@
         ].map((c) => mk(c))
       };
 
-      // ?asset=trains: one consist per category family through the
-      // same trains.js/rollingstock.js the theme ships (metres).
-      if (q.get('asset') === 'trains') {
+      // ?asset=windmills: the three Mont Crosin models plus the
+      // model-less power rung through the same turbines.js/
+      // windmills.js the theme ships (metres); rotors run at
+      // their region-2 speed for a 8 m/s hub wind, one blade
+      // phase apart. ?v= sets the wind.
+      if (q.get('asset') === 'windmills') {
+        sea.material.color.set('#5d7a52'); // grass stage
+        sun.position.set(-320, 380, -420);
+        const wmats = {body: mk('#d5d8d9', 0.55), dark: mk('#3c4146', 0.6)};
+        const LINEUP = [
+          {model: 'V90'},
+          {manufacturer: 'Enercon', model: 'E82'},
+          {model: 'V112'},
+          {'generator:output:electricity': '2000 kW'}
+        ];
+        const v = +q.get('v') || 8;
+        const rigs = [];
+        let x = 0;
+        const xs = [];
+        for (const tags of LINEUP) {
+          const spec = specOf(tags);
+          const g = new THREE.Group();
+          const rig = buildWindmill(g, spec, wmats, 1);
+          rig.rotor.rotation.z = rigs.length * 0.7;
+          rigs.push({rig, om: rotorOmega(spec, v)});
+          x += spec.d * 0.62;
+          g.position.set(x, 0, 0);
+          g.rotation.y = ((+q.get('yaw') || 20) * Math.PI) / 180;
+          xs.push(x);
+          x += spec.d * 0.62;
+          scene.add(g);
+        }
+        const mid = (xs[0] + xs[xs.length - 1]) / 2;
+        const az = ((+q.get('az') || 195) * Math.PI) / 180;
+        const el = ((+q.get('el') || 8) * Math.PI) / 180;
+        const d = +q.get('d') || 520;
+        camera.position.set(
+          mid + d * Math.cos(el) * Math.sin(az),
+          Math.max(d * Math.sin(el), 15),
+          d * Math.cos(el) * Math.cos(az)
+        );
+        camera.lookAt(mid, 75, 0);
+        await renderer.init();
+        window.__r = renderer;
+        window.__scene = scene;
+        window.__cam = camera;
+        window.__THREE = THREE;
+        let wframes = 0;
+        let wt = performance.now();
+        renderer.setAnimationLoop(() => {
+          const now = performance.now();
+          const dt = Math.min((now - wt) / 1000, 0.1);
+          wt = now;
+          for (const {rig, om} of rigs) rig.rotor.rotation.z -= om * dt;
+          renderer.render(scene, camera);
+          if (++wframes === 5) console.log('DONE');
+        });
+      } else if (q.get('asset') === 'trains') {
+        // ?asset=trains: one consist per category family through
+        // the same trains.js/rollingstock.js the theme ships
+        // (metres).
         sea.material.color.set('#82868b'); // ballast stage
         sun.position.set(-320, 380, -420);
         const tmats = {

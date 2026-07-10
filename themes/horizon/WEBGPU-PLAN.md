@@ -2973,6 +2973,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   brighter than a clear one, and the stars fade under it exactly
   as the contrast ratio says. Gate 53 sets (skyglow 4 -> 5
   landmarks); browser smoke clean.
+- DONE: wind turbines from OSM, spun by the real wind under the
+  manufacturers' own envelopes (Jul 10, all three lanes at once -
+  a real data source, a designed asset, and the published control
+  law followed rather than approximated). turbines.js: the spec
+  ladder (explicit rotor:diameter/height:hub tags > the model's
+  published sheet > fleet medians computed FROM the sheets - no
+  invented constants) resolves Vestas V90-2.0 (facts & figures:
+  cut-in 4/rated 12/cut-out 25 m/s, 9.3-16.6 rpm, nacelle
+  10.4x3.4x4 m), ENERCON E-82 E2 (product overview: 6-18 rpm,
+  storm control 28-34 m/s, cut-in and rated wind read off
+  ENERCON's own calculated power curve, Cp max 0.50) and the
+  V112 platform (General Specification 0011-9181 V03: 6.2-17.7
+  rpm, rotor tilt 6 deg, coning 4 deg, yaw 0.5 deg/s; rated 13).
+  The control law is Burton et al.'s variable-speed scheme:
+  region 2 tracks max Cp at Omega = lambda_opt v / R inside the
+  published interval, with the closure lambda_opt =
+  Omega_max R / v_rated so the rotor hits its published top
+  speed exactly at its published rated wind; Vestas stops hard
+  at cut-out, ENERCON's storm control tapers the speed linearly
+  across its published window instead. Hub wind comes from the
+  forecast model's own 80/120 m levels (syncWeather now asks for
+  them), log-profile interpolated to each hub. windmills.js
+  (vessels.js mould, ?asset=windmills stage): tower/nacelle/
+  three coned blades from the sheets' own dims and ratios (both
+  Vestas sheets put the blade at 0.49 D), nacelles slew into the
+  live wind at the published yaw rate, rotors spin clockwise
+  seen from upwind. Live fixture: the 19-turbine Juvent farm on
+  Mont Crosin (3 models, 16 JUV refs). Gate 54 sets (turbines: 6
+  landmarks - ladder, law, storm control, ENERCON's published
+  curve closing the constants, log-profile anchors, fixture).
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
