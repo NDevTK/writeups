@@ -5367,6 +5367,7 @@
       // exactly as photographs show; the straight quad above is
       // the ION tail (solar-wind carried, effectively radial).
       const DUST_TAUS = [2, 5, 10, 18, 28, 42, 60];
+      const DUST_BETAS = [0.1, 0.3, 0.6]; // the fan's syndynes
       const cometDustGeo = new THREE.BufferGeometry();
       cometDustGeo.setAttribute(
         'position',
@@ -5383,18 +5384,22 @@
         }
         cometDustGeo.setIndex(idx);
       }
-      const cometDustMat = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(1.0, 0.92, 0.78),
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide
+      const cometDusts = DUST_BETAS.map(() => {
+        const geo = cometDustGeo.clone();
+        const mat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(1.0, 0.92, 0.78),
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide
+        });
+        const m = new THREE.Mesh(geo, mat);
+        m.visible = false;
+        m.renderOrder = 1;
+        scene.add(m);
+        return m;
       });
-      const cometDust = new THREE.Mesh(cometDustGeo, cometDustMat);
-      cometDust.visible = false;
-      cometDust.renderOrder = 1;
-      scene.add(cometDust);
       let cometEls = null;
       async function syncComets() {
         if (params.get('comets') === '0') return;
@@ -6681,15 +6686,18 @@
                   return {alt: h.altitude * RAD, az: h.azimuth * RAD};
                 };
                 const sTail = 0.12 / c.r; // a step out along the radial
-                // the dust: each grain of the beta = 0.3 syndyne
-                // placed at ITS own sky position (comets.js
-                // syndyne - Finson-Probstein, gated)
-                const dust = syndyne(c.el, jd, 0.3, DUST_TAUS).map((g) =>
-                  place({
-                    x: g.x - obsEcl.x,
-                    y: g.y - obsEcl.y,
-                    z: g.z - obsEcl.z
-                  })
+                // the dust FAN: each grain of each syndyne
+                // (comets.js, Finson-Probstein, gated) placed at
+                // ITS own sky position - the fan's width IS the
+                // beta family
+                const dust = DUST_BETAS.map((b) =>
+                  syndyne(c.el, jd, b, DUST_TAUS).map((g) =>
+                    place({
+                      x: g.x - obsEcl.x,
+                      y: g.y - obsEcl.y,
+                      z: g.z - obsEcl.z
+                    })
+                  )
                 );
                 astro.comet = {
                   name: c.name,
@@ -6787,43 +6795,50 @@
               cometTailMat.opacity =
                 planetObj.u.night.value * lpVis * bright * 0.35;
               cometTail.visible = cometTailMat.opacity > 0.004;
-              // the dust strip through the syndyne's sky points,
-              // widening with grain age (older dust has spread)
-              if (c.dust && c.dust.length === DUST_TAUS.length) {
-                const da = cometDustGeo.attributes.position;
-                let prev = v;
-                for (let i = 0; i <= DUST_TAUS.length; i++) {
-                  const pt =
-                    i === 0
-                      ? v
-                      : skyPoint(c.dust[i - 1].alt, c.dust[i - 1].az, 858);
-                  const nxt =
-                    i < DUST_TAUS.length
-                      ? skyPoint(c.dust[i].alt, c.dust[i].az, 858)
-                      : pt;
-                  const seg = nxt.clone().sub(i === 0 ? pt : prev);
-                  if (seg.lengthSq() < 1e-8) seg.copy(dir);
-                  const sd = seg
-                    .normalize()
-                    .cross(pt.clone().normalize())
-                    .setLength(1.2 + i * 0.9);
-                  da.setXYZ(2 * i, pt.x - sd.x, pt.y - sd.y, pt.z - sd.z);
-                  da.setXYZ(2 * i + 1, pt.x + sd.x, pt.y + sd.y, pt.z + sd.z);
-                  prev = pt;
+              // the dust strips: one per syndyne of the fan,
+              // each widening with grain age (older dust has
+              // spread); the family's spread on the sky IS the
+              // tail's width
+              if (c.dust && c.dust.length === DUST_BETAS.length) {
+                for (let bIdx = 0; bIdx < DUST_BETAS.length; bIdx++) {
+                  const pts = c.dust[bIdx];
+                  const mesh = cometDusts[bIdx];
+                  const da = mesh.geometry.attributes.position;
+                  let prev = v;
+                  for (let i = 0; i <= DUST_TAUS.length; i++) {
+                    const pt =
+                      i === 0
+                        ? v
+                        : skyPoint(pts[i - 1].alt, pts[i - 1].az, 858);
+                    const nxt =
+                      i < DUST_TAUS.length
+                        ? skyPoint(pts[i].alt, pts[i].az, 858)
+                        : pt;
+                    const seg = nxt.clone().sub(i === 0 ? pt : prev);
+                    if (seg.lengthSq() < 1e-8) seg.copy(dir);
+                    const sd = seg
+                      .normalize()
+                      .cross(pt.clone().normalize())
+                      .setLength(1.2 + i * 0.9);
+                    da.setXYZ(2 * i, pt.x - sd.x, pt.y - sd.y, pt.z - sd.z);
+                    da.setXYZ(2 * i + 1, pt.x + sd.x, pt.y + sd.y, pt.z + sd.z);
+                    prev = pt;
+                  }
+                  da.needsUpdate = true;
+                  mesh.geometry.computeBoundingSphere();
+                  mesh.material.opacity =
+                    (planetObj.u.night.value * lpVis * bright * 0.32) /
+                    DUST_BETAS.length;
+                  mesh.visible = mesh.material.opacity > 0.002;
                 }
-                da.needsUpdate = true;
-                cometDustGeo.computeBoundingSphere();
-                cometDustMat.opacity =
-                  planetObj.u.night.value * lpVis * bright * 0.3;
-                cometDust.visible = cometDustMat.opacity > 0.004;
               } else {
-                cometDust.visible = false;
+                for (const m of cometDusts) m.visible = false;
               }
             }
           } else {
             cs.setX(0, 0);
             cometTail.visible = false;
-            cometDust.visible = false;
+            for (const m of cometDusts) m.visible = false;
           }
           cp.needsUpdate = true;
           cs.needsUpdate = true;

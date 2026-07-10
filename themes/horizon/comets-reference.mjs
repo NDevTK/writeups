@@ -284,4 +284,34 @@ const check = (name, ok, detail) => {
   );
 }
 
+{
+  // The dust FAN: syndynes are slices of one two-parameter sheet
+  // (beta, age). At fixed age the anti-sunward displacement
+  // grows STRICTLY with beta (lighter grains feel more of the
+  // sun) - the fan opens in order; at age -> 0 every beta
+  // collapses onto the head. That ordering is the FP diagram's
+  // whole geometry.
+  const els = parseSoft00(MPC_LINES.join('\n'));
+  const lk = els[2];
+  const jd = HORIZONS_JD;
+  const c0 = cometState(lk, jd);
+  const disp = (beta, tau) => {
+    const g = syndyne(lk, jd, beta, [tau])[0];
+    return Math.hypot(g.x - c0.x, g.y - c0.y, g.z - c0.z);
+  };
+  const betas = [0.05, 0.1, 0.3, 0.6, 1.0];
+  const d20 = betas.map((b) => disp(b, 20));
+  let ordered = true;
+  for (let i = 1; i < d20.length; i++) {
+    if (d20[i] <= d20[i - 1]) ordered = false;
+  }
+  const young = Math.max(...betas.map((b) => disp(b, 0.01)));
+  const ok = ordered && young < 1e-8 && d20[4] / d20[0] > 15;
+  check(
+    'the dust fan',
+    ok,
+    `20-day displacements over beta ${betas.join('/')}: ${d20.map((d) => d.toExponential(1)).join(', ')} AU - strictly fan-ordered (beta 1 carries ${(d20[4] / d20[0]).toFixed(0)}x beta 0.05); every grain collapses onto the head at age zero`
+  );
+}
+
 process.exit(fail ? 1 : 0);
