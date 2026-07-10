@@ -477,12 +477,25 @@ export function createContrailMaterial() {
 // Rainbows at the Descartes angles + the 22-deg halo with sundogs,
 // on one additive dome.
 export function createOpticsMaterial() {
+  const dogData = new Float32Array(256 * 4);
+  const dogTex = new DataTexture(dogData, 256, 1, RGBAFormat, FloatType);
+  dogTex.minFilter = dogTex.magFilter = LinearFilter;
+  dogTex.needsUpdate = true;
   const u = {
     sunDir: uniform(new Vector3(0, 1, 0)),
     antisolar: uniform(new Vector3(0, -1, 0)),
     bow: uniform(0),
     halo: uniform(0),
-    dogs: uniform(0)
+    dogs: uniform(0),
+    // Bravais parhelia (optics-lut buildDogLUT): azimuth-offset
+    // LUT re-laid by the theme as the source climbs; srcAlt +
+    // the plates' documented ~1.5-degree wobble envelope place
+    // it vertically.
+    srcAlt: uniform(0),
+    dogA0: uniform((18 * Math.PI) / 180),
+    dogA1: uniform((55 * Math.PI) / 180),
+    dogTex,
+    dogData
   };
   const material = new NodeMaterial();
   material.side = BackSide;
@@ -510,8 +523,10 @@ export function createOpticsMaterial() {
   };
   const haloLut = buildHaloLUT();
   const bowLut = buildBowLUT();
+  const bowTex = mkLutTex(bowLut);
+  u.bowTex = bowTex; // theme re-lays it from the measured rain
   const haloTexN = texture(mkLutTex(haloLut));
-  const bowTexN = texture(mkLutTex(bowLut));
+  const bowTexN = texture(bowTex);
 
   const DEG = 57.29577951308232;
   const v = normalize(positionLocal);
@@ -524,17 +539,31 @@ export function createOpticsMaterial() {
     vec2(aS.sub(haloLut.thMinDeg).div(haloLut.thMaxDeg - haloLut.thMinDeg), 0.5)
   ).rgb;
   const cBow = bowSample.mul(u.bow).mul(0.55);
-  // Parhelia placement stays the documented gaussian band at the
-  // sun's own elevation (plate-crystal orientation statistics are
-  // out of scope); its radial profile is now the physical halo LUT.
-  // exp(-x^2) written as a product - GLSL pow() is undefined for
-  // negative bases, and x goes negative below the sun.
-  const dx = v.y.sub(u.sunDir.y).mul(14.0);
-  const dogBand = exp(dx.mul(dx).negate());
-  const cHalo = haloSample.mul(
-    u.halo.mul(u.dogs.mul(dogBand).mul(0.6).add(0.18))
+  // Parhelia: the Bravais azimuth-offset LUT along the source's
+  // almucantar (dogs ON the halo at the horizon, migrating
+  // outward, dead past ~61 degrees - the LUT empties itself),
+  // spread vertically by the plates' documented ~1.5-degree
+  // wobble. The 0.18 base / 0.6 dog display gains keep their
+  // calibrated values.
+  const hd = max(sqrt(float(1.0).sub(v.y.mul(v.y))), 1e-4);
+  const hs = max(sqrt(float(1.0).sub(u.sunDir.y.mul(u.sunDir.y))), 1e-4);
+  const cosAz = clamp(
+    v.x.mul(u.sunDir.x).add(v.z.mul(u.sunDir.z)).div(hd.mul(hs)),
+    -1.0,
+    1.0
   );
-  material.colorNode = cBow.add(cHalo);
+  const azOff = acos(cosAz);
+  const dAlt = asin(clamp(v.y, -1.0, 1.0))
+    .sub(u.srcAlt)
+    .div((1.5 * Math.PI) / 180);
+  const dogSample = texture(u.dogTex).sample(
+    vec2(clamp(azOff.sub(u.dogA0).div(u.dogA1.sub(u.dogA0)), 0.0, 1.0), 0.5)
+  ).rgb;
+  const cDogs = dogSample
+    .mul(exp(dAlt.mul(dAlt).negate()))
+    .mul(u.halo.mul(u.dogs).mul(0.6));
+  const cHalo = haloSample.mul(u.halo.mul(0.18));
+  material.colorNode = cBow.add(cHalo).add(cDogs);
   material.opacityNode = 1.0;
   return {material, u};
 }
@@ -956,110 +985,6 @@ export function createSkyglowMaterial() {
   const h = clamp(d.y, 0.0, 1.0);
   const prof = exp(h.mul(-5.5)).mul(0.85).add(0.15);
   material.colorNode = vec3(u.tint).mul(w.mul(prof).mul(u.alpha));
-  material.opacityNode = float(1);
-  return {material, u};
-}
-
-/**
- * The rainbow overlay (rainbow.js computes the physics): a 1-D
- * RGB profile over the angle from the ANTISOLAR point, Airy
- * theory on the Marshall-Palmer drop of the measured rain,
- * uploaded as a LUT. The dome just measures each view ray's
- * angle off the antisolar axis and samples - primary, Alexander's
- * dark band, secondary and the supernumerary fringes are all IN
- * the profile. Additive, depth-tested (terrain occludes the low
- * arc), faded by the caller's alpha (sun, rain and cloud gates
- * live in the theme).
- */
-export function createRainbowMaterial(n = 512) {
-  const lutData = new Float32Array(n * 4);
-  const lut = new DataTexture(lutData, n, 1, RGBAFormat, FloatType);
-  lut.minFilter = lut.magFilter = LinearFilter;
-  lut.needsUpdate = true;
-  const u = {
-    alpha: uniform(0),
-    antisun: uniform(new Vector3(0, -1, 0)),
-    g0: uniform((37 * Math.PI) / 180),
-    g1: uniform((55 * Math.PI) / 180),
-    lut,
-    lutData
-  };
-  const material = new NodeMaterial();
-  material.transparent = true;
-  material.depthWrite = false;
-  material.side = BackSide;
-  material.blending = AdditiveBlending;
-  const d = normalize(positionLocal);
-  const g = acos(clamp(dot(d, u.antisun), -1.0, 1.0));
-  const frac = clamp(g.sub(u.g0).div(u.g1.sub(u.g0)), 0.0, 1.0);
-  const c = texture(u.lut).sample(vec2(frac, 0.5));
-  // the LUT ends at zero on both flanks; the hard clamp edges
-  // never show
-  material.colorNode = c.rgb.mul(u.alpha);
-  material.opacityNode = float(1);
-  return {material, u};
-}
-
-/**
- * The ice-halo overlay (halos.js computes the physics): the
- * 22-degree ring LUT over the angle from the SUN, plus the
- * sundog LUT over azimuthal offset along the sun's almucantar,
- * weighted vertically by the plates' documented ~1.5-degree
- * wobble. Additive, depth-tested, faded by the caller's alpha
- * (cirrus and sun gates live in the theme).
- */
-export function createHaloMaterial(n = 512, np = 256) {
-  const ringData = new Float32Array(n * 4);
-  const ring = new DataTexture(ringData, n, 1, RGBAFormat, FloatType);
-  ring.minFilter = ring.magFilter = LinearFilter;
-  ring.needsUpdate = true;
-  const parData = new Float32Array(np * 4);
-  const par = new DataTexture(parData, np, 1, RGBAFormat, FloatType);
-  par.minFilter = par.magFilter = LinearFilter;
-  par.needsUpdate = true;
-  const u = {
-    alpha: uniform(0),
-    parOn: uniform(0),
-    sunDir: uniform(new Vector3(0, 1, 0)),
-    sunAlt: uniform(0),
-    g0: uniform((18 * Math.PI) / 180),
-    g1: uniform((30 * Math.PI) / 180),
-    a0: uniform((18 * Math.PI) / 180),
-    a1: uniform((55 * Math.PI) / 180),
-    sigV: uniform((1.5 * Math.PI) / 180),
-    ring,
-    ringData,
-    par,
-    parData
-  };
-  const material = new NodeMaterial();
-  material.transparent = true;
-  material.depthWrite = false;
-  material.side = BackSide;
-  material.blending = AdditiveBlending;
-  const d = normalize(positionLocal);
-  const g = acos(clamp(dot(d, u.sunDir), -1.0, 1.0));
-  const ringC = texture(u.ring).sample(
-    vec2(clamp(g.sub(u.g0).div(u.g1.sub(u.g0)), 0.0, 1.0), 0.5)
-  );
-  // azimuth offset along the almucantar + the plates' vertical
-  // wobble envelope
-  const hd = max(sqrt(float(1.0).sub(d.y.mul(d.y))), 1e-4);
-  const hs = max(sqrt(float(1.0).sub(u.sunDir.y.mul(u.sunDir.y))), 1e-4);
-  const cosAz = clamp(
-    d.x.mul(u.sunDir.x).add(d.z.mul(u.sunDir.z)).div(hd.mul(hs)),
-    -1.0,
-    1.0
-  );
-  const az = acos(cosAz);
-  const dAlt = asin(clamp(d.y, -1.0, 1.0))
-    .sub(u.sunAlt)
-    .div(u.sigV);
-  const parC = texture(u.par)
-    .sample(vec2(clamp(az.sub(u.a0).div(u.a1.sub(u.a0)), 0.0, 1.0), 0.5))
-    .rgb.mul(exp(dAlt.mul(dAlt).negate()))
-    .mul(u.parOn);
-  material.colorNode = ringC.rgb.add(parC).mul(u.alpha);
   material.opacityNode = float(1);
   return {material, u};
 }

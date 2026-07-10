@@ -189,8 +189,7 @@
         turbines), peaks=0 (skip summit labels),
         discharge=0 (pin river widths to the ladder), snowcover=0|URL
         (measured snow off / tile endpoint override), soil=0 (pin
-        bare-soil tints dry), rainbow=0 (skip the
-        Airy rainbow), halos=0 (skip the ice halo), debug=1
+        bare-soil tints dry), debug=1
     -->
     <style>
       html,
@@ -345,22 +344,11 @@
         createFlashMaterial,
         createMilkyWayMaterial,
         createNLCMaterial,
-        createSkyglowMaterial,
-        createRainbowMaterial,
-        createHaloMaterial
+        createSkyglowMaterial
       } from './horizon/sky-objects-tsl.js';
       import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
-      import {
-        descartes,
-        rainbowProfile,
-        waterIndex
-      } from './horizon/rainbow.js';
-      import {
-        haloProfile,
-        ICE_N,
-        parhelionProfile,
-        prismDmin
-      } from './horizon/halos.js';
+      import {mpDropRadiusMm} from './horizon/rainbow.js';
+      import {buildBowLUT, buildDogLUT} from './horizon/optics-lut.js';
       import {
         apparentAltitude,
         buildProfile,
@@ -814,9 +802,8 @@
         } catch {
           say('weather unavailable · showing a calm day');
         }
-        // the measured rain and cover re-lay the bow and the halo
-        applyRainbow();
-        applyHalos();
+        // the measured rain re-lays the bow LUT
+        refreshBowLUT();
       }
 
       // Winds aloft and the freezing level: mid clouds ride the 700hPa
@@ -5407,6 +5394,10 @@
       // night adaptation closes most of it - documented, the
       // AGLOW_GAIN precedent).
       const MOONOPT_GAIN = 0.22;
+      let dogAltSun = null;
+      let dogOnSun = false;
+      let dogAltMoon = null;
+      let dogOnMoon = false;
       const opticsMoonObj = createOpticsMaterial();
       const opticsMoonU = opticsMoonObj.u;
       const opticsMoon = new THREE.Mesh(
@@ -5561,118 +5552,31 @@
       );
       scene.add(lpGlow);
 
-      // The rainbow: Airy's theory on the measured rain
-      // (rainbow.js computes the RGB profile - Descartes
-      // geometry on the Daimon-Masumura dispersion, Airy
-      // diffraction on the Marshall-Palmer drop of the measured
-      // rain rate, Fresnel bow strengths, solar-disk smearing -
-      // and the dome overlay samples it by angle from the
-      // antisolar point). Every gate is measured: rain at the
-      // anchor (state.precip), direct beam through the measured
-      // cloud cover, the sun up but low enough that the bow
-      // still clears the horizon. ?rainbow=0 disables.
-      const rainbowObj = createRainbowMaterial();
-      const rainbowMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(903, 48, 24),
-        rainbowObj.material
-      );
-      rainbowMesh.visible = false;
-      scene.add(rainbowMesh);
-      // The ice halo and the sundogs: the same dome pattern on
-      // the SUN side (halos.js - Warren-Brandt ice, prism
-      // minimum deviation, Bravais skew rays). The ring LUT is
-      // static physics; the sundog LUT follows the solar
-      // elevation in the frame loop; the amplitude follows the
-      // measured HIGH cloud - the cirrus deck that makes halos -
-      // through the direct beam of the lower decks. ?halos=0
-      // disables.
-      const haloObj = createHaloMaterial();
-      {
-        const hp = haloProfile();
-        for (let i = 0; i < hp.n; i++) {
-          haloObj.u.ringData[4 * i] = hp.data[3 * i];
-          haloObj.u.ringData[4 * i + 1] = hp.data[3 * i + 1];
-          haloObj.u.ringData[4 * i + 2] = hp.data[3 * i + 2];
-          haloObj.u.ringData[4 * i + 3] = 1;
+      // Measured rain re-lays the bow LUT (optics-lut buildBowLUT:
+      // Airy fringes at the Marshall-Palmer drop of the measured
+      // rain rate) for BOTH optics domes - sun bows and the rare
+      // moonbow share the same falling drops. The bow/halo/dog
+      // GATES (rain, cirrus, source altitude, direct beam, phase)
+      // live in the frame loop's optics block as they always did.
+      let bowLutR = null;
+      function refreshBowLUT() {
+        const R = Math.max(state.precip ?? 0, 0.1);
+        if (bowLutR !== null && Math.abs(R - bowLutR) < 0.05) return;
+        bowLutR = R;
+        const aMm = mpDropRadiusMm(R);
+        const lut = buildBowLUT(256, aMm);
+        for (const uu of [opticsU, opticsMoonU]) {
+          uu.bowTex.image.data.set(lut.data);
+          uu.bowTex.needsUpdate = true;
         }
-        haloObj.u.ring.needsUpdate = true;
-        haloObj.u.g0.value = hp.g0;
-        haloObj.u.g1.value = hp.g1;
-      }
-      const haloMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(902, 48, 24),
-        haloObj.material
-      );
-      haloMesh.visible = false;
-      scene.add(haloMesh);
-      let haloAmp = 0;
-      let haloParAlt = null;
-      function applyHalos() {
-        haloAmp = 0;
-        if (params.get('halos') === '0') {
-          haloMesh.visible = false;
-          return;
-        }
-        const hi = state.cloudHigh ?? 0;
-        haloAmp =
-          0.45 *
-          Math.min(hi / 50, 1) *
-          (1 - (state.cloudLow ?? 0) / 100) *
-          (1 - (0.7 * (state.cloudMid ?? 0)) / 100);
-        if (haloAmp > 0.01)
+        if ((state.precip ?? 0) > 0)
           record(
-            'ice halo & sundogs',
-            '22\u00b0 ring at ' +
-              ((prismDmin(ICE_N[0]) * 180) / Math.PI).toFixed(1) +
-              '-' +
-              ((prismDmin(ICE_N[2]) * 180) / Math.PI).toFixed(1) +
-              '\u00b0 (Warren-Brandt ice) \u00b7 sundogs by Bravais \u00b7 cirrus ' +
-              Math.round(hi) +
-              '%'
-          );
-      }
-      let rainbowAmp = 0;
-      let rainbowGammaR = descartes(waterIndex(0.68), 1).gamma;
-      const RAINBOW_PEAK5 = rainbowProfile(5).peak; // brightness datum
-      function applyRainbow() {
-        rainbowAmp = 0;
-        const R = state.precip ?? 0;
-        if (
-          params.get('rainbow') === '0' ||
-          !(R > 0) ||
-          (state.snow ?? 0) > 0
-        ) {
-          rainbowMesh.visible = false;
-          return;
-        }
-        const prof = rainbowProfile(R);
-        for (let i = 0; i < prof.n; i++) {
-          rainbowObj.u.lutData[4 * i] = prof.data[3 * i];
-          rainbowObj.u.lutData[4 * i + 1] = prof.data[3 * i + 1];
-          rainbowObj.u.lutData[4 * i + 2] = prof.data[3 * i + 2];
-          rainbowObj.u.lutData[4 * i + 3] = 1;
-        }
-        rainbowObj.u.lut.needsUpdate = true;
-        rainbowObj.u.g0.value = prof.g0;
-        rainbowObj.u.g1.value = prof.g1;
-        // direct beam through the measured cover, drop-size
-        // brightness relative to the 5 mm/h datum (the review's
-        // (a^7/lambda)^(1/3) law), ONE display gain like every
-        // other emissive.
-        rainbowAmp =
-          0.5 *
-          (1 - (state.cloud ?? 0) / 100) *
-          THREE.MathUtils.clamp(prof.peak / RAINBOW_PEAK5, 0.25, 1.6);
-        if (rainbowAmp > 0.01)
-          record(
-            'Airy rainbow',
-            'primary ' +
-              ((rainbowGammaR * 180) / Math.PI).toFixed(1) +
-              '\u00b0 \u00b7 drops \u00d8' +
-              (2 * prof.aMm).toFixed(1) +
+            'Airy rainbow LUT',
+            'drops \u00d8' +
+              (2 * aMm).toFixed(1) +
               ' mm (Marshall-Palmer, ' +
               R +
-              ' mm/h) \u00b7 Airy supernumeraries'
+              ' mm/h) \u00b7 supernumerary spacing \u221d (ka)^(-2/3)'
           );
       }
       let lpRatio = 0;
@@ -7001,51 +6905,6 @@
             nlcShell.visible = nlcU.uAmp.value > 0.001;
           }
         }
-        // The rainbow rides the antisolar point: lit while rain
-        // is measured, the sun is up, and the bow's radius still
-        // clears the horizon (it sinks as the sun climbs -
-        // gamma_R minus the solar altitude is what remains).
-        if (rainbowAmp > 0) {
-          const sv = skyPoint(sun.alt, sun.az, 1).normalize();
-          rainbowObj.u.antisun.value.copy(sv).negate();
-          const up = THREE.MathUtils.smoothstep(sun.alt, -0.005, 0.01);
-          const clear = THREE.MathUtils.smoothstep(
-            rainbowGammaR - sun.alt,
-            0,
-            0.08
-          );
-          rainbowObj.u.alpha.value = rainbowAmp * up * clear;
-          rainbowMesh.visible = rainbowObj.u.alpha.value > 0.005;
-        } else {
-          rainbowMesh.visible = false;
-        }
-        // The halo hugs the sun: the ring LUT is static physics,
-        // the sundog LUT re-solves Bravais when the sun has moved
-        // 0.2 deg, and past ~61 deg elevation the dogs are gone
-        // (the LUT empties itself).
-        if (haloAmp > 0) {
-          haloObj.u.sunDir.value.copy(skyPoint(sun.alt, sun.az, 1)).normalize();
-          haloObj.u.sunAlt.value = sun.alt;
-          if (haloParAlt === null || Math.abs(sun.alt - haloParAlt) > 0.0035) {
-            haloParAlt = sun.alt;
-            const pp = parhelionProfile(Math.max(sun.alt, 0));
-            for (let i = 0; i < pp.n; i++) {
-              haloObj.u.parData[4 * i] = pp.data[3 * i];
-              haloObj.u.parData[4 * i + 1] = pp.data[3 * i + 1];
-              haloObj.u.parData[4 * i + 2] = pp.data[3 * i + 2];
-              haloObj.u.parData[4 * i + 3] = 1;
-            }
-            haloObj.u.par.needsUpdate = true;
-            haloObj.u.a0.value = pp.a0;
-            haloObj.u.a1.value = pp.a1;
-            haloObj.u.parOn.value = pp.any ? 1 : 0;
-          }
-          const up = THREE.MathUtils.smoothstep(sun.alt, -0.005, 0.01);
-          haloObj.u.alpha.value = haloAmp * up;
-          haloMesh.visible = haloObj.u.alpha.value > 0.005;
-        } else {
-          haloMesh.visible = false;
-        }
         // Meteors: the observed rate right now is the sum over the
         // active showers of ZHR(lam_sun) x sin(radiant elevation)
         // (meteors.js). Poisson spawning; ?meteor=N forces N/h for
@@ -7864,11 +7723,21 @@
           (cHigh < 90 ? 1 : 0.5) *
           sunOut *
           (sun.alt > 0 ? 1 : 0);
-        opticsU.dogs.value = THREE.MathUtils.clamp(
-          (0.44 - sun.alt) / 0.26,
-          0,
-          1
-        );
+        // Bravais parhelia: re-lay the dog LUT when the sun has
+        // moved 0.2 deg; the migration, dispersion and the ~61-deg
+        // death are the LUT's own physics, so the old low-sun
+        // display ramp is gone.
+        opticsU.srcAlt.value = sun.alt;
+        if (dogAltSun === null || Math.abs(sun.alt - dogAltSun) > 0.0035) {
+          dogAltSun = sun.alt;
+          const dl = buildDogLUT(sun.alt);
+          opticsU.dogData.set(dl.data);
+          opticsU.dogTex.needsUpdate = true;
+          opticsU.dogA0.value = (dl.azMinDeg * Math.PI) / 180;
+          opticsU.dogA1.value = (dl.azMaxDeg * Math.PI) / 180;
+          dogOnSun = dl.any;
+        }
+        opticsU.dogs.value = dogOnSun ? 1 : 0;
         // The moon's dome: same gating physics (cirrus for the
         // halo, rain for the bow, low source for the dogs), the
         // source now the moon at its true phase brightness.
@@ -7891,11 +7760,20 @@
             (cHigh < 90 ? 1 : 0.5) *
             moonOut *
             (moon.alt > 0 ? 1 : 0);
-          opticsMoonU.dogs.value = THREE.MathUtils.clamp(
-            (0.44 - moon.alt) / 0.26,
-            0,
-            1
-          );
+          opticsMoonU.srcAlt.value = refr.moonApp;
+          if (
+            dogAltMoon === null ||
+            Math.abs(refr.moonApp - dogAltMoon) > 0.0035
+          ) {
+            dogAltMoon = refr.moonApp;
+            const dl = buildDogLUT(refr.moonApp);
+            opticsMoonU.dogData.set(dl.data);
+            opticsMoonU.dogTex.needsUpdate = true;
+            opticsMoonU.dogA0.value = (dl.azMinDeg * Math.PI) / 180;
+            opticsMoonU.dogA1.value = (dl.azMaxDeg * Math.PI) / 180;
+            dogOnMoon = dl.any;
+          }
+          opticsMoonU.dogs.value = dogOnMoon ? 1 : 0;
         }
 
         // Deciduous phenology: Hopkins' bioclimatic law shifts the leaf
@@ -8342,10 +8220,8 @@
         requestAnimationFrame(frame);
         await syncWeather();
         // overridden harness weather never reaches syncWeather's
-        // own call - lay the bow and halo from whatever state
-        // holds now
-        applyRainbow();
-        applyHalos();
+        // own call - lay the bow LUT from whatever state holds now
+        refreshBowLUT();
         setInterval(syncWeather, 15 * 60 * 1000);
         syncGeomag();
         syncAir();
