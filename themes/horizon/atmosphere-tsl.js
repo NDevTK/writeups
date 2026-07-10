@@ -284,7 +284,8 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     return vec4(exp(tau.negate()), 1.0);
   });
 
-  // ---------- multiple scattering (built once) ----------
+  // ---------- multiple scattering (rebuilt when aerosols or the
+  // fed ground albedo change) ----------
   const multiscatterNode = Fn(([vUv]) => {
     const muS = vUv.x.mul(2.0).sub(1.0);
     const r = float(RB)
@@ -348,10 +349,18 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
           -1.0,
           1.0
         );
+        // Ground contribution at the FED albedo - Hillaire's model
+        // has ONE ground_albedo parameter shared by this LUT and
+        // the sky-view terminal bounce (his reference implementation
+        // defaults it to zero and exposes it as an input; the old
+        // 0.3 literal here was uncited). The theme feeds Payne
+        // (1972) 0.06 where the box has sea, 0 inland until a
+        // measured land albedo earns its citation.
         Li.addAssign(
           T.mul(sunT(float(RB), muSg))
             .mul(max(muSg, 0.0))
-            .mul(0.3 / 3.14159265)
+            .mul(groundAlb)
+            .mul(1 / Math.PI)
         );
       });
       L2.addAssign(Li.div(DIRS));
@@ -736,6 +745,7 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
 
   let lutsBuilt = false;
   let lastMie = '';
+  let lastMs = '';
 
   return {
     ok: true,
@@ -802,15 +812,19 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       sunDirW.value.copy(sunDir);
       if (expo) exposure.value = expo;
       // Aerosols change on sync cadence, not per frame; rebuild the
-      // static LUTs only when the radiative set actually moves.
+      // static LUTs only when the radiative set actually moves. The
+      // multiple-scattering LUT also carries the fed ground albedo
+      // (sea/land differs by anchor), so its key includes it.
       const mieKey = mie
         ? mie.scat.join() + '|' + mie.abs.join() + '|' + mie.g
         : lastMie;
-      if (!lutsBuilt || mieKey !== lastMie) {
-        fillT();
+      const msKey = mieKey + '|' + groundAlb.value.x;
+      if (!lutsBuilt || msKey !== lastMs) {
+        if (!lutsBuilt || mieKey !== lastMie) fillT();
         fillMs();
         lutsBuilt = true;
         lastMie = mieKey;
+        lastMs = msKey;
       }
       fillSky();
       fillAerial();

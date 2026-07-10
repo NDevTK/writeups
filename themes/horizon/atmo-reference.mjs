@@ -115,63 +115,74 @@ const sunT = (r, mu) => {
   return bilinear(tLut, TW, TH, u, v);
 };
 
-// MS LUT 32x32
+// MS LUT 32x32. The ground contribution uses the FED albedo -
+// Hillaire's model has ONE ground_albedo parameter shared by this
+// LUT and the sky-view terminal bounce (his reference
+// implementation defaults it to zero and exposes it as an input;
+// the old 0.3 literal was uncited). Parameterised so the
+// landmarks below can hold identity at zero and linearity.
 const MW = 32;
-const msLut = new Float64Array(MW * MW * 3);
-for (let j = 0; j < MW; j++)
-  for (let i = 0; i < MW; i++) {
-    const muS = ((i + 0.5) / MW) * 2 - 1;
-    const r = Rb + ((j + 0.5) / MW) * (Rt - Rb) + 1;
-    const sd = [Math.sqrt(Math.max(1 - muS * muS, 0)), muS, 0];
-    const L2 = [0, 0, 0],
-      fms = [0, 0, 0];
-    for (let k = 0; k < 64; k++) {
-      const fi = k + 0.5;
-      const cosT = 1 - (2 * fi) / 64;
-      const sinT = Math.sqrt(Math.max(1 - cosT * cosT, 0));
-      const phi = fi * 2.399963;
-      const dir = [sinT * Math.cos(phi), cosT, sinT * Math.sin(phi)];
-      const mu = dir[1];
-      const dG = raySphere(r, mu, Rb),
-        dT = raySphere(r, mu, Rt);
-      const dEnd = dG > 0 ? dG : dT;
-      const dt = dEnd / 20;
-      const T = [1, 1, 1],
-        Li = [0, 0, 0],
-        f3 = [0, 0, 0];
-      const cSun = dir[0] * sd[0] + dir[1] * sd[1] + dir[2] * sd[2];
-      for (let s = 0; s < 20; s++) {
-        const ti = (s + 0.5) * dt;
-        const ri = Math.sqrt(r * r + ti * ti + 2 * r * ti * mu);
-        const h = ri - Rb;
-        const dd = dens(h);
-        const scat = rayS.map((rr, cc) => rr * dd[0] + mieS[cc] * dd[1]);
-        const e = ext(h);
-        const muSi = Math.min(Math.max((r * muS + ti * cSun) / ri, -1), 1);
-        const Ts = sunT(ri, muSi);
-        const ph = (phaseR(cSun) + phaseM(cSun)) * 0.5;
+const buildMs = (gAlbMs) => {
+  const lut = new Float64Array(MW * MW * 3);
+  for (let j = 0; j < MW; j++)
+    for (let i = 0; i < MW; i++) {
+      const muS = ((i + 0.5) / MW) * 2 - 1;
+      const r = Rb + ((j + 0.5) / MW) * (Rt - Rb) + 1;
+      const sd = [Math.sqrt(Math.max(1 - muS * muS, 0)), muS, 0];
+      const L2 = [0, 0, 0],
+        fms = [0, 0, 0];
+      for (let k = 0; k < 64; k++) {
+        const fi = k + 0.5;
+        const cosT = 1 - (2 * fi) / 64;
+        const sinT = Math.sqrt(Math.max(1 - cosT * cosT, 0));
+        const phi = fi * 2.399963;
+        const dir = [sinT * Math.cos(phi), cosT, sinT * Math.sin(phi)];
+        const mu = dir[1];
+        const dG = raySphere(r, mu, Rb),
+          dT = raySphere(r, mu, Rt);
+        const dEnd = dG > 0 ? dG : dT;
+        const dt = dEnd / 20;
+        const T = [1, 1, 1],
+          Li = [0, 0, 0],
+          f3 = [0, 0, 0];
+        const cSun = dir[0] * sd[0] + dir[1] * sd[1] + dir[2] * sd[2];
+        for (let s = 0; s < 20; s++) {
+          const ti = (s + 0.5) * dt;
+          const ri = Math.sqrt(r * r + ti * ti + 2 * r * ti * mu);
+          const h = ri - Rb;
+          const dd = dens(h);
+          const scat = rayS.map((rr, cc) => rr * dd[0] + mieS[cc] * dd[1]);
+          const e = ext(h);
+          const muSi = Math.min(Math.max((r * muS + ti * cSun) / ri, -1), 1);
+          const Ts = sunT(ri, muSi);
+          const ph = (phaseR(cSun) + phaseM(cSun)) * 0.5;
+          for (let c = 0; c < 3; c++) {
+            const S = scat[c] * ph * Ts[c];
+            const st = Math.exp(-e[c] * dt);
+            Li[c] += (T[c] * (S - S * st)) / Math.max(e[c], 1e-9);
+            f3[c] += (T[c] * (scat[c] - scat[c] * st)) / Math.max(e[c], 1e-9);
+            T[c] *= st;
+          }
+        }
+        if (dG > 0) {
+          const muSg = Math.min(Math.max((r * muS + dG * cSun) / Rb, -1), 1);
+          const Ts = sunT(Rb, muSg);
+          for (let c = 0; c < 3; c++)
+            Li[c] += (T[c] * Ts[c] * Math.max(muSg, 0) * gAlbMs) / Math.PI;
+        }
         for (let c = 0; c < 3; c++) {
-          const S = scat[c] * ph * Ts[c];
-          const st = Math.exp(-e[c] * dt);
-          Li[c] += (T[c] * (S - S * st)) / Math.max(e[c], 1e-9);
-          f3[c] += (T[c] * (scat[c] - scat[c] * st)) / Math.max(e[c], 1e-9);
-          T[c] *= st;
+          L2[c] += Li[c] / 64;
+          fms[c] += f3[c] / 64;
         }
       }
-      if (dG > 0) {
-        const muSg = Math.min(Math.max((r * muS + dG * cSun) / Rb, -1), 1);
-        const Ts = sunT(Rb, muSg);
-        for (let c = 0; c < 3; c++)
-          Li[c] += (T[c] * Ts[c] * Math.max(muSg, 0) * 0.3) / Math.PI;
-      }
-      for (let c = 0; c < 3; c++) {
-        L2[c] += Li[c] / 64;
-        fms[c] += f3[c] / 64;
-      }
+      for (let c = 0; c < 3; c++)
+        lut[(j * MW + i) * 3 + c] = L2[c] / Math.max(1 - fms[c], 1e-4);
     }
-    for (let c = 0; c < 3; c++)
-      msLut[(j * MW + i) * 3 + c] = L2[c] / Math.max(1 - fms[c], 1e-4);
-  }
+  return lut;
+};
+// Downstream landmarks run at the Payne (1972) sea feed of 0.06 -
+// one of the two values the theme actually sends (0 inland).
+const msLut = buildMs(0.06);
 const psiMS = (r, mu) =>
   bilinear(msLut, MW, MW, mu * 0.5 + 0.5, (r - Rb) / (Rt - Rb));
 
@@ -259,6 +270,42 @@ function bilinearAt(i, j) {
 }
 console.log('REF ms(20,0):', fmt(bilinearAt(20, 0)));
 console.log('REF ms(28,16):', fmt(bilinearAt(28, 16)));
+
+{
+  // The MS LUT's ground contribution at the FED albedo (Hillaire's
+  // single ground_albedo parameter, shared with the sky-view
+  // terminal bounce; his reference implementation defaults it to
+  // zero). Psi_ms = L2/(1 - f_ms) and f_ms carries no ground term,
+  // so the LUT must be EXACTLY linear in the albedo texel by
+  // texel: psi(0.12) - psi(0) = 2 x (psi(0.06) - psi(0)). And the
+  // contribution must be non-negative everywhere with a strictly
+  // positive gain on the bottom row under a high sun (dirs that
+  // hit the ground with the sun up).
+  const ms0 = buildMs(0);
+  const ms6 = buildMs(0.06);
+  const ms12 = buildMs(0.12);
+  let worstLin = 0;
+  let minGain = Infinity;
+  for (let t = 0; t < MW * MW * 3; t++) {
+    const d6 = ms6[t] - ms0[t];
+    const d12 = ms12[t] - ms0[t];
+    minGain = Math.min(minGain, d6);
+    // fp error scales with the texel magnitude (the differences on
+    // unlit-ground texels are pure cancellation noise), so the
+    // residual is measured against the texel, not the difference.
+    worstLin = Math.max(
+      worstLin,
+      Math.abs(d12 - 2 * d6) / Math.max(ms12[t], 1e-300)
+    );
+  }
+  // Bottom row (r ~ Rb), sun overhead (muS ~ 1): i = 31, j = 0.
+  const gainLow = ms6[(0 * MW + 31) * 3] - ms0[(0 * MW + 31) * 3];
+  const ok = worstLin < 1e-12 && minGain >= 0 && gainLow > 0;
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} ms ground albedo: psi linear in the fed albedo to ${worstLin.toExponential(1)} texel-by-texel, gain >= 0 everywhere, ${gainLow.toExponential(2)} at ground/high-sun - Hillaire's ONE ground_albedo shared with the terminal bounce (his implementation defaults 0; the theme feeds Payne 0.06 at sea, 0 inland)`
+  );
+  if (!ok) process.exit(1);
+}
 
 {
   // Full-circle back-compat: the new signed mapping at the old
