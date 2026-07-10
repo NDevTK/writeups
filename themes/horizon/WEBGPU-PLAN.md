@@ -2712,6 +2712,38 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   Renderers unchanged - the shared journey shape did the work.
   Gate 50 sets (trains 6 -> 9 landmarks); browser smoke unchanged
   and clean.
+- DONE: real cable cars (Jul 10, completing the Alpine transport
+  picture - the Jungfrau region's aerial installations are its
+  skyline: the Schilthorn cable cars, Beatenberg-Niederhorn, the
+  Firstbahn). OSM way[aerialway~cable_car|gondola|mixed_lift|
+  chair_lift] through the SAME mirrors; the way nodes ARE the
+  pylon positions, so the spans are real and NOTHING is thinned
+  at capture. aerialways.js (pure, gated at 4 landmarks): the
+  TRUE catenary, never the parabola - solveCatenaryA runs Newton
+  on the sag identity d = a (cosh(L/2a) - 1) seeded by the
+  parabolic answer (landmark: the solved a reproduces a 12 m sag
+  to 2.4e-13 AND measurably differs from L^2/8d - the
+  approximation is provably not what ships); catenaryPoints hangs
+  the cable between supports at UNEQUAL heights via the asinh
+  vertex closed form xv = L/2 - a asinh(h / (2a sinh(L/2a))) -
+  both endpoints exact to machine precision, every interior point
+  strictly below the chord (a cable hangs; it never rises above
+  its supports' line); the LIVE 44-installation fixture parses
+  with its identity (Niederhorn and the Firstbahn by name, the
+  first pylon line's 13 nodes intact); cabins hang at
+  deterministic shared-hash fractions - a cable car runs one per
+  direction, a gondola circulates by spacing. Theme:
+  syncAerialways (both mirrors, geodetic cache per anchor),
+  placeAerialways projects each pylon onto the sampled terrain
+  (interior supports 12 m, end stations 6 m), hangs every span on
+  its own catenary as LineSegments (1 px at any distance - what a
+  distant cable IS), pylon cylinders and cabin boxes
+  aerial-wrapped; ?aerialways=0; KEEP_PARAMS carries
+  'aerialways'. Gate 50 -> 51 sets. Browser smoke, SEVEN placed
+  layers now: 177/177 buildings, 319/319 roads, 88/116 landuse,
+  185/189 watercourses, 192/196 railways, 3/44 aerial
+  installations (the rest lie outside the 16 km box - honest),
+  one known warning class.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's
