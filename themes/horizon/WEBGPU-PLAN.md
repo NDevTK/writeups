@@ -3437,16 +3437,29 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   end-on (an aircraft flying at the camera projects its trail as
   a vertical streak); the pre-dawn tan is green vegetation under
   the warm dawn-sky ambient with the documented adaptation lift.
-- OPEN (visual QA finds, Jul 10): (a) the Maasvlakte NOON sea -
-  the ship floats on a flat grey expanse with a hard seam
-  against a near-black far band; grey = the reflector under the
-  overcast white sky (plausibly right), but the black band at
-  noon needs a raycast diagnosis (/eval + Raycaster through the
-  seam pixels) before any fix; at Nelson pre-dawn the same dark
-  open sea IS correct (water mirroring a dark sky). The same
-  black band frames Nelson's Tasman Bay by day - likely the
-  world-edge strip beyond the water plane's extent (the dome's
-  below-horizon rows), one diagnosis for both.
+- OPEN -> DIAGNOSED, ready to build (the black horizon band,
+  Jul 10 latest - diagnosed from the CODE this time, no raycast
+  involved): the band below the horizon at every anchor is the
+  dome's below-horizon LUT rows, and atmosphere-tsl's makeMarch
+  accumulates IN-SCATTER ONLY - Hillaire (2020) terminates the
+  ground-hitting sky-view rays with the ground bounce the march
+  omits: L += T(dGround) x (albedo/pi) x NdotL x T_sun(ground).
+  With no bounce, a steep below-horizon ray carries only its
+  short path's in-scatter -> near-black at noon; at night the
+  band is invisible (dark anyway), which is exactly the observed
+  behaviour (Rotterdam noon, daylit Tasman Bay; fine at Nelson
+  pre-dawn; the Maasvlakte grey/black seam is the reflector edge
+  meeting this band). BUILD PLAN: (1) makeMarch grows a
+  ground-hit flag + groundAlbedo uniform, applied only in
+  skyviewNode's below-horizon branch (the aerial march must NOT
+  add it - scene geometry provides that ground); (2) the albedo
+  is FED, not painted: Payne (1972) open-ocean broadband 0.06
+  where the box edge is sea; the land value needs its own
+  citation before inland boxes change; (3) atmo-reference
+  mirrors the term with a closed-point landmark (below-horizon
+  noon texel equals the T x NdotL x albedo/pi identity) and the
+  GPU-vs-reference texel probes hold both sides together; (4)
+  visual before/after at the Maasvlakte anchor.
 - OPEN -> INVESTIGATED (the Nelson cone, Jul 10 late): NOT the
   cathedral. The full forensic trail, every step measured
   through the viewer's /eval: not a building (no tagged height
