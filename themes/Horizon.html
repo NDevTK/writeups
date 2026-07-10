@@ -191,7 +191,9 @@
         (measured snow off / tile endpoint override), soil=0 (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
-        (skip satellite irradiance), ghi=W (override it), debug=1
+        (skip satellite irradiance), ghi=W (override it), debug=1,
+        look=az,alt (degrees - pin the default camera's view
+        direction, e.g. antisolar for a rainbow)
     -->
     <style>
       html,
@@ -462,7 +464,14 @@
         refDischarge,
         riversGeometry
       } from './horizon/rivers.js';
-      import {parseRailways, railsGeometry} from './horizon/rails.js';
+      import {
+        parseRailways,
+        railIndex,
+        railRoute,
+        railsGeometry,
+        routePoint,
+        snapToRail
+      } from './horizon/rails.js';
       import {
         BOAT_CATS,
         BOAT_DIMS,
@@ -3161,6 +3170,26 @@
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+      // Harness capture hooks (?debug=1): composited screenshots
+      // are blank for WebGPU surfaces under Xvfb, so the shoot
+      // driver captures through the page itself. The theme's frame
+      // is multi-pass (depth prepass, cloud composite, precipitation
+      // overlay), so a re-render from outside the loop both collides
+      // with the running backend and misses the composited passes -
+      // __capture instead queues a request that the frame loop
+      // services right after its own final pass, snapshotting the
+      // canvas before WebGPU presents (and recycles) the texture.
+      let captureReq = null;
+      if (params.has('debug')) {
+        window.__r = renderer;
+        window.__scene = scene;
+        window.__cam = camera;
+        window.__THREE = THREE;
+        window.__capture = (w, h) =>
+          new Promise((res) => {
+            captureReq = {w, h, res};
+          });
+      }
       camera.layers.enable(2);
 
       // Cascaded shadow maps (vendored three.js CSMShadowNode: practical
@@ -3807,12 +3836,22 @@
       // (road overpasses stay on top).
       let railMesh = null;
       let railMat = null;
+      // Map-matching over the drawn network (rails.js): moving
+      // trains follow the rail graph's own route between their
+      // stops (railRoute - the chord between stops cuts across
+      // city blocks); dwell positions snap to the nearest arc. A
+      // leg the drawn network cannot carry hides its train rather
+      // than gliding it across the grass. Routes cache per leg.
+      let railSnapIdx = null;
+      const railRouteCache = new Map();
       function placeRails() {
         if (railMesh) {
           ground.remove(railMesh);
           railMesh.geometry.dispose();
           railMesh = null;
         }
+        railSnapIdx = null;
+        railRouteCache.clear();
         if (!railsGeo || !railsGeo.length || params.get('rails') === '0')
           return;
         const groundY = (x, z) => {
@@ -3839,6 +3878,14 @@
         railMesh = new THREE.Mesh(geo, railMat);
         railMesh.receiveShadow = true;
         ground.add(railMesh);
+        railSnapIdx = railIndex(
+          railsGeo.map((w) =>
+            w.pts.map(([la, lo]) => {
+              const s = geoToScene(la, lo, dressAnchor);
+              return [s.x, s.z];
+            })
+          )
+        );
         record(
           'OSM railways placed',
           g.placed + ' of ' + railsGeo.length + ' ways on this box'
@@ -4374,6 +4421,12 @@
       // first frame snaps; only live changes pan.
       let yaw = state.lat < 0 ? Math.PI : 0;
       let yawInit = false;
+      // ?look=az,alt (degrees, compass azimuth): pin the default
+      // camera's view direction - the harness aims at the feature
+      // under test (a bow is antisolar, a halo circumsolar).
+      const LOOK = params.has('look')
+        ? params.get('look').split(',').map(Number)
+        : null;
 
       // Stars: the real sky (Yale Bright Star Catalog), spun by sidereal
       // time around a pole tilted to the latitude.
@@ -5306,7 +5359,7 @@
       // basis of McEwen's lunar-Lambert), not Lambert. That is why a
       // full moon renders flat like the real one instead of
       // limb-darkening like a billiard ball.
-      const moonObj = createMoonMaterial();
+      const moonObj = createMoonMaterial(atmo.skyRadiance);
       const moonU = moonObj.u;
       const moonDisc = new THREE.Mesh(
         new THREE.SphereGeometry(24, 24, 18),
@@ -6569,6 +6622,13 @@
         moonApp: 0,
         moonFlat: 1
       };
+      // The harness aims shots at computed sky positions (sun,
+      // antisolar, comet head) - expose the ephemeris record and
+      // accept a runtime look override alongside ?look=az,alt.
+      if (params.has('debug')) {
+        window.__astro = astro;
+        window.__look = null;
+      }
 
       // ---------- main loop ----------
       let last = performance.now();
@@ -7498,6 +7558,8 @@
             };
           }
           const nowMs = Date.now();
+          let onRails = 0;
+          let offNet = 0;
           for (const j of trainJourneys) {
             const key = j.label + '@' + j.stops[0].depMs;
             let g = trainPool.get(key);
@@ -7511,6 +7573,79 @@
               if (g) g.visible = false;
               continue;
             }
+            // Map-match to the drawn network (rails.js). Moving:
+            // route the leg over the rail graph and place BY ARC
+            // LENGTH at the timetable's fraction; dwelling: snap
+            // the station point to the nearest arc. A leg the
+            // network cannot carry (tunnel, undrawn way) hides
+            // its train rather than running it through the grass.
+            let dir = null;
+            if (railSnapIdx) {
+              let matched = false;
+              if (p.moving && p.legFrom && !j.path) {
+                const ck = key + '#' + p.legFrom.lat + ',' + p.legTo.lat;
+                let rt = railRouteCache.get(ck);
+                if (rt === undefined) {
+                  const a = geoToScene(
+                    p.legFrom.lat,
+                    p.legFrom.lon,
+                    dressAnchor
+                  );
+                  const b = geoToScene(p.legTo.lat, p.legTo.lon, dressAnchor);
+                  rt = railRoute(railSnapIdx, a.x, a.z, b.x, b.z, 150 / MPU);
+                  railRouteCache.set(ck, rt);
+                }
+                if (rt) {
+                  const q = routePoint(rt, p.f);
+                  sc.x = q.x;
+                  sc.z = q.z;
+                  dir = q;
+                  matched = true;
+                } else {
+                  // The leg would not route (a stop beyond the box
+                  // or the drawn ways): the chord position still
+                  // map-matches by nearest arc when the line is
+                  // gently curved - GPS-error-scale gate.
+                  const arc = snapToRail(railSnapIdx, sc.x, sc.z, 100 / MPU);
+                  if (arc) {
+                    sc.x = arc.x;
+                    sc.z = arc.z;
+                    let s = 1;
+                    if (p.hdgTo) {
+                      const t2 = geoToScene(
+                        p.hdgTo.lat,
+                        p.hdgTo.lon,
+                        dressAnchor
+                      );
+                      s =
+                        (t2.x - sc.x) * arc.dx + (t2.z - sc.z) * arc.dz < 0
+                          ? -1
+                          : 1;
+                    }
+                    dir = {dx: s * arc.dx, dz: s * arc.dz};
+                    matched = true;
+                  }
+                }
+              } else if (!p.moving) {
+                const arc = snapToRail(railSnapIdx, sc.x, sc.z, 120 / MPU);
+                if (arc) {
+                  sc.x = arc.x;
+                  sc.z = arc.z;
+                  dir = null; // heading from the next leg below
+                  matched = true;
+                }
+              } else {
+                // a journey carrying its own published shape is
+                // already on real geometry
+                matched = true;
+              }
+              if (!matched) {
+                offNet++;
+                if (g) g.visible = false;
+                continue;
+              }
+              onRails++;
+            }
             if (!g) {
               g = new THREE.Group();
               buildTrain(g, j.cat, j.consist, trainMats, 1 / MPU);
@@ -7521,11 +7656,21 @@
             // Seated at rail-bed height; over water (a rail bridge)
             // the deck rides the same clearance above the surface.
             g.position.set(sc.x, sample(sc.x, sc.z).y + 1.8 / MPU, sc.z);
-            if (p.hdgTo) {
+            if (dir) {
+              // The routed polyline runs from-stop -> to-stop, so
+              // its local direction IS the heading of travel.
+              g.rotation.y = Math.atan2(dir.dx, dir.dz);
+            } else if (p.hdgTo) {
               const t2 = geoToScene(p.hdgTo.lat, p.hdgTo.lon, dressAnchor);
               g.rotation.y = Math.atan2(t2.x - sc.x, t2.z - sc.z);
             }
           }
+          if (railSnapIdx)
+            live['trains (map-matched)'] =
+              onRails +
+              ' on drawn rails · ' +
+              offNet +
+              ' off-network hidden (tunnel or undrawn way)';
           if (trainPool.size > 24) {
             const live = new Set(
               trainJourneys.map((j) => j.label + '@' + j.stops[0].depMs)
@@ -8481,8 +8626,15 @@
         } else {
           const equatorYaw = state.lat < 0 ? Math.PI : 0;
           const auroraOn = auroraU.strength.value > 0.04;
-          const targetYaw = auroraOn ? Math.PI - equatorYaw : equatorYaw;
-          if (!yawInit) {
+          const LK = (params.has('debug') && window.__look) || LOOK;
+          const targetYaw = LK
+            ? Math.PI - LK[0] * RAD
+            : auroraOn
+              ? Math.PI - equatorYaw
+              : equatorYaw;
+          if (!yawInit || LK) {
+            // A pinned look (harness) takes effect immediately; only
+            // the ambient aurora turn keeps the slow ease.
             yaw = targetYaw;
             yawInit = true;
           }
@@ -8508,10 +8660,11 @@
             camBaseY + look.y * -1.2 + shakeY,
             camZ
           );
+          const lookAlt = LK ? (LK[1] || 0) * RAD : 0;
           camera.lookAt(
-            camX + vx * 66 + look.x * 8,
-            camBaseY + 1 + look.y * -5,
-            camZ + vz * 66
+            camX + Math.cos(lookAlt) * vx * 66 + look.x * 8,
+            camBaseY + 1 + look.y * -5 + Math.sin(lookAlt) * 66,
+            camZ + Math.cos(lookAlt) * vz * 66
           );
         }
 
@@ -8585,6 +8738,40 @@
           renderer.render(scene, camera);
           renderer.autoClear = true;
           camera.layers.mask = mask;
+        }
+
+        if (captureReq) {
+          // The WebGPU canvas texture is recycled on present, so no
+          // 2D snapshot ever sees it - instead the frame's own pass
+          // sequence (main render, cloud composite, precipitation
+          // overlay) is repeated into an offscreen target and read
+          // back through three. composite() draws its quad into
+          // whatever target is bound, so the bracket captures the
+          // full composited frame.
+          const req = captureReq;
+          captureReq = null;
+          const rt = new THREE.RenderTarget(req.w, req.h);
+          renderer.setRenderTarget(rt);
+          renderer.render(scene, camera);
+          if (cloudsActive) cloudSys.composite();
+          {
+            const mask = camera.layers.mask;
+            camera.layers.mask = 1 << 4;
+            renderer.autoClear = false;
+            renderer.render(scene, camera);
+            renderer.autoClear = true;
+            camera.layers.mask = mask;
+          }
+          renderer.setRenderTarget(null);
+          console.warn('capture: passes rendered, reading back');
+          renderer
+            .readRenderTargetPixelsAsync(rt, 0, 0, req.w, req.h)
+            .then((buf) => {
+              rt.dispose();
+              console.warn('capture: readback done');
+              req.res(buf);
+            })
+            .catch((e) => console.warn('capture: readback failed ' + e));
         }
       }
 

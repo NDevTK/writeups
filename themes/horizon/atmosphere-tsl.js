@@ -550,8 +550,12 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   });
 
   // ---------- the dome ----------
-  const domeColor = Fn(() => {
-    const v = normalize(positionLocal);
+  // The dome's LUT sample for an arbitrary world direction - shared
+  // by the dome itself and by anything that sits ABOVE the whole
+  // atmosphere (the moon disc): every metre of air along such a ray
+  // is in front of the object, so the full sky-view in-scatter adds
+  // over its surface radiance.
+  const skySampleFor = Fn(([v]) => {
     const r = float(RB).add(max(camH, 1.0));
     const horizon = sqrt(max(r.mul(r).sub(RB * RB), 0.0))
       .div(r)
@@ -588,11 +592,17 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       0.0,
       1.0
     );
-    const col = mix(
+    return mix(
       skyTexNode.sample(vec2(ux, uyBelow)).rgb,
       skyTexNode.sample(vec2(ux, uyAbove)).rgb,
       cov
-    ).toVar();
+    );
+  });
+
+  const domeColor = Fn(() => {
+    const v = normalize(positionLocal);
+    const r = float(RB).add(max(camH, 1.0));
+    const col = skySampleFor(v).toVar();
     // The sun disc: direct transmittance with photospheric limb
     // darkening, Hestroffer & Magnan (1998) power law I(mu) = mu^a,
     // a(lambda_um) = -0.023 + 0.292 / lambda, at the same 680/550/440
@@ -705,6 +715,11 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // Refraction of the drawn disc: per-channel apparent
     // directions + vertical flattening (set from refraction.js).
     sunDisc: {dirR: sunDirR, dirB: sunDirB, flatten: sunFlat},
+    // The dome's own radiance (exposure applied) for a world
+    // direction - objects above the atmosphere (the moon) add this
+    // over their surface so a dark disc never punches a hole in
+    // the day sky.
+    skyRadiance: (v) => skySampleFor(v).mul(exposure),
     // Exposed for the validation harness (orientation / content
     // checks against the GLSL reference).
     luts: {

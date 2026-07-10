@@ -108,7 +108,12 @@ export function createVeilMaterial() {
 // Lommel-Seeliger backbone survives inside Hapke's IMSA - and the
 // brightness now follows the observed phase curve, opposition surge
 // included.
-export function createMoonMaterial() {
+// skyFor: the atmosphere's skyRadiance node factory. The moon is
+// above every metre of air on the ray, so the dome's in-scatter adds
+// over the disc - by day the dark limb carries the sky's own
+// radiance instead of occluding it (the disc stays opaque, so lunar
+// occultations of stars still work).
+export function createMoonMaterial(skyFor) {
   const u = {
     sunDirM: uniform(new Vector3(0, 1, 0)),
     albM: uniform(new Color('#cdd4e2')),
@@ -200,7 +205,10 @@ export function createMoonMaterial() {
       .mul(u.eshine),
     0.0
   );
-  material.colorNode = u.albM.mul(lunar.add(earthlit)).mul(2.0).add(u.glowM);
+  let moonCol = u.albM.mul(lunar.add(earthlit)).mul(2.0).add(u.glowM);
+  if (skyFor)
+    moonCol = moonCol.add(skyFor(normalize(positionWorld.sub(cameraPosition))));
+  material.colorNode = moonCol;
   return {material, u};
 }
 
