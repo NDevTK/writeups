@@ -295,4 +295,48 @@ const rails = parseRailways(RAILS_FIXTURE);
   );
 }
 
+{
+  // Gap healing: the parse drops sub-50 m connector ways (switch
+  // throats), which fragments the graph exactly at junctions - so
+  // a dangling endpoint within the heal radius (cell/4 = 1 unit
+  // here) reconnects through the foreign arc at exact partial
+  // lengths. Two collinear arcs 0.5 apart route straight through
+  // (length exactly 18: 9 + 0.5 + 8.5); the same two arcs 5 apart
+  // stay separate - a five-unit hole is not a dropped connector.
+  const gapped = railIndex(
+    [
+      [
+        [0, 0],
+        [10, 0]
+      ],
+      [
+        [10.5, 0],
+        [20, 0]
+      ]
+    ],
+    4
+  );
+  const healed = railRoute(gapped, 1, 0, 19, 0, 60);
+  const wide = railIndex(
+    [
+      [
+        [0, 0],
+        [10, 0]
+      ],
+      [
+        [15, 0],
+        [25, 0]
+      ]
+    ],
+    4
+  );
+  const unhealed = railRoute(wide, 1, 0, 24, 0, 60);
+  const ok = healed && Math.abs(healed.len - 18) < 1e-9 && unhealed === null;
+  check(
+    'dropped-connector healing',
+    ok,
+    `a 0.5-unit junction gap heals: (1,0)->(19,0) routes at length exactly 18 through the dangling endpoint's partial-length edges; a 5-unit hole stays two components (null) - real dropped switch throats reconnect, invented links do not`
+  );
+}
+
 process.exit(fail ? 1 : 0);

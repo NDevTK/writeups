@@ -93,6 +93,7 @@ export const railsGeometry = roadsGeometry;
  */
 export function railIndex(polys, cell = 4) {
   const segs = [];
+  const ends = []; // way-endpoint coordinates (heal candidates)
   for (const pts of polys) {
     for (let i = 0; i + 1 < pts.length; i++) {
       const [ax, az] = pts[i];
@@ -100,6 +101,7 @@ export function railIndex(polys, cell = 4) {
       if (ax === bx && az === bz) continue;
       segs.push([ax, az, bx, bz]);
     }
+    if (pts.length >= 2) ends.push(pts[0], pts[pts.length - 1]);
   }
   const grid = new Map();
   segs.forEach((s, i) => {
@@ -134,7 +136,63 @@ export function railIndex(polys, cell = 4) {
     adj.get(a).push({to: b, len, seg: i});
     adj.get(b).push({to: a, len, seg: i});
   });
-  return {segs, grid, cell, nodes, adj, nid};
+  const idx = {segs, grid, cell, nodes, adj, nid};
+  // Heal dropped-connector holes. The parse drops sub-50 m ways -
+  // switch throats and crossovers, exactly the pieces that stitch
+  // a rail network together - so the graph shatters at junctions
+  // (measured: Interlaken West and Ost attach 4 m and 7 m from
+  // their arcs yet sit in components 36 m apart at the Ost
+  // throat). Every WAY ENDPOINT within `heal` of a foreign,
+  // non-incident arc reconnects through that arc's endpoints at
+  // the exact partial lengths: station throats are precisely
+  // where the dropped crossovers live, the healed gap is
+  // sub-pixel at theme scale, and a T ending mid-segment (never
+  // a shared vertex) connects exactly with d = 0. Interior
+  // vertices do NOT heal - parallel open lines stay separate.
+  // An endpoint heals to EVERY non-incident arc within the
+  // radius, not just the nearest: at a throat the nearest arc is
+  // often a parallel track already in the same component, and a
+  // single heal would spend itself there while the real severed
+  // continuation sits a few metres further.
+  const heal = cell / 4; // ~57 m at the theme's 4-unit cell
+  for (const [ux, uz] of ends) {
+    const id = nid(ux, uz);
+    const seen = new Set();
+    const r = Math.max(1, Math.ceil(heal / cell));
+    const cx0 = Math.floor(ux / cell);
+    const cz0 = Math.floor(uz / cell);
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dz = -r; dz <= r; dz++) {
+        for (const i of grid.get(cx0 + dx + ':' + (cz0 + dz)) || []) {
+          if (seen.has(i)) continue;
+          seen.add(i);
+          const s = segs[i];
+          // arcs incident to this node are not gaps
+          if (nid(s[0], s[1]) === id || nid(s[2], s[3]) === id) continue;
+          const vx = s[2] - s[0];
+          const vz = s[3] - s[1];
+          const t = Math.max(
+            0,
+            Math.min(
+              1,
+              ((ux - s[0]) * vx + (uz - s[1]) * vz) / (vx * vx + vz * vz)
+            )
+          );
+          const d = Math.hypot(ux - (s[0] + t * vx), uz - (s[1] + t * vz));
+          if (d > heal) continue;
+          const L = Math.hypot(vx, vz);
+          const a = nid(s[0], s[1]);
+          const b = nid(s[2], s[3]);
+          const ea = {to: a, len: d + t * L, seg: i};
+          const eb = {to: b, len: d + (1 - t) * L, seg: i};
+          adj.get(id).push(ea, eb);
+          adj.get(a).push({to: id, len: ea.len, seg: i});
+          adj.get(b).push({to: id, len: eb.len, seg: i});
+        }
+      }
+    }
+  }
+  return idx;
 }
 
 /**
