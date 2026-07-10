@@ -189,7 +189,8 @@
         turbines), peaks=0 (skip summit labels),
         discharge=0 (pin river widths to the ladder), snowcover=0|URL
         (measured snow off / tile endpoint override), soil=0 (pin
-        bare-soil tints dry), debug=1
+        bare-soil tints dry), comets=0 (skip MPC
+        comets), comet=g (synthetic comet for the harness), debug=1
     -->
     <style>
       html,
@@ -348,6 +349,7 @@
       } from './horizon/sky-objects-tsl.js';
       import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
       import {mpDropRadiusMm} from './horizon/rainbow.js';
+      import {parseSoft00, visibleComets} from './horizon/comets.js';
       import {buildBowLUT, buildDogLUT} from './horizon/optics-lut.js';
       import {
         apparentAltitude,
@@ -5324,6 +5326,77 @@
       );
       scene.add(planetObj.mesh);
 
+      // Real comets (comets.js): the MPC's own current element
+      // sets (CORS-open, cached a day), universal-Kepler
+      // propagated beside the planets. Most nights nothing
+      // clears the naked-eye bar - rare-event content, exactly
+      // like the eclipses; when one does, it gets a head sprite
+      // through the planets' own brightness law and an
+      // anti-sunward tail (the tail lies along the comet's own
+      // heliocentric radial, projected on the sky - dust lag is
+      // not modelled). ?comets=0 disables; ?comet=g forces a
+      // synthetic perihelion comet for the harness.
+      const cometObj = createPlanetSprites(
+        new Float32Array(3),
+        new Float32Array([0.85, 0.95, 1.0]),
+        new Float32Array([0])
+      );
+      scene.add(cometObj.mesh);
+      const cometTailGeo = new THREE.BufferGeometry();
+      cometTailGeo.setAttribute(
+        'position',
+        new THREE.BufferAttribute(new Float32Array(12), 3)
+      );
+      cometTailGeo.setIndex([0, 1, 2, 0, 2, 3]);
+      const cometTailMat = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(0.55, 0.75, 1.0),
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      const cometTail = new THREE.Mesh(cometTailGeo, cometTailMat);
+      cometTail.visible = false;
+      cometTail.renderOrder = 1;
+      scene.add(cometTail);
+      let cometEls = null;
+      async function syncComets() {
+        if (params.get('comets') === '0') return;
+        const KEY = 'horizon-comets-mpc';
+        try {
+          const hit = JSON.parse(localStorage.getItem(KEY) || 'null');
+          if (hit && Date.now() - hit.at < 86400e3) {
+            cometEls = hit.els;
+            record(
+              'MPC comet elements (cached)',
+              cometEls.length + ' element sets'
+            );
+            return;
+          }
+        } catch {}
+        try {
+          const r = await fetch(
+            'https://www.minorplanetcenter.net/iau/Ephemerides/Comets/Soft00Cmt.txt',
+            {credentials: 'omit'}
+          );
+          if (!r.ok) throw new Error(r.status);
+          cometEls = parseSoft00(await r.text());
+          record(
+            'MPC comet elements',
+            cometEls.length + ' element sets \u00b7 universal-Kepler propagated'
+          );
+          try {
+            localStorage.setItem(
+              KEY,
+              JSON.stringify({at: Date.now(), els: cometEls})
+            );
+          } catch {}
+        } catch {
+          cometEls = null; // no invented comets
+        }
+      }
+
       // Ephemeris cache, refreshed at 1Hz in the frame loop.
       const astro = {
         at: -1e9,
@@ -6525,6 +6598,77 @@
               const mag = AE.Illumination(AE.Body[PLANETS[i]], d).mag;
               astro.planets[i] = {alt: p.alt, az: p.az, mag};
             }
+            // Comets: propagate the MPC set once a minute; the
+            // brightest (if any clears magnitude 6.5) rides the
+            // same topocentric alt/az path as the planets.
+            // Ecliptic <-> equatorial by the J2000 obliquity;
+            // Earth from the same ephemeris. Geocentric suffices:
+            // parallax at comet distances is under 1e-4 AU.
+            if (
+              (cometEls || params.has('comet')) &&
+              t - (astro.cometAt ?? -1e9) > 60000
+            ) {
+              astro.cometAt = t;
+              astro.comet = null;
+              const EPS = 23.43929111 * RAD;
+              const jd = 2451545 + AE.MakeTime(d).tt;
+              const ev = AE.HelioVector(AE.Body.Earth, d);
+              const obsEcl = {
+                x: ev.x,
+                y: ev.y * Math.cos(EPS) + ev.z * Math.sin(EPS),
+                z: -ev.y * Math.sin(EPS) + ev.z * Math.cos(EPS)
+              };
+              let list = visibleComets(cometEls || [], jd, obsEcl, 6.5);
+              if (params.has('comet')) {
+                const el = {
+                  name: 'synthetic comet',
+                  tp: jd,
+                  q: 0.9,
+                  e: 0.999,
+                  peri: 1,
+                  node: 2,
+                  incl: 0.5,
+                  g: +params.get('comet') || 2,
+                  k: 4
+                };
+                list = visibleComets([el], jd, obsEcl, 99);
+              }
+              const c = list[0];
+              if (c) {
+                const place = (vEcl) => {
+                  const gx = vEcl.x;
+                  const gy = vEcl.y * Math.cos(EPS) - vEcl.z * Math.sin(EPS);
+                  const gz = vEcl.y * Math.sin(EPS) + vEcl.z * Math.cos(EPS);
+                  const rr = Math.hypot(gx, gy, gz);
+                  const ra = (Math.atan2(gy, gx) / RAD / 15 + 24) % 24;
+                  const dec = Math.asin(gz / rr) / RAD;
+                  const h = AE.Horizon(d, obs, ra, dec, 'normal');
+                  return {alt: h.altitude * RAD, az: h.azimuth * RAD};
+                };
+                const sTail = 0.12 / c.r; // a step out along the radial
+                astro.comet = {
+                  name: c.name,
+                  mag: c.mag,
+                  head: place(c.geo),
+                  tail: place({
+                    x: c.geo.x + c.helio.x * sTail,
+                    y: c.geo.y + c.helio.y * sTail,
+                    z: c.geo.z + c.helio.z * sTail
+                  })
+                };
+                record(
+                  'MPC comet',
+                  c.name +
+                    ' \u00b7 mag ' +
+                    c.mag.toFixed(1) +
+                    ' \u00b7 r ' +
+                    c.r.toFixed(2) +
+                    ' AU \u00b7 \u0394 ' +
+                    c.delta.toFixed(2) +
+                    ' AU'
+                );
+              }
+            }
             if (!astro.recorded) {
               astro.recorded = true;
               record(
@@ -6552,6 +6696,58 @@
           }
           pp.needsUpdate = true;
           ps.needsUpdate = true;
+        }
+        // The comet, when one is bright enough to exist here:
+        // head through the planets' own size law; the tail quad
+        // stretched toward the anti-sunward sky point, faded by
+        // the DIFFUSE-source contrast (lpVis - a tail washes out
+        // before the head does).
+        {
+          const c = astro.comet;
+          const cp = cometObj.posAttr;
+          const cs = cometObj.sizeAttr;
+          if (c && c.head.alt > 0) {
+            const v = skyPoint(c.head.alt, c.head.az, 858);
+            cp.setXYZ(0, v.x, v.y, v.z);
+            cs.setX(0, THREE.MathUtils.clamp(6 - c.mag * 1.4, 2, 9.5));
+            const tv = skyPoint(c.tail.alt, c.tail.az, 858);
+            const dir = tv.clone().sub(v);
+            const len = dir.length();
+            if (len > 1) {
+              dir.normalize();
+              const side = dir
+                .clone()
+                .cross(v.clone().normalize())
+                .setLength(Math.min(6, len * 0.08));
+              const end = v.clone().addScaledVector(dir, Math.min(len, 120));
+              const pa = cometTailGeo.attributes.position;
+              pa.setXYZ(0, v.x - side.x, v.y - side.y, v.z - side.z);
+              pa.setXYZ(1, v.x + side.x, v.y + side.y, v.z + side.z);
+              pa.setXYZ(
+                2,
+                end.x + side.x * 0.2,
+                end.y + side.y * 0.2,
+                end.z + side.z * 0.2
+              );
+              pa.setXYZ(
+                3,
+                end.x - side.x * 0.2,
+                end.y - side.y * 0.2,
+                end.z - side.z * 0.2
+              );
+              pa.needsUpdate = true;
+              cometTailGeo.computeBoundingSphere();
+              const bright = THREE.MathUtils.clamp((6.5 - c.mag) / 6, 0, 1);
+              cometTailMat.opacity =
+                planetObj.u.night.value * lpVis * bright * 0.35;
+              cometTail.visible = cometTailMat.opacity > 0.004;
+            }
+          } else {
+            cs.setX(0, 0);
+            cometTail.visible = false;
+          }
+          cp.needsUpdate = true;
+          cs.needsUpdate = true;
         }
         // Atmospheric refraction lifts, flattens and disperses the
         // drawn sun (refraction.js: Ciddor + the exact bending
@@ -7323,6 +7519,7 @@
           THREE.MathUtils.clamp(nightSky * 1.6, 0, 1) *
           (1 - cloudy * 0.85) *
           lpVisBright;
+        cometObj.u.night.value = planetObj.u.night.value;
         moonDisc.visible = moon.alt > -0.05;
 
         // The Water plane: the FFT ocean advances on REAL seconds
@@ -8222,6 +8419,7 @@
         // overridden harness weather never reaches syncWeather's
         // own call - lay the bow LUT from whatever state holds now
         refreshBowLUT();
+        syncComets();
         setInterval(syncWeather, 15 * 60 * 1000);
         syncGeomag();
         syncAir();
