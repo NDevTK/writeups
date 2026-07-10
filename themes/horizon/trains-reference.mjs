@@ -14,12 +14,15 @@ import {
   CAR_STD,
   CONSIST_CARS,
   consistOf,
+  decodePolyline,
   DEFAULT_CARS,
   parseBoard,
+  parseTrips,
+  pathPoint,
   providerFor,
   trainAt
 } from './trains.js';
-import {BOARD_FIXTURE, BOAT_FIXTURE} from './trains-fixture.mjs';
+import {BOARD_FIXTURE, BOAT_FIXTURE, TRIPS_FIXTURE} from './trains-fixture.mjs';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -208,23 +211,118 @@ const journeys = parseBoard(BOARD_FIXTURE);
 }
 
 {
-  // Scope: location-specific APIs are only called inside their
-  // coverage - Interlaken and border Basel resolve the Swiss
-  // provider, Paris and New York resolve NONE (no idle traffic).
+  // Scope AND order: the Swiss national board (richer metadata)
+  // wins inside its bbox; everywhere else the worldwide GTFS
+  // aggregator answers - each view calls exactly ONE provider.
   const ch = providerFor(46.69, 7.87);
   const basel = providerFor(47.55, 7.59);
+  const paris = providerFor(48.85, 2.35);
+  const nyc = providerFor(40.71, -74.0);
   const ok =
     ch &&
     ch.name === 'transport.opendata.ch' &&
+    ch.kind === 'board' &&
     basel === ch &&
-    providerFor(48.85, 2.35) === null &&
-    providerFor(40.71, -74.0) === null &&
+    paris &&
+    paris.name === 'transitous.org' &&
+    paris.kind === 'trips' &&
+    nyc === paris &&
     ch.boardURL('8507492').includes('stationboard') &&
-    ch.locationsURL(46.69, 7.87).includes('locations');
+    paris.tripsURL(48.85, 2.35, 1770000000000).includes('map/trips');
   check(
-    'provider scope',
+    'provider scope and order',
     ok,
-    'Interlaken and Basel resolve the Swiss provider; Paris and New York resolve none - outside a scope the API is never called'
+    'Interlaken and Basel resolve the Swiss board; Paris and New York fall through to the worldwide aggregator - one provider per view, never more'
+  );
+}
+
+{
+  // The polyline decoder against the CANONICAL documented example
+  // (the shared GTFS encoding): '_p~iF~ps|U_ulLnnqC_mqNvxq`@'
+  // decodes to (38.5,-120.2) (40.7,-120.95) (43.252,-126.453).
+  const p = decodePolyline('_p~iF~ps|U_ulLnnqC_mqNvxq`@');
+  const want = [
+    [38.5, -120.2],
+    [40.7, -120.95],
+    [43.252, -126.453]
+  ];
+  const exact =
+    p.length === 3 &&
+    p.every(
+      (q, i) =>
+        Math.abs(q[0] - want[i][0]) < 1e-9 && Math.abs(q[1] - want[i][1]) < 1e-9
+    );
+  check(
+    'polyline decoder',
+    exact,
+    'the documented reference polyline decodes to its three published coordinates exactly'
+  );
+}
+
+{
+  // Path interpolation by ARC LENGTH: an L of 300 m north then
+  // 100 m east - f = 0.5 sits at 200 m up the FIRST leg (half the
+  // 400 m total), not at the middle vertex.
+  const mLat = 111320;
+  const path = [
+    [46.7, 7.9],
+    [46.7 + 300 / mLat, 7.9],
+    [
+      46.7 + 300 / mLat,
+      7.9 + 100 / (mLat * Math.cos(((46.7 + 300 / mLat) * Math.PI) / 180))
+    ]
+  ];
+  const half = pathPoint(path, 0.5);
+  const start = pathPoint(path, 0);
+  const end = pathPoint(path, 1);
+  const ok =
+    Math.abs(half.lat - (46.7 + 200 / mLat)) < 1e-9 &&
+    Math.abs(half.lon - 7.9) < 1e-9 &&
+    start.lat === 46.7 &&
+    Math.abs(end.lon - path[2][1]) < 1e-12;
+  check(
+    'arc-length path point',
+    ok,
+    'f = 0.5 on a 300 m + 100 m L sits exactly 200 m up the first leg; f = 0 and f = 1 are the endpoints'
+  );
+}
+
+{
+  // The LIVE transitous fixture: 57 Frankfurt rail legs parse to
+  // the SAME journey shape the boards produce - the ICEs by name,
+  // modes mapped to the one consist ladder, real-time flags
+  // carried, every leg with its decoded route shape - and trainAt
+  // follows that shape: mid-leg the position must sit ON the
+  // polyline (near neither endpoint on a curved route).
+  const legs = parseTrips(TRIPS_FIXTURE);
+  const cats = new Set(legs.map((l) => l.cat));
+  const ice = legs.find((l) => /^ICE/.test(l.label));
+  const rt = legs.filter((l) => l.realTime).length;
+  const withPath = legs.filter((l) => l.path && l.path.length >= 2).length;
+  const mid = ice
+    ? trainAt(ice, (ice.stops[0].depMs + ice.stops[1].arrMs) / 2)
+    : null;
+  const onPath =
+    mid &&
+    ice.path.some(
+      (q) => Math.abs(q[0] - mid.lat) < 0.02 && Math.abs(q[1] - mid.lon) < 0.02
+    );
+  const ok =
+    legs.length >= 50 &&
+    ice &&
+    cats.has('ICE') &&
+    cats.has('S') &&
+    rt > 20 &&
+    withPath === legs.length &&
+    legs.every(
+      (l) => l.stops.length === 2 && l.stops[1].arrMs > l.stops[0].depMs
+    ) &&
+    legs.every((l) => l.consist.cars >= 1) &&
+    onPath;
+  check(
+    'live transitous legs',
+    ok,
+    `${legs.length} Frankfurt rail legs (${[...cats].join('/')}), ${rt} real-time, every one carrying its decoded route shape; ${ice ? ice.label : '?'} mid-leg rides ON its polyline`
   );
 }
 

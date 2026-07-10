@@ -39,6 +39,7 @@
 export const PROVIDERS = [
   {
     name: 'transport.opendata.ch',
+    kind: 'board',
     bbox: [45.6, 5.8, 47.95, 10.7],
     locationsURL: (lat, lon) =>
       'https://transport.opendata.ch/v1/locations?type=station&x=' +
@@ -48,6 +49,35 @@ export const PROVIDERS = [
     boardURL: (id) =>
       'https://transport.opendata.ch/v1/stationboard?limit=10&id=' +
       encodeURIComponent(id)
+  },
+  {
+    // The worldwide fallback: transitous.org aggregates public
+    // GTFS feeds globally (keyless, CORS-open). Its scope IS the
+    // world; national boards richer in metadata stay ahead of it
+    // in this registry. ONE box query around the view, a short
+    // window, real route shapes included.
+    name: 'transitous.org',
+    kind: 'trips',
+    bbox: [-90, -180, 90, 180],
+    tripsURL: (lat, lon, nowMs) => {
+      const d = 0.075; // ~8 km - the visible box
+      const iso = (t) => new Date(t).toISOString().slice(0, 19) + 'Z';
+      return (
+        'https://api.transitous.org/api/v6/map/trips?zoom=11&precision=5' +
+        '&max=' +
+        (lat + d).toFixed(4) +
+        ',' +
+        (lon - d).toFixed(4) +
+        '&min=' +
+        (lat - d).toFixed(4) +
+        ',' +
+        (lon + d).toFixed(4) +
+        '&startTime=' +
+        iso(nowMs) +
+        '&endTime=' +
+        iso(nowMs + 15 * 60000)
+      );
+    }
   }
 ];
 
@@ -112,6 +142,126 @@ export const DEFAULT_CARS = 3;
 // size); rendering reuses the gated vessels.js passenger hull.
 export const BOAT_CATS = new Set(['BAT']);
 export const BOAT_DIMS = {len: 48, beam: 9};
+
+// GTFS modes (the transitous aggregator) -> board categories, so
+// ONE consist ladder and ONE livery family serve both provider
+// kinds. Underground modes are deliberately absent: drawing a
+// metro on the surface would be inventing. FERRY routes to the
+// boats path.
+export const MODE_CAT = {
+  HIGHSPEED_RAIL: 'ICE',
+  LONG_DISTANCE: 'IC',
+  NIGHT_RAIL: 'EN',
+  REGIONAL_FAST_RAIL: 'RE',
+  REGIONAL_RAIL: 'R',
+  SUBURBAN: 'S',
+  TRAM: 'T',
+  FERRY: 'BAT'
+};
+
+// Standard encoded-polyline decoder (the Google algorithm the
+// GTFS world shares; transitous emits precision 5). Gated against
+// the canonical documented example.
+export function decodePolyline(str, precision = 5) {
+  const f = 10 ** precision;
+  const out = [];
+  let lat = 0;
+  let lon = 0;
+  for (let i = 0; i < str.length; ) {
+    for (const which of [0, 1]) {
+      let shift = 0;
+      let result = 0;
+      let b;
+      do {
+        b = str.charCodeAt(i++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const d = result & 1 ? ~(result >> 1) : result >> 1;
+      if (which === 0) lat += d;
+      else lon += d;
+    }
+    out.push([lat / f, lon / f]);
+  }
+  return out;
+}
+
+// A point at LENGTH fraction f along a geodetic path (the real
+// route shape) - by cumulative arc length, not by vertex count.
+export function pathPoint(path, f) {
+  const mLat = 111320;
+  const segLen = [];
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    const dx =
+      (path[i][1] - path[i - 1][1]) *
+      mLat *
+      Math.cos((path[i - 1][0] * Math.PI) / 180);
+    const dy = (path[i][0] - path[i - 1][0]) * mLat;
+    const l = Math.hypot(dx, dy);
+    segLen.push(l);
+    total += l;
+  }
+  if (!total) return {lat: path[0][0], lon: path[0][1], hdgTo: null};
+  let want = Math.max(0, Math.min(1, f)) * total;
+  for (let i = 0; i < segLen.length; i++) {
+    if (want <= segLen[i] || i === segLen.length - 1) {
+      const t = segLen[i] ? want / segLen[i] : 0;
+      return {
+        lat: path[i][0] + (path[i + 1][0] - path[i][0]) * t,
+        lon: path[i][1] + (path[i + 1][1] - path[i][1]) * t,
+        hdgTo: {lat: path[i + 1][0], lon: path[i + 1][1]}
+      };
+    }
+    want -= segLen[i];
+  }
+  return {lat: path[0][0], lon: path[0][1], hdgTo: null};
+}
+
+/**
+ * A transitous map/trips response -> the SAME journey shape the
+ * boards produce, so trainAt and the renderers serve both
+ * providers. Each leg: two timed stops (departure/arrival already
+ * real-time-adjusted upstream - the realTime flag says so) plus
+ * the decoded polyline of the actual route, which trainAt follows
+ * by arc length instead of the straight line. Modes outside
+ * MODE_CAT (bus, coach, plane, underground) are dropped.
+ */
+export function parseTrips(json) {
+  const out = [];
+  for (const leg of Array.isArray(json) ? json : []) {
+    const cat = MODE_CAT[leg.mode];
+    if (!cat) continue;
+    const dep = ms(leg.departure);
+    const arr = ms(leg.arrival);
+    const f = leg.from || {};
+    const t = leg.to || {};
+    if (
+      !Number.isFinite(dep) ||
+      !Number.isFinite(arr) ||
+      !Number.isFinite(f.lat) ||
+      !Number.isFinite(t.lat) ||
+      arr <= dep
+    )
+      continue;
+    const name = ((leg.trips || [])[0] && leg.trips[0].displayName) || cat;
+    out.push({
+      cat,
+      number: '',
+      operator: '',
+      to: t.name || '',
+      label: name,
+      realTime: !!leg.realTime,
+      consist: consistOf(cat, ''),
+      stops: [
+        {lat: f.lat, lon: f.lon, name: f.name || '', arrMs: dep, depMs: dep},
+        {lat: t.lat, lon: t.lon, name: t.name || '', arrMs: arr, depMs: arr}
+      ],
+      path: leg.polyline ? decodePolyline(leg.polyline) : null
+    });
+  }
+  return out;
+}
 
 // The metre-gauge and rack operators run shorter, narrower stock.
 export const NARROW_OPS = new Set([
@@ -206,6 +356,13 @@ export function trainAt(journey, nowMs) {
     }
     if (i + 1 < s.length && nowMs > s[i].depMs && nowMs < s[i + 1].arrMs) {
       const f = (nowMs - s[i].depMs) / (s[i + 1].arrMs - s[i].depMs);
+      // A journey carrying its real route shape (transitous legs)
+      // is followed along the SHAPE by arc length; board journeys
+      // interpolate the straight line between their stops.
+      if (journey.path && journey.path.length >= 2 && s.length === 2) {
+        const p = pathPoint(journey.path, f);
+        return {lat: p.lat, lon: p.lon, hdgTo: p.hdgTo, at: '', moving: true};
+      }
       return {
         lat: s[i].lat + (s[i + 1].lat - s[i].lat) * f,
         lon: s[i].lon + (s[i + 1].lon - s[i].lon) * f,

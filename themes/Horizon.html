@@ -125,7 +125,12 @@
         trains run the lines on their real timetable: category,
         number, operator and live delay from the station board,
         positions interpolated between the stops each train
-        reports at its delay-shifted times - and the PIER station's
+        reports at its delay-shifted times; everywhere else the
+        worldwide GTFS aggregator (transitous.org) answers instead -
+        every rail leg operating in the box right now, followed
+        along the polyline of its ACTUAL route by arc length, with
+        its published real-time times (ferries take the boats
+        path) - and the PIER station's
         board does the same for the lake steamers (category BAT):
         where AIS coverage misses them the schedule floats them at
         the lake's measured level, an active AIS vessel nearby
@@ -409,6 +414,7 @@
         BOAT_CATS,
         BOAT_DIMS,
         parseBoard,
+        parseTrips,
         providerFor,
         trainAt
       } from './horizon/trains.js';
@@ -1674,6 +1680,36 @@
         if (!prov) return; // outside every provider's scope: no call
         const seq = ++trainsSeq;
         try {
+          if (prov.kind === 'trips') {
+            // The worldwide aggregator: ONE box query around the
+            // view - every rail leg operating right now with its
+            // real-time times and the polyline of its actual
+            // route, which trainAt follows by arc length. FERRY
+            // legs take the boats path.
+            const legs = await (
+              await fetch(prov.tripsURL(state.lat, state.lon, Date.now()), {
+                credentials: 'omit'
+              })
+            ).json();
+            if (seq !== trainsSeq) return;
+            const all = parseTrips(legs);
+            trainJourneys = all.filter((j) => j.cat !== 'BAT');
+            boatJourneys = all.filter((j) => j.cat === 'BAT');
+            const rt = trainJourneys.filter((j) => j.realTime).length;
+            const first = trainJourneys[0];
+            record(
+              prov.name + ' map trips',
+              trainJourneys.length +
+                ' rail legs (' +
+                rt +
+                ' real-time)' +
+                (boatJourneys.length
+                  ? ' · ' + boatJourneys.length + ' ferries'
+                  : '') +
+                (first ? ' · ' + first.label + ' → ' + first.to : '')
+            );
+            return;
+          }
           const loc = await (
             await fetch(prov.locationsURL(state.lat, state.lon), {
               credentials: 'omit'
