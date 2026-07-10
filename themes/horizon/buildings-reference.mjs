@@ -174,6 +174,17 @@ const builds = parseBuildings(BUILDINGS_FIXTURE);
     if (ny < -1e-6) down++;
     if (y < 10 - 2 * U - 1e-6) yOk = false;
   }
+  // The roof flag: snow lies only where it can - every flagged
+  // vertex faces up or up-slope (ny > 0.05), every wall and gable
+  // is unflagged, and both classes exist in the set.
+  let roofOn = 0;
+  let roofBad = 0;
+  for (let i = 0; i < g.count; i++) {
+    if (g.roof[i] === 1) {
+      roofOn++;
+      if (g.normal[3 * i + 1] <= 0.05) roofBad++;
+    } else if (g.roof[i] !== 0) roofBad++;
+  }
   const hMax = Math.max(...set.map((b) => b.h)) * U;
   const drowned = buildingsGeometry(
     set,
@@ -192,10 +203,13 @@ const builds = parseBuildings(BUILDINGS_FIXTURE);
       up > 0 &&
       down === 0 &&
       maxY <= 10 + hMax * 1.36 &&
+      roofOn > 0 &&
+      roofOn < g.count &&
+      roofBad === 0 &&
       g.glow.every((v) => Math.abs(v - 0.7) < 1e-6) &&
       drowned.placed === 0 &&
       drowned.count === 0,
-    `${set.length} buildings (gabled + flat among them) -> ${g.count} vertices: bases at ground-2m, tops within height+gable, ${horiz} horizontal wall normals, ${up} straight-up roof normals, none facing down, glow carried; on water nothing is placed`
+    `${set.length} buildings (gabled + flat among them) -> ${g.count} vertices: bases at ground-2m, tops within height+gable, ${horiz} horizontal wall normals, ${up} straight-up roof normals, none facing down, glow carried, ${roofOn} snow-bearing roof vertices all facing upward; on water nothing is placed`
   );
 }
 

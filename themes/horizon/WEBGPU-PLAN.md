@@ -2926,6 +2926,26 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   every consumer. Hanger length corrected from the old ad hoc
   1.7 m offset to the documented 2.5 m arm. Gate 53 sets
   (aerialways 4 -> 5 landmarks); browser smoke clean.
+- DONE: snow lies on the roofs (Jul 10, the coupling lane - the
+  measured snow cover and the OSM buildings meet). buildingsGeometry
+  gained a fourth attribute: `roof` flags exactly the surfaces
+  snow can LIE on (the sloped ridge planes and flat caps - walls,
+  gable faces and the spires stay bare: snow does not stand on
+  the vertical or the steep). The merged-geometry landmark now
+  holds it structurally: every flagged vertex faces up or
+  up-slope (ny > 0.05), both classes present, nothing mis-flagged.
+  Theme: the buildings' colorNode mixes the terrain's OWN snow
+  albedo (0.87/0.90/0.93) over the roof surfaces by
+  max(measured, live) - `rsnow`, a per-vertex attribute sampled
+  from the SAME Salomonson-Appel FSC field the terrain reads
+  (syncSnowCover re-seats the town when the field lands, the
+  lights-path precedent), OR the live-snowfall term, the very
+  uSnowy value the terrain smooths each frame (bldSnowU mirrors
+  it) - so when it snows tonight the roofs whiten with the ground
+  in real time, and tomorrow the satellite confirms or clears
+  them. Nothing new is invented: one snow state, three consumers
+  (terrain, physics drifts, now the roofs). Gate 53 sets
+  (buildings landmark strengthened in place); browser smoke clean.
 - OPEN (environment, not code) - UPDATE (roam smoke, Jul 7): the
   drift now also manifests as a PER-FRAME uncaught TypeError -
   GPUTexture.createView rejects the `swizzle` field three's

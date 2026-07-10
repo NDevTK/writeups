@@ -319,14 +319,18 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
   const Nrm = [];
   const C = [];
   const G = [];
+  const R = []; // roof flag: 1 where snow can LIE (roof planes,
+  // flat caps), 0 on walls, gable faces and the spire - snow does
+  // not stand on the vertical or the steep
   let placed = 0;
-  const push = (p, nrm, col, glow) => {
+  const push = (p, nrm, col, glow, roof) => {
     P.push(...p);
     Nrm.push(...nrm);
     C.push(...col);
     G.push(glow);
+    R.push(roof);
   };
-  const tri = (a, b, c, col, glow) => {
+  const tri = (a, b, c, col, glow, roof = 0) => {
     const ux = b[0] - a[0];
     const uy = b[1] - a[1];
     const uz = b[2] - a[2];
@@ -340,7 +344,7 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
     nx /= l;
     ny /= l;
     nz /= l;
-    for (const p of [a, b, c]) push(p, [nx, ny, nz], col, glow);
+    for (const p of [a, b, c]) push(p, [nx, ny, nz], col, glow, roof);
   };
   for (const b of builds) {
     const pts = b.ring.map(([la, lo]) => {
@@ -412,10 +416,10 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
       const R2 = P3(hl, 0, top + gH);
       // two roof planes + two gable triangles (orders hand-checked
       // for outward normals under the axis convention)
-      tri(A, R2, B, ROOF, glow);
-      tri(A, R1, R2, ROOF, glow);
-      tri(C, R1, D, ROOF, glow);
-      tri(C, R2, R1, ROOF, glow);
+      tri(A, R2, B, ROOF, glow, 1);
+      tri(A, R1, R2, ROOF, glow, 1);
+      tri(C, R1, D, ROOF, glow, 1);
+      tri(C, R2, R1, ROOF, glow, 1);
       tri(A, D, R1, facade, glow);
       tri(C, B, R2, facade, glow);
     } else {
@@ -428,7 +432,8 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
           [pts[c][0], top, pts[c][1]],
           [pts[bb][0], top, pts[bb][1]],
           cap,
-          glow
+          glow,
+          1
         );
       }
     }
@@ -467,6 +472,7 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
     normal: new Float32Array(Nrm),
     color: new Float32Array(C),
     glow: new Float32Array(G),
+    roof: new Float32Array(R),
     count: P.length / 3,
     placed
   };
