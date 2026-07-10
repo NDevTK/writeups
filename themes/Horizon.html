@@ -8816,7 +8816,12 @@
           const rt = new THREE.RenderTarget(req.w, req.h);
           renderer.setRenderTarget(rt);
           renderer.render(scene, camera);
-          if (cloudsActive) cloudSys.composite();
+          // Diagnostic capture (__noClouds, harness-only like the
+          // other debug hooks): skipping the composite in the
+          // captured frame separates "occluded by cloud" from
+          // "not rendered" in a single shot - the live canvas
+          // keeps its clouds either way.
+          if (cloudsActive && !window.__noClouds) cloudSys.composite();
           {
             const mask = camera.layers.mask;
             camera.layers.mask = 1 << 4;
