@@ -165,6 +165,20 @@ await page.route(
     }
   }
 );
+// Older Chrome rejects three's GPUTextureViewDescriptor.swizzle -
+// same shim the probe pages carry inline.
+await page.addInitScript(() => {
+  if (navigator.gpu && self.GPUTexture) {
+    const ov = GPUTexture.prototype.createView;
+    GPUTexture.prototype.createView = function (d) {
+      if (d && 'swizzle' in d) {
+        d = Object.assign({}, d);
+        delete d.swizzle;
+      }
+      return ov.call(this, d);
+    };
+  }
+});
 await page.goto(url, {waitUntil: 'load', timeout: 120000});
 console.log('LOADED - control on :8905');
 
