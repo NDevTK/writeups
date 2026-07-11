@@ -24,6 +24,7 @@
 import {decimate, stitchRings} from './lakes.js';
 import {geoToScene} from './roam.js';
 import {cropAlbedoFromTags} from './crops.js';
+import {forestAlbedoFromTags} from './forest.js';
 
 // Linear albedos per OSM class (same space as the terrain's grass
 // vec3(0.09..0.19, 0.21..0.33, 0.05..0.08) ramp).
@@ -40,6 +41,7 @@ export const CLASS_ALBEDO = {
   recreation_ground: [0.12, 0.28, 0.07],
   village_green: [0.13, 0.3, 0.07],
   forest: [0.07, 0.16, 0.05],
+  wood: [0.07, 0.16, 0.05], // natural=wood - same dark canopy as forest
   residential: [0.2, 0.2, 0.16],
   industrial: [0.26, 0.25, 0.24],
   commercial: [0.25, 0.24, 0.23],
@@ -95,6 +97,11 @@ export const CROP_HOSTS = new Set([
   'vineyard'
 ]);
 
+// The classes that carry a real forest: on these an OSM
+// leaf_type/leaf_cycle overrides the flat class albedo with the
+// leaf-type + seasonal canopy colour (forest.js).
+export const FOREST_HOSTS = new Set(['forest', 'wood']);
+
 /**
  * Overpass landuse/natural elements -> [{id, cls, albedo, rings,
  * area}], largest area LAST in paint order terms (the caller
@@ -103,9 +110,11 @@ export const CROP_HOSTS = new Set([
  * are dropped - base grass is the truthful unknown.
  *
  * When `month` is supplied, a CROP_HOST parcel carrying a recognised
- * crop/produce/trees tag wears its crop canopy colour (crops.js),
- * seasonally shifted by `month`/`lat`; an unrecognised or absent crop
- * keeps the flat class albedo, so the tagless default is unchanged.
+ * crop/produce/trees tag wears its crop canopy colour (crops.js), and a
+ * FOREST_HOST parcel carrying leaf_type/leaf_cycle wears its leaf-type +
+ * seasonal canopy colour (forest.js), both shifted by `month`/`lat`; an
+ * unrecognised or absent tag keeps the flat class albedo, so the
+ * tagless default is unchanged.
  */
 export function parseLanduse(json, minSpanM = 60, cap = 400, month = 0, lat) {
   const out = [];
@@ -117,6 +126,9 @@ export function parseLanduse(json, minSpanM = 60, cap = 400, month = 0, lat) {
     if (month && CROP_HOSTS.has(cls)) {
       const crop = cropAlbedoFromTags(tags, month, lat);
       if (crop) albedo = crop;
+    } else if (month && FOREST_HOSTS.has(cls)) {
+      const canopy = forestAlbedoFromTags(tags, month, lat);
+      if (canopy) albedo = canopy;
     }
     let rings = null;
     if (el.type === 'way' && el.geometry && el.geometry.length >= 4) {
