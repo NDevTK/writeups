@@ -49,6 +49,14 @@ import {
   vec3,
   vec4
 } from 'three/tsl';
+import {spectralNode} from './spectral-srgb.js';
+
+// The display projection for the three spectral lines (680/550/440
+// nm CIE-weighted into linear sRGB, equal radiance -> D65; see
+// spectral-srgb.js). Applied at the DISPLAY ends only - the dome's
+// final colour and the skyRadiance export - so every LUT texel keeps
+// its reference-pinned spectral value.
+const spectral = spectralNode({vec3, dot, max});
 
 /**
  * TSL port of the Hillaire (2020) multiple-scattering atmosphere
@@ -766,7 +774,7 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         );
       });
     });
-    return vec4(col.mul(exposure), 1.0);
+    return vec4(spectral(col.mul(exposure)), 1.0);
   });
 
   // QuadMesh remains only for the irradiance pass (a 1x1
@@ -860,7 +868,7 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // direction - objects above the atmosphere (the moon) add this
     // over their surface so a dark disc never punches a hole in
     // the day sky.
-    skyRadiance: (v) => skySampleFor(v).mul(exposure),
+    skyRadiance: (v) => spectral(skySampleFor(v).mul(exposure)),
     // Exposed for the validation harness (orientation / content
     // checks against the GLSL reference).
     luts: {

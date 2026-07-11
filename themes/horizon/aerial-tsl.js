@@ -6,6 +6,7 @@ import {
   color,
   dot,
   exp,
+  max,
   min,
   mix,
   normalize,
@@ -16,9 +17,17 @@ import {
   toneMapping,
   uniform,
   vec2,
+  vec3,
   vec4,
   workingToColorSpace
 } from 'three/tsl';
+import {spectralNode} from './spectral-srgb.js';
+
+// The spectral display projection (spectral-srgb.js): the aerial
+// LUT's in-scatter is 680/550/440 nm radiance like the dome's - it
+// gets the same CIE weighting on its way to the screen, so haze and
+// sky cannot disagree about what colour the air is.
+const spectral = spectralNode({vec3, dot, max});
 
 /**
  * Aerial perspective + Koschmieder fog as a shared TSL output hook
@@ -96,7 +105,7 @@ export function createAerialFog(aerialLutTex) {
     );
     const lit = encoded()
       .mul(mix(1.0, aer.a, u.uAerialOn))
-      .add(aer.rgb.mul(u.uAerialExp).mul(u.uAerialOn));
+      .add(spectral(aer.rgb).mul(u.uAerialExp).mul(u.uAerialOn));
     return vec4(fogged(lit), output.a);
   })();
 
