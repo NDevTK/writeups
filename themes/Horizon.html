@@ -373,7 +373,8 @@
         buildProfile,
         standardProfile,
         SUN_DISC_RAD,
-        sunRefraction
+        sunRefraction,
+        transferCurve
       } from './horizon/refraction.js';
       import {
         demElev as demElevOf,
@@ -6823,6 +6824,7 @@
       // frame block); everything between recomputes reads this.
       let stdProf = null;
       const stdProfileFallback = () => (stdProf ??= standardProfile());
+      const sunsetLut = {prof: null, obsH: -1};
       const refr = {
         prof: null,
         alt: 1e9,
@@ -7242,6 +7244,25 @@
             d.dirR.value.copy(sunVec);
             d.dirB.value.copy(sunVec);
             d.flatten.value = 1;
+          }
+        }
+        // The sunset transfer LUT (profile- and height-keyed; the
+        // curve is sun-independent): rebuilt only when the profile
+        // or the observer's 200 m height bucket moves, and only
+        // engaged near the horizon - high-sun frames pay nothing.
+        if (atmo.ok && atmo.sunTransfer) {
+          const st = atmo.sunTransfer;
+          const lowSun = Math.abs(sun.alt) < 0.06; // ~3.4 deg
+          st.on.value = lowSun ? 1 : 0;
+          st.sunTrue.value = sun.alt;
+          if (
+            lowSun &&
+            (profNow !== sunsetLut.prof ||
+              Math.abs(camAltM - sunsetLut.obsH) > 200)
+          ) {
+            sunsetLut.prof = profNow;
+            sunsetLut.obsH = camAltM;
+            st.set(transferCurve(profNow, camAltM, -0.0105, 0.0349, 160, 200));
           }
         }
         // The one real sun light carries the true direction; the CSM
