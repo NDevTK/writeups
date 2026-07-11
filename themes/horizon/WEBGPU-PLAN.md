@@ -3406,6 +3406,57 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (the far horizon, Jul 11 - built, iterated through five
+  Tasman Bay renders, merged): the ring exists exactly as
+  planned below, plus four fixes the visuals forced: (1) open
+  SEA is not drawn - the sky-view LUT's Payne-lit horizon IS the
+  far sea; sea-only triangles drop, shoreline triangles keep
+  their water corners (island landmark: 258 of 688 triangles,
+  every one touching land); (2) those water corners clamp to the
+  SURFACE, not terrarium's -80 m bathymetry (landmarked); (3)
+  the fade rides the box fog's exact FogExp2 curve
+  (exp(-(1.98 d/V)^2), 2% at V and the half-distance identity
+  both landmarked) - linear-exponent Koschmieder was twice as
+  hazy at half distance and stepped the seam; (4) three's light
+  convention premultiplies pi, so the ring's Lambert drops its
+  /pi to match the box terrain. Albedo ladder: measured
+  white-sky RGB when the box has it, terrain-tsl's own
+  GRASS_MEAN (exported single-source) otherwise - Nelson (0
+  clear MODIS obs) wears the box's grass. VERIFIED at Nelson
+  looking SW: Waimea Plains and the Moutere hills continue past
+  the seam to ranges on the skyline at k = 0.292 from the
+  evening's MEASURED inversion; before/after delivered. Gate
+  green (63 sets, far-terrain at 8 landmarks + 3 GPU probes).
+  The original plan, for the record:
+- (plan) the far horizon: the world
+  currently ENDS at the box edge (8 km) - but from Nelson the
+  real view crosses Tasman Bay to ranges 40+ km out, and from
+  Interlaken the Oberland walls the sky far beyond any box. A
+  far-terrain ring from the SAME terrarium tiles at coarse zoom
+  (z8, ~500 m/px, ~9-16 tiles for a 400 km span, same decode,
+  same despike) drawn from the box edge to ~200 km: (1) geometry
+  - a polar grid around the anchor, log-spaced radii 140 -> 3500
+    units, elevation through the same mercator sampling, EARTH
+    CURVATURE subtracted before the box's asinh datum compression
+    (drop = d^2 / (2 R_eff) with R_eff = R/(1 - k)); the
+    refraction coefficient k comes from the MEASURED refraction
+    column's surface lapse rate (the standard geodetic formula -
+    verify the exact published coefficients before coding; the
+    textbook k ~ 0.13 must EMERGE from the standard-atmosphere
+    lapse as a landmark, not be assumed); (2) rendering - true
+    coordinates, a far pre-pass (its own depth range) before the
+    main scene, so no skybox parallax approximation; (3) colour -
+    at 25-200 km terrain is tonal: sun x slope shading on DEM
+    normals over the box's MEASURED white-sky albedo (the RTLSR
+    inversion), faded to the horizon sky by Koschmieder
+    transmittance at the MEASURED visibility (both already cited
+    in-theme); the aerial LUT covers the first 25.7 km exactly;
+    (4) landmarks - curvature drop closed-form, k from standard
+    atmosphere, seam continuity at the box edge (the ring's first
+    radius reads the same elevation the box's sampler reads),
+    mercator sampling identity vs demElev; (5) visual proof at
+    Nelson (the Arthur Range across Tasman Bay) and Interlaken
+    (the Oberland beyond the box).
 - DONE (cross-boundary legs, Jul 11): a leg whose far stop is off
   the drawn graph (beyond the box or the cap) now rides drawn
   rail to the graph LEAF nearest the far stop instead of hiding

@@ -90,6 +90,11 @@ const G_VOL_M = G_VOL.map((g, i) => g + G_DHOT[i]);
  * separate nodes loses nothing.
  */
 
+// The mean of grass0's two endpoints below - the far ring's
+// fallback albedo when no white-sky measurement exists for the
+// box, so the horizon wears the box's own grass.
+export const GRASS_MEAN = [0.14, 0.27, 0.065];
+
 export function createTerrainNodeMaterial(momentsTex, aerial) {
   // TextureNodes are part of the graph; rebakes swap via node.value.
   // momentsTex: RGBA32F (E[sx], E[sz], E[sx^2], E[sz^2]) with
