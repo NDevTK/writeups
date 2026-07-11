@@ -3437,10 +3437,11 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   256-byte aligned, and the expectation must integrate the
   pixel's own footprint half-pixel-exactly); the set sun stays
   set to 0.01%. Also: container rollback recovery - all merged
-  work was safe on the remote; an UNSHIPPED shared-sky presence
-  feature found in the restored snapshot is preserved verbatim
-  on claude/shared-sky-presence-snapshot for review; the
-  harness symlink + playwright-core + servers rebuilt. Gate 56
+  work was safe on the remote; stale shared-sky presence code
+  found in the restored snapshot was a feature REMOVED by
+  design and was discarded, not preserved (the wrongly-pushed
+  snapshot branch was buried at main); the harness symlink +
+  playwright-core + servers rebuilt. Gate 56
   sets + 4 GPU probes PASS.
 - DONE (the flash rim made continuous, Jul 11): the rim - the
   last rows where the 550 nm image persists past 680 nm's end -

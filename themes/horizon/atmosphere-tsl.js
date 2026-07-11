@@ -155,6 +155,14 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   transTex.minFilter = LinearFilter;
   transTex.needsUpdate = true;
   const transNode = texture(transTex);
+  // Harness-only radiometric tap (?debug float captures): 0 skips
+  // the spectral display projection AND its gamut clip on the
+  // dome, so a float readback carries the raw 680/550/440 nm
+  // radiance - the clip is not invertible (deep-red disc pixels
+  // recover B 2.38x high through clip + inversion), so honest
+  // radiometry needs the pre-projection values. Display always
+  // runs with 1.
+  const specOn = uniform(1);
   const transA0 = uniform(-0.0105);
   const transA1 = uniform(0.0349);
   const transOn = uniform(0);
@@ -886,7 +894,8 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         );
       });
     });
-    return vec4(spectral(col.mul(exposure)), 1.0);
+    const lin = col.mul(exposure);
+    return vec4(mix(lin, spectral(lin), specOn), 1.0);
   });
 
   // QuadMesh remains only for the irradiance pass (a 1x1
@@ -957,6 +966,9 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // Refraction of the drawn disc: per-channel apparent
     // directions + vertical flattening (set from refraction.js).
     sunDisc: {dirR: sunDirR, dirB: sunDirB, flatten: sunFlat},
+    // The radiometric tap (see specOn above) - harness captures
+    // set 0 for the captured frame and restore.
+    spectralOn: specOn,
     // The sunset transfer LUT feed (see the band in domeColor).
     sunTransfer: {
       on: transOn,

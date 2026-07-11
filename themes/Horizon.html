@@ -9148,6 +9148,11 @@
             req.h,
             req.float ? {type: THREE.FloatType} : {}
           );
+          // __noSpectral (float radiometry): the captured frame
+          // skips the dome's display projection + gamut clip, so
+          // the readback is the raw spectral radiance (the clip is
+          // not invertible); the live canvas is untouched.
+          if (atmo.ok && window.__noSpectral) atmo.spectralOn.value = 0;
           renderer.setRenderTarget(rt);
           renderer.render(scene, camera);
           // Diagnostic capture (__noClouds, harness-only like the
@@ -9165,6 +9170,7 @@
             camera.layers.mask = mask;
           }
           renderer.setRenderTarget(null);
+          if (atmo.ok) atmo.spectralOn.value = 1;
           console.warn('capture: passes rendered, reading back');
           renderer
             .readRenderTargetPixelsAsync(rt, 0, 0, req.w, req.h)

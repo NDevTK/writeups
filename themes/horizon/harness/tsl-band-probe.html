@@ -214,9 +214,34 @@
           `set-sun ghost max |dR| ${ghost.toFixed(4)} (vs disc ${disc[0].toFixed(1)})`
         );
 
+        // Pass 3: the radiometric tap (spectralOn = 0) - the drawn
+        // pixel is RAW spectral radiance with no projection and no
+        // gamut clip, so ALL THREE channels (including the B the
+        // clip floors in display) must equal 120 T at the exact
+        // observer radius.
+        atmo.sunTransfer.sunTrue.value = SUN_ALT;
+        atmo.spectralOn.value = 0;
+        const b3 = await shoot();
+        atmo.sunTransfer.sunTrue.value = -0.013;
+        const b4 = await shoot();
+        atmo.spectralOn.value = 1;
+        const r0 = px(b3, W / 2, W / 2);
+        const rS = px(b4, W / 2, W / 2);
+        const rawDisc = [r0[0] - rS[0], r0[1] - rS[1], r0[2] - rS[2]];
+        const rawWant = texp.map((t) => t * 120);
+        let worstRaw = 0;
+        for (let c = 0; c < 3; c++)
+          worstRaw = Math.max(worstRaw, Math.abs(rawDisc[c] / rawWant[c] - 1));
+        log(
+          `raw tap disc ${rawDisc.map((v) => v.toFixed(4)).join(' ')} vs 120T ${rawWant
+            .map((v) => v.toFixed(4))
+            .join(' ')} worst RGB ${(worstRaw * 100).toFixed(2)}%`
+        );
+
         const pass =
           rowsOk &&
           worst < 0.01 &&
+          worstRaw < 0.01 &&
           !clipped &&
           c0[2] === 0 &&
           want[2] < 0 &&
