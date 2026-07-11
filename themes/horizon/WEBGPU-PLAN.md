@@ -3406,6 +3406,29 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (the flash rim made continuous, Jul 11): the rim - the
+  last rows where the 550 nm image persists past 680 nm's end -
+  is thinner than a pixel (0.4-1.1 px through this mirage), and
+  point sampling a sub-pixel band on a curved arc broke it into
+  dashes: measured on the SF float captures, 9 of 55 disc
+  columns had NO green-rim pixel. The exact treatment is the
+  codebase's own precedent (the horizon seam): the fragment
+  shows the BOX-FILTER INTEGRAL of the band term over its 2D
+  footprint - an 8x4 fwidth quadrature in (apparent altitude,
+  azimuth offset); the altitude taps ride the LUT's hardware
+  interpolation so 8 reads serve all 32 membership evaluations;
+  fwidth hoisted to uniform control flow (WGSL forbids
+  derivatives in the divergent branch). Measured: dashed
+  columns 9 -> 3 (vertical-only) -> 1 faint dip at 12% of the
+  mean (the 2D filter), per-column G-excess continuous, the
+  drawn rim visually unbroken. TESTED AND REJECTED: doubling
+  TRANS_ROWS to 320 - the rim's sub-pixel thickness does NOT
+  converge with row count (160/320/640/.../4000 all move it
+  60-97% vs each other; it sits at the precision limit of the
+  curve integrator itself) and 320 measurably THINNED the drawn
+  rim (9 faint columns). The footprint integral is what fixes
+  the dashing; the row count stays at the gate-proven 160.
+  Gate 56 sets + 3 GPU probes PASS.
 - DONE (flash radiometry + the phantom sub-horizon sun, Jul 11):
   pointed the float tap at the SF sunset replay (same cached
   forecast/aerosol). New harness introspection: \*\*profileLevels
