@@ -136,6 +136,12 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   // theme on profile/observer-height cadence (the curve is
   // sun-independent); transOn gates the whole path so high-sun
   // frames pay nothing.
+  // 160 rows was tested against 320/640/.../4000 on the SF mirage
+  // captures: the flash rim's sub-pixel thickness does NOT converge
+  // with row count - it sits at the precision limit of the curve
+  // integrator itself - and 320 measurably thinned the drawn rim.
+  // The pixel-footprint quadrature below is what keeps the rim
+  // continuous; the row count stays at the gate-proven value.
   const TRANS_ROWS = 160;
   const transTex = new DataTexture(
     new Float32Array(TRANS_ROWS * 4),
@@ -721,28 +727,59 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       .and(aFrag.greaterThan(transA0))
       .and(aFrag.lessThan(transA1))
       .and(cosAz.greaterThan(0.999));
+    // The fragment's footprint in altitude AND azimuth offset,
+    // materialised in UNIFORM control flow (WGSL forbids
+    // derivatives inside the divergent branch below).
+    const hOff = sinAz.mul(cos(aFrag));
+    const fwA = fwidth(aFrag).toVar();
+    const fwH = fwidth(hOff).toVar();
     If(inBand, () => {
-      const uT = aFrag.sub(transA0).div(transA1.sub(transA0));
-      const t4 = transNode.sample(vec2(uT, 0.5));
-      const t3 = t4.rgb;
       const discR = float(Math.acos(0.9999893));
-      const hOff = sinAz.mul(cos(aFrag));
-      const chanMu = (tc) => {
-        const vOff = tc.sub(sunTrueAlt);
-        const s2 = clamp(
-          vOff.mul(vOff).add(hOff.mul(hOff)).div(discR.mul(discR)),
-          0.0,
-          1.0
-        );
-        return sqrt(s2.oneMinus());
-      };
-      const limb = vec3(
-        pow(chanMu(t3.x), 0.4064),
-        pow(chanMu(t3.y), 0.5079),
-        pow(chanMu(t3.z), 0.6406)
-      );
+      // The flash rim (the last row where the 550 nm image
+      // persists past 680 nm's end) is thinner than a pixel, and
+      // point sampling a sub-pixel feature on a curved arc breaks
+      // it into dashes (measured: 9 of 55 disc columns lost their
+      // green rim pixel; a vertical-only filter still left 3 -
+      // mid-arc the boundary crosses pixels horizontally). Same
+      // treatment as the horizon seam below: the fragment shows
+      // the BOX-FILTER INTEGRAL of the band term over its own 2D
+      // footprint (fwidth in both apparent altitude and azimuth
+      // offset), as an 8x4 quadrature - the altitude taps ride the
+      // LUT's hardware interpolation (transmittance depends only
+      // on altitude, so 8 LUT reads serve all 32 membership
+      // evaluations), converging on the true pixel integral
+      // instead of approximating the edge with a smoothstep.
+      const TAPS_A = 8;
+      const TAPS_H = 4;
+      const acc = vec3(0.0).toVar();
+      for (let i = 0; i < TAPS_A; i++) {
+        const aS = aFrag.add(fwA.mul((i + 0.5) / TAPS_A - 0.5));
+        const uT = aS.sub(transA0).div(transA1.sub(transA0));
+        const t4 = transNode.sample(vec2(uT, 0.5));
+        for (let j = 0; j < TAPS_H; j++) {
+          const hS = hOff.add(fwH.mul((j + 0.5) / TAPS_H - 0.5));
+          const chanMu = (tc) => {
+            const vOff = tc.sub(sunTrueAlt);
+            const s2 = clamp(
+              vOff.mul(vOff).add(hS.mul(hS)).div(discR.mul(discR)),
+              0.0,
+              1.0
+            );
+            return sqrt(s2.oneMinus());
+          };
+          const limb = vec3(
+            pow(chanMu(t4.r), 0.4064),
+            pow(chanMu(t4.g), 0.5079),
+            pow(chanMu(t4.b), 0.6406)
+          );
+          acc.addAssign(limb.mul(t4.a));
+        }
+      }
       col.addAssign(
-        tTexNode.sample(tParamsToUv(r, v.y)).rgb.mul(limb).mul(t4.a).mul(120.0)
+        tTexNode
+          .sample(tParamsToUv(r, v.y))
+          .rgb.mul(acc)
+          .mul(120.0 / (TAPS_A * TAPS_H))
       );
     }).Else(() => {
       // When the transfer band is engaged, a fragment BELOW its
