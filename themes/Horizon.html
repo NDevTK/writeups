@@ -3200,14 +3200,21 @@
           'this wallpaper needs WebGPU - current Chrome, Edge, Firefox or Safari';
         throw new Error('WebGPU unavailable');
       }
+      // Harness diagnostic (?debug=1&webgl=1): run the SAME scene
+      // through three's WebGL backend - a completely different
+      // compiler chain (GLSL/ANGLE, no Dawn/Tint) on this
+      // container's software stack. Compute-driven subsystems
+      // (LUT fills, FFT ocean) degrade; the point is differential
+      // geometry forensics (the Nelson cone), not a usable sky.
+      const forceWebGL = params.has('debug') && params.has('webgl');
       const renderer = new THREE.WebGPURenderer({
         canvas,
-        forceWebGL: false,
+        forceWebGL,
         antialias: true
       });
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
       await renderer.init();
-      if (!renderer.backend.isWebGPUBackend) {
+      if (!forceWebGL && !renderer.backend.isWebGPUBackend) {
         document.getElementById('caption').textContent =
           'this wallpaper needs WebGPU - the adapter request failed';
         throw new Error('WebGPU adapter unavailable');
