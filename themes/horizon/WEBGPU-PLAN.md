@@ -3406,6 +3406,37 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (real sunspots on the drawn sun, Jul 11): the research-
+  first rebuild, shipped. Placement: carrington_longitude against
+  L0(t) at render time through Meeus ch. 29 (his example 29.a
+  emerges; the tested feed semantics reproduce BOTH agency
+  products - CMD -32.9 vs SRS "W33", -47.2 vs the feed's W47).
+  Photometry: Mathew 2007 Table 2 size-dependent fits anchor a
+  constant Delta-T shift of the Maltby 1986 Table 3 brightness-
+  temperature curve -> per-spot per-channel tints (deeper in
+  blue); umbral share from Jha 2018 (5.5); limb-darkening of
+  contrast and cycle phase ignored WITH CAUSE from the read
+  sources. Drawing: 4 texels/spot (position/radii, per-spot
+  foreshortening z, umbra+penumbra tint vec3s) multiplying the
+  limb-darkened high-sun disc with analytic edge coverage; the
+  mirage band's folded disc is documented out of scope. Probe
+  pass 4: a synthetic spot through the raw tap draws its fed
+  tint to 1% per channel (and re-taught the harness that the
+  high-sun path needs dirR/dirB fed). LIVE verification on
+  2026-07-11's actual sun (4 spotted regions, largest 330
+  millionths): the first capture caught a REAL SIGN BUG - the
+  drawn spots mirrored in h; the measured pattern matched
+  prediction only under an h flip plus one common rotation that
+  equalled the page's parallactic angle exactly (u x d vs d x u
+  in the shader's east basis). Fixed, re-captured: drawn vs
+  predicted positions agree to 0.003 disc radii (~3 arcsec) for
+  regions 4482 and 4487, with 4485/4481 present at their
+  foreshortened limb positions. Also learned: the pose aims
+  ~1.35 deg high systematically (corrected empirically for the
+  captures; root cause on the harness list), and clouds - the
+  measured 51% cover - hid the sun until the noclouds
+  diagnostic separated the layers. Gate 57 sets + 4 GPU probes
+  PASS.
 - RESEARCH LOG (frontier integrations, Jul 11): sources TESTED
   and papers READ before any code - a first sunspot attempt
   written from recalled citations was removed unlanded; the
