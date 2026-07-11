@@ -316,9 +316,13 @@ export function makeAircraftMaterials(MaterialClass, opts = {}) {
   };
   const lv = opts.livery || null;
   const body =
-    lv && lv.fuselage ? mk(lv.fuselage[0], lv.fuselage[1], lv.fuselage[2]) : mk(g, g, g * 1.02);
+    lv && lv.fuselage
+      ? mk(lv.fuselage[0], lv.fuselage[1], lv.fuselage[2])
+      : mk(g, g, g * 1.02);
   const tail =
-    lv && lv.tail ? mk(lv.tail[0], lv.tail[1], lv.tail[2]) : mk(g * 0.92, g * 0.92, g * 0.96);
+    lv && lv.tail
+      ? mk(lv.tail[0], lv.tail[1], lv.tail[2])
+      : mk(g * 0.92, g * 0.92, g * 0.96);
   return {
     body,
     wing: mk(g * 0.92, g * 0.92, g * 0.96),

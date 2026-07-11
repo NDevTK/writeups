@@ -5145,7 +5145,9 @@
       const airMatsFor = (code, lv) => {
         let m = airMatCache.get(code);
         if (!m) {
-          m = makeAircraftMaterials(THREE.MeshStandardNodeMaterial, {livery: lv});
+          m = makeAircraftMaterials(THREE.MeshStandardNodeMaterial, {
+            livery: lv
+          });
           for (const mat of Object.values(m)) aerial.apply(mat);
           airMatCache.set(code, m);
         }
@@ -5206,7 +5208,15 @@
           '25.1385 arcs · 25.1391 candela · 25.1401 strobes · Allard slant range'
         );
       }
-      function updateAirLight(hex, s, track, now_, type = '', cat = '', flight = '') {
+      function updateAirLight(
+        hex,
+        s,
+        track,
+        now_,
+        type = '',
+        cat = '',
+        flight = ''
+      ) {
         const slot =
           airLights.find((a) => a.active && a.hex === hex) ??
           airLights.find((a) => !a.active);
