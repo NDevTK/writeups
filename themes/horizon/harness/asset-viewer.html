@@ -344,6 +344,38 @@
             ...CHURCH_FIXTURE.elements // the Unterseen spire
           ]
         });
+        // ?facade=demo: a row of colour/material-tagged buildings to
+        // verify facade.js maps OSM tags to real wall/roof colours.
+        if (q.get('facade') === 'demo') {
+          const box = (i, tags) => {
+            const la = 46.688,
+              lo = 7.8605 + i * 0.00042; // ~32 m apart, east
+            const d = 8 / 111320; // ~16 m square
+            const dl = d / Math.cos((la * Math.PI) / 180);
+            return {
+              type: 'way',
+              id: 900000 + i,
+              geometry: [
+                [la - d, lo - dl],
+                [la - d, lo + dl],
+                [la + d, lo + dl],
+                [la + d, lo - dl],
+                [la - d, lo - dl]
+              ].map(([lat, lon]) => ({lat, lon})),
+              tags: {building: 'house', 'building:levels': '3', ...tags}
+            };
+          };
+          const demos = [
+            {'building:material': 'brick', 'roof:material': 'roof_tiles'},
+            {'building:colour': 'white', 'roof:material': 'slate'},
+            {'building:material': 'glass', 'roof:material': 'glass'},
+            {'building:colour': '#eecfaf', 'roof:colour': '#753e3a'},
+            {'building:material': 'wood', 'roof:material': 'thatch'},
+            {'building:material': 'concrete', 'roof:material': 'copper'},
+            {'building:colour': 'sandybrown', 'roof:colour': 'firebrick'}
+          ];
+          builds = parseBuildings({elements: demos.map((t, i) => box(i, t))});
+        }
         if (+q.get('n')) builds = builds.slice(0, +q.get('n')); // nearest-first
         const g = buildingsGeometry(
           builds,
