@@ -64,7 +64,12 @@ export function farRingGeometry({radiiU, nAz, mpu, centerElev, k, elevAt}) {
       const x = Math.sin(az) * r;
       const z = -Math.cos(az) * r;
       const eRaw = elevAt(x, z);
-      const e = eRaw - curvatureDrop(r * mpu, k);
+      // Terrarium carries bathymetry below the waterline; a coast
+      // meets the sea at the SURFACE, so sea vertices (which only
+      // survive inside shoreline triangles) clamp to 0 m before
+      // the drop - never to the seabed.
+      const e =
+        Math.max(eRaw, eRaw <= 0.3 ? 0 : eRaw) - curvatureDrop(r * mpu, k);
       const y = 16 * Math.asinh((e - centerElev) / 500);
       // The box's sea rule: at or below the waterline this is
       // open water - the ring does NOT draw it (the sky-view

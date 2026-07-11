@@ -111,13 +111,15 @@ const check = (name, ok, detail) => {
   // one azimuth quadrant carries 500 m, the rest is water.
   // Sea-only triangles vanish, every kept triangle touches land
   // (shorelines meet the water without gaps).
+  // The water carries real terrarium BATHYMETRY (-80 m here);
+  // shoreline sea corners must sit at the SURFACE, not the seabed.
   const isle = farRingGeometry({
     radiiU: radii,
     nAz: 8,
     mpu,
     centerElev,
     k,
-    elevAt: (x, z) => (x > 0 && z > 0 ? 500 : 0)
+    elevAt: (x, z) => (x > 0 && z > 0 ? 500 : -80)
   });
   let touchLand = true;
   for (let t = 0; t < isle.indices.length; t += 3) {
@@ -128,12 +130,22 @@ const check = (name, ok, detail) => {
     )
       touchLand = false;
   }
+  let surfOk = true;
+  for (let t = 0; t < isle.indices.length; t++) {
+    const vi = isle.indices[t];
+    if (!isle.sea[vi]) continue;
+    const r = radii[Math.floor(vi / 8)];
+    const want =
+      16 * Math.asinh((0 - curvatureDrop(r * mpu, k) - centerElev) / 500);
+    if (Math.abs(isle.positions[vi * 3 + 1] - want) > 1e-5) surfOk = false;
+  }
   check(
     'sea not drawn',
     isle.indices.length < g.indices.length &&
       touchLand &&
-      isle.indices.length > 0,
-    `the island fixture keeps ${isle.indices.length / 3} of ${g.indices.length / 3} triangles - every one touches land, the open water is left to the LUT's measured sea`
+      isle.indices.length > 0 &&
+      surfOk,
+    `the island fixture keeps ${isle.indices.length / 3} of ${g.indices.length / 3} triangles - every one touches land, the open water stays the LUT's measured sea, and every kept shoreline sea corner sits at the dropped SURFACE (0 m), never the -80 m seabed`
   );
 }
 
