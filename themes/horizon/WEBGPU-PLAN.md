@@ -3406,6 +3406,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- OPEN -> BUILD PLAN (the green flash and the mirage sun, Jul
+  11): refraction.js already ray-traces the MEASURED column
+  (Ciddor 1996 refractivity, Auer & Standish 2000 integral) but
+  the drawn disc consumes only THREE scalars - per-channel
+  centres + one flattening - so the Omega sun, mock-mirage
+  slicing and the mirage-MAGNIFIED flash (Young: most naked-eye
+  flashes are magnified green rims, not the bare 10-20 arcsec
+  dispersion) cannot appear. The upgrade is van der Werf's
+  transfer curve: trueAlt(a) = a - R(a) per wavelength, indexed
+  by APPARENT altitude a - single-valued in a (each observed
+  direction sees one ray; no fixed point), with mirage folds
+  appearing as NON-monotonicity (several a seeing the same true
+  altitude = multiple images). The curve is SUN-INDEPENDENT -
+  profile- and observer-height-keyed only - so a ~160-row CPU
+  LUT rebuilt on profile cadence feeds the dome shader, and the
+  sun's true altitude slides against it per frame: the disc
+  membership test per fragment row per channel REPLACES the
+  centre+flatten model inside a +-2 deg horizon band (the old
+  path stays above it). Landmarks: (1) identity with the
+  existing roundtrip at +2 deg; (2) fold count 0 under the
+  standard atmosphere; (3) inferior mirage - a superadiabatic
+  surface layer folds the curve below the horizon and the folded
+  branch's slope is NEGATIVE (the reflected image is inverted, a
+  physical requirement); (4) the DUCTING CRITERION EMERGES:
+  bisect the fold-onset inversion strength and match the closed
+  form (dn/dh = -n/r, the critical lapse ~+0.11 K/m from
+  Ciddor's own partials - never assumed); (5) flash
+  magnification: a mild inversion stretches the last green
+  sliver beyond the flat-atmosphere rim. Visual: sunset series
+  at a west-facing sea anchor through the fov telephoto.
 - DONE (the far horizon, Jul 11 - built, iterated through five
   Tasman Bay renders, merged): the ring exists exactly as
   planned below, plus four fixes the visuals forced: (1) open

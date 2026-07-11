@@ -242,25 +242,44 @@ export function refractionRad(
   // s = 0; the s = 0 node uses the analytic limit 2/sqrt(2K),
   // K = |n'|/n + 1/r).
   let hAnchor = h0;
+  let CRay = C;
   if (z0 > Math.PI / 2) {
-    // Tangent height: n(h) (R+h) = C, below the observer. Newton
-    // from h0; floored at the profile bottom (a ray aimed lower
-    // than the ground graze is occluded - the graze value is the
-    // physical limit of what can be seen).
-    let h = h0;
-    for (let i = 0; i < 30; i++) {
-      const n = nOf(h);
-      const f = n * (R_EARTH_M + h) - C;
-      const df = nPrime(h) * (R_EARTH_M + h) + n;
-      const step = f / df;
-      h -= step;
-      if (h < profile.h0) {
-        h = profile.h0;
+    // Tangent height: the FIRST h below the observer with
+    // n(h) (R+h) = C. Newton is unreliable here (f is
+    // non-monotone under an inversion and the root sits metres
+    // above the ground at the graze), so bracket by a downward
+    // scan and bisect. A ray whose tangent would be underground
+    // is occluded: the transfer saturates at the GRAZE ray -
+    // anchor at the profile bottom AND integrate with the graze
+    // ray's own Snell constant (keeping the aimed constant there
+    // integrates a ray that never existed and folds the curve
+    // artificially - the old Newton+floor did exactly that).
+    const hBot = profile.h0;
+    const f = (h) => nOf(h) * (R_EARTH_M + h) - CRay;
+    const STEPS = 240;
+    let hi = h0;
+    let lo = h0;
+    let found = false;
+    for (let i = 1; i <= STEPS; i++) {
+      lo = h0 - ((h0 - hBot) * i) / STEPS;
+      if (f(lo) <= 0) {
+        found = true;
         break;
       }
-      if (Math.abs(step) < 1e-4) break;
+      hi = lo;
     }
-    hAnchor = Math.min(h, h0);
+    if (found) {
+      for (let i = 0; i < 60; i++) {
+        const mid = (lo + hi) / 2;
+        if (f(mid) <= 0) lo = mid;
+        else hi = mid;
+        if (hi - lo < 1e-4) break;
+      }
+      hAnchor = (lo + hi) / 2;
+    } else {
+      hAnchor = hBot;
+      CRay = nOf(hBot) * (R_EARTH_M + hBot);
+    }
   }
   const hMax = profile.hTop + 45000; // refractivity ~1e-9 up there
   const leg = (hEnd) => {
@@ -277,7 +296,7 @@ export function refractionRad(
       const n = ciddorN(lambdaUm, sp.tC, sp.pPa, sp.rh ?? 0);
       const np = nPrime(h);
       const r = R_EARTH_M + h;
-      const sinz = Math.min(C / (n * r), 1);
+      const sinz = Math.min(CRay / (n * r), 1);
       const cosz = Math.sqrt(Math.max(1 - sinz * sinz, 0));
       let term;
       if (cosz < 1e-7) {
@@ -313,6 +332,65 @@ export function apparentAltitude(
     a = next;
   }
   return a;
+}
+
+/**
+ * The sunset transfer curve (van der Werf 2003's method): TRUE
+ * altitude as a function of APPARENT altitude, per wavelength.
+ * Indexed by the OBSERVED direction it is single-valued - each
+ * apparent altitude sees exactly one ray, trueAlt(a) = a - R(a),
+ * no fixed point - and mirage phenomenology appears as structure
+ * of the curve itself: an inferior mirage (superadiabatic surface
+ * layer) or a mock mirage (elevated inversion past the ducting
+ * lapse) folds it, several apparent altitudes seeing the SAME
+ * true altitude = multiple images, and the folded branch runs
+ * BACKWARD (the reflected image is inverted). The curve is
+ * SUN-INDEPENDENT - profile and observer height only - so the
+ * theme rebuilds its small LUT on profile cadence and the sun's
+ * true altitude slides against it every frame.
+ * Returns {a, tR, tG, tB} (radians; rows ascending in a).
+ */
+export function transferCurve(
+  profile,
+  obsHm = 0,
+  aMinRad = -0.6 * DEG,
+  aMaxRad = 2 * DEG,
+  rows = 160,
+  N = 200
+) {
+  const a = new Float64Array(rows);
+  const out = [
+    new Float64Array(rows),
+    new Float64Array(rows),
+    new Float64Array(rows)
+  ];
+  for (let i = 0; i < rows; i++) {
+    a[i] = aMinRad + ((aMaxRad - aMinRad) * i) / (rows - 1);
+    for (let c = 0; c < 3; c++)
+      out[c][i] = a[i] - refractionRad(a[i], profile, LAMBDAS_UM[c], obsHm, N);
+  }
+  return {a, tR: out[0], tG: out[1], tB: out[2]};
+}
+
+// Fold count of a transfer branch: the number of maximal
+// BACKWARD runs whose cumulative drop exceeds minDrop (radians) -
+// 0 for a single erect image, each counted run is an inverted
+// image. The threshold keeps integrator ripple (well under an
+// arcsecond) from reading as imagery.
+export function foldCount(t, minDrop = 5e-6) {
+  let folds = 0;
+  let drop = 0;
+  for (let i = 1; i < t.length; i++) {
+    const d = t[i] - t[i - 1];
+    if (d < 0) {
+      drop += -d;
+    } else if (drop > 0) {
+      if (drop > minDrop) folds++;
+      drop = 0;
+    }
+  }
+  if (drop > minDrop) folds++;
+  return folds;
 }
 
 // Everything the drawn sun needs, from one true altitude:

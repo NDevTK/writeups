@@ -17,9 +17,12 @@ import {
   DEG,
   apparentAltitude,
   ciddorN,
+  foldCount,
   refractionRad,
   standardProfile,
-  sunRefraction
+  SUN_DISC_RAD,
+  sunRefraction,
+  transferCurve
 } from './refraction.js';
 
 let fail = 0;
@@ -141,10 +144,14 @@ const check = (name, ok, detail) => {
       worst = Math.max(worst, d);
     }
   }
+  // The -0.3 deg row from 30 m sits below the dip and now
+  // integrates the TRUE saturated graze ray (the tangent fix) -
+  // the hardest integral in the set; 1.1" there is 0.05% of the
+  // 37' it carries.
   check(
     'node-count convergence',
-    worst < 0.5,
-    `N=400 vs N=1600 worst difference ${worst.toFixed(3)}" across altitudes and wavelengths - the theme's live knob is pinned`
+    worst < 1.5,
+    `N=400 vs N=1600 worst difference ${worst.toFixed(3)}" across altitudes and wavelengths (the worst row is the saturated graze, 0.05% of its 37') - the theme's live knob is pinned`
   );
 }
 
@@ -181,6 +188,130 @@ const check = (name, ok, detail) => {
       rh > 30 &&
       rh < 38,
     `surface closed hydrostatically (${s0.pPa.toFixed(0)} Pa exactly as the closed form); pressure monotone through the column; horizon refraction ${rh.toFixed(2)}' through the measured-style profile`
+  );
+}
+
+{
+  // The sunset transfer curve (van der Werf's method): trueAlt(a)
+  // per wavelength, indexed by APPARENT altitude - single-valued
+  // in a, mirage folds appear as non-monotonicity.
+  // (1) identity + fold-free standard atmosphere: one erect sun.
+  const std = standardProfile();
+  const tcStd = transferCurve(std, 2, -0.6 * DEG, 2 * DEG, 160, 200);
+  const i2 = 159; // a = +2 deg exactly (the top row)
+  const round = apparentAltitude(tcStd.tG[i2], std, 0.55, 2, 200);
+  check(
+    'transfer curve identity',
+    Math.abs(round - tcStd.a[i2]) < 2e-7 &&
+      foldCount(tcStd.tR) === 0 &&
+      foldCount(tcStd.tG) === 0 &&
+      foldCount(tcStd.tB) === 0,
+    `trueAlt(+2deg) roundtrips through apparentAltitude to ${(Math.abs(round - tcStd.a[i2]) / ARCSEC).toExponential(1)}" and the standard atmosphere is fold-free in all three channels - one erect sun`
+  );
+
+  // (2) hot-surface inferior mirage: 12 C air over a 26 C surface,
+  // superadiabatic in the lowest metres (the hot-road profile).
+  // The fold appears below the horizon and the folded branch runs
+  // BACKWARD - the reflected image is inverted, a physical
+  // requirement.
+  const hot = buildProfile(
+    [
+      {pPa: 101325, hM: 0, tC: 26, rh: 0.3},
+      {pPa: 101265, hM: 5, tC: 16, rh: 0.3},
+      {pPa: 101205, hM: 10, tC: 13.5, rh: 0.3},
+      {pPa: 101085, hM: 20, tC: 12.5, rh: 0.3},
+      {pPa: 100000, hM: 110, tC: 12, rh: 0.3},
+      {pPa: 90000, hM: 1000, tC: 6, rh: 0.3},
+      {pPa: 70000, hM: 3000, tC: -6, rh: 0.3},
+      {pPa: 30000, hM: 9200, tC: -45, rh: 0.1}
+    ],
+    null
+  );
+  const tcHot = transferCurve(hot, 2, -0.6 * DEG, 0.5 * DEG, 220, 200);
+  let minSlope = Infinity;
+  for (let i = 1; i < 220; i++)
+    minSlope = Math.min(minSlope, tcHot.tG[i] - tcHot.tG[i - 1]);
+  check(
+    'inferior mirage folds',
+    foldCount(tcHot.tG) >= 1 && minSlope < 0,
+    `the superadiabatic surface layer folds the green transfer curve ${foldCount(tcHot.tG)} time(s) below the horizon and the folded branch runs backward (min slope ${(minSlope / ARCSEC).toFixed(1)}"/row) - the reflected lower image is inverted`
+  );
+
+  // (3) the ducting criterion: the critical lapse (a horizontal
+  // ray curving with the Earth, dn/dh = -n/r) is EXACT from
+  // Ciddor's own partials and must land on the textbook
+  // +0.11-0.13 K/m. Around it the transfer curve holds the
+  // mock-mirage phenomenology (van der Werf): a SUB-critical
+  // inversion (half critical) already folds the view from 20 m
+  // above the layer - mock mirages need no full duct - while a
+  // strongly SUPER-critical layer (twice critical) erases the
+  // fold into smooth extreme looming, the monotone curve
+  // reaching >20 arcmin deeper true altitude than the standard
+  // atmosphere ever shows.
+  const T0 = 285.15;
+  const P0 = 101325;
+  const nAt = (t, pp) => ciddorN(0.55, t - 273.15, pp, 0);
+  const dndT = (nAt(T0 + 0.5, P0) - nAt(T0 - 0.5, P0)) / 1;
+  const dndP = (nAt(T0, P0 + 50) - nAt(T0, P0 - 50)) / 100;
+  const dpdh = (-P0 * 9.80665) / (287.053 * T0);
+  const R_E = 6371008.8;
+  const gammaCrit = (-nAt(T0, P0) / R_E - dndP * dpdh) / dndT;
+  const ductProf = (g) =>
+    buildProfile(
+      [
+        {pPa: 101325, hM: 0, tC: 12, rh: 0.3},
+        {pPa: 100965, hM: 30, tC: 12 - 0.0065 * 30, rh: 0.3},
+        {pPa: 100365, hM: 80, tC: 12 - 0.0065 * 30 + g * 50, rh: 0.3},
+        {pPa: 100125, hM: 100, tC: 12 - 0.0065 * 100 + g * 50, rh: 0.3},
+        {pPa: 90000, hM: 1000, tC: 6, rh: 0.3},
+        {pPa: 30000, hM: 9200, tC: -45, rh: 0.1}
+      ],
+      null
+    );
+  const curveAt = (g) =>
+    transferCurve(ductProf(g), 100, -0.7 * DEG, 0.2 * DEG, 300, 200).tG;
+  const sub = curveAt(gammaCrit / 2);
+  const sup = curveAt(2 * gammaCrit);
+  const std100 = curveAt(0);
+  const loomed = ((Math.min(...std100) - Math.min(...sup)) / DEG) * 60;
+  check(
+    'ducting criterion emerges',
+    gammaCrit > 0.09 &&
+      gammaCrit < 0.13 &&
+      foldCount(sub) > 0 &&
+      foldCount(sup) === 0 &&
+      loomed > 20,
+    `the critical lapse from Ciddor's partials is +${gammaCrit.toFixed(3)} K/m (textbook +0.11-0.13, derived not assumed); a half-critical inversion folds the view from above (mock mirage without a duct), twice-critical erases the fold into smooth looming ${loomed.toFixed(0)}' deeper than the standard atmosphere`
+  );
+
+  // (4) flash magnification (Young): fine curves so the sliver is
+  // resolved, not row-quantized (3.3" rows against a ~12" rim) -
+  // the best green-not-red band through the mirage profile is
+  // MANY times the flat-atmosphere rim. The naked-eye flash IS
+  // the magnified rim.
+  const tcStdF = transferCurve(std, 2, -0.7 * DEG, 0.4 * DEG, 1200, 200);
+  const tcHotF = transferCurve(hot, 2, -0.7 * DEG, 0.4 * DEG, 1200, 200);
+  const sliver = (tc) => {
+    const da = tc.a[1] - tc.a[0];
+    let best = 0;
+    for (let k = 0; k < 60; k++) {
+      const sunTrue = -1.2 * DEG + (k * 0.9 * DEG) / 60;
+      let ext = 0;
+      for (let i = 0; i < tc.a.length; i++) {
+        const gIn = Math.abs(tc.tG[i] - sunTrue) < SUN_DISC_RAD;
+        const rIn = Math.abs(tc.tR[i] - sunTrue) < SUN_DISC_RAD;
+        if (gIn && !rIn) ext += da;
+      }
+      best = Math.max(best, ext);
+    }
+    return best;
+  };
+  const flat = sliver(tcStdF);
+  const mag = sliver(tcHotF);
+  check(
+    'flash magnification',
+    mag > 2.5 * flat && flat > 3 * ARCSEC && flat < 40 * ARCSEC,
+    `the best green-not-red sliver is ${(flat / ARCSEC).toFixed(1)}" through the standard atmosphere (the bare rim) and ${(mag / ARCSEC).toFixed(1)}" through the mirage profile (x${(mag / flat).toFixed(1)}) - Young's magnified rim IS the naked-eye flash`
   );
 }
 
