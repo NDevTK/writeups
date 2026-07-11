@@ -745,7 +745,18 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         tTexNode.sample(tParamsToUv(r, v.y)).rgb.mul(limb).mul(t4.a).mul(120.0)
       );
     }).Else(() => {
-      If(cSunG.greaterThan(0.9998), () => {
+      // When the transfer band is engaged, a fragment BELOW its
+      // floor is below the observer's geometric dip (the theme
+      // extends the floor under the horizon) - sea, never sun.
+      // Without this gate the graze-saturated apparent direction
+      // parks the set sun's disc just under the dip, where this
+      // unoccluded path painted it onto the LUT sea (caught by the
+      // SF flash float captures). Above the band's ceiling (a
+      // rising sun leaving the band) this path still draws.
+      const elseDisc = cSunG
+        .greaterThan(0.9998)
+        .and(transOn.lessThan(0.5).or(aFrag.greaterThanEqual(transA0)));
+      If(elseDisc, () => {
         const sin2R = 1 - 0.9999893 * 0.9999893;
         const chanMu = (dir) => {
           const cS = dot(v, dir);
