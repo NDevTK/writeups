@@ -565,6 +565,53 @@ export function parseNdvi(j) {
   };
 }
 
+// ---- Land colour: MODIS surface reflectance (ORNL DAAC MOD09A1) -
+// The measured-colour feed: MOD09A1 (Terra, 500 m, 8-day, atmospheric-
+// ally corrected surface reflectance) visible bands b03/b04/b01 for the
+// cell over the point, so the terrain colour is the MEASURED reflectance
+// (surface-color.js integrates the three bands through CIE), not one
+// inferred from NDVI. Same ORNL host and two-step (/dates then /subset)
+// posture as /ndvi; URLs built HERE from the snapped cell + resolved
+// date + a fixed band name only. MOD09A1 is raw SR, not BRDF-normalised
+// NBAR (MCD43A4 is not point-queryable on ORNL). The cell snap is
+// ndviCell (0.01 deg - the model lives once).
+const MOD09_BANDS = {
+  blue: 'sur_refl_b03',
+  green: 'sur_refl_b04',
+  red: 'sur_refl_b01'
+};
+const ORNL_MOD09A1 = 'https://modis.ornl.gov/rst/api/v1/MOD09A1';
+
+export function surfaceDatesUrl(cell) {
+  return `${ORNL_MOD09A1}/dates?latitude=${cell.lat}&longitude=${cell.lon}`;
+}
+
+export function surfaceUrl(cell, date, band) {
+  return (
+    `${ORNL_MOD09A1}/subset?latitude=${cell.lat}&longitude=${cell.lon}` +
+    `&startDate=${date}&endDate=${date}&band=${band}` +
+    '&kmAboveBelow=0&kmLeftRight=0'
+  );
+}
+
+// null = unusable response (-> 502); {refl: null} = a real no-measure
+// answer (empty subset over ocean/off-land, or a fill/out-of-range
+// pixel). MOD09A1 stores reflectance*1e-4 over the valid range
+// -100..16000; the -28672 fill and anything outside read null, and a
+// small negative reflectance is clamped up to 0.
+export function parseSurface(j) {
+  if (!j || !Array.isArray(j.subset)) return null;
+  const s = j.subset[0];
+  if (!s) return {refl: null, date: null};
+  if (!Array.isArray(s.data) || typeof s.data[0] !== 'number') return null;
+  const raw = s.data[0];
+  const ok = raw >= -100 && raw <= 16000;
+  return {
+    refl: ok ? Math.max(0, raw * 1e-4) : null,
+    date: typeof s.calendar_date === 'string' ? s.calendar_date : null
+  };
+}
+
 // ---- Aircraft: readsb failover from a clean IP -----------------
 // All three speak readsb v2 ({ac:[...]}, feet/knots) and feed the
 // reference-gated normalize(). Order preferred by data richness;
@@ -914,6 +961,7 @@ function main() {
   const aerosolCache = new Map(); // 0.25-deg cell key -> {t, body}
   const chlorCache = new Map(); // 1/12-deg cell key -> {t, body}
   const ndviCache = new Map(); // 0.01-deg cell key -> {t, body}
+  const surfaceCache = new Map(); // 0.01-deg cell key -> {t, body}
   setInterval(() => {
     const now = Date.now();
     for (const [k, v] of adsbCache) if (now - v.t > 30e3) adsbCache.delete(k);
@@ -925,6 +973,8 @@ function main() {
       if (now - v.t > 12 * 3600e3) chlorCache.delete(k);
     for (const [k, v] of ndviCache)
       if (now - v.t > 12 * 3600e3) ndviCache.delete(k);
+    for (const [k, v] of surfaceCache)
+      if (now - v.t > 12 * 3600e3) surfaceCache.delete(k);
   }, 30e3).unref();
 
   // Measured aerosol radiative properties: GEFS-Aerosols (NOAA's
@@ -1079,6 +1129,74 @@ function main() {
     } catch {
       ndviState.errors++;
       ndviCache.set(key, {t: Date.now(), body: null});
+      return null;
+    }
+  }
+  // Measured land colour for the 0.01-deg cell over the point: the three
+  // MOD09A1 visible bands (blue/green/red) at the latest 8-day composite
+  // (date resolved once, cached 6 h; the calendar is global). One
+  // upstream call per band - three per cell - assembled into a reflect-
+  // ance triple; successes cache 12 h, failures 10 min.
+  const surfaceState = {fetches: 0, errors: 0, date: '', calDate: ''};
+  const surfaceDateCache = {t: 0, date: ''};
+  async function resolveSurfaceDate() {
+    if (surfaceDateCache.date && Date.now() - surfaceDateCache.t < 6 * 3600e3)
+      return surfaceDateCache.date;
+    try {
+      const r = await fetch(surfaceDatesUrl(NDVI_DATE_REF), {
+        signal: AbortSignal.timeout(FETCH_MS),
+        headers: {'user-agent': UA}
+      });
+      if (!r.ok) throw new Error('ornl mod09 dates ' + r.status);
+      const date = ndviDate(await r.json()); // same Ayyyyddd calendar shape
+      if (!date) throw new Error('ornl mod09 dates shape');
+      surfaceDateCache.t = Date.now();
+      surfaceDateCache.date = date;
+      surfaceState.date = date;
+      return date;
+    } catch {
+      surfaceState.errors++;
+      return surfaceDateCache.date || null;
+    }
+  }
+  async function fetchSurface(lat, lon) {
+    const date = await resolveSurfaceDate();
+    if (!date) return null;
+    const cell = ndviCell(lat, lon);
+    const key = cell.lat + '/' + cell.lon;
+    const hit = surfaceCache.get(key);
+    if (hit && Date.now() - hit.t < (hit.body ? 720 : 10) * 60e3)
+      return hit.body;
+    try {
+      surfaceState.fetches++;
+      const opt = {
+        signal: AbortSignal.timeout(15e3),
+        headers: {'user-agent': UA}
+      };
+      const [blue, green, red] = await Promise.all(
+        [MOD09_BANDS.blue, MOD09_BANDS.green, MOD09_BANDS.red].map(
+          async (b) => {
+            const r = await fetch(surfaceUrl(cell, date, b), opt);
+            if (!r.ok) throw new Error('ornl mod09 ' + r.status);
+            const p = parseSurface(await r.json());
+            if (!p) throw new Error('ornl mod09 shape');
+            return p;
+          }
+        )
+      );
+      if (blue.date) surfaceState.calDate = blue.date;
+      const body = {
+        blue: blue.refl,
+        green: green.refl,
+        red: red.refl,
+        date: blue.date,
+        cell
+      };
+      surfaceCache.set(key, {t: Date.now(), body});
+      return body;
+    } catch {
+      surfaceState.errors++;
+      surfaceCache.set(key, {t: Date.now(), body: null});
       return null;
     }
   }
@@ -1256,6 +1374,13 @@ function main() {
         fetches: ndviState.fetches,
         errors: ndviState.errors
       };
+      const surfaceHealth = {
+        cells: surfaceCache.size,
+        date: surfaceState.calDate,
+        composite: surfaceState.date,
+        fetches: surfaceState.fetches,
+        errors: surfaceState.errors
+      };
       if (url.pathname === '/health')
         return json(
           200,
@@ -1280,6 +1405,7 @@ function main() {
           aerosol: aerosolHealth,
           chlor: chlorHealth,
           ndvi: ndviHealth,
+          surface: surfaceHealth,
           probe: await probeAll()
         },
         {'cache-control': 'no-store'}
@@ -1414,6 +1540,19 @@ function main() {
       return json(200, body, {
         'cache-control': 'public, max-age=3600',
         'x-ndvi-source': 'NASA MODIS MOD13Q1 (ORNL DAAC)'
+      });
+    }
+
+    if (url.pathname === '/surface') {
+      // Measured land colour: the three MOD09A1 visible-band reflect-
+      // ances (blue/green/red) in the 0.01-deg cell over the point.
+      // A null triple with a 200 is a real answer (water/off-land/fill);
+      // 502 means the upstream itself failed.
+      const body = await fetchSurface(lat, lon);
+      if (!body) return json(502, {blue: null, upstream: 'unavailable'});
+      return json(200, body, {
+        'cache-control': 'public, max-age=3600',
+        'x-surface-source': 'NASA MODIS MOD09A1 surface reflectance (ORNL DAAC)'
       });
     }
 

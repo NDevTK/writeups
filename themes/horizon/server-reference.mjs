@@ -37,6 +37,9 @@ import {
   ndviDatesUrl,
   ndviUrl,
   ndviDate,
+  parseSurface,
+  surfaceDatesUrl,
+  surfaceUrl,
   prune,
   pruneStrikes,
   aisBox,
@@ -444,6 +447,47 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       parseNdvi({}) === null &&
       parseNdvi({subset: [{data: []}]}) === null,
     `date resolves to the latest composite A2026145; cell snaps to 0.01 deg (45/-90), idempotent, poles/antimeridian clamp inside; /dates + /subset URLs pinned to the ORNL MOD13Q1 service with the snapped cell + date only; live Wisconsin 0.6813 and Sahara 0.096 parse exact; empty subset (ocean/off-land) and -3000 fill / out-of-range -> ndvi null (real no-measure, 200); non-numeric/malformed -> null (502)`
+  );
+}
+
+{
+  // Measured land colour (/surface): the pure pieces held to the LIVE
+  // ORNL DAAC MOD09A1 responses recorded when the source was pinned
+  // (2026-07-11, composite A2026169 / 2026-06-18): Sahara (23,13)
+  // sur_refl_b01 raw 4248 -> 0.4248; the -28672 fill and empty subset
+  // -> refl null (real no-measure).
+  const band = (raw, b = 'sur_refl_b01') => ({
+    subset: [
+      {
+        modis_date: 'A2026169',
+        calendar_date: '2026-06-18',
+        band: b,
+        data: [raw]
+      }
+    ]
+  });
+  const cell = ndviCell(23.0, 13.0);
+  const u = surfaceUrl(cell, 'A2026169', 'sur_refl_b01');
+  const PIN =
+    'https://modis.ornl.gov/rst/api/v1/MOD09A1/subset?latitude=23&longitude=13' +
+    '&startDate=A2026169&endDate=A2026169&band=sur_refl_b01&kmAboveBelow=0&kmLeftRight=0';
+  const red = parseSurface(band(4248));
+  check(
+    'surface reflectance (/surface)',
+    surfaceDatesUrl(cell) ===
+      'https://modis.ornl.gov/rst/api/v1/MOD09A1/dates?latitude=23&longitude=13' &&
+      u === PIN &&
+      Math.abs(red.refl - 0.4248) < 1e-9 &&
+      red.date === '2026-06-18' &&
+      Math.abs(parseSurface(band(2460, 'sur_refl_b04')).refl - 0.246) < 1e-9 &&
+      parseSurface(band(-28672)).refl === null &&
+      parseSurface(band(16001)).refl === null &&
+      parseSurface(band(-50)).refl === 0 && // small negative clamps up to 0
+      parseSurface({subset: []}).refl === null &&
+      parseSurface({subset: []}).date === null &&
+      parseSurface(band('x')) === null &&
+      parseSurface({}) === null,
+    `/dates + /subset URLs pinned to the ORNL MOD09A1 service with the snapped cell + date + band only; live Sahara red 0.4248 and green 0.246 parse exact; -28672 fill and out-of-range -> refl null, small negative clamps to 0; empty subset (ocean) -> null refl (200); non-numeric/malformed -> null (502)`
   );
 }
 

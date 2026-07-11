@@ -465,7 +465,10 @@
         pixelOf
       } from './horizon/nightlights.js';
       import {chromaticity, waterColorLinear} from './horizon/ocean-color.js';
-      import {landColorLinear, REFERENCE_NDVI} from './horizon/land-color.js';
+      import {
+        surfaceColorLinear,
+        REFERENCE_REFLECTANCE
+      } from './horizon/surface-color.js';
       import {
         attribute as tslAttribute,
         cameraPosition as tslCameraPosition,
@@ -2904,48 +2907,51 @@
         }
       }
 
-      // Land colour from MEASURED greenness - the terrestrial twin of
-      // the ocean-colour feed. The daemon returns the MODIS MOD13Q1
-      // NDVI (250 m, 16-day composite) for the cell over the view;
-      // vegetation.js (Carlson & Ripley fractional cover -> soil/canopy
-      // reflectance mixture) and the CIE integration (land-color.js,
-      // the SAME D65 + 1931 2-deg observer the sea uses) turn it into a
-      // linear-sRGB grass albedo, applied as a tint on the terrain's
-      // base grass ramp (uGrassTint). The tint is relative to the tuned
-      // reference cell, so a full canopy leaves the look unchanged and
-      // an arid cell reads brown - from the physics, not a painted
-      // class colour. ?ndvi=X pins the index (the deterministic A/B
-      // knob); ?ndvisrc=URL overrides the endpoint.
-      const NDVI_PROXY = params.get('ndvisrc') ?? 'https://api.ndev.tk/ndvi';
-      const NDVI_REF_RGB = landColorLinear(REFERENCE_NDVI); // exposure anchor
-      function applyNdvi(ndvi, note) {
-        const rgb = landColorLinear(ndvi);
+      // Land colour from MEASURED surface reflectance - the direct land
+      // analogue of the ocean-colour feed. The daemon returns the three
+      // MODIS MOD09A1 visible bands (blue/green/red, 500 m, 8-day) for
+      // the cell over the view; surface-color.js integrates them through
+      // the SAME D65 + 1931 2-deg observer the sea uses into a linear-
+      // sRGB albedo, applied as a tint on the terrain's base grass ramp
+      // (uGrassTint) relative to a canonical-grass reference - so a
+      // desert reads its real bright tan, a boreal forest its real dark
+      // green, a cropland its olive, from the MEASURED colour rather
+      // than one inferred from an index. ?surf=b,g,r pins a reflectance
+      // triple (the deterministic A/B knob); ?surfsrc=URL overrides the
+      // endpoint.
+      const SURFACE_PROXY =
+        params.get('surfsrc') ?? 'https://api.ndev.tk/surface';
+      const SURF_REF_RGB = surfaceColorLinear(...REFERENCE_REFLECTANCE);
+      function applySurface(blue, green, red, note) {
+        const rgb = surfaceColorLinear(blue, green, red);
         const tint = [
-          rgb[0] / NDVI_REF_RGB[0],
-          rgb[1] / NDVI_REF_RGB[1],
-          rgb[2] / NDVI_REF_RGB[2]
+          rgb[0] / SURF_REF_RGB[0],
+          rgb[1] / SURF_REF_RGB[1],
+          rgb[2] / SURF_REF_RGB[2]
         ];
         if (!terrainUniforms?.uGrassTint) return;
         terrainUniforms.uGrassTint.value.fromArray(tint);
         record(
-          'MODIS/NDVI land colour',
-          'NDVI ' +
-            ndvi.toFixed(3) +
+          'MODIS surface colour',
+          'refl ' +
+            [blue, green, red].map((v) => v.toFixed(3)).join('/') +
             ' · tint ' +
             tint.map((v) => v.toFixed(2)).join('/') +
             (note ? ' · ' + note : '')
         );
       }
-      async function syncNdvi() {
-        // Pinned index: deterministic, no fetch (harness A/B).
-        if (params.has('ndvi')) {
-          applyNdvi(Math.max(0, Math.min(1, +params.get('ndvi'))), 'pinned');
+      async function syncSurface() {
+        // Pinned reflectance triple: deterministic, no fetch (harness A/B).
+        if (params.has('surf')) {
+          const t = params.get('surf').split(',').map(Number);
+          if (t.length === 3 && t.every((v) => v >= 0))
+            applySurface(t[0], t[1], t[2], 'pinned');
           return;
         }
         try {
           const r = await (
             await fetch(
-              NDVI_PROXY +
+              SURFACE_PROXY +
                 '?lat=' +
                 state.lat.toFixed(3) +
                 '&lon=' +
@@ -2953,10 +2959,14 @@
               {credentials: 'omit'}
             )
           ).json();
-          if (typeof r.ndvi === 'number' && r.ndvi > 0)
-            applyNdvi(r.ndvi, r.date || '');
-          // ndvi null (200) is water / off-land: the terrain keeps its
-          // tuned grass colour.
+          if (
+            typeof r.blue === 'number' &&
+            typeof r.green === 'number' &&
+            typeof r.red === 'number'
+          )
+            applySurface(r.blue, r.green, r.red, r.date || '');
+          // A null triple (200) is water / off-land: the terrain keeps
+          // its tuned grass colour.
         } catch {
           // Network down: the tuned grass colour stands.
         }
@@ -6940,7 +6950,7 @@
         syncAerosol();
         syncWater();
         syncChlor();
-        syncNdvi();
+        syncSurface();
         syncBuildings();
         syncRoads();
         syncRivers();
@@ -9435,10 +9445,10 @@
         // poll (matching the /chlor cache) more than covers it.
         syncChlor();
         setInterval(syncChlor, 60 * 60 * 1000);
-        // NDVI is a 16-day composite; the same hourly poll (matching the
-        // /ndvi cache) more than covers it.
-        syncNdvi();
-        setInterval(syncNdvi, 60 * 60 * 1000);
+        // MOD09A1 is an 8-day composite; the same hourly poll (matching
+        // the /surface cache) more than covers it.
+        syncSurface();
+        setInterval(syncSurface, 60 * 60 * 1000);
         syncBuildings();
         syncRoads();
         syncRivers();
