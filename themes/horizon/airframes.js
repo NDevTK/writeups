@@ -272,7 +272,9 @@ export function buildAircraft(group, dims, mats, hash = 0, U = 1) {
   const fin = new Group();
   fin.position.set(0, rF * 0.6, finZ);
   fin.rotation.x = -0.5; // rake the fin aft
-  box(fin, rF * 0.14, finH, L * 0.12, mats.wing, 0, finH / 2, 0);
+  // the vertical fin carries the airline's tail colour (the surface a
+  // spotter reads); stabilisers stay in the wing tone
+  box(fin, rF * 0.14, finH, L * 0.12, mats.tail || mats.wing, 0, finH / 2, 0);
   group.add(fin);
   const tTail = cls === 'bizjet';
   const stabY = tTail ? rF * 0.6 + finH * 0.92 : rF * 0.5;
@@ -296,7 +298,10 @@ export function buildAircraft(group, dims, mats, hash = 0, U = 1) {
 }
 
 // A small material set in the caller's material class. tint (0..1)
-// nudges the fuselage brightness so a fleet is not uniform.
+// nudges the fuselage brightness so a fleet is not uniform. opts.livery
+// (airline.js {tail, fuselage}) paints the tail fin the airline's brand
+// colour - and its fuselage where the carrier's is not white - so a
+// plane reads by its airline; without it the airframe is neutral light.
 export function makeAircraftMaterials(MaterialClass, opts = {}) {
   const tint = opts.tint ?? 0;
   const g = 0.82 - tint * 0.16;
@@ -309,9 +314,15 @@ export function makeAircraftMaterials(MaterialClass, opts = {}) {
     }
     return m;
   };
+  const lv = opts.livery || null;
+  const body =
+    lv && lv.fuselage ? mk(lv.fuselage[0], lv.fuselage[1], lv.fuselage[2]) : mk(g, g, g * 1.02);
+  const tail =
+    lv && lv.tail ? mk(lv.tail[0], lv.tail[1], lv.tail[2]) : mk(g * 0.92, g * 0.92, g * 0.96);
   return {
-    body: mk(g, g, g * 1.02),
+    body,
     wing: mk(g * 0.92, g * 0.92, g * 0.96),
+    tail,
     engine: mk(0.3, 0.31, 0.34),
     glass: mk(0.1, 0.14, 0.22),
     prop: mk(0.22, 0.22, 0.24, 0.5)
