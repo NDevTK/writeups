@@ -3430,13 +3430,20 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   ends. VERIFIED: the full Rotterdam descent series through the
   measured evening profile - flattening emerging from the curve,
   the dip cutting the disc, the last sliver at 20:06:16.
-  Tonight's near-standard profile keeps the rim at 1 px (x1);
-  the VISIBLE flash is a live-weather event like the aurora -
-  the capability waits for a magnifying inversion (California's
-  marine layer is the classic) and the saturated sunset sky is
-  the other constraint (the 8-bit capture clips red at the
-  horizon; a flash-night check should also read the sliver
-  radiometrically).
+  Tonight's near-standard Rotterdam profile kept the rim at 1 px
+  (x1) - and then California DELIVERED: San Francisco's measured
+  marine inversion (15.2 -> 24.9 C across 1000 -> 950 hPa, the
+  live forecast column) ran the full Young sequence through the
+  same code, unscripted - the sun LOOMED past its Rotterdam
+  setting depth (half-disc at -0.95 true), FOLDED into a double
+  sun at 03:38:30 (the inverted second image of the mock
+  mirage), and at 03:39:00 the detached mirage-merged sliver
+  flashed yellow-green (G/R 0.95 inside the sliver vs 0.45 in
+  the surrounding sky; the red-saturated 8-bit sky is why the
+  hue reads yellow-green rather than pure green - a radiometric
+  float readback on a flash night would show the clean signal).
+  The same frames carry the far ring's Farallon Islands at
+  43 km. Sequence delivered.
   The original plan, for the record:
 - (plan) the green flash and the mirage sun (Jul
   11): refraction.js already ray-traces the MEASURED column
