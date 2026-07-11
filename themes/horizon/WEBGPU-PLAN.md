@@ -3406,6 +3406,31 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (the float radiometric capture, Jul 11): the harness
+  capture bracket (?debug=1 **capture) takes a float flag and
+  renders the SAME multi-pass frame into a FloatType target -
+  a linear radiometric tap. The dome and sky objects write raw
+  HDR radiance (x exposure, no tone map), so the readback
+  carries what 8-bit presentation clamps at 1.0 and crushes at
+  night; **roam.centerElev is exported so the harness can
+  mirror camH-dependent physics at the exact observer altitude.
+  MEASURED with it (Interlaken, live data, fov-5 telephoto):
+  (1) the rendered sun disc's radial profile reproduces
+  Hestroffer & Magnan mu^a PER CHANNEL to 0.36/0.45/0.57% RMS
+  (r < 0.9R) with the disc radius PREDICTED from the capture
+  geometry and the spectral projection INVERTED on the pixels -
+  the display matrix wiring verified end-to-end through the
+  GPU; (2) the disc centre's channel ratios equal the Hillaire
+  transmittance integral run on the SAME cached GEFS-Aerosols
+  response at the exact 1623 m observer: R/G +0.138%, B/G
+  -0.177%, and the implied exposure comes out one common scalar
+  across channels (18.64/18.61/18.58) as a single uniform must;
+  (3) disc centre 2080/1903/1670 in linear units - 2912:1 over
+  the adjacent sky, unrepresentable in 8 bits; (4) a night
+  frame re-exposed +3 EV after capture reveals the 557.7 nm
+  airglow wash, the Milky Way band and the van Rhijn horizon
+  brightening that the 8-bit snap crushes to black. Gate 56
+  sets + 3 GPU probes PASS.
 - DONE (the teal noon stratum -> the spectral display
   projection, Jul 11): built exactly as diagnosed below.
   spectral-srgb.js: the CIE 1931 2-deg CMF rows at 680/550/440

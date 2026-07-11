@@ -3285,9 +3285,14 @@
         window.__scene = scene;
         window.__cam = camera;
         window.__THREE = THREE;
-        window.__capture = (w, h) =>
+        // float=true renders the same pass bracket into a FloatType
+        // target: a linear radiometric tap. The dome and sky objects
+        // write raw HDR radiance (x exposure, no tone map), so the
+        // readback carries the values 8-bit presentation clamps at 1
+        // and crushes at night - measurable, not just viewable.
+        window.__capture = (w, h, float) =>
           new Promise((res) => {
-            captureReq = {w, h, res};
+            captureReq = {w, h, float: !!float, res};
           });
       }
       camera.layers.enable(2);
@@ -6799,6 +6804,13 @@
         },
         get anchor() {
           return {lat: state.lat, lon: state.lon};
+        },
+        // The box's elevation datum: scene y = 16 asinh((h -
+        // centerElev)/500). The harness needs it to convert posed
+        // camera heights and to mirror camH-dependent physics (the
+        // radiometric checks) at the EXACT observer altitude.
+        get centerElev() {
+          return centerElev;
         }
       };
 
@@ -9106,7 +9118,11 @@
           // full composited frame.
           const req = captureReq;
           captureReq = null;
-          const rt = new THREE.RenderTarget(req.w, req.h);
+          const rt = new THREE.RenderTarget(
+            req.w,
+            req.h,
+            req.float ? {type: THREE.FloatType} : {}
+          );
           renderer.setRenderTarget(rt);
           renderer.render(scene, camera);
           // Diagnostic capture (__noClouds, harness-only like the
