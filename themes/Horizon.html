@@ -4319,9 +4319,10 @@
           dM.mul(1.98).div(tslMax(uFarVis, 400)).pow(2).negate()
         );
         const ndl = tslMax(tslDot(tslNormalWorld, uFarSunDir), 0);
-        const lit = uFarAlbedo
-          .mul(uFarSunCol.mul(ndl).add(uFarSkyIrr))
-          .mul(1 / Math.PI);
+        // three's light convention premultiplies pi into the light
+        // units (the box terrain's own Lambert is albedo x NdotL x
+        // light with no explicit /pi) - the ring matches it.
+        const lit = uFarAlbedo.mul(uFarSunCol.mul(ndl).add(uFarSkyIrr));
         m.colorNode = tslMix(
           atmo.ok ? atmo.skyRadiance(tslNormalize(view)) : tslVec3(0, 0, 0),
           lit,
