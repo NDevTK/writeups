@@ -376,6 +376,40 @@
           ];
           builds = parseBuildings({elements: demos.map((t, i) => box(i, t))});
         }
+        // ?roofs=demo: one building per roof:shape to verify the
+        // roof geometry (gabled/hipped/half-hipped/pyramidal/skillion/
+        // flat), a uniform light colour so the shape reads.
+        if (q.get('roofs') === 'demo') {
+          const box2 = (i, tags) => {
+            const la = 46.688,
+              lo = 7.8605 + i * 0.0005; // ~38 m apart
+            const d = 9 / 111320;
+            const dl = (d * 1.6) / Math.cos((la * Math.PI) / 180); // oblong
+            return {
+              type: 'way',
+              id: 910000 + i,
+              geometry: [
+                [la - d, lo - dl],
+                [la - d, lo + dl],
+                [la + d, lo + dl],
+                [la + d, lo - dl],
+                [la - d, lo - dl]
+              ].map(([lat, lon]) => ({lat, lon})),
+              tags: {building: 'yes', 'building:levels': '3', ...tags}
+            };
+          };
+          const shapes = [
+            'gabled',
+            'hipped',
+            'half-hipped',
+            'pyramidal',
+            'skillion',
+            'flat'
+          ];
+          builds = parseBuildings({
+            elements: shapes.map((s, i) => box2(i, {'roof:shape': s}))
+          });
+        }
         if (+q.get('n')) builds = builds.slice(0, +q.get('n')); // nearest-first
         const g = buildingsGeometry(
           builds,

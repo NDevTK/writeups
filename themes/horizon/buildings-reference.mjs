@@ -16,7 +16,9 @@ import {
   heightOf,
   LEVEL_M,
   minAreaRect,
-  parseBuildings
+  parseBuildings,
+  ROOF_SHAPE,
+  roofShape
 } from './buildings.js';
 import {BUILDINGS_FIXTURE, CHURCH_FIXTURE} from './buildings-fixture.mjs';
 import {geoToScene} from './roam.js';
@@ -332,6 +334,96 @@ const builds = parseBuildings(BUILDINGS_FIXTURE);
       cMax > ridgeTop + 6 * U &&
       cDown === 0,
     `the notched 6-vertex house rides a real ridge (${sloped} sloped roof normals, none down); the Unterseen church (13 m ladder height) raises its spire ${((cMax - 10) / U).toFixed(1)} m over the ground, well above its ridge`
+  );
+}
+
+{
+  // roof:shape - the tag resolves to a builder (aliases folded onto
+  // the nearest silhouette), and every builder emits a real roof:
+  // sloped, snow-bearing faces above the wall top, NONE facing down.
+  const resOk =
+    roofShape({'roof:shape': 'hipped'}) === 'hipped' &&
+    roofShape({'roof:shape': 'half-hipped'}) === 'half_hipped' && // hyphen
+    roofShape({'roof:shape': 'pyramidal'}) === 'pyramidal' &&
+    roofShape({'roof:shape': 'skillion'}) === 'skillion' &&
+    roofShape({'roof:shape': 'pitched'}) === 'gabled' && // alias
+    roofShape({'roof:shape': 'mansard'}) === 'hipped' && // alias
+    roofShape({'roof:shape': 'dome'}) === 'pyramidal' && // alias
+    roofShape({'roof:shape': 'lean_to'}) === 'skillion' && // alias
+    Object.values(ROOF_SHAPE).every((v) =>
+      [
+        'flat',
+        'gabled',
+        'hipped',
+        'half_hipped',
+        'pyramidal',
+        'skillion'
+      ].includes(v)
+    ) &&
+    // an untagged non-house footprint stays flat; a house filling its
+    // rectangle takes the gabled default
+    roofShape({}, false, 0.9) === 'flat' &&
+    roofShape({}, true, 0.9) === 'gabled';
+
+  // A 20 x 12 m rectangle under each explicit shape: build it and
+  // check the roof.
+  const anc = {lat: 46.6863, lon: 7.8632};
+  const U = 7 / 400;
+  const dLa = 10 / 111320;
+  const dLo = 6 / (111320 * Math.cos((46.6863 * Math.PI) / 180));
+  const rect = (shape) => ({
+    type: 'way',
+    id: 1,
+    geometry: [
+      [46.6863 - dLa, 7.8632 - dLo],
+      [46.6863 - dLa, 7.8632 + dLo],
+      [46.6863 + dLa, 7.8632 + dLo],
+      [46.6863 + dLa, 7.8632 - dLo],
+      [46.6863 - dLa, 7.8632 - dLo]
+    ].map(([lat, lon]) => ({lat, lon})),
+    tags: {building: 'yes', height: '10', 'roof:shape': shape}
+  });
+  let allGood = resOk;
+  let worst = resOk ? '' : 'resolution';
+  const wallTop = 10 + 10 * U; // groundY 10 + height
+  for (const shape of ['hipped', 'half-hipped', 'pyramidal', 'skillion']) {
+    const builds = parseBuildings({elements: [rect(shape)]});
+    const g = buildingsGeometry(
+      builds,
+      anc,
+      () => 10,
+      () => 0,
+      U,
+      140
+    );
+    let down = 0;
+    let slopedRoof = 0;
+    let peak = -Infinity;
+    for (let i = 0; i < g.count; i++) {
+      const ny = g.normal[3 * i + 1];
+      if (ny < -1e-6) down++;
+      if (g.roof[i] === 1 && ny > 0.05) slopedRoof++;
+      peak = Math.max(peak, g.position[3 * i + 1]);
+    }
+    const good =
+      builds[0].shape === roofShape(rect(shape).tags) &&
+      g.placed === 1 &&
+      down === 0 && // nothing inside-out
+      slopedRoof >= 6 && // real sloped roof faces (>= 2 triangles)
+      peak > wallTop + 0.2 * U; // a ridge/apex above the walls
+    if (!good) {
+      allGood = false;
+      worst = `${shape} (down=${down} sloped=${slopedRoof} peak>${(
+        peak - wallTop
+      ).toFixed(3)})`;
+    }
+  }
+  check(
+    'roof shapes',
+    allGood,
+    allGood
+      ? 'hipped/half-hipped/pyramidal/skillion each build sloped snow-bearing roofs above the walls with nothing facing down; aliases fold onto the six builders'
+      : `bad ${worst}`
   );
 }
 
