@@ -715,7 +715,8 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       .and(cosAz.greaterThan(0.999));
     If(inBand, () => {
       const uT = aFrag.sub(transA0).div(transA1.sub(transA0));
-      const t3 = transNode.sample(vec2(uT, 0.5)).rgb;
+      const t4 = transNode.sample(vec2(uT, 0.5));
+      const t3 = t4.rgb;
       const discR = float(Math.acos(0.9999893));
       const hOff = sinAz.mul(cos(aFrag));
       const chanMu = (tc) => {
@@ -733,7 +734,7 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         pow(chanMu(t3.z), 0.6406)
       );
       col.addAssign(
-        tTexNode.sample(tParamsToUv(r, v.y)).rgb.mul(limb).mul(120.0)
+        tTexNode.sample(tParamsToUv(r, v.y)).rgb.mul(limb).mul(t4.a).mul(120.0)
       );
     }).Else(() => {
       If(cSunG.greaterThan(0.9998), () => {
@@ -846,7 +847,9 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
           d[i * 4] = curve.tR[i];
           d[i * 4 + 1] = curve.tG[i];
           d[i * 4 + 2] = curve.tB[i];
-          d[i * 4 + 3] = 1;
+          // Alpha = visibility: rows whose rays run into the
+          // surface show sea, not sun.
+          d[i * 4 + 3] = curve.vis ? curve.vis[i] : 1;
         }
         transTex.needsUpdate = true;
         transA0.value = curve.a[0];

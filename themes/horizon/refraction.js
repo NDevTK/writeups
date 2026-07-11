@@ -364,12 +364,29 @@ export function transferCurve(
     new Float64Array(rows),
     new Float64Array(rows)
   ];
+  // Visibility: an apparent direction whose ray runs into the
+  // surface shows GROUND, not sky - the Snell constant tells
+  // directly (the ray still points down at the profile bottom
+  // when C < n r there), so those rows carry vis = 0 and the
+  // drawn sun ends exactly at the true sea horizon, wherever the
+  // drawn water plane happens to end.
+  const vis = new Uint8Array(rows);
+  const h0 = Math.max(obsHm, profile.h0);
+  const sG = profile.at(h0);
+  const n0 = ciddorN(LAMBDAS_UM[1], sG.tC, sG.pPa, sG.rh ?? 0);
+  const sB = profile.at(profile.h0);
+  const nBotRBot =
+    ciddorN(LAMBDAS_UM[1], sB.tC, sB.pPa, sB.rh ?? 0) *
+    (R_EARTH_M + profile.h0);
   for (let i = 0; i < rows; i++) {
     a[i] = aMinRad + ((aMaxRad - aMinRad) * i) / (rows - 1);
+    const z0 = Math.PI / 2 - a[i];
+    const C = n0 * (R_EARTH_M + h0) * Math.sin(Math.min(z0, Math.PI));
+    vis[i] = a[i] >= 0 || z0 <= Math.PI / 2 || C >= nBotRBot ? 1 : 0;
     for (let c = 0; c < 3; c++)
       out[c][i] = a[i] - refractionRad(a[i], profile, LAMBDAS_UM[c], obsHm, N);
   }
-  return {a, tR: out[0], tG: out[1], tB: out[2]};
+  return {a, tR: out[0], tG: out[1], tB: out[2], vis};
 }
 
 // Fold count of a transfer branch: the number of maximal
