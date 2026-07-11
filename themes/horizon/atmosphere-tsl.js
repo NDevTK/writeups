@@ -25,6 +25,7 @@ import {
   atan,
   clamp,
   cos,
+  cross,
   dot,
   exp,
   float,
@@ -40,6 +41,7 @@ import {
   pow,
   select,
   sin,
+  smoothstep,
   sqrt,
   texture,
   textureStore,
@@ -189,6 +191,28 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   bandTTex.minFilter = LinearFilter;
   bandTTex.needsUpdate = true;
   const bandTNode = texture(bandTTex);
+  // Real sunspots (sunspots.js: SWPC regions through Meeus ch. 29,
+  // photometry from Mathew 2007 anchored on Maltby 1986 - see that
+  // module's header for the read sources). FOUR texels per spot:
+  //   A (v, h, rU, on)   B (foreshorten z, rP, 0, 0)
+  //   C (umbra RGB, 0)   D (penumbra RGB, 0)
+  // v/h in solar radii in the local vertical frame; tints are
+  // per-spot per-channel intensity ratios to the photosphere
+  // (size-dependent - a single value is "a very poor
+  // approximation", Mathew 2007). Drawn in the high-sun disc path
+  // only; the mirage band's folded disc is documented out of scope
+  // (spots there sit under 8x magnified turbulence and extinction).
+  const SPOTS_MAX = 8;
+  const spotsTex = new DataTexture(
+    new Float32Array(SPOTS_MAX * 4 * 4),
+    SPOTS_MAX * 4,
+    1,
+    RGBAFormat,
+    FloatType
+  );
+  spotsTex.magFilter = spotsTex.minFilter = LinearFilter;
+  spotsTex.needsUpdate = true;
+  const spotsNode = texture(spotsTex);
   let lastCurve = null;
   function fillBandT() {
     if (!lastCurve) return;
@@ -889,8 +913,63 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
           pow(chanMu(sunDirW), 0.5079),
           pow(chanMu(sunDirB), 0.6406)
         );
+        // Sunspots multiply the limb-darkened photosphere (the spot
+        // sits in the same limb-darkened environment). Fragment
+        // disc coordinates in the local vertical frame, in solar
+        // radii; the vertical shares the disc's refraction
+        // flattening. Each spot is a circle ON THE SPHERE, so its
+        // radial axis foreshortens by its own z; edges get analytic
+        // pixel coverage from the hoisted footprint (fwidth is
+        // illegal in this divergent branch).
+        const sinR = Math.sqrt(1 - 0.9999893 * 0.9999893);
+        const upW = normalize(
+          vec3(0.0, 1.0, 0.0)
+            .sub(sunDirW.mul(sunDirW.y))
+            .add(vec3(0.0, 0.0, 1e-9))
+        );
+        const eastW = normalize(cross(upW, sunDirW));
+        const offW = v.sub(sunDirW.mul(dot(v, sunDirW)));
+        const vN = dot(offW, upW).div(sunFlat).div(sinR);
+        const hN = dot(offW, eastW).div(sinR);
+        const aa = fwA.div(sinR).max(1e-4);
+        const spotF = vec3(1.0).toVar();
+        for (let i = 0; i < SPOTS_MAX; i++) {
+          const W = SPOTS_MAX * 4;
+          const sA = spotsNode.sample(vec2((4 * i + 0.5) / W, 0.5));
+          const sB = spotsNode.sample(vec2((4 * i + 1.5) / W, 0.5));
+          const sC = spotsNode.sample(vec2((4 * i + 2.5) / W, 0.5));
+          const sD = spotsNode.sample(vec2((4 * i + 3.5) / W, 0.5));
+          const rho = max(sA.xy.length(), 1e-4);
+          const rx = sA.x.div(rho);
+          const ry = sA.y.div(rho);
+          const dv = vN.sub(sA.x);
+          const dh = hN.sub(sA.y);
+          const zSh = max(sB.x, 0.05);
+          const dRad = dv.mul(rx).add(dh.mul(ry)).div(zSh);
+          const dTan = dh.mul(rx).sub(dv.mul(ry));
+          const rr = sqrt(dRad.mul(dRad).add(dTan.mul(dTan)));
+          const covU = smoothstep(
+            sA.z.sub(aa.mul(0.5)),
+            sA.z.add(aa.mul(0.5)),
+            rr
+          )
+            .oneMinus()
+            .mul(sA.w);
+          const covP = smoothstep(
+            sB.y.sub(aa.mul(0.5)),
+            sB.y.add(aa.mul(0.5)),
+            rr
+          )
+            .oneMinus()
+            .mul(sA.w);
+          spotF.mulAssign(mix(mix(vec3(1.0), sD.rgb, covP), sC.rgb, covU));
+        }
         col.addAssign(
-          tTexNode.sample(tParamsToUv(r, v.y)).rgb.mul(limb).mul(120.0)
+          tTexNode
+            .sample(tParamsToUv(r, v.y))
+            .rgb.mul(limb)
+            .mul(spotF)
+            .mul(120.0)
         );
       });
     });
@@ -966,6 +1045,30 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // Refraction of the drawn disc: per-channel apparent
     // directions + vertical flattening (set from refraction.js).
     sunDisc: {dirR: sunDirR, dirB: sunDirB, flatten: sunFlat},
+    // Real sunspots: the theme feeds buildSpots() output (sunspots
+    // .js). Empty list (or omission) clears the disc.
+    sunSpots: {
+      set(list) {
+        const d = spotsTex.image.data;
+        d.fill(0);
+        (list || []).slice(0, SPOTS_MAX).forEach((sp, i) => {
+          const o = i * 16;
+          d[o] = sp.v;
+          d[o + 1] = sp.h;
+          d[o + 2] = sp.rU;
+          d[o + 3] = 1;
+          d[o + 4] = sp.shorten ?? 1;
+          d[o + 5] = sp.rP;
+          d[o + 8] = sp.umbra[0];
+          d[o + 9] = sp.umbra[1];
+          d[o + 10] = sp.umbra[2];
+          d[o + 12] = sp.penumbra[0];
+          d[o + 13] = sp.penumbra[1];
+          d[o + 14] = sp.penumbra[2];
+        });
+        spotsTex.needsUpdate = true;
+      }
+    },
     // The radiometric tap (see specOn above) - harness captures
     // set 0 for the captured frame and restore.
     spectralOn: specOn,

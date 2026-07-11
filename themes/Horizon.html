@@ -316,6 +316,7 @@
     <script type="module">
       import * as THREE from 'three';
       import {sunTransmittanceJS} from './horizon/sun-transmittance.js';
+      import {buildSpots, parallacticAngle} from './horizon/sunspots.js';
       import {applySpectral} from './horizon/spectral-srgb.js';
       import {createAtmosphereTSL} from './horizon/atmosphere-tsl.js';
       import {
@@ -2544,6 +2545,43 @@
       // line intensities via PALACE Eq. 1. PALACE regressed on
       // centred 27-day averages; live we take the trailing 27-day
       // mean of the SWPC feed (~3 reports/day, newest first).
+      // Real sunspots: NOAA SWPC's numbered regions (a 30-day
+      // history; heliographic position + corrected group area).
+      // Placement runs in the astro block below through sunspots.js
+      // - carrington_longitude against L0(t), the tested-semantics
+      // route that never goes a day stale.
+      async function syncSolarRegions() {
+        try {
+          const rows = await (
+            await fetch(
+              'https://services.swpc.noaa.gov/json/solar_regions.json',
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (!Array.isArray(rows) || !rows.length) return;
+          state.solarRegions = rows;
+          const latest = rows.reduce(
+            (a, r) => (r.observed_date > a ? r.observed_date : a),
+            ''
+          );
+          const todays = rows.filter(
+            (r) => r.observed_date === latest && +r.area > 0
+          );
+          const big = todays.reduce((a, r) => Math.max(a, +r.area || 0), 0);
+          record(
+            'NOAA SWPC solar regions',
+            todays.length +
+              ' spotted regions (' +
+              latest +
+              ') · largest ' +
+              big +
+              ' millionths · Meeus ch. 29 placement · Mathew/Maltby photometry'
+          );
+        } catch {
+          // no data - the disc stays spotless
+        }
+      }
+
       async function syncF107() {
         if (params.has('f107')) {
           airglowU.uLineI.value.fromArray(lineStrengths(+params.get('f107')));
@@ -6898,6 +6936,33 @@
             const hMoon = AE.Horizon(d, obs, eqMoon.ra, eqMoon.dec, 'normal');
             astro.sun = {alt: hSun.altitude * RAD, az: hSun.azimuth * RAD};
             astro.moon = {alt: hMoon.altitude * RAD, az: hMoon.azimuth * RAD};
+            // Sunspot feed (1 Hz astro cadence, re-placed every
+            // minute): the sun's parallactic angle orients the disc
+            // in the local vertical frame; placement itself is
+            // carrington_longitude vs L0(now) inside buildSpots.
+            if (atmo.ok && atmo.sunSpots && state.solarRegions) {
+              const refeed = state.solarRegions !== astro.spotsSrc;
+              if (refeed || t - (astro.spotsAt || 0) > 60e3) {
+                astro.spotsSrc = state.solarRegions;
+                astro.spotsAt = t;
+                const gastH = AE.SiderealTime(d);
+                const haRad =
+                  ((((gastH + state.lon / 15 - eqSun.ra) * 15 * Math.PI) / 180 +
+                    3 * Math.PI) %
+                    (2 * Math.PI)) -
+                  Math.PI;
+                const qDeg =
+                  (parallacticAngle(
+                    haRad,
+                    (state.lat * Math.PI) / 180,
+                    (eqSun.dec * Math.PI) / 180
+                  ) *
+                    180) /
+                  Math.PI;
+                const jdUT = 2440587.5 + d.getTime() / 86400000;
+                atmo.sunSpots.set(buildSpots(state.solarRegions, jdUT, qDeg));
+              }
+            }
             // True apparent size: the moon disc scales with its real
             // distance (supermoon vs apogee is a visible ~7%).
             const distKm = AE.GeoMoon(d).Length() * AE.KM_PER_AU;
@@ -9216,6 +9281,8 @@
         syncShips();
         setInterval(syncShips, 120 * 1000);
         syncF107();
+        syncSolarRegions();
+        setInterval(syncSolarRegions, 6 * 3600e3);
         setInterval(syncF107, 6 * 60 * 60 * 1000);
         syncKp();
         setInterval(syncKp, 15 * 60 * 1000);
