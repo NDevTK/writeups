@@ -324,7 +324,13 @@
       } from './horizon/clouds-tsl.js';
       import {createAerialFog} from './horizon/aerial-tsl.js';
       import {createTerrainNodeMaterial} from './horizon/terrain-tsl.js';
-      import {ARCHETYPES, fitArchetype, mod09Clear} from './horizon/ross-li.js';
+      import {
+        ARCHETYPES,
+        fitArchetype,
+        fitRTLSR,
+        mod09Clear,
+        wsaAlbedo
+      } from './horizon/ross-li.js';
       import {shadowRate, sigmaScale, vRms} from './horizon/cn2.js';
       import {EYE_D_CM, youngSigma} from './horizon/scintillation.js';
       import {buildMomentPyramid, slopesFromHeights} from './horizon/leadr.js';
@@ -2339,9 +2345,29 @@
       // persistent cloud - the state-word QC keeps only cloud-,
       // shadow-, snow- and heavy-aerosol-free land) leaves the
       // grass Lambertian, and says so.
+      let landWSA = null; // measured [R,G,B] white-sky albedo (or null)
       async function syncBrdf() {
         const key =
-          'horizon-brdf-' + state.lat.toFixed(2) + ',' + state.lon.toFixed(2);
+          'horizon-brdf2-' + state.lat.toFixed(2) + ',' + state.lon.toFixed(2);
+        // The box's measured ground albedo for the atmosphere's
+        // Hillaire ground term: full RTLSR inversion (fitRTLSR, the
+        // operational MCD43 retrieval) per MODIS band 1/4/3 over the
+        // same clear record, white-sky albedo by the Lucht
+        // integrals - [R,G,B] at the nearest measured narrowbands
+        // to the 680/550/440 nm channels. No inversion -> null, and
+        // the ground term stays dark rather than invented.
+        const applyWSA = (wsa, n, cached) => {
+          if (!wsa) return;
+          landWSA = wsa;
+          record(
+            'MOD09A1 white-sky albedo' + (cached ? ' (cached)' : ''),
+            'RGB ' +
+              wsa.map((v) => v.toFixed(3)).join('/') +
+              ' · RTLSR full inversion (Lucht 2000) · ' +
+              n +
+              ' clear obs · feeds the sky ground bounce'
+          );
+        };
         const apply = (fit, n, cached) => {
           const w = ARCHETYPES.red[fit.k];
           terrainUniforms.uRossW.value.set(w.iso, w.vol, w.geo);
@@ -2367,8 +2393,9 @@
           const hit = JSON.parse(localStorage.getItem(key));
           // One MOD09A1 compositing period is 8 days.
           if (hit && Date.now() - hit.t < 8 * 864e5) {
-            apply(hit.fit, hit.n, true);
-            return;
+            if (hit.fit) apply(hit.fit, hit.n, true);
+            applyWSA(hit.wsa, hit.n, true);
+            if (hit.fit || hit.wsa) return;
           }
         } catch {}
         try {
@@ -2380,6 +2407,8 @@
           if (!Array.isArray(dr.dates)) return;
           const md = dr.dates.map((d) => d.modis_date).slice(-60);
           const obs = [];
+          const obsB = []; // band 3 (459-479 nm) -> blue channel
+          const obsG = []; // band 4 (545-565 nm) -> green channel
           // The subset endpoint caps one request at 10 composites.
           for (let i = 0; i < md.length; i += 10) {
             const span =
@@ -2388,32 +2417,52 @@
               '&endDate=' +
               md[Math.min(i + 9, md.length - 1)];
             const rs = await Promise.all(
-              ['b01', 'szen', 'vzen', 'raz', 'state_500m'].map((b) =>
-                fetch(
-                  base +
-                    '/subset?' +
-                    q +
-                    '&band=sur_refl_' +
-                    b +
-                    span +
-                    '&kmAboveBelow=0&kmLeftRight=0',
-                  {credentials: 'omit'}
-                ).then((r) => r.json())
+              ['b01', 'b03', 'b04', 'szen', 'vzen', 'raz', 'state_500m'].map(
+                (b) =>
+                  fetch(
+                    base +
+                      '/subset?' +
+                      q +
+                      '&band=sur_refl_' +
+                      b +
+                      span +
+                      '&kmAboveBelow=0&kmLeftRight=0',
+                    {credentials: 'omit'}
+                  ).then((r) => r.json())
               )
             );
             for (let j = 0; j < rs[0].subset.length; j++) {
-              const [r, sz, vz, ra, st] = rs.map((x) => x.subset[j].data[0]);
+              const [r, r3, r4, sz, vz, ra, st] = rs.map(
+                (x) => x.subset[j].data[0]
+              );
               const refl = r * 1e-4; // stored scale 0.0001
               if (!mod09Clear(st) || refl <= 0 || refl > 1) continue;
-              obs.push({
-                r: refl,
+              const g = {
                 ti: sz * 0.01 * RAD, // angles stored in 0.01 deg
                 tv: vz * 0.01 * RAD,
                 phi: ra * 0.01 * RAD
-              });
+              };
+              obs.push({r: refl, ...g});
+              // Same clear look, the green and blue narrowbands -
+              // for the per-channel white-sky albedo inversion.
+              if (r3 * 1e-4 > 0 && r3 * 1e-4 <= 1)
+                obsB.push({r: r3 * 1e-4, ...g});
+              if (r4 * 1e-4 > 0 && r4 * 1e-4 <= 1)
+                obsG.push({r: r4 * 1e-4, ...g});
             }
           }
           const fit = fitArchetype(obs, 'red');
+          // Per-channel white-sky albedo: all three bands must
+          // invert (the 7-obs full-inversion rule and the physical
+          // guards live in fitRTLSR) or none feed - a two-channel
+          // albedo would be invented colour.
+          const wR = fitRTLSR(obs);
+          const wG = fitRTLSR(obsG);
+          const wB = fitRTLSR(obsB);
+          const wsa =
+            wR && wG && wB
+              ? [wsaAlbedo(wR), wsaAlbedo(wG), wsaAlbedo(wB)]
+              : null;
           if (!fit) {
             // Too few clear looks: Lambertian stays - and the panel
             // proves the source was consulted, not skipped.
@@ -2421,13 +2470,15 @@
               'MODIS MOD09A1 BRDF',
               obs.length + ' clear obs of 60 - Lambertian fallback'
             );
-            return;
+          } else {
+            apply(fit, obs.length, false);
           }
-          apply(fit, obs.length, false);
+          applyWSA(wsa, obs.length, false);
+          if (!fit && !wsa) return;
           try {
             localStorage.setItem(
               key,
-              JSON.stringify({t: Date.now(), fit, n: obs.length})
+              JSON.stringify({t: Date.now(), fit, n: obs.length, wsa})
             );
           } catch {}
         } catch {
@@ -7175,7 +7226,7 @@
             mieRad,
             Math.max(eCam, 50),
             skyExposure,
-            water ? 0.06 : 0
+            water ? 0.06 : landWSA || 0
           );
           // Aerial perspective shares the dome's exposure so inscattered
           // light on the terrain matches the sky it comes from.

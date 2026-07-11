@@ -262,6 +262,84 @@ export function mod09Clear(state) {
  * runner-up RMSE gap - or null when the series cannot separate
  * anything (fewer than 4 clear observations).
  */
+/**
+ * Full RTLSR inversion - the OPERATIONAL MCD43 retrieval (Lucht,
+ * Schaaf & Strahler 2000, sec. III: linear least squares of
+ * R = f_iso + f_vol Kvol + f_geo Kgeo over the clear multi-angular
+ * record, BASE kernels as the product uses). ORNL's open subset
+ * API serves the MOD09A1 record globally but the MCD43 weights
+ * only at fixed sites, so the same published inversion runs here
+ * on the same observations the archetype fit already pulls.
+ * Rules mirror the product: a full inversion needs at least 7
+ * clear observations (the MCD43 full-inversion threshold); the
+ * normal matrix must be well-conditioned (degenerate repeated
+ * geometry refuses rather than extrapolating); and the retrieved
+ * set must be physical (f_iso and both integrated albedos inside
+ * (0, 1)). Returns {iso, vol, geo, rmse} or null.
+ */
+export function fitRTLSR(obs) {
+  if (!obs || obs.length < 7) return null;
+  // Normal equations A^T A x = A^T r for A rows [1, Kvol, Kgeo].
+  let s11 = 0;
+  let s12 = 0;
+  let s13 = 0;
+  let s22 = 0;
+  let s23 = 0;
+  let s33 = 0;
+  let b1 = 0;
+  let b2 = 0;
+  let b3 = 0;
+  const rows = obs.map((o) => {
+    const kv = rossThick(o.ti, o.tv, o.phi);
+    const kg = liSparseR(o.ti, o.tv, o.phi);
+    s11 += 1;
+    s12 += kv;
+    s13 += kg;
+    s22 += kv * kv;
+    s23 += kv * kg;
+    s33 += kg * kg;
+    b1 += o.r;
+    b2 += o.r * kv;
+    b3 += o.r * kg;
+    return [kv, kg];
+  });
+  const det =
+    s11 * (s22 * s33 - s23 * s23) -
+    s12 * (s12 * s33 - s23 * s13) +
+    s13 * (s12 * s23 - s22 * s13);
+  // Conditioning: identical geometries make the system rank-1; the
+  // determinant of the normal matrix scales with the cube of its
+  // magnitude, so gate it against that scale, not a bare epsilon.
+  const scale = Math.cbrt(Math.abs(s11 * s22 * s33)) || 1;
+  if (!(Math.abs(det) > 1e-9 * scale * scale * scale)) return null;
+  const iso =
+    ((s22 * s33 - s23 * s23) * b1 +
+      (s13 * s23 - s12 * s33) * b2 +
+      (s12 * s23 - s13 * s22) * b3) /
+    det;
+  const vol =
+    ((s13 * s23 - s12 * s33) * b1 +
+      (s11 * s33 - s13 * s13) * b2 +
+      (s12 * s13 - s11 * s23) * b3) /
+    det;
+  const geo =
+    ((s12 * s23 - s13 * s22) * b1 +
+      (s12 * s13 - s11 * s23) * b2 +
+      (s11 * s22 - s12 * s12) * b3) /
+    det;
+  const w = {iso, vol, geo};
+  const wsa = wsaAlbedo(w);
+  const bsa45 = bsaAlbedo(w, Math.PI / 4);
+  if (!(iso > 0 && iso < 1 && wsa > 0 && wsa < 1 && bsa45 > 0 && bsa45 < 1))
+    return null;
+  let sse = 0;
+  for (let j = 0; j < obs.length; j++) {
+    const e = obs[j].r - (iso + vol * rows[j][0] + geo * rows[j][1]);
+    sse += e * e;
+  }
+  return {iso, vol, geo, rmse: Math.sqrt(sse / obs.length)};
+}
+
 export function fitArchetype(obs, band = 'red') {
   if (obs.length < 4) return null;
   let best = null;

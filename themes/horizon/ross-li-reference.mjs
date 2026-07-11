@@ -23,6 +23,7 @@ import {
   brf,
   dirNorm,
   fitArchetype,
+  fitRTLSR,
   G_GEO,
   G_VOL,
   gaussLegendre,
@@ -32,6 +33,7 @@ import {
   mod09Clear,
   rossThick,
   rossThickMaignan,
+  wsaAlbedo,
   wsaKernel,
   XI0
 } from './ross-li.js';
@@ -288,6 +290,61 @@ const check = (name, ok, detail) => {
       'red'
     ) === null,
     'fewer than 4 clear observations returns null (Lambertian fallback)'
+  );
+}
+
+{
+  // Full RTLSR inversion (fitRTLSR) - the operational MCD43
+  // retrieval run on the same MOD09A1 record. Landmarks: (1) a
+  // synthetic record generated FROM a known weight set at the
+  // measured Grindelwald geometries inverts to EXACTLY that set
+  // (the system is linear - recovery is fp-exact) and its
+  // white-sky albedo matches the Lucht-integral value; (2) the
+  // MCD43 full-inversion floor: 6 observations refuse; (3)
+  // degenerate geometry (one sun/view pose repeated) is rank-1 -
+  // the conditioning gate refuses rather than extrapolating.
+  const szen = [
+    47.51, 49.2, 50.47, 44.57, 39.91, 34.69, 33.21, 32.71, 37.87, 41.06
+  ];
+  const vzen = [
+    46.15, 22.68, 39.26, 20.95, 44.2, 58.29, 57.63, 57.3, 13.95, 20.03
+  ];
+  const raz = [
+    149.45, 151.39, -21.71, 155.51, 154.95, 155.1, 158.67, 159.99, 167.58,
+    -10.69
+  ];
+  const geom = szen.map((s, j) => ({
+    ti: deg(s),
+    tv: deg(vzen[j]),
+    phi: deg(raz[j])
+  }));
+  const w0 = {iso: 0.31, vol: 0.12, geo: 0.045};
+  const obs = geom.map((g) => ({...g, r: brf(w0, g.ti, g.tv, g.phi, false)}));
+  const fit = fitRTLSR(obs);
+  const worst =
+    fit &&
+    Math.max(
+      Math.abs(fit.iso - w0.iso),
+      Math.abs(fit.vol - w0.vol),
+      Math.abs(fit.geo - w0.geo)
+    );
+  check(
+    'RTLSR full inversion',
+    fit && worst < 1e-10 && Math.abs(wsaAlbedo(fit) - wsaAlbedo(w0)) < 1e-10,
+    fit
+      ? `planted {0.31, 0.12, 0.045} recovered to ${worst.toExponential(1)} over the ${obs.length} Grindelwald geometries; WSA ${wsaAlbedo(fit).toFixed(6)} = the Lucht-integral value`
+      : 'inversion FAILED'
+  );
+  check(
+    'RTLSR full-inversion floor',
+    fitRTLSR(obs.slice(0, 6)) === null,
+    'six observations refuse (the MCD43 full-inversion threshold is 7)'
+  );
+  const flat = obs.map(() => ({...obs[0]}));
+  check(
+    'RTLSR conditioning gate',
+    fitRTLSR(flat) === null,
+    'one geometry repeated 16 times is rank-1: the normal-matrix determinant gate refuses rather than extrapolating'
   );
 }
 

@@ -123,6 +123,10 @@ const sunT = (r, mu) => {
 // landmarks below can hold identity at zero and linearity.
 const MW = 32;
 const buildMs = (gAlbMs) => {
+  // Scalar (the Payne sea feed) or per-channel [R,G,B] (the
+  // measured inland white-sky albedo) - the shader's uniform is a
+  // vec3 either way.
+  const gv = Array.isArray(gAlbMs) ? gAlbMs : [gAlbMs, gAlbMs, gAlbMs];
   const lut = new Float64Array(MW * MW * 3);
   for (let j = 0; j < MW; j++)
     for (let i = 0; i < MW; i++) {
@@ -168,7 +172,7 @@ const buildMs = (gAlbMs) => {
           const muSg = Math.min(Math.max((r * muS + dG * cSun) / Rb, -1), 1);
           const Ts = sunT(Rb, muSg);
           for (let c = 0; c < 3; c++)
-            Li[c] += (T[c] * Ts[c] * Math.max(muSg, 0) * gAlbMs) / Math.PI;
+            Li[c] += (T[c] * Ts[c] * Math.max(muSg, 0) * gv[c]) / Math.PI;
         }
         for (let c = 0; c < 3; c++) {
           L2[c] += Li[c] / 64;
@@ -300,9 +304,18 @@ console.log('REF ms(28,16):', fmt(bilinearAt(28, 16)));
   }
   // Bottom row (r ~ Rb), sun overhead (muS ~ 1): i = 31, j = 0.
   const gainLow = ms6[(0 * MW + 31) * 3] - ms0[(0 * MW + 31) * 3];
-  const ok = worstLin < 1e-12 && minGain >= 0 && gainLow > 0;
+  // Per-channel independence: an albedo fed on ONE channel moves
+  // ONLY that channel (the shader's vec3 uniform keeps the RGB
+  // measured narrowbands separate).
+  const msR = buildMs([0.31, 0, 0]);
+  let crossOk = true;
+  for (let t = 0; t < MW * MW * 3; t++) {
+    if (t % 3 === 0) continue;
+    if (msR[t] !== ms0[t]) crossOk = false;
+  }
+  const ok = worstLin < 1e-12 && minGain >= 0 && gainLow > 0 && crossOk;
   console.log(
-    `${ok ? 'REF' : 'FAIL'} ms ground albedo: psi linear in the fed albedo to ${worstLin.toExponential(1)} texel-by-texel, gain >= 0 everywhere, ${gainLow.toExponential(2)} at ground/high-sun - Hillaire's ONE ground_albedo shared with the terminal bounce (his implementation defaults 0; the theme feeds Payne 0.06 at sea, 0 inland)`
+    `${ok ? 'REF' : 'FAIL'} ms ground albedo: psi linear in the fed albedo to ${worstLin.toExponential(1)} texel-by-texel, gain >= 0 everywhere, ${gainLow.toExponential(2)} at ground/high-sun, channels independent (an R-only feed moves only R) - Hillaire's ONE ground_albedo shared with the terminal bounce (his implementation defaults 0; the theme feeds Payne 0.06 at sea, 0 inland)`
   );
   if (!ok) process.exit(1);
 }
