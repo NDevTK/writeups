@@ -927,7 +927,10 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
             .sub(sunDirW.mul(sunDirW.y))
             .add(vec3(0.0, 0.0, 1e-9))
         );
-        const eastW = normalize(cross(upW, sunDirW));
+        // d x u points toward INCREASING azimuth (u x d is its
+        // negation - caught on the first live capture: the drawn
+        // spots mirrored in h against the SWPC positions).
+        const eastW = normalize(cross(sunDirW, upW));
         const offW = v.sub(sunDirW.mul(dot(v, sunDirW)));
         const vN = dot(offW, upW).div(sunFlat).div(sinR);
         const hN = dot(offW, eastW).div(sinR);
