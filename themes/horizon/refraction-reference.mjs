@@ -298,6 +298,7 @@ const check = (name, ok, detail) => {
       const sunTrue = -1.2 * DEG + (k * 0.9 * DEG) / 60;
       let ext = 0;
       for (let i = 0; i < tc.a.length; i++) {
+        if (!tc.vis[i]) continue; // sea-blocked rows show water
         const gIn = Math.abs(tc.tG[i] - sunTrue) < SUN_DISC_RAD;
         const rIn = Math.abs(tc.tR[i] - sunTrue) < SUN_DISC_RAD;
         if (gIn && !rIn) ext += da;
@@ -308,10 +309,23 @@ const check = (name, ok, detail) => {
   };
   const flat = sliver(tcStdF);
   const mag = sliver(tcHotF);
+  // And the sea horizon itself: the visibility boundary (the
+  // Snell constant still points down at the profile bottom) sits
+  // at the REFRACTED dip - below the geometric horizontal,
+  // lifted from the geometric dip sqrt(2h/R) by the bending.
+  let dipRow = -1;
+  for (let i = 0; i < tcStdF.a.length; i++)
+    if (tcStdF.vis[i]) {
+      dipRow = i;
+      break;
+    }
+  const dip = tcStdF.a[dipRow];
+  const geomDip = -Math.sqrt((2 * 2) / 6371008.8);
+  const dipOk = dip < geomDip * 0.6 && dip > geomDip * 1.05;
   check(
     'flash magnification',
-    mag > 2.5 * flat && flat > 3 * ARCSEC && flat < 40 * ARCSEC,
-    `the best green-not-red sliver is ${(flat / ARCSEC).toFixed(1)}" through the standard atmosphere (the bare rim) and ${(mag / ARCSEC).toFixed(1)}" through the mirage profile (x${(mag / flat).toFixed(1)}) - Young's magnified rim IS the naked-eye flash`
+    mag > 2.5 * flat && flat > 3 * ARCSEC && flat < 40 * ARCSEC && dipOk,
+    `the best green-not-red sliver is ${(flat / ARCSEC).toFixed(1)}" through the standard atmosphere (the bare rim) and ${(mag / ARCSEC).toFixed(1)}" through the mirage profile (x${(mag / flat).toFixed(1)}) - Young's magnified rim IS the naked-eye flash; the sea horizon sits at ${((dip / DEG) * 60).toFixed(2)}' (geometric ${((geomDip / DEG) * 60).toFixed(2)}', lifted by refraction) and blocked rows carry vis 0`
   );
 }
 

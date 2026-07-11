@@ -1,6 +1,7 @@
 import {
   NoBlending,
   BackSide,
+  DataTexture,
   QuadMesh,
   HalfFloatType,
   FloatType,
@@ -8,6 +9,7 @@ import {
   Mesh,
   MeshBasicNodeMaterial,
   RenderTarget,
+  RGBAFormat,
   SphereGeometry,
   StorageTexture,
   Vector2,
@@ -18,6 +20,7 @@ import {
   If,
   Loop,
   abs,
+  asin,
   asinh,
   atan,
   clamp,
@@ -117,6 +120,30 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   const sunDirR = uniform(new Vector3(0, 1, 0));
   const sunDirB = uniform(new Vector3(0, 1, 0));
   const sunFlat = uniform(1);
+  // The sunset transfer LUT (refraction.js transferCurve): TRUE
+  // altitude per channel indexed by APPARENT altitude across a
+  // horizon band. Folds in the curve ARE the mirage images and
+  // the magnified green flash - the disc membership test below
+  // replaces the centre+flatten model inside the band. Fed by the
+  // theme on profile/observer-height cadence (the curve is
+  // sun-independent); transOn gates the whole path so high-sun
+  // frames pay nothing.
+  const TRANS_ROWS = 160;
+  const transTex = new DataTexture(
+    new Float32Array(TRANS_ROWS * 4),
+    TRANS_ROWS,
+    1,
+    RGBAFormat,
+    FloatType
+  );
+  transTex.magFilter = LinearFilter;
+  transTex.minFilter = LinearFilter;
+  transTex.needsUpdate = true;
+  const transNode = texture(transTex);
+  const transA0 = uniform(-0.0105);
+  const transA1 = uniform(0.0349);
+  const transOn = uniform(0);
+  const sunTrueAlt = uniform(0);
 
   const rayleighS = vec3(5.802e-6, 13.558e-6, 33.1e-6);
   const ozoneA = vec3(0.65e-6, 1.881e-6, 0.085e-6);
@@ -667,29 +694,77 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // component divided by the flatten factor; clamp keeps the
     // limb law's exact zero at the (elliptical) edge, as before.
     const cSunG = dot(v, sunDirW);
-    If(cSunG.greaterThan(0.9998), () => {
-      const sin2R = 1 - 0.9999893 * 0.9999893;
-      const chanMu = (dir) => {
-        const cS = dot(v, dir);
-        const up = normalize(
-          vec3(0.0, 1.0, 0.0)
-            .sub(dir.mul(dir.y))
-            .add(vec3(0.0, 0.0, 1e-9))
+    // Inside the transfer band at a low sun, the disc is drawn
+    // through the LUT: the fragment's APPARENT altitude reads the
+    // TRUE altitude each channel sees there, and disc membership
+    // is |trueAlt - sunTrueAlt| against the disc radius - folds in
+    // the curve then draw themselves as the Omega sun, mock-mirage
+    // slices and the magnified flash. Azimuth handled small-angle
+    // (the gate is a ~2.5 deg window around the sun's azimuth).
+    const aFrag = asin(clamp(v.y, -1.0, 1.0));
+    const vH = normalize(vec3(v.x, 0.0, v.z).add(vec3(0.0, 0.0, 1e-9)));
+    const sH = normalize(
+      vec3(sunDirW.x, 0.0, sunDirW.z).add(vec3(0.0, 0.0, 1e-9))
+    );
+    const cosAz = dot(vH, sH);
+    const sinAz = vH.x.mul(sH.z).sub(vH.z.mul(sH.x));
+    const inBand = transOn
+      .greaterThan(0.5)
+      .and(aFrag.greaterThan(transA0))
+      .and(aFrag.lessThan(transA1))
+      .and(cosAz.greaterThan(0.999));
+    If(inBand, () => {
+      const uT = aFrag.sub(transA0).div(transA1.sub(transA0));
+      const t4 = transNode.sample(vec2(uT, 0.5));
+      const t3 = t4.rgb;
+      const discR = float(Math.acos(0.9999893));
+      const hOff = sinAz.mul(cos(aFrag));
+      const chanMu = (tc) => {
+        const vOff = tc.sub(sunTrueAlt);
+        const s2 = clamp(
+          vOff.mul(vOff).add(hOff.mul(hOff)).div(discR.mul(discR)),
+          0.0,
+          1.0
         );
-        const off = v.sub(dir.mul(cS));
-        const ov = dot(off, up).div(sunFlat);
-        const rest = off.sub(up.mul(dot(off, up)));
-        const s2 = clamp(ov.mul(ov).add(dot(rest, rest)).div(sin2R), 0.0, 1.0);
         return sqrt(s2.oneMinus());
       };
       const limb = vec3(
-        pow(chanMu(sunDirR), 0.4064),
-        pow(chanMu(sunDirW), 0.5079),
-        pow(chanMu(sunDirB), 0.6406)
+        pow(chanMu(t3.x), 0.4064),
+        pow(chanMu(t3.y), 0.5079),
+        pow(chanMu(t3.z), 0.6406)
       );
       col.addAssign(
-        tTexNode.sample(tParamsToUv(r, v.y)).rgb.mul(limb).mul(120.0)
+        tTexNode.sample(tParamsToUv(r, v.y)).rgb.mul(limb).mul(t4.a).mul(120.0)
       );
+    }).Else(() => {
+      If(cSunG.greaterThan(0.9998), () => {
+        const sin2R = 1 - 0.9999893 * 0.9999893;
+        const chanMu = (dir) => {
+          const cS = dot(v, dir);
+          const up = normalize(
+            vec3(0.0, 1.0, 0.0)
+              .sub(dir.mul(dir.y))
+              .add(vec3(0.0, 0.0, 1e-9))
+          );
+          const off = v.sub(dir.mul(cS));
+          const ov = dot(off, up).div(sunFlat);
+          const rest = off.sub(up.mul(dot(off, up)));
+          const s2 = clamp(
+            ov.mul(ov).add(dot(rest, rest)).div(sin2R),
+            0.0,
+            1.0
+          );
+          return sqrt(s2.oneMinus());
+        };
+        const limb = vec3(
+          pow(chanMu(sunDirR), 0.4064),
+          pow(chanMu(sunDirW), 0.5079),
+          pow(chanMu(sunDirB), 0.6406)
+        );
+        col.addAssign(
+          tTexNode.sample(tParamsToUv(r, v.y)).rgb.mul(limb).mul(120.0)
+        );
+      });
     });
     return vec4(col.mul(exposure), 1.0);
   });
@@ -762,6 +837,25 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // Refraction of the drawn disc: per-channel apparent
     // directions + vertical flattening (set from refraction.js).
     sunDisc: {dirR: sunDirR, dirB: sunDirB, flatten: sunFlat},
+    // The sunset transfer LUT feed (see the band in domeColor).
+    sunTransfer: {
+      on: transOn,
+      sunTrue: sunTrueAlt,
+      set(curve) {
+        const d = transTex.image.data;
+        for (let i = 0; i < TRANS_ROWS; i++) {
+          d[i * 4] = curve.tR[i];
+          d[i * 4 + 1] = curve.tG[i];
+          d[i * 4 + 2] = curve.tB[i];
+          // Alpha = visibility: rows whose rays run into the
+          // surface show sea, not sun.
+          d[i * 4 + 3] = curve.vis ? curve.vis[i] : 1;
+        }
+        transTex.needsUpdate = true;
+        transA0.value = curve.a[0];
+        transA1.value = curve.a[curve.a.length - 1];
+      }
+    },
     // The dome's own radiance (exposure applied) for a world
     // direction - objects above the atmosphere (the moon) add this
     // over their surface so a dark disc never punches a hole in
