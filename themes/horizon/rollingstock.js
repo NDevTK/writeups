@@ -11,8 +11,12 @@
  * Swiss-regional reds, the BLS green, the SBB intercity silver.
  * This module only turns a consist + livery into geometry: a
  * carbody, a dark window band, a signature cheatline stripe, a
- * roof and a dark cab face. Built along -z (like the vessels'
- * bows) and centred, so the caller points +z at the next stop.
+ * roof, and a lead-car NOSE shaped to the category - a long
+ * streamlined prow for the high-speed families, a short raked cab
+ * for the standard network, a blunt stub for the narrow-gauge stock -
+ * so a train reads by its type as well as its paint. Built along -z
+ * (like the vessels' bows) and centred, so the caller points +z at
+ * the next stop.
  */
 
 import * as THREE from 'three/webgpu';
@@ -21,6 +25,51 @@ export const CAR_GAP_M = 0.8;
 
 export function trainLengthM(consist) {
   return consist.cars * consist.len + (consist.cars - 1) * CAR_GAP_M;
+}
+
+// The lead-car NOSE profile by category: a long, low, sharply tapered
+// prow for the high-speed families (the ICE/TGV/Railjet power-car
+// snout), a short raked cab for the standard network, and a blunt stub
+// for the narrow-gauge stock. len is the nose length as a fraction of a
+// car; tipY the tip's height (fraction of body height, lower = more
+// streamlined); taper the tip size (fraction of the cross-section).
+const HS_CATS = new Set(['ICE', 'TGV', 'RJ', 'RJX', 'ICN', 'EC', 'EN']);
+function noseProfile(cat, narrow) {
+  if (narrow) return {len: 0.1, tipY: 0.52, taper: 0.6}; // blunt
+  if (HS_CATS.has(String(cat || '').toUpperCase()))
+    return {len: 0.5, tipY: 0.28, taper: 0.14}; // streamlined
+  return {len: 0.22, tipY: 0.44, taper: 0.36}; // raked cab
+}
+
+// A tapered nose from the body-end cross-section (W x H at z = sZ) out
+// to a small low tip, as a five-face frustum. Double-sided material, so
+// the winding needs no bookkeeping; built for either end by the sign
+// of sZ.
+function noseMesh(mat, sZ, W, H, yBase, prof, U) {
+  const dir = Math.sign(sZ) || 1;
+  const zTip = sZ + dir * prof.len;
+  const yc = yBase + H * prof.tipY;
+  const w = (W / 2) * prof.taper;
+  const h = (H / 2) * prof.taper;
+  const Bbl = [-W / 2, yBase, sZ];
+  const Bbr = [W / 2, yBase, sZ];
+  const Btr = [W / 2, yBase + H, sZ];
+  const Btl = [-W / 2, yBase + H, sZ];
+  const Tbl = [-w, yc - h, zTip];
+  const Tbr = [w, yc - h, zTip];
+  const Ttr = [w, yc + h, zTip];
+  const Ttl = [-w, yc + h, zTip];
+  const P = [];
+  const quad = (a, b, c, d) => P.push(...a, ...b, ...c, ...a, ...c, ...d);
+  quad(Btl, Btr, Ttr, Ttl); // top (rakes down to the tip)
+  quad(Bbr, Bbl, Tbl, Tbr); // underside
+  quad(Bbl, Btl, Ttl, Tbl); // left
+  quad(Btr, Bbr, Tbr, Ttr); // right
+  quad(Ttl, Ttr, Tbr, Tbl); // tip cap
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, mat);
 }
 
 /**
@@ -64,7 +113,6 @@ export function buildTrain(group, cat, consist, mats, U) {
   // liveries set stripe = body so it reads as one colour.
   const stripeGeo = new THREE.BoxGeometry(W * 1.02, H * 0.12, L * 0.9);
   const roofGeo = new THREE.BoxGeometry(W * 0.9, 0.25 * U, L * 0.94);
-  const cabGeo = new THREE.BoxGeometry(W * 1.01, H * 0.9, 0.5 * U);
   const bogieGeo = new THREE.BoxGeometry(W * 0.75, 0.55 * U, 2.4 * U);
   for (let i = 0; i < consist.cars; i++) {
     const z0 =
@@ -87,11 +135,14 @@ export function buildTrain(group, cat, consist, mats, U) {
       group.add(bogie);
     }
   }
-  // Cab faces on both ends (push-pull - how these lines run).
-  for (const s of [-1, 1]) {
-    const cab = new THREE.Mesh(cabGeo, mats.cab);
-    cab.position.set(0, yBase + H * 0.45, s * (total / 2 - 0.25 * U));
-    group.add(cab);
-  }
+  // A shaped nose on both ends (push-pull - how these lines run):
+  // streamlined for high-speed, a raked cab otherwise, blunt for
+  // narrow-gauge. Double-sided so the frustum needs no winding care.
+  const noseMat = mats.cab.clone();
+  noseMat.side = THREE.DoubleSide;
+  const p = noseProfile(cat, consist.narrow);
+  const prof = {len: p.len * L, tipY: p.tipY, taper: p.taper};
+  for (const s of [-1, 1])
+    group.add(noseMesh(noseMat, s * (total / 2), W, H, yBase, prof, U));
   return trainLengthM(consist);
 }
