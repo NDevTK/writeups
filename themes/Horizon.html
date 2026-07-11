@@ -464,6 +464,7 @@
         lightsField,
         pixelOf
       } from './horizon/nightlights.js';
+      import {chromaticity, waterColorLinear} from './horizon/ocean-color.js';
       import {
         attribute as tslAttribute,
         cameraPosition as tslCameraPosition,
@@ -2844,6 +2845,61 @@
           );
         } catch {
           // The CAMS total AOD stands.
+        }
+      }
+
+      // Ocean colour from MEASURED chlorophyll. The daemon returns the
+      // VIIRS DINEOF chlor_a (mg m^-3, ~2-day-fresh) for the 1/12-deg
+      // cell over the view; the Morel & Maritorena (2001) Case-1
+      // reflectance model (morel.js) and the CIE colour integration
+      // (ocean-color.js, D65 + 1931 2-deg observer) turn it into the
+      // sea's linear-sRGB body colour - a subtropical gyre reads deep
+      // blue, a coastal bloom green, from the physics rather than a
+      // painted gradient. The colour rides the per-frame water block so
+      // it survives a roam rebuild. ?chl=X pins the concentration (the
+      // deterministic A/B knob); ?chlor=URL overrides the endpoint.
+      const CHLOR_PROXY = params.get('chlor') ?? 'https://api.ndev.tk/chlor';
+      let chlorColor = null; // linear-sRGB body colour once [Chl] is known
+      function applyChlor(chl, note) {
+        const rgb = waterColorLinear(chl);
+        chlorColor = chlorColor ?? new THREE.Color();
+        chlorColor.setRGB(rgb[0], rgb[1], rgb[2], THREE.LinearSRGBColorSpace);
+        const {x, y} = chromaticity(chl);
+        record(
+          'Morel/CIE ocean colour',
+          'Chl ' +
+            chl.toFixed(3) +
+            ' mg/m^3 · xy (' +
+            x.toFixed(3) +
+            ', ' +
+            y.toFixed(3) +
+            ')' +
+            (note ? ' · ' + note : '')
+        );
+      }
+      async function syncChlor() {
+        // Pinned concentration: deterministic, no fetch (harness A/B).
+        if (params.has('chl')) {
+          applyChlor(Math.max(0.001, +params.get('chl')), 'pinned');
+          return;
+        }
+        try {
+          const r = await (
+            await fetch(
+              CHLOR_PROXY +
+                '?lat=' +
+                state.lat.toFixed(3) +
+                '&lon=' +
+                state.lon.toFixed(3),
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (typeof r.chlor === 'number' && r.chlor > 0)
+            applyChlor(r.chlor, r.time ? r.time.slice(0, 10) : '');
+          // chlor null (200) is a real land/ice cell with no ocean-colour
+          // signal - the sea keeps its current colour.
+        } catch {
+          // Network down: the placeholder / last colour stands.
         }
       }
 
@@ -6824,6 +6880,7 @@
         syncSmoke();
         syncAerosol();
         syncWater();
+        syncChlor();
         syncBuildings();
         syncRoads();
         syncRivers();
@@ -8347,6 +8404,10 @@
           water.sunColor.value
             .copy(sunLight.color)
             .multiplyScalar(sunLight.intensity);
+          // Measured-chlorophyll body colour (Morel/CIE) once the /chlor
+          // fetch has resolved; until then the build-time placeholder
+          // stands. Applied here so a roam sea-rebuild keeps the colour.
+          if (chlorColor) water.waterColor.value.copy(chlorColor);
           // The MEASURED total Hs (marine model, includes secondary
           // swells) sets the surf/breaking scale when present; the
           // Pierson-Moskowitz wind estimate is the fallback.
@@ -9310,6 +9371,10 @@
         syncAerosol();
         setInterval(syncAerosol, 30 * 60 * 1000);
         syncWater();
+        // chlor_a is a daily DINEOF product (~2-day latency); an hourly
+        // poll (matching the /chlor cache) more than covers it.
+        syncChlor();
+        setInterval(syncChlor, 60 * 60 * 1000);
         syncBuildings();
         syncRoads();
         syncRivers();
