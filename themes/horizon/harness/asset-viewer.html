@@ -53,6 +53,8 @@
       import {RAILS_FIXTURE} from '../rails-fixture.mjs';
       import {consistOf} from '../trains.js';
       import {buildTrain} from '../rollingstock.js';
+      import {buildAircraft, makeAircraftMaterials} from '../airframes.js';
+      import {aircraftDims} from '../aircraft.js';
       import {rotorOmega, specOf} from '../turbines.js';
       import {buildWindmill} from '../windmills.js';
 
@@ -215,6 +217,65 @@
         renderer.setAnimationLoop(() => {
           renderer.render(scene, camera);
           if (++tframes === 5) console.log('DONE');
+        });
+      } else if (q.get('asset') === 'aircraft') {
+        // ?asset=aircraft: one airframe per body class through the same
+        // aircraft.js/airframes.js the theme ships, sized to the real
+        // wingspan/length (metres). ?type=A320 shows one large.
+        sea.material.color.set('#8a9099');
+        sun.position.set(-340, 360, -300);
+        const only = q.get('type');
+        const LINEUP = only
+          ? [only]
+          : [
+              'A388',
+              'B744',
+              'B77W',
+              'A320',
+              'B738',
+              'E195',
+              'AT72',
+              'GLF6',
+              'C172',
+              'EC35'
+            ];
+        let x = 0;
+        const xs = [];
+        for (let i = 0; i < LINEUP.length; i++) {
+          const dims = aircraftDims(LINEUP[i]);
+          const g = new THREE.Group();
+          const mats = makeAircraftMaterials(THREE.MeshStandardMaterial, {
+            tint: (i % 3) * 0.3
+          });
+          buildAircraft(g, dims, mats, i / LINEUP.length, 1);
+          const W = dims.wingspanM;
+          x += W / 2 + 14;
+          g.position.set(x, W * 0.35, 0);
+          g.rotation.y = ((+q.get('yaw') || -28) * Math.PI) / 180;
+          xs.push(x);
+          x += W / 2 + 14;
+          scene.add(g);
+        }
+        const mid = (xs[0] + xs[xs.length - 1]) / 2 || 0;
+        const az = ((+q.get('az') || 210) * Math.PI) / 180;
+        const el = ((+q.get('el') || 14) * Math.PI) / 180;
+        const d =
+          +q.get('d') || (only ? Math.max(80, 3) : Math.max(x * 0.6, 260));
+        camera.position.set(
+          mid + d * Math.cos(el) * Math.sin(az),
+          Math.max(d * Math.sin(el), 12),
+          d * Math.cos(el) * Math.cos(az)
+        );
+        camera.lookAt(mid, 6, 0);
+        await renderer.init();
+        window.__r = renderer;
+        window.__scene = scene;
+        window.__cam = camera;
+        window.__THREE = THREE;
+        let aframes = 0;
+        renderer.setAnimationLoop(() => {
+          renderer.render(scene, camera);
+          if (++aframes === 5) console.log('DONE');
         });
       } else if (q.get('asset') === 'buildings') {
         sea.material.color.set('#5d7a52'); // grass stage
