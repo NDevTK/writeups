@@ -465,6 +465,7 @@
         pixelOf
       } from './horizon/nightlights.js';
       import {chromaticity, waterColorLinear} from './horizon/ocean-color.js';
+      import {seaColorLinear} from './horizon/ocean-measured-color.js';
       import {
         surfaceColorLinear,
         REFERENCE_REFLECTANCE
@@ -2904,6 +2905,60 @@
           // signal - the sea keeps its current colour.
         } catch {
           // Network down: the placeholder / last colour stands.
+        }
+      }
+
+      // MEASURED sea colour from ESA Ocean Colour CCI remote-sensing
+      // reflectance - the direct measurement that supersedes the Morel
+      // model as the sea's body colour when it is available. The daemon
+      // returns the six visible Rrs bands for the cell; ocean-measured-
+      // color.js integrates them through the SAME CIE machinery into a
+      // linear-sRGB colour, so a turbid Case-2 coast reads its real muddy
+      // green (which the chlorophyll-only Morel colour misses). CCI is a
+      // slow science product (~6-month latency) with cloud gaps, so this
+      // runs AFTER syncChlor and only overrides the water colour when it
+      // has a measured spectrum - otherwise the NRT Morel colour stands.
+      // ?rrs=v1,...,v6 pins a spectrum; ?rrssrc=URL overrides.
+      const RRS_PROXY = params.get('rrssrc') ?? 'https://api.ndev.tk/rrs';
+      function applyRrs(rrs, note) {
+        const rgb = seaColorLinear(rrs);
+        chlorColor = chlorColor ?? new THREE.Color();
+        chlorColor.setRGB(rgb[0], rgb[1], rgb[2], THREE.LinearSRGBColorSpace);
+        record(
+          'ESA CCI measured sea colour',
+          'Rrs ' +
+            rrs.map((v) => v.toFixed(4)).join('/') +
+            (note ? ' · ' + note : '')
+        );
+      }
+      async function syncRrs() {
+        // Pinned spectrum: deterministic, no fetch (harness A/B).
+        if (params.has('rrs')) {
+          const t = params.get('rrs').split(',').map(Number);
+          if (t.length === 6 && t.every((v) => v >= 0)) applyRrs(t, 'pinned');
+          return;
+        }
+        try {
+          const r = await (
+            await fetch(
+              RRS_PROXY +
+                '?lat=' +
+                state.lat.toFixed(3) +
+                '&lon=' +
+                state.lon.toFixed(3),
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (
+            Array.isArray(r.rrs) &&
+            r.rrs.length === 6 &&
+            r.rrs.every((v) => typeof v === 'number')
+          )
+            applyRrs(r.rrs, r.time ? r.time.slice(0, 10) : '');
+          // rrs null (200) is a cloud gap / off-water: the Morel colour
+          // from syncChlor stands.
+        } catch {
+          // Network down: the Morel colour stands.
         }
       }
 
@@ -6950,6 +7005,7 @@
         syncAerosol();
         syncWater();
         syncChlor();
+        syncRrs();
         syncSurface();
         syncBuildings();
         syncRoads();
@@ -9445,6 +9501,10 @@
         // poll (matching the /chlor cache) more than covers it.
         syncChlor();
         setInterval(syncChlor, 60 * 60 * 1000);
+        // Measured Rrs (ESA CCI) overrides the Morel colour when present;
+        // it is a slow product, so the hourly poll is ample.
+        syncRrs();
+        setInterval(syncRrs, 60 * 60 * 1000);
         // MOD09A1 is an 8-day composite; the same hourly poll (matching
         // the /surface cache) more than covers it.
         syncSurface();

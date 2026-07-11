@@ -612,6 +612,64 @@ export function parseSurface(j) {
   };
 }
 
+// ---- Measured ocean colour: ESA CCI Rrs (CoastWatch ERDDAP) ----
+// The measured-sea-colour feed: ESA Ocean Colour CCI v6.0 remote-sensing
+// reflectance Rrs at six visible bands for the cell over the point, so
+// the sea colour is the MEASURED reflectance (ocean-measured-color.js
+// integrates the bands through CIE), valid in turbid Case-2 water the
+// Morel Case-1 /chlor model misreads. Like /chlor, CoastWatch ERDDAP
+// sends no CORS header so the daemon proxies; the URL is built HERE from
+// the snapped cell only. One request returns all six bands (ERDDAP joins
+// variables). CCI is science-quality (~6-month latency); the theme uses
+// it as the primary colour with the NRT Morel colour as the cloud-gap
+// fallback. The pure pieces live here for server-reference.mjs.
+const RRS_DATASET =
+  'https://coastwatch.pfeg.noaa.gov/erddap/griddap/pmlEsaCCI60OceanColorDaily.json';
+const RRS_VARS = [
+  'Rrs_412',
+  'Rrs_443',
+  'Rrs_490',
+  'Rrs_510',
+  'Rrs_560',
+  'Rrs_665'
+];
+
+// Snap to the ESA CCI ~1/24-deg (4 km) grid for cache coherence;
+// idempotent. ERDDAP nearest-neighbours the snapped point to its cell.
+export function rrsCell(lat, lon) {
+  const snap = (x, n) => Math.round(Math.max(-n, Math.min(n, x)) * 24) / 24;
+  return {lat: snap(lat, 90), lon: snap(lon, 180)};
+}
+
+// The multi-band point-query URL, built from the snapped cell only. The
+// CCI grid is [time][latitude][longitude] - no altitude term (the
+// chlorophyll product has one; this one does not).
+export function rrsUrl(cell) {
+  const idx = `%5B(last)%5D%5B(${cell.lat})%5D%5B(${cell.lon})%5D`;
+  return RRS_DATASET + '?' + RRS_VARS.map((v) => v + idx).join(',');
+}
+
+// null = unusable response (-> 502); {rrs: null} = a real no-measure
+// answer (a cloud-gap pixel: any band null or the 9.97e36 fill). A valid
+// answer is the six Rrs values in band order, small negatives (residual
+// atmospheric correction) clamped up to 0.
+export function parseRrs(j) {
+  const t = j?.table;
+  const row = t?.rows?.[0];
+  if (!row || !Array.isArray(t.columnNames)) return null;
+  const time = typeof row[0] === 'string' ? row[0] : null;
+  const rrs = [];
+  for (const v of RRS_VARS) {
+    const col = t.columnNames.indexOf(v);
+    if (col < 0) return null;
+    const val = row[col];
+    if (typeof val !== 'number' || !Number.isFinite(val) || val > 1)
+      return {rrs: null, time};
+    rrs.push(Math.max(0, val));
+  }
+  return {rrs, time};
+}
+
 // ---- Aircraft: readsb failover from a clean IP -----------------
 // All three speak readsb v2 ({ac:[...]}, feet/knots) and feed the
 // reference-gated normalize(). Order preferred by data richness;
@@ -962,6 +1020,7 @@ function main() {
   const chlorCache = new Map(); // 1/12-deg cell key -> {t, body}
   const ndviCache = new Map(); // 0.01-deg cell key -> {t, body}
   const surfaceCache = new Map(); // 0.01-deg cell key -> {t, body}
+  const rrsCache = new Map(); // 1/24-deg cell key -> {t, body}
   setInterval(() => {
     const now = Date.now();
     for (const [k, v] of adsbCache) if (now - v.t > 30e3) adsbCache.delete(k);
@@ -975,6 +1034,8 @@ function main() {
       if (now - v.t > 12 * 3600e3) ndviCache.delete(k);
     for (const [k, v] of surfaceCache)
       if (now - v.t > 12 * 3600e3) surfaceCache.delete(k);
+    for (const [k, v] of rrsCache)
+      if (now - v.t > 12 * 3600e3) rrsCache.delete(k);
   }, 30e3).unref();
 
   // Measured aerosol radiative properties: GEFS-Aerosols (NOAA's
@@ -1200,6 +1261,37 @@ function main() {
       return null;
     }
   }
+  // Measured ocean colour for the cell over the point: the six ESA CCI
+  // Rrs bands in ONE ERDDAP request (URL from the gated rrsUrl). Cloud-
+  // gap pixels answer {rrs: null} (a real 200); successes cache 12 h,
+  // failures 10 min. CCI is a slow science product, so the long cache is
+  // ample.
+  const rrsState = {fetches: 0, errors: 0, time: ''};
+  async function fetchRrs(lat, lon) {
+    const cell = rrsCell(lat, lon);
+    const key = cell.lat + '/' + cell.lon;
+    const hit = rrsCache.get(key);
+    if (hit && Date.now() - hit.t < (hit.body ? 720 : 10) * 60e3)
+      return hit.body;
+    try {
+      rrsState.fetches++;
+      const r = await fetch(rrsUrl(cell), {
+        signal: AbortSignal.timeout(15e3),
+        headers: {'user-agent': UA}
+      });
+      if (!r.ok) throw new Error('cci ' + r.status);
+      const parsed = parseRrs(await r.json());
+      if (!parsed) throw new Error('cci shape');
+      if (parsed.time) rrsState.time = parsed.time;
+      const body = {...parsed, cell};
+      rrsCache.set(key, {t: Date.now(), body});
+      return body;
+    } catch {
+      rrsState.errors++;
+      rrsCache.set(key, {t: Date.now(), body: null});
+      return null;
+    }
+  }
   // Aircraft near a point via the readsb failover chain, shared
   // by GET /adsb and the /stream pushes - the 15 s per-area cache
   // means many viewers in one place cost ONE upstream request,
@@ -1381,6 +1473,12 @@ function main() {
         fetches: surfaceState.fetches,
         errors: surfaceState.errors
       };
+      const rrsHealth = {
+        cells: rrsCache.size,
+        time: rrsState.time,
+        fetches: rrsState.fetches,
+        errors: rrsState.errors
+      };
       if (url.pathname === '/health')
         return json(
           200,
@@ -1406,6 +1504,7 @@ function main() {
           chlor: chlorHealth,
           ndvi: ndviHealth,
           surface: surfaceHealth,
+          rrs: rrsHealth,
           probe: await probeAll()
         },
         {'cache-control': 'no-store'}
@@ -1553,6 +1652,18 @@ function main() {
       return json(200, body, {
         'cache-control': 'public, max-age=3600',
         'x-surface-source': 'NASA MODIS MOD09A1 surface reflectance (ORNL DAAC)'
+      });
+    }
+
+    if (url.pathname === '/rrs') {
+      // Measured sea colour: the six ESA CCI Rrs bands over the point.
+      // A null rrs with a 200 is a real answer (cloud gap / off-water);
+      // 502 means the upstream itself failed.
+      const body = await fetchRrs(lat, lon);
+      if (!body) return json(502, {rrs: null, upstream: 'unavailable'});
+      return json(200, body, {
+        'cache-control': 'public, max-age=3600',
+        'x-rrs-source': 'ESA Ocean Colour CCI v6.0 (CoastWatch ERDDAP)'
       });
     }
 

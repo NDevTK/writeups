@@ -40,6 +40,9 @@ import {
   parseSurface,
   surfaceDatesUrl,
   surfaceUrl,
+  parseRrs,
+  rrsCell,
+  rrsUrl,
   prune,
   pruneStrikes,
   aisBox,
@@ -488,6 +491,66 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       parseSurface(band('x')) === null &&
       parseSurface({}) === null,
     `/dates + /subset URLs pinned to the ORNL MOD09A1 service with the snapped cell + date + band only; live Sahara red 0.4248 and green 0.246 parse exact; -28672 fill and out-of-range -> refl null, small negative clamps to 0; empty subset (ocean) -> null refl (200); non-numeric/malformed -> null (502)`
+  );
+}
+
+{
+  // Measured ocean colour (/rrs): the pure pieces held to the LIVE ESA
+  // CCI v6.0 response recorded when the source was pinned (2026-07-11):
+  // the clear gyre (25N, 140W) at 2025-12-31. A cloud-gap null or the
+  // 9.97e36 fill in any band -> {rrs: null} (a real no-measure answer).
+  const cols = [
+    'time',
+    'latitude',
+    'longitude',
+    'Rrs_412',
+    'Rrs_443',
+    'Rrs_490',
+    'Rrs_510',
+    'Rrs_560',
+    'Rrs_665'
+  ];
+  const row = (vals) => ({
+    table: {
+      columnNames: cols,
+      rows: [['2025-12-31T00:00:00Z', 24.979, -139.979, ...vals]]
+    }
+  });
+  const gyre = [
+    0.0095712375, 0.008005913, 0.0055653746, 0.0032426326, 0.0012882876,
+    1.4774383e-4
+  ];
+  const cell = rrsCell(25.0, -140.0);
+  const idem = rrsCell(cell.lat, cell.lon);
+  const u = rrsUrl(cell);
+  const idx = `%5B(last)%5D%5B(${cell.lat})%5D%5B(${cell.lon})%5D`;
+  const PIN =
+    'https://coastwatch.pfeg.noaa.gov/erddap/griddap/pmlEsaCCI60OceanColorDaily.json?' +
+    ['Rrs_412', 'Rrs_443', 'Rrs_490', 'Rrs_510', 'Rrs_560', 'Rrs_665']
+      .map((v) => v + idx)
+      .join(',');
+  const parsed = parseRrs(row(gyre));
+  const fillRow = row([9.96921e36, ...gyre.slice(1)]);
+  const nullRow = row([0.008, null, ...gyre.slice(2)]);
+  const negRow = row([-0.001, ...gyre.slice(1)]);
+  check(
+    'measured ocean colour (/rrs)',
+    cell.lat === 25 &&
+      cell.lon === -140 &&
+      idem.lat === cell.lat &&
+      idem.lon === cell.lon &&
+      rrsCell(91, 181).lat === 90 &&
+      u === PIN &&
+      parsed.rrs.length === 6 &&
+      Math.abs(parsed.rrs[1] - 0.008005913) < 1e-9 &&
+      Math.abs(parsed.rrs[4] - 0.0012882876) < 1e-9 &&
+      parsed.time === '2025-12-31T00:00:00Z' &&
+      parseRrs(fillRow).rrs === null &&
+      parseRrs(nullRow).rrs === null &&
+      parseRrs(negRow).rrs[0] === 0 &&
+      parseRrs({}) === null &&
+      parseRrs({table: {columnNames: ['time'], rows: [['t']]}}) === null,
+    `cell snaps to the 1/24-deg grid (25/-140), idempotent, poles/antimeridian clamp; one multi-band ERDDAP URL pinned to the CCI dataset with the snapped cell only; live gyre Rrs_443 0.008006 / Rrs_560 0.001288 parse exact; 9.97e36 fill and null band -> rrs null (no-measure), small negative clamps to 0; malformed/missing column -> null (502)`
   );
 }
 
