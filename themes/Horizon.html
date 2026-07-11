@@ -374,6 +374,7 @@
       } from './horizon/refraction.js';
       import {
         demElev as demElevOf,
+        despikeDEM,
         sampleDem
       } from './horizon/terrain-sample.js';
       import {
@@ -3118,6 +3119,10 @@
         for (let k = 0; k < elev.length; k++)
           elev[k] =
             data[k * 4] * 256 + data[k * 4 + 1] + data[k * 4 + 2] / 256 - 32768;
+        // The tiles themselves rarely carry garbage streaks (the
+        // measured Nelson needle: 531 m in a 3-6 m harbour) - the
+        // thresholded median repairs them before anything samples.
+        const repaired = despikeDEM(elev, canvas.width, canvas.height);
         record(
           'AWS terrarium DEM tiles',
           jobs.length +
@@ -3127,7 +3132,10 @@
             canvas.width +
             'x' +
             canvas.height +
-            ' px'
+            ' px' +
+            (repaired
+              ? ' · ' + repaired + ' px despiked (median repair)'
+              : ' · no spikes')
         );
         return {
           kind: 'img',
@@ -3200,14 +3208,21 @@
           'this wallpaper needs WebGPU - current Chrome, Edge, Firefox or Safari';
         throw new Error('WebGPU unavailable');
       }
+      // Harness diagnostic (?debug=1&webgl=1): run the SAME scene
+      // through three's WebGL backend - a completely different
+      // compiler chain (GLSL/ANGLE, no Dawn/Tint) on this
+      // container's software stack. Compute-driven subsystems
+      // (LUT fills, FFT ocean) degrade; the point is differential
+      // geometry forensics (the Nelson cone), not a usable sky.
+      const forceWebGL = params.has('debug') && params.has('webgl');
       const renderer = new THREE.WebGPURenderer({
         canvas,
-        forceWebGL: false,
+        forceWebGL,
         antialias: true
       });
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
       await renderer.init();
-      if (!renderer.backend.isWebGPUBackend) {
+      if (!forceWebGL && !renderer.backend.isWebGPUBackend) {
         document.getElementById('caption').textContent =
           'this wallpaper needs WebGPU - the adapter request failed';
         throw new Error('WebGPU adapter unavailable');

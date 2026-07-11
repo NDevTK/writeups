@@ -18,6 +18,7 @@ import {
   WATER_E,
   WATER_Y_OFF,
   demElev,
+  despikeDEM,
   sampleDem
 } from './terrain-sample.js';
 import {geoToScene, microRelief, sceneToGeo} from './roam.js';
@@ -181,6 +182,83 @@ function imgDem(lat, lon) {
     'anchor independence',
     worst < 1e-9,
     `flat 777 m box: the same geodetic points read the same y from two anchors to ${worst.toExponential(1)} (the roam overlap property survives the full sampler)`
+  );
+}
+
+{
+  // Hampel despike (Davies & Gather 1993; Pearson 2002): the AWS
+  // terrarium tiles rarely carry garbage streaks - the MEASURED
+  // Nelson needle (tile 12/4019/2564: a column of -92/134/448/531
+  // m flanked by -248/-276 m inside a 3-6 m harbour, which baked
+  // into a 500-m waterfront spike). Landmarks: (1) that exact
+  // captured patch planted on a 5 m plain repairs completely (every
+  // repaired cell lands on its neighbourhood median, here the
+  // plain) and the un-spiked cells are bit-identical; (2) a
+  // genuine 800-m ridge five pixels wide survives BIT-IDENTICAL
+  // (the neighbourhood median climbs with the feature); (3) a
+  // 120-m single-pixel sea stack survives (the 150 m floor - Old
+  // Man of Hoy, 137 m, is the tallest real one).
+  const W = 32;
+  const mk = (fill) => {
+    const e = new Float32Array(W * W).fill(fill);
+    return e;
+  };
+  // (1) the measured streak
+  const e1 = mk(5);
+  const streak = [
+    [15, 14, -92],
+    [15, 15, 134],
+    [15, 16, 448],
+    [15, 17, 531],
+    [16, 15, -248],
+    [16, 16, -276]
+  ];
+  for (const [x, y, v] of streak) e1[y * W + x] = v;
+  const before = Float32Array.from(e1);
+  const n1 = despikeDEM(e1, W, W);
+  // The four cells >150 m from their 3x3 median (134->448->531 and
+  // the -248/-276 pair) MUST repair to the 5 m plain; the -92 and
+  // 134 sit UNDER the documented floor (97 and 129 m deviations)
+  // and MUST survive - the boundary of the rule, asserted both
+  // ways. Everything unplanted stays bit-identical.
+  let cleanOk = true;
+  let othersOk = true;
+  for (let k = 0; k < W * W; k++) {
+    const pl = streak.find(([x, y]) => y * W + x === k);
+    if (pl) {
+      const big = Math.abs(pl[2] - 5) > 150;
+      if (big && e1[k] !== 5) cleanOk = false;
+      if (!big && e1[k] !== pl[2]) cleanOk = false;
+    } else if (e1[k] !== before[k]) othersOk = false;
+  }
+  check(
+    'DEM despike: measured streak',
+    n1 === 4 && cleanOk && othersOk,
+    `the captured Nelson garbage repairs in exactly 4 replacements (448/531/-248/-276 -> the 5 m median); the -92 and 134 survive under the 150 m floor by 97 and 129 m deviations - the rule boundary held both ways; every unplanted cell bit-identical`
+  );
+  // (2) a real knife ridge: 700 m of relief at sigma = 2 px - a
+  // 75 deg maximum slope, already past anything a 30 m radar DEM
+  // resolves - stays BIT-IDENTICAL because the neighbourhood
+  // median climbs with the feature (crest deviation 75 m).
+  const e2 = mk(100);
+  for (let y = 0; y < W; y++)
+    for (let x = 0; x < W; x++)
+      e2[y * W + x] = 100 + 700 * Math.exp(-((x - 14) * (x - 14)) / 8);
+  const b2 = Float32Array.from(e2);
+  const n2 = despikeDEM(e2, W, W);
+  check(
+    'DEM despike: ridge survives',
+    n2 === 0 && e2.every((v, k) => v === b2[k]),
+    'an 800-m knife ridge (sigma 2 px, ~75 deg flanks) is BIT-IDENTICAL through the filter - the neighbourhood median climbs with real terrain'
+  );
+  // (3) the sea stack under the floor
+  const e3 = mk(0);
+  e3[16 * W + 16] = 120;
+  const n3 = despikeDEM(e3, W, W);
+  check(
+    'DEM despike: sea stack floor',
+    n3 === 0 && e3[16 * W + 16] === 120,
+    'a 120-m single-pixel stack survives the 150 m floor (Old Man of Hoy, 137 m, is the tallest real one)'
   );
 }
 

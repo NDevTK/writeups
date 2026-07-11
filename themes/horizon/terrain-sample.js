@@ -32,6 +32,58 @@ const RAD = Math.PI / 180;
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
+/**
+ * DEM despike - decision-based median repair (the classic
+ * thresholded median filter for impulse noise): a sample is
+ * replaced by its 3x3 neighbourhood median ONLY when it deviates
+ * from that median by more than floorM metres. This exists
+ * because the AWS terrarium tiles themselves carry rare garbage
+ * streaks - the measured Nelson case (tile 12/4019/2564) holds a
+ * 1-2 px wide column of -92/134/448/531 m flanked by -248/-276 m
+ * in the middle of a 3-6 m harbour, which baked into a 500-m
+ * needle on the waterfront. The MEDIAN makes the rule safe on
+ * real terrain: on a cliff face or ridge the neighbourhood
+ * median follows the feature, so v - median stays small; only
+ * relief that stands >150 m proud of its own 3x3 median - a
+ * tower one or two 30 m pixels wide - trips it, and no real
+ * landform does that in a 30 m radar DEM (Old Man of Hoy, the
+ * tallest sea stack on Earth at 137 m, sits under the floor
+ * even in principle). A plain Hampel/MAD rule was REJECTED by
+ * the landmarks: a garbage cluster inflates its own window MAD
+ * and shields itself (the measured streak held 448 m against a
+ * 573 m MAD threshold). Iterated passes collapse longer streaks;
+ * returns the number of repaired samples.
+ */
+export function despikeDEM(elev, w, h, floorM = 150, passes = 4) {
+  const win = new Float64Array(8);
+  let repaired = 0;
+  for (let pass = 0; pass < passes; pass++) {
+    let touched = 0;
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const k = y * w + x;
+        win[0] = elev[k - w - 1];
+        win[1] = elev[k - w];
+        win[2] = elev[k - w + 1];
+        win[3] = elev[k - 1];
+        win[4] = elev[k + 1];
+        win[5] = elev[k + w - 1];
+        win[6] = elev[k + w];
+        win[7] = elev[k + w + 1];
+        const s = win.sort();
+        const med = (s[3] + s[4]) / 2;
+        if (Math.abs(elev[k] - med) > floorM) {
+          elev[k] = med;
+          touched++;
+        }
+      }
+    }
+    repaired += touched;
+    if (!touched) break;
+  }
+  return repaired;
+}
+
 // Elevation (metres AMSL) at scene x/z through the fetched DEM.
 export function demElev(dem, x, z, world) {
   if (dem.kind === 'img') {
