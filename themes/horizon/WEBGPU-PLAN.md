@@ -3454,6 +3454,33 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   end-on (an aircraft flying at the camera projects its trail as
   a vertical streak); the pre-dawn tan is green vegetation under
   the warm dawn-sky ambient with the documented adaptation lift.
+- DONE (measured land albedo, Jul 11 - closes the entry below's
+  open research): the unified ground albedo now takes the box's
+  MEASURED value inland. The MCD43 weights themselves stay
+  fixed-sites-only on ORNL's open API (checked live: MCD43A1/A/A4
+  all refuse arbitrary points while MOD09A1 serves globally), so
+  the theme runs the OPERATIONAL retrieval itself: fitRTLSR
+  (ross-li.js) is Lucht, Schaaf & Strahler 2000's linear least
+  squares of R = f_iso + f_vol Kvol + f_geo Kgeo over the same
+  clear MOD09A1 multi-angular record the archetype fit already
+  pulls (BASE kernels as the product uses), with the product's
+  rules mirrored: 7-observation full-inversion floor, a
+  normal-matrix conditioning gate (repeated geometry refuses),
+  and physical guards (f_iso and both integrated albedos inside
+  (0,1)). Run per MODIS band 1/4/3 - the nearest measured
+  narrowbands to the atmosphere's 680/550/440 nm channels - and
+  the already-validated Lucht white-sky integrals give an [R,G,B]
+  albedo; ALL THREE bands must invert or none feed (a two-channel
+  albedo would be invented colour). atmo.update accepts the vec3
+  (Payne 0.06 stays at sea); the MS rebuild key carries all three
+  channels. Landmarks: planted weights recover fp-exactly
+  (3.9e-16) on the measured Grindelwald geometries with the
+  Lucht-integral WSA; 6 obs refuse; rank-1 geometry refuses; the
+  MS landmark adds per-channel independence (an R-only feed moves
+  only R). VERIFIED LIVE at the Sydney box: 46 clear obs, panel
+  'MOD09A1 white-sky albedo - RGB 0.089/0.085/0.056' -
+  chlorophyll-shaped values feeding the sky ground bounce. Full
+  gate green.
 - DONE (ONE ground albedo: MS LUT unified with the terminal
   bounce, Jul 10 latest): research pass on Hillaire (2020)
   turned up that the multiple-scattering LUT's ground

@@ -795,9 +795,14 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // reproduction, not physics): twilight is genuinely darker, but
     // not pitch black.
     update(sunDir, mie, camHMetres, expo, groundAlbedo) {
-      // The terminal ground bounce's albedo (scalar, broadband):
-      // the theme feeds Payne (1972) 0.06 when the box has sea.
-      if (groundAlbedo != null) groundAlb.value.setScalar(groundAlbedo);
+      // The ground albedo (shared by the MS LUT and the terminal
+      // bounce): Payne (1972) 0.06 scalar where the box has sea,
+      // or the box's MEASURED per-channel white-sky albedo inland
+      // ([R,G,B] from the MOD09A1 RTLSR inversion - MODIS bands
+      // 1/4/3, the nearest measured narrowbands to the atmosphere's
+      // 680/550/440 nm channels).
+      if (Array.isArray(groundAlbedo)) groundAlb.value.fromArray(groundAlbedo);
+      else if (groundAlbedo != null) groundAlb.value.setScalar(groundAlbedo);
       // mie = {scat: [r,g,b], abs: [r,g,b], g} (1/m at h = 0) from
       // aerosol.js mieCoefficients - measured when /aerosol
       // answers, the Hillaire defaults calibrated to the measured
@@ -818,7 +823,14 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       const mieKey = mie
         ? mie.scat.join() + '|' + mie.abs.join() + '|' + mie.g
         : lastMie;
-      const msKey = mieKey + '|' + groundAlb.value.x;
+      const msKey =
+        mieKey +
+        '|' +
+        groundAlb.value.x +
+        ',' +
+        groundAlb.value.y +
+        ',' +
+        groundAlb.value.z;
       if (!lutsBuilt || msKey !== lastMs) {
         if (!lutsBuilt || mieKey !== lastMie) fillT();
         fillMs();
