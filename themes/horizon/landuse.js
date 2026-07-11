@@ -23,6 +23,7 @@
 
 import {decimate, stitchRings} from './lakes.js';
 import {geoToScene} from './roam.js';
+import {cropAlbedoFromTags} from './crops.js';
 
 // Linear albedos per OSM class (same space as the terrain's grass
 // vec3(0.09..0.19, 0.21..0.33, 0.05..0.08) ramp).
@@ -83,20 +84,40 @@ const ringArea = (r) => {
   return Math.abs(s) / 2;
 };
 
+// The classes that carry a real crop (farm parcels and orchards):
+// on these, an OSM crop/produce/trees tag overrides the flat class
+// albedo with the crop's own canopy colour (crops.js).
+export const CROP_HOSTS = new Set([
+  'farmland',
+  'farmyard',
+  'allotments',
+  'orchard',
+  'vineyard'
+]);
+
 /**
  * Overpass landuse/natural elements -> [{id, cls, albedo, rings,
  * area}], largest area LAST in paint order terms (the caller
  * paints in array order; we sort area-DESCENDING so small parcels
  * painted later win their texels). Classes outside CLASS_ALBEDO
  * are dropped - base grass is the truthful unknown.
+ *
+ * When `month` is supplied, a CROP_HOST parcel carrying a recognised
+ * crop/produce/trees tag wears its crop canopy colour (crops.js),
+ * seasonally shifted by `month`/`lat`; an unrecognised or absent crop
+ * keeps the flat class albedo, so the tagless default is unchanged.
  */
-export function parseLanduse(json, minSpanM = 60, cap = 400) {
+export function parseLanduse(json, minSpanM = 60, cap = 400, month = 0, lat) {
   const out = [];
   for (const el of (json && json.elements) || []) {
     const tags = el.tags || {};
     const cls = tags.landuse || tags.natural;
-    const albedo = CLASS_ALBEDO[cls];
+    let albedo = CLASS_ALBEDO[cls];
     if (!albedo) continue;
+    if (month && CROP_HOSTS.has(cls)) {
+      const crop = cropAlbedoFromTags(tags, month, lat);
+      if (crop) albedo = crop;
+    }
     let rings = null;
     if (el.type === 'way' && el.geometry && el.geometry.length >= 4) {
       let ring = el.geometry.map((g) => [g.lat, g.lon]);
