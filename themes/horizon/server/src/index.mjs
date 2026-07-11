@@ -89,7 +89,13 @@ export function normalize(j) {
       lon: a.lon,
       alt_baro: a.alt_baro,
       gs: a.gs,
-      track: a.track
+      track: a.track,
+      // The MEASURED airframe identity: ICAO type designator (readsb
+      // 't', e.g. A320/B789/GLF6) and DO-260B emitter category (e.g.
+      // A3/A5) - so the theme can draw each aircraft at its real type
+      // (aircraft.js), the aerial twin of the AIS ship silhouettes.
+      t: typeof a.t === 'string' ? a.t : '',
+      cat: typeof a.category === 'string' ? a.category : ''
     }));
 }
 
