@@ -246,6 +246,12 @@
         // feed -> texture -> shader chain, channel by channel.
         atmo.sunTransfer.on.value = 0;
         atmo.spectralOn.value = 0;
+        // The high-sun path draws each channel around its own
+        // refracted direction - the theme always feeds these; an
+        // unfed probe leaves R and B parked at the zenith (their
+        // default) with no disc at the camera at all.
+        atmo.sunDisc.dirR.value.copy(sunDir);
+        atmo.sunDisc.dirB.value.copy(sunDir);
         const TINT = [0.3, 0.2, 0.1];
         atmo.sunSpots.set([
           {
