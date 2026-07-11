@@ -465,6 +465,7 @@
         pixelOf
       } from './horizon/nightlights.js';
       import {chromaticity, waterColorLinear} from './horizon/ocean-color.js';
+      import {landColorLinear, REFERENCE_NDVI} from './horizon/land-color.js';
       import {
         attribute as tslAttribute,
         cameraPosition as tslCameraPosition,
@@ -2900,6 +2901,64 @@
           // signal - the sea keeps its current colour.
         } catch {
           // Network down: the placeholder / last colour stands.
+        }
+      }
+
+      // Land colour from MEASURED greenness - the terrestrial twin of
+      // the ocean-colour feed. The daemon returns the MODIS MOD13Q1
+      // NDVI (250 m, 16-day composite) for the cell over the view;
+      // vegetation.js (Carlson & Ripley fractional cover -> soil/canopy
+      // reflectance mixture) and the CIE integration (land-color.js,
+      // the SAME D65 + 1931 2-deg observer the sea uses) turn it into a
+      // linear-sRGB grass albedo, applied as a tint on the terrain's
+      // base grass ramp (uGrassTint). The tint is relative to the tuned
+      // reference cell, so a full canopy leaves the look unchanged and
+      // an arid cell reads brown - from the physics, not a painted
+      // class colour. ?ndvi=X pins the index (the deterministic A/B
+      // knob); ?ndvisrc=URL overrides the endpoint.
+      const NDVI_PROXY = params.get('ndvisrc') ?? 'https://api.ndev.tk/ndvi';
+      const NDVI_REF_RGB = landColorLinear(REFERENCE_NDVI); // exposure anchor
+      function applyNdvi(ndvi, note) {
+        const rgb = landColorLinear(ndvi);
+        const tint = [
+          rgb[0] / NDVI_REF_RGB[0],
+          rgb[1] / NDVI_REF_RGB[1],
+          rgb[2] / NDVI_REF_RGB[2]
+        ];
+        if (!terrainUniforms?.uGrassTint) return;
+        terrainUniforms.uGrassTint.value.fromArray(tint);
+        record(
+          'MODIS/NDVI land colour',
+          'NDVI ' +
+            ndvi.toFixed(3) +
+            ' · tint ' +
+            tint.map((v) => v.toFixed(2)).join('/') +
+            (note ? ' · ' + note : '')
+        );
+      }
+      async function syncNdvi() {
+        // Pinned index: deterministic, no fetch (harness A/B).
+        if (params.has('ndvi')) {
+          applyNdvi(Math.max(0, Math.min(1, +params.get('ndvi'))), 'pinned');
+          return;
+        }
+        try {
+          const r = await (
+            await fetch(
+              NDVI_PROXY +
+                '?lat=' +
+                state.lat.toFixed(3) +
+                '&lon=' +
+                state.lon.toFixed(3),
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (typeof r.ndvi === 'number' && r.ndvi > 0)
+            applyNdvi(r.ndvi, r.date || '');
+          // ndvi null (200) is water / off-land: the terrain keeps its
+          // tuned grass colour.
+        } catch {
+          // Network down: the tuned grass colour stands.
         }
       }
 
@@ -6881,6 +6940,7 @@
         syncAerosol();
         syncWater();
         syncChlor();
+        syncNdvi();
         syncBuildings();
         syncRoads();
         syncRivers();
@@ -9375,6 +9435,10 @@
         // poll (matching the /chlor cache) more than covers it.
         syncChlor();
         setInterval(syncChlor, 60 * 60 * 1000);
+        // NDVI is a 16-day composite; the same hourly poll (matching the
+        // /ndvi cache) more than covers it.
+        syncNdvi();
+        setInterval(syncNdvi, 60 * 60 * 1000);
         syncBuildings();
         syncRoads();
         syncRivers();

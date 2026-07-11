@@ -32,6 +32,11 @@ import {
   lzwDecode,
   originCheck,
   parseChlor,
+  parseNdvi,
+  ndviCell,
+  ndviDatesUrl,
+  ndviUrl,
+  ndviDate,
   prune,
   pruneStrikes,
   aisBox,
@@ -375,6 +380,70 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       parseChlor({}) === null &&
       parseChlor({table: {columnNames: ['time'], rows: [['t']]}}) === null,
     `cell snap matches the live-returned 1/12-deg centres (37.541664/-122.958336) and is idempotent; poles/antimeridian and out-of-range inputs clamp inside the grid; URL pinned to the CoastWatch dataset with the snapped cell only; live ocean 0.693 and gyre 0.064 mg/m^3 parse exact; land null is a real answer; -999 fill, out-of-valid-range and non-numeric -> null; malformed tables -> null (502)`
+  );
+}
+
+{
+  // Land greenness (/ndvi): the pure pieces held to the LIVE ORNL DAAC
+  // MOD13Q1 responses recorded when the source was pinned (2026-07-11):
+  //   (45,-90) Wisconsin -> 0.6813 at composite A2026145 (2026-05-25)
+  //   (23,13)  Sahara    -> 0.096 (bare desert)
+  //   -3000 fill / out-of-range -> ndvi null (a real no-measure cell)
+  const sub = (raw) => ({
+    subset: [
+      {
+        modis_date: 'A2026145',
+        calendar_date: '2026-05-25',
+        band: '250m_16_days_NDVI',
+        data: [raw]
+      }
+    ]
+  });
+  const dates = {
+    dates: [
+      {modis_date: 'A2026001', calendar_date: '2026-01-01'},
+      {modis_date: 'A2026145', calendar_date: '2026-05-25'}
+    ]
+  };
+  const wi = ndviCell(45.0, -90.0);
+  const idem = ndviCell(wi.lat, wi.lon);
+  const clamp = ndviCell(91, 181);
+  const date = ndviDate(dates);
+  const u = ndviUrl(wi, date);
+  const PIN =
+    'https://modis.ornl.gov/rst/api/v1/MOD13Q1/subset?latitude=45&longitude=-90' +
+    '&startDate=A2026145&endDate=A2026145&band=250m_16_days_NDVI' +
+    '&kmAboveBelow=0&kmLeftRight=0';
+  const grass = parseNdvi(sub(6813));
+  const desert = parseNdvi(sub(960));
+  check(
+    'land greenness (/ndvi)',
+    date === 'A2026145' &&
+      ndviDate({dates: []}) === null &&
+      ndviDate({}) === null &&
+      ndviDate({dates: [{modis_date: 'X'}]}) === null &&
+      ndviDatesUrl(wi) ===
+        'https://modis.ornl.gov/rst/api/v1/MOD13Q1/dates?latitude=45&longitude=-90' &&
+      wi.lat === 45 &&
+      wi.lon === -90 &&
+      idem.lat === wi.lat &&
+      idem.lon === wi.lon &&
+      clamp.lat === 90 &&
+      clamp.lon === 180 &&
+      ndviCell(-91, -181).lat === -90 &&
+      u === PIN &&
+      Math.abs(grass.ndvi - 0.6813) < 1e-9 &&
+      grass.date === '2026-05-25' &&
+      Math.abs(desert.ndvi - 0.096) < 1e-9 &&
+      parseNdvi(sub(-3000)).ndvi === null &&
+      parseNdvi(sub(-2001)).ndvi === null &&
+      parseNdvi(sub(10001)).ndvi === null &&
+      parseNdvi({subset: []}).ndvi === null &&
+      parseNdvi({subset: []}).date === null &&
+      parseNdvi(sub('0.5')) === null &&
+      parseNdvi({}) === null &&
+      parseNdvi({subset: [{data: []}]}) === null,
+    `date resolves to the latest composite A2026145; cell snaps to 0.01 deg (45/-90), idempotent, poles/antimeridian clamp inside; /dates + /subset URLs pinned to the ORNL MOD13Q1 service with the snapped cell + date only; live Wisconsin 0.6813 and Sahara 0.096 parse exact; empty subset (ocean/off-land) and -3000 fill / out-of-range -> ndvi null (real no-measure, 200); non-numeric/malformed -> null (502)`
   );
 }
 

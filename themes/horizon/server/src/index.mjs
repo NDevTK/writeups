@@ -500,6 +500,71 @@ export function parseChlor(j) {
   };
 }
 
+// ---- Land greenness: MODIS NDVI (ORNL DAAC MOD13Q1) ------------
+// The ORNL DAAC MODIS/VIIRS Web Service serves ONE MOD13Q1 (Terra,
+// 250 m, 16-day composite) NDVI pixel for a lat/lon as JSON, no key,
+// CORS-open. Two calls: /dates returns the composite calendar (global
+// - the same Ayyyyddd list for every land cell), /subset returns the
+// value at a date. Both URLs are built HERE from the snapped cell and
+// the resolved date only - never a caller-supplied URL, the same
+// point-query-proxy posture as /chlor. The land twin of the ocean
+// colour feed (vegetation.js/land-color.js turn the NDVI into a
+// terrain albedo). The pure pieces live here for server-reference.mjs.
+const NDVI_BAND = '250m_16_days_NDVI';
+const ORNL_MOD13Q1 = 'https://modis.ornl.gov/rst/api/v1/MOD13Q1';
+
+// Snap to a ~0.01-deg cell for cache coherence (many viewers in one
+// place cost one upstream query); the service nearest-neighbours the
+// snapped point to its containing 250 m pixel.
+export function ndviCell(lat, lon) {
+  const snap = (x, n) => Math.round(Math.max(-n, Math.min(n, x)) * 100) / 100;
+  return {lat: snap(lat, 90), lon: snap(lon, 180)};
+}
+
+// The /dates URL for a cell - resolves the composite calendar (the
+// latest Ayyyyddd is what /subset then queries).
+export function ndviDatesUrl(cell) {
+  return `${ORNL_MOD13Q1}/dates?latitude=${cell.lat}&longitude=${cell.lon}`;
+}
+
+// The /subset point URL, built from the snapped cell and a resolved
+// composite date only.
+export function ndviUrl(cell, date) {
+  return (
+    `${ORNL_MOD13Q1}/subset?latitude=${cell.lat}&longitude=${cell.lon}` +
+    `&startDate=${date}&endDate=${date}&band=${NDVI_BAND}` +
+    '&kmAboveBelow=0&kmLeftRight=0'
+  );
+}
+
+// The latest composite date (MODIS Ayyyyddd) from a /dates response;
+// null if the calendar is missing or malformed.
+export function ndviDate(j) {
+  const ds = j?.dates;
+  if (!Array.isArray(ds) || !ds.length) return null;
+  const m = ds[ds.length - 1]?.modis_date;
+  return typeof m === 'string' && /^A\d{7}$/.test(m) ? m : null;
+}
+
+// null = unusable response (-> 502); {ndvi: null} = a real answer
+// (no land measure here) and cached like any success, exactly as
+// chlor's land null. An empty subset is the service's answer for a
+// water/off-land point (200 with subset: []); a present pixel with a
+// -3000 fill or out-of-range value is a masked land pixel. Stored NDVI
+// is scaled by 1e-4 over the valid range -2000..10000 (-0.2..1.0).
+export function parseNdvi(j) {
+  if (!j || !Array.isArray(j.subset)) return null;
+  const s = j.subset[0];
+  if (!s) return {ndvi: null, date: null}; // no pixel: ocean/off-land
+  if (!Array.isArray(s.data) || typeof s.data[0] !== 'number') return null;
+  const raw = s.data[0];
+  const ok = raw >= -2000 && raw <= 10000;
+  return {
+    ndvi: ok ? raw * 1e-4 : null,
+    date: typeof s.calendar_date === 'string' ? s.calendar_date : null
+  };
+}
+
 // ---- Aircraft: readsb failover from a clean IP -----------------
 // All three speak readsb v2 ({ac:[...]}, feet/knots) and feed the
 // reference-gated normalize(). Order preferred by data richness;
@@ -848,6 +913,7 @@ function main() {
   const metarCache = new Map(); // area key -> {t, body}
   const aerosolCache = new Map(); // 0.25-deg cell key -> {t, body}
   const chlorCache = new Map(); // 1/12-deg cell key -> {t, body}
+  const ndviCache = new Map(); // 0.01-deg cell key -> {t, body}
   setInterval(() => {
     const now = Date.now();
     for (const [k, v] of adsbCache) if (now - v.t > 30e3) adsbCache.delete(k);
@@ -857,6 +923,8 @@ function main() {
       if (now - v.t > 90 * 60e3) aerosolCache.delete(k);
     for (const [k, v] of chlorCache)
       if (now - v.t > 12 * 3600e3) chlorCache.delete(k);
+    for (const [k, v] of ndviCache)
+      if (now - v.t > 12 * 3600e3) ndviCache.delete(k);
   }, 30e3).unref();
 
   // Measured aerosol radiative properties: GEFS-Aerosols (NOAA's
@@ -955,6 +1023,62 @@ function main() {
     } catch {
       chlorState.errors++;
       chlorCache.set(key, {t: Date.now(), body: null});
+      return null;
+    }
+  }
+  // Land greenness for the 0.01-deg cell over the point, from the
+  // ORNL DAAC MODIS MOD13Q1 NDVI service (250 m, 16-day composite,
+  // ~weeks latency). Two steps: resolve the latest composite date
+  // once (the calendar is global, cached 6 h), then one /subset point
+  // query per cell (URL from the gated ndviUrl). Successes - the fill
+  // "no measure" null included - cache 12 h, failures 10 min.
+  const ndviState = {fetches: 0, errors: 0, date: '', calDate: ''};
+  const ndviDateCache = {t: 0, date: ''};
+  const NDVI_DATE_REF = {lat: 45, lon: -90}; // any land cell; calendar is global
+  async function resolveNdviDate() {
+    if (ndviDateCache.date && Date.now() - ndviDateCache.t < 6 * 3600e3)
+      return ndviDateCache.date;
+    try {
+      const r = await fetch(ndviDatesUrl(NDVI_DATE_REF), {
+        signal: AbortSignal.timeout(FETCH_MS),
+        headers: {'user-agent': UA}
+      });
+      if (!r.ok) throw new Error('ornl dates ' + r.status);
+      const date = ndviDate(await r.json());
+      if (!date) throw new Error('ornl dates shape');
+      ndviDateCache.t = Date.now();
+      ndviDateCache.date = date;
+      ndviState.date = date;
+      return date;
+    } catch {
+      ndviState.errors++;
+      return ndviDateCache.date || null; // a stale date still serves
+    }
+  }
+  async function fetchNdvi(lat, lon) {
+    const date = await resolveNdviDate();
+    if (!date) return null;
+    const cell = ndviCell(lat, lon);
+    const key = cell.lat + '/' + cell.lon;
+    const hit = ndviCache.get(key);
+    if (hit && Date.now() - hit.t < (hit.body ? 720 : 10) * 60e3)
+      return hit.body;
+    try {
+      ndviState.fetches++;
+      const r = await fetch(ndviUrl(cell, date), {
+        signal: AbortSignal.timeout(15e3),
+        headers: {'user-agent': UA}
+      });
+      if (!r.ok) throw new Error('ornl ' + r.status);
+      const parsed = parseNdvi(await r.json());
+      if (!parsed) throw new Error('ornl shape');
+      if (parsed.date) ndviState.calDate = parsed.date;
+      const body = {...parsed, cell};
+      ndviCache.set(key, {t: Date.now(), body});
+      return body;
+    } catch {
+      ndviState.errors++;
+      ndviCache.set(key, {t: Date.now(), body: null});
       return null;
     }
   }
@@ -1125,6 +1249,13 @@ function main() {
         fetches: chlorState.fetches,
         errors: chlorState.errors
       };
+      const ndviHealth = {
+        cells: ndviCache.size,
+        date: ndviState.calDate,
+        composite: ndviState.date,
+        fetches: ndviState.fetches,
+        errors: ndviState.errors
+      };
       if (url.pathname === '/health')
         return json(
           200,
@@ -1134,7 +1265,8 @@ function main() {
             space: spaceHealth,
             smoke: smokeHealth,
             aerosol: aerosolHealth,
-            chlor: chlorHealth
+            chlor: chlorHealth,
+            ndvi: ndviHealth
           },
           {'cache-control': 'no-store'}
         );
@@ -1147,6 +1279,7 @@ function main() {
           smoke: smokeHealth,
           aerosol: aerosolHealth,
           chlor: chlorHealth,
+          ndvi: ndviHealth,
           probe: await probeAll()
         },
         {'cache-control': 'no-store'}
@@ -1269,6 +1402,18 @@ function main() {
       return json(200, body, {
         'cache-control': 'public, max-age=3600',
         'x-chlor-source': 'NOAA CoastWatch VIIRS DINEOF (ERDDAP)'
+      });
+    }
+
+    if (url.pathname === '/ndvi') {
+      // Land greenness (MODIS NDVI) in the 0.01-deg cell over the
+      // point. ndvi null with a 200 is a real answer (water/cloud/
+      // barren no-measure cell); 502 means the upstream itself failed.
+      const body = await fetchNdvi(lat, lon);
+      if (!body) return json(502, {ndvi: null, upstream: 'unavailable'});
+      return json(200, body, {
+        'cache-control': 'public, max-age=3600',
+        'x-ndvi-source': 'NASA MODIS MOD13Q1 (ORNL DAAC)'
       });
     }
 
