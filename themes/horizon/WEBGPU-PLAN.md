@@ -3406,7 +3406,39 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
-- OPEN -> BUILD PLAN (the green flash and the mirage sun, Jul
+- DONE (the green flash and the mirage sun, Jul 11 - built as
+  planned below, plus what the visuals forced): transferCurve +
+  foldCount in refraction.js, the 160-row LUT band in the dome
+  (alpha = per-row visibility), the theme feed on
+  profile/height cadence. Landmarks: identity + fold-free
+  standard atmosphere; the inferior mirage folds with a
+  BACKWARD branch; the ducting critical lapse EMERGES from
+  Ciddor's partials (+0.125 K/m, textbook, never assumed) with
+  sub-critical mock mirages and super-critical smooth looming
+  44' deep; the flash - 16.5" bare rim, x8.4 mirage-magnified,
+  measured with only VISIBLE rows; and the refracted dip itself
+  (-2.48' at 2 m vs geometric -2.72'). TWO REAL BUGS FORCED OUT:
+  (1) the below-horizon ray tracer's tangent Newton undershot at
+  the graze and the floor kept the aimed ray's Snell constant -
+  integrating a ray that never existed and folding the curve
+  artificially (now scan+bisect, underground rays saturate at
+  the true graze; the N-convergence pin re-based); (2) the first
+  sunset shots showed the disc floating past the drawn water's
+  edge - the LUT now carries visibility (a row whose ray still
+  points down at the profile bottom shows sea) so the sun sets
+  at the TRUE refracted horizon wherever the finite water plane
+  ends. VERIFIED: the full Rotterdam descent series through the
+  measured evening profile - flattening emerging from the curve,
+  the dip cutting the disc, the last sliver at 20:06:16.
+  Tonight's near-standard profile keeps the rim at 1 px (x1);
+  the VISIBLE flash is a live-weather event like the aurora -
+  the capability waits for a magnifying inversion (California's
+  marine layer is the classic) and the saturated sunset sky is
+  the other constraint (the 8-bit capture clips red at the
+  horizon; a flash-night check should also read the sliver
+  radiometrically).
+  The original plan, for the record:
+- (plan) the green flash and the mirage sun (Jul
   11): refraction.js already ray-traces the MEASURED column
   (Ciddor 1996 refractivity, Auer & Standish 2000 integral) but
   the drawn disc consumes only THREE scalars - per-channel
