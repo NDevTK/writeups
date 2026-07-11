@@ -1,0 +1,231 @@
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body style="margin: 0; overflow: hidden">
+    <canvas id="gl"></canvas>
+    <script>
+      /* swizzle shim */ if (navigator.gpu && self.GPUTexture) {
+        const ov = GPUTexture.prototype.createView;
+        GPUTexture.prototype.createView = function (d) {
+          if (d && 'swizzle' in d) {
+            d = Object.assign({}, d);
+            delete d.swizzle;
+          }
+          return ov.call(this, d);
+        };
+      }
+    </script>
+    <script type="module">
+      // Sunset-band probe: the dome's transfer band drawn on the GPU
+      // must land on the CPU ground truth. A synthetic IDENTITY
+      // transfer curve (true = apparent, vis = 1 above the tangent)
+      // puts the disc centre at a known fragment; the sky-subtracted,
+      // spectral-matrix-inverted disc radiance must equal
+      // 120 x sunTransmittanceJS at the EXACT observer radius (the
+      // band's CPU-built transmittance rows) per channel. A second
+      // pass parks the sun below the refracted horizon: every band
+      // row there is vis = 0 sea and the gated high-sun path must NOT
+      // repaint it - the phantom-disc regression stays dead.
+      import * as T from 'three/webgpu';
+      import {createAtmosphereTSL} from './writeups/themes/horizon/atmosphere-tsl.js';
+      import {sunTransmittanceJS} from './writeups/themes/horizon/sun-transmittance.js';
+      import {SPECTRAL_TO_SRGB} from './writeups/themes/horizon/spectral-srgb.js';
+      const log = (s) => console.log('BAND|' + s);
+      try {
+        const r = new T.WebGPURenderer({
+          canvas: document.getElementById('gl'),
+          forceWebGL: false,
+          antialias: false
+        });
+        await r.init();
+        log('backend ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'));
+        // 64 keeps the FloatType readback rows 256-byte aligned (an
+        // odd width comes back row-padded and scrambles indexing -
+        // measured). The half-pixel problem - pixel (32,32)'s centre
+        // sits 0.27 mrad off the camera axis, where grazing T_G
+        // genuinely moves ~4% - is solved by PITCHING the camera
+        // half a pixel, putting that pixel's centre exactly at
+        // SUN_ALT.
+        const W = 64;
+        r.setSize(W, W);
+
+        const atmo = createAtmosphereTSL(r, null);
+        const H_OBS = 130;
+        const SUN_ALT = 0.005; // rad, inside the band, above the dip
+        const sunDir = new T.Vector3(0, Math.sin(SUN_ALT), -Math.cos(SUN_ALT));
+        atmo.update(sunDir, null, H_OBS, 1, 0);
+
+        // Identity transfer curve over the shipped band with the
+        // observer-following floor (Horizon.html feeds the same
+        // shape from transferCurve; identity = no refraction, so
+        // the CPU expectation below is closed-form).
+        const ROWS = 160;
+        const aMin = Math.min(
+          -0.0105,
+          -Math.sqrt((2 * H_OBS) / 6371008.8) - 0.005
+        );
+        const muG = -Math.sqrt(1 - (6360e3 / (6360e3 + H_OBS)) ** 2);
+        const a = new Float64Array(ROWS);
+        const vis = new Uint8Array(ROWS);
+        for (let i = 0; i < ROWS; i++) {
+          a[i] = aMin + (i / (ROWS - 1)) * (0.0349 - aMin);
+          vis[i] = Math.sin(a[i]) > muG ? 1 : 0;
+        }
+        const curve = {a, tR: a, tG: a, tB: a, vis};
+        atmo.sunTransfer.set(curve);
+        // The CPU-built rows themselves: every row must hold the
+        // integral at ITS OWN altitude (bit-level check of fillBandT).
+        const MIE = {
+          scat: [3.996e-6, 3.996e-6, 3.996e-6],
+          abs: [4.44e-7, 4.44e-7, 4.44e-7]
+        };
+        let rowsOk = true;
+        {
+          const bd = atmo.sunTransfer.bandData();
+          for (let i = 0; i < ROWS; i += 7) {
+            const tt = sunTransmittanceJS(
+              Math.max(Math.sin(a[i]), muG + 1e-9),
+              MIE,
+              H_OBS
+            );
+            for (let c = 0; c < 3; c++)
+              if (Math.abs(bd[i * 4 + c] - tt[c]) > 1e-6) rowsOk = false;
+          }
+        }
+        log('bandT rows match the integral: ' + rowsOk);
+        atmo.sunTransfer.on.value = 1;
+        atmo.sunTransfer.sunTrue.value = SUN_ALT;
+
+        const scene = new T.Scene();
+        scene.add(atmo.mesh);
+        const cam = new T.PerspectiveCamera(2, 1, 0.1, 3000);
+        cam.position.set(0, 0, 0);
+        const pxRadCam = (2 * Math.tan(Math.PI / 180)) / W;
+        // px() reads rows bottom-up: pixel (32,32)'s centre sits
+        // half a pixel ABOVE the axis, so pitch the axis DOWN.
+        const AXIS_ALT = SUN_ALT - pxRadCam / 2;
+        cam.lookAt(0, Math.sin(AXIS_ALT), -Math.cos(AXIS_ALT));
+        cam.updateMatrixWorld();
+
+        const shoot = async () => {
+          const rt = new T.RenderTarget(W, W, {type: T.FloatType});
+          r.setRenderTarget(rt);
+          r.render(scene, cam);
+          r.setRenderTarget(null);
+          const buf = await r.readRenderTargetPixelsAsync(rt, 0, 0, W, W);
+          rt.dispose();
+          return buf;
+        };
+
+        // Compare in DISPLAY space: this disc is deep red, its
+        // pre-clip display B is NEGATIVE and the gamut clip engages
+        // - inverting P on clipped pixels is exactly the harness
+        // artifact that started this work. As long as NEITHER the
+        // sky pixel nor the combined pixel clips in a channel, the
+        // pixel DIFFERENCE equals P (120 T) in that channel - and
+        // B's difference must come out negative by the projection.
+        const applyP = (v) =>
+          SPECTRAL_TO_SRGB.map(
+            (row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]
+          );
+        const px = (buf, x, y) => {
+          // readback rows are bottom-up
+          const i = ((W - 1 - y) * W + x) * 4;
+          return [buf[i], buf[i + 1], buf[i + 2]];
+        };
+
+        // Pass 1: disc centre at the image centre. Pass 2 below
+        // re-shoots the SAME frame with the sun parked fully below
+        // the tangent - the sky-view LUT is untouched by the band's
+        // sunTrue uniform, so b2's centre pixel is the EXACT sky
+        // under the disc (no off-azimuth aureole-gradient error in
+        // the subtraction - a 28 px sky column inflated G by 4.5%).
+        const b1 = await shoot();
+        // Expectation = the band term box-integrated over the centre
+        // pixel's own footprint (T and the limb both vary across it),
+        // 16x16 subsamples of the direct integral - denser than the
+        // shader's 8x4, so it also cross-checks that quadrature.
+        const pxRad = (2 * Math.tan(Math.PI / 180)) / W;
+        const discR = Math.acos(0.9999893);
+        const texp = [0, 0, 0];
+        {
+          const N = 16;
+          const A = [0.4064, 0.5079, 0.6406];
+          for (let i = 0; i < N; i++)
+            for (let j = 0; j < N; j++) {
+              const alt = SUN_ALT + ((i + 0.5) / N - 0.5) * pxRad;
+              const az = ((j + 0.5) / N - 0.5) * pxRad;
+              const tt = sunTransmittanceJS(Math.sin(alt), MIE, H_OBS);
+              for (let c = 0; c < 3; c++) {
+                const s2 = Math.min(
+                  ((alt - SUN_ALT) ** 2 + az * az) / (discR * discR),
+                  1
+                );
+                texp[c] += tt[c] * Math.sqrt(1 - s2) ** A[c];
+              }
+            }
+          for (let c = 0; c < 3; c++) texp[c] /= N * N;
+        }
+
+        // Pass 2: the FULLY set sun stays set - centre far enough
+        // below the tangent that even the upper limb (+discR
+        // 0.0046) is under it, so every disc row is vis = 0 and the
+        // gated high-sun path must not repaint it. (-0.009 is NOT
+        // set: its upper limb genuinely rises above the -0.0064
+        // tangent - the first probe run proved that by drawing it.)
+        atmo.sunTransfer.sunTrue.value = -0.013;
+        const b2 = await shoot();
+        const c0 = px(b1, W / 2, W / 2);
+        const cS = px(b2, W / 2, W / 2);
+        const disc = [c0[0] - cS[0], c0[1] - cS[1], c0[2] - cS[2]];
+        const want = applyP(texp.map((t) => t * 120));
+        // R and G stay unclipped in both pixels and the difference
+        // is exactly P(120T) there; display B of the deep-red disc
+        // is negative pre-clip and this horizon sky's own B already
+        // sits at the clip floor, so the check for B IS the floor.
+        const clipped = c0[0] <= 0 || c0[1] <= 0 || cS[0] <= 0 || cS[1] <= 0;
+        let worst = 0;
+        for (let c = 0; c < 2; c++)
+          worst = Math.max(worst, Math.abs(disc[c] / want[c] - 1));
+        log(
+          `disc display diff ${disc.map((v) => v.toFixed(3)).join(' ')} vs P(120T) ${want
+            .map((v) => v.toFixed(3))
+            .join(
+              ' '
+            )} worst RG ${(worst * 100).toFixed(2)}% clipped=${clipped} B at clip floor=${c0[2] === 0 && want[2] < 0}`
+        );
+        let ghost = 0;
+        for (let y = 8; y < W - 8; y++) {
+          const d = px(b2, W / 2, y);
+          const s = px(b2, W / 2 - 28, y);
+          ghost = Math.max(ghost, Math.abs(d[0] - s[0]));
+        }
+        log(
+          `set-sun ghost max |dR| ${ghost.toFixed(4)} (vs disc ${disc[0].toFixed(1)})`
+        );
+
+        const pass =
+          rowsOk &&
+          worst < 0.01 &&
+          !clipped &&
+          c0[2] === 0 &&
+          want[2] < 0 &&
+          ghost < 0.02 * disc[0];
+        log(pass ? 'BAND PASS' : 'BAND FAIL');
+      } catch (e) {
+        console.log('ERR ' + (e.stack || e));
+      }
+      console.log('DONE');
+    </script>
+  </body>
+</html>

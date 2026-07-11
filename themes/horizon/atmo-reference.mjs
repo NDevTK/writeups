@@ -2,6 +2,7 @@
 // Mirrors the GLSL/TSL exactly (LUT sizes, bilinear sampling) - the ground
 // truth every GPU port is validated against. See WEBGPU-PLAN.md.
 import {yOfElev} from './roam.js';
+import {sunTransmittanceJS} from './sun-transmittance.js';
 
 const Rb = 6360e3,
   Rt = 6460e3;
@@ -601,6 +602,61 @@ if (aerFail) process.exit(1);
     worstId < 1e-12 && worstLin < 1e-12 && aboveSame && b06[0] > base[0];
   console.log(
     `${ok ? 'REF' : 'FAIL'} ground bounce: below-horizon texel gains EXACTLY T x T_sun x albedo/pi x NdotL (identity to ${worstId.toExponential(1)}), linear in albedo to ${worstLin.toExponential(1)}, above-horizon texels bit-identical - Hillaire's terminal term, Payne's 0.06 fed by the theme where the box has sea`
+  );
+  if (!ok) process.exit(1);
+}
+
+{
+  // The sunset band's transmittance rows. The 2D LUT stores one
+  // radius per texel row (~100 m apart near the ground) and the
+  // shader's bilinear blend near the horizon mixes transmittances
+  // of DIFFERENT grazing geometries - a channel-ratio skew right
+  // where the setting sun lives (first measured as a 1.5x R/G
+  // disagreement on the SF float captures). The band now builds
+  // its rows from the CPU integral at the EXACT observer radius
+  // (sunTransmittanceJS grew an hObs parameter):
+  //  - the historical 2-argument call is BIT-IDENTICAL to hObs=300
+  //  - the 32-step integral is converged at graze (vs 4096 steps)
+  //  - the LUT-bilinear skew is real but SMALL, and the exact rows
+  //    sit strictly closer to a 4096-step truth integral. (The 1.5x
+  //    K-spread that triggered this hunt was a HARNESS artifact -
+  //    the display gamut clip breaking the spectral inversion on
+  //    deep-red pixels; this landmark is what refuted it.)
+  const mie = {scat: mieS, abs: mieA};
+  const exact = (mu, hObs, N) => {
+    const r = Rb + hObs;
+    const d = -r * mu + Math.sqrt(r * r * (mu * mu - 1) + Rt * Rt);
+    const dt = d / N;
+    const tau = [0, 0, 0];
+    for (let i = 0; i < N; i++) {
+      const ti = (i + 0.5) * dt;
+      const h = Math.sqrt(r * r + ti * ti + 2 * r * ti * mu) - Rb;
+      const e = ext(h);
+      for (let c = 0; c < 3; c++) tau[c] += e[c] * dt;
+    }
+    return tau.map((t) => Math.exp(-t));
+  };
+  let worstId = 0;
+  for (let a = -0.2; a <= 60; a += 3.7) {
+    const mu = Math.sin((a * Math.PI) / 180);
+    const t2 = sunTransmittanceJS(mu, mie);
+    const t3 = sunTransmittanceJS(mu, mie, 300);
+    for (let c = 0; c < 3; c++)
+      worstId = Math.max(worstId, Math.abs(t2[c] - t3[c]));
+  }
+  const hObs = 130;
+  const mu = Math.sin((-0.25 * Math.PI) / 180);
+  const t32 = sunTransmittanceJS(mu, mie, hObs);
+  const t4k = exact(mu, hObs, 4096);
+  const conv = Math.max(
+    Math.abs(t32[0] / t32[1] / (t4k[0] / t4k[1]) - 1),
+    Math.abs(t32[2] / t32[1] / (t4k[2] / t4k[1]) - 1)
+  );
+  const lut = sunT(Rb + hObs, mu);
+  const skew = Math.abs(lut[0] / lut[1] / (t4k[0] / t4k[1]) - 1);
+  const ok = worstId === 0 && conv < 0.005 && skew < 0.02 && conv < skew;
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} band transmittance rows: 2-arg call bit-identical to hObs=300 (worst ${worstId.toExponential(1)}); at 130 m, -0.25 deg the 32-step exact-radius integral holds the truth R/G to ${(conv * 100).toFixed(2)}% vs the 2D LUT radius-row blend's ${(skew * 100).toFixed(2)}% - a small real error the band rows halve, NOT the 1.5x the clip-biased harness inversion suggested`
   );
   if (!ok) process.exit(1);
 }

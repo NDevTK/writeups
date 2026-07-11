@@ -3406,6 +3406,42 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (band transmittance exact + a refutation + the first
+  dome GPU probe, Jul 11): chased the flash mirror's 1.5x
+  per-channel K-spread. The honest landmark REFUTED the working
+  hypothesis - the 2D transmittance LUT's radius-row bilinear
+  blend skews sunset R/G by only 0.48% at the flash geometry
+  (atmo-reference, double precision); the 1.5x was the HARNESS
+  breaking itself: the display gamut clip zeroes the deep-red
+  disc's negative pre-clip B (and drags G), so inverting the
+  spectral matrix on clipped pixels is invalid (verified: a pure
+  disc colour recovers B 2.38x high through clip+inversion).
+  Still shipped, because exact beats small-error: (1)
+  sunTransmittanceJS grew an hObs parameter (2-arg call
+  BIT-IDENTICAL to the old 300 m, landmarked) and the band now
+  draws its transmittance from CPU-built rows at the EXACT
+  observer radius (bandTTex, filled with the curve on the same
+  cadence, refilled when the aerosol set moves) - halving the
+  0.48% to 0.19% of a 4096-step truth integral; (2) a REAL
+  half-texel bug found on the way: the band mapped altitude
+  linearly to u while row i's texel centre is (i+0.5)/N - up to
+  half a row of drift (0.15 mrad = 30 arcsec of drawn disc
+  geometry, ~4% of grazing T_G); uOfAlt lands each row's
+  altitude on its texel centre; (3) tsl-band-probe.html, the
+  gate's FIRST dome-path GPU probe: an identity transfer curve
+  puts the disc at a known fragment and the drawn pixel matches
+  P(120 T) to 0.08% in display space (comparing there because
+  the clip makes P non-invertible - the probe's own first runs
+  re-derived every harness lesson: the sky reference must be
+  the same fragment with the sun set, readback rows must stay
+  256-byte aligned, and the expectation must integrate the
+  pixel's own footprint half-pixel-exactly); the set sun stays
+  set to 0.01%. Also: container rollback recovery - all merged
+  work was safe on the remote; an UNSHIPPED shared-sky presence
+  feature found in the restored snapshot is preserved verbatim
+  on claude/shared-sky-presence-snapshot for review; the
+  harness symlink + playwright-core + servers rebuilt. Gate 56
+  sets + 4 GPU probes PASS.
 - DONE (the flash rim made continuous, Jul 11): the rim - the
   last rows where the 550 nm image persists past 680 nm's end -
   is thinner than a pixel (0.4-1.1 px through this mirage), and

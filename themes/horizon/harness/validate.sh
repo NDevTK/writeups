@@ -55,6 +55,7 @@ else
   probe ocean-wind "$BASE/tsl-ocean-num.html" 'TEXELS PASS'
   probe ocean-sea "$BASE/tsl-ocean-num.html?sea=1" 'TEXELS PASS'
   probe glints "$BASE/tsl-glint-probe.html" 'HASH PASS'
+  probe sunset-band "$BASE/tsl-band-probe.html" 'BAND PASS'
 fi
 
 if [ $fail = 0 ]; then echo "VALIDATE PASS"; else echo "VALIDATE FAIL"; fi
