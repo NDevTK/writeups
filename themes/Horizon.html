@@ -487,6 +487,11 @@
         vec3 as tslVec3
       } from 'three/tsl';
       import {buildVessel} from './horizon/vessels.js';
+      import {
+        buildAircraft,
+        makeAircraftMaterials
+      } from './horizon/airframes.js';
+      import {aircraftDims} from './horizon/aircraft.js';
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
       import {parseRoads, roadsGeometry} from './horizon/roads.js';
       import {
@@ -5089,7 +5094,7 @@
           // EVERY real aircraft (any altitude) carries its FAR
           // exterior lights after sunset - approach and departure
           // traffic low overhead is the brightest of all
-          updateAirLight(ac.hex, s, ac.track, now_);
+          updateAirLight(ac.hex, s, ac.track, now_, ac.t, ac.cat);
           if (ac.alt_baro < 26000 || seenFlights.has(ac.hex)) continue;
           // cruise only (~8 km up) claims contrail slots
           liveTraffic.push(s);
@@ -5117,6 +5122,14 @@
       // ?plane=N spawns deterministic synthetic aircraft for the
       // offline harness.
       const AIRLIGHT_N = 8;
+      // Aircraft bodies (airframes.js): each light slot also carries a
+      // real airframe built from the daemon's measured ICAO type, drawn
+      // day AND night (the lights are night-only). Size is visibility-
+      // scaled - the navlights are drawn at a readable size too - while
+      // the wingspan:length ratio and arrangement stay the real type's.
+      const AIRCRAFT_U = 2 / MPU;
+      const airMats = makeAircraftMaterials(THREE.MeshStandardNodeMaterial);
+      for (const m of Object.values(airMats)) aerial.apply(m);
       const airLights = [];
       {
         const dotGeo = new THREE.SphereGeometry(0.07, 8, 6);
@@ -5147,9 +5160,14 @@
           }
           g.visible = false;
           scene.add(g);
+          const frame = new THREE.Group(); // the airframe (day + night)
+          frame.visible = false;
+          scene.add(frame);
           airLights.push({
             g,
             lights,
+            frame,
+            frameType: null,
             hex: null,
             x: 0,
             z: 0,
@@ -5167,7 +5185,7 @@
           '25.1385 arcs · 25.1391 candela · 25.1401 strobes · Allard slant range'
         );
       }
-      function updateAirLight(hex, s, track, now_) {
+      function updateAirLight(hex, s, track, now_, type = '', cat = '') {
         const slot =
           airLights.find((a) => a.active && a.hex === hex) ??
           airLights.find((a) => !a.active);
@@ -5184,6 +5202,21 @@
           seen: now_,
           active: true
         });
+        // (Re)build the airframe when the measured type changes (a new
+        // aircraft claims this slot, or its type first arrives).
+        const key = (type || '') + '|' + (cat || '');
+        if (slot.frameType !== key) {
+          slot.frameType = key;
+          slot.frame.clear();
+          buildAircraft(
+            slot.frame,
+            aircraftDims(type, cat),
+            airMats,
+            0,
+            AIRCRAFT_U
+          );
+        }
+        return slot;
       }
       const planeOv = params.has('plane') ? +params.get('plane') : null;
       if (planeOv !== null) {
@@ -8397,8 +8430,14 @@
             ) {
               a.active = false;
               a.g.visible = false;
+              a.frame.visible = false;
               continue;
             }
+            // The airframe rides the same position/heading as the lights
+            // but shows in daylight too (the lights are night-only).
+            a.frame.position.set(a.x, a.y, a.z);
+            a.frame.rotation.y = -a.track * RAD;
+            a.frame.visible = true;
             if (!airOn) {
               a.g.visible = false;
               continue;
