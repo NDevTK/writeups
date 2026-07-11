@@ -492,6 +492,7 @@
         makeAircraftMaterials
       } from './horizon/airframes.js';
       import {aircraftDims} from './horizon/aircraft.js';
+      import {liveryForCallsign} from './horizon/airline.js';
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
       import {parseRoads, roadsGeometry} from './horizon/roads.js';
       import {
@@ -5101,7 +5102,7 @@
           // EVERY real aircraft (any altitude) carries its FAR
           // exterior lights after sunset - approach and departure
           // traffic low overhead is the brightest of all
-          updateAirLight(ac.hex, s, ac.track, now_, ac.t, ac.cat);
+          updateAirLight(ac.hex, s, ac.track, now_, ac.t, ac.cat, s.flight);
           if (ac.alt_baro < 26000 || seenFlights.has(ac.hex)) continue;
           // cruise only (~8 km up) claims contrail slots
           liveTraffic.push(s);
@@ -5137,6 +5138,19 @@
       const AIRCRAFT_U = 2 / MPU;
       const airMats = makeAircraftMaterials(THREE.MeshStandardNodeMaterial);
       for (const m of Object.values(airMats)) aerial.apply(m);
+      // Per-airline material sets (airline.js -> the carrier's tail
+      // colour), aerial-hooked, cached by ICAO code so a fleet of one
+      // airline shares materials; '' is the neutral light default.
+      const airMatCache = new Map([['', airMats]]);
+      const airMatsFor = (code, lv) => {
+        let m = airMatCache.get(code);
+        if (!m) {
+          m = makeAircraftMaterials(THREE.MeshStandardNodeMaterial, {livery: lv});
+          for (const mat of Object.values(m)) aerial.apply(mat);
+          airMatCache.set(code, m);
+        }
+        return m;
+      };
       const airLights = [];
       {
         const dotGeo = new THREE.SphereGeometry(0.07, 8, 6);
@@ -5192,7 +5206,7 @@
           '25.1385 arcs · 25.1391 candela · 25.1401 strobes · Allard slant range'
         );
       }
-      function updateAirLight(hex, s, track, now_, type = '', cat = '') {
+      function updateAirLight(hex, s, track, now_, type = '', cat = '', flight = '') {
         const slot =
           airLights.find((a) => a.active && a.hex === hex) ??
           airLights.find((a) => !a.active);
@@ -5209,16 +5223,19 @@
           seen: now_,
           active: true
         });
-        // (Re)build the airframe when the measured type changes (a new
-        // aircraft claims this slot, or its type first arrives).
-        const key = (type || '') + '|' + (cat || '');
+        // (Re)build the airframe when the measured type OR the airline
+        // changes (a new aircraft claims this slot, its type first
+        // arrives, or the callsign resolves to a carrier).
+        const lv = liveryForCallsign(flight);
+        const code = lv ? lv.code : '';
+        const key = (type || '') + '|' + (cat || '') + '|' + code;
         if (slot.frameType !== key) {
           slot.frameType = key;
           slot.frame.clear();
           buildAircraft(
             slot.frame,
             aircraftDims(type, cat),
-            airMats,
+            airMatsFor(code, lv),
             0,
             AIRCRAFT_U
           );
@@ -5226,6 +5243,18 @@
         return slot;
       }
       const planeOv = params.has('plane') ? +params.get('plane') : null;
+      // Demo callsigns for the offline harness, so ?plane= shows the
+      // real airline tail colours (airline.js).
+      const DEMO_CALLSIGNS = [
+        'SWR12',
+        'DLH441',
+        'BAW276',
+        'EZY83GH',
+        'RYR4KL',
+        'AFR1122',
+        'KLM56A',
+        'UAE201'
+      ];
       if (planeOv !== null) {
         // Offline harness: deterministic crossings at mixed
         // altitudes (an approach at 900 m, cruise above), fixed
@@ -5251,7 +5280,10 @@
                 altM
               },
               i % 2 ? 270 : 90,
-              Date.now()
+              Date.now(),
+              '',
+              '',
+              DEMO_CALLSIGNS[i % DEMO_CALLSIGNS.length]
             );
           }
         };

@@ -56,6 +56,7 @@
       import {liveryFor} from '../livery.js';
       import {buildAircraft, makeAircraftMaterials} from '../airframes.js';
       import {aircraftDims} from '../aircraft.js';
+      import {liveryForCallsign} from '../airline.js';
       import {rotorOmega, specOf} from '../turbines.js';
       import {buildWindmill} from '../windmills.js';
 
@@ -233,27 +234,45 @@
         sea.material.color.set('#8a9099');
         sun.position.set(-340, 360, -300);
         const only = q.get('type');
-        const LINEUP = only
-          ? [only]
-          : [
-              'A388',
-              'B744',
-              'B77W',
-              'A320',
-              'B738',
-              'E195',
-              'AT72',
-              'GLF6',
-              'C172',
-              'EC35'
-            ];
+        // ?livery=demo: one A320 per airline, to verify the tail
+        // colours (airline.js) from real ICAO callsigns.
+        const liveryDemo = q.get('livery') === 'demo';
+        const DEMO_CALLS = [
+          'SWR12',
+          'DLH441',
+          'BAW276',
+          'AFR1122',
+          'KLM56A',
+          'EZY83GH',
+          'RYR4KL',
+          'UAE201',
+          'QTR8',
+          'THY5'
+        ];
+        const LINEUP = liveryDemo
+          ? DEMO_CALLS.map(() => 'A320')
+          : only
+            ? [only]
+            : [
+                'A388',
+                'B744',
+                'B77W',
+                'A320',
+                'B738',
+                'E195',
+                'AT72',
+                'GLF6',
+                'C172',
+                'EC35'
+              ];
         let x = 0;
         const xs = [];
         for (let i = 0; i < LINEUP.length; i++) {
           const dims = aircraftDims(LINEUP[i]);
           const g = new THREE.Group();
           const mats = makeAircraftMaterials(THREE.MeshStandardMaterial, {
-            tint: (i % 3) * 0.3
+            tint: liveryDemo ? 0 : (i % 3) * 0.3,
+            livery: liveryDemo ? liveryForCallsign(DEMO_CALLS[i]) : null
           });
           buildAircraft(g, dims, mats, i / LINEUP.length, 1);
           const W = dims.wingspanM;
