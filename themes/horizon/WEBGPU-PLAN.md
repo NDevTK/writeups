@@ -3406,6 +3406,28 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (the teal noon stratum -> the spectral display
+  projection, Jul 11): built exactly as diagnosed below.
+  spectral-srgb.js: the CIE 1931 2-deg CMF rows at 680/550/440
+  (CVRL table VERBATIM), the three lines scaled so EQUAL
+  radiance maps to D65 (the unique all-positive 3x3 solution -
+  neutrality preserved by construction), then XYZ->sRGB DERIVED
+  from the primaries + D65. Landmarks (5): the published IEC
+  61966-2-1 coefficients (3.2406...) EMERGE from the derivation
+  to 3.7e-4; 550 nm sits at (0.302, 0.692) - the gap to the
+  green primary IS the bug; P(1,1,1) = (1,1,1) to 5.6e-16; the
+  pinned de-teal (Rayleigh zenith mixture G/B 0.410 -> 0.323,
+  R/B 0.175 -> 0.241); a pure 550 nm line clips back to the
+  green primary axis (mixtures change, monochromatic saturation
+  survives). Wired at the DISPLAY ends only - domeColor's final
+  colour, the skyRadiance export (moon + far ring), the aerial
+  LUT's in-scatter term, and the two CPU feeds (irradiance
+  readback -> ambient, sunTransmittanceJS -> sunLight colour,
+  where the Rec.709 luminance now means luminance) - every LUT
+  texel pin untouched, gate 56 sets + 3 GPU probes PASS.
+  VERIFIED at Interlaken noon (the diagnosis scene: the cyan
+  stratum gone, mid-sky G/R rebalanced) and a Rotterdam sea
+  noon.
 - OPEN -> DIAGNOSED (the teal noon stratum, Jul 11): clean
   inland noon skies (first stared at during the Interlaken
   far-horizon shots) carry a distinct cyan band between the

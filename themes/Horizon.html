@@ -316,6 +316,7 @@
     <script type="module">
       import * as THREE from 'three';
       import {sunTransmittanceJS} from './horizon/sun-transmittance.js';
+      import {applySpectral} from './horizon/spectral-srgb.js';
       import {createAtmosphereTSL} from './horizon/atmosphere-tsl.js';
       import {
         createCloudShadowHook,
@@ -7445,7 +7446,13 @@
         // The sun's light on the world carries its true transmitted
         // colour: the CPU mirror of the transmittance integral reddens
         // low sun physically instead of by hue heuristic.
-        const st = sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieRad);
+        // ... projected through the same CIE 1931 display matrix the
+        // dome uses (spectral-srgb.js): the 3-lambda transmittance is
+        // radiance-weighting for the disc's light, and the Rec.709
+        // luminance below only means luminance AFTER the projection.
+        const st = applySpectral(
+          sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieRad)
+        );
         const stMax = Math.max(st[0], st[1], st[2], 1e-4);
         sunLight.color.setRGB(st[0] / stMax, st[1] / stMax, st[2] / stMax);
         const stLum = 0.2126 * st[0] + 0.7152 * st[1] + 0.0722 * st[2];
@@ -7468,7 +7475,11 @@
             // or two later, which a 1 Hz ambient cannot notice.
             atmo.readIrradiance().then((ir) => {
               if (ir && ir[0] + ir[1] + ir[2] > 1e-7) {
-                skyIrr.setRGB(ir[0], ir[1], ir[2]);
+                // The irradiance readback is 3-lambda like the dome -
+                // same display projection, so the ambient's colour IS
+                // the projected sky's.
+                const p = applySpectral(ir);
+                skyIrr.setRGB(p[0], p[1], p[2]);
                 skyIrrReady = true;
               }
             });
