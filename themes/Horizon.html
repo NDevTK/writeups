@@ -323,7 +323,10 @@
         generateCloudTexturesTSL
       } from './horizon/clouds-tsl.js';
       import {createAerialFog} from './horizon/aerial-tsl.js';
-      import {createTerrainNodeMaterial} from './horizon/terrain-tsl.js';
+      import {
+        createTerrainNodeMaterial,
+        GRASS_MEAN
+      } from './horizon/terrain-tsl.js';
       import {
         ARCHETYPES,
         fitArchetype,
@@ -4294,7 +4297,11 @@
       // extinction model per regime, both measured.
       const FAR_R0 = 150; // scene units - just past the box edge
       const FAR_R1 = 3400; // ~195 km
-      const uFarAlbedo = tslUniform(new THREE.Color(0, 0, 0));
+      // Fallback: the box's own base grass (terrain-tsl GRASS_MEAN)
+      // until the measured white-sky albedo arrives.
+      const uFarAlbedo = tslUniform(
+        new THREE.Color(GRASS_MEAN[0], GRASS_MEAN[1], GRASS_MEAN[2])
+      );
       const uFarSunDir = tslUniform(new THREE.Vector3(0, 1, 0));
       const uFarSunCol = tslUniform(new THREE.Color(0, 0, 0));
       const uFarSkyIrr = tslUniform(new THREE.Color(0, 0, 0));
@@ -4307,7 +4314,10 @@
         });
         const view = tslPositionWorld.sub(tslCameraPosition);
         const dM = tslLength(tslVec2(view.x, view.z)).mul(MPU);
-        const T = tslExp(dM.mul(-3.912).div(tslMax(uFarVis, 400)));
+        // The box fog's exact curve (aerial-tsl FogExp2, 2% at V).
+        const T = tslExp(
+          dM.mul(1.98).div(tslMax(uFarVis, 400)).pow(2).negate()
+        );
         const ndl = tslMax(tslDot(tslNormalWorld, uFarSunDir), 0);
         const lit = uFarAlbedo
           .mul(uFarSunCol.mul(ndl).add(uFarSkyIrr))

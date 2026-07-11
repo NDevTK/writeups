@@ -106,9 +106,13 @@ export function farRadii(r0 = 150, r1 = 3500, n = 44) {
   return out;
 }
 
-// Koschmieder transmittance of a horizontal path: the same
-// extinction the theme's fog already cites, at the MEASURED
-// meteorological visibility V (metres): T = exp(-3.912 d / V).
+// Transmittance toward the horizon sky at the MEASURED
+// meteorological visibility V - the SAME curve the box fog uses
+// (aerial-tsl: exp(-(1.98 d / V)^2), FogExp2 calibrated so
+// T(V) = e^-3.9204 = 2%, Koschmieder's contrast threshold at
+// exactly V). Matching the box's curve keeps the seam from
+// stepping; the 2% calibration point is held as a landmark.
 export function koschmiederT(dM, visM) {
-  return Math.exp((-3.912 * dM) / Math.max(visM, 1));
+  const s = (1.98 * dM) / Math.max(visM, 1);
+  return Math.exp(-s * s);
 }

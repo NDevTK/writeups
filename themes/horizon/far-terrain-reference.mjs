@@ -154,13 +154,17 @@ const check = (name, ok, detail) => {
 }
 
 {
-  // Koschmieder at the measured visibility: T at exactly V is
-  // e^-3.912 = the 2% contrast threshold that DEFINES V.
+  // The horizon fade uses the BOX's own fog curve (aerial-tsl:
+  // exp(-(1.98 d/V)^2)) so the seam cannot step, and the curve
+  // still lands on Koschmieder's 2% contrast at exactly V.
   const t = koschmiederT(20e3, 20e3);
+  const mid = koschmiederT(10e3, 20e3);
   check(
-    'Koschmieder identity',
-    Math.abs(t - Math.exp(-3.912)) < 1e-12 && Math.abs(t - 0.02) < 0.0002,
-    `T(V) = e^-3.912 = ${t.toFixed(5)} - the 2% contrast threshold that defines meteorological visibility`
+    'Koschmieder calibration',
+    Math.abs(t - Math.exp(-1.98 * 1.98)) < 1e-12 &&
+      Math.abs(t - 0.0198) < 3e-4 &&
+      Math.abs(mid - Math.exp(-0.99 * 0.99)) < 1e-12,
+    `T(V) = e^-3.9204 = ${t.toFixed(5)} (Koschmieder's 2% at exactly V) and the half-distance value ${mid.toFixed(4)} IS the box fog's - the seam cannot step`
   );
 }
 
