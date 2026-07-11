@@ -8298,7 +8298,13 @@
             }
             if (!g) {
               g = new THREE.Group();
-              buildTrain(g, j.cat, j.consist, trainMatsFor(j.cat, j.operator), 1 / MPU);
+              buildTrain(
+                g,
+                j.cat,
+                j.consist,
+                trainMatsFor(j.cat, j.operator),
+                1 / MPU
+              );
               scene.add(g);
               trainPool.set(key, g);
             }
