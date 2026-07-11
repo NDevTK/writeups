@@ -38,6 +38,8 @@ import {
   ndviUrl,
   ndviDate,
   parseSurface,
+  parseSurfaceState,
+  surfaceQaClean,
   surfaceDatesUrl,
   surfaceUrl,
   parseRrs,
@@ -491,6 +493,31 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       parseSurface(band('x')) === null &&
       parseSurface({}) === null,
     `/dates + /subset URLs pinned to the ORNL MOD09A1 service with the snapped cell + date + band only; live Sahara red 0.4248 and green 0.246 parse exact; -28672 fill and out-of-range -> refl null, small negative clamps to 0; empty subset (ocean) -> null refl (200); non-numeric/malformed -> null (502)`
+  );
+}
+
+{
+  // Surface QA (sur_refl_state_500m): the cloud/cirrus/shadow decode
+  // held to the LIVE recorded states (2026-07-11): Amazon 138 (cloud
+  // state 10 = mixed) is contaminated and rejected; Sahara/Wisconsin 72
+  // (cloud state 00 = clear, land, low aerosol) pass. Bit meanings from
+  // the LP DAAC layer table.
+  check(
+    'surface QA decode',
+    surfaceQaClean(72) === true && // clear, land, low aerosol (Sahara/Wisconsin)
+      surfaceQaClean(138) === false && // mixed cloud (Amazon) - rejected
+      surfaceQaClean(0) === true && // clear
+      surfaceQaClean(3) === true && // "not set, assumed clear"
+      surfaceQaClean(1) === false && // cloudy (bits 0-1 = 01)
+      surfaceQaClean(2) === false && // mixed (bits 0-1 = 10)
+      surfaceQaClean(4) === false && // cloud shadow (bit 2)
+      surfaceQaClean(3 << 8) === false && // cirrus high (bits 8-9 = 11)
+      surfaceQaClean(1 << 10) === false && // internal cloud flag (bit 10)
+      surfaceQaClean(null) === false &&
+      parseSurfaceState({subset: [{data: [138]}]}) === 138 &&
+      parseSurfaceState({subset: []}) === null &&
+      parseSurfaceState({}) === null,
+    `state 72 (clear/land) clean, 138 (mixed cloud) rejected; cloudy/mixed/shadow/high-cirrus/internal-cloud all rejected; assumed-clear passes; raw state parsed, malformed -> null`
   );
 }
 

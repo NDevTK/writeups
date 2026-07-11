@@ -580,6 +580,7 @@ const MOD09_BANDS = {
   green: 'sur_refl_b04',
   red: 'sur_refl_b01'
 };
+const MOD09_STATE_BAND = 'sur_refl_state_500m';
 const ORNL_MOD09A1 = 'https://modis.ornl.gov/rst/api/v1/MOD09A1';
 
 export function surfaceDatesUrl(cell) {
@@ -610,6 +611,33 @@ export function parseSurface(j) {
     refl: ok ? Math.max(0, raw * 1e-4) : null,
     date: typeof s.calendar_date === 'string' ? s.calendar_date : null
   };
+}
+
+// The raw integer of the sur_refl_state_500m QA band from a subset
+// response (null if malformed).
+export function parseSurfaceState(j) {
+  if (!j || !Array.isArray(j.subset)) return null;
+  const s = j.subset[0];
+  if (!s || !Array.isArray(s.data) || typeof s.data[0] !== 'number')
+    return null;
+  return s.data[0];
+}
+
+// Decode the MOD09A1 sur_refl_state_500m bitfield and decide whether the
+// pixel's colour is trustworthy. Bit layout (LP DAAC / verified): bits
+// 0-1 cloud state (0 clear, 1 cloudy, 2 mixed, 3 assumed clear), bit 2
+// cloud shadow, bits 8-9 cirrus (0 none .. 3 high), bit 10 internal
+// cloud flag. A cloudy/mixed/shadowed/thick-cirrus/internal-cloud pixel
+// is contaminated (the Amazon 138 = mixed cloud is exactly this case),
+// so its measured colour is rejected in favour of the tuned grass.
+export function surfaceQaClean(state) {
+  if (typeof state !== 'number' || !Number.isFinite(state)) return false;
+  const cloud = state & 0b11; // bits 0-1
+  if (cloud === 1 || cloud === 2) return false; // cloudy or mixed
+  if ((state >> 2) & 1) return false; // bit 2 cloud shadow
+  if (((state >> 8) & 0b11) === 3) return false; // bits 8-9 cirrus high
+  if ((state >> 10) & 1) return false; // bit 10 internal cloud
+  return true;
 }
 
 // ---- Measured ocean colour: ESA CCI Rrs (CoastWatch ERDDAP) ----
@@ -1198,7 +1226,13 @@ function main() {
   // (date resolved once, cached 6 h; the calendar is global). One
   // upstream call per band - three per cell - assembled into a reflect-
   // ance triple; successes cache 12 h, failures 10 min.
-  const surfaceState = {fetches: 0, errors: 0, date: '', calDate: ''};
+  const surfaceState = {
+    fetches: 0,
+    errors: 0,
+    rejected: 0,
+    date: '',
+    calDate: ''
+  };
   const surfaceDateCache = {t: 0, date: ''};
   async function resolveSurfaceDate() {
     if (surfaceDateCache.date && Date.now() - surfaceDateCache.t < 6 * 3600e3)
@@ -1234,8 +1268,8 @@ function main() {
         signal: AbortSignal.timeout(15e3),
         headers: {'user-agent': UA}
       };
-      const [blue, green, red] = await Promise.all(
-        [MOD09_BANDS.blue, MOD09_BANDS.green, MOD09_BANDS.red].map(
+      const [blue, green, red, state] = await Promise.all([
+        ...[MOD09_BANDS.blue, MOD09_BANDS.green, MOD09_BANDS.red].map(
           async (b) => {
             const r = await fetch(surfaceUrl(cell, date, b), opt);
             if (!r.ok) throw new Error('ornl mod09 ' + r.status);
@@ -1243,14 +1277,27 @@ function main() {
             if (!p) throw new Error('ornl mod09 shape');
             return p;
           }
-        )
-      );
+        ),
+        (async () => {
+          const r = await fetch(surfaceUrl(cell, date, MOD09_STATE_BAND), opt);
+          if (!r.ok) throw new Error('ornl mod09 state ' + r.status);
+          return parseSurfaceState(await r.json());
+        })()
+      ]);
       if (blue.date) surfaceState.calDate = blue.date;
+      // A pixel counts as measured only when it has real reflectance AND
+      // its QA is clean; a cloud/mixed/shadow pixel (or a fill/off-land
+      // one) answers as no-measure so the terrain keeps its tuned grass.
+      const clean = surfaceQaClean(state);
+      const measured =
+        clean && blue.refl != null && green.refl != null && red.refl != null;
+      if (!clean) surfaceState.rejected++;
       const body = {
-        blue: blue.refl,
-        green: green.refl,
-        red: red.refl,
+        blue: measured ? blue.refl : null,
+        green: measured ? green.refl : null,
+        red: measured ? red.refl : null,
         date: blue.date,
+        qa: clean ? 'clean' : 'contaminated',
         cell
       };
       surfaceCache.set(key, {t: Date.now(), body});
@@ -1471,6 +1518,7 @@ function main() {
         date: surfaceState.calDate,
         composite: surfaceState.date,
         fetches: surfaceState.fetches,
+        rejected: surfaceState.rejected,
         errors: surfaceState.errors
       };
       const rrsHealth = {
