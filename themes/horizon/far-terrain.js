@@ -53,56 +53,47 @@ export function curvatureDrop(dM, k) {
  * indexed triangle mesh; y carries the asinh datum compression of
  * (e - drop - centerElev).
  */
-export function farRingGeometry({
-  radiiU,
-  nAz,
-  mpu,
-  centerElev,
-  k,
-  elevAt,
-  seaY = null
-}) {
+export function farRingGeometry({radiiU, nAz, mpu, centerElev, k, elevAt}) {
   const nR = radiiU.length;
   const positions = new Float32Array(nR * nAz * 3);
+  const sea = new Uint8Array(nR * nAz);
   for (let ri = 0; ri < nR; ri++) {
     const r = radiiU[ri];
     for (let ai = 0; ai < nAz; ai++) {
       const az = (ai / nAz) * 2 * Math.PI;
       const x = Math.sin(az) * r;
       const z = -Math.cos(az) * r;
-      const e = elevAt(x, z) - curvatureDrop(r * mpu, k);
-      let y = 16 * Math.asinh((e - centerElev) / 500);
-      // The sea keeps the box's water plane rule: at or below the
-      // waterline the far surface is the (curvature-dropped) sea.
-      if (seaY !== null && elevAt(x, z) <= 0.3)
-        y = Math.min(
-          y,
-          16 * Math.asinh((-curvatureDrop(r * mpu, k) - centerElev) / 500)
-        );
+      const eRaw = elevAt(x, z);
+      const e = eRaw - curvatureDrop(r * mpu, k);
+      const y = 16 * Math.asinh((e - centerElev) / 500);
+      // The box's sea rule: at or below the waterline this is
+      // open water - the ring does NOT draw it (the sky-view
+      // LUT's Payne-lit sea horizon is already the correct far
+      // sea; painting ring water over it would replace measured
+      // radiometry with a mesh). Sea-only triangles are dropped
+      // below; shoreline triangles keep their sea corners so
+      // coasts meet the water without gaps.
+      sea[ri * nAz + ai] = eRaw <= 0.3 ? 1 : 0;
       const o = (ri * nAz + ai) * 3;
       positions[o] = x;
       positions[o + 1] = y;
       positions[o + 2] = z;
     }
   }
-  // Quad strips between consecutive rings, wrapping in azimuth.
-  const indices = new Uint32Array((nR - 1) * nAz * 6);
-  let q = 0;
+  // Quad strips between consecutive rings, wrapping in azimuth;
+  // triangles whose three corners are all sea are dropped.
+  const idx = [];
   for (let ri = 0; ri + 1 < nR; ri++) {
     for (let ai = 0; ai < nAz; ai++) {
       const a = ri * nAz + ai;
       const b = ri * nAz + ((ai + 1) % nAz);
       const c = (ri + 1) * nAz + ai;
       const d = (ri + 1) * nAz + ((ai + 1) % nAz);
-      indices[q++] = a;
-      indices[q++] = c;
-      indices[q++] = b;
-      indices[q++] = b;
-      indices[q++] = c;
-      indices[q++] = d;
+      if (!(sea[a] && sea[c] && sea[b])) idx.push(a, c, b);
+      if (!(sea[b] && sea[c] && sea[d])) idx.push(b, c, d);
     }
   }
-  return {positions, indices, nR, nAz};
+  return {positions, indices: new Uint32Array(idx), sea, nR, nAz};
 }
 
 // Log-spaced radii from the box edge to the far limit: constant

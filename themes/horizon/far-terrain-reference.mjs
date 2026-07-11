@@ -68,7 +68,14 @@ const check = (name, ok, detail) => {
   const elevAt = (x, z) => 300 + 0.5 * Math.hypot(x, z);
   const k = 0.17;
   const radii = farRadii(150, 3500, 44);
-  const g = farRingGeometry({radiiU: radii, nAz: 8, mpu, centerElev, k, elevAt});
+  const g = farRingGeometry({
+    radiiU: radii,
+    nAz: 8,
+    mpu,
+    centerElev,
+    k,
+    elevAt
+  });
   let worst = 0;
   for (let ai = 0; ai < 8; ai++) {
     const az = (ai / 8) * 2 * Math.PI;
@@ -90,13 +97,43 @@ const check = (name, ok, detail) => {
     worst < 1e-6 && stepDeg < 0.057 && g.positions.length === 44 * 8 * 3,
     `box-edge ring vertices reproduce the box datum compression to ${worst.toExponential(1)}; the flat-box-meets-curved-world step is ${drop0.toFixed(2)} m = ${stepDeg.toFixed(3)} deg - inside one pixel`
   );
-  // Index sanity: full wrap, every index in range.
+  // Index sanity: full wrap, every index in range (the all-land
+  // dome drops nothing).
   let ok = g.indices.length === 43 * 8 * 6;
   for (const i of g.indices) if (i >= 44 * 8) ok = false;
   check(
     'ring topology',
     ok,
     `${g.indices.length / 3} triangles wrap ${44} rings x ${8} spokes with every index in range`
+  );
+  // Open sea is NOT drawn - the sky-view LUT's Payne-lit horizon
+  // IS the far sea; the ring only adds land. An island fixture:
+  // one azimuth quadrant carries 500 m, the rest is water.
+  // Sea-only triangles vanish, every kept triangle touches land
+  // (shorelines meet the water without gaps).
+  const isle = farRingGeometry({
+    radiiU: radii,
+    nAz: 8,
+    mpu,
+    centerElev,
+    k,
+    elevAt: (x, z) => (x > 0 && z > 0 ? 500 : 0)
+  });
+  let touchLand = true;
+  for (let t = 0; t < isle.indices.length; t += 3) {
+    if (
+      isle.sea[isle.indices[t]] &&
+      isle.sea[isle.indices[t + 1]] &&
+      isle.sea[isle.indices[t + 2]]
+    )
+      touchLand = false;
+  }
+  check(
+    'sea not drawn',
+    isle.indices.length < g.indices.length &&
+      touchLand &&
+      isle.indices.length > 0,
+    `the island fixture keeps ${isle.indices.length / 3} of ${g.indices.length / 3} triangles - every one touches land, the open water is left to the LUT's measured sea`
   );
 }
 

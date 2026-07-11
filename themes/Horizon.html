@@ -4352,8 +4352,7 @@
             mpu: MPU,
             centerElev,
             k,
-            elevAt: (x, z) => demElevOf(dem, x, z, world),
-            seaY: 0
+            elevAt: (x, z) => demElevOf(dem, x, z, world)
           });
           const geo = new THREE.BufferGeometry();
           geo.setAttribute(
