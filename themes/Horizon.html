@@ -1602,11 +1602,17 @@
       let landGeo = null;
       async function syncLanduse() {
         if (params.get('landuse') === '0') return;
+        // Month drives the crop canopy colour (rape yellow in spring,
+        // wheat gold in summer), so it is part of the cache key -
+        // otherwise an April field would stay yellow all year.
+        const cropMonth = now().getUTCMonth() + 1;
         const key =
           'horizon-landuse-geo-' +
           state.lat.toFixed(2) +
           ',' +
-          state.lon.toFixed(2);
+          state.lon.toFixed(2) +
+          ',m' +
+          cropMonth;
         try {
           const hit = localStorage.getItem(key);
           if (hit) {
@@ -1657,7 +1663,7 @@
             }
           }
           if (!osm) throw new Error('overpass unavailable');
-          landGeo = parseLanduse(osm);
+          landGeo = parseLanduse(osm, 60, 400, cropMonth, state.lat);
           record('OSM Overpass landuse', landGeo.length + ' polygons');
           try {
             localStorage.setItem(key, JSON.stringify(landGeo));
