@@ -348,7 +348,10 @@ const builds = parseBuildings(BUILDINGS_FIXTURE);
     roofShape({'roof:shape': 'skillion'}) === 'skillion' &&
     roofShape({'roof:shape': 'pitched'}) === 'gabled' && // alias
     roofShape({'roof:shape': 'mansard'}) === 'hipped' && // alias
-    roofShape({'roof:shape': 'dome'}) === 'pyramidal' && // alias
+    roofShape({'roof:shape': 'dome'}) === 'dome' &&
+    roofShape({'roof:shape': 'round'}) === 'dome' && // alias
+    roofShape({'roof:shape': 'onion'}) === 'onion' &&
+    roofShape({'roof:shape': 'cone'}) === 'cone' &&
     roofShape({'roof:shape': 'lean_to'}) === 'skillion' && // alias
     Object.values(ROOF_SHAPE).every((v) =>
       [
@@ -357,7 +360,10 @@ const builds = parseBuildings(BUILDINGS_FIXTURE);
         'hipped',
         'half_hipped',
         'pyramidal',
-        'skillion'
+        'skillion',
+        'dome',
+        'onion',
+        'cone'
       ].includes(v)
     ) &&
     // an untagged non-house footprint stays flat; a house filling its
@@ -386,7 +392,15 @@ const builds = parseBuildings(BUILDINGS_FIXTURE);
   let allGood = resOk;
   let worst = resOk ? '' : 'resolution';
   const wallTop = 10 + 10 * U; // groundY 10 + height
-  for (const shape of ['hipped', 'half-hipped', 'pyramidal', 'skillion']) {
+  for (const shape of [
+    'hipped',
+    'half-hipped',
+    'pyramidal',
+    'skillion',
+    'dome',
+    'onion',
+    'cone'
+  ]) {
     const builds = parseBuildings({elements: [rect(shape)]});
     const g = buildingsGeometry(
       builds,
@@ -422,7 +436,7 @@ const builds = parseBuildings(BUILDINGS_FIXTURE);
     'roof shapes',
     allGood,
     allGood
-      ? 'hipped/half-hipped/pyramidal/skillion each build sloped snow-bearing roofs above the walls with nothing facing down; aliases fold onto the six builders'
+      ? 'hipped/half-hipped/pyramidal/skillion/dome/onion/cone each build sloped snow-bearing roofs above the walls with nothing facing down; aliases fold onto the nine builders'
       : `bad ${worst}`
   );
 }

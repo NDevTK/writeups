@@ -69,11 +69,12 @@ const GABLED = new Set([
 
 // OSM roof:shape (taginfo: gabled 5.3M, flat 2.0M, hipped 956k,
 // pyramidal 293k, skillion 271k, half-hipped 130k, ...) -> one of the
-// six builders the geometry knows. The long tail is aliased onto the
+// builders the geometry knows. The long tail is aliased onto the
 // nearest silhouette: pitched/gambrel/saltbox read as gabled, mansard
-// and side/hipped variants as hipped, lean_to/sloped as skillion, and
-// the curved caps (dome/round/cone/onion) as a pyramidal cap (a coarse
-// approximation - they are not truly curved here).
+// and side/hipped variants as hipped, lean_to/sloped as skillion,
+// round as a dome. dome/onion/cone are real curved caps (radial rings
+// - onion is a pointed ogee without an overhang, so it stays watertight
+// from above).
 export const ROOF_SHAPE = {
   flat: 'flat',
   gabled: 'gabled',
@@ -91,10 +92,10 @@ export const ROOF_SHAPE = {
   half_hipped: 'half_hipped',
   side_half_hipped: 'half_hipped',
   pyramidal: 'pyramidal',
-  dome: 'pyramidal',
-  round: 'pyramidal',
-  cone: 'pyramidal',
-  onion: 'pyramidal',
+  dome: 'dome',
+  round: 'dome',
+  cone: 'cone',
+  onion: 'onion',
   skillion: 'skillion',
   lean_to: 'skillion',
   sloped: 'skillion'
@@ -509,15 +510,14 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
         face(C, B, R2, rc, 1); // right hip
       } else if (shape === 'pyramidal') {
         // Four slopes rising to one apex over the centre - the
-        // square-tower / spire-cap roof (also the coarse stand-in for
-        // dome/round/cone/onion).
+        // square-tower / spire-cap roof.
         gH = Math.min(0.6 * (obb.W + 2 * EAVE), 6 * U);
         const apex = P3(0, 0, top + gH);
         face(A, B, apex, rc, 1);
         face(B, C, apex, rc, 1);
         face(C, D, apex, rc, 1);
         face(D, A, apex, rc, 1);
-      } else {
+      } else if (shape === 'skillion') {
         // skillion: a single plane, the back eave raised over the
         // front; the two ends close with vertical facade triangles.
         gH = Math.min(0.3 * (obb.W + 2 * EAVE), 3.5 * U);
@@ -527,6 +527,65 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
         face(A, Ch, Dh, rc, 1);
         face(A, D, Dh, facade, 0); // left end gap (vertical)
         face(B, C, Ch, facade, 0); // right end gap (vertical)
+      } else {
+        // dome / onion / cone: a curved cap of radial rings over the
+        // footprint (ellipse rx x rz fitting the OBB). Each shape is a
+        // radius/height profile: dome a hemisphere, cone straight sides
+        // to a point, onion a tall pointed OGEE - the onion radius only
+        // ever shrinks with height (no bulge overhang), so no face ever
+        // points downward and the cap stays watertight from above.
+        const rBase = Math.min(hl, hw);
+        const H =
+          (shape === 'dome' ? 0.9 : shape === 'cone' ? 1.7 : 1.9) * rBase;
+        gH = H;
+        const SEG = 18;
+        const NR = 6; // rings below the apex
+        const prof = (t) => {
+          if (shape === 'cone') return {rf: 1 - t, hf: t};
+          if (shape === 'dome') {
+            const a = (t * Math.PI) / 2;
+            return {rf: Math.cos(a), hf: Math.sin(a)};
+          }
+          // onion: wide shoulder necking to a point (monotone radius)
+          return {rf: Math.pow(Math.cos((t * Math.PI) / 2), 0.6), hf: t};
+        };
+        const ring = (t) => {
+          const {rf, hf} = prof(t);
+          const y = top + H * hf;
+          const r = [];
+          for (let i = 0; i < SEG; i++) {
+            const th = (2 * Math.PI * i) / SEG;
+            r.push(P3(Math.cos(th) * hl * rf, Math.sin(th) * hw * rf, y));
+          }
+          return r;
+        };
+        // Emit a cap face: normalised so its normal points up (n_y >=
+        // 0), snow-flagged only where the slope actually holds it.
+        const capFace = (a, b2, c) => {
+          const ux = b2[0] - a[0];
+          const uy = b2[1] - a[1];
+          const uz = b2[2] - a[2];
+          const vx = c[0] - a[0];
+          const vy = c[1] - a[1];
+          const vz = c[2] - a[2];
+          let ny = uz * vx - ux * vz;
+          const nl = Math.hypot(uy * vz - uz * vy, ny, ux * vy - uy * vx) || 1;
+          const nyN = ny / nl;
+          const rf2 = Math.abs(nyN) > 0.05 ? 1 : 0;
+          if (nyN < 0) tri(a, c, b2, rc, glow, rf2);
+          else tri(a, b2, c, rc, glow, rf2);
+        };
+        const rings = [];
+        for (let j = 0; j < NR; j++) rings.push(ring(j / NR));
+        for (let j = 0; j < NR - 1; j++)
+          for (let i = 0; i < SEG; i++) {
+            const i2 = (i + 1) % SEG;
+            capFace(rings[j][i], rings[j][i2], rings[j + 1][i2]);
+            capFace(rings[j][i], rings[j + 1][i2], rings[j + 1][i]);
+          }
+        const apex = P3(0, 0, top + H);
+        for (let i = 0; i < SEG; i++)
+          capFace(rings[NR - 1][i], rings[NR - 1][(i + 1) % SEG], apex);
       }
     } else {
       // earClip emits shoelace-positive triangles - clockwise seen
