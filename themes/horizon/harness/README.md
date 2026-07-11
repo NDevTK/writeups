@@ -10,6 +10,11 @@ smoke/visual run. Every architectural choice here was forced by a
 measured failure; the full list and the matrix history live in
 `../WEBGPU-PLAN.md` (section "Real-WebGPU harness").
 
+One-time setup (ephemeral containers lose both):
+
+    ln -sfn ../../.. writeups   # probe pages import ./writeups/themes/...
+    npm install --no-save playwright-core
+
 Pieces:
 
 - `regen.py <site-dir> [theme-html]` — regenerates the fixture-served

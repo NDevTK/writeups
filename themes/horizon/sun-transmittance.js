@@ -8,10 +8,19 @@
 // coefficients (1/m at profile h = 0) the shader uniforms carry,
 // from aerosol.js (measured GEFS-Aerosols channel set, or the
 // Hillaire defaults calibrated to the measured total AOD).
-export function sunTransmittanceJS(cosZenith, mie) {
+//
+// hObs: observer height above the ground sphere in metres. The
+// historical callers (sun light tint, airglow zenith) keep the
+// original 300 m default; the sunset band feeds the EXACT camera
+// altitude - the 2D transmittance LUT's bilinear blend across its
+// ~100 m-spaced radius rows mixes transmittances of neighbouring
+// grazing geometries (a small but real channel-ratio error at the
+// horizon: 0.5% R/G at 130 m per atmo-reference), so the band's
+// texture is built from this integral at the true radius instead.
+export function sunTransmittanceJS(cosZenith, mie, hObs = 300) {
   const Rb = 6360e3;
   const Rt = 6460e3;
-  const r = Rb + 300;
+  const r = Rb + hObs;
   const mu = cosZenith;
   const b = r * mu;
   // Below the horizon the planet itself shadows the sun.

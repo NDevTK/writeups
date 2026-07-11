@@ -50,6 +50,7 @@ import {
   vec4
 } from 'three/tsl';
 import {spectralNode} from './spectral-srgb.js';
+import {sunTransmittanceJS} from './sun-transmittance.js';
 
 // The display projection for the three spectral lines (680/550/440
 // nm CIE-weighted into linear sRGB, equal radiance -> D65; see
@@ -158,6 +159,53 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   const transA1 = uniform(0.0349);
   const transOn = uniform(0);
   const sunTrueAlt = uniform(0);
+  // The band's own transmittance rows (same apparent-altitude axis
+  // as transTex): the 2D LUT's bilinear blend across its ~100 m
+  // radius rows mixes transmittances of neighbouring grazing
+  // geometries - a small real channel-ratio error at the horizon
+  // (0.5% R/G at 130 m, atmo-reference). These rows are the CPU
+  // integral at the EXACT observer radius instead, built in
+  // sunTransfer.set below on the same cadence as the curve. (The
+  // 1.5x K-spread that triggered this hunt turned out to be a
+  // HARNESS artifact: the display gamut clip on deep-red disc
+  // pixels breaks the spectral-matrix inversion - the landmark
+  // refuted the LUT hypothesis and pinned the true 0.5%.)
+  const bandTTex = new DataTexture(
+    new Float32Array(TRANS_ROWS * 4),
+    TRANS_ROWS,
+    1,
+    RGBAFormat,
+    FloatType
+  );
+  bandTTex.magFilter = LinearFilter;
+  bandTTex.minFilter = LinearFilter;
+  bandTTex.needsUpdate = true;
+  const bandTNode = texture(bandTTex);
+  let lastCurve = null;
+  function fillBandT() {
+    if (!lastCurve) return;
+    const mie = {scat: mieScat.value.toArray(), abs: mieAbs.value.toArray()};
+    const h = Math.max(camH.value, 1);
+    const rObs = RB + h;
+    // Rows below the straight-ray tangent keep the graze value -
+    // the same clamp the 2D LUT's edge texel applied there (the
+    // ducted rays those rows carry have no straight-ray
+    // transmittance; the tangent ray is the limit).
+    const muG = -Math.sqrt(Math.max(1 - (RB / rObs) ** 2, 0)) + 1e-9;
+    const d = bandTTex.image.data;
+    for (let i = 0; i < TRANS_ROWS; i++) {
+      const t = sunTransmittanceJS(
+        Math.max(Math.sin(lastCurve.a[i]), muG),
+        mie,
+        h
+      );
+      d[i * 4] = t[0];
+      d[i * 4 + 1] = t[1];
+      d[i * 4 + 2] = t[2];
+      d[i * 4 + 3] = 1;
+    }
+    bandTTex.needsUpdate = true;
+  }
 
   const rayleighS = vec3(5.802e-6, 13.558e-6, 33.1e-6);
   const ozoneA = vec3(0.65e-6, 1.881e-6, 0.085e-6);
@@ -751,11 +799,23 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       // instead of approximating the edge with a smoothstep.
       const TAPS_A = 8;
       const TAPS_H = 4;
+      // Row i of the band textures carries altitude a0 + i/(N-1) *
+      // span, but its texel CENTRE sits at (i+0.5)/N - a linear
+      // alt->u map drifts up to half a texel across the band, and
+      // half a row here is 0.15 mrad of altitude where the grazing
+      // transmittance moves ~4% (the band probe measured exactly
+      // that on the drawn disc). uOfAlt lands row i's altitude on
+      // its texel centre.
+      const uOfAlt = (aVal) =>
+        aVal
+          .sub(transA0)
+          .div(transA1.sub(transA0))
+          .mul((TRANS_ROWS - 1) / TRANS_ROWS)
+          .add(0.5 / TRANS_ROWS);
       const acc = vec3(0.0).toVar();
       for (let i = 0; i < TAPS_A; i++) {
         const aS = aFrag.add(fwA.mul((i + 0.5) / TAPS_A - 0.5));
-        const uT = aS.sub(transA0).div(transA1.sub(transA0));
-        const t4 = transNode.sample(vec2(uT, 0.5));
+        const t4 = transNode.sample(vec2(uOfAlt(aS), 0.5));
         for (let j = 0; j < TAPS_H; j++) {
           const hS = hOff.add(fwH.mul((j + 0.5) / TAPS_H - 0.5));
           const chanMu = (tc) => {
@@ -775,9 +835,13 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
           acc.addAssign(limb.mul(t4.a));
         }
       }
+      // Transmittance from the band's own CPU-built rows (exact
+      // observer radius) instead of the 2D LUT's radius-row blend
+      // (0.5% R/G error here); sampled once per fragment - T is
+      // smooth where the membership edge is not.
       col.addAssign(
-        tTexNode
-          .sample(tParamsToUv(r, v.y))
+        bandTNode
+          .sample(vec2(uOfAlt(aFrag), 0.5))
           .rgb.mul(acc)
           .mul(120.0 / (TAPS_A * TAPS_H))
       );
@@ -910,7 +974,13 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         transTex.needsUpdate = true;
         transA0.value = curve.a[0];
         transA1.value = curve.a[curve.a.length - 1];
-      }
+        // The band's transmittance rows follow the same cadence
+        // (and update() refills them when the aerosol set moves).
+        lastCurve = curve;
+        fillBandT();
+      },
+      // Harness introspection: the CPU-built rows, for probes.
+      bandData: () => bandTTex.image.data
     },
     // The dome's own radiance (exposure applied) for a world
     // direction - objects above the atmosphere (the moon) add this
@@ -982,7 +1052,12 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         ',' +
         groundAlb.value.z;
       if (!lutsBuilt || msKey !== lastMs) {
-        if (!lutsBuilt || mieKey !== lastMie) fillT();
+        if (!lutsBuilt || mieKey !== lastMie) {
+          fillT();
+          // The band transmittance rows carry the same mie set - a
+          // new aerosol answer rebuilds them from the stored curve.
+          fillBandT();
+        }
         fillMs();
         lutsBuilt = true;
         lastMie = mieKey;
