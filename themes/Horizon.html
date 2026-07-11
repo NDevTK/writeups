@@ -523,7 +523,8 @@
         providerFor,
         trainAt
       } from './horizon/trains.js';
-      import {buildTrain} from './horizon/rollingstock.js';
+      import {buildTrain, makeTrainMaterials} from './horizon/rollingstock.js';
+      import {liveryFor} from './horizon/livery.js';
       import {
         CABIN,
         cabinFractions,
@@ -8141,23 +8142,24 @@
         // hidden; the pool prunes boards that rolled over.
         if (trainJourneys.length && params.get('trains') !== '0') {
           if (!trainMats) {
-            const mk = (color, rough) => {
-              const m = new THREE.MeshStandardNodeMaterial({
-                color,
-                roughness: rough
-              });
-              applyAerial(m);
-              return m;
-            };
-            // The asset-viewer palette (?asset=trains), aerial-hooked.
-            trainMats = {
-              icBody: mk('#e6e7e9', 0.55),
-              regBody: mk('#a5291f', 0.6),
-              win: mk('#141a20', 0.3),
-              roof: mk('#686d72', 0.7),
-              cab: mk('#22272d', 0.5)
-            };
+            // Per-livery material sets (livery.js -> the operator's
+            // real painted colours), aerial-hooked, cached by livery
+            // key so a fleet of the same operator shares materials.
+            trainMats = new Map();
           }
+          const trainMatsFor = (cat, operator) => {
+            const lv = liveryFor(cat, operator);
+            let m = trainMats.get(lv.key);
+            if (!m) {
+              m = makeTrainMaterials(
+                THREE.MeshStandardNodeMaterial,
+                lv,
+                applyAerial
+              );
+              trainMats.set(lv.key, m);
+            }
+            return m;
+          };
           const nowMs = Date.now();
           let onRails = 0;
           let offNet = 0;
@@ -8296,7 +8298,7 @@
             }
             if (!g) {
               g = new THREE.Group();
-              buildTrain(g, j.cat, j.consist, trainMats, 1 / MPU);
+              buildTrain(g, j.cat, j.consist, trainMatsFor(j.cat, j.operator), 1 / MPU);
               scene.add(g);
               trainPool.set(key, g);
             }

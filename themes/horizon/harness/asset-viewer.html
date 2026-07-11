@@ -52,7 +52,8 @@
       import {parseRailways, railsGeometry} from '../rails.js';
       import {RAILS_FIXTURE} from '../rails-fixture.mjs';
       import {consistOf} from '../trains.js';
-      import {buildTrain} from '../rollingstock.js';
+      import {buildTrain, makeTrainMaterials} from '../rollingstock.js';
+      import {liveryFor} from '../livery.js';
       import {buildAircraft, makeAircraftMaterials} from '../airframes.js';
       import {aircraftDims} from '../aircraft.js';
       import {rotorOmega, specOf} from '../turbines.js';
@@ -172,26 +173,33 @@
         // (metres).
         sea.material.color.set('#82868b'); // ballast stage
         sun.position.set(-320, 380, -420);
-        const tmats = {
-          icBody: mk('#e6e7e9', 0.55),
-          regBody: mk('#a5291f', 0.6), // Swiss regional red
-          win: mk('#141a20', 0.3),
-          roof: mk('#686d72', 0.7),
-          cab: mk('#22272d', 0.5)
+        // One consist per real operator livery (livery.js): SBB
+        // intercity silver, DB ICE white + red cheatline, BLS
+        // silver-and-lime, RhB red, the Jungfrau blue/yellow BOB,
+        // Swiss regional red.
+        const liveryMatCache = new Map();
+        const matsFor = (cat, op) => {
+          const lv = liveryFor(cat, op);
+          let m = liveryMatCache.get(lv.key);
+          if (!m) {
+            m = makeTrainMaterials(THREE.MeshStandardMaterial, lv);
+            liveryMatCache.set(lv.key, m);
+          }
+          return m;
         };
         const LINEUP = [
           ['IC', 'SBB'],
-          ['ICE', 'SBB'],
+          ['ICE', 'DB'],
           ['RE', 'BLS-bls'],
-          ['R', 'ZB'],
+          ['R', 'RhB'],
           ['R', 'BOB'],
-          ['PE', 'ZB']
+          ['RE', 'SBB']
         ];
         let x = 0;
         const xs = [];
         for (const [cat, op] of LINEUP) {
           const g = new THREE.Group();
-          buildTrain(g, cat, consistOf(cat, op), tmats, 1);
+          buildTrain(g, cat, consistOf(cat, op), matsFor(cat, op), 1);
           x += 8;
           g.position.set(x, 0, 0);
           xs.push(x);
