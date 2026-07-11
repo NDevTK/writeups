@@ -457,6 +457,49 @@ export function createLimiter(perMin = 60) {
   };
 }
 
+// ---- Ocean colour: VIIRS chlorophyll (CoastWatch ERDDAP) -------
+// Semantics pinned by live queries (2026-07-11) against
+// noaacwNPPN20VIIRSDINEOFDaily (VIIRS NPP+N20, DINEOF gap-filled
+// daily, ~2-day latency): grid 2160x4320 (1/12 deg), cell centres
+// at (k + 0.5)/12 from -90/-180; chlor_a in mg m^-3, valid range
+// 0.001..100, land/ice cells arrive as JSON null (the -999 fill).
+// The pure pieces live here so server-reference.mjs can hold them
+// to the recorded live responses.
+export function chlorCell(lat, lon) {
+  const snap = (x, n) =>
+    (Math.max(-n, Math.min(n - 1, Math.floor(x * 12))) + 0.5) / 12;
+  return {
+    lat: snap(Math.max(-90, Math.min(90, lat)), 1080),
+    lon: snap(Math.max(-180, Math.min(180, lon)), 2160)
+  };
+}
+
+// The upstream URL is built HERE from the snapped cell only - the
+// endpoint is a point-query proxy for one dataset, never a general
+// fetcher of caller-supplied URLs.
+export function chlorUrl(cell) {
+  return (
+    'https://coastwatch.noaa.gov/erddap/griddap/' +
+    'noaacwNPPN20VIIRSDINEOFDaily.json' +
+    `?chlor_a%5B(last)%5D%5B(0.0)%5D%5B(${cell.lat})%5D%5B(${cell.lon})%5D`
+  );
+}
+
+// null = unusable response (-> 502); {chlor: null} = a real answer
+// (land/ice cell) and cached like any success.
+export function parseChlor(j) {
+  const t = j?.table;
+  const row = t?.rows?.[0];
+  if (!row || !Array.isArray(t.columnNames)) return null;
+  const col = t.columnNames.indexOf('chlor_a');
+  if (col < 0) return null;
+  const v = row[col];
+  return {
+    chlor: typeof v === 'number' && v >= 0.001 && v <= 100 ? v : null,
+    time: typeof row[0] === 'string' ? row[0] : null
+  };
+}
+
 // ---- Aircraft: readsb failover from a clean IP -----------------
 // All three speak readsb v2 ({ac:[...]}, feet/knots) and feed the
 // reference-gated normalize(). Order preferred by data richness;
@@ -804,6 +847,7 @@ function main() {
   const adsbCache = new Map(); // area key -> {t, body, src}
   const metarCache = new Map(); // area key -> {t, body}
   const aerosolCache = new Map(); // 0.25-deg cell key -> {t, body}
+  const chlorCache = new Map(); // 1/12-deg cell key -> {t, body}
   setInterval(() => {
     const now = Date.now();
     for (const [k, v] of adsbCache) if (now - v.t > 30e3) adsbCache.delete(k);
@@ -811,6 +855,8 @@ function main() {
       if (now - v.t > 20 * 60e3) metarCache.delete(k);
     for (const [k, v] of aerosolCache)
       if (now - v.t > 90 * 60e3) aerosolCache.delete(k);
+    for (const [k, v] of chlorCache)
+      if (now - v.t > 12 * 3600e3) chlorCache.delete(k);
   }, 30e3).unref();
 
   // Measured aerosol radiative properties: GEFS-Aerosols (NOAA's
@@ -878,6 +924,39 @@ function main() {
     }
     aerosolCache.set(key, {t: Date.now(), body: null});
     return null;
+  }
+  // Chlorophyll-a for the 1/12-deg cell over the point, from the
+  // gap-filled VIIRS daily product on CoastWatch ERDDAP - the host
+  // sends no CORS header, so the daemon proxies ONE point query
+  // (URL built by the gated chlorUrl from the snapped cell only).
+  // The product is daily with ~2-day latency, so successes - land
+  // included - cache for 6 h and failures for 10 min; many viewers
+  // in one place cost one upstream request.
+  const chlorState = {fetches: 0, errors: 0, time: ''};
+  async function fetchChlor(lat, lon) {
+    const cell = chlorCell(lat, lon);
+    const key = cell.lat + '/' + cell.lon;
+    const hit = chlorCache.get(key);
+    if (hit && Date.now() - hit.t < (hit.body ? 360 : 10) * 60e3)
+      return hit.body;
+    try {
+      chlorState.fetches++;
+      const r = await fetch(chlorUrl(cell), {
+        signal: AbortSignal.timeout(15e3),
+        headers: {'user-agent': UA}
+      });
+      if (!r.ok) throw new Error('erddap ' + r.status);
+      const parsed = parseChlor(await r.json());
+      if (!parsed) throw new Error('erddap shape');
+      if (parsed.time) chlorState.time = parsed.time;
+      const body = {...parsed, cell};
+      chlorCache.set(key, {t: Date.now(), body});
+      return body;
+    } catch {
+      chlorState.errors++;
+      chlorCache.set(key, {t: Date.now(), body: null});
+      return null;
+    }
   }
   // Aircraft near a point via the readsb failover chain, shared
   // by GET /adsb and the /stream pushes - the 15 s per-area cache
@@ -1040,6 +1119,12 @@ function main() {
         fetches: aerosolState.fetches,
         errors: aerosolState.errors
       };
+      const chlorHealth = {
+        cells: chlorCache.size,
+        time: chlorState.time,
+        fetches: chlorState.fetches,
+        errors: chlorState.errors
+      };
       if (url.pathname === '/health')
         return json(
           200,
@@ -1048,7 +1133,8 @@ function main() {
             lightning,
             space: spaceHealth,
             smoke: smokeHealth,
-            aerosol: aerosolHealth
+            aerosol: aerosolHealth,
+            chlor: chlorHealth
           },
           {'cache-control': 'no-store'}
         );
@@ -1060,6 +1146,7 @@ function main() {
           space: spaceHealth,
           smoke: smokeHealth,
           aerosol: aerosolHealth,
+          chlor: chlorHealth,
           probe: await probeAll()
         },
         {'cache-control': 'no-store'}
@@ -1170,6 +1257,18 @@ function main() {
       return json(200, body, {
         'cache-control': 'public, max-age=900',
         'x-aerosol-source': 'NOMADS GEFS-Aerosols (GOCART)'
+      });
+    }
+
+    if (url.pathname === '/chlor') {
+      // Chlorophyll-a in the 1/12-deg cell over the point, mg/m^3.
+      // chlor null with a 200 is a real answer (land/ice cell);
+      // 502 means the upstream itself failed.
+      const body = await fetchChlor(lat, lon);
+      if (!body) return json(502, {chlor: null, upstream: 'unavailable'});
+      return json(200, body, {
+        'cache-control': 'public, max-age=3600',
+        'x-chlor-source': 'NOAA CoastWatch VIIRS DINEOF (ERDDAP)'
       });
     }
 

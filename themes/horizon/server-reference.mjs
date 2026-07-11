@@ -20,6 +20,8 @@
 // All time-dependent landmarks pass explicit clocks - nothing
 // here reads the wall clock.
 import {
+  chlorCell,
+  chlorUrl,
   createAisState,
   createLimiter,
   createStrikeState,
@@ -29,6 +31,7 @@ import {
   ingestStrike,
   lzwDecode,
   originCheck,
+  parseChlor,
   prune,
   pruneStrikes,
   aisBox,
@@ -323,6 +326,55 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       Math.abs(box[1][0] - box[0][0] - 0.5) < 1e-12 &&
       Math.abs((box[0][1] + box[1][1]) / 2 - 8.04) < 1e-12,
     `readsb strip 3 -> 1 with 7 fields; AIS sentinels 102.3/360/511 -> 0/null/null, name trimmed; 15 nm box spans exactly 0.500 deg of latitude, centred`
+  );
+}
+
+{
+  // Ocean colour (/chlor): the pure pieces held to the LIVE
+  // responses recorded when the source was pinned (2026-07-11):
+  //   (37.5,-123)  -> cell 37.541664/-122.958336, 0.69309556 mg/m^3
+  //   (25,-140)    -> 0.06402797 (oligotrophic gyre low end)
+  //   (39,-100)    -> null (land - a real answer, not an error)
+  const row = (lat, lon, v) => ({
+    table: {
+      columnNames: ['time', 'altitude', 'latitude', 'longitude', 'chlor_a'],
+      rows: [['2026-07-09T12:00:00Z', 0, lat, lon, v]]
+    }
+  });
+  const sf = chlorCell(37.5, -123.0);
+  const idem = chlorCell(sf.lat, sf.lon);
+  const nw = chlorCell(90, 180);
+  const se = chlorCell(-91, -181); // out-of-range input clamps
+  const u = chlorUrl(sf);
+  const PIN =
+    'https://coastwatch.noaa.gov/erddap/griddap/' +
+    'noaacwNPPN20VIIRSDINEOFDaily.json?chlor_a%5B(last)%5D%5B(0.0)%5D';
+  const ocean = parseChlor(row(37.541664, -122.958336, 0.69309556));
+  const gyre = parseChlor(row(25.041662, -140.04166, 0.06402797));
+  const land = parseChlor(row(39.041664, -99.958336, null));
+  check(
+    'chlorophyll (/chlor)',
+    Math.abs(sf.lat - 37.541664) < 3e-6 &&
+      Math.abs(sf.lon - -122.958336) < 3e-6 &&
+      idem.lat === sf.lat &&
+      idem.lon === sf.lon &&
+      Math.abs(nw.lat - 89.958333) < 1e-6 &&
+      Math.abs(nw.lon - 179.958333) < 1e-6 &&
+      Math.abs(se.lat - -89.958333) < 1e-6 &&
+      Math.abs(se.lon - -179.958333) < 1e-6 &&
+      u === PIN + `%5B(${sf.lat})%5D%5B(${sf.lon})%5D` &&
+      ocean.chlor === 0.69309556 &&
+      ocean.time === '2026-07-09T12:00:00Z' &&
+      gyre.chlor === 0.06402797 &&
+      land.chlor === null &&
+      land.time === '2026-07-09T12:00:00Z' &&
+      parseChlor(row(0, 0, -999.0)).chlor === null &&
+      parseChlor(row(0, 0, 101)).chlor === null &&
+      parseChlor(row(0, 0, 5e-4)).chlor === null &&
+      parseChlor(row(0, 0, '0.5')).chlor === null &&
+      parseChlor({}) === null &&
+      parseChlor({table: {columnNames: ['time'], rows: [['t']]}}) === null,
+    `cell snap matches the live-returned 1/12-deg centres (37.541664/-122.958336) and is idempotent; poles/antimeridian and out-of-range inputs clamp inside the grid; URL pinned to the CoastWatch dataset with the snapped cell only; live ocean 0.693 and gyre 0.064 mg/m^3 parse exact; land null is a real answer; -999 fill, out-of-valid-range and non-numeric -> null; malformed tables -> null (502)`
   );
 }
 
