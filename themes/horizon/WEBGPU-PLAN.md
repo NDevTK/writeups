@@ -3572,7 +3572,51 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   altitude = centerElev + 500\*sinh(y/16)), so y=350 is above the
   atmosphere (black frame) and y=60 is a 10 km aerial view -
   keep posed cameras in single-digit y for eye-level shots.
-- OPEN -> INVESTIGATED (the Nelson cone, Jul 10 late): NOT the
+- RESOLVED (the Nelson cone, Jul 11 - solved IN-ENVIRONMENT, no
+  real hardware needed; the entry below records the earlier trail
+  and its wrong conclusion): the cone was GARBAGE IN THE SOURCE
+  TILE, faithfully baked and faithfully rendered. The differential
+  ladder that cracked it: (1) a geometry clone on a plain red
+  MeshBasicMaterial spiked too - not the terrain material; (2) a
+  fresh BufferGeometry from COPIED arrays spiked - not the GPU
+  buffers, so the CPU data itself, contradicting the earlier
+  "provably clean" verdict (that check verified the box MAXIMUM,
+  24.49 units - plausible Bryant Range height - never the tall
+  vertex's placement); (3) grid x/z regularity and index topology
+  scanned clean; (4) CPU projection reduced the needle to TWO
+  adjacent vertices carrying 507/389 m at the harbour waterfront
+  (grid c=148, r=136/137), each shielding the other from a
+  neighbour-spike scan; (5) decoding the SOURCE terrarium tile
+  (12/4019/2564) directly showed the same garbage - a 1-2 px
+  column of -92/134/448/531 m flanked by -248/-276 m in 3-6 m
+  harbour pixels ("tiles are clean" had only checked the box max,
+  which the 531 m garbage sits below). The lavapipe cross-check
+  was attempted first and is documented for the record: Chrome
+  hardwires its CPU-fallback WebGPU adapter to the bundled
+  SwiftShader (hiding the ICD, the bundled loader and the .so
+  makes requestAdapter return null - system lavapipe is never
+  offered), and the ?webgl=1 backend diagnostic boots but the
+  TSL chain floods NodeBuilder errors, so neither alternate
+  rasterizer runs the full theme here. FIX: despikeDEM
+  (terrain-sample.js), decision-based median repair at tile
+  decode - replace a sample only when it deviates >150 m from
+  its 3x3 neighbourhood median; the median follows real cliffs
+  and ridges, only 1-2 px towers trip it, and no real landform
+  stands 150 m proud of its 3x3 median at 30 m posting (Old Man
+  of Hoy, 137 m, is the tallest sea stack on Earth). A
+  Hampel/MAD rule was tried first and REJECTED BY THE LANDMARKS:
+  the garbage cluster inflates its own window MAD and shields
+  itself (448 m survived a 573 m threshold). Landmarks plant the
+  measured streak verbatim (exactly 4 repairs; the two
+  under-floor survivors asserted SURVIVING - the rule boundary
+  held both ways), hold a 75-deg knife ridge bit-identical, and
+  keep a 120 m sea stack. VERIFIED: same needle pose, panel
+  reads "7 px despiked", the harbour view is clean terrain -
+  before/after delivered. Full gate green. Also retired: the
+  "impossible Raycaster" caveat below - the raycasts were likely
+  answering truthfully about data nobody believed.
+- SUPERSEDED (the Nelson cone, Jul 10 late - the earlier trail,
+  kept for the record; its conclusion was WRONG): NOT the
   cathedral. The full forensic trail, every step measured
   through the viewer's /eval: not a building (no tagged height
   over 25 m in the box); not a tree instance (no InstancedMesh
