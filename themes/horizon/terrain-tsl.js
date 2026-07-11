@@ -124,6 +124,7 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     // 2700 K Planckian lamp tint.
     uLightsOn: uniform(0),
     uLandOn: uniform(0),
+    uGrassTint: uniform(new Vector3(1, 1, 1)),
     uSnowCovOn: uniform(0),
     uLightsNight: uniform(0),
     uLightsGain: uniform(0.035),
@@ -538,7 +539,13 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
         float(0.5).sub(positionWorld.z.div(u.uWorldSize))
       )
     );
-    const grass0 = mix(vec3(0.09, 0.21, 0.05), vec3(0.19, 0.33, 0.08), n1);
+    // Base grass ramp, tinted by the measured-NDVI land colour
+    // (land-color.js, driven from Horizon.html); uGrassTint = 1 until
+    // the /ndvi feed arrives, so the tuned look stands by default. The
+    // OSM landuse class albedo still refines it below.
+    const grass0 = mix(vec3(0.09, 0.21, 0.05), vec3(0.19, 0.33, 0.08), n1).mul(
+      u.uGrassTint
+    );
     const grass = mix(grass0, land.rgb, land.a.mul(u.uLandOn).mul(0.85))
       .mul(n3.mul(0.3).add(0.85))
       .mul(rossA);
