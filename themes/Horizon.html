@@ -434,6 +434,12 @@
         treeCandidates,
         yOfElev
       } from './horizon/roam.js';
+      import {
+        curvatureDrop,
+        farRadii,
+        farRingGeometry,
+        refractionK
+      } from './horizon/far-terrain.js';
       import {hpScale} from './horizon/solarwind.js';
       import {etageCovers, pickStation, visibilityM} from './horizon/metar.js';
       import {
@@ -453,8 +459,18 @@
       } from './horizon/nightlights.js';
       import {
         attribute as tslAttribute,
+        cameraPosition as tslCameraPosition,
+        dot as tslDot,
+        exp as tslExp,
+        float as tslFloat,
+        length as tslLength,
+        max as tslMax,
         mix as tslMix,
+        normalize as tslNormalize,
+        normalWorld as tslNormalWorld,
+        positionWorld as tslPositionWorld,
         uniform as tslUniform,
+        vec2 as tslVec2,
         vec3 as tslVec3
       } from 'three/tsl';
       import {buildVessel} from './horizon/vessels.js';
@@ -3067,12 +3083,19 @@
       const DEM_TILES =
         params.get('demtiles') ??
         'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
-      async function fetchDEMTiles(lat, lon) {
+      async function fetchDEMTiles(
+        lat,
+        lon,
+        halfM = DEM_HALF_M,
+        denom = 8000,
+        zLo = 8,
+        zHi = 13
+      ) {
         const z = Math.max(
-          8,
+          zLo,
           Math.min(
-            13,
-            Math.round(Math.log2((40075000 * Math.cos(lat * RAD)) / 8000))
+            zHi,
+            Math.round(Math.log2((40075000 * Math.cos(lat * RAD)) / denom))
           )
         );
         const world = 2 ** z * 256; // global pixels at this zoom
@@ -3086,8 +3109,8 @@
         };
         const mLat = 111320;
         const mLon = Math.max(111320 * Math.cos(lat * RAD), 1e-6);
-        const dLat = DEM_HALF_M / mLat;
-        const dLon = DEM_HALF_M / mLon;
+        const dLat = halfM / mLat;
+        const dLon = halfM / mLon;
         const x0 = Math.floor(px(lon - dLon) / 256);
         const x1 = Math.floor(px(lon + dLon) / 256);
         const y0 = Math.floor(py(lat + dLat) / 256);
@@ -3239,7 +3262,9 @@
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+      // far = 8000: the far-horizon ring lives at true scene
+      // coordinates out to ~3400 units (~195 km).
+      const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 8000);
       // Harness capture hooks (?debug=1): composited screenshots
       // are blank for WebGPU surfaces under Xvfb, so the shoot
       // driver captures through the page itself. The theme's frame
@@ -4253,6 +4278,111 @@
             labelText(sel[0])
         );
       }
+      // ---------- the far horizon ----------
+      // The box ends at 8 km; the real view does not. A silhouette
+      // ring from the SAME terrarium tiles at coarse zoom (z<=8,
+      // same decode, same despike) carries the view from the box
+      // edge to ~195 km: real elevations, Earth curvature dropped
+      // at the MEASURED refraction coefficient (Hirt et al. 2010
+      // from the refraction column's surface lapse; the standard
+      // atmosphere emerges as the textbook 1/6 - a far-terrain
+      // reference landmark), the box's own asinh datum, sun x
+      // slope Lambert over the box's MEASURED white-sky albedo,
+      // faded to the horizon sky by Koschmieder transmittance at
+      // the measured visibility. Beyond-LUT distances use the
+      // Koschmieder mix INSTEAD of the aerial hook - one
+      // extinction model per regime, both measured.
+      const FAR_R0 = 150; // scene units - just past the box edge
+      const FAR_R1 = 3400; // ~195 km
+      const uFarAlbedo = tslUniform(new THREE.Color(0, 0, 0));
+      const uFarSunDir = tslUniform(new THREE.Vector3(0, 1, 0));
+      const uFarSunCol = tslUniform(new THREE.Color(0, 0, 0));
+      const uFarSkyIrr = tslUniform(new THREE.Color(0, 0, 0));
+      const uFarVis = tslUniform(20000);
+      let farMesh = null;
+      let farGen = 0;
+      function makeFarMaterial() {
+        const m = new THREE.MeshBasicNodeMaterial({
+          side: THREE.DoubleSide
+        });
+        const view = tslPositionWorld.sub(tslCameraPosition);
+        const dM = tslLength(tslVec2(view.x, view.z)).mul(MPU);
+        const T = tslExp(dM.mul(-3.912).div(tslMax(uFarVis, 400)));
+        const ndl = tslMax(tslDot(tslNormalWorld, uFarSunDir), 0);
+        const lit = uFarAlbedo
+          .mul(uFarSunCol.mul(ndl).add(uFarSkyIrr))
+          .mul(1 / Math.PI);
+        m.colorNode = tslMix(
+          atmo.ok ? atmo.skyRadiance(tslNormalize(view)) : tslVec3(0, 0, 0),
+          lit,
+          T
+        );
+        m.toneMapped = false;
+        return m;
+      }
+      async function rebuildFarRing() {
+        const gen = ++farGen;
+        try {
+          const dem = await fetchDEMTiles(
+            state.lat,
+            state.lon,
+            200e3,
+            236000,
+            5,
+            8
+          );
+          if (gen !== farGen) return; // re-anchored meanwhile
+          const world = (2 * 200e3) / MPU;
+          // The measured refraction column drives k (surface lapse
+          // between its two lowest levels); the standard atmosphere
+          // stands in until the column loads. Clamped to the range
+          // Hirt et al. observed.
+          let k = refractionK(1013.25, 288.15, -0.0065);
+          const prof = state.profile;
+          if (prof && prof.at) {
+            // Surface lapse over the column's first 100 m.
+            const a = prof.at(prof.h0);
+            const b = prof.at(prof.h0 + 100);
+            k = refractionK(a.pPa / 100, a.tC + 273.15, (b.tC - a.tC) / 100);
+          }
+          k = Math.max(0, Math.min(0.4, k));
+          const ring = farRingGeometry({
+            radiiU: farRadii(FAR_R0, FAR_R1, 44),
+            nAz: 512,
+            mpu: MPU,
+            centerElev,
+            k,
+            elevAt: (x, z) => demElevOf(dem, x, z, world),
+            seaY: 0
+          });
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute(
+            'position',
+            new THREE.BufferAttribute(ring.positions, 3)
+          );
+          geo.setIndex(new THREE.BufferAttribute(ring.indices, 1));
+          geo.computeVertexNormals();
+          if (!farMesh) {
+            farMesh = new THREE.Mesh(geo, makeFarMaterial());
+            farMesh.frustumCulled = false;
+            scene.add(farMesh);
+          } else {
+            farMesh.geometry.dispose();
+            farMesh.geometry = geo;
+          }
+          record(
+            'far horizon',
+            'terrarium ring to ' +
+              Math.round((FAR_R1 * MPU) / 1000) +
+              ' km · k ' +
+              k.toFixed(3) +
+              ' (Hirt 2010, measured lapse) · Koschmieder to the horizon sky'
+          );
+        } catch (e) {
+          if (params.has('debug')) console.warn('far ring: ' + e.message);
+        }
+      }
+
       function buildWorld(pre) {
         // Roam rebuilds repeatedly: free the previous terrain
         // geometry (trees share cached geometries/materials and
@@ -4483,6 +4613,7 @@
           snowSim.clearDrifts();
         }
         worldBuilt = true;
+        rebuildFarRing();
       }
       buildWorld();
 
@@ -7268,6 +7399,15 @@
             : state.visibility;
         aerialU.uFogDensity.value =
           1.98 / (Math.max(visEff, 400) / MPU) + cloudy * 0.001;
+        // The far horizon breathes the same measured state.
+        uFarVis.value = Math.max(visEff, 400);
+        uFarSunDir.value.copy(sunVec);
+        uFarSunCol.value
+          .copy(sunLight.color)
+          .multiplyScalar(sunLight.intensity);
+        uFarSkyIrr.value.copy(skyIrr);
+        if (landWSA)
+          uFarAlbedo.value.setRGB(landWSA[0], landWSA[1], landWSA[2]);
 
         // A real solar eclipse dims the direct light by its obscuration.
         const ecl = astro.eclipse || 0;
