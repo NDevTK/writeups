@@ -3406,6 +3406,27 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- OPEN -> DIAGNOSED (the teal noon stratum, Jul 11): clean
+  inland noon skies (first stared at during the Interlaken
+  far-horizon shots) carry a distinct cyan band between the
+  zenith blue and the horizon white. Eliminated BY A/B RENDERS:
+  not the clouds (snap?noclouds=1 identical), not the measured
+  white-sky albedo's MS bounce (?brdf=1 zeroes the feed -
+  bit-identical sky), not aurora (0.00) or airglow (nightSky
+  gates on the overridden sun correctly). The band is intrinsic
+  to the sky chain's COLORIMETRY: the three radiance channels
+  (680/550/440 nm) write STRAIGHT into sRGB R/G/B - measured
+  mid-sky pixels run G 190 vs R 109 with G reaching parity with
+  B near the horizon, i.e. 550 nm assigned to pure sRGB green
+  over-saturates cyan exactly where Rayleigh's G/B converge.
+  Hillaire's own 3-lambda demo shares the shortcut; the exact
+  fix is the CIE 1931 projection - for three MONOCHROMATIC
+  bands the color-matching values give an exact 3x3 from
+  per-lambda radiance to XYZ, then the standard XYZ->sRGB - a
+  display-end matrix in domeColor (and the aerial/fog hook), so
+  every LUT texel pin is untouched; scene sweep pins would
+  re-base. A fresh session's feature: global, perceptual, worth
+  doing with daylight-scene comparisons at several anchors.
 - DONE (the green flash and the mirage sun, Jul 11 - built as
   planned below, plus what the visuals forced): transferCurve +
   foldCount in refraction.js, the 160-row LUT band in the dome
