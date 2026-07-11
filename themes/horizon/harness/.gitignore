@@ -1,2 +1,7 @@
 node_modules/
 writeups
+livecache/
+*.ppm
+*.png
+*.f32
+*.panel.txt
