@@ -3426,8 +3426,13 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   where the Rec.709 luminance now means luminance) - every LUT
   texel pin untouched, gate 56 sets + 3 GPU probes PASS.
   VERIFIED at Interlaken noon (the diagnosis scene: the cyan
-  stratum gone, mid-sky G/R rebalanced) and a Rotterdam sea
-  noon.
+  stratum gone; measured mid-sky G/R 1.78 -> 1.30, and the
+  zenith lands at R/B 0.47, G/B 0.60 - real clear-sky
+  chromaticity, where the raw channels starved red at 0.38) and
+  a Rotterdam sea noon (sunlit polder green untouched - the
+  projection moves the spectral radiances, never material
+  colours; the alpine ridges shift with it because the aerial
+  in-scatter carried the same bug as the sky).
 - OPEN -> DIAGNOSED (the teal noon stratum, Jul 11): clean
   inland noon skies (first stared at during the Interlaken
   far-horizon shots) carry a distinct cyan band between the
