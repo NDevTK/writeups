@@ -3406,19 +3406,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
-- OPEN: cross-boundary legs over-hide. A leg whose FAR stop is
-  outside the drawn box cannot route (nothing to attach to), and
-  when its chord also bows far off the line - Interlaken West ->
-  Spiez cuts across Lake Thun - the 100 m snap correctly refuses,
-  so an IC rolling ON drawn in-box rails hides for most of the
-  leg. The exact extension is A\* to an off-graph target: route
-  from the near stop's projection minimizing g(n) + euclid(n,
-  farStop) over the drawn graph - the argmin boundary node is the
-  route's true exit, the in-box partial path is real geometry,
-  and only the outside tail's length is approximated (affecting
-  along-track speed scaling, never track placement). Not built
-  yet: needs its own reference landmarks (exit-node argmin on a
-  forked network, the tail bound) before it can gate.
+- DONE (cross-boundary legs, Jul 11): a leg whose far stop is off
+  the drawn graph (beyond the box or the cap) now rides drawn
+  rail to the graph LEAF nearest the far stop instead of hiding
+  or chording - rails.js railRouteToward: Dijkstra ball from the
+  near stop's projection (limit maxDetour x the foot-to-target
+  line), exit = argmin of euclid(leaf, farStop) over reachable
+  degree-1 nodes, the in-box path is real geometry, ONLY the
+  outside tail's length is the euclid approximation (it scales
+  along-track speed, never placement); past the exit the train
+  hides (outside the drawn world). The plan's earlier sketch -
+  argmin of g(n) + euclid(n, farStop) over ALL nodes - was
+  REFUTED while building: by the triangle inequality that score
+  is minimal at the start foot (the landmark encodes the numbers:
+  41.0 at the foot vs 42.24/49/49 at the L-network's nodes), so
+  it can never leave the start; the leaf rule is the
+  degeneracy-free form and matches the physical claim (the real
+  line continues undrawn from the drawn stub nearest the stop it
+  serves). Guards: no leaf closer to the target than the foot ->
+  null; detour ball bound. Ladder wiring: railRoute null + exactly
+  one endpoint in-box -> railRouteToward (direction negated when
+  the OUT stop is the origin); fraction f maps over len + tail;
+  cache shares railRouteCache. Three landmarks (exact L-network
+  exit/len 19/tail 30 + the refutation inequality; fork exit
+  flips with the target's side at exact lengths; progress guard
+  nulls) - rails-reference at 10. Full gate green. Maasvlakte
+  seam re-check rode along (Jul 11, post-bounce + unified
+  albedo): the grey/black seam is GONE - the reflector edge now
+  meets a lit sea-toned band; what remains is the subtle tonal
+  transition of drawn water against the LUT background, real
+  geometry, not an artifact.
 - DONE: the visual QA pass, round two (Jul 10 evening - "same
   standard as boats and planes, need to show stuff happening").
   Ships and planes joined the seen-not-asserted club: the daemon

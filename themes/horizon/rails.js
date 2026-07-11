@@ -315,6 +315,94 @@ export function railRoute(idx, ax, az, bx, bz, gate, maxDetour = 3) {
 }
 
 /**
+ * Cross-boundary legs: the far stop is OFF the drawn graph (beyond
+ * the box or the cap), so railRoute has nothing to attach to - but
+ * the train still rides drawn rail up to wherever the drawn data
+ * ends. The exit is the reachable graph LEAF (degree-1 node, a
+ * drawn dead-end) nearest the far stop: the real line continues
+ * undrawn from its stub, so the stub closest to the far stop is
+ * the line serving it - the same nearest-wins logic as snapToRail,
+ * applied to the exit. (The g + euclid argmin the plan first
+ * sketched is degenerate: by the triangle inequality it always
+ * corner-cuts to an early exit and a long straight tail.) The
+ * in-box path is real Dijkstra geometry; ONLY the outside tail's
+ * length is the euclid approximation (it scales along-track speed,
+ * never track placement). Guards: a leaf no closer to the target
+ * than the start foot means routing gains nothing (null), and a
+ * path longer than maxDetour x the foot-to-target line means the
+ * drawn network does not serve this leg (null) - the caller falls
+ * back down the ladder.
+ */
+export function railRouteToward(idx, ax, az, tx, tz, gate, maxDetour = 3) {
+  const A = snapToRail(idx, ax, az, gate);
+  if (!A) return null;
+  let sa = null;
+  idx.segs.forEach((s, i) => {
+    const vx = s[2] - s[0];
+    const vz = s[3] - s[1];
+    const t = Math.max(
+      0,
+      Math.min(1, ((A.x - s[0]) * vx + (A.z - s[1]) * vz) / (vx * vx + vz * vz))
+    );
+    const d = Math.hypot(A.x - (s[0] + t * vx), A.z - (s[1] + t * vz));
+    if (!sa || d < sa.d) sa = {i, t, d};
+  });
+  if (!sa) return null;
+  const s0 = idx.segs[sa.i];
+  const la = Math.hypot(s0[2] - s0[0], s0[3] - s0[1]);
+  const a0 = idx.nid(s0[0], s0[1]);
+  const a1 = idx.nid(s0[2], s0[3]);
+  const eFoot = Math.hypot(tx - A.x, tz - A.z);
+  const limit = maxDetour * eFoot + la;
+  const dist = new Map([
+    [a0, sa.t * la],
+    [a1, (1 - sa.t) * la]
+  ]);
+  const prev = new Map();
+  const done = new Set();
+  while (true) {
+    let u = null;
+    let du = Infinity;
+    for (const [k, v] of dist) {
+      if (!done.has(k) && v < du) {
+        u = k;
+        du = v;
+      }
+    }
+    if (u === null || du > limit) break;
+    done.add(u);
+    for (const e of idx.adj.get(u) || []) {
+      const nd = du + e.len;
+      if (nd < (dist.get(e.to) ?? Infinity)) {
+        dist.set(e.to, nd);
+        prev.set(e.to, u);
+      }
+    }
+  }
+  let exit = null;
+  for (const n of done) {
+    if ((idx.adj.get(n) || []).length !== 1) continue; // not a drawn end
+    const [nx, nz] = idx.nodes.get(n);
+    const e = Math.hypot(tx - nx, tz - nz);
+    if (!exit || e < exit.e || (e === exit.e && dist.get(n) < exit.g))
+      exit = {n, e, g: dist.get(n)};
+  }
+  if (!exit || exit.e >= eFoot) return null;
+  const pts = [];
+  let n = exit.n;
+  while (n) {
+    pts.push(idx.nodes.get(n));
+    n = prev.get(n);
+  }
+  pts.push([A.x, A.z]);
+  pts.reverse();
+  let len = 0;
+  for (let i = 1; i < pts.length; i++)
+    len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  return {pts, len, tail: exit.e};
+}
+
+/**
  * The point at length fraction f along a routed polyline, with the
  * local unit direction (the track bearing there).
  */

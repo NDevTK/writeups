@@ -468,6 +468,7 @@
         parseRailways,
         railIndex,
         railRoute,
+        railRouteToward,
         railsGeometry,
         routePoint,
         snapToRail
@@ -7613,9 +7614,53 @@
                   );
                   const b = geoToScene(p.legTo.lat, p.legTo.lon, dressAnchor);
                   rt = railRoute(railSnapIdx, a.x, a.z, b.x, b.z, 150 / MPU);
-                  railRouteCache.set(ck, rt);
+                  if (!rt) {
+                    // Cross-boundary leg: exactly one stop attaches
+                    // (the other is beyond the box or the cap) -
+                    // ride drawn rail to the leaf nearest the far
+                    // stop (rails.js railRouteToward); the tail
+                    // past the exit is undrawn, the train hides
+                    // there instead of running through the grass.
+                    const aIn = Math.abs(a.x) <= 140 && Math.abs(a.z) <= 140;
+                    const bIn = Math.abs(b.x) <= 140 && Math.abs(b.z) <= 140;
+                    if (aIn !== bIn) {
+                      const tw = aIn
+                        ? railRouteToward(
+                            railSnapIdx,
+                            a.x,
+                            a.z,
+                            b.x,
+                            b.z,
+                            150 / MPU
+                          )
+                        : railRouteToward(
+                            railSnapIdx,
+                            b.x,
+                            b.z,
+                            a.x,
+                            a.z,
+                            150 / MPU
+                          );
+                      if (tw) rt = {tw, rev: !aIn};
+                    }
+                  }
+                  railRouteCache.set(ck, rt ?? null);
                 }
-                if (rt) {
+                if (rt && rt.tw) {
+                  // Fraction f covers path + tail at constant speed;
+                  // on the drawn path the position is real geometry,
+                  // past the exit the train is outside the drawn
+                  // world and hides (falls through unmatched).
+                  const tw = rt.tw;
+                  const d = (rt.rev ? 1 - p.f : p.f) * (tw.len + tw.tail);
+                  if (d <= tw.len) {
+                    const q = routePoint(tw, d / tw.len);
+                    sc.x = q.x;
+                    sc.z = q.z;
+                    dir = rt.rev ? {dx: -q.dx, dz: -q.dz} : q;
+                    matched = true;
+                  }
+                } else if (rt) {
                   const q = routePoint(rt, p.f);
                   sc.x = q.x;
                   sc.z = q.z;

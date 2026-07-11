@@ -24,6 +24,7 @@ import {
   RAIL_WIDTH,
   railIndex,
   railRoute,
+  railRouteToward,
   railsGeometry,
   railWidthOf,
   routePoint,
@@ -336,6 +337,101 @@ const rails = parseRailways(RAILS_FIXTURE);
     'dropped-connector healing',
     ok,
     `a 0.5-unit junction gap heals: (1,0)->(19,0) routes at length exactly 18 through the dangling endpoint's partial-length edges; a 5-unit hole stays two components (null) - real dropped switch throats reconnect, invented links do not`
+  );
+}
+
+{
+  // Cross-boundary legs (railRouteToward): the far stop is off the
+  // drawn graph, the exit is the reachable LEAF nearest the target
+  // (the drawn stub of the line that serves it), the in-box path is
+  // real Dijkstra geometry, only the outside tail is the euclid
+  // approximation. On an L network from (1,0.5), target far past
+  // the L's top: exit is the top leaf (10,10), path (1,0)-(10,0)-
+  // (10,10) at length exactly 19, tail exactly 30. NOTE the plan's
+  // first sketch (argmin of g + euclid over all nodes) is refuted
+  // in code here: by the triangle inequality that score is minimal
+  // AT THE START FOOT (41.0 at the foot beats 42.24 at (0,0) and
+  // 49 at both deeper nodes), so it can never leave the foot - the
+  // leaf rule is the degeneracy-free form.
+  const L = railIndex(
+    [
+      [
+        [0, 0],
+        [10, 0],
+        [10, 10]
+      ]
+    ],
+    4
+  );
+  const tw = railRouteToward(L, 1, 0.5, 10, 40, 2);
+  const gPlusE =
+    tw &&
+    [
+      [0, 0, 1],
+      [10, 0, 9],
+      [10, 10, 19]
+    ].every(
+      ([nx, nz, g]) => g + Math.hypot(10 - nx, 40 - nz) >= Math.hypot(9, 39.5)
+    );
+  const okL =
+    tw &&
+    Math.abs(tw.len - 19) < 1e-9 &&
+    Math.abs(tw.tail - 30) < 1e-9 &&
+    Math.abs(tw.pts[tw.pts.length - 1][0] - 10) < 1e-9 &&
+    Math.abs(tw.pts[tw.pts.length - 1][1] - 10) < 1e-9 &&
+    tw.tail < Math.hypot(10 - 1, 40 - 0) &&
+    gPlusE;
+  check(
+    'cross-boundary exit (L)',
+    okL,
+    `target (10,40) far past the L's top: exit IS the top leaf (10,10), path length exactly 19, tail exactly 30 (< the 41.0 foot-to-target line); and g + euclid really is minimal at the start foot on this network - the corner-cut degeneracy the leaf rule avoids`
+  );
+
+  // Forked network: the exit flips with the target's side - the
+  // leaf nearest the far stop is branch A's tip for a target on
+  // A's side and branch B's tip after mirroring the target.
+  const Y = railIndex(
+    [
+      [
+        [0, 0],
+        [10, 0]
+      ],
+      [
+        [10, 0],
+        [20, 5]
+      ],
+      [
+        [10, 0],
+        [20, -5]
+      ]
+    ],
+    4
+  );
+  const wantLen = 9 + Math.hypot(10, 5);
+  const twA = railRouteToward(Y, 1, 0.5, 30, 10, 2);
+  const twB = railRouteToward(Y, 1, 0.5, 30, -10, 2);
+  const okY =
+    twA &&
+    twB &&
+    Math.abs(twA.pts[twA.pts.length - 1][1] - 5) < 1e-9 &&
+    Math.abs(twB.pts[twB.pts.length - 1][1] + 5) < 1e-9 &&
+    Math.abs(twA.len - wantLen) < 1e-9 &&
+    Math.abs(twB.len - wantLen) < 1e-9 &&
+    Math.abs(twA.tail - Math.hypot(10, 5)) < 1e-9;
+  check(
+    'cross-boundary exit (fork)',
+    okY,
+    `the exit follows the target's side of the fork: (30,10) leaves via branch A's tip (20,5), (30,-10) via B's (20,-5), both at path length exactly ${wantLen.toFixed(5)} and tail ${Math.hypot(10, 5).toFixed(5)}`
+  );
+
+  // Progress guard: a target the drawn rails do not approach (all
+  // leaves farther from it than the start foot) refuses - the
+  // train must not ride AWAY dressed as progress.
+  const away = railRouteToward(L, 1, 0.5, 1, -40, 2);
+  check(
+    'cross-boundary progress guard',
+    away === null,
+    `target (1,-40) perpendicular-below the foot: every leaf is farther from it than the foot itself -> null (the ladder falls back, no invented exit)`
   );
 }
 
