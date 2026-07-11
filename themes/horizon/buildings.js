@@ -67,6 +67,51 @@ const GABLED = new Set([
   'church'
 ]);
 
+// OSM roof:shape (taginfo: gabled 5.3M, flat 2.0M, hipped 956k,
+// pyramidal 293k, skillion 271k, half-hipped 130k, ...) -> one of the
+// six builders the geometry knows. The long tail is aliased onto the
+// nearest silhouette: pitched/gambrel/saltbox read as gabled, mansard
+// and side/hipped variants as hipped, lean_to/sloped as skillion, and
+// the curved caps (dome/round/cone/onion) as a pyramidal cap (a coarse
+// approximation - they are not truly curved here).
+export const ROOF_SHAPE = {
+  flat: 'flat',
+  gabled: 'gabled',
+  pitched: 'gabled',
+  gambrel: 'gabled',
+  saltbox: 'gabled',
+  double_saltbox: 'gabled',
+  quadruple_saltbox: 'gabled',
+  gabled_row: 'gabled',
+  crosspitched: 'gabled',
+  hipped: 'hipped',
+  side_hipped: 'hipped',
+  hipped_and_gabled: 'hipped',
+  mansard: 'hipped',
+  half_hipped: 'half_hipped',
+  side_half_hipped: 'half_hipped',
+  pyramidal: 'pyramidal',
+  dome: 'pyramidal',
+  round: 'pyramidal',
+  cone: 'pyramidal',
+  onion: 'pyramidal',
+  skillion: 'skillion',
+  lean_to: 'skillion',
+  sloped: 'skillion'
+};
+
+// The roof BUILDER for a building: its tagged roof:shape when we can
+// build it, else the heuristic default (a small-house family filling
+// its rectangle takes a gabled ridge; everything else is flat).
+export function roofShape(tags = {}, house, fill) {
+  const raw = String(tags['roof:shape'] || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[\s-]+/g, '_');
+  if (ROOF_SHAPE[raw]) return ROOF_SHAPE[raw];
+  return house && fill >= 0.8 ? 'gabled' : 'flat';
+}
+
 // Andrew monotone-chain convex hull of [x, y] points (CCW).
 export function convexHull(pts) {
   const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -215,7 +260,10 @@ export function parseBuildings(json, cap = 400, minAreaM2 = 25) {
       // typed as a house family at all -> tiled roof tone even
       // when the footprint is too complex for a ridge
       house: GABLED.has(tags.building),
-      gabled: GABLED.has(tags.building) && fill >= 0.8,
+      // the real roof:shape (hipped, pyramidal, skillion, ...) when
+      // tagged, else the small-house gabled/flat heuristic
+      shape: roofShape(tags, GABLED.has(tags.building), fill),
+      gabled: roofShape(tags, GABLED.has(tags.building), fill) === 'gabled',
       // churches and chapels carry their spire (a documented
       // designed asset on the real tag, like the vessel
       // silhouettes) at a deterministic gable end
@@ -404,13 +452,13 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
     // overhang past the walls; ear-clipped flat cap otherwise.
     const obb = minAreaRect(pts);
     let gH = 0;
-    if (b.gabled && obb && obb.W > 0) {
+    const shape = obb && obb.W > 0 ? b.shape : 'flat';
+    if (shape !== 'flat') {
       const EAVE = 0.4 * U;
       const hl = obb.L / 2 + EAVE;
       const hw = obb.W / 2 + EAVE;
       const px = -obb.uy; // perpendicular unit axis
       const py = obb.ux;
-      gH = Math.min(0.35 * (obb.W + 2 * EAVE), 4.5 * U);
       const P3 = (du, dv, y) => [
         obb.cx + obb.ux * du + px * dv,
         y,
@@ -420,17 +468,66 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
       const B = P3(hl, -hw, top);
       const C = P3(hl, hw, top);
       const D = P3(-hl, hw, top);
-      const R1 = P3(-hl, 0, top + gH);
-      const R2 = P3(hl, 0, top + gH);
-      // two roof planes + two gable triangles (orders hand-checked
-      // for outward normals under the axis convention)
       const rc = b.roof || ROOF;
-      tri(A, R2, B, rc, glow, 1);
-      tri(A, R1, R2, rc, glow, 1);
-      tri(C, R1, D, rc, glow, 1);
-      tri(C, R2, R1, rc, glow, 1);
-      tri(A, D, R1, facade, glow);
-      tri(C, B, R2, facade, glow);
+      // Emit a face with whichever winding makes its normal point UP
+      // (n_y >= 0) - so no sloped roof plane is ever inside-out and
+      // nothing faces downward, whatever the shape.
+      const face = (a, b2, c, col, rf) => {
+        const ny =
+          (b2[2] - a[2]) * (c[0] - a[0]) - (b2[0] - a[0]) * (c[2] - a[2]);
+        if (ny < 0) tri(a, c, b2, col, glow, rf);
+        else tri(a, b2, c, col, glow, rf);
+      };
+      if (shape === 'gabled') {
+        // Two roof planes + two vertical gable ends (the original
+        // hand-checked winding).
+        gH = Math.min(0.35 * (obb.W + 2 * EAVE), 4.5 * U);
+        const R1 = P3(-hl, 0, top + gH);
+        const R2 = P3(hl, 0, top + gH);
+        tri(A, R2, B, rc, glow, 1);
+        tri(A, R1, R2, rc, glow, 1);
+        tri(C, R1, D, rc, glow, 1);
+        tri(C, R2, R1, rc, glow, 1);
+        tri(A, D, R1, facade, glow);
+        tri(C, B, R2, facade, glow);
+      } else if (shape === 'hipped' || shape === 'half_hipped') {
+        // A gable whose ends fold down into hips: the ridge is inset
+        // from each end (a half-width for a full hip, a shorter bite
+        // for a half-hip) and the end faces become sloped hips.
+        gH = Math.min(0.35 * (obb.W + 2 * EAVE), 4.5 * U);
+        const inset =
+          shape === 'hipped'
+            ? Math.min(hw, obb.L / 2)
+            : Math.min(hw * 0.5, obb.L * 0.4);
+        const R1 = P3(-hl + inset, 0, top + gH);
+        const R2 = P3(hl - inset, 0, top + gH);
+        face(A, R2, B, rc, 1); // front slope
+        face(A, R1, R2, rc, 1);
+        face(C, R1, D, rc, 1); // back slope
+        face(C, R2, R1, rc, 1);
+        face(A, D, R1, rc, 1); // left hip
+        face(C, B, R2, rc, 1); // right hip
+      } else if (shape === 'pyramidal') {
+        // Four slopes rising to one apex over the centre - the
+        // square-tower / spire-cap roof (also the coarse stand-in for
+        // dome/round/cone/onion).
+        gH = Math.min(0.6 * (obb.W + 2 * EAVE), 6 * U);
+        const apex = P3(0, 0, top + gH);
+        face(A, B, apex, rc, 1);
+        face(B, C, apex, rc, 1);
+        face(C, D, apex, rc, 1);
+        face(D, A, apex, rc, 1);
+      } else {
+        // skillion: a single plane, the back eave raised over the
+        // front; the two ends close with vertical facade triangles.
+        gH = Math.min(0.3 * (obb.W + 2 * EAVE), 3.5 * U);
+        const Dh = P3(-hl, hw, top + gH);
+        const Ch = P3(hl, hw, top + gH);
+        face(A, B, Ch, rc, 1); // the single sloped plane
+        face(A, Ch, Dh, rc, 1);
+        face(A, D, Dh, facade, 0); // left end gap (vertical)
+        face(B, C, Ch, facade, 0); // right end gap (vertical)
+      }
     } else {
       // earClip emits shoelace-positive triangles - clockwise seen
       // from +y in x-z coords - so emit REVERSED for an up normal.
