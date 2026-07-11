@@ -3427,6 +3427,19 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the seam to ranges on the skyline at k = 0.292 from the
   evening's MEASURED inversion; before/after delivered. Gate
   green (63 sets, far-terrain at 8 landmarks + 3 GPU probes).
+  INTERLAKEN verified (Jul 11, noon override): the ring carries a
+  ~4000 m mass at az 153-161, r 320-360 u - the Eiger-Moench-
+  Jungfrau group at its true bearings (Jungfrau az 155 from the
+  box centre, the classic Hoehematte gap view; Eiger is genuinely
+  foothill-hidden from town, as in reality). Honest caveat: the
+  theme's asinh datum compresses altitude differentials ~3x at
+  4000 m (dy/de = (16/500)/cosh), so the wall draws at 2.5 deg
+  from the hillside camera where reality gives 7.6 deg - the
+  IN-BOX peaks compress identically (the seam landmark holds the
+  consistency), so this is the theme's established vertical
+  language, not a ring defect; if the wallpaper ever wants true
+  alpine drama the datum itself is the knob, and every drawn
+  metre moves together.
   The original plan, for the record:
 - (plan) the far horizon: the world
   currently ENDS at the box edge (8 km) - but from Nelson the
