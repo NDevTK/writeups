@@ -5,3 +5,5 @@ livecache/
 *.png
 *.f32
 *.panel.txt
+viewer-*.log
+*.log

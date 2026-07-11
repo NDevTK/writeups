@@ -3406,6 +3406,24 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (sky parallax: the celestial group rides with the camera,
+  Jul 11): the sunspot verification's "pose aims 1.35 deg high"
+  was neither the pose nor the ephemeris - the camera provably
+  aimed at the astro sun (forward-dot 0.99999) while the DRAWN
+  disc sat 1.2 deg lower. Root cause: every directional sky
+  entity was painted on spheres anchored at the scene ORIGIN
+  while the camera sits ~35 scene units away - displacement over
+  radius = 1.4 deg on the 1400-unit dome, 2.3 deg on the
+  860-unit planet shell, DIFFERENT per shell, for every viewer
+  in every scene since the theme began. All 15 sky entities
+  (dome, veil, polar star group, NLC, moon, planets, comets,
+  meteors, aurora, airglow, optics x2, ISS, light-pollution
+  glow) now live in a skyGroup whose position copies the camera
+  per frame, world orientation untouched; world content stays
+  put. VERIFIED: posed at the raw astro sun, the drawn disc
+  lands 0.04 deg from the frame centre (seconds of solar drift)
+  - down from 1.2-1.5. The harness's empirical -1.35 deg pose
+    correction is retired. Gate 57 sets + 4 GPU probes PASS.
 - DONE (real sunspots on the drawn sun, Jul 11): the research-
   first rebuild, shipped. Placement: carrington_longitude against
   L0(t) at render time through Meeus ch. 29 (his example 29.a

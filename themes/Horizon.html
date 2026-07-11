@@ -3329,6 +3329,17 @@
       // __capture instead queues a request that the frame loop
       // services right after its own final pass, snapshotting the
       // canvas before WebGPU presents (and recycles) the texture.
+      // Every DIRECTIONAL sky entity (the atmosphere dome, stars,
+      // moon, planets, shells, glows) lives in this group, and the
+      // group follows the camera's POSITION each frame (orientation
+      // stays world). Without it the sky is painted on spheres
+      // anchored at the scene ORIGIN while the camera sits ~35
+      // units away - up to 1.4 deg of parallax on the dome (2.3 deg
+      // on the 860-unit planet shell), DIFFERENT per shell radius.
+      // Found by the sunspot capture: the camera provably aimed at
+      // the astro sun while the drawn disc sat 1.2 deg lower.
+      const skyGroup = new THREE.Group();
+      scene.add(skyGroup);
       let captureReq = null;
       if (params.has('debug')) {
         window.__r = renderer;
@@ -3412,7 +3423,7 @@
       // shadow hook - the haze itself shows the beams.
       const atmo = createAtmosphereTSL(renderer, cloudShadow);
       if (atmo.ok) {
-        scene.add(atmo.mesh);
+        skyGroup.add(atmo.mesh);
         record(
           'Hillaire (2020) atmosphere',
           'multiple-scattering LUTs · ozone · measured-aerosol Mie'
@@ -3474,7 +3485,7 @@
         veilObj.material
       );
       veil.renderOrder = -1;
-      scene.add(veil);
+      skyGroup.add(veil);
 
       // ---------- terrain ----------
       function mulberry32(a) {
@@ -4701,7 +4712,7 @@
       const celestial = new THREE.Group();
       const polar = new THREE.Group();
       polar.add(celestial);
-      scene.add(polar);
+      skyGroup.add(polar);
       // Zodiacal light: the Leinert brightness map rides the SAME
       // celestial dome as the stars, so the cone stands along the
       // real ecliptic and the Gegenschein tracks the antisolar
@@ -4754,7 +4765,7 @@
         nlcObj.material
       );
       nlcShell.visible = false;
-      scene.add(nlcShell);
+      skyGroup.add(nlcShell);
       // Meteor streaks: a small pool of quads on the star sphere,
       // spawned as a Poisson process at the REAL observed rate
       // (meteors.js: IMO 2026 working list rates through the
@@ -5634,7 +5645,7 @@
         moonObj.material
       );
       moonDisc.layers.set(2);
-      scene.add(moonDisc);
+      skyGroup.add(moonDisc);
 
       // Naked-eye planets at their true ephemeris positions, sized by
       // real apparent magnitude, tinted like the eye sees them.
@@ -5651,7 +5662,7 @@
         new Float32Array(PLANET_TINTS.flat()),
         new Float32Array(PLANETS.length).fill(4)
       );
-      scene.add(planetObj.mesh);
+      skyGroup.add(planetObj.mesh);
 
       // Real comets (comets.js): the MPC's own current element
       // sets (CORS-open, cached a day), universal-Kepler
@@ -5668,7 +5679,7 @@
         new Float32Array([0.85, 0.95, 1.0]),
         new Float32Array([0])
       );
-      scene.add(cometObj.mesh);
+      skyGroup.add(cometObj.mesh);
       const cometTailGeo = new THREE.BufferGeometry();
       cometTailGeo.setAttribute(
         'position',
@@ -5686,7 +5697,7 @@
       const cometTail = new THREE.Mesh(cometTailGeo, cometTailMat);
       cometTail.visible = false;
       cometTail.renderOrder = 1;
-      scene.add(cometTail);
+      skyGroup.add(cometTail);
       // The DUST tail: the Finson-Probstein beta = 0.3 syndyne
       // (grains released over the last two months, zero ejection
       // velocity - the FP model), drawn as a strip through the
@@ -5724,7 +5735,7 @@
         const m = new THREE.Mesh(geo, mat);
         m.visible = false;
         m.renderOrder = 1;
-        scene.add(m);
+        skyGroup.add(m);
         return m;
       });
       let cometEls = null;
@@ -5827,7 +5838,7 @@
         auroraObj.material
       );
       aurora.position.y = 420;
-      scene.add(aurora);
+      skyGroup.add(aurora);
 
       // Nightglow dome: the PALACE airglow line model (airglow.js) -
       // the [OI] green line, red doublet and Na D with per-layer van
@@ -5839,7 +5850,7 @@
         new THREE.SphereGeometry(770, 48, 24),
         airglowObj.material
       );
-      scene.add(airglow);
+      skyGroup.add(airglow);
 
       // Atmospheric optics on one additive dome:
       // - primary and secondary rainbows at their Descartes angles (42.0
@@ -5855,7 +5866,7 @@
         opticsObj.material
       );
       optics.renderOrder = 1;
-      scene.add(optics);
+      skyGroup.add(optics);
       // Paraselenic optics: the SAME certified halo/bow/dog dome,
       // instanced again and anchored to the MOON. Intensity scales
       // with how much light the moon actually sends - the shared
@@ -5879,7 +5890,7 @@
         opticsMoonObj.material
       );
       opticsMoon.renderOrder = 1;
-      scene.add(opticsMoon);
+      skyGroup.add(opticsMoon);
 
       // Clouds in the three layers the weather model actually reports
       // (open-meteo cloud_cover_low/mid/high): the low cumulus deck and
@@ -5942,7 +5953,7 @@
       aerial.applyTone(issMat); // fog: false in the classic build
       const iss = new THREE.Mesh(new THREE.SphereGeometry(2.4, 8, 6), issMat);
       iss.visible = false;
-      scene.add(iss);
+      skyGroup.add(iss);
       async function syncISS() {
         try {
           const tle = await (
@@ -6024,7 +6035,7 @@
         new THREE.SphereGeometry(905, 32, 16),
         lpGlowObj.material
       );
-      scene.add(lpGlow);
+      skyGroup.add(lpGlow);
 
       // Measured rain re-lays the bow LUT (optics-lut buildBowLUT:
       // Airy fringes at the Marshall-Palmer drop of the measured
@@ -9125,6 +9136,9 @@
             );
           }
         }
+        // The sky rides with the camera (see skyGroup) - position
+        // only, world orientation untouched.
+        skyGroup.position.copy(camera.position);
 
         if (!panel.hidden) {
           const Ums = state.wind / 3.6;
