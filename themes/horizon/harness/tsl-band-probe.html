@@ -238,10 +238,55 @@
             .join(' ')} worst RGB ${(worstRaw * 100).toFixed(2)}%`
         );
 
+        // Pass 4: a synthetic sunspot through the raw tap on the
+        // HIGH-SUN disc path (transfer band off). With b4 the pure
+        // raw sky, b6 the spotless disc and b5 the spotted one, the
+        // drawn contrast 1 + (b5-b6)/(b6-b4) must equal the fed
+        // per-channel tint exactly at the spot's centre - the whole
+        // feed -> texture -> shader chain, channel by channel.
+        atmo.sunTransfer.on.value = 0;
+        atmo.spectralOn.value = 0;
+        // The high-sun path draws each channel around its own
+        // refracted direction - the theme always feeds these; an
+        // unfed probe leaves R and B parked at the zenith (their
+        // default) with no disc at the camera at all.
+        atmo.sunDisc.dirR.value.copy(sunDir);
+        atmo.sunDisc.dirB.value.copy(sunDir);
+        const TINT = [0.3, 0.2, 0.1];
+        atmo.sunSpots.set([
+          {
+            v: 0,
+            h: 0,
+            rU: 0.05,
+            rP: 0.12,
+            shorten: 1,
+            umbra: TINT,
+            penumbra: [0.8, 0.75, 0.7]
+          }
+        ]);
+        const b5 = await shoot();
+        atmo.sunSpots.set([]);
+        const b6 = await shoot();
+        atmo.spectralOn.value = 1;
+        atmo.sunTransfer.on.value = 1;
+        const p5 = px(b5, W / 2, W / 2);
+        const p6 = px(b6, W / 2, W / 2);
+        const pSky = px(b4, W / 2, W / 2);
+        let worstSpot = 0;
+        const tintMeas = [0, 1, 2].map(
+          (c) => 1 + (p5[c] - p6[c]) / (p6[c] - pSky[c])
+        );
+        for (let c = 0; c < 3; c++)
+          worstSpot = Math.max(worstSpot, Math.abs(tintMeas[c] - TINT[c]));
+        log(
+          `spot tint drawn ${tintMeas.map((v) => v.toFixed(4)).join(' ')} vs fed ${TINT.join(' ')} worst ${worstSpot.toFixed(4)}`
+        );
+
         const pass =
           rowsOk &&
           worst < 0.01 &&
           worstRaw < 0.01 &&
+          worstSpot < 0.01 &&
           !clipped &&
           c0[2] === 0 &&
           want[2] < 0 &&

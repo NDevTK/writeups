@@ -3406,6 +3406,80 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (real sunspots on the drawn sun, Jul 11): the research-
+  first rebuild, shipped. Placement: carrington_longitude against
+  L0(t) at render time through Meeus ch. 29 (his example 29.a
+  emerges; the tested feed semantics reproduce BOTH agency
+  products - CMD -32.9 vs SRS "W33", -47.2 vs the feed's W47).
+  Photometry: Mathew 2007 Table 2 size-dependent fits anchor a
+  constant Delta-T shift of the Maltby 1986 Table 3 brightness-
+  temperature curve -> per-spot per-channel tints (deeper in
+  blue); umbral share from Jha 2018 (5.5); limb-darkening of
+  contrast and cycle phase ignored WITH CAUSE from the read
+  sources. Drawing: 4 texels/spot (position/radii, per-spot
+  foreshortening z, umbra+penumbra tint vec3s) multiplying the
+  limb-darkened high-sun disc with analytic edge coverage; the
+  mirage band's folded disc is documented out of scope. Probe
+  pass 4: a synthetic spot through the raw tap draws its fed
+  tint to 1% per channel (and re-taught the harness that the
+  high-sun path needs dirR/dirB fed). LIVE verification on
+  2026-07-11's actual sun (4 spotted regions, largest 330
+  millionths): the first capture caught a REAL SIGN BUG - the
+  drawn spots mirrored in h; the measured pattern matched
+  prediction only under an h flip plus one common rotation that
+  equalled the page's parallactic angle exactly (u x d vs d x u
+  in the shader's east basis). Fixed, re-captured: drawn vs
+  predicted positions agree to 0.003 disc radii (~3 arcsec) for
+  regions 4482 and 4487, with 4485/4481 present at their
+  foreshortened limb positions. Also learned: the pose aims
+  ~1.35 deg high systematically (corrected empirically for the
+  captures; root cause on the harness list), and clouds - the
+  measured 51% cover - hid the sun until the noclouds
+  diagnostic separated the layers. Gate 57 sets + 4 GPU probes
+  PASS.
+- RESEARCH LOG (frontier integrations, Jul 11): sources TESTED
+  and papers READ before any code - a first sunspot attempt
+  written from recalled citations was removed unlanded; the
+  actual paper then disproved its core simplification.
+  Data sources, tested with real queries:
+  (1) NOAA SWPC solar_regions.json - CORS \*, a 30-DAY HISTORY
+  (not a snapshot): region 4481 marches +47E..-47W at 13.3
+  deg/day across rows; cross-checked against the SRS text
+  product (JSON lon -33 on Jul 10 = SRS "W33", so longitude is
+  east-positive CMD valid at each row's OWN date 2400Z, and the
+  newest row is extrapolated a day past the 0030 UTC SRS). The
+  robust placement design that falls out: use the row's
+  carrington_longitude against L0(t) computed at render time -
+  continuous, never a day stale. Areas (millionths of the
+  hemisphere) match SRS (0010/0410/0175 on Jul 10).
+  (2) NOAA CoastWatch ERDDAP - coastwatch.pfeg redirects to
+  coastwatch.noaa.gov; the science-quality weekly chlor_a is
+  SIX WEEKS stale (rejected), the gap-filled DINEOF daily
+  (noaacwNPPN20VIIRSDINEOFDaily) is 2 days fresh and returned
+  3.1-4.7 mg/m3 off San Francisco (upwelling-plausible); NO
+  CORS headers on either host, so a browser integration must
+  route through the api.ndev.tk daemon like /aerosol.
+  (3) NASA SVS CGI Moon Kit (LROC albedo asset) - unreachable
+  from this environment (TLS failure through the proxy);
+  deferred until the asset and its licence text are actually
+  obtainable.
+  Research read (not recalled): Mathew, Martinez Pillet,
+  Solanki, Krivova 2007 (A&A 465, 291; arXiv astro-ph/0701401,
+  read in full): MDI 676.8 nm continuum, 160+ spots, stray-light
+  and Ni-line corrected. Table 2: umbral CORE intensity
+  power-law 1.8598 r^-1.0679 and mean umbral 0.8297 r^-0.3052
+  (r in arcsec; double-linear fits per size regime tabulated
+  too); mean penumbral 0.8561 - 0.0016 r_spot (near-constant);
+  umbra-penumbra boundary at 0.655 and penumbra-quiet-Sun at
+  0.945 of quiet-Sun intensity. The paper states outright that
+  a single umbral brightness for all spots is "a very poor
+  approximation" (core intensity spans x6 with size) - any
+  implementation must carry the size dependence. STILL MISSING
+  before implementation: a read source for the wavelength
+  scaling of the contrasts to 550/440 nm (Maltby et al. 1986
+  tables or an open successor - the 2015 A&A 1999-2014
+  sunspot-properties paper is open HTML and is the next read),
+  and a read source for the umbra/spot area share.
 - DONE (band transmittance exact + a refutation + the first
   dome GPU probe, Jul 11): chased the flash mirror's 1.5x
   per-channel K-spread. The honest landmark REFUTED the working
