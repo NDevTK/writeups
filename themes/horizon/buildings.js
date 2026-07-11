@@ -26,6 +26,7 @@
  */
 
 import {geoToScene, hash3} from './roam.js';
+import {roofColour, wallColour} from './facade.js';
 
 // The OSM height ladder. Simple 3D Buildings: one level = 3 m.
 export const LEVEL_M = 3;
@@ -218,7 +219,11 @@ export function parseBuildings(json, cap = 400, minAreaM2 = 25) {
       // churches and chapels carry their spire (a documented
       // designed asset on the real tag, like the vessel
       // silhouettes) at a deterministic gable end
-      spire: tags.building === 'church' || tags.building === 'chapel'
+      spire: tags.building === 'church' || tags.building === 'chapel',
+      // the REAL painted colours (facade.js): building:colour/material
+      // -> wall, roof:colour/material -> roof; null keeps the default
+      wall: wallColour(tags),
+      roof: roofColour(tags)
     });
   }
   // centroid-of-centroids -> nearest first, then the display cap
@@ -374,7 +379,10 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
     if (wet || !Number.isFinite(base)) continue;
     const hU = b.h * U;
     const top = base + hU;
-    const facade = FACADES[Math.floor(hash3(b.id | 0, 0, 31) * FACADES.length)];
+    // Real OSM facade colour when the building carries one, else the
+    // deterministic hash-picked stone tint.
+    const facade =
+      b.wall || FACADES[Math.floor(hash3(b.id | 0, 0, 31) * FACADES.length)];
     const glow = glowAt(pts[0][0], pts[0][1]);
     // Walls: one quad (two tris) per edge, sunk 2 m below base
     // (slope seating).
@@ -416,16 +424,17 @@ export function buildingsGeometry(builds, anchor, groundY, glowAt, U, lim) {
       const R2 = P3(hl, 0, top + gH);
       // two roof planes + two gable triangles (orders hand-checked
       // for outward normals under the axis convention)
-      tri(A, R2, B, ROOF, glow, 1);
-      tri(A, R1, R2, ROOF, glow, 1);
-      tri(C, R1, D, ROOF, glow, 1);
-      tri(C, R2, R1, ROOF, glow, 1);
+      const rc = b.roof || ROOF;
+      tri(A, R2, B, rc, glow, 1);
+      tri(A, R1, R2, rc, glow, 1);
+      tri(C, R1, D, rc, glow, 1);
+      tri(C, R2, R1, rc, glow, 1);
       tri(A, D, R1, facade, glow);
       tri(C, B, R2, facade, glow);
     } else {
       // earClip emits shoelace-positive triangles - clockwise seen
       // from +y in x-z coords - so emit REVERSED for an up normal.
-      const cap = b.house ? ROOF : ROOF_FLAT;
+      const cap = b.roof || (b.house ? ROOF : ROOF_FLAT);
       for (const [a, bb, c] of earClip(pts)) {
         tri(
           [pts[a][0], top, pts[a][1]],
