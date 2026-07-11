@@ -372,6 +372,7 @@
       import {
         apparentAltitude,
         buildProfile,
+        R_EARTH_M,
         standardProfile,
         SUN_DISC_RAD,
         sunRefraction,
@@ -991,6 +992,17 @@
               tC: state.temp,
               rh: rhSurf
             });
+            // Harness introspection (same precedent as __astro):
+            // the profile OBJECT holds closures, so expose its
+            // measured INPUTS - buildProfile on these reproduces
+            // the exact profile the drawn sun used (the harness's
+            // radiometric mirrors need it, e.g. the transfer-curve
+            // comparison against a float capture of the sliver).
+            if (params.has('debug'))
+              window.__profileLevels = {
+                levels: lv,
+                surface: {hM: elevM, tC: state.temp, rh: rhSurf}
+              };
             record(
               'refraction column (pressure levels)',
               lv.length +
@@ -7275,7 +7287,20 @@
           ) {
             sunsetLut.prof = profNow;
             sunsetLut.obsH = camAltM;
-            st.set(transferCurve(profNow, camAltM, -0.0105, 0.0349, 160, 200));
+            // The band floor follows the observer's horizon: the
+            // geometric dip -sqrt(2h/R) bounds the refracted dip
+            // from below (refraction only lifts), and the extra
+            // 0.005 rad (> the disc radius) keeps vis = 0 sea rows
+            // under any graze-saturated disc remnant - so the sun
+            // that has set below the REFRACTED horizon meets sea
+            // rows, never the unoccluded high-sun path (the SF
+            // float captures caught the phantom disc riding the
+            // LUT sea after sunset).
+            const aMin = Math.min(
+              -0.0105,
+              -Math.sqrt((2 * Math.max(camAltM, 2)) / R_EARTH_M) - 0.005
+            );
+            st.set(transferCurve(profNow, camAltM, aMin, 0.0349, 160, 200));
           }
         }
         // The one real sun light carries the true direction; the CSM

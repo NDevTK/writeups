@@ -3406,6 +3406,39 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (flash radiometry + the phantom sub-horizon sun, Jul 11):
+  pointed the float tap at the SF sunset replay (same cached
+  forecast/aerosol). New harness introspection: \*\*profileLevels
+  exports the measured refraction column INPUTS (buildProfile on
+  them reproduces the exact profile the drawn sun used). The CPU
+  mirror - transferCurve on the exported levels at the exact
+  observer, the shader's per-channel mu^A limb + vis, the LUT
+  atmosphere's transmittance on the cached GEFS set, spectral
+  matrix inverted on the float pixels, ONE fitted row shift -
+  reproduces the drawn sliver row by row (interior rows within
+  a few %, e.g. measured 33.7/2.8/0.5 vs predicted 33.8/2.8/0.5),
+  and the rim row measures linear G/R = 8.0 - the green flash as
+  RADIOMETRY (680 nm image ends a row below the 550 nm one,
+  exactly the transfer curve's geometry). Known residual: the
+  per-channel scale spread at grazing incidence is the shipped
+  transmittance LUT's finite mu resolution near the horizon edge
+  (CPU quadrature converged: 32 -> 4096 steps moves K < 0.3%).
+  AND A REAL BUG FORCED OUT: below the graze the apparent sun
+  deliberately saturates (twilight continuity), parking the SET
+  sun's disc just under the dip - BELOW the transfer band's
+  fixed -0.6 deg floor, where the unoccluded high-sun path
+  painted a phantom half-disc onto the LUT sea (the story's
+  "double sun at 03:38:30" lower image was THIS, not a mirage
+  fold - the record is corrected). Fix: (1) the band floor
+  follows the observer (min(-0.0105, -sqrt(2h/R) - 0.005), the
+  geometric dip bounding the refracted dip from below), so sea
+  rows always cover the graze-saturated remnant; (2) the
+  high-sun disc path never draws below an engaged band's floor
+  (rising suns above the ceiling still draw). VERIFIED on the
+  replay: 03:38:30 keeps the sliver + green rim ON the horizon,
+  phantom gone; 03:39:00 (sun true -1.23 deg, every disc point
+  below the refracted horizon) shows sea and twilight only.
+  Gate 56 sets + 3 GPU probes PASS.
 - DONE (the float radiometric capture, Jul 11): the harness
   capture bracket (?debug=1 **capture) takes a float flag and
   renders the SAME multi-pass frame into a FloatType target -
