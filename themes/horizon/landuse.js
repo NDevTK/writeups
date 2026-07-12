@@ -25,6 +25,7 @@ import {decimate, stitchRings} from './lakes.js';
 import {geoToScene} from './roam.js';
 import {cropAlbedoFromTags} from './crops.js';
 import {forestAlbedoFromTags} from './forest.js';
+import {grassColor} from './grassland.js';
 
 // Linear albedos per OSM class (same space as the terrain's grass
 // vec3(0.09..0.19, 0.21..0.33, 0.05..0.08) ramp).
@@ -102,6 +103,18 @@ export const CROP_HOSTS = new Set([
 // leaf-type + seasonal canopy colour (forest.js).
 export const FOREST_HOSTS = new Set(['forest', 'wood']);
 
+// The grass-family classes: turf that greens and browns with the
+// season (grassland.js) - a month/latitude modulation of the base
+// green, no OSM tag needed.
+export const GRASS_CLASSES = new Set([
+  'grass',
+  'meadow',
+  'grassland',
+  'village_green',
+  'recreation_ground',
+  'cemetery'
+]);
+
 /**
  * Overpass landuse/natural elements -> [{id, cls, albedo, rings,
  * area}], largest area LAST in paint order terms (the caller
@@ -112,9 +125,10 @@ export const FOREST_HOSTS = new Set(['forest', 'wood']);
  * When `month` is supplied, a CROP_HOST parcel carrying a recognised
  * crop/produce/trees tag wears its crop canopy colour (crops.js), and a
  * FOREST_HOST parcel carrying leaf_type/leaf_cycle wears its leaf-type +
- * seasonal canopy colour (forest.js), both shifted by `month`/`lat`; an
- * unrecognised or absent tag keeps the flat class albedo, so the
- * tagless default is unchanged.
+ * seasonal canopy colour (forest.js), and a GRASS_CLASS parcel's green
+ * greens and browns with the season (grassland.js), all shifted by
+ * `month`/`lat`; an unrecognised or absent tag keeps the flat class
+ * albedo, so the tagless default is unchanged.
  */
 export function parseLanduse(json, minSpanM = 60, cap = 400, month = 0, lat) {
   const out = [];
@@ -129,6 +143,8 @@ export function parseLanduse(json, minSpanM = 60, cap = 400, month = 0, lat) {
     } else if (month && FOREST_HOSTS.has(cls)) {
       const canopy = forestAlbedoFromTags(tags, month, lat);
       if (canopy) albedo = canopy;
+    } else if (month && GRASS_CLASSES.has(cls)) {
+      albedo = grassColor(albedo, month, lat);
     }
     let rings = null;
     if (el.type === 'way' && el.geometry && el.geometry.length >= 4) {
