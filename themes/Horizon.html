@@ -516,6 +516,7 @@
         metresBetween
       } from './horizon/bldlod.js';
       import {parseRoads, roadsGeometry, rankOf} from './horizon/roads.js';
+      import {geoGet, geoSet} from './horizon/geocache.js';
       import {lodFilterRoads} from './horizon/linelod.js';
       import {
         landTint,
@@ -1357,9 +1358,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            forestGeo = JSON.parse(hit);
+            forestGeo = hit;
             record(
               'OSM Overpass forests (cached)',
               forestGeo.length + ' wood polygons'
@@ -1416,7 +1417,7 @@
             );
           record('OSM Overpass forests', forestGeo.length + ' wood polygons');
           try {
-            localStorage.setItem(key, JSON.stringify(forestGeo));
+            await geoSet(key, forestGeo);
           } catch {}
           // Replant where the real woods are - trees only, the
           // standing terrain is untouched.
@@ -1457,9 +1458,9 @@
           }
         };
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            lakesGeo = JSON.parse(hit);
+            lakesGeo = hit;
             record(
               'OSM Overpass water (cached)',
               lakesGeo.length +
@@ -1522,7 +1523,7 @@
               (lakesGeo[0] && lakesGeo[0].name ? ' · ' + lakesGeo[0].name : '')
           );
           try {
-            localStorage.setItem(key, JSON.stringify(lakesGeo));
+            await geoSet(key, lakesGeo);
           } catch {}
           await adopt();
         } catch {
@@ -1545,9 +1546,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            buildsGeo = JSON.parse(hit);
+            buildsGeo = hit;
             record(
               'OSM Overpass buildings (cached)',
               buildsGeo.length + ' footprints'
@@ -1614,7 +1615,7 @@
               ' km'
           );
           try {
-            localStorage.setItem(key, JSON.stringify(buildsGeo));
+            await geoSet(key, buildsGeo);
           } catch {}
           if (worldBuilt) placeBuildings();
         } catch {
@@ -1640,9 +1641,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            roadsGeo = JSON.parse(hit);
+            roadsGeo = hit;
             record('OSM Overpass roads (cached)', roadsGeo.length + ' ways');
             if (worldBuilt) placeRoads();
             return;
@@ -1721,7 +1722,7 @@
               ' fetched'
           );
           try {
-            localStorage.setItem(key, JSON.stringify(roadsGeo));
+            await geoSet(key, roadsGeo);
           } catch {}
           if (worldBuilt) placeRoads();
         } catch {
@@ -1751,9 +1752,9 @@
           ',m' +
           cropMonth;
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            landGeo = JSON.parse(hit);
+            landGeo = hit;
             record(
               'OSM Overpass landuse (cached)',
               landGeo.length + ' polygons'
@@ -1811,7 +1812,7 @@
             landGeo.length + ' polygons (full coverage)'
           );
           try {
-            localStorage.setItem(key, JSON.stringify(landGeo));
+            await geoSet(key, landGeo);
           } catch {}
           if (worldBuilt) placeLanduse();
         } catch {
@@ -1834,9 +1835,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            riversGeo = JSON.parse(hit);
+            riversGeo = hit;
             record(
               'OSM Overpass waterways (cached)',
               riversGeo.length + ' watercourses'
@@ -1889,7 +1890,7 @@
             riversGeo.length + ' watercourses (full network)'
           );
           try {
-            localStorage.setItem(key, JSON.stringify(riversGeo));
+            await geoSet(key, riversGeo);
           } catch {}
           if (worldBuilt) placeRivers();
         } catch {
@@ -2114,9 +2115,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            railsGeo = JSON.parse(hit);
+            railsGeo = hit;
             record('OSM Overpass railways (cached)', railsGeo.length + ' ways');
             if (worldBuilt) placeRails();
             return;
@@ -2168,7 +2169,7 @@
             railsGeo.length + ' ways (full network)'
           );
           try {
-            localStorage.setItem(key, JSON.stringify(railsGeo));
+            await geoSet(key, railsGeo);
           } catch {}
           if (worldBuilt) placeRails();
         } catch {
@@ -2189,9 +2190,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            peaksGeo = JSON.parse(hit);
+            peaksGeo = hit;
             record('OSM Overpass peaks (cached)', peaksGeo.length + ' summits');
             if (worldBuilt) placePeaks();
             return;
@@ -2234,7 +2235,7 @@
           peaksGeo = parsePeaks(osm);
           record('OSM Overpass peaks', peaksGeo.length + ' summits');
           try {
-            localStorage.setItem(key, JSON.stringify(peaksGeo));
+            await geoSet(key, peaksGeo);
           } catch {}
           if (worldBuilt) placePeaks();
         } catch {
@@ -2257,9 +2258,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            aerialGeo = JSON.parse(hit);
+            aerialGeo = hit;
             record(
               'OSM Overpass aerialways (cached)',
               aerialGeo.length + ' installations'
@@ -2308,7 +2309,7 @@
             aerialGeo.length + ' installations'
           );
           try {
-            localStorage.setItem(key, JSON.stringify(aerialGeo));
+            await geoSet(key, aerialGeo);
           } catch {}
           if (worldBuilt) placeAerialways();
         } catch {
@@ -2330,9 +2331,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            turbinesGeo = JSON.parse(hit);
+            turbinesGeo = hit;
             record(
               'OSM Overpass wind turbines (cached)',
               turbinesGeo.length + ' turbines'
@@ -2383,7 +2384,7 @@
             turbinesGeo.length + ' turbines'
           );
           try {
-            localStorage.setItem(key, JSON.stringify(turbinesGeo));
+            await geoSet(key, turbinesGeo);
           } catch {}
           if (worldBuilt) placeTurbines();
         } catch {
@@ -3663,8 +3664,8 @@
       async function fetchDEM(lat, lon) {
         const key = 'horizon-dem-om-' + lat.toFixed(2) + ',' + lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
-          if (hit) return JSON.parse(hit);
+          const hit = await geoGet(key);
+          if (hit) return hit;
         } catch {}
         const mLat = 111320;
         const mLon = Math.max(111320 * Math.cos(lat * RAD), 1e-6);
@@ -3701,7 +3702,7 @@
           DEM_N + 'x' + DEM_N + ' grid (fallback)'
         );
         try {
-          localStorage.setItem(key, JSON.stringify(dem));
+          await geoSet(key, dem);
         } catch {}
         return dem;
       }
