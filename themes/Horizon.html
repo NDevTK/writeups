@@ -447,7 +447,22 @@
         farRingGeometry,
         refractionK
       } from './horizon/far-terrain.js';
-      import {hpScale} from './horizon/solarwind.js';
+      import {
+        hpScale,
+        parsePropagated,
+        parseHemiPower
+      } from './horizon/solarwind.js';
+      import {
+        ndviCell,
+        surfaceDatesUrl,
+        surfaceUrl,
+        ndviDate,
+        parseSurface,
+        parseSurfaceState,
+        surfaceQaClean,
+        MOD09_BANDS,
+        MOD09_STATE_BAND
+      } from './horizon/modis-land.js';
       import {etageCovers, pickStation, visibilityM} from './horizon/metar.js';
       import {
         channelSet,
@@ -2759,8 +2774,32 @@
       // the measured evolution of the SAME model that draws the
       // oval. The propagated time is a real physical lead: the
       // panel can say what the sky will do before it does it.
-      const SPACE_PROXY =
-        params.get('space') ?? 'https://api.ndev.tk/solarwind';
+      // SWPC's two space-weather files are keyless and CORS-open (they
+      // answer Access-Control-Allow-Origin: *), built for many clients,
+      // so the browser fetches them DIRECTLY - no proxy needed. The
+      // Newell coupling and the wire parsers live in the gated
+      // solarwind.js, run here exactly as the daemon ran them. ?space=URL
+      // still points at a proxy (a self-hoster's daemon) when set.
+      const SPACE_PROXY = params.get('space') ?? '';
+      const SWPC_WIND =
+        'https://services.swpc.noaa.gov/products/geospace/' +
+        'propagated-solar-wind-1-hour.json';
+      const SWPC_HP =
+        'https://services.swpc.noaa.gov/text/aurora-nowcast-hemi-power.txt';
+      async function fetchSpaceDirect() {
+        const opt = {credentials: 'omit'};
+        const [w, h] = await Promise.all([
+          fetch(SWPC_WIND, opt).then((r) =>
+            r.ok ? r.json() : Promise.reject(new Error('wind ' + r.status))
+          ),
+          fetch(SWPC_HP, opt).then((r) =>
+            r.ok ? r.text() : Promise.reject(new Error('hp ' + r.status))
+          )
+        ]);
+        const wind = parsePropagated(w);
+        const hp = parseHemiPower(h);
+        return {wind, hp, at: Date.now()};
+      }
       function applySpace(j) {
         if (j.hp) {
           state.hpNow = state.lat < 0 ? j.hp.south : j.hp.north;
@@ -2795,9 +2834,9 @@
       }
       async function syncSpace() {
         try {
-          const j = await (
-            await fetch(SPACE_PROXY, {credentials: 'omit'})
-          ).json();
+          const j = SPACE_PROXY
+            ? await (await fetch(SPACE_PROXY, {credentials: 'omit'})).json()
+            : await fetchSpaceDirect();
           applySpace(j);
         } catch {
           // Stream event or the next poll refreshes it.
@@ -3039,9 +3078,64 @@
       // than one inferred from an index. ?surf=b,g,r pins a reflectance
       // triple (the deterministic A/B knob); ?surfsrc=URL overrides the
       // endpoint.
-      const SURFACE_PROXY =
-        params.get('surfsrc') ?? 'https://api.ndev.tk/surface';
+      // The ORNL DAAC MOD09A1 service is keyless and CORS-open (it
+      // answers Access-Control-Allow-Origin), so the browser fetches the
+      // three visible bands + the QA state band DIRECTLY - the two-step
+      // (/dates then /subset) and the QA bitfield decode live in the
+      // gated modis-land.js, run here exactly as the daemon ran them.
+      // The composite calendar is global; resolve it once per 6 h.
+      // ?surfsrc=URL still points at a proxy (a self-hoster's daemon).
+      const SURFACE_PROXY = params.get('surfsrc') ?? '';
       const SURF_REF_RGB = surfaceColorLinear(...REFERENCE_REFLECTANCE);
+      let surfDateCache = {t: 0, date: ''};
+      async function resolveSurfaceDate() {
+        if (surfDateCache.date && Date.now() - surfDateCache.t < 6 * 3600e3)
+          return surfDateCache.date;
+        const r = await fetch(surfaceDatesUrl({lat: 45, lon: -90}), {
+          credentials: 'omit'
+        });
+        if (!r.ok) throw new Error('ornl dates ' + r.status);
+        const date = ndviDate(await r.json());
+        if (!date) throw new Error('ornl dates shape');
+        surfDateCache = {t: Date.now(), date};
+        return date;
+      }
+      async function fetchSurfaceDirect(lat, lon) {
+        const date = await resolveSurfaceDate();
+        const cell = ndviCell(lat, lon);
+        const opt = {credentials: 'omit'};
+        const [blue, green, red, qaState] = await Promise.all([
+          ...[MOD09_BANDS.blue, MOD09_BANDS.green, MOD09_BANDS.red].map(
+            async (b) => {
+              const r = await fetch(surfaceUrl(cell, date, b), opt);
+              if (!r.ok) throw new Error('ornl mod09 ' + r.status);
+              const p = parseSurface(await r.json());
+              if (!p) throw new Error('ornl mod09 shape');
+              return p;
+            }
+          ),
+          (async () => {
+            const r = await fetch(
+              surfaceUrl(cell, date, MOD09_STATE_BAND),
+              opt
+            );
+            if (!r.ok) throw new Error('ornl mod09 state ' + r.status);
+            return parseSurfaceState(await r.json());
+          })()
+        ]);
+        // A pixel counts as measured only when it has real reflectance AND
+        // its QA is clean; a cloud/mixed/shadow (or fill/off-land) pixel
+        // answers as no-measure so the terrain keeps its tuned grass.
+        const clean = surfaceQaClean(qaState);
+        const measured =
+          clean && blue.refl != null && green.refl != null && red.refl != null;
+        return {
+          blue: measured ? blue.refl : null,
+          green: measured ? green.refl : null,
+          red: measured ? red.refl : null,
+          date: blue.date
+        };
+      }
       function applySurface(blue, green, red, note) {
         const rgb = surfaceColorLinear(blue, green, red);
         const tint = [
@@ -3069,16 +3163,18 @@
           return;
         }
         try {
-          const r = await (
-            await fetch(
-              SURFACE_PROXY +
-                '?lat=' +
-                state.lat.toFixed(3) +
-                '&lon=' +
-                state.lon.toFixed(3),
-              {credentials: 'omit'}
-            )
-          ).json();
+          const r = SURFACE_PROXY
+            ? await (
+                await fetch(
+                  SURFACE_PROXY +
+                    '?lat=' +
+                    state.lat.toFixed(3) +
+                    '&lon=' +
+                    state.lon.toFixed(3),
+                  {credentials: 'omit'}
+                )
+              ).json()
+            : await fetchSurfaceDirect(state.lat, state.lon);
           if (
             typeof r.blue === 'number' &&
             typeof r.green === 'number' &&
@@ -6290,16 +6386,21 @@
       }
 
       // The naked-eye fleet: CelesTrak's `visual` group (the
-      // curated ~150 brightest satellites) via the daemon's /tles
-      // route (6 h cache - CelesTrak's own request), each
-      // propagated with the SAME SGP4 as the ISS and shown under
-      // the SAME visibility physics: above the horizon, outside
-      // Vallado's shadow cylinder, sky dark. Brightness from the
-      // McCants magnitude law (sats.js) on the Lambert phase law
-      // shared with earthshine; sets are checksum-verified before
-      // a single element is trusted. The ISS keeps its own path
-      // and is excluded here. ?tles=URL overrides the proxy.
-      const TLE_PROXY = params.get('tles') ?? 'https://api.ndev.tk/tles';
+      // curated ~150 brightest satellites), fetched DIRECTLY -
+      // CelesTrak is keyless and CORS-open (Access-Control-Allow-
+      // Origin: *) and built for many clients. Its one request is
+      // to fetch element sets at most every few hours; the 6 h
+      // refresh interval below honours that. Each is propagated
+      // with the SAME SGP4 as the ISS and shown under the SAME
+      // visibility physics: above the horizon, outside Vallado's
+      // shadow cylinder, sky dark. Brightness from the McCants
+      // magnitude law (sats.js) on the Lambert phase law shared
+      // with earthshine; sets are checksum-verified before a single
+      // element is trusted. The ISS keeps its own path and is
+      // excluded here. ?tles=URL overrides the source.
+      const TLE_PROXY =
+        params.get('tles') ??
+        'https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=tle';
       let satFleet = [];
       async function syncFleet() {
         try {

@@ -62,6 +62,20 @@ import {normalizeMetars} from '../../metar.js';
 import {parseHmsKml, smokeAt} from '../../smoke.js';
 import {parseGrib2} from '../../grib2.js';
 import {aerosolProducts} from '../../aerosol.js';
+import {
+  ndviCell,
+  ndviDatesUrl,
+  ndviUrl,
+  ndviDate,
+  parseNdvi,
+  MOD09_BANDS,
+  MOD09_STATE_BAND,
+  surfaceDatesUrl,
+  surfaceUrl,
+  parseSurface,
+  parseSurfaceState,
+  surfaceQaClean
+} from '../../modis-land.js';
 
 // Schema normalizers - moved here when the Cloudflare worker was
 // retired and deleted (the daemon superseded it; git history
@@ -506,145 +520,25 @@ export function parseChlor(j) {
   };
 }
 
-// ---- Land greenness: MODIS NDVI (ORNL DAAC MOD13Q1) ------------
-// The ORNL DAAC MODIS/VIIRS Web Service serves ONE MOD13Q1 (Terra,
-// 250 m, 16-day composite) NDVI pixel for a lat/lon as JSON, no key,
-// CORS-open. Two calls: /dates returns the composite calendar (global
-// - the same Ayyyyddd list for every land cell), /subset returns the
-// value at a date. Both URLs are built HERE from the snapped cell and
-// the resolved date only - never a caller-supplied URL, the same
-// point-query-proxy posture as /chlor. The land twin of the ocean
-// colour feed (vegetation.js/land-color.js turn the NDVI into a
-// terrain albedo). The pure pieces live here for server-reference.mjs.
-const NDVI_BAND = '250m_16_days_NDVI';
-const ORNL_MOD13Q1 = 'https://modis.ornl.gov/rst/api/v1/MOD13Q1';
-
-// Snap to a ~0.01-deg cell for cache coherence (many viewers in one
-// place cost one upstream query); the service nearest-neighbours the
-// snapped point to its containing 250 m pixel.
-export function ndviCell(lat, lon) {
-  const snap = (x, n) => Math.round(Math.max(-n, Math.min(n, x)) * 100) / 100;
-  return {lat: snap(lat, 90), lon: snap(lon, 180)};
-}
-
-// The /dates URL for a cell - resolves the composite calendar (the
-// latest Ayyyyddd is what /subset then queries).
-export function ndviDatesUrl(cell) {
-  return `${ORNL_MOD13Q1}/dates?latitude=${cell.lat}&longitude=${cell.lon}`;
-}
-
-// The /subset point URL, built from the snapped cell and a resolved
-// composite date only.
-export function ndviUrl(cell, date) {
-  return (
-    `${ORNL_MOD13Q1}/subset?latitude=${cell.lat}&longitude=${cell.lon}` +
-    `&startDate=${date}&endDate=${date}&band=${NDVI_BAND}` +
-    '&kmAboveBelow=0&kmLeftRight=0'
-  );
-}
-
-// The latest composite date (MODIS Ayyyyddd) from a /dates response;
-// null if the calendar is missing or malformed.
-export function ndviDate(j) {
-  const ds = j?.dates;
-  if (!Array.isArray(ds) || !ds.length) return null;
-  const m = ds[ds.length - 1]?.modis_date;
-  return typeof m === 'string' && /^A\d{7}$/.test(m) ? m : null;
-}
-
-// null = unusable response (-> 502); {ndvi: null} = a real answer
-// (no land measure here) and cached like any success, exactly as
-// chlor's land null. An empty subset is the service's answer for a
-// water/off-land point (200 with subset: []); a present pixel with a
-// -3000 fill or out-of-range value is a masked land pixel. Stored NDVI
-// is scaled by 1e-4 over the valid range -2000..10000 (-0.2..1.0).
-export function parseNdvi(j) {
-  if (!j || !Array.isArray(j.subset)) return null;
-  const s = j.subset[0];
-  if (!s) return {ndvi: null, date: null}; // no pixel: ocean/off-land
-  if (!Array.isArray(s.data) || typeof s.data[0] !== 'number') return null;
-  const raw = s.data[0];
-  const ok = raw >= -2000 && raw <= 10000;
-  return {
-    ndvi: ok ? raw * 1e-4 : null,
-    date: typeof s.calendar_date === 'string' ? s.calendar_date : null
-  };
-}
-
-// ---- Land colour: MODIS surface reflectance (ORNL DAAC MOD09A1) -
-// The measured-colour feed: MOD09A1 (Terra, 500 m, 8-day, atmospheric-
-// ally corrected surface reflectance) visible bands b03/b04/b01 for the
-// cell over the point, so the terrain colour is the MEASURED reflectance
-// (surface-color.js integrates the three bands through CIE), not one
-// inferred from NDVI. Same ORNL host and two-step (/dates then /subset)
-// posture as /ndvi; URLs built HERE from the snapped cell + resolved
-// date + a fixed band name only. MOD09A1 is raw SR, not BRDF-normalised
-// NBAR (MCD43A4 is not point-queryable on ORNL). The cell snap is
-// ndviCell (0.01 deg - the model lives once).
-const MOD09_BANDS = {
-  blue: 'sur_refl_b03',
-  green: 'sur_refl_b04',
-  red: 'sur_refl_b01'
+// ---- MODIS land feeds (NDVI + surface reflectance) ------------
+// The pure URL builders, parsers and QA bitfield decode now live in the
+// shared modis-land.js so the theme fetches ORNL DIRECTLY (the service
+// is keyless and CORS-open). Imported at the top for the daemon's
+// optional proxy handlers below, and re-exported for server-reference.
+export {
+  ndviCell,
+  ndviDatesUrl,
+  ndviUrl,
+  ndviDate,
+  parseNdvi,
+  MOD09_BANDS,
+  MOD09_STATE_BAND,
+  surfaceDatesUrl,
+  surfaceUrl,
+  parseSurface,
+  parseSurfaceState,
+  surfaceQaClean
 };
-const MOD09_STATE_BAND = 'sur_refl_state_500m';
-const ORNL_MOD09A1 = 'https://modis.ornl.gov/rst/api/v1/MOD09A1';
-
-export function surfaceDatesUrl(cell) {
-  return `${ORNL_MOD09A1}/dates?latitude=${cell.lat}&longitude=${cell.lon}`;
-}
-
-export function surfaceUrl(cell, date, band) {
-  return (
-    `${ORNL_MOD09A1}/subset?latitude=${cell.lat}&longitude=${cell.lon}` +
-    `&startDate=${date}&endDate=${date}&band=${band}` +
-    '&kmAboveBelow=0&kmLeftRight=0'
-  );
-}
-
-// null = unusable response (-> 502); {refl: null} = a real no-measure
-// answer (empty subset over ocean/off-land, or a fill/out-of-range
-// pixel). MOD09A1 stores reflectance*1e-4 over the valid range
-// -100..16000; the -28672 fill and anything outside read null, and a
-// small negative reflectance is clamped up to 0.
-export function parseSurface(j) {
-  if (!j || !Array.isArray(j.subset)) return null;
-  const s = j.subset[0];
-  if (!s) return {refl: null, date: null};
-  if (!Array.isArray(s.data) || typeof s.data[0] !== 'number') return null;
-  const raw = s.data[0];
-  const ok = raw >= -100 && raw <= 16000;
-  return {
-    refl: ok ? Math.max(0, raw * 1e-4) : null,
-    date: typeof s.calendar_date === 'string' ? s.calendar_date : null
-  };
-}
-
-// The raw integer of the sur_refl_state_500m QA band from a subset
-// response (null if malformed).
-export function parseSurfaceState(j) {
-  if (!j || !Array.isArray(j.subset)) return null;
-  const s = j.subset[0];
-  if (!s || !Array.isArray(s.data) || typeof s.data[0] !== 'number')
-    return null;
-  return s.data[0];
-}
-
-// Decode the MOD09A1 sur_refl_state_500m bitfield and decide whether the
-// pixel's colour is trustworthy. Bit layout (LP DAAC / verified): bits
-// 0-1 cloud state (0 clear, 1 cloudy, 2 mixed, 3 assumed clear), bit 2
-// cloud shadow, bits 8-9 cirrus (0 none .. 3 high), bit 10 internal
-// cloud flag. A cloudy/mixed/shadowed/thick-cirrus/internal-cloud pixel
-// is contaminated (the Amazon 138 = mixed cloud is exactly this case),
-// so its measured colour is rejected in favour of the tuned grass.
-export function surfaceQaClean(state) {
-  if (typeof state !== 'number' || !Number.isFinite(state)) return false;
-  const cloud = state & 0b11; // bits 0-1
-  if (cloud === 1 || cloud === 2) return false; // cloudy or mixed
-  if ((state >> 2) & 1) return false; // bit 2 cloud shadow
-  if (((state >> 8) & 0b11) === 3) return false; // bits 8-9 cirrus high
-  if ((state >> 10) & 1) return false; // bit 10 internal cloud
-  return true;
-}
 
 // ---- Measured ocean colour: ESA CCI Rrs (CoastWatch ERDDAP) ----
 // The measured-sea-colour feed: ESA Ocean Colour CCI v6.0 remote-sensing
