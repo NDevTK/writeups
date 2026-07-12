@@ -116,16 +116,16 @@ const wayAt = (dNorthM, sideM, id) => {
 }
 
 {
-  // hardMax is an OOM guard, not a display cap: it only bites far above
-  // any real count, keeps the NEAREST, and flags that it clipped.
+  // No count anywhere: 50 near houses all survive - bounded by geometry
+  // (radius + size at distance), never by a ceiling.
   const many = {elements: []};
   for (let i = 0; i < 50; i++) many.elements.push(wayAt(10 + i, 15, 'B' + i));
-  const r = lodFilterOsm(many, LAT, LON, 10);
-  const ok = r.elements.length === 10 && r.elements[0].id === 'B0' && r.clipped;
+  const r = lodFilterOsm(many, LAT, LON);
+  const ok = r.elements.length === 50 && r.elements[0].id === 'B0';
   check(
-    'hardMax guards OOM only, keeps nearest, flags clip',
+    'no count cap: every visible building kept',
     ok,
-    `50 -> ${r.elements.length} kept, nearest ${r.elements[0].id}, clipped ${r.clipped}`
+    `50 near houses -> ${r.elements.length} kept, nearest ${r.elements[0].id}`
   );
 }
 

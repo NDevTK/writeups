@@ -33,11 +33,6 @@
 // land-use tint + skyglow, and distant towers are the separate ring.
 export const BLD_NEAR_M = 1200;
 
-// A cheap raw guard on the Overpass response so a pathological metropolis
-// query cannot return tens of MB; it sits above any real ~1.2 km count
-// (central London ~4-5k) and, unlike the old 600, is only an OOM ceiling.
-export const BLD_FETCH_MAX = 12000;
-
 // Distance -> minimum footprint area (m^2) worth drawing. A ramp, not a
 // cliff: everything very near, houses to mid range, only blocks at the
 // edge. Grounded in what subtends a visible angle, not a budget.
@@ -81,13 +76,13 @@ export function ringAreaM2(geometry) {
 /**
  * Filter a raw Overpass buildings response to the footprints actually
  * visible from (lat, lon): each way is kept only when it is within the
- * near radius AND its footprint clears the size-at-distance threshold.
- * Returns a REDUCED Overpass object ({elements}) of the surviving ways
- * unchanged, sorted nearest first, so the caller's parseBuildings runs
- * its heavy per-building work only on what will be drawn. hardMax is a
- * pure OOM guard (nearest kept), NOT a display cap.
+ * near radius AND its footprint clears the size-at-distance threshold -
+ * every building you could see, and no others, bounded by geometry and
+ * never by a count. Returns a REDUCED Overpass object ({elements}) of the
+ * surviving ways unchanged, sorted nearest first, so the caller's
+ * parseBuildings runs its heavy per-building work only on what will draw.
  */
-export function lodFilterOsm(osm, lat, lon, hardMax = 3000) {
+export function lodFilterOsm(osm, lat, lon) {
   const kept = [];
   for (const el of (osm && osm.elements) || []) {
     if (el.type !== 'way' || !Array.isArray(el.geometry)) continue;
@@ -100,8 +95,5 @@ export function lodFilterOsm(osm, lat, lon, hardMax = 3000) {
     kept.push({el, distM});
   }
   kept.sort((a, b) => a.distM - b.distM);
-  const survivors = (kept.length > hardMax ? kept.slice(0, hardMax) : kept).map(
-    (k) => k.el
-  );
-  return {elements: survivors, clipped: kept.length > hardMax};
+  return {elements: kept.map((k) => k.el)};
 }

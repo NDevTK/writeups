@@ -512,11 +512,11 @@
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
       import {
         BLD_NEAR_M,
-        BLD_FETCH_MAX,
         lodFilterOsm,
         metresBetween
       } from './horizon/bldlod.js';
-      import {parseRoads, roadsGeometry} from './horizon/roads.js';
+      import {parseRoads, roadsGeometry, rankOf} from './horizon/roads.js';
+      import {lodFilterRoads} from './horizon/linelod.js';
       import {
         landTint,
         parseLanduse,
@@ -1579,11 +1579,7 @@
             ',' +
             (state.lon + dLon).toFixed(4);
           const q =
-            '[out:json][timeout:45];way[building](' +
-            bbox +
-            ');out geom ' +
-            BLD_FETCH_MAX +
-            ';';
+            '[out:json][timeout:60];way[building](' + bbox + ');out geom;';
           let osm = null;
           for (const host of [
             'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
@@ -1611,12 +1607,11 @@
           record(
             'OSM Overpass buildings',
             buildsGeo.length +
-              ' footprints · LOD-visible of ' +
+              ' footprints · every one visible of ' +
               rawCount +
               ' within ' +
               (BLD_NEAR_M / 1000).toFixed(1) +
-              ' km' +
-              (vis.clipped ? ' · clipped (OOM guard)' : '')
+              ' km'
           );
           try {
             localStorage.setItem(key, JSON.stringify(buildsGeo));
@@ -1634,6 +1629,9 @@
       // gated end to end). Cached geodetic per anchor; roams
       // re-project. ?roads=0 disables.
       let roadsGeo = null;
+      // The near box for the all-classes road pass (the streets you stand
+      // on); the arterial pass spans the full DEM box.
+      const ROAD_NEAR_M = 1500;
       async function syncRoads() {
         if (params.get('roads') === '0') return;
         const key =
@@ -1653,37 +1651,75 @@
         try {
           const mLat = 111320;
           const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
-          const dLat = DEM_HALF_M / mLat;
-          const dLon = DEM_HALF_M / mLon;
-          const bbox =
-            (state.lat - dLat).toFixed(4) +
-            ',' +
-            (state.lon - dLon).toFixed(4) +
-            ',' +
-            (state.lat + dLat).toFixed(4) +
-            ',' +
-            (state.lon + dLon).toFixed(4);
-          const q =
-            '[out:json][timeout:30];way[highway](' + bbox + ');out geom 800;';
-          let osm = null;
-          for (const host of [
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-          ]) {
-            try {
-              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
-                credentials: 'omit'
-              });
-              if (!r.ok) throw new Error(r.status);
-              osm = await r.json();
-              break;
-            } catch {
-              // Try the next mirror.
+          const boxOf = (rM) => {
+            const dLat = rM / mLat;
+            const dLon = rM / mLon;
+            return (
+              (state.lat - dLat).toFixed(4) +
+              ',' +
+              (state.lon - dLon).toFixed(4) +
+              ',' +
+              (state.lat + dLat).toFixed(4) +
+              ',' +
+              (state.lon + dLon).toFixed(4)
+            );
+          };
+          // A city holds ~200k highway ways over the 8 km box - it cannot
+          // be fetched whole, so roads come in two honest passes: ALL
+          // classes in the near box (the streets you stand on), and the
+          // ARTERIAL classes across the whole box (the network you see
+          // reaching away). Both carry only an OOM ceiling, not a display
+          // cap; linelod then keeps each road by class-at-distance.
+          const nearQ =
+            '[out:json][timeout:60];way[highway](' +
+            boxOf(ROAD_NEAR_M) +
+            ');out geom;';
+          const farQ =
+            '[out:json][timeout:60];way[highway~"^(motorway|trunk|primary|secondary|tertiary)(_link)?$"](' +
+            boxOf(DEM_HALF_M) +
+            ');out geom;';
+          const overpass = async (query) => {
+            for (const host of [
+              'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+              'https://overpass-api.de/api/interpreter'
+            ]) {
+              try {
+                const r = await fetch(
+                  host + '?data=' + encodeURIComponent(query),
+                  {credentials: 'omit'}
+                );
+                if (!r.ok) throw new Error(r.status);
+                return await r.json();
+              } catch {
+                // Try the next mirror.
+              }
             }
-          }
-          if (!osm) throw new Error('overpass unavailable');
-          roadsGeo = parseRoads(osm);
-          record('OSM Overpass roads', roadsGeo.length + ' ways');
+            return null;
+          };
+          const [nearOsm, farOsm] = await Promise.all([
+            overpass(nearQ),
+            overpass(farQ)
+          ]);
+          if (!nearOsm && !farOsm) throw new Error('overpass unavailable');
+          // Union the two passes, de-duped by OSM id (arterials inside the
+          // near box appear in both).
+          const seen = new Set();
+          const elements = [];
+          for (const src of [nearOsm, farOsm])
+            for (const el of (src && src.elements) || [])
+              if (!seen.has(el.id)) {
+                seen.add(el.id);
+                elements.push(el);
+              }
+          const all = parseRoads({elements}, Infinity);
+          roadsGeo = lodFilterRoads(all, state.lat, state.lon, rankOf);
+          record(
+            'OSM Overpass roads',
+            roadsGeo.length +
+              ' ways · every one visible of ' +
+              elements.length +
+              ' fetched'
+          );
           try {
             localStorage.setItem(key, JSON.stringify(roadsGeo));
           } catch {}
@@ -1819,8 +1855,8 @@
             bbox +
             // No count cap: the watercourse network is small (a few
             // hundred ways even over a large city) and every course is
-            // real - draw them all. 4000 is a pure OOM ceiling.
-            ');out geom 4000;';
+            // real - draw them all.
+            ');out geom;';
           let osm = null;
           for (const host of [
             'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
@@ -2098,9 +2134,8 @@
             // Even a rail-dense metropolis holds only a few thousand
             // ways over the box (~4,500 in London) and they draw as thin
             // ribbons - the whole network is cheap. The old 2000 slice
-            // ended lines mid-field and left trains riding invisible
-            // rails. 12000 is a pure OOM ceiling, not a display cap.
-            ');out geom 12000;';
+            // ended lines mid-field and left trains riding invisible rails.
+            ');out geom;';
           let osm = null;
           for (const host of [
             'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
