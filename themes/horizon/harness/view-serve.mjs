@@ -32,6 +32,7 @@ import {
 } from 'node:fs';
 import {createHash} from 'node:crypto';
 import http from 'node:http';
+import {ensureChrome} from './setup-chrome.mjs';
 
 const url = process.argv[2];
 if (!url) {
@@ -118,9 +119,7 @@ const args = [
   '--window-size=1300,760',
   'about:blank'
 ];
-const exe =
-  process.env.SHOOT_CHROME ||
-  '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const exe = await ensureChrome();
 const proc = spawn(exe, args, {stdio: 'ignore'});
 process.on('exit', () => {
   try {
@@ -165,20 +164,10 @@ await page.route(
     }
   }
 );
-// Older Chrome rejects three's GPUTextureViewDescriptor.swizzle -
-// same shim the probe pages carry inline.
-await page.addInitScript(() => {
-  if (navigator.gpu && self.GPUTexture) {
-    const ov = GPUTexture.prototype.createView;
-    GPUTexture.prototype.createView = function (d) {
-      if (d && 'swizzle' in d) {
-        d = Object.assign({}, d);
-        delete d.swizzle;
-      }
-      return ov.call(this, d);
-    };
-  }
-});
+// No swizzle shim: setup-chrome guarantees a current Chrome for
+// Testing that supports GPUTextureComponentSwizzle natively, so the
+// render is the browser's real behaviour, not a stripped-channel
+// approximation on an outdated build.
 await page.goto(url, {waitUntil: 'load', timeout: 120000});
 console.log('LOADED - control on :8905');
 
