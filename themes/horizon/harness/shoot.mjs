@@ -22,7 +22,7 @@
 //   --reduced-motion  emulate prefers-reduced-motion
 import {chromium} from 'playwright-core';
 import {spawn} from 'node:child_process';
-import {writeFileSync, rmSync} from 'node:fs';
+import {writeFileSync, readFileSync, rmSync} from 'node:fs';
 import {ensureChrome} from './setup-chrome.mjs';
 
 const [url, out, ...rest] = process.argv.slice(2);
@@ -40,6 +40,7 @@ const args = [
   '--no-sandbox',
   '--no-first-run',
   '--no-default-browser-check',
+  '--disable-background-networking', // no Chrome telemetry through the route
   `--user-data-dir=${profile}`,
   `--remote-debugging-port=${port}`,
   '--window-size=1300,760',
@@ -72,6 +73,68 @@ const ctx = browser.contexts()[0];
 const page = ctx.pages()[0] || (await ctx.newPage());
 if (has('--reduced-motion')) await page.emulateMedia({reducedMotion: 'reduce'});
 await page.setViewportSize({width: 1280, height: 720});
+
+// The launched Chrome cannot egress directly (its CONNECT tunnels reset
+// under the sandbox) and its --proxy-server tunnels reset too, so every
+// non-local request is answered server-side through curl - which DOES
+// honour the agent proxy, the same mechanism view-serve.mjs uses. A page
+// that fetches live data (the theme now calls the CORS-open feeds itself)
+// thus reaches the network "like the curl version". Localhost (the
+// fixture server) stays direct.
+let curlN = 0;
+const curlFetch = (method, u, body) =>
+  new Promise((resolve) => {
+    const tmp = `/tmp/shoot-curl-${process.pid}-${curlN++}.body`;
+    const args = [
+      '-sS',
+      '--max-time',
+      '30',
+      '-X',
+      method,
+      '-o',
+      tmp,
+      '-w',
+      '%{http_code}\t%{content_type}',
+      u
+    ];
+    if (body && body.length) args.push('--data-binary', '@-');
+    const p = spawn('curl', args);
+    let out = '';
+    p.stdout.on('data', (d) => (out += d));
+    if (body && body.length) p.stdin.end(body);
+    else p.stdin.end();
+    p.on('close', (code) => {
+      try {
+        if (code !== 0)
+          return resolve({buf: Buffer.alloc(0), status: 502, type: ''});
+        const [status, type] = out.split('\t');
+        const buf = readFileSync(tmp);
+        resolve({buf, status: +status || 502, type: type || ''});
+      } catch {
+        resolve({buf: Buffer.alloc(0), status: 502, type: ''});
+      } finally {
+        rmSync(tmp, {force: true});
+      }
+    });
+  });
+await page.route(
+  (u) =>
+    !u.href.startsWith('http://localhost') &&
+    !u.href.startsWith('http://127.0.0.1'),
+  async (route) => {
+    const req = route.request();
+    try {
+      const {buf, status, type} = await curlFetch(
+        req.method(),
+        req.url(),
+        req.postDataBuffer()
+      );
+      await route.fulfill({status, contentType: type, body: buf});
+    } catch {
+      await route.abort();
+    }
+  }
+);
 
 const t0 = Date.now();
 const ts = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
