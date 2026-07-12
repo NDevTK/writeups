@@ -1782,7 +1782,11 @@
             bbox +
             ');way[natural~"^(grassland|sand|beach|scree|bare_rock|wood)$"](' +
             bbox +
-            '););out geom 400;';
+            // No count cap: landuse paints a FIXED-size tint raster over
+            // the box, so every real polygon can be burned in for the same
+            // render cost - the old 400 slice left ground untinted where
+            // OSM had a wood or a meadow. `out geom` with no N.
+            '););out geom;';
           let osm = null;
           for (const host of [
             'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
@@ -1800,8 +1804,12 @@
             }
           }
           if (!osm) throw new Error('overpass unavailable');
-          landGeo = parseLanduse(osm, 60, 400, cropMonth, state.lat);
-          record('OSM Overpass landuse', landGeo.length + ' polygons');
+          // Infinity: keep every real polygon (the raster cost is fixed).
+          landGeo = parseLanduse(osm, 60, Infinity, cropMonth, state.lat);
+          record(
+            'OSM Overpass landuse',
+            landGeo.length + ' polygons (full coverage)'
+          );
           try {
             localStorage.setItem(key, JSON.stringify(landGeo));
           } catch {}
