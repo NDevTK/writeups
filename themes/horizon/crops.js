@@ -19,11 +19,14 @@
  * green peak (~550 nm): leaf visible reflectance is green ~10-15%,
  * red/blue ~3-6% (EUMeTrain 3.2; Humboldt GSP). Senescence/ripening =
  * chlorophyll breaks down, carotenoids/browns take over -> tan/gold
- * (Frontiers, wheat senescence PSRI 2019). The iconic colours are
- * spectral-literature grounded: rape flowering yellow (MDPI RS
- * 14(5):1113; canola yield spectra, Sui 2016), ripe-cereal gold, deep
- * maize green, cotton bolls white (MDPI RS 12(11):1712). Tag values and
- * usage counts from OSM taginfo (crop/produce/trees, fetched 2026-07-11).
+ * (Frontiers, wheat senescence PSRI 2019). The iconic colours trace to
+ * MEASURED band reflectance run through the repo's CIE 1931/D65 pipeline
+ * (spectral-color.js / ocean-color.js): rape flowering a low-blue yellow
+ * (MDPI RS 14(5):1113; canola spectra, Sui 2016), ripe-cereal gold, deep
+ * maize green, lavender a blue+red purple, cotton bolls white (MDPI RS
+ * 12(11):1712) - spectral-color-reference.mjs holds these hero colours
+ * to those measured signatures. Tag values and usage counts from OSM
+ * taginfo (crop/produce/trees, fetched 2026-07-11).
  */
 
 // Per canonical crop: `green` is the vegetative canopy (the safe
