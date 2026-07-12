@@ -21,9 +21,12 @@
  * ~3-5%; PROSPECT/SAIL leaf optics, Jacquemoud & Baret 1990). Autumn:
  * chlorophyll breaks down, unmasking carotenoids (yellow-orange) and
  * anthocyanins (red), reflectance climbs in red -> gold through
- * orange-red (Gitelson/Merzlyak senescence indices). These are moderate
- * confidence (converted from band-reflectance ranges); the ratios
- * matter more than the absolutes, so a single SCENE_SCALE lands them in
+ * orange-red (Gitelson/Merzlyak senescence indices). The colours trace
+ * to MEASURED band reflectance run through the repo's CIE 1931/D65
+ * pipeline (spectral-color.js / ocean-color.js): conifer/summer/spring
+ * come out green-led, autumn gold-orange (R>G>B) and brighter, bare a
+ * brown litter - spectral-color-reference.mjs holds these table values
+ * to those measured signatures. A single SCENE_SCALE then lands them in
  * the darker albedo space the terrain ramp and CLASS_ALBEDO.forest
  * ([0.07,0.16,0.05]) already use, preserving hue.
  */
