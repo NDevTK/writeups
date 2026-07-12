@@ -493,6 +493,7 @@
       } from './horizon/airframes.js';
       import {aircraftDims} from './horizon/aircraft.js';
       import {liveryForCallsign} from './horizon/airline.js';
+      import {parseWildfires, firesNear} from './horizon/wildfire.js';
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
       import {parseRoads, roadsGeometry} from './horizon/roads.js';
       import {
@@ -684,6 +685,7 @@
         profile: null, // measured refraction column (refraction.js)
         smoke: null, // analyst-verified wildfire plume overhead (smoke.js)
         sea: null, // measured wave partitions (marine model), null = wind sea
+        fires: [], // real active wildfires near the view (wildfire.js/EONET)
         shake: 0
       };
       // Pinned sea state (harness/debug): hsw/tpw/dww wind-sea Hs (m),
@@ -1179,6 +1181,56 @@
           }
         } catch {
           // Keep the wind-sea prediction.
+        }
+      }
+
+      // Real active wildfires (wildfire.js): NASA EONET is a keyless,
+      // CORS-open public feed built for many sites, so the browser
+      // fetches it DIRECTLY - no daemon. The freshest fire point per
+      // open event; state.fires keeps those within range of the view,
+      // with a bearing and an age-and-distance intensity. ?fire=N
+      // injects N demo fires around the box for the harness.
+      async function syncWildfires() {
+        if (params.get('fire') === '0') return;
+        const demo = params.has('fire') ? +params.get('fire') : 0;
+        if (demo) {
+          const now = Date.now();
+          const list = [];
+          for (let i = 0; i < demo; i++) {
+            const a = (i / demo) * 2 * Math.PI;
+            list.push({
+              id: 'demo' + i,
+              title: 'Demo Fire',
+              lat: state.lat + 0.03 * Math.cos(a),
+              lon: state.lon + 0.03 * Math.sin(a),
+              ageH: i * 6
+            });
+          }
+          state.fires = firesNear(list, state.lat, state.lon, 200);
+          record('wildfires (demo)', state.fires.length + ' fires');
+          return;
+        }
+        try {
+          const j = await (
+            await fetch(
+              'https://eonet.gsfc.nasa.gov/api/v3/categories/wildfires?status=open&days=20&limit=500',
+              {credentials: 'omit'}
+            )
+          ).json();
+          const all = parseWildfires(j, Date.now(), 240);
+          state.fires = firesNear(all, state.lat, state.lon, 200);
+          if (state.fires.length)
+            record(
+              'NASA EONET wildfires',
+              state.fires.length +
+                ' near · nearest ' +
+                state.fires[0].distKm.toFixed(0) +
+                ' km (' +
+                state.fires[0].title.slice(0, 28) +
+                ')'
+            );
+        } catch {
+          // no fires shown when the feed is unreachable
         }
       }
 
@@ -7074,6 +7126,7 @@
         syncTraffic();
         syncMetar();
         syncSmoke();
+        syncWildfires();
         syncAerosol();
         syncWater();
         syncChlor();
@@ -7174,6 +7227,92 @@
 
       // ---------- main loop ----------
       let last = performance.now();
+      // Wildfire embers: an additive warm point cluster at each real
+      // fire near the view (wildfire.js/EONET). Far fires clamp onto a
+      // horizon ring at their true bearing, so a distant blaze is a glow
+      // on the skyline; each ember flickers, brighter after dark though a
+      // fire shows a little by day. Same AgX + aerial-fog encode as the
+      // town lamps, so it dims with distance haze.
+      let fireGlow = null;
+      let fireT = 0;
+      const EMBERS = 5;
+      function updateFires(dt) {
+        const fires = state.fires;
+        if (!fires || !fires.length || params.get('fire') === '0') {
+          if (fireGlow) fireGlow.visible = false;
+          return;
+        }
+        fireT += dt;
+        const n = fires.length * EMBERS;
+        if (
+          !fireGlow ||
+          fireGlow.geometry.getAttribute('position').count !== n
+        ) {
+          if (fireGlow) {
+            scene.remove(fireGlow);
+            fireGlow.geometry.dispose();
+          }
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute(
+            'position',
+            new THREE.BufferAttribute(new Float32Array(n * 3), 3)
+          );
+          geo.setAttribute(
+            'color',
+            new THREE.BufferAttribute(new Float32Array(n * 3), 3)
+          );
+          const mat = new THREE.PointsNodeMaterial({
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+          });
+          mat.size = 3.4;
+          mat.sizeAttenuation = false;
+          mat.colorNode = aerial.encodeFog(tslAttribute('color'));
+          fireGlow = new THREE.Points(geo, mat);
+          fireGlow.frustumCulled = false;
+          scene.add(fireGlow);
+        }
+        fireGlow.visible = true;
+        const pos = fireGlow.geometry.getAttribute('position');
+        const col = fireGlow.geometry.getAttribute('color');
+        const sunAlt = astro.sun ? astro.sun.alt : -0.2;
+        const night = THREE.MathUtils.clamp(0.5 - sunAlt * 3, 0.14, 1);
+        const MAXR = 130; // clamp far fires onto the horizon ring
+        let k = 0;
+        for (const f of fires) {
+          const s = geoToScene(f.lat, f.lon, dressAnchor);
+          let x = s.x;
+          let z = s.z;
+          const r = Math.hypot(x, z) || 1;
+          if (r > MAXR) {
+            x = (x / r) * MAXR;
+            z = (z / r) * MAXR;
+          }
+          const gy = sample(x, z).y;
+          for (let e = 0; e < EMBERS; e++) {
+            const ph = k * 1.7 + e * 2.3;
+            const fl =
+              0.55 +
+              0.45 *
+                Math.sin(fireT * 7 + ph) *
+                Math.sin(fireT * 3.3 + ph * 1.7);
+            const spread = 0.3 + (0.7 * e) / EMBERS;
+            pos.setXYZ(
+              k,
+              x + Math.cos(ph) * 1.3 * spread,
+              gy + 0.3 + (1.7 * e) / EMBERS,
+              z + Math.sin(ph * 1.3) * 1.3 * spread
+            );
+            const b = f.intensity * (0.35 + 0.65 * night) * fl * (1 - 0.12 * e);
+            col.setXYZ(k, 2.5 * b, 0.9 * b, 0.16 * b); // warm ember
+            k++;
+          }
+        }
+        pos.needsUpdate = true;
+        col.needsUpdate = true;
+      }
+
       function frame(t) {
         requestAnimationFrame(frame);
         // Clamped BELOW too: rAF timestamps are not guaranteed
@@ -9449,6 +9588,7 @@
         }
 
         camera.updateMatrixWorld();
+        updateFires(dt);
 
         if (cloudsActive) {
           // Terrain depth prepass (cheap: colour writes off, override
@@ -9572,6 +9712,7 @@
         syncMetar();
         setInterval(syncMetar, 10 * 60 * 1000);
         syncSmoke();
+        syncWildfires();
         setInterval(syncSmoke, 30 * 60 * 1000);
         syncAerosol();
         setInterval(syncAerosol, 30 * 60 * 1000);
