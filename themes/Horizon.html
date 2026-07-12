@@ -1815,9 +1815,12 @@
             ',' +
             (state.lon + dLon).toFixed(4);
           const q =
-            '[out:json][timeout:30];way[waterway~"^(river|stream|canal|drain|ditch)$"](' +
+            '[out:json][timeout:45];way[waterway~"^(river|stream|canal|drain|ditch)$"](' +
             bbox +
-            ');out geom 600;';
+            // No count cap: the watercourse network is small (a few
+            // hundred ways even over a large city) and every course is
+            // real - draw them all. 4000 is a pure OOM ceiling.
+            ');out geom 4000;';
           let osm = null;
           for (const host of [
             'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
@@ -1835,8 +1838,12 @@
             }
           }
           if (!osm) throw new Error('overpass unavailable');
-          riversGeo = parseWaterways(osm);
-          record('OSM Overpass waterways', riversGeo.length + ' watercourses');
+          // Infinity: keep every real watercourse (no arbitrary slice).
+          riversGeo = parseWaterways(osm, Infinity);
+          record(
+            'OSM Overpass waterways',
+            riversGeo.length + ' watercourses (full network)'
+          );
           try {
             localStorage.setItem(key, JSON.stringify(riversGeo));
           } catch {}
@@ -2085,12 +2092,15 @@
             ',' +
             (state.lon + dLon).toFixed(4);
           const q =
-            '[out:json][timeout:30];way[railway~"^(rail|narrow_gauge|funicular|light_rail|tram)$"](' +
+            '[out:json][timeout:45];way[railway~"^(rail|narrow_gauge|funicular|light_rail|tram)$"](' +
             bbox +
-            // 2000: a Zurich-sized box holds 600+ ways and the old
-            // cap returned an ARBITRARY subset - drawn lines ended
-            // mid-field and trains rode invisible rails.
-            ');out geom 2000;';
+            // No count cap: a railway is a REAL ROUTE, not a sample.
+            // Even a rail-dense metropolis holds only a few thousand
+            // ways over the box (~4,500 in London) and they draw as thin
+            // ribbons - the whole network is cheap. The old 2000 slice
+            // ended lines mid-field and left trains riding invisible
+            // rails. 12000 is a pure OOM ceiling, not a display cap.
+            ');out geom 12000;';
           let osm = null;
           for (const host of [
             'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
@@ -2108,8 +2118,12 @@
             }
           }
           if (!osm) throw new Error('overpass unavailable');
-          railsGeo = parseRailways(osm);
-          record('OSM Overpass railways', railsGeo.length + ' ways');
+          // Infinity: keep the whole real network (no arbitrary slice).
+          railsGeo = parseRailways(osm, Infinity);
+          record(
+            'OSM Overpass railways',
+            railsGeo.length + ' ways (full network)'
+          );
           try {
             localStorage.setItem(key, JSON.stringify(railsGeo));
           } catch {}
