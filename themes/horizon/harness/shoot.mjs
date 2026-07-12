@@ -23,6 +23,7 @@
 import {chromium} from 'playwright-core';
 import {spawn} from 'node:child_process';
 import {writeFileSync, rmSync} from 'node:fs';
+import {ensureChrome} from './setup-chrome.mjs';
 
 const [url, out, ...rest] = process.argv.slice(2);
 const has = (f) => rest.includes(f);
@@ -47,9 +48,7 @@ const args = [
 if (has('--wgpu')) args.unshift('--enable-unsafe-webgpu');
 else args.unshift('--use-angle=swiftshader');
 
-const exe =
-  process.env.SHOOT_CHROME ||
-  '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const exe = await ensureChrome();
 const proc = spawn(exe, args, {stdio: 'ignore'});
 process.on('exit', () => {
   try {
