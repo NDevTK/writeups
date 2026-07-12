@@ -510,6 +510,12 @@
       import {liveryForCallsign} from './horizon/airline.js';
       import {parseWildfires, firesNear} from './horizon/wildfire.js';
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
+      import {
+        BLD_NEAR_M,
+        BLD_FETCH_MAX,
+        lodFilterOsm,
+        metresBetween
+      } from './horizon/bldlod.js';
       import {parseRoads, roadsGeometry} from './horizon/roads.js';
       import {
         landTint,
@@ -1553,8 +1559,17 @@
         try {
           const mLat = 111320;
           const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
-          const dLat = DEM_HALF_M / mLat;
-          const dLon = DEM_HALF_M / mLon;
+          // The buildings query is drawn from the near radius where an
+          // individual footprint reads (BLD_NEAR_M), NOT the whole 8 km
+          // box, and carries NO `out geom` count cap: within that radius
+          // Overpass returns every real building, and honest level-of-
+          // detail (bldlod.js) then keeps each only where it is large
+          // enough to be seen at its distance - so your actual
+          // neighbours are all here, not a scattered 400. Past this
+          // radius the city is the land-use tint + measured night-lights
+          // and the tall-landmark ring, never invented footprints.
+          const dLat = BLD_NEAR_M / mLat;
+          const dLon = BLD_NEAR_M / mLon;
           const bbox =
             (state.lat - dLat).toFixed(4) +
             ',' +
@@ -1564,7 +1579,11 @@
             ',' +
             (state.lon + dLon).toFixed(4);
           const q =
-            '[out:json][timeout:30];way[building](' + bbox + ');out geom 600;';
+            '[out:json][timeout:45];way[building](' +
+            bbox +
+            ');out geom ' +
+            BLD_FETCH_MAX +
+            ';';
           let osm = null;
           for (const host of [
             'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
@@ -1582,10 +1601,23 @@
             }
           }
           if (!osm) throw new Error('overpass unavailable');
-          // parseBuildings dedupes rings, applies the height ladder
-          // and keeps the footprints nearest the town centre (gated).
-          buildsGeo = parseBuildings(osm);
-          record('OSM Overpass buildings', buildsGeo.length + ' footprints');
+          // Honest LOD on the RAW response first (cheap shoelace area,
+          // size-at-distance) so the costly parse - roof OBB, colours -
+          // only ever runs on the footprints that will draw; then
+          // parseBuildings with no count slice (Infinity) keeps them all.
+          const rawCount = (osm.elements || []).length;
+          const vis = lodFilterOsm(osm, state.lat, state.lon);
+          buildsGeo = parseBuildings({elements: vis.elements}, Infinity, 12);
+          record(
+            'OSM Overpass buildings',
+            buildsGeo.length +
+              ' footprints · LOD-visible of ' +
+              rawCount +
+              ' within ' +
+              (BLD_NEAR_M / 1000).toFixed(1) +
+              ' km' +
+              (vis.clipped ? ' · clipped (OOM guard)' : '')
+          );
           try {
             localStorage.setItem(key, JSON.stringify(buildsGeo));
           } catch {}
@@ -4131,17 +4163,24 @@
       // warm exactly where the night lights say the town is lit,
       // with the lamps' own tint and eye-response mapping.
       let bldMesh = null;
+      let bldMeshFar = null;
       let bldMat = null;
+      // Only buildings within this radius cast shadows: a distant
+      // building's shadow is imperceptible, and casting from every one of
+      // the thousands of LOD footprints would triple them through the
+      // shadow cascades for nothing. Far buildings still RECEIVE shadow.
+      const BLD_SHADOW_M = 450;
       let bldNightU = null;
       let bldGlowAt = null; // scene (x,z) -> measured radiance [0..1]
       let bldSnowAt = null; // scene (x,z) -> measured FSC [0..1]
       let bldSnowU = null; // live-snowfall term (the terrain's uSnowy)
       function placeBuildings() {
-        if (bldMesh) {
-          ground.remove(bldMesh);
-          bldMesh.geometry.dispose();
-          bldMesh = null;
-        }
+        for (const m of [bldMesh, bldMeshFar])
+          if (m) {
+            ground.remove(m);
+            m.geometry.dispose();
+          }
+        bldMesh = bldMeshFar = null;
         if (!buildsGeo || !buildsGeo.length || params.get('buildings') === '0')
           return;
         const groundY = (x, z) => {
@@ -4149,30 +4188,56 @@
           return s.water ? null : s.y;
         };
         const glowAt = (x, z) => (bldGlowAt ? Math.sqrt(bldGlowAt(x, z)) : 0);
-        const g = buildingsGeometry(
-          buildsGeo,
-          dressAnchor,
-          groundY,
-          glowAt,
-          1 / MPU,
-          WORLD / 2
-        );
-        if (!g.placed) return;
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
-        geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
-        geo.setAttribute('color', new THREE.BufferAttribute(g.color, 3));
-        geo.setAttribute('glow', new THREE.BufferAttribute(g.glow, 1));
-        geo.setAttribute('roof', new THREE.BufferAttribute(g.roof, 1));
-        // Measured snow per vertex: the same FSC field the terrain
-        // reads, sampled at each building vertex (0 until the
-        // satellite answers).
-        const rsnow = new Float32Array(g.count);
-        if (bldSnowAt)
-          for (let i = 0; i < g.count; i++)
-            rsnow[i] = bldSnowAt(g.position[3 * i], g.position[3 * i + 2]);
-        geo.setAttribute('rsnow', new THREE.BufferAttribute(rsnow, 1));
-        if (!bldMat) {
+        // Split near (shadow-casting) from far (receive-only) by real
+        // distance from the anchor, so the shadow cascades only carry the
+        // handful of buildings whose shadow is actually visible.
+        const nearGeo = [];
+        const farGeo = [];
+        for (const b of buildsGeo) {
+          const p = b.ring && b.ring[0];
+          const d = p
+            ? metresBetween(dressAnchor.lat, dressAnchor.lon, p[0], p[1])
+            : 0;
+          (d <= BLD_SHADOW_M ? nearGeo : farGeo).push(b);
+        }
+        // Build one mesh from a footprint subset; `casts` sets shadow.
+        const build = (subset, casts) => {
+          if (!subset.length) return null;
+          const g = buildingsGeometry(
+            subset,
+            dressAnchor,
+            groundY,
+            glowAt,
+            1 / MPU,
+            WORLD / 2
+          );
+          if (!g.placed) return null;
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute(
+            'position',
+            new THREE.BufferAttribute(g.position, 3)
+          );
+          geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
+          geo.setAttribute('color', new THREE.BufferAttribute(g.color, 3));
+          geo.setAttribute('glow', new THREE.BufferAttribute(g.glow, 1));
+          geo.setAttribute('roof', new THREE.BufferAttribute(g.roof, 1));
+          // Measured snow per vertex: the same FSC field the terrain
+          // reads, sampled at each building vertex (0 until the
+          // satellite answers).
+          const rsnow = new Float32Array(g.count);
+          if (bldSnowAt)
+            for (let i = 0; i < g.count; i++)
+              rsnow[i] = bldSnowAt(g.position[3 * i], g.position[3 * i + 2]);
+          geo.setAttribute('rsnow', new THREE.BufferAttribute(rsnow, 1));
+          ensureBldMat();
+          const m = new THREE.Mesh(geo, bldMat);
+          m.castShadow = casts;
+          m.receiveShadow = true;
+          ground.add(m);
+          return {mesh: m, placed: g.placed};
+        };
+        function ensureBldMat() {
+          if (bldMat) return;
           bldNightU = tslUniform(0);
           bldSnowU = tslUniform(0);
           bldMat = new THREE.MeshStandardNodeMaterial({
@@ -4202,12 +4267,19 @@
             .mul(0.6);
           applyAerial(bldMat);
         }
-        bldMesh = new THREE.Mesh(geo, bldMat);
-        bldMesh.castShadow = bldMesh.receiveShadow = true;
-        ground.add(bldMesh);
+        const near = build(nearGeo, true);
+        const far = build(farGeo, false);
+        bldMesh = near && near.mesh;
+        bldMeshFar = far && far.mesh;
+        const placed = (near ? near.placed : 0) + (far ? far.placed : 0);
         record(
           'OSM buildings placed',
-          g.placed + ' of ' + buildsGeo.length + ' footprints on this box'
+          placed +
+            ' of ' +
+            buildsGeo.length +
+            ' footprints on this box · ' +
+            (near ? near.placed : 0) +
+            ' cast shadow'
         );
       }
       // Roads: ribbons of the measured width seated on the sampled
