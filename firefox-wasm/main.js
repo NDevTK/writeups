@@ -356,6 +356,24 @@ async function start() {
         200
       );
     });
+    if (window.parent !== window) {
+      let lastReported = '';
+      window.setInterval(async () => {
+        let url = '';
+        try {
+          url = await gecko.evalChrome(
+            "try { gBrowser.currentURI.spec } catch (e) { '' }"
+          );
+        } catch (e) {}
+        if (url && url !== lastReported) {
+          lastReported = url;
+          window.parent.postMessage(
+            {type: 'gecko-location', url},
+            location.origin
+          );
+        }
+      }, 800);
+    }
   } catch (e) {
     fail(e);
   }

@@ -122,9 +122,25 @@
         document.body.classList.toggle('forward', shown);
         window.parent.postMessage({type: 'shaderwall', state}, location.origin);
       }
+      // Mirror the embedded Firefox's active tab into the real address bar,
+      // but only for pages on this same site: the History API can't set a
+      // cross-origin URL (it throws), and we don't want to leak where the
+      // reader browses off-site into the host's location.
+      function syncLocation(raw) {
+        try {
+          const top = window.top;
+          const u = new URL(raw, location.href);
+          if (u.origin !== top.location.origin) return;
+          top.history.replaceState(null, '', u.pathname + u.search + u.hash);
+        } catch (e) {}
+      }
       addEventListener('message', (e) => {
         if (e.origin != location.origin) return;
         const d = e.data || {};
+        if (d.type === 'gecko-location') {
+          if (typeof d.url === 'string') syncLocation(d.url);
+          return;
+        }
         if (d.type !== 'shaderwall') return;
         if (d.action === 'show') setShown('bare');
         else if (d.action === 'hide') setShown('hidden');
