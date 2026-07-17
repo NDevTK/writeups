@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Firefox</title>
+    <style>
+      :root {
+        --frame: #1c1b22; /* tab strip / window frame */
+        --toolbar: #2b2a33; /* nav toolbar */
+        --tab: #42414d; /* active tab + urlbar */
+        --field: #1c1b22; /* address field well */
+        --content: #23222b; /* page/new-tab background */
+        --ink: #fbfbfe;
+        --muted: #b1aebb;
+        --faint: #8f8c9b;
+        --line: rgba(255, 255, 255, 0.09);
+        --accent: #00ddff; /* Firefox dark-theme focus accent */
+        --tint: rgba(0, 221, 255, 0.16);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--frame);
+        color: var(--ink);
+        font:
+          14px/1.4 -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          Roboto,
+          system-ui,
+          sans-serif;
+      }
+      /* Behind the writeup content the chrome is a dim, moody backdrop; the ✦
+         toggle brings it forward, crisp and interactive. */
+      .win {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        transition: filter 0.35s ease;
+      }
+      body:not(.forward) .win {
+        filter: brightness(0.62) saturate(0.9) blur(0.4px);
+      }
+
+      /* ---- tab strip ---- */
+      .tabs {
+        display: flex;
+        align-items: flex-end;
+        gap: 2px;
+        padding: 8px 8px 0;
+        background: var(--frame);
+        flex: 0 0 auto;
+      }
+      .tab {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 240px;
+        padding: 8px 12px;
+        border-radius: 8px 8px 0 0;
+        color: var(--muted);
+        font-size: 12.5px;
+        white-space: nowrap;
+      }
+      .tab.active {
+        background: var(--tab);
+        color: var(--ink);
+      }
+      .tab .fav {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+      }
+      .tab .x {
+        color: var(--faint);
+        font-size: 15px;
+        line-height: 1;
+      }
+      .newtab {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        margin-bottom: 4px;
+        border-radius: 7px;
+        color: var(--muted);
+        font-size: 20px;
+      }
+      .newtab:hover,
+      .tab:not(.active):hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .spacer {
+        flex: 1;
+      }
+
+      /* ---- nav toolbar ---- */
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 10px;
+        background: var(--toolbar);
+        border-bottom: 1px solid var(--line);
+        flex: 0 0 auto;
+      }
+      .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--ink);
+        cursor: pointer;
+        flex: 0 0 auto;
+      }
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .btn:disabled {
+        color: var(--faint);
+        cursor: default;
+      }
+      .btn:disabled:hover {
+        background: transparent;
+      }
+      .btn svg {
+        width: 17px;
+        height: 17px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      /* address bar */
+      .url {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        flex: 1;
+        min-width: 0;
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 9px;
+        background: var(--field);
+        border: 1px solid transparent;
+        color: var(--ink);
+      }
+      .url:focus-within {
+        background: #14131a;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--tint);
+      }
+      .url .lock {
+        width: 14px;
+        height: 14px;
+        flex: 0 0 auto;
+        color: #7ee081;
+      }
+      .url input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--ink);
+        font: inherit;
+        font-size: 13px;
+      }
+      .url input::placeholder {
+        color: var(--faint);
+      }
+      .url .go {
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      /* ---- viewport (start page or firefox-wasm) ---- */
+      .view {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        background: radial-gradient(
+            120% 90% at var(--px, 50%) var(--py, 22%),
+            #322b45 0%,
+            var(--content) 55%
+          )
+          var(--content);
+        overflow: hidden;
+      }
+      .home {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        padding: 24px;
+        text-align: center;
+      }
+      body.booted .home {
+        display: none;
+      }
+      .emblem {
+        width: 78px;
+        height: 78px;
+        filter: drop-shadow(0 6px 20px rgba(154, 84, 255, 0.35));
+      }
+      .word {
+        font-size: 34px;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+        margin: -4px 0 0;
+      }
+      .sub {
+        margin: -10px 0 4px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .sub code {
+        color: #d9b8ff;
+        font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+        font-size: 12px;
+      }
+      .launch {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        padding: 11px 20px;
+        border: 0;
+        border-radius: 10px;
+        cursor: pointer;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        background: linear-gradient(
+          135deg,
+          #ff9d3c 0%,
+          #ff5a37 34%,
+          #e83c72 66%,
+          #9a54ff 100%
+        );
+        box-shadow: 0 8px 24px rgba(232, 60, 114, 0.35);
+      }
+      .launch:hover {
+        filter: brightness(1.07);
+      }
+      .launch:active {
+        transform: translateY(1px);
+      }
+      .launch svg {
+        width: 15px;
+        height: 15px;
+        fill: #fff;
+      }
+      /* top-site shortcuts */
+      .tiles {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 12px;
+        max-width: 460px;
+        margin-top: 4px;
+      }
+      .tile {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 7px;
+        width: 78px;
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 11.5px;
+      }
+      .tile .ico {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        background: #35333f;
+        font-size: 20px;
+        transition: background 0.15s;
+      }
+      .tile:hover .ico {
+        background: #413e4d;
+      }
+      .tile:hover {
+        color: var(--ink);
+      }
+      /* isolation status + credit */
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 11px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--line);
+        color: var(--muted);
+      }
+      .status .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #ffb454;
+        box-shadow: 0 0 8px currentColor;
+      }
+      .status.ready {
+        color: #9ff0a3;
+      }
+      .status.ready .dot {
+        background: #7ee081;
+      }
+      .credit {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 14px;
+        text-align: center;
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .credit a {
+        color: var(--muted);
+      }
+      /* the firefox-wasm frame + its boot veil */
+      .wasm {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: var(--content);
+      }
+      .veil {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: var(--content);
+        color: var(--muted);
+        font-size: 13px;
+      }
+      body.booting .veil {
+        display: flex;
+      }
+      .ring {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 3px solid rgba(255, 255, 255, 0.14);
+        border-top-color: #e83c72;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .ring {
+          animation-duration: 2.4s;
+        }
+        .win {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="win">
+      <!-- tab strip -->
+      <div class="tabs">
+        <div class="tab active">
+          <span class="fav" data-fox></span>
+          <span id="tabTitle">Writeups</span>
+          <span class="x" aria-hidden="true">×</span>
+        </div>
+        <div class="newtab" aria-hidden="true">+</div>
+        <div class="spacer"></div>
+      </div>
+
+      <!-- nav toolbar -->
+      <div class="bar">
+        <button class="btn" id="back" title="Back" disabled>
+          <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg>
+        </button>
+        <button class="btn" id="fwd" title="Forward" disabled>
+          <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg>
+        </button>
+        <button class="btn" id="reload" title="Reload">
+          <svg viewBox="0 0 24 24">
+            <path d="M20 11a8 8 0 10-1 5" />
+            <path d="M20 5v6h-6" />
+          </svg>
+        </button>
+        <button class="btn" id="home" title="Home">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 11l8-7 8 7" />
+            <path d="M6 10v9h12v-9" />
+          </svg>
+        </button>
+        <div class="url">
+          <svg class="lock" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M6 10V8a6 6 0 0112 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H5a1 1 0 01-1-1v-9a1 1 0 011-1h1zm2 0h8V8a4 4 0 00-8 0v2z" />
+          </svg>
+          <input
+            id="addr"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+            aria-label="Address" />
+          <span class="go" aria-hidden="true">↵</span>
+        </div>
+        <button class="btn" id="menu" title="Menu">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- viewport -->
+      <div class="view" id="view">
+        <div class="home">
+          <span class="emblem" data-fox></span>
+          <h1 class="word">Firefox</h1>
+          <p class="sub">
+            running on WebAssembly · loads <code id="homeHost">this site</code>
+          </p>
+          <button class="launch" id="launch">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+            Launch Firefox
+          </button>
+          <div class="tiles" id="tiles"></div>
+          <div class="status" id="status">
+            <span class="dot"></span><span id="statusText">checking…</span>
+          </div>
+          <div class="credit">
+            powered by
+            <a
+              href="https://github.com/HeyPuter/firefox-wasm"
+              target="_blank"
+              rel="noreferrer noopener"
+              >HeyPuter/firefox-wasm</a
+            >
+          </div>
+        </div>
+        <div class="veil">
+          <div class="ring" aria-hidden="true"></div>
+          <div>Booting Gecko… first start downloads the engine.</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      'use strict';
+
+      // Where the custom build lives (same-origin, so it inherits cross-origin
+      // isolation and can use SharedArrayBuffer through the coi service worker).
+      const BUILD = '/writeups/firefox-wasm/';
+      const SITE = 'https://ndevtk.github.io/writeups/';
+
+      const view = document.getElementById('view');
+      const addr = document.getElementById('addr');
+      const statusEl = document.getElementById('status');
+      const statusText = document.getElementById('statusText');
+      const homeHost = document.getElementById('homeHost');
+
+      // --- the fox emblem (inline SVG, reused at a few sizes) ---
+      let foxN = 0;
+      function foxSVG() {
+        const g = 'fx' + foxN++;
+        return (
+          '<svg viewBox="0 0 100 100" width="100%" height="100%" ' +
+          'xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+          '<defs><linearGradient id="' +
+          g +
+          '" x1="0" y1="0" x2="1" y2="1">' +
+          '<stop offset="0" stop-color="#ffd23b"/>' +
+          '<stop offset=".22" stop-color="#ff9d3c"/>' +
+          '<stop offset=".48" stop-color="#ff5a37"/>' +
+          '<stop offset=".72" stop-color="#e83c72"/>' +
+          '<stop offset="1" stop-color="#9a54ff"/></linearGradient></defs>' +
+          '<path fill="url(#' +
+          g +
+          ')" d="M50 85 C38 81 27 73 24 58 C22 50 22 44 22.5 40 L19 15 ' +
+          'L41 30 C44 27.5 47 26.5 50 26.5 C53 26.5 56 27.5 59 30 L81 15 ' +
+          'L77.5 40 C78 44 78 50 76 58 C73 73 62 81 50 85 Z"/>' +
+          '<path fill="#fff" opacity=".9" d="M50 85 C43 81 35 74 32 63 ' +
+          'C39 67 45 69 50 69 C55 69 61 67 68 63 C65 74 57 81 50 85 Z"/>' +
+          '<path fill="#241a2e" d="M31 45 C34 41 41 42 43 48 C40 51 33 50 31 45 Z"/>' +
+          '<path fill="#241a2e" d="M69 45 C66 41 59 42 57 48 C60 51 67 50 69 45 Z"/>' +
+          '<path fill="#241a2e" d="M50 71 L45.5 64 L54.5 64 Z"/></svg>'
+        );
+      }
+      // Static, self-authored markup — safe to set directly.
+      document.querySelectorAll('[data-fox]').forEach((el) => {
+        el.innerHTML = foxSVG();
+      });
+
+      // --- target URL: the writeup the visitor is actually reading ---
+      function ourUrl() {
+        try {
+          if (window.parent && window.parent !== window) {
+            const h = window.parent.location.href; // same-origin read
+            if (/^https?:\/\//.test(h)) return h;
+          }
+        } catch (e) {}
+        return SITE;
+      }
+      const target = ourUrl();
+      addr.value = target;
+      try {
+        homeHost.textContent = new URL(target).host;
+      } catch (e) {}
+
+      // --- top-site shortcuts (open the real page in the top window) ---
+      const SHORTCUTS = [
+        {t: 'Writeups', u: SITE, i: '📝'},
+        {t: 'Chromium', u: 'https://issues.chromium.org/', i: '🧩'},
+        {t: 'GitHub', u: 'https://github.com/NDevTK', i: '🐙'},
+        {t: 'Credits', u: SITE + 'credits/', i: '🏆'},
+        {t: 'RSS', u: SITE + 'feed.xml', i: '📡'}
+      ];
+      const tiles = document.getElementById('tiles');
+      SHORTCUTS.forEach((s) => {
+        const a = document.createElement('a');
+        a.className = 'tile';
+        a.href = s.u;
+        a.target = '_top';
+        a.rel = 'noreferrer';
+        const ico = document.createElement('span');
+        ico.className = 'ico';
+        ico.textContent = s.i;
+        const label = document.createElement('span');
+        label.textContent = s.t;
+        a.append(ico, label);
+        tiles.appendChild(a);
+      });
+
+      // --- cross-origin isolation status ---
+      function refreshStatus() {
+        const ok =
+          window.crossOriginIsolated === true &&
+          typeof SharedArrayBuffer !== 'undefined';
+        statusEl.classList.toggle('ready', ok);
+        statusText.textContent = ok
+          ? 'SharedArrayBuffer ready'
+          : 'Isolating… reload if it stays here';
+        return ok;
+      }
+      refreshStatus();
+
+      // --- launch the WASM browser onto the target URL ---
+      let booted = false;
+      function boot(url) {
+        const dest = url || addr.value || target;
+        addr.value = dest;
+        refreshStatus();
+        const frame = document.createElement('iframe');
+        frame.className = 'wasm';
+        frame.title = 'Firefox (WebAssembly)';
+        // Hand the build the page to open. Same-origin, so no sandbox — it
+        // needs full privileges for workers + SharedArrayBuffer.
+        frame.src = BUILD + '?url=' + encodeURIComponent(dest);
+        frame.allow = 'cross-origin-isolated; fullscreen; clipboard-write';
+        frame.addEventListener('load', () =>
+          document.body.classList.remove('booting')
+        );
+        view.appendChild(frame);
+        document.body.classList.add('booted', 'booting');
+        booted = true;
+      }
+      function reboot(url) {
+        if (booted) {
+          view.querySelectorAll('.wasm').forEach((f) => f.remove());
+          document.body.classList.remove('booted', 'booting');
+          booted = false;
+        }
+        boot(url);
+      }
+
+      document.getElementById('launch').addEventListener('click', () => boot());
+      document.getElementById('reload').addEventListener('click', () => {
+        if (booted) reboot(addr.value);
+      });
+      document.getElementById('home').addEventListener('click', () => {
+        addr.value = SITE;
+        reboot(SITE);
+      });
+      // Enter in the address bar (re)opens that URL in the WASM browser.
+      addr.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        let u = addr.value.trim();
+        if (!u) return;
+        if (!/^[a-z]+:\/\//i.test(u)) u = 'https://' + u;
+        reboot(u);
+      });
+      addr.addEventListener('focus', () => addr.select());
+
+      // ---------- host bridge (shaderwall protocol) ----------
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+      let shown = false;
+      function setShown(state) {
+        // 'shown' and 'bare' are both "forward"; 'hidden' sits behind content.
+        shown = state !== 'hidden';
+        document.body.classList.toggle('forward', shown);
+        window.parent.postMessage({type: 'shaderwall', state}, location.origin);
+      }
+      addEventListener('message', (e) => {
+        if (e.origin != location.origin) return;
+        const d = e.data || {};
+        if (d.type === 'wallpaper-pointer') {
+          if (reduce.matches) return;
+          view.style.setProperty('--px', (d.x * 100).toFixed(1) + '%');
+          view.style.setProperty('--py', (d.y * 60).toFixed(1) + '%');
+          return;
+        }
+        if (d.type !== 'shaderwall') return;
+        if (d.action === 'show') setShown('shown');
+        else if (d.action === 'hide') setShown('hidden');
+        else if (d.action === 'toggle') setShown(shown ? 'hidden' : 'shown');
+      });
+      addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H')
+          setShown(shown ? 'hidden' : 'shown');
+      });
+      setShown('hidden');
+    </script>
+  </body>
+</html>
