@@ -17263,7 +17263,7 @@ class Ee {
   }
   async pump() {
     if (!this.running) {
-      for (this.running = !0; this.queue.length; ) {
+      for (this.running = !0; this.queue.length;) {
         const e = this.queue.shift(),
           A = await this.runCmd(e);
         e.resolve?.(A);
@@ -17673,7 +17673,7 @@ async function mA(n, e) {
 function G(n, e, A) {
   let t = e;
   const a = e + A;
-  for (; t < a && n[t] !== 0; ) t++;
+  for (; t < a && n[t] !== 0;) t++;
   return Be.decode(n.subarray(e, t));
 }
 function CA(n, e) {
@@ -17690,7 +17690,7 @@ function EA(n) {
   const e = Be.decode(n),
     A = {};
   let t = 0;
-  for (; t < e.length; ) {
+  for (; t < e.length;) {
     const a = e.indexOf(' ', t);
     if (a < 0) break;
     const r = Number.parseInt(e.slice(t, a), 10);
@@ -17725,7 +17725,7 @@ function QA(n) {
   let t = 0,
     a,
     r;
-  for (; t + 512 <= n.length && !dA(n, t); ) {
+  for (; t + 512 <= n.length && !dA(n, t);) {
     const i = String.fromCharCode(n[t + 156] || 0),
       s = CA(n, t + 124),
       l = t + 512,
@@ -17852,7 +17852,7 @@ function me(n) {
   const e = ['B', 'KB', 'MB', 'GB'];
   let A = n,
     t = 0;
-  for (; A >= 1024 && t < e.length - 1; ) ((A /= 1024), t++);
+  for (; A >= 1024 && t < e.length - 1;) ((A /= 1024), t++);
   return `${A >= 10 || t === 0 ? A.toFixed(0) : A.toFixed(1)} ${e[t]}`;
 }
 function X(n) {
