@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Firefox</title>
+    <style>
+      :root {
+        --bg: #1c1b22;
+        --panel: #23222b;
+        --ink: #fbfbfe;
+        --muted: #b1aebb;
+        --faint: #8f8c9b;
+        --line: rgba(255, 255, 255, 0.09);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          Roboto,
+          system-ui,
+          sans-serif;
+      }
+      /* Behind the writeup the launcher is a dim backdrop; the ✦ toggle brings
+         it forward, and Launch fills it with the real firefox-wasm browser. */
+      .stage {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        padding: 24px;
+        text-align: center;
+        background: radial-gradient(
+            125% 95% at var(--px, 50%) var(--py, 26%),
+            #322b45 0%,
+            var(--panel) 58%
+          )
+          var(--panel);
+        transition: filter 0.35s ease;
+      }
+      body:not(.forward) .stage {
+        filter: brightness(0.6) saturate(0.9);
+      }
+      body.booted .stage {
+        display: none;
+      }
+      .emblem {
+        width: 82px;
+        height: 82px;
+        filter: drop-shadow(0 6px 22px rgba(154, 84, 255, 0.38));
+      }
+      h1 {
+        margin: 0;
+        font-size: 34px;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+      }
+      .sub {
+        margin: -8px 0 6px;
+        color: var(--muted);
+        font-size: 13.5px;
+      }
+      .sub code {
+        color: #d9b8ff;
+        font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+        font-size: 12.5px;
+      }
+      .launch {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        padding: 12px 22px;
+        border: 0;
+        border-radius: 11px;
+        cursor: pointer;
+        color: #fff;
+        font-size: 14.5px;
+        font-weight: 600;
+        background: linear-gradient(
+          135deg,
+          #ff9d3c 0%,
+          #ff5a37 34%,
+          #e83c72 66%,
+          #9a54ff 100%
+        );
+        box-shadow: 0 8px 26px rgba(232, 60, 114, 0.38);
+      }
+      .launch:hover {
+        filter: brightness(1.07);
+      }
+      .launch:active {
+        transform: translateY(1px);
+      }
+      .launch svg {
+        width: 15px;
+        height: 15px;
+        fill: #fff;
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--line);
+        color: var(--muted);
+      }
+      .status .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #ffb454;
+        box-shadow: 0 0 8px currentColor;
+      }
+      .status.ready {
+        color: #9ff0a3;
+      }
+      .status.ready .dot {
+        background: #7ee081;
+      }
+      .credit {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 14px;
+        text-align: center;
+        font-size: 11px;
+        color: var(--faint);
+        pointer-events: none;
+      }
+      body.forward .credit {
+        pointer-events: auto;
+      }
+      .credit a {
+        color: var(--muted);
+      }
+      /* the real firefox-wasm browser, revealed on Launch */
+      .wasm {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: var(--panel);
+        display: none;
+      }
+      body.booted .wasm {
+        display: block;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .stage {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage" id="stage">
+      <span class="emblem" data-fox></span>
+      <h1>Firefox</h1>
+      <p class="sub">
+        running on WebAssembly · opens <code id="host">this site</code>
+      </p>
+      <button class="launch" id="launch">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+        Launch Firefox
+      </button>
+      <div class="status" id="status">
+        <span class="dot"></span><span id="statusText">checking…</span>
+      </div>
+    </div>
+    <div class="credit">
+      real Firefox, compiled to WebAssembly ·
+      <a
+        href="https://github.com/HeyPuter/firefox-wasm"
+        target="_blank"
+        rel="noreferrer noopener"
+        >HeyPuter/firefox-wasm</a
+      >
+    </div>
+
+    <script>
+      'use strict';
+
+      const BUILD = '/writeups/firefox-wasm/';
+      const SITE = 'https://ndevtk.github.io/writeups/';
+      const stage = document.getElementById('stage');
+      const statusEl = document.getElementById('status');
+      const statusText = document.getElementById('statusText');
+
+      // Fox emblem (inline SVG, self-authored — safe to set as static markup).
+      document.querySelector('[data-fox]').innerHTML =
+        '<svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true">' +
+        '<defs><linearGradient id="fx" x1="0" y1="0" x2="1" y2="1">' +
+        '<stop offset="0" stop-color="#ffd23b"/><stop offset=".22" stop-color="#ff9d3c"/>' +
+        '<stop offset=".48" stop-color="#ff5a37"/><stop offset=".72" stop-color="#e83c72"/>' +
+        '<stop offset="1" stop-color="#9a54ff"/></linearGradient></defs>' +
+        '<path fill="url(#fx)" d="M50 85 C38 81 27 73 24 58 C22 50 22 44 22.5 40 L19 15 ' +
+        'L41 30 C44 27.5 47 26.5 50 26.5 C53 26.5 56 27.5 59 30 L81 15 L77.5 40 ' +
+        'C78 44 78 50 76 58 C73 73 62 81 50 85 Z"/>' +
+        '<path fill="#fff" opacity=".9" d="M50 85 C43 81 35 74 32 63 C39 67 45 69 50 69 ' +
+        'C55 69 61 67 68 63 C65 74 57 81 50 85 Z"/>' +
+        '<path fill="#241a2e" d="M31 45 C34 41 41 42 43 48 C40 51 33 50 31 45 Z"/>' +
+        '<path fill="#241a2e" d="M69 45 C66 41 59 42 57 48 C60 51 67 50 69 45 Z"/>' +
+        '<path fill="#241a2e" d="M50 71 L45.5 64 L54.5 64 Z"/></svg>';
+
+      // Open the writeup the visitor is actually reading (same-origin parent).
+      function ourUrl() {
+        try {
+          if (window.parent && window.parent !== window) {
+            const h = window.parent.location.href;
+            if (/^https?:\/\//.test(h)) return h;
+          }
+        } catch (e) {}
+        return SITE;
+      }
+      const target = ourUrl();
+      try {
+        document.getElementById('host').textContent = new URL(target).host;
+      } catch (e) {}
+
+      function refreshStatus() {
+        const ok =
+          window.crossOriginIsolated === true &&
+          typeof SharedArrayBuffer !== 'undefined';
+        statusEl.classList.toggle('ready', ok);
+        statusText.textContent = ok
+          ? 'SharedArrayBuffer ready'
+          : 'isolating… reload if it stays here';
+      }
+      refreshStatus();
+
+      // Launch the real firefox-wasm browser onto the target page. Same-origin,
+      // so no sandbox (it needs workers + SharedArrayBuffer).
+      let booted = false;
+      document.getElementById('launch').addEventListener('click', () => {
+        if (booted) return;
+        booted = true;
+        const frame = document.createElement('iframe');
+        frame.className = 'wasm';
+        frame.title = 'Firefox (WebAssembly)';
+        frame.src = BUILD + '?url=' + encodeURIComponent(target);
+        frame.allow = 'cross-origin-isolated; fullscreen; clipboard-write';
+        document.body.appendChild(frame);
+        document.body.classList.add('booted');
+      });
+
+      // ---------- host bridge (shaderwall protocol) ----------
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+      let shown = false;
+      function setShown(state) {
+        shown = state !== 'hidden';
+        document.body.classList.toggle('forward', shown);
+        window.parent.postMessage({type: 'shaderwall', state}, location.origin);
+      }
+      addEventListener('message', (e) => {
+        if (e.origin != location.origin) return;
+        const d = e.data || {};
+        if (d.type === 'wallpaper-pointer') {
+          if (reduce.matches) return;
+          stage.style.setProperty('--px', (d.x * 100).toFixed(1) + '%');
+          stage.style.setProperty('--py', (d.y * 60).toFixed(1) + '%');
+          return;
+        }
+        if (d.type !== 'shaderwall') return;
+        if (d.action === 'show') setShown('shown');
+        else if (d.action === 'hide') setShown('hidden');
+        else if (d.action === 'toggle') setShown(shown ? 'hidden' : 'shown');
+      });
+      addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H')
+          setShown(shown ? 'hidden' : 'shown');
+      });
+      setShown('hidden');
+    </script>
+  </body>
+</html>

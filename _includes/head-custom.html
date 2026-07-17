@@ -3,6 +3,9 @@
   content="default-src 'self'; script-src 'self' 'inline-speculation-rules'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'none'; require-trusted-types-for 'script'; connect-src https://api.pwnedpasswords.com;" />
 <link rel="icon" href="/writeups/favicon.ico" type="image/x-icon" />
 <meta name="fediverse:creator" content="@ndevtk@infosec.exchange" />
+<!-- Synthesise COOP/COEP so the site is crossOriginIsolated and SharedArrayBuffer
+     works on GitHub Pages — needed by the Firefox theme's firefox-wasm build. -->
+<script src="/writeups/coi-serviceworker.js"></script>
 <noscript>
   <link rel="stylesheet" href="/writeups/themes/noscript.css" />
 </noscript>

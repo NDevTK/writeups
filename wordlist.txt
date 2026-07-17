@@ -299,3 +299,16 @@ sbrowser
 HackerOne
 Bugcrowd
 WontFix
+firefox
+wasm
+WebAssembly
+SharedArrayBuffer
+endpoint
+credentialless
+Emscripten
+Gecko
+WISP
+Puter
+pnpm
+COEP
+COOP

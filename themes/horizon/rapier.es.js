@@ -4069,7 +4069,7 @@ class tA {
   }
   set(A, I) {
     let g = this.index(A);
-    for (; this.data.length <= g;) this.data.push(null);
+    for (; this.data.length <= g; ) this.data.push(null);
     (null == this.data[g] && (this.size += 1), (this.data[g] = I));
   }
   len() {
