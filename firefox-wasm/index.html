@@ -5,19 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Firefox in WebAssembly</title>
     <link id="favicon" rel="icon" type="image/webp" href="logo.webp" />
-    <!-- Self-host everything; the only external calls are Google Fonts (below)
-         and the WISP network proxy the engine browses through. Cross-origin
-         isolation (for SharedArrayBuffer / Gecko's threads) is synthesised by
-         the writeups service worker, whose scope covers this path. Loaded here
-         too so the build is isolated even when opened on its own. -->
+    <!-- Everything is served from this folder as plain ES modules (gecko.js is
+         the prebuilt engine library; main.js / chrome-fs.js / zstddec.js are
+         readable modules). Cross-origin isolation for SharedArrayBuffer is
+         provided by the writeups service worker; registered here too so this
+         page is isolated even when opened on its own. -->
     <script src="/writeups/coi-serviceworker.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap"
       rel="stylesheet" />
-    <script type="module" src="./assets/app.js"></script>
-    <link rel="stylesheet" href="./assets/app.css" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./main.js"></script>
   </head>
   <body>
     <section id="splash" aria-live="polite">
@@ -104,9 +104,6 @@
             </div>
 
             <div class="panel-ready" aria-label="Launch">
-              <button id="start-btn" type="button" class="start-btn">
-                Launch Firefox
-              </button>
               <p id="jspi-note" class="jspi-note" hidden></p>
               <details class="advanced">
                 <summary>Advanced options</summary>
