@@ -13,7 +13,8 @@
         background: #1c1b22;
       }
       /* The writeup is rendered inside a real (WASM) Firefox that fills the
-         view; only the theme picker floats on top. */
+         view. Switching themes is handled by the host page's ✦ wallpaper
+         controls, so this theme adds no chrome of its own. */
       .fx {
         position: fixed;
         inset: 0;
@@ -22,49 +23,10 @@
         border: 0;
         display: block;
       }
-      .picker {
-        position: fixed;
-        top: 10px;
-        right: 12px;
-        z-index: 10;
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        padding: 5px 9px;
-        border-radius: 10px;
-        background: rgba(28, 27, 34, 0.82);
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        -webkit-backdrop-filter: blur(8px);
-        backdrop-filter: blur(8px);
-        color: #fbfbfe;
-        font:
-          12px/1 -apple-system,
-          BlinkMacSystemFont,
-          'Segoe UI',
-          system-ui,
-          sans-serif;
-      }
-      .picker select {
-        background: #2b2a33;
-        color: #fbfbfe;
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        border-radius: 6px;
-        padding: 3px 6px;
-        font: inherit;
-        cursor: pointer;
-      }
-      /* Hidden when the ✦ toggle sends the wallpaper behind the page. */
-      body:not(.forward) .picker {
-        display: none;
-      }
     </style>
   </head>
   <body>
     <iframe class="fx" id="fx" title="Firefox (WebAssembly)"></iframe>
-    <div class="picker" id="picker">
-      <span aria-hidden="true">🦊</span>
-      <select id="sel" aria-label="Theme"></select>
-    </div>
 
     <script>
       'use strict';
@@ -85,33 +47,10 @@
       // Embed firefox-wasm full-screen; it auto-boots and opens the writeup.
       const fx = document.getElementById('fx');
       fx.src = '/writeups/firefox-wasm/?url=' + encodeURIComponent(ourUrl());
-      fx.allow = 'cross-origin-isolated; fullscreen; clipboard-write';
-
-      // Theme picker: mirror the host's <select>, switch the host's theme.
-      (function () {
-        const sel = document.getElementById('sel');
-        try {
-          const host = window.parent.document.getElementById('themes');
-          if (host) {
-            for (const o of host.options) {
-              const opt = document.createElement('option');
-              opt.value = o.value;
-              opt.textContent = o.textContent;
-              sel.appendChild(opt);
-            }
-            sel.value = 'Firefox.html';
-          }
-        } catch (e) {}
-        sel.addEventListener('change', () => {
-          const v = sel.value;
-          try {
-            if (v === 'default.css')
-              window.parent.localStorage.removeItem('theme');
-            else window.parent.localStorage.setItem('theme', v);
-            window.parent.location.reload();
-          } catch (e) {}
-        });
-      })();
+      // `autoplay` clears the embedded browser to start its audio graph so
+      // media in the writeup can play (sound still needs a click first, per
+      // the browser autoplay policy).
+      fx.allow = 'cross-origin-isolated; fullscreen; clipboard-write; autoplay';
 
       // ---------- host bridge (shaderwall protocol) ----------
       // Forward by default (Firefox covers the page); the ✦ toggle drops it
@@ -119,7 +58,6 @@
       let shown = false;
       function setShown(state) {
         shown = state !== 'hidden';
-        document.body.classList.toggle('forward', shown);
         window.parent.postMessage({type: 'shaderwall', state}, location.origin);
       }
       // Mirror the embedded Firefox's active tab into the real address bar,
