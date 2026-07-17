@@ -402,7 +402,50 @@ function Typo(word) {
   return newString;
 }
 
-function reloadAll() {
+// The Firefox theme embeds firefox-wasm, which needs SharedArrayBuffer and thus
+// a cross-origin-isolated page. GitHub Pages can't send COOP/COEP, so a service
+// worker synthesises them (coi-serviceworker.js). That isolation reloads the
+// page and changes cross-origin loading site-wide, so we only want it for that
+// one theme: register the worker when switching into Firefox and tear it down
+// when switching out, instead of running it on every page.
+let coiPolicy;
+function coiScriptURL() {
+  const url = '/writeups/coi-serviceworker.js';
+  if (!(window.trustedTypes && window.trustedTypes.createPolicy)) return url;
+  // The CSP enforces require-trusted-types-for 'script', so the URL handed to
+  // serviceWorker.register() must come from a Trusted Types policy.
+  coiPolicy ??= window.trustedTypes.createPolicy('coi-serviceworker', {
+    createScriptURL: (s) => s
+  });
+  return coiPolicy.createScriptURL(url);
+}
+
+async function setCoiWorker(enable) {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    if (enable) {
+      await navigator.serviceWorker.register(coiScriptURL());
+      // Wait until it's active so the reload below is controlled — and so the
+      // freshly loaded page actually comes back cross-origin isolated.
+      await navigator.serviceWorker.ready;
+    } else {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+  } catch (e) {
+    console.error('coi-serviceworker:', e);
+  }
+}
+
+async function reloadAll() {
+  // Match the worker to the theme we're switching to, before reloading, so the
+  // next page load is isolated (Firefox) or plain (everything else). `theme` is
+  // the theme we're leaving; `themes.value` is the one we're moving to.
+  if (themes.value === 'Firefox.html') {
+    await setCoiWorker(true);
+  } else if (theme === 'Firefox.html') {
+    await setCoiWorker(false);
+  }
   reload.postMessage('');
   location.reload();
 }
