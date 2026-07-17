@@ -305,11 +305,8 @@ async function start() {
     ];
     await gecko.evalChrome(`(() => {
       const seed = async () => {
-        const SEEDED_PREF = 'chrome-demo.bookmarks.seeded.v2';
+        const SEEDED_PREF = 'chrome-demo.bookmarks.seeded';
         if (Services.prefs.getBoolPref(SEEDED_PREF, false)) return;
-        for (const oldGuid of ['chromedemo01', 'chromedemo02']) {
-          try { await PlacesUtils.bookmarks.remove(oldGuid); } catch (e) {}
-        }
         const bookmarks = ${JSON.stringify(PRELOADED_BOOKMARKS)};
         await PlacesUtils.bookmarks.insertTree({
           guid: PlacesUtils.bookmarks.toolbarGuid,
