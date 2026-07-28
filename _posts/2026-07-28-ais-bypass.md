@@ -2,7 +2,7 @@
 title: AI Studio Auth bypass
 ---
 
-**URL:** https://aistudio.google.com/
+**URL:** <https://aistudio.google.com/>
 
 **Vulnerability type:** Remote Code Execution (RCE)
 
@@ -79,5 +79,5 @@ Suggested mitigation: assign each applet container a dedicated service account d
 
 Scope of testing: demonstration was performed only against two applets I created under two Google accounts I own. No tokens were minted with audiences for URLs outside my own account. No third-party data was accessed.
 
-While cross-account exploitation has been mitigated, cross-sandbox access remains functional; this surface likely poses minimal risk barring the introduction of multi-user collaborative editing features.
+This was fixed via per Google account SAs while cross-account exploitation has been mitigated, cross-sandbox access remains functional; this surface likely poses minimal risk barring the introduction of multi-user collaborative editing features.
 Even after the double 🎉 Nice catch P1/S1 its claimed by the panel to be duplicate.
