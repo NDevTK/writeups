@@ -44,10 +44,12 @@ Cross-tenant authentication bypass on AI Studio applet control plane via shared 
 AI Studio applet containers have two auth systems: `user_auth_verification.lua` gates the user-facing applet at /, and `control-plane-api` (Go binary) gates the management API at `/__aistudio_internal_control_plane/*`. The latter is designed to only accept Google-signed ID tokens from Google's backend orchestrator; `/__aistudio_internal_control_plane/health` is exempt and returns a fixed liveness JSON.
 
 The control-plane validates tokens via:
+
 ```
 audience := fmt.Sprintf("https://%s", r.Host)
 idtoken.Validate(ctx, token, audience)
 ```
+
 Cloud Run pins `r.Host` to the container's canonical service URL at the routing layer, so the audience binding is per-container — which is correct in principle.
 
 The break: every applet container in europe-west2 runs as the same service account, `ais-sandbox@ais-europe-west2-064bc45eb5954.iam.gserviceaccount.com` — the same SA the orchestrator uses (verified by decoding legitimate orchestrator tokens captured at the `control-plane` endpoints). Because the GCP metadata server identity endpoint lets any workload mint ID tokens with arbitrary audience, an applet can mint a token cryptographically equivalent to one from the orchestrator, targeted at any other applet's URL.
@@ -62,10 +64,12 @@ From A's container, mint a token for C's URL:
 GET `http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/identity?audience=https://<C-url>`
 (Header: Metadata-Flavor: Google.) Returned JWT decodes to iss=accounts.google.com, email=ais-sandbox@…, aud=https://<C-url>.
 Use the minted token against C's control plane:
+
 ```
 curl -H "Authorization: Bearer <token>" \
 "https://<C-url>/__aistudio_internal_control_plane/fs/list?path=.&recursive=false&exclude="
 ```
+
 Returns HTTP 200 with C's app directory listing.
 Impact: the full control-plane surface is reachable in any victim applet whose URL is known:
 
