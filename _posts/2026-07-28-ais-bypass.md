@@ -15,7 +15,6 @@ However using the metadata API its possible from the attackers container to sign
 From the attackers container mint a signature for the victims container
 
 ```
-js
 app.get(`${endpoint}/mintid`, async (req, res) => {
   const aud = String(req.query.aud || '');
   if (!aud) return res.status(400).json({ error: 'aud query param required' });
