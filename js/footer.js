@@ -1,5 +1,5 @@
 'use strict';
-const themes = document.getElementById('themes');
+const themes = document.getElementById('themes-picker');
 const info = document.getElementById('info');
 
 // "Too common" is decided by prevalence in the HIBP corpus, not a static list:
