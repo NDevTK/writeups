@@ -330,4 +330,53 @@ function synth({R, E, D, nbits, xs, bitmap, la1, lo1, dj, di, ni, nj, scan}) {
   );
 }
 
+{
+  // Liveness under corruption: this decoder runs in the daemon's
+  // REQUEST path, so a non-advancing offset is a wedged process
+  // for every visitor, not a bad pixel. Each corruption must
+  // throw - loudly, immediately - never hang, never decode.
+  const base = () =>
+    synth({
+      R: 0,
+      E: 0,
+      D: 0,
+      nbits: 4,
+      xs: [0, 1, 2, 3, 4, 5],
+      la1: 48,
+      lo1: 7,
+      di: 0.25,
+      dj: 0.25,
+      ni: 3,
+      nj: 2,
+      scan: 0x00
+    });
+  const throws = (buf, re) => {
+    try {
+      parseGrib2(buf);
+      return false;
+    } catch (e) {
+      return re.test(String(e.message));
+    }
+  };
+  // Section 1 (starts at octet 17, offset 16): length 0 never
+  // advances the section walk - the exact infinite loop.
+  const zeroSec = base();
+  zeroSec.set([0, 0, 0, 0], 16);
+  // Indicator total length 8 < the 16-byte indicator itself.
+  const shortMsg = base();
+  new DataView(shortMsg.buffer).setUint32(12, 8, false);
+  // Sec 3 basic angle (octet 39 of the section, section at 16+21):
+  // a ratio of 2 rescales every angle - decoding with MICRO would
+  // be silent garbage.
+  const angled = base();
+  new DataView(angled.buffer).setUint32(37 + 38, 2, false);
+  check(
+    'corruption fails loudly',
+    throws(zeroSec, /corrupt GRIB2 section length 0/) &&
+      throws(shortMsg, /corrupt GRIB2 message length 8/) &&
+      throws(angled, /unsupported basic angle 2/),
+    `zero section length throws (was a non-advancing loop), 8-byte message throws, non-unit basic angle throws instead of mis-scaling`
+  );
+}
+
 process.exit(fail ? 1 : 0);

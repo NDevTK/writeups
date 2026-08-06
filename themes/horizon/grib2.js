@@ -84,6 +84,12 @@ export function parseGrib2(buf) {
       continue;
     }
     const total = u64(b, o + 8);
+    // A message shorter than its own 16-byte indicator section is
+    // corruption; NaN (truncated read) fails this test too. Throw
+    // rather than loop - this parser runs in the daemon's request
+    // path, and a non-advancing offset would wedge the process.
+    if (!(total >= 16))
+      throw new Error(`corrupt GRIB2 message length ${total}`);
     msgs.push(parseMessage(b.subarray(o, o + total)));
     o += total;
   }
@@ -105,6 +111,10 @@ function parseMessage(b) {
     )
       break;
     const len = u32(b, o);
+    // 4 length octets + 1 section number is the floor; a zero or
+    // truncated length would stop the walk advancing - same
+    // liveness rule as the message loop: fail loudly, never hang.
+    if (!(len >= 5)) throw new Error(`corrupt GRIB2 section length ${len}`);
     const sec = b[o + 4];
     if (sec === 1) {
       m.refTime = {
@@ -121,6 +131,21 @@ function parseMessage(b) {
       const scan = b[o + 71];
       if (scan & 0x20 || scan & 0x10)
         throw new Error(`unsupported scan mode 0x${scan.toString(16)}`);
+      // Octets 39-46: basic angle + subdivisions. Regulation
+      // 92.1.6: zero (or missing, all-ones) means the 1e-6 degree
+      // unit MICRO assumes; any other ratio rescales every angle
+      // in the section, so decoding it with MICRO would be silent
+      // garbage - the one unsupported case that previously slipped
+      // through quietly. Fail loudly like every other template gap.
+      const basicAngle = u32(b, o + 38);
+      const basicSub = u32(b, o + 42);
+      if (
+        (basicAngle !== 0 && basicAngle !== 0xffffffff) ||
+        (basicSub !== 0 && basicSub !== 0xffffffff)
+      )
+        throw new Error(
+          `unsupported basic angle ${basicAngle}/${basicSub} (not 1e-6 deg)`
+        );
       m.grid = {
         ni: u32(b, o + 30),
         nj: u32(b, o + 34),
