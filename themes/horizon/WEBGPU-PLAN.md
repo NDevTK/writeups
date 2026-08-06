@@ -3406,6 +3406,34 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (the drawn sun at its true radius + the eclipsed sky, Aug
+  6): the second half of the one-solar-disc item. The dome's
+  cos(0.9999893) literal (a fixed 0.2651 deg) became a uniform fed
+  at 1 Hz with the IAU radius over the live VSOP87 distance - the
+  disc breathes 976" (January) to 944" (July); refraction.js's
+  deliberately-mirrored constant now derives from the same
+  eclipses.js source, sunRefraction takes the live disc for its
+  flattening derivative (setting sun 0.833, closer to the
+  published 5/6), and the moon's squash spans the moon's OWN
+  semidiameter. R_SUN_KM carries its provenance honestly: Auwers
+  1891 / Almanac 959.63" (the value the eclipse gates were
+  certified with) vs IAU 2015 B3 nominal 695,700 km (~959.2") -
+  documented, not mixed. Found while verifying against the
+  2026-08-12 Galicia eclipse (six days out): obscuration dimmed
+  only sunLight - a 99.96%-covered sun lit a full daylight dome.
+  Fix: every atmosphere radiance is linear in the source
+  irradiance, so ONE uncovered-fraction uniform at the two
+  radiance-LUT outputs darkens dome + aerial + ambient exactly
+  (transmittance/Psi_ms are optical properties, unscaled; probes
+  see 1x). The DISC is deliberately unscaled - the moon covers it
+  geometrically: the 0.9996 A Coruna capture shows the sky down
+  to a horizon glow ring, terrain silhouetted, and the last
+  photospheric sliver burning past the moon. Documented scope:
+  penumbra sky gradient and the corona (totality goes dark).
+  Verified: live in-page radii (sun 947", moon 980" that day),
+  refraction/atmo/eclipses + full 77 + all four GPU probes green,
+  noon scene unchanged; the browser loop caught the one wiring
+  bug (d.radius undefined -> per-frame PAGEERROR) before commit.
 - DONE (one solar disc, convolved exactly once, Aug 6): the solar
   radius lived as five literals (0.266 in halos.js caustic and the
   rainbow kernel, 0.267 in optics-lut and snow-glints prose,
