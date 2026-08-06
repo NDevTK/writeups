@@ -213,6 +213,12 @@ export function quench1S(r) {
   return A / (A + kO2 * r.o2);
 }
 
+import {xyzToSrgbMatrix} from './spectral-srgb.js';
+
+// The derived XYZ -> linear sRGB matrix (see the display-line
+// comment below); built once at module load.
+const M_XYZ = xyzToSrgbMatrix();
+
 // CIE 1931 CMFs - Wyman, Sloan & Shirley (2013) multi-lobe fits.
 function gauss(x, mu, s1, s2) {
   const s = x < mu ? s1 : s2;
@@ -228,11 +234,15 @@ export function wavelengthToLinearSRGB(nm) {
     0.821 * gauss(nm, 568.8, 46.9, 40.5) + 0.286 * gauss(nm, 530.9, 16.3, 31.1);
   const Z =
     1.217 * gauss(nm, 437.0, 11.8, 36.0) + 0.681 * gauss(nm, 459.0, 26.0, 13.8);
-  // XYZ -> linear sRGB (IEC 61966-2-1), then clip out-of-gamut
+  // XYZ -> linear sRGB through the repo's ONE derived matrix
+  // (spectral-srgb.js builds it from the IEC 61966-2-1 primaries
+  // + D65; that file's own rule is that the coefficients emerge
+  // in the reference rather than being pasted - this module
+  // carried the last pasted copy). Then clip out-of-gamut
   // (spectral lines sit outside sRGB) and peak-normalise.
-  let r = 3.2406 * X - 1.5372 * Y - 0.4986 * Z;
-  let g = -0.9689 * X + 1.8758 * Y + 0.0415 * Z;
-  let b = 0.0557 * X - 0.204 * Y + 1.057 * Z;
+  let r = M_XYZ[0][0] * X + M_XYZ[0][1] * Y + M_XYZ[0][2] * Z;
+  let g = M_XYZ[1][0] * X + M_XYZ[1][1] * Y + M_XYZ[1][2] * Z;
+  let b = M_XYZ[2][0] * X + M_XYZ[2][1] * Y + M_XYZ[2][2] * Z;
   r = Math.max(r, 0);
   g = Math.max(g, 0);
   b = Math.max(b, 0);
