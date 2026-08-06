@@ -1,19 +1,23 @@
 // Reference gate for linelod.js (node linelod-reference.mjs): honest
-// level-of-detail for the OSM road network.
+// level-of-detail for OSM line networks.
 //
-//  - a road is kept when it is prominent enough to be seen at its nearest
-//    distance: its CLASS base radius (motorway across the box, service
-//    road underfoot) plus a LENGTH bonus. Never a count.
+//  - a fetched way is kept while its whole EXTENT still subtends the
+//    shared display threshold (veglod.js lodThresholdArcmin) at its
+//    nearest distance - never a count, never a class table.
+//  - the subtense law is veglod's own chordArcmin, re-exported not
+//    re-derived (one law for crowns and extents).
 //  - distance is to the NEAREST vertex (a road reaching toward you is
 //    near where it reaches, not at its far end).
-//  - the class radii line up with the real roads.js rank order.
+//  - the retired CLASS_RADIUS_M table dropped downloaded, visible
+//    ways; the landmark pins one such trail as KEPT under the law.
 import {
-  classRadiusM,
+  chordArcmin,
+  lineKeep,
   nearestDistM,
-  lineReachM,
   lodFilterRoads
 } from './linelod.js';
-import {rankOf} from './roads.js';
+import {lodThresholdArcmin, ACUITY_ARCMIN} from './veglod.js';
+import {crownArcmin} from './veglod.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -29,6 +33,20 @@ const mLon = mLat * Math.cos((LAT * Math.PI) / 180);
 const north = (dM) => [LAT + dM / mLat, LON];
 const east = (dM) => [LAT, LON + dM / mLon];
 
+// The shared display threshold for a representative display (60 deg
+// fov over 1080 rows): the finest-pixel subtense, floored by acuity.
+const THR = lodThresholdArcmin(60, 1080);
+
+{
+  // One subtense law: linelod's chordArcmin IS veglod's crownArcmin
+  // (function identity - re-exported, not re-derived).
+  check(
+    'one chord-subtense law (veglod re-export)',
+    chordArcmin === crownArcmin,
+    'chordArcmin === veglod.crownArcmin'
+  );
+}
+
 {
   // Nearest-vertex distance: closest point of {5 km N, 500 m E} is 500 m.
   const d = nearestDistM([north(5000), east(500)], LAT, LON);
@@ -36,74 +54,56 @@ const east = (dM) => [LAT, LON + dM / mLon];
 }
 
 {
-  // Class radius follows the rank order: motorway spans the box, a
-  // service road is underfoot, and the rank comes from roads.js.
+  // The keep boundary is exact both ways: at the closed-form keep
+  // radius d* = L / (2 tan(thr/2)) the extent subtends the threshold
+  // exactly; just inside it is kept, just past it is dropped.
+  const L = 100;
+  const thrRad = (THR / 60) * (Math.PI / 180);
+  const dStar = L / (2 * Math.tan(thrRad / 2));
   const ok =
-    classRadiusM(rankOf('motorway')) === 8000 &&
-    classRadiusM(rankOf('primary')) === 8000 &&
-    classRadiusM(rankOf('residential')) === 2500 &&
-    classRadiusM(rankOf('service')) === 900 &&
-    classRadiusM(rankOf('motorway_link')) === 8000 && // _link folds to base
-    classRadiusM(rankOf('footway')) < classRadiusM(rankOf('residential'));
+    lineKeep(L, dStar * 0.999, THR) &&
+    !lineKeep(L, dStar * 1.001, THR) &&
+    near(chordArcmin(L, dStar), THR, 1e-9);
   check(
-    'class radius by rank',
+    'extent boundary exact',
     ok,
-    `motorway ${classRadiusM(rankOf('motorway'))} · residential ${classRadiusM(rankOf('residential'))} · service ${classRadiusM(rankOf('service'))} m`
+    `100 m way: keep radius ${(dStar / 1000).toFixed(1)} km, subtense there ${chordArcmin(L, dStar).toFixed(4)}' = threshold ${THR.toFixed(4)}'`
   );
 }
 
 {
-  // Reach = base + capped length bonus.
-  const ok =
-    near(lineReachM(2500, 100), 2900, 1) &&
-    near(lineReachM(2500, 100000), 10500, 1); // 2500 + 8000 cap
-  check(
-    'reach = base + capped length',
-    ok,
-    `short ${lineReachM(2500, 100)} · capped ${lineReachM(2500, 100000)}`
-  );
-}
-
-{
-  // The heart of it: a motorway 6 km off is KEPT (class spans the box);
-  // a residential street 6 km off is DROPPED (class radius 2.5 km) but
-  // the same street near is KEPT; a service road only underfoot. Sorted
-  // nearest first, no count cap.
+  // The trail the table dropped: a 100 m footpath at 1.3 km subtends
+  // ~4.4 arcmin of extent - resolvable many times over - and the
+  // retired class table (600 m base + 4x length bonus = 1000 m) cut
+  // it. Under the extent law it is KEPT: nothing downloaded and
+  // visible is discarded.
   const feats = [
-    {id: 'M6', kind: 'motorway', pts: [north(6000)], len: 400},
-    {id: 'RES_FAR', kind: 'residential', pts: [north(6000)], len: 200},
-    {id: 'RES_NEAR', kind: 'residential', pts: [east(800)], len: 200},
-    {id: 'SVC_FAR', kind: 'service', pts: [north(4000)], len: 60},
-    {id: 'SVC_FEET', kind: 'service', pts: [north(120)], len: 60}
+    {id: 'TRAIL', kind: 'path', pts: [north(1300)], len: 100},
+    {id: 'STUB', kind: 'path', pts: [north(1300)], len: 0.2}
   ];
-  const kept = lodFilterRoads(feats, LAT, LON, rankOf);
-  const ids = kept.map((f) => f.id);
+  const kept = lodFilterRoads(feats, LAT, LON, THR).map((f) => f.id);
   const ok =
-    ids.includes('M6') &&
-    !ids.includes('RES_FAR') &&
-    ids.includes('RES_NEAR') &&
-    !ids.includes('SVC_FAR') &&
-    ids.includes('SVC_FEET') &&
-    ids[0] === 'SVC_FEET'; // nearest first
+    kept.includes('TRAIL') &&
+    !kept.includes('STUB') &&
+    chordArcmin(100, 1300) > 4 * ACUITY_ARCMIN;
   check(
-    'class LOD: arterials far, side streets near',
+    'the trail the class table dropped is kept',
     ok,
-    ok
-      ? `motorway@6km kept, residential@6km dropped/near kept, service@4km dropped/underfoot kept; nearest first (${ids.join(',')})`
-      : `got ${ids.join(',')}`
+    `path@1.3km extent ${chordArcmin(100, 1300).toFixed(1)}' kept; a 0.2 m stub there (${chordArcmin(0.2, 1300).toFixed(3)}') dropped`
   );
 }
 
 {
-  // No count anywhere: 400 near primary roads all survive (bounded by
-  // geometry - class + distance - never by a ceiling).
+  // No count anywhere: 400 near primary ways all survive (bounded by
+  // geometry - extent at distance - never by a ceiling), nearest
+  // first.
   const feats = [];
   for (let i = 0; i < 400; i++)
     feats.push({id: 'R' + i, kind: 'primary', pts: [north(10 + i)], len: 500});
-  const kept = lodFilterRoads(feats, LAT, LON, rankOf);
-  const ok = kept.length === 400 && kept[0].id === 'R0'; // all kept, nearest first
+  const kept = lodFilterRoads(feats, LAT, LON, THR);
+  const ok = kept.length === 400 && kept[0].id === 'R0';
   check(
-    'no count cap: every visible road kept',
+    'no count cap: every visible way kept',
     ok,
     `400 near primaries -> ${kept.length} kept, nearest ${kept[0].id}`
   );

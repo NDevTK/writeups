@@ -22,6 +22,7 @@ import {parseBuildings} from '../buildings.js';
 import {lodFilterOsm, BLD_NEAR_M} from '../bldlod.js';
 import {parseRoads, rankOf} from '../roads.js';
 import {lodFilterRoads} from '../linelod.js';
+import {lodThresholdArcmin} from '../veglod.js';
 import {parseRailways} from '../rails.js';
 import {parseWaterways} from '../rivers.js';
 
@@ -113,7 +114,7 @@ const roads = lodFilterRoads(
   parseRoads({elements: relems}, Infinity),
   lat,
   lon,
-  rankOf
+  lodThresholdArcmin(60, 1080) // representative display, as the reference
 );
 
 const rails = parseRailways(

@@ -1,59 +1,46 @@
 /**
- * linelod.js - honest level-of-detail for the OSM ROAD network, the
- * line-layer twin of bldlod.js, gated by linelod-reference.mjs.
+ * linelod.js - honest level-of-detail for OSM LINE networks (the
+ * roads), the line-layer sibling of bldlod.js and veglod.js, gated by
+ * linelod-reference.mjs.
  *
- * Roads had the same lie as the buildings: parse them, sort by class,
- * then slice(0, 500) - a fixed count that drops real, present streets the
- * moment the network is bigger than 500. Central London has ~209,000
- * highway ways (OSM splits every road at each junction); 500 was a
- * quarter of a percent, shown as if it were the city.
+ * Roads had the same lie as the buildings once: parse, sort by class,
+ * slice(0, 500). The first honest pass replaced the count with a
+ * hand-tuned CLASS table (motorway 8 km ... path 600 m) plus a length
+ * bonus - spatial, but every number in it was invented, and it kept
+ * dropping ALREADY-DOWNLOADED, plainly visible ways: a hiking trail
+ * 1.3 km across an alpine valley subtends whole arcminutes of extent
+ * (resolvable many times over) and the table cut it at 600 m while
+ * the fetch had already paid for it. A budget dressed as perception.
  *
- * Roads cannot be fetched whole at any radius, so the theme pulls them in
- * two honest passes - ALL classes near (the streets you stand on) and the
- * ARTERIAL classes across the box (the network you see reaching away) -
- * and this module decides what survives: a road is kept when it is
- * prominent enough to be seen at its nearest distance. Prominence is its
- * CLASS (a motorway reads clear across the box, a service road only when
- * you are on it) plus its LENGTH (a long way is seen from farther than a
- * short stub of the same class). Never a count. A village keeps its whole
- * network; a metropolis keeps its spine far and its side streets near.
+ * veglod.js wrote the real angle down (Reddy 1997: the display's
+ * finest pixel, floored by the Snellen observer's 1 arcmin), and for
+ * a LINE feature the honest test is its EXTENT: a way whose whole
+ * drawn extent subtends less than the threshold cannot structure the
+ * percept - drop it and nothing that could have been seen is lost. A
+ * sub-pixel-WIDE road, by contrast, still crosses hundreds of pixels
+ * along its length: presence survives where width does not, so width
+ * licenses no drop (the same argument that keeps a distant wire
+ * against the sky). The subtense law is veglod's own chordArcmin,
+ * re-exported, not re-derived.
  *
- * Distance is to the NEAREST vertex of the way (a road passing 5 km off
- * but reaching toward you is near where it reaches). Cheap
+ * What bounds the download is the FETCH, stated as such at the call
+ * site (Horizon.html): all classes within the near pass, arterial
+ * classes across the box - a feasibility budget in the open, not a
+ * perceptual claim. Everything fetched is then kept unless its whole
+ * extent could never have been seen.
+ *
+ * Distance is to the NEAREST vertex of the way (a road passing far
+ * off but reaching toward you is near where it reaches). Cheap
  * equirectangular metres, exact enough for LOD over a box.
  */
 
+import {crownArcmin as chordArcmin, vegKeep as extentKeep} from './veglod.js';
+
+// The one chord-subtense law (veglod.js): full-angle 2 atan(x / 2d).
+export {chordArcmin};
+
 const R_EARTH_M = 6371000;
 const RAD = Math.PI / 180;
-
-// OSM highway class -> base visibility radius (m): how far that class is
-// still worth drawing before length is considered. Trunk roads span the
-// box; service roads and paths only read underfoot. Ranks follow
-// roads.js RANK (0 motorway .. 15 path).
-const CLASS_RADIUS_M = [
-  8000, // 0 motorway
-  8000, // 1 trunk
-  8000, // 2 primary
-  6000, // 3 secondary
-  6000, // 4 tertiary
-  2500, // 5 unclassified
-  2500, // 6 residential
-  1600, // 7 living_street
-  1600, // 8 pedestrian
-  900, // 9 service
-  900, // 10 track
-  700, // 11 cycleway
-  700, // 12 footway
-  600, // 13 steps
-  600, // 14 bridleway
-  600 // 15 path
-];
-
-// Base radius (m) for a class rank (ranks past the table use the last).
-export function classRadiusM(rank) {
-  const i = Math.max(0, Math.min(rank | 0, CLASS_RADIUS_M.length - 1));
-  return CLASS_RADIUS_M[i];
-}
 
 // Nearest-vertex distance (m) from (lat, lon) to a polyline of [lat,lon]
 // points, in a local equirectangular frame around the view.
@@ -71,29 +58,26 @@ export function nearestDistM(pts, lat, lon) {
   return Math.sqrt(best);
 }
 
-/**
- * The visibility reach (m) of a line: its class base radius plus a bonus
- * for its own length (a long way is seen from farther), the bonus capped
- * so one very long way cannot reach the whole planet.
- */
-export function lineReachM(baseRadiusM, lenM, lenGain = 4, lenCapM = 8000) {
-  return baseRadiusM + Math.min(Math.max(lenM, 0) * lenGain, lenCapM);
+// Keep while the way's whole extent still subtends the threshold -
+// veglod's own keep decision applied to the line's length. Pure
+// geometry in, decision out: no counters, no classes, no cap.
+export function lineKeep(lenM, distM, thresholdArcmin) {
+  return extentKeep(lenM, distM, thresholdArcmin);
 }
 
 /**
- * Keep the roads visible from (lat, lon). Each feature needs
- * {pts:[[lat,lon]], len, kind}. `rankOf(kind)` maps the OSM highway class
- * to its rank (roads.js exports this). A road survives when its nearest
- * distance is within class-radius + length-bonus - so every road prominent
- * enough to see is kept and no others, bounded by geometry, never by a
- * count. Sorted nearest first.
+ * Keep the fetched ways visible from (lat, lon). Each feature needs
+ * {pts:[[lat,lon]], len}. thresholdArcmin is the shared display
+ * threshold (veglod.js lodThresholdArcmin). A way survives while its
+ * extent subtends at least the threshold at its nearest distance -
+ * bounded by geometry, never by a count or a class. Sorted nearest
+ * first.
  */
-export function lodFilterRoads(features, lat, lon, rankOf) {
+export function lodFilterRoads(features, lat, lon, thresholdArcmin) {
   const kept = [];
   for (const f of features || []) {
     const d = nearestDistM(f.pts, lat, lon);
-    const reach = lineReachM(classRadiusM(rankOf(f.kind)), f.len || 0);
-    if (d > reach) continue;
+    if (!lineKeep(f.len || 0, d, thresholdArcmin)) continue;
     kept.push({f, d});
   }
   kept.sort((a, b) => a.d - b.d);
