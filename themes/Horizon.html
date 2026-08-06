@@ -7353,6 +7353,12 @@
         syncSmoke();
         syncWildfires();
         syncAerosol();
+        // Location-anchored like the rest: CAMS AOD/PM2.5, the
+        // measured-GHI clearness index, and the OVATION oval whose
+        // meridian slice and hemisphere both follow the observer.
+        syncAir();
+        syncInsolation();
+        syncOvation();
         syncWater();
         syncChlor();
         syncRrs();
