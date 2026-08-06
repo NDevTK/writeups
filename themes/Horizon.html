@@ -545,6 +545,8 @@
       } from './horizon/geotiles.js';
       import {lodFilterRoads} from './horizon/linelod.js';
       import {lodThresholdArcmin, vegKeep} from './horizon/veglod.js';
+      import {fallWidthM, parseWaterfalls} from './horizon/waterfalls.js';
+      import {parsePowerLines} from './horizon/powerlines.js';
       import {mssTotal} from './horizon/coxmunk.js';
       import {
         landTint,
@@ -2250,6 +2252,164 @@
       // heights - not the parabola approximation). Cached geodetic
       // per anchor; ?aerialways=0 disables.
       let aerialGeo = null;
+      // ---- Waterfalls: waterway=waterfall nodes with a MEASURED
+      // height (waterfalls.js - no height, no curtain), width on
+      // the rivers' gated Leopold discharge ratio. ----
+      let wfallsGeo = null;
+      let wfGroup = null;
+      let wfMat = null;
+      async function syncWaterfalls() {
+        if (params.get('waterfalls') === '0') return;
+        try {
+          const elements = await overpassTiled(
+            'wf',
+            (b) =>
+              '[out:json][timeout:45];(node[waterway=waterfall](' +
+              b +
+              '););out;',
+            DEM_HALF_M,
+            12
+          );
+          if (!elements) throw new Error('overpass unavailable');
+          wfallsGeo = parseWaterfalls({elements});
+          record(
+            'OSM Overpass waterfalls',
+            wfallsGeo.length + ' measured falls (height tagged)'
+          );
+          if (worldBuilt) placeWaterfalls();
+        } catch {
+          // the base stands
+        }
+      }
+      function placeWaterfalls() {
+        if (wfGroup) {
+          ground.remove(wfGroup);
+          wfGroup.traverse((o) => o.geometry && o.geometry.dispose());
+          wfGroup = null;
+        }
+        if (!wfallsGeo || !wfallsGeo.length) return;
+        if (!wfMat) {
+          // Whitewater curtain: the surf's own foam tone; display
+          // furniture around the three measured facts (position,
+          // height, discharge ratio).
+          wfMat = new THREE.MeshStandardNodeMaterial({
+            color: '#dbe4e8',
+            roughness: 0.85,
+            side: THREE.DoubleSide
+          });
+          applyAerial(wfMat);
+        }
+        wfGroup = new THREE.Group();
+        const qR =
+          riverFlow && riverFlow.qRef ? riverFlow.qNow / riverFlow.qRef : 1;
+        for (const f of wfallsGeo) {
+          const s = geoToScene(f.lat, f.lon, dressAnchor);
+          if (Math.abs(s.x) > 138 || Math.abs(s.z) > 138) continue;
+          const g = sample(s.x, s.z);
+          if (g.water) continue;
+          const yTop = g.y;
+          const yBot = yOfElev(g.e - f.hM, centerElev);
+          const drop = yTop - yBot;
+          if (drop <= 0.001) continue;
+          const wU = fallWidthM(qR) / MPU;
+          const quad = new THREE.PlaneGeometry(wU, drop);
+          const m = new THREE.Mesh(quad, wfMat);
+          // Face the curtain down the local slope.
+          const gx = sample(s.x + 1, s.z).y - sample(s.x - 1, s.z).y;
+          const gz = sample(s.x, s.z + 1).y - sample(s.x, s.z - 1).y;
+          m.rotation.y = Math.atan2(-gx, -gz);
+          m.position.set(s.x, (yTop + yBot) / 2, s.z);
+          wfGroup.add(m);
+        }
+        ground.add(wfGroup);
+      }
+
+      // ---- Power lines: way[power=line|minor_line] - the grid's
+      // vertices ARE its supports; every span hangs on the SAME
+      // gated catenary the gondolas ride (powerlines.js re-exports
+      // it - one sag law). Underground/cable skipped (the tunnel
+      // doctrine). ----
+      let powerGeo = null;
+      let powerGroup = null;
+      let powerCableMat = null;
+      let powerMastMat = null;
+      async function syncPowerLines() {
+        if (params.get('power') === '0') return;
+        try {
+          const elements = await overpassTiled(
+            'pw',
+            (b) =>
+              '[out:json][timeout:45];(way[power~"^(line|minor_line)$"](' +
+              b +
+              '););out geom;',
+            DEM_HALF_M,
+            12
+          );
+          if (!elements) throw new Error('overpass unavailable');
+          powerGeo = parsePowerLines({elements});
+          record(
+            'OSM Overpass power grid',
+            powerGeo.length + ' lines (one gated sag law with the gondolas)'
+          );
+          if (worldBuilt) placePowerLines();
+        } catch {
+          // the base stands
+        }
+      }
+      function placePowerLines() {
+        if (powerGroup) {
+          ground.remove(powerGroup);
+          powerGroup.traverse((o) => {
+            if (o.geometry && o.geometry !== pylonGeo) o.geometry.dispose();
+          });
+          powerGroup = null;
+        }
+        if (!powerGeo || !powerGeo.length) return;
+        if (!powerCableMat) {
+          powerCableMat = new THREE.LineBasicNodeMaterial({color: '#26282b'});
+          powerMastMat = new THREE.MeshStandardNodeMaterial({
+            color: '#6e7276',
+            roughness: 0.55,
+            metalness: 0.5
+          });
+          applyAerial(powerMastMat);
+        }
+        powerGroup = new THREE.Group();
+        for (const w of powerGeo) {
+          const sup = [];
+          for (const [la, lo] of w.pts) {
+            const sc = geoToScene(la, lo, dressAnchor);
+            if (Math.abs(sc.x) > 140 || Math.abs(sc.z) > 140) {
+              if (sup.length >= 2) break;
+              sup.length = 0;
+              continue;
+            }
+            const g = sample(sc.x, sc.z);
+            sup.push([sc.x, g.y + w.hM / MPU, sc.z]);
+          }
+          if (sup.length < 2) continue;
+          const cablePts = [];
+          for (let i = 0; i + 1 < sup.length; i++) {
+            const span = catenaryPoints(sup[i], sup[i + 1], 8);
+            for (let k = 0; k + 1 < span.length; k++)
+              cablePts.push(...span[k], ...span[k + 1]);
+          }
+          const cg = new THREE.BufferGeometry();
+          cg.setAttribute(
+            'position',
+            new THREE.BufferAttribute(new Float32Array(cablePts), 3)
+          );
+          powerGroup.add(new THREE.LineSegments(cg, powerCableMat));
+          for (const p of sup) {
+            const mast = new THREE.Mesh(pylonGeo, powerMastMat);
+            mast.scale.y = w.hM / MPU;
+            mast.position.set(p[0], p[1] - w.hM / MPU / 2, p[2]);
+            powerGroup.add(mast);
+          }
+        }
+        ground.add(powerGroup);
+      }
+
       async function syncAerialways() {
         if (params.get('aerialways') === '0') return;
         const key =
@@ -5107,6 +5267,8 @@
         placeRivers();
         placeRails();
         placeAerialways();
+        placeWaterfalls();
+        placePowerLines();
         placeTurbines();
         placePeaks();
         placeLanduse();
@@ -7549,6 +7711,8 @@
         syncDischarge();
         syncRails();
         syncAerialways();
+        syncWaterfalls();
+        syncPowerLines();
         syncTurbines();
         syncPeaks();
         syncLanduse();
@@ -10328,6 +10492,8 @@
         setInterval(syncDischarge, 6 * 60 * 60 * 1000);
         syncRails();
         syncAerialways();
+        syncWaterfalls();
+        syncPowerLines();
         syncTurbines();
         syncPeaks();
         syncLanduse();
