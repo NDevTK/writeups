@@ -510,7 +510,20 @@
       import {liveryForCallsign} from './horizon/airline.js';
       import {parseWildfires, firesNear} from './horizon/wildfire.js';
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
-      import {parseRoads, roadsGeometry} from './horizon/roads.js';
+      import {
+        BLD_NEAR_M,
+        lodFilterOsm,
+        metresBetween
+      } from './horizon/bldlod.js';
+      import {parseRoads, roadsGeometry, rankOf} from './horizon/roads.js';
+      import {geoGet, geoSet} from './horizon/geocache.js';
+      import {
+        tileBbox,
+        tileKey,
+        tilesCovering,
+        unionElements
+      } from './horizon/geotiles.js';
+      import {lodFilterRoads} from './horizon/linelod.js';
       import {
         landTint,
         parseLanduse,
@@ -1337,6 +1350,89 @@
         }
       }
 
+      // ---- tiled Overpass: fetch the vector layers like map tiles ----
+      // One box-per-anchor meant a 4 km roam re-downloaded almost
+      // everything the old box already held. Instead the box is covered
+      // by standard slippy TILES (geotiles.js, gated), each fetched once
+      // and cached in IndexedDB under its universal z/x/y key: roam and
+      // only the edge tiles are new. A way crossing a tile edge returns
+      // from both tiles; unionElements dedupes by id. A tile fetched
+      // within a week serves from disk; a stale one still serves through
+      // an upstream outage. If any tile is missing AND unfetchable the
+      // whole layer fails (a partial network shown as complete is the
+      // lie this replaces).
+      const OVERPASS_MIRRORS = [
+        'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+        'https://overpass-api.de/api/interpreter'
+      ];
+      // ONE shared queue for every tile request from every layer, at most
+      // two in flight, with retry + backoff: the public Overpass mirrors
+      // rate-limit by IP (429/504 under six layers fetching in parallel),
+      // and a cached tile never asks again - so the first visit fills the
+      // cache politely over a minute or two, layers appearing as their
+      // tiles land, and every visit after is instant from IndexedDB.
+      let opActive = 0;
+      const opWaiters = [];
+      const opPump = () => {
+        while (opActive < 2 && opWaiters.length) {
+          opActive++;
+          opWaiters.shift()();
+        }
+      };
+      const opSlot = () =>
+        new Promise((res) => {
+          opWaiters.push(res);
+          opPump();
+        });
+      const opDone = () => {
+        opActive--;
+        opPump();
+      };
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      async function overpassTile(name, qOf, t) {
+        const ck = 'horizon-otile-' + name + '-' + tileKey(t.x, t.y, t.z);
+        const hit = await geoGet(ck);
+        if (hit && Date.now() - hit.t < 7 * 86400e3) return hit.elements;
+        await opSlot();
+        try {
+          for (let attempt = 0; attempt < 6; attempt++) {
+            const host = OVERPASS_MIRRORS[attempt % OVERPASS_MIRRORS.length];
+            try {
+              const r = await fetch(
+                host +
+                  '?data=' +
+                  encodeURIComponent(qOf(tileBbox(t.x, t.y, t.z))),
+                {credentials: 'omit'}
+              );
+              if (!r.ok) throw new Error(r.status);
+              const elements = (await r.json()).elements || [];
+              await geoSet(ck, {t: Date.now(), elements});
+              return elements;
+            } catch {
+              await sleep(1000 * (attempt + 1)); // back off a limited mirror
+            }
+          }
+        } finally {
+          opDone();
+        }
+        return hit ? hit.elements : null; // stale serves through outage
+      }
+      async function overpassTiled(name, qOf, halfM, z) {
+        const mLat = 111320;
+        const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+        const tiles = tilesCovering(
+          state.lat - halfM / mLat,
+          state.lon - halfM / mLon,
+          state.lat + halfM / mLat,
+          state.lon + halfM / mLon,
+          z
+        );
+        const parts = [];
+        for (const t of tiles) parts.push(await overpassTile(name, qOf, t));
+        if (parts.some((p) => p === null)) return null;
+        return unionElements(parts);
+      }
+
       // Real forests: OSM wood/forest polygons around the visitor decide
       // where trees stand (scene-space polygons, cached per location).
       // OSM wood polygons, stored GEODETIC ([lat, lon] rings) so a
@@ -1351,9 +1447,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            forestGeo = JSON.parse(hit);
+            forestGeo = hit;
             record(
               'OSM Overpass forests (cached)',
               forestGeo.length + ' wood polygons'
@@ -1410,7 +1506,7 @@
             );
           record('OSM Overpass forests', forestGeo.length + ' wood polygons');
           try {
-            localStorage.setItem(key, JSON.stringify(forestGeo));
+            await geoSet(key, forestGeo);
           } catch {}
           // Replant where the real woods are - trees only, the
           // standing terrain is untouched.
@@ -1451,9 +1547,9 @@
           }
         };
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            lakesGeo = JSON.parse(hit);
+            lakesGeo = hit;
             record(
               'OSM Overpass water (cached)',
               lakesGeo.length +
@@ -1516,7 +1612,7 @@
               (lakesGeo[0] && lakesGeo[0].name ? ' · ' + lakesGeo[0].name : '')
           );
           try {
-            localStorage.setItem(key, JSON.stringify(lakesGeo));
+            await geoSet(key, lakesGeo);
           } catch {}
           await adopt();
         } catch {
@@ -1539,9 +1635,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            buildsGeo = JSON.parse(hit);
+            buildsGeo = hit;
             record(
               'OSM Overpass buildings (cached)',
               buildsGeo.length + ' footprints'
@@ -1551,43 +1647,42 @@
           }
         } catch {}
         try {
-          const mLat = 111320;
-          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
-          const dLat = DEM_HALF_M / mLat;
-          const dLon = DEM_HALF_M / mLon;
-          const bbox =
-            (state.lat - dLat).toFixed(4) +
-            ',' +
-            (state.lon - dLon).toFixed(4) +
-            ',' +
-            (state.lat + dLat).toFixed(4) +
-            ',' +
-            (state.lon + dLon).toFixed(4);
-          const q =
-            '[out:json][timeout:30];way[building](' + bbox + ');out geom 600;';
-          let osm = null;
-          for (const host of [
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-          ]) {
-            try {
-              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
-                credentials: 'omit'
-              });
-              if (!r.ok) throw new Error(r.status);
-              osm = await r.json();
-              break;
-            } catch {
-              // Try the next mirror.
-            }
-          }
-          if (!osm) throw new Error('overpass unavailable');
-          // parseBuildings dedupes rings, applies the height ladder
-          // and keeps the footprints nearest the town centre (gated).
-          buildsGeo = parseBuildings(osm);
-          record('OSM Overpass buildings', buildsGeo.length + ' footprints');
+          // The buildings query is drawn from the near radius where an
+          // individual footprint reads (BLD_NEAR_M), NOT the whole 8 km
+          // box, and carries NO `out geom` count cap: within that radius
+          // Overpass returns every real building, and honest level-of-
+          // detail (bldlod.js) then keeps each only where it is large
+          // enough to be seen at its distance - so your actual
+          // neighbours are all here, not a scattered 400. Past this
+          // radius the city is the land-use tint + measured night-lights
+          // and the tall-landmark ring, never invented footprints.
+          // z14 tiles (~1.5 km here): the finest layer, fetched cell by
+          // cell so a roam only pulls the new edge tiles.
+          const elements = await overpassTiled(
+            'bld',
+            (b) => '[out:json][timeout:60];way[building](' + b + ');out geom;',
+            BLD_NEAR_M,
+            14
+          );
+          if (!elements) throw new Error('overpass unavailable');
+          // Honest LOD on the RAW response first (cheap shoelace area,
+          // size-at-distance) so the costly parse - roof OBB, colours -
+          // only ever runs on the footprints that will draw; then
+          // parseBuildings with no count slice (Infinity) keeps them all.
+          const rawCount = elements.length;
+          const vis = lodFilterOsm({elements}, state.lat, state.lon);
+          buildsGeo = parseBuildings({elements: vis.elements}, Infinity, 12);
+          record(
+            'OSM Overpass buildings',
+            buildsGeo.length +
+              ' footprints · every one visible of ' +
+              rawCount +
+              ' within ' +
+              (BLD_NEAR_M / 1000).toFixed(1) +
+              ' km'
+          );
           try {
-            localStorage.setItem(key, JSON.stringify(buildsGeo));
+            await geoSet(key, buildsGeo);
           } catch {}
           if (worldBuilt) placeBuildings();
         } catch {
@@ -1602,6 +1697,9 @@
       // gated end to end). Cached geodetic per anchor; roams
       // re-project. ?roads=0 disables.
       let roadsGeo = null;
+      // The near box for the all-classes road pass (the streets you stand
+      // on); the arterial pass spans the full DEM box.
+      const ROAD_NEAR_M = 1500;
       async function syncRoads() {
         if (params.get('roads') === '0') return;
         const key =
@@ -1610,50 +1708,53 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            roadsGeo = JSON.parse(hit);
+            roadsGeo = hit;
             record('OSM Overpass roads (cached)', roadsGeo.length + ' ways');
             if (worldBuilt) placeRoads();
             return;
           }
         } catch {}
         try {
-          const mLat = 111320;
-          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
-          const dLat = DEM_HALF_M / mLat;
-          const dLon = DEM_HALF_M / mLon;
-          const bbox =
-            (state.lat - dLat).toFixed(4) +
-            ',' +
-            (state.lon - dLon).toFixed(4) +
-            ',' +
-            (state.lat + dLat).toFixed(4) +
-            ',' +
-            (state.lon + dLon).toFixed(4);
-          const q =
-            '[out:json][timeout:30];way[highway](' + bbox + ');out geom 800;';
-          let osm = null;
-          for (const host of [
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-          ]) {
-            try {
-              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
-                credentials: 'omit'
-              });
-              if (!r.ok) throw new Error(r.status);
-              osm = await r.json();
-              break;
-            } catch {
-              // Try the next mirror.
-            }
-          }
-          if (!osm) throw new Error('overpass unavailable');
-          roadsGeo = parseRoads(osm);
-          record('OSM Overpass roads', roadsGeo.length + ' ways');
+          // A city holds ~200k highway ways over the 8 km box - it cannot
+          // be fetched whole, so roads come in two honest passes, each
+          // tiled: ALL classes in the near z14 tiles (the streets you
+          // stand on), and the ARTERIAL classes across the box in coarser
+          // z12 tiles (the network you see reaching away). No count cap
+          // anywhere; linelod keeps each road by class-at-distance.
+          const [nearEls, farEls] = await Promise.all([
+            overpassTiled(
+              'roadN',
+              (b) => '[out:json][timeout:60];way[highway](' + b + ');out geom;',
+              ROAD_NEAR_M,
+              14
+            ),
+            overpassTiled(
+              'roadF',
+              (b) =>
+                '[out:json][timeout:60];way[highway~"^(motorway|trunk|primary|secondary|tertiary)(_link)?$"](' +
+                b +
+                ');out geom;',
+              DEM_HALF_M,
+              12
+            )
+          ]);
+          if (!nearEls && !farEls) throw new Error('overpass unavailable');
+          // Union the two passes, de-duped by OSM id (arterials inside the
+          // near box appear in both).
+          const elements = unionElements([nearEls || [], farEls || []]);
+          const all = parseRoads({elements}, Infinity);
+          roadsGeo = lodFilterRoads(all, state.lat, state.lon, rankOf);
+          record(
+            'OSM Overpass roads',
+            roadsGeo.length +
+              ' ways · every one visible of ' +
+              elements.length +
+              ' fetched'
+          );
           try {
-            localStorage.setItem(key, JSON.stringify(roadsGeo));
+            await geoSet(key, roadsGeo);
           } catch {}
           if (worldBuilt) placeRoads();
         } catch {
@@ -1683,9 +1784,9 @@
           ',m' +
           cropMonth;
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            landGeo = JSON.parse(hit);
+            landGeo = hit;
             record(
               'OSM Overpass landuse (cached)',
               landGeo.length + ' polygons'
@@ -1695,47 +1796,40 @@
           }
         } catch {}
         try {
-          const mLat = 111320;
-          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
-          const dLat = DEM_HALF_M / mLat;
-          const dLon = DEM_HALF_M / mLon;
-          const bbox =
-            (state.lat - dLat).toFixed(4) +
-            ',' +
-            (state.lon - dLon).toFixed(4) +
-            ',' +
-            (state.lat + dLat).toFixed(4) +
-            ',' +
-            (state.lon + dLon).toFixed(4);
-          const q =
-            '[out:json][timeout:30];(way[landuse](' +
-            bbox +
-            ');relation[landuse](' +
-            bbox +
-            ');way[natural~"^(grassland|sand|beach|scree|bare_rock|wood)$"](' +
-            bbox +
-            '););out geom 400;';
-          let osm = null;
-          for (const host of [
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-          ]) {
-            try {
-              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
-                credentials: 'omit'
-              });
-              if (!r.ok) throw new Error(r.status);
-              osm = await r.json();
-              break;
-            } catch {
-              // Try the next mirror.
-            }
-          }
-          if (!osm) throw new Error('overpass unavailable');
-          landGeo = parseLanduse(osm, 60, 400, cropMonth, state.lat);
-          record('OSM Overpass landuse', landGeo.length + ' polygons');
+          // No count cap: landuse paints a FIXED-size tint raster over
+          // the box, so every real polygon can be burned in for the same
+          // render cost - the old 400 slice left ground untinted where
+          // OSM had a wood or a meadow. z12 tiles over the whole box (the
+          // tile cache is month-free: raw polygons don't change with the
+          // season, only the parse's crop colour does).
+          const elements = await overpassTiled(
+            'lu',
+            (b) =>
+              '[out:json][timeout:45];(way[landuse](' +
+              b +
+              ');relation[landuse](' +
+              b +
+              ');way[natural~"^(grassland|sand|beach|scree|bare_rock|wood)$"](' +
+              b +
+              '););out geom;',
+            DEM_HALF_M,
+            12
+          );
+          if (!elements) throw new Error('overpass unavailable');
+          // Infinity: keep every real polygon (the raster cost is fixed).
+          landGeo = parseLanduse(
+            {elements},
+            60,
+            Infinity,
+            cropMonth,
+            state.lat
+          );
+          record(
+            'OSM Overpass landuse',
+            landGeo.length + ' polygons (full coverage)'
+          );
           try {
-            localStorage.setItem(key, JSON.stringify(landGeo));
+            await geoSet(key, landGeo);
           } catch {}
           if (worldBuilt) placeLanduse();
         } catch {
@@ -1758,9 +1852,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            riversGeo = JSON.parse(hit);
+            riversGeo = hit;
             record(
               'OSM Overpass waterways (cached)',
               riversGeo.length + ' watercourses'
@@ -1770,43 +1864,27 @@
           }
         } catch {}
         try {
-          const mLat = 111320;
-          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
-          const dLat = DEM_HALF_M / mLat;
-          const dLon = DEM_HALF_M / mLon;
-          const bbox =
-            (state.lat - dLat).toFixed(4) +
-            ',' +
-            (state.lon - dLon).toFixed(4) +
-            ',' +
-            (state.lat + dLat).toFixed(4) +
-            ',' +
-            (state.lon + dLon).toFixed(4);
-          const q =
-            '[out:json][timeout:30];way[waterway~"^(river|stream|canal|drain|ditch)$"](' +
-            bbox +
-            ');out geom 600;';
-          let osm = null;
-          for (const host of [
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-          ]) {
-            try {
-              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
-                credentials: 'omit'
-              });
-              if (!r.ok) throw new Error(r.status);
-              osm = await r.json();
-              break;
-            } catch {
-              // Try the next mirror.
-            }
-          }
-          if (!osm) throw new Error('overpass unavailable');
-          riversGeo = parseWaterways(osm);
-          record('OSM Overpass waterways', riversGeo.length + ' watercourses');
+          // No count cap: the watercourse network is small (a few
+          // hundred ways even over a large city) and every course is
+          // real - draw them all. z12 tiles over the whole box.
+          const elements = await overpassTiled(
+            'ww',
+            (b) =>
+              '[out:json][timeout:45];way[waterway~"^(river|stream|canal|drain|ditch)$"](' +
+              b +
+              ');out geom;',
+            DEM_HALF_M,
+            12
+          );
+          if (!elements) throw new Error('overpass unavailable');
+          // Infinity: keep every real watercourse (no arbitrary slice).
+          riversGeo = parseWaterways({elements}, Infinity);
+          record(
+            'OSM Overpass waterways',
+            riversGeo.length + ' watercourses (full network)'
+          );
           try {
-            localStorage.setItem(key, JSON.stringify(riversGeo));
+            await geoSet(key, riversGeo);
           } catch {}
           if (worldBuilt) placeRivers();
         } catch {
@@ -2031,55 +2109,39 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            railsGeo = JSON.parse(hit);
+            railsGeo = hit;
             record('OSM Overpass railways (cached)', railsGeo.length + ' ways');
             if (worldBuilt) placeRails();
             return;
           }
         } catch {}
         try {
-          const mLat = 111320;
-          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
-          const dLat = DEM_HALF_M / mLat;
-          const dLon = DEM_HALF_M / mLon;
-          const bbox =
-            (state.lat - dLat).toFixed(4) +
-            ',' +
-            (state.lon - dLon).toFixed(4) +
-            ',' +
-            (state.lat + dLat).toFixed(4) +
-            ',' +
-            (state.lon + dLon).toFixed(4);
-          const q =
-            '[out:json][timeout:30];way[railway~"^(rail|narrow_gauge|funicular|light_rail|tram)$"](' +
-            bbox +
-            // 2000: a Zurich-sized box holds 600+ ways and the old
-            // cap returned an ARBITRARY subset - drawn lines ended
-            // mid-field and trains rode invisible rails.
-            ');out geom 2000;';
-          let osm = null;
-          for (const host of [
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-          ]) {
-            try {
-              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
-                credentials: 'omit'
-              });
-              if (!r.ok) throw new Error(r.status);
-              osm = await r.json();
-              break;
-            } catch {
-              // Try the next mirror.
-            }
-          }
-          if (!osm) throw new Error('overpass unavailable');
-          railsGeo = parseRailways(osm);
-          record('OSM Overpass railways', railsGeo.length + ' ways');
+          // No count cap: a railway is a REAL ROUTE, not a sample.
+          // Even a rail-dense metropolis holds only a few thousand
+          // ways over the box (~4,500 in London) and they draw as thin
+          // ribbons - the whole network is cheap. The old 2000 slice
+          // ended lines mid-field and left trains riding invisible rails.
+          // z12 tiles over the whole box.
+          const elements = await overpassTiled(
+            'rail',
+            (b) =>
+              '[out:json][timeout:45];way[railway~"^(rail|narrow_gauge|funicular|light_rail|tram)$"](' +
+              b +
+              ');out geom;',
+            DEM_HALF_M,
+            12
+          );
+          if (!elements) throw new Error('overpass unavailable');
+          // Infinity: keep the whole real network (no arbitrary slice).
+          railsGeo = parseRailways({elements}, Infinity);
+          record(
+            'OSM Overpass railways',
+            railsGeo.length + ' ways (full network)'
+          );
           try {
-            localStorage.setItem(key, JSON.stringify(railsGeo));
+            await geoSet(key, railsGeo);
           } catch {}
           if (worldBuilt) placeRails();
         } catch {
@@ -2100,9 +2162,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            peaksGeo = JSON.parse(hit);
+            peaksGeo = hit;
             record('OSM Overpass peaks (cached)', peaksGeo.length + ' summits');
             if (worldBuilt) placePeaks();
             return;
@@ -2145,7 +2207,7 @@
           peaksGeo = parsePeaks(osm);
           record('OSM Overpass peaks', peaksGeo.length + ' summits');
           try {
-            localStorage.setItem(key, JSON.stringify(peaksGeo));
+            await geoSet(key, peaksGeo);
           } catch {}
           if (worldBuilt) placePeaks();
         } catch {
@@ -2168,9 +2230,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            aerialGeo = JSON.parse(hit);
+            aerialGeo = hit;
             record(
               'OSM Overpass aerialways (cached)',
               aerialGeo.length + ' installations'
@@ -2219,7 +2281,7 @@
             aerialGeo.length + ' installations'
           );
           try {
-            localStorage.setItem(key, JSON.stringify(aerialGeo));
+            await geoSet(key, aerialGeo);
           } catch {}
           if (worldBuilt) placeAerialways();
         } catch {
@@ -2241,9 +2303,9 @@
           ',' +
           state.lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
+          const hit = await geoGet(key);
           if (hit) {
-            turbinesGeo = JSON.parse(hit);
+            turbinesGeo = hit;
             record(
               'OSM Overpass wind turbines (cached)',
               turbinesGeo.length + ' turbines'
@@ -2294,7 +2356,7 @@
             turbinesGeo.length + ' turbines'
           );
           try {
-            localStorage.setItem(key, JSON.stringify(turbinesGeo));
+            await geoSet(key, turbinesGeo);
           } catch {}
           if (worldBuilt) placeTurbines();
         } catch {
@@ -3574,8 +3636,8 @@
       async function fetchDEM(lat, lon) {
         const key = 'horizon-dem-om-' + lat.toFixed(2) + ',' + lon.toFixed(2);
         try {
-          const hit = localStorage.getItem(key);
-          if (hit) return JSON.parse(hit);
+          const hit = await geoGet(key);
+          if (hit) return hit;
         } catch {}
         const mLat = 111320;
         const mLon = Math.max(111320 * Math.cos(lat * RAD), 1e-6);
@@ -3612,7 +3674,7 @@
           DEM_N + 'x' + DEM_N + ' grid (fallback)'
         );
         try {
-          localStorage.setItem(key, JSON.stringify(dem));
+          await geoSet(key, dem);
         } catch {}
         return dem;
       }
@@ -4131,17 +4193,24 @@
       // warm exactly where the night lights say the town is lit,
       // with the lamps' own tint and eye-response mapping.
       let bldMesh = null;
+      let bldMeshFar = null;
       let bldMat = null;
+      // Only buildings within this radius cast shadows: a distant
+      // building's shadow is imperceptible, and casting from every one of
+      // the thousands of LOD footprints would triple them through the
+      // shadow cascades for nothing. Far buildings still RECEIVE shadow.
+      const BLD_SHADOW_M = 450;
       let bldNightU = null;
       let bldGlowAt = null; // scene (x,z) -> measured radiance [0..1]
       let bldSnowAt = null; // scene (x,z) -> measured FSC [0..1]
       let bldSnowU = null; // live-snowfall term (the terrain's uSnowy)
       function placeBuildings() {
-        if (bldMesh) {
-          ground.remove(bldMesh);
-          bldMesh.geometry.dispose();
-          bldMesh = null;
-        }
+        for (const m of [bldMesh, bldMeshFar])
+          if (m) {
+            ground.remove(m);
+            m.geometry.dispose();
+          }
+        bldMesh = bldMeshFar = null;
         if (!buildsGeo || !buildsGeo.length || params.get('buildings') === '0')
           return;
         const groundY = (x, z) => {
@@ -4149,30 +4218,56 @@
           return s.water ? null : s.y;
         };
         const glowAt = (x, z) => (bldGlowAt ? Math.sqrt(bldGlowAt(x, z)) : 0);
-        const g = buildingsGeometry(
-          buildsGeo,
-          dressAnchor,
-          groundY,
-          glowAt,
-          1 / MPU,
-          WORLD / 2
-        );
-        if (!g.placed) return;
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
-        geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
-        geo.setAttribute('color', new THREE.BufferAttribute(g.color, 3));
-        geo.setAttribute('glow', new THREE.BufferAttribute(g.glow, 1));
-        geo.setAttribute('roof', new THREE.BufferAttribute(g.roof, 1));
-        // Measured snow per vertex: the same FSC field the terrain
-        // reads, sampled at each building vertex (0 until the
-        // satellite answers).
-        const rsnow = new Float32Array(g.count);
-        if (bldSnowAt)
-          for (let i = 0; i < g.count; i++)
-            rsnow[i] = bldSnowAt(g.position[3 * i], g.position[3 * i + 2]);
-        geo.setAttribute('rsnow', new THREE.BufferAttribute(rsnow, 1));
-        if (!bldMat) {
+        // Split near (shadow-casting) from far (receive-only) by real
+        // distance from the anchor, so the shadow cascades only carry the
+        // handful of buildings whose shadow is actually visible.
+        const nearGeo = [];
+        const farGeo = [];
+        for (const b of buildsGeo) {
+          const p = b.ring && b.ring[0];
+          const d = p
+            ? metresBetween(dressAnchor.lat, dressAnchor.lon, p[0], p[1])
+            : 0;
+          (d <= BLD_SHADOW_M ? nearGeo : farGeo).push(b);
+        }
+        // Build one mesh from a footprint subset; `casts` sets shadow.
+        const build = (subset, casts) => {
+          if (!subset.length) return null;
+          const g = buildingsGeometry(
+            subset,
+            dressAnchor,
+            groundY,
+            glowAt,
+            1 / MPU,
+            WORLD / 2
+          );
+          if (!g.placed) return null;
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute(
+            'position',
+            new THREE.BufferAttribute(g.position, 3)
+          );
+          geo.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
+          geo.setAttribute('color', new THREE.BufferAttribute(g.color, 3));
+          geo.setAttribute('glow', new THREE.BufferAttribute(g.glow, 1));
+          geo.setAttribute('roof', new THREE.BufferAttribute(g.roof, 1));
+          // Measured snow per vertex: the same FSC field the terrain
+          // reads, sampled at each building vertex (0 until the
+          // satellite answers).
+          const rsnow = new Float32Array(g.count);
+          if (bldSnowAt)
+            for (let i = 0; i < g.count; i++)
+              rsnow[i] = bldSnowAt(g.position[3 * i], g.position[3 * i + 2]);
+          geo.setAttribute('rsnow', new THREE.BufferAttribute(rsnow, 1));
+          ensureBldMat();
+          const m = new THREE.Mesh(geo, bldMat);
+          m.castShadow = casts;
+          m.receiveShadow = true;
+          ground.add(m);
+          return {mesh: m, placed: g.placed};
+        };
+        function ensureBldMat() {
+          if (bldMat) return;
           bldNightU = tslUniform(0);
           bldSnowU = tslUniform(0);
           bldMat = new THREE.MeshStandardNodeMaterial({
@@ -4202,12 +4297,19 @@
             .mul(0.6);
           applyAerial(bldMat);
         }
-        bldMesh = new THREE.Mesh(geo, bldMat);
-        bldMesh.castShadow = bldMesh.receiveShadow = true;
-        ground.add(bldMesh);
+        const near = build(nearGeo, true);
+        const far = build(farGeo, false);
+        bldMesh = near && near.mesh;
+        bldMeshFar = far && far.mesh;
+        const placed = (near ? near.placed : 0) + (far ? far.placed : 0);
         record(
           'OSM buildings placed',
-          g.placed + ' of ' + buildsGeo.length + ' footprints on this box'
+          placed +
+            ' of ' +
+            buildsGeo.length +
+            ' footprints on this box · ' +
+            (near ? near.placed : 0) +
+            ' cast shadow'
         );
       }
       // Roads: ribbons of the measured width seated on the sampled

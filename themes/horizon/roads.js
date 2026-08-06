@@ -118,7 +118,7 @@ const RANK = [
   'bridleway',
   'path'
 ];
-const rankOf = (hw) => {
+export const rankOf = (hw) => {
   const i = RANK.indexOf(String(hw).replace(/_link$/, ''));
   return i < 0 ? RANK.length : i;
 };
