@@ -50,6 +50,17 @@ export function mssCross(U) {
   return 3.0e-3 + 1.92e-3 * clampU(U);
 }
 
+// The paper's separately fitted TOTAL mean-square slope,
+// sigma^2 = 3.0e-3 + 5.12e-3 U (+-0.004), U at the same 12.5 m
+// mast height and clamped to the same measured range as the
+// components. Exported so the sea's sub-grid slope variance and
+// the lakes' wet-pixel glitter consume ONE law - an inline copy
+// in the theme once ran unclamped on the 10 m wind and the two
+// surfaces obeyed different physics in the same frame.
+export function mssTotal(U) {
+  return 3.0e-3 + 5.12e-3 * clampU(U);
+}
+
 export function gcCoeffs(U) {
   const w = clampU(U);
   return {

@@ -532,6 +532,7 @@
       } from './horizon/geotiles.js';
       import {lodFilterRoads} from './horizon/linelod.js';
       import {lodThresholdArcmin, vegKeep} from './horizon/veglod.js';
+      import {mssTotal} from './horizon/coxmunk.js';
       import {
         landTint,
         parseLanduse,
@@ -9099,7 +9100,23 @@
           // Pierson-Moskowitz wind estimate is the fallback.
           const hsNow = state.sea?.hs ?? (0.21 * Ums * Ums) / 9.81;
           water.distortionScale.value = 0.6 + hsNow * 2.5;
-          const mss = 0.003 + 0.00512 * Ums;
+          // Cox-Munk TOTAL mss from coxmunk.js (gated): clamped to
+          // the paper's 1-14 m/s range and fed the wind at its own
+          // 12.5 m mast height (log-interpolated like the terrain's
+          // uWind125) - one law for the sea's sub-grid variance and
+          // the lakes' wet-pixel glitter. Monahan's whitecaps below
+          // correctly stay on the 10 m wind (U10 is that fit's own
+          // reference height).
+          const u125w =
+            state.wind80 != null
+              ? hubWind(
+                  Ums,
+                  state.wind80 / 3.6,
+                  (state.wind120 ?? state.wind80) / 3.6,
+                  12.5
+                )
+              : Ums;
+          const mss = mssTotal(u125w);
           const resolved = oceanCascades.reduce((s, c) => s + c.resolvedMss, 0);
           water.mssSubgrid.value = Math.max(mss - resolved, 1e-4);
           water.foamW.value = Math.min(3.84e-6 * Math.pow(Ums, 3.41), 0.5);
@@ -9908,8 +9925,17 @@
             ' m · Tp ' +
             (0.7305 * Ums).toFixed(1) +
             ' s (Pierson-Moskowitz) · mss ' +
-            (0.003 + 0.00512 * Ums).toFixed(4) +
-            ' (Cox-Munk) · whitecaps ' +
+            mssTotal(
+              state.wind80 != null
+                ? hubWind(
+                    Ums,
+                    state.wind80 / 3.6,
+                    (state.wind120 ?? state.wind80) / 3.6,
+                    12.5
+                  )
+                : Ums
+            ).toFixed(4) +
+            ' (Cox-Munk, 12.5 m) · whitecaps ' +
             (3.84e-4 * Math.pow(Ums, 3.41)).toFixed(2) +
             '% (Monahan)';
           live['visibility (Koschmieder fog)'] =

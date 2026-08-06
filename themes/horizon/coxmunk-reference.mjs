@@ -21,6 +21,7 @@ import {
   gcCoeffs,
   glintFactor,
   mssCross,
+  mssTotal,
   mssUp,
   N_WATER,
   slopePDF
@@ -72,6 +73,17 @@ const quad = (U, f) => {
     'published slope regressions',
     ok,
     `mu(10) = 0.0316, mc(10) = 0.0222 exact; |mu + mc - total-fit| <= ${worst.toExponential(1)} over 1-14 m/s (paper allows 4e-3); clamped to the measured range`
+  );
+  // The exported total is the paper's own separately fitted law,
+  // clamped exactly like the components - the single expression
+  // the sea's sub-grid variance and the lakes' glitter both run.
+  check(
+    'total-slope law',
+    Math.abs(mssTotal(10) - 0.0542) < 1e-15 &&
+      mssTotal(0) === mssTotal(1) &&
+      mssTotal(30) === mssTotal(14) &&
+      Math.abs(mssTotal(7) - (3e-3 + 5.12e-3 * 7)) < 1e-15,
+    `sigma^2(10) = 0.0542 exact; clamped at both ends of the 1-14 m/s data range`
   );
 }
 
