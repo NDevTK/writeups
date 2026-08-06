@@ -3406,6 +3406,25 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (three OSM layers: wetland, waterfalls, power grid, Aug
+  6): (1) natural=wetland with NO new constant - the albedo IS
+  the grassland base through the gated Lobell & Asner wet-soil
+  law at full saturation (x0.5006), both pieces already cited;
+  ways + relations; a SURFACE class (alpine bogs), so it
+  survives the rock bands; identity landmark. (2) Waterfalls:
+  waterway=waterfall nodes with a MEASURED height=* render as a
+  whitewater curtain down the exact asinh datum - no height, no
+  curtain; width = the rivers' gated Leopold exponent on the
+  live GloFAS ratio (re-exported); parse + reuse landmarks.
+  (3) The power grid: way[power=line|minor_line], vertices as
+  supports, every span on the aerialways' own gated catenary
+  (function-identity landmark: catenaryPoints IS the aerialways
+  export; 3% midpoint sag pinned) - one sag law for gondolas and
+  grid; cable/underground skipped (the tunnel doctrine); height
+  tag honoured, display defaults documented (35 m/10 m). All
+  through the tiled Overpass path. Grindelwald smoke: a minor
+  line marches its poles across the meadow, spans sagging on the
+  shared law; PAGEERROR 0; 82 reference sets green.
 - DONE (rock-band tint consumption, Aug 6): the landuse tint fed
   the grass band only, stranding glacier/quarry/bare_rock/scree/
   sand wherever the slope or elevation rock bands took over. The
