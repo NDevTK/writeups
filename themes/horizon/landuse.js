@@ -67,6 +67,24 @@ export const CLASS_ALBEDO = {
   glacier: [0.34, 0.34, 0.34]
 };
 
+// SURFACE classes: OSM tags that assert what the GROUND ITSELF is
+// (ice, rock, extraction face, sand) rather than a land USE over
+// unspecified ground. The distinction drives the tint raster's
+// alpha encoding below: a surface class survives the terrain's
+// slope and elevation rock bands (natural=glacier at 2800 m is a
+// measured ice surface, not a vegetation claim the alpine band
+// may override), while a use class keeps the original
+// grass-band-only behaviour - an alpine meadow polygon reaching
+// into the crags does not repaint the cliff faces inside it.
+export const SURFACE_CLASSES = new Set([
+  'glacier',
+  'bare_rock',
+  'scree',
+  'quarry',
+  'sand',
+  'beach'
+]);
+
 // Equirectangular span check (like parseWater's) - features under
 // minSpanM are below the tint raster texel.
 const spanOk = (rings, minSpanM) => {
@@ -245,12 +263,19 @@ export function landTint(polys, anchor, world, n, soilFactor = 1) {
           Math.floor(((xs[k + 1] + half) / world) * n - 0.5)
         );
         const f = SOIL_CLASSES.has(p.cls) ? soilFactor : 1;
+        // Alpha carries coverage AND the surface/use distinction
+        // in one float channel: 1 = surface class (the tint
+        // survives the rock bands), 0.5 = use class (grass band
+        // only). The shader decodes cov = min(2a, 1) and
+        // surf = max(2a - 1, 0); linear filtering blends the two
+        // levels into a soft edge where a quarry meets a meadow.
+        const aCls = SURFACE_CLASSES.has(p.cls) ? 1 : 0.5;
         for (let i = i0; i <= i1; i++) {
           const o = (row * n + i) * 4;
           data[o] = p.albedo[0] * f;
           data[o + 1] = p.albedo[1] * f;
           data[o + 2] = p.albedo[2] * f;
-          data[o + 3] = 1;
+          data[o + 3] = aCls;
           hit = true;
         }
       }

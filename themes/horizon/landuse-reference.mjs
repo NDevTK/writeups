@@ -318,4 +318,43 @@ const WORLD = 280;
   );
 }
 
+{
+  // The alpha packing: surface classes write 1 (the tint survives
+  // the terrain's rock bands), use classes 0.5 (grass band only),
+  // and the shader's decode identities hold exactly: cov =
+  // min(2a, 1) reads 1 for both, surf = max(2a - 1, 0) reads 1
+  // only for the surface class. tintAt stays alpha-truthy for
+  // both, so every older landmark reads through unchanged.
+  const polys = parseLanduse({
+    elements: [
+      way(21, square(46.62, 8.04, 400), {natural: 'glacier'}),
+      way(22, square(46.62, 8.06, 400), {landuse: 'meadow'})
+    ]
+  });
+  const tint = landTint(polys, {lat: 46.62, lon: 8.05}, 280, 192);
+  const aAt = (x) => {
+    const i = Math.floor(((x + 140) / 280) * 192);
+    const j = Math.floor((140 / 280) * 192);
+    return tint.data[((192 - 1 - j) * 192 + i) * 4 + 3];
+  };
+  const gx = geoToScene(46.62, 8.04, {lat: 46.62, lon: 8.05}).x;
+  const mx = geoToScene(46.62, 8.06, {lat: 46.62, lon: 8.05}).x;
+  const aG = aAt(gx);
+  const aM = aAt(mx);
+  const cov = (a) => Math.min(2 * a, 1);
+  const surf = (a) => Math.max(2 * a - 1, 0);
+  check(
+    'surface/use alpha packing',
+    aG === 1 &&
+      aM === 0.5 &&
+      cov(aG) === 1 &&
+      cov(aM) === 1 &&
+      surf(aG) === 1 &&
+      surf(aM) === 0 &&
+      tintAt(tint, gx, 0) !== null &&
+      tintAt(tint, mx, 0) !== null,
+    `glacier texel a = ${aG} (survives the rock bands), meadow a = ${aM} (grass band only); decode identities exact; tintAt truthy for both`
+  );
+}
+
 process.exit(fail ? 1 : 0);

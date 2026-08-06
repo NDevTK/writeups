@@ -546,7 +546,14 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     const grass0 = mix(vec3(0.09, 0.21, 0.05), vec3(0.19, 0.33, 0.08), n1).mul(
       u.uGrassTint
     );
-    const grass = mix(grass0, land.rgb, land.a.mul(u.uLandOn).mul(0.85))
+    // The tint alpha packs coverage AND landuse.js's surface/use
+    // distinction: cov = min(2a, 1) is any painted class,
+    // surf = max(2a - 1, 0) only the SURFACE classes (glacier,
+    // bare rock, scree, quarry, sand) whose tag asserts the
+    // ground itself.
+    const tintCov = land.a.mul(2.0).min(1.0);
+    const tintSurf = land.a.mul(2.0).sub(1.0).max(0.0);
+    const grass = mix(grass0, land.rgb, tintCov.mul(u.uLandOn).mul(0.85))
       .mul(n3.mul(0.3).add(0.85))
       .mul(rossA);
     const rock = mix(vec3(0.28, 0.25, 0.21), vec3(0.4, 0.37, 0.32), n2).mul(
@@ -554,7 +561,14 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     );
     const col1 = mix(grass, rock, rockF);
     const col2 = mix(col1, rock, smoothstep(1600.0, 2400.0, eM).mul(0.92));
-    const col3 = mix(col2, vec3(0.87, 0.9, 0.93), snow);
+    // Measured SURFACE classes carry through BOTH rock bands (the
+    // slope faces and the elevation band): a glacier tongue at
+    // 2200 m or a quarry floor keeps its measured albedo where a
+    // meadow polygon would honestly yield to the crags. Snow -
+    // the measured FSC and the live snowline - still wins above,
+    // so accumulation zones whiten exactly as before.
+    const col2s = mix(col2, land.rgb, tintSurf.mul(u.uLandOn).mul(0.85));
+    const col3 = mix(col2s, vec3(0.87, 0.9, 0.93), snow);
     // Sea: Monahan & O'Muircheartaigh (1980) whitecap fraction
     // W = 3.84e-6 * U^3.41.
     const U = max(u.uWindMs, 0.8);
