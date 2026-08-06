@@ -6,7 +6,8 @@ import {
   Mesh,
   NodeMaterial,
   RGBAFormat,
-  Vector3
+  Vector3,
+  Vector4
 } from 'three/webgpu';
 import {
   Fn,
@@ -26,6 +27,8 @@ import {
   pow,
   reflect,
   reflector,
+  abs,
+  exp,
   smoothstep,
   texture,
   uniform,
@@ -105,6 +108,26 @@ export class HorizonWaterMesh extends Mesh {
     // tide exactly as depth-limited breaking demands.
     this.tide = uniform(0);
     this.worldSize = uniform(options.worldSize ?? 280);
+    // Kelvin wakes (kelvin.js, gated): up to 8 vessels, fed per
+    // frame from live AIS. Per slot two vec4s in SCENE units:
+    //  A = (x, z, dirX, dirZ)   position + unit track direction
+    //  B = (tan(alpha), halfBeamU, sternOffU, gain)
+    // alpha is the Havelock/Kelvin wedge half-angle computed on
+    // the CPU from the vessel's measured SOG and the bathymetry's
+    // own depth at its position (deep 19.47 deg, widening toward
+    // the critical depth Froude number, Mach cone beyond). gain 0
+    // disables a slot (and an anchored ship's SOG-driven gain is
+    // 0 by itself). The GEOMETRY is the gated physics; the arm
+    // brightness profile below is display furniture like the
+    // hulls (amplitude needs hull shape - wave-resistance theory,
+    // out of scope), with the along-arm fade using the classical
+    // stationary-phase caustic exponent r^(-1/3).
+    this.wakeA = [];
+    this.wakeB = [];
+    for (let i = 0; i < 8; i++) {
+      this.wakeA.push(uniform(new Vector4(0, 0, 0, 1)));
+      this.wakeB.push(uniform(new Vector4(0.352, 0.1, 0, 0)));
+    }
     const depthTexNode = texture(options.depthTex);
     this.depthTexNode = depthTexNode; // swap via .value on rebuild
 
@@ -295,13 +318,53 @@ export class HorizonWaterMesh extends Mesh {
       const surf = smoothstep(zThr.sub(wS), zThr.add(wS), sumEta).mul(
         smoothstep(0.012, 0.05, dpt)
       );
+      // Kelvin wakes: for each fed vessel, the wedge of half-angle
+      // alpha (kelvin.js - the gated Havelock/Kelvin geometry)
+      // opens astern of the hull. Two foam sources per ship, both
+      // display-scaled like the hulls themselves: the divergent-
+      // wave ARMS along the wedge boundary (fading with the
+      // classical stationary-phase caustic exponent, (s0/s)^(1/3))
+      // and the turbulent CENTRELINE streak of beam width. The
+      // individual transverse crests (~25 m at 12 kt) sit under
+      // the display's resolvable angle at wallpaper distances -
+      // drawing them would alias (the veglod argument), so the
+      // envelope is what renders.
+      let wake = float(0);
+      for (let i = 0; i < 8; i++) {
+        const A = this.wakeA[i];
+        const B = this.wakeB[i];
+        const rel = positionWorld.xz.sub(A.xy);
+        const d = A.zw;
+        const sBack = rel.x.mul(d.x).add(rel.y.mul(d.y)).negate();
+        const q = abs(rel.x.mul(d.y).sub(rel.y.mul(d.x)));
+        const sEff = sBack.sub(B.z).max(0.0);
+        const behind = smoothstep(0.0, 0.05, sBack.sub(B.z));
+        const halfW = sEff.mul(B.x).add(B.y);
+        // Arm band: thickness one beam plus a slow display spread.
+        const armW = B.y.add(sEff.mul(0.02)).max(1e-4);
+        const arm = exp(q.sub(halfW).div(armW).pow(2).negate());
+        const ctr = exp(q.div(B.y.mul(1.4).max(1e-4)).pow(2).negate());
+        const s0 = float(1.5);
+        const decay = pow(s0.div(sEff.add(s0)), 1.0 / 3.0);
+        // Display end-fade at ~2.5 km so far wakes leave the
+        // uniform budget cleanly (the caustic decay alone never
+        // quite reaches zero).
+        const endFade = smoothstep(44.0, 30.0, sEff);
+        wake = wake.add(
+          behind
+            .mul(decay)
+            .mul(endFade)
+            .mul(arm.mul(0.65).add(ctr.mul(0.5)))
+            .mul(B.w)
+        );
+      }
       const foam = vec3(0.82, 0.86, 0.88).mul(
         max(this.sunDirection.y, 0.0).add(0.3)
       );
       return mix(
         albedo,
         foam,
-        clamp(capMask.mul(0.9).add(surf.mul(0.85)), 0.0, 1.0)
+        clamp(capMask.mul(0.9).add(surf.mul(0.85)).add(wake), 0.0, 1.0)
       );
     })();
   }

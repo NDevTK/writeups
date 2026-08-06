@@ -391,6 +391,7 @@
         despikeDEM,
         sampleDem
       } from './horizon/terrain-sample.js';
+      import {depthFroude, wedgeHalfAngleRad} from './horizon/kelvin.js';
       import {
         aisToScene,
         apparentLux,
@@ -5749,6 +5750,8 @@
       // Without a static report yet: a 90 x 14 m 'other'.
       function buildShip(slot, lenM, beamM, cls) {
         const key = cls + '/' + lenM + '/' + beamM + '/' + (slot.mmsi % 2);
+        slot.lenM = lenM;
+        slot.beamM = beamM;
         if (slot.dims === key) return;
         slot.dims = key;
         for (const c of [...slot.g.children]) {
@@ -8766,6 +8769,40 @@
                   .set(NAV_COLOR[color])
                   .multiplyScalar(0.4 + 3.6 * amp);
             }
+          }
+          // Kelvin wakes: feed the sea shader every moving hull.
+          // The wedge half-angle is the GATED physics (kelvin.js):
+          // Havelock's construction on the vessel's own measured
+          // speed over the bathymetry's own depth at its position
+          // (tide included) - deep hulls carry Kelvin's 19.47 deg,
+          // shallow harbours widen it toward the critical depth
+          // Froude number, a planing tender past critical carries
+          // the Mach cone. A held (anchored/moored) or slow hull
+          // feeds nothing; lake vessels ride the terrain's wet
+          // pixels, not this mesh. Gain is a display ramp in
+          // measured speed, furniture like the hulls themselves.
+          if (water) {
+            let wk = 0;
+            for (const s of shipPool) {
+              if (wk >= 8) break;
+              if (!s.active || !s.g.visible) continue;
+              const spdU = Math.hypot(s.vx, s.vz); // units/s
+              const uMs = spdU * MPU;
+              if (uMs < 1.0) continue; // under ~2 kt nothing shows
+              if (lakesMask && lakeAt(lakesMask, s.x, s.z) >= 0) continue;
+              const eS = sample(s.x, s.z).e;
+              const depth = Math.max((state.tide ?? 0) - eS, 0.5);
+              const alpha = wedgeHalfAngleRad(depthFroude(uMs, depth));
+              water.wakeA[wk].value.set(s.x, s.z, s.vx / spdU, s.vz / spdU);
+              water.wakeB[wk].value.set(
+                Math.tan(Math.min(alpha, 1.45)),
+                Math.max(s.beamM ?? 12, 6) / 2 / MPU,
+                Math.max(s.lenM ?? 60, 12) / 2 / MPU,
+                Math.min(uMs / 6, 1) * 0.85
+              );
+              wk++;
+            }
+            for (let i = wk; i < 8; i++) water.wakeB[i].value.w = 0;
           }
         }
         // Trains: each live journey drawn at the position its OWN
