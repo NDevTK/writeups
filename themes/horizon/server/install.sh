@@ -38,11 +38,21 @@ install -m 644 ../metar.js /opt/horizon-live/metar.js
 install -m 644 ../smoke.js /opt/horizon-live/smoke.js
 install -m 644 ../grib2.js /opt/horizon-live/grib2.js
 install -m 644 ../aerosol.js /opt/horizon-live/aerosol.js
+install -m 644 ../modis-land.js /opt/horizon-live/modis-land.js
 # The '../../' import paths must keep resolving from
 # /opt/horizon-live/index.mjs - rewrite them for the flat deploy
 # (metar.js's own './lightning.js' import and aerosol.js's own
 # './grib2.js' import already resolve there).
-sed -i "s#'../../lightning.js'#'./lightning.js'#; s#'../../solarwind.js'#'./solarwind.js'#; s#'../../metar.js'#'./metar.js'#; s#'../../smoke.js'#'./smoke.js'#; s#'../../grib2.js'#'./grib2.js'#; s#'../../aerosol.js'#'./aerosol.js'#" /opt/horizon-live/index.mjs
+sed -i "s#'../../lightning.js'#'./lightning.js'#; s#'../../solarwind.js'#'./solarwind.js'#; s#'../../metar.js'#'./metar.js'#; s#'../../smoke.js'#'./smoke.js'#; s#'../../grib2.js'#'./grib2.js'#; s#'../../aerosol.js'#'./aerosol.js'#; s#'../../modis-land.js'#'./modis-land.js'#" /opt/horizon-live/index.mjs
+# Ship-list drift guard: any '../../*.js' import left unrewritten means
+# a shared file was added to index.mjs without being added HERE, and the
+# flat deploy would crash-loop on ERR_MODULE_NOT_FOUND (Cloudflare 502s
+# while systemd shows "running"). Fail the install instead.
+if grep -q "'\.\./\.\./" /opt/horizon-live/index.mjs; then
+  echo "install.sh: unshipped '../../' import in index.mjs:" >&2
+  grep -n "'\.\./\.\./" /opt/horizon-live/index.mjs >&2
+  exit 1
+fi
 
 # Environment (created once; never overwritten - your key lives here).
 if [ ! -f /etc/horizon-live.env ]; then
