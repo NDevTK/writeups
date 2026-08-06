@@ -322,6 +322,18 @@ export function soilDarkening(theta) {
 
 // The pointwise probe the raster is gated against (and the smoke
 // checks with): the painted albedo under scene (x, z), or null.
+// natural=wetland: no new constant anywhere - the albedo IS the
+// grassland base pushed through the repo's own gated wet-soil law
+// (Lobell & Asner 2002) at FULL saturation (theta = porosity,
+// factor 0.5006): a marsh is graminoid cover on permanently
+// saturated ground, and both pieces are already cited and
+// landmarked. A SURFACE class (the tag asserts the ground itself
+// - alpine bogs are real), so it survives the rock bands.
+CLASS_ALBEDO.wetland = CLASS_ALBEDO.grassland.map(
+  (c) => c * soilDarkening(SOIL_POROSITY)
+);
+SURFACE_CLASSES.add('wetland');
+
 export function tintAt(tint, x, z) {
   if (!tint) return null;
   const {data, n, world} = tint;

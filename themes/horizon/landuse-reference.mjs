@@ -357,4 +357,29 @@ const WORLD = 280;
   );
 }
 
+{
+  // Wetland: the identity is the landmark - grassland through the
+  // gated Lobell & Asner law at full saturation, no constant of
+  // its own; and it is a SURFACE class (alpha 1 in the raster).
+  const f = soilDarkening(SOIL_POROSITY);
+  const w = CLASS_ALBEDO.wetland;
+  const g = CLASS_ALBEDO.grassland;
+  const polys = parseLanduse({
+    elements: [way(31, square(46.62, 8.04, 400), {natural: 'wetland'})]
+  });
+  const tint = landTint(polys, {lat: 46.62, lon: 8.05}, 280, 192);
+  const gx = geoToScene(46.62, 8.04, {lat: 46.62, lon: 8.05}).x;
+  const i = Math.floor(((gx + 140) / 280) * 192);
+  const j = Math.floor((140 / 280) * 192);
+  const aW = tint.data[((192 - 1 - j) * 192 + i) * 4 + 3];
+  check(
+    'wetland identity',
+    w.every((c, k) => Math.abs(c - g[k] * f) < 1e-15) &&
+      Math.abs(f - 0.5006) < 0.001 &&
+      polys.length === 1 &&
+      aW === 1,
+    `wetland = grassland x soilDarkening(porosity) = x${f.toFixed(4)} exactly - saturated marsh from two already-gated laws; surface class (alpha 1)`
+  );
+}
+
 process.exit(fail ? 1 : 0);
