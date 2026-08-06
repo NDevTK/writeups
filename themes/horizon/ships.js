@@ -118,7 +118,14 @@ export function statusUnderway(cls, makingWay) {
 //    red-white-red in a vertical line.
 // Vertical-line spacing per COLREGS Annex I 2(i): not less than
 // 2 m apart (1 m under 20 m length). Heights share lightPlan's
-// h1 display mast.
+// h1 display mast. All figures read from the treaty text itself
+// (UNTS vol. 1050, I-15824, Annex I 2(i)/2(k), Rules 27/30).
+// Two treaty nuances documented rather than modelled: Rule 30(e)
+// merely EXEMPTS an under-7 m vessel outside fairways from the
+// anchor light (permissive - the drawn light is one she may
+// carry), and Rule 27(b)(iv)'s RAM-at-anchor combination cannot
+// be told apart from plain RAM by the single M.1371 status the
+// feed carries.
 export function statusLights(lenM, beamM, cls) {
   const len = Math.max(lenM || 0, 6);
   const beam = Math.max(beamM || 0, 2);

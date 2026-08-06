@@ -3406,6 +3406,28 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (measured navigational status -> Rule 27/30 lights, Aug 6):
+  a new measured field end to end. The daemon received M.1371
+  NavigationalStatus (Table 45) on every position report and
+  dropped it; normalizeShip keeps it (missing -> 15, the
+  standard's default) and ships.js maps it to the COLREGS regimes
+  the rules DETERMINE: Rule 30 anchor whites (fore >= 6 m, >= 4.5
+  m above the after one, Annex I 2(k); one light under 50 m),
+  Rule 30(d) aground reds, Rule 27(a)/(b) NUC and RAM verticals
+  with their making-way carve-outs (NUC making way: side + stern,
+  NO masthead), Annex I 2(i) spacing, Rule 22 all-round ranges
+  (3/2 nm), Rule 21(e) no-arc visibility - and anchored/moored/
+  aground hulls HOLD instead of dead-reckoning GPS jitter across
+  the harbour. Deliberate abstentions pinned in the gate: status
+  4 (Rule 28 reds optional) and 7 (trawl vs other gear
+  unmeasured) keep the underway set. Pool builds the union of
+  every regime's dots once; the frame gates by live status - a
+  ship weighing anchor needs no rebuild. Harness fleet carries
+  statuses (anchored tanker, moored sailer, aground other).
+  Verified: 4 new ships landmarks + server landmark, night
+  browser capture of the anchored tanker (fore-high/aft-low
+  whites lit, underway set dark, in-page dot inspection), zero
+  page errors.
 - DONE (the drawn sun at its true radius + the eclipsed sky, Aug
   6): the second half of the one-solar-disc item. The dome's
   cos(0.9999893) literal (a fixed 0.2651 deg) became a uniform fed
