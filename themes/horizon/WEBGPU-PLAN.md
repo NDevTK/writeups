@@ -3406,6 +3406,24 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (rock-band tint consumption, Aug 6): the landuse tint fed
+  the grass band only, stranding glacier/quarry/bare_rock/scree/
+  sand wherever the slope or elevation rock bands took over. The
+  distinction shipped is OSM's own semantics: SURFACE classes
+  (the tag asserts the ground itself - ice, rock, extraction
+  face, sand; true at any altitude) vs USE classes (use over
+  unspecified ground, which the alpine bands legitimately
+  override). One float alpha packs both: 1 = surface, 0.5 = use;
+  shader decodes cov = min(2a,1) / surf = max(2a-1,0) exactly,
+  linear filtering blending the boundary; the surface share
+  re-applies after BOTH rock mixes at the same 0.85; snow still
+  wins above (accumulation zones whiten as before). tintAt stays
+  alpha-truthy - every existing consumer/landmark unchanged; new
+  'surface/use alpha packing' landmark. The browser loop caught
+  the one real break pre-commit: min() unimported in TSL scope =
+  a solid-black terrain with ZERO console errors (the second
+  silent-black this session; method-chained .min()/.max() is the
+  file's idiom). 80 sets green.
 - DONE (the totality corona, Aug 6): corona.js = Baumbach 1937
   eq. (5), READ from the original AN 263 scan (I(rho) = 0.0532
   rho^-2.5 + 1.425 rho^-7 + 2.565 rho^-17, millionths of the
