@@ -54,13 +54,107 @@ export const SUNSET_ELEV = -50 / 60;
 export const RANGE_NM = {masthead: 6, side: 3, stern: 3};
 
 // Rule 22 in full - minimum luminous ranges (nm) by vessel
-// length: (a) >= 50 m: masthead 6, side 3, stern 3; (b) >= 12 m
-// but < 50 m: masthead 5 (3 if under 20 m), side 2, stern 2;
-// (c) < 12 m: masthead 2, side 1, stern 2.
+// length: (a) >= 50 m: masthead 6, side 3, stern 3, all-round 3;
+// (b) >= 12 m but < 50 m: masthead 5 (3 if under 20 m), side 2,
+// stern 2, all-round 2; (c) < 12 m: masthead 2, side 1, stern 2,
+// all-round 2.
 export function rangesFor(lenM) {
-  if (lenM >= 50) return {masthead: 6, side: 3, stern: 3};
-  if (lenM >= 12) return {masthead: lenM >= 20 ? 5 : 3, side: 2, stern: 2};
-  return {masthead: 2, side: 1, stern: 2};
+  if (lenM >= 50) return {masthead: 6, side: 3, stern: 3, allRound: 3};
+  if (lenM >= 12)
+    return {masthead: lenM >= 20 ? 5 : 3, side: 2, stern: 2, allRound: 2};
+  return {masthead: 2, side: 1, stern: 2, allRound: 2};
+}
+
+// ITU-R M.1371 navigational status (message 1/2/3, Table 45) ->
+// the COLREGS light regime the hull carries. Only regimes whose
+// lights the rules DETERMINE from the measured status are
+// distinguished: 4 (constrained by draught) keeps the underway
+// set because Rule 28's three reds are optional ("may"), and 7
+// (fishing) keeps it because Rule 26 splits on trawl vs other
+// gear, which AIS does not carry - drawing either would be
+// inventing. 15 is the standard's own "undefined" default.
+export function statusClass(st) {
+  if (st === 1) return 'anchored';
+  if (st === 5) return 'moored';
+  if (st === 6) return 'aground';
+  if (st === 2) return 'nuc';
+  if (st === 3) return 'ram';
+  return 'underway';
+}
+
+// Which of the underway lights (Rule 23 masthead / Rule 21 side +
+// stern) the status still carries:
+//  - anchored / moored / aground: none (Rules 23/25 apply to
+//    vessels UNDERWAY; a moored vessel shows no navigation
+//    lights - deck working lights are out of scope).
+//  - not under command (Rule 27(a)): sidelights and sternlight
+//    only WHEN MAKING WAY - and no masthead even then.
+//  - restricted manoeuvrability (Rule 27(b)(iii)): masthead,
+//    sidelights and sternlight when making way.
+export function statusUnderway(cls, makingWay) {
+  if (cls === 'anchored' || cls === 'moored' || cls === 'aground')
+    return {masthead: false, side: false, stern: false};
+  if (cls === 'nuc')
+    return {masthead: false, side: !!makingWay, stern: !!makingWay};
+  if (cls === 'ram')
+    return {masthead: !!makingWay, side: !!makingWay, stern: !!makingWay};
+  return {masthead: true, side: true, stern: true};
+}
+
+// The status's own ALL-ROUND lights (Rule 21(e): 360 degrees),
+// placed from the measured length by the rules themselves:
+//  - at anchor (Rule 30(a)/(b)): fore all-round white, and on 50
+//    m+ a second at or near the stern LOWER than the fore one;
+//    Annex I 2(k): the forward light not less than 6 m above the
+//    hull and not less than 4.5 m above the after one. Under 50
+//    m: one all-round white where it can best be seen. (Rule
+//    30(c) deck illumination on 100 m+ is working lights - out
+//    of scope.)
+//  - aground (Rule 30(d)): the anchor lights plus two all-round
+//    red in a vertical line.
+//  - not under command (Rule 27(a)(i)): two all-round red in a
+//    vertical line.
+//  - restricted manoeuvrability (Rule 27(b)(i)): all-round
+//    red-white-red in a vertical line.
+// Vertical-line spacing per COLREGS Annex I 2(i): not less than
+// 2 m apart (1 m under 20 m length). Heights share lightPlan's
+// h1 display mast.
+export function statusLights(lenM, beamM, cls) {
+  const len = Math.max(lenM || 0, 6);
+  const beam = Math.max(beamM || 0, 2);
+  const h1 = Math.min(Math.max(6, beam), 12);
+  const sep = len >= 20 ? 2 : 1;
+  const out = [];
+  const anchorish = cls === 'anchored' || cls === 'aground';
+  if (anchorish) {
+    if (len >= 50) {
+      const fwdY = Math.max(6, h1);
+      out.push({
+        show: 'anchorish',
+        color: 'white',
+        y: fwdY,
+        z: -len / 2 + len * 0.1
+      });
+      out.push({
+        show: 'anchorish',
+        color: 'white',
+        y: Math.max(fwdY - 4.5, 2),
+        z: len / 2 - len * 0.15
+      });
+    } else {
+      out.push({show: 'anchorish', color: 'white', y: h1, z: 0});
+    }
+  }
+  if (cls === 'aground' || cls === 'nuc') {
+    out.push({show: cls, color: 'red', y: h1 + sep, z: 0});
+    out.push({show: cls, color: 'red', y: h1, z: 0});
+  }
+  if (cls === 'ram') {
+    out.push({show: 'ram', color: 'red', y: h1 + sep, z: 0});
+    out.push({show: 'ram', color: 'white', y: h1, z: 0});
+    out.push({show: 'ram', color: 'red', y: h1 - sep, z: 0});
+  }
+  return out;
 }
 
 // ITU-R M.1371 ship-type code (AIS message 5 "Type") -> the
@@ -175,9 +269,13 @@ export function aisToScene(ship, ref) {
   // drift); a vessel reporting only TrueHeading (M.1371 sends
   // COG=3600 "not available", the daemon nulls it) dead-reckons
   // along its heading; with NEITHER measured, inventing a track
-  // would march the hull due north - hold position instead.
+  // would march the hull due north - hold position instead. A
+  // MEASURED at-anchor/moored/aground status (M.1371 Table 45)
+  // also holds: the fix itself keeps arriving, and dead-reckoning
+  // GPS jitter would walk an anchored hull across its harbour.
+  const held = ship.st === 1 || ship.st === 5 || ship.st === 6;
   const dir = ship.cog ?? ship.hdg ?? null;
   const tr = ((dir ?? 0) * Math.PI) / 180;
-  const mv = dir === null ? 0 : sp;
+  const mv = dir === null || held ? 0 : sp;
   return {x, z, vx: mv * Math.sin(tr), vz: -mv * Math.cos(tr), sp};
 }

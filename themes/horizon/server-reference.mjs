@@ -339,10 +339,19 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       ship.sog === 0 &&
       ship.cog === null &&
       ship.hdg === null &&
+      ship.st === 15 &&
       ship.name === 'VERENA' &&
+      normalizeShip(
+        {},
+        {UserID: 2, Latitude: 0, Longitude: 0, Sog: 0, NavigationalStatus: 1}
+      ).st === 1 &&
+      normalizeShip(
+        {},
+        {UserID: 3, Latitude: 0, Longitude: 0, Sog: 0, NavigationalStatus: 16}
+      ).st === 15 &&
       Math.abs(box[1][0] - box[0][0] - 0.5) < 1e-12 &&
       Math.abs((box[0][1] + box[1][1]) / 2 - 8.04) < 1e-12,
-    `readsb strip 3 -> 1 with 9 fields incl. measured type A320 + category A3; AIS sentinels 102.3/360/511 -> 0/null/null, name trimmed; 15 nm box spans exactly 0.500 deg of latitude, centred`
+    `readsb strip 3 -> 1 with 9 fields incl. measured type A320 + category A3; AIS sentinels 102.3/360/511 -> 0/null/null, missing/out-of-range NavigationalStatus -> 15 (M.1371's own default), at-anchor 1 kept, name trimmed; 15 nm box spans exactly 0.500 deg of latitude, centred`
   );
 }
 

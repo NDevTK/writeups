@@ -398,6 +398,9 @@
         lightPlan,
         luminousIntensity,
         relBearing,
+        statusClass,
+        statusLights,
+        statusUnderway,
         SUNSET_ELEV,
         typeClass
       } from './horizon/ships.js';
@@ -5696,7 +5699,9 @@
         masthead: '#ffffff',
         stern: '#ffffff',
         port: '#ff2418',
-        starboard: '#19e34d'
+        starboard: '#19e34d',
+        white: '#ffffff',
+        red: '#ff2418'
       };
       const shipPool = [];
       const shipMats = {};
@@ -5805,6 +5810,34 @@
           deckY + hM(plan.sternY),
           L * 0.49
         );
+        // Status lights (Rules 27/30 from the MEASURED M.1371
+        // navigational status): the union of every regime's
+        // all-round lights is built once and the frame gates them
+        // by the live status, so a ship weighing anchor needs no
+        // geometry rebuild. Rule 22's all-round range rides each
+        // dot like the arc lights' own ranges do.
+        slot.statusList = [];
+        for (const sl of [
+          ...statusLights(lenM, beamM, 'aground'),
+          ...statusLights(lenM, beamM, 'nuc'),
+          ...statusLights(lenM, beamM, 'ram')
+        ]) {
+          const mat = new THREE.MeshBasicNodeMaterial({
+            color: NAV_COLOR[sl.color]
+          });
+          aerial.applyTone(mat);
+          const dot = new THREE.Mesh(dotGeo, mat);
+          dot.userData.dotMat = true;
+          dot.position.set(0, deckY + hM(sl.y), hM(sl.z));
+          dot.visible = false;
+          slot.g.add(dot);
+          slot.statusList.push({
+            show: sl.show,
+            color: sl.color,
+            range: plan.ranges.allRound,
+            dot
+          });
+        }
       }
       {
         for (let i = 0; i < SHIP_N; i++) {
@@ -5822,13 +5855,15 @@
             vx: 0,
             vz: 0,
             hdg: 0,
+            st: 15,
+            sog: 0,
             seen: 0,
             active: false
           });
         }
         record(
           'COLREGS navigation lights',
-          'Rule 21 arcs · Rule 23/25 by measured length · Annex I heights · Allard visibility'
+          'Rule 21 arcs · Rule 23/25 by measured length · Rule 27/30 by measured status · Annex I heights · Allard visibility'
         );
         record(
           'Measured vessels',
@@ -5849,30 +5884,35 @@
           const pz = shipCamDir.x;
           // One of each silhouette class, measured-sized: the
           // harness fleet exercises every hull the types produce.
+          // 4th column: M.1371 navigational status, so pinned
+          // shots exercise the Rule 27/30 regimes (anchored
+          // tanker, moored sailing boat, aground 'other').
           const FLEET = [
-            [70, 240, 32], // cargo
-            [80, 180, 28], // tanker
-            [60, 140, 22], // passenger
-            [30, 24, 7], // fishing
-            [36, 14, 4], // sailing
-            [52, 30, 10], // tug
-            [0, 90, 14], // unknown -> other
-            [71, 160, 24] // cargo again, odd mmsi paint
+            [70, 240, 32, 0], // cargo
+            [80, 180, 28, 1], // tanker, at anchor
+            [60, 140, 22, 0], // passenger
+            [30, 24, 7, 0], // fishing
+            [36, 14, 4, 5], // sailing, moored
+            [52, 30, 10, 0], // tug
+            [0, 90, 14, 6], // unknown -> other, aground
+            [71, 160, 24, 0] // cargo again, odd mmsi paint
           ];
           for (let i = 0; i < Math.min(shipOv, SHIP_N); i++) {
             const s = shipPool[i];
             const ahead = 55 + i * 20;
             const side = (i - (Math.min(shipOv, SHIP_N) - 1) / 2) * 26;
+            const [ft, fl, fb, fst] = FLEET[i % FLEET.length];
             Object.assign(s, {
               mmsi: 1000000 + i,
               name: 'HARNESS' + i,
               x: camera.position.x + shipCamDir.x * ahead + px * side,
               z: camera.position.z + shipCamDir.z * ahead + pz * side,
               hdg: (30 + i * 47) % 360,
+              st: fst,
+              sog: 0,
               seen: Date.now(),
               active: true
             });
-            const [ft, fl, fb] = FLEET[i % FLEET.length];
             buildShip(s, fl, fb, typeClass(ft));
             const tr = s.hdg * RAD;
             const sp = (12 * 0.514444) / MPU; // 12 kt
@@ -5928,6 +5968,10 @@
             vx: sc.vx,
             vz: sc.vz,
             hdg: ship.hdg ?? ship.cog ?? 0,
+            // M.1371 navigational status + SOG: Rule 27/30 light
+            // regimes and the making-way test both read these.
+            st: ship.st ?? 15,
+            sog: ship.sog ?? 0,
             seen: now_,
             active: true
           });
@@ -8658,11 +8702,24 @@
             const dM =
               Math.hypot(camera.position.x - s.x, camera.position.z - s.z) *
               MPU;
+            // The MEASURED navigational status picks the light
+            // regime (Rules 27/30): anchored/moored/aground hulls
+            // drop the underway set entirely; NUC/RAM carry side +
+            // stern (RAM the masthead too) only when MAKING WAY -
+            // SOG above the feed's own 0.1 kt resolution (M.1371).
+            const sCls = statusClass(s.st);
+            const uw = statusUnderway(sCls, (s.sog ?? 0) > 0.1);
+            const uwArc = {
+              masthead: uw.masthead,
+              port: uw.side,
+              starboard: uw.side,
+              stern: uw.stern
+            };
             // Each light carries ITS OWN Rule 22 range now (from
             // the measured length via lightPlan) - a 15 m boat's
             // 3 nm masthead fades sooner than a freighter's 6 nm.
             for (const {arc, range, dot} of s.lightList) {
-              if (!shipLightsOn || !arcs[arc]) {
+              if (!shipLightsOn || !arcs[arc] || !uwArc[arc]) {
                 dot.visible = false;
                 continue;
               }
@@ -8676,6 +8733,31 @@
               if (dot.visible)
                 dot.material.color
                   .set(NAV_COLOR[arc])
+                  .multiplyScalar(0.4 + 3.6 * amp);
+            }
+            // The status's own all-round lights (Rule 21(e): no
+            // arc test - visible from every bearing), through the
+            // same Allard fade at Rule 22's all-round range.
+            for (const {show, color, range, dot} of s.statusList ?? []) {
+              const on =
+                shipLightsOn &&
+                (show === sCls ||
+                  (show === 'anchorish' &&
+                    (sCls === 'anchored' || sCls === 'aground')));
+              if (!on) {
+                dot.visible = false;
+                continue;
+              }
+              const E = apparentLux(luminousIntensity(range), Math.max(dM, 30));
+              const amp = THREE.MathUtils.clamp(
+                Math.log10(E / 2e-7) / 2.5,
+                0,
+                1
+              );
+              dot.visible = amp > 0;
+              if (dot.visible)
+                dot.material.color
+                  .set(NAV_COLOR[color])
                   .multiplyScalar(0.4 + 3.6 * amp);
             }
           }

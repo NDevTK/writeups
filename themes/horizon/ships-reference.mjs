@@ -23,6 +23,9 @@ import {
   RANGE_NM,
   rangesFor,
   relBearing,
+  statusClass,
+  statusLights,
+  statusUnderway,
   SUNSET_ELEV,
   typeClass
 } from './ships.js';
@@ -248,6 +251,119 @@ const check = (name, ok, detail) => {
     'measured light plan',
     ok,
     `240 m cargo: two mastheads 12/16.5 m, 100 m apart, forward within L/4 of the stem, 6/3/3 nm; 30 m fisher: one masthead at beam height 7 m, 5/2/2; 8 m launch 2/1/2; 15 m masthead 3 nm; sailing = no masthead (Rule 25(b))`
+  );
+}
+
+{
+  // Navigational status -> light regime (ITU-R M.1371 Table 45
+  // through COLREGS Rules 27/30). The deliberate abstentions are
+  // pinned too: status 4 (constrained by draught) keeps the
+  // underway set because Rule 28's reds are optional, and 7
+  // (fishing) because AIS cannot say trawl vs other gear.
+  const ok =
+    statusClass(0) === 'underway' &&
+    statusClass(1) === 'anchored' &&
+    statusClass(2) === 'nuc' &&
+    statusClass(3) === 'ram' &&
+    statusClass(4) === 'underway' &&
+    statusClass(5) === 'moored' &&
+    statusClass(6) === 'aground' &&
+    statusClass(7) === 'underway' &&
+    statusClass(8) === 'underway' &&
+    statusClass(15) === 'underway' &&
+    statusClass(undefined) === 'underway';
+  check(
+    'M.1371 status classes',
+    ok,
+    `0/8 underway, 1 anchored, 2 NUC, 3 RAM, 5 moored, 6 aground; 4 and 7 deliberately keep the underway set (optional Rule 28 reds, unmeasured fishing gear); 15/missing = the standard's default`
+  );
+}
+
+{
+  // Rule 30 anchor lights from the measured length. 240 m: fore
+  // all-round white >= 6 m up and >= 4.5 m above the after one
+  // (Annex I 2(k)), fore light toward the bow (-z); 30 m: ONE
+  // all-round white (Rule 30(b)); aground adds two all-round
+  // reds 2 m apart (Annex I 2(i); 1 m under 20 m). Rule 22
+  // all-round ranges: 3 nm at 50 m+, 2 below.
+  const big = statusLights(240, 32, 'anchored');
+  const small = statusLights(30, 7, 'anchored');
+  const agnd = statusLights(240, 32, 'aground');
+  const dinghy = statusLights(12, 3, 'nuc');
+  const ok =
+    big.length === 2 &&
+    big[0].y >= 6 &&
+    big[0].y - big[1].y >= 4.5 &&
+    big[0].z < 0 &&
+    big[1].z > 0 &&
+    big.every((l) => l.color === 'white' && l.show === 'anchorish') &&
+    small.length === 1 &&
+    small[0].color === 'white' &&
+    agnd.length === 4 &&
+    agnd.filter((l) => l.color === 'red').length === 2 &&
+    agnd
+      .filter((l) => l.color === 'red')
+      .every((l, i, a) => i === 0 || a[0].y - l.y === 2) &&
+    dinghy.length === 2 &&
+    dinghy[0].y - dinghy[1].y === 1 &&
+    rangesFor(240).allRound === 3 &&
+    rangesFor(30).allRound === 2 &&
+    rangesFor(8).allRound === 2;
+  check(
+    'Rule 30/27 all-round lights',
+    ok,
+    `240 m anchored: fore white ${big[0].y} m (bow side), after ${big[1].y} m (>= 4.5 m lower); 30 m: one white where best seen; aground = anchor pair + two reds 2 m apart (1 m under 20 m); all-round ranges 3/2 nm`
+  );
+}
+
+{
+  // Rule 27's underway carve-outs: NUC making way shows side +
+  // stern but NO masthead (27(a)(iii)); RAM making way keeps the
+  // masthead too (27(b)(iii)); neither shows anything extra when
+  // stopped; anchored/moored/aground carry none of the underway
+  // set (Rules 23/25 apply to vessels underway).
+  const nucStop = statusUnderway('nuc', false);
+  const nucWay = statusUnderway('nuc', true);
+  const ramWay = statusUnderway('ram', true);
+  const anch = statusUnderway('anchored', true);
+  const ok =
+    !nucStop.side &&
+    !nucStop.stern &&
+    !nucStop.masthead &&
+    nucWay.side &&
+    nucWay.stern &&
+    !nucWay.masthead &&
+    ramWay.side &&
+    ramWay.stern &&
+    ramWay.masthead &&
+    !anch.masthead &&
+    !anch.side &&
+    !anch.stern &&
+    statusUnderway('underway', false).masthead;
+  check(
+    'Rule 27 making-way carve-outs',
+    ok,
+    `NUC making way: side + stern, no masthead; RAM making way: masthead too; stopped: reds only; anchored/moored/aground: no underway lights at all`
+  );
+}
+
+{
+  // A measured at-anchor status HOLDS the hull: the GPS-jitter
+  // SOG must not dead-reckon an anchored ship across its
+  // harbour (the fix itself keeps arriving).
+  const ref = {lat: 46.62, lon: 8.04, halfM: 8000, world: 280, mpu: 57.14};
+  const anch = aisToScene(
+    {lat: 46.62, lon: 8.04, sog: 0.2, cog: 90, st: 1},
+    ref
+  );
+  const under = aisToScene(
+    {lat: 46.62, lon: 8.04, sog: 0.2, cog: 90, st: 0},
+    ref
+  );
+  check(
+    'anchored hulls hold',
+    anch.vx === 0 && anch.vz === 0 && anch.sp > 0 && under.vx > 0,
+    `st=1 with 0.2 kt of jitter holds position (sp kept for the record); st=0 dead-reckons as before`
   );
 }
 

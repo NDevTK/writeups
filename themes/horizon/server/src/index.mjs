@@ -113,7 +113,7 @@ export function normalize(j) {
     }));
 }
 
-// One AIS position report -> the six fields the theme reads.
+// One AIS position report -> the seven fields the theme reads.
 // ITU-R M.1371 sentinels: Sog 102.3 kt, Cog 360, TrueHeading 511
 // all mean "not available".
 export function normalizeShip(meta, p) {
@@ -127,7 +127,20 @@ export function normalizeShip(meta, p) {
     hdg:
       typeof p.TrueHeading === 'number' && p.TrueHeading !== 511
         ? p.TrueHeading
-        : null
+        : null,
+    // Navigational status (M.1371 message 1/2/3, Table 45): 0
+    // under way (engine), 1 at anchor, 2 not under command, 3
+    // restricted manoeuvrability, 5 moored, 6 aground, 8 under
+    // way sailing; 15 is the standard's own "undefined" default.
+    // The theme turns this into the COLREGS Rule 27/30 light
+    // regimes and holds anchored hulls instead of dead-reckoning
+    // their GPS jitter.
+    st:
+      typeof p.NavigationalStatus === 'number' &&
+      p.NavigationalStatus >= 0 &&
+      p.NavigationalStatus <= 15
+        ? p.NavigationalStatus
+        : 15
   };
 }
 
