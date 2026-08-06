@@ -4,7 +4,7 @@ Offline, deterministic harness for `themes/Horizon.html` on
 `WebGPURenderer` — real WebGPU (Dawn) via SwiftShader Vulkan. The
 build is WebGPU-only (the WebGL2 backend - and with it A/B testing -
 was deleted); correctness rests on the CPU double-precision
-references (`../*-reference.mjs` - 77 sets, all run by
+references (`../*-reference.mjs` - 83 sets, all run by
 `validate.sh`) and the numeric probe pages that
 read GPU texels back against them; the pinned matrix is a
 smoke/visual run. Every architectural choice here was forced by a

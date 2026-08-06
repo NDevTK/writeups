@@ -1,21 +1,17 @@
 // Reference gate for grassland.js (node grassland-reference.mjs): the
-// month/latitude modulation of turf colour, held to grassland
-// remote-sensing phenology (MODIS LSP; ECOSTRESS dry-grass spectra).
+// turf colour at a MEASURED phenophase, held to the ECOSTRESS
+// dry-grass spectra.
 //
-//  - the growing season keeps the class's own green; NO summer browning
-//    in any band (the alpine-meadow guardrail).
-//  - winter browning is LATITUDE-GRADED: a gentle olive dulling that
-//    stays green-led in the maritime/mild temperate band, but the full
-//    warm straw (R>G>B, brighter) in the continental/boreal band.
-//  - amplitude ramps in above |lat| 26 deg; below it grass is
-//    evergreen; no month keeps green; the hemisphere flips the calendar.
-import {
-  GRASS_AUTUMN,
-  GRASS_DORMANT,
-  GRASS_OLIVE,
-  grassColor,
-  grassPhase
-} from './grassland.js';
+//  - the growing season keeps the class's own green.
+//  - a measured dormancy reaches the full warm straw (R>G>B, and
+//    BRIGHTER than the green - the load-bearing measured fact), the
+//    shoulder a milder warm blend between the two.
+//  - NO CALENDAR: there is no month or latitude argument left. A pixel
+//    with no measured cycle gets no seasonal modulation, because the
+//    product not retrieving a cycle IS the measurement that the pixel
+//    has no strong season. The old latitude month lists, the 26-40 deg
+//    amplitude ramp and the 52 deg straw/olive split are gone.
+import {GRASS_AUTUMN, GRASS_DORMANT, grassColor} from './grassland.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -31,107 +27,83 @@ const same = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-9);
 const bright = (c) => c[0] + c[1] + c[2];
 
 {
-  // Summer stays the class green in EVERY band - the alpine-meadow
-  // guardrail (no summer browning anywhere). Northern summer is July;
-  // southern summer is January.
+  // No measured phase means no season drawn - not a guessed one.
+  // A month number in the phase slot must be INERT: that is the proof
+  // the calendar is gone rather than merely unused, since every old
+  // call site passed a month there.
   const ok =
-    same(grassColor(BASE, 7, 47), BASE) && // mid-temperate July
-    same(grassColor(BASE, 7, 62), BASE) && // boreal July
-    same(grassColor(BASE, 7, 34), BASE) && // warm July
-    same(grassColor(BASE, 1, -45), BASE); // southern summer (Jan)
+    same(grassColor(BASE), BASE) &&
+    same(grassColor(BASE, null), BASE) &&
+    same(grassColor(BASE, 'green'), BASE) &&
+    [1, 7, 10, 12].every((m) => same(grassColor(BASE, m), BASE));
   check(
-    'no summer browning',
+    'no calendar behind it',
     ok,
-    'a July meadow stays the class green in every northern band; the southern summer (Jan) too - no Mediterranean-style summer browning fired by latitude alone'
+    'grassColor takes (base, phase) only; an absent phase returns the class green untouched, and passing a month number - 1, 7, 10, 12, what every old call site sent - moves nothing at all'
   );
 }
 
 {
-  // Winter is LATITUDE-GRADED. Maritime/mild temperate (47 deg): a
-  // gentle olive dulling that is STILL green-led (not straw).
-  // Continental/boreal (62 deg): the full warm straw, red-led and
-  // brighter than the green. This is the key correction from the
-  // phenology research - do not straw-brown an alpine winter meadow.
-  const midWinter = grassColor(BASE, 1, 47);
-  const borealWinter = grassColor(BASE, 1, 62);
-  const summer = BASE;
+  // A measured dormancy is a real one, so it reaches the measured
+  // cured-grass direction in full: red-led and brighter than green.
+  const dormant = grassColor(BASE, 'dormant');
+  const shoulder = grassColor(BASE, 'shoulder');
+  // The measured direction is warm AND brighter - and brighter in
+  // EVERY channel, green included: the ECOSTRESS dry-grass spectrum
+  // rises ~14% blue / 21% green / 32% red against green grass's
+  // ~4-11%, so cured turf does not darken its green, it lifts it.
   const ok =
-    greenLed(midWinter) && // temperate winter stays green-olive
-    !same(midWinter, summer) && // ...but is duller than summer
-    midWinter[1] < summer[1] && // green channel drops
-    redLed(borealWinter) && // continental winter is warm straw (R>G>B)
-    bright(borealWinter) > bright(summer) && // ...and brighter (dry grass)
-    borealWinter[0] > midWinter[0]; // continental browner than temperate
+    redLed(dormant) &&
+    bright(dormant) > bright(BASE) &&
+    dormant.every((v, i) => v > BASE[i]) &&
+    !same(shoulder, BASE) &&
+    !same(shoulder, dormant) &&
+    Math.abs(shoulder[0] - BASE[0]) < Math.abs(dormant[0] - BASE[0]);
   check(
-    'latitude-graded winter',
+    'measured dormancy cures',
     ok,
-    `mid-temperate Jan ${midWinter
-      .map((v) => v.toFixed(2))
-      .join('/')} green-olive; boreal Jan ${borealWinter
-      .map((v) => v.toFixed(2))
-      .join('/')} warm straw (R>G>B, brighter)`
+    `dormant ${dormant
+      .map((v) => v.toFixed(3))
+      .join(
+        '/'
+      )} is warm straw (R>G>B) and brighter in every channel - the ECOSTRESS dry-grass direction, which lifts green rather than dropping it; the shoulder ${shoulder
+      .map((v) => v.toFixed(3))
+      .join('/')} sits between base and straw`
   );
 }
 
 {
-  // Phase windows & hemisphere: mid-temperate peak (Jul) green, Sep
-  // senescence shoulder, Jan dormant; boreal Oct dormant; warm still
-  // green in Oct; the southern hemisphere is dormant in Jul, green in
-  // Jan; the tropics and no-month stay green.
+  // The surviving targets are well-formed and warm. GRASS_OLIVE is
+  // gone: it existed to soften a maritime winter that the latitude
+  // calendar browned wrongly, and a measured dormancy needs no such
+  // apology.
   const ok =
-    grassPhase(7, 47) === 'green' &&
-    grassPhase(9, 47) === 'shoulder' && // Sep-Oct senescence
-    grassPhase(1, 47) === 'dormant' &&
-    grassPhase(10, 62) === 'dormant' && // boreal browns early
-    grassPhase(10, 34) === 'green' && // warm still green
-    grassPhase(7, -45) === 'dormant' && // southern winter
-    grassPhase(1, -45) === 'green' && // southern summer
-    same(grassColor(BASE, 0, 47), BASE) && // no month -> green
-    same(grassColor(BASE, 1, 10), BASE); // tropics -> green even in Jan
-  check(
-    'phase windows + hemisphere',
-    ok,
-    'mid-temperate peak Jul / senescence Sep / dormant Jan; boreal dormant by Oct; warm green in Oct; southern winter in Jul; tropics + no-month stay green'
-  );
-}
-
-{
-  // The amplitude taper: no hard seam at the evergreen cutoff. At 26
-  // deg the seasonal effect is zero (base); it ramps to full by 40 deg;
-  // a mid-band latitude (33 deg) is partial.
-  const at26 = grassColor(BASE, 1, 26);
-  const at33 = grassColor(BASE, 1, 33);
-  const at40 = grassColor(BASE, 1, 40);
-  const ok =
-    same(at26, BASE) && // evergreen at the cutoff
-    !same(at33, BASE) && // partial in the ramp
-    !same(at40, BASE) && // full by 40
-    // 33 deg is a weaker shift than 40 deg (closer to base)
-    Math.abs(at33[0] - BASE[0]) < Math.abs(at40[0] - BASE[0]);
-  check(
-    'amplitude taper',
-    ok,
-    'seasonal amplitude 0 at |lat| 26 deg (evergreen), partial at 33, full by 40 - no seam'
-  );
-}
-
-{
-  // The dormancy/shoulder targets are well-formed and warm (straw
-  // red-led and brighter; olive still green-led; autumn between).
-  const ok =
-    redLed(GRASS_DORMANT) && // full straw warm
-    bright(GRASS_DORMANT) > bright(BASE) && // and brighter than green
-    greenLed(GRASS_OLIVE) && // olive still green-led (gentle)
+    redLed(GRASS_DORMANT) &&
+    bright(GRASS_DORMANT) > bright(BASE) &&
     redLed(GRASS_AUTUMN) &&
-    [GRASS_DORMANT, GRASS_OLIVE, GRASS_AUTUMN].every(
+    [GRASS_DORMANT, GRASS_AUTUMN].every(
       (c) => c.length === 3 && c.every((v) => v >= 0 && v <= 1)
     );
   check(
     'senescence targets',
     ok,
-    `straw ${GRASS_DORMANT.join('/')} (R>G>B, bright); olive ${GRASS_OLIVE.join(
+    `straw ${GRASS_DORMANT.join('/')} (R>G>B, bright); autumn shoulder ${GRASS_AUTUMN.join(
       '/'
-    )} (green-led); autumn ${GRASS_AUTUMN.join('/')}`
+    )}; the maritime-winter olive is deleted with the calendar that needed it`
+  );
+}
+
+{
+  // Every phase is stable and total: an unknown string must not
+  // silently brown anything.
+  const ok =
+    same(grassColor(BASE, 'summer'), BASE) &&
+    same(grassColor(BASE, ''), BASE) &&
+    same(grassColor(BASE, 'green'), BASE);
+  check(
+    'unknown phases never brown',
+    ok,
+    'only the two phases with a measured meaning ("shoulder", "dormant") move the colour; anything else keeps the class green'
   );
 }
 

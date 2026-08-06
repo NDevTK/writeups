@@ -1,6 +1,6 @@
 // Reference gate for forest.js (node forest-reference.mjs): the OSM
-// leaf_type/leaf_cycle + month/latitude -> phenology-grounded canopy
-// colour, held to the real taginfo tags and leaf-optics behaviour.
+// leaf_type/leaf_cycle + the MEASURED phenophase -> canopy colour,
+// held to the real taginfo tags and leaf-optics behaviour.
 //
 //  - kind resolution matches REAL OSM data: broadleaved(+deciduous) is
 //    the seasonal case, needleleaved -> conifer, mixed, palm/broadleaf
@@ -8,8 +8,12 @@
 //    still resolves.
 //  - the phenology is right: deciduous is dark green in summer, GOLD in
 //    autumn (red leads), grey-brown bare in winter, brighter green in
-//    spring; conifer/evergreen stay green year-round; the autumn window
-//    shifts earlier at high latitude and +6 months in the south.
+//    spring; conifer/evergreen stay green year-round.
+//  - NO CALENDAR: month and latitude are gone as arguments. The phase
+//    comes from phenology.js's reading of the pixel's own MCD12Q2
+//    amplitude crossings, and no measured phase means no season drawn
+//    - the canopy holds summer green rather than being run through a
+//    guessed year.
 //  - every colour sits in the scene's dark forest-albedo space (all
 //    channels well under 1), and green canopies are green-dominant.
 import {
@@ -17,8 +21,7 @@ import {
   SCENE_SCALE,
   forestAlbedoFromTags,
   forestColor,
-  forestKind,
-  phenophase
+  forestKind
 } from './forest.js';
 
 let fail = 0;
@@ -57,11 +60,10 @@ const inScene = (c) => c.every((v) => v >= 0 && v < 0.5); // dark albedo space
 {
   // Deciduous phenology (mid-latitude temperate ~47N): dark green in
   // summer, GOLD in autumn, grey-brown bare in winter, green in spring.
-  const lat = 47;
-  const summer = forestColor('broadleaved', 'deciduous', 7, lat);
-  const autumn = forestColor('broadleaved', 'deciduous', 10, lat);
-  const winter = forestColor('broadleaved', 'deciduous', 1, lat);
-  const spring = forestColor('broadleaved', 'deciduous', 4, lat);
+  const summer = forestColor('broadleaved', 'deciduous', 'summer');
+  const autumn = forestColor('broadleaved', 'deciduous', 'autumn');
+  const winter = forestColor('broadleaved', 'deciduous', 'bare');
+  const spring = forestColor('broadleaved', 'deciduous', 'spring');
   const ok =
     greenLed(summer) &&
     inScene(summer) &&
@@ -83,9 +85,9 @@ const inScene = (c) => c.every((v) => v >= 0 && v < 0.5); // dark albedo space
 {
   // Conifer / evergreen stay green year-round (winter only duller);
   // broadleaf evergreen has no autumn gold.
-  const cSummer = forestColor('needleleaved', '', 7, 47);
-  const cWinter = forestColor('needleleaved', '', 1, 47);
-  const evgAutumn = forestColor('broadleaved', 'evergreen', 10, 47);
+  const cSummer = forestColor('needleleaved', '', 'summer');
+  const cWinter = forestColor('needleleaved', '', 'bare');
+  const evgAutumn = forestColor('broadleaved', 'evergreen', 'autumn');
   const ok =
     greenLed(cSummer) &&
     greenLed(cWinter) && // conifer green even in winter
@@ -100,23 +102,29 @@ const inScene = (c) => c.every((v) => v >= 0 && v < 0.5); // dark albedo space
 }
 
 {
-  // Latitude & hemisphere: autumn comes earlier at high latitude, and
-  // the whole calendar shifts +6 months in the southern hemisphere.
-  const borealSep = phenophase(9, 62); // boreal: Sep is autumn
-  const tempSep = phenophase(9, 47); // temperate: Sep still summer
-  const tempOct = phenophase(10, 47); // temperate: Oct is autumn
-  const southApr = phenophase(4, -45); // S. temperate: Apr = autumn
-  const southOct = phenophase(10, -45); // S. temperate: Oct = spring/summer
+  // No measured phase means the canopy is NOT run through a season.
+  // This is the whole point of deleting the calendar: an unknown
+  // season must look like summer green, not like a guessed October.
+  const summer = forestColor('broadleaved', 'deciduous', 'summer');
+  const unknown = forestColor('broadleaved', 'deciduous');
+  const nulled = forestColor('broadleaved', 'deciduous', null);
+  const conifUnknown = forestColor('needleleaved', '');
+  const conifGreen = forestColor('needleleaved', '', 'summer');
+  const same = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-12);
+  // A month number in the phase slot must be INERT - the proof the
+  // calendar is gone rather than merely unused, since every old call
+  // site passed a month and a latitude there.
   const ok =
-    borealSep === 'autumn' &&
-    tempSep === 'summer' &&
-    tempOct === 'autumn' &&
-    southApr === 'autumn' &&
-    (southOct === 'spring' || southOct === 'summer');
+    same(unknown, summer) &&
+    same(nulled, summer) &&
+    same(conifUnknown, conifGreen) &&
+    [1, 4, 7, 10].every((m) =>
+      same(forestColor('broadleaved', 'deciduous', m), summer)
+    );
   check(
-    'latitude + hemisphere phenology',
+    'no calendar behind it',
     ok,
-    'boreal autumn in Sep, temperate in Oct; southern hemisphere autumn in Apr, growing in Oct'
+    'forestColor takes (leafType, leafCycle, phase); with no measured phase the canopy holds summer green and the conifer holds its green, and passing a month number - 1, 4, 7, 10, what every old call site sent - moves nothing at all'
   );
 }
 
@@ -126,10 +134,9 @@ const inScene = (c) => c.every((v) => v >= 0 && v < 0.5); // dark albedo space
   // albedo); the SCENE_SCALE keeps everything in the dark albedo space.
   const tagged = forestAlbedoFromTags(
     {leaf_type: 'broadleaved', leaf_cycle: 'deciduous'},
-    10,
-    47
+    'autumn'
   );
-  const tagless = forestAlbedoFromTags({}, 10, 47);
+  const tagless = forestAlbedoFromTags({}, 'autumn');
   let allDark = true;
   for (const t of Object.values(FOREST_SRGB))
     for (const c of Object.values(t))
@@ -148,6 +155,33 @@ const inScene = (c) => c.every((v) => v >= 0 && v < 0.5); // dark albedo space
     `leaf_type=broadleaved+deciduous in Oct -> gold; tagless -> null; ${
       Object.keys(FOREST_SRGB).length
     } kinds, all sRGB well-formed; SCENE_SCALE ${SCENE_SCALE}`
+  );
+}
+
+{
+  // The alpine August that motivated the whole change. MODIS put the
+  // Grindelwald pixel between maturity (14 Jul 2023) and senescence
+  // (15 Sep), so August is 'summer' - while the Hopkins shift the
+  // drawn canopies used to run had it 87% of the way into autumn
+  // colour. The measured phase must reach the table's summer green
+  // exactly, and must be nowhere near the autumn gold.
+  const tags = {leaf_type: 'broadleaved', leaf_cycle: 'deciduous'};
+  const measuredAug = forestAlbedoFromTags(tags, 'summer');
+  const autumn = forestAlbedoFromTags(tags, 'autumn');
+  const same = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-12);
+  check(
+    'the alpine August',
+    same(measuredAug, forestColor('broadleaved', 'deciduous', 'summer')) &&
+      greenLed(measuredAug) &&
+      goldLed(autumn) &&
+      !same(measuredAug, autumn),
+    `a measured August canopy is ${measuredAug
+      .map((v) => v.toFixed(2))
+      .join('/')} - green-led summer, not the ${autumn
+      .map((v) => v.toFixed(2))
+      .join(
+        '/'
+      )} gold that a 4-days-per-degree calendar shift produced at 1034 m`
   );
 }
 

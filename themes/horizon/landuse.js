@@ -160,8 +160,29 @@ export const GRASS_CLASSES = new Set([
  * `month`/`lat`; an unrecognised or absent tag keeps the flat class
  * albedo, so the tagless default is unchanged.
  */
-export function parseLanduse(json, minSpanM = 60, cap = 400, month = 0, lat) {
+export function parseLanduse(
+  json,
+  minSpanM = 60,
+  cap = 400,
+  month = 0,
+  lat,
+  pheno = null
+) {
   const out = [];
+  // The MEASURED phenophases for the pixel under the camera, already
+  // resolved by phenology.js (this module stays calendar-agnostic):
+  // {grass, forest}. Either may be absent, and then the grass and
+  // canopy are simply not put through a season - there is no month
+  // list left behind them to answer instead.
+  //
+  // Crops are the one deliberate exception, and keep their `month`:
+  // a cropland cycle turns on sowing and harvest dates that the
+  // phenometrics do not distinguish (the guide warns that two
+  // retrieved cycles are not guaranteed to be two cropping cycles),
+  // so crops.js keeps its own agronomic calendar until that is
+  // replaced by something measured rather than merely by nothing.
+  const gPhase = pheno && pheno.grass;
+  const fPhase = pheno && pheno.forest;
   for (const el of (json && json.elements) || []) {
     const tags = el.tags || {};
     const cls = tags.landuse || tags.natural;
@@ -170,11 +191,11 @@ export function parseLanduse(json, minSpanM = 60, cap = 400, month = 0, lat) {
     if (month && CROP_HOSTS.has(cls)) {
       const crop = cropAlbedoFromTags(tags, month, lat);
       if (crop) albedo = crop;
-    } else if (month && FOREST_HOSTS.has(cls)) {
-      const canopy = forestAlbedoFromTags(tags, month, lat);
+    } else if (FOREST_HOSTS.has(cls)) {
+      const canopy = forestAlbedoFromTags(tags, fPhase);
       if (canopy) albedo = canopy;
-    } else if (month && GRASS_CLASSES.has(cls)) {
-      albedo = grassColor(albedo, month, lat);
+    } else if (gPhase && GRASS_CLASSES.has(cls)) {
+      albedo = grassColor(albedo, gPhase);
     }
     let rings = null;
     if (el.type === 'way' && el.geometry && el.geometry.length >= 4) {

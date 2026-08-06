@@ -3412,7 +3412,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   law at full saturation (x0.5006), both pieces already cited;
   ways + relations; a SURFACE class (alpine bogs), so it
   survives the rock bands; identity landmark. (2) Waterfalls:
-  waterway=waterfall nodes with a MEASURED height=* render as a
+  waterway=waterfall nodes with a MEASURED height=\* render as a
   whitewater curtain down the exact asinh datum - no height, no
   curtain; width = the rivers' gated Leopold exponent on the
   live GloFAS ratio (re-exported); parse + reuse landmarks.
@@ -3464,7 +3464,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   floor, annulus ratio 6.7x vs Baumbach 5.7x through the AgX toe.
   Scope: K/F split, streamers, Ludendorff flattening. 80 sets.
 - DONE (shallow-regime pass + two owned corrections, Aug 6): the
-  new per-ship wake instrumentation (?debug __ships: uMs, depth,
+  new per-ship wake instrumentation (?debug \_\_ships: uMs, depth,
   Frh, drawn wedge) caught two defects in the first wake commit.
   (1) The depth source read the dressed sample().e (~0 over
   water) and the 0.5 m floor INVENTED supercritical cones for
@@ -3685,6 +3685,89 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   reaches the page through shoot.mjs's curl routing; view-serve's
   /eval + /panel verified the veglod pools and the provenance
   rows in-session.
+- DONE (measured phenology replaces three guessed calendars, and
+  the guesses are DELETED not demoted, Aug 6): the theme decided
+  when leaves came out and when grass cured from latitude
+  arithmetic in three separate places - grassland.js and forest.js
+  each carried hardcoded month lists per latitude band, and the
+  drawn tree canopies ran Hopkins' bioclimatic law. Hopkins is a
+  real rule but it is a SHIFT on a fixed reference calendar, and
+  its own arithmetic shows where it breaks: autumn tint starts at
+  senescence (day 265 - hop) while maturity needs 45 days from
+  leaf-out (105 + hop), so the two cross once hop > 57.5 - above
+  824 m at 46.6 deg N. At Grindelwald's 1034 m that put 6 August
+  87% of the way into autumn colour.
+  MCD12Q2 (MODIS Land Cover Dynamics) measures it instead, per
+  500 m pixel per year since 2001, on the ORNL DAAC point service
+  the NDVI and reflectance feeds already ride (keyless, CORS-open,
+  same ndviCell snap re-exported not re-derived).
+  Reading the RIGHT primary source mattered and cost a correction
+  mid-pass: the first document read was the Collection 6 guide
+  (Gray, Sulla-Menashe & Friedl, Jan 2019), but ORNL serves
+  product years through 2024, which is C6.1 - so the governing
+  text is the Collection 6.1 user guide (14 Mar 2022, LP DAAC doc
+  1417). Every gated number was re-checked against that edition.
+  They agree throughout - Table 1, the 15/50/90% definitions,
+  Figure 2's bit packing, Table 2's worked QA values - but C6.1
+  fixes spuriously early greenup from a spline discontinuity
+  across calendar years and targets generation 6 months after a
+  year ends, not 12.
+  What the product actually gives is not labels but a curve: each
+  dated metric is the crossing of a KNOWN fraction of the cycle's
+  own EVI2 amplitude (15/50/90% up, 90/50/15% down), so the seven
+  (date, level) knots reconstruct the pixel's season shape with
+  nothing invented. Section 3.2 tells users to prefer the stable
+  50% crossings for season start/end, so the green season is
+  bounded by MidGreenup/MidGreendown and the 15% ones only open
+  and close the shoulder. The up-leg and down-leg amplitudes are
+  defined differently (peak minus segment start vs peak minus
+  segment end), so the knots are a normalised SHAPE and nothing
+  converts them back to absolute EVI2.
+  Two facts the service taught that no document did: it serves 23
+  bands and Peak IS NOT one of them though Table 1 lists the SDS,
+  so no Peak band is requested and the level-1.0 knot is simply
+  absent rather than guessed (Peak still holds bits 6-7 of
+  QA_Detailed, so it stays in the key order); and the product runs
+  far enough behind that a measured season must be carried onto
+  the drawn year by WHOLE calendar years (month and day preserved,
+  no 365.2425 drift), trying three shifts because C6.1 files a
+  cycle under the year of its Peak and a southern season straddles
+  the new year.
+  NO FALLBACK, on the owner's call. The month lists and Hopkins
+  are removed, not kept behind the measured path: a guess kept as
+  a backstop is still drawn and still wrong. The product's own
+  retrieval test (amplitude >= 0.1 AND >= 35% of the three-year
+  range) IS the measurement of whether a pixel has a season, so no
+  cycle means no seasonal modulation - grass keeps its class
+  green, canopies hold summer. That deleted the 26-40 deg
+  amplitude ramp and the 52 deg straw/olive split with their
+  calendar, and GRASS_OLIVE with them: it existed to soften a
+  maritime winter the calendar browned wrongly, and a measured
+  dormancy needs no apology. Crops keep their agronomic calendar
+  as a documented exception - a cropland cycle turns on sowing and
+  harvest dates the phenometrics do not distinguish, and the guide
+  warns two retrieved cycles are not guaranteed to be two cropping
+  cycles.
+  The gates caught two of my own wrong assertions, both worth
+  keeping: dry grass is measurably BRIGHTER in every channel
+  including green (ECOSTRESS ~14/21/32% vs green grass's 4-11%),
+  so cured turf lifts its green rather than dropping it, and a
+  function's arity stops counting at the first default parameter -
+  replaced with the stronger claim that a month number in the
+  phase slot is now completely inert.
+  Browser-verified at Grindelwald under SwiftShader: nine live
+  ORNL requests all 200, resolving product year A2024001 at the
+  snapped cell; the measured 2024 season (greenup 5 Mar, half-green
+  4 Apr, mature 31 May, senescing 6 Sep, half-down 9 Oct, dormant
+  3 Nov; EVI2 amplitude 0.4675, QA 0 = best) carried onto 2026
+  keeping every month and day; 6 August reads grass "green",
+  canopy "summer"; every drawn canopy material green-dominant with
+  no autumn gold. Re-run with ?pheno=0 the canopy set is
+  byte-identical - no data, no season, where the old code would
+  have gilded them.
+  10 landmarks in phenology-reference.mjs (83 sets now), including
+  Figure 2's 14409 and all five Table 2 rows decoded exactly.
+  Left open: the aureole pass, still not started.
 - DONE (sky parallax: the celestial group rides with the camera,
   Jul 11): the sunspot verification's "pose aims 1.35 deg high"
   was neither the pose nor the ephemeris - the camera provably

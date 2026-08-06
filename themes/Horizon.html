@@ -483,6 +483,17 @@
         MOD09_BANDS,
         MOD09_STATE_BAND
       } from './horizon/modis-land.js';
+      import {
+        epochDay,
+        parsePhenoRaw,
+        PHENO_BANDS,
+        phenoAlign,
+        phenoCycle,
+        phenoDatesUrl,
+        phenoForestPhase,
+        phenoGrassPhase,
+        phenoUrl
+      } from './horizon/phenology.js';
       import {etageCovers, pickStation, visibilityM} from './horizon/metar.js';
       import {
         channelSet,
@@ -1792,21 +1803,138 @@
       // actually are (landuse.js, gated - raster vs pointwise
       // even-odd, paint order, shader row orientation). Cached
       // geodetic per anchor; roams re-project. ?landuse=0
+      // The MEASURED growing calendar for the pixel under the camera.
+      // MCD12Q2 (MODIS Land Cover Dynamics, C6) records the dates this
+      // 500 m pixel's own NBAR-EVI2 crossed 15/50/90% of its seasonal
+      // amplitude, so the theme no longer has to guess when the grass
+      // cures or the leaves come out from latitude arithmetic. Same
+      // ORNL DAAC point service, same cell snap and same two-step
+      // (/dates then /subset) as the NDVI and reflectance feeds -
+      // keyless, CORS-open, fetched straight from the browser. The
+      // product runs about eighteen months behind, so phenology.js
+      // carries the newest measured season onto the drawn year by
+      // whole calendar years. ?pheno=0 disables (the latitude month
+      // lists and Hopkins' law answer as before).
+      let phenoCyc = null;
+      // Set whenever there is no measured season to draw, so the
+      // canopies are put back to their base summer colour exactly
+      // once instead of being lerped along a calendar nobody observed.
+      let phenoSeasonOff = true;
+      let phenoReady = Promise.resolve();
+      let phenoDateCache = {t: 0, date: ''};
+      async function syncPhenology() {
+        if (params.get('pheno') === '0') return;
+        phenoReady = (async () => {
+          try {
+            const cell = ndviCell(state.lat, state.lon);
+            const opt = {credentials: 'omit'};
+            if (
+              !phenoDateCache.date ||
+              Date.now() - phenoDateCache.t > 24 * 3600e3
+            ) {
+              const r = await fetch(phenoDatesUrl(cell), opt);
+              if (!r.ok) throw new Error('ornl pheno dates ' + r.status);
+              const date = ndviDate(await r.json());
+              if (!date) throw new Error('ornl pheno dates shape');
+              phenoDateCache = {t: Date.now(), date};
+            }
+            const date = phenoDateCache.date;
+            const keys = Object.keys(PHENO_BANDS);
+            const vals = await Promise.all(
+              keys.map(async (k) => {
+                const r = await fetch(
+                  phenoUrl(cell, date, PHENO_BANDS[k]),
+                  opt
+                );
+                if (!r.ok) throw new Error('ornl pheno ' + r.status);
+                return parsePhenoRaw(await r.json());
+              })
+            );
+            const raw = {};
+            keys.forEach((k, i) => (raw[k] = vals[i]));
+            const cyc = phenoCycle(raw);
+            phenoCyc = cyc;
+            if (!cyc) phenoSeasonOff = true;
+            if (cyc) {
+              const d = (n) =>
+                new Date(n * 86400000).toISOString().slice(0, 10);
+              record(
+                'MODIS phenology (MCD12Q2)',
+                date.slice(1, 5) +
+                  ' season ' +
+                  d(cyc.midGreenup) +
+                  ' to ' +
+                  d(cyc.midGreendown) +
+                  ', EVI2 amplitude ' +
+                  cyc.amplitude.toFixed(3) +
+                  ', QA ' +
+                  cyc.qa
+              );
+            }
+          } catch {
+            // No measured season: nothing seasonal is drawn. There is
+            // no latitude calendar left to fall back to.
+            phenoCyc = null;
+            phenoSeasonOff = true;
+          }
+        })();
+        await phenoReady;
+      }
+      // The measured phases for right now, or nulls when there is no
+      // usable cycle (ocean, poor QA, or a pixel whose EVI2 swing is
+      // below the product's own 0.1 validity floor - all cases where
+      // the latitude heuristic is the honest answer).
+      function phenoPhases() {
+        if (!phenoCyc) return null;
+        const day = epochDay(now());
+        return {
+          grass: phenoGrassPhase(phenoCyc, day),
+          forest: phenoForestPhase(phenoCyc, day)
+        };
+      }
+      // Harness hook, like __ships: the measured season and the phases
+      // it puts the scene in right now.
+      window.__pheno = () => {
+        if (!phenoCyc) return {cycle: null, phases: null};
+        const iso = (n) =>
+          n == null ? null : new Date(n * 86400000).toISOString().slice(0, 10);
+        const a = phenoAlign(phenoCyc, epochDay(now()));
+        return {
+          cycle: Object.fromEntries(
+            Object.entries(phenoCyc).map(([k, v]) => [
+              k,
+              k === 'amplitude' || k === 'qa' ? v : iso(v)
+            ])
+          ),
+          drawnYear: Object.fromEntries(
+            ['greenup', 'midGreenup', 'maturity', 'senescence', 'dormancy'].map(
+              (k) => [k, iso(a[k])]
+            )
+          ),
+          phases: phenoPhases()
+        };
+      };
+
       // disables; unknown classes stay base grass.
       let landGeo = null;
       async function syncLanduse() {
         if (params.get('landuse') === '0') return;
         // Month drives the crop canopy colour (rape yellow in spring,
         // wheat gold in summer), so it is part of the cache key -
-        // otherwise an April field would stay yellow all year.
+        // otherwise an April field would stay yellow all year. The
+        // MEASURED phases join it for the same reason: a cached parse
+        // carries the colours it was parsed with.
         const cropMonth = now().getUTCMonth() + 1;
+        await phenoReady;
+        const ph = phenoPhases();
         const key =
           'horizon-landuse-geo-' +
           state.lat.toFixed(2) +
           ',' +
           state.lon.toFixed(2) +
           ',m' +
-          cropMonth;
+          cropMonth +
+          (ph ? ',p' + ph.grass[0] + ph.forest[0] : '');
         try {
           const hit = await geoGet(key);
           if (hit) {
@@ -1852,7 +1980,8 @@
             60,
             Infinity,
             cropMonth,
-            state.lat
+            state.lat,
+            ph
           );
           record(
             'OSM Overpass landuse',
@@ -7705,6 +7834,7 @@
         syncChlor();
         syncRrs();
         syncSurface();
+        syncPhenology();
         syncBuildings();
         syncRoads();
         syncRivers();
@@ -9899,28 +10029,44 @@
           opticsMoonU.dogs.value = dogOnMoon ? 1 : 0;
         }
 
-        // Deciduous phenology: Hopkins' bioclimatic law shifts the leaf
-        // calendar ~4 days per degree of latitude and per 122m of
-        // elevation; the southern hemisphere is half a year out of phase.
-        let doy = (d.getTime() - Date.UTC(d.getUTCFullYear(), 0, 0)) / 86400000;
-        if (state.lat < 0) doy = (doy + 182.5) % 365;
-        const hop = 4 * (Math.abs(state.lat) - 39) + centerElev / 30.5;
-        const leafOut = 105 + hop;
-        const senesce = 265 - hop;
-        const frac = (x, a, b) =>
-          THREE.MathUtils.clamp((x - a) / (b - a), 0, 1);
-        const spring = frac(doy, leafOut, leafOut + 18);
-        const mature = frac(doy, leafOut + 18, leafOut + 45);
-        const fall = frac(doy, senesce, senesce + 20);
-        const drop = frac(doy, senesce + 25, senesce + 45);
-        broadMats.forEach((m, i) => {
-          m.color
-            .copy(cBare)
-            .lerp(cSpring, spring)
-            .lerp(broadBases[i], spring * mature)
-            .lerp(cAutumn, fall)
-            .lerp(cBare, drop);
-        });
+        // Deciduous phenology, MEASURED. MCD12Q2 dates this pixel's own
+        // EVI2 amplitude crossings, so each of the four canopy ramps is
+        // bounded by two measured dates: leaf-out over the 15%->50%
+        // rise, maturity over 50%->90%, colour over the 90%->50% fall,
+        // leaf drop over 50%->15%. No offsets are invented.
+        //
+        // This replaced Hopkins' bioclimatic law (leaf-out at day 105
+        // shifted 4 days per degree of latitude and per 122 m of
+        // elevation, senescence at 265 shifted back the same). Hopkins
+        // is a real rule but it is a SHIFT on a fixed reference
+        // calendar, and once the shift passes 57.5 days - above about
+        // 824 m at 46.6 deg N - it starts autumn before the canopy has
+        // finished maturing: that is how a Grindelwald August came out
+        // 87% into autumn colour. It is deleted, not kept as a
+        // fallback. With no measured cycle the canopies simply hold
+        // their summer base colour rather than being run through a
+        // season nobody observed.
+        const pc = phenoCyc && phenoAlign(phenoCyc, epochDay(d));
+        if (pc && pc.greenup != null && pc.dormancy != null) {
+          const frac = (x, a, b) =>
+            THREE.MathUtils.clamp((x - a) / (b - a), 0, 1);
+          const t = epochDay(d);
+          const spring = frac(t, pc.greenup, pc.midGreenup);
+          const mature = frac(t, pc.midGreenup, pc.maturity);
+          const fall = frac(t, pc.senescence, pc.midGreendown);
+          const drop = frac(t, pc.midGreendown, pc.dormancy);
+          broadMats.forEach((m, i) => {
+            m.color
+              .copy(cBare)
+              .lerp(cSpring, spring)
+              .lerp(broadBases[i], spring * mature)
+              .lerp(cAutumn, fall)
+              .lerp(cBare, drop);
+          });
+        } else if (phenoSeasonOff) {
+          phenoSeasonOff = false;
+          broadMats.forEach((m, i) => m.color.copy(broadBases[i]));
+        }
 
         // Physical snow: lazily boot Rapier the first time it really
         // snows, then step the world once per frame.
@@ -10484,6 +10630,7 @@
         // MOD09A1 is an 8-day composite; the same hourly poll (matching
         // the /surface cache) more than covers it.
         syncSurface();
+        syncPhenology();
         setInterval(syncSurface, 60 * 60 * 1000);
         syncBuildings();
         syncRoads();

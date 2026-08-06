@@ -92,70 +92,41 @@ export function forestKind(leafType, leafCycle) {
   return null;
 }
 
-const wrapMonth = (m) => ((((m - 1) % 12) + 12) % 12) + 1;
-
-// The phenophase (spring/summer/autumn/bare) of a deciduous canopy at
-// a month and latitude. Higher |lat| pulls autumn earlier and spring
-// later (a shorter growing season); the southern hemisphere shifts the
-// whole calendar +6 months. Windows are mid-latitude temperate defaults
-// (MODIS/VIIRS land-surface phenology; USA-NPN), bucketed by latitude.
-export function phenophase(month, lat) {
-  let m = month;
-  if (Number.isFinite(lat) && lat < 0) m = wrapMonth(m + 6);
-  const a = Math.abs(Number.isFinite(lat) ? lat : 45);
-  let spring, summer, autumn;
-  if (a >= 55) {
-    // boreal / high latitude: brief summer, early autumn
-    spring = [5, 6];
-    summer = [7, 8];
-    autumn = [9];
-  } else if (a <= 38) {
-    // warm temperate: long season, late autumn
-    spring = [3, 4];
-    summer = [5, 6, 7, 8, 9, 10];
-    autumn = [11];
-  } else {
-    // mid-latitude temperate
-    spring = [4, 5];
-    summer = [6, 7, 8, 9];
-    autumn = [10];
-  }
-  if (spring.includes(m)) return 'spring';
-  if (summer.includes(m)) return 'summer';
-  if (autumn.includes(m)) return 'autumn';
-  return 'bare';
-}
-
+// The phenophase used to be guessed here from month and latitude -
+// spring/summer/autumn windows bucketed into three latitude bands.
+// It is now MEASURED for the pixel under the camera (phenology.js
+// phenoForestPhase, off the MCD12Q2 EVI2 amplitude crossings), and
+// the guess is deleted rather than kept as a backstop: without a
+// measured phase the canopy is simply not put through a season.
 const scale = (c) => [
   c[0] * SCENE_SCALE,
   c[1] * SCENE_SCALE,
   c[2] * SCENE_SCALE
 ];
 
-// The canopy albedo for a forest of the given structure at a month and
-// latitude, or null if the tags say nothing usable. Conifer/evergreen
-// stay green (conifer duller in winter); deciduous and mixed run the
-// full phenophase cycle; leafless is a constant sparse brown-green.
-export function forestColor(leafType, leafCycle, month, lat) {
+// The canopy albedo for a forest of the given structure at the
+// MEASURED phenophase, or null if the tags say nothing usable.
+// `phase` is phenology.js's reading of the pixel's own MCD12Q2 EVI2
+// amplitude crossings: 'spring' on the green-up ramp, 'summer' across
+// the >=90% plateau, 'autumn' on the green-down ramp, 'bare' outside
+// the season. Conifer/evergreen stay green (conifer duller only when
+// the pixel is measurably bare); deciduous and mixed run the full
+// cycle. No phase - no usable cycle for this pixel - means summer
+// green, the truthful unknown, NOT a calendar guess.
+export function forestColor(leafType, leafCycle, phase = null) {
   const kind = forestKind(leafType, leafCycle);
   if (!kind) return null;
   const t = FOREST_SRGB[kind];
-  if (kind === 'conifer') {
-    const winter = month && phenophase(month, lat) === 'bare';
-    return scale(winter ? t.winter : t.green);
-  }
+  if (kind === 'conifer') return scale(phase === 'bare' ? t.winter : t.green);
   if (kind === 'broadleaf_evergreen' || kind === 'leafless')
     return scale(t.green);
-  // deciduous / mixed: seasonal. No month -> summer green (the
-  // truthful default when the calendar is unknown).
-  const ph = month ? phenophase(month, lat) : 'summer';
-  return scale(t[ph]);
+  return scale(t[phase] || t.summer);
 }
 
-// The one call landuse.js makes: an OSM tags object + month + latitude
-// -> the forest canopy albedo, or null (caller keeps the flat forest
-// class albedo when the leaf tags are absent/unusable).
-export function forestAlbedoFromTags(tags, month, lat) {
+// The one call landuse.js makes: an OSM tags object + the measured
+// phenophase -> the forest canopy albedo, or null (caller keeps the
+// flat forest class albedo when the leaf tags are absent/unusable).
+export function forestAlbedoFromTags(tags, phase = null) {
   if (!tags) return null;
-  return forestColor(tags.leaf_type, tags.leaf_cycle, month, lat);
+  return forestColor(tags.leaf_type, tags.leaf_cycle, phase);
 }
