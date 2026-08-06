@@ -4,7 +4,8 @@ Offline, deterministic harness for `themes/Horizon.html` on
 `WebGPURenderer` — real WebGPU (Dawn) via SwiftShader Vulkan. The
 build is WebGPU-only (the WebGL2 backend - and with it A/B testing -
 was deleted); correctness rests on the CPU double-precision
-references (`../*-reference.mjs`) and the numeric probe pages that
+references (`../*-reference.mjs` - 77 sets, all run by
+`validate.sh`) and the numeric probe pages that
 read GPU texels back against them; the pinned matrix is a
 smoke/visual run. Every architectural choice here was forced by a
 measured failure; the full list and the matrix history live in
@@ -35,8 +36,9 @@ Pieces:
   at a Chrome for Testing binary
   (`npx @puppeteer/browsers install chrome@stable`).
 - `validate.sh` — the reference-first gate and the ONE correctness
-  entrypoint: all six CPU double-precision references, then the
-  GPU-vs-reference probes asserting texels at the reference values.
+  entrypoint: every CPU double-precision reference (77 sets), then
+  the GPU-vs-reference probes asserting texels at the reference
+  values.
   Nothing compares one render against another.
 - `sweep-pin.sh` — the eight-scene pinned smoke matrix on WebGPU
   (PAGEERROR detection + visual inspection).

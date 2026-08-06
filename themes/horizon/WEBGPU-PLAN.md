@@ -3406,6 +3406,108 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (one solar disc, convolved exactly once, Aug 6): the solar
+  radius lived as five literals (0.266 in halos.js caustic and the
+  rainbow kernel, 0.267 in optics-lut and snow-glints prose,
+  acos(0.9999893) in refraction.js) while eclipses.js proved the
+  true disc swings +-1.7%. eclipses.js now exports
+  sunAngularRadiusRad/moonAngularRadiusRad (IAU radii over the
+  true distance) and the caustic/bow/LUT paths derive from it. The
+  REAL bug found on the way: parhelionProfile fed caustic() -
+  already 5-point disc-smeared - into buildDogLUT's limb-darkened
+  sunConvolve, so the dogs shipped ~sqrt(2) wide and the gate
+  (position + cutoff only) could not see it. parhelionProfile now
+  integrates the RAW 1/sqrt caustic exactly per bin (causticBin:
+  int x^-1/2 = 2 sqrt x - integrable divergence, no floor, no
+  smear) and the disc enters ONCE, downstream; the dog/bow
+  rebuilds take the LIVE radius from the 1 Hz ephemeris and
+  paraselenae convolve with the MOON's disc (+-7% anomalistic).
+  New 'single solar convolution' landmark pins red-dog FWHM 0.72
+  deg and demands the width answer to the radius: a re-doubled
+  smear (~1.0) or a dropped convolution (~0.4) both fail. Scoped
+  OUT, next: the DRAWN disc (atmosphere-tsl cos 0.9999893, which
+  refraction.js deliberately mirrors) is its own shader+probe
+  pass. Browser-verified: both dogs compact and coloured on the
+  22-deg ring, PAGEERROR 0.
+- DONE (Cox-Munk unification + exact MPU, Aug 6): the sea's
+  sub-grid mss was an inline 0.003+0.00512U copy - unclamped and
+  fed the 10 m wind where the paper specifies its 12.5 m mast -
+  so sea and lakes obeyed different laws in one frame. coxmunk.js
+  now exports the paper's own total fit mssTotal (clamped 1-14
+  m/s, new landmark, sigma^2(10)=0.0542 exact) and the theme
+  feeds it the same log-interpolated 12.5 m wind as uWind125, for
+  the uniform and the panel receipt alike (Monahan's whitecaps
+  deliberately stay on U10 - that fit's own height). Also
+  terrain-tsl's three 57.14 literals -> exact 400/7, closing the
+  50 ppm drift atmosphere-tsl already closed. Nelson
+  browser-verified clean.
+- DONE (veglod.js: spatial tree LOD + instanced pools, Aug 6):
+  the vegetation layer was the last count cap (140 trees,
+  first-come, ~3 draws each). veglod.js is the third LOD sibling
+  with the angle finally written down: keep a tree while its
+  DRAWN crown subtends the display's finest pixel - the exact
+  tan-mapping edge derivative 2 tan(fov/2)/H cos^2(fov/2), not
+  small-angle fov/H - floored by the Snellen observer's 1 arcmin
+  (Tipton 1984; Reddy 1997 PhD, Secs. 2.3.3/3.1.5-3.1.6: detail
+  below these thresholds "would not be available" to any later
+  stage of vision). Five landmarks: derivative vs finite
+  difference, acuity floor, closed-form keep radius roundtrip,
+  monotonicity, purity (no counter in the API). Rendering pays
+  via InstancedMesh pools (piece x material x shadow tier,
+  offsets baked, one matrix per tree; near tier casts under the
+  buildings' BLD_SHADOW_M rationale; sway spring state per
+  instance). Browser-verified at Grindelwald: 249 trees above
+  3.9' in 6 draws, recorded in the provenance panel like every
+  honest layer.
+- DONE (live-data restorations, Aug 6): four measured features
+  were dark or wrong in production. (1) radar.js decode - three
+  functions used but never imported; the first non-transparent
+  pixel threw, the catch swallowed it, radarObs.field never
+  built, setRadarCover never ran, and the panel omitted the
+  RainViewer row exactly when radar was live (the precip-rate
+  override kept working, hiding it). (2) syncTraffic bailed
+  unless Schmidt-Appleman said contrails form - but applyTraffic
+  is the SOLE feeder of airframes/liveries/navlights, so dry-250
+  days emptied the polled sky while the SSE path stayed ungated;
+  the gate moved to the contrail-slot claim where ct.forms
+  already sat. (3) runRoamSyncs omitted syncAir, syncInsolation
+  and syncOvation - the oval kept the previous meridian for up to
+  a poll interval after a hop. (4) ships.js aisToScene
+  dead-reckoned cog-or-due-north; motion now follows COG, falls
+  back to TrueHeading, and with neither measured HOLDS (new 'AIS
+  track precedence' landmark; drawing an invented due-north track
+  was the one thing no instrument reported).
+- DONE (decoder/deploy hardening + the promised gate, Aug 6):
+  grib2.js could hang the daemon's request path - a zero section
+  length never advanced the walk; it now throws, as does a
+  sub-16-byte message and (new) a non-unit template 3.0 basic
+  angle that previously DECODED SILENTLY with the 1e-6
+  assumption ('corruption fails loudly' landmark drives all three
+  through synthetic messages). update.sh's hand-kept watch list
+  had drifted (modis-land.js shipped but unwatched = stale
+  physics forever); the list is now DERIVED from install.sh's own
+  ship list, and install.sh stages index.mjs and runs the
+  unshipped-import guard BEFORE replacing the live file (a guard
+  hit used to leave /opt unloadable for the next Restart=always
+  bounce). And modis-land.js's header claimed a reference that
+  did not exist - the only module asserting a gate it lacked;
+  modis-land-reference.mjs now holds the cell snap, the exact
+  point-query URL forms, the composite pick, both scale/fill
+  decodes and the sur_refl_state_500m QA decision (Amazon 138
+  rejected, malformed state fails CLOSED). validate.sh runs 77
+  reference sets.
+- HARNESS NOTE (real WebGPU in the agent container, Aug 6): the
+  OPEN environment item resolves as predicted - a CURRENT Chrome
+  for Testing (151.0.7922.76 via setup-chrome.mjs) under xvfb
+  with SwiftShader Vulkan renders the full theme with ZERO Dawn
+  errors. The flags that matter, wrapped around the CfT binary
+  and passed as SHOOT_CHROME: --use-webgpu-adapter=swiftshader
+  --enable-features=Vulkan --use-vulkan=swiftshader
+  --disable-gpu-sandbox (without them Dawn drops its instance in
+  popErrorScope on the stock shoot.mjs flag set). Live data
+  reaches the page through shoot.mjs's curl routing; view-serve's
+  /eval + /panel verified the veglod pools and the provenance
+  rows in-session.
 - DONE (sky parallax: the celestial group rides with the camera,
   Jul 11): the sunspot verification's "pose aims 1.35 deg high"
   was neither the pose nor the ephemeris - the camera provably
