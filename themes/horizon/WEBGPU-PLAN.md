@@ -3406,6 +3406,27 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (Kelvin wakes, Aug 6): kelvin.js derives the ship-wake
+  wedge by Havelock's 1908 construction over the finite-depth
+  dispersion (stationarity c = U cos theta; rays at the group
+  speed; wedge = max ray angle) - the closed forms EMERGE and six
+  landmarks pin them: deep sin(alpha) = 1/3 exactly (Thomson
+  1887; reproduced independently through the cos^2 = 2/3 cusp),
+  Havelock widening 19.6/34.6/67.9 deg at Frh 0.6/0.9/0.99, and
+  the supercritical Mach cone sin(alpha) = 1/Frh at 1.5/2.0.
+  water-tsl draws arms + turbulent centreline as a third foam
+  source from 8 per-vessel uniform pairs; Horizon feeds every
+  moving hull per frame (measured SOG over the bathymetry's
+  tide-adjusted depth AT the vessel; beam/stern from message 5).
+  Amplitude deliberately unclaimed (hull-shape territory): the
+  brightness is display furniture with the stationary-phase
+  caustic fade, and the ~25 m transverse crests stay undrawn
+  (below the display's resolvable angle - the veglod argument).
+  Composition for free: a held (anchored/moored) hull feeds
+  nothing, so the status physics silences the wake physics.
+  Browser-verified at Nelson dusk: three moving harness vessels
+  trail arm-arm-centreline Vs at the Kelvin angle; the anchored
+  tanker and moored sailer trail NOTHING; PAGEERROR 0. 79 sets.
 - DONE (aurora sRGB matrix derived + glacier layer, Aug 6): two
   smaller items. aurora-lut.js carried the repo's LAST pasted
   XYZ->sRGB coefficient block, contradicting spectral-srgb.js's
