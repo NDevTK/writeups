@@ -3406,6 +3406,29 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (shallow-regime pass + two owned corrections, Aug 6): the
+  new per-ship wake instrumentation (?debug __ships: uMs, depth,
+  Frh, drawn wedge) caught two defects in the first wake commit.
+  (1) The depth source read the dressed sample().e (~0 over
+  water) and the 0.5 m floor INVENTED supercritical cones for
+  every hull; worse, terrarium carries NO offshore bathymetry at
+  Nelson at all (bed 0.00 m across the bay, measured through the
+  512^2 grid). Honest rule shipped: a floating hull proves only
+  depth >= draught, so with no resolved bed (> 1.5 m) the wedge
+  is the parameter-free deep Kelvin; Havelock engages only on
+  data; ?bathy=N is the labelled harness override. (2) The synth
+  fleet moved held hulls (the anchored tanker steamed at 12 kt -
+  the earlier hand-off's 'anchored ships trailed nothing' was
+  WRONG for the harness path; live aisToScene did hold). Synth
+  now rests held statuses; a resting hull's instrumentation
+  reads null. Also: fleet speed column + 34 kt planing tender,
+  and the 'Frh = 3 crossover' landmark - the Mach cone passes
+  EXACTLY through the deep Kelvin sine 1/3 at Frh 3 (wakes are
+  WIDER than Kelvin between 1 and 3, narrower only beyond).
+  Browser-verified over a forced 2.2 m harbour: 48.8 deg
+  near-critical cones at Frh 1.33 beside the tender's 15.4 deg
+  at 3.77, both exactly on the gated curve, anchored hull
+  resting. 79 sets green.
 - DONE (Kelvin wakes, Aug 6): kelvin.js derives the ship-wake
   wedge by Havelock's 1908 construction over the finite-depth
   dispersion (stationarity c = U cos theta; rays at the group
