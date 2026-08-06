@@ -78,6 +78,29 @@ const anchor = {lat: 46.6863, lon: 7.8632};
 }
 
 {
+  // natural=glacier: the MEASURED bare-ice albedo of Oerlemans &
+  // Knap (1998) - 0.34 broadband, deliberately neutral (the blue
+  // of bare ice needs a bubble scattering coefficient no one
+  // measured; a tint would be invented). The seasonal FSC field
+  // whitens the accumulation zone over this base, so the value is
+  // the paper's own ablation-zone ice.
+  const g = parseLanduse({
+    elements: [way(11, square(46.6, 8.06, 400), {natural: 'glacier'})]
+  });
+  const a = CLASS_ALBEDO.glacier;
+  check(
+    'glacier ice albedo',
+    g.length === 1 &&
+      g[0].cls === 'glacier' &&
+      g[0].albedo === a &&
+      a[0] === 0.34 &&
+      a[1] === 0.34 &&
+      a[2] === 0.34,
+    `natural=glacier parsed with the measured Morteratsch bare-ice 0.34 (Oerlemans & Knap 1998), neutral by documented choice`
+  );
+}
+
+{
   // A relation arriving as four outer segments - shuffled, two
   // reversed - stitches into one polygon (the lakes' gated path).
   const ring = square(46.687, 7.86, 300);

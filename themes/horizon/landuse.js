@@ -52,7 +52,19 @@ export const CLASS_ALBEDO = {
   bare_rock: [0.32, 0.29, 0.25],
   scree: [0.3, 0.28, 0.24],
   sand: [0.45, 0.4, 0.3],
-  beach: [0.45, 0.4, 0.3]
+  beach: [0.45, 0.4, 0.3],
+  // natural=glacier: MEASURED bare-ice albedo 0.34 - the fitted
+  // ice value of Oerlemans & Knap (1998, J. Glaciol. 44(147),
+  // 231-238; snow 0.75 / firn 0.53 / ice 0.34 from a full year on
+  // Morteratschgletscher's ablation zone, read from the paper).
+  // Neutral on purpose: bare ice reads bluish because red absorbs
+  // (Warren & Brandt 2008), but the tint's magnitude needs the
+  // bubble scattering coefficient nobody measured here - a neutral
+  // triple at the measured broadband invents nothing. The seasonal
+  // MODIS FSC field paints measured snow OVER this base, so the
+  // accumulation zone whitens where snow is actually seen and the
+  // late-summer tongue shows bare ice - the paper's own zonation.
+  glacier: [0.34, 0.34, 0.34]
 };
 
 // Equirectangular span check (like parseWater's) - features under

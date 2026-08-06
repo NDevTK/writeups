@@ -1826,7 +1826,13 @@
               b +
               ');relation[landuse](' +
               b +
-              ');way[natural~"^(grassland|sand|beach|scree|bare_rock|wood)$"](' +
+              ');way[natural~"^(grassland|sand|beach|scree|bare_rock|wood|glacier)$"](' +
+              b +
+              // Alpine glaciers are frequently multipolygon
+              // RELATIONS (the ways are just their edges);
+              // parseLanduse already stitches relation rings via
+              // the lakes' gated endpoint matching.
+              ');relation[natural=glacier](' +
               b +
               '););out geom;',
             DEM_HALF_M,
