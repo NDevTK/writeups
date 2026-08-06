@@ -339,7 +339,14 @@
       import {shadowRate, sigmaScale, vRms} from './horizon/cn2.js';
       import {EYE_D_CM, youngSigma} from './horizon/scintillation.js';
       import {buildMomentPyramid, slopesFromHeights} from './horizon/leadr.js';
-      import {metresPerPixel, tileAt, windowStats} from './horizon/radar.js';
+      import {
+        decodeRed,
+        metresPerPixel,
+        rainRate,
+        snowRate,
+        tileAt,
+        windowStats
+      } from './horizon/radar.js';
       import {geomagneticLatitude, igrfField} from './horizon/igrf.js';
       import {HorizonWaterMesh} from './horizon/water-tsl.js';
       import {createOceanFFT} from './horizon/ocean-tsl.js';
