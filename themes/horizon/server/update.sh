@@ -33,11 +33,17 @@ LAST=$(cat "$STATE" 2>/dev/null || echo none)
 [ "$NEW" = "$LAST" ] && exit 0
 
 CUR=$(git rev-parse HEAD)
+# The shared-module watch list is DERIVED from install.sh's own ship
+# list, so the two can never drift again: a module install.sh ships
+# but this diff did not watch would deploy stale physics forever
+# (modis-land.js was exactly that). A ship-list change itself lands
+# under themes/horizon/server, which stays watched explicitly.
+mapfile -t SHIPPED < <(sed -n \
+  's#^install -m 644 \.\./\([a-z0-9-]*\.js\) .*#themes/horizon/\1#p' \
+  themes/horizon/server/install.sh)
 CHANGED=$(git diff --name-only "$CUR" "$NEW" -- \
   themes/horizon/server \
-  themes/horizon/lightning.js themes/horizon/solarwind.js \
-  themes/horizon/metar.js themes/horizon/smoke.js \
-  themes/horizon/grib2.js themes/horizon/aerosol.js \
+  "${SHIPPED[@]}" \
   themes/horizon/'*-reference.mjs' \
   themes/horizon/harness/validate.sh 2>/dev/null || echo forced)
 git checkout --quiet "$NEW"

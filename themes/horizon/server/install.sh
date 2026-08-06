@@ -31,7 +31,11 @@ fi
 # geometry and the solar-wind physics, so ship those files too.
 mkdir -p /opt/horizon-live
 rm -rf /opt/horizon-live/worker
-install -m 644 src/index.mjs /opt/horizon-live/index.mjs
+# Stage the entry point BESIDE the live one: the drift guard below
+# must run before anything replaces /opt/horizon-live/index.mjs,
+# or a guard hit leaves an unloadable file in place and the next
+# Restart=always bounce crash-loops the running service.
+install -m 644 src/index.mjs /opt/horizon-live/index.mjs.new
 install -m 644 ../lightning.js /opt/horizon-live/lightning.js
 install -m 644 ../solarwind.js /opt/horizon-live/solarwind.js
 install -m 644 ../metar.js /opt/horizon-live/metar.js
@@ -43,16 +47,19 @@ install -m 644 ../modis-land.js /opt/horizon-live/modis-land.js
 # /opt/horizon-live/index.mjs - rewrite them for the flat deploy
 # (metar.js's own './lightning.js' import and aerosol.js's own
 # './grib2.js' import already resolve there).
-sed -i "s#'../../lightning.js'#'./lightning.js'#; s#'../../solarwind.js'#'./solarwind.js'#; s#'../../metar.js'#'./metar.js'#; s#'../../smoke.js'#'./smoke.js'#; s#'../../grib2.js'#'./grib2.js'#; s#'../../aerosol.js'#'./aerosol.js'#; s#'../../modis-land.js'#'./modis-land.js'#" /opt/horizon-live/index.mjs
+sed -i "s#'../../lightning.js'#'./lightning.js'#; s#'../../solarwind.js'#'./solarwind.js'#; s#'../../metar.js'#'./metar.js'#; s#'../../smoke.js'#'./smoke.js'#; s#'../../grib2.js'#'./grib2.js'#; s#'../../aerosol.js'#'./aerosol.js'#; s#'../../modis-land.js'#'./modis-land.js'#" /opt/horizon-live/index.mjs.new
 # Ship-list drift guard: any '../../*.js' import left unrewritten means
 # a shared file was added to index.mjs without being added HERE, and the
 # flat deploy would crash-loop on ERR_MODULE_NOT_FOUND (Cloudflare 502s
-# while systemd shows "running"). Fail the install instead.
-if grep -q "'\.\./\.\./" /opt/horizon-live/index.mjs; then
+# while systemd shows "running"). Fail the install instead - the staged
+# file is discarded and the running deploy keeps its loadable tree.
+if grep -q "'\.\./\.\./" /opt/horizon-live/index.mjs.new; then
   echo "install.sh: unshipped '../../' import in index.mjs:" >&2
-  grep -n "'\.\./\.\./" /opt/horizon-live/index.mjs >&2
+  grep -n "'\.\./\.\./" /opt/horizon-live/index.mjs.new >&2
+  rm -f /opt/horizon-live/index.mjs.new
   exit 1
 fi
+mv /opt/horizon-live/index.mjs.new /opt/horizon-live/index.mjs
 
 # Environment (created once; never overwritten - your key lives here).
 if [ ! -f /etc/horizon-live.env ]; then
