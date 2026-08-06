@@ -73,7 +73,10 @@ const curlB64 = (url, extra = []) => {
 };
 const MIRROR = 'https://maps.mail.ru/osm/tools/overpass/api/interpreter';
 const overpass = (q) => {
-  const body = curlText(MIRROR, ['--data-urlencode', JSON.stringify('data=' + q)]);
+  const body = curlText(MIRROR, [
+    '--data-urlencode',
+    JSON.stringify('data=' + q)
+  ]);
   try {
     return JSON.parse(body);
   } catch {
@@ -92,7 +95,9 @@ const buildings = parseBuildings(
 );
 
 const rn = boxOf(1500).bbox;
-const roadNear = overpass(`[out:json][timeout:60];way[highway](${rn});out geom;`);
+const roadNear = overpass(
+  `[out:json][timeout:60];way[highway](${rn});out geom;`
+);
 const roadFar = overpass(
   `[out:json][timeout:60];way[highway~"^(motorway|trunk|primary|secondary|tertiary)(_link)?$"](${box.bbox});out geom;`
 );
@@ -104,7 +109,12 @@ for (const s of [roadNear, roadFar])
       seen.add(el.id);
       relems.push(el);
     }
-const roads = lodFilterRoads(parseRoads({elements: relems}, Infinity), lat, lon, rankOf);
+const roads = lodFilterRoads(
+  parseRoads({elements: relems}, Infinity),
+  lat,
+  lon,
+  rankOf
+);
 
 const rails = parseRailways(
   overpass(
@@ -131,7 +141,9 @@ const worldPx = (la, lo, z) => {
   return [x, y];
 };
 // zoom so the box is a handful of tiles wide
-let z = Math.round(Math.log2((40075016.686 * Math.cos(lat * RAD) * 3) / (2 * halfM)));
+let z = Math.round(
+  Math.log2((40075016.686 * Math.cos(lat * RAD) * 3) / (2 * halfM))
+);
 z = Math.max(10, Math.min(16, z));
 const [x0, y0] = worldPx(box.n, box.w, z); // top-left
 const [x1, y1] = worldPx(box.s, box.e, z); // bottom-right
@@ -151,7 +163,11 @@ for (let tx = tx0; tx <= tx1; tx++)
       JSON.stringify('horizon-mapcheck/1.0 (placement QA)')
     ]);
     if (b64)
-      tiles.push({px: tx * 256 - x0, py: ty * 256 - y0, uri: 'data:image/png;base64,' + b64});
+      tiles.push({
+        px: tx * 256 - x0,
+        py: ty * 256 - y0,
+        uri: 'data:image/png;base64,' + b64
+      });
   }
 console.error(`  OSM tiles z${z}: ${tiles.length} · frame ${W}x${H}`);
 
@@ -248,7 +264,8 @@ for (let i = 0; i < 60 && !browser; i++) {
   }
 }
 if (!browser) throw new Error('CDP connect failed');
-const page = browser.contexts()[0].pages()[0] || (await browser.contexts()[0].newPage());
+const page =
+  browser.contexts()[0].pages()[0] || (await browser.contexts()[0].newPage());
 await page.setViewportSize({width: W, height: H});
 await page.goto('file://' + htmlPath, {waitUntil: 'load', timeout: 60000});
 await page
