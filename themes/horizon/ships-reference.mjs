@@ -147,6 +147,31 @@ const check = (name, ok, detail) => {
       KT_MS === KT_MS_AIR,
     `origin exact; 10 kt east -> vx ${at.vx.toFixed(4)} u/s; +8 km north -> z ${north.z.toFixed(1)} (half-world); KT_MS shared with the aircraft path`
   );
+  // Track precedence: COG (includes set/drift) over TrueHeading;
+  // a heading-only vessel dead-reckons along that heading; with
+  // neither measured a moving hull HOLDS (marching it due north
+  // would be inventing a track). cog=0 is a measured due-north
+  // course, not a missing one.
+  const hdgOnly = aisToScene(
+    {lat: 46.62, lon: 8.04, sog: 10, cog: null, hdg: 90},
+    ref
+  );
+  const blind = aisToScene({lat: 46.62, lon: 8.04, sog: 10, cog: null}, ref);
+  const cogZero = aisToScene(
+    {lat: 46.62, lon: 8.04, sog: 10, cog: 0, hdg: 90},
+    ref
+  );
+  check(
+    'AIS track precedence',
+    Math.abs(hdgOnly.vx - spExp) < 1e-12 &&
+      Math.abs(hdgOnly.vz) < 1e-9 &&
+      blind.vx === 0 &&
+      blind.vz === 0 &&
+      Math.abs(blind.sp - spExp) < 1e-12 &&
+      Math.abs(cogZero.vz - -spExp) < 1e-12 &&
+      Math.abs(cogZero.vx) < 1e-9,
+    `hdg-only rides its heading (vx ${hdgOnly.vx.toFixed(4)}); directionless holds (sp kept ${blind.sp.toFixed(4)}); cog=0 beats hdg`
+  );
 }
 
 {

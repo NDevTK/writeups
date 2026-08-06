@@ -171,7 +171,13 @@ export function aisToScene(ship, ref) {
   const x = ((ship.lon - ref.lon) / (2 * dLon)) * ref.world;
   const z = (-(ship.lat - ref.lat) / (2 * dLat)) * ref.world;
   const sp = ((ship.sog || 0) * KT_MS) / ref.mpu; // scene units/s
-  const dir = ship.cog !== null && ship.cog !== undefined ? ship.cog : 0;
-  const tr = (dir * Math.PI) / 180;
-  return {x, z, vx: sp * Math.sin(tr), vz: -sp * Math.cos(tr), sp};
+  // Motion follows the course over ground (it includes set and
+  // drift); a vessel reporting only TrueHeading (M.1371 sends
+  // COG=3600 "not available", the daemon nulls it) dead-reckons
+  // along its heading; with NEITHER measured, inventing a track
+  // would march the hull due north - hold position instead.
+  const dir = ship.cog ?? ship.hdg ?? null;
+  const tr = ((dir ?? 0) * Math.PI) / 180;
+  const mv = dir === null ? 0 : sp;
+  return {x, z, vx: mv * Math.sin(tr), vz: -mv * Math.cos(tr), sp};
 }
