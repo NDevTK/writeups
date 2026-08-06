@@ -3406,6 +3406,26 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (the totality corona, Aug 6): corona.js = Baumbach 1937
+  eq. (5), READ from the original AN 263 scan (I(rho) = 0.0532
+  rho^-2.5 + 1.425 rho^-7 + 2.565 rho^-17, millionths of the
+  disc CENTRE - p. 124 fixes centre = 1e6 units, Abbot U = 0.6,
+  mean/centre = 1 - U/3 by its own eq. (2)). Five landmarks incl.
+  the verbatim limb sum 4.0432, the exact closed-form total flux
+  (~1.4e-6 of the sun, the of-order-the-full-moon classic) vs
+  log-spaced quadrature, and the irradiance closure. The dome
+  draws it ALWAYS with no visibility gate: anchored to the
+  disc-centre brightness IMPLIED by unit solar irradiance
+  (B_centre = 1/((1-U/3) pi sunRad^2) ~ 18,382 sr^-1, in-shader
+  from the live radius) it hides beneath the daytime aureole and
+  EMERGES at totality on radiometry alone; the moon covers the
+  inner reaches geometrically. LESSON: a first attempt anchored
+  to the drawn disc's 120 DISPLAY constant sat ~150x under the
+  sky and vanished - display compressions must never anchor real
+  radiances. Radial verification on the 0.9996 Galicia capture:
+  37/11/7.7 counts at rho 1.16/1.45/1.74 over the 6.4 twilight
+  floor, annulus ratio 6.7x vs Baumbach 5.7x through the AgX toe.
+  Scope: K/F split, streamers, Ludendorff flattening. 80 sets.
 - DONE (shallow-regime pass + two owned corrections, Aug 6): the
   new per-ship wake instrumentation (?debug __ships: uMs, depth,
   Frh, drawn wedge) caught two defects in the first wake commit.
