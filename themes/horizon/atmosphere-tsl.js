@@ -52,6 +52,7 @@ import {
   vec4
 } from 'three/tsl';
 import {spectralNode} from './spectral-srgb.js';
+import {sunAngularRadiusRad} from './eclipses.js';
 import {sunTransmittanceJS} from './sun-transmittance.js';
 
 // The display projection for the three spectral lines (680/550/440
@@ -131,6 +132,30 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   const sunDirR = uniform(new Vector3(0, 1, 0));
   const sunDirB = uniform(new Vector3(0, 1, 0));
   const sunFlat = uniform(1);
+  // The drawn disc's TRUE angular radius: the IAU photospheric
+  // radius over the live VSOP87 distance (eclipses.js; the theme
+  // feeds it at 1 Hz), so the disc breathes the +-1.7% annual
+  // swing - 976 arcsec at January perihelion, 944 at July
+  // aphelion. The retired cos(0.9999893) literal was a FIXED
+  // 0.2651 deg, 0.6% under the 1 au disc and blind to the swing;
+  // the Hestroffer & Magnan limb law is unchanged, only its edge
+  // now sits where the ephemeris puts it.
+  const sunRadU = uniform(sunAngularRadiusRad());
+  // Solar irradiance factor illuminating the whole column: 1
+  // normally; during a solar eclipse the theme sets the uncovered
+  // fraction (1 - obscuration, eclipses.js's exact lens area).
+  // Every radiance this module emits - single scatter, multiple
+  // scatter, ground bounce, aerial in-scatter, the 1x1 ambient
+  // integral - is LINEAR in this source term (the marches never
+  // depend on it nonlinearly), so one factor at the two LUT
+  // outputs is exact under a uniform-sky obscuration. Documented
+  // scope: the penumbra's brightness gradient across the sky near
+  // totality, and the corona (the only light left at obscuration
+  // 1), are not modelled - totality goes dark, as the 0.9996
+  // Galicia capture shows. The drawn DISC is deliberately NOT
+  // scaled: the uncovered photosphere keeps its full surface
+  // brightness and the moon disc covers it geometrically.
+  const sunE = uniform(1);
   // The sunset transfer LUT (refraction.js transferCurve): TRUE
   // altitude per channel indexed by APPARENT altitude across a
   // horizon band. Folds in the curve ARE the mirage images and
@@ -814,7 +839,7 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     const fwA = fwidth(aFrag).toVar();
     const fwH = fwidth(hOff).toVar();
     If(inBand, () => {
-      const discR = float(Math.acos(0.9999893));
+      const discR = sunRadU;
       // The flash rim (the last row where the 550 nm image
       // persists past 680 nm's end) is thinner than a pixel, and
       // point sampling a sub-pixel feature on a curved arc breaks
@@ -890,7 +915,8 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         .greaterThan(0.9998)
         .and(transOn.lessThan(0.5).or(aFrag.greaterThanEqual(transA0)));
       If(elseDisc, () => {
-        const sin2R = 1 - 0.9999893 * 0.9999893;
+        const sinRad = sin(sunRadU).toVar();
+        const sin2R = sinRad.mul(sinRad);
         const chanMu = (dir) => {
           const cS = dot(v, dir);
           const up = normalize(
@@ -921,7 +947,6 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         // radial axis foreshortens by its own z; edges get analytic
         // pixel coverage from the hoisted footprint (fwidth is
         // illegal in this divergent branch).
-        const sinR = Math.sqrt(1 - 0.9999893 * 0.9999893);
         const upW = normalize(
           vec3(0.0, 1.0, 0.0)
             .sub(sunDirW.mul(sunDirW.y))
@@ -932,9 +957,9 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         // spots mirrored in h against the SWPC positions).
         const eastW = normalize(cross(sunDirW, upW));
         const offW = v.sub(sunDirW.mul(dot(v, sunDirW)));
-        const vN = dot(offW, upW).div(sunFlat).div(sinR);
-        const hN = dot(offW, eastW).div(sinR);
-        const aa = fwA.div(sinR).max(1e-4);
+        const vN = dot(offW, upW).div(sunFlat).div(sinRad);
+        const hN = dot(offW, eastW).div(sinRad);
+        const aa = fwA.div(sinRad).max(1e-4);
         const spotF = vec3(1.0).toVar();
         for (let i = 0; i < SPOTS_MAX; i++) {
           const W = SPOTS_MAX * 4;
@@ -1017,8 +1042,20 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
 
   const fillT = makeFill(transmittanceNode, tLut);
   const fillMs = makeFill(multiscatterNode, msLut);
-  const fillSky = makeFill(skyviewNode, skyLut);
-  const fillAerial = makeFill(aerialNode, aerialLut);
+  // The two radiance LUTs are stored pre-scaled by the solar
+  // irradiance factor (eclipse obscuration; 1 normally, so the
+  // reference probes see the unscaled texels). Transmittance and
+  // Psi_ms are optical properties of the air, independent of how
+  // hard the sun shines - they stay unscaled. Alpha carries data
+  // (aerial mean transmittance), never scaled.
+  const fillSky = makeFill((vUv) => {
+    const s = skyviewNode(vUv).toVar();
+    return vec4(s.rgb.mul(sunE), s.a);
+  }, skyLut);
+  const fillAerial = makeFill((vUv) => {
+    const s = aerialNode(vUv).toVar();
+    return vec4(s.rgb.mul(sunE), s.a);
+  }, aerialLut);
 
   const irrMat = passMaterial(irradianceNode());
 
@@ -1047,7 +1084,14 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     aerialShadow: {camXZ: aerialCamXZ, sunAz: aerialSunAz, elev0: shadowElev0},
     // Refraction of the drawn disc: per-channel apparent
     // directions + vertical flattening (set from refraction.js).
-    sunDisc: {dirR: sunDirR, dirB: sunDirB, flatten: sunFlat},
+    sunDisc: {
+      dirR: sunDirR,
+      dirB: sunDirB,
+      flatten: sunFlat,
+      radius: sunRadU
+    },
+    // Solar-eclipse illumination: the theme sets 1 - obscuration.
+    sunE,
     // Real sunspots: the theme feeds buildSpots() output (sunspots
     // .js). Empty list (or omission) clears the disc.
     sunSpots: {

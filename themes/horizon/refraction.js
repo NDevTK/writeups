@@ -39,14 +39,21 @@
  */
 
 import {eLiq} from './contrails.js';
+import {sunAngularRadiusRad} from './eclipses.js';
 
 export const R_EARTH_M = 6371008.8; // IAU mean radius
 export const DEG = Math.PI / 180;
 export const ARCSEC = DEG / 3600;
 
-// Sun disc angular radius the sky shader draws (cos 0.9999893,
-// the atmosphere-tsl constant): ~0.265 deg.
-export const SUN_DISC_RAD = Math.acos(0.9999893);
+// The sun disc's angular radius at 1 au - the IAU photospheric
+// radius over the mean distance (eclipses.js, the one definition
+// every optics module shares). This is the OFFLINE default: the
+// theme passes the live ephemeris radius into sunRefraction and
+// the drawn disc's uniform alike, so the flattening derivative is
+// sampled across the disc actually drawn that day. (The old
+// acos(0.9999893) mirrored a fixed shader literal ~0.6% under
+// the 1 au disc; both ends now derive from the same ephemeris.)
+export const SUN_DISC_RAD = sunAngularRadiusRad();
 
 // The three wavelengths the theme's scattering/limb model uses
 // (um): red 680, green 550, blue 440.
@@ -416,19 +423,25 @@ export function foldCount(t, minDrop = 5e-6) {
 // d(apparent)/d(true) across the disc, evaluated at the green
 // wavelength (the dispersion of the flattening itself is second
 // order).
-export function sunRefraction(trueAltRad, profile, obsHm = 0, N = 800) {
+export function sunRefraction(
+  trueAltRad,
+  profile,
+  obsHm = 0,
+  N = 800,
+  discRad = SUN_DISC_RAD
+) {
   const app = LAMBDAS_UM.map((l) =>
     apparentAltitude(trueAltRad, profile, l, obsHm, N)
   );
   const up = apparentAltitude(
-    trueAltRad + SUN_DISC_RAD,
+    trueAltRad + discRad,
     profile,
     LAMBDAS_UM[1],
     obsHm,
     N
   );
   const dn = apparentAltitude(
-    trueAltRad - SUN_DISC_RAD,
+    trueAltRad - discRad,
     profile,
     LAMBDAS_UM[1],
     obsHm,
@@ -438,6 +451,6 @@ export function sunRefraction(trueAltRad, profile, obsHm = 0, N = 800) {
     appR: app[0],
     appG: app[1],
     appB: app[2],
-    flatten: Math.min((up - dn) / (2 * SUN_DISC_RAD), 1)
+    flatten: Math.min((up - dn) / (2 * discRad), 1)
   };
 }

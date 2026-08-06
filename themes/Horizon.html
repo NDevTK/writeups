@@ -8070,7 +8070,16 @@
           refr.alt = sun.alt;
           refr.obsH = camAltM;
           if (sun.alt > -0.06) {
-            refr.sun = sunRefraction(sun.alt, profNow, camAltM, 400);
+            // The flattening derivative is sampled across the TRUE
+            // disc of the day (ephemeris radius; 1 au stands in
+            // until the first tick).
+            refr.sun = sunRefraction(
+              sun.alt,
+              profNow,
+              camAltM,
+              400,
+              astro.sunAngR
+            );
             refr.graze = refr.sun.appG - sun.alt;
           } else {
             refr.sun = null; // sun deep below: constant graze shift
@@ -8083,6 +8092,11 @@
         const sunVec = skyPoint(sunApp, sun.az, 1);
         if (atmo.ok) {
           const d = atmo.sunDisc;
+          // The drawn disc at its TRUE radius (IAU photospheric
+          // radius over the live VSOP87 distance): ~976 arcsec in
+          // January, ~944 in July - the +-1.7% swing eclipses.js
+          // always knew about, finally drawn.
+          if (astro.sunAngR) d.radius.value = astro.sunAngR;
           if (refr.sun) {
             d.dirR.value.copy(skyPoint(refr.sun.appR, sun.az, 1));
             d.dirB.value.copy(skyPoint(refr.sun.appB, sun.az, 1));
@@ -8133,9 +8147,10 @@
         sunLight.target.position.set(0, 0, 0);
         // The moon takes the same measured lift and squash (its rim
         // dispersion sits far below the eye's threshold at lunar
-        // brightness - documented scope; SUN_DISC_RAD is the
-        // derivative-sampling span, second-order vs the moon's own
-        // radius).
+        // brightness - documented scope). The flattening derivative
+        // is sampled across the moon's OWN semidiameter (true
+        // distance, +-7% over the anomalistic month; the 1 au sun
+        // stands in before the first ephemeris tick).
         if (
           refr.moonAlt === null ||
           Math.abs(moon.alt - refr.moonAlt) >
@@ -8150,21 +8165,22 @@
               camAltM,
               400
             );
+            const mRad = astro.moonAngR ?? SUN_DISC_RAD;
             const u = apparentAltitude(
-              moon.alt + SUN_DISC_RAD,
+              moon.alt + mRad,
               profNow,
               0.55,
               camAltM,
               400
             );
             const dn = apparentAltitude(
-              moon.alt - SUN_DISC_RAD,
+              moon.alt - mRad,
               profNow,
               0.55,
               camAltM,
               400
             );
-            refr.moonFlat = Math.min((u - dn) / (2 * SUN_DISC_RAD), 1);
+            refr.moonFlat = Math.min((u - dn) / (2 * mRad), 1);
           } else {
             refr.moonApp = moon.alt + (refr.graze ?? 0.0093);
             refr.moonFlat = 1;
@@ -8302,6 +8318,13 @@
 
         // A real solar eclipse dims the direct light by its obscuration.
         const ecl = astro.eclipse || 0;
+        // ...and the SKY with it: the whole air column is lit by
+        // the uncovered fraction (every atmosphere term is linear
+        // in the source irradiance), so the dome, the aerial haze
+        // and the ambient all fall together toward totality. The
+        // drawn disc stays at full surface brightness - the moon
+        // covers it geometrically.
+        if (atmo.ok) atmo.sunE.value = 1 - ecl;
         // The sun's light on the world carries its true transmitted
         // colour: the CPU mirror of the transmittance integral reddens
         // low sun physically instead of by hue heuristic.

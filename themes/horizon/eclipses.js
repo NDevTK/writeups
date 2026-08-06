@@ -41,7 +41,18 @@
  * total lunar eclipse.
  */
 
-export const R_SUN_KM = 696000; // IAU photospheric radius
+// Solar radius convention, with its provenance: 696,000 km is the
+// classical Auwers (1891) photospheric semi-diameter - 959.63
+// arcsec at 1 au - the value eclipse computation has used ever
+// since (Astronomical Almanac / Espenak), and the one this
+// module's gates were certified with against real eclipse
+// circumstances (Dallas 2024, Galicia 2026). IAU 2015 Resolution
+// B3 (Prsa et al. 2016) defines a NOMINAL radius of 695,700 km
+// (~959.2 arcsec) - 0.04% smaller, inside the spread between
+// helioseismic and transit-timing measurements of where the
+// "edge" is. The eclipse-certified convention stands; the
+// difference is documented, not hidden.
+export const R_SUN_KM = 696000;
 export const R_MOON_KM = 1737.4;
 export const R_EARTH_EQ_KM = 6378.137;
 export const DANJON = 1.02; // shadow enlargement (Danjon's rule)
