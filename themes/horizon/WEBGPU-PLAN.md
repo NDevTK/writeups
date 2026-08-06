@@ -3768,6 +3768,49 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   10 landmarks in phenology-reference.mjs (83 sets now), including
   Figure 2's 14409 and all five Table 2 rows decoded exactly.
   Left open: the aureole pass, still not started.
+- DONE (the LOD review, Aug 6 second session): veglod wrote the
+  angle down; this pass held the OTHER layers to it. Three finds,
+  all shipped. (1) linelod's CLASS_RADIUS_M table + length bonus
+  (20 hand numbers) dropped ALREADY-DOWNLOADED, plainly visible
+  ways - a 100 m trail at 1.3 km subtends 264 arcmin of extent
+  and the table cut it at 600+400 m; a budget dressed as
+  perception. The law now: keep a fetched way while its EXTENT
+  subtends the shared threshold (the subtense law IS veglod's
+  crownArcmin, re-exported; landmark pins function identity).
+  The honest boundary is the FETCH (all classes in the near z14
+  pass, arterials across the box), stated as the feasibility
+  budget at the call site. Width licenses no drop: a sub-pixel-
+  wide road still crosses hundreds of pixels of length (the
+  telegraph-wire argument); only a way whose WHOLE extent sits
+  under the threshold can never structure the percept. Roads
+  cache key bumped (geo2) - old caches were table-filtered.
+  (2) aerialways carried the layer stack's LAST count cap
+  (parse cap=60, silent); retired, landmarked (200 synthetic
+  gondolas all parse; the Jungfrau fixture's 44 unchanged).
+  (3) veglod's consumption loop carried two UNCITED filters
+  overriding two measurements (OSM forest polygon, despiked
+  DEM): a scene-space slope cutoff whose true-slope meaning
+  DRIFTED with elevation (~31 deg at the datum, ~53 deg a
+  thousand metres up - an asinh-compression artifact; its "~35
+  deg" comment would delete WSL's own Stillberg site, 92,000
+  trees planted on a measured ~38 deg slope), and two
+  uncommented clearing circles at fixed scene coordinates
+  (0, +-26) carving invented meadows into real forests at EVERY
+  anchor (archaeology: b880238, added with no rationale). Both
+  deleted - a filter that overrides measurements needs a
+  citation to exist. Grindelwald live: 261 trees (was 249; the
+  12 were real), PAGEERROR 0. NOT changed, recorded verdicts:
+  bldlod's area ramp (12/55/130/260 m^2) drops houses subtending
+  30+ px at 850 m - it is a BUDGET mislabeled as perception, but
+  lifting it needs a dense-city perf measurement the fixtures
+  cannot give (Grindelwald village shows nothing); reworded
+  honestly is the floor, lifting is its own pass. nightlights
+  lampCandidates cap=4000 already documents itself as a
+  spatially-unbiased budget. Roads browser re-verify OWED: every
+  Overpass mirror was 504ing at session time (environmental);
+  the law is reference-gated, the call site compiles, PAGEERROR
+  0, but a live look at the drawn network is owed when mirrors
+  recover.
 - DONE (sky parallax: the celestial group rides with the camera,
   Jul 11): the sunspot verification's "pose aims 1.35 deg high"
   was neither the pose nor the ephemeris - the camera provably
