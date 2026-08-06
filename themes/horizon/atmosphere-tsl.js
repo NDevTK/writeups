@@ -150,11 +150,12 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   // depend on it nonlinearly), so one factor at the two LUT
   // outputs is exact under a uniform-sky obscuration. Documented
   // scope: the penumbra's brightness gradient across the sky near
-  // totality, and the corona (the only light left at obscuration
-  // 1), are not modelled - totality goes dark, as the 0.9996
-  // Galicia capture shows. The drawn DISC is deliberately NOT
-  // scaled: the uncovered photosphere keeps its full surface
-  // brightness and the moon disc covers it geometrically.
+  // totality is not modelled. The corona IS (Baumbach 1937, drawn
+  // below at its true millionths-of-centre radiance) - it is what
+  // remains when this factor reaches zero. The drawn DISC is
+  // deliberately NOT scaled: the uncovered photosphere keeps its
+  // full surface brightness and the moon disc covers it
+  // geometrically.
   const sunE = uniform(1);
   // The sunset transfer LUT (refraction.js transferCurve): TRUE
   // altitude per channel indexed by APPARENT altitude across a
@@ -992,12 +993,44 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
             .mul(sA.w);
           spotF.mulAssign(mix(mix(vec3(1.0), sD.rgb, covP), sC.rgb, covU));
         }
+        const discT = tTexNode.sample(tParamsToUv(r, v.y)).rgb.toVar();
+        col.addAssign(discT.mul(limb).mul(spotF).mul(120.0));
+        // The corona (Baumbach 1937, AN 263, 121, eq. (5) - read
+        // from the original scan; corona.js is the gated mirror):
+        // I(rho) = 0.0532 rho^-2.5 + 1.425 rho^-7 + 2.565 rho^-17
+        // in MILLIONTHS of the disc-CENTRE brightness - the
+        // paper's p. 124 sets the centre to 1e6 units, exactly
+        // the 120-constant's own normalisation, so the tie needs
+        // no conversion. Drawn ALWAYS at that true radiance
+        // through the same transmittance as the disc: beneath any
+        // daylit sky it vanishes on radiometry alone, and as an
+        // eclipse drives the sky down (sunE) it EMERGES - no
+        // visibility gate anywhere; the moon disc covers its
+        // inner reaches geometrically. vN/hN are already the
+        // flatten-consistent disc-frame coordinates in solar
+        // radii, so rho falls out of the frame the spots built.
+        // Fit range 1-6 R_sun (the paper's measured range); the
+        // else-branch's own cSunG gate ends the draw at ~4.3.
+        // K/F split, streamers and the cycle-dependent Ludendorff
+        // flattening: documented scope (eq. 5 is the mean).
+        const rho = sqrt(vN.mul(vN).add(hN.mul(hN))).max(0.2);
+        const bau = pow(rho, -2.5)
+          .mul(0.0532)
+          .add(pow(rho, -7.0).mul(1.425))
+          .add(pow(rho, -17.0).mul(2.565));
+        // Radiometric anchor (corona.js, gated): the disc-centre
+        // brightness IMPLIED by this model's unit solar irradiance
+        // is B_centre = 1/((1 - U/3) pi sunRad^2) - about 18,382
+        // sr^-1 at 1 au - and the corona is Baumbach's millionths
+        // of THAT, not of the display-compressed 120 disc (a 120-
+        // anchored first attempt sat ~150x beneath the sky and
+        // vanished). In this frame the limb corona (~0.074) lives
+        // among the sky's own radiances: beneath the daytime
+        // aureole, above the totality sky - emergence by
+        // radiometry alone.
+        const bCentre = float(1.0).div(sunRadU.mul(sunRadU).mul(0.8 * Math.PI));
         col.addAssign(
-          tTexNode
-            .sample(tParamsToUv(r, v.y))
-            .rgb.mul(limb)
-            .mul(spotF)
-            .mul(120.0)
+          discT.mul(bau.mul(smoothstep(0.98, 1.02, rho)).mul(bCentre.mul(1e-6)))
         );
       });
     });
