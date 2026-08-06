@@ -517,6 +517,12 @@
       } from './horizon/bldlod.js';
       import {parseRoads, roadsGeometry, rankOf} from './horizon/roads.js';
       import {geoGet, geoSet} from './horizon/geocache.js';
+      import {
+        tileBbox,
+        tileKey,
+        tilesCovering,
+        unionElements
+      } from './horizon/geotiles.js';
       import {lodFilterRoads} from './horizon/linelod.js';
       import {
         landTint,
@@ -1344,6 +1350,89 @@
         }
       }
 
+      // ---- tiled Overpass: fetch the vector layers like map tiles ----
+      // One box-per-anchor meant a 4 km roam re-downloaded almost
+      // everything the old box already held. Instead the box is covered
+      // by standard slippy TILES (geotiles.js, gated), each fetched once
+      // and cached in IndexedDB under its universal z/x/y key: roam and
+      // only the edge tiles are new. A way crossing a tile edge returns
+      // from both tiles; unionElements dedupes by id. A tile fetched
+      // within a week serves from disk; a stale one still serves through
+      // an upstream outage. If any tile is missing AND unfetchable the
+      // whole layer fails (a partial network shown as complete is the
+      // lie this replaces).
+      const OVERPASS_MIRRORS = [
+        'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+        'https://overpass-api.de/api/interpreter'
+      ];
+      // ONE shared queue for every tile request from every layer, at most
+      // two in flight, with retry + backoff: the public Overpass mirrors
+      // rate-limit by IP (429/504 under six layers fetching in parallel),
+      // and a cached tile never asks again - so the first visit fills the
+      // cache politely over a minute or two, layers appearing as their
+      // tiles land, and every visit after is instant from IndexedDB.
+      let opActive = 0;
+      const opWaiters = [];
+      const opPump = () => {
+        while (opActive < 2 && opWaiters.length) {
+          opActive++;
+          opWaiters.shift()();
+        }
+      };
+      const opSlot = () =>
+        new Promise((res) => {
+          opWaiters.push(res);
+          opPump();
+        });
+      const opDone = () => {
+        opActive--;
+        opPump();
+      };
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      async function overpassTile(name, qOf, t) {
+        const ck = 'horizon-otile-' + name + '-' + tileKey(t.x, t.y, t.z);
+        const hit = await geoGet(ck);
+        if (hit && Date.now() - hit.t < 7 * 86400e3) return hit.elements;
+        await opSlot();
+        try {
+          for (let attempt = 0; attempt < 6; attempt++) {
+            const host = OVERPASS_MIRRORS[attempt % OVERPASS_MIRRORS.length];
+            try {
+              const r = await fetch(
+                host +
+                  '?data=' +
+                  encodeURIComponent(qOf(tileBbox(t.x, t.y, t.z))),
+                {credentials: 'omit'}
+              );
+              if (!r.ok) throw new Error(r.status);
+              const elements = (await r.json()).elements || [];
+              await geoSet(ck, {t: Date.now(), elements});
+              return elements;
+            } catch {
+              await sleep(1000 * (attempt + 1)); // back off a limited mirror
+            }
+          }
+        } finally {
+          opDone();
+        }
+        return hit ? hit.elements : null; // stale serves through outage
+      }
+      async function overpassTiled(name, qOf, halfM, z) {
+        const mLat = 111320;
+        const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+        const tiles = tilesCovering(
+          state.lat - halfM / mLat,
+          state.lon - halfM / mLon,
+          state.lat + halfM / mLat,
+          state.lon + halfM / mLon,
+          z
+        );
+        const parts = [];
+        for (const t of tiles) parts.push(await overpassTile(name, qOf, t));
+        if (parts.some((p) => p === null)) return null;
+        return unionElements(parts);
+      }
+
       // Real forests: OSM wood/forest polygons around the visitor decide
       // where trees stand (scene-space polygons, cached per location).
       // OSM wood polygons, stored GEODETIC ([lat, lon] rings) so a
@@ -1558,8 +1647,6 @@
           }
         } catch {}
         try {
-          const mLat = 111320;
-          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
           // The buildings query is drawn from the near radius where an
           // individual footprint reads (BLD_NEAR_M), NOT the whole 8 km
           // box, and carries NO `out geom` count cap: within that radius
@@ -1569,41 +1656,21 @@
           // neighbours are all here, not a scattered 400. Past this
           // radius the city is the land-use tint + measured night-lights
           // and the tall-landmark ring, never invented footprints.
-          const dLat = BLD_NEAR_M / mLat;
-          const dLon = BLD_NEAR_M / mLon;
-          const bbox =
-            (state.lat - dLat).toFixed(4) +
-            ',' +
-            (state.lon - dLon).toFixed(4) +
-            ',' +
-            (state.lat + dLat).toFixed(4) +
-            ',' +
-            (state.lon + dLon).toFixed(4);
-          const q =
-            '[out:json][timeout:60];way[building](' + bbox + ');out geom;';
-          let osm = null;
-          for (const host of [
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-          ]) {
-            try {
-              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
-                credentials: 'omit'
-              });
-              if (!r.ok) throw new Error(r.status);
-              osm = await r.json();
-              break;
-            } catch {
-              // Try the next mirror.
-            }
-          }
-          if (!osm) throw new Error('overpass unavailable');
+          // z14 tiles (~1.5 km here): the finest layer, fetched cell by
+          // cell so a roam only pulls the new edge tiles.
+          const elements = await overpassTiled(
+            'bld',
+            (b) => '[out:json][timeout:60];way[building](' + b + ');out geom;',
+            BLD_NEAR_M,
+            14
+          );
+          if (!elements) throw new Error('overpass unavailable');
           // Honest LOD on the RAW response first (cheap shoelace area,
           // size-at-distance) so the costly parse - roof OBB, colours -
           // only ever runs on the footprints that will draw; then
           // parseBuildings with no count slice (Infinity) keeps them all.
-          const rawCount = (osm.elements || []).length;
-          const vis = lodFilterOsm(osm, state.lat, state.lon);
+          const rawCount = elements.length;
+          const vis = lodFilterOsm({elements}, state.lat, state.lon);
           buildsGeo = parseBuildings({elements: vis.elements}, Infinity, 12);
           record(
             'OSM Overpass buildings',
@@ -1650,68 +1717,33 @@
           }
         } catch {}
         try {
-          const mLat = 111320;
-          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
-          const boxOf = (rM) => {
-            const dLat = rM / mLat;
-            const dLon = rM / mLon;
-            return (
-              (state.lat - dLat).toFixed(4) +
-              ',' +
-              (state.lon - dLon).toFixed(4) +
-              ',' +
-              (state.lat + dLat).toFixed(4) +
-              ',' +
-              (state.lon + dLon).toFixed(4)
-            );
-          };
           // A city holds ~200k highway ways over the 8 km box - it cannot
-          // be fetched whole, so roads come in two honest passes: ALL
-          // classes in the near box (the streets you stand on), and the
-          // ARTERIAL classes across the whole box (the network you see
-          // reaching away). Both carry only an OOM ceiling, not a display
-          // cap; linelod then keeps each road by class-at-distance.
-          const nearQ =
-            '[out:json][timeout:60];way[highway](' +
-            boxOf(ROAD_NEAR_M) +
-            ');out geom;';
-          const farQ =
-            '[out:json][timeout:60];way[highway~"^(motorway|trunk|primary|secondary|tertiary)(_link)?$"](' +
-            boxOf(DEM_HALF_M) +
-            ');out geom;';
-          const overpass = async (query) => {
-            for (const host of [
-              'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-              'https://overpass-api.de/api/interpreter'
-            ]) {
-              try {
-                const r = await fetch(
-                  host + '?data=' + encodeURIComponent(query),
-                  {credentials: 'omit'}
-                );
-                if (!r.ok) throw new Error(r.status);
-                return await r.json();
-              } catch {
-                // Try the next mirror.
-              }
-            }
-            return null;
-          };
-          const [nearOsm, farOsm] = await Promise.all([
-            overpass(nearQ),
-            overpass(farQ)
+          // be fetched whole, so roads come in two honest passes, each
+          // tiled: ALL classes in the near z14 tiles (the streets you
+          // stand on), and the ARTERIAL classes across the box in coarser
+          // z12 tiles (the network you see reaching away). No count cap
+          // anywhere; linelod keeps each road by class-at-distance.
+          const [nearEls, farEls] = await Promise.all([
+            overpassTiled(
+              'roadN',
+              (b) => '[out:json][timeout:60];way[highway](' + b + ');out geom;',
+              ROAD_NEAR_M,
+              14
+            ),
+            overpassTiled(
+              'roadF',
+              (b) =>
+                '[out:json][timeout:60];way[highway~"^(motorway|trunk|primary|secondary|tertiary)(_link)?$"](' +
+                b +
+                ');out geom;',
+              DEM_HALF_M,
+              12
+            )
           ]);
-          if (!nearOsm && !farOsm) throw new Error('overpass unavailable');
+          if (!nearEls && !farEls) throw new Error('overpass unavailable');
           // Union the two passes, de-duped by OSM id (arterials inside the
           // near box appear in both).
-          const seen = new Set();
-          const elements = [];
-          for (const src of [nearOsm, farOsm])
-            for (const el of (src && src.elements) || [])
-              if (!seen.has(el.id)) {
-                seen.add(el.id);
-                elements.push(el);
-              }
+          const elements = unionElements([nearEls || [], farEls || []]);
           const all = parseRoads({elements}, Infinity);
           roadsGeo = lodFilterRoads(all, state.lat, state.lon, rankOf);
           record(
@@ -1764,49 +1796,34 @@
           }
         } catch {}
         try {
-          const mLat = 111320;
-          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
-          const dLat = DEM_HALF_M / mLat;
-          const dLon = DEM_HALF_M / mLon;
-          const bbox =
-            (state.lat - dLat).toFixed(4) +
-            ',' +
-            (state.lon - dLon).toFixed(4) +
-            ',' +
-            (state.lat + dLat).toFixed(4) +
-            ',' +
-            (state.lon + dLon).toFixed(4);
-          const q =
-            '[out:json][timeout:30];(way[landuse](' +
-            bbox +
-            ');relation[landuse](' +
-            bbox +
-            ');way[natural~"^(grassland|sand|beach|scree|bare_rock|wood)$"](' +
-            bbox +
-            // No count cap: landuse paints a FIXED-size tint raster over
-            // the box, so every real polygon can be burned in for the same
-            // render cost - the old 400 slice left ground untinted where
-            // OSM had a wood or a meadow. `out geom` with no N.
-            '););out geom;';
-          let osm = null;
-          for (const host of [
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-          ]) {
-            try {
-              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
-                credentials: 'omit'
-              });
-              if (!r.ok) throw new Error(r.status);
-              osm = await r.json();
-              break;
-            } catch {
-              // Try the next mirror.
-            }
-          }
-          if (!osm) throw new Error('overpass unavailable');
+          // No count cap: landuse paints a FIXED-size tint raster over
+          // the box, so every real polygon can be burned in for the same
+          // render cost - the old 400 slice left ground untinted where
+          // OSM had a wood or a meadow. z12 tiles over the whole box (the
+          // tile cache is month-free: raw polygons don't change with the
+          // season, only the parse's crop colour does).
+          const elements = await overpassTiled(
+            'lu',
+            (b) =>
+              '[out:json][timeout:45];(way[landuse](' +
+              b +
+              ');relation[landuse](' +
+              b +
+              ');way[natural~"^(grassland|sand|beach|scree|bare_rock|wood)$"](' +
+              b +
+              '););out geom;',
+            DEM_HALF_M,
+            12
+          );
+          if (!elements) throw new Error('overpass unavailable');
           // Infinity: keep every real polygon (the raster cost is fixed).
-          landGeo = parseLanduse(osm, 60, Infinity, cropMonth, state.lat);
+          landGeo = parseLanduse(
+            {elements},
+            60,
+            Infinity,
+            cropMonth,
+            state.lat
+          );
           record(
             'OSM Overpass landuse',
             landGeo.length + ' polygons (full coverage)'
@@ -1847,44 +1864,21 @@
           }
         } catch {}
         try {
-          const mLat = 111320;
-          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
-          const dLat = DEM_HALF_M / mLat;
-          const dLon = DEM_HALF_M / mLon;
-          const bbox =
-            (state.lat - dLat).toFixed(4) +
-            ',' +
-            (state.lon - dLon).toFixed(4) +
-            ',' +
-            (state.lat + dLat).toFixed(4) +
-            ',' +
-            (state.lon + dLon).toFixed(4);
-          const q =
-            '[out:json][timeout:45];way[waterway~"^(river|stream|canal|drain|ditch)$"](' +
-            bbox +
-            // No count cap: the watercourse network is small (a few
-            // hundred ways even over a large city) and every course is
-            // real - draw them all.
-            ');out geom;';
-          let osm = null;
-          for (const host of [
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-          ]) {
-            try {
-              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
-                credentials: 'omit'
-              });
-              if (!r.ok) throw new Error(r.status);
-              osm = await r.json();
-              break;
-            } catch {
-              // Try the next mirror.
-            }
-          }
-          if (!osm) throw new Error('overpass unavailable');
+          // No count cap: the watercourse network is small (a few
+          // hundred ways even over a large city) and every course is
+          // real - draw them all. z12 tiles over the whole box.
+          const elements = await overpassTiled(
+            'ww',
+            (b) =>
+              '[out:json][timeout:45];way[waterway~"^(river|stream|canal|drain|ditch)$"](' +
+              b +
+              ');out geom;',
+            DEM_HALF_M,
+            12
+          );
+          if (!elements) throw new Error('overpass unavailable');
           // Infinity: keep every real watercourse (no arbitrary slice).
-          riversGeo = parseWaterways(osm, Infinity);
+          riversGeo = parseWaterways({elements}, Infinity);
           record(
             'OSM Overpass waterways',
             riversGeo.length + ' watercourses (full network)'
@@ -2124,46 +2118,24 @@
           }
         } catch {}
         try {
-          const mLat = 111320;
-          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
-          const dLat = DEM_HALF_M / mLat;
-          const dLon = DEM_HALF_M / mLon;
-          const bbox =
-            (state.lat - dLat).toFixed(4) +
-            ',' +
-            (state.lon - dLon).toFixed(4) +
-            ',' +
-            (state.lat + dLat).toFixed(4) +
-            ',' +
-            (state.lon + dLon).toFixed(4);
-          const q =
-            '[out:json][timeout:45];way[railway~"^(rail|narrow_gauge|funicular|light_rail|tram)$"](' +
-            bbox +
-            // No count cap: a railway is a REAL ROUTE, not a sample.
-            // Even a rail-dense metropolis holds only a few thousand
-            // ways over the box (~4,500 in London) and they draw as thin
-            // ribbons - the whole network is cheap. The old 2000 slice
-            // ended lines mid-field and left trains riding invisible rails.
-            ');out geom;';
-          let osm = null;
-          for (const host of [
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-          ]) {
-            try {
-              const r = await fetch(host + '?data=' + encodeURIComponent(q), {
-                credentials: 'omit'
-              });
-              if (!r.ok) throw new Error(r.status);
-              osm = await r.json();
-              break;
-            } catch {
-              // Try the next mirror.
-            }
-          }
-          if (!osm) throw new Error('overpass unavailable');
+          // No count cap: a railway is a REAL ROUTE, not a sample.
+          // Even a rail-dense metropolis holds only a few thousand
+          // ways over the box (~4,500 in London) and they draw as thin
+          // ribbons - the whole network is cheap. The old 2000 slice
+          // ended lines mid-field and left trains riding invisible rails.
+          // z12 tiles over the whole box.
+          const elements = await overpassTiled(
+            'rail',
+            (b) =>
+              '[out:json][timeout:45];way[railway~"^(rail|narrow_gauge|funicular|light_rail|tram)$"](' +
+              b +
+              ');out geom;',
+            DEM_HALF_M,
+            12
+          );
+          if (!elements) throw new Error('overpass unavailable');
           // Infinity: keep the whole real network (no arbitrary slice).
-          railsGeo = parseRailways(osm, Infinity);
+          railsGeo = parseRailways({elements}, Infinity);
           record(
             'OSM Overpass railways',
             railsGeo.length + ' ways (full network)'
