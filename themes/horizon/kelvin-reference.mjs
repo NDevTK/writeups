@@ -95,6 +95,27 @@ const DEG = 180 / Math.PI;
 }
 
 {
+  // The Frh = 3 crossover: the supercritical Mach cone
+  // sin(alpha) = 1/Frh passes EXACTLY through the deep Kelvin
+  // sine 1/3 at Frh = 3 - two entirely different constructions
+  // (the dispersive cusp maximisation and the non-dispersive
+  // Mach front) meeting at one number. Only beyond Frh = 3 is a
+  // wake NARROWER than Kelvin's; between 1 and 3 the cone is
+  // WIDER (43.6 deg at 1.5) - the trap a "fast boats have narrow
+  // wakes" intuition falls into.
+  const a3 = wedgeHalfAngleRad(3.0);
+  const a4 = wedgeHalfAngleRad(4.0);
+  check(
+    'Frh = 3 crossover',
+    Math.abs(a3 - KELVIN_DEEP_RAD) < 2e-3 &&
+      a4 < a3 &&
+      Math.abs(Math.sin(a4) - 0.25) < 2e-3 &&
+      wedgeHalfAngleRad(1.5) > KELVIN_DEEP_RAD,
+    `alpha(3.0) = ${((a3 * 180) / Math.PI).toFixed(2)} deg = the deep Kelvin angle by the OTHER construction; alpha(4.0) = ${((a4 * 180) / Math.PI).toFixed(2)} deg, finally narrower; alpha(1.5) is WIDER than Kelvin`
+  );
+}
+
+{
   // The Froude helper: 12 kt over 10 m of water is subcritical
   // (0.62); the same speed over 1 m is supercritical (1.97).
   const u = 12 * 0.514444;

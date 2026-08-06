@@ -391,7 +391,11 @@
         despikeDEM,
         sampleDem
       } from './horizon/terrain-sample.js';
-      import {depthFroude, wedgeHalfAngleRad} from './horizon/kelvin.js';
+      import {
+        depthFroude,
+        KELVIN_DEEP_RAD,
+        wedgeHalfAngleRad
+      } from './horizon/kelvin.js';
       import {
         aisToScene,
         apparentLux,
@@ -5895,22 +5899,30 @@
           // harness fleet exercises every hull the types produce.
           // 4th column: M.1371 navigational status, so pinned
           // shots exercise the Rule 27/30 regimes (anchored
-          // tanker, moored sailing boat, aground 'other').
+          // tanker, moored sailing boat, aground 'other'). 5th:
+          // speed (kt) - the 34 kt pleasure tender rides the
+          // supercritical wake regime over real shallows (Frh > 1
+          // wherever the bathymetry is under U^2/g = 31 m, the
+          // Mach cone past Frh = 3 at 3.4 m).
           const FLEET = [
-            [70, 240, 32, 0], // cargo
-            [80, 180, 28, 1], // tanker, at anchor
-            [60, 140, 22, 0], // passenger
-            [30, 24, 7, 0], // fishing
-            [36, 14, 4, 5], // sailing, moored
-            [52, 30, 10, 0], // tug
-            [0, 90, 14, 6], // unknown -> other, aground
-            [71, 160, 24, 0] // cargo again, odd mmsi paint
+            [70, 240, 32, 0, 12], // cargo
+            [80, 180, 28, 1, 12], // tanker, at anchor
+            [60, 140, 22, 0, 12], // passenger
+            [37, 12, 3.5, 0, 34], // planing tender, supercritical
+            [36, 14, 4, 5, 12], // sailing, moored
+            [52, 30, 10, 0, 12], // tug
+            [0, 90, 14, 6, 12], // unknown -> other, aground
+            [30, 24, 7, 0, 12] // fishing (beyond the cull at 8-up)
           ];
           for (let i = 0; i < Math.min(shipOv, SHIP_N); i++) {
             const s = shipPool[i];
             const ahead = 55 + i * 20;
             const side = (i - (Math.min(shipOv, SHIP_N) - 1) / 2) * 26;
-            const [ft, fl, fb, fst] = FLEET[i % FLEET.length];
+            const [ft, fl, fb, fst, fkt] = FLEET[i % FLEET.length];
+            // A held status (anchored/moored/aground) rests the
+            // hull in the harness too - the live path holds via
+            // aisToScene; the synth path must not contradict it.
+            const fheld = fst === 1 || fst === 5 || fst === 6;
             Object.assign(s, {
               mmsi: 1000000 + i,
               name: 'HARNESS' + i,
@@ -5924,7 +5936,7 @@
             });
             buildShip(s, fl, fb, typeClass(ft));
             const tr = s.hdg * RAD;
-            const sp = (12 * 0.514444) / MPU; // 12 kt
+            const sp = fheld ? 0 : (fkt * 0.514444) / MPU; // per-entry knots
             s.vx = sp * Math.sin(tr);
             s.vz = -sp * Math.cos(tr);
           }
@@ -8682,7 +8694,13 @@
           if (params.has('debug'))
             window.__ships = shipPool
               .filter((s) => s.active)
-              .map((s) => ({x: s.x, y: s.g.position.y, z: s.z, label: s.name}));
+              .map((s) => ({
+                x: s.x,
+                y: s.g.position.y,
+                z: s.z,
+                label: s.name,
+                wake: s.wake ?? null
+              }));
           for (const s of shipPool) {
             if (!s.active) continue;
             s.x += s.vx * dt;
@@ -8786,13 +8804,48 @@
             for (const s of shipPool) {
               if (wk >= 8) break;
               if (!s.active || !s.g.visible) continue;
+              // A hull that feeds nothing reads null in the
+              // instrumentation - the held tanker's "no wake" is
+              // itself a measured statement.
+              s.wake = null;
               const spdU = Math.hypot(s.vx, s.vz); // units/s
               const uMs = spdU * MPU;
               if (uMs < 1.0) continue; // under ~2 kt nothing shows
               if (lakesMask && lakeAt(lakesMask, s.x, s.z) >= 0) continue;
-              const eS = sample(s.x, s.z).e;
-              const depth = Math.max((state.tide ?? 0) - eS, 0.5);
-              const alpha = wedgeHalfAngleRad(depthFroude(uMs, depth));
+              // The RAW DEM bed (demElev - the same source the
+              // 512^2 bathymetry grid is built from), NOT the
+              // dressed sample().e. Terrarium carries NO
+              // bathymetry over much open sea - the bed reads
+              // exactly ~0 there (void fill; measured at Nelson:
+              // 0.00 m across the whole bay). A hull FLOATING on
+              // such a texel proves only that the water is at
+              // least its draught deep, so the honest wedge for
+              // unknown depth is the parameter-free deep Kelvin;
+              // Havelock's finite-depth physics engages only
+              // where the DEM resolves a real bed (deeper than
+              // any AIS-class hull's draught, > 1.5 m). ?bathy=N
+              // is the labelled harness override (like ?ship),
+              // forcing a depth so pinned shots can exercise the
+              // gated shallow regimes.
+              const bedDepth =
+                (state.tide ?? 0) - (demData ? demElev(s.x, s.z) : 0);
+              const hOv = params.has('bathy') ? +params.get('bathy') : null;
+              const known = hOv !== null || bedDepth > 1.5;
+              const depth = hOv ?? Math.max(bedDepth, 0.5);
+              const alpha = known
+                ? wedgeHalfAngleRad(depthFroude(uMs, depth))
+                : KELVIN_DEEP_RAD;
+              // Instrumentation (?debug __ships): the measured
+              // inputs and the wedge each hull actually carries,
+              // so the harness can hold the drawn regime against
+              // the gated curve - deep Kelvin, Havelock widening,
+              // supercritical Mach - over the REAL bathymetry.
+              s.wake = {
+                uMs: +uMs.toFixed(2),
+                depthM: known ? +depth.toFixed(1) : null,
+                frh: known ? +depthFroude(uMs, depth).toFixed(2) : null,
+                alphaDeg: +((alpha * 180) / Math.PI).toFixed(1)
+              };
               water.wakeA[wk].value.set(s.x, s.z, s.vx / spdU, s.vz / spdU);
               water.wakeB[wk].value.set(
                 Math.tan(Math.min(alpha, 1.45)),
