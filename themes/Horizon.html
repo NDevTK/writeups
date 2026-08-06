@@ -546,7 +546,7 @@
         lodFilterOsm,
         metresBetween
       } from './horizon/bldlod.js';
-      import {parseRoads, roadsGeometry, rankOf} from './horizon/roads.js';
+      import {parseRoads, roadsGeometry} from './horizon/roads.js';
       import {geoGet, geoSet} from './horizon/geocache.js';
       import {
         tileBbox,
@@ -1738,7 +1738,7 @@
       async function syncRoads() {
         if (params.get('roads') === '0') return;
         const key =
-          'horizon-roads-geo-' +
+          'horizon-roads-geo2-' + // v2: extent-law LOD (old caches were class-table filtered)
           state.lat.toFixed(2) +
           ',' +
           state.lon.toFixed(2);
@@ -1756,8 +1756,11 @@
           // be fetched whole, so roads come in two honest passes, each
           // tiled: ALL classes in the near z14 tiles (the streets you
           // stand on), and the ARTERIAL classes across the box in coarser
-          // z12 tiles (the network you see reaching away). No count cap
-          // anywhere; linelod keeps each road by class-at-distance.
+          // z12 tiles (the network you see reaching away). These fetch
+          // bounds ARE the feasibility budget, stated here; past them
+          // nothing is downloaded. What IS downloaded is then kept
+          // unless its whole extent sits below the shared display
+          // threshold (linelod extent law - no count, no class table).
           const [nearEls, farEls] = await Promise.all([
             overpassTiled(
               'roadN',
@@ -1780,7 +1783,12 @@
           // near box appear in both).
           const elements = unionElements([nearEls || [], farEls || []]);
           const all = parseRoads({elements}, Infinity);
-          roadsGeo = lodFilterRoads(all, state.lat, state.lon, rankOf);
+          roadsGeo = lodFilterRoads(
+            all,
+            state.lat,
+            state.lon,
+            lodThresholdArcmin(camera.fov, Math.max(window.innerHeight, 1))
+          );
           record(
             'OSM Overpass roads',
             roadsGeo.length +
@@ -4510,14 +4518,17 @@
           const s0 = sample(x, z);
           if (s0.water || s0.e > tl) continue;
           if (!inForest(x, z)) continue;
-          // Real forests stand on ~35° alpine slopes; the asinh height
-          // compression roughly doubles scene gradients, hence 4.5.
-          const grade =
-            Math.abs(sample(x + 2, z).y - sample(x - 2, z).y) +
-            Math.abs(sample(x, z + 2).y - sample(x, z - 2).y);
-          if (grade > 4.5) continue;
-          if (Math.hypot(x, z - 26) < 24 || Math.hypot(x, z + 26) < 24)
-            continue;
+          // No slope gate and no clearing circles (both retired): a
+          // filter that overrides two measurements (the OSM forest
+          // polygon, the despiked DEM) needs a citation to exist,
+          // and neither ever carried one. The old scene-space grade
+          // cutoff (~31-35deg near the datum, drifting to ~53deg a
+          // thousand metres up - an artifact of the asinh
+          // compression it was written in) would have deleted WSL's
+          // own Stillberg site: 92,000 trees planted on a measured
+          // ~38deg slope above the Dischma valley. Steep measured
+          // forest is real forest; the treeline cap above is the one
+          // cited bound.
           const sc = 0.8 + c.r[0] * 1.4;
           // Conifers own the subalpine belt below the climatic treeline.
           const conifer = s0.e > tl - 700 || c.r[1] < 0.4;
