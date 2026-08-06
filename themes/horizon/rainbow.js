@@ -37,6 +37,7 @@
  */
 
 import {fresnelWater} from './coxmunk.js';
+import {sunAngularRadiusRad} from './eclipses.js';
 
 // Daimon & Masumura (2007), water, 21.5 C - verbatim.
 export const SELLMEIER_A = [
@@ -157,7 +158,7 @@ export function rainbowProfile(rainMmH, samples = 512) {
   const aMm = mpDropRadiusMm(rainMmH);
   const a = aMm * 1e-3; // metres
   const data = new Float32Array(samples * 3);
-  const sunR = (0.266 * Math.PI) / 180; // solar disk radius
+  const sunR = sunAngularRadiusRad(); // the shared IAU disc at 1 au
   for (let ch = 0; ch < 3; ch++) {
     const lam = RGB_UM[ch] * 1e-6;
     const kw = (2 * Math.PI) / lam;

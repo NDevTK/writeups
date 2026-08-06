@@ -33,12 +33,18 @@
  *    samples that library profile directly (buildDogLUT wraps it in
  *    the LUT format).
  *
- * All profiles are convolved with the sun's 0.267-degree-radius
- * disc carrying the same Hestroffer & Magnan limb darkening the dome
- * renders (alpha = 0.4064 / 0.5079 / 0.6406 per channel).
+ * All profiles are convolved EXACTLY ONCE with the source disc at
+ * its TRUE angular radius (IAU photospheric radius over the true
+ * distance, eclipses.js - the callers pass the live value; 959.6
+ * arcsec at 1 au stands in offline), carrying the same Hestroffer &
+ * Magnan limb darkening the dome renders (alpha = 0.4064 / 0.5079 /
+ * 0.6406 per channel). The dog profile arrives RAW from halos.js
+ * (causticBin - no internal smear), so this convolution is the only
+ * one; paraselenae pass the MOON's own disc radius instead.
  */
 
 import {ICE_N, mcHalo, parhelionProfile} from './halos.js';
+import {sunAngularRadiusRad} from './eclipses.js';
 import {
   airy,
   bowFresnel,
@@ -50,21 +56,21 @@ import {
 
 const N_ICE = ICE_N;
 const N_WATER = RGB_UM.map(waterIndex);
-const SUN_RADIUS = (0.267 * Math.PI) / 180;
+const SUN_RADIUS = sunAngularRadiusRad(); // IAU disc at 1 au (default)
 const LIMB_ALPHA = [0.4064, 0.5079, 0.6406];
 
 // Convolve a per-channel profile (uniform theta grid) with the
 // limb-darkened sun disc: kernel K(dt) = integral over the disc
 // chord at offset dt of mu^alpha, mu = sqrt(1 - (rho/R)^2).
-function sunConvolve(profile, bins, dTheta) {
-  const half = Math.ceil(SUN_RADIUS / dTheta);
+function sunConvolve(profile, bins, dTheta, srcR = SUN_RADIUS) {
+  const half = Math.ceil(srcR / dTheta);
   const out = new Float64Array(profile.length);
   for (let c = 0; c < 3; c++) {
     const kernel = [];
     let ksum = 0;
     for (let k = -half; k <= half; k++) {
       const dt = k * dTheta;
-      const s = dt / SUN_RADIUS;
+      const s = dt / srcR;
       if (Math.abs(s) >= 1) {
         kernel.push(0);
         continue;
@@ -111,10 +117,10 @@ function fresnelR(ci, n1, n2) {
  * sun convolution, peak-normalised. The 22 and the 46 both live
  * here at their EMERGENT relative strengths.
  */
-export function buildHaloLUT(samples = 400000) {
+export function buildHaloLUT(samples = 400000, srcR = SUN_RADIUS) {
   const mc = mcHalo(ICE_N, samples, 1337);
   const dTheta = (mc.g1 - mc.g0) / mc.bins;
-  const conv = sunConvolve(mc.data, mc.bins, dTheta);
+  const conv = sunConvolve(mc.data, mc.bins, dTheta, srcR);
   let peak = 0;
   for (const v of conv) peak = Math.max(peak, v);
   const out = new Float32Array(mc.bins * 4);
@@ -136,7 +142,11 @@ export function buildHaloLUT(samples = 400000) {
  * spacing from the drop radius (mm; the caller feeds Marshall-
  * Palmer on the measured rain). Normalised by the primary's peak.
  */
-export function buildBowLUT(bins = 256, aMm = mpDropRadiusMm(1)) {
+export function buildBowLUT(
+  bins = 256,
+  aMm = mpDropRadiusMm(1),
+  srcR = SUN_RADIUS
+) {
   const thMin = (35 * Math.PI) / 180;
   const thMax = (60 * Math.PI) / 180;
   const dTheta = (thMax - thMin) / bins;
@@ -162,7 +172,7 @@ export function buildBowLUT(bins = 256, aMm = mpDropRadiusMm(1)) {
       }
     }
   }
-  const conv = sunConvolve(prof, bins, dTheta);
+  const conv = sunConvolve(prof, bins, dTheta, srcR);
   // normalise by the PRIMARY peak (theta < 45 deg region)
   let peak = 0;
   for (let i = 0; i < bins; i++) {
@@ -187,7 +197,7 @@ export function buildBowLUT(bins = 256, aMm = mpDropRadiusMm(1)) {
  * limb-darkened-source convolved like the other profiles. Empty
  * past the ~61-degree cutoff (lut.any = false).
  */
-export function buildDogLUT(h, bins = 256) {
+export function buildDogLUT(h, bins = 256, srcR = SUN_RADIUS) {
   const pp = parhelionProfile(Math.max(h, 0), bins);
   const dAz = (pp.a1 - pp.a0) / bins;
   const prof = new Float64Array(bins * 3);
@@ -196,7 +206,7 @@ export function buildDogLUT(h, bins = 256) {
     prof[3 * i + 1] = pp.data[3 * i + 1];
     prof[3 * i + 2] = pp.data[3 * i + 2];
   }
-  const conv = sunConvolve(prof, bins, dAz);
+  const conv = sunConvolve(prof, bins, dAz, srcR);
   let peak = 0;
   for (const v of conv) peak = Math.max(peak, v);
   const out = new Float32Array(bins * 4);

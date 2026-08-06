@@ -45,6 +45,22 @@ export const R_SUN_KM = 696000; // IAU photospheric radius
 export const R_MOON_KM = 1737.4;
 export const R_EARTH_EQ_KM = 6378.137;
 export const DANJON = 1.02; // shadow enlargement (Danjon's rule)
+export const AU_KM = 149597870.7; // IAU 2012 definition of the au
+
+// THE solar and lunar discs, one definition for every optics
+// module: the IAU photospheric/lunar radius over the true
+// distance. At exactly 1 au the solar half-angle is the classical
+// 959.6 arcsec - the number the halo caustic, the bow kernel, the
+// LUT convolutions and the refraction band each used to carry as
+// a separate 0.266/0.267-degree literal, while this file already
+// proved the disc swings +-1.7% over the year.
+export function sunAngularRadiusRad(distKm = AU_KM) {
+  return Math.asin(R_SUN_KM / distKm);
+}
+
+export function moonAngularRadiusRad(distKm) {
+  return Math.asin(R_MOON_KM / distKm);
+}
 
 // Fraction of disc 1 (the sun) covered by disc 2 (the moon):
 // exact two-circle lens area. All angles in radians (small-angle

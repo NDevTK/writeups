@@ -41,6 +41,7 @@
  */
 
 import {fresnelWater} from './coxmunk.js';
+import {sunAngularRadiusRad} from './eclipses.js';
 
 // Warren & Brandt (2008) at the atmosphere's RGB (0.68/0.55/
 // 0.44 um) - verbatim table rows.
@@ -103,7 +104,7 @@ export function parhelion(n, h) {
  * rainbow's own kernel). eps floors the divergence at the
  * smearing scale.
  */
-const SUN_R = (0.266 * Math.PI) / 180;
+const SUN_R = sunAngularRadiusRad(); // the shared IAU disc at 1 au
 export function caustic(dD) {
   let acc = 0;
   let wsum = 0;
@@ -115,6 +116,28 @@ export function caustic(dD) {
     wsum += w;
   }
   return acc / wsum;
+}
+
+/**
+ * The UNSMEARED caustic, integrated exactly over one profile bin:
+ * mean of 1/sqrt(max(x, 0)) over [x0, x1], via the closed form
+ * int x^-1/2 dx = 2 sqrt(x). The 1/sqrt divergence at the
+ * minimum-deviation edge is integrable, so a bin average needs no
+ * floor and no smearing - the SOLAR DISC enters exactly once,
+ * downstream, through the limb-darkened convolution the LUT
+ * builders apply (optics-lut.js). caustic() above keeps its own
+ * disc smear for the legacy gated profiles; feeding ITS output to
+ * the LUT convolution would smear the disc twice and widen the
+ * dogs by ~sqrt(2), which is the bug this function removes.
+ */
+export function causticBin(x0, x1) {
+  const lo = Math.min(x0, x1);
+  const hi = Math.max(x0, x1);
+  if (hi <= 0) return 0;
+  const a = Math.max(lo, 0);
+  const w = hi - lo;
+  if (w <= 0) return hi > 0 ? 1 / Math.sqrt(hi) : 0;
+  return (2 * (Math.sqrt(hi) - Math.sqrt(a))) / w;
 }
 
 // ---- Greenler's Monte Carlo: random hexagonal ice prisms ----
@@ -347,12 +370,20 @@ export function parhelionProfile(h, samples = 256) {
     const Dm = prismDmin(np, PRISM_60);
     if (Dm == null) continue;
     const T = prismThroughput(np, PRISM_60);
+    // great-circle distance to a point az away on the sun's own
+    // altitude circle
+    const gc = (az) =>
+      Math.acos(Math.min(Math.max(sh2 + ch2 * Math.cos(az), -1), 1));
+    const hbin = (a1 - a0) / (samples - 1) / 2;
     for (let i = 0; i < samples; i++) {
       const az = a0 + ((a1 - a0) * i) / (samples - 1);
-      // great-circle distance to a point az away on the sun's
-      // own altitude circle
-      const D = Math.acos(Math.min(Math.max(sh2 + ch2 * Math.cos(az), -1), 1));
-      const v = T * caustic(D - Dm);
+      // Exact bin average of the RAW 1/sqrt caustic over this
+      // sample's cell - no disc smear here; the limb-darkened
+      // solar convolution is applied exactly once by the LUT
+      // builder (see causticBin).
+      const x0 = gc(Math.max(az - hbin, a0)) - Dm;
+      const x1 = gc(Math.min(az + hbin, a1)) - Dm;
+      const v = T * causticBin(x0, x1);
       if (v > 0) any = true;
       data[3 * i + ch] += v;
     }

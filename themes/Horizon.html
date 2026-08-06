@@ -415,7 +415,12 @@
       import {earthshineRatio} from './horizon/earthshine.js';
       import {BETA_MIN_DEG, seasonEnvelope} from './horizon/nlc.js';
       import {parseTLEs, satMagnitude, sunlitEci} from './horizon/sats.js';
-      import {lunarEclipse, solarEclipse} from './horizon/eclipses.js';
+      import {
+        lunarEclipse,
+        moonAngularRadiusRad,
+        solarEclipse,
+        sunAngularRadiusRad
+      } from './horizon/eclipses.js';
       import {relPhase} from './horizon/moonphase.js';
       import {
         bortleClass,
@@ -6680,7 +6685,11 @@
         if (bowLutR !== null && Math.abs(R - bowLutR) < 0.05) return;
         bowLutR = R;
         const aMm = mpDropRadiusMm(R);
-        const lut = buildBowLUT(256, aMm);
+        // Sun bows take the live solar disc radius (the 1 au IAU
+        // default stands until the first ephemeris tick); the rare
+        // moonbow shares this LUT - a documented ~3% disc
+        // difference, far under the Airy fringe scale.
+        const lut = buildBowLUT(256, aMm, astro.sunAngR);
         for (const uu of [opticsU, opticsMoonU]) {
           uu.bowTex.image.data.set(lut.data);
           uu.bowTex.needsUpdate = true;
@@ -7726,6 +7735,12 @@
               eqSun.dist * AE.KM_PER_AU,
               eqMoon.dist * AE.KM_PER_AU
             );
+            // The TRUE disc radii (same distances the eclipse just
+            // used): the optics LUTs convolve with these, so the
+            // dogs and bows breathe with the +-1.7% annual solar
+            // swing - and paraselenae with the moon's own +-7%.
+            astro.sunAngR = sunAngularRadiusRad(eqSun.dist * AE.KM_PER_AU);
+            astro.moonAngR = moonAngularRadiusRad(eqMoon.dist * AE.KM_PER_AU);
             astro.eclipse = params.has('eclipse')
               ? +params.get('eclipse')
               : se.obsc;
@@ -9472,7 +9487,7 @@
         opticsU.srcAlt.value = sun.alt;
         if (dogAltSun === null || Math.abs(sun.alt - dogAltSun) > 0.0035) {
           dogAltSun = sun.alt;
-          const dl = buildDogLUT(sun.alt);
+          const dl = buildDogLUT(sun.alt, 256, astro.sunAngR);
           opticsU.dogData.set(dl.data);
           opticsU.dogTex.needsUpdate = true;
           opticsU.dogA0.value = (dl.azMinDeg * Math.PI) / 180;
@@ -9508,7 +9523,8 @@
             Math.abs(refr.moonApp - dogAltMoon) > 0.0035
           ) {
             dogAltMoon = refr.moonApp;
-            const dl = buildDogLUT(refr.moonApp);
+            // Paraselenae: the MOON's own disc convolves the LUT.
+            const dl = buildDogLUT(refr.moonApp, 256, astro.moonAngR);
             opticsMoonU.dogData.set(dl.data);
             opticsMoonU.dogTex.needsUpdate = true;
             opticsMoonU.dogA0.value = (dl.azMinDeg * Math.PI) / 180;

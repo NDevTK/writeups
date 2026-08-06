@@ -189,4 +189,42 @@ function bowStats(c, lo, hi) {
   );
 }
 
+{
+  // Dog WIDTH: the landmark that was missing when the profile was
+  // solar-smeared twice (caustic()'s 5-point disc smear AND the
+  // limb-darkened LUT convolution - dogs came out ~sqrt(2) wide
+  // and no gate could see it). The profile now arrives RAW
+  // (halos.js causticBin) and the disc enters exactly once, so
+  // the red half-maximum width at 25 deg elevation sits near
+  // 0.72 deg, and doubling the source disc must widen it by well
+  // over a quarter - a reintroduced double smear lands ~1.0 deg
+  // and fails the band; a dropped convolution lands ~0.4 and
+  // fails it too.
+  const h = (25 * Math.PI) / 180;
+  const fwhm = (lut, c) => {
+    const dAz = (lut.azMaxDeg - lut.azMinDeg) / lut.bins;
+    let pV = 0;
+    let pI = 0;
+    for (let i = 0; i < lut.bins; i++) {
+      const v = lut.data[i * 4 + c];
+      if (v > pV) {
+        pV = v;
+        pI = i;
+      }
+    }
+    let lo = pI;
+    let hi = pI;
+    while (lo > 0 && lut.data[(lo - 1) * 4 + c] > pV / 2) lo--;
+    while (hi < lut.bins - 1 && lut.data[(hi + 1) * 4 + c] > pV / 2) hi++;
+    return (hi - lo + 1) * dAz;
+  };
+  const one = fwhm(buildDogLUT(h), 0);
+  const twice = fwhm(buildDogLUT(h, 256, 2 * 4.6524e-3), 0);
+  check(
+    'single solar convolution',
+    one > 0.6 && one < 0.85 && twice > one * 1.3,
+    `red dog FWHM ${one.toFixed(2)} deg at the true disc; a doubled source disc widens it to ${twice.toFixed(2)} - the width finally answers to the radius, once`
+  );
+}
+
 process.exit(fail ? 1 : 0);
