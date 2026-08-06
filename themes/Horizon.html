@@ -5308,7 +5308,12 @@
       let liveTraffic = null; // queue of unclaimed cruise snapshots
       const seenFlights = new Map(); // hex -> last spawn ms
       async function syncTraffic() {
-        if (!state.contrail?.forms && !params.has('contrail')) return;
+        // No contrail gate here: every live aircraft carries its
+        // airframe, livery and 14 CFR lights regardless of whether
+        // the 250 hPa air lets a trail form - Schmidt-Appleman is
+        // applied where the contrail slot is claimed (ct.forms at
+        // the pool), and the pushed `adsb` stream events were
+        // already ungated, so the poll and the push now agree.
         try {
           const r = await (
             await fetch(
