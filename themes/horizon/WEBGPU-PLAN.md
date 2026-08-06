@@ -3406,6 +3406,32 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly 17, the junction at f = 9/17, per-segment bearings,
   one-arc legs direct, disconnected components null). Gate 60
   sets + 3 GPU probes PASS.
+- DONE (aurora sRGB matrix derived + glacier layer, Aug 6): two
+  smaller items. aurora-lut.js carried the repo's LAST pasted
+  XYZ->sRGB coefficient block, contradicting spectral-srgb.js's
+  own emerge-don't-paste rule - it now consumes the one derived
+  matrix (line colours unchanged at printed precision). And
+  natural=glacier joined the landuse layer (ways + multipolygon
+  relations) at the measured Morteratsch bare-ice albedo 0.34
+  (Oerlemans & Knap 1998 J.Glaciol. 44(147), READ from the paper:
+  snow 0.75/firn 0.53/ice 0.34), deliberately neutral (the blue
+  of bare ice needs an unmeasured bubble-scattering coefficient)
+  with the MODIS FSC whitening accumulation zones over it.
+  Documented scope: the tint field feeds the grass band only
+  (landuse's standing design) so the value lands on low tongues;
+  letting the rock band consume the tint is its own pass, and it
+  would also un-strand quarry/bare_rock at altitude. Both gated
+  (glacier landmark; aurora gate green with the derived matrix).
+  METHOD NOTE (owner direction): papers are read DIRECTLY now -
+  the COLREGS figures were re-verified against the treaty text
+  (UNTS 1050 I-15824) and the albedos against the Oerlemans PDF
+  itself, not fetched summaries. Also observed on the box: the
+  update timer self-deployed the morning push (derived watch list
+  working), but the AIS upstream is DARK - /health shows keySet
+  true, 14 connects, ZERO frames, badFrames 0 (lightning/space
+  flow normally). Not a code path this session touched; the
+  /probe instrument exists for exactly this - owner attention
+  needed (key standing or aisstream outage).
 - DONE (measured navigational status -> Rule 27/30 lights, Aug 6):
   a new measured field end to end. The daemon received M.1371
   NavigationalStatus (Table 45) on every position report and
