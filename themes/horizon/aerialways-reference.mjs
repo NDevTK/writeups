@@ -108,6 +108,29 @@ const ways = parseAerialways(AERIAL_FIXTURE);
 }
 
 {
+  // No count cap (the layer stack's last one, retired): a synthetic
+  // box with 200 installations parses all 200 - bounded by the
+  // fetch box, never a ceiling.
+  const many = {
+    elements: Array.from({length: 200}, (_, i) => ({
+      type: 'way',
+      id: i + 1,
+      tags: {aerialway: 'gondola'},
+      geometry: [
+        {lat: 46 + i * 1e-4, lon: 8},
+        {lat: 46 + i * 1e-4, lon: 8.01}
+      ]
+    }))
+  };
+  const all = parseAerialways(many);
+  check(
+    'no count cap: every installation parses',
+    all.length === 200,
+    `200 synthetic gondolas -> ${all.length} kept`
+  );
+}
+
+{
   // Cabins: a cable car runs one per direction; a gondola
   // circulates by spacing; fractions live in [0, 1) and are
   // deterministic in the OSM id.

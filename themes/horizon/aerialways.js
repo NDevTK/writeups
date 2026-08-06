@@ -30,9 +30,13 @@ const KINDS = new Set(['cable_car', 'gondola', 'mixed_lift', 'chair_lift']);
 
 /**
  * Overpass aerialway ways -> [{id, kind, name, pts}] with pts
- * geodetic [[lat, lon], ...] - the pylon line, verbatim.
+ * geodetic [[lat, lon], ...] - the pylon line, verbatim. No count
+ * cap (the last one in the layer stack, retired): the box's real
+ * installations are what they are - the Jungfrau fixture carries
+ * 44 and a bigger resort simply has more. The fetch box is the
+ * only boundary, same doctrine as roads/rails/rivers.
  */
-export function parseAerialways(json, cap = 60) {
+export function parseAerialways(json, cap = Infinity) {
   const out = [];
   for (const el of (json && json.elements) || []) {
     if (el.type !== 'way' || !el.geometry || el.geometry.length < 2) continue;
