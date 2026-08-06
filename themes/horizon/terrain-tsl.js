@@ -161,7 +161,7 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     const Hs = U.mul(U).mul(0.21 / 9.81);
     const Tp = U.mul(0.7305);
     const Lp = max(Tp.mul(Tp).mul(1.5614), 4.0);
-    const pm = wp.xz.mul(57.14);
+    const pm = wp.xz.mul(400 / 7);
     const d1 = normalize(u.uWindVec);
     const d2 = normalize(
       u.uWindVec.add(vec2(u.uWindVec.y.negate(), u.uWindVec.x).mul(0.6))
@@ -368,7 +368,7 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
       .mul(1 - F0_ICE)
       .add(F0_ICE);
     const smooth2 = D.mul(Vis).mul(F).mul(nl).mul(FSPEC);
-    const pm = wp.xz.mul(57.14);
+    const pm = wp.xz.mul(400 / 7);
     const aM = length(fwidth(pm));
     const hb = [
       floor(H.x.mul(HBIN)).toInt(),
@@ -559,7 +559,7 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     // W = 3.84e-6 * U^3.41.
     const U = max(u.uWindMs, 0.8);
     const W = clamp(pow(U, 3.41).mul(3.84e-6), 0.0, 0.6);
-    const pmc = positionWorld.xz.mul(57.14 * 0.11);
+    const pmc = positionWorld.xz.mul((400 / 7) * 0.11);
     const capN = tnoise(
       pmc.add(normalize(u.uWindVec).mul(u.uTime.mul(0.25))).add(31.0)
     );
