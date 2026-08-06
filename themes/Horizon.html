@@ -531,6 +531,7 @@
         unionElements
       } from './horizon/geotiles.js';
       import {lodFilterRoads} from './horizon/linelod.js';
+      import {lodThresholdArcmin, vegKeep} from './horizon/veglod.js';
       import {
         landTint,
         parseLanduse,
@@ -4019,6 +4020,39 @@
         }
         geoCanopy.computeVertexNormals();
       }
+      // Instanced tree pieces: per-tree Groups became one
+      // InstancedMesh per (piece x material x shadow tier), so the
+      // whole forest costs ~a dozen draw calls however many trees
+      // the spatial LOD keeps. The piece offsets are baked into the
+      // pooled geometry so trunk and crown share one tree matrix.
+      const mergeGeos = (a, b) => {
+        const g = new THREE.BufferGeometry();
+        for (const name of ['position', 'normal', 'uv']) {
+          const A = a.attributes[name];
+          const B = b.attributes[name];
+          const arr = new Float32Array(A.array.length + B.array.length);
+          arr.set(A.array);
+          arr.set(B.array, A.array.length);
+          g.setAttribute(name, new THREE.BufferAttribute(arr, A.itemSize));
+        }
+        const ia = a.index.array;
+        const ib = b.index.array;
+        const off = a.attributes.position.count;
+        const idx = new Uint16Array(ia.length + ib.length);
+        idx.set(ia);
+        for (let i = 0; i < ib.length; i++) idx[ia.length + i] = ib[i] + off;
+        g.setIndex(new THREE.BufferAttribute(idx, 1));
+        return g;
+      };
+      const geoTrunkI = geoTrunk.clone().translate(0, 0.55, 0);
+      const geoConiferI = mergeGeos(
+        geoCone1.clone().translate(0, 1.7, 0),
+        geoCone2.clone().translate(0, 3.1, 0)
+      );
+      const geoBroadI = geoCanopy
+        .clone()
+        .scale(1, 0.82, 1)
+        .translate(0, 2.2, 0);
       // Deciduous phenology bases (Hopkins' law shifts the calendar).
       const broadBases = broadMats.map((m) => m.color.clone());
       const cBare = new THREE.Color('#6f5b46');
@@ -4031,7 +4065,8 @@
           ? 3500 + (30 - a) * 13
           : Math.max(3500 - 92 * (a - 30), 0);
       }
-      let trees = [];
+      let treePools = []; // InstancedMesh per (piece x material x tier)
+      let treeInsts = []; // per-tree sway state {t, a, v, slots}
       let camBaseY = 6;
       let viewSign = 1; // +1: camera looks south (north hemisphere)
       let snowSim = null; // Rapier world, booted the first time it snows
@@ -4132,8 +4167,12 @@
       // spots. Re-runnable on its own: fresh forest polygons
       // re-dress the standing terrain without a full rebuild.
       function placeTrees() {
-        for (const t of trees) ground.remove(t);
-        trees = [];
+        for (const p of treePools) {
+          ground.remove(p);
+          p.dispose();
+        }
+        treePools = [];
+        treeInsts = [];
         // Forest polygons are stored geodetic; project them onto
         // the CURRENT box for the point-in-polygon test.
         forestScene = forestGeo
@@ -4145,8 +4184,19 @@
             )
           : null;
         const tl = treelineM(state.lat);
+        // Spatial LOD (veglod.js, gated): a tree is kept while its
+        // DRAWN crown subtends more than the display's finest pixel,
+        // floored by Snellen acuity (Reddy 1997) - the bldlod/
+        // linelod doctrine with the angle actually written down,
+        // replacing the old `>= 140` count cap. At these drawn
+        // crown sizes every candidate in the box passes; the
+        // instanced pools are what make honesty affordable.
+        const lodThr = lodThresholdArcmin(
+          camera.fov,
+          Math.max(window.innerHeight, 1)
+        );
+        const kept = [];
         for (const c of treeCandidates(dressAnchor)) {
-          if (trees.length >= 140) break;
           const {x, z} = c;
           const s0 = sample(x, z);
           if (s0.water || s0.e > tl) continue;
@@ -4162,36 +4212,84 @@
           const sc = 0.8 + c.r[0] * 1.4;
           // Conifers own the subalpine belt below the climatic treeline.
           const conifer = s0.e > tl - 700 || c.r[1] < 0.4;
-          const tree = new THREE.Group();
-          const trunk = new THREE.Mesh(geoTrunk, trunkMat);
-          trunk.position.y = 0.55;
-          trunk.castShadow = true;
-          tree.add(trunk);
-          if (conifer) {
-            const mat = leafMats[Math.floor(c.r[2] * leafMats.length)];
-            const c1 = new THREE.Mesh(geoCone1, mat);
-            c1.position.y = 1.7;
-            const c2 = new THREE.Mesh(geoCone2, mat);
-            c2.position.y = 3.1;
-            c1.castShadow = c2.castShadow = true;
-            c1.receiveShadow = true;
-            tree.add(c1, c2);
-          } else {
-            const canopy = new THREE.Mesh(
-              geoCanopy,
-              broadMats[Math.floor(c.r[2] * broadMats.length)]
-            );
-            canopy.position.y = 2.2;
-            canopy.scale.y = 0.82;
-            canopy.castShadow = canopy.receiveShadow = true;
-            tree.add(canopy);
-          }
-          tree.scale.setScalar(sc);
-          tree.position.set(x, s0.y, z);
-          tree.userData = {phase: c.r[3] * Math.PI * 2, a: 0, v: 0};
-          trees.push(tree);
-          ground.add(tree);
+          // Drawn crown width in metres (display furniture, like the
+          // vessels): cone diameter 2.3 units, canopy sphere 2.5.
+          const crownM = (conifer ? 2.3 : 2.5) * sc * MPU;
+          const distM = Math.hypot(x, z) * MPU;
+          if (!vegKeep(crownM, distM, lodThr)) continue;
+          kept.push({
+            x,
+            z,
+            y: s0.y,
+            sc,
+            conifer,
+            near: distM <= BLD_SHADOW_M,
+            mi: Math.floor(
+              c.r[2] * (conifer ? leafMats.length : broadMats.length)
+            ),
+            phase: c.r[3] * Math.PI * 2
+          });
         }
+        // Pools: piece x material x shadow tier. Near trees cast
+        // into the CSM under the buildings' own BLD_SHADOW_M
+        // rationale (a farther shadow is imperceptible; casting all
+        // of them would triple the forest through the cascades);
+        // far trees still receive.
+        const pools = new Map();
+        const poolFor = (key, geo, mat, cast) => {
+          let p = pools.get(key);
+          if (!p) pools.set(key, (p = {key, geo, mat, cast, list: []}));
+          return p;
+        };
+        for (const t of kept) {
+          const tier = t.near ? 'n' : 'f';
+          const inst = {t, a: 0, v: 0, slots: []};
+          const trunkP = poolFor('t' + tier, geoTrunkI, trunkMat, t.near);
+          inst.slots.push({pool: trunkP, i: trunkP.list.length});
+          trunkP.list.push(inst);
+          const crownP = t.conifer
+            ? poolFor('c' + t.mi + tier, geoConiferI, leafMats[t.mi], t.near)
+            : poolFor('b' + t.mi + tier, geoBroadI, broadMats[t.mi], t.near);
+          inst.slots.push({pool: crownP, i: crownP.list.length});
+          crownP.list.push(inst);
+          treeInsts.push(inst);
+        }
+        const m4 = new THREE.Matrix4();
+        const q4 = new THREE.Quaternion();
+        const v4 = new THREE.Vector3();
+        const s4 = new THREE.Vector3();
+        for (const p of pools.values()) {
+          const mesh = new THREE.InstancedMesh(p.geo, p.mat, p.list.length);
+          mesh.castShadow = p.cast;
+          // Trunks never received shadow as Meshes either; crowns did.
+          mesh.receiveShadow = p.key[0] !== 't';
+          for (let i = 0; i < p.list.length; i++) {
+            const t = p.list[i].t;
+            m4.compose(
+              v4.set(t.x, t.y, t.z),
+              q4.identity(),
+              s4.setScalar(t.sc)
+            );
+            mesh.setMatrixAt(i, m4);
+          }
+          mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+          p.mesh = mesh;
+          treePools.push(mesh);
+          ground.add(mesh);
+        }
+        // Resolve slots to their InstancedMesh for the sway loop.
+        for (const inst of treeInsts)
+          inst.slots = inst.slots.map((s) => ({mesh: s.pool.mesh, i: s.i}));
+        if (treeInsts.length)
+          record(
+            'forest stand (veglod)',
+            treeInsts.length +
+              ' trees above ' +
+              lodThr.toFixed(1) +
+              "' in " +
+              treePools.length +
+              ' draws'
+          );
       }
       // Buildings: the town's real shape. Real OSM footprints are
       // projected through the shared Earth anchoring and seated on
@@ -4913,11 +5011,14 @@
 
       function buildWorld(pre) {
         // Roam rebuilds repeatedly: free the previous terrain
-        // geometry (trees share cached geometries/materials and
-        // need no disposal; ground.clear() drops the references).
+        // geometry (tree pools share cached geometries/materials
+        // but own their instance buffers - dispose those; then
+        // ground.clear() drops the references).
         if (terrainMesh) terrainMesh.geometry.dispose();
+        for (const p of treePools) p.dispose();
         ground.clear();
-        trees = [];
+        treePools = [];
+        treeInsts = [];
         // Pin the dressing to the box being built: per-frame
         // sample() calls stay consistent with this mesh even while
         // the next re-anchor's fetch is in flight.
@@ -6858,6 +6959,10 @@
       const windVMid = new THREE.Vector3(1, 0, 0);
       const windVHigh = new THREE.Vector3(1, 0, 0);
       const treeAxis = new THREE.Vector3(0, 0, 1);
+      const treeQ = new THREE.Quaternion();
+      const treeM = new THREE.Matrix4();
+      const treeV = new THREE.Vector3();
+      const treeS = new THREE.Vector3();
       const tmpP = new THREE.Color();
 
       // ---------- data panel (✦ toggle / ?debug=1 / D key) ----------
@@ -9476,19 +9581,26 @@
           0.6
         );
         treeAxis.set(windV.z, 0, -windV.x);
-        for (const tree of trees) {
-          const u = tree.userData;
+        for (const inst of treeInsts) {
+          const ph = inst.t.phase;
           const forcing =
             meanLean +
             gustAmp *
               (0.6 *
-                Math.sin(t * 0.0011 + u.phase) *
-                Math.sin(t * 0.00043 + u.phase * 2.7) +
-                0.4 * Math.sin(t * 0.0027 + u.phase * 1.3));
-          u.v += (14 * (forcing - u.a) - 4.2 * u.v) * dt;
-          u.a += u.v * dt;
-          tree.setRotationFromAxisAngle(treeAxis, u.a);
+                Math.sin(t * 0.0011 + ph) *
+                Math.sin(t * 0.00043 + ph * 2.7) +
+                0.4 * Math.sin(t * 0.0027 + ph * 1.3));
+          inst.v += (14 * (forcing - inst.a) - 4.2 * inst.v) * dt;
+          inst.a += inst.v * dt;
+          treeQ.setFromAxisAngle(treeAxis, inst.a);
+          treeM.compose(
+            treeV.set(inst.t.x, inst.t.y, inst.t.z),
+            treeQ,
+            treeS.setScalar(inst.t.sc)
+          );
+          for (const s of inst.slots) s.mesh.setMatrixAt(s.i, treeM);
         }
+        for (const p of treePools) p.instanceMatrix.needsUpdate = true;
 
         // Cable cabins: pendulums in the SAME measured wind that
         // sways the trees - the drag/gravity statics set the lean,
