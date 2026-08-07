@@ -3953,36 +3953,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   pins the algebraic endpoints bit-exactly. (2) The sky's ozone
   column is MEASURED. The shipped constants encode exactly 300 DU
   - not by inference: Bruneton's own demo.cc constructs
-  kMaxOzoneNumberDensity = 300 DU / 15 km over the same tent
-  (read from the source; the 15 km IS the tent integral, held to
-  its closed form in the gate). Absorption is linear in the
-  column, so the correction is ONE scale DU/300 on the ozone term
-  everywhere - shader extinction(), the CPU transmittance twin,
-  the band rows. The feed: the operational GFS's TOZNE (WMO
-  4.2-0-14-0, DU) through the SAME NOMADS grib-filter path the
-  aerosols ride - the KEY DISCOVERY making it free: the filter's
-  subregion extraction RE-PACKS complex-packed GFS fields to
-  simple packing (template 5.0), so the gated grib2.js decodes
-  the operational GFS unchanged (a captured 187-byte live message
-  is the checked-in fixture, its 297.753 DU at Grindelwald pinned
-  in the gate). Daemon /ozone mirrors /aerosol (cell cache,
-  cycle walk-back, health row; install.sh ships ozone.js and the
-  derived watch list picks it up). Census fails CLOSED outside
-  [70, 700] DU. ozone-reference: 5 landmarks including the
-  log-ratio identity - log T_s/T_1 per channel proportional to
-  the shipped cross-sections ALONE (G/R = 1.881/0.650 to 1e-9,
-  path-independent; no tuning could fake it). Theme: syncOzone
-  on the aerosol cadence + roam re-sync (the runRoamSyncs lesson
-  applied), 6 h freshness, ?du=N pin and ?ozone=URL override
-  composing with weather pins, panel row. Browser-verified at a
-  pinned Grindelwald sunset (sun 1.4 deg), 450 vs 150 DU float
-  captures: G dims to 0.71, R to 0.89, B to 0.96 across three
-  sky rows - the measured G/R log-ratio 2.96 lands on the
-  cross-sections' own 2.89, the Chappuis signature in the frame.
-  85 reference sets + 5 GPU probes green. Scope: the tent SHAPE
-  stays (profile seasonality is second order next to the 220-460
-  DU column swing); the live /ozone endpoint activates when the
-  owner's update timer deploys the daemon.
+    kMaxOzoneNumberDensity = 300 DU / 15 km over the same tent
+    (read from the source; the 15 km IS the tent integral, held to
+    its closed form in the gate). Absorption is linear in the
+    column, so the correction is ONE scale DU/300 on the ozone term
+    everywhere - shader extinction(), the CPU transmittance twin,
+    the band rows. The feed: the operational GFS's TOZNE (WMO
+    4.2-0-14-0, DU) through the SAME NOMADS grib-filter path the
+    aerosols ride - the KEY DISCOVERY making it free: the filter's
+    subregion extraction RE-PACKS complex-packed GFS fields to
+    simple packing (template 5.0), so the gated grib2.js decodes
+    the operational GFS unchanged (a captured 187-byte live message
+    is the checked-in fixture, its 297.753 DU at Grindelwald pinned
+    in the gate). Daemon /ozone mirrors /aerosol (cell cache,
+    cycle walk-back, health row; install.sh ships ozone.js and the
+    derived watch list picks it up). Census fails CLOSED outside
+    [70, 700] DU. ozone-reference: 5 landmarks including the
+    log-ratio identity - log T_s/T_1 per channel proportional to
+    the shipped cross-sections ALONE (G/R = 1.881/0.650 to 1e-9,
+    path-independent; no tuning could fake it). Theme: syncOzone
+    on the aerosol cadence + roam re-sync (the runRoamSyncs lesson
+    applied), 6 h freshness, ?du=N pin and ?ozone=URL override
+    composing with weather pins, panel row. Browser-verified at a
+    pinned Grindelwald sunset (sun 1.4 deg), 450 vs 150 DU float
+    captures: G dims to 0.71, R to 0.89, B to 0.96 across three
+    sky rows - the measured G/R log-ratio 2.96 lands on the
+    cross-sections' own 2.89, the Chappuis signature in the frame.
+    85 reference sets + 5 GPU probes green. Scope: the tent SHAPE
+    stays (profile seasonality is second order next to the 220-460
+    DU column swing); the live /ozone endpoint activates when the
+    owner's update timer deploys the daemon.
 - DONE (sky parallax: the celestial group rides with the camera,
   Jul 11): the sunspot verification's "pose aims 1.35 deg high"
   was neither the pose nor the ephemeris - the camera provably
