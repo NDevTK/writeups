@@ -380,6 +380,7 @@
         createNLCMaterial,
         createSkyglowMaterial
       } from './horizon/sky-objects-tsl.js';
+      import {starTintRGB} from './horizon/stars-color.js';
       import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
       import {mpDropRadiusMm, mpSigmaExt} from './horizon/rainbow.js';
       import {parseSoft00, syndyne, visibleComets} from './horizon/comets.js';
@@ -6836,12 +6837,14 @@
               900 * Math.sin(decR),
               900 * Math.cos(decR) * Math.cos(raR)
             );
-            const t = THREE.MathUtils.clamp((kelvin - 3000) / 9000, 0, 1);
-            col.setRGB(
-              1 - t * 0.25,
-              0.88 - Math.abs(t - 0.45) * 0.2,
-              0.72 + t * 0.28
-            );
+            // Tint from physics, not a ramp: Planck at the
+            // catalogue temperature through the repo's own CIE
+            // colorimetry (stars-color.js - Ballesteros solar
+            // anchor and Schaefer 1990's night-vision colour
+            // slope in its gate). Chromaticity carrier, max
+            // channel 1 - brightness stays in the magnitude term.
+            const [tr, tg, tb] = starTintRGB(kelvin);
+            col.setRGB(tr, tg, tb);
             color.push(col.r, col.g, col.b);
             size.push(THREE.MathUtils.clamp(7.5 - mag, 1.8, 7.5));
           }

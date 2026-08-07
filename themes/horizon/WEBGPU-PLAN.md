@@ -5426,6 +5426,62 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   published column-fraction retrieval (or one of our own
   from HaloCam-class data - out of scope for a review
   branch).
+- DONE (star tints from Planck + the F_c verdict, Aug 7
+  thirty-first push - a NEW PAPER read in full, a hand ramp
+  retired, and the twenty-ninth push's residual resolved):
+  Schaefer 1990 (PASP 102, 212, "Telescopic Limiting
+  Magnitudes" - 18 pages via the ADS scan). His Eq. 13 prints
+  the night-vision colour correction -2.5 log(F_c) =
+  1 - (B-V)/2 below log B = 3.17 in millimicroLamberts - the
+  SAME 1500 nL boundary the colour floor ships - and Eq. 14's
+  assembly (I* = I Fb Fe Ft Fp Fa Fsc Fr Fc) with the p. 214
+  prose ("the redder of the two stars would appear fainter"
+  under night vision) resolves the sign convention the
+  twenty-ninth push declined to guess: in the rod frame a
+  star's V-band brightness shifts by -(1 - (B-V)/2) mag, a
+  printed slope of +0.5 mag per unit B-V, redder fainter.
+  While landing it, the audit found the star tints themselves
+  were a hand ramp (clamp((kelvin-3000)/9000) into three
+  hand-shaped channel expressions - uncited display
+  approximation). Both shipped together: stars-color.js
+  derives each catalogue star's tint from Planck's law
+  (SI-exact h, c, k_B) through the repo's OWN CIE_1931_2DEG
+  table and XYZ_TO_LINEAR_SRGB matrix (ocean-color.js - the
+  same colorimetry the ocean, vegetation and sky ride), max-1
+  chromaticity carrier; 2300 K now renders (1, .33, .04) deep
+  orange and 45000 K (.34, .47, 1) blue-white where the ramp
+  was flat 0.72..1 - and the sprite fold's Rec.709 matrix
+  finally operates on tints that ARE Rec.709 linear. The
+  corroboration: the shipped Larson-Eq.-13 rod fold, run over
+  the Planck tints against Ballesteros 2012's printed
+  blackbody colour-temperature relation (EPL 97, 34008;
+  T = 4600(1/(0.92(B-V)+1.7) + 1/(0.92(B-V)+0.62)); his own
+  constants land T(0.65) = 5778.4 K, the solar effective
+  temperature) produces a rod-brightness slope of 0.417 mag
+  per B-V over B-V 0..1.5 - Schaefer's printed 0.5 to 17%,
+  sign matching, two independent printed routes (a
+  Macbeth-patch photometric fit vs astronomical physiology)
+  on one slope. F_c is therefore deliberately NOT applied on
+  top of the fold - the fold already carries it, and stacking
+  both would double-count (stated in the module header). Gate:
+  stars-color-reference.mjs, 5 landmarks - Ballesteros
+  constants verbatim + solar anchor to 1 K + inversion
+  round-trip 9e-16; fold-rows x display-matrix identity to
+  2.1e-4; 6500 K Planck vs shipped D65 dxy (0.0006, -0.0054)
+  < 0.006 (the D-series-vs-Planck offset, documented); locus
+  monotone with red-led cool / blue-led hot ends; the
+  Schaefer slope in [0.40, 0.55] + the fold's scale
+  invariance at 2e-16. validate.sh gains the gate; VALIDATE
+  PASS (all references + 7 GPU probes). Stated residuals: the
+  catalogue temperature is treated as a blackbody (no line
+  blanketing - Ballesteros' fit is itself the demonstration
+  that real-star B-V tracks the blackbody form); the shipped
+  CMF table's 360-700 nm span truncates the deepest-red tail
+  (sub-percent of X at 2300 K); and the twenty-ninth push's
+  FIRST residual stands unchanged - a per-star colour-
+  SURVIVAL brightness limit is still nowhere in print (1990b
+  prints the brightness correction, not a per-source colour
+  threshold; the 1500 nL floor remains a field statement).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
