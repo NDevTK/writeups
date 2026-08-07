@@ -47,7 +47,8 @@ import {
   ICE_N,
   mcHalo,
   parhelicCircleProfile,
-  parhelionProfile
+  parhelionProfile,
+  pillarAzSigma
 } from './halos.js';
 import {sunAngularRadiusRad} from './eclipses.js';
 import {
@@ -334,4 +335,59 @@ export function buildDogLUT(h, bins = 256, srcR = SUN_RADIUS) {
     azMaxDeg: (pp.a1 * 180) / Math.PI,
     any: pp.any
   };
+}
+
+/**
+ * The sun pillar's AZIMUTH profile about the source azimuth: the
+ * limb-darkened source disc's marginal convolved with the
+ * crystal's own azimuth Gaussian (halos.js pillarAzSigma -
+ * sqrt(2) Theta tan|h|, which DIES at the horizon: the grazing
+ * basal mirror is blind to the sideways tilt, so the drawn column
+ * is one source-disc wide, exactly the photographs). Even in
+ * azimuth, normalised to unit SIGNED-domain integral (1/rad); the
+ * absolute scale rides the amp as PLATE_ALPHA x pillarShare(h) x
+ * the vertical Gaussian's peak density - the dog/circle frame.
+ * The VERTICAL profile stays closed-form in the material: a
+ * Gaussian of sigma sqrt(2 Theta^2 + R^2/4) about altitude -h
+ * (the disc's marginal variance R^2/4 in quadrature - at
+ * sigma >> R the disc's vertical structure washes to that order,
+ * so the separable draw is exact to ~(R/sigma)^2).
+ */
+export function buildPillarLUT(h, bins = 64, srcR = SUN_RADIUS) {
+  const sc = pillarAzSigma(h);
+  const aMax = srcR + Math.max(5 * sc, srcR);
+  // Symmetric grid (odd count, centre index bins - 1 at zero):
+  // the convolution sees the even profile, the LUT keeps the
+  // right half and the material samples |azOff|.
+  const sym = 2 * bins - 1;
+  const dTh = (2 * aMax) / (sym - 1);
+  const prof = new Float64Array(sym * 3);
+  for (let i = 0; i < sym; i++) {
+    const th = -aMax + i * dTh;
+    const g =
+      sc > dTh / 2
+        ? Math.exp((-th * th) / (2 * sc * sc))
+        : i === bins - 1
+          ? 1
+          : 0;
+    prof[i * 3] = prof[i * 3 + 1] = prof[i * 3 + 2] = g;
+  }
+  const conv = sunConvolve(prof, sym, dTh, srcR);
+  const integ = [0, 0, 0];
+  for (let i = 0; i < sym; i++)
+    for (let c = 0; c < 3; c++) integ[c] += conv[i * 3 + c] * dTh;
+  const out = new Float32Array(bins * 4);
+  for (let i = 0; i < bins; i++) {
+    for (let c = 0; c < 3; c++) {
+      const v = conv[(bins - 1 + i) * 3 + c];
+      out[i * 4 + c] = integ[c] > 0 ? v / integ[c] : 0;
+    }
+    out[i * 4 + 3] = 1;
+  }
+  // The clamp-sampled edge stays dark (the domain carries the
+  // disc plus five crystal sigmas - nothing lives out there).
+  out[(bins - 1) * 4] = 0;
+  out[(bins - 1) * 4 + 1] = 0;
+  out[(bins - 1) * 4 + 2] = 0;
+  return {data: out, bins, azMaxRad: aMax};
 }

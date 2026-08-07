@@ -4662,6 +4662,52 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   beyond the dogs (120-degree parhelia, the blue spot) and the
   sun-pillar family (the booked basal reflections at low sun)
   stay named.
+- DONE (the sun pillar, Aug 7 thirteenth push - the column from
+  the reflections the circle pass booked): NO new empirical
+  constant - every number derives from research already
+  integrated (B&D's tilt and alpha, Auer-Veal aspects, the
+  ephemeris disc radius, Warren indices). The plate MC's
+  reflOffAlmT bucket gains a PILLAR sub-bucket (reflections
+  within 3 deg of the source azimuth: a +-15-deg apparent-
+  altitude histogram plus azimuth moments; the existing books
+  untouched, closure unchanged). The emergent physics is the
+  basal mirror exactly: the image sits at MINUS the source
+  altitude, a vertical Gaussian of sigma sqrt(2) Theta (B&D's
+  per-component Theta/sqrt(2), doubled by the mirror - MC rms
+  1.40 deg at h = 5 vs 1.414), and the azimuth deflection is
+  2 b tan|h| - the grazing mirror is BLIND to the sideways tilt
+  (folded-Gaussian moments held to two digits), so the drawn
+  column is one source-disc wide, exactly the photographs. Share
+  of the plate interaction: (3 sqrt(3)/2) sin|h| rho(sin|h|) /
+  A_tot(|h|) - MC 0.253 vs closed 0.261 at h = +5; at h = -6 the
+  photon enters the LOWER basal face and the image lands at +12
+  ABOVE the horizon (the twilight pillar's geometry, in the same
+  books; the histogram window's exact Gaussian truncation folded
+  into the expectation, share to 2%, mean to 0.1 deg). The
+  EMERGENCE is the law share x (1 - Phi(h / sigma)): peak near
+  h ~ 1 deg, x7.4 over h = 3, four decades down by 8 - a
+  sunrise/sunset optic, gated. Drawn with NO vertical LUT (the
+  profile is a closed-form Gaussian; sigma widens by the disc's
+  marginal variance R^2/4 in quadrature - the separable draw is
+  exact to (R/sigma)^2, stated) and a 64-bin azimuth LUT: the
+  limb-darkened disc marginal through the crystal Gaussian
+  (buildPillarLUT; unit signed-domain integral, the optics gate
+  holds the quadrature width law to 0.2% and the sigma_c -> 0
+  build IS the disc marginal). Below-horizon fragments gate off:
+  the deck lives ABOVE the eye, no crystals sit under the
+  horizon ray (the aircraft subsun waits on a camera-above-deck
+  geometry). Both sources ride the dog/circle chain (slabBase x
+  PLATE_ALPHA x T_air x peak density - occurrence, veil and
+  eclipse gate for free); the moon pillar takes the moon's own
+  disc width. halos-reference: the pillar landmark (share both
+  signs of h, mirror moments, folded azimuth, emergence);
+  optics-reference: the LUT landmark. Named limits: the TWILIGHT
+  pillar - the classic bright case, h < 0 with the image fully
+  above the horizon - waits on the deck's own twilight
+  illumination (an 8-km deck keeps direct sun for ~3 deg of
+  ground-horizon dip; today's slabBase chain gates at h > 0),
+  and internal-path pillar light (transmitted families) stays in
+  the lost/offAlm books, stated.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

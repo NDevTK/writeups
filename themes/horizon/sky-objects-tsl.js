@@ -512,6 +512,10 @@ export function createOpticsMaterial(cloudShadow) {
   const circleTex = new DataTexture(circleData, 256, 1, RGBAFormat, FloatType);
   circleTex.minFilter = circleTex.magFilter = LinearFilter;
   circleTex.needsUpdate = true;
+  const pillarData = new Float32Array(64 * 4);
+  const pillarTex = new DataTexture(pillarData, 64, 1, RGBAFormat, FloatType);
+  pillarTex.minFilter = pillarTex.magFilter = LinearFilter;
+  pillarTex.needsUpdate = true;
   const u = {
     sunDir: uniform(new Vector3(0, 1, 0)),
     antisolar: uniform(new Vector3(0, -1, 0)),
@@ -560,6 +564,23 @@ export function createOpticsMaterial(cloudShadow) {
     // density; the LUT is absolute per unit plate interaction.
     circleAmp: uniform(new Color(0, 0, 0)),
     circleSigma: uniform(0.0147),
+    // The SUN PILLAR / subsun: the same plates' BASAL faces as
+    // external mirrors - the horizontal mirror images the source
+    // at altitude -srcAlt, smeared vertically by the tilt through
+    // the mirror (sigma sqrt(2) Theta, halos.js pillarShare /
+    // PILLAR_SIGMA_ALT, MC-held) and ONE SOURCE-DISC WIDE in
+    // azimuth (the grazing mirror is blind to the sideways tilt;
+    // optics-lut buildPillarLUT carries the limb-darkened
+    // marginal). pillarAmp carries E_src x T_air x slab x
+    // PLATE_ALPHA x pillarShare(h) x the vertical Gaussian's peak
+    // density; the azimuth LUT integrates to 1 per radian, so the
+    // drawn column is sr^-1 in the ring's frame. Below-horizon
+    // fragments gate off: the deck lives ABOVE the eye, so no
+    // crystals sit along a downward ray (the aircraft subsun
+    // waits on a camera-above-deck geometry).
+    pillarAmp: uniform(new Color(0, 0, 0)),
+    pillarSigma: uniform(0.0248),
+    pillarAzMax: uniform(0.0155),
     // Bravais parhelia (optics-lut buildDogLUT): azimuth-offset
     // LUT re-laid by the theme as the source climbs; srcAlt +
     // the plates' documented ~1.5-degree wobble envelope place
@@ -570,7 +591,9 @@ export function createOpticsMaterial(cloudShadow) {
     dogTex,
     dogData,
     circleTex,
-    circleData
+    circleData,
+    pillarTex,
+    pillarData
   };
   const material = new NodeMaterial();
   material.side = BackSide;
@@ -694,8 +717,22 @@ export function createOpticsMaterial(cloudShadow) {
   const cCircle = circleSample
     .mul(exp(dAltC.mul(dAltC).mul(-0.5)))
     .mul(u.circleAmp);
+  // The pillar: the basal mirror's image at MINUS the source
+  // altitude, the tilt Gaussian vertical, the disc-marginal LUT
+  // azimuthal (sampled at |azOff| - the profile is even), gated
+  // to the sky above the horizon.
+  const dAltP = asin(clamp(v.y, -1.0, 1.0))
+    .add(u.srcAlt)
+    .div(max(u.pillarSigma, 1e-4));
+  const pillarSample = texture(u.pillarTex).sample(
+    vec2(azOff.div(max(u.pillarAzMax, 1e-4)).clamp(0.0, 1.0), 0.5)
+  ).rgb;
+  const cPillar = pillarSample
+    .mul(exp(dAltP.mul(dAltP).mul(-0.5)))
+    .mul(step(0.0, v.y))
+    .mul(u.pillarAmp);
   const cHalo = haloSample.mul(u.haloAmp);
-  material.colorNode = cBow.add(cHalo).add(cDogs).add(cCircle);
+  material.colorNode = cBow.add(cHalo).add(cDogs).add(cCircle).add(cPillar);
   material.opacityNode = 1.0;
   return {material, u};
 }

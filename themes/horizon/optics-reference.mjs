@@ -16,7 +16,12 @@
 //  - the dog LUT: alive and outside the halo at 25 deg
 //    elevation, red toward the source, EMPTY past the Bravais
 //    cutoff
-import {buildBowLUT, buildDogLUT, buildHaloLUT} from './optics-lut.js';
+import {
+  buildBowLUT,
+  buildDogLUT,
+  buildHaloLUT,
+  buildPillarLUT
+} from './optics-lut.js';
 import {bravais, prismDmin, ICE_N, PRISM_60} from './halos.js';
 import {
   bowGeometric,
@@ -455,6 +460,54 @@ function bowStats(c, lo, hi) {
     'two-leg slab: closed form = quadrature',
     ok,
     `worst rel ${worst.toExponential(1)} over sigH x (h, alpha) grid incl. removable point, above-source and downward rays; dry -> exactly 0`
+  );
+}
+
+{
+  // The pillar azimuth LUT: unit signed-domain integral (the amp
+  // carries the absolute scale), dark at the clamp-sampled edge,
+  // and the width obeys the quadrature law - the sigma_c -> 0
+  // build IS the limb-darkened disc marginal (its sd sits just
+  // under the flat disc's R/2), and at altitude the crystal
+  // Gaussian adds in quadrature.
+  const stats = (l, c) => {
+    const dTh = l.azMaxRad / (l.bins - 1);
+    let I = 0;
+    let V = 0;
+    for (let i = 0; i < l.bins; i++) {
+      const th = i * dTh;
+      const p = l.data[i * 4 + c];
+      const w = i === 0 ? 1 : 2;
+      I += w * p * dTh;
+      V += w * p * th * th * dTh;
+    }
+    return {I, sd: Math.sqrt(V / I)};
+  };
+  const R = 0.00465;
+  const l0 = buildPillarLUT(1e-6);
+  const l5 = buildPillarLUT((5 * Math.PI) / 180);
+  const sc5 =
+    Math.SQRT2 * ((1 * Math.PI) / 180) * Math.tan((5 * Math.PI) / 180);
+  let ok = true;
+  let worst = 0;
+  for (let c = 0; c < 3; c++) {
+    const s0 = stats(l0, c);
+    const s5 = stats(l5, c);
+    if (!(Math.abs(s0.I - 1) < 1e-3 && Math.abs(s5.I - 1) < 1e-3)) ok = false;
+    if (!(s0.sd < R / 2 && s0.sd > 0.85 * (R / 2))) ok = false;
+    const q = Math.hypot(s0.sd, sc5);
+    const rel = Math.abs(s5.sd / q - 1);
+    worst = Math.max(worst, rel);
+    if (!(rel < 0.02)) ok = false;
+    if (!(l0.data[(l0.bins - 1) * 4 + c] === 0)) ok = false;
+    if (!(l5.data[(l5.bins - 1) * 4 + c] === 0)) ok = false;
+    if (!Number.isFinite(s5.sd)) ok = false;
+  }
+  const s0g = stats(l0, 1);
+  check(
+    'pillar azimuth LUT: unit integral, disc-marginal width',
+    ok,
+    `integral 1; sd(h->0) ${((s0g.sd * 180) / Math.PI).toFixed(4)} deg (flat R/2 ${(((R / 2) * 180) / Math.PI).toFixed(4)}); quadrature law to ${(worst * 100).toFixed(2)}% at h = 5; edges dark`
   );
 }
 

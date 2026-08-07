@@ -39,6 +39,9 @@ import {
   HALO_FAMILY_FRACTION,
   haloOccurrence,
   parhelicCircleProfile,
+  pillarAzSigma,
+  pillarShare,
+  PILLAR_SIGMA_ALT,
   plateMeanC,
   plateProjArea,
   CIRCLE_SIGMA_ALT_DEG,
@@ -493,6 +496,124 @@ const RAD = Math.PI / 180;
     ok,
     detail +
       `zero toward the sun; white to ${(spread * 100).toFixed(1)}% across the ice indices; <c> ${plateMeanC().toFixed(3)}`
+  );
+}
+
+{
+  // The sun pillar / subsun: the basal-mirror closed form against
+  // the plate Monte Carlo's own pillar books. At h = +5 the image
+  // sits at -2h (the subsun), a vertical Gaussian of sigma
+  // sqrt(2) Theta, azimuth moments the folded |2 b tan h|
+  // Gaussian; at h = -6 the photon enters the LOWER basal face
+  // and the image lands at +2|h| ABOVE the horizon - the twilight
+  // pillar's geometry in the same books (the +-15-deg histogram
+  // window clips the top tail; the expectation folds the exact
+  // truncation). Emergence, analytic: visible-column energy
+  // share(h) x (1 - Phi(h/sigma)) peaks near h ~ 1 deg and is
+  // four decades down by h = 8 - the pillar is a HORIZON optic.
+  const phi = (x) => Math.exp((-x * x) / 2) / Math.sqrt(2 * Math.PI);
+  const erf = (x) => {
+    const s = x < 0 ? -1 : 1;
+    x = Math.abs(x);
+    const t = 1 / (1 + 0.3275911 * x);
+    const y =
+      1 -
+      ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) *
+        t +
+        0.254829592) *
+        t *
+        Math.exp(-x * x);
+    return s * y;
+  };
+  const Phi = (z) => 0.5 * (1 + erf(z / Math.SQRT2));
+  const sig = PILLAR_SIGMA_ALT;
+  let ok = PILLAR_SIGMA_ALT === Math.SQRT2 * PLATE_TILT_THETA;
+  let detail = '';
+  const moments = (mc, ch) => {
+    let s = 0;
+    let sy = 0;
+    let sy2 = 0;
+    for (let b = 0; b < mc.pillarBins; b++) {
+      const v = mc.pillarData[b * 3 + ch];
+      const dA = ((-15 + (30 * (b + 0.5)) / mc.pillarBins) * Math.PI) / 180;
+      s += v;
+      sy += v * dA;
+      sy2 += v * dA * dA;
+    }
+    const m = sy / s;
+    return {m, r: Math.sqrt(Math.max(sy2 / s - m * m, 0))};
+  };
+  for (const hd of [5, -6]) {
+    const h = hd * RAD;
+    const mc = mcParhelion(h, ICE_N, 250000);
+    const sh = pillarShare(h);
+    // The window's exact take of the image Gaussian at -2h
+    // (relative to the source; the circle's 5-deg almucantar gate
+    // owns the near band, the histogram stops at 15).
+    const c = -2 * h;
+    const a = ((Math.sign(c) * 5 * Math.PI) / 180 - c) / sig;
+    const b = ((Math.sign(c) * 15 * Math.PI) / 180 - c) / sig;
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    const Z = Phi(hi) - Phi(lo);
+    const mTh = c + (sig * (phi(lo) - phi(hi))) / Z;
+    for (let ch = 0; ch < 3; ch++) {
+      const mcShare = mc.pillarT[ch] / mc.accepted[ch];
+      if (!(Math.abs(mcShare / (sh[ch] * Z) - 1) < 0.06)) ok = false;
+      if (!(mc.pillarT[ch] <= mc.reflOffAlmT[ch] + 1e-9)) ok = false;
+    }
+    const {m, r} = moments(mc, 1);
+    if (!(Math.abs(m - mTh) < (0.3 * Math.PI) / 180)) ok = false;
+    const vTh =
+      sig *
+      Math.sqrt(
+        Math.max(
+          1 +
+            (lo * phi(lo) - hi * phi(hi)) / Z -
+            ((phi(lo) - phi(hi)) / Z) ** 2,
+          0
+        )
+      );
+    if (!(Math.abs(r / vTh - 1) < 0.08)) ok = false;
+    detail += `h${hd}: share ${(mc.pillarT[1] / mc.accepted[1]).toFixed(3)} (closed ${(sh[1] * Z).toFixed(3)}), image ${((m * 180) / Math.PI).toFixed(2)} deg (mirror ${((mTh * 180) / Math.PI).toFixed(2)}); `;
+    if (hd === 5) {
+      // Azimuth: the grazing mirror is blind to the sideways
+      // tilt - sigma_az = sqrt(2) Theta tan h, folded moments.
+      const sc = pillarAzSigma(h);
+      const azM = mc.pillarAz[1] / mc.pillarT[1];
+      const azS = Math.sqrt(
+        Math.max(mc.pillarAz2[1] / mc.pillarT[1] - azM * azM, 0)
+      );
+      if (!(Math.abs(azM / (sc * Math.sqrt(2 / Math.PI)) - 1) < 0.15))
+        ok = false;
+      if (!(Math.abs(azS / (sc * Math.sqrt(1 - 2 / Math.PI)) - 1) < 0.2))
+        ok = false;
+      // Off the almucantar at low sun the reflected family IS the
+      // pillar (the sub-bucket takes essentially all of it).
+      if (!(mc.pillarT[1] / mc.reflOffAlmT[1] > 0.97)) ok = false;
+      detail += `az mean ${((azM * 180) / Math.PI).toFixed(3)} deg (folded ${((sc * Math.sqrt(2 / Math.PI) * 180) / Math.PI).toFixed(3)}); `;
+    }
+  }
+  const R = 0.00465; // IAU solar angular radius, offline stand-in
+  const sigV = Math.hypot(sig, R / 2);
+  const Evis = (hd) => {
+    const h = hd * RAD;
+    return pillarShare(h)[1] * (1 - Phi(h / sigV));
+  };
+  ok =
+    ok &&
+    Evis(1) > 5 * Evis(3) &&
+    Evis(8) < 1e-4 * Evis(1) &&
+    Evis(1) > Evis(0.5) &&
+    Evis(1) > Evis(2) &&
+    pillarShare(0).every((v) => v === 0) &&
+    pillarShare(NaN).every((v) => v === 0) &&
+    pillarAzSigma(0) === 0;
+  check(
+    'the sun pillar: basal mirror closed form = the traced books',
+    ok,
+    detail +
+      `E_vis peaks at h ~ 1 (${Evis(1).toExponential(2)}), x${(Evis(1) / Evis(3)).toFixed(1)} over h = 3, dead by 8: a horizon optic`
   );
 }
 

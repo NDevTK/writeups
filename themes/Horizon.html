@@ -379,7 +379,8 @@
       import {
         buildBowLUT,
         buildCircleLUT,
-        buildDogLUT
+        buildDogLUT,
+        buildPillarLUT
       } from './horizon/optics-lut.js';
       import {
         SCF_COLUMN,
@@ -388,7 +389,9 @@
         parhelionSigmaAlt,
         haloOccurrence,
         HALO_FAMILY_FRACTION,
-        CIRCLE_SIGMA_ALT_DEG
+        CIRCLE_SIGMA_ALT_DEG,
+        pillarShare,
+        PILLAR_SIGMA_ALT
       } from './horizon/halos.js';
       import {
         apparentAltitude,
@@ -10415,6 +10418,28 @@
             tH[1] * cirA,
             tH[2] * cirA
           );
+          // The SUN PILLAR: the same slab chain on the plates'
+          // basal mirrors - halos.js pillarShare per channel
+          // (the grazing Fresnel barely sees the ice indices:
+          // white by physics), the mirror-doubled tilt sigma
+          // widened by the disc's vertical marginal in
+          // quadrature. The amp carries the vertical Gaussian's
+          // peak density; the azimuth LUT is per radian
+          // (buildPillarLUT, re-laid below at the dog cadence).
+          // The drawn column lives only while the image
+          // Gaussian's upper tail clears the horizon - the
+          // gate's emergence law: a sunrise/sunset optic, peak
+          // near h ~ 1 deg, gone by ~5.
+          const sigP = Math.hypot(PILLAR_SIGMA_ALT, astro.sunAngR / 2);
+          const shP = pillarShare(sun.alt);
+          const pilA =
+            slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigP);
+          opticsU.pillarSigma.value = sigP;
+          opticsU.pillarAmp.value.setRGB(
+            tH[0] * shP[0] * pilA,
+            tH[1] * shP[1] * pilA,
+            tH[2] * shP[2] * pilA
+          );
         }
         // Bravais parhelia: re-lay the dog LUT when the sun has
         // moved 0.2 deg; the migration, dispersion and the
@@ -10435,6 +10460,13 @@
           const cl = buildCircleLUT(sun.alt);
           opticsU.circleData.set(cl.data);
           opticsU.circleTex.needsUpdate = true;
+          // The pillar's azimuth profile: the sun's own
+          // limb-darkened marginal through the crystal sigma at
+          // this altitude.
+          const pl = buildPillarLUT(sun.alt, 64, astro.sunAngR);
+          opticsU.pillarData.set(pl.data);
+          opticsU.pillarTex.needsUpdate = true;
+          opticsU.pillarAzMax.value = pl.azMaxRad;
         }
         // The moon's dome: same gating physics (cirrus for the
         // halo, rain for the bow, low source for the dogs), the
@@ -10528,6 +10560,19 @@
               tH[1] * cirAM,
               tH[2] * cirAM
             );
+            // The MOON PILLAR - the same basal mirrors under the
+            // measured moonlight, the moon's own disc setting the
+            // column's width.
+            const sigPM = Math.hypot(PILLAR_SIGMA_ALT, astro.moonAngR / 2);
+            const shPM = pillarShare(moon.alt);
+            const pilAM =
+              slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigPM);
+            opticsMoonU.pillarSigma.value = sigPM;
+            opticsMoonU.pillarAmp.value.setRGB(
+              tH[0] * shPM[0] * pilAM,
+              tH[1] * shPM[1] * pilAM,
+              tH[2] * shPM[2] * pilAM
+            );
           }
           opticsMoonU.srcAlt.value = refr.moonApp;
           if (
@@ -10545,6 +10590,10 @@
             const cl = buildCircleLUT(refr.moonApp);
             opticsMoonU.circleData.set(cl.data);
             opticsMoonU.circleTex.needsUpdate = true;
+            const pl = buildPillarLUT(refr.moonApp, 64, astro.moonAngR);
+            opticsMoonU.pillarData.set(pl.data);
+            opticsMoonU.pillarTex.needsUpdate = true;
+            opticsMoonU.pillarAzMax.value = pl.azMaxRad;
           }
           // The LUNAR corona, radiometric: the same cold-cirrus
           // gate and measured column as the sun's, the amplitude
@@ -11047,7 +11096,9 @@
               : 'off') +
             ' (' +
             Math.round(HALO_FAMILY_FRACTION * 100) +
-            '% of cirrus, HaloCam) · eclipse ' +
+            '% of cirrus, HaloCam) · pillar amp G ' +
+            opticsU.pillarAmp.value.g.toExponential(1) +
+            ' (basal mirror) · eclipse ' +
             ((astro.eclipse || 0) * 100).toFixed(0) +
             '%';
           live['aurora curtain'] =

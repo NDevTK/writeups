@@ -480,6 +480,15 @@ export function mcParhelion(
   const circleY = [0, 0, 0];
   const circleY2 = [0, 0, 0];
   const reflOffAlmT = [0, 0, 0];
+  // The pillar sub-bucket of reflOffAlmT: apparent-altitude
+  // histogram (dAlt in [-15, +15] degrees) of reflections within
+  // 3 degrees of the sun's azimuth, plus azimuth moments for the
+  // drawn column's width.
+  const pillarBins = 128;
+  const pillarData = new Float64Array(pillarBins * 3);
+  const pillarT = [0, 0, 0];
+  const pillarAz = [0, 0, 0];
+  const pillarAz2 = [0, 0, 0];
   // Per-trial plate: diameter log-uniform over B&D's printed
   // oriented range, aspect from Auer & Veal's law - the
   // POPULATION average, not one resonant slab (a single exact
@@ -589,7 +598,27 @@ export function mcParhelion(
             circleY[ch] += wR * (altR - h);
             circleY2[ch] += wR * (altR - h) * (altR - h);
           }
-        } else reflOffAlmT[ch] += wR;
+        } else {
+          reflOffAlmT[ch] += wR;
+          // The PILLAR: basal-face reflections near the sun's own
+          // azimuth, off the almucantar - the tilt distribution
+          // through the horizontal mirror. Histogram over the
+          // apparent altitude around the sun (a sub-bucket of
+          // reflOffAlmT - the books above are untouched).
+          if (azAbs < (3 * Math.PI) / 180) {
+            const dA = altR - h;
+            const pb = Math.floor(
+              ((dA + (15 * Math.PI) / 180) / ((30 * Math.PI) / 180)) *
+                pillarBins
+            );
+            if (pb >= 0 && pb < pillarBins) {
+              pillarData[pb * 3 + ch] += wR;
+              pillarT[ch] += wR;
+              pillarAz[ch] += wR * azAbs;
+              pillarAz2[ch] += wR * azAbs * azAbs;
+            }
+          }
+        }
       }
       // The internal walk FOLLOWS total internal reflections (up
       // to 12 face events): in a thin plate the skew ray reaches
@@ -718,7 +747,12 @@ export function mcParhelion(
     circleData,
     circleT,
     reflOffAlmT,
-    circleSigmaAlt
+    circleSigmaAlt,
+    pillarBins,
+    pillarData,
+    pillarT,
+    pillarAz,
+    pillarAz2
   };
 }
 
@@ -782,6 +816,49 @@ export function parhelicCircleProfile(h, thetasRad, nIce = ICE_N) {
 // altitude (0.83-0.85 deg over h 10-30); the gate re-derives it
 // and holds this literal.
 export const CIRCLE_SIGMA_ALT_DEG = 0.84;
+
+// ---- the sun pillar / subsun, analytically ----
+// External reflection off the SAME oriented plates' BASAL faces:
+// the horizontal mirror images the source at altitude -h. B&D's
+// tilt density f = (1/pi Theta^2) exp(-theta_n^2 / Theta^2) has
+// per-component sigma Theta/sqrt(2) and the mirror doubles the
+// in-plane component, so the image is a vertical Gaussian of
+// sigma sqrt(2) Theta about -h - the plate Monte Carlo's own
+// reflected books measure exactly this (rms 1.40 deg at h = 5 vs
+// sqrt(2) x 1 deg). Azimuthally the out-of-plane component b
+// deflects the grazing ray by only 2 b tan|h| (in the mirror
+// plane the graze is blind to the sideways tilt - the MC holds
+// the folded-Gaussian moments to two digits), so the crystal's
+// azimuth spread DIES at the horizon and the drawn column's
+// width is the source disc's own (optics-lut buildPillarLUT
+// carries the limb-darkened marginal through this sigma). The
+// share of the plate's geometric interaction is the top basal
+// face's projected area times the grazing Fresnel reflectance:
+//     share(h) = (3 sqrt(3)/2) sin|h| rho(sin|h|) / A_tot(|h|),
+// MC-held at the few-percent level (the tilt's curvature of
+// sin h and of the grazing Fresnel is the residual). Above the
+// horizon the column survives only while the Gaussian's upper
+// tail clears alt 0 - share x (1 - Phi(h / sigma)): the pillar
+// is a HORIZON optic, peaking near h ~ 1 deg, gone by ~5 (the
+// gate pins the emergence). h < 0 mirrors: the photon enters the
+// LOWER basal face and the image lands at +|h| ABOVE the horizon
+// - the twilight pillar's geometry, in the same books (the MC
+// runs it unchanged; the drawn feed still needs the deck's own
+// twilight illumination, a named limit).
+export const PILLAR_SIGMA_ALT = Math.SQRT2 * PLATE_TILT_THETA;
+export function pillarShare(h, nRGB = ICE_N) {
+  const sa = Math.abs(Math.sin(h));
+  const A = plateProjArea(Math.abs(h));
+  return nRGB.map((n) => {
+    if (!(sa > 0) || !(A > 0)) return 0;
+    const rho = 1 - fresnelT(sa, n);
+    return (((3 * Math.sqrt(3)) / 2) * sa * rho) / A;
+  });
+}
+// The crystal part of the column's azimuth sigma (radians).
+export function pillarAzSigma(h, tiltTheta = PLATE_TILT_THETA) {
+  return Math.SQRT2 * tiltTheta * Math.abs(Math.tan(h));
+}
 
 // Unpolarised Fresnel transmittance into index n at cos(i) = ci -
 // the same formula refract() applies, exposed for the analytic
