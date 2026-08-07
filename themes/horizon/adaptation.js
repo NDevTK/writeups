@@ -172,6 +172,22 @@ export function skyTransferE(altRad) {
   ];
 }
 
+// ---- the point-source colour floor (Schaefer 1993) ----
+// Schaefer, "Astronomy and the Limits of Vision" (Vistas in
+// Astronomy 36, 311 - read in full), Sec. 2.12: "The human eye
+// can detect colors from sources brighter than 1500 nL" - the
+// photopic/scotopic boundary as he uses it throughout (his
+// case split log B = 3.17 IS log10(1500)). His own printed
+// conversion (p. 319): 1 nanoLambert = 3.18e-6 nit. The
+// product lands within 15% of Ferwerda/LBNL's printed
+// MESOPIC_LO above - two independent printed sources on one
+// colour floor - and his same table's 26.33 mag/arcsec^2 per
+// nL closes a THIRD way through this module's Falchi-anchored
+// bridge (the gate holds both corroborations).
+export const NL_TO_CDM2 = 3.18e-6;
+export const COLOR_LIMIT_NL = 1500;
+export const COLOR_LIMIT_CDM2 = COLOR_LIMIT_NL * NL_TO_CDM2;
+
 // ---- the display map ----
 // EXPO_DAY is the display's ONE remaining unit constant: the
 // exposure the theme's daytime appearance was built at (the old

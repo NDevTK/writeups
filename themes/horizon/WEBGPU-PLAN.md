@@ -5330,6 +5330,32 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     -2.4 deg capture shows the feature: the deep-red ring arcing
     over the sunset glow where the amp was hard zero before -
     halo amp G 0.007, the panel's own row.
+- DONE (star colours at the printed colour floor, Aug 7
+  twenty-ninth push - a NEW PAPER read in full, and the colour
+  boundary triple-corroborated): Schaefer 1993, "Astronomy and
+  the Limits of Vision" (Vistas in Astronomy 36, 311 - 51
+  pages, the celestial-visibility review). Sec. 2.12 prints the
+  point-source colour floor - "the human eye can detect colors
+  from sources brighter than 1500 nL" - and his case boundary
+  log B = 3.17 IS log10(1500) throughout the paper's threshold
+  machinery. His own p. 319 unit table (1 nL = 3.18e-6 nit)
+  lands the floor at 4.77 mcd/m^2 - within 15% of
+  Ferwerda/LBNL's printed mesopic edge (5.6), two independent
+  printed sources on ONE boundary - and his 26.33 mag/arcsec^2-
+  per-nL row closes a THIRD way: the theme's Falchi-anchored
+  bridge reproduces his nit conversion to 1.4% with no shared
+  constants (all three in one gate landmark). adaptation.js
+  ships NL*TO_CDM2 / COLOR_LIMIT*\*; the star sprites fold
+  their catalogue tints to their own Eq. 13 rod luminance under
+  the SAME shared mesopic blend the dome, optics and lighting
+  ride (makeSprites gains a colour hook; the theme feeds
+  mesoB). Stated residuals: the printed floor is a field
+  statement - the few brightest stars' colour survival needs a
+  per-source image-brightness limit no source here prints, so
+  the fold is uniform; planets keep their tints (their discs
+  sit brighter than any star); and the paper's F_c scotopic
+  B-V correction is NOT taken (its sign convention needs
+  deeper reading than a review pass should risk).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

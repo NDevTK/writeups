@@ -851,11 +851,11 @@ function makeSprites({positions, colors, sizes, opacityFor}) {
   // the same sizePx pixels.
   const viewZ = modelViewMatrix.mul(vec4(center, 1.0)).z.negate();
   const p11 = cameraProjectionMatrix.element(1).element(1);
-  const {sizeNode, opacityNode} = opacityFor(center, sizeA);
+  const {sizeNode, opacityNode, colorNode} = opacityFor(center, sizeA, colorA);
   material.scaleNode = sizeNode.mul(2.0).mul(viewZ).div(screenSize.y.mul(p11));
   // gl_PointCoord's radial mask on the quad's own uv
   const d = length(uv().sub(0.5));
-  material.colorNode = colorA;
+  material.colorNode = colorNode ?? colorA;
   material.opacityNode = opacityNode.mul(smoothstep(0.2, 0.5, d).oneMinus());
   const mesh = new InstancedMesh(geo, material, count);
   mesh.frustumCulled = false;
@@ -898,13 +898,25 @@ export function createStarSprites(positions, colors, sizes) {
     night: uniform(0),
     time: uniform(0),
     twRate: uniform(9),
-    sigZen: uniform(youngSigma(EYE_D_CM, 1))
+    sigZen: uniform(youngSigma(EYE_D_CM, 1)),
+    // The point-source colour floor (Schaefer 1993 Sec. 2.12,
+    // via adaptation.js COLOR_LIMIT: 1500 nL, corroborating the
+    // Ferwerda mesopic edge to 15% - gated): below the mesopic
+    // range the catalogue tints fold to their own rod luminance
+    // - the same Eq. 13 mirror as the dome and the optics. The
+    // theme feeds the shared mesopic blend. Stated residual:
+    // the printed floor is a field statement - the few
+    // brightest stars' colour survival needs a per-source
+    // image-brightness limit no source here prints, so the fold
+    // is uniform (and planets keep their tints - their discs
+    // sit brighter than any star).
+    scotB: uniform(1)
   };
   const {mesh} = makeSprites({
     positions,
     colors,
     sizes,
-    opacityFor: (center, sizeA) => {
+    opacityFor: (center, sizeA, colorA) => {
       const alt = max(
         normalize(modelWorldMatrix.mul(vec4(center, 1.0)).xyz).y,
         0.04
@@ -935,9 +947,25 @@ export function createStarSprites(positions, colors, sizes) {
         .add(q2.mul(q).mul(1 / 36))
         .add(q2.mul(q2).mul(1 / 576));
       const I = exp(sigma.mul(s)).div(i0);
+      const Xc = colorA.x
+        .mul(0.4124)
+        .add(colorA.y.mul(0.3576))
+        .add(colorA.z.mul(0.1805));
+      const Yc = colorA.x
+        .mul(0.2126)
+        .add(colorA.y.mul(0.7152))
+        .add(colorA.z.mul(0.0722));
+      const Zc = colorA.x
+        .mul(0.0193)
+        .add(colorA.y.mul(0.1192))
+        .add(colorA.z.mul(0.9505));
+      const Ys = Yc.mul(
+        Yc.add(Zc).div(max(Xc, 1e-12)).add(1.0).mul(1.33).sub(1.68)
+      ).div(2.31);
       return {
         sizeNode: sizeA,
-        opacityNode: u.night.mul(I)
+        opacityNode: u.night.mul(I),
+        colorNode: mix(vec3(Ys), colorA, u.scotB)
       };
     }
   });

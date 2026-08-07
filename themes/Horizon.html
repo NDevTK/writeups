@@ -9464,6 +9464,10 @@
         if (starObj) {
           starObj.u.night.value = nightSky * (1 - cloudy * 0.85) * lpVis;
           starObj.u.time.value = t / 1000;
+          // The catalogue tints grey with the rods (Schaefer's
+          // printed 1500 nL point-source colour floor - the same
+          // mesopic boundary the whole frame rides, gated).
+          starObj.u.scotB.value = mesoB;
           // Winds-aloft turbulence (cn2.js): the measured pressure-
           // level profile sets BOTH the twinkle depth (Young's
           // zenith sigma scaled by the Hufnagel-Valley mu_5/6 ratio

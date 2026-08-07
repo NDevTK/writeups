@@ -192,6 +192,27 @@ const check = (name, ok, detail) => {
 }
 
 {
+  // The point-source colour floor (Schaefer 1993, Sec. 2.12 +
+  // his p. 319 unit table): 1500 nL x his own printed
+  // 3.18e-6 nit/nL lands within 15% of Ferwerda/LBNL's printed
+  // mesopic floor - two independent printed sources on ONE
+  // colour boundary - and his 26.33 mag/arcsec^2 per nL row
+  // closes a THIRD way through this module's Falchi-anchored
+  // bridge: magArcsec2ToCdM2(26.33) must reproduce his nit
+  // conversion to ~1.5% with no shared constants.
+  const {NL_TO_CDM2, COLOR_LIMIT_CDM2} = await import('./adaptation.js');
+  const bridge = magArcsec2ToCdM2(26.33);
+  const ok =
+    Math.abs(COLOR_LIMIT_CDM2 / MESOPIC_LO_CDM2 - 1) < 0.15 &&
+    Math.abs(bridge / NL_TO_CDM2 - 1) < 0.02;
+  check(
+    'colour floor: Schaefer 1500 nL corroborates the mesopic edge',
+    ok,
+    `1500 nL = ${(COLOR_LIMIT_CDM2 * 1e3).toFixed(2)} mcd/m^2 vs Ferwerda ${MESOPIC_LO_CDM2 * 1e3} (${((COLOR_LIMIT_CDM2 / MESOPIC_LO_CDM2 - 1) * 100).toFixed(0)}%); his 26.33 mag/arcsec^2-per-nL through the Falchi bridge: ${bridge.toExponential(3)} vs printed 3.18e-6 (${((bridge / NL_TO_CDM2 - 1) * 100).toFixed(1)}%)`
+  );
+}
+
+{
   // The dome-source crossover: the theme switches the one march
   // from the sun to the moon when the moon's sky (its transfer at
   // its altitude, times its own E0) outshines the sun's. Derived
