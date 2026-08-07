@@ -64,7 +64,7 @@ const curlFetch = (method, u, body) =>
     const args = [
       '-sS',
       '--max-time',
-      '45',
+      process.env.VIEW_CURL_TIMEOUT || '45',
       '-X',
       method,
       '-o',
@@ -153,7 +153,12 @@ await page.route(
     const req = route.request();
     try {
       const body = req.postDataBuffer();
+      const t0 = Date.now();
       const {buf, meta} = await curlFetch(req.method(), req.url(), body);
+      if (meta.status >= 400 || Date.now() - t0 > 3000)
+        console.log(
+          `REQ|${meta.status}|${Date.now() - t0}ms|${req.url().slice(0, 140)}`
+        );
       await route.fulfill({
         status: meta.status,
         contentType: meta.type || TYPES[req.url().split('.').pop()] || '',
