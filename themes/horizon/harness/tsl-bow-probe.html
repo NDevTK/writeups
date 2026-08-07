@@ -1,0 +1,227 @@
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body style="margin: 0">
+    <canvas id="gl"></canvas>
+    <script>
+      /* swizzle shim */ if (navigator.gpu && self.GPUTexture) {
+        const ov = GPUTexture.prototype.createView;
+        GPUTexture.prototype.createView = function (d) {
+          if (d && 'swizzle' in d) {
+            d = Object.assign({}, d);
+            delete d.swizzle;
+          }
+          return ov.call(this, d);
+        };
+      }
+    </script>
+    <script type="module">
+      // Bow probe: the optics dome's radiometric bow term against
+      // its CPU ground truth - the absolute LUT times the two-leg
+      // slab (bowSlab, the closed form the shader transcribes)
+      // times the deck-shadow chi from a SYNTHETIC constant-tau
+      // map. Every leg closed-form:
+      //   A  the ring exists at the Descartes angle (diff > 0)
+      //   B  changing sigma H moves the term by EXACTLY the slab
+      //      law's ratio (saturating exponentials, not a gain)
+      //   C  the deck-shadow chi equals e^-tau_slant of the
+      //      synthetic map along the sun leg; uOn=0 removes it
+      //   D  absolute radiometry: pixel = LUT(theta) x slab, LUT
+      //      and slab both CPU (footprint-integrated)
+      import * as T from 'three/webgpu';
+      import {createOpticsMaterial} from './writeups/themes/horizon/sky-objects-tsl.js';
+      import {createCloudShadowHook} from './writeups/themes/horizon/clouds-tsl.js';
+      import {buildBowLUT} from './writeups/themes/horizon/optics-lut.js';
+      import {bowSlab} from './writeups/themes/horizon/rainbow.js';
+      const log = (s) => console.log('BOWP|' + s);
+      let fails = 0;
+      const check = (name, ok, detail) => {
+        log((ok ? 'ok  ' : 'FAIL') + ' ' + name + ': ' + detail);
+        if (!ok) fails++;
+      };
+      try {
+        const r = new T.WebGPURenderer({
+          canvas: document.getElementById('gl'),
+          forceWebGL: false,
+          antialias: false
+        });
+        await r.init();
+        log('backend ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'));
+        const W = 64;
+        r.setSize(W, W);
+
+        const hook = createCloudShadowHook();
+        const mkTau = (lo, mi) => {
+          const t = new T.DataTexture(
+            new Float32Array([lo, mi, 0, 1]),
+            1,
+            1,
+            T.RGBAFormat,
+            T.FloatType
+          );
+          t.needsUpdate = true;
+          return t;
+        };
+        hook.tauNode.value = mkTau(0.2, 0.1);
+        hook.uniforms.uOn.value = 0; // chi = 1 until pass C
+
+        const obj = createOpticsMaterial(hook);
+        const u = obj.u;
+        const SUN_ALT = Math.PI / 6; // 30 deg
+        const sunDir = new T.Vector3(0, Math.sin(SUN_ALT), -Math.cos(SUN_ALT));
+        u.sunDir.value.copy(sunDir);
+        u.antisolar.value.copy(sunDir).negate();
+        u.bowAmp.value.setRGB(1, 1, 1);
+        const SIG_H = 0.8;
+        u.bowSigH.value = SIG_H;
+        u.bowSinH.value = Math.sin(SUN_ALT);
+
+        const scene = new T.Scene();
+        const mesh = new T.Mesh(
+          new T.SphereGeometry(590, 64, 40),
+          obj.material
+        );
+        scene.add(mesh);
+        // Aim at the top of the primary ring: 41 deg above the
+        // antisolar point in the vertical plane -> elevation 11 deg.
+        const AIM_TH = (41 * Math.PI) / 180;
+        const aimAlt = -SUN_ALT + AIM_TH;
+        const cam = new T.PerspectiveCamera(8, 1, 0.1, 3000);
+        cam.position.set(0, 0, 0);
+        cam.lookAt(0, Math.sin(aimAlt), Math.cos(aimAlt));
+        cam.updateMatrixWorld();
+
+        const shoot = async () => {
+          const rt = new T.RenderTarget(W, W, {type: T.FloatType});
+          r.setRenderTarget(rt);
+          r.render(scene, cam);
+          r.setRenderTarget(null);
+          const buf = await r.readRenderTargetPixelsAsync(rt, 0, 0, W, W);
+          rt.dispose();
+          return buf;
+        };
+        const halfT = Math.tan((4 * Math.PI) / 180);
+        const rowAlt = (d) => Math.atan(((d + 0.5) / (W / 2)) * halfT);
+        const px = (buf, dRow) => {
+          const y = W / 2 + dRow;
+          const i = (y * W + W / 2) * 4;
+          return [buf[i], buf[i + 1], buf[i + 2]];
+        };
+
+        // The CPU side compares at the caustic peaks (stationary
+        // points - insensitive to sub-pixel geometry and to the
+        // readback's row orientation); the LUT is the same
+        // deterministic build the material runs.
+        const lut = buildBowLUT();
+
+        // Pass A/D: the ring at sigH = 0.8, chi off.
+        const b1 = await shoot();
+        // Pass B: sigH doubled.
+        u.bowSigH.value = 2 * SIG_H;
+        const b2 = await shoot();
+        u.bowSigH.value = SIG_H;
+        // Pass C: the synthetic deck map switched on.
+        hook.uniforms.uOn.value = 1;
+        const b3 = await shoot();
+        hook.uniforms.uOn.value = 0;
+
+        const P1 = 0; // the ring's caustic region at image centre
+        const g1 = px(b1, P1);
+        const g2 = px(b2, P1);
+        const g3 = px(b3, P1);
+
+        check(
+          'the ring exists',
+          g1.every((v) => v > 1e-4),
+          `at 41 deg from antisolar: [${g1.map((v) => v.toFixed(4)).join(', ')}]`
+        );
+
+        {
+          // The slab law's own ratio - saturation, not a gain.
+          const alt = aimAlt + rowAlt(P1);
+          const want =
+            bowSlab(2 * SIG_H, Math.sin(SUN_ALT), Math.sin(alt)) /
+            bowSlab(SIG_H, Math.sin(SUN_ALT), Math.sin(alt));
+          const ratios = g2.map((v, c) => v / Math.max(g1[c], 1e-12));
+          check(
+            'sigma H moves by the slab law',
+            ratios.every((q) => Math.abs(q / want - 1) < 0.02),
+            `2x sigma H -> x[${ratios.map((q) => q.toFixed(4)).join(', ')}], slab law wants ${want.toFixed(4)} (a linear gain would want 2)`
+          );
+        }
+
+        {
+          // chi = e^-tau_slant of the synthetic map: tau 0.3
+          // vertical over sin(30 deg) -> e^-0.6.
+          const want = Math.exp(-0.3 / Math.sin(SUN_ALT));
+          const ratios = g3.map((v, c) => v / Math.max(g1[c], 1e-12));
+          check(
+            'deck shadow chi on the sun leg',
+            ratios.every((q) => Math.abs(q / want - 1) < 0.01),
+            `map on -> x[${ratios.map((q) => q.toFixed(4)).join(', ')}], e^-0.6 = ${want.toFixed(4)}`
+          );
+        }
+
+        {
+          // Absolute radiometry AT THE RED CAUSTIC PEAK - a
+          // stationary point, so it is insensitive to sub-pixel
+          // geometry AND to the readback's row orientation (which
+          // this probe does not assume: the corona probe's target
+          // is radially symmetric, the bow's is not). Scan the
+          // whole centre column for the red maximum; hold its
+          // VALUE to the CPU LUT's own red peak times the slab at
+          // the aim elevation, green at the same row to the CPU
+          // value at the red-peak angle, and blue under 6% of red
+          // - at the bow's red edge blue is already in its own
+          // dark band (the colour order as an absolute statement).
+          // The peak must also sit inside the aimed neighbourhood.
+          const colMax = (c) => {
+            let pk = -(W / 2) + 2;
+            for (let d = -(W / 2) + 2; d < W / 2 - 2; d++)
+              if (px(b1, d)[c] > px(b1, pk)[c]) pk = d;
+            return pk;
+          };
+          const lutMax = (c) => {
+            let v = 0;
+            for (let i = 0; i < 256; i++) v = Math.max(v, lut.data[i * 4 + c]);
+            return v;
+          };
+          const slabPk = bowSlab(SIG_H, Math.sin(SUN_ALT), Math.sin(aimAlt));
+          const pkR = colMax(0);
+          const pkG = colMax(1);
+          const gotR = px(b1, pkR)[0];
+          const gotG = px(b1, pkG)[1];
+          const blueAtR = px(b1, pkR)[2];
+          const wantR = lutMax(0) * slabPk;
+          const wantG = lutMax(1) * slabPk;
+          const ok =
+            Math.abs(rowAlt(pkR)) < (2.5 * Math.PI) / 180 &&
+            Math.abs(gotR / wantR - 1) < 0.1 &&
+            Math.abs(gotG / wantG - 1) < 0.1 &&
+            blueAtR < 0.06 * gotR;
+          check(
+            'absolute radiometry at the caustic peaks',
+            ok,
+            `red peak ${gotR.toFixed(4)} vs CPU ${wantR.toFixed(4)}; green peak ${gotG.toFixed(4)} vs ${wantG.toFixed(4)} (each at its own stationary point x slab ${slabPk.toFixed(4)}); blue at the red edge ${blueAtR.toFixed(4)} - dark`
+          );
+        }
+
+        log(fails ? `${fails} FAILED` : 'BOWP PASS');
+        log('DONE');
+      } catch (e) {
+        log('ERR ' + e.message + ' :: ' + (e.stack || '').split('\n')[1]);
+        log('DONE');
+      }
+    </script>
+  </body>
+</html>

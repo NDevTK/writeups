@@ -483,8 +483,11 @@ export function createContrailMaterial() {
 }
 
 // Rainbows at the Descartes angles + the 22-deg halo with sundogs,
-// on one additive dome.
-export function createOpticsMaterial() {
+// on one additive dome. `cloudShadow` (optional) is the theme's
+// cloud shadow hook - the bow's sun leg reads the decks' measured
+// optical depth through it (the same map terrain shadows and the
+// droplet corona ride).
+export function createOpticsMaterial(cloudShadow) {
   const dogData = new Float32Array(256 * 4);
   const dogTex = new DataTexture(dogData, 256, 1, RGBAFormat, FloatType);
   dogTex.minFilter = dogTex.magFilter = LinearFilter;
@@ -492,7 +495,24 @@ export function createOpticsMaterial() {
   const u = {
     sunDir: uniform(new Vector3(0, 1, 0)),
     antisolar: uniform(new Vector3(0, -1, 0)),
-    bow: uniform(0),
+    // The RADIOMETRIC bow amplitude (per channel): the theme feeds
+    // E_src x T_air x e^-tau_veil x exposure; the rain shaft's own
+    // slab factor is assembled PER FRAGMENT below from bowSigH /
+    // bowSinH (the two-leg single-scatter integral in closed
+    // form), and the LUT it multiplies is ABSOLUTE (sr^-1 per
+    // unit geometric-interaction depth, energy-normalised against
+    // the Descartes/Fresnel ray mapping - optics-lut). The old
+    // 0.55 display gain and the 1 - cloudy x 1.1 daylight
+    // heuristic are retired; deck shadowing of the shaft is the
+    // measured cloud shadow map through chiSun.
+    bowAmp: uniform(new Color(0, 0, 0)),
+    // sigma_ext x H: Marshall-Palmer extinction of the measured
+    // rain rate times the measured rain-column depth (freezing
+    // level above the camera; rainbow.js mpSigmaExt).
+    bowSigH: uniform(0),
+    // sin(source altitude) - the sun leg's slant through the
+    // shaft.
+    bowSinH: uniform(0.5),
     // The RADIOMETRIC halo amplitude (per channel): the theme
     // feeds E_src x (tau/2) e^-tau x SCF x T_air x exposure - the
     // corona's slab radiometry on the measured cirrus column with
@@ -565,7 +585,43 @@ export function createOpticsMaterial() {
   const haloSample = haloTexN.sample(
     vec2(aS.sub(haloLut.thMinDeg).div(haloLut.thMaxDeg - haloLut.thMinDeg), 0.5)
   ).rgb;
-  const cBow = bowSample.mul(u.bow).mul(0.55);
+  // The rain shaft's slab factor, per fragment: the two-leg
+  // single-scatter integral through a homogeneous Marshall-Palmer
+  // layer from the eye up to the measured freezing level, in
+  // closed form. Eye at the layer base, drop at range s along a
+  // ray of elevation alpha: view leg e^-sigma s, sun leg
+  // e^-sigma (H - s sin alpha)/sin h; both exponents linear in s,
+  // so with kc = 1 - sin(alpha)/sin(h) and the geometric-share
+  // dtau_g = (sigma/2) ds,
+  //   slab = (1/2) (e^-tau0 - e^-tauV) / kc,
+  // tau0 = sigma H / sin h (the sun leg from the layer base),
+  // tauV = sigma H / sin(alpha) (the view leg to the layer top -
+  // the identity tau0 + sigma smax kc = tauV keeps both exponents
+  // non-negative, no overflow at any angle pair). Upward rays exit
+  // through the layer top; grazing/downward rays run the
+  // untruncated tail (kc > 0 there, tauV -> huge, the e^-tauV
+  // term vanishes; terrain z-buffers the dome wherever the ground
+  // would truncate it). kc -> 0 (the fragment at the source's own
+  // altitude) is removable: slab -> (1/2) e^-tau0 tauV. Zero rain
+  // or the camera above the freezing level zero bowSigH - no
+  // shaft, no bow.
+  const sinA = v.y;
+  const kc = float(1).sub(sinA.div(max(u.bowSinH, 1e-3)));
+  const tau0 = u.bowSigH.div(max(u.bowSinH, 1e-3));
+  const tauV = u.bowSigH.div(clamp(sinA, 1e-4, 1));
+  const bowSlab = select(
+    abs(kc).lessThan(1e-4),
+    exp(tau0.negate()).mul(tauV),
+    exp(tau0.negate()).sub(exp(tauV.negate())).div(kc)
+  ).mul(0.5);
+  // Deck shadowing of the shaft along the SUN leg: the measured
+  // cloud shadow map (one deck-column definition with terrain
+  // shadows and the droplet corona). The unattached map reads
+  // tau 0 - full sun.
+  const chiSun = cloudShadow
+    ? exp(cloudShadow.tauSlant(cameraPosition, u.sunDir).negate())
+    : float(1);
+  const cBow = bowSample.mul(u.bowAmp).mul(bowSlab).mul(chiSun);
   // Parhelia: the Bravais azimuth-offset LUT along the source's
   // almucantar (dogs ON the halo at the horizon, migrating
   // outward, dead past ~61 degrees - the LUT empties itself),

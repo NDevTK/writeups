@@ -369,7 +369,7 @@
         createSkyglowMaterial
       } from './horizon/sky-objects-tsl.js';
       import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
-      import {mpDropRadiusMm} from './horizon/rainbow.js';
+      import {mpDropRadiusMm, mpSigmaExt} from './horizon/rainbow.js';
       import {parseSoft00, syndyne, visibleComets} from './horizon/comets.js';
       import {
         ambientFactor,
@@ -6997,7 +6997,7 @@
       //   the sun shining below 42 deg
       // - the 22 deg ice-crystal halo (red inner edge) whenever real
       //   cirrus is present, with parhelia (sundogs) at low sun
-      const opticsObj = createOpticsMaterial();
+      const opticsObj = createOpticsMaterial(cloudShadow);
       const opticsU = opticsObj.u;
       const optics = new THREE.Mesh(
         new THREE.SphereGeometry(590, 32, 20),
@@ -7007,21 +7007,17 @@
       skyGroup.add(optics);
       // Paraselenic optics: the SAME certified halo/bow/dog dome,
       // instanced again and anchored to the MOON. Intensity scales
-      // with how much light the moon actually sends - the shared
-      // Hapke disk-integrated phase curve (moonphase.js, held to
-      // Rougier's observations by moon-reference). Full-moon
-      // cirrus nights get the classic 22-deg lunar halo and moon
-      // dogs (paraselenae); rain under a bright moon gets the rare
-      // moonbow. MOONOPT_GAIN anchors the display level (the
-      // physical sun/moon illuminance ratio is ~4e5 and the eye's
-      // night adaptation closes most of it - documented, the
-      // AGLOW_GAIN precedent).
-      const MOONOPT_GAIN = 0.22;
+      // with how much light the moon actually sends - the measured
+      // moonlight irradiance frame (moonlight.js) for halo and bow
+      // alike since the rain-shaft pass retired MOONOPT_GAIN (the
+      // moonbow's last display anchor). Full-moon cirrus nights get
+      // the classic 22-deg lunar halo and moon dogs (paraselenae);
+      // rain under a bright moon gets the rare moonbow.
       let dogAltSun = null;
       let dogOnSun = false;
       let dogAltMoon = null;
       let dogOnMoon = false;
-      const opticsMoonObj = createOpticsMaterial();
+      const opticsMoonObj = createOpticsMaterial(cloudShadow);
       const opticsMoonU = opticsMoonObj.u;
       const opticsMoon = new THREE.Mesh(
         new THREE.SphereGeometry(592, 32, 20),
@@ -7187,8 +7183,8 @@
       // GATES (rain, cirrus, source altitude, direct beam, phase)
       // live in the frame loop's optics block as they always did.
       let bowLutR = null;
-      function refreshBowLUT() {
-        const R = Math.max(state.precip ?? 0, 0.1);
+      function refreshBowLUT(rMeas) {
+        const R = Math.max(rMeas ?? state.precip ?? 0, 0.1);
         if (bowLutR !== null && Math.abs(R - bowLutR) < 0.05) return;
         bowLutR = R;
         const aMm = mpDropRadiusMm(R);
@@ -10239,22 +10235,46 @@
           p.needsUpdate = true;
         }
 
-        // Atmospheric optics: the bow still needs rain with the sun
-        // below the Descartes angle (display-gained until the rain
-        // shaft's optical depth is measured); the HALO is now
-        // RADIOMETRIC - the corona's slab law on the measured
-        // cirrus column, at Forster & Mayer 2022's smooth-crystal
-        // fraction, through the air's own transmittance in the
-        // sky's exposure. Its old cover heuristics (cHigh < 90,
-        // 1 - cloudy x 1.1, the day gate) retire: cover lives in
-        // tau, day/night in T_air, and the decks extinguish the
-        // dome per pixel in the composite. ?halo=0 is the labelled
-        // harness A/B override.
+        // Atmospheric optics: the BOW is now RADIOMETRIC like the
+        // halo - the two-leg single-scatter slab through a
+        // Marshall-Palmer layer at the MEASURED rain rate, capped
+        // by the MEASURED freezing level (no measurement, no
+        // shaft, no bow - and a camera above the freezing level
+        // sees snow, which never bows). The CPU leg feeds
+        // E_src x T_air x e^-tau_veil x exposure; sigma x H and
+        // sin(alt) ride uniforms into the per-fragment closed
+        // form, and the old 0.55 display gain with its
+        // 1 - cloudy x 1.1 day heuristic retires - deck shadowing
+        // of the shaft is the cloud shadow map's own tau along
+        // the sun leg (in-material chiSun), daylight is T_air.
+        // ?bow=0 is the labelled harness A/B override. The HALO:
+        // the corona's slab law on the measured cirrus column, at
+        // Forster & Mayer 2022's smooth-crystal fraction, through
+        // the air's own transmittance in the sky's exposure.
+        // ?halo=0 is its override.
         opticsU.sunDir.value.copy(sunVec);
         opticsU.antisolar.value.copy(sunVec).negate();
-        const sunOut = day * THREE.MathUtils.clamp(1 - cloudy * 1.1, 0, 1);
-        opticsU.bow.value =
-          raining && sun.alt > 0 && sun.alt < 0.733 ? sunOut : 0;
+        // The same asinh inversion the sky LUT feed uses: the
+        // camera's real altitude, so the rain column is the
+        // freezing level ABOVE THE EYE.
+        const eCamB = centerElev + 500 * Math.sinh(camera.position.y / 16);
+        const hRain = Math.max((state.freezing ?? 0) - eCamB, 0);
+        const sigmaRain = mpSigmaExt(raining ? precipMeas : 0);
+        // Radar-fresh rain re-lays the fringes too (0.05 mm/h
+        // hysteresis inside).
+        if (raining) refreshBowLUT(precipMeas);
+        {
+          const bowOn =
+            params.get('bow') !== '0' && sun.alt > 0 && sun.alt < 0.733;
+          opticsU.bowSigH.value = bowOn ? sigmaRain * hRain : 0;
+          opticsU.bowSinH.value = Math.max(
+            Math.sin(Math.max(sun.alt, 0)),
+            1e-3
+          );
+          const tB = sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieRad);
+          const aB = bowOn ? cirrusT * skyExposure : 0;
+          opticsU.bowAmp.value.setRGB(tB[0] * aB, tB[1] * aB, tB[2] * aB);
+        }
         {
           const haloOn = params.get('halo') !== '0' && sun.alt > 0;
           const slab = haloOn
@@ -10293,14 +10313,38 @@
           const moonVec2 = skyPoint(refr.moonApp, moon.az, 1);
           opticsMoonU.sunDir.value.copy(moonVec2);
           opticsMoonU.antisolar.value.copy(moonVec2).negate();
-          const moonOut =
-            (1 - day) *
-            THREE.MathUtils.clamp(1 - cloudy * 1.1, 0, 1) *
-            (astro.moonRel ?? 0) *
-            lpVisBright *
-            MOONOPT_GAIN;
-          opticsMoonU.bow.value =
-            raining && moon.alt > 0 && moon.alt < 0.733 ? moonOut : 0;
+          // The MOONBOW, radiometric: the same measured shaft
+          // (sigma x H) under the measured moonlight irradiance -
+          // MOONOPT_GAIN and the 1 - cloudy x 1.1 heuristic
+          // retire with the sun bow's; the rarity is now the
+          // physics (E0 x 10^-5.6 through the same slab).
+          {
+            const bowOnM =
+              params.get('bow') !== '0' && moon.alt > 0 && moon.alt < 0.733;
+            opticsMoonU.bowSigH.value = bowOnM ? sigmaRain * hRain : 0;
+            opticsMoonU.bowSinH.value = Math.max(
+              Math.sin(Math.max(moon.alt, 0)),
+              1e-3
+            );
+            const tBM = sunTransmittanceJS(
+              Math.sin(Math.max(moon.alt, 0)),
+              mieRad
+            );
+            const aBM = bowOnM
+              ? moonIrradianceE0(
+                  astro.moonRel,
+                  astro.moonDistKm,
+                  1 - (astro.lunarEcl?.inUmbra ?? 0)
+                ) *
+                Math.exp(-cirrusSlantTau(cHighFrac, Math.sin(moon.alt))) *
+                skyExposure
+              : 0;
+            opticsMoonU.bowAmp.value.setRGB(
+              tBM[0] * aBM,
+              tBM[1] * aBM,
+              tBM[2] * aBM
+            );
+          }
           // The lunar halo, radiometric like the sun's: the same
           // slab on the same column, the source now the MEASURED
           // moonlight (moonlight.js - printed anchor, gated phase,
@@ -10830,9 +10874,11 @@
           live['treeline (Körner & Paulsen)'] =
             Math.round(treelineM(state.lat)) + ' m';
           live['optics'] =
-            'bow ' +
-            opticsU.bow.value.toFixed(2) +
-            ' · halo amp G ' +
+            'bow σH ' +
+            opticsU.bowSigH.value.toFixed(2) +
+            ' · amp G ' +
+            opticsU.bowAmp.value.g.toFixed(2) +
+            ' (radiometric, MP shaft) · halo amp G ' +
             opticsU.haloAmp.value.g.toFixed(3) +
             ' (radiometric, SCF ' +
             SCF_COLUMN +

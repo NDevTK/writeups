@@ -26,11 +26,20 @@
  *    (1 - rho)^2 rho^k at the bow's own incidence (Adam sect.
  *    1.4), through the SAME gated unpolarised Fresnel the
  *    Cox-Munk glitter uses (coxmunk.js, per-wavelength n).
- *  - Drops: Marshall & Palmer (1948) - the same paper whose Z-R
- *    relation the radar already inverts - N(D) = N0 exp(-Lambda
- *    D) with Lambda = 4.1 R^-0.21 mm^-1; the median-volume
- *    diameter D0 = 3.67/Lambda sets the Airy drop size from the
- *    measured rain rate.
+ *  - Drops: Marshall & Palmer (1948, J. Meteor. 5, 165 - read in
+ *    full; the same paper whose Z-R relation the radar already
+ *    inverts) - N(D) = N0 exp(-Lambda D), their printed
+ *    N0 = 0.08 cm^-4 and Lambda = 41 R^-0.21 cm^-1; the
+ *    median-volume diameter D0 = 3.67/Lambda sets the Airy drop
+ *    size, and the closed second moment sets the shaft's
+ *    extinction (mpSigmaExt) - one distribution feeding fringe
+ *    spacing, radar inversion and radiometry alike.
+ *  - The shaft: the two-leg single-scatter slab (bowSlab) - the
+ *    corona/halo family's own certified law, here with the sun
+ *    leg climbing to the MEASURED freezing level - normalised
+ *    absolutely by the Descartes/Fresnel ray mapping
+ *    (bowGeometric / bowWindowEnergy): energy conservation pins
+ *    the Airy curve's scale, no display gain left.
  *  - The sun is not a point: the profile is convolved with the
  *    solar disk (radius 0.266 deg, chord-weighted), the 0.5 deg
  *    widening Adam notes.
@@ -130,6 +139,159 @@ export function mpLambda(R) {
 }
 export function mpDropRadiusMm(R) {
   return 3.67 / mpLambda(R) / 2;
+}
+
+/**
+ * Extinction coefficient (m^-1) of Marshall-Palmer rain at rate R
+ * (mm/h). The distribution is the paper's own (Marshall & Palmer
+ * 1948, J. Meteor. 5, 165, read in full - two pages): their
+ * eq. (1) N_D = N0 e^(-Lambda D), eq. (2) N0 = 0.08 cm^-4 "for
+ * any intensity of rainfall" (= 8000 m^-3 mm^-1), eq. (3)
+ * Lambda = 41 R^-0.21 cm^-1 (= 4.1 mm^-1 - mpLambda above).
+ * sigma = Q (pi/4) INT D^2 N(D) dD with Q = 2 exactly (the van de
+ * Hulst extinction paradox at x ~ pi D/lambda ~ 10^4 - the same
+ * asymptote the cirrus corona and desert coarse mode already
+ * ride). The exponential integrates in closed form:
+ *   INT D^2 N0 e^(-Lambda D) dD = 2 N0 / Lambda^3   (D in mm)
+ * so sigma = pi N0 / Lambda^3 x 1e-6 m^-1 (the 1e-6 converts the
+ * mm^2 cross-sections to m^2). At 5 mm/h this is ~1.0e-3 m^-1 -
+ * optical depth 1 over a kilometre of shower. Documented
+ * uncertainty, the paper's own: "for diameters less than about
+ * 1.5 mm, both sets of observations fall short of the value for
+ * N_D given by equation (1)" - their Table 1 puts the fitted
+ * moments 10-20% above the measured ones (M: 89 R^0.84 from the
+ * equations vs 72-80 R^0.88 direct), so this sigma leans the
+ * same way; the fitted exponential is the citable object and is
+ * carried uncorrected. Gate landmark holds the closed form
+ * against direct quadrature of N(D). R <= 0 returns exactly 0 -
+ * no rain, no bow.
+ */
+export function mpSigmaExt(R) {
+  if (!(R > 0)) return 0;
+  const L = mpLambda(R);
+  return (Math.PI * MP_N0 * 1e-6) / (L * L * L);
+}
+
+/**
+ * The rain shaft's slab factor - the two-leg single-scatter
+ * integral through a homogeneous Marshall-Palmer layer from the
+ * eye (layer base) to the freezing level, per unit
+ * geometric-interaction depth, in closed form. This is the
+ * REFERENCE implementation of the optics dome's per-fragment
+ * formula (sky-objects-tsl transcribes it to TSL): for a ray of
+ * elevation alpha under a source at elevation h,
+ *   slab = (1/2) INT sigma e^-(sigma s) e^-(sigma (H - s sin
+ *          alpha)/sin h) ds
+ *        = (1/2) (e^-tau0 - e^-tauV) / kc,
+ * tau0 = sigma H / sin h, tauV = sigma H / sin alpha, kc = 1 -
+ * sin(alpha)/sin(h) - the identity tau0 + sigma smax kc = tauV
+ * keeps both exponents non-negative (no overflow at any angle
+ * pair). Upward rays exit the layer top; grazing/downward rays
+ * run the untruncated convergent tail (the same 1e-4 floor);
+ * kc -> 0 is the removable point (1/2) e^-tau0 tauV. The gate
+ * holds this against direct quadrature across the angle grid,
+ * removable point and downward rays included.
+ */
+export function bowSlab(sigH, sinH, sinA) {
+  if (!(sigH > 0)) return 0;
+  const sh = Math.max(sinH, 1e-3);
+  const kc = 1 - sinA / sh;
+  const tau0 = sigH / sh;
+  const tauV = sigH / Math.min(Math.max(sinA, 1e-4), 1);
+  if (Math.abs(kc) < 1e-4) return 0.5 * Math.exp(-tau0) * tauV;
+  return (0.5 * (Math.exp(-tau0) - Math.exp(-tauV))) / kc;
+}
+
+/**
+ * The k-bow's window energy per unit geometric-interaction depth:
+ * the SAME ray mapping integrated in the impact-parameter domain,
+ *   E = INT 2 x (1-rho(x))^2 rho(x)^k dx over {x: theta(x) in
+ *       [th0, th1]},
+ * which is bowGeometric's solid-angle integral by exact change of
+ * variables - but free of the caustic's integrable (gamma-theta)
+ * ^(-1/2) singularity, so plain quadrature converges (the theta-
+ * domain midpoint rule was measured 2x wrong at 2048 bins - the
+ * singular endpoint). buildBowLUT normalises each Airy curve to
+ * carry exactly this energy; the gate holds the two domains equal
+ * and pins the default M's accuracy against a 10x finer pass.
+ */
+export function bowWindowEnergy(n, k, th0, th1, M = 20000) {
+  const thOf = (x) => {
+    const D = k * Math.PI + 2 * Math.asin(x) - 2 * (k + 1) * Math.asin(x / n);
+    return k === 1 ? Math.PI - D : D - Math.PI;
+  };
+  let E = 0;
+  for (let i = 0; i < M; i++) {
+    const x = (i + 0.5) / M;
+    const th = thOf(x);
+    if (th < th0 || th > th1) continue;
+    const rho = fresnelWater(Math.cos(Math.asin(x)), n);
+    E += 2 * x * (1 - rho) ** 2 * rho ** k * (1 / M);
+  }
+  return E;
+}
+
+/**
+ * The k-bow's geometric-optics intensity at theta from the
+ * antisolar point, in sr^-1 PER UNIT GEOMETRIC-INTERACTION DEPTH
+ * (the halo LUT's own absolute frame): flux through the impact
+ * annulus, Fresnel-chained, spread over the deviation annulus -
+ *   P(theta) = sum_branches x (1-rho(x))^2 rho(x)^k
+ *              / (pi sin(theta) |dD/dx|),
+ * with D(x) = k pi + 2 asin x - 2(k+1) asin(x/n) (Adam 2002,
+ * eq. 1.1a) and dD/dx = 2/sqrt(1-x^2) - 2(k+1)/sqrt(n^2-x^2).
+ * The a^2 of the annulus cancels against the pi a^2 of the
+ * geometric cross-section: the absolute geometric pattern is
+ * SIZE-INDEPENDENT, so it normalises the Airy profile for the
+ * whole Marshall-Palmer ensemble at once. Both x-branches of the
+ * fold (the caustic at x0) are summed; theta outside the bow's
+ * geometric range contributes zero. Used by the gate and by
+ * buildBowLUT's energy normalisation - the drawn Airy pattern
+ * carries exactly this much light, fringe structure and all.
+ */
+export function bowGeometric(n, k, thetaRad) {
+  const geo = descartes(n, k);
+  // Deviation D as a function of x, folded to the antisolar
+  // angle: primary theta = pi - D, secondary theta = D - pi.
+  const thOf = (x) => {
+    const D = k * Math.PI + 2 * Math.asin(x) - 2 * (k + 1) * Math.asin(x / n);
+    return k === 1 ? Math.PI - D : D - Math.PI;
+  };
+  // The deviation extremum at x0 folds the mapping: the primary's
+  // geometric light lies INSIDE its caustic (theta < gamma), the
+  // secondary's OUTSIDE (theta > gamma) - Alexander's band between
+  // them receives no ray from either, by construction.
+  if (k === 1 ? thetaRad >= geo.gamma || thetaRad < 0 : thetaRad <= geo.gamma)
+    return 0;
+  const dDdx = (x) =>
+    2 / Math.sqrt(1 - x * x) - (2 * (k + 1)) / Math.sqrt(n * n - x * x);
+  let sum = 0;
+  for (const [lo, hi] of [
+    [1e-6, geo.x0],
+    [geo.x0, 1 - 1e-9]
+  ]) {
+    // Bisect theta(x) = theta on the monotone branch (theta
+    // increases toward x0 from both sides).
+    let a = lo;
+    let b = hi;
+    const thLo = thOf(lo);
+    const thHi = thOf(hi);
+    const rising = thHi > thLo;
+    const thMin = Math.min(thLo, thHi);
+    const thMax = Math.max(thLo, thHi);
+    if (thetaRad < thMin || thetaRad > thMax) continue;
+    for (let i = 0; i < 60; i++) {
+      const m = (a + b) / 2;
+      if (thOf(m) < thetaRad === rising) a = m;
+      else b = m;
+    }
+    const x = (a + b) / 2;
+    const rho = fresnelWater(Math.cos(Math.asin(x)), n);
+    sum +=
+      (x * (1 - rho) ** 2 * rho ** k) /
+      (Math.PI * Math.sin(thetaRad) * Math.abs(dDdx(x)));
+  }
+  return sum;
 }
 
 /**

@@ -47,7 +47,7 @@ import {ICE_N, mcHalo, parhelionProfile} from './halos.js';
 import {sunAngularRadiusRad} from './eclipses.js';
 import {
   airy,
-  bowFresnel,
+  bowWindowEnergy,
   descartes,
   mpDropRadiusMm,
   RGB_UM,
@@ -191,9 +191,24 @@ export function buildHaloLUT(samples = 400000, srcR = SUN_RADIUS) {
  * point, per RGB channel: Airy diffraction at the primary and
  * secondary Descartes caustics (rainbow.js primitives), accumulated
  * into ONE profile - their ratio and the dark band between them
- * come from the Fresnel path factors, and the supernumerary fringe
- * spacing from the drop radius (mm; the caller feeds Marshall-
- * Palmer on the measured rain). Normalised by the primary's peak.
+ * come from the physics, and the supernumerary fringe spacing from
+ * the drop radius (mm; the caller feeds Marshall-Palmer on the
+ * measured rain).
+ *
+ * ABSOLUTE since the rain-shaft radiometry pass: sr^-1 per unit
+ * GEOMETRIC-INTERACTION DEPTH - the halo LUT's own frame. The
+ * scale is pinned by energy conservation, not by a prefactor from
+ * a book: each k-bow's Airy curve is normalised so its window
+ * integral carries exactly the energy the DESCARTES/FRESNEL ray
+ * mapping puts there (rainbow.js bowGeometric - flux through the
+ * impact annulus, Fresnel-chained, spread over the deviation
+ * annulus; size-independent once per unit geometric depth, so one
+ * normalisation serves the whole Marshall-Palmer ensemble). Airy
+ * theory then does what it is for: redistribute that energy into
+ * the caustic's fringes. The gate holds the window identity, the
+ * fringe-averaged asymptotic match to the geometric mapping away
+ * from the caustic, and Alexander's band staying dark in absolute
+ * terms.
  */
 export function buildBowLUT(
   bins = 256,
@@ -205,42 +220,49 @@ export function buildBowLUT(
   const dTheta = (thMax - thMin) / bins;
   const prof = new Float64Array(bins * 3);
   const a = aMm * 1e-3; // metres
+  const epsWin = [[], []];
   for (let c = 0; c < 3; c++) {
     const n = N_WATER[c];
     const kw = (2 * Math.PI) / (RGB_UM[c] * 1e-6);
     for (let k = 1; k <= 2; k++) {
       const geo = descartes(n, k);
       const s13 = ((2 * kw * kw * a * a) / Math.abs(geo.dpp)) ** (1 / 3);
-      const pre =
-        ((bowFresnel(n, k) * geo.x0) / Math.sin(geo.gamma)) *
-        a *
-        a *
-        (kw * a) ** (1 / 3);
+      // The k-bow's Airy shape over the window (unit prefactor -
+      // the energy normalisation below sets the scale).
+      const shape = new Float64Array(bins);
+      let eAiry = 0;
       for (let i = 0; i < bins; i++) {
         const th = thMin + (i + 0.5) * dTheta;
         // primary brightens INSIDE the bow, secondary OUTSIDE -
         // Alexander's band between them falls out of the signs
         const dTh = k === 1 ? geo.gamma - th : th - geo.gamma;
-        prof[i * 3 + c] += pre * airy(-s13 * dTh) ** 2;
+        shape[i] = airy(-s13 * dTh) ** 2;
+        eAiry += shape[i] * 2 * Math.PI * Math.sin(th) * dTheta;
       }
+      // The geometric window energy per unit geometric depth -
+      // the exact ray mapping this curve must carry (integrated in
+      // the impact-parameter domain: the caustic's (gamma-theta)
+      // ^(-1/2) singularity breaks theta-domain quadrature).
+      const eGeo = bowWindowEnergy(n, k, thMin, thMax);
+      const scale = eGeo / Math.max(eAiry, 1e-300);
+      epsWin[k - 1][c] = eGeo;
+      for (let i = 0; i < bins; i++) prof[i * 3 + c] += scale * shape[i];
     }
   }
   const conv = sunConvolve(prof, bins, dTheta, srcR);
-  // normalise by the PRIMARY peak (theta < 45 deg region)
-  let peak = 0;
+  let peakAbs = 0;
   for (let i = 0; i < bins; i++) {
     const th = 35 + (i + 0.5) * (25 / bins);
-    if (th < 45)
-      peak = Math.max(peak, conv[i * 3], conv[i * 3 + 1], conv[i * 3 + 2]);
+    if (th < 45) peakAbs = Math.max(peakAbs, conv[i * 3 + 1]);
   }
   const out = new Float32Array(bins * 4);
   for (let i = 0; i < bins; i++) {
-    out[i * 4] = conv[i * 3] / peak;
-    out[i * 4 + 1] = conv[i * 3 + 1] / peak;
-    out[i * 4 + 2] = conv[i * 3 + 2] / peak;
+    out[i * 4] = conv[i * 3];
+    out[i * 4 + 1] = conv[i * 3 + 1];
+    out[i * 4 + 2] = conv[i * 3 + 2];
     out[i * 4 + 3] = 1;
   }
-  return {data: out, bins, thMinDeg: 35, thMaxDeg: 60};
+  return {data: out, bins, thMinDeg: 35, thMaxDeg: 60, peakAbs, epsWin};
 }
 
 /**

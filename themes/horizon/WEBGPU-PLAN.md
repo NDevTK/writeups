@@ -4393,6 +4393,72 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   container. Scope: the mid deck rides the same two stratus
   classes (a printed altocumulus size climatology is its own
   source - named); ellipticity stays out of scope.
+- DONE (the rain-shaft bow, Aug 7 seventh push - the 0.55 display
+  gain retired, the optics dome's LAST display-scaled amplitude):
+  Marshall & Palmer 1948 READ IN FULL (two pages, the AMS
+  /downloadpdf/view path finally yielding after the plain path's
+  403 spell): eq. (1) N_D = N0 e^(-Lambda D), eq. (2) N0 = 0.08
+  cm^-4 "for any intensity of rainfall", eq. (3) Lambda = 41
+  R^-0.21 cm^-1 - the constants rainbow.js carried now verified
+  on the page, WITH the paper's own small-drop caveat carried as
+  documented uncertainty (their Table 1: fitted moments 10-20%
+  above measured - mpSigmaExt leans the same way, uncorrected:
+  the fitted exponential is the citable object). Gedzelman's
+  visibility papers (the natural radiative-transfer source) are
+  captcha-walled at Optica and closed at Unpaywall/S2 -
+  ATTEMPTED, not read, so nothing is cited from them; the shaft
+  law is instead the corona/halo family's own certified
+  single-scatter machinery, closed analytically. THE PIECES: (1)
+  mpSigmaExt - sigma = pi N0/Lambda^3 x 1e-6 m^-1 (Q = 2, the
+  paradox asymptote; ~1e-3/m at 5 mm/h - tau 1 per km of
+  shower), closed form == quadrature by landmark. (2) The
+  ABSOLUTE bow LUT: energy conservation replaces the uncited
+  Airy prefactor - each k-bow's curve is normalised to carry
+  exactly the window energy of the DESCARTES/FRESNEL ray mapping
+  (bowGeometric: flux through the impact annulus, Fresnel-
+  chained, spread over the deviation annulus; size-independent
+  per unit geometric depth, so one normalisation serves the
+  whole MP ensemble). The x-domain window integral
+  (bowWindowEnergy) replaced a theta-domain quadrature MEASURED
+  2x wrong at 2048 bins - the caustic's integrable singularity;
+  landmarks hold the two domains equal (0.9996), the default
+  quadrature at 5 digits, and - the scale's proof - the
+  FRINGE-AVERAGED Airy curve riding the geometric mapping at
+  0.996 away from the caustic. Secondary/primary peak ratio
+  comes out 0.101 from energy alone - the classic tenth. (3) The
+  two-leg slab (bowSlab): eye at the layer base, drops to the
+  MEASURED freezing level (state.freezing - no measurement, no
+  bow; camera above the freezing level sees snow, which never
+  bows - an emergent gate), sun leg climbing out at sin(h), view
+  leg at the fragment's own sin(alpha), both exponents linear in
+  s -> closed form (e^-tau0 - e^-tauV)/kc with the overflow-free
+  identity tau0 + sigma smax kc = tauV; == quadrature at 1.8e-8
+  across the angle grid incl. the removable point alpha = h and
+  downward rays. Per-fragment in the material (bowSigH/bowSinH
+  uniforms). (4) Deck shadowing of the shaft: chiSun =
+  e^-tauSlant(camera, sunDir) from the cloud shadow map (the
+  hook's third consumer) - the 1 - cloudy x 1.1 heuristic
+  retires; daylight lives in T_air; MOONOPT_GAIN retires with it
+  (the moonbow now rides moonlight.js's E0 x the same slab - its
+  rarity is the physics). optics-reference: 10 landmarks (4 new;
+  the bow-LUT landmark now asserts the ratio from energy and
+  Alexander's band relative to the absolute peak). GPU: a SECOND
+  new probe, tsl-bow-probe.html (validate.sh, SEVEN probes) -
+  synthetic constant-tau map again: sigma-H doubling moves the
+  term by the slab law's own 0.2174 (not a gain's 2.000 -
+  measured 0.2167), chi = e^-0.6 to four digits, absolute
+  radiometry at the caustic peaks 2.4%/1.3% (red/green, each at
+  its own stationary point - the probe assumes NO readback row
+  orientation after measuring the corona probe's symmetric
+  target had hidden that bit), blue dark at the red edge. The
+  drawn result: a bow whose brightness follows the measured rain
+  rate through sigma, the measured freezing level through H, the
+  sun's altitude through both legs, deck shadows through the
+  map, and the veil through e^-tau_cirrus - where 0.55 x
+  (1 - cloudy x 1.1) once stood. Scope: the shaft is horizontally
+  homogeneous (the radar's cell field could localise it - named);
+  MP is stratiform rain (their own scope), carried for showers
+  too as the only printed DSD in the theme's feeds.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
