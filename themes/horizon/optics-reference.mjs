@@ -508,12 +508,10 @@ function bowStats(c, lo, hi) {
         Math.sqrt(2 * Math.PI) /
         sigInt;
     if (!(Math.abs(lutInt / want - 1) < 0.02)) ok = false;
-    if (
-      !(
-        l25.sigmaAltRad > Math.min(sigExt, sigInt) &&
-        l25.sigmaAltRad < Math.max(sigExt, sigInt)
-      )
-    )
+    if (!(
+      l25.sigmaAltRad > Math.min(sigExt, sigInt) &&
+      l25.sigmaAltRad < Math.max(sigExt, sigInt)
+    ))
       ok = false;
   }
   // the 120-degree spot above its baseline
