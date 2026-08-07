@@ -214,13 +214,13 @@ const skyElev = (j) => {
   const s = Math.min(Math.max((uyv - 0.5 - guard) / span, 0), 1);
   return hA + s * s * (Math.PI / 2 - hA);
 };
-const skyAt = (az, j, chi, mode, gAlb = 0) => {
+const skyAt = (az, j, chi, mode, gAlb = 0, sunMuP = sunMu) => {
   const uyv = (j + 0.5) / SH;
   const r = Rb + 300;
   const elev = skyElev(j);
   const se = Math.sin(elev),
     ce = Math.cos(elev);
-  const sunS = Math.sqrt(Math.max(1 - sunMu * sunMu, 0));
+  const sunS = Math.sqrt(Math.max(1 - sunMuP * sunMuP, 0));
   const mu = se;
   const dG = raySphere(r, mu, Rb),
     dT = raySphere(r, mu, Rt);
@@ -229,7 +229,7 @@ const skyAt = (az, j, chi, mode, gAlb = 0) => {
   const dt = dEnd / 32;
   const T = [1, 1, 1],
     L = [0, 0, 0];
-  const cSun = ce * Math.cos(az) * sunS + se * sunMu;
+  const cSun = ce * Math.cos(az) * sunS + se * sunMuP;
   for (let s = 0; s < 32; s++) {
     const ti = (s + 0.5) * dt;
     const ri = Math.sqrt(r * r + ti * ti + 2 * r * ti * mu);
@@ -238,7 +238,7 @@ const skyAt = (az, j, chi, mode, gAlb = 0) => {
     const sR = rayS.map((rr) => rr * dd[0]);
     const sM = mieS.map((ss) => ss * dd[1]);
     const e = ext(h);
-    const muSi = Math.min(Math.max((r * sunMu + ti * cSun) / ri, -1), 1);
+    const muSi = Math.min(Math.max((r * sunMuP + ti * cSun) / ri, -1), 1);
     const Ts = sunT(ri, muSi);
     const psi = psiMS(ri, muSi);
     const x = chi ? chi(ti) : 1;
@@ -258,7 +258,7 @@ const skyAt = (az, j, chi, mode, gAlb = 0) => {
   // dot(P-hat, sun)). gAlb = 0 leaves every texel bit-identical.
   if (gAlb > 0 && uyv < 0.5 && dG > 0) {
     const rG = Math.sqrt(r * r + dEnd * dEnd + 2 * r * dEnd * mu);
-    const muG = Math.min(Math.max((r * sunMu + dEnd * cSun) / rG, -1), 1);
+    const muG = Math.min(Math.max((r * sunMuP + dEnd * cSun) / rG, -1), 1);
     const TsG = sunT(rG, muG);
     for (let c = 0; c < 3; c++)
       L[c] += (T[c] * TsG[c] * gAlb * Math.max(muG, 0)) / Math.PI;
@@ -877,6 +877,48 @@ const sunDM = (r, mu) => {
     sunTransmittanceJS(Math.sin((-2 * Math.PI) / 180), mie, HD)[0] > 0.2;
   console.log(
     `${ok ? 'REF' : 'FAIL'} segment closure: T_seg x T_rest = T_full to ${(worst * 100).toFixed(2)}% (32-step quadrature); above-target empty; deck planet shadow at -3.3 deg, red still 0.2+ at -2`
+  );
+  if (!ok) process.exit(1);
+}
+
+{
+  // The sky-transfer table (adaptation.js MOONSKY_*): re-derive
+  // three rows with THIS gate's own march - the same texel
+  // elevations, cosine-weighted over the upper hemisphere. The
+  // generator used an independent uniform-elevation quadrature,
+  // a directly marched transmittance, and ZERO multiple-
+  // scattering ground albedo where this gate's LUT bakes the
+  // Payne sea 0.06 - so agreement is a real cross-check of both
+  // the march and the table, and the tolerance covers the two
+  // quadratures plus that albedo difference (measured +8% at
+  // high sun, +2-4% low).
+  const {skyTransferE} = await import('./adaptation.js');
+  let ok = true;
+  let detail = '';
+  for (const altDeg of [0, 10, 45]) {
+    const mu = Math.sin((altDeg * Math.PI) / 180);
+    const E = [0, 0, 0];
+    const NA = 24;
+    for (let j = Math.ceil(SH / 2); j < SH; j++) {
+      const e0 = skyElev(j);
+      const e1 = j + 1 < SH ? skyElev(j + 1) : Math.PI / 2;
+      const dE = Math.max(e1 - e0, 0);
+      const el = (e0 + e1) / 2;
+      if (!(el > 0)) continue;
+      for (let ia = 0; ia < NA; ia++) {
+        const az = ((ia + 0.5) / NA) * 2 * Math.PI;
+        const L = skyAt(az, j, null, 'full', 0, mu);
+        const w = Math.sin(el) * Math.cos(el) * dE * ((2 * Math.PI) / NA);
+        for (let c = 0; c < 3; c++) E[c] += L[c] * w;
+      }
+    }
+    const want = skyTransferE((altDeg * Math.PI) / 180);
+    for (let c = 0; c < 3; c++)
+      if (!(Math.abs(E[c] / want[c] - 1) < 0.12)) ok = false;
+    detail += `alt ${altDeg}: G ${E[1].toExponential(3)} vs table ${want[1].toExponential(3)}; `;
+  }
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} sky-transfer rows = this march's own hemisphere: ${detail}two independent quadratures`
   );
   if (!ok) process.exit(1);
 }

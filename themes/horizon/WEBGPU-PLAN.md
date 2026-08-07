@@ -4967,6 +4967,52 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the gates pin, photographed in the integrated scene. The
   instrument is available again for the scene-light adaptation
   pass (the one item explicitly waiting on eyes).
+- DONE (photometric adaptation, stage 1, Aug 7 twentieth push -
+  the scene-light item's FOUNDATION, from a new paper read in
+  full): Larson, Rushmeier & Piatko 1997 (LBNL 39882, the
+  visibility-matching tone reproduction report - open access at
+  the Radiance site). adaptation.js now carries, verbatim: Table
+  1's piecewise just-noticeable-difference function (the
+  Ferwerda 1996 rod+cone thresholds combined at the printed
+  10^-0.0184 cd/m^2 crossover; the gate holds the scotopic
+  floor, both Weber branches at slope exactly 1, and the fit's
+  own seam sizes, 0.012 dex worst, stated); the contrast-
+  matching exposure SHAPE 1/JND(La) (Eq. 7a's global form - the
+  display-side threshold folds into the caller's anchor); the
+  printed mesopic range (0.0056-5.6 cd/m^2, linear ramp) and
+  Eq. 13's Macbeth-fit scotopic luminance (equal-energy closed
+  point Y*scot/Y = 2.31 exact; Purkinje ordering gated). THE
+  PHOTOMETRIC BRIDGE COSTS NO NEW CONSTANT: Falchi's printed
+  natural-sky pair (skyglow.js 0.174 mcd/m^2 = 22.00
+  mag/arcsec^2) plus the exact arcsec^2 solid angle gives the
+  point-source zero point (2.58e-6 lux at V = 0), and
+  moonlight.js's SUN_VMAG then DERIVES the solar illuminance
+  constant: 128.1 klx, inside the textbook 120-135, with the
+  full moon corroborating at 0.322 lx (textbook 0.25-0.35) -
+  the absolute luminance frame the scene needed, assembled
+  entirely from constants already cited in this repo. MOONSKY*\*:
+  the clear-sky hemisphere irradiance per unit source E0 versus
+  source altitude, generated from the Hillaire reference march
+  (same constants, MS at zero albedo) - linearity in the source
+  makes the sun's transfer the moon's; the atmo gate re-derives
+  three rows with ITS OWN march at a parameterised source
+  direction (skyAt gains sunMuP, default bit-identical;
+  tolerance covers the two quadratures plus the gate LUT's
+  Payne-0.06 vs generator-0 MS albedo, measured +8% at high
+  sun). The frame CLOSES the dead-end the intermittency pass
+  documented: clear-day mean sky 1889 cd/m^2 (textbook band),
+  full-moon sky 4.7 mcd/m^2 (the classic ~5), and the JND
+  exposure gain between them 2.91e4 - exactly the ~1e4-1e5 of
+  adaptation the display map was missing. Emergent bonus, gated:
+  the transfer table's twilight rows are RED over green (the
+  grazing path's own reddening) while blue stays on top -
+  asserted per row. STAGE 2 (named): wire expo/skyExposure,
+  sunLight, ambient and the moonlit term onto this frame -
+  retiring 0.18 + 2.4 stLum, the ambient 1.1 and moonUp
+  0.07 x RGB - with the day anchored to the current daytime
+  appearance (one derived continuity constant) and the restored
+  view-serve instrument shooting day/dusk/moonlit A/Bs before
+  the switch lands.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
