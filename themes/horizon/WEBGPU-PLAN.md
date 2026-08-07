@@ -4281,6 +4281,53 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   sharp caustic, energy conserved. The drawn ring now stands
   ~+30-50% over the adjacent sky at this tau - real halo
   prominence - where the display gain drew ~+3%.
+- DONE (the desert three-mode mixture, Aug 7 fifth push - the
+  aureole's in-desert scope closed): OPAC finally READ DIRECTLY
+  (the BAMS PDF downloaded this session - the AMS route recovered
+  after its 403 spell) alongside Chin et al. 2002 (23 pages, the
+  same route). Table 4's desert row verbatim: water-soluble 2000
+  - mineral nuc 269.5 / acc 30.5 / coa 0.142 cm^-3 - the
+    hand-off's remembered numbers confirmed on the page - and the
+    N_i x M\* cross-check against Table 1c CLOSES on the page
+    itself (7.49/168.7/46.0 vs printed 7.5/168.7/45.6, impactor
+    rounding only): a transcription-proof landmark. Chin Table 2's
+    dust rows give printed Q at 500 nm across the size range
+    (0.14->1.298 ... 4.50->2.178); the OPAC modes map by their own
+    effective radii - MINM r_e 0.213 -> the 0.24 row (2.201), MIAM
+    r_e 1.297 with sigma IDENTICAL to Chin's 2.00 -> the 1.40 row
+    (2.421), MICM r_e 8.22 (x ~ 94) -> the van de Hulst asymptote
+    2, the cirrus corona's own convention. The GATE is the feed
+    itself: when the measured dust AOT holds the MAJORITY of the
+    555 nm column (dominance in its plain sense, no tuned
+    threshold - OPAC's own framing separates transported MITR from
+    the desert TYPE), dust runs the three-mode mixture; below it
+    the transported system stands bit-identical, and missing bands
+    fail closed to transported. Only the "coa."-labelled MICM
+    spikes (the existing source-label criterion): its computed
+    share of desert-dust extinction is 9.16% through printed
+    numbers alone, so the desert spike tau is SMALLER (f550 0.041
+    vs MITR's 0.389 at the fixture) while the pattern's central
+    value is 24.1x TALLER (r_e 8.2 um vs the truncated
+    transported distribution) - the measured un-softening: a far
+    narrower, brighter circumsolar core over a cleaner mid-field,
+    the drawn cone tightening from the 30-degree cap to 12.1
+    degrees. aureole-reference grew the landmark set (13 total):
+    the page closure, the r_e-to-row mapping, the share, the
+    inequality pair, the majority flip both ways, and fail-closed
+    on missing bands - PLUS the real-feed SHAPE lesson: the first
+    lookup indexed tau as an array where the daemon keys it by
+    band VALUE (the fixture exposed it; the landmark now uses the
+    real object shape and channelSet's own access pattern).
+    BROWSER-VERIFIED end to end: the pinned-clear scene with the
+    Saharan fixture (du 80%) boots to the panel row "aureole f550
+    0.041 · cone 12.0° · desert 3-mode (dust majority, OPAC Table
+    4)" - the drawn-pattern machinery downstream is byte-identical
+    to the pipeline the aureole pass closed radiometrically at 1%.
+    Scope: the majority criterion is the plain-language dominance
+    convention (a finer discriminator - bin-resolved dust AOT,
+    source geography - stays named); MINM/MIAM's wide forward
+    lobes remain in the smooth CS term by the same label criterion
+    as every accumulation mode.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

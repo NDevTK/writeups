@@ -3402,7 +3402,10 @@
                   aur.fDiff[1].toFixed(3) +
                   ' · cone ' +
                   ((aur.coneRad * 180) / Math.PI).toFixed(1) +
-                  '°'
+                  '°' +
+                  (aur.desert
+                    ? ' · desert 3-mode (dust majority, OPAC Table 4)'
+                    : '')
                 : ' · no coarse mode, no aureole')
           );
         } catch {

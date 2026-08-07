@@ -64,9 +64,12 @@
  *    the paper anchors to a measured 8.9 m/s wind); the coarse
  *    mode's extinction share follows from that ratio, the two
  *    printed Q values and the modes' second moments - computed, not
- *    chosen. Dust is all MITR (documented scope: inside a source
- *    region the three-mode desert mixture would carry more large
- *    particles; the aureole there reads slightly soft).
+ *    chosen. Dust runs as MITR under TRANSPORT and as OPAC Table
+ *    4's three-mode DESERT mixture when the measured column says
+ *    dust holds the majority of the 555 nm extinction - the
+ *    source-region signal from the feed itself (see the desert
+ *    block at aureoleSet; the old "reads slightly soft in-desert"
+ *    scope is closed).
  *  - Sea salt swells with humidity: Chin Table 3's printed growth
  *    factors (1.6/1.8/2.0/2.4/2.9/4.8 at RH 50/70/80/90/95/99)
  *    scale the mode radius AND the limiting radii ("the mode radius
@@ -97,6 +100,32 @@ export const SSAM = {rm: 0.228, sigma: 2.03, q: 2.696};
 // transported - r_modN um, sigma, and the PRINTED limiting radii.
 // Q from Chin's r_e 2.40 um dust row (MITR's own r_e is 2.36 um).
 export const MITR = {rm: 0.5, sigma: 2.2, rMin: 0.02, rMax: 5.0, q: 2.277};
+// The DESERT three-mode mixture - OPAC read directly this time
+// (the BAMS PDF, this session). Table 1c mineral rows, verbatim:
+// nuc/acc/coa mode radii, sigmas and PRINTED limiting radii; the
+// paper's own words: "Mineral aerosol or desert dust ... is
+// modeled with three modes to allow to consider increasing
+// relative amount of large particles for increasing turbidity",
+// and "Mineral aerosol particles are assumed not to enlarge with
+// increasing relative humidity" - no growth, stated. Q at 500 nm
+// from Chin et al. 2002 Table 2's printed dust rows (read
+// directly), mapped by each mode's own effective radius: MINM
+// r_e 0.213 um -> the r_e 0.24 row (2.201); MIAM r_e 1.297 um,
+// sigma 2.00 IDENTICAL to Chin's lognormals -> the 1.40 row
+// (2.421); MICM r_e 8.22 um sits beyond the table (x ~ 94 at
+// 550 nm) -> the van de Hulst Q -> 2 asymptote, the same closed
+// limit the cirrus corona rides.
+export const MINM = {rm: 0.07, sigma: 1.95, rMin: 0.005, rMax: 20, q: 2.201};
+export const MIAM = {rm: 0.39, sigma: 2.0, rMin: 0.005, rMax: 20, q: 2.421};
+export const MICM = {rm: 1.9, sigma: 2.15, rMin: 0.005, rMax: 60, q: 2.0};
+// OPAC Table 4's desert row (printed, RH-independent by the
+// paper's own Sect. 5 statement): number densities cm^-3. The
+// N_i x M* cross-check against Table 1c closes on the page
+// (7.49/168.7/46.0 vs printed masses 7.5/168.7/45.6) - a gate
+// landmark, no transcription drift possible.
+export const DESERT_N = {minm: 269.5, miam: 30.5, micm: 0.142};
+export const DESERT_M = {minm: 7.5, miam: 168.7, micm: 45.6};
+export const MSTAR = {minm: 2.78e-2, miam: 5.53, micm: 3.24e2};
 // OPAC Table 4, maritime clean (printed): number densities cm^-3.
 export const SS_N_ACC = 20;
 export const SS_N_COA = 3.2e-3;
@@ -273,6 +302,23 @@ export function sscmExtinctionShare(grow) {
   return coa / Math.max(acc + coa, 1e-300);
 }
 
+// MICM's share of the DESERT dust extinction: OPAC Table 4's
+// printed number densities through each mineral mode's printed Q
+// and truncated second moment (dry radii - minerals do not grow,
+// the paper's own statement). Computed, never chosen. Only the
+// mode the dataset itself labels "coa." carries a separable
+// diffraction spike - the nuc/acc modes' wide forward lobes stay
+// inside the smooth CS term, exactly the aureole's existing
+// source-label criterion.
+export function micmExtinctionShare() {
+  const m2 = (mode) =>
+    lnIntegral(mode.rm, mode.sigma, mode.rMin, mode.rMax, (r) => r * r);
+  const nuc = DESERT_N.minm * MINM.q * m2(MINM);
+  const acc = DESERT_N.miam * MIAM.q * m2(MIAM);
+  const coa = DESERT_N.micm * MICM.q * m2(MICM);
+  return coa / Math.max(nuc + acc + coa, 1e-300);
+}
+
 // ---- the delta similarity set ----
 // From the live channel set (aerosol.js channelSet: tau/ssa/g per
 // channel + species fractions) and the raw products' per-species
@@ -295,11 +341,34 @@ export function aureoleSet(set, products, rhPct) {
   if (tauDu + tauSs <= 0) return null;
   const grow = ssGrowth(rhPct);
   const shareCoa = sscmExtinctionShare(grow);
-  // Diffracted scattering: per coarse mode, extinction share times
-  // the printed 1/Q (the extinction-paradox share). This is a
-  // GEOMETRIC cross-section - the same absolute tau at every
-  // wavelength for settled modes.
-  const tauSpikeDu = tauDu / MITR.q;
+  // IN a dust source region the transported-dust model understates
+  // the large particles - OPAC's own framing: MITR "describes
+  // desert dust that is transported over long distances with a
+  // reduced amount of large particles", the desert TYPE holds the
+  // three-mode mixture. The measured discriminator is the feed's
+  // own species split: when dust carries the MAJORITY of the
+  // measured 555 nm extinction column (dominance in its plain
+  // sense - no tuned threshold), the column is source-fresh and
+  // dust runs the desert mixture: only the "coa."-labelled MICM
+  // spikes (its printed share of desert-dust extinction through
+  // Table 4's densities and the mapped Chin Qs), with a pattern
+  // whose r_e 8.2 um core is far narrower and taller than MITR's
+  // - the un-softened in-desert aureole. Below the majority the
+  // transported model stands unchanged, bit for bit.
+  // The 555 nm total: the same bands.find + tau[band] access
+  // channelSet uses (the feed keys tau by band value). Missing
+  // bands fail closed to the transported model.
+  const b555 = Array.isArray(products.bands)
+    ? products.bands.find((nm) => Math.abs(nm - 555) < 1)
+    : undefined;
+  const total555 =
+    b555 !== undefined && Number.isFinite(products.tau?.[b555])
+      ? Math.max(products.tau[b555], 1e-9)
+      : null;
+  const desert = total555 !== null && tauDu / total555 > 0.5;
+  const tauSpikeDu = desert
+    ? (tauDu * micmExtinctionShare()) / MICM.q
+    : tauDu / MITR.q;
   const tauSpikeSs = (tauSs * shareCoa) / SSCM.q;
   const tauSpike = tauSpikeDu + tauSpikeSs;
   if (!(tauSpike > 0)) return null;
@@ -320,7 +389,8 @@ export function aureoleSet(set, products, rhPct) {
   const gSpike = [0, 0, 0];
   for (let c = 0; c < 3; c++) {
     const um = CHANNEL_UM[c];
-    const pDu = wDu > 0 ? diffractionPattern(MITR, um, thetas) : null;
+    const pDu =
+      wDu > 0 ? diffractionPattern(desert ? MICM : MITR, um, thetas) : null;
     const pSs = wSs > 0 ? diffractionPattern(SSCM, um, thetas, grow) : null;
     let gNum = 0;
     let gDen = 0;
@@ -383,7 +453,8 @@ export function aureoleSet(set, products, rhPct) {
     coneRad,
     tauSpike,
     shareCoa,
-    grow
+    grow,
+    desert
   };
 }
 

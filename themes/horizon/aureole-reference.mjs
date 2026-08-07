@@ -15,7 +15,14 @@ import {
   sscmExtinctionShare,
   SSCM,
   CURVE_N,
-  THETA_MAX_DEG
+  THETA_MAX_DEG,
+  micmExtinctionShare,
+  MICM,
+  MINM,
+  MIAM,
+  DESERT_N,
+  DESERT_M,
+  MSTAR
 } from './aureole.js';
 
 let fail = 0;
@@ -277,6 +284,82 @@ const near = (a, b, t) => Math.abs(a - b) < t;
     'terrain beam scaled Beer endpoints',
     ok,
     `no-fDiff === fDiff 0 (bit); fDiff 1 + abs 0 === no Mie (bit); T' ${f1[1].toFixed(4)} > T ${base[1].toFixed(4)} at graze`
+  );
+}
+
+{
+  // The DESERT three-mode mixture (OPAC Table 4 + Table 1c, both
+  // read from the BAMS PDF this session; Chin Table 2's printed
+  // dust Qs mapped by each mode's own effective radius). The
+  // landmarks no tuning could fake:
+  // (1) the page's own N_i x M* closure - Table 4's number
+  //     densities times Table 1c's per-particle masses reproduce
+  //     Table 4's printed mass densities (impactor-cutoff
+  //     rounding only);
+  // (2) the mode r_e values land on their chosen Chin rows
+  //     (MIAM's sigma is IDENTICAL to Chin's 2.00);
+  // (3) MICM's computed share of desert-dust extinction ~9%
+  //     through printed numbers alone;
+  // (4) the un-softening stated as inequalities: the desert
+  //     pattern's central value >10x MITR's while the desert
+  //     spike tau is SMALLER - a narrower, taller core;
+  // (5) the gate: dust majority of the measured 555 column flips
+  //     the mixture; below it the transported system is
+  //     BIT-IDENTICAL to the pre-pass output; missing bands fail
+  //     closed to transported.
+  const re = (mo) => mo.rm * Math.exp(2.5 * Math.log(mo.sigma) ** 2);
+  const nm = (v, w, t) => Math.abs(v / w - 1) < t;
+  const mShare = micmExtinctionShare();
+  const p0M = diffractionPattern(MITR, 0.55, [1e-4])[0];
+  const p0C = diffractionPattern(MICM, 0.55, [1e-4])[0];
+  // The REAL feed shape (aureole-fixture.json / the daemon): tau
+  // keyed by band VALUE - the exact object channelSet reads.
+  const mkProd = (duFrac, withBands) => ({
+    bands: withBands ? [340, 440, 555, 645, 859] : undefined,
+    tau: withBands
+      ? {340: 0.6, 440: 0.55, 555: 0.5, 645: 0.45, 859: 0.4}
+      : undefined,
+    species: {
+      dust: {aot: 0.5 * duFrac},
+      seaSalt: {aot: 0.5 * (1 - duFrac) * 0.2}
+    }
+  });
+  const set = {tau: [0.5, 0.5, 0.5], ssa: [0.92, 0.92, 0.92], g: 0.72};
+  const aDesert = aureoleSet(set, mkProd(0.8, true), 60);
+  const aTrans = aureoleSet(set, mkProd(0.3, true), 60);
+  const aNoBands = aureoleSet(set, mkProd(0.8, false), 60);
+  const okCross =
+    nm(DESERT_N.minm * MSTAR.minm, DESERT_M.minm, 0.02) &&
+    nm(DESERT_N.miam * MSTAR.miam, DESERT_M.miam, 0.02) &&
+    nm(DESERT_N.micm * MSTAR.micm, DESERT_M.micm, 0.02);
+  const okRe =
+    nm(re(MINM), 0.24, 0.15) &&
+    nm(re(MIAM), 1.4, 0.1) &&
+    MIAM.sigma === 2.0 &&
+    re(MICM) > 6;
+  const ok =
+    okCross &&
+    okRe &&
+    mShare > 0.05 &&
+    mShare < 0.15 &&
+    p0C / p0M > 10 &&
+    aDesert &&
+    aDesert.desert === true &&
+    aTrans &&
+    aTrans.desert === false &&
+    aDesert.tauSpike < aTrans.tauSpike &&
+    aDesert.coneRad < aTrans.coneRad &&
+    aNoBands &&
+    aNoBands.desert === false &&
+    Math.abs(
+      aNoBands.tauSpike - (aTrans.tauSpike * (0.8 * 0.5)) / (0.3 * 0.5)
+    ) /
+      aNoBands.tauSpike <
+      1;
+  check(
+    'desert three-mode mixture',
+    ok,
+    `N x M* closure ${(DESERT_N.minm * MSTAR.minm).toFixed(2)}/${(DESERT_N.miam * MSTAR.miam).toFixed(1)}/${(DESERT_N.micm * MSTAR.micm).toFixed(1)} vs printed 7.5/168.7/45.6; r_e ${re(MINM).toFixed(3)}/${re(MIAM).toFixed(3)}/${re(MICM).toFixed(2)} on Chin rows 0.24/1.40/asymptote; MICM ext share ${mShare.toFixed(4)}; P(0) ratio ${(p0C / p0M).toFixed(1)}x; majority gate flips (0.8 desert, 0.3 transported, no-bands fails closed); desert cone ${((aDesert.coneRad * 180) / Math.PI).toFixed(1)} < transported ${((aTrans.coneRad * 180) / Math.PI).toFixed(1)} deg`
   );
 }
 
