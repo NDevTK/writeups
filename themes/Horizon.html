@@ -5517,9 +5517,12 @@
           dM.mul(1.98).div(tslMax(uFarVis, 400)).pow(2).negate()
         );
         const ndl = tslMax(tslDot(tslNormalWorld, uFarSunDir), 0);
-        // three's light convention premultiplies pi into the light
-        // units (the box terrain's own Lambert is albedo x NdotL x
-        // light with no explicit /pi) - the ring matches it.
+        // No 1/pi here BY CONTRACT: three r185's BRDF_Lambert is
+        // diffuseColor/pi in the near terrain's materials, so the
+        // theme feeds this ring its sun and sky PRE-DIVIDED by pi
+        // (see the uFarSunCol/uFarSkyIrr feed) - the seam then
+        // carries one law. The old comment claimed three had no
+        // /pi; the build's source says otherwise.
         const lit = uFarAlbedo.mul(uFarSunCol.mul(ndl).add(uFarSkyIrr));
         m.colorNode = tslMix(
           atmo.ok ? atmo.skyRadiance(tslNormalize(view)) : tslVec3(0, 0, 0),
@@ -9178,10 +9181,28 @@
         // The far horizon breathes the same measured state.
         uFarVis.value = Math.max(visEff, 400);
         uFarSunDir.value.copy(sunVec);
-        // Far-strip sea glints: legacy feed (see sunIFeedLegacy).
-        uFarSunCol.value.copy(sunLight.color).multiplyScalar(sunIFeedLegacy);
-        uFarSkyIrr.value.copy(skyIrr).multiplyScalar(irrGuard * srcE0);
-        scotFold(uFarSkyIrr.value);
+        // The far ring on the physical frame: its Lambert is
+        // albedo x (sunCol x NdotL + skyIrr) with NO 1/pi of its
+        // own, and three r185's BRDF_Lambert IS diffuseColor/pi
+        // (checked in the build's source) - so the ring meets the
+        // near terrain's seam exactly when BOTH feeds arrive
+        // pre-divided: the rig's beam / pi and the hemisphere
+        // colour / pi. The ambient copy carries the exposure, the
+        // cloud dimming, the moon term and the rod fold in one
+        // place (one-frame lag, like every far feed). The legacy
+        // pin keeps the old pair - including its pre-existing
+        // units gap (the sky term was the RAW per-E0 readback,
+        // ~50x under the display frame; the fog hid it).
+        if (adaptPin) {
+          uFarSunCol.value.copy(sunLight.color).multiplyScalar(sunIFeedLegacy);
+          uFarSkyIrr.value.copy(skyIrr).multiplyScalar(irrGuard * srcE0);
+          scotFold(uFarSkyIrr.value);
+        } else {
+          uFarSunCol.value
+            .copy(sunLight.color)
+            .multiplyScalar(sunLight.intensity / Math.PI);
+          uFarSkyIrr.value.copy(ambient.color).multiplyScalar(1 / Math.PI);
+        }
         if (landWSA)
           uFarAlbedo.value.setRGB(landWSA[0], landWSA[1], landWSA[2]);
 
@@ -9270,11 +9291,12 @@
         sunLight.intensity = adaptPin
           ? sunILegacy
           : stMax * skyExposure * discFrac * cirrusT * (1 - ecl);
-        // Custom scatter systems (sea glints near and far, the
-        // ocean's own sun, the cloud deck's direct beam) keep the
-        // LEGACY feed until each one's radiometry is verified on
-        // the new scale - their shaders were calibrated against
-        // it, and a silent 9x jump is not a verification.
+        // The legacy-scale feed: after the ocean, far-ring and
+        // terrain-glitter audits landed their systems on the
+        // physical beam, ONE unverified consumer remains - the
+        // cloud deck's direct beam (its volumetric radiometry
+        // gets its own audit) - plus every consumer's pinned
+        // branch for the A/B.
         sunIFeedLegacy = adaptPin ? sunLight.intensity : sunILegacy;
         // The cirrus corona: rings only when the MEASURED 250 hPa
         // temperature sits in Sassen's corona-cirrus regime and a
@@ -10383,11 +10405,25 @@
         if (bldNightU) bldNightU.value = lightsNight;
         terrainUniforms.uWindVec.value.set(windV.x, windV.z);
         terrainUniforms.uSunDirW.value.copy(sunVec);
-        // Near sea/snow glitter: legacy feed (see sunIFeedLegacy).
+        // Near sea/snow glitter on the physical beam: the terrain
+        // glint nodes already run PRINTED radiometry - the sea's
+        // full anisotropic Cox & Munk law (Gram-Charlier bracket,
+        // the paper's own c21/c03 and peakedness coefficients,
+        // exact unpolarised Fresnel at n = 1.34, the
+        // 4 cos_v cos^4_n denominator) and the snow's
+        // Zirr-Kaplanyan counting model over a GGX-Smith-Fresnel
+        // lobe at the cited crystal area fraction - both emit
+        // RADIANCE per unit beam irradiance, so the physical feed
+        // (colour x intensity = st x exposure, no pi: specular
+        // adds outside the Lambert) completes them. The alt gate
+        // and the global cloud factor stay (the glint path is not
+        // CSM-shadowed - documented in the material).
         terrainUniforms.uSunCol.value
           .copy(sunLight.color)
           .multiplyScalar(
-            sunIFeedLegacy * (sun.alt > 0.01 ? 1 : 0) * (1 - cloudy * 0.8)
+            (adaptPin ? sunIFeedLegacy : sunLight.intensity) *
+              (sun.alt > 0.01 ? 1 : 0) *
+              (1 - cloudy * 0.8)
           );
         // Diffuse-skylight fraction for the Ross-Li blend (the
         // blue-sky albedo weighting, Roman et al. 2010): the SAME

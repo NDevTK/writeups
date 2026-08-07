@@ -5242,6 +5242,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the episode process has the ring hour OFF at the fixture
   time and the sunset sky renders clean - measured 27% of
   cirrus hours, exactly as the intermittency pass shipped.
+- DONE (terrain glitter and the far ring, Aug 7 twenty-sixth
+  push - two more scatter systems join the physical frame, and
+  a convention myth dies): the AUDIT found the terrain's sea
+  glitter already runs the COMPLETE printed Cox & Munk law -
+  the full anisotropic Gram-Charlier PDF with the paper's own
+  c21/c03 and peakedness coefficients (gated by
+  coxmunk-reference's moment identities), exact unpolarised
+  Fresnel at n = 1.34, the 4 cos_v cos^4_n denominator - and
+  the snow sparkle is the Zirr-Kaplanyan counting model over a
+  GGX-Smith-Fresnel lobe at the cited crystal area fraction:
+  both emit radiance per unit beam irradiance, so ONLY THE FEED
+  was display-bound. uSunCol now carries the physical beam
+  (colour x intensity, no pi - specular adds outside the
+  Lambert); the alt gate and the global cloud factor stay (the
+  glint path is not CSM-shadowed, documented). THE FAR RING:
+  its material claimed "three's light convention premultiplies
+  pi... no explicit /pi" - REFUTED from the build's own source
+  (r185 BRDF_Lambert = diffuseColor x 1/pi), so the ring now
+  receives the rig's beam and the hemisphere colour PRE-DIVIDED
+  by pi and meets the near terrain's seam under one law. The
+  audit also caught a pre-existing units gap: the ring's sky
+  term was fed the RAW per-E0 readback - no exposure at all,
+  ~50x under the display frame - so far land was effectively
+  sun-plus-fog only; it now copies ambient.color (exposure,
+  cloud dimming, moon term and the rod fold arrive in one
+  place, one-frame lag like every far feed). The legacy pin
+  keeps the old pair, units gap included - the A/B compares
+  systems as they were. ONE legacy-fed consumer remains, named:
+  the cloud deck's direct beam (its volumetric radiometry gets
+  its own audit).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
