@@ -4855,6 +4855,46 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   mirror image (booked transOffAlm, camera-above-deck territory
   with the subsun), and the Parry/Lowitz oriented-COLUMN arcs -
   a different crystal population (the plates cannot make them).
+- DONE (within-hour halo intermittency, Aug 7 seventeenth push
+  - the occurrence pass's documented limit, resolved from the
+    SAME paper): Forster 2017 prints BOTH ends - the instantaneous
+    family rate (27% of cirrus) AND "more than 50% if the HaloCam
+    observations are binned to 1 h intervals" (Sassen 2003's 54%
+    corroborating) - and a per-hour draw cannot satisfy both.
+    haloOccurrence is now an EPISODE process: cosine-interpolated
+    value noise per quantized site, pushed through its own EXACT
+    trapezoid CDF so the instantaneous marginal is uniform at
+    every phase - the printed 0.27 is pinned BY CONSTRUCTION, not
+    by tuning - thresholded at the printed fraction, with the node
+    spacing the one derived constant (43 min), fit so the 1-h
+    binned any-on rate lands at 0.538, inside the printed band;
+    mean episode ~53 min. Deterministic, site-decorrelated,
+    CONTINUOUS in time (threshold crossings ramp over ~10 s of
+    the field's own drift; the old hour-boundary 5-min ramp is
+    retired), fails closed on garbage. Every family that rides
+    haloOcc - ring, dogs, circle with its internal families and
+    120-degree spots, pillar, CZA/CHA - inherits the episode
+    texture for free: halos now come and go WITHIN the hour, as
+    the camera saw them. Gate re-pinned: instantaneous 0.2697
+    measured, binned 0.533, decorrelation at independence, max
+    5-s step 0.32, NaN closed. ALSO this pass, deferred with
+    reasons stated: the scene-light constants (0.18 + 2.4 stLum,
+    moonUp 0.07, the ambient 1.1) form ONE coupled photometric
+    system with the exposure curve - replacing the moonlit
+    ambient with the measured chain (moonlight E0 x the Hillaire
+    sky transfer) gives ~2e-5 three-units where the display shows
+    ~0.05: the 0.07 constant embodies the eye's missing scotopic
+    adaptation (~1e5 of dynamic range the 24/(0.2+0.8 day)
+    exposure does not span). The honest replacement is a mesopic/
+    scotopic adaptation model landed WITH visual verification,
+    which this session's instrument cannot provide (the theme-page
+    device loss is environment-wide, proven code-independent) -
+    named for a session with eyes. The upper tangent arc stays
+    blocked too, precisely: Forster prints its occurrence (7.8% of
+    cirrus time, 30% of halo time) but NO oriented-column
+    fraction exists in the literature read so far - the arc's
+    RADIANCE has no citation, and the house does not draw
+    uncited constants.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

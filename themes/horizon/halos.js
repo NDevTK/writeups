@@ -1063,27 +1063,61 @@ function fresnelT(ci, n) {
 // the instantaneous rate exact and underdraws the binned one; a
 // within-hour intermittency model stays named.
 export const HALO_FAMILY_FRACTION = 0.27;
-function hourDraw(latQ, lonQ, hourIdx) {
-  // One mulberry32 draw per (site, hour) - quantized site so a
-  // pan across a town does not reroll the sky.
+// The EPISODE process (the occurrence pass's documented 1-h
+// binning limit, resolved): Forster 2017 prints BOTH ends of
+// the intermittency - the instantaneous family rate (27% of
+// cirrus) AND "the fraction of halo-producing cirrus clouds
+// increases to more than 50% if the HaloCam observations are
+// binned to 1 h intervals" (Sassen et al. 2003's 54% of 1-h
+// cirrus periods corroborating). A single per-hour draw cannot
+// satisfy both. The process here: cosine-interpolated value
+// noise on a node grid, pushed through its own EXACT trapezoid
+// CDF - the instantaneous marginal is exactly uniform at every
+// phase, so thresholding at the printed 0.27 pins the
+// instantaneous rate BY CONSTRUCTION - and the node spacing is
+// the one derived constant, fit so the 1-h binned any-on rate
+// lands in the printed band (43 min -> 0.538, between the
+// paper's own > 0.50 and Sassen's 0.54; mean episode ~53 min).
+// Deterministic per quantized site; continuous in time (the
+// old hour-boundary ramp is retired - the threshold crossing
+// itself ramps over ~2 minutes of the smooth field).
+export const HALO_EPISODE_NODE_MIN = 43;
+function episodeNode(latQ, lonQ, k) {
   const seed =
     (Math.imul(latQ + 900, 2654435761) ^
       Math.imul(lonQ + 1800, 40503) ^
-      Math.imul(hourIdx, 668265263)) >>>
+      Math.imul(k, 668265263)) >>>
     0;
-  return mulberry32(seed)() < HALO_FAMILY_FRACTION;
+  return mulberry32(seed)();
+}
+// CDF of w U1 + (1 - w) U2 (trapezoid) - maps the lerped noise
+// back to an exactly uniform variate at every phase.
+function trapCDF(x, w) {
+  const a = Math.min(w, 1 - w);
+  const b = Math.max(w, 1 - w);
+  if (a === 0) return Math.min(Math.max(x, 0), 1);
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  if (x < a) return (x * x) / (2 * a * b);
+  if (x < b) return (2 * x - a) / (2 * b);
+  const y = 1 - x;
+  return 1 - (y * y) / (2 * a * b);
 }
 export function haloOccurrence(latDeg, lonDeg, utcMs) {
   if (!Number.isFinite(latDeg) || !Number.isFinite(lonDeg)) return 0;
   if (!Number.isFinite(utcMs)) return 0;
   const latQ = Math.round(latDeg * 10);
   const lonQ = Math.round(lonDeg * 10);
-  const hour = Math.floor(utcMs / 3600e3);
-  const cur = hourDraw(latQ, lonQ, hour) ? 1 : 0;
-  const prev = hourDraw(latQ, lonQ, hour - 1) ? 1 : 0;
-  const minIn = (utcMs / 3600e3 - hour) * 60;
-  const f = Math.min(Math.max(minIn / 5, 0), 1);
-  return prev + (cur - prev) * f;
+  const s = utcMs / 60000 / HALO_EPISODE_NODE_MIN;
+  const k = Math.floor(s);
+  const f = s - k;
+  const ca = (1 - Math.cos(Math.PI * f)) / 2;
+  const x =
+    (1 - ca) * episodeNode(latQ, lonQ, k) + ca * episodeNode(latQ, lonQ, k + 1);
+  const u = trapCDF(x, 1 - ca);
+  // Soft edge at the threshold crossing (~2 min of the field's
+  // drift): no pop, and the >0.5 rate stays the printed one.
+  return Math.min(Math.max((HALO_FAMILY_FRACTION - u) / 0.01 + 0.5, 0), 1);
 }
 
 export const PARHELION_ALT_DEG = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
