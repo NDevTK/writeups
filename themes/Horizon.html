@@ -378,9 +378,11 @@
         createFlashMaterial,
         createMilkyWayMaterial,
         createNLCMaterial,
-        createSkyglowMaterial
+        createSkyglowMaterial,
+        createStratMaterial
       } from './horizon/sky-objects-tsl.js';
       import {starTintRGB} from './horizon/stars-color.js';
+      import {fillStratTexture} from './horizon/stratos.js';
       import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
       import {mpDropRadiusMm, mpSigmaExt} from './horizon/rainbow.js';
       import {parseSoft00, syndyne, visibleComets} from './horizon/comets.js';
@@ -7305,6 +7307,23 @@
       );
       skyGroup.add(lpGlow);
 
+      // The twilight purple light (stratos.js, gated by
+      // stratos-reference.mjs): the stratospheric Junge layer the
+      // dome's 1.2 km mie profile cannot carry - lit long after
+      // the ground aerosol shadows out, scattering the
+      // tropospherically reddened beam (Lee & Hernandez-Andres
+      // 2003's mechanism at Kremser 2016's printed amplitude).
+      // The texture refills at 1 Hz inside the twilight window;
+      // the shell adds over the dome like the optics families.
+      const stratObj = createStratMaterial();
+      const stratShell = new THREE.Mesh(
+        new THREE.SphereGeometry(903, 32, 16),
+        stratObj.material
+      );
+      skyGroup.add(stratShell);
+      let stratFillAt = 0;
+      record('Kremser 2016 stratospheric aerosol', 'Junge layer 15-25 km');
+
       // Measured rain re-lays the bow LUT (optics-lut buildBowLUT:
       // Airy fringes at the Marshall-Palmer drop of the measured
       // rain rate) for BOTH optics domes - sun bows and the rare
@@ -9264,6 +9283,29 @@
         // corona, sunset band) by this exact factor - the cirrus
         // corona is the diffracted share of it coming back.
         if (atmo.ok) atmo.sunDisc.cirrusT.value = cirrusT;
+        // The stratospheric layer's purple light: refill the
+        // radiance texture at 1 Hz while the lit stratosphere
+        // matters (the gate's window ends by sun -8; by +8 the
+        // term is a few percent of the bright molecular sky).
+        // Gain rides the SAME skyExposure/per-E0 frame as the
+        // dome, rod-folded by the shared mesopic blend; the sun
+        // azimuth is taken from the drawn sun's own world vector
+        // so shell and disc can never disagree.
+        {
+          const inWin = sun.alt < 8 * RAD && sun.alt > -9 * RAD;
+          if (inWin && Date.now() - stratFillAt > 1000) {
+            stratFillAt = Date.now();
+            fillStratTexture(stratObj.u.data, sun.alt, mieRad, eyeVeilM, 1);
+            stratObj.u.tex.needsUpdate = true;
+          }
+          const sunW = skyPoint(sun.alt, sun.az, 1);
+          stratObj.u.sunAz.value = Math.atan2(sunW.x, -sunW.z);
+          stratObj.u.scotB.value = mesoB;
+          stratObj.u.gain.value = inWin
+            ? skyExposure *
+              THREE.MathUtils.clamp((8 * RAD - sun.alt) / (2 * RAD), 0, 1)
+            : 0;
+        }
         // The sun's DISPLAY intensity, stage 4 of the adaptation
         // frame: three r185's physical lights put the Lambert
         // 1/pi in the material, so a directional light whose

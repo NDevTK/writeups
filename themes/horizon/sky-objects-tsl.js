@@ -1302,3 +1302,53 @@ export function createSkyglowMaterial() {
   material.opacityNode = float(1);
   return {material, u};
 }
+
+// The twilight purple light: the stratospheric (Junge) layer's
+// single-scatter radiance (stratos.js - Kremser 2016's printed
+// amplitude riding the shipped Rayleigh scale, gated on Lee &
+// Hernandez-Andres 2003's printed window). The texture holds
+// per-unit-E0 radiance over (azimuth from the sun, elevation to
+// the zenith); uGain carries skyExposure (the same per-E0 frame
+// the dome's march draws in), and the rod fold is the shared
+// Eq. 13 under the same mesopic blend as the dome and optics.
+export function createStratMaterial() {
+  const W = 24;
+  const H = 16;
+  const data = new Float32Array(W * H * 4);
+  const tex = new DataTexture(data, W, H, RGBAFormat, FloatType);
+  tex.wrapS = RepeatWrapping;
+  tex.minFilter = tex.magFilter = LinearFilter;
+  tex.needsUpdate = true;
+  const u = {
+    gain: uniform(0),
+    sunAz: uniform(0),
+    scotB: uniform(1),
+    tex,
+    data
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = BackSide;
+  material.blending = AdditiveBlending;
+  const d = normalize(positionLocal);
+  const az = atan(d.x, d.z.negate());
+  // Texture u: dPhi in [-pi, pi] mapped to [0, 1] (RepeatWrapping
+  // closes the seam); v: elevation 0..pi/2.
+  const tu = az
+    .sub(u.sunAz)
+    .div(2 * Math.PI)
+    .add(1.5)
+    .mod(1);
+  const tv = asin(clamp(d.y, 0.0, 1.0)).div(Math.PI / 2);
+  const col = texture(tex).sample(vec2(tu, tv)).rgb.mul(u.gain);
+  const Xs = col.x.mul(0.4124).add(col.y.mul(0.3576)).add(col.z.mul(0.1805));
+  const Ys = col.x.mul(0.2126).add(col.y.mul(0.7152)).add(col.z.mul(0.0722));
+  const Zs = col.x.mul(0.0193).add(col.y.mul(0.1192)).add(col.z.mul(0.9505));
+  const rod = Ys.mul(
+    Ys.add(Zs).div(max(Xs, 1e-12)).add(1).mul(1.33).sub(1.68)
+  ).div(2.31);
+  material.colorNode = mix(vec3(max(rod, 0.0)), col, u.scotB);
+  material.opacityNode = float(1);
+  return {material, u};
+}

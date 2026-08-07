@@ -5528,6 +5528,67 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the blackbody locus (the solar-Teff blackbody sits at
   0.868 where the Sun measures ~0.82), and colours outside
   the 2300-45000 K span clamp to the end temperatures.
+- DONE (the twilight purple light, Aug 7 thirty-third push -
+  TWO papers read in full and a missing atmospheric layer
+  landed): the theme had NO stratospheric aerosol - the mie
+  profile's 1.2 km scale height puts every drawn particle in
+  the planet's shadow minutes after sunset, so the twilight
+  purple light (the pastel band that dominates clear evening
+  skies between civil-twilight start and end) had no source.
+  Sources, both read cover to cover: Lee & Hernandez-Andres
+  2003 (Applied Optics 42, 445, 13 pp, via the Granada colour
+  lab's own archive) - the purple light's reds are
+  TROPOSPHERICALLY reddened sunlight singly scattered in the
+  stratosphere (the stratosphere alone "at most yellows" it);
+  their Table 2 prints the evening window at view elevation
+  20 deg over 35 twilights: start h0 -1.41 +- 0.93, maximum
+  purity -3.89 +- 0.71, end -7.37 +- 0.56; scatterers are
+  sulfuric-acid droplets under 0.1 um. Kremser et al. 2016
+  (Rev. Geophys. 54, 278, all 59 pp, via the White Rose
+  archive) - the Junge layer sits at 15-25 km peaking near
+  20 km; in quiescent periods the aerosol is "only 5 to 10%
+  above molecular levels" in CALIPSO 532 backscatter, and the
+  stratospheric lidar ratio is "typically between 45 and 50
+  sr". THE AMPLITUDE CHAIN: those two printed ranges over the
+  EXACT molecular lidar ratio 8pi/3 fix the layer's
+  extinction at 0.27..0.60 of the molecular extinction inside
+  it (log-mid 0.40) - no new unit constant; the amplitude
+  rides the shipped Hillaire Rayleigh scale, and integrating
+  the printed layer against the shipped profile lands the
+  background AOD(532) at 5.4e-3 inside the printed-range
+  bracket [3.6e-3, 8.1e-3], overlapping the review's own
+  quiescent record (~3e-3..6e-3, its Figs. 4/10). stratos.js
+  computes the single-scatter term with the EXISTING certified
+  machinery - sunTransmittanceJS per sample (the
+  tropospherically reddened beam, exact planet shadow
+  included) x pathToRadiusT view legs x Rayleigh phase (the
+  printed sub-0.1 um size is the stated dipole reduction) -
+  and the drawn shell (createStratMaterial, a 24x16
+  radiance texture over sun-relative azimuth x elevation,
+  refilled at 1 Hz in the twilight window) adds over the dome
+  in the same per-E0 x skyExposure frame with the shared
+  Eq.-13 rod fold. THE EMERGENT WINDOW, gated: at view 20 deg
+  the term holds 70% of its sunset value at Lee's printed
+  start (-1.41), reddens through R/B 40 at his printed purity
+  peak (-3.89, 16% amplitude), and hard-shadows by -6; at
+  view 5 deg the term's last light dies between -6.81 and
+  -7.93 - the printed end -7.37 +- 0.56 BRACKETS the
+  single-scatter cutoff. Also gated: solar-azimuth
+  concentration x9 (the printed "eyelid" shape), day
+  smallness (6% of the molecular zenith order at sun 45),
+  and exact linearity in volcScale - the stage-2 hook for a
+  live OMPS/GIBS volcanic feed (Kremser prints the ~1 yr
+  sulfate e-folding and Table 1's moderate-eruption SO2
+  masses; the honest live mapping needs its own pass because
+  fresh SO2 is not yet aerosol). Stated scope: single
+  scattering only (the -7.37 end at view 20 carries a
+  higher-order tail the term omits - it reproduces the end
+  low in the sky instead, where the last purple actually
+  lives), grazing refraction (~0.5 deg) unbent, and the
+  Angstrom slope 1.35 is a documented graph-read of the
+  review's Fig. 10 (the one number not from body text).
+  validate.sh gains the gate; VALIDATE PASS (all references
+  + 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
