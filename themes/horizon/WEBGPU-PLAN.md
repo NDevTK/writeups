@@ -4708,6 +4708,63 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   ground-horizon dip; today's slabBase chain gates at h > 0),
   and internal-path pillar light (transmitted families) stays in
   the lost/offAlm books, stated.
+- DONE (twilight veil geometry, Aug 7 fourteenth push - the
+  named limit of the pillar pass, resolved): NEW PAPER read in
+  full - Sassen & Campbell 2001 (JAS 58, 481, FARS Part I, the
+  same instrument family as the tau chain's Part III): 10-yr
+  annual cirrus base/top 8.79/11.02 km MSL (Table 3; the layer
+  envelope 2.23 km is their difference exactly), shipped as
+  CIRRUS_BASE_M/CIRRUS_TOP_M. THE APPROXIMATION RETIRED: the
+  veil's plane-parallel slant 1/max(sin h, 0.08) - the 0.08
+  floor was a display-era clamp - replaced by the EXACT chord
+  through the printed spherical shell (shellChordAM, closed
+  two-branch geometry, eye-height aware, brute-force ray-sample
+  landmark to 8e-4 from the eye AND from inside the shell at
+  negative elevations). The honest numbers: 4.5% correction at
+  10 deg already, horizon air mass 18.2 where the floor said
+  12.5, and the chord keeps meaning below h = 0 down to the
+  shell's own tangent. All seven veil call sites (sun disc/
+  corona/halo slab, moon bow/halo/corona x2) now pass the
+  camera's own height. THE TWILIGHT PILLAR: pillarShare's
+  flat-plate sin|h| died at the horizon wrongly - the beam's
+  sine on the tilted normal folds as E[|sin h + t cos h|] (the
+  opposite tilt sign presents the OTHER basal face, the same
+  mirror plane), quadrature with Fresnel inside the fold, held
+  against a direct orientation Monte Carlo to 0.2% at h = 0/1/5
+  (share 0.077 at the horizon: the mirrors glint THROUGH
+  sunset). The drawn feed moves to the crystal-local frame
+  (Horizon.html pillarBase): visible-centroid view elevation
+  (truncated-Gaussian closed form), the crystal where that ray
+  meets the deck mid-shell, the LOCAL sun altitude there (the
+  horizon-dip arc: at h = -2 the crystals 180 km sunward see the
+  sun 0.4 deg below THEIR horizon), the deck-frame beam through
+  the existing Hillaire integral (its own planet-shadow test IS
+  the twilight cutoff), the view leg's air through the NEW
+  pathToRadiusT segment integral (closure landmark in
+  atmo-reference: T_seg x T_rest = T_full to 1% - the coarse
+  march's own quadrature), the view leg's in-veil extinction,
+  and the sun leg's slab on the first-exit chord - the stated
+  single-patch assumption (the far branch of a grazing chord
+  re-enters the shell 200+ km out, beyond the local cover's
+  domain; shellFirstExit, near/full both printed by the gate:
+  15.5/44.5 at -2 deg). The composed curve, pinned by the
+  cloud-corona-reference composition landmark: CONTINUOUS
+  through sunset (cross-ratio 1.028), peak at h = -3.0 deg at
+  cover 0.1 (-3.55 at 0.3), STRONGLY red there (R/G 10.5, R/B
+  ~1400 - the photographs' pillar), exactly zero at -4.6 deg
+  when the deck's own sun sets, zero cover kills it. Sun and
+  moon both (the moon pillar lives through moonrise/moonset the
+  same way, moonIrradianceE0 on top). The h > 0 pillar feed
+  upgraded to the same exact frame (one formula, no branch seam;
+  the pass-13 halos-reference emergence landmark re-stated:
+  share x visibility is monotone into twilight - the old
+  "peak near h ~ 1" was the flat-plate artifact). Documented
+  residuals: the uniform-shell in-cloud-graze valley near
+  h ~ -2.5 (the deck lit through its own long body - real in
+  the mean-field model, softened in patchy life); the subcirrus
+  oriented-plate "crystal layers" Sassen & Campbell report as
+  their second most common detection (p. 485) are the OTHER
+  pillar carrier, unmodelled - a future population.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

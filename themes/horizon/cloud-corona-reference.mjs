@@ -12,6 +12,10 @@ import {
   buildCloudCoronaLUT,
   buildDropletCoronaLUT,
   dropletMode,
+  shellChordAM,
+  shellFirstExit,
+  CIRRUS_BASE_M,
+  CIRRUS_TOP_M,
   CIRRUS_TAU_FULL,
   CORONA_T250_MAX,
   CORONA_D_UM,
@@ -30,6 +34,8 @@ import {
   lognormalMomentRatio
 } from './aureole.js';
 import {sunAngularRadiusRad} from './eclipses.js';
+import {pathToRadiusT, sunTransmittanceJS} from './sun-transmittance.js';
+import {pillarShare, PILLAR_SIGMA_ALT} from './halos.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -191,18 +197,90 @@ const near = (a, b, t) => Math.abs(a - b) < t;
 
 {
   // The measured cirrus column: full cover at the zenith is the
-  // printed FARS mean 0.75 exactly; cover scales linearly; the
-  // grazing floor matches cirrusT's documented 0.08.
-  const ok =
+  // printed FARS mean 0.75 exactly (the shell chord is exactly 1
+  // vertical), cover scales linearly, and the slant is now the
+  // EXACT chord through Sassen & Campbell's printed shell - the
+  // 0.08 grazing floor is retired. Closed points: the FARS Part I
+  // heights verbatim; vertical air mass 1 exact; convergence on
+  // the plane-parallel 1/sin where it was ever right (0.5% at 30
+  // deg) with the honest geometric correction at 10 deg (~4.5%);
+  // the horizon chord equals its own sqrt(2 R dH) closed form and
+  // BEATS the old floor (18.2 vs the clamped 12.5); even in
+  // elevation from below the shell; brute-force ray-sample match
+  // from the eye AND from inside the shell (the crystal frame) at
+  // positive and negative elevations; first-exit is never longer
+  // than the full chord and equals it whenever there is no
+  // far-side re-entry; garbage fails closed.
+  const R = 6360e3;
+  const brute = (e, hEye) => {
+    const r0 = R + hEye;
+    let L = 0;
+    const ds = 20;
+    for (let s = ds / 2; s < 3e6; s += ds) {
+      const r = Math.sqrt(r0 * r0 + s * s + 2 * r0 * s * Math.sin(e));
+      const h = r - R;
+      if (h >= CIRRUS_BASE_M && h <= CIRRUS_TOP_M) L += ds;
+      if (h > CIRRUS_TOP_M + 2e5 && s > 4e5) break;
+    }
+    return L / (CIRRUS_TOP_M - CIRRUS_BASE_M);
+  };
+  let ok =
+    CIRRUS_BASE_M === 8790 &&
+    CIRRUS_TOP_M === 11020 &&
     CIRRUS_TAU_FULL === 0.75 &&
+    shellChordAM(Math.PI / 2) === 1 &&
     cirrusSlantTau(1, 1) === 0.75 &&
-    near(cirrusSlantTau(0.5, 0.5), 0.75, 1e-15) &&
-    near(cirrusSlantTau(1, 0.01), 0.75 / 0.08, 1e-12) &&
-    cirrusSlantTau(0, 1) === 0;
+    cirrusSlantTau(0, 1) === 0 &&
+    cirrusSlantTau(1, NaN) === 0 &&
+    shellChordAM(NaN) === 0;
+  const am30 = shellChordAM((30 * Math.PI) / 180, 300);
+  const am10 = shellChordAM((10 * Math.PI) / 180, 300);
+  ok = ok && near(am30 * Math.sin((30 * Math.PI) / 180), 1, 0.005);
+  ok = ok && am10 < 1 / Math.sin((10 * Math.PI) / 180) && am10 > 5.3;
+  const g = shellChordAM(0, 300);
+  const gClosed =
+    (Math.sqrt((R + CIRRUS_TOP_M) ** 2 - (R + 300) ** 2) -
+      Math.sqrt((R + CIRRUS_BASE_M) ** 2 - (R + 300) ** 2)) /
+    (CIRRUS_TOP_M - CIRRUS_BASE_M);
+  ok = ok && near(g / gClosed, 1, 1e-9) && g > 1 / 0.08;
+  ok =
+    ok &&
+    shellChordAM((-5 * Math.PI) / 180, 300) ===
+      shellChordAM((5 * Math.PI) / 180, 300);
+  const Hm = (CIRRUS_BASE_M + CIRRUS_TOP_M) / 2;
+  let worstB = 0;
+  for (const [eDeg, hE] of [
+    [15, 300],
+    [2, 300],
+    [0, 300],
+    [-1, 300],
+    [5, Hm],
+    [0, Hm],
+    [-1, Hm],
+    [-2, Hm],
+    [-3, Hm]
+  ]) {
+    const e = (eDeg * Math.PI) / 180;
+    const rel = Math.abs(shellChordAM(e, hE) / brute(e, hE) - 1);
+    worstB = Math.max(worstB, rel);
+    if (!(rel < 1e-3)) ok = false;
+    const fx = shellFirstExit(e, hE);
+    if (!(fx <= shellChordAM(e, hE) + 1e-12)) ok = false;
+    if (hE === 300 || eDeg >= 0) {
+      // no far-side re-entry from below the shell, nor ascending
+      // from inside: first exit IS the chord
+      if (!near(fx, shellChordAM(e, hE), 1e-9)) ok = false;
+    }
+  }
+  // The patch assumption, measured: at the crystal frame the
+  // grazing sun leg's near branch vs the full chord.
+  const nf1 = shellFirstExit((-2 * Math.PI) / 180, Hm);
+  const nf2 = shellChordAM((-2 * Math.PI) / 180, Hm);
+  ok = ok && nf1 < nf2;
   check(
-    'Sassen & Comstock column',
+    'Sassen & Comstock column through the Sassen & Campbell shell',
     ok,
-    `full-cover zenith tau ${cirrusSlantTau(1, 1)} (printed mean 0.75); zero cover -> 0; grazing floor 0.08`
+    `heights 8.79/11.02 km verbatim; vertical AM 1 exact; 30-deg vs 1/sin ${((am30 * Math.sin((30 * Math.PI) / 180) - 1) * 100).toFixed(2)}%; 10-deg correction ${((1 - am10 * Math.sin((10 * Math.PI) / 180)) * 100).toFixed(1)}%; horizon chord ${g.toFixed(1)} = closed form (old floor said ${(1 / 0.08).toFixed(1)}); brute-force worst ${worstB.toExponential(1)}; near/full at the crystal, -2 deg: ${nf1.toFixed(1)}/${nf2.toFixed(1)}`
   );
 }
 
@@ -468,6 +546,107 @@ const near = (a, b, t) => Math.abs(a - b) < t;
     detail += `${name} P(0) ${raw0.toFixed(0)} -> ${c0.toFixed(0)}/sr; `;
   }
   check('droplet LUTs: smeared centre, monotone through the disc', ok, detail);
+}
+
+{
+  // The TWILIGHT PILLAR composition - the exact chain the theme
+  // draws (crystal-local frame): visible-centroid view elevation
+  // (truncated-Gaussian closed form), the crystal where that ray
+  // meets the deck mid-shell, the LOCAL sun altitude there
+  // (horizon-dip arc - at h = -2 the crystal 180 km sunward sees
+  // the sun only 0.4 deg below ITS horizon), the deck-frame beam
+  // through the Hillaire integral (its own planet shadow IS the
+  // twilight cutoff), the view leg's air (pathToRadiusT) and its
+  // in-veil extinction, the sun leg's in-veil slab on the
+  // first-exit chord (the stated single-patch assumption), and
+  // the tilt-folded share. Landmarks: finite and non-negative
+  // everywhere; CONTINUOUS through sunset (the fold's point); the
+  // drawn peak in deep twilight (h in [-4, -2] at thin cover);
+  // strongly RED there (the photographs' pillar); exactly zero
+  // once the deck's sun sets (~-4.6 deg); zero cover kills it.
+  const mie = {scat: [4e-6, 4e-6, 4e-6], abs: [4.4e-7, 4.4e-7, 4.4e-7]};
+  const Rb = 6360e3;
+  const Hm = (CIRRUS_BASE_M + CIRRUS_TOP_M) / 2;
+  const Rm = Rb + Hm;
+  const R1 = Rb + CIRRUS_BASE_M;
+  const RAD = Math.PI / 180;
+  const erf = (x) => {
+    const s = x < 0 ? -1 : 1;
+    x = Math.abs(x);
+    const t = 1 / (1 + 0.3275911 * x);
+    return (
+      s *
+      (1 -
+        ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t -
+          0.284496736) *
+          t +
+          0.254829592) *
+          t *
+          Math.exp(-x * x))
+    );
+  };
+  const Phi = (z) => 0.5 * (1 + erf(z / Math.SQRT2));
+  const phiN = (z) => Math.exp((-z * z) / 2) / Math.sqrt(2 * Math.PI);
+  const E = (hDeg, c, eyeH = 300) => {
+    const h = hDeg * RAD;
+    const sigV = Math.hypot(PILLAR_SIGMA_ALT, 0.00465 / 2);
+    const vis = 1 - Phi(h / sigV);
+    if (!(vis > 1e-12)) return [0, 0, 0];
+    const eVis = -h + (sigV * phiN(h / sigV)) / vis;
+    const r0 = Rb + eyeH;
+    const se = Math.sin(eVis);
+    const sMid = -r0 * se + Math.sqrt(r0 * se * r0 * se + Rm * Rm - r0 * r0);
+    const sBase = -r0 * se + Math.sqrt(r0 * se * r0 * se + R1 * R1 - r0 * r0);
+    const aC = Math.atan2(sMid * Math.cos(eVis), r0 + sMid * se);
+    const hLoc = h + aC;
+    const tB = sunTransmittanceJS(Math.sin(hLoc), mie, Hm);
+    const tV = pathToRadiusT(se, mie, eyeH, Hm);
+    const dens = (CIRRUS_TAU_FULL * c) / (CIRRUS_TOP_M - CIRRUS_BASE_M);
+    const tVeil = Math.exp(-dens * (sMid - sBase));
+    const amp = coronaAmp(CIRRUS_TAU_FULL * c * shellFirstExit(hLoc, Hm));
+    const sh = pillarShare(h);
+    return [0, 1, 2].map((k) => tB[k] * tV[k] * tVeil * amp * sh[k] * vis);
+  };
+  let ok = true;
+  let peak = 0;
+  let pH = 0;
+  for (let hd = -5; hd <= 3.001; hd += 0.05) {
+    const v = E(hd, 0.1);
+    if (!v.every((x) => Number.isFinite(x) && x >= 0)) ok = false;
+    if (v[0] > peak) {
+      peak = v[0];
+      pH = hd;
+    }
+  }
+  const atPeak = E(pH, 0.1);
+  const cross = E(-0.02, 0.1)[0] / E(0.02, 0.1)[0];
+  let p3 = 0;
+  let pH3 = 0;
+  for (let hd = -5; hd <= 0.001; hd += 0.05) {
+    const v = E(hd, 0.3)[0];
+    if (v > p3) {
+      p3 = v;
+      pH3 = hd;
+    }
+  }
+  ok =
+    ok &&
+    pH > -4 &&
+    pH < -2 &&
+    pH3 > -4.5 &&
+    pH3 < -2.5 &&
+    E(-4.6, 0.1).every((v) => v === 0) &&
+    E(-3, 0.1)[0] > 0 &&
+    E(-1, 0.1)[0] > E(1, 0.1)[0] &&
+    atPeak[0] / atPeak[1] > 5 &&
+    atPeak[0] / atPeak[2] > 100 &&
+    Math.abs(cross - 1) < 0.1 &&
+    E(-3, 0).every((v) => v === 0);
+  check(
+    'the twilight pillar: continuous through sunset, red, then the deck sets',
+    ok,
+    `peak at h = ${pH.toFixed(2)} deg (cover 0.1; ${pH3.toFixed(2)} at 0.3), R/G ${(atPeak[0] / atPeak[1]).toFixed(1)}, R/B ${(atPeak[0] / atPeak[2]).toFixed(0)}; cross-sunset ratio ${cross.toFixed(3)}; dark at -4.6 (the deck's own sunset); zero cover -> 0`
+  );
 }
 
 process.exit(fail ? 1 : 0);

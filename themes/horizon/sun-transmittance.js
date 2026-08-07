@@ -29,6 +29,46 @@
 // grazing geometries (a small but real channel-ratio error at the
 // horizon: 0.5% R/G at 130 m per atmo-reference), so the band's
 // texture is built from this integral at the true radius instead.
+// The same integral cut at the first crossing of radius
+// Rb + hTop: the SEGMENT transmittance from the observer to a
+// target shell (the twilight pillar's view leg, eye to the
+// cirrus deck). The closure identity T_full(eye) = T_seg(eye ->
+// deck) x T_full(deck, local direction cosine at the crossing)
+// - straight-line geometry, mu' = (r mu + d) / r' - is the
+// gate's landmark: the two marches must agree on the same ray.
+export function pathToRadiusT(cosZenith, mie, hObs = 300, hTopM = 11020) {
+  const Rb = 6360e3;
+  const rt = Rb + hTopM;
+  const r = Rb + hObs;
+  if (r >= rt) return [1, 1, 1];
+  const mu = cosZenith;
+  const b = r * mu;
+  const disc = b * b + rt * rt - r * r;
+  if (disc < 0) return [1, 1, 1];
+  const d = -b + Math.sqrt(disc);
+  if (d <= 0) return [1, 1, 1];
+  const N = 32;
+  const dt = d / N;
+  let tr = 0;
+  let tm = 0;
+  let to = 0;
+  for (let i = 0; i < N; i++) {
+    const ti = (i + 0.5) * dt;
+    const h = Math.sqrt(r * r + ti * ti + 2 * r * ti * mu) - Rb;
+    tr += Math.exp(-h / 8000) * dt;
+    tm += Math.exp(-h / 1200) * dt;
+    to += Math.max(0, 1 - Math.abs(h - 25e3) / 15e3) * dt;
+  }
+  const mieExt = (c) =>
+    (mie.scat[c] * (1 - (mie.fDiff ? mie.fDiff[c] : 0)) + mie.abs[c]) * tm;
+  const oz = (mie.ozScale ?? 1) * to;
+  return [
+    Math.exp(-(5.802e-6 * tr + mieExt(0) + 0.65e-6 * oz)),
+    Math.exp(-(13.558e-6 * tr + mieExt(1) + 1.881e-6 * oz)),
+    Math.exp(-(33.1e-6 * tr + mieExt(2) + 0.085e-6 * oz))
+  ];
+}
+
 export function sunTransmittanceJS(cosZenith, mie, hObs = 300) {
   const Rb = 6360e3;
   const Rt = 6460e3;

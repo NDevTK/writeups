@@ -846,14 +846,43 @@ export const CIRCLE_SIGMA_ALT_DEG = 0.84;
 // runs it unchanged; the drawn feed still needs the deck's own
 // twilight illumination, a named limit).
 export const PILLAR_SIGMA_ALT = Math.SQRT2 * PLATE_TILT_THETA;
+// The basal projection is TILT-FOLDED: the beam's sine on the
+// tilted normal is x = sin|h| + t cos h with t the Gaussian tilt
+// component (sigma Theta/sqrt(2) - the same linearised model the
+// image Gaussian above rides). The opposite tilt sign presents
+// the OTHER basal face - the same mirror plane - so the glint
+// folds |x|: E[|x|] = sigma sqrt(2/pi) > 0 at the horizon and
+// the pillar is CONTINUOUS through sunset, where the flat-plate
+// sin|h| died wrongly. Numerator and flux denominator both fold;
+// the Fresnel rides inside the fold (no Jensen shortcut -
+// grazing rho curves hard). A 48-point quadrature over the tilt
+// component; the gate holds it against a direct orientation
+// Monte Carlo.
 export function pillarShare(h, nRGB = ICE_N) {
-  const sa = Math.abs(Math.sin(h));
-  const A = plateProjArea(Math.abs(h));
-  return nRGB.map((n) => {
-    if (!(sa > 0) || !(A > 0)) return 0;
-    const rho = 1 - fresnelT(sa, n);
-    return (((3 * Math.sqrt(3)) / 2) * sa * rho) / A;
-  });
+  if (!Number.isFinite(h)) return nRGB.map(() => 0);
+  const m = Math.abs(Math.sin(h));
+  const ch = Math.abs(Math.cos(h));
+  const sig = (PLATE_TILT_THETA / Math.SQRT2) * ch;
+  const A_side = (6 / Math.PI) * plateMeanC() * ch;
+  const B = (3 * Math.sqrt(3)) / 2;
+  const N = 48;
+  let eProj = 0;
+  const eRho = nRGB.map(() => 0);
+  for (let i = 0; i < N; i++) {
+    const z = -5 + (10 * (i + 0.5)) / N;
+    const w = Math.exp((-z * z) / 2) / Math.sqrt(2 * Math.PI);
+    const ax = Math.abs(m + sig * z);
+    if (ax <= 0) continue;
+    const ci = Math.min(ax, 1);
+    eProj += w * ax;
+    for (let c = 0; c < nRGB.length; c++)
+      eRho[c] += w * ax * (1 - fresnelT(ci, nRGB[c]));
+  }
+  const dz = 10 / N;
+  eProj *= dz;
+  const A = B * eProj + A_side;
+  if (!(A > 0)) return nRGB.map(() => 0);
+  return eRho.map((r) => (B * r * dz) / A);
 }
 // The crystal part of the column's azimuth sigma (radians).
 export function pillarAzSigma(h, tiltTheta = PLATE_TILT_THETA) {

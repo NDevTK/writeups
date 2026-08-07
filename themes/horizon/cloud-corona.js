@@ -249,13 +249,93 @@ export function airyEncircled(u) {
 
 // ---- the slab radiometry ----
 
+// Sassen & Campbell 2001 (JAS 58, 481, read in full - FARS Part
+// I, the same instrument family as the tau above): 10-yr annual
+// mean cirrus cloud-base and cloud-top heights, Table 3 - 8.79
+// and 11.02 km MSL (the printed layer envelope 2.23 km is their
+// difference exactly; the abstract's 11.2 rounds the table's
+// value). The veil is drawn as this uniform spherical shell.
+export const CIRRUS_BASE_M = 8790;
+export const CIRRUS_TOP_M = 11020;
+
+// Exact path length of a straight ray through the spherical
+// shell [H1, H2], in units of the shell thickness (an air-mass
+// factor for the veil): eye at height hEye, elevation elev. Pure
+// shell geometry along the FORWARD ray - u is the along-ray
+// coordinate with u = 0 at the closest approach (impact
+// parameter p = r0 cos elev), the shell occupies |u| in [q1, q2]
+// and the eye sits at u_e = r0 sin elev. Replaces the
+// plane-parallel 1 / max(sin alt, 0.08) - at 10 degrees the two
+// agree to ~1%, at the horizon this is FINITE (the closed
+// sqrt(2R dH) chord) where the old floor was a display-era
+// clamp, and below the horizon it keeps meaning down to the
+// shell's own tangent: the twilight geometry. No ground test
+// here - the beam's planet shadow is sunTransmittanceJS's own
+// (the same Hillaire sphere).
+export function shellChordAM(
+  elevRad,
+  hEyeM = 300,
+  H1M = CIRRUS_BASE_M,
+  H2M = CIRRUS_TOP_M,
+  RM = 6360e3
+) {
+  if (!Number.isFinite(elevRad)) return 0;
+  const e = Math.min(Math.max(elevRad, -Math.PI / 2), Math.PI / 2);
+  const r0 = RM + hEyeM;
+  const R1 = RM + H1M;
+  const R2 = RM + H2M;
+  const p2 = r0 * Math.cos(e) * (r0 * Math.cos(e));
+  if (p2 >= R2 * R2) return 0;
+  const ue = r0 * Math.sin(e);
+  const q2 = Math.sqrt(R2 * R2 - p2);
+  const q1 = p2 < R1 * R1 ? Math.sqrt(R1 * R1 - p2) : 0;
+  const seg = (a, b) => Math.max(0, b - Math.max(a, ue));
+  return (seg(-q2, -q1) + seg(q1, q2)) / (H2M - H1M);
+}
+
+// The same geometry cut at the FIRST shell exit: the in-veil
+// path from a crystal at hEye (inside the shell) outward toward
+// elevation elev, NOT counting a far-side re-entry. The twilight
+// pillar's sun leg uses this as the stated single-patch
+// assumption: FARS's cirrus are mesoscale systems, and the far
+// branch of a grazing chord re-enters the shell 200+ km beyond
+// the measured local cover's domain - the emergence landmark
+// measures both branches so the assumption stays a number, not a
+// mood.
+export function shellFirstExit(
+  elevRad,
+  hEyeM,
+  H1M = CIRRUS_BASE_M,
+  H2M = CIRRUS_TOP_M,
+  RM = 6360e3
+) {
+  if (!Number.isFinite(elevRad)) return 0;
+  const e = Math.min(Math.max(elevRad, -Math.PI / 2), Math.PI / 2);
+  const r0 = RM + hEyeM;
+  const R1 = RM + H1M;
+  const R2 = RM + H2M;
+  const p2 = r0 * Math.cos(e) * (r0 * Math.cos(e));
+  if (p2 >= R2 * R2) return 0;
+  const ue = r0 * Math.sin(e);
+  const q2 = Math.sqrt(R2 * R2 - p2);
+  const q1 = p2 < R1 * R1 ? Math.sqrt(R1 * R1 - p2) : 0;
+  // Descending from inside the shell above the base: out through
+  // the base. Otherwise (ascending, or the tangent sits inside
+  // the shell): out through the top.
+  const L = ue < -q1 && q1 > 0 ? -q1 - ue : q2 - Math.max(ue, q1);
+  return Math.max(L, 0) / (H2M - H1M);
+}
+
 // Slant extinction optical depth of the high veil: the measured
-// full-cover mean scaled by the fractional cover, over the flat-air
-// slant 1/sin(alt) with the same 0.08 floor Horizon.html's cirrusT
-// has always used at grazing sun.
-export function cirrusSlantTau(coverFrac, sinAlt) {
+// full-cover mean scaled by the fractional cover, over the EXACT
+// shell chord at the eye's height (the 0.08 grazing floor is
+// retired - the geometry is finite on its own). Fails closed on
+// garbage.
+export function cirrusSlantTau(coverFrac, sinAlt, eyeHM = 300) {
   const c = Math.min(Math.max(coverFrac ?? 0, 0), 1);
-  return (CIRRUS_TAU_FULL * c) / Math.max(sinAlt, 0.08);
+  if (!(c > 0) || !Number.isFinite(sinAlt)) return 0;
+  const e = Math.asin(Math.min(Math.max(sinAlt, -1), 1));
+  return CIRRUS_TAU_FULL * c * shellChordAM(e, eyeHM);
 }
 
 // Corona amplitude per unit pre-cirrus direct irradiance at the

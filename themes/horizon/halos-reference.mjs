@@ -600,20 +600,87 @@ const RAD = Math.PI / 180;
     const h = hd * RAD;
     return pillarShare(h)[1] * (1 - Phi(h / sigV));
   };
+  // The tilt-folded share glints THROUGH the horizon: E[|x|] with
+  // x = sin h + t cos h never dies, so share x visibility rises
+  // monotonically as the sun sets (the flat-plate sin|h| zero at
+  // h = 0 was the linearisation's artifact - the twilight side is
+  // the bright side, and the DRAWN peak with the beam's own
+  // transmittance sits below the horizon: the composition gate in
+  // cloud-corona-reference pins it). Even in h; the horizon share
+  // equals the folded closed form's scale; the daytime death by
+  // h ~ 8 stands.
   ok =
     ok &&
     Evis(1) > 5 * Evis(3) &&
     Evis(8) < 1e-4 * Evis(1) &&
-    Evis(1) > Evis(0.5) &&
+    Evis(-1) > Evis(0) &&
+    Evis(0) > Evis(0.5) &&
+    Evis(0.5) > Evis(1) &&
     Evis(1) > Evis(2) &&
-    pillarShare(0).every((v) => v === 0) &&
+    pillarShare(0)[1] > 0.07 &&
+    pillarShare(0)[1] < 0.085 &&
+    pillarShare(0.5 * RAD)[1] === pillarShare(-0.5 * RAD)[1] &&
     pillarShare(NaN).every((v) => v === 0) &&
     pillarAzSigma(0) === 0;
   check(
     'the sun pillar: basal mirror closed form = the traced books',
     ok,
     detail +
-      `E_vis peaks at h ~ 1 (${Evis(1).toExponential(2)}), x${(Evis(1) / Evis(3)).toFixed(1)} over h = 3, dead by 8: a horizon optic`
+      `share(0) ${pillarShare(0)[1].toFixed(4)} (the fold glints through sunset); E_vis monotone into twilight, x${(Evis(1) / Evis(3)).toFixed(1)} over 1 -> 3 deg, dead by 8`
+  );
+}
+
+{
+  // The tilt-folded share's quadrature against a DIRECT
+  // orientation Monte Carlo - the full nonlinear basal projection
+  // under the B&D tilt model (Rayleigh magnitude, uniform axis),
+  // Fresnel inside the average, the spin-averaged side ring in
+  // the flux denominator. The linearised fold must hold at the
+  // horizon (its whole point), through the transition, and out
+  // where the flat plate was already right.
+  const rng = mulberry32(99);
+  const B = (3 * Math.sqrt(3)) / 2;
+  const mC = plateMeanC();
+  const rhoOf = (ci, n) => {
+    const st = Math.sqrt(Math.max(1 - ci * ci, 0)) / n;
+    const ct = Math.sqrt(1 - st * st);
+    const rs = (ci - n * ct) / (ci + n * ct);
+    const rp = (n * ci - ct) / (n * ci + ct);
+    return (rs * rs + rp * rp) / 2;
+  };
+  let ok = true;
+  let detail = '';
+  for (const hd of [0, 1, 5]) {
+    const h = hd * RAD;
+    const w = {x: Math.cos(h), y: 0, z: -Math.sin(h)};
+    let basN = 0;
+    let basR = 0;
+    let sideA = 0;
+    const N = 150000;
+    for (let i = 0; i < N; i++) {
+      const th =
+        PLATE_TILT_THETA * Math.sqrt(-Math.log(Math.max(rng(), 1e-12)));
+      const ps = rng() * 2 * Math.PI;
+      const nz = {
+        x: Math.sin(th) * Math.cos(ps),
+        y: Math.sin(th) * Math.sin(ps),
+        z: Math.cos(th)
+      };
+      const d = w.x * nz.x + w.y * nz.y + w.z * nz.z;
+      const proj = Math.abs(d);
+      basN += B * proj;
+      basR += B * proj * rhoOf(proj, ICE_N[1]);
+      sideA += (6 / Math.PI) * mC * Math.sqrt(Math.max(1 - d * d, 0));
+    }
+    const mcShare = basR / (basN + sideA);
+    const q = pillarShare(h)[1];
+    if (!(Math.abs(q / mcShare - 1) < 0.01)) ok = false;
+    detail += `h${hd}: ${q.toFixed(4)}/${mcShare.toFixed(4)}; `;
+  }
+  check(
+    'folded pillar share = the orientation Monte Carlo',
+    ok,
+    detail + 'quadrature within 1% of the nonlinear trace at every altitude'
   );
 }
 

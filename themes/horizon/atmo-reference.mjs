@@ -827,3 +827,56 @@ const sunDM = (r, mu) => {
   );
   if (!ok) process.exit(1);
 }
+
+{
+  // Segment transmittance (pathToRadiusT, the twilight pillar's
+  // view leg): the closure identity along one straight ray -
+  // T_full(eye) = T_seg(eye -> deck) x T_full(deck, mu') with
+  // mu' = (r mu + d) / r' at the crossing. Both sides are 32-step
+  // midpoint marches over different sub-domains, so the residual
+  // IS the coarse full-march's quadrature error - it must stay
+  // under 1.5% across altitudes, heights and channels, and the
+  // split must never disagree in SIGN of the graze ordering
+  // (segment alone is always brighter than the full path).
+  const {pathToRadiusT} = await import('./sun-transmittance.js');
+  const mie = {scat: mieS, abs: mieA};
+  const HD = 9905;
+  let worst = 0;
+  let ok = true;
+  for (const [altDeg, hObs] of [
+    [30, 300],
+    [5, 300],
+    [2.2, 300],
+    [1, 300],
+    [0.5, 1500],
+    [10, 2000]
+  ]) {
+    const mu = Math.sin((altDeg * Math.PI) / 180);
+    const r = Rb + hObs;
+    const full = sunTransmittanceJS(mu, mie, hObs);
+    const seg = pathToRadiusT(mu, mie, hObs, HD);
+    const b = r * mu;
+    const d = -b + Math.sqrt(b * b + (Rb + HD) ** 2 - r * r);
+    const muP = (r * mu + d) / (Rb + HD);
+    const rest = sunTransmittanceJS(muP, mie, HD);
+    for (let c = 0; c < 3; c++) {
+      const rel = Math.abs((seg[c] * rest[c]) / full[c] - 1);
+      worst = Math.max(worst, rel);
+      if (!(rel < 0.015)) ok = false;
+      if (!(seg[c] >= full[c])) ok = false;
+    }
+  }
+  // Above the target the segment is empty; the deck's own planet
+  // shadow lives in the full integral (the twilight cutoff).
+  const above = pathToRadiusT(0.5, mie, 12000, HD);
+  const shadow = sunTransmittanceJS(Math.sin((-3.3 * Math.PI) / 180), mie, HD);
+  ok =
+    ok &&
+    above.every((v) => v === 1) &&
+    shadow.every((v) => v === 0) &&
+    sunTransmittanceJS(Math.sin((-2 * Math.PI) / 180), mie, HD)[0] > 0.2;
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} segment closure: T_seg x T_rest = T_full to ${(worst * 100).toFixed(2)}% (32-step quadrature); above-target empty; deck planet shadow at -3.3 deg, red still 0.2+ at -2`
+  );
+  if (!ok) process.exit(1);
+}

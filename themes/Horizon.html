@@ -315,7 +315,10 @@
     <script src="./horizon/astronomy.browser.min.js"></script>
     <script type="module">
       import * as THREE from 'three';
-      import {sunTransmittanceJS} from './horizon/sun-transmittance.js';
+      import {
+        pathToRadiusT,
+        sunTransmittanceJS
+      } from './horizon/sun-transmittance.js';
       import {buildSpots, parallacticAngle} from './horizon/sunspots.js';
       import {applySpectral} from './horizon/spectral-srgb.js';
       import {createAtmosphereTSL} from './horizon/atmosphere-tsl.js';
@@ -524,6 +527,9 @@
         cirrusSlantTau,
         coronaAmp,
         coronaColdGate,
+        shellFirstExit,
+        CIRRUS_BASE_M,
+        CIRRUS_TOP_M,
         CIRRUS_TAU_FULL,
         CORONA_D_UM,
         CORONA_T250_MAX,
@@ -749,6 +755,67 @@
             Math.cos(lat2 * RAD) *
             Math.sin(((lon2 - lon1) * RAD) / 2) ** 2;
         return 12742 * Math.asin(Math.sqrt(a));
+      };
+
+      // The pillar's radiance base in the CRYSTAL-LOCAL twilight
+      // frame (per unit source irradiance; the caller multiplies
+      // exposure, occurrence, PLATE_ALPHA and the Gaussian peak):
+      // the visible column's centroid elevation (truncated-Gaussian
+      // closed form), the crystal where that ray meets the deck
+      // mid-shell (Sassen & Campbell's printed heights), the LOCAL
+      // source altitude there - the horizon-dip arc raises it, so
+      // at h = -2 the drawn crystals 180 km sunward still see the
+      // source 0.4 deg below THEIR horizon - the deck-frame beam
+      // through the Hillaire integral (whose own planet shadow is
+      // the twilight cutoff, ~-4.6 deg), the view leg's air and
+      // its in-veil extinction, and the sun leg's slab on the
+      // first-exit chord (the stated single-patch assumption:
+      // cloud-corona.js shellFirstExit). Continuous through
+      // sunset by the tilt-folded share; the composition landmark
+      // in cloud-corona-reference pins the whole curve.
+      const pillarBase = (hAlt, srcR, eyeHM, cFrac, mie) => {
+        const c = Math.min(Math.max(cFrac ?? 0, 0), 1);
+        if (!(c > 0) || !Number.isFinite(hAlt)) return [0, 0, 0];
+        const erf = (x) => {
+          const s = x < 0 ? -1 : 1;
+          x = Math.abs(x);
+          const t = 1 / (1 + 0.3275911 * x);
+          return (
+            s *
+            (1 -
+              ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t -
+                0.284496736) *
+                t +
+                0.254829592) *
+                t *
+                Math.exp(-x * x))
+          );
+        };
+        const sigV = Math.hypot(PILLAR_SIGMA_ALT, srcR / 2);
+        const vis = 0.5 * (1 - erf(hAlt / sigV / Math.SQRT2));
+        if (!(vis > 1e-9)) return [0, 0, 0];
+        const phiN =
+          Math.exp((-hAlt * hAlt) / (2 * sigV * sigV)) / Math.sqrt(2 * Math.PI);
+        const eVis = -hAlt + (sigV * phiN) / vis;
+        const Rb = 6360e3;
+        const Hm = (CIRRUS_BASE_M + CIRRUS_TOP_M) / 2;
+        const Rm = Rb + Hm;
+        const R1 = Rb + CIRRUS_BASE_M;
+        const r0 = Rb + Math.min(Math.max(eyeHM ?? 300, 0), CIRRUS_BASE_M - 1);
+        const se = Math.sin(eVis);
+        const sMid =
+          -r0 * se + Math.sqrt(r0 * se * r0 * se + Rm * Rm - r0 * r0);
+        const sBase =
+          -r0 * se + Math.sqrt(r0 * se * r0 * se + R1 * R1 - r0 * r0);
+        const aC = Math.atan2(sMid * Math.cos(eVis), r0 + sMid * se);
+        const hLoc = hAlt + aC;
+        const tB = sunTransmittanceJS(Math.sin(hLoc), mie, Hm);
+        const tV = pathToRadiusT(se, mie, r0 - Rb, Hm);
+        const dens = (CIRRUS_TAU_FULL * c) / (CIRRUS_TOP_M - CIRRUS_BASE_M);
+        const tVeil = Math.exp(-dens * (sMid - sBase));
+        const slab = coronaAmp(CIRRUS_TAU_FULL * c * shellFirstExit(hLoc, Hm));
+        const sh = pillarShare(hAlt);
+        return [0, 1, 2].map((k) => tB[k] * tV[k] * tVeil * slab * sh[k] * vis);
       };
 
       // ---------- state from the real world ----------
@@ -9019,16 +9086,21 @@
         const stLum = 0.2126 * st[0] + 0.7152 * st[1] + 0.0722 * st[2];
         // Direct-sun cloud attenuation is now per pixel (the cloud
         // shadow map, Beer-Lambert through the actual decks); the
-        // only GLOBAL cloud factor left is the cirrus veil, as
-        // exp(-tau/sin(alt)) with tau_vis at full high cover the
-        // MEASURED midlatitude cirrus mean: 0.75 (Sassen &
-        // Comstock 2001, JAS 58, 2113 - ~860 h of FARS
-        // lidar+radiometer; median 0.61). Replaces the uncited
-        // "typical" 1. cloud-corona.js reads the same constant, so
-        // the sun's dimming and the corona's brightness ride ONE
-        // measured column.
+        // only GLOBAL cloud factor left is the cirrus veil, with
+        // tau_vis at full high cover the MEASURED midlatitude
+        // cirrus mean: 0.75 (Sassen & Comstock 2001, JAS 58, 2113
+        // - ~860 h of FARS lidar+radiometer; median 0.61).
+        // Replaces the uncited "typical" 1. The slant is the EXACT
+        // chord through Sassen & Campbell's printed shell at the
+        // camera's own height (cloud-corona.js shellChordAM - the
+        // 0.08 grazing floor is retired). cloud-corona.js reads
+        // the same constant, so the sun's dimming and the corona's
+        // brightness ride ONE measured column.
         const cHighFrac = (state.cloudHigh ?? state.cloud * 0.3) / 100;
-        const cirrusT = Math.exp(-cirrusSlantTau(cHighFrac, Math.sin(sun.alt)));
+        const eyeVeilM = centerElev + 500 * Math.sinh(camera.position.y / 16);
+        const cirrusT = Math.exp(
+          -cirrusSlantTau(cHighFrac, Math.sin(sun.alt), eyeVeilM)
+        );
         // The DRAWN disc rides the same measured column: the dome
         // dims the direct solar image (disc, spots, totality
         // corona, sunset band) by this exact factor - the cirrus
@@ -9050,7 +9122,11 @@
             sun.alt > 0 &&
             coronaColdGate(state.t250);
           atmo.cloudCorona.setAmp(
-            corOn ? coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(sun.alt))) : 0
+            corOn
+              ? coronaAmp(
+                  cirrusSlantTau(cHighFrac, Math.sin(sun.alt), eyeVeilM)
+                )
+              : 0
           );
           // The DECK droplet corona (no cold gate - liquid decks
           // are the common producer): the CPU leg is the paradox
@@ -10375,7 +10451,9 @@
         {
           const haloOn = params.get('halo') !== '0' && sun.alt > 0;
           const slabBase = haloOn
-            ? coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(sun.alt))) *
+            ? coronaAmp(
+                cirrusSlantTau(cHighFrac, Math.sin(sun.alt), eyeVeilM)
+              ) *
               skyExposure *
               haloOcc
             : 0;
@@ -10418,27 +10496,36 @@
             tH[1] * cirA,
             tH[2] * cirA
           );
-          // The SUN PILLAR: the same slab chain on the plates'
-          // basal mirrors - halos.js pillarShare per channel
-          // (the grazing Fresnel barely sees the ice indices:
-          // white by physics), the mirror-doubled tilt sigma
-          // widened by the disc's vertical marginal in
-          // quadrature. The amp carries the vertical Gaussian's
-          // peak density; the azimuth LUT is per radian
+          // The SUN PILLAR in the crystal-local TWILIGHT frame
+          // (pillarBase): its own beam and view legs replace the
+          // ground-frame tH - the drawn crystals sit toward the
+          // sunset where the sun is still up in THEIR sky, so the
+          // column outlives the ground's sunset, peaks red near
+          // h ~ -3 deg and dies when the deck's own sun sets
+          // (~-4.6). The amp carries the vertical Gaussian's peak
+          // density; the azimuth LUT is per radian
           // (buildPillarLUT, re-laid below at the dog cadence).
-          // The drawn column lives only while the image
-          // Gaussian's upper tail clears the horizon - the
-          // gate's emergence law: a sunrise/sunset optic, peak
-          // near h ~ 1 deg, gone by ~5.
+          // Occurrence gates it (same crystal population as the
+          // ring); ?halo=0 kills it with the family.
           const sigP = Math.hypot(PILLAR_SIGMA_ALT, astro.sunAngR / 2);
-          const shP = pillarShare(sun.alt);
+          const pilB = pillarBase(
+            sun.alt,
+            astro.sunAngR,
+            eyeVeilM,
+            cHighFrac,
+            mieRad
+          );
           const pilA =
-            slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigP);
+            (params.get('halo') !== '0' ? 1 : 0) *
+            skyExposure *
+            haloOcc *
+            PLATE_ALPHA *
+            (1 / Math.sqrt(2 * Math.PI) / sigP);
           opticsU.pillarSigma.value = sigP;
           opticsU.pillarAmp.value.setRGB(
-            tH[0] * shP[0] * pilA,
-            tH[1] * shP[1] * pilA,
-            tH[2] * shP[2] * pilA
+            pilB[0] * pilA,
+            pilB[1] * pilA,
+            pilB[2] * pilA
           );
         }
         // Bravais parhelia: re-lay the dog LUT when the sun has
@@ -10500,7 +10587,9 @@
                   astro.moonDistKm,
                   1 - (astro.lunarEcl?.inUmbra ?? 0)
                 ) *
-                Math.exp(-cirrusSlantTau(cHighFrac, Math.sin(moon.alt))) *
+                Math.exp(
+                  -cirrusSlantTau(cHighFrac, Math.sin(moon.alt), eyeVeilM)
+                ) *
                 skyExposure
               : 0;
             opticsMoonU.bowAmp.value.setRGB(
@@ -10522,7 +10611,9 @@
                   astro.moonDistKm,
                   1 - (astro.lunarEcl?.inUmbra ?? 0)
                 ) *
-                coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(moon.alt))) *
+                coronaAmp(
+                  cirrusSlantTau(cHighFrac, Math.sin(moon.alt), eyeVeilM)
+                ) *
                 skyExposure *
                 haloOcc
               : 0;
@@ -10560,18 +10651,34 @@
               tH[1] * cirAM,
               tH[2] * cirAM
             );
-            // The MOON PILLAR - the same basal mirrors under the
-            // measured moonlight, the moon's own disc setting the
-            // column's width.
+            // The MOON PILLAR - the same crystal-local twilight
+            // frame under the measured moonlight, the moon's own
+            // disc setting the column's width: alive through
+            // moonrise and moonset like the sun's through sunset.
             const sigPM = Math.hypot(PILLAR_SIGMA_ALT, astro.moonAngR / 2);
-            const shPM = pillarShare(moon.alt);
+            const pilBM = pillarBase(
+              moon.alt,
+              astro.moonAngR,
+              eyeVeilM,
+              cHighFrac,
+              mieRad
+            );
             const pilAM =
-              slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigPM);
+              (params.get('halo') !== '0' ? 1 : 0) *
+              moonIrradianceE0(
+                astro.moonRel,
+                astro.moonDistKm,
+                1 - (astro.lunarEcl?.inUmbra ?? 0)
+              ) *
+              skyExposure *
+              haloOcc *
+              PLATE_ALPHA *
+              (1 / Math.sqrt(2 * Math.PI) / sigPM);
             opticsMoonU.pillarSigma.value = sigPM;
             opticsMoonU.pillarAmp.value.setRGB(
-              tH[0] * shPM[0] * pilAM,
-              tH[1] * shPM[1] * pilAM,
-              tH[2] * shPM[2] * pilAM
+              pilBM[0] * pilAM,
+              pilBM[1] * pilAM,
+              pilBM[2] * pilAM
             );
           }
           opticsMoonU.srcAlt.value = refr.moonApp;
@@ -10616,7 +10723,10 @@
                     astro.moonRel,
                     astro.moonDistKm,
                     1 - (astro.lunarEcl?.inUmbra ?? 0)
-                  ) * coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(moon.alt)))
+                  ) *
+                    coronaAmp(
+                      cirrusSlantTau(cHighFrac, Math.sin(moon.alt), eyeVeilM)
+                    )
                 : 0
             );
             // The moon's DECK droplet corona - the classic
@@ -10633,7 +10743,9 @@
                     1 - (astro.lunarEcl?.inUmbra ?? 0)
                   ) *
                     DROPLET_DIFF_SHARE *
-                    Math.exp(-cirrusSlantTau(cHighFrac, Math.sin(moon.alt)))
+                    Math.exp(
+                      -cirrusSlantTau(cHighFrac, Math.sin(moon.alt), eyeVeilM)
+                    )
                 : 0
             );
           }
