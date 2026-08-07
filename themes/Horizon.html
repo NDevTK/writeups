@@ -673,6 +673,12 @@
       import {buildWindmill} from './horizon/windmills.js';
       import {farmFactors} from './horizon/wakes.js';
       import {snowField, SNOW_LAYER, SNOW_Z} from './horizon/snowcover.js';
+      import {
+        SAOD_LAYER,
+        SAOD_Z,
+        sampleSaod,
+        volcScaleOfSaod
+      } from './horizon/volcanic.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -2267,6 +2273,78 @@
         'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/' +
           SNOW_LAYER +
           '/default/{d}/GoogleMapsCompatible_Level8/{z}/{r}/{c}.png';
+      // The MEASURED stratosphere (volcanic.js, gated): the OMPS
+      // Limb Profiler stratospheric aerosol optical depth over the
+      // same keyless GIBS WMTS, inverted through its published
+      // colormap and compared against the shipped background
+      // chain - volcScale for the purple-light layer. Unknown or
+      // below-floor cells read as the background (scale 1); a
+      // week-old tile is honest (sulfate e-folds over ~1 year).
+      // ?volcanic=0 pins the background.
+      let stratVolcScale = 1;
+      let stratSeq = 0;
+      async function syncStratAOD() {
+        if (params.get('volcanic') === '0') return;
+        const seq = ++stratSeq;
+        try {
+          const p = pixelOf(state.lat, state.lon, SAOD_Z);
+          const c = Math.floor(p.px / 256);
+          const r = Math.floor(p.py / 256);
+          for (let back = 1; back <= 10; back++) {
+            const d = new Date(Date.now() - back * 86400e3)
+              .toISOString()
+              .slice(0, 10);
+            try {
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.src =
+                'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/' +
+                SAOD_LAYER +
+                '/default/' +
+                d +
+                '/GoogleMapsCompatible_Level6/' +
+                SAOD_Z +
+                '/' +
+                r +
+                '/' +
+                c +
+                '.png';
+              await img.decode();
+              const cv = document.createElement('canvas');
+              cv.width = cv.height = 256;
+              const cx = cv.getContext('2d', {willReadFrequently: true});
+              cx.drawImage(img, 0, 0);
+              const data = cx.getImageData(0, 0, 256, 256).data;
+              if (seq !== stratSeq) return;
+              const pxAt = (ix, iy) => {
+                const lx = ix - c * 256;
+                const ly = iy - r * 256;
+                if (lx < 0 || lx > 255 || ly < 0 || ly > 255) return null;
+                const o = (ly * 256 + lx) * 4;
+                return [data[o], data[o + 1], data[o + 2], data[o + 3]];
+              };
+              const s = sampleSaod(pxAt, p.px, p.py, 16);
+              stratVolcScale = volcScaleOfSaod(s.saod);
+              record(
+                'OMPS-LP stratospheric AOD',
+                s.painted
+                  ? s.saod.toExponential(2) +
+                      ' (675 nm, ' +
+                      d +
+                      ') · layer ×' +
+                      stratVolcScale.toFixed(2)
+                  : 'background (' + d + ') · layer ×1'
+              );
+              return;
+            } catch {
+              // that day not published - go older
+            }
+          }
+        } catch (e) {
+          if (params.has('debug')) console.warn('volcanic: ' + e.message);
+        }
+      }
+
       let snowCovSeq = 0;
       async function syncSnowCover() {
         if (params.get('snowcover') === '0' || !terrainObj) return;
@@ -8201,6 +8279,7 @@
         // the heuristic back up until the new box's field lands.
         terrainUniforms.uSnowCovOn.value = 0;
         syncSnowCover();
+        syncStratAOD();
         // The lamp cloud is anchored to the OLD box - drop it now,
         // syncLights rebuilds it Earth-anchored on the new one.
         if (lampPts) {
@@ -9295,7 +9374,13 @@
           const inWin = sun.alt < 8 * RAD && sun.alt > -9 * RAD;
           if (inWin && Date.now() - stratFillAt > 1000) {
             stratFillAt = Date.now();
-            fillStratTexture(stratObj.u.data, sun.alt, mieRad, eyeVeilM, 1);
+            fillStratTexture(
+              stratObj.u.data,
+              sun.alt,
+              mieRad,
+              eyeVeilM,
+              stratVolcScale
+            );
             stratObj.u.tex.needsUpdate = true;
           }
           const sunW = skyPoint(sun.alt, sun.az, 1);
@@ -11841,6 +11926,7 @@
         syncLights();
         setInterval(syncLights, 6 * 60 * 60 * 1000);
         syncSnowCover();
+        syncStratAOD();
         setInterval(syncSnowCover, 6 * 60 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
         syncISS();

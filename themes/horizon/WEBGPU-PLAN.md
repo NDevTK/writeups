@@ -5620,6 +5620,43 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   push. This pass ships the verdict and the scouted layer
   names; the layer term itself is already linear in volcScale
   by construction (thirty-third push's gate).
+- DONE (the live stratosphere, Aug 7 thirty-fifth push - the
+  volcanic feed lands and the named next pass closes): volcanic.js
+  feeds the purple-light layer's volcScale from the MEASURED
+  stratosphere - the GIBS OMPS_NOAA21_LimbProfiler_Aerosol_
+  OpticalDepth layer (daily, keyless, epsg3857 Level6 verified
+  live; today's default is the current date), the very product
+  Kremser 2016 names as forthcoming. The published colormap
+  (v1.3, fetched 2026-08-07) is vendored VERBATIM and inverted
+  exactly, the snowcover.js pattern: 201 contiguous bins, no
+  duplicate colours, below-floor magenta under 6.00e-3, open top
+  above 2.50e-2. The LP retrieval reports extinction at 675 nm
+  (Loughman 2018 v1 basis / Taha 2021 v2.1), so volcScale =
+  measured SAOD_675 over the shipped chain moved to 675 by the
+  layer's own documented Angstrom slope (chainAOD675 = 3.94e-3).
+  THE CORROBORATION, gated: the product's own display floor
+  (6.00e-3) sits at x1.52 the shipped background - inside
+  Kremser's printed modern-vs-minimum band (2013 a factor
+  1.6-2 over the 2002 minimum) - and the LIVE Aug 2026 tile
+  reads in the first painted bins (~6.0-6.4e-3): the real
+  stratosphere lands exactly where the chain + the review put
+  it. Sampling: a 33x33 block around the viewer's pixel with
+  unknown/below-floor cells entered AT the chain background, so
+  an unpainted sky returns volcScale = 1 IDENTICALLY (the gate
+  holds it exact); day-backoff to 10 days is honest data (the
+  ~1 yr sulfate e-folding); clamp at 8 (the colormap top is
+  x6.4). Wired at boot and re-anchor beside the snow sync;
+  panel row records the measured value and day; ?volcanic=0
+  pins the background. Gate: volcanic-reference.mjs, 4
+  landmarks (published structure; floor-vs-chain corroboration;
+  201/201 inversion round-trip with monotone geometric mids;
+  sampler + clamp + unknown contracts). VALIDATE PASS (all
+  references + 7 GPU probes). The stratospheric story is now
+  END TO END real: printed background chain (thirty-third
+  push), measured live scaling (this push), drawn purple light
+  gated on Lee's printed window - and a future eruption will
+  paint the theme's twilights within days of the satellite
+  seeing it.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
