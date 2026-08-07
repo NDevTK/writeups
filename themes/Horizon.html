@@ -992,12 +992,17 @@
           ).json();
           const c = w.current;
           state.code = c.weather_code;
-          state.cloud = c.cloud_cover;
+          // The documented harness pins (?cloud/cloudlow/cloudmid/
+          // cloudhigh) hold THROUGH the live apply - the fetch used
+          // to overwrite them, which silently defeated every cloud
+          // A/B (found when a pinned-cirrus capture came back with
+          // no veil).
+          if (!params.has('cloud')) state.cloud = c.cloud_cover;
           // the measured cover re-scales the skyglow (Kyba 2011)
           applyCloudSkyglow();
-          state.cloudLow = c.cloud_cover_low;
-          state.cloudMid = c.cloud_cover_mid;
-          state.cloudHigh = c.cloud_cover_high;
+          if (!params.has('cloudlow')) state.cloudLow = c.cloud_cover_low;
+          if (!params.has('cloudmid')) state.cloudMid = c.cloud_cover_mid;
+          if (!params.has('cloudhigh')) state.cloudHigh = c.cloud_cover_high;
           state.visibility = c.visibility || state.visibility;
           state.precip = c.precipitation;
           state.snow = c.snowfall;
