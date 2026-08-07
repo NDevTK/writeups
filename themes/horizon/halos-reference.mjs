@@ -36,6 +36,8 @@ import {
   PLATE_D_UM,
   PLATE_H_UM,
   PLATE_TILT_THETA,
+  HALO_FAMILY_FRACTION,
+  haloOccurrence,
   PRISM_60,
   PRISM_90,
   prismDmin,
@@ -371,6 +373,64 @@ const RAD = Math.PI / 180;
     'share/sigma interpolation, closed outside the range',
     ok,
     `share(20) = ${parhelionShare((20 * Math.PI) / 180).toFixed(5)}, share(-)=0, share(58)=0; sigma(20) = ${(parhelionSigmaAlt((20 * Math.PI) / 180) * DEG).toFixed(3)} deg`
+  );
+}
+
+{
+  // The occurrence gate: Forster 2017's printed instantaneous
+  // family rate (27% of cirrus rings), drawn deterministically
+  // per site-hour. Landmarks: the long-run rate converges on the
+  // printed constant (10^5 hours, one site); the draw is
+  // DETERMINISTIC (same inputs, same sky); sites decorrelate;
+  // the 5-minute boundary ramp is continuous and monotone; and
+  // it fails closed on garbage coordinates or time.
+  const lat = 46.62;
+  const lon = 8.04;
+  let on = 0;
+  const N = 100000;
+  for (let h = 0; h < N; h++) {
+    const t = (h + 0.5) * 3600e3;
+    if (haloOccurrence(lat, lon, t) > 0.5) on++;
+  }
+  const rate = on / N;
+  const a = haloOccurrence(lat, lon, 1234 * 3600e3 + 1800e3);
+  const b = haloOccurrence(lat, lon, 1234 * 3600e3 + 1800e3);
+  // Decorrelation: two distant sites agree on ~rate^2 + (1-rate)^2
+  // of hours, not all of them.
+  let same = 0;
+  const M = 20000;
+  for (let h = 0; h < M; h++) {
+    const t = (h + 0.5) * 3600e3;
+    const x = haloOccurrence(lat, lon, t) > 0.5;
+    const y = haloOccurrence(-33.9, 151.2, t) > 0.5;
+    if (x === y) same++;
+  }
+  const expSame = HALO_FAMILY_FRACTION ** 2 + (1 - HALO_FAMILY_FRACTION) ** 2;
+  // Ramp continuity at an on->off boundary: find one and walk it.
+  let ramps = true;
+  for (let h = 1; h < 4000; h++) {
+    const t0 = h * 3600e3;
+    const before = haloOccurrence(lat, lon, t0 - 1);
+    const after = haloOccurrence(lat, lon, t0 + 1);
+    if (Math.abs(after - before) > 0.01) ramps = false; // jump at edge
+    const mid = haloOccurrence(lat, lon, t0 + 150e3); // 2.5 min in
+    const done = haloOccurrence(lat, lon, t0 + 320e3); // 5.33 min in
+    if (mid < Math.min(before, done) - 1e-9) ramps = false;
+    if (mid > Math.max(before, done) + 1e-9) ramps = false;
+    if (done !== haloOccurrence(lat, lon, t0 + 1800e3)) ramps = false;
+  }
+  const ok =
+    HALO_FAMILY_FRACTION === 0.27 &&
+    Math.abs(rate - HALO_FAMILY_FRACTION) < 0.01 &&
+    a === b &&
+    Math.abs(same / M - expSame) < 0.02 &&
+    ramps &&
+    haloOccurrence(NaN, lon, 1e12) === 0 &&
+    haloOccurrence(lat, lon, NaN) === 0;
+  check(
+    'ring occurrence: printed rate, deterministic, ramped',
+    ok,
+    `long-run rate ${rate.toFixed(4)} (printed 0.27); deterministic; two sites agree ${((same / M) * 100).toFixed(1)}% (independence expects ${(expSame * 100).toFixed(1)}%); hour boundaries ramp over 5 min; NaN fails closed`
   );
 }
 

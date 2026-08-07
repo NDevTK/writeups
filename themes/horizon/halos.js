@@ -668,6 +668,53 @@ export function mcParhelion(
 // EMERGE from the traced geometry; the fade is why real dogs die
 // as the sun climbs. Linear interpolation between rows; zero past
 // the end.
+// ---- the occurrence of the ring family ----
+// Forster et al. 2017 (AMT 10, 2499, read in full - the HaloCam
+// climatology): "during the campaign about 27% of the cirrus
+// clouds produced 22 deg halos, sundogs or upper tangent arcs"
+// (ACCEPT, visual evaluation - the instantaneous family rate),
+// and the automated algorithm's "about 25% of the detected
+// cirrus clouds occurred together with a 22 deg halo". The other
+// ~3/4 of cirrus is rough/aggregate-dominated and rings NOT AT
+// ALL - drawing every veil with a ring overdrew the occurrence
+// statistic (the SCF comment's own documented gap; the retrieved
+// 37% smooth fraction was measured ON halo images, so scoping
+// the ring to halo-producing scenes also uses that number in its
+// own population). The drawn model: a DETERMINISTIC per-site,
+// per-UTC-hour draw at the printed instantaneous rate - the same
+// sky for every visitor and every harness run, a new draw each
+// hour (displays come and go on cirrus advection timescales),
+// with a 5-minute ramp at the boundary so rings fade in rather
+// than pop. Documented limit, printed in the same paper: 1-hour
+// BINNED statistics read higher ("more than 50%"; Sassen et al.
+// 2003's 54% of cirrus hours, as printed there) because real
+// displays flicker within the hour - the binary hour gate holds
+// the instantaneous rate exact and underdraws the binned one; a
+// within-hour intermittency model stays named.
+export const HALO_FAMILY_FRACTION = 0.27;
+function hourDraw(latQ, lonQ, hourIdx) {
+  // One mulberry32 draw per (site, hour) - quantized site so a
+  // pan across a town does not reroll the sky.
+  const seed =
+    (Math.imul(latQ + 900, 2654435761) ^
+      Math.imul(lonQ + 1800, 40503) ^
+      Math.imul(hourIdx, 668265263)) >>>
+    0;
+  return mulberry32(seed)() < HALO_FAMILY_FRACTION;
+}
+export function haloOccurrence(latDeg, lonDeg, utcMs) {
+  if (!Number.isFinite(latDeg) || !Number.isFinite(lonDeg)) return 0;
+  if (!Number.isFinite(utcMs)) return 0;
+  const latQ = Math.round(latDeg * 10);
+  const lonQ = Math.round(lonDeg * 10);
+  const hour = Math.floor(utcMs / 3600e3);
+  const cur = hourDraw(latQ, lonQ, hour) ? 1 : 0;
+  const prev = hourDraw(latQ, lonQ, hour - 1) ? 1 : 0;
+  const minIn = (utcMs / 3600e3 - hour) * 60;
+  const f = Math.min(Math.max(minIn / 5, 0), 1);
+  return prev + (cur - prev) * f;
+}
+
 export const PARHELION_ALT_DEG = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 export const PARHELION_SHARE = [
   0.46593, 0.1363, 0.07013, 0.06406, 0.06236, 0.05291, 0.04016, 0.02912,

@@ -381,7 +381,9 @@
         SCF_COLUMN,
         PLATE_ALPHA,
         parhelionShare,
-        parhelionSigmaAlt
+        parhelionSigmaAlt,
+        haloOccurrence,
+        HALO_FAMILY_FRACTION
       } from './horizon/halos.js';
       import {
         apparentAltitude,
@@ -10351,11 +10353,23 @@
           const aB = bowOn ? cirrusT * skyExposure : 0;
           opticsU.bowAmp.value.setRGB(tB[0] * aB, tB[1] * aB, tB[2] * aB);
         }
+        // The ring family's OCCURRENCE (halos.js haloOccurrence):
+        // only ~27% of cirrus actually rings (Forster 2017's
+        // printed HaloCam rate) - the rest is rough-crystal veil
+        // with no display. One deterministic per-site per-hour
+        // draw gates the sun halo, the dogs and the moon's pair
+        // together (one crystal population); the cold-regime
+        // corona keeps its own t250 gate. ?halooccur=0|1 pins it
+        // for the harness A/B.
+        const haloOcc = params.has('halooccur')
+          ? +params.get('halooccur')
+          : haloOccurrence(state.lat, state.lon, now().getTime());
         {
           const haloOn = params.get('halo') !== '0' && sun.alt > 0;
           const slabBase = haloOn
             ? coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(sun.alt))) *
-              skyExposure
+              skyExposure *
+              haloOcc
             : 0;
           const slab = slabBase * SCF_COLUMN;
           const tH = sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieRad);
@@ -10452,7 +10466,8 @@
                   1 - (astro.lunarEcl?.inUmbra ?? 0)
                 ) *
                 coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(moon.alt))) *
-                skyExposure
+                skyExposure *
+                haloOcc
               : 0;
             const slab = slabBase * SCF_COLUMN;
             const tH = sunTransmittanceJS(
@@ -10987,7 +11002,13 @@
             opticsU.haloAmp.value.g.toFixed(3) +
             ' (radiometric, SCF ' +
             SCF_COLUMN +
-            ') · eclipse ' +
+            ') · ring hour ' +
+            (haloOccurrence(state.lat, state.lon, now().getTime()) > 0.5
+              ? 'ON'
+              : 'off') +
+            ' (' +
+            Math.round(HALO_FAMILY_FRACTION * 100) +
+            '% of cirrus, HaloCam) · eclipse ' +
             ((astro.eclipse || 0) * 100).toFixed(0) +
             '%';
           live['aurora curtain'] =

@@ -4594,6 +4594,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   is unchanged - re-lighting the GROUND from the coupled
   E_dn is the scene-light item's business; the veil alone
   consumes the factor today.
+- DONE (the ring family's occurrence, Aug 7 eleventh push - the
+  SCF comment's own documented overdraw closed): Forster 2017's
+  banked HaloCam paper re-read for its statistics, printed
+  verbatim: "about 27% of the cirrus clouds produced 22 deg
+  halos, sundogs or upper tangent arcs" (ACCEPT, visual - the
+  instantaneous family rate) and "about 25% of the detected
+  cirrus clouds occurred together with a 22 deg halo"
+  (automated). The other ~3/4 of cirrus is rough/aggregate
+  veil that rings NOT AT ALL - the theme had drawn every veil
+  ringing. HALO_FAMILY_FRACTION = 0.27 now gates the whole
+  crystal family (sun halo, dogs, moon halo, paraselenae -
+  one population, one gate; the cold-regime corona keeps its
+  own t250 gate) through haloOccurrence: a DETERMINISTIC
+  per-site (0.1-deg quantized), per-UTC-hour mulberry32 draw
+  with a 5-minute ramp at hour boundaries - the same sky for
+  every visitor and every harness run, rings fading in rather
+  than popping. Scoping bonus: the retrieved SCF 37% was
+  measured ON halo images, so gating the ring to
+  halo-producing hours uses that number inside its own
+  population at last. Documented limit, printed in the same
+  paper: 1-hour BINNED rates read higher ("more than 50%";
+  Sassen et al. 2003's 54% as printed there) because real
+  displays flicker within the hour - the binary hour gate
+  holds the instantaneous rate exact and a within-hour
+  intermittency model stays named. halos-reference: 12
+  landmarks (long-run rate 0.2689 vs the printed 0.27;
+  bit-determinism; two hemispheres decorrelate at exactly the
+  independence expectation 60.6%; ramp continuity; NaN fails
+  closed). ?halooccur=0|1 is the labelled harness pin; the
+  panel's optics row names the hour's state. Full gate green.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
