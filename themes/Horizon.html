@@ -674,6 +674,11 @@
       import {farmFactors} from './horizon/wakes.js';
       import {snowField, SNOW_LAYER, SNOW_Z} from './horizon/snowcover.js';
       import {
+        LOW_FRAC,
+        MID_FRAC,
+        HIGH_FRAC
+      } from './horizon/cloud-climatology.js';
+      import {
         SAOD_LAYER,
         SAOD_Z,
         sampleSaod,
@@ -9352,7 +9357,7 @@
         // 0.08 grazing floor is retired). cloud-corona.js reads
         // the same constant, so the sun's dimming and the corona's
         // brightness ride ONE measured column.
-        const cHighFrac = (state.cloudHigh ?? state.cloud * 0.3) / 100;
+        const cHighFrac = (state.cloudHigh ?? state.cloud * HIGH_FRAC) / 100;
         const eyeVeilM = centerElev + 500 * Math.sinh(camera.position.y / 16);
         const cirrusT = Math.exp(
           -cirrusSlantTau(cHighFrac, Math.sin(sun.alt), eyeVeilM)
@@ -10652,9 +10657,14 @@
           state.metar && Date.now() - state.metar.at < 90 * 60e3
             ? state.metar
             : null;
-        const cLow = mzr ? mzr.low : (state.cloudLow ?? state.cloud * 0.7);
-        const cMid = state.cloudMid ?? state.cloud * 0.5;
-        const cHigh = state.cloudHigh ?? state.cloud * 0.3;
+        // When the model lacks per-layer covers (rare), the split
+        // is the MEASURED top-view partition - ISCCP D-series
+        // global annual type sums, Rossow & Schiffer 1999 Table 5
+        // (cloud-climatology.js, gated) - retiring the invented
+        // overlapping 0.7/0.5/0.3.
+        const cLow = mzr ? mzr.low : (state.cloudLow ?? state.cloud * LOW_FRAC);
+        const cMid = state.cloudMid ?? state.cloud * MID_FRAC;
+        const cHigh = state.cloudHigh ?? state.cloud * HIGH_FRAC;
         const baseAgl =
           mzr && mzr.baseM !== null
             ? mzr.baseM // ceilometer measurement
