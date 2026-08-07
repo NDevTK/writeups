@@ -17,6 +17,7 @@
 //    elevation, red toward the source, EMPTY past the Bravais
 //    cutoff
 import {
+  buildArcLUT,
   buildBowLUT,
   buildCircleLUT,
   buildDogLUT,
@@ -580,6 +581,40 @@ function bowStats(c, lo, hi) {
     'pillar azimuth LUT: unit integral, disc-marginal width',
     ok,
     `integral 1; sd(h->0) ${((s0g.sd * 180) / Math.PI).toFixed(4)} deg (flat R/2 ${(((R / 2) * 180) / Math.PI).toFixed(4)}); quadrature law to ${(worst * 100).toFixed(2)}% at h = 5; edges dark`
+  );
+}
+
+{
+  // The wedge-arc azimuth LUTs: unit azimuth integral per
+  // channel INSIDE each window (the amp carries the absolute
+  // share), zero rows outside - including the per-channel
+  // staggering (at h = 31.5 the CZA's blue row is already empty
+  // while red still draws; at h = 58 only the CHA's red has
+  // opened); finite everywhere.
+  const RAD = Math.PI / 180;
+  const integ = (l, c) => {
+    let s = 0;
+    for (let i = 0; i < l.bins; i++) s += l.data[i * 4 + c];
+    return (s * Math.PI) / l.bins;
+  };
+  const cz20 = buildArcLUT(20 * RAD, 'cza');
+  const cz31 = buildArcLUT(31.5 * RAD, 'cza');
+  const cz40 = buildArcLUT(40 * RAD, 'cza');
+  const ch58 = buildArcLUT(58.2 * RAD, 'cha');
+  const ch70 = buildArcLUT(70 * RAD, 'cha');
+  let ok = true;
+  for (let c = 0; c < 3; c++) {
+    if (!(Math.abs(integ(cz20, c) - 1) < 1e-3)) ok = false;
+    if (!(Math.abs(integ(ch70, c) - 1) < 1e-3)) ok = false;
+    if (!(integ(cz40, c) === 0)) ok = false;
+  }
+  if (!(integ(cz31, 0) > 0.99 && integ(cz31, 2) === 0)) ok = false;
+  if (!(integ(ch58, 0) > 0.99 && integ(ch58, 2) === 0)) ok = false;
+  if (!cz20.data.every((v) => Number.isFinite(v))) ok = false;
+  check(
+    'wedge-arc LUTs: unit in-window, staggered channel windows',
+    ok,
+    `CZA h20 integrals 1; h31.5 red alive, blue empty; h40 all empty; CHA h58.2 blue still shut, h70 all 1`
   );
 }
 

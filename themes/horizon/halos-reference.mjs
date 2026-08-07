@@ -46,6 +46,17 @@ import {
   plateProjArea,
   circleInternalProfile,
   circleIntShare,
+  arcAzProfile,
+  czaAltitude,
+  czaShare,
+  chaAltitude,
+  chaShare,
+  CZA_SHARE_R,
+  CZA_SHARE_G,
+  CZA_SHARE_B,
+  CHA_SHARE_R,
+  CHA_SHARE_G,
+  CHA_SHARE_B,
   CIRCLE_SIGMA_ALT_DEG,
   PRISM_60,
   PRISM_90,
@@ -332,6 +343,8 @@ const RAD = Math.PI / 180;
           mc.trans2T[0] +
           mc.transThroughT[0] +
           mc.transOffAlmT[0] +
+          mc.czaT[0] +
+          mc.chaT[0] +
           mc.lostT[0] -
           A
       ) / A;
@@ -844,6 +857,99 @@ const RAD = Math.PI / 180;
     ok,
     `k2 peak ${az120.toFixed(1)} deg white to ${(spread2 * 100).toFixed(0)}%; cutoffs ${cuts.map((v) => v.toFixed(1)).join('/')} (closed ${want.map((v) => v.toFixed(1)).join('/')}); blue spot B/R ${(B / R).toFixed(1)}; anthelic alive at 35; seal at 2 deg; ` +
       detail
+  );
+}
+
+{
+  // The 90-degree-wedge arcs, held to their closed forms with NO
+  // new constant: the CZA altitude asin(sqrt(n^2 - cos^2 h))
+  // (per channel to ~0.1 deg at mid-window; red LOW, toward the
+  // sun) with its window closing at cos h = sqrt(n^2 - 1) - blue
+  // FIRST as the sun climbs; the CHA altitude
+  // asin(sqrt(1 + sin^2 h - n^2)) (red HIGH, toward the sun
+  // again) with its window opening at sin h = sqrt(n^2 - 1) -
+  // red first. The analytic azimuth fold (arcAzProfile) holds
+  // the traced books in windows; the shipped share tables
+  // re-derive; both arcs vanish exactly outside their windows.
+  const DEGA = 180 / Math.PI;
+  let ok = true;
+  let detail = '';
+  // CZA at h = 15
+  {
+    const h = (15 * Math.PI) / 180;
+    const mc = mcParhelion(h, ICE_N, 400000);
+    for (let c = 0; c < 3; c++) {
+      const m = mc.czaAltS[c] / mc.czaT[c];
+      const w = czaAltitude(ICE_N[c], h);
+      if (!(Math.abs(m - w) < (0.15 * Math.PI) / 180)) ok = false;
+    }
+    const mR = mc.czaAltS[0] / mc.czaT[0];
+    const mB = mc.czaAltS[2] / mc.czaT[2];
+    if (!(mR < mB)) ok = false;
+    if (!(Math.abs(mc.czaT[1] / mc.accepted[1] / czaShare(h)[1] - 1) < 0.06))
+      ok = false;
+    // azimuth fold vs the analytic in two windows (green)
+    const bins = mc.circleBins;
+    const bw = Math.PI / bins;
+    const thetas = [];
+    for (let b = 0; b < bins; b++) thetas.push((b + 0.5) * bw);
+    const ana = arcAzProfile(h, thetas, 'cza');
+    let integ = 0;
+    for (let b = 0; b < bins; b++) integ += mc.czaData[b * 3 + 1] * bw;
+    const win = (lo, hi) => {
+      let sM = 0;
+      let sA = 0;
+      for (let b = 0; b < bins; b++) {
+        const az = thetas[b] * DEGA;
+        if (az >= lo && az < hi) {
+          sM += (mc.czaData[b * 3 + 1] / integ) * bw;
+          sA += ana[1][b] * bw;
+        }
+      }
+      return [sM, sA];
+    };
+    const w1 = win(0, 20);
+    const w2 = win(20, 45);
+    if (!(Math.abs(w1[0] - w1[1]) < 0.05)) ok = false;
+    if (!(Math.abs(w2[0] - w2[1]) < 0.05)) ok = false;
+    detail += `CZA h15 alt ${((mc.czaAltS[1] / mc.czaT[1]) * DEGA).toFixed(2)} (closed ${(czaAltitude(ICE_N[1], h) * DEGA).toFixed(2)}), az windows ${w1[0].toFixed(3)}/${w1[1].toFixed(3)} and ${w2[0].toFixed(3)}/${w2[1].toFixed(3)}; `;
+  }
+  // CHA at h = 70
+  {
+    const h = (70 * Math.PI) / 180;
+    const mc = mcParhelion(h, ICE_N, 400000);
+    for (let c = 0; c < 3; c++) {
+      const m = mc.chaAltS[c] / mc.chaT[c];
+      const w = chaAltitude(ICE_N[c], h);
+      if (!(Math.abs(m - w) < (0.15 * Math.PI) / 180)) ok = false;
+    }
+    const mR = mc.chaAltS[0] / mc.chaT[0];
+    const mB = mc.chaAltS[2] / mc.chaT[2];
+    if (!(mR > mB)) ok = false;
+    if (!(Math.abs(mc.chaT[1] / mc.accepted[1] / chaShare(h)[1] - 1) < 0.06))
+      ok = false;
+    detail += `CHA h70 alt ${((mc.chaAltS[1] / mc.chaT[1]) * DEGA).toFixed(2)} (closed ${(chaAltitude(ICE_N[1], h) * DEGA).toFixed(2)}); `;
+  }
+  // windows: closed nulls, empty books, staggered edges
+  const mc40 = mcParhelion((40 * Math.PI) / 180, ICE_N, 150000);
+  ok =
+    ok &&
+    czaAltitude(ICE_N[1], (40 * Math.PI) / 180) === null &&
+    chaAltitude(ICE_N[1], (40 * Math.PI) / 180) === null &&
+    mc40.czaT[1] / mc40.accepted[1] < 1e-4 &&
+    mc40.chaT[1] / mc40.accepted[1] < 1e-4 &&
+    CZA_SHARE_R[6] > CZA_SHARE_G[6] &&
+    CZA_SHARE_G[6] > CZA_SHARE_B[6] &&
+    CHA_SHARE_R[1] > CHA_SHARE_G[1] &&
+    CHA_SHARE_G[1] > CHA_SHARE_B[1] &&
+    czaShare((40 * Math.PI) / 180).every((v) => v === 0) &&
+    chaShare((40 * Math.PI) / 180).every((v) => v === 0) &&
+    czaShare(NaN).every((v) => v === 0);
+  check(
+    'wedge arcs: closed altitudes, staggered windows, folded azimuth',
+    ok,
+    detail +
+      'both arcs empty at h = 40 (between the windows); blue dies first at the CZA top, red opens the CHA foot'
   );
 }
 

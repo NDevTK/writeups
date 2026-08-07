@@ -380,6 +380,7 @@
         pickHour
       } from './horizon/clearness.js';
       import {
+        buildArcLUT,
         buildBowLUT,
         buildCircleLUT,
         buildDogLUT,
@@ -393,7 +394,14 @@
         haloOccurrence,
         HALO_FAMILY_FRACTION,
         pillarShare,
-        PILLAR_SIGMA_ALT
+        PILLAR_SIGMA_ALT,
+        ICE_N,
+        czaAltitude,
+        czaShare,
+        czaSigmaAlt,
+        chaAltitude,
+        chaShare,
+        chaSigmaAlt
       } from './horizon/halos.js';
       import {
         apparentAltitude,
@@ -10527,6 +10535,39 @@
             pilB[1] * pilA,
             pilB[2] * pilA
           );
+          // The WEDGE ARCS - circumzenithal (sun below ~32) and
+          // circumhorizontal (above ~58): closed-form per-channel
+          // altitudes (the dispersion is pure vertical - red low
+          // on the CZA, high on the CHA, both toward the sun),
+          // the MC share tables on the same slab chain, the
+          // analytic azimuth fold in the LUTs re-laid below.
+          // Null altitudes (outside a channel's window) park the
+          // centre far off the dome - the arcs are born and die
+          // colour by colour.
+          const czAl = ICE_N.map((n) => czaAltitude(n, sun.alt));
+          const czS = czaShare(sun.alt);
+          const sigCz = Math.max(czaSigmaAlt(sun.alt), 1e-4);
+          const czB =
+            slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigCz);
+          opticsU.czaSigma.value = sigCz;
+          opticsU.czaAlt.value.set(czAl[0] ?? 9, czAl[1] ?? 9, czAl[2] ?? 9);
+          opticsU.czaAmp.value.setRGB(
+            tH[0] * czS[0] * czB,
+            tH[1] * czS[1] * czB,
+            tH[2] * czS[2] * czB
+          );
+          const chAl = ICE_N.map((n) => chaAltitude(n, sun.alt));
+          const chS = chaShare(sun.alt);
+          const sigCh = Math.max(chaSigmaAlt(sun.alt), 1e-4);
+          const chB =
+            slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigCh);
+          opticsU.chaSigma.value = sigCh;
+          opticsU.chaAlt.value.set(chAl[0] ?? 9, chAl[1] ?? 9, chAl[2] ?? 9);
+          opticsU.chaAmp.value.setRGB(
+            tH[0] * chS[0] * chB,
+            tH[1] * chS[1] * chB,
+            tH[2] * chS[2] * chB
+          );
         }
         // Bravais parhelia: re-lay the dog LUT when the sun has
         // moved 0.2 deg; the migration, dispersion and the
@@ -10555,6 +10596,12 @@
           opticsU.pillarData.set(pl.data);
           opticsU.pillarTex.needsUpdate = true;
           opticsU.pillarAzMax.value = pl.azMaxRad;
+          const acz = buildArcLUT(sun.alt, 'cza');
+          opticsU.czaData.set(acz.data);
+          opticsU.czaTex.needsUpdate = true;
+          const ach = buildArcLUT(sun.alt, 'cha');
+          opticsU.chaData.set(ach.data);
+          opticsU.chaTex.needsUpdate = true;
         }
         // The moon's dome: same gating physics (cirrus for the
         // halo, rain for the bow, low source for the dogs), the
@@ -10679,6 +10726,41 @@
               pilBM[1] * pilAM,
               pilBM[2] * pilAM
             );
+            // The moon's wedge arcs - the lunar CZA is a real
+            // (rare) sight; shares at the true altitude, centres
+            // at the drawn (refracted) moon like the dogs.
+            const czAlM = ICE_N.map((n) => czaAltitude(n, refr.moonApp));
+            const czSM = czaShare(moon.alt);
+            const sigCzM = Math.max(czaSigmaAlt(moon.alt), 1e-4);
+            const czBM =
+              slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigCzM);
+            opticsMoonU.czaSigma.value = sigCzM;
+            opticsMoonU.czaAlt.value.set(
+              czAlM[0] ?? 9,
+              czAlM[1] ?? 9,
+              czAlM[2] ?? 9
+            );
+            opticsMoonU.czaAmp.value.setRGB(
+              tH[0] * czSM[0] * czBM,
+              tH[1] * czSM[1] * czBM,
+              tH[2] * czSM[2] * czBM
+            );
+            const chAlM = ICE_N.map((n) => chaAltitude(n, refr.moonApp));
+            const chSM = chaShare(moon.alt);
+            const sigChM = Math.max(chaSigmaAlt(moon.alt), 1e-4);
+            const chBM =
+              slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigChM);
+            opticsMoonU.chaSigma.value = sigChM;
+            opticsMoonU.chaAlt.value.set(
+              chAlM[0] ?? 9,
+              chAlM[1] ?? 9,
+              chAlM[2] ?? 9
+            );
+            opticsMoonU.chaAmp.value.setRGB(
+              tH[0] * chSM[0] * chBM,
+              tH[1] * chSM[1] * chBM,
+              tH[2] * chSM[2] * chBM
+            );
           }
           opticsMoonU.srcAlt.value = refr.moonApp;
           if (
@@ -10701,6 +10783,12 @@
             opticsMoonU.pillarData.set(pl.data);
             opticsMoonU.pillarTex.needsUpdate = true;
             opticsMoonU.pillarAzMax.value = pl.azMaxRad;
+            const acz = buildArcLUT(refr.moonApp, 'cza');
+            opticsMoonU.czaData.set(acz.data);
+            opticsMoonU.czaTex.needsUpdate = true;
+            const ach = buildArcLUT(refr.moonApp, 'cha');
+            opticsMoonU.chaData.set(ach.data);
+            opticsMoonU.chaTex.needsUpdate = true;
           }
           // The LUNAR corona, radiometric: the same cold-cirrus
           // gate and measured column as the sun's, the amplitude

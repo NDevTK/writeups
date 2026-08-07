@@ -4810,6 +4810,51 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     external family); the 46-degree family and the high-altitude
     side-exit arcs (Parry/heliac territory) remain booked
     (transOffAlm) and named, not drawn.
+- DONE (the circumzenithal and circumhorizontal arcs, Aug 7
+  sixteenth push - the transOffAlm bucket WAS the CZA): the most
+  vivid plate optics, drawn from the books the circle passes
+  already carried, with NO new constant. The transit routes
+  separate the arcs exactly: basal entry + SIDE exit is the
+  CIRCUMZENITHAL ARC - tangential momenta through the
+  perpendicular faces give its altitude in closed form,
+  asin(sqrt(n^2 - cos^2 h)), real only while cos h >=
+  sqrt(n^2 - 1) (the sun below ~32 deg, the arc's documented
+  window - the SAME critical geometry as the circle's blue spot,
+  the same faces); side entry + BASAL exit is the
+  CIRCUMHORIZONTAL ARC at asin(sqrt(1 + sin^2 h - n^2)), open
+  past ~58 deg - the fire rainbow's documented season. The MC
+  lands both altitudes to the SECOND DECIMAL per channel (CZA
+  h15: 61.74/62.40/63.40 vs closed 61.75/62.42/63.41; CHA h70:
+  24.65/23.91/22.80 vs 24.65/23.91/22.82) - dispersion PURE
+  VERTICAL, red toward the sun on both arcs, ~1.7 deg of spread:
+  the most saturated colours in the family, from the Warren rows
+  alone. The WINDOW EDGES STAGGER by dispersion - blue leaves
+  the CZA first as the sun climbs (h = 30 shares R 0.85% > G
+  0.59% > B 0.37%), red opens the CHA first (h = 58: R 2.1% >>
+  B 0.2%) - so the drawn arcs are born and die colour by colour,
+  exactly as photographed; the gates hold the staggering in the
+  tables AND the LUT rows (a channel outside its window ships an
+  EMPTY row). Azimuth: the tangential Bravais fold, parametric
+  in the side-face azimuth (arcAzProfile - Fresnel-weighted,
+  numeric fold, unit integral), holds the traced books to a few
+  percent per window with the tails exact (the arcs die by ~55
+  deg of azimuth). Drawn as per-channel-ALTITUDE bands (vec3
+  centres - the closed forms per frame - under one MC tilt
+  sigma) times the azimuth LUTs, on the same slabBase x
+  PLATE*ALPHA x occurrence chain, sun AND moon (the lunar CZA is
+  a real rare sight; centres at the drawn refracted moon, shares
+  at the true altitude, the dogs' own split). Tables:
+  CZA_SHARE_R/G/B + sigma over the parhelion grid, CHA*\* over
+  its own 55-90 grid (600k, the shipping count). Landmarks:
+  halos-reference (closed altitudes per channel, red-low/red-
+  high ordering, window nulls and empty books at h = 40 between
+  the windows, staggered table edges, azimuth windows vs the
+  fold, closure with the new buckets), optics-reference (unit
+  in-window integrals, per-channel staggered LUT rows, h = 31.5
+  red-alive-blue-empty). Named, not drawn: the subhorizon CZA
+  mirror image (booked transOffAlm, camera-above-deck territory
+  with the subsun), and the Parry/Lowitz oriented-COLUMN arcs -
+  a different crystal population (the plates cannot make them).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

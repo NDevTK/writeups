@@ -516,6 +516,14 @@ export function createOpticsMaterial(cloudShadow) {
   const pillarTex = new DataTexture(pillarData, 64, 1, RGBAFormat, FloatType);
   pillarTex.minFilter = pillarTex.magFilter = LinearFilter;
   pillarTex.needsUpdate = true;
+  const czaData = new Float32Array(128 * 4);
+  const czaTex = new DataTexture(czaData, 128, 1, RGBAFormat, FloatType);
+  czaTex.minFilter = czaTex.magFilter = LinearFilter;
+  czaTex.needsUpdate = true;
+  const chaData = new Float32Array(128 * 4);
+  const chaTex = new DataTexture(chaData, 128, 1, RGBAFormat, FloatType);
+  chaTex.minFilter = chaTex.magFilter = LinearFilter;
+  chaTex.needsUpdate = true;
   const u = {
     sunDir: uniform(new Vector3(0, 1, 0)),
     antisolar: uniform(new Vector3(0, -1, 0)),
@@ -581,6 +589,24 @@ export function createOpticsMaterial(cloudShadow) {
     pillarAmp: uniform(new Color(0, 0, 0)),
     pillarSigma: uniform(0.0248),
     pillarAzMax: uniform(0.0155),
+    // The 90-degree-wedge ARCS of the same plates (halos.js
+    // czaAltitude/chaAltitude, arcAzProfile - the tangential
+    // Bravais fold): each arc is a per-channel-ALTITUDE band -
+    // the dispersion is pure vertical, so the altitude centre is
+    // a vec3 (the closed forms per ice index; the CZA holds red
+    // low toward the sun, the CHA red high toward the sun) under
+    // one MC tilt sigma, with the azimuth LUT normalised per
+    // radian and the amp carrying E_src x T_air x slab x
+    // PLATE_ALPHA x the MC share table x the vertical peak.
+    // Channels leave the windows one by one (the share table and
+    // the LUT rows both empty per channel) - the arcs are born
+    // and die colour by colour.
+    czaAmp: uniform(new Color(0, 0, 0)),
+    czaAlt: uniform(new Vector3(1, 1, 1)),
+    czaSigma: uniform(0.008),
+    chaAmp: uniform(new Color(0, 0, 0)),
+    chaAlt: uniform(new Vector3(0.3, 0.3, 0.3)),
+    chaSigma: uniform(0.008),
     // Bravais parhelia (optics-lut buildDogLUT): azimuth-offset
     // LUT re-laid by the theme as the source climbs; srcAlt +
     // the plates' documented ~1.5-degree wobble envelope place
@@ -593,7 +619,11 @@ export function createOpticsMaterial(cloudShadow) {
     circleTex,
     circleData,
     pillarTex,
-    pillarData
+    pillarData,
+    czaTex,
+    czaData,
+    chaTex,
+    chaData
   };
   const material = new NodeMaterial();
   material.side = BackSide;
@@ -731,8 +761,35 @@ export function createOpticsMaterial(cloudShadow) {
     .mul(exp(dAltP.mul(dAltP).mul(-0.5)))
     .mul(step(0.0, v.y))
     .mul(u.pillarAmp);
+  // The wedge arcs: per-channel altitude bands (the closed-form
+  // dispersion is vertical) at the azimuth-LUT brightness.
+  const altV = asin(clamp(v.y, -1.0, 1.0));
+  const dCz = vec3(
+    altV.sub(u.czaAlt.x),
+    altV.sub(u.czaAlt.y),
+    altV.sub(u.czaAlt.z)
+  ).div(max(u.czaSigma, 1e-4));
+  const czaSample = texture(u.czaTex).sample(
+    vec2(azOff.div(Math.PI).clamp(0.0, 1.0), 0.5)
+  ).rgb;
+  const cCza = czaSample.mul(exp(dCz.mul(dCz).mul(-0.5))).mul(u.czaAmp);
+  const dCh = vec3(
+    altV.sub(u.chaAlt.x),
+    altV.sub(u.chaAlt.y),
+    altV.sub(u.chaAlt.z)
+  ).div(max(u.chaSigma, 1e-4));
+  const chaSample = texture(u.chaTex).sample(
+    vec2(azOff.div(Math.PI).clamp(0.0, 1.0), 0.5)
+  ).rgb;
+  const cCha = chaSample.mul(exp(dCh.mul(dCh).mul(-0.5))).mul(u.chaAmp);
   const cHalo = haloSample.mul(u.haloAmp);
-  material.colorNode = cBow.add(cHalo).add(cDogs).add(cCircle).add(cPillar);
+  material.colorNode = cBow
+    .add(cHalo)
+    .add(cDogs)
+    .add(cCircle)
+    .add(cPillar)
+    .add(cCza)
+    .add(cCha);
   material.opacityNode = 1.0;
   return {material, u};
 }

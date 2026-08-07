@@ -44,6 +44,7 @@
  */
 
 import {
+  arcAzProfile,
   circleInt120Share,
   circleInt120Sigma,
   circleInternalProfile,
@@ -374,6 +375,34 @@ export function buildDogLUT(h, bins = 256, srcR = SUN_RADIUS) {
     azMaxDeg: (pp.a1 * 180) / Math.PI,
     any: pp.any
   };
+}
+
+/**
+ * The 90-degree-wedge arcs' azimuth LUTs over [0, 180] deg from
+ * the source azimuth: halos.js arcAzProfile (the tangential
+ * Bravais fold, Fresnel-weighted, unit azimuth integral per
+ * channel - the absolute scale rides the amp as PLATE_ALPHA x
+ * the MC share table x the vertical Gaussian's peak). Rows are
+ * ZERO outside each channel's existence window - the CZA loses
+ * blue first at its window top, the CHA gains red first at its
+ * window foot, so the drawn arcs are born and die colour by
+ * colour, exactly as photographed. No disc convolution (smooth
+ * on the disc scale); the vertical structure is the closed-form
+ * per-channel altitude (czaAltitude/chaAltitude) with the MC
+ * sigma - the material carries it, not this LUT.
+ */
+export function buildArcLUT(h, arc, bins = 128) {
+  const thetas = [];
+  for (let i = 0; i < bins; i++) thetas.push(((i + 0.5) / bins) * Math.PI);
+  const prof = arcAzProfile(Math.max(h, 0), thetas, arc);
+  const out = new Float32Array(bins * 4);
+  for (let i = 0; i < bins; i++) {
+    out[i * 4] = prof[0][i];
+    out[i * 4 + 1] = prof[1][i];
+    out[i * 4 + 2] = prof[2][i];
+    out[i * 4 + 3] = 1;
+  }
+  return {data: out, bins, azMaxDeg: 180};
 }
 
 /**

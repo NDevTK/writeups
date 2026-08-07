@@ -512,6 +512,21 @@ export function mcParhelion(
   // corner-reflector angle) - its drawn width.
   const trans2Az = [0, 0, 0];
   const trans2Az2 = [0, 0, 0];
+  // The 90-degree-wedge ARCS, booked by their transit routes:
+  // basal entry + SIDE exit rising = the CIRCUMZENITHAL ARC
+  // (azimuth fold histogram + apparent-altitude moments - the
+  // altitude is the closed form asin(sqrt(n^2 - cos^2 h)), the
+  // dispersion pure vertical); side entry + BASAL exit = the
+  // CIRCUMHORIZONTAL ARC family (asin(sqrt(1 + sin^2 h - n^2)),
+  // open only past ~58 deg of sun).
+  const czaData = new Float64Array(circleBins * 3);
+  const czaT = [0, 0, 0];
+  const czaAltS = [0, 0, 0];
+  const czaAltS2 = [0, 0, 0];
+  const chaData = new Float64Array(circleBins * 3);
+  const chaT = [0, 0, 0];
+  const chaAltS = [0, 0, 0];
+  const chaAltS2 = [0, 0, 0];
   // Per-trial plate: diameter log-uniform over B&D's printed
   // oriented range, aspect from Auer & Veal's law - the
   // POPULATION average, not one resonant slab (a single exact
@@ -689,7 +704,7 @@ export function mcParhelion(
           1
         );
         if (rout) {
-          out = {dir: rout.dir, T: Tacc * rout.T};
+          out = {dir: rout.dir, T: Tacc * rout.T, exitBasal: fOut.n.z !== 0};
           break;
         }
         // TIR: lossless mirror, walk on. Side-face mirrors fold
@@ -731,7 +746,20 @@ export function mcParhelion(
       // with the entry-face scoping - the old books carried a
       // few-percent basal-entry contamination in the window).
       if (basalEntry) {
-        if (Math.abs(dAlt) < (5 * Math.PI) / 180) {
+        if (!out.exitBasal) {
+          // side exit: the CZA when it rises (the subhorizon
+          // mirror-image stays a stated bucket)
+          if (alt > 0) {
+            const b = Math.min(
+              Math.floor((dAz / Math.PI) * circleBins),
+              circleBins - 1
+            );
+            czaData[b * 3 + ch] += T;
+            czaT[ch] += T;
+            czaAltS[ch] += T * alt;
+            czaAltS2[ch] += T * alt * alt;
+          } else transOffAlmT[ch] += T;
+        } else if (Math.abs(dAlt) < (5 * Math.PI) / 180) {
           if (kSide === 0) transThroughT[ch] += T;
           else {
             const b = Math.min(
@@ -749,6 +777,20 @@ export function mcParhelion(
             }
           }
         } else transOffAlmT[ch] += T;
+        continue;
+      }
+      // SIDE-ENTRY basal exits are the circumhorizontal family -
+      // booked before the window tests (they land ~46 deg under
+      // the source, never near the dog books).
+      if (out.exitBasal) {
+        const b = Math.min(
+          Math.floor((dAz / Math.PI) * circleBins),
+          circleBins - 1
+        );
+        chaData[b * 3 + ch] += T;
+        chaT[ch] += T;
+        chaAltS[ch] += T * alt;
+        chaAltS2[ch] += T * alt * alt;
         continue;
       }
       // The DOG books take only light near the sun's almucantar:
@@ -781,7 +823,9 @@ export function mcParhelion(
       trans1T[ch] -
       trans2T[ch] -
       transThroughT[ch] -
-      transOffAlmT[ch]
+      transOffAlmT[ch] -
+      czaT[ch] -
+      chaT[ch]
   );
   const sigmaAlt = binnedT.map((B, ch) => {
     if (B <= 0) return 0;
@@ -823,6 +867,14 @@ export function mcParhelion(
     transOffAlmT,
     trans2Az,
     trans2Az2,
+    czaData,
+    czaT,
+    czaAltS,
+    czaAltS2,
+    chaData,
+    chaT,
+    chaAltS,
+    chaAltS2,
     transSigmaAlt: [0, 1, 2].map((c) => {
       const B = trans1T[c] + trans2T[c];
       if (B <= 0) return 0;
@@ -1082,6 +1134,40 @@ export const CIRCLE_INT_120_SIGMA_DEG = [
   0.052, 0.052, 0.239, 0.422, 0.536, 0.634, 0.72, 0.805, 0.553, 0.553, 0.553,
   0.553
 ];
+// The 90-degree-wedge arcs' MC shares (600k, same derivation):
+// per channel - the WINDOW EDGES stagger by dispersion, blue
+// dying first at the CZA's top (h ~ 30: R 0.85% > G 0.59% > B
+// 0.37%) and red opening the CHA first (h = 58: R 2.1% >> B
+// 0.2%) - and the tilt sigma of the drawn band (green; inflated
+// rows at the window edges are the edge smear itself).
+export const CZA_SHARE_R = [
+  0.00024, 0.00973, 0.01795, 0.02141, 0.02096, 0.01636, 0.00845, 0, 0, 0, 0, 0
+];
+export const CZA_SHARE_G = [
+  0.00023, 0.00811, 0.01618, 0.02032, 0.01912, 0.01478, 0.0059, 0, 0, 0, 0, 0
+];
+export const CZA_SHARE_B = [
+  0.00027, 0.00833, 0.01612, 0.01947, 0.01876, 0.01394, 0.00372, 0, 0, 0, 0, 0
+];
+export const CZA_SIGMA_ALT_DEG = [
+  0.548, 0.534, 0.43, 0.351, 0.283, 0.397, 1.12, 1.12, 1.12, 1.12, 1.12, 1.12
+];
+export const CHA_ALT_DEG = [55, 58, 60, 63, 66, 70, 75, 80, 85, 90];
+export const CHA_SHARE_R = [
+  0, 0.02106, 0.03506, 0.03609, 0.03235, 0.02585, 0.01756, 0.00946, 0.00317,
+  0.00016
+];
+export const CHA_SHARE_G = [
+  0, 0.01105, 0.03324, 0.03607, 0.03324, 0.02689, 0.01853, 0.01014, 0.00324,
+  0.00015
+];
+export const CHA_SHARE_B = [
+  0, 0.00183, 0.02566, 0.03389, 0.03173, 0.02598, 0.01783, 0.00959, 0.00311,
+  0.00014
+];
+export const CHA_SIGMA_ALT_DEG = [
+  1.577, 1.577, 1.142, 0.503, 0.312, 0.277, 0.358, 0.467, 0.591, 0.453
+];
 function lerpTable(xs, ys, x) {
   if (x <= xs[0]) return ys[0];
   for (let i = 1; i < xs.length; i++) {
@@ -1126,6 +1212,120 @@ export function circleInt120Sigma(hRad) {
   return (
     (lerpTable(PARHELION_ALT_DEG, CIRCLE_INT_120_SIGMA_DEG, d) * Math.PI) / 180
   );
+}
+export function czaShare(hRad) {
+  const d = (hRad * 180) / Math.PI;
+  if (d < 0 || d > 35) return [0, 0, 0];
+  return [CZA_SHARE_R, CZA_SHARE_G, CZA_SHARE_B].map((t) =>
+    lerpTable(PARHELION_ALT_DEG, t, Math.min(d, 55))
+  );
+}
+export function czaSigmaAlt(hRad) {
+  const d = Math.min(Math.max((hRad * 180) / Math.PI, 0), 55);
+  return (lerpTable(PARHELION_ALT_DEG, CZA_SIGMA_ALT_DEG, d) * Math.PI) / 180;
+}
+export function chaShare(hRad) {
+  const d = (hRad * 180) / Math.PI;
+  if (d < 55 || d > 90) return [0, 0, 0];
+  return [CHA_SHARE_R, CHA_SHARE_G, CHA_SHARE_B].map((t) =>
+    lerpTable(CHA_ALT_DEG, t, d)
+  );
+}
+export function chaSigmaAlt(hRad) {
+  const d = Math.min(Math.max((hRad * 180) / Math.PI, 55), 90);
+  return (lerpTable(CHA_ALT_DEG, CHA_SIGMA_ALT_DEG, d) * Math.PI) / 180;
+}
+
+// ---- the 90-degree-wedge arcs, analytically ----
+// Tangential wave vectors through the plate's PERPENDICULAR
+// face pairs give both arc altitudes in closed form. CZA (basal
+// entry, side exit): the horizontal momentum cos h survives the
+// top face, the VERTICAL internal momentum sqrt(n^2 - cos^2 h)
+// survives the side face - the arc stands at
+//     alt = asin(sqrt(n^2 - cos^2 h)),
+// real only while cos h >= sqrt(n^2 - 1): the sun below ~32.1
+// deg, the arc's documented window (the same critical geometry
+// as the circle's blue spot - the same faces). CHA (side entry,
+// basal exit): sin h survives the side face, the internal
+// horizontal sqrt(n^2 - sin^2 h) must fit under the basal exit:
+//     alt = asin(sqrt(1 + sin^2 h - n^2)),
+// real only past sin h >= sqrt(n^2 - 1): the sun above ~58 deg -
+// the fire rainbow's documented season. Dispersion is PURE
+// VERTICAL: per-channel n moves only the altitude - red sits
+// low on the CZA (toward the sun) and high on the CHA (toward
+// the sun again). Null outside the windows.
+export function czaAltitude(n, h) {
+  const v = n * n - Math.cos(h) ** 2;
+  if (!(v <= 1) || !(v >= 0)) return null;
+  return Math.asin(Math.sqrt(v));
+}
+export function chaAltitude(n, h) {
+  const v = 1 + Math.sin(h) ** 2 - n * n;
+  if (!(v >= 0)) return null;
+  return Math.asin(Math.sqrt(v));
+}
+
+// The arcs' AZIMUTH profiles: the horizontal fold of the wedge
+// transit, parametric in the side-face azimuth psi (spin
+// uniform). Tangentials conserved at every face give the exit's
+// horizontal vector in closed form per psi; the profile is the
+// fold of the uniform spin through that map, weighted by the
+// side face's Fresnel (entry for the CHA, exit for the CZA -
+// the basal Fresnel is psi-independent and normalises away) and
+// the face's flux interception. Numeric fold on a fine psi
+// grid, normalised to unit azimuth integral per channel; the MC
+// holds it in windows (the hexagon first-hit correction the
+// circle documented applies here too, stated). Rows are zero
+// outside the arc's existence window - the CZA loses BLUE first
+// as the sun climbs to the window top, exactly as observed.
+export function arcAzProfile(h, thetasRad, arc, nIce = ICE_N) {
+  const bins = thetasRad.length;
+  return nIce.map((n) => {
+    const acc = new Float64Array(bins);
+    // CZA: exit needs cos^2 h cos^2 psi >= n^2 - 1 - empty when
+    // even psi = 0 cannot satisfy it (the window top). CHA: the
+    // window lives in the closed altitude (1 + sin^2 h >= n^2).
+    if (arc === 'cza' && (n * n - 1) / Math.cos(h) ** 2 > 1) return [...acc];
+    if (arc === 'cha' && 1 + Math.sin(h) ** 2 - n * n < 0) return [...acc];
+    const M = 4000;
+    const ch = Math.cos(h);
+    for (let i = 0; i < M; i++) {
+      const psi = (((i + 0.5) / M) * Math.PI) / 2; // fold psi > 0, doubled
+      const cp = Math.cos(psi);
+      const sp = Math.sin(psi);
+      let hx;
+      let hy;
+      let w;
+      if (arc === 'cza') {
+        const kn2 = ch * ch * cp * cp - (n * n - 1);
+        if (kn2 <= 0) continue;
+        const kn = Math.sqrt(kn2);
+        const kt = -ch * sp;
+        hx = kn * cp - kt * sp;
+        hy = kn * sp + kt * cp;
+        // exit Fresnel from inside (reciprocity: external cosine
+        // IS kn), flux interception of the face inside ~ cos psi
+        w = fresnelT(kn, n) * cp;
+      } else {
+        const ci = ch * cp;
+        const knIn2 = n * n - Math.sin(h) ** 2 - ch * ch * sp * sp;
+        if (knIn2 <= 0) continue;
+        const knIn = Math.sqrt(knIn2);
+        const kt = -ch * sp;
+        hx = knIn * cp - kt * sp;
+        hy = knIn * sp + kt * cp;
+        // entry Fresnel + the face's external flux interception
+        w = fresnelT(ci, n) * ci;
+      }
+      const dAz = Math.abs(Math.atan2(hy, hx));
+      const b = Math.min(Math.floor((dAz / Math.PI) * bins), bins - 1);
+      acc[b] += w;
+    }
+    let integ = 0;
+    const dTh = Math.PI / bins;
+    for (let i = 0; i < bins; i++) integ += acc[i] * dTh;
+    return [...acc].map((v) => (integ > 0 ? v / integ : 0));
+  });
 }
 
 // ---- the internal circle families, analytically ----
