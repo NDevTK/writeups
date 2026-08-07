@@ -149,6 +149,12 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   spikeTex.minFilter = LinearFilter;
   spikeTex.needsUpdate = true;
   const spikeNode = texture(spikeTex);
+  // Measured total-column ozone (ozone.js, gated): the shipped
+  // ozone constants encode exactly 300 DU (Bruneton's own printed
+  // construction); absorption is linear in the column, so the
+  // measured GFS TOZNE scales the term everywhere as DU/300. 1
+  // (the reference column) with no measurement.
+  const ozScale = uniform(1);
   const sunMu = uniform(0.5);
   const camH = uniform(300);
   const exposure = uniform(28);
@@ -275,7 +281,11 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   let lastCurve = null;
   function fillBandT() {
     if (!lastCurve) return;
-    const mie = {scat: mieScat.value.toArray(), abs: mieAbs.value.toArray()};
+    const mie = {
+      scat: mieScat.value.toArray(),
+      abs: mieAbs.value.toArray(),
+      ozScale: ozScale.value
+    };
     const h = Math.max(camH.value, 1);
     const rObs = RB + h;
     // Rows below the straight-ray tangent keep the graze value -
@@ -315,7 +325,7 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     return rayleighS
       .mul(d.x)
       .add(mieScat.add(mieAbs).mul(d.y))
-      .add(ozoneA.mul(d.z));
+      .add(ozoneA.mul(ozScale).mul(d.z));
   });
 
   // Distance to the sphere of radius R, or -1.
@@ -1366,6 +1376,9 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
           gPrime.value.setScalar(mie.g);
           spikeCosCone.value = 2;
         }
+        // Measured column ozone: DU/300 (1 when unmeasured). The
+        // T/MS LUTs rebuild through the key below when it moves.
+        ozScale.value = mie.ozScale ?? 1;
       }
       sunMu.value = sunDir.y;
       camH.value = camHMetres;
@@ -1381,6 +1394,8 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
           mie.abs.join() +
           '|' +
           mie.g +
+          '|' +
+          (mie.ozScale ?? 1) +
           '|' +
           (mie.aureole
             ? mie.aureole.fDiff.join() + '|' + mie.aureole.gPrime.join()

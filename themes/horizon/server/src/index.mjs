@@ -60,8 +60,9 @@ import {haversineKm} from '../../lightning.js';
 import {parseHemiPower, parsePropagated} from '../../solarwind.js';
 import {normalizeMetars} from '../../metar.js';
 import {parseHmsKml, smokeAt} from '../../smoke.js';
-import {parseGrib2} from '../../grib2.js';
+import {parseGrib2, gridValue} from '../../grib2.js';
 import {aerosolProducts} from '../../aerosol.js';
+import {ozoneCensus} from '../../ozone.js';
 import {
   ndviCell,
   ndviDatesUrl,
@@ -958,6 +959,7 @@ function main() {
   const adsbCache = new Map(); // area key -> {t, body, src}
   const metarCache = new Map(); // area key -> {t, body}
   const aerosolCache = new Map(); // 0.25-deg cell key -> {t, body}
+  const ozoneCache = new Map(); // 0.25-deg cell key -> {t, body}
   const chlorCache = new Map(); // 1/12-deg cell key -> {t, body}
   const ndviCache = new Map(); // 0.01-deg cell key -> {t, body}
   const surfaceCache = new Map(); // 0.01-deg cell key -> {t, body}
@@ -969,6 +971,8 @@ function main() {
       if (now - v.t > 20 * 60e3) metarCache.delete(k);
     for (const [k, v] of aerosolCache)
       if (now - v.t > 90 * 60e3) aerosolCache.delete(k);
+    for (const [k, v] of ozoneCache)
+      if (now - v.t > 3 * 3600e3) ozoneCache.delete(k);
     for (const [k, v] of chlorCache)
       if (now - v.t > 12 * 3600e3) chlorCache.delete(k);
     for (const [k, v] of ndviCache)
@@ -1043,6 +1047,71 @@ function main() {
       }
     }
     aerosolCache.set(key, {t: Date.now(), body: null});
+    return null;
+  }
+  // Measured total-column ozone: the operational GFS's TOZNE (WMO
+  // 4.2-0-14-0, Dobson units) through the SAME NOMADS grib-filter
+  // path the aerosols ride - the filter's subregion extraction
+  // re-packs to simple packing, so the gated grib2.js decodes the
+  // GFS unchanged. One 0.25-deg cell per request (~200 bytes);
+  // GFS cycles 6-hourly with hourly forecast files, so successes
+  // cache 60 min and failures 5. ozone.js's census fails CLOSED
+  // outside [70, 700] DU - the sky never runs on decode garbage.
+  const ozoneState = {fetches: 0, errors: 0, cycle: ''};
+  async function fetchOzone(lat, lon) {
+    const cla = Math.max(-90, Math.min(90, Math.round(lat * 4) / 4));
+    const clo = (((Math.round(lon * 4) / 4) % 360) + 360) % 360;
+    const key = cla + '/' + clo;
+    const hit = ozoneCache.get(key);
+    if (hit && Date.now() - hit.t < (hit.body ? 60 : 5) * 60e3) return hit.body;
+    const bottom = Math.max(-90, Math.min(cla - 0.25, 89.5));
+    const left = Math.max(0, Math.min(clo - 0.25, 359.5));
+    const CYC = 21600e3;
+    const newest = Math.floor((Date.now() - 5 * 3600e3) / CYC) * CYC;
+    for (let k = 0; k < 3; k++) {
+      const ct = newest - k * CYC;
+      const d = new Date(ct);
+      const ymd =
+        d.getUTCFullYear() +
+        String(d.getUTCMonth() + 1).padStart(2, '0') +
+        String(d.getUTCDate()).padStart(2, '0');
+      const hh = String(d.getUTCHours()).padStart(2, '0');
+      const fhr = Math.max(
+        0,
+        Math.min(120, Math.round((Date.now() - ct) / 3600e3))
+      );
+      const u =
+        'https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl' +
+        `?dir=%2Fgfs.${ymd}%2F${hh}%2Fatmos` +
+        `&file=gfs.t${hh}z.pgrb2.0p25.f${String(fhr).padStart(3, '0')}` +
+        '&var_TOZNE=on&all_lev=on' +
+        `&subregion=&leftlon=${left}&rightlon=${left + 0.5}` +
+        `&toplat=${bottom + 0.5}&bottomlat=${bottom}`;
+      try {
+        ozoneState.fetches++;
+        const r = await fetch(u, {
+          signal: AbortSignal.timeout(15e3),
+          headers: {'user-agent': UA}
+        });
+        if (!r.ok) continue;
+        const buf = new Uint8Array(await r.arrayBuffer());
+        const census = ozoneCensus(parseGrib2(buf), cla, clo, gridValue);
+        if (!census) continue;
+        const cycle = `${d.toISOString().slice(0, 13)}:00Z`;
+        ozoneState.cycle = cycle + '+' + fhr;
+        const body = {
+          du: census.du,
+          cycle,
+          fhr,
+          cell: {lat: cla, lon: clo > 180 ? clo - 360 : clo}
+        };
+        ozoneCache.set(key, {t: Date.now(), body});
+        return body;
+      } catch {
+        ozoneState.errors++;
+      }
+    }
+    ozoneCache.set(key, {t: Date.now(), body: null});
     return null;
   }
   // Chlorophyll-a for the 1/12-deg cell over the point, from the
@@ -1413,6 +1482,12 @@ function main() {
         fetches: aerosolState.fetches,
         errors: aerosolState.errors
       };
+      const ozoneHealth = {
+        cells: ozoneCache.size,
+        cycle: ozoneState.cycle,
+        fetches: ozoneState.fetches,
+        errors: ozoneState.errors
+      };
       const chlorHealth = {
         cells: chlorCache.size,
         time: chlorState.time,
@@ -1449,6 +1524,7 @@ function main() {
             space: spaceHealth,
             smoke: smokeHealth,
             aerosol: aerosolHealth,
+            ozone: ozoneHealth,
             chlor: chlorHealth,
             ndvi: ndviHealth
           },
@@ -1462,6 +1538,7 @@ function main() {
           space: spaceHealth,
           smoke: smokeHealth,
           aerosol: aerosolHealth,
+          ozone: ozoneHealth,
           chlor: chlorHealth,
           ndvi: ndviHealth,
           surface: surfaceHealth,
@@ -1576,6 +1653,19 @@ function main() {
       return json(200, body, {
         'cache-control': 'public, max-age=900',
         'x-aerosol-source': 'NOMADS GEFS-Aerosols (GOCART)'
+      });
+    }
+
+    if (url.pathname === '/ozone') {
+      // Measured total-column ozone (DU) for the 0.25-deg cell over
+      // the point - the GFS TOZNE field. The theme scales its ozone
+      // absorption by DU/300 (the column Bruneton's constants
+      // encode by construction).
+      const body = await fetchOzone(lat, lon);
+      if (!body) return json(502, {du: null, upstream: 'unavailable'});
+      return json(200, body, {
+        'cache-control': 'public, max-age=1800',
+        'x-ozone-source': 'NOMADS GFS TOZNE'
       });
     }
 

@@ -55,9 +55,13 @@ export function sunTransmittanceJS(cosZenith, mie, hObs = 300) {
   }
   const mieExt = (c) =>
     (mie.scat[c] * (1 - (mie.fDiff ? mie.fDiff[c] : 0)) + mie.abs[c]) * tm;
+  // Measured column ozone (ozone.js): DU/300 scales the term, 1
+  // when unmeasured - the same linear correction the shader's
+  // ozScale uniform applies.
+  const oz = (mie.ozScale ?? 1) * to;
   return [
-    Math.exp(-(5.802e-6 * tr + mieExt(0) + 0.65e-6 * to)),
-    Math.exp(-(13.558e-6 * tr + mieExt(1) + 1.881e-6 * to)),
-    Math.exp(-(33.1e-6 * tr + mieExt(2) + 0.085e-6 * to))
+    Math.exp(-(5.802e-6 * tr + mieExt(0) + 0.65e-6 * oz)),
+    Math.exp(-(13.558e-6 * tr + mieExt(1) + 1.881e-6 * oz)),
+    Math.exp(-(33.1e-6 * tr + mieExt(2) + 0.085e-6 * oz))
   ];
 }

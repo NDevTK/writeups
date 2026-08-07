@@ -502,6 +502,7 @@
         TAU_MIN
       } from './horizon/aerosol.js';
       import {aureoleSet} from './horizon/aureole.js';
+      import {ozoneScale} from './horizon/ozone.js';
       import {
         LAMP_FULL,
         LAMP_TINT,
@@ -3378,6 +3379,52 @@
           );
         } catch {
           // The CAMS total AOD stands.
+        }
+      }
+
+      // Measured total-column ozone: the GFS TOZNE field through the
+      // daemon (same NOMADS grib-filter path as the aerosols; the
+      // filter's subregion extraction re-packs to simple packing, so
+      // the gated grib2.js decodes the operational GFS unchanged).
+      // The shipped ozone constants encode exactly 300 DU by
+      // Bruneton's own construction; absorption is linear in the
+      // column, so the sky's ozone term scales as DU/300 - deeper
+      // horizon blues under a high spring column, a paler twilight
+      // under a low one, and an Antarctic ozone hole reads as the
+      // measured optical fact it is. ?du=N is the labelled harness
+      // pin; ?ozone=URL overrides the endpoint and composes with
+      // weather pins like ?aerosol= does.
+      const OZONE_PROXY = params.get('ozone') ?? 'https://api.ndev.tk/ozone';
+      async function syncOzone() {
+        if (params.has('du')) {
+          const du = parseFloat(params.get('du'));
+          state.ozone = {at: Date.now(), du, pinned: true};
+          record(
+            'total ozone (pinned)',
+            du + ' DU · ozone x' + ozoneScale(du).toFixed(2)
+          );
+          return;
+        }
+        if (overridden && !params.has('ozone')) return;
+        try {
+          const r = await (
+            await fetch(
+              OZONE_PROXY +
+                '?lat=' +
+                state.lat.toFixed(3) +
+                '&lon=' +
+                state.lon.toFixed(3),
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (!Number.isFinite(r.du)) return;
+          state.ozone = {at: Date.now(), du: r.du, cycle: r.cycle, fhr: r.fhr};
+          record(
+            'GFS total ozone ' + (r.cycle || '').slice(0, 13) + 'z+' + r.fhr,
+            r.du.toFixed(0) + ' DU · ozone x' + ozoneScale(r.du).toFixed(2)
+          );
+        } catch {
+          // The 300 DU reference column stands.
         }
       }
 
@@ -7872,6 +7919,7 @@
         syncSmoke();
         syncWildfires();
         syncAerosol();
+        syncOzone();
         // Location-anchored like the rest: CAMS AOD/PM2.5, the
         // measured-GHI clearness index, and the OVATION oval whose
         // meridian slice and hemisphere both follow the observer.
@@ -8667,6 +8715,14 @@
         // of the same measured sky with and without the split).
         if (aeroFresh && state.aerosol.aur && params.get('aureole') !== '0')
           mieRad.aureole = state.aerosol.aur;
+        // Measured column ozone scales the sky's ozone term
+        // (DU/300, ozone.js); a pin never goes stale, a live
+        // answer holds for 6 h, and with neither the reference
+        // 300 DU column stands (scale 1).
+        const ozFresh =
+          state.ozone &&
+          (state.ozone.pinned || Date.now() - state.ozone.at < 6 * 3600e3);
+        mieRad.ozScale = ozFresh ? ozoneScale(state.ozone.du) : 1;
         if (atmo.ok) {
           const skyExposure = 24 / (0.2 + 0.8 * day);
           // The camera's REAL altitude (inverting the asinh height
@@ -10682,6 +10738,8 @@
         setInterval(syncSmoke, 30 * 60 * 1000);
         syncAerosol();
         setInterval(syncAerosol, 30 * 60 * 1000);
+        syncOzone();
+        setInterval(syncOzone, 60 * 60 * 1000);
         syncWater();
         // chlor_a is a daily DINEOF product (~2-day latency); an hourly
         // poll (matching the /chlor cache) more than covers it.
