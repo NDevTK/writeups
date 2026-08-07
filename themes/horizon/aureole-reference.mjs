@@ -247,4 +247,37 @@ const near = (a, b, t) => Math.abs(a - b) < t;
   );
 }
 
+{
+  // The terrain direct beam's scaled Beer law
+  // (sun-transmittance.js fDiff): absent fDiff is bit-identical to
+  // fDiff = 0 (every historical caller unchanged), and a full
+  // fDiff = 1 with zero absorption removes the Mie term EXACTLY -
+  // the scaled extinction sigma_ext - f sigma_s at its algebraic
+  // endpoints.
+  const {sunTransmittanceJS} = await import('./sun-transmittance.js');
+  const mu = 0.05; // low sun, where the Mie term bites hardest
+  const s = [4e-6, 4e-6, 4e-6];
+  const base = sunTransmittanceJS(mu, {scat: s, abs: [0, 0, 0]});
+  const f0 = sunTransmittanceJS(mu, {
+    scat: s,
+    abs: [0, 0, 0],
+    fDiff: [0, 0, 0]
+  });
+  const f1 = sunTransmittanceJS(mu, {
+    scat: s,
+    abs: [0, 0, 0],
+    fDiff: [1, 1, 1]
+  });
+  const noMie = sunTransmittanceJS(mu, {scat: [0, 0, 0], abs: [0, 0, 0]});
+  const ok =
+    base.every((v, c) => v === f0[c]) &&
+    f1.every((v, c) => v === noMie[c]) &&
+    f1[1] > base[1];
+  check(
+    'terrain beam scaled Beer endpoints',
+    ok,
+    `no-fDiff === fDiff 0 (bit); fDiff 1 + abs 0 === no Mie (bit); T' ${f1[1].toFixed(4)} > T ${base[1].toFixed(4)} at graze`
+  );
+}
+
 process.exit(fail ? 1 : 0);

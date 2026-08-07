@@ -8745,8 +8745,18 @@
         // dome uses (spectral-srgb.js): the 3-lambda transmittance is
         // radiance-weighting for the disc's light, and the Rec.709
         // luminance below only means luminance AFTER the projection.
+        // The ground's direct beam rides the delta-scaled Beer law
+        // when a coarse aerosol is measured (sun-transmittance.js
+        // fDiff): the diffraction spike's light arrives within the
+        // quasi-direct cone and belongs to the terrain's sun - the
+        // aureole pass's one conservative scope, now closed. The
+        // drawn DISC and the airglow factor deliberately stay on
+        // the pure Beer-Lambert (documented there).
         const st = applySpectral(
-          sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieRad)
+          sunTransmittanceJS(
+            Math.sin(Math.max(sun.alt, 0)),
+            mieRad.aureole ? {...mieRad, fDiff: mieRad.aureole.fDiff} : mieRad
+          )
         );
         const stMax = Math.max(st[0], st[1], st[2], 1e-4);
         sunLight.color.setRGB(st[0] / stMax, st[1] / stMax, st[2] / stMax);

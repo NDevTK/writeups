@@ -4,10 +4,22 @@
 // double precision alongside the TSL LUT chain; atmo-reference.mjs is
 // the ground truth both are held to.
 //
-// mie = {scat: [r,g,b], abs: [r,g,b]} - the same per-channel
-// coefficients (1/m at profile h = 0) the shader uniforms carry,
-// from aerosol.js (measured GEFS-Aerosols channel set, or the
-// Hillaire defaults calibrated to the measured total AOD).
+// mie = {scat: [r,g,b], abs: [r,g,b], fDiff?: [r,g,b]} - the same
+// per-channel coefficients (1/m at profile h = 0) the shader
+// uniforms carry, from aerosol.js (measured GEFS-Aerosols channel
+// set, or the Hillaire defaults calibrated to the measured total
+// AOD). fDiff, when present, is the aureole pass's delta split
+// (aureole.js): the DIRECT beam then carries the coarse-mode
+// forward-diffracted share too - the delta-scaled Beer law
+// sigma_ext - f sigma_s, exactly the T' every march runs on - so
+// the ground's direct light stops losing energy that in fact
+// arrives within the quasi-direct cone. Callers whose light is
+// the truly UNSCATTERED image (the sunset band's drawn disc: the
+// photosphere at sub-degree scale, where 1-3 deg diffracted light
+// does not land) pass no fDiff and keep the pure Beer-Lambert;
+// the airglow zenith factor also stays unscaled (an extended
+// diffuse source is unchanged by forward redistribution to first
+// order).
 //
 // hObs: observer height above the ground sphere in metres. The
 // historical callers (sun light tint, airglow zenith) keep the
@@ -41,7 +53,8 @@ export function sunTransmittanceJS(cosZenith, mie, hObs = 300) {
     tm += Math.exp(-h / 1200) * dt;
     to += Math.max(0, 1 - Math.abs(h - 25e3) / 15e3) * dt;
   }
-  const mieExt = (c) => (mie.scat[c] + mie.abs[c]) * tm;
+  const mieExt = (c) =>
+    (mie.scat[c] * (1 - (mie.fDiff ? mie.fDiff[c] : 0)) + mie.abs[c]) * tm;
   return [
     Math.exp(-(5.802e-6 * tr + mieExt(0) + 0.65e-6 * to)),
     Math.exp(-(13.558e-6 * tr + mieExt(1) + 1.881e-6 * to)),
