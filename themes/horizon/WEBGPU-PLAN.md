@@ -4934,6 +4934,39 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   honesty: the circle scene needs x150 and the pillar x1e5 over
   the ring's x1 - the radiometric spread the scene-light
   adaptation item already names.
+- DONE (the full-page instrument restored + integrated A/B
+  difference renders, Aug 7 nineteenth push): the "device loss"
+  era is fully over - the earlier verdicts had TWO mundane
+  causes, both now fixed or documented. (1) window.\_\_r and the
+  capture hooks only install with ?debug=1: a healthy page looks
+  dead to the probes without it. (2) Boot is SLOW, not stalled:
+  the live-stream endpoint (api.ndev.tk/stream - an EventSource
+  that can never complete through the buffering curl route) and
+  heavy Overpass queries each eat a full curl timeout;
+  view-serve now logs REQ|status|ms|url for every failed or slow
+  proxied fetch and takes VIEW_CURL_TIMEOUT. (3) A REAL BUG
+  found on the way: the documented ?cloud/cloudlow/cloudmid/
+  cloudhigh harness pins were OVERWRITTEN by the live open-meteo
+  apply seconds after boot - every cloud A/B silently ran on
+  live cover (caught when a pinned-cirrus capture came back with
+  halo amp 0.000: the live sky had no high cloud). The apply now
+  skips URL-pinned fields. With all three fixed, the canonical
+  box boots to RENDERER-UP under real WebGPU (SwiftShader
+  Vulkan), and the session captured the first INTEGRATED
+  verification set: the 22-deg ring visible through the deck in
+  the display frame, and halo-on-minus-off LINEAR FLOAT
+  difference renders (the livecache replays byte-identical data
+  across the pair, so the subtraction isolates the drawn
+  families exactly; residual speckle is the volumetric deck's
+  temporal-reconstruction jitter, both signs). The sun-aim
+  difference is the ring alone - full circle, red inner edge, no
+  wash anywhere (the range-mask fix holding in-scene). The
+  high-aim difference shows the ring top PLUS the CZA's red and
+  green sub-bands with NO BLUE FRINGE - the sun sat at 30.3 deg,
+  past blue's window edge (31.1): the staggered channel death
+  the gates pin, photographed in the integrated scene. The
+  instrument is available again for the scene-light adaptation
+  pass (the one item explicitly waiting on eyes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
