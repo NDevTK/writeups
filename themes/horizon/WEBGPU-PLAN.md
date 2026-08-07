@@ -4895,6 +4895,45 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     fraction exists in the literature read so far - the arc's
     RADIANCE has no citation, and the house does not draw
     uncited constants.
+- DONE (visual verification, Aug 7 eighteenth push - the
+  instrument works again, and it caught a bug): the theme-page
+  device loss that took the view-serve instrument down earlier
+  is GONE after the environment cleanup, but full-page boots now
+  stall on upstream 504s for cache-missed live APIs (the page
+  never mounts its renderer; open-meteo itself answers - other
+  hosts time out through the proxy). The session's captures come
+  from a NEW dedicated instrument instead:
+  harness/tsl-optics-visual.html - the certified
+  createOpticsMaterial with the theme's own feed chains
+  (slabBase/alpha/shares/LUT re-lays verbatim in structure),
+  isolated over a dark sky, ?scene= presets at the showcase
+  geometries and ?expo= a documented linear display gain (the
+  capture path reads a render target: LINEAR, no tone mapping).
+  Four scenes shot under real WebGPU (SwiftShader Vulkan) and
+  verified by eye: (1) sun 22 - the ring's red inner edge, both
+  dogs ON the circle, and the CZA above curving around the
+  ZENITH (opposite curvature to the ring) with red toward the
+  sun at the closed-form 67-69 deg band; (2) sun 25 aimed at az
+  132 - the parhelic circle carrying the WHITE 120-deg parhelion
+  bump, then turning BLUE and dying at the TIR cutoffs
+  (137-142), then the faint external-only anthelic remnant -
+  pass 15's whole physics in one frame; (3) sun 60 - the CHA
+  below the sun, red rim on top (the 3-lambda dome renders its
+  4-deg spectral spread as three sub-bands - the renderer's
+  inherent wavelength discretisation, stated); (4) sun -2.5 -
+  the twilight pillar: a one-disc-wide deep-red column standing
+  on the horizon above the set sun. THE BUG THE INSTRUMENT
+  CAUGHT: texture sampling clamps to the edge texel, so the
+  halo, bow and dog terms painted their LAST BIN'S value across
+  the whole dome outside their angular windows - a uniform wash
+  the bright sky hides but a dark capture shows (the anthelic
+  frame arrived purple). Range masks added to all three terms
+  (sky-objects-tsl), and the bow probe gained pass E: the term
+  is EXACTLY zero at 75 deg from the antisolar point - the
+  regression is instrument-caught from now on. Display-gain
+  honesty: the circle scene needs x150 and the pillar x1e5 over
+  the ring's x1 - the radiometric spread the scene-light
+  adaptation item already names.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

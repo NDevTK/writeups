@@ -664,12 +664,27 @@ export function createOpticsMaterial(cloudShadow) {
   const v = normalize(positionLocal);
   const aA = acos(clamp(dot(v, u.antisolar), -1.0, 1.0)).mul(DEG);
   const aS = acos(clamp(dot(v, u.sunDir), -1.0, 1.0)).mul(DEG);
-  const bowSample = bowTexN.sample(
-    vec2(aA.sub(bowLut.thMinDeg).div(bowLut.thMaxDeg - bowLut.thMinDeg), 0.5)
-  ).rgb;
-  const haloSample = haloTexN.sample(
-    vec2(aS.sub(haloLut.thMinDeg).div(haloLut.thMaxDeg - haloLut.thMinDeg), 0.5)
-  ).rgb;
+  // Range masks: texture sampling clamps to the edge texel, so
+  // without them the halo and bow terms would paint their LAST
+  // BIN'S value across the whole dome outside their angular
+  // windows - a uniform wash the bright sky hides but a dark
+  // capture shows (found by the visual-verification instrument;
+  // the dog window below gets the same mask).
+  const bowIn = step(bowLut.thMinDeg, aA).mul(step(aA, bowLut.thMaxDeg));
+  const haloIn = step(haloLut.thMinDeg, aS).mul(step(aS, haloLut.thMaxDeg));
+  const bowSample = bowTexN
+    .sample(
+      vec2(aA.sub(bowLut.thMinDeg).div(bowLut.thMaxDeg - bowLut.thMinDeg), 0.5)
+    )
+    .rgb.mul(bowIn);
+  const haloSample = haloTexN
+    .sample(
+      vec2(
+        aS.sub(haloLut.thMinDeg).div(haloLut.thMaxDeg - haloLut.thMinDeg),
+        0.5
+      )
+    )
+    .rgb.mul(haloIn);
   // The rain shaft's slab factor, per fragment: the two-leg
   // single-scatter integral through a homogeneous Marshall-Palmer
   // layer from the eye up to the measured freezing level, in
@@ -731,9 +746,12 @@ export function createOpticsMaterial(cloudShadow) {
   const dAlt = asin(clamp(v.y, -1.0, 1.0))
     .sub(u.srcAlt)
     .div(max(u.dogSigma, 1e-4));
-  const dogSample = texture(u.dogTex).sample(
-    vec2(clamp(azOff.sub(u.dogA0).div(u.dogA1.sub(u.dogA0)), 0.0, 1.0), 0.5)
-  ).rgb;
+  const dogIn = step(u.dogA0, azOff).mul(step(azOff, u.dogA1));
+  const dogSample = texture(u.dogTex)
+    .sample(
+      vec2(clamp(azOff.sub(u.dogA0).div(u.dogA1.sub(u.dogA0)), 0.0, 1.0), 0.5)
+    )
+    .rgb.mul(dogIn);
   const cDogs = dogSample.mul(exp(dAlt.mul(dAlt).mul(-0.5))).mul(u.dogAmp);
   // The parhelic circle rides the SAME almucantar coordinates:
   // azOff spans the full [0, pi] the LUT covers, the vertical

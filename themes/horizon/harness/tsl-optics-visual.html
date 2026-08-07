@@ -1,0 +1,310 @@
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body style="margin: 0; background: #000">
+    <canvas id="gl"></canvas>
+    <script>
+      /* swizzle shim */ if (navigator.gpu && self.GPUTexture) {
+        const ov = GPUTexture.prototype.createView;
+        GPUTexture.prototype.createView = function (d) {
+          if (d && 'swizzle' in d) {
+            d = Object.assign({}, d);
+            delete d.swizzle;
+          }
+          return ov.call(this, d);
+        };
+      }
+    </script>
+    <script type="module">
+      // VISUAL harness for the optics dome: the certified material
+      // with the theme's own feed chains, isolated over a dark sky
+      // so the additive families read. Scenes (?scene=):
+      //   cza      sun 22 deg - ring, dogs, circle, CZA above
+      //   anthelic sun 25, aimed at 120-160 az - 120-deg spot,
+      //            blue-spot cutoff, circle
+      //   cha      sun 60 - the circumhorizontal arc below
+      //   pillar   sun -2.5 - the twilight pillar column
+      // ?expo= display multiplier (visual only - the radiometry is
+      // CPU-gated; this page verifies GEOMETRY and COLOUR).
+      import * as T from 'three/webgpu';
+      import {createOpticsMaterial} from './writeups/themes/horizon/sky-objects-tsl.js';
+      import {
+        buildArcLUT,
+        buildCircleLUT,
+        buildDogLUT,
+        buildPillarLUT
+      } from './writeups/themes/horizon/optics-lut.js';
+      import {
+        chaAltitude,
+        chaShare,
+        chaSigmaAlt,
+        czaAltitude,
+        czaShare,
+        czaSigmaAlt,
+        circleIntSigmaAlt,
+        ICE_N,
+        parhelionShare,
+        parhelionSigmaAlt,
+        pillarShare,
+        PILLAR_SIGMA_ALT,
+        PLATE_ALPHA,
+        SCF_COLUMN
+      } from './writeups/themes/horizon/halos.js';
+      import {
+        cirrusSlantTau,
+        coronaAmp,
+        shellFirstExit,
+        CIRRUS_BASE_M,
+        CIRRUS_TOP_M,
+        CIRRUS_TAU_FULL
+      } from './writeups/themes/horizon/cloud-corona.js';
+      import {
+        pathToRadiusT,
+        sunTransmittanceJS
+      } from './writeups/themes/horizon/sun-transmittance.js';
+      const log = (s) => console.log('VIS|' + s);
+      const q = new URLSearchParams(location.search);
+      const scene = q.get('scene') || 'cza';
+      const expo = +(q.get('expo') || 60);
+      try {
+        const r = new T.WebGPURenderer({
+          canvas: document.getElementById('gl'),
+          forceWebGL: false,
+          antialias: true
+        });
+        await r.init();
+        log('backend ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'));
+        const W = 900;
+        const H = 700;
+        r.setSize(W, H);
+
+        const obj = createOpticsMaterial(null);
+        const u = obj.u;
+        const CFG = {
+          cza: {h: 22, aimAz: 0, aimAlt: 45, fov: 78},
+          anthelic: {h: 25, aimAz: 132, aimAlt: 25, fov: 80},
+          cha: {h: 60, aimAz: 0, aimAlt: 32, fov: 75},
+          pillar: {h: -2.5, aimAz: 0, aimAlt: 6, fov: 30}
+        }[scene];
+        const hRad = (CFG.h * Math.PI) / 180;
+        const mie = {scat: [4e-6, 4e-6, 4e-6], abs: [4.4e-7, 4.4e-7, 4.4e-7]};
+        const cHigh = 0.25;
+        const eyeM = 300;
+        const skyExposure = 24;
+        const sunDir = new T.Vector3(0, Math.sin(hRad), -Math.cos(hRad));
+        u.sunDir.value.copy(sunDir);
+        u.antisolar.value.copy(sunDir).negate();
+        u.srcAlt.value = hRad;
+
+        // --- the theme's own feed chains (Horizon.html verbatim in
+        // structure; occurrence pinned ON, eclipse off) ---
+        const tH = sunTransmittanceJS(Math.sin(Math.max(hRad, 0)), mie);
+        const slabBase =
+          hRad > 0
+            ? coronaAmp(cirrusSlantTau(cHigh, Math.sin(hRad), eyeM)) *
+              skyExposure
+            : 0;
+        const slab = slabBase * SCF_COLUMN;
+        u.haloAmp.value.setRGB(tH[0] * slab, tH[1] * slab, tH[2] * slab);
+        const sigAlt = Math.max(parhelionSigmaAlt(Math.max(hRad, 0)), 1e-4);
+        const dl = buildDogLUT(Math.max(hRad, 0), 256);
+        u.dogData.set(dl.data);
+        u.dogTex.needsUpdate = true;
+        u.dogA0.value = (dl.azMinDeg * Math.PI) / 180;
+        u.dogA1.value = (dl.azMaxDeg * Math.PI) / 180;
+        const dogA =
+          slabBase *
+          PLATE_ALPHA *
+          parhelionShare(Math.max(hRad, 0)) *
+          (dl.any ? 1 : 0) *
+          (1 / Math.sqrt(2 * Math.PI) / sigAlt);
+        u.dogSigma.value = sigAlt;
+        u.dogAmp.value.setRGB(tH[0] * dogA, tH[1] * dogA, tH[2] * dogA);
+        const cl = buildCircleLUT(Math.max(hRad, 0));
+        u.circleData.set(cl.data);
+        u.circleTex.needsUpdate = true;
+        u.circleSigma.value = cl.sigmaAltRad || circleIntSigmaAlt(hRad);
+        const cirA = slabBase * PLATE_ALPHA;
+        u.circleAmp.value.setRGB(tH[0] * cirA, tH[1] * cirA, tH[2] * cirA);
+        // wedge arcs
+        const czAl = ICE_N.map((n) => czaAltitude(n, hRad));
+        const czS = czaShare(Math.max(hRad, 0));
+        const sigCz = Math.max(czaSigmaAlt(Math.max(hRad, 0)), 1e-4);
+        const czB =
+          slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigCz);
+        u.czaSigma.value = sigCz;
+        u.czaAlt.value.set(czAl[0] ?? 9, czAl[1] ?? 9, czAl[2] ?? 9);
+        u.czaAmp.value.setRGB(
+          tH[0] * czS[0] * czB,
+          tH[1] * czS[1] * czB,
+          tH[2] * czS[2] * czB
+        );
+        const chAl = ICE_N.map((n) => chaAltitude(n, hRad));
+        const chS = chaShare(Math.max(hRad, 0));
+        const sigCh = Math.max(chaSigmaAlt(Math.max(hRad, 0)), 1e-4);
+        const chB =
+          slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigCh);
+        u.chaSigma.value = sigCh;
+        u.chaAlt.value.set(chAl[0] ?? 9, chAl[1] ?? 9, chAl[2] ?? 9);
+        u.chaAmp.value.setRGB(
+          tH[0] * chS[0] * chB,
+          tH[1] * chS[1] * chB,
+          tH[2] * chS[2] * chB
+        );
+        const acz = buildArcLUT(Math.max(hRad, 0), 'cza');
+        u.czaData.set(acz.data);
+        u.czaTex.needsUpdate = true;
+        const ach = buildArcLUT(Math.max(hRad, 0), 'cha');
+        u.chaData.set(ach.data);
+        u.chaTex.needsUpdate = true;
+        // the pillar in the crystal-local twilight frame
+        const pillarBase = (hAlt) => {
+          const erf = (x) => {
+            const s = x < 0 ? -1 : 1;
+            x = Math.abs(x);
+            const t = 1 / (1 + 0.3275911 * x);
+            return (
+              s *
+              (1 -
+                ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t -
+                  0.284496736) *
+                  t +
+                  0.254829592) *
+                  t *
+                  Math.exp(-x * x))
+            );
+          };
+          const sigV = Math.hypot(PILLAR_SIGMA_ALT, 0.00465 / 2);
+          const vis = 0.5 * (1 - erf(hAlt / sigV / Math.SQRT2));
+          if (!(vis > 1e-9)) return [0, 0, 0];
+          const phiN =
+            Math.exp((-hAlt * hAlt) / (2 * sigV * sigV)) /
+            Math.sqrt(2 * Math.PI);
+          const eVis = -hAlt + (sigV * phiN) / vis;
+          const Rb = 6360e3;
+          const Hm = (CIRRUS_BASE_M + CIRRUS_TOP_M) / 2;
+          const Rm = Rb + Hm;
+          const R1 = Rb + CIRRUS_BASE_M;
+          const r0 = Rb + eyeM;
+          const se = Math.sin(eVis);
+          const sMid =
+            -r0 * se + Math.sqrt(r0 * se * r0 * se + Rm * Rm - r0 * r0);
+          const sBase =
+            -r0 * se + Math.sqrt(r0 * se * r0 * se + R1 * R1 - r0 * r0);
+          const aC = Math.atan2(sMid * Math.cos(eVis), r0 + sMid * se);
+          const hLoc = hAlt + aC;
+          const tB = sunTransmittanceJS(Math.sin(hLoc), mie, Hm);
+          const tV = pathToRadiusT(se, mie, eyeM, Hm);
+          const dens =
+            (CIRRUS_TAU_FULL * cHigh) / (CIRRUS_TOP_M - CIRRUS_BASE_M);
+          const tVeil = Math.exp(-dens * (sMid - sBase));
+          const amp = coronaAmp(
+            CIRRUS_TAU_FULL * cHigh * shellFirstExit(hLoc, Hm)
+          );
+          const sh = pillarShare(hAlt);
+          return [0, 1, 2].map(
+            (k) => tB[k] * tV[k] * tVeil * amp * sh[k] * vis
+          );
+        };
+        const sigP = Math.hypot(PILLAR_SIGMA_ALT, 0.00465 / 2);
+        const pilB = pillarBase(hRad);
+        const pilA =
+          skyExposure * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigP);
+        u.pillarSigma.value = sigP;
+        u.pillarAmp.value.setRGB(
+          pilB[0] * pilA,
+          pilB[1] * pilA,
+          pilB[2] * pilA
+        );
+        const pl = buildPillarLUT(hRad, 64);
+        u.pillarData.set(pl.data);
+        u.pillarTex.needsUpdate = true;
+        u.pillarAzMax.value = pl.azMaxRad;
+
+        // Display gain baked into the amps: the capture path reads
+        // a render target (no tone mapping), so the PPM is linear.
+        // ?expo= is a straight linear multiplier on every family
+        // (visual only - radiometry is CPU-gated).
+        const disp = expo / 60;
+        for (const k of [
+          'haloAmp',
+          'dogAmp',
+          'circleAmp',
+          'czaAmp',
+          'chaAmp',
+          'pillarAmp'
+        ])
+          u[k].value.multiplyScalar(disp);
+
+        log(
+          'feeds: slabBase=' +
+            slabBase.toExponential(2) +
+            ' tH=[' +
+            tH.map((v) => v.toFixed(3)).join(',') +
+            '] pillar=[' +
+            pilB.map((v) => v.toExponential(1)).join(',') +
+            ']'
+        );
+
+        const sc = new T.Scene();
+        sc.background = new T.Color(0.01, 0.014, 0.026);
+        const mesh = new T.Mesh(
+          new T.SphereGeometry(590, 96, 64),
+          obj.material
+        );
+        sc.add(mesh);
+        // a faint horizon line so altitude reads in the frame
+        const ring = new T.Mesh(
+          new T.TorusGeometry(589, 0.6, 8, 128),
+          new T.MeshBasicMaterial({color: 0x223344})
+        );
+        ring.rotation.x = Math.PI / 2;
+        sc.add(ring);
+        // sun/moon position marker (small disc at the source)
+        const mark = new T.Mesh(
+          new T.SphereGeometry(4.8, 16, 16),
+          new T.MeshBasicMaterial({color: 0xfff2cc})
+        );
+        mark.position.copy(sunDir).multiplyScalar(588);
+        if (CFG.h < 0) mark.material.color.setHex(0xcc5522);
+        sc.add(mark);
+
+        const cam = new T.PerspectiveCamera(CFG.fov, W / H, 0.1, 3000);
+        cam.position.set(0, 0, 0);
+        const aAz = (CFG.aimAz * Math.PI) / 180;
+        const aAl = (CFG.aimAlt * Math.PI) / 180;
+        cam.lookAt(
+          Math.sin(aAz) * Math.cos(aAl) * 10,
+          Math.sin(aAl) * 10,
+          -Math.cos(aAz) * Math.cos(aAl) * 10
+        );
+        cam.updateMatrixWorld();
+
+        r.toneMapping = T.ACESFilmicToneMapping;
+        r.toneMappingExposure = expo;
+        window.__r = r;
+        window.__scene = sc;
+        window.__cam = cam;
+        window.__THREE = T;
+        const loop = () => {
+          r.render(sc, cam);
+          requestAnimationFrame(loop);
+        };
+        loop();
+        log('READY scene=' + scene + ' expo=' + expo);
+      } catch (e) {
+        log('FATAL ' + (e && e.message));
+      }
+    </script>
+  </body>
+</html>

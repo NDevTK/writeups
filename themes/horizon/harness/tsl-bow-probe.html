@@ -216,6 +216,27 @@
           );
         }
 
+        {
+          // Pass E - the RANGE MASK: outside the LUT's angular
+          // window the term must be EXACTLY zero. Texture
+          // sampling clamps to the edge texel, so an unmasked
+          // sampler paints the last bin's value across the whole
+          // dome (the wash the visual instrument caught); aim 75
+          // deg from the antisolar point, far outside [35, 60].
+          const aimFar = -SUN_ALT + (75 * Math.PI) / 180;
+          cam.lookAt(0, Math.sin(aimFar), Math.cos(aimFar));
+          cam.updateMatrixWorld();
+          const b4 = await shoot();
+          cam.lookAt(0, Math.sin(aimAlt), Math.cos(aimAlt));
+          cam.updateMatrixWorld();
+          const g4 = px(b4, 0);
+          check(
+            'zero outside the angular window',
+            g4.every((v) => v === 0),
+            `at 75 deg from antisolar: [${g4.map((v) => v.toExponential(1)).join(', ')}]`
+          );
+        }
+
         log(fails ? `${fails} FAILED` : 'BOWP PASS');
         log('DONE');
       } catch (e) {
