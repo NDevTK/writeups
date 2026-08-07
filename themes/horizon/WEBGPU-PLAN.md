@@ -3917,10 +3917,10 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   Documented scope: ground direct beam stays on TRUE T (the
   spike's quasi-direct share is absent from the terrain budget
   - conservative, its own pass); desert source regions read
-  slightly soft (MITR vs the three-mode desert mixture); Q at
-  500 nm serves all channels (printed-value convention); the
-  droplet/ice diffraction corona through thin cloud is
-  optics-lut territory, untouched.
+    slightly soft (MITR vs the three-mode desert mixture); Q at
+    500 nm serves all channels (printed-value convention); the
+    droplet/ice diffraction corona through thin cloud is
+    optics-lut territory, untouched.
 - HAND-OFF (Aug 6 second session close): the approximation sweep
   after the aureole pass comes back CLEAN - every grep hit for
   roughly/guess/hand-tuned/arbitrary in the drawn layers is
