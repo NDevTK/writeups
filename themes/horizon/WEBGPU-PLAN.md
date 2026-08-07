@@ -4520,6 +4520,51 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   measured mostly 500-700 hPa clouds and note high clouds carry
   LOWER alpha - documented; subparhelia and the parhelic circle
   (the offAlm light) stay named.
+- DONE (the overcast veil as radiative transfer, Aug 7 ninth
+  push - the hand-picked #79838c/#a2abb3 gradient retired): two
+  papers read in full - Meador & Weaver 1980 (JAS 37, 630: the
+  two-stream review) and Wood 2012 (MWR 140, 2373: the
+  stratocumulus review) - and they interlock with the Miles
+  survey the theme already ships (Wood's own thickness
+  compilation cites Miles et al. 2000; the r_e is Miles' printed
+  D_e,obs by the measured air-mass class). THE COLUMN: Wood's
+  printed climatological LWP 40-150 g/m^2 (log midpoint carried,
+  range stated) through his own tau = (3/2) LWP/(rho r_e):
+  continental tau ~21.5, marine ~12.1 - inside his printed
+  overcast range. THE TRANSFER: MW Table 1's Eddington row at
+  omega_0 = 1 (Wood: "omega = 1" in the visible) gives gamma_1 =
+  (3/4)(1-g) = gamma_2, and their Eq. (29) prints the
+  conservative closed form R = gamma_1 tau/(1 + gamma_1 tau),
+  T = 1 - R; g = 0.84, the middle of Wood's printed 0.82-0.86
+  (Liou); conservative T depends on (1-g) tau alone so
+  delta-scaling dissolves (the similarity invariant). PRINTED
+  CORROBORATION: Wood's own "a = tau/(tau+7)" IS this formula at
+  g = 0.8095, just under the printed range - the gate holds the
+  identity and the 10% agreement at g = 0.84 over tau 5..40, and
+  holds the closed form to a direct RK4 two-stream ODE solution
+  at 2e-4. THE SKY UNDER THE DECK: MW's own Eq. (30) intensity
+  ansatz I = 1/2[(2+3mu)I+ + (2-3mu)I-] with a dark lower
+  boundary gives the emergent gradation L(mu) = E(2+3mu)/(4 pi)
+  - zenith 2.5x horizon, flux closure exact by quadrature
+  (landmark; the empirical CIE/Moon-Spencer 3:1 is steeper -
+  documented context, not read, not drawn). THE DRAWN VEIL:
+  veilE = T(tau) x (direct sun x (1-eclipse) + moonlight.js
+  moon + the MEASURED skyIrr ambient), display-projected,
+  x skyExposure; the material carries only (2+3mu)/(4 pi);
+  opacity = the COVER itself (at tau ~12-21 the covered sky's
+  pattern transmission is e^-tau ~ 1e-6 - opaque, so cover
+  measures coverage and nothing else). Retired together: the two
+  hand-picked greys, the cloudy^2 x 0.85 fade and the day gate -
+  night, eclipse and moonlit overcast all EMERGE from the fed
+  irradiance (a full-moon overcast now glows faintly grey, a new
+  -moon overcast is black). overcast-reference: 6 landmarks
+  (printed constants; interlocking tau; the Table-1 identity;
+  closed form = ODE; the tau/(tau+7) corroboration; flux
+  closure + 2.5:1 + fails closed). validate.sh: 88 reference
+  sets. Scope: single slab over a dark base (snow-under-overcast
+  brightening is its own pass); homogeneity per Wood's printed
+  <=10% correction; the fog-colour cGray lerp stays in the
+  scene-light constants item.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

@@ -24,7 +24,7 @@ REFDIR=${REFDIR:-..} # where the *-reference.mjs live
 fail=0
 
 echo "== CPU references (double precision, ground truth) =="
-for name in ozone cloud-corona moonlight aureole ocean atmo moon optics surf glint coxmunk aurora leadr radar igrf scintillation ross-li cn2 airglow zodiacal meteors comets contrails ships navlights aircraft airline wildfire lightning milkyway earthshine nlc sats eclipses skyglow rainbow halos explore roam solarwind metar clearness refraction smoke terrain-sample far-terrain spectral sunspots lakes buildings facade roads landuse rivers rails trains aerialways turbines wakes peaks snowcover grib2 aerosol nightlights morel ocean-color ocean-measured-color vegetation land-color surface-color spectral-color crops livery forest grassland bldlod linelod veglod kelvin corona waterfalls powerlines geotiles modis-land phenology server; do
+for name in ozone cloud-corona moonlight overcast aureole ocean atmo moon optics surf glint coxmunk aurora leadr radar igrf scintillation ross-li cn2 airglow zodiacal meteors comets contrails ships navlights aircraft airline wildfire lightning milkyway earthshine nlc sats eclipses skyglow rainbow halos explore roam solarwind metar clearness refraction smoke terrain-sample far-terrain spectral sunspots lakes buildings facade roads landuse rivers rails trains aerialways turbines wakes peaks snowcover grib2 aerosol nightlights morel ocean-color ocean-measured-color vegetation land-color surface-color spectral-color crops livery forest grassland bldlod linelod veglod kelvin corona waterfalls powerlines geotiles modis-land phenology server; do
   ref="$REFDIR/$name-reference.mjs"
   if [ ! -f "$ref" ]; then echo "[FAIL] $name-reference.mjs missing"; fail=1; continue; fi
   if out=$(node "$ref" 2>&1); then

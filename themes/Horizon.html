@@ -517,8 +517,10 @@
         CIRRUS_TAU_FULL,
         CORONA_D_UM,
         CORONA_T250_MAX,
-        DROPLET_DIFF_SHARE
+        DROPLET_DIFF_SHARE,
+        DROPLET_DE_OBS_UM
       } from './horizon/cloud-corona.js';
+      import {overcastT, overcastTau} from './horizon/overcast.js';
       import {moonIrradianceE0} from './horizon/moonlight.js';
       import {ozoneScale} from './horizon/ozone.js';
       import {
@@ -8874,7 +8876,51 @@
           aerialU.uSunAzV.value.set(sunVec.x, sunVec.z).normalize();
           aerialU.uAerialExp.value = skyExposure;
         }
-        veilU.alpha.value = cloudy * cloudy * 0.85 * day;
+        // The overcast veil, radiometric (overcast.js): E under
+        // the slab = T(tau) x (direct sun + direct moon + the
+        // measured sky ambient), tau from Wood 2012's printed LWP
+        // at Miles' printed r_e for the measured air-mass class,
+        // T from Meador & Weaver's conservative closed form. The
+        // material draws their Eq. (30) gradation; opacity is the
+        // cover itself (the covered sky is opaque at this tau).
+        // Day, night, eclipse and moonlight all arrive through
+        // the fed irradiance - the old cloudy^2 x 0.85 x day fade
+        // is retired.
+        {
+          const reOv =
+            (state.marineAir
+              ? DROPLET_DE_OBS_UM.marine
+              : DROPLET_DE_OBS_UM.continental) / 2;
+          const tOv = overcastT(overcastTau(reOv));
+          const eS =
+            Math.max(Math.sin(sun.alt), 0) * (1 - (astro.eclipse || 0));
+          const tSv = sunTransmittanceJS(
+            Math.sin(Math.max(sun.alt, 0)),
+            mieRad
+          );
+          const eM =
+            moonIrradianceE0(
+              astro.moonRel,
+              astro.moonDistKm,
+              1 - (astro.lunarEcl?.inUmbra ?? 0)
+            ) * Math.max(Math.sin(moon.alt), 0);
+          const tMv = sunTransmittanceJS(
+            Math.sin(Math.max(moon.alt, 0)),
+            mieRad
+          );
+          const pd = applySpectral([
+            tSv[0] * eS + tMv[0] * eM,
+            tSv[1] * eS + tMv[1] * eM,
+            tSv[2] * eS + tMv[2] * eM
+          ]);
+          const k = tOv * skyExposure;
+          veilU.veilE.value.setRGB(
+            Math.max(pd[0] + skyIrr.r, 0) * k,
+            Math.max(pd[1] + skyIrr.g, 0) * k,
+            Math.max(pd[2] + skyIrr.b, 0) * k
+          );
+          veilU.alpha.value = cloudy;
+        }
 
         tmpB
           .copy(cNightBot)

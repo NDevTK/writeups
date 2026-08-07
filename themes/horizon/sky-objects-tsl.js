@@ -86,19 +86,35 @@ import {MW_FBP, MW_FG, MW_FRP} from './milkyway-data.js';
  * sprite centre, like gl_PointSize).
  */
 
-// mix(bottom, top, h) gradient dome that fades in with cloud cover.
+// The overcast veil, RADIOMETRIC (overcast.js, gated by
+// overcast-reference.mjs): the sky under a stratocumulus slab of
+// Wood 2012's printed liquid water path at Miles' printed
+// effective radius, transmitted by Meador & Weaver's conservative
+// two-stream closed form, drawn with THEIR OWN Eq. (30) emergent
+// gradation L(mu) = E (2 + 3 mu) / (4 pi) - zenith 2.5x horizon.
+// The theme feeds veilE = E_below x exposure per channel (sun +
+// moon + measured sky ambient, display-projected); the material
+// carries only the printed angular law. Opacity is the COVER
+// fraction itself - at the drawn tau the covered sky is opaque
+// (e^-tau ~ 1e-6) - so the old hand-picked #79838c/#a2abb3
+// gradient, the cloudy^2 x 0.85 fade and the day gate are all
+// retired: day and night live in the fed irradiance.
 export function createVeilMaterial() {
   const u = {
     alpha: uniform(0),
-    top: uniform(new Color('#79838c')),
-    bottom: uniform(new Color('#a2abb3'))
+    veilE: uniform(new Color(0, 0, 0))
   };
   const material = new NodeMaterial();
   material.side = BackSide;
   material.transparent = true;
   material.depthWrite = false;
-  const h = clamp(normalize(positionLocal).y.mul(1.4).add(0.25), 0.0, 1.0);
-  material.colorNode = mix(u.bottom, u.top, h);
+  const mu = clamp(normalize(positionLocal).y, 0.0, 1.0);
+  material.colorNode = vec3(u.veilE).mul(
+    mu
+      .mul(3.0)
+      .add(2.0)
+      .mul(1 / (4 * Math.PI))
+  );
   material.opacityNode = u.alpha;
   return {material, u};
 }
