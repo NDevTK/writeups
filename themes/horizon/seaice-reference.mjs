@@ -9,8 +9,13 @@ import {
   tDiff,
   iceOmega0,
   iceAlbedoDiffuse,
-  iceAlbedoDirect
+  iceAlbedoDirect,
+  ICE_CONC_RGB,
+  iceConcOfRGBA,
+  sampleIceConc,
+  iceDisplayRGB
 } from './seaice.js';
+import {BODY_GAIN, TARGET_LUMINANCE, luminance} from './ocean-color.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -117,6 +122,53 @@ const check = (name, ok, detail) => {
     'printed 48-degree crossing',
     ok,
     `r(acos 2/3) - r_d = ${(rEq - rd).toExponential(1)} (exact); grazing ${iceAlbedoDirect(1, 0.05).toFixed(3)} > r_d ${rd.toFixed(3)} > normal ${iceAlbedoDirect(1, 1).toFixed(3)}`
+  );
+}
+
+{
+  // The published concentration colormap: 100 one-percent bins
+  // in order, unique colours, exact round-trip to bin centres;
+  // nodata and unlisted colours are unknown.
+  let okAll = ICE_CONC_RGB.length === 100;
+  for (let i = 0; i < ICE_CONC_RGB.length; i++) {
+    const [r, g, b, k] = ICE_CONC_RGB[i];
+    if (k !== i) okAll = false;
+    if (Math.abs(iceConcOfRGBA(r, g, b, 255) - (i + 0.5) / 100) > 1e-12)
+      okAll = false;
+  }
+  const unknowns =
+    iceConcOfRGBA(0, 0, 0, 0) === -1 && iceConcOfRGBA(9, 9, 9, 255) === -1;
+  check(
+    'published concentration colormap',
+    okAll && unknowns,
+    `100 bins [k, k+1)%, unique, round-trip exact; nodata/unlisted -> unknown`
+  );
+}
+
+{
+  // The sampler and the display frame: all-unknown returns -1
+  // (feature off over land); a half-ice block means correctly;
+  // the drawn ice colour is r_d x BODY_GAIN - the water body's
+  // own frame - and sits an order of magnitude above the tuned
+  // dark-sea luminance, as a 0.7-albedo surface must.
+  const off = sampleIceConc(() => null, 0, 0, 2);
+  const half = sampleIceConc(
+    (ix) => (ix < 0 ? [17, 17, 17, 255] : [255, 230, 230, 255]),
+    0,
+    0,
+    2
+  );
+  const ice = iceDisplayRGB();
+  const ratio = luminance(ice) / TARGET_LUMINANCE;
+  const ok =
+    off === -1 &&
+    Math.abs(half - (0.005 * 10 + 0.995 * 15) / 25) < 1e-12 &&
+    Math.abs(ice[1] - iceAlbedoDiffuse(1) * BODY_GAIN) < 1e-15 &&
+    ratio > 10;
+  check(
+    'sampler and display frame',
+    ok,
+    `all-unknown -> -1; half-plume mean ${half.toFixed(3)}; ice luminance x${ratio.toFixed(0)} the tuned dark sea (r_d ~0.71 vs the body reflectance, one shared BODY_GAIN)`
   );
 }
 

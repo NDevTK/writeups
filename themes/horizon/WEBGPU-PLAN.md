@@ -5732,6 +5732,34 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   inversion, boot/re-anchor sample, state.iceConc) and the
   drawn blend (water body colour toward r_d x incident,
   wave/glint damping by concentration) with its own gate.
+- DONE (sea ice stage 2: the polar ocean freezes by
+  measurement, Aug 7 thirty-eighth push): the GHRSST MUR
+  concentration feed lands and the drawn blend closes the
+  sea-ice pass. seaice.js gains the stage-2 machinery: the
+  published 100-bin colormap VERBATIM (one percent per bin,
+  unique colours - the gate round-trips every bin exactly),
+  iceConcOfRGBA / sampleIceConc (unknown cells SKIPPED - land
+  and gaps; an all-unknown sample returns -1 and the feature
+  stays off), and iceDisplayRGB = r_d x BODY_GAIN - the
+  white-ice albedo in the water body's OWN display frame (one
+  shared scalar, no new constant; the gate prints the
+  consequence: ice sits x64 the tuned dark-sea luminance,
+  exactly what a 0.71-albedo surface over a ~0.01-reflectance
+  body must do). Horizon.html: syncSeaIce beside the snow and
+  stratosphere syncs (boot + re-anchor; skipped below 35 deg
+  latitude; 6-day backoff; panel row records concentration
+  and day), and three frame-side effects - the body colour
+  lerps to the ice colour re-based every frame (never
+  compounds), the Cox-Munk glitter damps by (1 - C), and the
+  wind-sea drive damps to U(1 - C) (the measured-partition
+  path is left as served - WAM masks ice; stated). ?seaice=0
+  keeps liquid water. Gate: 6 landmarks total (the four
+  stage-1 optics landmarks + the colormap round-trip + the
+  sampler/display-frame contract). VALIDATE PASS (all
+  references + 7 GPU probes). A February fjord now freezes
+  because a satellite analysis says it is frozen, wearing the
+  printed white-ice albedo, with the sea calmed and the
+  glitter gone in proportion to the measured concentration.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

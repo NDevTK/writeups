@@ -684,6 +684,12 @@
         sampleSaod,
         volcScaleOfSaod
       } from './horizon/volcanic.js';
+      import {
+        SEAICE_LAYER,
+        SEAICE_Z,
+        sampleIceConc,
+        iceDisplayRGB
+      } from './horizon/seaice.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -2347,6 +2353,76 @@
           }
         } catch (e) {
           if (params.has('debug')) console.warn('volcanic: ' + e.message);
+        }
+      }
+
+      // The MEASURED sea ice (seaice.js, gated): the GHRSST MUR
+      // analysis's concentration over the same keyless GIBS WMTS,
+      // inverted through its published 100-bin colormap. The polar
+      // water freezes by measurement: body colour blends to the
+      // white-ice albedo in the water's own display frame, the
+      // wind sea and the glitter damp with concentration. Skipped
+      // below 35 deg latitude (no sea ice there) and off over
+      // land-only samples. ?seaice=0 keeps liquid water.
+      let seaIceC = 0;
+      let seaIceSeq = 0;
+      async function syncSeaIce() {
+        if (params.get('seaice') === '0' || Math.abs(state.lat) < 35) {
+          seaIceC = 0;
+          return;
+        }
+        const seq = ++seaIceSeq;
+        try {
+          const p = pixelOf(state.lat, state.lon, SEAICE_Z);
+          const c = Math.floor(p.px / 256);
+          const r = Math.floor(p.py / 256);
+          for (let back = 1; back <= 6; back++) {
+            const d = new Date(Date.now() - back * 86400e3)
+              .toISOString()
+              .slice(0, 10);
+            try {
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.src =
+                'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/' +
+                SEAICE_LAYER +
+                '/default/' +
+                d +
+                '/GoogleMapsCompatible_Level6/' +
+                SEAICE_Z +
+                '/' +
+                r +
+                '/' +
+                c +
+                '.png';
+              await img.decode();
+              const cv = document.createElement('canvas');
+              cv.width = cv.height = 256;
+              const cx = cv.getContext('2d', {willReadFrequently: true});
+              cx.drawImage(img, 0, 0);
+              const data = cx.getImageData(0, 0, 256, 256).data;
+              if (seq !== seaIceSeq) return;
+              const pxAt = (ix, iy) => {
+                const lx = ix - c * 256;
+                const ly = iy - r * 256;
+                if (lx < 0 || lx > 255 || ly < 0 || ly > 255) return null;
+                const o = (ly * 256 + lx) * 4;
+                return [data[o], data[o + 1], data[o + 2], data[o + 3]];
+              };
+              const v = sampleIceConc(pxAt, p.px, p.py, 16);
+              seaIceC = v > 0 ? v : 0;
+              if (v >= 0)
+                record(
+                  'GHRSST MUR sea ice',
+                  (v * 100).toFixed(0) + '% concentration (' + d + ')'
+                );
+              return;
+            } catch {
+              // that day not published - go older
+            }
+          }
+        } catch (e) {
+          if (params.has('debug')) console.warn('seaice: ' + e.message);
         }
       }
 
@@ -8285,6 +8361,7 @@
         terrainUniforms.uSnowCovOn.value = 0;
         syncSnowCover();
         syncStratAOD();
+        syncSeaIce();
         // The lamp cloud is anchored to the OLD box - drop it now,
         // syncLights rebuilds it Earth-anchored on the new one.
         if (lampPts) {
@@ -10409,23 +10486,24 @@
           // Measured partitions rule when the marine model has them
           // (they only move on the 15-minute sync); otherwise the
           // wind-sea prediction with its drift gating.
+          const iceDamp = 1 - seaIceC;
           const partsNow = seaParts();
           const seaKey = partsNow ? JSON.stringify(partsNow) : null;
           if (seaKey !== oceanBuiltSeaKey) {
             if (partsNow) {
               for (const c of oceanCascades) c.setSeaState(partsNow);
             } else {
-              for (const c of oceanCascades) c.setWind(Ums, dirNow);
-              oceanBuiltU = Ums;
+              for (const c of oceanCascades) c.setWind(Ums * iceDamp, dirNow);
+              oceanBuiltU = Ums * iceDamp;
               oceanBuiltDir = dirNow;
             }
             oceanBuiltSeaKey = seaKey;
           } else if (
             !partsNow &&
-            (Math.abs(Ums - oceanBuiltU) > 1.5 || dDir > 0.35)
+            (Math.abs(Ums * iceDamp - oceanBuiltU) > 1.5 || dDir > 0.35)
           ) {
-            for (const c of oceanCascades) c.setWind(Ums, dirNow);
-            oceanBuiltU = Ums;
+            for (const c of oceanCascades) c.setWind(Ums * iceDamp, dirNow);
+            oceanBuiltU = Ums * iceDamp;
             oceanBuiltDir = dirNow;
           }
           for (const c of oceanCascades) c.update(oceanTime);
@@ -10438,11 +10516,23 @@
           // the four legacy-fed scatter systems retired.
           water.sunColor.value
             .copy(sunLight.color)
-            .multiplyScalar(sunLight.intensity);
+            .multiplyScalar(sunLight.intensity * (1 - seaIceC));
           // Measured-chlorophyll body colour (Morel/CIE) once the /chlor
           // fetch has resolved; until then the build-time placeholder
           // stands. Applied here so a roam sea-rebuild keeps the colour.
           if (chlorColor) water.waterColor.value.copy(chlorColor);
+          // Measured sea ice: the body colour rides to the white-ice
+          // albedo in the SAME display frame (r_d x BODY_GAIN,
+          // seaice.js), re-based every frame so the blend never
+          // compounds; the glitter above and the wind sea below damp
+          // with the concentration.
+          if (seaIceC > 0) {
+            const ir = iceDisplayRGB();
+            water.waterColor.value.lerp(
+              tmpC.setRGB(ir[0], ir[1], ir[2], THREE.LinearSRGBColorSpace),
+              seaIceC
+            );
+          }
           // The MEASURED total Hs (marine model, includes secondary
           // swells) sets the surf/breaking scale when present; the
           // Pierson-Moskowitz wind estimate is the fallback.
@@ -11937,6 +12027,7 @@
         setInterval(syncLights, 6 * 60 * 60 * 1000);
         syncSnowCover();
         syncStratAOD();
+        syncSeaIce();
         setInterval(syncSnowCover, 6 * 60 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
         syncISS();

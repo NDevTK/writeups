@@ -126,3 +126,165 @@ export function iceAlbedoDirect(
     Math.sinh(gamma * tau + y)
   );
 }
+
+// ---- stage 2: the measured concentration feed and the display
+// frame ----
+// NASA GIBS GHRSST_L4_MUR25_Sea_Ice_Concentration (the MUR L4
+// analysis's ice field; daily, keyless, epsg3857 Level6
+// verified live - the AMSR2 12 km layer ended 2025-09-01 and
+// was rejected). The published colormap (v1.3, fetched
+// 2026-08-07) is 100 one-percent bins [k, k+1) with unique
+// colours - vendored verbatim, [r, g, b, k].
+export const SEAICE_LAYER = 'GHRSST_L4_MUR25_Sea_Ice_Concentration';
+export const SEAICE_Z = 6; // GoogleMapsCompatible_Level6
+export const ICE_CONC_RGB = [
+  [17, 17, 17, 0],
+  [14, 0, 14, 1],
+  [28, 0, 28, 2],
+  [50, 0, 50, 3],
+  [64, 0, 64, 4],
+  [78, 0, 78, 5],
+  [99, 0, 99, 6],
+  [113, 0, 113, 7],
+  [135, 0, 135, 8],
+  [149, 0, 149, 9],
+  [163, 0, 163, 10],
+  [184, 0, 184, 11],
+  [198, 0, 198, 12],
+  [220, 0, 220, 13],
+  [234, 0, 234, 14],
+  [248, 0, 248, 15],
+  [241, 0, 255, 16],
+  [227, 0, 255, 17],
+  [205, 0, 255, 18],
+  [191, 0, 255, 19],
+  [177, 0, 255, 20],
+  [156, 0, 255, 21],
+  [142, 0, 255, 22],
+  [127, 0, 255, 23],
+  [106, 0, 255, 24],
+  [92, 0, 255, 25],
+  [71, 0, 255, 26],
+  [57, 0, 255, 27],
+  [42, 0, 255, 28],
+  [21, 0, 255, 29],
+  [7, 0, 255, 30],
+  [0, 16, 255, 31],
+  [0, 33, 255, 32],
+  [0, 49, 255, 33],
+  [0, 74, 255, 34],
+  [0, 90, 255, 35],
+  [0, 115, 255, 36],
+  [0, 132, 255, 37],
+  [0, 148, 255, 38],
+  [0, 173, 255, 39],
+  [0, 189, 255, 40],
+  [0, 206, 255, 41],
+  [0, 230, 255, 42],
+  [0, 247, 255, 43],
+  [0, 250, 241, 44],
+  [0, 246, 227, 45],
+  [0, 241, 212, 46],
+  [0, 234, 191, 47],
+  [0, 229, 177, 48],
+  [0, 222, 156, 49],
+  [0, 217, 142, 50],
+  [0, 212, 127, 51],
+  [0, 205, 106, 52],
+  [0, 201, 92, 53],
+  [0, 194, 71, 54],
+  [0, 189, 57, 55],
+  [0, 184, 42, 56],
+  [0, 177, 21, 57],
+  [0, 172, 7, 58],
+  [15, 175, 0, 59],
+  [30, 180, 0, 60],
+  [45, 185, 0, 61],
+  [68, 193, 0, 62],
+  [83, 198, 0, 63],
+  [98, 203, 0, 64],
+  [120, 210, 0, 65],
+  [135, 215, 0, 66],
+  [158, 223, 0, 67],
+  [173, 228, 0, 68],
+  [188, 233, 0, 69],
+  [210, 240, 0, 70],
+  [225, 245, 0, 71],
+  [248, 253, 0, 72],
+  [255, 248, 0, 73],
+  [255, 234, 0, 74],
+  [255, 212, 0, 75],
+  [255, 198, 0, 76],
+  [255, 177, 0, 77],
+  [255, 163, 0, 78],
+  [255, 149, 0, 79],
+  [255, 127, 0, 80],
+  [255, 113, 0, 81],
+  [255, 99, 0, 82],
+  [255, 78, 0, 83],
+  [255, 64, 0, 84],
+  [255, 42, 0, 85],
+  [255, 28, 0, 86],
+  [255, 14, 0, 87],
+  [255, 9, 9, 88],
+  [255, 26, 26, 89],
+  [255, 51, 51, 90],
+  [255, 68, 68, 91],
+  [255, 85, 85, 92],
+  [255, 111, 111, 93],
+  [255, 128, 128, 94],
+  [255, 153, 153, 95],
+  [255, 170, 170, 96],
+  [255, 187, 187, 97],
+  [255, 213, 213, 98],
+  [255, 230, 230, 99]
+];
+
+const CONC_LUT = new Map();
+for (let i = 0; i < ICE_CONC_RGB.length; i++) {
+  const [r, g, b] = ICE_CONC_RGB[i];
+  CONC_LUT.set((r << 16) | (g << 8) | b, i);
+}
+
+// One pixel -> concentration fraction (bin centre). -1 =
+// unknown (no data / land / unlisted colour).
+export function iceConcOfRGBA(r, g, b, a) {
+  if (a < 255) return -1;
+  const i = CONC_LUT.get((r << 16) | (g << 8) | b);
+  if (i === undefined) return -1;
+  return (i + 0.5) / 100;
+}
+
+// Neighbourhood mean around a global pixel at SEAICE_Z: unknown
+// cells are SKIPPED (land, gaps); no valid cell at all returns
+// -1 and the feature stays off.
+export function sampleIceConc(pxAt, px, py, half = 16) {
+  let sum = 0;
+  let n = 0;
+  for (let dy = -half; dy <= half; dy++) {
+    for (let dx = -half; dx <= half; dx++) {
+      const p = pxAt(px + dx, py + dy);
+      if (!p) continue;
+      const v = iceConcOfRGBA(p[0], p[1], p[2], p[3]);
+      if (v >= 0) {
+        sum += v;
+        n++;
+      }
+    }
+  }
+  return n ? sum / n : -1;
+}
+
+// The drawn ice colour in the water body's own display frame:
+// the diffuse white-ice albedo (Eq. 29 at the printed
+// parameters) times the SAME BODY_GAIN scalar the Morel body
+// colour rides (ocean-color.js) - reflectance in, display out,
+// no new constant.
+import {BODY_GAIN} from './ocean-color.js';
+export function iceDisplayRGB() {
+  return [
+    iceAlbedoDiffuse(0) * BODY_GAIN,
+    iceAlbedoDiffuse(1) * BODY_GAIN,
+    iceAlbedoDiffuse(2) * BODY_GAIN
+  ];
+}
