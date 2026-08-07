@@ -5689,6 +5689,49 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     probes). With this, the original hand-off's legacy-display
     ledger is CLOSED: every item is either retired onto a
     printed frame or documented with its verdict.
+- DONE (sea ice stage 1: the white-ice optics, Aug 7
+  thirty-seventh push - a NEW PAPER read in full and a missing
+  surface's physics landed): the theme has measured snow for
+  LAND but no ice for the SEA - a polar fjord draws liquid blue
+  in February. Stage 1 ships the optics; the feed and the drawn
+  water blend are stage 2 (scouted: GIBS
+  GHRSST_L4_MUR_Sea_Ice_Concentration is live daily through
+  yesterday with a 102-entry published colormap, 1%-per-bin -
+  the AMSR2 12km layer DIED 2025-09-01, checked and rejected).
+  Source, all 35 pages: Malinka, Zege, Heygster & Istomina,
+  "Reflective properties of white sea ice and snow" (The
+  Cryosphere 10, 2541, 2016). White ice reflectance is closed
+  form in THREE parameters (their Table 1: layer tau, grain
+  chord a, yellow-substance absorption); seaice.js transcribes
+  Eq. 10 (Fresnel diffuse transmittance closed form), Eqs. 7-9
+  (the mixture's omega0), and Eq. 29's asymptotic albedos with
+  the printed g = 0.67, at the conclusion's printed ordinary-
+  white-ice ranges (tau 7..15, grains 1-4 mm, log-mids; pure
+  ice stated - Table 2's pure cases put the yellow substance
+  at ~1e-4/m). Ice n, kappa: Warren & Brandt 2008's published
+  ASCII rows at 440/550/680 VERBATIM (fetched from the UW
+  compilation). THE GATE'S FOUR LANDMARKS: (1) Eq. 10 equals
+  an independent first-principles Fresnel integral to 2e-10 -
+  and the check caught the PAPER itself: its printed 1-T_diff
+  interval ends 0.0695 at n = 1.334 where its own formula
+  (and the independent integral) give 0.0666; the low end
+  0.0611 is exact - a documented prose discrepancy, the
+  machine-verified formula ships. (2) The W&B rows: kappa
+  climbs three decades blue to red. (3) The albedo structure:
+  r_d(550) sits on Eq. 30's non-absorbing tau/(tau+4) to
+  0.56% (the paper: absorption is negligible at 550), the
+  spectrum orders blue > green > red (white ice faintly
+  blue: 0.717/0.715/0.703), and the printed tau range spans
+  the paper's own "about 0.7-0.8" white-ice band. (4) The
+  printed 48-degree crossing is EXACT: the paper says direct
+  and diffuse albedos are equal at theta0 = arccos(2/3), and
+  G(arccos(2/3)) = 1 makes it an identity - grazing sun
+  0.865 > r_d 0.715 > overhead 0.634, the printed ordering.
+  VALIDATE PASS (all references + 7 GPU probes). Stage 2,
+  named: the GHRSST feed (snowcover-pattern colormap
+  inversion, boot/re-anchor sample, state.iceConc) and the
+  drawn blend (water body colour toward r_d x incident,
+  wave/glint damping by concentration) with its own gate.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
