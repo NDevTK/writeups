@@ -5668,27 +5668,27 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   prints the D-series global annual cloud-TYPE amounts for
   1986-93 (nine types, ice and liquid separately, daytime only
   - the caption's own caveat); the level sums land low 26.5 /
-  middle 19.2 / high 21.6 (%), partitioning the printed 67.6
-  total to 0.3%, with the abstract's long-term global mean
-  0.675 +- 0.012 bracketing it. cloud-climatology.js vendors
-  the type table VERBATIM and derives the fallback fractions
-  low 0.392 / mid 0.284 / high 0.320 of total (sum 0.996 -
-  the old guess summed 1.5 by silent overlap); the semantics
-  are stated in the header: ISCCP classifies each cloudy
-  pixel once at its TOP (Fig. 2's printed 680/440 mb level
-  bounds), so lower layers under high decks are understated
-  relative to true per-layer covers - the fallback is the
-  measured top-view partition, the honest floor when data is
-  missing (open-meteo serves real per-layer covers almost
-  always). All four fallback sites in Horizon.html now read
-  the module (cHighFrac at the cirrus column + the
-  cLow/cMid/cHigh deck feeds); no hand split remains. Gate:
-  cloud-climatology-reference.mjs, 2 landmarks (Table 5's own
-  closure + the partition contract with the printed ordering
-  low > high > mid). VALIDATE PASS (all references + 7 GPU
-  probes). With this, the original hand-off's legacy-display
-  ledger is CLOSED: every item is either retired onto a
-  printed frame or documented with its verdict.
+    middle 19.2 / high 21.6 (%), partitioning the printed 67.6
+    total to 0.3%, with the abstract's long-term global mean
+    0.675 +- 0.012 bracketing it. cloud-climatology.js vendors
+    the type table VERBATIM and derives the fallback fractions
+    low 0.392 / mid 0.284 / high 0.320 of total (sum 0.996 -
+    the old guess summed 1.5 by silent overlap); the semantics
+    are stated in the header: ISCCP classifies each cloudy
+    pixel once at its TOP (Fig. 2's printed 680/440 mb level
+    bounds), so lower layers under high decks are understated
+    relative to true per-layer covers - the fallback is the
+    measured top-view partition, the honest floor when data is
+    missing (open-meteo serves real per-layer covers almost
+    always). All four fallback sites in Horizon.html now read
+    the module (cHighFrac at the cirrus column + the
+    cLow/cMid/cHigh deck feeds); no hand split remains. Gate:
+    cloud-climatology-reference.mjs, 2 landmarks (Table 5's own
+    closure + the partition contract with the printed ordering
+    low > high > mid). VALIDATE PASS (all references + 7 GPU
+    probes). With this, the original hand-off's legacy-display
+    ledger is CLOSED: every item is either retired onto a
+    printed frame or documented with its verdict.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
