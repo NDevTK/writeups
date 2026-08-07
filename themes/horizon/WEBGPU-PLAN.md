@@ -5272,6 +5272,34 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   systems as they were. ONE legacy-fed consumer remains, named:
   the cloud deck's direct beam (its volumetric radiometry gets
   its own audit).
+- DONE (the cloud deck's direct beam, Aug 7 twenty-seventh push
+  - the LAST legacy-fed scatter system retires, and the display
+    chain's final magic number explains itself): the volumetric
+    march's source was sunCol x sunTerm x 18/1.75 + ambient, with
+    the shader's own comment admitting "18 was the display
+    calibration". The audit's algebra: the legacy feed (x0.55 at
+    the theme, x18 in the shader, /1.75 octave sum) lands within
+    ~10% of the PHYSICAL beam (st x adaptive exposure) / 1.75 -
+    the 18 was the scene-light frame ratio all along, the same
+    ~pi x 2.9 family every stage-4 audit found. The march's
+    source is now the beam irradiance itself; the /1.75 STAYS
+    with a physical reading (the Wrenninge octaves triple-count
+    at zero optical depth - dividing by sum(a^i) pins the thin
+    limit to the single-scatter white point); the x18 moved
+    VERBATIM into the legacy pin's feed so ?adapt=0 reproduces
+    the old deck exactly; and the 0.02 night floor retires - the
+    adaptive exposure lights moonlit decks physically. The
+    deck's ambient half had ALREADY moved frames in stage 4
+    (ambCol copies ambient.color) but no fixture since had a
+    deck - the pose-pinned 55/25 sunset capture is its first
+    verification: the physical deck holds the legacy white point
+    (lit tops, dark bases, nothing clips), the gap beam threads
+    the per-pixel shadow map identically on both sides, and the
+    heavy-overcast sunset stays SEEN under adaptation where the
+    legacy side goes near-black. sunIFeedLegacy now survives
+    only inside the consumers' pinned branches - every scatter
+    system (ocean, near glitter, far ring, deck) runs the one
+    physical frame.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

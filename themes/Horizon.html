@@ -9291,12 +9291,10 @@
         sunLight.intensity = adaptPin
           ? sunILegacy
           : stMax * skyExposure * discFrac * cirrusT * (1 - ecl);
-        // The legacy-scale feed: after the ocean, far-ring and
-        // terrain-glitter audits landed their systems on the
-        // physical beam, ONE unverified consumer remains - the
-        // cloud deck's direct beam (its volumetric radiometry
-        // gets its own audit) - plus every consumer's pinned
-        // branch for the A/B.
+        // The legacy-scale feed: every scatter system now runs
+        // the physical beam - this survives ONLY inside the
+        // consumers' pinned branches, so ?adapt=0 reproduces the
+        // complete legacy display system for the A/B.
         sunIFeedLegacy = adaptPin ? sunLight.intensity : sunILegacy;
         // The cirrus corona: rings only when the MEASURED 250 hPa
         // temperature sits in Sassen's corona-cirrus regime and a
@@ -10573,10 +10571,24 @@
         cloudsActive = !!cloudSys && (cLow > 2 || cMid > 2);
         if (cloudsActive) {
           cloudSys.shared.sunDirW.value.copy(sunVec);
-          // Cloud direct beam: legacy feed (see sunIFeedLegacy).
+          // The deck's direct beam on the physical frame: the
+          // march's source is now the beam irradiance itself
+          // (colour x intensity = st x exposure) - the last
+          // legacy-fed scatter system retires. The shader's old
+          // x18 display gain folds into the PIN's feed verbatim
+          // (x0.55 x18 with the 0.02 night floor), so the A/B
+          // still reproduces the legacy deck exactly; unpinned,
+          // the physical feed supplies that magnitude by algebra
+          // (18/1.75 was ~ the frame ratio all along), and the
+          // night floor retires - the adaptive exposure lights
+          // moonlit decks physically.
           cloudSys.shared.sunCol.value
             .copy(sunLight.color)
-            .multiplyScalar(Math.max(sunIFeedLegacy, 0.02) * 0.55);
+            .multiplyScalar(
+              adaptPin
+                ? Math.max(sunIFeedLegacy, 0.02) * 0.55 * 18
+                : sunLight.intensity
+            );
           // Cloud ambient is the same integrated sky the terrain gets.
           if (atmo.ok)
             cloudSys.shared.ambCol.value

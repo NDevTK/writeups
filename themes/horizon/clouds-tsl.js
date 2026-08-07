@@ -445,14 +445,20 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
                 const octA = vec3(1.0, 0.5, 0.25);
                 const octExt = exp(tauS.negate().mul(vec3(1.0, 0.5, 0.25)));
                 const sunTerm = dot(octA.mul(octExt), phase);
-                // 18 was the display calibration of the old
-                // single-scatter term; dividing by sum(a^i) = 1.75
-                // keeps that white point - the octave SHAPE (deep
-                // transmission, more isotropic side-lighting) is the
-                // physics, the constant is exposure.
+                // sunCol IS the beam irradiance in display units
+                // (the physical scene-light frame: st x adaptive
+                // exposure - the old x18 display calibration moved
+                // into the legacy pin's feed, where the algebra
+                // shows it was standing in for exactly this frame:
+                // legacy feed x 18/1.75 ~ physical feed / 1.75 to
+                // ~10%). The /sum(a^i) = 1.75 stays: the Wrenninge
+                // octaves triple-count at zero optical depth, and
+                // dividing by their sum pins the thin limit to the
+                // single-scatter white point - shape is physics,
+                // the normalisation keeps energy at the edge.
                 const S = shared.sunCol
                   .mul(sunTerm)
-                  .mul(18.0 / 1.75)
+                  .mul(1.0 / 1.75)
                   .add(shared.ambCol.mul(mix(0.35, 1.0, h)));
                 const sT = exp(sg.mul(d).mul(dt).negate());
                 L.addAssign(T.mul(S.sub(S.mul(sT))));
