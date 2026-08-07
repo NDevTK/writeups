@@ -321,6 +321,14 @@
       } from './horizon/sun-transmittance.js';
       import {buildSpots, parallacticAngle} from './horizon/sunspots.js';
       import {applySpectral} from './horizon/spectral-srgb.js';
+      import {
+        adaptExposure,
+        E0_LUX,
+        lum3,
+        mesopicBlend,
+        scotopicY,
+        skyTransferE
+      } from './horizon/adaptation.js';
       import {createAtmosphereTSL} from './horizon/atmosphere-tsl.js';
       import {
         createCloudShadowHook,
@@ -462,7 +470,8 @@
         horizonGlow,
         pointVisibility,
         sampleRatio,
-        skyMag
+        skyMag,
+        NATURAL_MCD
       } from './horizon/skyglow.js';
       import {SKYGLOW, SKYGLOW_H, SKYGLOW_W} from './horizon/skyglow-data.js';
       import {
@@ -4443,6 +4452,7 @@
       const skyIrr = new THREE.Color(0.05, 0.07, 0.1);
       const tmpC = new THREE.Color();
       let lastIrrT = -1e9;
+      let irrResolves = 0;
       // The irradiance readback is async on WebGPURenderer (no
       // pipeline stall); until the first read resolves, skyIrr is a
       // guess. Systems with TEMPORAL HISTORY (the cloud buffer) must
@@ -8937,10 +8947,80 @@
           state.ozone &&
           (state.ozone.pinned || Date.now() - state.ozone.at < 6 * 3600e3);
         mieRad.ozScale = ozFresh ? ozoneScale(state.ozone.du) : 1;
-        // Photopic adaptation exposure (twilight genuinely darker,
-        // not pitch black) - frame-scoped: the dome, the aerial
-        // hooks AND the radiometric optics amps all share it.
-        const skyExposure = 24 / (0.2 + 0.8 * day);
+        // The eye's exposure (adaptation.js - LBNL 39882's JND
+        // frame): the adaptation luminance is the SAME transfer
+        // table the day anchor is derived on - the reference
+        // march's hemisphere irradiance at the sun's and the
+        // moon's real altitudes (each linear in its own E0),
+        // under the measured cloud dimming (Erbs kt), plus the
+        // Falchi zenith skyglow floor (natural + the atlas's
+        // artificial ratio) - bridged to cd/m^2 by the DERIVED
+        // solar illuminance constant. One instrument on both
+        // sides of the JND ratio: the dome's live irradiance
+        // readback keeps its ambient job but stays OUT of this
+        // loop - its absolute scale (live aerosol/ozone/deck)
+        // was never cross-calibrated against the reference march
+        // (measured ~3x low at sun 30 deg), and a biased ratio
+        // is a biased exposure. One frame for the dome, the
+        // aerial hooks, the radiometric optics amps, the veil
+        // and the ambient. The old 24/(0.2 + 0.8 day) display
+        // curve spanned 5x where the eye spans ~3e4: twilight
+        // now stays seen (the eye adapts), full-moon nights
+        // actually render, and the derived day anchor keeps the
+        // built daytime appearance. ?adapt=0 pins the legacy
+        // curve for the harness A/B.
+        const adaptPin = params.get('adapt') === '0';
+        const e0Moon = moonIrradianceE0(
+          astro.moonRel,
+          astro.moonDistKm,
+          1 - (astro.lunarEcl?.inUmbra ?? 0)
+        );
+        const dimCloudA =
+          state.ktAmbient != null ? state.ktAmbient : 1 - cloudy * 0.3;
+        const moonSkyE = skyTransferE(moon.alt);
+        const sunSkyE = skyTransferE(sun.alt);
+        const laCd =
+          ((lum3(sunSkyE[0], sunSkyE[1], sunSkyE[2]) +
+            lum3(moonSkyE[0], moonSkyE[1], moonSkyE[2]) * e0Moon) *
+            dimCloudA *
+            E0_LUX) /
+            Math.PI +
+          (1 + lpRatio) * NATURAL_MCD * 1e-3;
+        const skyExposure = adaptPin
+          ? 24 / (0.2 + 0.8 * day)
+          : adaptExposure(laCd);
+        // The Purkinje fold (LBNL 39882 Sec. 5.2 + Eq. 13): below
+        // the printed mesopic range the rods see luminance, not
+        // colour - each JS-fed lighting colour lerps toward its
+        // OWN rod luminance (Rec.709 -> XYZ is exact colorimetry,
+        // Eq. 13's scotopic Y, normalised at the paper's
+        // equal-energy closed point 2.31 so grey light is
+        // luminance-preserving). Blue-rich moonlight lands
+        // slightly BRIGHTER as grey than its cone luminance -
+        // the Purkinje shift, expressed with no new constant.
+        // The dome/optics shaders keep colour until the next
+        // stage (documented); the pin skips the fold entirely.
+        // Until the FIRST irradiance readback resolves (the async
+        // staging read takes seconds on a slow queue), skyIrr is
+        // the DAYLIGHT init guess - gate every consumer by the day
+        // factor so a page booted at night starts from darkness,
+        // not from a stale day sky the adaptive exposure would
+        // render blinding. No new constant: the existing day curve
+        // is exactly "how much of that daylight guess can be true".
+        const irrGuard = skyIrrReady ? 1 : day;
+        const mesoB = adaptPin ? 1 : mesopicBlend(laCd);
+        const scotFold = (c) => {
+          if (mesoB >= 1) return c;
+          const X = 0.4124 * c.r + 0.3576 * c.g + 0.1805 * c.b;
+          const Y = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+          const Z = 0.0193 * c.r + 0.1192 * c.g + 0.9505 * c.b;
+          const Ys = scotopicY(X, Y, Z) / 2.31;
+          return c.setRGB(
+            mesoB * c.r + (1 - mesoB) * Ys,
+            mesoB * c.g + (1 - mesoB) * Ys,
+            mesoB * c.b + (1 - mesoB) * Ys
+          );
+        };
         if (atmo.ok) {
           // The camera's REAL altitude (inverting the asinh height
           // compression) feeds the sky and aerial LUTs, so flying up
@@ -9029,10 +9109,11 @@
           ]);
           const k = tOv * skyExposure;
           veilU.veilE.value.setRGB(
-            Math.max(pd[0] + skyIrr.r, 0) * k * gf[0],
-            Math.max(pd[1] + skyIrr.g, 0) * k * gf[1],
-            Math.max(pd[2] + skyIrr.b, 0) * k * gf[2]
+            Math.max(pd[0] + skyIrr.r * irrGuard, 0) * k * gf[0],
+            Math.max(pd[1] + skyIrr.g * irrGuard, 0) * k * gf[1],
+            Math.max(pd[2] + skyIrr.b * irrGuard, 0) * k * gf[2]
           );
+          scotFold(veilU.veilE.value);
           veilU.alpha.value = cloudy;
         }
 
@@ -9042,6 +9123,7 @@
           .lerp(cSetBot, dusk * 0.8)
           .lerp(cGray, cloudy * 0.7 * day);
         aerialU.uFogColor.value.copy(tmpB);
+        scotFold(aerialU.uFogColor.value);
         // Koschmieder relation: extinction from the MEASURED visibility
         // (2% contrast at V). Fog codes need no special-casing - a foggy
         // hour reports a short visibility by itself. A fresh nearby
@@ -9060,7 +9142,8 @@
         uFarSunCol.value
           .copy(sunLight.color)
           .multiplyScalar(sunLight.intensity);
-        uFarSkyIrr.value.copy(skyIrr);
+        uFarSkyIrr.value.copy(skyIrr).multiplyScalar(irrGuard);
+        scotFold(uFarSkyIrr.value);
         if (landWSA)
           uFarAlbedo.value.setRGB(landWSA[0], landWSA[1], landWSA[2]);
 
@@ -9162,7 +9245,14 @@
             // Async staging read - no pipeline stall; it lands a frame
             // or two later, which a 1 Hz ambient cannot notice.
             atmo.readIrradiance().then((ir) => {
-              if (ir && ir[0] + ir[1] + ir[2] > 1e-7) {
+              // The first resolve can predate the first LUT fill, so
+              // a zero there still means "unwritten" - but from the
+              // second resolve on, zero IS the sky (a page booted at
+              // NIGHT must not keep the daylight init guess: under
+              // the adaptive exposure a stale 0.07-lum guess renders
+              // the terrain solid white).
+              irrResolves++;
+              if (ir && (ir[0] + ir[1] + ir[2] > 1e-7 || irrResolves > 1)) {
                 // The irradiance readback is 3-lambda like the dome -
                 // same display projection, so the ambient's colour IS
                 // the projected sky's.
@@ -9181,7 +9271,9 @@
           // does the same). The LUT is clear-sky and sunlit only, so the
           // measured cloud dimming, the eclipse obscuration and a small
           // moonlit-sky term apply here.
-          const expo = 24 / (0.2 + 0.8 * day);
+          // The shared adaptive exposure (one eye - the same
+          // frame the dome and the optics amps ride).
+          const expo = skyExposure;
           // the measured sky where the satellite saw one (the
           // Erbs-scaled clearness index), the cover heuristic
           // otherwise
@@ -9191,8 +9283,33 @@
           ambient.intensity = 1;
           // 1.1 puts the clear-sky diffuse fraction at ~20% of direct,
           // the measured real-world ratio.
-          ambient.color.copy(skyIrr).multiplyScalar(expo * 1.1 * dim);
-          tmpC.setRGB(0.05, 0.055, 0.075).multiplyScalar(moonUp * 14);
+          ambient.color
+            .copy(skyIrr)
+            .multiplyScalar(expo * 1.1 * dim * irrGuard);
+          if (adaptPin) {
+            // legacy moonlit term, kept under the A/B pin
+            tmpC.setRGB(0.05, 0.055, 0.075).multiplyScalar(moonUp * 14);
+          } else {
+            // The MOONLIT ambient from the measured chain: the
+            // moon's own sky (the same transfer the adaptation
+            // luminance reads) at the measured moonlight E0, in
+            // the shared spectral projection and the shared
+            // adaptive exposure - the 0.07 crossfade and its RGB
+            // triple retire here. Daylight drowns it by physics
+            // (E0 ~ 2.5e-6 of the sun); the adaptive exposure is
+            // what makes it visible at night, and the frame
+            // reproduces the old hand constant's magnitude
+            // (~0.08 display units at full moon vs the tuned
+            // ~0.05) from physics alone.
+            const pMoon = applySpectral([
+              moonSkyE[0] * e0Moon,
+              moonSkyE[1] * e0Moon,
+              moonSkyE[2] * e0Moon
+            ]);
+            tmpC
+              .setRGB(pMoon[0], pMoon[1], pMoon[2])
+              .multiplyScalar(expo * 1.1 * dimCloudA);
+          }
           ambient.color.add(tmpC);
           // Ground half: sky plus direct sun bounced off the terrain
           // albedo (0.25 grass/rock to 0.7 snow).
@@ -9204,6 +9321,8 @@
             )
             .add(ambient.color);
           ambient.groundColor.copy(tmpC).multiplyScalar(alb);
+          scotFold(ambient.color);
+          scotFold(ambient.groundColor);
         } else {
           // Preetham fallback keeps the tuned formula.
           ambient.intensity =
@@ -11280,6 +11399,15 @@
             ' (Cox-Munk, 12.5 m) · whitecaps ' +
             (3.84e-4 * Math.pow(Ums, 3.41)).toFixed(2) +
             '% (Monahan)';
+          live['adaptation (LBNL 39882)'] =
+            laCd.toExponential(2) +
+            ' cd/m² → expo ' +
+            skyExposure.toFixed(1) +
+            (adaptPin
+              ? ' (legacy pin)'
+              : mesoB < 1
+                ? ' · rod ' + Math.round((1 - mesoB) * 100) + '%'
+                : '');
           live['visibility (Koschmieder fog)'] =
             (state.visibility / 1000).toFixed(1) + ' km measured';
           live['snowline (freezing level)'] =

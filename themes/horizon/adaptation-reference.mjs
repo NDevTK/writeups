@@ -3,8 +3,11 @@
 // points, the derived photometric bridge against the textbook
 // values it must reproduce, and the sky-transfer table's physics.
 import {
+  adaptExposure,
   ARCSEC2_SR,
   E0_LUX,
+  EXPO_DAY,
+  LA_DAY_ANCHOR_CDM2,
   exposureShape,
   jnd,
   jndLog10,
@@ -161,6 +164,14 @@ const check = (name, ok, detail) => {
   const eM10 = skyTransferE((-10 * Math.PI) / 180);
   const dayL = (lum3(...e45) * E0_LUX) / Math.PI;
   const nightL = (lum3(...e45) * MOON_FULL_LUX) / Math.PI;
+  // Below the table edge the march's own log-slope carries the
+  // collapse on: by astronomical twilight (sun -18 deg, the
+  // printed no-sunlight definition) the sun's sky must sit AT OR
+  // BELOW the Falchi natural floor - deep night belongs to the
+  // moon and the skyglow, never to a clamped table row.
+  const eM18 = skyTransferE((-18 * Math.PI) / 180);
+  const sunL18 = (lum3(...eM18) * E0_LUX) / Math.PI;
+  const eM14 = skyTransferE((-14 * Math.PI) / 180);
   ok =
     ok &&
     lum3(...eM10) / lum3(...e45) < 1e-3 &&
@@ -168,11 +179,39 @@ const check = (name, ok, detail) => {
     dayL < 6000 &&
     nightL > 2e-3 &&
     nightL < 2e-2 &&
+    sunL18 < NATURAL_MCD * 1e-3 &&
+    lum3(...eM14) < lum3(...eM10) &&
+    lum3(...eM18) < lum3(...eM14) &&
+    lum3(...eM18) > 0 &&
     skyTransferE(NaN).every((v) => v === 0);
   check(
     'sky transfer: Rayleigh order, twilight collapse, absolute corroborations',
     ok,
-    `clear-day mean sky ${dayL.toFixed(0)} cd/m^2 (textbook 1000-6000); full-moon sky ${(nightL * 1e3).toFixed(1)} mcd/m^2 (classic ~5); twilight -10 deg down x${(lum3(...e45) / lum3(...eM10)).toExponential(1)}`
+    `clear-day mean sky ${dayL.toFixed(0)} cd/m^2 (textbook 1000-6000); full-moon sky ${(nightL * 1e3).toFixed(1)} mcd/m^2 (classic ~5); twilight -10 deg down x${(lum3(...e45) / lum3(...eM10)).toExponential(1)}; extrapolated -18 deg ${(sunL18 * 1e3).toExponential(1)} mcd/m^2 < the Falchi floor ${NATURAL_MCD}`
+  );
+}
+
+{
+  // The display map: EXACTLY the built daytime exposure at the
+  // derived clear-day anchor (continuity by construction), the
+  // JND ratio elsewhere - full-moon night lands at the ~7e5 the
+  // 3e4 adaptation gain implies over the anchor - and garbage
+  // returns the day value (fail-bright, never black).
+  const ok =
+    adaptExposure(LA_DAY_ANCHOR_CDM2) === EXPO_DAY &&
+    EXPO_DAY === 24 &&
+    LA_DAY_ANCHOR_CDM2 > 1000 &&
+    LA_DAY_ANCHOR_CDM2 < 6000 &&
+    adaptExposure(5e-3) > 3e5 &&
+    adaptExposure(5e-3) < 1.2e6 &&
+    adaptExposure(0.22) > 1e4 &&
+    adaptExposure(0.22) < 1e5 &&
+    adaptExposure(LA_DAY_ANCHOR_CDM2 / 2) > EXPO_DAY &&
+    adaptExposure(NaN) === EXPO_DAY;
+  check(
+    'display map: anchored day, adapted night',
+    ok,
+    `anchor ${LA_DAY_ANCHOR_CDM2.toFixed(0)} cd/m^2 -> ${EXPO_DAY} exact; civil twilight ${adaptExposure(0.22).toExponential(2)}; full-moon ${adaptExposure(5e-3).toExponential(2)}; NaN -> day`
   );
 }
 

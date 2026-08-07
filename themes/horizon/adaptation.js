@@ -140,7 +140,16 @@ export const MOONSKY_E_B = [
   0.098094, 0.10588, 0.106, 0.10747, 0.10823
 ];
 function lerpRows(xs, ys, x) {
-  if (x <= xs[0]) return ys[0];
+  if (x <= xs[0]) {
+    // Below the table edge the twilight collapse CONTINUES: the
+    // march's own log-slope between the last two rows (~0.8 dex
+    // per 2 deg) extrapolated down. By the astronomical-twilight
+    // definition (sun 18 deg down: no sunlight in the observer's
+    // sky) this decays past the Falchi natural-sky floor - the
+    // gate asserts that closure - so deep night never inherits
+    // the -10 deg row's 0.2 cd/m^2 (40x a full-moon sky).
+    return ys[0] * Math.pow(ys[1] / ys[0], (x - xs[0]) / (xs[1] - xs[0]));
+  }
   for (let i = 1; i < xs.length; i++) {
     if (x <= xs[i]) {
       const f = (x - xs[i - 1]) / (xs[i] - xs[i - 1]);
@@ -161,4 +170,25 @@ export function skyTransferE(altRad) {
     lerpRows(MOONSKY_ALT_DEG, MOONSKY_E_G, d),
     lerpRows(MOONSKY_ALT_DEG, MOONSKY_E_B, d)
   ];
+}
+
+// ---- the display map ----
+// EXPO_DAY is the display's ONE remaining unit constant: the
+// exposure the theme's daytime appearance was built at (the old
+// 24/(0.2 + 0.8 day) curve's daylight value - continuity, not
+// physics, documented as such). Everything else derives: the
+// anchor is the clear-day mean sky luminance the transfer table
+// and the bridge give (sun at 45 deg), and the exposure at any
+// other adaptation state follows the JND ratio - Eq. 7a's
+// global form. The old curve spanned 5x from day to night; this
+// map spans the eye's own ~3e4.
+export const EXPO_DAY = 24;
+export const LA_DAY_ANCHOR_CDM2 =
+  (lum3(...skyTransferE(Math.PI / 4)) * E0_LUX) / Math.PI;
+export function adaptExposure(LaCdM2) {
+  if (!Number.isFinite(LaCdM2)) return EXPO_DAY;
+  return (
+    (EXPO_DAY * exposureShape(Math.max(LaCdM2, 1e-6))) /
+    exposureShape(LA_DAY_ANCHOR_CDM2)
+  );
 }

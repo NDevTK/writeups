@@ -5013,6 +5013,92 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   appearance (one derived continuity constant) and the restored
   view-serve instrument shooting day/dusk/moonlit A/Bs before
   the switch lands.
+- DONE (photometric adaptation, stage 2, Aug 7 twenty-first
+  push - the switch LANDS): skyExposure and the moonlit ambient
+  now ride adaptation.js. The display map: EXPO_DAY = 24 (the
+  old curve's daylight value - continuity, the ONE remaining
+  unit constant, documented), anchored at the DERIVED clear-day
+  mean sky (the transfer table at sun 45 deg through the bridge:
+  1889 cd/m^2), and every other adaptation state follows the JND
+  ratio - Eq. 7a's global form (gate row: anchor -> 24 exact,
+  civil twilight 2.8e4, full-moon night 7.0e5, NaN fails BRIGHT
+  to day). The adaptation luminance is the SAME instrument as
+  the anchor - skyTransferE at the sun's AND the moon's real
+  altitudes (each linear in its own E0), under the measured
+  Erbs-kt cloud dimming, plus the Falchi skyglow floor
+  (1 + lpRatio, artificial included). THE FIRST CAPTURE ROUND
+  CAUGHT A REAL BUG: the first wiring fed the dome's live
+  irradiance readback as La against the table-derived anchor -
+  two instruments, never cross-calibrated, ~2.6-3x apart in
+  absolute scale (measured: readback 575 vs table 1511 cd/m^2 at
+  sun 30 deg; 25 vs 74 at sun -3.2 deg) - and the biased ratio
+  TRIPLED the day exposure into tone-mapper clip (the A/B frame
+  was solid white). The two instruments TRACK each other in
+  relative collapse (0.0435 vs 0.049 day->twilight, 15%) - so
+  the constant scale cancels once the table sits on BOTH sides
+  of the ratio, and the dome readback keeps its ambient job
+  (its product with the adaptive exposure stays ~0.84 day ->
+  twilight: Weber constancy lands on the terrain too, for
+  free). skyTransferE gained the below-edge extrapolation the
+  loop needed: the march's own log-slope carries the twilight
+  collapse past the -10 deg table edge, and by astronomical
+  twilight (-18 deg, the printed no-sunlight definition) the
+  sun's sky sits BELOW the Falchi natural floor (gated: 0.12 vs
+  0.174 mcd/m^2) - deep night belongs to the moon and the
+  skyglow, never to a clamped row (which would have pinned every
+  night at 0.2 cd/m^2, 40x a full-moon sky). THE MOON CAPTURE
+  CAUGHT A SECOND PRE-EXISTING BUG the new exposure amplified,
+  and it took THREE probes to name it honestly: the ambient's
+  irradiance readback is an ASYNC staging read that takes
+  seconds to first resolve on a slow queue, and its acceptance
+  guard (sum > 1e-7) never accepts a real night sky at all - so
+  a page booted at night runs on the DAYLIGHT init guess (0.05,
+  0.07, 0.1), for the first seconds always, and forever if the
+  night readback stays under the guard. At the legacy expo 120
+  the stale guess flattened to a cosmetic wash; at the adaptive
+  ~1e6 it rendered the terrain solid white (the first capture's
+  white-out), and the live-probe values only made sense once
+  the RACE was seen: early snaps catch the guess, late probes
+  catch the resolved sky. Fixed on both ends of what the guard
+  was actually for: (a) only the FIRST resolve can predate the
+  first LUT fill, so from the second resolve on, zero IS the
+  sky (a real moonless night no longer starves the update); (b)
+  until that first resolve lands, every skyIrr consumer
+  (ambient, veil, far horizon) gates the guess by the existing
+  day factor - a day boot keeps its day guess, a night boot
+  starts from darkness, zero new constants. The moonlit
+  ambient: moonUp 0.07 x hand-RGB(0.05, 0.055, 0.075) x 14
+  RETIRED - the term is now skyTransferE(moon.alt) x the
+  measured moonIrradianceE0 in the shared spectral projection
+  and the shared adaptive exposure, reproducing the old
+  constant's magnitude (~0.08 display units at full moon vs the
+  tuned ~0.05) from physics alone. ?adapt=0 pins the legacy
+  curve (and the legacy moonlit term) for the harness A/B; the
+  panel row shows La -> expo live. THE PURKINJE FOLD LANDS WITH
+  IT (at La 3.2e-3 the eye is 40% below cone threshold - the
+  paper's own physiology says colour cannot survive there):
+  below the printed mesopic range every JS-fed lighting colour
+  (ambient + ground, the veil, the Koschmieder fog, the
+  far-horizon sky) lerps toward its OWN rod luminance -
+  Rec.709 -> XYZ exact, Eq. 13's scotopic Y, normalised at the
+  paper's equal-energy closed point 2.31 so grey light is
+  luminance-preserving and blue-rich moonlight lands slightly
+  brighter as grey (the Purkinje shift, zero new constants);
+  the panel row appends the live rod fraction. The dome and
+  optics shaders keep colour until the next stage (uniform
+  plumbing, documented). A/B captures (view-serve,
+  fl=2700 pinning the aloft fetch so both sides share weather):
+  DAY sun 30 deg (La 1470 cd/m^2 both sides) expo 24 -> 31 (the
+  built appearance holds by anchor), TWILIGHT sun -3.2 deg
+  (La 59) 83 -> 716 (the eye adapts - dusk stays seen; the
+  optics amps ride the same frame, the emerging pillar
+  included), FULL-MOON night 120 -> ~7e5 (the moonlit landscape
+  actually renders, rod-grey). Documented scope, its own
+  pass: sunLight's 0.18 + 2.4 stLum three-unit map and the
+  ambient's 1.1 diffuse-fraction constant stay - the direct-sun
+  scene-light map is a COUPLED system (sun + ambient + material
+  albedos verified per-material) and this pass touches only the
+  sky-side frame.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
