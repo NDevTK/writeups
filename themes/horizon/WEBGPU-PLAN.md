@@ -3810,7 +3810,117 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   Overpass mirror was 504ing at session time (environmental);
   the law is reference-gated, the call site compiles, PAGEERROR
   0, but a live look at the drawn network is owed when mirrors
-  recover.
+  recover. UPDATE (same session, mirrors recovered): VERIFIED
+  live at Grindelwald - 997 of 997 parsed ways kept by the
+  extent law (the fetch is the boundary, as designed), 875
+  placed on the box, no perf cliff; the record line now
+  separates parsed-kept from raw-fetched (the first wording
+  counted Overpass elements parseRoads' own floors drop, which
+  read as an extent-law drop it never was).
+- DONE (the aureole pass, Aug 6 second session - the item every
+  hand-off since phenology left open): the sky march carried ONE
+  Cornette-Shanks lobe at the measured 340 nm asymmetry, and a
+  single smooth lobe cannot hold the forward DIFFRACTION SPIKE
+  of coarse particles - so the circumsolar aureole (dust's own
+  signature in the sky) never formed, and Hillaire's own paper
+  conditions the low-frequency sky-view LUT on exactly that
+  absence ("fairly smooth for realistic phase g values", Sec.
+  5.1, with anisotropic-phase LUT accuracy named as future
+  work). The construction, every number printed or measured:
+  (1) The classic delta decomposition (Joseph, Wiscombe &
+  Weinman 1976; Wiscombe NCAR TN-121+STR read from the scan -
+  its printed f = g^2 forms g/(1+g), (1-wg^2)tau, (1-g^2)w/
+  (1-wg^2) are a gate landmark my general-f relations must
+  reproduce): P = f P_spike + (1-f) CS(g'), with
+  f g_spike + (1-f) g' = g held to 1e-12 per channel. Every LUT
+  march (sky-view, aerial, MS, irradiance) runs the SCALED
+  system - Mie scattering (1-f) sigma_s, extinction minus
+  f sigma_s, phase CS(g') now per-channel - and the T LUT's
+  alpha carries the Mie density column D_M (km) so the marches'
+  sun transmittance is the scaled T' = T exp(+f sigma_s D_M):
+  forward-diffracted light stays in the quasi-direct beam. At
+  f = 0 (no measured coarse aerosol) every relation collapses
+  to identity - the four pre-existing GPU probes run exactly
+  there and stayed green, which IS the no-regression proof.
+  (2) The spike's shape and share derive from the documents
+  behind the live feed: GEFS-Aerosols computes its AODs through
+  the GOCART optics LUT (Zhang et al. 2022 GMD, Sect. 2.2 -
+  read; "no size distribution for OC, BC, and sulfate" in the
+  bulk scheme, optics from Colarco's LUT), whose size set is
+  the GADS/OPAC one printed in Chin et al. 2002 Table 2 and
+  Hess et al. 1998 (OPAC) Table 1c - both read from the page
+  scans. The spike is Fraunhofer diffraction (Babinet / van de
+  Hulst Sec. 8.31): a settled coarse particle diffracts exactly
+  its geometric cross-section, and BOTH papers PRINT the
+  extinction-paradox signature that shares out - sea-salt
+  coarse Q = 2.143, the r_e 2.4 um dust row Q = 2.277 - so each
+  coarse mode's diffracted share of extinction is a printed
+  1/Q, divided by the species' MEASURED single-scattering
+  albedo (the feed's own per-species SCTAOTK/AOTK at 555).
+  Which modes spike is the sources' own coarse/fine labels, not
+  an invented x-bound: SSCM (Chin's operational r_m 1.64) and
+  OPAC's mineral-transported MITR (r_modN 0.50, sigma 2.20,
+  PRINTED r_max 5 um - truncation is load-bearing, a landmark);
+  everything the sources call submicron/accumulation (sulfate,
+  OC, BC per Chin's own footnote, SSAM) stays in the smooth
+  lobe. Within sea salt the SSAM:SSCM split follows OPAC Table
+  4's printed maritime-clean 20 : 3.2e-3 through both printed
+  Qs and the modes' second moments (computed: SSCM carries
+  0.65% of species extinction - the aureole is a DUST
+  phenomenon, as the sun-photometry literature says); sea salt
+  swells by Chin Table 3's printed growth factors at the
+  MEASURED surface RH (Murphy-Koop dew-point rh, the refraction
+  column's own closure). tau_spike is channel-INDEPENDENT
+  (geometric cross-sections diffract at every wavelength); only
+  the pattern narrows with x - blue P(0) 76/sr vs red 32/sr for
+  MITR, a landmark.
+  (3) The drawn term: the dome adds P_spike(theta) x I_ss per
+  pixel inside a CPU-computed cone (where the spike falls under
+  1% of the full smooth source, Rayleigh included - clean day
+  13.7 deg, dust day 30) - the same per-pixel-after-the-LUT
+  road Hillaire's sun disc takes, with I_ss a 32-step scaled
+  march carrying the cloud shadow (an aureole dies behind a
+  deck) and sunE (an eclipse dims it linearly). theta from
+  asin|v x sun| (acos loses exactly the small angles the spike
+  lives at).
+  Gates: aureole-reference.mjs, 11 landmarks (A&S Bessel J1
+  printed values + first zero; Airy unit efficiency + the
+  closed-form central value pi<r^4>/(lambda^2<r^2>); first
+  minimum at j11/x; Wiscombe's printed forms recovered at
+  f = g^2; growth knots exact; the printed-ratio SSCM share;
+  conservation to 1e-12; wavelength ordering; MITR truncation
+  direction; full degeneration to null). atmo-reference grew
+  the D_M mirror (its own 40-term series to 1e-9) and the
+  scaled-march landmarks (f = 0 bit-identical; f = 0.3
+  near-sun 24.5% dimmer, anti-sun +0.04%, graze T' > T). New
+  GPU probe tsl-dm-probe.html: T-LUT alpha texels at the CPU
+  integral (1.0234 vs 1.0233 km; 159.13 km graze through fp16)
+  and rgb still pure exp(-tau). validate.sh: 84 sets + 5
+  probes, all green.
+  RADIOMETRIC CLOSURE in the browser (SwiftShader WebGPU, the
+  full theme): a synthetic Saharan-dust fixture
+  (aureole-fixture.json, tau550 0.5, du 80% of AOT) over a
+  pinned-clear Grindelwald afternoon, f550 = 0.389, and TWO
+  float captures (?aureole=0 is the new labelled A/B override;
+  an explicit ?aerosol= fixture now composes with weather pins
+  instead of being silenced by them). The measured ON-OFF
+  radial difference profile matches the double-precision CPU
+  prediction to 1% through the aureole core (1.01/1.00/0.99 at
+  1/2/4 deg, normalised at 2) and reproduces the predicted SIGN
+  CROSSOVER at ~8 deg where the flattened g' remainder starts
+  dimming the mid-field - conservation visible in the frame.
+  12 deg ratio 1.26: the MS pedestal shift the single-scatter
+  prediction omits, documented. Display look: the dust sky
+  carries a blinding white circumsolar glare fading to blue at
+  25+ deg, ON visibly bluer than OFF at the frame corners (the
+  redistributed side-scatter).
+  Documented scope: ground direct beam stays on TRUE T (the
+  spike's quasi-direct share is absent from the terrain budget
+  - conservative, its own pass); desert source regions read
+  slightly soft (MITR vs the three-mode desert mixture); Q at
+  500 nm serves all channels (printed-value convention); the
+  droplet/ice diffraction corona through thin cloud is
+  optics-lut territory, untouched.
 - DONE (sky parallax: the celestial group rides with the camera,
   Jul 11): the sunspot verification's "pose aims 1.35 deg high"
   was neither the pose nor the ephemeris - the camera provably
