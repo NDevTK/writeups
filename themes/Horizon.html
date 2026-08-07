@@ -377,6 +377,7 @@
         pickHour
       } from './horizon/clearness.js';
       import {buildBowLUT, buildDogLUT} from './horizon/optics-lut.js';
+      import {SCF_COLUMN} from './horizon/halos.js';
       import {
         apparentAltitude,
         buildProfile,
@@ -8788,8 +8789,11 @@
           state.ozone &&
           (state.ozone.pinned || Date.now() - state.ozone.at < 6 * 3600e3);
         mieRad.ozScale = ozFresh ? ozoneScale(state.ozone.du) : 1;
+        // Photopic adaptation exposure (twilight genuinely darker,
+        // not pitch black) - frame-scoped: the dome, the aerial
+        // hooks AND the radiometric optics amps all share it.
+        const skyExposure = 24 / (0.2 + 0.8 * day);
         if (atmo.ok) {
-          const skyExposure = 24 / (0.2 + 0.8 * day);
           // The camera's REAL altitude (inverting the asinh height
           // compression) feeds the sky and aerial LUTs, so flying up
           // physically lowers the horizon and thins the haze.
@@ -10172,19 +10176,36 @@
           p.needsUpdate = true;
         }
 
-        // Atmospheric optics, gated by the real conditions: bows need
-        // rain with the sun shining below the Descartes angle; the halo
-        // needs real cirrus; parhelia strengthen at low sun.
+        // Atmospheric optics: the bow still needs rain with the sun
+        // below the Descartes angle (display-gained until the rain
+        // shaft's optical depth is measured); the HALO is now
+        // RADIOMETRIC - the corona's slab law on the measured
+        // cirrus column, at Forster & Mayer 2022's smooth-crystal
+        // fraction, through the air's own transmittance in the
+        // sky's exposure. Its old cover heuristics (cHigh < 90,
+        // 1 - cloudy x 1.1, the day gate) retire: cover lives in
+        // tau, day/night in T_air, and the decks extinguish the
+        // dome per pixel in the composite. ?halo=0 is the labelled
+        // harness A/B override.
         opticsU.sunDir.value.copy(sunVec);
         opticsU.antisolar.value.copy(sunVec).negate();
         const sunOut = day * THREE.MathUtils.clamp(1 - cloudy * 1.1, 0, 1);
         opticsU.bow.value =
           raining && sun.alt > 0 && sun.alt < 0.733 ? sunOut : 0;
-        opticsU.halo.value =
-          (cHigh / 100) *
-          (cHigh < 90 ? 1 : 0.5) *
-          sunOut *
-          (sun.alt > 0 ? 1 : 0);
+        {
+          const haloOn = params.get('halo') !== '0' && sun.alt > 0;
+          const slab = haloOn
+            ? coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(sun.alt))) *
+              SCF_COLUMN *
+              skyExposure
+            : 0;
+          const tH = sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieRad);
+          opticsU.haloAmp.value.setRGB(
+            tH[0] * slab,
+            tH[1] * slab,
+            tH[2] * slab
+          );
+        }
         // Bravais parhelia: re-lay the dog LUT when the sun has
         // moved 0.2 deg; the migration, dispersion and the ~61-deg
         // death are the LUT's own physics, so the old low-sun
@@ -10217,11 +10238,33 @@
             MOONOPT_GAIN;
           opticsMoonU.bow.value =
             raining && moon.alt > 0 && moon.alt < 0.733 ? moonOut : 0;
-          opticsMoonU.halo.value =
-            (cHigh / 100) *
-            (cHigh < 90 ? 1 : 0.5) *
-            moonOut *
-            (moon.alt > 0 ? 1 : 0);
+          // The lunar halo, radiometric like the sun's: the same
+          // slab on the same column, the source now the MEASURED
+          // moonlight (moonlight.js - printed anchor, gated phase,
+          // live distance, umbral immersion). MOONOPT_GAIN and the
+          // display gates stay only on the bow.
+          {
+            const haloOn = params.get('halo') !== '0' && moon.alt > 0;
+            const slab = haloOn
+              ? moonIrradianceE0(
+                  astro.moonRel,
+                  astro.moonDistKm,
+                  1 - (astro.lunarEcl?.inUmbra ?? 0)
+                ) *
+                coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(moon.alt))) *
+                SCF_COLUMN *
+                skyExposure
+              : 0;
+            const tH = sunTransmittanceJS(
+              Math.sin(Math.max(moon.alt, 0)),
+              mieRad
+            );
+            opticsMoonU.haloAmp.value.setRGB(
+              tH[0] * slab,
+              tH[1] * slab,
+              tH[2] * slab
+            );
+          }
           opticsMoonU.srcAlt.value = refr.moonApp;
           if (
             dogAltMoon === null ||
@@ -10709,9 +10752,11 @@
           live['optics'] =
             'bow ' +
             opticsU.bow.value.toFixed(2) +
-            ' · halo ' +
-            opticsU.halo.value.toFixed(2) +
-            ' · eclipse ' +
+            ' · halo amp G ' +
+            opticsU.haloAmp.value.g.toFixed(3) +
+            ' (radiometric, SCF ' +
+            SCF_COLUMN +
+            ') · eclipse ' +
             ((astro.eclipse || 0) * 100).toFixed(0) +
             '%';
           live['aurora curtain'] =

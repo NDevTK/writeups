@@ -4210,7 +4210,77 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   session 403s (CloudFront) on later attempts for Miles et al.
   2000 and the OPAC BAMS paper - the droplet-corona and desert
   passes should budget the spawned-Chrome + curl-jar bridge for
-  their reading.
+  their reading. (Miles et al. 2000 landed on a later retry -
+  17 pages banked in-session for the droplet pass.)
+- DONE (the RADIOMETRIC halo - the display layer's first retiree,
+  Aug 7 fourth push): the review's top-ranked legacy item, closed
+  with one new measured source and the MC the repo already
+  certified. Forster & Mayer 2022 (ACP 22, 15179, OPEN ACCESS,
+  read directly - the HaloCam retrieval over 4400 22-degree halo
+  images) measures the SMOOTH CRYSTAL FRACTION: only smooth
+  hexagonal crystals ring (the rough remainder scatters
+  featurelessly - Jaervinen et al. 2018's 61-81% deformed
+  majority, cited therein); their printed per-habit average for
+  SOLID COLUMNS - exactly the habit mcHalo traces (HEX_C = 1) -
+  is ~37% (halos.js SCF_COLUMN, with the plate/hollow ~73/~47
+  rows and the (50 +- 30)% habit-independent figure documented at
+  the constant). The KEY code fact: mcHalo's entry rejection
+  sampling IS flux weighting, so every accepted sample is one
+  unit of light incident on the crystal - the MC has been
+  computing the absolute phase function all along, unnormalised.
+  mcHalo now books it (accepted / binnedT / lowT / highT / lostT
+  per channel; traceCrystal grew an optional counter, rng
+  sequence untouched - the seeded-determinism landmark holds
+  bit-identical), and buildHaloLUT converts to sr^-1 per unit
+  geometric-interaction depth BEFORE the disc convolution. The
+  measured books, green channel: pass-through (<15 deg) 26.2%,
+  histogram window 19.6%, wide 0.9%, UNTRACED (entry/exit
+  Fresnel reflections + TIR continuations the 2-refraction trace
+  does not follow - they exit somewhere, this histogram cannot
+  claim where) 53.3% - stated, and the ring is therefore
+  CONSERVATIVE; the 22-degree window carries 11.14% of the
+  geometric unit, peak 1.149/sr, 46/22 share ratio 0.328.
+  The drawn ring: L = E_src x (tau/2) e^-tau x SCF x P_abs(theta)
+  x T_air x exposure - the corona's own slab law (coronaAmp,
+  cirrusSlantTau - one implementation) on the same measured
+  column, for BOTH domes: the sun at E0 = 1 and the MOON through
+  moonlight.js (rel, live distance, umbral immersion) - the
+  lunar halo is radiometric moonlight now, not MOONOPT_GAIN. The
+  0.18 display gain and the halo's gating heuristics
+  (cHigh < 90 ? 1 : 0.5, day x (1 - cloudy x 1.1)) RETIRE: cover
+  lives in tau, day/night in T_air, deck occlusion in the
+  composite. The dogs ride the same amp at their shipped
+  calibrated ratio (dogK = (0.6/0.18) x peakAbs - the
+  oriented-plate fraction is unmeasured, documented); only the
+  BOW keeps a display gain (its radiometry needs the rain
+  shaft's optical depth - named). skyExposure hoisted to frame
+  scope (dome, aerial hooks and optics amps share one value).
+  ?halo=0 is the labelled A/B override; the panel row prints the
+  radiometric amp + SCF. Documented scope: always-ringing veil
+  vs Forster 2017's "at least 25% of cirrus produce 22-degree
+  halos" - the occurrence discriminator (which cirrus rings
+  today) is unmeasured in the theme's feeds and stays named;
+  the untraced 53% excludes 3+-leg features (parhelic circle,
+  120-degree dogs) by construction. Gate: optics-reference grew
+  the absolute-accounting landmark (books close to 0 exactly,
+  LUT integral = binned share to 0.01%, share22/peakAbs/ratio
+  pinned); halos-reference's MC landmarks hold unchanged.
+  BROWSER-VERIFIED (pinned Grindelwald day, cloudhigh 45, sun
+  32.86 deg, fov 55, ON vs ?halo=0 float captures - and a harness
+  lesson en route: three background capture tasks raced one
+  view-serve page and produced a bit-identical "A/B" (the OFF
+  snap fired on the ON page); the clean protocol VERIFIES the
+  page variant via /eval before every snap, one sequential task):
+  measured ring peaks R 21.88 / G 22.13 / B 22.38 deg vs
+  predicted 21.90/22.19/22.55 - red inside blue, each within a
+  bin; the inner edge is the caustic's zero (dL at 20.5 deg
+  0.000 of the peak); and the RING ENERGY INTEGRALS over
+  [19, 26] deg close at 0.960/0.959/0.962 of the radiometric
+  prediction per channel - 4%, with the peak-value deficit
+  (0.74-0.79) explained as annulus + LUT-bilinear smearing of a
+  sharp caustic, energy conserved. The drawn ring now stands
+  ~+30-50% over the adjacent sky at this tau - real halo
+  prominence - where the display gain drew ~+3%.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
@@ -4219,7 +4289,12 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   0.6 dogs) and gating heuristics (1 - cloudy x 1.1, the
   cHigh < 90 ? 1 : 0.5 halo dim) - the peak-normalised profiles
   are physical but their absolute scale is not, unlike the
-  aureole/totality-corona/cirrus-corona frame; (2) the overcast
+  aureole/totality-corona/cirrus-corona frame - PARTLY RETIRED
+  Aug 7 fourth push: the HALO (sun + moon) is radiometric with
+  its heuristics deleted; still display-scaled: the bow's 0.55
+  (needs the rain shaft's optical depth), the dogs' calibrated
+  ratio to the ring (oriented-plate fraction unmeasured), and
+  the bow's moonOut/MOONOPT_GAIN path; (2) the overcast
   veil mesh (hand-picked #79838c/#a2abb3 gradient, alpha =
   cloudy^2 x 0.85) standing in for overcast radiative transfer;
   (3) scene-light calibration constants (0.18 + 2.4 stLum,

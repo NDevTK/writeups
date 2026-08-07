@@ -124,23 +124,66 @@ function fresnelR(ci, n1, n2) {
  * Halo profile over theta in [15, 52] degrees from the sun, per
  * RGB channel: Greenler's crystal Monte Carlo (halos.js mcHalo -
  * deterministic seed, so this LUT is reproducible), limb-darkened
- * sun convolution, peak-normalised. The 22 and the 46 both live
- * here at their EMERGENT relative strengths.
+ * sun convolution. The 22 and the 46 both live here at their
+ * EMERGENT relative strengths - and, since the MC's rejection
+ * sampling is flux weighting, at their ABSOLUTE level: each bin
+ * is converted to the phase function of the traced channels,
+ *   P(theta_b) = (T_b / accepted) / (2 pi sin(theta_b) dTheta),
+ * in sr^-1 per unit geometric-interaction optical depth. The
+ * drawn ring is then L = E_src (tau/2) e^-tau SCF P(theta) - the
+ * corona's own slab radiometry with the measured smooth-crystal
+ * fraction - and the display gain retires. peakAbs (green
+ * channel) is returned for consumers holding calibrated ratios
+ * against the ring (the sundogs), share22/share46 for the gate.
  */
 export function buildHaloLUT(samples = 400000, srcR = SUN_RADIUS) {
   const mc = mcHalo(ICE_N, samples, 1337);
   const dTheta = (mc.g1 - mc.g0) / mc.bins;
-  const conv = sunConvolve(mc.data, mc.bins, dTheta, srcR);
-  let peak = 0;
-  for (const v of conv) peak = Math.max(peak, v);
+  // Absolute conversion BEFORE the convolution (the kernel is
+  // normalised, so convolving the sr^-1 curve stays sr^-1).
+  const abs = new Float64Array(mc.bins * 3);
+  for (let i = 0; i < mc.bins; i++) {
+    const th = mc.g0 + (i + 0.5) * dTheta;
+    const dOm = 2 * Math.PI * Math.sin(th) * dTheta;
+    for (let c = 0; c < 3; c++)
+      abs[i * 3 + c] = mc.data[i * 3 + c] / mc.accepted[c] / dOm;
+  }
+  const conv = sunConvolve(abs, mc.bins, dTheta, srcR);
+  let peakAbs = 0;
   const out = new Float32Array(mc.bins * 4);
   for (let i = 0; i < mc.bins; i++) {
-    out[i * 4] = conv[i * 3] / peak;
-    out[i * 4 + 1] = conv[i * 3 + 1] / peak;
-    out[i * 4 + 2] = conv[i * 3 + 2] / peak;
+    out[i * 4] = conv[i * 3];
+    out[i * 4 + 1] = conv[i * 3 + 1];
+    out[i * 4 + 2] = conv[i * 3 + 2];
     out[i * 4 + 3] = 1;
+    peakAbs = Math.max(peakAbs, conv[i * 3 + 1]);
   }
-  return {data: out, bins: mc.bins, thMinDeg: 15, thMaxDeg: 52};
+  // Windowed shares of the geometric-interaction unit (green):
+  // the 22-degree ring [20, 26] and the 46-degree ring [43, 52].
+  const share = (lo, hi) => {
+    let s = 0;
+    for (let i = 0; i < mc.bins; i++) {
+      const th = (mc.g0 + (i + 0.5) * dTheta) * (180 / Math.PI);
+      if (th >= lo && th < hi) s += mc.data[i * 3 + 1];
+    }
+    return s / mc.accepted[1];
+  };
+  return {
+    data: out,
+    bins: mc.bins,
+    thMinDeg: 15,
+    thMaxDeg: 52,
+    peakAbs,
+    share22: share(20, 26),
+    share46: share(43, 52),
+    accounting: {
+      accepted: mc.accepted,
+      binnedT: mc.binnedT,
+      lowT: mc.lowT,
+      highT: mc.highT,
+      lostT: mc.lostT
+    }
+  };
 }
 
 /**

@@ -493,8 +493,20 @@ export function createOpticsMaterial() {
     sunDir: uniform(new Vector3(0, 1, 0)),
     antisolar: uniform(new Vector3(0, -1, 0)),
     bow: uniform(0),
-    halo: uniform(0),
+    // The RADIOMETRIC halo amplitude (per channel): the theme
+    // feeds E_src x (tau/2) e^-tau x SCF x T_air x exposure - the
+    // corona's slab radiometry on the measured cirrus column with
+    // Forster & Mayer 2022's smooth-crystal fraction - and the
+    // LUT it multiplies is ABSOLUTE (sr^-1, optics-lut). The old
+    // 0.18 display gain and its cover heuristics are retired.
+    haloAmp: uniform(new Color(0, 0, 0)),
     dogs: uniform(0),
+    // The dogs keep their CALIBRATED ratio to the ring (the
+    // oriented-plate fraction is unmeasured): dogK = (0.6/0.18) x
+    // the absolute LUT's peak, set by the theme at build, so the
+    // dog:ring brightness ratio is exactly what shipped while the
+    // ring itself is now physical.
+    dogK: uniform(1),
     // Bravais parhelia (optics-lut buildDogLUT): azimuth-offset
     // LUT re-laid by the theme as the source climbs; srcAlt +
     // the plates' documented ~1.5-degree wobble envelope place
@@ -519,10 +531,13 @@ export function createOpticsMaterial() {
   // the Descartes deviation with the Fresnel chain - their
   // brightness ratio and Alexander's dark band between them emerge
   // from the physics (the band histograms to exactly zero). Both
-  // convolved with the limb-darkened sun disc. The old hand-tuned
-  // smoothstep bands and spectral ramp are deleted; the display
-  // gains (0.55 bow, halo's dog/base mix) keep their calibrated
-  // values, now scaling peak-normalised physical profiles.
+  // convolved with the limb-darkened sun disc. The halo LUT is
+  // ABSOLUTE (sr^-1 per unit geometric-interaction depth - the
+  // MC's own flux accounting) and scales by the fed radiometric
+  // haloAmp; the dogs ride the same amp at their calibrated ratio
+  // (dogK). Only the bow still runs a display gain (0.55) - its
+  // radiometry needs the rain shaft's optical depth, named in the
+  // plan.
   const mkLutTex = (lut) => {
     const t = new DataTexture(lut.data, lut.bins, 1, RGBAFormat, FloatType);
     t.minFilter = t.magFilter = LinearFilter;
@@ -530,6 +545,10 @@ export function createOpticsMaterial() {
     return t;
   };
   const haloLut = buildHaloLUT();
+  // The dogs' calibrated ratio against the now-absolute ring:
+  // (0.6/0.18) x the LUT's green peak reproduces the shipped
+  // dog:ring brightness exactly (see the u.dogK note above).
+  u.dogK.value = (0.6 / 0.18) * haloLut.peakAbs;
   const bowLut = buildBowLUT();
   const bowTex = mkLutTex(bowLut);
   u.bowTex = bowTex; // theme re-lays it from the measured rain
@@ -569,8 +588,9 @@ export function createOpticsMaterial() {
   ).rgb;
   const cDogs = dogSample
     .mul(exp(dAlt.mul(dAlt).negate()))
-    .mul(u.halo.mul(u.dogs).mul(0.6));
-  const cHalo = haloSample.mul(u.halo.mul(0.18));
+    .mul(u.haloAmp)
+    .mul(u.dogK.mul(u.dogs));
+  const cHalo = haloSample.mul(u.haloAmp);
   material.colorNode = cBow.add(cHalo).add(cDogs);
   material.opacityNode = 1.0;
   return {material, u};

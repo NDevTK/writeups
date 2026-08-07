@@ -33,13 +33,21 @@ function edgeAndPeak(lut, c) {
   const dth = (thMaxDeg - thMinDeg) / bins;
   let peakI = 0;
   let peakV = 0;
-  let first = -1;
   for (let i = 0; i < bins; i++) {
     const v = data[i * 4 + c];
-    if (first < 0 && v > 0.02) first = i;
     if (v > peakV) {
       peakV = v;
       peakI = i;
+    }
+  }
+  // Threshold relative to the channel peak: the halo LUT is
+  // ABSOLUTE now (sr^-1), the bow stays peak-normalised - 2% of
+  // peak reads the same edge on both.
+  let first = -1;
+  for (let i = 0; i < bins; i++) {
+    if (data[i * 4 + c] > 0.02 * peakV) {
+      first = i;
+      break;
     }
   }
   return {
@@ -68,6 +76,45 @@ function edgeAndPeak(lut, c) {
     'halo inner edges',
     ok,
     `red ${r.edge.toFixed(2)} / green ${g.edge.toFixed(2)} / blue ${b.edge.toFixed(2)} deg against the Warren-Brandt minima ${want.map((w) => w.toFixed(2)).join('/')} - red inside blue`
+  );
+}
+
+{
+  // The ABSOLUTE accounting that retires the halo's display gain
+  // (deterministic seed - these are exact facts of the traced
+  // ensemble, green channel): the energy books close (binned +
+  // low + high + lost = accepted), the parallel-face pass-through
+  // (<15 deg) outweighs the whole histogram window, the untraced
+  // remainder (Fresnel reflections + TIR continuations the
+  // 2-refraction trace does not follow) stays under 60% and is
+  // STATED, and the 22-degree window's share of the geometric-
+  // interaction unit is the printed ~11% at peak ~1.15/sr. The
+  // convolved LUT's own integral reproduces binned/accepted - the
+  // sr^-1 conversion is self-consistent.
+  const a = halo.accounting;
+  const A = a.accepted[1];
+  const closure =
+    Math.abs(a.binnedT[1] + a.lowT[1] + a.highT[1] + a.lostT[1] - A) / A;
+  const dth = ((halo.thMaxDeg - halo.thMinDeg) * (Math.PI / 180)) / halo.bins;
+  let integ = 0;
+  for (let i = 0; i < halo.bins; i++) {
+    const th = (halo.thMinDeg * Math.PI) / 180 + (i + 0.5) * dth;
+    integ += halo.data[i * 4 + 1] * 2 * Math.PI * Math.sin(th) * dth;
+  }
+  const binnedFrac = a.binnedT[1] / A;
+  const ok =
+    closure < 1e-9 &&
+    a.lowT[1] > a.binnedT[1] &&
+    a.lostT[1] / A < 0.6 &&
+    Math.abs(halo.share22 - 0.111) < 0.01 &&
+    Math.abs(halo.peakAbs - 1.15) < 0.1 &&
+    Math.abs(integ / binnedFrac - 1) < 0.02 &&
+    halo.share46 / halo.share22 > 0.2 &&
+    halo.share46 / halo.share22 < 0.45;
+  check(
+    'halo absolute accounting',
+    ok,
+    `books close to ${closure.toExponential(1)}; pass-through ${(a.lowT[1] / A).toFixed(3)} > binned ${binnedFrac.toFixed(3)}; lost (untraced refl/TIR) ${(a.lostT[1] / A).toFixed(3)}; 22-deg share ${halo.share22.toFixed(4)} at peak ${halo.peakAbs.toFixed(3)}/sr; LUT integral ${integ.toFixed(4)} = binned share (${(integ / binnedFrac).toFixed(4)}x); 46/22 share ratio ${(halo.share46 / halo.share22).toFixed(3)}`
   );
 }
 

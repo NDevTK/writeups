@@ -47,6 +47,24 @@ import {sunAngularRadiusRad} from './eclipses.js';
 // 0.44 um) - verbatim table rows.
 export const ICE_N = [1.3073, 1.311, 1.3163];
 
+// The measured smooth-crystal fraction: Forster & Mayer 2022
+// (ACP 22, 15179, read in full - the HaloCam retrieval over 4400
+// halo images). Only SMOOTH hexagonal crystals make the ring;
+// rough crystals scatter featurelessly (Jaervinen et al. 2018's
+// 61-81% mesoscopically deformed, cited therein). The paper's
+// per-habit average for SOLID COLUMNS - the habit this module's
+// MC traces (HEX_C = 1 compact column) - is ~37% smooth
+// ("Averaged over all 4400 images, the SCF for columnar, hollow,
+// and plate-shaped crystals amounts to about ~37%, ~47%, and
+// ~73%"; the abstract's headline mixture is the same 37/63).
+// Documented scope: the retrieval sees HALO-PRODUCING cirrus -
+// Forster et al. 2017's "at least 25% of all cirrus" - so a veil
+// drawn always-ringing overdraws the OCCURRENCE statistic; a
+// per-scene discriminator is its own research item, and the
+// rough remainder's featureless glare is conservatively not
+// drawn.
+export const SCF_COLUMN = 0.37;
+
 export const PRISM_60 = Math.PI / 3;
 export const PRISM_90 = Math.PI / 2;
 
@@ -264,13 +282,17 @@ function facePoint(f, rng) {
  * of scope). n = 1 must return dev = 0 exactly - the gate holds
  * that null test.
  */
-export function traceCrystal(n, rng) {
+export function traceCrystal(n, rng, acceptedCount, ch) {
   const d = randomRotate({x: 0, y: 0, z: 1}, rng); // sun in crystal frame
   // rejection-select the entry face by projected area
   const f = FACES[Math.floor(rng() * 8)];
   const proj = -dot3(d, f.n);
   if (proj <= 0) return null;
   if (rng() * AREA_MAX > f.area * proj) return null;
+  // Past the rejections this sample IS one unit of incident flux
+  // on the crystal - the absolute accounting counts it here, so
+  // Fresnel/TIR losses below stay inside the energy books.
+  if (acceptedCount) acceptedCount[ch] += 1;
   const rin = refract(d, f.n, 1, n);
   if (!rin) return null;
   const p0 = facePoint(f, rng);
@@ -307,22 +329,50 @@ export function traceCrystal(n, rng) {
  * their relative strengths set by the geometry and Fresnel - the
  * statistics the caustic model could not carry. Deterministic
  * (seeded), so the gate can hold exact facts about the output.
+ *
+ * ABSOLUTE accounting (the radiometric halo rides it): the entry
+ * rejection sampling IS flux weighting - every ACCEPTED sample
+ * is one unit of light incident on the crystal's projected area,
+ * so per channel the trace also books where that unit went:
+ *   accepted - incident units (the geometric-interaction total);
+ *   binnedT  - energy landing in the [15, 52] deg histogram;
+ *   lowT     - exits deviated under 15 deg (dominated by the
+ *              parallel-face pass-through at 0: quasi-direct);
+ *   highT    - exits deviated past 52 deg (wide scatter);
+ *   lostT    - accepted minus every traced exit: entry/exit
+ *              Fresnel reflections and TIR continuations the
+ *              2-refraction trace does not follow (they exit
+ *              eventually, at angles this histogram cannot
+ *              claim - stated, never lumped into the ring).
+ * data[b]/accepted / dOmega(b) is then the absolute phase
+ * function of the traced channels in sr^-1 per unit
+ * geometric-interaction optical depth - the number that retires
+ * the halo's display gain (see optics-lut buildHaloLUT).
  */
 export function mcHalo(nRGB = ICE_N, samples = 400000, seed = 1337) {
   const g0 = (15 * Math.PI) / 180;
   const g1 = (52 * Math.PI) / 180;
   const bins = 512;
   const data = new Float64Array(bins * 3);
+  const accepted = [0, 0, 0];
+  const binnedT = [0, 0, 0];
+  const lowT = [0, 0, 0];
+  const highT = [0, 0, 0];
   for (let ch = 0; ch < nRGB.length; ch++) {
     const rng = mulberry32(seed + ch);
     for (let i = 0; i < samples; i++) {
-      const hit = traceCrystal(nRGB[ch], rng);
+      const hit = traceCrystal(nRGB[ch], rng, accepted, ch);
       if (!hit) continue;
       const b = Math.floor(((hit.dev - g0) / (g1 - g0)) * bins);
-      if (b >= 0 && b < bins) data[b * 3 + ch] += hit.T;
+      if (b >= 0 && b < bins) {
+        data[b * 3 + ch] += hit.T;
+        binnedT[ch] += hit.T;
+      } else if (hit.dev < g0) lowT[ch] += hit.T;
+      else highT[ch] += hit.T;
     }
   }
-  return {g0, g1, bins, data};
+  const lostT = accepted.map((a, ch) => a - binnedT[ch] - lowT[ch] - highT[ch]);
+  return {g0, g1, bins, data, accepted, binnedT, lowT, highT, lostT};
 }
 
 /**
