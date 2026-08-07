@@ -5589,6 +5589,37 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   review's Fig. 10 (the one number not from body text).
   validate.sh gains the gate; VALIDATE PASS (all references
   - 7 GPU probes).
+- DONE (volcanic stage-2 verdict, Aug 7 thirty-fourth push - a
+  paper read in full and the SO2 blocker DISSOLVED by a found
+  direct product): the stage-2 question was how a live feed
+  could honestly scale volcScale when fresh SO2 is not yet
+  aerosol. Ridley et al. 2014 (GRL 41, 7763 + supplement, all
+  22 pp via the MIT archive) closes the modelling route with a
+  negative: it prints the clean background SAOD (0.0015 above
+  15 km, from the study's lidar minima), the below-15-km share
+  (30-70% of total SAOD, 28-39% at Tsukuba), the -25 W/m2 per
+  unit SAOD forcing conversion (after Solomon 2011), and the
+  post-2000 forcing -0.19 +- 0.09 W/m2 - but NO per-eruption
+  SAOD table and NO SO2-mass-to-SAOD relation; combined with
+  Kremser's conversion-lag physics, an instantaneous SO2-column
+  mapping stays unprintable. THE DISSOLUTION: the GIBS
+  GetCapabilities scout found the keyless layers
+  OMPS_NOAA21_LimbProfiler_Aerosol_OpticalDepth and
+  _Aerosol_ExtinctionCoefficient_{12,14,16,18,20}KM - the
+  MEASURED stratospheric aerosol optical depth itself, the
+  exact product Kremser's review names as forthcoming
+  (Gorkavyi et al. 2013), now operational. No SO2 modelling is
+  needed at all: the honest stage-2 feed is volcScale =
+  measured local sAOD / stratAOD532() (the shipped background
+  chain), same GIBS machinery snowcover.js already ships
+  (tile + colormap inversion). NAMED NEXT PASS: the
+  volcanic.js feed - fetch the layer's colormap XML, sample
+  the viewer's cell, gate the inversion round-trip and the
+  background-consistency (quiet sky should read ~stratAOD532
+  within the printed quiescent band), wire volcScale, validate,
+  push. This pass ships the verdict and the scouted layer
+  names; the layer term itself is already linear in volcScale
+  by construction (thirty-third push's gate).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
