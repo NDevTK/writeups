@@ -237,6 +237,36 @@
           );
         }
 
+        {
+          // Pass F - the PURKINJE FOLD: at scotB = 0 the material
+          // must output its own Eq. 13 rod luminance as GREY -
+          // the shader mirror of adaptation.js scotopicY
+          // (Rec.709 -> XYZ exact, /2.31 closed point), checked
+          // against the SAME math run here on the scotB = 1
+          // pixel. The bow's colour must actually die (red and
+          // blue leave their caustic separation).
+          const b5a = await shoot();
+          u.scotB.value = 0;
+          const b5b = await shoot();
+          u.scotB.value = 1;
+          const c1 = px(b5a, 0);
+          const c0 = px(b5b, 0);
+          const X = 0.4124 * c1[0] + 0.3576 * c1[1] + 0.1805 * c1[2];
+          const Y = 0.2126 * c1[0] + 0.7152 * c1[1] + 0.0722 * c1[2];
+          const Z = 0.0193 * c1[0] + 0.1192 * c1[1] + 0.9505 * c1[2];
+          const want =
+            (Y * (1.33 * (1 + (Y + Z) / Math.max(X, 1e-12)) - 1.68)) / 2.31;
+          const grey =
+            Math.abs(c0[0] - c0[1]) <= 1e-5 + 2e-3 * Math.abs(c0[1]) &&
+            Math.abs(c0[2] - c0[1]) <= 1e-5 + 2e-3 * Math.abs(c0[1]);
+          const ok = grey && Math.abs(c0[1] / Math.max(want, 1e-12) - 1) < 5e-3;
+          check(
+            'rod fold: scotB 0 outputs Eq. 13 grey',
+            ok,
+            `folded [${c0.map((v) => v.toExponential(3)).join(', ')}] vs JS rod luminance ${want.toExponential(3)} of coloured [${c1.map((v) => v.toExponential(3)).join(', ')}]`
+          );
+        }
+
         log(fails ? `${fails} FAILED` : 'BOWP PASS');
         log('DONE');
       } catch (e) {

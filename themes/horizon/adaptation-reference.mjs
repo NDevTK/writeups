@@ -192,6 +192,39 @@ const check = (name, ok, detail) => {
 }
 
 {
+  // The dome-source crossover: the theme switches the one march
+  // from the sun to the moon when the moon's sky (its transfer at
+  // its altitude, times its own E0) outshines the sun's. Derived
+  // here from the SHIPPED tables alone for a full moon at 45 deg:
+  // the crossover must sit in nautical twilight (sun -18..-9 deg,
+  // where the extrapolated collapse meets moonlight), the two
+  // skies must be EQUAL at the solved point (continuity of the
+  // switch), and the ordering must flip across it.
+  const e0Full = MOON_FULL_LUX / E0_LUX;
+  const moonL = lum3(...skyTransferE(Math.PI / 4)) * e0Full;
+  const sunL = (a) => lum3(...skyTransferE((a * Math.PI) / 180));
+  let lo = -25;
+  let hi = 0;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (sunL(mid) < moonL) lo = mid;
+    else hi = mid;
+  }
+  const cross = (lo + hi) / 2;
+  const ok =
+    cross > -18 &&
+    cross < -9 &&
+    Math.abs(sunL(cross) / moonL - 1) < 1e-6 &&
+    sunL(cross + 2) > moonL &&
+    sunL(cross - 2) < moonL;
+  check(
+    'dome source crossover: full moon takes the march in nautical twilight',
+    ok,
+    `sun ${cross.toFixed(2)} deg (band -18..-9); skies equal there to ${Math.abs(sunL(cross) / moonL - 1).toExponential(1)}; ordering flips across`
+  );
+}
+
+{
   // The display map: EXACTLY the built daytime exposure at the
   // derived clear-day anchor (continuity by construction), the
   // JND ratio elsewhere - full-moon night lands at the ~7e5 the

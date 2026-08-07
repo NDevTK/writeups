@@ -527,6 +527,13 @@ export function createOpticsMaterial(cloudShadow) {
   const u = {
     sunDir: uniform(new Vector3(0, 1, 0)),
     antisolar: uniform(new Vector3(0, -1, 0)),
+    // The Purkinje fold blend (adaptation.js scotopicY mirrored
+    // in TSL): 1 = photopic, 0 = pure rod vision - the summed
+    // optics families lerp toward their own Eq. 13 rod luminance
+    // (Rec.709 -> XYZ exact, /2.31 closed point). The theme
+    // feeds the printed mesopic ramp's blend; a moonlit-night
+    // halo ring greys like everything else the rods see.
+    scotB: uniform(1),
     // The RADIOMETRIC bow amplitude (per channel): the theme feeds
     // E_src x T_air x e^-tau_veil x exposure; the rain shaft's own
     // slab factor is assembled PER FRAGMENT below from bowSigH /
@@ -801,13 +808,24 @@ export function createOpticsMaterial(cloudShadow) {
   ).rgb;
   const cCha = chaSample.mul(exp(dCh.mul(dCh).mul(-0.5))).mul(u.chaAmp);
   const cHalo = haloSample.mul(u.haloAmp);
-  material.colorNode = cBow
+  const cSum = cBow
     .add(cHalo)
     .add(cDogs)
     .add(cCircle)
     .add(cPillar)
     .add(cCza)
-    .add(cCha);
+    .add(cCha)
+    .toVar();
+  // Rod vision (see u.scotB): X guarded like the JS scotopicY;
+  // (Y+Z)/X >= 0.562 for any non-negative RGB, so the bracket
+  // never goes negative.
+  const Xc = cSum.x.mul(0.4124).add(cSum.y.mul(0.3576)).add(cSum.z.mul(0.1805));
+  const Yc = cSum.x.mul(0.2126).add(cSum.y.mul(0.7152)).add(cSum.z.mul(0.0722));
+  const Zc = cSum.x.mul(0.0193).add(cSum.y.mul(0.1192)).add(cSum.z.mul(0.9505));
+  const Ys = Yc.mul(
+    Yc.add(Zc).div(max(Xc, 1e-12)).add(1.0).mul(1.33).sub(1.68)
+  ).div(2.31);
+  material.colorNode = mix(vec3(Ys), cSum, u.scotB);
   material.opacityNode = 1.0;
   return {material, u};
 }

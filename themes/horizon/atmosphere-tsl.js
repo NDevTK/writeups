@@ -267,6 +267,13 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   const sunMu = uniform(0.5);
   const camH = uniform(300);
   const exposure = uniform(28);
+  // The Purkinje fold (adaptation.js scotopicY mirrored in TSL):
+  // 1 = photopic (colour untouched), 0 = pure rod vision - the
+  // dome's displayed colour lerps toward its own Eq. 13 rod
+  // luminance (Rec.709 -> XYZ exact, normalised at the paper's
+  // equal-energy closed point 2.31). The theme feeds the printed
+  // mesopic ramp's blend each frame.
+  const scotB = uniform(1);
   // Hillaire (2020) terminates ground-hitting sky-view rays with a
   // Lambertian ground bounce; the albedo is FED by the theme, not
   // painted - Payne (1972) open-ocean broadband 0.06 where the box
@@ -1337,7 +1344,27 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       });
     });
     const lin = col.mul(exposure);
-    return vec4(mix(lin, spectral(lin), specOn), 1.0);
+    const disp = mix(lin, spectral(lin), specOn).toVar();
+    // Rod vision: below the mesopic range the eye reports Eq. 13's
+    // scotopic luminance, not colour (X guarded like the JS
+    // scotopicY; (Y+Z)/X >= 0.562 for any non-negative RGB, so the
+    // bracket never goes negative).
+    const Xc = disp.x
+      .mul(0.4124)
+      .add(disp.y.mul(0.3576))
+      .add(disp.z.mul(0.1805));
+    const Yc = disp.x
+      .mul(0.2126)
+      .add(disp.y.mul(0.7152))
+      .add(disp.z.mul(0.0722));
+    const Zc = disp.x
+      .mul(0.0193)
+      .add(disp.y.mul(0.1192))
+      .add(disp.z.mul(0.9505));
+    const Ys = Yc.mul(
+      Yc.add(Zc).div(max(Xc, 1e-12)).add(1.0).mul(1.33).sub(1.68)
+    ).div(2.31);
+    return vec4(mix(vec3(Ys), disp, scotB), 1.0);
   });
 
   // QuadMesh remains only for the irradiance pass (a 1x1
@@ -1462,6 +1489,9 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // The radiometric tap (see specOn above) - harness captures
     // set 0 for the captured frame and restore.
     spectralOn: specOn,
+    // The Purkinje fold blend (1 photopic .. 0 rod); the theme
+    // feeds mesopicBlend(La) each frame.
+    scotB,
     // The sunset transfer LUT feed (see the band in domeColor).
     sunTransfer: {
       on: transOn,

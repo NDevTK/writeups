@@ -5099,6 +5099,41 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   scene-light map is a COUPLED system (sun + ambient + material
   albedos verified per-material) and this pass touches only the
   sky-side frame.
+- DONE (photometric adaptation, stage 3, Aug 7 twenty-second
+  push - the MOONLIT DOME and the shader-side rod fold): the one
+  atmosphere march now serves whichever light OWNS the sky. The
+  linearity that built the MOONSKY table gets used in the other
+  direction: when the moon's sky (its transfer at its altitude
+  times its measured E0) outshines the sun's, the theme feeds
+  the march the MOON's direction and scales the fed exposure by
+  e0Moon - the dome, the aerial perspective, the ambient
+  readback and the crepuscular cloud shadow all become the
+  moon's, at the moon's own absolute level, with zero new code
+  in the march itself. The switch is CONTINUOUS by construction:
+  it happens exactly where the two skies are equal-luminance on
+  the same tables that decide it - the gate derives the full-
+  moon crossover from the shipped constants alone and holds it
+  to nautical twilight (sun -14.06 deg, band -18..-9, skies
+  equal there to 3e-15, ordering flips across). The analytic
+  moonlit-ambient term from stage 2 becomes the STAND-IN until
+  the moon-sourced readback resolves - the measured march then
+  replaces it (an analytic term on top would count the same
+  light twice); the readback consumers scale by the active
+  source's E0. The Purkinje fold goes SHADER-SIDE: a scotB
+  uniform in the dome's display node and the optics material
+  (both sun and moon instances) lerps the displayed colour
+  toward its own Eq. 13 rod luminance - the same Rec.709 -> XYZ
+  - /2.31 mirror as the JS fold, fed the same mesopic blend -
+    so the moonlit sky and a moonlit-night halo ring grey with
+    the rods like everything else. GPU-GATED: the bow probe's new
+    pass F sets scotB = 0 and holds the folded pixel to the JS
+    rod luminance of the coloured pixel - grey to 0.2%, value
+    exact to 0.5% (the Purkinje boost is visible in the pass:
+    grey 1.93e-2 from a blue-rich pixel whose green is 1.09e-2).
+    The panel row names the active source. Still stage-parked:
+    the star sprites keep their catalogue colours below the
+    mesopic range (their own display system), and the direct-sun
+    scene-light map is unchanged (its own pass, as named).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

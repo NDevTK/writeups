@@ -9021,6 +9021,27 @@
             mesoB * c.b + (1 - mesoB) * Ys
           );
         };
+        // The dome's SOURCE: the atmosphere is linear in its
+        // source (the same linearity the MOONSKY table rides), so
+        // the one march serves whichever light OWNS the sky - the
+        // sun, or the moon at its own measured E0 once the sun's
+        // sky has collapsed below the moon's (for a full moon the
+        // crossover sits near sun -12 deg, nautical twilight -
+        // the gate derives it from the shipped tables). At the
+        // crossover the two skies are EQUAL-luminance by the same
+        // tables that decide the switch, so the swap is
+        // continuous; the readback, the aerial hooks and the
+        // crepuscular shadow all follow the active source, and
+        // every readback consumer scales by the source's E0. The
+        // legacy pin keeps the sun (the A/B compares one thing).
+        const moonSourced =
+          !adaptPin &&
+          lum3(moonSkyE[0], moonSkyE[1], moonSkyE[2]) * e0Moon >
+            lum3(sunSkyE[0], sunSkyE[1], sunSkyE[2]);
+        const srcVec = moonSourced
+          ? skyPoint(refr.moonApp, moon.az, 1)
+          : sunVec;
+        const srcE0 = moonSourced ? e0Moon : 1;
         if (atmo.ok) {
           // The camera's REAL altitude (inverting the asinh height
           // compression) feeds the sky and aerial LUTs, so flying up
@@ -9028,13 +9049,14 @@
           const eCam = centerElev + 500 * Math.sinh(camera.position.y / 16);
           // Crepuscular rays: the sky and aerial marches place
           // their cloud shadow samples from the camera's scene
-          // position, the sun azimuth and the box's elevation
-          // datum (set BEFORE update - the fills run there).
+          // position, the source azimuth and the box's elevation
+          // datum (set BEFORE update - the fills run there);
+          // moonlit nights cast the moon's rays.
           atmo.aerialShadow.camXZ.value.set(
             camera.position.x,
             camera.position.z
           );
-          atmo.aerialShadow.sunAz.value.set(sunVec.x, sunVec.z).normalize();
+          atmo.aerialShadow.sunAz.value.set(srcVec.x, srcVec.z).normalize();
           atmo.aerialShadow.elev0.value = centerElev;
           // The droplet corona's ray origin: the camera's scene
           // height in the shadow map's own asinh frame.
@@ -9044,16 +9066,19 @@
           // box has sea, 0 inland (a land albedo needs its own
           // citation before inland horizons change).
           atmo.update(
-            sunVec,
+            srcVec,
             mieRad,
             Math.max(eCam, 50),
-            skyExposure,
+            skyExposure * srcE0,
             water ? 0.06 : landWSA || 0
           );
+          // The dome's Purkinje fold rides the same mesopic blend
+          // as the JS-fed colours (the optics materials below too).
+          atmo.scotB.value = mesoB;
           // Aerial perspective shares the dome's exposure so inscattered
           // light on the terrain matches the sky it comes from.
-          aerialU.uSunAzV.value.set(sunVec.x, sunVec.z).normalize();
-          aerialU.uAerialExp.value = skyExposure;
+          aerialU.uSunAzV.value.set(srcVec.x, srcVec.z).normalize();
+          aerialU.uAerialExp.value = skyExposure * srcE0;
         }
         // The overcast veil, radiometric (overcast.js): E under
         // the slab = T(tau) x (direct sun + direct moon + the
@@ -9108,10 +9133,13 @@
             tSv[2] * eS + tMv[2] * eM
           ]);
           const k = tOv * skyExposure;
+          // The readback is per unit of the ACTIVE source's E0
+          // (see srcE0 above), so its consumers scale by it.
+          const kIrr = irrGuard * srcE0;
           veilU.veilE.value.setRGB(
-            Math.max(pd[0] + skyIrr.r * irrGuard, 0) * k * gf[0],
-            Math.max(pd[1] + skyIrr.g * irrGuard, 0) * k * gf[1],
-            Math.max(pd[2] + skyIrr.b * irrGuard, 0) * k * gf[2]
+            Math.max(pd[0] + skyIrr.r * kIrr, 0) * k * gf[0],
+            Math.max(pd[1] + skyIrr.g * kIrr, 0) * k * gf[1],
+            Math.max(pd[2] + skyIrr.b * kIrr, 0) * k * gf[2]
           );
           scotFold(veilU.veilE.value);
           veilU.alpha.value = cloudy;
@@ -9142,7 +9170,7 @@
         uFarSunCol.value
           .copy(sunLight.color)
           .multiplyScalar(sunLight.intensity);
-        uFarSkyIrr.value.copy(skyIrr).multiplyScalar(irrGuard);
+        uFarSkyIrr.value.copy(skyIrr).multiplyScalar(irrGuard * srcE0);
         scotFold(uFarSkyIrr.value);
         if (landWSA)
           uFarAlbedo.value.setRGB(landWSA[0], landWSA[1], landWSA[2]);
@@ -9285,10 +9313,16 @@
           // the measured real-world ratio.
           ambient.color
             .copy(skyIrr)
-            .multiplyScalar(expo * 1.1 * dim * irrGuard);
+            .multiplyScalar(expo * 1.1 * dim * irrGuard * srcE0);
           if (adaptPin) {
             // legacy moonlit term, kept under the A/B pin
             tmpC.setRGB(0.05, 0.055, 0.075).multiplyScalar(moonUp * 14);
+          } else if (moonSourced && skyIrrReady) {
+            // The march IS the moon's sky now (the dome runs
+            // moon-sourced and the readback above already carries
+            // its hemisphere at the measured E0) - an analytic
+            // term on top would count the same light twice.
+            tmpC.setRGB(0, 0, 0);
           } else {
             // The MOONLIT ambient from the measured chain: the
             // moon's own sky (the same transfer the adaptation
@@ -9300,7 +9334,9 @@
             // what makes it visible at night, and the frame
             // reproduces the old hand constant's magnitude
             // (~0.08 display units at full moon vs the tuned
-            // ~0.05) from physics alone.
+            // ~0.05) from physics alone. Once the march itself
+            // goes moon-sourced this analytic term is only the
+            // STAND-IN until the readback resolves.
             const pMoon = applySpectral([
               moonSkyE[0] * e0Moon,
               moonSkyE[1] * e0Moon,
@@ -10547,6 +10583,9 @@
         // ?halo=0 is its override.
         opticsU.sunDir.value.copy(sunVec);
         opticsU.antisolar.value.copy(sunVec).negate();
+        // Both optics domes grey with the rods (see scotFold).
+        opticsU.scotB.value = mesoB;
+        opticsMoonU.scotB.value = mesoB;
         // The same asinh inversion the sky LUT feed uses: the
         // camera's real altitude, so the rain column is the
         // freezing level ABOVE THE EYE.
@@ -11405,9 +11444,9 @@
             skyExposure.toFixed(1) +
             (adaptPin
               ? ' (legacy pin)'
-              : mesoB < 1
-                ? ' · rod ' + Math.round((1 - mesoB) * 100) + '%'
-                : '');
+              : (mesoB < 1
+                  ? ' · rod ' + Math.round((1 - mesoB) * 100) + '%'
+                  : '') + (moonSourced ? ' · moon-sourced dome' : ''));
           live['visibility (Koschmieder fog)'] =
             (state.visibility / 1000).toFixed(1) + ' km measured';
           live['snowline (freezing level)'] =
