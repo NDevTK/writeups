@@ -18,11 +18,22 @@
 //    cutoff
 import {
   buildBowLUT,
+  buildCircleLUT,
   buildDogLUT,
   buildHaloLUT,
   buildPillarLUT
 } from './optics-lut.js';
-import {bravais, prismDmin, ICE_N, PRISM_60} from './halos.js';
+import {
+  bravais,
+  circleInt120Share,
+  circleIntShare,
+  circleIntSigmaAlt,
+  CIRCLE_SIGMA_ALT_DEG,
+  parhelicCircleProfile,
+  prismDmin,
+  ICE_N,
+  PRISM_60
+} from './halos.js';
 import {
   bowGeometric,
   bowSlab,
@@ -460,6 +471,69 @@ function bowStats(c, lo, hi) {
     'two-leg slab: closed form = quadrature',
     ok,
     `worst rel ${worst.toExponential(1)} over sigH x (h, alpha) grid incl. removable point, above-source and downward rays; dry -> exactly 0`
+  );
+}
+
+{
+  // The circle LUT composition: both families, absolute per
+  // steradian at the almucantar. Landmarks: the green row's
+  // azimuth integral reassembles from the pieces exactly (ext
+  // integral x its peak + [k1 share + 120 share] x the internal
+  // peak - the bake is self-consistent); the 120-degree spot
+  // stands above its local baseline; the blue spot survives into
+  // the DRAWN rows (B/R > 1.5 between the cutoffs at h = 25);
+  // sigmaAltRad sits between the families' own sigmas; at h = 45
+  // the anthelic end is lit (no cutoff above ~32 deg) while at
+  // h = 5 it is external-only dim; finite everywhere.
+  const RAD = Math.PI / 180;
+  const l25 = buildCircleLUT(25 * RAD);
+  const bw = Math.PI / l25.bins;
+  const at = (l, azDeg, c) =>
+    l.data[Math.min(Math.floor((azDeg / 180) * l.bins), l.bins - 1) * 4 + c];
+  let ok = l25.data.every((v) => Number.isFinite(v));
+  // reassembly (green)
+  {
+    let lutInt = 0;
+    for (let i = 0; i < l25.bins; i++) lutInt += l25.data[i * 4 + 1] * bw;
+    const thetas = [];
+    for (let i = 0; i < l25.bins; i++) thetas.push((i + 0.5) * bw);
+    const ext = parhelicCircleProfile(25 * RAD, thetas)[1];
+    let extInt = 0;
+    for (const v of ext) extInt += v * bw;
+    const sigExt = CIRCLE_SIGMA_ALT_DEG * RAD;
+    const sigInt = circleIntSigmaAlt(25 * RAD);
+    const want =
+      (extInt * 1) / Math.sqrt(2 * Math.PI) / sigExt +
+      ((circleIntShare(25 * RAD)[1] + circleInt120Share(25 * RAD)) * 1) /
+        Math.sqrt(2 * Math.PI) /
+        sigInt;
+    if (!(Math.abs(lutInt / want - 1) < 0.02)) ok = false;
+    if (
+      !(
+        l25.sigmaAltRad > Math.min(sigExt, sigInt) &&
+        l25.sigmaAltRad < Math.max(sigExt, sigInt)
+      )
+    )
+      ok = false;
+  }
+  // the 120-degree spot above its baseline
+  const spot = at(l25, 120, 1);
+  const base120 = (at(l25, 114, 1) + at(l25, 126, 1)) / 2;
+  if (!(spot > 1.1 * base120)) ok = false;
+  // the drawn blue spot between the cutoffs
+  const bOverR = at(l25, 139.5, 2) / Math.max(at(l25, 139.5, 0), 1e-9);
+  if (!(bOverR > 1.5)) ok = false;
+  // anthelic: the high-sun internal plateau brightens the far
+  // circle over the low-sun external-only value (the external
+  // near-normal mirrors are weak but real - the measured factor
+  // is ~3, not a collapse)
+  const l45 = buildCircleLUT(45 * RAD);
+  const l5 = buildCircleLUT(5 * RAD);
+  if (!(at(l45, 176, 1) > 2 * at(l5, 176, 1))) ok = false;
+  check(
+    'circle LUT: two families, corner spot, drawn blue spot',
+    ok,
+    `reassembles; spot/base ${(spot / base120).toFixed(2)} at 120 deg; B/R ${bOverR.toFixed(1)} at 139.5; anthelic 45/5 ratio ${(at(l45, 176, 1) / Math.max(at(l5, 176, 1), 1e-12)).toFixed(1)}; sigma ${(l25.sigmaAltRad / RAD || 0).toFixed(3)} deg between the families`
   );
 }
 

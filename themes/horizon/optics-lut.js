@@ -44,6 +44,12 @@
  */
 
 import {
+  circleInt120Share,
+  circleInt120Sigma,
+  circleInternalProfile,
+  circleIntShare,
+  circleIntSigmaAlt,
+  CIRCLE_SIGMA_ALT_DEG,
   ICE_N,
   mcHalo,
   parhelicCircleProfile,
@@ -286,27 +292,60 @@ export function buildBowLUT(
  */
 /**
  * The parhelic circle over the FULL azimuth range [0, 180] deg
- * from the source, at elevation h: halos.js's analytic
- * external-reflection profile (per radian of azimuth, per unit
- * plate geometric interaction - absolute, the dog/halo frame),
- * held to the plate Monte Carlo's own reflected books by the
- * halos gate. No source-disc convolution: the curve is smooth on
- * the 0.27-degree disc scale (no caustic - the mirrors' fold is
- * the gentle sin(dAz/2), documented). White by physics: the
- * Fresnel reflection barely sees the ice dispersion.
+ * from the source, at elevation h - now BOTH families of the
+ * measured plates:
+ *  - EXTERNAL side-face reflection (halos.js
+ *    parhelicCircleProfile): the low-sun circle, brightest
+ *    toward the sun, rho-dim behind;
+ *  - INTERNAL basal-entry transits (circleInternalProfile x the
+ *    MC share table): the TIR-bright high-sun circle with
+ *    Koennen's blue-spot cutoff at 2 asin(sqrt(n^2-1)/cos h),
+ *    plus the 120-DEGREE PARHELIA - the k = 2 adjacent-face
+ *    corner folds, white, drawn as the MC-held Gaussian spots.
+ * The LUT rows are ABSOLUTE per steradian AT THE ALMUCANTAR
+ * (each family's per-radian azimuth profile times ITS OWN
+ * vertical Gaussian peak density - the families' sigmas differ,
+ * 0.84 vs ~1 deg, so the peak factor moved INTO the LUT; the amp
+ * no longer carries it). sigmaAltRad returns the share-weighted
+ * drawn falloff sigma; the wings of the wider internal family
+ * are drawn slightly narrow (stated - the centre is exact). No
+ * source-disc convolution: smooth curves on the disc scale; the
+ * 120-degree spot sigma already carries the tilt (>= the disc
+ * where it matters, floored by it when drawn).
  */
 export function buildCircleLUT(h, bins = 256) {
+  const hs = Math.max(h, 0);
   const thetas = [];
   for (let i = 0; i < bins; i++) thetas.push(((i + 0.5) / bins) * Math.PI);
-  const prof = parhelicCircleProfile(Math.max(h, 0), thetas);
+  const ext = parhelicCircleProfile(hs, thetas);
+  const inn = circleInternalProfile(hs, thetas);
+  const shInt = circleIntShare(hs);
+  const sh120 = circleInt120Share(hs);
+  const sigExt = (CIRCLE_SIGMA_ALT_DEG * Math.PI) / 180;
+  const sigInt = Math.max(circleIntSigmaAlt(hs), 1e-4);
+  const sig120 = Math.max(circleInt120Sigma(hs), SUN_RADIUS / 2);
+  const pkExt = 1 / Math.sqrt(2 * Math.PI) / sigExt;
+  const pkInt = 1 / Math.sqrt(2 * Math.PI) / sigInt;
+  const wExt = [0, 0, 0];
+  const wInt = [0, 0, 0];
   const out = new Float32Array(bins * 4);
   for (let i = 0; i < bins; i++) {
-    out[i * 4] = prof[0][i];
-    out[i * 4 + 1] = prof[1][i];
-    out[i * 4 + 2] = prof[2][i];
+    const g120 =
+      Math.exp(-0.5 * ((thetas[i] - (2 * Math.PI) / 3) / sig120) ** 2) /
+      Math.sqrt(2 * Math.PI) /
+      sig120;
+    for (let c = 0; c < 3; c++) {
+      const e = ext[c][i];
+      const n = shInt[c] * inn[c][i] + sh120 * g120;
+      wExt[c] += e;
+      wInt[c] += n;
+      out[i * 4 + c] = e * pkExt + n * pkInt;
+    }
     out[i * 4 + 3] = 1;
   }
-  return {data: out, bins, azMaxDeg: 180};
+  const sigmaAltRad =
+    (sigExt * wExt[1] + sigInt * wInt[1]) / Math.max(wExt[1] + wInt[1], 1e-12);
+  return {data: out, bins, azMaxDeg: 180, sigmaAltRad};
 }
 
 export function buildDogLUT(h, bins = 256, srcR = SUN_RADIUS) {

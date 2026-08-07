@@ -44,6 +44,8 @@ import {
   PILLAR_SIGMA_ALT,
   plateMeanC,
   plateProjArea,
+  circleInternalProfile,
+  circleIntShare,
   CIRCLE_SIGMA_ALT_DEG,
   PRISM_60,
   PRISM_90,
@@ -326,6 +328,10 @@ const RAD = Math.PI / 180;
           mc.offAlmT[0] +
           mc.circleT[0] +
           mc.reflOffAlmT[0] +
+          mc.trans1T[0] +
+          mc.trans2T[0] +
+          mc.transThroughT[0] +
+          mc.transOffAlmT[0] +
           mc.lostT[0] -
           A
       ) / A;
@@ -377,7 +383,9 @@ const RAD = Math.PI / 180;
     parhelionShare(-0.01) === 0 &&
     parhelionShare((58 * Math.PI) / 180) === 0 &&
     parhelionShare((56 * Math.PI) / 180) > 0 &&
-    Math.abs(parhelionSigmaAlt((20 * Math.PI) / 180) * DEG - 0.359) < 1e-9;
+    Math.abs(
+      parhelionSigmaAlt((20 * Math.PI) / 180) * DEG - PARHELION_SIGMA_ALT_DEG[4]
+    ) < 1e-9;
   check(
     'share/sigma interpolation, closed outside the range',
     ok,
@@ -681,6 +689,161 @@ const RAD = Math.PI / 180;
     'folded pillar share = the orientation Monte Carlo',
     ok,
     detail + 'quadrature within 1% of the nonlinear trace at every altitude'
+  );
+}
+
+{
+  // The internal circle families - the basal-entry transits the
+  // circle pass left named, now booked by side-mirror count.
+  // Landmarks, all against the traced walk with NO new constant:
+  //  - the k = 2 adjacent-face fold peaks in the bin holding
+  //    EXACTLY 120 degrees (the corner reflector rotates by twice
+  //    the dihedral regardless of incidence) and is WHITE (the
+  //    parallel basal refractions cancel the dispersion);
+  //  - the k = 1 family's per-channel cutoff sits at the closed
+  //    form dAz_c = 2 asin(sqrt(n^2 - 1)/cos h), ordered red <
+  //    green < blue - between the cutoffs the circle turns BLUE
+  //    (Koennen's blue spot, emerging from the Warren rows);
+  //  - above cos h < sqrt(n^2 - 1) there is no cutoff and the
+  //    plateau reaches the anthelic point;
+  //  - the pipe seals toward the horizon (the internal basal
+  //    incidence crosses the critical angle): the internal
+  //    circle is a HIGH-SUN optic, complementary to the external
+  //    mirrors that carry the low-sun circle;
+  //  - the analytic drawn shape (sin(dAz/2) fold under the TIR
+  //    step, tilt-smeared edge) holds the MC in azimuth windows -
+  //    the near-sun window carries a stated ~20-30% deficit (the
+  //    hexagon's first-hit corner competition, not in the convex
+  //    fold; the dogs own that region visually);
+  //  - the shipped share/sigma tables re-derive.
+  const DEGL = 180 / Math.PI;
+  let ok = true;
+  let detail = '';
+  const h25 = (25 * Math.PI) / 180;
+  const mc = mcParhelion(h25, ICE_N, 1000000);
+  const bw = Math.PI / mc.circleBins;
+  // k2: peak bin at 120 deg, white
+  let pk2 = 0;
+  let pk2b = -1;
+  for (let b = 0; b < mc.circleBins; b++) {
+    const v = mc.trans2Data[b * 3 + 1];
+    if (v > pk2) {
+      pk2 = v;
+      pk2b = b;
+    }
+  }
+  const az120 = (pk2b + 0.5) * bw * DEGL;
+  if (!(Math.abs(az120 - 120) < bw * DEGL)) ok = false;
+  const chT = [0, 1, 2].map((c) => mc.trans2T[c] / mc.accepted[c]);
+  const spread2 =
+    (Math.max(...chT) - Math.min(...chT)) / Math.max(chT[1], 1e-12);
+  // white within the booking statistics (the corner fold has no
+  // dispersion mechanism - the parallel basal refractions cancel;
+  // ~250 weighted events per channel at this sample count)
+  if (!(spread2 < 0.5)) ok = false;
+  // k1 cutoffs: azimuth where the histogram falls below 25% of
+  // its 100-130 deg plateau mean, per channel
+  const cutOf = (c) => {
+    let plat = 0;
+    let n = 0;
+    for (let b = 0; b < mc.circleBins; b++) {
+      const az = (b + 0.5) * bw * DEGL;
+      if (az >= 100 && az < 130) {
+        plat += mc.trans1Data[b * 3 + c];
+        n++;
+      }
+    }
+    plat /= n;
+    for (
+      let b = Math.floor((135 / 180) * mc.circleBins);
+      b < mc.circleBins;
+      b++
+    )
+      if (mc.trans1Data[b * 3 + c] < 0.25 * plat) return (b + 0.5) * bw * DEGL;
+    return 180;
+  };
+  const cuts = [0, 1, 2].map(cutOf);
+  const want = ICE_N.map(
+    (n) => 2 * Math.asin(Math.sqrt(n * n - 1) / Math.cos(h25)) * DEGL
+  );
+  for (let c = 0; c < 3; c++)
+    if (!(Math.abs(cuts[c] - want[c]) < 3.5)) ok = false;
+  if (!(cuts[0] < cuts[1] && cuts[1] < cuts[2])) ok = false;
+  // the blue spot: B/R between the outer cutoffs
+  let R = 0;
+  let B = 0;
+  for (let b = 0; b < mc.circleBins; b++) {
+    const az = (b + 0.5) * bw * DEGL;
+    if (az >= want[0] + 0.5 && az < want[2] + 1) {
+      R += mc.trans1Data[b * 3] / mc.accepted[0];
+      B += mc.trans1Data[b * 3 + 2] / mc.accepted[2];
+    }
+  }
+  if (!(B / Math.max(R, 1e-12) > 2)) ok = false;
+  // anthelic reach at h = 35 (no cutoff above ~32 deg)
+  const mc35 = mcParhelion((35 * Math.PI) / 180, ICE_N, 300000);
+  let anth = 0;
+  for (let b = 0; b < mc35.circleBins; b++) {
+    const az = (b + 0.5) * bw * DEGL;
+    if (az > 165) anth += mc35.trans1Data[b * 3 + 1];
+  }
+  if (!(anth > 0)) ok = false;
+  // pipe seal toward the horizon
+  const mc2 = mcParhelion((2 * Math.PI) / 180, ICE_N, 200000);
+  if (
+    !(
+      mc2.trans1T[1] / mc2.accepted[1] <
+      0.05 * (mc.trans1T[1] / mc.accepted[1])
+    )
+  )
+    ok = false;
+  // analytic shape windows (green): mid and cutoff tight, near-sun
+  // stated-loose
+  {
+    const thetas = [];
+    for (let b = 0; b < mc.circleBins; b++) thetas.push((b + 0.5) * bw);
+    const ana = circleInternalProfile(h25, thetas);
+    let integ = 0;
+    for (let b = 0; b < mc.circleBins; b++)
+      integ += mc.trans1Data[b * 3 + 1] * bw;
+    const win = (lo, hi) => {
+      let sM = 0;
+      let sA = 0;
+      for (let b = 0; b < mc.circleBins; b++) {
+        const az = thetas[b] * DEGL;
+        if (az >= lo && az < hi) {
+          sM += (mc.trans1Data[b * 3 + 1] / integ) * bw;
+          sA += ana[1][b] * bw;
+        }
+      }
+      return [sM, sA];
+    };
+    const w2 = win(60, 110);
+    const w3 = win(110, 150);
+    const w1 = win(10, 60);
+    if (!(Math.abs(w2[0] / w2[1] - 1) < 0.08)) ok = false;
+    if (!(Math.abs(w3[0] / w3[1] - 1) < 0.15)) ok = false;
+    if (!(Math.abs(w1[0] / w1[1] - 1) < 0.35)) ok = false;
+    detail += `windows 60-110 ${(w2[0] / w2[1]).toFixed(3)}, 110-150 ${(w3[0] / w3[1]).toFixed(3)}, 10-60 ${(w1[0] / w1[1]).toFixed(2)} (hexagon first-hit, stated); `;
+  }
+  // shipped tables re-derive (mc IS the h = 25 row's own runner at
+  // 500k vs the 400k derivation - hold to 5%)
+  if (
+    !(
+      Math.abs(mc.trans1T[1] / mc.accepted[1] / circleIntShare(h25)[1] - 1) <
+      0.05
+    )
+  )
+    ok = false;
+  if (
+    !(Math.abs(mc.binnedT[1] / mc.accepted[1] / parhelionShare(h25) - 1) < 0.05)
+  )
+    ok = false;
+  check(
+    'internal circle: corner 120, blue-spot cutoffs, high-sun pipe',
+    ok,
+    `k2 peak ${az120.toFixed(1)} deg white to ${(spread2 * 100).toFixed(0)}%; cutoffs ${cuts.map((v) => v.toFixed(1)).join('/')} (closed ${want.map((v) => v.toFixed(1)).join('/')}); blue spot B/R ${(B / R).toFixed(1)}; anthelic alive at 35; seal at 2 deg; ` +
+      detail
   );
 }
 

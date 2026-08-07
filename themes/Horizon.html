@@ -392,7 +392,6 @@
         parhelionSigmaAlt,
         haloOccurrence,
         HALO_FAMILY_FRACTION,
-        CIRCLE_SIGMA_ALT_DEG,
         pillarShare,
         PILLAR_SIGMA_ALT
       } from './horizon/halos.js';
@@ -10482,15 +10481,16 @@
             (1 / Math.sqrt(2 * Math.PI) / Math.max(sigAlt, 1e-4));
           opticsU.dogSigma.value = sigAlt;
           opticsU.dogAmp.value.setRGB(tH[0] * dogA, tH[1] * dogA, tH[2] * dogA);
-          // The parhelic circle: the same plates' external
-          // reflection - no refraction cutoff (it outlives the
-          // dogs at high sun); the LUT is absolute per unit plate
-          // interaction, so the amp is just the slab chain and
-          // the vertical Gaussian's peak density.
-          const sigC = (CIRCLE_SIGMA_ALT_DEG * Math.PI) / 180;
-          const cirA =
-            slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigC);
-          opticsU.circleSigma.value = sigC;
+          // The parhelic circle: BOTH families of the same plates
+          // now ride in the LUT - the external mirrors (low sun)
+          // plus the internal basal-entry transits with the
+          // 120-degree parhelia and the blue-spot cutoff (high
+          // sun; optics-lut buildCircleLUT). The rows are per
+          // steradian at the almucantar with each family's own
+          // vertical peak baked in, so the amp is JUST the slab
+          // chain; the drawn falloff sigma is the LUT's own
+          // share-weighted value, fed at the re-lay below.
+          const cirA = slabBase * PLATE_ALPHA;
           opticsU.circleAmp.value.setRGB(
             tH[0] * cirA,
             tH[1] * cirA,
@@ -10547,6 +10547,7 @@
           const cl = buildCircleLUT(sun.alt);
           opticsU.circleData.set(cl.data);
           opticsU.circleTex.needsUpdate = true;
+          opticsU.circleSigma.value = cl.sigmaAltRad;
           // The pillar's azimuth profile: the sun's own
           // limb-darkened marginal through the crystal sigma at
           // this altitude.
@@ -10641,11 +10642,9 @@
               tH[2] * dogAM
             );
             // The paraselenic circle - the moon's own white ring
-            // off the same measured plates.
-            const sigCM = (CIRCLE_SIGMA_ALT_DEG * Math.PI) / 180;
-            const cirAM =
-              slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigCM);
-            opticsMoonU.circleSigma.value = sigCM;
+            // off the same measured plates, both families in the
+            // LUT (peak densities baked in; sigma at the re-lay).
+            const cirAM = slabBase * PLATE_ALPHA;
             opticsMoonU.circleAmp.value.setRGB(
               tH[0] * cirAM,
               tH[1] * cirAM,
@@ -10697,6 +10696,7 @@
             const cl = buildCircleLUT(refr.moonApp);
             opticsMoonU.circleData.set(cl.data);
             opticsMoonU.circleTex.needsUpdate = true;
+            opticsMoonU.circleSigma.value = cl.sigmaAltRad;
             const pl = buildPillarLUT(refr.moonApp, 64, astro.moonAngR);
             opticsMoonU.pillarData.set(pl.data);
             opticsMoonU.pillarTex.needsUpdate = true;

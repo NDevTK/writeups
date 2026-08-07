@@ -458,7 +458,8 @@ export function mcParhelion(
   samples = 400000,
   seed = 4711,
   tiltTheta = PLATE_TILT_THETA,
-  dRangeUm = PLATE_D_RANGE_UM
+  dRangeUm = PLATE_D_RANGE_UM,
+  maxEv = 40
 ) {
   const a0 = (18 * Math.PI) / 180;
   const a1 = (55 * Math.PI) / 180;
@@ -489,6 +490,28 @@ export function mcParhelion(
   const pillarT = [0, 0, 0];
   const pillarAz = [0, 0, 0];
   const pillarAz2 = [0, 0, 0];
+  // The TRANSMITTED basal-entry families on the almucantar (the
+  // parhelic circle's internal light): enter the top basal face,
+  // light-pipe with k side-mirror TIR events, exit the bottom -
+  // both basal refractions cancel, so the exit rides the sun's
+  // almucantar at the k-fold azimuth. k = 1 is the TIR-bright
+  // inner circle with the blue-spot cutoff; k = 2 off adjacent
+  // faces is the 120-degree parhelion (the corner reflector);
+  // k = 0 is the straight-through forward beam (booked, not
+  // drawn - it IS the disc's transmitted image). Same [0, pi]
+  // azimuth grid as the reflected circle.
+  const trans1Data = new Float64Array(circleBins * 3);
+  const trans2Data = new Float64Array(circleBins * 3);
+  const trans1T = [0, 0, 0];
+  const trans2T = [0, 0, 0];
+  const transThroughT = [0, 0, 0];
+  const transOffAlmT = [0, 0, 0];
+  const transY = [0, 0, 0];
+  const transY2 = [0, 0, 0];
+  // The 120-degree spot's azimuth moments about 2 pi / 3 (the
+  // corner-reflector angle) - its drawn width.
+  const trans2Az = [0, 0, 0];
+  const trans2Az2 = [0, 0, 0];
   // Per-trial plate: diameter log-uniform over B&D's printed
   // oriented range, aspect from Auer & Veal's law - the
   // POPULATION average, not one resonant slab (a single exact
@@ -621,7 +644,11 @@ export function mcParhelion(
         }
       }
       // The internal walk FOLLOWS total internal reflections (up
-      // to 12 face events): in a thin plate the skew ray reaches
+      // to maxEv face events - 40 default: the near-sun circle
+      // folds are grazing side approaches that light-pipe the
+      // longest, and a 12-event cap measurably starved them; the
+      // gate holds the shape's cap convergence): in a thin plate
+      // the skew ray reaches
       // the alternate side face by light-piping between the basal
       // faces - beyond ~10 degrees of sun the basal incidence
       // sits past the critical angle, the bounce is LOSSLESS, the
@@ -635,7 +662,9 @@ export function mcParhelion(
       let Tacc = rin.T;
       let p = facePointP(f, rng, cA);
       let out = null;
-      for (let ev = 0; ev < 12; ev++) {
+      const basalEntry = f.n.z !== 0;
+      let kSide = 0;
+      for (let ev = 0; ev < maxEv; ev++) {
         let tMin = Infinity;
         let fOut = null;
         for (const g of faces) {
@@ -663,7 +692,10 @@ export function mcParhelion(
           out = {dir: rout.dir, T: Tacc * rout.T};
           break;
         }
-        // TIR: lossless mirror, walk on.
+        // TIR: lossless mirror, walk on. Side-face mirrors fold
+        // the azimuth (counted - the k of the circle families);
+        // basal mirrors only flip the vertical cosine.
+        if (fOut.n.z === 0) kSide++;
         const dn = dot3(dir, fOut.n);
         dir = {
           x: dir.x - 2 * dn * fOut.n.x,
@@ -693,6 +725,32 @@ export function mcParhelion(
       const dAz = Math.abs(dAzS);
       const dAlt = alt - h;
       const T = out.T;
+      // BASAL-ENTRY transits are the circle families, booked by
+      // their side-mirror count; they no longer leak into the dog
+      // books (the shipped share/sigma tables were re-derived
+      // with the entry-face scoping - the old books carried a
+      // few-percent basal-entry contamination in the window).
+      if (basalEntry) {
+        if (Math.abs(dAlt) < (5 * Math.PI) / 180) {
+          if (kSide === 0) transThroughT[ch] += T;
+          else {
+            const b = Math.min(
+              Math.floor((dAz / Math.PI) * circleBins),
+              circleBins - 1
+            );
+            (kSide === 1 ? trans1Data : trans2Data)[b * 3 + ch] += T;
+            (kSide === 1 ? trans1T : trans2T)[ch] += T;
+            transY[ch] += T * dAlt;
+            transY2[ch] += T * dAlt * dAlt;
+            if (kSide !== 1) {
+              const dA2 = dAz - (2 * Math.PI) / 3;
+              trans2Az[ch] += T * dA2;
+              trans2Az2[ch] += T * dA2 * dA2;
+            }
+          }
+        } else transOffAlmT[ch] += T;
+        continue;
+      }
       // The DOG books take only light near the sun's almucantar:
       // side-to-side transits keep the vertical direction cosine
       // (vertical faces conserve it, the tilt wobble moves it by
@@ -719,7 +777,11 @@ export function mcParhelion(
       highT[ch] -
       offAlmT[ch] -
       circleT[ch] -
-      reflOffAlmT[ch]
+      reflOffAlmT[ch] -
+      trans1T[ch] -
+      trans2T[ch] -
+      transThroughT[ch] -
+      transOffAlmT[ch]
   );
   const sigmaAlt = binnedT.map((B, ch) => {
     if (B <= 0) return 0;
@@ -752,7 +814,21 @@ export function mcParhelion(
     pillarData,
     pillarT,
     pillarAz,
-    pillarAz2
+    pillarAz2,
+    trans1Data,
+    trans2Data,
+    trans1T,
+    trans2T,
+    transThroughT,
+    transOffAlmT,
+    trans2Az,
+    trans2Az2,
+    transSigmaAlt: [0, 1, 2].map((c) => {
+      const B = trans1T[c] + trans2T[c];
+      if (B <= 0) return 0;
+      const mB = transY[c] / B;
+      return Math.sqrt(Math.max(transY2[c] / B - mB * mB, 0));
+    })
   };
 }
 
@@ -959,13 +1035,52 @@ export function haloOccurrence(latDeg, lonDeg, utcMs) {
 }
 
 export const PARHELION_ALT_DEG = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+// Re-derived with the ENTRY-FACE scoping and the 40-event walk
+// (the internal-circle pass): the dog books are side-entry pure
+// now - the old rows carried a few-percent basal-entry leak in
+// the window (up to 5% at h = 20, and MOST of the h = 55 row,
+// where the true side-entry dogs are nearly dead) - and the
+// longer light-pipe recovers the grazing tails the 12-event cap
+// starved (+3% at h = 25, converged against an 80-event run).
 export const PARHELION_SHARE = [
-  0.46593, 0.1363, 0.07013, 0.06406, 0.06236, 0.05291, 0.04016, 0.02912,
-  0.02142, 0.01464, 0.00794, 0.00231
+  0.48229, 0.13604, 0.06902, 0.06234, 0.06021, 0.051, 0.03884, 0.02801, 0.02095,
+  0.0143, 0.00691, 0.00037
 ];
 export const PARHELION_SIGMA_ALT_DEG = [
-  0.756, 0.321, 0.338, 0.344, 0.359, 0.377, 0.408, 0.433, 0.483, 0.53, 0.584,
-  0.448
+  0.616, 0.32, 0.333, 0.338, 0.357, 0.372, 0.405, 0.424, 0.49, 0.549, 0.624,
+  0.469
+];
+// The TRANSMITTED basal-entry circle families (the plate MC's
+// own books, same 400k derivation): the k = 1 side-mirror share
+// per channel (TIR-bright, the blue-spot cutoff lives in the
+// SHAPE - circleInternalProfile), the 120-degree corner share
+// (k = 2 adjacent faces, white), the families' vertical sigma,
+// and the corner spot's azimuth sigma (tilt-driven; empty rows
+// at the tails are below the derivation's statistics and lerp
+// to the neighbours harmlessly - the shares there are 1e-5).
+export const CIRCLE_INT_SHARE_R = [
+  0.00004, 0.00332, 0.01056, 0.0183, 0.0238, 0.02889, 0.0362, 0.04577, 0.04115,
+  0.03697, 0.03275, 0.02738
+];
+export const CIRCLE_INT_SHARE_G = [
+  0.00003, 0.00327, 0.01007, 0.01746, 0.02337, 0.02928, 0.03688, 0.04376,
+  0.04037, 0.03651, 0.03204, 0.02704
+];
+export const CIRCLE_INT_SHARE_B = [
+  0.00005, 0.00302, 0.01001, 0.01763, 0.0245, 0.02976, 0.03974, 0.04327,
+  0.03938, 0.03612, 0.03189, 0.02712
+];
+export const CIRCLE_INT_120_SHARE = [
+  0, 0.000053, 0.000127, 0.00019, 0.000232, 0.000195, 0.00016, 0.00013,
+  0.000052, 0.000016, 0, 0
+];
+export const CIRCLE_INT_SIGMA_ALT_DEG = [
+  1.305, 0.878, 0.892, 0.942, 0.984, 1.035, 1.108, 1.157, 1.164, 1.148, 1.143,
+  1.14
+];
+export const CIRCLE_INT_120_SIGMA_DEG = [
+  0.052, 0.052, 0.239, 0.422, 0.536, 0.634, 0.72, 0.805, 0.553, 0.553, 0.553,
+  0.553
 ];
 function lerpTable(xs, ys, x) {
   if (x <= xs[0]) return ys[0];
@@ -988,6 +1103,93 @@ export function parhelionSigmaAlt(hRad) {
   const d = Math.min(Math.max((hRad * 180) / Math.PI, 0), 55);
   return (
     (lerpTable(PARHELION_ALT_DEG, PARHELION_SIGMA_ALT_DEG, d) * Math.PI) / 180
+  );
+}
+export function circleIntShare(hRad) {
+  const d = Math.min(Math.max((hRad * 180) / Math.PI, 0), 55);
+  return [CIRCLE_INT_SHARE_R, CIRCLE_INT_SHARE_G, CIRCLE_INT_SHARE_B].map((t) =>
+    lerpTable(PARHELION_ALT_DEG, t, d)
+  );
+}
+export function circleInt120Share(hRad) {
+  const d = Math.min(Math.max((hRad * 180) / Math.PI, 0), 55);
+  return lerpTable(PARHELION_ALT_DEG, CIRCLE_INT_120_SHARE, d);
+}
+export function circleIntSigmaAlt(hRad) {
+  const d = Math.min(Math.max((hRad * 180) / Math.PI, 0), 55);
+  return (
+    (lerpTable(PARHELION_ALT_DEG, CIRCLE_INT_SIGMA_ALT_DEG, d) * Math.PI) / 180
+  );
+}
+export function circleInt120Sigma(hRad) {
+  const d = Math.min(Math.max((hRad * 180) / Math.PI, 0), 55);
+  return (
+    (lerpTable(PARHELION_ALT_DEG, CIRCLE_INT_120_SIGMA_DEG, d) * Math.PI) / 180
+  );
+}
+
+// ---- the internal circle families, analytically ----
+// Basal-entry light that side-mirrors k times inside the plate
+// and exits the other basal face: both basal refractions cancel,
+// so the exit rides the almucantar at the k-fold azimuth. The
+// k = 1 SHAPE is closed-form: the fold density sin(dAz/2) (the
+// same mirror law as the external circle - uniform spin, the
+// hit-weighted fold), times the internal mirror's Fresnel - and
+// the internal mirror is TOTAL below the critical azimuth
+//     dAz_c = 2 asin(sqrt(n^2 - 1) / cos h)
+// (internal incidence cos i = (cos h / n) sin(dAz/2) crossing
+// sin i = 1/n): a TIR-BRIGHT plateau, then the light escapes the
+// side face instead (landing far off the almucantar - booked
+// transOffAlm by the MC) and the basal-exit circle DIES. Warren
+// dispersion orders the cutoffs red < green < blue: between them
+// only the bluer channels survive - KOENNEN'S BLUE SPOT, here
+// emerging from the traced indices with no new constant. Above
+// cos h < sqrt(n^2 - 1) (h ~ 32 deg) there is no cutoff and the
+// plateau runs to the anthelic point. The edge is smeared by the
+// tilt through d(dAz_c)/dh; the MC holds shape, cutoffs and the
+// spot's colour. Past-cutoff light from PARTIAL internal
+// reflections stays untraced (the walk's lost bucket, stated) -
+// the anthelic segment below 32 deg keeps only the external
+// family. Returns per-channel rows over thetasRad, each row
+// normalised to unit azimuth integral (the absolute scale is the
+// shipped MC share table).
+export function circleInternalProfile(h, thetasRad, nIce = ICE_N) {
+  const ch = Math.abs(Math.cos(h));
+  const sigE = circleIntSigmaAlt(h);
+  return nIce.map((n) => {
+    const s = Math.sqrt(n * n - 1) / Math.max(ch, 1e-9);
+    const azc = 2 * Math.asin(Math.min(s, 1));
+    // the tilt-smeared edge width: the cutoff's own altitude
+    // derivative through the families' vertical sigma
+    const dAzcDh =
+      s < 1
+        ? (2 * s * Math.abs(Math.tan(h))) / Math.sqrt(Math.max(1 - s * s, 1e-9))
+        : 0;
+    const sigEdge = Math.max(dAzcDh * sigE, 1e-4);
+    const row = thetasRad.map((dAz) => {
+      const a = Math.min(Math.max(dAz, 0), Math.PI);
+      const step =
+        s >= 1 ? 1 : 0.5 * (1 - erfApprox((a - azc) / (Math.SQRT2 * sigEdge)));
+      return Math.sin(a / 2) * step;
+    });
+    let integ = 0;
+    for (let i = 1; i < thetasRad.length; i++)
+      integ += ((row[i] + row[i - 1]) / 2) * (thetasRad[i] - thetasRad[i - 1]);
+    return row.map((v) => (integ > 0 ? v / integ : 0));
+  });
+}
+function erfApprox(x) {
+  const s = x < 0 ? -1 : 1;
+  x = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * x);
+  return (
+    s *
+    (1 -
+      ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) *
+        t +
+        0.254829592) *
+        t *
+        Math.exp(-x * x))
   );
 }
 

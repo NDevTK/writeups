@@ -4765,6 +4765,51 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   oriented-plate "crystal layers" Sassen & Campbell report as
   their second most common detection (p. 485) are the OTHER
   pillar carrier, unmodelled - a future population.
+- DONE (the circle's internal families, Aug 7 fifteenth push -
+  the light the circle pass left named, and TWO owned
+  corrections found on the way): NO new constant - the plate MC
+  already TRACED the basal-entry transits (top face in,
+  light-pipe, bottom face out - the parallel refractions cancel,
+  so the exit rides the almucantar at the side-mirror fold
+  azimuth); this pass BOOKS them by side-mirror count k. What
+  the books show, each MC-held with a closed form: k = 2 off
+  adjacent faces peaks in the bin holding EXACTLY 120 degrees
+  (the corner reflector rotates twice the dihedral regardless of
+  incidence) and is WHITE - the 120-DEGREE PARHELIA; k = 1 is a
+  TIR-BRIGHT plateau (share up to 4.4% of the plate interaction
+  at h = 35 vs the external mirrors' ~1%) that CUTS OFF at
+  dAz_c = 2 asin(sqrt(n^2 - 1)/cos h) per channel - Warren
+  dispersion orders the cutoffs red < green < blue and between
+  them the drawn circle turns BLUE at B/R ~ 4.8: KOENNEN'S BLUE
+  SPOT, emerging from the traced indices (the MC edges land on
+  the closed forms within the tilt smear: 138.5/139.9/144.1 vs
+  136.6/138.6/141.6 at h = 25). Above cos h < sqrt(n^2 - 1)
+  (h ~ 32 deg) there is no cutoff and the plateau reaches the
+  ANTHELIC point; toward the horizon the pipe SEALS (the
+  internal basal incidence crosses critical) - the internal
+  circle is the high-sun complement of the external low-sun
+  mirrors, and the whole circle now outlives both. THE
+  CORRECTIONS: (1) the dog books carried a basal-entry leak (up
+  to 5% at h = 20, most of the h = 55 row) - entry-face scoping
+  makes them side-entry pure; (2) the walk's 12-event cap
+  starved the grazing light-pipe tails (+3% dog share at h = 25)
+  - raised to 40, converged against 80. Both shipped tables
+    re-derived at the 600k shipping count (bit-tight in the gate
+    again). Drawn: buildCircleLUT sums the families ABSOLUTE per
+    steradian at the almucantar - each family's own vertical peak
+    density baked in (their sigmas differ, 0.84 vs ~1 deg), the
+    120-degree spots as MC-held Gaussians, the amp reduced to the
+    bare slab chain and the drawn falloff sigma now the LUT's
+    share-weighted value (fed at the dog-cadence re-lay, sun and
+    moon). Documented residuals: the analytic k = 1 fold
+    (sin(dAz/2) under the TIR step) carries a ~20-30% near-sun
+    deficit vs the traced hexagon (first-hit corner competition,
+    stated and gated loose - the dogs own that region visually);
+    past-cutoff partial internal reflections stay in the walk's
+    lost bucket (the anthelic segment below 32 deg keeps only the
+    external family); the 46-degree family and the high-altitude
+    side-exit arcs (Parry/heliac territory) remain booked
+    (transOffAlm) and named, not drawn.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
