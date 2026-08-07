@@ -501,6 +501,7 @@
         TAU_MAX,
         TAU_MIN
       } from './horizon/aerosol.js';
+      import {aureoleSet} from './horizon/aureole.js';
       import {
         LAMP_FULL,
         LAMP_TINT,
@@ -1792,9 +1793,11 @@
           record(
             'OSM Overpass roads',
             roadsGeo.length +
-              ' ways · every one visible of ' +
+              ' of ' +
+              all.length +
+              ' parsed ways visible (' +
               elements.length +
-              ' fetched'
+              ' raw fetched; the gap is parseRoads own floors)'
           );
           try {
             await geoSet(key, roadsGeo);
@@ -3302,7 +3305,12 @@
       const AEROSOL_PROXY =
         params.get('aerosol') ?? 'https://api.ndev.tk/aerosol';
       async function syncAerosol() {
-        if (overridden || params.has('aod')) return;
+        // Weather pins silence the live fetch (pinned scenes stay
+        // deterministic) - but an EXPLICIT ?aerosol= endpoint is a
+        // labelled override of its own and composes with the pins
+        // (the aureole A/B needs a pinned-clear sky over a fixture
+        // mix).
+        if ((overridden && !params.has('aerosol')) || params.has('aod')) return;
         try {
           const r = await (
             await fetch(
@@ -3316,7 +3324,29 @@
           ).json();
           if (!r.products) return;
           const set = channelSet(r.products);
-          state.aerosol = {at: Date.now(), set, cycle: r.cycle, fhr: r.fhr};
+          // The delta similarity set (aureole.js, gated): the
+          // coarse-mode diffraction spike from the measured
+          // dust/sea-salt split through the printed GADS/OPAC
+          // sizes; sea salt swollen by the MEASURED surface
+          // humidity (Murphy & Koop dew-point rh - the same value
+          // the refraction column closes on). Null when the mix
+          // has no coarse species - the sky then runs the
+          // unscaled system exactly as before.
+          const rhPct =
+            Number.isFinite(state.dew) && Number.isFinite(state.temp)
+              ? Math.min(
+                  eLiq(state.dew + 273.15) / eLiq(state.temp + 273.15),
+                  1
+                ) * 100
+              : undefined;
+          const aur = aureoleSet(set, r.products, rhPct);
+          state.aerosol = {
+            at: Date.now(),
+            set,
+            aur,
+            cycle: r.cycle,
+            fhr: r.fhr
+          };
           const f = set.fractions;
           const pct = (k) => Math.round((f[k] ?? 0) * 100);
           record(
@@ -3337,7 +3367,14 @@
               pct('organic') +
               '/' +
               pct('blackCarbon') +
-              '%'
+              '%' +
+              (aur
+                ? ' · aureole f550 ' +
+                  aur.fDiff[1].toFixed(3) +
+                  ' · cone ' +
+                  ((aur.coneRad * 180) / Math.PI).toFixed(1) +
+                  '°'
+                : ' · no coarse mode, no aureole')
           );
         } catch {
           // The CAMS total AOD stands.
@@ -8624,6 +8661,12 @@
           ? state.aerosol.set
           : {tau: [aodC, aodC, aodC], ssa: [0.9, 0.9, 0.9], g: 0.8};
         const mieRad = mieCoefficients(mieSet, centerElev);
+        // The delta split rides only with a fresh measured mix -
+        // the AOD fallback has no species and runs unscaled.
+        // ?aureole=0 is the labelled harness override (A/B captures
+        // of the same measured sky with and without the split).
+        if (aeroFresh && state.aerosol.aur && params.get('aureole') !== '0')
+          mieRad.aureole = state.aerosol.aur;
         if (atmo.ok) {
           const skyExposure = 24 / (0.2 + 0.8 * day);
           // The camera's REAL altitude (inverting the asinh height
