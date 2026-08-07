@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body style="margin: 0; overflow: hidden">
+    <canvas id="gl"></canvas>
+    <script>
+      /* swizzle shim */ if (navigator.gpu && self.GPUTexture) {
+        const ov = GPUTexture.prototype.createView;
+        GPUTexture.prototype.createView = function (d) {
+          if (d && 'swizzle' in d) {
+            d = Object.assign({}, d);
+            delete d.swizzle;
+          }
+          return ov.call(this, d);
+        };
+      }
+    </script>
+    <script type="module">
+      // D_M probe: the transmittance LUT's ALPHA channel now carries
+      // the Mie reference-density column INT exp(-h/1200) ds in km -
+      // the delta-scaled sun transmittance (aureole pass) is
+      // T' = T exp(+f sigma_s D_M), so this texel data is
+      // load-bearing whenever a coarse aerosol is measured. The GPU
+      // texels must land on the same 40-step double-precision
+      // integral the CPU computes (atmo-reference.mjs mirrors it);
+      // tolerance is the fp16 texel quantisation.
+      import * as T from 'three/webgpu';
+      import {createAtmosphereTSL} from './writeups/themes/horizon/atmosphere-tsl.js';
+      const log = (s) => console.log('DM|' + s);
+      try {
+        const r = new T.WebGPURenderer({
+          canvas: document.getElementById('gl'),
+          forceWebGL: false,
+          antialias: false
+        });
+        await r.init();
+        log('backend ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'));
+        const atmo = createAtmosphereTSL(r);
+        // Hillaire defaults; any mie set fills the T LUT.
+        atmo.update(
+          new T.Vector3(0, 0.5, Math.sqrt(0.75)).normalize(),
+          {
+            scat: [3.996e-6, 3.996e-6, 3.996e-6],
+            abs: [4.44e-7, 4.44e-7, 4.44e-7],
+            g: 0.8
+          },
+          300,
+          28,
+          0
+        );
+        // CPU mirror of the texel integral (the LUT fill's own
+        // parameterisation and 40 midpoint steps, double precision).
+        const Rb = 6360e3,
+          Rt = 6460e3;
+        const H = Math.sqrt(Rt * Rt - Rb * Rb);
+        const TW = 256,
+          TH = 64;
+        const dmRef = (i, j) => {
+          const ux = (i + 0.5) / TW,
+            uy = (j + 0.5) / TH;
+          const rho = H * uy,
+            rr = Math.sqrt(rho * rho + Rb * Rb);
+          const dMin = Rt - rr,
+            dMax = rho + H;
+          const d = dMin + ux * (dMax - dMin);
+          let mu = d === 0 ? 1 : (H * H - rho * rho - d * d) / (2 * rr * d);
+          mu = Math.min(Math.max(mu, -1), 1);
+          const dt = d / 40;
+          let dm = 0;
+          for (let s = 0; s < 40; s++) {
+            const ti = (s + 0.5) * dt;
+            const h = Math.sqrt(rr * rr + ti * ti + 2 * rr * ti * mu) - Rb;
+            dm += Math.exp(-h / 1200) * dt;
+          }
+          return dm / 1000;
+        };
+        // Three texels spanning the range: near-vertical short path,
+        // mid, and a long graze (the fp16 ceiling case).
+        const CASES = [
+          [0, 0],
+          [128, 32],
+          [255, 62]
+        ];
+        let pass = true;
+        for (const [i, j] of CASES) {
+          const px = await atmo.readLut('t', i, j, 1, 1);
+          const a = px[3];
+          const ref = dmRef(i, j);
+          // fp16 has ~0.1% relative precision at these magnitudes;
+          // allow 1% plus a small absolute floor.
+          const ok = Math.abs(a - ref) <= Math.max(0.01 * ref, 2e-3);
+          if (!ok) pass = false;
+          log(
+            `texel(${i},${j}) alpha ${a.toFixed(4)} km vs CPU ${ref.toFixed(4)} km ${ok ? 'ok' : 'MISMATCH'}`
+          );
+        }
+        // And the scaled-transmittance identity at f = 0: rgb texels
+        // must be pure exp(-tau) untouched by the alpha addition -
+        // spot the same three texels against the CPU 40-step T.
+        const ext = (h) => {
+          const dR = Math.exp(-h / 8000),
+            dM = Math.exp(-h / 1200),
+            dO = Math.max(0, 1 - Math.abs(h - 25e3) / 15e3);
+          return [
+            5.802e-6 * dR + 4.44e-6 * dM + 0.65e-6 * dO,
+            13.558e-6 * dR + 4.44e-6 * dM + 1.881e-6 * dO,
+            33.1e-6 * dR + 4.44e-6 * dM + 0.085e-6 * dO
+          ];
+        };
+        for (const [i, j] of CASES) {
+          const ux = (i + 0.5) / TW,
+            uy = (j + 0.5) / TH;
+          const rho = H * uy,
+            rr = Math.sqrt(rho * rho + Rb * Rb);
+          const dMin = Rt - rr,
+            dMax = rho + H;
+          const d = dMin + ux * (dMax - dMin);
+          let mu = d === 0 ? 1 : (H * H - rho * rho - d * d) / (2 * rr * d);
+          mu = Math.min(Math.max(mu, -1), 1);
+          const dt = d / 40;
+          const tau = [0, 0, 0];
+          for (let s = 0; s < 40; s++) {
+            const ti = (s + 0.5) * dt;
+            const h = Math.sqrt(rr * rr + ti * ti + 2 * rr * ti * mu) - Rb;
+            const e = ext(h);
+            for (let c = 0; c < 3; c++) tau[c] += e[c] * dt;
+          }
+          const px = await atmo.readLut('t', i, j, 1, 1);
+          for (let c = 0; c < 3; c++) {
+            const ref = Math.exp(-tau[c]);
+            const ok = Math.abs(px[c] - ref) <= Math.max(0.005 * ref, 1e-4);
+            if (!ok) {
+              pass = false;
+              log(`texel(${i},${j}) c${c} T ${px[c]} vs ${ref} MISMATCH`);
+            }
+          }
+        }
+        log('rgb transmittance texels hold the pure exp(-tau)');
+        log(pass ? 'DM PASS' : 'DM FAIL');
+      } catch (e) {
+        console.log('DM|ERR ' + (e && e.message));
+        console.log('DM FAIL');
+      }
+      console.log('DONE');
+    </script>
+  </body>
+</html>

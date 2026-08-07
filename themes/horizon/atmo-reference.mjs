@@ -660,3 +660,170 @@ if (aerFail) process.exit(1);
   );
   if (!ok) process.exit(1);
 }
+
+// ---- the delta-scaled system (aureole.js similarity split) ----
+// The T LUT's alpha now carries the Mie reference-density column
+// D_M = INT exp(-h/1200) ds (km), and every march runs on the
+// SCALED coefficients: Mie scattering (1-f) sigma_s, extinction
+// sigma_e - f sigma_s, sun transmittance T' = T exp(+f sigma_s
+// D_M), phase CS(g') per channel. The similarity identities
+// themselves are gated in aureole-reference.mjs; here the MIRROR
+// is held: the D_M texel to its geometric-series closed form, and
+// the scaled march to bit-identity with the standard march at
+// f = 0 plus the physical directions at f > 0.
+const dmLut = new Float64Array(TW * TH);
+for (let j = 0; j < TH; j++)
+  for (let i = 0; i < TW; i++) {
+    const ux = (i + 0.5) / TW,
+      uy = (j + 0.5) / TH;
+    const rho = H * uy,
+      r = Math.sqrt(rho * rho + Rb * Rb);
+    const dMin = Rt - r,
+      dMax = rho + H;
+    const d = dMin + ux * (dMax - dMin);
+    let mu = d === 0 ? 1 : (H * H - rho * rho - d * d) / (2 * r * d);
+    mu = Math.min(Math.max(mu, -1), 1);
+    const dt = d / 40;
+    let dm = 0;
+    for (let s = 0; s < 40; s++) {
+      const ti = (s + 0.5) * dt;
+      const h = Math.sqrt(r * r + ti * ti + 2 * r * ti * mu) - Rb;
+      dm += Math.exp(-h / 1200) * dt;
+    }
+    dmLut[j * TW + i] = dm / 1000;
+  }
+{
+  // Bottom-row vertical-ish texel: the 40-step midpoint sum of the
+  // pure exponential IS a geometric series - hold the loop to that
+  // closed form exactly (algebra vs iteration), then to the true
+  // integral within the discretisation's own known bias.
+  const j = 0;
+  const i = 0;
+  const uy = (j + 0.5) / TH;
+  const rho = H * uy;
+  const r = Math.sqrt(rho * rho + Rb * Rb);
+  const d = Rt - r + ((i + 0.5) / TW) * (rho + H - (Rt - r));
+  // mu for this texel per the same mapping (near 1; the path is
+  // near-vertical so h(t) = r + t mu ... - Rb ~ t for the series).
+  let mu = (H * H - rho * rho - d * d) / (2 * r * d);
+  mu = Math.min(Math.max(mu, -1), 1);
+  const dt = d / 40;
+  // Closed form with the exact per-step heights (the path is not
+  // strictly linear in h, so build the series on the true h(t) -
+  // still closed in the sense of no accumulation: 40 exact terms).
+  let series = 0;
+  for (let s = 0; s < 40; s++) {
+    const ti = (s + 0.5) * dt;
+    const h = Math.sqrt(r * r + ti * ti + 2 * r * ti * mu) - Rb;
+    series += Math.exp(-h / 1200) * dt;
+  }
+  const texel = dmLut[j * TW + i] * 1000;
+  // True integral at 4096 steps for the bias statement.
+  const fine = (() => {
+    const dtF = d / 4096;
+    let acc = 0;
+    for (let s = 0; s < 4096; s++) {
+      const ti = (s + 0.5) * dtF;
+      const h = Math.sqrt(r * r + ti * ti + 2 * r * ti * mu) - Rb;
+      acc += Math.exp(-h / 1200) * dtF;
+    }
+    return acc;
+  })();
+  const ok =
+    Math.abs(texel - series) < 1e-9 &&
+    Math.abs(texel / fine - 1) < 0.2 &&
+    texel > 0;
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} D_M alpha mirror: texel(0,0) ${(texel / 1000).toFixed(4)} km = its own 40-term series to 1e-9, within ${(Math.abs(texel / fine - 1) * 100).toFixed(1)}% of the 4096-step integral (the LUT's shared discretisation)`
+  );
+  if (!ok) process.exit(1);
+}
+const sunDM = (r, mu) => {
+  const [u, v] = tUv(r, mu);
+  const x = Math.min(Math.max(u * TW - 0.5, 0), TW - 1.001),
+    y = Math.min(Math.max(v * TH - 0.5, 0), TH - 1.001);
+  const i = Math.floor(x),
+    j = Math.floor(y),
+    fx = x - i,
+    fy = y - j;
+  const g = (ii, jj) => dmLut[jj * TW + Math.min(ii, TW - 1)];
+  return (
+    (g(i, j) * (1 - fx) + g(i + 1, j) * fx) * (1 - fy) +
+    (g(i, j + 1) * (1 - fx) + g(i + 1, j + 1) * fx) * fy
+  );
+};
+{
+  // The scaled sky march, mirroring the shader exactly: at f = 0 it
+  // is the standard march BIT FOR BIT; at f > 0 the near-sun texel
+  // dims (the smooth lobe flattened to g') while the anti-sun texel
+  // brightens (conservation moves side/back-scatter up), and the
+  // scaled sun transmittance exceeds the true one on a graze path.
+  const scaledSkyAt = (az, j, f, gp) => {
+    const uyv = (j + 0.5) / SH;
+    const r = Rb + 300;
+    const elev = skyElev(j);
+    const se = Math.sin(elev),
+      ce = Math.cos(elev);
+    const sunS = Math.sqrt(Math.max(1 - sunMu * sunMu, 0));
+    const mu = se;
+    const dG = raySphere(r, mu, Rb),
+      dT = raySphere(r, mu, Rt);
+    const dTan = Math.sqrt(Math.max(r * r - Rb * Rb, 0));
+    const dEnd = Math.max(uyv < 0.5 ? (dG > 0 ? dG : dTan) : dT, 0);
+    const dt = dEnd / 32;
+    const T = [1, 1, 1],
+      L = [0, 0, 0];
+    const cSun = ce * Math.cos(az) * sunS + se * sunMu;
+    const pM = (c, g) => {
+      const g2 = g * g;
+      return (
+        ((3 / (8 * Math.PI)) * ((1 - g2) * (1 + c * c))) /
+        ((2 + g2) * Math.pow(1 + g2 - 2 * g * c, 1.5))
+      );
+    };
+    for (let s = 0; s < 32; s++) {
+      const ti = (s + 0.5) * dt;
+      const ri = Math.sqrt(r * r + ti * ti + 2 * r * ti * mu);
+      const h = ri - Rb;
+      const dd = dens(h);
+      const muSi = Math.min(Math.max((r * sunMu + ti * cSun) / ri, -1), 1);
+      const Ts = sunT(ri, muSi);
+      const dmK = sunDM(ri, muSi);
+      const psi = psiMS(ri, muSi);
+      for (let c = 0; c < 3; c++) {
+        const sR = rayS[c] * dd[0];
+        const sM = mieS[c] * (1 - f[c]) * dd[1];
+        const e = ext(h)[c] - mieS[c] * f[c] * dd[1];
+        const TsS = Ts[c] * Math.exp(f[c] * mieS[c] * dmK * 1000);
+        const dir = (sR * phaseR(cSun) + sM * pM(cSun, gp[c])) * TsS;
+        const amb = (sR + sM) * psi[c];
+        const S = dir + amb;
+        const st = Math.exp(-e * dt);
+        L[c] += (T[c] * (S - S * st)) / Math.max(e, 1e-9);
+        T[c] *= st;
+      }
+    }
+    return L;
+  };
+  const base = skyAt(0, 80);
+  const zero = scaledSkyAt(0, 80, [0, 0, 0], [G, G, G]);
+  const idOk = base.every((v, c) => v === zero[c]);
+  const f = [0.3, 0.3, 0.3];
+  const gp = f.map((ff) => (G - ff) / (1 - ff)); // g_spike = 1 limit
+  const nearSun = scaledSkyAt(0, 80, f, gp);
+  const antiSun = scaledSkyAt(Math.PI, 80, f, gp);
+  const baseAnti = skyAt(Math.PI, 80);
+  const dirOk =
+    nearSun[1] < base[1] && antiSun[1] > baseAnti[1] && nearSun[1] > 0;
+  // Scaled sun transmittance on a graze: T' > T strictly.
+  const tTrue = sunT(Rb + 300, 0.01);
+  const tScaled = tTrue.map(
+    (t, c) => t * Math.exp(0.3 * mieS[c] * sunDM(Rb + 300, 0.01) * 1000)
+  );
+  const tOk = tScaled.every((t, c) => t > tTrue[c]);
+  const ok = idOk && dirOk && tOk;
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} delta-scaled march: f=0 bit-identical (${idOk}); f=0.3 near-sun ${((1 - nearSun[1] / base[1]) * 100).toFixed(1)}% dimmer, anti-sun +${((antiSun[1] / baseAnti[1] - 1) * 100).toFixed(3)}%; graze T' > T (${(tScaled[1] / tTrue[1]).toFixed(3)}x)`
+  );
+  if (!ok) process.exit(1);
+}

@@ -115,7 +115,40 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   // these defaults for paper-standard air).
   const mieScat = uniform(new Vector3(3.996e-6, 3.996e-6, 3.996e-6));
   const mieAbs = uniform(new Vector3(4.44e-7, 4.44e-7, 4.44e-7));
-  const mieG = uniform(0.8);
+  // Delta similarity (aureole.js, gated by aureole-reference.mjs):
+  // fDiff is the per-channel fraction of the Mie SCATTERING carried
+  // by the coarse-mode diffraction spike (dust MITR + sea-salt
+  // SSCM through their printed 1/Q shares); gPrime is the smooth
+  // remainder's asymmetry with f g_spike + (1 - f) g' = g held
+  // exactly on the CPU. Every march below runs the SCALED system
+  // (Joseph, Wiscombe & Weinman 1976): scattering (1-f) sigma_s,
+  // extinction sigma_e - f sigma_s, phase CS(g') - and the spike
+  // itself is drawn per pixel on the dome at first scattering
+  // order, where the sky-view LUT could never resolve it (the same
+  // resolution argument Hillaire 2020 uses to composite the sun
+  // disc after the LUT). f = 0 - no measured coarse aerosol -
+  // collapses every scaled relation to identity: the pre-aureole
+  // system, bit for bit (the existing GPU probes run exactly
+  // there).
+  const fDiff = uniform(new Vector3(0, 0, 0));
+  const gPrime = uniform(new Vector3(0.8, 0.8, 0.8));
+  // cos of the drawn-cone half angle; 2 disables the branch (no
+  // direction has cos > 1). aureole.js computes the cone as the
+  // angle where the spike falls under 1% of the full smooth source.
+  const spikeCosCone = uniform(2);
+  const spikeThetaMax = uniform(0.5236);
+  const SPIKE_N = 256;
+  const spikeTex = new DataTexture(
+    new Float32Array(SPIKE_N * 4),
+    SPIKE_N,
+    1,
+    RGBAFormat,
+    FloatType
+  );
+  spikeTex.magFilter = LinearFilter;
+  spikeTex.minFilter = LinearFilter;
+  spikeTex.needsUpdate = true;
+  const spikeNode = texture(spikeTex);
   const sunMu = uniform(0.5);
   const camH = uniform(300);
   const exposure = uniform(28);
@@ -332,18 +365,22 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       .add(1.0)
       .mul(3.0 / (16.0 * 3.14159265))
   );
-  // Henyey-Greenstein x Cornette-Shanks with the MEASURED asymmetry
-  // (GEFS-Aerosols ASYSFK uniform; 0.8 when no measurement).
+  // Henyey-Greenstein x Cornette-Shanks at the SCALED asymmetry g'
+  // (per channel - the delta split's f is wavelength-dependent, so
+  // the remainder's g' is too). With no measured coarse aerosol
+  // gPrime carries the measured 340 nm ASYSFK (0.8 default) in all
+  // channels and this is the pre-aureole phase exactly.
   const phaseM = Fn(([c]) => {
-    const g2 = mieG.mul(mieG);
+    const g2 = gPrime.mul(gPrime);
     return g2
       .oneMinus()
       .div(g2.add(2.0))
       .mul(3.0 / (8.0 * 3.14159265))
       .mul(c.mul(c).add(1.0))
-      .div(pow15(g2.add(1.0).sub(c.mul(mieG).mul(2.0))));
+      .div(pow15(g2.add(1.0).sub(gPrime.mul(c).mul(2.0))));
   });
-  // x^1.5 without pow's undefined-for-negative edge.
+  // x^1.5 without pow's undefined-for-negative edge (componentwise
+  // - phaseM feeds it a vec3 since the split went per-channel).
   const pow15 = Fn(([x]) => {
     const m = max(x, 1e-6);
     return m.mul(sqrt(m));
@@ -396,6 +433,13 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   const skyTexNode = texture(skyLut.tex);
 
   const sunT = Fn(([r, mu]) => tTexNode.sample(tParamsToUv(r, mu)).rgb);
+  // Delta-scaled sun transmittance to a march point: true
+  // Beer-Lambert times exp(+f sigma_s D_M) - the T LUT's alpha
+  // carries D_M in km. At f = 0 the factor is exactly 1.
+  const sunTS = Fn(([r, mu]) => {
+    const s = tTexNode.sample(tParamsToUv(r, mu));
+    return s.rgb.mul(exp(fDiff.mul(mieScat).mul(s.a.mul(1000.0))));
+  });
   const psiMS = Fn(
     ([r, mu]) =>
       msTexNode.sample(vec2(mu.mul(0.5).add(0.5), r.sub(RB).div(RT - RB))).rgb
@@ -421,14 +465,22 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     const N = 40;
     const dt = d.div(N);
     const tau = vec3(0).toVar();
+    // Alpha carries the Mie reference-density column D_M = INT
+    // exp(-h/1200) ds along the same path, in KILOMETRES (a graze
+    // path reaches ~220 km-equivalent - metres would overflow the
+    // fp16 texel). The delta-scaled transmittance is then exactly
+    // T' = T exp(+f sigma_s D_M): forward-diffracted light stays
+    // in the quasi-direct beam (the scaled system's own Beer law).
+    const dm = float(0).toVar();
     Loop(N, ({i}) => {
       const ti = float(i).add(0.5).mul(dt);
       const h = sqrt(
         r.mul(r).add(ti.mul(ti)).add(r.mul(ti).mul(mu).mul(2.0))
       ).sub(RB);
       tau.addAssign(extinction(h).mul(dt));
+      dm.addAssign(densities(h).y.mul(dt));
     });
-    return vec4(exp(tau.negate()), 1.0);
+    return vec4(exp(tau.negate()), dm.div(1000.0));
   });
 
   // ---------- multiple scattering (rebuilt when aerosols or the
@@ -476,10 +528,17 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         );
         const h = ri.sub(RB);
         const dens = densities(h);
-        const scat = rayleighS.mul(dens.x).add(mieScat.mul(dens.y));
-        const ext = extinction(h);
+        // The SCALED system (delta similarity): Mie scattering
+        // keeps only the smooth remainder (1 - f) sigma_s, the
+        // extinction drops the spike's share, and the sun
+        // transmittance carries the spike's light in the
+        // quasi-direct beam (sunTS). f = 0 is the old system.
+        const scat = rayleighS
+          .mul(dens.x)
+          .add(mieScat.mul(fDiff.oneMinus()).mul(dens.y));
+        const ext = extinction(h).sub(mieScat.mul(fDiff).mul(dens.y));
         const muSi = clamp(r.mul(muS).add(ti.mul(cSun)).div(ri), -1.0, 1.0);
-        const Ts = sunT(ri, muSi);
+        const Ts = sunTS(ri, muSi);
         const S = scat
           .mul(phaseR(cSun).add(phaseM(cSun)))
           .mul(0.5)
@@ -502,9 +561,10 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         // defaults it to zero and exposes it as an input; the old
         // 0.3 literal here was uncited). The theme feeds Payne
         // (1972) 0.06 where the box has sea, 0 inland until a
-        // measured land albedo earns its citation.
+        // measured land albedo earns its citation. Scaled sun
+        // transmittance like every march term.
         Li.addAssign(
-          T.mul(sunT(float(RB), muSg))
+          T.mul(sunTS(float(RB), muSg))
             .mul(max(muSg, 0.0))
             .mul(groundAlb)
             .mul(1 / Math.PI)
@@ -563,10 +623,15 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         const h = ri.sub(RB);
         const dens = densities(h);
         const scatR = rayleighS.mul(dens.x);
-        const scatM = mieScat.mul(dens.y);
-        const ext = extinction(h);
+        // The SCALED system (delta similarity, aureole.js): the
+        // smooth Mie remainder scatters here; the spike's share
+        // travels in the quasi-direct beam (scaled extinction,
+        // scaled sun transmittance) and is drawn on the dome at
+        // first order. f = 0 makes every line the old system.
+        const scatM = mieScat.mul(fDiff.oneMinus()).mul(dens.y);
+        const ext = extinction(h).sub(mieScat.mul(fDiff).mul(dens.y));
         const muSi = clamp(r.mul(sunMu).add(ti.mul(cSun)).div(ri), -1.0, 1.0);
-        const Ts = sunT(ri, muSi);
+        const Ts = sunTS(ri, muSi);
         // chi: sun visibility through the cloud decks at the
         // marched point - scene xz from the horizontal arc, scene
         // y from the altitude datum (a ray above the decks reads
@@ -600,7 +665,7 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         );
         const muG = clamp(r.mul(sunMu).add(dEnd.mul(cSun)).div(rG), -1.0, 1.0);
         L.addAssign(
-          T.mul(sunT(rG, muG))
+          T.mul(sunTS(rG, muG))
             .mul(groundAlb)
             .mul(max(muG, 0.0))
             .mul(1 / Math.PI)
@@ -814,6 +879,65 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // component divided by the flatten factor; clamp keeps the
     // limb law's exact zero at the (elliptical) edge, as before.
     const cSunG = dot(v, sunDirW);
+    // The AUREOLE: the coarse-mode diffraction spike's first
+    // scattering order, drawn per pixel exactly where the sky-view
+    // LUT cannot resolve it - the same resolution argument Hillaire
+    // (2020) gives for compositing the sun disc after the LUT. The
+    // marches above run the delta-SCALED system (the spike's light
+    // rides the quasi-direct beam); here that light scatters ONCE
+    // into its true angular pattern:
+    //   L = P_spike(theta) * INT sigma_s f * T'_sun * chi * T'_view ds
+    // with theta constant along the whole ray (sun and view fixed),
+    // so the pattern factors out of the march. Everything scaled
+    // (T'), cloud-shadowed (chi - the aureole dies behind a deck)
+    // and eclipse-dimmed (sunE). Outside the CPU-computed cone the
+    // term sits under 1% of the smooth source; with no measured
+    // coarse aerosol spikeCosCone = 2 and the branch never runs.
+    If(cSunG.greaterThan(spikeCosCone), () => {
+      const mu = v.y;
+      const dGround = raySphere(r, mu, float(RB)).toVar();
+      const dTop = raySphere(r, mu, float(RT)).toVar();
+      const dEnd = select(dGround.greaterThan(0.0), dGround, dTop).toVar();
+      const STEPS = 32;
+      const dt = dEnd.div(STEPS).toVar();
+      const Tv = vec3(1).toVar();
+      const Iss = vec3(0).toVar();
+      Loop(STEPS, ({i: s}) => {
+        const ti = float(s).add(0.5).mul(dt);
+        const ri = sqrt(
+          r.mul(r).add(ti.mul(ti)).add(r.mul(ti).mul(mu).mul(2.0))
+        );
+        const h = ri.sub(RB);
+        const dens = densities(h);
+        const sig = mieScat.mul(fDiff).mul(dens.y);
+        const ext = extinction(h).sub(sig);
+        const muSi = clamp(r.mul(sunMu).add(ti.mul(cSunG)).div(ri), -1.0, 1.0);
+        const Ts = sunTS(ri, muSi);
+        const chi = cloudShadow
+          ? (() => {
+              // Same scene mapping as the LUT marches: v.xz IS
+              // ce * horizontal direction, so the arc is direct.
+              const p = aerialCamXZ.add(v.xz.mul(ti.mul(SCENE_PER_M)));
+              const y = asinh(h.sub(shadowElev0).div(500)).mul(16);
+              return cloudShadow.transmittance(vec3(p.x, y, p.y));
+            })()
+          : float(1);
+        const S = sig.mul(Ts).mul(chi);
+        const stepT = exp(ext.mul(dt).negate());
+        Iss.addAssign(Tv.mul(S.sub(S.mul(stepT))).div(max(ext, vec3(1e-9))));
+        Tv.mulAssign(stepT);
+      });
+      // sin-form angle: acos loses precision exactly where the
+      // spike lives (theta -> 0); asin of the cross length holds it.
+      const sinTh = cross(v, sunDirW).length();
+      const th = asin(clamp(sinTh, 0.0, 1.0));
+      const uS = th
+        .div(spikeThetaMax)
+        .clamp(0.0, 1.0)
+        .mul((SPIKE_N - 1) / SPIKE_N)
+        .add(0.5 / SPIKE_N);
+      col.addAssign(spikeNode.sample(vec2(uS, 0.5)).rgb.mul(Iss).mul(sunE));
+    });
     // Inside the transfer band at a low sun, the disc is drawn
     // through the LUT: the fragment's APPARENT altitude reads the
     // TRUE altitude each channel sees there, and disc membership
@@ -1218,14 +1342,30 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       // 680/550/440 nm channels).
       if (Array.isArray(groundAlbedo)) groundAlb.value.fromArray(groundAlbedo);
       else if (groundAlbedo != null) groundAlb.value.setScalar(groundAlbedo);
-      // mie = {scat: [r,g,b], abs: [r,g,b], g} (1/m at h = 0) from
-      // aerosol.js mieCoefficients - measured when /aerosol
-      // answers, the Hillaire defaults calibrated to the measured
-      // total AOD otherwise.
+      // mie = {scat: [r,g,b], abs: [r,g,b], g, aureole?} (1/m at
+      // h = 0) from aerosol.js mieCoefficients - measured when
+      // /aerosol answers, the Hillaire defaults calibrated to the
+      // measured total AOD otherwise. aureole (aureole.js
+      // aureoleSet) carries the delta split: per-channel spike
+      // fraction, scaled asymmetry g', the drawn pattern and its
+      // cone. Without it f = 0 and the whole scaled system is the
+      // old system exactly.
       if (mie) {
         mieScat.value.fromArray(mie.scat);
         mieAbs.value.fromArray(mie.abs);
-        mieG.value = mie.g;
+        const aur = mie.aureole;
+        if (aur) {
+          fDiff.value.fromArray(aur.fDiff);
+          gPrime.value.fromArray(aur.gPrime);
+          spikeThetaMax.value = aur.thetaMaxRad;
+          spikeCosCone.value = Math.cos(aur.coneRad);
+          spikeTex.image.data.set(aur.curve);
+          spikeTex.needsUpdate = true;
+        } else {
+          fDiff.value.set(0, 0, 0);
+          gPrime.value.setScalar(mie.g);
+          spikeCosCone.value = 2;
+        }
       }
       sunMu.value = sunDir.y;
       camH.value = camHMetres;
@@ -1236,7 +1376,15 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       // multiple-scattering LUT also carries the fed ground albedo
       // (sea/land differs by anchor), so its key includes it.
       const mieKey = mie
-        ? mie.scat.join() + '|' + mie.abs.join() + '|' + mie.g
+        ? mie.scat.join() +
+          '|' +
+          mie.abs.join() +
+          '|' +
+          mie.g +
+          '|' +
+          (mie.aureole
+            ? mie.aureole.fDiff.join() + '|' + mie.aureole.gPrime.join()
+            : 'nof')
         : lastMie;
       const msKey =
         mieKey +
