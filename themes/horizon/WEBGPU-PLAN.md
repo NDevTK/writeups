@@ -5214,6 +5214,34 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   by geometry instead of by tuning. Still legacy-fed, named:
   the near sea/snow glitter sparkles, the far strip's glints,
   the cloud deck's direct beam.
+- DONE (the golden-hour "grey disc" hunt, Aug 7 - a
+  verification pass whose honest outcome is NO DEFECT): the
+  stage-4 captures flagged a large grey disc bounded near the
+  22-deg radius over the sunset, identical on both A/B sides.
+  The hunt, by harness bisection on the live instrument: it
+  dies with ?halo=0 and with nothing else (the first bisect's
+  cloudhigh=0 leg was VOID - appending a duplicate URL key
+  loses to the first occurrence, a lesson for future bisects).
+  Difference images against the halo-off frame show the family
+  adds light only OUTSIDE the sharp 21.8-deg inner edge -
+  the "grey disc interior" is the sky itself, darker by
+  contrast, which is exactly how a real 22-deg halo reads
+  (the classic dark interior), with the 46-deg ring's wing
+  filling the frame at capture scale. The amplitude chain was
+  then suspected of using the wrong frame (ground tH vs the
+  pillar's crystal-local deck frame) - REFUTED BY THE CLOSURE
+  IDENTITY: along the sun sight line pre-sunset, deck-beam x
+  view-segment IS the ground transmittance (T_seg x T_rest =
+  T_full, the gated identity), so the ground tH is correct
+  physics for the whole plate family while the sun is up; the
+  frames only diverge post-sunset, which the family's
+  sun.alt > 0 gate already excludes (the post-sunset ring on
+  still-lit cirrus stays a named future item with the pillar's
+  share fold as its template). The prominence in the captures
+  traces to the harness URL forcing halooccur=1: without it
+  the episode process has the ring hour OFF at the fixture
+  time and the sunset sky renders clean - measured 27% of
+  cirrus hours, exactly as the intermittency pass shipped.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
