@@ -316,6 +316,7 @@
     <script type="module">
       import * as THREE from 'three';
       import {
+        discVisibleFrac,
         pathToRadiusT,
         sunTransmittanceJS
       } from './horizon/sun-transmittance.js';
@@ -4453,6 +4454,11 @@
       const tmpC = new THREE.Color();
       let lastIrrT = -1e9;
       let irrResolves = 0;
+      // The legacy-scale sun feed for the custom scatter systems
+      // (see the sun chain): assigned each frame AFTER the far
+      // feeds read it, so like the old direct intensity read they
+      // carry a one-frame lag.
+      let sunIFeedLegacy = 0;
       // The irradiance readback is async on WebGPURenderer (no
       // pipeline stall); until the first read resolves, skyIrr is a
       // guess. Systems with TEMPORAL HISTORY (the cloud buffer) must
@@ -8979,8 +8985,13 @@
           state.ktAmbient != null ? state.ktAmbient : 1 - cloudy * 0.3;
         const moonSkyE = skyTransferE(moon.alt);
         const sunSkyE = skyTransferE(sun.alt);
+        // The sun's sky is linear in the uncovered photosphere
+        // (the same linearity the dome's sunE factor rides), so a
+        // solar eclipse dims the adaptation luminance with it -
+        // the eye adapts INTO totality.
         const laCd =
-          ((lum3(sunSkyE[0], sunSkyE[1], sunSkyE[2]) +
+          ((lum3(sunSkyE[0], sunSkyE[1], sunSkyE[2]) *
+            (1 - (astro.eclipse || 0)) +
             lum3(moonSkyE[0], moonSkyE[1], moonSkyE[2]) * e0Moon) *
             dimCloudA *
             E0_LUX) /
@@ -9167,9 +9178,8 @@
         // The far horizon breathes the same measured state.
         uFarVis.value = Math.max(visEff, 400);
         uFarSunDir.value.copy(sunVec);
-        uFarSunCol.value
-          .copy(sunLight.color)
-          .multiplyScalar(sunLight.intensity);
+        // Far-strip sea glints: legacy feed (see sunIFeedLegacy).
+        uFarSunCol.value.copy(sunLight.color).multiplyScalar(sunIFeedLegacy);
         uFarSkyIrr.value.copy(skyIrr).multiplyScalar(irrGuard * srcE0);
         scotFold(uFarSkyIrr.value);
         if (landWSA)
@@ -9229,8 +9239,43 @@
         // corona, sunset band) by this exact factor - the cirrus
         // corona is the diffracted share of it coming back.
         if (atmo.ok) atmo.sunDisc.cirrusT.value = cirrusT;
-        sunLight.intensity =
+        // The sun's DISPLAY intensity, stage 4 of the adaptation
+        // frame: three r185's physical lights put the Lambert
+        // 1/pi in the material, so a directional light whose
+        // colour x intensity equals the transmitted beam
+        // irradiance (per unit E0, display-projected) times the
+        // shared adaptive exposure lights every standard material
+        // at exactly albedo x E_beam x cos / pi x exposure - the
+        // same absolute frame the dome renders. The three hand
+        // units retire: the 2.4 display gain (the exposure IS the
+        // gain now), the 0.18 offset (a phantom floor that kept
+        // sun-facing slopes lit at T -> 0 - and would have been
+        // x700 under twilight adaptation, since sin(max(alt, 0))
+        // FREEZES the beam at its horizon value below the
+        // horizon), and the day > 0 hard gate (the setting disc's
+        // own visible-photosphere fraction is the physical gate:
+        // discVisibleFrac, the closed circular segment at the
+        // REFRACTED apparent altitude - the beam fades over the
+        // one solar diameter the real sunset takes, then 0). The
+        // eclipse factor is the uncovered fraction EXACTLY (the
+        // 0.93 display fudge retires; totality now actually
+        // extinguishes the beam, and the adaptation luminance
+        // carries the same factor so the eye adapts into it).
+        // The colour split is unchanged: colour carries the
+        // normalised chromaticity, intensity the magnitude -
+        // colour x intensity = st x exposure exactly.
+        const sunILegacy =
           (0.18 + 2.4 * stLum) * (day > 0 ? 1 : 0) * cirrusT * (1 - 0.93 * ecl);
+        const discFrac = discVisibleFrac(sunApp, astro.sunAngR || 0.00465);
+        sunLight.intensity = adaptPin
+          ? sunILegacy
+          : stMax * skyExposure * discFrac * cirrusT * (1 - ecl);
+        // Custom scatter systems (sea glints near and far, the
+        // ocean's own sun, the cloud deck's direct beam) keep the
+        // LEGACY feed until each one's radiometry is verified on
+        // the new scale - their shaders were calibrated against
+        // it, and a silent 9x jump is not a verification.
+        sunIFeedLegacy = adaptPin ? sunLight.intensity : sunILegacy;
         // The cirrus corona: rings only when the MEASURED 250 hPa
         // temperature sits in Sassen's corona-cirrus regime and a
         // thin veil actually fronts the sun - the amplitude is the
@@ -9309,11 +9354,22 @@
             state.ktAmbient != null ? state.ktAmbient : 1 - cloudy * 0.3;
           const dim = (1 - 0.85 * ecl) * dimCloud;
           ambient.intensity = 1;
-          // 1.1 puts the clear-sky diffuse fraction at ~20% of direct,
-          // the measured real-world ratio.
+          // The readback is the cosine-weighted MEAN RADIANCE
+          // (E/pi - irradianceNode divides by its weight sum),
+          // and three's physical Lambert divides by pi again, so
+          // the hemisphere colour must be E x exposure = readback
+          // x PI x exposure for the lit surface to come out at
+          // albedo x E x exposure / pi exactly. The old 1.1 was
+          // this pi hand-tuned 2.9x low - the same 2.9x the sun's
+          // 2.4 gain was low - the whole legacy scene sat one
+          // consistent factor under the dome's absolute frame,
+          // which is why it LOOKED right and measured wrong. The
+          // pin keeps it.
           ambient.color
             .copy(skyIrr)
-            .multiplyScalar(expo * 1.1 * dim * irrGuard * srcE0);
+            .multiplyScalar(
+              expo * (adaptPin ? 1.1 : Math.PI) * dim * irrGuard * srcE0
+            );
           if (adaptPin) {
             // legacy moonlit term, kept under the A/B pin
             tmpC.setRGB(0.05, 0.055, 0.075).multiplyScalar(moonUp * 14);
@@ -9342,18 +9398,32 @@
               moonSkyE[1] * e0Moon,
               moonSkyE[2] * e0Moon
             ]);
+            // The table IS the irradiance E (not E/pi), so the
+            // hemisphere colour is E x exposure directly - the
+            // same lit-surface law as the readback path, which
+            // carries pi to undo its own mean-radiance
+            // convention. The 1.1 retires here too.
             tmpC
               .setRGB(pMoon[0], pMoon[1], pMoon[2])
-              .multiplyScalar(expo * 1.1 * dimCloudA);
+              .multiplyScalar(expo * dimCloudA);
           }
           ambient.color.add(tmpC);
           // Ground half: sky plus direct sun bounced off the terrain
-          // albedo (0.25 grass/rock to 0.7 snow).
+          // albedo (0.25 grass/rock to 0.7 snow). The bounce is
+          // Lambertian: ground radiance = albedo x E_horizontal /
+          // pi, and the pi of the hemisphere it re-fills cancels
+          // that pi - so the ground colour is albedo x (beam x
+          // sin(alt) + sky E) x exposure, which is EXACTLY albedo
+          // x (sunColour x intensity x sin + ambient colour) in
+          // the new units. The 0.55 was this 1 hand-tuned low;
+          // the pin keeps it.
           const alb = 0.25 + 0.45 * terrainUniforms.uSnowy.value;
           tmpC
             .copy(sunLight.color)
             .multiplyScalar(
-              sunLight.intensity * Math.max(Math.sin(sun.alt), 0) * 0.55
+              sunLight.intensity *
+                Math.max(Math.sin(sun.alt), 0) *
+                (adaptPin ? 0.55 : 1)
             )
             .add(ambient.color);
           ambient.groundColor.copy(tmpC).multiplyScalar(alb);
@@ -10200,9 +10270,10 @@
           }
           for (const c of oceanCascades) c.update(oceanTime);
           water.sunDirection.value.copy(sunVec);
+          // Ocean specular: legacy feed (see sunIFeedLegacy).
           water.sunColor.value
             .copy(sunLight.color)
-            .multiplyScalar(sunLight.intensity);
+            .multiplyScalar(sunIFeedLegacy);
           // Measured-chlorophyll body colour (Morel/CIE) once the /chlor
           // fetch has resolved; until then the build-time placeholder
           // stands. Applied here so a roam sea-rebuild keeps the colour.
@@ -10307,21 +10378,26 @@
         if (bldNightU) bldNightU.value = lightsNight;
         terrainUniforms.uWindVec.value.set(windV.x, windV.z);
         terrainUniforms.uSunDirW.value.copy(sunVec);
+        // Near sea/snow glitter: legacy feed (see sunIFeedLegacy).
         terrainUniforms.uSunCol.value
           .copy(sunLight.color)
           .multiplyScalar(
-            sunLight.intensity * (sun.alt > 0.01 ? 1 : 0) * (1 - cloudy * 0.8)
+            sunIFeedLegacy * (sun.alt > 0.01 ? 1 : 0) * (1 - cloudy * 0.8)
           );
         // Diffuse-skylight fraction for the Ross-Li blend (the
         // blue-sky albedo weighting, Roman et al. 2010): the SAME
         // two irradiances the rig lights the terrain with, as
         // relative luminance - direct beam on the horizontal vs the
-        // hemisphere ambient.
+        // hemisphere ambient. Reads the RIG's sun (colour x
+        // intensity), not the glint feed - on the physical frame
+        // both sides are E x exposure, so the mix is the true
+        // diffuse fraction.
         {
-          const sc = terrainUniforms.uSunCol.value;
+          const sc = sunLight.color;
           const ac = ambient.color;
           const dirL =
             (0.2126 * sc.r + 0.7152 * sc.g + 0.0722 * sc.b) *
+            sunLight.intensity *
             Math.max(Math.sin(sun.alt), 0);
           const difL =
             ambient.intensity * (0.2126 * ac.r + 0.7152 * ac.g + 0.0722 * ac.b);
@@ -10456,9 +10532,10 @@
         cloudsActive = !!cloudSys && (cLow > 2 || cMid > 2);
         if (cloudsActive) {
           cloudSys.shared.sunDirW.value.copy(sunVec);
+          // Cloud direct beam: legacy feed (see sunIFeedLegacy).
           cloudSys.shared.sunCol.value
             .copy(sunLight.color)
-            .multiplyScalar(Math.max(sunLight.intensity, 0.02) * 0.55);
+            .multiplyScalar(Math.max(sunIFeedLegacy, 0.02) * 0.55);
           // Cloud ambient is the same integrated sky the terrain gets.
           if (atmo.ok)
             cloudSys.shared.ambCol.value

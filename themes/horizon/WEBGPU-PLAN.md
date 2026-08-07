@@ -5134,6 +5134,58 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     the star sprites keep their catalogue colours below the
     mesopic range (their own display system), and the direct-sun
     scene-light map is unchanged (its own pass, as named).
+- DONE (photometric adaptation, stage 4, Aug 7 twenty-third
+  push - the direct-sun scene-light map lands on the frame): the
+  named coupled system, closed by a units audit instead of a
+  recalibration. three r185's physical lights put the Lambert
+  1/pi IN THE MATERIAL, and the ambient readback is the
+  cosine-weighted MEAN RADIANCE (E/pi - irradianceNode divides
+  by its own weight sum), so the physical scene-light rig is
+  pure algebra: directional colour x intensity = transmitted
+  beam st x adaptive exposure (lit surface = albedo x E_beam x
+  cos x expo / pi, the dome's own absolute frame); hemisphere
+  colour = readback x PI x exposure; ground bounce = albedo x
+  (beam x sin(alt) + sky E) x exposure with NO factor (the
+  bounce's Lambert pi cancels the hemisphere's). THE AUDIT
+  EXPLAINED THE OLD NUMBERS: the 2.4 sun gain, the 1.1 ambient
+  factor and the 0.55 bounce factor were all the same ~2.9x
+  low - the whole legacy scene sat one consistent factor under
+  the dome's absolute level, which is why it LOOKED coherent
+  and measured wrong. All three retire (the exposure is the
+  gain now); the 0.18 offset retires as a PHANTOM FLOOR - and
+  a live bug: sin(max(alt, 0)) freezes the beam at its horizon
+  value below the horizon, which the old 0.18 + day > 0 pair
+  masked and the adaptive twilight exposure would have amplified
+  x700 on sun-facing slopes. The physical gate is the setting
+  disc itself: discVisibleFrac (sun-transmittance.js), the
+  closed circular segment at the REFRACTED apparent altitude -
+  discObscuration's two-circle lens in the occluder -> infinity
+  limit; gated in atmo-reference (half at centre-set exact,
+  symmetric to 1e-12, monotone, step fallback; limb darkening
+  stated out). The eclipse fudge 1 - 0.93 x ecl retires to the
+  exact uncovered fraction, and the adaptation luminance's sun
+  term now carries the same (1 - ecl) - the eye ADAPTS into
+  totality by the same linearity everything else rides. The
+  Ross-Li diffuse fraction reads the rig's own two irradiances
+  again (it had drifted onto the glint feed). SCOPED WITH NAMES:
+  the four custom scatter systems (near sea/snow glitter, the
+  far strip's glints, the ocean's specular sun, the cloud
+  deck's direct beam) stay on an explicit sunIFeedLegacy - each
+  shader's radiometry was calibrated against the legacy scale
+  and a silent 9x jump is not a verification; each is a named
+  follow-up. ?adapt=0 pins the complete legacy display system
+  (curve, sun map, 1.1, 0.55, 0.93, day gate) so the A/B
+  compares SYSTEMS, not knobs. A/B captures: DAY sun 30 deg
+  (24 -> 31) - the terrain joins the dome's frame, snow and
+  forest lit, nothing clips; GOLDEN HOUR sun +2.6 deg (52 -> 83) - the beam's transmitted reddening lands on the
+  sun-facing slopes; TWILIGHT -3.2 deg (83 -> 733) - the beam
+  is OFF (discFrac 0), terrain rides the pi-ambient through
+  the twilight purple. CAUGHT ON THE SIDE, pre-existing (both
+  A/B sides identically): a low-sun grey DISC bounded near the
+  22-deg radius over the sunset azimuth at golden hour - some
+  low-sun dome/optics term paints its interior through the
+  fog; needs its own hunt (range-mask family, sunset band, or
+  aureole cone are the suspects).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

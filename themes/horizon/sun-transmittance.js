@@ -105,3 +105,20 @@ export function sunTransmittanceJS(cosZenith, mie, hObs = 300) {
     Math.exp(-(33.1e-6 * tr + mieExt(2) + 0.085e-6 * oz))
   ];
 }
+
+// The SETTING DISC: visible photosphere fraction of a uniform
+// disc of angular radius angR whose centre sits at APPARENT
+// altitude altApp behind a straight horizon - the circular
+// segment in closed form (discObscuration's two-circle lens in
+// the occluder-radius -> infinity limit). Half at centre-set
+// exactly; refraction belongs in the caller's altApp. Limb
+// darkening is deliberately ignored here (a ~% effect on the
+// last half-degree, stated) - the drawn disc keeps its own
+// Hestroffer & Magnan law.
+export function discVisibleFrac(altAppRad, angRRad) {
+  if (!(angRRad > 0)) return altAppRad > 0 ? 1 : 0;
+  const x = altAppRad / angRRad;
+  if (x >= 1) return 1;
+  if (x <= -1) return 0;
+  return (Math.acos(-x) + x * Math.sqrt(1 - x * x)) / Math.PI;
+}

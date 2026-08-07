@@ -882,6 +882,36 @@ const sunDM = (r, mu) => {
 }
 
 {
+  // The setting disc (discVisibleFrac): the closed circular
+  // segment that gates the terrain's direct beam - half exactly
+  // at centre-set, whole/none one radius either side, symmetric
+  // (f(x) + f(-x) = 1, a uniform disc), monotone through the
+  // sunset, and degenerate radius falls back to a step. The
+  // legacy day > 0 hard gate and the 0.18 phantom floor retire
+  // against this and the transmitted beam itself.
+  const {discVisibleFrac} = await import('./sun-transmittance.js');
+  const R = 0.00465;
+  let ok = discVisibleFrac(0, R) === 0.5;
+  ok = ok && discVisibleFrac(R, R) === 1 && discVisibleFrac(-R, R) === 0;
+  ok =
+    ok && discVisibleFrac(2 * R, R) === 1 && discVisibleFrac(-2 * R, R) === 0;
+  let prev = -1;
+  for (let x = -1.2; x <= 1.21; x += 0.05) {
+    const f = discVisibleFrac(x * R, R);
+    if (!(f >= prev)) ok = false;
+    prev = f;
+    const sym = discVisibleFrac(x * R, R) + discVisibleFrac(-x * R, R);
+    if (Math.abs(sym - 1) > 1e-12) ok = false;
+  }
+  ok =
+    ok && discVisibleFrac(0.001, 0) === 1 && discVisibleFrac(-0.001, 0) === 0;
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} setting disc: closed segment - half at centre-set exact, symmetric to 1e-12, monotone, step fallback`
+  );
+  if (!ok) process.exit(1);
+}
+
+{
   // The sky-transfer table (adaptation.js MOONSKY_*): re-derive
   // three rows with THIS gate's own march - the same texel
   // elevations, cosine-weighted over the upper hemisphere. The
