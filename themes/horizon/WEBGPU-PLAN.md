@@ -4179,6 +4179,38 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   a real scene, pinned or live. Verified with the corrected mie:
   disc T matches the CPU twin to 1.6% per channel. Gate after
   integration: 87 reference sets + 5 GPU probes green.
+- DONE (the drawn disc onto the measured cirrus column, Aug 7
+  third push - the corona entry's remaining scope item): the
+  dome's DIRECT solar image - the high-sun disc with its limb and
+  spots, the totality corona riding it, and the sunset
+  transfer-band disc - now dims by e^-tau_slant of the same
+  Sassen & Comstock column the terrain's sunlight and the cirrus
+  corona already ride (ONE cirrusTd uniform, fed the exact
+  cirrusT the sunlight computes; default 1 keeps every probe page
+  and the no-cirrus sky bit-identical). The energy pair is now
+  honest at first scattering order and the gate SAYS so: new
+  landmark - 1 - e^-tau(1+tau) lies in [0, tau^2/2] across the
+  physical range, with the drawn corona exactly half the
+  scattered first order (the geometric large-angle half feeds the
+  halo/optics territory, still display-gained - named below).
+  Scope: the MOON disc is a mesh in the display frame (its cirrus
+  dimming stays with the veil until the moon-optics radiometric
+  pass); the ambient SKY's response to cirrus (every LUT march is
+  lit by the unshadowed sun) remains the overcast veil's display
+  job - that is the review list's item (2), a real radiative-
+  transfer pass of its own. BROWSER-VERIFIED against the
+  pre-change pinned capture (same scene, same pin, corona off,
+  cloudhigh 45, sun 32.86 deg): disc-centre float ratio new/old
+  = 0.5385/0.5386/0.5388 per channel vs predicted e^-0.622 =
+  0.5369 - 0.3%, channel-flat as grey ice demands - while the
+  sky 2 deg away is UNCHANGED to the printed digits (6.876 =
+  6.876): the multiplication touched exactly the direct image
+  and nothing else. Also recorded: the AMS
+  downloadpdf path that served Sassen & Comstock 2001 in this
+  session 403s (CloudFront) on later attempts for Miles et al.
+  2000 and the OPAC BAMS paper - the droplet-corona and desert
+  passes should budget the spawned-Chrome + curl-jar bridge for
+  their reading.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

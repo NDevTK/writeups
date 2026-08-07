@@ -8894,6 +8894,11 @@
         // measured column.
         const cHighFrac = (state.cloudHigh ?? state.cloud * 0.3) / 100;
         const cirrusT = Math.exp(-cirrusSlantTau(cHighFrac, Math.sin(sun.alt)));
+        // The DRAWN disc rides the same measured column: the dome
+        // dims the direct solar image (disc, spots, totality
+        // corona, sunset band) by this exact factor - the cirrus
+        // corona is the diffracted share of it coming back.
+        if (atmo.ok) atmo.sunDisc.cirrusT.value = cirrusT;
         sunLight.intensity =
           (0.18 + 2.4 * stLum) * (day > 0 ? 1 : 0) * cirrusT * (1 - 0.93 * ecl);
         // The cirrus corona: rings only when the MEASURED 250 hPa

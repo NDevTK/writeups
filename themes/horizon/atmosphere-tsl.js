@@ -195,6 +195,16 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   corMoonTex.minFilter = LinearFilter;
   corMoonTex.needsUpdate = true;
   const corMoonNode = texture(corMoonTex);
+  // The measured cirrus column over the DIRECT solar image: the
+  // drawn disc (limb, spots), the totality corona riding it and
+  // the sunset transfer-band disc all dim by e^-tau_slant of the
+  // same Sassen & Comstock column the terrain's sunlight and the
+  // cirrus corona already ride - the diffracted share of what the
+  // disc loses is exactly what the corona branch re-adds (first
+  // scattering order; the conservation landmark holds the pair).
+  // 1 (no cirrus, and every probe page's default) is identity.
+  // Grey: large-crystal extinction is flat across the visible.
+  const cirrusTd = uniform(1);
   // Measured total-column ozone (ozone.js, gated): the shipped
   // ozone constants encode exactly 300 DU (Bruneton's own printed
   // construction); absorption is linear in the column, so the
@@ -1118,6 +1128,7 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         bandTNode
           .sample(vec2(uOfAlt(aFrag), 0.5))
           .rgb.mul(acc)
+          .mul(cirrusTd)
           .mul(120.0 / (TAPS_A * TAPS_H))
       );
     }).Else(() => {
@@ -1211,7 +1222,7 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
           spotF.mulAssign(mix(mix(vec3(1.0), sD.rgb, covP), sC.rgb, covU));
         }
         const discT = tTexNode.sample(tParamsToUv(r, v.y)).rgb.toVar();
-        col.addAssign(discT.mul(limb).mul(spotF).mul(120.0));
+        col.addAssign(discT.mul(limb).mul(spotF).mul(cirrusTd).mul(120.0));
         // The corona (Baumbach 1937, AN 263, 121, eq. (5) - read
         // from the original scan; corona.js is the gated mirror):
         // I(rho) = 0.0532 rho^-2.5 + 1.425 rho^-7 + 2.565 rho^-17
@@ -1247,7 +1258,9 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         // radiometry alone.
         const bCentre = float(1.0).div(sunRadU.mul(sunRadU).mul(0.8 * Math.PI));
         col.addAssign(
-          discT.mul(bau.mul(smoothstep(0.98, 1.02, rho)).mul(bCentre.mul(1e-6)))
+          discT
+            .mul(bau.mul(smoothstep(0.98, 1.02, rho)).mul(bCentre.mul(1e-6)))
+            .mul(cirrusTd)
         );
       });
     });
@@ -1338,7 +1351,10 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       dirR: sunDirR,
       dirB: sunDirB,
       flatten: sunFlat,
-      radius: sunRadU
+      radius: sunRadU,
+      // e^-tau_slant of the measured cirrus column (the theme
+      // feeds the SAME cirrusT its sunlight rides); 1 = no veil.
+      cirrusT: cirrusTd
     },
     // Solar-eclipse illumination: the theme sets 1 - obscuration.
     sunE,

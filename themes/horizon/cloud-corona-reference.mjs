@@ -154,6 +154,31 @@ const near = (a, b, t) => Math.abs(a - b) < t;
 }
 
 {
+  // First-order energy conservation of the drawn pair: the disc
+  // dims by e^-tau while the singly scattered light returns as
+  // (tau/2) e^-tau diffracted (the drawn corona) plus the equal
+  // large-angle geometric half - so e^-tau (1 + tau) accounts for
+  // ALL first-order light and misses total energy only at second
+  // scattering order: 1 - e^-tau (1 + tau) = tau^2/2 - ... The
+  // gate holds the deficit under tau^2/2 across the physical
+  // range - extinction is redistribution, not loss.
+  let ok = true;
+  let worst = 0;
+  for (const tau of [0.01, 0.1, 0.3, 0.75, 1, 2]) {
+    const first = Math.exp(-tau) * (1 + tau);
+    const deficit = 1 - first;
+    worst = Math.max(worst, deficit / ((tau * tau) / 2));
+    if (!(deficit >= 0 && deficit <= (tau * tau) / 2)) ok = false;
+    if (!near(2 * coronaAmp(tau), tau * Math.exp(-tau), 1e-15)) ok = false;
+  }
+  check(
+    'disc + corona conserve at first order',
+    ok,
+    `1 - e^-tau(1+tau) in [0, tau^2/2] over tau 0.01..2 (worst fraction ${worst.toFixed(3)}); the drawn corona is exactly half the scattered first order`
+  );
+}
+
+{
   // The measured cirrus column: full cover at the zenith is the
   // printed FARS mean 0.75 exactly; cover scales linearly; the
   // grazing floor matches cirrusT's documented 0.08.
