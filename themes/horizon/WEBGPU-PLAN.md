@@ -3921,6 +3921,30 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   500 nm serves all channels (printed-value convention); the
   droplet/ice diffraction corona through thin cloud is
   optics-lut territory, untouched.
+- HAND-OFF (Aug 6 second session close): the approximation sweep
+  after the aureole pass comes back CLEAN - every grep hit for
+  roughly/guess/hand-tuned/arbitrary in the drawn layers is
+  documentation of a retired guess or a cited value; no
+  undocumented physics constant surfaced. The named next passes,
+  in rough order of value: (1) terrain direct beam onto the
+  scaled T' (the aureole's conservative scope - the spike's
+  quasi-direct share is currently absent from the ground
+  budget, ~f tau_M of the direct term on dusty days); (2) the
+  droplet/ice diffraction corona through thin cloud (the same
+  Airy machinery, sizes from nubis/optics territory); (3) the
+  desert three-mode mixture (OPAC Table 4 printed 269.5/30.5/
+  0.142) behind a source-region test, un-softening in-desert
+  aureoles; (4) bldlod's ramp lift - blocked on a dense-city
+  perf measurement the Grindelwald/Nelson fixtures cannot give.
+  Harness notes that cost time this session, do not rediscover:
+  pkill -f view-serve.mjs KILLS ITS OWN SHELL (the -f pattern
+  matches the wrapper's command line; use a [e] character-class
+  pattern); the SHOOT_CHROME wrapper script with the four
+  SwiftShader flags is REQUIRED for view-serve too (the raw CfT
+  binary drops Dawn's instance in createBuffer at boot); and
+  WEATHER_PINS silencing syncAerosol is why a pinned-clear
+  scene needs the explicit ?aerosol= fixture (which now
+  composes with pins by design).
 - DONE (sky parallax: the celestial group rides with the camera,
   Jul 11): the sunspot verification's "pose aims 1.35 deg high"
   was neither the pose nor the ephemeris - the camera provably
