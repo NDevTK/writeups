@@ -4546,25 +4546,54 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   ansatz I = 1/2[(2+3mu)I+ + (2-3mu)I-] with a dark lower
   boundary gives the emergent gradation L(mu) = E(2+3mu)/(4 pi)
   - zenith 2.5x horizon, flux closure exact by quadrature
-    (landmark; the empirical CIE/Moon-Spencer 3:1 is steeper -
-    documented context, not read, not drawn). THE DRAWN VEIL:
-    veilE = T(tau) x (direct sun x (1-eclipse) + moonlight.js
-    moon + the MEASURED skyIrr ambient), display-projected,
-    x skyExposure; the material carries only (2+3mu)/(4 pi);
-    opacity = the COVER itself (at tau ~12-21 the covered sky's
-    pattern transmission is e^-tau ~ 1e-6 - opaque, so cover
-    measures coverage and nothing else). Retired together: the two
-    hand-picked greys, the cloudy^2 x 0.85 fade and the day gate -
-    night, eclipse and moonlit overcast all EMERGE from the fed
-    irradiance (a full-moon overcast now glows faintly grey, a new
-    -moon overcast is black). overcast-reference: 6 landmarks
-    (printed constants; interlocking tau; the Table-1 identity;
-    closed form = ODE; the tau/(tau+7) corroboration; flux
-    closure + 2.5:1 + fails closed). validate.sh: 88 reference
-    sets. Scope: single slab over a dark base (snow-under-overcast
-    brightening is its own pass); homogeneity per Wood's printed
-    <=10% correction; the fog-colour cGray lerp stays in the
-    scene-light constants item.
+  (landmark; the empirical CIE/Moon-Spencer 3:1 is steeper -
+  documented context, not read, not drawn). THE DRAWN VEIL:
+  veilE = T(tau) x (direct sun x (1-eclipse) + moonlight.js
+  moon + the MEASURED skyIrr ambient), display-projected,
+  x skyExposure; the material carries only (2+3mu)/(4 pi);
+  opacity = the COVER itself (at tau ~12-21 the covered sky's
+  pattern transmission is e^-tau ~ 1e-6 - opaque, so cover
+  measures coverage and nothing else). Retired together: the two
+  hand-picked greys, the cloudy^2 x 0.85 fade and the day gate -
+  night, eclipse and moonlit overcast all EMERGE from the fed
+  irradiance (a full-moon overcast now glows faintly grey, a new
+  -moon overcast is black). overcast-reference: 6 landmarks
+  (printed constants; interlocking tau; the Table-1 identity;
+  closed form = ODE; the tau/(tau+7) corroboration; flux
+  closure + 2.5:1 + fails closed). validate.sh: 88 reference
+  sets. Scope: single slab over a dark base (snow-under-overcast
+  brightening is its own pass); homogeneity per Wood's printed
+  <=10% correction; the fog-colour cGray lerp stays in the
+  scene-light constants item.
+- DONE (the ground-coupled overcast - the white-out, Aug 7 tenth
+  push; closes the veil's dark-base scope the same day it was
+  written): Wiscombe & Warren 1980 READ IN FULL (JAS 37, 2712 -
+  the spectral snow-albedo model). The coupling is the adding
+  method on Meador & Weaver's own conservative R: the slab
+  re-reflects the surface's light, E_dn = T E0 / (1 - a R), with
+  the energy identity R + a T^2 F + (1-a) T F = 1 held EXACTLY
+  by landmark (space's share plus the ground's share is the
+  incident unit) and a = 0 collapsing to the dark-base law
+  bit-for-bit. THE ALBEDO IS MEASURED: the MOD09A1 white-sky
+  [R,G,B] the Hillaire ground term already rides (Payne's 0.06
+  at sea), snow-blended by the MODIS NDSI fractional cover
+  (snowField's mean FSC, now surfaced as snowFSC) through
+  Wiscombe & Warren's DIFFUSE snow albedo - their own Sec. 4
+  statement says the diffuse albedo is the operative one under
+  cloud, and their remark that cloud over snow RAISES albedo at
+  high sun points at exactly this coupling. SNOW_ALBEDO_RGB
+  [0.953, 0.968, 0.98] is read from their Fig. 9 at the standard
+  100 um grain (stated as a figure read), blue highest - a snowy
+  overcast whitens toward blue through the series, and at the
+  continental column full fresh snow multiplies the underside
+  light by ~3.4x: the white-out where ground and sky merge.
+  overcast-reference: 8 landmarks (series = closed form; exact
+  energy closure on the grid; a = 0 identity; the 3.3x printed;
+  channel ordering with the paper's 10-15% age bound). Scope:
+  the terrain's own drawn snow colour (0.87/0.9/0.93 display)
+  is unchanged - re-lighting the GROUND from the coupled
+  E_dn is the scene-light item's business; the veil alone
+  consumes the factor today.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

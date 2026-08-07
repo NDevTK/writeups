@@ -109,3 +109,35 @@ export function overcastRadiance(mu, eBelow) {
   const m = Math.min(Math.max(mu, 0), 1);
   return (Math.max(eBelow, 0) * (2 + 3 * m)) / (4 * Math.PI);
 }
+
+// ---- the ground-coupled overcast (the white-out) ----
+// The slab reflects downwelling light BACK at the ground with the
+// same conservative R (a symmetric diffuse slab), so a bright
+// surface and the deck multiply-reflect: the downwelling under
+// the slab is the geometric series
+//     E_dn = T E0 (1 + aR + (aR)^2 + ...) = T E0 / (1 - a R),
+// the adding method on Meador & Weaver's own R. Energy stays
+// exactly closed (gate landmark): R + a T^2 F + (1-a) T F = 1
+// with F = 1/(1-aR) - what space gets back plus what the ground
+// keeps. a = 0 is the shipped dark-base law unchanged; over full
+// fresh snow at the continental column the factor reaches ~3.4x
+// - the white-out, where Wiscombe & Warren's own Sec. 4 remark
+// points the same way ("the formation of cloud cover over snow
+// should raise its spectral albedo for solar elevations
+// exceeding ~40 deg" - the diffuse albedo is the one that
+// matters under a deck, their statement too).
+export function overcastGroundFactor(tau, albedo, g = CLOUD_G) {
+  const R = overcastAlbedo(tau, g);
+  const a = Math.min(Math.max(albedo || 0, 0), 1);
+  return 1 / (1 - a * R);
+}
+
+// Snow's DIFFUSE visible albedo: Wiscombe & Warren 1980 (JAS 37,
+// 2712, read in full), Fig. 9 at their standard 100 um new-fallen
+// grain - ~0.985 at 0.4 um, ~0.94 at 0.8 um - interpolated
+// linearly in wavelength to the theme's 0.68/0.55/0.44 um
+// channels (blue highest: snow's visible slope). Their printed
+// bound carries the age spread: visible reductions with grain
+// growth "never exceeding 10-15%". Figure-read values, stated as
+// such.
+export const SNOW_ALBEDO_RGB = [0.953, 0.968, 0.98];

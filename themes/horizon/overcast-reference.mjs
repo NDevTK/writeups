@@ -12,7 +12,9 @@ import {
   overcastGamma1,
   overcastAlbedo,
   overcastT,
-  overcastRadiance
+  overcastRadiance,
+  overcastGroundFactor,
+  SNOW_ALBEDO_RGB
 } from './overcast.js';
 import {DROPLET_DE_OBS_UM} from './cloud-corona.js';
 
@@ -186,6 +188,53 @@ const near = (a, b, t) => Math.abs(a - b) < t;
     'emergent (2+3mu)/4pi: flux closes, zenith 2.5x horizon',
     ok,
     `quadrature flux/E = ${(flux / E).toFixed(7)}; gradation ${(overcastRadiance(1, E) / overcastRadiance(0, E)).toFixed(2)}:1; negative irradiance fails closed`
+  );
+}
+
+{
+  // The ground coupling: the adding series summed in closed form
+  // (30-term partial sum matches at 1e-12), a = 0 the shipped
+  // dark-base law exactly, energy EXACTLY closed - what space
+  // gets back (R + a T^2 F) plus what the ground keeps
+  // ((1-a) T F) is the incident unit, algebraically and on the
+  // grid - and the white-out magnitude printed: full fresh snow
+  // over the continental column multiplies the underside light
+  // by ~3.4.
+  let ok = true;
+  const tauC = 21.5;
+  for (const tau of [1, 12.1, 21.5]) {
+    const R = overcastAlbedo(tau);
+    const T = overcastT(tau);
+    for (const a of [0, 0.06, 0.2, 0.968]) {
+      const F = overcastGroundFactor(tau, a);
+      let series = 0;
+      for (let n = 0; n < 140; n++) series += (a * R) ** n;
+      if (!near(F, series, 1e-9)) ok = false;
+      if (!near(R + a * T * T * F + (1 - a) * T * F, 1, 1e-12)) ok = false;
+    }
+    if (!near(overcastGroundFactor(tau, 0), 1, 1e-15)) ok = false;
+  }
+  const white = overcastGroundFactor(tauC, SNOW_ALBEDO_RGB[1]);
+  ok = ok && white > 3 && white < 4;
+  check(
+    'ground-coupled overcast: series, closure, white-out',
+    ok,
+    `factor(tau ${tauC}, snow G ${SNOW_ALBEDO_RGB[1]}) = ${white.toFixed(2)}x (the white-out); energy closes exactly; a = 0 is the dark-base law`
+  );
+}
+
+{
+  // Wiscombe & Warren's snow: blue > green > red (the visible
+  // slope of their Fig. 9), all inside the paper's own visible
+  // band statements (high, with the printed 10-15% age spread
+  // below their standard-grain values still above 0.8).
+  const s = SNOW_ALBEDO_RGB;
+  const ok =
+    s[2] > s[1] && s[1] > s[0] && s[0] > 0.94 && s[2] < 1 && s[0] * 0.85 > 0.8;
+  check(
+    'Wiscombe-Warren snow albedo channels',
+    ok,
+    `RGB [${s.join(', ')}] - blue highest; the printed 15% age drop keeps the visible above 0.8`
   );
 }
 

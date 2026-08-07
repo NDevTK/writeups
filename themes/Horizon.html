@@ -520,7 +520,12 @@
         DROPLET_DIFF_SHARE,
         DROPLET_DE_OBS_UM
       } from './horizon/cloud-corona.js';
-      import {overcastT, overcastTau} from './horizon/overcast.js';
+      import {
+        overcastT,
+        overcastTau,
+        overcastGroundFactor,
+        SNOW_ALBEDO_RGB
+      } from './horizon/overcast.js';
       import {moonIrradianceE0} from './horizon/moonlight.js';
       import {ozoneScale} from './horizon/ozone.js';
       import {
@@ -2221,6 +2226,7 @@
           };
           const N = 96;
           const f = snowField(pxAt, anchor, WORLD, N);
+          snowFSC = f.snowy || 0;
           const tex = new THREE.DataTexture(
             f.data,
             N,
@@ -2895,6 +2901,10 @@
       // shadow-, snow- and heavy-aerosol-free land) leaves the
       // grass Lambertian, and says so.
       let landWSA = null; // measured [R,G,B] white-sky albedo (or null)
+      // Measured mean fractional snow cover of the box (MODIS NDSI
+      // via snowField; 0 until seen) - the overcast veil's ground
+      // coupling reads it.
+      let snowFSC = 0;
       async function syncBrdf() {
         const key =
           'horizon-brdf2-' + state.lat.toFixed(2) + ',' + state.lon.toFixed(2);
@@ -8891,7 +8901,22 @@
             (state.marineAir
               ? DROPLET_DE_OBS_UM.marine
               : DROPLET_DE_OBS_UM.continental) / 2;
-          const tOv = overcastT(overcastTau(reOv));
+          const tauOv = overcastTau(reOv);
+          const tOv = overcastT(tauOv);
+          // Ground coupling (the white-out): the deck re-reflects
+          // the surface's light, and the surface is MEASURED - the
+          // MOD09A1 white-sky albedo (or Payne's 0.06 sea), snow-
+          // blended by the MODIS NDSI fractional cover through
+          // Wiscombe & Warren's diffuse snow albedo. Per channel:
+          // snow is blue-brightest, so a snowy overcast whitens
+          // toward blue exactly as the coupled series says.
+          const baseA = water ? [0.06, 0.06, 0.06] : landWSA || [0, 0, 0];
+          const gf = [0, 1, 2].map((c) =>
+            overcastGroundFactor(
+              tauOv,
+              snowFSC * SNOW_ALBEDO_RGB[c] + (1 - snowFSC) * baseA[c]
+            )
+          );
           const eS =
             Math.max(Math.sin(sun.alt), 0) * (1 - (astro.eclipse || 0));
           const tSv = sunTransmittanceJS(
@@ -8915,9 +8940,9 @@
           ]);
           const k = tOv * skyExposure;
           veilU.veilE.value.setRGB(
-            Math.max(pd[0] + skyIrr.r, 0) * k,
-            Math.max(pd[1] + skyIrr.g, 0) * k,
-            Math.max(pd[2] + skyIrr.b, 0) * k
+            Math.max(pd[0] + skyIrr.r, 0) * k * gf[0],
+            Math.max(pd[1] + skyIrr.g, 0) * k * gf[1],
+            Math.max(pd[2] + skyIrr.b, 0) * k * gf[2]
           );
           veilU.alpha.value = cloudy;
         }
