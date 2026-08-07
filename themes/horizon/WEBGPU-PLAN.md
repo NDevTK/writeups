@@ -5356,6 +5356,76 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   sit brighter than any star); and the paper's F_c scotopic
   B-V correction is NOT taken (its sign convention needs
   deeper reading than a review pass should risk).
+- DONE (the UTA hunt's verdict, Aug 7 thirtieth push - a
+  documented negative: NO printed oriented-column fraction
+  exists, and the literature itself says why): the task was
+  the COLUMN_ALPHA analog of PLATE_ALPHA (the sundogs' Breon
+  & Dubrulle log-midpoint) so the upper tangent arc could
+  ride the same cited-amplitude chain. Three NEW full reads
+  this pass. (1) Noel & Chepfer 2010 (JGR 115, D00H23, 13
+  pp, via the HAL archive): 18 months of global CALIOP -
+  oriented crystals in ~6% of optically thin ice layers,
+  in-layer proportion 1-5% (overall ratio 1e-3..5e-3),
+  detection delta < 0.12 = at least one oriented per ~154
+  random (Sassen & Benson's formula, beta_r/beta_h = 360) -
+  but the specular signature is "typical of oriented planar
+  or columnar crystals" (species NOT separable), and the
+  -30..-10 C detection band (the planar growth regime)
+  yields their conclusion "oriented crystals are mostly
+  planar". No column split anywhere. (2) Zhou, Yang,
+  Dessler, Hu & Baum 2012 (JAMC 51, 1426, 14 pp): the
+  instrument-side closure - they simulate oriented COLUMNS
+  explicitly (their ice cloud C) and print that the columns'
+  effect on the delta-gamma' relationship is "much smaller"
+  than the plates' (P11(180) an order under plates inside 1
+  deg incidence, their Fig. 8), so CALIOP's oriented signal
+  "is generated primarily from platelike particles": their
+  retrieved 0-6% / 0-3% / 0-0.5% fractions (mixed-phase /
+  warm ice / cold ice) are PLATE numbers, and the
+  space-lidar route that measured the plate family is
+  structurally blind to the column one. (3) Westbrook 2011
+  (QJRMS 137, 538, the author's own manuscript - ~150 tank
+  runs at Re 8-100): the reframe - orientation MODE is
+  deterministic, not fractional: hexagonal prisms flip at
+  the printed critical aspect ratio L/d = 0.9
+  (Re-independent); plates below fall c-axis vertical,
+  columns above c-axis horizontal in ALL ~130 column runs;
+  the secondary roll lock is two-facets-VERTICAL, weak, and
+  its predicted display "has not been observed in the
+  atmosphere" - real columns roll-average, exactly the
+  classical tangent-arc population - while Parry displays
+  trace to SCALENE cross-sections, and Sassen & Takano
+  2000's thick-plate Parry hypothesis is refuted in print.
+  Also closed: Breon & Dubrulle 2004 (the PLATE_ALPHA
+  source) contains zero column content (full-text check);
+  Forster & Mayer 2022 prints the exclusion verbatim
+  ("observations of upper tangent arcs and sundogs contain
+  valuable information about the fraction of oriented
+  columns and plates, they are excluded from the retrieval")
+  and drops its top image segment to keep UTA signatures OUT
+  of the fits; Noel & Sassen 2005 (last push's read) holds
+  one column case in six ("observed once... an exception");
+  Sassen & Takano 2000 itself is closed-access (checked: no
+  OA copy) - a single-case Parry study per its abstract and
+  both citing reads, not a fraction source. THE VERDICT: the
+  oriented-column fraction is per-cloud retrievable
+  information that no published study has retrieved - the
+  lidar that measured the plate numbers cannot see columns,
+  the halo photometry that could measure them excludes the
+  arcs by design, and the lab says the split is size/quality
+  microphysics (the Re window and facet quality), not a
+  universal constant. What IS printed for the arc:
+  occurrence (Forster 2017 - 7.8% of cirrus-present time, 9
+  of 30 halo-hours; Sassen et al. 2003 relative frequency
+  ~15%), the orientation mode (Westbrook), and the
+  total-oriented ceiling (1e-3..5e-3, mostly planar). The
+  house does not draw uncited constants: the arc stays
+  undrawn, and the twenty-third push's blocked note now has
+  its verdict - closed by the literature's own framing, not
+  by an unfinished search. A future landing needs a NEW
+  published column-fraction retrieval (or one of our own
+  from HaloCam-class data - out of scope for a review
+  branch).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
