@@ -502,6 +502,15 @@
         TAU_MIN
       } from './horizon/aerosol.js';
       import {aureoleSet} from './horizon/aureole.js';
+      import {
+        buildCloudCoronaLUT,
+        cirrusSlantTau,
+        coronaAmp,
+        coronaColdGate,
+        CIRRUS_TAU_FULL,
+        CORONA_D_UM,
+        CORONA_T250_MAX
+      } from './horizon/cloud-corona.js';
       import {ozoneScale} from './horizon/ozone.js';
       import {
         LAMP_FULL,
@@ -739,6 +748,7 @@
         dir700: params.has('d700') ? +params.get('d700') : null,
         wind250: params.has('w250') ? +params.get('w250') : null,
         dir250: params.has('d250') ? +params.get('d250') : null,
+        t250: params.has('t250') ? +params.get('t250') : null,
         freezing: params.has('fl') ? +params.get('fl') : null,
         code: params.has('code') ? +params.get('code') : 1,
         kp: params.has('kp') ? +params.get('kp') : 0,
@@ -1005,6 +1015,22 @@
           ) {
             const t250 = h.temperature_250hPa[0];
             const rh250 = h.relative_humidity_250hPa[0];
+            // The cirrus-corona cold gate reads the same measured
+            // level (cloud-corona.js; ?t250= pins it for the
+            // harness).
+            if (!params.has('t250')) state.t250 = t250;
+            record(
+              'Cirrus corona regime',
+              t250.toFixed(1) +
+                '°C at 250 hPa → ' +
+                (coronaColdGate(t250)
+                  ? 'cold small-crystal cirrus: D ' +
+                    CORONA_D_UM +
+                    ' µm rings when a thin veil fronts the sun'
+                  : 'warmer than ' +
+                    CORONA_T250_MAX +
+                    '°C: halo crystals, no rings')
+            );
             state.contrail = appleman(25000, t250, rh250 / 100);
             record(
               'Schmidt-Appleman contrails',
@@ -7155,6 +7181,27 @@
               ' mm/h) \u00b7 supernumerary spacing \u221d (ka)^(-2/3)'
           );
       }
+      // The cirrus-corona pattern re-lays on solar-disc drift (the
+      // +-1.7% annual swing moves the convolution kernel): the
+      // monodisperse Airy pattern of the measured 22 um crystals
+      // (cloud-corona.js), convolved once with the live disc. The
+      // AMPLITUDE - the whole (tau/2) e^-tau slab radiometry on the
+      // measured veil column behind the measured cold gate - feeds
+      // per frame in the sun block.
+      let coronaSrcR = null;
+      function refreshCoronaLUT() {
+        if (!atmo.ok) return;
+        // 0 until the first ephemeris tick - the builder then takes
+        // the 1 au IAU default, the bow LUT's own convention.
+        const R = astro.sunAngR || 0;
+        if (
+          coronaSrcR !== null &&
+          Math.abs(R - coronaSrcR) <= 0.01 * Math.max(coronaSrcR, 1e-9)
+        )
+          return;
+        coronaSrcR = R;
+        atmo.cloudCorona.setPattern(buildCloudCoronaLUT(R || undefined));
+      }
       let lpRatio = 0;
       let lpVis = 1;
       let lpVisBright = 1;
@@ -8820,14 +8867,34 @@
         // Direct-sun cloud attenuation is now per pixel (the cloud
         // shadow map, Beer-Lambert through the actual decks); the
         // only GLOBAL cloud factor left is the cirrus veil, as
-        // exp(-tau/sin(alt)) with tau_vis = 1 at full high cover
-        // (typical cirrostratus optical depth).
+        // exp(-tau/sin(alt)) with tau_vis at full high cover the
+        // MEASURED midlatitude cirrus mean: 0.75 (Sassen &
+        // Comstock 2001, JAS 58, 2113 - ~860 h of FARS
+        // lidar+radiometer; median 0.61). Replaces the uncited
+        // "typical" 1. cloud-corona.js reads the same constant, so
+        // the sun's dimming and the corona's brightness ride ONE
+        // measured column.
         const cHighFrac = (state.cloudHigh ?? state.cloud * 0.3) / 100;
-        const cirrusT = Math.exp(
-          -cHighFrac / Math.max(Math.sin(sun.alt), 0.08)
-        );
+        const cirrusT = Math.exp(-cirrusSlantTau(cHighFrac, Math.sin(sun.alt)));
         sunLight.intensity =
           (0.18 + 2.4 * stLum) * (day > 0 ? 1 : 0) * cirrusT * (1 - 0.93 * ecl);
+        // The cirrus corona: rings only when the MEASURED 250 hPa
+        // temperature sits in Sassen's corona-cirrus regime and a
+        // thin veil actually fronts the sun - the amplitude is the
+        // gated slab radiometry on the same measured column
+        // cirrusT just used (cloud-corona.js; ?cirruscorona=0 is
+        // the labelled harness A/B override; eclipse and cloud-deck
+        // extinction ride the dome branch's own factors).
+        if (atmo.ok) {
+          refreshCoronaLUT();
+          const corOn =
+            params.get('cirruscorona') !== '0' &&
+            sun.alt > 0 &&
+            coronaColdGate(state.t250);
+          atmo.cloudCorona.setAmp(
+            corOn ? coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(sun.alt))) : 0
+          );
+        }
         const moonUp = moon.alt > 0 ? 0.07 * (1 - day) : 0;
         if (atmo.ok) {
           if (t - lastIrrT > 1000) {

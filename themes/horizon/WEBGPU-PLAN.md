@@ -3929,9 +3929,10 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   in rough order of value: (1) terrain direct beam onto the
   scaled T' (the aureole's conservative scope - the spike's
   quasi-direct share is currently absent from the ground
-  budget, ~f tau_M of the direct term on dusty days); (2) the
-  droplet/ice diffraction corona through thin cloud (the same
-  Airy machinery, sizes from nubis/optics territory); (3) the
+  budget, ~f tau_M of the direct term on dusty days) - DONE Aug 7;
+  (2) the droplet/ice diffraction corona through thin cloud (the
+  same Airy machinery, sizes from nubis/optics territory) - DONE
+  Aug 7 (the ice corona; droplet altocumulus stays named); (3) the
   desert three-mode mixture (OPAC Table 4 printed 269.5/30.5/
   0.142) behind a source-region test, un-softening in-desert
   aureoles; (4) bldlod's ramp lift - blocked on a dense-city
@@ -3983,6 +3984,150 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     stays (profile seasonality is second order next to the 220-460
     DU column swing); the live /ozone endpoint activates when the
     owner's update timer deploys the daemon.
+- DONE (the cirrus diffraction corona + the veil's tau earns its
+  citation, Aug 7): the named next pass after the aureole - the
+  corona through thin cold cirrus, papers read before code.
+  Sources, read directly (the WAF-gated CSU repository PDF fetched
+  through a spawned-Chrome + curl-jar bridge; AMS serves its own):
+  Gedzelman & Lock 2003 (Appl. Opt. 42, 497, IN FULL) - coronas
+  through "optically thin clouds such as altocumulus and
+  cirrocumulus", ring radius inversely proportional to droplet
+  radius, ice coronas RARE because crystal shape/orientation/size
+  ranges wash rings unless the distribution is narrow; their
+  printed visibility arc (white aureole from tau ~ 0.001, purity
+  max flat over 0.05 <= tau <= 0.5, washed out tau >= 4, bright
+  coronas tau <= 0.2 ice / <= 1.0 droplets) and the
+  diffraction-theory validity edge (monodisperse a >= 5 um).
+  Sassen & Comstock 2001 (JAS 58, 2113, IN FULL) - the FARS
+  midlatitude cirrus climatology: mean visible optical depth 0.75
+  +- 0.91, median 0.61, from ~860 h of LIRAD; Table 2's midcloud
+  -42.6 C mean marks how much colder the corona subset is.
+  Sassen 1991 (Appl. Opt. 30, 3421, publisher abstract) - eleven
+  corona cirrus cases: thin cirrostratus at/above the tropopause,
+  BETWEEN -60 AND -70 C, mean diameters 12-30 um from the rings
+  themselves. Sassen, Mace, Hallett & Poellot 1998 (Appl. Opt.
+  37, 1477, publisher abstract) - the instrumented case: -71 C,
+  14 km, corona rings inverting to AN EFFECTIVE PARTICLE DIAMETER
+  OF ~22 UM, corroborated in situ ("simple solid crystals").
+  Jaervinen, Vochezer, Moehler & Schnaiter 2014 (Appl. Opt. 53,
+  7566, publisher abstract) - AIDA chamber: "a narrow distribution
+  of small (median Dp = 19-32 um) and compact ice crystals" from
+  homogeneous freezing - the WHY of the narrowness.
+  BUILT (cloud-corona.js, gated by cloud-corona-reference.mjs, 10
+  landmarks): the monodisperse Airy pattern of the printed 22 um
+  (monodisperse IS the sources' model - Sassen inverts rings
+  through it, G&L bound its validity; x ~ 126 sits deep inside),
+  source-disc convolved EXACTLY ONCE via optics-lut's own
+  sunConvolve (now exported - one convolution in the repo).
+  Radiometry: single scattering through a thin slab, L(theta) =
+  P(theta) (tau/2) e^-tau per unit pre-cirrus direct irradiance -
+  the tau/2 is the extinction paradox's diffracted half (van de
+  Hulst Sec. 8.31, the aureole's own citation; no printed Q needed
+  at x ~ 126), the e^-tau dies exactly as G&L's wash-out arc
+  demands. The GATE is a measurement the theme already fetches:
+  250 hPa temperature <= -60 C (Sassen's printed warm edge; the
+  contrail criterion's own level), failing CLOSED unmeasured -
+  ?t250= pins it for the harness. Drawn in the DOME per pixel
+  beside the aureole spike (same resolution argument, same
+  sin-form angle), through the T LUT's own air transmittance
+  (pure Beer - the drawn disc's documented convention), the
+  camera's cloud-shadow chi (a corona dies behind a deck) and
+  sunE. The veil's uncited "tau_vis = 1 (typical cirrostratus)"
+  became the PRINTED FARS mean 0.75 (CIRRUS_TAU_FULL), and
+  cirrusT + the corona now ride ONE measured column - the
+  sunlight through full cirrus brightened e^-0.75/e^-1 = 1.28x,
+  cited. Landmarks: A&S J0 printed values + first zero (J1 stays
+  aureole's - one Bessel each); Airy central value x^2/4pi; the
+  ring-to-diameter inversion returns 22.000 um from the pattern's
+  own first red minimum (Sassen's method run backward); red ring
+  outside green outside blue (2.160/1.747/1.398 deg); pattern
+  quadrature against the CLOSED encircled energy 1 - J0^2 - J1^2
+  (Born & Wolf 8.5.2) to 0.03% - the 6 deg cone holds 95.2% of
+  the diffracted light, stated not hidden; slab closed points
+  (slope exactly 1/2, max at tau = 1); the printed 0.75 column;
+  the cold gate both ways (-60/-71 pass, -59.9 refuses, null
+  refuses); convolution survival - the first green ring keeps 81%
+  modulation through the 0.533 deg disc, WHY Sassen could
+  photograph rings around the sun; degeneration to nothing on
+  every road (warm, no cover, unmeasured, ?cirruscorona=0).
+  BROWSER-VERIFIED (SwiftShader WebGPU, pinned Grindelwald
+  15:30Z, cloudhigh=45, t250=-65, sun 32.86 deg, tau_slant 0.622,
+  amp 0.167; ON vs ?cirruscorona=0 OFF float captures at fov 20,
+  nospec): the measured ON-OFF radial difference shows THREE
+  rings at the predicted angles - green minima 1.75/3.15/4.65 deg
+  vs predicted 1.75/3.20/4.64 - and the per-channel first minima
+  land at R 2.15 / G 1.75 / B 1.45 deg vs predicted
+  2.16/1.75/1.40: the red-outside-blue corona ordering MEASURED
+  in the frame. Band-integrated closure (0.5 deg annulus bands,
+  normalised at 2-2.5 deg): all 21 band x channel ratios of
+  measured to predicted sit within 0.88-1.19, most inside +-10%
+  - the residual is pixel/annulus quantisation against ring
+    gradients spanning 2.5 orders of magnitude (52x from 0.8 to
+    2.0 deg), plus tiny blue denominators where blue's own minima
+    fall. Display look: a delicate red-magenta first ring around
+    the saturated circumsolar glare - the corona photographs
+    describe.
+    Harness drift found and fixed on the way (regen.py): (1) the
+    terrarium string-rewrite assert no longer matched - the theme
+    grew the ?demtiles= infrastructure param; regen now asserts the
+    param instead and the harness URL carries demtiles=/tiles. (2)
+    regen still INJECTED a stale u8-only \_\_capture that executed
+    after - and so SHADOWED - the theme's own ?debug=1 native
+    capture (frame-loop-serviced, FloatType-capable): /snap?float=1
+    silently returned u8 bytes under an f32 header. The injection
+    is deleted; regen asserts the theme hook instead. Two more
+    lessons for the do-not-rediscover list: a compound shell
+    command that both pkills '[v]iew-serve.mjs' AND names
+    view-serve.mjs verbatim later in the same line kills its own
+    shell anyway (the character class only disguises the pattern,
+    not the target string elsewhere in the command line - restart
+    in a SEPARATE command); and view-serve's stdout must go to a
+    FILE, never through a pipeline that exits early (tee |
+    grep -m1 LOADED SIGPIPE-kills the server minutes later, orphaning
+    xvfb + chrome).
+    Documented scope: the LUNAR corona (the classic naked-eye case)
+    waits on a cited moonlight irradiance frame - the moon optics
+    dome's display gains are not that frame; droplet coronas
+    through altocumulus wait on a mid-deck optical-depth model;
+    corona ellipticity from oriented crystals out of scope
+    (Jaervinen's compact crystals justify circularity); the drawn
+    DISC still ignores the veil's tau (its cirrus dimming remains
+    the veil mesh's display alpha - unifying the disc onto the
+    measured column is its own pass).
+- HAND-OFF (Aug 7 session close - the review session): the
+  approximation sweep after ozone + direct-beam + corona stays
+  CLEAN in the physics layers; what remains lives in the LEGACY
+  DISPLAY layer, ranked for future radiometric passes: (1) the
+  optics dome's calibrated display gains (0.55 bow / 0.18 halo /
+  0.6 dogs) and gating heuristics (1 - cloudy x 1.1, the
+  cHigh < 90 ? 1 : 0.5 halo dim) - the peak-normalised profiles
+  are physical but their absolute scale is not, unlike the
+  aureole/totality-corona/cirrus-corona frame; (2) the overcast
+  veil mesh (hand-picked #79838c/#a2abb3 gradient, alpha =
+  cloudy^2 x 0.85) standing in for overcast radiative transfer;
+  (3) scene-light calibration constants (0.18 + 2.4 stLum,
+  moonUp 0.07, fog colour lerps); (4) the per-layer cloud-cover
+  fallback splits (0.7/0.5/0.3 of total when the model lacks
+  layers - rarely hit, open-meteo serves per-layer covers). The
+  named next passes, in rough order of value: (1) the LUNAR
+  corona - the classic naked-eye case - blocked only on a CITED
+  moonlight irradiance in the sky's E0 frame (the moon optics
+  dome's display gains are not that frame; with the citation the
+  same cloud-corona LUT anchors on the moon disc radius, and the
+  whole moon-optics stack could follow onto radiometry); (2) the
+  droplet corona through altocumulus (G&L's most common producer;
+  needs a mid-deck optical-depth model - the volumetric decks
+  know their density, the sprite layers do not); (3) the desert
+  three-mode mixture (OPAC Table 4 printed 269.5/30.5/0.142)
+  behind a source-region test; (4) the drawn disc onto the
+  measured cirrus column (today the disc ignores the veil's tau
+  entirely - display-alpha covers it); (5) bldlod's ramp lift,
+  still blocked on a dense-city perf measurement. Observed, not
+  mine, for the record: a boot-time "THREE.TSL: Length of
+  parameters exceeds maximum length of 'vec4()'" console warning
+  appears on every load of this build (no PAGEERROR, gate green,
+  no vec4 call in the corona pass) - three-internal, worth a
+  root-cause when convenient.
 - DONE (sky parallax: the celestial group rides with the camera,
   Jul 11): the sunspot verification's "pose aims 1.35 deg high"
   was neither the pose nor the ephemeris - the camera provably

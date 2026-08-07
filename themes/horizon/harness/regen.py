@@ -121,10 +121,14 @@ CAPTURE = """
 """
 
 s = open(THEME).read()
+# The theme grew the ?demtiles= infrastructure param (the offline
+# harness passes demtiles=/tiles in the URL), so the old terrarium
+# string rewrite is only applied where a pre-param theme is fed.
 s = s.replace(
     "'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/' +", "'/tiles/' +"
 )
-assert '/tiles/' in s
+if '/tiles/' not in s:
+    assert "params.get('demtiles')" in s, 'theme lost the demtiles override'
 s = s.replace(
     """      function record(name, value) {
         sources[name] = {value: String(value), at: Date.now()};
@@ -134,9 +138,12 @@ s = s.replace(
         console.log('REC|' + name + '|' + value);
       }""",
 )
-anchor = '      // ---------- main loop ----------'
-assert s.count(anchor) == 1
-s = s.replace(anchor, CAPTURE + anchor)
+# CAPTURE is no longer injected: the theme ships its own ?debug=1
+# __capture (frame-loop-serviced, FloatType-capable) - the injected
+# copy ran later in module flow and SHADOWED it with a stale
+# u8-only variant that broke /snap?float=1. The theme hook is
+# asserted instead.
+assert 'window.__capture' in s, 'theme lost its native __capture'
 i = s.index('<script type="module">')
 import tempfile
 

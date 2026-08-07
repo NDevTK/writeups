@@ -149,6 +149,30 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   spikeTex.minFilter = LinearFilter;
   spikeTex.needsUpdate = true;
   const spikeNode = texture(spikeTex);
+  // The cirrus diffraction corona (cloud-corona.js, gated by
+  // cloud-corona-reference.mjs): the monodisperse Airy pattern of
+  // the measured corona-cirrus crystals (Sassen et al. 1998's
+  // printed 22 um), source-disc convolved on the CPU, drawn per
+  // pixel at first scattering order like the aureole spike - the
+  // sky-view LUT can resolve neither. corAmp carries the whole
+  // slab radiometry (tau/2) e^-tau computed from the measured
+  // veil column; 0 - warm cirrus, no cover, or no measurement -
+  // never runs the branch (corCosCone 2 disables it outright).
+  const corAmp = uniform(0);
+  const corCosCone = uniform(2);
+  const corThetaMax = uniform(0.1047);
+  const COR_N = 256;
+  const corTex = new DataTexture(
+    new Float32Array(COR_N * 4),
+    COR_N,
+    1,
+    RGBAFormat,
+    FloatType
+  );
+  corTex.magFilter = LinearFilter;
+  corTex.minFilter = LinearFilter;
+  corTex.needsUpdate = true;
+  const corNode = texture(corTex);
   // Measured total-column ozone (ozone.js, gated): the shipped
   // ozone constants encode exactly 300 DU (Bruneton's own printed
   // construction); absorption is linear in the column, so the
@@ -948,6 +972,44 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         .add(0.5 / SPIKE_N);
       col.addAssign(spikeNode.sample(vec2(uS, 0.5)).rgb.mul(Iss).mul(sunE));
     });
+    // The cirrus corona: the cold veil's crystals diffract the
+    // direct beam once -
+    //   L(theta) = P(theta) * T_air * chi * amp * sunE,
+    // P the CPU-convolved Airy pattern (sr^-1), T_air the LUT's
+    // own eye->space transmittance along the fragment ray (pure
+    // Beer, the drawn disc's documented convention), chi the
+    // volumetric decks' Beer-Lambert at the camera (a corona dies
+    // behind a stratus deck), amp = (tau/2) e^-tau on the measured
+    // cirrus column - the extinction e^-tau lives INSIDE amp, so
+    // nothing here extinguishes twice.
+    If(cSunG.greaterThan(corCosCone), () => {
+      const sinTh = cross(v, sunDirW).length();
+      const th = asin(clamp(sinTh, 0.0, 1.0));
+      const uC = th
+        .div(corThetaMax)
+        .clamp(0.0, 1.0)
+        .mul((COR_N - 1) / COR_N)
+        .add(0.5 / COR_N);
+      const tAir = tTexNode.sample(tParamsToUv(r, v.y)).rgb;
+      const chi0 = cloudShadow
+        ? (() => {
+            // The camera's own position in the shadow map's
+            // mapping - the aureole march's expressions at t = 0.
+            const y = asinh(r.sub(RB).sub(shadowElev0).div(500)).mul(16);
+            return cloudShadow.transmittance(
+              vec3(aerialCamXZ.x, y, aerialCamXZ.y)
+            );
+          })()
+        : float(1);
+      col.addAssign(
+        corNode
+          .sample(vec2(uC, 0.5))
+          .rgb.mul(tAir)
+          .mul(chi0)
+          .mul(corAmp)
+          .mul(sunE)
+      );
+    });
     // Inside the transfer band at a low sun, the disc is drawn
     // through the LUT: the fragment's APPARENT altitude reads the
     // TRUE altitude each channel sees there, and disc membership
@@ -1311,6 +1373,24 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       // Harness introspection: the CPU-built rows, for probes.
       bandData: () => bandTTex.image.data
     },
+    // The cirrus corona feed (cloud-corona.js): pattern only when
+    // the LUT re-lays (sun-radius drift), amplitude every frame -
+    // 0 disables the branch entirely (cos cone 2).
+    cloudCorona: (() => {
+      let coneRad = 0;
+      return {
+        setPattern(lut) {
+          corTex.image.data.set(lut.curve);
+          corTex.needsUpdate = true;
+          corThetaMax.value = lut.thetaMaxRad;
+          coneRad = lut.coneRad;
+        },
+        setAmp(amp) {
+          corAmp.value = amp;
+          corCosCone.value = amp > 0 && coneRad > 0 ? Math.cos(coneRad) : 2;
+        }
+      };
+    })(),
     // The dome's own radiance (exposure applied) for a world
     // direction - objects above the atmosphere (the moon) add this
     // over their surface so a dark disc never punches a hole in

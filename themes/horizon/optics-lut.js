@@ -62,7 +62,8 @@ const LIMB_ALPHA = [0.4064, 0.5079, 0.6406];
 // Convolve a per-channel profile (uniform theta grid) with the
 // limb-darkened sun disc: kernel K(dt) = integral over the disc
 // chord at offset dt of mu^alpha, mu = sqrt(1 - (rho/R)^2).
-function sunConvolve(profile, bins, dTheta, srcR = SUN_RADIUS) {
+// Exported: cloud-corona.js rides the same certified convolution.
+export function sunConvolve(profile, bins, dTheta, srcR = SUN_RADIUS) {
   const half = Math.ceil(srcR / dTheta);
   const out = new Float64Array(profile.length);
   for (let c = 0; c < 3; c++) {
