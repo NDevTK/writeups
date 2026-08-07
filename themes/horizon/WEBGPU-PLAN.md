@@ -5588,7 +5588,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   Angstrom slope 1.35 is a documented graph-read of the
   review's Fig. 10 (the one number not from body text).
   validate.sh gains the gate; VALIDATE PASS (all references
-  + 7 GPU probes).
+  - 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
