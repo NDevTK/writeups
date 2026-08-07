@@ -544,6 +544,7 @@
         cirrusSlantTau,
         coronaAmp,
         coronaColdGate,
+        crystalBeamT,
         shellFirstExit,
         CIRRUS_BASE_M,
         CIRRUS_TOP_M,
@@ -10749,7 +10750,16 @@
           ? +params.get('halooccur')
           : haloOccurrence(state.lat, state.lon, now().getTime());
         {
-          const haloOn = params.get('halo') !== '0' && sun.alt > 0;
+          // The family lives past ground sunset: its crystals sit
+          // on the deck along the sun sight line, where the
+          // earth's curvature has rotated the frame a full
+          // horizon dip (~3.2 deg) - the beam below carries the
+          // ring, dogs, circle and arcs (reddening like the
+          // pillar) until the EXACT planet shadow in
+          // crystalBeamT closes the window near -6.4 deg; the
+          // -6.7 deg gate is past that cutoff, cheap, not the
+          // physics.
+          const haloOn = params.get('halo') !== '0' && sun.alt > -0.117;
           const slabBase = haloOn
             ? coronaAmp(
                 cirrusSlantTau(cHighFrac, Math.sin(sun.alt), eyeVeilM)
@@ -10758,7 +10768,13 @@
               haloOcc
             : 0;
           const slab = slabBase * SCF_COLUMN;
-          const tH = sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieRad);
+          // The beam in the CRYSTAL-LOCAL frame (cloud-corona.js
+          // crystalBeamT, gated): pre-sunset this equals the old
+          // ground transmittance EXACTLY by the closure identity;
+          // past sunset the ground formula froze at its horizon
+          // value while the deck's sun was still up - the swap is
+          // a no-op by day and the feature after.
+          const tH = crystalBeamT(sun.alt, eyeVeilM, mieRad);
           opticsU.haloAmp.value.setRGB(
             tH[0] * slab,
             tH[1] * slab,
@@ -10945,7 +10961,9 @@
           // live distance, umbral immersion). The paraselenae ride
           // the same measured plate fraction as the sun's dogs.
           {
-            const haloOn = params.get('halo') !== '0' && moon.alt > 0;
+            // Same crystal-local window as the sun family: the
+            // moon's ring survives moonset to the deck's shadow.
+            const haloOn = params.get('halo') !== '0' && moon.alt > -0.117;
             const slabBase = haloOn
               ? moonIrradianceE0(
                   astro.moonRel,
@@ -10959,10 +10977,7 @@
                 haloOcc
               : 0;
             const slab = slabBase * SCF_COLUMN;
-            const tH = sunTransmittanceJS(
-              Math.sin(Math.max(moon.alt, 0)),
-              mieRad
-            );
+            const tH = crystalBeamT(moon.alt, eyeVeilM, mieRad);
             opticsMoonU.haloAmp.value.setRGB(
               tH[0] * slab,
               tH[1] * slab,

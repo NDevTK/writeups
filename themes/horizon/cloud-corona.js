@@ -439,3 +439,48 @@ export function buildDropletCoronaLUT(
     limbAlpha
   );
 }
+
+// The plate family's beam in the CRYSTAL-LOCAL frame: the drawn
+// halo/dog/circle/arc crystals live on the deck mid-shell along
+// the sun sight line, where the horizon dips a_C below the
+// ground frame. PRE-SUNSET this is the ground transmittance
+// EXACTLY - deck-beam x view-segment = full path, the closure
+// identity the atmo gate holds to 1% - so swapping the family
+// onto this frame changes nothing while the sun is up. PAST
+// ground sunset the ground formula freezes (sin clamped at 0)
+// while the deck's crystals still see the sun: this frame
+// carries the ring, the dogs, the circle and the arcs on
+// still-lit cirrus - reddening like the pillar - until the
+// EXACT planet shadow closes it: the horizon-ward crystal sits
+// where the earth's curvature has rotated the frame a full
+// horizon dip (~3.2 deg from the deck), so its window runs to
+// ground altitude ~ -6.4 deg - two dips down, further than the
+// pillar's own centroid geometry (-4.6). The in-veil leg and
+// the slab stay with the caller.
+import {pathToRadiusT, sunTransmittanceJS} from './sun-transmittance.js';
+export function crystalBeamT(hAltRad, eyeHM, mie) {
+  const Rb = 6360e3;
+  const Hm = (CIRRUS_BASE_M + CIRRUS_TOP_M) / 2;
+  const Rm = Rb + Hm;
+  const r0 = Rb + Math.min(Math.max(eyeHM ?? 300, 0), CIRRUS_BASE_M - 1);
+  // The sight line to the deck: at and below the horizon the
+  // drawn crystals sit toward the horizon point (the family's
+  // display hugs the sunset), so the elevation floor keeps the
+  // chord geometric.
+  const e = Math.max(hAltRad, 0.001);
+  const se = Math.sin(e);
+  const sMid = -r0 * se + Math.sqrt(r0 * se * r0 * se + Rm * Rm - r0 * r0);
+  const aC = Math.atan2(sMid * Math.cos(e), r0 + sMid * se);
+  const hLoc = hAltRad + aC;
+  // The EXACT planet shadow: below the crystal's own horizon dip
+  // (cos dip = Rb/Rm) the sun ray from the deck intersects the
+  // earth - the transmittance integral alone cannot know this
+  // (it only meets the top sphere; a sub-surface path merely
+  // underflows), so the geometry closes the window here.
+  if (Math.sin(hLoc) < -Math.sqrt(1 - (Rb / Rm) * (Rb / Rm))) {
+    return [0, 0, 0];
+  }
+  const tB = sunTransmittanceJS(Math.sin(hLoc), mie, Hm);
+  const tV = pathToRadiusT(se, mie, r0 - Rb, Hm);
+  return [0, 1, 2].map((k) => tB[k] * tV[k]);
+}

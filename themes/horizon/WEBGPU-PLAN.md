@@ -5300,6 +5300,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     only inside the consumers' pinned branches - every scatter
     system (ocean, near glitter, far ring, deck) runs the one
     physical frame.
+- DONE (the post-sunset plate family, Aug 7 twenty-eighth push
+  - the named future item lands on the disc hunt's own
+    argument): the family's beam moves to the CRYSTAL-LOCAL frame
+    (cloud-corona.js crystalBeamT, gated) - and the closure
+    identity that REFUTED the frame swap as a bug fix is exactly
+    what makes it safe as a feature: pre-sunset, deck-beam x
+    view-segment equals the ground transmittance to 0.73% (the
+    gate holds the identity at 2/5/10/25 deg), so the swap is a
+    no-op while the sun is up. PAST ground sunset the old chain
+    froze at its horizon value behind a hard sun.alt > 0 gate;
+    the crystal frame carries the ring, the dogs, the circle and
+    the arcs on still-lit cirrus - reddening like the pillar
+    (R/G 11 at -2 deg, gated) - and the window's END is new
+    geometry: the horizon-ward crystal sits where the earth's
+    curvature has rotated the frame a FULL horizon dip (~3.2 deg
+    at the mid-shell), so its sun survives to ground altitude
+    ~ -6.4 deg - TWO dips down, further than the pillar's own
+    centroid (-4.6). The gate also caught a latent hole in the
+    transmittance machinery: sunTransmittanceJS only intersects
+    the TOP sphere, so a sub-surface path merely underflows -
+    at -6 deg it leaked 1e-2 of red through the earth.
+    crystalBeamT closes the window with the EXACT planet shadow
+    (sin h_loc < -sqrt(1 - (Rb/Rm)^2)); the gate asserts zeros
+    by -7. The moon family gets the same window (the moonset
+    ring). LUT builders verified at negative altitudes (dog,
+    circle, arc, closed-form cza all continuous); the share
+    tables stand on their h = 0 row past sunset (stated). The
+    -2.4 deg capture shows the feature: the deep-red ring arcing
+    over the sunset glow where the amp was hard zero before -
+    halo amp G 0.007, the panel's own row.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

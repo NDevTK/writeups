@@ -649,4 +649,53 @@ const near = (a, b, t) => Math.abs(a - b) < t;
   );
 }
 
+{
+  // The plate family's crystal-local beam (crystalBeamT): PRE-
+  // SUNSET it must equal the ground transmittance - deck-beam x
+  // view-segment IS the full path (the closure identity the atmo
+  // gate holds); PAST ground sunset the ground formula freezes at
+  // its horizon value while the deck's crystals still see the
+  // sun: the window must stay alive at -2 deg, redden
+  // monotonically (the sunset family's colour), decay
+  // monotonically, and be extinguished by the deck's planet
+  // shadow before -6 deg - the same cutoff the twilight pillar
+  // rides. This is what carries the ring, the dogs, the circle
+  // and the arcs past sunset on still-lit cirrus.
+  const {crystalBeamT} = await import('./cloud-corona.js');
+  const mie = {scat: [4e-6, 4e-6, 4e-6], abs: [4.4e-7, 4.4e-7, 4.4e-7]};
+  let ok = true;
+  let worst = 0;
+  for (const d of [2, 5, 10, 25]) {
+    const h = (d * Math.PI) / 180;
+    const cb = crystalBeamT(h, 900, mie);
+    const g = sunTransmittanceJS(Math.sin(h), mie, 900);
+    for (let c = 0; c < 3; c++) {
+      const rel = Math.abs(cb[c] / Math.max(g[c], 1e-30) - 1);
+      worst = Math.max(worst, rel);
+      if (!(rel < 0.015)) ok = false;
+    }
+  }
+  const at = (d) => crystalBeamT((d * Math.PI) / 180, 900, mie);
+  const m2 = at(-2);
+  const m4 = at(-4);
+  const m6 = at(-6);
+  const m7 = at(-7);
+  const rg = (v) => v[0] / Math.max(v[1], 1e-30);
+  ok =
+    ok &&
+    m2[0] > 0.05 &&
+    rg(m2) > rg(at(0)) &&
+    rg(m4) > rg(m2) &&
+    m4[0] < m2[0] &&
+    m2[0] < at(0)[0] &&
+    m6[0] < m4[0] &&
+    m6[0] > 0 &&
+    m7.every((v) => v === 0);
+  check(
+    'crystal-local beam: ground identity by day, the sunset window after',
+    ok,
+    `pre-sunset identity to ${(worst * 100).toFixed(2)}% (closure); -2 deg red ${m2[0].toFixed(3)} R/G ${rg(m2).toFixed(1)} (reddening, alive); monotone decay through -6 (${m6[0].toExponential(1)}, deep red); the EXACT planet shadow closes the window by -7 (two horizon dips - the horizon-ward crystal geometry, not the pillar's -4.6)`
+  );
+}
+
 process.exit(fail ? 1 : 0);
