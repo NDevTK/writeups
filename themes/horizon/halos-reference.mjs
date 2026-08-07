@@ -20,9 +20,22 @@ import {
   haloProfile,
   ICE_N,
   mcHalo,
+  mcParhelion,
   mulberry32,
   parhelion,
   parhelionProfile,
+  parhelionShare,
+  parhelionSigmaAlt,
+  PARHELION_ALT_DEG,
+  PARHELION_SHARE,
+  PARHELION_SIGMA_ALT_DEG,
+  PLATE_ALPHA,
+  PLATE_ALPHA_RANGE,
+  PLATE_C_OVER_A,
+  PLATE_D_RANGE_UM,
+  PLATE_D_UM,
+  PLATE_H_UM,
+  PLATE_TILT_THETA,
   PRISM_60,
   PRISM_90,
   prismDmin,
@@ -230,8 +243,13 @@ const RAD = Math.PI / 180;
   const p22 = peakIn(20, 25);
   const p46 = peakIn(43, 50);
   const ratio = p46.v / p22.v;
+  // hits threshold rescaled with the basal-area fix (the sundog
+  // pass's audit): the corrected 3 sqrt(3)/2 basal area raises
+  // AREA_MAX, so the flux rejection accepts fewer of the same
+  // 30000 trials (~4000, was ~7800) - the count follows the
+  // sampler, the physics is in the other clauses.
   const ok =
-    hits > 5000 &&
+    hits > 2500 &&
     maxDev < 1e-6 &&
     same &&
     Math.abs(p22.g - 21.8) < 0.4 &&
@@ -242,6 +260,117 @@ const RAD = Math.PI / 180;
     "Greenler's Monte Carlo",
     ok,
     `n = 1 null test: ${hits} transits, max deviation ${maxDev.toExponential(1)} rad; seeded histogram bit-identical; red 22 at ${p22.g.toFixed(2)} deg, red 46 at ${p46.g.toFixed(2)} deg, EMERGENT 46/22 ratio ${ratio.toFixed(2)} - the statistics Fresnel throughput alone put at 0.86`
+  );
+}
+
+{
+  // The plates behind the dogs, printed: Breon & Dubrulle 2004's
+  // area-weighted oriented fraction (PLATE_ALPHA = the log
+  // midpoint of their printed 1e-3..1e-2, the range itself
+  // shipped), their ~1-degree tilt, their 0.1-to-a-few-mm
+  // oriented sizes; Auer & Veal 1970's P1a law h = 2.020 d^0.449
+  // turning the size midpoint into the reference aspect. All
+  // identities of shipped constants - transcription-proof.
+  const midD = Math.sqrt(PLATE_D_RANGE_UM[0] * PLATE_D_RANGE_UM[1]);
+  const ok =
+    PLATE_ALPHA_RANGE[0] === 1e-3 &&
+    PLATE_ALPHA_RANGE[1] === 1e-2 &&
+    Math.abs(PLATE_ALPHA - Math.sqrt(1e-5)) < 1e-9 &&
+    Math.abs(PLATE_TILT_THETA - Math.PI / 180) < 1e-12 &&
+    PLATE_D_RANGE_UM[0] === 100 &&
+    PLATE_D_RANGE_UM[1] === 3000 &&
+    Math.abs(PLATE_D_UM - midD) < 1e-9 &&
+    Math.abs(PLATE_H_UM - 2.02 * midD ** 0.449) < 1e-9 &&
+    Math.abs(PLATE_C_OVER_A - PLATE_H_UM / (PLATE_D_UM / 2)) < 1e-12;
+  check(
+    'plate constants from the printed sources',
+    ok,
+    `alpha ${PLATE_ALPHA.toExponential(2)} (B&D 1e-3..1e-2), tilt 1 deg, d ${PLATE_D_UM.toFixed(0)} um of [${PLATE_D_RANGE_UM}], h ${PLATE_H_UM.toFixed(1)} um (Auer-Veal P1a), c/a ${PLATE_C_OVER_A.toFixed(4)}`
+  );
+}
+
+{
+  // The plate Monte Carlo lands the caustic at the BRAVAIS
+  // AZIMUTH - the cross-implementation position proof (vertical
+  // faces conserve the vertical direction cosine; the deflection
+  // is a rotation about the vertical), at three sun altitudes.
+  // Its books close, and the light-pipe carries the dog to
+  // altitude: without following basal total internal reflections
+  // a thin plate could only dog at grazing sun.
+  const DEG = 180 / Math.PI;
+  let ok = true;
+  let detail = '';
+  for (const hd of [5, 20, 35]) {
+    const mc = mcParhelion((hd * Math.PI) / 180, ICE_N, 200000);
+    let pk = 0;
+    for (let i = 0; i < mc.bins; i++)
+      if (mc.data[i * 3] > mc.data[pk * 3]) pk = i;
+    const azPk = (mc.a0 + ((pk + 0.5) / mc.bins) * (mc.a1 - mc.a0)) * DEG;
+    const want =
+      prismDmin(bravais(ICE_N[0], (hd * Math.PI) / 180), PRISM_60) * DEG;
+    const A = mc.accepted[0];
+    const closure =
+      Math.abs(
+        mc.binnedT[0] +
+          mc.lowT[0] +
+          mc.highT[0] +
+          mc.offAlmT[0] +
+          mc.lostT[0] -
+          A
+      ) / A;
+    if (!(Math.abs(azPk - want) < 0.6 && closure < 1e-9)) ok = false;
+    detail += `h${hd}: peak ${azPk.toFixed(2)} (Bravais ${want.toFixed(2)}); `;
+  }
+  check('plate MC caustic at the Bravais azimuth, books closed', ok, detail);
+}
+
+{
+  // The shipped share/sigma table IS the Monte Carlo: re-derive
+  // three rows at the shipping sample count and hold the literals
+  // to them (deterministic seed; 3% covers cross-engine float
+  // drift). Physics of the whole table: the grazing row is the
+  // maximum (a low plate is almost a pure prism to a low sun),
+  // the fade past 5 degrees is monotone - why real dogs die as
+  // the sun climbs - and the drawn wobble stays under a degree.
+  const DEG = 180 / Math.PI;
+  let ok = true;
+  let detail = '';
+  for (const [row, hd] of [
+    [1, 5],
+    [4, 20],
+    [8, 40]
+  ]) {
+    const mc = mcParhelion((Math.max(hd, 0.5) * Math.PI) / 180, ICE_N, 600000);
+    const s = mc.binnedT[1] / mc.accepted[1];
+    const sg = mc.sigmaAlt[1] * DEG;
+    if (!(Math.abs(s / PARHELION_SHARE[row] - 1) < 0.03)) ok = false;
+    if (!(Math.abs(sg / PARHELION_SIGMA_ALT_DEG[row] - 1) < 0.05)) ok = false;
+    detail += `h${hd}: share ${s.toFixed(4)} (shipped ${PARHELION_SHARE[row]}), sigma ${sg.toFixed(3)}; `;
+  }
+  for (let i = 2; i < PARHELION_SHARE.length; i++)
+    if (!(PARHELION_SHARE[i] <= PARHELION_SHARE[i - 1] * 1.02)) ok = false;
+  if (!(PARHELION_SHARE[0] > Math.max(...PARHELION_SHARE.slice(1)))) ok = false;
+  if (!PARHELION_SIGMA_ALT_DEG.every((s) => s > 0.25 && s < 0.9)) ok = false;
+  if (!(PARHELION_ALT_DEG.length === 12)) ok = false;
+  check('shipped parhelion table = the Monte Carlo', ok, detail);
+}
+
+{
+  // The interpolator: exact at the knots, zero outside the
+  // physical range (fails closed below the horizon and past the
+  // Bravais cutoff), sigma in radians.
+  const DEG = 180 / Math.PI;
+  const ok =
+    Math.abs(parhelionShare((20 * Math.PI) / 180) - PARHELION_SHARE[4]) <
+      1e-12 &&
+    parhelionShare(-0.01) === 0 &&
+    parhelionShare((58 * Math.PI) / 180) === 0 &&
+    parhelionShare((56 * Math.PI) / 180) > 0 &&
+    Math.abs(parhelionSigmaAlt((20 * Math.PI) / 180) * DEG - 0.359) < 1e-9;
+  check(
+    'share/sigma interpolation, closed outside the range',
+    ok,
+    `share(20) = ${parhelionShare((20 * Math.PI) / 180).toFixed(5)}, share(-)=0, share(58)=0; sigma(20) = ${(parhelionSigmaAlt((20 * Math.PI) / 180) * DEG).toFixed(3)} deg`
   );
 }
 

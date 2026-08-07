@@ -17,7 +17,7 @@
 //    elevation, red toward the source, EMPTY past the Bravais
 //    cutoff
 import {buildBowLUT, buildDogLUT, buildHaloLUT} from './optics-lut.js';
-import {prismDmin, ICE_N, PRISM_60} from './halos.js';
+import {bravais, prismDmin, ICE_N, PRISM_60} from './halos.js';
 import {
   bowGeometric,
   bowSlab,
@@ -98,7 +98,12 @@ function edgeAndPeak(lut, c) {
   // remainder (Fresnel reflections + TIR continuations the
   // 2-refraction trace does not follow) stays under 60% and is
   // STATED, and the 22-degree window's share of the geometric-
-  // interaction unit is the printed ~11% at peak ~1.15/sr. The
+  // interaction unit is ~8.5% at peak ~0.83/sr. (Re-pinned by the
+  // sundog pass's basal-area audit: the basal faces had entered
+  // the flux rejection at HALF their 3 sqrt(3)/2 area, so side
+  // transits were over-weighted - the shipped ring read share
+  // 0.111 at peak 1.15/sr, ~1.4x too bright, and the 46/22 share
+  // ratio was 0.33 where the corrected books say 0.43.) The
   // convolved LUT's own integral reproduces binned/accepted - the
   // sr^-1 conversion is self-consistent.
   const a = halo.accounting;
@@ -116,11 +121,11 @@ function edgeAndPeak(lut, c) {
     closure < 1e-9 &&
     a.lowT[1] > a.binnedT[1] &&
     a.lostT[1] / A < 0.6 &&
-    Math.abs(halo.share22 - 0.111) < 0.01 &&
-    Math.abs(halo.peakAbs - 1.15) < 0.1 &&
+    Math.abs(halo.share22 - 0.0854) < 0.008 &&
+    Math.abs(halo.peakAbs - 0.828) < 0.08 &&
     Math.abs(integ / binnedFrac - 1) < 0.02 &&
-    halo.share46 / halo.share22 > 0.2 &&
-    halo.share46 / halo.share22 < 0.45;
+    halo.share46 / halo.share22 > 0.35 &&
+    halo.share46 / halo.share22 < 0.5;
   check(
     'halo absolute accounting',
     ok,
@@ -233,16 +238,32 @@ function bowStats(c, lo, hi) {
     );
   };
   const haloEdge = prismDmin(ICE_N[0], PRISM_60) * DEG;
+  // The drawn caustic must sit at the BRAVAIS AZIMUTH - vertical
+  // faces conserve the vertical direction cosine, so the whole
+  // deflection is azimuthal (the plate Monte Carlo's independent
+  // trace arbitrated this; the old great-circle mapping drew the
+  // dog ~2.8 deg too far out at this altitude).
+  const wantAz =
+    prismDmin(bravais(ICE_N[0], (25 * Math.PI) / 180), PRISM_60) * DEG;
+  // Unit azimuth integral per channel - the absolute scale rides
+  // the amp (PLATE_ALPHA x share x Gaussian peak), so the LUT
+  // must carry exactly one unit of azimuthal distribution.
+  const dAzR = (((d25.azMaxDeg - d25.azMinDeg) / d25.bins) * Math.PI) / 180;
+  const integ = [0, 0, 0];
+  for (let i = 0; i < d25.bins; i++)
+    for (let c = 0; c < 3; c++) integ[c] += d25.data[i * 4 + c] * dAzR;
   const ok =
     d25.any &&
     peakAz(0) > haloEdge + 4 &&
+    Math.abs(peakAz(0) - wantAz) < 0.5 &&
     peakAz(2) > peakAz(0) &&
+    integ.every((v) => Math.abs(v - 1) < 1e-3) &&
     !dead.any &&
     dead.data.every((v, i) => i % 4 === 3 || v === 0);
   check(
     'the dog LUT',
     ok,
-    `at 25 deg the red dog sits ${peakAz(0).toFixed(1)} deg out (halo edge ${haloEdge.toFixed(1)} - migrated), blue at ${peakAz(2).toFixed(1)} (red toward the source); at 65 deg the LUT is empty`
+    `at 25 deg the red dog sits ${peakAz(0).toFixed(1)} deg out (Bravais azimuth ${wantAz.toFixed(1)}, halo edge ${haloEdge.toFixed(1)}), blue at ${peakAz(2).toFixed(1)} (red toward the source); unit integrals [${integ.map((v) => v.toFixed(4)).join(', ')}]; at 65 deg the LUT is empty`
   );
 }
 

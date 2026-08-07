@@ -268,9 +268,15 @@ export function buildBowLUT(
 /**
  * Sundog profile over AZIMUTH offset from the source in [18, 55]
  * degrees along its almucantar, at source elevation h (radians):
- * the Bravais parhelia of halos.js in the dome's LUT format,
- * limb-darkened-source convolved like the other profiles. Empty
- * past the ~61-degree cutoff (lut.any = false).
+ * the Bravais parhelia of halos.js (caustic at azimuth Dm - the
+ * plate Monte Carlo's arbitrated convention) in the dome's LUT
+ * format, limb-darkened-source convolved like the other profiles.
+ * NORMALISED to unit azimuth integral per channel (1/rad): the
+ * absolute scale rides the amp as PLATE_ALPHA x parhelionShare(h)
+ * x the vertical Gaussian's peak density - the Monte Carlo's own
+ * flux accounting, so the drawn dog is sr^-1 per unit CLOUD
+ * geometric-interaction depth once the theme multiplies the
+ * slab. Empty past the Bravais cutoff (lut.any = false).
  */
 export function buildDogLUT(h, bins = 256, srcR = SUN_RADIUS) {
   const pp = parhelionProfile(Math.max(h, 0), bins);
@@ -282,13 +288,13 @@ export function buildDogLUT(h, bins = 256, srcR = SUN_RADIUS) {
     prof[3 * i + 2] = pp.data[3 * i + 2];
   }
   const conv = sunConvolve(prof, bins, dAz, srcR);
-  let peak = 0;
-  for (const v of conv) peak = Math.max(peak, v);
+  const integ = [0, 0, 0];
+  for (let i = 0; i < bins; i++)
+    for (let c = 0; c < 3; c++) integ[c] += conv[i * 3 + c] * dAz;
   const out = new Float32Array(bins * 4);
   for (let i = 0; i < bins; i++) {
-    out[i * 4] = peak > 0 ? conv[i * 3] / peak : 0;
-    out[i * 4 + 1] = peak > 0 ? conv[i * 3 + 1] / peak : 0;
-    out[i * 4 + 2] = peak > 0 ? conv[i * 3 + 2] / peak : 0;
+    for (let c = 0; c < 3; c++)
+      out[i * 4 + c] = integ[c] > 0 ? conv[i * 3 + c] / integ[c] : 0;
     out[i * 4 + 3] = 1;
   }
   return {

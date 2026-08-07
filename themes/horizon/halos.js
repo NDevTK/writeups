@@ -101,18 +101,21 @@ export function sundogCutoff(n) {
 }
 
 /**
- * The parhelion's angular distance from the sun at solar
- * elevation h (great-circle), and its azimuthal offset along
- * the almucantar - null past the cutoff.
+ * The parhelion's position at solar elevation h: the Bravais
+ * minimum deviation D is the deviation of the HORIZONTAL
+ * projection (vertical side faces conserve the vertical
+ * direction cosine), so the dog's AZIMUTH offset from the sun is
+ * D itself - az = D. (Shipped until the sundog pass with a
+ * great-circle conversion that pushed the position outward with
+ * altitude; the plate Monte Carlo's independent trace arbitrated
+ * the convention.) The great-circle distance, if wanted, is
+ * acos(sin^2 h + cos^2 h cos D) < D. Null past the cutoff.
  */
 export function parhelion(n, h) {
   const np = bravais(n, h);
   const D = prismDmin(np, PRISM_60);
   if (D == null) return null;
-  const ch = Math.cos(h);
-  const cosAz = (Math.cos(D) - Math.sin(h) ** 2) / (ch * ch);
-  if (cosAz < -1 || cosAz > 1) return null;
-  return {D, az: Math.acos(cosAz), np};
+  return {D, az: D, np};
 }
 
 /**
@@ -210,8 +213,15 @@ const FACES = (() => {
       area: 1 * HEX_C // side width a=1 x height c
     });
   }
-  f.push({n: {x: 0, y: 0, z: 1}, d: HEX_C / 2, area: (3 * APOTHEM) / 2});
-  f.push({n: {x: 0, y: 0, z: -1}, d: HEX_C / 2, area: (3 * APOTHEM) / 2});
+  // Basal hexagon, side a = 1: area = 6 x (a x apothem / 2) =
+  // 3 sqrt(3) / 2 = 2.598. (Shipped as 3 x apothem / 2 = half of
+  // that until the sundog pass's audit - the basal faces entered
+  // the flux rejection at HALF their true area, over-weighting
+  // side-face transits: the 22-deg ring's absolute phase function
+  // read ~1.5x too bright and the 46-deg/pass-through books were
+  // mis-split. The gate's re-pinned accounting carries the fix.)
+  f.push({n: {x: 0, y: 0, z: 1}, d: HEX_C / 2, area: (3 * Math.sqrt(3)) / 2});
+  f.push({n: {x: 0, y: 0, z: -1}, d: HEX_C / 2, area: (3 * Math.sqrt(3)) / 2});
   return f;
 })();
 const AREA_MAX = Math.max(...FACES.map((f) => f.area));
@@ -375,6 +385,322 @@ export function mcHalo(nRGB = ICE_N, samples = 400000, seed = 1337) {
   return {g0, g1, bins, data, accepted, binnedT, lowT, highT, lostT};
 }
 
+// ---- The oriented plates behind the parhelia ----
+// Breon & Dubrulle 2004 (JAS 61, 2888, read in full): POLDER's
+// glint-direction reflectance measures the plates directly - "the
+// typical effective fraction (area weighted) of oriented plates in
+// clouds lies between 10^-3 and 10^-2" (their retrievals: "a
+// typical fraction of oriented plates in the range from 0.1 % to
+// 1 %"). PLATE_ALPHA carries the printed range's log midpoint,
+// the range itself stated; area-weighted IS interaction-share,
+// exactly the frame the halo's absolute accounting uses. Their
+// tilt statistics - "most retrievals are between 0.4 and 1.5
+// degrees", "most Theta are found close to 1 degree", with their
+// own Gaussian form f = (1/pi Theta^2) exp(-(theta_n/Theta)^2) -
+// give the wobble the drawn dog spreads over, replacing the old
+// hand quoted ~1.5 degrees. Their aerodynamic model prints the
+// oriented sizes: "the horizontal plate diameters are in the
+// range 0.1 to a few millimeters" - PLATE_D_UM is that range's
+// log midpoint, and Auer & Veal 1970 (JAS 27, 919, read in full;
+// Table 1, code P1a hexagonal plates) turns it into the aspect:
+// h = 2.020 d^0.449 (microns). The plate's thinness then does
+// real optical work: basal faces dominate its cross-section, so
+// only a small computed share of the plate's interaction takes
+// the side-to-side prism path - the Monte Carlo below books it.
+export const PLATE_ALPHA_RANGE = [1e-3, 1e-2];
+export const PLATE_ALPHA = Math.sqrt(
+  PLATE_ALPHA_RANGE[0] * PLATE_ALPHA_RANGE[1]
+);
+export const PLATE_TILT_THETA = Math.PI / 180; // B&D: "close to 1 degree"
+export const PLATE_D_RANGE_UM = [100, 3000];
+export const PLATE_D_UM = Math.sqrt(PLATE_D_RANGE_UM[0] * PLATE_D_RANGE_UM[1]);
+export const PLATE_H_UM = 2.02 * PLATE_D_UM ** 0.449; // Auer-Veal P1a
+export const PLATE_C_OVER_A = PLATE_H_UM / (PLATE_D_UM / 2); // ~0.125
+
+// Rodrigues rotation of v about unit axis u by angle t.
+function rotAxis(v, u, t) {
+  const c = Math.cos(t);
+  const s = Math.sin(t);
+  const d = dot3(u, v) * (1 - c);
+  return {
+    x: v.x * c + (u.y * v.z - u.z * v.y) * s + u.x * d,
+    y: v.y * c + (u.z * v.x - u.x * v.z) * s + u.y * d,
+    z: v.z * c + (u.x * v.y - u.y * v.x) * s + u.z * d
+  };
+}
+
+/**
+ * The parhelion Monte Carlo: the SAME traced hexagonal prism,
+ * with the orientation statistics of the plates that actually
+ * make sundogs - uniform spin about the vertical, tilt drawn
+ * from Breon & Dubrulle's own Gaussian (their eq. 1; Rayleigh in
+ * the tilt magnitude), aspect c/a from Auer & Veal's printed
+ * plate law at B&D's printed oriented sizes. Sun at elevation h.
+ *
+ * ABSOLUTE accounting exactly like mcHalo's: entry rejection on
+ * projected face area IS flux weighting, so per channel every
+ * accepted sample is one unit of light incident on the PLATE's
+ * whole projected area (basal faces at their true 3 sqrt(3)/2 -
+ * the audit's fix - so the thin plate's basal dominance is in
+ * the books). The azimuth histogram over [18, 55] degrees from
+ * the sun then divides to sr-free "per radian of azimuth per
+ * unit plate-interaction depth"; the vertical spread is RETURNED
+ * as moments (sigmaAlt) for the drawn Gaussian - the tilt
+ * distribution mapped through the actual refraction, not a
+ * hand-doubled mirror rule. data[b]/accepted/dAz x the drawn
+ * vertical Gaussian is the dog's absolute surface brightness per
+ * unit plate interaction; PLATE_ALPHA converts cloud-column
+ * interaction to plate interaction in the amp.
+ */
+export function mcParhelion(
+  h,
+  nRGB = ICE_N,
+  samples = 400000,
+  seed = 4711,
+  tiltTheta = PLATE_TILT_THETA,
+  dRangeUm = PLATE_D_RANGE_UM
+) {
+  const a0 = (18 * Math.PI) / 180;
+  const a1 = (55 * Math.PI) / 180;
+  const bins = 256;
+  const data = new Float64Array(bins * 3);
+  const accepted = [0, 0, 0];
+  const binnedT = [0, 0, 0];
+  const lowT = [0, 0, 0];
+  const highT = [0, 0, 0];
+  const offAlmT = [0, 0, 0];
+  const sumY = [0, 0, 0];
+  const sumY2 = [0, 0, 0];
+  // Per-trial plate: diameter log-uniform over B&D's printed
+  // oriented range, aspect from Auer & Veal's law - the
+  // POPULATION average, not one resonant slab (a single exact
+  // c/a light-pipes with geometric windows that a real size
+  // spread washes out; measured: the fixed-aspect share was
+  // non-monotone in sun altitude).
+  const lnLo = Math.log(dRangeUm[0]);
+  const lnHi = Math.log(dRangeUm[1]);
+  const sideN = [];
+  for (let k = 0; k < 6; k++) {
+    const phi = (k * Math.PI) / 3;
+    sideN.push({x: Math.cos(phi), y: Math.sin(phi), z: 0});
+  }
+  const BASAL_AREA = (3 * Math.sqrt(3)) / 2;
+  const facePointP = (f, rng, cA) => {
+    if (f.n.z !== 0) {
+      for (;;) {
+        const x = (rng() * 2 - 1) * 1;
+        const y = (rng() * 2 - 1) * APOTHEM;
+        if (
+          Math.abs(y) <= APOTHEM &&
+          Math.abs(y + Math.sqrt(3) * x) <= 2 * APOTHEM &&
+          Math.abs(y - Math.sqrt(3) * x) <= 2 * APOTHEM
+        ) {
+          return {x, y, z: f.n.z * (cA / 2)};
+        }
+      }
+    }
+    const t = {x: -f.n.y, y: f.n.x, z: 0};
+    const u = rng() - 0.5;
+    const v = (rng() - 0.5) * cA;
+    return {x: f.n.x * f.d + t.x * u, y: f.n.y * f.d + t.y * u, z: v};
+  };
+  // Photon direction in the world: sun at elevation h, azimuth 0.
+  const w = {x: Math.cos(h), y: 0, z: -Math.sin(h)};
+  for (let ch = 0; ch < nRGB.length; ch++) {
+    const n = nRGB[ch];
+    const rng = mulberry32(seed + ch);
+    for (let i = 0; i < samples; i++) {
+      // This trial's plate from the printed population.
+      const dUm = Math.exp(lnLo + rng() * (lnHi - lnLo));
+      const cA = (2.02 * dUm ** 0.449) / (dUm / 2);
+      const faces = [];
+      for (const nn of sideN) faces.push({n: nn, d: APOTHEM, area: cA});
+      faces.push({n: {x: 0, y: 0, z: 1}, d: cA / 2, area: BASAL_AREA});
+      faces.push({n: {x: 0, y: 0, z: -1}, d: cA / 2, area: BASAL_AREA});
+      const areaMax = BASAL_AREA;
+      // Orientation: tilt theta_n (Rayleigh from B&D's Gaussian)
+      // about a horizontal axis at uniform psi, spin phi about
+      // the crystal axis.
+      const thN = tiltTheta * Math.sqrt(-Math.log(Math.max(rng(), 1e-12)));
+      const psi = rng() * 2 * Math.PI;
+      const phi = rng() * 2 * Math.PI;
+      const axis = {x: Math.cos(psi), y: Math.sin(psi), z: 0};
+      // world -> crystal: untilt, then unspin
+      const dTilt = rotAxis(w, axis, -thN);
+      const cph = Math.cos(-phi);
+      const sph = Math.sin(-phi);
+      const dC = {
+        x: dTilt.x * cph - dTilt.y * sph,
+        y: dTilt.x * sph + dTilt.y * cph,
+        z: dTilt.z
+      };
+      // flux-correct entry face
+      const f = faces[Math.floor(rng() * 8)];
+      const proj = -dot3(dC, f.n);
+      if (proj <= 0) continue;
+      if (rng() * areaMax > f.area * proj) continue;
+      accepted[ch] += 1;
+      const rin = refract(dC, f.n, 1, n);
+      if (!rin) continue;
+      // The internal walk FOLLOWS total internal reflections (up
+      // to 12 face events): in a thin plate the skew ray reaches
+      // the alternate side face by light-piping between the basal
+      // faces - beyond ~10 degrees of sun the basal incidence
+      // sits past the critical angle, the bounce is LOSSLESS, the
+      // azimuthal (Bravais) deviation is untouched and the
+      // vertical cosine flips sign per bounce. Greenler's own
+      // parhelion mechanism at elevation; without it thin plates
+      // could draw dogs only at grazing sun. Partial reflections
+      // at transmitting faces stay untraced (the lost bucket, as
+      // in mcHalo).
+      let dir = rin.dir;
+      let Tacc = rin.T;
+      let p = facePointP(f, rng, cA);
+      let out = null;
+      for (let ev = 0; ev < 12; ev++) {
+        let tMin = Infinity;
+        let fOut = null;
+        for (const g of faces) {
+          const dn = dot3(dir, g.n);
+          if (dn <= 1e-12) continue;
+          const t = (g.d - dot3(p, g.n)) / dn;
+          if (t > 1e-9 && t < tMin) {
+            tMin = t;
+            fOut = g;
+          }
+        }
+        if (!fOut) break;
+        p = {
+          x: p.x + dir.x * tMin,
+          y: p.y + dir.y * tMin,
+          z: p.z + dir.z * tMin
+        };
+        const rout = refract(
+          dir,
+          {x: -fOut.n.x, y: -fOut.n.y, z: -fOut.n.z},
+          n,
+          1
+        );
+        if (rout) {
+          out = {dir: rout.dir, T: Tacc * rout.T};
+          break;
+        }
+        // TIR: lossless mirror, walk on.
+        const dn = dot3(dir, fOut.n);
+        dir = {
+          x: dir.x - 2 * dn * fOut.n.x,
+          y: dir.y - 2 * dn * fOut.n.y,
+          z: dir.z - 2 * dn * fOut.n.z
+        };
+      }
+      if (!out) continue;
+      // crystal -> world: spin, then tilt
+      const oc = out.dir;
+      const cph2 = Math.cos(phi);
+      const sph2 = Math.sin(phi);
+      const oSpun = {
+        x: oc.x * cph2 - oc.y * sph2,
+        y: oc.x * sph2 + oc.y * cph2,
+        z: oc.z
+      };
+      const oW = rotAxis(oSpun, axis, thN);
+      // Apparent sky positions: the source (-w) sits at azimuth
+      // pi, altitude h in this frame; the exit light appears from
+      // -oW. Azimuth offset wrapped about the sun's, mirror pair
+      // folded.
+      const alt = Math.asin(Math.min(Math.max(-oW.z, -1), 1));
+      let dAzS = Math.atan2(-oW.y, -oW.x) - Math.PI;
+      if (dAzS > Math.PI) dAzS -= 2 * Math.PI;
+      if (dAzS < -Math.PI) dAzS += 2 * Math.PI;
+      const dAz = Math.abs(dAzS);
+      const dAlt = alt - h;
+      const T = out.T;
+      // The DOG books take only light near the sun's almucantar:
+      // side-to-side transits keep the vertical direction cosine
+      // (vertical faces conserve it, the tilt wobble moves it by
+      // ~Theta), while side-to-basal transits land the same
+      // azimuth window tens of degrees off in altitude (the 46
+      // family and the subparhelion region - real light, OTHER
+      // optics: booked offAlm, stated, never in the dog).
+      if (dAz >= a0 && dAz < a1 && Math.abs(dAlt) < (5 * Math.PI) / 180) {
+        const b = Math.floor(((dAz - a0) / (a1 - a0)) * bins);
+        data[b * 3 + ch] += T;
+        binnedT[ch] += T;
+        sumY[ch] += T * dAlt;
+        sumY2[ch] += T * dAlt * dAlt;
+      } else if (dAz >= a0 && dAz < a1) offAlmT[ch] += T;
+      else if (dAz < a0) lowT[ch] += T;
+      else highT[ch] += T;
+    }
+  }
+  const lostT = accepted.map(
+    (a, ch) => a - binnedT[ch] - lowT[ch] - highT[ch] - offAlmT[ch]
+  );
+  const sigmaAlt = binnedT.map((B, ch) => {
+    if (B <= 0) return 0;
+    const m = sumY[ch] / B;
+    return Math.sqrt(Math.max(sumY2[ch] / B - m * m, 0));
+  });
+  return {
+    a0,
+    a1,
+    bins,
+    data,
+    accepted,
+    binnedT,
+    lowT,
+    highT,
+    offAlmT,
+    lostT,
+    sigmaAlt
+  };
+}
+
+// The parhelion's share of the PLATE's geometric interaction and
+// the drawn dog's vertical spread, tabulated from mcParhelion at
+// 600k samples per altitude (deterministic seed 4711; green
+// channel - the share is achromatic within the MC noise, colour
+// lives in the caustic profile). The gate RE-RUNS the Monte Carlo
+// at three altitudes and holds these literals to it - shipped
+// numbers that cannot drift from the code that made them. The
+// grazing spike (a low plate is almost a pure prism to a low sun)
+// and the monotone fade to the ~57-degree Bravais cutoff both
+// EMERGE from the traced geometry; the fade is why real dogs die
+// as the sun climbs. Linear interpolation between rows; zero past
+// the end.
+export const PARHELION_ALT_DEG = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+export const PARHELION_SHARE = [
+  0.46593, 0.1363, 0.07013, 0.06406, 0.06236, 0.05291, 0.04016, 0.02912,
+  0.02142, 0.01464, 0.00794, 0.00231
+];
+export const PARHELION_SIGMA_ALT_DEG = [
+  0.756, 0.321, 0.338, 0.344, 0.359, 0.377, 0.408, 0.433, 0.483, 0.53, 0.584,
+  0.448
+];
+function lerpTable(xs, ys, x) {
+  if (x <= xs[0]) return ys[0];
+  for (let i = 1; i < xs.length; i++) {
+    if (x <= xs[i]) {
+      const f = (x - xs[i - 1]) / (xs[i] - xs[i - 1]);
+      return ys[i - 1] + f * (ys[i] - ys[i - 1]);
+    }
+  }
+  return 0;
+}
+export function parhelionShare(hRad) {
+  const d = (hRad * 180) / Math.PI;
+  if (d < 0 || d > 57.5) return 0;
+  return d > 55
+    ? (PARHELION_SHARE[11] * (57.5 - d)) / 2.5
+    : lerpTable(PARHELION_ALT_DEG, PARHELION_SHARE, d);
+}
+export function parhelionSigmaAlt(hRad) {
+  const d = Math.min(Math.max((hRad * 180) / Math.PI, 0), 55);
+  return (
+    (lerpTable(PARHELION_ALT_DEG, PARHELION_SIGMA_ALT_DEG, d) * Math.PI) / 180
+  );
+}
+
 /**
  * The circular-halo profile over the angle from the sun: the
  * 22-degree halo of randomly oriented columns, per RGB,
@@ -412,18 +738,23 @@ export function parhelionProfile(h, samples = 256) {
   const a1 = (55 * Math.PI) / 180;
   const data = new Float32Array(samples * 3);
   let any = false;
-  const sh2 = Math.sin(h) ** 2;
-  const ch2 = Math.cos(h) ** 2;
   for (let ch = 0; ch < 3; ch++) {
     const n = ICE_N[ch];
     const np = bravais(n, h);
     const Dm = prismDmin(np, PRISM_60);
     if (Dm == null) continue;
     const T = prismThroughput(np, PRISM_60);
-    // great-circle distance to a point az away on the sun's own
-    // altitude circle
-    const gc = (az) =>
-      Math.acos(Math.min(Math.max(sh2 + ch2 * Math.cos(az), -1), 1));
+    // The Bravais minimum deviation is the deviation of the
+    // HORIZONTAL projection - vertical side faces conserve the
+    // vertical direction cosine, so the whole deflection is a
+    // rotation about the vertical and the caustic sits at
+    // AZIMUTH offset Dm from the sun, directly. (Shipped until
+    // the sundog pass as gc(az) = Dm - the great-circle
+    // conversion pushed the drawn dog outward with altitude,
+    // ~1.6 deg at a 20-degree sun, ~4 at 35; the plate Monte
+    // Carlo's independent vector-Snell trace lands the caustic
+    // at Dm in azimuth at every altitude and arbitrated the
+    // convention. Tape's printed positions agree.)
     const hbin = (a1 - a0) / (samples - 1) / 2;
     for (let i = 0; i < samples; i++) {
       const az = a0 + ((a1 - a0) * i) / (samples - 1);
@@ -431,8 +762,8 @@ export function parhelionProfile(h, samples = 256) {
       // sample's cell - no disc smear here; the limb-darkened
       // solar convolution is applied exactly once by the LUT
       // builder (see causticBin).
-      const x0 = gc(Math.max(az - hbin, a0)) - Dm;
-      const x1 = gc(Math.min(az + hbin, a1)) - Dm;
+      const x0 = Math.max(az - hbin, a0) - Dm;
+      const x1 = Math.min(az + hbin, a1) - Dm;
       const v = T * causticBin(x0, x1);
       if (v > 0) any = true;
       data[3 * i + ch] += v;

@@ -4459,6 +4459,67 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   homogeneous (the radar's cell field could localise it - named);
   MP is stratiform rain (their own scope), carried for showers
   too as the only printed DSD in the theme's feeds.
+- DONE (radiometric sundogs + two owned corrections, Aug 7 eighth
+  push - the optics dome's LAST display constant, dogK, retired):
+  two papers read in full through the recovered AMS route -
+  Breon & Dubrulle 2004 (JAS 61, 2888: POLDER glint measures the
+  oriented plates directly; "the typical effective fraction (area
+  weighted) of oriented plates in clouds lies between 10^-3 and
+  10^-2" -> PLATE_ALPHA = the printed range's log midpoint with
+  the decade stated; tilt "most Theta close to 1 degree" with
+  their own Gaussian form; oriented diameters "0.1 to a few
+  millimeters") and Auer & Veal 1970 (JAS 27, 919: Table 1 P1a
+  hexagonal plates, h = 2.020 d^0.449 - the printed aspect law).
+  THE AUDIT'S FIRST CORRECTION: building the plate faces exposed
+  that mcHalo's BASAL areas were shipped at HALF their true
+  3 sqrt(3)/2 - side transits over-weighted, the 22-deg ring's
+  absolute phase function ~1.4x too bright (share 0.111 -> 0.0854,
+  peak 1.15 -> 0.83/sr), the 46/22 share ratio 0.33 -> 0.43;
+  fixed, both gates re-pinned with the fix documented. THE
+  SECOND: the plate Monte Carlo's independent vector-Snell trace
+  arbitrated the parhelion POSITION convention - vertical faces
+  conserve the vertical direction cosine, so the Bravais minimum
+  deviation is the AZIMUTH offset itself; the shipped
+  great-circle conversion drew dogs outward with altitude (~2.8
+  deg too far at 25 deg sun). parhelionProfile, parhelion() and
+  the landmarks now carry az = Dmin (analytic 26.1, drawn LUT
+  26.3, Tape's tables agree). THE NEW MACHINERY: mcParhelion -
+  the traced hexagonal prism under the PLATES' orientation
+  statistics (uniform spin, B&D's Rayleigh-sampled ~1-deg tilt),
+  per-trial diameters log-uniform over B&D's printed range with
+  Auer-Veal aspects (a single fixed aspect light-pipes with
+  geometric resonances - measured non-monotone; the population
+  washes them), and the internal walk FOLLOWING basal total
+  internal reflections (up to 12 face events): the light-pipe
+  that carries dogs to altitude - without it thin plates dog
+  only at grazing sun. Off-almucantar exits (the 46 family, the
+  subparhelion region) are booked offAlm, stated, never in the
+  dog; the books close to 1e-9. The MC's caustic lands on the
+  Bravais azimuth at every tested altitude (24.43 vs 24.35 at
+  h=20), its share of the plate's interaction is tabulated
+  (PARHELION_SHARE, 12 altitudes at 600k samples, deterministic
+  seed) and the gate RE-RUNS three rows and holds the shipped
+  literals to 3% - the grazing maximum and the monotone fade to
+  the Bravais cutoff both emerge from the traced geometry (why
+  real dogs die as the sun climbs). The tilt wobble's DRAWN
+  sigma is the MC's own sigmaAlt (0.32-0.58 deg - B&D's printed
+  1-deg tilt mapped through the actual refraction), replacing
+  the hand-quoted 1.5-deg envelope. THE DRAWN DOG: azimuth LUT
+  normalised to unit integral; dogAmp = E_src x T_air x the same
+  measured cirrus slab x PLATE_ALPHA x parhelionShare(alt) x the
+  Gaussian's peak density - no SCF (the glint-measured alpha
+  already selects specular plates), dogK's (0.6/0.18) x peakAbs
+  deleted, u.dogs deleted, the moon's paraselenae on the same
+  chain through moonlight.js. halos-reference grew to 11
+  landmarks (4 new), optics-reference re-pinned + strengthened
+  (Bravais-azimuth assertion, unit integrals). Full gate green -
+  87 reference sets and SEVEN GPU probes (the bow probe
+  re-certifying the changed optics material). Scope: alpha spans
+  a printed DECADE (the dominant stated uncertainty - a dog can
+  honestly be 3x dimmer or brighter than the midpoint); B&D
+  measured mostly 500-700 hPa clouds and note high clouds carry
+  LOWER alpha - documented; subparhelia and the parhelic circle
+  (the offAlm light) stay named.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

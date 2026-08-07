@@ -520,13 +520,17 @@ export function createOpticsMaterial(cloudShadow) {
     // LUT it multiplies is ABSOLUTE (sr^-1, optics-lut). The old
     // 0.18 display gain and its cover heuristics are retired.
     haloAmp: uniform(new Color(0, 0, 0)),
-    dogs: uniform(0),
-    // The dogs keep their CALIBRATED ratio to the ring (the
-    // oriented-plate fraction is unmeasured): dogK = (0.6/0.18) x
-    // the absolute LUT's peak, set by the theme at build, so the
-    // dog:ring brightness ratio is exactly what shipped while the
-    // ring itself is now physical.
-    dogK: uniform(1),
+    // The RADIOMETRIC dog amplitude (per channel): the theme
+    // feeds E_src x T_air x slab x PLATE_ALPHA (Breon & Dubrulle
+    // 2004's measured oriented-plate fraction) x the Monte
+    // Carlo's parhelionShare(h) x the vertical Gaussian's peak
+    // density. The azimuth LUT it multiplies integrates to 1 per
+    // channel, so the drawn dog is sr^-1 in the same frame as
+    // the ring - the old calibrated dogK ratio is retired.
+    dogAmp: uniform(new Color(0, 0, 0)),
+    // The tilt wobble's drawn sigma (radians): the plate MC's
+    // sigmaAlt at the current source altitude, fed with the LUT.
+    dogSigma: uniform(0.006),
     // Bravais parhelia (optics-lut buildDogLUT): azimuth-offset
     // LUT re-laid by the theme as the source climbs; srcAlt +
     // the plates' documented ~1.5-degree wobble envelope place
@@ -551,13 +555,14 @@ export function createOpticsMaterial(cloudShadow) {
   // the Descartes deviation with the Fresnel chain - their
   // brightness ratio and Alexander's dark band between them emerge
   // from the physics (the band histograms to exactly zero). Both
-  // convolved with the limb-darkened sun disc. The halo LUT is
-  // ABSOLUTE (sr^-1 per unit geometric-interaction depth - the
-  // MC's own flux accounting) and scales by the fed radiometric
-  // haloAmp; the dogs ride the same amp at their calibrated ratio
-  // (dogK). Only the bow still runs a display gain (0.55) - its
-  // radiometry needs the rain shaft's optical depth, named in the
-  // plan.
+  // convolved with the limb-darkened sun disc. All THREE optics
+  // are now absolute: the halo LUT in sr^-1 per unit
+  // geometric-interaction depth (the MC's own flux accounting,
+  // basal areas corrected by the sundog pass's audit), the bow
+  // energy-normalised against the Descartes/Fresnel mapping, and
+  // the dogs riding the plate MC's own share table with Breon &
+  // Dubrulle's measured oriented-plate fraction - no display
+  // gain remains on this dome.
   const mkLutTex = (lut) => {
     const t = new DataTexture(lut.data, lut.bins, 1, RGBAFormat, FloatType);
     t.minFilter = t.magFilter = LinearFilter;
@@ -565,10 +570,6 @@ export function createOpticsMaterial(cloudShadow) {
     return t;
   };
   const haloLut = buildHaloLUT();
-  // The dogs' calibrated ratio against the now-absolute ring:
-  // (0.6/0.18) x the LUT's green peak reproduces the shipped
-  // dog:ring brightness exactly (see the u.dogK note above).
-  u.dogK.value = (0.6 / 0.18) * haloLut.peakAbs;
   const bowLut = buildBowLUT();
   const bowTex = mkLutTex(bowLut);
   u.bowTex = bowTex; // theme re-lays it from the measured rain
@@ -624,10 +625,17 @@ export function createOpticsMaterial(cloudShadow) {
   const cBow = bowSample.mul(u.bowAmp).mul(bowSlab).mul(chiSun);
   // Parhelia: the Bravais azimuth-offset LUT along the source's
   // almucantar (dogs ON the halo at the horizon, migrating
-  // outward, dead past ~61 degrees - the LUT empties itself),
-  // spread vertically by the plates' documented ~1.5-degree
-  // wobble. The 0.18 base / 0.6 dog display gains keep their
-  // calibrated values.
+  // outward at the Bravais azimuth, dead past the cutoff - the
+  // LUT empties itself), spread vertically by the MEASURED tilt
+  // wobble: the Gaussian whose sigma the plate Monte Carlo maps
+  // from Breon & Dubrulle's printed ~1-degree tilt distribution
+  // through the actual refraction (dogSigma, fed with the LUT).
+  // The azimuth LUT integrates to 1 per channel and dogAmp
+  // carries E_src x T_air x slab x PLATE_ALPHA x share(h) x the
+  // Gaussian's peak density - the old 0.6/0.18 calibrated ratio
+  // (dogK) is retired: the dog:ring ratio now follows from the
+  // plates' measured fraction and the two Monte Carlos' own
+  // absolute books.
   const hd = max(sqrt(float(1.0).sub(v.y.mul(v.y))), 1e-4);
   const hs = max(sqrt(float(1.0).sub(u.sunDir.y.mul(u.sunDir.y))), 1e-4);
   const cosAz = clamp(
@@ -638,14 +646,11 @@ export function createOpticsMaterial(cloudShadow) {
   const azOff = acos(cosAz);
   const dAlt = asin(clamp(v.y, -1.0, 1.0))
     .sub(u.srcAlt)
-    .div((1.5 * Math.PI) / 180);
+    .div(max(u.dogSigma, 1e-4));
   const dogSample = texture(u.dogTex).sample(
     vec2(clamp(azOff.sub(u.dogA0).div(u.dogA1.sub(u.dogA0)), 0.0, 1.0), 0.5)
   ).rgb;
-  const cDogs = dogSample
-    .mul(exp(dAlt.mul(dAlt).negate()))
-    .mul(u.haloAmp)
-    .mul(u.dogK.mul(u.dogs));
+  const cDogs = dogSample.mul(exp(dAlt.mul(dAlt).mul(-0.5))).mul(u.dogAmp);
   const cHalo = haloSample.mul(u.haloAmp);
   material.colorNode = cBow.add(cHalo).add(cDogs);
   material.opacityNode = 1.0;

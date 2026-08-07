@@ -377,7 +377,12 @@
         pickHour
       } from './horizon/clearness.js';
       import {buildBowLUT, buildDogLUT} from './horizon/optics-lut.js';
-      import {SCF_COLUMN} from './horizon/halos.js';
+      import {
+        SCF_COLUMN,
+        PLATE_ALPHA,
+        parhelionShare,
+        parhelionSigmaAlt
+      } from './horizon/halos.js';
       import {
         apparentAltitude,
         buildProfile,
@@ -10277,22 +10282,40 @@
         }
         {
           const haloOn = params.get('halo') !== '0' && sun.alt > 0;
-          const slab = haloOn
+          const slabBase = haloOn
             ? coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(sun.alt))) *
-              SCF_COLUMN *
               skyExposure
             : 0;
+          const slab = slabBase * SCF_COLUMN;
           const tH = sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieRad);
           opticsU.haloAmp.value.setRGB(
             tH[0] * slab,
             tH[1] * slab,
             tH[2] * slab
           );
+          // The RADIOMETRIC dogs: the same measured cirrus slab,
+          // the plates' measured share of it (Breon & Dubrulle's
+          // area-weighted alpha), the Monte Carlo's own
+          // parhelion share at this altitude, and the tilt
+          // Gaussian's peak density - the dog:ring ratio now
+          // follows from measurements and the traced plate, not
+          // from the retired 0.6/0.18 calibration. No SCF: the
+          // glint-measured alpha already selects the specular
+          // (smooth-faced) plates.
+          const sigAlt = parhelionSigmaAlt(sun.alt);
+          const dogA =
+            slabBase *
+            PLATE_ALPHA *
+            parhelionShare(sun.alt) *
+            (dogOnSun ? 1 : 0) *
+            (1 / Math.sqrt(2 * Math.PI) / Math.max(sigAlt, 1e-4));
+          opticsU.dogSigma.value = sigAlt;
+          opticsU.dogAmp.value.setRGB(tH[0] * dogA, tH[1] * dogA, tH[2] * dogA);
         }
         // Bravais parhelia: re-lay the dog LUT when the sun has
-        // moved 0.2 deg; the migration, dispersion and the ~61-deg
-        // death are the LUT's own physics, so the old low-sun
-        // display ramp is gone.
+        // moved 0.2 deg; the migration, dispersion and the
+        // Bravais death are the LUT's own physics, so the old
+        // low-sun display ramp is gone.
         opticsU.srcAlt.value = sun.alt;
         if (dogAltSun === null || Math.abs(sun.alt - dogAltSun) > 0.0035) {
           dogAltSun = sun.alt;
@@ -10303,7 +10326,6 @@
           opticsU.dogA1.value = (dl.azMaxDeg * Math.PI) / 180;
           dogOnSun = dl.any;
         }
-        opticsU.dogs.value = dogOnSun ? 1 : 0;
         // The moon's dome: same gating physics (cirrus for the
         // halo, rain for the bow, low source for the dogs), the
         // source now the moon at its true phase brightness.
@@ -10348,20 +10370,20 @@
           // The lunar halo, radiometric like the sun's: the same
           // slab on the same column, the source now the MEASURED
           // moonlight (moonlight.js - printed anchor, gated phase,
-          // live distance, umbral immersion). MOONOPT_GAIN and the
-          // display gates stay only on the bow.
+          // live distance, umbral immersion). The paraselenae ride
+          // the same measured plate fraction as the sun's dogs.
           {
             const haloOn = params.get('halo') !== '0' && moon.alt > 0;
-            const slab = haloOn
+            const slabBase = haloOn
               ? moonIrradianceE0(
                   astro.moonRel,
                   astro.moonDistKm,
                   1 - (astro.lunarEcl?.inUmbra ?? 0)
                 ) *
                 coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(moon.alt))) *
-                SCF_COLUMN *
                 skyExposure
               : 0;
+            const slab = slabBase * SCF_COLUMN;
             const tH = sunTransmittanceJS(
               Math.sin(Math.max(moon.alt, 0)),
               mieRad
@@ -10370,6 +10392,19 @@
               tH[0] * slab,
               tH[1] * slab,
               tH[2] * slab
+            );
+            const sigAltM = parhelionSigmaAlt(moon.alt);
+            const dogAM =
+              slabBase *
+              PLATE_ALPHA *
+              parhelionShare(moon.alt) *
+              (dogOnMoon ? 1 : 0) *
+              (1 / Math.sqrt(2 * Math.PI) / Math.max(sigAltM, 1e-4));
+            opticsMoonU.dogSigma.value = sigAltM;
+            opticsMoonU.dogAmp.value.setRGB(
+              tH[0] * dogAM,
+              tH[1] * dogAM,
+              tH[2] * dogAM
             );
           }
           opticsMoonU.srcAlt.value = refr.moonApp;
@@ -10386,7 +10421,6 @@
             opticsMoonU.dogA1.value = (dl.azMaxDeg * Math.PI) / 180;
             dogOnMoon = dl.any;
           }
-          opticsMoonU.dogs.value = dogOnMoon ? 1 : 0;
           // The LUNAR corona, radiometric: the same cold-cirrus
           // gate and measured column as the sun's, the amplitude
           // now carrying the moonlight irradiance in the sky's E0
