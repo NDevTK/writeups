@@ -275,16 +275,33 @@ export function sampleIceConc(pxAt, px, py, half = 16) {
   return n ? sum / n : -1;
 }
 
+// Snow-covered ice: Table 2's printed snow-covered-ice rows
+// (tau 27..73, grains 170..270 um - and the conclusion's fresh
+// snow at tau > 30, grains < 300 um agrees). Log-mids, like the
+// bare-ice pair.
+export const SNOW_ICE_TAU = Math.sqrt(27 * 73);
+export const SNOW_ICE_A_M = Math.sqrt(170 * 270) * 1e-6;
+
 // The drawn ice colour in the water body's own display frame:
 // the diffuse white-ice albedo (Eq. 29 at the printed
 // parameters) times the SAME BODY_GAIN scalar the Morel body
 // colour rides (ocean-color.js) - reflectance in, display out,
 // no new constant.
 import {BODY_GAIN} from './ocean-color.js';
-export function iceDisplayRGB() {
-  return [
-    iceAlbedoDiffuse(0) * BODY_GAIN,
-    iceAlbedoDiffuse(1) * BODY_GAIN,
-    iceAlbedoDiffuse(2) * BODY_GAIN
-  ];
+// fsc: the measured fractional snow cover (snowcover.js) as the
+// AREA fraction wearing the snow-covered-ice parameters - an
+// area-weighted albedo mix, exact for a fraction (the land
+// measurement stands proxy for snowfall on the adjacent ice, a
+// stated reduction).
+export function iceDisplayRGB(fsc = 0) {
+  const f = Math.min(Math.max(fsc, 0), 1);
+  const out = [];
+  for (let c = 0; c < 3; c++) {
+    out.push(
+      ((1 - f) * iceAlbedoDiffuse(c) +
+        f * iceAlbedoDiffuse(c, SNOW_ICE_TAU, SNOW_ICE_A_M)) *
+        BODY_GAIN
+    );
+  }
+  return out;
 }

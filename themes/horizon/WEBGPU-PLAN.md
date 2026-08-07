@@ -5760,6 +5760,29 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   because a satellite analysis says it is frozen, wearing the
   printed white-ice albedo, with the sea calmed and the
   glitter gone in proportion to the measured concentration.
+- DONE (sea ice stage 3: snow on the ice, Aug 7 thirty-ninth
+  push - the pass completes on the same paper's printed rows):
+  bare white ice is the SUMMER surface; the cold-season sea
+  wears snow, and Malinka's Table 2 prints the snow-covered-ice
+  parameters (tau 27..73, grains 170..270 um - the conclusion's
+  fresh-snow statistics agree: tau > 30, grains < 300 um).
+  seaice.js carries the log-mid pair and iceDisplayRGB(fsc)
+  mixes bare and snow-covered albedos AREA-WEIGHTED by the
+  theme's measured fractional snow cover (snowcover.js's GIBS
+  NDSI field - the land measurement standing proxy for
+  snowfall on the adjacent ice, a stated reduction; an area
+  fraction makes the linear albedo mix exact). The snow-covered
+  triple lands at r_d = 0.909/0.915/0.917 - inside the paper's
+  own measured snow-covered band (~0.85-0.95, its Fig. 11) and
+  properly above bare white ice. Gate: 7 landmarks (the new
+  one holds the Table-2 triple's band, the ordering, and the
+  mix's end-exactness and monotonicity). Documented residual:
+  the FAR sea stays the sky-view LUT's Payne-lit horizon (the
+  far ring deliberately draws no sea mesh), so the horizon
+  line keeps liquid radiance under full ice - the near drawn
+  water is where the freeze lives; a future pass could carry
+  the concentration into the sky-LUT's sea-horizon term.
+  VALIDATE PASS (all references + 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

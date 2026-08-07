@@ -13,7 +13,9 @@ import {
   ICE_CONC_RGB,
   iceConcOfRGBA,
   sampleIceConc,
-  iceDisplayRGB
+  iceDisplayRGB,
+  SNOW_ICE_TAU,
+  SNOW_ICE_A_M
 } from './seaice.js';
 import {BODY_GAIN, TARGET_LUMINANCE, luminance} from './ocean-color.js';
 
@@ -169,6 +171,34 @@ const check = (name, ok, detail) => {
     'sampler and display frame',
     ok,
     `all-unknown -> -1; half-plume mean ${half.toFixed(3)}; ice luminance x${ratio.toFixed(0)} the tuned dark sea (r_d ~0.71 vs the body reflectance, one shared BODY_GAIN)`
+  );
+}
+
+{
+  // Snow-covered ice at Table 2's printed rows (tau 27..73,
+  // grains 170..270 um, log-mids): the triple lands in the
+  // paper's measured snow-covered band (~0.85-0.95 visible,
+  // their Fig. 11) and above bare white ice; the area-weighted
+  // mix is exact at its ends and monotone in the measured snow
+  // fraction.
+  const snow = [0, 1, 2].map((c) =>
+    iceAlbedoDiffuse(c, SNOW_ICE_TAU, SNOW_ICE_A_M)
+  );
+  const bare = iceDisplayRGB(0);
+  const full = iceDisplayRGB(1);
+  const halfMix = iceDisplayRGB(0.5);
+  let ok = true;
+  for (let c = 0; c < 3; c++) {
+    if (!(snow[c] > 0.85 && snow[c] < 0.95)) ok = false;
+    if (!(snow[c] > iceAlbedoDiffuse(c))) ok = false;
+    if (Math.abs(full[c] - snow[c] * BODY_GAIN) > 1e-15) ok = false;
+    if (Math.abs(bare[c] - iceAlbedoDiffuse(c) * BODY_GAIN) > 1e-15) ok = false;
+    if (!(halfMix[c] > bare[c] && halfMix[c] < full[c])) ok = false;
+  }
+  check(
+    'snow-covered ice (Table 2 rows)',
+    ok,
+    `r_d snow (${snow.map((v) => v.toFixed(3)).join(', ')}) in the 0.85-0.95 measured band, above bare; area mix exact at ends, monotone`
   );
 }
 

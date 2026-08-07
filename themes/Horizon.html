@@ -10527,7 +10527,7 @@
           // compounds; the glitter above and the wind sea below damp
           // with the concentration.
           if (seaIceC > 0) {
-            const ir = iceDisplayRGB();
+            const ir = iceDisplayRGB(snowFSC || 0);
             water.waterColor.value.lerp(
               tmpC.setRGB(ir[0], ir[1], ir[2], THREE.LinearSRGBColorSpace),
               seaIceC
