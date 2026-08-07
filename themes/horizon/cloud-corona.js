@@ -78,16 +78,51 @@
  * sunlight's dimming and the corona's brightness ride ONE measured
  * column.
  *
- * Documented scope: the LUNAR corona (the classic naked-eye case)
- * needs the moonlight irradiance in the sky's radiometric frame
- * before it can be drawn honestly - named follow-up, not a display
- * gain here. Droplet coronas through altocumulus (G&L's most
- * common producer) wait on a mid-deck optical-depth model. Corona
- * ellipticity from oriented crystals: out of scope (Jaervinen's
- * compact crystals justify the circular pattern).
+ * THE DROPLET CORONA (the deck's own): G&L's most common producer
+ * is the liquid water cloud, and the theme's volumetric decks are
+ * exactly that. Their measured microphysics is Miles, Verlinde &
+ * Clothiaux 2000 (JAS 57, 295, read in full): a survey of every
+ * published in-situ stratus droplet spectrum, separated marine vs
+ * continental by the source papers' own classification, each
+ * distribution fitted by the lognormal (their Eq. 6)
+ *     n(D) = N_t / (sqrt(2 pi) sigma_log D)
+ *            * exp(-[ln(D / D_n,log)]^2 / (2 sigma_log^2)),
+ * D_n,log the median diameter and sigma_log the NATURAL-log width.
+ * Table 3's printed averages are this module's two droplet classes:
+ * marine D_n 13.1 um, continental 7.7 um, sigma_log 0.38 for both
+ * (the survey's own striking coincidence). The paper states the
+ * fitted parameters describe the UNTRUNCATED distributions ("the
+ * parameters reported in the database are the untruncated
+ * distributions that reproduce the measurements"), so the ensemble
+ * integrals run wide bounds and a gate landmark holds their moments
+ * at the closed lognormal forms. The corona pattern is the
+ * cross-section-weighted Airy ensemble over that lognormal - the
+ * aureole's own diffractionPattern, one implementation - and at
+ * sigma_log 0.38 the rings wash out entirely: the drawn corona is
+ * the smooth bright aureole G&L predict for broad distributions
+ * ("interference that results from flat and wide droplet size
+ * distributions washes out the outer rings"; "the most vibrant,
+ * multiringed coronas are produced by optically thin clouds with
+ * NARROW droplet size distributions"), rings appearing only for
+ * the narrow cirrus pattern above. Marine vs continental is the
+ * measured air mass: sea salt carrying the majority of the CAMS
+ * 555 nm extinction column (the desert gate's own majority test,
+ * mirrored). The deck's slant optical depth is read per fragment
+ * from the cloud shadow map (clouds-tsl tauSlant - the SAME map
+ * terrain shadows ride), and the amplitude is tau/2 WITHOUT the
+ * e^-tau: the volumetric composite extinguishes the dome behind
+ * every deck pixel, so the slab law's extinction leg already runs
+ * per pixel in the compositor - DROPLET_DIFF_SHARE * tau * e^-tau
+ * would count it twice. The identity landmark states the partition.
+ *
+ * Documented residuals: the mid deck (altocumulus) rides the same
+ * two stratus classes - Miles's survey is boundary-layer stratus,
+ * and a printed altocumulus size climatology would be its own
+ * source. Corona ellipticity from oriented crystals: out of scope
+ * (Jaervinen's compact crystals justify the circular pattern).
  */
 
-import {j1} from './aureole.js';
+import {diffractionPattern, j1} from './aureole.js';
 import {sunConvolve} from './optics-lut.js';
 
 // ---- printed constants, with their sources ----
@@ -104,6 +139,33 @@ export const CORONA_T250_MAX = -60;
 // diameter of ~22 um", in-situ corroborated. Inside Sassen 1991's
 // 12-30 um field range and Jaervinen 2014's 19-32 um lab medians.
 export const CORONA_D_UM = 22;
+
+// Miles, Verlinde & Clothiaux 2000 Table 3 (printed averages of
+// the whole published in-situ stratus record): lognormal median
+// diameters D_n,log 13.1 um (marine) / 7.7 um (continental), and
+// the logarithmic width sigma_log 0.38 - identical for both
+// classes in the printed table. Their Eq. (6) is the natural-log
+// form, so the aureole machinery's geometric standard deviation is
+// exp(0.38); rm is the median RADIUS D_n/2 (medians scale exactly
+// under D = 2r). Bounds: 1 um radius is the survey's own FSSP
+// floor (2 um diameter); 100 um sits far beyond every moment the
+// pattern uses - the paper reports UNTRUNCATED fits ("the
+// parameters reported in the database are the untruncated
+// distributions that reproduce the measurements"), and the
+// closed-moment landmark holds these bounds effectively
+// untruncated. Internal corroboration: their Eq. (7a)
+// D_e = D_n exp(5 sigma^2 / 2) reproduces the independently
+// printed D_e,obs for both classes (18.8 vs 19.2 +- 4.7 um;
+// 11.0 vs 10.8 +- 4.1 um) - held by a gate landmark.
+export const DROPLET_SIGMA_LOG = 0.38;
+export const DROPLET_DN_UM = {marine: 13.1, continental: 7.7};
+export const DROPLET_DE_OBS_UM = {marine: 19.2, continental: 10.8};
+export const dropletMode = (cls) => ({
+  rm: DROPLET_DN_UM[cls] / 2,
+  sigma: Math.exp(DROPLET_SIGMA_LOG),
+  rMin: 1,
+  rMax: 100
+});
 
 // Theme channels (aerosol.js CHANNEL_NM) in um.
 export const CHANNEL_UM = [0.68, 0.55, 0.44];
@@ -205,6 +267,24 @@ export function coronaAmp(tauSlant) {
   return 0.5 * t * Math.exp(-t);
 }
 
+// The deck droplet corona's amplitude PER UNIT slant optical
+// depth: exactly the extinction-paradox diffracted half (van de
+// Hulst 1957 Sec. 8.31 - x = pi D/lambda ~ 44-75 for the Miles
+// diameters, deep in the Q -> 2 regime; liquid water absorbs
+// nothing at visible depths, scattering = extinction). The dome
+// multiplies by the fragment ray's own deck tau from the cloud
+// shadow map and by NO e^-tau: the volumetric composite already
+// extinguishes the dome behind every deck pixel, which IS the
+// slab law's extinction leg -
+//   DROPLET_DIFF_SHARE * tau * e^-tau === coronaAmp(tau)
+// (the gate landmark) - the same law, the e^-tau carried by the
+// compositor instead of the amp. The march's dual-lobe HG phase
+// never resolves the diffraction spike (a few sr^-1 at these
+// angles against the ensemble's ~10^3 sr^-1 peak), so the pair
+// partitions Q = 2 cleanly: diffraction half exact on the dome,
+// geometric half in the march.
+export const DROPLET_DIFF_SHARE = 0.5;
+
 // The cold gate: the MEASURED 250 hPa temperature at or below the
 // printed corona-cirrus edge. Fails closed without the measurement
 // - an unmeasured sky draws no rings.
@@ -223,18 +303,14 @@ export function coronaColdGate(t250) {
 // its own Hapke rendering draws. RGBA Float32Array in the
 // aureole-curve texture format; values stay in sr^-1 - the dome
 // multiplies by transmittance, amplitude and eclipse factor only.
-export function buildCloudCoronaLUT(
-  srcRadRad,
-  dUm = CORONA_D_UM,
-  limbAlpha = undefined
-) {
+function packCoronaLUT(profFor, srcRadRad, limbAlpha) {
   const thetaMaxRad = (CORONA_THETA_MAX_DEG * Math.PI) / 180;
   const dTheta = thetaMaxRad / CORONA_N;
   const thetas = [];
   for (let i = 0; i < CORONA_N; i++) thetas.push((i + 0.5) * dTheta);
   const prof = new Float64Array(CORONA_N * 3);
   for (let c = 0; c < 3; c++) {
-    const p = airyPattern(dUm, CHANNEL_UM[c], thetas);
+    const p = profFor(CHANNEL_UM[c], thetas);
     for (let i = 0; i < CORONA_N; i++) prof[i * 3 + c] = p[i];
   }
   const conv =
@@ -249,4 +325,37 @@ export function buildCloudCoronaLUT(
     curve[i * 4 + 3] = 1;
   }
   return {curve, thetaMaxRad, coneRad: thetaMaxRad};
+}
+
+export function buildCloudCoronaLUT(
+  srcRadRad,
+  dUm = CORONA_D_UM,
+  limbAlpha = undefined
+) {
+  return packCoronaLUT(
+    (um, thetas) => airyPattern(dUm, um, thetas),
+    srcRadRad,
+    limbAlpha
+  );
+}
+
+// The deck droplet corona's pattern: the cross-section-weighted
+// Airy ensemble over the Miles lognormal for the measured air-mass
+// class - the aureole's diffractionPattern, the one ensemble
+// implementation - convolved once with the live source disc like
+// every drawn optic. At the printed sigma_log the pattern is a
+// smooth monotone aureole (the gate landmark holds it ringless);
+// its similarity landmark states G&L's inverse size law: the
+// continental pattern IS the marine one stretched by D_mar/D_cont
+// and dimmed by its square.
+export function buildDropletCoronaLUT(
+  srcRadRad,
+  cls = 'continental',
+  limbAlpha = undefined
+) {
+  return packCoronaLUT(
+    (um, thetas) => diffractionPattern(dropletMode(cls), um, thetas),
+    srcRadRad,
+    limbAlpha
+  );
 }

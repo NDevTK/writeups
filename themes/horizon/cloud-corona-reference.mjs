@@ -1,7 +1,7 @@
 // Reference gate for cloud-corona.js (node cloud-corona-reference.mjs):
-// the cirrus diffraction corona, held to A&S printed Bessel values,
-// the closed Airy forms, the papers' printed microphysics, and the
-// slab radiometry's closed points.
+// the cirrus and droplet diffraction coronas, held to A&S printed
+// Bessel values, the closed Airy and lognormal forms, the papers'
+// printed microphysics, and the slab radiometry's closed points.
 import {
   j0,
   airyPattern,
@@ -10,14 +10,25 @@ import {
   coronaAmp,
   coronaColdGate,
   buildCloudCoronaLUT,
+  buildDropletCoronaLUT,
+  dropletMode,
   CIRRUS_TAU_FULL,
   CORONA_T250_MAX,
   CORONA_D_UM,
   CORONA_N,
   CORONA_THETA_MAX_DEG,
-  CHANNEL_UM
+  CHANNEL_UM,
+  DROPLET_SIGMA_LOG,
+  DROPLET_DN_UM,
+  DROPLET_DE_OBS_UM,
+  DROPLET_DIFF_SHARE
 } from './cloud-corona.js';
-import {j1} from './aureole.js';
+import {
+  j1,
+  diffractionPattern,
+  lnIntegral,
+  lognormalMomentRatio
+} from './aureole.js';
 import {sunAngularRadiusRad} from './eclipses.js';
 
 let fail = 0;
@@ -268,6 +279,195 @@ const near = (a, b, t) => Math.abs(a - b) < t;
     ok,
     `warm/no-cover/unmeasured -> 0; cold measured cover -> ${ampOf(-65, 0.5, 0.5).toFixed(4)}`
   );
+}
+
+{
+  // Miles, Verlinde & Clothiaux 2000 Table 3, printed: median
+  // diameters 13.1 um (marine) / 7.7 um (continental), sigma_log
+  // 0.38 for both classes. Internal corroboration - their Eq. (7a)
+  // D_e = D_n exp(5 sigma^2/2) computed from the two fitted
+  // parameters must land inside the printed spread of the
+  // INDEPENDENTLY tabulated D_e,obs (19.2 +- 4.7 / 10.8 +- 4.1):
+  // two survey columns agreeing through the lognormal's own
+  // closed moment, not through anything this module chose.
+  const de = (cls) =>
+    DROPLET_DN_UM[cls] * Math.exp(2.5 * DROPLET_SIGMA_LOG ** 2);
+  const ok =
+    DROPLET_DN_UM.marine === 13.1 &&
+    DROPLET_DN_UM.continental === 7.7 &&
+    DROPLET_SIGMA_LOG === 0.38 &&
+    near(de('marine'), 18.8, 0.05) &&
+    Math.abs(de('marine') - DROPLET_DE_OBS_UM.marine) < 4.7 &&
+    near(de('continental'), 11.05, 0.05) &&
+    Math.abs(de('continental') - DROPLET_DE_OBS_UM.continental) < 4.1;
+  check(
+    'Miles Table 3 printed classes, Eq. 7a corroboration',
+    ok,
+    `D_e from (D_n, sigma): marine ${de('marine').toFixed(2)} um (printed obs 19.2 +- 4.7), continental ${de('continental').toFixed(2)} um (printed obs 10.8 +- 4.1)`
+  );
+}
+
+{
+  // The paper reports UNTRUNCATED fits; the module's quadrature
+  // bounds (1 um - the survey's FSSP floor - to 100 um) must be
+  // effectively untruncated: the second-to-third moment ratio from
+  // the bounded quadrature agrees with the closed untruncated
+  // lognormal form to < 1e-4 relative, both classes.
+  let ok = true;
+  let detail = '';
+  for (const cls of ['marine', 'continental']) {
+    const m = dropletMode(cls);
+    const q =
+      lnIntegral(m.rm, m.sigma, m.rMin, m.rMax, (r) => r * r * r) /
+      lnIntegral(m.rm, m.sigma, m.rMin, m.rMax, (r) => r * r);
+    const cl = lognormalMomentRatio(m.rm, m.sigma, 3, 2);
+    const rel = Math.abs(q / cl - 1);
+    if (!(rel < 1e-4)) ok = false;
+    detail += `${cls} rel ${rel.toExponential(1)}; `;
+  }
+  check(
+    'droplet bounds effectively untruncated',
+    ok,
+    detail + 'closed lognormal moments reproduced'
+  );
+}
+
+{
+  // The ensemble pattern's central closed form - the aureole
+  // machinery's own documented identity, at the droplet modes:
+  // P(0) = pi <r^4> / (lambda^2 <r^2>).
+  let ok = true;
+  let detail = '';
+  for (const cls of ['marine', 'continental']) {
+    const m = dropletMode(cls);
+    const p0 = diffractionPattern(m, CHANNEL_UM[1], [1e-7])[0];
+    const closed =
+      (Math.PI * lognormalMomentRatio(m.rm, m.sigma, 4, 2)) /
+      (CHANNEL_UM[1] * CHANNEL_UM[1]);
+    if (!near(p0 / closed, 1, 1e-4)) ok = false;
+    detail += `${cls} P(0) ${p0.toFixed(1)}/sr (closed ${closed.toFixed(1)}); `;
+  }
+  check('droplet ensemble central closed form', ok, detail);
+}
+
+{
+  // Degeneration: as sigma_g -> 1 the ensemble collapses onto the
+  // monodisperse Airy pattern of the same median - the droplet and
+  // cirrus coronas are ONE machinery at different widths. (Angles
+  // away from the Airy minima, where a vanishing spread must not
+  // matter.)
+  const rm = 11;
+  const tight = {
+    rm,
+    sigma: Math.exp(0.01),
+    rMin: rm * Math.exp(-0.05),
+    rMax: rm * Math.exp(0.05)
+  };
+  const th = [0.3, 0.8, 1.2].map((d) => (d * Math.PI) / 180);
+  const pe = diffractionPattern(tight, CHANNEL_UM[1], th);
+  const pa = airyPattern(2 * rm, CHANNEL_UM[1], th);
+  const ok = th.every((t, i) => near(pe[i] / pa[i], 1, 0.01));
+  check(
+    'ensemble degenerates to the monodisperse Airy',
+    ok,
+    `sigma_g -> 1 at D = 22 um: ratios ${th.map((t, i) => (pe[i] / pa[i]).toFixed(4)).join(', ')}`
+  );
+}
+
+{
+  // At the PRINTED width the rings are gone: every channel of both
+  // classes is strictly monotone decreasing across the drawn 6 deg
+  // grid - G&L's flat-and-wide washout ("interference that results
+  // from flat and wide droplet size distributions washes out the
+  // outer rings"), from the survey's own sigma. The cirrus pattern
+  // above keeps its rings; the deck's corona is the smooth aureole.
+  const thMax = (CORONA_THETA_MAX_DEG * Math.PI) / 180;
+  const grid = [];
+  for (let i = 0; i < CORONA_N; i++) grid.push(((i + 0.5) / CORONA_N) * thMax);
+  let ok = true;
+  for (const cls of ['marine', 'continental']) {
+    const m = dropletMode(cls);
+    for (const um of CHANNEL_UM) {
+      const p = diffractionPattern(m, um, grid);
+      for (let i = 1; i < CORONA_N; i++) if (p[i] > p[i - 1]) ok = false;
+    }
+  }
+  check(
+    'printed width leaves an aureole, not rings',
+    ok,
+    `both classes, all channels monotone over 0..${CORONA_THETA_MAX_DEG} deg at sigma_log ${DROPLET_SIGMA_LOG}`
+  );
+}
+
+{
+  // G&L's inverse size law as exact similarity: with equal
+  // sigma_log and bounds scaled with the median, the continental
+  // pattern IS the marine one stretched by D_mar/D_cont in angle
+  // and dimmed by its square - P_mar(asin(sin th / s)) =
+  // s^2 P_cont(th), s = 13.1/7.7. Held at four angles to 0.1%.
+  const s = DROPLET_DN_UM.marine / DROPLET_DN_UM.continental;
+  const th = [0.5, 1.5, 3, 5].map((d) => (d * Math.PI) / 180);
+  const pc = diffractionPattern(dropletMode('continental'), CHANNEL_UM[1], th);
+  const pm = diffractionPattern(
+    dropletMode('marine'),
+    CHANNEL_UM[1],
+    th.map((t) => Math.asin(Math.sin(t) / s))
+  );
+  const ok = th.every((t, i) => near(pm[i] / (s * s * pc[i]), 1, 1e-3));
+  check(
+    'inverse size law: continental = marine stretched by D ratio',
+    ok,
+    `s = ${s.toFixed(3)}; similarity ratios ${th.map((t, i) => (pm[i] / (s * s * pc[i])).toFixed(4)).join(', ')}`
+  );
+}
+
+{
+  // The deck amp partition: the dome carries DROPLET_DIFF_SHARE *
+  // tau (the paradox half, NO e^-tau) because the volumetric
+  // composite extinguishes the dome behind every deck pixel -
+  // multiplying the two legs back together must reproduce the
+  // cirrus corona's whole slab law EXACTLY, at every tau: same
+  // physics, the extinction carried by the compositor instead of
+  // the amp. And with no deck (tau 0, the unattached map's zero
+  // texture) the corona is exactly nothing - fails closed.
+  let ok = DROPLET_DIFF_SHARE === 0.5;
+  for (const tau of [0, 0.01, 0.3, 0.75, 1, 2, 4]) {
+    const domeLeg = DROPLET_DIFF_SHARE * tau;
+    const compositeLeg = Math.exp(-tau);
+    if (!near(domeLeg * compositeLeg, coronaAmp(tau), 1e-15)) ok = false;
+  }
+  check(
+    'deck amp * composite extinction = the slab law',
+    ok,
+    `share ${DROPLET_DIFF_SHARE} (van de Hulst paradox half); (tau/2) * e^-tau reassembled exactly over tau 0..4; tau 0 -> nothing`
+  );
+}
+
+{
+  // The drawn droplet LUTs: the sun's limb-darkened disc and the
+  // moon's flat disc each smear the centre DOWN (normalised
+  // kernel), and the convolved curves stay monotone - the drawn
+  // aureole keeps the ensemble's ringless shape through the disc.
+  const srcR = sunAngularRadiusRad();
+  let ok = true;
+  let detail = '';
+  for (const [name, lut] of [
+    ['sun/marine', buildDropletCoronaLUT(srcR, 'marine')],
+    ['moon/continental', buildDropletCoronaLUT(srcR, 'continental', [0, 0, 0])]
+  ]) {
+    const cls = name.split('/')[1];
+    const m = dropletMode(cls);
+    const raw0 =
+      (Math.PI * lognormalMomentRatio(m.rm, m.sigma, 4, 2)) /
+      (CHANNEL_UM[1] * CHANNEL_UM[1]);
+    const c0 = lut.curve[1];
+    if (!(c0 < raw0 && c0 > 0.5 * raw0)) ok = false;
+    for (let i = 1; i < CORONA_N; i++)
+      if (lut.curve[i * 4 + 1] > lut.curve[(i - 1) * 4 + 1] * 1.0001)
+        ok = false;
+    detail += `${name} P(0) ${raw0.toFixed(0)} -> ${c0.toFixed(0)}/sr; `;
+  }
+  check('droplet LUTs: smeared centre, monotone through the disc', ok, detail);
 }
 
 process.exit(fail ? 1 : 0);

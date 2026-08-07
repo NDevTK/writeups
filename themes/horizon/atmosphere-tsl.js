@@ -195,6 +195,59 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   corMoonTex.minFilter = LinearFilter;
   corMoonTex.needsUpdate = true;
   const corMoonNode = texture(corMoonTex);
+  // The DECK droplet corona (cloud-corona.js buildDropletCoronaLUT):
+  // the cross-section-weighted Airy ensemble of the Miles, Verlinde
+  // & Clothiaux 2000 Table 3 lognormal for the measured air-mass
+  // class - at the printed sigma_log 0.38 a smooth ringless aureole,
+  // G&L's flat-and-wide washout. Its amplitude is assembled PER
+  // FRAGMENT: the CPU feeds DROPLET_DIFF_SHARE (the van de Hulst
+  // paradox half) times the veil transmittance in front of the
+  // source, and the fragment multiplies the deck's own slant
+  // optical depth along the VIEW ray, read from the cloud shadow
+  // map (clouds-tsl tauSlant - the exact map terrain shadows ride,
+  // one deck-column definition). NO e^-tau here: the volumetric
+  // composite extinguishes the dome behind every deck pixel, which
+  // IS the slab law's extinction leg - the reference gate holds
+  // amp * e^-tau === (tau/2) e^-tau, the cirrus corona's own law
+  // with the extinction carried by the compositor. Through a GAP
+  // the map's tau is zero and the corona vanishes with the
+  // droplets that would have drawn it; the unattached map's zero
+  // texture fails the whole term closed.
+  const corDropAmp = uniform(0);
+  const corDropCosCone = uniform(2);
+  const corDropTex = new DataTexture(
+    new Float32Array(COR_N * 4),
+    COR_N,
+    1,
+    RGBAFormat,
+    FloatType
+  );
+  corDropTex.magFilter = LinearFilter;
+  corDropTex.minFilter = LinearFilter;
+  corDropTex.needsUpdate = true;
+  const corDropNode = texture(corDropTex);
+  // The moon's droplet set: the same ensemble convolved with the
+  // MOON's flat disc, the amplitude carrying the moonlight
+  // irradiance (moonlight.js) - the classic naked-eye lunar corona
+  // through thin stratus. Anchored on the drawn moon direction the
+  // cirrus set already carries.
+  const corMoonDropAmp = uniform(0);
+  const corMoonDropCosCone = uniform(2);
+  const corMoonDropTex = new DataTexture(
+    new Float32Array(COR_N * 4),
+    COR_N,
+    1,
+    RGBAFormat,
+    FloatType
+  );
+  corMoonDropTex.magFilter = LinearFilter;
+  corMoonDropTex.minFilter = LinearFilter;
+  corMoonDropTex.needsUpdate = true;
+  const corMoonDropNode = texture(corMoonDropTex);
+  // The camera's scene-space height (asinh world y, the shadow
+  // map's own frame) - with aerialCamXZ it places the fragment
+  // ray's origin for the deck-column read.
+  const corCamY = uniform(0);
   // The measured cirrus column over the DIRECT solar image: the
   // drawn disc (limb, spots), the totality corona riding it and
   // the sunset transfer-band disc all dim by e^-tau_slant of the
@@ -1041,6 +1094,25 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     If(dot(v, corMoonDir).greaterThan(corMoonCosCone), () => {
       coronaAdd(corMoonDir, corMoonAmp, corMoonNode);
     });
+    // The deck droplet coronas: amp = (paradox half * veil
+    // transmittance, CPU) * the deck's slant tau along THIS
+    // fragment's ray (the cloud shadow map - one deck-column
+    // definition with the terrain's shadows), no e^-tau (the
+    // volumetric composite extinguishes the dome behind every
+    // deck pixel - the slab law's other leg). Gaps zero the map's
+    // tau and the corona dies with the droplets; the unattached
+    // map fails closed.
+    if (cloudShadow) {
+      const camPos = () => vec3(aerialCamXZ.x, corCamY, aerialCamXZ.y);
+      If(cSunG.greaterThan(corDropCosCone), () => {
+        const tauD = cloudShadow.tauSlant(camPos(), v);
+        coronaAdd(sunDirW, tauD.mul(corDropAmp).mul(sunE), corDropNode);
+      });
+      If(dot(v, corMoonDir).greaterThan(corMoonDropCosCone), () => {
+        const tauD = cloudShadow.tauSlant(camPos(), v);
+        coronaAdd(corMoonDir, tauD.mul(corMoonDropAmp), corMoonDropNode);
+      });
+    }
     // Inside the transfer band at a low sun, the disc is drawn
     // through the LUT: the fragment's APPARENT altitude reads the
     // TRUE altitude each channel sees there, and disc membership
@@ -1344,7 +1416,12 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // scene position, the sun's azimuth vector and the box's
     // elevation datum to place their shadow samples (set per frame
     // next to the fog hook's uSunAzV).
-    aerialShadow: {camXZ: aerialCamXZ, sunAz: aerialSunAz, elev0: shadowElev0},
+    aerialShadow: {
+      camXZ: aerialCamXZ,
+      sunAz: aerialSunAz,
+      elev0: shadowElev0,
+      camY: corCamY
+    },
     // Refraction of the drawn disc: per-channel apparent
     // directions + vertical flattening (set from refraction.js).
     sunDisc: {
@@ -1417,6 +1494,8 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     cloudCorona: (() => {
       let coneRad = 0;
       let coneRadMoon = 0;
+      let coneRadDrop = 0;
+      let coneRadMoonDrop = 0;
       return {
         setPattern(lut) {
           corTex.image.data.set(lut.curve);
@@ -1438,6 +1517,31 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
           corMoonAmp.value = amp;
           corMoonCosCone.value =
             amp > 0 && coneRadMoon > 0 ? Math.cos(coneRadMoon) : 2;
+        },
+        // The deck droplet corona set: patterns are the Miles
+        // lognormal ensembles convolved with each source's live
+        // disc; amps carry the paradox half times the veil
+        // transmittance (sun) or times the moonlight irradiance
+        // (moon) - the deck's own tau rides the fragment.
+        setDropPattern(lut) {
+          corDropTex.image.data.set(lut.curve);
+          corDropTex.needsUpdate = true;
+          coneRadDrop = lut.coneRad;
+        },
+        setDropAmp(amp) {
+          corDropAmp.value = amp;
+          corDropCosCone.value =
+            amp > 0 && coneRadDrop > 0 ? Math.cos(coneRadDrop) : 2;
+        },
+        setMoonDropPattern(lut) {
+          corMoonDropTex.image.data.set(lut.curve);
+          corMoonDropTex.needsUpdate = true;
+          coneRadMoonDrop = lut.coneRad;
+        },
+        setMoonDrop(amp) {
+          corMoonDropAmp.value = amp;
+          corMoonDropCosCone.value =
+            amp > 0 && coneRadMoonDrop > 0 ? Math.cos(coneRadMoonDrop) : 2;
         }
       };
     })(),

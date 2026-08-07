@@ -1,0 +1,257 @@
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body style="margin: 0">
+    <canvas id="gl"></canvas>
+    <script>
+      /* swizzle shim */ if (navigator.gpu && self.GPUTexture) {
+        const ov = GPUTexture.prototype.createView;
+        GPUTexture.prototype.createView = function (d) {
+          if (d && 'swizzle' in d) {
+            d = Object.assign({}, d);
+            delete d.swizzle;
+          }
+          return ov.call(this, d);
+        };
+      }
+    </script>
+    <script type="module">
+      // Droplet-corona probe: the dome's deck corona term against its
+      // CPU ground truth, with the cloud shadow map replaced by a
+      // SYNTHETIC constant-tau texture so every leg is closed-form.
+      //   A  the term exists where the LUT says it does (diff > 0)
+      //   B  doubling the map's tau doubles the term EXACTLY - the
+      //      amp is tau/2 with NO e^-tau in the dome (the composite
+      //      carries it); reintroducing e^-tau would read ~0.86x2
+      //      here, far outside tolerance - the regression this pins
+      //   C  uOn = 0 (unattached/disabled map) kills the term to
+      //      zero - fails closed
+      //   D  the drawn angular pattern matches the CPU LUT's own
+      //      ratio between two angles, per channel
+      //   E  absolute radiometry: diff = P_lut(theta) * (tau_slant/2)
+      //      * T_air, T_air the same sunTransmittanceJS the band
+      //      probe certifies, through the display's linear spectral
+      //      projection
+      import * as T from 'three/webgpu';
+      import {createAtmosphereTSL} from './writeups/themes/horizon/atmosphere-tsl.js';
+      import {createCloudShadowHook} from './writeups/themes/horizon/clouds-tsl.js';
+      import {buildDropletCoronaLUT} from './writeups/themes/horizon/cloud-corona.js';
+      import {sunTransmittanceJS} from './writeups/themes/horizon/sun-transmittance.js';
+      import {SPECTRAL_TO_SRGB} from './writeups/themes/horizon/spectral-srgb.js';
+      const log = (s) => console.log('DROPCOR|' + s);
+      let fails = 0;
+      const check = (name, ok, detail) => {
+        log((ok ? 'ok  ' : 'FAIL') + ' ' + name + ': ' + detail);
+        if (!ok) fails++;
+      };
+      try {
+        const r = new T.WebGPURenderer({
+          canvas: document.getElementById('gl'),
+          forceWebGL: false,
+          antialias: false
+        });
+        await r.init();
+        log('backend ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'));
+        const W = 64;
+        r.setSize(W, W);
+
+        // The hook with a synthetic constant-tau map: 1x1 float RGBA
+        // (x = low deck vertical tau, y = mid deck vertical tau);
+        // LinearFilter makes it constant over the whole world.
+        const hook = createCloudShadowHook();
+        const TAU1 = [0.4, 0.2];
+        const mkTau = (lo, mi) => {
+          const t = new T.DataTexture(
+            new Float32Array([lo, mi, 0, 1]),
+            1,
+            1,
+            T.RGBAFormat,
+            T.FloatType
+          );
+          t.needsUpdate = true;
+          return t;
+        };
+        hook.tauNode.value = mkTau(TAU1[0], TAU1[1]);
+        hook.uniforms.uWorldSize.value = 280;
+        hook.uniforms.uMidLow.value = 31;
+        hook.uniforms.uMidMid.value = 60;
+        hook.uniforms.uOn.value = 1;
+
+        const atmo = createAtmosphereTSL(r, hook);
+        const H_OBS = 130;
+        const SUN_ALT = Math.PI / 4;
+        const sunDir = new T.Vector3(0, Math.sin(SUN_ALT), -Math.cos(SUN_ALT));
+        hook.update(sunDir, true);
+        atmo.update(sunDir, null, H_OBS, 1, 0);
+        atmo.aerialShadow.camY.value = 2;
+
+        // The continental droplet pattern on the default disc.
+        const lut = buildDropletCoronaLUT(undefined);
+        atmo.cloudCorona.setDropPattern(lut);
+
+        const scene = new T.Scene();
+        scene.add(atmo.mesh);
+        const cam = new T.PerspectiveCamera(8, 1, 0.1, 3000);
+        cam.position.set(0, 0, 0);
+        cam.lookAt(sunDir);
+        cam.updateMatrixWorld();
+
+        const shoot = async () => {
+          const rt = new T.RenderTarget(W, W, {type: T.FloatType});
+          r.setRenderTarget(rt);
+          r.render(scene, cam);
+          r.setRenderTarget(null);
+          const buf = await r.readRenderTargetPixelsAsync(rt, 0, 0, W, W);
+          rt.dispose();
+          return buf;
+        };
+        // Fragment CENTRE altitude offset for buffer row W/2 + d:
+        // the centre sits at d + 0.5 pixels above the axis
+        // (tan-spaced, exact) - the band probe's half-pixel lesson.
+        const halfT = Math.tan((4 * Math.PI) / 180);
+        const rowAlt = (d) => Math.atan(((d + 0.5) / (W / 2)) * halfT);
+        // Probe pixels: theta ~ 1 deg and ~ 2.5 deg above the sun.
+        const P1 = 8;
+        const P2 = 20;
+        const px = (buf, dRow) => {
+          const y = W / 2 + dRow; // rows are bottom-up in readback
+          const i = (y * W + W / 2) * 4;
+          return [buf[i], buf[i + 1], buf[i + 2]];
+        };
+        const sub = (a, b) => a.map((v, i) => v - b[i]);
+        const applyP = (v) =>
+          SPECTRAL_TO_SRGB.map(
+            (row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]
+          );
+
+        // Pass 0: amp off (branch disabled) - the bare sky.
+        atmo.cloudCorona.setDropAmp(0);
+        const b0 = await shoot();
+        // Pass 1: the paradox half, veil transmittance 1.
+        atmo.cloudCorona.setDropAmp(0.5);
+        const b1 = await shoot();
+        // Pass 2: the same with the map's tau DOUBLED.
+        hook.tauNode.value = mkTau(2 * TAU1[0], 2 * TAU1[1]);
+        const b2 = await shoot();
+        // Pass 3: back to tau1, map switched off - fails closed.
+        hook.tauNode.value = mkTau(TAU1[0], TAU1[1]);
+        hook.uniforms.uOn.value = 0;
+        const b3 = await shoot();
+        hook.uniforms.uOn.value = 1;
+
+        const d1a = sub(px(b1, P1), px(b0, P1));
+        const d1b = sub(px(b1, P2), px(b0, P2));
+        const d2a = sub(px(b2, P1), px(b0, P1));
+        const d3a = sub(px(b3, P1), px(b0, P1));
+
+        // A: the term exists.
+        check(
+          'corona present',
+          d1a.every((v) => v > 1e-5) && d1b.every((v) => v > 1e-6),
+          `diff at ${((rowAlt(P1) * 180) / Math.PI).toFixed(2)} deg = [${d1a.map((v) => v.toExponential(2)).join(', ')}]`
+        );
+
+        // B: linear in tau - NO e^-tau in the dome leg.
+        const ratios = d2a.map((v, c) => v / Math.max(d1a[c], 1e-12));
+        check(
+          'amp linear in tau (no double extinction)',
+          ratios.every((q) => Math.abs(q - 2) < 0.04),
+          `2x tau -> x[${ratios.map((q) => q.toFixed(3)).join(', ')}] (e^-tau in the dome would read ~${(2 * Math.exp(-(TAU1[0] + TAU1[1]) / Math.sin(SUN_ALT))).toFixed(2)})`
+        );
+
+        // C: fails closed.
+        check(
+          'uOn=0 fails closed',
+          d3a.every((v) => Math.abs(v) < 1e-5),
+          `diff with map off = [${d3a.map((v) => v.toExponential(1)).join(', ')}]`
+        );
+
+        // D: the drawn pattern IS the CPU LUT - ratio between the
+        // two probe angles per channel (T_air nearly cancels; its
+        // drift over 1.5 deg of altitude is well under the 5%).
+        // The expectation BOX-INTEGRATES the LUT over the pixel's
+        // own angular footprint (the band probe's lesson: at 1 deg
+        // the red curve bends ~20% across one pixel), with the
+        // shader's exact texel mapping u = th/thMax * (N-1).
+        const lutAt = (thRad, c) => {
+          const u = (thRad / lut.thetaMaxRad) * 255;
+          const i = Math.max(0, Math.min(254, Math.floor(u)));
+          const f = Math.min(Math.max(u - i, 0), 1);
+          return (
+            lut.curve[i * 4 + c] * (1 - f) + lut.curve[(i + 1) * 4 + c] * f
+          );
+        };
+        const pxRad = (2 * halfT) / W;
+        const lutPix = (dRow, c) => {
+          const N = 8;
+          let s = 0;
+          for (let i = 0; i < N; i++)
+            for (let j = 0; j < N; j++) {
+              const dAlt = rowAlt(dRow - 0.5 + (i + 0.5) / N);
+              const dAz = ((j + 0.5) / N - 0.5) * pxRad;
+              s += lutAt(Math.hypot(dAlt, dAz), c);
+            }
+          return s / (N * N);
+        };
+        const th1 = rowAlt(P1);
+        const th2 = rowAlt(P2);
+        // The measured ratio lives in display space; project the
+        // CPU spike ratios through the same linear matrix.
+        const specM = (dRow) =>
+          applyP([lutPix(dRow, 0), lutPix(dRow, 1), lutPix(dRow, 2)]);
+        const eM1 = specM(P1);
+        const eM2 = specM(P2);
+        const patOk = [0, 1, 2].every((c) => {
+          const got = d1a[c] / Math.max(d1b[c], 1e-12);
+          const want = eM1[c] / eM2[c];
+          return Math.abs(got / want - 1) < 0.05;
+        });
+        check(
+          'angular pattern matches the LUT',
+          patOk,
+          `P(th1)/P(th2) got [${[0, 1, 2].map((c) => (d1a[c] / d1b[c]).toFixed(3)).join(', ')}] want [${[0, 1, 2].map((c) => (eM1[c] / eM2[c]).toFixed(3)).join(', ')}]`
+        );
+
+        // E: absolute radiometry at P1: P_lut * (tau_slant/2) * T_air
+        // through the spectral projection. T_air from the SAME CPU
+        // integral the band probe certifies against the LUT.
+        const MIE = {
+          scat: [3.996e-6, 3.996e-6, 3.996e-6],
+          abs: [4.44e-7, 4.44e-7, 4.44e-7]
+        };
+        const altP1 = SUN_ALT + th1;
+        const tSlant = (TAU1[0] + TAU1[1]) / Math.max(Math.sin(altP1), 0.08);
+        const tAir = sunTransmittanceJS(Math.sin(altP1), MIE, H_OBS);
+        const eAbs = applyP([
+          lutPix(P1, 0) * 0.5 * tSlant * tAir[0],
+          lutPix(P1, 1) * 0.5 * tSlant * tAir[1],
+          lutPix(P1, 2) * 0.5 * tSlant * tAir[2]
+        ]);
+        const absOk = [0, 1, 2].every(
+          (c) => Math.abs(d1a[c] / eAbs[c] - 1) < 0.05
+        );
+        check(
+          'absolute radiometry',
+          absOk,
+          `got [${d1a.map((v) => v.toFixed(4)).join(', ')}] want [${eAbs.map((v) => v.toFixed(4)).join(', ')}] (tau_slant ${tSlant.toFixed(3)})`
+        );
+
+        log(fails ? `${fails} FAILED` : 'DROPCOR PASS');
+        log('DONE');
+      } catch (e) {
+        log('ERR ' + e.message + ' :: ' + (e.stack || '').split('\n')[1]);
+        log('DONE');
+      }
+    </script>
+  </body>
+</html>

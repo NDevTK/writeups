@@ -4328,6 +4328,71 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     source geography - stays named); MINM/MIAM's wide forward
     lobes remain in the smooth CS term by the same label criterion
     as every accumulation mode.
+- DONE (the droplet corona through the volumetric deck, Aug 7
+  sixth push - G&L's most common producer joins the drawn sky):
+  Miles, Verlinde & Clothiaux 2000 read in full (JAS 57, 295,
+  the AMS route again): every published in-situ stratus droplet
+  spectrum in one survey, fitted by their Eq. (6) lognormal -
+  NATURAL-log width, median diameter - and separated marine vs
+  continental by the source papers' own classification. Table 3's
+  printed averages are the two drawn classes: D_n 13.1 / 7.7 um,
+  sigma_log 0.38 for BOTH (the survey's own coincidence); their
+  Eq. (7a) D_e = D_n exp(5 sigma^2/2) reproduces the
+  independently tabulated D_e,obs inside the printed spreads for
+  both classes (18.8 vs 19.2 +- 4.7; 11.0 vs 10.8 +- 4.1), and
+  the paper's own instruction ("the parameters reported in the
+  database are the untruncated distributions that reproduce the
+  measurements") sets the quadrature bounds, held effectively
+  untruncated by a closed-moment landmark. The pattern is the
+  aureole's OWN diffractionPattern at deck sizes (one ensemble
+  implementation) - and at the printed width every ring washes
+  out: the drawn corona is the smooth aureole G&L's Mie runs
+  predict ("interference that results from flat and wide droplet
+  size distributions washes out the outer rings"), monotone by
+  landmark in every channel, while the inverse size law survives
+  as EXACT similarity (continental = marine stretched by
+  13.1/7.7 in angle, dimmed by its square - a fourth-decimal
+  landmark). The radiometry: amp = tau/2 and NOTHING ELSE in the
+  dome - the volumetric composite extinguishes the dome behind
+  every deck pixel, so the slab law's e^-tau leg already runs
+  per pixel in the compositor; (tau/2) e^-tau reassembles
+  EXACTLY (landmark) - the chi-fix architecture stated as an
+  identity. The deck tau reads PER FRAGMENT from the cloud
+  shadow map along the fragment's own ray (clouds-tsl tauSlant:
+  the transmittance hook refactored to take a direction, terrain
+  shadows unchanged through the wrapper), so a GAP zeroes the
+  corona with the droplets that would have drawn it, and the
+  unattached map's zero texture fails the whole term closed. The
+  air-mass class is the desert gate's own majority test on sea
+  salt (marine when it holds the 555 nm column; continental
+  otherwise and without products - the panel row names class and
+  D_n). The MOON rides the same machinery on its flat disc
+  through moonlight.js's E0 frame - the classic naked-eye corona
+  through thin stratus - and the veil in front of either source
+  is carried as e^-tau_cirrus on the CPU leg. cloud-corona-
+  reference grew to 19 landmarks (8 new). GPU CERTIFICATION IS A
+  NEW PROBE, not a screenshot: tsl-dropcorona-probe.html joins
+  validate.sh (six probes now) - the hook's map replaced by a
+  synthetic constant-tau texture so every leg is closed-form:
+  the term present; DOUBLING tau doubles it to 2.000/2.000/2.000
+  (an e^-tau in the dome would read 0.86 - the double-extinction
+  regression pinned on real WebGPU); uOn=0 an exact zero; the
+  drawn pattern on the CPU LUT within 5% (box-integrated over
+  the pixel footprint - the band probe's half-pixel lesson
+  relearned); absolute radiometry through sunTransmittanceJS
+  within ~3%. HARNESS FINDING, measured and code-independent:
+  the volumetric deck was NEVER covered by this harness (every
+  prior scene pinned cloudlow=0), and the full theme page under
+  SwiftShader now loses its device in EVERY configuration - the
+  2x2 matrix (deck/clear x working-tree/HEAD) shows the same
+  createBuffer/popErrorScope signature on COMMITTED code, so
+  the view-serve visual instrument is down environment-wide
+  this session while the probe pages stay healthy (the six-probe
+  gate is green). A deck march under SwiftShader and a
+  theme-page visual of this corona both stay named for a fresh
+  container. Scope: the mid deck rides the same two stratus
+  classes (a printed altocumulus size climatology is its own
+  source - named); ellipticity stays out of scope.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

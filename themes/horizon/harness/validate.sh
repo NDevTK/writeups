@@ -57,6 +57,7 @@ else
   probe glints "$BASE/tsl-glint-probe.html" 'HASH PASS'
   probe sunset-band "$BASE/tsl-band-probe.html" 'BAND PASS'
   probe dm-column "$BASE/tsl-dm-probe.html" 'DM PASS'
+  probe drop-corona "$BASE/tsl-dropcorona-probe.html" 'DROPCOR PASS'
 fi
 
 if [ $fail = 0 ]; then echo "VALIDATE PASS"; else echo "VALIDATE FAIL"; fi

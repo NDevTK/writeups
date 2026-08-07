@@ -505,12 +505,14 @@
       import {aureoleSet} from './horizon/aureole.js';
       import {
         buildCloudCoronaLUT,
+        buildDropletCoronaLUT,
         cirrusSlantTau,
         coronaAmp,
         coronaColdGate,
         CIRRUS_TAU_FULL,
         CORONA_D_UM,
-        CORONA_T250_MAX
+        CORONA_T250_MAX,
+        DROPLET_DIFF_SHARE
       } from './horizon/cloud-corona.js';
       import {moonIrradianceE0} from './horizon/moonlight.js';
       import {ozoneScale} from './horizon/ozone.js';
@@ -3369,6 +3371,24 @@
                 ) * 100
               : undefined;
           const aur = aureoleSet(set, r.products, rhPct);
+          // The deck droplet corona's air-mass class (Miles,
+          // Verlinde & Clothiaux 2000 Table 3 marine vs
+          // continental): sea salt carrying the MAJORITY of the
+          // measured 555 nm extinction column - the desert gate's
+          // own majority test, run on the marine species. Without
+          // products the class stays continental (the default
+          // site's air), never a guess of the sea.
+          const b555c = Array.isArray(r.products.bands)
+            ? r.products.bands.find((nm) => Math.abs(nm - 555) < 1)
+            : undefined;
+          const tot555c =
+            b555c !== undefined && Number.isFinite(r.products.tau?.[b555c])
+              ? Math.max(r.products.tau[b555c], 1e-9)
+              : null;
+          const ssAotC = Number.isFinite(r.products.species?.seaSalt?.aot)
+            ? Math.max(r.products.species.seaSalt.aot, 0)
+            : 0;
+          state.marineAir = tot555c !== null && ssAotC / tot555c > 0.5;
           state.aerosol = {
             at: Date.now(),
             set,
@@ -3406,7 +3426,12 @@
                   (aur.desert
                     ? ' · desert 3-mode (dust majority, OPAC Table 4)'
                     : '')
-                : ' · no coarse mode, no aureole')
+                : ' · no coarse mode, no aureole') +
+              ' · deck droplets ' +
+              (state.marineAir
+                ? 'marine Dₙ 13.1 µm (sea-salt majority)'
+                : 'continental Dₙ 7.7 µm') +
+              ' (Miles 2000 Table 3)'
           );
         } catch {
           // The CAMS total AOD stands.
@@ -7195,29 +7220,47 @@
       // per frame in the sun block.
       let coronaSrcR = null;
       let coronaSrcRMoon = null;
+      let dropCls = null;
+      let dropClsMoon = null;
       function refreshCoronaLUT() {
         if (!atmo.ok) return;
         // 0 until the first ephemeris tick - the builder then takes
         // the 1 au IAU default, the bow LUT's own convention.
         const R = astro.sunAngR || 0;
-        if (
+        const cls = state.marineAir ? 'marine' : 'continental';
+        const sunDrift =
           coronaSrcR === null ||
-          Math.abs(R - coronaSrcR) > 0.01 * Math.max(coronaSrcR, 1e-9)
-        ) {
+          Math.abs(R - coronaSrcR) > 0.01 * Math.max(coronaSrcR, 1e-9);
+        if (sunDrift) {
           coronaSrcR = R;
           atmo.cloudCorona.setPattern(buildCloudCoronaLUT(R || undefined));
+        }
+        // The deck droplet pattern rides the same disc drift AND
+        // the measured air-mass class (marine when sea salt owns
+        // the majority of the 555 nm column).
+        if (sunDrift || cls !== dropCls) {
+          dropCls = cls;
+          atmo.cloudCorona.setDropPattern(
+            buildDropletCoronaLUT(R || undefined, cls)
+          );
         }
         // The moon's own pattern: same crystals, the MOON's live
         // disc (+-7% over the month) with the flat kernel its
         // full-phase Hapke disc really has.
         const RM = astro.moonAngR || 0;
-        if (
+        const moonDrift =
           coronaSrcRMoon === null ||
-          Math.abs(RM - coronaSrcRMoon) > 0.01 * Math.max(coronaSrcRMoon, 1e-9)
-        ) {
+          Math.abs(RM - coronaSrcRMoon) > 0.01 * Math.max(coronaSrcRMoon, 1e-9);
+        if (moonDrift) {
           coronaSrcRMoon = RM;
           atmo.cloudCorona.setMoonPattern(
             buildCloudCoronaLUT(RM || undefined, CORONA_D_UM, [0, 0, 0])
+          );
+        }
+        if (moonDrift || cls !== dropClsMoon) {
+          dropClsMoon = cls;
+          atmo.cloudCorona.setMoonDropPattern(
+            buildDropletCoronaLUT(RM || undefined, cls, [0, 0, 0])
           );
         }
       }
@@ -8811,6 +8854,9 @@
           );
           atmo.aerialShadow.sunAz.value.set(sunVec.x, sunVec.z).normalize();
           atmo.aerialShadow.elev0.value = centerElev;
+          // The droplet corona's ray origin: the camera's scene
+          // height in the shadow map's own asinh frame.
+          atmo.aerialShadow.camY.value = camera.position.y;
           // The dome's terminal ground bounce (Hillaire 2020): fed
           // Payne (1972) open-ocean broadband albedo 0.06 where the
           // box has sea, 0 inland (a land albedo needs its own
@@ -8923,6 +8969,20 @@
             coronaColdGate(state.t250);
           atmo.cloudCorona.setAmp(
             corOn ? coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(sun.alt))) : 0
+          );
+          // The DECK droplet corona (no cold gate - liquid decks
+          // are the common producer): the CPU leg is the paradox
+          // half times the veil transmittance in front of the sun
+          // (the deck sits UNDER the cirrus, so its illumination
+          // already lost e^-tau_veil - the same cirrusT the disc
+          // and terrain ride); the deck's own tau multiplies per
+          // fragment from the cloud shadow map, and the composite
+          // carries the extinction leg. ?dropcorona=0 is the
+          // harness A/B override.
+          atmo.cloudCorona.setDropAmp(
+            params.get('dropcorona') !== '0' && sun.alt > 0
+              ? DROPLET_DIFF_SHARE * cirrusT
+              : 0
           );
         }
         const moonUp = moon.alt > 0 ? 0.07 * (1 - day) : 0;
@@ -10305,6 +10365,23 @@
                     astro.moonDistKm,
                     1 - (astro.lunarEcl?.inUmbra ?? 0)
                   ) * coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(moon.alt)))
+                : 0
+            );
+            // The moon's DECK droplet corona - the classic
+            // naked-eye corona through thin stratus. No cold gate
+            // (liquid decks); the moonlight irradiance in the E0
+            // frame times the paradox half times the veil in
+            // front of the moon; the deck's tau rides the
+            // fragment, its extinction the composite.
+            atmo.cloudCorona.setMoonDrop(
+              params.get('dropcorona') !== '0' && moon.alt > 0
+                ? moonIrradianceE0(
+                    astro.moonRel,
+                    astro.moonDistKm,
+                    1 - (astro.lunarEcl?.inUmbra ?? 0)
+                  ) *
+                    DROPLET_DIFF_SHARE *
+                    Math.exp(-cirrusSlantTau(cHighFrac, Math.sin(moon.alt)))
                 : 0
             );
           }

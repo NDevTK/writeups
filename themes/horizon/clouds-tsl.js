@@ -135,30 +135,39 @@ export function createCloudShadowHook() {
     uWorldSize: uniform(280),
     uOn: uniform(0)
   };
-  const transmittance = Fn(([worldPos]) => {
-    const res = float(1).toVar();
+  // Slant extinction optical depth of both decks along an arbitrary
+  // upward direction from a world position - the direction is a
+  // parameter so the dome's droplet corona can ride the SAME map
+  // along the fragment ray toward the sun or moon (one deck-column
+  // definition for terrain shadows and coronas alike). 0 whenever
+  // the map is off or unattached (the zero texture) - fails closed.
+  const tauSlant = Fn(([worldPos, dirW]) => {
+    const res = float(0).toVar();
     If(u.uOn.greaterThan(0.5), () => {
-      const sy = max(u.uSunDirW.y, 0.08);
+      const sy = max(dirW.y, 0.08);
       const slant = sy.reciprocal();
       const toUv = (p) => p.div(u.uWorldSize).add(0.5);
-      // Project along the sun ray to each deck's mid height; the map
+      // Project along the ray to each deck's mid height; the map
       // stores each deck's VERTICAL sigma*integral(density) in its
       // own channel.
-      const oLow = u.uSunDirW.xz
+      const oLow = dirW.xz
         .div(sy)
         .mul(u.uMidLow.sub(worldPos.y))
         .add(worldPos.xz);
-      const oMid = u.uSunDirW.xz
+      const oMid = dirW.xz
         .div(sy)
         .mul(u.uMidMid.sub(worldPos.y))
         .add(worldPos.xz);
       const tau = tauNode
         .sample(toUv(oLow))
         .x.add(tauNode.sample(toUv(oMid)).y);
-      res.assign(exp(tau.mul(slant).negate()));
+      res.assign(tau.mul(slant));
     });
     return res;
   });
+  const transmittance = Fn(([worldPos]) =>
+    exp(tauSlant(worldPos, u.uSunDirW).negate())
+  );
   return {
     tauNode,
     uniforms: u,
@@ -166,6 +175,10 @@ export function createCloudShadowHook() {
     // For unlit materials (the water builds its sun terms itself):
     // the Beer-Lambert transmittance at a world position.
     transmittance,
+    // The raw slant optical depth along an arbitrary direction -
+    // the dome's droplet corona reads its per-fragment deck column
+    // through this (amp tau/2; the composite carries the e^-tau).
+    tauSlant,
     applyTo(material) {
       material.receivedShadowNode = Fn(([shadow]) =>
         shadow.mul(transmittance(positionWorld))
