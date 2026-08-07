@@ -376,14 +376,19 @@
         clearnessIndex,
         pickHour
       } from './horizon/clearness.js';
-      import {buildBowLUT, buildDogLUT} from './horizon/optics-lut.js';
+      import {
+        buildBowLUT,
+        buildCircleLUT,
+        buildDogLUT
+      } from './horizon/optics-lut.js';
       import {
         SCF_COLUMN,
         PLATE_ALPHA,
         parhelionShare,
         parhelionSigmaAlt,
         haloOccurrence,
-        HALO_FAMILY_FRACTION
+        HALO_FAMILY_FRACTION,
+        CIRCLE_SIGMA_ALT_DEG
       } from './horizon/halos.js';
       import {
         apparentAltitude,
@@ -10396,6 +10401,20 @@
             (1 / Math.sqrt(2 * Math.PI) / Math.max(sigAlt, 1e-4));
           opticsU.dogSigma.value = sigAlt;
           opticsU.dogAmp.value.setRGB(tH[0] * dogA, tH[1] * dogA, tH[2] * dogA);
+          // The parhelic circle: the same plates' external
+          // reflection - no refraction cutoff (it outlives the
+          // dogs at high sun); the LUT is absolute per unit plate
+          // interaction, so the amp is just the slab chain and
+          // the vertical Gaussian's peak density.
+          const sigC = (CIRCLE_SIGMA_ALT_DEG * Math.PI) / 180;
+          const cirA =
+            slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigC);
+          opticsU.circleSigma.value = sigC;
+          opticsU.circleAmp.value.setRGB(
+            tH[0] * cirA,
+            tH[1] * cirA,
+            tH[2] * cirA
+          );
         }
         // Bravais parhelia: re-lay the dog LUT when the sun has
         // moved 0.2 deg; the migration, dispersion and the
@@ -10410,6 +10429,12 @@
           opticsU.dogA0.value = (dl.azMinDeg * Math.PI) / 180;
           opticsU.dogA1.value = (dl.azMaxDeg * Math.PI) / 180;
           dogOnSun = dl.any;
+          // The parhelic circle re-lays with the dogs - the same
+          // plates, the same cadence (the analytic profile is
+          // cheap; no disc convolution, the curve is smooth).
+          const cl = buildCircleLUT(sun.alt);
+          opticsU.circleData.set(cl.data);
+          opticsU.circleTex.needsUpdate = true;
         }
         // The moon's dome: same gating physics (cirrus for the
         // halo, rain for the bow, low source for the dogs), the
@@ -10492,6 +10517,17 @@
               tH[1] * dogAM,
               tH[2] * dogAM
             );
+            // The paraselenic circle - the moon's own white ring
+            // off the same measured plates.
+            const sigCM = (CIRCLE_SIGMA_ALT_DEG * Math.PI) / 180;
+            const cirAM =
+              slabBase * PLATE_ALPHA * (1 / Math.sqrt(2 * Math.PI) / sigCM);
+            opticsMoonU.circleSigma.value = sigCM;
+            opticsMoonU.circleAmp.value.setRGB(
+              tH[0] * cirAM,
+              tH[1] * cirAM,
+              tH[2] * cirAM
+            );
           }
           opticsMoonU.srcAlt.value = refr.moonApp;
           if (
@@ -10506,6 +10542,9 @@
             opticsMoonU.dogA0.value = (dl.azMinDeg * Math.PI) / 180;
             opticsMoonU.dogA1.value = (dl.azMaxDeg * Math.PI) / 180;
             dogOnMoon = dl.any;
+            const cl = buildCircleLUT(refr.moonApp);
+            opticsMoonU.circleData.set(cl.data);
+            opticsMoonU.circleTex.needsUpdate = true;
           }
           // The LUNAR corona, radiometric: the same cold-cirrus
           // gate and measured column as the sun's, the amplitude

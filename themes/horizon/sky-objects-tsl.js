@@ -508,6 +508,10 @@ export function createOpticsMaterial(cloudShadow) {
   const dogTex = new DataTexture(dogData, 256, 1, RGBAFormat, FloatType);
   dogTex.minFilter = dogTex.magFilter = LinearFilter;
   dogTex.needsUpdate = true;
+  const circleData = new Float32Array(256 * 4);
+  const circleTex = new DataTexture(circleData, 256, 1, RGBAFormat, FloatType);
+  circleTex.minFilter = circleTex.magFilter = LinearFilter;
+  circleTex.needsUpdate = true;
   const u = {
     sunDir: uniform(new Vector3(0, 1, 0)),
     antisolar: uniform(new Vector3(0, -1, 0)),
@@ -547,6 +551,15 @@ export function createOpticsMaterial(cloudShadow) {
     // The tilt wobble's drawn sigma (radians): the plate MC's
     // sigmaAlt at the current source altitude, fed with the LUT.
     dogSigma: uniform(0.006),
+    // The PARHELIC CIRCLE: the same measured plates' EXTERNAL
+    // reflection off their vertical faces - white by physics,
+    // zero toward the sun (the dogs' territory), riding the same
+    // PLATE_ALPHA x slab x occurrence chain (halos.js
+    // parhelicCircleProfile, MC-held). circleAmp carries E_src x
+    // T_air x slab x alpha x the vertical Gaussian's peak
+    // density; the LUT is absolute per unit plate interaction.
+    circleAmp: uniform(new Color(0, 0, 0)),
+    circleSigma: uniform(0.0147),
     // Bravais parhelia (optics-lut buildDogLUT): azimuth-offset
     // LUT re-laid by the theme as the source climbs; srcAlt +
     // the plates' documented ~1.5-degree wobble envelope place
@@ -555,7 +568,9 @@ export function createOpticsMaterial(cloudShadow) {
     dogA0: uniform((18 * Math.PI) / 180),
     dogA1: uniform((55 * Math.PI) / 180),
     dogTex,
-    dogData
+    dogData,
+    circleTex,
+    circleData
   };
   const material = new NodeMaterial();
   material.side = BackSide;
@@ -667,8 +682,20 @@ export function createOpticsMaterial(cloudShadow) {
     vec2(clamp(azOff.sub(u.dogA0).div(u.dogA1.sub(u.dogA0)), 0.0, 1.0), 0.5)
   ).rgb;
   const cDogs = dogSample.mul(exp(dAlt.mul(dAlt).mul(-0.5))).mul(u.dogAmp);
+  // The parhelic circle rides the SAME almucantar coordinates:
+  // azOff spans the full [0, pi] the LUT covers, the vertical
+  // Gaussian uses the reflected family's own sigma.
+  const dAltC = asin(clamp(v.y, -1.0, 1.0))
+    .sub(u.srcAlt)
+    .div(max(u.circleSigma, 1e-4));
+  const circleSample = texture(u.circleTex).sample(
+    vec2(azOff.div(Math.PI).clamp(0.0, 1.0), 0.5)
+  ).rgb;
+  const cCircle = circleSample
+    .mul(exp(dAltC.mul(dAltC).mul(-0.5)))
+    .mul(u.circleAmp);
   const cHalo = haloSample.mul(u.haloAmp);
-  material.colorNode = cBow.add(cHalo).add(cDogs);
+  material.colorNode = cBow.add(cHalo).add(cDogs).add(cCircle);
   material.opacityNode = 1.0;
   return {material, u};
 }

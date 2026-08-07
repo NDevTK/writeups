@@ -4624,6 +4624,44 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   independence expectation 60.6%; ramp continuity; NaN fails
   closed). ?halooccur=0|1 is the labelled harness pin; the
   panel's optics row names the hour's state. Full gate green.
+- DONE (the parhelic circle, Aug 7 twelfth push - the white ring
+  from the plates already measured): NO new population constant -
+  the circle is the B&D-measured oriented plates' EXTERNAL
+  reflection off their vertical side faces, which conserve the
+  vertical direction cosine: every reflection lands ON the
+  almucantar. The plate Monte Carlo now BOOKS the entry-face
+  Fresnel reflection (1 - T, zero extra rng draws - the shipped
+  share table stays bit-identical, asserted) into a circle
+  histogram plus a reflOffAlmT bucket (basal reflections - the
+  sun-pillar family, stated, not drawn); the books still close
+  to 0 exactly. The DRAWN profile is analytic: the mirror law
+  folds the uniform face azimuth as psi = (dAz + pi)/2, so
+  P(dAz) = <c> cos h sin(dAz/2) rho(cos h sin(dAz/2)) / A_tot(h)
+  per radian of azimuth per unit plate interaction - the mirror
+  PAIR doubling the one-branch Jacobian (the first draft missed
+  it; the MC caught the exact factor 2), <c> the population-mean
+  aspect over B&D's sizes through Auer-Veal, A_tot the
+  spin-averaged projection (one basal + the side ring). The MC
+  holds the closed form (12% past 90 deg, 25% below - the
+  analytic omits the tilt smear on the steep near-sun flank,
+  stated); GRAZING mirrors vanish toward the sun (the circle is
+  zero where the dogs live - complementarity by geometry), and
+  the circle is WHITE by physics (the ice indices move rho by
+  ~4% - landmark). Vertical spread: the reflected family's own
+  MC sigma, 0.84 deg flat in altitude (the printed ~1-deg tilt
+  through the actual mirror), shipped as CIRCLE_SIGMA_ALT_DEG
+  with the gate re-deriving it. Drawn as a 256-bin absolute LUT
+  over [0, 180] deg (no disc convolution - smooth curve,
+  documented) re-laid with the dogs, riding the SAME chain:
+  slabBase x PLATE_ALPHA x T_air x Gaussian peak - so the
+  occurrence hour, the veil column and the eclipse all gate it
+  for free, and it has NO refraction cutoff: it outlives the
+  dogs at high sun, exactly as observed. The moon gets the
+  paraselenic circle on the same feeds. halos-reference: 13
+  landmarks. Scope: the internal families' almucantar light
+  beyond the dogs (120-degree parhelia, the blue spot) and the
+  sun-pillar family (the booked basal reflections at low sun)
+  stay named.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

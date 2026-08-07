@@ -471,6 +471,15 @@ export function mcParhelion(
   const offAlmT = [0, 0, 0];
   const sumY = [0, 0, 0];
   const sumY2 = [0, 0, 0];
+  // The externally reflected family: the parhelic circle's
+  // almucantar histogram over |dAz| in [0, pi] plus its vertical
+  // moments, and the off-almucantar remainder (pillar family).
+  const circleBins = 128;
+  const circleData = new Float64Array(circleBins * 3);
+  const circleT = [0, 0, 0];
+  const circleY = [0, 0, 0];
+  const circleY2 = [0, 0, 0];
+  const reflOffAlmT = [0, 0, 0];
   // Per-trial plate: diameter log-uniform over B&D's printed
   // oriented range, aspect from Auer & Veal's law - the
   // POPULATION average, not one resonant slab (a single exact
@@ -542,6 +551,46 @@ export function mcParhelion(
       accepted[ch] += 1;
       const rin = refract(dC, f.n, 1, n);
       if (!rin) continue;
+      // The EXTERNALLY REFLECTED share of this entry - Fresnel's
+      // 1 - T off the entry face, no extra rng draws (the shipped
+      // share table stays bit-identical). A vertical side face
+      // conserves the vertical direction cosine, so its
+      // reflection lands ON the almucantar at some azimuth: the
+      // PARHELIC CIRCLE's light, booked into its own histogram.
+      // Basal-face reflections (the sun-pillar family) and
+      // tilt-strayed side reflections land off the almucantar -
+      // booked reflOffAlmT, stated, not drawn here.
+      {
+        const wR = 1 - rin.T;
+        const dnR = dot3(dC, f.n);
+        const dR = {
+          x: dC.x - 2 * dnR * f.n.x,
+          y: dC.y - 2 * dnR * f.n.y,
+          z: dC.z - 2 * dnR * f.n.z
+        };
+        const cphR = Math.cos(phi);
+        const sphR = Math.sin(phi);
+        const rSpun = {
+          x: dR.x * cphR - dR.y * sphR,
+          y: dR.x * sphR + dR.y * cphR,
+          z: dR.z
+        };
+        const rW = rotAxis(rSpun, axis, thN);
+        const altR = Math.asin(Math.min(Math.max(-rW.z, -1), 1));
+        let dAzR = Math.atan2(-rW.y, -rW.x) - Math.PI;
+        if (dAzR > Math.PI) dAzR -= 2 * Math.PI;
+        if (dAzR < -Math.PI) dAzR += 2 * Math.PI;
+        const azAbs = Math.abs(dAzR);
+        if (Math.abs(altR - h) < (5 * Math.PI) / 180) {
+          const b = Math.floor((azAbs / Math.PI) * circleBins);
+          if (b >= 0 && b < circleBins) {
+            circleData[b * 3 + ch] += wR;
+            circleT[ch] += wR;
+            circleY[ch] += wR * (altR - h);
+            circleY2[ch] += wR * (altR - h) * (altR - h);
+          }
+        } else reflOffAlmT[ch] += wR;
+      }
       // The internal walk FOLLOWS total internal reflections (up
       // to 12 face events): in a thin plate the skew ray reaches
       // the alternate side face by light-piping between the basal
@@ -634,12 +683,24 @@ export function mcParhelion(
     }
   }
   const lostT = accepted.map(
-    (a, ch) => a - binnedT[ch] - lowT[ch] - highT[ch] - offAlmT[ch]
+    (a, ch) =>
+      a -
+      binnedT[ch] -
+      lowT[ch] -
+      highT[ch] -
+      offAlmT[ch] -
+      circleT[ch] -
+      reflOffAlmT[ch]
   );
   const sigmaAlt = binnedT.map((B, ch) => {
     if (B <= 0) return 0;
     const m = sumY[ch] / B;
     return Math.sqrt(Math.max(sumY2[ch] / B - m * m, 0));
+  });
+  const circleSigmaAlt = circleT.map((B, ch) => {
+    if (B <= 0) return 0;
+    const m = circleY[ch] / B;
+    return Math.sqrt(Math.max(circleY2[ch] / B - m * m, 0));
   });
   return {
     a0,
@@ -652,8 +713,84 @@ export function mcParhelion(
     highT,
     offAlmT,
     lostT,
-    sigmaAlt
+    sigmaAlt,
+    circleBins,
+    circleData,
+    circleT,
+    reflOffAlmT,
+    circleSigmaAlt
   };
+}
+
+// ---- the parhelic circle, analytically ----
+// External reflection off the oriented plates' VERTICAL side
+// faces: the mirror conserves the vertical direction cosine, so
+// every reflection lands on the sun's almucantar - the white
+// circle. With the spin uniform, the face-normal azimuth psi is
+// uniform; the mirror law folds it to the apparent azimuth
+// offset dAz = 2 psi - pi, so psi = (dAz + pi)/2 and the
+// incidence obeys cos i = cos h sin(dAz/2): GRAZING mirrors
+// (rho -> 1) send light next to the sun where the dogs already
+// live, NEAR-NORMAL mirrors (rho small) to the anthelic point.
+// Per unit of the plate's geometric interaction, per radian of
+// azimuth (both mirror-image faces fold into [0, pi]; the
+// vertical spread is the tilt Gaussian through the mirror,
+// carried separately). BOTH faces of the mirror pair (+-psi)
+// fold into the same |dAz|, so the pair doubles the one-branch
+// Jacobian:
+//     P(dAz) = <c> cos h sin(dAz/2) rho(cos h sin(dAz/2))
+//              / A_tot(h),
+// A_tot(h) = (3 sqrt(3)/2) sin h + (6/pi) <c> cos h the
+// spin-averaged projected area (one basal + the side ring), <c>
+// the population-mean aspect over B&D's printed size range
+// through Auer & Veal's law. The Monte Carlo's own reflected
+// books hold this closed form (gate landmark) - and the circle
+// comes out WHITE: rho barely moves across the ice indices
+// (landmark holds the channel spread to ~1%).
+export function plateMeanC(dRangeUm = PLATE_D_RANGE_UM, M = 4000) {
+  const lnLo = Math.log(dRangeUm[0]);
+  const lnHi = Math.log(dRangeUm[1]);
+  let s = 0;
+  for (let i = 0; i < M; i++) {
+    const d = Math.exp(lnLo + ((i + 0.5) / M) * (lnHi - lnLo));
+    s += (2.02 * d ** 0.449) / (d / 2);
+  }
+  return s / M;
+}
+export function plateProjArea(h, meanC = plateMeanC()) {
+  return (
+    ((3 * Math.sqrt(3)) / 2) * Math.max(Math.sin(h), 0) +
+    (6 / Math.PI) * meanC * Math.max(Math.cos(h), 0)
+  );
+}
+export function parhelicCircleProfile(h, thetasRad, nIce = ICE_N) {
+  const meanC = plateMeanC();
+  const A = plateProjArea(h, meanC);
+  return nIce.map((n) =>
+    thetasRad.map((dAz) => {
+      const s = Math.sin(Math.min(Math.max(dAz, 0), Math.PI) / 2);
+      const ci = Math.cos(h) * s;
+      if (!(ci > 0) || !(A > 0)) return 0;
+      const rho = 1 - fresnelT(ci, n);
+      return (meanC * Math.cos(h) * s * rho) / A;
+    })
+  );
+}
+// The drawn circle's vertical spread: the reflected family's own
+// sigmaAlt from the plate Monte Carlo - the printed ~1-degree
+// tilt through the actual mirror geometry - measured flat in sun
+// altitude (0.83-0.85 deg over h 10-30); the gate re-derives it
+// and holds this literal.
+export const CIRCLE_SIGMA_ALT_DEG = 0.84;
+
+// Unpolarised Fresnel transmittance into index n at cos(i) = ci -
+// the same formula refract() applies, exposed for the analytic
+// circle (and its landmark) without a vector trace.
+function fresnelT(ci, n) {
+  const cost = Math.sqrt(Math.max(1 - (1 - ci * ci) / (n * n), 0));
+  const rs = (ci - n * cost) / (ci + n * cost);
+  const rp = (n * ci - cost) / (n * ci + cost);
+  return 1 - (rs * rs + rp * rp) / 2;
 }
 
 // The parhelion's share of the PLATE's geometric interaction and

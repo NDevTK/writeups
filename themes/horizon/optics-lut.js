@@ -43,7 +43,12 @@
  * one; paraselenae pass the MOON's own disc radius instead.
  */
 
-import {ICE_N, mcHalo, parhelionProfile} from './halos.js';
+import {
+  ICE_N,
+  mcHalo,
+  parhelicCircleProfile,
+  parhelionProfile
+} from './halos.js';
 import {sunAngularRadiusRad} from './eclipses.js';
 import {
   airy,
@@ -278,6 +283,31 @@ export function buildBowLUT(
  * geometric-interaction depth once the theme multiplies the
  * slab. Empty past the Bravais cutoff (lut.any = false).
  */
+/**
+ * The parhelic circle over the FULL azimuth range [0, 180] deg
+ * from the source, at elevation h: halos.js's analytic
+ * external-reflection profile (per radian of azimuth, per unit
+ * plate geometric interaction - absolute, the dog/halo frame),
+ * held to the plate Monte Carlo's own reflected books by the
+ * halos gate. No source-disc convolution: the curve is smooth on
+ * the 0.27-degree disc scale (no caustic - the mirrors' fold is
+ * the gentle sin(dAz/2), documented). White by physics: the
+ * Fresnel reflection barely sees the ice dispersion.
+ */
+export function buildCircleLUT(h, bins = 256) {
+  const thetas = [];
+  for (let i = 0; i < bins; i++) thetas.push(((i + 0.5) / bins) * Math.PI);
+  const prof = parhelicCircleProfile(Math.max(h, 0), thetas);
+  const out = new Float32Array(bins * 4);
+  for (let i = 0; i < bins; i++) {
+    out[i * 4] = prof[0][i];
+    out[i * 4 + 1] = prof[1][i];
+    out[i * 4 + 2] = prof[2][i];
+    out[i * 4 + 3] = 1;
+  }
+  return {data: out, bins, azMaxDeg: 180};
+}
+
 export function buildDogLUT(h, bins = 256, srcR = SUN_RADIUS) {
   const pp = parhelionProfile(Math.max(h, 0), bins);
   const dAz = (pp.a1 - pp.a0) / bins;

@@ -38,6 +38,10 @@ import {
   PLATE_TILT_THETA,
   HALO_FAMILY_FRACTION,
   haloOccurrence,
+  parhelicCircleProfile,
+  plateMeanC,
+  plateProjArea,
+  CIRCLE_SIGMA_ALT_DEG,
   PRISM_60,
   PRISM_90,
   prismDmin,
@@ -317,6 +321,8 @@ const RAD = Math.PI / 180;
           mc.lowT[0] +
           mc.highT[0] +
           mc.offAlmT[0] +
+          mc.circleT[0] +
+          mc.reflOffAlmT[0] +
           mc.lostT[0] -
           A
       ) / A;
@@ -431,6 +437,62 @@ const RAD = Math.PI / 180;
     'ring occurrence: printed rate, deterministic, ramped',
     ok,
     `long-run rate ${rate.toFixed(4)} (printed 0.27); deterministic; two sites agree ${((same / M) * 100).toFixed(1)}% (independence expects ${(expSame * 100).toFixed(1)}%); hour boundaries ramp over 5 min; NaN fails closed`
+  );
+}
+
+{
+  // The parhelic circle: the analytic external-reflection profile
+  // against the Monte Carlo's own reflected books at two
+  // altitudes (10 percent past 90 deg, 20 percent below - the
+  // analytic omits the tilt smear that softens the steep
+  // near-sun flank; stated). Shape closed points: exactly zero
+  // toward the sun (grazing mirrors carry no area), white to a
+  // few percent across the ice indices, and the drawn vertical
+  // sigma equals the MC's reflected-family sigma at the shipped
+  // literal.
+  const DEG = 180 / Math.PI;
+  let ok = true;
+  let detail = '';
+  for (const hd of [10, 30]) {
+    const mc = mcParhelion((hd * Math.PI) / 180, ICE_N, 400000);
+    const A = mc.accepted[1];
+    const az = [60, 90, 130, 165].map((d) => (d * Math.PI) / 180);
+    const ana = parhelicCircleProfile((hd * Math.PI) / 180, az);
+    for (let k = 0; k < az.length; k++) {
+      const b = Math.floor((az[k] / Math.PI) * mc.circleBins);
+      const mcP =
+        (mc.circleData[b * 3 + 1] +
+          mc.circleData[(b + 1) * 3 + 1] +
+          mc.circleData[(b - 1) * 3 + 1]) /
+        3 /
+        A /
+        (Math.PI / mc.circleBins);
+      const tol = az[k] > (Math.PI * 80) / 180 ? 0.12 : 0.25;
+      if (!(Math.abs(mcP / ana[1][k] - 1) < tol)) ok = false;
+    }
+    const sg = mc.circleSigmaAlt[1] * DEG;
+    if (!(Math.abs(sg / CIRCLE_SIGMA_ALT_DEG - 1) < 0.08)) ok = false;
+    detail += `h${hd}: sigma ${sg.toFixed(3)} deg; `;
+  }
+  const zero = parhelicCircleProfile((20 * Math.PI) / 180, [0, 1e-6]);
+  const white = parhelicCircleProfile((20 * Math.PI) / 180, [Math.PI / 2]);
+  const spread =
+    (Math.max(...white.map((c) => c[0])) -
+      Math.min(...white.map((c) => c[0]))) /
+    white[1][0];
+  ok =
+    ok &&
+    zero[1][0] === 0 &&
+    zero[1][1] < 1e-6 &&
+    spread < 0.05 &&
+    plateProjArea(0.5) > 0 &&
+    plateMeanC() > 0.1 &&
+    plateMeanC() < 0.2;
+  check(
+    'the parhelic circle: analytic = the traced mirrors',
+    ok,
+    detail +
+      `zero toward the sun; white to ${(spread * 100).toFixed(1)}% across the ice indices; <c> ${plateMeanC().toFixed(3)}`
   );
 }
 
