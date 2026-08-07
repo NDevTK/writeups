@@ -259,3 +259,243 @@ export function cellS10(fg, fbp, frp, areaDeg2) {
 }
 
 export const CELL_AREA_DEG2 = 41252.96125 / HPX_NPIX; // 3.357
+
+// ---- the EDR3 passbands: a cell's colour as a temperature ------
+// The BP and RP response curves S(lambda) from the EDR3 passband
+// release (Riello et al. 2021, A&A 649, A3 - read in full; files
+// distributed "in electronic tabular format as a part of this
+// paper", fetched from the DPAC passband page, version 2),
+// decimated to the 5 nm grid below (the gate re-derives the
+// paper's Table 3 pivot wavelengths, 510.97 / 776.91 nm, from
+// these rows to 0.1 nm). With the paper's own synthetic-
+// photometry frame (its Eqs. 13-17: photon-weighted VEGAMAG,
+// f_nu-weighted AB, and one printed zero point per band per
+// system) a blackbody's VEGAMAG colour needs NO Vega spectrum:
+// per band m_VEG - m_AB = ZP_VEG - ZP_AB (both printed in
+// Table 3), so
+//   (BP-RP)_VEG = (BP-RP)_AB + (BP_ZP_VEGA - BP_ZP_AB)
+//                            - (RP_ZP_VEGA - RP_ZP_AB),
+// and (BP-RP)_AB comes from the vendored curves and Planck's law
+// alone. Inverting that monotone relation reads each cell's
+// integrated colour as a blackbody temperature - the SAME frame
+// the star sprites' tints ride (stars-color.js), so the galaxy
+// and the drawn stars share one cited colour chain. Stated
+// reduction: a cell's light is a mixed population, drawn here as
+// the single blackbody of the same EDR3 colour (line blanketing
+// shifts real stars a few hundredths of a mag in BP-RP off the
+// blackbody locus - the solar-Teff blackbody sits at 0.868 where
+// the Sun measures ~0.82).
+export const BP_ZP_AB = 25.354; // Riello 2021 Table 3
+export const RP_ZP_AB = 25.104;
+export const BPRP_VEGA_MINUS_AB =
+  BP_ZP_VEGA - BP_ZP_AB - (RP_ZP_VEGA - RP_ZP_AB);
+export const GAIA_BP_PASSBAND = [
+  [325, 3.8705e-5],
+  [330, 0.010946],
+  [335, 0.096035],
+  [340, 0.20978],
+  [345, 0.24624],
+  [350, 0.18465],
+  [355, 0.19699],
+  [360, 0.23526],
+  [365, 0.22397],
+  [370, 0.20435],
+  [375, 0.17832],
+  [380, 0.16214],
+  [385, 0.18406],
+  [390, 0.25435],
+  [395, 0.34762],
+  [400, 0.43218],
+  [405, 0.49247],
+  [410, 0.53347],
+  [415, 0.56057],
+  [420, 0.5783],
+  [425, 0.5899],
+  [430, 0.59902],
+  [435, 0.60758],
+  [440, 0.6153],
+  [445, 0.62321],
+  [450, 0.62699],
+  [455, 0.62786],
+  [460, 0.62703],
+  [465, 0.62757],
+  [470, 0.6292],
+  [475, 0.63221],
+  [480, 0.63464],
+  [485, 0.63534],
+  [490, 0.63529],
+  [495, 0.63406],
+  [500, 0.63146],
+  [505, 0.63079],
+  [510, 0.63012],
+  [515, 0.63018],
+  [520, 0.63001],
+  [525, 0.62766],
+  [530, 0.62335],
+  [535, 0.62122],
+  [540, 0.62017],
+  [545, 0.61996],
+  [550, 0.62269],
+  [555, 0.62295],
+  [560, 0.61933],
+  [565, 0.61428],
+  [570, 0.60859],
+  [575, 0.60527],
+  [580, 0.61329],
+  [585, 0.63077],
+  [590, 0.6432],
+  [595, 0.64122],
+  [600, 0.62786],
+  [605, 0.61363],
+  [610, 0.61317],
+  [615, 0.62558],
+  [620, 0.64953],
+  [625, 0.66653],
+  [630, 0.66687],
+  [635, 0.65093],
+  [640, 0.62067],
+  [645, 0.5787],
+  [650, 0.52838],
+  [655, 0.46237],
+  [660, 0.3412],
+  [665, 0.15848],
+  [670, 0.035156],
+  [675, 0.0037052],
+  [680, 0.00072891]
+];
+export const GAIA_RP_PASSBAND = [
+  [610, 0.00010668],
+  [615, 0.00070504],
+  [620, 0.0089591],
+  [625, 0.089419],
+  [630, 0.39453],
+  [635, 0.68322],
+  [640, 0.72846],
+  [645, 0.67837],
+  [650, 0.69325],
+  [655, 0.69917],
+  [660, 0.70683],
+  [665, 0.71687],
+  [670, 0.72586],
+  [675, 0.73146],
+  [680, 0.73177],
+  [685, 0.72955],
+  [690, 0.73113],
+  [695, 0.7342],
+  [700, 0.73759],
+  [705, 0.73776],
+  [710, 0.73519],
+  [715, 0.73177],
+  [720, 0.73223],
+  [725, 0.73412],
+  [730, 0.73956],
+  [735, 0.74395],
+  [740, 0.74344],
+  [745, 0.74019],
+  [750, 0.73839],
+  [755, 0.74007],
+  [760, 0.73919],
+  [765, 0.73783],
+  [770, 0.72999],
+  [775, 0.72344],
+  [780, 0.71484],
+  [785, 0.70811],
+  [790, 0.70454],
+  [795, 0.7029],
+  [800, 0.70376],
+  [805, 0.70378],
+  [810, 0.70123],
+  [815, 0.69833],
+  [820, 0.69046],
+  [825, 0.68302],
+  [830, 0.67502],
+  [835, 0.66688],
+  [840, 0.65525],
+  [845, 0.64375],
+  [850, 0.62786],
+  [855, 0.61422],
+  [860, 0.59849],
+  [865, 0.58175],
+  [870, 0.56643],
+  [875, 0.55057],
+  [880, 0.53206],
+  [885, 0.51569],
+  [890, 0.49984],
+  [895, 0.48171],
+  [900, 0.46318],
+  [905, 0.44331],
+  [910, 0.42365],
+  [915, 0.4042],
+  [920, 0.38373],
+  [925, 0.36112],
+  [930, 0.34096],
+  [935, 0.32011],
+  [940, 0.2992],
+  [945, 0.27841],
+  [950, 0.25554],
+  [955, 0.23721],
+  [960, 0.21654],
+  [965, 0.19773],
+  [970, 0.17879],
+  [975, 0.16347],
+  [980, 0.14539],
+  [985, 0.13186],
+  [990, 0.11426],
+  [995, 0.098733],
+  [1000, 0.081517],
+  [1005, 0.066117],
+  [1010, 0.052165],
+  [1015, 0.040046],
+  [1020, 0.030169],
+  [1025, 0.022855],
+  [1030, 0.016592],
+  [1035, 0.012222],
+  [1040, 0.0086189],
+  [1045, 0.006114],
+  [1050, 0.0042268],
+  [1055, 0.0028113],
+  [1060, 0.001905],
+  [1065, 0.0012324],
+  [1070, 0.00076934],
+  [1075, 0.00049053],
+  [1080, 0.00030284]
+];
+
+import {planckSpectralRadiance, LIGHT_C} from './stars-color.js';
+
+// A blackbody's VEGAMAG BP-RP: the paper's Eq. 14/16 AB colour
+// (per band <f_nu> = int f_lam S lam dlam / int S (c/lam) dlam,
+// the -56.10 zero point cancelling in the band difference) plus
+// the printed VEGAMAG-AB offset above.
+export function bpRpOfPlanck(kelvin) {
+  const band = (tab) => {
+    let num = 0;
+    let den = 0;
+    for (const [nm, S] of tab) {
+      const lam = nm * 1e-9;
+      num += planckSpectralRadiance(nm, kelvin) * S * lam;
+      den += (S * LIGHT_C) / lam;
+    }
+    return num / den;
+  };
+  return (
+    -2.5 * Math.log10(band(GAIA_BP_PASSBAND) / band(GAIA_RP_PASSBAND)) +
+    BPRP_VEGA_MINUS_AB
+  );
+}
+
+// Monotone inversion over the star sprites' own catalogue span;
+// colours outside the blackbody range clamp to the end
+// temperatures.
+export const BPRP_T_LO = 2300;
+export const BPRP_T_HI = 45000;
+export function kelvinFromBpRp(bpRp) {
+  let lo = BPRP_T_LO;
+  let hi = BPRP_T_HI;
+  for (let i = 0; i < 60; i++) {
+    const mid = 0.5 * (lo + hi);
+    if (bpRpOfPlanck(mid) > bpRp) lo = mid;
+    else hi = mid;
+  }
+  return 0.5 * (lo + hi);
+}

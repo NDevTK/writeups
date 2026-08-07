@@ -5482,6 +5482,52 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   SURVIVAL brightness limit is still nowhere in print (1990b
   prints the brightness correction, not a per-source colour
   threshold; the 1500 nL floor remains a field statement).
+- DONE (milky way tints from Gaia's own passbands, Aug 7
+  thirty-second push - a NEW PAPER read in full and the second
+  hand colour ramp retired): the galaxy dome's cell tints
+  mapped integrated BP-RP through a hand lerp ("bluish 0.6 ->
+  warm 1.6", two hand endpoint colours - the bake comment
+  itself called it the one documented display mapping).
+  Retired on the same frame as the star sprites: Riello et
+  al. 2021 (A&A 649, A3, "Gaia EDR3: photometric content and
+  validation" - all 35 pages) is the SOURCE PAPER of the
+  zero points and G-V polynomial milkyway.js already shipped
+  (its Table C.2 prints the -0.02704/0.01424/-0.2156/0.01426
+  row verbatim; Table 3 prints the shipped 25.6874/25.3385/
+  24.7479 VEGAMAG zero points), and the same Table 3 prints
+  the AB zero points (25.8010/25.3540/25.1040) and the band
+  pivot wavelengths (621.79/510.97/776.91 nm) while its Eqs.
+  13-17 define the synthetic-photometry frame. The key
+  arithmetic: per band m_VEG - m_AB = ZP_VEG - ZP_AB, so a
+  blackbody's VEGAMAG BP-RP needs NO Vega spectrum - the AB
+  colour from the passband curves plus the printed offset
+  (0.3406; the release's full-precision zeropt.dat gives
+  0.3406749). The official EDR3 passband release (DPAC
+  version-2 files, the paper's own electronic tables) is
+  vendored at 5 nm into milkyway.js; bpRpOfPlanck folds
+  Planck's law (stars-color.js SI-exact constants) through
+  the curves, kelvinFromBpRp inverts the monotone relation,
+  and the bake draws each cell as starTintRGB of that
+  temperature via a 256-tap colour LUT - the galaxy and the
+  drawn stars now ride ONE cited colour chain end to end
+  (the old ramp domain gets real temperatures: bpRp 0.6 ->
+  6940 K, 1.6 -> 3889 K; the bulge reads warm orange
+  (1, .64, .35) where the ramp was flat (1, .88, .72)).
+  Gate: milkyway-reference.mjs grows two landmarks - the
+  vendoring one (pivot wavelengths re-derived from the
+  decimated rows land on the printed 510.97/776.91 to 0.02
+  nm; the VEGA-AB offset is the printed zero-point
+  arithmetic) and the inversion one (monotone, round-trip
+  3.5e-15, the 0.6/1.6 temperatures in stated bands, solar-
+  Teff blackbody colour 0.868). VALIDATE PASS (all
+  references + 7 GPU probes; the bake LUT costs ~0.3 s once
+  at galaxy creation, off the frame loop). Stated
+  reductions: a cell's mixed stellar population is drawn as
+  the single blackbody of its integrated EDR3 colour - line
+  blanketing shifts real stars a few hundredths of a mag off
+  the blackbody locus (the solar-Teff blackbody sits at
+  0.868 where the Sun measures ~0.82), and colours outside
+  the 2300-45000 K span clamp to the end temperatures.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

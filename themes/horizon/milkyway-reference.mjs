@@ -20,16 +20,29 @@
 //  - structure: the galactic-plane cells outshine the poles by
 //    the classical factor (>5x); the NGP cell sits in the
 //    Toller/Leinert pole band (15-45 S10 for Gaia's G<21 depth)
+//  - the EDR3 passband vendoring: pivot wavelengths re-derived
+//    from the 5 nm rows land on Riello Table 3's printed
+//    510.97 / 776.91 nm; the VEGAMAG-AB colour offset is the
+//    printed zero-point arithmetic; the blackbody colour is
+//    monotone and inverts round-trip, so a cell's integrated
+//    BP-RP reads as one temperature on the star sprites' frame
 import {
   ang2pix,
+  bpRpOfPlanck,
+  BPRP_T_HI,
+  BPRP_T_LO,
+  BPRP_VEGA_MINUS_AB,
   CELL_AREA_DEG2,
   cellS10,
   equToGal,
   G_ZP_VEGA,
+  GAIA_BP_PASSBAND,
+  GAIA_RP_PASSBAND,
   galToEqu,
   gMinusV,
   HPX_NPIX,
   HPX_NSIDE,
+  kelvinFromBpRp,
   pix2ang
 } from './milkyway.js';
 import {MW_FBP, MW_FG, MW_FRP, MW_N} from './milkyway-data.js';
@@ -160,6 +173,73 @@ const check = (name, ok, detail) => {
       ngpS10 < 90 &&
       plane > 100,
     `plane (|b|<5) mean ${plane.toFixed(0)} S10 vs pole (|b|>80) mean ${pole.toFixed(1)} S10 (Toller band 20-40) - contrast ${(plane / pole).toFixed(1)}x; exact-NGP cell ${ngpS10.toFixed(1)} S10 (Poisson of undrawn 5.5-6.5 mag stars)`
+  );
+}
+
+{
+  // The vendored EDR3 passbands against the paper's own numbers:
+  // pivot wavelengths (Riello 2021 Table 3: BP 510.97, RP 776.91
+  // nm) re-derived from the decimated rows, and the VEGAMAG-AB
+  // colour offset as printed zero-point arithmetic ((25.3385 -
+  // 25.354) - (24.7479 - 25.104) = 0.3406; the release's
+  // full-precision zeropt.dat file gives 0.3406749).
+  const pivot = (tab) => {
+    let a = 0;
+    let b = 0;
+    for (const [nm, S] of tab) {
+      a += S * nm;
+      b += S / nm;
+    }
+    return Math.sqrt(a / b);
+  };
+  const pBP = pivot(GAIA_BP_PASSBAND);
+  const pRP = pivot(GAIA_RP_PASSBAND);
+  const ok =
+    Math.abs(pBP - 510.97) < 0.1 &&
+    Math.abs(pRP - 776.91) < 0.1 &&
+    Math.abs(BPRP_VEGA_MINUS_AB - 0.3406) < 1e-9 &&
+    Math.abs(BPRP_VEGA_MINUS_AB - 0.3406749) < 2e-4;
+  check(
+    'EDR3 passband vendoring',
+    ok,
+    `pivots ${pBP.toFixed(2)}/${pRP.toFixed(2)} nm (printed 510.97/776.91); VEGA-AB offset ${BPRP_VEGA_MINUS_AB.toFixed(4)} (full-precision 0.3406749)`
+  );
+}
+
+{
+  // The blackbody colour-temperature relation on the vendored
+  // curves: monotone decreasing across the sprite span, exact
+  // round-trip inversion, and the bake's old ramp domain gets
+  // its real temperatures (bpRp 0.6 / 1.6 near 6900 / 3900 K -
+  // the solar-Teff blackbody sits at 0.868, the ~0.05 mag
+  // line-blanketing offset off the real Sun's ~0.82 being part
+  // of the stated single-temperature reduction).
+  let mono = true;
+  let last = Infinity;
+  let worst = 0;
+  for (let T = BPRP_T_LO; T <= BPRP_T_HI; T *= 1.15) {
+    const c = bpRpOfPlanck(T);
+    if (c >= last) mono = false;
+    last = c;
+    if (T > BPRP_T_LO * 1.001 && T < BPRP_T_HI * 0.999) {
+      worst = Math.max(worst, Math.abs(kelvinFromBpRp(c) - T) / T);
+    }
+  }
+  const t06 = kelvinFromBpRp(0.6);
+  const t16 = kelvinFromBpRp(1.6);
+  const cSun = bpRpOfPlanck(5772);
+  const ok =
+    mono &&
+    worst < 1e-9 &&
+    t06 > 6500 &&
+    t06 < 7500 &&
+    t16 > 3500 &&
+    t16 < 4200 &&
+    Math.abs(cSun - 0.868) < 0.005;
+  check(
+    'blackbody BP-RP inversion',
+    ok,
+    `monotone; round-trip worst ${worst.toExponential(1)}; bpRp 0.6 -> ${t06.toFixed(0)} K, 1.6 -> ${t16.toFixed(0)} K; solar-Teff blackbody colour ${cSun.toFixed(3)}`
   );
 }
 

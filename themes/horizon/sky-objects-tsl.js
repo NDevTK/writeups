@@ -67,8 +67,9 @@ import {
 import {EYE_D_CM, SIGMA_MAX, youngSigma} from './scintillation.js';
 import {AGLOW_GAIN, LINES, R_EARTH} from './airglow.js';
 import {buildZodiacalGrid, OBLIQUITY, zlPerGreen} from './zodiacal.js';
-import {ang2pix, cellS10, CELL_AREA_DEG2} from './milkyway.js';
+import {ang2pix, cellS10, CELL_AREA_DEG2, kelvinFromBpRp} from './milkyway.js';
 import {MW_FBP, MW_FG, MW_FRP} from './milkyway-data.js';
+import {starTintRGB} from './stars-color.js';
 
 /**
  * Horizon's sky objects as TSL node materials (WebGPU project,
@@ -1051,8 +1052,12 @@ export function createFlashMaterial() {
 // cells (documented display smoothing on exact data). Photometry
 // rides the SAME zlPerGreen base and AGLOW_GAIN as the zodiacal
 // light, so the galaxy/zodiacal contrast carries no free
-// parameter; the colour tint from each cell's integrated BP-RP is
-// the one documented display mapping (bluish 0.6 -> warm 1.6).
+// parameter; each cell's integrated BP-RP is read as the
+// blackbody of the same EDR3 colour (milkyway.js Riello
+// machinery) and drawn with the star sprites' own Planck tint
+// chain (stars-color.js) - one cited colour frame for the
+// galaxy and the drawn stars, a stated single-temperature
+// reduction of each cell's mixed population.
 export function buildMilkyWayGrid(W, H) {
   const lum = new Float32Array(W * H);
   const tint = new Float32Array(W * H * 2); // bpRp packed later
@@ -1099,13 +1104,32 @@ export function buildMilkyWayGrid(W, H) {
     return a;
   };
   const lumB = blur(lum);
+  // Tint LUT over the colour axis: 256 taps of the cited chain
+  // (bpRp -> blackbody temperature -> Planck tint), so the bake
+  // pays the bisection/integration once per colour, not per
+  // texel.
+  const TN = 256;
+  const T0 = -0.5;
+  const T1 = 3.0;
+  const tintLut = new Float32Array(TN * 3);
+  for (let i = 0; i < TN; i++) {
+    const bp = T0 + ((T1 - T0) * i) / (TN - 1);
+    const [r, g, b] = starTintRGB(kelvinFromBpRp(bp));
+    tintLut[i * 3] = r;
+    tintLut[i * 3 + 1] = g;
+    tintLut[i * 3 + 2] = b;
+  }
   const data = new Float32Array(W * H * 4);
   for (let i = 0; i < W * H; i++) {
-    const c = Math.min(Math.max((tint[i * 2] - 0.6) / 1.0, 0), 1);
-    // bluish-white (0.6) -> warm (1.6) - display mapping
-    data[i * 4] = (0.82 + 0.18 * c) * lumB[i];
-    data[i * 4 + 1] = (0.9 - 0.02 * c) * lumB[i];
-    data[i * 4 + 2] = (1.0 - 0.28 * c) * lumB[i];
+    const j =
+      3 *
+      Math.min(
+        Math.max(Math.round(((tint[i * 2] - T0) / (T1 - T0)) * (TN - 1)), 0),
+        TN - 1
+      );
+    data[i * 4] = tintLut[j] * lumB[i];
+    data[i * 4 + 1] = tintLut[j + 1] * lumB[i];
+    data[i * 4 + 2] = tintLut[j + 2] * lumB[i];
     data[i * 4 + 3] = 1;
   }
   return data;
