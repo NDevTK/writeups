@@ -5186,6 +5186,34 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   low-sun dome/optics term paints its interior through the
   fog; needs its own hunt (range-mask family, sunset band, or
   aureole cone are the suspects).
+- DONE (ocean glitter, Aug 7 twenty-fourth push - the first of
+  stage 4's four legacy-fed scatter systems retired): the sea's
+  specular sun now runs the PRINTED Cox & Munk (1954) sun-glitter
+  law. ocean-glint.js carries the Gaussian slope PDF and the
+  Fresnel-less kernel P(slope)/(4 cos_v cos^4_tilt), gated
+  (ocean-glint-reference.mjs): the PDF integrates to 1 with its
+  mean-square slope equal to the fed mss to 1e-12, the kernel's
+  hemisphere energy is CONSERVED against the surface flux
+  E cos(theta_s) - 1.0000 at calm and at the Cox-Munk 5 m/s
+  variance, 0.98 at gale (the single-facet law's own
+  shadowing/multi-bounce loss, stated) - the mirror peak is
+  1/(pi mss 4 cos_v) exact and the grazing 1/cos_v glitter road
+  is the printed law's own. water-tsl.js transcribes the kernel
+  on the half-vector in the RESOLVED frame at the per-pixel
+  effective variance (Bruneton 2010's filter split, already
+  probe-gated); the facet Fresnel is the Schlick term that
+  already weights the mirror + specular branch (rhoF at the
+  macro normal approximates rhoF at the facet - exact in the
+  glitter core, stated). RETIRED: the classic three.js Water
+  energy patch pow(dir, shiny) x (0.02 shiny + 0.5) - the
+  exponent rode the variance, the ENERGY was an uncited display
+  calibration - and the ocean's sunIFeedLegacy: water.sunColor
+  is now the physical beam (st x adaptive exposure), so the
+  glitter sits on the same absolute frame as the dome and the
+  terrain, and the sunset glitter road brightens toward grazing
+  by geometry instead of by tuning. Still legacy-fed, named:
+  the near sea/snow glitter sparkles, the far strip's glints,
+  the cloud deck's direct beam.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

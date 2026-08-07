@@ -10270,10 +10270,15 @@
           }
           for (const c of oceanCascades) c.update(oceanTime);
           water.sunDirection.value.copy(sunVec);
-          // Ocean specular: legacy feed (see sunIFeedLegacy).
+          // Ocean sun: the PHYSICAL beam (colour x intensity = st x
+          // exposure) - the water material's glitter now runs the
+          // printed Cox & Munk law (ocean-glint.js, gated), so its
+          // radiance is E_beam x P/(4 cos_v cos^4_n) on the same
+          // absolute frame as the dome and the terrain. First of
+          // the four legacy-fed scatter systems retired.
           water.sunColor.value
             .copy(sunLight.color)
-            .multiplyScalar(sunIFeedLegacy);
+            .multiplyScalar(sunLight.intensity);
           // Measured-chlorophyll body colour (Morel/CIE) once the /chlor
           // fetch has resolved; until then the build-time placeholder
           // stands. Applied here so a roam sea-rebuild keeps the colour.
