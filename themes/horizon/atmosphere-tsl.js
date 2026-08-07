@@ -173,6 +173,28 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   corTex.minFilter = LinearFilter;
   corTex.needsUpdate = true;
   const corNode = texture(corTex);
+  // The lunar corona's own set: the pattern re-convolved with the
+  // MOON's live disc (flat kernel - the full-moon disc is flat,
+  // the theme's own Hapke rendering says so), the amplitude in
+  // E0 units through moonlight.js, anchored on the DRAWN
+  // (refracted) moon direction.
+  const corMoonDir = uniform(new Vector3(0, -1, 0));
+  // Scalar: the printed V-band anchor serves all three channels
+  // (documented convention, moonlight.js) - colour lives in the
+  // per-channel pattern.
+  const corMoonAmp = uniform(0);
+  const corMoonCosCone = uniform(2);
+  const corMoonTex = new DataTexture(
+    new Float32Array(COR_N * 4),
+    COR_N,
+    1,
+    RGBAFormat,
+    FloatType
+  );
+  corMoonTex.magFilter = LinearFilter;
+  corMoonTex.minFilter = LinearFilter;
+  corMoonTex.needsUpdate = true;
+  const corMoonNode = texture(corMoonTex);
   // Measured total-column ozone (ozone.js, gated): the shipped
   // ozone constants encode exactly 300 DU (Bruneton's own printed
   // construction); absorption is linear in the column, so the
@@ -974,16 +996,19 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     });
     // The cirrus corona: the cold veil's crystals diffract the
     // direct beam once -
-    //   L(theta) = P(theta) * T_air * chi * amp * sunE,
+    //   L(theta) = P(theta) * T_air * amp * sunE,
     // P the CPU-convolved Airy pattern (sr^-1), T_air the LUT's
     // own eye->space transmittance along the fragment ray (pure
-    // Beer, the drawn disc's documented convention), chi the
-    // volumetric decks' Beer-Lambert at the camera (a corona dies
-    // behind a stratus deck), amp = (tau/2) e^-tau on the measured
-    // cirrus column - the extinction e^-tau lives INSIDE amp, so
-    // nothing here extinguishes twice.
-    If(cSunG.greaterThan(corCosCone), () => {
-      const sinTh = cross(v, sunDirW).length();
+    // Beer, the drawn disc's documented convention), amp =
+    // (tau/2) e^-tau on the measured cirrus column - the
+    // extinction e^-tau lives INSIDE amp. The volumetric decks
+    // need NO factor here: the cirrus sits above them, the
+    // sun-side path to it crosses no deck, and the view-side leg
+    // is extinguished by the cloud composite itself (the dome is
+    // behind every deck pixel) - a chi here would extinguish
+    // twice.
+    const coronaAdd = (dirU, ampU, texN) => {
+      const sinTh = cross(v, dirU).length();
       const th = asin(clamp(sinTh, 0.0, 1.0));
       const uC = th
         .div(corThetaMax)
@@ -991,24 +1016,20 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         .mul((COR_N - 1) / COR_N)
         .add(0.5 / COR_N);
       const tAir = tTexNode.sample(tParamsToUv(r, v.y)).rgb;
-      const chi0 = cloudShadow
-        ? (() => {
-            // The camera's own position in the shadow map's
-            // mapping - the aureole march's expressions at t = 0.
-            const y = asinh(r.sub(RB).sub(shadowElev0).div(500)).mul(16);
-            return cloudShadow.transmittance(
-              vec3(aerialCamXZ.x, y, aerialCamXZ.y)
-            );
-          })()
-        : float(1);
-      col.addAssign(
-        corNode
-          .sample(vec2(uC, 0.5))
-          .rgb.mul(tAir)
-          .mul(chi0)
-          .mul(corAmp)
-          .mul(sunE)
-      );
+      col.addAssign(texN.sample(vec2(uC, 0.5)).rgb.mul(tAir).mul(ampU));
+    };
+    If(cSunG.greaterThan(corCosCone), () => {
+      coronaAdd(sunDirW, corAmp.mul(sunE), corNode);
+    });
+    // The LUNAR corona - the same pattern anchored on the drawn
+    // moon, its amplitude carrying the moonlight irradiance in
+    // this frame's own E0 units (moonlight.js: the printed
+    // fact-sheet anchor through the gated Hapke phase curve and
+    // the live distance; a lunar eclipse's umbral immersion
+    // dims it linearly upstream). No sunE - the sun's eclipse
+    // does not touch moonlight.
+    If(dot(v, corMoonDir).greaterThan(corMoonCosCone), () => {
+      coronaAdd(corMoonDir, corMoonAmp, corMoonNode);
     });
     // Inside the transfer band at a low sun, the disc is drawn
     // through the LUT: the fragment's APPARENT altitude reads the
@@ -1373,11 +1394,13 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
       // Harness introspection: the CPU-built rows, for probes.
       bandData: () => bandTTex.image.data
     },
-    // The cirrus corona feed (cloud-corona.js): pattern only when
-    // the LUT re-lays (sun-radius drift), amplitude every frame -
-    // 0 disables the branch entirely (cos cone 2).
+    // The cirrus corona feed (cloud-corona.js): patterns only when
+    // a LUT re-lays (source-disc drift), amplitudes every frame -
+    // 0 disables a branch entirely (cos cone 2). Sun and moon are
+    // the same machinery at their own discs and amplitudes.
     cloudCorona: (() => {
       let coneRad = 0;
+      let coneRadMoon = 0;
       return {
         setPattern(lut) {
           corTex.image.data.set(lut.curve);
@@ -1388,6 +1411,17 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         setAmp(amp) {
           corAmp.value = amp;
           corCosCone.value = amp > 0 && coneRad > 0 ? Math.cos(coneRad) : 2;
+        },
+        setMoonPattern(lut) {
+          corMoonTex.image.data.set(lut.curve);
+          corMoonTex.needsUpdate = true;
+          coneRadMoon = lut.coneRad;
+        },
+        setMoon(dir, amp) {
+          if (dir) corMoonDir.value.copy(dir);
+          corMoonAmp.value = amp;
+          corMoonCosCone.value =
+            amp > 0 && coneRadMoon > 0 ? Math.cos(coneRadMoon) : 2;
         }
       };
     })(),

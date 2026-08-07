@@ -63,7 +63,16 @@ const LIMB_ALPHA = [0.4064, 0.5079, 0.6406];
 // limb-darkened sun disc: kernel K(dt) = integral over the disc
 // chord at offset dt of mu^alpha, mu = sqrt(1 - (rho/R)^2).
 // Exported: cloud-corona.js rides the same certified convolution.
-export function sunConvolve(profile, bins, dTheta, srcR = SUN_RADIUS) {
+// limbAlpha overrides the per-channel exponents - [0, 0, 0] is a
+// FLAT disc (mu^0 = 1), the moon's own full-disc profile (the
+// Hapke rendering's flat disc at full phase).
+export function sunConvolve(
+  profile,
+  bins,
+  dTheta,
+  srcR = SUN_RADIUS,
+  limbAlpha = LIMB_ALPHA
+) {
   const half = Math.ceil(srcR / dTheta);
   const out = new Float64Array(profile.length);
   for (let c = 0; c < 3; c++) {
@@ -83,7 +92,7 @@ export function sunConvolve(profile, bins, dTheta, srcR = SUN_RADIUS) {
       for (let m = 0; m < M; m++) {
         const t = ((m + 0.5) / M) * tMax;
         const mu = Math.sqrt(Math.max(1 - s * s - t * t, 0));
-        w += Math.pow(mu, LIMB_ALPHA[c]);
+        w += Math.pow(mu, limbAlpha[c]);
       }
       kernel.push((2 * w * tMax) / M);
     }

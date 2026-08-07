@@ -216,13 +216,18 @@ export function coronaColdGate(t250) {
 
 // ---- the drawn LUT ----
 // Per-channel pattern over theta in [0, CORONA_THETA_MAX_DEG],
-// convolved exactly once with the limb-darkened source disc at its
-// TRUE angular radius (optics-lut sunConvolve - the one certified
-// convolution; the caller passes the live sun radius, and a lunar
-// consumer would pass the moon's). RGBA Float32Array in the
+// convolved exactly once with the source disc at its TRUE angular
+// radius (optics-lut sunConvolve - the one certified convolution).
+// The sun passes its Hestroffer-Magnan limb darkening by default;
+// the MOON passes limbAlpha [0, 0, 0] - the flat full-moon disc
+// its own Hapke rendering draws. RGBA Float32Array in the
 // aureole-curve texture format; values stay in sr^-1 - the dome
 // multiplies by transmittance, amplitude and eclipse factor only.
-export function buildCloudCoronaLUT(srcRadRad, dUm = CORONA_D_UM) {
+export function buildCloudCoronaLUT(
+  srcRadRad,
+  dUm = CORONA_D_UM,
+  limbAlpha = undefined
+) {
   const thetaMaxRad = (CORONA_THETA_MAX_DEG * Math.PI) / 180;
   const dTheta = thetaMaxRad / CORONA_N;
   const thetas = [];
@@ -232,7 +237,10 @@ export function buildCloudCoronaLUT(srcRadRad, dUm = CORONA_D_UM) {
     const p = airyPattern(dUm, CHANNEL_UM[c], thetas);
     for (let i = 0; i < CORONA_N; i++) prof[i * 3 + c] = p[i];
   }
-  const conv = sunConvolve(prof, CORONA_N, dTheta, srcRadRad);
+  const conv =
+    limbAlpha === undefined
+      ? sunConvolve(prof, CORONA_N, dTheta, srcRadRad)
+      : sunConvolve(prof, CORONA_N, dTheta, srcRadRad, limbAlpha);
   const curve = new Float32Array(CORONA_N * 4);
   for (let i = 0; i < CORONA_N; i++) {
     curve[i * 4] = conv[i * 3];

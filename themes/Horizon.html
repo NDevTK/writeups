@@ -511,6 +511,7 @@
         CORONA_D_UM,
         CORONA_T250_MAX
       } from './horizon/cloud-corona.js';
+      import {moonIrradianceE0} from './horizon/moonlight.js';
       import {ozoneScale} from './horizon/ozone.js';
       import {
         LAMP_FULL,
@@ -7189,18 +7190,32 @@
       // measured veil column behind the measured cold gate - feeds
       // per frame in the sun block.
       let coronaSrcR = null;
+      let coronaSrcRMoon = null;
       function refreshCoronaLUT() {
         if (!atmo.ok) return;
         // 0 until the first ephemeris tick - the builder then takes
         // the 1 au IAU default, the bow LUT's own convention.
         const R = astro.sunAngR || 0;
         if (
-          coronaSrcR !== null &&
-          Math.abs(R - coronaSrcR) <= 0.01 * Math.max(coronaSrcR, 1e-9)
-        )
-          return;
-        coronaSrcR = R;
-        atmo.cloudCorona.setPattern(buildCloudCoronaLUT(R || undefined));
+          coronaSrcR === null ||
+          Math.abs(R - coronaSrcR) > 0.01 * Math.max(coronaSrcR, 1e-9)
+        ) {
+          coronaSrcR = R;
+          atmo.cloudCorona.setPattern(buildCloudCoronaLUT(R || undefined));
+        }
+        // The moon's own pattern: same crystals, the MOON's live
+        // disc (+-7% over the month) with the flat kernel its
+        // full-phase Hapke disc really has.
+        const RM = astro.moonAngR || 0;
+        if (
+          coronaSrcRMoon === null ||
+          Math.abs(RM - coronaSrcRMoon) > 0.01 * Math.max(coronaSrcRMoon, 1e-9)
+        ) {
+          coronaSrcRMoon = RM;
+          atmo.cloudCorona.setMoonPattern(
+            buildCloudCoronaLUT(RM || undefined, CORONA_D_UM, [0, 0, 0])
+          );
+        }
       }
       let lpRatio = 0;
       let lpVis = 1;
@@ -8243,6 +8258,9 @@
             // swing - and paraselenae with the moon's own +-7%.
             astro.sunAngR = sunAngularRadiusRad(eqSun.dist * AE.KM_PER_AU);
             astro.moonAngR = moonAngularRadiusRad(eqMoon.dist * AE.KM_PER_AU);
+            // The live distance itself: the moonlight irradiance
+            // frame (moonlight.js) scales by its inverse square.
+            astro.moonDistKm = eqMoon.dist * AE.KM_PER_AU;
             astro.eclipse = params.has('eclipse')
               ? +params.get('eclipse')
               : se.obsc;
@@ -10214,6 +10232,31 @@
             dogOnMoon = dl.any;
           }
           opticsMoonU.dogs.value = dogOnMoon ? 1 : 0;
+          // The LUNAR corona, radiometric: the same cold-cirrus
+          // gate and measured column as the sun's, the amplitude
+          // now carrying the moonlight irradiance in the sky's E0
+          // frame - the printed fact-sheet anchor through the
+          // gated Hapke phase (astro.moonRel, the value this block
+          // already breathes), the live inverse-square distance,
+          // and the exact umbral immersion when a lunar eclipse is
+          // in progress. Anchored on the DRAWN moon like the rest
+          // of the paraselenic optics.
+          if (atmo.ok) {
+            const corMoonOn =
+              params.get('cirruscorona') !== '0' &&
+              moon.alt > 0 &&
+              coronaColdGate(state.t250);
+            atmo.cloudCorona.setMoon(
+              moonVec2,
+              corMoonOn
+                ? moonIrradianceE0(
+                    astro.moonRel,
+                    astro.moonDistKm,
+                    1 - (astro.lunarEcl?.inUmbra ?? 0)
+                  ) * coronaAmp(cirrusSlantTau(cHighFrac, Math.sin(moon.alt)))
+                : 0
+            );
+          }
         }
 
         // Deciduous phenology, MEASURED. MCD12Q2 dates this pixel's own

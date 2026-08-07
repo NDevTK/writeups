@@ -4094,6 +4094,91 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     DISC still ignores the veil's tau (its cirrus dimming remains
     the veil mesh's display alpha - unifying the disc onto the
     measured column is its own pass).
+- DONE (the moonlight irradiance frame + the LUNAR corona, Aug 7
+  second push): the corona entry's first scope item, closed the
+  same day - the classic naked-eye corona now draws around the
+  moon, radiometrically, from two printed values and physics the
+  repo already gated. moonlight.js states E_moon in the sky's own
+  E0 units: NASA NSSDC fact sheets (archived pages, read
+  directly - the live NSSDC site now redirects to a generic
+  nasa.gov page) print the full moon's apparent V magnitude
+  -12.74 AT ITS PRINTED GEOMETRY ("Mean values at opposition:
+  distance 378,000 km, apparent diameter 1896 arcsec") and the
+  sun's -26.74, so the full-moon ratio is EXACTLY
+  10^(-14.00/2.5) = 10^-5.6 = 2.512e-6 - no invented brightness;
+  phase rides the ALREADY-GATED disk-integrated Hapke curve
+  (moonphase.js relPhase, the same astro.moonRel the paraselenic
+  optics breathe, held to Rougier), distance rides the live
+  ephemeris inverse-square (astro.moonDistKm now stored beside
+  moonAngR), and a lunar eclipse dims by the exact umbral
+  immersion (1 - inUmbra, eclipses.js geometry) - linear in the
+  source, the sunE argument on the other body. Documented
+  conventions: the V-band anchor serves all three channels (the
+  moon is nearly grey; per-channel lunar albedo needs its own
+  citation), penumbral dimming and the umbral copper glow
+  (~1e-4, refracted light) are second-order scope. The KEY
+  cross-check landmark: the shipped Helfenstein & Veverka Hapke
+  parameters, integrated ABSOLUTELY over the disc ((w/4pi)
+  INT hapkeR dxdy = disk I/F 0.1419 vs the fact sheet's printed
+  geometric albedo 0.12), give E_full/E0 = 3.00e-6 at the printed
+  distance - within 19% of the printed anchor, UNTUNED: the
+  shipped photometry and the printed anchor describe the same
+  moon, and the printed measurement anchors.
+  The drawn side: the dome's corona machinery became a shared
+  coronaAdd(dir, amp, tex) with a SECOND branch on corMoonDir -
+  the same 22 um pattern re-convolved with the MOON's live disc
+  (sunConvolve grew an optional limbAlpha; [0,0,0] is the flat
+  disc the moon's own full-phase Hapke rendering draws),
+  re-laid on the +-7% monthly disc drift, anchored on the DRAWN
+  (refracted) moon beside the other paraselenic optics, amp =
+  E_moon x (tau/2) e^-tau behind the same measured cold gate.
+  No sunE on the moon branch (a solar eclipse does not touch
+  moonlight). ALSO FIXED, found while deriving the moon's
+  geometry: the sun branch's cloud-shadow chi DOUBLE-COUNTED -
+  the cirrus sits above the volumetric decks, the sun-side path
+  to it crosses no deck, and the view-side leg is extinguished
+  by the cloud composite itself (the dome sits behind every deck
+  pixel); the chi factor is deleted from the corona branch (the
+  aureole march's chi is different physics - sun-side shadowing
+  of in-scatter generated along the ray - and stays).
+  moonlight-reference.mjs holds 5 landmarks: the printed
+  magnitudes to 10^-5.6 exactly; phase through the gated curve
+  (quarter/full 0.082 on Rougier's ~0.08) + printed
+  perigee/apogee inverse-square bracketing (1.246); umbral
+  linearity clamped; fails closed on any missing input; and the
+  Hapke-corroborates-the-anchor coherence bound (<20%, converged
+  N=800). validate.sh: 87 sets + 5 GPU probes green.
+  BROWSER-VERIFIED at a pinned Grindelwald night (2026-08-28
+  21:30Z: sun -27.5, gibbous moon rel 0.646 at 27.95 deg, E_moon
+  1.566e-6, corMoonAmp 2.74e-7 - rings drawn at two ten-millionths
+  of the sky's unit solar irradiance and measured there): ON vs
+  ?cirruscorona=0 float captures, disc-centroid-centred - the
+  measured first minima land ON the drawn LUT's own convolved
+  positions to 0.01-0.03 deg (R 2.18/2.19, G 1.78/1.79, B
+  1.43/1.46 - the raw Airy angles shift outward ~0.04 deg under
+  the disc convolution, and the measurement resolves THAT), all
+  21 band x channel shape ratios within 0.93-1.13, and the
+  ABSOLUTE radiometric chain closes: measured T x exposure per
+  channel over P x amp gives T = 0.766/0.656/0.523 vs the CPU
+  chain's 0.737/0.631/0.500 (+4%), while the same closure on the
+  SOLAR corona frames lands 0.992/0.992/0.993 - sub-percent.
+  Chasing that closure was its own lesson: the first pass read a
+  channel-flat 0.855 deficit in BOTH scenes, survived three
+  refuted hypotheses (high-sprite alpha - cover-scaling test,
+  UNCHANGED at cloudhigh 12 vs 45; volumetric composite -
+  noclouds ratio exactly 1.0000; spectral projection -
+  applySpectral is grey-preserving, spec/nospec captures
+  bit-identical), and cracked on the DRAWN DISC itself (discT x
+  120 x exposure reads the GPU's own T in-frame): the prediction
+  chain had fed sunTransmittanceJS the raw Hillaire defaults
+  while the theme correctly runs the AOD-0.12 FALLBACK calibrated
+  at centerElev (mieCoefficients - sigma(0) 2.13e-4, 53x the
+  paper coefficient at this altitude). The pinned-clear-scene
+  aerosol lesson from the aureole pass, met again from the
+  analysis side: the sky's Mie term is NEVER the paper default in
+  a real scene, pinned or live. Verified with the corrected mie:
+  disc T matches the CPU twin to 1.6% per channel. Gate after
+  integration: 87 reference sets + 5 GPU probes green.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
@@ -4114,7 +4199,9 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   moonlight irradiance in the sky's E0 frame (the moon optics
   dome's display gains are not that frame; with the citation the
   same cloud-corona LUT anchors on the moon disc radius, and the
-  whole moon-optics stack could follow onto radiometry); (2) the
+  whole moon-optics stack could follow onto radiometry) - DONE
+  the same day, moonlight.js (the entry above); the moon-optics
+  stack's own move onto that frame stays named; (2) the
   droplet corona through altocumulus (G&L's most common producer;
   needs a mid-deck optical-depth model - the volumetric decks
   know their density, the sprite layers do not); (3) the desert
