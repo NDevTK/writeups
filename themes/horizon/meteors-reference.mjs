@@ -22,8 +22,11 @@ import {
   dLam,
   drawMagnitude,
   hourlyRate,
+  KR_AREA,
+  perceptionP,
   radiantAt,
   SHOWERS,
+  visibleRateFactor,
   zhrAt
 } from './meteors.js';
 
@@ -137,6 +140,56 @@ const S = Object.fromEntries(SHOWERS.map((s) => [s.code, s]));
     'radiant drift',
     Math.abs(drift.ra - (48 - 1.3 * 13)) < 1e-12 && drift.dec < 58,
     `PER radiant on Jul 30 at (${drift.ra.toFixed(1)}, ${drift.dec.toFixed(1)}) - east/north of it by the peak (Jenniskens drift)`
+  );
+}
+
+{
+  // Koschack & Rendtel's perception machinery at its own printed
+  // numbers: Eq. 5 over the vendored Tables 4 + 6 re-derives
+  // their Table 5 standard-field row EXACTLY (p = 0.00482 /
+  // 0.0593 / 0.365 / 0.860 at dm = 0.5 / 2 / 3.5 / 6); the
+  // printed field portions sum to 1; the rate factor is exactly
+  // 1 at the ZHR definition's own lm = 6.5; the textbook
+  // r^(lm - 6.5) limiting-magnitude correction EMERGES from the
+  // printed tables (within a few percent over lm 4.3-6.5); a
+  // full-moon sky (Schaefer lm ~4.3) keeps ~13% of a Perseid-
+  // class shower - the famous moonlit-shower suppression - and
+  // daylight keeps essentially none; monotone in lm.
+  const t5 =
+    Math.abs(perceptionP(0.5) - 0.00482) < 5e-5 &&
+    Math.abs(perceptionP(2) - 0.0593) < 5e-4 &&
+    Math.abs(perceptionP(3.5) - 0.365) < 2e-3 &&
+    Math.abs(perceptionP(6) - 0.86) < 2e-3;
+  const areaSum = KR_AREA.reduce((a, b) => a + b, 0);
+  const unit = Math.abs(visibleRateFactor(2.5, 6.5) - 1) < 1e-12;
+  let emerges = true;
+  for (const lm of [4.3, 5, 5.5, 6]) {
+    const f = visibleRateFactor(2.5, lm);
+    const tb = Math.pow(2.5, lm - 6.5);
+    if (Math.abs(f / tb - 1) > 0.06) emerges = false;
+  }
+  const moon = visibleRateFactor(2.5, 4.3);
+  const day = visibleRateFactor(2.5, -4);
+  let mono = true;
+  let prev = -1;
+  for (let lm = -4; lm <= 8; lm += 0.5) {
+    const f = visibleRateFactor(2.6, lm);
+    if (f < prev - 1e-12) mono = false;
+    prev = f;
+  }
+  const ok =
+    t5 &&
+    Math.abs(areaSum - 1) < 0.005 &&
+    unit &&
+    emerges &&
+    moon > 0.08 &&
+    moon < 0.2 &&
+    day < 1e-3 &&
+    mono;
+  check(
+    'Koschack & Rendtel perception (printed tables)',
+    ok,
+    `Table 5 row re-derived exact (${perceptionP(0.5).toFixed(5)}/${perceptionP(2).toFixed(4)}/${perceptionP(3.5).toFixed(3)}/${perceptionP(6).toFixed(3)} vs printed 0.00482/0.0593/0.365/0.860); portions sum ${areaSum.toFixed(4)}; factor(6.5) = 1 exact; textbook r^(lm-6.5) emerges within 6% (lm 4.3-6.5); full moon keeps ${(moon * 100).toFixed(0)}% of the shower, daylight ${day.toExponential(0)}; monotone`
   );
 }
 

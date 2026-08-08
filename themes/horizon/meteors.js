@@ -24,8 +24,10 @@
  * clear sky at limiting magnitude 6.5 with the radiant in the
  * zenith) unwinds with the standard zenith correction
  *   HR = ZHR sin(h_R)   for radiant elevation h_R > 0
- * (Koschack & Rendtel 1990); the display keeps lm = 6.5 and lets
- * the night/cloud gates hide meteors exactly as they hide stars.
+ * (Koschack & Rendtel 1990) and with the SAME paper's perception
+ * machinery at the frame's live Schaefer limiting magnitude (the
+ * visibleRateFactor block below) - moonlight, twilight and city
+ * glow suppress the shower as they suppress real counts.
  * Meteors per frame are a Poisson process at HR; magnitudes draw
  * from the population-index law N(< m) ~ r^m truncated at lm, so a
  * Geminid-class shower (r = 2.6) shows mostly faint streaks with
@@ -254,4 +256,76 @@ export function activeShowers(lamSun, floor = 0.5) {
   return SHOWERS.map((s) => ({s, zhr: zhrAt(s, lamSun)})).filter(
     (a) => a.zhr >= floor
   );
+}
+
+// ---- perception: the rate at ANY limiting magnitude ----
+// Koschack & Rendtel 1990 (WGN 18:2, 44 - read in full; the same
+// paper as the zenith correction above). Their Table 4 prints the
+// MEASURED probability of perception p(dm, R) - dm = lm - m (their
+// Eq. 4), R the distance from the field centre - from ~5000
+// double-count meteors; blank cells are unobserved (zero). Table 6
+// prints the standard field portions A'_R (h_f = 50 deg, r = 2.7,
+// H = 100 km); their Eq. 5 field-averages the two - and their
+// Table 5 prints the standard-field outcomes (0.00482 / 0.0593 /
+// 0.365 / 0.860 at dm = 0.5 / 2 / 3.5 / 6), which the gate
+// re-derives EXACTLY from the vendored tables. With the magnitude
+// distribution ~ r^m (their Eq. 6), the observed fraction of the
+// standard lm = 6.5 rate at any current limiting magnitude
+// follows with no new constants - moonlight and city glow
+// suppress the drawn shower exactly as they suppress real counts,
+// and the textbook r^(lm - 6.5) correction emerges as the
+// large-dm asymptote.
+export const KR_DM = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8];
+export const KR_P = [
+  [0.0347, 0.0777, 0.158, 0.33, 0.6, 0.794, 0.912, 0.98, 1, 1, 1, 1, 1],
+  [0.0252, 0.055, 0.112, 0.23, 0.445, 0.677, 0.85, 0.95, 0.98, 0.98, 1, 1, 1],
+  [
+    0.0186, 0.039, 0.0775, 0.162, 0.322, 0.575, 0.813, 0.91, 0.95, 0.98, 0.98,
+    1, 1
+  ],
+  [
+    0.0135, 0.0275, 0.055, 0.115, 0.245, 0.49, 0.723, 0.85, 0.91, 0.93, 0.95, 1,
+    1
+  ],
+  [
+    0.01, 0.0195, 0.038, 0.079, 0.178, 0.355, 0.575, 0.74, 0.83, 0.87, 0.91,
+    0.98, 1
+  ],
+  [0, 0, 0, 0.059, 0.135, 0.245, 0.416, 0.617, 0.723, 0.81, 0.89, 0.98, 1],
+  [0, 0, 0, 0.0415, 0.0954, 0.17, 0.302, 0.478, 0.616, 0.723, 0.85, 0.93, 1],
+  [0, 0, 0, 0.0295, 0.0645, 0.118, 0.214, 0.346, 0.5, 0.645, 0.83, 0.93, 0.98],
+  [0, 0, 0, 0, 0.0397, 0.066, 0.114, 0.2, 0.362, 0.588, 0.79, 0.89, 0.95],
+  [0, 0, 0, 0, 0, 0, 0.0724, 0.112, 0.208, 0.524, 0.76, 0.85, 0.93]
+];
+export const KR_AREA = [
+  0.0202, 0.0381, 0.0598, 0.0804, 0.0963, 0.121, 0.1379, 0.1506, 0.154, 0.1415
+];
+
+// Eq. 5: the field-averaged probability of perception at dm =
+// lm - m. Linear in dm between the printed columns; zero at and
+// below dm = 0 (their own note: p there is under 1e-3).
+export function perceptionP(dm) {
+  if (!(dm > 0)) return 0;
+  const col = (j) => KR_P.reduce((s, row, i) => s + row[j] * KR_AREA[i], 0);
+  if (dm >= KR_DM[KR_DM.length - 1]) return col(KR_DM.length - 1);
+  if (dm <= KR_DM[0]) return (col(0) * dm) / KR_DM[0];
+  let j = 0;
+  while (dm > KR_DM[j + 1]) j++;
+  const f = (dm - KR_DM[j]) / (KR_DM[j + 1] - KR_DM[j]);
+  return col(j) + f * (col(j + 1) - col(j));
+}
+
+// The visible fraction of the standard (lm = 6.5) rate for a
+// shower of population index r at the CURRENT limiting magnitude:
+// the r^m magnitude distribution folded with the perception
+// probabilities, normalised at the ZHR definition's own 6.5.
+export function visibleRateFactor(r, lm) {
+  const sum = (L) => {
+    let s = 0;
+    for (let m = -3; m <= 9; m++) s += Math.pow(r, m) * perceptionP(L - m);
+    return s;
+  };
+  const ref = sum(6.5);
+  if (!(ref > 0) || !Number.isFinite(lm)) return 0;
+  return Math.min(Math.max(sum(lm) / ref, 0), 2);
 }

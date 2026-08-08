@@ -713,7 +713,8 @@
         activeShowers,
         drawMagnitude,
         hourlyRate,
-        radiantAt
+        radiantAt,
+        visibleRateFactor
       } from './horizon/meteors.js';
       import {CSMShadowNode} from './horizon/CSMShadowNode.js';
 
@@ -6184,6 +6185,9 @@
         meteorPool.push({mesh, u: mo.u, active: false, t: 0, dur: 1});
       }
       let meteorsRecorded = false;
+      // The frame's Schaefer limiting magnitude for the meteor
+      // system (set in the render loop; spawn draws truncate at it).
+      let meteorLm = 6.5;
       window.__meteors = meteorPool; // harness introspection
 
       // Contrails: ambient cruise traffic whose trails exist ONLY
@@ -7061,7 +7065,7 @@
         const ax = mV1.copy(B).sub(w); // reuse mV1 (vr done)
         const cx = mV2.copy(w).add(B).multiplyScalar(0.5).normalize();
         const ay = mV3.copy(cx).cross(ax).normalize();
-        const m = drawMagnitude(s.r, 1 - Math.random());
+        const m = drawMagnitude(s.r, 1 - Math.random(), meteorLm);
         const p = meteorPool[slot];
         const wid = (m < 0 ? 3.5 : 2.2) * RAD * R;
         p.mesh.matrix.makeBasis(
@@ -10039,7 +10043,16 @@
         // (meteors.js). Poisson spawning; ?meteor=N forces N/h for
         // the offline harness.
         {
-          const mNight = nightSky * (1 - cloudy * 0.85) * lpVisBright;
+          // The observed rate now follows Koschack & Rendtel's
+          // printed perception machinery at the frame's Schaefer
+          // limiting magnitude (meteors.js visibleRateFactor):
+          // moonlight, twilight and city glow suppress the shower
+          // exactly as they suppress real counts - the ZHR's own
+          // lm = 6.5 standard sky gives factor 1, a full-moon sky
+          // ~0.13, daylight ~0. The hand nightSky x lpVisBright
+          // gate retires; clouds still occlude.
+          meteorLm = Math.min(limitingMagnitude(laCd), 8);
+          const mNight = 1 - cloudy * 0.85;
           let total = 0;
           const act = [];
           if (mNight > 0.05) {
@@ -10052,7 +10065,8 @@
                 state.lat,
                 state.lon
               );
-              const hr = hourlyRate(zhr, aa.alt);
+              const hr =
+                hourlyRate(zhr, aa.alt) * visibleRateFactor(s.r, meteorLm);
               if (hr > 0.3) {
                 total += hr;
                 act.push({s, rad, cum: total});

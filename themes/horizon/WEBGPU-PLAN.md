@@ -6075,6 +6075,31 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   population-rate frame (transients, documented scope).
   Twilight full-page smoke clean. VALIDATE PASS (all
   references + 7 GPU probes).
+- DONE (meteor perception, Aug 8 forty-eighth push - moonlight
+  suppresses the shower): the meteor system spawned against a
+  fixed lm = 6.5 no matter the sky, gated by the same hand
+  nightSky ramp the stars just retired. One paper read in full:
+  Koschack & Rendtel 1990 (WGN 18:2, 44, the ADS scan - the
+  SAME paper the zenith correction already cites). meteors.js
+  vendors their Table 4 (the MEASURED probability of perception
+  p(dm, R) from ~5000 double-count meteors; blank cells zero,
+  their own reading) and Table 6 (the standard field portions),
+  folds them through their Eq. 5 - and their printed Table 5
+  standard row RE-EMERGES EXACTLY (0.00482 / 0.0593 / 0.365 /
+  0.860). visibleRateFactor(r, lm) then folds the r^m magnitude
+  distribution (their Eq. 6) against the perception curve,
+  normalised at the ZHR definition's own 6.5 - and the textbook
+  r^(lm - 6.5) limiting-magnitude correction EMERGES from the
+  printed tables within 6% over lm 4.3-6.5, nothing fitted.
+  The theme drives it with the frame's Schaefer limiting
+  magnitude (last push): a full-moon sky keeps 13% of a
+  Perseid-class shower - the famous moonlit-shower suppression
+  - city glow thins rates by the measured atlas, twilight and
+    daylight kill them through the same law, and spawn draws
+    truncate at the live limit so no drawn streak is fainter
+    than the sky allows. The hand nightSky x lpVisBright meteor
+    gate retires; clouds still occlude. Perseid-night full-page
+    smoke clean. VALIDATE PASS (all references + 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
