@@ -7552,8 +7552,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   lobe LANDS ON THE SHIPPED CERTIFIED airyPattern within 7.3%
   over the inner half-lobe at x = 114 - the new exact code and
   the old certified law meet in their common regime. THE GLORY
-  EMERGES: at the fogbow's own printed 14 um droplet (Mazoyer
-  2019) the exact backscatter makes a first ring 2.1 deg from
+  EMERGES: at the fogbow's own printed 14 um droplet (Mazoyer 2019) the exact backscatter makes a first ring 2.1 deg from
   the antisolar point (green), red 2.7 OUTSIDE blue 1.8 (the
   ratios are lambda's), and doubling the droplet halves the
   ring - nothing about the glory is coded; it is what the
