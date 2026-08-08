@@ -7114,6 +7114,72 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   future pass could derive one from the printed backscatter
   and lidar ratios). validate.sh full PASS (108 CPU gates
   incl. the new 9-landmark psc gate, all 7 GPU probes).
+- DONE (Aug 8, the review session's 69th pass - STEVE from its
+  discovery primaries): the subauroral arc joins the sky on the
+  aurora's own live machinery. Two primaries read in full:
+  MacDonald et al. 2018 (Science Advances eaaq0030 - science.org
+  403s; the Europe PMC deposit PMC5851661 serves the full text
+  keylessly) prints the discovery geometry - arc just below
+  60 deg MLAT, SAID climatology 60.1 deg / 22:30 MLT /
+  half-width 0.57 deg, westward flow 5.5 km/s, emission mapped
+  at 170-230 km, proton aurora >= 2 deg poleward, premidnight,
+  "approximately an hour", green picket fence - and Chu et al.
+  2019 (arXiv:1906.08886, equation page machine-read) prints the
+  photometric chain: the Carlson O(1D) thermal excitation rate
+  alpha(Te) = 0.15 sqrt(Te)(8537+Te)/(34191+Te)^3 exp(-22756/Te)
+  anchored on Foster 1994's SAR arc (350 R at 3500-4000 K) gives
+  the event's 7600 K "red auroral emission of 7 to 17 kR which
+  is visible to the human eye". A derivation FINDING the gate
+  now holds: the printed 7-17 window IS the Foster Te span alone
+  through their own equation (350 x alpha(7600)/alpha(4000.. 3500) = 7.0-16.9 kR, both ends within 10%); the Ne depletion
+  (x0.65) is their separately stated caveat, NOT folded into the
+  printed window - first drafted WITH the Ne factor, the low end
+  landed at 4.6 kR and the print refuted the arithmetic.
+  steve.js carries the printed constants + the excitation rate,
+  the curvature-drop geometry (slab edges 45-54 deg tall from
+  the discovery belt, thin 3 deg band from gmLat 50, null past
+  range - fails closed), the printed 5.5 km/s flow as the
+  drawn angular drift at slant range (1.2 deg/s - the pickets
+  stream at the printed speed), the midnight-WRAPPING
+  premidnight window (first draft failed 00:12 local - the
+  [21, 24.5] test needs h>=21 OR h<=0.5, caught while writing
+  the landmark), and the printed ~1 h episode as a per-site-
+  night hashed onset (halo episode-node pattern; no printed
+  per-night rate is claimed; envelope integrates 55 min with
+  5-min cosine edges). steve-reference.mjs holds 12 landmarks
+  including the bracket re-derivation, Te dominance x30 vs Ne
+  x0.65, and the Crumey gate: 7 kR at 630 nm = 3.17e-4 cd/m^2 =
+  1.8x the natural dark sky - visible 1.00 dark, 0 in daylight,
+  the printed phrase through the printed threshold. The drawn
+  side rides shipped machinery end to end: createSteveMaterial
+  (sky-objects-tsl.js) is the aurora-curtain cylinder idiom with
+  the certified 630.0 + 557.7 CIE lines, the continuum share of
+  the mauve a documented display mixture (the primaries print
+  "exotic emissions" and decline to explain it); Horizon.html
+  gates the ribbon on the live aurora drive (enhanced-activity),
+  the window, the episode, steveSlabDeg(state.gmLat) and
+  extendedVisibility(7 kR, laCd) - moon/city/twilight kill it
+  exactly as the discovery photography does - with display level
+  DERIVED as mid-window 12 kR over the curtain ladder's 100 kR
+  full-scale (0.12, not hand-picked), magnetic-meridian
+  placement flipped equatorward for poleward visitors, and
+  ?steve=1|0 harness pins. Pinned A/B captures (rural Alberta
+  night, gmLat 58.9, look=13,50): the amplified diff shows the
+  mauve ribbon arcing the frame with grouped green pickets along
+  its lower edge; the only other deltas are +-1-count exposure-
+  loop couplings on stars/terrain (the adaptation responding to
+  added light - expected of every additive layer). Display
+  finding recorded in steve.js: at 1x the night pipeline's rod
+  fold mutes 630 nm exactly as Purkinje says - the ribbon reads
+  pale, matching naked-eye STEVE reports; the mauve is the
+  long-exposure camera's colour. CORRECTION to an earlier shelf
+  note: the gegenschein is NOT missing - zodiacal.js ships
+  Leinert Table 17 verbatim through the Delta-lambda = 180 row
+  (antisolar 230 S10, ~22.0 mag/as^2) and the dome draws it; the
+  shelf note came from a case-sensitive grep ("gegenschein" vs
+  the file's capitalized "Gegenschein"). Validation: full gate
+  green - 109 CPU references (steve registered after aurora) +
+  all 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

@@ -400,6 +400,76 @@ export function createAuroraMaterial() {
   return {material, u, setE0};
 }
 
+// STEVE: the thin mauve subauroral ribbon with its green picket
+// fence (steve.js - MacDonald et al. 2018 + Chu et al. 2019,
+// both read in full). The mesh is an open cylinder arc like the
+// aurora curtain; uv.x runs along the arc (magnetic east-west),
+// the local height spans the printed 170-230 km emission slab.
+// What the print gives: the 630.0 nm redline share of the colour
+// (the same CIE fit the curtain uses), the picket fence in the
+// aurora's own certified 557.7 nm green, and the streaming -
+// uDrift is the printed 5.5 km/s SAID flow at the observer's
+// slant range (steve.js steveDriftRadPerS), so the structures
+// visibly stream at the printed angular rate. What stays
+// documented display: the continuum share of the mauve (the
+// primaries print the spectrum as continuum-bearing "exotic
+// emissions" and leave it unexplained - a flat lift toward blue
+// makes the printed WORD "mauve" read), and the picket count and
+// duty cycle (no printed spacing in hand).
+export function createSteveMaterial() {
+  const u = {
+    amp: uniform(0), // Crumey-gated drive x episode envelope
+    time: uniform(0),
+    uDrift: uniform(0.02), // rad/s along the arc - printed flow at range
+    uPicket: uniform(1)
+  };
+  const C630 = wavelengthToLinearSRGB(630.0);
+  const C5577 = wavelengthToLinearSRGB(557.7);
+  // Redline + documented continuum lift = the mauve body.
+  const CONT = [0.5, 0.42, 1.15];
+  const mauve = C630.map((v, i) => v * 0.85 + CONT[i] * 0.5);
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = DoubleSide;
+  material.blending = AdditiveBlending;
+  const ARC = Math.PI / 1.3; // must match the theme's mesh
+  const ux = uv().x;
+  const uy = positionLocal.y.add(0.5); // unit-height cylinder, 0=bottom
+  // Streaming coordinate: arc angle minus the printed drift.
+  const ph = ux.mul(ARC).add(u.time.mul(u.uDrift));
+  // Gentle vertical undulation (the arc's kinks) and large-scale
+  // luminosity structure, both riding the printed drift.
+  const wob = sin(ph.mul(3.0))
+    .mul(0.06)
+    .add(sin(ph.mul(7.0).add(1.7)).mul(0.04));
+  const yc = uy.sub(0.55).add(wob).div(0.28);
+  const band = exp(yc.mul(yc).negate());
+  const body = band.mul(sin(ph.mul(2.0).add(0.7)).mul(0.15).add(0.85));
+  // The picket fence: short green columns hanging at the ribbon's
+  // lower edge, quasi-periodic, grouped, streaming with the flow.
+  const yp = uy.sub(0.16).div(0.11);
+  const py = exp(yp.mul(yp).negate());
+  const pk = smoothstep(
+    float(0.6),
+    float(0.82),
+    sin(ph.mul(88.0)).mul(0.5).add(0.5)
+  ).mul(
+    smoothstep(
+      float(0.3),
+      float(0.72),
+      sin(ph.mul(13.0).add(2.0)).mul(0.5).add(0.5)
+    )
+  );
+  const fence = py.mul(pk).mul(u.uPicket).mul(1.5);
+  const col = vec3(...mauve)
+    .mul(body)
+    .add(vec3(...C5577).mul(fence));
+  material.colorNode = col.mul(u.amp);
+  material.opacityNode = clamp(body.add(fence).mul(u.amp), 0.0, 1.0);
+  return {material, u};
+}
+
 // Nightglow dome (airglow.js): the PALACE line model's three
 // visible groups - the [OI] 557.7 nm green line (97 km), the
 // ionospheric [OI] red doublet (250 km) and Na D (92 km) - each

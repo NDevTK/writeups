@@ -198,7 +198,9 @@
         tide=M still pins the level outright), no2=0|N (clean-air
         pin / force the NO2 column in molec/cm² - the brown
         horizon), psc=T|0 (force the 50 hPa temperature in °C
-        for nacreous clouds / never draw them), soil=0 (pin
+        for nacreous clouds / never draw them), steve=1|0 (pin
+        the STEVE episode+activity for the harness / never draw
+        the subauroral ribbon), soil=0 (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
         (skip satellite irradiance), ghi=W (override it), debug=1,
@@ -347,6 +349,7 @@
       } from './horizon/adaptation.js';
       import {createAtmosphereTSL} from './horizon/atmosphere-tsl.js';
       import {
+        AURORA_KR_GREAT,
         AURORA_SR,
         curtainKR,
         curtainLuminance
@@ -397,6 +400,7 @@
         createContrailMaterial,
         createFlashMaterial,
         createNacreousMaterial,
+        createSteveMaterial,
         createRedSpriteMaterial,
         createMilkyWayMaterial,
         createNLCMaterial,
@@ -782,6 +786,19 @@
         T_ICE_K,
         WAVE_ICE_D_UM
       } from './horizon/psc.js';
+      import {
+        STEVE_KR,
+        STEVE_LAM_RED,
+        STEVE_SR,
+        eveningIndex,
+        inSteveWindow,
+        localSolarHours,
+        steveDriftRadPerS,
+        steveEnvelope,
+        steveOnsetHour,
+        steveSideSign,
+        steveSlabDeg
+      } from './horizon/steve.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
         activeShowers,
@@ -7293,6 +7310,37 @@
         pscPool.push({mesh, u: nm.u, f});
       }
       let pscSaid = false;
+
+      // STEVE: the thin mauve subauroral ribbon (steve.js -
+      // MacDonald 2018 discovery paper + Chu 2019 driver paper).
+      // Same open-cylinder idiom as the aurora curtain; unit
+      // height, scaled per frame to the printed 170-230 km slab's
+      // viewing angles at the visitor's geomagnetic latitude.
+      const steveObj = createSteveMaterial();
+      const steveU = steveObj.u;
+      const steveMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          750,
+          750,
+          1,
+          96,
+          1,
+          true,
+          Math.PI - Math.PI / 2.6,
+          Math.PI / 1.3
+        ),
+        steveObj.material
+      );
+      steveMesh.visible = false;
+      skyGroup.add(steveMesh);
+      let steveSaid = false;
+      // The printed LOWER bound through the SI rayleigh chain -
+      // the conservative end of "visible to the human eye".
+      const steveLumCd = lineLuminance(
+        STEVE_KR[0] * 1e3,
+        STEVE_LAM_RED,
+        cieY(STEVE_LAM_RED)
+      );
       const PSC_DISPLAY_K = 0.45; // display exposure of the sr^-1 LUT
       let liveES = null;
       const strikeOv = params.has('strike') ? +params.get('strike') : null;
@@ -11663,6 +11711,85 @@
         // west, hence the minus).
         aurora.rotation.y =
           (state.lat < 0 ? Math.PI : 0) - (state.magD ?? 0) * RAD;
+
+        // STEVE (steve.js - MacDonald 2018 + Chu 2019): the thin
+        // mauve subauroral ribbon draws when EVERY gate passes -
+        // the live aurora machinery says the oval is active
+        // ("during enhanced activity" - the same OVATION/Kp drive
+        // the curtain uses), the local clock sits in the printed
+        // premidnight window, the per-night hashed episode is on
+        // (printed ~1 h), the visitor's geomagnetic latitude puts
+        // the printed ~60 deg MLAT arc in the sky, and the
+        // printed 7 kR lower bound beats Crumey's threshold
+        // against the SAME adapted sky the stars use ("visible to
+        // the human eye" - moonlight, city glow and twilight kill
+        // it first, exactly like the discovery photography).
+        // Display level rides the curtain's own printed ladder:
+        // mid-window 12 kR over the great-aurora 100 kR
+        // full-scale. ?steve=1 pins episode+activity for the
+        // harness; ?steve=0 removes the layer.
+        {
+          const stOv = params.get('steve');
+          const slab = steveSlabDeg(state.gmLat);
+          let stAmp = 0;
+          if (stOv !== '0' && slab) {
+            const lh = localSolarHours(d.getTime(), state.lon);
+            const env =
+              stOv !== null
+                ? 1
+                : inSteveWindow(lh) && auroraDrive > 0.05
+                  ? steveEnvelope(
+                      lh,
+                      steveOnsetHour(
+                        eveningIndex(d.getTime(), state.lon),
+                        state.lat,
+                        state.lon
+                      )
+                    )
+                  : 0;
+            if (env > 0) {
+              stAmp =
+                env *
+                extendedVisibility(steveLumCd, laCd, STEVE_SR) *
+                (1 - cloudy * 0.9);
+            }
+          }
+          steveMesh.visible = stAmp > 1e-3;
+          if (steveMesh.visible) {
+            // The slab's viewing angles -> cylinder-wall heights,
+            // capped at the curtain's own 1.1 rad elevation (the
+            // tan blowup guard; an overhead ribbon is beyond the
+            // cylinder idiom, drawn as a high arc).
+            const CAP = 1.1;
+            const yLo = Math.tan(Math.min(slab.lo * RAD, CAP - 0.05)) * 750;
+            const yHi = Math.tan(Math.min(slab.hi * RAD, CAP)) * 750;
+            steveMesh.scale.y = Math.max(yHi - yLo, 8);
+            steveMesh.position.y = (yHi + yLo) / 2;
+            // Magnetic-meridian placement like the curtain, flipped
+            // to the equator side for visitors poleward of the arc.
+            steveMesh.rotation.y =
+              (state.lat < 0 ? Math.PI : 0) -
+              (state.magD ?? 0) * RAD +
+              (steveSideSign(state.gmLat) > 0 ? 0 : Math.PI);
+            steveU.amp.value =
+              stAmp * ((STEVE_KR[0] + STEVE_KR[1]) / 2 / AURORA_KR_GREAT);
+            steveU.time.value = t / 1000;
+            steveU.uDrift.value = steveDriftRadPerS(state.gmLat);
+            if (!steveSaid) {
+              steveSaid = true;
+              record(
+                'STEVE (subauroral arc)',
+                'gmLat ' +
+                  (state.gmLat ?? 0).toFixed(1) +
+                  '° → ribbon ' +
+                  slab.lo.toFixed(0) +
+                  '-' +
+                  slab.hi.toFixed(0) +
+                  '° up · printed 7-17 kR redline + 557.7 picket fence'
+              );
+            }
+          }
+        }
 
         // Three cloud layers from the model's real per-layer covers.
         // A fresh nearby METAR outranks the model where it can see:
