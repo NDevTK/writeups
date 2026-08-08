@@ -30,9 +30,11 @@
  *    earthshine.js - the third body lit by reflection in this
  *    theme, one phase law for all of them. m_std is the
  *    magnitude at 1000 km and half phase; intrinsic values are
- *    not distributed with GP data, so the fleet uses the
- *    naked-eye class default 4.0 (documented display choice -
- *    the GEOMETRY of every pass is exact).
+ *    not distributed with GP data, so the fleet reads them from
+ *    the MEASURED catalogue (satmags.js - the McCants/MMT-9
+ *    lineage at this exact convention anchor), and only ids
+ *    absent from the catalogue fall back to the naked-eye class
+ *    default 4.0 (the catalogue median of the fleet is 3.5).
  */
 
 import {lambertPhase} from './earthshine.js';

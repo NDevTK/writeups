@@ -6362,6 +6362,50 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   chain (CCI spectral first, chl-Morel NRT second - the chain
   already documents the seam). The IBC I-III rungs stay locked
   (WEKO3 shell, Gao closed).
+- DONE (satellite standard magnitudes, Aug 8 fifty-sixth push -
+  every satellite gets its own brightness and earns its twilight):
+  the fleet drew all ~150 CelesTrak visual-group satellites at one
+  flat naked-eye default (m_std 4.0) and cut them at a hand 4.6.
+  Both retire. THE CATALOGUE: the Stellarium project's
+  satellites.dat (GPL data, fetched keyless from the repo raw;
+  gzip inflated by the browser's own DecompressionStream), whose
+  header prints its provenance - Mike McCants' magnitude files,
+  the MMT-9 automated photometric observatory, CelesTrak RCS -
+  16,346 standard magnitudes covering 138 of today's 157
+  visual-group ids (88 percent). The lineage was audited both
+  ways before trusting it: on the 126 ids shared with the
+  community's archived 2014 qs.mag mirror, every value agrees
+  within 0.5 mag, median difference 0.00 - one catalogue carried
+  forward, extended by observatory photometry (Tianhe 1.87,
+  recent CZ bodies). THE CONVENTION, printed: McCants' own file
+  description (quoted verbatim in the GPL plugin source) - mag =
+  stdmag - 15.75 + 2.5 log10(range^2/fracil) - anchors stdmag at
+  1000 km, HALF illuminated (-15.75 + 2.5 log10(1e6/0.5) =
+  +0.003), which is EXACTLY where sats.js's Lambert-sphere law
+  normalises, so catalogue values plug into satMagnitude()
+  unchanged; the 1000-km standard system is the one the open
+  photometric literature prints (Mallama 2021, arXiv:2111.09735,
+  read in full - his MMT-9-derived OneWeb 7.18 +/- 0.03 and
+  VisorSat 7.21 are the same observatory-and-convention chain,
+  and 7.21 is verbatim what the plugin source carries for
+  Starlink, closing paper-to-catalogue). WIRED: satmags.js
+  vendors the 138-id visual-group snapshot (2026-08-08, offline
+  floor) and live-refreshes from the maintained file;
+  syncFleet() entries carry their NORAD id; the draw loop reads
+  each satellite's own m_std (absent ids keep the 4.0 default -
+  now a documented FALLBACK, half a magnitude dim of the
+  catalogue median 3.5); and the hand 4.6 cutoff is now the
+  frame's live Schaefer limiting magnitude - the same printed
+  threshold the stars obey since the forty-ninth push, so
+  satellites emerge as twilight deepens and drown under
+  moonlight and city glow exactly as real passes do. LANDMARKS
+  (satmags-reference, gated): the parser on the documented
+  format; the ISS -2.5 / Hubble 1.5 / Envisat 3.0 anchors
+  (Hubble and Envisat identical across twelve years of the
+  lineage); the convention anchor exact to 1e-12 across all 138
+  vendored values; the retired default in context (median 3.5,
+  spread -2.5..7.5); the ISS overhead at -4.4 - the Venus-class
+  pass of observing lore - against a default-class body at +2.1.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

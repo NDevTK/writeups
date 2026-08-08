@@ -484,6 +484,11 @@
       import {BETA_MIN_DEG, seasonEnvelope} from './horizon/nlc.js';
       import {parseTLEs, satMagnitude, sunlitEci} from './horizon/sats.js';
       import {
+        parseSatMags,
+        SATMAG_URL,
+        snapshotMap
+      } from './horizon/satmags.js';
+      import {
         lunarEclipse,
         moonAngularRadiusRad,
         solarEclipse,
@@ -7646,6 +7651,33 @@
         params.get('tles') ??
         'https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=tle';
       let satFleet = [];
+      // Per-satellite standard magnitudes (satmags.js): the vendored
+      // visual-group snapshot serves immediately; the live
+      // Stellarium catalogue (gzip - the browser's own
+      // DecompressionStream inflates it) overrides when it lands,
+      // covering visual-group drift. Ids in neither keep the 4.0
+      // default inside satMagnitude.
+      let satMags = snapshotMap();
+      async function syncSatMags() {
+        if (typeof DecompressionStream === 'undefined') return;
+        try {
+          const r = await fetch(SATMAG_URL, {credentials: 'omit'});
+          if (!r.ok) return;
+          const text = await new Response(
+            r.body.pipeThrough(new DecompressionStream('gzip'))
+          ).text();
+          const live = parseSatMags(text);
+          if (!live.size) return;
+          satMags = live;
+          record(
+            'McCants/MMT-9 standard magnitudes',
+            live.size +
+              ' catalogued satellites (Stellarium satellites.dat, live)'
+          );
+        } catch {
+          /* snapshot serves */
+        }
+      }
       async function syncFleet() {
         try {
           const text = await (
@@ -7655,6 +7687,7 @@
           if (!sets.length || !window.satellite) return;
           satFleet = sets.map((s) => ({
             name: s.name,
+            norad: s.norad,
             satrec: satellite.twoline2satrec(s.l1, s.l2),
             r: null,
             v: null,
@@ -12043,6 +12076,7 @@
         {
           let dotI = 0;
           if (satFleet.length && window.satellite && sun.alt < -0.05) {
+            const satLm = limitingMagnitude(laCd);
             const sEq2 = sunEquatorial(d);
             const sHat = {
               x: Math.cos(sEq2.dec) * Math.cos(sEq2.ra),
@@ -12097,8 +12131,14 @@
                   1
                 )
               );
-              const m = satMagnitude(lk.rangeSat, beta);
-              if (m > 4.6) continue; // below the naked eye
+              // Catalogue standard magnitude for THIS satellite
+              // (satmags.js); the cutoff is the frame's live
+              // Schaefer limiting magnitude - the same printed
+              // threshold the stars obey, so satellites emerge as
+              // twilight deepens and vanish under moonlight and
+              // city glow exactly as real passes do.
+              const m = satMagnitude(lk.rangeSat, beta, satMags.get(f.norad));
+              if (m > satLm) continue;
               const dot = satDots[dotI++];
               dot.visible = true;
               dot.position.copy(skyPoint(lk.elevation, lk.azimuth, 820));
@@ -12487,6 +12527,7 @@
         syncISS();
         setInterval(syncISS, 6 * 60 * 60 * 1000);
         syncFleet();
+        syncSatMags();
         setInterval(syncFleet, 6 * 60 * 60 * 1000);
         if (params.get('dem') !== '0') {
           try {
