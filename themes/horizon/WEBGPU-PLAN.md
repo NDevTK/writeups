@@ -6590,6 +6590,37 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   MATH to print, but only captures hold the PIXELS to the math -
   the two bugs stacked so that each hid the other, and no CPU
   gate could see either.
+- DONE (the mutation audit acquits the pattern, Aug 8
+  sixty-first push - a verdict, no code): the sixtieth push's
+  texture bug raised an alarming generalisation - the theme
+  mutates DataTextures at runtime in a dozen places (the sundog
+  LUT re-lays every 0.2 deg of sun travel, the parhelic circle
+  with it, the transmittance and sunspot rows on their feeds,
+  the corona radii, the bow's rain re-lay, the moon face and
+  umbra on their async loads, the live radar frames, the ocean
+  spectrum on every wind change) and every atmosphere-side one
+  is a height-1 row like the aurora LUT that died. If runtime
+  mutation zeroed them all, half the theme's live behaviour was
+  silently broken. THE CONTROLLED EXPERIMENT SAYS NO: a
+  shape-matrix probe on the live page (bind a texture in a
+  material, render, mutate its data + needsUpdate, render again)
+  measured float32 64x64 (69.3 -> 68.5), float32 256x1 (68.1 ->
+  68.0) and uint8 256x1 (67.9 -> 67.8) - every mutation
+  re-uploads and keeps rendering. The generalised rewrite is
+  NOT justified; the healthy call sites stay as they are. What
+  remains true and fixed: the aurora curtain is pixel-verified
+  green after the sixtieth push's pair of fixes, and the
+  fresh-texture swap it now uses is harmless-at-worst. What
+  remains UNRESOLVED and recorded: in the sixtieth session's
+  ladder, a fresh material binding the REAL page's aurora LUT -
+  after its real mid-loop rebuild - read the texture as empty,
+  while the same probe pattern today reads mutated textures
+  fine; the difference (64-wide row? update ordering inside the
+  page's own frame task? a one-off backend state?) was not run
+  to ground, and the aurora no longer depends on it. Environment
+  note for future sessions: the :8901 static server died twice
+  this window (container worker restarts) - a probe that cannot
+  even navigate is reporting the server, not the page.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
