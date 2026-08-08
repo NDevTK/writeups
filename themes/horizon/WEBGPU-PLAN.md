@@ -7317,6 +7317,25 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   triplet was 2 h old - evening, sun down - and latestFresh
   correctly handed back to the model. Full gate green - 110 CPU
   references + 7 GPU probes.
+- DONE (Aug 8, the review session's 73rd pass - the aeronet
+  deploy ships): the 72nd pass's daemon endpoint never reached
+  api.ndev.tk - install.sh's ship list lacked aeronet.js, and
+  the box's own drift guard did exactly what it was built for:
+  caught the unrewritten '../../aeronet.js' import in the staged
+  entry point, discarded it, and kept the previous deploy
+  running (probed live: /health healthy on the 71st-pass build,
+  /aeronet 404, the update timer retrying every 5 min). Fix:
+  aeronet.js joins the ship list and the sed rewrite (the watch
+  list derives from the ship list, so it self-updates). Proven
+  before pushing by replaying install.sh's staging into a
+  scratch flat deploy: zero unrewritten imports, the daemon
+  boots and stays alive, and the LOCAL /aeronet endpoint served
+  the real upstream end to end - GSFC answered a triplet 30 min
+  old (fresher than the gate's fixture: the station had
+  measured again), mid-Pacific answered obs:null (fails
+  closed), and the second hit came from cache in 1.4 ms.
+  Deploy = push to main; the box gates the full CPU suite
+  itself before installing.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
