@@ -62,6 +62,12 @@ import {normalizeMetars} from '../../metar.js';
 import {parseHmsKml, smokeAt} from '../../smoke.js';
 import {parseGrib2, gridValue} from '../../grib2.js';
 import {aerosolProducts} from '../../aerosol.js';
+import {
+  latestFresh,
+  nearestAeronetSite,
+  parseAeronetSites,
+  parseAeronetV3
+} from '../../aeronet.js';
 import {ozoneCensus} from '../../ozone.js';
 import {
   ndviCell,
@@ -958,6 +964,8 @@ function main() {
   let tlesCache = {t: 0, body: null}; // CelesTrak visual group
   const adsbCache = new Map(); // area key -> {t, body, src}
   const metarCache = new Map(); // area key -> {t, body}
+  const aeronetCache = new Map(); // site name -> {t, body}
+  let aeronetSites = {t: 0, sites: []}; // the station list, daily
   const aerosolCache = new Map(); // 0.25-deg cell key -> {t, body}
   const ozoneCache = new Map(); // 0.25-deg cell key -> {t, body}
   const chlorCache = new Map(); // 1/12-deg cell key -> {t, body}
@@ -1654,6 +1662,84 @@ function main() {
         'cache-control': 'public, max-age=900',
         'x-aerosol-source': 'NOMADS GEFS-Aerosols (GOCART)'
       });
+    }
+
+    if (url.pathname === '/aeronet') {
+      // The nearest AERONET station's latest direct-sun AOD
+      // (Giles et al. 2019 V3, Level 1.5 near-real-time; the
+      // web service sends no CORS header so the daemon proxies,
+      // the METAR pattern). Station list cached a day; per-site
+      // observations 15 min (the printed triplet cadence is
+      // 3 min - one upstream request serves many viewers).
+      // Normalisation is the gated aeronet.js; the freshness
+      // and radius decisions stay with the CLIENT (it knows its
+      // scene clock) - the daemon serves the newest same-day
+      // rows verbatim-parsed.
+      try {
+        if (Date.now() - aeronetSites.t > 24 * 3600e3) {
+          const r = await fetch(
+            'https://aeronet.gsfc.nasa.gov/aeronet_locations_v3.txt',
+            {signal: AbortSignal.timeout(FETCH_MS), headers: {'user-agent': UA}}
+          );
+          if (r.ok) {
+            const sites = parseAeronetSites(await r.text());
+            if (sites.length > 100) aeronetSites = {t: Date.now(), sites};
+          }
+        }
+        const site = nearestAeronetSite(aeronetSites.sites, lat, lon);
+        if (!site) return json(200, {obs: null, site: null});
+        const hit = aeronetCache.get(site.name);
+        if (hit && Date.now() - hit.t < 15 * 60e3) {
+          return json(
+            200,
+            {...hit.body, site},
+            {
+              'cache-control': 'public, max-age=300',
+              'x-aeronet-source': 'aeronet.gsfc.nasa.gov (cached)'
+            }
+          );
+        }
+        const now = new Date();
+        const y = new Date(now.getTime() - 86400e3);
+        const u =
+          'https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=' +
+          encodeURIComponent(site.name) +
+          '&year=' +
+          y.getUTCFullYear() +
+          '&month=' +
+          (y.getUTCMonth() + 1) +
+          '&day=' +
+          y.getUTCDate() +
+          '&year2=' +
+          now.getUTCFullYear() +
+          '&month2=' +
+          (now.getUTCMonth() + 1) +
+          '&day2=' +
+          now.getUTCDate() +
+          '&AOD15=1&AVG=10&if_no_html=1';
+        const r = await fetch(u, {
+          signal: AbortSignal.timeout(FETCH_MS),
+          headers: {'user-agent': UA}
+        });
+        if (!r.ok) throw new Error(r.status);
+        const rows = parseAeronetV3(await r.text());
+        // Newest few rows only - the client applies its own
+        // freshness window against its scene clock.
+        const tail = rows.slice(-4);
+        const obs = tail.length ? tail[tail.length - 1] : null;
+        const body = {obs, recent: tail};
+        aeronetCache.set(site.name, {t: Date.now(), body});
+        return json(
+          200,
+          {...body, site},
+          {
+            'cache-control': 'public, max-age=300',
+            'x-aeronet-source': 'aeronet.gsfc.nasa.gov'
+          }
+        );
+      } catch {
+        return json(502, {obs: null, site: null, upstream: 'unavailable'});
+      }
     }
 
     if (url.pathname === '/ozone') {

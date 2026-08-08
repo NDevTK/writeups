@@ -7268,6 +7268,55 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   restart had killed the :8901 fixture server; all-probe FAIL
   with every CPU gate green is the server-down signature -
   restart from the repo root and re-run).
+- DONE (Aug 8, the review session's 72nd pass - AERONET:
+  measured Sun photometry outranks the aerosol model): a new
+  keyless feed on the METAR/tide pattern - where a photometer
+  actually looked, the measurement replaces the model. The
+  primary: Giles et al. 2019 (AMT 12, 169 - the Version 3
+  algorithm paper, open access, READ IN FULL). Printed and
+  carried in the new aeronet.js: direct-Sun AOD as "the ground
+  truth in the measurement of AOD"; the standard wavelengths
+  340/380/440/500/675/870/1020/1640 nm; triplets every 3 min;
+  V3 Level 1.5 = near-real-time AUTOMATIC cloud screening and
+  anomaly QC with printed NRT uncertainty +0.02 bias / 0.02
+  one-sigma (field instruments 0.01-0.02); the printed QC fences
+  (triplet-variability screen, the physical Angstrom-exponent
+  window [-1, 3], smoothness); and Eq. (3)'s gas subtraction
+  whose NO2 term uses the Burrows 1998 coefficients - the same
+  laboratory dataset the theme's no2 gate vendors: the feed's
+  own correction and the drawn absorber share a printed source.
+  The feed: print_web_data_v3 (keyless, ~1700-station
+  aeronet_locations_v3 list) - NOT CORS-open, so it rides the
+  horizon-live daemon like METAR/ADS-B: new /aeronet endpoint
+  (station list cached daily, per-site rows 15 min, generic
+  errors), serving the newest verbatim-parsed rows; freshness
+  and radius stay CLIENT decisions. aeronet.js: header-driven
+  CSV parse keyed by each instrument's EXACT filter wavelengths
+  (-999 dropped), latestFresh with the printed AE fence,
+  Eck-1999 log-log regression, nearest-site haversine inside a
+  documented 75 km representativity radius, 90-min freshness
+  window (= 30 printed triplet periods), and the channel bridge
+  is aerosol.js's own angstromTau - ONE wavelength bridge for
+  the model bands and the measured ones. The gate
+  (aeronet-reference.mjs, 7 landmarks, registered after aerosol)
+  runs on a VENDORED REAL response (GSFC Level 1.5, fetched
+  2026-08-08, the newest row 25 min old at fetch): the served
+  Angstrom-exponent columns RE-DERIVE from the same row's AODs
+  to 5e-6 (1.798550 vs served 1.798548; 1.772734 vs 1.772729) -
+  the file is read exactly the way the print defines it; 550 nm
+  lands between the measured 500/675 neighbours; the row's own
+  O3/NO2 Dobson columns ride along; freshness/AE/radius all fail
+  closed. Client: syncAerosol now asks /aeronet after the GEFS
+  census and swaps ONLY set.tau to the measured channels (SSA,
+  asymmetry, species split stay with the model - direct sun
+  measures extinction, documented split), with a record line
+  carrying site, distance and the printed L1.5 +-0.02;
+  aeronet=URL|0 params. Live end-to-end proof both ways: GSFC
+  mid-afternoon served fresh (AOD440 0.321, AE 1.80); Lille at
+  18:40 UT resolved to its station at 6.1 km but the newest
+  triplet was 2 h old - evening, sun down - and latestFresh
+  correctly handed back to the model. Full gate green - 110 CPU
+  references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

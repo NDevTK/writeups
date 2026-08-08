@@ -88,6 +88,14 @@ are gated by `../server-reference.mjs` — the `server` set in
   by the gated `aerosol.js`; per-cell answers cached 45 min
   (3-hourly product), failures 5 min, cycle fallback when the
   newest run is not yet published.
+- `GET /aeronet?lat&lon` — the nearest AERONET station's latest
+  direct-sun AOD (Giles et al. 2019 Version 3, Level 1.5
+  near-real-time; the web service sends no CORS header). Station
+  list refreshed daily, per-site observations cached 15 min,
+  rows normalized by the gated `aeronet.js`; the client applies
+  its own freshness window and representativity radius —
+  measured Sun photometry outranks the aerosol model where a
+  photometer actually looked.
 - `GET /solarwind` — the aurora's measured driver: DSCOVR/ACE
   solar wind at L1, already propagated to the bow shock by SWPC
   (the `propagated_time_tag` is a real physical lead time of tens

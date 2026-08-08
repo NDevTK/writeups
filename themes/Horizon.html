@@ -200,7 +200,9 @@
         horizon), psc=T|0 (force the 50 hPa temperature in °C
         for nacreous clouds / never draw them), steve=1|0 (pin
         the STEVE episode+activity for the harness / never draw
-        the subauroral ribbon), soil=0 (pin
+        the subauroral ribbon), aeronet=URL|0 (daemon endpoint
+        override for the measured-AOD station feed / skip the
+        measured override, model only), soil=0 (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
         (skip satellite irradiance), ghi=W (override it), debug=1,
@@ -582,6 +584,11 @@
         TAU_MAX,
         TAU_MIN
       } from './horizon/aerosol.js';
+      import {
+        AERONET_MAX_KM,
+        aeronetChannelTau,
+        latestFresh
+      } from './horizon/aeronet.js';
       import {aureoleSet} from './horizon/aureole.js';
       import {
         bishopAmpOf,
@@ -4061,6 +4068,12 @@
       // extinction, measured albedo and measured phase asymmetry.
       const AEROSOL_PROXY =
         params.get('aerosol') ?? 'https://api.ndev.tk/aerosol';
+      // The AERONET endpoint rides the same daemon origin
+      // (?aeronet= overrides for the harness; aeronet=0 skips
+      // the measured override entirely).
+      const AERONET_PROXY =
+        params.get('aeronet') ??
+        AEROSOL_PROXY.replace(/\/aerosol$/, '/aeronet');
       async function syncAerosol() {
         // Weather pins silence the live fetch (pinned scenes stay
         // deterministic) - but an EXPLICIT ?aerosol= endpoint is a
@@ -4081,6 +4094,60 @@
           ).json();
           if (!r.products) return;
           const set = channelSet(r.products);
+          // MEASURED direct-sun AOD outranks the model where a
+          // photometer actually looked (aeronet.js, gated -
+          // Giles 2019 V3 Level 1.5): the nearest station's
+          // fresh triplet replaces the per-channel extinction
+          // tau; SSA, asymmetry and the species split stay with
+          // the model (direct sun measures extinction only -
+          // documented). No station, no fresh daylight triplet,
+          // AE outside the printed window -> the model continues
+          // untouched. Same pattern as METAR over the cloud
+          // model and NOAA gauges over the tide model.
+          try {
+            const an = await (
+              await fetch(
+                AERONET_PROXY +
+                  '?lat=' +
+                  state.lat.toFixed(3) +
+                  '&lon=' +
+                  state.lon.toFixed(3),
+                {credentials: 'omit'}
+              )
+            ).json();
+            const obs =
+              an && an.site && an.site.distKm <= AERONET_MAX_KM
+                ? latestFresh(an.recent || (an.obs ? [an.obs] : []), Date.now())
+                : null;
+            const chTau = obs ? aeronetChannelTau(obs) : null;
+            if (chTau && chTau.every((v) => Number.isFinite(v) && v >= 0)) {
+              set.tau = chTau.map((v) => Math.max(v, 1e-4));
+              state.aeronet = {
+                site: an.site.name,
+                distKm: an.site.distKm,
+                at: obs.tUtcMs,
+                ae: obs.ae440_870
+              };
+              record(
+                'AERONET ' + an.site.name + ' (measured Sun)',
+                'AOD 440/550/680 ' +
+                  chTau[2].toFixed(3) +
+                  '/' +
+                  chTau[1].toFixed(3) +
+                  '/' +
+                  chTau[0].toFixed(3) +
+                  ' · AE ' +
+                  (obs.ae440_870 ?? 0).toFixed(2) +
+                  ' · ' +
+                  an.site.distKm.toFixed(0) +
+                  ' km · L1.5 ±0.02'
+              );
+            } else {
+              state.aeronet = null;
+            }
+          } catch {
+            state.aeronet = null;
+          }
           // The delta similarity set (aureole.js, gated): the
           // coarse-mode diffraction spike from the measured
           // dust/sea-salt split through the printed GADS/OPAC
