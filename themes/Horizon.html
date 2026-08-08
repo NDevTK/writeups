@@ -205,7 +205,9 @@
         measured override, model only), pillars=1|0 (pin the
         METAR ice-crystal report for the harness / never draw
         light pillars), fogbow=V|0 (pin fog at visibility V
-        metres for the harness / never draw the fogbow), soil=0
+        metres for the harness / never draw the fogbow),
+        gwaves=A|0 (pin the airglow banding amplitude for the
+        harness / remove the banding), soil=0
         (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
@@ -815,6 +817,13 @@
         fogReported,
         fogSigH
       } from './horizon/fogbow.js';
+      import {
+        GW_LAMBDA_MED_KM,
+        GW_SPEED_MED_MS,
+        gwNight,
+        gwNightIndex,
+        gwUniforms
+      } from './horizon/gwaves.js';
       // (PILLAR_SIGMA_ALT already arrives from halos.js for the
       // sun pillar - lightpillars.js re-exports the same binding.)
       import {
@@ -8320,6 +8329,7 @@
       // live in the frame loop's optics block as they always did.
       let bowLutR = null;
       let fogbowSaid = false;
+      let gwSaid = false;
       function refreshBowLUT(rMeas, fogAMm = null) {
         // fogAMm swaps the drop to the printed fog droplet
         // (fogbow.js) - keyed so fog/rain flips re-lay exactly
@@ -10748,6 +10758,46 @@
           ) *
           (1 - cloudy * 0.85);
         airglowU.uTzen.value.fromArray(sunTransmittanceJS(1, mieRad));
+        // Gravity-wave banding on the green line (gwaves.js):
+        // the night's hashed train inside the printed Bohyun
+        // IQRs at the printed Kototabang amplitude, drifting at
+        // the printed phase speed, riding the dome's own Crumey
+        // gate. ?gwaves=0 removes it; ?gwaves=A pins the
+        // amplitude for the harness.
+        {
+          const gwOv = params.get('gwaves');
+          if (gwOv === '0') airglowU.uGwAmp.value = 0;
+          else {
+            const gwDraw = gwNight(
+              gwNightIndex(d.getTime(), state.lon),
+              state.lat,
+              state.lon
+            );
+            const gu = gwUniforms(gwDraw);
+            airglowU.uGwAmp.value = gwOv !== null ? +gwOv : gu.amp;
+            airglowU.uGwKx.value = gu.kx;
+            airglowU.uGwKz.value = gu.kz;
+            airglowU.uGwPh.value =
+              (gu.omega * (d.getTime() / 1000)) % (2 * Math.PI);
+            if (!gwSaid && airglowU.night.value > 0.02) {
+              gwSaid = true;
+              record(
+                'airglow gravity waves (imaged statistics)',
+                'λ ' +
+                  (gwDraw.lambdaM / 1000).toFixed(1) +
+                  ' km · ' +
+                  gwDraw.speedMs.toFixed(0) +
+                  ' m/s · amp ' +
+                  (airglowU.uGwAmp.value * 100).toFixed(1) +
+                  '% · medians ' +
+                  GW_LAMBDA_MED_KM +
+                  ' km / ' +
+                  GW_SPEED_MED_MS +
+                  ' m/s'
+              );
+            }
+          }
+        }
         // Zodiacal light: anchored to the sun's ecliptic longitude,
         // scaled by the Earth's REAL heliocentric distance (r^-2.3,
         // ephemeris when the engine is loaded) and the Masana

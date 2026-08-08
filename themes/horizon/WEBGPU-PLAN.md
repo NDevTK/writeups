@@ -7429,6 +7429,55 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   (invisible at 1x - recorded as a known display subtlety, a
   future shader window-feather if it ever matters). Full gate
   green - 112 CPU references + 7 GPU probes.
+- DONE (Aug 8, the review session's 76th pass - airglow
+  gravity-wave banding; the elve hunt closed negative a third
+  time). THE HUNT FIRST: the elve stays undrawn for want of an
+  open printed brightness. This round read Perez-Invernon et
+  al.'s spectroscopic-diagnostic paper (arXiv:1911.01219) and
+  their halo/elve emission model (arXiv:1901.07197) in search of
+  a rayleigh-frame number - both work in spacecraft photon
+  counts and reduced-field diagnostics, not surface brightness;
+  Europe PMC full-text sweeps ("elve"+"kR", ISUAL+brightness)
+  return nothing open; the ISUAL/GRL photometry (Kuo,
+  Barrington-Leigh, Fukunishi) has no open deposit; Mini-EUSO
+  measures at UV 337 nm (not an eye-visible band). Geometry is
+  printed everywhere (ring at ~88 km, halos 75-85 km disks
+  > 100 km, < 10 ms) but the Blondel-Rey/Crumey chain cannot be
+  > run without a brightness - the elve stays shelved with THREE
+  > documented dead ends, awaiting an open kR print. THE PASS:
+  > gravity-wave banding on the nightglow - the striped structure
+  > every all-sky imager records, now on the theme's own green
+  > line. Primaries, both Annales Geophysicae, both open, both
+  > read: Hwang et al. 2022 (ANGEO 40, 247 - THREE YEARS of OI
+  > 557.7 nm all-sky imaging at Mt. Bohyun, the very line and
+  > ~96 km layer the dome draws: 150 events in 144 clear nights;
+  > IQRs wavelength 20.5-35.5 km / median 27.8, speed
+  > 27.4-45.0 m/s / median 36.3, period 10.8-13.7 min / median
+  > 11.7) and Suzuki et al. 2009 (ANGEO 27, 1625 - 702 OH events
+  > at Kototabang; printed detection floor 0.5% and "intensity
+  > amplitudes were less than 3%" - the amplitude window).
+  > gwaves.js carries the statistics verbatim and hashes ONE
+  > dominant wave train per site-night inside the printed windows
+  > (the halo episode-node pattern; noon-anchored seed so a night
+  > never flips at midnight); the gate's centrepiece is INTERNAL
+  > CONSISTENCY - the printed medians' own implied period
+  > (27.8 km / 36.3 m/s = 12.8 min) sits inside the printed
+  > period IQR: three independently printed distributions agree.
+  > The dome material modulates the GREEN line only (the imaged
+  > line; the 250 km red doublet and Na D stay clean) as
+  > 1 + a sin(k.h - omega t) with h the view ray's horizontal
+  > position AT the printed 96 km layer - bands compress toward
+  > the horizon by pure perspective exactly as all-sky images
+  > show - drifting at the printed phase speed, with a 0.05
+  > direction-cosine floor as the grazing guard (imagers unwarp
+  > only to ~60 deg themselves). 5-landmark gate registered after
+  > airglow; ?gwaves=A|0 pins. Pinned A/B (rural dark night,
+  > amplitude at the printed 3% max, x40-amplified instrument):
+  > parallel wave fronts cross the dome, widening at the zenith
+  > and compressing to the horizon - the classic banding
+  > morphology - while the 1x display stays the whisper the real
+  > phenomenon is (mean ~0.02 counts). Full gate green - 113 CPU
+  > references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

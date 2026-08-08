@@ -487,7 +487,16 @@ export function createAirglowMaterial() {
     // lineStrengths(srf): luminance-weighted, green = 1 at 100 sfu.
     uLineI: uniform(new Vector3(1, 0.221, 0.164)),
     // Hillaire zenith transmittance (sunTransmittanceJS(1, mie)).
-    uTzen: uniform(new Vector3(0.94, 0.87, 0.72))
+    uTzen: uniform(new Vector3(0.94, 0.87, 0.72)),
+    // Gravity-wave banding on the GREEN line (gwaves.js - the
+    // imaged 557.7 statistics): wave vector (rad/m over the
+    // layer's horizontal plane, scene frame), phase (advanced
+    // CPU-side at the printed speed) and the printed few-percent
+    // amplitude. Zero amp = the dome exactly as before.
+    uGwAmp: uniform(0),
+    uGwKx: uniform(0),
+    uGwKz: uniform(0),
+    uGwPh: uniform(0)
   };
   const C = LINES.map((l) => wavelengthToLinearSRGB(l.lam));
   const material = new NodeMaterial();
@@ -495,7 +504,8 @@ export function createAirglowMaterial() {
   material.depthWrite = false;
   material.side = BackSide;
   material.blending = AdditiveBlending;
-  const cosZ = clamp(normalize(positionWorld.sub(cameraPosition)).y, 0.0, 1.0);
+  const dirW = normalize(positionWorld.sub(cameraPosition));
+  const cosZ = clamp(dirW.y, 0.0, 1.0);
   const s2 = float(1).sub(cosZ.mul(cosZ));
   const vr = (hKm) => {
     const q = R_EARTH / (R_EARTH + hKm * 1e3);
@@ -503,8 +513,25 @@ export function createAirglowMaterial() {
   };
   const X = float(1).div(cosZ.add(exp(cosZ.mul(-11)).mul(0.025)));
   const T = pow(vec3(u.uTzen), X);
+  // The ray's horizontal position AT the green layer: bands
+  // compress toward the horizon by pure perspective (what every
+  // all-sky image shows); the 0.05 floor freezes them in the
+  // last grazing degrees instead of aliasing (imagers unwarp
+  // only to ~60 deg zenith angle themselves - documented guard).
+  const hScale = float(LINES[0].hKm * 1000).div(max(dirW.y, 0.05));
+  const gw = float(1).add(
+    u.uGwAmp.mul(
+      sin(
+        dirW.x
+          .mul(hScale)
+          .mul(u.uGwKx)
+          .add(dirW.z.mul(hScale).mul(u.uGwKz))
+          .sub(u.uGwPh)
+      )
+    )
+  );
   const col = vec3(...C[0])
-    .mul(u.uLineI.x.mul(vr(LINES[0].hKm)))
+    .mul(u.uLineI.x.mul(vr(LINES[0].hKm)).mul(gw))
     .add(vec3(...C[1]).mul(u.uLineI.y.mul(vr(LINES[1].hKm))))
     .add(vec3(...C[2]).mul(u.uLineI.z.mul(vr(LINES[2].hKm))))
     .mul(T)
