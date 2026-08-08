@@ -6709,6 +6709,63 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   whole), and Barrington-Leigh's thesis on his McGill page.
   validate.sh full PASS (102 CPU gates incl. the new 6, all 7
   GPU probes).
+- DONE (the browser gets its trust: proxy-debug session, Aug 8
+  sixty-third push - environment tooling, one repo tool): the
+  user asked for two fixes - the dead real-browser route through
+  the agent proxy, and Wayback Machine access. BOTH DIAGNOSED TO
+  GROUND with a Chrome net-log (--log-net-log + the netlog JSON
+  repaired past its truncation): the "CONNECTION_RESET for every
+  external host" verdict from the sixty-second pass was TWO
+  stacked faults, neither what it looked like. (1) Chrome's
+  TLS 1.3 ClientHello is RESET mid-handshake by the proxy's MITM
+  stack (the [begin-ok, -101] pairs on every tunnel; curl's
+  classical hello passes) - capping the browser at
+  --ssl-version-max=tls1.2 clears it, and the capped hop is only
+  browser->localhost-proxy (the proxy re-originates its own TLS
+  upstream; verification stays ON). (2) On retries that DID
+  handshake, ERR_CERT_AUTHORITY_INVALID: the proxy README's
+  promised "browser NSS store" was EMPTY - certutil -L showed a
+  bare database. Fix: apt-get install libnss3-tools; certutil -d
+  sql:/root/.pki/nssdb -A -t "C,," -n ccr-agent-proxy -i
+  /root/.ccr/agent-proxy-ca.crt. (The CACertificates enterprise
+  policy was tried first and is NOT honoured by this CfT build -
+  both policy dirs written, cert errors persisted.) The working
+  recipe is now a VERSIONED TOOL, harness/fetch-web.mjs: page
+  text mode and PDF mode (direct application/pdf capture, else
+  first bitstream/.pdf link fetched with the page's own session),
+  with the one-time container setup documented in its header -
+  containers are ephemeral, so the two setup commands must be
+  re-run per container. PROVEN REACH, one target per wall class:
+  Springer's cookie flow FELL (snm13.pdf, 932 KB - Stenbaek-
+  Nielsen, Kanmae, McHarg & Haaland 2013, Surveys in Geophysics
+  34,769, the sprite-streamer photometry review that was locked
+  during the sixty-second hunt; its prints CORROBORATE the
+  shipped anchor: sprite brightness "typically substantially
+  above the 3 MR saturation ... maximum ~12 MR" against the
+  shipped 10 MR characteristic, streamer heads discussed to
+  100 GR with the authors' own caveat, and Sentman's "roughly
+  that of bright aurorae"); Anubis-class proof-of-work walls
+  AUTO-SOLVE (hdl.handle.net cleared its challenge and followed
+  the redirect). WAYBACK, decoded: web.archive.org is NOT
+  policy-blocked - the proxy grants the CONNECT and the
+  UPSTREAM leg to web.archive.org resets ~11 s later (curl and
+  browser identically); unreachable from this egress, reported,
+  not worked around. But the archive.org HOST works fully:
+  /wayback/available API answers (closest-snapshot lookups
+  work), metadata API answers, and ITEM DOWNLOADS serve whole
+  scans - the 1888 Royal Society Krakatoa Committee report
+  (eruptionofkrakat00roya: 44 MB scan PDF + OCR text) is IN THE
+  SCRATCHPAD, flipping the parked Bishop's-ring candidate to
+  viable (printed ring radii from the primary, live OMPS AOD
+  already wired since the fortieth pass). STILL CLOSED, by
+  choice or by upstream: IOP (Radware captcha) and Wiley
+  (Cloudflare interactive) are bot managers this project does
+  not defeat; digital.csic.es is served a "Web Page Blocked!"
+  page by the upstream URL filter (block page names the egress
+  client IP) - an admin-level allowlist item, reported. Admin
+  notes worth relaying: the README's browser-NSS promise is
+  unfulfilled in this image, and toolTrustFailureCodes reports
+  java_truststore_seed_failed.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
