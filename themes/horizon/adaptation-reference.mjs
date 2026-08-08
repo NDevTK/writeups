@@ -29,9 +29,12 @@ import {
   extendedVisibility,
   milkyWayVisibility,
   CRUMEY_R1,
+  CRUMEY_R2,
   CRUMEY_K1,
+  CRUMEY_K2,
   CRUMEY_Q,
   CRUMEY_F,
+  CRUMEY_B_VALID,
   DETECT_HALF_MAG,
   NL_TO_CDM2,
   COLOR_LIMIT_NL
@@ -379,6 +382,54 @@ const check = (name, ok, detail) => {
     'Crumey extended-source threshold (printed constants)',
     ok,
     `gegenschein-class feature ${dark.toFixed(0)}x threshold at the dark sky (visible ${visDark}), ratio ${moonR.toFixed(2)} with printed F=2 under full moon (vis ${visMoon.toFixed(2)} - marginal, as real), 0 in twilight; milky way on at the printed Bigourdan 20.25, full at 21.25; monotone, printed 1e-5 floor exact`
+  );
+}
+
+{
+  // The Weber continuation past Crumey's printed validity edge
+  // ("approximately 0.1 cd m^-2 ... for achromatic sources"):
+  // below the edge the threshold is EXACTLY the printed model
+  // (recomputed here from the raw coefficients); at the edge it
+  // is continuous; beyond it the contrast freezes at the model's
+  // own edge value so the threshold rises linearly with B - the
+  // photopic slope-one regime the Ferwerda frame above prints -
+  // instead of flattening on the expired fit (k1 B^-1/4 + k2
+  // crosses zero near 1.3 cd/m^2 and would otherwise pin the
+  // threshold to a floor that lets any bright extended source
+  // survive daylight).
+  const A = 0.1;
+  const raw = (B) => {
+    const b4 = Math.pow(B, -0.25);
+    const R = Math.pow(Math.max(CRUMEY_R1 * b4 + CRUMEY_R2, 0), 2);
+    const Cinf = Math.max(CRUMEY_K1 * b4 + CRUMEY_K2, 1e-6);
+    return (
+      B *
+      Math.pow(
+        Math.pow(R / A, CRUMEY_Q) + Math.pow(Cinf, CRUMEY_Q),
+        1 / CRUMEY_Q
+      )
+    );
+  };
+  const below = Math.abs(crumeyThresholdDB(0.03, A) / raw(0.03) - 1);
+  const edge = Math.abs(
+    crumeyThresholdDB(CRUMEY_B_VALID * (1 + 1e-9), A) /
+      crumeyThresholdDB(CRUMEY_B_VALID, A) -
+      1
+  );
+  const weber =
+    crumeyThresholdDB(CRUMEY_B_VALID * 100, A) /
+    crumeyThresholdDB(CRUMEY_B_VALID, A);
+  let mono = true;
+  let prev = 0;
+  for (let lb = -5; lb <= 3.5; lb += 0.25) {
+    const t = crumeyThresholdDB(Math.pow(10, lb), A);
+    if (t < prev) mono = false;
+    prev = t;
+  }
+  check(
+    'Crumey validity edge: Weber continuation',
+    below < 1e-12 && edge < 1e-6 && Math.abs(weber - 100) < 1e-9 && mono,
+    `below-edge identical to the raw printed model (rel ${below.toExponential(1)}); continuous at ${CRUMEY_B_VALID} cd/m^2 (step ${edge.toExponential(1)}); x100 B -> x${weber.toFixed(1)} threshold beyond; monotone over 8.5 decades`
   );
 }
 

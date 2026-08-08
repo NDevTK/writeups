@@ -232,14 +232,29 @@ export const COLOR_LIMIT_CDM2 = COLOR_LIMIT_NL * NL_TO_CDM2;
 // ~16x ABOVE this threshold - visible, as it really is - and
 // drops to ~2x under a full-moon sky (marginal; with Crumey's
 // field factor ~2 for non-laboratory conditions, gone).
+//
+// Above his printed validity edge ("approximately 0.1 cd m^-2
+// (15 mag arcsec^-2) for achromatic sources") the fitted
+// coefficients expire - k1 B^-1/4 + k2 crosses zero near 1.3
+// cd/m^2 and the threshold would flatten to a floor instead of
+// rising. So past the edge the threshold continues as a WEBER
+// law: contrast frozen at the model's own edge value, threshold
+// growing linearly with B - the printed photopic regime (the
+// Ferwerda frame's photopic branch above is the same slope-one
+// line). Continuous at the edge by construction, identical below
+// it, and it lets a bright-source gate (the aurora curtain) die
+// correctly in twilight and daylight instead of surviving on the
+// expired fit.
 export const CRUMEY_R1 = 7.31e-4;
 export const CRUMEY_R2 = -5.162e-4;
 export const CRUMEY_K1 = 7.633e-3;
 export const CRUMEY_K2 = -7.174e-3;
 export const CRUMEY_Q = 0.6;
 export const CRUMEY_B_FLOOR = 1e-5;
+export const CRUMEY_B_VALID = 0.1;
 export function crumeyThresholdDB(Bcdm2, Asr) {
-  const B = Math.max(Bcdm2, CRUMEY_B_FLOOR);
+  const Braw = Math.max(Bcdm2, CRUMEY_B_FLOOR);
+  const B = Math.min(Braw, CRUMEY_B_VALID);
   const b4 = Math.pow(B, -0.25);
   const R = Math.pow(Math.max(CRUMEY_R1 * b4 + CRUMEY_R2, 0), 2);
   const Cinf = Math.max(CRUMEY_K1 * b4 + CRUMEY_K2, 1e-6);
@@ -247,7 +262,9 @@ export function crumeyThresholdDB(Bcdm2, Asr) {
     Math.pow(R / Math.max(Asr, 1e-9), CRUMEY_Q) + Math.pow(Cinf, CRUMEY_Q),
     1 / CRUMEY_Q
   );
-  return B * C;
+  // Weber continuation past the printed validity edge (ratio 1
+  // below it).
+  return B * C * (Braw / B);
 }
 // Visibility of an extended feature of excess luminance dL and
 // solid angle A over sky B: the printed +-0.5 mag Blackwell ramp

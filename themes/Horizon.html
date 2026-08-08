@@ -337,6 +337,11 @@
       } from './horizon/adaptation.js';
       import {createAtmosphereTSL} from './horizon/atmosphere-tsl.js';
       import {
+        AURORA_SR,
+        curtainKR,
+        curtainLuminance
+      } from './horizon/aurora-lut.js';
+      import {
         createCloudShadowHook,
         createCloudSystemTSL,
         generateCloudTexturesTSL
@@ -11016,15 +11021,40 @@
         // Live hemispheric power scales the curtain between oval
         // refreshes (linear in precipitating power, gated hpScale;
         // rebased to 1 whenever a fresh grid lands). Pinned aurora
-        // stays pinned; the product is clamped at the full-curtain
-        // display level the theme was designed around.
+        // stays pinned; the clamped product is the DRIVE, and the
+        // full-curtain display level is now pinned to print: drive
+        // 1 means the ~100 kR great-aurora greenline on the
+        // curtainKR ladder (aurora-lut.js).
         const hpK =
           params.has('aurora') || state.auroraP === null
             ? 1
             : hpScale(state.hpNow, state.hpAtGrid);
+        const auroraDrive = Math.min(auroraP * hpK, 1);
+        // The curtain's absolute brightness gates its own
+        // appearance: peak 5577 column brightness from the printed
+        // ladder (PALACE airglow floor to the printed 100 kR great
+        // aurora), converted to luminance by the SI rayleigh
+        // (Brandstrom 2012 Eqs. 1-2 via the airglow chain), tested
+        // by Crumey's extended-source threshold against the SAME
+        // mean sky luminance the stars use (laCd - twilight,
+        // moonlight and the measured skyglow already inside, with
+        // the Weber continuation past his printed 0.1 cd/m^2
+        // validity edge). A great display pierces full moonlight;
+        // a quiet arc drowns in it; daylight extinguishes both.
+        // This retires the hand nightSky ramp here - the curtain
+        // appears exactly when its printed brightness beats the
+        // printed threshold.
+        const auroraVis =
+          auroraDrive > 0
+            ? extendedVisibility(
+                curtainLuminance(curtainKR(auroraDrive)),
+                laCd,
+                AURORA_SR
+              )
+            : 0;
         auroraU.strength.value =
-          Math.min(auroraP * hpK, 1) *
-          nightSky *
+          auroraDrive *
+          auroraVis *
           (1 - cloudy * 0.7) *
           (elevA > 0.035 ? 1 : 0);
         auroraU.time.value = t / 1000;

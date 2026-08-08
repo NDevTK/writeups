@@ -6203,6 +6203,79 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     the aurora keeps its documented display frame - the same
     honest state the extended-source features held between the
     fiftieth verdict and the Crumey unblock.
+- DONE (aurora absolute brightness, Aug 8 fifty-third push - the
+  curtain gets printed kilorayleighs and earns its own visibility):
+  the fifty-second entry's blocker dissolved one route sideways -
+  the AGU Classics digitisation of Chamberlain 1961 sits behind
+  Cloudflare (and the wayback mirror behind this container's
+  egress policy), but an OpenAlex sweep of the 138 papers citing
+  Hunten et al. 1956 surfaced everything needed in OPEN journals,
+  all four read in full: Brandstrom et al. 2012 (GI 1, 43) prints
+  the SI rayleigh - Eq. 1: 1 R defined as 1e10 photons s^-1 m^-2
+  column; Eq. 2: apparent radiance = 1e10 I/(4 pi) per sr (Baker
+  & Romick 1976 lineage, the exact convention airglow.js already
+  carries from PALACE Sect. 2, so the aurora reuses the airglow's
+  own lineRadiance/lineLuminance/cieY chain - one conversion, one
+  home); Baumgardner et al. 2007 (Ann. Geophys. 25, 2593) prints
+  the brightness anchors - SAR-arc climatology 500 +- 270 R
+  "almost always sub-visual", the 29 Oct 1991 arc at 9.5 kR above
+  background that "approaches naked-eye visibility" (13.5 kR +-
+  20% above atmosphere), and the 23-24 Mar 1969 great aurora at
+  ~100 kR greenline + ~200 kR redline (Noxon & Evans 1976);
+  Hayakawa et al. 2018 (ApJ 869, 57, the ApJ/arXiv open copy)
+  prints IBC Class IV ~ 1000 kR at 5577 with Chamberlain's
+  "total illumination on the ground equals to that of full moon";
+  Dahlgren et al. 2011 (Ann. Geophys. 29, 1699) prints the same
+  SI definition for auroral arcs plus few-kR ordinary discrete
+  arcs. WHAT SHIPPED: (1) aurora-lut.js curtain-photometry block
+  - curtainKR(drive) rides a printed ladder from the PALACE
+    green-airglow mean (163 R, the sky's zero-aurora green line,
+    imported from airglow.js LINES) to the printed 100 kR great
+    aurora at full drive, log-linear across the three decades
+    (decade-built like the IBC scale; mid-drive lands at 4.0 kR,
+    the ordinary-arc band); curtainLuminance(kR) closes kR ->
+    cd/m^2 through the airglow chain; (2) adaptation.js gains
+    CRUMEY_B_VALID = 0.1 - Crumey's own printed validity edge
+    ("approximately 0.1 cd m^-2 ... for achromatic sources") - and
+    crumeyThresholdDB now continues past it as a Weber law at the
+    model's edge contrast (continuous by construction, identical
+    below, and the printed photopic slope-one regime beyond - the
+    expired fit would otherwise let any bright extended source
+    survive daylight); (3) Horizon.html retires the aurora's hand
+    nightSky ramp: strength = drive x extendedVisibility(
+    curtainLuminance(curtainKR(drive)), laCd, 0.1 sr) x cloud x
+    elevation - the curtain now appears exactly when its printed
+    brightness beats the printed threshold against the same live
+    sky luminance the stars use. LANDMARKS (aurora-reference, all
+    gated): the SI chain re-derived by independent arithmetic
+    (1 kR at 5577 = 1.927e-4 cd/m^2 exact) and that unit rung
+    sits at 1.11x the moonless natural sky (skyglow's printed
+    NATURAL_MCD pair - why a 1 kR aurora is a threshold object);
+    ladder endpoints exact with monotone log interior; the
+    visibility matrix emerges - a 100 kR great aurora pierces full
+    moonlight (the theme's own 5e-3 cd/m^2 class) AND the
+    validity-edge twilight sky while daylight extinguishes even
+    IBC IV, and a quiet 1 kR arc is full at dark, 0.33 under the
+    moon, dead in twilight; Hayakawa's IBC IV sentence closes
+    through the theme's own moon - full-sky 1000 kR delivers 0.61
+    lx vs the derived MOON_FULL_LUX 0.322 lx, equality at half-sky
+    coverage, two printed chains meeting at a sentence from 1961;
+    Baumgardner's red-line pair through the same chain - 500 R at
+    1.02x the achromatic dark-sky threshold (sub-visual once the
+    630 nm rod penalty applies) vs 9.5 kR at 19.3x (approaches
+    visibility), luminance ratio exactly 19; the Weber continuation
+    continuous at the edge, exactly linear beyond, monotone over
+    8.5 decades (adaptation-reference holds the below-edge
+    identity against the raw printed model). STILL DISPLAY, now
+    documented as such against the printed frame: the inter-line
+    gains (6300 x2.0 exposure, 4278 at the printed 1/5.5 Rees
+    ratio), the E0-from-probability mapping, the sine curtain
+    shape, and the log drive axis itself (its endpoints are
+    printed; the interpolation is the neutral choice across a
+    decade-built span). The IBC I-III rungs remain unvendored -
+    Ebihara 2017's full ladder sits in a WEKO3 SPA (KURENAI) that
+    serves only its shell to every API probed, and Gao 2020 is
+    closed - but nothing load-bearing waits on them.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

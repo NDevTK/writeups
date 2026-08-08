@@ -283,10 +283,14 @@ export function createMoonMaterial(skyFor, faceTex, umbraTex) {
 // quenching, sampled by the fragment's emission altitude. The
 // characteristic energy E0 (from the precipitation data) rebuilds
 // the LUT in place; the sine curtain waving stays as the documented
-// shape heuristic (curtain fluid dynamics are out of scope). What
-// the physics gives untuned: green lower border near 100 km, the
-// purple N2+ fringe below it, red 630.0 tops above 200 km that take
-// over as precipitation softens.
+// shape heuristic (curtain fluid dynamics are out of scope). The
+// theme drives `strength` as OVATION drive x the Crumey visibility
+// of the curtain's PRINTED brightness (aurora-lut.js curtain
+// photometry: the kR ladder against the live sky luminance), so
+// appearance is earned, not ramped. What the physics gives
+// untuned: green lower border near 100 km, the purple N2+ fringe
+// below it, red 630.0 tops above 200 km that take over as
+// precipitation softens.
 export function createAuroraMaterial() {
   const u = {
     time: uniform(0),

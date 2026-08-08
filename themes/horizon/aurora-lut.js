@@ -31,8 +31,11 @@
  *    quenching at the lower border. 630.0 nm O(1D) follows the
  *    atomic-oxygen share (direct impact / recombination on O). The
  *    absolute excitation-transfer yields fold into the calibrated
- *    per-line display gains - profiles are the physics, gains are
- *    exposure. O(1D) collisional quenching uses
+ *    per-line display gains - profiles are the physics, the
+ *    INTER-line gains are the documented display piece. The
+ *    curtain's absolute 557.7 nm scale, by contrast, is printed:
+ *    see the curtain-photometry block at the end of this file.
+ *    O(1D) collisional quenching uses
  *    A = 0.0091 s^-1 (tau ~ 110 s) against
  *    k(N2) = 2.0e-11 exp(107.8/T) and
  *    k(O2) = 2.9e-11 exp(67.5/T) cm^3/s (Streit et al. 1976) - the
@@ -303,3 +306,54 @@ export function buildAuroraLUT(E0, bins = 128) {
 
 // Exposed for the reference printer.
 export {ROWS as ATMO_ROWS};
+
+import {cieY, lineLuminance, LINES} from './airglow.js';
+
+// ---- absolute curtain photometry (printed kilorayleighs) ----
+// The SI rayleigh (Brandstrom et al. 2012, GI 1, 43 - read in
+// full - Eq. 1: 1 R is defined as 1e10 photons s^-1 m^-2 column;
+// Eq. 2: apparent radiance = 1e10 I / (4 pi) photons s^-1 m^-2
+// sr^-1; the same convention the airglow module carries from
+// PALACE Sect. 2, and the definition Dahlgren et al. 2011, Ann.
+// Geophys. 29, 1699, Eq. 1 print for auroral arcs, both citing
+// Hunten et al. 1956 / Baker & Romick 1976) turns a curtain's
+// 557.7 nm column brightness into photopic luminance through the
+// airglow module's own chain (hc/lambda, 683 lm/W, CIE Y) - one
+// conversion, one home.
+//
+// The drawn curtain's peak brightness rides a printed ladder:
+//  - drive 0: the PALACE green-airglow annual mean (LINES[0].refR
+//    = 163 R) - the sky's own zero-aurora green line;
+//  - drive 1: the ~100 kR 5577 greenline printed for the great
+//    aurora of 23-24 Mar 1969 above Millstone Hill (Noxon & Evans
+//    1976, as printed in Baumgardner et al. 2007, Ann. Geophys.
+//    25, 2593 - read in full - alongside ~200 kR of 6300);
+//  - log-linear between: the span is three decades and auroral
+//    brightness classes are decade-built (IBC Class IV ~ 1000 kR
+//    at 557.7 nm, Hayakawa et al. 2018, ApJ 869, 57 - read in
+//    full - "the total illumination on the ground equals to that
+//    of full moon", citing Hunten et al. 1956 and Chamberlain
+//    1961). Mid-drive lands in the few-kR band Dahlgren et al.
+//    2011 measure for ordinary discrete arcs (their bright 10-keV
+//    arc: 4 kR at OI 7774).
+// The drive is the theme's live OVATION oval probability times
+// the hemispheric-power scaling - emission stays linear in
+// precipitating power (Rees 1989 ch. 3), the ladder pins its
+// display design point to print.
+export const AURORA_KR_GREAT = 100; // kR at drive 1 (printed, 1969)
+export const AURORA_KR_IBC4 = 1000; // kR, printed IBC Class IV bound
+export function curtainKR(drive) {
+  const floorKR = LINES[0].refR / 1000; // 0.163 kR (PALACE mean)
+  const d = Math.min(Math.max(drive, 0), 1);
+  return floorKR * Math.pow(AURORA_KR_GREAT / floorKR, d);
+}
+// Photopic luminance (cd/m^2) of a 557.7 nm curtain of kR
+// kilorayleighs - Brandstrom Eqs. 1-2 through lineLuminance.
+export function curtainLuminance(kR) {
+  return lineLuminance(kR * 1000, 557.7, cieY(557.7));
+}
+// The curtain's angular size for the Crumey extended-source
+// threshold: tens of degrees across the sky (~0.1 sr). At these
+// sizes the threshold sits in the asymptotic-contrast regime
+// (R/A << C_inf), so the exact value barely matters.
+export const AURORA_SR = 0.1;
