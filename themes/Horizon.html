@@ -705,6 +705,7 @@
       import {pondFraction} from './horizon/meltpond.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lakeIceSeries, lakeIceAlphaBare} from './horizon/lakeice.js';
+      import {planetTintRGB} from './horizon/planets-color.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -7210,16 +7211,24 @@
       moonDisc.layers.set(2);
       skyGroup.add(moonDisc);
 
-      // Naked-eye planets at their true ephemeris positions, sized by
-      // real apparent magnitude, tinted like the eye sees them.
-      const PLANETS = ['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn'];
-      const PLANET_TINTS = [
-        [0.9, 0.85, 0.78],
-        [1, 0.98, 0.9],
-        [1, 0.62, 0.44],
-        [0.98, 0.92, 0.8],
-        [0.95, 0.9, 0.72]
+      // Naked-eye planets at their true ephemeris positions, sized
+      // by real apparent magnitude, tinted from Mallama's printed
+      // band albedos through the stars' own Planck chain
+      // (planets-color.js, gated) - the hand-picked tints are
+      // retired, Uranus and Neptune go blue-green as the printed
+      // methane collapse says, and Uranus itself joins the sky:
+      // its opposition magnitude (+5.6, corroborated in the gate)
+      // sits a magnitude inside the star catalogue's own 6.5
+      // naked-eye limit.
+      const PLANETS = [
+        'Mercury',
+        'Venus',
+        'Mars',
+        'Jupiter',
+        'Saturn',
+        'Uranus'
       ];
+      const PLANET_TINTS = PLANETS.map((n) => planetTintRGB(n));
       const planetObj = createPlanetSprites(
         new Float32Array(PLANETS.length * 3),
         new Float32Array(PLANET_TINTS.flat()),

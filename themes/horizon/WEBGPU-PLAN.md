@@ -6006,6 +6006,40 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   keeps its own measured concentration path untouched. Full-
   page WebGPU smoke at Vanajavesi compiles clean. VALIDATE
   PASS (all references + 7 GPU probes).
+- DONE (planet colours, Aug 8 forty-sixth push - the last
+  hand-picked tints in the sky): the five drawn planets carried
+  fifteen hand-picked RGB numbers while every star's tint came
+  from physics. One paper read in full (49 pp): Mallama,
+  Krobusek & Pavlov 2017 (Icarus 282, arXiv) - the modern
+  reference photometry for all eight planets. planets-color.js
+  vendors its Table 6 (solar magnitudes), Table 7 (per-band
+  geometric albedos) and Table 3 (V references) verbatim, plus
+  the Venus and Jupiter phase polynomials from the appendix.
+  The drawn tint is the stars' own Planck carrier at the
+  PRINTED solar colour (Table 6's B-V = 0.65 through the
+  shipped Ballesteros relation = 5778 K, seven kelvin from the
+  Sun's real 5772 - gated) times the printed B/V/R albedos,
+  whose band centres (436/549/700 nm, printed) sit on the
+  theme's 440/550/680 channels. Mars goes deep red (its
+  printed albedo TRIPLES from B to R), Saturn warm, Venus
+  near-neutral - and URANUS JOINS THE SKY as the sixth
+  naked-eye planet: its opposition magnitude (+5.6 from the
+  printed reference, gated) sits a magnitude inside the star
+  catalogue's own 6.5 limit, and its printed albedo collapse
+  (0.561 B -> 0.202 R, the methane blanket) makes it
+  blue-green - a colour no colour-index Planck fit could
+  produce. THE GATES: the paper's own worked example
+  re-emerges exactly from the vendored tables (Saturn L-ratio
+  7.31e-8, area factor 1.46e-7 from the printed 57,240 km
+  radius, geometric albedo 0.499 = Table 7); Venus's printed
+  phase polynomial plus plain circular geometry puts greatest
+  brilliancy at -4.81 at phase 124 deg - the almanac value,
+  nothing fitted; Jupiter's printed quadratic dims 7.5% at its
+  12-deg maximum phase (the paper's own "about 6%"
+  cross-check); the live magnitudes stay with the ephemeris
+  engine, now corroborated against the printed frame. Night
+  full-page smoke clean with six planets. VALIDATE PASS (all
+  references + 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
