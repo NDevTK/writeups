@@ -62,10 +62,15 @@ export function pathToRadiusT(cosZenith, mie, hObs = 300, hTopM = 11020) {
   const mieExt = (c) =>
     (mie.scat[c] * (1 - (mie.fDiff ? mie.fDiff[c] : 0)) + mie.abs[c]) * tm;
   const oz = (mie.ozScale ?? 1) * to;
+  // Measured tropospheric NO2 (no2.js): per-metre absorption at
+  // h = 0 riding the SAME 1200 m boundary-layer integral as the
+  // mie terms. Absent -> zero, identity.
+  const n2 = mie.no2;
+  const n2Ext = (c) => (n2 ? n2[c] * tm : 0);
   return [
-    Math.exp(-(5.802e-6 * tr + mieExt(0) + 0.65e-6 * oz)),
-    Math.exp(-(13.558e-6 * tr + mieExt(1) + 1.881e-6 * oz)),
-    Math.exp(-(33.1e-6 * tr + mieExt(2) + 0.085e-6 * oz))
+    Math.exp(-(5.802e-6 * tr + mieExt(0) + 0.65e-6 * oz + n2Ext(0))),
+    Math.exp(-(13.558e-6 * tr + mieExt(1) + 1.881e-6 * oz + n2Ext(1))),
+    Math.exp(-(33.1e-6 * tr + mieExt(2) + 0.085e-6 * oz + n2Ext(2)))
   ];
 }
 
@@ -99,10 +104,13 @@ export function sunTransmittanceJS(cosZenith, mie, hObs = 300) {
   // when unmeasured - the same linear correction the shader's
   // ozScale uniform applies.
   const oz = (mie.ozScale ?? 1) * to;
+  // Measured tropospheric NO2 (no2.js) on the same 1200 m leg.
+  const n2 = mie.no2;
+  const n2Ext = (c) => (n2 ? n2[c] * tm : 0);
   return [
-    Math.exp(-(5.802e-6 * tr + mieExt(0) + 0.65e-6 * oz)),
-    Math.exp(-(13.558e-6 * tr + mieExt(1) + 1.881e-6 * oz)),
-    Math.exp(-(33.1e-6 * tr + mieExt(2) + 0.085e-6 * oz))
+    Math.exp(-(5.802e-6 * tr + mieExt(0) + 0.65e-6 * oz + n2Ext(0))),
+    Math.exp(-(13.558e-6 * tr + mieExt(1) + 1.881e-6 * oz + n2Ext(1))),
+    Math.exp(-(33.1e-6 * tr + mieExt(2) + 0.085e-6 * oz + n2Ext(2)))
   ];
 }
 

@@ -6978,6 +6978,76 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   smoke: the SF city-front scene loads the gauge path clean
   under debug. validate.sh full PASS (106 CPU gates incl. the
   new 9-landmark tides gate, all 7 GPU probes).
+- DONE (the brown horizon: Aug 8 sixty-seventh push - no2.js +
+  no2-xsec-data.js + no2-reference.mjs + the march wiring): a
+  fresh survey opened the turn (the parked list was empty):
+  (A) tropospheric NO2 as a drawn absorber, (B) an elve
+  brightness ladder, (C) the STEVE climatology. Verdicts: B is
+  recorded Blondel-Rey-NEGATIVE pending a bright-elve print -
+  at the sub-millisecond elve lifetime the printed t/(a+t)
+  factor is ~0.003, putting the >1 MR characteristic elve well
+  under the naked-eye threshold (consistent with elves being a
+  camera phenomenon; a printed tens-of-MR class would reopen
+  it); C has open arXiv copies of related STEVE papers (parked
+  viable); A VERIFIED END TO END AND EXECUTED. THE PHYSICS -
+  NO2 is the coloured gas of polluted air: its visible bands
+  absorb blue ~87x more than red (5x more than green), so long
+  low paths lose blue and brown the skyline while the zenith
+  stays blue. THE DATA - the MPI-Mainz UV/VIS Spectral Atlas
+  (Keller-Rudek, Moortgat, Sander & Soerensen 2013, ESSD 5,
+  365, open access, READ IN FULL - their Sect. 3.3 fixes the
+  cm^2 molecule^-1 base-e air-wavelength conventions), serving
+  each study's ORIGINAL published cross sections; THREE
+  independent laboratory datasets vendored at the theme's
+  channel windows (0.5-nm bin means over +-20 nm - the banded
+  spectrum makes a single-wavelength read unstable, a gate
+  landmark holds the max/min spread that justifies this):
+  Bogumil 2003 (SCIAMACHY PFM, the shipped values - the only
+  set covering the red window whole), Vandaele 1998 (FTS) and
+  Burrows 1998 (GOME FM) - mutually held to 2.6% (B/V) and
+  7.0% (vs Burrows, the documented GOME low bias). THE FEED -
+  Sentinel-5P TROPOMI tropospheric column via GIBS, keyless
+  WMTS, LIVE (tiles confirmed for the current date - NB
+  Worldview's own config lists the layer's dateRange as ENDING
+  2024-12-03, stale by ~20 months against its own serving GIBS
+  stack), inverted exactly through the published 191-bin OMI
+  palette Worldview styles it with (0..2e16 molec/cm^2, open
+  top; unpainted -> ZERO column, fails closed). TEMPO L3 serves
+  the same quantity HOURLY over North America (recorded future
+  refinement; its WMTS needs the hourly TIME dimension). THE
+  WIRING - the ozone road exactly: a per-channel Beer absorber
+  in EVERY march, riding the boundary-layer profile the mie
+  terms already integrate (the 1200 m Hillaire exponential - a
+  documented co-emission reduction; beta0 = sigma N / 1200 m
+  puts the whole measured column under it identically, a gate
+  identity): atmosphere-tsl extinction() gains no2A on d.y
+  (mieKey extended - LUTs rebuild when the column moves), BOTH
+  sun-transmittance.js integrators gain the term on their tm
+  leg (absent -> bit-exact identity, and the 27-landmark atmo
+  CPU-vs-GPU closure gate stays green untouched), Horizon.html
+  syncNO2 samples the tile (volcanic.js pattern) and attaches
+  mieRad.no2. ?no2=0 pins clean air, ?no2=N forces the column.
+  THE GATE (9 landmarks): three-laboratory agreement; the
+  ordering IS the brown tint; exact colormap roundtrip; the
+  column-under-profile identity; the CPU twin against the
+  analytic zenith ratio; and EMERGENCE with no coded threshold
+  - a 1.5e16 plume at the horizon transmits 60% in blue
+    against 99.4% in red (R/B 1.67, the brown band over the
+    skyline), 99.4% blue at the zenith (the classic look-up blue
+    over a brown skyline), and a 1e15 background stays over
+    99.9% - under a JND everywhere. VERIFIED IN PIXELS over a
+    clean sea horizon (the first Alpine A/B was invalidated by
+    drifting valley fog - recorded): the forced-plume frame
+    shows the dusky band hugging the horizon, and the
+    glare-free difference profile drops 12 blue counts in the
+    unclipped horizon strip with red untouched, confined exactly
+    to the low rows (the saturated sky above clips at 255 -
+    the drawn band lives where the display has headroom, honest
+    tone-mapping behaviour). Environment note: Semantic Scholar
+    API rate-limited this session (429 on the elve probe);
+    plain-http arXiv still returns empty (https works).
+    validate.sh full PASS (107 CPU gates incl. the new 9-landmark
+    no2 gate, all 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

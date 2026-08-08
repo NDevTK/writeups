@@ -468,6 +468,11 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
 
   const rayleighS = vec3(5.802e-6, 13.558e-6, 33.1e-6);
   const ozoneA = vec3(0.65e-6, 1.881e-6, 0.085e-6);
+  // Measured tropospheric NO2 (no2.js, gated): per-metre
+  // absorption at h = 0, riding the mie boundary-layer profile
+  // (d.y - the same 1200 m exponential its emissions share).
+  // Zero = clean or unmeasured sky, exact identity.
+  const no2A = uniform(new Vector3(0, 0, 0));
 
   // x: rayleigh, y: mie, z: ozone (tent at 25 km).
   const densities = Fn(([h]) =>
@@ -482,7 +487,7 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     const d = densities(h);
     return rayleighS
       .mul(d.x)
-      .add(mieScat.add(mieAbs).mul(d.y))
+      .add(mieScat.add(mieAbs).add(no2A).mul(d.y))
       .add(ozoneA.mul(ozScale).mul(d.z));
   });
 
@@ -1727,6 +1732,9 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
         // Measured column ozone: DU/300 (1 when unmeasured). The
         // T/MS LUTs rebuild through the key below when it moves.
         ozScale.value = mie.ozScale ?? 1;
+        // Measured NO2 boundary-layer absorption (no2.js).
+        if (mie.no2) no2A.value.set(mie.no2[0], mie.no2[1], mie.no2[2]);
+        else no2A.value.set(0, 0, 0);
       }
       sunMu.value = sunDir.y;
       camH.value = camHMetres;
@@ -1744,6 +1752,8 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
           mie.g +
           '|' +
           (mie.ozScale ?? 1) +
+          '|' +
+          (mie.no2 ? mie.no2.join() : '0') +
           '|' +
           (mie.aureole
             ? mie.aureole.fDiff.join() + '|' + mie.aureole.gPrime.join()

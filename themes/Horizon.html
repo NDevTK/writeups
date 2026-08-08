@@ -195,7 +195,9 @@
         the stratospheric excess to volcScale N for the 1888
         Bishop's ring - harness), bishopring=0 (never draw the
         ring), tidegauge=0 (skip NOAA gauges - model tide only;
-        tide=M still pins the level outright), soil=0 (pin
+        tide=M still pins the level outright), no2=0|N (clean-air
+        pin / force the NO2 column in molec/cm² - the brown
+        horizon), soil=0 (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
         (skip satellite irradiance), ghi=W (override it), debug=1,
@@ -769,6 +771,7 @@
         tideLatestUrl,
         tideStationsUrl
       } from './horizon/tides.js';
+      import {NO2_LAYER, NO2_Z, no2BetaPerM, sampleNo2} from './horizon/no2.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
         activeShowers,
@@ -2502,6 +2505,77 @@
           }
         } catch (e) {
           if (params.has('debug')) console.warn('volcanic: ' + e.message);
+        }
+      }
+
+      // The MEASURED tropospheric NO2 (no2.js, gated): the
+      // Sentinel-5P TROPOMI column over the same keyless GIBS
+      // WMTS, inverted through the published palette - the brown
+      // horizon of polluted air enters the marches as a
+      // boundary-layer Beer absorber. Unpainted cells read a zero
+      // column (clean or unmeasured - no tint, fails closed); a
+      // day-old tile is normal (daily product), the fetch walks
+      // back up to 5 days. ?no2=0 pins clean air, ?no2=N forces
+      // the column.
+      let no2Seq = 0;
+      async function syncNO2() {
+        if (params.has('no2')) return;
+        const seq = ++no2Seq;
+        try {
+          const p = pixelOf(state.lat, state.lon, NO2_Z);
+          const c = Math.floor(p.px / 256);
+          const r = Math.floor(p.py / 256);
+          for (let back = 1; back <= 5; back++) {
+            const d = new Date(Date.now() - back * 86400e3)
+              .toISOString()
+              .slice(0, 10);
+            try {
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.src =
+                'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/' +
+                NO2_LAYER +
+                '/default/' +
+                d +
+                '/GoogleMapsCompatible_Level6/' +
+                NO2_Z +
+                '/' +
+                r +
+                '/' +
+                c +
+                '.png';
+              await img.decode();
+              const cv = document.createElement('canvas');
+              cv.width = cv.height = 256;
+              const cx = cv.getContext('2d', {willReadFrequently: true});
+              cx.drawImage(img, 0, 0);
+              const data = cx.getImageData(0, 0, 256, 256).data;
+              if (seq !== no2Seq) return;
+              const pxAt = (ix, iy) => {
+                const lx = ix - c * 256;
+                const ly = iy - r * 256;
+                if (lx < 0 || lx > 255 || ly < 0 || ly > 255) return null;
+                const o = (ly * 256 + lx) * 4;
+                return [data[o], data[o + 1], data[o + 2], data[o + 3]];
+              };
+              const s = sampleNo2(pxAt, p.px, p.py, 16);
+              state.no2Col = s.col;
+              if (s.painted)
+                record(
+                  'TROPOMI NO2 column',
+                  s.col.toExponential(2) +
+                    ' molec/cm² (' +
+                    d +
+                    ') · blue tau_v ' +
+                    (no2BetaPerM(s.col)[2] * 1200).toExponential(1)
+                );
+              return;
+            } catch {
+              // that day not published - go older
+            }
+          }
+        } catch (e) {
+          if (params.has('debug')) console.warn('no2: ' + e.message);
         }
       }
 
@@ -8815,6 +8889,7 @@
         terrainUniforms.uSnowCovOn.value = 0;
         syncSnowCover();
         syncStratAOD();
+        syncNO2();
         syncSeaIce();
         syncLakeIce();
         syncSnowAge();
@@ -9691,6 +9766,19 @@
           state.ozone &&
           (state.ozone.pinned || Date.now() - state.ozone.at < 6 * 3600e3);
         mieRad.ozScale = ozFresh ? ozoneScale(state.ozone.du) : 1;
+        // Measured tropospheric NO2 (no2.js): the boundary-layer
+        // absorber per channel from the TROPOMI column - the
+        // brown horizon of polluted air. Zero column (clean sky,
+        // no tile, or ?no2=0) is exact identity. ?no2=N forces
+        // the column (molecules/cm^2) for harness captures.
+        const no2Forced = parseFloat(params.get('no2'));
+        const no2Col =
+          params.get('no2') === '0'
+            ? 0
+            : Number.isFinite(no2Forced)
+              ? no2Forced
+              : state.no2Col || 0;
+        mieRad.no2 = no2Col > 0 ? no2BetaPerM(no2Col) : null;
         // The eye's exposure (adaptation.js - LBNL 39882's JND
         // frame): the adaptation luminance is the SAME transfer
         // table the day anchor is derived on - the reference
@@ -12825,6 +12913,8 @@
         setInterval(syncLights, 6 * 60 * 60 * 1000);
         syncSnowCover();
         syncStratAOD();
+        syncNO2();
+        setInterval(syncNO2, 6 * 60 * 60 * 1000);
         syncSeaIce();
         syncLakeIce();
         setInterval(syncLakeIce, 6 * 60 * 60 * 1000);
