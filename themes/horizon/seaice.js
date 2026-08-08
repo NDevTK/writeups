@@ -288,29 +288,40 @@ export const SNOW_ICE_A_M = Math.sqrt(170 * 270) * 1e-6;
 // colour rides (ocean-color.js) - reflectance in, display out,
 // no new constant.
 import {BODY_GAIN} from './ocean-color.js';
+// Melt ponds (meltpond.js): the printed Lu 2016/2018 two-stream
+// pond albedo at the printed default pond (Hp = 0.3 m on 1.0 m
+// FYI). Computed once - the pond state is the printed default;
+// the AREA the ponds occupy is the measured seasonal fraction.
+import {pondAlbedoRGB} from './meltpond.js';
+const POND_RGB = pondAlbedoRGB();
 // fsc: the measured fractional snow cover (snowcover.js) as the
 // AREA fraction wearing the snow-covered-ice parameters - an
 // area-weighted albedo mix, exact for a fraction (the land
 // measurement stands proxy for snowfall on the adjacent ice, a
 // stated reduction).
+// pf: the melt-pond fraction of the snow-free ice surface
+// (meltpond.js: Rosel's measured Arctic climatology gated by the
+// measured air temperature) - new snow covers the ponds (printed
+// in Rosel 2012), so the pond term rides the snow-free part.
 // The ABSOLUTE diffuse albedo of the drawn ice surface at
-// channel c: bare and snow-covered mixed area-weighted by the
-// measured snow fraction. This is what the dome's ground-bounce
-// and the overcast coupling consume (they run on absolute
-// albedos); the display colour below is the same number in the
-// water body's frame.
-export function iceAlbedoMix(c, fsc = 0) {
+// channel c: snow-covered, ponded and bare white ice mixed
+// area-weighted by the measured fractions. This is what the
+// dome's ground-bounce and the overcast coupling consume (they
+// run on absolute albedos); the display colour below is the same
+// number in the water body's frame.
+export function iceAlbedoMix(c, fsc = 0, pf = 0) {
   const f = Math.min(Math.max(fsc, 0), 1);
+  const p = Math.min(Math.max(pf, 0), 1);
   return (
-    (1 - f) * iceAlbedoDiffuse(c) +
+    (1 - f) * ((1 - p) * iceAlbedoDiffuse(c) + p * POND_RGB[c]) +
     f * iceAlbedoDiffuse(c, SNOW_ICE_TAU, SNOW_ICE_A_M)
   );
 }
 
-export function iceDisplayRGB(fsc = 0) {
+export function iceDisplayRGB(fsc = 0, pf = 0) {
   return [
-    iceAlbedoMix(0, fsc) * BODY_GAIN,
-    iceAlbedoMix(1, fsc) * BODY_GAIN,
-    iceAlbedoMix(2, fsc) * BODY_GAIN
+    iceAlbedoMix(0, fsc, pf) * BODY_GAIN,
+    iceAlbedoMix(1, fsc, pf) * BODY_GAIN,
+    iceAlbedoMix(2, fsc, pf) * BODY_GAIN
   ];
 }

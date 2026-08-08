@@ -5434,7 +5434,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the night-vision colour correction -2.5 log(F_c) =
   1 - (B-V)/2 below log B = 3.17 in millimicroLamberts - the
   SAME 1500 nL boundary the colour floor ships - and Eq. 14's
-  assembly (I* = I Fb Fe Ft Fp Fa Fsc Fr Fc) with the p. 214
+  assembly (I\* = I Fb Fe Ft Fp Fa Fsc Fr Fc) with the p. 214
   prose ("the redder of the two stars would appear fainter"
   under night vision) resolves the sign convention the
   twenty-ninth push declined to guess: in the rod frame a
@@ -5604,8 +5604,8 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   Kremser's conversion-lag physics, an instantaneous SO2-column
   mapping stays unprintable. THE DISSOLUTION: the GIBS
   GetCapabilities scout found the keyless layers
-  OMPS_NOAA21_LimbProfiler_Aerosol_OpticalDepth and
-  _Aerosol_ExtinctionCoefficient_{12,14,16,18,20}KM - the
+  OMPS*NOAA21_LimbProfiler_Aerosol_OpticalDepth and
+  \_Aerosol_ExtinctionCoefficient*{12,14,16,18,20}KM - the
   MEASURED stratospheric aerosol optical depth itself, the
   exact product Kremser's review names as forthcoming
   (Gorkavyi et al. 2013), now operational. No SO2 modelling is
@@ -5623,7 +5623,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
 - DONE (the live stratosphere, Aug 7 thirty-fifth push - the
   volcanic feed lands and the named next pass closes): volcanic.js
   feeds the purple-light layer's volcScale from the MEASURED
-  stratosphere - the GIBS OMPS_NOAA21_LimbProfiler_Aerosol_
+  stratosphere - the GIBS OMPS*NOAA21_LimbProfiler_Aerosol*
   OpticalDepth layer (daily, keyless, epsg3857 Level6 verified
   live; today's default is the current date), the very product
   Kremser 2016 names as forthcoming. The published colormap
@@ -5925,6 +5925,49 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   Science 222 result, eclipse brightness as a stratospheric
   aerosol probe, now runs INSIDE the theme in the forward
   direction). VALIDATE PASS (all references + 7 GPU probes).
+- DONE (melt ponds, Aug 8 forty-fourth push - the summer ice
+  turns blue by printed optics): the measured floe was
+  year-round white; Arctic summer ice is 10-40 % ponds. Three
+  papers read in full: Lu et al. 2016 (Cold Reg. Sci. Technol.
+  124 - the journal copy is paywalled, so the pass fetched the
+  authors' accepted manuscript from Helda via the unpaywall
+  API, then recovered the display equations VERBATIM from the
+  .docx's Equation-Editor WMF drawings with a hand-written WMF
+  text-record parser: the two-stream pair, mu/kappa, the four
+  boundary conditions, Dera's R1'' = (1-R1)/n_w^2 = 0.54); Lu
+  et al. 2018 (The Cryosphere 12, 1331 - the same RTM as
+  colour, with the printed Istomina in-situ HSL windows and
+  the printed melting narrative); Rosel et al. 2012 (The
+  Cryosphere 6, 431 - the MODIS pond-fraction climatology).
+  meltpond.js solves the printed three-layer model in closed
+  form over Smith & Baker 1981 water + Warren & Brandt 2008
+  ice rows (the WB rows shared verbatim with seaice.js);
+  seaice.js's iceAlbedoMix/iceDisplayRGB gain a pond fraction
+  (ponds ride the snow-free part - new snow covers ponds,
+  printed); the theme drives it with Rosel's Fig. 6 curve
+  (machine-read from the published raster at the printed
+  anchors: > 15 % peak at the end of June, the end-of-July
+  second maximum, season day 129-249) gated by the measured
+  open-meteo 2 m temperature above freezing, northern
+  hemisphere only (the data's own domain). THE NUMBERS, all
+  gated: the closed form satisfies the printed ODEs and BCs to
+  1e-12; sigma_i = 0 gives albedo = R1 = 0.05 EXACTLY at every
+  wavelength (printed "only specular reflectance"), and the
+  melt end (Hi = 0) lands there too; the CIE-folded melting
+  case runs grey (sat 0.035, "about 0.6") -> blue (hue 0.54)
+  -> almost black (0.05) with red lowest and near-linear
+  (late/early step 1.18) while green/blue accelerate
+  (3.0/3.6) - Lu 2018's printed Fig. 8 narrative emerges
+  whole; the default pond sits in the printed Istomina windows
+  (sat 0.077, lum 0.470, hue 0.553 vs measured 0.2-0.5 inside
+  the printed 2 eps = 0.22 band); the underlying-ice albedo
+  window 0.5-0.7 holds and rises with BOTH Hi and (through the
+  water's spectral weighting) Hp, exactly as printed; sigma_i
+  1.2 -> 2.5 moves broadband albedo +0.11 vs printed +0.10;
+  the printed 350-600 / 600-900 nm sensitivity split lands
+  (Hp moves 680 nm 12x more than 440; Hi moves 440 nm, ~zero
+  at 800); 500 nm young/mature ponds 0.63/0.28 vs printed
+  0.6/0.25. VALIDATE PASS (all references + 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

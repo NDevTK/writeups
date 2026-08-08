@@ -702,6 +702,7 @@
         iceDisplayRGB,
         iceAlbedoMix
       } from './horizon/seaice.js';
+      import {pondFraction} from './horizon/meltpond.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -2378,6 +2379,20 @@
       // land-only samples. ?seaice=0 keeps liquid water.
       let seaIceC = 0;
       let seaIceSeq = 0;
+      // Melt ponds on the measured ice (meltpond.js): Rosel's
+      // measured Arctic pond-fraction climatology at the sim
+      // clock's day of year, live only where the measured 2 m
+      // air (state.temp, open-meteo) is above freezing - the
+      // ponded share of the floe wears the printed Lu two-stream
+      // pond colour inside iceAlbedoMix/iceDisplayRGB.
+      const pondFrac = () => {
+        const d = now();
+        return pondFraction(
+          (d.getTime() - Date.UTC(d.getUTCFullYear(), 0, 0)) / 86400e3,
+          state.temp,
+          state.lat
+        );
+      };
       async function syncSeaIce() {
         if (params.get('seaice') === '0' || Math.abs(state.lat) < 35) {
           seaIceC = 0;
@@ -2427,6 +2442,15 @@
                 record(
                   'GHRSST MUR sea ice',
                   (v * 100).toFixed(0) + '% concentration (' + d + ')'
+                );
+              const pfR = pondFrac();
+              if (v > 0 && pfR > 0)
+                record(
+                  'Rosel melt ponds',
+                  (pfR * 100).toFixed(0) +
+                    '% of the ice ponded (measured ' +
+                    state.temp.toFixed(0) +
+                    ' C)'
                 );
               return;
             } catch {
@@ -9389,17 +9413,20 @@
           // citation before inland horizons change).
           // Under measured sea ice the bounce albedo rides from
           // Payne's 0.06 to the white-ice diffuse albedo (seaice.js,
-          // area-weighted by concentration and the measured snow
-          // fraction) - the sky-view LUT's sea horizon whitens with
-          // the frozen sea, closing the far-sea residual.
+          // area-weighted by concentration, the measured snow
+          // fraction and the measured melt-pond fraction) - the
+          // sky-view LUT's sea horizon whitens with the frozen sea,
+          // closing the far-sea residual, and dims again where the
+          // summer ponds darken the floe.
+          const pfIce = pondFrac();
           const seaAlb =
             seaIceC > 0
               ? 0.06 +
                 seaIceC *
                   (lum3(
-                    iceAlbedoMix(0, snowFSC || 0),
-                    iceAlbedoMix(1, snowFSC || 0),
-                    iceAlbedoMix(2, snowFSC || 0)
+                    iceAlbedoMix(0, snowFSC || 0, pfIce),
+                    iceAlbedoMix(1, snowFSC || 0, pfIce),
+                    iceAlbedoMix(2, snowFSC || 0, pfIce)
                   ) -
                     0.06)
               : 0.06;
@@ -9444,7 +9471,9 @@
           // toward blue exactly as the coupled series says.
           const baseA = water
             ? [0, 1, 2].map(
-                (c) => 0.06 + seaIceC * (iceAlbedoMix(c, snowFSC || 0) - 0.06)
+                (c) =>
+                  0.06 +
+                  seaIceC * (iceAlbedoMix(c, snowFSC || 0, pondFrac()) - 0.06)
               )
             : landWSA || [0, 0, 0];
           const gf = [0, 1, 2].map((c) =>
@@ -10669,9 +10698,10 @@
           // albedo in the SAME display frame (r_d x BODY_GAIN,
           // seaice.js), re-based every frame so the blend never
           // compounds; the glitter above and the wind sea below damp
-          // with the concentration.
+          // with the concentration. The measured summer pond
+          // fraction blues the floe (meltpond.js).
           if (seaIceC > 0) {
-            const ir = iceDisplayRGB(snowFSC || 0);
+            const ir = iceDisplayRGB(snowFSC || 0, pondFrac());
             water.waterColor.value.lerp(
               tmpC.setRGB(ir[0], ir[1], ir[2], THREE.LinearSRGBColorSpace),
               seaIceC
