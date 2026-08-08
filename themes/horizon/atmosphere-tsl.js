@@ -244,6 +244,48 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
   corMoonDropTex.minFilter = LinearFilter;
   corMoonDropTex.needsUpdate = true;
   const corMoonDropNode = texture(corMoonDropTex);
+  // Bishop's Ring (bishop.js, gated by bishop-reference.mjs): the
+  // STRATOSPHERIC diffraction corona of a volcanically loaded sky
+  // - the 1888 Krakatoa Committee report's printed geometry
+  // inverted through the same certified Airy machinery, its
+  // amplitude the MEASURED OMPS volcanic excess over the Kremser
+  // background through the (tau/2) e^-tau slab law. Its own
+  // theta_max: the ring lives at 12-23 deg from the sun, not the
+  // corona's 6. Background stratosphere -> amp 0, branch off
+  // (cos cone 2) - today's sky draws nothing.
+  const bishopAmpU = uniform(0);
+  const bishopCosCone = uniform(2);
+  const bishopThetaMax = uniform(0.4887);
+  const bishopTex = new DataTexture(
+    new Float32Array(COR_N * 4),
+    COR_N,
+    1,
+    RGBAFormat,
+    FloatType
+  );
+  bishopTex.magFilter = LinearFilter;
+  bishopTex.minFilter = LinearFilter;
+  bishopTex.needsUpdate = true;
+  const bishopNode = texture(bishopTex);
+  // The lunar Bishop's ring - the report's own Table II holds
+  // moon rows ("a red haze round the moon all night", Thessalus);
+  // same pattern with the flat lunar disc, amplitude in the
+  // moonlight E0 frame. Its printed smaller apparent size ("in
+  // consequence of its inferior brilliancy") emerges through the
+  // theme's adaptation, not through a different pattern.
+  const bishopMoonAmp = uniform(0);
+  const bishopMoonCosCone = uniform(2);
+  const bishopMoonTex = new DataTexture(
+    new Float32Array(COR_N * 4),
+    COR_N,
+    1,
+    RGBAFormat,
+    FloatType
+  );
+  bishopMoonTex.magFilter = LinearFilter;
+  bishopMoonTex.minFilter = LinearFilter;
+  bishopMoonTex.needsUpdate = true;
+  const bishopMoonNode = texture(bishopMoonTex);
   // The camera's scene-space height (asinh world y, the shadow
   // map's own frame) - with aerialCamXZ it places the fragment
   // ray's origin for the deck-column read.
@@ -1077,11 +1119,11 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // is extinguished by the cloud composite itself (the dome is
     // behind every deck pixel) - a chi here would extinguish
     // twice.
-    const coronaAdd = (dirU, ampU, texN) => {
+    const coronaAdd = (dirU, ampU, texN, thMaxU = corThetaMax) => {
       const sinTh = cross(v, dirU).length();
       const th = asin(clamp(sinTh, 0.0, 1.0));
       const uC = th
-        .div(corThetaMax)
+        .div(thMaxU)
         .clamp(0.0, 1.0)
         .mul((COR_N - 1) / COR_N)
         .add(0.5 / COR_N);
@@ -1100,6 +1142,18 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     // does not touch moonlight.
     If(dot(v, corMoonDir).greaterThan(corMoonCosCone), () => {
       coronaAdd(corMoonDir, corMoonAmp, corMoonNode);
+    });
+    // Bishop's Ring: the stratospheric slab's diffraction at its
+    // own wider cone - the white inner space and reddish-brown
+    // border of the 1888 record around sun and moon. Same
+    // first-order road as the cirrus corona (the stratosphere
+    // sits above every deck, the composite carries the view-side
+    // extinction, tAir the eye->space leg).
+    If(cSunG.greaterThan(bishopCosCone), () => {
+      coronaAdd(sunDirW, bishopAmpU.mul(sunE), bishopNode, bishopThetaMax);
+    });
+    If(dot(v, corMoonDir).greaterThan(bishopMoonCosCone), () => {
+      coronaAdd(corMoonDir, bishopMoonAmp, bishopMoonNode, bishopThetaMax);
     });
     // The deck droplet coronas: amp = (paradox half * veil
     // transmittance, CPU) * the deck's slant tau along THIS
@@ -1572,6 +1626,36 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
           corMoonDropAmp.value = amp;
           corMoonDropCosCone.value =
             amp > 0 && coneRadMoonDrop > 0 ? Math.cos(coneRadMoonDrop) : 2;
+        }
+      };
+    })(),
+    // Bishop's Ring feed (bishop.js): patterns on source-disc
+    // drift, the measured-excess amplitude every frame; amp 0
+    // disables a branch outright. The moon ring anchors on the
+    // corMoonDir the cirrus set keeps live.
+    bishopRing: (() => {
+      let coneRad = 0;
+      let coneRadMoon = 0;
+      return {
+        setPattern(lut) {
+          bishopTex.image.data.set(lut.curve);
+          bishopTex.needsUpdate = true;
+          bishopThetaMax.value = lut.thetaMaxRad;
+          coneRad = lut.coneRad;
+        },
+        setAmp(amp) {
+          bishopAmpU.value = amp;
+          bishopCosCone.value = amp > 0 && coneRad > 0 ? Math.cos(coneRad) : 2;
+        },
+        setMoonPattern(lut) {
+          bishopMoonTex.image.data.set(lut.curve);
+          bishopMoonTex.needsUpdate = true;
+          coneRadMoon = lut.coneRad;
+        },
+        setMoon(amp) {
+          bishopMoonAmp.value = amp;
+          bishopMoonCosCone.value =
+            amp > 0 && coneRadMoon > 0 ? Math.cos(coneRadMoon) : 2;
         }
       };
     })(),

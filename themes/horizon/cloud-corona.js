@@ -383,8 +383,8 @@ export function coronaColdGate(t250) {
 // its own Hapke rendering draws. RGBA Float32Array in the
 // aureole-curve texture format; values stay in sr^-1 - the dome
 // multiplies by transmittance, amplitude and eclipse factor only.
-function packCoronaLUT(profFor, srcRadRad, limbAlpha) {
-  const thetaMaxRad = (CORONA_THETA_MAX_DEG * Math.PI) / 180;
+function packCoronaLUT(profFor, srcRadRad, limbAlpha, thetaMaxDeg) {
+  const thetaMaxRad = ((thetaMaxDeg ?? CORONA_THETA_MAX_DEG) * Math.PI) / 180;
   const dTheta = thetaMaxRad / CORONA_N;
   const thetas = [];
   for (let i = 0; i < CORONA_N; i++) thetas.push((i + 0.5) * dTheta);
@@ -410,12 +410,14 @@ function packCoronaLUT(profFor, srcRadRad, limbAlpha) {
 export function buildCloudCoronaLUT(
   srcRadRad,
   dUm = CORONA_D_UM,
-  limbAlpha = undefined
+  limbAlpha = undefined,
+  thetaMaxDeg = undefined
 ) {
   return packCoronaLUT(
     (um, thetas) => airyPattern(dUm, um, thetas),
     srcRadRad,
-    limbAlpha
+    limbAlpha,
+    thetaMaxDeg
   );
 }
 

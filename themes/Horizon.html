@@ -191,7 +191,10 @@
         (measured snow off / tile endpoint override), snowage=0
         (keep the drawn snow class fresh), seasmoke=0 (never
         steam the sea), sprite=N (red sprite above every Nth
-        synthetic strike - use with strike=N), soil=0 (pin
+        synthetic strike - use with strike=N), bishop=N (force
+        the stratospheric excess to volcScale N for the 1888
+        Bishop's ring - harness), bishopring=0 (never draw the
+        ring), soil=0 (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
         (skip satellite irradiance), ghi=W (override it), debug=1,
@@ -571,6 +574,12 @@
         TAU_MIN
       } from './horizon/aerosol.js';
       import {aureoleSet} from './horizon/aureole.js';
+      import {
+        bishopAmpOf,
+        bishopDiameterUm,
+        bishopExcessTau,
+        buildBishopLUT
+      } from './horizon/bishop.js';
       import {
         buildCloudCoronaLUT,
         buildDropletCoronaLUT,
@@ -2377,6 +2386,7 @@
       // ?volcanic=0 pins the background.
       let stratVolcScale = 1;
       let stratSeq = 0;
+      let bishopSaid = false;
       async function syncStratAOD() {
         if (params.get('volcanic') === '0') return;
         const seq = ++stratSeq;
@@ -7919,6 +7929,9 @@
         if (sunDrift) {
           coronaSrcR = R;
           atmo.cloudCorona.setPattern(buildCloudCoronaLUT(R || undefined));
+          // Bishop's Ring rides the same disc drift - the 1888
+          // stratospheric pattern convolved with the live sun.
+          atmo.bishopRing.setPattern(buildBishopLUT(R || undefined));
         }
         // The deck droplet pattern rides the same disc drift AND
         // the measured air-mass class (marine when sea salt owns
@@ -7940,6 +7953,9 @@
           coronaSrcRMoon = RM;
           atmo.cloudCorona.setMoonPattern(
             buildCloudCoronaLUT(RM || undefined, CORONA_D_UM, [0, 0, 0])
+          );
+          atmo.bishopRing.setMoonPattern(
+            buildBishopLUT(RM || undefined, [0, 0, 0])
           );
         }
         if (moonDrift || cls !== dropClsMoon) {
@@ -10059,6 +10075,33 @@
               ? DROPLET_DIFF_SHARE * cirrusT
               : 0
           );
+          // Bishop's Ring: the measured OMPS excess through the
+          // 15-25 km chord (bishop.js). Background stratosphere
+          // -> exactly 0, branch off; the cloud decks in front
+          // extinguish it in the composite like every dome term.
+          // ?bishop=N forces the volcScale (harness capture of a
+          // Krakatoa-class sky); ?bishopring=0 is the labelled
+          // A/B override.
+          const vsBishop =
+            +params.get('bishop') > 1 ? +params.get('bishop') : stratVolcScale;
+          const bishopA =
+            params.get('bishopring') !== '0' && sun.alt > 0
+              ? bishopAmpOf(vsBishop, Math.sin(sun.alt), eyeVeilM)
+              : 0;
+          atmo.bishopRing.setAmp(bishopA);
+          if (bishopA > 0 && !bishopSaid) {
+            bishopSaid = true;
+            record(
+              "Bishop's ring (1888 Krakatoa optics)",
+              'd = ' +
+                bishopDiameterUm().toFixed(2) +
+                ' um, excess tau ' +
+                bishopExcessTau(vsBishop).toExponential(2) +
+                ' (OMPS x' +
+                vsBishop.toFixed(2) +
+                ')'
+            );
+          }
         }
         const moonUp = moon.alt > 0 ? 0.07 * (1 - day) : 0;
         if (atmo.ok) {
@@ -12024,6 +12067,23 @@
                     coronaAmp(
                       cirrusSlantTau(cHighFrac, Math.sin(moon.alt), eyeVeilM)
                     )
+                : 0
+            );
+            // The lunar Bishop's ring: the report's own moon rows
+            // ("a red haze round the moon all night"). Same
+            // measured excess, moonlight E0 frame; its printed
+            // smaller apparent extent emerges via adaptation.
+            const vsBishopM =
+              +params.get('bishop') > 1
+                ? +params.get('bishop')
+                : stratVolcScale;
+            atmo.bishopRing.setMoon(
+              params.get('bishopring') !== '0' && moon.alt > 0
+                ? moonIrradianceE0(
+                    astro.moonRel,
+                    astro.moonDistKm,
+                    1 - (astro.lunarEcl?.inUmbra ?? 0)
+                  ) * bishopAmpOf(vsBishopM, Math.sin(moon.alt), eyeVeilM)
                 : 0
             );
             // The moon's DECK droplet corona - the classic

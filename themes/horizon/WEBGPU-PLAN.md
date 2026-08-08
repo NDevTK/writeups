@@ -6766,6 +6766,94 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   notes worth relaying: the README's browser-NSS promise is
   unfulfilled in this image, and toolTrustFailureCodes reports
   java_truststore_seed_failed.
+- DONE (Bishop's Ring from its own primary: Aug 8 sixty-fourth
+  push - bishop.js + bishop-reference.mjs + the TSL ring pair +
+  wiring): the stratospheric diffraction corona of a volcanically
+  loaded sky, from the phenomenon's 1888 primary - the Royal
+  Society Krakatoa Committee report, Part IV Sec. I(e) (E.
+  Douglas Archibald, pp. 232-263), the 44 MB archive.org scan the
+  sixty-third session unlocked. Per the standing scan rule every
+  shipped value was MACHINE-READ FROM THE PAGE IMAGES (report
+  pages 232/235/236/237/238/256/257 = scan 338/341-344/362-363,
+  rendered at 150 dpi and read page by page; OCR used only to
+  locate them). What the pages print: Bishop's Sep 5 1883
+  Honolulu discovery ("20 deg to 30 deg from the sun ... whitish
+  haze with pinkish tint, shading off into lilac or purple ...
+  hardly a conspicuous object"); the Carola's "deep red outer
+  margin" (diffraction, the reverse of the ice halo); Cornu's
+  inside-out tint order; Table II means 21 deg 7' / 45 deg 33'
+  (adopted 21 / 45 deg 30'); Ricco's May 1884 theodolite triplet
+  21 deg 36' / 30 deg 20' / 42 deg 52' (the value Archibald
+  himself elevates); Riggenbach's independent 20/28/44; the
+  63-observation sunset dilatation table; the purple-glow bridge
+  (18.6 deg at ZD 92-94, the glow starting at the dilated
+  corona); the STOKES REDUCTION sin(D/2) = N lambda/d with
+  N = 0.7655 / 1.7571 ("indebted to Professor Stokes") and its
+  particle table 0.00165/0.00162/0.00150 mm -> mean 0.00159 mm =
+  0.00006 in adopted; Forel 0.003 mm and Flogel 0.001 mm
+  independent; visibility to June 1886; equatorial washout to "a
+  mere glare" where densest. THE FIND: Stokes' printed constants
+  are the first two J0 ZEROS OVER PI (2.40483/pi, 5.52008/pi -
+  the repo's own A&S anchors, matched to the era's table
+  precision; a gate landmark). His first-order criterion places
+  the ring at u = 2.405 - the CENTRAL LOBE's shoulder - so the
+  drawn diameter re-inverts the report's best measurement
+  through the theme's one certified diffraction machinery
+  instead (the Sassen road the cirrus corona took): Ricco's
+  printed maximum-intensity radius 15 deg 10' identified with
+  the first bright Airy ring (u = j2,1 = 5.13562, re-derived by
+  direct maximisation in the gate) at the photopic 550 nm
+  channel gives d = 3.44 um - ON Forel's independent printed
+  0.003 mm, and differing from Archibald's 1.59 um by EXACTLY
+  j21/j01 = 2.1356 (gate landmark: one criterion constant
+  between the two printed reductions). The other two printed
+  anchors then EMERGE unfitted: the mid-spectrum first minimum
+  lands at 11.3 deg vs the printed 10.5 inner radius, and the
+  printed 22.75 outer red limit falls between the red first
+  ring (18.9) and red second zero (26.2). AMPLITUDE, all
+  measured: tau_ring = (volcScale - 1) x chainAOD675() - the
+  live OMPS-LP excess over the shipped Kremser background chain
+  (the printed formula itself FORBIDS a background ring: no
+  sin <= 1 solution for the quiescent sub-0.2 um layer) - on
+  the exact shellChordAM chord through the printed 15-25 km
+  Junge layer, through the cirrus corona's own (tau/2) e^-tau
+  slab law, achromatic by the aureole's geometric-cross-section
+  convention (x ~ 20). Visibility EMERGES radiometrically: at
+  volcScale 8 the ring modulates the circumsolar Rayleigh floor
+  at the tens-of-percent level ("visible every day and all
+  day"); an unpainted quiet stratosphere adds EXACTLY zero; the
+  colormap-floor read stays under 10% even as an upper bound -
+  no coded threshold anywhere. Drawn as a corona-family branch:
+  coronaAdd generalised to per-branch theta_max (28 deg,
+  encircled-energy landmark > 90%), buildCloudCoronaLUT gained
+  an optional thetaMaxDeg (default untouched - cloud-corona gate
+  green unchanged), sun ring under sunE with tAir, LUNAR ring on
+  the corMoonDir/moonIrradianceE0 frame (the report's own moon
+  rows; its printed smaller apparent extent - "in consequence of
+  its inferior brilliancy" - now emerges through adaptation
+  rather than being drawn smaller). ?bishop=N forces a
+  Krakatoa-class volcScale for capture, ?bishopring=0 is the
+  labelled A/B override. VERIFIED IN PIXELS: A/B pairs at the
+  noon fixture - identical saturated core, additions confined to
+  the 28 deg cone, and the off-glare structure at the Airy
+  radii for d = 3.44 um (red first ring ~19-20 deg, green
+  second ~25.4, blue third ~28.2 in the zenith-aim cut) with
+  the lilac-into-blue rim of Bishop's own description visible
+  at the glare's edge. Documented scope: the sunset dilatation
+  and the equatorial multiple-scattering washout are carried as
+  printed record, not modelled; quiet-time OMPS excesses are
+  fine-mode and their drawn ring is sub-visible by magnitude
+  (the emergence landmark); supernumerary rings of the
+  monodisperse "supposed spherical" model would smear under the
+  real 1883 size dispersion (no printed distribution to carry).
+  The user's note that bot-guarded pages can be fetched is
+  received - nothing in this pass needed the two interactive
+  bot managers, and the recorded stance stands until a pass
+  actually requires one. validate.sh full PASS (104 CPU gates
+  incl. the new 21-landmark bishop gate, all 7 GPU probes; the
+  probes need BASE=http://localhost:8901/themes/horizon/harness
+  - the script default is the bare origin and 404s, worth a
+    future default fix).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
