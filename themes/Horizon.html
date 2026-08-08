@@ -188,7 +188,8 @@
         (skip OSM cable cars), turbines=0 (skip OSM wind
         turbines), peaks=0 (skip summit labels),
         discharge=0 (pin river widths to the ladder), snowcover=0|URL
-        (measured snow off / tile endpoint override), soil=0 (pin
+        (measured snow off / tile endpoint override), snowage=0
+        (keep the drawn snow class fresh), soil=0 (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
         (skip satellite irradiance), ghi=W (override it), debug=1,
@@ -694,6 +695,11 @@
       import {buildWindmill} from './horizon/windmills.js';
       import {farmFactors} from './horizon/wakes.js';
       import {snowField, SNOW_LAYER, SNOW_Z} from './horizon/snowcover.js';
+      import {
+        SNOW_FRESH_RGB,
+        snowAlbedoFromSeries,
+        snowDisplayRGB
+      } from './horizon/snowage.js';
       import {
         LOW_FRAC,
         MID_FRAC,
@@ -2402,6 +2408,9 @@
       // measured snow fraction (the printed 0.1 m ramp read as
       // the areal fraction).
       let lakeIceH = 0; // cm, 0 = unfrozen
+      // Snow-age display class (snowage.js): fresh until the
+      // archive series says otherwise.
+      let snowAgeRGB = SNOW_FRESH_RGB.slice();
       let lakeIceSeq = 0;
       async function syncLakeIce() {
         if (params.get('lakeice') === '0' || Math.abs(state.lat) < 35) {
@@ -2444,6 +2453,58 @@
             );
         } catch {
           /* feed unreachable - lakes stay liquid */
+        }
+      }
+      // Snow age (snowage.js): the FSM 1.0 prognostic albedo -
+      // Eq. 10 with Table 2 verbatim - integrated over the
+      // trailing 90 days of the SAME keyless ERA5 archive the
+      // lake ice uses (daily snowfall_sum + temperature_2m_mean).
+      // Fresh storms brighten the drawn snow class, cold age dims
+      // it slowly, melt collapses it in days; the display colour
+      // is the fresh class scaled by the printed alpha/alb_max.
+      let snowAgeSeq = 0;
+      async function syncSnowAge() {
+        if (params.get('snowage') === '0') return;
+        const seq = ++snowAgeSeq;
+        try {
+          const d = now();
+          const end = d.toISOString().slice(0, 10);
+          const start = new Date(d.getTime() - 90 * 86400000)
+            .toISOString()
+            .slice(0, 10);
+          const r = await fetch(
+            'https://archive-api.open-meteo.com/v1/archive?latitude=' +
+              state.lat.toFixed(3) +
+              '&longitude=' +
+              state.lon.toFixed(3) +
+              '&start_date=' +
+              start +
+              '&end_date=' +
+              end +
+              '&daily=snowfall_sum,temperature_2m_mean&timezone=UTC'
+          );
+          const j = await r.json();
+          if (seq !== snowAgeSeq) return;
+          const sf = j?.daily?.snowfall_sum;
+          const tm = j?.daily?.temperature_2m_mean;
+          if (!Array.isArray(sf) || !Array.isArray(tm) || !sf.length) return;
+          const days = sf.map((s, i) => ({snowCm: s || 0, tC: tm[i] ?? 0}));
+          const alpha = snowAlbedoFromSeries(days);
+          snowAgeRGB = snowDisplayRGB(alpha);
+          const lastSnow = sf
+            .map((s, i) => (s > 0.1 ? i : -1))
+            .reduce((a, b) => Math.max(a, b), -1);
+          record(
+            'FSM snow age',
+            'albedo ' +
+              alpha.toFixed(2) +
+              (lastSnow >= 0
+                ? ', ' + (sf.length - 1 - lastSnow) + ' d since snowfall'
+                : ', no snowfall in 90 d') +
+              ' (ERA5 archive)'
+          );
+        } catch {
+          /* feed unreachable - snow stays fresh */
         }
       }
       // Melt ponds on the measured ice (meltpond.js): Rosel's
@@ -5236,7 +5297,7 @@
           // snow albedo is the terrain's own.
           bldMat.colorNode = tslMix(
             tslAttribute('color'),
-            tslVec3(0.87, 0.9, 0.93),
+            terrainUniforms.uSnowCol,
             tslAttribute('roof')
               .mul(tslAttribute('rsnow').max(bldSnowU))
               .clamp(0, 1)
@@ -8524,6 +8585,7 @@
         syncStratAOD();
         syncSeaIce();
         syncLakeIce();
+        syncSnowAge();
         // The lamp cloud is anchored to the OLD box - drop it now,
         // syncLights rebuilds it Earth-anchored on the new one.
         if (lampPts) {
@@ -11229,14 +11291,21 @@
         // measured Stefan thickness, ramped to the terrain's own
         // snow class by the measured snow fraction (the printed
         // 0.1 m snow ramp read as the areal fraction).
+        // The snow display class carries its FSM age (snowage.js)
+        // to the ground, the roofs and the lake-ice ramp alike.
+        terrainUniforms.uSnowCol.value.set(
+          snowAgeRGB[0],
+          snowAgeRGB[1],
+          snowAgeRGB[2]
+        );
         terrainUniforms.uLakeIce.value = lakeIceH > 0 ? 1 : 0;
         if (lakeIceH > 0) {
           const aBare = lakeIceAlphaBare(lakeIceH / 100);
           const rampS = Math.min(Math.max(snowFSC || 0, 0), 1);
           terrainUniforms.uLakeIceCol.value.set(
-            aBare + rampS * (0.87 - aBare),
-            aBare + rampS * (0.9 - aBare),
-            aBare + rampS * (0.93 - aBare)
+            aBare + rampS * (snowAgeRGB[0] - aBare),
+            aBare + rampS * (snowAgeRGB[1] - aBare),
+            aBare + rampS * (snowAgeRGB[2] - aBare)
           );
         }
 
@@ -12387,6 +12456,8 @@
         syncSeaIce();
         syncLakeIce();
         setInterval(syncLakeIce, 6 * 60 * 60 * 1000);
+        syncSnowAge();
+        setInterval(syncSnowAge, 6 * 60 * 60 * 1000);
         setInterval(syncSnowCover, 6 * 60 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
         syncISS();

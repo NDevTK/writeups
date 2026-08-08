@@ -134,7 +134,12 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     // snow-blended CPU-side. Applies to 'lake' pixels only; the
     // sea keeps its own measured concentration path.
     uLakeIce: uniform(0),
-    uLakeIceCol: uniform(new Vector3(0.2, 0.2, 0.2))
+    uLakeIceCol: uniform(new Vector3(0.2, 0.2, 0.2)),
+    // Snow display class, aged CPU-side by the printed FSM law
+    // (snowage.js): the fresh (0.87, 0.9, 0.93) scaled by the
+    // live alpha/alb_max factor from the archive snowfall and
+    // temperature series. Roofs share this uniform.
+    uSnowCol: uniform(new Vector3(0.87, 0.9, 0.93))
   };
 
   const thash = Fn(([p]) =>
@@ -579,7 +584,7 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     // the measured FSC and the live snowline - still wins above,
     // so accumulation zones whiten exactly as before.
     const col2s = mix(col2, land.rgb, tintSurf.mul(u.uLandOn).mul(0.85));
-    const col3 = mix(col2s, vec3(0.87, 0.9, 0.93), snow);
+    const col3 = mix(col2s, u.uSnowCol, snow);
     // Sea: Monahan & O'Muircheartaigh (1980) whitecap fraction
     // W = 3.84e-6 * U^3.41.
     const U = max(u.uWindMs, 0.8);

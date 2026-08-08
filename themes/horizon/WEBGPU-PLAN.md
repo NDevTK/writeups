@@ -6276,6 +6276,51 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     Ebihara 2017's full ladder sits in a WEKO3 SPA (KURENAI) that
     serves only its shell to every API probed, and Gao 2020 is
     closed - but nothing load-bearing waits on them.
+- DONE (snow albedo aging, Aug 8 fifty-fourth push - the snow on
+  the ground gets a history): the terrain's snow class was a fixed
+  fresh white - vec3(0.87, 0.9, 0.93) painted identically onto a
+  January drift and an April crust - repeated verbatim on the
+  building roofs and as the lake-ice snow-ramp target. Now it ages
+  by print. SOURCE (read in full, CC-BY): Essery 2015 (GMD 8,
+  3867), FSM 1.0, whose prognostic albedo is the classic
+  ISBA/Douville-lineage scheme as the paper itself prints -
+  Eq. 10, d(alpha)/dt = (alb_min - alpha)/tau +
+  (Sf/S_alpha)(alb_max - alpha) - with Table 2 verbatim: alb_max
+  0.8, alb_min 0.5, S_alpha 10 kg/m^2, T_alpha 2 C, tau_cold
+  1000 h, tau_melt 100 h (the printed 10x: melt collapses in days
+  what cold barely dents in months); Eq. 11 (the diagnostic
+  variant) carried for the cross-gate. DRIVER: the same keyless
+  open-meteo ERA5 archive the Stefan lake ice uses - trailing 90
+  days of daily snowfall_sum + temperature_2m_mean at the
+  visitor, snowfall converted by the feed's own printed "divide
+  by 7" depth-to-water rule (7 cm of depth IS the printed 10
+  kg/m^2 refresh mass, exactly). The daily step solves the linear
+  ODE in closed form, so the integration is sub-step independent;
+  cold-vs-melting switches on the daily mean against 0 C
+  (documented archive proxy for FSM's surface state). DISPLAY
+  FOLD, stated not invented: the fresh class is PINNED at alb_max
+  (visible-band reflectance rightly sits above broadband) and
+  rides the printed broadband factor alpha/alb_max down to
+  exactly 0.625 of fresh at the aged floor - the visible
+  darkening of real old snow is impurity- and wetness-driven and
+  FSM's broadband range folds those in. WIRED: terrain-tsl
+  uSnowCol uniform (ground mix), the roofs share the same
+  uniform (their comment already promised "the snow albedo is
+  the terrain's own"), and the lake-ice ramp targets the aged
+  class; ?snowage=0 keeps it fresh; panel records "FSM snow age:
+  albedo 0.71, 12 d since snowfall". LANDMARKS (snowage-reference,
+  all gated): Table 2 verbatim; the closed step IS Eq. 10 (Euler
+  convergence + exact half-day composition); Fig. 3a re-derived -
+  e-fold at exactly tau for both timescales, fortnight of cold
+  keeps 0.714 while a fortnight of melt lands 0.510; one 7 cm
+  storm day recovers 62% of the gap to fresh; Eq. 11 agrees
+  about temperature (fresh at -2 C, floor at 0 C, exact midpoint
+  -1 C); a synthetic season - weekly storms hold winter at 0.72,
+  then melt crosses 0.6 on day 4 and sits within 0.006 of the
+  floor by day 15: the famous spring darkening emerges from two
+  printed timescales with nothing tuned; display fold exact at
+  both ends. Sea ice keeps its OWN printed snow optics (Table 2
+  snow-covered-ice rows in seaice.js) - no change there.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
