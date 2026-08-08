@@ -5845,6 +5845,52 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   rolled to the lon-0 convention - the map checks are why the
   face is right). VALIDATE PASS (all references + 7 GPU
   probes).
+- DONE (the eclipsed moon, Aug 8 forty-second push - TWO papers
+  read in full and the copper tint retired onto a printed
+  shadow): the lunar-eclipse darkening was a hand copper lerp
+  (the block itself called it "the documented display mapping
+  of a mid-scale L2 eclipse") plus a 0.18 penumbral constant.
+  Mallama 2022 (arXiv:2112.08966, 12 pp) prints the whole
+  answer: his Table B.1 is the DISK-RESOLVED shadow profile -
+  magnitudes lost in Johnson B/V/R at 50 positions from the
+  outer penumbral boundary to the shadow centre - vendored
+  VERBATIM in lunar-umbra.js (stood in for 440/550/680, band
+  centres within ~15 nm, stated). The moon material now
+  samples it PER FRAGMENT: pos = 1 - d/penumbra with the live
+  penumbral radius (his printed scale note), the shadow-centre
+  direction from the same geocentric vectors the eclipse
+  geometry already used (antisolar-minus-moon offset through
+  the celestial group's sidereal frame) - so the umbral edge
+  CREEPS ACROSS THE MEASURED MARIA FACE from the last push,
+  blue dying first and red last, penumbra included (the 0.18
+  constant retires with the copper; earthshine is left
+  unshadowed - its own geometry). GATES, four landmarks:
+  (1) the table's printed structure - 50 rows monotone, centre
+  B/V/R 22.24/15.44/11.02 verbatim, the colour branches
+  joined at a third of the way in and forked after, as the
+  paper narrates; (2) the printed drops - centre blue "almost
+  a billion" (7.9e8), red "20,000 times" (2.6e4); (3) THE
+  EMERGENT REPRODUCTION - disc-integrating the vendored
+  resolved table with the paper's own stated geometry
+  (penumbral annulus = lunar diameter; umbra/rMoon from the
+  theme's own eclipses.js at mean distances) lands his
+  integrated Table B.2 endpoints to 0.01-0.02 mag (B +7.38 vs
+  7.39, V +1.42 vs 1.44, R -3.06 vs -3.05) - the integrated
+  table re-emerges from the resolved one, no fit - and his
+  full-moon baseline -12.73 sits 0.01 from the theme's shipped
+  MOON_FULL_VMAG; (4) the half-million span (4.7e5, his
+  "nearly one-half million") and the MEASURED corroboration -
+  Ugolnikov, Maslov & Korotkiy 2011 (arXiv:1106.6178, 5 pp,
+  read in full) measured the June 2011 umbra at 503/677/867 nm
+  and print "falls down to about 1e-6" at 503 - this table's
+  deep-umbra green is 6.7e-7, a factor 1.5. Stated scope: the
+  profile is for a clear atmosphere - Mallama prints that
+  volcanic aerosol darkens eclipses below it ("an approximate
+  upper limit" after major eruptions), the named hook for a
+  future coupling to the theme's measured stratospheric AOD
+  feed. VALIDATE PASS (all references + 7 GPU probes; the
+  suite's GPU legs needed the restart-killed :8901 server
+  rebooted - environment, not code).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

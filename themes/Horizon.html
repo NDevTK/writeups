@@ -388,6 +388,7 @@
         MOON_POLE_RA_DEG,
         MOON_POLE_DEC_DEG
       } from './horizon/moonface.js';
+      import {buildUmbraLUT} from './horizon/lunar-umbra.js';
       import {
         MOON_ALB,
         MOON_ALB_W,
@@ -6917,7 +6918,6 @@
       const eshV = new THREE.Vector3(); // earthshine phase temp
       // Danjon L2 copper for the fully eclipsed moon (display
       // level ~10% of the sunlit albedo, strongly reddened).
-      const eclCopper = new THREE.Color(0.3, 0.09, 0.04);
       const mV1 = new THREE.Vector3();
       const mV2 = new THREE.Vector3();
       const mV3 = new THREE.Vector3();
@@ -7097,7 +7097,24 @@
       const mfPole = new THREE.Vector3();
       const mfEarth = new THREE.Vector3();
       const mfM4 = new THREE.Matrix4();
-      const moonObj = createMoonMaterial(atmo.skyRadiance, moonFaceTex);
+      // The eclipse shadow profile (lunar-umbra.js): Mallama's
+      // printed Table B.1 as a 1D LUT - the copper display tint
+      // and the 0.18 penumbral constant retire.
+      const umbraTex = new THREE.DataTexture(
+        buildUmbraLUT(64),
+        64,
+        1,
+        THREE.RGBAFormat,
+        THREE.FloatType
+      );
+      umbraTex.minFilter = umbraTex.magFilter = THREE.LinearFilter;
+      umbraTex.needsUpdate = true;
+      const ecV = new THREE.Vector3();
+      const moonObj = createMoonMaterial(
+        atmo.skyRadiance,
+        moonFaceTex,
+        umbraTex
+      );
       const moonU = moonObj.u;
       const moonDisc = new THREE.Mesh(
         new THREE.SphereGeometry(24, 24, 18),
@@ -8682,6 +8699,15 @@
                 sl * AE.KM_PER_AU,
                 ml * AE.KM_PER_AU
               );
+              // The shadow centre's offset from the moon on the
+              // sky (equatorial frame): antisolar minus moon unit
+              // vectors - applied through the celestial group's
+              // sidereal frame at the drawn disc.
+              astro.lunarEcl.offEq = [
+                -sv.x / sl - mv.x / ml,
+                -sv.y / sl - mv.y / ml,
+                -sv.z / sl - mv.z / ml
+              ];
               if (astro.lunarEcl.inUmbra > 0.02 && !astro.lunarSaid) {
                 astro.lunarSaid = true;
                 say(
@@ -9164,14 +9190,20 @@
         // gently, as it really does.
         {
           const le = astro.lunarEcl;
-          const imm = le ? THREE.MathUtils.clamp(le.inUmbra, 0, 1) : 0;
-          const pen = le
-            ? THREE.MathUtils.clamp(le.penMag, 0, 1) * (1 - imm)
-            : 0;
-          moonU.albM.value
-            .setHex(0xcdd4e2)
-            .multiplyScalar(1 - 0.18 * pen)
-            .lerp(eclCopper, imm);
+          const on = le && le.penMag > 0 ? 1 : 0;
+          moonU.eclOn.value = on;
+          if (on) {
+            ecV
+              .set(le.offEq[0], le.offEq[1], le.offEq[2])
+              .applyQuaternion(celestial.getWorldQuaternion(mfQ));
+            moonU.shadowDir.value
+              .copy(moonDisc.position)
+              .normalize()
+              .add(ecV)
+              .normalize();
+            moonU.shadowPen.value = le.penumbra;
+          }
+          moonU.albM.value.setHex(0xcdd4e2);
         }
 
         polar.rotation.x = -(90 - state.lat) * RAD;

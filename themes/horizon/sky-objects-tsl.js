@@ -130,11 +130,18 @@ export function createVeilMaterial() {
 // over the disc - by day the dark limb carries the sky's own
 // radiance instead of occluding it (the disc stays opaque, so lunar
 // occultations of stars still work).
-export function createMoonMaterial(skyFor, faceTex) {
+export function createMoonMaterial(skyFor, faceTex, umbraTex) {
   const u = {
     sunDirM: uniform(new Vector3(0, 1, 0)),
     albM: uniform(new Color('#cdd4e2')),
     glowM: uniform(new Color('#0c0f16')),
+    // Lunar-eclipse shadow (lunar-umbra.js): the shadow centre's
+    // world direction, the penumbral angular radius, and the
+    // gate. The per-fragment position in the shadow samples
+    // Mallama's printed profile.
+    shadowDir: uniform(new Vector3(0, 0, 1)),
+    shadowPen: uniform(0.02),
+    eclOn: uniform(0),
     // earthlight/sunlight illuminance ratio (earthshine.js: the
     // Goode 2001 measured Earth albedo through the Lambert phase
     // law at the exact complement of the lunar phase; ~8e-5 at
@@ -228,7 +235,23 @@ export function createMoonMaterial(skyFor, faceTex) {
   // coordinates ARE selenographic. Row 0 = north at v = 0
   // (DataTexture memory order), column 0 = lon 0, east positive;
   // texel 128 = 1.0.
-  let shape = lunar.add(earthlit);
+  // The eclipse shadow multiplies the SUN-lit term only (the
+  // earthshine term is its own geometry): per-fragment shadow
+  // position pos = 1 - d/penumbra (Mallama's Pos'n with the live
+  // penumbral radius), the printed profile from the LUT.
+  let sunTerm = lunar;
+  if (umbraTex) {
+    const skyD = normalize(positionWorld.sub(cameraPosition));
+    const dAng = acos(clamp(dot(skyD, u.shadowDir), -1.0, 1.0));
+    const sPos = clamp(
+      float(1).sub(dAng.div(max(u.shadowPen, 1e-6))),
+      0.0,
+      1.0
+    );
+    const sFac = texture(umbraTex).sample(vec2(sPos, 0.5)).rgb;
+    sunTerm = sunTerm.mul(mix(vec3(1, 1, 1), sFac, u.eclOn));
+  }
+  let shape = sunTerm.add(earthlit);
   if (faceTex) {
     const nL = normalize(positionLocal);
     const fLat = asin(clamp(nL.y, -1.0, 1.0));
