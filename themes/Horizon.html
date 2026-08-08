@@ -792,7 +792,9 @@
         C_TO_K,
         pscIceAmp,
         PSC_ALT_M,
+        PSC_AMP,
         T_ICE_K,
+        TAU_WAVE,
         WAVE_ICE_D_UM
       } from './horizon/psc.js';
       import {
@@ -7399,7 +7401,12 @@
         STEVE_LAM_RED,
         cieY(STEVE_LAM_RED)
       );
-      const PSC_DISPLAY_K = 0.45; // display exposure of the sr^-1 LUT
+      // The nacreous slab amplitude is DERIVED now (psc.js
+      // PSC_AMP): Reichardt's printed lidar chain inverts to
+      // TAU_WAVE, drawn through the corona machinery's
+      // (tau/2) e^-tau, times the one documented exposure - the
+      // hand PSC_DISPLAY_K = 0.45 of the 68th pass is retired
+      // (the derived value lands at 0.446).
       let liveES = null;
       const strikeOv = params.has('strike') ? +params.get('strike') : null;
       const spriteOv = params.has('sprite') ? +params.get('sprite') : 0;
@@ -11422,9 +11429,9 @@
               p.mesh.lookAt(camera.position.x, pos.y, camera.position.z);
               p.u.sunDir.value.copy(skyPoint(sun.alt, sun.az, 1)).normalize();
               p.u.ampV.value.set(
-                beam[0] * pscA * PSC_DISPLAY_K,
-                beam[1] * pscA * PSC_DISPLAY_K,
-                beam[2] * pscA * PSC_DISPLAY_K
+                beam[0] * pscA * PSC_AMP,
+                beam[1] * pscA * PSC_AMP,
+                beam[2] * pscA * PSC_AMP
               );
             }
             if (lit && !pscSaid) {
@@ -11438,7 +11445,8 @@
                   WAVE_ICE_D_UM[0] +
                   '-' +
                   WAVE_ICE_D_UM[1] +
-                  ' µm iridescence'
+                  ' µm · derived tau ' +
+                  TAU_WAVE.toFixed(2)
               );
             }
           } else {

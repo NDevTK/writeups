@@ -7229,6 +7229,45 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   fresh scan had published: the diurnal cycle observably in the
   feed); browser load capture PAGEERROR-free. Full gate green -
   109 CPU references + 7 GPU probes.
+- DONE (Aug 8, the review session's 71st pass - the nacreous
+  optical depth derived; PSC_DISPLAY_K retired): the 68th pass's
+  recorded future work is done, from the SAME two primaries
+  already read in full - no new sources needed, the numbers were
+  already printed. Reichardt 2004 prints the whole lidar chain
+  for the wave-ice phases: PSC geometrical thickness "nearly
+  constant at ~3 km"; PSC-mean lidar ratios S̄par = 20 sr (M4)
+  and 35 sr (M5) with their own definition S̄par = tau /
+  integrated backscatter; 355 nm backscatter-ratio maxima 10-20
+  in those phases and the PSC II core extremes "R > 25 at
+  355 nm, > 150 at 532 nm"; Pitts 2018 prints the wave-ice
+  classification R532 > 50 and defines R against the molecular
+  backscatter (their Eq. 1). psc.js now inverts Reichardt's
+  definition - tau = S̄par x (R-1) x beta_mol(180) x thickness -
+  with beta_mol from the theme's ONE Rayleigh (stratos.js
+  RAY_BETA at 440 nm, lambda^-4, the shipped 8 km barometric
+  profile, the Rayleigh 180-deg phase 3/(8pi)): the printed
+  bracket is tau 0.25-0.93 and the drawn TAU_WAVE = 0.48 is its
+  geometric mean - a real nacreous display is a thin-cirrus-
+  class cloud. Cross-gated at 532 nm: Pitts' classification
+  floor gives 0.27 (inside the bracket's low end) and
+  Reichardt's extreme 1.44 caps it - two instruments, two
+  wavelengths, one tau scale. van de Hulst's ADT extinction
+  efficiency (the corona machinery's own printed source) carries
+  the lidar tau to the visible: size-ensemble mean Q_ext 2.03 at
+  355 nm vs 1.88 at 550 nm (ratio 0.93, both at the extinction
+  paradox's 2). The slab amplitude becomes the corona machinery's
+  own thin-slab law at the derived depth - coronaAmp(TAU_WAVE) x
+  PSC_EXPOSURE = 0.446, recovering the 68th pass's capture-
+  verified 0.45 within 1% with PSC_EXPOSURE = 3 the ONE
+  documented display factor left (AGLOW_GAIN pattern; the pixel
+  verification carries over, no new captures needed).
+  Horizon.html swaps PSC_DISPLAY_K for the imported PSC_AMP and
+  the record line prints the derived tau. Five new landmarks in
+  psc-reference.mjs (14 total). Full gate green - 109 CPU
+  references + 7 GPU probes (one incidental find: the container
+  restart had killed the :8901 fixture server; all-probe FAIL
+  with every CPU gate green is the server-down signature -
+  restart from the repo root and re-run).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

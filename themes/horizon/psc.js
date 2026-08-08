@@ -71,13 +71,19 @@
  * needs the layer inside the dome's tone pipeline (recorded
  * refinement).
  *
- * Documented display constants: the slab amplitude (no printed
- * wave-PSC visible optical depth is in hand - a future pass
- * could derive one from the printed backscatter ratios and
- * lidar ratios) and the lenticular envelope geometry.
+ * Documented display constants: the lenticular envelope
+ * geometry and ONE additive-layer exposure (PSC_EXPOSURE, the
+ * AGLOW_GAIN pattern). The slab amplitude itself is DERIVED:
+ * Reichardt's printed lidar chain (S̄par, backscatter ratios,
+ * the ~3 km thickness) inverts to a wave-ice optical depth
+ * bracket, cross-checked at 532 nm against Pitts' printed
+ * wave-ice classification threshold, carried to the visible by
+ * van de Hulst's ADT extinction efficiency, and drawn through
+ * the corona machinery's own (tau/2) e^-tau thin-slab law.
  */
 
-import {airyPattern, CHANNEL_UM} from './cloud-corona.js';
+import {airyPattern, CHANNEL_UM, coronaAmp} from './cloud-corona.js';
+import {RAY_BETA} from './stratos.js';
 
 // ---- Pitts et al. 2018, printed ---------------------------------
 // Reference conditions: 50 hPa, 10 ppbv HNO3, 5 ppmv H2O.
@@ -163,3 +169,90 @@ export function nacreousRingDeg(dUm, lambdaUm) {
   const J21 = 5.13562; // first zero of J2 (A&S) - the ring max
   return (Math.asin((J21 * lambdaUm) / (Math.PI * dUm)) * 180) / Math.PI;
 }
+
+// ---- the DERIVED optical depth (the 68th pass's recorded
+// future work, now done) --------------------------------------
+// Reichardt 2004 prints the whole lidar chain for the wave-ice
+// phases: PSC geometrical thickness "nearly constant at ~3 km";
+// PSC-mean lidar ratios S̄par = 20 sr (M4) and 35 sr (M5) - their
+// own definition S̄par = tau / integrated-backscatter; 355 nm
+// backscatter ratios R reaching "maximum values of 10-20" in the
+// same phases, with the PSC II core hitting the extremes
+// "R > 25 at 355 nm, > 150 at 532 nm". Pitts 2018 classifies
+// wave ice at R532 > 50 (their Eq. 1 defines R against the
+// molecular backscatter). Inverting Reichardt's definition,
+//   tau = S̄par x (R - 1) x beta_mol(180 deg) x thickness,
+// with beta_mol from the theme's ONE Rayleigh (stratos.js
+// RAY_BETA at 440 nm, lambda^-4, the shipped 8 km barometric
+// profile, phase 3/(16pi)(1+cos^2 180) = 3/(8pi)).
+export const PSC_THICK_M = 3000; // printed "~3 km"
+export const S_PAR_ICE_SR = [20, 35]; // printed M4/M5 means
+export const R355_ICE_MAX = [10, 20]; // printed M4/M5 maxima
+export const R355_EXTREME = 25; // printed PSC II core (355 nm)
+export const R532_EXTREME = 150; // printed PSC II core (532 nm)
+export const PITTS_R532_WAVE = 50; // Pitts wave-ice class (P11)
+export const PSC_LIDAR_UM = 0.355; // the GKSS Raman lidar
+export const H_RAY_M = 8000; // the shipped Rayleigh scale height
+export function betaMol180(lamUm, hM) {
+  const b = RAY_BETA[2] * Math.pow(0.44 / lamUm, 4) * Math.exp(-hM / H_RAY_M);
+  return (b * 3) / (8 * Math.PI);
+}
+export function waveIceTau(
+  sSr,
+  rMinus1,
+  lamUm = PSC_LIDAR_UM,
+  dzM = PSC_THICK_M,
+  hM = PSC_ALT_M
+) {
+  return sSr * rMinus1 * betaMol180(lamUm, hM) * dzM;
+}
+// The printed bracket - M4 (20 sr, R-1 = 9) to M5 (35 sr,
+// R-1 = 19) over the printed 3 km - and the drawn value, its
+// geometric mean (documented reduction: the event's own phases
+// bound it; the 532 nm chain with Pitts' classification floor
+// and Reichardt's extreme brackets the same scale, the gate
+// holds both).
+export function waveIceTauBracket() {
+  return [
+    waveIceTau(S_PAR_ICE_SR[0], R355_ICE_MAX[0] - 1),
+    waveIceTau(S_PAR_ICE_SR[1], R355_ICE_MAX[1] - 1)
+  ];
+}
+export const TAU_WAVE = Math.sqrt(
+  waveIceTauBracket()[0] * waveIceTauBracket()[1]
+);
+
+// van de Hulst's anomalous-diffraction extinction efficiency
+// (1957 - the same printed source the corona machinery's Q -> 2
+// share rides): Q(rho) = 2 - 4 sin(rho)/rho + 4(1 - cos rho)/
+// rho^2 with rho = 2 x (n - 1) x pi D / lambda. It carries the
+// 355 nm tau to the visible: over the printed size span the
+// SIZE-ENSEMBLE mean Q sits at the extinction paradox's 2 at
+// both wavelengths (individual sizes wiggle - the drawn cloud
+// spans the sizes, so the ensemble is what the slab sees).
+export function qExtADT(dUm, lamUm, n = ICE_N) {
+  const rho = (2 * Math.PI * dUm * (n - 1)) / lamUm;
+  return (
+    2 - (4 * Math.sin(rho)) / rho + (4 * (1 - Math.cos(rho))) / (rho * rho)
+  );
+}
+export function qExtMeanADT(lamUm, n = ICE_N, steps = 12) {
+  let s = 0;
+  for (let i = 0; i < steps; i++) {
+    const d =
+      WAVE_ICE_D_UM[0] +
+      ((WAVE_ICE_D_UM[1] - WAVE_ICE_D_UM[0]) * (i + 0.5)) / steps;
+    s += qExtADT(d, lamUm, n);
+  }
+  return s / steps;
+}
+
+// The slab's drawn amplitude: the corona machinery's own thin-
+// slab law (tau/2) e^-tau at the DERIVED optical depth, times
+// one documented additive-layer exposure (the AGLOW_GAIN
+// pattern) - chosen as the small integer that lands the
+// capture-verified display level of the 68th pass (0.45); the
+// physics underneath is now derived, the exposure is the only
+// display factor left.
+export const PSC_EXPOSURE = 3;
+export const PSC_AMP = coronaAmp(TAU_WAVE) * PSC_EXPOSURE;

@@ -11,29 +11,52 @@
 //    span land in the classic nacreous colour zone (17-28 deg)
 //    with the exact inverse-size similarity and red outside
 //  - the LUT carries the closed-form Airy centre per size row
+//  - the slab's optical depth is DERIVED: Reichardt's printed
+//    lidar chain (S̄par 20/35 sr, R355 maxima 10-20, ~3 km) on
+//    the theme's one Rayleigh brackets tau, Pitts' printed
+//    wave-ice classification cross-checks it at 532 nm, van de
+//    Hulst's ADT carries it to the visible, and the corona
+//    machinery's (tau/2) e^-tau draws it - one documented
+//    exposure left (AGLOW_GAIN pattern)
 //  - the twilight window EMERGES from the shipped transmittance
 //    geometry: lit and reddened past ground sunset, planet-
 //    shadowed at the drawn shell's exact 4.97 deg horizon dip
 //  - fails closed: no measurement, no cloud
 import {
+  betaMol180,
   buildNacreousLUT,
   C_TO_K,
+  H_RAY_M,
   ICE_FWHM_K,
   ICE_LOGISTIC_W_K,
   ICE_N,
   ICE_SIGMA_G,
   nacreousRingDeg,
+  PITTS_R532_WAVE,
   PSC_ALT_M,
+  PSC_AMP,
+  PSC_EXPOSURE,
+  PSC_LIDAR_UM,
   PSC_TEX_H,
   PSC_TEX_W,
   PSC_THETA_MAX_DEG,
+  PSC_THICK_M,
   pscIceAmp,
+  qExtADT,
+  qExtMeanADT,
+  R355_ICE_MAX,
+  R532_EXTREME,
+  S_PAR_ICE_SR,
   T_ICE_K,
   T_NAT_K,
   T_STS_K,
-  WAVE_ICE_D_UM
+  TAU_WAVE,
+  WAVE_ICE_D_UM,
+  waveIceTau,
+  waveIceTauBracket
 } from './psc.js';
-import {CHANNEL_UM} from './cloud-corona.js';
+import {CHANNEL_UM, coronaAmp} from './cloud-corona.js';
+import {RAY_BETA} from './stratos.js';
 import {sunTransmittanceJS} from './sun-transmittance.js';
 
 let fail = 0;
@@ -134,6 +157,86 @@ const check = (name, ok, detail) => {
     `ice n = 1.31 and ensemble sigma_g = 1.38 carried from the print; the ` +
       `LOCALLY monodisperse draw rides Reichardt's stated narrow-distribution ` +
       `licence for wave PSCs`
+  );
+}
+
+// ---- 2b. the DERIVED optical depth ------------------------------
+// Reichardt 2004's own lidar chain, inverted (S̄par = tau over
+// integrated backscatter): the printed S̄par, backscatter-ratio
+// maxima and ~3 km thickness make a wave-ice optical depth
+// bracket on the theme's own Rayleigh; Pitts 2018's printed
+// wave-ice classification cross-checks the scale at 532 nm; van
+// de Hulst's ADT carries it to the visible.
+{
+  const bSea = betaMol180(0.44, 0);
+  check(
+    'molecular backscatter hinges on the shipped Rayleigh',
+    Math.abs(bSea - (RAY_BETA[2] * 3) / (8 * Math.PI)) < 1e-18 &&
+      Math.abs(
+        betaMol180(0.355, 24000) / betaMol180(0.532, 24000) -
+          Math.pow(532 / 355, 4)
+      ) < 1e-9 &&
+      Math.abs(betaMol180(0.44, H_RAY_M) / bSea - Math.E ** -1) < 1e-12,
+    `at 440 nm sea level exactly RAY_BETA x 3/(8pi) (the Rayleigh 180-deg ` +
+      `phase); lambda^-4 across the two lidar colours exact; one scale height ` +
+      `= one e-fold - the theme's ONE Rayleigh, no second constant`
+  );
+  const [lo, hi] = waveIceTauBracket();
+  check(
+    'printed lidar chain brackets the optical depth',
+    lo > 0.2 &&
+      lo < 0.3 &&
+      hi > 0.8 &&
+      hi < 1.0 &&
+      Math.abs(TAU_WAVE - Math.sqrt(lo * hi)) < 1e-12 &&
+      TAU_WAVE > 0.4 &&
+      TAU_WAVE < 0.6,
+    `M4 (20 sr, R-1 = 9) to M5 (35 sr, R-1 = 19) over the printed 3 km at ` +
+      `355 nm: tau ${lo.toFixed(2)}-${hi.toFixed(2)}; drawn TAU_WAVE = ` +
+      `${TAU_WAVE.toFixed(2)}, the bracket's geometric mean - a real nacreous ` +
+      `display is a thin-cirrus-class cloud, derived not styled`
+  );
+  const tPitts = waveIceTau(S_PAR_ICE_SR[0], PITTS_R532_WAVE - 1, 0.532);
+  const tExtreme = waveIceTau(S_PAR_ICE_SR[1], R532_EXTREME - 1, 0.532);
+  check(
+    'the 532 nm chain agrees across instruments',
+    tPitts > 0.2 &&
+      tPitts < 0.35 &&
+      tPitts < TAU_WAVE &&
+      tExtreme > 1 &&
+      tExtreme < 2 &&
+      TAU_WAVE < tExtreme,
+    `Pitts' wave-ice classification floor (R532 > 50) at the printed lidar ` +
+      `ratios: tau ${tPitts.toFixed(2)} - INSIDE the 355 nm bracket's low end; ` +
+      `Reichardt's PSC II extreme (R532 = 150): ${tExtreme.toFixed(2)} caps it; ` +
+      `the drawn value sits between the classification floor and the extreme - ` +
+      `two instruments, two wavelengths, one tau scale`
+  );
+  const q355 = qExtMeanADT(PSC_LIDAR_UM);
+  const q550 = qExtMeanADT(CHANNEL_UM[1]);
+  check(
+    'ADT carries the tau to the visible',
+    Math.abs(q355 - 2) < 0.4 &&
+      Math.abs(q550 - 2) < 0.4 &&
+      Math.abs(q550 / q355 - 1) < 0.15 &&
+      Math.abs(qExtADT(2.4, 0.532) - 2) < 0.5,
+    `size-ensemble mean Q_ext(ADT): ${q355.toFixed(2)} at 355 nm, ` +
+      `${q550.toFixed(2)} at 550 nm (ratio ${(q550 / q355).toFixed(2)}) - both ` +
+      `at van de Hulst's extinction-paradox 2, so the lidar tau IS the visible ` +
+      `tau across the printed sizes`
+  );
+  check(
+    'slab amplitude derived through the corona law',
+    Math.abs(PSC_AMP - coronaAmp(TAU_WAVE) * PSC_EXPOSURE) < 1e-15 &&
+      PSC_EXPOSURE === 3 &&
+      PSC_AMP > 0.4 &&
+      PSC_AMP < 0.5 &&
+      Math.abs(PSC_THICK_M - 3000) < 1e-9 &&
+      Math.abs(R355_ICE_MAX[1] / R355_ICE_MAX[0] - 2) < 1e-12,
+    `(tau/2) e^-tau at the derived TAU_WAVE x the one documented exposure ` +
+      `(x${PSC_EXPOSURE}, AGLOW_GAIN pattern) = ${PSC_AMP.toFixed(3)} - the ` +
+      `68th pass's capture-verified level (0.45) recovered with the physics ` +
+      `underneath derived; printed thickness and R-ratio carried`
   );
 }
 
