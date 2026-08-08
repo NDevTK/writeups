@@ -65,6 +65,16 @@ import {
   Z_MIN
 } from './aurora-lut.js';
 import {EYE_D_CM, SIGMA_MAX, youngSigma} from './scintillation.js';
+import {
+  BLUE_EXC_W,
+  QUENCH_1P_KM,
+  QUENCH_2P_KM,
+  SPRITE_BOT_KM,
+  SPRITE_LAM_BLUE,
+  SPRITE_LAM_RED,
+  SPRITE_TOP_KM,
+  quenchScaleHeightKm
+} from './sprites.js';
 import {AGLOW_GAIN, LINES, R_EARTH} from './airglow.js';
 import {buildZodiacalGrid, OBLIQUITY, zlPerGreen} from './zodiacal.js';
 import {ang2pix, cellS10, CELL_AREA_DEG2, kelvinFromBpRp} from './milkyway.js';
@@ -1153,6 +1163,63 @@ export function createFlashMaterial() {
   const r2 = uv().sub(0.5).length().mul(2).clamp(0, 1).pow(2);
   const glow = exp(r2.mul(-4));
   material.colorNode = vec3(0.82, 0.87, 1.0).mul(glow.mul(u.amp));
+  material.opacityNode = float(1);
+  return {material, u};
+}
+
+// One red sprite (sprites.js owns the physics): a quad whose v
+// axis IS emission altitude, mapped by the caller across the
+// printed 40-90 km span (Chen 2008) at the strike's elevation.
+// Column strips + the 75-85 km halo band are the documented
+// display shapes; the COLOUR at every altitude is the printed
+// quenching physics - N2(1P) red survival crossing 1/2 at 50 km,
+// the blue system at 32 km (Pasko 1997 coefficients via
+// Barrington-Leigh 2000), the same logistic-in-altitude the
+// reference gate pins. `amp` carries the Crumey-gated luminance
+// factor times the flash envelope.
+export function createRedSpriteMaterial() {
+  const u = {
+    amp: uniform(0),
+    // four column centres across the quad (set from the spawn's
+    // uniform stream - deterministic under the pin harness)
+    cols: uniform(new Vector3(0.3, 0.52, 0.7)),
+    col4: uniform(0.42),
+    colW: uniform(0.045)
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = DoubleSide;
+  material.blending = AdditiveBlending;
+  const H = quenchScaleHeightKm();
+  const CR = wavelengthToLinearSRGB(SPRITE_LAM_RED);
+  const CB = wavelengthToLinearSRGB(SPRITE_LAM_BLUE);
+  const x = uv().x;
+  const z = uv()
+    .y.mul(SPRITE_TOP_KM - SPRITE_BOT_KM)
+    .add(SPRITE_BOT_KM);
+  const qR = float(1).div(float(1).add(exp(float(QUENCH_1P_KM).sub(z).div(H))));
+  const qB = float(BLUE_EXC_W).div(
+    float(1).add(exp(float(QUENCH_2P_KM).sub(z).div(H)))
+  );
+  const strip = (c) => exp(x.sub(c).div(u.colW).pow(2).negate());
+  const cols = strip(u.cols.x)
+    .add(strip(u.cols.y))
+    .add(strip(u.cols.z))
+    .add(strip(u.col4));
+  // columns live 55-85 km with tendrils fading to the printed
+  // 40 km floor; the halo is the featureless 75-85 km disk
+  const colEnv = smoothstep(float(SPRITE_BOT_KM), float(56), z).mul(
+    float(1).sub(smoothstep(float(83), float(SPRITE_TOP_KM), z))
+  );
+  const halo = exp(z.sub(80).div(4).pow(2).negate()).mul(
+    exp(x.sub(0.5).mul(3.5).pow(2).negate()).mul(0.15)
+  );
+  const shape = cols.mul(colEnv).add(halo);
+  const colr = vec3(CR[0], CR[1], CR[2])
+    .mul(qR)
+    .add(vec3(CB[0], CB[1], CB[2]).mul(qB));
+  material.colorNode = colr.mul(shape).mul(u.amp);
   material.opacityNode = float(1);
   return {material, u};
 }

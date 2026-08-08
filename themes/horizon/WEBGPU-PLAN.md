@@ -6621,6 +6621,94 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   note for future sessions: the :8901 static server died twice
   this window (container worker restarts) - a probe that cannot
   even navigate is reporting the server, not the page.
+- DONE (red sprites above the measured strikes, Aug 8
+  sixty-second push - the research-first turn): the user asked
+  for a survey before code, so this pass began as one. Candidates
+  weighed: red sprites over the live Blitzortung feed, STEVE,
+  Bishop's ring from the live OMPS layer, and the tide waterline
+  (found already DONE - water plane, surf depth chain and ships
+  all ride state.tide). VERDICTS on the parked two: STEVE's
+  brightness anchor is open (MacDonald 2018 Sci Adv CC-BY) but
+  its occurrence climatology is Wiley-locked - parked until an
+  open printer surfaces; Bishop's ring needs the 1888 Royal
+  Society Krakatoa report (archive.org egress-blocked) or any
+  open printed ring radius - none found - parked. SPRITES WON:
+  the trigger feed already ships (strike events with bearing +
+  great-circle distance), the photometry rides this window's
+  rayleigh->Crumey chain, and the sources fell open one by one:
+  Hu et al. 2002 GRL and Cummer & Lyons 2005 JGR from Cummer's
+  own Duke reprint archive (both READ IN FULL: the +CG charge
+  moment ladder - >90% sprite above 1000 C km in <6 ms, <10%
+  below 600, ~60% between; sharp nightly thresholds 600/600/350
+  C km; zero sprites from ~900 analysed -CGs; above-threshold
+  +CGs outnumber -CGs ~30:1), Chen et al. 2008 JGR from the
+  ISUAL group's own NCKU site (READ IN FULL: 633 sprites in the
+  three-year survey, global rate 0.50/min observed, factor-two
+  detection correction to ~1/min, Sato & Fukunishi's independent
+  0.5/min quoted alongside; sprite columns span 40-90 km, halo
+  disk 75-85 km; sprites per unit area land:coast:ocean
+  4.7:3.2:1 against lightning's 10:1), Kuo et al. 2005 GRL from
+  the same shelf (READ IN FULL: N2 1PG red canon, SP band
+  physics, 1N quench height 48 km), and Barrington-Leigh's
+  Stanford thesis from his own McGill page (photometric
+  calibration sec. 3.3, quenching sec. 2.3.3 and the elve/halo
+  chapters read: 1 kR = 22.6 pW cm^-2 sr^-1 at 700 nm - the
+  SAME SI rayleigh the theme ships, cross-checked in the gate to
+  0.08%; observed sprite-halo photometer signals of order 10 MR
+  against a 60 MR modeled QE flash; elves >1 MR; and the Pasko
+  1997 coefficients with the printed crossovers - red 1P
+  quenched below 50 km, blue 2P surviving to 32). The global
+  flash rate (~45/s, Christian 2003/Cecil 2014) prints in the
+  fully-open Perez-Invernon 2023 sprite-chemistry preprint
+  (Copernicus direct PDF). WHAT SHIPPED (sprites.js +
+  sprites-reference.mjs, 6 landmarks; createRedSpriteMaterial in
+  sky-objects-tsl.js; Horizon.html wiring): each located flash
+  rolls 1-in-2700 (corrected rate over flash rate), ocean
+  flashes x2.44 by the two printed per-area ratios (marine SST
+  presence = the theme's open-water proof, the seasmoke pass's
+  own device); a winner hangs the printed 40-90 km span at the
+  strike's bearing with the exact curvature drop (the aurora
+  uBase lesson, now gated: flat+drop vs exact spherical within
+  0.4 deg over the feed's 60-200 km), columns + halo band as the
+  documented display shapes; the COLOUR at every altitude is the
+  printed quenching physics - survival q = A/(A + alpha N(z)) is
+  a logistic centred on each printed crossover, the barometric
+  H = 6.72 km DERIVED from the printed A/alpha pair (squarely
+  the handbook mesospheric value - the print is
+  self-consistent), so the red body and blue tendril bottoms
+  EMERGE with the handover computed at 44.4 km; appearance is
+  Crumey-gated on the printed 10 MR through the shipped chain
+  (6.7e-3 cd/m^2 = 38x the dark sky: plainly visible rural-dark,
+  extinguished by daylight - the printed dark-sky lore
+  reproduced by the printed threshold), decaying on the printed
+  several-to-tens-of-ms lifetime; ?sprite=N sprites every Nth
+  synthetic strike and holds the envelope for the offline
+  harness. PIXEL-VERIFIED (xvfb-run + --wgpu, the validate
+  recipe): crimson columns with purplish bottoms at the mapped
+  elevations over the Manitoba night ridge, two events at their
+  two distances, stars and airglow ring behind - first capture
+  showed additive white-out and a hard halo quad edge (x-envelope
+  0.30 at the edge), fixed to 0.15 weight and 3.5 sharpness with
+  the display exposure at 0.5. RECORDED GAPS, not gates: the
+  parent-physics ladder (polarity, charge moment) compresses
+  into the single per-flash probability because Blitzortung
+  carries neither - the Hu/Cummer constants ship as
+  documentation; Crumey's threshold is steady-state and the
+  few-tens-of-ms brevity is an unmodelled hardening (no printed
+  Blondel-Rey/Bloch constant in the repo yet - a future pass);
+  elves (6.5x more frequent, printed >60 kA peak-current gate in
+  Chen 2008 via Barrington-Leigh & Inan 1999) are blocked on a
+  current-bearing feed. Environment notes: Wiley/IOP/Springer
+  and both Anubis walls (handle.net, digital.csic.es) stay
+  closed - and the real-browser route through the agent proxy
+  is dead at the transport (Chromium's CONNECT is reset for
+  every external host, headed or headless, example.com
+  included; recorded, per the proxy README this is
+  report-not-work-around) - the unlock was author self-hosting:
+  Duke reprints, the NCKU ISUAL shelf (plain http, PDFs served
+  whole), and Barrington-Leigh's thesis on his McGill page.
+  validate.sh full PASS (102 CPU gates incl. the new 6, all 7
+  GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

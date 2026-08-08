@@ -190,7 +190,8 @@
         discharge=0 (pin river widths to the ladder), snowcover=0|URL
         (measured snow off / tile endpoint override), snowage=0
         (keep the drawn snow class fresh), seasmoke=0 (never
-        steam the sea), soil=0 (pin
+        steam the sea), sprite=N (red sprite above every Nth
+        synthetic strike - use with strike=N), soil=0 (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
         (skip satellite irradiance), ghi=W (override it), debug=1,
@@ -388,6 +389,7 @@
         createMeteorMaterial,
         createContrailMaterial,
         createFlashMaterial,
+        createRedSpriteMaterial,
         createMilkyWayMaterial,
         createNLCMaterial,
         createSkyglowMaterial,
@@ -737,8 +739,20 @@
       import {
         AGLOW_SR,
         airglowStructureCd,
+        cieY,
+        lineLuminance,
         lineStrengths
       } from './horizon/airglow.js';
+      import {
+        SPRITE_BOT_KM,
+        SPRITE_LAM_RED,
+        SPRITE_LIFE_MS,
+        SPRITE_MR_OBS,
+        SPRITE_SR,
+        SPRITE_TOP_KM,
+        HALO_WIDTH_KM,
+        spriteProbPerFlash
+      } from './horizon/sprites.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
         activeShowers,
@@ -7026,8 +7040,77 @@
         p.mesh.visible = true;
         strikeCount++;
       }
+      // ---- Red sprites above the strikes (sprites.js physics,
+      // sources read in full this pass): each located flash rolls
+      // the ISUAL-statistics chance - the corrected 1 sprite/min
+      // global rate over the ~45 flashes/s global lightning rate
+      // (Chen 2008; Perez-Invernon 2023) is 1-in-2700, ocean
+      // flashes x2.44 by Chen's printed per-area ratios (marine
+      // SST presence is the theme's open-water proof). A winner
+      // hangs the printed 40-90 km column span (Chen 2008) at the
+      // strike's bearing with the exact curvature drop, coloured
+      // by the printed quenching physics (red dies below 50 km,
+      // blue survives to 32 - Barrington-Leigh 2000), and its
+      // appearance is gated by Crumey's threshold on the printed
+      // 10 MR halo brightness through the SAME rayleigh chain the
+      // aurora rides. The parent-physics ladder (sprites follow
+      // +CG charge moments >600-1000 C km - Hu 2002, Cummer &
+      // Lyons 2005) is documentation: Blitzortung carries no
+      // polarity, so the single per-flash probability compresses
+      // it. ?sprite=N sprites every Nth synthetic strike for the
+      // offline harness.
+      const SPRITE_N = 2;
+      const spritePool = [];
+      const spriteLumCd = lineLuminance(
+        SPRITE_MR_OBS * 1e6,
+        SPRITE_LAM_RED,
+        cieY(SPRITE_LAM_RED)
+      );
+      for (let i = 0; i < SPRITE_N; i++) {
+        const sm = createRedSpriteMaterial();
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), sm.material);
+        mesh.visible = false;
+        scene.add(mesh);
+        spritePool.push({mesh, u: sm.u, active: false, t: 0});
+      }
+      let spriteCount = 0;
+      function spawnSprite(azDeg, distKm, rands) {
+        const p = spritePool.find((f) => !f.active) ?? spritePool[0];
+        const d = Math.max(distKm, 30);
+        const drop = (d * d) / (2 * 6371);
+        const R = 235;
+        const yTop = R * Math.tan(Math.atan((SPRITE_TOP_KM - drop) / d));
+        const yBot =
+          R * Math.max(Math.tan(Math.atan((SPRITE_BOT_KM - drop) / d)), 0.02);
+        const w = Math.min((R * HALO_WIDTH_KM) / d, 200);
+        const az = azDeg * RAD;
+        const yMid = (yTop + yBot) / 2;
+        p.mesh.position.set(
+          camera.position.x + Math.sin(az) * R,
+          yMid,
+          camera.position.z - Math.cos(az) * R
+        );
+        p.mesh.scale.set(w, yTop - yBot, 1);
+        p.mesh.lookAt(camera.position.x, yMid, camera.position.z);
+        p.u.cols.value.set(
+          0.2 + 0.25 * rands[0],
+          0.42 + 0.2 * rands[1],
+          0.62 + 0.22 * rands[2]
+        );
+        p.u.col4.value = 0.3 + 0.45 * rands[3];
+        p.u.colW.value = 0.03 + 0.03 * rands[4];
+        p.t = 0;
+        p.active = true;
+        p.mesh.visible = true;
+        spriteCount++;
+        record(
+          'red sprite (ISUAL odds x Blitzortung)',
+          spriteCount + ' above the storms · ' + Math.round(distKm) + ' km out'
+        );
+      }
       let liveES = null;
       const strikeOv = params.has('strike') ? +params.get('strike') : null;
+      const spriteOv = params.has('sprite') ? +params.get('sprite') : 0;
       if (strikeOv !== null) {
         // Offline harness: deterministic flashes in the camera
         // cone on a fixed cadence (fixed uniform table - no
@@ -7046,6 +7129,9 @@
               360) %
             360;
           spawnFlash(az, 12 + ((k * 23) % 60), RANDS.slice(k % 8));
+          if (spriteOv > 0 && k % spriteOv === 0) {
+            spawnSprite(az, 60 + ((k * 29) % 120), RANDS.slice((k + 3) % 8));
+          }
           k++;
         }, 1700);
       } else if (typeof EventSource !== 'undefined') {
@@ -7080,6 +7166,15 @@
               s.km,
               Array.from({length: 12}, () => Math.random())
             );
+            // the ISUAL-statistics sprite roll (marine SST
+            // presence = the theme's open-water proof)
+            if (Math.random() < spriteProbPerFlash(state.sst != null ? 1 : 0)) {
+              spawnSprite(
+                az,
+                s.km,
+                Array.from({length: 8}, () => Math.random())
+              );
+            }
             record(
               'Blitzortung.org lightning (CC BY-SA)',
               strikeCount + ' strikes streamed · nearest ' + s.km + ' km'
@@ -10917,6 +11012,32 @@
             continue;
           }
           p.u.amp.value = flashAmplitude(p.seq, p.t) * p.amp0 * 2.2;
+        }
+        // Red sprites: the printed "several-to-tens of ms"
+        // lifetime as an exponential envelope, through the Crumey
+        // gate on the printed 10 MR brightness against the SAME
+        // adapted sky the stars use (laCd - so daylight, moonlight
+        // and city glow extinguish sprites exactly as the printed
+        // threshold says), and the local cloud shield (a sprite
+        // hides behind the observer's own overcast). Crumey's
+        // threshold is steady-state; the few-tens-of-ms brevity is
+        // a documented unmodelled hardening.
+        const spriteVis =
+          extendedVisibility(spriteLumCd, laCd, SPRITE_SR) * (1 - cloudy * 0.9);
+        for (const p of spritePool) {
+          if (!p.active) continue;
+          p.t += dt;
+          const tau = SPRITE_LIFE_MS / 1000;
+          // ?sprite=N holds the envelope at peak - the offline
+          // harness photographs a 180 ms transient
+          if (spriteOv <= 0 && p.t > 6 * tau) {
+            p.active = false;
+            p.mesh.visible = false;
+            p.u.amp.value = 0;
+            continue;
+          }
+          const env = spriteOv > 0 ? 1 : Math.exp(-p.t / tau);
+          p.u.amp.value = env * spriteVis * 0.5;
         }
         if (constMat)
           constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2 * lpVis;
