@@ -6543,6 +6543,53 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   and it keeps its display policy. The airglow's remaining
   display piece is AGLOW_GAIN alone (the drawn amplitude);
   its APPEARANCE is now printed physics end to end.
+- DONE (visual verification finds the invisible curtain, Aug 8
+  sixtieth push - two stacked field bugs, probed to root cause
+  and fixed): after six wiring-heavy passes on the night-sky
+  visibility stack, this pass put eyes on the frames - and the
+  aurora curtain, strength 0.97 on the panel, drew NOTHING.
+  A capture-and-probe session (shoot.mjs grew a --dump-text
+  flag - the debug panel saved beside every frame - and three
+  throwaway CDP probes: a scene-graph inspector, a draw-call
+  toggler, and a node-graph ladder that swaps materials live and
+  reads back the mean of each try) separated FOUR hypotheses and
+  killed two: float32 filtering is granted on this SwiftShader
+  (fresh float32 textures sample bright), and the material class
+  is innocent (bare NodeMaterial with constant nodes renders).
+  WHAT WAS ACTUALLY BROKEN, both latent for a long time: (1) the
+  E0 rebuild mutated the live LUT DataTexture (data.set +
+  needsUpdate) mid-render-loop, and on this build's WebGPU
+  backend that re-upload leaves the GPU copy ZEROED - the ladder
+  measured it directly (fresh texture bright at 91, the same
+  texture after one mutation black at 0.8); the fix ships a
+  FRESH DataTexture through the texture node's .value on every
+  rebuild (the swap path measured bright at 91). (2) The curtain
+  base mapping buried the physics: the material maps mesh height
+  to emission altitude (92-320 km over 720 units), so the ~100
+  km green border lives 25 units above uBase - but the frame
+  loop set uBase = yAurora - 160, sinking the bright border ~13
+  degrees BELOW the horizon for every DISTANT oval (the common
+  case; the replica-graph probe proved the visible band sampled
+  only the profile's empty high-altitude tail - raw LUT sum
+  drawn full-green still read black). The curtain only ever
+  showed when the oval sat overhead. Fix: uBase = yAurora - 25
+  (the border offset derived from the LUT span, commented in
+  place), cylinder centre riding half its height above. VERIFIED
+  in pixels: the green border now stands at the oval's elevation
+  over the northern ridge at a 9-degree-distant oval - occluded
+  properly by terrain, waving. Also seen working in the same
+  frames, one capture each: the FSM snow age at the aged floor
+  (0.50, 84 d since snowfall, Manitoba in August), the live
+  McCants catalogue (16,346 magnitudes through the browser's
+  own DecompressionStream), the measured HMS wildfire glow
+  lighting the valley (real August fires - the red the first
+  capture mistook for a bug), no sea smoke inland, and the
+  magnitude-ordered stars. The MeshBasicNodeMaterial blanket
+  swap tried mid-hunt was REVERTED once proven irrelevant -
+  the fix is minimal. Lesson recorded: reference gates hold the
+  MATH to print, but only captures hold the PIXELS to the math -
+  the two bugs stacked so that each hid the other, and no CPU
+  gate could see either.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

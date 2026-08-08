@@ -306,19 +306,36 @@ export function createAuroraMaterial() {
   // Must match the curtain mesh (open CylinderGeometry in the theme).
   const ARC = Math.PI / 1.3;
   const RADIUS = 760;
-  const lutData = new Float32Array(128 * 4);
-  const lutTex = new DataTexture(lutData, 128, 1, RGBAFormat, FloatType);
-  lutTex.minFilter = lutTex.magFilter = LinearFilter;
-  const lutNode = texture(lutTex);
-  let builtE0 = 0;
+  // Each E0 rebuild ships a FRESH DataTexture through the node's
+  // value. Mutating one live texture (data.set + needsUpdate) is
+  // the documented three pattern, but on this build's WebGPU
+  // backend the mid-loop re-upload leaves the GPU copy ZEROED -
+  // the curtain drew nothing while its CPU-side LUT was full
+  // (found by this pass's ladder probe: a fresh texture samples
+  // bright, the mutated original samples black). Swapping
+  // textureNode.value is the supported path and survives it.
+  const mkLut = (e) => {
+    const t = new DataTexture(
+      buildAuroraLUT(e).data,
+      128,
+      1,
+      RGBAFormat,
+      FloatType
+    );
+    t.minFilter = t.magFilter = LinearFilter;
+    t.needsUpdate = true;
+    return t;
+  };
+  const lutNode = texture(mkLut(3));
+  let builtE0 = 3;
   const setE0 = (e0) => {
     const e = Math.min(Math.max(e0, 0.3), 20);
     if (Math.abs(e - builtE0) < builtE0 * 0.05) return;
     builtE0 = e;
-    lutData.set(buildAuroraLUT(e).data);
-    lutTex.needsUpdate = true;
+    const old = lutNode.value;
+    lutNode.value = mkLut(e);
+    if (old) old.dispose();
   };
-  setE0(3);
   // Monochromatic line colors (CIE fits, linear sRGB) with
   // calibrated display gains. Green and blue share the N2 profile
   // shape, so the blue gain carries the OBSERVED photometric ratio

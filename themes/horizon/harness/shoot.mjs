@@ -20,6 +20,7 @@
 //   --wait-ms N       settle time before capture (default 20000)
 //   --wait-console R  capture as soon as a console line matches R
 //   --reduced-motion  emulate prefers-reduced-motion
+//   --dump-text F     write the page text (debug panel) to F
 import {chromium} from 'playwright-core';
 import {spawn} from 'node:child_process';
 import {writeFileSync, readFileSync, rmSync} from 'node:fs';
@@ -214,6 +215,20 @@ if (rtShot && rtShot.bpe === 1) {
   console.log(ts() + '|SHOT|rt-unsupported-bpe|' + rtShot.bpe);
 } else {
   console.log(ts() + '|SHOT|no-capture');
+}
+// --dump-text F: after the capture, write the page's visible text
+// (the debug panel included) to F - the capture's own flight
+// recorder, so a render can be read side by side with the live
+// state that produced it.
+const dumpText = val('--dump-text', null);
+if (dumpText) {
+  try {
+    const txt = await page.evaluate(() => document.body.innerText);
+    writeFileSync(dumpText, txt);
+    console.log(ts() + '|TEXT|' + dumpText);
+  } catch (e) {
+    console.log(ts() + '|TEXT|failed|' + e.message);
+  }
 }
 await browser.close();
 process.exit(0);

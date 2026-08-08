@@ -11220,8 +11220,20 @@
         // (aurora-lut.js). setE0 gates its own rebuilds.
         auroraObj.setE0(1.5 + 4.5 * auroraP);
         const yAurora = Math.tan(THREE.MathUtils.clamp(elevA, 0.06, 1.1)) * 760;
-        auroraU.uBase.value = yAurora - 160;
-        aurora.position.y = yAurora + 200;
+        // The curtain's GREEN BORDER must sit at the oval's
+        // elevation. The material maps mesh height to emission
+        // altitude as z = 92 + (y - uBase)/720 * 228 km, so the
+        // ~100 km border lives (100 - 92)/228 * 720 = 25 units
+        // above uBase - uBase = yAurora - 25 puts it exactly at
+        // elevA, and the cylinder's centre rides half its 720
+        // height above that. (The old -160 offset buried the
+        // bright border ~13 deg below the horizon for every
+        // DISTANT oval - the common case - leaving only the
+        // faint high-altitude tail in the sky: the curtain was
+        // invisible unless the oval sat overhead. Found by this
+        // pass's capture-and-probe session.)
+        auroraU.uBase.value = yAurora - 25;
+        aurora.position.y = yAurora + 335;
         // The curtain centres on MAGNETIC north (south), not true:
         // auroral arcs run along geomagnetic east-west, so the
         // whole band swings by the local IGRF declination (+D means
