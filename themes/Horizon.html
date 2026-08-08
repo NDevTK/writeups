@@ -383,6 +383,16 @@
       } from './horizon/sky-objects-tsl.js';
       import {starTintRGB} from './horizon/stars-color.js';
       import {fillStratTexture} from './horizon/stratos.js';
+      import {
+        moonOrientation,
+        MOON_POLE_RA_DEG,
+        MOON_POLE_DEC_DEG
+      } from './horizon/moonface.js';
+      import {
+        MOON_ALB,
+        MOON_ALB_W,
+        MOON_ALB_H
+      } from './horizon/moon-albedo-data.js';
       import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
       import {mpDropRadiusMm, mpSigmaExt} from './horizon/rainbow.js';
       import {parseSoft00, syndyne, visibleComets} from './horizon/comets.js';
@@ -7067,7 +7077,27 @@
       // basis of McEwen's lunar-Lambert), not Lambert. That is why a
       // full moon renders flat like the real one instead of
       // limb-darkening like a billiard ball.
-      const moonObj = createMoonMaterial(atmo.skyRadiance);
+      // The moon's measured face: the vendored LROC WAC map as a
+      // red-channel texture (moon-albedo-data.js, mean-1 in units
+      // of 1/128), oriented per frame by the engine's libration
+      // and the IAU pole (moonface.js).
+      const moonFaceTex = new THREE.DataTexture(
+        MOON_ALB,
+        MOON_ALB_W,
+        MOON_ALB_H,
+        THREE.RedFormat,
+        THREE.UnsignedByteType
+      );
+      moonFaceTex.wrapS = THREE.RepeatWrapping;
+      moonFaceTex.minFilter = moonFaceTex.magFilter = THREE.LinearFilter;
+      moonFaceTex.needsUpdate = true;
+      record('LROC WAC moon face', '256x128 mean-1 modulation + libration');
+      let moonFaceAt = 0;
+      const mfQ = new THREE.Quaternion();
+      const mfPole = new THREE.Vector3();
+      const mfEarth = new THREE.Vector3();
+      const mfM4 = new THREE.Matrix4();
+      const moonObj = createMoonMaterial(atmo.skyRadiance, moonFaceTex);
       const moonU = moonObj.u;
       const moonDisc = new THREE.Mesh(
         new THREE.SphereGeometry(24, 24, 18),
@@ -9060,6 +9090,51 @@
           }
         }
         moonDisc.position.copy(skyPoint(refr.moonApp, moon.az, 1500));
+        // The face's orientation (moonface.js): the engine's
+        // libration gives the sub-observer selenographic point, the
+        // IAU pole rides the celestial group's own sidereal frame,
+        // and the sub-observer meridian turns to the observer -
+        // libration wobble included, refreshed every 30 s.
+        if (window.Astronomy && Date.now() - moonFaceAt > 30000) {
+          moonFaceAt = Date.now();
+          const lib = window.Astronomy.Libration(new Date());
+          const pd = MOON_POLE_DEC_DEG * RAD;
+          const pr = MOON_POLE_RA_DEG * RAD;
+          mfPole
+            .set(
+              Math.cos(pd) * Math.sin(pr),
+              Math.sin(pd),
+              Math.cos(pd) * Math.cos(pr)
+            )
+            .applyQuaternion(celestial.getWorldQuaternion(mfQ));
+          mfEarth.copy(moonDisc.position).negate().normalize();
+          const R = moonOrientation(
+            lib.elat,
+            lib.elon,
+            [mfEarth.x, mfEarth.y, mfEarth.z],
+            [mfPole.x, mfPole.y, mfPole.z]
+          );
+          moonDisc.quaternion.setFromRotationMatrix(
+            mfM4.set(
+              R[0],
+              R[3],
+              R[6],
+              0,
+              R[1],
+              R[4],
+              R[7],
+              0,
+              R[2],
+              R[5],
+              R[8],
+              0,
+              0,
+              0,
+              0,
+              1
+            )
+          );
+        }
         moonDisc.scale.y = astro.moonScale * refr.moonFlat;
         // Sun direction as seen at the moon disc (same geometry the old
         // directional light encoded), feeding the Lommel-Seeliger shader.

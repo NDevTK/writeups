@@ -130,7 +130,7 @@ export function createVeilMaterial() {
 // over the disc - by day the dark limb carries the sky's own
 // radiance instead of occluding it (the disc stays opaque, so lunar
 // occultations of stars still work).
-export function createMoonMaterial(skyFor) {
+export function createMoonMaterial(skyFor, faceTex) {
   const u = {
     sunDirM: uniform(new Vector3(0, 1, 0)),
     albM: uniform(new Color('#cdd4e2')),
@@ -222,7 +222,31 @@ export function createMoonMaterial(skyFor) {
       .mul(u.eshine),
     0.0
   );
-  let moonCol = u.albM.mul(lunar.add(earthlit)).mul(2.0).add(u.glowM);
+  // The measured face (moon-albedo-data.js: LROC WAC mosaic,
+  // mean-1 modulation): sampled by the LOCAL normal - the mesh's
+  // quaternion is the body orientation (moonface.js), so local
+  // coordinates ARE selenographic. Row 0 = north at v = 0
+  // (DataTexture memory order), column 0 = lon 0, east positive;
+  // texel 128 = 1.0.
+  let shape = lunar.add(earthlit);
+  if (faceTex) {
+    const nL = normalize(positionLocal);
+    const fLat = asin(clamp(nL.y, -1.0, 1.0));
+    const fLon = atan(nL.x, nL.z);
+    const fUV = vec2(
+      fLon
+        .div(2 * Math.PI)
+        .add(1)
+        .mod(1),
+      float(0.5).sub(fLat.div(Math.PI))
+    );
+    shape = shape.mul(
+      texture(faceTex)
+        .sample(fUV)
+        .r.mul(255 / 128)
+    );
+  }
+  let moonCol = u.albM.mul(shape).mul(2.0).add(u.glowM);
   if (skyFor)
     moonCol = moonCol.add(skyFor(normalize(positionWorld.sub(cameraPosition))));
   material.colorNode = moonCol;

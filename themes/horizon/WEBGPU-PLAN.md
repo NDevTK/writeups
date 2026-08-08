@@ -5806,6 +5806,45 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   The sea-ice arc is complete across four stages: printed
   optics, measured concentration, measured snow on the ice,
   and the frozen sea reflected in sky, horizon and overcast.
+- DONE (the moon gets its face, Aug 8 forty-first push - a NEW
+  DATA SOURCE and the sky's most recognizable pattern): the
+  drawn moon was a uniform-albedo Hapke sphere - calibrated
+  photometry, blank face. Now it wears the MEASURED maria:
+  moon-albedo-data.js vendors the LROC WAC global morphologic
+  mosaic (LRO_WAC_Mosaic_Global_303ppd_v02; Robinson et al.
+  2010, Space Sci. Rev. 150, 81 - the LROC instrument paper),
+  fetched from NASA Moon Trek's keyless WMTS (the two zoom-0
+  equirect tiles), downsampled to 256x128 and normalized to an
+  AREA-WEIGHTED sphere mean of exactly 1 - a pure spatial
+  modulation, so the shipped Hapke disc calibration
+  (R_FULL_CENTRE, the full-moon anchor) is preserved by
+  construction. Orientation WITHOUT a rotation series
+  (moonface.js): the vendored engine's Libration() gives the
+  sub-observer selenographic point, the moon-to-earth
+  direction is the drawn moon's own vector negated, and the
+  spin pole is the IAU frame's printed constant (Archinal et
+  al. 2011: alpha0 269.9949, delta0 66.5392; the report's
+  sub-0.05-deg series dropped, stated) riding the celestial
+  group's own sidereal frame - three facts fix the body frame
+  completely, libration wobble included, refreshed every 30 s.
+  The material samples the map by the LOCAL normal (the mesh
+  quaternion IS the body orientation), multiplying the
+  lunar + earthshine term - so the maria show in earthshine
+  too, as they really do. GATES (moon-reference grows two):
+  the WAC face landmark - sphere mean 1.000, Crisium 0.55 /
+  Tranquillitatis 0.49 dark and Tycho's terrain 1.58 /
+  farside highlands 1.30 bright at printed selenographic
+  coordinates, and the dark-area fraction 38% nearside vs 10%
+  farside (the classic printed nearside-maria concentration);
+  the orientation landmark - IAU constants verbatim, R
+  orthonormal to 4e-16, sub-observer-to-earth exact to 1e-16,
+  pole alignment cos = 1 on consistent geometry, zero
+  libration facing (0,0) exactly. A longitude-origin bug was
+  caught DURING the build by the landmark values themselves
+  (Crisium read bright until the WMTS -180 column origin was
+  rolled to the lon-0 convention - the map checks are why the
+  face is right). VALIDATE PASS (all references + 7 GPU
+  probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
