@@ -6450,6 +6450,54 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   flank, and hard substorm curtains keep the classic coincident
   green-over-purple wall - both orderings now measured, not
   assumed.
+- DONE (the sea steams, Aug 8 fifty-eighth push - sea smoke by
+  the printed ASTD gate, and the whitecap law's scan read at
+  last): the AMS throttle lifted on retry and both named papers
+  landed. MAIN PASS - sea smoke: Shen, Li, Yan, Perrie, Zhang &
+  Zhu 2022 (J. Atmos. Sci. 79, 3163 - read in full), the Qingdao
+  "Hai Hao" sea smoke of 7 Jan 2021 (buoys, Himawari-8, GOCI,
+  Sentinel-1B SAR, coupled ROMS-WRF). Their Table 1 prints the
+  century-old classification by air-sea temperature difference
+  (SAT > SST warm advection fog, SAT < SST cold advection fog,
+  SAT << SST sea smoke - the Willett 1928 / Saunders 1964
+  lineage, tabulated openly at last after Saunders itself proved
+  closed), and the case pins the numbers: ASTD ~20 C (air
+  -13.3 C over ~6.7 C water, RH 89.0 percent, "steam on the
+  surface of boiling water", a layer a few metres deep, too
+  shallow for the passive satellites) with simulated lowest
+  visibility 3.09 km - against the printed typical winter ASTD
+  of 5-7 C in the same sea "with no fog" and the 2006 large
+  cold-advection fog at ASTD ~3 C. WHAT SHIPPED: seasmoke.js -
+  Table 1's classes and seaSmokeVisM: smoke density linear in
+  the ASTD excess above the printed no-fog band top (7 C), so
+  Koschmieder visibility = 3.09 km x 13/(ASTD - 7), exactly the
+  printed event value at the printed 20 C, infinity at the
+  printed band. DRIVER: sea_surface_temperature appended to the
+  marine current= request the theme already makes (zero new
+  calls; the marine grid answers only over water, so a non-null
+  SST is itself the open-water proof). WIRED: visEff =
+  min(measured visibility, smoke visibility) at the one
+  Koschmieder site - the model's own fog stays authoritative
+  when it already sees it, and the fold's licence to touch the
+  whole coastal scene is the paper's own "propagate inland by
+  the sea breeze" sentence; panel records the steaming sea;
+  ?seasmoke=0. LANDMARKS (seasmoke-reference): Table 1 classes;
+  the printed pair (band -> infinity, 20 C -> 3090 m exact);
+  Koschmieder linearity (vis x (ASTD-7) constant to 2e-16,
+  half-way ASTD gives exactly twice the event visibility); the
+  buoy morning lands on the printed 3.09 km and the 2006 event
+  classifies as fog-not-smoke with the module silent - the
+  paper's own division of labour. RIDER - provenance: Monahan &
+  O'Muircheartaigh 1980 (JPO 10, 2094), the source of the
+  theme's whitecap law, turned out to be a pure scan - all six
+  pages machine-read: the vendored W = 3.84e-6 U^3.41 is their
+  Eq. 5, the RECOMMENDED robust-biweight fit to the 90 combined
+  points, with the OLS twin Eq. 4 (2.95e-6 U^3.52) printed
+  beside it; ocean-reference now gates the twins against each
+  other (within 10.5 percent over the observed 4-15 m/s core)
+  and the printed nil-below-3-m/s lore; terrain-tsl's citation
+  carries the read. The sea's foam and the sea's smoke both
+  stand on print now.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

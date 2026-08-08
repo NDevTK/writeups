@@ -189,7 +189,8 @@
         turbines), peaks=0 (skip summit labels),
         discharge=0 (pin river widths to the ladder), snowcover=0|URL
         (measured snow off / tile endpoint override), snowage=0
-        (keep the drawn snow class fresh), soil=0 (pin
+        (keep the drawn snow class fresh), seasmoke=0 (never
+        steam the sea), soil=0 (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
         (skip satellite irradiance), ghi=W (override it), debug=1,
@@ -706,6 +707,7 @@
         snowCoverFraction,
         snowDisplayRGB
       } from './horizon/snowage.js';
+      import {seaFogClass, seaSmokeVisM} from './horizon/seasmoke.js';
       import {
         LOW_FRAC,
         MID_FRAC,
@@ -929,6 +931,7 @@
         auroraLat: 68,
         hpNow: null, // OVATION hemispheric power, GW (live, 5 min)
         snowDepth: null, // measured model snow depth, m (open-meteo)
+        sst: null, // measured sea surface temperature, C (open-meteo marine)
         hpAtGrid: null, // ...as it was when the oval grid was fetched
         metar: null, // nearest fresh aerodrome observation (metar.js)
         profile: null, // measured refraction column (refraction.js)
@@ -1401,7 +1404,7 @@
                 state.lat +
                 '&longitude=' +
                 state.lon +
-                '&current=wave_height,wind_wave_height,wind_wave_peak_period,wind_wave_direction,swell_wave_height,swell_wave_peak_period,swell_wave_direction,sea_level_height_msl',
+                '&current=wave_height,wind_wave_height,wind_wave_peak_period,wind_wave_direction,swell_wave_height,swell_wave_peak_period,swell_wave_direction,sea_level_height_msl,sea_surface_temperature',
               {credentials: 'omit'}
             )
           ).json();
@@ -1416,6 +1419,23 @@
             record(
               'open-meteo tide',
               'sea level ' + c.sea_level_height_msl.toFixed(2) + ' m vs MSL'
+            );
+          }
+          state.sst =
+            c && typeof c.sea_surface_temperature === 'number'
+              ? c.sea_surface_temperature
+              : null;
+          if (
+            state.sst !== null &&
+            seaFogClass(state.sst, state.temp) === 'sea-smoke'
+          ) {
+            record(
+              'sea smoke',
+              'air ' +
+                state.temp +
+                ' C over ' +
+                state.sst.toFixed(1) +
+                ' C water - the sea steams (Shen 2022 ASTD gate)'
             );
           }
           if (c && (c.wind_wave_height || c.swell_wave_height)) {
@@ -9739,12 +9759,24 @@
         // (2% contrast at V). Fog codes need no special-casing - a foggy
         // hour reports a short visibility by itself. A fresh nearby
         // METAR's transmissometer reading outranks the model value.
-        const visEff =
+        const visMeasured =
           state.metar &&
           Date.now() - state.metar.at < 90 * 60e3 &&
           state.metar.visM !== null
             ? state.metar.visM
             : state.visibility;
+        // Sea smoke (seasmoke.js): when bitter air sits on warm
+        // water (the printed ASTD gate - Shen et al. 2022), the
+        // steaming sea gets its own Koschmieder visibility,
+        // folded as min() with the measurement - the model's own
+        // fog stays authoritative when it already sees it, and
+        // the smoke only speaks where the marine feed proves
+        // open water at the visitor. ?seasmoke=0 silences it.
+        const smokeVis =
+          state.sst !== null && params.get('seasmoke') !== '0'
+            ? seaSmokeVisM(state.sst, state.temp)
+            : Infinity;
+        const visEff = Math.min(visMeasured, smokeVis);
         aerialU.uFogDensity.value =
           1.98 / (Math.max(visEff, 400) / MPU) + cloudy * 0.001;
         // The far horizon breathes the same measured state.

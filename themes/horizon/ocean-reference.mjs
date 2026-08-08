@@ -216,10 +216,33 @@ const jxz = ifft2(F.Jxz);
 // smoothstep(Jt, Jt - FOAM_W, J) - foam grows as the Jacobian folds
 // below Jt. Calibrate Jt against THAT mask (not an idealised hard
 // threshold): bisect so the grid-mean masked coverage equals
-// Monahan & O'Muircheartaigh (1980) W = 3.84e-6 U^3.41 at this
-// wind - after that, coverage at every other wind follows from the
-// physics alone.
+// Monahan & O'Muircheartaigh (1980, JPO 10, 2094 - the scan
+// machine-read in full) W = 3.84e-6 U^3.41 at this wind - their
+// Eq. 5, the RECOMMENDED robust-biweight fit to the combined
+// Monahan 1971 + Toba & Chaen 1973 sets (54 + 36 non-zero
+// points); after that, coverage at every other wind follows
+// from the physics alone. Their printed OLS twin (Eq. 4,
+// W = 2.95e-6 U^3.52) is the cross-check below: two printed
+// fits to the same 90 points must agree at the data's heart.
 const FOAM_W = 0.175;
+{
+  // The printed twins: Eq. 4 (OLS) and Eq. 5 (robust biweight)
+  // agree within 12 percent across the observed 4-15 m/s core
+  // (they cross near 10 m/s; MSE 4.56 vs 4.59 in print), and
+  // both honour the printed "coverage is nil below 3 m/s"
+  // (under 2e-4 fractional cover there).
+  const rbf = (U) => 3.84e-6 * Math.pow(U, 3.41);
+  const ols = (U) => 2.95e-6 * Math.pow(U, 3.52);
+  let worst = 0;
+  for (let U = 4; U <= 15.001; U += 0.5) {
+    worst = Math.max(worst, Math.abs(ols(U) / rbf(U) - 1));
+  }
+  const ok = worst < 0.12 && rbf(3) < 2e-4 && ols(3) < 2e-4;
+  console.log(
+    `${ok ? 'REF' : 'FAIL'} Monahan Eq.4/Eq.5 twins: printed OLS vs robust fits within ${(worst * 100).toFixed(1)}% over 4-15 m/s; W(3 m/s) = ${(rbf(3) * 100).toFixed(3)}% (printed nil-below-3 lore)`
+  );
+  if (!ok) process.exit(1);
+}
 {
   const U = PARAMS.U10;
   const W = 3.84e-6 * Math.pow(U, 3.41);

@@ -585,8 +585,10 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     // so accumulation zones whiten exactly as before.
     const col2s = mix(col2, land.rgb, tintSurf.mul(u.uLandOn).mul(0.85));
     const col3 = mix(col2s, u.uSnowCol, snow);
-    // Sea: Monahan & O'Muircheartaigh (1980) whitecap fraction
-    // W = 3.84e-6 * U^3.41.
+    // Sea: Monahan & O'Muircheartaigh (1980, JPO 10, 2094 - scan
+    // machine-read in full) whitecap fraction W = 3.84e-6 * U^3.41
+    // - their Eq. 5, the recommended robust-biweight fit (OLS twin
+    // Eq. 4 gated in ocean-reference).
     const U = max(u.uWindMs, 0.8);
     const W = clamp(pow(U, 3.41).mul(3.84e-6), 0.0, 0.6);
     const pmc = positionWorld.xz.mul((400 / 7) * 0.11);
