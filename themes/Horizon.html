@@ -204,7 +204,9 @@
         override for the measured-AOD station feed / skip the
         measured override, model only), pillars=1|0 (pin the
         METAR ice-crystal report for the harness / never draw
-        light pillars), soil=0 (pin
+        light pillars), fogbow=V|0 (pin fog at visibility V
+        metres for the harness / never draw the fogbow), soil=0
+        (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
         (skip satellite irradiance), ghi=W (override it), debug=1,
@@ -807,6 +809,12 @@
         TAU_WAVE,
         WAVE_ICE_D_UM
       } from './horizon/psc.js';
+      import {
+        FOG_D_DRAWN_UM,
+        fogDropRadiusMm,
+        fogReported,
+        fogSigH
+      } from './horizon/fogbow.js';
       // (PILLAR_SIGMA_ALT already arrives from halos.js for the
       // sun pillar - lightpillars.js re-exports the same binding.)
       import {
@@ -8311,11 +8319,16 @@
       // GATES (rain, cirrus, source altitude, direct beam, phase)
       // live in the frame loop's optics block as they always did.
       let bowLutR = null;
-      function refreshBowLUT(rMeas) {
+      let fogbowSaid = false;
+      function refreshBowLUT(rMeas, fogAMm = null) {
+        // fogAMm swaps the drop to the printed fog droplet
+        // (fogbow.js) - keyed so fog/rain flips re-lay exactly
+        // once; the rain path keeps its 0.05 mm/h hysteresis.
         const R = Math.max(rMeas ?? state.precip ?? 0, 0.1);
-        if (bowLutR !== null && Math.abs(R - bowLutR) < 0.05) return;
-        bowLutR = R;
-        const aMm = mpDropRadiusMm(R);
+        const key = fogAMm !== null ? -fogAMm : R;
+        if (bowLutR !== null && Math.abs(key - bowLutR) < 0.05) return;
+        bowLutR = key;
+        const aMm = fogAMm !== null ? fogAMm : mpDropRadiusMm(R);
         // Sun bows take the live solar disc radius (the 1 au IAU
         // default stands until the first ephemeris tick); the rare
         // moonbow shares this LUT - a documented ~3% disc
@@ -12300,10 +12313,49 @@
         // Radar-fresh rain re-lays the fringes too (0.05 mm/h
         // hysteresis inside).
         if (raining) refreshBowLUT(precipMeas);
+        // The FOGBOW (fogbow.js): the aerodrome's FG report puts
+        // the printed 14 um fog droplet into the SAME Airy
+        // builder (whiteness and the pulled-in radius emerge)
+        // and the shaft becomes the fog bank itself - the
+        // MEASURED visibility through Koschmieder at the printed
+        // 18 m thin-fog top. Rain outranks fog on the LUT (a
+        // raining fog draws the rain bow); dense fog kills its
+        // own display inside the slab. ?fogbow=V pins the
+        // visibility for the harness; =0 removes the branch.
+        const fbOv = params.get('fogbow');
+        let fogVisM = null;
+        if (!raining && fbOv !== '0') {
+          if (fbOv !== null) fogVisM = Math.max(+fbOv, 20);
+          else if (
+            state.metar &&
+            Date.now() - state.metar.at < 90 * 60e3 &&
+            fogReported(state.metar.wx) &&
+            Number.isFinite(state.metar.visM)
+          )
+            fogVisM = state.metar.visM;
+        }
+        const fogBow = fogVisM !== null && fogVisM > 0;
+        if (fogBow) refreshBowLUT(0, fogDropRadiusMm());
+        if (fogBow && !fogbowSaid) {
+          fogbowSaid = true;
+          record(
+            'fogbow (measured fog)',
+            'droplets Ø' +
+              FOG_D_DRAWN_UM +
+              ' µm (Mazoyer 2019) · vis ' +
+              Math.round(fogVisM) +
+              ' m · sigma·18 m = ' +
+              fogSigH(fogVisM).toFixed(2)
+          );
+        }
         {
           const bowOn =
             params.get('bow') !== '0' && sun.alt > 0 && sun.alt < 0.733;
-          opticsU.bowSigH.value = bowOn ? sigmaRain * hRain : 0;
+          opticsU.bowSigH.value = bowOn
+            ? fogBow
+              ? fogSigH(fogVisM)
+              : sigmaRain * hRain
+            : 0;
           opticsU.bowSinH.value = Math.max(
             Math.sin(Math.max(sun.alt, 0)),
             1e-3
@@ -12503,7 +12555,13 @@
           {
             const bowOnM =
               params.get('bow') !== '0' && moon.alt > 0 && moon.alt < 0.733;
-            opticsMoonU.bowSigH.value = bowOnM ? sigmaRain * hRain : 0;
+            // The lunar fogbow shares the swapped LUT and the
+            // fog slab - the rarest of the family, same physics.
+            opticsMoonU.bowSigH.value = bowOnM
+              ? fogBow
+                ? fogSigH(fogVisM)
+                : sigmaRain * hRain
+              : 0;
             opticsMoonU.bowSinH.value = Math.max(
               Math.sin(Math.max(moon.alt, 0)),
               1e-3

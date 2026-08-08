@@ -7383,6 +7383,52 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   columns, tall over near lamps and short over far ones, soft
   tops, cleanly isolated over the star field. Full gate green -
   111 CPU references + 7 GPU probes.
+- DONE (Aug 8, the review session's 75th pass - the fogbow:
+  the rainbow machinery at measured fog). Survey first: the
+  other candidate (measured swell) was already shipped - the
+  ocean rides open-meteo marine WAM wave partitions - so the
+  white bow was the pass. The primary: Mazoyer et al. 2019
+  (ACP 19, 4323, open access, READ IN FULL - the SIRTA fog
+  microphysics campaign, 23 instrumented events). Printed and
+  carried in the new fogbow.js: droplet MEAN DIAMETERS 4-14 um
+  with the anticorrelation spelled out (255 cm^-3 pairs with
+  4 um; clean-air fogs reach twice 7 um) - the drawn droplet is
+  the clean-fog 14 um end, weighted there by Adam's a^(7/3)
+  brightness law that rainbow.js already prints; the FM-100's
+  2-50 um range; fog's own definition ("visibility below the
+  1 km threshold") which IS the METAR FG code this gates on;
+  and the thin/thick classification - "thin" fog top BELOW 18 M
+  (the diffusometer pair) - the printed anchor for the shallow
+  regime the fogbow needs. THE OPTICS ARE THE RAINBOW'S OWN:
+  buildBowLUT at the fog radius instead of Marshall-Palmer
+  rain, and everything the fogbow IS emerges from the shipped
+  Airy-on-Descartes law - the gate holds the per-channel
+  primary peaks COLLAPSING from 1.2 deg apart (rain) to
+  0.29 deg (14 um) and 0.00 deg (4 um): the colour collapse IS
+  the white bow, across the whole printed span; the green FWHM
+  balloons x9.4 (the printed (ka)^(-2/3) fringe law); the
+  primary pulls 5.5 deg inside the rain red peak (the classic
+  fogbow radius). THE AMPLITUDE IS MEASURED END TO END: sigma =
+  3.912/V exactly (Koschmieder's definitional constant, already
+  printed in lightning.js) through the rainbow's own two-leg
+  bowSlab at the printed 18 m thin-fog top - and DENSE FOG
+  KILLS ITS OWN BOW emergently (400 m visibility scatters
+  14.7x more into the bow than 50 m: the sun leg's extinction
+  is the physics, no threshold coded). Occurrence: the METAR FG
+  family (MI/BC/PR/FZ/VC qualifiers; BR mist and FU smoke
+  rejected - the printed 1 km definition draws the line);
+  ?fogbow=V|0 harness pins; the lunar fogbow shares the swapped
+  LUT and slab. refreshBowLUT gained a fog-droplet override
+  with a mode-keyed hysteresis (fog/rain flips re-lay exactly
+  once; rain outranks fog - a raining fog draws the rain bow).
+  6-landmark gate registered after rainbow. Pinned A/B (Alpine
+  morning, sun 25 deg, antisolar view, fogbow=300 vs 0): the 1x
+  frame shows the classic photograph - a broad WHITE fringeless
+  arc around the antisolar point; the x4-amplified instrument
+  additionally reveals the 35-60 deg LUT window edge at fog tau
+  (invisible at 1x - recorded as a known display subtlety, a
+  future shader window-feather if it ever matters). Full gate
+  green - 112 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
