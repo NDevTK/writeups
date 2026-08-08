@@ -58,7 +58,8 @@ self.onmessage = (ev) => {
       lakes
     );
     meshY[k] = s.y;
-    meshWet[k] = s.water ? 1 : 0;
+    // 0 dry, 1 sea, 2 lake - the lake-ice pass needs the split.
+    meshWet[k] = s.water ? (s.lake ? 2 : 1) : 0;
   }
 
   // Signed bathymetry (metres vs MSL / 40, clamped) + mean depth.

@@ -704,6 +704,7 @@
       } from './horizon/seaice.js';
       import {pondFraction} from './horizon/meltpond.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
+      import {lakeIceSeries, lakeIceAlphaBare} from './horizon/lakeice.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
@@ -2379,6 +2380,60 @@
       // land-only samples. ?seaice=0 keeps liquid water.
       let seaIceC = 0;
       let seaIceSeq = 0;
+      // Lake ice (lakeice.js): the measured winter, day by day.
+      // The open-meteo ERA5 archive supplies the anchor's daily
+      // mean temperatures since the season start; the Stefan
+      // integrator (constants pinned by the Vanajavesi paper's
+      // printed climatology) grows and melts the ice; the drawn
+      // colour is the printed Yang/Pirazzini bare-ice albedo,
+      // snow-blended to the terrain's own snow class by the
+      // measured snow fraction (the printed 0.1 m ramp read as
+      // the areal fraction).
+      let lakeIceH = 0; // cm, 0 = unfrozen
+      let lakeIceSeq = 0;
+      async function syncLakeIce() {
+        if (params.get('lakeice') === '0' || Math.abs(state.lat) < 35) {
+          lakeIceH = 0;
+          return;
+        }
+        const seq = ++lakeIceSeq;
+        try {
+          const north = state.lat >= 0;
+          const d = now();
+          const y = d.getUTCFullYear();
+          const m = d.getUTCMonth(); // 0-based
+          const startY = north ? (m >= 7 ? y : y - 1) : m >= 1 ? y : y - 1;
+          const start = `${startY}-${north ? '08' : '02'}-01`;
+          const end = d.toISOString().slice(0, 10);
+          const r = await fetch(
+            'https://archive-api.open-meteo.com/v1/archive?latitude=' +
+              state.lat.toFixed(3) +
+              '&longitude=' +
+              state.lon.toFixed(3) +
+              '&start_date=' +
+              start +
+              '&end_date=' +
+              end +
+              '&daily=temperature_2m_mean&timezone=UTC'
+          );
+          const j = await r.json();
+          if (seq !== lakeIceSeq) return;
+          const series = j?.daily?.temperature_2m_mean;
+          if (!Array.isArray(series) || !series.length) return;
+          const ice = lakeIceSeries(series);
+          lakeIceH = ice.on ? ice.hCm : 0;
+          if (lakeIceH > 0)
+            record(
+              'Stefan lake ice',
+              lakeIceH.toFixed(0) +
+                ' cm from ' +
+                series.length +
+                ' measured days (ERA5 archive)'
+            );
+        } catch {
+          /* feed unreachable - lakes stay liquid */
+        }
+      }
       // Melt ponds on the measured ice (meltpond.js): Rosel's
       // measured Arctic pond-fraction climatology at the sim
       // clock's day of year, live only where the measured 2 m
@@ -5844,20 +5899,27 @@
         }
         const pos = geo.attributes.position;
         const wet = new Float32Array(pos.count);
+        // Lake pixels split from the sea (worker encodes 2): the
+        // lake-ice pass freezes lakes only - the sea has its own
+        // measured concentration.
+        const lakeA = new Float32Array(pos.count);
         if (pre && pre.meshY) {
           for (let i = 0; i < pos.count; i++) {
             pos.setY(i, pre.meshY[i]);
-            wet[i] = pre.meshWet[i];
+            wet[i] = pre.meshWet[i] ? 1 : 0;
+            lakeA[i] = pre.meshWet[i] === 2 ? 1 : 0;
           }
         } else {
           for (let i = 0; i < pos.count; i++) {
             const s = sample(pos.getX(i), pos.getZ(i));
             pos.setY(i, s.y);
             wet[i] = s.water ? 1 : 0;
+            lakeA[i] = s.lake ? 1 : 0;
           }
         }
         geo.computeVertexNormals();
         geo.setAttribute('wet', new THREE.BufferAttribute(wet, 1));
+        geo.setAttribute('lake', new THREE.BufferAttribute(lakeA, 1));
         const terrain = new THREE.Mesh(geo, terrainMat);
         terrain.castShadow = true;
         terrain.receiveShadow = true;
@@ -8435,6 +8497,7 @@
         syncSnowCover();
         syncStratAOD();
         syncSeaIce();
+        syncLakeIce();
         // The lamp cloud is anchored to the OLD box - drop it now,
         // syncLights rebuilds it Earth-anchored on the new one.
         if (lampPts) {
@@ -11056,6 +11119,20 @@
         terrainUniforms.uSnowy.value +=
           (snowyGround - terrainUniforms.uSnowy.value) * Math.min(dt, 1);
         if (bldSnowU) bldSnowU.value = terrainUniforms.uSnowy.value;
+        // Lake ice display: the printed bare-ice albedo at the
+        // measured Stefan thickness, ramped to the terrain's own
+        // snow class by the measured snow fraction (the printed
+        // 0.1 m snow ramp read as the areal fraction).
+        terrainUniforms.uLakeIce.value = lakeIceH > 0 ? 1 : 0;
+        if (lakeIceH > 0) {
+          const aBare = lakeIceAlphaBare(lakeIceH / 100);
+          const rampS = Math.min(Math.max(snowFSC || 0, 0), 1);
+          terrainUniforms.uLakeIceCol.value.set(
+            aBare + rampS * (0.87 - aBare),
+            aBare + rampS * (0.9 - aBare),
+            aBare + rampS * (0.93 - aBare)
+          );
+        }
 
         const snowing =
           state.snow > 0 ||
@@ -12202,6 +12279,8 @@
         syncSnowCover();
         syncStratAOD();
         syncSeaIce();
+        syncLakeIce();
+        setInterval(syncLakeIce, 6 * 60 * 60 * 1000);
         setInterval(syncSnowCover, 6 * 60 * 60 * 1000);
         setInterval(syncSpace, 5 * 60 * 1000);
         syncISS();

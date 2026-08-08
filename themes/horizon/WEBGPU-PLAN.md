@@ -5968,6 +5968,44 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   (Hp moves 680 nm 12x more than 440; Hi moves 440 nm, ~zero
   at 800); 500 nm young/mature ponds 0.63/0.28 vs printed
   0.6/0.25. VALIDATE PASS (all references + 7 GPU probes).
+- DONE (lake ice, Aug 8 forty-fifth push - the lakes freeze by
+  Stefan's law on the measured winter): the OSM lakes rippled
+  blue in January at 61 N. Two papers read in full: Yang,
+  Lepparanta, Cheng & Li 2012 (Tellus A 64, Lake Vanajavesi -
+  fetched from Helda, keyless) and Pirazzini et al. 2006 (Ann.
+  Glaciol. 44 - the albedo law, open at Cambridge). NEW
+  EXTERNAL DATA SOURCE: the open-meteo ERA5 archive API
+  (keyless) - daily mean 2 m temperature at the anchor since
+  the season start. lakeice.js integrates the measured series
+  day by day with ZERO free knobs - every constant is a
+  printed pair from the Vanajavesi paper: the sqrt-FDD growth
+  structure is printed verbatim ("in proportion to the square
+  root of the freezing-degree days"); a = 2.21 cm/sqrt(degC d)
+  pinned by the printed 53 cm climatological maximum over
+  Table 1's printed monthly temperatures; the ice-on budget
+  (12 degC d) by the printed 30 November mean freezing date at
+  November's printed -0.4 degC; the melt rate by the printed
+  "2 cm d-1 melting in April" at April's printed +2.7. What
+  then EMERGES, gated: breakup 27 April vs the printed
+  observed 30 April (season 147 d vs printed 152); the
+  Kuivajarvi validation circles (mid-month 17/32/45/51 cm vs
+  observed ~20/35/44/50); the printed sensitivities (+1 degC:
+  freeze +4 d vs printed 5 d/degC, maximum -6.5 cm vs printed
+  ~6, breakup -10/+7 d vs printed 8). The drawn colour is the
+  printed Yang Eq. 2 / Pirazzini Eq. 3 law at the printed
+  values (film 0.15 below the printed 0.001 m; bare black ice
+  min(0.55, 0.15 h^1.5 + 0.15) - 0.208 at 53 cm; snow ramp to
+  the terrain's own snow class over the printed 0.1 m, read as
+  the measured areal fraction; Pirazzini's tuned melting form
+  corroborates - 0.6 m ice at 0.294 vs their printed "about
+  0.3", RMSE 0.032). Wiring: terrain-sample/worker split lake
+  pixels from sea (0/1/2 in the wet grid), terrain-tsl gains a
+  lake attribute + two uniforms - frozen lake pixels trade the
+  animated sea for the ice albedo, go still (DEM normal), wear
+  the snow-class roughness and drop the wave glitter; the sea
+  keeps its own measured concentration path untouched. Full-
+  page WebGPU smoke at Vanajavesi compiles clean. VALIDATE
+  PASS (all references + 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

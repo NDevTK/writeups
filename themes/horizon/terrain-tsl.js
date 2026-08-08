@@ -128,7 +128,13 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     uSnowCovOn: uniform(0),
     uLightsNight: uniform(0),
     uLightsGain: uniform(0.035),
-    uLightsTint: uniform(new Vector3(1, 0.417, 0.1))
+    uLightsTint: uniform(new Vector3(1, 0.417, 0.1)),
+    // Lake ice (lakeice.js): presence (0/1) and the drawn ice
+    // colour - the printed Yang/Pirazzini bare-ice albedo,
+    // snow-blended CPU-side. Applies to 'lake' pixels only; the
+    // sea keeps its own measured concentration path.
+    uLakeIce: uniform(0),
+    uLakeIceCol: uniform(new Vector3(0.2, 0.2, 0.2))
   };
 
   const thash = Fn(([p]) =>
@@ -380,6 +386,11 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
   });
 
   const wet = attribute('wet', 'float');
+  // Inland-water flag (0/1): which wet pixels are lakes. The
+  // Stefan-law freeze (lakeice.js) rides it - frozen lake pixels
+  // trade the animated sea for the printed ice albedo.
+  const lake = attribute('lake', 'float');
+  const lakeFz = lake.mul(u.uLakeIce);
 
   // Shared pieces of the material decision (deduplicated by the
   // graph). ONE trilinear moments sample per fragment: mean slope ->
@@ -583,7 +594,10 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
       vec3(0.75, 0.8, 0.84),
       smoothstep(W.oneMinus(), W.oneMinus().add(0.04), capN)
     );
-    return mix(col3, sea, wet);
+    // Frozen lakes: the measured winter's ice (lakeice.js) - the
+    // printed albedo replaces the animated water on lake pixels.
+    const wetCol = mix(sea, u.uLakeIceCol, lakeFz);
+    return mix(col3, wetCol, wet);
   })();
 
   // Per-pixel GGX roughness: vegetation ~0.95, rock ~0.88, snow 0.45
@@ -593,11 +607,19 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
   const rBase = mix(mix(0.95, 0.88, rockF), 0.45, snow);
   const aBase = rBase.mul(rBase);
   const aEff = sqrt(aBase.mul(aBase).add(sig2.mul(2.0)));
-  const roughnessNode = mix(clamp(sqrt(aEff), 0.0, 1.0), 1.0, wet);
+  // Frozen lake pixels wear the snow-class roughness (0.45, the
+  // existing convention - no new constant); open water keeps 1 so
+  // the Blinn seaSpec stays the one glitter model.
+  const roughnessNode = mix(
+    clamp(sqrt(aEff), 0.0, 1.0),
+    mix(1.0, 0.45, lakeFz),
+    wet
+  );
 
-  // World normal: waves on wet pixels, the DEM normal map elsewhere.
+  // World normal: waves on wet pixels, the DEM normal map
+  // elsewhere - and a frozen lake is still (the flat DEM normal).
   const normalNode = transformNormalToView(
-    mix(nW, seaNormal(positionWorld), wet)
+    mix(nW, seaNormal(positionWorld), wet.mul(lakeFz.oneMinus()))
   );
 
   // Glitter adds to the outgoing light exactly like the GLSL
@@ -633,7 +655,7 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     .mul(u.uLightsTint);
 
   const emissiveNode = seaSpec(positionWorld)
-    .mul(wet)
+    .mul(wet.mul(lakeFz.oneMinus()))
     .add(snowGlint(positionWorld, nW, sig2).mul(snow).mul(wet.oneMinus()))
     .add(nightLights);
 

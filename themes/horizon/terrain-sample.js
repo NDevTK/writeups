@@ -133,6 +133,7 @@ export function sampleDem(dem, x, z, centerElev, anchor, world, lakes) {
   const e = demElev(dem, x, z, world);
   let water = e <= WATER_E;
   let waterE = 0; // the sea sits at the datum
+  let lake = false; // inland water - the lake-ice pass freezes it
   // Real inland water (lakes.js): the OSM wet mask puts a FLAT
   // surface at the lake's measured level - the sea rule alone can
   // never see a lake above 0.3 m.
@@ -144,6 +145,7 @@ export function sampleDem(dem, x, z, centerElev, anchor, world, lakes) {
       const li = grid[j * n + i];
       if (li >= 0) {
         water = true;
+        lake = true;
         waterE = elevs[li];
       }
     }
@@ -155,5 +157,5 @@ export function sampleDem(dem, x, z, centerElev, anchor, world, lakes) {
     const micro = dem.kind === 'img' ? MICRO_IMG : MICRO_GRID;
     y += micro * (microRelief(x, z, anchor) - 0.5);
   }
-  return {e, y, water};
+  return {e, y, water, lake};
 }
