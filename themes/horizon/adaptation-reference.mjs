@@ -25,6 +25,13 @@ import {
   scotopicY,
   skyTransferE,
   limitingMagnitude,
+  crumeyThresholdDB,
+  extendedVisibility,
+  milkyWayVisibility,
+  CRUMEY_R1,
+  CRUMEY_K1,
+  CRUMEY_Q,
+  CRUMEY_F,
   DETECT_HALF_MAG,
   NL_TO_CDM2,
   COLOR_LIMIT_NL
@@ -318,6 +325,60 @@ const check = (name, ok, detail) => {
     'Schaefer limiting magnitude (printed anchors)',
     ok,
     `typical sky 136 nL -> ${mTyp.toFixed(2)} (printed 6.05 exact); best sky 65 nL -> ${mBest.toFixed(2)} vs the catalogue's 6.5 limit; bridge pairings 21.0 -> ${bridge21.toFixed(0)} nL (printed 136), 21.8 -> ${bridge218.toFixed(0)} nL (printed 65); daylight 5000 cd/m^2 -> ${mDay.toFixed(2)} (Venus -4.8 visible, Jupiter -2.9 not); full-moon sky -> ${mMoon.toFixed(2)} (lore 4-5); monotone; seam = the printed 1500 nL colour floor; +-${DETECT_HALF_MAG} mag printed detection width`
+  );
+}
+
+{
+  // Crumey's scotopic extended-source threshold at its printed
+  // constants, doing what the flash JND provably cannot (the
+  // fiftieth-push verdict): the gegenschein-class feature (the
+  // zodiacal module's own ~22.0 mag/arcsec^2 anchor, ~0.03 sr)
+  // sits WELL ABOVE threshold at the natural dark sky - visible,
+  // as it really is - and falls to the marginal band under a
+  // full-moon sky with his printed notional field factor F = 2;
+  // the milky way's drawn fade runs his printed Bigourdan band
+  // (on at 20.25 mag/arcsec^2, full by the printed 21.25 black
+  // boundary); thresholds monotone in B; the printed
+  // zero-background floor holds (no divergence below 1e-5).
+  const dL = magArcsec2ToCdM2(22.0);
+  const dark = dL / crumeyThresholdDB(1.9e-4, 0.03);
+  const moonR = dL / (CRUMEY_F * crumeyThresholdDB(4e-3, 0.03));
+  const visDark = extendedVisibility(dL, 1.9e-4, 0.03);
+  const visMoon = extendedVisibility(dL, 4e-3, 0.03);
+  const visTwi = extendedVisibility(dL, 0.05, 0.03);
+  let mono = true;
+  let prev = 0;
+  for (let lg = -5; lg <= -1; lg += 0.25) {
+    const th = crumeyThresholdDB(Math.pow(10, lg), 0.03);
+    if (th < prev - 1e-15) mono = false;
+    prev = th;
+  }
+  const floorOk =
+    Math.abs(crumeyThresholdDB(1e-7, 0.03) - crumeyThresholdDB(1e-5, 0.03)) <
+    1e-15;
+  const mw =
+    milkyWayVisibility(magArcsec2ToCdM2(20.3)) < 0.1 &&
+    milkyWayVisibility(magArcsec2ToCdM2(21.25)) === 1 &&
+    milkyWayVisibility(magArcsec2ToCdM2(19.5)) === 0;
+  const ok =
+    CRUMEY_R1 === 7.31e-4 &&
+    CRUMEY_K1 === 7.633e-3 &&
+    CRUMEY_Q === 0.6 &&
+    dark > 8 &&
+    dark < 30 &&
+    visDark === 1 &&
+    moonR > 0.5 &&
+    moonR < 1.3 &&
+    visMoon > 0.05 &&
+    visMoon < 0.7 &&
+    visTwi === 0 &&
+    mono &&
+    floorOk &&
+    mw;
+  check(
+    'Crumey extended-source threshold (printed constants)',
+    ok,
+    `gegenschein-class feature ${dark.toFixed(0)}x threshold at the dark sky (visible ${visDark}), ratio ${moonR.toFixed(2)} with printed F=2 under full moon (vis ${visMoon.toFixed(2)} - marginal, as real), 0 in twilight; milky way on at the printed Bigourdan 20.25, full at 21.25; monotone, printed 1e-5 floor exact`
   );
 }
 

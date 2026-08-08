@@ -325,7 +325,11 @@
       import {
         adaptExposure,
         E0_LUX,
+        crumeyThresholdDB,
+        extendedVisibility,
         limitingMagnitude,
+        magArcsec2ToCdM2,
+        milkyWayVisibility,
         lum3,
         mesopicBlend,
         scotopicY,
@@ -9999,7 +10003,15 @@
         const dNow = now();
         const sunLam = sunEclipticLon(dNow);
         {
-          zodiU.night.value = nightSky * (1 - cloudy * 0.85) * lpVis;
+          // The zodiacal cone through Crumey's printed scotopic
+          // contrast threshold at the frame's adaptation sky: its
+          // characteristic excess is the module's own documented
+          // ~22.0 mag/arcsec^2 (the Leinert-derived gegenschein
+          // anchor) over ~0.03 sr - visible at a dark sky (~16x
+          // threshold), drowned by moonlight and city glow.
+          zodiU.night.value =
+            extendedVisibility(magArcsec2ToCdM2(22.0), laCd, 0.03) *
+            (1 - cloudy * 0.85);
           zodiU.uSunLam.value = sunLam;
           const AEg = window.Astronomy;
           const rAU =
@@ -10013,7 +10025,10 @@
           // The galaxy shares the zodiacal gating and extinction
           // (same night factor, same zenith transmittance) - only
           // the r^-2.3 heliocentric factor is zodiacal-specific.
-          mwU.night.value = zodiU.night.value;
+          // The milky way turns on at Crumey's printed Bigourdan
+          // anchor (visible from ~20.25 mag/arcsec^2 sky, full by
+          // his printed 21.25 'black' boundary).
+          mwU.night.value = milkyWayVisibility(laCd) * (1 - cloudy * 0.85);
           mwU.uTzen.value.copy(airglowU.uTzen.value);
           // Noctilucent clouds: geometry in the shader (exact
           // shadow cylinder); here only the sun direction, the

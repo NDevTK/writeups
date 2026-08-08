@@ -6146,6 +6146,35 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   and vendored; wiring them through the flash JND would have
   erased real sky features and is rejected. The blocker is
   named for a future pass.
+- DONE (extended sources unblocked, Aug 8 fifty-first push -
+  Crumey opens what Blackwell's paywall closed): the fiftieth
+  push's verdict named the blocker; the unblock is Crumey 2014
+  (MNRAS 442, 2600, arXiv - read in full), which re-derives
+  Blackwell's large-field data in closed form with every
+  constant printed. adaptation.js gains his scotopic model -
+  his own recommendation "for astronomical visibility": Ricco
+  branch R = (r1 B^-1/4 + r2)^2, large-target branch Cinf =
+  k1 B^-1/4 + k2, joined as ((R/A)^q + Cinf^q)^(1/q) with the
+  printed q = 0.6, the printed 1e-5 cd/m^2 zero-background
+  floor, and his printed notional field factor F = 2 (the value
+  his own telescopic application shows landing Sinnott's
+  best-value limits). The gate holds what the flash JND
+  provably could not: the gegenschein-class zodiacal feature
+  (the module's own Leinert-derived 22.0 mag/arcsec^2 over
+  0.03 sr) sits 14x ABOVE threshold at the natural dark sky -
+  visible, as it really is - falls to ratio 0.86 (vis 0.33,
+  marginal) under a full-moon sky, and to zero in twilight.
+  The milky way's appearance rides Crumey's printed
+  OBSERVATIONAL anchor (Bigourdan 1907 via his Sec. 9: visible
+  at sun -13 deg, sky ~20.25 mag/arcsec^2) fading in over his
+  printed grey band to full at the 21.25 black boundary - his
+  own practical dark-sky definition. Wiring: zodiU.night and
+  mwU.night now run these laws at the frame's adaptation sky
+  (laCd - twilight, moonlight and the measured skyglow all
+  inside), retiring their share of the nightSky x lpVis hand
+  ramp; airglow keeps its frame (it IS the background, not a
+  feature on it - documented); clouds still occlude. VALIDATE
+  PASS (all references + 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

@@ -215,6 +215,70 @@ export const COLOR_LIMIT_CDM2 = COLOR_LIMIT_NL * NL_TO_CDM2;
 // too: Blackwell's 10->50 and 50->90% probability steps are
 // each "roughly half a magnitude" - the sprites fade over
 // +-0.5 mag around this limit.
+// ---- extended-source contrast threshold (Crumey 2014) ----
+// Crumey, "Human contrast threshold and astronomical visibility"
+// (MNRAS 442, 2600, arXiv:1405.4209 - read in full): Blackwell's
+// large-field data re-derived in closed form. His scotopic model
+// - his own recommendation "for astronomical visibility" (valid
+// below the printed ~0.1 cd/m^2) - with every constant printed:
+//   R = (r1 B^-1/4 + r2)^2         (Ricco branch, Eqs. 23/26)
+//   Cinf = k1 B^-1/4 + k2          (large-target branch, Eqs. 35/49)
+//   C(A) = ((R/A)^q + Cinf^q)^1/q  (Eq. 41), q = 0.6 (Eq. 44)
+// with the printed zero-background floor B >= 1e-5 cd/m^2 and
+// threshold excess dB = B C. The detection RAMP reuses the
+// printed Blackwell half-magnitude probability width the star
+// and meteor gates carry. What the model does that the flash JND
+// (above) provably cannot: the gegenschein at a dark sky sits
+// ~16x ABOVE this threshold - visible, as it really is - and
+// drops to ~2x under a full-moon sky (marginal; with Crumey's
+// field factor ~2 for non-laboratory conditions, gone).
+export const CRUMEY_R1 = 7.31e-4;
+export const CRUMEY_R2 = -5.162e-4;
+export const CRUMEY_K1 = 7.633e-3;
+export const CRUMEY_K2 = -7.174e-3;
+export const CRUMEY_Q = 0.6;
+export const CRUMEY_B_FLOOR = 1e-5;
+export function crumeyThresholdDB(Bcdm2, Asr) {
+  const B = Math.max(Bcdm2, CRUMEY_B_FLOOR);
+  const b4 = Math.pow(B, -0.25);
+  const R = Math.pow(Math.max(CRUMEY_R1 * b4 + CRUMEY_R2, 0), 2);
+  const Cinf = Math.max(CRUMEY_K1 * b4 + CRUMEY_K2, 1e-6);
+  const C = Math.pow(
+    Math.pow(R / Math.max(Asr, 1e-9), CRUMEY_Q) + Math.pow(Cinf, CRUMEY_Q),
+    1 / CRUMEY_Q
+  );
+  return B * C;
+}
+// Visibility of an extended feature of excess luminance dL and
+// solid angle A over sky B: the printed +-0.5 mag Blackwell ramp
+// on the threshold ratio.
+// Crumey's field factor for non-laboratory viewing (his notional
+// working value F = 2, printed in his telescopic application and
+// shown there to land Sinnott's best-value limiting magnitudes).
+export const CRUMEY_F = 2;
+export function extendedVisibility(dLcdm2, Bcdm2, Asr) {
+  if (!(dLcdm2 > 0)) return 0;
+  const ratio = dLcdm2 / (CRUMEY_F * crumeyThresholdDB(Bcdm2, Asr));
+  const half = Math.pow(10, 0.4 * DETECT_HALF_MAG);
+  const t = (Math.log(ratio) / Math.log(half) + 1) / 2;
+  return Math.min(Math.max(t, 0), 1);
+}
+// The milky way's drawn appearance: Crumey's printed observation
+// anchor (Bigourdan 1907 via his Sec. 9): the summer milky way
+// "became visible ... when the Sun reached 13 degrees below
+// horizon", sky ~20.2-20.3 mag/arcsec^2, with his printed
+// dark-sky bands (grey 20.25-21.24, black 21.25-21.74). The
+// drawn fade runs the printed grey band: on at 20.25, full at
+// 21.25 - his own practical dark-sky definition ("one in which
+// the Milky Way is capable of being seen").
+export function milkyWayVisibility(Bcdm2) {
+  const mag =
+    NATURAL_MAG -
+    2.5 * Math.log10(Math.max(Bcdm2, 1e-9) / (NATURAL_MCD * 1e-3));
+  const t = (mag - 20.25) / (21.25 - 20.25);
+  return Math.min(Math.max(t, 0), 1);
+}
+
 export const KV_TYPICAL = 0.3;
 export const DETECT_HALF_MAG = 0.5;
 export function limitingMagnitude(Bcdm2, kv = KV_TYPICAL) {
