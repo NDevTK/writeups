@@ -51,7 +51,11 @@
  * ionization peaks sweeping 230 -> 105 km as electrons harden from
  * 0.1 to 10 keV, red 630.0 nm confined above ~200 km by quenching
  * (soft precipitation -> red-dominated tall aurora, hard -> green
- * curtains with a purple N2+ fringe at the bottom).
+ * curtains with a purple N2+ fringe at the bottom), and - via the
+ * transfer chain's [O] weighting - the blue 427.8 nm peaking ABOVE
+ * the green with a split that grows as precipitation softens,
+ * exactly the seven-winter measured statistics of Whiter et al.
+ * 2023 (green mean 114.84 km, blue 116.55 km).
  */
 
 // [z km, T K, log10 n m^-3: N2, O2, O, Ar] - CIRA-72 mean (AFGL
@@ -266,6 +270,17 @@ export const Z_MAX = 400;
  */
 export function buildAuroraLUT(E0, bins = 128) {
   const q = qMaxwellian(E0);
+  // Blue 427.8 first: N2+ 1NG is prompt (270 ns - Whiter et al.
+  // 2023 cite Gilmore; quenching under 1 percent even at 90 km),
+  // so it follows the N2 ionization share directly. Its peak row
+  // anchors the green line's transfer weighting below.
+  const blue = ROWS.map((r, i) => {
+    const denom = 0.92 * r.n2 + r.o2 + 0.56 * r.o;
+    return q[i] * ((0.92 * r.n2) / denom);
+  });
+  let bi = 0;
+  for (let i = 0; i < blue.length; i++) if (blue[i] > blue[bi]) bi = i;
+  const oRef = ROWS[bi].o;
   const prof = [];
   for (let i = 0; i < ROWS.length; i++) {
     const r = ROWS[i];
@@ -274,8 +289,24 @@ export function buildAuroraLUT(E0, bins = 128) {
     const fO = r.o / (r.n2 + r.o2 + r.o + r.ar);
     prof.push([
       q[i] * fO * quench1D(r), // 630.0: O(1D), oxygen share
-      q[i] * pN2 * quench1S(r), // 557.7: N2(A) transfer chain
-      q[i] * pN2 // 427.8: N2+ 1NG
+      // 557.7: the N2(A) energy-transfer chain, whose rate is the
+      // PRODUCT of the N2(A) production (the N2 ionization share)
+      // and the atomic-O density (Whiter et al. 2023, Ann.
+      // Geophys. 41, 1 - read in full - their printed mechanism:
+      // "the N2(A) + O energy transfer rate depends on the
+      // product of the atomic O number density and N2(A) number
+      // density"). The weight is normalised to 1 at the blue
+      // line's own peak so the inter-line display calibration
+      // keeps its meaning. What the single [O] factor gives,
+      // both printed: soft precipitation peaks high, where [O]
+      // falls with altitude, so the green peaks BELOW the blue
+      // (their measured means 114.84 vs 116.55 km - blue above
+      // green, "contrary to a common misconception"); hard
+      // precipitation peaks at 95-105 km, ON the [O] profile's
+      // own flat top, so the two lines converge (their measured
+      // convergence below 110 km).
+      q[i] * pN2 * (r.o / oRef) * quench1S(r),
+      blue[i] // 427.8: N2+ 1NG
     ]);
   }
   // resample the table rows onto a uniform altitude grid

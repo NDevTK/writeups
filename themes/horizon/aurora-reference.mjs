@@ -11,6 +11,9 @@
 //    red/green column ratio grows as precipitation softens
 //  - line colors from the CIE fits: 557.7 green, 630.0 red,
 //    427.8 violet-blue
+//  - Whiter et al. 2023 measured peak altitudes: green near its
+//    114.84 km climatological mean with blue above it, the
+//    blue-green split growing as precipitation softens
 import {
   ATMO_ROWS,
   buildAuroraLUT,
@@ -21,6 +24,12 @@ import {
   Z_MAX,
   Z_MIN
 } from './aurora-lut.js';
+
+let fail = 0;
+const check = (name, ok, detail) => {
+  console.log(`${ok ? 'REF' : 'FAIL'} ${name}: ${detail}`);
+  if (!ok) fail++;
+};
 
 {
   const r100 = ATMO_ROWS.find((r) => r.z === 100);
@@ -125,6 +134,70 @@ for (const nm of [557.7, 630.0, 427.8]) {
   );
 }
 
+{
+  // Whiter et al. 2023 (Ann. Geophys. 41, 1 - read in full):
+  // 57,907 simultaneous green/blue peak-height pairs from seven
+  // winters of MIRACLE all-sky cameras. Their printed anchors,
+  // held against the LUT (CIRA-72 + Fang vs their MSIS +
+  // transport model - band tolerances, not exact):
+  //  - both lines typically peak near 114 km (means 114.84 green,
+  //    116.55 blue): some E0 in the auroral range must put the
+  //    LUT's green peak in 112-118 km, with the blue ABOVE it
+  //    there - "contrary to a common misconception that blue
+  //    peaks below green"
+  //  - the height difference GROWS as precipitation softens
+  //    (their Figs. 7-9: blue-green up to ~10 km at the softest)
+  //    and shrinks toward the crossover for harder spectra
+  //  - below ~110 km the observations converge; the printed
+  //    model itself overshoots there (their own caveat - the
+  //    low-altitude O(1S) sources beyond N2(A) transfer are
+  //    unmodelled in print), so the hard end is gated as a BOUND,
+  //    not a convergence claim
+  //  - the red 630.0 line stays far above both at every energy
+  const peakZ = (lut, c) => {
+    let b = 0;
+    for (let i = 0; i < lut.bins; i++) {
+      if (lut.data[i * 4 + c] > lut.data[b * 4 + c]) b = i;
+    }
+    return Z_MIN + ((b + 0.5) / lut.bins) * (Z_MAX - Z_MIN);
+  };
+  const at = (E0) => {
+    const l = buildAuroraLUT(E0);
+    return {g: peakZ(l, 1), b: peakZ(l, 2), r: peakZ(l, 0)};
+  };
+  let typical = null;
+  for (const E0 of [0.7, 0.8, 0.9, 1.0, 1.1, 1.2]) {
+    const p = at(E0);
+    if (p.g >= 112 && p.g <= 118) {
+      typical = {E0, ...p};
+      break;
+    }
+  }
+  const soft = at(0.5);
+  const mid = at(1.5);
+  const hard = at(3);
+  const deep = at(15);
+  const softDiff = soft.b - soft.g;
+  const ok =
+    typical !== null &&
+    typical.b - typical.g > 1 &&
+    typical.b - typical.g < 12 &&
+    softDiff >= 8 &&
+    softDiff <= 20 &&
+    softDiff > mid.b - mid.g &&
+    mid.b - mid.g > hard.b - hard.g - 1e-9 &&
+    Math.abs(deep.b - deep.g) <= 8 &&
+    soft.r > soft.b &&
+    deep.r > deep.g;
+  check(
+    'Whiter 2023 measured peak altitudes',
+    ok,
+    `green hits ${typical ? typical.g.toFixed(1) : '-'} km at E0 ${typical ? typical.E0 : '-'} keV (measured mean 114.84) with blue ${typical ? (typical.b - typical.g).toFixed(1) : '-'} km above (measured +1.7, model up to ~10); ` +
+      `blue-green softens ${softDiff.toFixed(1)} -> ${(mid.b - mid.g).toFixed(1)} -> ${(hard.b - hard.g).toFixed(1)} km (0.5/1.5/3 keV); ` +
+      `hard-end bound |${(deep.b - deep.g).toFixed(1)}| km at 15 keV (printed model's own overshoot regime); red far above`
+  );
+}
+
 // ---- absolute curtain photometry (gated landmarks) ----
 // Sources read in full: Brandstrom et al. 2012 (GI 1, 43) Eqs.
 // 1-2 (the SI rayleigh and its 4-pi apparent radiance);
@@ -152,12 +225,6 @@ import {
   MOON_FULL_LUX
 } from './adaptation.js';
 import {NATURAL_MCD} from './skyglow.js';
-
-let fail = 0;
-const check = (name, ok, detail) => {
-  console.log(`${ok ? 'REF' : 'FAIL'} ${name}: ${detail}`);
-  if (!ok) fail++;
-};
 
 {
   // The SI chain re-derived independently of the module: 1 kR of

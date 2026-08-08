@@ -6406,6 +6406,50 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   vendored values; the retired default in context (median 3.5,
   spread -2.5..7.5); the ISS overhead at -4.4 - the Venus-class
   pass of observing lore - against a default-class body at +2.1.
+- DONE (the green line finds its measured altitude, Aug 8
+  fifty-seventh push - Whiter's seven winters gate the curtain):
+  the hunt first hit two walls worth recording - the AMS archive
+  that served Wiscombe & Warren freely one push ago now returns
+  CloudFront "Request blocked" on every try (IP throttling after
+  the first success; the Yellow Sea sea-smoke paper JAS-D-22-0065
+  and Monahan & O'Muircheartaigh 1980 both wait behind it, named
+  here for a cooled-off window), and the Springer-era Annales
+  Geophysicae (Lummerzheim & Lilensten 1994) is served by neither
+  Copernicus nor ADS. The open route that DID land: Whiter,
+  Partamies, Gustavsson & Kauristie 2023 (Ann. Geophys. 41, 1,
+  CC-BY - read in full), a 57,907-pair statistical study of green
+  557.7 and blue 427.8 peak emission altitudes from seven winters
+  of MIRACLE all-sky cameras - printed means 114.84 +/- 0.06 km
+  (green) and 116.55 +/- 0.07 km (blue), the blue ABOVE the green
+  "contrary to a common misconception", the split growing as
+  precipitation softens, the two converging below 110 km, and the
+  printed mechanism for all of it: the N2(A) + O energy-transfer
+  rate is the PRODUCT of the N2(A) and atomic-O densities, so the
+  transfer-fed green peaks below the ionization-fed blue wherever
+  [O] falls with altitude. THE CHANGE (aurora-lut.js): the 5577
+  profile - which shared the blue's N2-ionization shape apart
+  from low-border quenching - now carries the printed [O] product
+  weighting, normalised to 1 at the blue line's own peak so the
+  inter-line display calibration keeps its meaning. ONE factor,
+  BOTH printed regimes emerge: soft spectra put the blue peak
+  km above the green (0.5 keV: +14.5; 1.5 keV: +4.8) because [O]
+  falls with altitude up there, and hard spectra converge
+  (3 keV: 0.0) because 95-105 km is the [O] profile's own flat
+  top; at the measured-typical 114.84 km (the LUT's E0 ~ 0.8
+  keV) the blue sits above by the printed direction. The hard
+  end (15 keV: green 7 km above blue) is gated as a BOUND with
+  the paper's own caveat quoted - their model overshoots there
+  too, because the low-altitude O(1S) sources beyond the
+  transfer chain (O2+ dissociative recombination et al., their
+  Table 2) are unmodelled in print. Landmarks (aurora-reference):
+  the typical-window pairing, the softening sequence 14.5 -> 4.8
+  -> 0.0 km, the hard bound, red far above at every energy; all
+  fifteen prior aurora landmarks (Fang, quenching, photometry,
+  Crumey visibility) hold unchanged. What the eye gets: soft
+  evening arcs now wear their green LOW against a taller blue
+  flank, and hard substorm curtains keep the classic coincident
+  green-over-purple wall - both orderings now measured, not
+  assumed.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
