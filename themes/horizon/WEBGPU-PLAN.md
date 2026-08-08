@@ -6123,6 +6123,29 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   there. Above-horizon field unchanged (93 vs 101 bright px,
   scintillation noise). VALIDATE PASS (all references + 7 GPU
   probes).
+- DONE (extended-source visibility, Aug 8 fiftieth push - a
+  VERDICT, no code): the natural sequel to the Schaefer point-
+  source threshold was to put the milky way, zodiacal light and
+  airglow on a printed extended-source law and retire their
+  remaining hand nightSky ramp. The candidate mechanism - the
+  shipped Ferwerda/LBNL JND as the contrast threshold - FAILS
+  its own sanity check, measured before any code: at the dark-
+  sky adaptation floor (1.74e-4 cd/m^2) the shipped JND is
+  1.39e-3 cd/m^2, which puts the gegenschein at 0.125 of
+  threshold, the zodiacal cone at 0.26 and the bright milky-way
+  clouds at 0.50 - all INVISIBLE, while every one is a real
+  naked-eye dark-sky object. The diagnosis: Ferwerda's numbers
+  are BRIEF-PRESENTATION detection thresholds; astronomical
+  extended sources are seen by long inspection with spatial
+  summation over degrees, governed by Blackwell 1946's large-
+  field long-duration contrast tables (JOSA 36, 624) - which
+  are paywalled at Optica, with no open mirror found. VERDICT:
+  the diffuse dome features keep their existing documented
+  frame until Blackwell's printed large-field tables (or an
+  open equivalent, e.g. a CIE contrast standard) can be read
+  and vendored; wiring them through the flash JND would have
+  erased real sky features and is rejected. The blocker is
+  named for a future pass.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
