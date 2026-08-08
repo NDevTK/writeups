@@ -206,6 +206,8 @@
         METAR ice-crystal report for the harness / never draw
         light pillars), fogbow=V|0 (pin fog at visibility V
         metres for the harness / never draw the fogbow),
+        glory=0 (remove the exact-Mie antisolar rings the same
+        pinned fog otherwise draws),
         gwaves=A|0 (pin the airglow banding amplitude for the
         harness / remove the banding), gmn=URL|0 (daemon
         endpoint override for the measured meteor medians /
@@ -409,6 +411,7 @@
         createMeteorMaterial,
         createContrailMaterial,
         createFlashMaterial,
+        createGloryMaterial,
         createLightPillarMaterial,
         createNacreousMaterial,
         createSteveMaterial,
@@ -432,7 +435,7 @@
         MOON_ALB_H
       } from './horizon/moon-albedo-data.js';
       import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
-      import {mpDropRadiusMm, mpSigmaExt} from './horizon/rainbow.js';
+      import {bowSlab, mpDropRadiusMm, mpSigmaExt} from './horizon/rainbow.js';
       import {parseSoft00, syndyne, visibleComets} from './horizon/comets.js';
       import {
         ambientFactor,
@@ -819,6 +822,11 @@
         fogReported,
         fogSigH
       } from './horizon/fogbow.js';
+      import {
+        buildGloryLUT,
+        GLORY_MAX_DEG,
+        gloryRingDeg
+      } from './horizon/mie.js';
       import {
         GW_LAMBDA_MED_KM,
         GW_SPEED_MED_MS,
@@ -8192,6 +8200,48 @@
       );
       opticsMoon.renderOrder = 1;
       skyGroup.add(opticsMoon);
+      // The GLORY (mie.js, gated by mie-reference.mjs): exact Mie
+      // rings around the antisolar point from the SAME printed fog
+      // droplet as the fogbow - one measured fog, two displays
+      // (Airy bow at ~39 deg, Mie rings at 0-8 deg). A billboard
+      // quad per source (sun / moon) samples the exact phase
+      // function by TRUE angle from the antisolar direction;
+      // depth test off because the glory forms on the fog veiling
+      // whatever stands behind it (the Brocken spectre geometry).
+      const gloryLUT = buildGloryLUT();
+      const glorySunObj = createGloryMaterial(gloryLUT);
+      const glorySun = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        glorySunObj.material
+      );
+      glorySun.renderOrder = 2;
+      glorySun.visible = false;
+      scene.add(glorySun);
+      const gloryMoonObj = createGloryMaterial(gloryLUT);
+      const gloryMoon = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        gloryMoonObj.material
+      );
+      gloryMoon.renderOrder = 2;
+      gloryMoon.visible = false;
+      scene.add(gloryMoon);
+      let glorySaid = false;
+      const gloryV3 = new THREE.Vector3();
+      // Place a glory quad on its antisolar direction (unit
+      // vector), camera-relative, sized so the quad edge is
+      // exactly the LUT window (the feather ends there).
+      const GLORY_R = 235;
+      const gloryW = 2 * GLORY_R * Math.tan((GLORY_MAX_DEG * Math.PI) / 180);
+      function placeGlory(mesh, u, antiUnit) {
+        gloryV3.copy(antiUnit);
+        u.antiDir.value.copy(gloryV3);
+        mesh.position
+          .copy(gloryV3)
+          .multiplyScalar(GLORY_R)
+          .add(camera.position);
+        mesh.scale.set(gloryW, gloryW, 1);
+        mesh.lookAt(camera.position);
+      }
 
       // Clouds in the three layers the weather model actually reports
       // (open-meteo cloud_cover_low/mid/high): the low cumulus deck and
@@ -12481,6 +12531,44 @@
           const tB = sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieRad);
           const aB = bowOn ? cirrusT * skyExposure : 0;
           opticsU.bowAmp.value.setRGB(tB[0] * aB, tB[1] * aB, tB[2] * aB);
+          // The GLORY rides the same measured fog through the
+          // same radiometric chain: the exact Mie phase function
+          // (mie.js LUT) times transmittance x veil x exposure x
+          // the two-leg fog slab, evaluated CPU-side AT the
+          // antisolar point (sinA = -sinH, kc = 2 exactly - the
+          // stated small-angle reduction over the 8-deg window).
+          // No upper sun-altitude cap: unlike the bow, the rings
+          // sit around the antisolar point at any elevation (from
+          // a rise or in roam flight, the Brocken spectre).
+          // ?glory=0 removes the branch for the harness A/B.
+          {
+            const gOn = params.get('glory') !== '0' && fogBow && sun.alt > 0;
+            const slabG = gOn
+              ? bowSlab(
+                  fogSigH(fogVisM),
+                  Math.max(Math.sin(sun.alt), 1e-3),
+                  -Math.sin(sun.alt)
+                )
+              : 0;
+            const aG = slabG * cirrusT * skyExposure;
+            glorySun.visible = gOn && aG > 1e-5;
+            if (glorySun.visible) {
+              gloryV3.copy(sunVec).negate();
+              placeGlory(glorySun, glorySunObj.u, gloryV3);
+              glorySunObj.u.ampV.value.set(tB[0] * aG, tB[1] * aG, tB[2] * aG);
+              if (!glorySaid) {
+                glorySaid = true;
+                record(
+                  'glory (exact Mie)',
+                  'first ring ' +
+                    gloryRingDeg(FOG_D_DRAWN_UM, 0.55).toFixed(1) +
+                    '° from antisolar · droplet Ø' +
+                    FOG_D_DRAWN_UM +
+                    ' µm · van de Hulst series'
+                );
+              }
+            }
+          }
         }
         // The ring family's OCCURRENCE (halos.js haloOccurrence):
         // only ~27% of cirrus actually rings (Forster 2017's
@@ -12704,6 +12792,40 @@
               tBM[1] * aBM,
               tBM[2] * aBM
             );
+            // The LUNAR glory: same fog, same exact Mie rings,
+            // the source now the measured moonlight - the rarest
+            // of the pair, carried by the same chain as the
+            // moonbow (no upper altitude cap, like the sun's).
+            {
+              const gOnM =
+                params.get('glory') !== '0' && fogBow && moon.alt > 0;
+              const aGM = gOnM
+                ? bowSlab(
+                    fogSigH(fogVisM),
+                    Math.max(Math.sin(moon.alt), 1e-3),
+                    -Math.sin(moon.alt)
+                  ) *
+                  moonIrradianceE0(
+                    astro.moonRel,
+                    astro.moonDistKm,
+                    1 - (astro.lunarEcl?.inUmbra ?? 0)
+                  ) *
+                  Math.exp(
+                    -cirrusSlantTau(cHighFrac, Math.sin(moon.alt), eyeVeilM)
+                  ) *
+                  skyExposure
+                : 0;
+              gloryMoon.visible = gOnM && aGM > 1e-5;
+              if (gloryMoon.visible) {
+                gloryV3.copy(moonVec2).negate();
+                placeGlory(gloryMoon, gloryMoonObj.u, gloryV3);
+                gloryMoonObj.u.ampV.value.set(
+                  tBM[0] * aGM,
+                  tBM[1] * aGM,
+                  tBM[2] * aGM
+                );
+              }
+            }
           }
           // The lunar halo, radiometric like the sun's: the same
           // slab on the same column, the source now the MEASURED

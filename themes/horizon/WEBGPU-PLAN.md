@@ -7534,6 +7534,63 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   spawns, 0 rejects, drawn durations 0.39-0.51 s - inside
   yesterday's measured range. Full gate green - 114 CPU
   references + 7 GPU probes.
+- DONE (Aug 8, the review session's 78th pass - the glory: exact
+  Mie scattering, the fog's second display). THE LAW: mie.js
+  implements van de Hulst 1957 Ch. 9 EXACTLY - the very book the
+  corona machinery already cites for its Airy approximation:
+  logarithmic-derivative downward recurrence for D_n(mx),
+  Riccati-Bessel psi/chi upward, pi/tau angular recurrences,
+  Wiscombe's printed truncation N = x + 4x^(1/3) + 2; water in
+  the visible is non-absorbing at drawn precision, so m is REAL
+  and a_n = A_n/(A_n - iB_n) computes in real arithmetic. THE
+  GATE (mie-reference.mjs, 8 landmarks) brackets the series with
+  the two printed van de Hulst limits (Rayleigh asymptote to
+  1e-5; extinction paradox Qext(x=400) = 2.031) and holds the
+  EXACT identities no approximate code fakes: the optical
+  theorem Qext = (4/x^2) Re S(0) to 1.2e-14 and energy
+  Qsca = Qext to 2.2e-16 across x = 1..114; and the forward
+  lobe LANDS ON THE SHIPPED CERTIFIED airyPattern within 7.3%
+  over the inner half-lobe at x = 114 - the new exact code and
+  the old certified law meet in their common regime. THE GLORY
+  EMERGES: at the fogbow's own printed 14 um droplet (Mazoyer
+  2019) the exact backscatter makes a first ring 2.1 deg from
+  the antisolar point (green), red 2.7 OUTSIDE blue 1.8 (the
+  ratios are lambda's), and doubling the droplet halves the
+  ring - nothing about the glory is coded; it is what the
+  series does at 180 deg. THE DRAWN SIDE rides the fogbow's
+  whole measured chain unchanged: same METAR FG occurrence,
+  same Koschmieder sigma = 3.912/V, same printed 18 m thin-fog
+  slab - ONE measured fog, TWO displays (Airy bow at ~39 deg,
+  exact Mie rings at 0-8 deg, both antisolar, exactly as on the
+  mountain). A billboard quad per source (sun and moon -
+  psc/pillar idiom, no optics-dome shader branch, GPU probes
+  untouched) samples the exact phase-function LUT by TRUE angle
+  from the antisolar direction (rings stay circular at any quad
+  orientation); amp = transmittance x veil x exposure x the
+  rainbow's own bowSlab evaluated AT the antisolar point
+  (sinA = -sinH, where kc = 2 identically - the stated
+  small-angle reduction of the per-fragment slab across the
+  8-deg window); depth test off BY DESIGN - the glory forms on
+  the fog veiling whatever stands behind it (the Brocken
+  spectre geometry), so it must draw over the terrain the fog
+  hides; window-edge feather to zero at 8 deg. No upper
+  sun-altitude cap: unlike the bow the rings sit around the
+  antisolar point at any elevation. ?glory=0 harness pin.
+  Pinned A/B (Alpine morning, fogbow=300, look=263,-25; the
+  time param parses as UTC so the sun stood at 45 deg - the
+  capless gate is exactly what let the display run): the 1x
+  frame shows the textbook bullseye on the hillside below the
+  horizon - bright core, three ring orders, red outside green.
+  MEASURED off the capture through the camera model, in true
+  angle from the antisolar direction: red first ring 2.6-2.8
+  deg, green 2.0-2.3, blue ~1.6 - the gate's own 2.7/2.1/1.8
+  drawn to the LUT's 0.05-deg bin. The pair separates cleanly:
+  inside the 8-deg window the difference is ONE-SIGNED added
+  light (mean +43 counts); outside 10 deg it is zero-mean
+  (+-0.8, the known pinned-pair vegetation timing dither) - the
+  billboard adds light exactly where the law says and nowhere
+  else. Gate registered after fogbow. Full gate green - 114 CPU
+  references (mie included) + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

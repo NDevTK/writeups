@@ -1396,6 +1396,54 @@ export function createNacreousMaterial(lut) {
   return {material, u};
 }
 
+// The glory (mie.js law): the exact Mie backscatter rings around
+// the antisolar point, on a billboard quad centred on the
+// antisolar direction. The 1-D LUT is the exact phase function
+// p(theta) (sr^-1) per RGB channel over 0..GLORY_MAX_DEG from
+// 180 deg, at the fogbow's own printed droplet - the SAME fog
+// makes both displays. Each fragment samples at its TRUE angle
+// from the antisolar direction (billboard flatness never enters
+// the angle), so the rings stay circular at any quad
+// orientation. ampV carries the whole fogbow radiometric chain
+// computed CPU-side at the antisolar point: source transmittance
+// x veil x exposure x the two-leg fog slab (bowSlab at
+// sinA = -sinH, where kc = 2 exactly) - the small-angle
+// reduction of the dome's per-fragment slab to one value across
+// the 8-deg window, stated. Depth test is OFF by design: the
+// glory forms on the fog BETWEEN the eye and every fogged
+// surface (the Brocken geometry), so it must draw over the
+// terrain the fog veils; the additive quad feathers to zero at
+// the LUT window edge.
+export function createGloryMaterial(lut) {
+  const tex = new DataTexture(lut.data, lut.w, 1, RGBAFormat, FloatType);
+  tex.magFilter = LinearFilter;
+  tex.minFilter = LinearFilter;
+  tex.needsUpdate = true;
+  const u = {
+    ampV: uniform(new Vector3(0, 0, 0)),
+    antiDir: uniform(new Vector3(0, -1, 0))
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.depthTest = false;
+  material.side = DoubleSide;
+  material.blending = AdditiveBlending;
+  const texN = texture(tex);
+  const dirW = normalize(positionWorld.sub(cameraPosition));
+  const cosT = clamp(dot(dirW, u.antiDir), -1, 1);
+  const gN = acos(cosT).div((lut.maxDeg * Math.PI) / 180);
+  const uTh = gN
+    .clamp(0, 1)
+    .mul((lut.w - 1) / lut.w)
+    .add(0.5 / lut.w);
+  const pat = texN.sample(vec2(uTh, 0.5)).rgb;
+  const feather = float(1).sub(smoothstep(float(0.86), float(1.0), gN));
+  material.colorNode = pat.mul(feather).mul(u.ampV);
+  material.opacityNode = float(1);
+  return {material, u};
+}
+
 // The Milky Way dome: Gaia DR3 integrated starlight
 // (milkyway.js / milkyway-data.js - every DR3 source aggregated
 // server-side at ESA, minus the G < 5.5 bright end the theme
