@@ -6498,6 +6498,51 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   and the printed nil-below-3-m/s lore; terrain-tsl's citation
   carries the read. The sea's foam and the sea's smoke both
   stand on print now.
+- DONE (the airglow ring earns its dark sky, Aug 8 fifty-ninth
+  push - and an NLC hunt verdict): the pass began as an NLC lead
+  and ended somewhere better. HUNT VERDICT first: the fifty-third
+  push's pattern (gate a faint layer's visibility by its printed
+  brightness through the shipped Crumey threshold) wants to
+  retire the noctilucent shell's documented 6-degree
+  sky-brightness gate too, but the open NLC photometry corpus
+  (Ugolnikov's arXiv line: the 2021 RGB radiative-transfer
+  paper, the 2018 bright-display polarimetry - both read) works
+  in camera-selection RATIO floors (NLC-to-background 0.02-0.1,
+  instrument limits, not visual contrasts) and prints no typical
+  visual-display brightness or contrast; the 6-degree gate
+  therefore stays documented, with the printed 16.6-degree
+  geometric end still exact. Also noted for the record:
+  Ugolnikov 2025 reports WINTER NLC after a sudden stratospheric
+  warming - the theme's summer-only climatological envelope now
+  has a printed exception it deliberately does not chase (no
+  live SSW-state feed). THE PASS THAT SHIPPED INSTEAD: the
+  airglow dome itself was still gated by the hand nightSky ramp
+  times the lpVis light-pollution stand-in - the exact pair the
+  zodiacal light shed in the fifty-first push - even though
+  every printed piece needed was already vendored: the PALACE
+  line intensities (163/164/36.5 R), their solar-cycle slopes,
+  the rayleigh-to-luminance chain, and Crumey's threshold.
+  airglow.js gains airglowStructureCd(srf) - the three visible
+  line groups' total photopic luminance at the live F10.7
+  (4.353e-5 cd/m^2 at 100 sfu, re-derived in the gate by
+  independent arithmetic) - and Horizon replaces the ramp pair
+  with extendedVisibility(structure, laCd, AGLOW_SR): moonlight
+  and the MEASURED city glow now drown the ring through laCd
+  itself. What emerges, all gated: fully visible at the
+  pristine natural sky, extinguished under full moonlight and
+  at a 10x-natural city sky, MARGINAL (0.43) from a 3x-natural
+  suburb at mean flux - and at solar maximum (200 sfu) the
+  strengthened lines push the suburban ring back to full
+  visibility, the IGY-era lore that airglow structure was
+  prominent at solar max, emergent from the printed slopes;
+  monotone in flux; conservative by construction (the mean
+  airglow already sits inside the natural-sky floor it is
+  tested against, so the onset can only err later, never
+  earlier). The one lpVis consumer left is the constellation
+  stick-figure overlay - an annotation, not a physical layer,
+  and it keeps its display policy. The airglow's remaining
+  display piece is AGLOW_GAIN alone (the drawn amplitude);
+  its APPEARANCE is now printed physics end to end.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

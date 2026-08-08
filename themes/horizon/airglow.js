@@ -89,6 +89,35 @@ export function lineLuminance(refR, lamNm, vLambda) {
   return 683 * vLambda * lineRadiance(refR, lamNm);
 }
 
+// The airglow structure's total photopic luminance (cd/m^2) at
+// solar radio flux srf: the three visible line groups' zenith
+// means, solar-scaled by PALACE Eq. 1, through the same printed
+// rayleigh chain the aurora curtain uses (Brandstrom 2012 Eqs.
+// 1-2 lineage). This is the excess the EYE must detect against
+// the night sky to see any airglow structure at all - the theme
+// gates the drawn dome with it through Crumey's extended-source
+// threshold, so moonlight and city glow drown the ring through
+// the SAME printed threshold that drowns the zodiacal light,
+// and the solar-cycle line strengthening genuinely widens where
+// the ring can be seen. (The mean airglow is itself part of the
+// natural-sky floor inside the background luminance; testing the
+// structure against a background that already contains its mean
+// errs conservative - the onset can only be later, never
+// earlier, than the printed physics.)
+export function airglowStructureCd(srf = 100) {
+  return LINES.reduce(
+    (s, l) =>
+      s + lineLuminance(l.refR * palaceSolar(l.msce, srf), l.lam, cieY(l.lam)),
+    0
+  );
+}
+
+// The ring's angular scale for the extended-source threshold:
+// tens of degrees of sky (~0.5 sr); the threshold sits in the
+// asymptotic-contrast regime there, insensitive to the exact
+// value.
+export const AGLOW_SR = 0.5;
+
 // CIE 1931 photopic Y (luminous efficiency) - the same Wyman,
 // Sloan & Shirley (2013) multi-lobe fit the aurora's colour
 // conversion uses. Needed here because wavelengthToLinearSRGB

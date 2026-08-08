@@ -119,6 +119,65 @@ const check = (name, ok, detail) => {
   );
 }
 
+{
+  // The ring earns its dark sky: the structure's total printed
+  // luminance (three PALACE lines through the rayleigh chain)
+  // re-derived by independent arithmetic, then through the
+  // shipped Crumey threshold at the theme's sky classes. What
+  // must emerge: fully visible at the pristine natural sky,
+  // extinguished under full moonlight and city glow (the ring is
+  // a dark-site phenomenon), marginal from a suburban 3x-natural
+  // sky at solar minimum-to-mean - and at solar MAXIMUM the
+  // strengthened lines push it back over the threshold there
+  // (the IGY-era lore that airglow structure was prominent at
+  // solar max), monotone in solar flux throughout.
+  const {airglowStructureCd, AGLOW_SR} = await import('./airglow.js');
+  const {extendedVisibility} = await import('./adaptation.js');
+  const {NATURAL_MCD} = await import('./skyglow.js');
+  const H = 6.62607015e-34;
+  const C = 2.99792458e8;
+  const lum = (R, lam, Y) =>
+    683 * Y * ((R * 1e10) / (4 * Math.PI)) * ((H * C) / (lam * 1e-9));
+  const indep =
+    lum(163, 557.7, cieY(557.7)) +
+    lum(164, 631.6, cieY(631.6)) +
+    lum(36.5, 589.3, cieY(589.3));
+  const total = airglowStructureCd(100);
+  const dark = NATURAL_MCD * 1e-3;
+  const vis = (srf, B) =>
+    extendedVisibility(airglowStructureCd(srf), B, AGLOW_SR);
+  const vDark = vis(100, dark);
+  const vMoon = vis(100, 5e-3);
+  const vSuburb = vis(100, 3 * dark);
+  const vCity = vis(100, 10 * dark);
+  const vSuburbMax = vis(200, 3 * dark);
+  let mono = true;
+  let prev = -1;
+  for (let srf = 70; srf <= 250; srf += 10) {
+    const v = vis(srf, 3 * dark);
+    if (v < prev - 1e-12) mono = false;
+    prev = v;
+  }
+  const ok =
+    Math.abs(total / indep - 1) < 1e-12 &&
+    total > 4.2e-5 &&
+    total < 4.5e-5 &&
+    vDark === 1 &&
+    vMoon === 0 &&
+    vSuburb > 0.2 &&
+    vSuburb < 0.7 &&
+    vCity === 0 &&
+    vSuburbMax > 0.9 &&
+    mono;
+  check(
+    'the ring earns its dark sky (Crumey gate)',
+    ok,
+    `structure ${total.toExponential(3)} cd/m^2 at 100 sfu (independent arithmetic exact); ` +
+      `vis: pristine ${vDark}, full moon ${vMoon}, suburban 3x ${vSuburb.toFixed(2)} (marginal), city 10x ${vCity}; ` +
+      `solar max at the suburb ${vSuburbMax.toFixed(2)} - the IGY lore emerges; monotone in flux`
+  );
+}
+
 if (fail) {
   console.log(`${fail} LANDMARK(S) FAILED`);
   process.exit(1);

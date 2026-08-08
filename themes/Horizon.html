@@ -734,7 +734,11 @@
         SNOW_RAMP_M
       } from './horizon/lakeice.js';
       import {planetTintRGB} from './horizon/planets-color.js';
-      import {lineStrengths} from './horizon/airglow.js';
+      import {
+        AGLOW_SR,
+        airglowStructureCd,
+        lineStrengths
+      } from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
         activeShowers,
@@ -10131,9 +10135,24 @@
         }
         // Nightglow: per-line solar scaling arrives via syncF107
         // (uLineI); extinction rides the engine's own zenith
-        // transmittance at the current aerosol load; gated with the
-        // stars.
-        airglowU.night.value = nightSky * (1 - cloudy * 0.85) * lpVis;
+        // transmittance at the current aerosol load. The dome's
+        // APPEARANCE is earned, not ramped: the structure's printed
+        // luminance (airglow.js airglowStructureCd - the PALACE
+        // lines through the rayleigh chain, solar-scaled) against
+        // the live sky through Crumey's threshold - the same
+        // machinery that gates the zodiacal light and the aurora.
+        // The hand nightSky ramp and the lpVis stand-in retire
+        // here: moonlight and the measured city glow drown the
+        // ring through laCd itself, and at solar maximum the
+        // strengthened lines genuinely widen where the ring shows
+        // (the IGY lore, emergent).
+        airglowU.night.value =
+          extendedVisibility(
+            airglowStructureCd(state.f107 || 100),
+            laCd,
+            AGLOW_SR
+          ) *
+          (1 - cloudy * 0.85);
         airglowU.uTzen.value.fromArray(sunTransmittanceJS(1, mieRad));
         // Zodiacal light: anchored to the sun's ecliptic longitude,
         // scaled by the Earth's REAL heliocentric distance (r^-2.3,
