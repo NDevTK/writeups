@@ -1353,6 +1353,38 @@ export function createLightPillarMaterial() {
   return {material, u};
 }
 
+// Volcanic plume quad (gvp.js occurrence + printed height): an
+// alpha-blended ash column between the volcano's summit and the
+// observatory's reported plume top. The column widens toward
+// the top (uWiden) and the top drifts downwind (uBend, from the
+// scene's own measured wind direction) - both DOCUMENTED display
+// shapes; the two load-bearing numbers (that a plume exists, and
+// how high it reaches) are the weekly report's own. uDay is the
+// stated display shading (ash grey under the current daylight).
+export function createPlumeMaterial() {
+  const u = {
+    amp: uniform(0),
+    uBend: uniform(0),
+    uWiden: uniform(2.5),
+    uCol: uniform(new Vector3(0.36, 0.33, 0.3)),
+    uDay: uniform(1)
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = DoubleSide;
+  const v = uv().y;
+  const xc = uv().x.sub(0.5).sub(u.uBend.mul(v).mul(0.35));
+  const w = mix(float(1).div(u.uWiden), float(1), v).mul(0.5);
+  const body = smoothstep(w, w.mul(0.55), abs(xc));
+  const top = float(1).sub(smoothstep(float(0.9), float(1.0), v));
+  const base = smoothstep(float(0.0), float(0.04), v);
+  const a = body.mul(top).mul(base).mul(u.amp);
+  material.colorNode = u.uCol.mul(u.uDay);
+  material.opacityNode = clamp(a, 0.0, 1.0);
+  return {material, u};
+}
+
 // Nacreous (mother-of-pearl) cloud material - psc.js physics: the
 // certified Airy iridescence LUT (rows = the printed 1.9-3.0 um
 // wave-ice size span, columns = scattering angle) sampled at each

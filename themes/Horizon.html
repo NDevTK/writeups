@@ -209,6 +209,10 @@
         glory=0 (remove the exact-Mie antisolar rings the same
         pinned fog otherwise draws), vars=0 (freeze the variable
         stars at their static catalogue magnitudes),
+        volcano=URL|0|AZ,TOPM,DISTKM (daemon endpoint override
+        for the weekly eruption report / never draw plumes / pin
+        a synthetic plume at bearing AZ with reported top TOPM
+        at DISTKM for the harness),
         gwaves=A|0 (pin the airglow banding amplitude for the
         harness / remove the banding), gmn=URL|0 (daemon
         endpoint override for the measured meteor medians /
@@ -413,6 +417,7 @@
         createContrailMaterial,
         createFlashMaterial,
         createGloryMaterial,
+        createPlumeMaterial,
         createLightPillarMaterial,
         createNacreousMaterial,
         createSteveMaterial,
@@ -829,6 +834,7 @@
         gloryRingDeg
       } from './horizon/mie.js';
       import {bscIndexOf, VARSTARS, varV} from './horizon/varstars.js';
+      import {apparentAltRad} from './horizon/gvp.js';
       import {
         GW_LAMBDA_MED_KM,
         GW_SPEED_MED_MS,
@@ -4122,6 +4128,27 @@
       // daemon; gmn=0 keeps the vendored real-day defaults).
       const GMN_PROXY =
         params.get('gmn') ?? AEROSOL_PROXY.replace(/\/aerosol$/, '/gmn');
+      // This week's reported eruptions (gvp.js via the daemon):
+      // every plume drawn to the observatory's own printed
+      // height. ?volcano=0 disables; ?volcano=AZ,TOPM,DISTKM
+      // pins a synthetic plume for the harness A/B.
+      const VOLCANO_PROXY =
+        params.get('volcano') && params.get('volcano').includes(',')
+          ? null
+          : (params.get('volcano') ??
+            AEROSOL_PROXY.replace(/\/aerosol$/, '/volcano'));
+      async function syncVolcano() {
+        if (!VOLCANO_PROXY || VOLCANO_PROXY === '0') return;
+        try {
+          const r = await (
+            await fetch(VOLCANO_PROXY, {credentials: 'omit'})
+          ).json();
+          if (!Array.isArray(r.volcanoes)) return;
+          state.volcano = r;
+        } catch {
+          // no report, no plume
+        }
+      }
       async function syncGmn() {
         if (params.get('gmn') === '0') return;
         try {
@@ -8262,6 +8289,21 @@
         mesh.scale.set(gloryW, gloryW, 1);
         mesh.lookAt(camera.position);
       }
+      // This week's reported eruption on the horizon (gvp.js):
+      // one plume quad for the nearest volcano the weekly report
+      // gives a printed height for - the drawn top IS that
+      // number through the exact curvature drop; the column's
+      // widening and downwind bend are documented display shapes
+      // on a measured occurrence.
+      const plumeObj = createPlumeMaterial();
+      const plumeMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        plumeObj.material
+      );
+      plumeMesh.visible = false;
+      plumeMesh.renderOrder = 1;
+      scene.add(plumeMesh);
+      let plumeSaid = false;
 
       // Clouds in the three layers the weather model actually reports
       // (open-meteo cloud_cover_low/mid/high): the low cumulus deck and
@@ -11817,6 +11859,110 @@
             for (const p of pscPool) p.mesh.visible = false;
           }
         }
+        // The reported plume: nearest weekly-report volcano with
+        // a printed height inside 280 km (the 7-km-class horizon
+        // limit the gate prints), or the ?volcano=AZ,TOPM,DISTKM
+        // harness pin. Geometry is exact (haversine range, the
+        // curvature-drop apparent altitudes of summit and top);
+        // amp fades the plume out over the last 80 km like any
+        // distant feature dissolving into the air.
+        {
+          const vOv = params.get('volcano');
+          let vAz = null;
+          let vDist = null;
+          let vTop = null;
+          let vElev = null;
+          let vName = null;
+          if (vOv && vOv.includes(',')) {
+            const [a, t, d] = vOv.split(',').map(Number);
+            vAz = a * RAD;
+            vTop = t;
+            vDist = d || 60;
+            vElev = 1500;
+            vName = 'pinned';
+          } else if (
+            vOv !== '0' &&
+            state.volcano &&
+            Array.isArray(state.volcano.volcanoes)
+          ) {
+            let best = null;
+            for (const v of state.volcano.volcanoes) {
+              const d = haversineKm(state.lat, state.lon, v.lat, v.lon);
+              if (d < 280 && (!best || d < best.d)) best = {v, d};
+            }
+            if (best) {
+              const dLon = (best.v.lon - state.lon) * RAD;
+              const la1 = state.lat * RAD;
+              const la2 = best.v.lat * RAD;
+              vAz = Math.atan2(
+                Math.sin(dLon) * Math.cos(la2),
+                Math.cos(la1) * Math.sin(la2) -
+                  Math.sin(la1) * Math.cos(la2) * Math.cos(dLon)
+              );
+              vDist = best.d;
+              vTop = best.v.topM;
+              vElev = best.v.elevM ?? 0;
+              vName = best.v.name;
+            }
+          }
+          if (vTop !== null && vDist !== null) {
+            const altTop = apparentAltRad(vDist, vTop, centerElev);
+            const altBase = Math.max(
+              apparentAltRad(vDist, vElev ?? 0, centerElev),
+              -0.01
+            );
+            if (altTop > 0.002) {
+              const R = 235;
+              const y0 = R * Math.tan(altBase);
+              const y1 = R * Math.tan(altTop);
+              // Drawn width: a quarter of the rise (documented
+              // display proportion of a sustained column).
+              const wKm = Math.max((vTop - (vElev ?? 0)) / 1000, 0.5) * 0.25;
+              const w = (R * wKm) / vDist;
+              plumeMesh.visible = true;
+              plumeMesh.position.set(
+                camera.position.x + R * Math.cos(altTop / 2) * Math.sin(vAz),
+                (y0 + y1) / 2,
+                camera.position.z - R * Math.cos(altTop / 2) * Math.cos(vAz)
+              );
+              plumeMesh.scale.set(w * 2.5, y1 - y0, 1);
+              plumeMesh.lookAt(
+                camera.position.x,
+                (y0 + y1) / 2,
+                camera.position.z
+              );
+              // Downwind bend from the measured 700 hPa wind
+              // (the plume-height level): signed lateral shift
+              // as seen from here.
+              const wd = ((state.dir700 ?? state.winddir ?? 0) + 180) * RAD;
+              plumeObj.u.uBend.value = Math.sin(wd - vAz);
+              plumeObj.u.uDay.value = Math.min(
+                Math.max(Math.sin(sun.alt) * 5, 0.12),
+                1
+              );
+              plumeObj.u.amp.value =
+                0.85 *
+                Math.min(Math.max((280 - vDist) / 80, 0), 1) *
+                (1 - cloudy * 0.85);
+              if (!plumeSaid) {
+                plumeSaid = true;
+                record(
+                  'volcanic plume (GVP weekly)',
+                  vName +
+                    ' · ' +
+                    Math.round(vDist) +
+                    ' km · reported top ' +
+                    Math.round(vTop) +
+                    ' m a.s.l.'
+                );
+              }
+            } else {
+              plumeMesh.visible = false;
+            }
+          } else {
+            plumeMesh.visible = false;
+          }
+        }
         if (constMat)
           constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2 * lpVis;
         // The measured city glow rises as the sky darkens and even
@@ -13734,6 +13880,8 @@
         syncStratAOD();
         syncGmn();
         setInterval(syncGmn, 6 * 60 * 60 * 1000);
+        syncVolcano();
+        setInterval(syncVolcano, 6 * 60 * 60 * 1000);
         syncNO2();
         // The printed TEMPO revisit is 1 hour (Table 1) - the
         // refresh follows it so the drawn brown horizon carries

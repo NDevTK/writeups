@@ -69,6 +69,7 @@ import {
   parseAeronetV3
 } from '../../aeronet.js';
 import {gmnMedians, parseTrajSummary} from '../../gmn.js';
+import {GVP_RSS, GVP_WFS, parseGvpRss, plumeTopM} from '../../gvp.js';
 import {ozoneCensus} from '../../ozone.js';
 import {
   ndviCell,
@@ -968,6 +969,8 @@ function main() {
   const aeronetCache = new Map(); // site name -> {t, body}
   let aeronetSites = {t: 0, sites: []}; // the station list, daily
   let gmnCache = {t: 0, body: null}; // yesterday's medians, 6-hourly
+  let gvpCache = {t: 0, body: null}; // weekly eruption report, 6-hourly
+  let gvpElev = {t: 0, map: new Map()}; // Holocene summit elevations, daily
   const aerosolCache = new Map(); // 0.25-deg cell key -> {t, body}
   const ozoneCache = new Map(); // 0.25-deg cell key -> {t, body}
   const chlorCache = new Map(); // 1/12-deg cell key -> {t, body}
@@ -1709,6 +1712,79 @@ function main() {
           });
         }
         return json(502, {medians: null, upstream: 'unavailable'});
+      }
+    }
+
+    if (url.pathname === '/volcano') {
+      // The Smithsonian/USGS Weekly Volcanic Activity Report:
+      // every currently reported eruption with the observatory's
+      // OWN printed plume height (gvp.js parses the two printed
+      // grammars behind a plume-context guard), joined to the
+      // GVP Holocene list's summit elevations for the a.s.l.
+      // conversion - one institution, both numbers. The report
+      // is weekly; 6-hour cache, elevations daily, stale-serve.
+      if (gvpCache.body && Date.now() - gvpCache.t < 6 * 3600e3) {
+        return json(200, gvpCache.body, {
+          'cache-control': 'public, max-age=3600',
+          'x-gvp-source': 'volcano.si.edu weekly report (cached)'
+        });
+      }
+      try {
+        if (Date.now() - gvpElev.t > 24 * 3600e3) {
+          const r = await fetch(GVP_WFS, {
+            signal: AbortSignal.timeout(60000),
+            headers: {'user-agent': UA}
+          });
+          if (!r.ok) throw new Error(r.status);
+          const gj = await r.json();
+          const map = new Map();
+          for (const f of gj.features || []) {
+            const p = f.properties || {};
+            if (p.Volcano_Name)
+              map.set(p.Volcano_Name, {
+                lat: p.Latitude,
+                lon: p.Longitude,
+                elevM: p.Elevation
+              });
+          }
+          if (map.size < 500) throw new Error('short volcano list');
+          gvpElev = {t: Date.now(), map};
+        }
+        const r = await fetch(GVP_RSS, {
+          signal: AbortSignal.timeout(60000),
+          headers: {'user-agent': UA}
+        });
+        if (!r.ok) throw new Error(r.status);
+        const rows = parseGvpRss(await r.text());
+        const volcanoes = [];
+        for (const v of rows) {
+          const ref = gvpElev.map.get(v.name);
+          const elevM = ref ? ref.elevM : null;
+          const topM = plumeTopM(v, elevM);
+          if (topM === null) continue; // no printed height, no plume
+          volcanoes.push({
+            name: v.name,
+            lat: v.lat,
+            lon: v.lon,
+            elevM,
+            topM
+          });
+        }
+        if (!rows.length) throw new Error('empty report');
+        const body = {at: Date.now(), reported: rows.length, volcanoes};
+        gvpCache = {t: Date.now(), body};
+        return json(200, body, {
+          'cache-control': 'public, max-age=3600',
+          'x-gvp-source': 'volcano.si.edu weekly report + Holocene WFS'
+        });
+      } catch {
+        if (gvpCache.body) {
+          return json(200, gvpCache.body, {
+            'cache-control': 'public, max-age=600',
+            'x-gvp-source': 'volcano.si.edu weekly report (stale)'
+          });
+        }
+        return json(502, {volcanoes: null, upstream: 'unavailable'});
       }
     }
 

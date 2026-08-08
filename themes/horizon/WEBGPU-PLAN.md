@@ -7669,6 +7669,76 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   drawn sky now loses Mira for months at a time, exactly as
   the real one. Gate registered after stars-color. Full gate
   green - 115 CPU references + 7 GPU probes.
+- DONE (Aug 8, the review session's 80th pass - live volcanic
+  eruptions: the weekly report puts this week's plumes on the
+  horizon). THE SURVEY first: the pollen corona (open-meteo
+  pollen counts through the corona machinery at printed birch
+  grain sizes) died on primary access - the elliptical-corona
+  papers live at Applied Optics (Tränkle & Mielke 1994;
+  Parviainen/Bohren-family), and Optica 502s through the proxy
+  (Crossref confirms the DOIs; OpenAlex rate-capped) - shelved
+  with the dead end documented, like the elve. THE PASS: the
+  Smithsonian/USGS Weekly Volcanic Activity Report
+  (volcano.si.edu WeeklyVolcanoRSS.xml, keyless - a cooperative
+  research product; no CORS, so the daemon proxies): 23
+  volcanoes reported this week with georss coordinates and
+  prose from the responsible observatories (INGV, INSIVUMEH,
+  PVMBG, JMA, IG-EPN, IGP...) that PRINTS plume heights in two
+  grammars - "rose 1-3 km above the summit / crater rim" and
+  "rose to 7 km (23,000 ft) a.s.l.". gvp.js carries exactly
+  those printed numbers: the drawn plume top IS the
+  observatory's reported height. (Mastin 2009's height-flux
+  relation stays uncited - Elsevier closed, the MTU deposit
+  403s, the USGS warehouse page carries no PDF - and is NOT
+  needed: the report prints the height itself.) Summit
+  elevations for the a.s.l. conversion come from the GVP's OWN
+  Holocene list (webservices.volcano.si.edu WFS, keyless, 1214
+  volcanoes with Elevation) - one institution, both numbers.
+  PARSER HONESTY, gate-held on six VERBATIM vendored items from
+  the 30 July-5 August report: a height is accepted only when
+  the preceding 120 chars name a plume/emission/cloud/column,
+  because the same reports print ballistic heights (Fuego:
+  "ejected incandescent material as high as 300 m above the
+  summit" REFUSED while its "gas-and-ash plumes ... 1.1 km
+  above the summit" carries) and exclusion radii ("stay 2 km
+  away from the summit" never parses); ranges keep the upper
+  end (Aira's "1-3 km" -> 3000 m, Reventador's "300-1,600 m"
+  comma thousands -> 1600); both grammars can coexist
+  (Krakatau: 100 m white puffs AND the Darwin VAAC's 1.5 km
+  a.s.l. steam plume - both carried, the max drawn); Etna's "7
+  km (23,000 ft) a.s.l." survives the feet parenthetical. No
+  printed height = no plume - fails to data, never to style.
+  THE DAEMON gains /volcano (RSS 6 h cache, elevations daily,
+  stale-serve; gvp.js ships in install.sh in the SAME commit -
+  the aeronet lesson institutionalised), boot-tested in a
+  scratch flat deploy against the LIVE upstreams: 23 reported,
+  heights joined (Etna 7000 a.s.l.; Fuego 3799 + 3400 = 7199 -
+  the live item's later escalation paragraph outranks the early
+  1.1 km, the max-of-week logic working on real prose).
+  Horizon.html: syncVolcano (6 h), one plume quad
+  (createPlumeMaterial - alpha-blended ash column, widening and
+  downwind bend from the measured 700 hPa wind direction as
+  DOCUMENTED display shapes on the two measured numbers), the
+  nearest reported volcano inside 280 km (the gate's own
+  7-km-class horizon limit: apparentAltRad drops d^2/2R
+  exactly - an Etna-class top still peeks past 280 km and sinks
+  by 350), distance fade over the last 80 km, ?volcano=
+  AZ,TOPM,DISTKM harness pin. Pinned A/B took three fixtures to
+  aim honestly: the Alpine valley floor cannot see a 2-deg
+  horizon (forest), and Nelson at "12:00" is midnight (the time
+  param is UTC - relearned); Nelson at local noon (00:00Z,
+  winter sun north) shows the column standing on the SEA
+  horizon at the pinned bearing, spanning its computed
+  0.7-4.6 deg (base = the 1500 m pinned summit's true apparent
+  altitude at 80 km - the edifice beyond the terrain box is not
+  drawn, and the reported object IS the plume; stated), reading
+  near-black against the sun-side sky exactly as backlit ash
+  does. The diff carries the column as its only structured
+  addition, over a diffuse terrain-tone residual (the in-frame
+  sun's adaptation coupling between runs plus the known
+  town-light dither - the instrument's floor, stated). Gate (9
+  landmarks) registered after volcanic. Full gate green - 116
+  CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

@@ -44,13 +44,14 @@ install -m 644 ../grib2.js /opt/horizon-live/grib2.js
 install -m 644 ../aerosol.js /opt/horizon-live/aerosol.js
 install -m 644 ../aeronet.js /opt/horizon-live/aeronet.js
 install -m 644 ../gmn.js /opt/horizon-live/gmn.js
+install -m 644 ../gvp.js /opt/horizon-live/gvp.js
 install -m 644 ../ozone.js /opt/horizon-live/ozone.js
 install -m 644 ../modis-land.js /opt/horizon-live/modis-land.js
 # The '../../' import paths must keep resolving from
 # /opt/horizon-live/index.mjs - rewrite them for the flat deploy
 # (metar.js's own './lightning.js' import and aerosol.js's own
 # './grib2.js' import already resolve there).
-sed -i "s#'../../lightning.js'#'./lightning.js'#; s#'../../solarwind.js'#'./solarwind.js'#; s#'../../metar.js'#'./metar.js'#; s#'../../smoke.js'#'./smoke.js'#; s#'../../grib2.js'#'./grib2.js'#; s#'../../aerosol.js'#'./aerosol.js'#; s#'../../aeronet.js'#'./aeronet.js'#; s#'../../gmn.js'#'./gmn.js'#; s#'../../ozone.js'#'./ozone.js'#; s#'../../modis-land.js'#'./modis-land.js'#" /opt/horizon-live/index.mjs.new
+sed -i "s#'../../lightning.js'#'./lightning.js'#; s#'../../solarwind.js'#'./solarwind.js'#; s#'../../metar.js'#'./metar.js'#; s#'../../smoke.js'#'./smoke.js'#; s#'../../grib2.js'#'./grib2.js'#; s#'../../aerosol.js'#'./aerosol.js'#; s#'../../aeronet.js'#'./aeronet.js'#; s#'../../gmn.js'#'./gmn.js'#; s#'../../gvp.js'#'./gvp.js'#; s#'../../ozone.js'#'./ozone.js'#; s#'../../modis-land.js'#'./modis-land.js'#" /opt/horizon-live/index.mjs.new
 # Ship-list drift guard: any '../../*.js' import left unrewritten means
 # a shared file was added to index.mjs without being added HERE, and the
 # flat deploy would crash-loop on ERR_MODULE_NOT_FOUND (Cloudflare 502s
