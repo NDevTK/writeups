@@ -127,10 +127,11 @@ const check = (name, ok, detail) => {
   // the thesis's 700 nm convention through the shipped luminance
   // chain, tested against the same adapted backgrounds the aurora
   // matrix uses. Dark rural sky: plainly visible. Daylight:
-  // extinguished. The threshold is steady-state (Crumey's printed
-  // validity) - the few-tens-of-ms brevity is a documented,
-  // unmodelled hardening (no printed flash-threshold constant in
-  // the repo yet).
+  // extinguished. The threshold here is steady-state (Crumey's
+  // printed validity); the few-tens-of-ms brevity hardening now
+  // has its printed constant - Blondel & Rey 1911's a = 0.21 s
+  // (blondel.js) - and blondel-reference.mjs holds the hardened
+  // sprite to the same landmarks.
   const lum = (mr) =>
     lineLuminance(mr * 1e6, SPRITE_LAM_RED, cieY(SPRITE_LAM_RED));
   const L10 = lum(SPRITE_MR_OBS);

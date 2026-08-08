@@ -6854,6 +6854,72 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   probes need BASE=http://localhost:8901/themes/horizon/harness
   - the script default is the bare origin and 404s, worth a
     future default fix).
+- DONE (brief lights get their printed constant: Aug 8
+  sixty-fifth push - blondel.js + blondel-reference.mjs + the
+  sprite gate wiring): the sprite pass had recorded one honest
+  gap - "Crumey's threshold is steady-state; the
+  few-tens-of-ms brevity is a documented unmodelled hardening
+  (no printed flash-threshold constant in the repo yet)". The
+  constant now exists in the repo, from the law's own primary:
+  Blondel & Rey 1911, "Sur la perception des lumieres breves a
+  la limite de leur portee" (J. Phys. Theor. Appl. 1, 530-550)
+  plus the companion "Application aux signaux ..." (1, 643-655)
+  - BOTH found as open HAL scans (jpa-00241701/11, the EDP
+    digitisation of the 1911 journal, located through the HAL
+    search API in one query), both READ IN FULL in the original
+    French, and - standing scan rule - every shipped value ALSO
+    machine-read from the page images (pp. 547, 548, 652, 653,
+    655; the machine read corrected the OCR's "12 et 23 0/0"
+    probable error to the printed "12 et 25 0/0"). What the
+    pages print: the a-priori argument that Bloch's E t =
+    constant cannot hold at threshold (a light AT the steady
+    threshold would need infinite time - the E(t) hyperbola must
+    be asymptotic to E0, not the axis); the eye at a flash's
+    range limit as a BALLISTIC galvanometer; two purpose-built
+    flash comparators, 25 series over 17 observers, durations
+    1/1000 to 3 s, geometric means, probable error 12-25%; the
+    law in four printed forms (p. 548, machine-read): E t =
+    E0(0.21 + t), (E - E0) t = 0.21 E0, E/E0 = 1 + 0.21/t, t =
+    0.21 E0/(E - E0) - the time constant a = 0.21 s from the
+    printed axis cut "21/100 de seconde a gauche de l'origine",
+    restated in the application paper's eq. (8) and conclusion;
+    the equivalent-fixed-light reduction I t/(a + t); the
+    ballistic integral for non-uniform flashes (p. 652,
+    machine-read): int(E - E0)dt = a E0 and I'h = int I dt /
+    (a + (t2 - t1)) - the effective-intensity form signal optics
+    still uses - admitted by the authors to ~1 s; E0 point-source
+    threshold documentation 0.5-1e-7 lux; their own honest
+    footnote keeping the general (E - b E0) t = a E0 should
+    either constant need refinement. THE MODULE: blondel.js
+    carries the constant, the printed validity window and the
+    two closed forms blondelReyFactor (t/(a+t)) and
+    blondelReyThreshold ((a+t)/t); the 7-landmark gate holds the
+    algebra (half-efficiency EXACTLY 1/2 at t = a; Bloch limit
+    E t -> a E0 at 1 ms; steady -> 1), re-derives the paper's own
+    worked example (doubling a 0.21 s flash gains exactly 4/3 -
+    their printed "33 0/0, au lieu de 100 0/0"), and holds the
+    WIRING: the sprite's 30 ms display life needs x8.00 the
+    steady threshold, the printed 10 MR halo KEEPS dark-rural
+    visibility 1.00 (the printed "dark-sky phenomenon" survives
+    its own printed brevity) and 0 in daylight, while the
+    twilight extinction point moves x8.1 darker - the hardening
+    in the same adapted-luminance units the stars use. WIRED:
+    spriteVis now gates on spriteLumCd x blondelReyFactor(30 ms)
+    (Horizon.html; the stale "unmodelled" notes in the frame
+    comment and sprites-reference.mjs updated to point at the
+    new module). NEGATIVE WIRINGS, checked and stated in the
+    gate: meteors are NOT corrected - visibleRateFactor gates on
+    a perception-probability table MEASURED ON REAL METEORS, so
+    the transient penalty is already inside the measurement and
+    Blondel-Rey on top would double-count (the would-be 0.3 s
+    factor 0.59 ~ 0.58 mag is printed for the record); lightning
+    flashes and glints carry no threshold gate (suprathreshold
+    when drawn); stars/planets/aurora/airglow are the steady
+    t -> infinity limit, factor 1 exactly. Runtime smoke: the
+    night strike+sprite fixture still draws its crimson columns
+    through the hardened gate (dark-sky vis 1.0, as the gate
+    predicted). validate.sh full PASS (105 CPU gates incl. the
+    new 7-landmark blondel gate, all 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

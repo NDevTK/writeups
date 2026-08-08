@@ -762,6 +762,7 @@
         HALO_WIDTH_KM,
         spriteProbPerFlash
       } from './horizon/sprites.js';
+      import {blondelReyFactor} from './horizon/blondel.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
         activeShowers,
@@ -11063,10 +11064,18 @@
         // and city glow extinguish sprites exactly as the printed
         // threshold says), and the local cloud shield (a sprite
         // hides behind the observer's own overcast). Crumey's
-        // threshold is steady-state; the few-tens-of-ms brevity is
-        // a documented unmodelled hardening.
+        // threshold is steady-state; the printed Blondel-Rey 1911
+        // reduction t/(a + t) makes the transient's EFFECTIVE
+        // luminance enter it (blondel.js - the 30 ms flash needs
+        // 8x the steady threshold; still a dark-sky object, dies
+        // earlier into twilight).
         const spriteVis =
-          extendedVisibility(spriteLumCd, laCd, SPRITE_SR) * (1 - cloudy * 0.9);
+          extendedVisibility(
+            spriteLumCd * blondelReyFactor(SPRITE_LIFE_MS / 1000),
+            laCd,
+            SPRITE_SR
+          ) *
+          (1 - cloudy * 0.9);
         for (const p of spritePool) {
           if (!p.active) continue;
           p.t += dt;
