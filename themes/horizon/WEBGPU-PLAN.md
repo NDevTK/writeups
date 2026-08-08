@@ -7478,6 +7478,62 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   > morphology - while the 1x display stays the whisper the real
   > phenomenon is (mean ~0.02 counts). Full gate green - 113 CPU
   > references + 7 GPU probes.
+- DONE (Aug 8, the review session's 77th pass - GMN: yesterday's
+  measured meteors shape today's streaks, and a day-one spawn bug
+  falls). THE SURVEY set the honest scope: the Global Meteor
+  Network's machine products (CC BY 4.0, keyless, CORS-open) are
+  per-shower flux PNGs, per-camera tallies and the DAILY
+  TRAJECTORY SUMMARY - ~6-7000 triangulated meteors every day
+  with IAU shower code, entry elevation, velocities, begin/end
+  heights, measured duration. Raw counts are deliberately NOT
+  turned into rates (flux needs the network's own
+  collecting-area weighting; the theme's rates stay with the
+  printed IMO/Jenniskens machinery) - what the feed honestly
+  gives is per-meteor PHYSICS, weather-independent. The primary:
+  Vida et al. 2021 (MNRAS 506, 5046; open arXiv:2107.12335) -
+  the network system paper: +6.0 limiting magnitude, 220,000+
+  orbits, 0.47 deg median radiant precision, and THEIR OWN
+  validity fences (begin 50-150 km, end 20-130 km) which the
+  parser applies verbatim. gmn.js: fixed-format parser,
+  per-shower medians (documented minN floor), and the EXACT
+  kinematic bridge that retires the old documented display
+  mapping ("~20 deg/s x V/72 x sinD"): a meteor flies along the
+  radiant, so its entry slope at the site is the radiant's own
+  elevation; path = (HtBeg-HtEnd)/sin(radiant alt); the angular
+  rate is V sin(D)/range with the exact spherical-shell chord at
+  the sky point's elevation; duration = path/V. THE GATE PROVES
+  THE BRIDGE READS THE FILE RIGHT: on vendored real rows,
+  path/sin(elev)/V reproduces the network's own measured
+  Duration column within 6% (the residual is deceleration,
+  absorbed by Vavg). The vendored real day (6916 meteors,
+  2026-08-08): fast Perseids ablate at 109.1-95.0 km
+  (58.7 km/s), slow Capricornids at 94.3-82.8 km (23.5 km/s) -
+  the height-velocity physics visible in one day of data; these
+  medians are the FALLBACK (fails to data, never to style). The
+  daemon gains /gmn (6 MB daily file reduced to a
+  few-hundred-byte medians JSON, 6 h cache, stale-serve;
+  aeronet-lesson applied: gmn.js ships in install.sh in the SAME
+  commit) - boot-tested in a scratch flat deploy against the
+  live upstream: 6916 meteors reduced, 12 shower medians served,
+  cache 1.2 ms. Horizon.html: syncGmn on the daemon origin
+  (gmn=URL|0), spawnMeteor now takes the radiant altitude and
+  draws every streak from streakKinematics on the served (or
+  vendored) medians - a +-30% draw carries the day's spread
+  (documented residual). AND THE BUG: the spawn candidate loop
+  used applyMatrix4(celestial.matrixWorld) on DIRECTIONS - the
+  celestial group rides skyGroup, which follows the camera's
+  POSITION, so the translation folded into every "sky
+  direction": the horizon test passed for EVERY candidate
+  whenever the camera sat above y = 0.12 (i.e. always - meteors
+  could spawn below the horizon), and the ?meteor camera-cone
+  bias NEVER accepted a point (the normalized sum pointed along
+  the camera position; dot ~ -0.5 constant) - broken since the
+  day it was written, found by this pass's spawn
+  instrumentation (57 attempts, 57 rejects), fixed with
+  transformDirection (rotation alone). Post-fix capture: 34
+  spawns, 0 rejects, drawn durations 0.39-0.51 s - inside
+  yesterday's measured range. Full gate green - 114 CPU
+  references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

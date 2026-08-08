@@ -68,6 +68,7 @@ import {
   parseAeronetSites,
   parseAeronetV3
 } from '../../aeronet.js';
+import {gmnMedians, parseTrajSummary} from '../../gmn.js';
 import {ozoneCensus} from '../../ozone.js';
 import {
   ndviCell,
@@ -966,6 +967,7 @@ function main() {
   const metarCache = new Map(); // area key -> {t, body}
   const aeronetCache = new Map(); // site name -> {t, body}
   let aeronetSites = {t: 0, sites: []}; // the station list, daily
+  let gmnCache = {t: 0, body: null}; // yesterday's medians, 6-hourly
   const aerosolCache = new Map(); // 0.25-deg cell key -> {t, body}
   const ozoneCache = new Map(); // 0.25-deg cell key -> {t, body}
   const chlorCache = new Map(); // 1/12-deg cell key -> {t, body}
@@ -1662,6 +1664,52 @@ function main() {
         'cache-control': 'public, max-age=900',
         'x-aerosol-source': 'NOMADS GEFS-Aerosols (GOCART)'
       });
+    }
+
+    if (url.pathname === '/gmn') {
+      // Yesterday's measured meteors, reduced: the Global Meteor
+      // Network's daily trajectory summary (~6 MB, CC BY 4.0,
+      // regenerated each morning) parsed by the gated gmn.js at
+      // Vida 2021's own validity fences and served as per-shower
+      // MEDIANS (begin/end heights, duration, speed) - a
+      // few-hundred-byte payload the theme's streak kinematics
+      // draw from. Counts are deliberately not turned into
+      // rates (flux needs the network's own collecting-area
+      // weighting); 6-hour cache, one upstream fetch a day in
+      // practice.
+      if (gmnCache.body && Date.now() - gmnCache.t < 6 * 3600e3) {
+        return json(200, gmnCache.body, {
+          'cache-control': 'public, max-age=3600',
+          'x-gmn-source': 'globalmeteornetwork.org CC BY 4.0 (cached)'
+        });
+      }
+      try {
+        const r = await fetch(
+          'https://globalmeteornetwork.org/data/traj_summary_data/daily/traj_summary_yesterday.txt',
+          {signal: AbortSignal.timeout(60000), headers: {'user-agent': UA}}
+        );
+        if (!r.ok) throw new Error(r.status);
+        const rows = parseTrajSummary(await r.text());
+        if (rows.length < 50) throw new Error('short file');
+        const body = {
+          at: Date.now(),
+          meteors: rows.length,
+          medians: gmnMedians(rows)
+        };
+        gmnCache = {t: Date.now(), body};
+        return json(200, body, {
+          'cache-control': 'public, max-age=3600',
+          'x-gmn-source': 'globalmeteornetwork.org CC BY 4.0'
+        });
+      } catch {
+        if (gmnCache.body) {
+          return json(200, gmnCache.body, {
+            'cache-control': 'public, max-age=600',
+            'x-gmn-source': 'globalmeteornetwork.org CC BY 4.0 (stale)'
+          });
+        }
+        return json(502, {medians: null, upstream: 'unavailable'});
+      }
     }
 
     if (url.pathname === '/aeronet') {

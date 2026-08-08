@@ -207,7 +207,9 @@
         light pillars), fogbow=V|0 (pin fog at visibility V
         metres for the harness / never draw the fogbow),
         gwaves=A|0 (pin the airglow banding amplitude for the
-        harness / remove the banding), soil=0
+        harness / remove the banding), gmn=URL|0 (daemon
+        endpoint override for the measured meteor medians /
+        vendored real-day defaults only), soil=0
         (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
@@ -824,6 +826,8 @@
         gwNightIndex,
         gwUniforms
       } from './horizon/gwaves.js';
+      import {streakKinematics} from './horizon/gmn.js';
+      import {GMN_DEFAULT_MEDIANS} from './horizon/gmn-fixture.js';
       // (PILLAR_SIGMA_ALT already arrives from halos.js for the
       // sun pillar - lightpillars.js re-exports the same binding.)
       import {
@@ -1048,6 +1052,7 @@
         profile: null, // measured refraction column (refraction.js)
         smoke: null, // analyst-verified wildfire plume overhead (smoke.js)
         sea: null, // measured wave partitions (marine model), null = wind sea
+        gmn: null, // yesterday's measured meteor medians (GMN daily)
         fires: [], // real active wildfires near the view (wildfire.js/EONET)
         shake: 0
       };
@@ -4103,6 +4108,37 @@
       const AERONET_PROXY =
         params.get('aeronet') ??
         AEROSOL_PROXY.replace(/\/aerosol$/, '/aeronet');
+      // Yesterday's measured meteors (gmn.js medians via the
+      // daemon; gmn=0 keeps the vendored real-day defaults).
+      const GMN_PROXY =
+        params.get('gmn') ?? AEROSOL_PROXY.replace(/\/aerosol$/, '/gmn');
+      async function syncGmn() {
+        if (params.get('gmn') === '0') return;
+        try {
+          const r = await (
+            await fetch(GMN_PROXY, {credentials: 'omit'})
+          ).json();
+          if (!r.medians || !r.medians.all) return;
+          state.gmn = r;
+          const pm = r.medians.PER || r.medians.all;
+          record(
+            'GMN meteors (yesterday, CC BY)',
+            r.meteors +
+              ' triangulated · ' +
+              (r.medians.PER ? 'PER ' : 'all ') +
+              pm.htBegKm +
+              '→' +
+              pm.htEndKm +
+              ' km · ' +
+              pm.durS +
+              ' s · ' +
+              pm.vKms +
+              ' km/s'
+          );
+        } catch {
+          // vendored real-day medians keep serving
+        }
+      }
       async function syncAerosol() {
         // Weather pins silence the live fetch (pinned scenes stay
         // deterministic) - but an EXPLICIT ?aerosol= endpoint is a
@@ -7673,7 +7709,7 @@
       const mV3 = new THREE.Vector3();
       const mV4 = new THREE.Vector3();
       // Spawn one meteor of shower s (radiant ra/dec in degrees).
-      function spawnMeteor(slot, s, rad) {
+      function spawnMeteor(slot, s, rad, radAlt) {
         const vr = mV1.set(
           Math.cos(rad.dec * RAD) * Math.sin(rad.ra * RAD),
           Math.sin(rad.dec * RAD),
@@ -7687,6 +7723,7 @@
         const biased = params.has('meteor');
         if (biased) camera.getWorldDirection(mV4);
         let w = null;
+        let elPoint = 0.5;
         for (let tries = 0; tries < (biased ? 40 : 8) && !w; tries++) {
           const zc = Math.random() * 2 - 1;
           const ph = Math.random() * 2 * Math.PI;
@@ -7694,9 +7731,20 @@
           mV2.set(rr * Math.cos(ph), zc, rr * Math.sin(ph));
           const cosD = mV2.dot(vr);
           if (cosD > 0.985 || cosD < -0.17) continue; // 10..100 deg
-          mV3.copy(mV2).applyMatrix4(celestial.matrixWorld);
+          // DIRECTION through the celestial rotation - the group
+          // rides skyGroup, which follows the camera's POSITION,
+          // so applyMatrix4 here folded that translation into the
+          // sky direction: the horizon test passed for every
+          // point whenever the camera sat above y = 0.12 (always)
+          // and the ?meteor camera-cone bias never accepted one
+          // (the normalized sum pointed along the camera position,
+          // dot ~ -0.5 constant). transformDirection is the
+          // rotation alone - found by this pass's spawn
+          // instrumentation.
+          mV3.copy(mV2).transformDirection(celestial.matrixWorld);
           if (mV3.y < 0.12) continue; // below/near horizon
-          if (biased && mV3.normalize().dot(mV4) < 0.6) continue;
+          if (biased && mV3.dot(mV4) < 0.6) continue;
+          elPoint = Math.asin(Math.min(Math.max(mV3.y, -1), 1));
           w = mV2;
         }
         if (!w) return false;
@@ -7707,12 +7755,31 @@
           .addScaledVector(w, -w.dot(vr))
           .normalize()
           .negate();
-        // Display kinematics: streak length foreshortens with
-        // sin(D) and scales with the shower's entry speed; angular
-        // rate ~ 20 deg/s x (V/72) x sin(D) (documented mapping of
-        // the true ~radians/s sky speeds).
-        const Ldeg = (2 + 14 * sinD * (s.v / 72)) * (0.7 + 0.6 * Math.random());
-        const wdeg = Math.max(20 * (s.v / 72) * sinD, 5);
+        // MEASURED kinematics (gmn.js): yesterday's network
+        // medians for this shower (live via the daemon, else the
+        // vendored real day) set the ablation heights; the streak
+        // length, sweep rate and duration follow EXACTLY as
+        // path x sin(D)/range and V sin(D)/range at this sky
+        // point's elevation - the old "20 deg/s" display mapping
+        // is retired. A shower with no measured median flies the
+        // sporadic geometry at its own printed IMO speed. The
+        // +-30% draw is the day's spread around the served
+        // medians (documented residual).
+        const mm = (state.gmn && state.gmn.medians) || GMN_DEFAULT_MEDIANS;
+        const med = mm[s.code] || null;
+        const base = med || mm.spo || GMN_DEFAULT_MEDIANS.spo;
+        const kin = streakKinematics(
+          {
+            htBegKm: base.htBegKm,
+            htEndKm: base.htEndKm,
+            vKms: med ? base.vKms : s.v
+          },
+          radAlt ?? 0.5,
+          sinD,
+          elPoint
+        );
+        const Ldeg = (kin.lenRad / RAD) * (0.7 + 0.6 * Math.random());
+        const wdeg = Math.max(kin.rateRadS / RAD, 3);
         const Lr = Ldeg * RAD;
         const B = mV4
           .copy(w)
@@ -10887,7 +10954,7 @@
                 hourlyRate(zhr, aa.alt) * visibleRateFactor(s.r, meteorLm);
               if (hr > 0.3) {
                 total += hr;
-                act.push({s, rad, cum: total});
+                act.push({s, rad, cum: total, alt: aa.alt});
               }
             }
             if (params.has('meteor') && act.length === 0) {
@@ -10898,7 +10965,8 @@
               act.push({
                 s: {v: 59, r: 2.2},
                 rad: {ra: lst / RAD, dec: state.lat},
-                cum: total
+                cum: total,
+                alt: Math.PI / 2
               });
             } else if (params.has('meteor') && total > 0) {
               total = +params.get('meteor') || 60;
@@ -10932,7 +11000,7 @@
             } else if (total > 0 && Math.random() < (total * dt) / 3600) {
               const pick = Math.random() * total;
               const a = act.find((x) => pick <= x.cum) ?? act[act.length - 1];
-              const ok = spawnMeteor(meteorPool.indexOf(p), a.s, a.rad);
+              const ok = spawnMeteor(meteorPool.indexOf(p), a.s, a.rad, a.alt);
               if (params.has('meteor'))
                 console.log(
                   'METEOR|' +
@@ -13499,6 +13567,8 @@
         setInterval(syncLights, 6 * 60 * 60 * 1000);
         syncSnowCover();
         syncStratAOD();
+        syncGmn();
+        setInterval(syncGmn, 6 * 60 * 60 * 1000);
         syncNO2();
         // The printed TEMPO revisit is 1 hour (Table 1) - the
         // refresh follows it so the drawn brown horizon carries
