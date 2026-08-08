@@ -6920,6 +6920,64 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     through the hardened gate (dark-sky vis 1.0, as the gate
     predicted). validate.sh full PASS (105 CPU gates incl. the
     new 7-landmark blondel gate, all 7 GPU probes).
+- DONE (the tide gets its printed physics and a real gauge: Aug 8
+  sixty-sixth push - tides.js + tides-reference.mjs +
+  tide-fixture.js + the gauge wiring): the drawn tide existed
+  (open-meteo's modeled sea_level_height_msl lifting the water
+  plane and the surf zone's true depth) but carried no printed
+  frame and no measurement. Both now exist. THE PRIMARY:
+  Schureman, "Manual of Harmonic Analysis and Prediction of
+  Tides", USC&GS Special Publication 98 (1941), public-domain,
+  fetched whole from archive.org (manualofharmonic00usco,
+  340-page scan) - the manual behind the constants NOAA still
+  serves. Standing scan rule: the shipped constants were
+  MACHINE-READ from the page images - Table 1 "Fundamental
+  astronomical data" (p. 163: hourly rates s 0.54901653, h
+  0.04106864, p 0.00464183, N -0.00220641, p1 0.00000196) and
+  Table 38, the CONSTITUENT GEARS OF TIDE-PREDICTING MACHINE
+  No. 2 (p. 308: "theoretical speed per hour" to seven decimals
+  for every constituent - the column the Survey's brass computer
+  was geared to; the M1 row re-read at high magnification,
+  14.4920521). THE FEED: NOAA CO-OPS, keyless with open CORS -
+  the 301-gauge station list, measured water_level (date=latest,
+  datum MSL, metric) and each station's published harmonic
+  constants (harcon). THE GATE (9 landmarks on a vendored San
+  Francisco 9414290 fixture: harcon + a 60-day hourly NOAA
+  prediction series + a held-out week, provenance in the
+  fixture header): (1) Table 38 DERIVES from Table 1 - 29
+  standard lunisolar arguments (M2 = 2T-2s+2h, K1 = T+h, ...)
+  land on the printed seven decimals, worst 1.4e-7 deg/hr; (2)
+  the compounds are exact printed sums - 18 identities
+  (O1+K1=M2, K1+P1=S2, K1-O1=MF, M2-N2=MM, 2K1=K2, S2+-SA=
+  R2/T2, ...) close at the table's own rounding: one astronomy,
+  one table; (3) NOAA SERVES THE 1941 PRINT - 36 of 37 harcon
+  speeds equal Table 38 to their rounding, and the single
+  exception is a definitional find CLOSED IN PRINT: served M1
+  14.496694 = printed M1 + printed perigee rate exactly (the
+  modern convention folds the p-dependence into the speed
+  instead of Schureman's nodal u); (4) a least-squares fit AT
+  THE PRINTED SPEEDS to NOAA's own 60-day series reproduces the
+  held-out week to 0.41 mm RMS - the served prediction product
+  IS a synthesis at the 1941 machine's speeds - and recovers
+  the published M2 at -3.3% (the 2026-epoch lunar-nodal
+  factor), with the station's printed M2 > K1 > O1 > S2 mixed
+  hierarchy; (5) nearest-gauge discovery finds the city-front
+  gauge at 0.5 km and returns null from the Alps - fails closed
+  to the model chain. WIRED: syncMarine now tries the nearest
+  CO-OPS gauge within 75 km first - state.tide rides the
+  MEASUREMENT (tides + surge) with a "NOAA tide gauge" record
+  line; no gauge in reach keeps the open-meteo model value
+  (record line now says so); ?tidegauge=0 pins the model path,
+  the existing ?tide=M pin stands above both. Documented scope:
+  V0+u equilibrium arguments and f node factors are not
+  implemented (the fit absorbs the epoch's f x H and V0 + u,
+  which is exactly what synthesis needs; kappa phase lags are
+  not compared); the drawn tide is always a measured or model
+  value, never a local synthesis; CO-OPS coverage is US +
+  territories - elsewhere the model fallback stands. Runtime
+  smoke: the SF city-front scene loads the gauge path clean
+  under debug. validate.sh full PASS (106 CPU gates incl. the
+  new 9-landmark tides gate, all 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

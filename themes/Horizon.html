@@ -194,7 +194,8 @@
         synthetic strike - use with strike=N), bishop=N (force
         the stratospheric excess to volcScale N for the 1888
         Bishop's ring - harness), bishopring=0 (never draw the
-        ring), soil=0 (pin
+        ring), tidegauge=0 (skip NOAA gauges - model tide only;
+        tide=M still pins the level outright), soil=0 (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
         (skip satellite irradiance), ghi=W (override it), debug=1,
@@ -763,6 +764,11 @@
         spriteProbPerFlash
       } from './horizon/sprites.js';
       import {blondelReyFactor} from './horizon/blondel.js';
+      import {
+        nearestTideStation,
+        tideLatestUrl,
+        tideStationsUrl
+      } from './horizon/tides.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
         activeShowers,
@@ -1421,10 +1427,53 @@
         );
       }
 
+      // NOAA CO-OPS gauge tide (tides.js, gated by
+      // tides-reference.mjs against the vendored fixture): where a
+      // real water-level gauge sits within 75 km, the drawn tide
+      // rides the MEASUREMENT (tides + surge, datum MSL) instead
+      // of the open-meteo model value. The 301-station list loads
+      // once, lazily; no gauge near (or ?tidegauge=0) falls back
+      // to the model - fails closed to the existing chain.
+      let coopsStations = null;
+      let tideGaugeFresh = false;
+      async function syncTideGauge() {
+        tideGaugeFresh = false;
+        if (params.get('tidegauge') === '0' || params.has('tide')) return;
+        try {
+          if (!coopsStations) {
+            const d = await (
+              await fetch(tideStationsUrl(), {credentials: 'omit'})
+            ).json();
+            coopsStations = d.stations;
+          }
+          const near = nearestTideStation(coopsStations, state.lat, state.lon);
+          if (!near) return;
+          const wl = await (
+            await fetch(tideLatestUrl(near.id), {credentials: 'omit'})
+          ).json();
+          const v = parseFloat(wl?.data?.[0]?.v);
+          if (Number.isFinite(v)) {
+            state.tide = v;
+            tideGaugeFresh = true;
+            record(
+              'NOAA tide gauge',
+              near.name +
+                ' (' +
+                near.km.toFixed(0) +
+                ' km): measured ' +
+                v.toFixed(2) +
+                ' m vs MSL'
+            );
+          }
+        } catch (e) {
+          if (params.has('debug')) console.warn('tide gauge: ' + e.message);
+        }
+      }
       async function syncMarine() {
         // Pinned sea, or pinned weather (a live sea would contradict
         // the pinned wind): keep what the URL says.
         if (params.has('hsw') || params.has('hss') || overridden) return;
+        await syncTideGauge();
         try {
           const m = await (
             await fetch(
@@ -1442,11 +1491,17 @@
           // mapping the terrain uses and deepens/shoals the surf
           // zone's true depth. Independent of the wave fields -
           // a flat calm still has a tide.
-          if (c && typeof c.sea_level_height_msl === 'number') {
+          if (
+            !tideGaugeFresh &&
+            c &&
+            typeof c.sea_level_height_msl === 'number'
+          ) {
             state.tide = c.sea_level_height_msl;
             record(
               'open-meteo tide',
-              'sea level ' + c.sea_level_height_msl.toFixed(2) + ' m vs MSL'
+              'sea level ' +
+                c.sea_level_height_msl.toFixed(2) +
+                ' m vs MSL (model - no gauge in reach)'
             );
           }
           state.sst =
