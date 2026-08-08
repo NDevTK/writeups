@@ -6321,6 +6321,47 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   printed timescales with nothing tuned; display fold exact at
   both ends. Sea ice keeps its OWN printed snow optics (Table 2
   snow-covered-ice rows in seaice.js) - no change there.
+- DONE (measured snow depth + the GIBS census, Aug 8 fifty-fifth
+  push - the depth laws get a depth): the recorded catalogue sweep
+  ran - the keyless GIBS WMTS GetCapabilities enumerates 1338
+  layers, and the census that matters is the TIME axis: MUR L4
+  sea-surface temperature, MODIS daily land-surface temperature
+  and MODIS L2 chlorophyll are live to this week; the AMSR
+  snow-water-equivalent family - the layer that would have served
+  a measured depth - DIED 2025-09-01 (eleven months stale, the
+  AMSR2 sunset), a reminder that a feed's existence is not its
+  liveness and every candidate must be checked against its
+  Dimension extent before any code leans on it. The measured
+  depth arrived anyway, from the family already trusted:
+  open-meteo's current block serves model snow_depth in metres on
+  the SAME request the theme already makes for weather (one
+  parameter appended, zero new calls). TWO documented
+  approximations retired: (1) the live-snowfall ground whitening
+  was a binary - snowing now at under half a degree paints
+  uSnowy 1, else 0; it is now FSM 1.0's printed Eq. 13 cover
+  curve, fs = tanh(h/hf) with Table 2's hf = 0.1 m, driven by the
+  measured depth - the paper's own sentence "snow of depth equal
+  to parameter hf thus covers 76 % of the ground and depth 2 hf
+  covers 96 %" is the gate's landmark, re-derived exactly
+  (tanh 1 = 0.762, tanh 2 = 0.964); the roofs inherit it through
+  the shared uniform; the binary survives only as the null-depth
+  fallback. (2) The lake-ice snow ramp - Yang's printed 0.1 m
+  DEPTH ramp, which the forty-seventh pass could only run on the
+  MODIS areal fraction as a documented proxy - now runs on the
+  measured depth over lakeice.js's own exported SNOW_RAMP_M; the
+  areal proxy stands in only when the feed omits depth. Panel
+  unchanged (the weather record already carries the snow state);
+  snowage-reference grew the Eq. 13 landmark (printed 76/96 pair
+  exact, monotone, saturating). NEXT LEADS from the census, in
+  value order: MUR L4 SST (gap-free daily 1 km - sea smoke
+  criterion, air-sea contrast; needs a printed steam-fog
+  threshold paper), MODIS daily LST (surface-air split for the
+  near-ground optical-turbulence term the HV profile pins at its
+  climatological A - needs a printed A(dT) law), MODIS L2
+  chlorophyll as an NRT bridge inside the ocean-colour fallback
+  chain (CCI spectral first, chl-Morel NRT second - the chain
+  already documents the seam). The IBC I-III rungs stay locked
+  (WEKO3 shell, Gao closed).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

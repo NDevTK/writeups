@@ -23,6 +23,7 @@
 import {
   FSM_ALB_MAX,
   FSM_ALB_MIN,
+  FSM_HF,
   FSM_S_ALPHA,
   FSM_T_ALPHA,
   FSM_TAU_COLD,
@@ -31,6 +32,7 @@ import {
   snowAlbedoDiagnostic,
   snowAlbedoFromSeries,
   snowAlbedoStep,
+  snowCoverFraction,
   snowDisplayRGB,
   snowfallCmToKgM2
 } from './snowage.js';
@@ -195,6 +197,36 @@ const check = (name, ok, detail) => {
     'display fold (pinned at alb_max)',
     okFresh && okAged && mono,
     `fresh class exact (${fresh.map((c) => c.toFixed(2)).join('/')}); aged floor 0.625x fresh exact; monotone`
+  );
+}
+
+{
+  // FSM Eq. 13, the ground-cover curve, against the paper's own
+  // printed sentence: "Snow of depth equal to parameter hf thus
+  // covers 76 % of the ground and depth 2 hf covers 96 %" -
+  // tanh(1) and tanh(2) re-derived exactly, monotone from bare
+  // ground, saturating on deep packs. This is the curve the
+  // measured model snow depth now drives live.
+  const f1 = snowCoverFraction(FSM_HF);
+  const f2 = snowCoverFraction(2 * FSM_HF);
+  let mono = true;
+  let prev = -1;
+  for (let h = 0; h <= 0.5001; h += 0.01) {
+    const f = snowCoverFraction(h);
+    if (f < prev) mono = false;
+    prev = f;
+  }
+  check(
+    'Eq. 13 cover curve (printed 76/96 pair)',
+    FSM_HF === 0.1 &&
+      Math.abs(f1 - Math.tanh(1)) < 1e-15 &&
+      Math.abs(f2 - Math.tanh(2)) < 1e-15 &&
+      Math.round(f1 * 100) === 76 &&
+      Math.round(f2 * 100) === 96 &&
+      snowCoverFraction(0) === 0 &&
+      snowCoverFraction(1) > 0.9999 &&
+      mono,
+    `hf covers ${(f1 * 100).toFixed(1)}% (printed 76), 2hf ${(f2 * 100).toFixed(1)}% (printed 96); bare 0, 1 m saturated; monotone`
   );
 }
 

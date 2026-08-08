@@ -698,6 +698,7 @@
       import {
         SNOW_FRESH_RGB,
         snowAlbedoFromSeries,
+        snowCoverFraction,
         snowDisplayRGB
       } from './horizon/snowage.js';
       import {
@@ -720,7 +721,11 @@
       } from './horizon/seaice.js';
       import {pondFraction} from './horizon/meltpond.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
-      import {lakeIceSeries, lakeIceAlphaBare} from './horizon/lakeice.js';
+      import {
+        lakeIceSeries,
+        lakeIceAlphaBare,
+        SNOW_RAMP_M
+      } from './horizon/lakeice.js';
       import {planetTintRGB} from './horizon/planets-color.js';
       import {lineStrengths} from './horizon/airglow.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
@@ -918,6 +923,7 @@
         auroraP: null, // OVATION oval probability 0..1, null = use Kp
         auroraLat: 68,
         hpNow: null, // OVATION hemispheric power, GW (live, 5 min)
+        snowDepth: null, // measured model snow depth, m (open-meteo)
         hpAtGrid: null, // ...as it was when the oval grid was fetched
         metar: null, // nearest fresh aerodrome observation (metar.js)
         profile: null, // measured refraction column (refraction.js)
@@ -1048,7 +1054,7 @@
                 state.lat +
                 '&longitude=' +
                 state.lon +
-                '&current=weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,dew_point_2m' +
+                '&current=weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,dew_point_2m,snow_depth' +
                 '&hourly=wind_speed_80m,wind_speed_120m&forecast_hours=1',
               {credentials: 'omit'}
             )
@@ -1069,6 +1075,8 @@
           state.visibility = c.visibility || state.visibility;
           state.precip = c.precipitation;
           state.snow = c.snowfall;
+          state.snowDepth =
+            typeof c.snow_depth === 'number' ? c.snow_depth : null;
           state.wind = c.wind_speed_10m;
           state.winddir = c.wind_direction_10m;
           state.gust = c.wind_gusts_10m;
@@ -11282,15 +11290,28 @@
         cirrusMat.opacity = 0.05 + day * 0.12;
 
         // Ground snow cover reacts live to the real temperature.
+        // Live snow on the ground: the measured model snow depth
+        // through FSM 1.0's printed cover curve, Eq. 13
+        // (snowage.js snowCoverFraction) - tanh(h/0.1 m), the
+        // printed pair "depth hf covers 76 %, 2 hf covers 96 %".
+        // The old is-it-snowing binary survives only as the
+        // fallback when the feed omits snow_depth.
         const snowyGround =
-          state.temp <= 0.5 && (state.snow > 0 || state.code >= 71) ? 1 : 0;
+          state.snowDepth != null
+            ? snowCoverFraction(state.snowDepth)
+            : state.temp <= 0.5 && (state.snow > 0 || state.code >= 71)
+              ? 1
+              : 0;
         terrainUniforms.uSnowy.value +=
           (snowyGround - terrainUniforms.uSnowy.value) * Math.min(dt, 1);
         if (bldSnowU) bldSnowU.value = terrainUniforms.uSnowy.value;
         // Lake ice display: the printed bare-ice albedo at the
         // measured Stefan thickness, ramped to the terrain's own
-        // snow class by the measured snow fraction (the printed
-        // 0.1 m snow ramp read as the areal fraction).
+        // snow class over the printed 0.1 m DEPTH (lakeice.js
+        // SNOW_RAMP_M) by the measured model snow depth - the
+        // Yang ramp finally runs on the depth it was printed
+        // for; the MODIS areal fraction stands in only when the
+        // feed omits depth.
         // The snow display class carries its FSM age (snowage.js)
         // to the ground, the roofs and the lake-ice ramp alike.
         terrainUniforms.uSnowCol.value.set(
@@ -11301,7 +11322,10 @@
         terrainUniforms.uLakeIce.value = lakeIceH > 0 ? 1 : 0;
         if (lakeIceH > 0) {
           const aBare = lakeIceAlphaBare(lakeIceH / 100);
-          const rampS = Math.min(Math.max(snowFSC || 0, 0), 1);
+          const rampS =
+            state.snowDepth != null
+              ? Math.min(state.snowDepth / SNOW_RAMP_M, 1)
+              : Math.min(Math.max(snowFSC || 0, 0), 1);
           terrainUniforms.uLakeIceCol.value.set(
             aBare + rampS * (snowAgeRGB[0] - aBare),
             aBare + rampS * (snowAgeRGB[1] - aBare),

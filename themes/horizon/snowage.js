@@ -103,3 +103,14 @@ export function snowDisplayRGB(alpha) {
   const f = Math.min(Math.max(alpha / FSM_ALB_MAX, 0), 1);
   return SNOW_FRESH_RGB.map((c) => c * f);
 }
+
+// FSM Eq. 13, the printed snow-cover fraction of the ground for
+// snow depth h: fs = tanh(h / hf) with Table 2's hf = 0.1 m. The
+// paper's own printed pair - "Snow of depth equal to parameter
+// hf thus covers 76 % of the ground and depth 2 hf covers 96 %"
+// - is the gate's landmark. Driven live by the measured model
+// snow depth (open-meteo current snow_depth, metres).
+export const FSM_HF = 0.1;
+export function snowCoverFraction(hM) {
+  return Math.tanh(Math.max(hM, 0) / FSM_HF);
+}
