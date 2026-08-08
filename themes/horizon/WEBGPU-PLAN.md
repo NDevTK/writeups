@@ -7048,6 +7048,72 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     plain-http arXiv still returns empty (https works).
     validate.sh full PASS (107 CPU gates incl. the new 9-landmark
     no2 gate, all 7 GPU probes).
+- DONE (nacreous clouds: Aug 8 sixty-eighth push - psc.js +
+  psc-reference.mjs + createNacreousMaterial + the 50 hPa feed):
+  mother-of-pearl clouds (type II polar stratospheric clouds)
+  from two Copernicus-open primaries READ IN FULL, under a NEW
+  measured feed. Pitts, Poole & Gonzalez 2018 (ACP, the 12-year
+  CALIOP climatology) prints the threshold ladder at exactly the
+  level the feed serves - 50 hPa, 10 ppbv HNO3, 5 ppmv H2O:
+  T_NAT 195.7 K, T_STS 192 K, T_ice 188.5 K - and the ice-PSC
+  occurrence mode "slightly below the frost point with a FWHM of
+  about 1 K" (their Fig. 12, both hemispheres), which IS the
+  drawn gate: a logistic in the MEASURED temperature, 1/2 at the
+  printed frost point, the printed width; plus ice optics
+  (n = 1.31, lognormal sigma 1.38), seasons (Antarctic May-Oct
+  peak Jul-Aug +-25%; Arctic Dec-Mar, rel-std > 100%), the
+  wave-ice class (R532 > 50, mountain-wave; Antarctic-Peninsula
+  and Scandinavian-lee hotspots), and their MERRA-2 caveat
+  (synoptic analyses under-resolve wave amplitudes) carried as
+  the gate's documented conservatism. Reichardt et al. 2004
+  (ACP, the Esrange two-lidar wave-PSC case) prints the
+  microphysics the iridescence rides: wave-ice maximum
+  dimensions 3 -> 1.9 um through the wave phase, isometric
+  (aspect 0.75-1.25), and the KEY licence quoted verbatim -
+  "the size distribution of the optically relevant PSC
+  particles is narrow ... justified as in situ measurements
+  confirm" - so the drawn colour is LOCALLY MONODISPERSE
+  certified Airy (cloud-corona machinery) with the size
+  gradient ACROSS the lenticular form being the printed phase
+  evolution: the banding IS the size sorting. First bright
+  rings land at 17.4-28.2 deg mid-visible (the classic nacreous
+  zone; exact inverse-size similarity a landmark). THE FEED:
+  open-meteo serves temperature_50hPa keylessly - one variable
+  added to the existing winds-aloft request (state.t50). The
+  9-landmark gate holds the ladder, the logistic (1/2 at T_ice
+  exactly, the printed 1 K FWHM), the degC bridge, the ring
+  zone, the closed-form Airy centres per LUT row, and the
+  twilight window CLOSED-FORM: the 24 km shell (Pitts prints
+  PSCs "up to > 25 km"; the gate level stays 50 hPa where the
+  thresholds are printed) is lit at sun -3 deg with R/B 6-22
+  (the reddened pearl beam), still lit 0.1 deg above its
+  acos(R/(R+h)) = 4.97 deg dip and EXACTLY dark 0.1 deg past
+  it. ?psc=T forces the 50 hPa temperature, ?psc=0 disables.
+  THE DEBUG SAGA, recorded as harness lore: the drawn forms
+  "vanished" through five capture cycles and the causes were
+  never the physics - (1) additive colour over the theme's
+  near-saturated twilight band saturates to white-on-white and
+  a chromatic pixel detector goes blind (the bare-green bisect
+  finally showed a white RECTANGLE hiding in the white band);
+  (2) an A/B pair taken as two page loads 40 s apart caught
+  LIVE-AEROSOL drift - a 55.7M-count whole-frame difference
+  that shrank to 1.2M once the pair was pinned with
+  aod/volcanic=0/no2=0/irr=0 - A/B captures of live-feed
+  pages MUST pin every feed (protocol note for every future
+  pass); (3) the 20.5 km shell's twilight window closes at
+  -4.6 deg, BEFORE this theme's bright band darkens - the
+  display window is real physics and the drawn shell moved to
+  the printed band top. The pinned difference render shows the
+  three lenticular forms drawn at their positions with the
+  pattern sampled at the true sun angle; the 8-bit output
+  against the brightest band has headroom only in green, so
+  the vivid pearl look needs the layer inside the dome's tone
+  pipeline - recorded refinement, with the display exposure
+  (0.45) and lens envelope documented as display constants
+  (no printed wave-PSC visible optical depth is in hand; a
+  future pass could derive one from the printed backscatter
+  and lidar ratios). validate.sh full PASS (108 CPU gates
+  incl. the new 9-landmark psc gate, all 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

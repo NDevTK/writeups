@@ -197,7 +197,8 @@
         ring), tidegauge=0 (skip NOAA gauges - model tide only;
         tide=M still pins the level outright), no2=0|N (clean-air
         pin / force the NO2 column in molec/cm² - the brown
-        horizon), soil=0 (pin
+        horizon), psc=T|0 (force the 50 hPa temperature in °C
+        for nacreous clouds / never draw them), soil=0 (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
         (skip satellite irradiance), ghi=W (override it), debug=1,
@@ -395,6 +396,7 @@
         createMeteorMaterial,
         createContrailMaterial,
         createFlashMaterial,
+        createNacreousMaterial,
         createRedSpriteMaterial,
         createMilkyWayMaterial,
         createNLCMaterial,
@@ -772,6 +774,14 @@
         tideStationsUrl
       } from './horizon/tides.js';
       import {NO2_LAYER, NO2_Z, no2BetaPerM, sampleNo2} from './horizon/no2.js';
+      import {
+        buildNacreousLUT,
+        C_TO_K,
+        pscIceAmp,
+        PSC_ALT_M,
+        T_ICE_K,
+        WAVE_ICE_D_UM
+      } from './horizon/psc.js';
       import {fR, ZL_OMEGA} from './horizon/zodiacal.js';
       import {
         activeShowers,
@@ -1187,7 +1197,7 @@
                 state.lat +
                 '&longitude=' +
                 state.lon +
-                '&hourly=wind_speed_700hPa,wind_direction_700hPa,wind_direction_250hPa,freezing_level_height,temperature_250hPa,relative_humidity_250hPa,' +
+                '&hourly=wind_speed_700hPa,wind_direction_700hPa,wind_direction_250hPa,freezing_level_height,temperature_250hPa,relative_humidity_250hPa,temperature_50hPa,' +
                 LV.map(
                   (p) =>
                     'wind_speed_' + p + 'hPa,geopotential_height_' + p + 'hPa'
@@ -1240,6 +1250,11 @@
             // level (cloud-corona.js; ?t250= pins it for the
             // harness).
             if (!params.has('t250')) state.t250 = t250;
+            // The measured lower-stratospheric temperature (psc.js):
+            // 50 hPa ~ 20.5 km, the level the printed PSC
+            // thresholds are stated at.
+            if (typeof h.temperature_50hPa?.[0] === 'number')
+              state.t50 = h.temperature_50hPa[0];
             record(
               'Cirrus corona regime',
               t250.toFixed(1) +
@@ -7248,6 +7263,37 @@
           spriteCount + ' above the storms · ' + Math.round(distKm) + ' km out'
         );
       }
+      // Nacreous clouds (psc.js, gated by psc-reference.mjs):
+      // lenticular wave-cloud forms at the 50 hPa level, drawn
+      // when the MEASURED lower-stratospheric temperature sits
+      // under the printed frost point (Pitts 2018: T_ice =
+      // 188.5 K at 50 hPa, occurrence mode FWHM ~1 K). The
+      // iridescence is the certified Airy LUT over Reichardt
+      // 2004's printed 1.9-3 um wave-ice span, sampled at each
+      // fragment's true angle from the sun; the reddened
+      // 20.5 km twilight beam carries the display window
+      // (sunlit past ground sunset, planet-shadowed by ~-10
+      // deg). Placement toward the sun's azimuth and the lens
+      // envelope are documented display choices; the synoptic
+      // 50 hPa T under-resolves wave amplitudes (Pitts' own
+      // MERRA-2 caveat) so the gate errs conservative. ?psc=T
+      // forces the 50 hPa temperature (degC), ?psc=0 disables.
+      const pscLUT = buildNacreousLUT();
+      const pscPool = [];
+      const PSC_FORMS = [
+        {daz: -18, el: 15, w: 15, h: 3.6},
+        {daz: 8, el: 19, w: 10, h: 2.6},
+        {daz: -4, el: 12, w: 12, h: 3.0}
+      ];
+      for (const f of PSC_FORMS) {
+        const nm = createNacreousMaterial(pscLUT);
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), nm.material);
+        mesh.visible = false;
+        scene.add(mesh);
+        pscPool.push({mesh, u: nm.u, f});
+      }
+      let pscSaid = false;
+      const PSC_DISPLAY_K = 0.45; // display exposure of the sr^-1 LUT
       let liveES = null;
       const strikeOv = params.has('strike') ? +params.get('strike') : null;
       const spriteOv = params.has('sprite') ? +params.get('sprite') : 0;
@@ -11233,6 +11279,65 @@
           }
           const env = spriteOv > 0 ? 1 : Math.exp(-p.t / tau);
           p.u.amp.value = env * spriteVis * 0.5;
+        }
+        // Nacreous clouds: the measured 50 hPa temperature under
+        // the printed frost point, lit by the exact 20.5 km
+        // twilight beam (sunTransmittanceJS carries the planet
+        // shadow, so the display turns on after ground sunset
+        // and off when the shadow climbs past the layer).
+        {
+          const pscParam = params.get('psc');
+          const t50C =
+            pscParam !== null && pscParam !== '0' ? +pscParam : state.t50;
+          const pscA =
+            pscParam === '0'
+              ? 0
+              : pscIceAmp((t50C ?? 999) + C_TO_K) * (1 - cloudy * 0.9);
+          if (pscA > 1e-3) {
+            const beam = sunTransmittanceJS(
+              Math.sin(sun.alt),
+              mieRad,
+              PSC_ALT_M
+            );
+            const lit = beam[0] + beam[1] + beam[2] > 0;
+            for (const p of pscPool) {
+              p.mesh.visible = lit;
+              if (!lit) continue;
+              const az = sun.az + p.f.daz * RAD;
+              const el = p.f.el * RAD;
+              const R = 235;
+              const pos = skyPoint(el, az, R);
+              p.mesh.position.set(
+                camera.position.x + pos.x,
+                pos.y,
+                camera.position.z + pos.z
+              );
+              p.mesh.scale.set(R * p.f.w * RAD, R * p.f.h * RAD, 1);
+              p.mesh.lookAt(camera.position.x, pos.y, camera.position.z);
+              p.u.sunDir.value.copy(skyPoint(sun.alt, sun.az, 1)).normalize();
+              p.u.ampV.value.set(
+                beam[0] * pscA * PSC_DISPLAY_K,
+                beam[1] * pscA * PSC_DISPLAY_K,
+                beam[2] * pscA * PSC_DISPLAY_K
+              );
+            }
+            if (lit && !pscSaid) {
+              pscSaid = true;
+              record(
+                'nacreous clouds (measured stratosphere)',
+                (t50C ?? 0).toFixed(1) +
+                  '°C at 50 hPa vs printed frost point ' +
+                  (T_ICE_K - C_TO_K).toFixed(1) +
+                  '°C · wave-ice ' +
+                  WAVE_ICE_D_UM[0] +
+                  '-' +
+                  WAVE_ICE_D_UM[1] +
+                  ' µm iridescence'
+              );
+            }
+          } else {
+            for (const p of pscPool) p.mesh.visible = false;
+          }
         }
         if (constMat)
           constMat.opacity = nightSky * (1 - cloudy * 0.9) * 0.2 * lpVis;

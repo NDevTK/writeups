@@ -1224,6 +1224,51 @@ export function createRedSpriteMaterial() {
   return {material, u};
 }
 
+// Nacreous (mother-of-pearl) cloud material - psc.js physics: the
+// certified Airy iridescence LUT (rows = the printed 1.9-3.0 um
+// wave-ice size span, columns = scattering angle) sampled at each
+// fragment's TRUE angle from the sun, with the size row swept
+// ALONG the lenticular form (Reichardt 2004's printed 3 -> 1.9 um
+// phase evolution - the banding IS the size gradient). ampV
+// carries the reddened 20.5 km twilight beam per channel times
+// the measured-temperature gate; the lens envelope is a
+// documented display shape.
+export function createNacreousMaterial(lut) {
+  const tex = new DataTexture(lut.data, lut.w, lut.h, RGBAFormat, FloatType);
+  tex.magFilter = LinearFilter;
+  tex.minFilter = LinearFilter;
+  tex.needsUpdate = true;
+  const u = {
+    ampV: uniform(new Vector3(0, 0, 0)),
+    sunDir: uniform(new Vector3(0, 1, 0))
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = DoubleSide;
+  material.blending = AdditiveBlending;
+  const texN = texture(tex);
+  const dirW = normalize(positionWorld.sub(cameraPosition));
+  const cosT = clamp(dot(dirW, u.sunDir), -1, 1);
+  const th = acos(cosT);
+  const uTh = th
+    .div(lut.thetaMaxRad)
+    .clamp(0, 1)
+    .mul((lut.w - 1) / lut.w)
+    .add(0.5 / lut.w);
+  const vRow = uv()
+    .x.clamp(0, 1)
+    .mul((lut.h - 1) / lut.h)
+    .add(0.5 / lut.h);
+  const pat = texN.sample(vec2(uTh, vRow)).rgb;
+  const ex = uv().x.sub(0.5).div(0.38);
+  const ey = uv().y.sub(0.5).div(0.22);
+  const env = exp(ex.pow(2).add(ey.pow(2)).negate().mul(3.0));
+  material.colorNode = pat.mul(env).mul(u.ampV);
+  material.opacityNode = float(1);
+  return {material, u};
+}
+
 // The Milky Way dome: Gaia DR3 integrated starlight
 // (milkyway.js / milkyway-data.js - every DR3 source aggregated
 // server-side at ESA, minus the G < 5.5 bright end the theme
