@@ -7180,6 +7180,55 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the file's capitalized "Gegenschein"). Validation: full gate
   green - 109 CPU references (steve registered after aurora) +
   all 7 GPU probes.
+- DONE (Aug 8, the review session's 70th pass - TEMPO: the
+  hourly geostationary column joins the brown horizon): the
+  shelved TEMPO refinement is unblocked and shipped. The blocker
+  dissolved in the capabilities: GIBS serves
+  TEMPO_L3_NO2_Vertical_Column_Troposphere (epsg3857
+  GoogleMapsCompatible_Level7 and epsg4326 1km, PNG) with TIME
+  values that are exact per-scan timestamps (~40-60 min cadence,
+  live today) - the earlier 400s were date-format misses, and
+  TIME=default resolves server-side to the LATEST scan, so the
+  client needs no time discovery at all. The primary: Zoogman et
+  al. 2017 (JQSRT, the mission paper) - paywalled at PMC but open
+  at NTRS (deposit 20170003141), READ IN FULL with Tables 1-2
+  machine-read from the rendered pages. Printed and carried in
+  no2.js: hourly daylight revisit; FOR 4.82 x 8.38 deg =
+  "from Mexico City, Cuba, and the Bahamas to the Canadian oil
+  sands, and from the Atlantic to the Pacific" (the abstract
+  corners become the precheck box, the tile's own painted cells
+  the real gate); IFOV 2.1 x 4.4 km, product 8.4 x 4.4; NO2
+  typical 6e15, required precision 1.0e15 molec/cm^2; and THE
+  print that ties feed to optics - the NO2 retrieval fits
+  423-451 nm (Table 1 SNR window; Sect. 7 fit range 400-465 nm),
+  INSIDE the theme's 440 +- 20 nm blue band-mean window: the
+  instrument measures the column in the very band the drawn
+  absorber removes. Sect. 9 puts the morning/evening scans on
+  "peaks in vehicle miles traveled" - rush hour enters the sky.
+  The TEMPO palette (v1.3, 254 linear bins 0..3.0e16) is
+  vendored verbatim next to the OMI one; the inverter is now
+  shared (paletteOfRGBA) and sampleNo2 takes the palette as an
+  argument. Five new landmarks in no2-reference.mjs (14 total):
+  the TEMPO palette roundtrips exactly; the TWO published
+  palettes invert the same column to the same molec/cm^2 within
+  one TEMPO bin (worst 9.0e13 across the shared range - no
+  scale factor between instruments anywhere); the printed fit
+  windows sit inside the drawn blue band (mid 437 vs channel
+  440 nm); the printed structure + FOR box hold (Mexico City and
+  the oil sands in, Hamburg and Seoul out, NaN out); and the
+  printed 1e15 precision transmits 96.6% blue on the horizon
+  chord (under a JND) while the printed typical 6e15 transmits
+  81% - the drawn tint sits above the instrument's own noise by
+  construction. Horizon.html syncNO2 goes TEMPO-first inside the
+  box (TIME=default, tempoOfRGBA, zero painted cells fall
+  through to the TROPOMI 5-day walk unchanged) and the refresh
+  tightens from 6 h to the printed 1 h revisit. Verified on live
+  bytes end to end with the module's own exports: the LA
+  neighbourhood sampled 54/54 painted cells at 7.66e15 (and the
+  column CHANGED between two fetches twenty minutes apart - a
+  fresh scan had published: the diurnal cycle observably in the
+  feed); browser load capture PAGEERROR-free. Full gate green -
+  109 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

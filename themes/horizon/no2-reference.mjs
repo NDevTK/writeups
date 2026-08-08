@@ -20,13 +20,22 @@
 import {
   NO2_H_M,
   NO2_RGB,
+  TEMPO_FIT_NM,
+  TEMPO_FIT_WIDE_NM,
+  TEMPO_FOR_DEG,
+  TEMPO_NO2_PREC_CM2,
+  TEMPO_NO2_TYP_CM2,
+  TEMPO_REVISIT_H,
+  TEMPO_RGB,
   bandMean,
+  inTempoBox,
   no2BetaPerM,
   no2OfRGBA,
   no2SigmaBurrows,
   no2SigmaCm2,
   no2SigmaVandaeleBG,
-  sampleNo2
+  sampleNo2,
+  tempoOfRGBA
 } from './no2.js';
 import {NO2_BOGUMIL_B, NO2_BOGUMIL_R} from './no2-xsec-data.js';
 import {pathToRadiusT, sunTransmittanceJS} from './sun-transmittance.js';
@@ -134,6 +143,115 @@ const MIE0 = {scat: [0, 0, 0], abs: [0, 0, 0]};
       sunTransmittanceJS(1, MIE0, 300).every((v, i) => v === t0[i]),
     `zenith blue ratio ${(t1[2] / t0[2]).toFixed(4)} vs analytic ` +
       `${expect.toFixed(4)} (32-step quadrature); no2 absent is bit-exact identity`
+  );
+}
+
+// ---- 3b. TEMPO: the hourly geostationary column -----------------
+// Zoogman et al. 2017 (NTRS 20170003141, read in full; Tables 1-2
+// machine-read): the geostationary instrument scans greater North
+// America every daylight hour and retrieves NO2 inside the very
+// blue band the drawn absorber removes from the sky.
+{
+  // The vendored TEMPO palette: contiguous linear bins over the
+  // published 0..3.0e16 span, every bin roundtripping to its mid
+  // through the shared inverter.
+  let contiguous = true;
+  let roundtrip = true;
+  for (let i = 1; i < TEMPO_RGB.length; i++) {
+    const [r, g, b, lo, hi] = TEMPO_RGB[i];
+    if (i > 1 && Math.abs(lo - TEMPO_RGB[i - 1][4]) > 1e6) contiguous = false;
+    const v = tempoOfRGBA(r, g, b, 255);
+    const want = lo < 0 ? 0 : (lo + hi) / 2;
+    if (Math.abs(v - want) > 1e-9 * Math.max(hi, 1)) roundtrip = false;
+  }
+  check(
+    'TEMPO palette inverts exactly',
+    TEMPO_RGB.length === 255 &&
+      contiguous &&
+      roundtrip &&
+      TEMPO_RGB[1][3] === 0 &&
+      Math.abs(TEMPO_RGB[TEMPO_RGB.length - 1][4] - 3e16) < 1e6 &&
+      tempoOfRGBA(0, 255, 0, 255) === null &&
+      tempoOfRGBA(238, 134, 94, 40) === null,
+    `254 contiguous linear bins 0..3.0e16 molec/cm^2 roundtrip to their mids ` +
+      `through the shared inverter; below-range reads clean air; off-palette ` +
+      `and transparent read null`
+  );
+  // The two published palettes measure the SAME quantity: a
+  // column painted by both inverts to the same value within one
+  // bin of the coarser scale (OMI 1.06e14, TEMPO 1.18e14 bins).
+  const probes = [8e14, 3.2e15, 7.9e15, 1.4e16, 1.9e16];
+  let worst = 0;
+  for (const N of probes) {
+    const oBin = NO2_RGB.find(([, , , lo, hi]) => lo >= 0 && N >= lo && N < hi);
+    const tBin = TEMPO_RGB.find(
+      ([, , , lo, hi]) => lo >= 0 && N >= lo && N < hi
+    );
+    const o = no2OfRGBA(oBin[0], oBin[1], oBin[2], 255);
+    const t = tempoOfRGBA(tBin[0], tBin[1], tBin[2], 255);
+    worst = Math.max(worst, Math.abs(o - t));
+  }
+  check(
+    'two palettes, one quantity',
+    worst < 1.18e14,
+    `OMI-styled TROPOMI and TEMPO paints of the same column invert within one ` +
+      `TEMPO bin (worst ${worst.toExponential(2)} molec/cm^2 across the shared ` +
+      `range) - instrument-independent inversion, no scale factor anywhere`
+  );
+  // The printed fit windows sit inside the theme's blue channel
+  // band-mean window (440 +- 20 nm): the instrument measures the
+  // column in the band the drawn absorber removes.
+  const bWin = [420, 460];
+  check(
+    'TEMPO fits NO2 in the drawn blue band',
+    TEMPO_FIT_NM[0] >= bWin[0] &&
+      TEMPO_FIT_NM[1] <= bWin[1] &&
+      TEMPO_FIT_WIDE_NM[0] <= bWin[0] &&
+      TEMPO_FIT_WIDE_NM[1] >= bWin[1] &&
+      Math.abs((TEMPO_FIT_NM[0] + TEMPO_FIT_NM[1]) / 2 - 440) < 5,
+    `Table 1 SNR window 423-451 nm INSIDE the theme's 420-460 nm blue mean ` +
+      `window (mid 437 vs channel 440); Sect. 7 fit range 400-465 nm brackets ` +
+      `it - the retrieval and the drawn optics share one band`
+  );
+  // Printed structure + the FOR precheck box from the abstract's
+  // named corners.
+  check(
+    'printed mission structure carried',
+    TEMPO_REVISIT_H === 1 &&
+      TEMPO_FOR_DEG[0] === 4.82 &&
+      TEMPO_FOR_DEG[1] === 8.38 &&
+      TEMPO_NO2_TYP_CM2 === 6e15 &&
+      TEMPO_NO2_PREC_CM2 === 1e15 &&
+      inTempoBox(19.4, -99.1) &&
+      inTempoBox(57, -111.4) &&
+      inTempoBox(34.05, -118.24) &&
+      !inTempoBox(53.5, 10) &&
+      !inTempoBox(37.5, 127) &&
+      !inTempoBox(NaN, -100),
+    `hourly revisit, 4.82 x 8.38 deg FOR, typical 6e15 / precision 1e15 ` +
+      `(Table 2); the precheck box holds the abstract's corners - Mexico City ` +
+      `and the oil sands in, Hamburg and Seoul out, unmeasured out`
+  );
+  // The printed precision as the tint floor: a 1-sigma column is
+  // invisible even on the horizon chord; the printed TYPICAL
+  // background column is already at the JND edge there - the
+  // feed's noise cannot paint a band, its signal can.
+  const bPrec = no2BetaPerM(TEMPO_NO2_PREC_CM2);
+  const bTyp = no2BetaPerM(TEMPO_NO2_TYP_CM2);
+  const ratio = (mie, mu) => {
+    const a = pathToRadiusT(mu, MIE0, 300);
+    const b = pathToRadiusT(mu, mie, 300);
+    return b[2] / a[2];
+  };
+  const hPrec = ratio({...MIE0, no2: bPrec}, 0.001);
+  const hTyp = ratio({...MIE0, no2: bTyp}, 0.001);
+  check(
+    'printed precision under the tint floor',
+    hPrec > 0.95 && hTyp < 0.85 && hTyp > 0.6,
+    `1e15 (the required precision) transmits ${(hPrec * 100).toFixed(1)}% blue ` +
+      `on the horizon chord - under a JND; the printed typical 6e15 transmits ` +
+      `${(hTyp * 100).toFixed(0)}% - a visible browning: the drawn tint sits ` +
+      `above the instrument's own noise by construction`
   );
 }
 

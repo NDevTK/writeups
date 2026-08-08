@@ -777,7 +777,16 @@
         tideLatestUrl,
         tideStationsUrl
       } from './horizon/tides.js';
-      import {NO2_LAYER, NO2_Z, no2BetaPerM, sampleNo2} from './horizon/no2.js';
+      import {
+        inTempoBox,
+        NO2_LAYER,
+        NO2_Z,
+        no2BetaPerM,
+        sampleNo2,
+        TEMPO_LAYER,
+        TEMPO_Z,
+        tempoOfRGBA
+      } from './horizon/no2.js';
       import {
         buildNacreousLUT,
         C_TO_K,
@@ -2540,15 +2549,21 @@
         }
       }
 
-      // The MEASURED tropospheric NO2 (no2.js, gated): the
-      // Sentinel-5P TROPOMI column over the same keyless GIBS
-      // WMTS, inverted through the published palette - the brown
-      // horizon of polluted air enters the marches as a
-      // boundary-layer Beer absorber. Unpainted cells read a zero
-      // column (clean or unmeasured - no tint, fails closed); a
-      // day-old tile is normal (daily product), the fetch walks
-      // back up to 5 days. ?no2=0 pins clean air, ?no2=N forces
-      // the column.
+      // The MEASURED tropospheric NO2 (no2.js, gated): TEMPO
+      // hourly over greater North America, TROPOMI daily
+      // everywhere else - both over the same keyless GIBS WMTS,
+      // each inverted through its own published palette - the
+      // brown horizon of polluted air enters the marches as a
+      // boundary-layer Beer absorber. TEMPO (Zoogman 2017, read
+      // in full) scans the printed FOR every daylight hour and
+      // retrieves NO2 in the 423-451 nm window - inside the very
+      // blue band the drawn absorber removes; TIME=default serves
+      // the latest scan, and a tile with no painted cells (night,
+      // FOR edge, gaps) falls through to the TROPOMI daily walk.
+      // Unpainted cells read a zero column (clean or unmeasured -
+      // no tint, fails closed); a day-old TROPOMI tile is normal
+      // (daily product), the walk goes back up to 5 days. ?no2=0
+      // pins clean air, ?no2=N forces the column.
       let no2Seq = 0;
       async function syncNO2() {
         if (params.has('no2')) return;
@@ -2557,6 +2572,49 @@
           const p = pixelOf(state.lat, state.lon, NO2_Z);
           const c = Math.floor(p.px / 256);
           const r = Math.floor(p.py / 256);
+          if (inTempoBox(state.lat, state.lon)) {
+            try {
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.src =
+                'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/' +
+                TEMPO_LAYER +
+                '/default/default/GoogleMapsCompatible_Level7/' +
+                TEMPO_Z +
+                '/' +
+                r +
+                '/' +
+                c +
+                '.png';
+              await img.decode();
+              const cv = document.createElement('canvas');
+              cv.width = cv.height = 256;
+              const cx = cv.getContext('2d', {willReadFrequently: true});
+              cx.drawImage(img, 0, 0);
+              const data = cx.getImageData(0, 0, 256, 256).data;
+              if (seq !== no2Seq) return;
+              const pxAt = (ix, iy) => {
+                const lx = ix - c * 256;
+                const ly = iy - r * 256;
+                if (lx < 0 || lx > 255 || ly < 0 || ly > 255) return null;
+                const o = (ly * 256 + lx) * 4;
+                return [data[o], data[o + 1], data[o + 2], data[o + 3]];
+              };
+              const s = sampleNo2(pxAt, p.px, p.py, 16, tempoOfRGBA);
+              if (s.painted) {
+                state.no2Col = s.col;
+                record(
+                  'TEMPO NO2 column (hourly scan)',
+                  s.col.toExponential(2) +
+                    ' molec/cm² · geostationary, fit 423-451 nm · blue tau_v ' +
+                    (no2BetaPerM(s.col)[2] * 1200).toExponential(1)
+                );
+                return;
+              }
+            } catch {
+              // TEMPO tile unavailable - the daily walk serves
+            }
+          }
           for (let back = 1; back <= 5; back++) {
             const d = new Date(Date.now() - back * 86400e3)
               .toISOString()
@@ -13146,7 +13204,11 @@
         syncSnowCover();
         syncStratAOD();
         syncNO2();
-        setInterval(syncNO2, 6 * 60 * 60 * 1000);
+        // The printed TEMPO revisit is 1 hour (Table 1) - the
+        // refresh follows it so the drawn brown horizon carries
+        // the measured diurnal cycle; outside the FOR the same
+        // tick just re-reads the cheap daily TROPOMI tile.
+        setInterval(syncNO2, 60 * 60 * 1000);
         syncSeaIce();
         syncLakeIce();
         setInterval(syncLakeIce, 6 * 60 * 60 * 1000);
