@@ -7110,6 +7110,7 @@
       umbraTex.minFilter = umbraTex.magFilter = THREE.LinearFilter;
       umbraTex.needsUpdate = true;
       const ecV = new THREE.Vector3();
+      let umbraLutKey = -1;
       const moonObj = createMoonMaterial(
         atmo.skyRadiance,
         moonFaceTex,
@@ -8703,6 +8704,7 @@
               // sky (equatorial frame): antisolar minus moon unit
               // vectors - applied through the celestial group's
               // sidereal frame at the drawn disc.
+              astro.lunarEcl.distKm = ml * AE.KM_PER_AU;
               astro.lunarEcl.offEq = [
                 -sv.x / sl - mv.x / ml,
                 -sv.y / sl - mv.y / ml,
@@ -9202,6 +9204,20 @@
               .add(ecV)
               .normalize();
             moonU.shadowPen.value = le.penumbra;
+            // The measured stratosphere darkens the umbra
+            // (lunar-umbra.js volcanic coupling): rebuild the
+            // profile LUT when the live volcScale moves - at
+            // background it adds tenths of a magnitude; after an
+            // eruption the OMPS feed will darken the eclipse by
+            // the magnitudes the record shows.
+            const key = Math.round(stratVolcScale * 20);
+            if (key !== umbraLutKey) {
+              umbraLutKey = key;
+              umbraTex.image.data.set(
+                buildUmbraLUT(64, stratVolcScale, le.penumbra, le.distKm)
+              );
+              umbraTex.needsUpdate = true;
+            }
           }
           moonU.albM.value.setHex(0xcdd4e2);
         }

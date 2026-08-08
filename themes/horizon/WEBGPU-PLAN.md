@@ -5891,6 +5891,40 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   feed. VALIDATE PASS (all references + 7 GPU probes; the
   suite's GPU legs needed the restart-killed :8901 server
   rebooted - environment, not code).
+- DONE (volcanic lunar eclipses, Aug 8 forty-third push - two
+  shipped systems close a loop with ZERO new constants):
+  Mallama prints that his shadow profile is for a clear
+  atmosphere and that volcanic stratospheric aerosol darkens
+  eclipses below it (his Fig. 5.1 post-eruption outliers,
+  "an approximate upper limit") - the hook the last push
+  named. It closes from what the theme already ships: his
+  Table 3.1 prints the umbral rays' minimum altitudes against
+  shadow distance (vendored verbatim - deep-umbra rays graze
+  at 0-8 km, BELOW the Junge layer), each such ray crosses
+  the stratos.js shell twice, and the chord integral of the
+  layer's per-channel extinction times the LIVE measured
+  volcScale (the OMPS feed) is the darkening.
+  lunar-umbra.js gains rayMinAltM + volcanicMagExtra, and
+  buildUmbraLUT folds the extra magnitudes per channel; the
+  theme rebuilds the LUT during an eclipse whenever the
+  measured volcScale moves. THE NUMBERS, gated: at background
+  the centre gains only 0.16 mag (green) - Mallama's clear
+  table stays right, and the exactness check now pins the LUT
+  at volcScale 0 to his table verbatim; at the Pinatubo scale
+  (SAOD675 = 0.1 through the live feed's OWN chainAOD675
+  conversion, volcScale 25.4) the centre darkens by
+  +3.0/+4.0/+5.4 mag in R/G/B - squarely on the observed
+  record (his outliers sit ~3-4 mag under the model in V) -
+  with blue dying fastest, so a volcanic umbra reddens before
+  it blacks out, exactly as 1992-93 was described; and the
+  extra is exactly linear in volcScale (the gate holds the
+  identity). The loop this closes is the pass's point: the
+  same satellite measurement that scales the twilight purple
+  light now darkens the eclipsed moon - two independently
+  grounded systems joined by printed geometry (Keen's classic
+  Science 222 result, eclipse brightness as a stratospheric
+  aerosol probe, now runs INSIDE the theme in the forward
+  direction). VALIDATE PASS (all references + 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

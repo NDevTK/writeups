@@ -118,14 +118,112 @@ export function umbralFactor(c, pos) {
 }
 
 // A 1D RGBA float LUT over pos 0..1 for the moon material.
-export function buildUmbraLUT(n = 64) {
+export function buildUmbraLUT(
+  n = 64,
+  volcScale = 1,
+  penRad = 0.0213,
+  distKm = 384400
+) {
   const out = new Float32Array(n * 4);
   for (let i = 0; i < n; i++) {
     const pos = i / (n - 1);
-    out[i * 4] = umbralFactor(0, pos);
-    out[i * 4 + 1] = umbralFactor(1, pos);
-    out[i * 4 + 2] = umbralFactor(2, pos);
+    for (let c = 0; c < 3; c++) {
+      out[i * 4 + c] = Math.pow(
+        10,
+        -0.4 *
+          (umbralMagLost(c, pos) +
+            volcanicMagExtra(c, pos, volcScale, penRad, distKm))
+      );
+    }
     out[i * 4 + 3] = 1;
   }
   return out;
+}
+
+// ---- the volcanic coupling (Mallama's stated hook) ----
+// Mallama prints that his profile is "computed for a clear
+// atmosphere" and that volcanic stratospheric aerosol darkens
+// eclipses below it (his Fig. 5.1 outliers after major
+// eruptions sit magnitudes under the model - "an approximate
+// upper limit"). The extra extinction is computable with NO new
+// constants: his Table 3.1 prints the umbral rays' minimum
+// altitudes against distance from the shadow centre (at the
+// lunar distance) - deep-umbra rays graze at 0-8 km, BELOW the
+// Junge layer - and each such ray crosses the theme's shipped
+// stratospheric layer (stratos.js: the printed 15-25 km shell
+// on the Hillaire Rayleigh scale) twice, on its way down and
+// out. The chord integral of the layer's per-channel extinction
+// times the LIVE measured volcScale (volcanic.js's OMPS feed)
+// is the darkening: at background it adds 0.1-0.4 mag
+// (Mallama's clear table stays right); at Pinatubo scale
+// (SAOD675 ~ 0.1) it adds ~3-5 mag with blue dying fastest -
+// the printed behaviour of the 1992-93 dark eclipses, and the
+// reddening-then-black of a volcanic umbra.
+
+// Table 3.1, printed pairs: [distance from shadow centre at the
+// lunar distance, km; ray minimum altitude, km].
+export const RAY_MIN_ALT = [
+  [6435, 64],
+  [6420, 50],
+  [6395, 37],
+  [6338, 32],
+  [6142, 25],
+  [5604, 18],
+  [3724, 8],
+  [-1620, 0]
+];
+
+// Mean-geometry defaults; the theme feeds the live radii.
+export const DEFAULT_PEN_RAD = 0.0213;
+export const DEFAULT_DIST_KM = 384400;
+
+import {stratBeta, STRAT_BASE_M, STRAT_TOP_M} from './stratos.js';
+
+// The ray's minimum altitude (m) at shadow position pos.
+export function rayMinAltM(
+  pos,
+  penRad = DEFAULT_PEN_RAD,
+  distKm = DEFAULT_DIST_KM
+) {
+  const dKm = (1 - pos) * penRad * distKm;
+  const t = RAY_MIN_ALT;
+  if (dKm >= t[0][0]) return 1e6; // outside the refracted field
+  for (let i = 1; i < t.length; i++) {
+    if (dKm >= t[i][0]) {
+      const f = (dKm - t[i - 1][0]) / (t[i][0] - t[i - 1][0]);
+      return (t[i - 1][1] + f * (t[i][1] - t[i - 1][1])) * 1000;
+    }
+  }
+  return 0;
+}
+
+const RB = 6360e3;
+// Extra magnitudes of extinction at channel c and shadow
+// position pos: the exact chord of the ray (tangent height from
+// the printed table) through the stratospheric shell, times the
+// measured volcScale. 1.0857 = 2.5 / ln 10.
+export function volcanicMagExtra(
+  c,
+  pos,
+  volcScale = 1,
+  penRad = DEFAULT_PEN_RAD,
+  distKm = DEFAULT_DIST_KM
+) {
+  const ht = rayMinAltM(pos, penRad, distKm);
+  if (ht >= STRAT_TOP_M) return 0;
+  const rt = RB + ht;
+  const seg = (rr) => {
+    const q = (RB + rr) * (RB + rr) - rt * rt;
+    return q > 0 ? Math.sqrt(q) : 0;
+  };
+  const sTop = seg(STRAT_TOP_M);
+  const s0 = ht < STRAT_BASE_M ? seg(STRAT_BASE_M) : 0;
+  let tau = 0;
+  const N = 32;
+  for (let i = 0; i < N; i++) {
+    const sp = s0 + ((i + 0.5) / N) * (sTop - s0);
+    const h = Math.sqrt(rt * rt + sp * sp) - RB;
+    tau += stratBeta(c, h) * ((sTop - s0) / N);
+  }
+  return 1.0857362 * 2 * tau * volcScale;
 }

@@ -6,8 +6,12 @@ import {
   UMBRA_MAG_LOST,
   umbralMagLost,
   umbralFactor,
-  buildUmbraLUT
+  buildUmbraLUT,
+  RAY_MIN_ALT,
+  rayMinAltM,
+  volcanicMagExtra
 } from './lunar-umbra.js';
+import {chainAOD675} from './volcanic.js';
 import {lunarEclipse} from './eclipses.js';
 import {MOON_FULL_VMAG} from './moonlight.js';
 
@@ -122,7 +126,7 @@ const BASE = {B: -11.82, G: -12.73, R: -13.64};
   // LUT is the table (spot row).
   const ratio = Math.pow(10, 0.4 * (1.44 - BASE.G));
   const deepG = umbralFactor(1, 1);
-  const lut = buildUmbraLUT(64);
+  const lut = buildUmbraLUT(64, 0);
   const ok =
     ratio > 3e5 &&
     ratio < 6e5 &&
@@ -134,6 +138,38 @@ const BASE = {B: -11.82, G: -12.73, R: -13.64};
     'half-million ratio and the measured umbra',
     ok,
     `integrated span ratio ${ratio.toExponential(2)} ("nearly one-half million"); deep-umbra green ${deepG.toExponential(2)} vs Ugolnikov's measured ~1e-6; LUT ends exact`
+  );
+}
+
+{
+  // The volcanic coupling: Table 3.1's printed ray altitudes
+  // verbatim and monotone (deeper shadow = lower graze); the
+  // background stratosphere adds only tenths of a magnitude
+  // (Mallama's clear table stays right at volcScale 1); at the
+  // Pinatubo scale - SAOD675 = 0.1 through the LIVE feed's own
+  // conversion - the centre darkens by the observed magnitudes
+  // (his Fig. 5.1 outliers sit ~3-4 mag under the clear model)
+  // with blue dying fastest; and the extra is exactly linear in
+  // the measured volcScale.
+  const okTab =
+    RAY_MIN_ALT[1][0] === 6420 &&
+    RAY_MIN_ALT[1][1] === 50 &&
+    RAY_MIN_ALT[6][0] === 3724 &&
+    RAY_MIN_ALT[6][1] === 8 &&
+    rayMinAltM(0.5) > rayMinAltM(1.0);
+  const bgG = volcanicMagExtra(1, 1, 1);
+  const vs = 0.1 / chainAOD675();
+  const pR = volcanicMagExtra(0, 1, vs);
+  const pG = volcanicMagExtra(1, 1, vs);
+  const pB = volcanicMagExtra(2, 1, vs);
+  const lin =
+    Math.abs(volcanicMagExtra(1, 1, 2) - 2 * volcanicMagExtra(1, 1, 1)) < 1e-12;
+  const ok =
+    okTab && bgG < 0.25 && pG > 3 && pG < 5.5 && pB > pG && pG > pR && lin;
+  check(
+    'volcanic coupling (the live stratosphere)',
+    ok,
+    `ray altitudes verbatim, monotone; background centre extra ${bgG.toFixed(2)} mag; Pinatubo scale (volcScale ${vs.toFixed(1)}) R/G/B +${pR.toFixed(1)}/+${pG.toFixed(1)}/+${pB.toFixed(1)} mag (observed ~3-4 in V), blue fastest; exactly linear in volcScale`
   );
 }
 
