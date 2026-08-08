@@ -1294,6 +1294,36 @@ export function createRedSpriteMaterial() {
   return {material, u};
 }
 
+// Light pillar quad (lightpillars.js law): the diamond-dust
+// image column over a city lamp - flat body (every height inside
+// the layer mirrors somewhere along the sightline), the top
+// softened over the tilt fold's share of the column (uSoft,
+// computed CPU-side from the gated pillarProfile law - this
+// node graph is its renderer twin), a thin horizontal Gaussian
+// at the booked tilt width, the lamp's own warm tint.
+export function createLightPillarMaterial() {
+  const u = {
+    amp: uniform(0),
+    uSoft: uniform(0.15),
+    uCol: uniform(new Vector3(1, 0.82, 0.55))
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = DoubleSide;
+  material.blending = AdditiveBlending;
+  const v = uv().y;
+  const x = uv().x.sub(0.5).mul(2.0);
+  const body = clamp(v.div(0.06), 0.0, 1.0);
+  const te = max(v.sub(float(1.0).sub(u.uSoft)).div(u.uSoft), 0.0);
+  const top = exp(te.mul(te).mul(-3.0));
+  const across = exp(x.mul(x).mul(-2.2));
+  const a = body.mul(top).mul(across).mul(u.amp);
+  material.colorNode = u.uCol.mul(a);
+  material.opacityNode = clamp(a, 0.0, 1.0);
+  return {material, u};
+}
+
 // Nacreous (mother-of-pearl) cloud material - psc.js physics: the
 // certified Airy iridescence LUT (rows = the printed 1.9-3.0 um
 // wave-ice size span, columns = scattering angle) sampled at each

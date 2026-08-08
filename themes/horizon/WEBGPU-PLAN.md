@@ -7336,6 +7336,53 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   closed), and the second hit came from cache in 1.4 ms.
   Deploy = push to main; the box gates the full CPU suite
   itself before installing.
+- DONE (Aug 8, the review session's 74th pass - light pillars:
+  the aerodrome's own ice-crystal report over the measured city
+  lights). First, a survey CLOSED without code: the green
+  rim/flash needs nothing - refraction.js already ships Ciddor
+  dispersion, Auer & Standish ray tracing on the measured
+  profile, van der Werf transfer curves with fold counting, the
+  derived ducting criterion and the gated x8.8 mirage
+  magnification of the green-not-red sliver ("Young's magnified
+  rim IS the naked-eye flash") - the earlier idea list
+  underestimated the shipped refraction pass. The NEW layer:
+  light pillars. Primaries, both open, both read: Zeng 2018
+  (JAMES - diamond dust "forms at temperatures typically less
+  than -10 degC", is "usually composed of well-developed
+  crystals (often plates)", arctic winter frequency 20-50%) and
+  Ricaud et al. 2017 (ACP, the Dome C lidar episodes - diamond
+  dust/ice fog "in the planetary boundary layer to a maximum
+  altitude of 100-300 m above the ground"). lightpillars.js
+  carries the printed frame and the EXACT catoptrics: a basal
+  mirror at height h images a ground light at 2h, so the layer
+  paints a column of top elevation atan(2H/d) - drawn as the 2H
+  image column over each lamp in the box's own asinh datum,
+  wide by the BOOKED plate tilt at true range (Breon &
+  Dubrulle's ~1 deg through the sun pillar's sqrt(2) mirror
+  fold - the pass adds NO new physical constant), top softened
+  by the fold's share of the column (relatively wider for far
+  lights, as the geometry says). THE OCCURRENCE GATE IS A
+  MEASUREMENT: METAR present-weather 'IC' from the station the
+  theme already reads - the aerodrome reported crystals in the
+  air; no coded temperature threshold anywhere (Zeng's -10 degC
+  is carried as documentation). The strongest PILLAR_N lamps by
+  radiance-over-range-squared carry quads rebuilt on the
+  lights' cadence; the frame loop drives amplitude only
+  (lightsNight x the report x the lamp's own calibrated
+  brightness x one documented PILLAR_GAIN). 6-landmark gate
+  (registered after nightlights): the printed frame; no-new-
+  constant; atan(2H/d) towering-near/stub-far with fails-closed
+  zeros; the tilt width at range (49 m half-width at 2 km);
+  the IC code-group test (BLSN/DRSN/FZFG/'ICE' all rejected);
+  the flat-body tilt-fold profile. One capture bug caught and
+  fixed: PILLAR_SIGMA_ALT arrived twice (halos.js already
+  exports it for the sun pillar; the duplicate import
+  PAGEERRORed - the re-export note now sits on the import).
+  Pinned A/B (Calgary winter night, pillars=1 vs 0): the
+  amplified diff is a textbook pillar forest - thin warm
+  columns, tall over near lamps and short over far ones, soft
+  tops, cleanly isolated over the star field. Full gate green -
+  111 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

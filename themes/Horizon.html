@@ -202,7 +202,9 @@
         the STEVE episode+activity for the harness / never draw
         the subauroral ribbon), aeronet=URL|0 (daemon endpoint
         override for the measured-AOD station feed / skip the
-        measured override, model only), soil=0 (pin
+        measured override, model only), pillars=1|0 (pin the
+        METAR ice-crystal report for the harness / never draw
+        light pillars), soil=0 (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
         (skip satellite irradiance), ghi=W (override it), debug=1,
@@ -401,6 +403,7 @@
         createMeteorMaterial,
         createContrailMaterial,
         createFlashMaterial,
+        createLightPillarMaterial,
         createNacreousMaterial,
         createSteveMaterial,
         createRedSpriteMaterial,
@@ -804,6 +807,15 @@
         TAU_WAVE,
         WAVE_ICE_D_UM
       } from './horizon/psc.js';
+      // (PILLAR_SIGMA_ALT already arrives from halos.js for the
+      // sun pillar - lightpillars.js re-exports the same binding.)
+      import {
+        DD_LAYER_DRAWN_M,
+        diamondDustReported,
+        pillarColumnM,
+        pillarHalfWidthM,
+        pillarTopRad
+      } from './horizon/lightpillars.js';
       import {
         STEVE_KR,
         STEVE_LAM_RED,
@@ -4526,6 +4538,17 @@
           '/default/{d}/GoogleMapsCompatible_Level8/{z}/{r}/{c}.png';
       let lightsSeq = 0;
       let lampPts = null;
+      // Light pillars: the diamond-dust image columns over the
+      // strongest nearby lamps (lightpillars.js - Ricaud's printed
+      // 100-300 m layer, the booked plate tilt, METAR's own IC
+      // report as the gate). Geometry rebuilds on the lights'
+      // cadence; the frame loop drives amplitude only. One
+      // documented display gain against the lamps' own calibrated
+      // brightness.
+      const PILLAR_N = 14;
+      const PILLAR_GAIN = 0.5;
+      let pillarPool = [];
+      let pillarSaid = false;
       let lampMat = null;
       let lampNightU = null;
       async function syncLights() {
@@ -4657,6 +4680,56 @@
           lampPts = new THREE.Points(lg, lampMat);
           lampPts.frustumCulled = false;
           scene.add(lampPts);
+          // The pillar pool: the PILLAR_N strongest lamps by
+          // radiance over range-squared carry the image columns.
+          // Each quad stands EXACTLY 2H over its lamp (the mirror
+          // image of the printed layer, lightpillars.js) in the
+          // box's own asinh datum, with the booked tilt width at
+          // the lamp's true range and the tilt fold's share of
+          // the column as the top softness.
+          for (const p of pillarPool) {
+            scene.remove(p.mesh);
+            p.mesh.geometry.dispose();
+          }
+          pillarPool = [];
+          const pcand = lamps
+            .map((L) => ({
+              L,
+              s: L.rad / (L.x * L.x + L.z * L.z + 400)
+            }))
+            .sort((a, b) => b.s - a.s)
+            .slice(0, PILLAR_N);
+          for (const {L} of pcand) {
+            const g = sample(L.x, L.z);
+            const y0 = g.y + 0.05;
+            const eLamp = elevOfY(g.y, centerElev);
+            const yTop = yOfElev(eLamp + pillarColumnM(), centerElev);
+            const hU = Math.max(yTop - y0, 0.5);
+            const dM = Math.max(Math.hypot(L.x, L.z) * MPU, 60);
+            const wU = Math.max((2 * pillarHalfWidthM(dM)) / MPU, 0.12);
+            const pm = createLightPillarMaterial();
+            pm.u.uSoft.value = Math.min(
+              Math.max(
+                PILLAR_SIGMA_ALT / Math.max(pillarTopRad(dM), 1e-6),
+                0.05
+              ),
+              0.45
+            );
+            pm.u.uCol.value.set(LAMP_TINT[0], LAMP_TINT[1], LAMP_TINT[2]);
+            const mesh = new THREE.Mesh(
+              new THREE.PlaneGeometry(1, 1),
+              pm.material
+            );
+            mesh.position.set(L.x, (y0 + yTop) / 2, L.z);
+            mesh.scale.set(wU, hU, 1);
+            mesh.visible = false;
+            scene.add(mesh);
+            pillarPool.push({
+              mesh,
+              u: pm.u,
+              b: 0.35 + 0.65 * Math.sqrt(Math.min(L.rad / LAMP_FULL, 1))
+            });
+          }
           // The town's walls sample the SAME measured field for
           // their window glow - re-seat the standing buildings so
           // the attribute picks up the fresh radiances.
@@ -11705,6 +11778,46 @@
         if (lampNightU) lampNightU.value = lightsNight;
         if (lampPts) lampPts.visible = lightsNight > 0;
         if (bldNightU) bldNightU.value = lightsNight;
+        // Light pillars: amplitude only - the aerodrome's own IC
+        // report (diamond dust) over the night-gated lamps, the
+        // geometry standing from the lights' cadence. ?pillars=1
+        // pins the report for the harness; =0 removes the layer.
+        {
+          const pOv = params.get('pillars');
+          const icNow =
+            pOv === '1' ||
+            (pOv !== '0' &&
+              state.metar &&
+              Date.now() - state.metar.at < 90 * 60e3 &&
+              diamondDustReported(state.metar.wx));
+          const pAmp = icNow ? lightsNight * PILLAR_GAIN : 0;
+          for (const p of pillarPool) {
+            p.mesh.visible = pAmp > 1e-3;
+            if (!p.mesh.visible) continue;
+            p.u.amp.value = pAmp * p.b;
+            // Yaw-only billboard: the column faces the camera but
+            // stays vertical.
+            p.mesh.lookAt(
+              camera.position.x,
+              p.mesh.position.y,
+              camera.position.z
+            );
+          }
+          if (pAmp > 1e-3 && pillarPool.length && !pillarSaid) {
+            pillarSaid = true;
+            record(
+              'light pillars (METAR ice crystals)',
+              (state.metar && state.metar.wx ? state.metar.wx : 'IC pinned') +
+                ' · image columns 2×' +
+                DD_LAYER_DRAWN_M +
+                ' m over ' +
+                pillarPool.length +
+                ' lamps · tilt ±' +
+                ((PILLAR_SIGMA_ALT * 180) / Math.PI).toFixed(1) +
+                '°'
+            );
+          }
+        }
         terrainUniforms.uWindVec.value.set(windV.x, windV.z);
         terrainUniforms.uSunDirW.value.copy(sunVec);
         // Near sea/snow glitter on the physical beam: the terrain
