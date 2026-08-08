@@ -6175,6 +6175,34 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   ramp; airglow keeps its frame (it IS the background, not a
   feature on it - documented); clouds still occlude. VALIDATE
   PASS (all references + 7 GPU probes).
+- DONE (aurora-visibility source hunt, Aug 8 fifty-second push
+  - a hunt record, no code): the named lead was to put the
+    aurora's naked-eye visibility on the shipped Crumey threshold
+    via the rayleigh unit and the IBC brightness classes. The
+    hunt's verified outcomes: Hunten, Roach & Chamberlain 1956
+    (JATP 8, 309 - the paper that DEFINES the rayleigh and the
+    IBC scale) is CLOSED - the ADS scan returns AccessDenied
+    (Elsevier-era JATP; ADS only serves society-journal scans)
+    and unpaywall confirms no open copy; Sigernes et al. 2014
+    (GI 3, 241, Copernicus - fetched and checked) is open but is
+    spectral calibration only (R/Angstrom), printing neither the
+    IBC classes nor visual-brightness anchors. The deeper
+    blocker found on inspection: the drawn curtain's absolute
+    brightness chain is deliberately display-calibrated
+    (aurora-lut's own documented split - "profiles are the
+    physics, gains are exposure") because the absolute
+    photons-per-ion-pair yields live in book-only sources (Rees
+    1989 ch. 3, Chamberlain 1961); without them an honest kR
+    level for the drawn curtain cannot be constructed, whatever
+    the threshold law. NEXT-WINDOW ROUTES, in order: (1) the
+    AGU/Wiley open digitisation of Chamberlain 1961 (Physics of
+    the Aurora and Airglow was re-issued in the AGU Classics
+    series) for the printed yields AND the IBC definitions in
+    one source; (2) an open Fang-lineage paper printing the
+    35.5 eV per ion pair and 5577 yield chain; (3) failing both,
+    the aurora keeps its documented display frame - the same
+    honest state the extended-source features held between the
+    fiftieth verdict and the Crumey unblock.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
