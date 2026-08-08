@@ -23,7 +23,11 @@ import {
   MOONSKY_E_G,
   MOONSKY_E_R,
   scotopicY,
-  skyTransferE
+  skyTransferE,
+  limitingMagnitude,
+  DETECT_HALF_MAG,
+  NL_TO_CDM2,
+  COLOR_LIMIT_NL
 } from './adaptation.js';
 import {NATURAL_MCD, NATURAL_MAG} from './skyglow.js';
 import {SUN_VMAG} from './moonlight.js';
@@ -266,6 +270,54 @@ const check = (name, ok, detail) => {
     'display map: anchored day, adapted night',
     ok,
     `anchor ${LA_DAY_ANCHOR_CDM2.toFixed(0)} cd/m^2 -> ${EXPO_DAY} exact; civil twilight ${adaptExposure(0.22).toExponential(2)}; full-moon ${adaptExposure(5e-3).toExponential(2)}; NaN -> day`
+  );
+}
+
+{
+  // Schaefer's naked-eye limiting magnitude at its own printed
+  // numbers: the worked example EXACT (B = 136 nL, k_v = 0.3 ->
+  // 6.05, "in excellent agreement with common lore"); his
+  // printed sky pairings against the module's own
+  // Falchi-anchored bridge (21.0 mag/arcsec^2 <-> 136 nL, 21.8
+  // <-> 65 nL - two independent printed conversions within a
+  // few percent); the day branch puts the daytime limit near
+  // -4, so Venus at greatest brilliancy (-4.8) pierces daylight
+  // while Jupiter (-2.9 at best) cannot - the classic; the
+  // moonlit and light-polluted skies land on lore (full-moon
+  // zenith ~4-5); monotone in B; and the branch seam sits at
+  // the SAME printed 1500 nL as the colour floor.
+  const mTyp = limitingMagnitude(136 * NL_TO_CDM2);
+  const mBest = limitingMagnitude(65 * NL_TO_CDM2);
+  const bridge21 = magArcsec2ToCdM2(21.0) / NL_TO_CDM2;
+  const bridge218 = magArcsec2ToCdM2(21.8) / NL_TO_CDM2;
+  const mDay = limitingMagnitude(5000);
+  const mMoon = limitingMagnitude(1100 * NL_TO_CDM2);
+  let mono = true;
+  let prev = Infinity;
+  for (let lg = -1; lg <= 10; lg += 0.25) {
+    const m = limitingMagnitude(Math.pow(10, lg) * NL_TO_CDM2);
+    if (m > prev + 1e-9) mono = false;
+    prev = m;
+  }
+  const ok =
+    Math.abs(mTyp - 6.05) < 0.01 &&
+    mBest > 6.2 &&
+    mBest < 6.7 &&
+    Math.abs(bridge21 / 136 - 1) < 0.06 &&
+    Math.abs(bridge218 / 65 - 1) < 0.06 &&
+    mDay > -4.6 &&
+    mDay < -3.8 &&
+    -4.8 < mDay &&
+    mDay < -2.9 &&
+    mMoon > 3.8 &&
+    mMoon < 5.2 &&
+    mono &&
+    Math.abs(Math.log10(COLOR_LIMIT_NL) - 3.17) < 0.01 &&
+    DETECT_HALF_MAG === 0.5;
+  check(
+    'Schaefer limiting magnitude (printed anchors)',
+    ok,
+    `typical sky 136 nL -> ${mTyp.toFixed(2)} (printed 6.05 exact); best sky 65 nL -> ${mBest.toFixed(2)} vs the catalogue's 6.5 limit; bridge pairings 21.0 -> ${bridge21.toFixed(0)} nL (printed 136), 21.8 -> ${bridge218.toFixed(0)} nL (printed 65); daylight 5000 cd/m^2 -> ${mDay.toFixed(2)} (Venus -4.8 visible, Jupiter -2.9 not); full-moon sky -> ${mMoon.toFixed(2)} (lore 4-5); monotone; seam = the printed 1500 nL colour floor; +-${DETECT_HALF_MAG} mag printed detection width`
   );
 }
 

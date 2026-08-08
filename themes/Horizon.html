@@ -325,6 +325,7 @@
       import {
         adaptExposure,
         E0_LUX,
+        limitingMagnitude,
         lum3,
         mesopicBlend,
         scotopicY,
@@ -7087,6 +7088,7 @@
           const pos = [];
           const color = [];
           const size = [];
+          const magArr = [];
           const col = new THREE.Color();
           for (const [ra, dec, mag, kelvin] of stars) {
             const raR = ra * RAD;
@@ -7106,6 +7108,7 @@
             col.setRGB(tr, tg, tb);
             color.push(col.r, col.g, col.b);
             size.push(THREE.MathUtils.clamp(7.5 - mag, 1.8, 7.5));
+            magArr.push(mag);
           }
           // Scintillation: Kolmogorov turbulence makes twinkle grow
           // with airmass (~sec z), so horizon stars shimmer and zenith
@@ -7115,7 +7118,8 @@
           starObj = createStarSprites(
             new Float32Array(pos),
             new Float32Array(color),
-            new Float32Array(size)
+            new Float32Array(size),
+            new Float32Array(magArr)
           );
           celestial.add(starObj.mesh);
           record(
@@ -8971,15 +8975,18 @@
         {
           const pp = planetObj.posAttr;
           const ps = planetObj.sizeAttr;
+          const pm = planetObj.magAttr;
           for (let i = 0; i < PLANETS.length; i++) {
             const pl = astro.planets[i];
             if (!pl) continue;
             const v = skyPoint(pl.alt, pl.az, 860);
             pp.setXYZ(i, v.x, v.y, v.z);
             ps.setX(i, THREE.MathUtils.clamp(6 - pl.mag * 1.4, 2, 9.5));
+            pm.setX(i, pl.mag);
           }
           pp.needsUpdate = true;
           ps.needsUpdate = true;
+          pm.needsUpdate = true;
         }
         // The comet, when one is bright enough to exist here:
         // head through the planets' own size law; the tail quad
@@ -8994,6 +9001,8 @@
             const v = skyPoint(c.head.alt, c.head.az, 858);
             cp.setXYZ(0, v.x, v.y, v.z);
             cs.setX(0, THREE.MathUtils.clamp(6 - c.mag * 1.4, 2, 9.5));
+            cometObj.magAttr.setX(0, c.mag);
+            cometObj.magAttr.needsUpdate = true;
             const tv = skyPoint(c.tail.alt, c.tail.az, 858);
             const dir = tv.clone().sub(v);
             const len = dir.length();
@@ -9022,8 +9031,16 @@
               pa.needsUpdate = true;
               cometTailGeo.computeBoundingSphere();
               const bright = THREE.MathUtils.clamp((6.5 - c.mag) / 6, 0, 1);
+              // The tail follows the head through the same Schaefer
+              // gate (last frame's limiting magnitude, the printed
+              // +-0.5 mag ramp); u.night is the cloud occlusion.
+              const headVis = THREE.MathUtils.clamp(
+                planetObj.u.limMag.value - c.mag + 0.5,
+                0,
+                1
+              );
               cometTailMat.opacity =
-                planetObj.u.night.value * lpVis * bright * 0.35;
+                planetObj.u.night.value * headVis * bright * 0.35;
               cometTail.visible = cometTailMat.opacity > 0.004;
               // the dust strips: one per syndyne of the fan,
               // each widening with grain age (older dust has
@@ -9057,7 +9074,14 @@
                   da.needsUpdate = true;
                   mesh.geometry.computeBoundingSphere();
                   mesh.material.opacity =
-                    (planetObj.u.night.value * lpVis * bright * 0.32) /
+                    (planetObj.u.night.value *
+                      THREE.MathUtils.clamp(
+                        planetObj.u.limMag.value - c.mag + 0.5,
+                        0,
+                        1
+                      ) *
+                      bright *
+                      0.32) /
                     DUST_BETAS.length;
                   mesh.visible = mesh.material.opacity > 0.002;
                 }
@@ -9919,7 +9943,17 @@
           ambient.groundColor.copy(tmpB).multiplyScalar(0.4);
         }
         if (starObj) {
-          starObj.u.night.value = nightSky * (1 - cloudy * 0.85) * lpVis;
+          // The stars' gate is now Schaefer's printed threshold at
+          // the frame's own adaptation sky (limitingMagnitude of
+          // laCd - twilight, moonlight and the measured skyglow all
+          // live inside laCd already): each star fades in over the
+          // printed +-0.5 mag detection width at its own catalogue
+          // magnitude, so the sky fills in magnitude order at dusk
+          // and thins the same way under a full moon or city glow.
+          // The hand twilight ramp and the lpVis contrast stand-in
+          // are retired for point sources; clouds still occlude.
+          starObj.u.night.value = 1 - cloudy * 0.85;
+          starObj.u.limMag.value = limitingMagnitude(laCd);
           starObj.u.time.value = t / 1000;
           // The catalogue tints grey with the rods (Schaefer's
           // printed 1500 nL point-source colour floor - the same
@@ -10703,12 +10737,16 @@
         // glows warm rather than black).
         lpGlowObj.u.alpha.value =
           lpGlowAmp * nightSky * 0.22 * (1 + cloudy * 0.8);
-        // Venus and Jupiter pierce twilight a little before the stars.
-        planetObj.u.night.value =
-          THREE.MathUtils.clamp(nightSky * 1.6, 0, 1) *
-          (1 - cloudy * 0.85) *
-          lpVisBright;
+        // Planets and comets ride the same Schaefer threshold as
+        // the stars - Venus clears the twilight limit long before
+        // any star (and pierces daylight near greatest brilliancy,
+        // the classic), Mercury waits for real darkness. The hand
+        // x1.6 "pierce twilight" factor is retired; clouds still
+        // occlude.
+        planetObj.u.night.value = 1 - cloudy * 0.85;
+        planetObj.u.limMag.value = limitingMagnitude(laCd);
         cometObj.u.night.value = planetObj.u.night.value;
+        cometObj.u.limMag.value = planetObj.u.limMag.value;
         moonDisc.visible = moon.alt > -0.05;
 
         // The Water plane: the FFT ocean advances on REAL seconds

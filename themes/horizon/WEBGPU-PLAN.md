@@ -6040,6 +6040,41 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   engine, now corroborated against the printed frame. Night
   full-page smoke clean with six planets. VALIDATE PASS (all
   references + 7 GPU probes).
+- DONE (star visibility, Aug 8 forty-seventh push - the stars
+  appear in magnitude order): every point source shared one
+  hand twilight ramp (nightSky on sun altitude), planets got a
+  hand x1.6 "pierce twilight" factor, and light pollution
+  dimmed stars through the 1/(1+r) stand-in. All three retire
+  behind Schaefer's PRINTED threshold law (PASP 102, 212, both
+  1990 papers on disk, reread): adaptation.js gains
+  limitingMagnitude(B) - the Knoll-Tousey-Hulburt/Hecht
+  two-branch threshold (Eq. 2, printed constants, day/night
+  split at the printed log B = 3.17 which IS the module's own
+  1500 nL colour floor), the Allen anchor (Eq. 16), and his
+  assembled naked-eye Eq. 18 - whose printed worked example
+  (136 nL, k_v 0.3 -> 6.05, "in excellent agreement with
+  common lore") the gate reproduces EXACTLY, with his printed
+  sky pairings (21.0 <-> 136 nL, 21.8 <-> 65 nL) agreeing with
+  the module's own Falchi-anchored bridge to 1%. Every star,
+  planet and comet sprite now carries its V magnitude and
+  fades in over the PRINTED +-0.5 mag Blackwell detection
+  width around the frame's limiting magnitude, computed from
+  laCd - the adaptation sky that already contains twilight,
+  moonlight and the measured Falchi skyglow. What EMERGES:
+  the dusk sky fills in magnitude order (Venus, then Sirius
+  and Jupiter, the 6.5 tail last); the daytime limit sits at
+  -4.3, so Venus near greatest brilliancy pierces daylight
+  while Jupiter cannot (the classic, gated); a full-moon sky
+  reads limiting magnitude 4.3 (lore 4-5) and a Bortle-8 city
+  keeps only its bright stars - the Bortle scale emerges from
+  the measured atlas through one printed law; and during
+  totality laCd collapses so the stars come out over the
+  eclipsed sun by the same threshold, nothing special-cased.
+  The best-sky limit lands at 6.5 - the catalogue's own
+  naked-eye cut, closing the loop. Meteors keep their
+  population-rate frame (transients, documented scope).
+  Twilight full-page smoke clean. VALIDATE PASS (all
+  references + 7 GPU probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

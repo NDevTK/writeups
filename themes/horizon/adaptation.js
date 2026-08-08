@@ -188,6 +188,48 @@ export const NL_TO_CDM2 = 3.18e-6;
 export const COLOR_LIMIT_NL = 1500;
 export const COLOR_LIMIT_CDM2 = COLOR_LIMIT_NL * NL_TO_CDM2;
 
+// ---- naked-eye limiting magnitude (Schaefer 1990) ----
+// Schaefer, "Telescopic limiting magnitudes" (PASP 102, 212 -
+// read in full): the Knoll-Tousey-Hulburt threshold as
+// summarised by Hecht, his Eq. 2 with the printed constants -
+// I = C (1 + [K B]^0.5)^2, log C = -9.80 / log K = -1.90 for
+// night vision and log C = -8.35 / log K = -5.90 for day, split
+// at the printed log B = 3.17 (B in nanoLamberts - the SAME
+// printed 1500 nL boundary as this module's colour floor); the
+// Allen anchor m = -16.57 - 2.5 log I* (his Eq. 16); and his
+// assembled naked-eye zenith equation (Eq. 18):
+//   m_z = 8.68 - 1.2 k_v - 5 log(1 + 0.158 sqrt(B_nL)),
+// whose printed worked example - B = 136 nL, k_v = 0.3 gives
+// 6.05, "in excellent agreement with common lore" - the gate
+// reproduces exactly, along with his printed nL pairings for
+// 21.0 and 21.8 mag/arcsec^2 skies (136 and 65 nL). The day
+// branch assembles the same way from Eq. 2's printed day
+// constants with the printed day extinction q = 1.0 (Eq. 3)
+// and no colour correction (Eq. 13) - and puts the daytime
+// naked-eye limit near -4: Venus stays visible in daylight,
+// Jupiter does not, the classic. The two branches are separate
+// experimental fits that do not quite meet at the seam; the
+// drawn limit blends linearly in log B across +-0.2 dex there
+// (documented). k_v = 0.3 is his printed "more typical
+// weather" extinction. The detection TRANSITION is printed
+// too: Blackwell's 10->50 and 50->90% probability steps are
+// each "roughly half a magnitude" - the sprites fade over
+// +-0.5 mag around this limit.
+export const KV_TYPICAL = 0.3;
+export const DETECT_HALF_MAG = 0.5;
+export function limitingMagnitude(Bcdm2, kv = KV_TYPICAL) {
+  const nL = Math.max(Bcdm2, 1e-9) / NL_TO_CDM2;
+  const logB = Math.log10(nL);
+  const mNight = 8.68 - 1.2 * kv - 5 * Math.log10(1 + 0.158 * Math.sqrt(nL));
+  const mDay =
+    -16.57 +
+    2.5 * 8.35 -
+    kv -
+    5 * Math.log10(1 + Math.pow(10, -5.9 / 2) * Math.sqrt(nL));
+  const t = Math.min(Math.max((logB - 2.97) / 0.4, 0), 1);
+  return mNight * (1 - t) + mDay * t;
+}
+
 // ---- the display map ----
 // EXPO_DAY is the display's ONE remaining unit constant: the
 // exposure the theme's daytime appearance was built at (the old

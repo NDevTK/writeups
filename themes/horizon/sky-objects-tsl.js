@@ -881,25 +881,38 @@ export function createOpticsMaterial(cloudShadow) {
 // Shared machinery for the two point-sprite systems: an InstancedMesh
 // of unit planes, SpriteNodeMaterial billboarding, and a scale node
 // reproducing gl_PointSize (pixels at the projected centre).
-function makeSprites({positions, colors, sizes, opacityFor}) {
+function makeSprites({positions, colors, sizes, mags, opacityFor}) {
   const count = sizes.length;
   const geo = new PlaneGeometry(1, 1);
   const posAttr = new InstancedBufferAttribute(positions, 3);
   const colAttr = new InstancedBufferAttribute(colors, 3);
   const sizeAttr = new InstancedBufferAttribute(sizes, 1);
+  // Per-sprite V magnitude, for the Schaefer visibility threshold
+  // (adaptation.js limitingMagnitude). Callers that do not pass
+  // mags get sprites that ignore the threshold (mag -99).
+  const magAttr = new InstancedBufferAttribute(
+    mags || new Float32Array(count).fill(-99),
+    1
+  );
   const material = new SpriteNodeMaterial();
   material.transparent = true;
   material.depthWrite = false;
   const center = instancedBufferAttribute(posAttr);
   const colorA = instancedBufferAttribute(colAttr);
   const sizeA = instancedBufferAttribute(sizeAttr);
+  const magA = instancedBufferAttribute(magAttr);
   material.positionNode = center;
   // gl_PointSize is pixels at the centre's projected depth: a quad of
   // world height sizePx * 2*viewZ / (screenH * P[1][1]) rasterizes to
   // the same sizePx pixels.
   const viewZ = modelViewMatrix.mul(vec4(center, 1.0)).z.negate();
   const p11 = cameraProjectionMatrix.element(1).element(1);
-  const {sizeNode, opacityNode, colorNode} = opacityFor(center, sizeA, colorA);
+  const {sizeNode, opacityNode, colorNode} = opacityFor(
+    center,
+    sizeA,
+    colorA,
+    magA
+  );
   material.scaleNode = sizeNode.mul(2.0).mul(viewZ).div(screenSize.y.mul(p11));
   // gl_PointCoord's radial mask on the quad's own uv
   const d = length(uv().sub(0.5));
@@ -907,7 +920,7 @@ function makeSprites({positions, colors, sizes, opacityFor}) {
   material.opacityNode = opacityNode.mul(smoothstep(0.2, 0.5, d).oneMinus());
   const mesh = new InstancedMesh(geo, material, count);
   mesh.frustumCulled = false;
-  return {mesh, posAttr, sizeAttr};
+  return {mesh, posAttr, sizeAttr, magAttr};
 }
 
 // PCG hash (Jarzynski & Olano 2020, "Hash Functions for GPU
@@ -941,12 +954,20 @@ const pcg = (v) => {
 // shadowRate; documented display division of a ~500 Hz process).
 // The size stays fixed: scintillation is an intensity phenomenon;
 // image wander is sub-sprite at this scale.
-export function createStarSprites(positions, colors, sizes) {
+export function createStarSprites(positions, colors, sizes, mags) {
   const u = {
     night: uniform(0),
     time: uniform(0),
     twRate: uniform(9),
     sigZen: uniform(youngSigma(EYE_D_CM, 1)),
+    // Schaefer's naked-eye limiting magnitude at the current sky
+    // (adaptation.js limitingMagnitude, fed per frame): each star
+    // fades in over the PRINTED +-0.5 mag detection width
+    // (Blackwell's 10-50-90% steps) around its own catalogue
+    // magnitude - the stars appear in magnitude order at dusk,
+    // Sirius first and the 6.5 tail last, and a light-polluted
+    // or moonlit sky keeps its faint tail dark by the same law.
+    limMag: uniform(99),
     // The point-source colour floor (Schaefer 1993 Sec. 2.12,
     // via adaptation.js COLOR_LIMIT: 1500 nL, corroborating the
     // Ferwerda mesopic edge to 15% - gated): below the mesopic
@@ -964,7 +985,8 @@ export function createStarSprites(positions, colors, sizes) {
     positions,
     colors,
     sizes,
-    opacityFor: (center, sizeA, colorA) => {
+    mags,
+    opacityFor: (center, sizeA, colorA, magA) => {
       const alt = max(
         normalize(modelWorldMatrix.mul(vec4(center, 1.0)).xyz).y,
         0.04
@@ -1010,9 +1032,13 @@ export function createStarSprites(positions, colors, sizes) {
       const Ys = Yc.mul(
         Yc.add(Zc).div(max(Xc, 1e-12)).add(1.0).mul(1.33).sub(1.68)
       ).div(2.31);
+      // The Schaefer visibility gate: the printed +-0.5 mag
+      // Blackwell detection ramp around the current limiting
+      // magnitude (0 at limMag - 0.5 below the star, 1 at +0.5).
+      const vis = smoothstep(float(-0.5), float(0.5), u.limMag.sub(magA));
       return {
         sizeNode: sizeA,
-        opacityNode: u.night.mul(I),
+        opacityNode: u.night.mul(I).mul(vis),
         colorNode: mix(vec3(Ys), colorA, u.scotB)
       };
     }
@@ -1022,18 +1048,26 @@ export function createStarSprites(positions, colors, sizes) {
 
 // Naked-eye planets: fixed pixel size, night-gated discs at their
 // live ephemeris positions (write posAttr + needsUpdate at 1 Hz).
-export function createPlanetSprites(positions, colors, sizes) {
-  const u = {night: uniform(0)};
-  const {mesh, posAttr, sizeAttr} = makeSprites({
+export function createPlanetSprites(positions, colors, sizes, mags) {
+  // limMag: the same Schaefer threshold the stars ride - Venus
+  // (mag -4.6) clears the daytime/twilight limit long before any
+  // star, Mercury near +0.2 waits for real darkness, exactly the
+  // sky's own order. Callers write magAttr per frame beside the
+  // ephemeris positions.
+  const u = {night: uniform(0), limMag: uniform(99)};
+  const {mesh, posAttr, sizeAttr, magAttr} = makeSprites({
     positions,
     colors,
     sizes,
-    opacityFor: (center, sizeA) => ({
+    mags,
+    opacityFor: (center, sizeA, colorA, magA) => ({
       sizeNode: sizeA,
-      opacityNode: u.night
+      opacityNode: u.night.mul(
+        smoothstep(float(-0.5), float(0.5), u.limMag.sub(magA))
+      )
     })
   });
-  return {mesh, u, posAttr, sizeAttr};
+  return {mesh, u, posAttr, sizeAttr, magAttr};
 }
 
 // Precipitation particles: the classic PointsMaterial with a soft
