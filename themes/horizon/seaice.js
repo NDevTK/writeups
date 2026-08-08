@@ -293,15 +293,24 @@ import {BODY_GAIN} from './ocean-color.js';
 // area-weighted albedo mix, exact for a fraction (the land
 // measurement stands proxy for snowfall on the adjacent ice, a
 // stated reduction).
-export function iceDisplayRGB(fsc = 0) {
+// The ABSOLUTE diffuse albedo of the drawn ice surface at
+// channel c: bare and snow-covered mixed area-weighted by the
+// measured snow fraction. This is what the dome's ground-bounce
+// and the overcast coupling consume (they run on absolute
+// albedos); the display colour below is the same number in the
+// water body's frame.
+export function iceAlbedoMix(c, fsc = 0) {
   const f = Math.min(Math.max(fsc, 0), 1);
-  const out = [];
-  for (let c = 0; c < 3; c++) {
-    out.push(
-      ((1 - f) * iceAlbedoDiffuse(c) +
-        f * iceAlbedoDiffuse(c, SNOW_ICE_TAU, SNOW_ICE_A_M)) *
-        BODY_GAIN
-    );
-  }
-  return out;
+  return (
+    (1 - f) * iceAlbedoDiffuse(c) +
+    f * iceAlbedoDiffuse(c, SNOW_ICE_TAU, SNOW_ICE_A_M)
+  );
+}
+
+export function iceDisplayRGB(fsc = 0) {
+  return [
+    iceAlbedoMix(0, fsc) * BODY_GAIN,
+    iceAlbedoMix(1, fsc) * BODY_GAIN,
+    iceAlbedoMix(2, fsc) * BODY_GAIN
+  ];
 }

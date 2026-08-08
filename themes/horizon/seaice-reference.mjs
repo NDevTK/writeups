@@ -14,6 +14,7 @@ import {
   iceConcOfRGBA,
   sampleIceConc,
   iceDisplayRGB,
+  iceAlbedoMix,
   SNOW_ICE_TAU,
   SNOW_ICE_A_M
 } from './seaice.js';
@@ -194,6 +195,8 @@ const check = (name, ok, detail) => {
     if (Math.abs(full[c] - snow[c] * BODY_GAIN) > 1e-15) ok = false;
     if (Math.abs(bare[c] - iceAlbedoDiffuse(c) * BODY_GAIN) > 1e-15) ok = false;
     if (!(halfMix[c] > bare[c] && halfMix[c] < full[c])) ok = false;
+    if (Math.abs(iceAlbedoMix(c, 0.5) * BODY_GAIN - halfMix[c]) > 1e-15)
+      ok = false;
   }
   check(
     'snow-covered ice (Table 2 rows)',

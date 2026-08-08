@@ -688,7 +688,8 @@
         SEAICE_LAYER,
         SEAICE_Z,
         sampleIceConc,
-        iceDisplayRGB
+        iceDisplayRGB,
+        iceAlbedoMix
       } from './horizon/seaice.js';
       import {lakeAt, lakeMask, parseWater} from './horizon/lakes.js';
       import {lineStrengths} from './horizon/airglow.js';
@@ -9263,12 +9264,28 @@
           // Payne (1972) open-ocean broadband albedo 0.06 where the
           // box has sea, 0 inland (a land albedo needs its own
           // citation before inland horizons change).
+          // Under measured sea ice the bounce albedo rides from
+          // Payne's 0.06 to the white-ice diffuse albedo (seaice.js,
+          // area-weighted by concentration and the measured snow
+          // fraction) - the sky-view LUT's sea horizon whitens with
+          // the frozen sea, closing the far-sea residual.
+          const seaAlb =
+            seaIceC > 0
+              ? 0.06 +
+                seaIceC *
+                  (lum3(
+                    iceAlbedoMix(0, snowFSC || 0),
+                    iceAlbedoMix(1, snowFSC || 0),
+                    iceAlbedoMix(2, snowFSC || 0)
+                  ) -
+                    0.06)
+              : 0.06;
           atmo.update(
             srcVec,
             mieRad,
             Math.max(eCam, 50),
             skyExposure * srcE0,
-            water ? 0.06 : landWSA || 0
+            water ? seaAlb : landWSA || 0
           );
           // The dome's Purkinje fold rides the same mesopic blend
           // as the JS-fed colours (the optics materials below too).
@@ -9302,7 +9319,11 @@
           // Wiscombe & Warren's diffuse snow albedo. Per channel:
           // snow is blue-brightest, so a snowy overcast whitens
           // toward blue exactly as the coupled series says.
-          const baseA = water ? [0.06, 0.06, 0.06] : landWSA || [0, 0, 0];
+          const baseA = water
+            ? [0, 1, 2].map(
+                (c) => 0.06 + seaIceC * (iceAlbedoMix(c, snowFSC || 0) - 0.06)
+              )
+            : landWSA || [0, 0, 0];
           const gf = [0, 1, 2].map((c) =>
             overcastGroundFactor(
               tauOv,

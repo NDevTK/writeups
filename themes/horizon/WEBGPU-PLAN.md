@@ -5783,6 +5783,29 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   water is where the freeze lives; a future pass could carry
   the concentration into the sky-LUT's sea-horizon term.
   VALIDATE PASS (all references + 7 GPU probes).
+- DONE (sea ice stage 4: the frozen sea reaches the horizon
+  and the sky, Aug 8 fortieth push - the stage-3 residual
+  closed): the far sea stayed a liquid Payne-lit horizon under
+  full ice because the dome's terminal ground bounce fed
+  Payne's 0.06 wherever the box has sea - and that SAME feed
+  is the sky-view LUT's sea-horizon term. seaice.js now
+  exports iceAlbedoMix(c, fsc) - the ABSOLUTE diffuse albedo
+  of the drawn ice (bare/snow-covered area-weighted), with
+  iceDisplayRGB refactored to be exactly that number in the
+  water body's display frame (the gate holds the consistency
+  to 1e-15). Both Payne consumers ride it by measured
+  concentration: the dome ground bounce (scalar - the lum3 of
+  the mixed triple; the sky-view LUT's sea horizon and the
+  aerial in-scatter whiten with the frozen sea, closing the
+  residual the honest way, through the SAME term that was
+  documented as the gap) and the overcast ground coupling
+  (per channel - a polar overcast over pack ice now whitens
+  by the ice-coupled series exactly as the snow-land path
+  does). Under no ice both sites reduce to Payne's 0.06
+  verbatim. VALIDATE PASS (all references + 7 GPU probes).
+  The sea-ice arc is complete across four stages: printed
+  optics, measured concentration, measured snow on the ice,
+  and the frozen sea reflected in sky, horizon and overcast.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
