@@ -6100,6 +6100,29 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     than the sky allows. The hand nightSky x lpVisBright meteor
     gate retires; clouds still occlude. Perseid-night full-page
     smoke clean. VALIDATE PASS (all references + 7 GPU probes).
+- DONE (visual review + horizon hardening, Aug 8 forty-ninth
+  push): captured and INSPECTED real twilight and deep-night
+  renders of the new sky passes (Gibraltar, 4 h apart). What
+  the pixels confirm: the Schaefer threshold visibly fills the
+  sky in magnitude order - a sparse bright-star field at
+  nautical twilight against the red sunset band, the faint
+  magnitude tail arriving by 00:30 - with natural brightness
+  spread and no artifacts. A flagged anomaly (star-like dots
+  below the sea horizon, one soft mover) was hunted and
+  RESOLVED AS NOT A BUG: a pixel census (101 bright px above /
+  20 below), an attempted sprite fix that changed nothing, and
+  a close look identified the dots as the strait's FLASHING
+  NAVIGATION LIGHTS on the water (navlights.js working as
+  designed - their frame-to-frame variation is the real light
+  characters). The hunt still landed a real hardening: the
+  celestial sprite shell (r ~900) reaches far past the drawn
+  sea/terrain box, so a set star or planet could peek past the
+  world's far edge with nothing to occlude it - star AND
+  planet/comet sprites now fade over the horizon (short
+  smoothstep at altitude zero), replacing geometry that is not
+  there. Above-horizon field unchanged (93 vs 101 bright px,
+  scintillation noise). VALIDATE PASS (all references + 7 GPU
+  probes).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

@@ -987,11 +987,15 @@ export function createStarSprites(positions, colors, sizes, mags) {
     sizes,
     mags,
     opacityFor: (center, sizeA, colorA, magA) => {
-      const alt = max(
-        normalize(modelWorldMatrix.mul(vec4(center, 1.0)).xyz).y,
-        0.04
-      );
+      const altRaw = normalize(modelWorldMatrix.mul(vec4(center, 1.0)).xyz).y;
+      const alt = max(altRaw, 0.04);
       const am = float(1.0).div(alt);
+      // The sky ends at the horizon: the celestial sphere (r ~900)
+      // reaches far beyond the drawn sea/terrain box, so a
+      // below-horizon star would otherwise peek past the world's
+      // far edge (caught in the Aug 8 visual review). A short fade
+      // through the horizon replaces geometry that is not there.
+      const aboveHor = smoothstep(float(-0.02), float(0.005), altRaw);
       // Per-star phase in [0, 2pi) from the position bit patterns.
       // vertexStage() is load-bearing: left to the fragment stage,
       // the attribute arrives through an INTERPOLATED varying and
@@ -1038,7 +1042,7 @@ export function createStarSprites(positions, colors, sizes, mags) {
       const vis = smoothstep(float(-0.5), float(0.5), u.limMag.sub(magA));
       return {
         sizeNode: sizeA,
-        opacityNode: u.night.mul(I).mul(vis),
+        opacityNode: u.night.mul(I).mul(vis).mul(aboveHor),
         colorNode: mix(vec3(Ys), colorA, u.scotB)
       };
     }
@@ -1062,9 +1066,18 @@ export function createPlanetSprites(positions, colors, sizes, mags) {
     mags,
     opacityFor: (center, sizeA, colorA, magA) => ({
       sizeNode: sizeA,
-      opacityNode: u.night.mul(
-        smoothstep(float(-0.5), float(0.5), u.limMag.sub(magA))
-      )
+      // The same horizon fade as the stars: the sprite shell
+      // reaches past the drawn world's far edge, so a set planet
+      // must fade at the horizon rather than rely on geometry.
+      opacityNode: u.night
+        .mul(smoothstep(float(-0.5), float(0.5), u.limMag.sub(magA)))
+        .mul(
+          smoothstep(
+            float(-0.02),
+            float(0.005),
+            normalize(modelWorldMatrix.mul(vec4(center, 1.0)).xyz).y
+          )
+        )
     })
   });
   return {mesh, u, posAttr, sizeAttr, magAttr};
