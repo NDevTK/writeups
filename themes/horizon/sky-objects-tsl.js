@@ -1109,7 +1109,7 @@ export function createStarSprites(positions, colors, sizes, mags) {
     // sit brighter than any star).
     scotB: uniform(1)
   };
-  const {mesh} = makeSprites({
+  const {mesh, sizeAttr, magAttr} = makeSprites({
     positions,
     colors,
     sizes,
@@ -1175,7 +1175,9 @@ export function createStarSprites(positions, colors, sizes, mags) {
       };
     }
   });
-  return {mesh, u};
+  // sizeAttr/magAttr exposed so the variable stars (varstars.js
+  // printed GCVS elements) can re-write their live magnitudes.
+  return {mesh, u, sizeAttr, magAttr};
 }
 
 // Naked-eye planets: fixed pixel size, night-gated discs at their

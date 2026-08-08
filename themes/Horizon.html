@@ -207,7 +207,8 @@
         light pillars), fogbow=V|0 (pin fog at visibility V
         metres for the harness / never draw the fogbow),
         glory=0 (remove the exact-Mie antisolar rings the same
-        pinned fog otherwise draws),
+        pinned fog otherwise draws), vars=0 (freeze the variable
+        stars at their static catalogue magnitudes),
         gwaves=A|0 (pin the airglow banding amplitude for the
         harness / remove the banding), gmn=URL|0 (daemon
         endpoint override for the measured meteor medians /
@@ -827,6 +828,7 @@
         GLORY_MAX_DEG,
         gloryRingDeg
       } from './horizon/mie.js';
+      import {bscIndexOf, VARSTARS, varV} from './horizon/varstars.js';
       import {
         GW_LAMBDA_MED_KM,
         GW_SPEED_MED_MS,
@@ -7819,6 +7821,11 @@
       }
 
       let starObj = null;
+      // The variable-star roster resolved onto catalogue rows
+      // (varstars.js bscIndexOf - unique coordinate match or the
+      // star is left static). ?vars=0 keeps the still photograph.
+      const varPairs = [];
+      let varLastT = -99;
       fetch('./horizon/stars.json')
         .then((r) => r.json())
         .then((stars) => {
@@ -7863,6 +7870,19 @@
             'Yale Bright Star Catalog',
             stars.length + ' stars (vendored)'
           );
+          if (params.get('vars') !== '0') {
+            for (const g of VARSTARS) {
+              const idx = bscIndexOf(g, stars);
+              if (idx >= 0) varPairs.push([g, idx]);
+            }
+            if (varPairs.length)
+              record(
+                'variable stars (GCVS elements)',
+                varPairs.length +
+                  ' phased: Algol 2.867 d (Goodricke 1783 + Stebbins ' +
+                  '1910 curve) · δ Cep 5.37 d · Mira 332 d · …'
+              );
+          }
         });
 
       // Constellation figures (d3-celestial dataset): faint real lines
@@ -10853,6 +10873,29 @@
             4,
             18
           );
+          // The VARIABLE SKY (varstars.js): the classical
+          // variables' live magnitudes from printed GCVS elements
+          // - Algol on Stebbins 1910's own selenium curve, the
+          // Cepheids and Mira on the catalogue's M-m skeleton.
+          // Re-folded every 10 s (Algol's steepest branch moves
+          // ~1 mmag in that time); size and the Schaefer
+          // visibility magnitude update together, so a deep Mira
+          // minimum really drops the star out of the naked-eye
+          // sky. ?vars=0 pins the still-photograph catalogue.
+          if (varPairs.length && t / 1000 - varLastT > 10) {
+            varLastT = t / 1000;
+            const jd = 2440587.5 + now().getTime() / 86400000;
+            for (const [g, idx] of varPairs) {
+              const V = varV(g, jd);
+              starObj.magAttr.setX(idx, V);
+              starObj.sizeAttr.setX(
+                idx,
+                THREE.MathUtils.clamp(7.5 - V, 1.8, 7.5)
+              );
+            }
+            starObj.magAttr.needsUpdate = true;
+            starObj.sizeAttr.needsUpdate = true;
+          }
         }
         // Nightglow: per-line solar scaling arrives via syncF107
         // (uLineI); extinction rides the engine's own zenith

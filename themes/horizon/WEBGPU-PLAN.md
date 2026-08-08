@@ -7590,6 +7590,85 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   billboard adds light exactly where the law says and nowhere
   else. Gate registered after fogbow. Full gate green - 114 CPU
   references (mie included) + 7 GPU probes.
+- DONE (Aug 8, the review session's 79th pass - the variable sky:
+  the catalogue stops being a still photograph). THE PRIMARIES,
+  all read in full: Goodricke 1783 (Phil. Trans. 73, 474 - the
+  DISCOVERY of Algol's periodicity, via the Internet Archive's
+  public-domain scan): the 2nd-to-4th-magnitude fall and
+  recovery in "nearly three hours and a half" each way, the
+  period "about every two days and nearly twenty hours and
+  three quarters", his minima table with its quotient column,
+  and the eclipse hypothesis itself ("the interposition of a
+  large body revolving round Algol"). Stebbins 1910 (ApJ 32,
+  185 - the FIRST photoelectric photometry of a star, a
+  selenium cell in an ice pack on a 12-inch refractor; the
+  scanned tables machine-read from rendered page images):
+  discovered the SECONDARY minimum ("the variation of 0.06
+  magnitude"), fit the between-minima reflection law
+  L = L1 + s(1 - cos phi) (L1 = 0.8507, s = 0.0201 in alpha-Per
+  light units), printed the system elements (kappa 1.14,
+  i 82.3 deg, r 4.77), the 9.80 h eclipse duration, the 1.22 mag
+  range, and the ADOPTED LIGHT-CURVE (Table VI) - vendored
+  verbatim, 35 points. GCVS 5.1 (Samus 2017) rows vendored for
+  seven classical variables: bet Per, lam Tau, bet Lyr, del Cep,
+  eta Aql, zet Gem, omi Cet. THE MODELS carry printed numbers
+  only: Algol IS Stebbins' own curve (eclipse + reflection +
+  his secondary dip), phase-folded on the GCVS epoch/period and
+  anchored exactly on the GCVS V endpoints (a stated 1.02x
+  selenium-to-V stretch); other eclipsers draw the GCVS CLASS
+  DEFINITIONS literally (EA: light constant between eclipses,
+  raised-cosine dips of the printed D width to the printed
+  depths; EB: no constant phase, cos^2 lobes); pulsators warp a
+  raised cosine by the catalogue's own M-m rise fraction
+  (del Cep's printed 25% fast rise makes the classic Cepheid
+  sawtooth - the gate measures the rise 3.0x steeper than the
+  fall; zet Gem's printed 50% = symmetric, as observed; Mira
+  swings 2.0-10.1 over 332 d). Epoch conventions per GCVS
+  (minimum for eclipsers, maximum for pulsators); STATED
+  reductions: HJD light-time (< 8.3 min) ignored, Mira maxima
+  wander cycle-to-cycle (the GCVS's own caveat), old eclipser
+  epochs carry O-C drift, and the semiregulars (Betelgeuse) are
+  NOT drawn varying - no strict phase exists to fold. THE GATE
+  (varstars-reference.mjs, 10 landmarks): the 1783 period
+  agrees with the modern element to 0.09% (and his own quotient
+  column, excluding the entry HIS OWN FOOTNOTE excludes, to
+  0.06%); the vendored Stebbins table reproduces his printed
+  reflection fit to 0.0006 light units and his 0.06-mag
+  secondary at 0.061; the two printed eclipse durations (9.80 h
+  selenium, GCVS D = 14% -> 9.63 h) agree to 1.7% with
+  Goodricke's naked-eye 7 h inside both; V endpoints exact;
+  phase folding to nanophases; class models hit every printed
+  depth at every printed phase; all seven roster stars resolve
+  to UNIQUE Yale BSC rows whose static magnitudes lie inside
+  the printed ranges. THE DRAWN SIDE: createStarSprites now
+  exposes its magnitude/size attributes; the frame loop
+  re-folds the seven variables every 10 s (Algol's steepest
+  branch moves ~1 mmag in that window) - and because the
+  Schaefer/Blackwell visibility gate reads the same live
+  magnitude, a deep Mira minimum drops the star out of the
+  naked-eye sky EMERGENTLY, exactly as the real Mira vanishes
+  for months. The variables ride the SHIPPED display
+  conventions unchanged (size = 7.5 - V, the Schaefer gate on
+  the live V). ?vars=0 pins the still photograph. Pinned A/B
+  (Alpine night 2026-11-09 20:11 UTC - a COMPUTED Algol
+  minimum from the vendored elements): the star-field diff is
+  twinkle-limited (the scintillation clock is wall time, so
+  every star carries a +-25% flux residual between runs - the
+  instrument's own noise floor, stated), and against 248 star
+  sites Algol's is the DIMMEST flux ratio in the whole frame
+  (0.747, the size-law prediction 0.58 x twinkle), exactly at
+  its predicted pixel at its computed minimum. THE MIRA PAIR is
+  unambiguous: aimed at omi Cet (live phase 0.751, V 9.5 vs the
+  catalogue's still-photo 3.0), background-subtracted star
+  photometry over 175 field sites puts Mira's on/off flux ratio
+  at 0.039 - GONE, ten times below the field's 5th-percentile
+  twinkle - while its two faint neighbours stand unchanged in
+  the crops; the only other sub-0.3 ratios are four
+  low-altitude sites inside the deep-scintillation tail
+  (sigma at its clamp swings exp(+-2 sigma)), stated. The
+  drawn sky now loses Mira for months at a time, exactly as
+  the real one. Gate registered after stars-color. Full gate
+  green - 115 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
