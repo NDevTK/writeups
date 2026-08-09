@@ -9490,6 +9490,40 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   21-landmark reference all serve the THEME's research section
   now. FINDINGS section 7 rewritten to name the research view as
   Horizon.html's own.
+- DONE (Aug 9, the review session's 125th pass - THE LOOP CLOSES:
+  the research view starts improving the pixels): two integrations.
+  (1) THE SCAN GATES THE DRAWN TRAILS: applySounding now computes
+  the full-ascent Schmidt-Appleman scan once (state.contrailScan,
+  recorded as 'contrail bands' with the band summary) and the
+  contrail slot-claim judges EVERY candidate at its own altitude -
+  a live ADS-B jet trails iff its altM sits in the formation band
+  and persists iff in the overlap band; ambient traffic is judged
+  at its spawn altitude 10500 m; the single 250 hPa verdict
+  (state.contrail) remains only as the model-aloft fallback when no
+  fresh ascent ships rows, and the harness ?contrail override still
+  wins. The research panel's contrail line now READS the same
+  stored scan (state.contrailScan ?? recompute) - one computation,
+  two consumers: the sentence "the panel line and the drawn trails
+  share one computation" is now literally true. A jet at 10.7 km in
+  an ISSR below the 250 hPa level - misjudged before - trails
+  correctly now. (2) DIAGNOSES AT THE CAMERA'S EYE: the research
+  mirage line runs columnPanel at the camera's own altitude
+  (elevOfY(camera.position.y, centerElev), floored just above the
+  station) beside the 450 m reference - "folds N at YOUR eye
+  (X m)": the fan the panel describes is the one on screen, the
+  same camAltM the theme's transfer LUT already rides. VERIFIED
+  live under the WebGPU shooter: "folds 0 at YOUR eye (591 m), 0
+  at 450 m" rendered at the shooter's real camera altitude, the
+  contrail line rode the shared scan - and the run also exercised
+  the GATE COMPOSITION correctly: at that location the nearest
+  ascent sits outside SOUNDING_MAX_KM, so applySounding (and
+  therefore the drawn trails) fell back to the 250 hPa model
+  verdict while the research line still diagnosed the raw column -
+  the theme's freshness/distance gates keep authority over the
+  pixels, the panel keeps its wider diagnostic reach. Queued next
+  per the review conversation: the page-wiring probe (pinned-feeds
+  load asserting the research section renders) and the second
+  frozen day.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

@@ -4590,6 +4590,10 @@
         // rebuilds state.profile on its cadence.)
         state.profileMeas = null;
         state.resBlhAglM = null;
+        // Measured-only like the rest: no fresh ascent, no
+        // per-altitude trail bands (the 250 hPa model verdict
+        // below stands in).
+        state.contrailScan = null;
         // An EXPLICIT ?sounding=URL pin is authoritative even
         // under pin=1 (the harness A/B) - a bare pin still
         // silences the measurement, as everywhere.
@@ -4643,6 +4647,31 @@
               ' rows to ' +
               Math.round(s.rows[s.rows.length - 1].hM / 1000) +
               ' km · the drawn sun rides the ascent'
+          );
+          // The full-ascent Schmidt-Appleman scan: ONE computation
+          // shared by the research line and the drawn trails, so
+          // each aircraft is judged AT ITS OWN ALTITUDE instead of
+          // by the single 250 hPa level (which stays as the
+          // model-aloft fallback below).
+          state.contrailScan = contrailPanel(s.rows);
+          record(
+            'contrail bands (full-ascent Schmidt–Appleman)',
+            (state.contrailScan.formBand
+              ? 'forms ' +
+                (state.contrailScan.formBand.loM / 1000).toFixed(1) +
+                '–' +
+                (state.contrailScan.formBand.hiM / 1000).toFixed(1) +
+                ' km'
+              : 'no formation zone') +
+              ' · ' +
+              (state.contrailScan.persistBand
+                ? 'persists ' +
+                  (state.contrailScan.persistBand.loM / 1000).toFixed(1) +
+                  '–' +
+                  (state.contrailScan.persistBand.hiM / 1000).toFixed(1) +
+                  ' km'
+                : 'nothing persists') +
+              ' · trails judged per aircraft altitude'
           );
         }
         if (Number.isFinite(s.t250C) && Number.isFinite(s.rh250)) {
@@ -10345,17 +10374,26 @@
         try {
           const rows = state.soundingData?.rows;
           if (Array.isArray(rows) && rows.length >= 10) {
-            const c = columnPanel(rows);
-            const [beach, aloft] = c.observers;
+            // Diagnose at the CAMERA's own altitude - the fan the
+            // panel describes is the one on screen - beside the
+            // 450 m reference eye.
+            const eyeM = Math.max(
+              elevOfY(camera.position.y, centerElev),
+              rows[0].hM + 2
+            );
+            const c = columnPanel(rows, {obsHms: [eyeM, 450]});
+            const [here, aloft] = c.observers;
             research['mirage (measured column)'] =
-              `folds ${beach.folds}/${aloft.folds} at eye 15/450 m · ` +
-              `inversion +${c.inversion.dT.toFixed(1)}°C at ` +
-              `${c.inversion.hM} m · horizon R ` +
-              `${beach.r0Arcmin.toFixed(1)}′ vs ISA ` +
-              `${beach.r0IsaArcmin.toFixed(1)}′ · sunset flattening ` +
-              `${beach.flatten.toFixed(2)} · green rim ` +
-              `${beach.rimArcsec.toFixed(0)}″`;
-            const con = contrailPanel(rows);
+              `folds ${here.folds} at YOUR eye (${eyeM.toFixed(0)} m), ` +
+              `${aloft.folds} at 450 m · inversion ` +
+              `+${c.inversion.dT.toFixed(1)}°C at ${c.inversion.hM} m · ` +
+              `horizon R ${here.r0Arcmin.toFixed(1)}′ vs ISA ` +
+              `${here.r0IsaArcmin.toFixed(1)}′ · sunset flattening ` +
+              `${here.flatten.toFixed(2)} · green rim ` +
+              `${here.rimArcsec.toFixed(0)}″`;
+            // The SAME scan that gates the drawn trails (set by
+            // applySounding); recomputed only if a pin silenced it.
+            const con = state.contrailScan ?? contrailPanel(rows);
             research['contrail layer (Schmidt–Appleman)'] =
               (con.formBand
                 ? `forms ${(con.formBand.loM / 1000).toFixed(1)}–` +
@@ -12981,22 +13019,42 @@
                 p.active = false;
                 p.mesh.visible = false;
               }
-            } else if (ct.forms && dayHigh > 0.02) {
+            } else if (dayHigh > 0.02) {
               // REAL aircraft claim free slots first (live ADS-B
               // via the daemon); otherwise the ambient-traffic
               // cadence (documented display choice: a new transit
               // every ~75 s; the harness override spawns fast so a
-              // pinned shot catches one).
+              // pinned shot catches one). Each candidate is judged
+              // AT ITS OWN ALTITUDE against the full-ascent bands
+              // (state.contrailScan, the same computation the
+              // research line shows); the single 250 hPa verdict
+              // stands in only when no fresh ascent shipped rows.
+              const judge = (altM) => {
+                if (ctOv !== null) return ct;
+                const sc = state.contrailScan;
+                if (!sc) return ct;
+                const inBand = (b) => b && altM >= b.loM && altM <= b.hiM;
+                return {
+                  forms: inBand(sc.formBand),
+                  persists: inBand(sc.persistBand)
+                };
+              };
               const live = liveTraffic?.length ? liveTraffic.shift() : null;
               if (live) {
                 seenFlights.set(live.hex, Date.now());
-                spawnContrail(p, !!ct.persists, live);
-                p.u.day.value = dayHigh;
-                p.u.tint.value.copy(sunLight.color);
-              } else if (Math.random() < dt / (ctOv !== null ? 4 : 75)) {
-                spawnContrail(p, !!ct.persists);
-                p.u.day.value = dayHigh;
-                p.u.tint.value.copy(sunLight.color);
+                const v = judge(live.altM);
+                if (v.forms) {
+                  spawnContrail(p, !!v.persists, live);
+                  p.u.day.value = dayHigh;
+                  p.u.tint.value.copy(sunLight.color);
+                }
+              } else {
+                const v = judge(10500);
+                if (v.forms && Math.random() < dt / (ctOv !== null ? 4 : 75)) {
+                  spawnContrail(p, !!v.persists);
+                  p.u.day.value = dayHigh;
+                  p.u.tint.value.copy(sunLight.color);
+                }
               }
             }
           }
