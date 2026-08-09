@@ -7190,6 +7190,7 @@
       const uFarSkyIrr = tslUniform(new THREE.Color(0, 0, 0));
       const uFarVis = tslUniform(20000);
       let farMesh = null;
+      let farMesh2 = null; // the duct's second image (stage B)
       let farGen = 0;
       // The live ring's remap state: geometry plus the per-vertex
       // pre-drop elevations/distances farRingGeometry retains, the
@@ -7290,6 +7291,36 @@
             farMesh.geometry.dispose();
             farMesh.geometry = geo;
           }
+          // STAGE B - the duct's SECOND IMAGE (looming.js gate:
+          // adjacent fold branches carry opposite parity, the
+          // upper one compressing into the duct-edge wall): a
+          // twin ring whose vertices ride fanBranches branch 1.
+          // Pushed 0.2% farther out so wherever no second branch
+          // exists (vertices parked at the primary's own y) it
+          // hides BEHIND the primary silhouette; where the live
+          // measured column ducts, the inverted strip floats
+          // above the horizon on its own.
+          {
+            const geo2 = new THREE.BufferGeometry();
+            geo2.setAttribute(
+              'position',
+              new THREE.BufferAttribute(ring.positions.slice(), 3)
+            );
+            geo2.setIndex(new THREE.BufferAttribute(ring.indices, 1));
+            geo2.computeVertexNormals();
+            farRingData.geo2 = geo2;
+            if (!farMesh2) {
+              farMesh2 = new THREE.Mesh(geo2, farMesh.material);
+              farMesh2.frustumCulled = false;
+              farMesh2.scale.set(1.002, 1, 1.002);
+              farMesh2.visible = false;
+              scene.add(farMesh2);
+            } else {
+              farMesh2.geometry.dispose();
+              farMesh2.geometry = geo2;
+              farMesh2.visible = false;
+            }
+          }
           record(
             'far horizon',
             'terrarium ring to ' +
@@ -7338,6 +7369,7 @@
             pos.array[i * 3 + 1] = baseY[i];
           pos.needsUpdate = true;
           geo.computeVertexNormals();
+          if (farMesh2) farMesh2.visible = false;
           farRingData.appliedProf = prof || null;
           if (had || prof)
             record(
@@ -7361,6 +7393,9 @@
         for (let i = 0; i < nA; i++)
           alphas[i] = ((-1.4 + (2.2 * i) / (nA - 1)) * Math.PI) / 180;
         const fan = rayFan(prof, obsHm, alphas, FAR_R1 * MPU + 1000, 100);
+        const pos2 = farRingData.geo2
+          ? farRingData.geo2.getAttribute('position')
+          : null;
         let warped = 0;
         let stacked = 0;
         for (let v = 0; v < trueEM.length; v++) {
@@ -7370,19 +7405,40 @@
             // Hidden through the measured column, or outside the
             // fan band: the mean-k datum stands.
             pos.array[v * 3 + 1] = baseY[v];
+            if (pos2) pos2.array[v * 3 + 1] = baseY[v];
             continue;
           }
           // Apparent altitude of the lowest image; same asinh
           // datum the build used (under uniform kappa this IS
           // e - curvatureDrop: the observer height cancels).
           const eApp = obsHm + dM * Math.tan(br[0]);
-          pos.array[v * 3 + 1] =
-            16 * Math.asinh((eApp - farRingData.centerElev) / 500);
+          const y0 = 16 * Math.asinh((eApp - farRingData.centerElev) / 500);
+          pos.array[v * 3 + 1] = y0;
           warped++;
-          if (br.length > 1) stacked++;
+          // STAGE B: the second fold branch is the floating
+          // image (looming-reference: adjacent branches carry
+          // opposite parity, the upper one compressing into the
+          // duct-edge wall). Where it exists the twin ring rises
+          // to it; elsewhere the twin parks at the primary's y
+          // and hides behind it (its radius is 0.2% larger).
+          if (pos2) {
+            if (br.length > 1) {
+              const eApp2 = obsHm + dM * Math.tan(br[1]);
+              pos2.array[v * 3 + 1] =
+                16 * Math.asinh((eApp2 - farRingData.centerElev) / 500);
+              stacked++;
+            } else {
+              pos2.array[v * 3 + 1] = y0;
+            }
+          } else if (br.length > 1) stacked++;
         }
         pos.needsUpdate = true;
         geo.computeVertexNormals();
+        if (pos2) {
+          pos2.needsUpdate = true;
+          farRingData.geo2.computeVertexNormals();
+        }
+        if (farMesh2) farMesh2.visible = stacked > 0;
         farRingData.appliedProf = prof;
         record(
           'far horizon (mirage fan)',
@@ -7391,7 +7447,9 @@
             trueEM.length +
             ' ring vertices re-solved through the balloon column' +
             (stacked
-              ? ' · ' + stacked + ' multi-image (duct) - primary drawn'
+              ? ' · ' +
+                stacked +
+                ' duct-stacked - SECOND IMAGE drawn (looming.js gate)'
               : '')
         );
       }

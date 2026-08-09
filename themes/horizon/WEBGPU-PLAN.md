@@ -9001,6 +9001,47 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   changes (an audit pass - the honest first step of any
   correction). Full gate green - 131 CPU references
   (rayleighpol 10) + 7 GPU probes.
+- DONE (Aug 9, the review session's 111th pass - LOOMING: THE
+  BATHURST HINDCAST AND THE SECOND IMAGE DRAWN): the mirage
+  fan's stage B lands, gated on a theodolite record. PRIMARY
+  (author-hosted OA, read in full): Lehn & Legal 1998,
+  "Long-range superior mirages" (Appl. Opt. 37, 1489) - their
+  Bathurst observation: a 351 m peak at 105 km from Resolute
+  Bay, INVISIBLE in ordinary air, that "suddenly appeared" as
+  a 2.3-2.8 arcmin image (theodolite, -12.1' to -9.8'), the
+  top 37 m loomed into view at 2.33x magnification; their
+  favored model 1 a MILD unsloped inversion at a printed 60 m
+  center over 32-68 km of the path. NEW looming.js: the fan's
+  flat-earth transform with the column GATED IN x (the NZ
+  ladder reduced to three regions), the paper's own base
+  column (2 degC, 0.006 deg/m), the NZ pass's Fermi form as
+  the inversion (one inversion law, two hindcasts), the two
+  printed obstacles as a ground mask. WHAT LANDS
+  (looming-reference, 3 landmarks): THE PRINTED STANDARD-AIR
+  ANCHORS - their -14.2' ray grazes to 0.2 m at 32.0 km vs
+  their printed sea tangency 32.4 km (a razor-thin
+  discriminant, and the repo's Ciddor kappa chain lands ON it),
+  Claxton translations 14.4/18.5 m vs printed 14/18 - three
+  printed numbers, no tuning; THE LOOMING EMERGES - invisible
+  at dT 0, visible from dT ~ 2.0 ("the weakest inversion",
+  mild as they demand), and at dT\* = 3.9 the image spans
+  [-12.5', -9.8'] vs their printed model [-12.6', -9.8'],
+  lifting 41 m (printed 37) at 1.96x (printed 2.33; residual =
+  the unprinted inversion shape, stated); THE SECOND IMAGE -
+  under the 1597 duct (the NZ pass's own printed parameters,
+  through the SHIPPED rayFan/fanBranches) a 51-59 m band at
+  60 km carries TWO images 11' apart, the lower INVERTED, the
+  upper compressing 8 m into 0.1 arcsec (486x flatter) - the
+  duct-edge WALL of the classic superior mirage, the stacking
+  that squeezed de Veer's sun; adjacent fold branches carry
+  opposite parity. THE DRAWN WORLD: the far ring gains a twin
+  mesh riding fanBranches branch 1 - pushed 0.2% farther out
+  so it hides behind the primary wherever no second branch
+  exists, and rises as the floating inverted strip wherever
+  the LIVE measured column ducts (visible only then;
+  applyMirageFan fills both meshes in one pass and the record
+  line now says "SECOND IMAGE drawn"). Full gate green - 132
+  CPU references (looming 3) + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
