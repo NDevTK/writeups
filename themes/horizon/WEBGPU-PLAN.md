@@ -8129,6 +8129,51 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     record matches before trusting a whole-frame pair). Gate:
     buoy-reference.mjs joins with 10 landmarks - full gate
     green, 120 CPU references + 7 GPU probes.
+- DONE (Aug 9, the review session's 90th pass - the instruments
+  finish the verticals: measured boundary layer, measured
+  700 hPa, in-situ water temperature). Three quantities still
+  rode models while the instruments already measured them.
+  (1) The pollen column's depth was the model BLH: sounding.js
+  now computes the radiosonde community's own boundary-layer
+  reduction - the bulk Richardson number (Vogelezang & Holtslag
+  1996; Seidel et al. 2012; the OPEN AMT 16, 4289 (2023) prints
+  the working equation and the friction-term dismissal read in
+  full) - Ri(z) = (g/thv_s)(thv_z - thv_s)(z - z_s)/(shear^2),
+  PBL top at the LOWEST crossing of the printed Ri_c = 0.25,
+  interpolated. Virtual potential temperature carries the EXACT
+  factor (1 + w/eps)/(1 + w) - eps is the gated Appleman
+  constant, the 0.61 approximation never enters; theta rides
+  the exported Rd/cp. GATE-HELD on the vendored Payerne 12Z
+  ascent: BLH 1399 m AGL (pinned from the run), and it tops
+  BELOW the parcel pass's independent 1906 m AGL LCL - two
+  separate reductions of the same measured profile agreeing the
+  mixed layer sits under the cloud base; the honesty pair (no
+  rows -> null; surface inversion under calm -> 0 m) gated.
+  LIVE: the boot test's midnight Payerne ascent answered
+  blhAglM = 1 m - the nocturnal stable layer, the honesty case
+  in production (the daytime fixture's 1399 m is the convective
+  answer). The residual layer above a collapsed nocturnal BL
+  carries yesterday's pollen and neither the model BLH nor the
+  measured one sees it - stated, unmodeled, same semantics both
+  sources. syncPollen now reads the measured depth first
+  (state.blhAglMeas ?? model), record labelling which stood.
+  (2) applySounding adopts the measured 700 hPa wind/direction
+  (levelAt on the same rows) - the mid deck's drift and the
+  volcanic plume's bend now ride the balloon where it reached,
+  re-ranked over the winds-aloft model at the model's own sync,
+  and the daemon /sounding payload gains t700C/drct700/
+  spd700Ms/blhAglM. (3) The buoy's in-situ WTMP outranks the
+  model SST: syncBuoy sets state.sstMeas under the spectrum's
+  own fresh/near gates and the marine sync re-asserts it over
+  its model assignment - sea smoke, sprite odds and the
+  sea-fog gate now read a thermometer in the water when one is
+  near. Measured-only fields FAIL CLOSED on roam: applySounding
+  clears blhAglMeas/stormTopM before its gates so a stale
+  ascent cannot fossilise a tower or a mixed layer (the model
+  fields have their own re-syncs; these two had no other
+  writer). No new constants beyond the printed Ri_c = 0.25.
+  Gate: sounding-reference grows 13 -> 15 landmarks; full gate
+  green - 120 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

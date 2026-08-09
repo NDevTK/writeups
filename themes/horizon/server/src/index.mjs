@@ -71,6 +71,7 @@ import {
 import {gmnMedians, parseTrajSummary} from '../../gmn.js';
 import {GVP_RSS, GVP_WFS, parseGvpRss, plumeTopM} from '../../gvp.js';
 import {
+  blhRiM,
   freezingLevelM,
   IGRA_STATIONS,
   levelAt,
@@ -1987,6 +1988,13 @@ function main() {
             rh250: levelAt(rows, 250, 'rh'),
             drct250: levelAt(rows, 250, 'drct'),
             spd250Ms: levelAt(rows, 250, 'spdMs'),
+            // The measured 700 hPa level (mid-deck drift, plume
+            // bend) and the bulk-Richardson boundary layer depth
+            // (sounding.js, both gated).
+            t700C: levelAt(rows, 700, 'tC'),
+            drct700: levelAt(rows, 700, 'drct'),
+            spd700Ms: levelAt(rows, 700, 'spdMs'),
+            blhAglM: blhRiM(rows),
             // The parcel ascent (sounding.js, gated): measured
             // cloud base / storm top / instability energy.
             ...parcelAscent(rows)

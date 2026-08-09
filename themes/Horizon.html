@@ -1660,6 +1660,11 @@
             c && typeof c.sea_surface_temperature === 'number'
               ? c.sea_surface_temperature
               : null;
+          // The buoy's in-situ thermometer outranks the model SST
+          // (syncBuoy sets sstMeas under the spectrum's own
+          // fresh/near gates) - re-asserted here so the model's
+          // 15-min sync never buries the measurement.
+          if (Number.isFinite(state.sstMeas)) state.sst = state.sstMeas;
           if (
             state.sst !== null &&
             seaFogClass(state.sst, state.temp) === 'sea-smoke'
@@ -4278,21 +4283,34 @@
       const EL_PIN = params.has('el') ? parseFloat(params.get('el')) : null;
       function applySounding() {
         const s = state.soundingData;
+        // Measured-ONLY fields fail closed first: no fresh near
+        // ascent means no measured tower and no measured BLH (the
+        // model fields below have their own re-syncs; these two
+        // have no other writer, so a roam must not fossilise them).
+        state.blhAglMeas = null;
+        state.stormTopM = null;
         if (!s || overridden) return;
         const ageH = (Date.now() - Date.parse(s.at)) / 3600e3;
         if (ageH > SOUNDING_FRESH_H || s.distKm > SOUNDING_MAX_KM) return;
         if (Number.isFinite(s.freezingM)) state.freezing = s.freezingM;
         if (Number.isFinite(s.spd250Ms)) state.wind250 = s.spd250Ms * 3.6;
         if (Number.isFinite(s.drct250)) state.dir250 = s.drct250;
+        // The measured 700 hPa level: the mid deck's drift and the
+        // plume's bend ride the balloon where it reached.
+        if (Number.isFinite(s.spd700Ms)) state.wind700 = s.spd700Ms * 3.6;
+        if (Number.isFinite(s.drct700)) state.dir700 = s.drct700;
+        // The measured boundary layer (bulk Richardson, gated):
+        // the pollen column's depth outranks the model BLH;
+        // cleared above, set only here.
+        if (Number.isFinite(s.blhAglM)) state.blhAglMeas = s.blhAglM;
         if (Number.isFinite(s.t250C) && Number.isFinite(s.rh250)) {
           if (!params.has('t250')) state.t250 = s.t250C;
           state.contrail = appleman(25000, s.t250C, s.rh250 / 100);
         }
         // The measured storm top: parcelAscent's equilibrium
         // level (null on a stable ascent - the contract) sizes
-        // the convective deck. Always assigned, so a newer
-        // stable ascent retires an older tower.
-        state.stormTopM = Number.isFinite(s.elM) ? s.elM : null;
+        // the convective deck; cleared above, set only here.
+        if (Number.isFinite(s.elM)) state.stormTopM = s.elM;
       }
       // MEASURED wave spectrum (buoy.js via the daemon): the
       // nearest NDBC buoy's directional spectrum outranks the wave
@@ -4317,6 +4335,10 @@
           ).json();
           if (!r.id || !Array.isArray(r.f) || !Array.isArray(r.s)) return;
           state.buoy = r;
+          // In-situ water temperature outranks the model SST at
+          // the same gates the spectrum rides (buoyBands).
+          state.sstMeas =
+            buoyBands() && Number.isFinite(r.wtmp) ? r.wtmp : null;
           const m0 = m0OfSpec(r.f, r.s);
           let pk = 0;
           for (let i = 0; i < r.f.length; i++)
@@ -4377,7 +4399,11 @@
             ).json()
           ]);
           const birch = aq.hourly?.birch_pollen?.[0];
-          const blh = fc.hourly?.boundary_layer_height?.[0];
+          // The MEASURED boundary layer (radiosonde bulk
+          // Richardson, applySounding) outranks the model BLH as
+          // the pollen column's depth when a fresh ascent reached.
+          const blhModel = fc.hourly?.boundary_layer_height?.[0];
+          const blh = state.blhAglMeas ?? blhModel;
           if (!Number.isFinite(birch) || !Number.isFinite(blh)) return;
           state.pollen = {birch, blh, tau: pollenTau(birch, blh)};
           if (state.pollen.tau > 1e-4)
@@ -4386,7 +4412,10 @@
               Math.round(birch) +
                 ' grains/m³ · BLH ' +
                 Math.round(blh) +
-                ' m · τ ' +
+                (state.blhAglMeas != null
+                  ? ' m (measured, bulk Ri)'
+                  : ' m (model)') +
+                ' · τ ' +
                 state.pollen.tau.toFixed(4) +
                 ' · Ø' +
                 BIRCH_D_UM +

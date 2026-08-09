@@ -230,6 +230,68 @@ export function parcelAscent(rows) {
   };
 }
 
+// ---- The boundary layer's MEASURED depth: bulk Richardson ----
+// The radiosonde PBL method (Vogelezang & Holtslag 1996; Seidel
+// et al. 2012; the open AMT 16, 4289 (2023) prints the working
+// equation): Ri(z) = (g/thv_s)(thv_z - thv_s)(z - z_s) /
+// ((u_z-u_s)^2 + (v_z-v_s)^2), the surface-friction term
+// "generally ignored ... due to the much smaller magnitude" (the
+// paper's own sentence), and the PBL top is the LOWEST level
+// where Ri crosses the printed critical value 0.25, interpolated
+// between the bracketing rows. Virtual potential temperature
+// carries the EXACT factor (1 + w/eps)/(1 + w) - eps is the
+// gated Appleman constant, no 0.61 approximation enters; theta
+// rides Rd/cp already exported above. Rows missing dewpoint
+// contribute dry thv (w = 0, stated); rows missing wind are
+// skipped (the shear denominator needs them). Returns metres
+// ABOVE GROUND (the column depth consumers integrate over), or
+// null when the profile never crosses.
+export const RI_CRIT = 0.25;
+export function blhRiM(rows, riC = RI_CRIT) {
+  const lv = rows
+    .filter(
+      (r) =>
+        Number.isFinite(r.p) &&
+        Number.isFinite(r.hM) &&
+        Number.isFinite(r.tC) &&
+        Number.isFinite(r.drct) &&
+        Number.isFinite(r.spdMs)
+    )
+    .sort((a, b) => b.p - a.p);
+  if (lv.length < 3) return null;
+  const thetaV = (r) => {
+    const th = (r.tC + 273.15) * Math.pow(1000 / r.p, RD_J_KGK / CP);
+    if (!Number.isFinite(r.dwC)) return th;
+    const e = eLiq(r.dwC + 273.15) / 100;
+    const w = (EPS * e) / (r.p - e);
+    return (th * (1 + w / EPS)) / (1 + w);
+  };
+  const uv = (r) => {
+    const a = (r.drct * Math.PI) / 180;
+    return [-r.spdMs * Math.sin(a), -r.spdMs * Math.cos(a)];
+  };
+  const s = lv[0];
+  const thS = thetaV(s);
+  const [us, vs] = uv(s);
+  let prev = {ri: 0, hM: s.hM};
+  for (let i = 1; i < lv.length; i++) {
+    const r = lv[i];
+    const [u, v] = uv(r);
+    const du2 = (u - us) * (u - us) + (v - vs) * (v - vs);
+    const buoy = (G_M_S2 / thS) * (thetaV(r) - thS) * (r.hM - s.hM);
+    const ri = du2 > 0 ? buoy / du2 : buoy > 0 ? Infinity : 0;
+    if (ri >= riC) {
+      const f =
+        prev.ri < riC && Number.isFinite(ri)
+          ? (riC - prev.ri) / (ri - prev.ri)
+          : 0;
+      return Math.round(prev.hM + f * (r.hM - prev.hM) - s.hM);
+    }
+    prev = {ri, hM: r.hM};
+  }
+  return null;
+}
+
 // Parse the IGRA station list into rows usable for a nearest-
 // station search: only entries whose identifier embeds a WMO
 // number (..M00#####) and whose record reaches recent years.

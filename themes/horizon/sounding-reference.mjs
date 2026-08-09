@@ -15,6 +15,7 @@
 //    published coordinates
 import {appleman, CP, EPS, eLiq} from './contrails.js';
 import {
+  blhRiM,
   freezingLevelM,
   G_M_S2,
   levelAt,
@@ -23,6 +24,7 @@ import {
   parseIgraStations,
   parseWyoText,
   RD_J_KGK,
+  RI_CRIT,
   SOUNDING_FRESH_H,
   SOUNDING_MAX_KM
 } from './sounding.js';
@@ -205,7 +207,33 @@ const rows = parseWyoText(WYO_FIXTURE_TEXT);
   );
 }
 
-// ---- 7. the station list ----------------------------------------
+// ---- 7. the boundary layer by bulk Richardson -------------------
+{
+  const blh = blhRiM(rows);
+  const a = parcelAscent(rows);
+  check(
+    'bulk-Richardson BLH on the real ascent',
+    RI_CRIT === 0.25 && blh === 1399 && blh < a.lclM - rows[0].hM,
+    `first Ri >= ${RI_CRIT} crossing at ${blh} m AGL (pinned from the ` +
+      `run) - a 1.4 km summer midday mixed layer, and it tops BELOW the ` +
+      `parcel's independent ${a.lclM - rows[0].hM} m AGL cloud base: two ` +
+      `separate reductions of the same measured profile agree the mixed ` +
+      `layer sits under the cloud deck`
+  );
+  check(
+    'BLH honesty',
+    blhRiM([]) === null &&
+      blhRiM([
+        {p: 1000, hM: 0, tC: 10, dwC: 0, drct: 0, spdMs: 1},
+        {p: 950, hM: 480, tC: 11, dwC: 0, drct: 0, spdMs: 1.5},
+        {p: 900, hM: 988, tC: 12, dwC: -5, drct: 10, spdMs: 2}
+      ]) === 0,
+    `no rows returns null; a surface inversion under calm winds crosses ` +
+      `immediately (0 m - the stable morning's answer, not an invention)`
+  );
+}
+
+// ---- 8. the station list ----------------------------------------
 {
   // The REAL Payerne row, verbatim from the fetched list.
   const line =
