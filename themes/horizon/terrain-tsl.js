@@ -135,6 +135,13 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     // sea keeps its own measured concentration path.
     uLakeIce: uniform(0),
     uLakeIceCol: uniform(new Vector3(0.2, 0.2, 0.2)),
+    // Wet ground (wetground.js, gated - Lekner & Dorf 1988): the
+    // measured-wetness darkening factor on the LAND albedo only.
+    // Snow, the sea and lake ice never read it - a water film on
+    // water is no film, and wet snow is a different (unmodelled,
+    // stated) story. 1 = dry, fed per frame from the live soil
+    // moisture and rain.
+    uWetF: uniform(1),
     // Snow display class, aged CPU-side by the printed FSM law
     // (snowage.js): the fresh (0.87, 0.9, 0.93) scaled by the
     // live alpha/alb_max factor from the archive snowfall and
@@ -584,7 +591,10 @@ export function createTerrainNodeMaterial(momentsTex, aerial) {
     // the measured FSC and the live snowline - still wins above,
     // so accumulation zones whiten exactly as before.
     const col2s = mix(col2, land.rgb, tintSurf.mul(u.uLandOn).mul(0.85));
-    const col3 = mix(col2s, u.uSnowCol, snow);
+    // Wet ground darkens the LAND albedo before snow and water
+    // mix over it (wetground.js factor, measured wetness).
+    const col2w = col2s.mul(u.uWetF);
+    const col3 = mix(col2w, u.uSnowCol, snow);
     // Sea: Monahan & O'Muircheartaigh (1980, JPO 10, 2094 - scan
     // machine-read in full) whitecap fraction W = 3.84e-6 * U^3.41
     // - their Eq. 5, the recommended robust-biweight fit (OLS twin

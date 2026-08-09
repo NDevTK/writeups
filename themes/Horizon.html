@@ -362,6 +362,7 @@
         solarDiscGeometry
       } from './horizon/sunspots.js';
       import {coronaSurfB} from './horizon/kcorona.js';
+      import {wetDarkenFactor, wetnessFrom} from './horizon/wetground.js';
       import {applySpectral} from './horizon/spectral-srgb.js';
       import {
         adaptExposure,
@@ -1268,7 +1269,7 @@
                 '&longitude=' +
                 state.lon +
                 '&current=weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,dew_point_2m,snow_depth' +
-                '&hourly=wind_speed_80m,wind_speed_120m&forecast_hours=1',
+                '&hourly=wind_speed_80m,wind_speed_120m,soil_moisture_0_to_1cm&forecast_hours=1',
               {credentials: 'omit'}
             )
           ).json();
@@ -1306,6 +1307,10 @@
           // interpolates on ln z between them).
           state.wind80 = w.hourly?.wind_speed_80m?.[0] ?? null;
           state.wind120 = w.hourly?.wind_speed_120m?.[0] ?? null;
+          // Top-layer soil moisture (m^3/m^3): the wet-ground
+          // state (wetground.js) - the world darkens after rain
+          // and dries at the speed the soil model actually dries.
+          state.soilMoist = w.hourly?.soil_moisture_0_to_1cm?.[0] ?? null;
           // the measured wind re-lays the farm wakes
           applyWakes();
           record(
@@ -7192,6 +7197,8 @@
       let farMesh = null;
       let farMesh2 = null; // the duct's second image (stage B)
       let farGen = 0;
+      let wetFarF = 1; // wet-ground factor for the far ring
+      let wetSaid = false;
       // The live ring's remap state: geometry plus the per-vertex
       // pre-drop elevations/distances farRingGeometry retains, the
       // mean-k y datum to fall back to, and the identity of the
@@ -12082,8 +12089,54 @@
             .multiplyScalar(sunLight.intensity / Math.PI);
           uFarSkyIrr.value.copy(ambient.color).multiplyScalar(1 / Math.PI);
         }
+        // THE WET WORLD (wetground.js, gated - Lekner & Dorf 1988
+        // through the shipped Fresnel split): measured topsoil
+        // moisture + live rain set a wetness, and every land
+        // surface darkens by the paper's internal-reflection
+        // ladder at its own dry-albedo class - the near terrain
+        // (land pixels only, in-shader), the far ring at the
+        // box's own measured white-sky albedo, and the roads at
+        // the asphalt class the paper itself names. ?wet pins
+        // wetness for the harness; ?wet=0 disables.
+        {
+          const wRaw = params.has('wet')
+            ? +params.get('wet')
+            : wetnessFrom(state.soilMoist, state.precip);
+          const wNow = Math.min(Math.max(wRaw, 0), 1);
+          terrainUniforms.uWetF.value = wetDarkenFactor(0.2, wNow);
+          if (roadMat) {
+            const fRoad = wetDarkenFactor(0.1, wNow);
+            roadMat.color.setRGB(fRoad, fRoad, fRoad);
+          }
+          wetFarF =
+            wNow > 0 && landWSA
+              ? wetDarkenFactor(
+                  Math.max((landWSA[0] + landWSA[1] + landWSA[2]) / 3, 0.05),
+                  wNow
+                )
+              : 1;
+          if (!wetSaid && wNow > 0.15) {
+            wetSaid = true;
+            record(
+              'wet ground (Lekner & Dorf 1988)',
+              'wetness ' +
+                wNow.toFixed(2) +
+                ' (topsoil ' +
+                (state.soilMoist != null
+                  ? state.soilMoist.toFixed(2) + ' m3/m3'
+                  : 'rain skin') +
+                ') - land albedo x ' +
+                terrainUniforms.uWetF.value.toFixed(2) +
+                ', roads x ' +
+                wetDarkenFactor(0.1, wNow).toFixed(2) +
+                '; p = 0.475 from the shipped Fresnel'
+            );
+          }
+        }
         if (landWSA)
-          uFarAlbedo.value.setRGB(landWSA[0], landWSA[1], landWSA[2]);
+          uFarAlbedo.value
+            .setRGB(landWSA[0], landWSA[1], landWSA[2])
+            .multiplyScalar(wetFarF);
 
         // A real solar eclipse dims the direct light by its obscuration.
         const ecl = astro.eclipse || 0;

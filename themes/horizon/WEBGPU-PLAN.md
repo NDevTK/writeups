@@ -9042,6 +9042,48 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   applyMirageFan fills both meshes in one pass and the record
   line now says "SECOND IMAGE drawn"). Full gate green - 132
   CPU references (looming 3) + 7 GPU probes.
+- DONE (Aug 9, the review session's 112th pass - THE WET WORLD:
+  a missing environmental system built by combining sources):
+  it rained in this world for a hundred passes and nothing ever
+  got wet. PRIMARY (read in full - the paper is openly served
+  complete in Fermat's Library's annotated rendering): Lekner &
+  Dorf 1988, "Why some things are darker when wet" (Appl. Opt.
+  27, 1278) - Angstrom's 1925 mechanism (diffuse reflection
+  under a water film feeds total internal reflection back onto
+  the absorber) with their two extensions: Eq. (9)'s
+  sub-critical Fresnel return and Eq. (11)'s relative-index
+  rise in the single-interaction absorption. NEW wetground.js +
+  wetground-reference (5 landmarks): THE INTERNAL MIRROR FROM
+  THE SHIPPED FRESNEL - Stern's isotropic-average reflectance
+  is INTEGRATED from the repo's own coxmunk fresnelRsRp (the
+  107th pass's split), not transcribed, and lands BOTH printed
+  return probabilities (Angstrom 0.4375 exact, theirs 0.475)
+  plus Stern's reciprocity R(x,n) = R(x/n^2,1/n) to 1e-15 -
+  the machinery that polarizes the drawn sea now sets how dark
+  the wet ground goes; the printed small-absorption ratios
+  1.07/1.08/1.10 land to 0.002; ANGSTROM'S 1925 PYRANOMETER
+  PAIRS land (dry sand 0.182 wets to 0.115 vs his measured
+  0.091, black mold 0.141 -> 0.092 vs 0.084 - the paper's own
+  Fig. 3 scatter); the model's honest SIGN CHANGE found and
+  gated - below dry albedo ~0.03 the film's ~2% entry gloss
+  outshines a near-black surface (wet coal glints), above it
+  everything wets darker, with A/a_d falling from weak to
+  strong absorption exactly as their Fig. 2 sentence says.
+  THE WETNESS STATE combines two live sources: open-meteo
+  soil_moisture_0_to_1cm (one variable added to the EXISTING
+  weather request - the world dries at the speed the soil
+  model actually dries) and the current rain (a skin film
+  exists while rain falls, saturating the surface regardless
+  of the column - stated). THE DRAWN WORLD: terrain-tsl gains
+  uWetF applied to the LAND albedo only (snow, sea and lake
+  ice never read it - a film on water is no film); the far
+  ring darkens at the box's own measured white-sky albedo; the
+  roads darken at the asphalt class THE PAPER ITSELF NAMES
+  ("rough solid surfaces, such as blackboards, asphalt, or
+  concrete"). ?wet pins wetness for the harness, ?wet=0
+  disables. Wet-road specular sheen and wet-snow are the
+  stated next stages. Full gate green - 133 CPU references
+  (wetground 5) + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
