@@ -8321,6 +8321,55 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   change (the double-fill was wasted work, not wrong work - the
   second fill produced the same spectrum). Full gate green -
   122 CPU references + 7 GPU probes.
+- DONE (Aug 9, the review session's 95th pass - measured droplet
+  size: VIIRS r_eff rescales the corona; the elve's fifth dead
+  end). THE HUNT FIRST: the Auger ICRC 2013 elves contribution
+  (arXiv 1307.5059, read in full) is trigger design and event
+  statistics - amplitudes in uncalibrated ADC channels, no
+  absolute photometry - and the 2025 TLECAM paper was already
+  instrument-only; the elve stays undrawn for want of an open
+  printed brightness, fifth documented attempt. THE PASS: the
+  droplet corona's ring scale was the printed stratus class
+  average (Miles' marine 19.2 / continental 10.8 um De, chosen
+  by the measured air-mass class); VIIRS retrieves cloud
+  effective radius PER PHASE and GIBS serves it over the same
+  keyless CORS-open WMTS as the other censuses. creff.js embeds
+  the published two-phase colormap VERBATIM (water 125 bands
+  4-30 um, ice 126 bands 5-60 um; the sourceValue axis is
+  micrometres x100, its own value attribute printing the
+  microns), classifies pixels phase-first and medians the box.
+  SCOPE THE PHYSICS DEMANDS, stated and gated: the WATER median
+  feeds the corona - D_e = 2 r_eff rescales the printed
+  lognormal mode at fixed sigma (the distribution's WIDTH stays
+  Miles' printed spectrum, its SIZE becomes the satellite's,
+  the class still choosing the width family); the ICE median is
+  recorded and NEVER fed - bulk ice r_eff includes the
+  aggregates that ring nothing (cloud-corona.js's own printed
+  caveat), and this tile proved the point: ice median 24 um
+  (48 um diameter) against the corona-visible 22 um crystal
+  class. GATE-HELD (6 landmarks) on a REAL Alpine tile
+  (2026-08-07: 6014 water pixels median 11.05 um - D_e 22.1,
+  a real day measurably above both printed class averages -
+  and 1222 ice pixels median 24.13): palette verbatim, phases
+  never mixed, real pixels read back, per-phase census with
+  unseen honesty, and the exact ring law - DOUBLING De halves
+  the first-minimum angle through the gated airyPattern, ratio
+  2.001. Client: syncCreff (the census pattern), refreshCoronaLUT
+  rebuilds the sun AND moon droplet patterns when the measured
+  De moves 0.3 um (the overcast r_eff consumer rides the same
+  choice); ?reff=UM pins; fail-closed to the class average.
+  CAPTURE HONESTY: the Overpass anchor lottery flapped ~50/50
+  across two pairs; cross-pairing the four captures yielded one
+  matched world (11.7% of pixels move under reff 5.4 -> 11) but
+  its camera faces forest - no ring portrait this round, stated;
+  the ring-DRAWING is capture-proven in the 11th and 85th
+  passes and this pass moves only their diameter input, held
+  exactly by the CPU identity. ALSO: tree-count alone is not a
+  full world fingerprint (the second matched-count pair
+  diverged on another layer lottery) - future whole-frame pairs
+  should compare the full record list. Gate: creff-reference
+  joins with 6 landmarks - full gate green, 123 CPU references
+  - 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

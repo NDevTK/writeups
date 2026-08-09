@@ -873,6 +873,12 @@
         ISCCP_LOW_TOP_M,
         ISCCP_MID_TOP_M
       } from './horizon/cloudtop.js';
+      import {
+        CREFF_FRESH_D,
+        CREFF_TILES,
+        CREFF_Z,
+        creffStats
+      } from './horizon/creff.js';
       import {measuredMag} from './horizon/cobs.js';
       import {buildPollenLUT, pollenTau, BIRCH_D_UM} from './horizon/pollen.js';
       import {
@@ -3123,6 +3129,106 @@
         } catch (e) {
           // the hand thickness stands
           if (params.has('debug')) console.warn('cloudtop: ' + e.message);
+        }
+      }
+      // MEASURED droplet size (creff.js): VIIRS effective radius
+      // per phase over the box - the water median's D_e = 2 r_eff
+      // rescales the droplet corona's printed mode (the ice
+      // median is recorded, never fed - bulk ice r_eff includes
+      // the aggregates that ring nothing). ?reff=UM pins the
+      // water r_eff; =0 disables.
+      let creffSeq = 0;
+      async function syncCreff() {
+        state.creff = null; // fail closed; set only below
+        if (params.get('reff') === '0') return;
+        if (params.has('reff')) {
+          const v = parseFloat(params.get('reff'));
+          if (Number.isFinite(v))
+            state.creff = {waterUm: v, iceUm: null, day: 'pinned'};
+          return;
+        }
+        if (overridden) return;
+        const seq = ++creffSeq;
+        try {
+          const anchor = {lat: state.lat, lon: state.lon};
+          const need = new Map();
+          for (const [sx, sz] of [
+            [-1, -1],
+            [1, -1],
+            [-1, 1],
+            [1, 1]
+          ]) {
+            const g = sceneToGeo((sx * WORLD) / 2, (sz * WORLD) / 2, anchor);
+            const p = pixelOf(g.lat, g.lon, CREFF_Z);
+            need.set(Math.floor(p.py / 256) + '/' + Math.floor(p.px / 256), [
+              Math.floor(p.py / 256),
+              Math.floor(p.px / 256)
+            ]);
+          }
+          let imgs = null;
+          let day = '';
+          for (let back = 1; back <= CREFF_FRESH_D + 1 && !imgs; back++) {
+            const d = new Date(Date.now() - back * 86400e3)
+              .toISOString()
+              .slice(0, 10);
+            try {
+              const loaded = await Promise.all(
+                [...need.values()].map(([r, c]) => {
+                  const img = new Image();
+                  img.crossOrigin = 'anonymous';
+                  img.src = CREFF_TILES.replace('{d}', d)
+                    .replace('{z}', CREFF_Z)
+                    .replace('{r}', r)
+                    .replace('{c}', c);
+                  return img.decode().then(() => img);
+                })
+              );
+              imgs = new Map([...need.keys()].map((k, i) => [k, loaded[i]]));
+              day = d;
+            } catch {
+              // that day not published - go older
+            }
+          }
+          if (!imgs || seq !== creffSeq) return;
+          const px = new Map();
+          for (const [k, img] of imgs) {
+            const cv = document.createElement('canvas');
+            cv.width = cv.height = 256;
+            const cx = cv.getContext('2d', {willReadFrequently: true});
+            cx.drawImage(img, 0, 0);
+            px.set(k, cx.getImageData(0, 0, 256, 256).data);
+          }
+          const pxAt = (ix, iy) => {
+            const d = px.get(Math.floor(iy / 256) + '/' + Math.floor(ix / 256));
+            if (!d) return null;
+            const o = ((iy & 255) * 256 + (ix & 255)) * 4;
+            return [d[o], d[o + 1], d[o + 2], d[o + 3]];
+          };
+          const stats = creffStats(pxAt, anchor, WORLD, 64);
+          if (stats.waterUm === null && stats.iceUm === null) return;
+          state.creff = {...stats, day};
+          record(
+            'VIIRS droplet size ' + day,
+            (stats.waterUm !== null
+              ? 'water r_eff ' +
+                stats.waterUm.toFixed(1) +
+                ' µm (D_e ' +
+                (2 * stats.waterUm).toFixed(1) +
+                ', n=' +
+                stats.nWater +
+                ') → the corona'
+              : 'no liquid seen') +
+              (stats.iceUm !== null
+                ? ' · ice ' +
+                  stats.iceUm.toFixed(1) +
+                  ' µm (n=' +
+                  stats.nIce +
+                  ', recorded only - bulk ice rings nothing)'
+                : '')
+          );
+        } catch (e) {
+          // the printed class average stands
+          if (params.has('debug')) console.warn('creff: ' + e.message);
         }
       }
       async function syncSnowCover() {
@@ -9198,6 +9304,8 @@
       let coronaSrcRMoon = null;
       let dropCls = null;
       let dropClsMoon = null;
+      let dropDe = null;
+      let dropDeMoon = null;
       function refreshCoronaLUT() {
         if (!atmo.ok) return;
         // 0 until the first ephemeris tick - the builder then takes
@@ -9214,13 +9322,30 @@
           // stratospheric pattern convolved with the live sun.
           atmo.bishopRing.setPattern(buildBishopLUT(R || undefined));
         }
-        // The deck droplet pattern rides the same disc drift AND
-        // the measured air-mass class (marine when sea salt owns
-        // the majority of the 555 nm column).
-        if (sunDrift || cls !== dropCls) {
+        // The deck droplet pattern rides the same disc drift, the
+        // measured air-mass class (marine when sea salt owns the
+        // majority of the 555 nm column) AND the measured droplet
+        // size: VIIRS water-phase r_eff x 2 (syncCreff) rescales
+        // the printed mode when the satellite saw liquid here
+        // today - the class average stands otherwise.
+        const deMeas =
+          state.creff && Number.isFinite(state.creff.waterUm)
+            ? 2 * state.creff.waterUm
+            : null;
+        if (
+          sunDrift ||
+          cls !== dropCls ||
+          Math.abs((deMeas ?? -1) - (dropDe ?? -1)) > 0.3
+        ) {
           dropCls = cls;
+          dropDe = deMeas;
           atmo.cloudCorona.setDropPattern(
-            buildDropletCoronaLUT(R || undefined, cls)
+            buildDropletCoronaLUT(
+              R || undefined,
+              cls,
+              undefined,
+              deMeas ?? undefined
+            )
           );
         }
         // The moon's own pattern: same crystals, the MOON's live
@@ -9239,10 +9364,20 @@
             buildBishopLUT(RM || undefined, [0, 0, 0])
           );
         }
-        if (moonDrift || cls !== dropClsMoon) {
+        if (
+          moonDrift ||
+          cls !== dropClsMoon ||
+          Math.abs((deMeas ?? -1) - (dropDeMoon ?? -1)) > 0.3
+        ) {
           dropClsMoon = cls;
+          dropDeMoon = deMeas;
           atmo.cloudCorona.setMoonDropPattern(
-            buildDropletCoronaLUT(RM || undefined, cls, [0, 0, 0])
+            buildDropletCoronaLUT(
+              RM || undefined,
+              cls,
+              [0, 0, 0],
+              deMeas ?? undefined
+            )
           );
         }
       }
@@ -11123,9 +11258,11 @@
         // is retired.
         {
           const reOv =
-            (state.marineAir
-              ? DROPLET_DE_OBS_UM.marine
-              : DROPLET_DE_OBS_UM.continental) / 2;
+            (state.creff && Number.isFinite(state.creff.waterUm)
+              ? 2 * state.creff.waterUm
+              : state.marineAir
+                ? DROPLET_DE_OBS_UM.marine
+                : DROPLET_DE_OBS_UM.continental) / 2;
           const tauOv = overcastTau(reOv);
           const tOv = overcastT(tauOv);
           // Ground coupling (the white-out): the deck re-reflects
@@ -14710,6 +14847,8 @@
         setInterval(syncSnotel, 60 * 60 * 1000);
         syncCloudTop();
         setInterval(syncCloudTop, 60 * 60 * 1000);
+        syncCreff();
+        setInterval(syncCreff, 60 * 60 * 1000);
         syncCobs();
         setInterval(syncCobs, 3 * 60 * 60 * 1000);
         syncPollen();

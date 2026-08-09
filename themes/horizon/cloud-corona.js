@@ -433,10 +433,21 @@ export function buildCloudCoronaLUT(
 export function buildDropletCoronaLUT(
   srcRadRad,
   cls = 'continental',
-  limbAlpha = undefined
+  limbAlpha = undefined,
+  deUm = undefined
 ) {
+  // A MEASURED effective diameter (VIIRS r_eff x 2, creff.js)
+  // rescales the printed mode: at fixed sigma every lognormal
+  // diameter scales together (D_e proportional to rm), so the
+  // distribution's WIDTH stays Miles' printed spectrum while its
+  // SIZE becomes the satellite's - measured over printed class
+  // average, the class still choosing the width family.
+  const mode = dropletMode(cls);
+  const m = Number.isFinite(deUm)
+    ? {...mode, rm: (mode.rm * deUm) / DROPLET_DE_OBS_UM[cls]}
+    : mode;
   return packCoronaLUT(
-    (um, thetas) => diffractionPattern(dropletMode(cls), um, thetas),
+    (um, thetas) => diffractionPattern(m, um, thetas),
     srcRadRad,
     limbAlpha
   );
