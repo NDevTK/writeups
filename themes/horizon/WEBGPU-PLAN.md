@@ -8427,6 +8427,54 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   only by its own record: the 1x display is unchanged
   everywhere the earlier captures pinned. Full gate green -
   123 CPU references + 7 GPU probes.
+- DONE (Aug 9, the review session's 98th pass - the living
+  index; the dewbow shelved with its chain written down). THE
+  SHELF RECORD FIRST: the dewbow (Minnaert's morning bow on
+  dewy grass) is fully drawable on shipped machinery - the bow
+  LUT at any measured drop radius, the terrain material's own
+  world-position/sun uniforms and grass mask, the ground conic
+  being nothing but antisolar-angle sampling on the terrain -
+  and its amplitude chain is identified (areal drop cover
+  f ~ (3/2) h_dew / r; the literature prints h_dew = 0.14
+  +/- 0.02 mm/night on grass and mean drop D ~ 0.2 mm) but
+  EVERY primary carrying those numbers is paywalled through
+  this route (Wiley, ScienceDirect, MDPI's Akamai). Shelved,
+  the elve pattern: any open print of dewfall depth + drop
+  size unshelves it, and at D ~ 0.2 mm the shipped machinery
+  itself will answer whether it draws white or coloured. THE
+  INDEX - the measured-first program as of pass 97, one line
+  per feed (module / gate landmarks / transport / pin):
+  METAR aerodromes (metar.js/11/daemon /metar/?metar),
+  radiosondes (sounding.js/18/daemon /sounding - freezing,
+  250+700 hPa, parcel LCL-LFC-EL-CAPE, bulk-Ri BLH, residual
+  layer, thinned refraction column/?sounding+?el),
+  NDBC wave spectra (buoy.js/11/daemon /buoy - Longuet-Higgins
+  bands into the FFT ocean, WTMP/?buoy), USGS discharge
+  (rivers.js/9/CORS-direct/?discharge), SNOTEL pillows
+  (snotel.js/5/CORS-direct/?snwd), AWDB closed-SWE chain
+  (recorded, awaiting AMSR3), VIIRS cloud tops
+  (cloudtop.js/6/GIBS census/?ctop), VIIRS droplet size
+  (creff.js/6/GIBS census/?reff), MODIS NDSI snow cover
+  (snowcover.js/GIBS census/?snowcover), VIIRS Black Marble
+  lights, MODIS BRDF+NDVI+phenology+surface colour, AMSR2 sea
+  ice + GHRSST MUR SST, ESA CCI ocean colour, OMPS-LP
+  stratospheric AOD + GFS ozone (daemon /ozone), TEMPO+TROPOMI
+  NO2, AERONET AOD (daemon /aeronet), GEFS aerosol (daemon
+  /aerosol), NOAA HMS smoke (daemon /smoke), open-meteo
+  weather/marine/air-quality/winds-aloft/tide, NOAA CO-OPS
+  tide, Blitzortung lightning (daemon stream), aisstream ships
+  (self-healing churn, upstream availability), adsb.lol
+  aircraft, CelesTrak TLEs, DSCOVR/ACE solar wind + OVATION +
+  K-index + F10.7 + solar regions (SWPC), GMN meteors, COBS
+  comets (daemon /comets), GVP eruptions (daemon /volcano),
+  MPC elements, Gaia starlight, GCVS variables, USGS quakes,
+  EONET wildfires, Falchi skyglow, OSM Overpass (nine layers),
+  AWS terrarium DEM. Gate: 123 CPU reference files + 7 GPU
+  probes; the standing shelf: elve (5 dead ends), dewbow
+  (above), fogbow feather DONE (97th), AIS upstream, mirage
+  (draws itself on a measured duct), residual layer DONE
+  (96th). No code in this pass - the entry IS the deliverable,
+  the map future sessions start from. Full gate green.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
