@@ -8475,6 +8475,37 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   (draws itself on a measured duct), residual layer DONE
   (96th). No code in this pass - the entry IS the deliverable,
   the map future sessions start from. Full gate green.
+- DONE (Aug 9, the review session's 99th pass - the live
+  census: what a real visitor gets). Every capture in 98
+  passes ran PINNED; this one loaded the page UNPINNED at
+  Nelson (a winter night, live feeds only) and read its own
+  instrument panel - the integration test no CPU gate can run.
+  VERDICT: the client-direct measured chain is healthy
+  end-to-end - ~55 records landed, among them open-meteo
+  current/aloft/air-quality/tide, SWPC F10.7 + K + wind +
+  regions + OVATION, GFS ozone + OMPS AOD, Black Marble
+  (1840 lamps), NDSI (0% seen - winter night honesty), VIIRS
+  cloud tops (100% cloudy, 8725 m high band only) AND droplet
+  size (all-ice box, 'recorded only - bulk ice rings nothing'
+  - the 95th's scope statement live), Morel/CIE colour, GloFAS
+    with Leopold-Maddock, Falchi, GMN-calendar meteors, GCVS
+    variables, both TLE groups, MPC, IGRF - and every ABSENCE
+    honest: 'no gauge in reach' keeps the model tide, no NZ
+    SNOTEL, no winter bloom, RainViewer 'no radar coverage
+    here'. The two same-scene satellite products CORROBORATE
+    each other (100% cloud at 8.7 km + an all-ice r_eff box =
+    one winter high-cloud sheet, seen twice). INSTRUMENT LIMIT,
+    stated: the shoot harness's server-side fetch cannot reach
+    api.ndev.tk, so the daemon-fed records (metar, sounding,
+    buoy, aeronet, comets, volcano, smoke, aerosol, streams)
+    are absent HERE while verified live in production after
+    every daemon push - the census audits the browser-direct
+    half, the endpoint checks audit the rest. ONE COSMETIC FIX:
+    the cloud-tops record dangled 'tops ' when only one band
+    existed - the segments now join cleanly. AIS check rode
+    along: attempts 71, frames 0 - the upstream still starves,
+    the engine still self-heals, as documented. Full gate
+    green - 123 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

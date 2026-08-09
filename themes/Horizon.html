@@ -3118,13 +3118,15 @@
             'VIIRS cloud tops ' + day,
             Math.round(stats.cloudFrac * 100) +
               '% of the box cloudy · tops ' +
-              (stats.lowM !== null ? Math.round(stats.lowM) + ' m low' : '') +
-              (stats.midM !== null
-                ? ' · ' + Math.round(stats.midM) + ' m mid'
-                : '') +
-              (stats.highM !== null
-                ? ' · ' + Math.round(stats.highM) + ' m high'
-                : '') +
+              [
+                stats.lowM !== null ? Math.round(stats.lowM) + ' m low' : null,
+                stats.midM !== null ? Math.round(stats.midM) + ' m mid' : null,
+                stats.highM !== null
+                  ? Math.round(stats.highM) + ' m high'
+                  : null
+              ]
+                .filter(Boolean)
+                .join(' · ') +
               (sr ? ' · bands per the ascent' : ' · ISA bands')
           );
         } catch (e) {
