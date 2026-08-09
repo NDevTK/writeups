@@ -846,7 +846,11 @@
       } from './horizon/mie.js';
       import {bscIndexOf, VARSTARS, varV} from './horizon/varstars.js';
       import {apparentAltRad} from './horizon/gvp.js';
-      import {SOUNDING_FRESH_H, SOUNDING_MAX_KM} from './horizon/sounding.js';
+      import {
+        levelAt,
+        SOUNDING_FRESH_H,
+        SOUNDING_MAX_KM
+      } from './horizon/sounding.js';
       import {
         BUOY_FRESH_H,
         BUOY_MAX_KM,
@@ -861,6 +865,14 @@
         SNOTEL_MAX_DELEV_M,
         SNOTEL_MAX_KM
       } from './horizon/snotel.js';
+      import {
+        CTOP_FRESH_D,
+        CTOP_TILES,
+        CTOP_Z,
+        ctopStats,
+        ISCCP_LOW_TOP_M,
+        ISCCP_MID_TOP_M
+      } from './horizon/cloudtop.js';
       import {measuredMag} from './horizon/cobs.js';
       import {buildPollenLUT, pollenTau, BIRCH_D_UM} from './horizon/pollen.js';
       import {
@@ -3003,6 +3015,116 @@
       }
 
       let snowCovSeq = 0;
+      // MEASURED cloud tops (cloudtop.js): the VIIRS afternoon
+      // pass's cloud-top heights over the box, censused through
+      // the same GIBS WMTS as the snow and lights. The ISCCP band
+      // boundaries come from the MEASURED radiosonde column when
+      // one is fresh (levelAt hM at 680/440 hPa), else the ISA
+      // heights. ?ctop=LOW,MID,HIGH pins (m a.s.l.); =0 disables.
+      let ctopSeq = 0;
+      async function syncCloudTop() {
+        state.ctop = null; // fail closed; set only below
+        if (params.get('ctop') === '0') return;
+        if (params.has('ctop')) {
+          const v = params.get('ctop').split(',').map(parseFloat);
+          state.ctop = {
+            lowM: Number.isFinite(v[0]) ? v[0] : null,
+            midM: Number.isFinite(v[1]) ? v[1] : null,
+            highM: Number.isFinite(v[2]) ? v[2] : null,
+            day: 'pinned',
+            cloudFrac: 1
+          };
+          return;
+        }
+        if (overridden) return;
+        const seq = ++ctopSeq;
+        try {
+          const anchor = {lat: state.lat, lon: state.lon};
+          const need = new Map();
+          for (const [sx, sz] of [
+            [-1, -1],
+            [1, -1],
+            [-1, 1],
+            [1, 1]
+          ]) {
+            const g = sceneToGeo((sx * WORLD) / 2, (sz * WORLD) / 2, anchor);
+            const p = pixelOf(g.lat, g.lon, CTOP_Z);
+            const c = Math.floor(p.px / 256);
+            const r = Math.floor(p.py / 256);
+            need.set(r + '/' + c, [r, c]);
+          }
+          let imgs = null;
+          let day = '';
+          for (let back = 1; back <= CTOP_FRESH_D + 1 && !imgs; back++) {
+            const d = new Date(Date.now() - back * 86400e3)
+              .toISOString()
+              .slice(0, 10);
+            try {
+              const loaded = await Promise.all(
+                [...need.values()].map(([r, c]) => {
+                  const img = new Image();
+                  img.crossOrigin = 'anonymous';
+                  img.src = CTOP_TILES.replace('{d}', d)
+                    .replace('{z}', CTOP_Z)
+                    .replace('{r}', r)
+                    .replace('{c}', c);
+                  return img.decode().then(() => img);
+                })
+              );
+              imgs = new Map([...need.keys()].map((k, i) => [k, loaded[i]]));
+              day = d;
+            } catch {
+              // that day not published - go older
+            }
+          }
+          if (!imgs || seq !== ctopSeq) return;
+          const px = new Map();
+          for (const [k, img] of imgs) {
+            const cv = document.createElement('canvas');
+            cv.width = cv.height = 256;
+            const cx = cv.getContext('2d', {willReadFrequently: true});
+            cx.drawImage(img, 0, 0);
+            px.set(k, cx.getImageData(0, 0, 256, 256).data);
+          }
+          const pxAt = (ix, iy) => {
+            const d = px.get(Math.floor(iy / 256) + '/' + Math.floor(ix / 256));
+            if (!d) return null;
+            const o = ((iy & 255) * 256 + (ix & 255)) * 4;
+            return [d[o], d[o + 1], d[o + 2], d[o + 3]];
+          };
+          // Band boundaries: the balloon's own 680/440 hPa heights
+          // when the ascent is ruling, else the ISA fallback.
+          const sr = state.profileMeas ? state.soundingData?.rows : null;
+          const lowTop = sr ? levelAt(sr, 680, 'hM') : null;
+          const midTop = sr ? levelAt(sr, 440, 'hM') : null;
+          const stats = ctopStats(
+            pxAt,
+            anchor,
+            WORLD,
+            64,
+            lowTop ?? ISCCP_LOW_TOP_M,
+            midTop ?? ISCCP_MID_TOP_M
+          );
+          if (!stats.n) return; // no cloud seen - the hand stands
+          state.ctop = {...stats, day};
+          record(
+            'VIIRS cloud tops ' + day,
+            Math.round(stats.cloudFrac * 100) +
+              '% of the box cloudy · tops ' +
+              (stats.lowM !== null ? Math.round(stats.lowM) + ' m low' : '') +
+              (stats.midM !== null
+                ? ' · ' + Math.round(stats.midM) + ' m mid'
+                : '') +
+              (stats.highM !== null
+                ? ' · ' + Math.round(stats.highM) + ' m high'
+                : '') +
+              (sr ? ' · bands per the ascent' : ' · ISA bands')
+          );
+        } catch (e) {
+          // the hand thickness stands
+          if (params.has('debug')) console.warn('cloudtop: ' + e.message);
+        }
+      }
       async function syncSnowCover() {
         if (params.get('snowcover') === '0' || !terrainObj) return;
         const seq = ++snowCovSeq;
@@ -13102,10 +13224,25 @@
             wmo >= 80 && Number.isFinite(elMeas)
               ? 16 * Math.asinh((elMeas - centerElev) / 500) + 8
               : null;
+          // MEASURED low-deck top for the NON-storm sky: the VIIRS
+          // census's low-band median through the same mapping
+          // (syncCloudTop; the parcel EL still outranks on storm
+          // codes). A slab thinner than 4 units degenerates - the
+          // hand thickness stands there, stated.
+          const ctopLow =
+            state.ctop && Number.isFinite(state.ctop.lowM)
+              ? state.ctop.lowM
+              : null;
+          const yLowTop =
+            wmo < 80 && ctopLow !== null
+              ? 16 * Math.asinh((ctopLow - centerElev) / 500) + 8
+              : null;
           lu.yTop.value =
             yEl !== null && yEl > yCloud + 8
               ? yEl
-              : yCloud + 8 + lu.cType.value * 9;
+              : yLowTop !== null && yLowTop > yCloud + 4
+                ? yLowTop
+                : yCloud + 8 + lu.cType.value * 9;
           lu.wOff.value.x += windV.x * state.wind * 0.06 * dt;
           lu.wOff.value.y += windV.z * state.wind * 0.06 * dt;
 
@@ -13116,7 +13253,16 @@
           mu.cov.value =
             cMid > 2 ? THREE.MathUtils.clamp(cMid / 100, 0, 0.95) : 0;
           mu.yBase.value = Math.max(16 * Math.asinh(8), yCloud + 16);
-          mu.yTop.value = mu.yBase.value + 6;
+          // The mid deck's top: measured (VIIRS mid-band median)
+          // when the census saw altostratus, the hand +6 otherwise.
+          const ctopMid =
+            state.ctop && Number.isFinite(state.ctop.midM)
+              ? 16 * Math.asinh((state.ctop.midM - centerElev) / 500) + 8
+              : null;
+          mu.yTop.value =
+            ctopMid !== null && ctopMid > mu.yBase.value + 2
+              ? ctopMid
+              : mu.yBase.value + 6;
           const w700 = state.wind700 ?? state.wind;
           mu.wOff.value.x += windVMid.x * w700 * 0.06 * dt;
           mu.wOff.value.y += windVMid.z * w700 * 0.06 * dt;
@@ -13125,10 +13271,17 @@
         // zero (full sun) whenever the decks are inactive.
         cloudShadow.update(sunVec, cloudsActive);
         if (cloudsActive) cloudSys.updateShadow();
+        // The cirrus level: measured (VIIRS high-band median)
+        // when the census saw high cloud, the 8 km hand otherwise.
         driftLayer(
           cloudsHigh,
           cHigh,
-          Math.max(16 * Math.asinh(16), yCloud + 26),
+          Math.max(
+            state.ctop && Number.isFinite(state.ctop.highM)
+              ? 16 * Math.asinh((state.ctop.highM - centerElev) / 500) + 8
+              : 16 * Math.asinh(16),
+            yCloud + 26
+          ),
           windVHigh,
           state.wind250 ?? state.wind
         );
@@ -14552,6 +14705,8 @@
         setInterval(syncBuoy, 30 * 60 * 1000);
         syncSnotel();
         setInterval(syncSnotel, 60 * 60 * 1000);
+        syncCloudTop();
+        setInterval(syncCloudTop, 60 * 60 * 1000);
         syncCobs();
         setInterval(syncCobs, 3 * 60 * 60 * 1000);
         syncPollen();

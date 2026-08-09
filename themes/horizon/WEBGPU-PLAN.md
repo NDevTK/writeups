@@ -8251,6 +8251,48 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the gate carries it, stated. Gate: sounding-reference grows
   15 -> 17 landmarks; full gate green - 121 CPU references +
   7 GPU probes.
+- DONE (Aug 9, the review session's 93rd pass - measured cloud
+  tops: VIIRS heights size every deck). The 88th gave the STORM
+  deck its measured top (parcel EL); every other deck still
+  wore the hand thickness (yCloud + 8 + cType\*9, mid +6, cirrus
+  at a fixed 8 km). The VIIRS afternoon pass RETRIEVES cloud-top
+  height at 750 m and GIBS serves it as palettized PNGs over the
+  same keyless CORS-open WMTS the snow and night-light censuses
+  ride: cloudtop.js embeds the published colormap VERBATIM
+  (240 bands of 50 m to 12 km plus the open [12000,+INF) anvil
+  class whose value is its FLOOR - "at least", never an invented
+  height). The GIBS colormap files were RENAMED upstream between
+  July and August (the snow census's old URL now 404s while its
+  vendored ramp keeps working) - vendoring verbatim is why these
+  censuses survive the churn, now demonstrated in production.
+  WHAT A PIXEL MEANS is stated and gated: opaque = retrieved
+  top; transparent = clear sky OR no retrieval, indistinguishable
+  - so the census claims HEIGHTS, never cover (cover stays with
+    METAR/model). ctopStats medians the box per the ISCCP bands
+    the repo already carries (cloud-climatology.js: low > 680 mb,
+    mid 440-680, high < 440), taking the two boundary HEIGHTS as
+    arguments: the client hands the MEASURED radiosonde column's
+    own 680/440 hPa heights (levelAt hM - the 92nd pass's rows)
+    when an ascent is ruling, else the ISA barometric heights
+    3240/6508 m (gate-derived from the formula itself). GATE-HELD
+    (6 landmarks) on pixels from a REAL Alpine tile (2026-08-07,
+    24.8% cloud, banded median 5575 m, 474 anvil pixels): palette
+    verbatim, inversion exact, real pixels read back 3075-3725 m,
+    scripted census medians per band (its colours drawn FROM the
+    vendored table - an earlier draft invented rgb values and the
+    classifier rightly refused them), unseen honesty, ISA
+    identities. DISPLAY: low deck yTop = the census's low-band
+    median through the terrain mapping on NON-storm codes (the
+    parcel EL still outranks storms; slabs thinner than 4 units
+    degenerate and the hand stands, stated); mid deck yTop = the
+    mid median; the cirrus level = the high median (anvil floor
+    included). ?ctop=LOW,MID,HIGH pins; =0 disables; fail-closed
+    null on roam and on a box the satellite never answered. A/B at
+    pinned Nelson noon, matched worlds (359 trees both): hand
+    thickness vs pinned measured tops 2600/5600/9200 m - 10.7% of
+    pixels move as the fair-weather field deepens at constant base
+    and cover. Gate: cloudtop-reference joins with 6 landmarks -
+    full gate green, 122 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
