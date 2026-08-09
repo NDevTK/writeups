@@ -1323,6 +1323,19 @@ export function createRedSpriteMaterial() {
   return {material, u};
 }
 
+// The rod-luminance of an RGB node - the SAME Purkinje fold the
+// star sprites carry inline (sRGB->XYZ, then the gated scotopic
+// luminance estimator; adaptation.js holds the law): billboards
+// mix toward this with their scotB uniform.
+const rodY = (c) => {
+  const Xc = c.x.mul(0.4124).add(c.y.mul(0.3576)).add(c.z.mul(0.1805));
+  const Yc = c.x.mul(0.2126).add(c.y.mul(0.7152)).add(c.z.mul(0.0722));
+  const Zc = c.x.mul(0.0193).add(c.y.mul(0.1192)).add(c.z.mul(0.9505));
+  return Yc.mul(
+    Yc.add(Zc).div(max(Xc, 1e-12)).add(1.0).mul(1.33).sub(1.68)
+  ).div(2.31);
+};
+
 // Light pillar quad (lightpillars.js law): the diamond-dust
 // image column over a city lamp - flat body (every height inside
 // the layer mirrors somewhere along the sightline), the top
@@ -1367,7 +1380,9 @@ export function createPlumeMaterial() {
     uBend: uniform(0),
     uWiden: uniform(2.5),
     uCol: uniform(new Vector3(0.36, 0.33, 0.3)),
-    uDay: uniform(1)
+    uDay: uniform(1),
+    // Twilight plumes grey with the rods like everything else.
+    scotB: uniform(1)
   };
   const material = new NodeMaterial();
   material.transparent = true;
@@ -1380,7 +1395,8 @@ export function createPlumeMaterial() {
   const top = float(1).sub(smoothstep(float(0.9), float(1.0), v));
   const base = smoothstep(float(0.0), float(0.04), v);
   const a = body.mul(top).mul(base).mul(u.amp);
-  material.colorNode = u.uCol.mul(u.uDay);
+  const lit = u.uCol.mul(u.uDay);
+  material.colorNode = mix(vec3(rodY(lit)), lit, u.scotB);
   material.opacityNode = clamp(a, 0.0, 1.0);
   return {material, u};
 }
@@ -1401,7 +1417,10 @@ export function createNacreousMaterial(lut) {
   tex.needsUpdate = true;
   const u = {
     ampV: uniform(new Vector3(0, 0, 0)),
-    sunDir: uniform(new Vector3(0, 1, 0))
+    sunDir: uniform(new Vector3(0, 1, 0)),
+    // The twilight nacreous display lives in mesopic light - it
+    // joins the same gated rod fold as the rest of the frame.
+    scotB: uniform(1)
   };
   const material = new NodeMaterial();
   material.transparent = true;
@@ -1425,7 +1444,8 @@ export function createNacreousMaterial(lut) {
   const ex = uv().x.sub(0.5).div(0.38);
   const ey = uv().y.sub(0.5).div(0.22);
   const env = exp(ex.pow(2).add(ey.pow(2)).negate().mul(3.0));
-  material.colorNode = pat.mul(env).mul(u.ampV);
+  const lit = pat.mul(env).mul(u.ampV);
+  material.colorNode = mix(vec3(rodY(lit)), lit, u.scotB);
   material.opacityNode = float(1);
   return {material, u};
 }
@@ -1455,7 +1475,12 @@ export function createGloryMaterial(lut) {
   tex.needsUpdate = true;
   const u = {
     ampV: uniform(new Vector3(0, 0, 0)),
-    antiDir: uniform(new Vector3(0, -1, 0))
+    antiDir: uniform(new Vector3(0, -1, 0)),
+    // The mesopic rod fold (the same gated Eq. 13 mirror the
+    // dome, stars and optics ride) - fed mesoB per frame so a
+    // moonlit ring greys exactly as the printed colour floor
+    // says real lunar coronae do.
+    scotB: uniform(1)
   };
   const material = new NodeMaterial();
   material.transparent = true;
@@ -1473,7 +1498,8 @@ export function createGloryMaterial(lut) {
     .add(0.5 / lut.w);
   const pat = texN.sample(vec2(uTh, 0.5)).rgb;
   const feather = float(1).sub(smoothstep(float(0.86), float(1.0), gN));
-  material.colorNode = pat.mul(feather).mul(u.ampV);
+  const lit = pat.mul(feather).mul(u.ampV);
+  material.colorNode = mix(vec3(rodY(lit)), lit, u.scotB);
   material.opacityNode = float(1);
   return {material, u};
 }

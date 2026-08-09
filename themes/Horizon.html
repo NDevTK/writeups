@@ -12936,9 +12936,17 @@
         // ?halo=0 is its override.
         opticsU.sunDir.value.copy(sunVec);
         opticsU.antisolar.value.copy(sunVec).negate();
-        // Both optics domes grey with the rods (see scotFold).
+        // Both optics domes grey with the rods (see scotFold) -
+        // and the whole billboard family (glory, pollen corona,
+        // nacreous, plume) rides the same fold now.
         opticsU.scotB.value = mesoB;
         opticsMoonU.scotB.value = mesoB;
+        glorySunObj.u.scotB.value = mesoB;
+        gloryMoonObj.u.scotB.value = mesoB;
+        pollenObj.u.scotB.value = mesoB;
+        pollenMoonObj.u.scotB.value = mesoB;
+        plumeObj.u.scotB.value = mesoB;
+        for (const p of pscPool) p.u.scotB.value = mesoB;
         // The same asinh inversion the sky LUT feed uses: the
         // camera's real altitude, so the rain column is the
         // freezing level ABOVE THE EYE.
