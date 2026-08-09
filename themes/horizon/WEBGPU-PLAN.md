@@ -9448,6 +9448,48 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   project. Shelf status: comets / purple light / sprites remain
   OPTIONAL garnish behind the deepening work (closures on the
   same frozen day, the archive itself).
+- DONE (Aug 9, the review session's 124th pass - THE RESEARCH VIEW
+  COMES HOME: the user's correction taken literally - "I asked for
+  the PAGE to be useful for research", and the page is Horizon.html):
+  the standalone harness/observatory.html is RETIRED (deleted; a
+  sibling page was the wrong reading of the steer) and the research
+  view now lives in the theme's own data panel (the ✦ toggle /
+  ?debug=1 / D key) as a RESEARCH section rendered between the live
+  values and the source provenance: the observatory compositions -
+  each reference-gated on the frozen day - run on THIS page's own
+  live state, so the panel diagnoses the world currently drawn.
+  Lines: mirage (folds at two eyes, horizon refraction vs ISA,
+  flattening, rim - the drawn sun's own numbers), contrail layer
+  (formation zone / ISSR sheets / persistence verdict), wave ladder
+  (vector-vs-scalar crest wind, lam and the resonant ridge window),
+  whitecaps (the SAME Monahan number the drawn sea carries - the
+  panel's existing sea-state line and the research line agree,
+  verified in the live dump), wet ground (wetness -> the exact
+  factor multiplying the drawn terrain), meteors (IMO calendar ZHR
+  x the GMN measured share from state.gmn), tonight's passes (SGP4
+  over state.tleText - captured at the existing /tles sync - graded
+  by the live McCants catalogue the theme already fetches), and the
+  tide surge study (ONE lazy 30-day gauge + harcon fetch per
+  session, only while someone is looking: surge now, held-out RMS,
+  the M2/O1 node ratios). Every line fails closed by name when its
+  measurement is absent ("no fresh ascent - no mirage claim" -
+  observed live when the shooter's egress geolocated somewhere
+  without a fresh 12Z). Compute posture: recomputed on panel open
+  with two catch-up cycles (15/32 s - the first sync RACES the
+  feeds, measured: the initial 8 s pass caught only the early
+  weather state) then a minute cadence; about a second of work,
+  diagnostics cadence not frame cadence. VERIFIED in the real page
+  under the WebGPU shooter with --dump-text: all eight research
+  lines render from live state, and the shooter's location turned
+  out to be a WAVE DAY (vector 9.4 m/s crest wind, lam 14.1 km,
+  ridges 3.5-14 km would resonate) with 108 passes in the coming
+  dark hours - the in-page view already reporting weather the
+  frozen fixture never saw. The gate machinery is untouched and
+  still the instrument's spine: observatory.js (composition only,
+  never a law), the frozen fixture + generated day pins, and the
+  21-landmark reference all serve the THEME's research section
+  now. FINDINGS section 7 rewritten to name the research view as
+  Horizon.html's own.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

@@ -278,8 +278,9 @@ The practice the corpus demonstrates, stated so it can be reused:
    (a normalization, a sign) are pinned once, documented as conventions,
    and the gate asserts they are global — a convention that varies
    per-row would be a fit, and fails.
-7. **The instrument** (`harness/observatory.html`, passes 114–122): the
-   gated modules run on the LIVE feeds and draw their diagnostics — the
+7. **The research view** (Horizon.html's data panel, passes 114–124):
+   the gated modules run on the LIVE feeds and report their diagnostics
+   inside the theme's own page — the
    current ascent's fold count and horizon refraction, the measured
    wind's whitecap fraction, six cities on the wet-albedo ladder, the
    day's aerosol-diluted polarization map, the active-region count's
@@ -288,7 +289,7 @@ The practice the corpus demonstrates, stated so it can be reused:
    pass's radiative closure re-run on the current measured irradiance
    at every load, and the Schmidt–Appleman criterion scanned over the
    whole ascent — formation zone, ice-supersaturated sheets, and their
-   overlap — with live ADS-B aircraft marked on the temperature curve — the per-level lee-wave ladder with its resonant ridge-width windows, the Schureman frame predicting the unseen tide gauge with the surge read off the residual and the lunar node in the fitted-vs-published ratios, and the visual satellite fleet propagated across the coming night with every culmination graded by the measured magnitude catalogue.
+   overlap, the per-level lee-wave ladder with its resonant ridge-width windows, the Schureman frame predicting the unseen tide gauge with the surge read off the residual and the lunar node in the fitted-vs-published ratios, and the visual satellite fleet propagated across the coming night with every culmination graded by the measured magnitude catalogue. Since pass 124 these diagnoses render as the RESEARCH section of the theme's own data panel (✦ / ?debug=1 / D), computed from the page's live state — the drawn world, diagnosed in place; a standalone harness page was tried and retired.
    One real day (2026-08-09, San Diego: a +8.7 °C marine
    inversion that folds the fan at eye 450 m and not at 15 m; 1842
    measured Perseids 2.7 days before peak; the drawn dome landing 97.4 %

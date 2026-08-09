@@ -554,6 +554,18 @@
         SATMAG_URL,
         snapshotMap
       } from './horizon/satmags.js';
+      // The research view (data panel, R section): the same gated
+      // compositions the reference pins, run on THIS page's own
+      // live state - the drawn world, diagnosed in place.
+      import {
+        columnPanel,
+        contrailPanel,
+        leewavePanel,
+        meteorsPanel,
+        monahanW,
+        satsPanel,
+        tidePanel
+      } from './horizon/observatory.js';
       import {
         lunarEclipse,
         moonAngularRadiusRad,
@@ -9813,6 +9825,7 @@
           const text = await (
             await fetch(TLE_PROXY, {credentials: 'omit'})
           ).text();
+          state.tleText = text; // the research view predicts passes from it
           const sets = parseTLEs(text).filter((s) => s.norad !== 25544);
           if (!sets.length || !window.satellite) return;
           satFleet = sets.map((s) => ({
@@ -10288,6 +10301,17 @@
           line.textContent = k + ': ' + v;
           panel.appendChild(line);
         }
+        if (Object.keys(research).length) {
+          const rh = document.createElement('b');
+          rh.textContent =
+            '\nresearch · the drawn world diagnosed (reference-gated)\n';
+          panel.appendChild(rh);
+          for (const [k, v] of Object.entries(research)) {
+            const line = document.createElement('div');
+            line.textContent = '· ' + k + ' — ' + v;
+            panel.appendChild(line);
+          }
+        }
         const hdr = document.createElement('b');
         hdr.textContent = '\nlive sources\n';
         panel.appendChild(hdr);
@@ -10303,10 +10327,218 @@
         }
       }
       setInterval(refreshPanel, 1000);
+      // ---------- the research view (same panel, R section) ----------
+      // The observatory compositions - each one reference-gated on a
+      // frozen real day (observatory-reference.mjs) - run here on the
+      // page's OWN live state, so the panel diagnoses the world
+      // currently drawn: does this column mirage, where would trails
+      // persist, what would resonate, who passes tonight. Lines fail
+      // closed by name when their measurement is absent. Recomputed
+      // on panel open and each minute while open (about a second of
+      // work - diagnostics cadence, not frame cadence).
+      const research = {};
+      let researchBusy = false;
+      let tideStudy = null; // one lazy 30-day fetch per session
+      async function syncResearch() {
+        if (researchBusy) return;
+        researchBusy = true;
+        try {
+          const rows = state.soundingData?.rows;
+          if (Array.isArray(rows) && rows.length >= 10) {
+            const c = columnPanel(rows);
+            const [beach, aloft] = c.observers;
+            research['mirage (measured column)'] =
+              `folds ${beach.folds}/${aloft.folds} at eye 15/450 m · ` +
+              `inversion +${c.inversion.dT.toFixed(1)}°C at ` +
+              `${c.inversion.hM} m · horizon R ` +
+              `${beach.r0Arcmin.toFixed(1)}′ vs ISA ` +
+              `${beach.r0IsaArcmin.toFixed(1)}′ · sunset flattening ` +
+              `${beach.flatten.toFixed(2)} · green rim ` +
+              `${beach.rimArcsec.toFixed(0)}″`;
+            const con = contrailPanel(rows);
+            research['contrail layer (Schmidt–Appleman)'] =
+              (con.formBand
+                ? `forms ${(con.formBand.loM / 1000).toFixed(1)}–` +
+                  `${(con.formBand.hiM / 1000).toFixed(1)} km`
+                : 'no formation zone') +
+              ' · ' +
+              (con.issrLevels.length
+                ? `ice-supersaturated at ` +
+                  con.issrLevels
+                    .map((q) => (q.hM / 1000).toFixed(1))
+                    .join('/') +
+                  ' km'
+                : 'no supersaturated sheet') +
+              ' · ' +
+              (con.persistBand
+                ? `PERSIST ${(con.persistBand.loM / 1000).toFixed(1)}–` +
+                  `${(con.persistBand.hiM / 1000).toFixed(1)} km`
+                : 'nothing persists');
+            const lee = leewavePanel(rows);
+            research['wave ladder (Stull ch. 17)'] = lee.layer
+              ? `1–3 km wind: vector ${lee.layer.mMs.toFixed(1)} vs ` +
+                `scalar ${lee.layer.scalarMs.toFixed(1)} m/s` +
+                (lee.spot
+                  ? ` · λ ${(lee.spot.lamM / 1000).toFixed(1)} km at ` +
+                    `${(lee.spot.hM / 1000).toFixed(1)} km → ridges ` +
+                    `${lee.spot.wLoM.toFixed(0)}–` +
+                    `${lee.spot.wHiM.toFixed(0)} m would resonate`
+                  : '') +
+                (lee.layer.mMs < 1 ? ' · under the 1 m/s gate' : '')
+              : 'no wind-bearing levels';
+          } else {
+            research['mirage (measured column)'] =
+              'no fresh ascent - no mirage claim';
+            delete research['contrail layer (Schmidt–Appleman)'];
+            delete research['wave ladder (Stull ch. 17)'];
+          }
+          if (Number.isFinite(state.wind)) {
+            const u = state.wind / 3.6;
+            research['whitecaps (Monahan 1980)'] =
+              `${(monahanW(u) * 100).toFixed(2)}% of the drawn sea in ` +
+              `foam at ${u.toFixed(1)} m/s`;
+          }
+          if (
+            Number.isFinite(state.soilMoist) ||
+            Number.isFinite(state.precip)
+          ) {
+            const w = wetnessFrom(state.soilMoist, state.precip);
+            research['wet ground (Lekner–Dorf 1988)'] =
+              `wetness ${w.toFixed(2)} → drawn ground at ` +
+              `${Math.round(wetDarkenFactor(0.2, w) * 100)}% of its dry ` +
+              `brightness`;
+          }
+          if (window.Astronomy && state.gmn?.medians?.all?.n) {
+            const lam = Astronomy.SunPosition(
+              Astronomy.MakeTime(new Date())
+            ).elon;
+            const m = meteorsPanel({
+              lamSunDeg: lam,
+              gmnMedians: state.gmn.medians
+            });
+            const top = m.shares?.filter((s) => s.code !== 'spo')[0];
+            research['meteors (IMO calendar × GMN)'] =
+              `${m.shower.name} ZHR ${m.zhrNow.toFixed(0)}, peak in ` +
+              `${m.daysToPeak.toFixed(1)} d` +
+              (top
+                ? ` · measured: ${top.code} ${(top.share * 100).toFixed(0)}%` +
+                  ` of yesterday's ${state.gmn.medians.all.n} meteors`
+                : '');
+          }
+          if (state.tleText && window.satellite && window.Astronomy) {
+            const obsR = new Astronomy.Observer(state.lat, state.lon, 30);
+            const eqAt = (ms) => {
+              const t = Astronomy.MakeTime(new Date(ms));
+              return {
+                t,
+                eq: Astronomy.Equator(Astronomy.Body.Sun, t, obsR, true, true)
+              };
+            };
+            const r = satsPanel({
+              tleText: state.tleText,
+              latDeg: state.lat,
+              lonDeg: state.lon,
+              startMs: Date.now(),
+              hours: 14,
+              satlib: satellite,
+              sunRaDecAtMs: (ms) => {
+                const {eq} = eqAt(ms);
+                return {raH: eq.ra, decDeg: eq.dec};
+              },
+              sunAltAtMs: (ms) => {
+                const {t, eq} = eqAt(ms);
+                return Astronomy.Horizon(t, obsR, eq.ra, eq.dec, 'normal')
+                  .altitude;
+              },
+              mags: satMags ?? snapshotMap()
+            });
+            const best = r.passes[0];
+            research["tonight's passes (SGP4 × McCants)"] =
+              `${r.passes.length} above 20° / ${r.nakedEye} naked-eye in ` +
+              `the next ${r.darkHours.toFixed(1)} dark h` +
+              (best
+                ? ` · best ${best.name.trim()} mag ` +
+                  `${best.minMag.toFixed(1)} at ` +
+                  new Date(best.peakMs).toISOString().slice(11, 16) +
+                  'Z'
+                : '');
+          }
+          // The surge study: one 30-day gauge fetch per session,
+          // only while someone is actually looking.
+          if (!tideStudy) {
+            tideStudy = 'fetching';
+            try {
+              const sid = '9410170';
+              const [wl, hc] = await Promise.all([
+                fetch(
+                  'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=water_level&application=horizon&range=720&datum=MSL&units=metric&time_zone=gmt&format=json&station=' +
+                    sid,
+                  {credentials: 'omit'}
+                ).then((r) => r.json()),
+                fetch(
+                  'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/' +
+                    sid +
+                    '/harcon.json?units=metric',
+                  {credentials: 'omit'}
+                )
+                  .then((r) => r.json())
+                  .catch(() => null)
+              ]);
+              const vals = wl.data
+                .filter((_, i) => i % 10 === 0)
+                .map((q) => parseFloat(q.v))
+                .filter(Number.isFinite);
+              if (vals.length >= 700) {
+                const pub = hc
+                  ? Object.fromEntries(
+                      hc.HarmonicConstituents.map((q) => [
+                        q.name,
+                        {ampM: q.amplitude}
+                      ])
+                    )
+                  : null;
+                const t = tidePanel(
+                  {values: vals, stepHours: 1},
+                  {published: pub}
+                );
+                const o1 = t.amps.find((a) => a.n === 'O1');
+                tideStudy =
+                  `surge ${(t.latestResidM * 100).toFixed(1)} cm now · ` +
+                  `the fit held the unseen 5 d to ` +
+                  `${(t.rmsOutM * 100).toFixed(1)} cm RMS` +
+                  (t.amps[0].ratio
+                    ? ` · vs published: M2 ×${t.amps[0].ratio.toFixed(2)}, ` +
+                      `O1 ×${o1.ratio.toFixed(2)} (the 18.6-yr node)`
+                    : '');
+              } else tideStudy = 'gauge record too short';
+            } catch {
+              tideStudy = null; // retry on a later cycle
+            }
+          }
+          if (typeof tideStudy === 'string' && tideStudy !== 'fetching')
+            research['tide surge (Schureman fit, San Diego gauge)'] = tideStudy;
+        } finally {
+          researchBusy = false;
+          refreshPanel();
+        }
+      }
+      setInterval(() => {
+        if (panelOn) syncResearch();
+      }, 60000);
+      // The first syncs race the feeds - diagnose what arrived,
+      // then catch the stragglers twice before settling to the
+      // minute cadence.
+      const researchKick = () => {
+        syncResearch();
+        setTimeout(() => panelOn && syncResearch(), 15000);
+        setTimeout(() => panelOn && syncResearch(), 32000);
+      };
+      if (panelOn) setTimeout(researchKick, 6000);
       function setPanel(on) {
         panelOn = on;
         panel.hidden = !on;
         refreshPanel();
+        if (on) researchKick();
       }
       addEventListener('keydown', (e) => {
         // 'd' strafes once the free camera is engaged; use ?debug=1 or
