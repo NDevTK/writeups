@@ -78,6 +78,7 @@ import {
   parcelAscent,
   parseIgraStations,
   parseWyoText,
+  thinRows,
   WYO_BASE
 } from '../../sounding.js';
 import {
@@ -1995,6 +1996,10 @@ function main() {
             drct700: levelAt(rows, 700, 'drct'),
             spd700Ms: levelAt(rows, 700, 'spdMs'),
             blhAglM: blhRiM(rows),
+            // The thinned profile itself (~4 KB): the client's
+            // refraction column rides the balloon (sounding.js
+            // thinRows keeps the mirage-making low rows verbatim).
+            rows: thinRows(rows),
             // The parcel ascent (sounding.js, gated): measured
             // cloud base / storm top / instability energy.
             ...parcelAscent(rows)

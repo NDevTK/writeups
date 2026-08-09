@@ -26,8 +26,16 @@ import {
   RD_J_KGK,
   RI_CRIT,
   SOUNDING_FRESH_H,
-  SOUNDING_MAX_KM
+  SOUNDING_MAX_KM,
+  thinRows
 } from './sounding.js';
+import {
+  buildProfile,
+  DEG,
+  foldCount,
+  sunRefraction,
+  transferCurve
+} from './refraction.js';
 import {WYO_FIXTURE_TEXT} from './sounding-fixture.js';
 
 let fail = 0;
@@ -233,7 +241,57 @@ const rows = parseWyoText(WYO_FIXTURE_TEXT);
   );
 }
 
-// ---- 8. the station list ----------------------------------------
+// ---- 8. the balloon's column through the refraction machine -----
+{
+  const thin = thinRows(rows);
+  const lv = thin
+    .filter((q) => q.hM > thin[0].hM + 0.5)
+    .map((q) => ({pPa: q.p * 100, hM: q.hM, tC: q.tC, rh: q.rh / 100}));
+  const prof = buildProfile(lv, {
+    hM: thin[0].hM,
+    tC: thin[0].tC,
+    rh: thin[0].rh / 100
+  });
+  const sr = sunRefraction(0, prof, 2, 800);
+  const arcmin = ((sr.appG - 0) / DEG) * 60;
+  const tc = transferCurve(prof, 2);
+  check(
+    'the measured ascent refracts the sunset',
+    thin.length === 119 &&
+      thin[0].p === 961.4 &&
+      thin[thin.length - 1].p === 100 &&
+      Math.abs(arcmin - 24.0) < 0.1 &&
+      sr.flatten > 0.9 &&
+      sr.flatten < 0.95 &&
+      foldCount(tc.tG) === 0,
+    `1099 rows thin to ${thin.length} (surface and top verbatim, the ` +
+      `lowest 20 undecimated); the SHIPPED Ciddor/Auer-Standish machinery ` +
+      `on the balloon's own column lifts the true-zero sun ` +
+      `${arcmin.toFixed(2)} arcmin and squashes it to ${sr.flatten.toFixed(3)} ` +
+      `- and folds NOTHING: this smooth summer ascent carries no mirage, ` +
+      `stated, not assumed`
+  );
+  const profInv = buildProfile(
+    [
+      {pPa: 94400, hM: 550, tC: 10, rh: 0.5},
+      {pPa: 93800, hM: 600, tC: 10.2, rh: 0.5},
+      {pPa: 90000, hM: 950, tC: 8, rh: 0.5},
+      {pPa: 80000, hM: 1900, tC: 2, rh: 0.5},
+      {pPa: 50000, hM: 5500, tC: -20, rh: 0.3}
+    ],
+    {hM: 500, tC: 2, rh: 0.7}
+  );
+  check(
+    'a measured inversion WOULD mirage',
+    foldCount(transferCurve(profInv, 2).tG) >= 1,
+    `a +8 degC / 50 m surface inversion folds the same transfer curve ` +
+      `(${foldCount(transferCurve(profInv, 2).tG)} inverted images) - when ` +
+      `an ascent measures a duct, the drawn sun mirages by the machinery ` +
+      `already in the chain, no new law`
+  );
+}
+
+// ---- 9. the station list ----------------------------------------
 {
   // The REAL Payerne row, verbatim from the fetched list.
   const line =

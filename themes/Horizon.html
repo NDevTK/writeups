@@ -1459,6 +1459,10 @@
               tC: state.temp,
               rh: rhSurf
             });
+            // The balloon's column outranks the model's when a
+            // fresh ascent shipped rows (applySounding) - the
+            // re-assert at the model's own sync, as everywhere.
+            if (state.profileMeas) state.profile = state.profileMeas;
             // Harness introspection (same precedent as __astro):
             // the profile OBJECT holds closures, so expose its
             // measured INPUTS - buildProfile on these reproduces
@@ -4303,7 +4307,13 @@
         // have no other writer, so a roam must not fossilise them).
         state.blhAglMeas = null;
         state.stormTopM = null;
-        if (!s || overridden) return;
+        // (profileMeas clears too - the model column's own sync
+        // rebuilds state.profile on its cadence.)
+        state.profileMeas = null;
+        // An EXPLICIT ?sounding=URL pin is authoritative even
+        // under pin=1 (the harness A/B) - a bare pin still
+        // silences the measurement, as everywhere.
+        if (!s || (overridden && !params.has('sounding'))) return;
         const ageH = (Date.now() - Date.parse(s.at)) / 3600e3;
         if (ageH > SOUNDING_FRESH_H || s.distKm > SOUNDING_MAX_KM) return;
         if (Number.isFinite(s.freezingM)) state.freezing = s.freezingM;
@@ -4317,6 +4327,34 @@
         // the pollen column's depth outranks the model BLH;
         // cleared above, set only here.
         if (Number.isFinite(s.blhAglM)) state.blhAglMeas = s.blhAglM;
+        // The refraction column rides the BALLOON when the ascent
+        // ships its thinned rows: the same gated buildProfile the
+        // model column uses, fed the measured profile - the drawn
+        // sun's lift, squash, green rim and any measured-inversion
+        // folds all follow (the transfer LUT is identity-keyed).
+        if (Array.isArray(s.rows) && s.rows.length >= 10) {
+          const lv = s.rows
+            .filter((q) => q.hM > s.rows[0].hM + 0.5)
+            .map((q) => ({
+              pPa: q.p * 100,
+              hM: q.hM,
+              tC: q.tC,
+              rh: (q.rh ?? 0) / 100
+            }));
+          state.profileMeas = buildProfile(lv, {
+            hM: s.rows[0].hM,
+            tC: s.rows[0].tC,
+            rh: (s.rows[0].rh ?? 0) / 100
+          });
+          state.profile = state.profileMeas;
+          record(
+            'refraction column (radiosonde)',
+            s.rows.length +
+              ' rows to ' +
+              Math.round(s.rows[s.rows.length - 1].hM / 1000) +
+              ' km · the drawn sun rides the ascent'
+          );
+        }
         if (Number.isFinite(s.t250C) && Number.isFinite(s.rh250)) {
           if (!params.has('t250')) state.t250 = s.t250C;
           state.contrail = appleman(25000, s.t250C, s.rh250 / 100);
@@ -4558,7 +4596,11 @@
         }
       }
       async function syncSounding() {
-        if (SOUNDING_PROXY === '0' || overridden) return;
+        // An explicit ?sounding=URL works under pin=1 (the
+        // harness A/B path, like ?buoy) - a bare pin still
+        // silences the default daemon fetch.
+        if (SOUNDING_PROXY === '0' || (overridden && !params.has('sounding')))
+          return;
         try {
           const r = await (
             await fetch(

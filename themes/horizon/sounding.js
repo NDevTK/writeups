@@ -230,6 +230,37 @@ export function parcelAscent(rows) {
   };
 }
 
+// Thin an ascent's rows for transport and for the refraction
+// column: the lowest KEEP_LOW rows stay verbatim (surface
+// inversions - the mirage-making structure - live in the first
+// hundred metres and must not be decimated), the remainder is
+// strided to fit maxN, and the top row always survives (the
+// column's isothermal continuation anchors there). Fields kept
+// are exactly what buildProfile consumes: p, hM, tC, rh.
+export function thinRows(rows, maxN = 120, keepLow = 20) {
+  const lv = rows
+    .filter(
+      (r) =>
+        Number.isFinite(r.p) && Number.isFinite(r.hM) && Number.isFinite(r.tC)
+    )
+    .sort((a, b) => b.p - a.p)
+    .map((r) => ({
+      p: r.p,
+      hM: r.hM,
+      tC: r.tC,
+      rh: Number.isFinite(r.rh) ? r.rh : 0
+    }));
+  if (lv.length <= maxN) return lv;
+  const low = lv.slice(0, keepLow);
+  const rest = lv.slice(keepLow);
+  const need = maxN - keepLow - 1;
+  const stride = Math.ceil((rest.length - 1) / need);
+  const out = low;
+  for (let i = 0; i < rest.length - 1; i += stride) out.push(rest[i]);
+  out.push(rest[rest.length - 1]);
+  return out;
+}
+
 // ---- The boundary layer's MEASURED depth: bulk Richardson ----
 // The radiosonde PBL method (Vogelezang & Holtslag 1996; Seidel
 // et al. 2012; the open AMT 16, 4289 (2023) prints the working

@@ -8176,12 +8176,12 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   green - 120 CPU references + 7 GPU probes.
 - DONE (Aug 9, the review session's 91st pass - measured snow
   depth: SNOTEL pillows outrank the model). The drawn snow's
-  depth was the weather model's snow_depth; the NRCS SNOTEL
+  depth was the weather model's snow*depth; the NRCS SNOTEL
   network measures it - ~900 pillow-and-sensor stations across
   the western US and Alaska, and the AWDB REST API is the
-  repo's SECOND CORS-open feed (access-control-allow-origin: _,
+  repo's SECOND CORS-open feed (access-control-allow-origin: *,
   browser-direct, keyless, no daemon - the USGS-rivers
-  pattern). snotel.js parses /stations (the _:\*:SNTL wildcard
+  pattern). snotel.js parses /stations (the \_:\*:SNTL wildcard
   filters server-side to the 913 pillows; elevation arrives in
   FEET through the gated FT_M) and /data daily SNWD/WTEQ rows
   (INCHES; IN_M = 0.0254 - the international inch is 25.4 mm BY
@@ -8211,6 +8211,46 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   cover at the measured depth. Gate: snotel-reference.mjs
   joins with 5 landmarks - full gate green, 121 CPU
   references + 7 GPU probes.
+- DONE (Aug 9, the review session's 92nd pass - the balloon
+  refracts the sunset: the radiosonde column drives the
+  refraction machinery). The drawn sun's lift, squash, green
+  rim, transfer LUT and horizon dip rode the MODEL's pressure
+  levels (open-meteo) through the gated Ciddor/Auer-Standish
+  ray tracer; the radiosonde measures that same column, and its
+  rows are exactly buildProfile's input shape. sounding.js
+  gains thinRows (1099 rows -> 119 for transport: the lowest 20
+  stay VERBATIM - surface inversions, the mirage-making
+  structure, live in the first hundred metres and must not be
+  decimated; surface and top rows always survive); the daemon
+  /sounding payload ships them (~4 KB) and applySounding builds
+  state.profileMeas through the SAME gated buildProfile the
+  model column uses, re-asserted at the model's own sync (the
+  sstMeas pattern) - every consumer follows automatically
+  because the refraction caches are profile-identity keyed
+  (refr, sunset transfer LUT). GATE-HELD on the vendored
+  Payerne ascent through the SHIPPED machinery: the balloon's
+  column lifts the true-zero sun 24.00 arcmin and squashes it
+  to 0.928 (a hot 28 degC surface refracts LESS than standard -
+  the measured answer), and foldCount = 0: that smooth summer
+  ascent carries no mirage, stated, not assumed; a synthetic
+  +8 degC / 50 m surface inversion folds the same transfer
+  curve TWICE - when an ascent measures a duct, the drawn sun
+  mirages by machinery already in the chain, no new law and no
+  new constants in the entire pass. ?sounding=URL now works
+  under pin=1 (explicit pins are authoritative; a bare pin
+  still silences the fetch - applySounding and syncSounding
+  both carry the exception), fixing a latent gap where the
+  pinned payload only ever printed a record line. A/B at pinned
+  Nelson sunset (matched worlds): the panel flips to
+  'refraction column (radiosonde) - 119 rows to 17 km' and
+  0.51% of pixels move at the arcminute scale - the sun-ward
+  gradient shifts, and the OFF frame's contrail VANISHES in ON
+  (the pinned ascent's measured -47.4 degC flipped the
+  Schmidt-Appleman regime - the 81st pass's field visibly at
+  work); the disc-shape change itself is sub-pixel at 720p,
+  the gate carries it, stated. Gate: sounding-reference grows
+  15 -> 17 landmarks; full gate green - 121 CPU references +
+  7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
