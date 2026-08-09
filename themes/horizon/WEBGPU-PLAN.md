@@ -7887,6 +7887,62 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   (fallWidthM already rides the same ratio). Gate grows to the
   rivers reference (+3 landmarks). Full gate green - 118 CPU
   references + 7 GPU probes.
+- DONE (Aug 9, the review session's 85th pass - the pollen
+  corona: the shelved display unshelved by an open primary).
+  The 80th-pass survey shelved the pollen corona because its
+  classic papers live at Applied Optics (Optica 502s through
+  the proxy, dead end documented); this pass found the open
+  road: Filioglou et al. 2023 (EGUsphere/AMT, CC BY, READ) - a
+  three-lidar closure study of birch and pine pollen whose mass
+  conversion PRINTS the grain properties: "particle diameter of
+  25 and 75 um and a particle density of 0.8 and 0.4 g cm-3 for
+  birch and pine pollen, respectively ... (Gregory, 1961)" -
+  the classic aerobiology numbers, now carried verbatim in
+  pollen.js. THE CHAIN, every factor measured or printed:
+  tau = N grains/m3 (open-meteo air-quality API, keyless CORS,
+  the family the theme already rides) x Qext = 2 (the printed
+  extinction-paradox limit - a 25 um grain sits at x ~ 140) x
+  pi (d/2)^2 x the measured boundary_layer_height (open-meteo
+  forecast) - a big birch day (20,000 grains under 1.5 km)
+  computes to tau 0.029, the FAINT ring real pollen coronae
+  are; the amplitude is the shipped coronaAmp(tau) through the
+  bow's own transmittance x veil x exposure, nothing
+  hand-scaled. THE PATTERN is the SHIPPED certified airyPattern
+  at the printed diameter: first bright ring 2.06 deg at 550 nm,
+  red 2.55 outside blue 1.65 - the gate holds the red/blue
+  ratio equal to lambda's (1.545 = 1.545, three decimals,
+  nothing coded). THE DRAWN SIDE is exact reuse: the glory
+  pass's radial-LUT billboard (createGloryMaterial) aimed at
+  the SUN instead of the antisolar point, with depth test back
+  ON (this ring lives on the sky - a hill in front of the sun
+  hides it; the fog geometry that justified the glory's
+  depth-off does not apply). Only birch is drawn - the classic
+  corona species and the one with an open printed diameter;
+  other species contribute no display for want of one, and the
+  Applied Optics ellipticity (air-sac grains making vertically
+  elliptical rings) is documented UNDRAWN. A LUNAR twin rides
+  the moon optics block (pollen coronae are classically
+  observed around the moon), amp through the measured-moonlight
+  chain. ?pollen=N|0 pins (BLH 1500 m stated). THE A/B taught
+  the instrument's own physics: at every DAYLIGHT exposure the
+  solar aureole saturates the display across the corona's whole
+  window (mid-morning AND golden hour both measured 100%
+  saturated near the sun - real pollen coronae are photographed
+  with the sun occluded), so the verifying capture is the LUNAR
+  one: full moon 2026-11-24 22Z over the Alpine fixture,
+  pollen=20000 vs 0. The pair delivers the classic photograph -
+  the full moon wearing concentric coloured rings with the red
+  rim outermost, 96% of the diff one-signed added light against
+  an unsaturated sky. Per-channel diff peaks measure 1.5-2.1
+  deg rather than the LUT's pure 2.55/2.05/1.64: the diff reads
+  the quad through the tonemap's local Jacobian at a dark
+  background, whose channel cross-talk pulls every measured
+  peak toward the brighter blue/green patterns (B carries 2.4x
+  R's Airy amplitude) - stated as the instrument's nonlinearity;
+  the LUT positions themselves are gate-held and the visible
+  red outer rim is the R ring's tail. Gate (5 landmarks)
+  registered after aeronet. Full gate green - 119 CPU
+  references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

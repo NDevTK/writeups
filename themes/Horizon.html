@@ -217,7 +217,9 @@
         model aloft), cobs=URL|0 (daemon endpoint override for
         the measured comet magnitudes / keep the g/k formula),
         usgs=0 (keep the GloFAS model discharge - never consult
-        the measured US gauges),
+        the measured US gauges), pollen=N|0 (pin the birch
+        concentration in grains/m³ with a stated 1500 m boundary
+        layer for the harness / never draw the pollen corona),
         gwaves=A|0 (pin the airglow banding amplitude for the
         harness / remove the banding), gmn=URL|0 (daemon
         endpoint override for the measured meteor medians /
@@ -846,6 +848,7 @@
       import {apparentAltRad} from './horizon/gvp.js';
       import {SOUNDING_FRESH_H, SOUNDING_MAX_KM} from './horizon/sounding.js';
       import {measuredMag} from './horizon/cobs.js';
+      import {buildPollenLUT, pollenTau, BIRCH_D_UM} from './horizon/pollen.js';
       import {
         GW_LAMBDA_MED_KM,
         GW_SPEED_MED_MS,
@@ -4258,6 +4261,56 @@
       // formula. ?cobs=URL overrides; =0 keeps the formula.
       const COBS_PROXY =
         params.get('cobs') ?? AEROSOL_PROXY.replace(/\/aerosol$/, '/comets');
+      // The measured birch bloom (pollen.js): concentration from
+      // the air-quality API, column depth from the forecast
+      // API's boundary layer - both keyless/CORS, the family the
+      // theme already rides. ?pollen=N pins grains (BLH pinned
+      // 1500 m, stated); =0 disables.
+      async function syncPollen() {
+        if (params.has('pollen') || overridden) return;
+        try {
+          const [aq, fc] = await Promise.all([
+            (
+              await fetch(
+                'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' +
+                  state.lat.toFixed(4) +
+                  '&longitude=' +
+                  state.lon.toFixed(4) +
+                  '&hourly=birch_pollen&forecast_hours=1',
+                {credentials: 'omit'}
+              )
+            ).json(),
+            (
+              await fetch(
+                'https://api.open-meteo.com/v1/forecast?latitude=' +
+                  state.lat.toFixed(4) +
+                  '&longitude=' +
+                  state.lon.toFixed(4) +
+                  '&hourly=boundary_layer_height&forecast_hours=1',
+                {credentials: 'omit'}
+              )
+            ).json()
+          ]);
+          const birch = aq.hourly?.birch_pollen?.[0];
+          const blh = fc.hourly?.boundary_layer_height?.[0];
+          if (!Number.isFinite(birch) || !Number.isFinite(blh)) return;
+          state.pollen = {birch, blh, tau: pollenTau(birch, blh)};
+          if (state.pollen.tau > 1e-4)
+            record(
+              'birch pollen (measured bloom)',
+              Math.round(birch) +
+                ' grains/m³ · BLH ' +
+                Math.round(blh) +
+                ' m · τ ' +
+                state.pollen.tau.toFixed(4) +
+                ' · Ø' +
+                BIRCH_D_UM +
+                ' µm (Gregory 1961)'
+            );
+        } catch {
+          // no bloom data, no corona
+        }
+      }
       async function syncCobs() {
         if (COBS_PROXY === '0') return;
         try {
@@ -8452,16 +8505,44 @@
       // exactly the LUT window (the feather ends there).
       const GLORY_R = 235;
       const gloryW = 2 * GLORY_R * Math.tan((GLORY_MAX_DEG * Math.PI) / 180);
-      function placeGlory(mesh, u, antiUnit) {
+      function placeGlory(mesh, u, antiUnit, w = gloryW) {
         gloryV3.copy(antiUnit);
         u.antiDir.value.copy(gloryV3);
         mesh.position
           .copy(gloryV3)
           .multiplyScalar(GLORY_R)
           .add(camera.position);
-        mesh.scale.set(gloryW, gloryW, 1);
+        mesh.scale.set(w, w, 1);
         mesh.lookAt(camera.position);
       }
+      // The POLLEN CORONA (pollen.js): the measured birch bloom
+      // rings the SUN through the same radial-LUT billboard the
+      // glory uses - the LUT is the shipped certified Airy law
+      // at the printed 25 um grain. Depth test stays ON (unlike
+      // the glory's fog geometry, this ring is on the sky and a
+      // hill in front of the sun hides it).
+      const pollenLUT = buildPollenLUT();
+      const pollenObj = createGloryMaterial(pollenLUT);
+      pollenObj.material.depthTest = true;
+      const pollenMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        pollenObj.material
+      );
+      pollenMesh.renderOrder = 2;
+      pollenMesh.visible = false;
+      scene.add(pollenMesh);
+      const pollenW =
+        2 * GLORY_R * Math.tan((pollenLUT.maxDeg * Math.PI) / 180);
+      const pollenMoonObj = createGloryMaterial(pollenLUT);
+      pollenMoonObj.material.depthTest = true;
+      const pollenMoonMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        pollenMoonObj.material
+      );
+      pollenMoonMesh.renderOrder = 2;
+      pollenMoonMesh.visible = false;
+      scene.add(pollenMoonMesh);
+      let pollenSaid = false;
       // This week's reported eruption on the horizon (gvp.js):
       // one plume quad for the nearest volcano the weekly report
       // gives a printed height for - the drawn top IS that
@@ -12955,6 +13036,41 @@
               }
             }
           }
+          // The POLLEN CORONA: the measured birch column's tau
+          // through the shipped coronaAmp, the printed 25 um
+          // Airy LUT around the SUN - the same radiometric chain
+          // as the bow (transmittance x veil x exposure), the
+          // same billboard idiom as the glory. ?pollen=N pins
+          // the concentration (BLH 1500 m stated); =0 removes.
+          {
+            const pOv = params.get('pollen');
+            const tauP =
+              pOv === '0'
+                ? 0
+                : pOv !== null
+                  ? pollenTau(Math.max(+pOv, 0), 1500)
+                  : (state.pollen?.tau ?? 0);
+            const aP =
+              tauP > 1e-4 && sun.alt > 0
+                ? coronaAmp(tauP) * cirrusT * skyExposure
+                : 0;
+            pollenMesh.visible = aP > 1e-6;
+            if (pollenMesh.visible) {
+              placeGlory(pollenMesh, pollenObj.u, sunVec, pollenW);
+              pollenObj.u.ampV.value.set(tB[0] * aP, tB[1] * aP, tB[2] * aP);
+              if (!pollenSaid) {
+                pollenSaid = true;
+                record(
+                  'pollen corona (measured bloom)',
+                  'τ ' +
+                    tauP.toFixed(4) +
+                    ' · first ring ~2.1° · Ø' +
+                    BIRCH_D_UM +
+                    ' µm birch'
+                );
+              }
+            }
+          }
         }
         // The ring family's OCCURRENCE (halos.js haloOccurrence):
         // only ~27% of cirrus actually rings (Forster 2017's
@@ -13209,6 +13325,42 @@
                   tBM[0] * aGM,
                   tBM[1] * aGM,
                   tBM[2] * aGM
+                );
+              }
+            }
+            // The LUNAR pollen corona: pollen coronae are
+            // classically OBSERVED around the moon (the dark sky
+            // shows the ring the daylight aureole saturates
+            // away) - same measured tau, same printed 25 um Airy
+            // LUT, the source now the measured moonlight.
+            {
+              const pOv = params.get('pollen');
+              const tauP =
+                pOv === '0'
+                  ? 0
+                  : pOv !== null
+                    ? pollenTau(Math.max(+pOv, 0), 1500)
+                    : (state.pollen?.tau ?? 0);
+              const aPM =
+                tauP > 1e-4 && moon.alt > 0
+                  ? coronaAmp(tauP) *
+                    moonIrradianceE0(
+                      astro.moonRel,
+                      astro.moonDistKm,
+                      1 - (astro.lunarEcl?.inUmbra ?? 0)
+                    ) *
+                    Math.exp(
+                      -cirrusSlantTau(cHighFrac, Math.sin(moon.alt), eyeVeilM)
+                    ) *
+                    skyExposure
+                  : 0;
+              pollenMoonMesh.visible = aPM > 1e-7;
+              if (pollenMoonMesh.visible) {
+                placeGlory(pollenMoonMesh, pollenMoonObj.u, moonVec2, pollenW);
+                pollenMoonObj.u.ampV.value.set(
+                  tBM[0] * aPM,
+                  tBM[1] * aPM,
+                  tBM[2] * aPM
                 );
               }
             }
@@ -14083,6 +14235,8 @@
         setInterval(syncSounding, 60 * 60 * 1000);
         syncCobs();
         setInterval(syncCobs, 3 * 60 * 60 * 1000);
+        syncPollen();
+        setInterval(syncPollen, 60 * 60 * 1000);
         syncNO2();
         // The printed TEMPO revisit is 1 hour (Table 1) - the
         // refresh follows it so the drawn brown horizon carries
