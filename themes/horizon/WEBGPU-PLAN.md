@@ -7972,9 +7972,9 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   key or IP on purpose, the churn signature (attempts climbing,
   frames 0, lastClose 1006 or null) will now say so in /health
   - and the remedy is a fresh AISSTREAM_KEY in
-  /etc/horizon-live.env, a human action. No drawn-side change;
-  no reference count change (the integration shell is outside
-  the gate, server-reference green).
+    /etc/horizon-live.env, a human action. No drawn-side change;
+    no reference count change (the integration shell is outside
+    the gate, server-reference green).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
