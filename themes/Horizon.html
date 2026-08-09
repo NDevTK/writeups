@@ -371,7 +371,11 @@
         scotopicY,
         skyTransferE
       } from './horizon/adaptation.js';
-      import {createAtmosphereTSL} from './horizon/atmosphere-tsl.js';
+      import {
+        createAtmosphereTSL,
+        RAYLEIGH_S_M,
+        RAYLEIGH_H_M
+      } from './horizon/atmosphere-tsl.js';
       import {
         AURORA_KR_GREAT,
         AURORA_SR,
@@ -6261,6 +6265,71 @@
       let snowSim = null; // Rapier world, booted the first time it snows
       let snowLoading = false;
       let water = null; // three.js Water plane, built when the DEM has sea
+      // The polarized sky on the sea (rayleighpol.js stage 2): the
+      // IPRT-gated doubling engine bakes the mirror factor
+      // f = 1 + [(Rp-Rs)/(Rp+Rs)] w Q/I off the main thread (a full
+      // three-channel solve is ~1-2 s of matrix arithmetic);
+      // rebaked when the sun moves 0.75 deg or the channel AOD
+      // moves 0.02. The water's LUT stays identity until the first
+      // bake lands, and any worker failure falls back to the
+      // scalar sea forever after - same posture as the terrain
+      // worker. tauR is the DOME'S own molecular column
+      // (atmosphere-tsl.js exports it), so the mirrored sky and
+      // the drawn sky share one Rayleigh atmosphere; tauA is the
+      // live measured AOD, diluting q by the molecular share
+      // w = tauR/(tauR + tauA) per channel (single-scattering
+      // mixing, gate-held limits in rayleighpol-reference.mjs).
+      let skyPolWorker = null;
+      let skyPolJob = 0;
+      let skyPolKey = '';
+      let skyPolTold = false;
+      const SKYPOL_TAU_R = RAYLEIGH_S_M.map((s) => s * RAYLEIGH_H_M);
+      function maybeBakeSkyPol(sunAltDeg) {
+        if (!water || sunAltDeg <= 2 || skyPolWorker === false) return;
+        const ms = state.mieSetNow;
+        const tauA = ms && ms.tau ? ms.tau : [0.12, 0.12, 0.12];
+        const key =
+          Math.round(sunAltDeg / 0.75) +
+          '|' +
+          tauA.map((t) => Math.round(t / 0.02)).join(',');
+        if (key === skyPolKey) return;
+        if (!skyPolWorker) {
+          try {
+            skyPolWorker = new Worker(
+              new URL('./horizon/rayleighpol-worker.js', location.href),
+              {type: 'module'}
+            );
+            skyPolWorker.addEventListener('error', () => {
+              skyPolWorker = false;
+            });
+            skyPolWorker.addEventListener('message', (ev) => {
+              const d = ev.data;
+              if (!d || d.id !== skyPolJob || !water) return;
+              water.skyPolTex.image.data.set(d.data);
+              water.skyPolTex.needsUpdate = true;
+              if (!skyPolTold) {
+                skyPolTold = true;
+                record(
+                  'Polarized sky on the sea',
+                  'IPRT-benchmarked doubling (rayleighpol.js, gated) x ' +
+                    'Fresnel Rs/Rp split (coxmunk.js) - the mirrored dome ' +
+                    'dims through the Brewster band at 90 deg from the sun'
+                );
+              }
+            });
+          } catch {
+            skyPolWorker = false;
+            return;
+          }
+        }
+        skyPolKey = key;
+        skyPolWorker.postMessage({
+          id: ++skyPolJob,
+          sunAltDeg,
+          tauR: SKYPOL_TAU_R,
+          tauA
+        });
+      }
       let oceanCascades = null; // FFT ocean (phase 5), built with water
       let oceanBuiltU = -1; // wind the spectrum was built at (m/s)
       let oceanBuiltDir = 0;
@@ -7660,6 +7729,8 @@
           water.geometry.dispose();
           water.material.dispose();
           water.userData.depthTex?.dispose();
+          water.skyPolTex?.dispose();
+          skyPolKey = ''; // the next water starts identity - rebake
           water = null;
         }
         if (oceanCascades) {
@@ -11521,6 +11592,9 @@
         const mieSet = aeroFresh
           ? state.aerosol.set
           : {tau: [aodC, aodC, aodC], ssa: [0.9, 0.9, 0.9], g: 0.8};
+        // The polarized-sky bake reads the same channel AODs the
+        // dome draws with (maybeBakeSkyPol - one aerosol truth).
+        state.mieSetNow = mieSet;
         const mieRad = mieCoefficients(mieSet, centerElev);
         // The delta split rides only with a fresh measured mix -
         // the AOD fallback has no species and runs unscaled.
@@ -13387,6 +13461,16 @@
           }
           for (const c of oceanCascades) c.update(oceanTime);
           water.sunDirection.value.copy(sunVec);
+          // Polarized-sky mirror factor: ramp on with the climbing
+          // sun (the engine's beam geometry needs the sun up -
+          // twilight and night keep the scalar sea), and bake
+          // off-thread when the sun or the measured AOD moves.
+          {
+            const sunAltDegW =
+              ((astro.sun ? astro.sun.alt : -1) * 180) / Math.PI;
+            water.skyPolOn.value = THREE.MathUtils.smoothstep(sunAltDegW, 2, 6);
+            maybeBakeSkyPol(sunAltDegW);
+          }
           // Ocean sun: the PHYSICAL beam (colour x intensity = st x
           // exposure) - the water material's glitter now runs the
           // printed Cox & Munk law (ocean-glint.js, gated), so its

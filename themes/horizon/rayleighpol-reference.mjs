@@ -27,12 +27,14 @@ import {
   gauss01,
   rayleighF,
   singleScatterA1,
+  skyPolLut,
   solveA1,
   USIGN,
   zFourier,
   zMatrix
 } from './rayleighpol.js';
 import {IPRT_A1_IPOL} from './rayleighpol-data.js';
+import {fresnelRsRp, N_WATER} from './coxmunk.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -334,6 +336,125 @@ for (const c of CASES) {
       `Brewster ${(Math.max(...zeros) - 30).toFixed(1)} deg below - and ` +
       `both zeros sit inside the benchmark's own sign-change brackets ` +
       `[${brackets.map((b) => b.join('-')).join(', ')}]`
+  );
+}
+
+// ---- stage 2: the polarized sea -------------------------------
+{
+  // The water fold: f = 1 + [(Rp-Rs)/(Rp+Rs)] w Q/I on the
+  // mirrored dome, composed EXACTLY as the worker composes it
+  // (same two gated modules). The landmarks: the photographers'
+  // azimuth (the sea's mirrored sky dims at 90 deg from the sun,
+  // stays bright toward and away), the Brewster band carrying
+  // the deepest dip, and the stated limits - no aerosol recovers
+  // the pure engine, heavy aerosol recovers the scalar sea.
+  const nTheta = 16;
+  const thetaMax = 88;
+  const polK = [];
+  for (let i = 0; i < nTheta; i++) {
+    const th = (i * thetaMax) / (nTheta - 1);
+    const {Rs, Rp} = fresnelRsRp(Math.cos((th * Math.PI) / 180), N_WATER);
+    polK.push((Rp - Rs) / Math.max(Rp + Rs, 1e-12));
+  }
+  const base = {
+    sunAltDeg: 10,
+    tauA: [0, 0, 0],
+    polK,
+    nTheta,
+    thetaMaxDeg: thetaMax
+  };
+  const lut = skyPolLut(base);
+  const at = (l, i, j, ch) => l.data[(i * l.nDaz + j) * 4 + ch];
+  const dazOf = (j) => (j * 180) / (lut.nDaz - 1);
+  // Brewster row: theta_i grid point nearest atan(n) = 53.27 deg.
+  const thB = (Math.atan(N_WATER) * 180) / Math.PI;
+  let iB = 0;
+  for (let i = 0; i < nTheta; i++)
+    if (
+      Math.abs((i * thetaMax) / (nTheta - 1) - thB) <
+      Math.abs((iB * thetaMax) / (nTheta - 1) - thB)
+    )
+      iB = i;
+  let jMin = 0;
+  for (let j = 0; j < lut.nDaz; j++)
+    if (at(lut, iB, j, 1) < at(lut, iB, jMin, 1)) jMin = j;
+  const fMin = at(lut, iB, jMin, 1);
+  const f0 = at(lut, iB, 0, 1);
+  const f180 = at(lut, iB, lut.nDaz - 1, 1);
+  const dip = (i) => {
+    let mx = 0;
+    for (let j = 0; j < lut.nDaz; j++)
+      mx = Math.max(mx, Math.abs(at(lut, i, j, 1) - 1));
+    return mx;
+  };
+  // The default-AOD fold (the page's fallback air, tauA 0.12):
+  // the factor the sea actually ships when nothing is measured.
+  const dflt = skyPolLut({...base, tauA: [0.12, 0.12, 0.12]});
+  let dMin = 2;
+  let dMax = 0;
+  for (let k = 0; k < dflt.data.length; k += 4) {
+    dMin = Math.min(dMin, dflt.data[k + 1]);
+    dMax = Math.max(dMax, dflt.data[k + 1]);
+  }
+  check(
+    'THE POLARIZED SEA has the photographers’ azimuth',
+    fMin < f0 &&
+      fMin < f180 &&
+      dazOf(jMin) >= 60 &&
+      dazOf(jMin) <= 120 &&
+      fMin > 0.1 &&
+      fMin < 0.3 &&
+      dip(iB) > dip(2) &&
+      dip(iB) > dip(nTheta - 1) &&
+      dMin > 0.5 &&
+      dMin < 0.7 &&
+      dMax > 1.1 &&
+      dMax < 1.3,
+    `sun 10 deg up, green channel: with NO aerosol the mirrored dome at ` +
+      `Brewster incidence dims to f = ${fMin.toFixed(3)} at ` +
+      `${dazOf(jMin).toFixed(0)} deg from the sun's azimuth (toward/away ` +
+      `${f0.toFixed(3)}/${f180.toFixed(3)}) - the thin molecular column ` +
+      `(tau 0.108) polarizes its 90-deg sky to ~0.87, and Rp's death ` +
+      `takes nearly all of it out of the mirror; the dip peaks AT the ` +
+      `Brewster band (|f-1| ${dip(iB).toFixed(3)} vs ${dip(2).toFixed(3)} ` +
+      `steep, ${dip(nTheta - 1).toFixed(3)} grazing); under the page's ` +
+      `fallback AOD 0.12 the shipped factor spans ${dMin.toFixed(3)} - ` +
+      `${dMax.toFixed(3)}: a ~40% darkening at right angles to the sun, ` +
+      `~18% brightening toward it - the polarizer-like azimuth every ` +
+      `seascape photographer works around`
+  );
+  // Limits: heavy aerosol returns the scalar sea; the LUT's
+  // economy quadrature (nGauss 10, 20 doublings) matches a
+  // benchmark-grade solve at the deepest texel.
+  const heavy = skyPolLut({
+    ...base,
+    tauA: [1e4, 1e4, 1e4]
+  });
+  let worstHeavy = 0;
+  for (let k = 0; k < heavy.data.length; k += 4)
+    for (let c = 0; c < 3; c++)
+      worstHeavy = Math.max(worstHeavy, Math.abs(heavy.data[k + c] - 1));
+  const thIB = (iB * thetaMax) / (nTheta - 1);
+  const fine = solveA1({
+    tau: 0.1085,
+    depol: 0.03,
+    mu0: Math.cos((80 * Math.PI) / 180),
+    vzaDownDeg: [thIB],
+    vzaUpDeg: [],
+    dphiDeg: [dazOf(jMin)],
+    nGauss: 16,
+    nDouble: 25
+  })[0];
+  const fFine = 1 + polK[iB] * (fine.Q / fine.I);
+  check(
+    'the polarized sea holds its limits',
+    worstHeavy < 2e-4 && Math.abs(fFine - fMin) < 5e-4,
+    `tauA = 1e4: every texel returns to 1 within ` +
+      `${worstHeavy.toExponential(1)} (the scalar sea is the aerosol ` +
+      `limit, exactly as stated); and the deepest texel recomputed at ` +
+      `benchmark-grade quadrature (nGauss 16, 25 doublings) moves ` +
+      `${Math.abs(fFine - fMin).toExponential(1)} - the bake's economy ` +
+      `settings cost nothing the eye could see`
   );
 }
 

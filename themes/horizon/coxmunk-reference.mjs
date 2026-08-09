@@ -17,6 +17,7 @@
 //    drops, the off-specular sky brightens
 import {
   CM_RANGE,
+  fresnelRsRp,
   fresnelWater,
   gcCoeffs,
   glintFactor,
@@ -169,6 +170,45 @@ const quad = (U, f) => {
     'glitter geometry',
     ok,
     `mirror case exact: ${g.toExponential(3)} = rhoF p(0,0)/(4 cos 30); peak falls with wind (${peak(2).toFixed(1)} > ${peak(8).toFixed(1)} > ${peak(14).toFixed(1)}) while 12 deg off-specular brightens (${off(2).toExponential(1)} -> ${off(14).toExponential(1)}) - the glitter widens exactly as photographed; no sun below the horizon`
+  );
+}
+
+{
+  // The polarised Fresnel split (stage 2 of the polarized sky):
+  // the textbook anchors, held exactly, and the law-lives-once
+  // identity - the shipped unpolarised reflectance IS the mean
+  // of the split at every angle.
+  const thB = Math.atan(N_WATER);
+  const atB = fresnelRsRp(Math.cos(thB));
+  const rsB = ((N_WATER * N_WATER - 1) / (N_WATER * N_WATER + 1)) ** 2;
+  const at0 = fresnelRsRp(1);
+  const r0 = ((N_WATER - 1) / (N_WATER + 1)) ** 2;
+  let worstMean = 0;
+  let kGraze = 0;
+  for (let i = 0; i <= 200; i++) {
+    const c = i / 200;
+    const {Rs, Rp} = fresnelRsRp(c);
+    worstMean = Math.max(worstMean, Math.abs((Rs + Rp) / 2 - fresnelWater(c)));
+    if (i === 1) kGraze = (Rp - Rs) / (Rp + Rs);
+  }
+  const ok =
+    atB.Rp < 1e-30 &&
+    Math.abs(atB.Rs - rsB) < 1e-15 &&
+    Math.abs(at0.Rs - r0) < 1e-15 &&
+    Math.abs(at0.Rp - r0) < 1e-15 &&
+    worstMean === 0 &&
+    Math.abs(kGraze) < 0.01;
+  check(
+    'the Fresnel split holds its anchors',
+    ok,
+    `Brewster tan(theta_B) = n: Rp = ${atB.Rp.toExponential(1)} (exact ` +
+      `zero) while Rs = ((n^2-1)/(n^2+1))^2 to ${Math.abs(
+        atB.Rs - rsB
+      ).toExponential(1)}; normal incidence Rs = Rp = ((n-1)/(n+1))^2 = ` +
+      `${r0.toFixed(4)}; (Rs+Rp)/2 IS fresnelWater bit-exactly at 201 ` +
+      `angles; grazing polarising power (Rp-Rs)/(Rp+Rs) -> ` +
+      `${kGraze.toExponential(1)} - the split cannot move waterline ` +
+      `reflections`
   );
 }
 

@@ -11,6 +11,7 @@ import {
 } from 'three/webgpu';
 import {
   Fn,
+  acos,
   cameraPosition,
   clamp,
   cross,
@@ -112,6 +113,21 @@ export class HorizonWaterMesh extends Mesh {
     // tide exactly as depth-limited breaking demands.
     this.tide = uniform(0);
     this.worldSize = uniform(options.worldSize ?? 280);
+    // Polarized-sky mirror factor (rayleighpol.js stage 2, the
+    // IPRT-gated doubling engine composed with coxmunk.js's
+    // Fresnel split): an RGBA f-LUT over (relative azimuth
+    // 0..180 deg across, incidence 0..88 deg down), identity
+    // until the worker's first bake lands. skyPolOn ramps with
+    // sun altitude and gates the whole fold; the page writes
+    // texels in place and flips needsUpdate.
+    {
+      const polData = new Float32Array(19 * 16 * 4).fill(1);
+      this.skyPolTex = new DataTexture(polData, 19, 16, RGBAFormat, FloatType);
+      this.skyPolTex.magFilter = LinearFilter;
+      this.skyPolTex.minFilter = LinearFilter;
+      this.skyPolTex.needsUpdate = true;
+    }
+    this.skyPolOn = uniform(0);
     // Kelvin wakes (kelvin.js, gated): up to 8 vessels, fed per
     // frame from live AIS. Per slot two vec4s in SCENE units:
     //  A = (x, z, dirX, dirZ)   position + unit track direction
@@ -294,9 +310,41 @@ export class HorizonWaterMesh extends Mesh {
       const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(
         this.waterColor
       );
+      // The polarized sky in the mirror (rayleighpol.js stage 2):
+      // the sky is partially polarized and Fresnel splits Rs/Rp,
+      // so the mirrored dome differs from the scalar prediction by
+      // f = 1 + [(Rp-Rs)/(Rp+Rs)] (Q/I) - dimmest at 90 deg from
+      // the sun through the Brewster band, brighter toward and
+      // away (the photographers' azimuth). Looked up on the MACRO
+      // water plane (wave tilt is second-order here - stated):
+      // theta_i from the view drop, relative azimuth between the
+      // look and the sun. Grazing incidence forces f -> 1 (Rs =
+      // Rp), which also guards the waterline reflections of
+      // terrain and hulls - only high-sky mirror pixels move. The
+      // factor multiplies the MIRROR alone: the glitter is direct
+      // UNPOLARIZED sunlight, already carried by the scalar
+      // Fresnel weight. Epsilons keep the azimuths defined at sun
+      // zenith / view nadir, where the LUT is flat anyway.
+      const cosI = clamp(eyeDirection.y, 0.0, 1.0);
+      const hV = normalize(
+        vec2(eyeDirection.x, eyeDirection.z).negate().add(vec2(1e-5, 0))
+      );
+      const hS = normalize(
+        vec2(this.sunDirection.x, this.sunDirection.z).add(vec2(1e-5, 0))
+      );
+      const dazT = acos(clamp(dot(hV, hS), -1.0, 1.0)).div(Math.PI);
+      const thT = clamp(acos(cosI).mul(180 / Math.PI / 88), 0.0, 1.0);
+      const polF = mix(
+        vec3(1),
+        texture(
+          this.skyPolTex,
+          vec2(dazT.mul(18 / 19).add(0.5 / 19), thT.mul(15 / 16).add(0.5 / 16))
+        ).rgb,
+        this.skyPolOn
+      );
       const albedo = mix(
         this.sunColor.mul(diffuseLight).mul(0.3).add(scatter),
-        mirrorSampler.rgb.add(specularLight),
+        mirrorSampler.rgb.mul(polF).add(specularLight),
         reflectance
       );
 

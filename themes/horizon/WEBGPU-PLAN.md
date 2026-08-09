@@ -8826,6 +8826,53 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   dome polarization degree + Fresnel Rs/Rp split on the water,
   through this gated engine. Full gate green - 129 CPU
   references (rayleighpol 6) + 7 GPU probes.
+- DONE (Aug 9, the review session's 107th pass - THE POLARIZED
+  SEA, STAGE 2): the gated doubling engine reaches the drawn
+  world. Fresnel reflection off water splits Rs/Rp, so the
+  mirrored dome differs from the scalar prediction by exactly
+  f = 1 + [(Rp-Rs)/(Rp+Rs)] (Q/I) in the incidence plane (which
+  IS the meridian frame the engine already outputs) - the
+  polarizer-like azimuth every seascape photographer works
+  around. NEW in coxmunk.js: fresnelRsRp (the split; the shipped
+  unpolarised fresnelWater is now literally its mean -
+  law-lives-once, and the gate holds Brewster Rp = 0 EXACTLY,
+  normal-incidence equality, bit-exact mean identity at 201
+  angles, and the grazing polK -> 0 that PROTECTS waterline
+  reflections of terrain and hulls by pure physics). NEW in
+  rayleighpol.js: skyPolLut - a 19x16 (relative azimuth x
+  incidence) RGBA factor LUT from one solveA1 per channel at
+  the DOME'S OWN molecular column (atmosphere-tsl.js now
+  exports RAYLEIGH_S_M/RAYLEIGH_H_M - one Rayleigh atmosphere
+  for the drawn sky and its reflection), with the pure-Rayleigh
+  q diluted per channel by the molecular share
+  w = tauR/(tauR + tauA) from the LIVE measured AOD (stated
+  single-scattering mixing; gate-held limits: tauA = 0 recovers
+  the engine, tauA = 1e4 returns every texel to 1 within 2e-5).
+  THE NUMBERS (gate-held): sun 10 deg up, no aerosol, green -
+  the Brewster-incidence mirror dims to f = 0.179 at 90 deg
+  from the sun (the thin tau 0.108 column polarizes its 90-deg
+  sky to ~0.87 and Rp's death takes nearly all of it); under
+  the page's fallback AOD 0.12 the shipped factor spans
+  0.610-1.178 - a ~40% darkening at right angles to the sun,
+  ~18% brightening toward it - and the dip PEAKS at the
+  Brewster band (|f-1| 0.821 vs 0.055 steep / 0.051 grazing).
+  The bake runs in a module worker (rayleighpol-worker.js -
+  same graceful-fallback posture as the terrain worker; any
+  failure keeps the scalar sea forever), rebaked when the sun
+  moves 0.75 deg or a channel AOD moves 0.02; economy
+  quadrature (nGauss 10, 20 doublings) matches benchmark-grade
+  at the deepest texel to 6.5e-6 (gate-held). water-tsl.js
+  multiplies the MIRROR TERM ONLY (the glitter is direct
+  unpolarized sunlight, already correct under scalar Fresnel)
+  through a LinearFilter texel-center lookup; skyPolOn ramps
+  smoothstep(2, 6 deg) with sun altitude - twilight and night
+  keep the scalar sea (moonlit polarization: stated future).
+  Also fixed en passant: the stale tsl-water-gpu.html harness
+  page referenced an undefined V in its done-line (pre-dates
+  this pass; the page now completes 'water frame done' and
+  smoke-proves the material builds with the fold). Full gate
+  green - 129 CPU references (rayleighpol 8, coxmunk +1) + 7
+  GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

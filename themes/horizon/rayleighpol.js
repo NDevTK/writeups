@@ -282,7 +282,7 @@ function mulc(A, B, muw) {
  * probes)}. The thin-layer initialisation is first-order single
  * scattering at tau0 = tau / 2^25 (error O(tau0^2) ~ 1e-16).
  */
-export function doubleLayer(m, tau, nodes, depol) {
+export function doubleLayer(m, tau, nodes, depol, steps = 25) {
   const nm = nodes.mu.length;
   const n = 3 * nm;
   const muw = new Float64Array(n);
@@ -306,8 +306,7 @@ export function doubleLayer(m, tau, nodes, depol) {
           ZT.im[(a * 3 + r) * n + (b * 3 + c)] = ft.im[r][c][m];
         }
     }
-  const STEPS = 25;
-  const tau0 = tau / Math.pow(2, STEPS);
+  const tau0 = tau / Math.pow(2, steps);
   // Thin-layer single scatter: R0(i,j) = tau0/(4 mu_i mu_j) ZR,
   // T0 likewise; the 1/(4 mu mu') is the classical slab factor
   // (calibrated exactly by the single-scatter gate).
@@ -329,7 +328,7 @@ export function doubleLayer(m, tau, nodes, depol) {
   let t = tau0;
   for (let a = 0; a < nm; a++)
     for (let s = 0; s < 3; s++) G[a * 3 + s] = Math.exp(-tau0 / nodes.mu[a]);
-  for (let step = 0; step < STEPS; step++) {
+  for (let step = 0; step < steps; step++) {
     // S = (1 - R_up o R_dn)^{-1} by Neumann; up-incident
     // operators are the D-conjugates (Hovenier's mirror
     // symmetry): R_up = D R D, T_up = D T D. At m = 0 the
@@ -391,7 +390,8 @@ export function solveA1({
   vzaDownDeg = [],
   vzaUpDeg = [],
   dphiDeg = [],
-  nGauss = 32
+  nGauss = 32,
+  nDouble = 25
 }) {
   const g = gauss01(nGauss);
   // Polar directions (mu = 1) sit at the meridian frame's
@@ -420,7 +420,8 @@ export function solveA1({
   ws.push(0);
   const nodes = {mu: Float64Array.from(mus), w: Float64Array.from(ws)};
   const modes = [];
-  for (let m = 0; m <= 2; m++) modes.push(doubleLayer(m, tau, nodes, depol));
+  for (let m = 0; m <= 2; m++)
+    modes.push(doubleLayer(m, tau, nodes, depol, nDouble));
   const nm = nodes.mu.length;
   const n = 3 * nm;
   const out = [];
@@ -491,4 +492,76 @@ export function singleScatterA1({tau, depol, mu0, muV, up, dphiRad}) {
     Q: (Z[1][0] * geom) / Math.PI,
     U: (Z[2][0] * geom) / Math.PI
   };
+}
+
+/**
+ * Stage 2: the polarized-sky factor for the water's mirrored
+ * dome. Fresnel reflection off water splits Rs/Rp, so the
+ * reflected SKY differs from the scalar (Rs+Rp)/2 prediction:
+ * with Q = I_l - I_r in the meridian frame of the reflected ray
+ * (which IS the incidence plane of a flat-water reflection),
+ *   I_refl = Rp I_l + Rs I_r
+ *          = ((Rs+Rp)/2) I [ 1 + ((Rp-Rs)/(Rp+Rs)) Q/I ],
+ * i.e. a multiplicative factor f = 1 + polK q on the scalar
+ * mirror term. The engine supplies q at the mirror direction
+ * (the benchmark's own bottom-sensor geometry: theta_i = vza,
+ * relative azimuth = view azimuth - solar azimuth); the caller
+ * supplies polK(theta_i) from the gated Fresnel split
+ * (coxmunk.js) so this module stays dependency-free.
+ *
+ * The pure-Rayleigh q is diluted per channel by the molecular
+ * share w = tauR/(tauR + tauA) - the single-scattering mixing
+ * of polarized molecular against near-unpolarized aerosol light
+ * (a stated approximation with gate-held limits: tauA = 0
+ * recovers the engine exactly, tauA >> tauR recovers the scalar
+ * water). Black lower boundary (the sea under this sky is dark,
+ * albedo ~0.06 - stated); sun only (the moonlit sky polarizes
+ * the same way - stated future stage).
+ *
+ * Returns {nTheta, nDaz, thetaMaxDeg, data} with data a
+ * Float32Array of RGBA texels, rows theta_i in [0, thetaMaxDeg]
+ * (endpoint grid), cols relative azimuth in [0, 180] (endpoint
+ * grid), f per RGB channel, alpha 1.
+ */
+export function skyPolLut({
+  sunAltDeg,
+  tauR = [0.0464, 0.1085, 0.2648],
+  tauA = [0, 0, 0],
+  depol = 0.03,
+  polK,
+  nTheta = 16,
+  nDaz = 19,
+  thetaMaxDeg = 88,
+  nGauss = 10,
+  nDouble = 20
+}) {
+  const thetaIDeg = [];
+  for (let i = 0; i < nTheta; i++)
+    thetaIDeg.push((i * thetaMaxDeg) / (nTheta - 1));
+  const dazDeg = [];
+  for (let j = 0; j < nDaz; j++) dazDeg.push((j * 180) / (nDaz - 1));
+  const mu0 = Math.cos(((90 - sunAltDeg) * Math.PI) / 180);
+  const data = new Float32Array(nTheta * nDaz * 4).fill(1);
+  for (let ch = 0; ch < 3; ch++) {
+    const w = tauR[ch] / (tauR[ch] + tauA[ch]);
+    const sol = solveA1({
+      tau: tauR[ch],
+      depol,
+      mu0,
+      vzaDownDeg: thetaIDeg,
+      vzaUpDeg: [],
+      dphiDeg: dazDeg,
+      nGauss,
+      nDouble
+    });
+    // solveA1 emits rows vza-outer, dphi-inner.
+    for (let i = 0; i < nTheta; i++)
+      for (let j = 0; j < nDaz; j++) {
+        const r = sol[i * nDaz + j];
+        const q = r.Q / Math.max(r.I, 1e-12);
+        const f = 1 + polK[i] * w * q;
+        data[(i * nDaz + j) * 4 + ch] = Math.min(2, Math.max(0, f));
+      }
+  }
+  return {nTheta, nDaz, thetaMaxDeg, data};
 }

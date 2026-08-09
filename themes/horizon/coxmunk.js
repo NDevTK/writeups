@@ -98,14 +98,28 @@ export function slopePDF(su, sc, U) {
   );
 }
 
-/** Unpolarised Fresnel reflectance of water at cos(incidence). */
-export function fresnelWater(cosw, n = N_WATER) {
+/**
+ * The polarised Fresnel split of water: intensity reflectances
+ * {Rs, Rp} at cos(incidence) - s perpendicular to the incidence
+ * plane, p parallel. The classical amplitude forms; Rp vanishes
+ * exactly at Brewster incidence tan(theta_B) = n and the two
+ * meet at ((n-1)/(n+1))^2 at normal incidence (both gate-held).
+ * The polarized-sky water fold (rayleighpol.js stage 2) reads
+ * this split; the unpolarised reflectance below is its mean.
+ */
+export function fresnelRsRp(cosw, n = N_WATER) {
   const c = Math.min(Math.max(cosw, 0), 1);
   const s2 = 1 - c * c;
   const ct = Math.sqrt(Math.max(1 - s2 / (n * n), 0));
   const rs = (c - n * ct) / (c + n * ct);
   const rp = (n * c - ct) / (n * c + ct);
-  return (rs * rs + rp * rp) / 2;
+  return {Rs: rs * rs, Rp: rp * rp};
+}
+
+/** Unpolarised Fresnel reflectance of water at cos(incidence). */
+export function fresnelWater(cosw, n = N_WATER) {
+  const {Rs, Rp} = fresnelRsRp(cosw, n);
+  return (Rs + Rp) / 2;
 }
 
 /**

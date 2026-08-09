@@ -104,6 +104,14 @@ const SKY_H = 108; // sky-view LUT rows; the guarded split needs it
 // `cloudShadow` (optional) is the theme's cloud shadow hook
 // (clouds-tsl.js createCloudShadowHook): its Beer-Lambert
 // transmittance(worldPos) shadows the aerial march's direct term.
+// The dome's Rayleigh scattering (per metre, RGB at the theme's
+// 680/550/440 channels) and its exponential scale height - the
+// ONE place these live. The polarized-sky bake (rayleighpol.js
+// stage 2) reads its vertical optical depths from here, so the
+// mirrored dome and the drawn dome share one molecular column.
+export const RAYLEIGH_S_M = [5.802e-6, 13.558e-6, 33.1e-6];
+export const RAYLEIGH_H_M = 8000;
+
 export function createAtmosphereTSL(renderer, cloudShadow) {
   // Mie radiative properties as uniforms (aerosol.js): per-channel
   // scattering and absorption coefficients at profile h = 0 (1/m)
@@ -466,7 +474,7 @@ export function createAtmosphereTSL(renderer, cloudShadow) {
     bandTTex.needsUpdate = true;
   }
 
-  const rayleighS = vec3(5.802e-6, 13.558e-6, 33.1e-6);
+  const rayleighS = vec3(RAYLEIGH_S_M[0], RAYLEIGH_S_M[1], RAYLEIGH_S_M[2]);
   const ozoneA = vec3(0.65e-6, 1.881e-6, 0.085e-6);
   // Measured tropospheric NO2 (no2.js, gated): per-metre
   // absorption at h = 0, riding the mie boundary-layer profile
