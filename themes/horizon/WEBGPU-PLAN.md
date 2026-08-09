@@ -8769,6 +8769,63 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   already carries measured-column folds - a real polar duct
   would draw through that path; stated). Full gate green -
   128 CPU references (nz 6) + 7 GPU probes.
+- DONE (Aug 9, the review session's 106th pass - THE POLARIZED
+  SKY, STAGE 1): the dome is scalar; the sky is not. NEW
+  rayleighpol.js: exact polarized Rayleigh radiative transfer
+  (Stokes I,Q,U; V decouples and the benchmark's own V column
+  is zero) by the classical doubling method - Hansen-Travis
+  scattering matrix with depolarization Delta=(1-d)/(1+d/2),
+  meridian rotations by the spherical triangle, complex
+  Fourier modes m = 0..2 (band-limited EXACTLY for Rayleigh),
+  composite direct/diffuse operator algebra so the direct beam
+  never leaks through a quadrature sum, 25 doublings from
+  tau/2^25, exact view/sun cosines riding as zero-weight
+  quadrature nodes. GROUND TRUTH: the IPRT phase A
+  intercomparison case A1 (Emde et al. 2015, GMD 8, 1739 -
+  open LMU pages, read in full), 408 result rows vendored
+  verbatim (rayleighpol-data.js) across three sub-cases
+  (depol 0/0.03/0.1, sza 0/30, saa 0/65), both boundaries; the
+  vendored IPOL and PSTAR tables agree in I,Q to 4e-7 but
+  differ in the SIGN of U (pure convention, documented in the
+  data header). THE ENGINE LANDS ON ALL 408 ROWS: worst
+  |dI|,|dQ| 1.8e-6, worst |dU| 8.9e-7 - the intercomparison's
+  own cross-model level - under exactly two pinned
+  conventions, NORM = 1/pi and USIGN = -1, both asserted
+  CONSTANT across every row (a convention, not a fit). WHAT
+  THE GATE CAUGHT (the pass's real findings): (1) the
+  symmetric-layer doubling needs the MIRROR-SYMMETRY
+  conjugation on upward legs (R_up = D R D, T_up = D T D, D =
+  diag(1,1,-1)) - the m = 0 mode is BLIND to it (the
+  sin-block elements vanish in the azimuth average), so
+  scalar-looking checks pass while U and the oblique modes sit
+  wrong at 4.8e-3; the benchmark comparison itself found it;
+  (2) sin(i) via sqrt(1-ci^2) has a sqrt(eps) ~ 1e-8 noise
+  floor AT the meridian plane where ci -> +-1 - a point defect
+  the Fourier trapezoid smears into every mode at 5e-9; the
+  law of sines (si = s_theta sd/sTh) removes it exactly and
+  the band-limit landmark now holds at 5.8e-15; (3) two
+  self-inflicted comparison bugs found and named: averaging
+  vaa 0..360 INCLUSIVE double-counts the seam, and the
+  single-scatter closed form carried a spurious /mu (caught
+  because engine/analytic ratios came out exactly mu).
+  rayleighpol-reference 6 landmarks: F11 sphere-mean 1 to
+  6e-16; Fourier round-trip 5.8e-15; thin-limit vs closed-form
+  single scattering 3.2e-4 I-relative AND the residual halves
+  when tau halves (ratio 1.998 - it IS the second scattering
+  order); THE BENCHMARK (above); energy closure of the
+  conservative layer to 2.1e-7 (in the benchmark
+  normalization the hemispheric sums are energy fractions -
+  reflected 0.202090 + diffuse 0.191379 + direct 0.606531 =
+  1); and THE NEUTRAL POINTS EMERGE: single scattering in the
+  sun's meridian has NO polarization zero away from the sun,
+  the full field crosses Q = 0 at vza 19.6 and 45.0 deg (sun
+  at 30) - Babinet 10.4 deg above, Brewster 15.0 deg below,
+  both inside the benchmark's own 5-deg-row sign-change
+  brackets: multiple scattering CREATES the observables.
+  No client wiring this pass (stage 1, stated); stage 2 =
+  dome polarization degree + Fresnel Rs/Rp split on the water,
+  through this gated engine. Full gate green - 129 CPU
+  references (rayleighpol 6) + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
