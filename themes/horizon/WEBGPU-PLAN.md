@@ -9350,6 +9350,31 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   rising: a substorm onset between the frozen hour and the dry
   run). This turns the observatory from one frozen day into an
   archivable series of them.
+- DONE (Aug 9, the review session's 121st pass - THE FIT MEETS THE
+  PUBLICATION, and reads the lunar node): the surge gauge's 25-day
+  fit cross-closed against NOAA's OWN long-record harmonic
+  constants for the same station (CO-OPS mdapi harcon, nine
+  constituents frozen with provenance: the six fitted plus the
+  three the fit lumps). The closure came out better than planned:
+  published amplitudes are MEANS (nodal corrections divided out)
+  while a raw epoch fit sees amp x f(now) - so the ratio
+  fitted/published carries the 18.6-YEAR NODAL FACTOR of the
+  moment. Measured: M2 x0.970 (inside Schureman's printed f_M2
+  band 0.963..1.038, BELOW 1) while O1 x1.20 (at the printed f_O1
+  maximum 1.194 plus its sub-Rayleigh neighbours) - OPPOSITE
+  signs, exactly the node phase of 2026, which suppresses
+  semidiurnals and inflates diurnals: a one-month gauge record
+  plus the publication reads the 18.6-year cycle's current phase.
+  The lumps stay inside printed envelopes (K1 0.427 between
+  published K1 0.337 and K1 x f_max + P1 = 0.481 with their
+  phases 2.5 deg apart; N2 carries NU2; S2 absorbs K2 at its
+  printed f up to 1.317). Landmark 14 (nodal ranges pinned inline
+  from Schureman Table 14, the 57th pass's own primary);
+  tidePanel gains the published column (page table + headline
+  ratio line, live harcon fetched beside the gauge);
+  observatory-freeze.mjs fetches harcon with the tide series;
+  FINDINGS section 3 gains the closure. Gate: observatory 14
+  landmarks, VALIDATE PASS.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

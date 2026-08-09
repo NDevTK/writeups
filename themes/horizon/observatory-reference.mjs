@@ -43,7 +43,7 @@ import {
 } from './observatory.js';
 import {fr3Regime, froude3, FR3_RES_HI, FR3_RES_LO} from './leewave.js';
 import {tidePanel} from './observatory.js';
-import {TIDE} from './observatory-fixture.js';
+import {TIDE, TIDE_PUBLISHED} from './observatory-fixture.js';
 import {
   ADSB,
   AEROSOL,
@@ -441,6 +441,56 @@ const col = columnPanel(SOUNDING.rows);
       `evening), and catches a real ${(t.maxAbsOut.v * 100).toFixed(0)} ` +
       `cm anomaly inside the held-out window - the weather in the ` +
       `water, separated from the astronomy by the repo's own frame`
+  );
+}
+
+// ---- the fit meets the publication ----------------------------
+{
+  const t = tidePanel(TIDE, {published: TIDE_PUBLISHED.rows});
+  const by = Object.fromEntries(t.amps.map((a) => [a.n, a]));
+  const pub = TIDE_PUBLISHED.rows;
+  // Schureman's printed nodal extremes (Table 14; the 57th
+  // pass's own primary): published amplitudes are means, a raw
+  // epoch fit sees amp x f(now).
+  const F_M2 = [0.963, 1.038];
+  const F_O1 = [0.806, 1.194];
+  const F_K1_MAX = 1.113;
+  const F_K2_MAX = 1.317;
+  const rM2 = by.M2.ratio;
+  const rO1 = by.O1.ratio;
+  const k1Lump =
+    by.K1.ampM > pub.K1.ampM &&
+    by.K1.ampM < pub.K1.ampM * F_K1_MAX + pub.P1.ampM;
+  const n2Env =
+    by.N2.ampM > (pub.N2.ampM - pub.NU2.ampM) * F_M2[0] &&
+    by.N2.ampM < (pub.N2.ampM + pub.NU2.ampM) * F_M2[1];
+  const s2Env =
+    by.S2.ampM > pub.S2.ampM - pub.K2.ampM * F_K2_MAX &&
+    by.S2.ampM < pub.S2.ampM + pub.K2.ampM * F_K2_MAX;
+  check(
+    'THE FIT MEETS THE PUBLICATION - and reads the lunar node',
+    rM2 > F_M2[0] &&
+      rM2 < 1 &&
+      rO1 > 1.15 &&
+      rO1 < 1.25 &&
+      k1Lump &&
+      n2Env &&
+      s2Env,
+    `NOAA's long-record constants for the same gauge land beside the ` +
+      `25-day fit: M2 ${by.M2.ampM.toFixed(3)} vs published ` +
+      `${pub.M2.ampM} (ratio ${rM2.toFixed(3)}, inside Schureman's ` +
+      `printed f_M2 band ${F_M2[0]}..${F_M2[1]} and BELOW 1) while O1 ` +
+      `${by.O1.ampM.toFixed(3)} vs ${pub.O1.ampM} runs ` +
+      `${rO1.toFixed(2)}x (at the printed f_O1 maximum 1.194 plus its ` +
+      `sub-Rayleigh neighbours) - opposite signs, exactly the ` +
+      `18.6-year node's cross-signature: 2026 sits at the lunar-node ` +
+      `phase that SUPPRESSES semidiurnals and INFLATES diurnals, and ` +
+      `a 25-day gauge fit reads it; the lumps stay inside their ` +
+      `printed envelopes (K1 ${by.K1.ampM.toFixed(3)} between ` +
+      `published K1 ${pub.K1.ampM} and K1 x f_max + P1 = ` +
+      `${(pub.K1.ampM * F_K1_MAX + pub.P1.ampM).toFixed(3)}, phases ` +
+      `2.5 deg apart; N2 carries NU2; S2 absorbs K2 at its printed ` +
+      `f up to ${F_K2_MAX})`
   );
 }
 

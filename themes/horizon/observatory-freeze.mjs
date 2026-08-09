@@ -267,6 +267,18 @@ async function main() {
       values
     };
   });
+  const harcon = await feed('published harcon (NOAA CO-OPS)', async () => {
+    const h = await jget(
+      `https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${TIDE_STATION}/harcon.json?units=metric`
+    );
+    const want = ['M2', 'S2', 'N2', 'K1', 'O1', 'M4', 'P1', 'NU2', 'K2'];
+    const rows = {};
+    for (const r of h.HarmonicConstituents)
+      if (want.includes(r.name))
+        rows[r.name] = {ampM: r.amplitude, phaseDeg: r.phase_GMT};
+    if (Object.keys(rows).length < 9) throw new Error('constituents missing');
+    return {at, stationId: TIDE_STATION, units: 'metric', rows};
+  });
 
   if (failures.length) {
     console.error(
@@ -389,6 +401,8 @@ export const TIDE = {
   stepHours: 1,
   values: [${tide.values.map((v) => v.toFixed(3)).join(', ')}]
 };
+
+export const TIDE_PUBLISHED = ${JSON.stringify(harcon)};
 `;
   writeFileSync(OUT, fixture);
   console.log(`\nwrote ${OUT} (${fixture.length} bytes)`);
@@ -438,7 +452,7 @@ PIN CANDIDATES (${at}, ${F.SOUNDING.wmo} ${F.SOUNDING.at})
  aurora   rows ${aur.history.length}; latest ${aur.latest?.gwN} GW at ${aur.latest?.at}; ov p ${f3(aur.ov?.p)} lat ${aur.ov?.latDeg}; Kp ${aur.kpEst}
  contrail form ${con.formBand ? con.formBand.loM + '-' + con.formBand.hiM : 'none'}; issr ${con.issrLevels.map((q) => q.hM + '@' + f3(q.rhi)).join(',') || 'none'}; persist ${con.persistBand ? con.persistBand.loM + '-' + con.persistBand.hiM : 'null'}; ac ${con.aircraft?.n} max ${f3(con.aircraft?.maxAltM)}
  leewave  levels ${lee.levels.length}; layer mMs ${f3(lee.layer?.mMs)} scalar ${f3(lee.layer?.scalarMs)}; spot ${lee.spot?.hM} m lam ${f3(lee.spot?.lamM)}
- tide     ${tid.amps.map((a) => `${a.n} ${f3(a.ampM)}`).join('; ')}; rmsOut ${f3(tid.rmsOutM)}; latest resid ${f3(tid.latestResidM)}
+ tide     ${tid.amps.map((a) => `${a.n} ${f3(a.ampM)}`).join('; ')}; rmsOut ${f3(tid.rmsOutM)}; latest resid ${f3(tid.latestResidM)}; vs published M2 x${f3(tid.amps[0].ratio)} O1 x${f3(tid.amps.find((a) => a.n === 'O1')?.ratio)}
  closure  global ${f3(clo.ratios?.globalRatio)}; beam ${f3(clo.ratios?.beamRatio)}; diffuse ${f3(clo.ratios?.diffuseRatio)}
 
 Now RE-PIN observatory-reference.mjs from these numbers before

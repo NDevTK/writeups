@@ -637,7 +637,7 @@ export const TIDE_FIT_NAMES = ['M2', 'S2', 'N2', 'K1', 'O1', 'M4'];
  */
 export function tidePanel(
   {values, stepHours = 1},
-  {fitHours = 600, names = TIDE_FIT_NAMES} = {}
+  {fitHours = 600, names = TIDE_FIT_NAMES, published = null} = {}
 ) {
   const speeds = synthesisSpeeds(names);
   const nFit = Math.min(fitHours / stepHours, values.length);
@@ -650,9 +650,24 @@ export function tidePanel(
   let maxAbs = {v: 0, i: nFit};
   for (let i = nFit; i < resid.length; i++)
     if (Math.abs(resid[i]) > Math.abs(maxAbs.v)) maxAbs = {v: resid[i], i};
+  // The cross-closure column: NOAA's own long-record constants
+  // beside the 25-day fit. Published amplitudes are MEAN (nodal
+  // corrections divided out), the raw fit is at THIS epoch - so
+  // the ratio fitted/published carries the 18.6-year nodal
+  // factor of the moment (plus each row's sub-Rayleigh lump).
+  const amps = names.map((n) => {
+    const ampM = fitAmplitude(fit, n, names);
+    const pub = published?.[n]?.ampM;
+    return {
+      n,
+      ampM,
+      pubM: Number.isFinite(pub) ? pub : null,
+      ratio: Number.isFinite(pub) && pub > 0 ? ampM / pub : null
+    };
+  });
   return {
     names,
-    amps: names.map((n) => ({n, ampM: fitAmplitude(fit, n, names)})),
+    amps,
     fit,
     nFit,
     synth,

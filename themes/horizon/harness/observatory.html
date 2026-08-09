@@ -242,7 +242,8 @@
         SOUNDING,
         SUN,
         SUN_ELON,
-        TIDE
+        TIDE,
+        TIDE_PUBLISHED
       } from './writeups/themes/horizon/observatory-fixture.js';
 
       const params = new URLSearchParams(location.search);
@@ -1421,8 +1422,8 @@
       }
 
       // ---- draw: the surge gauge ----------------------------------
-      function drawTide(series, meta, prov) {
-        const t = tidePanel(series);
+      function drawTide(series, published, prov) {
+        const t = tidePanel(series, {published});
         const N = series.values.length;
         const showH = 240;
         const days = (i) => (i - (N - 1)) / 24;
@@ -1436,7 +1437,14 @@
             .slice(0, 4)
             .map((a) => `${a.n} ${a.ampM.toFixed(2)} m`)
             .join(', ') +
-          ` (K1 carries P1 - the 720 h Rayleigh lump)`;
+          ` (K1 carries P1 - the 720 h Rayleigh lump)` +
+          (t.amps[0].ratio
+            ? ` · vs NOAA’s published constants: M2 ×` +
+              `${t.amps[0].ratio.toFixed(2)}, O1 ×` +
+              `${t.amps.find((a) => a.n === 'O1').ratio.toFixed(2)} - ` +
+              `opposite signs, the 18.6-year lunar node’s ` +
+              `cross-signature at its 2026 diurnal maximum`
+            : '');
         $('tid-chart').innerHTML = '';
         lineChart($('tid-chart'), {
           series: [
@@ -1467,8 +1475,13 @@
         });
         table(
           'tid',
-          ['constituent', 'fitted amplitude (m)'],
-          t.amps.map((a) => [a.n, a.ampM.toFixed(3)])
+          ['constituent', 'fitted (m)', 'published (m)', 'ratio'],
+          t.amps.map((a) => [
+            a.n,
+            a.ampM.toFixed(3),
+            a.pubM != null ? a.pubM.toFixed(3) : '–',
+            a.ratio != null ? a.ratio.toFixed(3) : '–'
+          ])
         );
         $('tid-prov').textContent = prov;
       }
@@ -1674,9 +1687,10 @@
       );
       drawTide(
         TIDE,
-        null,
+        TIDE_PUBLISHED.rows,
         `NOAA CO-OPS ${TIDE.stationId} (${TIDE.name}), 720 hourly values ` +
-          `to ${TIDE.t0.slice(0, 10)}+30d · frozen`
+          `to ${TIDE.t0.slice(0, 10)}+30d · published harcon ` +
+          `${TIDE_PUBLISHED.at} · frozen`
       );
       drawClosure(
         {
@@ -1739,20 +1753,35 @@
           })
           .catch((e) => setLive('lee', false, e.message));
         const TIDE_STATION_ID = params.get('tidestation') ?? '9410170';
-        j(
-          `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=water_level&application=horizon&range=720&datum=MSL&units=metric&time_zone=gmt&format=json&station=${TIDE_STATION_ID}`
-        )
-          .then((r) => {
+        Promise.all([
+          j(
+            `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=water_level&application=horizon&range=720&datum=MSL&units=metric&time_zone=gmt&format=json&station=${TIDE_STATION_ID}`
+          ),
+          j(
+            `https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${TIDE_STATION_ID}/harcon.json?units=metric`
+          ).catch(() => null)
+        ])
+          .then(([r, hc]) => {
             const vals = r.data
               .filter((_, i) => i % 10 === 0)
               .map((q) => parseFloat(q.v))
               .filter(Number.isFinite);
             if (vals.length < 700) throw new Error('short record');
+            const pub = hc
+              ? Object.fromEntries(
+                  hc.HarmonicConstituents.map((q) => [
+                    q.name,
+                    {ampM: q.amplitude}
+                  ])
+                )
+              : null;
             drawTide(
               {values: vals, stepHours: 1},
-              null,
+              pub,
               `NOAA CO-OPS ${TIDE_STATION_ID}, ${vals.length} hourly ` +
-                `values to ${r.data[r.data.length - 1].t}Z · live`
+                `values to ${r.data[r.data.length - 1].t}Z` +
+                (pub ? ' + published harcon' : '') +
+                ` · live`
             );
             setLive('tid', true);
           })

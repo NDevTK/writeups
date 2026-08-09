@@ -191,6 +191,14 @@ side was fitted to the other.
 - **Baily-march durations vs. the four-code spread**: an independent
   limb dataset lands 32.3 s against 32.6–36.1 s from four eclipse codes
   at the same radius. (`beads-reference`)
+- **A 25-day gauge fit reads the 18.6-year lunar node**: the Schureman
+  frame fitted to one month of the San Diego gauge, divided by NOAA's
+  own long-record constants, gives M2 ×0.970 (inside Schureman's
+  printed f_M2 band, below 1) and O1 ×1.20 (at the printed f_O1
+  maximum) — opposite signs, exactly the nodal phase of 2026, which
+  suppresses semidiurnals while inflating diurnals; the sub-Rayleigh
+  lumps (P1→K1, NU2→N2, K2→S2) sit inside their printed envelopes.
+  (`observatory-reference`)
 
 ---
 

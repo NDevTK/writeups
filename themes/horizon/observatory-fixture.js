@@ -1842,3 +1842,28 @@ export const TIDE = {
     0.477, 0.516, 0.451, 0.269, 0.131, 0.088, 0.15
   ]
 };
+
+// ---- the 121st pass's feed (fetched 2026-08-09T22:32Z) --------
+//  - published harmonic constants: NOAA CO-OPS mdapi harcon for
+//    station 9410170 (metres, phases GMT) - the Center's own
+//    long-record analysis, the cross-closure target for the
+//    surge gauge's 25-day fit. Nine constituents kept: the six
+//    fitted plus the three the fit LUMPS (P1 into K1, NU2 into
+//    N2, K2 into S2 - under the 720 h Rayleigh limit).
+
+export const TIDE_PUBLISHED = {
+  at: '2026-08-09T22:32Z',
+  stationId: '9410170',
+  units: 'metric',
+  rows: {
+    M2: {ampM: 0.542, phaseDeg: 143.3},
+    S2: {ampM: 0.225, phaseDeg: 140.4},
+    N2: {ampM: 0.126, phaseDeg: 123.1},
+    K1: {ampM: 0.337, phaseDeg: 208.4},
+    M4: {ampM: 0.003, phaseDeg: 255.5},
+    O1: {ampM: 0.214, phaseDeg: 192.6},
+    NU2: {ampM: 0.025, phaseDeg: 129.7},
+    P1: {ampM: 0.106, phaseDeg: 205.9},
+    K2: {ampM: 0.066, phaseDeg: 134.5}
+  }
+};
