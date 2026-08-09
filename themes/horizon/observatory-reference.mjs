@@ -42,8 +42,10 @@ import {
   wetPanel
 } from './observatory.js';
 import {fr3Regime, froude3, FR3_RES_HI, FR3_RES_LO} from './leewave.js';
-import {tidePanel} from './observatory.js';
-import {TIDE, TIDE_PUBLISHED} from './observatory-fixture.js';
+import {satsPanel, tidePanel} from './observatory.js';
+import {TIDE, TIDE_PUBLISHED, TLES} from './observatory-fixture.js';
+import {satMagnitude} from './sats.js';
+import {snapshotMap} from './satmags.js';
 import {
   ADSB,
   AEROSOL,
@@ -491,6 +493,68 @@ const col = columnPanel(SOUNDING.rows);
       `${(pub.K1.ampM * F_K1_MAX + pub.P1.ampM).toFixed(3)}, phases ` +
       `2.5 deg apart; N2 carries NU2; S2 absorbs K2 at its printed ` +
       `f up to ${F_K2_MAX})`
+  );
+}
+
+// ---- tonight's passes -----------------------------------------
+{
+  const req = createRequire(import.meta.url);
+  const satlib = req('./satellite.min.js');
+  const A = AstroEngine;
+  const obs = new A.Observer(SUN.latDeg, SUN.lonDeg, 30);
+  const eqAt = (ms) => {
+    const t = A.MakeTime(new Date(ms));
+    return {t, eq: A.Equator(A.Body.Sun, t, obs, true, true)};
+  };
+  const r = satsPanel({
+    tleText: TLES.text,
+    latDeg: SUN.latDeg,
+    lonDeg: SUN.lonDeg,
+    startMs: Date.parse('2026-08-10T02:00:00Z'),
+    hours: 12,
+    satlib,
+    sunRaDecAtMs: (ms) => {
+      const {eq} = eqAt(ms);
+      return {raH: eq.ra, decDeg: eq.dec};
+    },
+    sunAltAtMs: (ms) => {
+      const {t, eq} = eqAt(ms);
+      return A.Horizon(t, obs, eq.ra, eq.dec, 'normal').altitude;
+    },
+    mags: snapshotMap()
+  });
+  const best = r.passes[0];
+  const rbTop = r.passes
+    .slice(0, 8)
+    .filter((p) => p.name.includes('R/B')).length;
+  const issTonight = r.passes.some((p) => p.norad === 25544);
+  check(
+    "TONIGHT'S PASSES from the frozen fleet",
+    Math.abs(satMagnitude(1000, Math.PI / 2, 3.3) - 3.3) < 1e-12 &&
+      r.nSats === 157 &&
+      r.nCatalogued === 138 &&
+      Math.abs(r.darkHours - 9.5) < 0.15 &&
+      r.passes.length === 88 &&
+      r.nakedEye === 56 &&
+      best.norad === 28932 &&
+      best.minMag > 0.7 &&
+      best.minMag < 0.9 &&
+      best.peakElDeg > 74 &&
+      rbTop >= 5 &&
+      !issTonight,
+    `the McCants anchor holds exactly (m(1000 km, half phase) = ` +
+      `m_std to 1e-12); the frozen visual fleet (157 TLEs, checksums ` +
+      `enforced, 138 with MEASURED standard magnitudes) propagated ` +
+      `across the coming ${r.darkHours.toFixed(1)} dark hours gives ` +
+      `${r.passes.length} culminations above 20 deg, ` +
+      `${r.nakedEye} naked-eye; the brightest is ${best.name} (norad ` +
+      `${best.norad}) at mag ${best.minMag.toFixed(1)}, ` +
+      `${best.peakElDeg.toFixed(0)} deg up - and ${rbTop} of the top 8 ` +
+      `are ROCKET BODIES (Zenit and H-2A stages outshining the ` +
+      `payloads: the brightness-pollution debate's other half, graded ` +
+      `by the same MMT-9/McCants catalogue Mallama's constellation ` +
+      `photometry extends); the ISS honestly sits out this window ` +
+      `over the fixture point`
   );
 }
 

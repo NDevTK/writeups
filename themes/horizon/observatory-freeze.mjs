@@ -267,6 +267,14 @@ async function main() {
       values
     };
   });
+  const tles = await feed('TLEs (api.ndev.tk/tles)', async () => {
+    const txt = (await tget('https://api.ndev.tk/tles')).trim();
+    if (!txt.startsWith('1 ') && !txt.includes('\n1 '))
+      throw new Error('not TLE text');
+    if (txt.includes('`') || txt.includes('${'))
+      throw new Error('unsafe characters for the template literal');
+    return {at, text: txt};
+  });
   const harcon = await feed('published harcon (NOAA CO-OPS)', async () => {
     const h = await jget(
       `https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${TIDE_STATION}/harcon.json?units=metric`
@@ -403,6 +411,11 @@ export const TIDE = {
 };
 
 export const TIDE_PUBLISHED = ${JSON.stringify(harcon)};
+
+export const TLES = {
+  at: '${tles.at}',
+  text: \`${tles.text}\`
+};
 `;
   writeFileSync(OUT, fixture);
   console.log(`\nwrote ${OUT} (${fixture.length} bytes)`);

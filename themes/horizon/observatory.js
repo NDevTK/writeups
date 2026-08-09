@@ -82,6 +82,7 @@ import {
   synthesisSpeeds,
   tideSynth
 } from './tides.js';
+import {parseTLEs, satMagnitude, sunlitEci} from './sats.js';
 
 // The drawn ocean's whitecap coverage law (Monahan &
 // O'Muircheartaigh 1980, W = 3.84e-6 U10^3.41) - the GPU copy
@@ -676,5 +677,175 @@ export function tidePanel(
     rmsOutM: out.length ? rms(out) : null,
     maxAbsOut: maxAbs,
     latestResidM: resid[resid.length - 1]
+  };
+}
+
+/**
+ * TONIGHT'S PASSES: the measured bright fleet (CelesTrak visual
+ * group via the daemon, TLE checksums enforced by sats.js
+ * parseTLEs) propagated with the vendored SGP4 across the coming
+ * dark hours, each culmination graded by the MEASURED
+ * standard-magnitude catalogue (satmags.js - the McCants/MMT-9
+ * lineage, the same 1000 km half-phase convention Mallama 2021
+ * prints for the constellation-brightness debate) through the
+ * gated Lambert-sphere law and cylindrical shadow test. The
+ * heavy dependencies stay with the CALLER: satlib is the
+ * vendored satellite.js (a browser global on the page,
+ * createRequire in the reference), and the sun arrives as two
+ * callables from the astronomy engine - sunRaDecAtMs (equatorial
+ * of date, taken as the propagation frame's sun: the sub-degree
+ * frame difference is far below the shadow and phase geometry it
+ * feeds) and sunAltAtMs at the observer.
+ */
+export function satsPanel({
+  tleText,
+  latDeg,
+  lonDeg,
+  startMs,
+  hours = 12,
+  satlib,
+  sunRaDecAtMs,
+  sunAltAtMs,
+  mags = null,
+  minElDeg = 20,
+  elGateDeg = 10,
+  sunMaxDeg = -6,
+  coarseS = 60,
+  fineS = 5
+}) {
+  const sats = parseTLEs(tleText).map((t) => ({
+    ...t,
+    rec: satlib.twoline2satrec(t.l1, t.l2),
+    // satmags.js snapshotMap() is a Map keyed by norad number.
+    mStd: mags?.get ? mags.get(t.norad) : mags?.[t.norad]
+  }));
+  const gd = {
+    latitude: (latDeg * Math.PI) / 180,
+    longitude: (lonDeg * Math.PI) / 180,
+    height: 0.03
+  };
+  const sunEci = (ms) => {
+    const {raH, decDeg} = sunRaDecAtMs(ms);
+    const ra = (raH * Math.PI) / 12;
+    const dec = (decDeg * Math.PI) / 180;
+    return {
+      x: Math.cos(dec) * Math.cos(ra),
+      y: Math.cos(dec) * Math.sin(ra),
+      z: Math.sin(dec)
+    };
+  };
+  // One look: elevation/range/magnitude of one satellite at one
+  // moment (null when the propagator declines the epoch).
+  const look = (s, ms, sun) => {
+    const d = new Date(ms);
+    const pv = satlib.propagate(s.rec, d);
+    if (!pv.position) return null;
+    const gmst = satlib.gstime(d);
+    const la = satlib.ecfToLookAngles(gd, satlib.eciToEcf(pv.position, gmst));
+    const lit = sunlitEci(pv.position, sun);
+    // Phase angle at the satellite: observer direction vs the
+    // (at-infinity) sun direction.
+    const oEcf = satlib.geodeticToEcf(gd);
+    const cg = Math.cos(gmst);
+    const sg = Math.sin(gmst);
+    const oEci = {
+      x: oEcf.x * cg - oEcf.y * sg,
+      y: oEcf.x * sg + oEcf.y * cg,
+      z: oEcf.z
+    };
+    const to = {
+      x: oEci.x - pv.position.x,
+      y: oEci.y - pv.position.y,
+      z: oEci.z - pv.position.z
+    };
+    const n = Math.hypot(to.x, to.y, to.z);
+    const beta = Math.acos(
+      Math.max(
+        -1,
+        Math.min(1, (to.x * sun.x + to.y * sun.y + to.z * sun.z) / n)
+      )
+    );
+    return {
+      elDeg: (la.elevation * 180) / Math.PI,
+      azDeg: ((la.azimuth * 180) / Math.PI + 360) % 360,
+      rangeKm: la.rangeSat,
+      lit,
+      mag: satMagnitude(la.rangeSat, beta, s.mStd)
+    };
+  };
+  const passes = [];
+  const open = new Map(); // norad -> running pass
+  const endMs = startMs + hours * 3600e3;
+  let darkSteps = 0;
+  for (let ms = startMs; ms <= endMs; ms += coarseS * 1000) {
+    if (sunAltAtMs(ms) > sunMaxDeg) {
+      // Daylight closes every running pass.
+      for (const p of open.values()) passes.push(p);
+      open.clear();
+      continue;
+    }
+    darkSteps++;
+    const sun = sunEci(ms);
+    for (const s of sats) {
+      const q = look(s, ms, sun);
+      const up = q && q.elDeg > elGateDeg && q.lit;
+      const run = open.get(s.norad);
+      if (up) {
+        if (!run) {
+          open.set(s.norad, {
+            name: s.name,
+            norad: s.norad,
+            mStd: s.mStd ?? null,
+            startMs: ms,
+            endMs: ms,
+            peakMs: ms,
+            peakElDeg: q.elDeg,
+            azAtPeakDeg: q.azDeg,
+            minMag: q.mag
+          });
+        } else {
+          run.endMs = ms;
+          if (q.elDeg > run.peakElDeg) {
+            run.peakElDeg = q.elDeg;
+            run.peakMs = ms;
+            run.azAtPeakDeg = q.azDeg;
+          }
+          if (q.mag < run.minMag) run.minMag = q.mag;
+        }
+      } else if (run) {
+        passes.push(run);
+        open.delete(s.norad);
+      }
+    }
+  }
+  for (const p of open.values()) passes.push(p);
+  // Refine each culmination on a fine grid around the coarse peak.
+  for (const p of passes) {
+    const s = sats.find((q) => q.norad === p.norad);
+    for (
+      let ms = p.peakMs - coarseS * 1000;
+      ms <= p.peakMs + coarseS * 1000;
+      ms += fineS * 1000
+    ) {
+      if (sunAltAtMs(ms) > sunMaxDeg) continue;
+      const q = look(s, ms, sunEci(ms));
+      if (!q || !q.lit) continue;
+      if (q.elDeg > p.peakElDeg) {
+        p.peakElDeg = q.elDeg;
+        p.peakMs = ms;
+        p.azAtPeakDeg = q.azDeg;
+      }
+      if (q.mag < p.minMag) p.minMag = q.mag;
+    }
+  }
+  const kept = passes
+    .filter((p) => p.peakElDeg >= minElDeg)
+    .sort((a, b) => a.minMag - b.minMag);
+  return {
+    nSats: sats.length,
+    nCatalogued: sats.filter((s) => Number.isFinite(s.mStd)).length,
+    darkHours: (darkSteps * coarseS) / 3600,
+    passes: kept,
+    nakedEye: kept.filter((p) => p.minMag <= 4).length
   };
 }

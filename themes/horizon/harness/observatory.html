@@ -209,6 +209,7 @@
     <main id="main"></main>
     <div class="tip" id="tip"></div>
     <script src="./writeups/themes/horizon/astronomy.browser.min.js"></script>
+    <script src="./writeups/themes/horizon/satellite.min.js"></script>
     <script type="module">
       import {
         columnPanel,
@@ -223,9 +224,11 @@
         contrailPanel,
         leewavePanel,
         meteorsPanel,
+        satsPanel,
         tidePanel
       } from './writeups/themes/horizon/observatory.js';
       import {radiantAt, SHOWERS} from './writeups/themes/horizon/meteors.js';
+      import {snapshotMap} from './writeups/themes/horizon/satmags.js';
       import {
         ADSB,
         AEROSOL,
@@ -243,7 +246,8 @@
         SUN,
         SUN_ELON,
         TIDE,
-        TIDE_PUBLISHED
+        TIDE_PUBLISHED,
+        TLES
       } from './writeups/themes/horizon/observatory-fixture.js';
 
       const params = new URLSearchParams(location.search);
@@ -721,6 +725,114 @@
         return svg;
       }
 
+      // dots: [{x, y, name?, color?, tipText}] - a scatter with
+      // per-mark hover, labels on the named few.
+      function dotChart(host, o) {
+        const W = o.w ?? 560;
+        const H = o.h ?? 280;
+        const m = {l: 52, r: 40, t: 12, b: 34};
+        const x0 = o.xMin;
+        const x1 = o.xMax;
+        const y0 = o.yMin ?? 0;
+        const y1 = o.yMax;
+        const X = (v) => m.l + ((v - x0) / (x1 - x0)) * (W - m.l - m.r);
+        const Y = (v) => H - m.b - ((v - y0) / (y1 - y0)) * (H - m.t - m.b);
+        const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, width: '100%'}, host);
+        for (const v of ticks(y0, y1, 5)) {
+          el(
+            'line',
+            {
+              x1: m.l,
+              x2: W - m.r,
+              y1: Y(v),
+              y2: Y(v),
+              stroke: css('--grid')
+            },
+            svg
+          );
+          el(
+            'text',
+            {x: m.l - 6, y: Y(v) + 4, 'text-anchor': 'end'},
+            svg
+          ).textContent = fmt(v);
+        }
+        for (const v of ticks(x0, x1, 7)) {
+          el(
+            'text',
+            {x: X(v), y: H - m.b + 16, 'text-anchor': 'middle'},
+            svg
+          ).textContent = o.xFmt ? o.xFmt(v) : fmt(v);
+        }
+        el(
+          'line',
+          {
+            x1: m.l,
+            x2: W - m.r,
+            y1: H - m.b,
+            y2: H - m.b,
+            stroke: css('--axis')
+          },
+          svg
+        );
+        el(
+          'text',
+          {
+            x: (m.l + W - m.r) / 2,
+            y: H - 4,
+            'text-anchor': 'middle'
+          },
+          svg
+        ).textContent = o.xLabel;
+        el(
+          'text',
+          {
+            x: 12,
+            y: (m.t + H - m.b) / 2,
+            transform: `rotate(-90 12 ${(m.t + H - m.b) / 2})`,
+            'text-anchor': 'middle'
+          },
+          svg
+        ).textContent = o.yLabel;
+        const placed = [];
+        for (const d of o.dots) {
+          const c = css(d.color ?? '--s-blue');
+          const dot = el(
+            'circle',
+            {
+              cx: X(d.x),
+              cy: Y(d.y),
+              r: 5,
+              fill: c,
+              stroke: css('--panel'),
+              'stroke-width': 2
+            },
+            svg
+          );
+          dot.addEventListener('mousemove', (ev) => showTip(ev, d.tipText));
+          dot.addEventListener('mouseleave', hideTip);
+          if (d.name) {
+            let ly = Y(d.y) - 8;
+            while (placed.some((p) => Math.abs(p - ly) < 12)) ly -= 12;
+            placed.push(ly);
+            // Labels near the right edge flip to end-anchored so
+            // they never clip.
+            const flip = X(d.x) > W - m.r - 110;
+            el(
+              'text',
+              {
+                x: flip ? X(d.x) - 7 : X(d.x) + 7,
+                y: ly,
+                class: 'lbl',
+                'text-anchor': flip ? 'end' : 'start',
+                style: `fill:${c}`
+              },
+              svg
+            ).textContent = d.name;
+          }
+        }
+        return svg;
+      }
+
       // ---- panels --------------------------------------------------
       const main = $('main');
       function panel(id, title, law, wide = false) {
@@ -831,6 +943,17 @@
           'window λ/4–λ that would resonate it into lenticular rows ' +
           '(the printed Fr₃ 0.5–2.0 band). The glider pilot’s question, ' +
           'answered from the balloon alone.'
+      );
+      panel(
+        'sat',
+        'Tonight’s passes',
+        'The measured bright fleet (CelesTrak’s visual group, TLE ' +
+          'checksums enforced) propagated with the vendored SGP4 across ' +
+          'the coming dark hours; each culmination graded by the ' +
+          'MEASURED standard-magnitude catalogue (satmags.js - the ' +
+          'McCants/MMT-9 lineage, the same 1000 km half-phase ' +
+          'convention Mallama’s constellation photometry prints) ' +
+          'through the gated Lambert-sphere law and shadow test.'
       );
       panel(
         'tid',
@@ -1421,6 +1544,96 @@
         $('lee-prov').textContent = prov;
       }
 
+      // ---- draw: tonight's passes ---------------------------------
+      function drawSats(inp, prov) {
+        const obs2 = new Astronomy.Observer(inp.latDeg, inp.lonDeg, 30);
+        const eqAt = (ms) => {
+          const t = Astronomy.MakeTime(new Date(ms));
+          return {
+            t,
+            eq: Astronomy.Equator(Astronomy.Body.Sun, t, obs2, true, true)
+          };
+        };
+        const r = satsPanel({
+          ...inp,
+          satlib: satellite,
+          sunRaDecAtMs: (ms) => {
+            const {eq} = eqAt(ms);
+            return {raH: eq.ra, decDeg: eq.dec};
+          },
+          sunAltAtMs: (ms) => {
+            const {t, eq} = eqAt(ms);
+            return Astronomy.Horizon(t, obs2, eq.ra, eq.dec, 'normal').altitude;
+          },
+          mags: snapshotMap()
+        });
+        const best = r.passes[0];
+        const rbTop = r.passes
+          .slice(0, 8)
+          .filter((p) => p.name.includes('R/B')).length;
+        const iss = r.passes.find((p) => p.norad === 25544);
+        $('sat-num').innerHTML =
+          `<b>${r.passes.length}</b> passes above 20° in the coming ` +
+          `${r.darkHours.toFixed(1)} dark hours · <b>${r.nakedEye}</b> ` +
+          `naked-eye` +
+          (best
+            ? ` · brightest: <b>${best.name}</b> at mag ` +
+              `<b>${best.minMag.toFixed(1)}</b>, ` +
+              `${best.peakElDeg.toFixed(0)}° up at ` +
+              `${new Date(best.peakMs).toISOString().slice(11, 16)}Z`
+            : '') +
+          ` · <b>${rbTop}</b> of the top 8 are rocket bodies · ISS: ` +
+          (iss
+            ? `mag ${iss.minMag.toFixed(1)} at ` +
+              new Date(iss.peakMs).toISOString().slice(11, 16) +
+              'Z'
+            : 'no pass this window') +
+          ` · ${r.nCatalogued}/${r.nSats} with measured magnitudes`;
+        $('sat-chart').innerHTML = '';
+        const hRel = (ms) => (ms - inp.startMs) / 3600e3;
+        const startH =
+          new Date(inp.startMs).getUTCHours() +
+          new Date(inp.startMs).getUTCMinutes() / 60;
+        dotChart($('sat-chart'), {
+          dots: r.passes.slice(0, 24).map((p, i) => ({
+            x: hRel(p.peakMs),
+            y: p.peakElDeg,
+            name: i < 4 ? `${p.name.trim()} ${p.minMag.toFixed(1)}` : null,
+            color: p.norad === 25544 ? '--s-orange' : '--s-blue',
+            tipText:
+              `${p.name.trim()}\n` +
+              `${new Date(p.peakMs).toISOString().slice(11, 16)}Z · peak ` +
+              `${p.peakElDeg.toFixed(0)}° az ${p.azAtPeakDeg.toFixed(0)}°\n` +
+              `mag ${p.minMag.toFixed(1)}` +
+              (Number.isFinite(p.mStd) ? ` (measured m_std ${p.mStd})` : '')
+          })),
+          xMin: 0,
+          xMax: inp.hours,
+          yMax: 92,
+          w: 560,
+          h: 280,
+          xLabel:
+            'culmination hour (UTC) - top 24 passes, labels on the ' +
+            'brightest 4',
+          yLabel: 'peak altitude (°)',
+          xFmt: (v) => ((v + startH) % 24).toFixed(0) + 'h'
+        });
+        table(
+          'sat',
+          ['peak (UTC)', 'satellite', 'alt (°)', 'az (°)', 'mag'],
+          r.passes
+            .slice(0, 15)
+            .map((p) => [
+              new Date(p.peakMs).toISOString().slice(11, 16),
+              p.name.trim(),
+              p.peakElDeg.toFixed(0),
+              p.azAtPeakDeg.toFixed(0),
+              p.minMag.toFixed(1)
+            ])
+        );
+        $('sat-prov').textContent = prov;
+      }
+
       // ---- draw: the surge gauge ----------------------------------
       function drawTide(series, published, prov) {
         const t = tidePanel(series, {published});
@@ -1685,6 +1898,17 @@
         SOUNDING.rows,
         `${SOUNDING.wmo} ascent ${SOUNDING.at} level winds · frozen`
       );
+      drawSats(
+        {
+          tleText: TLES.text,
+          latDeg: SUN.latDeg,
+          lonDeg: SUN.lonDeg,
+          startMs: Date.parse('2026-08-10T02:00:00Z'),
+          hours: 12
+        },
+        `CelesTrak visual group via api.ndev.tk/tles, ${TLES.at} · the ` +
+          `night of 2026-08-10 (02–14 UTC) at the fixture point · frozen`
+      );
       drawTide(
         TIDE,
         TIDE_PUBLISHED.rows,
@@ -1752,6 +1976,28 @@
             setLive('lee', true);
           })
           .catch((e) => setLive('lee', false, e.message));
+        fetch('https://api.ndev.tk/tles', {credentials: 'omit'})
+          .then((r) => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.text();
+          })
+          .then((txt) => {
+            // The coming night: from now (or the next sunset if the
+            // sun is still up) for 12 hours.
+            drawSats(
+              {
+                tleText: txt,
+                latDeg: LAT,
+                lonDeg: LON,
+                startMs: Date.now(),
+                hours: 14
+              },
+              `CelesTrak visual group via api.ndev.tk/tles · the coming ` +
+                `14 h at ${LAT.toFixed(2)}, ${LON.toFixed(2)} · live`
+            );
+            setLive('sat', true);
+          })
+          .catch((e) => setLive('sat', false, e.message));
         const TIDE_STATION_ID = params.get('tidestation') ?? '9410170';
         Promise.all([
           j(

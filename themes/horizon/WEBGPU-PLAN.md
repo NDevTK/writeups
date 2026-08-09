@@ -9375,6 +9375,40 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   observatory-freeze.mjs fetches harcon with the tide series;
   FINDINGS section 3 gains the closure. Gate: observatory 14
   landmarks, VALIDATE PASS.
+- DONE (Aug 9, the review session's 122nd pass - TONIGHT'S PASSES:
+  fourth shelved topic; the measured fleet, graded): satsPanel
+  propagates the frozen CelesTrak visual group (157 TLEs via the
+  daemon's /tles, checksums enforced by the gated parseTLEs) with
+  the vendored SGP4 across the coming dark hours and grades every
+  culmination through the gated Lambert-sphere magnitude law and
+  cylindrical shadow test, standard magnitudes from the MEASURED
+  catalogue (satmags.js - the McCants/MMT-9 lineage at the same
+  1000 km half-phase convention Mallama's constellation photometry
+  prints; 138 of 157 ids measured). The heavy dependencies stay
+  with the caller by design: satellite.js is a browser global on
+  the page and createRequire in the reference; the sun arrives as
+  two astronomy-engine callables (equatorial-of-date taken as the
+  propagation frame's sun - the sub-degree frame difference is far
+  below the shadow and phase geometry it feeds, stated). THE NIGHT
+  OF AUG 10 AT THE FIXTURE POINT: 88 culminations above 20 deg in
+  9.5 dark hours, 56 naked-eye; the brightest is the H-2A rocket
+  body 28932 at mag 0.8, 76 deg up at 11:49Z; SEVEN of the top
+  eight are ROCKET BODIES (Zenit and H-2A stages outshining the
+  payloads - the brightness-pollution debate's other half, graded
+  by the same catalogue lineage the constellation papers use); the
+  ISS honestly sits out the window; and the drawn timeline shows
+  the classic MID-NIGHT SHADOW GAP (no passes ~6-11 UTC - the
+  whole fleet inside Earth's shadow, emerging in the pre-dawn
+  cluster). Landmark 15 pins the McCants anchor identity
+  (m(1000 km, half phase) = m_std to 1e-12), the counts, the
+  brightest pass, the rocket-body share and the ISS absence. One
+  found-and-fixed: satmags snapshotMap() is a Map keyed by NUMBER
+  - the first join produced 0 catalogued and every satellite fell
+    to the class default. Page: a dedicated dot chart with per-mark
+    hover (a lineChart contortion was rejected - dots without
+    per-mark tooltips fail the interaction rule), edge labels
+    flipping anchor so they never clip; ?lat/?lon move the whole
+    night. observatory-freeze.mjs fetches /tles with the rest.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
