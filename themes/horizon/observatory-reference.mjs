@@ -34,12 +34,14 @@ import {
   columnPanel,
   contrailPanel,
   coronaPanel,
+  leewavePanel,
   meteorsPanel,
   monahanW,
   polPanel,
   seaPanel,
   wetPanel
 } from './observatory.js';
+import {fr3Regime, froude3, FR3_RES_HI, FR3_RES_LO} from './leewave.js';
 import {
   ADSB,
   AEROSOL,
@@ -366,6 +368,42 @@ const col = columnPanel(SOUNDING.rows);
       `top out at ${(c.aircraft.maxAltM / 1000).toFixed(1)} km, below ` +
       `even the form floor - today San Diego's sky writes nothing, ` +
       `for a reason the scan can point at`
+  );
+}
+
+// ---- the wave ladder ------------------------------------------
+{
+  const w = leewavePanel(SOUNDING.rows);
+  const capable = w.levels.filter((q) => q.lamM);
+  // The window edges are the printed Fr3 band, exactly.
+  const edgeHi = froude3(w.spot.lamM, w.spot.wLoM);
+  const edgeLo = froude3(w.spot.lamM, w.spot.wHiM);
+  check(
+    'THE WAVE LADDER on a calm marine day',
+    w.levels.length === 29 &&
+      capable.length === 29 &&
+      w.layer.n === 10 &&
+      Math.abs(w.layer.mMs - 0.43) < 0.05 &&
+      w.layer.scalarMs > 2 * w.layer.mMs &&
+      Math.abs(w.spot.hM - 1908) < 1 &&
+      Math.abs(w.spot.lamM - 657) < 5 &&
+      Math.abs(edgeHi - FR3_RES_HI) < 1e-12 &&
+      Math.abs(edgeLo - FR3_RES_LO) < 1e-12 &&
+      fr3Regime(froude3(w.spot.lamM, w.spot.lamM / 2)) === 'resonant' &&
+      w.layer.mMs < 1,
+    `every one of the ${w.levels.length} wind-bearing levels ` +
+      `oscillates (N^2 > 0 throughout - the same static stability ` +
+      `that holds the marine inversion); but the 1-3 km crest layer's ` +
+      `VECTOR-mean wind is ${w.layer.mMs.toFixed(2)} m/s against a ` +
+      `scalar mean of ${w.layer.scalarMs.toFixed(2)} - the light ` +
+      `winds swirl, no single ridge faces the flow; the spotlight ` +
+      `level (${w.spot.hM} m) would write lam = ` +
+      `${w.spot.lamM.toFixed(0)} m waves resonating only toy ridges ` +
+      `${w.spot.wLoM.toFixed(0)}-${w.spot.wHiM.toFixed(0)} m wide ` +
+      `(the window's edges land the printed Fr3 band ` +
+      `${FR3_RES_LO}..${FR3_RES_HI} exactly), and the theme's own ` +
+      `wind gate (>= 1 m/s) reports no wave claim - the calm-day ` +
+      `null, stated with its reason`
   );
 }
 

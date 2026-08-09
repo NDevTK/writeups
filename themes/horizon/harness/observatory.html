@@ -221,6 +221,7 @@
         auroraPanel,
         closurePanel,
         contrailPanel,
+        leewavePanel,
         meteorsPanel
       } from './writeups/themes/horizon/observatory.js';
       import {radiantAt, SHOWERS} from './writeups/themes/horizon/meteors.js';
@@ -818,6 +819,17 @@
           'mark who is actually up there.'
       );
       panel(
+        'lee',
+        'The wave ladder',
+        'Stull ch. 17 (leewave.js - the chain the theme runs against ' +
+          'its DEM-hunted ridge): every stable wind-bearing level of the ' +
+          'ascent oscillates at its own Brunt–Väisälä frequency; the ' +
+          'natural wavelength λ = 2πU/N per level, and the ridge-width ' +
+          'window λ/4–λ that would resonate it into lenticular rows ' +
+          '(the printed Fr₃ 0.5–2.0 band). The glider pilot’s question, ' +
+          'answered from the balloon alone.'
+      );
+      panel(
         'clo',
         'The dome audits itself',
         'The 91st pass’s radiative closure run on the CURRENT ' +
@@ -1335,6 +1347,68 @@
         $('con-prov').textContent = prov;
       }
 
+      // ---- draw: the wave ladder ----------------------------------
+      function drawLeewave(rows, prov) {
+        const w = leewavePanel(rows);
+        const caps = w.levels.filter((q) => q.lamM);
+        const swirl =
+          w.layer && w.layer.scalarMs > 0
+            ? w.layer.mMs / w.layer.scalarMs
+            : null;
+        $('lee-num').innerHTML =
+          (w.layer
+            ? `1–3 km layer wind: vector mean ` +
+              `<b>${w.layer.mMs.toFixed(1)} m/s</b>` +
+              (swirl != null && swirl < 0.6
+                ? ` vs scalar ${w.layer.scalarMs.toFixed(1)} - the winds ` +
+                  `swirl, no single ridge faces the flow`
+                : ` from ${w.layer.dirFrom.toFixed(0)}°`)
+            : 'no layer wind') +
+          (w.spot
+            ? ` · at ${(w.spot.hM / 1000).toFixed(1)} km: λ = ` +
+              `<b>${(w.spot.lamM / 1000).toFixed(1)} km</b>, resonant ` +
+              `ridges <b>${w.spot.wLoM.toFixed(0)}–` +
+              `${w.spot.wHiM.toFixed(0)} m</b> wide`
+            : '') +
+          ` · ${caps.length}/${w.levels.length} levels wave-capable` +
+          (w.layer && w.layer.mMs < 1
+            ? ` · the theme’s wind gate (≥ 1 m/s): <b>no wave ` +
+              `claim today</b>`
+            : '');
+        $('lee-chart').innerHTML = '';
+        lineChart($('lee-chart'), {
+          series: [
+            {
+              name: 'λ',
+              color: '--s-blue',
+              pts: caps.map((q) => ({x: q.lamM / 1000, y: q.hM}))
+            }
+          ],
+          w: 560,
+          h: 280,
+          rPad: 70,
+          xLabel: 'natural wavelength λ (km) per measured level',
+          yLabel: 'height (m)',
+          yFmt: (v) => v.toFixed(0)
+        });
+        table(
+          'lee',
+          ['h (m)', 'U (m/s)', 'from (°)', 'N (rad/s)', 'λ (m)', 'ridges (m)'],
+          w.levels
+            .filter((q) => q.lamM)
+            .filter((_, i) => i % 2 === 0)
+            .map((q) => [
+              q.hM,
+              q.uMs.toFixed(1),
+              q.dirFrom,
+              q.nBv.toFixed(4),
+              q.lamM.toFixed(0),
+              `${q.wLoM.toFixed(0)}–${q.wHiM.toFixed(0)}`
+            ])
+        );
+        $('lee-prov').textContent = prov;
+      }
+
       // ---- draw: the closure --------------------------------------
       function drawClosure(inp, prov) {
         const c = closurePanel(inp);
@@ -1530,6 +1604,10 @@
         `${SOUNDING.wmo} ascent ${SOUNDING.at} · ${ADSB.ac.length} ADS-B ` +
           `aircraft (dist ${ADSB.distNm}) at ${ADSB.at} · frozen`
       );
+      drawLeewave(
+        SOUNDING.rows,
+        `${SOUNDING.wmo} ascent ${SOUNDING.at} level winds · frozen`
+      );
       drawClosure(
         {
           sunAltDeg: RADIATION.sunAltDeg,
@@ -1584,6 +1662,12 @@
             setLive('con', true);
           })
           .catch((e) => setLive('con', false, e.message));
+        sndP
+          .then((s) => {
+            drawLeewave(s.rows, `${s.wmo} ascent ${s.at} level winds · live`);
+            setLive('lee', true);
+          })
+          .catch((e) => setLive('lee', false, e.message));
         Promise.all([
           j(
             `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=wind_speed_10m&wind_speed_unit=ms`

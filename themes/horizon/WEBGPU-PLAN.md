@@ -9242,6 +9242,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exact, in-band aircraft counts zero); lineChart grew multi-band
   shading for the three-object display. Gate 141 [ok] + 7 GPU
   probes, VALIDATE PASS.
+- DONE (Aug 9, the review session's 117th pass - THE WAVE LADDER:
+  second shelved topic; Stull's chain answers the glider pilot from
+  the balloon alone): leewavePanel runs the gated ch. 17 machinery
+  (leewave.js - exact virtual temperature, eq. 5.4a Brunt-Vaisala,
+  eq. 17.30 natural wavelength, eq. 17.32 Froude regime - the same
+  chain the theme runs against its DEM-hunted ridge) per-level over
+  the ascent's wind-bearing levels, WITHOUT the terrain hunt: for
+  every stable level, lam = 2 pi U / N_BV and the resonant
+  ridge-width window [lam/4, lam] (the printed Fr3 0.5..2.0 band,
+  window edges asserted to land FR3_RES_LO/HI exactly). The fixture
+  SOUNDING rows regenerated to carry the daemon's drct/spdMs
+  columns (same frozen 12Z ascent, now 6 fields - the first
+  regeneration attempt failed SILENTLY on a 502'd re-fetch chained
+  behind &&, caught only by verifying the fixture rows in node;
+  the daemon's original capture already held the winds). TODAY'S
+  DIAGNOSIS - the calm-day null with its reason: all 29
+  wind-bearing levels oscillate (N^2 > 0 throughout, the same
+  static stability that holds the 8.7 C inversion), but the 1-3 km
+  crest layer's VECTOR-mean wind is 0.43 m/s against a 3.43 scalar
+  mean - the light winds swirl 8x, no single ridge faces the flow;
+  the spotlight level (1908 m) would write 657 m waves resonating
+  only toy ridges 164-657 m wide, and the theme's own wind gate
+  (>= 1 m/s) reports no wave claim. Landmark 12 pins it (level
+  count, vector/scalar split, spot lam, exact Fr3 edge identities,
+  the gate verdict). Panel chart: lam(z) profile, single series -
+  a drafted second wind series on the same axis was cut as the
+  dual-axis anti-pattern in disguise; the table carries U. Shelf
+  remaining: sprites (SSE stream), purple-light watch (OMPS),
+  comets (COBS), satellite pass brightness (TLE + satmags), tide
+  surge residual (CO-OPS).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

@@ -270,7 +270,7 @@ The practice the corpus demonstrates, stated so it can be reused:
    (a normalization, a sign) are pinned once, documented as conventions,
    and the gate asserts they are global — a convention that varies
    per-row would be a fit, and fails.
-7. **The instrument** (`harness/observatory.html`, passes 114–116): the
+7. **The instrument** (`harness/observatory.html`, passes 114–117): the
    gated modules run on the LIVE feeds and draw their diagnostics — the
    current ascent's fold count and horizon refraction, the measured
    wind's whitecap fraction, six cities on the wet-albedo ladder, the
@@ -280,7 +280,7 @@ The practice the corpus demonstrates, stated so it can be reused:
    pass's radiative closure re-run on the current measured irradiance
    at every load, and the Schmidt–Appleman criterion scanned over the
    whole ascent — formation zone, ice-supersaturated sheets, and their
-   overlap — with live ADS-B aircraft marked on the temperature curve.
+   overlap — with live ADS-B aircraft marked on the temperature curve — and the per-level lee-wave ladder with its resonant ridge-width windows.
    One real day (2026-08-09, San Diego: a +8.7 °C marine
    inversion that folds the fan at eye 450 m and not at 15 m; 1842
    measured Perseids 2.7 days before peak; the drawn dome landing 97.4 %

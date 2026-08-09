@@ -67,6 +67,15 @@ import {
 import {mieCoefficients} from './aerosol.js';
 import {closureRatios} from './closure.js';
 import {appleman, FT_M} from './contrails.js';
+import {
+  fr3Regime,
+  froude3,
+  FR3_RES_HI,
+  FR3_RES_LO,
+  naturalWavelengthM,
+  nBV,
+  virtualTk
+} from './leewave.js';
 
 // The drawn ocean's whitecap coverage law (Monahan &
 // O'Muircheartaigh 1980, W = 3.84e-6 U10^3.41) - the GPU copy
@@ -528,4 +537,79 @@ export function contrailPanel(rows, {ac = null, eta = 0.3} = {}) {
     aircraft,
     eta
   };
+}
+
+/**
+ * THE WAVE LADDER: Stull's ch. 17 machinery (leewave.js - exact
+ * virtual temperature, eq. 5.4a Brunt-Vaisala, eq. 17.30 natural
+ * wavelength, eq. 17.32 Froude regime - the same chain the theme
+ * runs against its DEM-hunted ridge) applied per-level to the
+ * measured ascent, WITHOUT the terrain hunt: for every stable
+ * wind-bearing level, the wavelength today's air would oscillate
+ * at, and the ridge-width window [lam/4, lam] that would resonate
+ * it into standing lenticular rows (Fr3 = lam/2w in the printed
+ * 0.5..2.0 band). The panel answers the glider pilot's question -
+ * "would MY ridge work today?" - from the balloon alone; the
+ * theme's own DEM verdict stays in the theme.
+ */
+export function leewavePanel(rows, {zLoM = 400, zHiM = 7000} = {}) {
+  const wr = rows.filter(
+    (q) =>
+      q.hM >= zLoM &&
+      q.hM <= zHiM &&
+      Number.isFinite(q.drct) &&
+      Number.isFinite(q.spdMs)
+  );
+  const levels = [];
+  for (let i = 1; i < wr.length - 1; i++) {
+    const a = wr[i - 1];
+    const q = wr[i];
+    const b = wr[i + 1];
+    if (!(b.hM > a.hM)) continue;
+    const lapse = (b.tC - a.tC) / (b.hM - a.hM);
+    const tv = virtualTk(q.tC, (q.rh ?? 0) / 100, q.p * 100);
+    const n = nBV(tv, lapse);
+    const lamM = n && q.spdMs > 0.5 ? naturalWavelengthM(q.spdMs, n) : null;
+    levels.push({
+      hM: q.hM,
+      uMs: q.spdMs,
+      dirFrom: q.drct,
+      nBv: n,
+      lamM,
+      wLoM: lamM ? lamM / (2 * FR3_RES_HI) : null,
+      wHiM: lamM ? lamM / (2 * FR3_RES_LO) : null
+    });
+  }
+  // The vector-mean wind of the classic crest layer (1-3 km) -
+  // arithmetic, the theme's own leeLayerWind form.
+  let u = 0;
+  let v = 0;
+  let s = 0;
+  let n = 0;
+  for (const q of wr) {
+    if (q.hM < 1000 || q.hM > 3000) continue;
+    const a = (q.drct * Math.PI) / 180;
+    u += -q.spdMs * Math.sin(a);
+    v += -q.spdMs * Math.cos(a);
+    s += q.spdMs;
+    n++;
+  }
+  // Vector mean vs scalar mean: when they differ the layer's
+  // winds are swirling, and no single ridge faces the flow.
+  const layer =
+    n >= 2
+      ? {
+          mMs: Math.hypot(u / n, v / n),
+          scalarMs: s / n,
+          dirFrom: ((Math.atan2(-u / n, -v / n) * 180) / Math.PI + 360) % 360,
+          n
+        }
+      : null;
+  // The spotlight level: nearest wave-capable level to 2 km (a
+  // typical ridge-crest height, stated).
+  let spot = null;
+  for (const q of levels)
+    if (q.lamM && (!spot || Math.abs(q.hM - 2000) < Math.abs(spot.hM - 2000)))
+      spot = q;
+  return {levels, layer, spot, fr3: {lo: FR3_RES_LO, hi: FR3_RES_HI}};
 }
