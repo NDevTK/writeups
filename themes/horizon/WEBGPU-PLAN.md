@@ -7851,6 +7851,42 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   whole network is watching tonight, now drawn at the
   brightness the network measures. Gate registered after
   comets. Full gate green - 118 CPU references + 7 GPU probes.
+- DONE (Aug 9, the review session's 84th pass - measured rivers:
+  the gauge outranks the model, and PP 252 closes its own
+  identity). The rivers already rode Leopold & Maddock's printed
+  at-a-station width law on the GloFAS MODEL (w ~ Q^0.26 as a
+  ratio against the 92-day record); this pass reads the primary
+  deeper and adds the MEASUREMENT rung. PP 252 (USGS
+  Professional Paper 252, public domain, the full text read):
+  the complete printed at-a-station set from 20 river cross
+  sections is b = 0.26, f = 0.40, m = 0.34 - and the paper
+  prints its own constraint, "b+f+m=1.0 ... as is required by
+  the identity Q=wdv". rivers.js now carries all three printed
+  exponents with the identity as a gate landmark (exact
+  arithmetic: 0.26 + 0.40 + 0.34 = 1.0); only the width
+  exponent has a drawn counterpart - depth and velocity are
+  documented, undrawn. THE MEASUREMENT: the USGS Water Services
+  instantaneous-values API - keyless AND CORS-open
+  (Access-Control-Allow-Origin: *), the FIRST feed in the theme
+  needing no daemon proxy. The nearest discharge gauge within a
+  documented 40 km answers with its current reading; the
+  reference is the gauge's OWN 30-day record through the SAME
+  shipped refDischarge/dischargeFactor pair the GloFAS path
+  rides - measurement and model on one gated law, units
+  cancelling in the ratio. US coverage only: an empty bounding
+  box leaves the model standing, and a missing model leaves the
+  ladder widths - fails to data at every rung. USGS's ice/
+  backwater sentinel (-999999) parses to NO gauge (a frozen
+  river never narrows the drawn one by arithmetic accident).
+  ?usgs=0 pin. GATED on vendored REAL responses (Lees Ferry,
+  2026-08-09): the bounding box parses its three gauges
+  verbatim; 09380000 reads 8070 cfs at its published
+  coordinates; its own thinned 30-day record medians to 6530
+  cfs - the Colorado running above its month, width x1.057 by
+  the paper's own law. The waterfalls inherit automatically
+  (fallWidthM already rides the same ratio). Gate grows to the
+  rivers reference (+3 landmarks). Full gate green - 118 CPU
+  references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

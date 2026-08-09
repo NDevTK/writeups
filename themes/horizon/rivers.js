@@ -116,3 +116,59 @@ export function dischargeFactor(qNow, qRef, b = B_AT_A_STATION) {
     return 1;
   return Math.min(2, Math.max(0.5, Math.pow(qNow / qRef, b)));
 }
+
+// ---- The full printed at-a-station set and its own identity ----
+// PP 252 prints all three exponents from 20 river cross sections
+// (b = 0.26, f = 0.40, m = 0.34) and the exact constraint
+// "b+f+m=1.0 ... as is required by the identity Q=wdv". Only the
+// WIDTH exponent has a drawn counterpart; depth and velocity are
+// carried as the printed set the gate's identity check needs -
+// documented, not drawn.
+export const F_AT_A_STATION = 0.4;
+export const M_AT_A_STATION = 0.34;
+
+// ---- USGS measured gauges (the AERONET pattern for rivers) ----
+// waterservices.usgs.gov instantaneous values: keyless AND
+// CORS-open (Access-Control-Allow-Origin: *) - the first feed in
+// the theme that needs no daemon proxy. A near gauge's MEASURED
+// discharge outranks the GloFAS model ratio; the reference stays
+// the gauge's own recent record through the SAME refDischarge /
+// dischargeFactor, so model and measurement ride one gated law.
+// Units cancel in the ratio (cfs/cfs), stated. US coverage only:
+// elsewhere the bounding box is empty and GloFAS stands.
+export const USGS_IV = 'https://waterservices.usgs.gov/nwis/iv/';
+export const GAUGE_MAX_KM = 40;
+
+// Latest discharge per site from an IV response (parameter 00060).
+// USGS marks ice/estimated gaps with sentinel negatives - only
+// finite positive readings count as measurements.
+export function parseUsgsIv(json) {
+  const out = [];
+  for (const ts of (json && json.value && json.value.timeSeries) || []) {
+    const si = ts.sourceInfo || {};
+    const loc = (si.geoLocation || {}).geogLocation || {};
+    const vv = ((ts.values || [])[0] || {}).value || [];
+    const last = vv[vv.length - 1];
+    const q = last ? parseFloat(last.value) : NaN;
+    if (!Number.isFinite(q) || q <= 0) continue;
+    out.push({
+      site: ((si.siteCode || [])[0] || {}).value || '',
+      name: si.siteName || '',
+      lat: loc.latitude,
+      lon: loc.longitude,
+      q,
+      atMs: last.dateTime ? Date.parse(last.dateTime) : NaN
+    });
+  }
+  return out;
+}
+
+// All finite positive readings of the first series (for the
+// gauge's own refDischarge over a period request).
+export function usgsSeries(json) {
+  const ts = ((json && json.value && json.value.timeSeries) || [])[0];
+  const vv = ((ts && ts.values) || [])[0];
+  return ((vv && vv.value) || [])
+    .map((r) => parseFloat(r.value))
+    .filter((v) => Number.isFinite(v) && v > 0);
+}

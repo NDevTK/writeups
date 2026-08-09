@@ -11,13 +11,19 @@ import {
   B_AT_A_STATION,
   DEFAULT_WATER_WIDTH,
   dischargeFactor,
+  F_AT_A_STATION,
+  GAUGE_MAX_KM,
+  M_AT_A_STATION,
+  parseUsgsIv,
   parseWaterways,
   refDischarge,
   RIVER_COLOR,
   riversGeometry,
   riverWidthOf,
+  usgsSeries,
   WATER_WIDTH
 } from './rivers.js';
+import {USGS_BBOX_FIXTURE, USGS_P30_FIXTURE} from './usgs-fixture.js';
 import {densify, thin} from './roads.js';
 import {DISCHARGE_FIXTURE, RIVERS_FIXTURE} from './rivers-fixture.mjs';
 import {geoToScene} from './roam.js';
@@ -207,6 +213,71 @@ const rivers = parseWaterways(RIVERS_FIXTURE);
       f > 0.9 &&
       f < 1,
     `93 days -> median ${ref} m3/s; capture day ${today} -> width x${f.toFixed(3)} - the Aare a touch narrower that day, by the paper's own law`
+  );
+}
+
+{
+  // PP 252's full printed at-a-station set closes its own
+  // identity: "b+f+m=1.0 ... as is required by the identity
+  // Q=wdv" - the exponents are the paper's, the constraint is
+  // exact arithmetic, and only b has a drawn counterpart.
+  check(
+    'the printed exponents close Q = w d v',
+    B_AT_A_STATION + F_AT_A_STATION + M_AT_A_STATION === 1 &&
+      B_AT_A_STATION === 0.26 &&
+      F_AT_A_STATION === 0.4 &&
+      M_AT_A_STATION === 0.34,
+    `b + f + m = ${B_AT_A_STATION} + ${F_AT_A_STATION} + ` +
+      `${M_AT_A_STATION} = 1.0 exactly - PP 252's own identity, held as ` +
+      `printed (width drawn; depth and velocity documented, undrawn)`
+  );
+}
+
+{
+  // MEASURED gauges outrank the model (vendored real responses,
+  // Lees Ferry 2026-08-09): the parser reads the box's three
+  // gauges verbatim, the P30D series feeds the SAME shipped
+  // refDischarge/dischargeFactor pair the GloFAS path uses, and
+  // the units cancel in the ratio.
+  const g = parseUsgsIv(USGS_BBOX_FIXTURE);
+  const lees = g.find((x) => x.site === '09380000');
+  const s = usgsSeries(USGS_P30_FIXTURE);
+  const ref = refDischarge(s);
+  const f = dischargeFactor(lees.q, ref);
+  check(
+    'USGS measured gauges through the same gated law',
+    g.length === 3 &&
+      lees &&
+      lees.q === 8070 &&
+      Math.abs(lees.lat - 36.86433333) < 1e-8 &&
+      s.length === 60 &&
+      ref === 6530 &&
+      f > 1 &&
+      f < 1.1 &&
+      f === Math.min(2, Math.max(0.5, Math.pow(lees.q / ref, 0.26))) &&
+      GAUGE_MAX_KM === 40,
+    `the Lees Ferry box parses 3 gauges; 09380000 reads 8070 cfs at its ` +
+      `published coordinates; its own 30-day record (60 vendored rows) ` +
+      `medians to ${ref} cfs - the reading sits above its month, width ` +
+      `x${f.toFixed(3)} through the SAME ` +
+      `refDischarge/dischargeFactor the model path rides - measurement ` +
+      `and model on one printed law (radius ${GAUGE_MAX_KM} km documented)`
+  );
+  const iced = parseUsgsIv({
+    value: {
+      timeSeries: [
+        {
+          sourceInfo: {siteName: 'x', siteCode: [{value: 'x'}]},
+          values: [{value: [{value: '-999999', dateTime: ''}]}]
+        }
+      ]
+    }
+  });
+  check(
+    'sentinel readings are not measurements',
+    iced.length === 0,
+    `USGS's ice/backwater sentinel (-999999) parses to NO gauge - a frozen ` +
+      `river never narrows the drawn one by arithmetic accident`
   );
 }
 

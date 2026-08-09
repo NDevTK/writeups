@@ -216,6 +216,8 @@
         endpoint override for the measured radiosonde / keep the
         model aloft), cobs=URL|0 (daemon endpoint override for
         the measured comet magnitudes / keep the g/k formula),
+        usgs=0 (keep the GloFAS model discharge - never consult
+        the measured US gauges),
         gwaves=A|0 (pin the airglow banding amplitude for the
         harness / remove the banding), gmn=URL|0 (daemon
         endpoint override for the measured meteor medians /
@@ -706,9 +708,13 @@
       } from './horizon/landuse.js';
       import {
         dischargeFactor,
+        GAUGE_MAX_KM,
+        parseUsgsIv,
         parseWaterways,
         refDischarge,
-        riversGeometry
+        riversGeometry,
+        USGS_IV,
+        usgsSeries
       } from './horizon/rivers.js';
       import {
         parseRailways,
@@ -3082,6 +3088,74 @@
         } catch (e) {
           riverFlow = null; // ladder widths stand - nothing invented
           if (params.has('debug')) console.warn('discharge: ' + e.message);
+        }
+        // A MEASURED gauge outranks the model (rivers.js USGS
+        // machinery - keyless AND CORS-open, no daemon): the
+        // nearest instantaneous-discharge gauge within the
+        // documented 40 km, its ratio against its OWN 30-day
+        // record through the SAME refDischarge/dischargeFactor
+        // pair. US coverage only - an empty box leaves GloFAS
+        // standing. ?usgs=0 keeps the model.
+        if (params.get('usgs') !== '0') {
+          try {
+            const bb =
+              (state.lon - 0.45).toFixed(3) +
+              '%2C' +
+              (state.lat - 0.35).toFixed(3) +
+              '%2C' +
+              (state.lon + 0.45).toFixed(3) +
+              '%2C' +
+              (state.lat + 0.35).toFixed(3);
+            const gauges = parseUsgsIv(
+              await (
+                await fetch(
+                  USGS_IV +
+                    '?format=json&bBox=' +
+                    bb +
+                    '&parameterCd=00060&siteStatus=active',
+                  {credentials: 'omit'}
+                )
+              ).json()
+            );
+            let best = null;
+            for (const g of gauges) {
+              const d = haversineKm(state.lat, state.lon, g.lat, g.lon);
+              if (d <= GAUGE_MAX_KM && (!best || d < best.d)) best = {g, d};
+            }
+            if (best) {
+              const s = usgsSeries(
+                await (
+                  await fetch(
+                    USGS_IV +
+                      '?format=json&sites=' +
+                      best.g.site +
+                      '&parameterCd=00060&period=P30D',
+                    {credentials: 'omit'}
+                  )
+                ).json()
+              );
+              const qRef = refDischarge(s);
+              if (qRef !== null) {
+                const factor = dischargeFactor(best.g.q, qRef);
+                riverFlow = {qNow: best.g.q, qRef, factor, measured: true};
+                record(
+                  'USGS gauge (measured discharge)',
+                  best.g.name.slice(0, 34) +
+                    ' · ' +
+                    Math.round(best.d) +
+                    ' km · ' +
+                    best.g.q +
+                    ' cfs vs 30-day median ' +
+                    qRef +
+                    ' · width ×' +
+                    factor.toFixed(2)
+                );
+                if (worldBuilt) placeRivers();
+              }
+            }
+          } catch {
+            // the model (or the ladder) stands
+          }
         }
       }
 
