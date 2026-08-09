@@ -852,9 +852,24 @@ export function createOpticsMaterial(cloudShadow) {
   // BIN'S value across the whole dome outside their angular
   // windows - a uniform wash the bright sky hides but a dark
   // capture shows (found by the visual-verification instrument;
-  // the dog window below gets the same mask).
-  const bowIn = step(bowLut.thMinDeg, aA).mul(step(aA, bowLut.thMaxDeg));
-  const haloIn = step(haloLut.thMinDeg, aS).mul(step(aS, haloLut.thMaxDeg));
+  // the dog window below gets the same mask). The edges FEATHER
+  // over one LUT bin - the instrument's own resolution, no new
+  // constant: the 77th pass's x4-amplified fogbow capture showed
+  // the hard step at the window edge (invisible at 1x, recorded
+  // as a shelf item); a bin-wide smoothstep states the
+  // truncation smoothly.
+  const bowFea = (bowLut.thMaxDeg - bowLut.thMinDeg) / bowLut.bins;
+  const bowIn = smoothstep(bowLut.thMinDeg, bowLut.thMinDeg + bowFea, aA).mul(
+    smoothstep(bowLut.thMaxDeg - bowFea, bowLut.thMaxDeg, aA).oneMinus()
+  );
+  const haloFea = (haloLut.thMaxDeg - haloLut.thMinDeg) / haloLut.bins;
+  const haloIn = smoothstep(
+    haloLut.thMinDeg,
+    haloLut.thMinDeg + haloFea,
+    aS
+  ).mul(
+    smoothstep(haloLut.thMaxDeg - haloFea, haloLut.thMaxDeg, aS).oneMinus()
+  );
   const bowSample = bowTexN
     .sample(
       vec2(aA.sub(bowLut.thMinDeg).div(bowLut.thMaxDeg - bowLut.thMinDeg), 0.5)

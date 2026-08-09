@@ -8400,6 +8400,33 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   structure held on the vendored values with the print
   quoted). Full gate green - 123 CPU references + 7 GPU
   probes.
+- DONE (Aug 9, the review session's 97th pass - the window
+  feather lands; the global-SWE vein closes with evidence). TWO
+  SURVEY RECORDS FIRST: (1) the global measured-snowpack pass
+  (AMSR SWE through FSM's printed density - the palette maps
+  colours to EXACT millimetres and FSM Table 2 prints
+  rho_f = 100 / rho_cold = 300 / rho_melt = 500 kg m-3 with
+  tau_rho = 200 h and the closed form rho = rho_max +
+  (rho_i - rho_max) e^(-dt/tau) at the paper's own line) is
+  fully sourced but NOT BUILDABLE: the GIBS layer's own time
+  extent ends 2025-09-01 - AMSR2 aged out, no successor SWE
+  layer serves - a live-feed pass cannot ride a discontinued
+  product; the whole chain is recorded here for the day AMSR3
+  lands in GIBS. (2) The systematic sweep of all 1331 GIBS
+  layers against the drawn quantities is DONE - cloud tops,
+  droplet size and the closed SWE were its finds; precipitable
+  water and ocean wind are marginal against feeds already
+  measured; the GIBS vein is mined. THE PASS: the 77th's shelf
+  item - the x4-amplified fogbow capture had shown the hard
+  step at the bow LUT's 35-60 deg window edge (invisible at 1x,
+  recorded then). The bow and halo range masks now FEATHER over
+  ONE LUT BIN - the instrument's own resolution, no new
+  constant - a smoothstep at each window edge stating the
+  truncation smoothly; the dog window's edges are uniform-
+  driven and have never shown, unchanged, stated. Amplified-
+  only by its own record: the 1x display is unchanged
+  everywhere the earlier captures pinned. Full gate green -
+  123 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
