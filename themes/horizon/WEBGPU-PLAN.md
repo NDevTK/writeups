@@ -9121,6 +9121,51 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   appended - a pass that changes findings-level content
   extends the register in the same commit. No code changes;
   gate unchanged at 140 ok.
+- DONE (Aug 9, the review session's 114th pass - THE OBSERVATORY:
+  the gated machinery runs on the live world and draws it): the
+  standing directive turned visual - "results get to be visual with
+  real current data" - and the answer is an instrument IN the repo,
+  not a document about it. harness/observatory.html pushes the live
+  feeds through the already-gated modules and draws five panels
+  (SVG, hover layer, table views, validated palette in both color
+  schemes - the dataviz gate run on every series set): THE COLUMN
+  (api.ndev.tk/sounding daemon rows -> profileFromRows, the theme's
+  applySounding mapping verbatim -> transferCurve/foldCount at two
+  eyes + horizon refraction vs ISA + flattening + green-rim split,
+  the fan chart windowed on any fold), THE SEA (Monahan
+  W = 3.84e-6 U^3.41 - the terrain-tsl GPU law as a CPU callable -
+  with the measured wind on the curve), THE WET GROUND (six cities'
+  soil_moisture_0_to_1cm + live rain -> wetnessFrom ->
+  wetDarkenFactor bars beside the Lekner-Dorf curve and its gloss
+  floor), THE POLARIZED SKY (solveA1 DoP map at the astronomy
+  engine's current sun, diluted by the measured AOD(550) through
+  the same w = tauR/(tauR+tauA) skyPolLut applies), THE CORONA
+  (SWPC region count -> the client's regions/12 phase -> van de
+  Hulst K eq/pole + F profiles, whole-corona lux in full moons).
+  Feeds fall back panel-by-panel to observatory-fixture.js - one
+  REAL frozen day (2026-08-09 San Diego, every value fetched and
+  stamped: the 12Z Miramar ascent's +8.7 C marine inversion, NDBC
+  46047's 6.0 m/s / Hs 1.3 m / 15 s swell, AOD 0.15, 6 SWPC
+  regions, Mumbai in live drizzle among six cities) - and
+  observatory-reference.mjs pins the compositions in the gate
+  (7 landmarks, validate.sh now 141 [ok]): the engine's sun matches
+  the frozen stamp; TODAY'S COLUMN MIRAGES ALOFT (fold count 1 at
+  eye 450 m, 0 at 15 m - the elevated inversion diagnosis, run
+  live the day it was true); the lifted squashed sun (38.2' vs ISA
+  33.0' at the horizon, flattening 0.70, 47 arcsec of rim split
+  through the 93%-humid marine layer); the foam law's exact 3.41
+  power; the wet world's composition (Mumbai's monsoon topsoil
+  0.966 beats its own rain skin; Bergen 0.95 with no rain falling;
+  Phoenix 0.10 - one law, six climates); the diluted polarization
+  (molecular max DoP 0.874 ON the 90-degree lobe, times w = 0.420
+  = 0.367 - the measured aerosol takes 58% of the signal); the
+  corona at six regions (phase 0.5, 0.46 full moons, inside van de
+  Hulst's printed band). FINDINGS.md gains method point 7 (the
+  instrument). The page answers the research-value steer both
+  ways: live data made visual through validated physics, and the
+  visual itself validated - a claim like "today the sun sets 5.2
+  arcmin late" is reproducible from the frozen fixture, not a
+  screenshot.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

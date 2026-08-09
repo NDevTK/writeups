@@ -1,0 +1,1223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>horizon observatory - today through the gated machinery</title>
+    <style>
+      /* Tokens: the dataviz reference palette, validated for this
+         page's series sets in BOTH modes (see WEBGPU-PLAN.md, the
+         114th pass). Light is the bare default; dark rides the OS. */
+      :root {
+        color-scheme: light;
+        --surface: #fcfcfb;
+        --panel: #f4f3f0;
+        --ink: #0b0b0b;
+        --ink-2: #52514e;
+        --ink-3: #8a887f;
+        --grid: #e3e1da;
+        --axis: #b8b5aa;
+        --s-blue: #2a78d6;
+        --s-orange: #eb6834;
+        --s-aqua: #1baf7a;
+        --s-red: #e34948;
+        --s-green: #008300;
+        --seq-lo: #cde2fb;
+        --seq-hi: #0d366b;
+        --live: #0ca30c;
+        --fixture: #eda100;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --surface: #1a1a19;
+          --panel: #232322;
+          --ink: #ffffff;
+          --ink-2: #c3c2b7;
+          --ink-3: #8a887f;
+          --grid: #33332f;
+          --axis: #55534b;
+          --s-blue: #3987e5;
+          --s-orange: #d95926;
+          --s-aqua: #199e70;
+          --s-red: #e66767;
+          --s-green: #008300;
+          --seq-lo: #0d366b;
+          --seq-hi: #cde2fb;
+          --live: #0ca30c;
+          --fixture: #c98500;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--surface);
+        color: var(--ink);
+        font:
+          14px/1.5 system-ui,
+          sans-serif;
+        font-variant-numeric: tabular-nums;
+      }
+      header {
+        padding: 20px 24px 8px;
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 2px;
+      }
+      h1 small {
+        color: var(--ink-2);
+        font-weight: 400;
+      }
+      .sub {
+        color: var(--ink-2);
+        max-width: 72ch;
+      }
+      main {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 8px 24px 40px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 1100px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+      section {
+        background: var(--panel);
+        border-radius: 6px;
+        padding: 14px 16px 10px;
+        min-width: 0;
+      }
+      section.wide {
+        grid-column: 1 / -1;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 0;
+      }
+      .badge {
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        border-radius: 3px;
+        padding: 1px 6px;
+        margin-left: 8px;
+        vertical-align: 2px;
+        color: var(--surface);
+        background: var(--fixture);
+      }
+      .badge.live {
+        background: var(--live);
+      }
+      .law {
+        color: var(--ink-2);
+        font-size: 12.5px;
+        margin: 2px 0 8px;
+        max-width: 88ch;
+      }
+      .numbers {
+        font-size: 13px;
+        margin: 6px 0;
+        color: var(--ink);
+      }
+      .numbers b {
+        font-weight: 600;
+      }
+      .prov {
+        color: var(--ink-3);
+        font-size: 11.5px;
+        margin-top: 6px;
+      }
+      .chartwrap {
+        overflow-x: auto;
+      }
+      svg {
+        display: block;
+      }
+      svg text {
+        fill: var(--ink-2);
+        font:
+          11px system-ui,
+          sans-serif;
+      }
+      svg .lbl {
+        font-weight: 600;
+        fill: var(--ink);
+      }
+      details {
+        margin-top: 6px;
+        font-size: 12.5px;
+      }
+      summary {
+        cursor: pointer;
+        color: var(--ink-2);
+      }
+      table {
+        border-collapse: collapse;
+        margin: 6px 0;
+      }
+      td,
+      th {
+        padding: 2px 10px 2px 0;
+        text-align: right;
+        border-bottom: 1px solid var(--grid);
+      }
+      th {
+        color: var(--ink-2);
+        font-weight: 600;
+      }
+      td:first-child,
+      th:first-child {
+        text-align: left;
+      }
+      .tip {
+        position: fixed;
+        pointer-events: none;
+        background: var(--ink);
+        color: var(--surface);
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        white-space: pre;
+        z-index: 9;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>
+        horizon observatory
+        <small>- the world right now, through the gated machinery</small>
+      </h1>
+      <p class="sub">
+        Every number on this page is a measured feed pushed through modules the
+        validation gate already pins to their primaries - no physics lives in
+        this page. Panels open on the frozen fixture of
+        <b id="fixat"></b> and flip to LIVE as each feed answers;
+        <code>?fixture=1</code> keeps the frozen day,
+        <code>?lat=&amp;lon=</code> moves the point.
+      </p>
+    </header>
+    <main id="main"></main>
+    <div class="tip" id="tip"></div>
+    <script src="./writeups/themes/horizon/astronomy.browser.min.js"></script>
+    <script type="module">
+      import {
+        columnPanel,
+        coronaPanel,
+        polPanel,
+        seaPanel,
+        wetPanel
+      } from './writeups/themes/horizon/observatory.js';
+      import {
+        AEROSOL,
+        BUOY,
+        CITIES,
+        FIXTURE_AT,
+        SOLAR_REGIONS,
+        SOUNDING,
+        SUN
+      } from './writeups/themes/horizon/observatory-fixture.js';
+
+      const params = new URLSearchParams(location.search);
+      const FIXED = params.get('fixture') === '1';
+      const LAT = parseFloat(params.get('lat') ?? '32.72');
+      const LON = parseFloat(params.get('lon') ?? '-117.16');
+      document.getElementById('fixat').textContent =
+        FIXTURE_AT + ' (San Diego)';
+      const $ = (id) => document.getElementById(id);
+      const css = (v) =>
+        getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+      const tip = $('tip');
+      const showTip = (ev, text) => {
+        tip.style.display = 'block';
+        tip.textContent = text;
+        const x = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8);
+        tip.style.left = x + 'px';
+        tip.style.top = ev.clientY + 14 + 'px';
+      };
+      const hideTip = () => (tip.style.display = 'none');
+
+      // ---- tiny SVG chart kit (2px lines, >=8px markers, hover) ----
+      const NS = 'http://www.w3.org/2000/svg';
+      const el = (t, a, parent) => {
+        const e = document.createElementNS(NS, t);
+        for (const k in a) e.setAttribute(k, a[k]);
+        if (parent) parent.appendChild(e);
+        return e;
+      };
+      const ticks = (lo, hi, n = 5) => {
+        const span = hi - lo;
+        const step0 = Math.pow(10, Math.floor(Math.log10(span / n)));
+        const step = [1, 2, 2.5, 5, 10]
+          .map((m) => m * step0)
+          .find((s) => span / s <= n + 1);
+        const t = [];
+        for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step)
+          t.push(+v.toFixed(10));
+        return t;
+      };
+      const fmt = (v) =>
+        Math.abs(v) >= 100
+          ? v.toFixed(0)
+          : Math.abs(v) >= 1
+            ? +v.toFixed(2) + ''
+            : +v.toFixed(3) + '';
+
+      // series: [{name, color, pts:[{x,y}], dash?, marker?}]
+      function lineChart(host, o) {
+        const W = o.w ?? 560;
+        const H = o.h ?? 300;
+        const m = {l: 52, r: o.rPad ?? 76, t: 12, b: 34};
+        const all = o.series.flatMap((s) => s.pts);
+        const xs = all.map((p) => p.x);
+        const ys = all.map((p) => p.y);
+        const x0 = o.xMin ?? Math.min(...xs);
+        const x1 = o.xMax ?? Math.max(...xs);
+        let y0 = o.yMin ?? Math.min(...ys);
+        let y1 = o.yMax ?? Math.max(...ys);
+        if (o.yLog) {
+          y0 = Math.log10(y0);
+          y1 = Math.log10(y1);
+        }
+        const X = (v) => m.l + ((v - x0) / (x1 - x0)) * (W - m.l - m.r);
+        const Y = (v) => {
+          const t = o.yLog ? Math.log10(v) : v;
+          return H - m.b - ((t - y0) / (y1 - y0)) * (H - m.t - m.b);
+        };
+        const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, width: '100%'}, host);
+        if (o.band) {
+          el(
+            'rect',
+            {
+              x: m.l,
+              y: Y(o.band[1]),
+              width: W - m.l - m.r,
+              height: Y(o.band[0]) - Y(o.band[1]),
+              fill: css('--s-orange'),
+              opacity: 0.12
+            },
+            svg
+          );
+        }
+        const xt = ticks(x0, x1, o.xTicks ?? 6);
+        const yt = o.yLog
+          ? Array.from({length: Math.floor(y1) - Math.ceil(y0) + 1}, (_, i) =>
+              Math.pow(10, Math.ceil(y0) + i)
+            )
+          : ticks(o.yMin ?? Math.min(...ys), o.yMax ?? Math.max(...ys));
+        for (const v of yt) {
+          el(
+            'line',
+            {
+              x1: m.l,
+              x2: W - m.r,
+              y1: Y(v),
+              y2: Y(v),
+              stroke: css('--grid'),
+              'stroke-width': 1
+            },
+            svg
+          );
+          el(
+            'text',
+            {x: m.l - 6, y: Y(v) + 4, 'text-anchor': 'end'},
+            svg
+          ).textContent = o.yFmt ? o.yFmt(v) : fmt(v);
+        }
+        for (const v of xt) {
+          el(
+            'line',
+            {
+              x1: X(v),
+              x2: X(v),
+              y1: H - m.b,
+              y2: H - m.b + 4,
+              stroke: css('--axis')
+            },
+            svg
+          );
+          el(
+            'text',
+            {x: X(v), y: H - m.b + 16, 'text-anchor': 'middle'},
+            svg
+          ).textContent = o.xFmt ? o.xFmt(v) : fmt(v);
+        }
+        el(
+          'line',
+          {
+            x1: m.l,
+            x2: W - m.r,
+            y1: H - m.b,
+            y2: H - m.b,
+            stroke: css('--axis'),
+            'stroke-width': 1
+          },
+          svg
+        );
+        el(
+          'text',
+          {x: (m.l + W - m.r) / 2, y: H - 4, 'text-anchor': 'middle'},
+          svg
+        ).textContent = o.xLabel;
+        el(
+          'text',
+          {
+            x: 12,
+            y: (m.t + H - m.b) / 2,
+            transform: `rotate(-90 12 ${(m.t + H - m.b) / 2})`,
+            'text-anchor': 'middle'
+          },
+          svg
+        ).textContent = o.yLabel;
+        for (const r of o.refLines ?? []) {
+          el(
+            'line',
+            {
+              x1: X(r.x ?? x0),
+              x2: X(r.x ?? x1),
+              y1: r.y != null ? Y(r.y) : m.t,
+              y2: r.y != null ? Y(r.y) : H - m.b,
+              stroke: css('--ink-3'),
+              'stroke-dasharray': '3 3'
+            },
+            svg
+          );
+        }
+        const placedLbl = [];
+        for (const s of o.series) {
+          const c = css(s.color);
+          const pts = s.pts.filter((p) => p.x >= x0 - 1e-9 && p.x <= x1 + 1e-9);
+          el(
+            'polyline',
+            {
+              points: pts.map((p) => `${X(p.x)},${Y(p.y)}`).join(' '),
+              fill: 'none',
+              stroke: c,
+              'stroke-width': 2,
+              'stroke-dasharray': s.dash ?? 'none',
+              'stroke-linejoin': 'round'
+            },
+            svg
+          );
+          const last = pts[pts.length - 1];
+          if (s.label !== false) {
+            // Direct labels are this page's CVD relief - stagger any
+            // that would overprint where series converge.
+            let ly = Y(last.y) + 4;
+            while (placedLbl.some((p) => Math.abs(p - ly) < 13)) ly += 13;
+            if (ly > H - m.b + 8) {
+              ly = Y(last.y) + 4;
+              while (placedLbl.some((p) => Math.abs(p - ly) < 13)) ly -= 13;
+            }
+            placedLbl.push(ly);
+            el(
+              'text',
+              {
+                x: Math.min(X(last.x) + 5, W - 2),
+                y: ly,
+                class: 'lbl',
+                fill: c,
+                style: `fill:${c}`
+              },
+              svg
+            ).textContent = s.name;
+          }
+        }
+        for (const p of o.points ?? []) {
+          const c = css(p.color);
+          el(
+            'circle',
+            {
+              cx: X(p.x),
+              cy: Y(p.y),
+              r: 5,
+              fill: c,
+              stroke: css('--panel'),
+              'stroke-width': 2
+            },
+            svg
+          );
+          el(
+            'text',
+            {
+              x: X(p.x) + 8,
+              y: Y(p.y) - 8,
+              class: 'lbl',
+              style: `fill:${c}`
+            },
+            svg
+          ).textContent = p.name;
+        }
+        // hover: nearest-x crosshair over all series
+        const cross = el(
+          'line',
+          {
+            y1: m.t,
+            y2: H - m.b,
+            stroke: css('--ink-3'),
+            'stroke-width': 1,
+            visibility: 'hidden'
+          },
+          svg
+        );
+        svg.addEventListener('mousemove', (ev) => {
+          const r = svg.getBoundingClientRect();
+          const px = ((ev.clientX - r.left) / r.width) * W;
+          if (px < m.l || px > W - m.r) return hideTip();
+          const xv = x0 + ((px - m.l) / (W - m.l - m.r)) * (x1 - x0);
+          cross.setAttribute('x1', X(xv));
+          cross.setAttribute('x2', X(xv));
+          cross.setAttribute('visibility', 'visible');
+          const lines = [
+            (
+              o.xLabel.split('(')[0] +
+              ' ' +
+              (o.xFmt ? o.xFmt(xv) : fmt(xv))
+            ).trim()
+          ];
+          for (const s of o.series) {
+            let best = s.pts[0];
+            for (const p of s.pts)
+              if (Math.abs(p.x - xv) < Math.abs(best.x - xv)) best = p;
+            lines.push(`${s.name}: ${o.yFmt ? o.yFmt(best.y) : fmt(best.y)}`);
+          }
+          showTip(ev, lines.join('\n'));
+        });
+        svg.addEventListener('mouseleave', () => {
+          cross.setAttribute('visibility', 'hidden');
+          hideTip();
+        });
+        return svg;
+      }
+
+      function heatmap(host, o) {
+        const W = 560;
+        const cw = (W - 100) / o.xs.length;
+        const ch = 11;
+        const m = {l: 46, t: 8, b: 64};
+        const H = m.t + ch * o.ys.length + m.b;
+        const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, width: '100%'}, host);
+        const lo = [...css('--seq-lo').matchAll(/[0-9a-f]{2}/g)].map((h) =>
+          parseInt(h, 16)
+        );
+        const hi = [...css('--seq-hi').matchAll(/[0-9a-f]{2}/g)].map((h) =>
+          parseInt(h, 16)
+        );
+        const ramp = (t) =>
+          `rgb(${lo.map((l, i) => Math.round(l + (hi[i] - l) * t)).join(',')})`;
+        const vmax = o.vMax ?? Math.max(...o.grid.flat());
+        o.grid.forEach((row, i) =>
+          row.forEach((v, j) => {
+            const r = el(
+              'rect',
+              {
+                x: m.l + j * cw,
+                y: m.t + i * ch,
+                width: cw - 1,
+                height: ch - 1,
+                fill: ramp(v / vmax)
+              },
+              svg
+            );
+            r.addEventListener('mousemove', (ev) =>
+              showTip(
+                ev,
+                `view zenith ${o.ys[i]}°  Δaz ${o.xs[j]}°\n${o.vName} ${(v * 100).toFixed(1)}%`
+              )
+            );
+            r.addEventListener('mouseleave', hideTip);
+          })
+        );
+        for (let i = 0; i < o.ys.length; i += 4)
+          el(
+            'text',
+            {
+              x: m.l - 5,
+              y: m.t + i * ch + 9,
+              'text-anchor': 'end'
+            },
+            svg
+          ).textContent = o.ys[i] + '°';
+        for (let j = 0; j < o.xs.length; j += 4)
+          el(
+            'text',
+            {
+              x: m.l + j * cw + cw / 2,
+              y: m.t + ch * o.ys.length + 14,
+              'text-anchor': 'middle'
+            },
+            svg
+          ).textContent = o.xs[j] + '°';
+        el(
+          'text',
+          {
+            x: (m.l + W) / 2,
+            y: H - 34,
+            'text-anchor': 'middle'
+          },
+          svg
+        ).textContent = o.xLabel;
+        el(
+          'text',
+          {
+            x: 10,
+            y: m.t + (ch * o.ys.length) / 2,
+            transform: `rotate(-90 10 ${m.t + (ch * o.ys.length) / 2})`,
+            'text-anchor': 'middle'
+          },
+          svg
+        ).textContent = o.yLabel;
+        for (const mk of o.marks ?? []) {
+          const j = o.xs.findIndex((x) => x >= mk.x);
+          const i = o.ys.findIndex((y) => y >= mk.y);
+          el(
+            'circle',
+            {
+              cx: m.l + (j >= 0 ? j : o.xs.length - 1) * cw + cw / 2,
+              cy: m.t + (i >= 0 ? i : o.ys.length - 1) * ch + ch / 2,
+              r: 5,
+              fill: 'none',
+              stroke: css(mk.color),
+              'stroke-width': 2
+            },
+            svg
+          );
+          el(
+            'text',
+            {
+              x: m.l + (j >= 0 ? j : o.xs.length - 1) * cw + cw / 2 + 8,
+              y: m.t + (i >= 0 ? i : o.ys.length - 1) * ch + ch / 2 + 4,
+              class: 'lbl'
+            },
+            svg
+          ).textContent = mk.name;
+        }
+        // scale bar on its own bottom row, clear of the tick labels
+        const sw = 140;
+        for (let i = 0; i < 20; i++)
+          el(
+            'rect',
+            {
+              x: W - sw - 8 + (i * sw) / 20,
+              y: H - 16,
+              width: sw / 20 + 0.5,
+              height: 7,
+              fill: ramp(i / 19)
+            },
+            svg
+          );
+        el(
+          'text',
+          {x: W - sw - 12, y: H - 9, 'text-anchor': 'end'},
+          svg
+        ).textContent = '0';
+        el(
+          'text',
+          {x: W - 4, y: H - 20, 'text-anchor': 'end'},
+          svg
+        ).textContent = (vmax * 100).toFixed(0) + '% ' + o.vName;
+        return svg;
+      }
+
+      function barChart(host, o) {
+        const W = 560;
+        const bh = 22;
+        const m = {l: 92, r: 120, t: 6, b: 26};
+        const H = m.t + o.rows.length * (bh + 6) + m.b;
+        const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, width: '100%'}, host);
+        const vmax = o.xMax ?? Math.max(...o.rows.map((r) => r.value));
+        const X = (v) => m.l + (v / vmax) * (W - m.l - m.r);
+        for (const v of ticks(0, vmax, 5)) {
+          el(
+            'line',
+            {
+              x1: X(v),
+              x2: X(v),
+              y1: m.t,
+              y2: H - m.b,
+              stroke: css('--grid')
+            },
+            svg
+          );
+          el(
+            'text',
+            {
+              x: X(v),
+              y: H - m.b + 14,
+              'text-anchor': 'middle'
+            },
+            svg
+          ).textContent = fmt(v);
+        }
+        o.rows.forEach((r, i) => {
+          const y = m.t + i * (bh + 6);
+          const bar = el(
+            'rect',
+            {
+              x: m.l,
+              y,
+              width: Math.max(X(r.value) - m.l, 2),
+              height: bh,
+              rx: 4,
+              fill: css(o.color)
+            },
+            svg
+          );
+          el(
+            'text',
+            {x: m.l - 8, y: y + bh / 2 + 4, 'text-anchor': 'end'},
+            svg
+          ).textContent = r.label;
+          el(
+            'text',
+            {
+              x: X(r.value) + 6,
+              y: y + bh / 2 + 4,
+              class: 'lbl'
+            },
+            svg
+          ).textContent = r.note;
+          bar.addEventListener('mousemove', (ev) => showTip(ev, r.tipText));
+          bar.addEventListener('mouseleave', hideTip);
+        });
+        el(
+          'text',
+          {
+            x: (m.l + W - m.r) / 2,
+            y: H - 4,
+            'text-anchor': 'middle'
+          },
+          svg
+        ).textContent = o.xLabel;
+        return svg;
+      }
+
+      // ---- panels --------------------------------------------------
+      const main = $('main');
+      function panel(id, title, law, wide = false) {
+        const s = document.createElement('section');
+        if (wide) s.className = 'wide';
+        s.innerHTML =
+          `<h2>${title} <span class="badge" id="${id}-badge">FIXTURE</span></h2>` +
+          `<p class="law">${law}</p>` +
+          `<div class="numbers" id="${id}-num"></div>` +
+          `<div class="chartwrap" id="${id}-chart"></div>` +
+          `<div class="chartwrap" id="${id}-chart2"></div>` +
+          `<details><summary>table</summary><div id="${id}-table"></div></details>` +
+          `<p class="prov" id="${id}-prov"></p>`;
+        main.appendChild(s);
+      }
+      const setLive = (id, on, why) => {
+        const b = $(id + '-badge');
+        b.textContent = on ? 'LIVE' : 'FIXTURE' + (why ? ' · ' + why : '');
+        b.classList.toggle('live', on);
+      };
+      const table = (id, head, rows) => {
+        $(id + '-table').innerHTML =
+          `<table><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr>` +
+          rows
+            .map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`)
+            .join('') +
+          '</table>';
+      };
+
+      panel(
+        'col',
+        'The column - does today’s air mirage?',
+        'The latest radiosonde ascent through the gated Ciddor + ' +
+          'Auer–Standish integrator (refraction.js): each backward fold ' +
+          'of the transfer curve is an inverted second image in the fan. ' +
+          'Left: the measured low-level temperatures. Right: apparent vs ' +
+          'true altitude at the two eyes, per wavelength.',
+        true
+      );
+      panel(
+        'pol',
+        'The polarized sky right now',
+        'The doubling engine (rayleighpol.js, gated on the ' +
+          'Coulson–Natraj tables) solves the molecular dome at the ' +
+          'current sun; the measured AOD(550) dilutes the degree of ' +
+          'polarization by w = τR/(τR+τA) - exactly the ' +
+          'factor the theme’s sky-reflection LUT applies.'
+      );
+      panel(
+        'wet',
+        'The wet ground, six cities',
+        'Lekner & Dorf 1988 (wetground.js): measured topsoil moisture and ' +
+          'live rain set each city’s wetness; the internal-mirror ' +
+          'ladder sets how dark wet ground goes. Below the gloss floor the ' +
+          'film’s own 2% sheen wins - wet coal glints.'
+      );
+      panel(
+        'sea',
+        'The sea in foam',
+        'Monahan & O’Muircheartaigh 1980: whitecap coverage ' +
+          'W = 3.84×10⁻⁶ U³·⁴¹ - the same ' +
+          'law the drawn ocean writes on the GPU (terrain-tsl.js), with the ' +
+          'measured buoy wind on it.'
+      );
+      panel(
+        'cor',
+        'The corona, were totality now',
+        'van de Hulst 1950 (kcorona.js): today’s SWPC active-region ' +
+          'count sets the activity phase through the client’s own ' +
+          'regions/12 mapping; K equator, K pole and the F corona in ' +
+          'mean-solar-disc units.'
+      );
+
+      // ---- draw: the column ---------------------------------------
+      function drawColumn(rows, prov) {
+        const col = columnPanel(rows);
+        const [beach, aloft] = col.observers;
+        $('col-num').innerHTML =
+          `Inversion <b>+${col.inversion.dT.toFixed(1)} °C</b> ` +
+          `(${col.surface.tC.toFixed(1)} °C at ${col.surface.hM} m → ` +
+          `${col.inversion.tC.toFixed(1)} °C at ${col.inversion.hM} m) · ` +
+          `folds: <b>${beach.folds}</b> at eye 15 m, <b>${aloft.folds}</b> at 450 m · ` +
+          `horizon refraction <b>${beach.r0Arcmin.toFixed(1)}′</b> vs ISA ` +
+          `${beach.r0IsaArcmin.toFixed(1)}′ · sunset flattening ` +
+          `<b>${beach.flatten.toFixed(2)}</b> · green-rim split ` +
+          `<b>${beach.rimArcsec.toFixed(0)}″</b>`;
+        $('col-chart').innerHTML = '';
+        $('col-chart2').innerHTML = '';
+        lineChart($('col-chart'), {
+          series: [
+            {
+              name: 'T',
+              color: '--s-blue',
+              pts: col.temps.map((t) => ({x: t.tC, y: t.hM}))
+            },
+            {
+              name: 'dewpoint',
+              color: '--s-aqua',
+              pts: col.temps.map((t) => ({x: t.dwptC, y: t.hM}))
+            }
+          ],
+          w: 560,
+          h: 320,
+          rPad: 84,
+          band: [col.surface.hM, col.inversion.hM],
+          xLabel: '°C (shaded: the inversion)',
+          yLabel: 'height (m)',
+          yFmt: (v) => v.toFixed(0)
+        });
+        // Window the fan chart onto the fold if the column holds one
+        // (the backward run of true altitude IS the inverted image);
+        // a fold-free day shows the whole fan.
+        const ob = aloft;
+        let iA = 0;
+        let iB = ob.curve.aDeg.length - 1;
+        if (ob.folds > 0) {
+          let kMin = 1;
+          for (let i = 1; i < ob.curve.tGDeg.length; i++)
+            if (
+              ob.curve.tGDeg[i] - ob.curve.tGDeg[i - 1] <
+              ob.curve.tGDeg[kMin] - ob.curve.tGDeg[kMin - 1]
+            )
+              kMin = i;
+          for (iA = kMin; iA > 0; iA--)
+            if (ob.curve.aDeg[kMin] - ob.curve.aDeg[iA] > 0.45) break;
+          for (iB = kMin; iB < ob.curve.aDeg.length - 1; iB++)
+            if (ob.curve.aDeg[iB] - ob.curve.aDeg[kMin] > 0.45) break;
+        }
+        const win = (arr) =>
+          Array.from(arr.slice(iA, iB + 1), (v, i) => ({
+            x: v,
+            y: ob.curve.aDeg[iA + i]
+          }));
+        lineChart($('col-chart2'), {
+          series: [
+            {name: '0.68 µm', color: '--s-red', pts: win(ob.curve.tRDeg)},
+            {name: '0.55 µm', color: '--s-green', pts: win(ob.curve.tGDeg)},
+            {name: '0.44 µm', color: '--s-blue', pts: win(ob.curve.tBDeg)}
+          ],
+          w: 560,
+          h: 320,
+          rPad: 84,
+          xLabel:
+            'true altitude (°) at eye 450 m - a backward run is an inverted image' +
+            (ob.folds > 0 ? ' (windowed on the fold)' : ''),
+          yLabel: 'apparent altitude (°)',
+          xFmt: (v) => v.toFixed(2) + '°',
+          yFmt: (v) => v.toFixed(2) + '°'
+        });
+        table(
+          'col',
+          ['eye (m)', 'folds', 'R(0) (′)', 'ISA (′)', 'flatten', 'rim (″)'],
+          col.observers.map((o) => [
+            o.obsHm,
+            o.folds,
+            o.r0Arcmin.toFixed(2),
+            o.r0IsaArcmin.toFixed(2),
+            o.flatten.toFixed(3),
+            o.rimArcsec.toFixed(1)
+          ])
+        );
+        $('col-prov').textContent = prov;
+        console.log(
+          `OBS col folds ${beach.folds}/${aloft.folds} R0 ` +
+            `${beach.r0Arcmin.toFixed(2)} isa ${beach.r0IsaArcmin.toFixed(2)}`
+        );
+      }
+
+      // ---- draw: the sea ------------------------------------------
+      function drawSea(inp, prov) {
+        const sea = seaPanel(inp);
+        $('sea-num').innerHTML =
+          `Wind <b>${sea.u10Ms.toFixed(1)} m/s</b> → ` +
+          `<b>${(sea.W * 100).toFixed(2)}%</b> of the sea in foam` +
+          (Number.isFinite(sea.wvhtM)
+            ? ` · measured Hs <b>${sea.wvhtM} m</b>, dominant period ` +
+              `<b>${sea.dpdS} s</b>, water <b>${sea.wtmpC} °C</b>`
+            : '');
+        $('sea-chart').innerHTML = '';
+        lineChart($('sea-chart'), {
+          series: [
+            {
+              name: 'W(U)',
+              color: '--s-blue',
+              pts: sea.curve.map((p) => ({x: p.u, y: p.W * 100}))
+            }
+          ],
+          points: [
+            {
+              name: 'now',
+              color: '--s-orange',
+              x: sea.u10Ms,
+              y: sea.W * 100
+            }
+          ],
+          w: 560,
+          h: 260,
+          xLabel: 'wind U10 (m/s)',
+          yLabel: 'whitecap coverage (%)',
+          yFmt: (v) => v.toFixed(1) + '%'
+        });
+        table(
+          'sea',
+          ['U (m/s)', 'W (%)'],
+          [4, 6, 8, 10, 12, 15, 20].map((u) => [
+            u,
+            (seaPanel({u10Ms: u}).W * 100).toFixed(3)
+          ])
+        );
+        $('sea-prov').textContent = prov;
+      }
+
+      // ---- draw: the wet ground -----------------------------------
+      function drawWet(cities, prov) {
+        const wet = wetPanel(cities);
+        const rows = [...wet.rows].sort((a, b) => a.factor - b.factor);
+        $('wet-num').innerHTML =
+          `Gloss floor at dry albedo <b>${wet.crossRho.toFixed(3)}</b> · ` +
+          `factors below at display albedo ${wet.rhoDisplay} · ` +
+          rows
+            .filter((r) => r.raining)
+            .map((r) => `<b>${r.name}</b> in live rain`)
+            .join(' · ');
+        $('wet-chart').innerHTML = '';
+        $('wet-chart2').innerHTML = '';
+        lineChart($('wet-chart'), {
+          series: [
+            {
+              name: 'wet',
+              color: '--s-blue',
+              pts: wet.curve.map((p) => ({x: p.rho, y: p.wet}))
+            },
+            {
+              name: 'dry (=)',
+              color: '--s-aqua',
+              dash: '4 3',
+              pts: [
+                {x: 0.005, y: 0.005},
+                {x: 0.9, y: 0.9}
+              ]
+            }
+          ],
+          refLines: [{x: wet.crossRho}],
+          w: 560,
+          h: 240,
+          xLabel: 'dry albedo (dashed vertical: the gloss floor)',
+          yLabel: 'albedo when wet'
+        });
+        barChart($('wet-chart2'), {
+          color: '--s-blue',
+          xMax: 1,
+          rows: rows.map((r) => ({
+            label: r.name,
+            value: r.factor,
+            note: '×' + r.factor.toFixed(2) + (r.raining ? ' · raining' : ''),
+            tipText:
+              `${r.name}\nsoil ${r.soilM3M3} m³/m³ · rain ` +
+              `${r.precipMm} mm\nwetness ${r.w.toFixed(2)} → ground at ` +
+              `${Math.round(r.factor * 100)}% of dry brightness`
+          })),
+          xLabel: 'ground brightness vs dry (×factor, albedo 0.2)'
+        });
+        table(
+          'wet',
+          ['city', 'soil m³/m³', 'rain mm', 'wetness', '×factor'],
+          rows.map((r) => [
+            r.name,
+            r.soilM3M3.toFixed(3),
+            r.precipMm,
+            r.w.toFixed(3),
+            r.factor.toFixed(3)
+          ])
+        );
+        $('wet-prov').textContent = prov;
+      }
+
+      // ---- draw: the polarized sky --------------------------------
+      function drawPol(inp, prov) {
+        $('pol-num').textContent = 'solving the dome…';
+        setTimeout(() => {
+          const pol = polPanel(inp);
+          $('pol-num').innerHTML =
+            `Sun <b>${pol.sunAltDeg.toFixed(1)}°</b> up · molecular ` +
+            `max DoP <b>${(pol.maxPure * 100).toFixed(0)}%</b> on the ` +
+            `${pol.maxAt.scatDeg.toFixed(0)}° lobe · measured ` +
+            `AOD(550) <b>${pol.aod550}</b> → w = ${pol.w.toFixed(2)} ` +
+            `→ today’s max <b>${(pol.maxToday * 100).toFixed(0)}%</b>`;
+          $('pol-chart').innerHTML = '';
+          heatmap($('pol-chart'), {
+            xs: pol.dphi,
+            ys: pol.vza,
+            grid: pol.dopPure.map((row) => row.map((v) => v * pol.w)),
+            vMax: 1,
+            vName: 'DoP',
+            xLabel: 'azimuth from sun (°)',
+            yLabel: 'view zenith (°)',
+            marks: [
+              {
+                name: 'max',
+                color: '--s-orange',
+                x: pol.maxAt.dphi,
+                y: pol.maxAt.vza
+              }
+            ]
+          });
+          table(
+            'pol',
+            ['', ...pol.dphi.filter((_, j) => j % 6 === 0).map((d) => d + '°')],
+            pol.vza
+              .filter((_, i) => i % 4 === 0)
+              .map((v, ii) => [
+                'vz ' + v + '°',
+                ...pol.dphi
+                  .map((_, j) => j)
+                  .filter((j) => j % 6 === 0)
+                  .map(
+                    (j) =>
+                      (pol.dopPure[ii * 4][j] * pol.w * 100).toFixed(0) + '%'
+                  )
+              ])
+          );
+          $('pol-prov').textContent = prov;
+          console.log(
+            `OBS pol max ${pol.maxToday.toFixed(3)} w ${pol.w.toFixed(3)}`
+          );
+          console.log('OBS DONE');
+        }, 30);
+      }
+
+      // ---- draw: the corona ---------------------------------------
+      function drawCorona(inp, prov) {
+        const cor = coronaPanel(inp);
+        $('cor-num').innerHTML =
+          `<b>${cor.regionCount}</b> numbered regions → phase ` +
+          `<b>${cor.phase.toFixed(2)}</b> · whole-corona illuminance ` +
+          `<b>${cor.lux.toFixed(2)} lux</b> = <b>${cor.moons.toFixed(2)} ` +
+          `full moons</b>`;
+        $('cor-chart').innerHTML = '';
+        lineChart($('cor-chart'), {
+          series: [
+            {
+              name: 'K equator',
+              color: '--s-blue',
+              pts: cor.profiles.map((p) => ({x: p.r, y: p.eq}))
+            },
+            {
+              name: 'K pole',
+              color: '--s-orange',
+              pts: cor.profiles.map((p) => ({x: p.r, y: p.pole}))
+            },
+            {
+              name: 'F corona',
+              color: '--s-aqua',
+              pts: cor.profiles.map((p) => ({x: p.r, y: p.f}))
+            }
+          ],
+          w: 560,
+          h: 280,
+          rPad: 88,
+          yLog: true,
+          xLabel: 'distance (solar radii)',
+          yLabel: 'brightness (mean solar disc = 1)',
+          yFmt: (v) => '1e' + Math.round(Math.log10(v))
+        });
+        table(
+          'cor',
+          ['r/R☉', 'K eq', 'K pole', 'F', 'K eq (cd/m²)'],
+          cor.profiles
+            .filter((_, i) => i % 8 === 0)
+            .map((p) => [
+              p.r.toFixed(2),
+              p.eq.toExponential(2),
+              p.pole.toExponential(2),
+              p.f.toExponential(2),
+              p.eqCd.toFixed(0)
+            ])
+        );
+        $('cor-prov').textContent = prov;
+      }
+
+      // ---- fixture first ------------------------------------------
+      drawColumn(
+        SOUNDING.rows,
+        `${SOUNDING.name} (${SOUNDING.wmo}) ascent ${SOUNDING.at} via ` +
+          `api.ndev.tk/sounding · frozen ${FIXTURE_AT}`
+      );
+      drawSea(
+        {
+          u10Ms: BUOY.wspdMs,
+          wvhtM: BUOY.wvhtM,
+          dpdS: BUOY.dpdS,
+          wtmpC: BUOY.wtmpC
+        },
+        `NDBC ${BUOY.id} (${BUOY.name}) ${BUOY.at} · anemometer ` +
+          `${BUOY.anemometerM} m, taken as U10 unlifted · frozen`
+      );
+      drawWet(
+        CITIES,
+        `open-meteo current + soil_moisture_0_to_1cm per city, ~20:45Z ` +
+          `2026-08-09 · frozen`
+      );
+      drawPol(
+        {sunAltDeg: SUN.altDeg, aod550: AEROSOL.aod550},
+        `sun: vendored astronomy engine at ${SUN.at} · AOD: open-meteo ` +
+          `air quality ${AEROSOL.at} · frozen`
+      );
+      drawCorona(
+        {regionCount: SOLAR_REGIONS.count},
+        `SWPC solar_regions.json, ${SOLAR_REGIONS.count} regions observed ` +
+          `${SOLAR_REGIONS.at} · frozen`
+      );
+
+      // ---- then live, feed by feed --------------------------------
+      if (!FIXED) {
+        const j = (u) =>
+          fetch(u, {credentials: 'omit'}).then((r) => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          });
+        j(`https://api.ndev.tk/sounding?lat=${LAT}&lon=${LON}`)
+          .then((s) => {
+            if (!Array.isArray(s.rows) || s.rows.length < 10)
+              throw new Error('no rows');
+            drawColumn(
+              s.rows,
+              `${s.name} (${s.wmo}) ascent ${s.at}, ${s.distKm} km away · ` +
+                `api.ndev.tk/sounding · live`
+            );
+            setLive('col', true);
+          })
+          .catch((e) => setLive('col', false, e.message));
+        Promise.all([
+          j(
+            `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=wind_speed_10m&wind_speed_unit=ms`
+          ),
+          j(`https://api.ndev.tk/buoy?lat=${LAT}&lon=${LON}`).catch(() => null)
+        ])
+          .then(([w, b]) => {
+            drawSea(
+              {
+                u10Ms: w.current.wind_speed_10m,
+                wvhtM: b?.wvht,
+                dpdS: b?.dpd,
+                wtmpC: b?.wtmp
+              },
+              `open-meteo U10 ${w.current.time}Z` +
+                (b
+                  ? ` · NDBC ${b.id} spectrum ${b.at}, ${b.distKm} km`
+                  : ' · buoy daemon unreachable') +
+                ' · live'
+            );
+            setLive('sea', true);
+          })
+          .catch((e) => setLive('sea', false, e.message));
+        Promise.all(
+          CITIES.map((c) =>
+            j(
+              `https://api.open-meteo.com/v1/forecast?latitude=${c.latDeg}&longitude=${c.lonDeg}&current=precipitation,temperature_2m&hourly=soil_moisture_0_to_1cm&forecast_hours=1`
+            ).then((r) => ({
+              ...c,
+              soilM3M3: r.hourly.soil_moisture_0_to_1cm[0],
+              precipMm: r.current.precipitation,
+              tC: r.current.temperature_2m,
+              at: r.current.time + 'Z'
+            }))
+          )
+        )
+          .then((cs) => {
+            drawWet(
+              cs,
+              `open-meteo current + soil_moisture_0_to_1cm, ${cs[0].at} · live`
+            );
+            setLive('wet', true);
+          })
+          .catch((e) => setLive('wet', false, e.message));
+        j(
+          `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${LAT}&longitude=${LON}&current=aerosol_optical_depth`
+        )
+          .then((aq) => {
+            const t = Astronomy.MakeTime(new Date());
+            const obs = new Astronomy.Observer(LAT, LON, 30);
+            const eq = Astronomy.Equator(
+              Astronomy.Body.Sun,
+              t,
+              obs,
+              true,
+              true
+            );
+            const hor = Astronomy.Horizon(t, obs, eq.ra, eq.dec, 'normal');
+            drawPol(
+              {
+                sunAltDeg: Math.max(hor.altitude, 1),
+                aod550: aq.current.aerosol_optical_depth
+              },
+              `sun: astronomy engine now (${hor.altitude.toFixed(1)}°` +
+                (hor.altitude < 1 ? ', clamped to 1° - it is night' : '') +
+                `) · AOD: open-meteo air quality ${aq.current.time}Z · live`
+            );
+            setLive('pol', true);
+          })
+          .catch((e) => setLive('pol', false, e.message));
+        j('https://services.swpc.noaa.gov/json/solar_regions.json')
+          .then((reg) => {
+            const dates = {};
+            for (const r of reg)
+              if (r.observed_date)
+                dates[r.observed_date] = (dates[r.observed_date] ?? 0) + 1;
+            const latest = Object.keys(dates).sort().pop();
+            drawCorona(
+              {regionCount: dates[latest]},
+              `SWPC solar_regions.json, ${dates[latest]} regions observed ` +
+                `${latest} · live`
+            );
+            setLive('cor', true);
+          })
+          .catch((e) => setLive('cor', false, e.message));
+      }
+    </script>
+  </body>
+</html>
