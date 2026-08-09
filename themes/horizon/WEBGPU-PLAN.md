@@ -8920,6 +8920,56 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   moves ~0.03% and the certified Dallas/Galicia landmarks hold
   unchanged. Full gate green - 130 CPU references (beads 7) +
   7 GPU probes.
+- DONE (Aug 9, the review session's 109th pass - THE CORONA
+  JOINS TOTALITY, gated on CORONALITY): the theme dimmed and
+  adapted into totality around a dark hole - no drawn corona.
+  PRIMARIES (both open ADS scans): van de Hulst 1950 (BAN 11,
+  135; the brightness sections pp. 135-140 read in full - the
+  rest sits behind ADS's retired login CGI, stated) prints THE
+  model corona as closed forms - K_max/K_min/F/K_pole as
+  C_n r^-n sums in 1e-8 mean-disc-brightness units, equatorial
+  0.7 / polar 0.3 sectors at minimum, c = 1.78 to maximum, and
+  Eq. (10) turning any sum into ring totals; Saito, Poland &
+  Munro 1977 (SoPh 55, 121, read in full) prints the Skylab
+  coronagraph's streamer-free B_K+F at r = 2.5-5, equator and
+  pole. NEW kcorona.js + kcorona-reference (6 landmarks):
+  Eq. (10) reproduces vdH's printed Table 1 (every total to
+  0.06%, ring ratio Q 1.85 vs printed 1.84); THE CORONA IS
+  WORTH 0.33-0.59 FULL MOONS through the theme's own magnitude
+  bridge (E_FULL_RATIO), the maximum inside vdH's quoted
+  Dyson-Woolley photoelectric record; the 1950 model MEETS the
+  1973 Skylab tables at every printed radius (worst 21%, inside
+  SPM's stated accuracy) - two instruments, 23 years apart, one
+  corona; the inner corona (4730 cd/m^2) OUTSHINES the mean
+  clear sky (1889) - the corona hides behind the circumsolar
+  aureole, not the mean sky; and THE CORONALITY LOOP: the 108th
+  pass's primary printed a naked-eye record from the umbral
+  edge (full corona visible >= 35-40 s before C2, ~50-60 s in
+  all, around ~13-15 s totality) - that onset time DEMANDS a
+  circumsolar sky 33-79x the mean at 0.8 deg (vdH outer-corona
+  brightness / LDF residual fraction / skyTransferE), and the
+  theme's OWN aureole spike (aureole.js OPAC/Chin diffraction,
+  dust tau 0.02-0.08) independently draws 21-82x - overlapping
+  bands: A NAKED-EYE TIMING FROM 2017 MEASURES THE AUREOLE THE
+  DOME DRAWS. With the mid column, coronality runs 77 s (39 s
+  lead, 23 s tail) around 15.4 s of totality. beads.js gains
+  the paper's own Eq. (6)-(7) LDF machinery (exposedIllum-
+  Fraction; gate-held: zero during totality exactly, monotone
+  into C2). THE DRAWN WORLD: createCoronaMaterial (sky-objects-
+  tsl.js) - a billboard around the sun, LUT rows = equatorial/
+  polar profiles in E0-relative radiance at the live cycle
+  phase (NOAA active-region count / 12, a stated proxy for the
+  printed 1.78x swing), sectors blended around the PROJECTED
+  SOLAR AXIS riding the drawn sunspots' own P + parallactic
+  frame, inner feather at the moon's true radius ratio,
+  amplitude = sun transmittance x cloud veil x sky exposure -
+  so coronality EMERGES from the same adaptation frame as
+  everything else; drawn when obscuration > 0.5 (stated cull;
+  ?kcorona=0 the harness override), scotB in the billboard
+  family fold. Timely: Galicia totality 2026-08-12 is three
+  days from this commit - the drawn eclipse now has its
+  corona. Full gate green - 131 CPU references (kcorona 6) +
+  7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

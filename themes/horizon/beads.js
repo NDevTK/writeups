@@ -23,6 +23,8 @@
  */
 
 import {
+  LDF_ALPHA_A,
+  LDF_ALPHA_B,
   LIMB_RING_ARCSEC,
   LIMB_RING_STEP_DEG,
   MOON_SEMIDIAM_POLY,
@@ -109,6 +111,55 @@ export function exposedState(tMin, sArcsec, minPeakArcsec = 0) {
   }
   const beads = arcs.filter((a) => a.peak >= minPeakArcsec);
   return {maxOver, maxPsi, arcs, beads, beadCount: beads.length};
+}
+
+/** Their Eq. (6) exponent alpha at wavelength lambda (um). */
+export function ldfAlpha(lambdaUm) {
+  return LDF_ALPHA_A + LDF_ALPHA_B / lambdaUm;
+}
+
+/**
+ * The exposed photosphere's ILLUMINANCE as a fraction of the
+ * whole disc, LDF-weighted - their Eq. (7) integral over the
+ * region above the lunar limb, against the closed-form full-disc
+ * integral 2 pi Sigma^2 / (alpha + 2). Small angles throughout
+ * (sin phi / sin Sigma -> phi / Sigma at 0.005 rad discs).
+ */
+export function exposedIllumFraction(tMin, sArcsec, lambdaUm = 0.55) {
+  const alpha = ldfAlpha(lambdaUm);
+  const sig =
+    poly3(SUN_SEMIDIAM_POLY, tMin) * (sArcsec / SUN_POLY_BASIS_ARCSEC);
+  const sm = poly3(MOON_SEMIDIAM_POLY, tMin);
+  const X = poly3(SUN_X_POLY, tMin);
+  const Y = poly3(SUN_Y_POLY, tMin);
+  const n = LIMB_RING_ARCSEC.length;
+  const dPsi = (LIMB_RING_STEP_DEG * Math.PI) / 180;
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    const p = (i * LIMB_RING_STEP_DEG * Math.PI) / 180;
+    const sp = Math.sin(p);
+    const cp = Math.cos(p);
+    const cd = -X * sp + Y * cp;
+    const perp2 = X * X + Y * Y - cd * cd;
+    const q2 = sig * sig - perp2;
+    if (q2 <= 0) continue;
+    const q = Math.sqrt(q2);
+    const rLo = Math.max(sm + LIMB_RING_ARCSEC[i], cd - q);
+    const rHi = cd + q;
+    if (rHi <= rLo) continue;
+    const steps = Math.max(8, Math.ceil((rHi - rLo) / 0.02));
+    const dr = (rHi - rLo) / steps;
+    for (let k = 0; k < steps; k++) {
+      const rho = rLo + (k + 0.5) * dr;
+      const px = -rho * sp - X;
+      const py = rho * cp - Y;
+      const phi = Math.hypot(px, py);
+      const x2 = Math.min(1, (phi * phi) / (sig * sig));
+      sum += Math.pow(1 - x2, alpha / 2) * rho * dr * dPsi;
+    }
+  }
+  const disc = (2 * Math.PI * sig * sig) / (alpha + 2);
+  return sum / disc;
 }
 
 /**

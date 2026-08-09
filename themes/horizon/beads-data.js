@@ -68,6 +68,14 @@ export const LIBRATION_L_DEG = 5.2;
 export const LIBRATION_B_DEG = -0.172;
 export const MOON_DIST_KM = 367399.181;
 
+// Their Eq. (6): the Hestroffer & Magnan 1998 limb darkening
+// function LDF(phi, lambda) = [1 - (sin phi / sin Sigma)^2]^
+// (alpha/2) with alpha(lambda) = -0.023 + 0.292 / lambda(um) -
+// the weight their light-curve integral (Eq. 7) puts on each
+// patch of exposed photosphere.
+export const LDF_ALPHA_A = -0.023;
+export const LDF_ALPHA_B = 0.292;
+
 // The printed observables.
 export const AUWERS_ARCSEC = 959.63;
 export const MEASURED_S_ARCSEC = 959.95; // +- 0.05, their Eq. 15

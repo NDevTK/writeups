@@ -356,7 +356,12 @@
         pathToRadiusT,
         sunTransmittanceJS
       } from './horizon/sun-transmittance.js';
-      import {buildSpots, parallacticAngle} from './horizon/sunspots.js';
+      import {
+        buildSpots,
+        parallacticAngle,
+        solarDiscGeometry
+      } from './horizon/sunspots.js';
+      import {coronaSurfB} from './horizon/kcorona.js';
       import {applySpectral} from './horizon/spectral-srgb.js';
       import {
         adaptExposure,
@@ -426,6 +431,7 @@
         createZodiacalMaterial,
         createMeteorMaterial,
         createContrailMaterial,
+        createCoronaMaterial,
         createFlashMaterial,
         createGloryMaterial,
         createLenticularMaterial,
@@ -9485,6 +9491,54 @@
       // depth test off because the glory forms on the fog veiling
       // whatever stands behind it (the Brocken spectre geometry).
       const gloryLUT = buildGloryLUT();
+      // The K + F solar corona (kcorona.js, gated on van de Hulst
+      // 1950 + the Skylab cross-check + the 2017 coronality
+      // record): a billboard around the sun whose LUT rows are the
+      // equatorial/polar surface-brightness profiles at the
+      // current cycle phase, in E0-relative radiance so the sky
+      // exposure reveals it exactly as the eclipsed sky collapses.
+      // Phase rides a stated proxy: the live NOAA active-region
+      // count over ~12 regions spans minimum to maximum (the
+      // corona's total light swings the printed 1.78x).
+      const KCOR_RMAX = 6.5;
+      const KCOR_W = 96;
+      const kcorData = new Float32Array(KCOR_W * 2 * 4);
+      const kcoronaObj = createCoronaMaterial({
+        data: kcorData,
+        w: KCOR_W,
+        rMax: KCOR_RMAX
+      });
+      const kcoronaMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        kcoronaObj.material
+      );
+      kcoronaMesh.renderOrder = 2;
+      kcoronaMesh.visible = false;
+      scene.add(kcoronaMesh);
+      let kcorPhase = -1;
+      function refreshKcorona(p) {
+        if (Math.abs(p - kcorPhase) < 0.15) return;
+        kcorPhase = p;
+        const s = Math.sin(sunAngularRadiusRad());
+        const norm = 1 / (Math.PI * s * s); // E0-relative radiance
+        for (let i = 0; i < KCOR_W; i++) {
+          const r = 1 + ((KCOR_RMAX - 1) * i) / (KCOR_W - 1);
+          const eq = coronaSurfB(r, 'eq', p) * norm;
+          const po = coronaSurfB(r, 'pole', p) * norm;
+          for (let c = 0; c < 3; c++) {
+            kcorData[i * 4 + c] = eq;
+            kcorData[(KCOR_W + i) * 4 + c] = po;
+          }
+          kcorData[i * 4 + 3] = 1;
+          kcorData[(KCOR_W + i) * 4 + 3] = 1;
+        }
+        kcoronaObj.u.tex.needsUpdate = true;
+      }
+      refreshKcorona(0.2);
+      let kcorSaid = false;
+      const kcorV3a = new THREE.Vector3();
+      const kcorV3b = new THREE.Vector3();
+      const kcorV3c = new THREE.Vector3();
       const glorySunObj = createGloryMaterial(gloryLUT);
       const glorySun = new THREE.Mesh(
         new THREE.PlaneGeometry(1, 1),
@@ -10899,6 +10953,12 @@
                   Math.PI;
                 const jdUT = 2440587.5 + d.getTime() / 86400000;
                 atmo.sunSpots.set(buildSpots(state.solarRegions, jdUT, qDeg));
+                // The corona billboard shares the drawn disc's own
+                // frame: solar axis position angle = P (vs
+                // celestial north) + the parallactic angle (north
+                // vs the local vertical at the sun).
+                astro.sunAxisRad =
+                  ((solarDiscGeometry(jdUT).P + qDeg) * Math.PI) / 180;
               }
             }
             // True apparent size: the moon disc scales with its real
@@ -14165,6 +14225,7 @@
         glorySunObj.u.scotB.value = mesoB;
         gloryMoonObj.u.scotB.value = mesoB;
         pollenObj.u.scotB.value = mesoB;
+        kcoronaObj.u.scotB.value = mesoB;
         pollenMoonObj.u.scotB.value = mesoB;
         plumeObj.u.scotB.value = mesoB;
         for (const p of pscPool) p.u.scotB.value = mesoB;
@@ -14228,6 +14289,72 @@
           const tB = sunTransmittanceJS(Math.sin(Math.max(sun.alt, 0)), mieRad);
           const aB = bowOn ? cirrusT * skyExposure : 0;
           opticsU.bowAmp.value.setRGB(tB[0] * aB, tB[1] * aB, tB[2] * aB);
+          // The K + F CORONA: always physically present, drawn
+          // when the eclipse makes it matter (below 50% obscuration
+          // the addition is under 0.1% of the circumsolar sky at
+          // any exposure - a stated display cull, ?kcorona=0 the
+          // harness override). Amplitude = the sun's transmittance
+          // x cloud veil x sky exposure: the corona is sunlight,
+          // and coronality then EMERGES from the adaptation frame
+          // as the eclipsed sky collapses (kcorona-reference holds
+          // the window against the 2017 record). The inner feather
+          // tracks the MOON's true radius ratio; the axis rides
+          // the drawn sunspots' own P + parallactic frame.
+          {
+            const cOn =
+              params.get('kcorona') !== '0' &&
+              (astro.eclipse || 0) > 0.5 &&
+              sun.alt > 0;
+            kcoronaMesh.visible = cOn;
+            if (cOn) {
+              refreshKcorona(
+                Math.min(1, (state.solarRegions?.length || 0) / 12)
+              );
+              const u = kcoronaObj.u;
+              u.sunDir.value.copy(sunVec);
+              u.rSunRad.value = astro.sunAngR || 0.00465;
+              u.innerR.value =
+                Math.min(
+                  1.2,
+                  Math.max(1.0, (astro.moonAngR || 1) / (astro.sunAngR || 1))
+                ) + 0.01;
+              // Projected solar axis: vertical-at-sun rotated by
+              // the stashed position angle toward east.
+              const up = kcorV3a.set(0, 1, 0);
+              const vAtSun = kcorV3b
+                .copy(up)
+                .addScaledVector(sunVec, -up.dot(sunVec))
+                .normalize();
+              const eAtSun = kcorV3c.crossVectors(up, sunVec).normalize();
+              const ax = astro.sunAxisRad || 0;
+              u.axisU.value
+                .copy(vAtSun)
+                .multiplyScalar(Math.cos(ax))
+                .addScaledVector(eAtSun, Math.sin(ax));
+              const aC = cirrusT * skyExposure;
+              u.ampV.value.set(tB[0] * aC, tB[1] * aC, tB[2] * aC);
+              const halfW =
+                2 * GLORY_R * Math.tan(KCOR_RMAX * (astro.sunAngR || 0.00465));
+              kcoronaMesh.position
+                .copy(sunVec)
+                .multiplyScalar(GLORY_R)
+                .add(camera.position);
+              kcoronaMesh.scale.set(halfW, halfW, 1);
+              kcoronaMesh.lookAt(camera.position);
+              if (!kcorSaid) {
+                kcorSaid = true;
+                record(
+                  'solar corona (van de Hulst model)',
+                  'K+F at cycle phase ' +
+                    kcorPhase.toFixed(1) +
+                    ' - total light ' +
+                    (0.33 + kcorPhase * 0.26).toFixed(2) +
+                    ' full moons; coronality gated on the 2017 ' +
+                    'edge-site record (kcorona-reference)'
+                );
+              }
+            }
+          }
           // The GLORY rides the same measured fog through the
           // same radiometric chain: the exact Mie phase function
           // (mie.js LUT) times transmittance x veil x exposure x

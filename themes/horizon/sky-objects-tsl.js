@@ -1548,6 +1548,72 @@ export function createGloryMaterial(lut) {
   return {material, u};
 }
 
+// The K + F solar corona (kcorona.js, gated): van de Hulst
+// 1950's printed model corona on a billboard around the SUN,
+// drawn in the dome's own absolute frame. The LUT rows are the
+// equatorial and polar surface-brightness profiles (E0-relative
+// radiance, i.e. cd/m^2 per lux of solar constant) at the
+// current cycle phase; the fragment blends them by position
+// angle around the SOLAR AXIS (u.axisU, the projected rotation
+// axis fed CPU-side from sunspots.js's own disc geometry - the
+// same P + parallactic frame the drawn spots ride), polar caps
+// 0.3 of the circumference as van de Hulst's model states. The
+// inner feather starts at the MOON's current radius ratio
+// (u.innerR - during totality the moon covers the corona's
+// base) and the amplitude is the sun's transmittance times the
+// sky exposure: the corona is sunlight, and its visibility
+// against the drawn sky then EMERGES from the same adaptation
+// frame everything else rides - dazzled away in daylight,
+// revealed exactly as the eclipsed sky collapses (the
+// coronality the kcorona gate holds against the 2017 record).
+export function createCoronaMaterial(lut) {
+  const tex = new DataTexture(lut.data, lut.w, 2, RGBAFormat, FloatType);
+  tex.magFilter = LinearFilter;
+  tex.minFilter = LinearFilter;
+  tex.needsUpdate = true;
+  const u = {
+    ampV: uniform(new Vector3(0, 0, 0)),
+    sunDir: uniform(new Vector3(0, 1, 0)),
+    axisU: uniform(new Vector3(0, 1, 0)),
+    rSunRad: uniform(0.00465),
+    innerR: uniform(1.03),
+    scotB: uniform(1),
+    tex
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.depthTest = true;
+  material.side = DoubleSide;
+  material.blending = AdditiveBlending;
+  const texN = texture(tex);
+  const dirW = normalize(positionWorld.sub(cameraPosition));
+  const cosT = clamp(dot(dirW, u.sunDir), -1, 1);
+  const rr = acos(cosT).div(u.rSunRad); // solar radii from centre
+  const span = lut.rMax - 1;
+  const gN = rr.sub(1).div(span).clamp(0, 1);
+  const uTh = gN.mul((lut.w - 1) / lut.w).add(0.5 / lut.w);
+  // Position angle around the projected solar axis: the polar
+  // caps span 0.3 of the circumference (54 deg about each pole
+  // -> |PA| < 27 deg), blended over a stated 10-deg seam.
+  const perp = dirW.sub(u.sunDir.mul(cosT));
+  const perpN = normalize(perp.add(vec3(1e-6, 0, 0)));
+  const cosPA = abs(dot(perpN, u.axisU));
+  const polarMix = smoothstep(
+    float(Math.cos((32 * Math.PI) / 180)),
+    float(Math.cos((22 * Math.PI) / 180)),
+    cosPA
+  );
+  const vRow = mix(float(0.25), float(0.75), polarMix);
+  const pat = texN.sample(vec2(uTh, vRow)).rgb;
+  const featherIn = smoothstep(u.innerR, u.innerR.add(0.08), rr);
+  const featherOut = float(1).sub(smoothstep(float(0.88), float(1.0), gN));
+  const lit = pat.mul(featherIn).mul(featherOut).mul(u.ampV);
+  material.colorNode = mix(vec3(rodY(lit)), lit, u.scotB);
+  material.opacityNode = float(1);
+  return {material, u};
+}
+
 // The Milky Way dome: Gaia DR3 integrated starlight
 // (milkyway.js / milkyway-data.js - every DR3 source aggregated
 // server-side at ESA, minus the G < 5.5 bright end the theme
