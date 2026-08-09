@@ -55,7 +55,10 @@ import {
   queryStrikes,
   SEC_HEADERS,
   SSE_BUFFER_MAX,
-  sseEvent
+  sseEvent,
+  budgetLeftMs,
+  fetchBudgetMs,
+  UPSTREAM_BUDGET_MS
 } from './server/src/index.mjs';
 
 import {haversineKm} from './lightning.js';
@@ -656,6 +659,38 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     'rate limiter',
     granted === 60 && otherIp && afterRefill && !stillDry && lim.size() === 2,
     `60/min budget: 70 instant requests -> exactly 60 granted; other IP unaffected; 2 s refill grants ~2 more then dry again`
+  );
+}
+
+// ---- upstream time budget --------------------------------------
+{
+  const t0 = 1_000_000;
+  const dl = t0 + UPSTREAM_BUDGET_MS;
+  const full = fetchBudgetMs(dl, t0, 20000);
+  const mid = fetchBudgetMs(dl, t0 + 20000, 20000);
+  const spent = budgetLeftMs(dl, dl);
+  const past = budgetLeftMs(dl, dl + 5000);
+  const mono =
+    budgetLeftMs(dl, t0) > budgetLeftMs(dl, t0 + 1) &&
+    budgetLeftMs(dl, t0 + 1) > budgetLeftMs(dl, t0 + 2);
+  check(
+    'upstream time budget',
+    UPSTREAM_BUDGET_MS === 25000 &&
+      UPSTREAM_BUDGET_MS < 30000 &&
+      full === 20000 &&
+      mid === 5000 &&
+      spent === 0 &&
+      past === 0 &&
+      mono,
+    `one ${UPSTREAM_BUDGET_MS / 1000} s deadline per multi-fetch ` +
+      `handler (under the tightest common edge origin timeout with ` +
+      `margin - the measured /sounding and /buoy cold walks could ` +
+      `run minutes and surface as the EDGE's 502): a fetch takes ` +
+      `min(cap, remaining) - ${full / 1000} s when fresh, ` +
+      `${mid / 1000} s with 5 s left - remaining decreases ` +
+      `monotonically and clamps to 0 at and past the deadline, ` +
+      `where the handlers fall to the stale cache or fail fast as ` +
+      `their own json`
   );
 }
 

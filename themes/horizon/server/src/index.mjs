@@ -479,6 +479,27 @@ export function overBackpressure(buffered, max = SSE_BUFFER_MAX) {
   return buffered > max;
 }
 
+// ---- Upstream time budget --------------------------------------
+
+// The wall clock an edge grants an origin is finite (Cloudflare's
+// free-tier origin timeout is 100 s), so a handler that walks
+// slow upstreams SERIALLY can hang past it and surface as the
+// edge's own plain-text 502 - measured on /sounding (up to 4
+// slots x 2 Wyoming fetches x 45 s) and /buoy (4 candidates x 6
+// NDBC files x 30 s: a 12-minute worst case). Every multi-fetch
+// handler therefore shares ONE deadline: each fetch takes the
+// smaller of its own cap and the time left, and when the budget
+// is spent the answer comes from the stale cache or fails fast
+// as OUR json - never as an edge timeout. 25 s keeps a whole
+// cold walk under the tightest common edge limit with margin.
+export const UPSTREAM_BUDGET_MS = 25000;
+export function budgetLeftMs(deadlineMs, nowMs) {
+  return Math.max(0, deadlineMs - nowMs);
+}
+export function fetchBudgetMs(deadlineMs, nowMs, capMs) {
+  return Math.min(capMs, budgetLeftMs(deadlineMs, nowMs));
+}
+
 // ---- Origin allowlist + per-IP rate limit ----------------------
 
 // Browser requests carry Origin; only the website's origin gets
@@ -1969,10 +1990,16 @@ function main() {
           'x-sounding-source': 'weather.uwyo.edu + IGRA (cached)'
         });
       }
+      // One shared deadline for the whole upstream walk (see
+      // UPSTREAM_BUDGET_MS): slow Wyoming answers degrade to the
+      // stale cache, never to an edge timeout.
+      const deadline = Date.now() + UPSTREAM_BUDGET_MS;
       try {
         if (Date.now() - sndStations.t > 24 * 3600e3) {
           const r = await fetch(IGRA_STATIONS, {
-            signal: AbortSignal.timeout(60000),
+            signal: AbortSignal.timeout(
+              fetchBudgetMs(deadline, Date.now(), 15000)
+            ),
             headers: {'user-agent': UA}
           });
           if (!r.ok) throw new Error(r.status);
@@ -2007,6 +2034,8 @@ function main() {
         }
         let body = null;
         const fetchAscent = async (slot) => {
+          const left = fetchBudgetMs(deadline, Date.now(), 20000);
+          if (left < 2000) return null;
           const r = await fetch(
             WYO_BASE +
               '?datetime=' +
@@ -2014,7 +2043,7 @@ function main() {
               '&id=' +
               best.s.wmo +
               '&type=TEXT:LIST',
-            {signal: AbortSignal.timeout(45000), headers: {'user-agent': UA}}
+            {signal: AbortSignal.timeout(left), headers: {'user-agent': UA}}
           );
           if (!r.ok) return null;
           const pre = (await r.text()).match(/<PRE>([\s\S]*?)<\/PRE>/i);
@@ -2023,15 +2052,20 @@ function main() {
           return rows.length < 50 ? null : rows;
         };
         for (let si = 0; si < slots.length; si++) {
+          if (budgetLeftMs(deadline, Date.now()) < 2000) break;
           const slot = slots[si];
           const rows = await fetchAscent(slot);
           if (!rows) continue;
           // The RESIDUAL layer (Stull's printed structure): the
           // PREVIOUS ascent's mixed-layer depth still carries its
-          // pollutants tonight - reduce the next slot back too.
+          // pollutants tonight - reduce the next slot back too
+          // (an optional extra: it yields to the budget first).
           let prevBlhAglM = null;
           let prevAt = null;
-          if (si + 1 < slots.length) {
+          if (
+            si + 1 < slots.length &&
+            budgetLeftMs(deadline, Date.now()) > 5000
+          ) {
             const prevRows = await fetchAscent(slots[si + 1]);
             if (prevRows) {
               prevBlhAglM = blhRiM(prevRows);
@@ -2108,10 +2142,16 @@ function main() {
           'x-buoy-source': 'ndbc.noaa.gov (cached)'
         });
       }
+      // One shared deadline for the whole candidate walk (see
+      // UPSTREAM_BUDGET_MS): a silent NDBC degrades to the stale
+      // cache, never to an edge timeout.
+      const deadline = Date.now() + UPSTREAM_BUDGET_MS;
       try {
         if (Date.now() - buoyStations.t > 24 * 3600e3) {
           const r = await fetch(NDBC_STATIONS, {
-            signal: AbortSignal.timeout(45000),
+            signal: AbortSignal.timeout(
+              fetchBudgetMs(deadline, Date.now(), 15000)
+            ),
             headers: {'user-agent': UA}
           });
           if (!r.ok) throw new Error(r.status);
@@ -2128,9 +2168,12 @@ function main() {
           .slice(0, 4);
         let body = null;
         for (const cand of near) {
+          if (budgetLeftMs(deadline, Date.now()) < 2000) break;
           const get = async (prod) => {
+            const left = fetchBudgetMs(deadline, Date.now(), 12000);
+            if (left < 1500) return null;
             const r = await fetch(NDBC_BASE + cand.s.id + '.' + prod, {
-              signal: AbortSignal.timeout(30000),
+              signal: AbortSignal.timeout(left),
               headers: {'user-agent': UA}
             });
             return r.ok ? r.text() : null;
@@ -2144,6 +2187,8 @@ function main() {
           // when its file's newest row shares the spectrum's
           // timestamp and band grid - otherwise null (isotropic
           // at draw time, the Longuet-Higgins series' own limit).
+          // Optional files yield to the budget first - a found
+          // spectrum ships even if its directions ran out of time.
           const dir = {};
           for (const prod of ['swdir', 'swdir2', 'swr1', 'swr2']) {
             const t = await get(prod);

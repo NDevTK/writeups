@@ -9296,6 +9296,29 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   fetch at any CO-OPS gauge. Shelf remaining: sprites (SSE),
   purple-light watch (OMPS), comets (COBS), satellite passes
   (TLE + satmags).
+- DONE (Aug 9, the review session's 119th pass - THE DAEMON'S TIME
+  BUDGET: the observed edge 502s were the handlers' own worst
+  cases): the plain-text "error code: 502" measured on /buoy and
+  /sounding this session was NOT the daemon's stale logic (both
+  routes already cache and stale-serve) - it was the EDGE giving
+  up on the origin while a cold-cache handler walked slow
+  upstreams serially: /sounding could take 4 slots x 2 Wyoming
+  fetches x 45 s each, /buoy 4 candidates x 6 NDBC files x 30 s -
+  a 12-minute worst case behind a ~100 s edge origin timeout.
+  Fix: one shared deadline per multi-fetch handler
+  (UPSTREAM_BUDGET_MS = 25 s, stated under the tightest common
+  edge limit with margin) - budgetLeftMs/fetchBudgetMs exported
+  pure; every fetch's AbortSignal takes min(cap, remaining);
+  candidate/slot loops break when nearly spent; the OPTIONAL
+  extras (the residual-layer previous ascent, the directional
+  spectrum files) yield to the budget first so a found ascent or
+  spectrum still ships without them; exhaustion falls to the
+  existing stale cache or fails fast as the daemon's OWN json -
+  never as an edge timeout. server-reference gains the budget
+  landmark (constant pinned under 30 s, min-composition exact,
+  monotone, clamps to zero at and past the deadline) - 19
+  landmarks. NOTE: lands live only when the daemon box redeploys;
+  the gate is the in-repo verification.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
