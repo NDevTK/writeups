@@ -8970,6 +8970,37 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   days from this commit - the drawn eclipse now has its
   corona. Full gate green - 131 CPU references (kcorona 6) +
   7 GPU probes.
+- DONE (Aug 9, the review session's 110th pass - THE SCALAR
+  DOME AUDITED, polarization stage 3): the drawn dome is
+  scalar; stage 1 built the exact vector engine; this pass
+  turns it on its own host. PRIMARY (GISS-served pp. 491-500
+  read - abstract through the mechanism section): Mishchenko,
+  Lacis & Travis 1994 (JQSRT 51, 491), THE study of what
+  neglecting polarization costs Rayleigh radiance - errors to
+  the literature's 11.7%, peaking near tau = 1, decreasing
+  with depolarization, the reflected-light error always
+  peaking at relative azimuth 180 (their Eq. 18), the cause
+  low-order paths with 90-deg scattering and 90-deg
+  reference-plane rotations. rayleighpol.js gains a SCALAR
+  MODE (keep only the (0,0) phase block - the classical
+  approximation, riding the identical doubling), and the gate
+  (2 new landmarks, 10 total) measures it against the
+  PUBLISHED vector I of the vendored IPRT table: worst errors
+  11.1% / 9.4% / 6.9% at depol 0 / 0.03 / 0.1 - the printed
+  depolarization ordering, under the printed ceiling - and
+  Eq. (18) HOLDS IN THE DATA at all 34 azimuth-resolved
+  reflected views. THE DOME NUMBER: the transmitted (drawn-
+  sky) field at the dome's own tau_RGB across sun 10-60 deg:
+  worst scalar error -2.7% / -4.8% / -8.1% per channel, every
+  worst case at low sun near the zenith toward azimuth 180 -
+  the 90-deg-scattering geometry the mechanism names. The
+  shipped scalar dome OVERBRIGHTENS that blue sky by up to
+  ~8%; the bias is now measured, bounded and documented at
+  the constants it belongs to (atmosphere-tsl.js), with the
+  vector engine as the stated correction path. No client
+  changes (an audit pass - the honest first step of any
+  correction). Full gate green - 131 CPU references
+  (rayleighpol 10) + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

@@ -282,7 +282,7 @@ function mulc(A, B, muw) {
  * probes)}. The thin-layer initialisation is first-order single
  * scattering at tau0 = tau / 2^25 (error O(tau0^2) ~ 1e-16).
  */
-export function doubleLayer(m, tau, nodes, depol, steps = 25) {
+export function doubleLayer(m, tau, nodes, depol, steps = 25, scalar = false) {
   const nm = nodes.mu.length;
   const n = 3 * nm;
   const muw = new Float64Array(n);
@@ -298,8 +298,15 @@ export function doubleLayer(m, tau, nodes, depol, steps = 25) {
     for (let b = 0; b < nm; b++) {
       const fr = zFourier(nodes.mu[a], -nodes.mu[b], depol);
       const ft = zFourier(-nodes.mu[a], -nodes.mu[b], depol);
+      // The SCALAR approximation (the audit mode): keep only the
+      // (0,0) phase-matrix element - the classical replacement of
+      // every 4x4 matrix by its (1,1)-element (Mishchenko, Lacis
+      // & Travis 1994, Sec. 2). The rotations never touch (0,0),
+      // so this is exactly scalar radiative transfer riding the
+      // same doubling; the Q/U rows stay zero throughout.
       for (let r = 0; r < 3; r++)
         for (let c = 0; c < 3; c++) {
+          if (scalar && (r !== 0 || c !== 0)) continue;
           ZR.re[(a * 3 + r) * n + (b * 3 + c)] = fr.re[r][c][m];
           ZR.im[(a * 3 + r) * n + (b * 3 + c)] = fr.im[r][c][m];
           ZT.re[(a * 3 + r) * n + (b * 3 + c)] = ft.re[r][c][m];
@@ -391,7 +398,8 @@ export function solveA1({
   vzaUpDeg = [],
   dphiDeg = [],
   nGauss = 32,
-  nDouble = 25
+  nDouble = 25,
+  scalar = false
 }) {
   const g = gauss01(nGauss);
   // Polar directions (mu = 1) sit at the meridian frame's
@@ -421,7 +429,7 @@ export function solveA1({
   const nodes = {mu: Float64Array.from(mus), w: Float64Array.from(ws)};
   const modes = [];
   for (let m = 0; m <= 2; m++)
-    modes.push(doubleLayer(m, tau, nodes, depol, nDouble));
+    modes.push(doubleLayer(m, tau, nodes, depol, nDouble, scalar));
   const nm = nodes.mu.length;
   const n = 3 * nm;
   const out = [];

@@ -109,6 +109,18 @@ const SKY_H = 108; // sky-view LUT rows; the guarded split needs it
 // ONE place these live. The polarized-sky bake (rayleighpol.js
 // stage 2) reads its vertical optical depths from here, so the
 // mirrored dome and the drawn dome share one molecular column.
+//
+// KNOWN SCALAR BIAS (measured, gate-held): this dome is scalar,
+// and scalar radiative transfer errs for Rayleigh skies
+// (Mishchenko, Lacis & Travis 1994). The theme's own
+// IPRT-benchmarked vector engine (rayleighpol.js, scalar mode
+// vs vector - rayleighpol-reference stage 3) bounds what that
+// costs THIS column: worst transmitted-sky error -2.7% / -4.8%
+// / -8.1% per RGB channel, peaking at low sun near the zenith
+// toward azimuth 180 (the 90-deg-scattering geometry) - the
+// drawn blue sky runs up to ~8% too bright there. The vector
+// engine is the stated correction path; until then the bias is
+// bounded, not hidden.
 export const RAYLEIGH_S_M = [5.802e-6, 13.558e-6, 33.1e-6];
 export const RAYLEIGH_H_M = 8000;
 
