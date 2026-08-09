@@ -9084,6 +9084,43 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   disables. Wet-road specular sheen and wet-snow are the
   stated next stages. Full gate green - 133 CPU references
   (wetground 5) + 7 GPU probes.
+- DONE (Aug 9, the review session's 113th pass - THE FINDINGS
+  REGISTER: the research made legible): 112 passes had produced
+  real research content - candidate novel findings, hindcast
+  landings, cross-module closures - but it lived buried in this
+  plan file's dated entries and the gate output. NEW
+  FINDINGS.md: the curated, executable index. Section 1 - the
+  eleven candidate NOVEL findings (results the primaries do not
+  print), each stated with evidence and its gate: the
+  duct-release non-equivalence via adiabatic invariance (F1),
+  the m0-blindness of the doubling mirror-symmetry bug (F2),
+  the sqrt(eps) meridian noise floor and its law-of-sines cure
+  (F3), the naked-eye-coronality-measures-the-aureole loop
+  (F4), the 443 km photograph at its own atmosphere's limit
+  (F5), the razor-discriminant tangency (F6), the wet-coal
+  sign change (F7), the 486x duct-edge wall (F8), the scalar
+  dome's per-channel error field (F9), the 0.962 illuminance
+  closure (F10), the inconspicuous-beads prominence class
+  (F11). Section 2 - the hindcast table (1597 de Veer x2, 1925
+  Angstrom pairs, 1951 Liljequist, 1994 Bathurst, 2016 Nimes
+  443 km, 2017 beads/contact-valleys/coronality, Dallas 2024 +
+  Galicia 2026 pins), each with its residual stated. Section
+  3 - ten cross-closures (independent chains, one number).
+  Section 4 - the corpus index: 133 reference files, 993
+  landmark lines, 7 GPU probes (live-gate count), the
+  provenance and access-route conventions. Section 5 - the
+  honesty ledger: bounded-not-corrected biases, stated
+  residuals, walled primaries, and the coverage caveat
+  (landmarks prove laws at gated points, not every pixel).
+  Section 6 - the METHOD, stated for reuse: law-lives-once,
+  the five landmark classes, run-then-pin (with the two cases
+  where the assertion was wrong because the physics was more
+  interesting), the full-read rule, vendored-slice provenance,
+  and convention pins asserted constant. Every number in the
+  register quotes a live gate line; the standing rule is
+  appended - a pass that changes findings-level content
+  extends the register in the same commit. No code changes;
+  gate unchanged at 140 ok.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
