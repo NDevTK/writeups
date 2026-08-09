@@ -8721,6 +8721,54 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   Deliverable is the gate (validation, not a live layer - the
   98th-pass precedent). Full gate green - 127 CPU references
   (hindcast 5) + 7 GPU probes.
+- DONE (Aug 9, the review session's 105th pass - THE NOVAYA
+  ZEMLYA HINDCAST: de Veer's 1597 sun through the duct
+  machinery). The recorded-reality agenda's third installment,
+  with a 400-year-old ground truth. (First: the Danjon eclipse
+  series was HUNTED and is WALLED - Keen's raw brightness
+  table lives behind Science 1983's paywall; the open GVP/GML
+  pages carry only his derived AOD - shelved with the chain
+  written down.) THE PRIMARY, author-hosted OA and read in
+  full: van der Werf, Konnen, Lehn, Steenhuisen & Davidson
+  2003 (Appl. Opt. 42, 379) - the printed observations (24 Jan
+  1597: a GLIMPSE of the sun at geometric -5 deg 26'; 27 Jan:
+  "in its full roundness" at -4 deg 41'; Liljequist 1951 at
+  -4 deg 18') and the printed model (Eq. B5 Fermi inversion:
+  Tciso 250 K at 80 m, dT 12 K, a 5 m, 1040 hPa, eye 14 m;
+  Eq. B4's hydrostatic B = 3.4177e-2). NEW nz.js: the Fermi
+  column as a profile object (hydrostatic P integrated with
+  the repo's OWN g/Rd - which lands on their printed B to 0.6
+  parts in 1e4, two constant chains on one number) + the
+  gradual-release duct march on the mirage fan's own
+  flat-earth transform. WHAT THE MACHINERY TAUGHT (the pass's
+  real finding): their two "nearly equivalent" release laws
+  are NOT equivalent for forward rays - widening a at fixed dT
+  GROWS the duct's action capacity (depth falls, width grows
+  faster), so adiabatic invariance holds every trapped ray to
+  an all-at-once collapse in a narrow deep band; shrinking dT
+  at fixed a shrinks capacity monotonically and releases rays
+  progressively by action - the continuous transformation
+  curve of their Fig. 3B. The theme ships the dT release
+  (their first-stated method; exponential scale L = 400 km,
+  run-then-pinned). THE TWO DAYS COME OUT AS WRITTEN,
+  gate-held: on the 24th the curve's floor (-5.40 deg) falls
+  INSIDE the solar disc - upper limb ducted, centre not: a
+  partial sun, de Veer's "glimpse"; on the 27th the whole 32'
+  disc connects - "full roundness"; one duct, both
+  phenomenologies (the paper's own self-imposed standard),
+  with Liljequist's depression inside the same curve and the
+  paper's trapping sentence PROVEN by the same march (an
+  unweakened duct strands 221 rays - the dark band de Veer
+  took for haze). BONUS CROSS-GATE: their Eq. (1) flattening
+  law meets the SHIPPED sunRefraction - 0.827 vs printed
+  0.830 at the standard lapse (eye 2 m; at exactly h = 0 the
+  horizon ray is degenerate-tangent, found and stated), the
+  +0.05 K/m case direction-and-magnitude confirmed with the
+  integrator's grazing ripple stated as the band. nz-reference
+  6 landmarks; no client changes (the shipped sunset LUT
+  already carries measured-column folds - a real polar duct
+  would draw through that path; stated). Full gate green -
+  128 CPU references (nz 6) + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
