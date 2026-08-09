@@ -853,6 +853,14 @@
         hsOfM0,
         m0OfSpec
       } from './horizon/buoy.js';
+      import {
+        parseSnotelStations,
+        snotelLatestM,
+        SNOTEL_BASE,
+        SNOTEL_FRESH_D,
+        SNOTEL_MAX_DELEV_M,
+        SNOTEL_MAX_KM
+      } from './horizon/snotel.js';
       import {measuredMag} from './horizon/cobs.js';
       import {buildPollenLUT, pollenTau, BIRCH_D_UM} from './horizon/pollen.js';
       import {
@@ -1237,6 +1245,12 @@
           state.snow = c.snowfall;
           state.snowDepth =
             typeof c.snow_depth === 'number' ? c.snow_depth : null;
+          // A SNOTEL pillow in reach outranks the model depth
+          // (syncSnotel sets snowDepthMeas under its distance/
+          // elevation/freshness gates) - re-asserted here so the
+          // model's sync never buries the measurement.
+          if (Number.isFinite(state.snowDepthMeas))
+            state.snowDepth = state.snowDepthMeas;
           state.wind = c.wind_speed_10m;
           state.winddir = c.wind_direction_10m;
           state.gust = c.wind_gusts_10m;
@@ -4361,6 +4375,95 @@
           );
         } catch {
           // the wave model stands
+        }
+      }
+      // MEASURED snow depth (snotel.js): an NRCS SNOTEL pillow in
+      // reach outranks the model snow depth - CORS-open (the
+      // USGS-rivers pattern), browser-direct, no daemon. The
+      // station list only exists over the western US/Alaska, so a
+      // coarse bbox spares everyone else the fetch. ?snwd=M pins
+      // the measured depth for the harness; =off disables.
+      let snotelStations = null;
+      async function syncSnotel() {
+        state.snowDepthMeas = null; // fail closed; set only below
+        if (params.get('snwd') === 'off') return;
+        if (params.has('snwd')) {
+          const v = parseFloat(params.get('snwd'));
+          if (Number.isFinite(v)) {
+            state.snowDepthMeas = v;
+            // Pins are authoritative: the model weather sync may
+            // never run under pin=1, so land the value directly.
+            state.snowDepth = v;
+          }
+          return;
+        }
+        if (overridden) return;
+        if (
+          state.lat < 31 ||
+          state.lat > 72 ||
+          state.lon < -170 ||
+          state.lon > -102
+        )
+          return; // outside the network's own footprint
+        try {
+          if (!snotelStations) {
+            const r = await (
+              await fetch(
+                SNOTEL_BASE + '/stations?stationTriplets=*%3A*%3ASNTL',
+                {credentials: 'omit'}
+              )
+            ).json();
+            snotelStations = parseSnotelStations(r);
+          }
+          let best = null;
+          for (const s of snotelStations) {
+            const d = haversineKm(state.lat, state.lon, s.lat, s.lon);
+            if (d > SNOTEL_MAX_KM) continue;
+            if (
+              s.elevM === null ||
+              Math.abs(s.elevM - centerElev) > SNOTEL_MAX_DELEV_M
+            )
+              continue;
+            if (!best || d < best.d) best = {s, d};
+          }
+          if (!best) return;
+          const end = new Date();
+          const begin = new Date(end.getTime() - SNOTEL_FRESH_D * 86400e3);
+          const day = (t) => t.toISOString().slice(0, 10);
+          const data = await (
+            await fetch(
+              SNOTEL_BASE +
+                '/data?stationTriplets=' +
+                encodeURIComponent(best.s.triplet) +
+                '&elements=SNWD%2CWTEQ&duration=DAILY&beginDate=' +
+                day(begin) +
+                '&endDate=' +
+                day(end),
+              {credentials: 'omit'}
+            )
+          ).json();
+          const m = snotelLatestM(data);
+          if (!m || m.snwdM === null) return;
+          state.snowDepthMeas = m.snwdM;
+          // Land it now too - the model sync re-asserts on its own
+          // cadence, but the measurement should not wait for it.
+          state.snowDepth = m.snwdM;
+          record(
+            'SNOTEL pillow (measured snow)',
+            best.s.name +
+              ' ' +
+              best.d.toFixed(0) +
+              ' km · ' +
+              Math.round(best.s.elevM) +
+              ' m · depth ' +
+              m.snwdM.toFixed(2) +
+              ' m' +
+              (m.wteqM !== null ? ' · SWE ' + m.wteqM.toFixed(2) + ' m' : '') +
+              ' · ' +
+              m.date
+          );
+        } catch {
+          // the model depth stands
         }
       }
       // MEASURED comet brightness (cobs.js via the daemon): the
@@ -14405,6 +14508,8 @@
         setInterval(syncSounding, 60 * 60 * 1000);
         syncBuoy();
         setInterval(syncBuoy, 30 * 60 * 1000);
+        syncSnotel();
+        setInterval(syncSnotel, 60 * 60 * 1000);
         syncCobs();
         setInterval(syncCobs, 3 * 60 * 60 * 1000);
         syncPollen();

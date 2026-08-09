@@ -8174,6 +8174,43 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   writer). No new constants beyond the printed Ri_c = 0.25.
   Gate: sounding-reference grows 13 -> 15 landmarks; full gate
   green - 120 CPU references + 7 GPU probes.
+- DONE (Aug 9, the review session's 91st pass - measured snow
+  depth: SNOTEL pillows outrank the model). The drawn snow's
+  depth was the weather model's snow_depth; the NRCS SNOTEL
+  network measures it - ~900 pillow-and-sensor stations across
+  the western US and Alaska, and the AWDB REST API is the
+  repo's SECOND CORS-open feed (access-control-allow-origin: _,
+  browser-direct, keyless, no daemon - the USGS-rivers
+  pattern). snotel.js parses /stations (the _:\*:SNTL wildcard
+  filters server-side to the 913 pillows; elevation arrives in
+  FEET through the gated FT_M) and /data daily SNWD/WTEQ rows
+  (INCHES; IN_M = 0.0254 - the international inch is 25.4 mm BY
+  DEFINITION, nothing fitted). GATE-HELD on a vendored real
+  winter response (Red Mountain Pass 713:CO:SNTL, Feb 2026, a
+  storm growing the pack 30 -> 34 in): rows verbatim, exact
+  unit identities, and the two independent sensors agree on one
+  snowpack - WTEQ/SNWD density 0.206, inside the textbook
+  0.15-0.35 settled-pack band. DOCUMENTED GATES: 40 km (the
+  USGS gauge/basin argument), 300 m elevation band (mountain
+  snow is elevation-banded; 300 m moves the chain's own ISA
+  6.5 K/km lapse by under 2 degC) and 2 days freshness (daily
+  telemetry plus report lag) - outside any, the model stands;
+  a coarse western-US/Alaska bbox spares everyone else the
+  station-list fetch entirely. The adoption is the sstMeas
+  pattern: syncSnotel sets state.snowDepthMeas (fail-closed
+  cleared first), lands it in state.snowDepth directly AND
+  re-asserts at the model's own sync so neither ordering buries
+  the measurement; consumers unchanged (FSM Eq. 13 cover, the
+  depth ramp, the lake ramp - the 52nd pass's machinery now
+  fed a pillow where one is near). ?snwd=M pins (authoritative
+  under pin=1, where the model sync never runs); =off disables.
+  A/B at the pinned Alpine fixture, matched worlds (the veglod
+  tree-count check from the 89th's lesson - 261 trees in both
+  panels): bare August terrain vs the vendored 0.86 m pack -
+  48.6% of pixels move as the valleys white out under FSM
+  cover at the measured depth. Gate: snotel-reference.mjs
+  joins with 5 landmarks - full gate green, 121 CPU
+  references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
