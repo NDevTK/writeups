@@ -424,6 +424,7 @@
         createContrailMaterial,
         createFlashMaterial,
         createGloryMaterial,
+        createLenticularMaterial,
         createPlumeMaterial,
         createLightPillarMaterial,
         createNacreousMaterial,
@@ -448,6 +449,17 @@
         MOON_ALB_H
       } from './horizon/moon-albedo-data.js';
       import {adsbToScene, appleman, eLiq} from './horizon/contrails.js';
+      import {
+        crestClouds,
+        dewC,
+        fr3Regime,
+        froude3,
+        naturalWavelengthM,
+        nBV,
+        ridgeFromTransect,
+        virtualTk,
+        zLclM
+      } from './horizon/leewave.js';
       import {bowSlab, mpDropRadiusMm, mpSigmaExt} from './horizon/rainbow.js';
       import {parseSoft00, syndyne, visibleComets} from './horizon/comets.js';
       import {
@@ -640,6 +652,7 @@
         DROPLET_DE_OBS_UM
       } from './horizon/cloud-corona.js';
       import {
+        overcastAlbedo,
         overcastT,
         overcastTau,
         overcastGroundFactor,
@@ -1436,8 +1449,10 @@
           // refresh so the measurement keeps its rank.
           applySounding();
           // The far ring follows the column's fate (identity-
-          // keyed: a no-change sync costs nothing).
+          // keyed: a no-change sync costs nothing), and the
+          // wave train re-solves on the fresh winds.
           applyMirageFan();
+          syncLeeWave();
           const pts = LV.map((p) => ({
             h: h['geopotential_height_' + p + 'hPa'][0] - w.elevation,
             v: h['wind_speed_' + p + 'hPa'][0] / 3.6
@@ -4871,8 +4886,10 @@
           state.soundingData = r;
           applySounding();
           // The far ring warps through the fresh column (or
-          // relaxes to mean-k if the ascent failed the gates).
+          // relaxes to mean-k if the ascent failed the gates),
+          // and the wave train re-solves on the fresh column.
           applyMirageFan();
+          syncLeeWave();
           record(
             'radiosonde (measured upper air)',
             r.name +
@@ -7183,7 +7200,11 @@
             distU: ring.distU,
             baseY,
             centerElev,
-            appliedProf: undefined
+            appliedProf: undefined,
+            // The 200 km mosaic stays readable: the lee-wave pass
+            // hunts its upwind ridge on this same DEM (a transect
+            // needs no resampling of tiles).
+            elevAt: (x, z) => demElevOf(dem, x, z, world)
           };
           if (!farMesh) {
             farMesh = new THREE.Mesh(geo, makeFarMaterial());
@@ -7202,6 +7223,7 @@
               ' (Hirt 2010, measured lapse) · Koschmieder to the horizon sky'
           );
           applyMirageFan();
+          syncLeeWave();
         } catch (e) {
           if (params.has('debug')) console.warn('far ring: ' + e.message);
         }
@@ -7295,6 +7317,226 @@
             (stacked
               ? ' · ' + stacked + ' multi-image (duct) - primary drawn'
               : '')
+        );
+      }
+
+      // The mountain writes waves in the measured wind
+      // (leewave.js, gated): hunt the upwind ridge on the far
+      // DEM along the wave-layer wind, oscillate the MEASURED
+      // column at its own Brunt-Vaisala frequency (exact virtual
+      // temperature, eq. 5.4a), and cap the resonant crests with
+      // lenticulars wherever the ladder clears the crest air's
+      // own LCL - Stull's ch. 17 machinery end to end, every
+      // branch recorded by name. The wave-layer wind: the level
+      // winds of the ascent itself when the payload ships them
+      // (vector mean over the crest layer, one transect
+      // refinement), else the adopted 700 hPa state (measured
+      // when the balloon is fresh, model otherwise - the
+      // verticals pass's own split). Clouds draw only in the
+      // printed RESONANT regime (z1 = H/2 is Stull's only
+      // printed amplitude); blocked and wake days report their
+      // regime and draw nothing - stated, never invented.
+      const LEE_RIDGE_MAX_M = 80e3;
+      const LEE_STEP_M = 250;
+      function leeTransect(dirFromDeg) {
+        const az = (dirFromDeg * Math.PI) / 180;
+        const ux = Math.sin(az);
+        const uz = -Math.cos(az);
+        const dArr = [];
+        const eArr = [];
+        for (let d = 500; d <= LEE_RIDGE_MAX_M; d += LEE_STEP_M) {
+          dArr.push(d);
+          eArr.push(farRingData.elevAt((ux * d) / MPU, (uz * d) / MPU));
+        }
+        return {dArr, eArr, ux, uz};
+      }
+      function leeLayerWind(rows, hLoM, hHiM) {
+        if (!Array.isArray(rows)) return null;
+        let u = 0;
+        let v = 0;
+        let n = 0;
+        for (const r of rows) {
+          if (
+            !Number.isFinite(r.hM) ||
+            r.hM < hLoM ||
+            r.hM > hHiM ||
+            !Number.isFinite(r.drct) ||
+            !Number.isFinite(r.spdMs)
+          )
+            continue;
+          const a = (r.drct * Math.PI) / 180;
+          u += -r.spdMs * Math.sin(a);
+          v += -r.spdMs * Math.cos(a);
+          n++;
+        }
+        if (n < 2) return null;
+        u /= n;
+        v /= n;
+        const spd = Math.hypot(u, v);
+        if (!(spd > 0)) return null;
+        const dirFrom = ((Math.atan2(-u, -v) * 180) / Math.PI + 360) % 360;
+        return {mMs: spd, dirFrom, n};
+      }
+      function syncLeeWave() {
+        for (const p of leePool) p.mesh.visible = false;
+        leeState = null;
+        const REC = 'lee waves (measured column, Stull ch. 17)';
+        if (!farRingData || !farRingData.elevAt) return;
+        const prof = state.profileMeas;
+        if (!prof) {
+          record(REC, 'no fresh measured column - no wave claim');
+          return;
+        }
+        // The 700 hPa adopted wind seeds the hunt (km/h in state).
+        let mMs = state.wind700 / 3.6;
+        let dirFrom = state.dir700;
+        let windSrc = '700 hPa';
+        if (!Number.isFinite(mMs) || !Number.isFinite(dirFrom)) {
+          record(REC, 'no wind aloft yet - no wave claim');
+          return;
+        }
+        let tr = leeTransect(dirFrom);
+        let ridge = ridgeFromTransect(tr.dArr, tr.eArr);
+        // Level winds from the ascent outrank the single level:
+        // vector mean over the crest layer, then one transect
+        // refinement along the refined direction.
+        const rows = state.soundingData ? state.soundingData.rows : null;
+        if (ridge) {
+          const span0 = Math.max(ridge.hM, 500);
+          const lw = leeLayerWind(rows, ridge.elevM, ridge.elevM + span0);
+          if (lw) {
+            mMs = lw.mMs;
+            dirFrom = lw.dirFrom;
+            windSrc = 'balloon layer (' + lw.n + ' levels)';
+            tr = leeTransect(dirFrom);
+            ridge = ridgeFromTransect(tr.dArr, tr.eArr);
+          }
+        }
+        if (!(mMs >= 1)) {
+          record(REC, 'calm aloft (< 1 m/s) - no wave');
+          return;
+        }
+        if (!ridge) {
+          record(
+            REC,
+            'no ridge over 200 m within 80 km upwind (' +
+              Math.round(dirFrom) +
+              '°) - flat fetch writes no waves'
+          );
+          return;
+        }
+        const rid =
+          'ridge ' +
+          Math.round(ridge.elevM) +
+          ' m at ' +
+          (ridge.dM / 1000).toFixed(0) +
+          ' km upwind (' +
+          Math.round(dirFrom) +
+          '°) · H ' +
+          Math.round(ridge.hM) +
+          ' · W ' +
+          (ridge.wM / 1000).toFixed(1) +
+          ' km';
+        // The oscillating layer: crest to crest + max(H, 500 m) -
+        // the sample's streamline band at the hill's own scale.
+        const span = Math.max(ridge.hM, 500);
+        const sB = prof.at(ridge.elevM);
+        const sT = prof.at(ridge.elevM + span);
+        const tvB = virtualTk(sB.tC, sB.rh ?? 0, sB.pPa);
+        const tvT = virtualTk(sT.tC, sT.rh ?? 0, sT.pPa);
+        const n = nBV(tvB, (tvT - tvB) / span);
+        if (!n) {
+          record(REC, rid + ' · statically unstable layer - no oscillation');
+          return;
+        }
+        const lam = naturalWavelengthM(mMs, n);
+        const fr3 = froude3(lam, ridge.wM);
+        const regime = fr3Regime(fr3);
+        const phys =
+          rid +
+          ' · N ' +
+          n.toFixed(4) +
+          ' · M ' +
+          mMs.toFixed(1) +
+          ' m/s (' +
+          windSrc +
+          ') · λ ' +
+          (lam / 1000).toFixed(1) +
+          ' km · Fr3 ' +
+          fr3.toFixed(2) +
+          ' ' +
+          regime;
+        if (regime !== 'resonant') {
+          record(
+            REC,
+            phys + ' - no printed amplitude off resonance, nothing drawn'
+          );
+          return;
+        }
+        const z1 = ridge.hM / 2; // the printed resonance amplitude
+        const td = dewC(sB.tC, sB.rh ?? 0);
+        if (td === null) {
+          record(REC, phys + ' · crest air bone dry - waves without clouds');
+          return;
+        }
+        const lcl = zLclM(sB.tC, td);
+        const clouds = crestClouds({z1M: z1, lamM: lam, zLclRelM: lcl});
+        if (!clouds.length) {
+          record(
+            REC,
+            phys +
+              ' · zLCL ' +
+              Math.round(lcl) +
+              ' m tops z1 ' +
+              Math.round(z1) +
+              ' m - every crest stays dry'
+          );
+          return;
+        }
+        // The lens tau rides the veil's own r_eff source: the
+        // MEASURED water droplet size when VIIRS saw one, else
+        // the printed observed mode for the air mass.
+        const reLee =
+          (state.creff && Number.isFinite(state.creff.waterUm)
+            ? 2 * state.creff.waterUm
+            : state.marineAir
+              ? DROPLET_DE_OBS_UM.marine
+              : DROPLET_DE_OBS_UM.continental) / 2;
+        const tau = overcastTau(reLee);
+        const ce = farRingData.centerElev;
+        let drawn = 0;
+        for (const c of clouds) {
+          if (drawn >= LEE_MAX) break;
+          const sU = (ridge.dM - c.xM) / MPU;
+          const eBase = ridge.elevM + c.baseRelM;
+          const eTop = ridge.elevM + c.topRelM;
+          const yB = 16 * Math.asinh((eBase - ce) / 500);
+          const yT = 16 * Math.asinh((eTop - ce) / 500);
+          const p = leePool[drawn];
+          p.mesh.position.set(tr.ux * sU, (yB + yT) / 2, tr.uz * sU);
+          p.mesh.scale.set(c.chordM / MPU, Math.max(yT - yB, 0.3), 1);
+          p.mesh.visible = true;
+          drawn++;
+        }
+        leeState = {
+          albedo: overcastAlbedo(tau),
+          amp: 1 - Math.exp(-tau)
+        };
+        record(
+          REC,
+          phys +
+            ' · zLCL ' +
+            Math.round(lcl) +
+            ' m · ' +
+            clouds.length +
+            ' lens' +
+            (clouds.length > 1 ? 'es' : '') +
+            ' (cap + ' +
+            (clouds.length - 1) +
+            ') · chords ' +
+            clouds.map((c) => (c.chordM / 1000).toFixed(1)).join('/') +
+            ' km · tau ' +
+            tau.toFixed(1)
         );
       }
 
@@ -8474,6 +8716,24 @@
         pscPool.push({mesh, u: nm.u, f});
       }
       let pscSaid = false;
+
+      // Lee-wave lenticular pool (leewave.js, gated by
+      // leewave-reference.mjs): syncLeeWave() places and sizes
+      // the lenses from Stull's printed machinery on the measured
+      // column over the real upwind ridge; the frame loop feeds
+      // only the traced lighting (the deck's own sun and ambient
+      // through the gated two-stream albedo) and the yaw
+      // billboard. World-anchored, unlike the sky-dome family.
+      const LEE_MAX = 6;
+      const leePool = [];
+      for (let i = 0; i < LEE_MAX; i++) {
+        const lm = createLenticularMaterial();
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), lm.material);
+        mesh.visible = false;
+        scene.add(mesh);
+        leePool.push({mesh, u: lm.u});
+      }
+      let leeState = null;
 
       // STEVE: the thin mauve subauroral ribbon (steve.js -
       // MacDonald 2018 discovery paper + Chu 2019 driver paper).
@@ -12816,6 +13076,28 @@
             for (const p of pscPool) p.mesh.visible = false;
           }
         }
+        // Lee-wave lenticulars: geometry stands from syncLeeWave
+        // (the measured wave train); per frame only the traced
+        // lighting - the deck's own two feeds (transmitted sun
+        // beam, cloud ambient) through the gated two-stream
+        // albedo - and the yaw billboard.
+        if (leeState) {
+          const sA = sunLight.intensity * leeState.albedo;
+          for (const p of leePool) {
+            if (!p.mesh.visible) continue;
+            p.mesh.lookAt(
+              camera.position.x,
+              p.mesh.position.y,
+              camera.position.z
+            );
+            p.u.litV.value.set(
+              ambient.color.r * 0.6 + sunLight.color.r * sA,
+              ambient.color.g * 0.6 + sunLight.color.g * sA,
+              ambient.color.b * 0.6 + sunLight.color.b * sA
+            );
+            p.u.amp.value = leeState.amp;
+          }
+        }
         // The reported plume: nearest weekly-report volcano with
         // a printed height inside 280 km (the 7-km-class horizon
         // limit the gate prints), or the ?volcano=AZ,TOPM,DISTKM
@@ -13693,6 +13975,7 @@
         pollenMoonObj.u.scotB.value = mesoB;
         plumeObj.u.scotB.value = mesoB;
         for (const p of pscPool) p.u.scotB.value = mesoB;
+        for (const p of leePool) p.u.scotB.value = mesoB;
         // The same asinh inversion the sky LUT feed uses: the
         // camera's real altitude, so the rain column is the
         // freezing level ABOVE THE EYE.

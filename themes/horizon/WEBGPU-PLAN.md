@@ -8555,6 +8555,51 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     observability half of the census audit, shipped without the
     boot-test ceremony. Full gate green - 123 CPU references
     (far-terrain at 12) + 7 GPU probes.
+- DONE (Aug 9, the review session's 101st pass - lee waves:
+  the mountain writes lenticular rows in the measured wind).
+  NEW PRIMARY, read in full: Stull, Practical Meteorology
+  v1.02b (open CC, UBC), ch. 17.7 Mountain Waves + ch. 5.6.3
+  Brunt-Vaisala - every equation AND both worked samples
+  printed: N_BV = sqrt((|g|/Tv)(dTv/dz + Gamma_d)) with his
+  own 9.8/9.8 (eq. 5.4a; ISA-at-4-km sample 0.0111 rad/s,
+  period 565.5 s - landmark), lambda = 2 pi M/N_BV (17.30;
+  sample 14.62 km at M 30 - landmark), the damped standing
+  wave z1 e^(-x/b lambda) cos(2 pi x/lambda) (17.31; its own
+  e-folding sentence held exactly), Fr3 = lambda/2W (17.32;
+  resonance z1 = H/2 his only printed amplitude), zLCL =
+  125 (T - Td) (the sample's own print). THE FLAGSHIP GATE:
+  his sample air over a resonant ridge grows EXACTLY '1 cap
+  cloud and 2 lenticular clouds' - his printed sentence -
+  from the assembled chain (ladder 500/358.3/256.7 over 250,
+  crest 3 at 183.9 stays dry); leewave-reference holds 9
+  landmarks (both samples, the e-fold identity, exact dew
+  inversion against the gated eLiq, the exact-Tv factor, the
+  synthetic-ridge finder with nearest-wins and the 200 m
+  prominence floor failing closed, the regime ladder, the
+  emergence). CLIENT (leewave.js + syncLeeWave): the upwind
+  transect samples the far ring's own retained 200 km DEM
+  along the wave-layer wind (700 hPa adopted state seeds the
+  hunt - measured when the balloon is fresh, model else; the
+  ascent's LEVEL winds outrank it when the payload ships them
+  - thinRows now passes drct/spdMs through, optional-field so
+    old payloads stay valid, the daemon module rides install.sh
+    in this same commit); the measured column oscillates at its
+    own exact-Tv N_BV over the crest layer; clouds draw ONLY in
+    the printed resonant regime (the Fr3 octave stated as the
+    display reading of 'nearly equal') as world-anchored lens
+    billboards whose chord comes from the printed cosine
+    crossing the crest air's own LCL, shaded by the deck's own
+    two frame feeds through the gated overcast two-stream at
+    the veil's own r_eff source (measured VIIRS water droplets
+    first) - the only new display choices are the almond
+    envelope and the octave, both documented; blocked, wake,
+    calm, dry, flat-fetch, no-column and unstable-layer days
+    all record their reason by name and draw nothing. SCOPE,
+    stated: single-transect ridge-normal geometry (the
+    sample's own Fig. 17.29 frame); the full Scorer l^2
+    trapping analysis is beyond this print - shelved with the
+    chain written down. Full gate green - 124 CPU references
+    (leewave 9) + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

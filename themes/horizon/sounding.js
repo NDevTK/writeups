@@ -236,7 +236,10 @@ export function parcelAscent(rows) {
 // hundred metres and must not be decimated), the remainder is
 // strided to fit maxN, and the top row always survives (the
 // column's isothermal continuation anchors there). Fields kept
-// are exactly what buildProfile consumes: p, hM, tC, rh.
+// are what buildProfile consumes - p, hM, tC, rh - plus the
+// level wind (drct, spdMs) where the file reports it: the
+// lee-wave layer average rides it (consumers treat wind as
+// optional - older daemon payloads lack it).
 // CONSISTENCY, stated: the daemon's scalar reductions (parcel
 // ascent, BLH, levels) run on the FULL rows before thinning;
 // only the transported column is strided - refraction varies
@@ -249,12 +252,19 @@ export function thinRows(rows, maxN = 120, keepLow = 20) {
         Number.isFinite(r.p) && Number.isFinite(r.hM) && Number.isFinite(r.tC)
     )
     .sort((a, b) => b.p - a.p)
-    .map((r) => ({
-      p: r.p,
-      hM: r.hM,
-      tC: r.tC,
-      rh: Number.isFinite(r.rh) ? r.rh : 0
-    }));
+    .map((r) => {
+      const o = {
+        p: r.p,
+        hM: r.hM,
+        tC: r.tC,
+        rh: Number.isFinite(r.rh) ? r.rh : 0
+      };
+      if (Number.isFinite(r.drct) && Number.isFinite(r.spdMs)) {
+        o.drct = r.drct;
+        o.spdMs = r.spdMs;
+      }
+      return o;
+    });
   if (lv.length <= maxN) return lv;
   const low = lv.slice(0, keepLow);
   const rest = lv.slice(keepLow);

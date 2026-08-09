@@ -1416,6 +1416,35 @@ export function createPlumeMaterial() {
   return {material, u};
 }
 
+// Lenticular (mountain-wave) cloud lens - the lee-wave pass.
+// leewave.js places and sizes every lens (crest ladder, chord,
+// thickness: Stull's printed machinery on the measured column
+// over the real ridge); the SHADING is traced per frame: litV =
+// the reddened beam at the lens's own altitude times the gated
+// overcast two-stream albedo, plus the deck's own ambient; amp
+// carries the two-stream's 1 - e^-tau (opaque at stratiform tau).
+// The smooth almond envelope is the family's documented display
+// shape (the PSC/plume precedent), and the lenses grey with the
+// rods like every billboard in the mesopic fold.
+export function createLenticularMaterial() {
+  const u = {
+    amp: uniform(0),
+    litV: uniform(new Vector3(0.5, 0.5, 0.5)),
+    scotB: uniform(1)
+  };
+  const material = new NodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.side = DoubleSide;
+  const lx = uv().x.sub(0.5).mul(2);
+  const ly = uv().y.sub(0.5).mul(2);
+  const rr = lx.mul(lx).add(ly.mul(ly));
+  const a = smoothstep(float(1), float(0.55), rr).mul(u.amp);
+  material.colorNode = mix(vec3(rodY(u.litV)), u.litV, u.scotB);
+  material.opacityNode = clamp(a, 0.0, 1.0);
+  return {material, u};
+}
+
 // Nacreous (mother-of-pearl) cloud material - psc.js physics: the
 // certified Airy iridescence LUT (rows = the printed 1.9-3.0 um
 // wave-ice size span, columns = scattering angle) sampled at each
