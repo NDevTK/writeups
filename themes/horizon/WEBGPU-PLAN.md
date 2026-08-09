@@ -8873,6 +8873,53 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   smoke-proves the material builds with the fold). Full gate
   green - 129 CPU references (rayleighpol 8, coxmunk +1) + 7
   GPU probes.
+- DONE (Aug 9, the review session's 108th pass - BAILY'S BEADS:
+  THE GRAZE HINDCAST): agenda item 4 lands. The primary, open
+  and read in full: Quaglia, Irwin, Emmanouilidis & Pessi 2021
+  (arXiv:2107.09416) - the 2017 Aug 21 totality recorded as a
+  flash-spectrum video from a few hundred metres INSIDE the
+  southern umbral limit near Vale, Oregon, where totality
+  duration is exquisitely sensitive to the solar radius. Their
+  Table 2 prints the eclipse computational model itself (cubic
+  polynomials, +-1 min around T0 = 17:25:55.1 UTC: topocentric
+  solar/lunar semidiameters and the sun-centre track in the
+  lunar-north frame; DE430, IAU-2006, fully relativistic) and
+  Figure 5 prints the limb geometry (libration L +5.200, B
+  -0.172, R 367399.181 km). NEW beads-data.js: Table 2 vendored
+  verbatim + THE INDEPENDENT LEG - the topocentric lunar limb
+  ring derived HERE from the LOLA gridded DEM (LDEM_16, PDS
+  LRO-L-LOLA-4-GDR-V1.0, 33 MB of laser altimetry in the same
+  ME/DE421 frame their SLDEM-256/LDEM-128 limb uses; finite-
+  distance tangent construction, max apparent elevation over
+  +-6 deg of the geometric limb, 0.1-deg ring, heights over
+  their own 1738.091 km datum). NEW beads.js: the march -
+  h_sun(psi, t) vs limb ring, beads = maximal exposed arcs,
+  totality = complete photospheric extinction. WHAT LANDS
+  (beads-reference, 7 landmarks): my limb REPRODUCES their limb
+  (C2 valley local min at PA 171.4/-1.55", C3 at 185.4/-1.07",
+  the narrow double valley between under a bump, heights +-3");
+  THE RECORDED VIDEO DISCRIMINATES - at Auwers' 959.63" the
+  march gives 32.3 s of extinction (their own model prints
+  32.6; four codes span 32.6-36.1) vs the video's recorded
+  9-17 s, while their measured 959.95" lands 15.4 s INSIDE the
+  bounds, and at 960.00" the contacts land at T0-6.2/+6.6 vs
+  their printed -+6.6; the contacts pick the SAME two lunar
+  valleys their Figure 6 marks; the bead sequence plays as
+  written (3+ arcs half a minute out, a 1-2 bead trickle with
+  sub-0.05" glints - their "inconspicuous" made literal - to
+  the brink, 6 arcs by C3+10 s: reappearance faster than
+  vanishing, as their video shows); the intermediate double
+  valley NEVER shines (solar limb to within 0.26" of its floor
+  at mid-totality - their sentence, quantified); and Table 2
+  closes on itself (datum/distance to 0.5 mas, August
+  heliocentric distance). THE THEME CHANGE: eclipses.js exports
+  S_SUN_ECLIPSE_ARCSEC = 959.95 (the measured radius of
+  complete photospheric extinction) and solarEclipse now runs
+  its solar disc at that scale - drawn totality at umbral path
+  edges was tens of seconds too long under Auwers; obscuration
+  moves ~0.03% and the certified Dallas/Galicia landmarks hold
+  unchanged. Full gate green - 130 CPU references (beads 7) +
+  7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

@@ -58,6 +58,25 @@ export const R_EARTH_EQ_KM = 6378.137;
 export const DANJON = 1.02; // shadow enlargement (Danjon's rule)
 export const AU_KM = 149597870.7; // IAU 2012 definition of the au
 
+// The MEASURED eclipse solar radius: Quaglia, Irwin,
+// Emmanouilidis & Pessi 2021 (arXiv:2107.09416, read in full)
+// recorded the 2017-08-21 flash spectrum from inside the
+// southern umbral limit and fit S = 959.95" +- 0.05 at 1 au -
+// the radius of COMPLETE PHOTOSPHERIC EXTINCTION, the boundary
+// the drawn totality actually cares about. Auwers' 959.63"
+// (which R_SUN_KM/AU encodes) put 32.6 s of totality at their
+// site; the video recorded 9-17 s - at umbral path edges the
+// standard radius overstates totality by tens of seconds. The
+// beads gate (beads-reference.mjs) holds both numbers through
+// the real LOLA limb. solarEclipse applies the measured scale
+// to its solar disc so drawn totality starts and ends at the
+// photosphere the video saw; obscuration/magnitude move by only
+// ~0.03% (the certified Dallas/Galicia landmarks hold
+// unchanged).
+export const S_SUN_ECLIPSE_ARCSEC = 959.95;
+export const ECLIPSE_SUN_SCALE =
+  (S_SUN_ECLIPSE_ARCSEC * Math.PI) / 648000 / Math.asin(R_SUN_KM / AU_KM);
+
 // THE solar and lunar discs, one definition for every optics
 // module: the IAU photospheric/lunar radius over the true
 // distance. At exactly 1 au the solar half-angle is the classical
@@ -108,7 +127,7 @@ export function discObscuration(sep, rSun, rMoon) {
 // what the light does) and magnitude (diameter fraction, what
 // the almanacs quote).
 export function solarEclipse(sepRad, distSunKm, distMoonKm) {
-  const rSun = Math.asin(R_SUN_KM / distSunKm);
+  const rSun = Math.asin(R_SUN_KM / distSunKm) * ECLIPSE_SUN_SCALE;
   const rMoon = Math.asin(R_MOON_KM / distMoonKm);
   const obsc = discObscuration(sepRad, rSun, rMoon);
   const mag = Math.max((rSun + rMoon - sepRad) / (2 * rSun), 0);
