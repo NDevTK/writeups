@@ -9208,6 +9208,40 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   pass brightness (celestrak TLE + gated satmags - the Starlink
   brightening debate made this a live research topic), tide surge
   residual (CO-OPS measured minus Schureman prediction).
+- DONE (Aug 9, the review session's 116th pass - THE CONTRAIL
+  LAYER: first shelved topic built; the Schmidt-Appleman criterion
+  reads the whole balloon): contrailPanel runs the gated exact
+  tangency construction (contrails.js appleman - the same call the
+  theme makes once at 250 hPa) over EVERY measured level of the
+  ascent between 500 and 100 hPa, and splits the answer into the
+  three objects the avoidance literature actually reasons about:
+  the FORMATION zone (T <= T_LC at the measured humidity), the
+  ICE-SUPERSATURATED sheets (RHi > 1 - natural-cirrus-capable air,
+  kept as individual levels since thin sheets survive the daemon's
+  row thinning as single rows), and their OVERLAP, where a trail
+  both forms and persists. The live ADS-B state vectors (the
+  daemon's readsb digest, api.ndev.tk/adsb dist=60; alt_baro feet
+  through the module's own exact FT_M) then say who is actually up
+  there. TODAY'S DIAGNOSIS - the honest negative with a reason the
+  scan can point at: the 12Z Miramar column HOLDS supersaturated
+  air (two sheets, 10.8 km at RHi 1.10 and 11.5 km at RHi 1.08)
+  but the formation floor sits at 12.4 km - the two conditions
+  MISS by 961 m, the overlap band is empty, nothing persists; at
+  the theme's own 250 hPa level the air is 7.1 K too warm against
+  T_LC -48.2 and sits at RHi 0.996 (0.4% under saturation - the
+  knife edge); the 74 tracked aircraft top out at 8.8 km, below
+  even the form floor. An earlier landmark draft asserted max
+  RHi < 1 ("no ISSR today") and FAILED - the failure was the
+  finding: the column is supersaturated where trails cannot form,
+  the exact decomposition the panel now draws (form band shaded,
+  aqua sheets, red overlap when it exists, aircraft dots labeled
+  by flight number on the temperature curve at their altitudes).
+  observatory-reference.mjs pins it as the 11th landmark (nearest-
+  row identity to the daemon's own served t250C, band edges, sheet
+  heights and RHi to 0.005, the 961 m miss, the FT_M conversion
+  exact, in-band aircraft counts zero); lineChart grew multi-band
+  shading for the three-object display. Gate 141 [ok] + 7 GPU
+  probes, VALIDATE PASS.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

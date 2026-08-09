@@ -66,6 +66,7 @@ import {
 } from './meteors.js';
 import {mieCoefficients} from './aerosol.js';
 import {closureRatios} from './closure.js';
+import {appleman, FT_M} from './contrails.js';
 
 // The drawn ocean's whitecap coverage law (Monahan &
 // O'Muircheartaigh 1980, W = 3.84e-6 U10^3.41) - the GPU copy
@@ -438,4 +439,93 @@ export function closurePanel({
     difWm2
   });
   return {sunAltDeg, aod550, ratios: r};
+}
+
+/**
+ * THE CONTRAIL LAYER: the Schmidt-Appleman criterion
+ * (contrails.js, the exact tangency construction the theme
+ * already applies at its single 250 hPa level) run over EVERY
+ * measured level of the ascent between 500 and 100 hPa - the
+ * ice-supersaturated layer that contrail-avoidance research
+ * reroutes around, read straight off today's balloon. A trail
+ * FORMS where T <= T_LC at the measured humidity; it PERSISTS
+ * where it forms into ice-supersaturated air (RHi > 1). Bands
+ * are the longest contiguous height runs of each. The live
+ * ADS-B state vectors (the daemon's readsb digest, alt_baro in
+ * feet - the module's own exact FT_M) then say who is actually
+ * up there writing.
+ */
+export function contrailPanel(rows, {ac = null, eta = 0.3} = {}) {
+  const levels = rows
+    .filter((q) => q.p <= 500 && q.p >= 100)
+    .map((q) => ({
+      ...q,
+      a: appleman(q.p * 100, q.tC, (q.rh ?? 0) / 100, eta)
+    }));
+  const run = (flag) => {
+    let best = null;
+    let cur = null;
+    for (const q of levels) {
+      if (flag(q)) {
+        if (!cur) cur = {loM: q.hM, hiM: q.hM, n: 0};
+        cur.hiM = q.hM;
+        cur.n++;
+        if (!best || cur.hiM - cur.loM > best.hiM - best.loM) best = cur;
+      } else cur = null;
+    }
+    return best;
+  };
+  const formBand = run((q) => q.a.forms);
+  // The ice-supersaturated layer on its own (RHi > 1, whether or
+  // not a trail can form there) - natural-cirrus-capable air, the
+  // region the avoidance literature maps...
+  const issrBand = run((q) => q.a.persists);
+  // ...and the overlap: where a trail both forms AND lands in
+  // supersaturated air. Empty whenever the two bands miss.
+  const persistBand = run((q) => q.a.forms && q.a.persists);
+  // The theme's own level: the measured row nearest 250 hPa.
+  let l250 = levels[0] ?? null;
+  for (const q of levels)
+    if (Math.abs(q.p - 250) < Math.abs(l250.p - 250)) l250 = q;
+  // How close the column comes to ice saturation, and where -
+  // the margin the avoidance literature watches - plus every
+  // supersaturated level individually (thin sheets survive the
+  // daemon's row thinning as single levels).
+  let maxRhi = null;
+  for (const q of levels)
+    if (!maxRhi || q.a.rhi > maxRhi.rhi) maxRhi = {rhi: q.a.rhi, hM: q.hM};
+  const issrLevels = levels
+    .filter((q) => q.a.persists)
+    .map((q) => ({hM: q.hM, rhi: q.a.rhi}));
+  let aircraft = null;
+  if (Array.isArray(ac)) {
+    const list = ac
+      .filter((q) => Number.isFinite(q.alt_baro))
+      .map((q) => ({...q, altM: q.alt_baro * FT_M}));
+    aircraft = {
+      n: list.length,
+      maxAltM: list.reduce((m, q) => Math.max(m, q.altM), 0),
+      inForm: formBand
+        ? list.filter((q) => q.altM >= formBand.loM && q.altM <= formBand.hiM)
+            .length
+        : 0,
+      inPersist: persistBand
+        ? list.filter(
+            (q) => q.altM >= persistBand.loM && q.altM <= persistBand.hiM
+          ).length
+        : 0,
+      list
+    };
+  }
+  return {
+    levels,
+    formBand,
+    issrBand,
+    issrLevels,
+    persistBand,
+    l250,
+    maxRhi,
+    aircraft,
+    eta
+  };
 }

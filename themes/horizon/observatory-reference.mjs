@@ -32,6 +32,7 @@ import {
   auroraPanel,
   closurePanel,
   columnPanel,
+  contrailPanel,
   coronaPanel,
   meteorsPanel,
   monahanW,
@@ -40,6 +41,7 @@ import {
   wetPanel
 } from './observatory.js';
 import {
+  ADSB,
   AEROSOL,
   BUOY,
   CITIES,
@@ -315,6 +317,55 @@ const col = columnPanel(SOUNDING.rows);
       `fixture meridian, Kp ${a.kpEst} - a quiet magnetosphere under ` +
       `an active-region-rich sun, and every number here is a ` +
       `measurement, not a mood`
+  );
+}
+
+// ---- the contrail layer ---------------------------------------
+{
+  const c = contrailPanel(SOUNDING.rows, {ac: ADSB.ac});
+  // Every form-band level really is at or under its own critical
+  // temperature, and every persistent level would lie inside a
+  // form run by construction - checked on the day's data.
+  const bandHonest = c.levels
+    .filter((q) => q.hM >= c.formBand.loM && q.hM <= c.formBand.hiM)
+    .every((q) => q.tC <= q.a.tlc + 1e-12);
+  const missM = c.formBand.loM - c.issrLevels[c.issrLevels.length - 1].hM;
+  check(
+    'THE CONTRAIL LAYER read off the ascent',
+    Math.abs(c.l250.p - 250) < 2 &&
+      Math.abs(c.l250.tC - -41.3) < 0.5 &&
+      c.l250.a.forms === false &&
+      Math.abs(c.l250.a.tlc - -48.18) < 0.1 &&
+      c.l250.a.rhi > 0.99 &&
+      c.l250.a.rhi < 1 &&
+      Math.abs(c.formBand.loM - 12431) < 1 &&
+      Math.abs(c.formBand.hiM - 16578) < 1 &&
+      c.issrLevels.length === 2 &&
+      Math.abs(c.issrLevels[0].hM - 10769) < 1 &&
+      Math.abs(c.issrLevels[0].rhi - 1.097) < 0.005 &&
+      Math.abs(c.issrLevels[1].hM - 11470) < 1 &&
+      c.persistBand === null &&
+      missM > 900 &&
+      missM < 1000 &&
+      bandHonest &&
+      c.aircraft.n === 74 &&
+      Math.abs(c.aircraft.maxAltM - 29025 * 0.3048) < 0.1 &&
+      c.aircraft.inForm === 0 &&
+      c.aircraft.inPersist === 0,
+    `at the theme's own level (${c.l250.p} hPa, ` +
+      `${c.l250.tC} C) the exact tangency construction says NO trail ` +
+      `forms - the air is ${(c.l250.tC - c.l250.a.tlc).toFixed(1)} K ` +
+      `too warm against T_LC ${c.l250.a.tlc.toFixed(1)}; the column ` +
+      `DOES hold ice-supersaturated air - two thin sheets at ` +
+      `${c.issrLevels.map((q) => (q.hM / 1000).toFixed(1)).join(' and ')} ` +
+      `km (RHi ${c.issrLevels.map((q) => q.rhi.toFixed(2)).join(', ')}, ` +
+      `cirrus-capable) - but the formation zone starts at ` +
+      `${(c.formBand.loM / 1000).toFixed(1)} km: the two conditions ` +
+      `MISS by ${missM} m, so nothing persists today (the overlap ` +
+      `band is empty), and the ${c.aircraft.n} live ADS-B aircraft ` +
+      `top out at ${(c.aircraft.maxAltM / 1000).toFixed(1)} km, below ` +
+      `even the form floor - today San Diego's sky writes nothing, ` +
+      `for a reason the scan can point at`
   );
 }
 

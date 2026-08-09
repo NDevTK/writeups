@@ -220,10 +220,12 @@
       import {
         auroraPanel,
         closurePanel,
+        contrailPanel,
         meteorsPanel
       } from './writeups/themes/horizon/observatory.js';
       import {radiantAt, SHOWERS} from './writeups/themes/horizon/meteors.js';
       import {
+        ADSB,
         AEROSOL,
         BUOY,
         CITIES,
@@ -307,16 +309,17 @@
           return H - m.b - ((t - y0) / (y1 - y0)) * (H - m.t - m.b);
         };
         const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, width: '100%'}, host);
-        if (o.band) {
+        for (const b of o.bands ??
+          (o.band ? [{lo: o.band[0], hi: o.band[1]}] : [])) {
           el(
             'rect',
             {
               x: m.l,
-              y: Y(o.band[1]),
+              y: Y(b.hi),
               width: W - m.l - m.r,
-              height: Y(o.band[0]) - Y(o.band[1]),
-              fill: css('--s-orange'),
-              opacity: 0.12
+              height: Y(b.lo) - Y(b.hi),
+              fill: css(b.color ?? '--s-orange'),
+              opacity: b.opacity ?? 0.12
             },
             svg
           );
@@ -804,6 +807,17 @@
           'with the oval’s probability on this meridian and the live Kp.'
       );
       panel(
+        'con',
+        'The contrail layer',
+        'The Schmidt–Appleman criterion (contrails.js, the exact ' +
+          'tangency construction the theme applies at 250 hPa) run over ' +
+          'every measured level of the ascent: where trails FORM ' +
+          '(T ≤ T_LC), where the air is ice-supersaturated (RHi > 1 - ' +
+          'the layer contrail-avoidance research reroutes around), and ' +
+          'their overlap, where trails PERSIST. Live ADS-B aircraft ' +
+          'mark who is actually up there.'
+      );
+      panel(
         'clo',
         'The dome audits itself',
         'The 91st pass’s radiative closure run on the CURRENT ' +
@@ -1209,6 +1223,118 @@
         $('aur-prov').textContent = prov;
       }
 
+      // ---- draw: the contrail layer -------------------------------
+      function drawContrail(inp, prov) {
+        const c = contrailPanel(inp.rows, {ac: inp.ac});
+        const bands = [];
+        if (c.formBand) bands.push({lo: c.formBand.loM, hi: c.formBand.hiM});
+        for (const q of c.issrLevels)
+          bands.push({
+            lo: q.hM - 60,
+            hi: q.hM + 60,
+            color: '--s-aqua',
+            opacity: 0.3
+          });
+        if (c.persistBand)
+          bands.push({
+            lo: c.persistBand.loM,
+            hi: c.persistBand.hiM,
+            color: '--s-red',
+            opacity: 0.25
+          });
+        const missM = c.issrLevels.length
+          ? c.formBand.loM - c.issrLevels[c.issrLevels.length - 1].hM
+          : null;
+        $('con-num').innerHTML =
+          (c.persistBand
+            ? `Trails PERSIST ` +
+              `${(c.persistBand.loM / 1000).toFixed(1)}–` +
+              `${(c.persistBand.hiM / 1000).toFixed(1)} km today`
+            : `Nothing persists today`) +
+          (c.formBand
+            ? ` · formation zone ` +
+              `<b>${(c.formBand.loM / 1000).toFixed(1)}–` +
+              `${(c.formBand.hiM / 1000).toFixed(1)} km</b>`
+            : ' · no formation zone') +
+          ` · ice-supersaturated sheets: ` +
+          (c.issrLevels.length
+            ? c.issrLevels
+                .map(
+                  (q) =>
+                    `<b>${(q.hM / 1000).toFixed(1)} km</b> (RHi ` +
+                    `${q.rhi.toFixed(2)})`
+                )
+                .join(', ') +
+              (c.persistBand
+                ? ''
+                : missM != null
+                  ? ` - <b>${missM} m below</b> the formation floor: the ` +
+                    `two conditions miss`
+                  : '')
+            : 'none') +
+          (c.aircraft
+            ? ` · <b>${c.aircraft.n}</b> aircraft tracked, highest ` +
+              `${(c.aircraft.maxAltM / 1000).toFixed(1)} km, ` +
+              `<b>${c.aircraft.inPersist}</b> writing persistent trails`
+            : '');
+        $('con-chart').innerHTML = '';
+        const acPts = (c.aircraft?.list ?? [])
+          .filter((q) => q.altM > 5200 && q.altM < 17000)
+          .map((q) => {
+            let best = c.levels[0];
+            for (const l of c.levels)
+              if (Math.abs(l.hM - q.altM) < Math.abs(best.hM - q.altM))
+                best = l;
+            return {
+              name: q.flight?.trim() || q.hex,
+              color: '--s-orange',
+              x: best.tC,
+              y: q.altM
+            };
+          })
+          .slice(0, 4);
+        lineChart($('con-chart'), {
+          series: [
+            {
+              name: 'T measured',
+              color: '--s-blue',
+              pts: c.levels.map((q) => ({x: q.tC, y: q.hM}))
+            },
+            {
+              name: 'T_LC',
+              color: '--s-orange',
+              pts: c.levels.map((q) => ({x: q.a.tlc, y: q.hM}))
+            }
+          ],
+          points: acPts,
+          bands,
+          w: 560,
+          h: 320,
+          rPad: 96,
+          xLabel:
+            '°C - trails form where the blue curve crosses left of ' +
+            'orange (shaded); aqua sheets: RHi > 1',
+          yLabel: 'height (m)',
+          yFmt: (v) => v.toFixed(0)
+        });
+        table(
+          'con',
+          ['p (hPa)', 'h (m)', 'T (°C)', 'T_LC', 'RHi', 'forms', 'persists'],
+          c.levels
+            .filter((_, i) => i % 4 === 0)
+            .map((q) => [
+              q.p,
+              q.hM,
+              q.tC.toFixed(1),
+              q.a.tlc.toFixed(1),
+              q.a.rhi.toFixed(2),
+              q.a.forms ? 'yes' : '',
+              q.a.forms && q.a.persists ? 'yes' : ''
+            ])
+        );
+        $('con-prov').textContent = prov;
+      }
+
       // ---- draw: the closure --------------------------------------
       function drawClosure(inp, prov) {
         const c = closurePanel(inp);
@@ -1399,6 +1525,11 @@
         `SWPC hemi-power wire + OVATION oval ${OVATION.obsAt} ` +
           `(meridian slice) + Kp ${KP.at} · frozen`
       );
+      drawContrail(
+        {rows: SOUNDING.rows, ac: ADSB.ac},
+        `${SOUNDING.wmo} ascent ${SOUNDING.at} · ${ADSB.ac.length} ADS-B ` +
+          `aircraft (dist ${ADSB.distNm}) at ${ADSB.at} · frozen`
+      );
       drawClosure(
         {
           sunAltDeg: RADIATION.sunAltDeg,
@@ -1418,10 +1549,15 @@
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
           });
-        j(`https://api.ndev.tk/sounding?lat=${LAT}&lon=${LON}`)
+        const sndP = j(
+          `https://api.ndev.tk/sounding?lat=${LAT}&lon=${LON}`
+        ).then((s) => {
+          if (!Array.isArray(s.rows) || s.rows.length < 10)
+            throw new Error('no rows');
+          return s;
+        });
+        sndP
           .then((s) => {
-            if (!Array.isArray(s.rows) || s.rows.length < 10)
-              throw new Error('no rows');
             drawColumn(
               s.rows,
               `${s.name} (${s.wmo}) ascent ${s.at}, ${s.distKm} km away · ` +
@@ -1430,6 +1566,24 @@
             setLive('col', true);
           })
           .catch((e) => setLive('col', false, e.message));
+        Promise.all([
+          sndP,
+          j(`https://api.ndev.tk/adsb?lat=${LAT}&lon=${LON}&dist=60`).catch(
+            () => null
+          )
+        ])
+          .then(([s, ad]) => {
+            drawContrail(
+              {rows: s.rows, ac: ad?.ac ?? null},
+              `${s.wmo} ascent ${s.at}` +
+                (ad
+                  ? ` · ${ad.ac.length} ADS-B aircraft via api.ndev.tk/adsb`
+                  : ' · adsb daemon unreachable') +
+                ' · live'
+            );
+            setLive('con', true);
+          })
+          .catch((e) => setLive('con', false, e.message));
         Promise.all([
           j(
             `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=wind_speed_10m&wind_speed_unit=ms`
