@@ -29,8 +29,11 @@
 //    third-to-three-fifths-of-a-full-moon band
 import {createRequire} from 'module';
 import {
+  auroraPanel,
+  closurePanel,
   columnPanel,
   coronaPanel,
+  meteorsPanel,
   monahanW,
   polPanel,
   seaPanel,
@@ -40,10 +43,22 @@ import {
   AEROSOL,
   BUOY,
   CITIES,
+  GMN,
+  HEMI_POWER_TXT,
+  KP,
+  OVATION,
+  PERSEID_NIGHT,
+  RADIATION,
   SOLAR_REGIONS,
   SOUNDING,
-  SUN
+  SUN,
+  SUN_ELON
 } from './observatory-fixture.js';
+import {visibleRateFactor} from './meteors.js';
+
+const AstroEngine = createRequire(import.meta.url)(
+  './astronomy.browser.min.js'
+);
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -53,7 +68,7 @@ const check = (name, ok, detail) => {
 
 // ---- the engine's sun -----------------------------------------
 {
-  const A = createRequire(import.meta.url)('./astronomy.browser.min.js');
+  const A = AstroEngine;
   const t = A.MakeTime(new Date(SUN.at.replace('Z', ':00Z')));
   const obs = new A.Observer(SUN.latDeg, SUN.lonDeg, 30);
   const eq = A.Equator(A.Body.Sun, t, obs, true, true);
@@ -210,6 +225,131 @@ const col = columnPanel(SOUNDING.rows);
       `${cor.moons.toFixed(2)} full moons - inside van de Hulst's ` +
       `third-to-three-fifths band - with the equator ` +
       `${(at15.eq / at15.pole).toFixed(2)}x the pole at 1.5 solar radii`
+  );
+}
+
+// ---- the Perseids at the door ---------------------------------
+{
+  const A = AstroEngine;
+  const elon = A.SunPosition(
+    A.MakeTime(new Date(SUN_ELON.at.replace('Z', ':00Z')))
+  ).elon;
+  const m = meteorsPanel({
+    lamSunDeg: SUN_ELON.elonDeg,
+    gmnMedians: GMN.medians,
+    radiantAltRad: (PERSEID_NIGHT.radiantAltDeg * Math.PI) / 180
+  });
+  // The ZHR definition's own normalization: at lm = 6.5 the
+  // perception fold is exactly 1.
+  const norm = visibleRateFactor(m.shower.r, 6.5);
+  const topShower = m.shares.filter((s) => s.code !== 'spo')[0];
+  // When does the engine's sun cross the printed lam_max = 140.0?
+  let peakIso = null;
+  for (let h = 0; h <= 180; h += 3) {
+    const tt = A.MakeTime(
+      new Date(Date.parse('2026-08-09T00:00:00Z') + h * 3600e3)
+    );
+    if (A.SunPosition(tt).elon >= 140.0) {
+      peakIso = new Date(
+        Date.parse('2026-08-09T00:00:00Z') + h * 3600e3
+      ).toISOString();
+      break;
+    }
+  }
+  check(
+    'THE PERSEIDS AT THE DOOR',
+    Math.abs(elon - SUN_ELON.elonDeg) < 0.02 &&
+      Math.abs(m.zhrNow - 28.9) < 0.5 &&
+      m.daysToPeak > 2.5 &&
+      m.daysToPeak < 3.0 &&
+      topShower.code === 'PER' &&
+      topShower.share > 0.25 &&
+      topShower.share < 0.45 &&
+      Math.abs(norm - 1) < 1e-12 &&
+      Math.abs(
+        m.rates[0].perHour -
+          m.zhrNow * Math.sin((PERSEID_NIGHT.radiantAltDeg * Math.PI) / 180)
+      ) < 1e-9 &&
+      peakIso.startsWith('2026-08-12'),
+    `the engine's sun sits at ecliptic longitude ` +
+      `${elon.toFixed(2)} deg; the printed Jenniskens profile puts the ` +
+      `Perseids at ZHR ${m.zhrNow.toFixed(0)} today, ` +
+      `${m.daysToPeak.toFixed(1)} days before the lam 140.0 peak the ` +
+      `engine dates ${peakIso.slice(0, 10)}; the LIVE Global Meteor ` +
+      `Network counted ${topShower.n} Perseids = ` +
+      `${(topShower.share * 100).toFixed(0)}% of yesterday's ` +
+      `${GMN.medians.all.n} meteors - the measured shower already ` +
+      `dominates the sky; tonight at the point the gated corrections ` +
+      `give ${m.rates[0].perHour.toFixed(0)}/h dark-sky and ` +
+      `${m.rates[1].perHour.toFixed(0)}/h suburban (the lm 6.5 ` +
+      `perception fold is exactly 1 - the ZHR definition's own ` +
+      `normalization, held to 1e-12)`
+  );
+}
+
+// ---- the aurora supply ----------------------------------------
+{
+  const a = auroraPanel({
+    hemiText: HEMI_POWER_TXT,
+    ovationCoords: OVATION.cells,
+    lonDeg: OVATION.lonDegE,
+    kpEst: KP.est
+  });
+  check(
+    'THE AURORA SUPPLY, measured at five-minute cadence',
+    a.history.length === 258 &&
+      a.latest.at === '2026-08-09T21:25Z' &&
+      a.latest.gwN === 13 &&
+      a.latest.gwN >= 5 &&
+      a.latest.gwN <= 60 &&
+      a.ov.latDeg >= 60 &&
+      a.ov.latDeg <= 80 &&
+      a.ov.p > 0 &&
+      a.ov.p < 0.5 &&
+      a.kpEst < 3,
+    `${a.history.length} five-minute rows parse from the frozen SWPC ` +
+      `wire; the northern hemisphere is drawing ${a.latest.gwN} GW at ` +
+      `${a.latest.at} (the same file the theme's curtain scales by - ` +
+      `emission linear in precipitating power); OVATION puts ` +
+      `${(a.ov.p * 100).toFixed(0)}% at lat ${a.ov.latDeg} N on the ` +
+      `fixture meridian, Kp ${a.kpEst} - a quiet magnetosphere under ` +
+      `an active-region-rich sun, and every number here is a ` +
+      `measurement, not a mood`
+  );
+}
+
+// ---- the dome audits itself, live -----------------------------
+{
+  const A = AstroEngine;
+  const t = A.MakeTime(new Date(RADIATION.at.replace('Z', ':00Z')));
+  const obs = new A.Observer(SUN.latDeg, SUN.lonDeg, 30);
+  const eq = A.Equator(A.Body.Sun, t, obs, true, true);
+  const alt = A.Horizon(t, obs, eq.ra, eq.dec, 'normal').altitude;
+  const c = closurePanel({
+    sunAltDeg: RADIATION.sunAltDeg,
+    aod550: AEROSOL.aod550,
+    ghiWm2: RADIATION.ghiWm2,
+    dirWm2: RADIATION.dirWm2,
+    difWm2: RADIATION.difWm2
+  });
+  const r = c.ratios;
+  check(
+    'THE DOME AUDITS ITSELF on the current measured irradiance',
+    Math.abs(alt - RADIATION.sunAltDeg) < 0.05 &&
+      r &&
+      r.globalRatio > 0.9 &&
+      r.globalRatio < 1.05 &&
+      r.beamRatio > 1 &&
+      r.diffuseRatio < 0.5,
+    `at the radiation hour's engine sun (${alt.toFixed(2)} deg) the ` +
+      `drawn dome's integral lands ${(r.globalRatio * 100).toFixed(1)}% ` +
+      `of the measured ${RADIATION.ghiWm2} W/m2 global - the 91st ` +
+      `pass's closure holding LIVE at the measured AOD ` +
+      `${AEROSOL.aod550}; the split leans exactly as the frame states ` +
+      `it must (beam ${r.beamRatio.toFixed(2)}, diffuse ` +
+      `${r.diffuseRatio.toFixed(2)}: the drawn diffuse is the ` +
+      `molecular Hillaire dome, so the gray aerosol's forward scatter ` +
+      `stays in the beam channel's loss)`
   );
 }
 

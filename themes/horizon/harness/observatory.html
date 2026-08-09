@@ -218,13 +218,26 @@
         wetPanel
       } from './writeups/themes/horizon/observatory.js';
       import {
+        auroraPanel,
+        closurePanel,
+        meteorsPanel
+      } from './writeups/themes/horizon/observatory.js';
+      import {radiantAt, SHOWERS} from './writeups/themes/horizon/meteors.js';
+      import {
         AEROSOL,
         BUOY,
         CITIES,
         FIXTURE_AT,
+        GMN,
+        HEMI_POWER_TXT,
+        KP,
+        OVATION,
+        PERSEID_NIGHT,
+        RADIATION,
         SOLAR_REGIONS,
         SOUNDING,
-        SUN
+        SUN,
+        SUN_ELON
       } from './writeups/themes/horizon/observatory-fixture.js';
 
       const params = new URLSearchParams(location.search);
@@ -773,6 +786,33 @@
           'regions/12 mapping; K equator, K pole and the F corona in ' +
           'mean-solar-disc units.'
       );
+      panel(
+        'met',
+        'The Perseids at the door',
+        'The printed Jenniskens activity profile (meteors.js) against ' +
+          'the LIVE Global Meteor Network count - yesterday’s ' +
+          'measured meteors by shower - with tonight’s expected rate ' +
+          'at the point through the gated zenith and ' +
+          'Koschack–Rendtel perception corrections.'
+      );
+      panel(
+        'aur',
+        'The aurora supply',
+        'The measured hemispheric power (SWPC OVATION, 5-minute ' +
+          'cadence) - the same file the theme scales its drawn curtain ' +
+          'by, emission linear in precipitating power (Rees 1989) - ' +
+          'with the oval’s probability on this meridian and the live Kp.'
+      );
+      panel(
+        'clo',
+        'The dome audits itself',
+        'The 91st pass’s radiative closure run on the CURRENT ' +
+          'measured irradiance: the drawn dome’s beam and diffuse ' +
+          'integrals (closure.js) against measured GHI/direct/diffuse at ' +
+          'the point. The drawn diffuse is the molecular dome - the gray ' +
+          'aerosol’s forward scatter stays in the beam channel, and ' +
+          'the split must lean exactly that way.'
+      );
 
       // ---- draw: the column ---------------------------------------
       function drawColumn(rows, prov) {
@@ -1081,6 +1121,234 @@
         $('cor-prov').textContent = prov;
       }
 
+      // ---- draw: the Perseids -------------------------------------
+      function drawMeteors(inp, prov) {
+        const m = meteorsPanel(inp);
+        const per = m.shares?.find((s) => s.code === m.shower.code);
+        $('met-num').innerHTML =
+          `ZHR <b>${m.zhrNow.toFixed(0)}</b> today · peak in ` +
+          `<b>${m.daysToPeak.toFixed(1)} days</b>` +
+          (per
+            ? ` · GMN measured <b>${per.n}</b> ${m.shower.name} = ` +
+              `<b>${(per.share * 100).toFixed(0)}%</b> of yesterday’s ` +
+              `${inp.gmnMedians.all.n} meteors`
+            : '') +
+          ` · tonight ≈ <b>${m.rates[0].perHour?.toFixed(0) ?? '–'}/h</b> ` +
+          `dark sky, <b>${m.rates[1].perHour?.toFixed(0) ?? '–'}/h</b> ` +
+          `suburban (radiant ` +
+          `${((inp.radiantAltRad * 180) / Math.PI).toFixed(0)}° up at 2 am)`;
+        $('met-chart').innerHTML = '';
+        lineChart($('met-chart'), {
+          series: [
+            {
+              name: 'ZHR',
+              color: '--s-blue',
+              pts: m.curve.map((p) => ({x: p.days, y: p.zhr}))
+            }
+          ],
+          points: [
+            {
+              name: 'today',
+              color: '--s-orange',
+              x: -m.daysToPeak,
+              y: m.zhrNow
+            }
+          ],
+          w: 560,
+          h: 250,
+          xLabel: 'days from the printed peak (λ☉ 140.0)',
+          yLabel: 'zenith hourly rate',
+          yMin: 0
+        });
+        if (m.shares)
+          table(
+            'met',
+            ['shower', 'meteors', 'share'],
+            m.shares
+              .slice(0, 8)
+              .map((s) => [s.code, s.n, (s.share * 100).toFixed(1) + '%'])
+          );
+        $('met-prov').textContent = prov;
+      }
+
+      // ---- draw: the aurora supply --------------------------------
+      function drawAurora(inp, prov) {
+        const a = auroraPanel(inp);
+        const t0 = Date.parse(a.latest.at);
+        $('aur-num').innerHTML =
+          `Northern hemisphere drawing <b>${a.latest.gwN} GW</b> at ` +
+          `${a.latest.at.slice(11, 16)}Z · OVATION on this meridian: ` +
+          `<b>${(a.ov.p * 100).toFixed(0)}%</b> at lat ` +
+          `<b>${a.ov.latDeg}°N</b> · Kp <b>${a.kpEst}</b>`;
+        $('aur-chart').innerHTML = '';
+        lineChart($('aur-chart'), {
+          series: [
+            {
+              name: 'GW north',
+              color: '--s-blue',
+              pts: a.history.map((r) => ({
+                x: (Date.parse(r.at) - t0) / 3600e3,
+                y: r.gwN
+              }))
+            }
+          ],
+          points: [{name: 'now', color: '--s-orange', x: 0, y: a.latest.gwN}],
+          w: 560,
+          h: 250,
+          xLabel: 'hours before now (5-minute cadence)',
+          yLabel: 'hemispheric power (GW)',
+          yMin: 0
+        });
+        table(
+          'aur',
+          ['time', 'GW N', 'GW S'],
+          a.history
+            .filter((_, i) => i % 24 === 0)
+            .map((r) => [r.at.slice(5, 16) + 'Z', r.gwN, r.gwS])
+        );
+        $('aur-prov').textContent = prov;
+      }
+
+      // ---- draw: the closure --------------------------------------
+      function drawClosure(inp, prov) {
+        const c = closurePanel(inp);
+        $('clo-chart').innerHTML = '';
+        if (!c.ratios) {
+          $('clo-num').innerHTML =
+            `Sun at <b>${c.sunAltDeg.toFixed(1)}°</b> - below the ` +
+            `closure’s own 5° validity floor; the audit sleeps ` +
+            `until morning.`;
+          $('clo-prov').textContent = prov;
+          return;
+        }
+        const r = c.ratios;
+        $('clo-num').innerHTML =
+          `Drawn global = <b>${(r.globalRatio * 100).toFixed(1)}%</b> of ` +
+          `measured (${inp.ghiWm2} W/m²) at sun ` +
+          `<b>${c.sunAltDeg.toFixed(1)}°</b>, AOD ${c.aod550}` +
+          (r.beamRatio
+            ? ` · beam ×${r.beamRatio.toFixed(2)} · diffuse ` +
+              `×${r.diffuseRatio?.toFixed(2) ?? '–'} (the stated ` +
+              `molecular-dome split)`
+            : '');
+        const rows = [
+          {label: 'global drawn', value: r.drawnGlobalLux / 1000, c: 1},
+          {label: 'global meas', value: r.measGlobalLux / 1000, c: 2},
+          {label: 'beam drawn', value: r.drawnBeamLux / 1000, c: 1},
+          {
+            label: 'beam meas',
+            value: r.beamRatio ? r.drawnBeamLux / r.beamRatio / 1000 : 0,
+            c: 2
+          },
+          {label: 'diffuse drawn', value: r.drawnDiffuseLux / 1000, c: 1},
+          {
+            label: 'diffuse meas',
+            value: r.diffuseRatio
+              ? r.drawnDiffuseLux / r.diffuseRatio / 1000
+              : 0,
+            c: 2
+          }
+        ];
+        const host = $('clo-chart');
+        const W = 560;
+        const bh = 18;
+        const mm = {l: 100, r: 90, t: 6, b: 38};
+        const H = mm.t + rows.length * (bh + 5) + 10 + mm.b;
+        const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, width: '100%'}, host);
+        const vmax = Math.max(...rows.map((q) => q.value));
+        const X = (v) => mm.l + (v / vmax) * (W - mm.l - mm.r);
+        for (const v of ticks(0, vmax, 4)) {
+          el(
+            'line',
+            {
+              x1: X(v),
+              x2: X(v),
+              y1: mm.t,
+              y2: H - mm.b,
+              stroke: css('--grid')
+            },
+            svg
+          );
+          el(
+            'text',
+            {x: X(v), y: H - mm.b + 13, 'text-anchor': 'middle'},
+            svg
+          ).textContent = fmt(v);
+        }
+        rows.forEach((q, i) => {
+          const y = mm.t + i * (bh + 5) + (i >= 2 ? 5 : 0) + (i >= 4 ? 5 : 0);
+          const bar = el(
+            'rect',
+            {
+              x: mm.l,
+              y,
+              width: Math.max(X(q.value) - mm.l, 2),
+              height: bh,
+              rx: 4,
+              fill: css(q.c === 1 ? '--s-blue' : '--s-orange')
+            },
+            svg
+          );
+          el(
+            'text',
+            {x: mm.l - 8, y: y + bh / 2 + 4, 'text-anchor': 'end'},
+            svg
+          ).textContent = q.label;
+          el(
+            'text',
+            {
+              x: X(q.value) + 6,
+              y: y + bh / 2 + 4,
+              class: 'lbl'
+            },
+            svg
+          ).textContent = fmt(q.value);
+          bar.addEventListener('mousemove', (ev) =>
+            showTip(ev, `${q.label}: ${q.value.toFixed(1)} klux`)
+          );
+          bar.addEventListener('mouseleave', hideTip);
+        });
+        el(
+          'text',
+          {
+            x: (mm.l + W - mm.r) / 2,
+            y: H - 4,
+            'text-anchor': 'middle'
+          },
+          svg
+        ).textContent =
+          'horizontal illuminance (klux) - drawn (blue) vs measured (orange)';
+        table(
+          'clo',
+          ['channel', 'drawn (klux)', 'measured (klux)', 'ratio'],
+          [
+            [
+              'global',
+              (r.drawnGlobalLux / 1000).toFixed(1),
+              (r.measGlobalLux / 1000).toFixed(1),
+              r.globalRatio.toFixed(3)
+            ],
+            [
+              'beam',
+              (r.drawnBeamLux / 1000).toFixed(1),
+              r.beamRatio
+                ? (r.drawnBeamLux / r.beamRatio / 1000).toFixed(1)
+                : '–',
+              r.beamRatio?.toFixed(3) ?? '–'
+            ],
+            [
+              'diffuse',
+              (r.drawnDiffuseLux / 1000).toFixed(1),
+              r.diffuseRatio
+                ? (r.drawnDiffuseLux / r.diffuseRatio / 1000).toFixed(1)
+                : '–',
+              r.diffuseRatio?.toFixed(3) ?? '–'
+            ]
+          ]
+        );
+        $('clo-prov').textContent = prov;
+      }
+
       // ---- fixture first ------------------------------------------
       drawColumn(
         SOUNDING.rows,
@@ -1111,6 +1379,36 @@
         {regionCount: SOLAR_REGIONS.count},
         `SWPC solar_regions.json, ${SOLAR_REGIONS.count} regions observed ` +
           `${SOLAR_REGIONS.at} · frozen`
+      );
+      drawMeteors(
+        {
+          lamSunDeg: SUN_ELON.elonDeg,
+          gmnMedians: GMN.medians,
+          radiantAltRad: (PERSEID_NIGHT.radiantAltDeg * Math.PI) / 180
+        },
+        `GMN daily digest via api.ndev.tk/gmn (${GMN.meteors} meteors) · ` +
+          `λ☉ ${SUN_ELON.elonDeg.toFixed(2)}° at ${SUN_ELON.at} · frozen`
+      );
+      drawAurora(
+        {
+          hemiText: HEMI_POWER_TXT,
+          ovationCoords: OVATION.cells,
+          lonDeg: OVATION.lonDegE,
+          kpEst: KP.est
+        },
+        `SWPC hemi-power wire + OVATION oval ${OVATION.obsAt} ` +
+          `(meridian slice) + Kp ${KP.at} · frozen`
+      );
+      drawClosure(
+        {
+          sunAltDeg: RADIATION.sunAltDeg,
+          aod550: AEROSOL.aod550,
+          ghiWm2: RADIATION.ghiWm2,
+          dirWm2: RADIATION.dirWm2,
+          difWm2: RADIATION.difWm2
+        },
+        `open-meteo current radiation ${RADIATION.at} + AOD ` +
+          `${AEROSOL.at} · frozen`
       );
 
       // ---- then live, feed by feed --------------------------------
@@ -1217,6 +1515,97 @@
             setLive('cor', true);
           })
           .catch((e) => setLive('cor', false, e.message));
+        j('https://api.ndev.tk/gmn')
+          .then((g) => {
+            // Tonight's 2 am local mean solar time, then the drifted
+            // radiant through the engine - geometry stays the
+            // engine's job.
+            const now = new Date();
+            let utc2am = new Date(now);
+            utc2am.setUTCHours((((2 - LON / 15) % 24) + 24) % 24, 0, 0, 0);
+            if (utc2am < now) utc2am = new Date(+utc2am + 86400e3);
+            const t = Astronomy.MakeTime(utc2am);
+            const lam2 = Astronomy.SunPosition(t).elon;
+            const per = SHOWERS.find((s) => s.code === 'PER');
+            const rad = radiantAt(per, lam2);
+            const obs = new Astronomy.Observer(LAT, LON, 30);
+            const hor = Astronomy.Horizon(
+              t,
+              obs,
+              rad.ra / 15,
+              rad.dec,
+              'normal'
+            );
+            drawMeteors(
+              {
+                lamSunDeg: Astronomy.SunPosition(Astronomy.MakeTime(now)).elon,
+                gmnMedians: g.medians,
+                radiantAltRad: (Math.max(hor.altitude, 0) * Math.PI) / 180
+              },
+              `GMN daily digest via api.ndev.tk/gmn (${g.meteors} ` +
+                `meteors) · engine λ☉ now · live`
+            );
+            setLive('met', true);
+          })
+          .catch((e) => setLive('met', false, e.message));
+        Promise.all([
+          fetch(
+            'https://services.swpc.noaa.gov/text/aurora-nowcast-hemi-power.txt',
+            {credentials: 'omit'}
+          ).then((r) => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.text();
+          }),
+          j('https://services.swpc.noaa.gov/json/ovation_aurora_latest.json'),
+          j('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json')
+        ])
+          .then(([hemi, ov, kp]) => {
+            drawAurora(
+              {
+                hemiText: hemi,
+                ovationCoords: ov.coordinates,
+                lonDeg: ((LON % 360) + 360) % 360,
+                kpEst: kp[kp.length - 1].estimated_kp
+              },
+              `SWPC hemi-power wire + OVATION oval ` +
+                `${ov['Observation Time']} + Kp · live`
+            );
+            setLive('aur', true);
+          })
+          .catch((e) => setLive('aur', false, e.message));
+        Promise.all([
+          j(
+            `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=shortwave_radiation,direct_radiation,diffuse_radiation`
+          ),
+          j(
+            `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${LAT}&longitude=${LON}&current=aerosol_optical_depth`
+          )
+        ])
+          .then(([w, aq]) => {
+            const t = Astronomy.MakeTime(new Date());
+            const obs = new Astronomy.Observer(LAT, LON, 30);
+            const eq = Astronomy.Equator(
+              Astronomy.Body.Sun,
+              t,
+              obs,
+              true,
+              true
+            );
+            const hor = Astronomy.Horizon(t, obs, eq.ra, eq.dec, 'normal');
+            drawClosure(
+              {
+                sunAltDeg: hor.altitude,
+                aod550: aq.current.aerosol_optical_depth,
+                ghiWm2: w.current.shortwave_radiation,
+                dirWm2: w.current.direct_radiation,
+                difWm2: w.current.diffuse_radiation
+              },
+              `open-meteo current radiation ${w.current.time}Z + AOD · ` +
+                `engine sun now · live`
+            );
+            setLive('clo', true);
+          })
+          .catch((e) => setLive('clo', false, e.message));
       }
     </script>
   </body>

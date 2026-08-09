@@ -9166,6 +9166,48 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   visual itself validated - a claim like "today the sun sets 5.2
   arcmin late" is reproducible from the frozen fixture, not a
   screenshot.
+- DONE (Aug 9, the review session's 115th pass - CURRENT RESEARCH
+  TOPICS, LIVE: the observatory is the research view, so each panel
+  is a timely question): surveyed the topical space (what is
+  scientifically CURRENT on 2026-08-09 that gated machinery + live
+  feeds can answer) and built the three strongest; the rest are
+  shelved with their feeds verified. BUILT: THE PERSEIDS AT THE DOOR
+  (peak in 2.7 days - the printed Jenniskens profile via meteors.js
+  zhrAt against the LIVE Global Meteor Network daily digest
+  (api.ndev.tk/gmn): 1842 measured Perseids = 33% of yesterday's
+  5571 meteors, the shower already dominating the sky; tonight's
+  rate at the point through hourlyRate x visibleRateFactor - 18/h
+  dark, 5/h suburban - with the lm 6.5 perception fold asserted
+  exactly 1, the ZHR definition's own normalization; the engine
+  dates the lam 140.0 crossing Aug 12, matching IMO). THE AURORA
+  SUPPLY (SWPC hemispheric power, 5-min cadence - the file the
+  theme's curtain already scales by, emission linear in
+  precipitating power - parsed pure and drawn as a day history that
+  CAUGHT a substorm decay 52 -> 13 GW; OVATION's oval probability on
+  the point's meridian via the theme's own extraction as a pure
+  function, 5% at 71 N; Kp 1.33 - quiet magnetosphere under an
+  active-region-rich sun). THE DOME AUDITS ITSELF (the 91st pass's
+  radiative closure run per load on the CURRENT open-meteo
+  measured irradiance: at the frozen hour the drawn dome lands
+  97.4% of the measured 890 W/m2 global at engine sun 64.97 deg and
+  measured AOD 0.15, with the beam/diffuse split leaning exactly as
+  closure.js states it must - drawn diffuse is the molecular
+  Hillaire dome, aerosol forward scatter stays in the beam channel:
+  beam 1.15, diffuse 0.32). observatory-reference.mjs now pins 10
+  landmarks (the three new ones re-derive the engine's sun/lambda
+  at the stamps); fixture extended with the frozen GMN digest,
+  the verbatim SWPC hemi-power wire, an OVATION meridian slice
+  (1086 of 65160 cells, provenance stated), Kp, and the radiation
+  hour. SHELVED topics with feeds verified this pass: contrail
+  persistence (daemon already ships t250C/rh250; appleman() gated -
+  the cheapest next panel), sprite-capable storms (live Blitzortung
+  stream + the gated charge-moment thresholds), lee-wave/lenticular
+  nowcast (current ascent through the Scorer machinery), twilight
+  purple-light watch (live OMPS stratospheric AOD through the
+  volcanic machinery), comet watch (COBS live magnitudes), satellite
+  pass brightness (celestrak TLE + gated satmags - the Starlink
+  brightening debate made this a live research topic), tide surge
+  residual (CO-OPS measured minus Schureman prediction).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

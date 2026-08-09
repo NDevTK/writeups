@@ -57,6 +57,15 @@ import {
 } from './kcorona.js';
 import {E0_LUX} from './adaptation.js';
 import {E_FULL_RATIO} from './moonlight.js';
+import {
+  dLam,
+  hourlyRate,
+  SHOWERS,
+  visibleRateFactor,
+  zhrAt
+} from './meteors.js';
+import {mieCoefficients} from './aerosol.js';
+import {closureRatios} from './closure.js';
 
 // The drawn ocean's whitecap coverage law (Monahan &
 // O'Muircheartaigh 1980, W = 3.84e-6 U10^3.41) - the GPU copy
@@ -293,4 +302,140 @@ export function coronaPanel({regionCount}) {
     lux,
     moons: lux / E0_LUX / E_FULL_RATIO
   };
+}
+
+/**
+ * THE PERSEIDS (or any coded shower): the printed IMO/Jenniskens
+ * calendar (meteors.js SHOWERS, the double-exponential activity
+ * profile) against the LIVE Global Meteor Network count share -
+ * yesterday's measured meteors by shower, the daemon's own
+ * medians digest - plus tonight's expected visible rate at the
+ * point through the gated zenith and perception corrections
+ * (hourlyRate, visibleRateFactor). lamSunDeg and the radiant
+ * altitude come from the caller (the astronomy engine owns
+ * time -> geometry).
+ */
+export function meteorsPanel({
+  code = 'PER',
+  lamSunDeg,
+  gmnMedians = null,
+  radiantAltRad = null,
+  lms = [6.5, 5.0],
+  lamHalfSpanDeg = 14
+}) {
+  const s = SHOWERS.find((q) => q.code === code);
+  const curve = [];
+  for (let i = 0; i <= 140; i++) {
+    const lam = s.lam - lamHalfSpanDeg + (i / 140) * 2 * lamHalfSpanDeg;
+    // Solar longitude advances 360/365.2422 deg per day - the
+    // calendar axis in days from the peak.
+    curve.push({
+      lam,
+      days: dLam(lam, s.lam) / (360 / 365.2422),
+      zhr: zhrAt(s, lam)
+    });
+  }
+  const zhrNow = zhrAt(s, lamSunDeg);
+  const daysToPeak = -dLam(lamSunDeg, s.lam) / (360 / 365.2422);
+  // The measured side: shower shares of yesterday's GMN count.
+  let shares = null;
+  if (gmnMedians && gmnMedians.all?.n > 0) {
+    shares = Object.entries(gmnMedians)
+      .filter(([k]) => k !== 'all')
+      .map(([k, v]) => ({code: k, n: v.n, share: v.n / gmnMedians.all.n}))
+      .sort((a, b) => b.n - a.n);
+  }
+  const rates = lms.map((lm) => ({
+    lm,
+    perHour:
+      radiantAltRad != null
+        ? hourlyRate(zhrNow, radiantAltRad) * visibleRateFactor(s.r, lm)
+        : null
+  }));
+  return {shower: s, curve, lamSunDeg, zhrNow, daysToPeak, shares, rates};
+}
+
+/**
+ * THE AURORA SUPPLY: the measured hemispheric power (SWPC
+ * OVATION, 5-minute cadence - the same file the theme scales its
+ * drawn curtain by, emission linear in precipitating power) as a
+ * day-long history, the OVATION oval's probability on the
+ * point's meridian (the theme's own extraction as a pure
+ * function), and the live Kp. Parsers here are the instrument's
+ * only code: no physics.
+ */
+export function parseHemiPower(text) {
+  const rows = [];
+  for (const line of text.split('\n')) {
+    if (!line || line.startsWith('#')) continue;
+    const p = line.trim().split(/\s+/);
+    if (p.length < 4) continue;
+    const at = p[0].replace('_', 'T') + 'Z';
+    const n = parseInt(p[2], 10);
+    const s = parseInt(p[3], 10);
+    if (Number.isFinite(n)) rows.push({at, gwN: n, gwS: s});
+  }
+  return rows;
+}
+
+/** The theme's oval extraction, pure: strongest probability
+ * within 3 deg of the meridian on the northern hemisphere. */
+export function ovationAtMeridian(coords, lonDeg) {
+  const our = ((lonDeg % 360) + 360) % 360;
+  let best = 0;
+  let bestLat = null;
+  for (const [lo, la, val] of coords) {
+    if (la < 0) continue;
+    let dl = Math.abs(lo - our);
+    if (dl > 180) dl = 360 - dl;
+    if (dl > 3) continue;
+    if (val > best) {
+      best = val;
+      bestLat = la;
+    }
+  }
+  return {p: best / 100, latDeg: bestLat};
+}
+
+export function auroraPanel({hemiText, ovationCoords, lonDeg, kpEst}) {
+  const history = parseHemiPower(hemiText);
+  const latest = history[history.length - 1] ?? null;
+  const ov = ovationCoords ? ovationAtMeridian(ovationCoords, lonDeg) : null;
+  return {history, latest, ov, kpEst};
+}
+
+/**
+ * THE DOME AUDITS ITSELF: the 91st pass's radiative closure, run
+ * on the CURRENT measured irradiance - the drawn dome's beam and
+ * diffuse integrals (closure.js, luminous-efficacy bridge and
+ * all) against the measured GHI/direct/diffuse at the point,
+ * every load. The aerosol enters as the closure reference's own
+ * gray set at the MEASURED 550 nm depth (stated: one measured
+ * number, no invented spectrum).
+ */
+export function closurePanel({
+  sunAltDeg,
+  aod550,
+  ghiWm2,
+  dirWm2,
+  difWm2,
+  eyeHM = 0
+}) {
+  const mie = mieCoefficients(
+    {
+      tau: [aod550, aod550, aod550],
+      ssa: [0.9, 0.9, 0.9],
+      g: 0.8
+    },
+    eyeHM
+  );
+  const r = closureRatios({
+    sunAltRad: sunAltDeg * DEG,
+    mieRad: mie,
+    eyeHM,
+    ghiWm2,
+    dirWm2,
+    difWm2
+  });
+  return {sunAltDeg, aod550, ratios: r};
 }
