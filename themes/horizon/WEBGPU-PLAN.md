@@ -7819,6 +7819,38 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   row; varV folds modern-elements stars on epoch2. Gate grows
   to 11 landmarks. Full gate green - 117 CPU references + 7
   GPU probes.
+- DONE (Aug 9, the review session's 83rd pass - measured comet
+  brightness: the observer network outranks the g/k formula).
+  THE FEED: the Comet Observation Database (cobs.si, keyless
+  JSON API, no CORS - the daemon proxies): dated total-coma
+  magnitude estimates from the worldwide visual/CCD network,
+  each tagged with its ICQ observation method and the comet's
+  MPC designation - the very quantity the SOFT00 g/k law
+  predicts, measured. THE REDUCTION (cobs.js, the GMN medians
+  pattern): per-comet MEDIAN of the last 10 days behind a
+  documented n >= 3 floor - no single-observer sky; visual and
+  CCD total magnitudes pool as the ICQ archive treats them. THE
+  JOIN: COBS fullnames match the SOFT00 name column verbatim;
+  the designation prefix is the fallback key ("220P/McNaught"
+  -> 220P, "C/2024 J3 (ATLAS)" -> C/2024 J3). THE SWAP
+  (Horizon.html): the comet list now builds to magnitude 14 and
+  re-filters at the drawn 6.5 AFTER fresh medians replace the
+  formula - so an outbursting comet the formula calls faint
+  appears at its OBSERVED magnitude (the 17P/Holmes case, the
+  reason the wide pre-list matters) and a dust-starved one
+  fades as actually seen; comets without fresh estimates keep
+  the g/k prediction - fails to data, never to style.
+  ?cobs=URL|0. Gate (3 landmarks) on twelve VERBATIM vendored
+  observations: 220P's four estimates (6.7-7.2) reduce to their
+  own median 6.9; stale rows fall out and two estimates never
+  steer; the join finds the SOFT00 name and returns null for
+  the unobserved. Daemon /comets (3 h cache, stale-serve;
+  cobs.js ships in install.sh in the SAME commit), boot-tested
+  against the LIVE feed: 235 observations this window reduce to
+  medians led by 220P/McNaught at 7.0 from n=51 - a comet the
+  whole network is watching tonight, now drawn at the
+  brightness the network measures. Gate registered after
+  comets. Full gate green - 118 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

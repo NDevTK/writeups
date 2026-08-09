@@ -78,6 +78,7 @@ import {
   parseWyoText,
   WYO_BASE
 } from '../../sounding.js';
+import {COBS_API, COBS_WINDOW_DAYS, cobsMedians} from '../../cobs.js';
 import {ozoneCensus} from '../../ozone.js';
 import {
   ndviCell,
@@ -981,6 +982,7 @@ function main() {
   let gvpElev = {t: 0, map: new Map()}; // Holocene summit elevations, daily
   let sndStations = {t: 0, list: []}; // IGRA station list, daily
   const sndCache = new Map(); // 1-deg area -> {t, body}, hourly
+  let cobsCache = {t: 0, body: null}; // measured comet medians, 3-hourly
   const aerosolCache = new Map(); // 0.25-deg cell key -> {t, body}
   const ozoneCache = new Map(); // 0.25-deg cell key -> {t, body}
   const chlorCache = new Map(); // 1/12-deg cell key -> {t, body}
@@ -1795,6 +1797,52 @@ function main() {
           });
         }
         return json(502, {volcanoes: null, upstream: 'unavailable'});
+      }
+    }
+
+    if (url.pathname === '/comets') {
+      // MEASURED comet brightness (cobs.js): the COBS network's
+      // recent magnitude estimates reduced to per-comet medians
+      // - the g/k formula's stand-in wherever an estimate is
+      // fresh. 3-hour cache, stale-serve.
+      if (cobsCache.body && Date.now() - cobsCache.t < 3 * 3600e3) {
+        return json(200, cobsCache.body, {
+          'cache-control': 'public, max-age=3600',
+          'x-cobs-source': 'cobs.si (cached)'
+        });
+      }
+      try {
+        const from = new Date(Date.now() - COBS_WINDOW_DAYS * 86400e3)
+          .toISOString()
+          .slice(0, 10);
+        const r = await fetch(COBS_API + '&from_date=' + from, {
+          signal: AbortSignal.timeout(60000),
+          headers: {'user-agent': UA}
+        });
+        if (!r.ok) throw new Error(r.status);
+        const j = await r.json();
+        const flat = (j.objects || []).map((o) => ({
+          obs_date: o.obs_date,
+          fullname: o.comet?.fullname,
+          magnitude: o.magnitude
+        }));
+        const medians = cobsMedians(flat, Date.now());
+        if (!Object.keys(medians).length && flat.length < 5)
+          throw new Error('empty feed');
+        const body = {at: Date.now(), observations: flat.length, medians};
+        cobsCache = {t: Date.now(), body};
+        return json(200, body, {
+          'cache-control': 'public, max-age=3600',
+          'x-cobs-source': 'cobs.si'
+        });
+      } catch {
+        if (cobsCache.body) {
+          return json(200, cobsCache.body, {
+            'cache-control': 'public, max-age=600',
+            'x-cobs-source': 'cobs.si (stale)'
+          });
+        }
+        return json(502, {medians: null, upstream: 'unavailable'});
       }
     }
 

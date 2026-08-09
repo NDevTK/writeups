@@ -214,7 +214,8 @@
         a synthetic plume at bearing AZ with reported top TOPM
         at DISTKM for the harness), sounding=URL|0 (daemon
         endpoint override for the measured radiosonde / keep the
-        model aloft),
+        model aloft), cobs=URL|0 (daemon endpoint override for
+        the measured comet magnitudes / keep the g/k formula),
         gwaves=A|0 (pin the airglow banding amplitude for the
         harness / remove the banding), gmn=URL|0 (daemon
         endpoint override for the measured meteor medians /
@@ -838,6 +839,7 @@
       import {bscIndexOf, VARSTARS, varV} from './horizon/varstars.js';
       import {apparentAltRad} from './horizon/gvp.js';
       import {SOUNDING_FRESH_H, SOUNDING_MAX_KM} from './horizon/sounding.js';
+      import {measuredMag} from './horizon/cobs.js';
       import {
         GW_LAMBDA_MED_KM,
         GW_SPEED_MED_MS,
@@ -4175,6 +4177,40 @@
         if (Number.isFinite(s.t250C) && Number.isFinite(s.rh250)) {
           if (!params.has('t250')) state.t250 = s.t250C;
           state.contrail = appleman(25000, s.t250C, s.rh250 / 100);
+        }
+      }
+      // MEASURED comet brightness (cobs.js via the daemon): the
+      // COBS network's fresh per-comet medians outrank the g/k
+      // formula. ?cobs=URL overrides; =0 keeps the formula.
+      const COBS_PROXY =
+        params.get('cobs') ?? AEROSOL_PROXY.replace(/\/aerosol$/, '/comets');
+      async function syncCobs() {
+        if (COBS_PROXY === '0') return;
+        try {
+          const r = await (
+            await fetch(COBS_PROXY, {credentials: 'omit'})
+          ).json();
+          if (!r.medians) return;
+          state.cobs = r;
+          const ks = Object.keys(r.medians);
+          if (ks.length) {
+            const b = ks.reduce((a, k) =>
+              r.medians[k].mag < r.medians[a].mag ? k : a
+            );
+            record(
+              'COBS measured comets',
+              ks.length +
+                ' with fresh medians · brightest ' +
+                b +
+                ' at ' +
+                r.medians[b].mag +
+                ' (n=' +
+                r.medians[b].n +
+                ')'
+            );
+          }
+        } catch {
+          // the g/k formula stands
         }
       }
       async function syncSounding() {
@@ -9795,7 +9831,31 @@
                 y: ev.y * Math.cos(EPS) + ev.z * Math.sin(EPS),
                 z: -ev.y * Math.sin(EPS) + ev.z * Math.cos(EPS)
               };
-              let list = visibleComets(cometEls || [], jd, obsEcl, 6.5);
+              // The MEASURED brightness outranks the g/k formula
+              // (cobs.js): list wide, swap fresh COBS medians in,
+              // re-filter at the drawn limit - so an outbursting
+              // comet the formula calls faint appears at its
+              // OBSERVED magnitude (the Holmes case), and a
+              // dust-starved one fades as actually seen.
+              let list = visibleComets(
+                cometEls || [],
+                jd,
+                obsEcl,
+                state.cobs ? 14 : 6.5
+              );
+              if (state.cobs) {
+                for (const cc of list) {
+                  const m = measuredMag(cc.name, state.cobs.medians);
+                  if (m !== null) {
+                    cc.magModel = cc.mag;
+                    cc.mag = m;
+                    cc.measured = true;
+                  }
+                }
+                list = list
+                  .filter((cc) => cc.mag <= 6.5)
+                  .sort((a, b) => a.mag - b.mag);
+              }
               if (params.has('comet')) {
                 const el = {
                   name: 'synthetic comet',
@@ -13947,6 +14007,8 @@
         setInterval(syncVolcano, 6 * 60 * 60 * 1000);
         syncSounding();
         setInterval(syncSounding, 60 * 60 * 1000);
+        syncCobs();
+        setInterval(syncCobs, 3 * 60 * 60 * 1000);
         syncNO2();
         // The printed TEMPO revisit is 1 hour (Table 1) - the
         // refresh follows it so the drawn brown horizon carries
