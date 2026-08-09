@@ -467,6 +467,7 @@
         clearnessIndex,
         pickHour
       } from './horizon/clearness.js';
+      import {closureRatios} from './horizon/closure.js';
       import {
         buildArcLUT,
         buildBowLUT,
@@ -9305,7 +9306,7 @@
                 state.lat +
                 '&longitude=' +
                 state.lon +
-                '&hourly=shortwave_radiation&forecast_days=1',
+                '&hourly=shortwave_radiation,direct_radiation,diffuse_radiation&forecast_days=1',
               {credentials: 'omit'}
             )
           ).json();
@@ -9313,6 +9314,11 @@
             state.ghiSeries = {
               time: r.hourly.time,
               vals: r.hourly.shortwave_radiation,
+              // The component split, for the radiative closure
+              // audit: the beam on the horizontal and the diffuse
+              // (their sum is the identity check on the feed).
+              dir: r.hourly.direct_radiation,
+              dif: r.hourly.diffuse_radiation,
               at: Date.now()
             };
           }
@@ -11071,6 +11077,36 @@
                     state.ktAmbient.toFixed(2) +
                     ' (Erbs)'
                 );
+                // Stage the picked hour for the radiative closure
+                // audit - it runs later this frame, once the live
+                // mie/ozone/NO2 dress is on (TDZ order).
+                let dirW = null;
+                let difW = null;
+                if (!params.has('ghi') && state.ghiSeries) {
+                  const hd = state.ghiSeries.dir
+                    ? pickHour(
+                        state.ghiSeries.time,
+                        state.ghiSeries.dir,
+                        Date.now()
+                      )
+                    : null;
+                  const hf = state.ghiSeries.dif
+                    ? pickHour(
+                        state.ghiSeries.time,
+                        state.ghiSeries.dif,
+                        Date.now()
+                      )
+                    : null;
+                  if (hd) dirW = hd.ghi;
+                  if (hf) difW = hf.ghi;
+                }
+                astro.closure = {
+                  ghiW: ghi,
+                  dirW,
+                  difW,
+                  altRad: Math.asin(cosZ),
+                  kt
+                };
               }
             }
             if (!astro.recorded) {
@@ -11513,6 +11549,61 @@
               ? no2Forced
               : state.no2Col || 0;
         mieRad.no2 = no2Col > 0 ? no2BetaPerM(no2Col) : null;
+        // The radiative closure audit (closure.js, gated): the
+        // drawn sky's own integral against the satellite's
+        // measured irradiance - the assembled frame PREDICTS the
+        // picked hour's illuminance (diffuse from the gated
+        // transfer table, beam through the LIVE mie/ozone/NO2
+        // dress just built) and reports where it lands. A CLEAR
+        // audit needs the Erbs correlation's own printed clear
+        // branch (kt > 0.8, the same boundary clearness.js
+        // anchors on); cloudy hours still report the global
+        // ratio with the veil-chain closure named as the next
+        // stage. Grazing hours refuse by the kt chain's own
+        // 5 degree floor.
+        if (astro.closure && t - (astro.closureAt ?? -1e9) > 60000) {
+          astro.closureAt = t;
+          const c = astro.closure;
+          const REC = 'radiative closure (drawn sky vs satellite)';
+          const r = closureRatios({
+            sunAltRad: c.altRad,
+            mieRad,
+            eyeHM: centerElev,
+            ghiWm2: c.ghiW,
+            dirWm2: c.dirW,
+            difWm2: c.difW
+          });
+          if (!r) {
+            record(
+              REC,
+              'sun under 5° at the measured hour - grazing geometry, no audit'
+            );
+          } else {
+            const parts =
+              'global ×' +
+              r.globalRatio.toFixed(2) +
+              (r.beamRatio != null
+                ? ' · beam ×' + r.beamRatio.toFixed(2)
+                : '') +
+              (r.diffuseRatio != null
+                ? ' · diffuse ×' + r.diffuseRatio.toFixed(2)
+                : '') +
+              ' · drawn ' +
+              (r.drawnGlobalLux / 1000).toFixed(1) +
+              ' klx vs measured ' +
+              (r.measGlobalLux / 1000).toFixed(1) +
+              ' klx';
+            record(
+              REC,
+              c.kt > 0.8
+                ? 'CLEAR (kt ' + c.kt.toFixed(2) + ') · ' + parts
+                : 'kt ' +
+                    c.kt.toFixed(2) +
+                    ' (Erbs cloudy branch - the clear-sky dome is not this sky; veil-chain closure is the next stage) · ' +
+                    parts
+            );
+          }
+        }
         // The eye's exposure (adaptation.js - LBNL 39882's JND
         // frame): the adaptation luminance is the SAME transfer
         // table the day anchor is derived on - the reference

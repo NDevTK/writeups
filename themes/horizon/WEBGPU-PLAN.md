@@ -8635,6 +8635,52 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   safety checked before editing: the gated ocean probes assert
   FFT texels and glint hashes, not composed sea colour. Full
   gate green - 125 CPU references (whitecap 6) + 7 GPU probes.
+- DONE (Aug 9, the review session's 103rd pass - RADIATIVE
+  CLOSURE: the drawn sky's integral meets the measured
+  irradiance). The turn of the whole project: every pass so
+  far gates against printed THEORY; this one makes the
+  assembled frame PREDICT a number an independent instrument
+  measures every hour - the satellite GHI already fetched for
+  the clearness index - and reports where the prediction
+  lands, live, in the census. NEW closure.js + the vendored
+  ASTM G173-03 reference spectra (g173-data.js, all 2002 rows
+  280-4000 nm, verbatim; gate-held to the STANDARD'S OWN
+  printed broadband totals 1000.37/900.14 W/m^2). The
+  W-to-lux bridge is DERIVED, not assumed: luminous
+  efficacies 683 int V E/int E through the repo's own gated
+  CIE Y (global 109.5, direct 108.0, ETR 98.8 lm/W - textbook
+  window, ground exceeds extraterrestrial because the
+  atmosphere strips IR). TWO CROSS-VALIDATIONS LANDED AND ARE
+  GATE-HELD: (1) the solar illuminance constant arrived at by
+  two chains sharing NOTHING - E0_LUX 128.1 klx (Falchi sky
+  pair + sun Vmag, astronomy) vs the G173 ETR luminous
+  integral 133.1 klx (radiometry) - agree at ratio 0.962;
+  (2) THE AM1.5 FLAGSHIP: at the standard's own geometry and
+  its own printed aerosol (AOD 0.084 flat; one-octave slope
+  sensitivity measured at 0.0046), the Hillaire beam's
+  visible transmittance lands 0.7513 vs the standard's own
+  0.7300 - ratio 1.029, residual the right SIGN and SIZE for
+  Hillaire's unmodelled visible water vapour - the drawn sun
+  against ASTM with no shared machinery. The drawn side is
+  entirely the frame's own gated instruments: diffuse =
+  skyTransferE (the adaptation table the atmo gate re-derives
+  by its own march) x E0_LUX; beam = sunTransmittanceJS with
+  the LIVE mie/ozone/NO2 dress x E0_LUX x sin(alt). CLIENT:
+  the satellite fetch gains direct_radiation +
+  diffuse_radiation; the kt block stages the picked hour
+  (midpoint sun via astronomy-engine); the audit runs after
+  the live aerosol dress (TDZ order), conditions a CLEAR
+  verdict on the Erbs correlation's own printed clear branch
+  (kt > 0.8 - the repo's existing anchor), reports
+  global/beam/diffuse ratios with drawn-vs-measured klx on
+  every hour, refuses grazing hours by the kt chain's 5
+  degree floor, and names the veil-chain cloudy closure as
+  the next stage. Stated budget riders: mean-distance E0_LUX
+  (+-3.4% eccentricity), AM1.5 efficacy scope. closure at 6
+  landmarks; identity feed-back returns ratios 1.000000
+  exactly. Full gate green - 126 CPU references + 7 GPU
+  probes (one server restart mid-run, the recurring container
+  kill, not code).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
