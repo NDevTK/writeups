@@ -9319,6 +9319,37 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   monotone, clamps to zero at and past the deadline) - 19
   landmarks. NOTE: lands live only when the daemon box redeploys;
   the gate is the in-repo verification.
+- DONE (Aug 9, the review session's 120th pass - THE FREEZE
+  SCRIPT: the fixture day becomes a one-command, repeatable
+  procedure): observatory-freeze.mjs IS the 114th-118th passes'
+  by-hand freezing, scripted - it fetches all twelve feeds the
+  observatory reads (daemon sounding/gmn/adsb, NDBC realtime2,
+  open-meteo weather/air-quality/radiation, SWPC regions +
+  hemi-power + OVATION slice + Kp, CO-OPS water levels), computes
+  the engine-owned geometry at the fetch stamps (sun, solar
+  longitude, next-2am shower radiant), writes a COMPLETE
+  observatory-fixture.js in the exact shape the page and
+  reference consume, then runs all eleven panels on the fresh day
+  and prints the pin candidates. The RUN-THEN-PIN contract is in
+  the header: after a real refreeze the old day's reference bands
+  are EXPECTED to fail - re-pin deliberately from the printed
+  numbers before committing. Feed posture: all-or-nothing with
+  failures listed by name (a refreeze is worth doing on a fully
+  measurable day). The dry run (--out to a scratch path; the
+  shipped 2026-08-09 fixture untouched) exercised every path and
+  caught two real client bugs now fixed: a parallel city burst
+  429s open-meteo's shared-egress window (now sequential with
+  spacing), and rate-limit windows outlast a quick retry (429 now
+  waits 30 s then 60 s across three attempts; 5xx/network get one
+  5 s retry; the first attempt also caught the daemon's
+  pre-deploy /sounding 502 and recovered through the retry). The
+  verified dry run froze 2026-08-09T22:21Z end-to-end - same 12Z
+  ascent so the column/contrail/leewave numbers reproduce
+  exactly, and the LIVE drift is visible in the candidates (buoy
+  wind 6.0 -> 5.0 m/s, hemispheric power 13 -> 21 GW with Kp
+  rising: a substorm onset between the frozen hour and the dry
+  run). This turns the observatory from one frozen day into an
+  archivable series of them.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
