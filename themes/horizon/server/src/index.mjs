@@ -1959,7 +1959,7 @@ function main() {
           if (!slots.includes(iso)) slots.push(iso);
         }
         let body = null;
-        for (const slot of slots) {
+        const fetchAscent = async (slot) => {
           const r = await fetch(
             WYO_BASE +
               '?datetime=' +
@@ -1969,12 +1969,28 @@ function main() {
               '&type=TEXT:LIST',
             {signal: AbortSignal.timeout(45000), headers: {'user-agent': UA}}
           );
-          if (!r.ok) continue;
-          const html = await r.text();
-          const pre = html.match(/<PRE>([\s\S]*?)<\/PRE>/i);
-          if (!pre) continue;
+          if (!r.ok) return null;
+          const pre = (await r.text()).match(/<PRE>([\s\S]*?)<\/PRE>/i);
+          if (!pre) return null;
           const rows = parseWyoText(pre[1]);
-          if (rows.length < 50) continue;
+          return rows.length < 50 ? null : rows;
+        };
+        for (let si = 0; si < slots.length; si++) {
+          const slot = slots[si];
+          const rows = await fetchAscent(slot);
+          if (!rows) continue;
+          // The RESIDUAL layer (Stull's printed structure): the
+          // PREVIOUS ascent's mixed-layer depth still carries its
+          // pollutants tonight - reduce the next slot back too.
+          let prevBlhAglM = null;
+          let prevAt = null;
+          if (si + 1 < slots.length) {
+            const prevRows = await fetchAscent(slots[si + 1]);
+            if (prevRows) {
+              prevBlhAglM = blhRiM(prevRows);
+              prevAt = slots[si + 1].replace(' ', 'T') + 'Z';
+            }
+          }
           body = {
             wmo: best.s.wmo,
             name: best.s.name,
@@ -1996,6 +2012,8 @@ function main() {
             drct700: levelAt(rows, 700, 'drct'),
             spd700Ms: levelAt(rows, 700, 'spdMs'),
             blhAglM: blhRiM(rows),
+            prevBlhAglM,
+            prevAt,
             // The thinned profile itself (~4 KB): the client's
             // refraction column rides the balloon (sounding.js
             // thinRows keeps the mirage-making low rows verbatim).

@@ -848,6 +848,7 @@
       import {apparentAltRad} from './horizon/gvp.js';
       import {
         levelAt,
+        RESIDUAL_MAX_AGE_H,
         SOUNDING_FRESH_H,
         SOUNDING_MAX_KM
       } from './horizon/sounding.js';
@@ -4538,6 +4539,7 @@
         // (profileMeas clears too - the model column's own sync
         // rebuilds state.profile on its cadence.)
         state.profileMeas = null;
+        state.resBlhAglM = null;
         // An EXPLICIT ?sounding=URL pin is authoritative even
         // under pin=1 (the harness A/B) - a bare pin still
         // silences the measurement, as everywhere.
@@ -4555,6 +4557,16 @@
         // the pollen column's depth outranks the model BLH;
         // cleared above, set only here.
         if (Number.isFinite(s.blhAglM)) state.blhAglMeas = s.blhAglM;
+        // The RESIDUAL layer: the previous ascent's mixed-layer
+        // depth "contains the pollutants ... from the previous
+        // mixed layer" (Stull, open CC) for ONE night - a prev
+        // older than a synoptic day carries no residual claim.
+        if (
+          Number.isFinite(s.prevBlhAglM) &&
+          s.prevAt &&
+          Date.now() - Date.parse(s.prevAt) < RESIDUAL_MAX_AGE_H * 3600e3
+        )
+          state.resBlhAglM = s.prevBlhAglM;
         // The refraction column rides the BALLOON when the ascent
         // ships its thinned rows: the same gated buildProfile the
         // model column uses, fed the measured profile - the drawn
@@ -4772,7 +4784,16 @@
           // Richardson, applySounding) outranks the model BLH as
           // the pollen column's depth when a fresh ascent reached.
           const blhModel = fc.hourly?.boundary_layer_height?.[0];
-          const blh = state.blhAglMeas ?? blhModel;
+          // The pollen column: the current boundary layer OR the
+          // residual layer above it, whichever is deeper - a
+          // collapsed nocturnal BL still has yesterday's pollen
+          // aloft in the residual layer (Stull's printed
+          // structure; pass 90 documented the collapse, this
+          // closes it).
+          const blh = Math.max(
+            state.blhAglMeas ?? blhModel ?? NaN,
+            state.resBlhAglM ?? 0
+          );
           if (!Number.isFinite(birch) || !Number.isFinite(blh)) return;
           state.pollen = {birch, blh, tau: pollenTau(birch, blh)};
           if (state.pollen.tau > 1e-4)
@@ -4781,9 +4802,12 @@
               Math.round(birch) +
                 ' grains/m³ · BLH ' +
                 Math.round(blh) +
-                (state.blhAglMeas != null
-                  ? ' m (measured, bulk Ri)'
-                  : ' m (model)') +
+                (state.resBlhAglM != null &&
+                state.resBlhAglM > (state.blhAglMeas ?? blhModel ?? 0)
+                  ? ' m (residual layer - yesterday, Stull)'
+                  : state.blhAglMeas != null
+                    ? ' m (measured, bulk Ri)'
+                    : ' m (model)') +
                 ' · τ ' +
                 state.pollen.tau.toFixed(4) +
                 ' · Ø' +

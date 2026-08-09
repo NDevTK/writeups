@@ -8370,6 +8370,36 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   should compare the full record list. Gate: creff-reference
   joins with 6 landmarks - full gate green, 123 CPU references
   - 7 GPU probes.
+- DONE (Aug 9, the review session's 96th pass - the residual
+  layer: yesterday's mixed layer carries the night's pollen).
+  The 90th pass stated a limit: the nocturnal boundary layer
+  collapses (the live midnight Payerne answered 1 m) and
+  neither the model BLH nor the measured one sees the pollen
+  still aloft from yesterday - the residual layer, unmodeled.
+  CLOSED with an OPEN PRINT from the boundary layer's own
+  authority: Stull, Practical Meteorology (CC licence, UBC),
+  ch. 18 - "the residual layer contains the pollutants and
+  moisture from the previous mixed layer, but is not very
+  turbulent", persisting ONE night (the stable ABL or the next
+  day's mixing retires it - the chapter's own diurnal cycle).
+  Daemon: /sounding now also reduces the PREVIOUS synoptic
+  slot's ascent and ships prevBlhAglM/prevAt (one extra
+  Wyoming fetch per hourly cache fill). Client: applySounding
+  adopts state.resBlhAglM only while the previous ascent is
+  under RESIDUAL_MAX_AGE_H = 24 h (fail-closed cleared with
+  the other measured-only fields), and the pollen column's
+  depth becomes max(current BLH, residual) - by day the
+  growing mixed layer wins (the boot test's live noon answered
+  current 556 m over prev 1 m - the residual correctly claims
+  nothing); by night the collapsed 1 m current yields to
+  yesterday's ~1.4 km, and the record labels which stood
+  ('residual layer - yesterday, Stull'). No new constants
+  beyond the printed one-night lifetime; the reduction is the
+  90th pass's own gated blhRiM on one more ascent. Gate:
+  sounding-reference grows 17 -> 18 landmarks (the max()
+  structure held on the vendored values with the print
+  quoted). Full gate green - 123 CPU references + 7 GPU
+  probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

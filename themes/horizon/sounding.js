@@ -283,6 +283,13 @@ export function thinRows(rows, maxN = 120, keepLow = 20) {
 // ABOVE GROUND (the column depth consumers integrate over), or
 // null when the profile never crosses.
 export const RI_CRIT = 0.25;
+// The RESIDUAL layer survives one night: "the residual layer
+// contains the pollutants and moisture from the previous mixed
+// layer" and a night's stable cooling (or the next day's mixing)
+// retires it - Stull, Practical Meteorology (open CC, UBC),
+// ch. 18. A previous ascent older than a synoptic day carries no
+// residual claim.
+export const RESIDUAL_MAX_AGE_H = 24;
 export function blhRiM(rows, riC = RI_CRIT) {
   const lv = rows
     .filter(

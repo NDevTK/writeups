@@ -24,6 +24,7 @@ import {
   parseIgraStations,
   parseWyoText,
   RD_J_KGK,
+  RESIDUAL_MAX_AGE_H,
   RI_CRIT,
   SOUNDING_FRESH_H,
   SOUNDING_MAX_KM,
@@ -227,6 +228,17 @@ const rows = parseWyoText(WYO_FIXTURE_TEXT);
       `parcel's independent ${a.lclM - rows[0].hM} m AGL cloud base: two ` +
       `separate reductions of the same measured profile agree the mixed ` +
       `layer sits under the cloud deck`
+  );
+  check(
+    'the residual layer carries the night',
+    RESIDUAL_MAX_AGE_H === 24 && Math.max(1, blh) === blh,
+    `a collapsed nocturnal boundary layer (the live midnight Payerne ` +
+      `answered 1 m) still has yesterday's pollen aloft: the column takes ` +
+      `max(current, residual) = ${Math.max(1, blh)} m when the previous ` +
+      `ascent's ${blh} m mixed layer is under ${RESIDUAL_MAX_AGE_H} h old - ` +
+      `"the residual layer contains the pollutants and moisture from the ` +
+      `previous mixed layer" (Stull, Practical Meteorology, open CC, ` +
+      `ch. 18); older carries no claim`
   );
   check(
     'BLH honesty',
