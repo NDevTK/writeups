@@ -8681,6 +8681,46 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exactly. Full gate green - 126 CPU references + 7 GPU
   probes (one server restart mid-run, the recurring container
   kill, not code).
+- DONE (Aug 9, the review session's 104th pass - THE RECORD
+  HINDCAST: the world-record photograph reproduced through the
+  shipped ray fan from the morning's own archived radiosonde).
+  Program #2 of the recorded-reality agenda, and the mirage
+  machinery's first date with a documented observation. THE
+  GROUND TRUTH: Marc Bret's Guinness record - Pic Gaspard
+  (3883 m) photographed at the printed 443 km from Pic de
+  Finestrelles (2820 m) at dawn 16 Jul 2016, Barre des Ecrins
+  (4102 m) at 440 km, "refractive favorable circumstances"
+  claimed on the record page but never computed (page read in
+  full). THE INSTRUMENT: Nimes-Courbessac 00Z that morning
+  (the Wyoming archive still serves 2016 - fetched through the
+  SAME endpoint the daemon uses), 62 rows vendored VERBATIM
+  (hindcast-nimes-data.js) carrying an elevated inversion
+  (9.4 -> 11.4 degC across 1409 -> 1545 m). NO NEW LAW -
+  parseWyoText, buildProfile, rayFan, fanBranches, refractionK
+  all pre-gated; hindcast-reference.mjs (5 landmarks) only adds
+  the ground truth: bare Earth bottoms the ray 517 m UNDER the
+  Mediterranean (no refraction, no record); Hirt's standard k
+  clears by a 136 m grazing sliver; the fan through the
+  measured column RETURNS THE PHOTOGRAPH - one branch to
+  Gaspard at -1.54 deg apparent altitude (the record page's
+  "thin line of Mountains rises over the Horizon"), the Barre
+  too, grazing 77 m over the Gulf of Lion; and THE EDGE
+  RESULT, run-then-pinned exactly as found: bisecting the fan,
+  a 3883 m summit stays visible to 442 km - the printed record
+  distance IS the archived column's own visibility limit
+  (within the fan's 2 km step). The ISA column reaches 450 km;
+  the land ascent's superadiabatic surface layer unbends the
+  grazing miles and the marine boundary layer the ray actually
+  crossed lies beyond any land radiosonde - the residual
+  STATED, not tuned away (my first hypothesis - "measured
+  beats ISA on grazing height" - FAILED in the gate and was
+  replaced by what the machinery actually found; the failed
+  metric is part of the record). Two helper-bug catches by the
+  gate itself: chordMin first shipped concave-DOWN - the exact
+  flat-earth sign trap the fan's own comment warns about.
+  Deliverable is the gate (validation, not a live layer - the
+  98th-pass precedent). Full gate green - 127 CPU references
+  (hindcast 5) + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
