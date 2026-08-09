@@ -7972,19 +7972,19 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   key or IP on purpose, the churn signature (attempts climbing,
   frames 0, lastClose 1006 or null) will now say so in /health
   - and the remedy is a fresh AISSTREAM_KEY in
-  /etc/horizon-live.env, a human action. No drawn-side change;
-  no reference count change (the integration shell is outside
-  the gate, server-reference green). RESOLUTION (same day,
-  observed live on the hardened build): the watchdog's first
-  cycle closed the silent socket (1006 recorded in /health) and
-  FRESH connections opened - the loop is un-wedged - but every
-  fresh connection is also accepted-and-silent: an aisstream
-  AVAILABILITY problem upstream (user-confirmed read). No open
-  global AIS alternative exists (Digitraffic and Kystverket are
-  regional), so the engine STAYS on aisstream with the
-  self-healing churn - ships return the moment the upstream
-  does, and /health's attempts/cycles counters show the state
-  at a glance.
+    /etc/horizon-live.env, a human action. No drawn-side change;
+    no reference count change (the integration shell is outside
+    the gate, server-reference green). RESOLUTION (same day,
+    observed live on the hardened build): the watchdog's first
+    cycle closed the silent socket (1006 recorded in /health) and
+    FRESH connections opened - the loop is un-wedged - but every
+    fresh connection is also accepted-and-silent: an aisstream
+    AVAILABILITY problem upstream (user-confirmed read). No open
+    global AIS alternative exists (Digitraffic and Kystverket are
+    regional), so the engine STAYS on aisstream with the
+    self-healing churn - ships return the moment the upstream
+    does, and /health's attempts/cycles counters show the state
+    at a glance.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
