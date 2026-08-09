@@ -93,6 +93,19 @@ export const VARSTARS = [
     min2: 3.85,
     epoch: 2408247.95,
     period: 12.913834,
+    // beta Lyr's period GROWS at the printed 19 s/yr (Mennickent
+    // & Djurasevic 2013, arXiv:1303.5812, quoting Harmanec &
+    // Scholz 1993) - by 2026 the 1882 linear elements are ~65
+    // DAYS of accumulated O-C (five whole cycles: a meaningless
+    // phase). The drawn phase therefore uses the MODERN printed
+    // locally-linear elements (Rucinski et al. 2019,
+    // arXiv:1906.04831, quoting the Ak et al. 2007 quadratic
+    // ephemeris at cycle E = 3875): Min I = HJD 2458347.0119,
+    // P = 12.94379 d - carried verbatim; the gate closes the
+    // 144-year loop between all three printed sources.
+    epoch2: 2458347.0119,
+    period2: 12.94379,
+    pdotSyr: 19,
     dPct: null,
     raDeg: 282.52,
     decDeg: 33.363
@@ -288,8 +301,14 @@ export function pulseV(phaseFrac, g) {
 }
 
 // The dispatcher: drawn V magnitude of a roster star at a JD.
+// A star carrying modern locally-linear elements (epoch2 /
+// period2 - beta Lyr's growing period) folds on those; the
+// residual of constant-P against the printed 19 s/yr growth is
+// ~0.2 d by 2026 (1.6% of the period), stated.
 export function varV(g, jd) {
-  const p = phaseOf(jd, g.epoch, g.period);
+  const p = g.epoch2
+    ? phaseOf(jd, g.epoch2, g.period2)
+    : phaseOf(jd, g.epoch, g.period);
   if (g.name === 'bet Per') return algolV(p, g);
   if (g.type === 'EA') return eaV(p, g);
   if (g.type === 'EB') return ebV(p, g);

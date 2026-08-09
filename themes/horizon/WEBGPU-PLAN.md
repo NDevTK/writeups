@@ -7793,6 +7793,32 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   LIVE on api.ndev.tk (~7 min after push, 23 volcanoes served);
   /sounding to be verified the same way after this push. Full
   gate green - 117 CPU references + 7 GPU probes.
+- DONE (Aug 9, the review session's 82nd pass - beta Lyrae's
+  growing period: a 144-year loop closed by three printed
+  sources). The 79th pass carried the GCVS linear elements
+  verbatim and STATED the O-C caveat; this pass retires it for
+  the one star where the linear ephemeris is not just drifting
+  but DEAD: beta Lyr's period grows at the printed 19 s/yr
+  (Mennickent & Djurasevic 2013, arXiv:1303.5812 - READ -
+  quoting Harmanec & Scholz 1993), so the 1882 epoch's linear
+  fold has accumulated ~66 days of O-C by 2026 - five whole
+  cycles, a meaningless phase. The drawn phase now rides the
+  MODERN printed locally-linear elements (Rucinski et al. 2019,
+  arXiv:1906.04831 - READ - quoting the Ak et al. 2007
+  quadratic at cycle E = 3875: Min I = HJD 2458347.0119,
+  P = 12.94379 d, carried verbatim; the residual of constant-P
+  against the printed growth is ~0.2 d by 2026, 1.6% of the
+  period, stated). THE LANDMARK closes the loop: the 1882 GCVS
+  period grown at the printed 19 s/yr for exactly 3875 cycles
+  equals the 2018 printed period to 0.001%, and quadratic
+  back-integration from the 2018 elements lands 0.2 DAYS from
+  the 1882 GCVS epoch across 144 years - GCVS 5.1, a 2013
+  accretion-disc paper and a 2019 BRITE photometry paper, none
+  aware of this test, agreeing to a tenth of a percent of one
+  orbit. varstars.js: epoch2/period2/pdotSyr on the bet Lyr
+  row; varV folds modern-elements stars on epoch2. Gate grows
+  to 11 landmarks. Full gate green - 117 CPU references + 7
+  GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

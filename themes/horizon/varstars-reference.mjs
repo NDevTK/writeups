@@ -197,6 +197,35 @@ const G = Object.fromEntries(VARSTARS.map((v) => [v.name, v]));
   );
 }
 
+// ---- 6b. beta Lyr's growing period closes a 144-year loop -------
+{
+  const bl = G['bet Lyr'];
+  // dP/dE from the printed 19 s/yr at the 1882 period.
+  const dPdE = (bl.pdotSyr / 31557600) * bl.period;
+  const grown = bl.period + dPdE * 3875;
+  const relP = Math.abs(grown / bl.period2 - 1);
+  // Constant-P back-integration 3875 cycles from the modern
+  // elements, with the quadratic correction from the printed
+  // rate, must land near the GCVS 1882 epoch (mod one period).
+  const back = bl.epoch2 - bl.period2 * 3875 + (dPdE / 2) * 3875 * 3875;
+  const offD = Math.abs(back - bl.epoch);
+  const offPhase = Math.min(offD % bl.period, bl.period - (offD % bl.period));
+  // And the OLD linear elements are dead: accumulated O-C today.
+  const cycles = (2461360 - bl.epoch) / bl.period;
+  const oc = (dPdE / 2) * cycles * cycles;
+  check(
+    'beta Lyr: three printed sources, one growing period',
+    relP < 3e-4 && offPhase < 2.5 && oc > 55 && oc < 75,
+    `the 1882 GCVS period grown at the printed 19 s/yr for 3875 cycles = ` +
+      `${grown.toFixed(5)} d vs the 2018 printed 12.94379 ` +
+      `(${(relP * 100).toFixed(3)}%); quadratic back-integration lands ` +
+      `${offPhase.toFixed(1)} d from the 1882 epoch across 144 years; the ` +
+      `linear elements' accumulated O-C today is ${oc.toFixed(0)} DAYS ` +
+      `(five whole cycles) - why the drawn phase now rides the modern ` +
+      `printed elements`
+  );
+}
+
 // ---- 7. the roster finds its BSC rows ---------------------------
 {
   const stars = JSON.parse(
