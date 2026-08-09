@@ -18,13 +18,17 @@
  * the page and reference consume, then runs every panel on the
  * fresh fixture and prints the headline numbers.
  *
- * THE RUN-THEN-PIN CONTRACT: after a real refreeze the
- * reference's pinned bands describe the OLD day and will fail -
- * that is the method working, not breaking. The printed numbers
- * are the new pin candidates; re-pin observatory-reference.mjs
- * deliberately, landmark by landmark, before committing the new
- * day. (--out elsewhere leaves the shipped fixture untouched -
- * the dry-run posture used to verify this script itself.)
+ * THE RUN-THEN-PIN CONTRACT (since the 123rd pass): the
+ * reference's DAY-INVARIANT landmarks (identities, printed
+ * envelopes, form checks) hold on any frozen day untouched; the
+ * DAY-PINNED numbers are generated DATA - this script writes
+ * observatory-pins.js beside the fixture, and the reference's
+ * generic runner asserts them. A refreeze is therefore: run this
+ * script, READ THE DIFF of fixture and pins (that reading is
+ * where run-then-pin's deliberateness lives), run the gate,
+ * commit both. --pins-only regenerates just the pins from the
+ * existing fixture; --out elsewhere leaves the shipped files
+ * untouched (the dry-run posture used to verify this script).
  *
  * Feed posture: all feeds must answer - a refreeze is worth
  * doing on a day when the world is fully measurable; on a
@@ -419,10 +423,20 @@ export const TLES = {
 `;
   writeFileSync(OUT, fixture);
   console.log(`\nwrote ${OUT} (${fixture.length} bytes)`);
+  await emitPins(OUT);
+}
 
-  // ---- run every panel on the fresh day: the pin candidates ----
+/**
+ * Run every panel on a fixture and write observatory-pins.js -
+ * the DAY-PINNED numbers as data, [value, tolerance] pairs the
+ * reference's generic runner asserts. Tolerances are stated per
+ * quantity at its physical noise scale (regression-tight, not
+ * loose). The reference refuses pins whose generatedFor stamp
+ * differs from the fixture's - fixture and pins move together.
+ */
+async function emitPins(fixturePath) {
   const O = await import('./observatory.js');
-  const F = await import('file://' + OUT + '?t=' + Date.now());
+  const F = await import('file://' + fixturePath + '?t=' + Date.now());
   const col = O.columnPanel(F.SOUNDING.rows);
   const [beach, aloft] = col.observers;
   const sea = O.seaPanel({u10Ms: F.BUOY.wspdMs, wvhtM: F.BUOY.wvhtM});
@@ -445,7 +459,7 @@ export const TLES = {
   });
   const con = O.contrailPanel(F.SOUNDING.rows, {ac: F.ADSB.ac});
   const lee = O.leewavePanel(F.SOUNDING.rows);
-  const tid = O.tidePanel(F.TIDE);
+  const tid = O.tidePanel(F.TIDE, {published: F.TIDE_PUBLISHED?.rows});
   const clo = O.closurePanel({
     sunAltDeg: F.RADIATION.sunAltDeg,
     aod550: F.AEROSOL.aod550,
@@ -453,9 +467,144 @@ export const TLES = {
     dirWm2: F.RADIATION.dirWm2,
     difWm2: F.RADIATION.difWm2
   });
+  // Tonight's passes: the night starting at the first 02:00Z at
+  // or after the fixture stamp - the same deterministic window
+  // convention the reference uses.
+  const satlib = createRequire(import.meta.url)('./satellite.min.js');
+  const M = await import('./satmags.js');
+  const satObs = new A.Observer(F.SUN.latDeg, F.SUN.lonDeg, 30);
+  const satEq = (ms) => {
+    const t = A.MakeTime(new Date(ms));
+    return {t, eq: A.Equator(A.Body.Sun, t, satObs, true, true)};
+  };
+  const night0 = new Date(F.FIXTURE_AT.replace('Z', ':00Z'));
+  const nightStart = new Date(night0);
+  nightStart.setUTCHours(2, 0, 0, 0);
+  if (nightStart < night0) nightStart.setUTCDate(nightStart.getUTCDate() + 1);
+  const sat = O.satsPanel({
+    tleText: F.TLES.text,
+    latDeg: F.SUN.latDeg,
+    lonDeg: F.SUN.lonDeg,
+    startMs: +nightStart,
+    hours: 12,
+    satlib,
+    sunRaDecAtMs: (ms) => {
+      const {eq} = satEq(ms);
+      return {raH: eq.ra, decDeg: eq.dec};
+    },
+    sunAltAtMs: (ms) => {
+      const {t, eq} = satEq(ms);
+      return A.Horizon(t, satObs, eq.ra, eq.dec, 'normal').altitude;
+    },
+    mags: M.snapshotMap()
+  });
+  const perTop = met.shares?.filter((s) => s.code !== 'spo')[0];
+  const best = sat.passes[0];
+  const pins = {
+    generatedFor: F.FIXTURE_AT,
+    column: {
+      invDT: [col.inversion.dT, 0.05],
+      invHM: col.inversion.hM,
+      foldsBeach: beach.folds,
+      foldsAloft: aloft.folds,
+      r0Arcmin: [beach.r0Arcmin, 0.3],
+      r0IsaArcmin: [beach.r0IsaArcmin, 0.3],
+      flatten: [beach.flatten, 0.05],
+      rimArcsec: [beach.rimArcsec, 8]
+    },
+    wet: {
+      order: [...wet.rows].sort((a, b) => a.w - b.w).map((r) => r.name),
+      raining: wet.rows.filter((r) => r.raining).map((r) => r.name),
+      w: Object.fromEntries(wet.rows.map((r) => [r.name, [r.w, 0.03]]))
+    },
+    pol: {maxPure: [pol.maxPure, 0.02]},
+    meteors: {
+      zhrNow: [met.zhrNow, 0.5],
+      daysToPeak: [met.daysToPeak, 0.1],
+      topCode: perTop?.code ?? null,
+      topShare: perTop ? [perTop.share, 0.03] : null
+    },
+    aurora: {
+      rows: aur.history.length,
+      latestGwN: aur.latest.gwN,
+      latestAt: aur.latest.at,
+      ovP: [aur.ov.p, 0.02],
+      ovLatDeg: aur.ov.latDeg,
+      kpEst: [aur.kpEst, 0.01]
+    },
+    contrail: {
+      l250TC: [con.l250.tC, 0.5],
+      l250Tlc: [con.l250.a.tlc, 0.2],
+      l250Rhi: [con.l250.a.rhi, 0.01],
+      formLoM: con.formBand ? con.formBand.loM : null,
+      formHiM: con.formBand ? con.formBand.hiM : null,
+      issr: con.issrLevels.map((q) => [q.hM, [q.rhi, 0.01]]),
+      persistNull: con.persistBand === null,
+      acN: con.aircraft.n,
+      acMaxAltM: [con.aircraft.maxAltM, 0.5],
+      acInForm: con.aircraft.inForm,
+      acInPersist: con.aircraft.inPersist
+    },
+    leewave: {
+      levels: lee.levels.length,
+      layerMMs: [lee.layer.mMs, 0.05],
+      layerScalarMs: [lee.layer.scalarMs, 0.05],
+      spotHM: lee.spot.hM,
+      spotLamM: [lee.spot.lamM, 5]
+    },
+    tide: {
+      amps: Object.fromEntries(tid.amps.map((a) => [a.n, [a.ampM, 0.01]])),
+      rmsOutM: [tid.rmsOutM, 0.01],
+      latestResidM: [tid.latestResidM, 0.02],
+      maxAbsOutM: [tid.maxAbsOut.v, 0.02],
+      rM2: tid.amps[0].ratio ? [tid.amps[0].ratio, 0.01] : null,
+      rO1: (() => {
+        const o = tid.amps.find((a) => a.n === 'O1');
+        return o?.ratio ? [o.ratio, 0.02] : null;
+      })()
+    },
+    sats: {
+      passes: sat.passes.length,
+      nakedEye: sat.nakedEye,
+      darkHours: [sat.darkHours, 0.15],
+      bestNorad: best?.norad ?? null,
+      bestMag: best ? [best.minMag, 0.1] : null,
+      bestElDeg: best ? [best.peakElDeg, 1] : null,
+      rbTop8: sat.passes.slice(0, 8).filter((p) => p.name.includes('R/B'))
+        .length,
+      issTonight: sat.passes.some((p) => p.norad === 25544)
+    },
+    closure: clo.ratios
+      ? {
+          globalRatio: [clo.ratios.globalRatio, 0.01],
+          beamRatio: [clo.ratios.beamRatio, 0.02],
+          diffuseRatio: [clo.ratios.diffuseRatio, 0.02]
+        }
+      : null
+  };
+  const pinsPath = resolve(HERE, opt('pins', 'observatory-pins.js'));
+  writeFileSync(
+    pinsPath,
+    `/**
+ * observatory-pins.js - the frozen day's DAY-PINNED numbers as
+ * data, GENERATED by observatory-freeze.mjs (--pins-only reruns
+ * just this file from the existing fixture). Scalars are exact;
+ * [value, tolerance] pairs are asserted within their stated
+ * physical noise scale by the reference's generic runner. The
+ * generatedFor stamp must equal the fixture's FIXTURE_AT - the
+ * reference refuses stale pins. Regenerate, READ THE DIFF, then
+ * commit fixture and pins together: the review is where
+ * run-then-pin's deliberateness now lives.
+ */
+
+export const DAY_PINS = ${JSON.stringify(pins, null, 2)};
+`
+  );
+  console.log(`wrote ${pinsPath}`);
+
   const f3 = (v) => (v == null ? 'null' : (+v).toFixed(3));
   console.log(`
-PIN CANDIDATES (${at}, ${F.SOUNDING.wmo} ${F.SOUNDING.at})
+THE DAY (${F.FIXTURE_AT}, ${F.SOUNDING.wmo} ${F.SOUNDING.at})
  column   inversion +${f3(col.inversion.dT)} C at ${col.inversion.hM} m; folds ${beach.folds}/${aloft.folds}; R0 ${f3(beach.r0Arcmin)}' vs ISA ${f3(beach.r0IsaArcmin)}'; flatten ${f3(beach.flatten)}; rim ${f3(beach.rimArcsec)}"
  sea      W(${F.BUOY.wspdMs}) = ${f3(sea.W * 100)} %
  wet      ${wet.rows.map((r) => `${r.name} ${f3(r.w)}`).join('; ')}
@@ -466,11 +615,19 @@ PIN CANDIDATES (${at}, ${F.SOUNDING.wmo} ${F.SOUNDING.at})
  contrail form ${con.formBand ? con.formBand.loM + '-' + con.formBand.hiM : 'none'}; issr ${con.issrLevels.map((q) => q.hM + '@' + f3(q.rhi)).join(',') || 'none'}; persist ${con.persistBand ? con.persistBand.loM + '-' + con.persistBand.hiM : 'null'}; ac ${con.aircraft?.n} max ${f3(con.aircraft?.maxAltM)}
  leewave  levels ${lee.levels.length}; layer mMs ${f3(lee.layer?.mMs)} scalar ${f3(lee.layer?.scalarMs)}; spot ${lee.spot?.hM} m lam ${f3(lee.spot?.lamM)}
  tide     ${tid.amps.map((a) => `${a.n} ${f3(a.ampM)}`).join('; ')}; rmsOut ${f3(tid.rmsOutM)}; latest resid ${f3(tid.latestResidM)}; vs published M2 x${f3(tid.amps[0].ratio)} O1 x${f3(tid.amps.find((a) => a.n === 'O1')?.ratio)}
+ sats     ${sat.passes.length} passes / ${sat.nakedEye} naked-eye over ${f3(sat.darkHours)} dark h; best ${best?.name?.trim()} mag ${f3(best?.minMag)} at ${f3(best?.peakElDeg)} deg
  closure  global ${f3(clo.ratios?.globalRatio)}; beam ${f3(clo.ratios?.beamRatio)}; diffuse ${f3(clo.ratios?.diffuseRatio)}
 
-Now RE-PIN observatory-reference.mjs from these numbers before
-committing the new fixture (the old day's bands are expected to
-fail - that is run-then-pin working).`);
+Fixture and pins are regenerated TOGETHER. Read the git diff of
+observatory-pins.js - the day's story in numbers - then run the
+gate and commit both. The reference's invariant landmarks hold on
+any day by form; the day pins hold because you just reviewed them.`);
 }
 
-main();
+if (args.includes('--pins-only')) {
+  emitPins(resolve(HERE, opt('fixture', 'observatory-fixture.js'))).then(() =>
+    console.log('pins regenerated from the existing fixture')
+  );
+} else {
+  main();
+}

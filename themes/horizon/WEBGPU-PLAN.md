@@ -9409,6 +9409,45 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     per-mark tooltips fail the interaction rule), edge labels
     flipping anchor so they never clip; ?lat/?lon move the whole
     night. observatory-freeze.mjs fetches /tles with the rest.
+- DONE (Aug 9, the review session's 123rd pass - THE LANDMARK
+  SPLIT: refreezing becomes affordable, the archive becomes real):
+  the scope decision from the review conversation, executed - the
+  observatory's panel set is DECLARED COMPLETE at twelve, and the
+  discipline shifts from widening to deepening. The reference's
+  fifteen landmark blocks split into two kinds: DAY-INVARIANT
+  landmarks (eleven blocks that hold on ANY frozen day by form -
+  the engine-sun agreement, the Monahan closed-form/power/monotone
+  identities at whatever wind froze, the polarization w and
+  maxToday = w x maxPure identities with the 90-degree lobe, the
+  corona's any-phase printed band, the meteor frame's exact-1
+  perception fold and rate composition and year-pinned lam 140.0
+  crossing, the aurora wire's form checks, the contrail scan's
+  internal honesty (band members under their own T_LC, persistence
+  inside formation, the exact FT_M ceiling), the wave ladder's
+  exact Fr3 edges, the tide ratios inside Schureman's printed
+  nodal envelopes with the node-era sign dated in the source, the
+  McCants anchor) and DAY PINS - the frozen day's numbers as
+  GENERATED DATA: observatory-freeze.mjs now writes
+  observatory-pins.js beside the fixture ([value, tolerance] pairs
+  at stated physical noise scales, exact ints/strings/nulls), a
+  generic runner asserts them (70 pinned quantities across ten
+  panels this day), and a PINS GUARD fails the gate outright when
+  the pins' generatedFor stamp differs from FIXTURE_AT - fixture
+  and pins move together or not at all. --pins-only regenerates
+  pins from the existing fixture (how this day's file was built,
+  mechanically, and verified identical to the hand-pinned
+  numbers). The refreeze procedure is now: one command, read the
+  diff (where run-then-pin's deliberateness lives), gate, commit -
+  minutes, not an hour - so the frozen-day archive the observatory
+  implies is finally affordable. The freeze script also gained the
+  satsPanel run (the 122nd's panel had landed without extending
+  the pin printer) with the same deterministic night-window
+  convention the reference uses. Rule made explicit in the plan:
+  observatory.js may COMPOSE gated modules but never own a law -
+  the line that keeps the visual view and the research one
+  project. Shelf status: comets / purple light / sprites remain
+  OPTIONAL garnish behind the deepening work (closures on the
+  same frozen day, the archive itself).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

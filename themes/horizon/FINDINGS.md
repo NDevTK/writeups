@@ -296,7 +296,13 @@ The practice the corpus demonstrates, stated so it can be reused:
    `observatory-reference.mjs` pins the compositions in the gate — so
    the instrument itself is validated, and a claim like "today the sun
    sets 5.2′ late and 30 % squashed" is a reproducible artifact, not a
-   screenshot.
+   screenshot. The landmarks split (pass 123) into day-invariant code
+   (identities, printed envelopes, form checks — they survive any
+   refreeze) and generated day pins (`observatory-pins.js`, written by
+   `observatory-freeze.mjs` beside the fixture, guarded by a stamp
+   match): re-anchoring the instrument to a new real day costs one
+   command plus reading the diff, which is where run-then-pin's
+   deliberateness now lives — the affordable frozen-day archive.
 
 ---
 
