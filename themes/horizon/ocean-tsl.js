@@ -30,7 +30,11 @@ import {
   vec3,
   vec4
 } from 'three/tsl';
-import {buildInitialSpectrum, calibrateSeaState} from './ocean-spectrum.js';
+import {
+  buildInitialSpectrum,
+  calibrateBuoyBands,
+  calibrateSeaState
+} from './ocean-spectrum.js';
 
 /**
  * Tessendorf (2001) FFT ocean on the GPU (WebGPU project, phase 5).
@@ -73,7 +77,10 @@ export function createOceanFFT(renderer, opts = {}) {
     // Measured sea-state mode: opts.sea = [{hs, tp, dir, U10?}]
     // partitions (live marine data) override the fetch-limited
     // wind-sea prediction.
-    partitions: opts.sea ? calibrateSeaState(opts.sea) : undefined
+    partitions: opts.sea ? calibrateSeaState(opts.sea) : undefined,
+    // Measured SPECTRUM mode (NDBC buoy, buoy.js): opts.buoy =
+    // [{f, s, a1, a2, r1, r2}] tabulated bands outrank both.
+    bands: opts.buoy ? calibrateBuoyBands(opts.buoy) : undefined
   };
   const seed = opts.seed ?? 1337;
 
@@ -335,6 +342,7 @@ export function createOceanFFT(renderer, opts = {}) {
       params.U10 = U10;
       params.windDir = windDir;
       params.partitions = undefined; // back to the wind-sea prediction
+      params.bands = undefined;
       fillSpectrum();
       h0Tex.needsUpdate = true;
     },
@@ -342,6 +350,13 @@ export function createOceanFFT(renderer, opts = {}) {
     // in-place rebuild as setWind.
     setSeaState(sea) {
       params.partitions = calibrateSeaState(sea);
+      fillSpectrum();
+      h0Tex.needsUpdate = true;
+    },
+    // A fresh measured spectrum (buoy): same in-place rebuild.
+    // null returns to the partitions/wind chain.
+    setBuoyBands(bands) {
+      params.bands = bands ? calibrateBuoyBands(bands) : undefined;
       fillSpectrum();
       h0Tex.needsUpdate = true;
     },

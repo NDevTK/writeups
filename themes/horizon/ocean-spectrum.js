@@ -191,17 +191,120 @@ export function calibrateSeaState(parts) {
     });
 }
 
+/**
+ * Calibrate a MEASURED buoy spectrum (NDBC via buoy.js) for
+ * spectrumK. bands: [{f, s, a1, a2, r1, r2}] - centre frequency
+ * (Hz), spectral density C11 (m^2/Hz), and the Longuet-Higgins
+ * directional pair (a1/a2 already converted to world-XZ math
+ * radians, waves travelling TOWARD; r1/r2 dimensionless). Bands
+ * with missing density drop; missing direction means isotropic
+ * (r1 = r2 = 0 - the series' own limit).
+ *
+ * Stored per band are the distribution's own Fourier
+ * coefficients A1 = r1 cos a1, B1 = r1 sin a1, A2 = r2 cos 2a2,
+ * B2 = r2 sin 2a2, so interpolation across frequency is LINEAR
+ * in the quantities the buoy actually resolves (Longuet-Higgins,
+ * Cartwright & Smith 1963 - the truncated series is exactly
+ * these four numbers per band). The truncated series can dip
+ * negative; evaluation clamps at zero and divides by the
+ * clamped form's own integral (256-panel trapezoid per band,
+ * precomputed here), so each band's directional distribution
+ * stays a distribution and the tabulated C11 variance is
+ * conserved exactly - the renormalisation the buoy-analysis
+ * literature applies, stated.
+ */
+export function calibrateBuoyBands(bands) {
+  const rows = (bands || [])
+    .filter((b) => b && Number.isFinite(b.f) && Number.isFinite(b.s))
+    .sort((x, y) => x.f - y.f)
+    .map((b) => {
+      const has = Number.isFinite(b.a1) && Number.isFinite(b.r1);
+      const A1 = has ? b.r1 * Math.cos(b.a1) : 0;
+      const B1 = has ? b.r1 * Math.sin(b.a1) : 0;
+      const has2 = Number.isFinite(b.a2) && Number.isFinite(b.r2);
+      const A2 = has2 ? b.r2 * Math.cos(2 * b.a2) : 0;
+      const B2 = has2 ? b.r2 * Math.sin(2 * b.a2) : 0;
+      let I = 0;
+      const NP = 256;
+      for (let i = 0; i < NP; i++) {
+        const th = ((i + 0.5) / NP) * 2 * Math.PI;
+        I +=
+          Math.max(
+            0.5 +
+              A1 * Math.cos(th) +
+              B1 * Math.sin(th) +
+              A2 * Math.cos(2 * th) +
+              B2 * Math.sin(2 * th),
+            0
+          ) *
+          ((2 * Math.PI) / NP);
+      }
+      return {f: b.f, s: b.s, A1, B1, A2, B2, invNorm: I > 0 ? 1 / I : 0};
+    });
+  return rows.length >= 2 ? rows : null;
+}
+
 // Directional wavenumber spectrum S(kx,kz) (change of variables:
-// S(k,theta) k dk dtheta = S(w,theta) dw dtheta). Two modes, one
-// formulation: params.partitions (calibrateSeaState output) sums the
-// measured partitions; otherwise the fetch-limited wind sea from
-// {U10, F, windDir} - the physics when no marine data exists.
+// S(k,theta) k dk dtheta = S(w,theta) dw dtheta). Three modes, one
+// formulation: params.bands (calibrateBuoyBands output) reads the
+// buoy's own tabulated directional spectrum below its measurement
+// ceiling; params.partitions (calibrateSeaState output) sums the
+// measured marine-model partitions; otherwise the fetch-limited
+// wind sea from {U10, F, windDir} - the physics when no data
+// exists. With bands present the wind-sea prediction still
+// supplies every frequency ABOVE the buoy's last band (its
+// sampling ceiling, 0.485 Hz for NDBC - the short chop a moored
+// hull cannot resolve), so glitter-scale waves survive; below the
+// first band (T > 30 s) the measured answer is zero.
 export function spectrumK(kx, kz, params) {
   const {U10, F, D, windDir} = params;
   const k = Math.hypot(kx, kz);
   if (k < 1e-6) return 0;
   const {w, dwdk} = dispersion(k, D);
   const thK = Math.atan2(kz, kx);
+  if (params.bands) {
+    const bs = params.bands;
+    const f = w / (2 * Math.PI);
+    const last = bs[bs.length - 1];
+    if (f <= last.f) {
+      if (f < bs[0].f) return 0;
+      let i = 1;
+      while (bs[i].f < f) i++;
+      const a = bs[i - 1];
+      const b = bs[i];
+      const t = (f - a.f) / (b.f - a.f);
+      const Sf = a.s + (b.s - a.s) * t;
+      if (Sf <= 0) return 0;
+      const A1 = a.A1 + (b.A1 - a.A1) * t;
+      const B1 = a.B1 + (b.B1 - a.B1) * t;
+      const A2 = a.A2 + (b.A2 - a.A2) * t;
+      const B2 = a.B2 + (b.B2 - a.B2) * t;
+      const invN = a.invNorm + (b.invNorm - a.invNorm) * t;
+      const Dth =
+        Math.max(
+          0.5 +
+            A1 * Math.cos(thK) +
+            B1 * Math.sin(thK) +
+            A2 * Math.cos(2 * thK) +
+            B2 * Math.sin(2 * thK),
+          0
+        ) * invN;
+      // S(w,theta) = C11(f)/(2 pi) * D(theta) (df/dw = 1/2pi).
+      return ((Sf / (2 * Math.PI)) * Dth * dwdk) / k || 0;
+    }
+    // fall through: the wind-sea prediction above the ceiling
+    if (!(U10 > 0)) return 0;
+    const S = tmaSpectrum(w, U10, F, D);
+    if (S <= 0) return 0;
+    const wp = peakOmega(U10, F);
+    const th = thK - windDir;
+    return (
+      (S *
+        hasselmannSpread(w, wp, U10, Math.atan2(Math.sin(th), Math.cos(th))) *
+        dwdk) /
+      k
+    );
+  }
   if (params.partitions) {
     let sum = 0;
     for (const p of params.partitions) {

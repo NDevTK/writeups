@@ -8063,6 +8063,72 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   20.3% of pixels move, base and cover untouched. Gate:
   sounding-reference grows 7 -> 13 landmarks; full gate
   green - 119 CPU references + 7 GPU probes.
+- DONE (Aug 9, the review session's 89th pass - the measured
+  wave spectrum: NDBC buoys hand the FFT ocean its own
+  spectrum). The sea's last model dependency: the ocean rode
+  ECMWF WAM partitions (open-meteo marine) reshaped through a
+  parametric JONSWAP + imposed spreading. NOAA NDBC wave buoys
+  publish the MEASURED thing itself, keyless, every 10-30 min:
+  .data_spec is C11(f) in m^2/Hz (~46 bands to 0.485 Hz, finer
+  on CDIP hulls), and .swdir/.swdir2/.swr1/.swr2 are the
+  Longuet-Higgins, Cartwright & Smith (1963) directional pair
+  per band - D(theta|f) = (1/pi)(1/2 + r1 cos(theta-alpha1)
+  - r2 cos 2(theta-alpha2)), the buoy's pitch-roll harmonics.
+    buoy.js parses all five products plus activestations.xml
+    (999/9.999 sentinels -> null; the txt's 10-min met rows
+    interleaving hourly wave rows walked to the newest finite
+    field). GATE-HELD identities, measured against measured on
+    the vendored 46042 (Monterey) files: Hs = 4 sqrt(m0) by
+    trapezoid over the file's own bands = 1.190 m vs the buoy's
+    OWN reported WVHT 1.2 m at the SAME 02:20Z record (0.8%);
+    the spectral peak 0.058 Hz -> 17.2 s vs its reported DPD
+    17 s; alpha1 at the peak 176 deg vs its MWD 174; D(theta)
+    integrates to 1 over the circle to 1e-9 (the harmonics
+    vanish analytically). ocean-spectrum.js gains the bands mode:
+    spectrumK interpolates the distribution's own Fourier
+    coefficients (r1 cos a1, r1 sin a1, r2 cos 2a2, r2 sin 2a2 -
+    LINEAR in f, the quantities the buoy resolves), clamps the
+    truncated series' negative lobes and renormalises per band
+    (256-panel integral, stated - the buoy-analysis practice), so
+    the k-plane integral of the DISPLAY's own spectrumK returns
+    99.6% of the tabulated variance (dispersion Jacobian and all);
+    above the buoy's 0.485 Hz sampling ceiling the fetch-limited
+    wind sea still supplies the chop (a moored hull cannot
+    measure it - stated), below the first band the measured
+    answer is zero. The 17 s Pacific swell arrives BROAD (r1
+    0.37, toward/opposite energy 2.8) where the parametric mode
+    would have imposed Goda's s_max = 75 pencil - the measurement
+    corrects the model's imposed shape, the pass's whole point.
+    Daemon /buoy walks the four nearest active stations within
+    400 km (list daily, spectra 30 min/1-deg, stale-serve),
+    joining directional rows only when they share the spectrum's
+    timestamp and grid; install.sh ships buoy.js in the SAME
+    commit (drift guard), flat-deploy boot-tested against the
+    live feed (46236 Monterey Canyon at 18 km answered with 98
+    CDIP bands). Client: syncBuoy every 30 min; buoyBands()
+    gates (BUOY_MAX_KM 150 - half the coastal network spacing;
+    BUOY_FRESH_H 3) and converts per band through the SAME
+    seaDirRad as the partitions; the ruling chain is now
+    buoy > marine partitions > wind prediction, with a material
+    wind move under a ruling buoy re-seeding the wind first (the
+    above-ceiling tail rides it) then the bands. ?buoy=URL
+    overrides and works under pin=1 - the harness A/B rides a
+    vendored payload. A/B at pinned Nelson 15:00 (matched
+    worlds): the page's own instrument flips JONSWAP/TMA wind
+    sea -> MEASURED buoy spectrum (NDBC 46042) - Hs 1.2 m
+    (4 sqrt m0, reported 1.2) - peak 17 s - directional; 24.3%
+    of unsaturated sea pixels move and the along-row luminance
+    sigma drops 34.0 -> 30.2 (the parametric chop's glitter
+    variance yields to the long swell). Wave PHASE decorrelates
+    between capture runs (oceanTime is elapsed-anchored - the
+    twinkle clock's ocean cousin, stated), so the pixel fraction
+    bundles phase with spectrum; the sigma drop and the panel
+    line are the spectrum's own signatures. One capture pair was
+    discarded for a WORLD mismatch (Overpass availability moved
+    the camera anchor between runs - check the veglod tree-count
+    record matches before trusting a whole-frame pair). Gate:
+    buoy-reference.mjs joins with 10 landmarks - full gate
+    green, 120 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

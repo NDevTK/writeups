@@ -79,6 +79,13 @@ import {
   parseWyoText,
   WYO_BASE
 } from '../../sounding.js';
+import {
+  firstSpecRow,
+  firstTxtValue,
+  NDBC_BASE,
+  NDBC_STATIONS,
+  parseStations
+} from '../../buoy.js';
 import {COBS_API, COBS_WINDOW_DAYS, cobsMedians} from '../../cobs.js';
 import {ozoneCensus} from '../../ozone.js';
 import {
@@ -1023,6 +1030,8 @@ function main() {
   let gvpElev = {t: 0, map: new Map()}; // Holocene summit elevations, daily
   let sndStations = {t: 0, list: []}; // IGRA station list, daily
   const sndCache = new Map(); // 1-deg area -> {t, body}, hourly
+  let buoyStations = {t: 0, list: []}; // NDBC active stations, daily
+  const buoyCache = new Map(); // 1-deg area -> {t, body}, 30 min
   let cobsCache = {t: 0, body: null}; // measured comet medians, 3-hourly
   const aerosolCache = new Map(); // 0.25-deg cell key -> {t, body}
   const ozoneCache = new Map(); // 0.25-deg cell key -> {t, body}
@@ -1999,6 +2008,115 @@ function main() {
           });
         }
         return json(502, {sounding: null, upstream: 'unavailable'});
+      }
+    }
+
+    if (url.pathname === '/buoy') {
+      // MEASURED sea state (buoy.js): the nearest NDBC station's
+      // newest directional wave spectrum - C11(f) plus the
+      // Longuet-Higgins alpha1/alpha2/r1/r2 per band - joined
+      // with the standard met row. Station list daily; spectra
+      // cached 30 min per 1-degree area; stale-serve. The
+      // freshness/radius gates stay with the CLIENT.
+      const lat = parseFloat(url.searchParams.get('lat'));
+      const lon = parseFloat(url.searchParams.get('lon'));
+      if (!Number.isFinite(lat) || !Number.isFinite(lon))
+        return json(400, {error: 'lat/lon required'});
+      const key = Math.round(lat) + ',' + Math.round(lon);
+      const hit = buoyCache.get(key);
+      if (hit && Date.now() - hit.t < 1800e3) {
+        return json(200, hit.body, {
+          'cache-control': 'public, max-age=600',
+          'x-buoy-source': 'ndbc.noaa.gov (cached)'
+        });
+      }
+      try {
+        if (Date.now() - buoyStations.t > 24 * 3600e3) {
+          const r = await fetch(NDBC_STATIONS, {
+            signal: AbortSignal.timeout(45000),
+            headers: {'user-agent': UA}
+          });
+          if (!r.ok) throw new Error(r.status);
+          const list = parseStations(await r.text());
+          if (list.length > 100) buoyStations = {t: Date.now(), list};
+        }
+        // Nearest stations first; a buoy can be adrift or silent,
+        // so walk up to the four nearest within 400 km and take
+        // the first with a live spectral file.
+        const near = buoyStations.list
+          .map((s) => ({s, d: haversineKm(lat, lon, s.lat, s.lon)}))
+          .filter((x) => x.d < 400)
+          .sort((a, b) => a.d - b.d)
+          .slice(0, 4);
+        let body = null;
+        for (const cand of near) {
+          const get = async (prod) => {
+            const r = await fetch(NDBC_BASE + cand.s.id + '.' + prod, {
+              signal: AbortSignal.timeout(30000),
+              headers: {'user-agent': UA}
+            });
+            return r.ok ? r.text() : null;
+          };
+          const specTxt = await get('data_spec');
+          if (!specTxt) continue;
+          const spec = firstSpecRow(specTxt, true);
+          if (!spec || spec.f.length < 10) continue;
+          // Directional products are optional (many met buoys
+          // report density only): a band's direction joins ONLY
+          // when its file's newest row shares the spectrum's
+          // timestamp and band grid - otherwise null (isotropic
+          // at draw time, the Longuet-Higgins series' own limit).
+          const dir = {};
+          for (const prod of ['swdir', 'swdir2', 'swr1', 'swr2']) {
+            const t = await get(prod);
+            const row = t ? firstSpecRow(t, false) : null;
+            dir[prod] =
+              row && row.at === spec.at && row.f.length === spec.f.length
+                ? row.v
+                : null;
+          }
+          const txt = await get('txt');
+          const wv = txt ? firstTxtValue(txt, 'wvht') : null;
+          const dpd = txt ? firstTxtValue(txt, 'dpd') : null;
+          const mwd = txt ? firstTxtValue(txt, 'mwd') : null;
+          const wt = txt ? firstTxtValue(txt, 'wtmp') : null;
+          body = {
+            id: cand.s.id,
+            name: cand.s.name,
+            lat: cand.s.lat,
+            lon: cand.s.lon,
+            distKm: Math.round(cand.d),
+            at: new Date(spec.at).toISOString().replace('.000', ''),
+            sep: spec.sep,
+            f: spec.f,
+            s: spec.v,
+            a1: dir.swdir,
+            a2: dir.swdir2,
+            r1: dir.swr1,
+            r2: dir.swr2,
+            wvht: wv ? wv.val : null,
+            dpd: dpd ? dpd.val : null,
+            mwd: mwd ? mwd.val : null,
+            wtmp: wt ? wt.val : null
+          };
+          break;
+        }
+        if (!body) throw new Error('no reporting buoy in range');
+        buoyCache.set(key, {t: Date.now(), body});
+        if (buoyCache.size > 500)
+          buoyCache.delete(buoyCache.keys().next().value);
+        return json(200, body, {
+          'cache-control': 'public, max-age=600',
+          'x-buoy-source': 'ndbc.noaa.gov'
+        });
+      } catch (e) {
+        if (hit) {
+          return json(200, hit.body, {
+            'cache-control': 'public, max-age=300',
+            'x-buoy-source': 'ndbc.noaa.gov (stale)'
+          });
+        }
+        return json(502, {buoy: null, upstream: 'unavailable'});
       }
     }
 

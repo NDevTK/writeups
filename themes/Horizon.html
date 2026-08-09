@@ -847,6 +847,12 @@
       import {bscIndexOf, VARSTARS, varV} from './horizon/varstars.js';
       import {apparentAltRad} from './horizon/gvp.js';
       import {SOUNDING_FRESH_H, SOUNDING_MAX_KM} from './horizon/sounding.js';
+      import {
+        BUOY_FRESH_H,
+        BUOY_MAX_KM,
+        hsOfM0,
+        m0OfSpec
+      } from './horizon/buoy.js';
       import {measuredMag} from './horizon/cobs.js';
       import {buildPollenLUT, pollenTau, BIRCH_D_UM} from './horizon/pollen.js';
       import {
@@ -1523,6 +1529,30 @@
           parts.push({hs: s.hs, tp: s.tp, dir: seaDirRad(s.dir)});
         }
         return parts.length ? parts : null;
+      }
+      // MEASURED wave spectrum (NDBC buoy via the daemon, buoy.js):
+      // fresh and near, the buoy's own directional bands outrank
+      // both the marine model's partitions and the wind prediction.
+      // Directions convert per band through the SAME seaDirRad the
+      // partitions use; missing directional bands go isotropic
+      // (NaN - the Longuet-Higgins series' own r = 0 limit).
+      function buoyBands() {
+        const b = state.buoy;
+        if (!b || !Array.isArray(b.f) || !Array.isArray(b.s)) return null;
+        if (Date.now() - Date.parse(b.at) > BUOY_FRESH_H * 3600e3) return null;
+        if (!(b.distKm <= BUOY_MAX_KM)) return null;
+        const rows = [];
+        for (let i = 0; i < b.f.length; i++) {
+          rows.push({
+            f: b.f[i],
+            s: b.s[i],
+            a1: b.a1 && b.a1[i] !== null ? seaDirRad(b.a1[i]) : NaN,
+            a2: b.a2 && b.a2[i] !== null ? seaDirRad(b.a2[i]) : NaN,
+            r1: b.r1 ? b.r1[i] : null,
+            r2: b.r2 ? b.r2[i] : null
+          });
+        }
+        return rows.length >= 2 ? rows : null;
       }
       // Geomagnetic frame at the visitor (IGRF-14, igrf.js):
       // declination steers the aurora curtain azimuth, geomagnetic
@@ -4264,6 +4294,53 @@
         // stable ascent retires an older tower.
         state.stormTopM = Number.isFinite(s.elM) ? s.elM : null;
       }
+      // MEASURED wave spectrum (buoy.js via the daemon): the
+      // nearest NDBC buoy's directional spectrum outranks the wave
+      // model - the radiosonde pattern on the sea. ?buoy=URL
+      // overrides AND works under pin=1 (the harness A/B path,
+      // pointing at a vendored payload); =0 disables.
+      const BUOY_PROXY =
+        params.get('buoy') ?? AEROSOL_PROXY.replace(/\/aerosol$/, '/buoy');
+      async function syncBuoy() {
+        if (BUOY_PROXY === '0' || (overridden && !params.has('buoy'))) return;
+        try {
+          const r = await (
+            await fetch(
+              BUOY_PROXY +
+                (BUOY_PROXY.includes('?') ? '&' : '?') +
+                'lat=' +
+                state.lat +
+                '&lon=' +
+                state.lon,
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (!r.id || !Array.isArray(r.f) || !Array.isArray(r.s)) return;
+          state.buoy = r;
+          const m0 = m0OfSpec(r.f, r.s);
+          let pk = 0;
+          for (let i = 0; i < r.f.length; i++)
+            if ((r.s[i] ?? 0) > (r.s[pk] ?? 0)) pk = i;
+          record(
+            'NDBC buoy (measured spectrum)',
+            r.id +
+              ' ' +
+              r.distKm +
+              ' km · ' +
+              r.f.length +
+              ' bands · Hs ' +
+              hsOfM0(m0).toFixed(1) +
+              ' m (4√m0' +
+              (Number.isFinite(r.wvht) ? ', reported ' + r.wvht : '') +
+              ') · peak ' +
+              (1 / r.f[pk]).toFixed(0) +
+              ' s' +
+              (r.a1 ? ' · directional' : ' · isotropic')
+          );
+        } catch {
+          // the wave model stands
+        }
+      }
       // MEASURED comet brightness (cobs.js via the daemon): the
       // COBS network's fresh per-comet medians outrank the g/k
       // formula. ?cobs=URL overrides; =0 keeps the formula.
@@ -6845,10 +6922,16 @@
           oceanSeaDepth = dCnt ? Math.max(dSum / dCnt, 5) : 60;
           oceanBuiltU = state.wind / 3.6;
           oceanBuiltDir = Math.atan2(windV.z, windV.x);
-          // Measured sea-state partitions (marine model) take over
-          // from the wind prediction when present.
+          // Measured sea state takes over from the wind prediction
+          // when present: the buoy's own spectrum first, then the
+          // marine model's partitions.
           const seaNow = seaParts();
-          oceanBuiltSeaKey = seaNow ? JSON.stringify(seaNow) : null;
+          const buoyNow0 = buoyBands();
+          oceanBuiltSeaKey = buoyNow0
+            ? 'buoy:' + state.buoy.id + state.buoy.at
+            : seaNow
+              ? JSON.stringify(seaNow)
+              : null;
           const OCEAN_SPLIT = (2 * Math.PI) / 25;
           oceanCascades = [
             createOceanFFT(renderer, {
@@ -6859,6 +6942,7 @@
               D: oceanSeaDepth,
               windDir: oceanBuiltDir,
               sea: seaNow ?? undefined,
+              buoy: buoyNow0 ?? undefined,
               kMax: OCEAN_SPLIT,
               seed: 1337,
               lambda: 1.1
@@ -6871,6 +6955,7 @@
               D: oceanSeaDepth,
               windDir: oceanBuiltDir,
               sea: seaNow ?? undefined,
+              buoy: buoyNow0 ?? undefined,
               kMin: OCEAN_SPLIT,
               seed: 7331,
               lambda: 1.1
@@ -6901,9 +6986,11 @@
           ground.add(water);
           record(
             'Tessendorf FFT ocean',
-            (oceanBuiltSeaKey
-              ? 'measured marine partitions (wind sea + swell)'
-              : 'JONSWAP/TMA wind sea') +
+            (buoyNow0
+              ? 'MEASURED buoy spectrum (NDBC ' + state.buoy.id + ')'
+              : oceanBuiltSeaKey
+                ? 'measured marine partitions (wind sea + swell)'
+                : 'JONSWAP/TMA wind sea') +
               ' · exact spectral normals · Jacobian whitecaps'
           );
         }
@@ -12290,14 +12377,26 @@
               Math.cos(dirNow - oceanBuiltDir)
             )
           );
-          // Measured partitions rule when the marine model has them
-          // (they only move on the 15-minute sync); otherwise the
-          // wind-sea prediction with its drift gating.
+          // Measured sea rules when present - the buoy's spectrum
+          // first (it only moves on its half-hour sync), then the
+          // marine model's partitions; otherwise the wind-sea
+          // prediction with its drift gating. A material wind move
+          // under a ruling buoy re-seeds the wind FIRST (the tail
+          // above the buoy's ceiling rides it), then the bands.
           const iceDamp = 1 - seaIceC;
+          const buoyNow = buoyBands();
           const partsNow = seaParts();
-          const seaKey = partsNow ? JSON.stringify(partsNow) : null;
+          const seaKey = buoyNow
+            ? 'buoy:' + state.buoy.id + state.buoy.at
+            : partsNow
+              ? JSON.stringify(partsNow)
+              : null;
+          const windMoved =
+            Math.abs(Ums * iceDamp - oceanBuiltU) > 1.5 || dDir > 0.35;
           if (seaKey !== oceanBuiltSeaKey) {
-            if (partsNow) {
+            if (buoyNow) {
+              for (const c of oceanCascades) c.setBuoyBands(buoyNow);
+            } else if (partsNow) {
               for (const c of oceanCascades) c.setSeaState(partsNow);
             } else {
               for (const c of oceanCascades) c.setWind(Ums * iceDamp, dirNow);
@@ -12305,10 +12404,14 @@
               oceanBuiltDir = dirNow;
             }
             oceanBuiltSeaKey = seaKey;
-          } else if (
-            !partsNow &&
-            (Math.abs(Ums * iceDamp - oceanBuiltU) > 1.5 || dDir > 0.35)
-          ) {
+          } else if (windMoved && buoyNow) {
+            for (const c of oceanCascades) {
+              c.setWind(Ums * iceDamp, dirNow);
+              c.setBuoyBands(buoyNow);
+            }
+            oceanBuiltU = Ums * iceDamp;
+            oceanBuiltDir = dirNow;
+          } else if (windMoved && !partsNow) {
             for (const c of oceanCascades) c.setWind(Ums * iceDamp, dirNow);
             oceanBuiltU = Ums * iceDamp;
             oceanBuiltDir = dirNow;
@@ -14271,6 +14374,8 @@
         setInterval(syncVolcano, 6 * 60 * 60 * 1000);
         syncSounding();
         setInterval(syncSounding, 60 * 60 * 1000);
+        syncBuoy();
+        setInterval(syncBuoy, 30 * 60 * 1000);
         syncCobs();
         setInterval(syncCobs, 3 * 60 * 60 * 1000);
         syncPollen();
