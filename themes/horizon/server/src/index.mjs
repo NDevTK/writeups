@@ -70,6 +70,14 @@ import {
 } from '../../aeronet.js';
 import {gmnMedians, parseTrajSummary} from '../../gmn.js';
 import {GVP_RSS, GVP_WFS, parseGvpRss, plumeTopM} from '../../gvp.js';
+import {
+  freezingLevelM,
+  IGRA_STATIONS,
+  levelAt,
+  parseIgraStations,
+  parseWyoText,
+  WYO_BASE
+} from '../../sounding.js';
 import {ozoneCensus} from '../../ozone.js';
 import {
   ndviCell,
@@ -971,6 +979,8 @@ function main() {
   let gmnCache = {t: 0, body: null}; // yesterday's medians, 6-hourly
   let gvpCache = {t: 0, body: null}; // weekly eruption report, 6-hourly
   let gvpElev = {t: 0, map: new Map()}; // Holocene summit elevations, daily
+  let sndStations = {t: 0, list: []}; // IGRA station list, daily
+  const sndCache = new Map(); // 1-deg area -> {t, body}, hourly
   const aerosolCache = new Map(); // 0.25-deg cell key -> {t, body}
   const ozoneCache = new Map(); // 0.25-deg cell key -> {t, body}
   const chlorCache = new Map(); // 1/12-deg cell key -> {t, body}
@@ -1785,6 +1795,115 @@ function main() {
           });
         }
         return json(502, {volcanoes: null, upstream: 'unavailable'});
+      }
+    }
+
+    if (url.pathname === '/sounding') {
+      // MEASURED upper air (sounding.js): the nearest active
+      // radiosonde station's latest 00/12Z ascent from the
+      // Wyoming server, reduced to the numbers the theme's
+      // consumers read - measured freezing level, 250 hPa
+      // temperature/humidity/wind. Stations via NOAA's IGRA
+      // list (daily); ascents cached an hour per 1-degree area;
+      // stale-serve. Freshness/radius decisions stay with the
+      // CLIENT (it knows its scene clock).
+      const lat = parseFloat(url.searchParams.get('lat'));
+      const lon = parseFloat(url.searchParams.get('lon'));
+      if (!Number.isFinite(lat) || !Number.isFinite(lon))
+        return json(400, {error: 'lat/lon required'});
+      const key = Math.round(lat) + ',' + Math.round(lon);
+      const hit = sndCache.get(key);
+      if (hit && Date.now() - hit.t < 3600e3) {
+        return json(200, hit.body, {
+          'cache-control': 'public, max-age=900',
+          'x-sounding-source': 'weather.uwyo.edu + IGRA (cached)'
+        });
+      }
+      try {
+        if (Date.now() - sndStations.t > 24 * 3600e3) {
+          const r = await fetch(IGRA_STATIONS, {
+            signal: AbortSignal.timeout(60000),
+            headers: {'user-agent': UA}
+          });
+          if (!r.ok) throw new Error(r.status);
+          const list = parseIgraStations(await r.text());
+          if (list.length > 300) sndStations = {t: Date.now(), list};
+        }
+        let best = null;
+        for (const s of sndStations.list) {
+          const d = haversineKm(lat, lon, s.lat, s.lon);
+          if (!best || d < best.d) best = {s, d};
+        }
+        if (!best) throw new Error('no stations');
+        // Latest synoptic slots, newest first (ascents launch
+        // ~1 h before the nominal hour and land ~1 h after).
+        const slots = [];
+        const now = new Date();
+        for (let back = 0; back < 4; back++) {
+          const t = new Date(now.getTime() - back * 12 * 3600e3);
+          const h = t.getUTCHours() >= 13 ? 12 : t.getUTCHours() >= 1 ? 0 : -12;
+          const d = new Date(t);
+          let hh = h;
+          if (h === -12) {
+            d.setUTCDate(d.getUTCDate() - 1);
+            hh = 12;
+          }
+          const iso =
+            d.toISOString().slice(0, 10) +
+            ' ' +
+            String(hh).padStart(2, '0') +
+            ':00:00';
+          if (!slots.includes(iso)) slots.push(iso);
+        }
+        let body = null;
+        for (const slot of slots) {
+          const r = await fetch(
+            WYO_BASE +
+              '?datetime=' +
+              encodeURIComponent(slot) +
+              '&id=' +
+              best.s.wmo +
+              '&type=TEXT:LIST',
+            {signal: AbortSignal.timeout(45000), headers: {'user-agent': UA}}
+          );
+          if (!r.ok) continue;
+          const html = await r.text();
+          const pre = html.match(/<PRE>([\s\S]*?)<\/PRE>/i);
+          if (!pre) continue;
+          const rows = parseWyoText(pre[1]);
+          if (rows.length < 50) continue;
+          body = {
+            wmo: best.s.wmo,
+            name: best.s.name,
+            lat: best.s.lat,
+            lon: best.s.lon,
+            distKm: Math.round(best.d),
+            at: slot.replace(' ', 'T') + 'Z',
+            n: rows.length,
+            topHpa: rows[rows.length - 1].p,
+            freezingM: freezingLevelM(rows),
+            t250C: levelAt(rows, 250, 'tC'),
+            rh250: levelAt(rows, 250, 'rh'),
+            drct250: levelAt(rows, 250, 'drct'),
+            spd250Ms: levelAt(rows, 250, 'spdMs')
+          };
+          break;
+        }
+        if (!body) throw new Error('no recent ascent');
+        sndCache.set(key, {t: Date.now(), body});
+        if (sndCache.size > 500) sndCache.delete(sndCache.keys().next().value);
+        return json(200, body, {
+          'cache-control': 'public, max-age=900',
+          'x-sounding-source': 'weather.uwyo.edu + IGRA'
+        });
+      } catch {
+        if (hit) {
+          return json(200, hit.body, {
+            'cache-control': 'public, max-age=600',
+            'x-sounding-source': 'weather.uwyo.edu + IGRA (stale)'
+          });
+        }
+        return json(502, {sounding: null, upstream: 'unavailable'});
       }
     }
 

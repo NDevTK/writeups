@@ -7739,6 +7739,60 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   town-light dither - the instrument's floor, stated). Gate (9
   landmarks) registered after volcanic. Full gate green - 116
   CPU references + 7 GPU probes.
+- DONE (Aug 9, the review session's 81st pass - measured upper
+  air: the balloon outranks the model, the AERONET pattern in
+  the vertical). THE FEED: the University of Wyoming sounding
+  server (weather.uwyo.edu/wsgi/sounding, keyless - the classic
+  TEXT:LIST fixed-width table; the old cgi-bin path is dead,
+  relearned) serves every synoptic radiosonde ascent; stations
+  resolve through NOAA's IGRA station list (keyless, 2932
+  stations - the WMO number is embedded in the 11-char IGRA id
+  as ..M000#####, and the LSTYEAR column at the format
+  document's own offsets filters to 916 currently-active WMO
+  launch sites). Neither endpoint sends CORS - the daemon
+  proxies (the METAR pattern). sounding.js: the fixed-width
+  parser, log-p interpolation (exact at tabulated levels), the
+  measured freezing level (first 0 C crossing, linear in height
+  across its bracketing rows; a frozen surface freezes at the
+  surface, a never-freezing ascent returns null - no invented
+  level), and the IGRA list parser. GATED on a VENDORED REAL
+  ascent (Payerne WMO 06610, 2026-08-08 12Z, every third row
+  verbatim, 1099 levels): the parser reads the file's own
+  surface (961.4 hPa / 491 m / 28.3 C) and top (100 hPa /
+  16684 m / -59.0 C) back exactly; the measured freezing level
+  lands between its bracketing tabulated rows (+0.1 C at
+  4395 m, 0.0 at 4409 - a summer Alpine 4.4 km); 250 hPa
+  interpolates to -47.4 C / 25% between the ascent's own
+  bracketing rows and runs through the SHIPPED Schmidt-Appleman
+  criterion (contrails.js) - the very function the display
+  consumes, now on the balloon's numbers (forms=false this
+  ascent: too warm at T_LC -50.5). WHAT THE MEASUREMENT
+  REPLACES while fresh (13 h - the 00/12Z cadence) and near
+  (300 km - continental network spacing; both documented, the
+  model stands outside either): the freezing level the bow
+  shaft caps at, the 250 hPa temperature the cirrus-corona cold
+  gate reads, the contrail regime, and the 250 hPa jet the
+  turbulence profile rides. The 50 hPa nacreous level STAYS
+  with the model - real ascents often burst below it (the
+  vendored ascent tops at 100 hPa): stated, not patched. THE
+  DAEMON gains /sounding (station list daily, per-degree-area
+  ascent cache hourly, synoptic-slot walkback, stale-serve;
+  sounding.js ships in install.sh in the SAME commit),
+  boot-tested in a scratch flat deploy against the LIVE
+  upstreams: the Alpine fixture finds Payerne itself at 86 km
+  and serves the real 12Z ascent (freezing 4405 m at full
+  resolution vs the subsampled fixture's 4409-bracket; 250 hPa
+  -47.4 C / 25% / 289 deg 17.1 m/s). Horizon.html: syncSounding
+  hourly; applySounding re-ranks the measurement over every
+  model refresh (called at the end of the winds-aloft sync);
+  weather pins keep pinned scenes deterministic; ?sounding=URL|0.
+  A data-plumbing pass verified by gates + live boot test + a
+  clean smoke capture (no A/B pair: the override moves numbers
+  many layers already draw). Gate (7 landmarks) registered
+  after metar. Production /volcano from the 80th pass verified
+  LIVE on api.ndev.tk (~7 min after push, 23 volcanoes served);
+  /sounding to be verified the same way after this push. Full
+  gate green - 117 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

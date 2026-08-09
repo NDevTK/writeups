@@ -212,7 +212,9 @@
         volcano=URL|0|AZ,TOPM,DISTKM (daemon endpoint override
         for the weekly eruption report / never draw plumes / pin
         a synthetic plume at bearing AZ with reported top TOPM
-        at DISTKM for the harness),
+        at DISTKM for the harness), sounding=URL|0 (daemon
+        endpoint override for the measured radiosonde / keep the
+        model aloft),
         gwaves=A|0 (pin the airglow banding amplitude for the
         harness / remove the banding), gmn=URL|0 (daemon
         endpoint override for the measured meteor medians /
@@ -835,6 +837,7 @@
       } from './horizon/mie.js';
       import {bscIndexOf, VARSTARS, varV} from './horizon/varstars.js';
       import {apparentAltRad} from './horizon/gvp.js';
+      import {SOUNDING_FRESH_H, SOUNDING_MAX_KM} from './horizon/sounding.js';
       import {
         GW_LAMBDA_MED_KM,
         GW_SPEED_MED_MS,
@@ -1375,6 +1378,11 @@
           // Heights above ground (geopotential is AMSL), speeds in
           // m/s; the RMS 5-20 km wind sets the HV profile, and the
           // profile sets the twinkle depth and rate.
+          // A fresh nearby radiosonde outranks the model fields
+          // just set (sounding.js - measured freezing level,
+          // 250 hPa state, jet) - re-applied after every model
+          // refresh so the measurement keeps its rank.
+          applySounding();
           const pts = LV.map((p) => ({
             h: h['geopotential_height_' + p + 'hPa'][0] - w.elevation,
             v: h['wind_speed_' + p + 'hPa'][0] / 3.6
@@ -4147,6 +4155,61 @@
           state.volcano = r;
         } catch {
           // no report, no plume
+        }
+      }
+      // MEASURED upper air (sounding.js via the daemon): the
+      // nearest radiosonde's latest ascent outranks the model
+      // aloft while fresh and near - the AERONET pattern in the
+      // vertical. ?sounding=URL overrides; =0 keeps the model.
+      const SOUNDING_PROXY =
+        params.get('sounding') ??
+        AEROSOL_PROXY.replace(/\/aerosol$/, '/sounding');
+      function applySounding() {
+        const s = state.soundingData;
+        if (!s || overridden) return;
+        const ageH = (Date.now() - Date.parse(s.at)) / 3600e3;
+        if (ageH > SOUNDING_FRESH_H || s.distKm > SOUNDING_MAX_KM) return;
+        if (Number.isFinite(s.freezingM)) state.freezing = s.freezingM;
+        if (Number.isFinite(s.spd250Ms)) state.wind250 = s.spd250Ms * 3.6;
+        if (Number.isFinite(s.drct250)) state.dir250 = s.drct250;
+        if (Number.isFinite(s.t250C) && Number.isFinite(s.rh250)) {
+          if (!params.has('t250')) state.t250 = s.t250C;
+          state.contrail = appleman(25000, s.t250C, s.rh250 / 100);
+        }
+      }
+      async function syncSounding() {
+        if (SOUNDING_PROXY === '0' || overridden) return;
+        try {
+          const r = await (
+            await fetch(
+              SOUNDING_PROXY + '?lat=' + state.lat + '&lon=' + state.lon,
+              {credentials: 'omit'}
+            )
+          ).json();
+          if (!r.wmo || !Number.isFinite(r.t250C)) return;
+          state.soundingData = r;
+          applySounding();
+          record(
+            'radiosonde (measured upper air)',
+            r.name +
+              ' ' +
+              r.distKm +
+              ' km · ' +
+              r.at.slice(5, 13).replace('T', ' ') +
+              'Z · freezing ' +
+              (Number.isFinite(r.freezingM)
+                ? Math.round(r.freezingM) + ' m'
+                : 'none') +
+              ' · 250 hPa ' +
+              r.t250C.toFixed(1) +
+              '°C ' +
+              Math.round(r.rh250) +
+              '% · jet ' +
+              (r.spd250Ms * 3.6).toFixed(0) +
+              ' km/h'
+          );
+        } catch {
+          // the model stands
         }
       }
       async function syncGmn() {
@@ -13882,6 +13945,8 @@
         setInterval(syncGmn, 6 * 60 * 60 * 1000);
         syncVolcano();
         setInterval(syncVolcano, 6 * 60 * 60 * 1000);
+        syncSounding();
+        setInterval(syncSounding, 60 * 60 * 1000);
         syncNO2();
         // The printed TEMPO revisit is 1 hour (Table 1) - the
         // refresh follows it so the drawn brown horizon carries
