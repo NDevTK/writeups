@@ -9272,6 +9272,30 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   remaining: sprites (SSE stream), purple-light watch (OMPS),
   comets (COBS), satellite pass brightness (TLE + satmags), tide
   surge residual (CO-OPS).
+- DONE (Aug 9, the review session's 118th pass - THE SURGE GAUGE:
+  third shelved topic; the Schureman frame separates the weather
+  from the astronomy in the live water): tidePanel fits 25 days of
+  the measured NOAA CO-OPS gauge (9410170 San Diego Bay,
+  water_level 6-minute preliminary decimated hourly - the verified
+  hourly_height product turned out to LAG WEEKS and was rejected
+  after it returned a July-ending window) at the printed Schureman
+  speeds through the gated harmonicFit/tideSynth (tides.js, the
+  57th pass), then synthesizes across the whole 30-day window: the
+  residual is the non-tidal surge. TIDE_FIT_NAMES states the
+  Rayleigh-resolvable short-period set of a 720 h record (M2 S2 N2
+  K1 O1 M4; P1 hides inside K1, NU2 inside N2 - stated, not
+  fitted). TODAY: the fit lands M2 0.526 m / K1 0.427 (visibly
+  carrying P1 - published K1+P1 at this station sums near it) /
+  O1 0.257 / S2 0.201 in the classic mixed-semidiurnal ordering;
+  the synthesis predicts the UNSEEN last five days to 7.5 cm RMS,
+  reads the surge right now at +0.6 cm (calm Pacific), and catches
+  a real -19 cm anomaly inside the held-out window. Landmark 13
+  pins amplitudes, ordering, both RMS, the calm reading and the
+  anomaly. Panel: measured vs synthesized last 10 days with the
+  fit/prediction boundary dashed; ?tidestation=ID points the live
+  fetch at any CO-OPS gauge. Shelf remaining: sprites (SSE),
+  purple-light watch (OMPS), comets (COBS), satellite passes
+  (TLE + satmags).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

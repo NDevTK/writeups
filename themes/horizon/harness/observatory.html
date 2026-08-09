@@ -222,7 +222,8 @@
         closurePanel,
         contrailPanel,
         leewavePanel,
-        meteorsPanel
+        meteorsPanel,
+        tidePanel
       } from './writeups/themes/horizon/observatory.js';
       import {radiantAt, SHOWERS} from './writeups/themes/horizon/meteors.js';
       import {
@@ -240,7 +241,8 @@
         SOLAR_REGIONS,
         SOUNDING,
         SUN,
-        SUN_ELON
+        SUN_ELON,
+        TIDE
       } from './writeups/themes/horizon/observatory-fixture.js';
 
       const params = new URLSearchParams(location.search);
@@ -830,6 +832,15 @@
           'answered from the balloon alone.'
       );
       panel(
+        'tid',
+        'The surge gauge',
+        'The Schureman machinery (tides.js, printed constituent speeds ' +
+          'and the least-squares harmonic frame) fits 25 days of the ' +
+          'measured NOAA gauge, then predicts the days it never saw. The ' +
+          'residual is the weather in the water - the non-tidal surge, ' +
+          'separated from the astronomy by the repo’s own frame.'
+      );
+      panel(
         'clo',
         'The dome audits itself',
         'The 91st pass’s radiative closure run on the CURRENT ' +
@@ -1409,6 +1420,59 @@
         $('lee-prov').textContent = prov;
       }
 
+      // ---- draw: the surge gauge ----------------------------------
+      function drawTide(series, meta, prov) {
+        const t = tidePanel(series);
+        const N = series.values.length;
+        const showH = 240;
+        const days = (i) => (i - (N - 1)) / 24;
+        $('tid-num').innerHTML =
+          `Surge right now: <b>${(t.latestResidM * 100).toFixed(1)} cm</b> · ` +
+          `the frame predicts the unseen last ${(N - t.nFit) / 24} days to ` +
+          `<b>${(t.rmsOutM * 100).toFixed(1)} cm RMS</b> · biggest ` +
+          `held-out anomaly <b>${(t.maxAbsOut.v * 100).toFixed(0)} cm</b> · ` +
+          `fit: ` +
+          t.amps
+            .slice(0, 4)
+            .map((a) => `${a.n} ${a.ampM.toFixed(2)} m`)
+            .join(', ') +
+          ` (K1 carries P1 - the 720 h Rayleigh lump)`;
+        $('tid-chart').innerHTML = '';
+        lineChart($('tid-chart'), {
+          series: [
+            {
+              name: 'measured',
+              color: '--s-blue',
+              pts: series.values
+                .slice(N - showH)
+                .map((v, i) => ({x: days(N - showH + i), y: v}))
+            },
+            {
+              name: 'synth',
+              color: '--s-orange',
+              pts: t.synth
+                .slice(N - showH)
+                .map((v, i) => ({x: days(N - showH + i), y: v}))
+            }
+          ],
+          refLines: [{x: days(t.nFit)}],
+          w: 560,
+          h: 260,
+          rPad: 92,
+          xLabel:
+            'days before now (dashed: end of the fit window - rightward ' +
+            'is prediction)',
+          yLabel: 'water level (m MSL)',
+          xFmt: (v) => v.toFixed(0)
+        });
+        table(
+          'tid',
+          ['constituent', 'fitted amplitude (m)'],
+          t.amps.map((a) => [a.n, a.ampM.toFixed(3)])
+        );
+        $('tid-prov').textContent = prov;
+      }
+
       // ---- draw: the closure --------------------------------------
       function drawClosure(inp, prov) {
         const c = closurePanel(inp);
@@ -1608,6 +1672,12 @@
         SOUNDING.rows,
         `${SOUNDING.wmo} ascent ${SOUNDING.at} level winds · frozen`
       );
+      drawTide(
+        TIDE,
+        null,
+        `NOAA CO-OPS ${TIDE.stationId} (${TIDE.name}), 720 hourly values ` +
+          `to ${TIDE.t0.slice(0, 10)}+30d · frozen`
+      );
       drawClosure(
         {
           sunAltDeg: RADIATION.sunAltDeg,
@@ -1668,6 +1738,25 @@
             setLive('lee', true);
           })
           .catch((e) => setLive('lee', false, e.message));
+        const TIDE_STATION_ID = params.get('tidestation') ?? '9410170';
+        j(
+          `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=water_level&application=horizon&range=720&datum=MSL&units=metric&time_zone=gmt&format=json&station=${TIDE_STATION_ID}`
+        )
+          .then((r) => {
+            const vals = r.data
+              .filter((_, i) => i % 10 === 0)
+              .map((q) => parseFloat(q.v))
+              .filter(Number.isFinite);
+            if (vals.length < 700) throw new Error('short record');
+            drawTide(
+              {values: vals, stepHours: 1},
+              null,
+              `NOAA CO-OPS ${TIDE_STATION_ID}, ${vals.length} hourly ` +
+                `values to ${r.data[r.data.length - 1].t}Z · live`
+            );
+            setLive('tid', true);
+          })
+          .catch((e) => setLive('tid', false, e.message));
         Promise.all([
           j(
             `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=wind_speed_10m&wind_speed_unit=ms`

@@ -42,6 +42,8 @@ import {
   wetPanel
 } from './observatory.js';
 import {fr3Regime, froude3, FR3_RES_HI, FR3_RES_LO} from './leewave.js';
+import {tidePanel} from './observatory.js';
+import {TIDE} from './observatory-fixture.js';
 import {
   ADSB,
   AEROSOL,
@@ -404,6 +406,41 @@ const col = columnPanel(SOUNDING.rows);
       `${FR3_RES_LO}..${FR3_RES_HI} exactly), and the theme's own ` +
       `wind gate (>= 1 m/s) reports no wave claim - the calm-day ` +
       `null, stated with its reason`
+  );
+}
+
+// ---- the surge gauge ------------------------------------------
+{
+  const t = tidePanel(TIDE);
+  const by = Object.fromEntries(t.amps.map((a) => [a.n, a.ampM]));
+  const ordered =
+    by.M2 > by.K1 &&
+    by.K1 > by.O1 &&
+    by.O1 > by.S2 &&
+    by.S2 > by.N2 &&
+    by.N2 > by.M4;
+  check(
+    'THE SURGE GAUGE: the Schureman frame predicts the unseen water',
+    Math.abs(by.M2 - 0.526) < 0.01 &&
+      by.K1 > 0.4 &&
+      by.K1 < 0.46 &&
+      ordered &&
+      t.rmsFitM < 0.08 &&
+      t.rmsOutM < 0.09 &&
+      Math.abs(t.latestResidM) < 0.03 &&
+      Math.abs(t.maxAbsOut.v - -0.189) < 0.01 &&
+      t.nFit === 600,
+    `a 25-day fit of the measured San Diego Bay gauge at the printed ` +
+      `Schureman speeds lands M2 ${by.M2.toFixed(3)} m, ` +
+      `K1 ${by.K1.toFixed(3)} (carrying P1 inside it - the stated ` +
+      `Rayleigh lump of a 720 h record), O1 ${by.O1.toFixed(3)}, ` +
+      `S2 ${by.S2.toFixed(3)} - the classic mixed-semidiurnal ordering ` +
+      `held; the synthesis then predicts the UNSEEN last five days to ` +
+      `${(t.rmsOutM * 100).toFixed(1)} cm RMS, reads the surge right ` +
+      `now at ${(t.latestResidM * 100).toFixed(1)} cm (a calm Pacific ` +
+      `evening), and catches a real ${(t.maxAbsOut.v * 100).toFixed(0)} ` +
+      `cm anomaly inside the held-out window - the weather in the ` +
+      `water, separated from the astronomy by the repo's own frame`
   );
 }
 

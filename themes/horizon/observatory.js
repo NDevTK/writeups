@@ -76,6 +76,12 @@ import {
   nBV,
   virtualTk
 } from './leewave.js';
+import {
+  fitAmplitude,
+  harmonicFit,
+  synthesisSpeeds,
+  tideSynth
+} from './tides.js';
 
 // The drawn ocean's whitecap coverage law (Monahan &
 // O'Muircheartaigh 1980, W = 3.84e-6 U10^3.41) - the GPU copy
@@ -612,4 +618,48 @@ export function leewavePanel(rows, {zLoM = 400, zHiM = 7000} = {}) {
     if (q.lamM && (!spot || Math.abs(q.hM - 2000) < Math.abs(spot.hM - 2000)))
       spot = q;
   return {levels, layer, spot, fr3: {lo: FR3_RES_LO, hi: FR3_RES_HI}};
+}
+
+// The short-period constituents a 30-day hourly window resolves
+// (every pair separated by more than the Rayleigh 0.5 deg/hr of
+// a 720 h record; P1 hides inside K1 and NU2 inside N2 at this
+// length - stated, not fitted).
+export const TIDE_FIT_NAMES = ['M2', 'S2', 'N2', 'K1', 'O1', 'M4'];
+
+/**
+ * THE SURGE GAUGE: the 57th pass's Schureman machinery
+ * (tides.js - the printed constituent speeds, the least-squares
+ * harmonic fit, the synthesis) run on the LIVE gauge: fit the
+ * first fitHours of the measured hourly record, synthesize
+ * across the whole window, and read the residual - the
+ * non-tidal, weather-driven part of the water level. The last
+ * hours' residual IS the surge right now.
+ */
+export function tidePanel(
+  {values, stepHours = 1},
+  {fitHours = 600, names = TIDE_FIT_NAMES} = {}
+) {
+  const speeds = synthesisSpeeds(names);
+  const nFit = Math.min(fitHours / stepHours, values.length);
+  const fit = harmonicFit(values.slice(0, nFit), speeds, stepHours);
+  const synth = values.map((_, i) => tideSynth(fit, i * stepHours));
+  const resid = values.map((v, i) => v - synth[i]);
+  const rms = (arr) =>
+    Math.sqrt(arr.reduce((s, v) => s + v * v, 0) / arr.length);
+  const out = resid.slice(nFit);
+  let maxAbs = {v: 0, i: nFit};
+  for (let i = nFit; i < resid.length; i++)
+    if (Math.abs(resid[i]) > Math.abs(maxAbs.v)) maxAbs = {v: resid[i], i};
+  return {
+    names,
+    amps: names.map((n) => ({n, ampM: fitAmplitude(fit, n, names)})),
+    fit,
+    nFit,
+    synth,
+    resid,
+    rmsFitM: rms(resid.slice(0, nFit)),
+    rmsOutM: out.length ? rms(out) : null,
+    maxAbsOut: maxAbs,
+    latestResidM: resid[resid.length - 1]
+  };
 }
