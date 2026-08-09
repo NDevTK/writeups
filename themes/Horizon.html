@@ -7346,7 +7346,11 @@
         const eArr = [];
         for (let d = 500; d <= LEE_RIDGE_MAX_M; d += LEE_STEP_M) {
           dArr.push(d);
-          eArr.push(farRingData.elevAt((ux * d) / MPU, (uz * d) / MPU));
+          // The ring's own sea rule: terrarium carries bathymetry,
+          // but the flow descends to the SURFACE - a coastal
+          // ridge's H must not be measured from the seabed.
+          const eRaw = farRingData.elevAt((ux * d) / MPU, (uz * d) / MPU);
+          eArr.push(Math.max(eRaw, eRaw <= 0.3 ? 0 : eRaw));
         }
         return {dArr, eArr, ux, uz};
       }
@@ -7437,6 +7441,20 @@
           ' · W ' +
           (ridge.wM / 1000).toFixed(1) +
           ' km';
+        // The fan's own honesty rule: the profile clamps to its
+        // floor row below h0, so a crest under the balloon
+        // station's elevation would oscillate FABRICATED
+        // isothermal air. No measured layer, no claim.
+        if (ridge.elevM < prof.h0 - 1) {
+          record(
+            REC,
+            rid +
+              ' · column floor ' +
+              Math.round(prof.h0) +
+              ' m sits above the crest - no measured layer, no claim'
+          );
+          return;
+        }
         // The oscillating layer: crest to crest + max(H, 500 m) -
         // the sample's streamline band at the hill's own scale.
         const span = Math.max(ridge.hM, 500);
