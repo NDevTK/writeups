@@ -36,6 +36,7 @@ import {
   vertexStage
 } from 'three/tsl';
 import {buildSurfLUT} from './surf.js';
+import {foamRGB} from './whitecap.js';
 
 /**
  * Horizon's sea as a TSL node material (WebGPU project, phase 2;
@@ -54,7 +55,11 @@ import {buildSurfLUT} from './surf.js';
  *    0.7974 is calibrated against that EXACT mask so grid-mean
  *    coverage matches Monahan & O'Muircheartaigh (1980)
  *    W = 3.84e-6 U^3.41 at U = 12 m/s (ocean-reference.mjs bisects
- *    it) - at every other wind, coverage follows from the physics
+ *    it) - at every other wind, coverage follows from the physics.
+ *    What that coverage PAINTS is printed too (whitecap.js,
+ *    gated): Dierssen 2019 Eq. (7)'s spectral foam at Koepke
+ *    1984's effective 22%, mixed by Dierssen Eq. (12) with EXACT
+ *    area weights - the last hand foam colour is retired
  *  - Cox & Munk (1954) glitter, the PRINTED law (ocean-glint.js,
  *    gated): radiance = E_beam x P(slope)/(4 cos_v cos^4_tilt) at
  *    the RESIDUAL slope variance - total wind mss minus what the
@@ -367,14 +372,25 @@ export class HorizonWaterMesh extends Mesh {
             .mul(B.w)
         );
       }
-      const foam = vec3(0.82, 0.86, 0.88).mul(
+      // The foam's PRINTED optics (whitecap.js, gated): Dierssen
+      // 2019 Eq. (7)'s spectral shape at the theme's channels,
+      // pinned to Koepke 1984's time-averaged effective 22% -
+      // the operational level defined on exactly the photographic
+      // whitecap area the Monahan-calibrated mask marks. The old
+      // hand vec3(0.82, 0.86, 0.88) stood ~4x this level and
+      // retires. The daylight envelope (direct-sun elevation +
+      // 0.3 ambient floor) is the material's documented display
+      // shading, unchanged.
+      const fRGB = foamRGB();
+      const foam = vec3(fRGB[0], fRGB[1], fRGB[2]).mul(
         max(this.sunDirection.y, 0.0).add(0.3)
       );
-      return mix(
-        albedo,
-        foam,
-        clamp(capMask.mul(0.9).add(surf.mul(0.85)).add(wake), 0.0, 1.0)
-      );
+      // Dierssen Eq. (12) / Gordon 1997: Rt = A Rf + (1-A) Rw -
+      // the mixed pixel with its area weights EXACT. The old 0.9
+      // and 0.85 dilution factors undercut the Monahan-calibrated
+      // coverage and the Battjes-Janssen Qb by exactly that much;
+      // both retire so mean foam radiance is W x Rf by algebra.
+      return mix(albedo, foam, clamp(capMask.add(surf).add(wake), 0.0, 1.0));
     })();
   }
 

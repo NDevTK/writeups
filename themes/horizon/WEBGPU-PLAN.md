@@ -8600,6 +8600,41 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     trapping analysis is beyond this print - shelved with the
     chain written down. Full gate green - 124 CPU references
     (leewave 9) + 7 GPU probes.
+- DONE (Aug 9, the review session's 102nd pass - the foam's
+  printed optics: the last hand foam colour retires). BOTH
+  primaries read in full: Monahan & O Muircheartaigh 1980 (JPO
+  10, 2094 - the 6-page scan read page by page; AMS CloudFront
+  blocks curl but a browser UA passes) and Dierssen 2019
+  (Front. Earth Sci. 7:14, open access, whole body). The
+  coverage side already shipped (the Jacobian mask's folding
+  threshold is bisected to Monahan's robust fit, twins
+  gate-held in ocean-reference) - what remained HAND was what
+  that coverage paints: water-tsl's vec3(0.82, 0.86, 0.88).
+  NEW whitecap.js (6 landmarks): Dierssen Eq. (7) - average
+  whitecap reflectance as a cubic in log(aw) - with the LOG
+  BASE PROVEN internally (base 10 reproduces her printed
+  "~40% in visible" and Frouin's printed 85% SWIR reduction;
+  a natural log drives visible reflectance negative -
+  impossible); the LEVEL is Koepke 1984's time-averaged
+  effective 22%, carried verbatim in her open text (fresh
+  20-55% decaying to 3-10% after 10 s) and corroborated by
+  her own thin-foam ~18% ("nearly equivalent"); the channels
+  ride the repo's own vendored Morel Table 2 Kw standing in
+  for Rottgers aw - a documented substitution the gate BOUNDS
+  (factor-two absorption error: raw poly < 3% absolute, drawn
+  re-pinned colour < 1.5%); the drawn rgb lands
+  0.194/0.220/0.217 - red dips (the 600 nm liquid trough's
+  side, aged foam faintly cyan) and the visible stays "nearly
+  spectrally flat", both her sentences, both held. The mix IS
+  Dierssen Eq. (12)/Gordon 1997's area-weighted average: the
+  0.9 and 0.85 dilution factors on capMask and surf RETIRE so
+  mean foam radiance is W x Rf by algebra (the Monahan
+  calibration and Battjes-Janssen Qb now paint undiluted).
+  THE RETIREMENT IS PRINTED as its own landmark: the old hand
+  foam stood 3.91x the operational effective level. Probe
+  safety checked before editing: the gated ocean probes assert
+  FFT texels and glint hashes, not composed sea colour. Full
+  gate green - 125 CPU references (whitecap 6) + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
