@@ -29,6 +29,8 @@
  * at a tabulated level the tabulated number returns exactly.
  */
 
+import {CP, EPS, eLiq} from './contrails.js';
+
 export const WYO_BASE = 'https://weather.uwyo.edu/wsgi/sounding';
 export const IGRA_STATIONS =
   'https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-station-list.txt';
@@ -104,6 +106,128 @@ export function freezingLevelM(rows) {
     }
   }
   return null;
+}
+
+// ---- The parcel ascent: LCL, LFC, EL, CAPE from the MEASURED
+// profile ------------------------------------------------------
+// Every constant printed and already in the repo's chain:
+// cp = 1004 and eps = 0.622 are contrails.js's gated Appleman
+// constants; Rd = 287.053 is refraction.js's own ISA constant;
+// the latent heat of vaporisation is DERIVED from FSM's printed
+// Table 1 (Essery 2015, the snow model primary): Lv = Ls - Lf =
+// 2.835e6 - 0.334e6 J/kg - the exact triple-point identity
+// (sublimation = fusion + vaporisation); g = 9.81 from the same
+// table. Saturation vapour pressure is the SHIPPED gated eLiq.
+// The ascent is the textbook parcel: dry adiabat (Poisson,
+// kappa = Rd/cp) conserving mixing ratio to saturation (the
+// LCL, solved by bisection inside its pressure step), then the
+// pseudoadiabatic saturated lapse in pressure coordinates,
+//   dT/dlnp = (Rd T + Lv ws) / (cp + Lv^2 ws eps / (Rd T^2)),
+// against the sounding's own environment rows for buoyancy: LFC
+// at the first positive crossing, EL at the last, CAPE =
+// integral Rd (Tp - Te) dlnp over the positive area. No
+// crossing = null - a stable day builds no measured tower.
+export const RD_J_KGK = 287.053;
+export const LV_J_KG = 2.835e6 - 0.334e6; // Ls - Lf (FSM Table 1)
+export const G_M_S2 = 9.81;
+
+const wsat = (tK, pHpa) => {
+  const es = eLiq(tK) / 100; // eLiq returns Pa; work in hPa
+  return es >= pHpa ? Infinity : (EPS * es) / (pHpa - es);
+};
+
+export function parcelAscent(rows) {
+  const lv = rows
+    .filter(
+      (r) =>
+        Number.isFinite(r.p) && Number.isFinite(r.hM) && Number.isFinite(r.tC)
+    )
+    .sort((a, b) => b.p - a.p);
+  if (lv.length < 5 || !Number.isFinite(lv[0].dwC)) {
+    return {lclM: null, lfcM: null, elM: null, capeJkg: null};
+  }
+  const kappa = RD_J_KGK / CP;
+  const sfc = lv[0];
+  let T = sfc.tC + 273.15;
+  const e0 = eLiq(sfc.dwC + 273.15) / 100; // hPa
+  const w0 = (EPS * e0) / (sfc.p - e0);
+  let saturated = false;
+  let lclM = null;
+  let lfcM = null;
+  let elM = null;
+  let cape = 0;
+  let prev = {p: sfc.p, hM: sfc.hM, T, Te: T};
+  for (let i = 1; i < lv.length; i++) {
+    const env = lv[i];
+    const dlnp = Math.log(prev.p / env.p);
+    let Tnew;
+    if (!saturated) {
+      Tnew = T * Math.pow(env.p / prev.p, kappa);
+      const eNew = (w0 * env.p) / (EPS + w0);
+      if (eNew >= eLiq(Tnew) / 100) {
+        // saturation inside this step: bisect on log-p for the LCL
+        let lo = 0;
+        let hi = dlnp;
+        for (let k = 0; k < 40; k++) {
+          const mid = (lo + hi) / 2;
+          const pm = prev.p * Math.exp(-mid);
+          const Tm = T * Math.pow(pm / prev.p, kappa);
+          const em = (w0 * pm) / (EPS + w0);
+          if (em >= eLiq(Tm) / 100) hi = mid;
+          else lo = mid;
+        }
+        const pl = prev.p * Math.exp(-hi);
+        const f = Math.log(prev.p / pl) / dlnp;
+        lclM = prev.hM + f * (env.hM - prev.hM);
+        // finish the step saturated from the LCL
+        let Ts = T * Math.pow(pl / prev.p, kappa);
+        const sub = 6;
+        const rest = Math.log(pl / env.p);
+        for (let k = 0; k < sub; k++) {
+          const pm = pl * Math.exp((-rest * (k + 0.5)) / sub);
+          const ws = wsat(Ts, pm);
+          const dT =
+            ((RD_J_KGK * Ts + LV_J_KG * ws) /
+              (CP + (LV_J_KG * LV_J_KG * ws * EPS) / (RD_J_KGK * Ts * Ts))) *
+            (rest / sub);
+          Ts -= dT;
+        }
+        Tnew = Ts;
+        saturated = true;
+      }
+    } else {
+      const sub = 4;
+      let Ts = T;
+      for (let k = 0; k < sub; k++) {
+        const pm = prev.p * Math.exp((-dlnp * (k + 0.5)) / sub);
+        const ws = wsat(Ts, pm);
+        const dT =
+          ((RD_J_KGK * Ts + LV_J_KG * ws) /
+            (CP + (LV_J_KG * LV_J_KG * ws * EPS) / (RD_J_KGK * Ts * Ts))) *
+          (dlnp / sub);
+        Ts -= dT;
+      }
+      Tnew = Ts;
+    }
+    const Te = env.tC + 273.15;
+    const buoyPrev = prev.T - prev.Te;
+    const buoy = Tnew - Te;
+    if (saturated) {
+      if (buoy > 0 && buoyPrev <= 0 && lfcM === null) lfcM = env.hM;
+      if (buoy > 0) {
+        cape += RD_J_KGK * ((buoy + Math.max(buoyPrev, 0)) / 2) * dlnp;
+        elM = env.hM; // keeps extending while buoyant
+      }
+    }
+    prev = {p: env.p, hM: env.hM, T: Tnew, Te};
+    T = Tnew;
+  }
+  return {
+    lclM: lclM !== null ? Math.round(lclM) : null,
+    lfcM: lfcM !== null ? Math.round(lfcM) : null,
+    elM: elM !== null && cape > 0 ? Math.round(elM) : null,
+    capeJkg: cape > 0 ? Math.round(cape) : 0
+  };
 }
 
 // Parse the IGRA station list into rows usable for a nearest-

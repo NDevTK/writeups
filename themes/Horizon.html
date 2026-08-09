@@ -4243,6 +4243,9 @@
       const SOUNDING_PROXY =
         params.get('sounding') ??
         AEROSOL_PROXY.replace(/\/aerosol$/, '/sounding');
+      // ?el=TOPM pins the parcel ascent's equilibrium level
+      // (m a.s.l.) for the harness A/B - the measured storm top.
+      const EL_PIN = params.has('el') ? parseFloat(params.get('el')) : null;
       function applySounding() {
         const s = state.soundingData;
         if (!s || overridden) return;
@@ -4255,6 +4258,11 @@
           if (!params.has('t250')) state.t250 = s.t250C;
           state.contrail = appleman(25000, s.t250C, s.rh250 / 100);
         }
+        // The measured storm top: parcelAscent's equilibrium
+        // level (null on a stable ascent - the contract) sizes
+        // the convective deck. Always assigned, so a newer
+        // stable ascent retires an older tower.
+        state.stormTopM = Number.isFinite(s.elM) ? s.elM : null;
       }
       // MEASURED comet brightness (cobs.js via the daemon): the
       // COBS network's fresh per-comet medians outrank the g/k
@@ -4369,7 +4377,12 @@
               Math.round(r.rh250) +
               '% · jet ' +
               (r.spd250Ms * 3.6).toFixed(0) +
-              ' km/h'
+              ' km/h' +
+              (Number.isFinite(r.elM)
+                ? ' · CAPE ' + r.capeJkg + ' J/kg → EL ' + r.elM + ' m'
+                : Number.isFinite(r.capeJkg)
+                  ? ' · stable (CAPE ' + r.capeJkg + ')'
+                  : '')
           );
         } catch {
           // the model stands
@@ -12798,7 +12811,24 @@
             wmo >= 80 ? 1.85 : wmo === 3 || (wmo >= 45 && wmo <= 67) ? 0.15 : 1;
           lu.cType.value += (cTypeT - lu.cType.value) * Math.min(dt * 0.5, 1);
           lu.yBase.value = yCloud;
-          lu.yTop.value = yCloud + 8 + lu.cType.value * 9;
+          // MEASURED storm top: on shower/thunder codes the deck
+          // tops out at the radiosonde parcel's equilibrium level
+          // (applySounding; ?el=M pins) through the terrain's own
+          // height mapping - the anvil height the ascent itself
+          // bounds (EL cannot exceed the sounding's top row). The
+          // type keeps shaping the density profile; only the slab
+          // height becomes measured. The hand thickness stands
+          // where no fresh unstable ascent reaches, or when the
+          // measured EL would degenerate the slab.
+          const elMeas = EL_PIN ?? state.stormTopM;
+          const yEl =
+            wmo >= 80 && Number.isFinite(elMeas)
+              ? 16 * Math.asinh((elMeas - centerElev) / 500) + 8
+              : null;
+          lu.yTop.value =
+            yEl !== null && yEl > yCloud + 8
+              ? yEl
+              : yCloud + 8 + lu.cType.value * 9;
           lu.wOff.value.x += windV.x * state.wind * 0.06 * dt;
           lu.wOff.value.y += windV.z * state.wind * 0.06 * dt;
 

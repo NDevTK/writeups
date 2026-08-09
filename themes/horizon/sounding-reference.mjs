@@ -13,12 +13,16 @@
 //    same numbers the display consumes
 //  - the IGRA station list parser finds Payerne itself at its
 //    published coordinates
-import {appleman} from './contrails.js';
+import {appleman, CP, EPS, eLiq} from './contrails.js';
 import {
   freezingLevelM,
+  G_M_S2,
   levelAt,
+  LV_J_KG,
+  parcelAscent,
   parseIgraStations,
   parseWyoText,
+  RD_J_KGK,
   SOUNDING_FRESH_H,
   SOUNDING_MAX_KM
 } from './sounding.js';
@@ -122,7 +126,86 @@ const rows = parseWyoText(WYO_FIXTURE_TEXT);
   );
 }
 
-// ---- 5. the station list ----------------------------------------
+// ---- 5. the parcel ascent's constants are the printed ones ------
+{
+  check(
+    'FSM triple-point identity lands on the textbook Lv',
+    LV_J_KG === 2.501e6 && RD_J_KGK === 287.053 && G_M_S2 === 9.81,
+    `Ls - Lf = 2.835e6 - 0.334e6 = ${LV_J_KG.toExponential(3)} J/kg - FSM ` +
+      `Table 1's printed sublimation and fusion heats close EXACTLY on the ` +
+      `textbook vaporisation heat 2.501e6 (the triple-point identity); ` +
+      `Rd = ${RD_J_KGK} is refraction.js's own ISA constant, g = ${G_M_S2} ` +
+      `the same table`
+  );
+  const dryKm = (G_M_S2 / CP) * 1000;
+  check(
+    'dry adiabatic lapse is g/cp',
+    dryKm > 9.7 && dryKm < 9.85,
+    `g/cp = ${dryKm.toFixed(2)} K/km from the gated Appleman cp = ${CP} - ` +
+      `the textbook 9.8 K/km falls out of constants already in the chain`
+  );
+  // The pseudoadiabatic coefficient at a textbook point: 850 hPa,
+  // +15 C. Moist lapse there must sit in the canonical 4-6 K/km.
+  const T = 288.15;
+  const p = 850;
+  const es = eLiq(T) / 100;
+  const ws = (EPS * es) / (p - es);
+  const dTdlnp =
+    (RD_J_KGK * T + LV_J_KG * ws) /
+    (CP + (LV_J_KG * LV_J_KG * ws * EPS) / (RD_J_KGK * T * T));
+  const moistKm = ((dTdlnp * G_M_S2) / (RD_J_KGK * T)) * 1000;
+  check(
+    'pseudoadiabatic lapse in the textbook window',
+    moistKm > 4 && moistKm < 6,
+    `dT/dz = ${moistKm.toFixed(2)} K/km at 850 hPa / +15 C - inside the ` +
+      `canonical 4-6 K/km moist-adiabatic range, from the derived Lv and ` +
+      `the gated eLiq/cp/eps with no new constants`
+  );
+}
+
+// ---- 6. the measured tower on the vendored ascent ---------------
+{
+  const a = parcelAscent(rows);
+  check(
+    'parcel ascent on the real Payerne profile',
+    a.lclM === 2397 && a.lfcM === 5207 && a.elM === 9354 && a.capeJkg === 137,
+    `LCL ${a.lclM} m, LFC ${a.lfcM} m, EL ${a.elM} m, CAPE ` +
+      `${a.capeJkg} J/kg - a marginal summer tower to 9.4 km on the ` +
+      `2026-08-08 12Z ascent (pinned from the vendored data itself)`
+  );
+  const espyAgl = 125 * (rows[0].tC - rows[0].dwC);
+  const lclAgl = a.lclM - rows[0].hM;
+  check(
+    'Espy corroborates the bisected LCL',
+    Math.abs(lclAgl - espyAgl) < 40,
+    `bisection puts cloud base ${lclAgl} m AGL; Espy's 125(T-Td) rule ` +
+      `says ${espyAgl.toFixed(0)} m - ${Math.abs(lclAgl - espyAgl).toFixed(
+        0
+      )} m apart, the display's fallback formula and the measured ascent ` +
+      `agree on this profile`
+  );
+  const stable = parcelAscent([
+    {p: 1000, hM: 0, tC: 10, dwC: 0},
+    {p: 900, hM: 988, tC: 10},
+    {p: 850, hM: 1457, tC: 10},
+    {p: 700, hM: 3012, tC: 10},
+    {p: 500, hM: 5574, tC: 10}
+  ]);
+  check(
+    'stable-day and empty honesty',
+    stable.lclM > 1200 &&
+      stable.lclM < 1500 &&
+      stable.lfcM === null &&
+      stable.elM === null &&
+      stable.capeJkg === 0 &&
+      parcelAscent([]).capeJkg === null,
+    `an isothermal environment still condenses (LCL ${stable.lclM} m) but ` +
+      `builds no tower - LFC/EL null, CAPE 0; no data at all returns null ` +
+      `CAPE, distinct from a measured stable 0`
+  );
+}
+
+// ---- 7. the station list ----------------------------------------
 {
   // The REAL Payerne row, verbatim from the fetched list.
   const line =

@@ -7867,7 +7867,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   exponent has a drawn counterpart - depth and velocity are
   documented, undrawn. THE MEASUREMENT: the USGS Water Services
   instantaneous-values API - keyless AND CORS-open
-  (Access-Control-Allow-Origin: *), the FIRST feed in the theme
+  (Access-Control-Allow-Origin: \*), the FIRST feed in the theme
   needing no daemon proxy. The nearest discharge gauge within a
   documented 40 km answers with its current reading; the
   reference is the gauge's OWN 30-day record through the SAME
@@ -8013,6 +8013,56 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   proof. No constants, no new landmarks - a material-graph
   unification under an already-gated law. Full gate green -
   119 CPU references + 7 GPU probes.
+- DONE (Aug 9, the review session's 88th pass - measured storm
+  tops: the parcel ascent's equilibrium level sizes the
+  convective deck). The towering-cumulus deck was the last hand
+  THICKNESS: storm codes (wmo >= 80) set cType 1.85 and the
+  slab topped out at yBase + 8 + 1.85\*9 world units (~2.4 km
+  over a 400 m base) - a shape constant, not a measurement,
+  while the 81st pass's radiosondes already carry the whole
+  vertical profile. sounding.js now runs the textbook parcel
+  ascent on the measured rows: dry Poisson ascent (kappa =
+  Rd/cp) conserving the surface mixing ratio to saturation,
+  the LCL bisected in log-p (40 iterations) inside its own
+  step, then the pseudoadiabatic lapse dT/dlnp = (Rd T + Lv
+  ws)/(cp + Lv^2 ws eps/(Rd T^2)) in sub-steps per layer
+  against the sounding's own environment rows; LFC at the
+  first buoyant crossing, EL while buoyant, CAPE = Rd times
+  the positive area in lnp. Every constant already in the
+  chain: cp = 1004 / eps = 0.622 / eLiq are contrails.js's
+  gated Appleman constants, Rd = 287.053 is refraction.js's
+  ISA constant, and Lv is DERIVED, not imported: FSM Table 1
+  (Essery 2015, the snow primary) prints Ls = 2.835e6 and
+  Lf = 0.334e6, and the triple-point identity Lv = Ls - Lf
+  lands EXACTLY on the textbook 2.501e6 J/kg - gate-held.
+  Corroborations gate-held on the vendored Payerne ascent:
+  dry lapse g/cp = 9.77 K/km; the pseudoadiabatic coefficient
+  gives 4.41 K/km at 850 hPa/+15 C (canonical 4-6 window);
+  Espy's 125(T-Td) display fallback lands 6 m from the
+  bisection (1900 vs 1906 m AGL); the ascent itself builds
+  LCL 2397 / LFC 5207 / EL 9354 m / CAPE 137 J/kg (pinned
+  from the run - the run-then-pin rule); an isothermal
+  environment still condenses but builds no tower (LFC/EL
+  null, CAPE 0) while no data returns null CAPE - distinct
+  honesty states, both gated. The daemon /sounding payload
+  gains {lclM, lfcM, elM, capeJkg} through the same
+  parcelAscent; install.sh ships contrails.js in the SAME
+  commit (the drift-guard lesson; scratch flat-deploy
+  boot-tested clean). DISPLAY: on shower/thunder codes the
+  deck's yTop becomes the measured EL through the terrain's
+  own asinh height mapping (applySounding adopts
+  state.stormTopM under the same fresh/near gates; a newer
+  stable ascent retires an older tower; ?el=M pins) - the
+  anvil height is bounded by the ascent's own top row, so no
+  invented cap is needed; the hand thickness stands where no
+  fresh unstable ascent reaches or the slab would degenerate.
+  The cType shape constant now shapes ONLY the density
+  profile; the slab HEIGHT is measured. A/B at pinned Nelson
+  noon (cloud=70, code=95, el=9354 vs unset): the same 70%
+  deck grows from the shallow hand slab into a 9.4 km tower -
+  20.3% of pixels move, base and cover untouched. Gate:
+  sounding-reference grows 7 -> 13 landmarks; full gate
+  green - 119 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

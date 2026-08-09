@@ -74,6 +74,7 @@ import {
   freezingLevelM,
   IGRA_STATIONS,
   levelAt,
+  parcelAscent,
   parseIgraStations,
   parseWyoText,
   WYO_BASE
@@ -1976,7 +1977,10 @@ function main() {
             t250C: levelAt(rows, 250, 'tC'),
             rh250: levelAt(rows, 250, 'rh'),
             drct250: levelAt(rows, 250, 'drct'),
-            spd250Ms: levelAt(rows, 250, 'spdMs')
+            spd250Ms: levelAt(rows, 250, 'spdMs'),
+            // The parcel ascent (sounding.js, gated): measured
+            // cloud base / storm top / instability energy.
+            ...parcelAscent(rows)
           };
           break;
         }
