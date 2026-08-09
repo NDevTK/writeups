@@ -1430,6 +1430,45 @@ function main() {
     return null;
   }
 
+  // Per-endpoint counters for /health (the 86th pass's lesson,
+  // finished: the AIS incident was diagnosed remotely because the
+  // socket engine had counters - the fetch endpoints get the
+  // same). Outcomes read off the response itself: status < 400
+  // with a '(cached)'/'(stale)' source header counts as served-
+  // from-cache; a 4xx/5xx is a fail with its time kept.
+  const epStats = new Map();
+  const epMark = (path, code, extra = {}) => {
+    if (path === '/health' || path === '/probe') return;
+    let s = epStats.get(path);
+    if (!s)
+      epStats.set(
+        path,
+        (s = {
+          hits: 0,
+          ok: 0,
+          cached: 0,
+          fail: 0,
+          lastOkAt: null,
+          lastFailAt: null
+        })
+      );
+    s.hits++;
+    const src =
+      Object.entries(extra).find(
+        ([k]) => k.startsWith('x-') && k.endsWith('-source')
+      )?.[1] || '';
+    if (code < 400) {
+      if (src.includes('cached') || src.includes('stale')) s.cached++;
+      else {
+        s.ok++;
+        s.lastOkAt = new Date().toISOString();
+      }
+    } else {
+      s.fail++;
+      s.lastFailAt = new Date().toISOString();
+    }
+  };
+
   const server = http.createServer(async (req, res) => {
     const ip = TRUST
       ? (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
@@ -1451,7 +1490,9 @@ function main() {
         : {}),
       ...extra
     });
+    let curPath = null;
     const send = (code, body, extra) => {
+      if (curPath) epMark(curPath, code, extra);
       res.writeHead(code, head(extra));
       res.end(body);
     };
@@ -1460,6 +1501,7 @@ function main() {
     if (req.method !== 'GET') return send(405, 'method not allowed');
     if (!limiter.take(ip)) return send(429, 'rate limited');
     const url = new URL(req.url, 'http://localhost');
+    curPath = url.pathname;
     const json = (code, obj, extra = {}) =>
       send(code, JSON.stringify(obj), {
         'content-type': 'application/json',
@@ -1606,7 +1648,12 @@ function main() {
             aerosol: aerosolHealth,
             ozone: ozoneHealth,
             chlor: chlorHealth,
-            ndvi: ndviHealth
+            ndvi: ndviHealth,
+            // Every fetch endpoint's own counters (the 86th
+            // pass's lesson finished): ok = served fresh from
+            // upstream, cached = cache/stale-serve, fail = 4xx/5xx
+            // with its time - the next incident diagnoses itself.
+            endpoints: Object.fromEntries(epStats)
           },
           {'cache-control': 'no-store'}
         );

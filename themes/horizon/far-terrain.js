@@ -57,6 +57,13 @@ export function farRingGeometry({radiiU, nAz, mpu, centerElev, k, elevAt}) {
   const nR = radiiU.length;
   const positions = new Float32Array(nR * nAz * 3);
   const sea = new Uint8Array(nR * nAz);
+  // Retained per vertex for the EXACT refraction remap (the
+  // mirage path): the pre-drop true elevation and the scene-unit
+  // distance - the caller can re-solve every vertex's apparent
+  // altitude through the terrestrial ray fan (rayFan /
+  // fanBranches below) without resampling the DEM.
+  const trueEM = new Float32Array(nR * nAz);
+  const distU = new Float32Array(nR * nAz);
   for (let ri = 0; ri < nR; ri++) {
     const r = radiiU[ri];
     for (let ai = 0; ai < nAz; ai++) {
@@ -83,6 +90,8 @@ export function farRingGeometry({radiiU, nAz, mpu, centerElev, k, elevAt}) {
       positions[o] = x;
       positions[o + 1] = y;
       positions[o + 2] = z;
+      trueEM[ri * nAz + ai] = Math.max(eRaw, eRaw <= 0.3 ? 0 : eRaw);
+      distU[ri * nAz + ai] = r;
     }
   }
   // Quad strips between consecutive rings, wrapping in azimuth;
@@ -98,7 +107,157 @@ export function farRingGeometry({radiiU, nAz, mpu, centerElev, k, elevAt}) {
       if (!(sea[b] && sea[c] && sea[d])) idx.push(b, c, d);
     }
   }
-  return {positions, indices: new Uint32Array(idx), sea, nR, nAz};
+  return {
+    positions,
+    indices: new Uint32Array(idx),
+    sea,
+    nR,
+    nAz,
+    trueEM,
+    distU
+  };
+}
+
+/**
+ * The EXACT far-strip vertical remap - the mirage path. Given a
+ * transfer curve's rows (aApp ascending, tTrue = the true
+ * altitude each apparent direction sees; refraction.js
+ * transferCurve's own output) and one vertex's true angular
+ * altitude, return the PRIMARY apparent altitude: the lowest
+ * crossing of tTrue(aApp) = aTrue, linearly interpolated between
+ * rows. Physics, not display: where the curve folds (a measured
+ * duct), higher crossings are additional images - branchCount
+ * reports how many, and the primary branch alone already carries
+ * the four classical continuous mirage classes (looming,
+ * towering, sinking, stooping) because d(apparent)/d(true) is
+ * the curve's own slope. Outside the table's true-altitude span
+ * the caller keeps its mean-k fallback - stated, never
+ * extrapolated.
+ */
+export function apparentPrimary(aApp, tTrue, aTrue) {
+  for (let i = 1; i < aApp.length; i++) {
+    const t0 = tTrue[i - 1];
+    const t1 = tTrue[i];
+    if ((t0 - aTrue) * (t1 - aTrue) <= 0 && t0 !== t1) {
+      const f = (aTrue - t0) / (t1 - t0);
+      return aApp[i - 1] + f * (aApp[i] - aApp[i - 1]);
+    }
+  }
+  return null;
+}
+
+export function branchCount(aApp, tTrue, aTrue) {
+  let n = 0;
+  for (let i = 1; i < aApp.length; i++) {
+    const t0 = tTrue[i - 1];
+    const t1 = tTrue[i];
+    if ((t0 - aTrue) * (t1 - aTrue) <= 0 && t0 !== t1) n++;
+  }
+  return n;
+}
+
+// ---- The TERRESTRIAL ray fan: the mirage machinery ------------
+// The astronomical transfer curve integrates bending to the top
+// of the atmosphere and is the WRONG instrument for a target
+// 30 km away (measured here before shipping: it mis-lifted a
+// sea-level target by +184 m where -59 m belongs). Terrestrial
+// rays need the classical flat-earth construction (Wegener's):
+// in the flattened frame a ray's height obeys
+//   d2h/dx2 = kappa(h) - 1/R,
+// kappa = -dn/dh the local ray curvature from the SAME Ciddor
+// refractivity the sunset rides. Everything falls out of it:
+//  - at the standard lapse, kappa ~ k/R and the ray parabola
+//    reproduces the Hirt-k curvatureDrop (gate-held: the mean-k
+//    model EMERGES as the uniform-kappa limit);
+//  - a measured inversion with kappa > 1/R is a DUCT - the
+//    classical super-refraction criterion (dN/dh < -157 N/km)
+//    derived, not quoted: kappa = 1/R IS that threshold;
+//  - where the fan folds, one target shows several images - the
+//    superior mirage's classical stack.
+import {ciddorN} from './refraction.js';
+
+// kappa(h) table from a refraction profile (refraction.js
+// buildProfile): centred difference of Ciddor n at the green
+// channel over dh, from the profile's own measured rows.
+export function kappaTable(profile, hMaxM = 3000, dhM = 2) {
+  const n = Math.ceil(hMaxM / dhM) + 1;
+  const kap = new Float32Array(n);
+  const h0 = profile.h0;
+  const nAt = (h) => {
+    const s = profile.at(h);
+    return ciddorN(0.55, s.tC, s.pPa, s.rh ?? 0);
+  };
+  for (let i = 0; i < n; i++) {
+    const h = h0 + i * dhM;
+    kap[i] = -(nAt(h + dhM) - nAt(h - dhM < h0 ? h0 : h - dhM)) / (2 * dhM);
+  }
+  return {kap, h0, dhM, n};
+}
+
+/**
+ * March a fan of rays from the observer at obsHm through the
+ * kappa table out to dMaxM. alphas: launch elevations (radians,
+ * ascending). Returns {alphas, hs}: hs[i][j] = ray i's height
+ * (m AMSL) at x = (j+1) dsM. Rays that strike the ground (h
+ * below the profile floor) carry NaN beyond the strike - a
+ * terrain-hidden direction, exactly what the z-buffer needs.
+ */
+export function rayFan(profile, obsHm, alphas, dMaxM = 200e3, dsM = 100) {
+  const kt = kappaTable(profile);
+  const kAt = (h) => {
+    const i = Math.min(kt.n - 1, Math.max(0, Math.round((h - kt.h0) / kt.dhM)));
+    return kt.kap[i];
+  };
+  const nS = Math.ceil(dMaxM / dsM);
+  const hs = alphas.map(() => new Float32Array(nS));
+  for (let i = 0; i < alphas.length; i++) {
+    let h = obsHm;
+    let slope = Math.tan(alphas[i]);
+    let dead = false;
+    for (let j = 0; j < nS; j++) {
+      // Flat-earth transform: the sphere falls away under a
+      // straight ray (+1/R), refraction curves it back down
+      // (-kappa) - h'' = 1/R - kappa(h). Standard air gives the
+      // (1-k)/R effective curvature; kappa > 1/R flips the sign:
+      // the duct.
+      const acc = 1 / R_EARTH - kAt(h);
+      slope += acc * dsM;
+      h += slope * dsM;
+      if (dead || h < kt.h0 - 1) {
+        dead = true;
+        hs[i][j] = NaN;
+      } else {
+        hs[i][j] = h;
+      }
+    }
+  }
+  return {alphas, hs, dsM};
+}
+
+/**
+ * All apparent-elevation branches that see a target at distance
+ * dM, height eM, through a rayFan: scan ray pairs bracketing eM
+ * at the target column and interpolate the launch angle. Rays
+ * already dead (ground-struck) before the column cannot see it.
+ * Returns ascending apparent elevations (radians), possibly
+ * empty (hidden), length > 1 under a duct - the image stack.
+ */
+export function fanBranches(fan, dM, eM) {
+  const j = Math.min(
+    fan.hs[0].length - 1,
+    Math.max(0, Math.round(dM / fan.dsM) - 1)
+  );
+  const out = [];
+  for (let i = 1; i < fan.alphas.length; i++) {
+    const a = fan.hs[i - 1][j];
+    const b = fan.hs[i][j];
+    if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+    if ((a - eM) * (b - eM) <= 0 && a !== b) {
+      const f = (eM - a) / (b - a);
+      out.push(fan.alphas[i - 1] + f * (fan.alphas[i] - fan.alphas[i - 1]));
+    }
+  }
+  return out;
 }
 
 // Log-spaced radii from the box edge to the far limit: constant

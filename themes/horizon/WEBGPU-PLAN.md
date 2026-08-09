@@ -8506,6 +8506,55 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     along: attempts 71, frames 0 - the upstream still starves,
     the engine still self-heals, as documented. Full gate
     green - 123 CPU references + 7 GPU probes.
+- DONE (Aug 9, the review session's 100th pass - the world
+  mirages: the terrestrial ray fan warps the far horizon).
+  The far ring drew its curvature drop from ONE number (Hirt's
+  mean k from the surface lapse); the balloon ships a whole
+  kappa PROFILE, and mirages live in its structure. DEAD END
+  CAUGHT BY RUN-THEN-PIN: the first cut fed the ring through
+  the astronomical transferCurve - it integrates bending to
+  the TOP of the atmosphere, the wrong instrument for a target
+  30 km out (measured before shipping: +184 m lift where
+  -59 m belongs). The right construction is the classical
+  flat-earth transform (Wegener's): h'' = 1/R - kappa(h),
+  kappa = -dn/dh from the SAME gated Ciddor refractivity the
+  sunset rides, on the measured column's own rows (a first
+  march wrote kappa - 1/R and doubled the drop - the sign
+  derivation now sits in the comment: the sphere falls away
+  +1/R, refraction bends down -kappa). EVERYTHING EMERGES,
+  gate-held in far-terrain-reference (12 landmarks now): the
+  Hirt-k parabola IS the uniform-kappa limit (fan lands 0.14 m
+  from it at 20 km, 0.46 m at 40 km; at 180 km the fan draws
+  19.4 m LOWER because the long ray samples thinner air aloft
+  - physics the parabola cannot know); the classical
+    super-refraction threshold (dN/dh < -157 N/km) is nothing
+    but kappa = 1/R, DERIVED, never quoted, and holds row-by-row
+    across an inversion (31-59 m, all 29 rows); a 20 m target at
+    80 km under that duct shows TWO images (-0.0417/+0.0584 deg,
+    erect below, ducted above), at 50 km NO ray reaches it - the
+    classical SKIP ZONE unprompted - and at 110 km the pair
+    compresses to 1.4 arcmin, the Novaya-Zemlya squeeze. CLIENT:
+    farRingGeometry now retains per-vertex pre-drop elevation +
+    distance; applyMirageFan() (identity-keyed on the profile
+    object, the LUT idiom) marches 600 rays across the horizon
+    band (-1.4..+0.8 deg, 0.22 arcmin spacing) from the eye 2 m
+    over the ring's own anchor and re-solves every vertex's
+    apparent altitude through fanBranches - the PRIMARY branch
+    warps the mesh (looming, towering, sinking, stooping all
+    live in its slope), multi-image vertices are counted and
+    reported in the census record (drawing the ducted SECOND
+    image as a mirrored instance is the stated next stage);
+    out-of-band, fan-hidden, and column-floor-above-eye cases
+    keep the mean-k datum - stated fallbacks, never
+    extrapolation (under uniform kappa the fan's apparent
+    altitude reduces EXACTLY to e - curvatureDrop, observer
+    height cancelling, so the remap is a strict refinement with
+    no seam). RIDER: the daemon /health payload now carries
+    per-endpoint ok/cached/fail counters with last-ok/last-fail
+    stamps (epStats, skipping /health and /probe) - the
+    observability half of the census audit, shipped without the
+    boot-test ceremony. Full gate green - 123 CPU references
+    (far-terrain at 12) + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

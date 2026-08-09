@@ -14,13 +14,19 @@
 //    ~35 km of Tasman Bay clears the horizon by the closed-form
 //    apparent height; the drop hides the first ~96 m of it
 import {
+  apparentPrimary,
+  branchCount,
   curvatureDrop,
+  fanBranches,
   farRadii,
   farRingGeometry,
+  kappaTable,
   koschmiederT,
   R_EARTH,
+  rayFan,
   refractionK
 } from './far-terrain.js';
+import {buildProfile, standardProfile} from './refraction.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -177,6 +183,90 @@ const check = (name, ok, detail) => {
       Math.abs(t - 0.0198) < 3e-4 &&
       Math.abs(mid - Math.exp(-0.99 * 0.99)) < 1e-12,
     `T(V) = e^-3.9204 = ${t.toFixed(5)} (Koschmieder's 2% at exactly V) and the half-distance value ${mid.toFixed(4)} IS the box fog's - the seam cannot step`
+  );
+}
+
+// ---- The terrestrial ray fan: the mirage machinery --------------
+{
+  const DEG = Math.PI / 180;
+  const prof = standardProfile();
+  const alphas = [];
+  for (let i = 0; i <= 600; i++) alphas.push((-1.4 + (i * 2.2) / 600) * DEG);
+  const fan = rayFan(prof, 50, alphas, 200e3, 100);
+  const kStd = refractionK(1013.25, 288.15, -0.0065);
+  const diffAt = (dKm, eM) => {
+    const br = fanBranches(fan, dKm * 1e3, eM);
+    if (!br.length) return null;
+    return (
+      50 + dKm * 1e3 * Math.tan(br[0]) - (eM - curvatureDrop(dKm * 1e3, kStd))
+    );
+  };
+  const d20 = diffAt(20, 0);
+  const d40 = diffAt(40, 300);
+  const d180 = diffAt(180, 2600);
+  check(
+    'Hirt-k EMERGES from the ray fan',
+    Math.abs(d20) < 0.5 && Math.abs(d40) < 1 && d180 < 0 && Math.abs(d180) < 25,
+    `h'' = 1/R - kappa(h) through the standard column lands ` +
+      `${Math.abs(d20).toFixed(2)} m from the Hirt-k parabola at 20 km and ` +
+      `${Math.abs(d40).toFixed(2)} m at 40 km - the mean-k model IS the ` +
+      `uniform-kappa limit; at 180 km the fan draws ${(-d180).toFixed(1)} m ` +
+      `LOWER because the long ray samples thinner air aloft where kappa ` +
+      `falls - physics the parabola cannot know, in the physical direction`
+  );
+  // The classical superior-mirage column: +6 degC across 30-60 m
+  // over a cold sea, eye at 15 m, targets low and far.
+  const profInv = buildProfile(
+    [
+      {pPa: 101000, hM: 30, tC: 4, rh: 0.8},
+      {pPa: 100650, hM: 60, tC: 10, rh: 0.6},
+      {pPa: 100000, hM: 120, tC: 9.5, rh: 0.6},
+      {pPa: 95000, hM: 550, tC: 7, rh: 0.6},
+      {pPa: 80000, hM: 1900, tC: -1, rh: 0.5}
+    ],
+    {hM: 0, tC: 4, rh: 0.8}
+  );
+  const kt = kappaTable(profInv, 400, 1);
+  const over = [];
+  for (let i = 0; i < kt.n; i++)
+    if (kt.kap[i] > 1 / R_EARTH) over.push(kt.h0 + i * kt.dhM);
+  check(
+    'the duct criterion DERIVES',
+    over.length > 20 && over[0] >= 30 && over[over.length - 1] <= 60,
+    `kappa > 1/R exactly across the inversion (${over[0]}-` +
+      `${over[over.length - 1]} m, ${over.length} rows) - the classical ` +
+      `super-refraction threshold (dN/dh < -157 N/km) is nothing but ` +
+      `kappa = 1/R, derived from the gated Ciddor chain, never quoted`
+  );
+  const alphas2 = [];
+  for (let i = 0; i <= 1200; i++)
+    alphas2.push((-0.35 + (i * 0.7) / 1200) * DEG);
+  const fan2 = rayFan(profInv, 15, alphas2, 150e3, 50);
+  const img80 = fanBranches(fan2, 80e3, 20);
+  const img50 = fanBranches(fan2, 50e3, 20);
+  const img110 = fanBranches(fan2, 110e3, 40);
+  check(
+    'the superior mirage stacks and the skip zone empties',
+    img80.length === 2 &&
+      Math.abs(img80[0] / DEG - -0.0417) < 0.005 &&
+      Math.abs(img80[1] / DEG - 0.0584) < 0.005 &&
+      img50.length === 0 &&
+      img110.length === 2 &&
+      img110[1] - img110[0] < 0.03 * DEG,
+    `an 80 km target at 20 m shows TWO images (${(img80[0] / DEG).toFixed(4)} ` +
+      `and ${(img80[1] / DEG).toFixed(4)} deg - erect below, ducted above); ` +
+      `at 50 km NO ray reaches it at any tested height - the classical ` +
+      `SKIP ZONE of ducted propagation, emerging unprompted; at 110 km the ` +
+      `pair compresses to ${(((img110[1] - img110[0]) / DEG) * 60).toFixed(1)} ` +
+      `arcmin - the Novaya-Zemlya squeeze`
+  );
+  check(
+    'fan honesty and the crossing utilities',
+    fanBranches(fan2, 80e3, 1).length === 0 &&
+      apparentPrimary([0, 1, 2], [5, 3, 1], 4) === 0.5 &&
+      branchCount([0, 1, 2, 3], [0, 2, 0, 2], 1) === 3,
+    `a target below every surviving ray is HIDDEN (empty, not invented); ` +
+      `the crossing solver interpolates exactly and counts every fold`
   );
 }
 
