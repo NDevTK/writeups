@@ -7943,6 +7943,38 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   red outer rim is the R ring's tail. Gate (5 landmarks)
   registered after aeronet. Full gate green - 119 CPU
   references + 7 GPU probes.
+- DONE (Aug 9, the review session's 86th pass - api.ndev.tk /ais
+  incident: the wedged reconnect loop). A production audit of
+  the two vehicle feeds found /adsb HEALTHY (live aircraft from
+  api.adsb.lol - a 737 at FL360 over Zurich in the check) and
+  /ais answering 200 with an EMPTY engine: /health showed
+  connects=1, frames=0, badFrames=0 across the daemon's whole
+  40-minute uptime - the aisstream socket opened once, the
+  global subscription went out, and NOTHING ever arrived, while
+  Blitzortung on the same box churned normally (7 connects,
+  ~4000 strikes resident). Probes from the dev container
+  established aisstream's live failure modes: a bad key gets
+  open -> close(1006) in ~3-6 s - every failure CLOSES - yet a
+  daemon-shaped connection could also sit open-and-silent
+  through 18 s (accept-and-starve, throttle-style). The engine
+  had two wedge points for exactly this shape: Node's WebSocket
+  has NO handshake timeout (a half-open upstream fires no event
+  and the loop waits forever), and the silence watchdog cycled
+  via ws.close() - which un-wedges nothing when the dead socket
+  swallows its own close event (the frozen connects=1 is that
+  signature). HARDENED: a 15 s handshake timeout aborts and
+  retries; the watchdog now goes through a generation-guarded
+  forceReopen that reschedules even when no close event ever
+  fires; close codes, attempt and cycle counters land in
+  /health (attempts/cycles/lastClose) so the NEXT diagnosis
+  reads remotely. Boot-tested in a scratch flat deploy. What
+  this cannot fix from here: if aisstream is starving the BOX's
+  key or IP on purpose, the churn signature (attempts climbing,
+  frames 0, lastClose 1006 or null) will now say so in /health
+  - and the remedy is a fresh AISSTREAM_KEY in
+  /etc/horizon-live.env, a human action. No drawn-side change;
+  no reference count change (the integration shell is outside
+  the gate, server-reference green).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

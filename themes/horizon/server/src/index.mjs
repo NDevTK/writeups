@@ -690,6 +690,9 @@ function runAisSocket(key, st, log) {
   let backoff = 1000;
   const connect = () => {
     let ended = false;
+    st.attempts = (st.attempts || 0) + 1;
+    st.gen = (st.gen || 0) + 1;
+    const gen = st.gen;
     const reopen = () => {
       if (ended) return;
       ended = true;
@@ -704,7 +707,26 @@ function runAisSocket(key, st, log) {
       reopen();
       return;
     }
+    // Node's WebSocket has NO handshake timeout: a half-open
+    // upstream (SYN accepted, 101 never answered) fires no event
+    // at all and would wedge the reconnect loop forever - the
+    // production box was found exactly there (connects frozen at
+    // 1, zero frames for the daemon's whole uptime). 15 s with
+    // no 'open' aborts and retries.
+    const openTimer = setTimeout(() => {
+      if (st.gen === gen) {
+        log('ais handshake timeout - aborting the attempt');
+        try {
+          ws.close();
+        } catch {
+          // fall through to reopen either way
+        }
+        reopen();
+      }
+    }, 15e3);
+    openTimer.unref?.();
     ws.addEventListener('open', () => {
+      clearTimeout(openTimer);
       st.connects++;
       backoff = 1000;
       log('ais socket open - global subscription sent');
@@ -738,7 +760,14 @@ function runAisSocket(key, st, log) {
         if (st.badFrames === 1) log('first bad frame: ' + e);
       }
     });
-    ws.addEventListener('close', reopen, {once: true});
+    ws.addEventListener(
+      'close',
+      (ev) => {
+        st.lastClose = {code: ev.code, at: Date.now()};
+        reopen();
+      },
+      {once: true}
+    );
     ws.addEventListener(
       'error',
       () => {
@@ -751,19 +780,30 @@ function runAisSocket(key, st, log) {
       },
       {once: true}
     );
-  };
-  connect();
-  // Watchdog: a socket that is "open" but silent for 3 minutes is
-  // dead upstream (a valid global subscription never goes quiet
-  // that long - the world's oceans do not empty).
-  setInterval(() => {
-    if (st.connects > 0 && Date.now() - (st.lastFrame || st.started) > 180e3) {
-      log('ais watchdog: no frames for 180 s - cycling the socket');
+    // The reopen path for THIS attempt, callable by the watchdog
+    // even when the socket swallows its own close event.
+    st.forceReopen = () => {
+      if (st.gen !== gen) return; // a newer attempt owns the loop
       try {
         ws.close();
       } catch {
-        // triggers reopen either way
+        // proceed to reopen regardless
       }
+      reopen();
+    };
+  };
+  connect();
+  // Watchdog: a socket that is "open" but silent for 3 minutes is
+  // dead upstream (a valid global subscription floods within
+  // seconds - the world's oceans do not empty). The cycle goes
+  // through forceReopen, which reschedules EVEN IF the dead
+  // socket never fires its close event - the failure mode that
+  // froze the production box at connects=1 with zero frames.
+  setInterval(() => {
+    if (Date.now() - (st.lastFrame || st.started) > 180e3) {
+      log('ais watchdog: no frames for 180 s - cycling the socket');
+      st.cycles = (st.cycles || 0) + 1;
+      if (st.forceReopen) st.forceReopen();
     }
   }, 60e3).unref();
   setInterval(() => prune(st), 60e3).unref();
@@ -1473,6 +1513,9 @@ function main() {
         badFrames: st.badFrames,
         lastFrameAgoMs: st.lastFrame ? Date.now() - st.lastFrame : null,
         connects: st.connects,
+        attempts: st.attempts || 0,
+        cycles: st.cycles || 0,
+        lastClose: st.lastClose || null,
         uptimeMs: Date.now() - st.started,
         keySet: !!env.AISSTREAM_KEY
       };
