@@ -331,6 +331,10 @@ const median = (arr) => {
  * Returns {cloudFrac, n, lowM, midM, highM, nLow, nMid, nHigh}:
  * medians in metres a.s.l. per ISCCP band, null where the
  * satellite saw no such cloud - the hand thickness stands there.
+ * The MEDIAN is a deliberate reduction: the drawn deck is one
+ * slab per band, so a bimodal band (two stratocumulus levels)
+ * collapses to its median top - the display's own single-slab
+ * limit, stated, not a claim about the field.
  */
 export function ctopStats(
   sample,

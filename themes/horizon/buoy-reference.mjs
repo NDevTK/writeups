@@ -19,6 +19,7 @@ import {
   hsOfM0,
   lhD,
   m0OfSpec,
+  parseSpecRow,
   parseStations
 } from './buoy.js';
 import {calibrateBuoyBands, spectrumK} from './ocean-spectrum.js';
@@ -74,10 +75,12 @@ const r2 = firstSpecRow(NDBC_SWR2, false);
     '999 sentinel and MM honesty',
     a1.v.filter((x) => x === null).length === 4 &&
       a1.v[0] === null &&
-      spec.v[0] === 0,
+      spec.v[0] === 0 &&
+      parseSpecRow('2026 08 09 03 00 9.999 0.100 (0.100)', true).sep === null,
     `the four empty low-frequency direction bands parse as null (999 ` +
-      `sentinel), while a measured zero density stays 0 - absence and ` +
-      `zero stay distinct`
+      `sentinel), a measured zero density stays 0, and the 9.999 ` +
+      `Sep_Freq flag (hulls that never compute the split - the live ` +
+      `46236 answered it) parses null - absence and zero stay distinct`
   );
 }
 

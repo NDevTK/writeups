@@ -12701,10 +12701,9 @@
             }
             oceanBuiltSeaKey = seaKey;
           } else if (windMoved && buoyNow) {
-            for (const c of oceanCascades) {
-              c.setWind(Ums * iceDamp, dirNow);
-              c.setBuoyBands(buoyNow);
-            }
+            // One fill: the tail's wind and the bands together.
+            for (const c of oceanCascades)
+              c.setBuoyBands(buoyNow, Ums * iceDamp, dirNow);
             oceanBuiltU = Ums * iceDamp;
             oceanBuiltDir = dirNow;
           } else if (windMoved && !partsNow) {
@@ -13226,9 +13225,13 @@
               : null;
           // MEASURED low-deck top for the NON-storm sky: the VIIRS
           // census's low-band median through the same mapping
-          // (syncCloudTop; the parcel EL still outranks on storm
-          // codes). A slab thinner than 4 units degenerates - the
-          // hand thickness stands there, stated.
+          // (syncCloudTop). RANKING, stated: on storm codes the
+          // parcel EL outranks the satellite - the ascent is
+          // fresher (13 h vs up to 2 d), local, and today's
+          // thermodynamic ceiling; a VIIRS anvil (the 12 km class
+          // floor) corroborates but cannot override yesterday's
+          // pass onto today's storm. A slab thinner than 4 units
+          // degenerates - the hand thickness stands there, stated.
           const ctopLow =
             state.ctop && Number.isFinite(state.ctop.lowM)
               ? state.ctop.lowM

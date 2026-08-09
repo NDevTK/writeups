@@ -8293,6 +8293,34 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     pixels move as the fair-weather field deepens at constant base
     and cover. Gate: cloudtop-reference joins with 6 landmarks -
     full gate green, 122 CPU references + 7 GPU probes.
+- DONE (Aug 9, the review session's 94th pass - the sweep turns
+  on its own window: passes 88-93 audited). The task-#1 pattern
+  applied to this session's six newest passes. FOUND AND FIXED:
+  a material wind move under a ruling buoy re-seeded the ocean
+  with setWind + setBuoyBands - TWO spectrum fills and h0
+  uploads per cascade where one suffices; setBuoyBands now takes
+  optional wind args and the client path is a single fill.
+  FOUND AND GATED: the 9.999 Sep_Freq sentinel (hulls that never
+  compute the wind-sea/swell split - the live 46236 answered
+  exactly that) parsed correctly but was un-landmarked; the
+  honesty check now holds it. STATED (three ranking/limit
+  clarities added at the code): on storm codes the parcel EL
+  outranks the VIIRS anvil - the ascent is fresher (13 h vs up
+  to 2 d), local, and today's thermodynamic ceiling; a same-box
+  anvil corroborates but cannot override yesterday's pass onto
+  today's storm. The census median is the display's own
+  single-slab reduction - a bimodal band collapses to its
+  median, a statement about the DRAWN deck, not the field. The
+  daemon's scalar reductions (parcel, BLH, levels) run on FULL
+  rows; only the transported refraction column is thinned -
+  crossings never ride a stride. AUDITED CLEAN: every numeric
+  literal in the six new modules traces to a gate pin, a
+  documented sentinel, the file formats' own column indices, or
+  the vendored palette; the snotel pin path's gate-skip is the
+  pins-are-authoritative convention, already stated. No display
+  change (the double-fill was wasted work, not wrong work - the
+  second fill produced the same spectrum). Full gate green -
+  122 CPU references + 7 GPU probes.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

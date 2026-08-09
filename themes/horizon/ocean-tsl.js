@@ -354,8 +354,13 @@ export function createOceanFFT(renderer, opts = {}) {
       h0Tex.needsUpdate = true;
     },
     // A fresh measured spectrum (buoy): same in-place rebuild.
-    // null returns to the partitions/wind chain.
-    setBuoyBands(bands) {
+    // null returns to the partitions/wind chain. Optional wind
+    // args update the above-ceiling tail in the SAME fill (a
+    // material wind move under a ruling buoy previously went
+    // setWind + setBuoyBands = two fills; one is enough).
+    setBuoyBands(bands, U10, windDir) {
+      if (Number.isFinite(U10)) params.U10 = U10;
+      if (Number.isFinite(windDir)) params.windDir = windDir;
       params.bands = bands ? calibrateBuoyBands(bands) : undefined;
       fillSpectrum();
       h0Tex.needsUpdate = true;

@@ -237,6 +237,11 @@ export function parcelAscent(rows) {
 // strided to fit maxN, and the top row always survives (the
 // column's isothermal continuation anchors there). Fields kept
 // are exactly what buildProfile consumes: p, hM, tC, rh.
+// CONSISTENCY, stated: the daemon's scalar reductions (parcel
+// ascent, BLH, levels) run on the FULL rows before thinning;
+// only the transported column is strided - refraction varies
+// over hundreds of metres, the reductions' crossings do not
+// survive a stride and are never asked to.
 export function thinRows(rows, maxN = 120, keepLow = 20) {
   const lv = rows
     .filter(
