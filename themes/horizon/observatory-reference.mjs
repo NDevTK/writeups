@@ -25,7 +25,9 @@ import {
   columnPanel,
   contrailPanel,
   coronaPanel,
+  eveningKey,
   flashFromProfile,
+  flashLedgerVerdict,
   flashPanel,
   leewavePanel,
   retrievalPanel,
@@ -599,6 +601,48 @@ check(
     r.retrieved
       ? `the 450-m eye's fan folds at ${(r.distM / 1000).toFixed(0)} km with the pivot BELOW the eye (mock geometry, auto-selected); the Morrish-strategy fit lands base ${r.retrieved.params.zBaseM.toFixed(1)} m (truth 380), +${r.retrieved.params.dTK.toFixed(2)} K (truth 4), closing on the balloon at ${r.retrieved.rmsK.toFixed(3)} K RMS down to ${r.retrieved.probedFloorM.toFixed(0)} m - the elevated coastal eye can now read the layer below it`
       : `declined: ${r.note}`
+  );
+}
+
+// ---- the forecast ledger's pure parts -------------------------
+// The page stores; these decide. The pairing identity IS the
+// design: a station's 12Z ascent and the FOLLOWING 00Z ascent key
+// to one local evening (the morning forecast and its evening
+// verifier), while the next 12Z opens a new evening. Verdicts:
+// Young's taxonomy is the claim, the duration its size.
+{
+  const pdt = 420;
+  const pair =
+    eveningKey('2026-08-09T12:00:00Z', pdt) === '2026-08-09' &&
+    eveningKey('2026-08-10T00:00:00Z', pdt) === '2026-08-09' &&
+    eveningKey('2026-08-10T12:00:00Z', pdt) === '2026-08-10' &&
+    eveningKey('2026-08-10T00:00:00Z', 0) === '2026-08-10';
+  const held = flashLedgerVerdict(
+    {type: 'mock-mirage', durationS: 1.65},
+    {type: 'mock-mirage', durationS: 1.5}
+  );
+  const revT = flashLedgerVerdict(
+    {type: 'mock-mirage', durationS: 1.65},
+    {type: 'textbook', durationS: 1.2}
+  );
+  const revD = flashLedgerVerdict(
+    {type: 'textbook', durationS: 1.0},
+    {type: 'textbook', durationS: 1.9}
+  );
+  const nulls = flashLedgerVerdict(
+    {type: 'in-duct', durationS: null},
+    {type: 'in-duct', durationS: null}
+  );
+  check(
+    'FORECAST LEDGER pure parts',
+    pair &&
+      held.held &&
+      !revT.held &&
+      !revD.held &&
+      nulls.held &&
+      held.label.includes('held (mock-mirage') &&
+      revT.label.includes('revised (mock-mirage'),
+    `12Z and the following 00Z key to ONE local evening (PDT pair -> 2026-08-09; the next 12Z opens 2026-08-10; at Greenwich the 00Z belongs to its own date); same type within 0.5 s holds, a type change or a ${'>'}0.5-s drift revises, and matching null durations (flashless types) hold`
   );
 }
 

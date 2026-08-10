@@ -373,7 +373,11 @@ The practice the corpus demonstrates, stated so it can be reused:
    strategy, read in full): the 450-m ridge reads a marine cap below
    it — an SD-like synthetic closes at 0.183 K RMS through the
    panel's own path — and the frozen day's decline is now measured
-   from both eyes.
+   from both eyes. Pass 131 closes the loop in time: every ascent's
+   forecast at the fixed 450-m eye is stored under its local evening
+   (the 12Z morning forecast paired with its 00Z evening verifier by
+   `eveningKey`), and scored evenings render held/revised verdicts —
+   the prediction sheet keeps its own record.
 
 ---
 

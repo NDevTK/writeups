@@ -9774,6 +9774,34 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   references + 8 chrome probes. Next per the endorsed plan: the
   forecast ledger (the 12Z forecast scored against the 00Z
   evening ascent in the research view).
+- DONE (Aug 10, the review session's 131st pass - THE FORECAST
+  LEDGER: the prediction sheet starts scoring itself): the nightly
+  green-flash forecast was falsifiable in principle; now the page
+  checks it. The design rides one clean identity: a station's 12Z
+  ascent and the FOLLOWING 00Z ascent describe the same local
+  sunset evening (San Diego: 12Z is 5 am, the next 00Z is 5 pm,
+  sunset near 8 pm), so the evening ascent is the morning
+  forecast's natural verifier. observatory.js gains the pure
+  parts - eveningKey (ascent stamp -> local evening, in the
+  getTimezoneOffset convention) and flashLedgerVerdict (held when
+  the Young type matches and the duration drifts no more than
+  half a second; revised otherwise; flashless types with null
+  durations compare exactly) - landmarked in observatory-reference
+  (the PDT pairing identity 12Z Aug 9 + 00Z Aug 10 -> one evening,
+  the next 12Z opening the next; Greenwich keeping 00Z on its own
+  date; the verdict truth table). Horizon.html stores: each fresh
+  ascent's forecast at the FIXED 450-m reference eye (the pinned
+  convention - camera-independent, one fast flashPanel run per new
+  ascent) lands in localStorage under its evening key, capped at
+  14 evenings x 4 ascents; any evening holding two or more ascents
+  renders its verdict in the research view - "forecast ledger
+  (morning -> evening ascent): 2026-08-10: held (mock-mirage
+  1.6->1.5 s) . held m/n evenings" - wrapped so a storage failure
+  can never take the panel down, failing closed with the ascent,
+  and deliberately absent from the page-wiring probe's required
+  set (it needs two same-evening ascents to exist at all). The
+  sunset-as-instrument program now runs its full loop in time:
+  forecast at dawn, verify at dusk, score across the fortnight.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

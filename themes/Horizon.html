@@ -560,6 +560,8 @@
       import {
         columnPanel,
         contrailPanel,
+        eveningKey,
+        flashLedgerVerdict,
         flashPanel,
         leewavePanel,
         meteorsPanel,
@@ -10372,6 +10374,7 @@
       let tideStudy = null; // one lazy 30-day fetch per session
       let flashCache = null; // {key, line} - the panel is ~0.5 s
       let lehnCache = null; // {key, line} - the fan is ~0.3 s
+      let ledgerCache = null; // {at} - one 450-m forecast per ascent
       async function syncResearch() {
         if (researchBusy) return;
         researchBusy = true;
@@ -10528,6 +10531,89 @@
               };
             }
             research['mirage inversion retrieval (Lehn 1983)'] = lehnCache.line;
+            // The forecast ledger: every fresh ascent's flash
+            // forecast at the FIXED 450-m reference eye is stored
+            // under its local evening (eveningKey pairs a 12Z
+            // morning forecast with its 00Z evening verifier), and
+            // scored evenings render their verdicts. The page
+            // stores; the gated helpers decide.
+            if (
+              window.Astronomy &&
+              ledgerCache?.at !== (state.soundingData.at ?? '')
+            ) {
+              try {
+                const obsL = new Astronomy.Observer(state.lat, state.lon, 30);
+                const sunsetL = Astronomy.SearchRiseSet(
+                  Astronomy.Body.Sun,
+                  obsL,
+                  -1,
+                  Astronomy.MakeTime(new Date()),
+                  2
+                );
+                let rateL = null;
+                if (sunsetL) {
+                  const altL = (t) => {
+                    const eq = Astronomy.Equator(
+                      Astronomy.Body.Sun,
+                      t,
+                      obsL,
+                      true,
+                      true
+                    );
+                    return Astronomy.Horizon(t, obsL, eq.ra, eq.dec, null)
+                      .altitude;
+                  };
+                  rateL =
+                    (altL(sunsetL.AddDays(-60 / 86400)) -
+                      altL(sunsetL.AddDays(60 / 86400))) /
+                    120;
+                }
+                const flL = flashPanel(rows, {
+                  eyeM: 450,
+                  rateDegPerS: rateL,
+                  fast: true
+                });
+                ledgerCache = {at: state.soundingData.at ?? ''};
+                const key = eveningKey(
+                  state.soundingData.at,
+                  new Date().getTimezoneOffset()
+                );
+                const L = JSON.parse(
+                  localStorage.getItem('flashLedger') ?? '{}'
+                );
+                const day = L[key] ?? [];
+                if (!day.some((e) => e.ascentAt === state.soundingData.at)) {
+                  day.push({
+                    ascentAt: state.soundingData.at,
+                    type: flL.type,
+                    durationS: flL.durationS
+                  });
+                }
+                L[key] = day.slice(-4);
+                const keys = Object.keys(L).sort().slice(-14);
+                localStorage.setItem(
+                  'flashLedger',
+                  JSON.stringify(Object.fromEntries(keys.map((k) => [k, L[k]])))
+                );
+                let heldN = 0;
+                let scoredN = 0;
+                let latest = null;
+                for (const k of keys) {
+                  const d = L[k];
+                  if (d && d.length >= 2) {
+                    const v = flashLedgerVerdict(d[0], d[d.length - 1]);
+                    scoredN++;
+                    if (v.held) heldN++;
+                    latest = `${k}: ${v.label}`;
+                  }
+                }
+                if (scoredN)
+                  research['forecast ledger (morning → evening ascent)'] =
+                    `${latest} · held ${heldN}/${scoredN} evenings (450 m eye)`;
+              } catch (e) {
+                /* the ledger is garnish - never block the panel */
+              }
+            }
           } else {
             research['mirage (measured column)'] =
               'no fresh ascent - no mirage claim';
@@ -10535,6 +10621,7 @@
             delete research['wave ladder (Stull ch. 17)'];
             delete research['green flash tonight (Young)'];
             delete research['mirage inversion retrieval (Lehn 1983)'];
+            delete research['forecast ledger (morning → evening ascent)'];
           }
           if (Number.isFinite(state.wind)) {
             const u = state.wind / 3.6;

@@ -500,6 +500,41 @@ export function flashPanel(rows, opts = {}) {
 }
 
 /**
+ * THE FORECAST LEDGER's pure parts (the page stores, these
+ * decide). A station's 12Z ascent and the FOLLOWING 00Z ascent
+ * both describe the same local sunset evening (San Diego: 12Z is
+ * 5 am, next 00Z is 5 pm, sunset near 8 pm) - so the evening
+ * ascent is the morning forecast's natural verifier. eveningKey
+ * maps an ascent stamp to its local evening (tzOffsetMin in the
+ * getTimezoneOffset convention: minutes BEHIND UTC); two ascents
+ * with one key score one forecast.
+ */
+export function eveningKey(iso, tzOffsetMin) {
+  const t = new Date(iso).getTime() - tzOffsetMin * 60000;
+  return new Date(t).toISOString().slice(0, 10);
+}
+
+/** Held or revised: same type and duration within half a second
+ * (Young's taxonomy is the claim; the duration is its size). */
+export function flashLedgerVerdict(prev, next) {
+  if (!prev || !next) return null;
+  const sameType = prev.type === next.type;
+  const dOk =
+    prev.durationS === null || next.durationS === null
+      ? prev.durationS === next.durationS
+      : Math.abs(prev.durationS - next.durationS) <= 0.5;
+  const dur = (r) =>
+    r.durationS === null ? '' : ` ~${r.durationS.toFixed(1)} s`;
+  return {
+    held: sameType && dOk,
+    label:
+      sameType && dOk
+        ? `held (${next.type}${prev.durationS !== null && next.durationS !== null ? ` ${prev.durationS.toFixed(1)}→${next.durationS.toFixed(1)} s` : ''})`
+        : `revised (${prev.type}${dur(prev)} → ${next.type}${dur(next)})`
+  };
+}
+
+/**
  * THE MIRAGE INVERSION RETRIEVAL (the sunset-as-instrument
  * program's inverse problem): the theme's own terrestrial fan
  * (far-terrain's rayFan - Ciddor refractivity, the machinery that
