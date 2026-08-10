@@ -72,6 +72,35 @@ else
   probe dm-column "$BASE/tsl-dm-probe.html" 'DM PASS'
   probe drop-corona "$BASE/tsl-dropcorona-probe.html" 'DROPCOR PASS'
   probe bow-shaft "$BASE/tsl-bow-probe.html" 'BOWP PASS'
+
+  # The page wiring: the research section must render inside the
+  # THEME itself - the panels' module graph imports, syncResearch
+  # survives, refreshPanel prints. Wiring is gated either way the
+  # feeds land: a live ascent must show the flash and retrieval
+  # lines; no ascent must show the mirage line's fail-closed text.
+  # (The 124th-129th panels were hand-verified per pass; this
+  # probe owns that check now.)
+  PAGEBASE="${BASE%/themes/horizon/harness}"
+  if [ "$PAGEBASE" = "$BASE" ]; then
+    echo "[skip] page-wiring (BASE carries no repo root above the harness)"
+  else
+    ptxt=$(mktemp)
+    timeout 240 xvfb-run -a node shoot.mjs \
+      "$PAGEBASE/themes/Horizon.html?debug=1" /dev/null --wgpu \
+      --wait-ms 50000 --dump-text "$ptxt" >/dev/null 2>&1
+    if grep -qa "research · the drawn world diagnosed" "$ptxt" &&
+      grep -qa "mirage (measured column)" "$ptxt" &&
+      { grep -qa "no fresh ascent" "$ptxt" ||
+        { grep -qa "green flash tonight (Young)" "$ptxt" &&
+          grep -qa "mirage inversion retrieval (Lehn 1983)" "$ptxt"; }; }; then
+      echo "[ok]   page-wiring (research section renders in the theme)"
+    else
+      echo "[FAIL] page-wiring"
+      grep -a "research\|mirage\|green flash" "$ptxt" | head -4
+      echo "       $(wc -l <"$ptxt") lines of page text -> $ptxt"
+      fail=1
+    fi
+  fi
 fi
 
 if [ $fail = 0 ]; then echo "VALIDATE PASS"; else echo "VALIDATE FAIL"; fi

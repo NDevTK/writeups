@@ -9750,6 +9750,30 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   probe (validate gates the research section's rendering), then
   the forecast ledger (the 12Z forecast checked against the 00Z
   evening ascent).
+- DONE (Aug 10, the review session's 130th pass - THE PAGE-WIRING
+  PROBE: validate owns the research section's rendering): the last
+  untested seam closes. Since the 124th the research view lives
+  inside Horizon.html, and every pass since verified its rendering
+  BY HAND with a browser run - the one check the gate did not own
+  (and the tool that would have caught the 128th's observatory.js
+  truncation instantly). validate.sh's chrome block gains an
+  eighth probe: shoot.mjs loads the THEME itself (?debug=1,
+  --dump-text after a 50-s settle spanning the research kick and
+  its catch-ups) and the gate asserts the wiring either way the
+  feeds land - the research header and mirage line must render,
+  and EITHER the mirage line carries its fail-closed text (no
+  ascent reached the page) OR the green-flash and Lehn-retrieval
+  lines are present too (a live ascent must produce all three).
+  An import error anywhere in the panels' module graph, a thrown
+  syncResearch, or a broken refreshPanel section now fails the
+  gate instead of a hand check. The probe derives the repo-root
+  URL from BASE (${BASE%/themes/horizon/harness}) and skips with
+  a notice when the fixture server carries no repo root - and the
+  129th's BASE fail-fast guard already ensures the harness half
+  is pointed correctly. First full run: VALIDATE PASS, 135 CPU
+  references + 8 chrome probes. Next per the endorsed plan: the
+  forecast ledger (the 12Z forecast scored against the 00Z
+  evening ascent in the research view).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
