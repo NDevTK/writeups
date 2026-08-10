@@ -9825,9 +9825,9 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   through the new flow: Resolute closes again on the same 00Z
   ascent and the dedup answers "every closing day already frozen"
   - the append path exercised by the migration, the skip path by
-  the live run. The measured edges stand unchanged in the report
-  (Oakland/Quillayute/Utqiagvik still fold without closing at
-  130 km - candidate future days for a superior-mode domain fix).
+    the live run. The measured edges stand unchanged in the report
+    (Oakland/Quillayute/Utqiagvik still fold without closing at
+    130 km - candidate future days for a superior-mode domain fix).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
