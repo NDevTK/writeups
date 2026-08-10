@@ -267,14 +267,18 @@ between it and the next tier.
   law is implemented as printed at the gated points, not that every
   drawn pixel is right. The GPU probes close part of that gap; the
   sweep-pin visual matrix is a separate, weaker instrument.
-- **The Lehn retrieval stays in his low-eye geometry** (observer under
-  the elevated structure, the erect low image below the pivot). From an
-  elevated coastal eye the pre-pivot rays themselves vertex and his
-  zone I no longer applies; retrieving San Diego's marine inversion
-  from the 450-m ridge needs that generalization (his later corpus —
-  Kropla '92, Morrish '86 — is downloaded unread as the stated path).
-  And the retrieval reaches only as high as the rays' vertices: the
-  probed span is reported with every closure.
+- **The Lehn retrieval covers both printed geometries since pass 128**
+  (shore eye/1983 zones for superior mirages; ridge eye/Morrish-1986
+  parametric strategy for mock mirages, licensed by Eq. (2) holding at
+  traced perigees to 0.32 K). What remains: the retrieval reaches only
+  as far as the rays turn (probed span reported with every closure);
+  the elevated family is a single-inversion trapezoid; and a REAL-day
+  closure awaits a column that actually folds a terrestrial TC — the
+  frozen day's +1.2 K surface inversion folds none within 200 km from
+  either eye, so its pins carry the double decline. Lehn & Morrish's
+  own finding frames the wait: the optics out-resolves a ±0.1 °C
+  thermistor mast, so on the day the fan folds, the panel's closure
+  will be the sharpest reading of the marine cap the theme has.
 
 ## 6. Method — reference-first validation
 
@@ -346,7 +350,12 @@ The practice the corpus demonstrates, stated so it can be reused:
    balloon that never entered the retrieval above eye level) while the
    frozen sub-critical day is pinned DECLINING: the instrument refuses
    to invent an inversion the fan cannot fold, and that refusal is
-   itself the day's checkable statement.
+   itself the day's checkable statement. Pass 128 adds the elevated
+   eye by the corpus's own methods (Lehn & Morrish 1986's parametric
+   strategy, read in full): the 450-m ridge reads a marine cap below
+   it — an SD-like synthetic closes at 0.183 K RMS through the
+   panel's own path — and the frozen day's decline is now measured
+   from both eyes.
 
 ---
 

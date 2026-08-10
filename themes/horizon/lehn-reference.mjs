@@ -22,6 +22,7 @@ import {
   LEHN_R_E,
   gradientFromCurvature,
   lehnDensity,
+  lehnFitElevated,
   lehnForwardTC,
   lehnInvertTC,
   rayCurvature,
@@ -221,6 +222,89 @@ const DIST = 20000;
     'fold-free days invert to null',
     iP < 0 && inv === null,
     `the same machinery under a +4 K inversion hoisted to 20-40 m shows a monotone TC at 20 km (no pivot: the vertex-and-return does not fit the range) and the inversion declines - no invented inversions on quiet days`
+  );
+}
+
+{
+  // The ELEVATED eye (beyond the printed corpus by its own
+  // methods - Lehn & Morrish 1986's parametric fit on the 1983
+  // tracer, mirrored): an eye at 450 m over a +4 K inversion at
+  // 280-330 m. First the invariant that licenses the mirror:
+  // Eq. (1)/(2) is a TURNING-POINT condition - at a traced ray's
+  // PERIGEE the same closed form must return the profile's own
+  // temperature, exactly as it does at a vertex.
+  const T450 = 18;
+  const tTruth = (z) =>
+    z >= 330
+      ? T450 - 0.0065 * (z - 450)
+      : z >= 280
+        ? T450 - 0.0065 * (330 - 450) - (4 * (330 - z)) / 50
+        : T450 - 0.0065 * (330 - 450) - 4 - 0.0065 * (z - 280);
+  const truth = {
+    hM: [0, 280, 330, 450, 3450],
+    tC: [0, 280, 330, 450, 3450].map(tTruth)
+  };
+  const alphas = [];
+  for (let a = -75; a <= 5; a += 0.25) alphas.push(a * MIN);
+  const obs = lehnForwardTC(truth, {eyeM: 450, distM: 90000, alphas});
+  const {iP, iM} = tcCriticalPoints(obs, 6);
+  let periWorst = 0;
+  let periChecked = 0;
+  for (let k = 0; k < alphas.length; k++) {
+    if (obs.nPerigee[k] !== 1 || !Number.isFinite(obs.zPerigee[k])) continue;
+    if (obs.zPerigee[k] > 440 || obs.zPerigee[k] < 250) continue;
+    // phi at the TURN is zero; the launch angle phi enters Eq. (2)
+    // squared - the invariant is direction-agnostic in it.
+    const tv =
+      vertexTemperature(Math.abs(alphas[k]), obs.zPerigee[k], {
+        zE: 450,
+        TzeK: T450 + 273.15,
+        TmK: T450 + 273.15,
+        p0Pa: 101325
+      }) - 273.15;
+    periWorst = Math.max(periWorst, Math.abs(tv - tTruth(obs.zPerigee[k])));
+    periChecked++;
+  }
+  check(
+    'the turning invariant holds at perigees',
+    periChecked > 10 && periWorst < 0.7,
+    `${periChecked} single-perigee rays from the 450-m eye: Eq. (2) at each traced perigee returns the profile's own temperature to ${periWorst.toFixed(2)} K worst - the vertex equation IS a turning-point equation, whichever side the ray turns from`
+  );
+  // The elevated round trip: fit the below-eye family from the
+  // 90-km image alone.
+  const fit = lehnFitElevated(obs, {eyeM: 450, distM: 90000, TzeC: T450});
+  let rms = Infinity;
+  if (fit) {
+    const tFit = (z) => {
+      const {hM, tC} = fit.nodes;
+      let i = 0;
+      while (i < hM.length - 2 && hM[i + 1] <= z) i++;
+      const f = Math.min(1, Math.max(0, (z - hM[i]) / (hM[i + 1] - hM[i])));
+      return tC[i] + (tC[i + 1] - tC[i]) * f;
+    };
+    let s2 = 0;
+    let n = 0;
+    for (let z = Math.max(0, fit.probedFloorM); z <= 450; z += 5) {
+      const d = tFit(z) - tTruth(z);
+      s2 += d * d;
+      n++;
+    }
+    rms = Math.sqrt(s2 / n);
+  }
+  check(
+    'the elevated eye retrieves its inversion',
+    iP >= 0 &&
+      iM > iP + 2 &&
+      fit !== null &&
+      Math.abs(fit.params.zBaseM - 280) < 8 &&
+      Math.abs(fit.params.dTK - 4) < 0.5 &&
+      Math.abs(fit.params.wM - 50) < 15 &&
+      fit.onePerigee &&
+      fit.tcRmsM < 3 &&
+      rms < 0.3,
+    fit
+      ? `the mock-mirage S at 90 km (pivot ${(obs.alphas[iP] / MIN).toFixed(1)}'), inverted by the Morrish strategy (parametric family + TC-residual search): base ${fit.params.zBaseM.toFixed(1)} m (truth 280), strength ${fit.params.dTK.toFixed(2)} K (truth 4), thickness ${fit.params.wM.toFixed(0)} m (truth 50); TC reproduced to ${fit.tcRmsM.toFixed(2)} m, profile to ${rms.toFixed(3)} K RMS over ${fit.probedFloorM.toFixed(0)}-450 m - from the image and the eye-level temperature alone`
+      : 'fit returned null'
   );
 }
 

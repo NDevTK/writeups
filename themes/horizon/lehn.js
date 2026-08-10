@@ -161,14 +161,18 @@ export function lehnForwardTC(nodes, {eyeM, distM, alphas, p0Pa = 101325}) {
   const ground = hs[0];
   const zAt = new Float64Array(alphas.length).fill(NaN);
   const zVertex = new Float64Array(alphas.length).fill(NaN);
+  const zPerigee = new Float64Array(alphas.length).fill(NaN);
   const nVertex = new Uint8Array(alphas.length);
+  const nPerigee = new Uint8Array(alphas.length);
   for (let k = 0; k < alphas.length; k++) {
     let x = 0;
     let h = eyeM;
     let slope = Math.tan(alphas[k]);
     let hMax = h;
+    let hMin = h;
     let guard = 0;
     let verts = 0;
+    let peris = 0;
     while (x < distM && guard++ < 4 * nL + 40) {
       const i = layerOf(h, slope);
       const a = 1 / LEHN_R_E - layerCurv[i];
@@ -199,17 +203,23 @@ export function lehnForwardTC(nodes, {eyeM, distM, alphas, p0Pa = 101325}) {
       const dx = Math.min(up, dn, distM - x);
       if (!Number.isFinite(dx) || dx <= 0) break;
       const hNew = h + slope * dx + (a * dx * dx) / 2;
-      // Vertex inside the step? (Count them: the algorithm's
-      // stated domain is AT MOST ONE per ray.)
+      // Turning point inside the step? A vertex (up-turn) or a
+      // perigee (down-turn) - the algorithms' stated domains want
+      // AT MOST ONE of the relevant kind per ray.
       if (slope > 0 && slope + a * dx < 0) {
         const xv = -slope / a;
         hMax = Math.max(hMax, h + slope * xv + (a * xv * xv) / 2);
         verts++;
+      } else if (slope < 0 && slope + a * dx > 0) {
+        const xv = -slope / a;
+        hMin = Math.min(hMin, h + slope * xv + (a * xv * xv) / 2);
+        peris++;
       }
       slope += a * dx;
       x += dx;
       h = hNew;
       hMax = Math.max(hMax, h);
+      hMin = Math.min(hMin, h);
       if (h <= ground + 1e-6 && x < distM) {
         h = NaN;
         break;
@@ -218,10 +228,19 @@ export function lehnForwardTC(nodes, {eyeM, distM, alphas, p0Pa = 101325}) {
     if (Number.isFinite(h) && x >= distM - 1e-6) {
       zAt[k] = h;
       zVertex[k] = hMax;
+      zPerigee[k] = hMin;
       nVertex[k] = verts;
+      nPerigee[k] = peris;
     }
   }
-  return {alphas: Float64Array.from(alphas), zAt, zVertex, nVertex};
+  return {
+    alphas: Float64Array.from(alphas),
+    zAt,
+    zVertex,
+    zPerigee,
+    nVertex,
+    nPerigee
+  };
 }
 
 /**
@@ -451,5 +470,124 @@ export function lehnInvertTC(
     min: iM >= 0 ? {phi: obs.alphas[iM], zM: obs.zAt[iM]} : null,
     vertexEl,
     rms: rmsLog
+  };
+}
+
+/**
+ * THE ELEVATED EYE (beyond the printed corpus, by its own
+ * methods): an observer ABOVE the inversion looks down through
+ * it at a distant low object - the mock-mirage geometry, the one
+ * a coastal ridge over a marine layer actually has. Lehn 1983's
+ * zone decomposition does not carry over (the erect low image's
+ * rays now turn - perigees, not vertices - so zone I's
+ * no-turning premise fails), but Lehn & Morrish 1986 solve their
+ * analogous problem WITHOUT zones: a parametric temperature
+ * family with the physics of the layer, fitted by minimizing a
+ * residual of forward-modeled optical observables ("optical
+ * methods provide the simplest and most sensitive probes" - they
+ * closed it against a 12-thermistor mast and found the mast's
+ * own +-0.1 C noise insufficient to predict the images). This
+ * function is that strategy on the mirrored geometry: the family
+ * is a below-eye inversion (background lapse gamma, base zBaseM,
+ * thickness wM, strength dTK), the residual is the TC misfit
+ * through the 1983 forward tracer, the search is a deterministic
+ * multi-start coordinate descent (their "somewhat tedious search
+ * ... identified the minima with no difficulty"). The turning
+ * invariant (1983's Eq. 1; tau = phi_e^2 - phi^2 in Morrish's
+ * Fraser coordinates) is direction-agnostic, so the same forward
+ * machinery holds; gated by round trips in lehn-reference.
+ */
+export function lehnFitElevated(
+  obs,
+  {eyeM, distM, TzeC, p0Pa = 101325, groundM = 0}
+) {
+  const use = [];
+  for (let i = 0; i < obs.alphas.length; i++)
+    if (Number.isFinite(obs.zAt[i])) use.push(i);
+  if (use.length < 12) return null;
+  const alphas = use.map((i) => obs.alphas[i]);
+  const zObs = use.map((i) => obs.zAt[i]);
+  const nodesOf = (g, zB, w, dT) => {
+    const zT = zB + w;
+    const tAt = (z) =>
+      z >= zT
+        ? TzeC + g * (z - eyeM)
+        : z >= zB
+          ? TzeC + g * (zT - eyeM) - (dT * (zT - z)) / w
+          : TzeC + g * (zT - eyeM) - dT + g * (z - zB);
+    const hM = [groundM, zB, zT, eyeM, eyeM + 3000];
+    return {hM, tC: hM.map(tAt)};
+  };
+  const cost = (g, zB, w, dT) => {
+    if (zB <= groundM + 2 || zB + w >= eyeM - 10 || w < 4 || dT < 0)
+      return Infinity;
+    const f = lehnForwardTC(nodesOf(g, zB, w, dT), {
+      eyeM,
+      distM,
+      alphas,
+      p0Pa
+    });
+    let s2 = 0;
+    let n = 0;
+    for (let k = 0; k < alphas.length; k++) {
+      if (!Number.isFinite(f.zAt[k])) {
+        s2 += 300 * 300;
+        n++;
+        continue;
+      }
+      const d = f.zAt[k] - zObs[k];
+      s2 += d * d;
+      n++;
+    }
+    return Math.sqrt(s2 / n);
+  };
+  // Multi-start coordinate descent, deterministic.
+  let best = null;
+  const span = eyeM - groundM;
+  for (const zB0 of [0.2, 0.35, 0.5, 0.65, 0.8].map(
+    (f) => groundM + f * span
+  )) {
+    for (const dT0 of [1.5, 4, 8]) {
+      let p = [-0.0065, zB0, 40, dT0];
+      let c = cost(...p);
+      const steps = [0.003, span / 8, 20, 2];
+      for (let round = 0; round < 24; round++) {
+        let moved = false;
+        for (let j = 0; j < 4; j++) {
+          for (const dir of [1, -1]) {
+            const q = p.slice();
+            q[j] += dir * steps[j];
+            const cq = cost(...q);
+            if (cq < c) {
+              p = q;
+              c = cq;
+              moved = true;
+            }
+          }
+        }
+        if (!moved) for (let j = 0; j < 4; j++) steps[j] *= 0.55;
+        if (steps[1] < 0.5) break;
+      }
+      if (!best || c < best.c) best = {p, c};
+    }
+  }
+  if (!best || !Number.isFinite(best.c) || best.c > 250) return null;
+  const [g, zB, w, dT] = best.p;
+  const nodes = nodesOf(g, zB, w, dT);
+  // The probed floor: how deep the fitted rays actually see (the
+  // minimum perigee over the observed directions).
+  const f = lehnForwardTC(nodes, {eyeM, distM, alphas, p0Pa});
+  let floor = eyeM;
+  let onePerigee = true;
+  for (let k = 0; k < alphas.length; k++) {
+    if (Number.isFinite(f.zPerigee[k])) floor = Math.min(floor, f.zPerigee[k]);
+    if (f.nPerigee[k] > 1) onePerigee = false;
+  }
+  return {
+    nodes,
+    params: {gammaKm: g, zBaseM: zB, wM: w, dTK: dT},
+    tcRmsM: best.c,
+    probedFloorM: floor,
+    onePerigee
   };
 }

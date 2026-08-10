@@ -10510,13 +10510,21 @@
               lehnCache = {
                 key: state.soundingData.at ?? '',
                 line: lr.retrieved
-                  ? `image at ${(lr.distM / 1000).toFixed(0)} km from ` +
-                    `eye ${lr.eyeM.toFixed(0)} m → +` +
-                    `${lr.retrieved.dTretr.toFixed(1)} K by ` +
-                    `${lr.retrieved.probedTopM.toFixed(0)} m vs balloon +` +
-                    `${lr.retrieved.dTballoon.toFixed(1)} K · RMS ` +
-                    `${lr.retrieved.rmsK.toFixed(2)} K`
-                  : 'no superior mirage in this column — the instrument declines rather than invent'
+                  ? lr.mode === 'elevated'
+                    ? `ridge eye ${lr.eyeM.toFixed(0)} m, image at ` +
+                      `${(lr.distM / 1000).toFixed(0)} km → layer +` +
+                      `${lr.retrieved.params.dTK.toFixed(1)} K at ` +
+                      `${lr.retrieved.params.zBaseM.toFixed(0)}–` +
+                      `${(lr.retrieved.params.zBaseM + lr.retrieved.params.wM).toFixed(0)} m ` +
+                      `vs balloon +${lr.retrieved.dTballoon.toFixed(1)} K · ` +
+                      `RMS ${lr.retrieved.rmsK.toFixed(2)} K`
+                    : `shore eye ${lr.eyeM.toFixed(0)} m, image at ` +
+                      `${(lr.distM / 1000).toFixed(0)} km → +` +
+                      `${lr.retrieved.dTretr.toFixed(1)} K by ` +
+                      `${lr.retrieved.probedTopM.toFixed(0)} m vs balloon +` +
+                      `${lr.retrieved.dTballoon.toFixed(1)} K · RMS ` +
+                      `${lr.retrieved.rmsK.toFixed(2)} K`
+                  : lr.note
               };
             }
             research['mirage inversion retrieval (Lehn 1983)'] = lehnCache.line;

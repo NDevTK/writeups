@@ -9656,6 +9656,63 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   remaining Lehn corpus (Kropla 92, Morrish 86, downloaded
   unread) holds the wide-angle and three-dimensional extensions
   if a future pass wants the elevated eye.
+- DONE (Aug 10, the review session's 128th pass - THE ELEVATED EYE:
+  the ridge reads the layer below it): the Lehn retrieval sheds its
+  low-eye restriction, by the corpus's own methods. The remaining
+  two archive papers were read in full first: Kropla & Lehn 1992
+  (JOSA A 9, 601 - the differential-geometric reformulation:
+  optical path length as a metric, Gaussian curvature K of the
+  resulting surface tied to the profile, K = 0 <-> linear T and
+  unit magnification, constant K <-> parabolic T and a linear TC
+  whose slope IS the magnification; their re-solve of Whitefish
+  by K-segments; still a 2.5-m camera) and Lehn & Morrish 1986
+  (IEEE TGRS GE-24, 940 - the INFERIOR-mirage retrieval: a
+  three-parameter exponential-plus-linear family fitted by
+  minimizing weighted residuals of three optical observables
+  through the forward tracer, CLOSED AGAINST A 12-THERMISTOR MAST
+  with the profiles landing inside the mast's own noise - and the
+  finding that +-0.1 C mast noise is insufficient to predict the
+  images: the optics out-resolves the mast; camera at 5.7 m).
+  Neither paper elevates the eye, but Morrish supplies the METHOD
+  for the geometry his zones cannot reach: parametric family +
+  optical-residual minimization. lehn.js therefore gains (a)
+  perigee tracking in the forward tracer (turning points counted
+  both ways), and (b) lehnFitElevated - the below-eye inversion
+  family (background lapse, base, thickness, strength) fitted to
+  the observed TC by deterministic multi-start coordinate descent
+  through the 1983 arcs. The mirror is licensed numerically, not
+  rhetorically: lehn-reference's new block traces 70
+  single-perigee rays from a 450-m eye and shows Eq. (2) - the
+  1983 VERTEX temperature - returning the profile's own
+  temperature at every traced PERIGEE to 0.32 K worst: the
+  equation is a turning-point condition whichever side the ray
+  turns from (Morrish's tau = phi_e^2 - phi^2 form says the same
+  in Fraser coordinates). The elevated round trip then recovers a
+  +4 K / 280-330 m cap seen from 450 m at 90 km to base 281.3 m,
+  strength 3.97 K, thickness 48 m, profile 0.030 K RMS - from the
+  image and the eye-level temperature alone. retrievalPanel
+  becomes a two-eye cascade in observable geometry: the shore eye
+  (1983 zones, pivot ABOVE the eye - superior) and the theme's
+  450-m ridge eye (1986 strategy, pivot BELOW - mock), with
+  asymmetric mode bands (superior pivots HUG a low eye -
+  Whitefish's sits 13 m over the camera - while mock pivots lie
+  well below a ridge), every failed eye accounted in the decline
+  note. Gated end to end in observatory-reference: an SD-like
+  synthetic (station 134 m, +4 K cap at 380-430 m) through the
+  panel folds at 60 km, auto-selects the elevated mode, and lands
+  base 378.9 m / +3.80 K / 0.183 K RMS against its balloon; the
+  Whitefish-class low-eye landmark unchanged; the frozen day still
+  declines - now measured from BOTH eyes (its +1.2 K surface
+  inversion folds no terrestrial TC within 200 km from 136 m or
+  450 m; pins byte-identical). The research line reports
+  mode-aware closures and prints the panel's own two-eye
+  accounting when it declines. One measured failure fixed on the
+  way: a whole-function text replacement keyed on a non-unique
+  marker truncated observatory.js (restored from the 127th commit;
+  the replacement redone bounded by the function's true extent).
+  The instrument now covers both printed geometries; what remains
+  is a DAY that folds - the strong marine-cap days the panel is
+  armed for.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

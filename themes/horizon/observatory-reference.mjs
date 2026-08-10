@@ -558,6 +558,50 @@ check(
   );
 }
 
+// ---- the Lehn retrieval, elevated eye -------------------------
+// The mirrored geometry end to end through the panel: an SD-like
+// day (station 134 m, +4 K marine cap at 380-430 m) seen from the
+// theme's 450-m ridge eye. The cascade must pick the ELEVATED
+// mode (the S's pivot sits below the eye) and the Morrish-
+// strategy fit must close on the balloon.
+{
+  const tSD = (z) =>
+    z >= 430
+      ? 18 - 0.0065 * (z - 450)
+      : z >= 380
+        ? 18 - 0.0065 * (430 - 450) - (4 * (430 - z)) / 50
+        : 18 - 0.0065 * (430 - 450) - 4 - 0.0065 * (z - 380);
+  const rows = [];
+  let p = 1013.25;
+  let hPrev = 134;
+  for (const h of [
+    134, 200, 280, 340, 380, 395, 410, 430, 450, 500, 600, 900, 1500, 3000, 6000
+  ]) {
+    if (h > 134) {
+      const tMean = (tSD(hPrev) + tSD(h)) / 2 + 273.15;
+      p *= Math.exp((-(h - hPrev) * 9.80665 * 0.0289644) / (8.31451 * tMean));
+    }
+    rows.push({p, hM: h, tC: +tSD(h).toFixed(3), rh: 30});
+    hPrev = h;
+  }
+  const r = retrievalPanel(rows);
+  const ok =
+    r.retrieved !== null &&
+    r.mode === 'elevated' &&
+    r.eyeM === 450 &&
+    Math.abs(r.retrieved.params.zBaseM - 380) < 8 &&
+    Math.abs(r.retrieved.params.dTK - 4) < 0.5 &&
+    r.retrieved.onePerigee &&
+    r.retrieved.rmsK < 0.4;
+  check(
+    'LEHN RETRIEVAL, elevated: the ridge reads the marine cap',
+    ok,
+    r.retrieved
+      ? `the 450-m eye's fan folds at ${(r.distM / 1000).toFixed(0)} km with the pivot BELOW the eye (mock geometry, auto-selected); the Morrish-strategy fit lands base ${r.retrieved.params.zBaseM.toFixed(1)} m (truth 380), +${r.retrieved.params.dTK.toFixed(2)} K (truth 4), closing on the balloon at ${r.retrieved.rmsK.toFixed(3)} K RMS down to ${r.retrieved.probedFloorM.toFixed(0)} m - the elevated coastal eye can now read the layer below it`
+      : `declined: ${r.note}`
+  );
+}
+
 // ================================================================
 // THE DAY PINS - generated data, asserted generically.
 // ================================================================
