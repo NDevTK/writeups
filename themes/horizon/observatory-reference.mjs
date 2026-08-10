@@ -604,6 +604,63 @@ check(
   );
 }
 
+// ---- the Lehn retrieval, superior fallback --------------------
+// The 133rd pass end to end: an Oakland-class day - beach film
+// (superadiabatic 0-10 m), isothermal marine layer, and a strong
+// +15 K subsidence cap at 310-560 m right over the 300-m ridge
+// eye - through the panel's cascade. The early 90-km graze fold
+// must be attempted and REFUSED (first CLOSING fold wins, not
+// first fold - the brittleness the live days taught: one graze
+// ray's ground strike, moved metres by an rh difference, used to
+// flip the whole outcome); at 130 km the zones starve and the
+// 1986-strategy fallback recovers the cap and closes.
+// Day-invariant: all hand numbers.
+{
+  const tOak = (h) =>
+    h >= 560
+      ? 32.6 - 0.0065 * (h - 560)
+      : h >= 310
+        ? 17.6 + (60 * (h - 310)) / 1000
+        : h <= 10
+          ? 21.6 - 0.4 * h
+          : 17.6;
+  const rows = [];
+  let p = 1013.25;
+  let hPrev = 0;
+  for (const h of [
+    0, 5, 10, 20, 50, 110, 180, 250, 310, 360, 420, 480, 560, 700, 1000, 2000,
+    5000, 9000
+  ]) {
+    if (h > 0) {
+      const tMean = (tOak(hPrev) + tOak(h)) / 2 + 273.15;
+      p *= Math.exp((-(h - hPrev) * 9.80665 * 0.0289644) / (8.31451 * tMean));
+    }
+    rows.push({p, hM: h, tC: +tOak(h).toFixed(3), rh: 40});
+    hPrev = h;
+  }
+  const r = retrievalPanel(rows, {eyesM: [2, 300]});
+  const R = r.retrieved;
+  const ok =
+    R !== null &&
+    r.mode === 'superior' &&
+    R.method === 'fit' &&
+    R.closes &&
+    r.distM === 130000 &&
+    r.eyeM === 300 &&
+    Math.abs(R.params.zBaseM - 310) < 15 &&
+    R.params.dTK > 10 &&
+    R.params.dTK < 18 &&
+    R.rmsK < 1.5 &&
+    r.tried.some((t) => t.distM === 90000);
+  check(
+    'LEHN RETRIEVAL, superior fallback: the cascade closes the cap',
+    ok,
+    R
+      ? `the 300-m eye's 90-km graze fold is attempted and refused (${r.tried.find((t) => t.distM === 90000)?.why ?? 'not tried'}); at ${(r.distM / 1000).toFixed(0)} km the zones starve and the parametric fallback lands base ${R.params.zBaseM.toFixed(0)} m (truth 310), +${R.params.dTK.toFixed(1)} K claimed vs the balloon's +${R.dTballoon.toFixed(1)} K over the same interval, closing at ${R.rmsK.toFixed(2)} K RMS over the fold-probed span - the cascade walks past the unretrievable fold to the one the image can defend`
+      : `declined: ${r.note}`
+  );
+}
+
 // ---- the forecast ledger's pure parts -------------------------
 // The page stores; these decide. The pairing identity IS the
 // design: a station's 12Z ascent and the FOLLOWING 00Z ascent key

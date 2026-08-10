@@ -85,7 +85,12 @@ import {
 } from './tides.js';
 import {parseTLEs, satMagnitude, sunlitEci} from './sats.js';
 import {rayFan} from './far-terrain.js';
-import {lehnFitElevated, lehnInvertTC, tcCriticalPoints} from './lehn.js';
+import {
+  lehnFitElevated,
+  lehnFitSuperior,
+  lehnInvertTC,
+  tcCriticalPoints
+} from './lehn.js';
 
 // The drawn ocean's whitecap coverage law (Monahan &
 // O'Muircheartaigh 1980, W = 3.84e-6 U10^3.41) - the GPU copy
@@ -571,12 +576,24 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
   const dists = distsM ?? [20e3, 40e3, 60e3, 90e3, 130e3, 180e3];
   const eyes = eyesM ?? [h0 + 2, ...(450 > h0 + 60 ? [450] : [])];
   const tries = [];
+  // THE CASCADE (133rd pass): the ladder no longer bets the whole
+  // retrieval on the FIRST detectable S - a graze fold at one
+  // distance can mask a retrievable cap fold farther out, and
+  // which S the detector meets first is delicate at the sea-
+  // horizon boundary (measured: one ray's ground strike, moved
+  // metres by an rh difference, flipped the whole outcome). Every
+  // folding distance from every eye gets its attempt; the first
+  // retrieval that CLOSES on the balloon wins; if none closes,
+  // the first honest non-closure is reported as before - and a
+  // day with no defensible fold declines with the accounting.
+  let firstNonCloser = null;
+  let fitBudget = 3;
   for (const eye of eyes) {
     const TzeC = profile.at(eye).tC;
     const alphas = [];
     for (let a = -80; a <= 40; a += 0.25) alphas.push(a * MINR);
     const fan = rayFan(profile, eye, alphas, 200e3, 100);
-    let chosen = null;
+    let folded = false;
     for (const dM of dists) {
       const j = Math.min(
         fan.hs[0].length - 1,
@@ -594,141 +611,266 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
       // prominence and the inverted branch must span more than a
       // couple of samples.
       const {iP, iM} = tcCriticalPoints(tc, 6);
-      if (iP >= 0 && iM > iP + 2) {
-        chosen = {dM, tc, iP, iM};
-        break;
-      }
-    }
-    if (!chosen) {
-      tries.push({eyeM: eye, distM: null, why: 'no fold'});
-      continue;
-    }
-    const pivotAbs = h0 + chosen.tc.zAt[chosen.iP];
-    const common = {
-      eyeM: eye,
-      TzeC,
-      balloon,
-      distM: chosen.dM,
-      pivot: {
-        phiArcmin: chosen.tc.alphas[chosen.iP] / MINR,
-        zM: h0 + chosen.tc.zAt[chosen.iP]
-      },
-      min: {
-        phiArcmin: chosen.tc.alphas[chosen.iM] / MINR,
-        zM: h0 + chosen.tc.zAt[chosen.iM]
-      },
-      tried: tries
-    };
-    // Superior pivots HUG a low eye (Whitefish: 13 m above a
-    // 2.5-m camera); mock pivots sit well below a ridge eye - so
-    // the mode bands are asymmetric.
-    if (pivotAbs > eye + 5) {
-      // Superior geometry: the 1983 zones.
-      const inv = lehnInvertTC(chosen.tc, {
-        eyeM: eye - h0,
-        distM: chosen.dM,
+      if (!(iP >= 0 && iM > iP + 2)) continue;
+      folded = true;
+      const pivotAbs = h0 + tc.zAt[iP];
+      const common = {
+        eyeM: eye,
         TzeC,
-        p0Pa,
-        iterations: 8
-      });
-      if (!inv) {
-        tries.push({eyeM: eye, distM: chosen.dM, why: 'zone I starved'});
+        balloon,
+        distM: dM,
+        pivot: {
+          phiArcmin: tc.alphas[iP] / MINR,
+          zM: h0 + tc.zAt[iP]
+        },
+        min: {
+          phiArcmin: tc.alphas[iM] / MINR,
+          zM: h0 + tc.zAt[iM]
+        },
+        tried: tries
+      };
+      // Superior pivots HUG a low eye (Whitefish: 13 m above a
+      // 2.5-m camera); mock pivots sit well below a ridge eye - so
+      // the mode bands are asymmetric.
+      if (pivotAbs > eye + 5) {
+        // Superior geometry: the 1983 zones first - they own the
+        // short/medium-range class the reference gate pins on
+        // Whitefish. A closing zone retrieval returns as before.
+        const inv = lehnInvertTC(tc, {
+          eyeM: eye - h0,
+          distM: dM,
+          TzeC,
+          p0Pa,
+          iterations: 8
+        });
+        let zonesOut = null;
+        if (inv) {
+          const probedTopM = h0 + Math.max(...inv.vertexEl, eye - h0);
+          const tRetr = (hAbs) => {
+            const {hM, tC} = inv.nodes;
+            const h = hAbs - h0;
+            let i = 0;
+            while (i < hM.length - 2 && hM[i + 1] <= h) i++;
+            const f = Math.min(
+              1,
+              Math.max(0, (h - hM[i]) / (hM[i + 1] - hM[i]))
+            );
+            return tC[i] + (tC[i + 1] - tC[i]) * f;
+          };
+          let s2 = 0;
+          let n2 = 0;
+          for (let h = eye; h <= probedTopM; h += 5) {
+            const d = tRetr(h) - profile.at(h).tC;
+            s2 += d * d;
+            n2++;
+          }
+          const rmsK = n2 ? Math.sqrt(s2 / n2) : null;
+          zonesOut = {
+            ...common,
+            mode: 'superior',
+            // The closure against the balloon is the instrument's
+            // own verdict: a retrieval that misses the measured
+            // column by kelvins is a FOLD WITHOUT A CLOSURE -
+            // reported as such, never as a reading (the 1983
+            // iteration leaves its stated short/medium-range
+            // domain gracelessly; measured on a 130-km, 600-m-high
+            // structure).
+            retrieved: {
+              method: 'zones',
+              nodesHM: inv.nodes.hM.map((h) => h + h0),
+              nodesTC: inv.nodes.tC,
+              tcRmsM: inv.rms,
+              probedTopM,
+              rmsK,
+              closes: rmsK !== null && rmsK < 2.5,
+              dTretr: tRetr(probedTopM) - tRetr(eye),
+              dTballoon: profile.at(probedTopM).tC - profile.at(eye).tC
+            }
+          };
+          if (zonesOut.retrieved.closes) return zonesOut;
+        }
+        // The zones left their domain (or starved): Lehn & Morrish
+        // 1986's parametric fallback on the same fold. The fitted
+        // layer is confined to the FOLD-PROBED SPAN - the heights
+        // the fold-window rays (those that actually reach the
+        // object plane) traverse, read off the fan - and the claim
+        // must survive TWO closures: profile RMS over the probed-
+        // plus-claimed span, and the claimed layer strength
+        // against the balloon over the claimed interval itself
+        // (max(1 K, 35%) - the tolerance a fictitious layer cannot
+        // meet). Only a fit that survives both replaces the zones'
+        // honest non-closure.
+        let sLo = Infinity;
+        let sHi = -Infinity;
+        const jTop = Math.round(dM / fan.dsM);
+        for (
+          let i = Math.max(0, iP - 8);
+          i <= Math.min(alphas.length - 1, iM + 8);
+          i++
+        ) {
+          if (!Number.isFinite(tc.zAt[i])) continue;
+          const hh = fan.hs[i];
+          for (let k = 0; k <= Math.min(jTop, hh.length - 1); k++) {
+            const h = hh[k];
+            if (!Number.isFinite(h)) break;
+            if (h - h0 < sLo) sLo = h - h0;
+            if (h - h0 > sHi) sHi = h - h0;
+          }
+        }
+        sLo = Math.max(0, sLo);
+        const fitAllowed = Number.isFinite(sHi) && fitBudget-- > 0;
+        const fit = fitAllowed
+          ? lehnFitSuperior(tc, {
+              eyeM: eye - h0,
+              distM: dM,
+              TzeC,
+              p0Pa,
+              spanLoM: sLo,
+              spanHiM: sHi
+            })
+          : null;
+        if (fit) {
+          const zTRel = fit.params.zBaseM + fit.params.wM;
+          const tFit = (hAbs) => {
+            const {hM, tC} = fit.nodes;
+            const h = hAbs - h0;
+            let i = 0;
+            while (i < hM.length - 2 && hM[i + 1] <= h) i++;
+            const f = Math.min(
+              1,
+              Math.max(0, (h - hM[i]) / (hM[i + 1] - hM[i]))
+            );
+            return tC[i] + (tC[i + 1] - tC[i]) * f;
+          };
+          let s2 = 0;
+          let n2 = 0;
+          for (let h = h0 + sLo; h <= h0 + Math.max(sHi, zTRel); h += 5) {
+            const d = tFit(h) - profile.at(h).tC;
+            s2 += d * d;
+            n2++;
+          }
+          const rmsK = n2 ? Math.sqrt(s2 / n2) : null;
+          const dTb =
+            profile.at(h0 + zTRel).tC - profile.at(h0 + fit.params.zBaseM).tC;
+          const layerOK =
+            Math.abs(dTb - fit.params.dTK) <=
+            Math.max(1.0, 0.35 * fit.params.dTK);
+          if (rmsK !== null && rmsK < 2.5 && layerOK) {
+            return {
+              ...common,
+              mode: 'superior',
+              retrieved: {
+                method: 'fit',
+                nodesHM: fit.nodes.hM.map((h) => h + h0),
+                nodesTC: fit.nodes.tC,
+                tcRmsM: fit.tcRmsM,
+                probedTopM: h0 + Math.max(sHi, zTRel),
+                spanM: [h0 + sLo, h0 + sHi],
+                rmsK,
+                closes: true,
+                params: {
+                  zBaseM: h0 + fit.params.zBaseM,
+                  wM: fit.params.wM,
+                  dTK: fit.params.dTK,
+                  gammaKm: fit.params.gammaKm
+                },
+                dTretr: fit.params.dTK,
+                dTballoon: dTb
+              }
+            };
+          }
+        }
+        if (zonesOut) {
+          if (!firstNonCloser) firstNonCloser = zonesOut;
+          tries.push({
+            eyeM: eye,
+            distM: dM,
+            why: `superior does not close (${zonesOut.retrieved.rmsK === null ? 'no span' : zonesOut.retrieved.rmsK.toFixed(1) + ' K'})`
+          });
+        } else {
+          tries.push({
+            eyeM: eye,
+            distM: dM,
+            why: fitAllowed ? 'zone I starved' : 'fit budget spent'
+          });
+        }
         continue;
       }
-      const probedTopM = h0 + Math.max(...inv.vertexEl, eye - h0);
-      const tRetr = (hAbs) => {
-        const {hM, tC} = inv.nodes;
-        const h = hAbs - h0;
-        let i = 0;
-        while (i < hM.length - 2 && hM[i + 1] <= h) i++;
-        const f = Math.min(1, Math.max(0, (h - hM[i]) / (hM[i + 1] - hM[i])));
-        return tC[i] + (tC[i + 1] - tC[i]) * f;
-      };
-      let s2 = 0;
-      let n2 = 0;
-      for (let h = eye; h <= probedTopM; h += 5) {
-        const d = tRetr(h) - profile.at(h).tC;
-        s2 += d * d;
-        n2++;
-      }
-      const rmsK = n2 ? Math.sqrt(s2 / n2) : null;
-      return {
-        ...common,
-        mode: 'superior',
-        // The closure against the balloon is the instrument's own
-        // verdict: a retrieval that misses the measured column by
-        // kelvins is a FOLD WITHOUT A CLOSURE - reported as such,
-        // never as a reading (the 1983 iteration leaves its stated
-        // short/medium-range domain gracelessly; measured on a
-        // 130-km, 600-m-high structure).
-        retrieved: {
-          nodesHM: inv.nodes.hM.map((h) => h + h0),
-          nodesTC: inv.nodes.tC,
-          tcRmsM: inv.rms,
-          probedTopM,
-          rmsK,
-          closes: rmsK !== null && rmsK < 2.5,
-          dTretr: tRetr(probedTopM) - tRetr(eye),
-          dTballoon: profile.at(probedTopM).tC - profile.at(eye).tC
+      if (pivotAbs < eye - 20) {
+        // Mock geometry: the 1986 parametric strategy.
+        const fitAllowed = fitBudget-- > 0;
+        const fit = fitAllowed
+          ? lehnFitElevated(tc, {
+              eyeM: eye - h0,
+              distM: dM,
+              TzeC,
+              p0Pa,
+              groundM: 0
+            })
+          : null;
+        if (!fit) {
+          tries.push({
+            eyeM: eye,
+            distM: dM,
+            why: fitAllowed ? 'fit failed' : 'fit budget spent'
+          });
+          continue;
         }
-      };
-    }
-    if (pivotAbs < eye - 20) {
-      // Mock geometry: the 1986 parametric strategy.
-      const fit = lehnFitElevated(chosen.tc, {
-        eyeM: eye - h0,
-        distM: chosen.dM,
-        TzeC,
-        p0Pa,
-        groundM: 0
-      });
-      if (!fit) {
-        tries.push({eyeM: eye, distM: chosen.dM, why: 'fit failed'});
+        const floorAbs = h0 + Math.max(0, fit.probedFloorM);
+        const tFit = (hAbs) => {
+          const {hM, tC} = fit.nodes;
+          const h = hAbs - h0;
+          let i = 0;
+          while (i < hM.length - 2 && hM[i + 1] <= h) i++;
+          const f = Math.min(1, Math.max(0, (h - hM[i]) / (hM[i + 1] - hM[i])));
+          return tC[i] + (tC[i + 1] - tC[i]) * f;
+        };
+        let s2 = 0;
+        let n2 = 0;
+        for (let h = floorAbs; h <= eye; h += 5) {
+          const d = tFit(h) - profile.at(h).tC;
+          s2 += d * d;
+          n2++;
+        }
+        const baseAbs = h0 + fit.params.zBaseM;
+        const topAbs = baseAbs + fit.params.wM;
+        const rmsKe = n2 ? Math.sqrt(s2 / n2) : null;
+        const elevOut = {
+          ...common,
+          mode: 'elevated',
+          retrieved: {
+            method: 'fit',
+            nodesHM: fit.nodes.hM.map((h) => h + h0),
+            nodesTC: fit.nodes.tC,
+            tcRmsM: fit.tcRmsM,
+            probedFloorM: floorAbs,
+            onePerigee: fit.onePerigee,
+            closes: rmsKe !== null && rmsKe < 2.5,
+            params: {
+              zBaseM: baseAbs,
+              wM: fit.params.wM,
+              dTK: fit.params.dTK,
+              gammaKm: fit.params.gammaKm
+            },
+            rmsK: rmsKe,
+            dTretr: fit.params.dTK,
+            dTballoon: profile.at(topAbs).tC - profile.at(baseAbs).tC
+          }
+        };
+        if (elevOut.retrieved.closes) return elevOut;
+        if (!firstNonCloser) firstNonCloser = elevOut;
+        tries.push({
+          eyeM: eye,
+          distM: dM,
+          why: `elevated does not close (${elevOut.retrieved.rmsK === null ? 'no span' : elevOut.retrieved.rmsK.toFixed(1) + ' K'})`
+        });
         continue;
       }
-      const floorAbs = h0 + Math.max(0, fit.probedFloorM);
-      const tFit = (hAbs) => {
-        const {hM, tC} = fit.nodes;
-        const h = hAbs - h0;
-        let i = 0;
-        while (i < hM.length - 2 && hM[i + 1] <= h) i++;
-        const f = Math.min(1, Math.max(0, (h - hM[i]) / (hM[i + 1] - hM[i])));
-        return tC[i] + (tC[i + 1] - tC[i]) * f;
-      };
-      let s2 = 0;
-      let n2 = 0;
-      for (let h = floorAbs; h <= eye; h += 5) {
-        const d = tFit(h) - profile.at(h).tC;
-        s2 += d * d;
-        n2++;
-      }
-      const baseAbs = h0 + fit.params.zBaseM;
-      const topAbs = baseAbs + fit.params.wM;
-      const rmsKe = n2 ? Math.sqrt(s2 / n2) : null;
-      return {
-        ...common,
-        mode: 'elevated',
-        retrieved: {
-          nodesHM: fit.nodes.hM.map((h) => h + h0),
-          nodesTC: fit.nodes.tC,
-          tcRmsM: fit.tcRmsM,
-          probedFloorM: floorAbs,
-          onePerigee: fit.onePerigee,
-          closes: rmsKe !== null && rmsKe < 2.5,
-          params: {
-            zBaseM: baseAbs,
-            wM: fit.params.wM,
-            dTK: fit.params.dTK,
-            gammaKm: fit.params.gammaKm
-          },
-          rmsK: rmsKe,
-          dTretr: fit.params.dTK,
-          dTballoon: profile.at(topAbs).tC - profile.at(baseAbs).tC
-        }
-      };
+      tries.push({eyeM: eye, distM: dM, why: 'pivot at the eye'});
     }
-    tries.push({eyeM: eye, distM: chosen.dM, why: 'pivot at the eye'});
+    if (!folded) tries.push({eyeM: eye, distM: null, why: 'no fold'});
   }
+  if (firstNonCloser) return firstNonCloser;
   return {
     eyeM: eyes[0],
     TzeC: profile.at(eyes[0]).tC,

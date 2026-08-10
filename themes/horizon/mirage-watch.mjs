@@ -116,8 +116,8 @@ for (const [name, lat, lon] of STATIONS) {
     if (r.retrieved) {
       line +=
         `${r.retrieved.closes ? 'FOLDS+CLOSES' : 'folds, DOES NOT CLOSE'}: ` +
-        `${r.mode} eye ${r.eyeM.toFixed(0)} m @ ${(r.distM / 1000).toFixed(0)} km  ` +
-        (r.mode === 'elevated'
+        `${r.mode}/${r.retrieved.method} eye ${r.eyeM.toFixed(0)} m @ ${(r.distM / 1000).toFixed(0)} km  ` +
+        (r.retrieved.params
           ? `layer +${r.retrieved.params.dTK.toFixed(1)} K at ${r.retrieved.params.zBaseM.toFixed(0)}-${(r.retrieved.params.zBaseM + r.retrieved.params.wM).toFixed(0)} m  `
           : `+${r.retrieved.dTretr.toFixed(1)} K to ${r.retrieved.probedTopM.toFixed(0)} m  `) +
         `vs balloon +${r.retrieved.dTballoon.toFixed(1)} K  RMS ${r.retrieved.rmsK.toFixed(2)} K`;
@@ -174,6 +174,7 @@ if (doFreeze && hits.length) {
       h.panel.mode === 'elevated'
         ? {
             mode: 'elevated',
+            method: R.method,
             distM: h.panel.distM,
             zBaseM: [R.params.zBaseM, 6],
             wM: [R.params.wM, 12],
@@ -183,7 +184,15 @@ if (doFreeze && hits.length) {
           }
         : {
             mode: 'superior',
+            method: R.method,
             distM: h.panel.distM,
+            ...(R.params
+              ? {
+                  zBaseM: [R.params.zBaseM, 6],
+                  wM: [R.params.wM, 12],
+                  dTK: [R.params.dTK, 0.4]
+                }
+              : {}),
             probedTopM: [R.probedTopM, 5],
             dTretr: [R.dTretr, 0.5],
             rmsK: [R.rmsK, 0.3],

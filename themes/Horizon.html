@@ -10510,18 +10510,19 @@
             // instrument declines on fold-free days.
             if (lehnCache?.key !== (state.soundingData.at ?? '')) {
               const lr = retrievalPanel(rows);
+              const lrEye = lr.eyeM >= 100 ? 'ridge' : 'shore';
               lehnCache = {
                 key: state.soundingData.at ?? '',
                 line: lr.retrieved
-                  ? lr.mode === 'elevated'
-                    ? `ridge eye ${lr.eyeM.toFixed(0)} m, image at ` +
+                  ? lr.retrieved.params
+                    ? `${lrEye} eye ${lr.eyeM.toFixed(0)} m, image at ` +
                       `${(lr.distM / 1000).toFixed(0)} km → layer +` +
                       `${lr.retrieved.params.dTK.toFixed(1)} K at ` +
                       `${lr.retrieved.params.zBaseM.toFixed(0)}–` +
                       `${(lr.retrieved.params.zBaseM + lr.retrieved.params.wM).toFixed(0)} m ` +
                       `vs balloon +${lr.retrieved.dTballoon.toFixed(1)} K · ` +
                       `RMS ${lr.retrieved.rmsK.toFixed(2)} K`
-                    : `shore eye ${lr.eyeM.toFixed(0)} m, image at ` +
+                    : `${lrEye} eye ${lr.eyeM.toFixed(0)} m, image at ` +
                       `${(lr.distM / 1000).toFixed(0)} km → +` +
                       `${lr.retrieved.dTretr.toFixed(1)} K by ` +
                       `${lr.retrieved.probedTopM.toFixed(0)} m vs balloon +` +

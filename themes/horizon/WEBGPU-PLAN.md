@@ -9828,6 +9828,56 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     the live run. The measured edges stand unchanged in the report
     (Oakland/Quillayute/Utqiagvik still fold without closing at
     130 km - candidate future days for a superior-mode domain fix).
+- DONE (Aug 10, the review session's 133rd pass - THE CASCADE
+  CLOSES THE 130-KM DAYS: superior-mode parametric fallback +
+  first-CLOSING-fold-wins): the 132nd's measured edge worked.
+  Diagnosis on the live folding non-closers found three distinct
+  mechanisms: Oakland's ridge eye sits AT its marine cap's base
+  (309 m rel vs eye 300) so the 1983 zones leave their domain;
+  Quillayute's fold RIDES THE SURFACE (span floor 0 m - an
+  inferior-family graze under a -47 K/km beach film, not a
+  superior mirage); and the ladder's "first detectable S wins"
+  was brittle - one graze ray's ground strike, moved metres by
+  an rh difference, flipped which fold the panel committed to.
+  Three fixes, each a lesson made code: (1) lehnFitSuperior -
+  Lehn & Morrish 1986's parametric strategy on the
+  pivot-above-eye geometry, the trapezoid RE-ANCHORED at the eye
+  (base may sit below/straddle/top the eye) and confined to the
+  FOLD-PROBED SPAN read off the fan (without that constraint the
+  optimizer parks fictitious layers in the smooth wings where no
+  closure metric can indict them - measured, twice); w >= 20 m
+  and dT >= 0.5 K degeneracy floors. (2) The retrievalPanel
+  CASCADE: every folding distance from every eye gets its
+  attempt (zones first where they own the class, fit as
+  fallback), the first retrieval that CLOSES wins, the first
+  honest non-closure is reported when nothing does, and a fit
+  budget (3/panel) bounds the page's cost. (3) TWO closures for
+  a fit claim: profile RMS over the probed-plus-claimed span AND
+  the claimed layer strength vs the balloon over the claimed
+  interval (max(1 K, 35%) - the tolerance the compression
+  degeneracy cannot meet; the identifiability trade w-vs-dT
+  under fixed integrated bending is MEASURED in the new
+  lehn-reference family round trip: base/lapse pin sharply,
+  thickness trades 177-for-220 m against strength 8.5-for-9 K).
+  Gates: lehn-reference gains the family round trip;
+  observatory-reference gains the end-to-end cascade landmark (a
+  day-invariant Oakland-class synthetic: beach film + isothermal
+  marine layer + 60 K/km cap over a 300-m eye - the 90-km graze
+  fold is attempted and REFUSED, the 130-km fold closes at
+  1.07 K RMS with base 315 vs truth 310). THE LIVE RESULT, same
+  evening, one sweep: VANDENBERG folds and closes (superior/fit,
+  +9.9 K at 387-467 m vs balloon +7.1 K, 1.08 K RMS) and
+  OAKLAND folds and closes at 180 km - the cascade walking past
+  its non-closing 130-km attempt - (+10.2 K at 323-584 m, base
+  14 m off the balloon's 309, vs balloon +6.9 K, 1.49 K RMS);
+  both frozen by the standing --freeze procedure. THE ARCHIVE
+  now holds three days in three geometries: Resolute elevated,
+  Vandenberg superior/fit, Oakland superior/fit-at-180. The
+  edges that remain are named honestly: Quillayute/Utqiagvik
+  still refuse (surface-graze folds; the inferior-family
+  retrieval is a different instrument, parked), and the page's
+  lehn line + watch prints now carry the method tag and
+  layer-vs-balloon numbers for any closing mode.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

@@ -232,6 +232,31 @@ side was fitted to the other.
   columns), and one no-inversion column was matched by a degenerate
   ΔT≈0 fit — both now guarded (fits under 0.5 K decline; retrievals
   carry an explicit closes verdict). (`lehn-reference` THE REAL DAY)
+- **The cascade closes the 130-km days** (pass 133): the 129th's
+  measured edge — three stations folding without closing — split
+  under diagnosis into three mechanisms: a ridge eye sitting AT its
+  marine cap's base (Oakland, 309 m rel vs eye 300 — the 1983 zones'
+  domain simply ends there), folds that RIDE THE SURFACE under a
+  beach superadiabat (Quillayute, span floor 0 m — inferior-family
+  physics, not a superior mirage), and a ladder that bet everything
+  on the first detectable S (one graze ray's ground strike, moved
+  metres by a humidity difference, flipped which fold the panel
+  committed to). The answer is Lehn & Morrish 1986's own strategy
+  carried to the pivot-above-eye geometry: a trapezoid family
+  re-anchored at the eye, confined to the fold-probed span read off
+  the fan, refereed by TWO closures (span RMS < 2.5 K and the
+  claimed layer strength vs the balloon over the claimed interval),
+  inside a cascade where every folding distance gets its attempt and
+  the first CLOSING retrieval wins. Same evening, one sweep:
+  Vandenberg closes (+9.9 K at 387–467 m vs balloon +7.1 K, 1.08 K
+  RMS) and Oakland closes at 180 km — the cascade walking past its
+  refused 130-km attempt — with the retrieved base 14 m off the
+  balloon's 309 m. The archive holds three days in three geometries;
+  the w-vs-ΔT compression under fixed integrated bending is measured
+  in the family round trip (thickness 177-for-220 m against strength
+  8.5-for-9 K) and it is exactly what the layer closure indicts on
+  curved-cap days. (`lehn-reference` family round trip + THE
+  ARCHIVE; `observatory-reference` superior fallback)
 
 ---
 
@@ -287,14 +312,22 @@ between it and the next tier.
 - **The Lehn retrieval covers both printed geometries since pass 128**
   (shore eye/1983 zones for superior mirages; ridge eye/Morrish-1986
   parametric strategy for mock mirages, licensed by Eq. (2) holding at
-  traced perigees to 0.32 K), and since pass 129 it has its real-day
-  closure (Resolute, §3). Remaining limits, now partly MEASURED: the
-  1983 superior-mode iteration degrades gracelessly at ~130-km ranges
-  with high structure (three watch stations folded without closing,
-  +28…+43 K retrievals against +2-K columns — reported with an
-  explicit `closes: false`, never as readings); the elevated family
-  is a single-inversion trapezoid; the retrieval reaches only as far
-  as the rays turn (probed span reported with every closure); and San
+  traced perigees to 0.32 K), holds real-day closures in three
+  geometries since pass 133 (Resolute elevated; Vandenberg and
+  Oakland through the superior-mode parametric fallback, §3), and
+  the 1983 iteration's graceless ~130-km degradation is now handled
+  rather than merely reported: the cascade attempts every folding
+  distance and the span-confined fit replaces the zones only when
+  its claim survives both closures. Remaining limits: folds that
+  ride the surface graze refuse retrieval (Quillayute/Utqiagvik —
+  the inferior-family instrument, a superadiabatic surface layer
+  read from its own mirage, is not built; parked as a named lead);
+  both families are single-inversion trapezoids; the w-vs-ΔT
+  compression under fixed integrated bending is a measured
+  identifiability limit (family round trip: 177-for-220 m), so
+  fitted thickness/strength carry the layer-closure band, not
+  metrological precision; the retrieval reaches only as far as the
+  fold rays fly (probed span reported with every closure); and San
   Diego's own column has yet to fold from either eye — the home
   research line still waits on a strong marine-cap day.
 
@@ -377,7 +410,15 @@ The practice the corpus demonstrates, stated so it can be reused:
    forecast at the fixed 450-m eye is stored under its local evening
    (the 12Z morning forecast paired with its 00Z evening verifier by
    `eveningKey`), and scored evenings render held/revised verdicts —
-   the prediction sheet keeps its own record.
+   the prediction sheet keeps its own record. Passes 129/132/133 give
+   the retrieval its field campaign: `mirage-watch.mjs` sweeps eight
+   literature-anchored stations each session and `--freeze` appends
+   every closing day to `lehn-fixture.js` with bands written at freeze
+   time, `lehn-reference`'s archive runner holds each frozen day to
+   its own pins, and the retrieval cascade (every folding distance
+   attempted, first CLOSING fold wins, two closures refereeing any
+   fitted claim) is what turned the watch's measured edges into
+   archive days.
 
 ---
 

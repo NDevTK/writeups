@@ -596,3 +596,117 @@ export function lehnFitElevated(
     onePerigee
   };
 }
+
+/**
+ * THE SUPERIOR FIT (the 1986 strategy on the 1983 geometry): the
+ * zone decomposition is Lehn's own method for the superior mirage
+ * and lehn-reference holds it on his Whitefish class - but at the
+ * ranges the mirage watch actually meets (130 km under
+ * marine-layer caps) its vertex-locus iteration leaves the stated
+ * short/medium-range domain gracelessly, retrieving tens of
+ * kelvin against measured columns. Lehn & Morrish 1986's answer
+ * to their own ill-conditioned case was a parametric family
+ * fitted by optical residuals; this is that strategy for the
+ * pivot-above-eye geometry, with two lessons the live 130-km
+ * days taught:
+ *  - the layer must live INSIDE the fold-probed span [spanLoM,
+ *    spanHiM] (the heights the fold-window rays actually
+ *    traverse, read off the fan - image-side knowledge). Without
+ *    that constraint the optimizer parks a fictitious layer in
+ *    the smooth wings where no closure metric can indict it
+ *    (measured on Oakland and Quillayute, both of which it did).
+ *  - the temperature shape is RE-ANCHORED at the eye (t(eye) =
+ *    TzeC by construction), so the trapezoid may sit below,
+ *    straddle, or top the eye - a ridge eye sits AT the marine
+ *    cap's base, and the arctic shore's classic inversion hangs
+ *    below a 300-m eye entirely (measured on Utqiagvik).
+ * Same degeneracy guards as the elevated family, plus a
+ * physical floor on thickness (w >= 20 m): fitted strengths
+ * under half a kelvin, and slivers thinner than a radiosonde
+ * can resolve, decline rather than invent.
+ */
+export function lehnFitSuperior(
+  obs,
+  {eyeM, distM, TzeC, p0Pa = 101325, groundM = 0, spanLoM, spanHiM, topM = 2500}
+) {
+  const use = [];
+  for (let i = 0; i < obs.alphas.length; i++)
+    if (Number.isFinite(obs.zAt[i])) use.push(i);
+  if (use.length < 12) return null;
+  if (!(spanHiM - spanLoM > 50)) return null;
+  const alphas = use.map((i) => obs.alphas[i]);
+  const zObs = use.map((i) => obs.zAt[i]);
+  const nodesOf = (g, zB, w, dT) => {
+    const zT = zB + w;
+    const raw = (z) =>
+      z <= zB
+        ? g * z
+        : z <= zT
+          ? g * zB + (dT * (z - zB)) / w
+          : g * zB + dT + g * (z - zT);
+    const off = TzeC - raw(eyeM);
+    const hM = [groundM, zB, zT, zT + 3000];
+    return {hM, tC: hM.map((z) => raw(z) + off)};
+  };
+  const cost = (g, zB, w, dT) => {
+    if (zB < groundM + 5 || zB < spanLoM + 5 || zB > spanHiM - 15)
+      return Infinity;
+    if (w < 20 || dT < 0 || zB + w > eyeM + topM) return Infinity;
+    const f = lehnForwardTC(nodesOf(g, zB, w, dT), {
+      eyeM,
+      distM,
+      alphas,
+      p0Pa
+    });
+    let s2 = 0;
+    let n = 0;
+    for (let k = 0; k < alphas.length; k++) {
+      if (!Number.isFinite(f.zAt[k])) {
+        s2 += 300 * 300;
+        n++;
+        continue;
+      }
+      const d = f.zAt[k] - zObs[k];
+      s2 += d * d;
+      n++;
+    }
+    return Math.sqrt(s2 / n);
+  };
+  const span = spanHiM - spanLoM;
+  let best = null;
+  for (const zB0 of [0.2, 0.45, 0.7, 0.9].map((f) => spanLoM + f * span)) {
+    for (const w0 of [50, 250]) {
+      for (const dT0 of [1, 4, 10]) {
+        let p = [-0.0065, zB0, w0, dT0];
+        let c = cost(...p);
+        const steps = [0.003, span / 6, 30, 1.5];
+        for (let round = 0; round < 24; round++) {
+          let moved = false;
+          for (let j = 0; j < 4; j++) {
+            for (const dir of [1, -1]) {
+              const q = p.slice();
+              q[j] += dir * steps[j];
+              const cq = cost(...q);
+              if (cq < c) {
+                p = q;
+                c = cq;
+                moved = true;
+              }
+            }
+          }
+          if (!moved) for (let j = 0; j < 4; j++) steps[j] *= 0.55;
+          if (steps[1] < 0.5) break;
+        }
+        if (!best || c < best.c) best = {p, c};
+      }
+    }
+  }
+  if (!best || !Number.isFinite(best.c) || best.c > 250) return null;
+  if (best.p[3] < 0.5) return null;
+  const [g, zB, w, dT] = best.p;
+  return {
+    nodes: nodesOf(g, zB, w, dT),
+    params: {gammaKm: g, zBaseM: zB, wM: w, dTK: dT},
+    tcRmsM: best.c
+  };
+}

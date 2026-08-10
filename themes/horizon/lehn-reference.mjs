@@ -23,6 +23,7 @@ import {
   gradientFromCurvature,
   lehnDensity,
   lehnFitElevated,
+  lehnFitSuperior,
   lehnForwardTC,
   lehnInvertTC,
   rayCurvature,
@@ -306,6 +307,76 @@ const DIST = 20000;
       rms < 0.3,
     fit
       ? `the mock-mirage S at 90 km (pivot ${(obs.alphas[iP] / MIN).toFixed(1)}'), inverted by the Morrish strategy (parametric family + TC-residual search): base ${fit.params.zBaseM.toFixed(1)} m (truth 280), strength ${fit.params.dTK.toFixed(2)} K (truth 4), thickness ${fit.params.wM.toFixed(0)} m (truth 50); TC reproduced to ${fit.tcRmsM.toFixed(2)} m, profile to ${rms.toFixed(3)} K RMS over ${fit.probedFloorM.toFixed(0)}-450 m - from the image and the eye-level temperature alone`
+      : 'fit returned null'
+  );
+}
+
+// ---- the superior fit round trip ------------------------------
+// The 133rd pass's fallback family (lehnFitSuperior): an exact
+// single-trapezoid member - background lapse -2 K/km, +9 K over
+// 320-540 m, anchored t(300 m) = 16 C - forwarded to a 130-km
+// TC from a 300-m eye and fitted back from the image alone. The
+// bands MEASURE the long-range identifiability: base and
+// background lapse pin sharply, while thickness trades against
+// strength under near-constant integrated bending (the
+// compression the live Oakland fold taught; the panel's layer
+// closure is what referees it on real days).
+{
+  const tT = (z) =>
+    z >= 540
+      ? 16 - 0.002 * (320 - 300) + 9 - 0.002 * (z - 540)
+      : z >= 320
+        ? 16 - 0.002 * (320 - 300) + (9 * (z - 320)) / 220
+        : 16 - 0.002 * (z - 300);
+  const truth = {hM: [0, 320, 540, 3540], tC: [0, 320, 540, 3540].map(tT)};
+  const alphas = [];
+  for (let a = -45; a <= 10; a += 0.25) alphas.push(a * MIN);
+  const obs = lehnForwardTC(truth, {eyeM: 300, distM: 130000, alphas});
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let i = 0; i < alphas.length; i++) {
+    if (!Number.isFinite(obs.zAt[i])) continue;
+    lo = Math.min(lo, Number.isFinite(obs.zPerigee[i]) ? obs.zPerigee[i] : 300);
+    hi = Math.max(hi, obs.zAt[i]);
+  }
+  lo = Math.max(0, Math.min(lo, 300));
+  const fit = lehnFitSuperior(obs, {
+    eyeM: 300,
+    distM: 130000,
+    TzeC: 16,
+    spanLoM: lo,
+    spanHiM: hi
+  });
+  let rms = Infinity;
+  if (fit) {
+    const tFit = (z) => {
+      const {hM, tC} = fit.nodes;
+      let i = 0;
+      while (i < hM.length - 2 && hM[i + 1] <= z) i++;
+      const f = Math.min(1, Math.max(0, (z - hM[i]) / (hM[i + 1] - hM[i])));
+      return tC[i] + (tC[i + 1] - tC[i]) * f;
+    };
+    let s2 = 0;
+    let n = 0;
+    const zT = fit.params.zBaseM + fit.params.wM;
+    for (let z = lo; z <= Math.max(hi, zT); z += 5) {
+      const d = tFit(z) - tT(z);
+      s2 += d * d;
+      n++;
+    }
+    rms = Math.sqrt(s2 / n);
+  }
+  check(
+    'the superior fit round-trips its family',
+    fit !== null &&
+      Math.abs(fit.params.zBaseM - 320) < 12 &&
+      Math.abs(fit.params.dTK - 9) < 1 &&
+      Math.abs(fit.params.wM - 220) < 60 &&
+      Math.abs(fit.params.gammaKm + 0.002) < 5e-4 &&
+      fit.tcRmsM < 2 &&
+      rms < 0.8,
+    fit
+      ? `from the monotone 130-km image alone: base ${fit.params.zBaseM.toFixed(1)} m (truth 320), strength ${fit.params.dTK.toFixed(2)} K (truth 9), thickness ${fit.params.wM.toFixed(0)} m (truth 220 - the strength-thickness trade under constant integrated bending), lapse ${(fit.params.gammaKm * 1000).toFixed(2)} K/km (truth -2); TC to ${fit.tcRmsM.toFixed(2)} m, profile to ${rms.toFixed(3)} K RMS over ${lo.toFixed(0)}-${Math.max(hi, fit.params.zBaseM + fit.params.wM).toFixed(0)} m`
       : 'fit returned null'
   );
 }
