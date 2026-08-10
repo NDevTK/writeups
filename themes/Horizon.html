@@ -560,6 +560,7 @@
       import {
         columnPanel,
         contrailPanel,
+        flashPanel,
         leewavePanel,
         meteorsPanel,
         monahanW,
@@ -10368,6 +10369,7 @@
       const research = {};
       let researchBusy = false;
       let tideStudy = null; // one lazy 30-day fetch per session
+      let flashCache = null; // {key, line} - the panel is ~0.5 s
       async function syncResearch() {
         if (researchBusy) return;
         researchBusy = true;
@@ -10424,11 +10426,85 @@
                   : '') +
                 (lee.layer.mMs < 1 ? ' · under the 1 m/s gate' : '')
               : 'no wind-bearing levels';
+            // Tonight's green flash (Young): type from this same
+            // ascent's transfer curves, duration from the engine's
+            // own sunset rate (airless altitudes ±60 s around the
+            // next sunset). Cached per ascent × 25-m eye band -
+            // the panel costs ~0.5 s even in its fast mode.
+            if (window.Astronomy) {
+              const key =
+                (state.soundingData.at ?? '') +
+                '|' +
+                Math.round(eyeM / 25) +
+                '|' +
+                new Date().toISOString().slice(0, 10);
+              if (flashCache?.key !== key) {
+                const obsF = new Astronomy.Observer(state.lat, state.lon, 30);
+                const sunset = Astronomy.SearchRiseSet(
+                  Astronomy.Body.Sun,
+                  obsF,
+                  -1,
+                  Astronomy.MakeTime(new Date()),
+                  2
+                );
+                let rate = null;
+                if (sunset) {
+                  const alt = (t) => {
+                    const eq = Astronomy.Equator(
+                      Astronomy.Body.Sun,
+                      t,
+                      obsF,
+                      true,
+                      true
+                    );
+                    return Astronomy.Horizon(t, obsF, eq.ra, eq.dec, null)
+                      .altitude;
+                  };
+                  rate =
+                    (alt(sunset.AddDays(-60 / 86400)) -
+                      alt(sunset.AddDays(60 / 86400))) /
+                    120;
+                }
+                const fl = flashPanel(rows, {
+                  eyeM,
+                  rateDegPerS: rate,
+                  fast: true
+                });
+                flashCache = {
+                  key,
+                  line:
+                    fl.type +
+                    (fl.flash ? '' : ' — no green flash') +
+                    (fl.durationS !== null
+                      ? ` · ~${fl.durationS.toFixed(1)} s`
+                      : '') +
+                    (fl.widthArcsec !== null
+                      ? ` · ${fl.widthArcsec.toFixed(0)}″ tall` +
+                        (fl.magX ? ` (×${fl.magX.toFixed(1)} the rim)` : '')
+                      : '') +
+                    (fl.appArcmin !== null
+                      ? ` at ${fl.appArcmin.toFixed(0)}′ apparent`
+                      : '') +
+                    ` · eye ${fl.eyeM.toFixed(0)} m · ` +
+                    (fl.nakedEye
+                      ? 'naked-eye'
+                      : fl.flash
+                        ? 'binoculars (Dietze)'
+                        : 'red flash only') +
+                    (fl.ducts.length
+                      ? ` · DUCT ${fl.ducts[0].floorM.toFixed(0)}–` +
+                        `${fl.ducts[0].topM.toFixed(0)} m`
+                      : '')
+                };
+              }
+              research['green flash tonight (Young)'] = flashCache.line;
+            }
           } else {
             research['mirage (measured column)'] =
               'no fresh ascent - no mirage claim';
             delete research['contrail layer (Schmidt–Appleman)'];
             delete research['wave ladder (Stull ch. 17)'];
+            delete research['green flash tonight (Young)'];
           }
           if (Number.isFinite(state.wind)) {
             const u = state.wind / 3.6;

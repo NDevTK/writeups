@@ -17,6 +17,7 @@ import {
   DEG,
   apparentAltitude,
   ciddorN,
+  ductScan,
   foldCount,
   refractionRad,
   standardProfile,
@@ -326,6 +327,56 @@ const check = (name, ok, detail) => {
     'flash magnification',
     mag > 2.5 * flat && flat > 3 * ARCSEC && flat < 40 * ARCSEC && dipOk,
     `the best green-not-red sliver is ${(flat / ARCSEC).toFixed(1)}" through the standard atmosphere (the bare rim) and ${(mag / ARCSEC).toFixed(1)}" through the mirage profile (x${(mag / flat).toFixed(1)}) - Young's magnified rim IS the naked-eye flash; the sea horizon sits at ${((dip / DEG) * 60).toFixed(2)}' (geometric ${((geomDip / DEG) * 60).toFixed(2)}', lifted by refraction) and blocked rows carry vis 0`
+  );
+}
+
+{
+  // (5) the duct scan (Wegener/Young): n(h)(R+h) read radially.
+  // Young's Santa Ana sub-duct model (aty.sdsu.edu/~aty/explain/
+  // simulations/sub-duct: a 15 K inversion from 200 to 250 m,
+  // standard lapse below, Standard Atmosphere above) puts the
+  // duct floor "a little above 130 m, which is 70 m below the
+  // base of the inversion" - in air whose local lapse is
+  // perfectly ordinary. The scan must reproduce that printed
+  // number from Ciddor's n alone, order the floors by wavelength
+  // (blue refracts harder, so its duct is deeper - the sub-duct
+  // flash's chromatics), and find nothing in the ISA.
+  const tSanta = (h) => {
+    if (h >= 250) return 15 - 0.0065 * h;
+    const tBase = 15 - 0.0065 * 250 - 15;
+    if (h >= 200) return tBase + (15 * (h - 200)) / 50;
+    return tBase + 0.0065 * (200 - h);
+  };
+  const hs = [];
+  for (let h = 0; h <= 300; h += 5) hs.push(h);
+  hs.push(350, 400, 500, 700, 1000, 1500, 2000, 4000, 8000);
+  const levels = [];
+  let p = 101325;
+  let hPrev = 0;
+  for (const h of hs) {
+    if (h > 0) {
+      const tMean = (tSanta(hPrev) + tSanta(h)) / 2 + 273.15;
+      p *= Math.exp((-(h - hPrev) * 9.80665 * 0.0289644) / (8.31451 * tMean));
+    }
+    levels.push({pPa: p, hM: h, tC: tSanta(h), rh: 0});
+    hPrev = h;
+  }
+  const santa = buildProfile(levels, null);
+  const dIsa = ductScan(standardProfile());
+  const dG = ductScan(santa, {lambdaUm: 0.55});
+  const dR = ductScan(santa, {lambdaUm: 0.68});
+  const dB = ductScan(santa, {lambdaUm: 0.44});
+  const under = dG.length ? dG[0].baseM - dG[0].floorM : NaN;
+  check(
+    'duct scan (Wegener/Young)',
+    dIsa.length === 0 &&
+      dG.length === 1 &&
+      dG[0].topM === 250 &&
+      dG[0].baseM === 200 &&
+      Math.abs(under - 70) < 5 &&
+      dB[0].floorM < dG[0].floorM &&
+      dG[0].floorM < dR[0].floorM,
+    `ISA duct-free; Young's 15 K / 200-250 m Santa Ana inversion ducts from its top with the green floor ${dG[0]?.floorM.toFixed(1)} m - ${under.toFixed(1)} m below the inversion base (his printed "70 m below the base ... a little above 130 m") - and the floors order blue ${dB[0]?.floorM.toFixed(1)} < green < red ${dR[0]?.floorM.toFixed(1)} m: the duct is deeper in blue`
   );
 }
 

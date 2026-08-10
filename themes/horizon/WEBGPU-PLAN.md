@@ -9524,6 +9524,73 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   per the review conversation: the page-wiring probe (pinned-feeds
   load asserting the research section renders) and the second
   frozen day.
+- DONE (Aug 10, the review session's 126th pass - THE SUNSET AS AN
+  INSTRUMENT, part one: the green-flash predictor): the research
+  view now issues a falsifiable nightly forecast of tonight's
+  flash, quantified through Young's frame (aty.sdsu.edu - fifteen
+  pages read in full: simintro, transfer, sub-duct/SDGF, rims,
+  duct_intro, realistic, how, and the six animation pages). The
+  quantitative spine is his transfer-curve principle: a smooth
+  minimum in the wavelength-split transfer curves means a green
+  flash when the upper limb reaches that true altitude; the limb
+  crosses the RED minimum first (red image gone) and the GREEN
+  minimum second (flash over); true altitude is linear in time, so
+  duration = (minTrue_red - minTrue_green) / sunset rate - his own
+  sub-duct captions close on this (0.5' at the equatorial 15"/s =
+  his printed "two seconds near the equator, three at 50 deg").
+  Three pieces shipped. (1) refraction.js ductScan: n(h)(R+h) -
+  the Snell invariant read radially - walked up the profile;
+  super-critical segments (n r falling) hang ducts whose FLOOR is
+  found by bisection where n r regains the duct-top value BELOW
+  the inversion; gated in refraction-reference block 5 by Young's
+  own Santa Ana model (15 K over 200-250 m): the green floor lands
+  69.9 m below the inversion base against his printed "70 m below
+  the base ... a little above 130 m", the floors order blue 128.5
+  < green 130.1 < red 131.1 m (his sub-duct chromatics: the duct
+  is deeper in blue), and the ISA carries none. (2) observatory.js
+  flashFromProfile/flashPanel: transfer curves at the eye
+  (adaptive cost - duct days buy N=2400 reference nodes because
+  rays grazing a super-critical layer are near-singular far from
+  the anchor and at everyday N the sub-duct minima simply do not
+  exist; duct-free days run N=400, the page's cached fast mode
+  N=240), extrema by local-minimum-with-prominence on lightly
+  smoothed curves (the global argmin is the sea-horizon graze, NOT
+  the flash; the graze arcminute is skipped as ray-family
+  alternation), classification by curve + duct geometry into
+  Young's six types (textbook / inferior-mirage / mock-mirage /
+  ducted-mock-mirage / in-duct / sub-duct), duration from the
+  red-min/green-min split over an INJECTED engine sunset rate,
+  width as the green-not-red run at the tangent moment, and the
+  preceding red flash from the red curve's interior maximum.
+  Landmarked in observatory-reference against Young's printed
+  anchors: ISA textbook 0.95 s ("a second or so", Dietze
+  sub-naked-eye), his 0.8 K weak mock mirage detected at -3.9'
+  apparent with its preceding red maximum (0.90 s, x2.9 the rim),
+  his 2 K duct from 70 m = ducted-MM red-flash-only / from 45 m =
+  in-duct blank strip, and the Santa Ana sub-duct from 129 m:
+  minimum at -1.1' apparent ("very nearly at the astronomical
+  horizon"), 6.4 s = 6.8x the textbook flash (his "about three
+  times", with more green still to fade), gone to extended-rim by
+  120 m (his 131-m too-low case, the metre sensitivity). (3) the
+  pins + the page: emitPins computes the frozen day's airless
+  engine sunset rate (11.93"/s, cross-checked in the reference
+  against an independent engine sampling) and pins both eyes -
+  beach textbook 1.46 s; 450 m MOCK-MIRAGE 1.65 s, x4.0 the rim,
+  60" tall at -21.9' apparent (the 12Z ascent's morning surface
+  inversion below the ridge eye) - and Horizon.html's research
+  section gained 'green flash tonight (Young)': type, ~seconds,
+  size, x-rim, apparent altitude, naked-eye/binoculars/red-only,
+  any duct span - computed at the camera's own eye with the
+  engine's rate for tonight's actual sunset, cached per ascent x
+  25-m eye band, failing closed with the ascent. Known limits,
+  stated in code: the panel reads Young's taxonomy through this
+  repo's 680/550/440 nm triple (his boundary is 580 nm), the
+  in-duct upward integrand saturates rather than reflecting
+  (in-duct/ducted classifications lean on the exact duct scan, not
+  the curve), and durations quote the red-to-green minimum
+  interval, not the longer full green-visibility window. Next per
+  the same program: the Lehn-style fold-geometry inversion
+  retrieval closed against the balloon's measured inversion.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

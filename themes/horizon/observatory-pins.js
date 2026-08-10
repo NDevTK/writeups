@@ -99,6 +99,17 @@ export const DAY_PINS = {
     rbTop8: 7,
     issTonight: false
   },
+  flash: {
+    rateArcsecS: [11.927113001831344, 0.05],
+    beachType: 'textbook',
+    beachS: [1.4631960203600975, 0.15],
+    aloftType: 'mock-mirage',
+    aloftS: [1.6537655645679004, 0.2],
+    aloftWidth: [60.44280597742651, 12],
+    aloftMagX: [3.9820387413723464, 0.6],
+    aloftAppArcmin: [-21.86839016727958, 1],
+    ducts: 0
+  },
   closure: {
     globalRatio: [0.9739819539544845, 0.01],
     beamRatio: [1.1454677271244231, 0.02],

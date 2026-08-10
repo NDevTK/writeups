@@ -199,6 +199,22 @@ side was fitted to the other.
   suppresses semidiurnals while inflating diurnals; the sub-Rayleigh
   lumps (P1→K1, NU2→N2, K2→S2) sit inside their printed envelopes.
   (`observatory-reference`)
+- **Young's sub-duct geometry from the Snell invariant alone**: walking
+  n(h)·(R+h) up Young's own Santa Ana model (a 15 K inversion at
+  200–250 m) puts the optical duct's floor 69.9 m below the inversion
+  base against his printed "70 m below the base … a little above
+  130 m" — his number came from his refraction integrator, this one
+  from a Ciddor-refractivity scan that shares nothing with it — with
+  his chromatic ordering emerging unasked (floors 128.5/130.1/131.1 m
+  in blue/green/red: the duct is deeper in blue, his sub-duct flash
+  colours). The same transfer-curve machinery then reproduces his
+  printed duration anchors: the ISA textbook flash at 0.95 s against
+  his "a second or so", and the sub-duct flash at 6.8× the textbook
+  second against his "about three times the duration of a normal
+  flash" — stated at a moment with "still a way to go", so ≥3× is the
+  printed floor — with the sub-duct minima landing "very nearly at the
+  astronomical horizon" (−1.1′) exactly as his transfer plots show.
+  (`refraction-reference` block 5, `observatory-reference` FLASH)
 
 ---
 
@@ -278,7 +294,7 @@ The practice the corpus demonstrates, stated so it can be reused:
    (a normalization, a sign) are pinned once, documented as conventions,
    and the gate asserts they are global — a convention that varies
    per-row would be a fit, and fails.
-7. **The research view** (Horizon.html's data panel, passes 114–124):
+7. **The research view** (Horizon.html's data panel, passes 114–126):
    the gated modules run on the LIVE feeds and report their diagnostics
    inside the theme's own page — the
    current ascent's fold count and horizon refraction, the measured
@@ -304,6 +320,14 @@ The practice the corpus demonstrates, stated so it can be reused:
    match): re-anchoring the instrument to a new real day costs one
    command plus reading the diff, which is where run-then-pin's
    deliberateness now lives — the affordable frozen-day archive.
+   Since pass 126 the panel also issues a falsifiable nightly forecast:
+   the ascent's wavelength-split transfer curves are classified through
+   Young's taxonomy (textbook / inferior-mirage / mock-mirage /
+   ducted-mock-mirage / in-duct / sub-duct) and timed by his principle
+   that the flash runs from the red curve's minimum to the green's at
+   the engine's own sunset rate — the frozen day pins "450 m eye:
+   mock-mirage, 1.65 s, ×4.0 the rim, at −21.9′ apparent" as a
+   checkable prediction of that evening's sunset.
 
 ---
 

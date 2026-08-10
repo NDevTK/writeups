@@ -498,6 +498,27 @@ async function emitPins(fixturePath) {
     },
     mags: M.snapshotMap()
   });
+  // Tonight's green flash: the sunset after the fixture stamp,
+  // its true-altitude rate from airless engine altitudes +-60 s,
+  // then the frozen ascent through flashPanel at the research
+  // view's two eyes (the beach clamp and the 450 m ridge).
+  const sunsetT = A.SearchRiseSet(
+    A.Body.Sun,
+    satObs,
+    -1,
+    A.MakeTime(new Date(F.FIXTURE_AT.replace('Z', ':00Z'))),
+    2
+  );
+  const airless = (t) => {
+    const eq = A.Equator(A.Body.Sun, t, satObs, true, true);
+    return A.Horizon(t, satObs, eq.ra, eq.dec, null).altitude;
+  };
+  const rateDegPerS =
+    (airless(sunsetT.AddDays(-60 / 86400)) -
+      airless(sunsetT.AddDays(60 / 86400))) /
+    120;
+  const flB = O.flashPanel(F.SOUNDING.rows, {eyeM: 15, rateDegPerS});
+  const flA = O.flashPanel(F.SOUNDING.rows, {eyeM: 450, rateDegPerS});
   const perTop = met.shares?.filter((s) => s.code !== 'spo')[0];
   const best = sat.passes[0];
   const pins = {
@@ -573,6 +594,17 @@ async function emitPins(fixturePath) {
       rbTop8: sat.passes.slice(0, 8).filter((p) => p.name.includes('R/B'))
         .length,
       issTonight: sat.passes.some((p) => p.norad === 25544)
+    },
+    flash: {
+      rateArcsecS: [rateDegPerS * 3600, 0.05],
+      beachType: flB.type,
+      beachS: flB.durationS === null ? null : [flB.durationS, 0.15],
+      aloftType: flA.type,
+      aloftS: flA.durationS === null ? null : [flA.durationS, 0.2],
+      aloftWidth: flA.widthArcsec === null ? null : [flA.widthArcsec, 12],
+      aloftMagX: flA.magX === null ? null : [flA.magX, 0.6],
+      aloftAppArcmin: flA.appArcmin === null ? null : [flA.appArcmin, 1],
+      ducts: flA.ducts.length
     },
     closure: clo.ratios
       ? {

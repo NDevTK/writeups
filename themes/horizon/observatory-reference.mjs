@@ -25,6 +25,8 @@ import {
   columnPanel,
   contrailPanel,
   coronaPanel,
+  flashFromProfile,
+  flashPanel,
   leewavePanel,
   meteorsPanel,
   monahanW,
@@ -34,6 +36,7 @@ import {
   tidePanel,
   wetPanel
 } from './observatory.js';
+import {buildProfile, standardProfile} from './refraction.js';
 import {
   ADSB,
   AEROSOL,
@@ -372,6 +375,138 @@ check(
     `measured magnitudes)`
 );
 
+// ---- the flash taxonomy (Young, read in full) ------------------
+// flashFromProfile against Young's own model atmospheres, at the
+// equatorial sunset rate (the sun's hour-angle rate, 15"/s of
+// true altitude - his animations' clock). Day-invariant: these
+// synthetic columns are Young's, not the fixture's.
+{
+  const EQ = 360.98565 / 86400;
+  const mkProf = (tAt) => {
+    const hs = [];
+    for (let h = 0; h <= 300; h += 5) hs.push(h);
+    hs.push(350, 400, 500, 700, 1000, 1500, 2000, 4000, 8000);
+    const levels = [];
+    let p = 101325;
+    let hPrev = 0;
+    for (const h of hs) {
+      if (h > 0) {
+        const tMean = (tAt(hPrev) + tAt(h)) / 2 + 273.15;
+        p *= Math.exp((-(h - hPrev) * 9.80665 * 0.0289644) / (8.31451 * tMean));
+      }
+      levels.push({pPa: p, hM: h, tC: tAt(h), rh: 0});
+      hPrev = h;
+    }
+    return buildProfile(levels, null);
+  };
+  // The textbook sunset: ISA, low eye. Young: the bare rim makes
+  // "a (very feeble) green flash" lasting about a second - and
+  // Dietze showed it is sub-naked-eye at a sea horizon.
+  const tb = flashFromProfile(standardProfile(), {eyeM: 2, rateDegPerS: EQ});
+  check(
+    'FLASH textbook (Young/Dietze)',
+    tb.type === 'textbook' &&
+      tb.flash &&
+      !tb.nakedEye &&
+      tb.nMinima === 0 &&
+      tb.durationS > 0.7 &&
+      tb.durationS < 1.3,
+    `ISA from 2 m: no transfer-curve minimum, the flash is the bare ` +
+      `rim - ${tb.durationS.toFixed(2)} s at the equatorial rate ` +
+      `(Young's "a second or so"), binoculars only`
+  );
+  // Young's weak mock mirage (0.8 K inversion, 30-50 m, eye 38 m
+  // inside it): a shallow-but-real minimum at the line of sight
+  // tangent to the inversion base, a preceding red-flash maximum
+  // to its left, and a magnified flash.
+  const wm = flashFromProfile(
+    mkProf((h) => {
+      if (h >= 50) return 15 - 0.0065 * h;
+      const tBase = 15 - 0.0065 * 50 - 0.8;
+      if (h >= 30) return tBase + (0.8 * (h - 30)) / 20;
+      return tBase + 0.0065 * (30 - h);
+    }),
+    {eyeM: 38, rateDegPerS: EQ}
+  );
+  check(
+    'FLASH mock-mirage (Young)',
+    wm.type === 'mock-mirage' &&
+      wm.flash &&
+      wm.nakedEye &&
+      wm.minG.aArcmin < 0 &&
+      wm.minG.aArcmin > -8 &&
+      wm.redFlash?.kind === 'preceding' &&
+      wm.redFlash.aArcmin < wm.minG.aArcmin + 0.5 &&
+      wm.durationS > 0.4 &&
+      wm.durationS < 1.6 &&
+      wm.magX > 1.5,
+    `0.8 K / 30-50 m inversion, eye 38 m: minimum at ` +
+      `${wm.minG.aArcmin.toFixed(1)}' apparent (below the astronomical ` +
+      `horizon, above the sea), preceded by the red-flash maximum at ` +
+      `${wm.redFlash?.aArcmin.toFixed(1)}'; ${wm.durationS.toFixed(2)} s, ` +
+      `x${wm.magX.toFixed(1)} the bare rim`
+  );
+  // Young's ducted mock mirage (2 K over 50-60 m, eye above the
+  // duct): the duct draws the green minimum to a point - "in
+  // practice, these sunsets never produce green flashes" - while
+  // the broad maximum survives as a red flash. From inside the
+  // same duct: Wegener's blank strip, no flash at all.
+  const dp = mkProf((h) => {
+    if (h >= 60) return 15 - 0.0065 * h;
+    const tBase = 15 - 0.0065 * 60 - 2;
+    if (h >= 50) return tBase + (2 * (h - 50)) / 10;
+    return tBase + 0.0065 * (50 - h);
+  });
+  const dAbove = flashFromProfile(dp, {eyeM: 70, rateDegPerS: EQ});
+  const dIn = flashFromProfile(dp, {eyeM: 45, rateDegPerS: EQ});
+  check(
+    'FLASH ducted family (Young/Wegener)',
+    dAbove.type === 'ducted-mock-mirage' &&
+      !dAbove.flash &&
+      dAbove.redFlash?.kind === 'preceding' &&
+      dAbove.durationS === null &&
+      dIn.type === 'in-duct' &&
+      !dIn.flash &&
+      dAbove.ducts.length === 1 &&
+      Math.abs(dAbove.ducts[0].topM - 60) < 3,
+    `2 K / 50-60 m duct: from 70 m the green minimum is a point - no ` +
+      `flash, red flash at ${dAbove.redFlash?.aArcmin.toFixed(1)}'; from ` +
+      `45 m (inside) the blank strip - no flash; the scan's duct top ` +
+      `${dAbove.ducts[0].topM.toFixed(0)} m`
+  );
+  // The sub-duct flash (Young's Santa Ana model): eye just under
+  // the duct floor sees minima "very nearly at the astronomical
+  // horizon" and a flash "about three times the duration of a
+  // normal flash" - here against the textbook second. A few
+  // metres lower the minima are gone and only an extended rim
+  // remains (his 131 m: "not a proper flash at all").
+  const santa = mkProf((h) => {
+    if (h >= 250) return 15 - 0.0065 * h;
+    const tBase = 15 - 0.0065 * 250 - 15;
+    if (h >= 200) return tBase + (15 * (h - 200)) / 50;
+    return tBase + 0.0065 * (200 - h);
+  });
+  const sd = flashFromProfile(santa, {eyeM: 129, rateDegPerS: EQ});
+  const sdLow = flashFromProfile(santa, {eyeM: 120, rateDegPerS: EQ});
+  check(
+    'FLASH sub-duct (Young)',
+    sd.type === 'sub-duct' &&
+      sd.flash &&
+      sd.nakedEye &&
+      Math.abs(sd.minG.aArcmin) < 3 &&
+      sd.durationS > 2.5 * tb.durationS &&
+      sd.durationS < 12 * tb.durationS &&
+      sdLow.type === 'sub-duct' &&
+      !sdLow.flash,
+    `15 K / 200-250 m Santa Ana duct, eye 129 m (1 m under the green ` +
+      `floor): minimum at ${sd.minG.aArcmin.toFixed(1)}' apparent - the ` +
+      `astronomical horizon - lasting ${sd.durationS.toFixed(1)} s = ` +
+      `${(sd.durationS / tb.durationS).toFixed(1)}x the textbook flash ` +
+      `(Young: "about three times", with more green still to fade); at ` +
+      `120 m the minima are gone - extended rim only, his too-low case`
+  );
+}
+
 // ================================================================
 // THE DAY PINS - generated data, asserted generically.
 // ================================================================
@@ -558,6 +693,45 @@ pinBlock(
     `${sat.passes[0]?.minMag.toFixed(1)}, ${DAY_PINS.sats.rbTop8} of ` +
     `top 8 rocket bodies`
 );
+{
+  // The flash pins: tonight's prediction from the frozen ascent.
+  // The sunset rate is pinned data, cross-checked here against an
+  // INDEPENDENT engine sampling (airless altitudes +-60 s around
+  // the sunset after the fixture stamp) - then the frozen rows
+  // run through flashPanel at the research view's two eyes.
+  const A = AstroEngine;
+  const t0 = A.MakeTime(new Date(FIXTURE_AT.replace('Z', ':00Z')));
+  const sunset = A.SearchRiseSet(A.Body.Sun, satObs, -1, t0, 2);
+  const airless = (t) => {
+    const eq = A.Equator(A.Body.Sun, t, satObs, true, true);
+    return A.Horizon(t, satObs, eq.ra, eq.dec, null).altitude;
+  };
+  const rateEng =
+    (airless(sunset.AddDays(-60 / 86400)) -
+      airless(sunset.AddDays(60 / 86400))) /
+    120;
+  const rate = DAY_PINS.flash.rateArcsecS[0] / 3600;
+  const flB = flashPanel(SOUNDING.rows, {eyeM: 15, rateDegPerS: rate});
+  const flA = flashPanel(SOUNDING.rows, {eyeM: 450, rateDegPerS: rate});
+  pinBlock(
+    'flash',
+    [
+      ['rate "/s (engine)', rateEng * 3600, DAY_PINS.flash.rateArcsecS],
+      ['beach type', flB.type, DAY_PINS.flash.beachType],
+      ['beach s', flB.durationS, DAY_PINS.flash.beachS],
+      ['aloft type', flA.type, DAY_PINS.flash.aloftType],
+      ['aloft s', flA.durationS, DAY_PINS.flash.aloftS],
+      ['aloft width "', flA.widthArcsec, DAY_PINS.flash.aloftWidth],
+      ['aloft mag x', flA.magX, DAY_PINS.flash.aloftMagX],
+      ["aloft app '", flA.appArcmin, DAY_PINS.flash.aloftAppArcmin],
+      ['ducts', flA.ducts.length, DAY_PINS.flash.ducts]
+    ],
+    `sunset drops ${DAY_PINS.flash.rateArcsecS[0].toFixed(1)}"/s; beach ` +
+      `${flB.type} ${flB.durationS?.toFixed(1)}s, 450 m ${flA.type} ` +
+      `${flA.durationS?.toFixed(1)}s${flA.magX ? ' x' + flA.magX.toFixed(1) : ''}`
+  );
+}
+
 pinBlock(
   'closure',
   [

@@ -417,6 +417,77 @@ export function foldCount(t, minDrop = 5e-6) {
   return folds;
 }
 
+/**
+ * Duct scan (Wegener 1918 / Young): walk n(h)(R+h) - the radial
+ * factor of the Snell invariant - up the profile. Where it FALLS
+ * with height the layer is super-critical (a horizontal ray's
+ * curvature exceeds the Earth's) and an optical duct hangs from
+ * the segment's top. The duct's floor is NOT the inversion base:
+ * a ray is trapped wherever n r stays below the duct-top value,
+ * so the floor sits where n r last equals that value BELOW the
+ * super-critical layer - Young's sub-duct geometry (the floor can
+ * hang tens of metres below the inversion, in air whose local
+ * lapse is perfectly ordinary; his 15 K / 200-250 m Santa Ana
+ * example floors near 133 m). Wavelength enters through Ciddor n:
+ * blue refracts harder, so the floor sits LOWER in blue light -
+ * the chromatics of the sub-duct flash. Returns ducts ascending:
+ * {topM, baseM (super-critical segment bottom - the inversion
+ * base), floorM (trapped-ray floor, clamped at the profile
+ * bottom), depthM}.
+ */
+export function ductScan(
+  profile,
+  {lambdaUm = 0.55, topM = 5000, stepM = 2} = {}
+) {
+  const nr = (h) => {
+    const s = profile.at(h);
+    return ciddorN(lambdaUm, s.tC, s.pPa, s.rh ?? 0) * (R_EARTH_M + h);
+  };
+  const hEnd = Math.min(topM, profile.hTop);
+  const ducts = [];
+  let segBase = null;
+  const close = (top) => {
+    const nrTop = nr(top);
+    let floor = segBase;
+    while (floor - stepM >= profile.h0 && nr(floor) > nrTop) floor -= stepM;
+    if (nr(floor) > nrTop) {
+      // Trapped all the way down: a surface duct.
+      floor = profile.h0;
+    } else {
+      // The marginal ray n r = n r(top) turns between floor and
+      // floor + step; bisect - the sub-duct flash lives on
+      // metre-scale floor position (Young's 133 vs 136 m).
+      let lo = floor;
+      let hi = Math.min(floor + stepM, segBase);
+      for (let i = 0; i < 40; i++) {
+        const mid = (lo + hi) / 2;
+        if (nr(mid) <= nrTop) lo = mid;
+        else hi = mid;
+      }
+      floor = (lo + hi) / 2;
+    }
+    ducts.push({
+      topM: top,
+      baseM: segBase,
+      floorM: floor,
+      depthM: top - floor
+    });
+    segBase = null;
+  };
+  let prev = nr(profile.h0);
+  for (let h = profile.h0 + stepM; h <= hEnd + 1e-9; h += stepM) {
+    const cur = nr(h);
+    if (cur < prev - 1e-6) {
+      if (segBase === null) segBase = h - stepM;
+    } else if (segBase !== null) {
+      close(h - stepM);
+    }
+    prev = cur;
+  }
+  if (segBase !== null) close(hEnd);
+  return ducts;
+}
+
 // Everything the drawn sun needs, from one true altitude:
 // per-wavelength apparent altitudes (the green rim IS
 // app[green] - app[red]) and the vertical flattening ratio -

@@ -36,6 +36,7 @@ import {
   ARCSEC,
   DEG,
   buildProfile,
+  ductScan,
   foldCount,
   refractionRad,
   standardProfile,
@@ -181,6 +182,319 @@ function dewpointC(tC, rhPct) {
   const rh = Math.min(Math.max(rhPct ?? 0, 0.1), 100);
   const g = Math.log(rh / 100) + (17.62 * tC) / (243.12 + tC);
   return (243.12 * g) / (17.62 - g);
+}
+
+/**
+ * THE GREEN FLASH PREDICTOR (Young, aty.sdsu.edu, read in full):
+ * tonight's flash type and duration from the measured column.
+ * Everything is read off the wavelength-split transfer curves the
+ * repo already ray-traces (refraction.js) plus the duct scan -
+ * Young's frame, quantified:
+ *  - "if there's a smooth minimum in the transfer curves, there
+ *    will be a green flash when the Sun's upper limb reaches that
+ *    true altitude" (his transfer-curve page, the general
+ *    principle). The upper limb crosses the RED minimum first
+ *    (red image gone) and the GREEN minimum second (flash over),
+ *    and true altitude is nearly linear in time near the horizon,
+ *    so duration = (minTrue_red - minTrue_green) / sunset rate.
+ *    His own sub-duct numbers close on this: 0.5' of true
+ *    altitude at the equatorial rate (15"/s) is his printed "two
+ *    seconds (near the equator) or three (at about 50 deg)".
+ *  - flash WIDTH by his tangent construction: the horizontal
+ *    tangent at the red minimum cuts the green curve at two
+ *    apparent altitudes; their gap is the flash's apparent size.
+ *  - taxonomy by curve + duct geometry: textbook (no minimum -
+ *    the bare rim, sub-naked-eye at a sea horizon per Dietze),
+ *    inferior-mirage (superadiabatic surface, minimum at the
+ *    fold), mock-mirage (elevated inversion below eye; a broad
+ *    maximum left of the minimum = the preceding red flash),
+ *    ducted-mock-mirage (eye above a duct: the minimum is drawn
+ *    to a point - red flash only, no green), in-duct (Wegener's
+ *    blank strip - no flash), sub-duct (eye under the duct floor:
+ *    deep green-vs-red minima split, "the most spectacular",
+ *    about three times a normal flash's duration).
+ * The sunset RATE is injected (deg of true altitude per second,
+ * positive; the astronomy engine owns sun kinematics) - with no
+ * rate the panel still classifies, durations null.
+ */
+export function flashFromProfile(
+  profile,
+  {eyeM = 15, rateDegPerS = null, fast = false} = {}
+) {
+  const eye = Math.max(eyeM, profile.h0 + 2);
+  const dipRad = Math.sqrt((2 * (eye - profile.h0 + 2)) / (R_EARTH_M / 1.2));
+  // Ducts first: rays grazing a super-critical layer make the
+  // refraction integrand near-singular INSIDE the inversion, far
+  // from the anchor where the sqrt substitution protects it - at
+  // the everyday node count the whole duct region is noise and
+  // the sub-duct minima (Young: "very nearly at the astronomical
+  // horizon") simply do not exist. Duct days buy reference-grade
+  // nodes; duct-free days (San Diego's usual) stay cheap - and
+  // the page's live view (fast) cheaper still, cached per ascent.
+  const ducts = ductScan(profile, {topM: Math.min(eye + 3000, 5000)});
+  const nRows = ducts.length ? 600 : fast ? 500 : 900;
+  const N = ducts.length ? 2400 : fast ? 240 : 400;
+  const t = transferCurve(
+    profile,
+    eye,
+    -(dipRad + 0.45 * DEG),
+    0.6 * DEG,
+    nRows,
+    N
+  );
+  let first = 0;
+  while (first < nRows - 1 && !t.vis[first]) first++;
+  const rowRad = t.a[1] - t.a[0];
+  // The per-row integrals still carry ~1" jitter, so extrema are
+  // read off lightly smoothed curves (3-point boxcar - well under
+  // the 24"-wide weak-mock dip, far under arcmin duct structure)
+  // and only count with real prominence.
+  const smooth = (arr) => {
+    const out = Float64Array.from(arr);
+    for (let i = first; i < nRows; i++) {
+      let s = 0;
+      let n = 0;
+      for (
+        let k = Math.max(first, i - 1);
+        k <= Math.min(nRows - 1, i + 1);
+        k++
+      ) {
+        s += arr[k];
+        n++;
+      }
+      out[i] = s / n;
+    }
+    return out;
+  };
+  const gS = smooth(t.tG);
+  const rS = smooth(t.tR);
+  const PROM = 6 * ARCSEC;
+  // Interior local minima of the green curve with prominence: the
+  // flash minima of Young's principle. (The global minimum is the
+  // sea-horizon graze - the disk keeps setting below a mock-mirage
+  // line - so argmin is NOT the flash.)
+  // Skip the arcminute just above the sea horizon: the graze zone
+  // flips between ray families row to row (an alternation
+  // artifact, not structure), and no flash minimum lives at the
+  // horizon itself - the inferior-mirage fold sits arcminutes up.
+  const skipTo = first + Math.max(4, Math.round((60 * ARCSEC) / rowRad));
+  const localMins = (arr) => {
+    const out = [];
+    for (let i = skipTo; i < nRows - 4; i++) {
+      if (arr[i] > arr[i - 1] || arr[i] > arr[i + 1]) continue;
+      if (out.length && i - out[out.length - 1].i < 4) continue;
+      let rise = Infinity;
+      for (const dir of [-1, 1]) {
+        let best = 0;
+        for (let k = i + dir; k >= first && k < nRows; k += dir) {
+          if (arr[k] < arr[i]) break;
+          best = Math.max(best, arr[k] - arr[i]);
+        }
+        rise = Math.min(rise, best);
+      }
+      if (rise >= PROM) out.push({i, prom: rise});
+    }
+    return out;
+  };
+  const mins = localMins(gS);
+  let iG = -1;
+  let prom = 0;
+  for (const m of mins)
+    if (m.prom > prom) {
+      prom = m.prom;
+      iG = m.i;
+    }
+  const interior = iG >= 0;
+  // The matched red minimum: the red curve's OWN local minimum of
+  // the same structure (Young reads the flash between the red and
+  // green minima; a windowed argmin slides onto the sea-horizon
+  // branch and collapses the split). Fallback when red has no
+  // minimum there: the red curve's value at the green minimum.
+  let iR = -1;
+  if (interior) {
+    const minsR = localMins(rS);
+    let bestD = 151;
+    for (const m of minsR) {
+      const d = Math.abs(m.i - iG);
+      if (d < bestD) {
+        bestD = d;
+        iR = m.i;
+      }
+    }
+  }
+  const dIn = ducts.find((d) => eye >= d.floorM && eye < d.topM) ?? null;
+  const dBelowEye = [...ducts].reverse().find((d) => d.topM <= eye) ?? null;
+  const dOverhead = ducts.find((d) => d.floorM > eye) ?? null;
+  // Profile signatures for the inferior/mock split.
+  const T = (h) => profile.at(h).tC;
+  const infSig = T(profile.h0) - T(profile.h0 + 5) > 0.3;
+  let mockSig = false;
+  for (let h = profile.h0 + 5; h + 5 <= eye; h += 5)
+    if (T(h + 5) - T(h) > 0.05) mockSig = true;
+  // Position helper: is the flash minimum in the lowest quarter of
+  // the visible window (the miraged strip at the sea horizon)?
+  const lowQuarter = interior && t.a[iG] < t.a[first] + 0.25 * (0 - t.a[first]);
+  // ---- classify (Young's taxonomy) ----
+  let type;
+  let flash;
+  let nakedEye = false;
+  const notes = [];
+  if (dIn) {
+    type = 'in-duct';
+    flash = false;
+    notes.push(
+      `eye inside the duct (${dIn.floorM.toFixed(0)}-${dIn.topM.toFixed(0)} m): Wegener's blank strip, no green flash`
+    );
+  } else if (dBelowEye && !(interior && infSig && lowQuarter)) {
+    type = 'ducted-mock-mirage';
+    flash = false;
+    notes.push(
+      `duct below eye (top ${dBelowEye.topM.toFixed(0)} m): the green minimum is drawn to a point - red flash only ("in practice, these sunsets never produce green flashes")`
+    );
+  } else if (interior && dOverhead) {
+    type = 'sub-duct';
+    flash = true;
+    nakedEye = true;
+    const fR = ductScan(profile, {
+      lambdaUm: 0.68,
+      topM: Math.min(eye + 3000, 5000)
+    }).find((d) => d.floorM > eye);
+    const fB = ductScan(profile, {
+      lambdaUm: 0.44,
+      topM: Math.min(eye + 3000, 5000)
+    }).find((d) => d.floorM > eye);
+    notes.push(
+      `eye ${(dOverhead.floorM - eye).toFixed(0)} m under the duct floor (green ${dOverhead.floorM.toFixed(1)} m` +
+        (fR && fB
+          ? `; red ${fR.floorM.toFixed(1)}, blue ${fB.floorM.toFixed(1)} m - the floor is lower in blue`
+          : '') +
+        `): the most spectacular flash, metre-sensitive to eye height`
+    );
+  } else if (!interior && dOverhead) {
+    type = 'sub-duct';
+    flash = false;
+    notes.push(
+      `eye ${(dOverhead.floorM - eye).toFixed(0)} m under the duct floor but no transfer-curve minimum: extended green rim only (too low)`
+    );
+  } else if (interior && infSig && (lowQuarter || !mockSig)) {
+    type = 'inferior-mirage';
+    flash = true;
+    nakedEye = true;
+    notes.push(
+      'superadiabatic surface layer: the Omega sunset; flash at the fold where erect and inverted images join' +
+        (dBelowEye ? " (below the overhead duct's strip)" : '')
+    );
+  } else if (interior) {
+    type = 'mock-mirage';
+    flash = true;
+    nakedEye = true;
+    notes.push(
+      mockSig
+        ? 'elevated inversion below eye: flash below the astronomical horizon as the plume pinches off'
+        : 'interior transfer-curve minimum without a textbook layer signature'
+    );
+  } else {
+    type = 'textbook';
+    flash = true;
+    nakedEye = false;
+    notes.push(
+      'no minimum: the bare green rim - sub-naked-eye at a sea horizon (Dietze); binoculars, or an elevated horizon at 1-2 deg apparent altitude'
+    );
+  }
+  // ---- Young's quantities ----
+  // The bare rim at the same eye (green-over-red refraction split
+  // at the astronomical horizon, one integral per channel - the
+  // graze zone is never differenced): the magnification baseline
+  // AND the textbook flash's own span. Meaningless when the a = 0
+  // ray threads a duct, so nulled for the ducted eyes.
+  const ducted = dIn !== null || dBelowEye !== null;
+  const rimArcsec = ducted
+    ? null
+    : (refractionRad(0, profile, 0.55, eye) -
+        refractionRad(0, profile, 0.68, eye)) /
+      ARCSEC;
+  // Duration: the upper limb crosses the red minimum (red image
+  // gone), then the green minimum (flash over); true altitude is
+  // linear in time. The textbook flash is the same construction
+  // collapsed onto the horizon ray: its span is the rim itself.
+  const redMinVal = interior ? (iR >= 0 ? rS[iR] : rS[iG]) : null;
+  const splitArcsec = interior
+    ? Math.max((redMinVal - gS[iG]) / ARCSEC, 0)
+    : rimArcsec;
+  const durationS =
+    flash && rateDegPerS > 0 && splitArcsec !== null
+      ? splitArcsec / 3600 / rateDegPerS
+      : null;
+  // Width at onset: with the upper limb at the red minimum's true
+  // altitude (Young's tangent moment), the green-not-red span is
+  // the contiguous run of apparent altitudes around the minimum
+  // where the green curve sits below the cut and the red above it
+  // - the drawn flash, the same sliver the refraction gate pins.
+  let widthArcsec = null;
+  if (flash && interior) {
+    const cut = redMinVal;
+    let lo = iG;
+    let hi = iG;
+    while (lo - 1 >= first && gS[lo - 1] <= cut && rS[lo - 1] >= cut) lo--;
+    while (hi + 1 < nRows && gS[hi + 1] <= cut && rS[hi + 1] >= cut) hi++;
+    widthArcsec = ((hi - lo + 1) * rowRad) / ARCSEC;
+  }
+  const magX =
+    widthArcsec !== null && rimArcsec ? widthArcsec / rimArcsec : null;
+  // The preceding red flash: a prominent interior maximum of the
+  // red curve left of the flash minimum (mock-mirage family); for
+  // the inferior mirage the only maximum is the sea-horizon ray -
+  // the telescopic red rim as the inverted image first rises.
+  let redFlash = null;
+  if (interior) {
+    let iM = first;
+    for (let i = first; i <= iG; i++) if (rS[i] > rS[iM]) iM = i;
+    if (iM > first + 2 && iM < iG - 2)
+      redFlash = {
+        aArcmin: (t.a[iM] / DEG) * 60,
+        tArcmin: (rS[iM] / DEG) * 60,
+        kind: 'preceding'
+      };
+  }
+  if (!redFlash && type === 'inferior-mirage')
+    redFlash = {
+      aArcmin: (t.a[first] / DEG) * 60,
+      tArcmin: (rS[first] / DEG) * 60,
+      kind: 'horizon-rim (telescopic)'
+    };
+  return {
+    eyeM: eye,
+    type,
+    flash,
+    nakedEye,
+    durationS,
+    splitArcsec,
+    widthArcsec,
+    rimArcsec,
+    magX,
+    promArcsec: interior ? prom / ARCSEC : null,
+    nMinima: mins.length,
+    appArcmin: interior ? (t.a[iG] / DEG) * 60 : null,
+    minR: interior
+      ? {
+          aArcmin: (t.a[iR >= 0 ? iR : iG] / DEG) * 60,
+          tArcmin: (redMinVal / DEG) * 60
+        }
+      : null,
+    minG: interior
+      ? {aArcmin: (t.a[iG] / DEG) * 60, tArcmin: (gS[iG] / DEG) * 60}
+      : null,
+    redFlash,
+    ducts,
+    dipArcmin: (dipRad / DEG) * 60,
+    rateDegPerS: rateDegPerS ?? null,
+    notes
+  };
+}
+
+/** The daemon-row adapter (the theme and pins call this). */
+export function flashPanel(rows, opts = {}) {
+  return flashFromProfile(profileFromRows(rows), opts);
 }
 
 /**
