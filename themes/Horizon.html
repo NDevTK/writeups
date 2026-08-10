@@ -564,6 +564,7 @@
         leewavePanel,
         meteorsPanel,
         monahanW,
+        retrievalPanel,
         satsPanel,
         tidePanel
       } from './horizon/observatory.js';
@@ -10370,6 +10371,7 @@
       let researchBusy = false;
       let tideStudy = null; // one lazy 30-day fetch per session
       let flashCache = null; // {key, line} - the panel is ~0.5 s
+      let lehnCache = null; // {key, line} - the fan is ~0.3 s
       async function syncResearch() {
         if (researchBusy) return;
         researchBusy = true;
@@ -10499,12 +10501,32 @@
               }
               research['green flash tonight (Young)'] = flashCache.line;
             }
+            // The mirage INVERSE problem (Lehn 1983): could an
+            // observer at the shore retrieve today's column from
+            // its own far-off image? Cached per ascent; the
+            // instrument declines on fold-free days.
+            if (lehnCache?.key !== (state.soundingData.at ?? '')) {
+              const lr = retrievalPanel(rows);
+              lehnCache = {
+                key: state.soundingData.at ?? '',
+                line: lr.retrieved
+                  ? `image at ${(lr.distM / 1000).toFixed(0)} km from ` +
+                    `eye ${lr.eyeM.toFixed(0)} m → +` +
+                    `${lr.retrieved.dTretr.toFixed(1)} K by ` +
+                    `${lr.retrieved.probedTopM.toFixed(0)} m vs balloon +` +
+                    `${lr.retrieved.dTballoon.toFixed(1)} K · RMS ` +
+                    `${lr.retrieved.rmsK.toFixed(2)} K`
+                  : 'no superior mirage in this column — the instrument declines rather than invent'
+              };
+            }
+            research['mirage inversion retrieval (Lehn 1983)'] = lehnCache.line;
           } else {
             research['mirage (measured column)'] =
               'no fresh ascent - no mirage claim';
             delete research['contrail layer (Schmidt–Appleman)'];
             delete research['wave ladder (Stull ch. 17)'];
             delete research['green flash tonight (Young)'];
+            delete research['mirage inversion retrieval (Lehn 1983)'];
           }
           if (Number.isFinite(state.wind)) {
             const u = state.wind / 3.6;

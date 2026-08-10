@@ -9591,6 +9591,71 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   interval, not the longer full green-visibility window. Next per
   the same program: the Lehn-style fold-geometry inversion
   retrieval closed against the balloon's measured inversion.
+- DONE (Aug 10, the review session's 127th pass - THE SUNSET AS AN
+  INSTRUMENT, part two: Lehn's inverse problem, the column
+  retrieved from its own image): lehn.js implements Lehn 1983
+  ("Inversion of superior mirage data to compute temperature
+  profiles", JOSA 73, 1622-1625, read in full from his Manitoba
+  archive). His frame: a mirage ties (object at known distance,
+  transmitted image, temperature profile) together - any two give
+  the third; the observable is the TRANSFER CHARACTERISTIC (ray
+  elevation at the eye vs the height that ray meets the object
+  plane), S-shaped under an inversion with a PIVOT (its maximum)
+  and minimum bounding the inverted image. The module owns his
+  machinery: the two-constant air model (n = 1 + eps rho, eps =
+  0.000226; rho = beta p / T, beta = 1/R_M), exact parabolic arcs
+  per layer (A2-A7; equivalently a flat-earth march at curvature
+  1/R_E - 1/r, closed-form crossings via the STABLE quadratic -
+  the naive root cancels exactly at every layer boundary and the
+  ray then coasts through the whole column on the wrong
+  curvature, a measured failure), zone I solved directly (the
+  bottom radius from the tangent closed form A5, then one
+  gradient bisection per layer, A1 converting radius to dT/dz),
+  zone II iterated on the VERTEX LOCUS (his Eq. 2 - vertex
+  temperature from launch elevation and vertex height - with his
+  steepen-the-locus rule, damped), zone III as his per-batch
+  gradient nudge. lehn-reference.mjs (in validate.sh, the 135th
+  CPU reference) holds it to: constants against the repo (g beta
+  0.03413 vs the nz gate's printed 0.03418; eps rho within 0.5%
+  of Ciddor), the A5/A6 tangency identities to 4e-16 m, Eq. (2)
+  against the tracer's own vertices (0.06 K), the forward TC
+  against far-terrain's INDEPENDENT Ciddor fan (0.22 m at 20 km),
+  the round trip (a Whitefish-class +6 K inversion at 12-24 m
+  forward to a 74-sample TC and inverted from the image alone:
+  his printed convergence "reasonable in three ... good in
+  eight" as TC error 36 -> 19.6 -> 17.5 m, profile recovered to
+  1.16 K RMS over 0-50 m, the sub-inversion gradient -0.0222 vs
+  truth -0.02), and the stated domain failed closed (a fold-free
+  column inverts to null, never an invented inversion).
+  observatory.js retrievalPanel composes it end to end: the
+  theme's own far-terrain rayFan (Ciddor - the machinery that
+  warps the drawn ridges) photographs the measured column from a
+  LOW eye in Lehn's own geometry, tcCriticalPoints finds a REAL S
+  (prominence must beat the stepped fan's metre noise, a side
+  ending at the sea horizon does not bound it - both measured
+  failure modes), the nearest folding range among 20-180 km
+  becomes the object plane, lehn.js inverts the image knowing
+  only eye height, eye-level temperature and surface pressure,
+  and the result is closed against the balloon that never entered
+  it above eye level. Gated end to end in observatory-reference:
+  the Whitefish-class day through the PANEL's own path folds at
+  20 km (his range) and comes back at 0.87 K RMS over the probed
+  span; the frozen San Diego day is PINNED DECLINING (eye 136 m,
+  no fold at any range - consistent with the flash pins' ducts
+  0: the marine inversion is sub-critical, so it mock-mirages
+  the view from above but cannot vertex rays from below), the
+  refusal itself the day's falsifiable statement.  Horizon.html's
+  research view gained 'mirage inversion retrieval (Lehn 1983)':
+  the closure numbers on ducting days, the explicit decline
+  otherwise, cached per ascent, failing closed with it. Known
+  limits, stated in code: the panel stays in his low-eye
+  geometry (an elevated eye's pre-pivot rays vertex and his zone
+  I no longer applies - the elevated-coastal generalization is
+  future work), and durations of zone I resolve only to the
+  layer scaffold his Fig. 4 defines. Next in the program: the
+  remaining Lehn corpus (Kropla 92, Morrish 86, downloaded
+  unread) holds the wide-angle and three-dimensional extensions
+  if a future pass wants the elevated eye.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

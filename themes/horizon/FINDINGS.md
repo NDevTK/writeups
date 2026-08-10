@@ -267,6 +267,14 @@ between it and the next tier.
   law is implemented as printed at the gated points, not that every
   drawn pixel is right. The GPU probes close part of that gap; the
   sweep-pin visual matrix is a separate, weaker instrument.
+- **The Lehn retrieval stays in his low-eye geometry** (observer under
+  the elevated structure, the erect low image below the pivot). From an
+  elevated coastal eye the pre-pivot rays themselves vertex and his
+  zone I no longer applies; retrieving San Diego's marine inversion
+  from the 450-m ridge needs that generalization (his later corpus —
+  Kropla '92, Morrish '86 — is downloaded unread as the stated path).
+  And the retrieval reaches only as high as the rays' vertices: the
+  probed span is reported with every closure.
 
 ## 6. Method — reference-first validation
 
@@ -327,7 +335,18 @@ The practice the corpus demonstrates, stated so it can be reused:
    that the flash runs from the red curve's minimum to the green's at
    the engine's own sunset rate — the frozen day pins "450 m eye:
    mock-mirage, 1.65 s, ×4.0 the rim, at −21.9′ apparent" as a
-   checkable prediction of that evening's sunset.
+   checkable prediction of that evening's sunset. Pass 127 adds the
+   inverse problem (Lehn 1983, JOSA 73, 1622, read in full): the
+   theme's own Ciddor ray fan photographs the measured column at a
+   known object plane and `lehn.js` retrieves the temperature profile
+   from the image alone — his parabolic-arc layers, zone I direct from
+   the tangent closed form, the inverted image iterated on his
+   vertex-locus equation — gated end to end on a Whitefish-class day
+   (fold at his own 20 km; profile back at 0.87 K RMS against the
+   balloon that never entered the retrieval above eye level) while the
+   frozen sub-critical day is pinned DECLINING: the instrument refuses
+   to invent an inversion the fan cannot fold, and that refusal is
+   itself the day's checkable statement.
 
 ---
 

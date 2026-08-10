@@ -28,6 +28,7 @@ import {
   flashFromProfile,
   flashPanel,
   leewavePanel,
+  retrievalPanel,
   meteorsPanel,
   monahanW,
   polPanel,
@@ -507,6 +508,56 @@ check(
   );
 }
 
+// ---- the Lehn retrieval, end to end ---------------------------
+// The whole inverse-problem pipeline through the PANEL's own code
+// path: a Whitefish-class day (Lehn's geometry - a +6 K inversion
+// at 12-24 m over a 0-m station, dry arctic air) as daemon rows;
+// the theme's Ciddor fan photographs it, lehn.js inverts the
+// image alone, and the closure against the same rows' balloon
+// must land. Day-invariant: the synthetic day is Lehn's, not the
+// fixture's.
+{
+  const rows = [];
+  let p = 1013.25;
+  const tAt = (h) => {
+    if (h >= 24) {
+      if (h >= 60) return 3.55 - 0.0065 * (h - 60);
+      return 3.73 + ((3.55 - 3.73) * (h - 24)) / 36;
+    }
+    if (h >= 12) return -2.27 + (6 * (h - 12)) / 12;
+    return -2.03 - 0.02 * h;
+  };
+  let hPrev = 0;
+  for (const h of [
+    0, 4, 8, 12, 15, 18, 21, 24, 30, 40, 60, 120, 300, 800, 2000, 5000, 9000
+  ]) {
+    if (h > 0) {
+      const tMean = (tAt(hPrev) + tAt(h)) / 2 + 273.15;
+      p *= Math.exp((-(h - hPrev) * 9.80665 * 0.0289644) / (8.31451 * tMean));
+    }
+    rows.push({p, hM: h, tC: +tAt(h).toFixed(3), rh: 5});
+    hPrev = h;
+  }
+  const r = retrievalPanel(rows);
+  const ok =
+    r.retrieved !== null &&
+    r.distM === 20000 &&
+    r.retrieved.rmsK < 1.3 &&
+    r.retrieved.dTretr / r.retrieved.dTballoon > 0.5 &&
+    r.retrieved.dTretr / r.retrieved.dTballoon < 1.05 &&
+    r.retrieved.tcRmsM[7] < r.retrieved.tcRmsM[0] &&
+    r.retrieved.probedTopM > 18 &&
+    r.retrieved.probedTopM < 30;
+  check(
+    'LEHN RETRIEVAL closes on a Whitefish-class day',
+    ok,
+    r.retrieved
+      ? `the fan folds at ${(r.distM / 1000).toFixed(0)} km (his own range); from the image + eye-level temperature alone the profile comes back to ` +
+          `${r.retrieved.rmsK.toFixed(2)} K RMS over eye..${r.retrieved.probedTopM.toFixed(0)} m, warming ${r.retrieved.dTretr.toFixed(1)} K vs the balloon's ${r.retrieved.dTballoon.toFixed(1)} K over the probed span; TC error ${r.retrieved.tcRmsM[0].toFixed(0)} -> ${r.retrieved.tcRmsM[7].toFixed(0)} m`
+      : `no retrieval: ${r.note}`
+  );
+}
+
 // ================================================================
 // THE DAY PINS - generated data, asserted generically.
 // ================================================================
@@ -729,6 +780,43 @@ pinBlock(
     `sunset drops ${DAY_PINS.flash.rateArcsecS[0].toFixed(1)}"/s; beach ` +
       `${flB.type} ${flB.durationS?.toFixed(1)}s, 450 m ${flA.type} ` +
       `${flA.durationS?.toFixed(1)}s${flA.magX ? ' x' + flA.magX.toFixed(1) : ''}`
+  );
+}
+
+{
+  // The Lehn pins: what the frozen day's own column says to the
+  // inverse problem. A sub-critical day declines (that refusal is
+  // the pinned fact); a ducting day pins its closure numbers.
+  const leh = retrievalPanel(SOUNDING.rows);
+  pinBlock(
+    'lehn',
+    [
+      ['eye', leh.eyeM, DAY_PINS.lehn.eyeM],
+      ['dist', leh.distM, DAY_PINS.lehn.distM],
+      ['declined', leh.retrieved === null, DAY_PINS.lehn.declined],
+      ...(DAY_PINS.lehn.declined
+        ? []
+        : [
+            ['rms K', leh.retrieved?.rmsK ?? null, DAY_PINS.lehn.rmsK],
+            ['dT retr', leh.retrieved?.dTretr ?? null, DAY_PINS.lehn.dTretr],
+            [
+              'dT balloon',
+              leh.retrieved?.dTballoon ?? null,
+              DAY_PINS.lehn.dTballoon
+            ],
+            [
+              'probed',
+              leh.retrieved?.probedTopM ?? null,
+              DAY_PINS.lehn.probedTopM
+            ]
+          ])
+    ],
+    DAY_PINS.lehn.declined
+      ? `no superior mirage in the frozen column from eye ${leh.eyeM} m - ` +
+          `the instrument declines rather than invent (the marine ` +
+          `inversion is sub-critical: the flash pins carry ducts 0)`
+      : `retrieved to ${leh.retrieved?.rmsK?.toFixed(2)} K RMS at ` +
+          `${(leh.distM / 1000).toFixed(0)} km`
   );
 }
 

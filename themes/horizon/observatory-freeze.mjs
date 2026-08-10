@@ -519,6 +519,7 @@ async function emitPins(fixturePath) {
     120;
   const flB = O.flashPanel(F.SOUNDING.rows, {eyeM: 15, rateDegPerS});
   const flA = O.flashPanel(F.SOUNDING.rows, {eyeM: 450, rateDegPerS});
+  const leh = O.retrievalPanel(F.SOUNDING.rows);
   const perTop = met.shares?.filter((s) => s.code !== 'spo')[0];
   const best = sat.passes[0];
   const pins = {
@@ -595,6 +596,17 @@ async function emitPins(fixturePath) {
         .length,
       issTonight: sat.passes.some((p) => p.norad === 25544)
     },
+    lehn: leh.retrieved
+      ? {
+          eyeM: leh.eyeM,
+          distM: leh.distM,
+          declined: false,
+          rmsK: [leh.retrieved.rmsK, 0.25],
+          dTretr: [leh.retrieved.dTretr, 0.4],
+          dTballoon: [leh.retrieved.dTballoon, 0.3],
+          probedTopM: [leh.retrieved.probedTopM, 3]
+        }
+      : {eyeM: leh.eyeM, distM: null, declined: true},
     flash: {
       rateArcsecS: [rateDegPerS * 3600, 0.05],
       beachType: flB.type,

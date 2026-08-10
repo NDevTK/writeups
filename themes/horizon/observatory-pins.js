@@ -99,6 +99,11 @@ export const DAY_PINS = {
     rbTop8: 7,
     issTonight: false
   },
+  lehn: {
+    eyeM: 136,
+    distM: null,
+    declined: true
+  },
   flash: {
     rateArcsecS: [11.927113001831344, 0.05],
     beachType: 'textbook',

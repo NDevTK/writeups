@@ -84,6 +84,8 @@ import {
   tideSynth
 } from './tides.js';
 import {parseTLEs, satMagnitude, sunlitEci} from './sats.js';
+import {rayFan} from './far-terrain.js';
+import {lehnInvertTC, tcCriticalPoints} from './lehn.js';
 
 // The drawn ocean's whitecap coverage law (Monahan &
 // O'Muircheartaigh 1980, W = 3.84e-6 U10^3.41) - the GPU copy
@@ -495,6 +497,140 @@ export function flashFromProfile(
 /** The daemon-row adapter (the theme and pins call this). */
 export function flashPanel(rows, opts = {}) {
   return flashFromProfile(profileFromRows(rows), opts);
+}
+
+/**
+ * THE MIRAGE INVERSION RETRIEVAL (Lehn 1983, JOSA 73, 1622): the
+ * sunset-as-instrument program's inverse problem. The theme's own
+ * terrestrial fan (far-terrain's rayFan - Ciddor refractivity,
+ * the machinery that warps the drawn far ridges) plays the
+ * photograph: its transfer characteristic at a known object
+ * plane is handed to lehn.js, which recovers a temperature
+ * profile knowing ONLY the image, the eye height, the eye-level
+ * temperature and the surface pressure - and the retrieval is
+ * then closed against the balloon's measured column, which never
+ * entered it above eye level. The observer stands at the
+ * instrument's own reference eye (30 m under the balloon's
+ * inversion peak by default - Lehn positioned himself too; the
+ * CHOICE of eye uses the balloon, the retrieval does not), and
+ * the object plane is the nearest range where the fan actually
+ * folds (his footnote: the workable range follows the height of
+ * the inversion above the eye).
+ */
+export function retrievalPanel(rows, {eyeM = null, distsM = null} = {}) {
+  const profile = profileFromRows(rows);
+  const h0 = rows[0].hM;
+  // The balloon's inversion headline (columnPanel's convention).
+  let tMax = rows[0];
+  for (const q of rows) {
+    if (q.hM > 2500) break;
+    if (q.tC > tMax.tC) tMax = q;
+  }
+  // Lehn's own observing geometry: a LOW eye under the elevated
+  // structure (he stood 2.5 m over the ice; his stated domain
+  // needs the erect low image below the pivot, which an elevated
+  // eye inside or above the layers does not give - those rays
+  // vertex before the pivot and his zone I no longer applies).
+  const eye = Math.max(eyeM ?? h0 + 2, h0 + 2);
+  const TzeC = profile.at(eye).tC;
+  const p0Pa = rows[0].p * 100;
+  const MINR = Math.PI / 180 / 60;
+  const alphas = [];
+  for (let a = -20; a <= 40; a += 0.25) alphas.push(a * MINR);
+  const fan = rayFan(profile, eye, alphas, 200e3, 100);
+  const dists = distsM ?? [20e3, 40e3, 60e3, 90e3, 130e3, 180e3];
+  let chosen = null;
+  for (const dM of dists) {
+    const j = Math.min(
+      fan.hs[0].length - 1,
+      Math.max(0, Math.round(dM / fan.dsM) - 1)
+    );
+    const tc = {
+      alphas: Float64Array.from(alphas),
+      zAt: Float64Array.from(alphas, (_, i) => {
+        const h = fan.hs[i][j];
+        return Number.isFinite(h) ? h - h0 : NaN;
+      })
+    };
+    // A real S, not fan noise: the stepped Float32 fan wiggles at
+    // the metre scale, so the pivot needs mirage-scale prominence
+    // (Whitefish's own S drops ~10 m at 20 km) and the inverted
+    // branch must span more than a couple of samples.
+    const {iP, iM} = tcCriticalPoints(tc, 6);
+    if (iP >= 0 && iM > iP + 2) {
+      chosen = {dM, tc, iP, iM};
+      break;
+    }
+  }
+  const balloon = {invHM: tMax.hM, invDTc: tMax.tC - rows[0].tC};
+  if (!chosen)
+    return {
+      eyeM: eye,
+      TzeC,
+      balloon,
+      distM: null,
+      retrieved: null,
+      note: 'the fan shows no fold at any candidate range - no superior mirage today, no retrieval (zone I alone would only repeat the eye-level gradient)'
+    };
+  const inv = lehnInvertTC(chosen.tc, {
+    eyeM: eye - h0,
+    distM: chosen.dM,
+    TzeC,
+    p0Pa,
+    iterations: 8
+  });
+  if (!inv)
+    return {
+      eyeM: eye,
+      TzeC,
+      balloon,
+      distM: chosen.dM,
+      retrieved: null,
+      note: 'fold present but too little of the low image is visible for zone I - out of the stated domain'
+    };
+  // Close against the balloon over the ray-probed span.
+  const probedTopM = h0 + Math.max(...inv.vertexEl, eye - h0);
+  const tRetr = (hAbs) => {
+    const {hM, tC} = inv.nodes;
+    const h = hAbs - h0;
+    let i = 0;
+    while (i < hM.length - 2 && hM[i + 1] <= h) i++;
+    const f = Math.min(1, Math.max(0, (h - hM[i]) / (hM[i + 1] - hM[i])));
+    return tC[i] + (tC[i + 1] - tC[i]) * f;
+  };
+  let s2 = 0;
+  let n2 = 0;
+  for (let h = eye; h <= probedTopM; h += 5) {
+    const d = tRetr(h) - profile.at(h).tC;
+    s2 += d * d;
+    n2++;
+  }
+  const rmsK = n2 ? Math.sqrt(s2 / n2) : null;
+  const dTretr = tRetr(probedTopM) - tRetr(eye);
+  const dTballoon = profile.at(probedTopM).tC - profile.at(eye).tC;
+  return {
+    eyeM: eye,
+    TzeC,
+    balloon,
+    distM: chosen.dM,
+    pivot: {
+      phiArcmin: chosen.tc.alphas[chosen.iP] / MINR,
+      zM: h0 + chosen.tc.zAt[chosen.iP]
+    },
+    min: {
+      phiArcmin: chosen.tc.alphas[chosen.iM] / MINR,
+      zM: h0 + chosen.tc.zAt[chosen.iM]
+    },
+    retrieved: {
+      nodesHM: inv.nodes.hM.map((h) => h + h0),
+      nodesTC: inv.nodes.tC,
+      tcRmsM: inv.rms,
+      probedTopM,
+      rmsK,
+      dTretr,
+      dTballoon
+    }
+  };
 }
 
 /**
