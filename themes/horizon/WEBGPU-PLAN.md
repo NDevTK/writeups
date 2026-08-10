@@ -9644,7 +9644,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   no fold at any range - consistent with the flash pins' ducts
   0: the marine inversion is sub-critical, so it mock-mirages
   the view from above but cannot vertex rays from below), the
-  refusal itself the day's falsifiable statement.  Horizon.html's
+  refusal itself the day's falsifiable statement. Horizon.html's
   research view gained 'mirage inversion retrieval (Lehn 1983)':
   the closure numbers on ducting days, the explicit decline
   otherwise, cached per ascent, failing closed with it. Known
