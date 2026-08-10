@@ -49,6 +49,11 @@ else
     else
       echo "[FAIL] $1"
       echo "$out" | grep -aE 'OCEAN|GLINT|PROBE' | tail -6
+      # The filtered view hides launcher-level failures (a dead
+      # fixture server, a chrome that never started) - keep the
+      # raw transcript for the post-mortem.
+      echo "$out" > "/tmp/validate-gpu-$1.raw"
+      echo "       raw -> /tmp/validate-gpu-$1.raw ($(echo "$out" | wc -l) lines)"
       fail=1
     fi
   }
