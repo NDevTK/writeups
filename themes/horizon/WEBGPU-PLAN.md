@@ -9802,6 +9802,32 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   set (it needs two same-evening ascents to exist at all). The
   sunset-as-instrument program now runs its full loop in time:
   forecast at dawn, verify at dusk, score across the fortnight.
+- DONE (Aug 10, the review session's 132nd pass - THE GROWING
+  ARCHIVE: sweep each session, freeze what closes): the standing
+  procedure the review conversation set. lehn-fixture.js is
+  restructured from one day into THE ARCHIVE - a DAYS list where
+  each entry carries the station, the ascent stamp, the eye
+  convention the watch used, the run-then-pinned closure bands
+  WRITTEN AT FREEZE TIME, and the packed rows (Resolute migrated
+  with its 129th-pass bands). mirage-watch.mjs gains --freeze:
+  after the sweep, closing days the archive lacks are appended
+  with their bands (mode-aware: elevated pins base/thickness/
+  strength/RMS/balloon-span, superior pins probed-top/warming/
+  RMS), deduplicated by station + stamp, the whole fixture
+  regenerated deterministically; the header documents the ONE
+  COMMAND each session runs (node mirage-watch.mjs --freeze) and
+  the contract after it (read the fixture diff, run
+  lehn-reference, validate, commit). lehn-reference's single-day
+  block becomes the generic ARCHIVE RUNNER: every frozen day
+  re-runs through retrievalPanel and is held to its own pins with
+  a per-key MISSED report - the archive grows, the gate grows
+  with it, one landmark line per day. This session's sweep run
+  through the new flow: Resolute closes again on the same 00Z
+  ascent and the dedup answers "every closing day already frozen"
+  - the append path exercised by the migration, the skip path by
+  the live run. The measured edges stand unchanged in the report
+  (Oakland/Quillayute/Utqiagvik still fold without closing at
+  130 km - candidate future days for a superior-mode domain fix).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

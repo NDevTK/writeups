@@ -33,11 +33,7 @@ import {
 } from './lehn.js';
 import {buildProfile, ciddorN} from './refraction.js';
 import {retrievalPanel} from './observatory.js';
-import {
-  AT as LEHN_AT,
-  ROWS as LEHN_ROWS,
-  STATION as LEHN_STATION
-} from './lehn-fixture.js';
+import {DAYS as LEHN_DAYS} from './lehn-fixture.js';
 import {rayFan} from './far-terrain.js';
 
 let fail = 0;
@@ -315,35 +311,52 @@ const DIST = 20000;
 }
 
 {
-  // THE FIRST REAL DAY (frozen by mirage-watch.mjs, the 129th
-  // pass): Resolute, Nunavut - Lehn & Legal 1994's own looming
-  // site, already hindcast by looming-reference - whose
-  // 2026-08-10 00Z ascent is the first real balloon the retrieval
-  // closed on. The arctic surface inversion, seen from a 346-m
-  // eye at 130 km through the theme's Ciddor fan, comes back as a
-  // +2.0 K layer at 107-168 m against the balloon's +3.2 K over
-  // the same span, 0.43 K RMS down to the ground. Run-then-pinned
-  // inline, hindcast style.
-  const h0 = LEHN_ROWS[0].hM;
-  const r = retrievalPanel(LEHN_ROWS, {eyesM: [h0 + 2, h0 + 300]});
-  const p = r.retrieved?.params;
-  check(
-    `THE REAL DAY closes: ${LEHN_STATION.name} ${LEHN_AT.slice(0, 10)}`,
-    r.retrieved !== null &&
-      r.mode === 'elevated' &&
-      r.distM === 130000 &&
-      r.retrieved.closes &&
-      Math.abs(p.zBaseM - 107) < 6 &&
-      Math.abs(p.dTK - 2.0) < 0.4 &&
-      r.retrieved.rmsK < 0.7 &&
-      r.retrieved.dTballoon > 2.7 &&
-      r.retrieved.dTballoon < 3.7 &&
-      r.retrieved.onePerigee &&
-      r.retrieved.probedFloorM < h0 + 5,
-    r.retrieved
-      ? `the frozen ascent folds at ${(r.distM / 1000).toFixed(0)} km from the ${r.eyeM.toFixed(0)}-m eye and the fit reads +${p.dTK.toFixed(2)} K at ${p.zBaseM.toFixed(0)}-${(p.zBaseM + p.wM).toFixed(0)} m - closing on the real balloon at ${r.retrieved.rmsK.toFixed(3)} K RMS to the ground (${r.retrieved.probedFloorM.toFixed(0)} m), single-perigee rays throughout`
-      : `declined: ${r.note}`
-  );
+  // THE ARCHIVE: every real day the retrieval ever closed on,
+  // re-run through the panel and held to the bands written at its
+  // own freeze (mirage-watch.mjs --freeze; run-then-pin lives in
+  // reading the fixture diff before committing). The archive
+  // grows a landmark per frozen day. First day: Resolute,
+  // 2026-08-10 - Lehn & Legal 1994's own looming site.
+  const near = (v, pin) =>
+    Array.isArray(pin) ? Math.abs(v - pin[0]) <= pin[1] : Object.is(v, pin);
+  for (const d of LEHN_DAYS) {
+    const rows = d.rowsPacked.map(([p, hM, tC, rh]) => ({p, hM, tC, rh}));
+    const h0 = rows[0].hM;
+    const r = retrievalPanel(rows, {
+      eyesM: d.eyesM ?? [h0 + 2, h0 + 300]
+    });
+    const val = (k) =>
+      k === 'mode'
+        ? r.mode
+        : k === 'distM'
+          ? r.distM
+          : k === 'zBaseM' || k === 'wM' || k === 'dTK'
+            ? r.retrieved?.params?.[k]
+            : r.retrieved?.[k];
+    const bad = r.retrieved
+      ? Object.entries(d.pins).filter(([k, pin]) => !near(val(k), pin))
+      : [['retrieved', 'null']];
+    const p = r.retrieved?.params;
+    check(
+      `THE ARCHIVE closes: ${d.station.name} ${d.at.slice(0, 10)}`,
+      r.retrieved !== null && r.retrieved.closes && bad.length === 0,
+      r.retrieved
+        ? bad.length === 0
+          ? `${r.mode} at ${(r.distM / 1000).toFixed(0)} km` +
+            (p
+              ? `, +${p.dTK.toFixed(2)} K at ${p.zBaseM.toFixed(0)}-${(p.zBaseM + p.wM).toFixed(0)} m`
+              : '') +
+            `, ${r.retrieved.rmsK.toFixed(3)} K RMS vs the balloon - the frozen day still closes on its own pins`
+          : 'MISSED: ' +
+            bad
+              .map(
+                ([k, pin]) =>
+                  `${k} = ${JSON.stringify(val(k))} vs ${JSON.stringify(pin)}`
+              )
+              .join('; ')
+        : `declined: ${r.note}`
+    );
+  }
 }
 
 process.exit(fail ? 1 : 0);
