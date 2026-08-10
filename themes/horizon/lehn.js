@@ -572,6 +572,11 @@ export function lehnFitElevated(
     }
   }
   if (!best || !Number.isFinite(best.c) || best.c > 250) return null;
+  // A fitted strength under half a kelvin is no inversion at all:
+  // the family is matching fan noise, not a layer (measured on a
+  // live no-inversion column whose TC wiggle the S-detector
+  // passed). Degenerate fits decline.
+  if (best.p[3] < 0.5) return null;
   const [g, zB, w, dT] = best.p;
   const nodes = nodesOf(g, zB, w, dT);
   // The probed floor: how deep the fitted rays actually see (the

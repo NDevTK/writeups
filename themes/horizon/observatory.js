@@ -616,15 +616,23 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
         s2 += d * d;
         n2++;
       }
+      const rmsK = n2 ? Math.sqrt(s2 / n2) : null;
       return {
         ...common,
         mode: 'superior',
+        // The closure against the balloon is the instrument's own
+        // verdict: a retrieval that misses the measured column by
+        // kelvins is a FOLD WITHOUT A CLOSURE - reported as such,
+        // never as a reading (the 1983 iteration leaves its stated
+        // short/medium-range domain gracelessly; measured on a
+        // 130-km, 600-m-high structure).
         retrieved: {
           nodesHM: inv.nodes.hM.map((h) => h + h0),
           nodesTC: inv.nodes.tC,
           tcRmsM: inv.rms,
           probedTopM,
-          rmsK: n2 ? Math.sqrt(s2 / n2) : null,
+          rmsK,
+          closes: rmsK !== null && rmsK < 2.5,
           dTretr: tRetr(probedTopM) - tRetr(eye),
           dTballoon: profile.at(probedTopM).tC - profile.at(eye).tC
         }
@@ -661,6 +669,7 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
       }
       const baseAbs = h0 + fit.params.zBaseM;
       const topAbs = baseAbs + fit.params.wM;
+      const rmsKe = n2 ? Math.sqrt(s2 / n2) : null;
       return {
         ...common,
         mode: 'elevated',
@@ -670,13 +679,14 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
           tcRmsM: fit.tcRmsM,
           probedFloorM: floorAbs,
           onePerigee: fit.onePerigee,
+          closes: rmsKe !== null && rmsKe < 2.5,
           params: {
             zBaseM: baseAbs,
             wM: fit.params.wM,
             dTK: fit.params.dTK,
             gammaKm: fit.params.gammaKm
           },
-          rmsK: n2 ? Math.sqrt(s2 / n2) : null,
+          rmsK: rmsKe,
           dTretr: fit.params.dTK,
           dTballoon: profile.at(topAbs).tC - profile.at(baseAbs).tC
         }

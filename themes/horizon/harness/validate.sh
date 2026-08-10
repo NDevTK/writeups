@@ -40,6 +40,14 @@ if [ -z "${SHOOT_CHROME:-}" ]; then
   echo "== GPU probes skipped (SHOOT_CHROME unset) =="
 else
   echo "== GPU-vs-reference probes (WebGPU) =="
+  # Fail fast on a mispointed BASE: the probes 404 quietly (seven
+  # slow no-capture failures) when the fixture server's root is
+  # the repo instead of this harness directory - measured, twice.
+  if ! curl -sf -o /dev/null --max-time 10 "$BASE/tsl-ocean-num.html"; then
+    echo "[FAIL] BASE $BASE does not serve the harness pages"
+    echo "       (serve THIS directory, or set BASE=.../themes/horizon/harness)"
+    fail=1
+  fi
   probe() { # name url pass_regex
     local out
     out=$(timeout 240 xvfb-run -a node shoot.mjs "$2" /dev/null --wgpu \

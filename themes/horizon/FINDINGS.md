@@ -215,6 +215,23 @@ side was fitted to the other.
   printed floor — with the sub-duct minima landing "very nearly at the
   astronomical horizon" (−1.1′) exactly as his transfer plots show.
   (`refraction-reference` block 5, `observatory-reference` FLASH)
+- **A real arctic day retrieved from its own image**: the mirage watch
+  (pass 129) swept eight literature-anchored stations and found the
+  2026-08-10 00Z Resolute ascent — Lehn & Legal 1994's own looming
+  site, already hindcast by `looming-reference` — folding a
+  terrestrial transfer characteristic from a 346-m eye at 130 km. The
+  Morrish-strategy fit, given only that image and the eye-level
+  temperature, reads a +2.0 K inversion at 107–168 m; the balloon it
+  never saw above eye level carries +3.2 K over the same span, and
+  the profiles agree to 0.43 K RMS all the way to the ground. Frozen
+  as `lehn-fixture.js`, pinned in `lehn-reference` — the retrieval's
+  first closure on a measured atmosphere. The same sweep measured the
+  method's edges honestly: three stations folded WITHOUT closing (the
+  1983 superior-mode iteration at 130-km ranges runs far out of its
+  stated short/medium domain, retrieving +28…+43 K against +2-K
+  columns), and one no-inversion column was matched by a degenerate
+  ΔT≈0 fit — both now guarded (fits under 0.5 K decline; retrievals
+  carry an explicit closes verdict). (`lehn-reference` THE REAL DAY)
 
 ---
 
@@ -270,15 +287,16 @@ between it and the next tier.
 - **The Lehn retrieval covers both printed geometries since pass 128**
   (shore eye/1983 zones for superior mirages; ridge eye/Morrish-1986
   parametric strategy for mock mirages, licensed by Eq. (2) holding at
-  traced perigees to 0.32 K). What remains: the retrieval reaches only
-  as far as the rays turn (probed span reported with every closure);
-  the elevated family is a single-inversion trapezoid; and a REAL-day
-  closure awaits a column that actually folds a terrestrial TC — the
-  frozen day's +1.2 K surface inversion folds none within 200 km from
-  either eye, so its pins carry the double decline. Lehn & Morrish's
-  own finding frames the wait: the optics out-resolves a ±0.1 °C
-  thermistor mast, so on the day the fan folds, the panel's closure
-  will be the sharpest reading of the marine cap the theme has.
+  traced perigees to 0.32 K), and since pass 129 it has its real-day
+  closure (Resolute, §3). Remaining limits, now partly MEASURED: the
+  1983 superior-mode iteration degrades gracelessly at ~130-km ranges
+  with high structure (three watch stations folded without closing,
+  +28…+43 K retrievals against +2-K columns — reported with an
+  explicit `closes: false`, never as readings); the elevated family
+  is a single-inversion trapezoid; the retrieval reaches only as far
+  as the rays turn (probed span reported with every closure); and San
+  Diego's own column has yet to fold from either eye — the home
+  research line still waits on a strong marine-cap day.
 
 ## 6. Method — reference-first validation
 

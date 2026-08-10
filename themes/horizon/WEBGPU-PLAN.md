@@ -9713,6 +9713,43 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   The instrument now covers both printed geometries; what remains
   is a DAY that folds - the strong marine-cap days the panel is
   armed for.
+- DONE (Aug 10, the review session's 129th pass - THE MIRAGE WATCH
+  AND THE FIRST REAL DAY): the hunt for a day that folds, and its
+  first catch. mirage-watch.mjs sweeps eight literature-anchored
+  IGRA points through the daemon (San Diego control; Vandenberg,
+  Oakland, Quillayute on the Pacific marine layer; Utqiagvik,
+  Inuvik - Lehn's Tuktoyaktuk coast - Resolute - Lehn & Legal's
+  looming site - and Malye Karmakuly on Novaya Zemlya, de Veer's
+  effect), runs each fresh ascent through retrievalPanel's own
+  S-detector and prints who folds, from which eye, at what range,
+  with closure numbers. The first sweep was a masterclass in why
+  verdicts matter: San Diego's evening column "folded" into a
+  DEGENERATE fit (dT = 0 matching fan noise - now guarded: fitted
+  strengths under 0.5 K decline), and three stations folded
+  WITHOUT closing (the 1983 superior-mode iteration at 130 km
+  under 600-900-m structure retrieved +28..+43 K against +2-K
+  columns - the method's stated short/medium-range domain measured
+  from outside; retrievals now carry an explicit closes verdict,
+  rmsK < 2.5 K, and non-closing folds are reported as such, never
+  as readings). The arctic 502s taught the retry ladder (the
+  daemon's first cold-station touch blows its own 25-s budget
+  warming the cache; 5/10/20-s backoff recovers). And then
+  RESOLUTE CLOSED: the 2026-08-10 00Z ascent - Lehn & Legal
+  1994's own site, the repo's looming hindcast - folds from a
+  346-m eye at 130 km, and the Morrish-strategy fit reads a
+  +2.0 K inversion at 107-168 m against the balloon's +3.2 K over
+  the same span, 0.43 K RMS to the ground, single-perigee rays
+  throughout: the retrieval's FIRST CLOSURE ON A REAL MEASURED
+  ATMOSPHERE, frozen as lehn-fixture.js (station, stamp, 119
+  rows) and run-then-pinned inline in lehn-reference (now 9
+  landmarks). FINDINGS gains the closure in section 3 and the
+  measured method edges in section 5. The archive doctrine
+  extends: the observatory keeps its one San Diego day; the Lehn
+  instrument now keeps its own days, frozen by the watch whenever
+  a sweep closes. Next per the endorsed plan: the page-wiring
+  probe (validate gates the research section's rendering), then
+  the forecast ledger (the 12Z forecast checked against the 00Z
+  evening ascent).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
