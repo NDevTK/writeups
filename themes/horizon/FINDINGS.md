@@ -257,6 +257,41 @@ side was fitted to the other.
   8.5-for-9 K) and it is exactly what the layer closure indicts on
   curved-cap days. (`lehn-reference` family round trip + THE
   ARCHIVE; `observatory-reference` superior fallback)
+- **The inferior mirage joins the instrument, and San Diego closes**
+  (pass 134): Fleagle 1950 printed the mirror of Lehn's inverse
+  problem 33 years earlier — the apparent-minus-true height of a
+  target reads the MEAN LAPSE of the skimmed layer in closed form,
+  h grows as x², and objects appear lower only past the
+  autoconvective rate g/R (his "34 C per km" — a third independent
+  printing of the constant the repo carries as Lehn's gβ 0.03413
+  and the NZ gate's 0.03418; his 0.114 humidity coefficient is
+  1 − A₂ε/A₁ exactly, and his Eq. 11 meets both of the repo's
+  independent integrators within 0.24 mm at Johnson & Roberts' own
+  362/724-m baselines). Baum 1951 licenses the target: the
+  stability excess falls as depth⁻⁴, so films of thousands of K/km
+  are printed-normal near the ground. The geometry had to be
+  probed, not assumed: an eye INSIDE a film cannot fold (the film
+  launches every exiting ray at √(2h″Δz) regardless of entry —
+  erect and compressed, never inverted), so the instrument's
+  posture is an eye ABOVE the film, and the balloon-resolvable
+  film class folds at 20–45 km. The cascade's film fallback reads
+  any ground-hugging fold no warm family closed, under a 0.5-K
+  claim floor (a film smaller than the referee's own tolerance is
+  unfalsifiable and declines — measured on Utqiagvik). Same
+  evening: SAN DIEGO CLOSES FOR THE FIRST TIME IN THE PROGRAM —
+  the mesa's 5-pm film, −3.9 K over 134–192 m vs the balloon's
+  −3.6 K at 2.19 K RMS from the 450-m ridge eye at 90 km — and
+  Quillayute's surface-graze refusal becomes a reading (−1.6 K
+  over 57–117 m vs −1.4 K). The archive holds five days across
+  all three mirage families. The synthetic that gated it also
+  found and fixed two closure holes (the zones' RMS integral now
+  samples its endpoint — a top node carrying +14 K hid between
+  5-m grid samples; thin probed spans no longer count) and two
+  archive-contract lessons (pins are written from the packed rows
+  the fixture stores; the eye list is data, stored verbatim,
+  never a runner-side convention). (`fleagle-reference`;
+  `lehn-reference` THE ARCHIVE; `observatory-reference` inferior
+  film)
 
 ---
 
@@ -318,18 +353,26 @@ between it and the next tier.
   the 1983 iteration's graceless ~130-km degradation is now handled
   rather than merely reported: the cascade attempts every folding
   distance and the span-confined fit replaces the zones only when
-  its claim survives both closures. Remaining limits: folds that
-  ride the surface graze refuse retrieval (Quillayute/Utqiagvik —
-  the inferior-family instrument, a superadiabatic surface layer
-  read from its own mirage, is not built; parked as a named lead);
-  both families are single-inversion trapezoids; the w-vs-ΔT
-  compression under fixed integrated bending is a measured
-  identifiability limit (family round trip: 177-for-220 m), so
-  fitted thickness/strength carry the layer-closure band, not
-  metrological precision; the retrieval reaches only as far as the
-  fold rays fly (probed span reported with every closure); and San
-  Diego's own column has yet to fold from either eye — the home
-  research line still waits on a strong marine-cap day.
+  its claim survives both closures. Since pass 134 the third
+  family closes the surface-graze class (Fleagle's film read from
+  its own mirage — Quillayute and San Diego are archive days), and
+  the home station's "yet to fold" era is over. Remaining limits:
+  the film family reads the MEAN lapse of the lowest balloon rows
+  (Fleagle's own design — his instrument reports mean lapse, and
+  the balloon cannot resolve the decimetre hot-road films Baum's
+  laminar limit allows), so a fitted film can smear a steeper
+  shallower reality into a balloon-consistent mean; claims under
+  the 0.5-K referee floor decline as unfalsifiable
+  (Utqiagvik-class days stay honest non-closures); all families
+  are single-layer; the w-vs-ΔT compression under fixed
+  integrated bending is a measured identifiability limit (family
+  round trips: 177-for-220 m, 58×67-for-28×125 under row
+  packing), so fitted layer shapes carry closure bands, not
+  metrological precision; the retrieval reaches only as far as
+  the fold rays fly (probed span reported with every closure);
+  and the drawn SEA horizon's own film — the marine surface layer
+  over the water — is not what an inland balloon measures: the
+  film readings are the station column's, stated as such.
 
 ## 6. Method — reference-first validation
 
@@ -418,7 +461,13 @@ The practice the corpus demonstrates, stated so it can be reused:
    its own pins, and the retrieval cascade (every folding distance
    attempted, first CLOSING fold wins, two closures refereeing any
    fitted claim) is what turned the watch's measured edges into
-   archive days.
+   archive days. Pass 134 completes the mirage-family triptych
+   (Fleagle 1950's surface film joins Lehn's zones and the
+   Morrish-strategy families), and the archive's growth taught
+   two contract rules now in force: freeze pins are computed from
+   the PACKED rows the fixture stores, and the eye list rides in
+   the fixture as data — the runner reproduces the watch's
+   geometry verbatim rather than assuming it.
 
 ---
 

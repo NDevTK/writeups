@@ -392,16 +392,20 @@ const DIST = 20000;
     Array.isArray(pin) ? Math.abs(v - pin[0]) <= pin[1] : Object.is(v, pin);
   for (const d of LEHN_DAYS) {
     const rows = d.rowsPacked.map(([p, hM, tC, rh]) => ({p, hM, tC, rh}));
-    const h0 = rows[0].hM;
-    const r = retrievalPanel(rows, {
-      eyesM: d.eyesM ?? [h0 + 2, h0 + 300]
-    });
+    // The fixture stores the eye list the watch actually used
+    // (null = the panel's own defaults, San Diego's convention);
+    // the runner reproduces it verbatim. A convention default
+    // here once diverged from the watch - the 450-m panel eye vs
+    // a hand-rolled h0+300 - and the same frozen day fitted two
+    // different film trades. The eye list is data, not
+    // convention.
+    const r = retrievalPanel(rows, d.eyesM ? {eyesM: d.eyesM} : {});
     const val = (k) =>
       k === 'mode'
         ? r.mode
         : k === 'distM'
           ? r.distM
-          : k === 'zBaseM' || k === 'wM' || k === 'dTK'
+          : k === 'zBaseM' || k === 'wM' || k === 'dTK' || k === 'gammaFilmKpM'
             ? r.retrieved?.params?.[k]
             : r.retrieved?.[k];
     const bad = r.retrieved
@@ -415,7 +419,7 @@ const DIST = 20000;
         ? bad.length === 0
           ? `${r.mode} at ${(r.distM / 1000).toFixed(0)} km` +
             (p
-              ? `, +${p.dTK.toFixed(2)} K at ${p.zBaseM.toFixed(0)}-${(p.zBaseM + p.wM).toFixed(0)} m`
+              ? `, ${p.dTK >= 0 ? '+' : ''}${p.dTK.toFixed(2)} K at ${p.zBaseM.toFixed(0)}-${(p.zBaseM + p.wM).toFixed(0)} m`
               : '') +
             `, ${r.retrieved.rmsK.toFixed(3)} K RMS vs the balloon - the frozen day still closes on its own pins`
           : 'MISSED: ' +

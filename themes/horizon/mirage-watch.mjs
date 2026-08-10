@@ -103,7 +103,8 @@ for (const [name, lat, lon] of STATIONS) {
     // The station's own geometry: the shore eye just above the
     // field elevation, and a generic ridge eye 300 m over it (San
     // Diego keeps the theme's 450-m AMSL convention).
-    const eyes = name === 'San Diego' ? null : {eyesM: [h0 + 2, h0 + 300]};
+    const eyes =
+      name === 'San Diego' ? null : {eyesM: [h0 + 2, h0 + 300, h0 + 22]};
     const r = retrievalPanel(rows, eyes ?? {});
     let tMax = rows[0];
     for (const q of rows) {
@@ -118,9 +119,9 @@ for (const [name, lat, lon] of STATIONS) {
         `${r.retrieved.closes ? 'FOLDS+CLOSES' : 'folds, DOES NOT CLOSE'}: ` +
         `${r.mode}/${r.retrieved.method} eye ${r.eyeM.toFixed(0)} m @ ${(r.distM / 1000).toFixed(0)} km  ` +
         (r.retrieved.params
-          ? `layer +${r.retrieved.params.dTK.toFixed(1)} K at ${r.retrieved.params.zBaseM.toFixed(0)}-${(r.retrieved.params.zBaseM + r.retrieved.params.wM).toFixed(0)} m  `
+          ? `layer ${r.retrieved.params.dTK >= 0 ? '+' : ''}${r.retrieved.params.dTK.toFixed(1)} K at ${r.retrieved.params.zBaseM.toFixed(0)}-${(r.retrieved.params.zBaseM + r.retrieved.params.wM).toFixed(0)} m  `
           : `+${r.retrieved.dTretr.toFixed(1)} K to ${r.retrieved.probedTopM.toFixed(0)} m  `) +
-        `vs balloon +${r.retrieved.dTballoon.toFixed(1)} K  RMS ${r.retrieved.rmsK.toFixed(2)} K`;
+        `vs balloon ${r.retrieved.dTballoon >= 0 ? '+' : ''}${r.retrieved.dTballoon.toFixed(1)} K  RMS ${r.retrieved.rmsK.toFixed(2)} K`;
       if (r.retrieved.closes)
         hits.push({
           station: name,
@@ -169,6 +170,37 @@ if (doFreeze && hits.length) {
   let added = 0;
   for (const h of hits) {
     if (have.has(h.station + '|' + h.at)) continue;
+    // Run-then-pin ON THE PACKED ROWS: the archive re-runs what
+    // the fixture stores (pressure rounded to 0.01 hPa), and a
+    // fit's flat valley can land elsewhere under that rounding
+    // (measured: the same film day traded 58 m x -67 K/km for
+    // 28 m x -125 K/km - same drop, same closure, missed pins).
+    // So the pins are written from the packed day itself, and a
+    // closure that does not survive packing is not frozen.
+    const packed = h.rows.map((q) => [
+      +(+q.p).toFixed(2),
+      q.hM,
+      q.tC,
+      q.rh ?? null
+    ]);
+    const rp = retrievalPanel(
+      packed.map(([p, hM, tC, rh]) => ({p, hM, tC, rh})),
+      h.station === 'San Diego'
+        ? {}
+        : {eyesM: [h.rows[0].hM + 2, h.rows[0].hM + 300, h.rows[0].hM + 22]}
+    );
+    if (!rp.retrieved || !rp.retrieved.closes) {
+      console.log(
+        `NOT frozen: ${h.station} ${h.at} - closure did not survive row packing`
+      );
+      continue;
+    }
+    h.panel = {
+      mode: rp.mode,
+      eyeM: rp.eyeM,
+      distM: rp.distM,
+      retrieved: rp.retrieved
+    };
     const R = h.panel.retrieved;
     const pins =
       h.panel.mode === 'elevated'
@@ -183,14 +215,17 @@ if (doFreeze && hits.length) {
             dTballoon: [R.dTballoon, 0.5]
           }
         : {
-            mode: 'superior',
+            mode: h.panel.mode,
             method: R.method,
             distM: h.panel.distM,
             ...(R.params
               ? {
                   zBaseM: [R.params.zBaseM, 6],
                   wM: [R.params.wM, 12],
-                  dTK: [R.params.dTK, 0.4]
+                  dTK: [R.params.dTK, 0.4],
+                  ...(R.params.gammaFilmKpM !== undefined
+                    ? {gammaFilmKpM: [R.params.gammaFilmKpM, 0.03]}
+                    : {})
                 }
               : {}),
             probedTopM: [R.probedTopM, 5],
@@ -202,14 +237,12 @@ if (doFreeze && hits.length) {
       station: {name: h.station, latDeg: h.latDeg, lonDeg: h.lonDeg},
       at: h.at,
       frozen: new Date().toISOString().slice(0, 10),
-      eyesM: h.station === 'San Diego' ? null : null,
+      eyesM:
+        h.station === 'San Diego'
+          ? null
+          : [h.rows[0].hM + 2, h.rows[0].hM + 300, h.rows[0].hM + 22],
       pins,
-      rowsPacked: h.rows.map((q) => [
-        +(+q.p).toFixed(2),
-        q.hM,
-        q.tC,
-        q.rh ?? null
-      ])
+      rowsPacked: packed
     });
     added++;
     console.log(`frozen: ${h.station} ${h.at}`);

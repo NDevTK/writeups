@@ -85,6 +85,7 @@ import {
 } from './tides.js';
 import {parseTLEs, satMagnitude, sunlitEci} from './sats.js';
 import {rayFan} from './far-terrain.js';
+import {fleagleFitFilm} from './fleagle.js';
 import {
   lehnFitElevated,
   lehnFitSuperior,
@@ -574,7 +575,7 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
   const p0Pa = rows[0].p * 100;
   const MINR = Math.PI / 180 / 60;
   const dists = distsM ?? [20e3, 40e3, 60e3, 90e3, 130e3, 180e3];
-  const eyes = eyesM ?? [h0 + 2, ...(450 > h0 + 60 ? [450] : [])];
+  const eyes = eyesM ?? [h0 + 2, ...(450 > h0 + 60 ? [450] : []), h0 + 22];
   const tries = [];
   // THE CASCADE (133rd pass): the ladder no longer bets the whole
   // retrieval on the FIRST detectable S - a graze fold at one
@@ -587,7 +588,7 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
   // the first honest non-closure is reported as before - and a
   // day with no defensible fold declines with the accounting.
   let firstNonCloser = null;
-  let fitBudget = 3;
+  let fitBudget = 4;
   for (const eye of eyes) {
     const TzeC = profile.at(eye).tC;
     const alphas = [];
@@ -629,6 +630,29 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
         },
         tried: tries
       };
+      // The fold-probed span first (the heights the fold-window
+      // rays that reach the object plane actually traverse, read
+      // off the fan): the parametric families are confined to it,
+      // and a span floor at the ground marks the graze/inferior
+      // class for the film fallback.
+      let sLo = Infinity;
+      let sHi = -Infinity;
+      const jTop = Math.round(dM / fan.dsM);
+      for (
+        let i = Math.max(0, iP - 8);
+        i <= Math.min(alphas.length - 1, iM + 8);
+        i++
+      ) {
+        if (!Number.isFinite(tc.zAt[i])) continue;
+        const hh = fan.hs[i];
+        for (let k = 0; k <= Math.min(jTop, hh.length - 1); k++) {
+          const h = hh[k];
+          if (!Number.isFinite(h)) break;
+          if (h - h0 < sLo) sLo = h - h0;
+          if (h - h0 > sHi) sHi = h - h0;
+        }
+      }
+      sLo = Math.max(0, sLo);
       // Superior pivots HUG a low eye (Whitefish: 13 m above a
       // 2.5-m camera); mock pivots sit well below a ridge eye - so
       // the mode bands are asymmetric.
@@ -664,6 +688,16 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
             s2 += d * d;
             n2++;
           }
+          // The probed TOP is itself a sample: the 5-m grid can
+          // step over a top node carrying the whole claimed
+          // warming (measured on a film day - +14 K in the last
+          // 3 m of span, invisible to the grid, visible to
+          // dTretr). The endpoint always testifies.
+          {
+            const d = tRetr(probedTopM) - profile.at(probedTopM).tC;
+            s2 += d * d;
+            n2++;
+          }
           const rmsK = n2 ? Math.sqrt(s2 / n2) : null;
           zonesOut = {
             ...common,
@@ -682,7 +716,12 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
               tcRmsM: inv.rms,
               probedTopM,
               rmsK,
-              closes: rmsK !== null && rmsK < 2.5,
+              // A closure is only a closure over a real span: a
+              // probed top hugging the eye leaves the RMS integral
+              // one anchored sample, which any retrieval passes
+              // (measured on a film day whose zone vertices sat
+              // 3 m over the tower eye while claiming +14 K).
+              closes: rmsK !== null && rmsK < 2.5 && probedTopM - eye >= 10,
               dTretr: tRetr(probedTopM) - tRetr(eye),
               dTballoon: profile.at(probedTopM).tC - profile.at(eye).tC
             }
@@ -700,24 +739,6 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
         // (max(1 K, 35%) - the tolerance a fictitious layer cannot
         // meet). Only a fit that survives both replaces the zones'
         // honest non-closure.
-        let sLo = Infinity;
-        let sHi = -Infinity;
-        const jTop = Math.round(dM / fan.dsM);
-        for (
-          let i = Math.max(0, iP - 8);
-          i <= Math.min(alphas.length - 1, iM + 8);
-          i++
-        ) {
-          if (!Number.isFinite(tc.zAt[i])) continue;
-          const hh = fan.hs[i];
-          for (let k = 0; k <= Math.min(jTop, hh.length - 1); k++) {
-            const h = hh[k];
-            if (!Number.isFinite(h)) break;
-            if (h - h0 < sLo) sLo = h - h0;
-            if (h - h0 > sHi) sHi = h - h0;
-          }
-        }
-        sLo = Math.max(0, sLo);
         const fitAllowed = Number.isFinite(sHi) && fitBudget-- > 0;
         const fit = fitAllowed
           ? lehnFitSuperior(tc, {
@@ -794,9 +815,7 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
             why: fitAllowed ? 'zone I starved' : 'fit budget spent'
           });
         }
-        continue;
-      }
-      if (pivotAbs < eye - 20) {
+      } else if (pivotAbs < eye - 20) {
         // Mock geometry: the 1986 parametric strategy.
         const fitAllowed = fitBudget-- > 0;
         const fit = fitAllowed
@@ -814,59 +833,138 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
             distM: dM,
             why: fitAllowed ? 'fit failed' : 'fit budget spent'
           });
-          continue;
-        }
-        const floorAbs = h0 + Math.max(0, fit.probedFloorM);
-        const tFit = (hAbs) => {
-          const {hM, tC} = fit.nodes;
-          const h = hAbs - h0;
-          let i = 0;
-          while (i < hM.length - 2 && hM[i + 1] <= h) i++;
-          const f = Math.min(1, Math.max(0, (h - hM[i]) / (hM[i + 1] - hM[i])));
-          return tC[i] + (tC[i + 1] - tC[i]) * f;
-        };
-        let s2 = 0;
-        let n2 = 0;
-        for (let h = floorAbs; h <= eye; h += 5) {
-          const d = tFit(h) - profile.at(h).tC;
-          s2 += d * d;
-          n2++;
-        }
-        const baseAbs = h0 + fit.params.zBaseM;
-        const topAbs = baseAbs + fit.params.wM;
-        const rmsKe = n2 ? Math.sqrt(s2 / n2) : null;
-        const elevOut = {
-          ...common,
-          mode: 'elevated',
-          retrieved: {
-            method: 'fit',
-            nodesHM: fit.nodes.hM.map((h) => h + h0),
-            nodesTC: fit.nodes.tC,
-            tcRmsM: fit.tcRmsM,
-            probedFloorM: floorAbs,
-            onePerigee: fit.onePerigee,
-            closes: rmsKe !== null && rmsKe < 2.5,
-            params: {
-              zBaseM: baseAbs,
-              wM: fit.params.wM,
-              dTK: fit.params.dTK,
-              gammaKm: fit.params.gammaKm
-            },
-            rmsK: rmsKe,
-            dTretr: fit.params.dTK,
-            dTballoon: profile.at(topAbs).tC - profile.at(baseAbs).tC
+        } else {
+          const floorAbs = h0 + Math.max(0, fit.probedFloorM);
+          const tFit = (hAbs) => {
+            const {hM, tC} = fit.nodes;
+            const h = hAbs - h0;
+            let i = 0;
+            while (i < hM.length - 2 && hM[i + 1] <= h) i++;
+            const f = Math.min(
+              1,
+              Math.max(0, (h - hM[i]) / (hM[i + 1] - hM[i]))
+            );
+            return tC[i] + (tC[i + 1] - tC[i]) * f;
+          };
+          let s2 = 0;
+          let n2 = 0;
+          for (let h = floorAbs; h <= eye; h += 5) {
+            const d = tFit(h) - profile.at(h).tC;
+            s2 += d * d;
+            n2++;
           }
-        };
-        if (elevOut.retrieved.closes) return elevOut;
-        if (!firstNonCloser) firstNonCloser = elevOut;
-        tries.push({
-          eyeM: eye,
-          distM: dM,
-          why: `elevated does not close (${elevOut.retrieved.rmsK === null ? 'no span' : elevOut.retrieved.rmsK.toFixed(1) + ' K'})`
-        });
-        continue;
+          const baseAbs = h0 + fit.params.zBaseM;
+          const topAbs = baseAbs + fit.params.wM;
+          const rmsKe = n2 ? Math.sqrt(s2 / n2) : null;
+          const elevOut = {
+            ...common,
+            mode: 'elevated',
+            retrieved: {
+              method: 'fit',
+              nodesHM: fit.nodes.hM.map((h) => h + h0),
+              nodesTC: fit.nodes.tC,
+              tcRmsM: fit.tcRmsM,
+              probedFloorM: floorAbs,
+              onePerigee: fit.onePerigee,
+              closes: rmsKe !== null && rmsKe < 2.5 && eye - floorAbs >= 10,
+              params: {
+                zBaseM: baseAbs,
+                wM: fit.params.wM,
+                dTK: fit.params.dTK,
+                gammaKm: fit.params.gammaKm
+              },
+              rmsK: rmsKe,
+              dTretr: fit.params.dTK,
+              dTballoon: profile.at(topAbs).tC - profile.at(baseAbs).tC
+            }
+          };
+          if (elevOut.retrieved.closes) return elevOut;
+          if (!firstNonCloser) firstNonCloser = elevOut;
+          tries.push({
+            eyeM: eye,
+            distM: dM,
+            why: `elevated does not close (${elevOut.retrieved.rmsK === null ? 'no span' : elevOut.retrieved.rmsK.toFixed(1) + ' K'})`
+          });
+        }
+      } else {
+        tries.push({eyeM: eye, distM: dM, why: 'pivot at the eye'});
       }
-      tries.push({eyeM: eye, distM: dM, why: 'pivot at the eye'});
+      // THE FILM FALLBACK (Fleagle 1950, the 134th pass): any fold
+      // no family closed, whose rays HUG THE GROUND (span floor
+      // under 2 m), gets the inferior-mirage reading - the
+      // two-segment surface film fitted by optical residuals, the
+      // layer Fleagle built his instrument to measure. The claim
+      // survives the same two-closure referee: profile RMS over
+      // the probed-plus-claimed span, and the claimed film DROP
+      // against the balloon over the film itself.
+      if (sLo < 2 && Number.isFinite(sHi) && fitBudget-- > 0) {
+        const film = fleagleFitFilm(tc, {
+          eyeM: eye - h0,
+          distM: dM,
+          TzeC,
+          p0Pa,
+          spanHiM: sHi
+        });
+        if (film) {
+          const hF = film.params.filmM;
+          const tFit = (hAbs) => {
+            const {hM, tC} = film.nodes;
+            const h = hAbs - h0;
+            let i = 0;
+            while (i < hM.length - 2 && hM[i + 1] <= h) i++;
+            const f = Math.min(
+              1,
+              Math.max(0, (h - hM[i]) / (hM[i + 1] - hM[i]))
+            );
+            return tC[i] + (tC[i + 1] - tC[i]) * f;
+          };
+          let s2 = 0;
+          let n2 = 0;
+          for (let h = h0; h <= h0 + Math.max(sHi, hF); h += 2) {
+            const d = tFit(h) - profile.at(h).tC;
+            s2 += d * d;
+            n2++;
+          }
+          const rmsK = n2 ? Math.sqrt(s2 / n2) : null;
+          const dropClaim = -film.params.gammaFilmKpM * hF;
+          const dropBalloon = profile.at(h0).tC - profile.at(h0 + hF).tC;
+          const filmOK =
+            Math.abs(dropBalloon - dropClaim) <=
+            Math.max(0.5, 0.35 * dropClaim);
+          if (rmsK !== null && rmsK < 2.5 && filmOK) {
+            return {
+              ...common,
+              mode: 'inferior',
+              retrieved: {
+                method: 'fit',
+                nodesHM: film.nodes.hM.map((h) => h + h0),
+                nodesTC: film.nodes.tC,
+                tcRmsM: film.tcRmsM,
+                probedTopM: h0 + Math.max(sHi, hF),
+                spanM: [h0 + sLo, h0 + sHi],
+                rmsK,
+                closes: true,
+                params: {
+                  zBaseM: h0,
+                  wM: hF,
+                  dTK: -dropClaim,
+                  gammaKm: film.params.gammaKpM,
+                  gammaFilmKpM: film.params.gammaFilmKpM
+                },
+                dTretr: -dropClaim,
+                dTballoon: -dropBalloon
+              }
+            };
+          }
+          tries.push({
+            eyeM: eye,
+            distM: dM,
+            why: `film does not close (${rmsK === null ? 'no span' : rmsK.toFixed(1) + ' K'})`
+          });
+        } else {
+          tries.push({eyeM: eye, distM: dM, why: 'film declined'});
+        }
+      }
     }
     if (!folded) tries.push({eyeM: eye, distM: null, why: 'no fold'});
   }

@@ -661,6 +661,57 @@ check(
   );
 }
 
+// ---- the Lehn retrieval, inferior film ------------------------
+// The 134th pass end to end: Fleagle 1950's geometry through the
+// panel's cascade. A super-autoconvective surface film (-240
+// K/km over 10 m - printed-normal by Baum's Eq. 5) under an
+// ordinary lapse, seen from the panel's own tower eye (22 m,
+// above every balloon-resolvable film): the fold at 40 km
+// classifies superior-band, the zones' claim is indicted by the
+// endpoint-sampled closure (they read +14 K where the balloon
+// cools), the warm families refuse, and the film fallback reads
+// the layer Fleagle built his instrument for. Day-invariant:
+// all hand numbers.
+{
+  const gF = -0.24;
+  const hF = 10;
+  const gB = -0.0065;
+  const rawT = (z) => (z <= hF ? gF * z : gF * hF + gB * (z - hF));
+  const offT = 18 - rawT(22);
+  const rows = [];
+  let p = 1013.25;
+  let hPrev = 0;
+  for (const h of [0, 2, 5, 10, 15, 25, 50, 120, 300, 1000, 3000, 9000]) {
+    if (h > 0) {
+      const tMean = (rawT(hPrev) + rawT(h)) / 2 + offT + 273.15;
+      p *= Math.exp((-(h - hPrev) * 9.80665 * 0.0289644) / (8.31451 * tMean));
+    }
+    rows.push({p, hM: h, tC: +(rawT(h) + offT).toFixed(3), rh: 30});
+    hPrev = h;
+  }
+  const r = retrievalPanel(rows);
+  const R = r.retrieved;
+  const ok =
+    R !== null &&
+    r.mode === 'inferior' &&
+    R.method === 'fit' &&
+    R.closes &&
+    r.eyeM === 22 &&
+    r.distM === 40000 &&
+    Math.abs(R.params.gammaFilmKpM - gF) < 0.02 &&
+    Math.abs(R.params.wM - hF) < 1.5 &&
+    Math.abs(R.dTretr - gF * hF) < 0.3 &&
+    R.rmsK < 0.5 &&
+    r.tried.some((t) => t.why && t.why.startsWith('superior does not close'));
+  check(
+    'LEHN RETRIEVAL, inferior film: Fleagle reads the beach layer',
+    ok,
+    R
+      ? `the 22-m tower eye's fold at ${(r.distM / 1000).toFixed(0)} km lands in the superior band; the zones' +14-K invention is indicted (${r.tried.find((t) => t.why?.startsWith('superior'))?.why ?? '?'}) and the film family reads ${(R.params.gammaFilmKpM * 1000).toFixed(0)} K/km over ${R.params.wM.toFixed(1)} m (truth ${gF * 1000}/${hF}), drop ${(-R.dTretr).toFixed(2)} K vs the balloon's ${(-R.dTballoon).toFixed(2)} K, closing at ${R.rmsK.toFixed(3)} K RMS - the third mirage family joins the instrument`
+      : `declined: ${r.note}`
+  );
+}
+
 // ---- the forecast ledger's pure parts -------------------------
 // The page stores; these decide. The pairing identity IS the
 // design: a station's 12Z ascent and the FOLLOWING 00Z ascent key

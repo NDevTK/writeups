@@ -9878,6 +9878,64 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   retrieval is a different instrument, parked), and the page's
   lehn line + watch prints now carry the method tag and
   layer-vs-balloon numbers for any closing mode.
+- DONE (Aug 10, the review session's 134th pass - THE INFERIOR
+  MIRAGE JOINS THE INSTRUMENT: Fleagle 1950's lapse-rate
+  retrieval): the third mirage family, from its own primaries.
+  Fleagle 1950 ("The Optical Measurement of Lapse Rate", Bull.
+  AMS 31(2) 51-55, READ IN FULL) states the inverse problem the
+  mirror of Lehn's - the apparent-minus-true height h of a target
+  at range x reads the MEAN LAPSE of the skimmed layer, h grows
+  as x^2, and the sign flips at the autoconvective rate g/R (his
+  printed "34 C per km" - the THIRD independent printing of the
+  constant the repo carries as Lehn's g\*beta 0.03413 and the NZ
+  gate's 0.03418); Baum 1951 (J. Meteor. 8, 196-198, READ IN
+  FULL) licenses the target's persistence (the stability excess
+  falls as depth^-4: films of thousands of K/km are
+  printed-normal near the ground). fleagle.js carries the
+  constants, his Eq. (11) closed form, the Eq. (12) curvature
+  ladder, the Eq. (13/14) quarter-layer depth, Baum's Eq. (5),
+  and fleagleFitFilm - the Morrish-strategy pattern on the
+  two-segment surface family (film lapse over depth, background
+  above, anchored at the eye), with a 0.5-K claim floor: a film
+  smaller than the closure referee's own tolerance is
+  unfalsifiable and DECLINES (measured on Utqiagvik: a 0.35-K
+  "film" the balloon mildly contradicted). fleagle-reference
+  holds seven landmark classes including Eq. (11) against BOTH
+  independent integrators at Johnson & Roberts' own 362/724-m
+  baselines (within 0.24 mm) with the appears-lower flip exactly
+  at g/R. THE GEOMETRY LESSON, probed not assumed: an eye INSIDE
+  a film cannot fold (the film launches every exiting ray at
+  sqrt(2 h'' dz) regardless of entry - erect, compressed, no
+  inverted branch), so the instrument's posture is the TOWER EYE
+  above the film (h0+22 joins the panel and watch eye lists) and
+  the balloon-resolvable film class folds at 20-45 km, not at
+  hot-road metres. The panel cascade gains the FILM FALLBACK: any
+  fold no family closed whose rays hug the ground (span floor
+  under 2 m) gets the film reading, refereed by profile RMS plus
+  the claimed film drop against the balloon. Two closure holes
+  found by the synthetic and fixed: the zones' RMS integral now
+  SAMPLES ITS ENDPOINT (a top node carrying +14 K hid between
+  5-m grid points while dTretr read it), and thin probed spans
+  (under 10 m) no longer count as closures. Two archive-contract
+  lessons the frozen days taught: pins are written from the
+  PACKED rows the fixture stores (pressure rounding moved a flat
+  film-fit valley 58x-67 to 28x-125 - same drop, same closure,
+  missed pins), and the EYE LIST IS DATA (a runner-side
+  convention default silently diverged from the watch's 450-m
+  panel eye; the fixture now stores eyesM verbatim). THE LIVE
+  RESULT, same evening: SAN DIEGO CLOSES FOR THE FIRST TIME IN
+  THE PROGRAM - inferior/fit from the 450-m ridge eye at 90 km,
+  the mesa's 5-pm film -3.9 K over 134-192 m vs the balloon's
+  -3.6 K at 2.19 K RMS - and Quillayute (the 133rd's honest
+  surface-graze refusal) closes with the right family (-1.6 K
+  over 57-117 m vs -1.4 K, 1.32 K RMS). THE ARCHIVE holds FIVE
+  days across ALL THREE families: Resolute elevated, Vandenberg
+  - Oakland superior/fit, Quillayute + San Diego inferior/film.
+    observatory-reference gains the end-to-end film landmark (the
+    zones' +14-K invention indicted by the endpoint sample, the
+    film family reading -235 K/km over 10.5 m against truth
+    -240/10 at 0.155 K RMS). The page's lehn line gains the tower
+    tier and sign-correct layer text.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
