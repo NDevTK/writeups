@@ -56,6 +56,8 @@
  */
 
 import http from 'node:http';
+import {readFileSync, renameSync, writeFileSync} from 'node:fs';
+import {join as joinPath} from 'node:path';
 import {haversineKm} from '../../lightning.js';
 import {parseHemiPower, parsePropagated} from '../../solarwind.js';
 import {normalizeMetars} from '../../metar.js';
@@ -520,6 +522,118 @@ export function warmUpPaths(home) {
 }
 export const WARM_UP_TRIES = 3;
 export const WARM_UP_PAUSE_MS = 5000;
+
+// ---- Cache persistence across restarts (144th pass) -------------
+// Every deploy restarts the process (the self-update timer; measured
+// uptime 3.8 h after a busy day), and a fresh process holds empty
+// caches - the warm-up covers the home area, nobody else's. So the
+// slow per-area caches and the sitewide feeds are snapshotted to
+// the systemd StateDirectory every STATE_SAVE_MS and on SIGTERM,
+// and restored at start; the warm-up then also refreshes the areas
+// the snapshot served most recently. Pure helpers, gated:
+// snapshotCaches serializes named Maps of {t, body} rows and named
+// singles {t, ...}; restoreCaches puts back rows younger than
+// maxAgeMs without overwriting anything fresher already fetched.
+export const STATE_SAVE_MS = 5 * 60e3;
+export const STATE_MAX_AGE_MS = 24 * 3600e3;
+export function snapshotCaches({maps = {}, singles = {}}, now = Date.now()) {
+  const out = {savedAt: now, maps: {}, singles: {}};
+  for (const [name, m] of Object.entries(maps))
+    out.maps[name] = [...m.entries()].filter(
+      ([, v]) => v && typeof v === 'object' && Number.isFinite(v.t)
+    );
+  for (const [name, s] of Object.entries(singles)) {
+    const v = s.get();
+    if (v && typeof v === 'object' && Number.isFinite(v.t) && v.t > 0)
+      out.singles[name] = v;
+  }
+  return out;
+}
+export function restoreCaches(
+  snap,
+  {maps = {}, singles = {}},
+  now = Date.now(),
+  maxAgeMs = STATE_MAX_AGE_MS
+) {
+  const counts = {maps: 0, singles: 0, dropped: 0};
+  if (!snap || typeof snap !== 'object') return counts;
+  const fresh = (v) =>
+    v &&
+    typeof v === 'object' &&
+    Number.isFinite(v.t) &&
+    now - v.t <= maxAgeMs &&
+    v.t <= now + 60e3;
+  for (const [name, m] of Object.entries(maps)) {
+    const rows = snap.maps?.[name];
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows) {
+      if (!Array.isArray(row) || row.length !== 2 || typeof row[0] !== 'string')
+        continue;
+      const [k, v] = row;
+      if (!fresh(v)) {
+        counts.dropped++;
+        continue;
+      }
+      const have = m.get(k);
+      if (have && Number.isFinite(have.t) && have.t >= v.t) continue;
+      m.set(k, v);
+      counts.maps++;
+    }
+  }
+  for (const [name, s] of Object.entries(singles)) {
+    const v = snap.singles?.[name];
+    if (v === undefined) continue;
+    if (!fresh(v)) {
+      counts.dropped++;
+      continue;
+    }
+    const have = s.get();
+    if (have && Number.isFinite(have.t) && have.t >= v.t) continue;
+    s.set(v);
+    counts.singles++;
+  }
+  return counts;
+}
+// The areas a snapshot served most recently, from its per-area cache
+// keys ("33,-117" one-degree keys or "32.9/-117.1" tenth-degree
+// ones), newest first, the home's own area excluded, at most max.
+export function recentAreas(
+  snap,
+  home,
+  max = 6,
+  now = Date.now(),
+  maxAgeMs = STATE_MAX_AGE_MS
+) {
+  const seen = new Map();
+  for (const rows of Object.values(snap?.maps ?? {})) {
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows) {
+      if (!Array.isArray(row) || typeof row[0] !== 'string') continue;
+      const m = /^(-?\d+(?:\.\d+)?)[,/](-?\d+(?:\.\d+)?)$/.exec(row[0]);
+      if (!m) continue;
+      const lat = Number(m[1]);
+      const lon = Number(m[2]);
+      if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) continue;
+      const t = Number.isFinite(row[1]?.t) ? row[1].t : 0;
+      if (now - t > maxAgeMs) continue; // an area nobody asked for in a day
+      const key = Math.round(lat) + ',' + Math.round(lon);
+      if (home && key === Math.round(home.lat) + ',' + Math.round(home.lon))
+        continue;
+      const have = seen.get(key);
+      if (!have || have.t < t)
+        seen.set(key, {lat: Math.round(lat), lon: Math.round(lon), t});
+    }
+  }
+  return [...seen.values()]
+    .sort((a, b) => b.t - a.t)
+    .slice(0, max)
+    .map(({lat, lon}) => ({lat, lon}));
+}
+export function warmUpPlan(home, areas = []) {
+  const out = [];
+  for (const a of [home, ...areas]) for (const p of warmUpPaths(a)) out.push(p);
+  return [...new Set(out)];
+}
 export function budgetLeftMs(deadlineMs, nowMs) {
   return Math.max(0, deadlineMs - nowMs);
 }
@@ -640,8 +754,17 @@ export {
 // variables). CCI is science-quality (~6-month latency); the theme uses
 // it as the primary colour with the NRT Morel colour as the cloud-gap
 // fallback. The pure pieces live here for server-reference.mjs.
-const RRS_DATASET =
-  'https://coastwatch.pfeg.noaa.gov/erddap/griddap/pmlEsaCCI60OceanColorDaily.json';
+// The daily product is the primary; its 8-day composite is the
+// CLOUD-GAP fallback (144th pass: a daily cell answers null under
+// cloud or at the coast for weeks at a time - the composite carries
+// the same bands over the same grid, filled by the clear days).
+export const RRS_DATASETS = {
+  daily:
+    'https://coastwatch.pfeg.noaa.gov/erddap/griddap/pmlEsaCCI60OceanColorDaily.json',
+  '8day':
+    'https://coastwatch.pfeg.noaa.gov/erddap/griddap/pmlEsaCCI60OceanColor8Day.json'
+};
+const RRS_DATASET = RRS_DATASETS.daily;
 const RRS_VARS = [
   'Rrs_412',
   'Rrs_443',
@@ -661,9 +784,18 @@ export function rrsCell(lat, lon) {
 // The multi-band point-query URL, built from the snapped cell only. The
 // CCI grid is [time][latitude][longitude] - no altitude term (the
 // chlorophyll product has one; this one does not).
-export function rrsUrl(cell) {
+export function rrsUrl(cell, product = 'daily') {
   const idx = `%5B(last)%5D%5B(${cell.lat})%5D%5B(${cell.lon})%5D`;
-  return RRS_DATASET + '?' + RRS_VARS.map((v) => v + idx).join(',');
+  const base = RRS_DATASETS[product] ?? RRS_DATASET;
+  return base + '?' + RRS_VARS.map((v) => v + idx).join(',');
+}
+// Which answer serves: the daily's measurement when it has one, else
+// the composite's, else whichever real no-measure answer arrived
+// (daily first); null when neither request produced a usable body.
+export function rrsPick(daily, composite) {
+  if (daily && daily.rrs) return daily;
+  if (composite && composite.rrs) return composite;
+  return daily ?? composite ?? null;
 }
 
 // null = unusable response (-> 502); {rrs: null} = a real no-measure
@@ -1108,6 +1240,98 @@ function main() {
       if (now - v.t > 12 * 3600e3) rrsCache.delete(k);
   }, 30e3).unref();
 
+  // Persistence (snapshotCaches/restoreCaches): the slow per-area
+  // caches and the sitewide feeds survive a restart through the
+  // systemd StateDirectory (HORIZON_STATE_DIR overrides; none set:
+  // no persistence, logged once). The short-lived adsb cache and
+  // the streaming pictures are not persisted.
+  const STATE_DIR = (env.HORIZON_STATE_DIR ?? env.STATE_DIRECTORY ?? '')
+    .split(':')[0]
+    .trim();
+  const STATE_FILE = STATE_DIR ? joinPath(STATE_DIR, 'cache.json') : '';
+  const single = (get, set) => ({get, set});
+  const persisted = {
+    maps: {
+      sounding: sndCache,
+      buoy: buoyCache,
+      metar: metarCache,
+      aeronet: aeronetCache,
+      aerosol: aerosolCache,
+      ozone: ozoneCache,
+      chlor: chlorCache,
+      ndvi: ndviCache,
+      surface: surfaceCache,
+      rrs: rrsCache
+    },
+    singles: {
+      tles: single(
+        () => tlesCache,
+        (v) => (tlesCache = v)
+      ),
+      gmn: single(
+        () => gmnCache,
+        (v) => (gmnCache = v)
+      ),
+      gvp: single(
+        () => gvpCache,
+        (v) => (gvpCache = v)
+      ),
+      cobs: single(
+        () => cobsCache,
+        (v) => (cobsCache = v)
+      ),
+      sndStations: single(
+        () => sndStations,
+        (v) => (sndStations = v)
+      ),
+      buoyStations: single(
+        () => buoyStations,
+        (v) => (buoyStations = v)
+      ),
+      aeronetSites: single(
+        () => aeronetSites,
+        (v) => (aeronetSites = v)
+      )
+    }
+  };
+  const stateInfo = {file: STATE_FILE || null, restored: null, savedAt: 0};
+  let stateSnap = null;
+  if (STATE_FILE) {
+    try {
+      stateSnap = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+      const c = restoreCaches(stateSnap, persisted);
+      stateInfo.restored = {...c, savedAt: stateSnap.savedAt ?? null};
+      log(
+        `state: restored ${c.maps} cache rows and ${c.singles} feeds from ${STATE_FILE} ` +
+          `(saved ${new Date(stateSnap.savedAt ?? 0).toISOString()}, ${c.dropped} stale dropped)`
+      );
+    } catch (e) {
+      log(
+        `state: nothing restored from ${STATE_FILE} (${e.code ?? e.message})`
+      );
+    }
+  } else log('state: no StateDirectory - caches live only in RAM');
+  const saveState = () => {
+    if (!STATE_FILE) return false;
+    try {
+      const snap = snapshotCaches(persisted);
+      writeFileSync(STATE_FILE + '.tmp', JSON.stringify(snap));
+      renameSync(STATE_FILE + '.tmp', STATE_FILE);
+      stateInfo.savedAt = snap.savedAt;
+      return true;
+    } catch (e) {
+      log('state: save failed (' + e.message + ')');
+      return false;
+    }
+  };
+  setInterval(saveState, STATE_SAVE_MS).unref();
+  for (const sig of ['SIGTERM', 'SIGINT'])
+    process.on(sig, () => {
+      const ok = saveState();
+      log(`state: ${ok ? 'saved' : 'not saved'} on ${sig}, exiting`);
+      process.exit(0);
+    });
+
   // Measured aerosol radiative properties: GEFS-Aerosols (NOAA's
   // operational GOCART coupling) via the NOMADS grib filter - the
   // supported subsetting path since OpenDAP retired (SCN 25-81).
@@ -1429,15 +1653,33 @@ function main() {
       return hit.body;
     try {
       rrsState.fetches++;
-      const r = await fetch(rrsUrl(cell), {
-        signal: AbortSignal.timeout(15e3),
-        headers: {'user-agent': UA}
-      });
-      if (!r.ok) throw new Error('cci ' + r.status);
-      const parsed = parseRrs(await r.json());
-      if (!parsed) throw new Error('cci shape');
-      if (parsed.time) rrsState.time = parsed.time;
-      const body = {...parsed, cell};
+      // Both products in parallel under the shared upstream budget
+      // (a six-band ERDDAP point query takes ~18 s here - measured
+      // 17.7 s twice on 2026-09-05 - which the old 15-s timeout
+      // turned into a 502 on every call); the daily's measurement
+      // wins, the composite fills its cloud gaps (rrsPick).
+      const deadline = Date.now() + UPSTREAM_BUDGET_MS;
+      const get = async (product) => {
+        const r = await fetch(rrsUrl(cell, product), {
+          signal: AbortSignal.timeout(
+            fetchBudgetMs(deadline, Date.now(), UPSTREAM_BUDGET_MS)
+          ),
+          headers: {'user-agent': UA}
+        });
+        if (!r.ok) throw new Error('cci ' + r.status);
+        const parsed = parseRrs(await r.json());
+        if (!parsed) throw new Error('cci shape');
+        return {...parsed, product};
+      };
+      const [d, c] = await Promise.allSettled([get('daily'), get('8day')]);
+      const picked = rrsPick(
+        d.status === 'fulfilled' ? d.value : null,
+        c.status === 'fulfilled' ? c.value : null
+      );
+      if (!picked)
+        throw new Error(d.reason?.message ?? c.reason?.message ?? 'cci');
+      if (picked.time) rrsState.time = picked.time;
+      const body = {...picked, cell};
       rrsCache.set(key, {t: Date.now(), body});
       return body;
     } catch {
@@ -2505,7 +2747,16 @@ function main() {
     // the warm-up (see warmUpPaths): one request per slow route for
     // the home area, sequential, each failure logged and ignored
     const home = parseHome(env.HORIZON_HOME ?? HOME_DEFAULT);
-    const paths = warmUpPaths(home);
+    // the home first, then the areas the restored snapshot served
+    // most recently (their caches came back with it; the warm-up
+    // refreshes what went stale)
+    const areas = recentAreas(stateSnap, home);
+    const paths = warmUpPlan(home, areas);
+    if (areas.length)
+      log(
+        `warm: ${areas.length} recent area(s) beside the home: ` +
+          areas.map((a) => a.lat + ',' + a.lon).join(' ')
+      );
     const self = `http://${HOST === '0.0.0.0' || HOST === '::' ? '127.0.0.1' : HOST}:${PORT}`;
     // A cold /sounding can spend its budget on the station list
     // plus one slow Wyoming answer and fail once (measured in the

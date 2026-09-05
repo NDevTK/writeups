@@ -63,7 +63,14 @@ import {
   parseHome,
   warmUpPaths,
   WARM_UP_TRIES,
-  WARM_UP_PAUSE_MS
+  WARM_UP_PAUSE_MS,
+  recentAreas,
+  restoreCaches,
+  rrsPick,
+  snapshotCaches,
+  STATE_MAX_AGE_MS,
+  STATE_SAVE_MS,
+  warmUpPlan
 } from './server/src/index.mjs';
 
 import {haversineKm} from './lightning.js';
@@ -735,6 +742,93 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       `monotonically and clamps to 0 at and past the deadline, ` +
       `where the handlers fall to the stale cache or fail fast as ` +
       `their own json`
+  );
+}
+
+{
+  // Cache persistence across restarts (144th pass): a snapshot of
+  // named Maps of {t, body} rows and named singles round-trips
+  // through JSON; a restore drops rows older than the age limit
+  // (and rows stamped in the future), never overwrites a fresher
+  // row already fetched, and the warm-up plan then covers the home
+  // first and the snapshot's most recently served areas after it.
+  const now = 1_700_000_000_000;
+  const rows = new Map([
+    ['33,-117', {t: now - 60e3, body: {a: 1}}],
+    ['34,-120', {t: now - 3600e3, body: {b: 2}}],
+    ['51,0', {t: now - 2 * STATE_MAX_AGE_MS, body: {old: true}}],
+    ['bad', 'not a row']
+  ]);
+  let single = {t: now - 5000, body: 'tles'};
+  const reg = {
+    maps: {
+      sounding: rows,
+      metar: new Map([['32.9/-117.1', {t: now - 10e3, body: {}}]])
+    },
+    singles: {
+      tles: {get: () => single, set: (v) => (single = v)},
+      empty: {get: () => ({t: 0, body: null}), set: () => {}}
+    }
+  };
+  const snap = JSON.parse(JSON.stringify(snapshotCaches(reg, now)));
+  const back = new Map([['33,-117', {t: now + 1, body: {fresher: true}}]]);
+  let single2 = {t: 0, body: null};
+  const reg2 = {
+    maps: {sounding: back, metar: new Map()},
+    singles: {tles: {get: () => single2, set: (v) => (single2 = v)}}
+  };
+  const c = restoreCaches(snap, reg2, now);
+  const areas = recentAreas(snap, {lat: 32.85, lon: -117.12}, 6, now);
+  const plan = warmUpPlan({lat: 32.85, lon: -117.12}, areas);
+  check(
+    'cache persistence across restarts',
+    snap.savedAt === now &&
+      snap.maps.sounding.length === 3 &&
+      snap.singles.tles.body === 'tles' &&
+      snap.singles.empty === undefined &&
+      c.maps === 2 &&
+      c.singles === 1 &&
+      c.dropped === 1 &&
+      back.get('33,-117').body.fresher === true &&
+      back.get('34,-120').body.b === 2 &&
+      !back.has('51,0') &&
+      single2.body === 'tles' &&
+      restoreCaches(null, reg2, now).maps === 0 &&
+      areas.length === 1 &&
+      areas[0].lat === 34 &&
+      areas[0].lon === -120 &&
+      plan.length === 6 &&
+      plan[0] === '/sounding?lat=32.85&lon=-117.12' &&
+      plan[3] === '/sounding?lat=34.00&lon=-120.00' &&
+      STATE_SAVE_MS === 5 * 60e3 &&
+      STATE_MAX_AGE_MS === 24 * 3600e3,
+    `${snap.maps.sounding.length} rows and 1 feed snapshotted (the empty feed and the ` +
+      `malformed row skipped); restored ${c.maps} rows + ${c.singles} feed, ${c.dropped} stale ` +
+      `dropped, the fresher row already in RAM kept; the snapshot names ${areas.length} recent ` +
+      `area beside the home (the home's own area and the tenth-degree metar key of the same ` +
+      `area fold in), so the warm-up plan runs ${plan.length} paths, home first`
+  );
+  // The ocean-colour pick: the daily's measurement wins, the 8-day
+  // composite fills its cloud gaps, a real no-measure answer beats
+  // nothing, and the composite URL is the daily's over its own
+  // dataset.
+  const d0 = {rrs: null, product: 'daily'};
+  const c1 = {rrs: [1, 2, 3, 4, 5, 6], product: '8day'};
+  check(
+    'ocean colour: composite fills the daily gap (/rrs)',
+    rrsPick({rrs: [1, 1, 1, 1, 1, 1], product: 'daily'}, c1).product ===
+      'daily' &&
+      rrsPick(d0, c1).product === '8day' &&
+      rrsPick(d0, null) === d0 &&
+      rrsPick(null, {rrs: null, product: '8day'}).product === '8day' &&
+      rrsPick(null, null) === null &&
+      rrsUrl(rrsCell(25, -140), '8day').startsWith(
+        'https://coastwatch.pfeg.noaa.gov/erddap/griddap/pmlEsaCCI60OceanColor8Day.json?Rrs_412'
+      ) &&
+      rrsUrl(rrsCell(25, -140), 'nonsense') === rrsUrl(rrsCell(25, -140)),
+    `daily with data wins; a daily cloud gap takes the 8-day composite; a lone null is still ` +
+      `a real answer; the composite asks the 8-day dataset for the same six bands (a six-band ` +
+      `point query measured at 17.7 s on 2026-09-05 - the old 15-s timeout failed every call)`
   );
 }
 

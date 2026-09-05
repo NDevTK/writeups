@@ -16,6 +16,10 @@ NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
+# The one writable place: /var/lib/horizon-live, where the daemon
+# snapshots its slow caches every five minutes and on stop, and
+# restores them at start (STATE_DIRECTORY is exported by systemd).
+StateDirectory=horizon-live
 PrivateDevices=yes
 ProtectKernelTunables=yes
 ProtectControlGroups=yes

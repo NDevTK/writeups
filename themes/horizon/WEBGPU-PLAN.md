@@ -10345,6 +10345,56 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 144th pass - THE DAEMON REPAIRED
+  AND THE SWEEP): what the live counters said, fixed, and the 143rd
+  read again with fresh eyes. (1) /rrs FAILED EVERY CALL (9 of 9 in
+  /health): a six-band ESA CCI point query on CoastWatch's ERDDAP
+  takes ~18 s (17.7 s measured twice) and the route's own 15-s
+  timeout turned each into a 502. The route now asks the daily
+  product and its 8-day composite in parallel under the shared
+  25-s budget; the daily's measurement wins, the composite fills
+  the daily's cloud gaps (the home cell answers null under cloud
+  or at the coast for weeks; the daily's latest time was
+  2026-06-30 - the science product's stated latency), and the
+  answer names its product (rrsPick, gated). (2) THE EMPTY-BODY
+  PAGE ERROR that every dump this session carried ("unexpected end
+  of JSON input", no URL) was NAMED with a ?debug=1 hook on
+  Response.json: open-meteo's forecast and marine endpoints
+  answered 502 with empty bodies at 42 and 50 s; three direct
+  fetches (weather, soil moisture, marine) now check the status
+  before parsing and say which upstream failed. The daemon's own
+  failures were already JSON. (3) PERSISTENCE: every deploy
+  restarts the daemon (uptime 3.8 h at the day's reading) and the
+  warm-up covered one home; the slow per-area caches and the
+  sitewide feeds are now snapshotted to the systemd StateDirectory
+  (/var/lib/horizon-live, the unit's one writable path; the
+  service file gains StateDirectory=horizon-live) every five
+  minutes and on SIGTERM, restored at start with rows older than a
+  day dropped and fresher rows never overwritten, and the warm-up
+  plan covers the home first and the snapshot's most recently
+  served areas after it (snapshotCaches, restoreCaches,
+  recentAreas, warmUpPlan; two new server landmarks; /health
+  carries the state file, the restore counts and the last save).
+  (4) THE SWEEP over the 143rd (its module and page wiring;
+  passes 135-142 were each landmarked at their own time and their
+  page constants re-read: the 3.4-m sensor fallback and the 60-m
+  coastal-plain station rule stand as stated): the white split
+  was a typed 240 and is now DERIVED (the midpoint between the
+  cold ramp's top level 230 and white 255, WHITE_SPLIT_LEVEL); the
+  grey tolerance 6 is now GATED against the palette (under half
+  the least saturated colour's 26 levels); the -40 C proxy for
+  ACHA's water/supercooled/mixed cloud types is named
+  (HOMOGENEOUS_FREEZING_C) and stated; the -60 C cut between the
+  grey ramps, the 3-px near-land proxy for the AIADD's unfetched
+  1-km coast mask, the 50-km buoy reach (half the window), the
+  40-min freshness (four image cadences) and the 5% deck-top rule
+  are stated where they live as THE THEME'S OWN RULES. Nothing in
+  the sweep changed a pinned number: the goesir pins and the
+  frozen census are untouched. STATED LIMITS: the daemon's
+  restored caches serve stale under the routes' own stale-serve
+  rules - persistence buys warm answers, not fresh ones; the
+  composite's Rrs is an 8-day mean under a daily's name of
+  measurement (the product field says which).
 - DONE (Sep 5, the review session's 143rd pass - THE MEASURED CLOUD
   FIELD): the sky's cloud cover within 100 km of the observer is now
   MEASURED, every ten minutes, from GOES-West's Band 13 (10.35 um)

@@ -113,6 +113,29 @@ Browser access is origin-locked to `ALLOW_ORIGIN` (the website —
 this is not an open CORS proxy); everything is rate-limited per
 IP.
 
+## Persistence across restarts
+
+Every deploy restarts the process (the self-update timer), and a
+fresh process holds empty caches. Since the 144th pass the slow
+per-area caches (sounding, buoy, metar, aeronet, aerosol, ozone,
+chlor, ndvi, surface, rrs) and the sitewide feeds (TLEs, GMN, GVP,
+COBS, the station lists) are snapshotted to `cache.json` in the
+systemd `StateDirectory` (`/var/lib/horizon-live`, the unit's one
+writable path; `HORIZON_STATE_DIR` overrides) every five minutes
+and on `SIGTERM`, and restored at start - rows older than a day are
+dropped, rows already refetched are never overwritten. The warm-up
+then covers the home area first and the snapshot's most recently
+served areas after it (`recentAreas`, `warmUpPlan`, gated in
+`server-reference.mjs`). `/health` reports the state file, what was
+restored and the last save. The streaming pictures (AIS, lightning)
+and the 15-second aircraft cache are not persisted.
+
+The ocean-colour route (`/rrs`) asks the daily ESA CCI product and
+its 8-day composite in parallel under the shared upstream budget
+(a six-band ERDDAP point query takes about 18 s - the old 15-s
+timeout failed every call); the daily's measurement wins, the
+composite fills its cloud gaps, and the answer names its `product`.
+
 ## Security posture
 
 - Every response carries `content-security-policy: sandbox` and

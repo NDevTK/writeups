@@ -989,6 +989,22 @@
       import {CSMShadowNode} from './horizon/CSMShadowNode.js';
 
       const params = new URL(location.href).searchParams;
+      // Harness diagnostic (?debug=1): name the response whose body
+      // failed to parse - a bare "unexpected end of JSON input" page
+      // error carries no URL, and the theme has seventy fetches.
+      if (params.has('debug')) {
+        const parse = Response.prototype.json;
+        Response.prototype.json = async function () {
+          try {
+            return await parse.call(this);
+          } catch (e) {
+            console.warn(
+              'json: ' + this.status + ' ' + this.url + ' · ' + e.message
+            );
+            throw e;
+          }
+        };
+      }
       const reduceMotion = matchMedia(
         '(prefers-reduced-motion: reduce)'
       ).matches;
@@ -1300,17 +1316,19 @@
           }
         }
         try {
-          const w = await (
-            await fetch(
-              'https://api.open-meteo.com/v1/forecast?latitude=' +
-                state.lat +
-                '&longitude=' +
-                state.lon +
-                '&current=weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,dew_point_2m,snow_depth' +
-                '&hourly=wind_speed_80m,wind_speed_120m,soil_moisture_0_to_1cm&forecast_hours=1',
-              {credentials: 'omit'}
-            )
-          ).json();
+          const wr = await fetch(
+            'https://api.open-meteo.com/v1/forecast?latitude=' +
+              state.lat +
+              '&longitude=' +
+              state.lon +
+              '&current=weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,dew_point_2m,snow_depth' +
+              '&hourly=wind_speed_80m,wind_speed_120m,soil_moisture_0_to_1cm&forecast_hours=1',
+            {credentials: 'omit'}
+          );
+          // an upstream 502 carries an empty body (measured on
+          // 2026-09-05): say so instead of failing to parse it
+          if (!wr.ok) throw new Error('open-meteo ' + wr.status);
+          const w = await wr.json();
           const c = w.current;
           state.code = c.weather_code;
           // The documented harness pins (?cloud/cloudlow/cloudmid/
@@ -2083,16 +2101,16 @@
         await syncTideGauge();
         await syncCoopsMet();
         try {
-          const m = await (
-            await fetch(
-              'https://marine-api.open-meteo.com/v1/marine?latitude=' +
-                state.lat +
-                '&longitude=' +
-                state.lon +
-                '&current=wave_height,wind_wave_height,wind_wave_peak_period,wind_wave_direction,swell_wave_height,swell_wave_peak_period,swell_wave_direction,sea_level_height_msl,sea_surface_temperature',
-              {credentials: 'omit'}
-            )
-          ).json();
+          const mr = await fetch(
+            'https://marine-api.open-meteo.com/v1/marine?latitude=' +
+              state.lat +
+              '&longitude=' +
+              state.lon +
+              '&current=wave_height,wind_wave_height,wind_wave_peak_period,wind_wave_direction,swell_wave_height,swell_wave_peak_period,swell_wave_direction,sea_level_height_msl,sea_surface_temperature',
+            {credentials: 'omit'}
+          );
+          if (!mr.ok) throw new Error('open-meteo marine ' + mr.status);
+          const m = await mr.json();
           const c = m.current;
           // The MEASURED tide (sea level vs MSL, tides + surge):
           // lifts the water plane through the same asinh world
@@ -2240,7 +2258,8 @@
       // the layer's cadence; ?goes=0 disables; silent under pins.
       // The field needs a measured sea temperature within reach:
       // the COARE skin, else the CO-OPS sensor, else a buoy within
-      // 50 km - a buoy 150 km out does not speak for this window.
+      // 50 km (half the window's reach - the theme's rule, stated:
+      // a buoy 150 km out does not speak for this window).
       let goesObs = null;
       let goesBusy = false;
       let goesRerun = false; // a call that arrived mid-fetch runs after it
@@ -3245,16 +3264,16 @@
       async function syncSoil() {
         if (params.get('soil') === '0') return;
         try {
-          const j = await (
-            await fetch(
-              'https://api.open-meteo.com/v1/forecast?latitude=' +
-                state.lat.toFixed(4) +
-                '&longitude=' +
-                state.lon.toFixed(4) +
-                '&hourly=soil_moisture_0_to_1cm&forecast_days=1',
-              {credentials: 'omit'}
-            )
-          ).json();
+          const sr = await fetch(
+            'https://api.open-meteo.com/v1/forecast?latitude=' +
+              state.lat.toFixed(4) +
+              '&longitude=' +
+              state.lon.toFixed(4) +
+              '&hourly=soil_moisture_0_to_1cm&forecast_days=1',
+            {credentials: 'omit'}
+          );
+          if (!sr.ok) throw new Error('open-meteo ' + sr.status);
+          const j = await sr.json();
           const times = (j.hourly && j.hourly.time) || [];
           const vals = (j.hourly && j.hourly.soil_moisture_0_to_1cm) || [];
           const hour = new Date().toISOString().slice(0, 13) + ':00';
@@ -15357,6 +15376,7 @@
         // satellite's high fraction as a floor - the single-window
         // test is a lower bound (thin cirrus escapes it), so it
         // lifts the model and never clears it.
+        // fresh within four image cadences (40 min; the theme's rule)
         const goes =
           goesObs && Date.now() - goesObs.at < 40 * 60e3 ? goesObs : null;
         const cLow = mzr ? mzr.low : (state.cloudLow ?? state.cloud * LOW_FRAC);
@@ -15495,7 +15515,8 @@
           // measured sea stratus (goesir.js, minutes old, the
           // pier's own column) outranks the up-to-two-day-old VIIRS
           // census when the field holds a low deck worth sizing
-          // (5% of the sea or more).
+          // (5% of the sea or more - the theme's rule, stated: a
+          // median over fewer texels is not trusted over the census).
           const ctopLow =
             goes && goes.lowTopM !== null && goes.lowPct >= 5
               ? goes.lowTopM

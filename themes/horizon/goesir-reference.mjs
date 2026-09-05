@@ -19,6 +19,8 @@ import {
   COLOUR_BINS,
   ETROP_THRESH,
   GOES_WEST_LON_DEG,
+  GREY_SAT_MAX,
+  WHITE_SPLIT_LEVEL,
   INVERSION_LAPSE_K_PER_KM,
   ISCCP_HIGH_HPA,
   ISCCP_LOW_HPA,
@@ -121,6 +123,23 @@ check(
       `warm grey ramp ${warm.length} bins from ${Math.min(...warm.map((e) => e.lo))} C ` +
       `(levels ${warm[0].r}..${warm[warm.length - 1].r}), white the ${WHITE_BIN.lo} C bin, ` +
       `${COLOUR_BINS.length} colour bins between - the two grey ramps share levels, hence the rule`
+  );
+  // the grey tolerance sits under half the palette's least colour
+  // saturation, and the white split between the cold ramp's top
+  // level and white itself (144th sweep: derived, not typed)
+  const minSat = Math.min(
+    ...COLOUR_BINS.map((e) => Math.max(e.r, e.g, e.b) - Math.min(e.r, e.g, e.b))
+  );
+  const coldTop = Math.max(...COLD_GREYS.map((e) => e.r));
+  check(
+    "THE GREY TOLERANCE and the white split are the palette's own",
+    GREY_SAT_MAX * 2 < minSat &&
+      WHITE_SPLIT_LEVEL === (coldTop + WHITE_BIN.r) / 2 &&
+      coldTop < WHITE_SPLIT_LEVEL &&
+      WHITE_SPLIT_LEVEL < WHITE_BIN.r,
+    `a pixel is grey under a saturation of ${GREY_SAT_MAX}; the palette's least saturated ` +
+      `colour is ${minSat} levels from grey; white is read above level ${WHITE_SPLIT_LEVEL}, ` +
+      `halfway between the cold ramp's top level ${coldTop} and white ${WHITE_BIN.r}`
   );
   // every bin's own colour decodes to its own reading
   let round = 0;

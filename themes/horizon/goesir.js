@@ -460,13 +460,26 @@ export const B13_BINS = B13_COLORMAP.map(([r, g, b, lo, hi]) => ({
 // (from -19.1 C to +INF, levels 197 down to 1) and the single white
 // bin at the cold end ((-92.1, -91.1] C).
 const greyRun = (bins) => [...bins].sort((a, b) => a.r - b.r);
-export const COLD_GREYS = greyRun(
-  B13_BINS.filter((e) => e.grey && e.tC < -60 && e.r < 240)
+// The map's coldest grey bin is the single white one.
+export const WHITE_BIN = B13_BINS.filter((e) => e.grey).reduce((a, e) =>
+  e.tC < a.tC ? e : a
 );
-export const WARM_GREYS = greyRun(B13_BINS.filter((e) => e.grey && e.tC > -60));
-export const WHITE_BIN = B13_BINS.find((e) => e.grey && e.r >= 240);
+// THE THEME'S OWN RULES, STATED (the 144th sweep): the grey ramps
+// are split at COLD_BORDER_C, a cut INSIDE the colour ramp
+// (-70.1..-19.1 C) chosen so that an anvil's ring (colder than
+// -60 C) counts as cold context and a mid-cloud edge (-19..-45 C)
+// does not; the white split is the midpoint between the cold
+// ramp's top level and white (derived below, not typed).
+export const COLD_BORDER_C = -60;
+export const COLD_GREYS = greyRun(
+  B13_BINS.filter((e) => e.grey && e !== WHITE_BIN && e.tC < COLD_BORDER_C)
+);
+export const WARM_GREYS = greyRun(
+  B13_BINS.filter((e) => e.grey && e.tC > COLD_BORDER_C)
+);
+export const WHITE_SPLIT_LEVEL =
+  (Math.max(...COLD_GREYS.map((e) => e.r)) + WHITE_BIN.r) / 2;
 export const COLOUR_BINS = B13_BINS.filter((e) => !e.grey);
-export const COLD_BORDER_C = -60; // colour colder than this borders a cold grey region
 
 // A grey level read on one grey ramp: linear between the ramp's own
 // levels, clamped at its ends (resampled tiles carry in-between
@@ -497,7 +510,11 @@ export function colourReading(r, g, b) {
   }
   return best.tC;
 }
-export const GREY_SAT_MAX = 6; // max(rgb) - min(rgb) at or under this is grey
+// A pixel is grey when max(rgb) - min(rgb) is at or under this: the
+// resampler's near-greys must pass, and the palette's least
+// saturated colour is 26 levels from grey (the (-70.1, -69.1] bin,
+// rgb 26,0,0) - the tolerance stays under half of that (gated).
+export const GREY_SAT_MAX = 6;
 
 /**
  * RGBA bytes (w x h, alpha 0 = no data) -> brightness temperature
@@ -615,7 +632,10 @@ export function resolveGreys(dec) {
   let coldPixels = 0;
   for (let q = 0; q < n; q++) {
     if (!grey[q] || !regions[comp[q]].cold) continue;
-    bt[q] = level[q] >= 240 ? WHITE_BIN.tC : greyReading(COLD_GREYS, level[q]);
+    bt[q] =
+      level[q] >= WHITE_SPLIT_LEVEL
+        ? WHITE_BIN.tC
+        : greyReading(COLD_GREYS, level[q]);
     coldPixels++;
   }
   return {
@@ -1014,7 +1034,12 @@ export const CLS = {
   mid: 4,
   high: 5
 };
-export const COAST_PX = 3; // water within this many pixels of land is "near land"
+// The ATBD's coast class comes from an ancillary 1-km coast mask
+// (COAST_MASK_NASA_1KM, described in the AIADD) the theme does not
+// fetch; its proxy, stated: water within COAST_PX pixels (Chebyshev,
+// about 6 km) of a land pixel is "near land".
+export const COAST_PX = 3;
+export const HOMOGENEOUS_FREEZING_C = -40;
 /**
  * Classify the window. bt: the decoded mosaic's temperatures;
  * elevM: the window's elevation (metres, terrarium bathymetry kept:
@@ -1124,9 +1149,13 @@ export function classifyField({
         cls[q] = CLS.clear;
         continue;
       }
-      // opaque top: the pixel's temperature on the column
+      // opaque top: the pixel's temperature on the column. ACHA's
+      // inversion rule is for "Water, Supercooled or Mixed" cloud
+      // types over water; without the phase product the theme
+      // reads a top warmer than the homogeneous-freezing limit of
+      // supercooled water (-40 C) as one of those (stated).
       let h;
-      if (water[q] && inversion && t > -40) {
+      if (water[q] && inversion && t > HOMOGENEOUS_FREEZING_C) {
         h = Math.max(0, ((tSkinC - t) / INVERSION_LAPSE_K_PER_KM) * 1000);
       } else {
         h = heightOfTemperature(rows, t, tropHm);
