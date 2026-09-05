@@ -646,7 +646,12 @@
         phenoGrassPhase,
         phenoUrl
       } from './horizon/phenology.js';
-      import {etageCovers, pickStation, visibilityM} from './horizon/metar.js';
+      import {
+        coverFraction,
+        etageCovers,
+        pickStation,
+        visibilityM
+      } from './horizon/metar.js';
       import {
         channelSet,
         mieCoefficients,
@@ -1796,8 +1801,73 @@
             uMs,
             zuM: Number.isFinite(sens.zuM) && sens.zuM > 0.5 ? sens.zuM : 10,
             ztM: Number.isFinite(sens.ztM) && sens.ztM > 0.5 ? sens.ztM : 5,
-            pPa: Number.isFinite(pHpa) ? pHpa * 100 : null
+            pPa: Number.isFinite(pHpa) ? pHpa * 100 : null,
+            latDeg: near.lat,
+            lonDeg: near.lng,
+            shore: null
           };
+          // THE SHORE SCREEN (136th pass): the pier has no
+          // hygrometer and no pyrgeometer. The nearest fresh
+          // coastal METAR to the PIER (not to the visitor) lends
+          // its dewpoint to the pier's air and its screen
+          // temperature and cover to the modelled sky longwave
+          // that sets the sea's cool skin (coolskin.js). Via the
+          // daemon's METAR proxy; a missing shore leaves the skin
+          // to COARE's latitude default, named as such.
+          try {
+            const mj = await (
+              await fetch(
+                (params.get('metar') ?? 'https://api.ndev.tk/metar') +
+                  '?lat=' +
+                  near.lat.toFixed(3) +
+                  '&lon=' +
+                  near.lng.toFixed(3),
+                {credentials: 'omit'}
+              )
+            ).json();
+            // Coastal-plain stations first (elevation under 60 m):
+            // an inland mesa's aerodrome reports the land's night
+            // air, not the shore's.
+            const withDew = (mj?.metars ?? []).filter(
+              (m) => Number.isFinite(m.dewp) && Number.isFinite(m.temp)
+            );
+            const low = withDew.filter(
+              (m) => Number.isFinite(m.elev) && m.elev <= 60
+            );
+            const pick =
+              pickStation(low, near.lat, near.lng, Date.now() / 1000) ??
+              pickStation(withDew, near.lat, near.lng, Date.now() / 1000);
+            if (pick) {
+              const cf = Math.max(
+                coverFraction(pick.cover) ?? 0,
+                ...(pick.clouds ?? []).map((c) => coverFraction(c.cover) ?? 0)
+              );
+              state.coopsMet.shore = {
+                id: pick.id,
+                km: pick.km,
+                tC: pick.temp,
+                dewC: pick.dewp,
+                cf,
+                cover: pick.cover ?? null,
+                obsTime: pick.obsTime
+              };
+              record(
+                'shore screen (METAR ' + pick.id + ')',
+                pick.km.toFixed(0) +
+                  ' km from the pier: ' +
+                  pick.temp.toFixed(1) +
+                  ' °C, dewpoint ' +
+                  pick.dewp.toFixed(1) +
+                  ' °C, cover ' +
+                  (pick.cover ?? '?') +
+                  ' (' +
+                  Math.round(cf * 100) +
+                  '%) · lends the pier its humidity and the sky its modelled longwave'
+              );
+            }
+          } catch (e) {
+            if (params.has('debug')) console.warn('shore metar: ' + e.message);
+          }
           record(
             'CO-OPS pier met',
             near.name +
@@ -4758,8 +4828,14 @@
           let colRows = s.rows;
           if (state.coopsMet) {
             try {
+              // The skin (136th): the shore METAR's dewpoint and
+              // screen feed the pier's humidity and the modelled sky
+              // longwave; the composed column stands on the
+              // interface, tenths cooler than the pier's bulk.
               const mp = marinePanel(state.coopsMet, s.rows, {
-                bliM: Number.isFinite(s.blhAglM) ? s.blhAglM : null
+                bliM: Number.isFinite(s.blhAglM) ? s.blhAglM : null,
+                shore: state.coopsMet.shore ?? null,
+                latDeg: state.lat
               });
               if (mp) {
                 state.marine = mp;
@@ -4798,7 +4874,14 @@
                 (state.marine.modelBand
                   ? state.marine.modelBand.map((z) => z.toFixed(0)).join('–') +
                     ' m'
-                  : 'nowhere')
+                  : 'nowhere') +
+                (state.marine.lwDnWm2 !== null
+                  ? ' · skin ' +
+                    (-state.marine.skinK).toFixed(2) +
+                    ' K under the bulk (COARE 3.6; ' +
+                    state.marine.lwSource +
+                    ')'
+                  : ' · no skin claimed (no sky longwave)')
               : s.rows.length +
                 ' rows to ' +
                 Math.round(s.rows[s.rows.length - 1].hM / 1000) +
@@ -10567,6 +10650,13 @@
                 (m.modelBand
                   ? `${m.modelBand[0].toFixed(0)}–${m.modelBand[1].toFixed(0)} m`
                   : 'nowhere') +
+                (m.lwDnWm2 !== null
+                  ? ` · skin ${(-m.skinK).toFixed(2)} K (COARE 3.6: sky ` +
+                    `${m.lwDnWm2.toFixed(0)} W/m² ${m.lwSource}` +
+                    (m.lwRmseWm2 ? ` ±${m.lwRmseWm2}` : '') +
+                    `, loss ${m.q0Wm2.toFixed(0)} W/m² → air−skin ` +
+                    `${m.dTairSkinK >= 0 ? '+' : ''}${m.dTairSkinK.toFixed(1)} K)`
+                  : ' · no skin claimed') +
                 ` (dewpoint: ${m.dewSource})`;
             } else
               delete research[

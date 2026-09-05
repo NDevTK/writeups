@@ -307,9 +307,49 @@ async function main() {
     const uMs = parseFloat(wd?.s);
     if (![taC, tsC, uMs].every(Number.isFinite))
       throw new Error('met fields missing');
+    // THE SHORE SCREEN (136th pass): the pier has no hygrometer and
+    // no pyrgeometer; the nearest fresh coastal METAR's dewpoint
+    // stands in for the pier's humidity and its screen + cover
+    // feed the modelled sky longwave behind the cool skin. The
+    // pier's own coordinates pick the station.
+    const meta = await jget(
+      `https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${MET_STATION}.json?units=metric`
+    );
+    const st = meta?.stations?.[0] ?? {};
+    const pierLat = Number.isFinite(+st.lat) ? +st.lat : LAT;
+    const pierLon = Number.isFinite(+st.lng) ? +st.lng : LON;
+    const mj = await jget(
+      `https://api.ndev.tk/metar?lat=${pierLat.toFixed(3)}&lon=${pierLon.toFixed(3)}`
+    );
+    const {pickStation, coverFraction} = await import('./metar.js');
+    // coastal-plain stations first (elevation under 60 m), as the
+    // page picks: an inland mesa's night screen is the land's
+    const withDew = (mj?.metars ?? []).filter(
+      (m) => Number.isFinite(m.dewp) && Number.isFinite(m.temp)
+    );
+    const low = withDew.filter((m) => Number.isFinite(m.elev) && m.elev <= 60);
+    const pick =
+      pickStation(low, pierLat, pierLon, Date.now() / 1000) ??
+      pickStation(withDew, pierLat, pierLon, Date.now() / 1000);
+    const shore = pick
+      ? {
+          id: pick.id,
+          km: pick.km,
+          tC: pick.temp,
+          dewC: pick.dewp,
+          cf: Math.max(
+            coverFraction(pick.cover) ?? 0,
+            ...(pick.clouds ?? []).map((c) => coverFraction(c.cover) ?? 0)
+          ),
+          cover: pick.cover ?? null,
+          obsTime: pick.obsTime
+        }
+      : null;
     return {
       station: MET_STATION,
       name: sj.name ?? MET_STATION,
+      latDeg: pierLat,
+      lonDeg: pierLon,
       at: (ta.t ?? '').replace(' ', 'T') + ':00Z',
       taC,
       ztM: above(byName['Air Temperature']) ?? 5,
@@ -317,7 +357,8 @@ async function main() {
       uMs,
       zuM: above(byName['Wind']) ?? 10,
       pPa: Number.isFinite(parseFloat(pr?.v)) ? parseFloat(pr.v) * 100 : null,
-      dewC: null
+      dewC: null,
+      shore
     };
   });
   const harcon = await feed('published harcon (NOAA CO-OPS)', async () => {
@@ -566,7 +607,11 @@ async function emitPins(fixturePath) {
   // The marine surface layer on the frozen pier contrast (null on
   // fixtures frozen before the 135th pass).
   const mar = F.COOPS_MET
-    ? O.marinePanel(F.COOPS_MET, F.SOUNDING.rows, {bliM: null})
+    ? O.marinePanel(F.COOPS_MET, F.SOUNDING.rows, {
+        bliM: null,
+        shore: F.COOPS_MET.shore ?? null,
+        latDeg: F.COOPS_MET.latDeg ?? null
+      })
     : null;
   // The SEA column's own retrieval on the page's ladder - the line
   // the research view prints for this day (a non-closure is a
@@ -684,7 +729,14 @@ async function emitPins(fixturePath) {
           pierTopM: mar.pierTopM,
           joinM: mar.joinM,
           modelBand: mar.modelBand,
-          clamped: mar.clamped
+          clamped: mar.clamped,
+          // the skin (136th): fixtures frozen earlier carry none
+          skinK: [mar.skinK, 0.02],
+          dTairSkinK: [mar.dTairSkinK, 0.05],
+          lwDnWm2: mar.lwDnWm2 === null ? null : [mar.lwDnWm2, 3],
+          q0Wm2: mar.q0Wm2 === null ? null : [mar.q0Wm2, 3],
+          dewSource: mar.dewSource,
+          lwSource: mar.lwSource
         }
       : null,
     lehnSea: lehSea
@@ -744,7 +796,7 @@ THE DAY (${F.FIXTURE_AT}, ${F.SOUNDING.wmo} ${F.SOUNDING.at})
  tide     ${tid.amps.map((a) => `${a.n} ${f3(a.ampM)}`).join('; ')}; rmsOut ${f3(tid.rmsOutM)}; latest resid ${f3(tid.latestResidM)}; vs published M2 x${f3(tid.amps[0].ratio)} O1 x${f3(tid.amps.find((a) => a.n === 'O1')?.ratio)}
  sats     ${sat.passes.length} passes / ${sat.nakedEye} naked-eye over ${f3(sat.darkHours)} dark h; best ${best?.name?.trim()} mag ${f3(best?.minMag)} at ${f3(best?.peakElDeg)} deg
  closure  global ${f3(clo.ratios?.globalRatio)}; beam ${f3(clo.ratios?.beamRatio)}; diffuse ${f3(clo.ratios?.diffuseRatio)}
- marine   ${mar ? `${mar.stability}; air-sea ${f3(mar.dTairSeaK)} K; film ${f3(mar.filmLapseKm)} K/km; model band ${mar.modelBand?.map((z) => z.toFixed(0)).join('-')}` : 'no pier met in this fixture'}
+ marine   ${mar ? `${mar.stability}; air-sea ${f3(mar.dTairSeaK)} K (skin ${f3(mar.skinK)} K -> ${f3(mar.dTairSkinK)}); film ${f3(mar.filmLapseKm)} K/km; model band ${mar.modelBand?.map((z) => z.toFixed(0)).join('-')}; sky ${f3(mar.lwDnWm2)} W/m2 (${mar.lwSource}); dew ${mar.dewSource}` : 'no pier met in this fixture'}
  lehnSea  ${lehSea ? (lehSea.retrieved ? `${lehSea.mode}/${lehSea.retrieved.method} eye ${lehSea.eyeM} m at ${lehSea.distM / 1000} km ${lehSea.retrieved.closes ? 'CLOSES' : 'does not close'} rms ${f3(lehSea.retrieved.rmsK)} K` : `declines from ${lehSea.eyeM} m`) : 'no sea column'}
 
 Fixture and pins are regenerated TOGETHER. Read the git diff of

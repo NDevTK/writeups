@@ -50,10 +50,14 @@
  * STATED LIMITS: the Kansas forms are used within their observed
  * range (zeta clamped to [-2.5, 2] - Businger's Fig. 1 span);
  * COARE 3.0's convective blend and Beljaars-Holtslag stable forms
- * are not implemented; the water temperature is the pier's bulk
- * sensor (COARE's cool-skin correction, "several tenths", is not
- * applied); the humidity profile rides only when an air-side
- * dewpoint is supplied.
+ * are not implemented; the water temperature this module is given
+ * is whatever the caller measured or corrected - the pier's bulk
+ * sensor alone, or (since the 136th pass) the interface under
+ * COARE 3.6's cool skin, which observatory.marinePanel solves
+ * together with this profile (coolskin.js); the humidity profile
+ * rides only when an air-side dewpoint is supplied (the pier's
+ * own, the shore METAR's, or the ascent's surface row - the
+ * caller names which).
  */
 
 /** Von Karman's constant AS COARE 3.0 USES IT with the Kansas

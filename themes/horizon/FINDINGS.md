@@ -326,6 +326,32 @@ side was fitted to the other.
   prints both verdicts, the non-closure named as such.
   (`surfacelayer-reference`; `observatory-reference` DAY PINS marine
   and lehnSea)
+- **The pier's skin and humidity** (pass 136): the pier thermometer
+  reads the bulk water 3.4 m down, but the air touches an interface a
+  few tenths cooler — the sensible, latent and net-infrared losses all
+  leave through a millimetre where only molecular conduction carries
+  heat. Fairall et al. 2026 (JGR Oceans, open, read in full) prints
+  the COARE 3.6 skin model — the interfacial budget, Saunders' δ =
+  6ν/u\*w, k ΔT/Q₀ = 0.6 δᵤ — with its Table A2, Figs. 2 and 4 and
+  cruise statistics; the authors' published code supplies the
+  free-convection limit on λ and the seawater constants the equations
+  do not print. `coolskin.js` reproduces that code to 5·10⁻⁴ K in five
+  regimes and lands the printed anchors (0.28 K at 2 m/s, 0.19 K at
+  10 m/s, PISTON's 0.169 K). No pyrgeometer looks at the sea off the
+  pier, so the sky's longwave is modelled — Yang et al. 2022 (ACP,
+  open, read in full): Brunt's emissivity refitted on 12,368
+  pyrgeometer hours, an all-sky cloud/humidity correction, the printed
+  spread of other networks' coefficients the fit is held inside, and
+  the RMSEs the page now quotes beside every skin. The screen is the
+  pier's own measured air; the shore lends only its dewpoint and
+  cover, and coastal-plain stations win over the nearer inland mesa
+  whose night screen ran 5 K under the pier's air. The similarity
+  profile and the skin budget are solved as one fixed point and the
+  sea column stands on the interface: tonight's pier (air 19.4 °C,
+  water 20.5 °C, calm) carries a 0.35-K skin under a 343 W/m² sky,
+  the contrast −1.1 K becoming −0.7 K at the interface.
+  (`coolskin-reference`; `observatory-reference` DAY PINS marine:
+  skin, sky, loss, provenance)
 
 ---
 
@@ -413,9 +439,14 @@ between it and the next tier.
   layer: the Kansas forms are clamped to their observed range
   (free-convection nights are reported as past it), COARE's
   convective blend and Beljaars–Holtslag stable forms are not
-  implemented, the water temperature is the pier's bulk sensor
-  (no cool-skin correction), and the pier's humidity is borrowed
-  from the ascent's surface row where the pier has no hygrometer.
+  implemented; since pass 136 the water temperature is the
+  INTERFACE (COARE 3.6's cool skin on the pier's bulk sensor, no
+  warm layer, no rain term) under a sky longwave that is MODELLED
+  from the pier's air and the shore's dewpoint and cover (a
+  screen-level emissivity fit made over land, quoted with its
+  printed RMSE), and the pier's humidity is the nearest coastal
+  METAR's dewpoint, the ascent's surface row standing in only when
+  no shore screen is fresh.
 
 ## 6. Method — reference-first validation
 

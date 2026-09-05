@@ -305,18 +305,28 @@ check(
     (con.formBand &&
       con.persistBand.loM >= con.formBand.loM &&
       con.persistBand.hiM <= con.formBand.hiM);
-  const rawMax = Math.max(...ADSB.ac.map((a) => a.alt_baro)) * FT_M;
+  // An empty ADS-B window (a small-hours refreeze can catch no
+  // aircraft at all - measured on the 136th pass's 10Z freeze)
+  // leaves the ceiling check vacuous: the scan must then report
+  // no ceiling rather than a converted one.
+  const rawMax = ADSB.ac.length
+    ? Math.max(...ADSB.ac.map((a) => a.alt_baro)) * FT_M
+    : null;
+  const ceilingOk =
+    rawMax === null
+      ? !(con.aircraft.maxAltM > 0)
+      : Math.abs(con.aircraft.maxAltM - rawMax) < 1e-9;
   check(
     'THE CONTRAIL SCAN is internally honest',
-    bandHonest &&
-      persistInForm &&
-      Math.abs(con.aircraft.maxAltM - rawMax) < 1e-9,
+    bandHonest && persistInForm && ceilingOk,
     `every level inside the formation band really is at or under its ` +
       `own critical temperature; any persistence band lies inside the ` +
-      `formation band by construction; and the ADS-B ceiling converts ` +
-      `through the module's exact international foot ` +
-      `(${(con.aircraft.maxAltM / 1000).toFixed(2)} km) - the scan's ` +
-      `own bookkeeping, on any day's column`
+      `formation band by construction; and the ADS-B ceiling ` +
+      (rawMax === null
+        ? `is absent with the frozen window's ${ADSB.ac.length} aircraft (no invented ceiling)`
+        : `converts through the module's exact international foot ` +
+          `(${(con.aircraft.maxAltM / 1000).toFixed(2)} km)`) +
+      ` - the scan's own bookkeeping, on any day's column`
   );
 }
 
@@ -1027,24 +1037,43 @@ pinBlock(
 // pass): the composed sea column's own numbers, pinned as data.
 // Fixtures frozen before the pass carry no pier met and skip.
 if (COOPS_MET && DAY_PINS.marine) {
-  const mar = marinePanel(COOPS_MET, SOUNDING.rows, {bliM: null});
+  const mar = marinePanel(COOPS_MET, SOUNDING.rows, {
+    bliM: null,
+    shore: COOPS_MET.shore ?? null,
+    latDeg: COOPS_MET.latDeg ?? null
+  });
+  const P = DAY_PINS.marine;
   pinBlock(
     'marine',
     [
-      ['stability', mar.stability, DAY_PINS.marine.stability],
-      ['air-sea K', mar.dTairSeaK, DAY_PINS.marine.dTairSeaK],
-      ['film K/km', mar.filmLapseKm, DAY_PINS.marine.filmLapseKm],
-      ['film drop K', mar.filmDropK, DAY_PINS.marine.filmDropK],
-      ['pier top', mar.pierTopM, DAY_PINS.marine.pierTopM],
-      ['join', mar.joinM, DAY_PINS.marine.joinM],
-      ['clamped', mar.clamped, DAY_PINS.marine.clamped],
+      ['stability', mar.stability, P.stability],
+      ['air-sea K', mar.dTairSeaK, P.dTairSeaK],
+      ['film K/km', mar.filmLapseKm, P.filmLapseKm],
+      ['film drop K', mar.filmDropK, P.filmDropK],
+      ['pier top', mar.pierTopM, P.pierTopM],
+      ['join', mar.joinM, P.joinM],
+      ['clamped', mar.clamped, P.clamped],
       [
         'model band',
         JSON.stringify(mar.modelBand),
-        JSON.stringify(DAY_PINS.marine.modelBand)
-      ]
+        JSON.stringify(P.modelBand)
+      ],
+      // the skin (136th pass) - pinned since; older pins skip
+      ...(P.skinK !== undefined
+        ? [
+            ['skin K', mar.skinK, P.skinK],
+            ['air-skin K', mar.dTairSkinK, P.dTairSkinK],
+            ['sky W/m2', mar.lwDnWm2, P.lwDnWm2],
+            ['Q0 W/m2', mar.q0Wm2, P.q0Wm2],
+            ['dew source', mar.dewSource, P.dewSource],
+            ['sky source', mar.lwSource, P.lwSource]
+          ]
+        : [])
     ],
-    `${COOPS_MET.name}: air-sea ${mar.dTairSeaK >= 0 ? '+' : ''}${mar.dTairSeaK.toFixed(1)} K, ${mar.stability}, film ${mar.filmLapseKm.toFixed(0)} K/km in the lowest 10 m - ${mar.klass}; the mixed layer modelled over ${mar.modelBand ? mar.modelBand.map((z) => z.toFixed(0)).join('-') + ' m' : 'no band'}`
+    `${COOPS_MET.name}: air-sea ${mar.dTairSeaK >= 0 ? '+' : ''}${mar.dTairSeaK.toFixed(1)} K, ${mar.stability}, film ${mar.filmLapseKm.toFixed(0)} K/km in the lowest 10 m - ${mar.klass}; the mixed layer modelled over ${mar.modelBand ? mar.modelBand.map((z) => z.toFixed(0)).join('-') + ' m' : 'no band'}` +
+      (P.skinK !== undefined
+        ? `; skin ${mar.skinK.toFixed(2)} K cooler than the bulk (${mar.lwSource}; sky ${mar.lwDnWm2?.toFixed(0)} W/m2, loss ${mar.q0Wm2?.toFixed(0)} W/m2), humidity from ${mar.dewSource}`
+        : '')
   );
   // The sea column's own retrieval - the line the page prints for
   // this day. A non-closure is pinned as such: the composed

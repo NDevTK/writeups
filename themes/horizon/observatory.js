@@ -87,7 +87,15 @@ import {parseTLEs, satMagnitude, sunlitEci} from './sats.js';
 import {rayFan} from './far-terrain.js';
 import {fleagleFitFilm} from './fleagle.js';
 import {AUTOCONVECTIVE_K_PER_M} from './fleagle.js';
-import {marineColumnRows} from './surfacelayer.js';
+import {KAPPA, eSatPa, marineColumnRows} from './surfacelayer.js';
+import {
+  CP_AIR,
+  airDensity,
+  coolSkin,
+  latentHeat,
+  lwDown,
+  lwDownDefault
+} from './coolskin.js';
 import {
   lehnFitElevated,
   lehnFitSuperior,
@@ -1039,13 +1047,97 @@ export function retrievalPanel(
  * mixed-layer depth. Returns the composed rows for every other
  * panel to read, the model band no closure may lean on, and the
  * film's verdict in Fleagle's own terms.
+ *
+ * THE SKIN (136th pass): the pier's thermometer reads the bulk
+ * water metres down; the air touches an interface a few tenths
+ * cooler (coolskin.js - COARE 3.6's skin model, Fairall et al.
+ * 2026). The skin depends on the fluxes and the fluxes on the
+ * skin, so the similarity profile and the skin budget are solved
+ * together as one fixed point; the composed column then stands on
+ * the INTERFACE temperature. shore: the nearest coastal METAR
+ * {id, km, tC, dewC, cf, rhPct} - its dewpoint stands in for the
+ * pier's missing hygrometer, its screen and cover feed the
+ * modelled sky longwave (named as modelled, with the fit's own
+ * RMSE); latDeg: COARE's latitude default when no shore screen
+ * is fresh. Without either, the skin is not claimed (skinK 0).
  */
-export function marinePanel(met, rows, {bliM = null} = {}) {
-  const comp = marineColumnRows(rows, met, {bliM});
-  if (!comp) return null;
+export function marinePanel(
+  met,
+  rows,
+  {bliM = null, shore = null, latDeg = null, swNetWm2 = 0} = {}
+) {
+  const pierDew = Number.isFinite(met.dewC) ? met.dewC : null;
+  const shoreDew =
+    pierDew === null && shore && Number.isFinite(shore.dewC)
+      ? shore.dewC
+      : null;
+  const metQ = {...met, dewC: pierDew ?? shoreDew ?? null};
+  let lw = null;
+  if (shore && Number.isFinite(shore.dewC)) {
+    // The screen temperature is the PIER's own measured air (the
+    // marine air the sky radiates onto); the shore lends only what
+    // the pier lacks - its dewpoint and its cloud cover. An inland
+    // aerodrome's night screen is the land's, not the sea's.
+    const eHpa = Math.min(eSatPa(shore.dewC), eSatPa(met.taC)) / 100;
+    const rhPct = (100 * eHpa * 100) / eSatPa(met.taC);
+    const cf = Number.isFinite(shore.cf) ? shore.cf : 0;
+    const d = lwDown({taC: met.taC, eHpa, cf, rhPct});
+    lw = {
+      wm2: d.wm2,
+      rmseWm2: d.rmseWm2,
+      source: `modelled sky: Brunt on the pier's air + ${(cf * 100).toFixed(0)}% cover from METAR ${shore.id}`
+    };
+  } else if (Number.isFinite(latDeg)) {
+    lw = {
+      wm2: lwDownDefault(latDeg),
+      rmseWm2: null,
+      source: 'COARE latitude default (no fresh shore screen)'
+    };
+  }
+  let skin = 0;
+  let cs = null;
+  let flux = null;
+  let comp = null;
+  for (let i = 0; i < 12; i++) {
+    comp = marineColumnRows(rows, {...metQ, tsC: met.tsC - skin}, {bliM});
+    if (!comp) return null;
+    if (!lw) break;
+    const mo = comp.mo;
+    const rhoA = airDensity(comp.pSeaPa, met.taC, mo.qA ?? mo.qS);
+    // w'theta' = -kappa u* theta* in the module's convention, so
+    // the ocean's sensible loss is -rho cp kappa u* theta*.
+    const hsb = -rhoA * CP_AIR * KAPPA * mo.uStar * mo.thetaStar;
+    const hlb =
+      mo.qA === null
+        ? 0
+        : -rhoA * latentHeat(met.tsC) * KAPPA * mo.uStar * mo.qStar;
+    cs = coolSkin({
+      uStar: mo.uStar,
+      rhoA,
+      tsC: met.tsC,
+      hsb,
+      hlb,
+      lwDn: lw.wm2,
+      swNet: swNetWm2
+    });
+    flux = {hsb, hlb, rhoA};
+    const converged = Math.abs(cs.dTK - skin) < 1e-5;
+    skin = cs.dTK;
+    if (converged) {
+      comp = marineColumnRows(rows, {...metQ, tsC: met.tsC - skin}, {bliM});
+      if (!comp) return null;
+      break;
+    }
+  }
   const mo = comp.mo;
   const lapse = ((mo.tAt(10) - mo.tAt(0.5)) / 9.5) * 1000;
   const dTairSea = met.taC - met.tsC;
+  const dewSource =
+    pierDew !== null
+      ? 'pier'
+      : shoreDew !== null
+        ? `METAR ${shore.id} (${Number.isFinite(shore.km) ? shore.km.toFixed(0) : '?'} km)`
+        : comp.dewSource;
   const stability =
     !Number.isFinite(mo.L) || Math.abs(mo.L) > 1e4
       ? 'neutral'
@@ -1080,9 +1172,23 @@ export function marinePanel(met, rows, {bliM = null} = {}) {
     t100C: mo.tAt(comp.pierTopM),
     gustMs: mo.gust,
     dewC: comp.dewC,
-    dewSource: comp.dewSource,
+    dewSource,
     z0M: mo.z0,
-    iterations: mo.iterations
+    iterations: mo.iterations,
+    // the skin (136th pass)
+    skinK: skin,
+    skinDzM: cs ? cs.dzM : null,
+    skinLambda: cs ? cs.lambda : null,
+    tInterfaceC: met.tsC - skin,
+    dTairSkinK: met.taC - (met.tsC - skin),
+    lwDnWm2: lw ? lw.wm2 : null,
+    lwSource: lw ? lw.source : 'none',
+    lwRmseWm2: lw ? lw.rmseWm2 : null,
+    hsbWm2: flux ? flux.hsb : null,
+    hlbWm2: flux ? flux.hlb : null,
+    rnlWm2: cs ? cs.rnlWm2 : null,
+    q0Wm2: cs ? cs.qcolWm2 : null,
+    shore: shore ? {id: shore.id, km: shore.km} : null
   };
 }
 

@@ -11,7 +11,7 @@
  */
 
 export const DAY_PINS = {
-  generatedFor: '2026-09-05T09:31Z',
+  generatedFor: '2026-09-05T10:23Z',
   column: {
     invDT: [0, 0.05],
     invHM: 134,
@@ -26,30 +26,30 @@ export const DAY_PINS = {
     order: ['Phoenix', 'London', 'Singapore', 'San Diego', 'Bergen', 'Mumbai'],
     raining: ['Mumbai'],
     w: {
-      Bergen: [0.8228571428571428, 0.03],
-      London: [0.33428571428571435, 0.03],
-      Mumbai: [0.9542857142857144, 0.03],
+      Bergen: [0.8142857142857143, 0.03],
+      London: [0.3285714285714286, 0.03],
+      Mumbai: [0.9514285714285715, 0.03],
       Phoenix: [0.11714285714285716, 0.03],
       'San Diego': [0.6371428571428572, 0.03],
-      Singapore: [0.5571428571428572, 0.03]
+      Singapore: [0.56, 0.03]
     }
   },
   pol: {
     maxPure: [0.8699279700373292, 0.02]
   },
   meteors: {
-    zhrNow: [0.002691162980337087, 0.5],
-    daysToPeak: [-23.183038451833397, 0.1],
+    zhrNow: [0.002648012311783547, 0.5],
+    daysToPeak: [-23.21864956633334, 0.1],
     topCode: 'NUE',
     topShare: [0.029532030895047707, 0.03]
   },
   aurora: {
-    rows: 115,
-    latestGwN: 29,
-    latestAt: '2026-09-05T09:30Z',
-    ovP: [0.2, 0.02],
-    ovLatDeg: 58,
-    kpEst: [0.33, 0.01]
+    rows: 125,
+    latestGwN: 23,
+    latestAt: '2026-09-05T10:20Z',
+    ovP: [0.14, 0.02],
+    ovLatDeg: 60,
+    kpEst: [1.67, 0.01]
   },
   contrail: {
     l250TC: [-42, 0.5],
@@ -59,8 +59,8 @@ export const DAY_PINS = {
     formHiM: 16491,
     issr: [[10145, [1.1244703499944904, 0.01]]],
     persistNull: true,
-    acN: 1,
-    acMaxAltM: [10683.24, 0.5],
+    acN: 0,
+    acMaxAltM: [0, 0.5],
     acInForm: 0,
     acInPersist: 0
   },
@@ -73,18 +73,18 @@ export const DAY_PINS = {
   },
   tide: {
     amps: {
-      M2: [0.5263998517295105, 0.01],
-      S2: [0.26647239965879416, 0.01],
-      N2: [0.11744444241398828, 0.01],
-      K1: [0.34192910178230507, 0.01],
-      O1: [0.2556275252708381, 0.01],
-      M4: [0.0029254764168489774, 0.01]
+      M2: [0.5279349817018464, 0.01],
+      S2: [0.2658350444379495, 0.01],
+      N2: [0.11726149734818565, 0.01],
+      K1: [0.3423759569594035, 0.01],
+      O1: [0.2564331877814236, 0.01],
+      M4: [0.0028093730798563017, 0.01]
     },
-    rmsOutM: [0.09113515549762433, 0.01],
-    latestResidM: [-0.036476750124160906, 0.02],
-    maxAbsOutM: [0.21601595411032243, 0.02],
-    rM2: [0.971217438615333, 0.01],
-    rO1: [1.1945211461254117, 0.02]
+    rmsOutM: [0.09229572057232974, 0.01],
+    latestResidM: [-0.02248771749050904, 0.02],
+    maxAbsOutM: [0.23885169856888827, 0.02],
+    rM2: [0.9740497817377239, 0.01],
+    rO1: [1.1982859242122599, 0.02]
   },
   sats: {
     passes: 82,
@@ -106,11 +106,11 @@ export const DAY_PINS = {
     probedTopM: [449.1650390625, 3]
   },
   flash: {
-    rateArcsecS: [12.50078659535518, 0.05],
+    rateArcsecS: [12.500787466214405, 0.05],
     beachType: 'textbook',
-    beachS: [0.9101091359254416, 0.15],
+    beachS: [0.9101090725232809, 0.15],
     aloftType: 'inferior-mirage',
-    aloftS: [1.232682537926456, 0.2],
+    aloftS: [1.232682452052429, 0.2],
     aloftWidth: [20.147601992475504, 12],
     aloftMagX: [1.498992167203663, 0.6],
     aloftAppArcmin: [-30.37515545299185, 1],
@@ -118,23 +118,24 @@ export const DAY_PINS = {
   },
   marine: {
     stability: 'unstable',
-    dTairSeaK: [-1.8999999999999986, 0.05],
-    filmLapseKm: [-65.8860239136218, 3],
-    filmDropK: [0.6259172271794071, 0.05],
+    dTairSeaK: [-1.2000000000000028, 0.05],
+    filmLapseKm: [-21.041731702836177, 3],
+    filmDropK: [0.19989645117694366, 0.05],
     pierTopM: 100,
     joinM: 716,
     modelBand: [100, 716],
-    clamped: true
+    clamped: true,
+    skinK: [0.356761427293956, 0.02],
+    dTairSkinK: [-0.8432385727060456, 0.05],
+    lwDnWm2: [342.89114858682336, 3],
+    q0Wm2: [98.1170544199398, 3],
+    dewSource: 'METAR KSAN (16 km)',
+    lwSource: "modelled sky: Brunt on the pier's air + 0% cover from METAR KSAN"
   },
   lehnSea: {
-    eyeM: 22,
-    distM: 130000,
-    declined: false,
-    mode: 'superior',
-    method: 'zones',
-    closes: false,
-    rmsK: [18.77900596868612, 0.25],
-    dTballoon: [2.262898208093663, 0.3]
+    eyeM: 2,
+    distM: null,
+    declined: true
   },
   closure: null
 };

@@ -10015,6 +10015,63 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   temperature without the cool-skin tenths, the mixed layer's
   height a proxy from the inland ascent, humidity from the
   ascent's surface row when the pier has no hygrometer.
+- DONE (Sep 5, the review session's 136th pass - THE PIER'S SKIN
+  AND HUMIDITY: COARE's cool skin on the CO-OPS bulk water, the
+  shore's measured dewpoint): two stated limits of the 135th
+  retired in one composition. (1) The pier thermometer reads the
+  bulk water 3.4 m down; the air touches an interface a few
+  tenths cooler, because the sensible, latent and net-infrared
+  losses all leave through a millimetre where only molecular
+  conduction carries heat. Fairall, Thompson, Bariteau, Wick,
+  Minnett, Szczodrak, Jessup & Witte 2026 (JGR Oceans, open,
+  READ IN FULL) prints the COARE 3.6 skin model this pass runs
+  (the steady interfacial budget, DT = (Q0 - f(delta) Rns0)
+  delta / k, Saunders' delta = 6 nu / u\*w, the version-3.6
+  statement k DT/Q0 = 0.6 delta_u), its Table A2 (0.34 K of
+  cooling at Q0 = 115), its Figs. 2 and 4 (0.19 K at 10 m/s,
+  0.28 K at 2 m/s) and its cruise statistics (PISTON 0.163 K
+  measured, 0.169 modelled); the authors' published
+  implementation (coare36vn_zrf_et, NOAA-PSL) supplies what the
+  equations do not print - the free-convection limit on lambda,
+  the seawater expansion coefficients, the skin's solar
+  absorption, the skin's own emission fed back into the net
+  infrared. coolskin.js is that port; its gate reproduces the
+  authors' code to 5e-4 K in five regimes (buoyancy-limited
+  light wind, 10-m/s shear, the calm La Jolla night, 3 m/s at
+  the pier, a 300 W/m^2 solar case) and lands the paper's
+  printed anchors. (2) No pyrgeometer looks at the sea off the
+  pier, so the sky's longwave is MODELLED - Yang, Hu, Chen & Quan
+  2022 (ACP, open, READ IN FULL): Brunt's clear-sky emissivity
+  refitted on 12,368 pyrgeometer hours (0.599 + 0.053 sqrt e),
+  the all-sky cloud/humidity correction, the printed spread of
+  other networks' Brunt coefficients (SURFRAD, a 36-site global
+  fit - the gate holds the fit inside it to 0.02) and the printed
+  RMSEs (13.8 clear, 17.3 all-sky W/m^2) that the page now quotes
+  beside every skin. The screen temperature is the PIER's own
+  measured air; the shore lends only what the pier lacks - the
+  nearest fresh coastal METAR's dewpoint (the pier has no
+  hygrometer: the 135th's "ascent surface" stand-in retired) and
+  its cover in FMH-1 oktas (metar.js). Coastal-plain stations
+  first: the nearest aerodrome to the pier is an inland mesa
+  (KNKX, 138 m) whose night screen ran 5 K under the pier's air -
+  the land's, not the sea's - so stations under 60 m win (KSAN,
+  16 km). observatory.marinePanel solves the similarity profile
+  and the skin budget as ONE fixed point (the skin depends on the
+  fluxes, the fluxes on the skin) and composes the sea column on
+  the INTERFACE temperature; the page's marine line reports the
+  skin, the modelled sky with its RMSE, the interfacial loss and
+  the air-skin contrast; the freeze carries the shore screen and
+  pins skin, sky, loss and both provenance strings. Tonight's
+  pier (air 19.4 C, water 20.5 C, 1 m/s, KSAN dewpoint 16.1 C):
+  a 0.35-K skin under a 343 W/m^2 sky, the contrast -1.1 K
+  becoming -0.7 K at the interface, the film -19 K/km. STATED
+  LIMITS: no warm layer (the daytime near-surface warming; the
+  water sensor at -3.4 m), no rain term, COARE 3.6's total-stress
+  skin rather than 3.7's tangential one (needs the wave-stress
+  fraction of Fairall et al. 2011), the longwave from a screen
+  fit made over land with its own RMSE, okta midpoints where the
+  fit used a fisheye camera. Fairall 1996 itself stays walled;
+  its framework is reprinted in the 2026 paper.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY
