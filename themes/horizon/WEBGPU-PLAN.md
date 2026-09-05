@@ -10434,23 +10434,23 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   reference 20.52 C off the nearshore buoy (the first run beat the
   pier's column; it reruns on the skin), warmest sea pixel -1.87 K.
   MEASURED TODAY, stated: the default tile's layer-time-actual
-  header, exposed to CORS and read by curl, does not reach the page
-  - the field asks the WMTS time domain for the latest stamp; the
-    domain runs ahead of the tile cache and a fresh stamp's four tiles
-    arrive one by one (a 17:00Z end with one tile of four at 17:19Z),
-    so the page steps back ten minutes until the whole mosaic answers.
-    STATED LIMITS: the window is the band centre alone (no spectral
-    response; line absorption, ozone and CO2 neglected in the clean
-    window); the sea's emissivity is the flat Fresnel value (no
-    roughness term); the SST is one point (pier skin, else the CO-OPS
-    sensor, else a buoy within 50 km) - the offshore gradient shows up
-    as the warm-pixel closure and is reported, not corrected; over the
-    sea the single window misses cloud filling under a third of a
-    pixel and thin cirrus under the threshold (the field is a lower
-    bound: it lifts the cirrus scalar and never clears it); over land
-    the mask sees mid and high only; no LRC, no snow/desert classes;
-    the ceilometer split is the theme's rule, not the ATBD's; a
-    60-km-old METAR speaks for the whole window's split.
+  header, exposed to CORS and read by curl, does not reach the page,
+  so the field asks the WMTS time domain for the latest stamp; the
+  domain runs ahead of the tile cache and a fresh stamp's four tiles
+  arrive one by one (a 17:00Z end with one tile of four at 17:19Z),
+  so the page steps back ten minutes until the whole mosaic answers.
+  STATED LIMITS: the window is the band centre alone (no spectral
+  response; line absorption, ozone and CO2 neglected in the clean
+  window); the sea's emissivity is the flat Fresnel value (no
+  roughness term); the SST is one point (pier skin, else the CO-OPS
+  sensor, else a buoy within 50 km) - the offshore gradient shows up
+  as the warm-pixel closure and is reported, not corrected; over the
+  sea the single window misses cloud filling under a third of a
+  pixel and thin cirrus under the threshold (the field is a lower
+  bound: it lifts the cirrus scalar and never clears it); over land
+  the mask sees mid and high only; no LRC, no snow/desert classes;
+  the ceilometer split is the theme's rule, not the ATBD's; a
+  60-km-old METAR speaks for the whole window's split.
 - DONE (Sep 5, the review session's 142nd pass - THE CHAIN CLOSES
   ON ITSELF): four loose ends of the marine chain and the daemon,
   each measured. (1) THE FEEDBACK: the 139th integrated the pier's
