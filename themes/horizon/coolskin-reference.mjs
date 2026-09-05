@@ -49,6 +49,8 @@ import {
   EMISSIVITY_SEA,
   K_WATER,
   LAMBDA_SAUNDERS,
+  LW_OCEAN_ALLSKY,
+  LW_OCEAN_CLEAR,
   LW_RMSE_ALLSKY_WM2,
   LW_RMSE_CLEAR_WM2,
   NU_WATER,
@@ -355,7 +357,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     ovc > 0.85 &&
     ovc < 0.95 &&
     Math.abs(sky.wm2 - dflt) / dflt < 0.03 &&
-    sky.rmseWm2 === LW_RMSE_CLEAR_WM2;
+    sky.rmseWm2 === LW_OCEAN_CLEAR.rmseWm2;
   check(
     'the longwave',
     ok,
@@ -418,7 +420,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     skinned.filmLapseKm < 0 &&
     skinned.dewSource.includes('KSAN') &&
     skinned.lwSource.includes('modelled') &&
-    skinned.lwRmseWm2 === LW_RMSE_CLEAR_WM2 &&
+    skinned.lwRmseWm2 === LW_OCEAN_CLEAR.rmseWm2 &&
     skinned.hlbWm2 > 0 &&
     skinned.q0Wm2 > 50;
   check(
@@ -427,6 +429,216 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     skinned
       ? `calm pier, water 20.9 C under 19.0 C air, the shore METAR's dewpoint 16.1 C: the sky sends ${skinned.lwDnWm2.toFixed(0)} W/m^2 down (${skinned.lwSource}), the water loses ${skinned.q0Wm2.toFixed(0)} W/m^2 (sensible ${skinned.hsbWm2.toFixed(1)}, latent ${skinned.hlbWm2.toFixed(1)}, infrared ${skinned.rnlWm2.toFixed(1)}) through a ${(skinned.skinDzM * 1000).toFixed(2)}-mm skin ${skinned.skinK.toFixed(3)} K cooler than the bulk - the interface at ${skinned.tInterfaceC.toFixed(2)} C, the contrast ${skinned.dTairSkinK.toFixed(2)} K instead of ${bare.dTairSeaK.toFixed(2)}, the film ${skinned.filmLapseKm.toFixed(0)} K/km instead of ${bare.filmLapseKm.toFixed(0)}; humidity from ${skinned.dewSource}`
       : 'marinePanel returned null'
+  );
+}
+
+// 8. THE SHIP-FLUX ARCHIVE (137th pass): NOAA PSL's 31,914 measured
+// hours, sampled into shipflux-fixture.js - the archive Fairall et
+// al. 2026 describe in their Section 2.1, with measured pyrgeometer
+// longwave, sea-snake and air temperatures, the bulk fluxes and the
+// COARE skin PSL computed from them.
+import {
+  SHIPFLUX_ALLSKY,
+  SHIPFLUX_AT,
+  SHIPFLUX_CLEAR,
+  SHIPFLUX_COUNTS,
+  SHIPFLUX_CRUISES,
+  SHIPFLUX_SKIN
+} from './shipflux-fixture.js';
+{
+  // the code's own latitude-dependent gravity (grv)
+  const grv = (lat) => {
+    const x = Math.sin((lat * Math.PI) / 180);
+    return (
+      9.7803267715 *
+      (1 +
+        0.0052790414 * x ** 2 +
+        0.0000232718 * x ** 4 +
+        1.262e-7 * x ** 6 +
+        7e-10 * x ** 8)
+    );
+  };
+  // (a) the skin: the archive's inputs in, PSL's own COARE skin out
+  let n = 0;
+  let sb = 0;
+  let s2 = 0;
+  let sx = 0;
+  let sy = 0;
+  let sxx = 0;
+  let syy = 0;
+  let sxy = 0;
+  const byU = {};
+  for (const r of SHIPFLUX_SKIN) {
+    const cs = coolSkin({
+      uStar: r.uStar,
+      rhoA: r.rhoA,
+      tsC: r.tseaC,
+      hsb: -r.hsDown,
+      hlb: -r.hlDown,
+      lwDn: r.lwDn,
+      swNet: Math.max(0, r.swDn) * 0.94,
+      ssPsu: r.ssPsu ?? 35,
+      g: grv(r.latDeg)
+    });
+    const d = cs.dTK - r.dtSkin;
+    n++;
+    sb += d;
+    s2 += d * d;
+    sx += cs.dTK;
+    sy += r.dtSkin;
+    sxx += cs.dTK * cs.dTK;
+    syy += r.dtSkin * r.dtSkin;
+    sxy += cs.dTK * r.dtSkin;
+    if (Number.isFinite(r.u10nMs)) {
+      const k = Math.min(12, Math.floor(r.u10nMs / 2) * 2);
+      byU[k] ??= {n: 0, psl: 0};
+      byU[k].n++;
+      byU[k].psl += r.dtSkin;
+    }
+  }
+  const bias = sb / n;
+  const rmse = Math.sqrt(s2 / n);
+  const corr =
+    (n * sxy - sx * sy) / Math.sqrt((n * sxx - sx * sx) * (n * syy - sy * sy));
+  const ladder = Object.keys(byU)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .filter((k) => byU[k].n >= 15)
+    .map((k) => ({k, mean: byU[k].psl / byU[k].n, n: byU[k].n}));
+  const falls = ladder.every((b, i) => i === 0 || b.mean < ladder[i - 1].mean);
+  const okSkin =
+    n >= 400 &&
+    Math.abs(bias) < 0.001 &&
+    rmse < 0.002 &&
+    corr > 0.9999 &&
+    ladder.length >= 5 &&
+    falls &&
+    ladder[0].mean > 0.25 &&
+    ladder[ladder.length - 1].mean < 0.15;
+  check(
+    "THE SHIP-FLUX ARCHIVE reproduces PSL's skin",
+    okSkin,
+    `${n} night, rain-free, warm-layer-free hours on ${SHIPFLUX_CRUISES.length} cruises (every ${SHIPFLUX_COUNTS.skinStride}th of ${SHIPFLUX_COUNTS.skinEligible}, frozen ${SHIPFLUX_AT}): fed the archive's own friction velocity, fluxes and measured longwave, the port returns PSL's COARE skin with bias ${bias.toFixed(5)} K, RMSE ${rmse.toFixed(5)} K, r ${corr.toFixed(5)} (mean ${(sy / n).toFixed(3)} K); by 10-m wind the archive's skin falls ${ladder.map((b) => `${b.k}-${b.k + 2} m/s ${b.mean.toFixed(3)}`).join(', ')} - the shape of the paper's Fig. 14`
+  );
+  // (b) the clear sky over the ocean: measured pyrgeometer longwave
+  // on hours the sun itself certifies clear
+  const eOf = (r) => {
+    const q = r.qGkg / 1000;
+    return (q * r.pHpa) / (0.622 + 0.378 * q);
+  };
+  const fit = (P) => {
+    let N = 0;
+    let Sx = 0;
+    let Sy = 0;
+    let Sxx = 0;
+    let Sxy = 0;
+    for (const p of P) {
+      const x = Math.sqrt(eOf(p));
+      const eps = p.lwDn / (SIGMA_SB * Math.pow(p.taC + 273.15, 4));
+      N++;
+      Sx += x;
+      Sy += eps;
+      Sxx += x * x;
+      Sxy += x * eps;
+    }
+    const b = (N * Sxy - Sx * Sy) / (N * Sxx - Sx * Sx);
+    return {a: (Sy - b * Sx) / N, b, N};
+  };
+  const score = (P, a, b) => {
+    let s = 0;
+    let sBias = 0;
+    for (const p of P) {
+      const d =
+        (a + b * Math.sqrt(eOf(p))) * SIGMA_SB * Math.pow(p.taC + 273.15, 4) -
+        p.lwDn;
+      s += d * d;
+      sBias += d;
+    }
+    return {rmse: Math.sqrt(s / P.length), bias: sBias / P.length};
+  };
+  const oc = fit(SHIPFLUX_CLEAR);
+  const sOc = score(SHIPFLUX_CLEAR, oc.a, oc.b);
+  const sC = score(SHIPFLUX_CLEAR, ...BRUNT_CBSRN);
+  const sS = score(SHIPFLUX_CLEAR, ...BRUNT_SURFRAD);
+  const sG = score(SHIPFLUX_CLEAR, ...BRUNT_GLOBAL36);
+  // e-binned emissivities against the printed curve
+  const bins = {};
+  for (const p of SHIPFLUX_CLEAR) {
+    const e = eOf(p);
+    const k = Math.min(30, Math.floor(e / 5) * 5);
+    bins[k] ??= {n: 0, eps: 0, e: 0};
+    bins[k].n++;
+    bins[k].eps += p.lwDn / (SIGMA_SB * Math.pow(p.taC + 273.15, 4));
+    bins[k].e += e;
+  }
+  const binRows = Object.keys(bins)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .filter((k) => bins[k].n >= 20)
+    .map((k) => ({
+      k,
+      n: bins[k].n,
+      eps: bins[k].eps / bins[k].n,
+      brunt: emissivityClear(bins[k].e / bins[k].n)
+    }));
+  const binsHold = binRows.every((b) => Math.abs(b.eps - b.brunt) < 0.02);
+  const okClear =
+    SHIPFLUX_CLEAR.length >= 250 &&
+    Math.abs(sC.bias) < 5 &&
+    sC.rmse < LW_RMSE_CLEAR_WM2 &&
+    sC.rmse - sOc.rmse < 1 &&
+    Math.abs(oc.a - BRUNT_CBSRN[0]) < 0.03 &&
+    Math.abs(oc.b - BRUNT_CBSRN[1]) < 0.006 &&
+    binRows.length >= 4 &&
+    binsHold;
+  check(
+    'THE SHIP-FLUX ARCHIVE holds Brunt over the clear ocean',
+    okClear,
+    `${SHIPFLUX_CLEAR.length} daytime hours whose measured solar reached ${SHIPFLUX_COUNTS.clearnessMin} of the clear-sky solar: the land fit (0.599 + 0.053 sqrt e) reads the sea's pyrgeometers with bias ${sC.bias.toFixed(1)} W/m^2 and RMSE ${sC.rmse.toFixed(1)} (the paper's land RMSE ${LW_RMSE_CLEAR_WM2}); the ocean's own least squares lands ${oc.a.toFixed(3)} + ${oc.b.toFixed(4)} sqrt e (RMSE ${sOc.rmse.toFixed(1)}), SURFRAD's pair ${sS.bias.toFixed(1)}/${sS.rmse.toFixed(1)}, the 36-site pair ${sG.bias.toFixed(1)}/${sG.rmse.toFixed(1)}; binned by vapour pressure the sea's emissivity sits ${binRows.map((b) => `${b.k}-${b.k + 5} hPa ${b.eps.toFixed(3)} (Brunt ${b.brunt.toFixed(3)}, n ${b.n})`).join(', ')}`
+  );
+  // (c) the night sea under unlogged cover: what the clear formula
+  // misses when nobody records the sky
+  let N = 0;
+  let sEps = 0;
+  let sEps2 = 0;
+  for (const p of SHIPFLUX_ALLSKY) {
+    const eps = p.lwDn / (SIGMA_SB * Math.pow(p.taC + 273.15, 4));
+    N++;
+    sEps += eps;
+    sEps2 += eps * eps;
+  }
+  const epsMean = sEps / N;
+  const sAll = score(SHIPFLUX_ALLSKY, ...BRUNT_CBSRN);
+  const sConst = score(SHIPFLUX_ALLSKY, epsMean, 0);
+  const okAll =
+    N >= 400 &&
+    epsMean > 0.87 &&
+    epsMean < 0.95 &&
+    sAll.bias < -15 &&
+    sConst.rmse > 12 &&
+    sConst.rmse < 30 &&
+    sConst.rmse < sAll.rmse;
+  check(
+    'THE SHIP-FLUX ARCHIVE measures the unlogged cover',
+    okAll,
+    `${N} night hours of any sky (every ${SHIPFLUX_COUNTS.allskyStride}th of ${SHIPFLUX_COUNTS.allskyEligible}): the sea's mean effective emissivity is ${epsMean.toFixed(3)}, and the clear formula alone under-reads those nights by ${(-sAll.bias).toFixed(0)} W/m^2 (RMSE ${sAll.rmse.toFixed(0)}) where a flat ${epsMean.toFixed(2)} scatters ${sConst.rmse.toFixed(0)} - the cloud term is what the pier's METAR cover supplies and the ships never logged`
+  );
+  // (d) the pinned ocean numbers the page quotes (coolskin.js
+  // carries them as constants; a refreeze of the sample that
+  // moves them past their tolerance must re-pin them - read the
+  // diff)
+  const okPins =
+    near(LW_OCEAN_CLEAR.biasWm2, sC.bias, 0.5) &&
+    near(LW_OCEAN_CLEAR.rmseWm2, sC.rmse, 0.5) &&
+    LW_OCEAN_CLEAR.hours === SHIPFLUX_CLEAR.length &&
+    LW_OCEAN_CLEAR.cruises === SHIPFLUX_CRUISES.length &&
+    near(LW_OCEAN_ALLSKY.epsMean, epsMean, 0.005) &&
+    near(LW_OCEAN_ALLSKY.rmseWm2, sConst.rmse, 1) &&
+    LW_OCEAN_ALLSKY.hours === N;
+  check(
+    'THE SHIP-FLUX ARCHIVE pins the numbers the page quotes',
+    okPins,
+    `clear sea: bias ${LW_OCEAN_CLEAR.biasWm2}, RMSE ${LW_OCEAN_CLEAR.rmseWm2} W/m^2 over ${LW_OCEAN_CLEAR.hours} hours on ${LW_OCEAN_CLEAR.cruises} cruises (computed ${sC.bias.toFixed(2)}, ${sC.rmse.toFixed(2)}); unlogged-cover nights: emissivity ${LW_OCEAN_ALLSKY.epsMean}, scatter ${LW_OCEAN_ALLSKY.rmseWm2} W/m^2 over ${LW_OCEAN_ALLSKY.hours} hours (computed ${epsMean.toFixed(3)}, ${sConst.rmse.toFixed(1)})`
   );
 }
 

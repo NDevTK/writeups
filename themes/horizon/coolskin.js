@@ -57,20 +57,34 @@
  *    Brunt coefficients other networks found (SURFRAD 0.598/0.057,
  *    36 sites worldwide 0.605/0.048 - the spread this module's
  *    landmarks hold the fit inside), and its printed errors
- *    (clear-sky RMSE 13.8 W/m^2, all-sky 17.3 W/m^2 - the
- *    uncertainty this module carries into the skin). No pyrgeometer
+ *    (clear-sky RMSE 13.8 W/m^2, all-sky 17.3 W/m^2). No pyrgeometer
  *    looks at the sea off the pier; the sky's longwave is MODELLED
- *    from the measured shore screen temperature, dewpoint and cloud
- *    cover, and every line that uses it says so.
+ *    from the pier's measured air with the shore's dewpoint and
+ *    cloud cover, and every line that uses it says so.
+ *  - NOAA PSL's hourly ship flux archive (137th pass;
+ *    NOAA_PSL_Hourly_Ship_Flux on the COAPS ERDDAP - the database
+ *    Fairall et al. 2026 describe in their Section 2.1): 31,914
+ *    measured hours on 44 research cruises, 1991-2021, sampled
+ *    into shipflux-fixture.js. Fed the archive's own friction
+ *    velocity, fluxes and measured longwave, this module returns
+ *    PSL's COARE skin over 507 night hours to 6e-5 K RMS; on 323
+ *    daytime hours whose measured solar certified a clear sky,
+ *    the land-fitted Brunt reads the sea's pyrgeometers with bias
+ *    -2.0 W/m^2 and RMSE 10.6 - the clear-sky uncertainty the page
+ *    now quotes (LW_OCEAN_CLEAR) - while on 616 nights of unlogged
+ *    cover the clear formula under-reads by 27 W/m^2 (the cloud
+ *    term the pier's METAR supplies; LW_OCEAN_ALLSKY).
  *
  * STATED LIMITS: no warm layer (the daytime near-surface warming;
  * the CO-OPS water sensor sits 3.4 m down - a daytime skin is
  * offered with that caveat, a night-time one without); no rain
  * sensible heat; COARE 3.6's total-stress skin, not 3.7's
  * tangential one; the longwave from a screen-level emissivity fit
- * made over land (China's baseline network), with the ACP paper's
- * own RMSE as the stated noise; METAR cloud cover in okta
- * midpoints where the fit used a fisheye camera.
+ * made over land (China's baseline network), its clear-sky form
+ * held over the ocean by the ship archive, its cloud term still on
+ * the land fit's printed coefficients (the ships log no cover);
+ * METAR cloud cover in okta midpoints where the fit used a fisheye
+ * camera.
  */
 
 // --- seawater and air constants, the code's own ---------------
@@ -97,6 +111,15 @@ export const BRUNT_GLOBAL36 = [0.605, 0.048]; // Table 2, Wang & Liang 2009
 export const ALLSKY = {a: 0.178, b: 0.339, c: 0.075, d: 0.395, e: 0.253}; // Eq. (6)
 export const LW_RMSE_CLEAR_WM2 = 13.8; // their independent validation
 export const LW_RMSE_ALLSKY_WM2 = 17.3;
+// --- the sky over the SEA: NOAA PSL's ship flux archive (137th),
+// pinned from the frozen sample and held to it in the gate ------
+export const LW_OCEAN_CLEAR = {
+  biasWm2: -2.0,
+  rmseWm2: 10.6,
+  hours: 323,
+  cruises: 44
+};
+export const LW_OCEAN_ALLSKY = {epsMean: 0.911, rmseWm2: 22, hours: 616};
 
 /** COARE's latent heat of vaporization (J/kg) at the water
  * temperature - the code's Le. */
@@ -232,7 +255,9 @@ export function lwDown({taC, eHpa, cf = 0, rhPct = 50}) {
     wm2: epsAll * SIGMA_SB * Math.pow(tK, 4),
     epsClr,
     epsAll,
-    rmseWm2: cf > 0 ? LW_RMSE_ALLSKY_WM2 : LW_RMSE_CLEAR_WM2
+    // clear: the ocean's own test of the fit (the ship archive);
+    // covered: the land fit's all-sky validation, cover known
+    rmseWm2: cf > 0 ? LW_RMSE_ALLSKY_WM2 : LW_OCEAN_CLEAR.rmseWm2
   };
 }
 
