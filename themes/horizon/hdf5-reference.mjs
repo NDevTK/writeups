@@ -7,7 +7,14 @@
 // values and CF attributes must match; a layout the reader cannot
 // read must be NAMED, not guessed.
 import {inflateSync} from 'node:zlib';
-import {openHdf5, physicalValues, unshuffle} from './hdf5.js';
+import {
+  NeedBytes,
+  openHdf5,
+  openHdf5Lazy,
+  physicalValues,
+  SparseReader,
+  unshuffle
+} from './hdf5.js';
 import {
   ACHAC_B64,
   ACHAC_EXPECT,
@@ -253,6 +260,193 @@ const scalarAttr = (a) => (Array.isArray(a) ? a[0] : a);
     `superblock 3 with v2 headers and link messages: the contiguous and attribute paths read ` +
       `(x, the projection's attributes, the root's title), and the chunked datasets answer ` +
       `"${m.values.unread}" - HDF5 1.10+ chunk indexes are outside the reader, stated, never guessed`
+  );
+}
+
+// ---- THE WINDOW READ (151st pass) --------------------------------
+// dataset(name, {window}) reads the chunks a window touches and
+// cuts it out of them: every window pixel equals the whole read's,
+// on the chunk-strip file (HT in a 262-row strip plus an edge strip
+// of 38 rows) across the strip boundary, at the dataset's corner
+// (clipped, the clipped box echoed), on a contiguous vector, and
+// on h5py's 5x7-chunked mask.
+{
+  const bytes = bytesOf(ACHAC_B64);
+  const f = openHdf5(bytes, inflate);
+  const whole = f.dataset('HT').values;
+  const cut = (win) => {
+    const d = f.dataset('HT', {window: win});
+    const [r, c] = d.window;
+    let bad = 0;
+    for (let i = r[0]; i < r[1]; i++)
+      for (let j = c[0]; j < c[1]; j++)
+        if (
+          d.values[(i - r[0]) * (c[1] - c[0]) + (j - c[0])] !==
+          whole[i * 500 + j]
+        )
+          bad++;
+    return {d, bad, n: d.values.length};
+  };
+  const mid = cut([
+    [120, 140],
+    [415, 435]
+  ]);
+  const strip = cut([
+    [255, 270],
+    [0, 500]
+  ]);
+  const corner = cut([
+    [290, 400],
+    [490, 600]
+  ]);
+  const empty = cut([
+    [300, 310],
+    [0, 10]
+  ]);
+  const xw = f.dataset('x', {window: [[10, 20]]});
+  const xAll = f.dataset('x').values;
+  const t = f.dataset('t', {window: [[0, 1]]});
+  const syn = openHdf5(bytesOf(SYN_EARLIEST_B64), inflate);
+  const mAll = syn.dataset('mask').values;
+  const mw = syn.dataset('mask', {
+    window: [
+      [3, 12],
+      [5, 20]
+    ]
+  });
+  let synBad = 0;
+  for (let i = 3; i < 12; i++)
+    for (let j = 5; j < 20; j++)
+      if (mw.values[(i - 3) * 15 + (j - 5)] !== mAll[i * 23 + j]) synBad++;
+  check(
+    'THE WINDOW READ cuts the whole read’s pixels from the chunks it touches',
+    mid.bad === 0 &&
+      mid.n === 400 &&
+      JSON.stringify(mid.d.window) === '[[120,140],[415,435]]' &&
+      JSON.stringify(mid.d.shape) === '[300,500]' &&
+      strip.bad === 0 &&
+      strip.n === 7500 &&
+      corner.bad === 0 &&
+      corner.n === 100 &&
+      JSON.stringify(corner.d.window) === '[[290,300],[490,500]]' &&
+      empty.n === 0 &&
+      JSON.stringify(empty.d.window) === '[[300,300],[0,10]]' &&
+      xw.values.length === 10 &&
+      Array.from(xw.values).join(',') ===
+        Array.from(xAll.slice(10, 20)).join(',') &&
+      t.values.length === 1 &&
+      t.values[0] === f.dataset('t').values[0] &&
+      mw.values.length === 135 &&
+      synBad === 0,
+    `a 20x20 window inside the first strip, a 15-row window across the strip boundary (rows 255-270), ` +
+      `the 10x10 corner clipped from an over-long ask, an empty window past the edge, ten of the x ` +
+      `axis (contiguous), the scalar t, and a 9x15 window over h5py's 5x7-chunked mask all equal the ` +
+      `whole reads element for element`
+  );
+}
+
+// ---- THE RANGE READ (151st pass) ---------------------------------
+// openHdf5Lazy over a counting readRange: the parse runs on the
+// bytes fetched so far, a NeedBytes fetches whole blocks and
+// replays; a window of a dataset costs the head, the chunk index
+// and that window's chunks; every value equals the whole read's;
+// an asynchronous inflate (a Promise per chunk) gives the same;
+// the sparse reader's own accounting (segments merge, gaps are
+// whole blocks).
+{
+  const bytes = bytesOf(ACHAC_B64);
+  const whole = openHdf5(bytes, inflate);
+  const mk = (opts, infl = inflate) => {
+    const reads = [];
+    const readRange = async (s, e) => {
+      const end = Math.min(e, bytes.length);
+      reads.push([s, end]);
+      return bytes.subarray(s, end);
+    };
+    return {reads, open: () => openHdf5Lazy(readRange, infl, opts)};
+  };
+  const same = (a, b) =>
+    a.length === b.length && Array.from(a).every((v, i) => v === b[i]);
+  // the daemon's sizes: a 256 kB head, 64 kB blocks
+  const A = mk({});
+  const fa = await A.open();
+  const names = await fa.names();
+  const root = await fa.rootAttrs();
+  const x = await fa.dataset('x');
+  const roundsMeta = fa.stats.rounds;
+  const win = [
+    [120, 140],
+    [415, 435]
+  ];
+  const hw = await fa.dataset('HT', {window: win});
+  const hWhole = whole.dataset('HT', {window: win});
+  const dq = await fa.dataset('DQF');
+  const statsA = {...fa.stats};
+  // small blocks: many rounds, the same numbers
+  const B = mk({blockBytes: 4096, headBytes: 8192});
+  const fb = await B.open();
+  const hb = await fb.dataset('HT', {window: win});
+  const xb = await fb.dataset('x');
+  // an asynchronous inflate
+  const C = mk({}, (raw) => Promise.resolve(inflate(raw)));
+  const fc = await C.open();
+  const hc = await fc.dataset('HT', {window: win});
+  // a range reader that answers nothing past the end is not asked
+  // past it again: the file's size is learnt from the short read
+  const shortRead = A.reads.find(([s, e]) => e - s < 65536);
+  // the sparse reader itself
+  const sr = new SparseReader();
+  sr.add(0, new Uint8Array([1, 2, 3, 4]));
+  sr.add(4, new Uint8Array([5, 6]));
+  sr.add(10, new Uint8Array([7, 8, 9, 10]));
+  let need = null;
+  try {
+    sr.u32(8);
+  } catch (e) {
+    need = e;
+  }
+  const gaps = sr.missing(
+    [
+      [0, 8],
+      [12, 20]
+    ],
+    4
+  );
+  check(
+    'THE RANGE READ parses over the bytes fetched so far and fetches what a parse lacked',
+    fa.superblock.version === 2 &&
+      names.length === 36 &&
+      root.platform_ID === 'G18' &&
+      same(x.values, whole.dataset('x').values) &&
+      roundsMeta === 1 &&
+      hw.values.length === 400 &&
+      same(hw.values, hWhole.values) &&
+      same(dq.values, whole.dataset('DQF').values) &&
+      statsA.rounds === 3 &&
+      statsA.ranges === 3 &&
+      statsA.bytes === bytes.length &&
+      statsA.held === bytes.length &&
+      statsA.eof === bytes.length &&
+      A.reads[0][0] === 0 &&
+      A.reads[0][1] === 262144 &&
+      shortRead !== undefined &&
+      same(hb.values, hWhole.values) &&
+      same(xb.values, x.values) &&
+      fb.stats.rounds > statsA.rounds &&
+      fb.stats.bytes <= bytes.length &&
+      fb.stats.bytes >= hw.values.length * 2 &&
+      same(hc.values, hWhole.values) &&
+      // the head, then the window's strip (no DQF asked of this one)
+      fc.stats.rounds === 2 &&
+      fc.stats.bytes < statsA.bytes &&
+      sr.segs.length === 2 &&
+      sr.segs[0].end === 6 &&
+      sr.u16(4) === 0x0605 &&
+      need instanceof NeedBytes &&
+      JSON.stringify(need.ranges) === '[[8,12]]' &&
+      JSON.stringify(gaps) === '[[6,8],[14,20]]' &&
+      sr.heldBytes() === 10,
+    `the vendored ${ACHAC_NAME} through range reads: ${statsA.rounds} rounds and ${statsA.ranges} ranges for the metadata, the x axis, a 20x20 HT window and all of DQF (${statsA.bytes} of ${bytes.length} bytes - the 256 kB head, then the strip the window lies in, the file's end learnt from the short read); 4 kB blocks take ${fb.stats.rounds} rounds and ${fb.stats.bytes} bytes for the same window and axis; a Promise-returning inflate gives the same window in the same ${fc.stats.rounds} rounds; the sparse reader merges touching segments, throws NeedBytes [8, 12) for a word across a gap and lists block-rounded gaps`
   );
 }
 

@@ -375,8 +375,21 @@ export const L2_PRODUCTS = {
   height: 'ABI-L2-ACHAC',
   imagery: 'ABI-L2-CMIPC',
   cod: 'ABI-L2-CODC',
-  cps: 'ABI-L2-CPSC'
+  cps: 'ABI-L2-CPSC',
+  // the 151st pass: the sea surface (skin) temperature - full disk
+  // only (no CONUS SST product), hourly, 2 km, 32 MB a file, read
+  // by HTTP range (its window costs ~1 MB)
+  sst: 'ABI-L2-SSTF'
 };
+// The SST file's own flag meanings (DQF flag_values 0..3, read from
+// OR_ABI-L2-SSTF-M6_G18_s20262482000212...nc): only 0 is a
+// retrieval to use; 1 is degraded (kept, counted apart).
+export const SST_DQF_MEANINGS = [
+  'good_quality_qf',
+  'degraded_quality_qf',
+  'severely_degraded_quality_qf',
+  'invalid_due_to_unprocessed_qf'
+];
 // The imagery bucket lists every band's file under one prefix
 // (OR_ABI-L2-CMIPC-M6C13_G18_s...): the band from a key, and the
 // keys of one band.
@@ -473,6 +486,57 @@ export function unscale(raw, {scale = 1, offset = 0, fill = 65535} = {}) {
 export function quantile(sorted, f) {
   if (!sorted.length) return null;
   return sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))];
+}
+// THE HOUR'S SKIN AGAINST THE DAY-OLD ANALYSIS (151st pass): every
+// good SST pixel of the window (DQF 0) navigated to its lat/lon and
+// looked up in the analysis field through `lookup(latDeg, lonDeg)`
+// (the page passes its MUR grid's bilinear read; null where the
+// analysis has no sea). Differences ABI minus analysis in kelvin:
+// the count, median, p10, p90 and mean. ABI's product is the SKIN
+// temperature of the hour; MUR's analysed_sst is a foundation
+// temperature (below the diurnal warm layer), so a daytime
+// difference carries the warm layer as well as the day between them
+// - stated on the line, never blended.
+export function sstAgainstGrid(sstK, dqf, {g, xCoord, yCoord, box}, lookup) {
+  const d = [];
+  let sum = 0;
+  for (let q = 0; q < sstK.length; q++) {
+    if (!Number.isFinite(sstK[q]) || (dqf && dqf[q] !== 0)) continue;
+    const i = box.i0 + (q % box.cols);
+    const j = box.j0 + Math.floor(q / box.cols);
+    const p = fixedGridToLatLon(scanAngle(i, xCoord), scanAngle(j, yCoord), g);
+    if (!p) continue;
+    const ref = lookup(p.latDeg, p.lonDeg);
+    if (!Number.isFinite(ref)) continue;
+    const diff = sstK[q] - 273.15 - ref; // the analysis is in degrees C
+    d.push(diff);
+    sum += diff;
+  }
+  d.sort((a, b) => a - b);
+  return {
+    n: d.length,
+    medianK: quantile(d, 0.5),
+    p10K: quantile(d, 0.1),
+    p90K: quantile(d, 0.9),
+    meanK: d.length ? sum / d.length : null
+  };
+}
+// The census of a kelvin field over a window, DQF 0 (good) only:
+// how many pixels, how many good, their minimum, median, maximum.
+// The imagery's brightness temperature and the SST share it.
+export function goodCensus(valuesK, dqf) {
+  const good = [];
+  for (let q = 0; q < valuesK.length; q++)
+    if (Number.isFinite(valuesK[q]) && (!dqf || dqf[q] === 0))
+      good.push(valuesK[q]);
+  good.sort((a, b) => a - b);
+  return {
+    n: valuesK.length,
+    good: good.length,
+    minK: good.length ? good[0] : null,
+    medianK: quantile(good, 0.5),
+    maxK: good.length ? good[good.length - 1] : null
+  };
 }
 // THE DECODER AUDITED: the theme's brightness temperatures (read
 // off GIBS's colour-mapped tiles, C) against NOAA's own CMI (K) at

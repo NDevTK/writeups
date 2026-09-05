@@ -32,6 +32,15 @@
  *    the inflate the caller supplies), shuffle (id 2, the byte
  *    de-interleave), fletcher32 (id 3, the 4-byte checksum dropped,
  *    not verified - stated); edge chunks clipped to the dataset
+ *  - a WINDOW of a dataset (151st pass): dataset(name, {window})
+ *    reads only the chunks the window touches, the B-tree pruned by
+ *    its keys (the chunks' lexicographic order), and cuts the window
+ *    out of them; contiguous data by its rows
+ *  - the file through RANGE READS (151st): openHdf5Lazy(readRange,
+ *    inflate) parses over the bytes fetched so far and fetches what
+ *    a parse lacked (NeedBytes), so a window of a 32 MB full-disk
+ *    product costs a few hundred kB - the same parser, the same
+ *    numbers as the whole buffer (held in hdf5-reference.mjs)
  *
  * NOT READ (stated): layout version 4 indexes (fixed/extensible
  * arrays, v2 B-trees - HDF5 1.10+ "latest" files), compound and
@@ -87,10 +96,164 @@ class Reader {
     return x;
   }
   str(p, n) {
-    return dec.decode(this.b.subarray(p, p + n));
+    return dec.decode(this.bytes(p, n));
   }
   sig(p) {
     return this.str(p, 4);
+  }
+  bytes(p, n) {
+    return this.b.subarray(p, p + n);
+  }
+  int(p, size, signed, le) {
+    const v = this.v;
+    if (size === 1) return signed ? v.getInt8(p) : v.getUint8(p);
+    if (size === 2) return signed ? v.getInt16(p, le) : v.getUint16(p, le);
+    if (size === 4) return signed ? v.getInt32(p, le) : v.getUint32(p, le);
+    return Number(signed ? v.getBigInt64(p, le) : v.getBigUint64(p, le));
+  }
+  float(p, size, le) {
+    return size === 4 ? this.v.getFloat32(p, le) : this.v.getFloat64(p, le);
+  }
+  // every byte of the whole buffer is here: nothing to fetch
+  ensure() {}
+}
+
+// ---------------------------------------------------------------
+// The sparse reader (151st pass): the same accessors over the byte
+// ranges fetched so far. An access outside them throws NeedBytes,
+// which openHdf5Lazy catches, fetches (HTTP range requests, or any
+// readRange) and replays - so the ONE parser above serves whole
+// buffers and range reads alike, and a 101 x 101 window of a 32 MB
+// full-disk file costs its own chunks' bytes, not the file's.
+// ---------------------------------------------------------------
+export class NeedBytes extends Error {
+  constructor(ranges) {
+    super('need bytes ' + ranges.map((r) => r.join('..')).join(' '));
+    this.ranges = ranges; // [[start, end), ...]
+  }
+}
+export class SparseReader {
+  constructor() {
+    this.segs = []; // {start, end, r: Reader} sorted, disjoint, non-adjacent
+  }
+  // the segment holding [p, p + n), or a NeedBytes for it
+  _at(p, n) {
+    const segs = this.segs;
+    let lo = 0;
+    let hi = segs.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const s = segs[mid];
+      if (p < s.start) hi = mid - 1;
+      else if (p >= s.end) lo = mid + 1;
+      else {
+        if (p + n <= s.end) return s;
+        break;
+      }
+    }
+    throw new NeedBytes([[p, p + n]]);
+  }
+  // add fetched bytes; touching or overlapping segments are merged
+  // into one so an access never straddles two
+  add(start, bytes) {
+    if (!bytes.length) return;
+    let s = start;
+    let b = bytes;
+    const keep = [];
+    for (const seg of this.segs) {
+      if (seg.end < s || seg.start > s + b.length) {
+        keep.push(seg);
+        continue;
+      }
+      const ns = Math.min(s, seg.start);
+      const ne = Math.max(s + b.length, seg.end);
+      const merged = new Uint8Array(ne - ns);
+      merged.set(seg.r.b, seg.start - ns);
+      merged.set(b, s - ns);
+      s = ns;
+      b = merged;
+    }
+    keep.push({start: s, end: s + b.length, r: new Reader(b)});
+    keep.sort((a, c) => a.start - c.start);
+    this.segs = keep;
+  }
+  // the parts of [start, end) not held, rounded out to whole blocks
+  // and merged - what one fetch round has to bring
+  missing(ranges, block = 1, eof = Infinity) {
+    const out = [];
+    for (const [a0, b0] of ranges) {
+      let a = Math.floor(a0 / block) * block;
+      const b = Math.min(eof, Math.ceil(b0 / block) * block);
+      for (const seg of this.segs) {
+        if (seg.end <= a) continue;
+        if (seg.start >= b) break;
+        if (seg.start > a) out.push([a, seg.start]);
+        a = Math.max(a, seg.end);
+      }
+      if (a < b) out.push([a, b]);
+    }
+    out.sort((x, y) => x[0] - y[0]);
+    const merged = [];
+    for (const r of out) {
+      const last = merged[merged.length - 1];
+      if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+      else merged.push(r);
+    }
+    return merged;
+  }
+  heldBytes() {
+    let n = 0;
+    for (const s of this.segs) n += s.end - s.start;
+    return n;
+  }
+  // all of these ranges at once, or one NeedBytes naming every gap:
+  // a level of B-tree nodes, a window's chunks - one fetch round
+  ensure(ranges) {
+    const gaps = this.missing(ranges);
+    if (gaps.length) throw new NeedBytes(gaps);
+  }
+  u8(p) {
+    const s = this._at(p, 1);
+    return s.r.u8(p - s.start);
+  }
+  u16(p) {
+    const s = this._at(p, 2);
+    return s.r.u16(p - s.start);
+  }
+  u32(p) {
+    const s = this._at(p, 4);
+    return s.r.u32(p - s.start);
+  }
+  u64(p) {
+    const s = this._at(p, 8);
+    return s.r.u64(p - s.start);
+  }
+  addr(p, size = 8) {
+    const s = this._at(p, size);
+    return s.r.addr(p - s.start, size);
+  }
+  uint(p, size) {
+    const s = this._at(p, size);
+    return s.r.uint(p - s.start, size);
+  }
+  str(p, n) {
+    const s = this._at(p, n);
+    return s.r.str(p - s.start, n);
+  }
+  sig(p) {
+    return this.str(p, 4);
+  }
+  bytes(p, n) {
+    const s = this._at(p, n);
+    return s.r.bytes(p - s.start, n);
+  }
+  int(p, size, signed, le) {
+    const s = this._at(p, size);
+    return s.r.int(p - s.start, size, signed, le);
+  }
+  float(p, size, le) {
+    const s = this._at(p, size);
+    return s.r.float(p - s.start, size, le);
   }
 }
 
@@ -108,17 +271,19 @@ export function readSuperblock(r) {
     let p = 24;
     if (version === 1) p += 4;
     const base = r.addr(p, so);
+    const eof = r.addr(p + 2 * so, so);
     p += so * 4; // base, free-space info, EOF, driver info
     // the root group's symbol table entry
     const ent = readSymbolEntry(r, p, so);
-    return {version, so, sl, base: base ?? 0, root: ent.ohdr};
+    return {version, so, sl, base: base ?? 0, eof, root: ent.ohdr};
   }
   if (version === 2 || version === 3) {
     const so = r.u8(9);
     const sl = r.u8(10);
     const base = r.addr(12, so) ?? 0;
+    const eof = r.addr(12 + 2 * so, so);
     const root = r.addr(12 + 3 * so, so);
-    return {version, so, sl, base, root};
+    return {version, so, sl, base, eof, root};
   }
   throw new Error('superblock version ' + version);
 }
@@ -259,21 +424,10 @@ export function readDatatype(r, p) {
 // The bytes of one element of type t at p, as a JS number/string.
 function decodeElement(r, t, p) {
   const le = t.littleEndian;
-  if (t.kind === 'int') {
-    if (t.size === 1) return t.signed ? r.v.getInt8(p) : r.v.getUint8(p);
-    if (t.size === 2)
-      return t.signed ? r.v.getInt16(p, le) : r.v.getUint16(p, le);
-    if (t.size === 4)
-      return t.signed ? r.v.getInt32(p, le) : r.v.getUint32(p, le);
-    if (t.size === 8)
-      return Number(
-        t.signed ? r.v.getBigInt64(p, le) : r.v.getBigUint64(p, le)
-      );
-  }
-  if (t.kind === 'float') {
-    if (t.size === 4) return r.v.getFloat32(p, le);
-    if (t.size === 8) return r.v.getFloat64(p, le);
-  }
+  if (t.kind === 'int' && [1, 2, 4, 8].includes(t.size))
+    return r.int(p, t.size, t.signed, le);
+  if (t.kind === 'float' && (t.size === 4 || t.size === 8))
+    return r.float(p, t.size, le);
   if (t.kind === 'string') {
     let s = r.str(p, t.size);
     const z = s.indexOf('\0');
@@ -581,7 +735,7 @@ export function readBtreeV2Records(r, addr, so) {
     let p = a + 6;
     if (s === 'BTLF') {
       for (let i = 0; i < n; i++) {
-        out.push(r.b.subarray(p, p + recSize));
+        out.push(r.bytes(p, recSize));
         p += recSize;
       }
       return;
@@ -593,7 +747,7 @@ export function readBtreeV2Records(r, addr, so) {
     // record count, and the subtree total below depth 1)
     const recs = [];
     for (let i = 0; i < n; i++) {
-      recs.push(r.b.subarray(p, p + recSize));
+      recs.push(r.bytes(p, recSize));
       p += recSize;
     }
     const kids = [];
@@ -682,8 +836,7 @@ export function readVlenBytes(r, p, so) {
     const idx = r.u16(q);
     const size = r.u64(q + 8);
     if (idx === 0) break; // the free-space object ends the list
-    if (idx === index)
-      return r.b.subarray(q + 16, q + 16 + Math.min(size, len));
+    if (idx === index) return r.bytes(q + 16, Math.min(size, len));
     q += 16 + Math.ceil(size / 8) * 8;
   }
   return null;
@@ -733,16 +886,44 @@ function linksFromSymbolTable(r, btree, heap, so, sl) {
 // ---------------------------------------------------------------
 // The v1 B-tree chunk index
 // ---------------------------------------------------------------
-function chunkEntries(r, addr, so, sl, dim) {
+// Lexicographic order of chunk offsets - the order the v1 B-tree
+// keeps its chunks in (the first dimension most significant).
+const lexLess = (a, b) => {
+  for (let d = 0; d < a.length; d++) {
+    if (a[d] < b[d]) return true;
+    if (a[d] > b[d]) return false;
+  }
+  return false;
+};
+// The chunks of a dataset, or only those a window needs: `want` is
+// {lo, hi} in chunk-offset coordinates (lo inclusive, hi exclusive,
+// per dimension). Each node's keys bound its children's chunks in
+// lexicographic order, so a subtree entirely before the window's
+// first row or after its last is never read - and the nodes of one
+// level are asked for together (r.ensure: one fetch round a level
+// on a range read).
+function chunkEntries(r, addr, so, sl, dim, want = null) {
   const out = [];
+  const keySize = 8 + 8 * (dim + 1);
+  // the lexicographic bounds a subtree must intersect: rows from
+  // the window's first chunk row to past its last
+  const lo = want ? [want.lo[0], ...new Array(dim - 1).fill(0)] : null;
+  const hi = want ? [want.hi[0], ...new Array(dim - 1).fill(0)] : null;
+  const inWindow = (offsets) => {
+    if (!want) return true;
+    for (let d = 0; d < dim; d++)
+      if (offsets[d] >= want.hi[d] || offsets[d] < want.lo[d]) return false;
+    return true;
+  };
   const node = (a) => {
     if (a === null || r.sig(a) !== 'TREE') return;
     const type = r.u8(a + 4);
     const level = r.u8(a + 5);
     const used = r.u16(a + 6);
     if (type !== 1) throw new Error('B-tree type ' + type + ' for chunks');
+    r.ensure([[a, a + 8 + 2 * so + (used + 1) * keySize + used * so]]);
     let q = a + 8 + 2 * so;
-    const keySize = 8 + 8 * (dim + 1);
+    const entries = [];
     for (let i = 0; i < used; i++) {
       const size = r.u32(q);
       const mask = r.u32(q + 4);
@@ -751,9 +932,20 @@ function chunkEntries(r, addr, so, sl, dim) {
       q += keySize;
       const child = r.addr(q, so);
       q += so;
-      if (level > 0) node(child);
-      else out.push({addr: child, size, mask, offsets});
+      entries.push({addr: child, size, mask, offsets});
     }
+    // the key after the last child bounds it from above
+    const last = [];
+    for (let d = 0; d < dim; d++) last.push(r.u64(q + 8 + 8 * d));
+    if (level > 0) {
+      const kids = entries.filter((e, i) => {
+        if (!want) return true;
+        const next = i + 1 < entries.length ? entries[i + 1].offsets : last;
+        return lexLess(e.offsets, hi) && lexLess(lo, next);
+      });
+      r.ensure(kids.map((e) => [e.addr, e.addr + 8 + 2 * so]));
+      for (const e of kids) node(e.addr);
+    } else for (const e of entries) if (inWindow(e.offsets)) out.push(e);
   };
   node(addr);
   return out;
@@ -763,7 +955,21 @@ function chunkEntries(r, addr, so, sl, dim) {
 // The file
 // ---------------------------------------------------------------
 export function openHdf5(bytes, inflate) {
-  const r = new Reader(bytes);
+  return openHdf5Reader(new Reader(bytes), inflate);
+}
+// The reader over any Reader - a whole buffer, or the sparse one
+// openHdf5Lazy drives. `inflate(raw, key)` may answer a Promise:
+// the parser then throws NeedInflate for the driver to await (the
+// browser's DecompressionStream); a synchronous inflate (node's
+// zlib) is used in place.
+export class NeedInflate extends Error {
+  constructor(key, pending) {
+    super('need inflate ' + key);
+    this.key = key;
+    this.pending = pending;
+  }
+}
+export function openHdf5Reader(r, inflate) {
   const sb = readSuperblock(r);
   const {so, sl} = sb;
   const skipped = [];
@@ -865,71 +1071,112 @@ export function openHdf5(bytes, inflate) {
     return null;
   };
   // the dataset's values as a typed array in row-major order (a
-  // scalar dataset answers a one-element array)
-  const readDataset = (obj) => {
+  // scalar dataset answers a one-element array), or a window of them:
+  // win = [[start, end), ...] per dimension, clipped to the dataset
+  const readDataset = (obj, win = null) => {
     const t = obj.type;
     const ds = obj.space;
     const dims = ds.dims.length ? ds.dims : [1];
-    const n = dims.reduce((s, d) => s * d, 1);
+    const dim = dims.length;
+    const w = dims.map((d, i) => {
+      const s = win && win[i] ? Math.max(0, Math.min(d, win[i][0])) : 0;
+      const e = win && win[i] ? Math.max(s, Math.min(d, win[i][1])) : d;
+      return [s, e];
+    });
+    const wdims = w.map(([s, e]) => e - s);
+    const n = wdims.reduce((s, d) => s * d, 1);
     const arr = typedArray(t, n);
     if (!arr) return {unread: 'datatype ' + t.kind};
-    const elemAt = (bytes, off) => {
-      const rr = new Reader(bytes);
-      return decodeElement(rr, t, off);
-    };
     const L = obj.layout;
+    // dst strides over the window, src strides over the dataset
+    const dstStride = new Array(dim).fill(1);
+    const srcStride = new Array(dim).fill(1);
+    for (let d = dim - 2; d >= 0; d--) {
+      dstStride[d] = dstStride[d + 1] * wdims[d + 1];
+      srcStride[d] = srcStride[d + 1] * dims[d + 1];
+    }
     if (L.cls === 'compact' || L.cls === 'contiguous') {
       const start = L.cls === 'compact' ? L.data : L.addr;
-      if (start === null) return arr; // never written: fill
-      for (let i = 0; i < n; i++)
-        arr[i] = decodeElement(r, t, start + i * t.size);
+      if (start === null || n === 0) return arr; // never written: fill
+      if (L.cls === 'contiguous') {
+        // the rows the window spans, one fetch round on a range read
+        const first = w.reduce((s, [a], d) => s + a * srcStride[d], 0);
+        const lastRow = w.reduce(
+          (s, [a, e], d) => s + (d === dim - 1 ? a : e - 1) * srcStride[d],
+          0
+        );
+        r.ensure([
+          [start + first * t.size, start + (lastRow + wdims[dim - 1]) * t.size]
+        ]);
+      }
+      const walk = (d, src, dst) => {
+        if (d === dim - 1) {
+          for (let i = 0; i < wdims[d]; i++)
+            arr[dst + i] = decodeElement(r, t, start + (src + i) * t.size);
+          return;
+        }
+        for (let i = 0; i < wdims[d]; i++)
+          walk(d + 1, src + i * srcStride[d], dst + i * dstStride[d]);
+      };
+      walk(
+        0,
+        w.reduce((s, [a], d) => s + a * srcStride[d], 0),
+        0
+      );
       return arr;
     }
     if (L.cls !== 'chunked' || L.unread) return {unread: L.unread ?? L.cls};
-    const dim = L.dim;
     const chunk = L.chunk;
     const filters = obj.pipeline ? obj.pipeline.filters : [];
-    const entries = chunkEntries(r, L.btree, so, sl, dim);
+    // the chunks the window touches, in chunk-offset coordinates
+    const want = {
+      lo: w.map(([s], d) => Math.floor(s / chunk[d]) * chunk[d]),
+      hi: w.map(([, e]) => e)
+    };
+    const entries = chunkEntries(r, L.btree, so, sl, dim, want).filter(
+      (e) => e.addr !== null
+    );
+    // every wanted chunk's bytes together: one fetch round
+    r.ensure(entries.map((e) => [e.addr, e.addr + e.size]));
     const chunkN = chunk.reduce((s, d) => s * d, 1);
+    const chunkStride = new Array(dim).fill(1);
+    for (let d = dim - 2; d >= 0; d--)
+      chunkStride[d] = chunkStride[d + 1] * chunk[d + 1];
     for (const e of entries) {
-      if (e.addr === null) continue;
-      let raw = r.b.subarray(e.addr, e.addr + e.size);
+      let raw = r.bytes(e.addr, e.size);
       // filters are listed in application order; undo them in reverse
       for (let k = filters.length - 1; k >= 0; k--) {
         const f = filters[k];
         if (e.mask & (1 << k)) continue; // filter skipped for this chunk
-        if (f.id === 1) raw = inflate(raw);
-        else if (f.id === 2) raw = unshuffle(raw, f.cd[0] || t.size);
+        if (f.id === 1) {
+          const got = inflate(raw, e.addr);
+          if (got && typeof got.then === 'function')
+            throw new NeedInflate(e.addr, got);
+          raw = got;
+        } else if (f.id === 2) raw = unshuffle(raw, f.cd[0] || t.size);
         else if (f.id === 3) raw = raw.subarray(0, raw.length - 4);
         else return {unread: 'filter ' + f.id + (f.name ? ' ' + f.name : '')};
       }
       if (raw.length < chunkN * t.size)
         return {unread: 'short chunk at ' + e.addr};
-      // copy the chunk into place, clipped at the dataset's edges
+      const cr = new Reader(raw);
+      // copy the chunk's part of the window into place, clipped at
+      // the dataset's edges and the window's
       const copy = (d, srcBase, dstBase) => {
-        const cnt = Math.min(chunk[d], dims[d] - e.offsets[d]);
-        if (cnt <= 0) return;
+        const from = Math.max(e.offsets[d], w[d][0]);
+        const to = Math.min(e.offsets[d] + chunk[d], dims[d], w[d][1]);
+        if (to <= from) return;
+        const s0 = srcBase + (from - e.offsets[d]) * chunkStride[d];
+        const d0 = dstBase + (from - w[d][0]) * dstStride[d];
         if (d === dim - 1) {
-          for (let i = 0; i < cnt; i++)
-            arr[dstBase + i] = elemAt(raw, (srcBase + i) * t.size);
+          for (let i = 0; i < to - from; i++)
+            arr[d0 + i] = decodeElement(cr, t, (s0 + i) * t.size);
           return;
         }
-        let srcStride = 1;
-        let dstStride = 1;
-        for (let k = d + 1; k < dim; k++) {
-          srcStride *= chunk[k];
-          dstStride *= dims[k];
-        }
-        for (let i = 0; i < cnt; i++)
-          copy(d + 1, srcBase + i * srcStride, dstBase + i * dstStride);
+        for (let i = 0; i < to - from; i++)
+          copy(d + 1, s0 + i * chunkStride[d], d0 + i * dstStride[d]);
       };
-      let dst = 0;
-      for (let d = 0; d < dim; d++) {
-        let stride = 1;
-        for (let k = d + 1; k < dim; k++) stride *= dims[k];
-        dst += e.offsets[d] * stride;
-      }
-      copy(0, 0, dst);
+      copy(0, 0, 0);
     }
     return arr;
   };
@@ -939,16 +1186,27 @@ export function openHdf5(bytes, inflate) {
     names: () => root.links.map((l) => l.name),
     rootAttrs: () => attrsOf(root),
     skipped,
-    // {shape, dtype, chunks, filters, attrs, values}
-    dataset(name) {
-      if (datasetCache.has(name)) return datasetCache.get(name);
+    // {shape, dtype, chunks, filters, attrs, values}; with
+    // {window: [[start, end), ...]} the values of that window only
+    // (shape is the dataset's, window the clipped box read)
+    dataset(name, opts = null) {
+      const win = opts && opts.window ? opts.window : null;
+      const ck = win ? name + ' ' + JSON.stringify(win) : name;
+      if (datasetCache.has(ck)) return datasetCache.get(ck);
       const l = byName.get(name);
       if (!l || l.addr === null) return null;
       const obj = object(l.addr);
       const t = obj.type;
+      const dims = obj.space ? obj.space.dims : [];
       const info = {
         name,
-        shape: obj.space ? obj.space.dims : [],
+        shape: dims,
+        window: win
+          ? dims.map((d, i) => {
+              const s = win[i] ? Math.max(0, Math.min(d, win[i][0])) : 0;
+              return [s, win[i] ? Math.max(s, Math.min(d, win[i][1])) : d];
+            })
+          : null,
         dtype: t
           ? t.kind === 'int'
             ? (t.signed ? 'int' : 'uint') + t.size * 8
@@ -964,12 +1222,76 @@ export function openHdf5(bytes, inflate) {
         attrs: attrsOf(obj),
         values: null
       };
-      info.values = obj.layout && t ? readDataset(obj) : {unread: 'no layout'};
-      datasetCache.set(name, info);
+      info.values =
+        obj.layout && t ? readDataset(obj, win) : {unread: 'no layout'};
+      datasetCache.set(ck, info);
       return info;
     }
   };
   return api;
+}
+// The file through range reads (151st pass): readRange(start, end)
+// answers the bytes of [start, end) - fewer at the end of the file -
+// as a Promise; every parse runs against the bytes held so far and
+// a NeedBytes fetches what it lacked (whole blocks, merged) and
+// replays it. The first `headBytes` come up front: NetCDF-4 writes
+// its object headers, attribute heaps and coordinate vectors there,
+// so the metadata is usually ONE round and each window's chunk
+// B-tree and chunks one or two more. `inflate` may be asynchronous
+// (a Promise per chunk: NeedInflate is awaited and the chunk cached
+// by its address). The result mirrors openHdf5's, every method a
+// Promise, with `stats` {rounds, ranges, bytes, held} for the gate
+// and the daemon's journal.
+export async function openHdf5Lazy(
+  readRange,
+  inflate,
+  {blockBytes = 65536, headBytes = 262144, maxRounds = 200} = {}
+) {
+  const r = new SparseReader();
+  const stats = {rounds: 0, ranges: 0, bytes: 0, held: 0, eof: null};
+  const inflated = new Map();
+  const inflateHere = (raw, key) => {
+    if (inflated.has(key)) return inflated.get(key);
+    return inflate(raw, key);
+  };
+  const fetchRanges = async (ranges) => {
+    const gaps = r.missing(ranges, blockBytes, stats.eof ?? Infinity);
+    if (!gaps.length) throw new Error('range read past the end of the file');
+    stats.rounds++;
+    await Promise.all(
+      gaps.map(async ([s, e]) => {
+        const got = await readRange(s, e);
+        stats.ranges++;
+        stats.bytes += got.length;
+        if (got.length < e - s) stats.eof = s + got.length;
+        r.add(s, got);
+      })
+    );
+    stats.held = r.heldBytes();
+  };
+  const run = async (fn) => {
+    for (let i = 0; i < maxRounds; i++) {
+      try {
+        return fn();
+      } catch (e) {
+        if (e instanceof NeedBytes) await fetchRanges(e.ranges);
+        else if (e instanceof NeedInflate) inflated.set(e.key, await e.pending);
+        else throw e;
+      }
+    }
+    throw new Error('range reads did not converge');
+  };
+  await fetchRanges([[0, headBytes]]);
+  const api = await run(() => openHdf5Reader(r, inflateHere));
+  if (stats.eof === null && api.superblock.eof) stats.eof = api.superblock.eof;
+  return {
+    superblock: api.superblock,
+    skipped: api.skipped,
+    stats,
+    names: () => run(() => api.names()),
+    rootAttrs: () => run(() => api.rootAttrs()),
+    dataset: (name, opts = null) => run(() => api.dataset(name, opts))
+  };
 }
 // The shuffle filter's inverse: bytes stored byte-plane by byte-plane
 // (all first bytes, then all second bytes ...) back to element order.

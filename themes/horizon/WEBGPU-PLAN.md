@@ -10345,6 +10345,118 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 151st pass - THE WINDOW READ IN
+  PLACE; THE HOUR'S SKIN): the 148th-150th downloaded NOAA's whole
+  L2 files (4-5 MB each, five a set, 51 MB) to cut a 101 x 101
+  window from each, decoded them in a worker thread and guarded the
+  daemon's memory against them; the products worth having next were
+  full-disk files (SST 32 MB, downward shortwave 40 MB, band 2 at
+  half a kilometre 68 MB) that no whole download could afford on the
+  e2-micro. MEASURED FIRST: the buckets answer HTTP Range (206 with
+  the Content-Range total) and are CORS-open with it (an OPTIONS
+  preflight from https://ndev.tk allows GET with the range header;
+  the listing too), and NOAA chunks every field in FULL-WIDTH ROW
+  STRIPS - 52 rows x 2500 on the 2-km CONUS grid for the 16-bit
+  fields, 104 for the 8-bit flags, 24 x 5424 on the full disk - so
+  a window is two or three strips, never the file. (1) THE READER
+  (hdf5.js): a SparseReader holds the byte ranges fetched so far and
+  throws NeedBytes for an access outside them; openHdf5Lazy(readRange,
+  inflate) fetches the first 256 kB (NetCDF-4 writes its object
+  headers, attribute heaps and coordinate vectors up front), then
+  parses over what it holds and fetches what a parse lacked in 64 kB
+  blocks, replaying - so the ONE parser serves whole buffers and
+  range reads alike, and a Promise-returning inflate (the browser's
+  DecompressionStream) is awaited the same way (NeedInflate, cached
+  by chunk address). dataset(name, {window}) reads only the chunks a
+  window touches: the v1 chunk B-tree is pruned by its keys (the
+  chunks' lexicographic order - a subtree entirely before the
+  window's first row or after its last is never read), a level's
+  nodes and a window's chunks are asked for together (one fetch
+  round each), and the window is cut from the strips; contiguous
+  data by its rows. GATE (hdf5-reference, 2 landmarks): windows
+  inside a strip, across the strip boundary, clipped at the corner,
+  empty past the edge, on a contiguous axis, a scalar and h5py's
+  5x7-chunked mask all equal the whole reads element for element;
+  the vendored ACHAC file through counting range reads gives every
+  value of the whole read in 3 rounds (the head, then the strip),
+  4 kB blocks give the same in 12, the asynchronous inflate the
+  same in 2; the sparse reader's merging, NeedBytes and gap listing
+  pinned. MEASURED on the real files (every window pixel equal to
+  the whole decode's, zero mismatches): the 32 MB full-disk SST
+  window in 6 rounds and 1.09 MB (3.4%), the 40 MB DSR in 5 rounds
+  and 1.42 MB, the 4 MB mask in 4 rounds and 0.92 MB, the 3.8 MB
+  band-13 imagery in 3 rounds and 0.76 MB, the 5 MB COD in 4 rounds
+  and 0.80 MB, the 7 MB AOD in 4 rounds and 0.96 MB, the 0.3 MB
+  TPW in 1. (2) THE DAEMON: decodeL2Window(handle, spec, lat, lon,
+  halfPx) reads the frame, navigates the point, and reads ONLY that
+  window of each dataset; l2File holds windows per file and
+  tenth-degree cell (a dozen a product) instead of whole files; the
+  worker thread, the serial decode chain and the 150th's memory
+  guard are retired with the whole files they guarded (resident
+  size no longer moves with the products: ~130 MB with six windows
+  held). Against the live bucket: all six products cold in 1.2 s
+  (the whole-file path: 5.5-6.4 s and 51 MB for five) - the mask 4
+  ranges 896 kB of 4.2 MB in 465 ms, the imagery 3 ranges 736 kB of
+  3.8 MB, COD 4 ranges 824 kB of 5.0 MB, CPS 3 ranges 755 kB of
+  5.4 MB, the heights whole (325 kB), the SST 6 ranges 1065 kB of
+  32.3 MB in 767 ms. /probe lists each held window's kilobytes read
+  of its file's megabytes and the range counters. GATE
+  (server-reference): the vendored file through counting ranges
+  gives the whole decode's 21 x 21 home window pixel for pixel (340
+  tops, median 3056.6 m), an outside point reads nothing past the
+  frame, a whole-buffer handle agrees; the worker landmark retired.
+  (3) THE HOUR'S SKIN: ABI-L2-SSTF (full disk only - there is no
+  CONUS SST product - hourly, 2 km; SST as uint16 counts at
+  0.00244163 K from 180 K, fill 65535; DQF 0 good, 1 degraded, 2
+  severely degraded, 3 unprocessed - the file's own flag_meanings)
+  is the sixth product, never asked for a mosaic's minute (no
+  hourly file lies within 15 min of one); l2SstBody carries the
+  counts, the flags and goodCensus (DQF 0: n, good, min, median,
+  max) with the degraded count beside it. THE PAGE: unpackProduct
+  gives the kelvin; the NOAA line prints the hour's skin median
+  over the good pixels within +-100 km and, through
+  goesl2.sstAgainstGrid (every good pixel navigated to its lat/lon
+  and read from the MUR grid bilinearly), ABI minus MUR at the same
+  pixels - median, p10, p90 - with the caveat stated on the line:
+  ABI's product is the hour's SKIN temperature, MUR's analysed_sst
+  a foundation temperature below the diurnal warm layer, so a
+  daytime difference carries the day's warm layer as well as the
+  day between them, never blended; the overhead pixel beside the
+  theme's own sea temperature; a stable record "NOAA GOES-18 sea
+  surface temperature (SSTF)" with the stamp and the ABI - MUR
+  median in the value; the pick readout adds "NOAA SST". Measured
+  at 21:32Z: the 20:55Z file's window had 2412 good pixels of
+  10201 (240 degraded), skin 21.8 to 25.1 C, median 23.0 C; on the
+  page, ABI minus MUR (2026-09-04 09:00Z) read median +1.07 K
+  (p10/p90 +0.60/+1.59) over 2362 pixels - and the theme's own
+  COARE warm layer stood at +0.71 K at the surface that hour (the
+  pier's line), so two thirds of the skin-over-foundation difference
+  is the warm layer the theme already models and the rest the day
+  between the analyses: the comparison closes on the theme's own
+  physics rather than contradicting it. GATE
+  (goesl2-reference): goodCensus and sstAgainstGrid on a 3 x 3 home
+  window (five good pixels navigated within a tenth of a degree,
+  the analysis covering four, the median/p10/p90/mean pinned), the
+  product and the four flag meanings; (server-reference): an SST
+  body dressed on the fixture's grid censuses from 180 K counts,
+  recomputed from the wire exactly, six asks with their half widths
+  and the SST's timed: false. STATED LIMITS: the SST is skin, and a
+  daytime skin under a warm layer reads warmer than any bulk
+  measurement - the theme's own sea temperature (the pier's
+  thermistor, COARE's skin and warm-layer corrections) is not
+  replaced by it this pass, only set beside it; the analysis
+  comparison is at MUR's 0.05-degree stride; the page's own range
+  reads (the buckets being CORS-open) are the next pass's option -
+  the daemon stays the shared cache. THE DEPLOY, WATCHED: the live
+  daemon answered /goesl2 200 at 21:41Z with a 37-second uptime,
+  carrying the 149th's dcomp body and worker counter (the
+  self-update run that began after the 147th's deploy took the
+  newest main of its minute, the 149th plus the Prettier commit,
+  and gated it in forty minutes this time); the 150th and this
+  pass follow in their own runs. THE OTHER LARGE PRODUCTS the
+  reader now affords (DSRF surface irradiance against Open-Meteo's
+  satellite GHI, AODC/ADPC/TPWC aerosol and water against AERONET
+  and the model, band-2 reflectance at 0.5 km) are the 152nd's.
 - DONE (Sep 5, the review session's 150th pass - TODAY'S DROPLETS RING
   THE CORONA; THE DAEMON FITS ITS 512 MB): the 84th pass let VIIRS's
   effective radius, a day or more old, size the droplet corona, the

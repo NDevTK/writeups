@@ -51,7 +51,7 @@ import {
   SST_HALF_DEG,
   SST_STRIDE,
   decodeL2,
-  decodeL2Async,
+  decodeL2Window,
   l2Cell,
   l2DcompBody,
   l2FileUrl,
@@ -60,19 +60,22 @@ import {
   l2ListUrl,
   l2MaskBody,
   l2Prefixes,
+  l2SstBody,
   l2Window,
   L2_ASKS,
   L2_AT_MAX_AGE_MS,
   L2_COD_SPEC,
   L2_CPS_SPEC,
   L2_HALF_PX,
+  L2_HEAD_BYTES,
   L2_HEIGHT_SPEC,
-  L2_HELD_PER_PRODUCT,
+  L2_HELD_WINDOWS,
   L2_IMAGERY_SPEC,
   L2_LIST_MS,
   L2_MASK_SPEC,
+  L2_RANGE_BLOCK,
   L2_RETRY_MS,
-  L2_HELD_TRIM_MB,
+  L2_SST_SPEC,
   L2_WINDOW_MS,
   prune,
   pruneStrikes,
@@ -103,7 +106,15 @@ import {
 } from './server/src/index.mjs';
 
 import {haversineKm} from './lightning.js';
-import {dcompCensus, heightCensus, unpackArray, unscale} from './goesl2.js';
+import {
+  dcompCensus,
+  goodCensus,
+  heightCensus,
+  unpackArray,
+  unscale
+} from './goesl2.js';
+import {openHdf5, openHdf5Lazy} from './hdf5.js';
+import {inflateSync} from 'node:zlib';
 import {ACHAC_B64, ACHAC_NAME} from './hdf5-fixture.js';
 
 let fail = 0;
@@ -761,7 +772,7 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_LIST_MS === 60e3 &&
       L2_RETRY_MS === 2 * 60e3 &&
       L2_WINDOW_MS === 15 * 60e3 &&
-      L2_HELD_PER_PRODUCT === 2 &&
+      L2_HELD_WINDOWS === 12 &&
       L2_AT_MAX_AGE_MS === 7 * 86400e3 &&
       l2ListUrl('noaa-goes18', 'ABI-L2-ACMC/2026/248/19/') ===
         'https://noaa-goes18.s3.amazonaws.com/?list-type=2&prefix=ABI-L2-ACMC%2F2026%2F248%2F19%2F&max-keys=1000' &&
@@ -770,33 +781,91 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       pre.length === 2 &&
       pre[0] === 'ABI-L2-ACMC/2026/248/20/' &&
       pre[1] === 'ABI-L2-ACMC/2026/248/19/',
-    `the vendored ${ACHAC_NAME} decodes to G18 CONUS at ${dec && dec.time} (LZA bound ${dec && dec.lzaMaxDeg}, 500x300, HT as float32 metres with NaN fill, DQF bytes); the tenth-degree cell (32.9/-117.1) cuts the 21x21 window at pixel (424, 127) - the goesl2 gate's own pin - with ${body && body.census.n} retrieved tops, median ${body && body.census.medianM.toFixed(1)} m, ${body && body.pixel.ewM} x ${body && body.pixel.nsM} m pixels at the slant; the packed heights unpack to the same census; the sub-satellite point is outside the scene (null); a missing dataset -> null (502), and the mask body on a height decode is null, never a throw; the listing and file URLs and the this-hour/last-hour prefixes are pinned; listings stand ${L2_LIST_MS / 1000} s, ${L2_HELD_PER_PRODUCT} decoded files per product, ?t= reaches ${L2_AT_MAX_AGE_MS / 86400e3} days back`
+    `the vendored ${ACHAC_NAME} decodes to G18 CONUS at ${dec && dec.time} (LZA bound ${dec && dec.lzaMaxDeg}, 500x300, HT as float32 metres with NaN fill, DQF bytes); the tenth-degree cell (32.9/-117.1) cuts the 21x21 window at pixel (424, 127) - the goesl2 gate's own pin - with ${body && body.census.n} retrieved tops, median ${body && body.census.medianM.toFixed(1)} m, ${body && body.pixel.ewM} x ${body && body.pixel.nsM} m pixels at the slant; the packed heights unpack to the same census; the sub-satellite point is outside the scene (null); a missing dataset -> null (502), and the mask body on a height decode is null, never a throw; the listing and file URLs and the this-hour/last-hour prefixes are pinned; listings stand ${L2_LIST_MS / 1000} s, ${L2_HELD_WINDOWS} decoded windows per product, ?t= reaches ${L2_AT_MAX_AGE_MS / 86400e3} days back`
   );
-  // The decode worker (the event loop keeps serving while a 4 MB
-  // mask inflates): the same bytes through the worker come back as
-  // the main thread's decode, typed arrays and all
-  const t0 = Date.now();
-  const decW = await decodeL2Async(bytes, L2_HEIGHT_SPEC);
-  const ms = Date.now() - t0;
-  const sum = (a) => {
-    let s = 0;
-    for (const v of a) if (Number.isFinite(v)) s += v;
-    return s;
+  // THE WINDOW READ IN PLACE (151st pass): the daemon's decode reads
+  // the vendored file by ranges - a counting readRange over the
+  // same bytes, the daemon's own block and head sizes - and the
+  // window it returns is the whole-file decode's cut, pixel for
+  // pixel; an outside point reads nothing past the frame; a
+  // whole-buffer handle gives the same through the same code.
+  const inflate = (u8) =>
+    new Uint8Array(
+      inflateSync(Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength))
+    );
+  const reads = [];
+  const readRange = async (s, e) => {
+    reads.push([s, Math.min(e, bytes.length)]);
+    return bytes.subarray(s, Math.min(e, bytes.length));
   };
+  const t0 = Date.now();
+  const lazy = await openHdf5Lazy(readRange, inflate, {
+    blockBytes: L2_RANGE_BLOCK,
+    headBytes: L2_HEAD_BYTES
+  });
+  const decR = await decodeL2Window(
+    lazy,
+    L2_HEIGHT_SPEC,
+    cell.lat,
+    cell.lon,
+    10
+  );
+  const ms = Date.now() - t0;
+  const bodyR = decR ? l2HeightBody(decR, 'k', cell.lat, cell.lon) : null;
+  const same = (a, b) =>
+    a.length === b.length &&
+    Array.from(a).every(
+      (v, i) => v === b[i] || (Number.isNaN(v) && Number.isNaN(b[i]))
+    );
+  const readsBefore = reads.length;
+  const outsideR = await decodeL2Window(lazy, L2_HEIGHT_SPEC, 0, -137, 10);
+  const wholeR = await decodeL2Window(
+    openHdf5(bytes, inflate),
+    L2_HEIGHT_SPEC,
+    cell.lat,
+    cell.lon,
+    10
+  );
   check(
-    'the decode worker returns the main thread’s decode',
-    decW !== null &&
-      dec !== null &&
-      decW.time === dec.time &&
-      decW.platform === dec.platform &&
-      decW.x.n === dec.x.n &&
-      decW.data.HT instanceof Float32Array &&
-      decW.data.DQF instanceof Uint8Array &&
-      decW.data.HT.length === dec.data.HT.length &&
-      Math.abs(sum(decW.data.HT) - sum(dec.data.HT)) < 1e-3 &&
-      sum(decW.data.DQF) === sum(dec.data.DQF) &&
-      JSON.stringify(decW.proj) === JSON.stringify(dec.proj),
-    `a worker thread imported this module (main() guarded by import.meta.url), decoded the vendored file and posted ${decW && decW.data.HT.length} heights back as Float32Array with the same sum, DQF and projection - in ${ms} ms including the worker's start`
+    'THE WINDOW READ IN PLACE: ranges of the file give the whole decode’s window',
+    decR !== null &&
+      w !== null &&
+      decR.time === dec.time &&
+      decR.platform === 'G18' &&
+      decR.lzaMaxDeg === 70 &&
+      decR.x.n === 500 &&
+      decR.y.n === 300 &&
+      decR.box.i === 424 &&
+      decR.box.j === 127 &&
+      decR.box.rows === 21 &&
+      decR.box.cols === 21 &&
+      decR.data.HT instanceof Float32Array &&
+      decR.data.HT.length === 441 &&
+      same(decR.data.HT, w.cut.HT) &&
+      same(decR.data.DQF, w.cut.DQF) &&
+      bodyR !== null &&
+      bodyR.census.n === body.census.n &&
+      bodyR.census.medianM === body.census.medianM &&
+      bodyR.pixel.ewM === body.pixel.ewM &&
+      bodyR.box.i0 === body.box.i0 &&
+      // the reads: the head, then the chunk index and the chunks of
+      // the one strip the window lies in - whole blocks, merged
+      lazy.stats.rounds === 3 &&
+      lazy.stats.ranges === 3 &&
+      lazy.stats.bytes === bytes.length &&
+      reads[0][0] === 0 &&
+      reads[0][1] === L2_HEAD_BYTES &&
+      L2_RANGE_BLOCK === 65536 &&
+      L2_HEAD_BYTES === 262144 &&
+      outsideR !== null &&
+      outsideR.box === null &&
+      outsideR.data === null &&
+      l2HeightBody(outsideR, 'k', 0, -137) === null &&
+      reads.length === readsBefore &&
+      wholeR !== null &&
+      same(wholeR.data.HT, decR.data.HT) &&
+      wholeR.box.i === 424,
+    `the vendored ${ACHAC_NAME} read by ${lazy.stats.ranges} ranges in ${lazy.stats.rounds} rounds (${lazy.stats.bytes} of its ${bytes.length} bytes: the ${L2_HEAD_BYTES}-byte head, then the strip the home window lies in) gives the 21x21 home window at (424, 127) pixel for pixel - ${bodyR && bodyR.census.n} tops, median ${bodyR && bodyR.census.medianM.toFixed(1)} m - in ${ms} ms; the sub-satellite point answers box null with nothing more read; a whole-buffer handle through the same decode agrees`
   );
   // The imagery and DCOMP windows (149th pass): the raw16 mode
   // keeps the counts with the file's own scaling (tried on the
@@ -884,6 +953,35 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
   const dqBack = dc ? unpackArray(dc.dqf) : null;
   const dcAgain = dc ? dcompCensus(codBack, cpsBack, dqBack) : null;
   const noCps = l2DcompBody(codDec, null, 'kc', null, cell.lat, cell.lon);
+  // a synthetic SST decode on the fixture's grid (151st): counts =
+  // the HT counts (0.00244163 K each from 180 K), DQF 0 where
+  // retrieved, every 7th retrieved pixel degraded (1), 3 where fill
+  const sstArr = new Uint16Array(raw.data.HT.length);
+  const sstDqf = new Uint8Array(raw.data.HT.length);
+  let kept = 0;
+  for (let q = 0; q < sstArr.length; q++) {
+    const h = raw.data.HT[q];
+    sstArr[q] = h;
+    if (h === 65535) sstDqf[q] = 3;
+    else sstDqf[q] = ++kept % 7 === 0 ? 1 : 0;
+  }
+  const sstDec = {
+    ...raw,
+    data: {SST: sstArr, DQF: sstDqf},
+    meta: {SST: {scale: 0.00244163, offset: 180, fill: 65535, units: 'K'}}
+  };
+  const ss = l2SstBody(sstDec, 'ks', cell.lat, cell.lon);
+  const ssBack = ss
+    ? unscale(unpackArray(ss.sst), {
+        scale: ss.sstScale,
+        offset: ss.sstOffset,
+        fill: ss.sstFill
+      })
+    : null;
+  const ssDq = ss ? unpackArray(ss.dqf) : null;
+  const ssAgain = ss ? goodCensus(ssBack, ssDq) : null;
+  let ssDegraded = 0;
+  if (ssDq) for (const v of ssDq) if (v === 1) ssDegraded++;
   check(
     'the imagery and DCOMP windows (/goesl2, 149th)',
     rawOk &&
@@ -923,18 +1021,39 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       noCps !== null &&
       noCps.cps === null &&
       noCps.census.water.reffN === 0 &&
-      L2_ASKS.length === 5 &&
-      L2_ASKS.map((a) => a.id).join(',') === 'mask,height,imagery,cod,cps' &&
+      // the SST body (151st): the census over DQF 0 with the
+      // degraded count beside it, recomputed from the wire exactly
+      ss !== null &&
+      ss.product === 'ABI-L2-SSTF' &&
+      ss.sst.kind === 'u16' &&
+      ss.sstOffset === 180 &&
+      ss.sstFill === 65535 &&
+      ss.box.i === 424 &&
+      ss.box.rows === 101 &&
+      ss.census.good > 0 &&
+      ss.census.degraded > 0 &&
+      ss.census.good + ss.census.degraded <= ss.census.n &&
+      ss.census.minK >= 180 &&
+      ssAgain.good === ss.census.good &&
+      ssAgain.medianK === ss.census.medianK &&
+      ssDegraded === ss.census.degraded &&
+      L2_SST_SPEC.SST === 'raw16' &&
+      L2_SST_SPEC.DQF === 'raw' &&
+      L2_HALF_PX.sst === 50 &&
+      L2_ASKS.length === 6 &&
+      L2_ASKS.map((a) => a.id).join(',') ===
+        'mask,height,imagery,cod,cps,sst' &&
       L2_ASKS[2].band === 'C13' &&
+      L2_ASKS.map((a) => a.halfPx).join(',') === '50,10,50,50,50,50' &&
+      // the hourly full-disk SST is never asked for a mosaic's minute
+      L2_ASKS[5].timed === false &&
+      L2_ASKS.slice(0, 5).every((a) => a.timed === undefined) &&
       L2_IMAGERY_SPEC.CMI === 'raw16' &&
       L2_COD_SPEC.COD === 'raw16' &&
       L2_CPS_SPEC.CPS === 'raw16' &&
       // the CPS file's flags are the COD file's (measured): not held
-      L2_CPS_SPEC.DQF === undefined &&
-      // the memory guard (held arrays, not resident size) sits well
-      // under the service's 512 MB MemoryMax
-      L2_HELD_TRIM_MB === 160,
-    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; /goesl2 asks five products, the imagery by band C13`
+      L2_CPS_SPEC.DQF === undefined,
+    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; /goesl2 asks six products, the imagery by band C13, the hourly SST never for a mosaic's minute`
   );
 }
 

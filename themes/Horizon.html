@@ -456,6 +456,7 @@
         mercatorLatLon,
         pickSatellite,
         sstAnomalyField,
+        sstAt,
         sstNearest,
         tileIsBlank,
         VIEW_ZENITH_MAX_DEG,
@@ -469,6 +470,7 @@
         dcompOverPixels,
         fixedGridGeometry,
         maskAgreement,
+        sstAgainstGrid,
         unpackArray,
         unscale,
         windowIndexOf
@@ -6251,8 +6253,40 @@
       let goesL2 = null;
       let goesL2Reach = null;
       let goesL2Memo = null; // {obsAt, l2At, agreement}
+      let goesL2SstMemo = null; // {sstTime, gridTime, audit}
       let goesL2Busy = false;
       let goesL2Rerun = false;
+      // NOAA's skin SST at a place (151st pass): the window pixel's
+      // kelvin and flag, or null off the window / no retrieval
+      function goesL2SstAt(latDeg, lonDeg) {
+        const s = goesL2 && goesL2.sst;
+        if (!s || !s.sstK) return null;
+        const q = windowIndexOf(latDeg, lonDeg, s.g, s.x, s.y, s.box);
+        if (q < 0 || !Number.isFinite(s.sstK[q])) return null;
+        return {sstC: s.sstK[q] - 273.15, dqf: s.dqf ? s.dqf[q] : null};
+      }
+      // The hour's skin against the day-old MUR analysis at the same
+      // pixels (goesl2.sstAgainstGrid, gated), memoised per pair of
+      // stamps
+      function goesL2SstAudit() {
+        const s = goesL2 && goesL2.sst;
+        const grid = state.sstGrid;
+        if (!s || !s.sstK || !grid) return null;
+        if (
+          goesL2SstMemo &&
+          goesL2SstMemo.sstTime === s.time &&
+          goesL2SstMemo.gridTime === grid.time
+        )
+          return goesL2SstMemo.audit;
+        const audit = sstAgainstGrid(
+          s.sstK,
+          s.dqf,
+          {g: s.g, xCoord: s.x, yCoord: s.y, box: s.box},
+          (la, lo) => sstAt(grid, la, lo)
+        );
+        goesL2SstMemo = {sstTime: s.time, gridTime: grid.time, audit};
+        return audit;
+      }
       const unpackProduct = (p) =>
         p
           ? {
@@ -6277,6 +6311,14 @@
                 : null,
               cps: p.cps
                 ? unscale(unpackArray(p.cps), {scale: p.cpsScale, fill: p.fill})
+                : null,
+              // the hour's skin SST in kelvin (151st pass)
+              sstK: p.sst
+                ? unscale(unpackArray(p.sst), {
+                    scale: p.sstScale,
+                    offset: p.sstOffset,
+                    fill: p.sstFill
+                  })
                 : null
             }
           : null;
@@ -6327,9 +6369,13 @@
             imagery: unpackProduct(j.imagery),
             dcomp: unpackProduct(j.dcomp),
             imageryAt: null,
-            dcompAt: null
+            dcompAt: null,
+            // the hour's sea surface temperature (151st pass; the
+            // full-disk hourly file, never asked for a mosaic's minute)
+            sst: unpackProduct(j.sst)
           };
           goesL2Reach = null;
+          goesL2SstMemo = null;
           const m = goesL2.mask;
           const h = goesL2.height;
           // stable record names (the stamp rides in the value, so a
@@ -6359,6 +6405,17 @@
               `${dc.time.slice(11, 16)}Z · τ640 median ${dc.census.codMedian.toFixed(1)} over ${dc.census.retrieved} retrieved px` +
                 (dc.census.water.reffMedian !== null
                   ? ` · water r_eff ${dc.census.water.reffMedian.toFixed(1)} µm`
+                  : '')
+            );
+          const ss = goesL2.sst;
+          if (ss && ss.census.good)
+            record(
+              `NOAA ${j.craft} sea surface temperature (SSTF)`,
+              `${ss.time.slice(11, 16)}Z · skin median ${(ss.census.medianK - 273.15).toFixed(1)} °C over ` +
+                `${ss.census.good} good 2-km px within ±100 km (full disk, hourly)` +
+                (goesL2SstAudit() && goesL2SstAudit().n
+                  ? ` · ABI − MUR ${(goesL2SstAudit().medianK >= 0 ? '+' : '') + goesL2SstAudit().medianK.toFixed(2)} K ` +
+                    `at ${goesL2SstAudit().n} px`
                   : '')
             );
           if (
@@ -6727,6 +6784,37 @@
               line += ' · nothing retrieved overhead (clear)';
           } else
             line += ` · DCOMP ${dc.time.slice(11, 16)}Z: no daytime retrieval within ±100 km (night, or all clear)`;
+        }
+        // THE HOUR'S SKIN (151st pass): ABI's own sea surface
+        // temperature, read by HTTP range from the 32 MB full-disk
+        // file, beside the day-old MUR analysis at the same pixels
+        const ss = goesL2.sst;
+        if (ss && ss.census) {
+          const c = ss.census;
+          if (c.good) {
+            line +=
+              ` · sea surface (skin) temperature ${ss.time.slice(11, 16)}Z (ABI-L2-SSTF, full disk, hourly, ` +
+              `${(ss.pixel.ewM / 1000).toFixed(1)} × ${(ss.pixel.nsM / 1000).toFixed(1)} km px here): median ` +
+              `${(c.medianK - 273.15).toFixed(1)} °C over ${c.good} good px within ±100 km ` +
+              `(${(c.minK - 273.15).toFixed(1)} to ${(c.maxK - 273.15).toFixed(1)} °C` +
+              (c.degraded ? `; ${c.degraded} degraded, not counted` : '') +
+              `; the rest cloud, land or unprocessed)`;
+            const au = goesL2SstAudit();
+            if (au && au.n && state.sstGrid)
+              line +=
+                ` · vs MUR's analysis of ${state.sstGrid.time.slice(0, 10)} ${state.sstGrid.time.slice(11, 16)}Z at the same px: ` +
+                `ABI − MUR median ${sgn(au.medianK)} K (p10/p90 ${sgn(au.p10K)}/${sgn(au.p90K)}) over ${au.n} px - ` +
+                `the hour's skin over the day-old foundation temperature (the day's warm layer rides in the difference)`;
+            const here = goesL2SstAt(state.lat, state.lon);
+            if (here)
+              line +=
+                ` · overhead ${here.sstC.toFixed(1)} °C` +
+                (here.dqf === 1 ? ' (degraded)' : '') +
+                (Number.isFinite(state.sst)
+                  ? ` vs the theme's ${state.sst.toFixed(1)} °C`
+                  : '');
+          } else
+            line += ` · sea surface temperature ${ss.time.slice(11, 16)}Z: no good retrieval within ±100 km (cloud)`;
         }
         return line;
       }
@@ -12845,6 +12933,16 @@
                     ? ' r_eff ' + own.dcomp.reff.toFixed(0) + ' µm'
                     : '') +
                   (own.dcomp.ice ? ' ice' : ' water');
+              // NOAA's skin SST there (151st)
+              const skin =
+                goesObs.pxLat &&
+                goesL2SstAt(goesObs.pxLat[q], goesObs.pxLon[q]);
+              if (skin)
+                detail +=
+                  ', NOAA SST ' +
+                  skin.sstC.toFixed(1) +
+                  ' °C' +
+                  (skin.dqf === 1 ? ' (degraded)' : '');
             }
             // a clear low texel under a "low" pixel is the split
             // rule at work: the ceilometer reported no low layer,

@@ -26,6 +26,9 @@ import {
   heightCensus,
   indexOfScanAngle,
   keyBand,
+  goodCensus,
+  sstAgainstGrid,
+  SST_DQF_MEANINGS,
   latLonToFixedGrid,
   latestByStart,
   maskAgreement,
@@ -465,6 +468,80 @@ const inflate = (u8) =>
     `u8 ${u8.join('/')}, u16 ${u16.join('/')} and float32 (with NaN and null as fill) come back exact; ` +
       `every length 1..6 and 10201 round-trips; node's Buffer reads the daemon's base64 (${nodeReads}); ` +
       `a 101x101 mask is ${wire} bytes on the wire against ${digits} as JSON digits`
+  );
+}
+
+// ---- THE HOUR'S SKIN (151st pass) --------------------------------
+// goodCensus over a kelvin field with flags; sstAgainstGrid: every
+// good pixel navigated to its lat/lon and looked up in an analysis
+// field, ABI minus analysis in kelvin; the SST product and the
+// file's own flag meanings.
+{
+  const cen = goodCensus([300, NaN, 290, 310, 305], [0, 0, 1, 0, 0]);
+  const g = fixedGridGeometry({
+    semi_major_axis: 6378137,
+    semi_minor_axis: 6356752.31414,
+    perspective_point_height: 35786023,
+    longitude_of_projection_origin: -137
+  });
+  const x = {scale: 0.000056, offset: -0.069972, n: 2500};
+  const y = {scale: -0.000056, offset: 0.128212, n: 1500};
+  const box = windowBox(32.85, -117.12, g, x, y, x.n, y.n, 1);
+  // a 3x3 window: kelvin at the corners and centre, NaN and a
+  // degraded pixel left out; the "analysis" answers 20 C everywhere
+  // except at one pixel it does not cover
+  const sstK = [
+    295.15,
+    NaN,
+    293.15,
+    296.15,
+    294.15,
+    293.15,
+    NaN,
+    297.15,
+    293.15
+  ];
+  const dqf = [0, 0, 1, 0, 0, 0, 0, 0, 3];
+  const seen = [];
+  const au = sstAgainstGrid(
+    sstK,
+    dqf,
+    {g, xCoord: x, yCoord: y, box},
+    (la, lo) => {
+      seen.push([la, lo]);
+      return seen.length === 3 ? null : 20;
+    }
+  );
+  // good pixels: q0 +2, q3 +3, q4 +1, q5 0, q7 +4 -> the third lookup
+  // (q4) is null -> diffs [2, 3, 0, 4] sorted [0, 2, 3, 4]
+  check(
+    "THE HOUR'S SKIN: the census and the analysis comparison",
+    cen.n === 5 &&
+      cen.good === 3 &&
+      cen.minK === 300 &&
+      cen.medianK === 305 &&
+      cen.maxK === 310 &&
+      box !== null &&
+      box.rows === 3 &&
+      box.cols === 3 &&
+      au.n === 4 &&
+      au.medianK === 3 &&
+      au.p10K === 0 &&
+      au.p90K === 4 &&
+      near(au.meanK, 2.25, 1e-9) &&
+      seen.length === 5 &&
+      seen.every(
+        ([la, lo]) => Math.abs(la - 32.85) < 0.1 && Math.abs(lo + 117.12) < 0.1
+      ) &&
+      L2_PRODUCTS.sst === 'ABI-L2-SSTF' &&
+      SST_DQF_MEANINGS.length === 4 &&
+      SST_DQF_MEANINGS[0] === 'good_quality_qf' &&
+      SST_DQF_MEANINGS[1] === 'degraded_quality_qf',
+    `goodCensus counts ${cen.good} good of ${cen.n} (a NaN and a degraded pixel out), min/median/max ` +
+      `${cen.minK}/${cen.medianK}/${cen.maxK} K; over a 3x3 home window five good pixels are navigated ` +
+      `within a tenth of a degree of the point, the analysis covers four, and ABI minus analysis ` +
+      `reads median +${au.medianK} K (p10/p90 +${au.p10K}/+${au.p90K}, mean +${au.meanK}); the SST product ` +
+      `is ${L2_PRODUCTS.sst} with the file's four flag meanings`
   );
 }
 

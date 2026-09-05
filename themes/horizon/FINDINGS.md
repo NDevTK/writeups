@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **143 CPU reference files printing
-1136 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
+1139 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **143 reference files, 1136 landmark lines, 7 GPU probes** (live gate
+- **143 reference files, 1139 landmark lines, 7 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -796,11 +796,28 @@ The practice the corpus demonstrates, stated so it can be reused:
    sizes the corona, the overcast veil and the lee-wave deck, and
    VIIRS's day-old radius stands again when DCOMP retrieves nothing
    (night, or a clear window); one function, `dropletSource`, is the
-   only place the drawing asks (`goesl2-reference` THE IMAGERY
-   AND DCOMP; `server-reference` the imagery and DCOMP windows;
-   `hdf5-reference` THE PRODUCT FILE,
-   H5PY'S EARLIEST/LATEST FILES; `goesl2-reference` THE FIXED GRID,
-   THE WINDOW, THE CENSUSES, THE WIRE; `server-reference` NOAA
+   only place the drawing asks. Pass 151 reads the files in place:
+   the buckets answer HTTP Range (and are CORS-open with it,
+   measured) and NOAA chunks every field in full-width row strips,
+   so the pure reader gained a sparse mode — the first 256 kB, then
+   only the strips a window touches, the chunk index pruned by its
+   own keys, every parse replayed over the bytes fetched so far —
+   and a ±100 km window of the 32 MB full-disk sea-surface
+   temperature file costs about 1 MB in six round trips, the 4 MB
+   mask about 0.9 MB in four, every window pixel equal to the
+   whole-file decode's (zero mismatches on seven products; the
+   daemon's six products cold in 1.2 s where five took 6 s and 51 MB,
+   the worker thread and memory guard retired with the whole files).
+   That affords the hour's skin SST as the sixth product, set beside
+   the day-old MUR analysis at the same pixels with the warm-layer
+   caveat stated (ABI is skin, MUR foundation), never blended
+   (`hdf5-reference` THE WINDOW READ, THE RANGE READ;
+   `server-reference` THE WINDOW READ IN PLACE; `goesl2-reference`
+   THE HOUR'S SKIN; and from passes 148-150: `goesl2-reference` THE
+   IMAGERY AND DCOMP; `server-reference` the imagery and DCOMP
+   windows; `hdf5-reference` THE PRODUCT FILE, H5PY'S
+   EARLIEST/LATEST FILES; `goesl2-reference` THE FIXED GRID, THE
+   WINDOW, THE CENSUSES, THE WIRE; `server-reference` NOAA
    cloud-product windows).
 
 ---

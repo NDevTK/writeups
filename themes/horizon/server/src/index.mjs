@@ -107,15 +107,15 @@ import {
   surfaceQaClean
 } from '../../modis-land.js';
 import {inflateSync} from 'node:zlib';
-import {Worker} from 'node:worker_threads';
 import {pickSatellite} from '../../satellites.js';
-import {openHdf5, physicalValues} from '../../hdf5.js';
+import {openHdf5, openHdf5Lazy, physicalValues} from '../../hdf5.js';
 import {
   bandKeys,
   bucketPrefix,
   cutWindow,
   dcompCensus,
   fixedGridGeometry,
+  goodCensus,
   heightCensus,
   IMAGERY_BAND,
   L2_BUCKETS,
@@ -937,21 +937,32 @@ export function parseSst(j) {
 // DQF on the 2-km CONUS grid, every 5 min) and the cloud top height
 // (ABI-L2-ACHAC: HT on the 10-km grid) from the NOAA Open Data
 // buckets (noaa-goes18 for GOES-West, noaa-goes19 for GOES-East;
-// anonymous S3, no CORS on the listing - the daemon lists and
-// fetches). A file is ~4 MB (mask) / ~330 kB (heights); the pure
-// reader (hdf5.js, gated against h5py) decodes it in ~2 s here, so
-// ONE decoded file per satellite and product is held for the
-// product's own cadence and every window is cut from it in
-// milliseconds. The page compares its own field with NOAA's at the
-// same pixels (goesl2.js maskAgreement); the decks keep the theme's
-// field - stated in goesl2.js. The pure pieces are exported for
+// anonymous S3 - and CORS-open with Range, measured in the 151st
+// pass: the page could read them itself). The 151st pass reads
+// each file by HTTP RANGE (hdf5.js openHdf5Lazy): the first quarter
+// megabyte carries the object headers and coordinate vectors, then
+// only the chunks a window touches - NOAA chunks these files in
+// full-width row strips (52 rows on the 2-km CONUS grid, 24 on the
+// full disk), so a 101 x 101 window is two or three strips. Measured
+// on the files themselves: the 4 MB mask in 4 rounds and 0.9 MB, the
+// 3.8 MB band-13 imagery in 3 rounds and 0.76 MB, the 32 MB
+// full-disk SST in 6 rounds and 1.1 MB - every window pixel equal to
+// the whole-file decode's (hdf5-reference.mjs). Windows are held
+// per satellite, product, file and tenth-degree cell (tens of kB
+// each; the whole-file decodes of the 148th-150th passes, 15 MB
+// apiece, their worker thread and memory guard are retired). The
+// page compares its own field with NOAA's at the same pixels
+// (goesl2.js maskAgreement); the decks keep the theme's field -
+// stated in goesl2.js. The pure pieces are exported for
 // server-reference.mjs.
-export const L2_HALF_PX = {mask: 50, height: 10}; // +-100 km on 2-km / 10-km grids
+export const L2_HALF_PX = {mask: 50, height: 10, sst: 50}; // +-100 km on 2-km / 10-km grids
 export const L2_LIST_MS = 60e3; // a bucket listing stands a minute (the cheap part)
 export const L2_RETRY_MS = 2 * 60e3; // after a listing or fetch failure
 export const L2_WINDOW_MS = 15 * 60e3; // windows outlive their file by design: a new file keys new windows
-export const L2_HELD_PER_PRODUCT = 2; // decoded files held per satellite and product (the newest and the mosaic's; five products x ~15 MB each, twice, per satellite)
+export const L2_HELD_WINDOWS = 12; // decoded windows held per satellite and product (the newest and the mosaics' stamps, the cells asked)
 export const L2_AT_MAX_AGE_MS = 7 * 86400e3; // how far back ?t= may ask
+export const L2_RANGE_BLOCK = 65536; // range reads are whole 64 kB blocks (a B-tree node and its neighbours in one)
+export const L2_HEAD_BYTES = 262144; // the first read: NetCDF-4's headers and coordinate vectors live up front
 export const L2_LIST_KEYS = 1000; // an hour of CMIPC lists 16 bands x 12 files
 export function l2ListUrl(bucket, prefix) {
   return (
@@ -998,43 +1009,44 @@ export const L2_COD_SPEC = {COD: 'raw16', DQF: 'raw16'};
 // 149th), so only the radii are held - 7.5 MB a file kept out of a
 // 512 MB service (horizon-live.service MemoryMax)
 export const L2_CPS_SPEC = {CPS: 'raw16'};
-// when the decoded arrays the daemon holds (counted exactly: ~50 MB
-// a set of five files) grow past this, the decoded files are
-// trimmed to the newest per product. The service is OOM-killed at
-// 512 MB resident, and resident size is the wrong gauge for the
-// trim: V8 keeps ~200 MB of heap and worker residue that no
-// eviction returns (measured: 236-254 MB resident with five files
-// held), so a resident-size trim would oscillate. One satellite's
-// two sets (~100 MB) fit under this; a second satellite's sets trip
-// it and only the newest file of each product stays.
-export const L2_HELD_TRIM_MB = 160;
-// what /goesl2 fetches for a point: product, spec, the imagery's
-// band (the CMIPC prefix lists every band's file)
+// The 151st pass: the sea surface (skin) temperature's counts (uint16
+// at 0.00244163 K from 180 K, fill 65535) with its flags (0 good, 1
+// degraded, 2 severely degraded, 3 unprocessed - the file's own
+// flag_meanings, goesl2.SST_DQF_MEANINGS)
+export const L2_SST_SPEC = {SST: 'raw16', DQF: 'raw'};
+// what /goesl2 fetches for a point: product, spec, the window's half
+// width on the product's grid, the imagery's band (the CMIPC prefix
+// lists every band's file); timed false = not asked for a mosaic's
+// minute (the hourly full-disk SST has no file within 15 min of it)
 export const L2_ASKS = [
-  {id: 'mask', product: L2_PRODUCTS.mask, spec: L2_MASK_SPEC},
-  {id: 'height', product: L2_PRODUCTS.height, spec: L2_HEIGHT_SPEC},
+  {id: 'mask', product: L2_PRODUCTS.mask, spec: L2_MASK_SPEC, halfPx: 50},
+  {id: 'height', product: L2_PRODUCTS.height, spec: L2_HEIGHT_SPEC, halfPx: 10},
   {
     id: 'imagery',
     product: L2_PRODUCTS.imagery,
     spec: L2_IMAGERY_SPEC,
-    band: IMAGERY_BAND
+    band: IMAGERY_BAND,
+    halfPx: 50
   },
-  {id: 'cod', product: L2_PRODUCTS.cod, spec: L2_COD_SPEC},
-  {id: 'cps', product: L2_PRODUCTS.cps, spec: L2_CPS_SPEC}
+  {id: 'cod', product: L2_PRODUCTS.cod, spec: L2_COD_SPEC, halfPx: 50},
+  {id: 'cps', product: L2_PRODUCTS.cps, spec: L2_CPS_SPEC, halfPx: 50},
+  {
+    id: 'sst',
+    product: L2_PRODUCTS.sst,
+    spec: L2_SST_SPEC,
+    halfPx: 50,
+    timed: false
+  }
 ];
 const l2Scalar = (a) => (Array.isArray(a) ? a[0] : a);
 const l2Inflate = (u8) =>
   new Uint8Array(
     inflateSync(Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength))
   );
-// null = not a product file the daemon can read (the route answers
-// 502 and the journal names the dataset).
-export function decodeL2(bytes, spec, inflate = l2Inflate) {
-  const f = openHdf5(bytes, inflate);
-  const projD = f.dataset('goes_imager_projection');
-  const xd = f.dataset('x');
-  const yd = f.dataset('y');
-  const td = f.dataset('t');
+// The product's frame from its datasets: the projection's
+// attributes, the coordinate vectors' scaling and length, the time;
+// null when any is missing or unread.
+function l2Frame(projD, xd, yd, td) {
   if (!projD || !xd || !yd || !td) return null;
   if (!xd.values || xd.values.unread || !yd.values || yd.values.unread)
     return null;
@@ -1056,103 +1068,134 @@ export function decodeL2(bytes, spec, inflate = l2Inflate) {
   const y = coord(yd);
   if (![x.scale, x.offset, y.scale, y.offset].every(Number.isFinite))
     return null;
-  const root = f.rootAttrs();
-  const data = {};
-  const meta = {};
-  for (const [name, mode] of Object.entries(spec)) {
-    const d = f.dataset(name);
-    if (!d || !d.values || d.values.unread) return null;
-    if (d.values.length !== x.n * y.n) return null;
-    if (mode === 'raw') data[name] = d.values;
-    else if (mode === 'phys') data[name] = physicalValues(d);
-    else if (mode === 'raw16') {
-      // the counts as stored, with the file's own scaling beside
-      // them (a signed int16 fill of -1 becomes 65535 on the wire)
-      data[name] = d.values;
-      meta[name] = {
+  return {proj, x, y, time: productTimeIso(td.values[0])};
+}
+// One dataset in its spec mode - {value, meta} or null when unread
+// or not the expected size: raw bytes, the physical field, the
+// counts as stored with the file's own scaling beside them (a
+// signed int16 fill of -1 becomes 65535 on the wire), or a percent
+// byte.
+function l2Convert(d, mode, n) {
+  if (!d || !d.values || d.values.unread) return null;
+  if (d.values.length !== n) return null;
+  if (mode === 'raw') return {value: d.values, meta: null};
+  if (mode === 'phys') return {value: physicalValues(d), meta: null};
+  if (mode === 'raw16')
+    return {
+      value: d.values,
+      meta: {
         scale: l2Scalar(d.attrs.scale_factor) ?? 1,
         offset: l2Scalar(d.attrs.add_offset) ?? 0,
         fill: l2Scalar(d.attrs._FillValue) ?? 65535,
         units: d.attrs.units ?? null
-      };
-    } else {
-      const ph = physicalValues(d);
-      const pct = new Uint8Array(ph.length);
-      for (let q = 0; q < ph.length; q++)
-        pct[q] = Number.isFinite(ph[q]) ? Math.round(100 * ph[q]) : 255;
-      data[name] = pct;
-    }
+      }
+    };
+  const ph = physicalValues(d);
+  const pct = new Uint8Array(ph.length);
+  for (let q = 0; q < ph.length; q++)
+    pct[q] = Number.isFinite(ph[q]) ? Math.round(100 * ph[q]) : 255;
+  return {value: pct, meta: null};
+}
+const l2Tail = (root, lza) => ({
+  platform: root.platform_ID ?? null,
+  scene: root.scene_id ?? null,
+  start: root.time_coverage_start ?? null,
+  end: root.time_coverage_end ?? null,
+  lzaMaxDeg:
+    lza && lza.values && !lza.values.unread ? Number(lza.values[1]) : null
+});
+// The whole grid from whole bytes (the gate's path, and any caller
+// holding a file). null = not a product file the daemon can read
+// (the route answers 502 and the journal names the dataset).
+export function decodeL2(bytes, spec, inflate = l2Inflate) {
+  const f = openHdf5(bytes, inflate);
+  const frame = l2Frame(
+    f.dataset('goes_imager_projection'),
+    f.dataset('x'),
+    f.dataset('y'),
+    f.dataset('t')
+  );
+  if (!frame) return null;
+  const data = {};
+  const meta = {};
+  for (const [name, mode] of Object.entries(spec)) {
+    const c = l2Convert(f.dataset(name), mode, frame.x.n * frame.y.n);
+    if (!c) return null;
+    data[name] = c.value;
+    if (c.meta) meta[name] = c.meta;
   }
   const lza =
     f.dataset('quantitative_local_zenith_angle_bounds') ??
     f.dataset('local_zenith_angle_bounds');
+  return {...frame, ...l2Tail(f.rootAttrs(), lza), data, meta};
+}
+// The window decode (151st pass) over a range-read handle
+// (hdf5.js openHdf5Lazy) - or a whole-buffer one, every call
+// awaited either way: the frame first (the projection, the
+// coordinate vectors, the time: the file's first quarter megabyte),
+// the window's box from the point, then ONLY that window of each
+// dataset. null = not a product file; box null = the point is
+// outside the scene (nothing more was read).
+export async function decodeL2Window(f, spec, lat, lon, halfPx) {
+  const frame = l2Frame(
+    await f.dataset('goes_imager_projection'),
+    await f.dataset('x'),
+    await f.dataset('y'),
+    await f.dataset('t')
+  );
+  if (!frame) return null;
+  const lza =
+    (await f.dataset('quantitative_local_zenith_angle_bounds')) ??
+    (await f.dataset('local_zenith_angle_bounds'));
+  const head = {...frame, ...l2Tail(await f.rootAttrs(), lza)};
+  const g = fixedGridGeometry(frame.proj);
+  const box = windowBox(
+    lat,
+    lon,
+    g,
+    frame.x,
+    frame.y,
+    frame.x.n,
+    frame.y.n,
+    halfPx
+  );
+  if (!box) return {...head, box: null, pixel: null, data: null, meta: null};
+  const window = [
+    [box.j0, box.j0 + box.rows],
+    [box.i0, box.i0 + box.cols]
+  ];
+  const data = {};
+  const meta = {};
+  for (const [name, mode] of Object.entries(spec)) {
+    const c = l2Convert(
+      await f.dataset(name, {window}),
+      mode,
+      box.rows * box.cols
+    );
+    if (!c) return null;
+    data[name] = c.value;
+    if (c.meta) meta[name] = c.meta;
+  }
   return {
-    proj,
-    x,
-    y,
-    time: productTimeIso(td.values[0]),
-    platform: root.platform_ID ?? null,
-    scene: root.scene_id ?? null,
-    start: root.time_coverage_start ?? null,
-    end: root.time_coverage_end ?? null,
-    lzaMaxDeg:
-      lza && lza.values && !lza.values.unread ? Number(lza.values[1]) : null,
+    ...head,
+    box,
+    pixel: pixelSizeM(box, g, frame.x, frame.y),
     data,
     meta
   };
 }
-// The decode in a worker thread, so the daemon's event loop keeps
-// serving its streams while the 4 MB mask file inflates (2 s here,
-// measured): the worker imports this module - main() is guarded by
-// import.meta.url, so nothing listens twice - runs the same decodeL2
-// on the same bytes and posts the decoded typed arrays back
-// (structured clone, ~15 MB, milliseconds). Rejects when the worker
-// cannot start or dies; the caller falls back to the main thread
-// and counts it.
-export function decodeL2Async(bytes, spec) {
-  return new Promise((resolve, reject) => {
-    let w;
-    try {
-      w = new Worker(
-        "const {parentPort, workerData} = require('node:worker_threads');" +
-          'import(workerData.url).then((m) => {' +
-          '  parentPort.postMessage(' +
-          '    m.decodeL2(new Uint8Array(workerData.bytes), workerData.spec)' +
-          '  );' +
-          '});',
-        {
-          eval: true,
-          workerData: {url: import.meta.url, bytes: bytes.buffer, spec}
-        }
-      );
-    } catch (e) {
-      reject(e);
-      return;
-    }
-    let done = false;
-    w.once('message', (dec) => {
-      done = true;
-      resolve(dec);
-      w.terminate();
-    });
-    w.once('error', (e) => {
-      if (!done) {
-        done = true;
-        reject(e);
-      }
-    });
-    w.once('exit', (code) => {
-      if (!done) {
-        done = true;
-        reject(new Error('decode worker exit ' + code));
-      }
-    });
-  });
-}
 // The window around a point on a decoded product: the index box,
 // the pixel's ground size at the view's slant, and every kept
-// dataset cut to it; null when the point is outside the scene.
+// dataset cut to it; null when the point is outside the scene. A
+// window decode (decodeL2Window) is already cut - its own box and
+// arrays, as plain arrays for the bodies.
 export function l2Window(dec, lat, lon, halfPx) {
+  if (dec.box !== undefined) {
+    if (!dec.box || !dec.data) return null;
+    const cut = {};
+    for (const [n, arr] of Object.entries(dec.data)) cut[n] = Array.from(arr);
+    return {box: dec.box, pixel: dec.pixel, cut};
+  }
   const g = fixedGridGeometry(dec.proj);
   const box = windowBox(lat, lon, g, dec.x, dec.y, dec.x.n, dec.y.n, halfPx);
   if (!box) return null;
@@ -1179,7 +1222,8 @@ const l2Common = (dec, product, key, w) => ({
     ? {ewM: Math.round(w.pixel.ewM), nsM: Math.round(w.pixel.nsM)}
     : null
 });
-const l2Has = (dec, spec) => Object.keys(spec).every((n) => dec.data[n]);
+const l2Has = (dec, spec) =>
+  !!dec.data && Object.keys(spec).every((n) => dec.data[n]);
 export function l2MaskBody(dec, key, lat, lon) {
   if (!l2Has(dec, L2_MASK_SPEC)) return null;
   const w = l2Window(dec, lat, lon, L2_HALF_PX.mask);
@@ -1221,10 +1265,6 @@ export function l2ImageryBody(dec, key, lat, lon) {
   if (!w) return null;
   const m = dec.meta.CMI ?? {scale: 1, offset: 0, fill: -1};
   const btK = unscale(w.cut.CMI, m);
-  const good = [];
-  for (let q = 0; q < btK.length; q++)
-    if (Number.isFinite(btK[q]) && w.cut.DQF[q] === 0) good.push(btK[q]);
-  good.sort((a, b) => a - b);
   return {
     ...l2Common(dec, L2_PRODUCTS.imagery, key, w),
     band: IMAGERY_BAND,
@@ -1233,13 +1273,31 @@ export function l2ImageryBody(dec, key, lat, lon) {
     btOffset: m.offset,
     btFill: 65535,
     dqf: packArray(w.cut.DQF, 'u8'),
-    census: {
-      n: btK.length,
-      good: good.length,
-      minK: good.length ? good[0] : null,
-      medianK: quantile(good, 0.5),
-      maxK: good.length ? good[good.length - 1] : null
-    }
+    census: goodCensus(btK, w.cut.DQF)
+  };
+}
+// The sea surface temperature window (151st pass): ABI's own skin
+// SST (ABI-L2-SSTF: full disk, hourly, 2 km) as counts with the
+// file's scaling, its flags, and the census over good pixels (DQF
+// 0) with the degraded count (DQF 1) beside it. The page sets it
+// beside the day-old MUR analysis at the same pixels - a fresher
+// measurement, stated on the line.
+export function l2SstBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_SST_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.sst);
+  if (!w) return null;
+  const m = dec.meta.SST ?? {scale: 1, offset: 0, fill: 65535};
+  const sstK = unscale(w.cut.SST, m);
+  let degraded = 0;
+  for (const q of w.cut.DQF) if (q === 1) degraded++;
+  return {
+    ...l2Common(dec, L2_PRODUCTS.sst, key, w),
+    sst: l2Counts(w.cut.SST, m.fill),
+    sstScale: m.scale,
+    sstOffset: m.offset,
+    sstFill: 65535,
+    dqf: packArray(w.cut.DQF, 'u8'),
+    census: {...goodCensus(sstK, w.cut.DQF), degraded}
   };
 }
 // The DCOMP window (149th pass): the optical depth at 640 nm and
@@ -1681,13 +1739,14 @@ function main() {
   const surfaceCache = new Map(); // 0.01-deg cell key -> {t, body}
   const rrsCache = new Map(); // 1/24-deg cell key -> {t, body}
   const sstCache = new Map(); // 0.5-deg cell key -> {t, body} (MUR box)
-  // NOAA's L2 cloud products (148th pass): the bucket listings, the
-  // decoded files by key (typed arrays, tens of MB - RAM only, never
-  // persisted; a few per satellite and product), the downloads in
-  // flight, the products' failure holds, and the cut windows per
-  // tenth-degree cell and file key
+  // NOAA's L2 cloud products (148th pass; range reads in the 151st):
+  // the bucket listings, the decoded WINDOWS by file key and
+  // tenth-degree cell (typed arrays, tens of kB each - RAM only,
+  // never persisted; a dozen per satellite and product), the reads
+  // in flight, the products' failure holds, and the dressed bodies
+  // per cell and file keys
   const l2Listings = new Map(); // `${bucket}/${prefix}` -> {t, until, keys}
-  const l2Decoded = new Map(); // `${bucket}/${product}/${key}` -> {t, key, stamp, dec}
+  const l2Decoded = new Map(); // `${bucket}/${product}/${key}/${cell}` -> {t, key, stamp, cell, dec, ranges, bytes, total}
   const l2Inflight = new Map(); // the same key -> the promise in flight
   const l2Fail = new Map(); // `${bucket}/${product}` -> retry-after ms
   const goesl2Cache = new Map(); // `${sat}/${cell}/${keys}` -> {t, body}
@@ -1712,8 +1771,7 @@ function main() {
       if (now - v.t > 12 * 3600e3) sstCache.delete(k);
     for (const [k, v] of goesl2Cache)
       if (now - v.t > L2_WINDOW_MS) goesl2Cache.delete(k);
-    // a decoded file nobody asked for in an hour is let go (a roam
-    // to the other satellite's reach must not pin both in RAM)
+    // a decoded window nobody asked for in an hour is let go
     for (const [k, v] of l2Decoded) if (now - v.t > 3600e3) l2Decoded.delete(k);
     for (const [k, v] of l2Listings) if (now > v.until) l2Listings.delete(k);
     for (const [k, v] of l2Fail) if (now > v) l2Fail.delete(k);
@@ -2198,25 +2256,24 @@ function main() {
       return null;
     }
   }
-  // NOAA's L2 cloud products (148th pass). A product's file for a
-  // moment: the bucket's hour prefix is listed (a listing stands a
-  // minute - the cheap part, ~2 kB), the newest start stamp is taken
-  // for "latest", or the stamp nearest the asked time (a mosaic's
-  // own minute, within 15 min - nearestByStart, gated); the file is
-  // downloaded and decoded ONLY when that key is not already held.
-  // Decoded files are kept by key, a few per product (the newest and
-  // the mosaics' - L2_HELD_PER_PRODUCT), each decode in a worker
-  // thread so the event loop keeps serving. One download per key in
-  // flight at a time (many windows from one file); a listing or
-  // download failure holds the product L2_RETRY_MS, during which the
-  // newest decoded file stands in for "latest" and a timed ask gets
-  // nothing.
+  // NOAA's L2 cloud products (148th pass; range reads in the 151st).
+  // A product's file for a moment: the bucket's hour prefix is
+  // listed (a listing stands a minute - the cheap part, ~2 kB), the
+  // newest start stamp is taken for "latest", or the stamp nearest
+  // the asked time (a mosaic's own minute, within 15 min -
+  // nearestByStart, gated); the window is read from the file by
+  // HTTP range ONLY when that key and cell are not already held.
+  // Windows are kept by file key and cell, a dozen per product
+  // (L2_HELD_WINDOWS). One read per key and cell in flight at a
+  // time; a listing or read failure holds the product L2_RETRY_MS,
+  // during which the newest held window of the cell stands in for
+  // "latest" and a timed ask gets nothing.
   const l2State = {
     lists: 0,
     fetches: 0,
+    ranges: 0,
+    rangeBytes: 0,
     errors: 0,
-    workerFallbacks: 0,
-    trims: 0,
     lastError: ''
   };
   async function l2Listing(bucket, prefix, deadline) {
@@ -2247,49 +2304,63 @@ function main() {
     }
     return null;
   }
-  const l2Newest = (pk) => {
+  // the newest window held for a product and cell (a hold's stand-in)
+  const l2Newest = (pk, ck) => {
     let best = null;
     for (const [k, v] of l2Decoded)
-      if (k.startsWith(pk + '/') && (!best || v.stamp > best.stamp)) best = v;
+      if (
+        k.startsWith(pk + '/') &&
+        k.endsWith('/' + ck) &&
+        (!best || v.stamp > best.stamp)
+      )
+        best = v;
     return best;
   };
-  // the bytes of decoded arrays the daemon holds - exact, unlike
-  // process.memoryUsage's arrayBuffers, which counts the inflate
-  // buffers and worker copies not yet collected (measured 108-180
-  // MB "held" around a decode with 50 MB of files kept)
-  const l2HeldMb = () => {
-    let b = 0;
-    for (const v of l2Decoded.values())
-      for (const a of Object.values(v.dec.data)) b += a.byteLength ?? 0;
-    return b / 1048576;
-  };
-  // one decode at a time: five products can arrive together, and
-  // five workers with their inflated arrays would not fit a small
-  // box beside the daemon (the 4 MB mask alone peaks ~120 MB)
-  let l2DecodeChain = Promise.resolve();
-  const l2DecodeSerial = (bytes, spec) => {
-    const run = l2DecodeChain.then(() => decodeL2Async(bytes, spec));
-    l2DecodeChain = run.catch(() => {});
-    return run;
+  // one HTTP range of a bucket file: 206 with the bytes (the
+  // Content-Range total is the file's size, for the journal), 416
+  // past the end (nothing), 200 from a server that ignored the
+  // range (the whole file, cut here), anything else an error
+  const l2RangeReader = (url, product, deadline, onTotal) => async (s, e) => {
+    const r = await fetch(url, {
+      signal: AbortSignal.timeout(
+        fetchBudgetMs(deadline, Date.now(), UPSTREAM_BUDGET_MS)
+      ),
+      headers: {'user-agent': UA, range: `bytes=${s}-${e - 1}`}
+    });
+    if (r.status === 206) {
+      const m = /\/(\d+)$/.exec(r.headers.get('content-range') ?? '');
+      if (m) onTotal(+m[1]);
+      return new Uint8Array(await r.arrayBuffer());
+    }
+    if (r.status === 416) return new Uint8Array(0);
+    if (r.status === 200) {
+      const all = new Uint8Array(await r.arrayBuffer());
+      onTotal(all.length);
+      return all.subarray(s, e);
+    }
+    throw new Error(product + ' ' + r.status);
   };
   async function l2File(
     bucket,
     product,
     spec,
     deadline,
-    at = null,
-    band = null
+    at,
+    band,
+    cell,
+    halfPx
   ) {
     const pk = bucket + '/' + product + (band ? '-' + band : '');
+    const ck = cell.lat + '/' + cell.lon;
     const held = l2Fail.get(pk);
-    if (held && Date.now() < held) return at ? null : l2Newest(pk);
+    if (held && Date.now() < held) return at ? null : l2Newest(pk, ck);
     try {
       const pick = await l2KeyFor(bucket, product, at, deadline, band);
       if (!pick) {
         if (at) return null;
         throw new Error(product + ': no file listed');
       }
-      const dk = pk + '/' + pick.key;
+      const dk = pk + '/' + pick.key + '/' + ck;
       const have = l2Decoded.get(dk);
       if (have) {
         have.t = Date.now();
@@ -2299,65 +2370,49 @@ function main() {
       const p = (async () => {
         try {
           l2State.fetches++;
-          const r = await fetch(l2FileUrl(bucket, pick.key), {
-            signal: AbortSignal.timeout(
-              fetchBudgetMs(deadline, Date.now(), UPSTREAM_BUDGET_MS)
-            ),
-            headers: {'user-agent': UA}
-          });
-          if (!r.ok) throw new Error(product + ' ' + r.status);
-          const bytes = new Uint8Array(await r.arrayBuffer());
+          let total = null;
           const t0 = Date.now();
-          let dec;
-          try {
-            dec = await l2DecodeSerial(bytes, spec);
-          } catch (e) {
-            l2State.workerFallbacks++;
-            log(
-              'goesl2: decode worker failed (' + e.message + '), main thread'
-            );
-            dec = decodeL2(bytes, spec);
-          }
+          const f = await openHdf5Lazy(
+            l2RangeReader(
+              l2FileUrl(bucket, pick.key),
+              product,
+              deadline,
+              (n) => {
+                total = n;
+              }
+            ),
+            l2Inflate,
+            {blockBytes: L2_RANGE_BLOCK, headBytes: L2_HEAD_BYTES}
+          );
+          const dec = await decodeL2Window(f, spec, cell.lat, cell.lon, halfPx);
           if (!dec) throw new Error(product + ': not readable');
-          const row = {t: Date.now(), key: pick.key, stamp: pick.stamp, dec};
+          l2State.ranges += f.stats.ranges;
+          l2State.rangeBytes += f.stats.bytes;
+          const row = {
+            t: Date.now(),
+            key: pick.key,
+            stamp: pick.stamp,
+            cell: ck,
+            dec,
+            ranges: f.stats.ranges,
+            bytes: f.stats.bytes,
+            total
+          };
           l2Decoded.set(dk, row);
-          // at most L2_HELD_PER_PRODUCT per product: the least
-          // recently asked for go first
+          // at most L2_HELD_WINDOWS per product: the least recently
+          // asked for go first
           const mine = [...l2Decoded]
             .filter(([k]) => k.startsWith(pk + '/'))
             .sort((a, b) => a[1].t - b[1].t);
-          while (mine.length > L2_HELD_PER_PRODUCT)
+          while (mine.length > L2_HELD_WINDOWS)
             l2Decoded.delete(mine.shift()[0]);
-          // the memory guard: past L2_HELD_TRIM_MB of held arrays
-          // keep only the newest file of every product (the
-          // service's MemoryMax would otherwise kill the whole
-          // daemon)
-          const heldMb = l2HeldMb();
-          const rssMb = process.memoryUsage().rss / 1048576;
-          if (heldMb > L2_HELD_TRIM_MB) {
-            const newest = new Map();
-            for (const [k, v] of l2Decoded) {
-              const prod = k.split('/').slice(0, 2).join('/');
-              const cur = newest.get(prod);
-              if (!cur || v.t > cur.t) newest.set(prod, {k, t: v.t});
-            }
-            const keep = new Set([...newest.values()].map((e) => e.k));
-            let dropped = 0;
-            for (const k of [...l2Decoded.keys()])
-              if (!keep.has(k)) {
-                l2Decoded.delete(k);
-                dropped++;
-              }
-            l2State.trims++;
-            log(
-              `goesl2: ${heldMb.toFixed(0)} MB of arrays held (${rssMb.toFixed(0)} MB resident), ` +
-                `${dropped} decoded files let go`
-            );
-          }
           log(
-            `goesl2: ${pick.key.split('/').pop()} (${(bytes.length / 1e6).toFixed(1)} MB, ` +
-              `decoded in ${Date.now() - t0} ms, ${dec.time}` +
+            `goesl2: ${pick.key.split('/').pop()} (${f.stats.ranges} ranges, ` +
+              `${(f.stats.bytes / 1024).toFixed(0)} kB of ` +
+              (total ? `${(total / 1e6).toFixed(1)} MB` : 'unknown size') +
+              `, ${f.stats.rounds} rounds in ${Date.now() - t0} ms, ${dec.time}` +
               (at ? `, for ${at}` : '') +
+              (dec.box ? '' : ', outside the scene') +
               ')'
           );
           return row;
@@ -2372,7 +2427,7 @@ function main() {
       l2State.lastError = e.message;
       log('goesl2: ' + e.message);
       l2Fail.set(pk, Date.now() + L2_RETRY_MS);
-      return at ? null : l2Newest(pk);
+      return at ? null : l2Newest(pk, ck);
     }
   }
   // The answer for a point: null = both products failed (502); a
@@ -2395,15 +2450,25 @@ function main() {
       };
     const cell = l2Cell(lat, lon);
     const deadline = Date.now() + UPSTREAM_BUDGET_MS;
+    const asks = at ? L2_ASKS.filter((a) => a.timed !== false) : L2_ASKS;
     const got = await Promise.all(
-      L2_ASKS.map((a) =>
-        l2File(bucket, a.product, a.spec, deadline, at, a.band ?? null)
+      asks.map((a) =>
+        l2File(
+          bucket,
+          a.product,
+          a.spec,
+          deadline,
+          at,
+          a.band ?? null,
+          cell,
+          a.halfPx
+        )
       )
     );
-    const F = Object.fromEntries(L2_ASKS.map((a, i) => [a.id, got[i]]));
+    const F = Object.fromEntries(asks.map((a, i) => [a.id, got[i]]));
     if (!got.some((f) => f)) return null;
     const ck =
-      `${pick.sat.id}/${cell.lat}/${cell.lon}/` +
+      `${pick.sat.id}/${cell.lat}/${cell.lon}/${at ?? 'latest'}/` +
       got.map((f) => (f ? f.key : '-')).join('/');
     const hit = goesl2Cache.get(ck);
     if (hit) return hit.body;
@@ -2435,6 +2500,7 @@ function main() {
             cell.lon
           )
         : null,
+      sst: F.sst ? l2SstBody(F.sst.dec, F.sst.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial'
     };
     goesl2Cache.set(ck, {t: Date.now(), body});
@@ -2686,24 +2752,28 @@ function main() {
         errors: sstState.errors
       };
       const goesl2Health = {
-        files: [...l2Decoded].map(([k, v]) => ({
+        windows: [...l2Decoded].map(([k, v]) => ({
           product: k.split('/').slice(0, 2).join('/'),
           file: v.key.split('/').pop(),
+          cell: v.cell,
           time: v.dec.time,
           scene: v.dec.scene,
+          box: v.dec.box ? `${v.dec.box.rows}x${v.dec.box.cols}` : null,
+          readKb: Math.round(v.bytes / 1024),
+          fileMb: v.total ? +(v.total / 1e6).toFixed(1) : null,
+          ranges: v.ranges,
           askedS: Math.round((Date.now() - v.t) / 1000)
         })),
         listings: l2Listings.size,
-        windows: goesl2Cache.size,
+        bodies: goesl2Cache.size,
         holds: [...l2Fail.keys()],
         lists: l2State.lists,
         fetches: l2State.fetches,
+        ranges: l2State.ranges,
+        rangeMb: +(l2State.rangeBytes / 1e6).toFixed(1),
         errors: l2State.errors,
-        workerFallbacks: l2State.workerFallbacks,
-        trims: l2State.trims,
         rssMb: Math.round(process.memoryUsage().rss / 1048576),
         heapMb: Math.round(process.memoryUsage().heapUsed / 1048576),
-        heldMb: Math.round(l2HeldMb()),
         lastError: l2State.lastError
       };
       if (url.pathname === '/health')
