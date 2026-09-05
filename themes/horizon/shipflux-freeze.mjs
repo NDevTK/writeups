@@ -148,12 +148,94 @@ const clear = clearAll
     clearness: r3(o.sw_down / o.sw_down_clear)
   }));
 
+// WARM-LAYER RUNS (139th pass): contiguous hourly stretches of a
+// cruise, each spanning at least 36 hours with the warm-layer
+// inputs and PSL's own dT_warm/dz_warm present, chosen by the
+// strongest daily warming PSL found (the eight largest peaks) and
+// by a fixed stride through the rest (every 12th eligible run) -
+// the port integrates each run from its start.
+const warmQ =
+  'cruise_name,time,latitude,longitude,tsea,dt_skin,dt_warm,dz_warm,dt_warm_to_skin,tau_bulk,hs_bulk,hl_bulk,hrain,lw_down,sw_down,prate&flag_bad_ship=0';
+const warmAll = await fetchCsv(warmQ);
+const warmNeed = [
+  'latitude',
+  'longitude',
+  'tsea',
+  'dt_warm',
+  'dz_warm',
+  'tau_bulk',
+  'hs_bulk',
+  'hl_bulk',
+  'lw_down',
+  'sw_down'
+];
+const byCruise = {};
+for (const o of warmAll.rows) (byCruise[o.cruise_name] ??= []).push(o);
+const runsAll = [];
+for (const [cruise, seq] of Object.entries(byCruise)) {
+  seq.sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
+  let cur = [];
+  const flush = () => {
+    if (cur.length >= 36) {
+      const span =
+        (Date.parse(cur[cur.length - 1].time) - Date.parse(cur[0].time)) /
+        3600e3;
+      if (span >= 36 && span <= cur.length * 1.5)
+        runsAll.push({
+          cruise,
+          rows: cur,
+          peak: Math.max(...cur.map((o) => o.dt_warm))
+        });
+    }
+    cur = [];
+  };
+  for (const o of seq) {
+    if (!fin(o, warmNeed)) {
+      flush();
+      continue;
+    }
+    if (
+      cur.length &&
+      Date.parse(o.time) - Date.parse(cur[cur.length - 1].time) > 2 * 3600e3
+    )
+      flush();
+    cur.push(o);
+    if (cur.length >= 72) flush();
+  }
+  flush();
+}
+runsAll.sort((a, b) => b.peak - a.peak);
+const STRIDE_WARM = 12;
+const warmPick = [
+  ...runsAll.slice(0, 8),
+  ...runsAll.slice(8).filter((_, i) => i % STRIDE_WARM === 0)
+];
+const warm = warmPick.map((r) => ({
+  cruise: r.cruise,
+  latDeg: r3(r.rows[0].latitude),
+  lonDeg: r3(r.rows[0].longitude),
+  peakPsl: r3(r.peak),
+  rows: r.rows.map((o) => ({
+    time: o.time,
+    tseaC: r3(o.tsea),
+    dtSkin: Number.isFinite(o.dt_skin) ? r4(o.dt_skin) : null,
+    dtWarm: r4(o.dt_warm),
+    dzWarm: r3(o.dz_warm),
+    tau: r4(o.tau_bulk),
+    hsDown: r3(o.hs_bulk),
+    hlDown: r3(o.hl_bulk),
+    hrainDown: Number.isFinite(o.hrain) ? r3(o.hrain) : null,
+    lwDn: r3(o.lw_down),
+    swDn: r3(o.sw_down)
+  }))
+}));
+
 // cruise names once; rows carry an index (a third of the bytes)
 const cruiseList = [
-  ...new Set([...skin, ...allsky, ...clear].map((o) => o.cruise))
+  ...new Set([...skin, ...allsky, ...clear, ...warm].map((o) => o.cruise))
 ];
 const cruises = new Set(cruiseList);
-for (const set of [skin, allsky, clear])
+for (const set of [skin, allsky, clear, warm])
   for (const o of set) {
     o.c = cruiseList.indexOf(o.cruise);
     delete o.cruise;
@@ -202,6 +284,8 @@ export const SHIPFLUX_CRUISES = ${JSON.stringify(cruiseList)};
 export const SHIPFLUX_SKIN = ${packed(skin)};
 export const SHIPFLUX_ALLSKY = ${packed(allsky)};
 export const SHIPFLUX_CLEAR = ${packed(clear)};
+// warm-layer runs (139th): ${warm.length} contiguous stretches (the ${Math.min(8, runsAll.length)} strongest of ${runsAll.length} eligible, then every ${STRIDE_WARM}th), rows per run below
+export const SHIPFLUX_WARM = ${packed(warm)};
 `;
 const path = resolve(HERE, 'shipflux-fixture.js');
 writeFileSync(path, out);

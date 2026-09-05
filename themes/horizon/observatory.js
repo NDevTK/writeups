@@ -96,6 +96,7 @@ import {
   lwDown,
   lwDownDefault
 } from './coolskin.js';
+import {localSeconds, warmLayerInit, warmLayerStep} from './warmlayer.js';
 import {
   lehnFitElevated,
   lehnFitSuperior,
@@ -1064,14 +1065,23 @@ export function retrievalPanel(
 export function marinePanel(
   met,
   rows,
-  {bliM = null, shore = null, latDeg = null, swNetWm2 = 0} = {}
+  {bliM = null, shore = null, latDeg = null, swNetWm2 = 0, warm = null} = {}
 ) {
   const pierDew = Number.isFinite(met.dewC) ? met.dewC : null;
   const shoreDew =
     pierDew === null && shore && Number.isFinite(shore.dewC)
       ? shore.dewC
       : null;
-  const metQ = {...met, dewC: pierDew ?? shoreDew ?? null};
+  // THE WARM LAYER (139th pass): the pier's thermometer reads the
+  // bulk metres down; the day's warm layer (warmLayerDay) lifts the
+  // sub-skin surface above it by what the layer holds above the
+  // sensor. The skin then cools that surface, not the sensor.
+  const warmK =
+    warm && Number.isFinite(warm.dTtoSensorK) && warm.dTtoSensorK > 0
+      ? warm.dTtoSensorK
+      : 0;
+  const tsBase = met.tsC + warmK;
+  const metQ = {...met, tsC: tsBase, dewC: pierDew ?? shoreDew ?? null};
   let lw = null;
   if (shore && Number.isFinite(shore.dewC)) {
     // The screen temperature is the PIER's own measured air (the
@@ -1099,7 +1109,7 @@ export function marinePanel(
   let flux = null;
   let comp = null;
   for (let i = 0; i < 12; i++) {
-    comp = marineColumnRows(rows, {...metQ, tsC: met.tsC - skin}, {bliM});
+    comp = marineColumnRows(rows, {...metQ, tsC: tsBase - skin}, {bliM});
     if (!comp) return null;
     if (!lw) break;
     const mo = comp.mo;
@@ -1110,11 +1120,11 @@ export function marinePanel(
     const hlb =
       mo.qA === null
         ? 0
-        : -rhoA * latentHeat(met.tsC) * KAPPA * mo.uStar * mo.qStar;
+        : -rhoA * latentHeat(tsBase) * KAPPA * mo.uStar * mo.qStar;
     cs = coolSkin({
       uStar: mo.uStar,
       rhoA,
-      tsC: met.tsC,
+      tsC: tsBase,
       hsb,
       hlb,
       lwDn: lw.wm2,
@@ -1124,7 +1134,7 @@ export function marinePanel(
     const converged = Math.abs(cs.dTK - skin) < 1e-5;
     skin = cs.dTK;
     if (converged) {
-      comp = marineColumnRows(rows, {...metQ, tsC: met.tsC - skin}, {bliM});
+      comp = marineColumnRows(rows, {...metQ, tsC: tsBase - skin}, {bliM});
       if (!comp) return null;
       break;
     }
@@ -1196,8 +1206,15 @@ export function marinePanel(
     skinK: skin,
     skinDzM: cs ? cs.dzM : null,
     skinLambda: cs ? cs.lambda : null,
-    tInterfaceC: met.tsC - skin,
-    dTairSkinK: met.taC - (met.tsC - skin),
+    tInterfaceC: tsBase - skin,
+    dTairSkinK: met.taC - (tsBase - skin),
+    // the warm layer (139th pass): what the day left above the sensor
+    warmK,
+    warmDzM: warm && Number.isFinite(warm.dzWarmM) ? warm.dzWarmM : null,
+    warmSurfaceK: warm && Number.isFinite(warm.dTwarmK) ? warm.dTwarmK : null,
+    warmSolarKwhM2:
+      warm && Number.isFinite(warm.solarKwhM2) ? warm.solarKwhM2 : null,
+    tBaseC: tsBase,
     lwDnWm2: lw ? lw.wm2 : null,
     lwSource: lw ? lw.source : 'none',
     lwRmseWm2: lw ? lw.rmseWm2 : null,
@@ -1206,6 +1223,153 @@ export function marinePanel(
     rnlWm2: cs ? cs.rnlWm2 : null,
     q0Wm2: cs ? cs.qcolWm2 : null,
     shore: shore ? {id: shore.id, km: shore.km} : null
+  };
+}
+
+/**
+ * THE PIER'S WARM LAYER FROM THE DAY'S OWN HISTORY (139th pass):
+ * the CO-OPS water sensor sits metres down; on a sunny, light-wind
+ * day the surface can be tenths warmer by sunset (warmlayer.js -
+ * COARE 3.6's warm-layer scheme, Fairall 1996's simplified PWP).
+ * The pier's six-minute series since the morning (air and water
+ * temperature, wind, pressure - measured), the hourly solar (the
+ * satellite-derived series the page already holds - modelled at
+ * the sky, not measured at the pier) and the modelled sky longwave
+ * drive the integral: at each step the similarity profile gives
+ * the stress and the fluxes, the skin the net infrared, and the
+ * scheme accumulates. series: [{utcMs, taC, tsC, uMs, pPa?}] in
+ * time order; opts: {zuM, ztM, lonDeg, latDeg, zSensorM, dewC,
+ * cf, solarAt: (utcMs) => W/m^2 downwelling, albedo}. Returns the
+ * layer now: its warming at the surface, its depth, the warming
+ * above the sensor (what the interface carries over the bulk
+ * reading), the day's absorbed solar and the number of steps.
+ */
+/** An hourly irradiance series {time: [ISO], vals: [W/m^2]} (the
+ * page's satellite-derived shortwave, GMT stamps without a zone)
+ * as a function of UTC milliseconds, linear between the hours and
+ * zero outside the series. */
+export function solarInterpolator(hourly) {
+  if (!hourly || !Array.isArray(hourly.time) || !Array.isArray(hourly.vals))
+    return null;
+  const ts = hourly.time.map((t) =>
+    Date.parse(/Z$|[+-]\d\d:?\d\d$/.test(t) ? t : t + 'Z')
+  );
+  const vs = hourly.vals.map((v) => (Number.isFinite(v) ? v : 0));
+  return (utcMs) => {
+    if (!ts.length || utcMs < ts[0] || utcMs > ts[ts.length - 1]) return 0;
+    let i = 0;
+    while (i + 1 < ts.length && ts[i + 1] <= utcMs) i++;
+    if (i + 1 >= ts.length) return vs[i];
+    const f = (utcMs - ts[i]) / (ts[i + 1] - ts[i]);
+    return vs[i] + f * (vs[i + 1] - vs[i]);
+  };
+}
+
+export function warmLayerDay(
+  series,
+  {
+    zuM,
+    ztM,
+    lonDeg,
+    latDeg = null,
+    zSensorM = 3.4,
+    dewC = null,
+    cf = 0,
+    solarAt,
+    albedo = 0.055
+  }
+) {
+  if (
+    !Array.isArray(series) ||
+    series.length < 4 ||
+    typeof solarAt !== 'function'
+  )
+    return null;
+  let st = warmLayerInit();
+  let solarJ = 0;
+  let steps = 0;
+  let prevMs = null;
+  // the day's solar: summed from the scheme's own local midnight
+  // (the series runs three days; the layer belongs to the last)
+  const lastMs = series[series.length - 1].utcMs;
+  const dayStartMs = lastMs - localSeconds(lastMs, lonDeg) * 1000;
+  const g = Number.isFinite(latDeg)
+    ? 9.7803267715 *
+      (1 +
+        0.0052790414 * Math.sin((latDeg * Math.PI) / 180) ** 2 +
+        0.0000232718 * Math.sin((latDeg * Math.PI) / 180) ** 4)
+    : 9.80665;
+  for (const s of series) {
+    if (![s.utcMs, s.taC, s.tsC, s.uMs].every(Number.isFinite)) continue;
+    const pPa = Number.isFinite(s.pPa) ? s.pPa : 101325;
+    const mo = moBulk({
+      uMs: s.uMs,
+      zuM,
+      taC: s.taC,
+      ztM,
+      tsC: s.tsC,
+      pPa,
+      dewC,
+      bliM: 600
+    });
+    const rhoA = airDensity(pPa, s.taC, mo.qA ?? mo.qS);
+    const hsb = -rhoA * CP_AIR * KAPPA * mo.uStar * mo.thetaStar;
+    const hlb =
+      mo.qA === null
+        ? 0
+        : -rhoA * latentHeat(s.tsC) * KAPPA * mo.uStar * mo.qStar;
+    const tau = rhoA * mo.uStar * mo.uStar;
+    const eHpa =
+      dewC === null ? null : Math.min(eSatPa(dewC), eSatPa(s.taC)) / 100;
+    const lwDn =
+      eHpa === null
+        ? lwDownDefault(latDeg ?? 30)
+        : lwDown({
+            taC: s.taC,
+            eHpa,
+            cf,
+            rhPct: (100 * eHpa * 100) / eSatPa(s.taC)
+          }).wm2;
+    const swNet = Math.max(0, solarAt(s.utcMs)) * (1 - albedo);
+    const cs = coolSkin({
+      uStar: mo.uStar,
+      rhoA,
+      tsC: s.tsC,
+      hsb,
+      hlb,
+      lwDn,
+      swNet
+    });
+    st = warmLayerStep(
+      st,
+      {
+        utcMs: s.utcMs,
+        lonDeg,
+        tseaC: s.tsC,
+        swNet,
+        lwNet: cs.rnlWm2,
+        hsb,
+        hlb,
+        tau,
+        g
+      },
+      zSensorM
+    );
+    if (prevMs !== null && s.utcMs >= dayStartMs)
+      solarJ += swNet * ((s.utcMs - prevMs) / 1000);
+    prevMs = s.utcMs;
+    steps++;
+  }
+  return {
+    dTwarmK: st.dTwarm,
+    dzWarmM: st.dzWarm,
+    dTtoSensorK: st.dTtoDepth,
+    zSensorM,
+    solarKwhM2: solarJ / 3.6e6,
+    armed: st.jamset,
+    steps,
+    fromMs: series[0].utcMs,
+    toMs: series[series.length - 1].utcMs
   };
 }
 

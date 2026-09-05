@@ -570,7 +570,9 @@
         marinePanel,
         pierWindPanel,
         satsPanel,
+        solarInterpolator,
         tidePanel,
+        warmLayerDay,
         SEA_RETRIEVAL_DISTS_M
       } from './horizon/observatory.js';
       import {
@@ -1733,6 +1735,11 @@
       const coopsSensorCache = {};
       const COOPS_MET_FRESH_MIN = 90;
       const COOPS_MET_MAX_KM = 60;
+      // The water sensor's depth below the surface: CO-OPS lists it
+      // against the station datum (La Jolla: -3.43 m), not the
+      // moving surface; the warm-layer scheme reads a thermometer
+      // at this depth (139th pass).
+      const COOPS_WATER_SENSOR_M = 3.4;
       // The sea's wind: the nearest measured wind over water when one
       // is fresh (the pier first, a buoy's anemometer when the daemon
       // serves it), else the model's 10-m wind. m/s.
@@ -1783,12 +1790,86 @@
             ).json();
             return j?.data?.[0] ?? null;
           };
-          const [ta, ts, wd, pr] = await Promise.all([
+          // THE DAY'S SERIES (139th pass): the last 72 hours of
+          // six-minute readings, for the warm layer's integral
+          // (range=72 - date=recent came back sparse for the wind
+          // product, measured; the day since the local morning is
+          // what the scheme reads).
+          const grabRecent = async (product) => {
+            try {
+              const j = await (
+                await fetch(
+                  metLatestUrl(near.id, product).replace(
+                    'date=latest',
+                    'range=72'
+                  ),
+                  {credentials: 'omit'}
+                )
+              ).json();
+              return Array.isArray(j?.data) ? j.data : [];
+            } catch {
+              return [];
+            }
+          };
+          const [ta, ts, wd, pr, rTa, rTs, rWd, rPr] = await Promise.all([
             grab('air_temperature'),
             grab('water_temperature'),
             grab('wind'),
-            grab('air_pressure')
+            grab('air_pressure'),
+            grabRecent('air_temperature'),
+            grabRecent('water_temperature'),
+            grabRecent('wind'),
+            grabRecent('air_pressure')
           ]);
+          // Joined on the temperature stamps; the wind and pressure
+          // take the nearest reading within 20 minutes (the wind
+          // product's recent series comes back sparse at times -
+          // measured: one row where the temperatures had 719).
+          const stampMs = (t) => Date.parse(t.replace(' ', 'T') + ':00Z');
+          const nearest = (list, key) => {
+            const pts = list
+              .map((q) => ({ms: stampMs(q.t), v: parseFloat(q[key])}))
+              .filter((q) => Number.isFinite(q.ms) && Number.isFinite(q.v))
+              .sort((a, b) => a.ms - b.ms);
+            return (ms) => {
+              let lo = 0;
+              let hi = pts.length - 1;
+              if (!pts.length) return null;
+              while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                if (pts[mid].ms < ms) lo = mid + 1;
+                else hi = mid;
+              }
+              const c = [pts[lo], pts[lo - 1]].filter(Boolean);
+              c.sort((a, b) => Math.abs(a.ms - ms) - Math.abs(b.ms - ms));
+              return Math.abs(c[0].ms - ms) <= 20 * 60e3 ? c[0].v : null;
+            };
+          };
+          const windAt = nearest(rWd, 's');
+          const presAt = nearest(rPr, 'v');
+          const byT = {};
+          for (const q of rTa) (byT[q.t] ??= {}).taC = parseFloat(q.v);
+          for (const q of rTs) (byT[q.t] ??= {}).tsC = parseFloat(q.v);
+          const series = Object.keys(byT)
+            .sort()
+            .map((t) => {
+              const ms = stampMs(t);
+              const p = presAt(ms);
+              return {
+                utcMs: ms,
+                taC: byT[t].taC,
+                tsC: byT[t].tsC,
+                uMs: windAt(ms),
+                pPa: p === null ? null : p * 100
+              };
+            })
+            .filter(
+              (q) =>
+                Number.isFinite(q.utcMs) &&
+                Number.isFinite(q.taC) &&
+                Number.isFinite(q.tsC) &&
+                Number.isFinite(q.uMs)
+            );
           const taC = parseFloat(ta?.v);
           const tsC = parseFloat(ts?.v);
           const uMs = parseFloat(wd?.s);
@@ -1815,7 +1896,8 @@
             pPa: Number.isFinite(pHpa) ? pHpa * 100 : null,
             latDeg: near.lat,
             lonDeg: near.lng,
-            shore: null
+            shore: null,
+            series
           };
           // THE SHORE SCREEN (136th pass): the pier has no
           // hygrometer and no pyrgeometer. The nearest fresh
@@ -4881,10 +4963,39 @@
               // screen feed the pier's humidity and the modelled sky
               // longwave; the composed column stands on the
               // interface, tenths cooler than the pier's bulk.
+              // The warm layer (139th): the pier's day - its
+              // six-minute series since the local morning under the
+              // satellite-derived hourly solar - integrated by the
+              // COARE scheme; the sub-skin surface stands that much
+              // above the 3.4-m sensor.
+              let warm = null;
+              const solarAt = solarInterpolator(state.ghiSeries);
+              if (
+                solarAt &&
+                Array.isArray(state.coopsMet.series) &&
+                state.coopsMet.series.length >= 4
+              ) {
+                try {
+                  warm = warmLayerDay(state.coopsMet.series, {
+                    zuM: state.coopsMet.zuM,
+                    ztM: state.coopsMet.ztM,
+                    lonDeg: state.coopsMet.lonDeg,
+                    latDeg: state.coopsMet.latDeg,
+                    zSensorM: COOPS_WATER_SENSOR_M,
+                    dewC: state.coopsMet.shore?.dewC ?? null,
+                    cf: state.coopsMet.shore?.cf ?? 0,
+                    solarAt
+                  });
+                } catch (e) {
+                  if (params.has('debug'))
+                    console.warn('warm layer: ' + e.message);
+                }
+              }
               const mp = marinePanel(state.coopsMet, s.rows, {
                 bliM: Number.isFinite(s.blhAglM) ? s.blhAglM : null,
                 shore: state.coopsMet.shore ?? null,
-                latDeg: state.lat
+                latDeg: state.lat,
+                warm
               });
               if (mp) {
                 state.marine = mp;
@@ -9812,6 +9923,9 @@
               dif: r.hourly.diffuse_radiation,
               at: Date.now()
             };
+            // the pier's warm layer integrates this day's solar
+            // (139th): recompose the sea column once it is here
+            if (state.coopsMet && state.soundingData) applySounding();
           }
         } catch {
           // the heuristic fallback stands
@@ -10719,6 +10833,12 @@
                 (m.modelBand
                   ? `${m.modelBand[0].toFixed(0)}–${m.modelBand[1].toFixed(0)} m`
                   : 'nowhere') +
+                (m.warmSurfaceK !== null
+                  ? ` · warm layer +${m.warmSurfaceK.toFixed(2)} K at the surface over ` +
+                    `${m.warmDzM.toFixed(1)} m (+${m.warmK.toFixed(2)} K above the ` +
+                    `${COOPS_WATER_SENSOR_M}-m sensor; day's solar ` +
+                    `${m.warmSolarKwhM2.toFixed(1)} kWh/m²)`
+                  : ' · warm layer not integrated') +
                 (m.lwDnWm2 !== null
                   ? ` · skin ${(-m.skinK).toFixed(2)} K (COARE 3.6: sky ` +
                     `${m.lwDnWm2.toFixed(0)} W/m² ${m.lwSource}` +

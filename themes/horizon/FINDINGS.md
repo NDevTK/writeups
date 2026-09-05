@@ -381,6 +381,23 @@ side was fitted to the other.
   the measured wind aloft (3.3 m/s from a measured 3.0 with water 3 K
   warmer) while sitting far under it in stable air. (`surfacelayer-
 reference`; `observatory-reference` DAY PINS marine: wind)
+- **The pier's warm layer from the day's own history** (pass 139): by
+  sunset on a calm, sunny day the sea's surface can be tenths warmer
+  than the pier's thermometer 3.4 m down. The COARE 3.6 warm-layer
+  scheme (Fairall 1996's simplified Price–Weller–Pinkel, ported from
+  the authors' published code) integrates the pier's six-minute day —
+  stress and fluxes from the similarity profile, the net infrared from
+  the skin, the satellite-derived hourly solar — and the sub-skin
+  surface stands that much above the sensor before the skin cools it.
+  The gate holds the PWP closure as an identity (the layer's bulk
+  Richardson number is exactly 0.65 at every uncapped step: the two
+  printed coefficients are one number), the near-√t growth, the day's
+  shape, and reproduces PSL's own warm-layer column over 22 frozen
+  cruise-runs (1,175 hours) with bias 0.002 K and RMSE 0.08 K — every
+  run that warmed past 0.3 K landing its peak. A cut starting mid-day
+  misses a day's warming: runs must begin before dawn (measured:
+  RMSE 0.17 before the trim, 0.08 after). (`warmlayer-reference`;
+  `observatory-reference` DAY PINS marine: warm layer)
 
 ---
 
@@ -470,7 +487,10 @@ between it and the next tier.
   convective blend and Beljaars–Holtslag stable forms are not
   implemented; since pass 136 the water temperature is the
   INTERFACE (COARE 3.6's cool skin on the pier's bulk sensor, no
-  warm layer, no rain term) under a sky longwave that is MODELLED
+  rain term; since pass 139 the day's warm layer lifts the sub-skin
+  surface above the 3.4-m sensor by what the scheme holds above it,
+  under hourly satellite-derived solar) under a sky longwave that is
+  MODELLED
   from the pier's air and the shore's dewpoint and cover (a
   screen-level emissivity fit made over land, held over the clear
   ocean by 323 measured ship hours to −2 ± 11 W/m² since pass 137;

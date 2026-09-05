@@ -302,6 +302,59 @@ async function main() {
     const ts = await grab('water_temperature');
     const wd = await grab('wind');
     const pr = await grab('air_pressure');
+    // THE DAY'S SERIES (139th pass): the last 72 hours of six-minute
+    // readings, joined on the stamp, for the warm layer's integral.
+    const grabRecent = async (product) => {
+      const j = await jget(
+        `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=${product}&application=horizon&range=72&units=metric&time_zone=gmt&format=json&station=${MET_STATION}`
+      );
+      return Array.isArray(j?.data) ? j.data : [];
+    };
+    // joined on the temperature stamps; wind and pressure take the
+    // nearest reading within 20 minutes (the wind product's recent
+    // series comes back sparse at times - measured)
+    const stampMs = (t) => Date.parse(t.replace(' ', 'T') + ':00Z');
+    const nearest = (list, key) => {
+      const pts = list
+        .map((q) => ({ms: stampMs(q.t), v: parseFloat(q[key])}))
+        .filter((q) => Number.isFinite(q.ms) && Number.isFinite(q.v))
+        .sort((a, b) => a.ms - b.ms);
+      return (ms) => {
+        if (!pts.length) return null;
+        let best = pts[0];
+        for (const p of pts)
+          if (Math.abs(p.ms - ms) < Math.abs(best.ms - ms)) best = p;
+        return Math.abs(best.ms - ms) <= 20 * 60e3 ? best.v : null;
+      };
+    };
+    const rTa = await grabRecent('air_temperature');
+    const rTs = await grabRecent('water_temperature');
+    const windAt = nearest(await grabRecent('wind'), 's');
+    const presAt = nearest(await grabRecent('air_pressure'), 'v');
+    const byT = {};
+    for (const q of rTa) (byT[q.t] ??= {}).taC = parseFloat(q.v);
+    for (const q of rTs) (byT[q.t] ??= {}).tsC = parseFloat(q.v);
+    const series = Object.keys(byT)
+      .sort()
+      .map((t) => {
+        const ms = stampMs(t);
+        const p = presAt(ms);
+        return {
+          utcMs: ms,
+          taC: byT[t].taC,
+          tsC: byT[t].tsC,
+          uMs: windAt(ms),
+          pPa: p === null ? null : p * 100
+        };
+      })
+      .filter(
+        (q) =>
+          Number.isFinite(q.utcMs) &&
+          Number.isFinite(q.taC) &&
+          Number.isFinite(q.tsC) &&
+          Number.isFinite(q.uMs)
+      );
+    if (series.length < 24) throw new Error('recent series too short');
     const taC = parseFloat(ta?.v);
     const tsC = parseFloat(ts?.v);
     const uMs = parseFloat(wd?.s);
@@ -358,9 +411,26 @@ async function main() {
       zuM: above(byName['Wind']) ?? 10,
       pPa: Number.isFinite(parseFloat(pr?.v)) ? parseFloat(pr.v) * 100 : null,
       dewC: null,
-      shore
+      shore,
+      waterSensorM: 3.4,
+      series
     };
   });
+  // THE DAY'S SOLAR at the pier (139th pass): the satellite-derived
+  // hourly shortwave the page fetches (satellite-api.open-meteo),
+  // today's hours, GMT stamps - the warm layer's heating.
+  const solarHourly = await feed(
+    'solar hourly (open-meteo satellite)',
+    async () => {
+      const pierLat = coopsMet?.latDeg ?? LAT;
+      const pierLon = coopsMet?.lonDeg ?? LON;
+      const r = await jget(
+        `https://satellite-api.open-meteo.com/v1/archive?latitude=${pierLat}&longitude=${pierLon}&hourly=shortwave_radiation&past_days=1&forecast_days=1`
+      );
+      if (!r?.hourly?.time?.length) throw new Error('no hourly solar');
+      return {at, time: r.hourly.time, vals: r.hourly.shortwave_radiation};
+    }
+  );
   const harcon = await feed('published harcon (NOAA CO-OPS)', async () => {
     const h = await jget(
       `https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${TIDE_STATION}/harcon.json?units=metric`
@@ -500,6 +570,8 @@ export const TIDE_PUBLISHED = ${JSON.stringify(harcon)};
 
 export const COOPS_MET = ${JSON.stringify(coopsMet)};
 
+export const SOLAR_HOURLY = ${JSON.stringify(solarHourly)};
+
 export const TLES = {
   at: '${tles.at}',
   text: \`${tles.text}\`
@@ -606,11 +678,28 @@ async function emitPins(fixturePath) {
   const leh = O.retrievalPanel(F.SOUNDING.rows);
   // The marine surface layer on the frozen pier contrast (null on
   // fixtures frozen before the 135th pass).
+  // The pier's warm layer from its own day (139th): the frozen
+  // six-minute series under the frozen hourly solar.
+  const solarAt = F.SOLAR_HOURLY ? O.solarInterpolator(F.SOLAR_HOURLY) : null;
+  const warm =
+    F.COOPS_MET && Array.isArray(F.COOPS_MET.series) && solarAt
+      ? O.warmLayerDay(F.COOPS_MET.series, {
+          zuM: F.COOPS_MET.zuM,
+          ztM: F.COOPS_MET.ztM,
+          lonDeg: F.COOPS_MET.lonDeg,
+          latDeg: F.COOPS_MET.latDeg,
+          zSensorM: F.COOPS_MET.waterSensorM ?? 3.4,
+          dewC: F.COOPS_MET.shore?.dewC ?? null,
+          cf: F.COOPS_MET.shore?.cf ?? 0,
+          solarAt
+        })
+      : null;
   const mar = F.COOPS_MET
     ? O.marinePanel(F.COOPS_MET, F.SOUNDING.rows, {
         bliM: null,
         shore: F.COOPS_MET.shore ?? null,
-        latDeg: F.COOPS_MET.latDeg ?? null
+        latDeg: F.COOPS_MET.latDeg ?? null,
+        warm
       })
     : null;
   // The SEA column's own retrieval on the page's ladder - the line
@@ -740,7 +829,14 @@ async function emitPins(fixturePath) {
           // the pier's wind on the sea's footing (138th)
           uMeasMs: mar.uMeasMs,
           u10nMs: [mar.u10nMs, 0.05],
-          u10Ms: [mar.u10Ms, 0.05]
+          u10Ms: [mar.u10Ms, 0.05],
+          // the warm layer from the day's own series (139th)
+          warmK: [mar.warmK, 0.02],
+          warmSurfaceK:
+            mar.warmSurfaceK === null ? null : [mar.warmSurfaceK, 0.02],
+          warmDzM: mar.warmDzM === null ? null : [mar.warmDzM, 0.5],
+          warmSolarKwhM2:
+            mar.warmSolarKwhM2 === null ? null : [mar.warmSolarKwhM2, 0.05]
         }
       : null,
     lehnSea: lehSea
@@ -800,7 +896,7 @@ THE DAY (${F.FIXTURE_AT}, ${F.SOUNDING.wmo} ${F.SOUNDING.at})
  tide     ${tid.amps.map((a) => `${a.n} ${f3(a.ampM)}`).join('; ')}; rmsOut ${f3(tid.rmsOutM)}; latest resid ${f3(tid.latestResidM)}; vs published M2 x${f3(tid.amps[0].ratio)} O1 x${f3(tid.amps.find((a) => a.n === 'O1')?.ratio)}
  sats     ${sat.passes.length} passes / ${sat.nakedEye} naked-eye over ${f3(sat.darkHours)} dark h; best ${best?.name?.trim()} mag ${f3(best?.minMag)} at ${f3(best?.peakElDeg)} deg
  closure  global ${f3(clo.ratios?.globalRatio)}; beam ${f3(clo.ratios?.beamRatio)}; diffuse ${f3(clo.ratios?.diffuseRatio)}
- marine   ${mar ? `${mar.stability}; air-sea ${f3(mar.dTairSeaK)} K (skin ${f3(mar.skinK)} K -> ${f3(mar.dTairSkinK)}); film ${f3(mar.filmLapseKm)} K/km; model band ${mar.modelBand?.map((z) => z.toFixed(0)).join('-')}; sky ${f3(mar.lwDnWm2)} W/m2 (${mar.lwSource}); dew ${mar.dewSource}; wind ${f3(mar.uMeasMs)} m/s at ${f3(mar.zuM)} m -> U10N ${f3(mar.u10nMs)} (actual 10 m ${f3(mar.u10Ms)})` : 'no pier met in this fixture'}
+ marine   ${mar ? `${mar.stability}; air-sea ${f3(mar.dTairSeaK)} K (skin ${f3(mar.skinK)} K -> ${f3(mar.dTairSkinK)}); film ${f3(mar.filmLapseKm)} K/km; model band ${mar.modelBand?.map((z) => z.toFixed(0)).join('-')}; sky ${f3(mar.lwDnWm2)} W/m2 (${mar.lwSource}); dew ${mar.dewSource}; wind ${f3(mar.uMeasMs)} m/s at ${f3(mar.zuM)} m -> U10N ${f3(mar.u10nMs)} (actual 10 m ${f3(mar.u10Ms)}); warm layer ${mar.warmSurfaceK === null ? 'not integrated' : `${f3(mar.warmSurfaceK)} K over ${f3(mar.warmDzM)} m (${f3(mar.warmK)} K above the sensor; solar ${f3(mar.warmSolarKwhM2)} kWh/m2, ${warm?.steps ?? 0} steps)`}` : 'no pier met in this fixture'}
  lehnSea  ${lehSea ? (lehSea.retrieved ? `${lehSea.mode}/${lehSea.retrieved.method} eye ${lehSea.eyeM} m at ${lehSea.distM / 1000} km ${lehSea.retrieved.closes ? 'CLOSES' : 'does not close'} rms ${f3(lehSea.retrieved.rmsK)} K` : `declines from ${lehSea.eyeM} m`) : 'no sea column'}
 
 Fixture and pins are regenerated TOGETHER. Read the git diff of

@@ -10163,6 +10163,60 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     for the sea stays the model's (the buoy spectrum's directions
     rule the waves when present); the buoy fallback is dormant
     until the daemon redeploys.
+- DONE (Sep 5, the review session's 139th pass - THE PIER'S WARM
+  LAYER FROM THE DAY'S OWN HISTORY): the 136th's first stated
+  limit, "no warm layer (the water sensor sits 3.4 m down)",
+  retired. By sunset on a calm, sunny day the sea's surface can be
+  tenths warmer than a thermometer metres down - the morning's
+  solar heat trapped in a layer the wind has not stirred through.
+  warmlayer.js ports the COARE 3.6 warm-layer scheme from the
+  authors' published code (coare36vnWarm_et - Fairall 1996's
+  simplified Price-Weller-Pinkel; the routine PSL ran for the
+  warm-layer columns of their ship archive): the longitude clock
+  and the 06:00 local start, the stress accumulator with its
+  0.002-N/m^2 floor, the heat accumulator armed at 50 W/m^2 of net
+  heating, the three-band absorption iterated with the depth, the
+  19-m cap, and the PWP closure dz = ctd1 tau_ac / sqrt(qcol_ac),
+  dT = ctd2 qcol_ac^1.5 / tau_ac at Ri_c = 0.65. warmlayer-
+  reference holds five landmarks: the constants and clock; THE
+  PWP CLOSURE AS AN IDENTITY (g Al dT dz / du^2 = 0.65 to 3e-16 at
+  every uncapped step - the two printed coefficients are one
+  critical Richardson number); the near-sqrt(t) growth under
+  steady forcing (exponents 0.45 for depth and 0.63 for warming
+  against the fixed-absorption closed form's 0.5, the layer's own
+  deepening letting it absorb more of the sun); the day's shape (a
+  900-W/m^2 June day warms a calm sea 1.8 K at the surface and a
+  windy one 0.05 K; nothing before 06:00; the second day from
+  zero); and THE ARCHIVE: 22 contiguous cruise-runs frozen from
+  PSL's database (shipflux-fixture SHIPFLUX_WARM - the eight
+  strongest warmings and a stride through the rest), each
+  integrated from its first pre-dawn row with the archive's own
+  hourly stress, fluxes and measured solar, reproduce PSL's
+  dT_warm with bias 0.002 K and RMSE 0.080 K over 1,175 hours
+  (bias -0.05, RMSE 0.11 on the 281 hours PSL warmed past 0.2 K),
+  the day's peak landing within 35% or 0.15 K on all 12 runs that
+  warmed past 0.3 K - hourly steps standing in for PSL's finer
+  clock, and a cut starting mid-day missing a day's warming until
+  the runs were trimmed to a pre-dawn start (measured: RMSE 0.17
+  before, 0.08 after). What the page does: syncCoopsMet fetches
+  the pier's last 72 hours of six-minute readings (date=recent,
+  four products joined on the stamp); observatory.warmLayerDay
+  integrates the day at every step through the similarity profile
+  (stress and fluxes), the skin (net infrared) and the scheme,
+  under the satellite-derived hourly solar the page already
+  fetches (solarInterpolator) and the modelled sky; marinePanel
+  stands the sub-skin surface at the sensor's reading plus what
+  the layer holds above the sensor, and the skin cools THAT; the
+  marine line reports the layer's surface warming, depth, the
+  part above the sensor and the day's solar; DAY PINS marine gains
+  the four; the freeze carries the series and the hourly solar
+  (SOLAR_HOURLY). STATED LIMITS: the scheme's own (a slab, no
+  advection, tide or surf); hourly satellite-derived solar, not a
+  pyranometer on the pier; the sensor's depth taken as 3.4 m below
+  the surface (CO-OPS lists it against the station datum); the
+  code's zenith-angle albedo table replaced by its constant 0.945
+  branch; the pier's day integrated in one pass (the code reruns
+  the fluxes on the corrected temperature).
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

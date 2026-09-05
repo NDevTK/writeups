@@ -39,6 +39,8 @@ import {
   seaPanel,
   tidePanel,
   wetPanel,
+  solarInterpolator,
+  warmLayerDay,
   SEA_RETRIEVAL_DISTS_M
 } from './observatory.js';
 import {buildProfile, standardProfile} from './refraction.js';
@@ -61,7 +63,8 @@ import {
   TIDE,
   TIDE_PUBLISHED,
   TLES,
-  COOPS_MET
+  COOPS_MET,
+  SOLAR_HOURLY
 } from './observatory-fixture.js';
 import {DAY_PINS} from './observatory-pins.js';
 import {visibleRateFactor} from './meteors.js';
@@ -1037,10 +1040,31 @@ pinBlock(
 // pass): the composed sea column's own numbers, pinned as data.
 // Fixtures frozen before the pass carry no pier met and skip.
 if (COOPS_MET && DAY_PINS.marine) {
+  // the warm layer from the frozen day's own six-minute series under
+  // the frozen hourly solar (139th pass; fixtures frozen earlier
+  // carry neither and skip)
+  const solarAt =
+    typeof SOLAR_HOURLY !== 'undefined' && SOLAR_HOURLY
+      ? solarInterpolator(SOLAR_HOURLY)
+      : null;
+  const warm =
+    Array.isArray(COOPS_MET.series) && solarAt
+      ? warmLayerDay(COOPS_MET.series, {
+          zuM: COOPS_MET.zuM,
+          ztM: COOPS_MET.ztM,
+          lonDeg: COOPS_MET.lonDeg,
+          latDeg: COOPS_MET.latDeg,
+          zSensorM: COOPS_MET.waterSensorM ?? 3.4,
+          dewC: COOPS_MET.shore?.dewC ?? null,
+          cf: COOPS_MET.shore?.cf ?? 0,
+          solarAt
+        })
+      : null;
   const mar = marinePanel(COOPS_MET, SOUNDING.rows, {
     bliM: null,
     shore: COOPS_MET.shore ?? null,
-    latDeg: COOPS_MET.latDeg ?? null
+    latDeg: COOPS_MET.latDeg ?? null,
+    warm
   });
   const P = DAY_PINS.marine;
   pinBlock(
@@ -1076,6 +1100,15 @@ if (COOPS_MET && DAY_PINS.marine) {
             ['U10N m/s', mar.u10nMs, P.u10nMs],
             ['u(10 m) m/s', mar.u10Ms, P.u10Ms]
           ]
+        : []),
+      // the warm layer from the day's own series (139th pass)
+      ...(P.warmK !== undefined
+        ? [
+            ['warm above sensor K', mar.warmK, P.warmK],
+            ['warm surface K', mar.warmSurfaceK, P.warmSurfaceK],
+            ['warm depth m', mar.warmDzM, P.warmDzM],
+            ['day solar kWh/m2', mar.warmSolarKwhM2, P.warmSolarKwhM2]
+          ]
         : [])
     ],
     `${COOPS_MET.name}: air-sea ${mar.dTairSeaK >= 0 ? '+' : ''}${mar.dTairSeaK.toFixed(1)} K, ${mar.stability}, film ${mar.filmLapseKm.toFixed(0)} K/km in the lowest 10 m - ${mar.klass}; the mixed layer modelled over ${mar.modelBand ? mar.modelBand.map((z) => z.toFixed(0)).join('-') + ' m' : 'no band'}` +
@@ -1084,6 +1117,11 @@ if (COOPS_MET && DAY_PINS.marine) {
         : '') +
       (P.u10nMs !== undefined
         ? `; the pier's ${mar.uMeasMs.toFixed(1)} m/s at ${mar.zuM.toFixed(1)} m is ${mar.u10nMs.toFixed(2)} m/s on the 10-m neutral footing (actual 10-m wind ${mar.u10Ms.toFixed(2)})`
+        : '') +
+      (P.warmK !== undefined
+        ? mar.warmSurfaceK === null
+          ? '; warm layer not integrated'
+          : `; the day's warm layer holds ${mar.warmSurfaceK.toFixed(2)} K at the surface over ${mar.warmDzM.toFixed(1)} m (${mar.warmK.toFixed(2)} K above the ${(COOPS_MET.waterSensorM ?? 3.4).toFixed(1)}-m sensor) from ${mar.warmSolarKwhM2.toFixed(1)} kWh/m^2 of solar`
         : '')
   );
   // The sea column's own retrieval - the line the page prints for
