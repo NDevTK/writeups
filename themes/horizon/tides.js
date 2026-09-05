@@ -278,4 +278,30 @@ export function nearestTideStation(stations, lat, lon, maxKm = 75) {
   }
   return best;
 }
+// The met side of the same feed (135th pass): CO-OPS shore
+// stations that carry air temperature, water temperature, wind
+// and pressure - the measured air-sea contrast the marine surface
+// layer rides. Sensor elevations come from the station's own
+// sensors list (the profile needs the heights the readings were
+// taken at).
+export function metStationsUrl() {
+  return COOPS_BASE + '/mdapi/prod/webapi/stations.json?type=met&units=metric';
+}
+export function metSensorsUrl(id) {
+  return (
+    COOPS_BASE +
+    '/mdapi/prod/webapi/stations/' +
+    id +
+    '/sensors.json?units=metric'
+  );
+}
+export function metLatestUrl(id, product) {
+  return (
+    COOPS_BASE +
+    '/api/prod/datagetter?product=' +
+    product +
+    '&application=horizon&date=latest&units=metric&time_zone=gmt&format=json&station=' +
+    id
+  );
+}
 export const FT_TO_M = 0.3048; // exact international foot

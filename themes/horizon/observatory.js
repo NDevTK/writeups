@@ -86,6 +86,8 @@ import {
 import {parseTLEs, satMagnitude, sunlitEci} from './sats.js';
 import {rayFan} from './far-terrain.js';
 import {fleagleFitFilm} from './fleagle.js';
+import {AUTOCONVECTIVE_K_PER_M} from './fleagle.js';
+import {marineColumnRows} from './surfacelayer.js';
 import {
   lehnFitElevated,
   lehnFitSuperior,
@@ -562,7 +564,27 @@ export function flashLedgerVerdict(prev, next) {
  * folds, and a day that folds from neither eye is DECLINED with
  * the accounting - never an invented inversion.
  */
-export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
+/**
+ * The object-plane ladder for the COMPOSED sea column (135th
+ * pass): the pier's film folds at Fleagle's short ranges from a
+ * tower eye (his 20-45 km), so the sea column is probed from 10 km
+ * out, then on through the balloon-only ladder's far rungs. One
+ * definition for the page, the freeze and the day pins.
+ */
+export const SEA_RETRIEVAL_DISTS_M = [
+  10e3, 15e3, 20e3, 25e3, 30e3, 40e3, 60e3, 90e3, 130e3, 180e3
+];
+export function retrievalPanel(
+  rows,
+  {eyesM = null, distsM = null, modelBand = null} = {}
+) {
+  // A closure is a comparison against MEASURED air: when the
+  // column carries a modelled segment (the composed marine
+  // column's mixed layer, 135th pass), any closure span that
+  // overlaps it is not a closure - the instrument declines to
+  // claim agreement with air nobody measured.
+  const leans = (loAbs, hiAbs) =>
+    Array.isArray(modelBand) && hiAbs > modelBand[0] && loAbs < modelBand[1];
   const profile = profileFromRows(rows);
   const h0 = rows[0].hM;
   // The balloon's inversion headline (columnPanel's convention).
@@ -721,7 +743,11 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
               // one anchored sample, which any retrieval passes
               // (measured on a film day whose zone vertices sat
               // 3 m over the tower eye while claiming +14 K).
-              closes: rmsK !== null && rmsK < 2.5 && probedTopM - eye >= 10,
+              closes:
+                rmsK !== null &&
+                rmsK < 2.5 &&
+                probedTopM - eye >= 10 &&
+                !leans(eye, probedTopM),
               dTretr: tRetr(probedTopM) - tRetr(eye),
               dTballoon: profile.at(probedTopM).tC - profile.at(eye).tC
             }
@@ -776,7 +802,12 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
           const layerOK =
             Math.abs(dTb - fit.params.dTK) <=
             Math.max(1.0, 0.35 * fit.params.dTK);
-          if (rmsK !== null && rmsK < 2.5 && layerOK) {
+          if (
+            rmsK !== null &&
+            rmsK < 2.5 &&
+            layerOK &&
+            !leans(h0 + sLo, h0 + Math.max(sHi, zTRel))
+          ) {
             return {
               ...common,
               mode: 'superior',
@@ -866,7 +897,11 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
               tcRmsM: fit.tcRmsM,
               probedFloorM: floorAbs,
               onePerigee: fit.onePerigee,
-              closes: rmsKe !== null && rmsKe < 2.5 && eye - floorAbs >= 10,
+              closes:
+                rmsKe !== null &&
+                rmsKe < 2.5 &&
+                eye - floorAbs >= 10 &&
+                !leans(floorAbs, eye),
               params: {
                 zBaseM: baseAbs,
                 wM: fit.params.wM,
@@ -931,7 +966,12 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
           const filmOK =
             Math.abs(dropBalloon - dropClaim) <=
             Math.max(0.5, 0.35 * dropClaim);
-          if (rmsK !== null && rmsK < 2.5 && filmOK) {
+          if (
+            rmsK !== null &&
+            rmsK < 2.5 &&
+            filmOK &&
+            !leans(h0, h0 + Math.max(sHi, hF))
+          ) {
             return {
               ...common,
               mode: 'inferior',
@@ -985,6 +1025,64 @@ export function retrievalPanel(rows, {eyesM = null, distsM = null} = {}) {
         )
         .join('; ') +
       ' - the instrument declines rather than invent'
+  };
+}
+
+/**
+ * THE MARINE SURFACE LAYER (the 135th pass): the shore station's
+ * measured air-sea contrast through Monin-Obukhov similarity
+ * (surfacelayer.js - Businger 1971 / Paulson 1970 / COARE 3.0),
+ * composed under the balloon into the SEA's column - the pier's
+ * film below, a tagged modelled mixed layer, the ascent above.
+ * met: {taC, ztM, tsC, uMs, zuM, pPa?, dewC?, at?, station?};
+ * rows: the ascent's daemon rows; bliM: the ascent's measured
+ * mixed-layer depth. Returns the composed rows for every other
+ * panel to read, the model band no closure may lean on, and the
+ * film's verdict in Fleagle's own terms.
+ */
+export function marinePanel(met, rows, {bliM = null} = {}) {
+  const comp = marineColumnRows(rows, met, {bliM});
+  if (!comp) return null;
+  const mo = comp.mo;
+  const lapse = ((mo.tAt(10) - mo.tAt(0.5)) / 9.5) * 1000;
+  const dTairSea = met.taC - met.tsC;
+  const stability =
+    !Number.isFinite(mo.L) || Math.abs(mo.L) > 1e4
+      ? 'neutral'
+      : mo.L < 0
+        ? 'unstable'
+        : 'stable';
+  const klass =
+    stability === 'unstable'
+      ? lapse < -AUTOCONVECTIVE_K_PER_M * 1000
+        ? 'sinking (inferior-mirage class: film past autoconvective)'
+        : 'sinking (sub-autoconvective film)'
+      : stability === 'stable'
+        ? 'looming (surface inversion: ducted/towering class)'
+        : 'neutral film';
+  return {
+    rows: comp.rows,
+    modelBand: comp.modelBand,
+    pierTopM: comp.pierTopM,
+    joinM: comp.joinM,
+    dTairSeaK: dTairSea,
+    stability,
+    klass,
+    L: mo.L,
+    zetaU: mo.zetaU,
+    clamped: mo.clamped,
+    uStar: mo.uStar,
+    thetaStar: mo.thetaStar,
+    filmLapseKm: lapse,
+    filmDropK: mo.tAt(0.5) - mo.tAt(10),
+    tSurfaceC: mo.tAt(0),
+    t10C: mo.tAt(10),
+    t100C: mo.tAt(comp.pierTopM),
+    gustMs: mo.gust,
+    dewC: comp.dewC,
+    dewSource: comp.dewSource,
+    z0M: mo.z0,
+    iterations: mo.iterations
   };
 }
 

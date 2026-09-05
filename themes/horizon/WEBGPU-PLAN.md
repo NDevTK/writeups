@@ -9936,6 +9936,85 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     film family reading -235 K/km over 10.5 m against truth
     -240/10 at 0.155 K RMS). The page's lehn line gains the tower
     tier and sign-correct layer text.
+- DONE (Sep 5, the review session's 135th pass - THE SEA HORIZON
+  GETS ITS OWN MEASURED FILM: the marine surface layer from
+  CO-OPS air-sea contrast): the sharpest stated limit of the
+  134th - the retrieval's film readings were the inland
+  balloon's, while the drawn horizon's mirage lives over the
+  water - retired by a measured quantity the repo already
+  fetched. NOAA CO-OPS shore stations (La Jolla / Scripps Pier,
+  14 km from the theme's point) serve air temperature, water
+  temperature, wind and pressure at their sensor heights,
+  keyless and CORS-open (the tide pass's own service; the page
+  fetches them directly, no daemon change). Three primaries READ
+  IN FULL turn that contrast into the lowest hundred metres over
+  the sea: Businger, Wyngaard, Izumi & Bradley 1971 (the Kansas
+  flux-profile relations - phi_m, phi_h, the measured k = 0.35,
+  the 0.74 neutral Prandtl ratio, Ri(zeta) and the 0.21 stable
+  limit), Paulson 1970 (the closed-form psi integrals, held here
+  as IDENTITIES against numerical integration of Businger's own
+  phi to 6e-9), and Fairall et al. 2003 (COARE 3.0: Charnock's
+  z0 with alpha 0.011 -> 0.018 across 10-18 m/s, the scalar
+  roughness cap, the 0.98 seawater saturation, the gustiness
+  velocity, and the printed pairing of the Kansas forms with
+  k = 0.40 - the choice this module runs, because COARE's
+  roughness was fitted with 0.40 and mixing k's puts the drag
+  coefficient 24% under COARE's Fig. 5; measured in the gate).
+  surfacelayer.js carries the bulk solution (fixed-point on the
+  profiles with COARE roughness and gustiness, Kansas range
+  clamped and reported) and THE COMPOSED COLUMN in three tagged
+  segments: the pier's similarity profile to 100 m, a modelled
+  well-mixed marine layer (theta and q constant, blended over
+  150 m to the balloon's value) up to the ascent's own capping-
+  inversion base (or its mixed-layer depth), and the balloon
+  above - the inland ascent's lowest rows being its LAUNCH
+  SITE's film, not the sea's. The modelled band is returned and
+  retrievalPanel now REFUSES any closure whose span overlaps it
+  (four closure sites): agreement with air nobody measured is not
+  a closure. What the page now does: with a fresh pier contrast
+  the refraction column reaches the sea surface, so the
+  far-horizon fan applies at beach eye heights for the first time
+  (it had declined whenever the balloon's 134-m floor sat above
+  the eye - every beach view), the drawn sun sets through the
+  pier's own film, the research view's flash and retrieval lines
+  read the sea rows (with the model band and a short-range
+  ladder), and a new line reports the pier: air-sea contrast,
+  stability, Obukhov length, the film's lapse in the lowest 10 m
+  in Fleagle's own terms (past autoconvective = the sinking
+  class; a surface inversion = the looming class), and where the
+  mixed layer is modelled. surfacelayer-reference holds eight
+  landmark classes, ending in THE CROSS-CLOSURE: a calm pier with
+  water 5 K warmer than the air, composed under a synthetic
+  ascent, read back from the composed column's own fan by the
+  Fleagle instrument at 30 km - the film family lands -152 K/km
+  over 12 m (the similarity film is -169 over 0.5-10 m), closing
+  at 0.152 K RMS INSIDE the pier's measured band with no lean on
+  the modelled layer; the mirror case (warm air over cold water)
+  shows up as a surface duct with one of Young's ducted flash
+  classes - the looming side of the same measured contrast.
+  Tonight's real pier (water 21.1 C under 19.0 C air, calm):
+  free convection past the Kansas range (reported as such), a
+  -72 K/km film, the sea column's flash class shifting from the
+  inland column's inferior-mirage to textbook at a 30-m eye.
+  The freeze script gains the pier met feed and a marine pins
+  block; the reference a DAY PINS marine block (skipped on
+  fixtures frozen before this pass). The sea column's OWN
+  retrieval is pinned too (DAY PINS lehnSea, on the one ladder
+  SEA_RETRIEVAL_DISTS_M the page, the freeze and the gate share):
+  on the frozen day it does NOT close - the composed column's
+  first fold sits at 130 km and reads back 19 K RMS - while the
+  inland ascent alone closes at 90 km on its launch site's own
+  superadiabatic film. The page's retrieval line now SAYS "does
+  not close" on a non-closure (it had printed the failed
+  reading's numbers bare - a +129 K "layer" beside a 17-K RMS,
+  legible only to a reader who knew the referee) and carries the
+  inland-ascent-alone verdict beside the sea column's, named as
+  the launch site's. STATED LIMITS carried in
+  the module header: Kansas range clamp, no COARE convective
+  blend or Beljaars-Holtslag stable forms, bulk water
+  temperature without the cool-skin tenths, the mixed layer's
+  height a proxy from the inland ascent, humidity from the
+  ascent's surface row when the pier has no hygrometer.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

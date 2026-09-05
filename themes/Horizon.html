@@ -567,8 +567,10 @@
         meteorsPanel,
         monahanW,
         retrievalPanel,
+        marinePanel,
         satsPanel,
-        tidePanel
+        tidePanel,
+        SEA_RETRIEVAL_DISTS_M
       } from './horizon/observatory.js';
       import {
         lunarEclipse,
@@ -854,7 +856,10 @@
       import {
         nearestTideStation,
         tideLatestUrl,
-        tideStationsUrl
+        tideStationsUrl,
+        metStationsUrl,
+        metSensorsUrl,
+        metLatestUrl
       } from './horizon/tides.js';
       import {
         inTempoBox,
@@ -1710,11 +1715,119 @@
           if (params.has('debug')) console.warn('tide gauge: ' + e.message);
         }
       }
+      // THE PIER'S AIR-SEA CONTRAST (135th pass): the nearest CO-OPS
+      // shore station with a met suite - air temperature, water
+      // temperature, wind, pressure, each at its own sensor height -
+      // is the measured anchor of the marine surface layer that
+      // becomes the sea column's lowest hundred metres
+      // (surfacelayer.js). Keyless, CORS-open, the tide feed's own
+      // service; six-minute data, so 90 min is stale; 60 km is the
+      // reach of one shore's contrast. ?coopsmet=0 disables.
+      let coopsMetStations = null;
+      const coopsSensorCache = {};
+      const COOPS_MET_FRESH_MIN = 90;
+      const COOPS_MET_MAX_KM = 60;
+      async function syncCoopsMet() {
+        state.coopsMet = null;
+        if (params.get('coopsmet') === '0' || overridden) return;
+        try {
+          if (!coopsMetStations) {
+            const d = await (
+              await fetch(metStationsUrl(), {credentials: 'omit'})
+            ).json();
+            coopsMetStations = d.stations;
+          }
+          const near = nearestTideStation(
+            coopsMetStations,
+            state.lat,
+            state.lon,
+            COOPS_MET_MAX_KM
+          );
+          if (!near) return;
+          if (!coopsSensorCache[near.id]) {
+            const sj = await (
+              await fetch(metSensorsUrl(near.id), {credentials: 'omit'})
+            ).json();
+            const byName = {};
+            for (const q of sj.sensors ?? []) byName[q.name] = q;
+            const site = byName.site?.elevation ?? 0;
+            const above = (q) =>
+              q
+                ? (q.refdatum === 'Site Elevation' ? site : 0) + q.elevation
+                : null;
+            coopsSensorCache[near.id] = {
+              ztM: above(byName['Air Temperature']),
+              zuM: above(byName['Wind'])
+            };
+          }
+          const sens = coopsSensorCache[near.id];
+          const grab = async (product) => {
+            const j = await (
+              await fetch(metLatestUrl(near.id, product), {credentials: 'omit'})
+            ).json();
+            return j?.data?.[0] ?? null;
+          };
+          const [ta, ts, wd, pr] = await Promise.all([
+            grab('air_temperature'),
+            grab('water_temperature'),
+            grab('wind'),
+            grab('air_pressure')
+          ]);
+          const taC = parseFloat(ta?.v);
+          const tsC = parseFloat(ts?.v);
+          const uMs = parseFloat(wd?.s);
+          const pHpa = parseFloat(pr?.v);
+          if (
+            !Number.isFinite(taC) ||
+            !Number.isFinite(tsC) ||
+            !Number.isFinite(uMs)
+          )
+            return;
+          const at = (ta.t ?? '').replace(' ', 'T') + ':00Z';
+          const ageMin = (Date.now() - Date.parse(at)) / 60000;
+          if (!(ageMin <= COOPS_MET_FRESH_MIN)) return;
+          state.coopsMet = {
+            station: near.id,
+            name: near.name,
+            km: near.km,
+            at,
+            taC,
+            tsC,
+            uMs,
+            zuM: Number.isFinite(sens.zuM) && sens.zuM > 0.5 ? sens.zuM : 10,
+            ztM: Number.isFinite(sens.ztM) && sens.ztM > 0.5 ? sens.ztM : 5,
+            pPa: Number.isFinite(pHpa) ? pHpa * 100 : null
+          };
+          record(
+            'CO-OPS pier met',
+            near.name +
+              ' (' +
+              near.km.toFixed(0) +
+              ' km): air ' +
+              taC.toFixed(1) +
+              ' °C at ' +
+              state.coopsMet.ztM.toFixed(1) +
+              ' m, water ' +
+              tsC.toFixed(1) +
+              ' °C, wind ' +
+              uMs.toFixed(1) +
+              ' m/s · air−sea ' +
+              (taC - tsC >= 0 ? '+' : '') +
+              (taC - tsC).toFixed(1) +
+              ' K'
+          );
+          // the sea column recomposes on the ascent already held
+          if (state.soundingData) applySounding();
+        } catch (e) {
+          if (params.has('debug')) console.warn('coops met: ' + e.message);
+        }
+      }
       async function syncMarine() {
         // Pinned sea, or pinned weather (a live sea would contradict
         // the pinned wind): keep what the URL says.
         if (params.has('hsw') || params.has('hss') || overridden) return;
         await syncTideGauge();
+        await syncCoopsMet();
         try {
           const m = await (
             await fetch(
@@ -4594,6 +4707,10 @@
         // rebuilds state.profile on its cadence.)
         state.profileMeas = null;
         state.resBlhAglM = null;
+        // The sea column (pier film + modelled mixed layer + ascent):
+        // measured-only like the rest - no fresh pier, no sea rows.
+        state.marine = null;
+        state.rowsSea = null;
         // Measured-only like the rest: no fresh ascent, no
         // per-altitude trail bands (the 250 hPa model verdict
         // below stands in).
@@ -4631,8 +4748,31 @@
         // sun's lift, squash, green rim and any measured-inversion
         // folds all follow (the transfer LUT is identity-keyed).
         if (Array.isArray(s.rows) && s.rows.length >= 10) {
-          const lv = s.rows
-            .filter((q) => q.hM > s.rows[0].hM + 0.5)
+          // THE SEA COLUMN (135th pass): with a fresh pier contrast
+          // the ascent's inland floor gives way to the similarity
+          // film over the water - the refraction column now reaches
+          // the sea surface, so the far-horizon fan applies at
+          // beach eye heights and the drawn sun sets through the
+          // pier's own film. The modelled mixed layer is tagged;
+          // the retrieval refuses to close across it.
+          let colRows = s.rows;
+          if (state.coopsMet) {
+            try {
+              const mp = marinePanel(state.coopsMet, s.rows, {
+                bliM: Number.isFinite(s.blhAglM) ? s.blhAglM : null
+              });
+              if (mp) {
+                state.marine = mp;
+                state.rowsSea = mp.rows;
+                colRows = mp.rows;
+              }
+            } catch (e) {
+              if (params.has('debug'))
+                console.warn('marine column: ' + e.message);
+            }
+          }
+          const lv = colRows
+            .filter((q) => q.hM > colRows[0].hM + 0.5)
             .map((q) => ({
               pPa: q.p * 100,
               hM: q.hM,
@@ -4640,17 +4780,29 @@
               rh: (q.rh ?? 0) / 100
             }));
           state.profileMeas = buildProfile(lv, {
-            hM: s.rows[0].hM,
-            tC: s.rows[0].tC,
-            rh: (s.rows[0].rh ?? 0) / 100
+            hM: colRows[0].hM,
+            tC: colRows[0].tC,
+            rh: (colRows[0].rh ?? 0) / 100
           });
           state.profile = state.profileMeas;
           record(
-            'refraction column (radiosonde)',
-            s.rows.length +
-              ' rows to ' +
-              Math.round(s.rows[s.rows.length - 1].hM / 1000) +
-              ' km · the drawn sun rides the ascent'
+            state.marine
+              ? 'refraction column (pier film + radiosonde)'
+              : 'refraction column (radiosonde)',
+            (state.marine
+              ? 'sea surface to ' +
+                Math.round(colRows[colRows.length - 1].hM / 1000) +
+                ' km · ' +
+                state.marine.klass +
+                ' · mixed layer modelled ' +
+                (state.marine.modelBand
+                  ? state.marine.modelBand.map((z) => z.toFixed(0)).join('–') +
+                    ' m'
+                  : 'nowhere')
+              : s.rows.length +
+                ' rows to ' +
+                Math.round(s.rows[s.rows.length - 1].hM / 1000) +
+                ' km') + ' · the drawn sun rides the ascent'
           );
           // The full-ascent Schmidt-Appleman scan: ONE computation
           // shared by the research line and the drawn trails, so
@@ -10380,15 +10532,20 @@
         researchBusy = true;
         try {
           const rows = state.soundingData?.rows;
+          // The drawn world's column: the sea rows when the pier
+          // contrast is fresh (the same rows the fan rides), else
+          // the ascent alone. The modelled band travels with them.
+          const seaRows = state.rowsSea ?? rows;
+          const seaBand = state.marine?.modelBand ?? null;
           if (Array.isArray(rows) && rows.length >= 10) {
             // Diagnose at the CAMERA's own altitude - the fan the
             // panel describes is the one on screen - beside the
             // 450 m reference eye.
             const eyeM = Math.max(
               elevOfY(camera.position.y, centerElev),
-              rows[0].hM + 2
+              seaRows[0].hM + 2
             );
-            const c = columnPanel(rows, {obsHms: [eyeM, 450]});
+            const c = columnPanel(seaRows, {obsHms: [eyeM, 450]});
             const [here, aloft] = c.observers;
             research['mirage (measured column)'] =
               `folds ${here.folds} at YOUR eye (${eyeM.toFixed(0)} m), ` +
@@ -10398,6 +10555,23 @@
               `${here.r0IsaArcmin.toFixed(1)}′ · sunset flattening ` +
               `${here.flatten.toFixed(2)} · green rim ` +
               `${here.rimArcsec.toFixed(0)}″`;
+            if (state.marine) {
+              const m = state.marine;
+              research['marine surface layer (Businger–Dyer · CO-OPS pier)'] =
+                `${state.coopsMet.name}: air−sea ` +
+                `${m.dTairSeaK >= 0 ? '+' : ''}${m.dTairSeaK.toFixed(1)} K → ` +
+                `${m.stability}, L ${Number.isFinite(m.L) ? (Math.abs(m.L) < 1 ? m.L.toFixed(2) : Math.abs(m.L) < 10 ? m.L.toFixed(1) : m.L.toFixed(0)) + ' m' : '∞'}` +
+                `${m.clamped ? ' (past the Kansas range)' : ''} · film ` +
+                `${m.filmLapseKm >= 0 ? '+' : ''}${m.filmLapseKm.toFixed(0)} K/km in the lowest 10 m · ` +
+                `${m.klass} · mixed layer modelled ` +
+                (m.modelBand
+                  ? `${m.modelBand[0].toFixed(0)}–${m.modelBand[1].toFixed(0)} m`
+                  : 'nowhere') +
+                ` (dewpoint: ${m.dewSource})`;
+            } else
+              delete research[
+                'marine surface layer (Businger–Dyer · CO-OPS pier)'
+              ];
             // The SAME scan that gates the drawn trails (set by
             // applySounding); recomputed only if a pin silenced it.
             const con = state.contrailScan ?? contrailPanel(rows);
@@ -10440,6 +10614,8 @@
               const key =
                 (state.soundingData.at ?? '') +
                 '|' +
+                (state.coopsMet?.at ?? '') +
+                '|' +
                 Math.round(eyeM / 25) +
                 '|' +
                 new Date().toISOString().slice(0, 10);
@@ -10470,7 +10646,7 @@
                       alt(sunset.AddDays(60 / 86400))) /
                     120;
                 }
-                const fl = flashPanel(rows, {
+                const fl = flashPanel(seaRows, {
                   eyeM,
                   rateDegPerS: rate,
                   fast: true
@@ -10508,31 +10684,60 @@
             // observer at the shore retrieve today's column from
             // its own far-off image? Cached per ascent; the
             // instrument declines on fold-free days.
-            if (lehnCache?.key !== (state.soundingData.at ?? '')) {
-              const lr = retrievalPanel(rows);
-              const lrEyeRel = lr.eyeM - (rows[0]?.hM ?? 0);
-              const lrEye =
-                lrEyeRel >= 100 ? 'ridge' : lrEyeRel >= 15 ? 'tower' : 'shore';
-              lehnCache = {
-                key: state.soundingData.at ?? '',
-                line: lr.retrieved
-                  ? lr.retrieved.params
-                    ? `${lrEye} eye ${lr.eyeM.toFixed(0)} m, image at ` +
-                      `${(lr.distM / 1000).toFixed(0)} km → layer ` +
-                      `${lr.retrieved.params.dTK >= 0 ? '+' : ''}${lr.retrieved.params.dTK.toFixed(1)} K at ` +
-                      `${lr.retrieved.params.zBaseM.toFixed(0)}–` +
-                      `${(lr.retrieved.params.zBaseM + lr.retrieved.params.wM).toFixed(0)} m ` +
-                      `vs balloon ${lr.retrieved.dTballoon >= 0 ? '+' : ''}${lr.retrieved.dTballoon.toFixed(1)} K · ` +
-                      `RMS ${lr.retrieved.rmsK.toFixed(2)} K`
-                    : `${lrEye} eye ${lr.eyeM.toFixed(0)} m, image at ` +
-                      `${(lr.distM / 1000).toFixed(0)} km → +` +
-                      `${lr.retrieved.dTretr.toFixed(1)} K by ` +
-                      `${lr.retrieved.probedTopM.toFixed(0)} m vs balloon ` +
-                      `${lr.retrieved.dTballoon >= 0 ? '+' : ''}` +
-                      `${lr.retrieved.dTballoon.toFixed(1)} K · RMS ` +
-                      `${lr.retrieved.rmsK.toFixed(2)} K`
-                  : lr.note
+            const lehnKey =
+              (state.soundingData.at ?? '') + '|' + (state.coopsMet?.at ?? '');
+            if (lehnCache?.key !== lehnKey) {
+              // The panel reports the first CLOSING retrieval, else
+              // the first honest non-closure - which the line must
+              // SAY: a fold read back to 17 K RMS is not a layer.
+              const lehnLine = (lr, baseRows) => {
+                const R = lr.retrieved;
+                if (!R) return lr.note;
+                const eyeRel = lr.eyeM - (baseRows[0]?.hM ?? 0);
+                const eye =
+                  eyeRel >= 100 ? 'ridge' : eyeRel >= 15 ? 'tower' : 'shore';
+                const head =
+                  `${eye} eye ${lr.eyeM.toFixed(0)} m, image at ` +
+                  `${(lr.distM / 1000).toFixed(0)} km → `;
+                const body = R.params
+                  ? `layer ${R.params.dTK >= 0 ? '+' : ''}` +
+                    `${R.params.dTK.toFixed(1)} K at ` +
+                    `${R.params.zBaseM.toFixed(0)}–` +
+                    `${(R.params.zBaseM + R.params.wM).toFixed(0)} m `
+                  : `+${R.dTretr.toFixed(1)} K by ` +
+                    `${R.probedTopM.toFixed(0)} m `;
+                return (
+                  head +
+                  (R.closes ? '' : 'does not close: ') +
+                  body +
+                  `vs balloon ${R.dTballoon >= 0 ? '+' : ''}` +
+                  `${R.dTballoon.toFixed(1)} K · RMS ${R.rmsK.toFixed(2)} K`
+                );
               };
+              const lr = retrievalPanel(
+                seaRows,
+                state.rowsSea
+                  ? {modelBand: seaBand, distsM: SEA_RETRIEVAL_DISTS_M}
+                  : {}
+              );
+              let line = lehnLine(lr, seaRows);
+              if (state.rowsSea) {
+                // The ascent alone, for the record: its lowest rows
+                // are the launch site's film, not the sea's, so a
+                // closure there is the inland instrument's - named
+                // as such beside the sea column's verdict.
+                const lb = retrievalPanel(rows);
+                const B = lb.retrieved;
+                line +=
+                  ' · inland ascent alone: ' +
+                  (B
+                    ? (B.closes ? 'closes' : 'does not close') +
+                      ` at ${(lb.distM / 1000).toFixed(0)} km from ` +
+                      `${lb.eyeM.toFixed(0)} m (RMS ${B.rmsK.toFixed(2)} K` +
+                      (B.closes ? ", the launch site's film)" : ')')
+                    : 'declines');
+              }
+              lehnCache = {key: lehnKey, line};
             }
             research['mirage inversion retrieval (Lehn 1983)'] = lehnCache.line;
             // The forecast ledger: every fresh ascent's flash
@@ -10572,7 +10777,7 @@
                       altL(sunsetL.AddDays(60 / 86400))) /
                     120;
                 }
-                const flL = flashPanel(rows, {
+                const flL = flashPanel(seaRows, {
                   eyeM: 450,
                   rateDegPerS: rateL,
                   fast: true
@@ -10625,6 +10830,9 @@
             delete research['wave ladder (Stull ch. 17)'];
             delete research['green flash tonight (Young)'];
             delete research['mirage inversion retrieval (Lehn 1983)'];
+            delete research[
+              'marine surface layer (Businger–Dyer · CO-OPS pier)'
+            ];
             delete research['forecast ledger (morning → evening ascent)'];
           }
           if (Number.isFinite(state.wind)) {

@@ -31,13 +31,15 @@ import {
   flashPanel,
   leewavePanel,
   retrievalPanel,
+  marinePanel,
   meteorsPanel,
   monahanW,
   polPanel,
   satsPanel,
   seaPanel,
   tidePanel,
-  wetPanel
+  wetPanel,
+  SEA_RETRIEVAL_DISTS_M
 } from './observatory.js';
 import {buildProfile, standardProfile} from './refraction.js';
 import {
@@ -58,7 +60,8 @@ import {
   SUN_ELON,
   TIDE,
   TIDE_PUBLISHED,
-  TLES
+  TLES,
+  COOPS_MET
 } from './observatory-fixture.js';
 import {DAY_PINS} from './observatory-pins.js';
 import {visibleRateFactor} from './meteors.js';
@@ -269,9 +272,13 @@ check(
 }
 
 // ---- the aurora wire parses to sense ---------------------------
+// (the SWPC wire is a since-midnight file: a fixture frozen at
+// 09Z carries ~110 five-minute rows, one frozen at 21Z ~250 - the
+// row floor is two hours of rows, not a day's worth; measured on
+// the 135th pass's morning refreeze)
 check(
   'THE AURORA WIRE parses to sense',
-  aur.history.length > 200 &&
+  aur.history.length >= 24 &&
     aur.latest.gwN >= 1 &&
     aur.latest.gwN <= 200 &&
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/.test(aur.latest.at) &&
@@ -1014,6 +1021,67 @@ pinBlock(
       : `retrieved to ${leh.retrieved?.rmsK?.toFixed(2)} K RMS at ` +
           `${(leh.distM / 1000).toFixed(0)} km`
   );
+}
+
+// The marine surface layer on the frozen pier contrast (135th
+// pass): the composed sea column's own numbers, pinned as data.
+// Fixtures frozen before the pass carry no pier met and skip.
+if (COOPS_MET && DAY_PINS.marine) {
+  const mar = marinePanel(COOPS_MET, SOUNDING.rows, {bliM: null});
+  pinBlock(
+    'marine',
+    [
+      ['stability', mar.stability, DAY_PINS.marine.stability],
+      ['air-sea K', mar.dTairSeaK, DAY_PINS.marine.dTairSeaK],
+      ['film K/km', mar.filmLapseKm, DAY_PINS.marine.filmLapseKm],
+      ['film drop K', mar.filmDropK, DAY_PINS.marine.filmDropK],
+      ['pier top', mar.pierTopM, DAY_PINS.marine.pierTopM],
+      ['join', mar.joinM, DAY_PINS.marine.joinM],
+      ['clamped', mar.clamped, DAY_PINS.marine.clamped],
+      [
+        'model band',
+        JSON.stringify(mar.modelBand),
+        JSON.stringify(DAY_PINS.marine.modelBand)
+      ]
+    ],
+    `${COOPS_MET.name}: air-sea ${mar.dTairSeaK >= 0 ? '+' : ''}${mar.dTairSeaK.toFixed(1)} K, ${mar.stability}, film ${mar.filmLapseKm.toFixed(0)} K/km in the lowest 10 m - ${mar.klass}; the mixed layer modelled over ${mar.modelBand ? mar.modelBand.map((z) => z.toFixed(0)).join('-') + ' m' : 'no band'}`
+  );
+  // The sea column's own retrieval - the line the page prints for
+  // this day. A non-closure is pinned as such: the composed
+  // column's folds sit on the modelled band or read back far from
+  // the balloon, and the instrument says so rather than lean.
+  if (DAY_PINS.lehnSea) {
+    const ls = retrievalPanel(mar.rows, {
+      modelBand: mar.modelBand,
+      distsM: SEA_RETRIEVAL_DISTS_M
+    });
+    const P = DAY_PINS.lehnSea;
+    pinBlock(
+      'lehnSea',
+      [
+        ['eye', ls.eyeM, P.eyeM],
+        ['dist', ls.distM, P.distM],
+        ['declined', ls.retrieved === null, P.declined],
+        ...(P.declined
+          ? []
+          : [
+              ['mode', ls.mode ?? null, P.mode],
+              ['method', ls.retrieved?.method ?? null, P.method],
+              ['closes', ls.retrieved?.closes ?? null, P.closes],
+              ['rms K', ls.retrieved?.rmsK ?? null, P.rmsK],
+              ['dT balloon', ls.retrieved?.dTballoon ?? null, P.dTballoon]
+            ])
+      ],
+      P.declined
+        ? `the sea column folds from no eye - the instrument declines`
+        : `${ls.mode}/${ls.retrieved?.method} from ${ls.eyeM} m at ` +
+            `${(ls.distM / 1000).toFixed(0)} km ` +
+            (ls.retrieved?.closes
+              ? `closes to ${ls.retrieved.rmsK.toFixed(2)} K RMS`
+              : `does not close (${ls.retrieved?.rmsK?.toFixed(2)} K RMS) - ` +
+                `reported as a non-closure, not a layer`)
+    );
+  }
 }
 
 pinBlock(

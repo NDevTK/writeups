@@ -11,113 +11,130 @@
  */
 
 export const DAY_PINS = {
-  generatedFor: '2026-08-09T20:53Z',
+  generatedFor: '2026-09-05T09:31Z',
   column: {
-    invDT: [8.7, 0.05],
-    invHM: 878,
-    foldsBeach: 0,
-    foldsAloft: 1,
-    r0Arcmin: [38.17017135105405, 0.3],
+    invDT: [0, 0.05],
+    invHM: 134,
+    foldsBeach: 1,
+    foldsAloft: 2,
+    r0Arcmin: [25.30038746994851, 0.3],
     r0IsaArcmin: [32.99043696204497, 0.3],
-    flatten: [0.7005730595174965, 0.05],
-    rimArcsec: [46.870870329097684, 8]
+    flatten: [2.388159012848769, 0.05],
+    rimArcsec: [30.116285379871048, 8]
   },
   wet: {
-    order: ['Phoenix', 'London', 'San Diego', 'Singapore', 'Bergen', 'Mumbai'],
+    order: ['Phoenix', 'London', 'Singapore', 'San Diego', 'Bergen', 'Mumbai'],
     raining: ['Mumbai'],
     w: {
-      Bergen: [0.9542857142857144, 0.03],
-      London: [0.22285714285714286, 0.03],
-      Mumbai: [0.9657142857142859, 0.03],
-      Phoenix: [0.09714285714285716, 0.03],
-      'San Diego': [0.6057142857142858, 0.03],
-      Singapore: [0.6742857142857143, 0.03]
+      Bergen: [0.8228571428571428, 0.03],
+      London: [0.33428571428571435, 0.03],
+      Mumbai: [0.9542857142857144, 0.03],
+      Phoenix: [0.11714285714285716, 0.03],
+      'San Diego': [0.6371428571428572, 0.03],
+      Singapore: [0.5571428571428572, 0.03]
     }
   },
   pol: {
-    maxPure: [0.874480734638003, 0.02]
+    maxPure: [0.8699279700373292, 0.02]
   },
   meteors: {
-    zhrNow: [28.929438208226316, 0.5],
-    daysToPeak: [2.732518936833356, 0.1],
-    topCode: 'PER',
-    topShare: [0.3306408185245019, 0.03]
+    zhrNow: [0.002691162980337087, 0.5],
+    daysToPeak: [-23.183038451833397, 0.1],
+    topCode: 'NUE',
+    topShare: [0.029532030895047707, 0.03]
   },
   aurora: {
-    rows: 258,
-    latestGwN: 13,
-    latestAt: '2026-08-09T21:25Z',
-    ovP: [0.05, 0.02],
-    ovLatDeg: 71,
-    kpEst: [1.33, 0.01]
+    rows: 115,
+    latestGwN: 29,
+    latestAt: '2026-09-05T09:30Z',
+    ovP: [0.2, 0.02],
+    ovLatDeg: 58,
+    kpEst: [0.33, 0.01]
   },
   contrail: {
-    l250TC: [-41.1, 0.5],
-    l250Tlc: [-48.17926567727552, 0.2],
-    l250Rhi: [0.9963815541864853, 0.01],
-    formLoM: 12431,
-    formHiM: 16578,
-    issr: [
-      [10769, [1.0972837448363952, 0.01]],
-      [11470, [1.0791292323228823, 0.01]]
-    ],
+    l250TC: [-42, 0.5],
+    l250Tlc: [-51.06361015977839, 0.2],
+    l250Rhi: [0.10494117621275592, 0.01],
+    formLoM: 13171,
+    formHiM: 16491,
+    issr: [[10145, [1.1244703499944904, 0.01]]],
     persistNull: true,
-    acN: 74,
-    acMaxAltM: [8846.82, 0.5],
+    acN: 1,
+    acMaxAltM: [10683.24, 0.5],
     acInForm: 0,
     acInPersist: 0
   },
   leewave: {
-    levels: 29,
-    layerMMs: [0.43390620717408956, 0.05],
-    layerScalarMs: [3.4299999999999997, 0.05],
-    spotHM: 1908,
-    spotLamM: [656.8816066810133, 5]
+    levels: 28,
+    layerMMs: [6.145850002661892, 0.05],
+    layerScalarMs: [6.611111111111111, 0.05],
+    spotHM: 1978,
+    spotLamM: [3269.6905578421515, 5]
   },
   tide: {
     amps: {
-      M2: [0.5258554704710658, 0.01],
-      S2: [0.20140377675714904, 0.01],
-      N2: [0.13016608922794187, 0.01],
-      K1: [0.42695555773427274, 0.01],
-      O1: [0.2565490898978216, 0.01],
-      M4: [0.003904767409875476, 0.01]
+      M2: [0.5263998517295105, 0.01],
+      S2: [0.26647239965879416, 0.01],
+      N2: [0.11744444241398828, 0.01],
+      K1: [0.34192910178230507, 0.01],
+      O1: [0.2556275252708381, 0.01],
+      M4: [0.0029254764168489774, 0.01]
     },
-    rmsOutM: [0.0749777107705048, 0.01],
-    latestResidM: [0.006062785110163088, 0.02],
-    maxAbsOutM: [-0.18860445423506422, 0.02],
-    rM2: [0.970213045149568, 0.01],
-    rO1: [1.1988275228870169, 0.02]
+    rmsOutM: [0.09113515549762433, 0.01],
+    latestResidM: [-0.036476750124160906, 0.02],
+    maxAbsOutM: [0.21601595411032243, 0.02],
+    rM2: [0.971217438615333, 0.01],
+    rO1: [1.1945211461254117, 0.02]
   },
   sats: {
-    passes: 88,
-    nakedEye: 56,
-    darkHours: [9.516666666666667, 0.15],
-    bestNorad: 28932,
-    bestMag: [0.7900806355045955, 0.1],
-    bestElDeg: [75.66604212274808, 1],
-    rbTop8: 7,
-    issTonight: false
+    passes: 82,
+    nakedEye: 51,
+    darkHours: [10.383333333333333, 0.15],
+    bestNorad: 25544,
+    bestMag: [-4.2978419278019615, 0.1],
+    bestElDeg: [69.39931752023709, 1],
+    rbTop8: 5,
+    issTonight: true
   },
   lehn: {
-    eyeM: 136,
-    distM: null,
-    declined: true
+    eyeM: 450,
+    distM: 90000,
+    declined: false,
+    rmsK: [1.0176603549219836, 0.25],
+    dTretr: [-2.3412656249999997, 0.4],
+    dTballoon: [-2.203544117647059, 0.3],
+    probedTopM: [449.1650390625, 3]
   },
   flash: {
-    rateArcsecS: [11.927113001831344, 0.05],
+    rateArcsecS: [12.50078659535518, 0.05],
     beachType: 'textbook',
-    beachS: [1.4631960203600975, 0.15],
-    aloftType: 'mock-mirage',
-    aloftS: [1.6537655645679004, 0.2],
-    aloftWidth: [60.44280597742651, 12],
-    aloftMagX: [3.9820387413723464, 0.6],
-    aloftAppArcmin: [-21.86839016727958, 1],
+    beachS: [0.9101091359254416, 0.15],
+    aloftType: 'inferior-mirage',
+    aloftS: [1.232682537926456, 0.2],
+    aloftWidth: [20.147601992475504, 12],
+    aloftMagX: [1.498992167203663, 0.6],
+    aloftAppArcmin: [-30.37515545299185, 1],
     ducts: 0
   },
-  closure: {
-    globalRatio: [0.9739819539544845, 0.01],
-    beamRatio: [1.1454677271244231, 0.02],
-    diffuseRatio: [0.320199021876009, 0.02]
-  }
+  marine: {
+    stability: 'unstable',
+    dTairSeaK: [-1.8999999999999986, 0.05],
+    filmLapseKm: [-65.8860239136218, 3],
+    filmDropK: [0.6259172271794071, 0.05],
+    pierTopM: 100,
+    joinM: 716,
+    modelBand: [100, 716],
+    clamped: true
+  },
+  lehnSea: {
+    eyeM: 22,
+    distM: 130000,
+    declined: false,
+    mode: 'superior',
+    method: 'zones',
+    closes: false,
+    rmsK: [18.77900596868612, 0.25],
+    dTballoon: [2.262898208093663, 0.3]
+  },
+  closure: null
 };

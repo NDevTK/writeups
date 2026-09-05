@@ -54,6 +54,10 @@ const OUT = resolve(HERE, opt('out', 'observatory-fixture.js'));
 const LAT = parseFloat(opt('lat', '32.72'));
 const LON = parseFloat(opt('lon', '-117.16'));
 const TIDE_STATION = opt('tidestation', '9410170');
+// The shore met station for the marine surface layer (135th pass):
+// La Jolla / Scripps Pier carries air + water temperature, wind and
+// pressure with their sensor heights.
+const MET_STATION = opt('metstation', '9410230');
 // The wet-world city set: fixed, alphabetical by label.
 const CITIES = [
   ['Bergen', 60.39, 5.32],
@@ -279,6 +283,43 @@ async function main() {
       throw new Error('unsafe characters for the template literal');
     return {at, text: txt};
   });
+  const coopsMet = await feed('pier met (NOAA CO-OPS)', async () => {
+    const sj = await jget(
+      `https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${MET_STATION}/sensors.json?units=metric`
+    );
+    const byName = {};
+    for (const q of sj.sensors ?? []) byName[q.name] = q;
+    const site = byName.site?.elevation ?? 0;
+    const above = (q) =>
+      q ? (q.refdatum === 'Site Elevation' ? site : 0) + q.elevation : null;
+    const grab = async (product) => {
+      const j = await jget(
+        `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=${product}&application=horizon&date=latest&units=metric&time_zone=gmt&format=json&station=${MET_STATION}`
+      );
+      return j?.data?.[0] ?? null;
+    };
+    const ta = await grab('air_temperature');
+    const ts = await grab('water_temperature');
+    const wd = await grab('wind');
+    const pr = await grab('air_pressure');
+    const taC = parseFloat(ta?.v);
+    const tsC = parseFloat(ts?.v);
+    const uMs = parseFloat(wd?.s);
+    if (![taC, tsC, uMs].every(Number.isFinite))
+      throw new Error('met fields missing');
+    return {
+      station: MET_STATION,
+      name: sj.name ?? MET_STATION,
+      at: (ta.t ?? '').replace(' ', 'T') + ':00Z',
+      taC,
+      ztM: above(byName['Air Temperature']) ?? 5,
+      tsC,
+      uMs,
+      zuM: above(byName['Wind']) ?? 10,
+      pPa: Number.isFinite(parseFloat(pr?.v)) ? parseFloat(pr.v) * 100 : null,
+      dewC: null
+    };
+  });
   const harcon = await feed('published harcon (NOAA CO-OPS)', async () => {
     const h = await jget(
       `https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${TIDE_STATION}/harcon.json?units=metric`
@@ -416,6 +457,8 @@ export const TIDE = {
 
 export const TIDE_PUBLISHED = ${JSON.stringify(harcon)};
 
+export const COOPS_MET = ${JSON.stringify(coopsMet)};
+
 export const TLES = {
   at: '${tles.at}',
   text: \`${tles.text}\`
@@ -520,6 +563,20 @@ async function emitPins(fixturePath) {
   const flB = O.flashPanel(F.SOUNDING.rows, {eyeM: 15, rateDegPerS});
   const flA = O.flashPanel(F.SOUNDING.rows, {eyeM: 450, rateDegPerS});
   const leh = O.retrievalPanel(F.SOUNDING.rows);
+  // The marine surface layer on the frozen pier contrast (null on
+  // fixtures frozen before the 135th pass).
+  const mar = F.COOPS_MET
+    ? O.marinePanel(F.COOPS_MET, F.SOUNDING.rows, {bliM: null})
+    : null;
+  // The SEA column's own retrieval on the page's ladder - the line
+  // the research view prints for this day (a non-closure is a
+  // pinned fact too: the fold is there, the reading is not).
+  const lehSea = mar
+    ? O.retrievalPanel(mar.rows, {
+        modelBand: mar.modelBand,
+        distsM: O.SEA_RETRIEVAL_DISTS_M
+      })
+    : null;
   const perTop = met.shares?.filter((s) => s.code !== 'spo')[0];
   const best = sat.passes[0];
   const pins = {
@@ -618,6 +675,32 @@ async function emitPins(fixturePath) {
       aloftAppArcmin: flA.appArcmin === null ? null : [flA.appArcmin, 1],
       ducts: flA.ducts.length
     },
+    marine: mar
+      ? {
+          stability: mar.stability,
+          dTairSeaK: [mar.dTairSeaK, 0.05],
+          filmLapseKm: [mar.filmLapseKm, 3],
+          filmDropK: [mar.filmDropK, 0.05],
+          pierTopM: mar.pierTopM,
+          joinM: mar.joinM,
+          modelBand: mar.modelBand,
+          clamped: mar.clamped
+        }
+      : null,
+    lehnSea: lehSea
+      ? lehSea.retrieved
+        ? {
+            eyeM: lehSea.eyeM,
+            distM: lehSea.distM,
+            declined: false,
+            mode: lehSea.mode,
+            method: lehSea.retrieved.method,
+            closes: lehSea.retrieved.closes,
+            rmsK: [lehSea.retrieved.rmsK, 0.25],
+            dTballoon: [lehSea.retrieved.dTballoon, 0.3]
+          }
+        : {eyeM: lehSea.eyeM, distM: null, declined: true}
+      : null,
     closure: clo.ratios
       ? {
           globalRatio: [clo.ratios.globalRatio, 0.01],
@@ -661,6 +744,8 @@ THE DAY (${F.FIXTURE_AT}, ${F.SOUNDING.wmo} ${F.SOUNDING.at})
  tide     ${tid.amps.map((a) => `${a.n} ${f3(a.ampM)}`).join('; ')}; rmsOut ${f3(tid.rmsOutM)}; latest resid ${f3(tid.latestResidM)}; vs published M2 x${f3(tid.amps[0].ratio)} O1 x${f3(tid.amps.find((a) => a.n === 'O1')?.ratio)}
  sats     ${sat.passes.length} passes / ${sat.nakedEye} naked-eye over ${f3(sat.darkHours)} dark h; best ${best?.name?.trim()} mag ${f3(best?.minMag)} at ${f3(best?.peakElDeg)} deg
  closure  global ${f3(clo.ratios?.globalRatio)}; beam ${f3(clo.ratios?.beamRatio)}; diffuse ${f3(clo.ratios?.diffuseRatio)}
+ marine   ${mar ? `${mar.stability}; air-sea ${f3(mar.dTairSeaK)} K; film ${f3(mar.filmLapseKm)} K/km; model band ${mar.modelBand?.map((z) => z.toFixed(0)).join('-')}` : 'no pier met in this fixture'}
+ lehnSea  ${lehSea ? (lehSea.retrieved ? `${lehSea.mode}/${lehSea.retrieved.method} eye ${lehSea.eyeM} m at ${lehSea.distM / 1000} km ${lehSea.retrieved.closes ? 'CLOSES' : 'does not close'} rms ${f3(lehSea.retrieved.rmsK)} K` : `declines from ${lehSea.eyeM} m`) : 'no sea column'}
 
 Fixture and pins are regenerated TOGETHER. Read the git diff of
 observatory-pins.js - the day's story in numbers - then run the

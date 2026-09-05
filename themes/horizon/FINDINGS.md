@@ -292,6 +292,40 @@ side was fitted to the other.
   never a runner-side convention). (`fleagle-reference`;
   `lehn-reference` THE ARCHIVE; `observatory-reference` inferior
   film)
+- **The sea horizon gets its own measured film** (pass 135): the
+  retrieval's films were an inland balloon's, but the drawn horizon's
+  mirage lives over the water — and NOAA CO-OPS piers measure the
+  air–sea contrast that governs it (La Jolla / Scripps Pier: air and
+  water temperature, wind, pressure, each at a stated sensor height;
+  keyless, CORS-open, the tide pass's own service). Monin–Obukhov
+  similarity in the printed Kansas forms (Businger et al. 1971, read
+  in full; Paulson 1970's closed-form integrals held as identities
+  against numerical integration of Businger's φ to 6·10⁻⁹; COARE
+  3.0's sea roughness, gustiness and its printed pairing of the
+  Kansas forms with κ = 0.40 — a mismatch of κ's would put the drag
+  coefficient 24 % under COARE's own Fig. 5) turns that contrast
+  into the lowest hundred metres over the sea. The composed column
+  is three tagged segments — the pier's profile, a modelled
+  well-mixed marine layer up to the ascent's capping-inversion base,
+  the balloon above — and the retrieval now REFUSES any closure
+  whose span overlaps the modelled band: agreement with air nobody
+  measured is not a closure. Two consequences on the page: the
+  far-horizon fan applies at beach eye heights for the first time
+  (it had declined whenever the balloon's 134-m floor sat above the
+  eye), and the sun sets through the pier's film. The cross-closure
+  that gates it: a calm pier 5 K warmer than its air, composed under
+  a synthetic ascent, read back from the composed column's own fan
+  by the Fleagle instrument at 30 km — −152 K/km over 12 m against
+  the similarity film's −169, 0.152 K RMS inside the measured band
+  — Fleagle reads Businger; and the mirror case, warm air over cold
+  water, appears as a surface duct with a ducted flash class, the
+  looming side of one measured contrast. On the frozen day the sea
+  column's own retrieval does not close (its first fold sits at
+  130 km and reads back 19 K RMS) while the inland ascent alone
+  closes at 90 km on its launch site's superadiabatic film; the page
+  prints both verdicts, the non-closure named as such.
+  (`surfacelayer-reference`; `observatory-reference` DAY PINS marine
+  and lehnSea)
 
 ---
 
@@ -370,9 +404,18 @@ between it and the next tier.
   packing), so fitted layer shapes carry closure bands, not
   metrological precision; the retrieval reaches only as far as
   the fold rays fly (probed span reported with every closure);
-  and the drawn SEA horizon's own film — the marine surface layer
-  over the water — is not what an inland balloon measures: the
-  film readings are the station column's, stated as such.
+  and since pass 135 the drawn SEA horizon rides its own measured
+  film (the pier's air–sea contrast through similarity theory)
+  while the marine layer between the pier's hundred metres and the
+  capping inversion remains MODELLED (θ and q constant, the
+  inversion's height a proxy from the inland ascent) — tagged, and
+  barred from every closure. Further stated limits of the marine
+  layer: the Kansas forms are clamped to their observed range
+  (free-convection nights are reported as past it), COARE's
+  convective blend and Beljaars–Holtslag stable forms are not
+  implemented, the water temperature is the pier's bulk sensor
+  (no cool-skin correction), and the pier's humidity is borrowed
+  from the ascent's surface row where the pier has no hygrometer.
 
 ## 6. Method — reference-first validation
 
@@ -467,7 +510,13 @@ The practice the corpus demonstrates, stated so it can be reused:
    two contract rules now in force: freeze pins are computed from
    the PACKED rows the fixture stores, and the eye list rides in
    the fixture as data — the runner reproduces the watch's
-   geometry verbatim rather than assuming it.
+   geometry verbatim rather than assuming it. Pass 135 adds the
+   fourth kind of instrument to the column: a measured boundary
+   condition (the pier's air–sea contrast) turned into profile by
+   printed similarity theory, composed with the balloon under a
+   contract that tags what is modelled and forbids closures across
+   it — the first time the drawn horizon's lowest metres come from
+   a measurement taken over the water it draws.
 
 ---
 
