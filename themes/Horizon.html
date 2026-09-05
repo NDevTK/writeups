@@ -283,6 +283,35 @@
       #panel .age {
         color: rgba(230, 237, 243, 0.45);
       }
+      /* the pick readout (145th pass): what a click in the world is */
+      #pick {
+        position: fixed;
+        max-width: min(380px, calc(100vw - 28px));
+        padding: 8px 11px;
+        border-radius: 8px;
+        background: rgba(10, 14, 24, 0.86);
+        backdrop-filter: blur(6px);
+        color: rgba(230, 237, 243, 0.92);
+        font:
+          11px/1.5 ui-monospace,
+          'Cascadia Mono',
+          'SF Mono',
+          Menlo,
+          Consolas,
+          monospace;
+        pointer-events: none;
+        white-space: pre-wrap;
+        z-index: 6;
+      }
+      #pick b {
+        color: #7ee2a8;
+      }
+      #panel .look {
+        color: #7ee2a8;
+        cursor: pointer;
+        margin-left: 6px;
+        text-decoration: underline dotted;
+      }
       #explore {
         position: fixed;
         left: 14px;
@@ -347,6 +376,7 @@
     <div id="caption"></div>
     <div id="panel" hidden></div>
     <div id="explore" hidden></div>
+    <div id="pick" hidden></div>
     <script src="./horizon/satellite.min.js"></script>
     <script src="./horizon/astronomy.browser.min.js"></script>
     <script type="module">
@@ -425,6 +455,16 @@
         mercatorLatLon,
         windowTiles
       } from './horizon/goesir.js';
+      import {
+        azAltFromDir,
+        catalogueIndexNear,
+        fieldPixelOfTexel,
+        rayPlaneY,
+        seaHorizonAzimuth,
+        sepDeg,
+        yawPitchFor
+      } from './horizon/pick.js';
+      import {STAR_NAMES} from './horizon/starnames-data.js';
       import {geomagneticLatitude, igrfField} from './horizon/igrf.js';
       import {HorizonWaterMesh} from './horizon/water-tsl.js';
       import {createOceanFFT} from './horizon/ocean-tsl.js';
@@ -2426,6 +2466,13 @@
             at: Date.now(),
             time,
             seaSource,
+            // the pick layer reads the field behind a clicked texel
+            // and the look link aims at the cloudiest sea sector
+            panel: P,
+            win,
+            i0,
+            j0,
+            lookAz: P.sectors.cloudiest ? P.sectors.cloudiest.azDeg : null,
             deck: P.deck,
             worldUnits,
             deckOn,
@@ -2478,6 +2525,7 @@
           };
           if (cloudSys)
             cloudSys.setGoesCover(P.deck.data, P.deck.rm, worldUnits);
+          if (goesOverlayOn) buildGoesOverlay();
           record(
             'GOES-West band 13 (GIBS ' + time.slice(11, 16) + 'Z)',
             `sea within 100 km ${pct(s.waterLow + s.waterMid + s.waterHigh, s.waterMeasured)}% cloud ` +
@@ -8080,6 +8128,15 @@
           // the satellite cloud field reads this DEM for its sea
           // mask: its first run waits for the ring (syncGoesIr)
           if (!goesObs) syncGoesIr();
+          // the open-sea direction the look links aim at (pick.js):
+          // the centre of the widest arc of azimuths whose walk
+          // along this DEM stays at sea the longest
+          seaHorizon = seaHorizonAzimuth(farRingData.elevAt, {
+            mpu: MPU,
+            maxM: 200e3,
+            stepM: 500,
+            n: 72
+          });
           if (!farMesh) {
             farMesh = new THREE.Mesh(geo, makeFarMaterial());
             farMesh.frustumCulled = false;
@@ -9938,9 +9995,17 @@
       // star is left static). ?vars=0 keeps the still photograph.
       const varPairs = [];
       let varLastT = -99;
+      // The IAU names the pick layer can give a clicked star: each
+      // named star matched to its catalogue row by its own J2000
+      // coordinates (pick.js catalogueIndexNear, 0.1 deg).
+      let namedStars = [];
       fetch('./horizon/stars.json')
         .then((r) => r.json())
         .then((stars) => {
+          namedStars = STAR_NAMES.map((s) => ({
+            ...s,
+            idx: catalogueIndexNear(s.raDeg, s.decDeg, stars)
+          })).filter((s) => s.idx >= 0);
           const pos = [];
           const color = [];
           const size = [];
@@ -11090,6 +11155,20 @@
           for (const [k, v] of Object.entries(research)) {
             const line = document.createElement('div');
             line.textContent = '· ' + k + ' — ' + v;
+            // a line with a place in the sky carries a link that
+            // aims the camera there (145th pass; lookTo)
+            const tgt = researchLook[k];
+            if (tgt) {
+              const a = document.createElement('span');
+              a.className = 'look';
+              a.textContent =
+                '↗ look ' +
+                Math.round(tgt.azDeg) +
+                '°' +
+                (tgt.note ? ' (' + tgt.note + ')' : '');
+              a.addEventListener('click', () => lookTo(tgt.azDeg, tgt.altDeg));
+              line.appendChild(a);
+            }
             panel.appendChild(line);
           }
         }
@@ -11118,6 +11197,12 @@
       // on panel open and each minute while open (about a second of
       // work - diagnostics cadence, not frame cadence).
       const research = {};
+      // Where a research line's subject sits in the sky, when it has
+      // a place: {azDeg, altDeg, note} - the panel renders a link
+      // that aims the camera (the satellite field's cloudiest
+      // sector, the open-sea horizon for the mirage and the flash,
+      // the nearest cruise aircraft for the contrails).
+      const researchLook = {};
       let researchBusy = false;
       let tideStudy = null; // one lazy 30-day fetch per session
       let flashCache = null; // {key, line} - the panel is ~0.5 s
@@ -11198,6 +11283,68 @@
             if (goesObs)
               research['cloud field (GOES-West band 13 · GIBS)'] = goesObs.line;
             else delete research['cloud field (GOES-West band 13 · GIBS)'];
+            // Where each line's subject sits (the look links, 145th
+            // pass): the satellite's cloudiest sea sector, the open
+            // sea for the mirage and the sea-state lines, the sun
+            // itself for the flash when it is low (else the open
+            // sea), the nearest cruise aircraft for the contrails.
+            {
+              const setLook = (k, tgt) => {
+                if (research[k] && tgt) researchLook[k] = tgt;
+                else delete researchLook[k];
+              };
+              const sea = seaHorizon
+                ? {azDeg: seaHorizon.azDeg, altDeg: 0, note: 'open sea'}
+                : null;
+              setLook(
+                'cloud field (GOES-West band 13 · GIBS)',
+                goesObs && goesObs.lookAz !== null
+                  ? {
+                      azDeg: goesObs.lookAz,
+                      altDeg: 4,
+                      note: 'cloudiest sea sector'
+                    }
+                  : null
+              );
+              setLook('mirage (measured column)', sea);
+              setLook('mirage inversion retrieval (Lehn 1983)', sea);
+              const sunLow = astro.sun && astro.sun.alt / RAD < 12;
+              setLook(
+                'green flash tonight (Young)',
+                sunLow
+                  ? {azDeg: astro.sun.az / RAD, altDeg: 0, note: 'the sun'}
+                  : sea
+              );
+              setLook(
+                'whitecaps (Monahan 1980)',
+                sea ? {...sea, altDeg: -1} : null
+              );
+              setLook(
+                'wave ladder (Stull ch. 17)',
+                sea ? {...sea, altDeg: -1} : null
+              );
+              let nearAc = null;
+              for (const s of liveTraffic || []) {
+                const dd = Math.hypot(
+                  s.x - camera.position.x,
+                  s.z - camera.position.z
+                );
+                if (!nearAc || dd < nearAc.dd) nearAc = {dd, s};
+              }
+              setLook(
+                'contrail layer (Schmidt–Appleman)',
+                nearAc
+                  ? {
+                      ...azAltFromDir({
+                        x: nearAc.s.x - camera.position.x,
+                        y: nearAc.s.y - camera.position.y,
+                        z: nearAc.s.z - camera.position.z
+                      }),
+                      note: nearAc.s.flight || 'nearest aircraft'
+                    }
+                  : null
+              );
+            }
             // The SAME scan that gates the drawn trails (set by
             // applySounding); recomputed only if a pin silenced it.
             const con = state.contrailScan ?? contrailPanel(rows);
@@ -11768,6 +11915,355 @@
       });
       canvas.addEventListener('dblclick', () => setExplore(!exploreOn));
       if (params.get('explore') === '1') setExplore(true);
+
+      // ---------- pick: what a click in the world is (145th pass) ----------
+      // A click (no drag) casts a ray: the sky's bodies by angle (the
+      // sun, the moon, the planets, the IAU-named stars, the ships
+      // and aircraft the feeds placed), then the ground by
+      // intersection (the near terrain, the sea, the far ring), and
+      // the satellite field's texel wherever the ray crosses a deck.
+      // The readout names the measurement behind what was clicked.
+      // pick.js owns the geometry (gated); C toggles the satellite
+      // overlay; a research line's "look" link aims the camera.
+      const pickBox = document.getElementById('pick');
+      let pickTimer = 0;
+      let lookOverride = null; // [az, alt] set by a look link
+      let seaHorizon = null; // {azDeg, runM, arcDeg} from the far ring's DEM
+      let goesOverlayOn = params.get('goesoverlay') === '1';
+      let goesOverlay = null;
+      const raycaster = new THREE.Raycaster();
+      const PICK_CLASS = [
+        'no data',
+        'unmeasured',
+        'clear',
+        'low',
+        'mid',
+        'high'
+      ];
+      function lookTo(azDeg, altDeg) {
+        if (freeCam.on) {
+          const yp = yawPitchFor(azDeg, altDeg);
+          freeCam.yaw = yp.yaw;
+          freeCam.pitch = THREE.MathUtils.clamp(yp.pitch, -1.35, 1.35);
+        } else lookOverride = [azDeg, altDeg];
+      }
+      function showPick(text, x, y) {
+        pickBox.textContent = text;
+        pickBox.hidden = false;
+        const w = pickBox.offsetWidth;
+        const h = pickBox.offsetHeight;
+        pickBox.style.left =
+          Math.max(8, Math.min(x + 12, innerWidth - w - 8)) + 'px';
+        pickBox.style.top =
+          Math.max(8, Math.min(y + 12, innerHeight - h - 8)) + 'px';
+        clearTimeout(pickTimer);
+        pickTimer = setTimeout(() => (pickBox.hidden = true), 9000);
+        live['pick (click in the world)'] = text.replace(/\n/g, ' · ');
+      }
+      const fmtDist = (m) =>
+        m < 950
+          ? Math.round(m) + ' m'
+          : (m / 1000).toFixed(m < 20000 ? 1 : 0) + ' km';
+      function pickAt(cx, cy) {
+        const ndc = new THREE.Vector2(
+          (cx / innerWidth) * 2 - 1,
+          -(cy / innerHeight) * 2 + 1
+        );
+        raycaster.setFromCamera(ndc, camera);
+        const o = raycaster.ray.origin;
+        const d = raycaster.ray.direction;
+        const dir = azAltFromDir(d);
+        const lines = [];
+        // the sky's bodies and the feeds' objects, by angle
+        const bodies = [];
+        if (astro.sun)
+          bodies.push({
+            azDeg: astro.sun.az / RAD,
+            altDeg: astro.sun.alt / RAD,
+            max: 2,
+            name: 'the sun'
+          });
+        if (astro.moon)
+          bodies.push({
+            azDeg: astro.moon.az / RAD,
+            altDeg: astro.moon.alt / RAD,
+            max: 2,
+            name: 'the moon'
+          });
+        (astro.planets || []).forEach((pl, i) => {
+          if (pl)
+            bodies.push({
+              azDeg: pl.az / RAD,
+              altDeg: pl.alt / RAD,
+              max: 1.5,
+              name: PLANETS[i]
+            });
+        });
+        if (namedStars.length && window.Astronomy) {
+          const A = window.Astronomy;
+          const t = A.MakeTime(new Date());
+          const obs = new A.Observer(state.lat, state.lon, centerElev);
+          for (const s of namedStars) {
+            const h = A.Horizon(t, obs, s.raDeg / 15, s.decDeg, 'normal');
+            if (h.altitude > -1)
+              bodies.push({
+                azDeg: h.azimuth,
+                altDeg: h.altitude,
+                max: 1.2,
+                name: s.name + ' (' + s.bayer + ', V ' + s.mag.toFixed(2) + ')'
+              });
+          }
+        }
+        const angleTo = (x, y, z) =>
+          azAltFromDir({x: x - o.x, y: y - o.y, z: z - o.z});
+        for (const s of shipPool)
+          if (s.active)
+            bodies.push({
+              ...angleTo(s.x, s.g.position.y, s.z),
+              max: 1.5,
+              name:
+                'ship ' +
+                (s.name || s.mmsi) +
+                (s.dims ? ' ' + s.dims : '') +
+                ', ' +
+                s.sog.toFixed(1) +
+                ' kn',
+              distM: Math.hypot(s.x - o.x, s.z - o.z) * MPU
+            });
+        for (const a of airLights)
+          if (a.active)
+            bodies.push({
+              ...angleTo(a.x, a.y, a.z),
+              max: 1.5,
+              name: 'aircraft ' + (a.flight || a.hex || ''),
+              distM: Math.hypot(a.x - o.x, a.z - o.z) * MPU
+            });
+        let best = null;
+        for (const b of bodies) {
+          const s = sepDeg(dir, b);
+          if (s <= b.max && (!best || s < best.s)) best = {b, s};
+        }
+        if (best)
+          lines.push(
+            best.b.name +
+              (best.b.distM ? ', ' + fmtDist(best.b.distM) : '') +
+              ' · ' +
+              best.b.altDeg.toFixed(1) +
+              '° up at ' +
+              Math.round(best.b.azDeg) +
+              '°'
+          );
+        // the ground: near terrain, the sea, the far ring
+        const targets = [terrainMesh, water, farMesh].filter(Boolean);
+        const hits = raycaster.intersectObjects(targets, false);
+        const ground = hits.find((h) => h.distance > 0.5);
+        if (ground) {
+          const p = ground.point;
+          const distM = Math.hypot(p.x - o.x, p.z - o.z) * MPU;
+          const where = ' at ' + Math.round(dir.azDeg) + '°';
+          if (ground.object === water)
+            lines.push(
+              'the sea, ' +
+                fmtDist(distM) +
+                ' out' +
+                where +
+                (state.marine
+                  ? ', skin ' + state.marine.tInterfaceC.toFixed(1) + ' °C'
+                  : '')
+            );
+          else if (ground.object === farMesh) {
+            const e =
+              farRingData && farRingData.elevAt
+                ? farRingData.elevAt(p.x, p.z)
+                : null;
+            lines.push(
+              (e !== null && e <= 0.3
+                ? 'the sea (far ring), '
+                : 'far terrain, ') +
+                fmtDist(distM) +
+                where +
+                (e !== null && e > 0.3 ? ', ' + Math.round(e) + ' m up' : '')
+            );
+          } else
+            lines.push(
+              'terrain, ' +
+                fmtDist(distM) +
+                where +
+                ', ' +
+                Math.round(elevOfY(p.y, centerElev)) +
+                ' m'
+            );
+        }
+        // the satellite field where the ray crosses a deck base
+        if (cloudSys && goesObs && goesObs.panel) {
+          for (const [deck, u] of [
+            ['low', cloudSys.uniformsLow],
+            ['mid', cloudSys.uniformsMid]
+          ]) {
+            const t = rayPlaneY(o, d, u.yBase.value);
+            if (t === null || (ground && t > ground.distance)) continue;
+            const tx = cloudSys.goesTexelAt(o.x + d.x * t, o.z + d.z * t, deck);
+            if (!tx) continue;
+            const P = goesObs.panel;
+            const win = goesObs.win;
+            const fp = fieldPixelOfTexel(
+              tx.ii,
+              tx.jj,
+              win.halfPx,
+              Math.floor(win.px - goesObs.i0),
+              Math.floor(win.py - goesObs.j0),
+              tx.rm
+            );
+            let detail = '';
+            let cls = null;
+            if (
+              fp &&
+              fp.i >= 0 &&
+              fp.j >= 0 &&
+              fp.i < P.field.ww &&
+              fp.j < P.field.wh
+            ) {
+              const q = fp.j * P.field.ww + fp.i;
+              const bt = P.field.btAt(q);
+              cls = P.field.cls[q];
+              detail =
+                (Number.isFinite(bt) ? ', GOES ' + bt.toFixed(1) + ' °C' : '') +
+                (Number.isFinite(P.field.eps[q])
+                  ? ', ε ' + P.field.eps[q].toFixed(2)
+                  : '') +
+                (Number.isFinite(P.field.topM[q])
+                  ? ', opaque top ' + fmtDist(P.field.topM[q])
+                  : '') +
+                ' (' +
+                PICK_CLASS[P.field.cls[q]] +
+                (P.field.water[q] ? ', sea' : ', land') +
+                ')';
+            }
+            // a clear low texel under a "low" pixel is the split
+            // rule at work: the ceilometer reported no low layer,
+            // so the satellite's low pixels went to the mid deck
+            const handed =
+              deck === 'low' &&
+              tx.valid &&
+              !(tx.cover > 0) &&
+              cls === 3 &&
+              goesObs.deck &&
+              goesObs.deck.lowToMid;
+            lines.push(
+              deck +
+                ' deck on this ray: ' +
+                (tx.valid
+                  ? tx.cover > 0
+                    ? 'measured cloud'
+                    : handed
+                      ? 'the pixel is low cloud handed to the mid deck ' +
+                        '(the ceilometer reports no low layer)'
+                      : 'measured clear'
+                  : 'unmeasured, the noise cover') +
+                detail
+            );
+            break;
+          }
+        }
+        if (!lines.length)
+          lines.push(
+            'sky at ' +
+              Math.round(dir.azDeg) +
+              '°, ' +
+              dir.altDeg.toFixed(1) +
+              '° up'
+          );
+        showPick(lines.join('\n'), cx, cy);
+      }
+      {
+        let down = null;
+        canvas.addEventListener('pointerdown', (e) => {
+          down = {x: e.clientX, y: e.clientY, t: performance.now()};
+        });
+        addEventListener('pointerup', (e) => {
+          if (!down) return;
+          const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+          const dt = performance.now() - down.t;
+          down = null;
+          if (moved < 4 && dt < 400 && e.target === canvas)
+            pickAt(e.clientX, e.clientY);
+        });
+      }
+      // The satellite's own view of the sea, drawn on it: one texel
+      // per GOES pixel over the +/-100 km field - white where the low
+      // deck is measured cloud, blue-grey for the mid deck, a faint
+      // teal for measured clear sea, nothing where unmeasured. A
+      // diagnostic view: C toggles it, ?goesoverlay=1 starts with it.
+      function buildGoesOverlay() {
+        if (!goesObs || !goesObs.deck) return;
+        const {data, rm} = goesObs.deck;
+        const px = new Uint8Array(rm * rm * 4);
+        for (let k = 0; k < rm * rm; k++) {
+          const r = data[k * 4];
+          const g = data[k * 4 + 1];
+          const b = data[k * 4 + 2];
+          const a = data[k * 4 + 3];
+          let c = [0, 0, 0, 0];
+          if (a > 0 && r > 0) c = [245, 245, 245, 150];
+          else if (b > 0 && g > 0) c = [170, 190, 215, 140];
+          else if (a > 0) c = [40, 140, 150, 50];
+          px.set(c, k * 4);
+        }
+        const tex = new THREE.DataTexture(px, rm, rm, THREE.RGBAFormat);
+        tex.magFilter = tex.minFilter = THREE.NearestFilter;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.flipY = true; // texel row 0 is the field's north
+        tex.needsUpdate = true;
+        if (!goesOverlay) {
+          goesOverlay = new THREE.Mesh(
+            new THREE.PlaneGeometry(1, 1),
+            new THREE.MeshBasicMaterial({
+              transparent: true,
+              depthWrite: false,
+              toneMapped: false
+            })
+          );
+          goesOverlay.rotation.x = -Math.PI / 2;
+          goesOverlay.renderOrder = 1;
+          scene.add(goesOverlay);
+        }
+        if (goesOverlay.material.map) goesOverlay.material.map.dispose();
+        goesOverlay.material.map = tex;
+        goesOverlay.material.needsUpdate = true;
+        goesOverlay.scale.set(goesObs.worldUnits, goesObs.worldUnits, 1);
+        goesOverlay.position.set(0, (water ? water.position.y : 0) + 0.4, 0);
+        goesOverlay.visible = goesOverlayOn;
+      }
+      function setGoesOverlay(on) {
+        goesOverlayOn = on;
+        if (on && !goesOverlay) buildGoesOverlay();
+        if (goesOverlay) goesOverlay.visible = on;
+        live['satellite overlay (C)'] = on
+          ? goesObs
+            ? 'on · ' + goesObs.time.slice(11, 16) + 'Z field on the sea'
+            : 'on · waiting for the field'
+          : 'off';
+      }
+      addEventListener('keydown', (e) => {
+        if (typing(e)) return;
+        if (e.key === 'Escape') pickBox.hidden = true;
+        if (e.key === 'c') setGoesOverlay(!goesOverlayOn);
+      });
+      // Harness hooks (?debug=1): a scripted click and the look link
+      if (params.has('debug')) {
+        window.__pickAt = (x, y) => {
+          pickAt(x, y);
+          return pickBox.textContent;
+        };
+        window.__lookTo = lookTo;
+        window.__goesOverlay = setGoesOverlay;
+        window.__lookState = () => ({
+          lookOverride,
+          freeOn: freeCam.on,
+          seaHorizon,
+          looks: Object.keys(researchLook)
+        });
+      }
 
       // ---------- free camera ----------
       // Drag to look, WASD/arrows to fly (Shift for speed, R/F for
@@ -16766,7 +17262,8 @@
         } else {
           const equatorYaw = state.lat < 0 ? Math.PI : 0;
           const auroraOn = auroraU.strength.value > 0.04;
-          const LK = (params.has('debug') && window.__look) || LOOK;
+          const LK =
+            lookOverride || (params.has('debug') && window.__look) || LOOK;
           const targetYaw = LK
             ? Math.PI - LK[0] * RAD
             : auroraOn
@@ -16806,6 +17303,8 @@
             camBaseY + 1 + look.y * -5 + Math.sin(lookAlt) * 66,
             camZ + Math.cos(lookAlt) * vz * 66
           );
+          if (params.has('debug'))
+            window.__yawState = {LK, yaw, targetYaw, camX, camZ};
           // Harness pose override (?debug=1): place the camera AT a
           // point with a compass az / alt view - close framing for
           // visual verification (a train fills the frame instead of

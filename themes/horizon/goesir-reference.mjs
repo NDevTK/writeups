@@ -55,6 +55,7 @@ import {
   radfn,
   resolveGreys,
   seaEmissivity,
+  sectorCensus,
   viewZenithDeg,
   windowTiles
 } from './goesir.js';
@@ -583,6 +584,40 @@ pinBlock(
       (shore === 'CLR'
         ? ' - a clear ceilometer with a partly clouded offshore sea, consistent'
         : '')
+  );
+}
+
+// ---- the field by sector (the look-here target) ---------------
+{
+  // a 41 x 41 sea with cloud only in a wedge from 25 to 45 deg of
+  // azimuth: of 16 sectors the cloudiest must be the one centred at
+  // 33.75 deg (22.5..45), mostly cloudy, its neighbours clear
+  const ww = 41;
+  const cls = new Uint8Array(ww * ww).fill(CLS.clear);
+  const water = new Uint8Array(ww * ww).fill(1);
+  for (let j = 0; j < ww; j++)
+    for (let i = 0; i < ww; i++) {
+      const dx = i + 0.5 - 20.5;
+      const dy = j + 0.5 - 20.5;
+      const az = ((((Math.atan2(dx, -dy) * 180) / Math.PI) % 360) + 360) % 360;
+      if (az >= 25 && az < 45) cls[j * ww + i] = CLS.low;
+    }
+  const sc = sectorCensus({ww, wh: ww, cls, water}, 20.5, 20.5, 19, 16);
+  const sw = sc.sectors[Math.floor((225 / 360) * 16)];
+  check(
+    'THE SECTOR CENSUS finds the cloudy wedge',
+    sc.sectors.length === 16 &&
+      sc.cloudiest &&
+      near(sc.cloudiest.azDeg, 33.75, 1e-9) &&
+      sc.cloudiest.frac > 0.8 &&
+      sc.sectors[0].frac < 0.15 &&
+      sc.sectors[2].frac === 0 &&
+      sw.frac === 0 &&
+      sc.sectors.every((s) => s.measured > 0),
+    `a cloudy wedge from 25 to 45 deg on a synthetic sea: the cloudiest of 16 sectors is ` +
+      `centred at ${sc.cloudiest.azDeg} deg at ${(sc.cloudiest.frac * 100).toFixed(0)}% cloud, ` +
+      `its neighbours ${(sc.sectors[0].frac * 100).toFixed(0)}% and 0%, the south-west clear, ` +
+      `every sector measured`
   );
 }
 

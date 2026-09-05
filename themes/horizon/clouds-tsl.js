@@ -52,6 +52,7 @@ import {
 } from 'three/tsl';
 import {generateCloudArrays} from './cloud-noise.js';
 import {generateBlueNoise} from './blue-noise.js';
+import {texelIndex} from './pick.js';
 
 /**
  * TSL port of the temporally reconstructed Nubis cloud system (WebGPU
@@ -891,6 +892,33 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     // validity, zero border ring) spanning worldUnits of scene space
     // centred on the observer, anchored to EACH deck's current
     // advection offset. null clears it back to the pinned default.
+    // The texel the shader samples for a deck at scene xz (the pick
+    // layer's readout, 145th pass): the same shift coverAt applies
+    // (p + wOff - fieldOff), nearest texel; null without a field or
+    // outside it.
+    goesTexelAt(x, z, deck = 'low') {
+      const img = goesTex.image;
+      if (!img || !(img.width > 1)) return null;
+      const low = deck === 'low';
+      const wOff = (low ? uniformsLow : uniformsMid).wOff.value;
+      const off = (low ? uGoesOffLow : uGoesOffMid).value;
+      const t = texelIndex(
+        x + wOff.x - off.x,
+        z + wOff.y - off.y,
+        uGoesWorld.value,
+        img.width
+      );
+      if (!t) return null;
+      const k = (t.jj * img.width + t.ii) * 4;
+      const d = img.data;
+      return {
+        ii: t.ii,
+        jj: t.jj,
+        rm: img.width,
+        cover: low ? d[k] : d[k + 1],
+        valid: low ? d[k + 3] : d[k + 2]
+      };
+    },
     setGoesCover(data, rm, worldUnits) {
       if (!data) {
         goesTex.image = {data: goesZeroData, width: 1, height: 1};

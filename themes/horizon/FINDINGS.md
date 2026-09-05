@@ -9,8 +9,8 @@ from the code. Run the whole corpus with:
 cd themes/horizon/harness && bash validate.sh
 ```
 
-At the time of writing the gate holds **140 CPU reference files printing
-1112 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
+At the time of writing the gate holds **141 CPU reference files printing
+1118 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **140 reference files, 1112 landmark lines, 7 GPU probes** (live gate
+- **141 reference files, 1118 landmark lines, 7 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -722,7 +722,23 @@ The practice the corpus demonstrates, stated so it can be reused:
    printed similarity theory, composed with the balloon under a
    contract that tags what is modelled and forbids closures across
    it — the first time the drawn horizon's lowest metres come from
-   a measurement taken over the water it draws.
+   a measurement taken over the water it draws. Pass 143 adds the
+   first per-pixel measurement of the sky itself (GOES-West's
+   window channel through the marine chain's own clear-sky
+   reference), and pass 145 closes the loop the other way: the
+   drawn world answers a click. A ray from the camera names what it
+   meets — the sky's bodies and the IAU-named stars by angle, the
+   feeds' ships and aircraft, the terrain, the sea, the far ring,
+   and the satellite texel where the ray crosses a deck, with the
+   field pixel's temperature, emissivity and class behind it — and
+   every research line carries a "look" link that turns the camera
+   to what it diagnoses (the cloudiest sea sector, the open sea by
+   the DEM walk, the setting sun, the nearest cruise aircraft); the
+   satellite field itself can be drawn on the sea as the mosaic the
+   decks carve from. The geometry is a gated module
+   (`pick-reference`): the compass convention round-trips against
+   the camera's own vector, the texel index inverts the deck field's
+   mapping, and the sea walk is held on synthetic coasts.
 
 ---
 

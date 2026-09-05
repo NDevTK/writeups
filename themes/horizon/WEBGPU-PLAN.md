@@ -10345,6 +10345,78 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 145th pass - THE WORLD ANSWERS A
+  CLICK): the research view's diagnoses get hands in the drawn
+  world. (1) THE PICK LAYER: a click (no drag) on the canvas casts a
+  ray from the camera; pick.js owns the geometry and is gated
+  (pick-reference: the compass convention - scene +x east, +y up, -z
+  north, the camera's yaw pi - az, the free camera's pitch -alt -
+  round-trips and reproduces the camera's own forward vector;
+  separations exact at the cardinal points; the texel index
+  reproduces the deck shader's sampling and inverts deckField's
+  mapping; the sea walk; the IAU slice). The readout names, by
+  angle, the sun, the moon, the planets, the IAU-named stars
+  (starnames-data.js: 85 names to V 2.5 from the IAU WGSN catalogue,
+  CC BY, with J2000 coordinates and Bayer designations, placed by
+  the page's own astronomy engine), the AIS ships and the ADS-B
+  aircraft the feeds placed (with their distance); then, by
+  intersection, the near terrain (its elevation), the sea (the
+  marine chain's skin temperature), the far ring (sea or terrain by
+  the DEM) and, where the ray crosses a deck's base plane, the
+  satellite field's texel there - measured cloud, measured clear or
+  unmeasured, with the GOES temperature, eps_trop, opaque top, class
+  and sea/land of the field pixel the texel came from (clouds-tsl
+  exposes goesTexelAt with the same per-deck advection offset the
+  shader applies). A clear low texel under a "low" pixel names the
+  split rule (the pixel handed to the mid deck). (2) LOOK LINKS:
+  research lines carry "look N deg" links that aim the camera at what
+  the line diagnoses - the cloud field at its cloudiest 100-km sector
+  (sectorCensus, 16 wedges, gated: a synthetic 25-45 deg wedge reads
+  cloudiest at 33.75 deg with its neighbours clear); the mirage, Lehn
+  and wave-ladder lines and the whitecaps at the OPEN SEA:
+  seaHorizonAzimuth walks 72 azimuths along the far ring's DEM 200 km
+  out in 500-m steps, skips the land the observer stands on, counts
+  the sea run and answers the CENTRE of the widest arc of azimuths
+  within 5% of the longest run (Miramar: 242.5 deg, 186.5 km, a
+  50-deg arc; the first walk broke on the mesa's own land and
+  answered null - gated now on a synthetic coast, the same coast
+  from a mesa 20 km inland, an all-land ring, an all-sea ring and a
+  bay across the wrap); the green flash at the sun under 12 deg and
+  at the sea otherwise; the contrail line at the nearest cruise
+  aircraft. A look sets the default camera's heading and altitude
+  (lookOverride) or the free camera's yaw and pitch (yawPitchFor).
+  (3) THE SATELLITE OVERLAY (C, ?goesoverlay=1): the deck field drawn
+  on the sea one texel per GOES pixel - white where the low deck is
+  measured cloud, blue-grey the mid deck, a faint teal measured clear
+  sea, nothing where unmeasured - the diagnostic view of what the
+  decks carve from. (4) THE HARNESS: shoot.mjs gains --act (a script
+  run BEFORE the capture, so the capture shows the interaction) and
+  --eval (after it); window.**pickAt, **lookTo, **goesOverlay,
+  **lookState and \_\_yawState under ?debug=1. MEASURED TODAY (Miramar,
+  the 17:50Z field): the centre pick "sky at 180 deg, 0.9 deg up";
+  the lower third "terrain, 948 m at 180 deg, 140 m"; high in the
+  frame "low deck on this ray: unmeasured, the noise cover, GOES
+  9.6 C, eps 0.19 (clear, land)"; right of frame "the sea (far ring),
+  17.9 km at 213 deg"; the panel's cloud-field link turned the camera
+  to 258.75 deg (the sector centre) and the centre pick then read the
+  sea's deck there: GOES 3.7 C, eps 0.28, opaque top 1.9 km, a low
+  pixel handed to the mid deck (KNKX reporting no low layer; 73% of
+  3064 sea pixels low, 27% clear); the overlay line "on - 17:50Z
+  field on the sea"; from a 5-km eye over the shore the overlay is
+  the field's 2-km mosaic on the sea. THE FRAME RATE, measured: two
+  animation frames in 3.8 s under SwiftShader - the first two probes
+  read the camera before any frame had run and reported the look
+  "ignored"; the harness note now says so, and a scripted look waits
+  for a frame. STATED LIMITS: the pick meets a deck at its BASE plane
+  (the volumetric extent is not marched); the far ring's sea test is
+  the DEM's 0.3-m rule; the named stars are the IAU's 85 to V 2.5 -
+  fainter stars answer "sky"; ships and aircraft match within
+  1.5 deg; the 143rd's stated limit on GIBS's layer-time-actual
+  header is now known to be the HARNESS's: shoot.mjs routes every
+  non-local request through curl and forwards only the status and
+  the content type, so no response header reaches the page under
+  test - the page's own read of the exposed header is untested
+  outside the harness and it keeps asking the time domain.
 - DONE (Sep 5, the review session's 144th pass - THE DAEMON REPAIRED
   AND THE SWEEP): what the live counters said, fixed, and the 143rd
   read again with fresh eyes. (1) /rrs FAILED EVERY CALL (9 of 9 in

@@ -1254,6 +1254,48 @@ export function fieldStats(field, cx, cy, radiusPx) {
 }
 
 /**
+ * The field by compass sector (145th pass, the panel's look-here
+ * target): n sectors of 360/n degrees around the observer, each the
+ * measured-sea cloud fraction within radiusPx; azimuth clockwise
+ * from north (pixel +i east, +j south). Returns the sectors and the
+ * cloudiest one (ties to the first; null when no sector holds a
+ * measured sea pixel).
+ */
+export function sectorCensus(field, cx, cy, radiusPx, n = 16) {
+  const {ww, wh, cls, water} = field;
+  const sectors = [];
+  for (let s = 0; s < n; s++)
+    sectors.push({
+      azDeg: (360 * (s + 0.5)) / n,
+      measured: 0,
+      cloud: 0,
+      frac: null
+    });
+  for (let j = 0; j < wh; j++)
+    for (let i = 0; i < ww; i++) {
+      const dx = i + 0.5 - cx;
+      const dy = j + 0.5 - cy;
+      const r2 = dx * dx + dy * dy;
+      if (r2 > radiusPx * radiusPx || r2 === 0) continue;
+      const q = j * ww + i;
+      if (!water[q]) continue;
+      const c = cls[q];
+      if (c === CLS.nodata || c === CLS.unmeasured) continue;
+      const az = ((((Math.atan2(dx, -dy) * 180) / Math.PI) % 360) + 360) % 360;
+      const s = Math.min(n - 1, Math.floor((az / 360) * n));
+      sectors[s].measured++;
+      if (c !== CLS.clear) sectors[s].cloud++;
+    }
+  let cloudiest = null;
+  for (const sec of sectors) {
+    if (!sec.measured) continue;
+    sec.frac = sec.cloud / sec.measured;
+    if (!cloudiest || sec.frac > cloudiest.frac) cloudiest = sec;
+  }
+  return {sectors, cloudiest};
+}
+
+/**
  * THE DECK FIELD for the volumetric clouds: an RM x RM RGBA float
  * field, one texel per satellite pixel around the observer with a
  * zero border ring, in the SAME orientation as the radar field
@@ -1366,6 +1408,7 @@ export function goesPanel({
   const pxPerKm = 1000 / win.mppM;
   const r100 = fieldStats(field, cx, cy, 100 * pxPerKm);
   const r30 = fieldStats(field, cx, cy, 30 * pxPerKm);
+  const sectors = sectorCensus(field, cx, cy, 100 * pxPerKm);
   const deck = deckField(field, cx, cy, win.halfPx, {metar});
   // the decks' tops: the low deck's from the field's own heights;
   // the mid deck's from its mid pixels plus, when the ceilometer
@@ -1400,6 +1443,7 @@ export function goesPanel({
     field,
     r100,
     r30,
+    sectors,
     deck,
     observer: {
       btC: field.btAt(oq),

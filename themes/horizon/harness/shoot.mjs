@@ -21,6 +21,14 @@
 //   --wait-console R  capture as soon as a console line matches R
 //   --reduced-motion  emulate prefers-reduced-motion
 //   --dump-text F     write the page text (debug panel) to F
+//   --eval F          run F's script in the page after the capture
+//   --act F           run F's script BEFORE the capture (a scripted
+//                     interaction the capture then shows). Under
+//                     SwiftShader a frame takes seconds (measured:
+//                     2 rAF ticks in 3.8 s), so a look or a click
+//                     that needs a frame must wait several seconds
+//                     for it, and --eval, after the readback, may
+//                     see none at all.
 import {chromium} from 'playwright-core';
 import {spawn} from 'node:child_process';
 import {writeFileSync, readFileSync, rmSync} from 'node:fs';
@@ -161,6 +169,20 @@ if (waitRe) {
   await page.waitForTimeout(waitMs);
 }
 
+// --act F: a scripted interaction before the capture, so the
+// capture shows its result (a frame takes seconds under SwiftShader:
+// the script must wait for one).
+const actFile = val('--act', null);
+if (actFile) {
+  try {
+    const src = readFileSync(actFile, 'utf8');
+    const r = await page.evaluate(src);
+    console.log(ts() + '|ACT|' + JSON.stringify(r).slice(0, 4000));
+  } catch (e) {
+    console.log(ts() + '|ACT|failed|' + e.message.slice(0, 400));
+  }
+}
+
 // Pages may expose window.__capture(w, h) -> RGBA buffer for
 // multi-pass frames; otherwise the generic scene re-render is used.
 // Rows are normalised to top-origin: WebGL-backend readbacks are
@@ -215,6 +237,20 @@ if (rtShot && rtShot.bpe === 1) {
   console.log(ts() + '|SHOT|rt-unsupported-bpe|' + rtShot.bpe);
 } else {
   console.log(ts() + '|SHOT|no-capture');
+}
+// --eval F: after the capture, run the script in F inside the page
+// (its completion value, awaited, printed as EVAL|json) - the way a
+// scripted interaction (a click through window.__pickAt, a look
+// link, the overlay toggle) is exercised without a human's pointer.
+const evalFile = val('--eval', null);
+if (evalFile) {
+  try {
+    const src = readFileSync(evalFile, 'utf8');
+    const r = await page.evaluate(src);
+    console.log(ts() + '|EVAL|' + JSON.stringify(r).slice(0, 4000));
+  } catch (e) {
+    console.log(ts() + '|EVAL|failed|' + e.message.slice(0, 400));
+  }
 }
 // --dump-text F: after the capture, write the page's visible text
 // (the debug panel included) to F - the capture's own flight
