@@ -50,6 +50,19 @@
 //    PSL's u*, t*, Hs, Hl, density and U10N out, hour by hour; and
 //    the Kansas pairing measured on the same hours (the reason for
 //    the switch, in W/m^2)
+//  - THE MEASURED STRESS (141st pass): the bulk against the
+//    archive's DIRECTLY MEASURED fluxes - the covariance stress
+//    along the wind, the covariance sensible and latent heat
+//    fluxes - by 10-m neutral wind class; the pinned residual
+//    table the page states (BULK_RESIDUALS) recomputed from the
+//    frozen rows, run-then-pin; Fairall 2003's printed verdict on
+//    COARE 3.0 ("within 5% for wind speeds of 0-10 m/s and 10%
+//    for 10-20") as the printed comparison
+//  - THE WAVE BRANCH TRIED: the code's wave-state Charnock (zoS =
+//    sigH Ad (usr/cp)^Bd) with the archive's MEASURED wave height
+//    and dominant period against the same covariance stress,
+//    beside the wind-speed form - by wave age; measured, and not
+//    adopted
 import {
   ALPHA_EDDY_NEUTRAL,
   BETA_STABLE,
@@ -80,8 +93,11 @@ import {
   roughnessZ0
 } from './surfacelayer.js';
 import {SHIPFLUX_AT, SHIPFLUX_SKIN} from './shipflux-fixture.js';
+import {SHIPFLUX_COV, SHIPFLUX_COV_AT} from './shipflux-cov-fixture.js';
+import {BULK_RESIDUALS, bulkResidual} from './surfacelayer.js';
 import {retrievalPanel, flashPanel} from './observatory.js';
 import {ductScan} from './refraction.js';
+import {rayFan} from './far-terrain.js';
 import {profileFromRows} from './observatory.js';
 
 let fail = 0;
@@ -356,6 +372,32 @@ const balloon = (h0, tSurf, invBaseAgl = 600) => {
     ...ladder
   });
   const filmC = film(warmC.mo);
+  // the S each column draws at the tower eye's 30 km - the fan's
+  // z(alpha) at that distance, its height the spread of the curve's
+  // local extrema; the detector takes folds 6 m prominent
+  // (retrievalPanel's tcCriticalPoints(tc, 6)), and the fan step is
+  // tried at 100 and 10 m
+  const foldSpanM = (col, eyeM, dM, dsM) => {
+    const profile = profileFromRows(col.rows);
+    const MINR = Math.PI / 180 / 60;
+    const alphas = [];
+    for (let a = -80; a <= 40; a += 0.25) alphas.push(a * MINR);
+    const fan = rayFan(profile, eyeM, alphas, dM + 1e3, dsM);
+    const j = Math.max(0, Math.round(dM / fan.dsM) - 1);
+    const z = alphas.map((_, i) => fan.hs[i][j]);
+    const ext = [];
+    for (let i = 1; i + 1 < z.length; i++)
+      if (
+        [z[i - 1], z[i], z[i + 1]].every(Number.isFinite) &&
+        ((z[i] > z[i - 1] && z[i] > z[i + 1]) ||
+          (z[i] < z[i - 1] && z[i] < z[i + 1]))
+      )
+        ext.push(z[i]);
+    return ext.length ? Math.max(...ext) - Math.min(...ext) : 0;
+  };
+  const spanK = foldSpanM(warm, 22, 30e3, 100);
+  const spanC = foldSpanM(warmC, 22, 30e3, 100);
+  const spanC10 = foldSpanM(warmC, 22, 30e3, 10);
   const cold = marineColumnRows(
     rows,
     {uMs: 3, zuM: 8, taC: 21, ztM: 7, tsC: 17, pPa: 101325},
@@ -378,6 +420,9 @@ const balloon = (h0, tSurf, invBaseAgl = 600) => {
     warmC.mo.forms === 'coare36' &&
     filmC < -34.16 &&
     filmC > filmMo &&
+    spanK > 3 &&
+    spanC < spanK / 3 &&
+    Math.abs(spanC10 - spanC) < 1 &&
     warmC.mo.tAt(0) - warmC.mo.tAt(1) > warm.mo.tAt(0) - warm.mo.tAt(1) &&
     ducts.length >= 1 &&
     ['in-duct', 'ducted-mock-mirage', 'sub-duct'].includes(fl.type);
@@ -385,7 +430,7 @@ const balloon = (h0, tSurf, invBaseAgl = 600) => {
     'Fleagle reads Businger: the cross-closure, and the looming class',
     ok,
     R
-      ? `water +5 K, calm, Kansas forms: the similarity film is ${filmMo.toFixed(0)} K/km over 0.5-10 m; the tower eye's fold at ${(r.distM / 1000).toFixed(0)} km is read by the film family as ${(R.params.gammaFilmKpM * 1000).toFixed(0)} K/km over ${R.params.wM.toFixed(0)} m (drop ${(-R.dTretr).toFixed(2)} K vs the profile's ${(-R.dTballoon).toFixed(2)} K), closing at ${R.rmsK.toFixed(3)} K RMS over ${R.spanM[0].toFixed(0)}-${R.spanM[1].toFixed(0)} m - inside the pier's ${warm.pierTopM}-m band, no lean on the modelled layer; the SAME contrast on COARE 3.6's forms: ${filmC.toFixed(0)} K/km over 0.5-10 m (the free-convection limb holds ${(warmC.mo.tAt(0) - warmC.mo.tAt(1)).toFixed(2)} K in the lowest metre against Kansas's ${(warm.mo.tAt(0) - warm.mo.tAt(1)).toFixed(2)}), and the same fan from 22/30 m over 10-60 km ${rC.retrieved ? `folds at ${(rC.distM / 1000).toFixed(0)} km (${rC.mode}, ${rC.retrieved.closes ? 'closes' : 'does not close'})` : 'finds no fold - the archive-gated forms keep the calm film below what the 100-m fan resolves'}; air +4 K over cold water: ${ducts.length} surface duct(s), flash class "${fl.type}" - the looming side of the same measured contrast`
+      ? `water +5 K, calm, Kansas forms: the similarity film is ${filmMo.toFixed(0)} K/km over 0.5-10 m; the tower eye's fold at ${(r.distM / 1000).toFixed(0)} km is read by the film family as ${(R.params.gammaFilmKpM * 1000).toFixed(0)} K/km over ${R.params.wM.toFixed(0)} m (drop ${(-R.dTretr).toFixed(2)} K vs the profile's ${(-R.dTballoon).toFixed(2)} K), closing at ${R.rmsK.toFixed(3)} K RMS over ${R.spanM[0].toFixed(0)}-${R.spanM[1].toFixed(0)} m - inside the pier's ${warm.pierTopM}-m band, no lean on the modelled layer; the SAME contrast on COARE 3.6's forms: ${filmC.toFixed(0)} K/km over 0.5-10 m (the free-convection limb holds ${(warmC.mo.tAt(0) - warmC.mo.tAt(1)).toFixed(2)} K in the lowest metre against Kansas's ${(warm.mo.tAt(0) - warm.mo.tAt(1)).toFixed(2)}), and the same fan from 22/30 m over 10-60 km ${rC.retrieved ? `folds at ${(rC.distM / 1000).toFixed(0)} km (${rC.mode}, ${rC.retrieved.closes ? 'closes' : 'does not close'})` : `finds no fold it will take: the S at 30 km spans ${spanC.toFixed(1)} m on COARE's column against ${spanK.toFixed(1)} m on Kansas's, under the detector's 6-m prominence - the fan step changes nothing (${spanC10.toFixed(1)} m at 10 m); a smaller mirage, not an unresolved one`}; air +4 K over cold water: ${ducts.length} surface duct(s), flash class "${fl.type}" - the looming side of the same measured contrast`
       : `declined: ${r.note}`
   );
 }
@@ -691,6 +736,226 @@ const balloon = (h0, tSurf, invBaseAgl = 600) => {
     "THE ARCHIVE: PSL's measured hours through the module",
     ok,
     `${c.n} frozen night hours (${SHIPFLUX_AT}) with the bulk inputs: on COARE 3.6's forms the module returns PSL's u* to ${fmt(c.u, 5)} m/s (worst ${c.uMax.toFixed(4)}), t* to ${fmt(c.ts, 5)} K, sensible flux ${fmt(c.hs, 3)} W/m^2, latent flux ${fmt(c.hl, 2)} W/m^2 (worst ${c.hlMax.toFixed(1)}; the archive's humidity is printed to 0.1 g/kg), air density ${fmt(c.rho, 5)} kg/m^3, U10N ${fmt(c.u10n, 3)} m/s on ${c.nU10} hours - ${c.far} hour(s) off by more than 5 W/m^2 latent or 0.01 m/s in u*; the Kansas pairing (0.74 Prandtl, COARE 3.0 roughness) on the same hours: u* ${fmt(k.u, 4)}, sensible ${fmt(k.hs, 2)}, latent ${fmt(k.hl, 1)} W/m^2 - the measured reason the page switched forms`
+  );
+}
+
+// 12. THE MEASURED STRESS (141st pass): the bulk against the
+// archive's directly measured fluxes, by 10-m neutral wind class -
+// the covariance stress along the wind (all signs: a noisy hour's
+// negative stress is a measurement too, and keeping only the
+// positive ones would inflate the low-wind mean), the sonic
+// sensible flux, the gas-analyser latent flux. The pinned table
+// the page states (BULK_RESIDUALS) is recomputed here from the
+// frozen rows: a drift prints the fresh table to pin.
+const bulkOf = (r, extra = {}) =>
+  moBulk({
+    uMs: r.uMs,
+    zuM: r.zuM,
+    taC: r.taC,
+    ztM: r.ztM,
+    zqM: r.zqM,
+    qAKgKg: r.qGkg / 1000,
+    tsC: r.tskinC,
+    pPa: r.pHpa * 100,
+    latDeg: r.latDeg,
+    ssPsu: r.ssPsu ?? 35,
+    bliM: 600,
+    ...extra
+  });
+const pairStat = (v, rd) => {
+  const n = v.length;
+  if (!n) return {bias: null, rmse: null, ratio: null};
+  const d = v.map((x) => x[0] - x[1]);
+  const bias = d.reduce((s, x) => s + x, 0) / n;
+  const rmse = Math.sqrt(d.reduce((s, x) => s + x * x, 0) / n);
+  const mm = v.reduce((s, x) => s + x[1], 0) / n;
+  const mb = v.reduce((s, x) => s + x[0], 0) / n;
+  const r3 = (x) => Math.round(x * 1e3) / 1e3;
+  return {bias: rd(bias), rmse: rd(rmse), ratio: r3(mb / mm)};
+};
+{
+  const EDGES = [0, 3, 6, 9, 12, Infinity];
+  const classes = EDGES.slice(0, -1).map((lo, i) => ({
+    u10nMs: [lo, EDGES[i + 1]],
+    tau: [],
+    ust: [],
+    hs: [],
+    hl: []
+  }));
+  for (const r of SHIPFLUX_COV) {
+    const mo = bulkOf(r);
+    const c =
+      classes.find(
+        (k) => mo.u10nMs >= k.u10nMs[0] && mo.u10nMs < k.u10nMs[1]
+      ) ?? classes[classes.length - 1];
+    if (Number.isFinite(r.tauCov)) {
+      c.tau.push([mo.tauNm2, r.tauCov]);
+      // the measured friction velocity: the sign-preserving root of
+      // the streamwise stress over the module's own air density
+      c.ust.push([
+        mo.uStar,
+        Math.sign(r.tauCov) * Math.sqrt(Math.abs(r.tauCov) / mo.rhoA)
+      ]);
+    }
+    if (Number.isFinite(r.hsCov)) c.hs.push([mo.hsbWm2, -r.hsCov]);
+    if (Number.isFinite(r.hlCov)) c.hl.push([mo.hlbWm2, -r.hlCov]);
+  }
+  const r4 = (x) => Math.round(x * 1e4) / 1e4;
+  const r2 = (x) => Math.round(x * 100) / 100;
+  const fresh = {
+    at: SHIPFLUX_COV_AT,
+    classes: classes.map((c) => {
+      const u = pairStat(c.ust, r4);
+      return {
+        u10nMs: c.u10nMs,
+        hours: {tau: c.tau.length, hs: c.hs.length, hl: c.hl.length},
+        tau: pairStat(c.tau, r4),
+        uStar: {bias: u.bias, rmse: u.rmse},
+        hs: pairStat(c.hs, r2),
+        hl: pairStat(c.hl, r2)
+      };
+    })
+  };
+  // the pinned table against the fresh one, number by number
+  const near = (a, b, tol) =>
+    (a === null && b === null) ||
+    (Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tol);
+  let pinned =
+    BULK_RESIDUALS.at === fresh.at &&
+    BULK_RESIDUALS.classes.length === fresh.classes.length;
+  const drift = [];
+  if (pinned)
+    fresh.classes.forEach((f, i) => {
+      const p = BULK_RESIDUALS.classes[i];
+      const rows = [
+        ['hours.tau', p.hours.tau, f.hours.tau, 0],
+        ['hours.hs', p.hours.hs, f.hours.hs, 0],
+        ['hours.hl', p.hours.hl, f.hours.hl, 0],
+        ['tau.bias', p.tau.bias, f.tau.bias, 1e-4],
+        ['tau.rmse', p.tau.rmse, f.tau.rmse, 1e-4],
+        ['tau.ratio', p.tau.ratio, f.tau.ratio, 1e-3],
+        ['uStar.bias', p.uStar.bias, f.uStar.bias, 1e-4],
+        ['uStar.rmse', p.uStar.rmse, f.uStar.rmse, 1e-4],
+        ['hs.bias', p.hs.bias, f.hs.bias, 0.01],
+        ['hs.rmse', p.hs.rmse, f.hs.rmse, 0.01],
+        ['hs.ratio', p.hs.ratio, f.hs.ratio, 1e-3],
+        ['hl.bias', p.hl.bias, f.hl.bias, 0.01],
+        ['hl.rmse', p.hl.rmse, f.hl.rmse, 0.01],
+        ['hl.ratio', p.hl.ratio, f.hl.ratio, 1e-3]
+      ];
+      for (const [k, a, b, tol] of rows)
+        if (!near(a, b, tol))
+          drift.push(`class ${i} ${k}: pinned ${a} vs ${b}`);
+    });
+  if (!pinned || drift.length)
+    console.log(
+      'BULK_RESIDUALS to pin:\n' +
+        JSON.stringify(fresh, null, 2).replace(
+          /null(?=\s*\]|\s*,\s*"hours")/g,
+          'Infinity'
+        )
+    );
+  const F = fresh.classes;
+  const physics =
+    F.every((c) => c.hours.tau >= 30 && c.hours.hl >= 30) &&
+    // the stress: under the measured at low winds (the covariance
+    // magnitude's noise floor), within a tenth from 6 m/s up
+    F[0].tau.ratio > 0.4 &&
+    F[0].tau.ratio < 0.9 &&
+    F.slice(1).every((c) => c.tau.ratio > 0.8 && c.tau.ratio < 1.05) &&
+    // the heat fluxes: latent within a tenth in every class, sensible
+    // under the sonic's by up to a third
+    // (the thin classes - the calm and the gale ends of the sample -
+    // are printed, not banded: a few dozen hours at 40-65 W/m^2 RMSE
+    // do not pin a mean to a tenth)
+    F.filter((c) => c.hours.hl >= 150).every(
+      (c) => c.hl.ratio > 0.88 && c.hl.ratio < 1.12
+    ) &&
+    F.every((c) => c.hs.ratio > 0.6 && c.hs.ratio < 1.05) &&
+    // the pier's classes carry a stated scatter the page can print
+    bulkResidual(1.7) !== null &&
+    bulkResidual(1.7).label === '0-3 m/s' &&
+    bulkResidual(25).label === '12+ m/s';
+  check(
+    "THE MEASURED STRESS: PSL's covariance hours against the bulk",
+    pinned && drift.length === 0 && physics,
+    (pinned && drift.length === 0
+      ? `the pinned table (${BULK_RESIDUALS.at}) reproduces from the frozen rows number by number; `
+      : `DRIFT: ${drift.slice(0, 4).join('; ') || 'table not pinned for this fixture'}; `) +
+      F.map(
+        (c) =>
+          `${c.u10nMs[0]}${c.u10nMs[1] === Infinity ? '+' : '-' + c.u10nMs[1]} m/s: stress bulk/measured ${c.tau.ratio} (bias ${c.tau.bias}, RMSE ${c.tau.rmse} N/m^2, ${c.hours.tau} h; u* RMSE ${c.uStar.rmse} m/s), sensible ${c.hs.ratio} (RMSE ${c.hs.rmse} W/m^2, ${c.hours.hs} h), latent ${c.hl.ratio} (bias ${c.hl.bias}, RMSE ${c.hl.rmse} W/m^2, ${c.hours.hl} h)`
+      ).join('; ') +
+      ` - Fairall 2003 printed COARE 3.0 "accurate within 5% for wind speeds of 0-10 m/s and 10% for 10-20", covariance stress "slightly lower at low wind speed" and "about 10% higher than the model at wind speeds over 15 m/s"; the archive's calm hours carry the covariance's noise floor, so the bulk sits under the measured mean below 3 m/s - the page states the RMSE at the pier's class as the bulk's uncertainty`
+  );
+}
+
+// 13. THE WAVE BRANCH TRIED (141st pass): the code's wave-state
+// Charnock with the archive's MEASURED wave height and dominant
+// period (cp = g Tp / 2 pi, deep water) against the same
+// covariance stress, beside the wind-speed form, by wave age
+// cp/u*. The pier's buoy measures both; the branch is adopted
+// only if it closes better - it does not (measured).
+{
+  const rows = SHIPFLUX_COV.filter(
+    (r) =>
+      Number.isFinite(r.waveHm) &&
+      Number.isFinite(r.waveTpS) &&
+      Number.isFinite(r.tauCov) &&
+      r.uMs > 1
+  );
+  const all = {wind: [], wave: [], waveParam: []};
+  const byAge = {};
+  for (const r of rows) {
+    const cpMs = (gravityOfLat(r.latDeg) * r.waveTpS) / (2 * Math.PI);
+    const w0 = bulkOf(r);
+    const w1 = bulkOf(r, {waves: {cpMs, sigHm: r.waveHm}});
+    const w2 = bulkOf(r, {waves: {cpMs}});
+    all.wind.push([w0.tauNm2, r.tauCov]);
+    all.wave.push([w1.tauNm2, r.tauCov]);
+    all.waveParam.push([w2.tauNm2, r.tauCov]);
+    const age = cpMs / w0.uStar;
+    const k =
+      age < 20 ? '<20' : age < 35 ? '20-35' : age < 60 ? '35-60' : '60+';
+    const B = (byAge[k] ??= {wind: [], wave: [], n: 0});
+    B.wind.push([w0.tauNm2, r.tauCov]);
+    B.wave.push([w1.tauNm2, r.tauCov]);
+    B.n++;
+  }
+  const r4 = (x) => Math.round(x * 1e4) / 1e4;
+  const S = {
+    wind: pairStat(all.wind, r4),
+    wave: pairStat(all.wave, r4),
+    waveParam: pairStat(all.waveParam, r4)
+  };
+  const ages = ['<20', '20-35', '35-60', '60+'].filter((k) => byAge[k]);
+  const A = Object.fromEntries(
+    ages.map((k) => [
+      k,
+      {
+        n: byAge[k].n,
+        wind: pairStat(byAge[k].wind, r4),
+        wave: pairStat(byAge[k].wave, r4)
+      }
+    ])
+  );
+  const young = A['<20'];
+  const ok =
+    rows.length >= 300 &&
+    S.wind.ratio > 0.9 &&
+    S.wind.ratio < 1.05 &&
+    S.wave.rmse > S.wind.rmse &&
+    S.wave.ratio > S.wind.ratio &&
+    young &&
+    young.n >= 20 &&
+    young.wave.ratio > young.wind.ratio + 0.15 &&
+    // the wave-height parameterization the code falls back on when
+    // only the period is measured sits between the two
+    S.waveParam.rmse >= S.wind.rmse * 0.98;
+  check(
+    'THE WAVE BRANCH TRIED on the measured waves',
+    ok,
+    `${rows.length} frozen hours with a laser-altimeter wave height and period and a covariance stress: the wind-speed Charnock returns the measured stress at ratio ${S.wind.ratio} (RMSE ${S.wind.rmse} N/m^2); the code's wave branch with the MEASURED cp and Hs at ${S.wave.ratio} (RMSE ${S.wave.rmse}) and with cp alone (its parameterized height) at ${S.waveParam.ratio} (RMSE ${S.waveParam.rmse}); by wave age cp/u*: ${ages.map((k) => `${k}: n ${A[k].n}, wind ${A[k].wind.ratio}, wave ${A[k].wave.ratio}`).join('; ')} - the measured branch over-predicts the stress of young seas and buys nothing on old swell, so the page keeps the wind-speed form and the buoy's period stays out of the roughness (stated)`
   );
 }
 

@@ -1121,6 +1121,16 @@ if (COOPS_MET && DAY_PINS.marine) {
             ['latent W/m2', mar.hlbWm2, P.hlbWm2],
             ['stress N/m2', mar.tauNm2, P.tauNm2]
           ]
+        : []),
+      // the measured residual's wind class (141st pass)
+      ...(P.residualClass !== undefined
+        ? [
+            [
+              'measured-residual class',
+              mar.residual ? mar.residual.label : null,
+              P.residualClass
+            ]
+          ]
         : [])
     ],
     `${COOPS_MET.name}: air-sea ${mar.dTairSeaK >= 0 ? '+' : ''}${mar.dTairSeaK.toFixed(1)} K, ${mar.stability}, film ${mar.filmLapseKm.toFixed(0)} K/km in the lowest 10 m - ${mar.klass}; the mixed layer modelled over ${mar.modelBand ? mar.modelBand.map((z) => z.toFixed(0)).join('-') + ' m' : 'no band'}` +
@@ -1137,6 +1147,9 @@ if (COOPS_MET && DAY_PINS.marine) {
         : '') +
       (P.uStarMs !== undefined
         ? `; on ${mar.forms}'s forms u* ${mar.uStar.toFixed(4)} m/s, the sea losing ${mar.hsbWm2.toFixed(1)} W/m^2 sensible and ${mar.hlbWm2.toFixed(1)} latent under a stress of ${mar.tauNm2.toFixed(4)} N/m^2${mar.k50 ? ' (zeta_u > 50: the code keeps its first pass)' : ''}`
+        : '') +
+      (P.residualClass !== undefined && mar.residual
+        ? `; PSL's measured hours at ${mar.residual.label} put the bulk at u* +/-${mar.residual.uStar.rmse.toFixed(3)} m/s, sensible +/-${mar.residual.hs.rmse.toFixed(1)}, latent +/-${mar.residual.hl.rmse.toFixed(1)} W/m^2 (${mar.residual.hours.hl} h)`
         : '')
   );
   // The sea column's own retrieval - the line the page prints for

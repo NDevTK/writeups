@@ -87,7 +87,12 @@ import {parseTLEs, satMagnitude, sunlitEci} from './sats.js';
 import {rayFan} from './far-terrain.js';
 import {fleagleFitFilm} from './fleagle.js';
 import {AUTOCONVECTIVE_K_PER_M} from './fleagle.js';
-import {eSatPa, marineColumnRows, moBulk} from './surfacelayer.js';
+import {
+  bulkResidual,
+  eSatPa,
+  marineColumnRows,
+  moBulk
+} from './surfacelayer.js';
 import {coolSkin, lwDown, lwDownDefault} from './coolskin.js';
 import {localSeconds, warmLayerInit, warmLayerStep} from './warmlayer.js';
 import {
@@ -1174,6 +1179,10 @@ export function marinePanel(
     tauNm2: mo.tauNm2,
     rhoAKgM3: mo.rhoA,
     cd10n: mo.cd10n,
+    // what PSL's directly measured fluxes say about the bulk at
+    // this wind class (141st pass): the archive's scatter, stated
+    // with the numbers
+    residual: bulkResidual(mo.u10nMs),
     filmLapseKm: lapse,
     filmDropK: mo.tAt(0.5) - mo.tAt(10),
     tSurfaceC: mo.tAt(0),

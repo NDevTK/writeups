@@ -843,7 +843,9 @@ async function emitPins(fixturePath) {
           uStarMs: [mar.uStar, 0.003],
           hsbWm2: [mar.hsbWm2, 0.5],
           hlbWm2: [mar.hlbWm2, 1],
-          tauNm2: [mar.tauNm2, 0.002]
+          tauNm2: [mar.tauNm2, 0.002],
+          // the measured residual's wind class (141st)
+          residualClass: mar.residual ? mar.residual.label : null
         }
       : null,
     lehnSea: lehSea

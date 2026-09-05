@@ -419,12 +419,37 @@ reference`; `observatory-reference` DAY PINS marine: wind)
   And a measured consequence for the drawn horizon: on COARE's forms
   the calm warm-water film lives in the lowest metre (4.7 K there
   against Kansas's 3.9, but −51 K/km over 0.5–10 m against −169), and
-  the tower eye's fan over 10–60 km finds no fold where the Kansas
-  forms folded at 30 km — the inferior mirage from a pier-height eye
-  is a profile-form question the archive decides, and the retrieval's
-  100-m fan does not yet resolve the film the archive-gated forms
-  draw. (`surfacelayer-reference`: the code's forms, THE ARCHIVE;
-  `observatory-reference` DAY PINS marine: fluxes)
+  the tower eye's fan over 10–60 km finds no fold the detector will
+  take where the Kansas forms folded at 30 km — the S the
+  archive-gated forms draw there spans 0.4 m against the Kansas
+  column's 6.3 m, under the detector's 6-m prominence, and the fan
+  step (100 to 10 m) changes nothing: the inferior mirage from a
+  pier-height eye is a profile-form question the archive decides, and
+  on COARE's forms it is a tenth the size. (`surfacelayer-reference`:
+  the code's forms, THE ARCHIVE; `observatory-reference` DAY PINS
+  marine: fluxes)
+- **The measured stress** (pass 141): PSL's archive holds directly
+  measured fluxes beside its bulk ones — the eddy-covariance stress
+  on 18,642 good-flag hours, the sonic sensible and gas-analyser
+  latent fluxes on 12,724, and the ship's laser-altimeter waves on
+  3,629. On 1,530 frozen hours the bulk the pier reports sits at
+  0.93–0.99 of the measured stress from 3 m/s up (RMSE 0.03–0.15
+  N/m²) and at 0.70 below 3 m/s — the covariance's noise floor, kept
+  with its sign (keeping only positive stresses inflated the calm
+  mean by half); the latent flux at 1.01 / 0.96 / 0.92 on the three
+  well-filled classes (RMSE 23–41 W/m²), the sensible at 0.73–1.02
+  (RMSE 8–24). Fairall 2003's printed "within 5% for 0–10 m/s and
+  10% for 10–20" holds on the hourly archive inside the covariance's
+  own 10% flow-distortion caveat. The table is pinned into the module
+  and the marine line states the bulk's measured scatter at the
+  pier's wind class. The code's wave-state Charnock, tried with the
+  archive's measured wave height and period on 762 hours, returns
+  the stress at 1.09 against the wind-speed form's 0.95 — over-
+  predicting young seas by half (cp/u\* < 20, n 46) and buying nothing
+  on old swell — so the buoy's swell-dominated period stays out of
+  the pier's roughness, measured and stated. (`surfacelayer-
+reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
+  `observatory-reference` DAY PINS marine: residual class)
 
 ---
 
@@ -515,9 +540,14 @@ between it and the next tier.
   no wave-age Charnock (the pier measures no phase speed); the
   archive's humidity is printed to 0.1 g/kg, which bounds the
   latent-flux closure near 1 W/m²; the Fleagle cross-closure's fold
-  is a Kansas-form fold — on COARE's forms the calm film's mirage
-  sits under the retrieval fan's 100-m resolution; since pass 136
-  the water temperature is the
+  is a Kansas-form fold — on COARE's forms the calm film's mirage at
+  the tower eye is a half-metre S, under the detector's 6-m
+  prominence, and whether it shows on the drawn horizon is not
+  settled; the bulk's
+  stated scatter (pass 141) is the archive's — at low winds as much
+  the covariance measurement's as the algorithm's, its calm and gale
+  classes thin, its wave hours one altimeter's on mostly old swell;
+  since pass 136 the water temperature is the
   INTERFACE (COARE 3.6's cool skin on the pier's bulk sensor, no
   rain term; since pass 139 the day's warm layer lifts the sub-skin
   surface above the 3.4-m sensor by what the scheme holds above it,

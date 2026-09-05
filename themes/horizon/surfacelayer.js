@@ -145,6 +145,12 @@ export const COARE36 = Object.freeze({
   zoqExp: 0.72,
   /** the first guess's 10-m Stanton number */
   ch10First: 0.00115,
+  /** the wave-state branch: zoS = sigH Ad (usr/cp)^Bd, the wave
+   * height parameterized as max(0.25, (0.02 (cp/u10)^1.1 - 0.0025)
+   * u10^2) when not measured */
+  waveAd: 0.2,
+  waveBd: 2.2,
+  waveHsigMinM: 0.25,
   nits: 10,
   /** zeta_u > 50 at the bulk-Richardson first guess: the code
    * keeps its first pass through the loop */
@@ -155,6 +161,84 @@ export const COARE36 = Object.freeze({
   ssDefaultPsu: 35,
   latDefaultDeg: 45
 });
+
+/**
+ * THE BULK'S MEASURED RESIDUAL (141st pass): what NOAA PSL's directly
+ * measured fluxes say about COARE 3.6's bulk values on the same
+ * hours, by 10-m neutral wind class - the covariance stress along
+ * the wind, the covariance sensible and latent heat fluxes
+ * (shipflux-cov-fixture.js; the module's bulk minus the measured,
+ * hour by hour). PINNED FROM THE GATE (surfacelayer-reference
+ * recomputes every number from the frozen rows and fails on a
+ * drift): bias and RMSE in the flux's own unit, ratio = mean bulk
+ * / mean measured, hours = the rows behind each. The page states
+ * the RMSE at the pier's wind class as the bulk's uncertainty -
+ * the archive's scatter, which at low winds is as much the
+ * measurement's (Fairall et al. 2003: covariance stress "slightly
+ * lower at low wind speed", "could be overestimated by about 10%
+ * because of ship flow distortion") as the algorithm's.
+ */
+export const BULK_RESIDUALS = Object.freeze({
+  at: '2026-09-05T11:54Z',
+  classes: [
+    {
+      u10nMs: [0, 3],
+      hours: {tau: 162, hs: 161, hl: 96},
+      tau: {bias: -0.0021, rmse: 0.0206, ratio: 0.7},
+      uStar: {bias: 0.0242, rmse: 0.1022},
+      hs: {bias: -1.91, rmse: 10.21, ratio: 0.727},
+      hl: {bias: 11.95, rmse: 38.56, ratio: 1.276}
+    },
+    {
+      u10nMs: [3, 6],
+      hours: {tau: 595, hs: 592, hl: 447},
+      tau: {bias: -0.0019, rmse: 0.0291, ratio: 0.928},
+      uStar: {bias: 0.0144, rmse: 0.0851},
+      hs: {bias: 0.12, rmse: 9.96, ratio: 1.023},
+      hl: {bias: 0.86, rmse: 22.65, ratio: 1.01}
+    },
+    {
+      u10nMs: [6, 9],
+      hours: {tau: 548, hs: 537, hl: 420},
+      tau: {bias: -0.0048, rmse: 0.0394, ratio: 0.935},
+      uStar: {bias: 0.0033, rmse: 0.0908},
+      hs: {bias: -1.3, rmse: 7.63, ratio: 0.84},
+      hl: {bias: -5.38, rmse: 33.66, ratio: 0.959}
+    },
+    {
+      u10nMs: [9, 12],
+      hours: {tau: 181, hs: 176, hl: 138},
+      tau: {bias: -0.0132, rmse: 0.0553, ratio: 0.928},
+      uStar: {bias: -0.0076, rmse: 0.0677},
+      hs: {bias: -2.49, rmse: 18.27, ratio: 0.825},
+      hl: {bias: -16.21, rmse: 40.89, ratio: 0.92}
+    },
+    {
+      u10nMs: [12, Infinity],
+      hours: {tau: 39, hs: 36, hl: 34},
+      tau: {bias: -0.0029, rmse: 0.1445, ratio: 0.993},
+      uStar: {bias: 0.0191, rmse: 0.1508},
+      hs: {bias: -3.09, rmse: 23.94, ratio: 0.925},
+      hl: {bias: 23.97, rmse: 65.47, ratio: 1.14}
+    }
+  ]
+});
+/** The residual class for a 10-m neutral wind (m/s): the pinned
+ * entry whose band holds it (the last class is open above). */
+export function bulkResidual(u10nMs) {
+  const cls = BULK_RESIDUALS.classes;
+  if (!cls.length || !Number.isFinite(u10nMs)) return null;
+  const u = Math.max(0, u10nMs);
+  const c =
+    cls.find((k) => u >= k.u10nMs[0] && u < k.u10nMs[1]) ?? cls[cls.length - 1];
+  return {
+    ...c,
+    label:
+      c.u10nMs[1] === Infinity
+        ? `${c.u10nMs[0]}+ m/s`
+        : `${c.u10nMs[0]}-${c.u10nMs[1]} m/s`
+  };
+}
 
 /** Businger's dimensionless wind shear (Eqs. 8, 10). */
 export function phiM(zeta) {
@@ -386,7 +470,8 @@ export function moBulk({
   ssPsu = null,
   latDeg = null,
   bliM = 600,
-  forms = 'coare36'
+  forms = 'coare36',
+  waves = null
 }) {
   const args = {
     uMs,
@@ -400,7 +485,8 @@ export function moBulk({
     qAKgKg,
     ssPsu,
     latDeg,
-    bliM
+    bliM,
+    waves
   };
   return forms === 'kansas' ? kansasBulk(args) : coareBulk(args);
 }
@@ -419,7 +505,8 @@ function coareBulk({
   qAKgKg,
   ssPsu,
   latDeg,
-  bliM
+  bliM,
+  waves = null
 }) {
   const C = COARE36;
   const von = C.vonKarman;
@@ -472,7 +559,27 @@ function coareBulk({
   usr = (ut * von) / (Math.log(zuM / zo10) - psiM40(zuM / L10));
   let tsr = (-dT * von * fdg) / (Math.log(ztM / zot10) - psiH26(ztM / L10));
   let qsr = (-dq * von * fdg) / (Math.log(zq / zot10) - psiH26(zq / L10));
-  let charn = charnock36(u10);
+  // the code's wave-state Charnock when a phase speed is given
+  // (charnS = zoS g / usr^2 with zoS = sigH Ad (usr/cp)^Bd; the
+  // wave height parameterized from the wave age when not
+  // measured) - tried on the archive's wave hours in
+  // surfacelayer-reference and NOT what the page runs (measured:
+  // it worsens the stress closure; see the 141st pass)
+  const cp =
+    waves && Number.isFinite(waves.cpMs) && waves.cpMs > 0 ? waves.cpMs : null;
+  const sigH =
+    cp === null
+      ? null
+      : Number.isFinite(waves.sigHm) && waves.sigHm > 0
+        ? waves.sigHm
+        : Math.max(
+            C.waveHsigMinM,
+            (0.02 * Math.pow(cp / u10, 1.1) - 0.0025) * u10 * u10
+          );
+  const charnWave = (usrNow) =>
+    (sigH * C.waveAd * Math.pow(usrNow / cp, C.waveBd) * grav) /
+    (usrNow * usrNow);
+  let charn = cp === null ? charnock36(u10) : charnWave(usr);
   let L = L10;
   let zeta = zetau;
   let zo = zo10;
@@ -500,7 +607,7 @@ function coareBulk({
     gf = du > 0 ? ut / du : Infinity;
     if (i === 1) first = {usr, tsr, qsr, L, zeta};
     const u10N = du > 0 ? (usr / von / gf) * Math.log(10 / zo) : 0;
-    charn = charnock36(u10N);
+    charn = cp === null ? charnock36(u10N) : charnWave(usr);
   }
   if (k50 && first) ({usr, tsr, qsr, L, zeta} = first);
   // ---- the fluxes ---------------------------------------------------

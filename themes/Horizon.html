@@ -10831,7 +10831,16 @@
                 // the bulk fluxes on COARE 3.6's own profile forms
                 // (140th pass), gated on PSL's measured ship hours
                 `u* ${m.uStar.toFixed(3)} m/s, sensible ${m.hsbWm2.toFixed(0)} / ` +
-                `latent ${m.hlbWm2.toFixed(0)} W/m² out of the sea · film ` +
+                `latent ${m.hlbWm2.toFixed(0)} W/m² out of the sea` +
+                // the bulk's measured residual (141st pass): PSL's
+                // eddy-covariance hours at this wind class
+                (m.residual
+                  ? ` (bulk; PSL's measured hours at ${m.residual.label}: ` +
+                    `u* ±${m.residual.uStar.rmse.toFixed(2)}, sensible ±` +
+                    `${m.residual.hs.rmse.toFixed(0)}, latent ±` +
+                    `${m.residual.hl.rmse.toFixed(0)} over ${m.residual.hours.hl} h)`
+                  : '') +
+                ` · film ` +
                 `${m.filmLapseKm >= 0 ? '+' : ''}${m.filmLapseKm.toFixed(0)} K/km in the lowest 10 m · ` +
                 `${m.klass} · mixed layer modelled ` +
                 (m.modelBand

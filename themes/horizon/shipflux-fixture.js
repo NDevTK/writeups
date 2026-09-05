@@ -2,7 +2,7 @@
  * shipflux-fixture.js - a frozen SAMPLE of NOAA PSL's hourly ship
  * flux archive (NOAA_PSL_Hourly_Ship_Flux on the COAPS ERDDAP; the
  * database Fairall et al. 2026 describe in Section 2.1), GENERATED
- * by shipflux-freeze.mjs at 2026-09-05T11:22Z. Measured pyrgeometer longwave,
+ * by shipflux-freeze.mjs at 2026-09-05T11:54Z. Measured pyrgeometer longwave,
  * sea-snake and air temperatures, humidity, the bulk fluxes and
  * the COARE cool skin PSL computed from them, on 44
  * research cruises. Systematic samples in time order:
@@ -23,7 +23,7 @@
  * at the gate. Rows carry a cruise index c into SHIPFLUX_CRUISES.
  * Generated data, one row per line - listed in .prettierignore.
  */
-export const SHIPFLUX_AT = '2026-09-05T11:22Z';
+export const SHIPFLUX_AT = '2026-09-05T11:54Z';
 export const SHIPFLUX_QUERIES = [
   "https://erddap-misc.coaps.fsu.edu/erddap/tabledap/NOAA_PSL_Hourly_Ship_Flux.csv?cruise_name,time,latitude,tair,qair,z_tair,z_qair,wspd_sfc,z_wspd,tskin,tstar,qstar,psealevel,wspd_10N,tsea,dt_skin,depth,dt_warm_to_skin,ustar,hs_bulk,hl_bulk,lw_down,sw_down,rhoair,prate,ssea_ship&sw_down<10&flag_bad_bulk=0&flag_bad_ship=0",
   "https://erddap-misc.coaps.fsu.edu/erddap/tabledap/NOAA_PSL_Hourly_Ship_Flux.csv?cruise_name,time,latitude,tair,qair,psealevel,lw_down,sw_down,sw_down_clear,prate&sw_down>200&flag_bad_ship=0"
