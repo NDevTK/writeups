@@ -9,14 +9,23 @@ import {ACHAC_B64, ACHAC_EXPECT} from './hdf5-fixture.js';
 import {
   ACM_MEANINGS,
   BCM_MEANINGS,
+  DCOMP_COD_MAX,
+  DCOMP_FLAGS,
+  IMAGERY_BAND,
   L2_BUCKETS,
   L2_PRODUCTS,
+  bandKeys,
+  btDifference,
   bucketPrefix,
   cutWindow,
+  dcompAt,
+  dcompCensus,
+  dcompOverPixels,
   fixedGridGeometry,
   fixedGridToLatLon,
   heightCensus,
   indexOfScanAngle,
+  keyBand,
   latLonToFixedGrid,
   latestByStart,
   maskAgreement,
@@ -29,6 +38,7 @@ import {
   scanAngle,
   stampToIso,
   unpackArray,
+  unscale,
   windowBox,
   windowIndexOf
 } from './goesl2.js';
@@ -266,6 +276,141 @@ const inflate = (u8) =>
       `start stamp 20262481851177 is 2026-09-05T18:51:17Z under the day-of-year/hour prefix ` +
       `ABI-L2-ACMC/2026/248/18/; the file nearest a mosaic's 18:50Z is the 18:51:17 one (+77 s), ` +
       `nearest 18:44Z the 18:46:17 one (+137 s), none within 15 min of 19:30Z`
+  );
+}
+
+// ---- the imagery and DCOMP (149th pass) ----------------------------
+{
+  const keys = [
+    'ABI-L2-CMIPC/2026/248/20/OR_ABI-L2-CMIPC-M6C02_G18_s20262482016177_e1_c1.nc',
+    'ABI-L2-CMIPC/2026/248/20/OR_ABI-L2-CMIPC-M6C13_G18_s20262482016177_e1_c1.nc',
+    'ABI-L2-CMIPC/2026/248/20/OR_ABI-L2-CMIPC-M6C13_G18_s20262482021177_e1_c1.nc',
+    'ABI-L2-CMIPC/2026/248/20/OR_ABI-L2-CMIPC-M3C13_G18_s20262482026177_e1_c1.nc'
+  ];
+  const c13 = bandKeys(keys, 'C13');
+  // the CMI scaling: counts 0 and 4095 to kelvin, the fill to NaN
+  const k = unscale([0, 4095, 65535], {
+    scale: 0.06145332,
+    offset: 89.62,
+    fill: 65535
+  });
+  // a 3 x 3 NOAA imagery window at 0.1 deg per pixel around (32,
+  // -117) and the theme's pixels at its centres, 0.5 K warmer over
+  // the clear ones and 2 K colder over the cloud ones; a DQF 1
+  // pixel and a fill pixel drop out
+  const g = fixedGridGeometry({
+    semi_major_axis: 6378137,
+    semi_minor_axis: 6356752.31414,
+    perspective_point_height: 35786023,
+    longitude_of_projection_origin: -137
+  });
+  const centre = latLonToFixedGrid(32, -117, g);
+  const step = 0.000056 * 40;
+  const xc = {scale: step, offset: centre.x - step};
+  const yc = {scale: -step, offset: centre.y + step};
+  const box = {i0: 0, j0: 0, rows: 3, cols: 3, i: 1, j: 1};
+  const btK = new Float32Array([280, 281, 282, 283, 284, 285, 286, 287, NaN]);
+  const dqf = new Uint8Array([0, 0, 0, 0, 1, 0, 0, 0, 0]);
+  const at = (i, j) => fixedGridToLatLon(scanAngle(i, xc), scanAngle(j, yc), g);
+  const px = [];
+  for (let j = 0; j < 3; j++)
+    for (let i = 0; i < 3; i++) {
+      const p = at(i, j);
+      const q = j * 3 + i;
+      const cloud = q % 2 === 1;
+      px.push({
+        latDeg: p.latDeg,
+        lonDeg: p.lonDeg,
+        btC: btK[q] - 273.15 + (cloud ? -2 : 0.5),
+        cloud
+      });
+    }
+  px.push({latDeg: 0, lonDeg: -137, btC: 10, cloud: false}); // outside
+  px.push({latDeg: px[0].latDeg, lonDeg: px[0].lonDeg, btC: NaN, cloud: false}); // unmeasured
+  const bd = btDifference(px, {g, xCoord: xc, yCoord: yc, box, btK, dqf});
+  // DCOMP's census: a fill, a clear, four retrievals (three water,
+  // one ice; one thin, one at the thick bound)
+  const cod = [NaN, 0, 5, 10, 2, 150];
+  const cps = [NaN, NaN, 12, 30, 20, 8];
+  const fl = [0, 0, 0, 128, 512, 256];
+  const dc = dcompCensus(cod, cps, fl);
+  const a3 = dcompAt(3, cod, cps, fl);
+  // over the theme's pixels: the same 3 x 3 window carrying the six
+  // values (and three more retrievals), the nine theme pixels plus
+  // one outside and one duplicate
+  const cod9 = [NaN, 0, 5, 10, 2, 150, 7, 7, 7];
+  const cps9 = [NaN, NaN, 12, 30, 20, 8, 9, 9, 9];
+  const fl9 = [0, 0, 0, 128, 512, 256, 0, 0, 0];
+  const over = dcompOverPixels(
+    [...px.slice(0, 9), px[0], {latDeg: 0, lonDeg: -137}],
+    {g, xCoord: xc, yCoord: yc, box, cod: cod9, cps: cps9, dqf: fl9}
+  );
+  check(
+    'THE IMAGERY AND DCOMP: the decoder audited, the retrievals censused',
+    keyBand(keys[1]) === 'C13' &&
+      keyBand(keys[0]) === 'C02' &&
+      keyBand('ABI-L2-ACMC/2026/248/18/OR_ABI-L2-ACMC-M6_G18_s1_e1_c1.nc') ===
+        null &&
+      c13.length === 3 &&
+      latestByStart(c13).stamp === '20262482026177' &&
+      IMAGERY_BAND === 'C13' &&
+      L2_PRODUCTS.imagery === 'ABI-L2-CMIPC' &&
+      L2_PRODUCTS.cod === 'ABI-L2-CODC' &&
+      L2_PRODUCTS.cps === 'ABI-L2-CPSC' &&
+      near(k[0], 89.62, 1e-5) &&
+      near(k[1], 89.62 + 4095 * 0.06145332, 1e-3) &&
+      Number.isNaN(k[2]) &&
+      // nine window pixels: the DQF 1 pixel (q 4, clear) and the
+      // fill pixel (q 8, clear) drop out - 3 clear, 4 cloud remain
+      bd.n === 7 &&
+      bd.clear.n === 3 &&
+      bd.cloud.n === 4 &&
+      near(bd.clear.medianK, 0.5, 1e-4) &&
+      near(bd.cloud.medianK, -2, 1e-4) &&
+      near(bd.meanK, (3 * 0.5 - 4 * 2) / 7, 1e-4) &&
+      near(bd.p10K, -2, 1e-4) &&
+      near(bd.p90K, 0.5, 1e-4) &&
+      near(bd.rmsK, Math.sqrt((3 * 0.25 + 4 * 4) / 7), 1e-4) &&
+      dc.n === 6 &&
+      dc.fill === 1 &&
+      dc.clear === 1 &&
+      dc.retrieved === 4 &&
+      dc.water.n === 3 &&
+      dc.ice.n === 1 &&
+      dc.thin === 1 &&
+      dc.thick === 1 &&
+      dc.water.codMedian === 5 &&
+      dc.water.reffMedian === 12 &&
+      dc.ice.codMedian === 10 &&
+      dc.ice.reffMedian === 30 &&
+      dc.codMedian === 10 &&
+      a3 !== null &&
+      a3.tau === 10 &&
+      a3.reff === 30 &&
+      a3.ice === true &&
+      a3.thin === false &&
+      dcompAt(1, cod, cps, fl) === null &&
+      dcompAt(0, cod, cps, fl) === null &&
+      dcompAt(4, cod, cps, fl).thin === true &&
+      dcompAt(5, cod, cps, fl).thick === true &&
+      over.n === 9 &&
+      over.retrieved === 7 &&
+      over.water.n === 6 &&
+      over.ice.n === 1 &&
+      DCOMP_FLAGS.ice === 128 &&
+      DCOMP_FLAGS.thick === 256 &&
+      DCOMP_FLAGS.thin === 512 &&
+      DCOMP_FLAGS.glint === 64 &&
+      DCOMP_FLAGS.nonconvergence === 32 &&
+      near(DCOMP_COD_MAX, 158.49, 1e-9),
+    `the imagery prefix's keys sort by band (three C13 files of four, the newest 20:26:17; an ACMC key has ` +
+      `no band); counts 0 and 4095 unscale to 89.62 and 341.27 K, the fill to NaN; the theme's nine pixels ` +
+      `against a 3x3 imagery window read ${bd.n} differences (a DQF 1 pixel and a fill pixel out, an ` +
+      `outside pixel and an unmeasured one skipped): clear median +0.50 K over ${bd.clear.n}, cloud -2.00 K ` +
+      `over ${bd.cloud.n}, rms ${bd.rmsK.toFixed(3)} K; six DCOMP values census to 1 fill, 1 clear, 4 ` +
+      `retrievals (3 water, tau median 5, r_eff 12 um; 1 ice, tau 10, r_eff 30), 1 thin, 1 at the thick ` +
+      `bound; dcompAt reads the ice pixel and refuses the clear and fill ones; over the theme's pixels the ` +
+      `window's ${over.retrieved} retrievals are counted once each`
   );
 }
 

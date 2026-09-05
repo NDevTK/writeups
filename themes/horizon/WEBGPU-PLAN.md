@@ -10345,6 +10345,98 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 149th pass - THE IMAGERY AND THE
+  RETRIEVALS BESIDE THE THEME'S): the 148th put NOAA's mask beside
+  the theme's field; this pass puts NOAA's brightness temperature
+  itself under the theme's palette decoder and DCOMP's daytime
+  retrievals - the 640-nm optical depth and the cloud-top effective
+  radius - on the panel and under the pick. PRIMARIES READ IN FULL:
+  the Cloud and Moisture Imagery Product ATBD, Enterprise v4 (Schmit
+  & Gunshor 2021 - the CMI of bands 7-16 is the brightness
+  temperature by the modified Planck function with the file's own
+  fk1/fk2/bc1/bc2, NEdT 0.1 K at 300 K, DQF 0 good; band 13's 12-bit
+  counts at 0.0615 K) and the DCOMP ATBD, Enterprise v1.2 (Walther &
+  Straka 2020 - COD the column's optical thickness, "almost
+  independent of wavelength in the visible", CPS the effective
+  radius, daytime = solar zenith <= 65 deg full quality and 65-82
+  degraded, retrieved for the mask's probably-cloudy and cloudy
+  pixels, LUTs COD 0.25-158.5 and r_eff 2.5-100 um, thick clouds set
+  to the upper bound, thin clouds' REF set to the a priori;
+  requirements COD 2 or 20% liquid / 3 or 30% ice, CPS 4 / 10 um;
+  MODIS validation COD water bias 1.59 precision 4.43, CPS 3.03 um).
+  THE FILES (noaa-goes18, 20:21Z): CMIPC C13 3.8 MB (CMI int16
+  counts 0..4095, scale 0.06145332 K, offset 89.62 K, fill -1; DQF
+  all 0 that scan), CODC 5.0 MB and CPSC 5.4 MB (uint16 counts at
+  0.00244163, fill 65535; a shared flag word - the two files' DQF
+  equal pixel for pixel, measured; day/twilight/night solar zenith
+  bounds 0-65 / 65-90 / 90-180, day algorithm to 82, LZA good to
+  65). WHAT THE FLAGS SAY, MEASURED against the mask of the same
+  minute before any use: every retrieved pixel (COD > 0, 2.28 M of
+  the scene) carries the "degraded" AND "nonconvergence" bits, every
+  clear pixel the "ice phase" bit - those three bits cannot be read
+  by their names in product v02r03 (stated in goesl2.js); the ice,
+  thick, thin, glint, snow and twilight bits sort the retrievals as
+  the ATBD says (ice r_eff median 41 um against water 17; thick at
+  the LUT's 158.49; thin under tau 3.5; a thin-cloud REF is NOT a
+  constant a priori in the file - p10/50/90 15/22/33 um - so the
+  radii are reported as retrieved). The theme reads a retrieval by
+  its VALUE: fill = none, 0 = clear, > 0 = retrieved. (1) goesl2.js:
+  keyBand/bandKeys (the CMIPC prefix lists 16 bands' files - 192 an
+  hour, the listing cap raised to 1000), unscale (counts to
+  physical, fill to NaN), btDifference (the theme's pixels looked up
+  in the imagery window, theme minus NOAA in kelvin, all / clear /
+  cloud with median, p10/p90, mean, rms), DCOMP_FLAGS with the
+  measured caveat, dcompCensus (fill / clear / retrieved, by phase,
+  tau and r_eff quantiles, the thin/thick/glint/twilight/snow
+  counts), dcompOverPixels (the theme's own sea pixels, each NOAA
+  pixel once), dcompAt. GATE: THE IMAGERY AND DCOMP (the band keys,
+  counts 0 and 4095 to 89.62 and 341.27 K, nine theme pixels against
+  a 3x3 imagery window with a DQF-1 and a fill pixel out and the
+  clear/cloud medians exact, six DCOMP values censused by phase and
+  flag, dcompAt on ice / thin / thick / clear / fill, the theme's
+  pixels counted once each). (2) THE DAEMON: /goesl2 asks five
+  products (L2_ASKS; the imagery by band), raw16 decode mode (the
+  counts as stored with the file's scaling beside them), the imagery
+  and DCOMP bodies (counts on the wire as u16, a signed fill mapped
+  to 65535, ~180 kB a window), ONE decode at a time (five workers
+  with their inflated arrays would not fit a small box), two decoded
+  files per product (five products x ~15 MB x two = 262 MB resident
+  with both sets held, measured). MEASURED: a cold ask for all five
+  answers in 6.4 s, cached in 5 ms, the timed ask for the mosaic's
+  minute in 6.1 s. GATE (server-reference): raw16 on the vendored HT
+  (uint16 counts x 0.3052037 = the height), an imagery body dressed
+  on the fixture's grid (10201 counts unscaling back to kelvin at
+  the first measured pixel), a DCOMP body whose census the page
+  recomputes from the wire exactly, no radii without a CPS file,
+  five asks. (3) THE PAGE: the windows unpacked to kelvin, tau and
+  um; THE DECODER AUDITED - "the theme's band 13 decode (GIBS's
+  colour map) vs NOAA's own brightness temperature at the same px
+  and the mosaic's minute": MEASURED 20:47Z over San Diego's window,
+  9678 pixels, median +0.34 K, the theme's clear px +0.36 K over
+  6044 and its cloud px +0.30 K over 3634 - the palette decode's
+  bias is a third of a kelvin, under the map's own bin width - with
+  p10/p90 -3.40/+4.70 K and rms 6.86 K in the tails, which are
+  GIBS's Web-Mercator resampling of the 2-km grid at cloud edges
+  (stated on the line: the CMI counts 0.06 K); DCOMP on the line -
+  "5176 retrieved of 9264 2-km px within +-100 km, tau median 4.2
+  (p10/p90 0.6/16.9); water 2479 px tau 5.4, r_eff 13.5 um; ice 2697
+  px tau 2.9, r_eff 20.6 um (2470 thin, 11 at the retrieval's upper
+  bound 158)", the theme's sea alone (1394 retrieved px, tau 0.9,
+  water r_eff 19.7 um) against VIIRS's r_eff that rings the corona
+  when the 84th's census is in, the observer's own pixel ("nothing
+  retrieved overhead (clear)"); the pick readout prints NOAA's BT,
+  tau and r_eff with the phase under the clicked texel beside the
+  theme's; the records list the imagery and DCOMP. THE DECKS AND
+  THE CORONA KEEP THE THEME'S OWN VALUES - the imagery audits the
+  decoder, DCOMP is reported beside the VIIRS radius, nothing is
+  substituted (a next pass may let DCOMP's water r_eff ring the
+  corona when VIIRS is older than a day: the primaries are read,
+  the numbers are on the line). STATED LIMITS: DCOMP is daytime
+  only (solar zenith <= 82 deg; the line says so at night); the
+  imagery audit's tails carry the resampling and the tile stamp's
+  own minute, not the decoder alone; the three unusable flag bits
+  are named, not read; the visible band 2 (68 MB a file) stays out
+  - HTTP range reads of the chunked HDF5 are the stated path.
 - DONE (Sep 5, the review session's 148th pass - NOAA'S OWN CLOUD
   PRODUCTS READ IN NODE): the theme's cloud field has been a
   re-implementation of the ATBD's ETROP test on GIBS's colour-mapped

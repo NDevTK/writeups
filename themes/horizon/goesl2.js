@@ -42,6 +42,40 @@
  *    quantitative_local_zenith_angle_bounds [0, 70] and
  *    local_zenith_angle_bounds [0, 70] - the products' own reach;
  *    t in seconds since 2000-01-01T12:00:00Z.
+ *  - (149th pass) The Cloud and Moisture Imagery Product ATBD,
+ *    Enterprise version 4 (Schmit & Gunshor, 13 January 2021), read
+ *    in full: the CMI of bands 7-16 is the brightness temperature
+ *    from the radiance by the modified Planck function T = (fk2 /
+ *    ln(fk1/L + 1) - bc1) / bc2 with the file's own planck_fk1,
+ *    planck_fk2, planck_bc1, planck_bc2 (band 13: 10803.30, 1392.74
+ *    K, 0.07550 K, 0.99975 for GOES-16; the GOES-18 file prints
+ *    10818.40, 1393.39, 0.07725, 0.99974); the NEdT specification
+ *    0.1 K at 300 K; DQF 0 good, 1 conditionally usable, 2 out of
+ *    range, 3 no value, 4 focal-plane temperature exceeded. The
+ *    file (OR_ABI-L2-CMIPC-M6C13_G18_s20262482021177): CMI int16
+ *    counts 0..4095, scale_factor 0.06145332 K, add_offset 89.62 K,
+ *    _FillValue -1, 199.7-324.1 K over the CONUS scene.
+ *  - (149th pass) The Daytime Cloud Optical and Microphysical
+ *    Properties (DCOMP) ATBD, Enterprise version 1.2 (Walther &
+ *    Straka, 9 October 2020), read in full: COD "the vertical
+ *    optical thickness between the top and bottom of an atmospheric
+ *    column ... almost independent of wavelength in the visible",
+ *    CPS the effective radius (third over second moment of the
+ *    droplet distribution); daytime = solar zenith <= 65 deg full
+ *    quality, 65-82 degraded; retrieved for the mask's probably
+ *    cloudy and cloudy pixels; the LUTs span COD 10^-0.6..10^2.2
+ *    (0.25-158.5) and r_eff 10^0.4..10^2.0 um; thick clouds set COD
+ *    to the upper bound, thin clouds set REF to the a priori;
+ *    requirements COD 2 or 20% (liquid) / 3 or 30% (ice), CPS 4 um /
+ *    10 um; validation against MODIS: COD water bias 1.59, precision
+ *    4.43; CPS water 3.03 um, 4.3 um. The files
+ *    (OR_ABI-L2-CODC/CPSC-M6_G18_s20262482021177): uint16 counts at
+ *    scale_factor 0.00244163, fill 65535, valid_range [0, 65530];
+ *    day_solar_zenith_angle_bounds [0, 65], twilight [65, 90],
+ *    day_algorithm [0, 82]; quantitative_local_zenith_angle_bounds
+ *    [0, 65]; the DQF flag_masks 1..512 with their flag_meanings
+ *    (DCOMP_FLAGS below), MEASURED against the mask of the same
+ *    minute before use.
  *
  * OWNERSHIP: this module owns the navigation, the window cut and
  * the comparison census; the daemon lists and fetches the buckets
@@ -333,7 +367,27 @@ export const L2_BUCKETS = {
   'goes-west': 'noaa-goes18',
   'goes-east': 'noaa-goes19'
 };
-export const L2_PRODUCTS = {mask: 'ABI-L2-ACMC', height: 'ABI-L2-ACHAC'};
+// The products the daemon reads (149th pass adds the imagery band
+// 13 - the brightness temperature itself, 2 km - and DCOMP's
+// daytime optical depth and particle size, both 2 km).
+export const L2_PRODUCTS = {
+  mask: 'ABI-L2-ACMC',
+  height: 'ABI-L2-ACHAC',
+  imagery: 'ABI-L2-CMIPC',
+  cod: 'ABI-L2-CODC',
+  cps: 'ABI-L2-CPSC'
+};
+// The imagery bucket lists every band's file under one prefix
+// (OR_ABI-L2-CMIPC-M6C13_G18_s...): the band from a key, and the
+// keys of one band.
+export const IMAGERY_BAND = 'C13';
+export function keyBand(key) {
+  const m = /-M\d(C\d\d)_/.exec(key);
+  return m ? m[1] : null;
+}
+export function bandKeys(keys, band) {
+  return keys.filter((k) => keyBand(k) === band);
+}
 // The window's arrays on the wire: typed arrays as base64 (a 101x101
 // uint8 mask is 13.6 kB instead of 20.4 kB of JSON digits - measured
 // in the gate; a float is 4 bytes instead of up to 18 characters),
@@ -401,4 +455,188 @@ export function unpackArray(packed) {
   const out = new Float32Array(n);
   for (let i = 0; i < n; i++) out[i] = dv.getFloat32(i * 4, true);
   return out;
+}
+
+// ---------------------------------------------------------------
+// The imagery and DCOMP (149th pass)
+// ---------------------------------------------------------------
+// The products' own scaling: raw counts to the physical value with
+// the fill as NaN (CMI: int16 counts 0..4095 at 0.0614533 K per
+// count from 89.62 K, fill -1 - carried on the wire as 65535; COD
+// and CPS: uint16 at 0.00244163 per count, fill 65535).
+export function unscale(raw, {scale = 1, offset = 0, fill = 65535} = {}) {
+  const out = new Float32Array(raw.length);
+  for (let q = 0; q < raw.length; q++)
+    out[q] = raw[q] === fill ? NaN : raw[q] * scale + offset;
+  return out;
+}
+export function quantile(sorted, f) {
+  if (!sorted.length) return null;
+  return sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))];
+}
+// THE DECODER AUDITED: the theme's brightness temperatures (read
+// off GIBS's colour-mapped tiles, C) against NOAA's own CMI (K) at
+// the same places - each theme pixel looked up in the imagery
+// window, DQF 0 only; differences theme minus NOAA in kelvin, all
+// pixels and the clear and cloud classes apart (the theme's call).
+export function btDifference(themePixels, noaa) {
+  const {g, xCoord, yCoord, box, btK, dqf} = noaa;
+  const all = [];
+  const clear = [];
+  const cloud = [];
+  for (const p of themePixels) {
+    if (!Number.isFinite(p.btC)) continue;
+    const q = windowIndexOf(p.latDeg, p.lonDeg, g, xCoord, yCoord, box);
+    if (q < 0) continue;
+    if (dqf && dqf[q] !== 0) continue;
+    const t = btK[q];
+    if (!Number.isFinite(t)) continue;
+    const d = p.btC + 273.15 - t;
+    all.push(d);
+    if (p.cloud === true) cloud.push(d);
+    else if (p.cloud === false) clear.push(d);
+  }
+  const stats = (a) => {
+    const s = [...a].sort((x, y) => x - y);
+    let sum = 0;
+    let sq = 0;
+    for (const v of s) {
+      sum += v;
+      sq += v * v;
+    }
+    return {
+      n: s.length,
+      medianK: quantile(s, 0.5),
+      p10K: quantile(s, 0.1),
+      p90K: quantile(s, 0.9),
+      meanK: s.length ? sum / s.length : null,
+      rmsK: s.length ? Math.sqrt(sq / s.length) : null
+    };
+  };
+  return {...stats(all), clear: stats(clear), cloud: stats(cloud)};
+}
+// DCOMP's flag bits as the product files print them
+// (OR_ABI-L2-CODC-M6_G18_s20262482021177, flag_masks and
+// flag_meanings, read 2026-09-05). MEASURED on that file against
+// the mask of the same minute: every retrieved pixel (COD > 0)
+// carries the "degraded" and "nonconvergence" bits and every clear
+// pixel the "ice phase" bit, so those three bits cannot be read by
+// their names (product version v02r03, stated); the ice, thick,
+// thin, glint, snow and twilight bits sort the retrievals as the
+// ATBD says (ice r_eff median 41 um against water 17; thick at the
+// LUT's upper bound 158.5; thin under tau 3.5). The theme reads a
+// retrieval by its VALUE: fill = none, 0 = clear, > 0 = retrieved.
+export const DCOMP_FLAGS = {
+  notDay: 1,
+  notNight: 2,
+  degraded: 4,
+  snow: 8,
+  twilight: 16,
+  nonconvergence: 32,
+  glint: 64,
+  ice: 128,
+  thick: 256,
+  thin: 512
+};
+export const DCOMP_COD_MAX = 158.49; // the LUT's 10^2.2, where thick clouds saturate
+// The census of a DCOMP window: the retrievals (COD > 0) with
+// their optical depths and effective radii, by phase, and the
+// flags' counts. cod/cps physical (NaN fill); dqf the raw flags.
+export function dcompCensus(cod, cps, dqf, water = null) {
+  const c = {
+    n: cod.length,
+    fill: 0,
+    clear: 0,
+    retrieved: 0,
+    sea: 0,
+    thin: 0,
+    thick: 0,
+    glint: 0,
+    twilight: 0,
+    snow: 0,
+    water: {n: 0, cod: [], cps: []},
+    ice: {n: 0, cod: [], cps: []}
+  };
+  const all = [];
+  for (let q = 0; q < cod.length; q++) {
+    const v = cod[q];
+    if (!Number.isFinite(v)) {
+      c.fill++;
+      continue;
+    }
+    if (v <= 0) {
+      c.clear++;
+      continue;
+    }
+    c.retrieved++;
+    if (water && water[q]) c.sea++;
+    const d = dqf ? dqf[q] : 0;
+    if (d & DCOMP_FLAGS.thin) c.thin++;
+    if (d & DCOMP_FLAGS.thick) c.thick++;
+    if (d & DCOMP_FLAGS.glint) c.glint++;
+    if (d & DCOMP_FLAGS.twilight) c.twilight++;
+    if (d & DCOMP_FLAGS.snow) c.snow++;
+    const ph = d & DCOMP_FLAGS.ice ? c.ice : c.water;
+    ph.n++;
+    ph.cod.push(v);
+    if (Number.isFinite(cps[q])) ph.cps.push(cps[q]);
+    all.push(v);
+  }
+  const fin = (ph) => {
+    const cs = ph.cod.sort((a, b) => a - b);
+    const rs = ph.cps.sort((a, b) => a - b);
+    return {
+      n: ph.n,
+      codMedian: quantile(cs, 0.5),
+      codP10: quantile(cs, 0.1),
+      codP90: quantile(cs, 0.9),
+      reffN: rs.length,
+      reffMedian: quantile(rs, 0.5),
+      reffP10: quantile(rs, 0.1),
+      reffP90: quantile(rs, 0.9)
+    };
+  };
+  const s = all.sort((a, b) => a - b);
+  c.codMedian = quantile(s, 0.5);
+  c.codP10 = quantile(s, 0.1);
+  c.codP90 = quantile(s, 0.9);
+  c.water = fin(c.water);
+  c.ice = fin(c.ice);
+  return c;
+}
+// DCOMP over the theme's own pixels (its sea, say): each theme
+// pixel looked up in the DCOMP window, every NOAA pixel counted
+// once, then the census - so the daemon's window (all surfaces)
+// and the theme's sea read the same law.
+export function dcompOverPixels(themePixels, noaa) {
+  const {g, xCoord, yCoord, box, cod, cps, dqf} = noaa;
+  const seen = new Set();
+  const c2 = [];
+  const p2 = [];
+  const d2 = [];
+  for (const p of themePixels) {
+    const q = windowIndexOf(p.latDeg, p.lonDeg, g, xCoord, yCoord, box);
+    if (q < 0 || seen.has(q)) continue;
+    seen.add(q);
+    c2.push(cod[q]);
+    p2.push(cps ? cps[q] : NaN);
+    d2.push(dqf ? dqf[q] : 0);
+  }
+  return dcompCensus(c2, p2, d2);
+}
+// DCOMP at one window index: {tau, reff, ice, thin, thick} or null
+// where nothing was retrieved (clear or fill).
+export function dcompAt(q, cod, cps, dqf) {
+  if (q < 0 || q >= cod.length) return null;
+  const v = cod[q];
+  if (!Number.isFinite(v) || v <= 0) return null;
+  const d = dqf ? dqf[q] : 0;
+  return {
+    tau: v,
+    reff: Number.isFinite(cps[q]) ? cps[q] : null,
+    ice: !!(d & DCOMP_FLAGS.ice),
+    thin: !!(d & DCOMP_FLAGS.thin),
+    thick: !!(d & DCOMP_FLAGS.thick),
+    glint: !!(d & DCOMP_FLAGS.glint)
+  };
 }

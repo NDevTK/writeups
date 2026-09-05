@@ -53,16 +53,22 @@ import {
   decodeL2,
   decodeL2Async,
   l2Cell,
+  l2DcompBody,
   l2FileUrl,
   l2HeightBody,
+  l2ImageryBody,
   l2ListUrl,
   l2MaskBody,
   l2Prefixes,
   l2Window,
+  L2_ASKS,
   L2_AT_MAX_AGE_MS,
+  L2_COD_SPEC,
+  L2_CPS_SPEC,
   L2_HALF_PX,
   L2_HEIGHT_SPEC,
   L2_HELD_PER_PRODUCT,
+  L2_IMAGERY_SPEC,
   L2_LIST_MS,
   L2_MASK_SPEC,
   L2_RETRY_MS,
@@ -96,7 +102,7 @@ import {
 } from './server/src/index.mjs';
 
 import {haversineKm} from './lightning.js';
-import {heightCensus, unpackArray} from './goesl2.js';
+import {dcompCensus, heightCensus, unpackArray, unscale} from './goesl2.js';
 import {ACHAC_B64, ACHAC_NAME} from './hdf5-fixture.js';
 
 let fail = 0;
@@ -754,10 +760,10 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_LIST_MS === 60e3 &&
       L2_RETRY_MS === 2 * 60e3 &&
       L2_WINDOW_MS === 15 * 60e3 &&
-      L2_HELD_PER_PRODUCT === 3 &&
+      L2_HELD_PER_PRODUCT === 2 &&
       L2_AT_MAX_AGE_MS === 7 * 86400e3 &&
       l2ListUrl('noaa-goes18', 'ABI-L2-ACMC/2026/248/19/') ===
-        'https://noaa-goes18.s3.amazonaws.com/?list-type=2&prefix=ABI-L2-ACMC%2F2026%2F248%2F19%2F&max-keys=200' &&
+        'https://noaa-goes18.s3.amazonaws.com/?list-type=2&prefix=ABI-L2-ACMC%2F2026%2F248%2F19%2F&max-keys=1000' &&
       l2FileUrl('noaa-goes19', 'ABI-L2-ACHAC/2026/248/19/x.nc') ===
         'https://noaa-goes19.s3.amazonaws.com/ABI-L2-ACHAC/2026/248/19/x.nc' &&
       pre.length === 2 &&
@@ -790,6 +796,139 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       sum(decW.data.DQF) === sum(dec.data.DQF) &&
       JSON.stringify(decW.proj) === JSON.stringify(dec.proj),
     `a worker thread imported this module (main() guarded by import.meta.url), decoded the vendored file and posted ${decW && decW.data.HT.length} heights back as Float32Array with the same sum, DQF and projection - in ${ms} ms including the worker's start`
+  );
+  // The imagery and DCOMP windows (149th pass): the raw16 mode
+  // keeps the counts with the file's own scaling (tried on the
+  // vendored file's HT: raw uint16, scale 0.3052037, fill 65535,
+  // count x scale = the physical height); the imagery and DCOMP
+  // bodies are built on a decode dressed as those products (the
+  // real files are 4-5 MB each, not vendored) - counts on the wire
+  // as u16 with a signed fill mapped to 65535, the page's unscale
+  // giving the kelvin back, the censuses by value and phase.
+  const raw = decodeL2(bytes, {HT: 'raw16', DQF: 'raw'});
+  let q0 = -1; // the first retrieved pixel of the file
+  if (raw)
+    for (let q = 0; q < raw.data.HT.length; q++)
+      if (raw.data.HT[q] !== 65535) {
+        q0 = q;
+        break;
+      }
+  const rawOk =
+    raw &&
+    raw.data.HT instanceof Uint16Array &&
+    Math.abs(raw.meta.HT.scale - 0.3052037) < 1e-7 &&
+    raw.meta.HT.fill === 65535 &&
+    raw.meta.HT.units === 'm' &&
+    q0 >= 0 &&
+    Math.abs(raw.data.HT[q0] * raw.meta.HT.scale - dec.data.HT[q0]) < 1e-3;
+  // a synthetic imagery decode on the fixture's grid: CMI counts
+  // from the heights (count = height / 10, so 0..6553 fits the
+  // 12-bit range's spirit), fill -1 where HT is fill, DQF 0
+  const cmi = new Int16Array(raw.data.HT.length);
+  for (let q = 0; q < cmi.length; q++)
+    cmi[q] = raw.data.HT[q] === 65535 ? -1 : Math.round(raw.data.HT[q] / 10);
+  const imDec = {
+    ...raw,
+    data: {CMI: cmi, DQF: new Uint8Array(cmi.length)},
+    meta: {CMI: {scale: 0.06145332, offset: 89.62, fill: -1, units: 'K'}}
+  };
+  const im = l2ImageryBody(imDec, 'im', cell.lat, cell.lon);
+  const btRaw = im ? unpackArray(im.bt) : null;
+  const btK = im
+    ? unscale(btRaw, {scale: im.btScale, offset: im.btOffset, fill: im.btFill})
+    : null;
+  // the first measured pixel of the window, back on the file's grid
+  let qw = -1;
+  if (btRaw)
+    for (let q = 0; q < btRaw.length; q++)
+      if (btRaw[q] !== 65535) {
+        qw = q;
+        break;
+      }
+  const gq =
+    im && qw >= 0
+      ? (im.box.j0 + Math.floor(qw / im.box.cols)) * 500 +
+        im.box.i0 +
+        (qw % im.box.cols)
+      : -1;
+  // a synthetic DCOMP pair: COD counts = HT counts (0..65530), the
+  // flag word marking every 3rd retrieval ice, every 5th thin, a
+  // fill where HT is fill; CPS = half the COD count
+  const codArr = new Uint16Array(raw.data.HT.length);
+  const cpsArr = new Uint16Array(raw.data.HT.length);
+  const flags = new Uint16Array(raw.data.HT.length);
+  for (let q = 0; q < codArr.length; q++) {
+    const h = raw.data.HT[q];
+    codArr[q] = h === 65535 ? 65535 : h;
+    cpsArr[q] = h === 65535 ? 65535 : Math.floor(h / 2);
+    flags[q] = (q % 3 === 0 ? 128 : 0) | (q % 5 === 0 ? 512 : 0);
+  }
+  const codDec = {
+    ...raw,
+    data: {COD: codArr, DQF: flags},
+    meta: {COD: {scale: 0.00244163, offset: 0, fill: 65535, units: '1'}}
+  };
+  const cpsDec = {
+    ...raw,
+    data: {CPS: cpsArr, DQF: flags},
+    meta: {CPS: {scale: 0.00244163, offset: 0, fill: 65535, units: 'um'}}
+  };
+  const dc = l2DcompBody(codDec, cpsDec, 'kc', 'kp', cell.lat, cell.lon);
+  const codBack = dc
+    ? unscale(unpackArray(dc.cod), {scale: dc.codScale, fill: dc.fill})
+    : null;
+  const cpsBack = dc
+    ? unscale(unpackArray(dc.cps), {scale: dc.cpsScale, fill: dc.fill})
+    : null;
+  const dqBack = dc ? unpackArray(dc.dqf) : null;
+  const dcAgain = dc ? dcompCensus(codBack, cpsBack, dqBack) : null;
+  const noCps = l2DcompBody(codDec, null, 'kc', null, cell.lat, cell.lon);
+  check(
+    'the imagery and DCOMP windows (/goesl2, 149th)',
+    rawOk &&
+      im !== null &&
+      im.product === 'ABI-L2-CMIPC' &&
+      im.band === 'C13' &&
+      im.bt.kind === 'u16' &&
+      im.btFill === 65535 &&
+      btRaw.length === im.box.rows * im.box.cols &&
+      im.box.i === 424 &&
+      im.box.j === 127 &&
+      // the fixture's 300x500 grid cut with the 2-km half width:
+      // 101 wide, clipped at the scene's top edge to fewer rows
+      im.box.cols === 101 &&
+      im.box.rows === 101 &&
+      Number.isNaN(btK[0]) ===
+        (raw.data.HT[im.box.j0 * 500 + im.box.i0] === 65535) &&
+      qw >= 0 &&
+      Math.abs(
+        btK[qw] - (Math.round(raw.data.HT[gq] / 10) * 0.06145332 + 89.62)
+      ) < 1e-3 &&
+      im.census.good > 0 &&
+      im.census.good <= im.census.n &&
+      im.census.medianK > 89 &&
+      dc !== null &&
+      dc.product === 'ABI-L2-CODC' &&
+      dc.cpsKey === 'kp' &&
+      dc.cod.kind === 'u16' &&
+      dc.dqf.kind === 'u16' &&
+      dc.census.retrieved > 0 &&
+      dc.census.fill + dc.census.clear + dc.census.retrieved === dc.census.n &&
+      dc.census.ice.n + dc.census.water.n === dc.census.retrieved &&
+      dc.census.thin > 0 &&
+      dcAgain.retrieved === dc.census.retrieved &&
+      dcAgain.codMedian === dc.census.codMedian &&
+      dcAgain.water.reffMedian === dc.census.water.reffMedian &&
+      noCps !== null &&
+      noCps.cps === null &&
+      noCps.census.water.reffN === 0 &&
+      L2_ASKS.length === 5 &&
+      L2_ASKS.map((a) => a.id).join(',') === 'mask,height,imagery,cod,cps' &&
+      L2_ASKS[2].band === 'C13' &&
+      L2_IMAGERY_SPEC.CMI === 'raw16' &&
+      L2_COD_SPEC.COD === 'raw16' &&
+      L2_CPS_SPEC.CPS === 'raw16',
+    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; /goesl2 asks five products, the imagery by band C13`
   );
 }
 

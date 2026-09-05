@@ -111,10 +111,13 @@ import {Worker} from 'node:worker_threads';
 import {pickSatellite} from '../../satellites.js';
 import {openHdf5, physicalValues} from '../../hdf5.js';
 import {
+  bandKeys,
   bucketPrefix,
   cutWindow,
+  dcompCensus,
   fixedGridGeometry,
   heightCensus,
+  IMAGERY_BAND,
   L2_BUCKETS,
   L2_PRODUCTS,
   latestByStart,
@@ -124,6 +127,8 @@ import {
   parseS3Keys,
   pixelSizeM,
   productTimeIso,
+  quantile,
+  unscale,
   windowBox
 } from '../../goesl2.js';
 
@@ -945,9 +950,9 @@ export const L2_HALF_PX = {mask: 50, height: 10}; // +-100 km on 2-km / 10-km gr
 export const L2_LIST_MS = 60e3; // a bucket listing stands a minute (the cheap part)
 export const L2_RETRY_MS = 2 * 60e3; // after a listing or fetch failure
 export const L2_WINDOW_MS = 15 * 60e3; // windows outlive their file by design: a new file keys new windows
-export const L2_HELD_PER_PRODUCT = 3; // decoded files held per satellite and product (the newest, the mosaics')
+export const L2_HELD_PER_PRODUCT = 2; // decoded files held per satellite and product (the newest and the mosaic's; five products x ~15 MB each, twice, per satellite)
 export const L2_AT_MAX_AGE_MS = 7 * 86400e3; // how far back ?t= may ask
-export const L2_LIST_KEYS = 200;
+export const L2_LIST_KEYS = 1000; // an hour of CMIPC lists 16 bands x 12 files
 export function l2ListUrl(bucket, prefix) {
   return (
     `https://${bucket}.s3.amazonaws.com/?list-type=2&prefix=` +
@@ -982,6 +987,28 @@ export const L2_MASK_SPEC = {
   Cloud_Probabilities: 'pct'
 };
 export const L2_HEIGHT_SPEC = {HT: 'phys', DQF: 'raw'};
+// The 149th pass: the imagery's brightness temperature (CMI, int16
+// counts with the file's scale and offset - kept raw with its
+// scaling so the wire carries 2 bytes a pixel) and DCOMP's optical
+// depth and particle size (uint16 counts, the same 0.00244163 per
+// count) with their shared flag word.
+export const L2_IMAGERY_SPEC = {CMI: 'raw16', DQF: 'raw'};
+export const L2_COD_SPEC = {COD: 'raw16', DQF: 'raw16'};
+export const L2_CPS_SPEC = {CPS: 'raw16', DQF: 'raw16'};
+// what /goesl2 fetches for a point: product, spec, the imagery's
+// band (the CMIPC prefix lists every band's file)
+export const L2_ASKS = [
+  {id: 'mask', product: L2_PRODUCTS.mask, spec: L2_MASK_SPEC},
+  {id: 'height', product: L2_PRODUCTS.height, spec: L2_HEIGHT_SPEC},
+  {
+    id: 'imagery',
+    product: L2_PRODUCTS.imagery,
+    spec: L2_IMAGERY_SPEC,
+    band: IMAGERY_BAND
+  },
+  {id: 'cod', product: L2_PRODUCTS.cod, spec: L2_COD_SPEC},
+  {id: 'cps', product: L2_PRODUCTS.cps, spec: L2_CPS_SPEC}
+];
 const l2Scalar = (a) => (Array.isArray(a) ? a[0] : a);
 const l2Inflate = (u8) =>
   new Uint8Array(
@@ -1018,13 +1045,24 @@ export function decodeL2(bytes, spec, inflate = l2Inflate) {
     return null;
   const root = f.rootAttrs();
   const data = {};
+  const meta = {};
   for (const [name, mode] of Object.entries(spec)) {
     const d = f.dataset(name);
     if (!d || !d.values || d.values.unread) return null;
     if (d.values.length !== x.n * y.n) return null;
     if (mode === 'raw') data[name] = d.values;
     else if (mode === 'phys') data[name] = physicalValues(d);
-    else {
+    else if (mode === 'raw16') {
+      // the counts as stored, with the file's own scaling beside
+      // them (a signed int16 fill of -1 becomes 65535 on the wire)
+      data[name] = d.values;
+      meta[name] = {
+        scale: l2Scalar(d.attrs.scale_factor) ?? 1,
+        offset: l2Scalar(d.attrs.add_offset) ?? 0,
+        fill: l2Scalar(d.attrs._FillValue) ?? 65535,
+        units: d.attrs.units ?? null
+      };
+    } else {
       const ph = physicalValues(d);
       const pct = new Uint8Array(ph.length);
       for (let q = 0; q < ph.length; q++)
@@ -1046,7 +1084,8 @@ export function decodeL2(bytes, spec, inflate = l2Inflate) {
     end: root.time_coverage_end ?? null,
     lzaMaxDeg:
       lza && lza.values && !lza.values.unread ? Number(lza.values[1]) : null,
-    data
+    data,
+    meta
   };
 }
 // The decode in a worker thread, so the daemon's event loop keeps
@@ -1150,6 +1189,79 @@ export function l2HeightBody(dec, key, lat, lon) {
     ht: packArray(w.cut.HT, 'f32'),
     dqf: packArray(w.cut.DQF, 'u8'),
     census: heightCensus(w.cut.HT, w.cut.DQF)
+  };
+}
+// raw counts on the wire: a signed fill (-1) becomes 65535, the
+// page unscales with the scaling beside it
+const l2Counts = (cut, fill) =>
+  packArray(
+    cut.map((v) => (v === fill || v == null || v < 0 ? 65535 : v)),
+    'u16'
+  );
+// The imagery window (149th pass): band 13's brightness temperature
+// as NOAA computed it from the radiance (the CMIP ATBD's modified
+// Planck function, the file's own planck_fk1/fk2/bc1/bc2), 12-bit
+// counts at 0.0615 K, DQF 0 good.
+export function l2ImageryBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_IMAGERY_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.mask);
+  if (!w) return null;
+  const m = dec.meta.CMI ?? {scale: 1, offset: 0, fill: -1};
+  const btK = unscale(w.cut.CMI, m);
+  const good = [];
+  for (let q = 0; q < btK.length; q++)
+    if (Number.isFinite(btK[q]) && w.cut.DQF[q] === 0) good.push(btK[q]);
+  good.sort((a, b) => a - b);
+  return {
+    ...l2Common(dec, L2_PRODUCTS.imagery, key, w),
+    band: IMAGERY_BAND,
+    bt: l2Counts(w.cut.CMI, m.fill),
+    btScale: m.scale,
+    btOffset: m.offset,
+    btFill: 65535,
+    dqf: packArray(w.cut.DQF, 'u8'),
+    census: {
+      n: btK.length,
+      good: good.length,
+      minK: good.length ? good[0] : null,
+      medianK: quantile(good, 0.5),
+      maxK: good.length ? good[good.length - 1] : null
+    }
+  };
+}
+// The DCOMP window (149th pass): the optical depth at 640 nm and
+// the effective radius (um) with the flag word the two files share
+// (the CPS file's DQF equals the COD file's pixel for pixel,
+// measured), censused by value and phase (goesl2.dcompCensus).
+export function l2DcompBody(decCod, decCps, keyCod, keyCps, lat, lon) {
+  if (!l2Has(decCod, L2_COD_SPEC)) return null;
+  const w = l2Window(decCod, lat, lon, L2_HALF_PX.mask);
+  if (!w) return null;
+  const mc = decCod.meta.COD ?? {scale: 1, offset: 0, fill: 65535};
+  let cpsCut = null;
+  let mp = null;
+  if (decCps && l2Has(decCps, L2_CPS_SPEC)) {
+    const wp = l2Window(decCps, lat, lon, L2_HALF_PX.mask);
+    if (wp && wp.box.i0 === w.box.i0 && wp.box.j0 === w.box.j0) {
+      cpsCut = wp.cut.CPS;
+      mp = decCps.meta.CPS ?? mc;
+    }
+  }
+  const cod = unscale(w.cut.COD, mc);
+  const cps = cpsCut
+    ? unscale(cpsCut, mp)
+    : new Float32Array(cod.length).fill(NaN);
+  return {
+    ...l2Common(decCod, L2_PRODUCTS.cod, keyCod, w),
+    cpsKey: cpsCut ? keyCps : null,
+    cpsTime: cpsCut && decCps ? decCps.time : null,
+    cod: l2Counts(w.cut.COD, mc.fill),
+    codScale: mc.scale,
+    cps: cpsCut ? l2Counts(cpsCut, mp.fill) : null,
+    cpsScale: mp ? mp.scale : null,
+    fill: 65535,
+    dqf: packArray(w.cut.DQF, 'u16'),
+    census: dcompCensus(cod, cps, w.cut.DQF)
   };
 }
 
@@ -2111,10 +2223,11 @@ function main() {
   }
   // the key for a moment (null: nothing listed for it): this hour's
   // prefix, then the previous hour's
-  async function l2KeyFor(bucket, product, at, deadline) {
+  async function l2KeyFor(bucket, product, at, deadline, band = null) {
     const when = at ? new Date(at) : new Date();
     for (const prefix of l2Prefixes(product, when)) {
-      const keys = await l2Listing(bucket, prefix, deadline);
+      const listed = await l2Listing(bucket, prefix, deadline);
+      const keys = band ? bandKeys(listed, band) : listed;
       const pick = at ? nearestByStart(keys, at) : latestByStart(keys);
       if (pick) return pick;
     }
@@ -2126,12 +2239,28 @@ function main() {
       if (k.startsWith(pk + '/') && (!best || v.stamp > best.stamp)) best = v;
     return best;
   };
-  async function l2File(bucket, product, spec, deadline, at = null) {
-    const pk = bucket + '/' + product;
+  // one decode at a time: five products can arrive together, and
+  // five workers with their inflated arrays would not fit a small
+  // box beside the daemon (the 4 MB mask alone peaks ~120 MB)
+  let l2DecodeChain = Promise.resolve();
+  const l2DecodeSerial = (bytes, spec) => {
+    const run = l2DecodeChain.then(() => decodeL2Async(bytes, spec));
+    l2DecodeChain = run.catch(() => {});
+    return run;
+  };
+  async function l2File(
+    bucket,
+    product,
+    spec,
+    deadline,
+    at = null,
+    band = null
+  ) {
+    const pk = bucket + '/' + product + (band ? '-' + band : '');
     const held = l2Fail.get(pk);
     if (held && Date.now() < held) return at ? null : l2Newest(pk);
     try {
-      const pick = await l2KeyFor(bucket, product, at, deadline);
+      const pick = await l2KeyFor(bucket, product, at, deadline, band);
       if (!pick) {
         if (at) return null;
         throw new Error(product + ': no file listed');
@@ -2157,7 +2286,7 @@ function main() {
           const t0 = Date.now();
           let dec;
           try {
-            dec = await decodeL2Async(bytes, spec);
+            dec = await l2DecodeSerial(bytes, spec);
           } catch (e) {
             l2State.workerFallbacks++;
             log(
@@ -2216,12 +2345,16 @@ function main() {
       };
     const cell = l2Cell(lat, lon);
     const deadline = Date.now() + UPSTREAM_BUDGET_MS;
-    const [mf, hf] = await Promise.all([
-      l2File(bucket, L2_PRODUCTS.mask, L2_MASK_SPEC, deadline, at),
-      l2File(bucket, L2_PRODUCTS.height, L2_HEIGHT_SPEC, deadline, at)
-    ]);
-    if (!mf && !hf) return null;
-    const ck = `${pick.sat.id}/${cell.lat}/${cell.lon}/${mf ? mf.key : '-'}/${hf ? hf.key : '-'}`;
+    const got = await Promise.all(
+      L2_ASKS.map((a) =>
+        l2File(bucket, a.product, a.spec, deadline, at, a.band ?? null)
+      )
+    );
+    const F = Object.fromEntries(L2_ASKS.map((a, i) => [a.id, got[i]]));
+    if (!got.some((f) => f)) return null;
+    const ck =
+      `${pick.sat.id}/${cell.lat}/${cell.lon}/` +
+      got.map((f) => (f ? f.key : '-')).join('/');
     const hit = goesl2Cache.get(ck);
     if (hit) return hit.body;
     const body = {
@@ -2233,9 +2366,26 @@ function main() {
       cell,
       at,
       halfPx: L2_HALF_PX,
-      mask: mf ? l2MaskBody(mf.dec, mf.key, cell.lat, cell.lon) : null,
-      height: hf ? l2HeightBody(hf.dec, hf.key, cell.lat, cell.lon) : null,
-      upstream: mf && hf ? 'ok' : 'partial'
+      mask: F.mask
+        ? l2MaskBody(F.mask.dec, F.mask.key, cell.lat, cell.lon)
+        : null,
+      height: F.height
+        ? l2HeightBody(F.height.dec, F.height.key, cell.lat, cell.lon)
+        : null,
+      imagery: F.imagery
+        ? l2ImageryBody(F.imagery.dec, F.imagery.key, cell.lat, cell.lon)
+        : null,
+      dcomp: F.cod
+        ? l2DcompBody(
+            F.cod.dec,
+            F.cps ? F.cps.dec : null,
+            F.cod.key,
+            F.cps ? F.cps.key : null,
+            cell.lat,
+            cell.lon
+          )
+        : null,
+      upstream: got.every((f) => f) ? 'ok' : 'partial'
     };
     goesl2Cache.set(ck, {t: Date.now(), body});
     return body;

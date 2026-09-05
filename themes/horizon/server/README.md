@@ -113,13 +113,19 @@ are gated by `../server-reference.mjs` — the `server` set in
   fetched by the daemon, decoded by the gated pure-JS HDF5 reader
   `hdf5.js`, navigated by `goesl2.js`'s PUG equations), cut to
   ±100 km windows (101 × 101 mask pixels, 21 × 21 height pixels)
-  and packed as base64 typed arrays with their censuses. One
-  decoded file per satellite and product is held for the
-  products' 5-minute cadence; windows are keyed by file, so a new
-  file keys new windows. `sat: null` with a `reason` is a real
-  answer (no bucket reaches this longitude; Himawari's products
-  are not on AWS in this form); 502 when both products failed
-  upstream; `upstream: 'partial'` names a body with one of them.
+  and packed as base64 typed arrays with their censuses. Since the
+  149th pass the answer also carries the band-13 imagery itself
+  (`ABI-L2-CMIPC` C13: NOAA's brightness temperature as 12-bit
+  counts with the file's scale and offset, DQF) and DCOMP's daytime
+  retrievals (`ABI-L2-CODC` optical depth at 640 nm and `ABI-L2-CPSC`
+  effective radius, uint16 counts with their scale, the shared flag
+  word) as `imagery` and `dcomp`, five products in all (about 180 kB
+  a window). Decoded files are held two per satellite and product;
+  windows are keyed by file, so a new file keys new windows. `sat:
+  null` with a `reason` is a real answer (no bucket reaches this
+  longitude; Himawari's products are not on AWS in this form); 502
+  when every product failed upstream; `upstream: 'partial'` names a
+  body missing some.
 - `GET /health` — AIS + lightning + space-weather + smoke +
   aerosol engine stats.
 - `GET /probe` — health + the fixed-target reachability
@@ -172,18 +178,21 @@ nearest that moment within 15 minutes, so the page can compare its
 GIBS mosaic with the mask of the mosaic's own minute (GIBS's tiles
 trailed the bucket by 2 h 12 min on 2026-09-05 at 20:05Z, measured) -
 and downloads and decodes the file only when that key is not already
-held. The decode runs in a worker thread (the 4 MB mask file takes
-about 2 s; the 330 kB height file 70 ms) so the event loop keeps
+held. The decode runs in a worker thread, one at a time (the 4 MB
+mask file takes about 2 s; the 330 kB height file 70 ms; five
+workers at once would not fit a small box) so the event loop keeps
 serving: `/health` answered in 1-3 ms while a mask inflated,
-measured. A cold request for both products answers in 2.7 s, a cached
-window in 2 ms. One download per file is in flight at a time; a
-listing or download failure holds the product for two minutes, during
-which the newest decoded file stands in for "latest". Decoded files
-are typed arrays of tens of megabytes and live in RAM only (never
-persisted; three per satellite and product, the least recently asked
-for let go; all let go after an hour unasked); the home is warmed on
-start like the other slow routes. `/probe` lists the held files with
-their times and the listing/fetch/error/worker-fallback counters.
+measured. A cold request for all five products answers in about
+6.4 s, a cached window in 5 ms; the daemon holds about 260 MB with
+two sets of five files decoded, measured. One download per file is
+in flight at a time; a listing or download failure holds the product
+for two minutes, during which the newest decoded file stands in for
+"latest". Decoded files are typed arrays of tens of megabytes and
+live in RAM only (never persisted; two per satellite and product, the
+least recently asked for let go; all let go after an hour unasked);
+the home is warmed on start like the other slow routes. `/probe`
+lists the held files with their times and the
+listing/fetch/error/worker-fallback counters.
 
 ## Security posture
 

@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **143 reference files, 1134 landmark lines, 7 GPU probes** (live gate
+- **143 reference files, 1136 landmark lines, 7 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -780,7 +780,18 @@ The practice the corpus demonstrates, stated so it can be reused:
    that the grey rule had read as −18.9 °C, so a one-colour tile is
    now no measurement and the mosaic walk follows the domain's own
    stamps across its gaps (`goesir-reference` THE PLACEHOLDER TILE,
-   THE DOMAIN'S OWN STAMPS; `hdf5-reference` THE PRODUCT FILE,
+   THE DOMAIN'S OWN STAMPS). Pass 149 puts NOAA's brightness
+   temperature itself under the theme's palette decoder — 9678
+   pixels at the mosaic's minute read a median +0.34 K (clear +0.36,
+   cloud +0.30), the decode's bias a third of a kelvin under the
+   map's own bin width, the tails (rms 6.9 K) the Web-Mercator
+   resampling at cloud edges — and reports DCOMP's daytime optical
+   depth and effective radius per pixel beside the theme's VIIRS
+   radius, after measuring the product's flag word against the mask
+   of the same minute (three of its bits contradict their names in
+   v02r03 and are named, not read) (`goesl2-reference` THE IMAGERY
+   AND DCOMP; `server-reference` the imagery and DCOMP windows;
+   `hdf5-reference` THE PRODUCT FILE,
    H5PY'S EARLIEST/LATEST FILES; `goesl2-reference` THE FIXED GRID,
    THE WINDOW, THE CENSUSES, THE WIRE; `server-reference` NOAA
    cloud-product windows).

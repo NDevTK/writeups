@@ -463,9 +463,14 @@
       } from './horizon/goesir.js';
       import {
         ACM_MEANINGS,
+        btDifference,
+        DCOMP_COD_MAX,
+        dcompAt,
+        dcompOverPixels,
         fixedGridGeometry,
         maskAgreement,
         unpackArray,
+        unscale,
         windowIndexOf
       } from './horizon/goesl2.js';
       import {
@@ -6257,7 +6262,22 @@
               acm: p.acm ? unpackArray(p.acm) : null,
               dqf: p.dqf ? unpackArray(p.dqf) : null,
               prob: p.prob ? unpackArray(p.prob) : null,
-              ht: p.ht ? unpackArray(p.ht) : null
+              ht: p.ht ? unpackArray(p.ht) : null,
+              // the imagery's kelvin and DCOMP's tau and r_eff from
+              // the counts on the wire (149th pass; goesl2.unscale)
+              btK: p.bt
+                ? unscale(unpackArray(p.bt), {
+                    scale: p.btScale,
+                    offset: p.btOffset,
+                    fill: p.btFill
+                  })
+                : null,
+              cod: p.cod
+                ? unscale(unpackArray(p.cod), {scale: p.codScale, fill: p.fill})
+                : null,
+              cps: p.cps
+                ? unscale(unpackArray(p.cps), {scale: p.cpsScale, fill: p.fill})
+                : null
             }
           : null;
       async function syncGoesL2() {
@@ -6301,7 +6321,13 @@
             // 12 min on 2026-09-05 at 20:05Z - so the newest mask is
             // not the mosaic's sky)
             maskAt: null,
-            heightAt: null
+            heightAt: null,
+            // the imagery's band 13 and DCOMP (149th pass), now and
+            // at the mosaic's minute
+            imagery: unpackProduct(j.imagery),
+            dcomp: unpackProduct(j.dcomp),
+            imageryAt: null,
+            dcompAt: null
           };
           goesL2Reach = null;
           const m = goesL2.mask;
@@ -6317,6 +6343,22 @@
               `NOAA ${j.craft} cloud top height (ACHAC ${h.time.slice(11, 16)}Z)`,
               `median ${(h.census.medianM / 1000).toFixed(1)} km over ${h.census.n} retrieved 10-km px`
             );
+          const im = goesL2.imagery;
+          if (im && im.census.good)
+            record(
+              `NOAA ${j.craft} band 13 imagery (CMIPC ${im.time.slice(11, 16)}Z)`,
+              `brightness temperature ${(im.census.minK - 273.15).toFixed(1)} to ` +
+                `${(im.census.maxK - 273.15).toFixed(1)} °C over ${im.census.good} good 2-km px within ±100 km`
+            );
+          const dc = goesL2.dcomp;
+          if (dc && dc.census.retrieved)
+            record(
+              `NOAA ${j.craft} DCOMP (CODC/CPSC ${dc.time.slice(11, 16)}Z)`,
+              `τ640 median ${dc.census.codMedian.toFixed(1)} over ${dc.census.retrieved} retrieved px` +
+                (dc.census.water.reffMedian !== null
+                  ? ` · water r_eff ${dc.census.water.reffMedian.toFixed(1)} µm`
+                  : '')
+            );
           if (
             goesObs &&
             goesObs.time &&
@@ -6328,6 +6370,8 @@
               if (j2 && j2.sat && j2.mask) {
                 goesL2.maskAt = unpackProduct(j2.mask);
                 goesL2.heightAt = unpackProduct(j2.height);
+                goesL2.imageryAt = unpackProduct(j2.imagery);
+                goesL2.dcompAt = unpackProduct(j2.dcomp);
                 goesL2.at = Date.now();
               }
             } catch (e) {
@@ -6394,6 +6438,100 @@
         if (q < 0 || m.dqf[q] !== 0 || m.acm[q] > 3) return null;
         return {acm: m.acm[q], prob: m.prob[q] <= 100 ? m.prob[q] : null};
       }
+      // NOAA's own brightness temperature and DCOMP retrieval at a
+      // place (149th pass): {btC, tau, reff, ice, thin, thick} with
+      // nulls where the imagery is not good or nothing was retrieved
+      function goesL2ImageryAt(latDeg, lonDeg) {
+        if (!goesL2) return null;
+        const out = {btC: null, dcomp: null};
+        const im = goesL2.imagery;
+        if (im && im.btK) {
+          const q = windowIndexOf(latDeg, lonDeg, im.g, im.x, im.y, im.box);
+          if (q >= 0 && im.dqf[q] === 0 && Number.isFinite(im.btK[q]))
+            out.btC = im.btK[q] - 273.15;
+        }
+        const dc = goesL2.dcomp;
+        if (dc && dc.cod) {
+          const q = windowIndexOf(latDeg, lonDeg, dc.g, dc.x, dc.y, dc.box);
+          if (q >= 0) out.dcomp = dcompAt(q, dc.cod, dc.cps, dc.dqf);
+        }
+        return out.btC === null && !out.dcomp ? null : out;
+      }
+      // THE DECODER AUDITED (149th pass): the theme's brightness
+      // temperatures off GIBS's colour-mapped tiles against NOAA's
+      // CMI at the same pixels and the mosaic's own minute - every
+      // window pixel the theme measured, sea and land, its clear or
+      // cloud call splitting the differences. Memoised on the two
+      // stamps like the mask agreement.
+      let goesL2BtMemo = null;
+      function goesL2BtAudit() {
+        if (!goesObs || !goesObs.panel || !goesL2) return null;
+        const im = goesL2.imageryAt ?? goesL2.imagery;
+        if (!im || !im.btK) return null;
+        if (
+          goesL2BtMemo &&
+          goesL2BtMemo.obsAt === goesObs.at &&
+          goesL2BtMemo.l2At === goesL2.at
+        )
+          return goesL2BtMemo.audit;
+        const F = goesObs.panel.field;
+        const px = [];
+        for (let q = 0; q < F.cls.length; q++) {
+          const c = F.cls[q];
+          if (c < 2) continue;
+          const bt = F.btAt(q);
+          if (!Number.isFinite(bt)) continue;
+          px.push({
+            latDeg: goesObs.pxLat[q],
+            lonDeg: goesObs.pxLon[q],
+            btC: bt,
+            cloud: c >= 3
+          });
+        }
+        const audit = btDifference(px, {
+          g: im.g,
+          xCoord: im.x,
+          yCoord: im.y,
+          box: im.box,
+          btK: im.btK,
+          dqf: im.dqf
+        });
+        audit.time = im.time;
+        audit.timed = !!goesL2.imageryAt;
+        goesL2BtMemo = {obsAt: goesObs.at, l2At: goesL2.at, audit};
+        return audit;
+      }
+      // DCOMP over the theme's own sea pixels (goesl2.dcompOverPixels)
+      let goesL2SeaMemo = null;
+      function goesL2SeaDcomp() {
+        if (!goesObs || !goesObs.panel || !goesL2) return null;
+        const dc = goesL2.dcompAt ?? goesL2.dcomp;
+        if (!dc || !dc.cod) return null;
+        if (
+          goesL2SeaMemo &&
+          goesL2SeaMemo.obsAt === goesObs.at &&
+          goesL2SeaMemo.l2At === goesL2.at
+        )
+          return goesL2SeaMemo.census;
+        const F = goesObs.panel.field;
+        const px = [];
+        for (let q = 0; q < F.cls.length; q++)
+          if (F.water[q])
+            px.push({latDeg: goesObs.pxLat[q], lonDeg: goesObs.pxLon[q]});
+        const census = dcompOverPixels(px, {
+          g: dc.g,
+          xCoord: dc.x,
+          yCoord: dc.y,
+          box: dc.box,
+          cod: dc.cod,
+          cps: dc.cps,
+          dqf: dc.dqf
+        });
+        census.time = dc.time;
+        census.timed = !!goesL2.dcompAt;
+        goesL2SeaMemo = {obsAt: goesObs.at, l2At: goesL2.at, census};
+        return census;
+      }
       function goesL2Line() {
         if (!goesL2) return goesL2Reach ? 'NOAA L2: ' + goesL2Reach : null;
         const m = goesL2.mask;
@@ -6453,6 +6591,79 @@
               line += ` vs the theme's opaque tops ${own.join(', ')} (ACHA retrieves the emitting top; a thin cirrus reads lower as an opaque top)`;
           }
         } else if (h) line += ' · no cloud top retrieved within ±100 km';
+        // THE DECODER AUDITED (149th pass): the palette decode
+        // against NOAA's own kelvin, pixel for pixel
+        const sgn = (v) => (v >= 0 ? '+' : '') + v.toFixed(2);
+        const audit = goesL2BtAudit();
+        if (audit && audit.n) {
+          line +=
+            ` · the theme's band 13 decode (GIBS's colour map, ${goesObs.time.slice(11, 16)}Z) vs NOAA's ` +
+            `own brightness temperature (CMIPC ${audit.time.slice(11, 16)}Z` +
+            (audit.timed ? ', the mosaic’s minute' : ', the newest') +
+            `) at the same ${audit.n} px: median ${sgn(audit.medianK)} K, p10/p90 ${sgn(audit.p10K)}/` +
+            `${sgn(audit.p90K)} K, rms ${audit.rmsK.toFixed(2)} K` +
+            (audit.clear.n
+              ? `; the theme’s clear px ${sgn(audit.clear.medianK)} K over ${audit.clear.n}`
+              : '') +
+            (audit.cloud.n
+              ? `, its cloud px ${sgn(audit.cloud.medianK)} K over ${audit.cloud.n}`
+              : '') +
+            ` (the CMI counts 0.06 K; GIBS resamples the 2-km grid to Web Mercator)`;
+        } else if (goesL2.imagery && goesL2.imagery.census.good)
+          line +=
+            ` · NOAA's band 13 imagery ${goesL2.imagery.time.slice(11, 16)}Z: ` +
+            `${(goesL2.imagery.census.minK - 273.15).toFixed(1)} to ` +
+            `${(goesL2.imagery.census.maxK - 273.15).toFixed(1)} °C over ${goesL2.imagery.census.good} px`;
+        // DCOMP (the ATBD's daytime retrieval, SZA <= 65 deg full
+        // quality): the window's retrievals by phase, the theme's
+        // sea alone, the flags' counts, the observer's pixel
+        const dc = goesL2.dcompAt ?? goesL2.dcomp;
+        if (dc && dc.census) {
+          const c = dc.census;
+          const um = (v) => (v === null ? '—' : v.toFixed(1) + ' µm');
+          const tau = (v) => (v === null ? '—' : v.toFixed(1));
+          if (c.retrieved) {
+            line +=
+              ` · DCOMP ${dc.time.slice(11, 16)}Z (ABI-L2-CODC/CPSC, daytime; the 640-nm optical depth and the ` +
+              `cloud-top effective radius): ${c.retrieved} retrieved of ${c.n - c.fill} 2-km px within ±100 km - ` +
+              `τ median ${tau(c.codMedian)} (p10/p90 ${tau(c.codP10)}/${tau(c.codP90)})`;
+            if (c.water.n)
+              line += `; water ${c.water.n} px τ ${tau(c.water.codMedian)}, r_eff ${um(c.water.reffMedian)}`;
+            if (c.ice.n)
+              line += `; ice ${c.ice.n} px τ ${tau(c.ice.codMedian)}, r_eff ${um(c.ice.reffMedian)}`;
+            if (c.thin || c.thick || c.glint)
+              line +=
+                ` (${c.thin} thin` +
+                (c.thick
+                  ? `, ${c.thick} at the retrieval’s upper bound ${DCOMP_COD_MAX.toFixed(0)}`
+                  : '') +
+                (c.glint ? `, ${c.glint} in glint` : '') +
+                ')';
+            const sea = goesL2SeaDcomp();
+            if (sea && sea.retrieved)
+              line +=
+                ` · the theme’s sea alone: ${sea.retrieved} retrieved px, τ median ${tau(sea.codMedian)}` +
+                (sea.water.reffMedian !== null
+                  ? `, water r_eff ${um(sea.water.reffMedian)}`
+                  : '') +
+                (state.creff && Number.isFinite(state.creff.waterUm)
+                  ? ` vs VIIRS’s ${state.creff.waterUm.toFixed(1)} µm of ${state.creff.day} that rings the corona (84th)`
+                  : '');
+            const ov = goesL2ImageryAt(state.lat, state.lon);
+            if (ov && ov.dcomp)
+              line +=
+                ` · overhead τ ${ov.dcomp.tau.toFixed(1)}` +
+                (ov.dcomp.reff !== null
+                  ? `, r_eff ${ov.dcomp.reff.toFixed(1)} µm`
+                  : '') +
+                (ov.dcomp.ice ? ' (ice)' : ' (water)') +
+                (ov.dcomp.thin ? ', thin' : '') +
+                (ov.dcomp.thick ? ', at the upper bound' : '');
+            else if (ov && ov.btC !== null)
+              line += ' · nothing retrieved overhead (clear)';
+          } else
+            line += ` · DCOMP ${dc.time.slice(11, 16)}Z: no daytime retrieval within ±100 km (night, or all clear)`;
+        }
         return line;
       }
       function applyRrs(rrs, note) {
@@ -12559,6 +12770,20 @@
                   ', NOAA ' +
                   ACM_MEANINGS[noaa.acm].replace(/_/g, ' ') +
                   (noaa.prob !== null ? ' ' + noaa.prob + '%' : '');
+              // NOAA's own kelvin and DCOMP retrieval there (149th)
+              const own =
+                goesObs.pxLat &&
+                goesL2ImageryAt(goesObs.pxLat[q], goesObs.pxLon[q]);
+              if (own && own.btC !== null)
+                detail += ', NOAA BT ' + own.btC.toFixed(1) + ' °C';
+              if (own && own.dcomp)
+                detail +=
+                  ', τ ' +
+                  own.dcomp.tau.toFixed(1) +
+                  (own.dcomp.reff !== null
+                    ? ' r_eff ' + own.dcomp.reff.toFixed(0) + ' µm'
+                    : '') +
+                  (own.dcomp.ice ? ' ice' : ' water');
             }
             // a clear low texel under a "low" pixel is the split
             // rule at work: the ceilometer reported no low layer,
