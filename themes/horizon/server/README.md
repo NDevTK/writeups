@@ -122,7 +122,7 @@ are gated by `../server-reference.mjs` — the `server` set in
   word) as `imagery` and `dcomp`, five products in all (about 180 kB
   a window). Decoded files are held two per satellite and product;
   windows are keyed by file, so a new file keys new windows. `sat:
-  null` with a `reason` is a real answer (no bucket reaches this
+null` with a `reason` is a real answer (no bucket reaches this
   longitude; Himawari's products are not on AWS in this form); 502
   when every product failed upstream; `upstream: 'partial'` names a
   body missing some.
