@@ -210,8 +210,7 @@ export function createGoesL2Client({
       const mine = [...windows]
         .filter(([k]) => k.startsWith(pk + '/'))
         .sort((a, b) => a[1].t - b[1].t);
-      while (mine.length > CLIENT_HELD_WINDOWS)
-        windows.delete(mine.shift()[0]);
+      while (mine.length > CLIENT_HELD_WINDOWS) windows.delete(mine.shift()[0]);
       return row;
     } catch (e) {
       stats.errors++;
@@ -222,7 +221,8 @@ export function createGoesL2Client({
   async function fetchGoesL2(lat, lon, at = null) {
     const pick = pickSatellite(lat, lon);
     const bucket = pick.sat ? L2_BUCKETS[pick.sat.id] : null;
-    if (!bucket) return {sat: null, via: 'bucket', reason: noBucketReason(pick)};
+    if (!bucket)
+      return {sat: null, via: 'bucket', reason: noBucketReason(pick)};
     const cell = l2Cell(lat, lon);
     const asks = at ? L2_ASKS.filter((a) => a.timed !== false) : L2_ASKS;
     const got = await Promise.all(asks.map((a) => file(bucket, a, at, cell)));

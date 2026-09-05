@@ -10414,10 +10414,10 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   is unknown there (the journal figure only); the sandbox's page
   probes exercise the direct path only through the repaired bridge
   - the live site's browsers talk to S3 themselves. THE DEPLOY,
-  WATCHED: api.ndev.tk still answered nothing at 23:27Z (the page's
-  own metar call through the harness bridge read a 522 - the
-  origin unreachable behind its front); the 150th-155th wait for
-  the box, and the page no longer waits with them.
+    WATCHED: api.ndev.tk still answered nothing at 23:27Z (the page's
+    own metar call through the harness bridge read a 522 - the
+    origin unreachable behind its front); the 150th-155th wait for
+    the box, and the page no longer waits with them.
 - DONE (Sep 5, the review session's 154th pass - THE FIELD THAT
   NEVER ARRIVED): the page probes of the 151st-153rd passes carried
   one console line every run - "THREE.WebGPURenderer: Uncaptured

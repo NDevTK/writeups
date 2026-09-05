@@ -71,10 +71,17 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
     const e = Math.min(+m[2] + 1, bytes.length);
     calls.push([s, +m[2] + 1]);
     if (s >= bytes.length)
-      return {status: 416, headers: {get: () => null}, arrayBuffer: async () => new ArrayBuffer(0)};
+      return {
+        status: 416,
+        headers: {get: () => null},
+        arrayBuffer: async () => new ArrayBuffer(0)
+      };
     return {
       status: 206,
-      headers: {get: (h) => (h === 'content-range' ? `bytes ${s}-${e - 1}/${bytes.length}` : null)},
+      headers: {
+        get: (h) =>
+          h === 'content-range' ? `bytes ${s}-${e - 1}/${bytes.length}` : null
+      },
       arrayBuffer: async () => bytes.slice(s, e).buffer
     };
   };
@@ -97,7 +104,10 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
   })(10, 14);
   let threw = null;
   try {
-    await rangeReader('u', async () => ({status: 500, headers: {get: () => null}}))(0, 10);
+    await rangeReader('u', async () => ({
+      status: 500,
+      headers: {get: () => null}
+    }))(0, 10);
   } catch (e) {
     threw = e.message;
   }
@@ -139,10 +149,14 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       const prefix = u.searchParams.get('prefix');
       log.lists.push(prefix);
       const product = prefix.split('/')[0];
-      const keys = Object.keys(files).filter((k) => k.includes(product.replace('ABI-L2-', '-')));
+      const keys = Object.keys(files).filter((k) =>
+        k.includes(product.replace('ABI-L2-', '-'))
+      );
       const body =
         '<?xml version="1.0"?><ListBucketResult>' +
-        keys.map((k) => `<Contents><Key>${prefix}${k}</Key></Contents>`).join('') +
+        keys
+          .map((k) => `<Contents><Key>${prefix}${k}</Key></Contents>`)
+          .join('') +
         '</ListBucketResult>';
       return {ok: true, status: 200, text: async () => body};
     }
@@ -152,15 +166,30 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       log.other.push(name);
       return {ok: false, status: 404, headers: {get: () => null}};
     }
-    const m = /bytes=(\d+)-(\d+)/.exec((opts.headers && opts.headers.range) || '');
-    if (!m) return {status: 200, headers: {get: () => null}, arrayBuffer: async () => bytes.slice().buffer};
+    const m = /bytes=(\d+)-(\d+)/.exec(
+      (opts.headers && opts.headers.range) || ''
+    );
+    if (!m)
+      return {
+        status: 200,
+        headers: {get: () => null},
+        arrayBuffer: async () => bytes.slice().buffer
+      };
     const s = +m[1];
     const e = Math.min(+m[2] + 1, bytes.length);
     log.ranges.push([name.slice(0, 16), s, +m[2] + 1]); // as asked
-    if (s >= bytes.length) return {status: 416, headers: {get: () => null}, arrayBuffer: async () => new ArrayBuffer(0)};
+    if (s >= bytes.length)
+      return {
+        status: 416,
+        headers: {get: () => null},
+        arrayBuffer: async () => new ArrayBuffer(0)
+      };
     return {
       status: 206,
-      headers: {get: (h) => (h === 'content-range' ? `bytes ${s}-${e - 1}/${bytes.length}` : null)},
+      headers: {
+        get: (h) =>
+          h === 'content-range' ? `bytes ${s}-${e - 1}/${bytes.length}` : null
+      },
       arrayBuffer: async () => bytes.slice(s, e).buffer
     };
   };
@@ -180,7 +209,11 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
   clock += 30e3;
   const again = await client.fetchGoesL2(32.85, -117.12);
   // the ACHAC's own minute: the timed asks only (no sst, no dmw)
-  const timed = await client.fetchGoesL2(32.85, -117.12, '2026-09-05T18:46:00Z');
+  const timed = await client.fetchGoesL2(
+    32.85,
+    -117.12,
+    '2026-09-05T18:46:00Z'
+  );
   // a point no bucket reaches (Himawari's longitude)
   const far = await client.fetchGoesL2(35, 140);
   const farPick = pickSatellite(35, 140);
@@ -218,8 +251,14 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       filesAfterFirst === 2 &&
       // the range reads: the heights' head then its strips, the winds
       // whole in one megabyte ask
-      log.ranges.some(([n, s, e]) => n.startsWith('OR_ABI-L2-ACHAC') && s === 0 && e === 262144) &&
-      log.ranges.some(([n, s, e]) => n.startsWith('OR_ABI-L2-DMWC') && s === 0 && e === 1048576) &&
+      log.ranges.some(
+        ([n, s, e]) =>
+          n.startsWith('OR_ABI-L2-ACHAC') && s === 0 && e === 262144
+      ) &&
+      log.ranges.some(
+        ([n, s, e]) =>
+          n.startsWith('OR_ABI-L2-DMWC') && s === 0 && e === 1048576
+      ) &&
       client.stats.errors === 0 &&
       again !== null &&
       client.stats.lists === listsAfterFirst &&
@@ -283,16 +322,35 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       const prefix = u.searchParams.get('prefix');
       lists.push(prefix);
       const product = prefix.split('/')[0];
-      const keys = Object.keys(files).filter((k) => k.includes(product.replace('ABI-L2-', '-')));
-      return {ok: true, status: 200, text: async () => '<r>' + keys.map((k) => `<Contents><Key>${prefix}${k}</Key></Contents>`).join('') + '</r>'};
+      const keys = Object.keys(files).filter((k) =>
+        k.includes(product.replace('ABI-L2-', '-'))
+      );
+      return {
+        ok: true,
+        status: 200,
+        text: async () =>
+          '<r>' +
+          keys
+            .map((k) => `<Contents><Key>${prefix}${k}</Key></Contents>`)
+            .join('') +
+          '</r>'
+      };
     }
     const name = u.pathname.split('/').pop();
     const b = files[name];
     if (!b) return {ok: false, status: 404, headers: {get: () => null}};
-    return {status: 200, headers: {get: () => null}, arrayBuffer: async () => b.slice().buffer};
+    return {
+      status: 200,
+      headers: {get: () => null},
+      arrayBuffer: async () => b.slice().buffer
+    };
   };
   let clock = Date.parse('2026-09-05T18:50:00Z');
-  const client = createGoesL2Client({fetchFn: fetchWhole, inflate: inflateStream, now: () => clock});
+  const client = createGoesL2Client({
+    fetchFn: fetchWhole,
+    inflate: inflateStream,
+    now: () => clock
+  });
   const body = await client.fetchGoesL2(32.85, -117.12);
   const listsFirst = lists.length;
   clock += 2 * 60e3; // the listings have aged out
@@ -312,7 +370,8 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       body.rangesHonoured === false &&
       body.read.length === 2 &&
       body.read.every((r) => r.whole === true) &&
-      body.read.find((r) => r.file.startsWith('OR_ABI-L2-DMWC')).kb === Math.round(dmwc.length / 1024) &&
+      body.read.find((r) => r.file.startsWith('OR_ABI-L2-DMWC')).kb ===
+        Math.round(dmwc.length / 1024) &&
       body.height !== null &&
       body.dmw !== null &&
       body.dmw.n === DMWC_EXPECT.within150 &&
@@ -325,7 +384,9 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       // fake bucket lacks, one for the two it holds), the full-disk
       // ones not
       listedAgain.length === 4 * 3 + 2 &&
-      !listedAgain.some((p) => p.startsWith('ABI-L2-SSTF') || p.startsWith('ABI-L2-DSRF')),
+      !listedAgain.some(
+        (p) => p.startsWith('ABI-L2-SSTF') || p.startsWith('ABI-L2-DSRF')
+      ),
     `three range asks of a whole-answering server cost ${calls} download (${a.length}, ${b.length} and ${c.length} bytes cut from it, the last short at the end); ` +
       `the client over such a bucket reads its two files whole (${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB`).join(', ')}), ` +
       `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the CONUS products and none for the full-disk SST and DSR`
