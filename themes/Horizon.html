@@ -568,6 +568,7 @@
         monahanW,
         retrievalPanel,
         marinePanel,
+        pierWindPanel,
         satsPanel,
         tidePanel,
         SEA_RETRIEVAL_DISTS_M
@@ -1621,7 +1622,7 @@
             hs: w.hs,
             tp: w.tp,
             dir: seaDirRad(w.dir),
-            U10: Math.max(state.wind / 3.6, 1)
+            U10: Math.max(seaWindMs(), 1)
           });
         }
         if (s && s.hs > 0.01 && s.tp > 0.5) {
@@ -1732,8 +1733,18 @@
       const coopsSensorCache = {};
       const COOPS_MET_FRESH_MIN = 90;
       const COOPS_MET_MAX_KM = 60;
+      // The sea's wind: the nearest measured wind over water when one
+      // is fresh (the pier first, a buoy's anemometer when the daemon
+      // serves it), else the model's 10-m wind. m/s.
+      function seaWindMs() {
+        return state.windSea && Number.isFinite(state.windSea.ms)
+          ? state.windSea.ms
+          : state.wind / 3.6;
+      }
       async function syncCoopsMet() {
         state.coopsMet = null;
+        if (state.windSea && state.windSea.src.startsWith('CO-OPS'))
+          state.windSea = null; // fail closed: a stale pier never rules
         if (params.get('coopsmet') === '0' || overridden) return;
         try {
           if (!coopsMetStations) {
@@ -1867,6 +1878,44 @@
             }
           } catch (e) {
             if (params.has('debug')) console.warn('shore metar: ' + e.message);
+          }
+          // THE SEA'S WIND (138th pass): the pier's anemometer is
+          // the nearest measured wind OVER WATER; brought to the
+          // 10-m neutral wind the whitecap and slope laws were
+          // fitted to (pierWindPanel: the similarity profile at the
+          // pier's own stability), it outranks the model's land
+          // wind for the drawn sea - foam, glitter, the wind sea.
+          try {
+            const pw = pierWindPanel({
+              ...state.coopsMet,
+              dewC: state.coopsMet.shore?.dewC ?? null
+            });
+            if (Number.isFinite(pw.u10nMs) && pw.u10nMs >= 0) {
+              state.windSea = {
+                src: 'CO-OPS pier ' + near.name,
+                at: state.coopsMet.at,
+                ms: pw.u10nMs,
+                u10Ms: pw.u10Ms,
+                uMeasMs: pw.uMeasMs,
+                zuM: pw.zuM,
+                stability: pw.stability
+              };
+              record(
+                'sea wind (CO-OPS pier)',
+                uMs.toFixed(1) +
+                  ' m/s at ' +
+                  state.coopsMet.zuM.toFixed(1) +
+                  ' m → 10-m neutral ' +
+                  pw.u10nMs.toFixed(1) +
+                  ' m/s (' +
+                  pw.stability +
+                  ', u* ' +
+                  pw.uStar.toFixed(3) +
+                  ') · sets the foam, the glitter and the wind sea'
+              );
+            }
+          } catch (e) {
+            if (params.has('debug')) console.warn('sea wind: ' + e.message);
           }
           record(
             'CO-OPS pier met',
@@ -4945,6 +4994,26 @@
           ).json();
           if (!r.id || !Array.isArray(r.f) || !Array.isArray(r.s)) return;
           state.buoy = r;
+          // The buoy's anemometer (138th pass; served once the
+          // daemon carries wspd): the sea's wind when no pier is in
+          // reach - NDBC's standard 5-m mast brought to 10 m by the
+          // neutral log law over a 1e-4 m sea (the height is not
+          // served, so the standard mast is assumed and said).
+          if (
+            Number.isFinite(r.wspd) &&
+            !(state.windSea && state.windSea.src.startsWith('CO-OPS'))
+          ) {
+            const k = Math.log(10 / 1e-4) / Math.log(5 / 1e-4);
+            state.windSea = {
+              src: 'NDBC buoy ' + r.id + ' (5-m mast assumed)',
+              at: r.at,
+              ms: r.wspd * k,
+              u10Ms: r.wspd * k,
+              uMeasMs: r.wspd,
+              zuM: 5,
+              stability: 'neutral log law'
+            };
+          }
           // In-situ water temperature outranks the model SST at
           // the same gates the spectrum rides (buoyBands).
           state.sstMeas =
@@ -8151,7 +8220,7 @@
           // rebuilds in place when the wind moves materially (same
           // gating pattern as the aerosol LUTs).
           oceanSeaDepth = dCnt ? Math.max(dSum / dCnt, 5) : 60;
-          oceanBuiltU = state.wind / 3.6;
+          oceanBuiltU = seaWindMs();
           oceanBuiltDir = Math.atan2(windV.z, windV.x);
           // Measured sea state takes over from the wind prediction
           // when present: the buoy's own spectrum first, then the
@@ -10925,11 +10994,15 @@
             ];
             delete research['forecast ledger (morning → evening ascent)'];
           }
-          if (Number.isFinite(state.wind)) {
-            const u = state.wind / 3.6;
+          if (Number.isFinite(state.wind) || state.windSea) {
+            const u = seaWindMs();
             research['whitecaps (Monahan 1980)'] =
               `${(monahanW(u) * 100).toFixed(2)}% of the drawn sea in ` +
-              `foam at ${u.toFixed(1)} m/s`;
+              `foam at ${u.toFixed(1)} m/s` +
+              (state.windSea
+                ? ` (${state.windSea.src}: ${state.windSea.uMeasMs.toFixed(1)} m/s at ` +
+                  `${state.windSea.zuM.toFixed(0)} m → U10N, ${state.windSea.stability})`
+                : ' (model 10-m wind)');
           }
           if (
             Number.isFinite(state.soilMoist) ||
@@ -14368,7 +14441,7 @@
         // and whitecap coverage now emerges from the folding Jacobian
         // inside the material.
         if (water && oceanCascades) {
-          const Ums = state.wind / 3.6;
+          const Ums = seaWindMs();
           oceanTime += dt;
           const dirNow = Math.atan2(windV.z, windV.x);
           const dDir = Math.abs(

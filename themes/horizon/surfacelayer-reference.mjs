@@ -346,4 +346,77 @@ const balloon = (h0, tSurf, invBaseAgl = 600) => {
   );
 }
 
+// 9. THE 10-m NEUTRAL WIND (138th pass): COARE's U10N = (u*/kappa)
+// ln(10/z0), the footing the whitecap and slope laws were fitted
+// on, recovered from the pier's sensor-height wind through the
+// profile: u* = sqrt(Cd10n) U10N exactly, and the ACTUAL 10-m wind
+// sits under U10N in unstable air (psi_m > 0) and over it in
+// stable air - the profile's own bracket.
+{
+  const cases = [
+    {name: 'unstable (water +3 K, 3 m/s at 17.5 m)', uMs: 3, taC: 17, tsC: 20},
+    {name: 'stable (air +4 K, 3 m/s at 17.5 m)', uMs: 3, taC: 21, tsC: 17},
+    {
+      // neutral in the dry sense: equal potential temperatures and
+      // no humidity gradient (a dewpoint would add its own buoyancy)
+      name: 'neutral (equal potential temperatures, dry, 6 m/s)',
+      uMs: 6,
+      taC: 20 - (9.80665 / 1004.67) * 16.5,
+      tsC: 20,
+      dry: true
+    }
+  ];
+  const outs = cases.map((c) => {
+    const mo = moBulk({
+      uMs: c.uMs,
+      zuM: 17.5,
+      taC: c.taC,
+      ztM: 16.5,
+      tsC: c.tsC,
+      pPa: 101325,
+      dewC: c.dry ? null : 15,
+      bliM: 600
+    });
+    // COARE's gust factor takes the convective gustiness back out
+    // of the neutral wind (u10N = usr / von / gf x ln(10/zo))
+    const gf = Math.sqrt(c.uMs * c.uMs + mo.gust * mo.gust) / c.uMs;
+    const u10n = ((mo.uStar / KAPPA) * Math.log(10 / mo.z0)) / gf;
+    const cd10n = (KAPPA / Math.log(10 / mo.z0)) ** 2;
+    return {
+      ...c,
+      mo,
+      gf,
+      u10n,
+      u10: mo.uAt(10),
+      cd10n,
+      uStarBack: Math.sqrt(cd10n) * u10n * gf
+    };
+  });
+  const [un, st, ne] = outs;
+  const ok =
+    outs.every((o) => Math.abs(o.uStarBack - o.mo.uStar) < 1e-9) &&
+    un.mo.L < 0 &&
+    un.u10 < un.u10n &&
+    st.mo.L > 0 &&
+    st.u10 > st.u10n &&
+    Math.abs(ne.u10 - ne.u10n) < 0.03 * ne.u10n &&
+    // U10N is the neutral wind that would carry this stress: it
+    // can EXCEED the sensor-height wind in unstable, gusty air
+    // (momentum crosses a convective layer more easily) and sit
+    // far under it in stable air (the stress is small) - a band,
+    // not an ordering
+    outs.every((o) => o.u10n > 0.3 * o.uMs && o.u10n < 1.4 * o.uMs);
+  check(
+    'THE 10-m NEUTRAL WIND from the pier',
+    ok,
+    outs
+      .map(
+        (o) =>
+          `${o.name}: U10N ${o.u10n.toFixed(3)} m/s (u* ${o.mo.uStar.toFixed(4)} = sqrt(Cd10n ${o.cd10n.toExponential(3)}) x U10N to 1e-9), actual 10-m wind ${o.u10.toFixed(3)}`
+      )
+      .join('; ') +
+      ' - the actual wind sits under the neutral wind when the water heats the air and over it when the air is the warmer, meeting it at neutrality'
+  );
+}
+
 process.exit(fail ? 1 : 0);

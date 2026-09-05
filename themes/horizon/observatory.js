@@ -87,7 +87,7 @@ import {parseTLEs, satMagnitude, sunlitEci} from './sats.js';
 import {rayFan} from './far-terrain.js';
 import {fleagleFitFilm} from './fleagle.js';
 import {AUTOCONVECTIVE_K_PER_M} from './fleagle.js';
-import {KAPPA, eSatPa, marineColumnRows} from './surfacelayer.js';
+import {KAPPA, eSatPa, marineColumnRows, moBulk} from './surfacelayer.js';
 import {
   CP_AIR,
   airDensity,
@@ -1175,6 +1175,23 @@ export function marinePanel(
     dewSource,
     z0M: mo.z0,
     iterations: mo.iterations,
+    // the pier's wind on the sea's own footing (138th pass): the
+    // measured wind at its sensor height, the profile's actual
+    // 10-m wind, and COARE's 10-m NEUTRAL wind U10N = (u* / kappa)
+    // ln(10/z0) - the wind the whitecap and slope laws were
+    // fitted to.
+    uMeasMs: met.uMs,
+    zuM: met.zuM,
+    u10Ms: mo.uAt(10),
+    // COARE's u10N = usr / von / gf x ln(10/zo): the gust factor
+    // gf = sqrt(U^2 + gust^2) / U takes the convective gustiness
+    // back OUT, so a calm pier under a warm sea reports a calm
+    // neutral wind, not the gust velocity's
+    u10nMs:
+      met.uMs > 1e-6
+        ? ((mo.uStar / KAPPA) * Math.log(10 / mo.z0)) /
+          (Math.sqrt(met.uMs * met.uMs + mo.gust * mo.gust) / met.uMs)
+        : 0,
     // the skin (136th pass)
     skinK: skin,
     skinDzM: cs ? cs.dzM : null,
@@ -1189,6 +1206,55 @@ export function marinePanel(
     rnlWm2: cs ? cs.rnlWm2 : null,
     q0Wm2: cs ? cs.qcolWm2 : null,
     shore: shore ? {id: shore.id, km: shore.km} : null
+  };
+}
+
+/**
+ * THE PIER'S WIND ON THE SEA'S FOOTING (138th pass): the shore
+ * station's anemometer sits at its own height in air of its own
+ * stability; the whitecap law (Monahan), the slope law (Cox-Munk)
+ * and the wave spectrum were fitted to the 10-m wind - Monahan's
+ * and COARE's neutral-equivalent U10N in particular. The profile
+ * already solved for the pier (surfacelayer.js) brings the measured
+ * wind down: u* from the bulk iteration, U10N = (u* / kappa)
+ * ln(10/z0) (COARE's definition), and the actual 10-m wind for
+ * the record. met: {uMs, zuM, taC, ztM, tsC, pPa?, dewC?}.
+ */
+export function pierWindPanel(met, {bliM = 600} = {}) {
+  const mo = moBulk({
+    uMs: met.uMs,
+    zuM: met.zuM,
+    taC: met.taC,
+    ztM: met.ztM,
+    tsC: met.tsC,
+    pPa: Number.isFinite(met.pPa) ? met.pPa : 101325,
+    dewC: Number.isFinite(met.dewC) ? met.dewC : null,
+    bliM: Number.isFinite(bliM) ? bliM : 600
+  });
+  const stability =
+    !Number.isFinite(mo.L) || Math.abs(mo.L) > 1e4
+      ? 'neutral'
+      : mo.L < 0
+        ? 'unstable'
+        : 'stable';
+  return {
+    uMeasMs: met.uMs,
+    zuM: met.zuM,
+    uStar: mo.uStar,
+    z0M: mo.z0,
+    gustMs: mo.gust,
+    L: mo.L,
+    stability,
+    u10Ms: mo.uAt(10),
+    // COARE's u10N = usr / von / gf x ln(10/zo): the gust factor
+    // gf = sqrt(U^2 + gust^2) / U takes the convective gustiness
+    // back OUT, so a calm pier under a warm sea reports a calm
+    // neutral wind, not the gust velocity's
+    u10nMs:
+      met.uMs > 1e-6
+        ? ((mo.uStar / KAPPA) * Math.log(10 / mo.z0)) /
+          (Math.sqrt(met.uMs * met.uMs + mo.gust * mo.gust) / met.uMs)
+        : 0
   };
 }
 

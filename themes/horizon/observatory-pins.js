@@ -11,7 +11,7 @@
  */
 
 export const DAY_PINS = {
-  generatedFor: '2026-09-05T10:23Z',
+  generatedFor: '2026-09-05T10:47Z',
   column: {
     invDT: [0, 0.05],
     invHM: 134,
@@ -38,18 +38,18 @@ export const DAY_PINS = {
     maxPure: [0.8699279700373292, 0.02]
   },
   meteors: {
-    zhrNow: [0.002648012311783547, 0.5],
-    daysToPeak: [-23.21864956633334, 0.1],
+    zhrNow: [0.002628451694533943, 0.5],
+    daysToPeak: [-23.23498400916661, 0.1],
     topCode: 'NUE',
     topShare: [0.029532030895047707, 0.03]
   },
   aurora: {
-    rows: 125,
-    latestGwN: 23,
-    latestAt: '2026-09-05T10:20Z',
-    ovP: [0.14, 0.02],
+    rows: 130,
+    latestGwN: 21,
+    latestAt: '2026-09-05T10:45Z',
+    ovP: [0.12, 0.02],
     ovLatDeg: 60,
-    kpEst: [1.67, 0.01]
+    kpEst: [1.33, 0.01]
   },
   contrail: {
     l250TC: [-42, 0.5],
@@ -59,8 +59,8 @@ export const DAY_PINS = {
     formHiM: 16491,
     issr: [[10145, [1.1244703499944904, 0.01]]],
     persistNull: true,
-    acN: 0,
-    acMaxAltM: [0, 0.5],
+    acN: 3,
+    acMaxAltM: [11277.6, 0.5],
     acInForm: 0,
     acInPersist: 0
   },
@@ -73,26 +73,26 @@ export const DAY_PINS = {
   },
   tide: {
     amps: {
-      M2: [0.5279349817018464, 0.01],
-      S2: [0.2658350444379495, 0.01],
-      N2: [0.11726149734818565, 0.01],
-      K1: [0.3423759569594035, 0.01],
-      O1: [0.2564331877814236, 0.01],
-      M4: [0.0028093730798563017, 0.01]
+      M2: [0.5261825031791585, 0.01],
+      S2: [0.26562331769174474, 0.01],
+      N2: [0.11850041888444053, 0.01],
+      K1: [0.3414087531391408, 0.01],
+      O1: [0.25537267194114227, 0.01],
+      M4: [0.004247089845385242, 0.01]
     },
-    rmsOutM: [0.09229572057232974, 0.01],
-    latestResidM: [-0.02248771749050904, 0.02],
-    maxAbsOutM: [0.23885169856888827, 0.02],
-    rM2: [0.9740497817377239, 0.01],
-    rO1: [1.1982859242122599, 0.02]
+    rmsOutM: [0.09168187296915266, 0.01],
+    latestResidM: [-0.034313741892420035, 0.02],
+    maxAbsOutM: [0.22291897546423123, 0.02],
+    rM2: [0.9708164265298126, 0.01],
+    rO1: [1.193330242715618, 0.02]
   },
   sats: {
     passes: 82,
     nakedEye: 51,
     darkHours: [10.383333333333333, 0.15],
     bestNorad: 25544,
-    bestMag: [-4.2978419278019615, 0.1],
-    bestElDeg: [69.39931752023709, 1],
+    bestMag: [-4.2978406804711495, 0.1],
+    bestElDeg: [69.39935386041245, 1],
     rbTop8: 5,
     issTonight: true
   },
@@ -106,11 +106,11 @@ export const DAY_PINS = {
     probedTopM: [449.1650390625, 3]
   },
   flash: {
-    rateArcsecS: [12.500787466214405, 0.05],
+    rateArcsecS: [12.500786639515695, 0.05],
     beachType: 'textbook',
-    beachS: [0.9101090725232809, 0.15],
+    beachS: [0.9101091327103729, 0.15],
     aloftType: 'inferior-mirage',
-    aloftS: [1.232682452052429, 0.2],
+    aloftS: [1.2326825335718583, 0.2],
     aloftWidth: [20.147601992475504, 12],
     aloftMagX: [1.498992167203663, 0.6],
     aloftAppArcmin: [-30.37515545299185, 1],
@@ -118,19 +118,23 @@ export const DAY_PINS = {
   },
   marine: {
     stability: 'unstable',
-    dTairSeaK: [-1.2000000000000028, 0.05],
-    filmLapseKm: [-21.041731702836177, 3],
-    filmDropK: [0.19989645117694366, 0.05],
+    dTairSeaK: [-1.3000000000000007, 0.05],
+    filmLapseKm: [-22.368668635706218, 3],
+    filmDropK: [0.21250235203920909, 0.05],
     pierTopM: 100,
     joinM: 716,
     modelBand: [100, 716],
     clamped: true,
-    skinK: [0.356761427293956, 0.02],
-    dTairSkinK: [-0.8432385727060456, 0.05],
-    lwDnWm2: [342.89114858682336, 3],
-    q0Wm2: [98.1170544199398, 3],
+    skinK: [0.35953576360096684, 0.02],
+    dTairSkinK: [-0.9404642363990341, 0.05],
+    lwDnWm2: [342.42257409531027, 3],
+    q0Wm2: [100.66174817431967, 3],
     dewSource: 'METAR KSAN (16 km)',
-    lwSource: "modelled sky: Brunt on the pier's air + 0% cover from METAR KSAN"
+    lwSource:
+      "modelled sky: Brunt on the pier's air + 0% cover from METAR KSAN",
+    uMeasMs: 1.2,
+    u10nMs: [1.3079977566073155, 0.05],
+    u10Ms: [1.2395776497106308, 0.05]
   },
   lehnSea: {
     eyeM: 2,

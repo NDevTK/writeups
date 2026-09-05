@@ -91,7 +91,19 @@ export function firstSpecRow(text, hasSep) {
 // (rows interleave 10-min met and hourly wave records, so the
 // newest row often has WVHT = MM). Fields per the file's own
 // header: WVHT 8, DPD 9, APD 10, MWD 11, WTMP 14.
-const TXT_FIELDS = {wvht: 8, dpd: 9, apd: 10, mwd: 11, wtmp: 14};
+// realtime2 .txt columns: YY MM DD hh mm WDIR WSPD GST WVHT DPD APD
+// MWD PRES ATMP WTMP DEWP VIS PTDY TIDE (the wind - 138th pass -
+// is the buoy's anemometer wind in m/s, height per station)
+const TXT_FIELDS = {
+  wdir: 5,
+  wspd: 6,
+  gst: 7,
+  wvht: 8,
+  dpd: 9,
+  apd: 10,
+  mwd: 11,
+  wtmp: 14
+};
 export function firstTxtValue(text, field) {
   const idx = TXT_FIELDS[field];
   if (idx === undefined) return null;

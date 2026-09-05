@@ -736,7 +736,11 @@ async function emitPins(fixturePath) {
           lwDnWm2: mar.lwDnWm2 === null ? null : [mar.lwDnWm2, 3],
           q0Wm2: mar.q0Wm2 === null ? null : [mar.q0Wm2, 3],
           dewSource: mar.dewSource,
-          lwSource: mar.lwSource
+          lwSource: mar.lwSource,
+          // the pier's wind on the sea's footing (138th)
+          uMeasMs: mar.uMeasMs,
+          u10nMs: [mar.u10nMs, 0.05],
+          u10Ms: [mar.u10Ms, 0.05]
         }
       : null,
     lehnSea: lehSea
@@ -796,7 +800,7 @@ THE DAY (${F.FIXTURE_AT}, ${F.SOUNDING.wmo} ${F.SOUNDING.at})
  tide     ${tid.amps.map((a) => `${a.n} ${f3(a.ampM)}`).join('; ')}; rmsOut ${f3(tid.rmsOutM)}; latest resid ${f3(tid.latestResidM)}; vs published M2 x${f3(tid.amps[0].ratio)} O1 x${f3(tid.amps.find((a) => a.n === 'O1')?.ratio)}
  sats     ${sat.passes.length} passes / ${sat.nakedEye} naked-eye over ${f3(sat.darkHours)} dark h; best ${best?.name?.trim()} mag ${f3(best?.minMag)} at ${f3(best?.peakElDeg)} deg
  closure  global ${f3(clo.ratios?.globalRatio)}; beam ${f3(clo.ratios?.beamRatio)}; diffuse ${f3(clo.ratios?.diffuseRatio)}
- marine   ${mar ? `${mar.stability}; air-sea ${f3(mar.dTairSeaK)} K (skin ${f3(mar.skinK)} K -> ${f3(mar.dTairSkinK)}); film ${f3(mar.filmLapseKm)} K/km; model band ${mar.modelBand?.map((z) => z.toFixed(0)).join('-')}; sky ${f3(mar.lwDnWm2)} W/m2 (${mar.lwSource}); dew ${mar.dewSource}` : 'no pier met in this fixture'}
+ marine   ${mar ? `${mar.stability}; air-sea ${f3(mar.dTairSeaK)} K (skin ${f3(mar.skinK)} K -> ${f3(mar.dTairSkinK)}); film ${f3(mar.filmLapseKm)} K/km; model band ${mar.modelBand?.map((z) => z.toFixed(0)).join('-')}; sky ${f3(mar.lwDnWm2)} W/m2 (${mar.lwSource}); dew ${mar.dewSource}; wind ${f3(mar.uMeasMs)} m/s at ${f3(mar.zuM)} m -> U10N ${f3(mar.u10nMs)} (actual 10 m ${f3(mar.u10Ms)})` : 'no pier met in this fixture'}
  lehnSea  ${lehSea ? (lehSea.retrieved ? `${lehSea.mode}/${lehSea.retrieved.method} eye ${lehSea.eyeM} m at ${lehSea.distM / 1000} km ${lehSea.retrieved.closes ? 'CLOSES' : 'does not close'} rms ${f3(lehSea.retrieved.rmsK)} K` : `declines from ${lehSea.eyeM} m`) : 'no sea column'}
 
 Fixture and pins are regenerated TOGETHER. Read the git diff of

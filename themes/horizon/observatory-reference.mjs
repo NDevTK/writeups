@@ -1068,11 +1068,22 @@ if (COOPS_MET && DAY_PINS.marine) {
             ['dew source', mar.dewSource, P.dewSource],
             ['sky source', mar.lwSource, P.lwSource]
           ]
+        : []),
+      // the pier's wind on the sea's footing (138th pass)
+      ...(P.u10nMs !== undefined
+        ? [
+            ['wind measured m/s', mar.uMeasMs, P.uMeasMs],
+            ['U10N m/s', mar.u10nMs, P.u10nMs],
+            ['u(10 m) m/s', mar.u10Ms, P.u10Ms]
+          ]
         : [])
     ],
     `${COOPS_MET.name}: air-sea ${mar.dTairSeaK >= 0 ? '+' : ''}${mar.dTairSeaK.toFixed(1)} K, ${mar.stability}, film ${mar.filmLapseKm.toFixed(0)} K/km in the lowest 10 m - ${mar.klass}; the mixed layer modelled over ${mar.modelBand ? mar.modelBand.map((z) => z.toFixed(0)).join('-') + ' m' : 'no band'}` +
       (P.skinK !== undefined
         ? `; skin ${mar.skinK.toFixed(2)} K cooler than the bulk (${mar.lwSource}; sky ${mar.lwDnWm2?.toFixed(0)} W/m2, loss ${mar.q0Wm2?.toFixed(0)} W/m2), humidity from ${mar.dewSource}`
+        : '') +
+      (P.u10nMs !== undefined
+        ? `; the pier's ${mar.uMeasMs.toFixed(1)} m/s at ${mar.zuM.toFixed(1)} m is ${mar.u10nMs.toFixed(2)} m/s on the 10-m neutral footing (actual 10-m wind ${mar.u10Ms.toFixed(2)})`
         : '')
   );
   // The sea column's own retrieval - the line the page prints for

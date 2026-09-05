@@ -10072,6 +10072,97 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   fit made over land with its own RMSE, okta midpoints where the
   fit used a fisheye camera. Fairall 1996 itself stays walled;
   its framework is reprinted in the 2026 paper.
+- DONE (Sep 5, the review session's 137th pass - THE SHIP-FLUX
+  ARCHIVE GATES THE PIER: NOAA PSL's 31,914 measured hours): the
+  136th's two modelled quantities - the COARE skin and the
+  Brunt sky - meet the largest open archive of measured air-sea
+  fluxes there is. NOAA PSL's hourly ship flux database (COAPS
+  ERDDAP, NOAA_PSL_Hourly_Ship_Flux; the archive Fairall et al.
+  2026 describe in their Section 2.1) carries 31,914 one-hour
+  observations from 44 research cruises, 1991-2021: pyrgeometer
+  and pyranometer fluxes, sea-snake and air temperatures,
+  humidity, wind, the bulk fluxes, and the COARE cool skin PSL
+  computed from them. shipflux-freeze.mjs samples it
+  systematically into shipflux-fixture.js (three subsets, fixed
+  strides, the query URLs and counts stamped; generated data,
+  prettier-ignored) and coolskin-reference holds four new
+  landmarks: (1) fed the archive's own friction velocity,
+  fluxes and measured longwave, the port returns PSL's COARE
+  skin over 507 night, rain-free, warm-layer-free hours with
+  bias -0.00002 K and RMSE 0.00006 K (r = 1.00000) - the
+  136th's five-case oracle became five hundred measured hours -
+  and the archive's skin falls with wind from 0.30 K (0-2 m/s)
+  to 0.11 K (12-14 m/s), the shape of the paper's Fig. 14;
+  (2) on 323 daytime hours whose MEASURED solar reached 0.95 of
+  the clear-sky solar (a clear sky by the sun's own test), the
+  land-fitted Brunt (0.599 + 0.053 sqrt e) reads the sea's
+  pyrgeometers with bias -2.0 W/m^2 and RMSE 10.6 - BETTER than
+  its own land RMSE of 13.8 - the ocean's least squares landing
+  at 0.592 + 0.0553 sqrt e, and the emissivity binned by vapour
+  pressure sitting within 0.008 of the printed curve from 10 to
+  35 hPa (SURFRAD's pair +5.9/12.0, the 36-site pair -9.9/14.6);
+  (3) on 616 night hours of any sky the sea's mean effective
+  emissivity is 0.911 and the clear formula alone under-reads
+  by 27 W/m^2 - the cloud term is what the pier's METAR cover
+  supplies and the ships never logged; (4) the numbers the page
+  quotes are pinned as constants (LW_OCEAN_CLEAR, LW_OCEAN_ALLSKY)
+  and held to the frozen sample. lwDown now carries the
+  ocean-validated clear-sky RMSE (10.6) where the 136th quoted
+  the land's, the ACP all-sky RMSE staying for covered skies.
+  What the archive says about the pier's question: of its 8,591
+  night hours with the water warmer than the air at the bulk
+  sensor, the skin flips the sign of the contrast in 308 (3.6%)
+  - the median skin (0.21 K) is a fifth of the median contrast
+    (0.99 K) - so the 136th's correction changes the film's class
+    on a few nights in a hundred and its strength on all of them
+    (measured at freeze time on the full night subset). STATED
+    LIMITS: the sample is night skin / clear day / any-sky night,
+    not the whole archive (strides 8/16/2; the full-archive
+    statistics at freeze time - 4052 skin hours, RMSE 0.00005 K;
+    645 clear hours, bias -2.1, RMSE 10.8 - agree); the ships log
+    no cloud fraction, so the all-sky correction stays gated on
+    the ACP paper's printed coefficients; PSL's clear-sky longwave
+    column (their own estimate, bias -10 W/m^2 on the same hours)
+    is not used.
+- DONE (Sep 5, the review session's 138th pass - THE PIER'S WIND
+  SETS THE SEA'S GLITTER AND FOAM): the drawn sea's wind - the
+  whitecap law (Monahan 1980), the Cox-Munk slope variance behind
+  the glitter, the wind sea's U10 and the FFT's rebuild gate - had
+  been Open-Meteo's model 10-m wind at the theme point, a land
+  model's wind. Measured beats modelled: the nearest fresh
+  anemometer OVER WATER now rules the sea. The CO-OPS pier's wind
+  (6-minute, at its own 17.5-m sensor height, in air of its own
+  stability) is brought to the footing those laws were fitted on
+  - COARE's 10-m NEUTRAL wind U10N = (u* / kappa) ln(10/z0) - by
+    the similarity profile the 135th already solves for the pier
+    (observatory.pierWindPanel: u* from the bulk iteration with
+    gustiness, z0 from COARE's roughness); state.windSea carries it
+    with its provenance, seaWindMs() serves every sea consumer, and
+    the land's wind (terrain, turbines, wakes) stays the model's or
+    METAR's. surfacelayer-reference gains the landmark: u* =
+    sqrt(Cd10n) U10N exactly, the actual 10-m wind under U10N in
+    unstable air and over it in stable air, equal at dry
+    neutrality; and the finding that U10N can EXCEED the measured
+    17.5-m wind in unstable, gusty air (3.26 m/s from a measured
+    3.0 with water 3 K warmer - momentum crosses a convective layer
+    more easily) while sitting far under it in stable air (1.68
+    from 3.0 with air 4 K warmer) - a band, not an ordering. DAY
+    PINS marine gains the measured wind, U10N and the actual 10-m
+    wind; the buoy path is prepared for the day the daemon serves
+    the NDBC anemometer (buoy.js TXT_FIELDS wdir/wspd/gst, the
+    /buoy record's wspd/wdir; the page assumes NDBC's standard 5-m
+    mast and says so; a redeploy of the daemon is the user's).
+    The neutral wind is COARE's own u10N = usr / von / gf x
+    ln(10/zo): the gust factor gf takes the convective gustiness
+    back OUT, so a calm pier under a warm sea reports a calm
+    neutral wind rather than the gust velocity's (a first wiring
+    printed 0.5 m/s for a measured 0.0 - caught on the page).
+    Tonight: the pier's 1.2 m/s at 17.5 m is 1.31 m/s on the
+    neutral footing (unstable, u* 0.046) - the foam and glitter of
+    a near-calm sea, measured. STATED LIMITS: the wind's DIRECTION
+    for the sea stays the model's (the buoy spectrum's directions
+    rule the waves when present); the buoy fallback is dormant
+    until the daemon redeploys.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

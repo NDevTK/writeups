@@ -352,6 +352,35 @@ side was fitted to the other.
   the contrast −1.1 K becoming −0.7 K at the interface.
   (`coolskin-reference`; `observatory-reference` DAY PINS marine:
   skin, sky, loss, provenance)
+- **The ship-flux archive gates the pier** (pass 137): NOAA PSL's
+  hourly ship-flux database (31,914 measured hours on 44 research
+  cruises, 1991–2021, served by the COAPS ERDDAP; the archive Fairall
+  et al. 2026 describe) is sampled systematically into a fixture and
+  put to the 136th's two modelled quantities. Fed the archive's own
+  friction velocity, fluxes and measured longwave, the skin port
+  returns PSL's COARE skin over 507 night hours to 6·10⁻⁵ K RMS — the
+  five-case oracle became five hundred measured hours — and the
+  archive's skin falls with wind from 0.30 K to 0.11 K. On 323
+  daytime hours whose measured solar certified a clear sky, the
+  land-fitted Brunt emissivity reads the sea's pyrgeometers with bias
+  −2 W/m² and RMSE 10.6, better than its own land RMSE, the
+  vapour-pressure-binned emissivity within 0.008 of the printed curve;
+  on 616 nights of unlogged cover the clear formula under-reads by
+  27 W/m² — the cloud term the pier's METAR supplies. The page now
+  quotes the ocean-validated clear-sky uncertainty. (`shipflux-freeze`,
+  `shipflux-fixture`; `coolskin-reference` ship-flux landmarks)
+- **The pier's wind sets the sea's glitter and foam** (pass 138): the
+  drawn sea's wind — Monahan's whitecaps, the Cox–Munk slopes behind
+  the glitter, the wind sea — had been a land model's 10-m wind. The
+  nearest measured wind over water now rules: the pier's anemometer,
+  brought to the 10-m neutral footing those laws were fitted on
+  through the similarity profile the pier already solves (COARE's
+  U10N = u*/κ · ln(10/z₀)). The gate holds u* = √C_D10N · U10N
+  exactly and the ordering of the actual 10-m wind against U10N by
+  stability — and records that in unstable, gusty air U10N can exceed
+  the measured wind aloft (3.3 m/s from a measured 3.0 with water 3 K
+  warmer) while sitting far under it in stable air. (`surfacelayer-
+reference`; `observatory-reference` DAY PINS marine: wind)
 
 ---
 
@@ -443,8 +472,10 @@ between it and the next tier.
   INTERFACE (COARE 3.6's cool skin on the pier's bulk sensor, no
   warm layer, no rain term) under a sky longwave that is MODELLED
   from the pier's air and the shore's dewpoint and cover (a
-  screen-level emissivity fit made over land, quoted with its
-  printed RMSE), and the pier's humidity is the nearest coastal
+  screen-level emissivity fit made over land, held over the clear
+  ocean by 323 measured ship hours to −2 ± 11 W/m² since pass 137;
+  the cover term still on the land fit's printed coefficients), and
+  the pier's humidity is the nearest coastal
   METAR's dewpoint, the ascent's surface row standing in only when
   no shore screen is fresh.
 

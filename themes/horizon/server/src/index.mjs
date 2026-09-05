@@ -2203,6 +2203,10 @@ function main() {
           const dpd = txt ? firstTxtValue(txt, 'dpd') : null;
           const mwd = txt ? firstTxtValue(txt, 'mwd') : null;
           const wt = txt ? firstTxtValue(txt, 'wtmp') : null;
+          // the buoy's own wind (138th pass): the sea's nearest
+          // over-water anemometer when no pier is in reach
+          const ws = txt ? firstTxtValue(txt, 'wspd') : null;
+          const wd = txt ? firstTxtValue(txt, 'wdir') : null;
           body = {
             id: cand.s.id,
             name: cand.s.name,
@@ -2220,7 +2224,9 @@ function main() {
             wvht: wv ? wv.val : null,
             dpd: dpd ? dpd.val : null,
             mwd: mwd ? mwd.val : null,
-            wtmp: wt ? wt.val : null
+            wtmp: wt ? wt.val : null,
+            wspd: ws ? ws.val : null,
+            wdir: wd ? wd.val : null
           };
           break;
         }
