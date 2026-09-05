@@ -448,6 +448,7 @@
       } from './horizon/radar.js';
       import {
         decodeMosaic,
+        domainTimes,
         gibsDomainsUrl,
         gibsTileUrl,
         goesPanel,
@@ -456,9 +457,17 @@
         pickSatellite,
         sstAnomalyField,
         sstNearest,
+        tileIsBlank,
         VIEW_ZENITH_MAX_DEG,
         windowTiles
       } from './horizon/goesir.js';
+      import {
+        ACM_MEANINGS,
+        fixedGridGeometry,
+        maskAgreement,
+        unpackArray,
+        windowIndexOf
+      } from './horizon/goesl2.js';
       import {
         azAltFromDir,
         catalogueIndexNear,
@@ -2414,11 +2423,15 @@
           const latest = latestTimeFromDomains(dom);
           if (!latest) throw new Error('no GIBS time domain');
           // the domain runs a step or two ahead of the tile cache,
-          // and a fresh stamp's tiles arrive one by one (measured:
-          // a 17:00Z end with one of four tiles served at 17:19Z,
-          // the default tile serving 16:50Z) - step back ten
-          // minutes at a time until the WHOLE mosaic answers, at
-          // most an hour
+          // a fresh stamp's tiles arrive one by one (measured: a
+          // 17:00Z end with one of four tiles served at 17:19Z, the
+          // default tile serving 16:50Z), a listed stamp can answer
+          // 200 with a blank white placeholder (measured 2026-09-05
+          // 20:15Z, every 19:50Z tile - tileIsBlank, gated), and the
+          // domain has gaps (09:00-17:50 then 19:50-20:00 that
+          // afternoon) - so walk the domain's OWN stamps, newest
+          // first, until the WHOLE mosaic answers with real tiles,
+          // at most three hours back
           const tileAt = async (t, tm) => {
             const r = await fetch(
               gibsTileUrl(t.row, t.col, tm, pick.sat.layer),
@@ -2426,33 +2439,42 @@
                 credentials: 'omit'
               }
             );
-            return r.ok ? r : null;
+            if (!r.ok) return null;
+            const bmp = await createImageBitmap(await r.blob());
+            const cv = document.createElement('canvas');
+            cv.width = cv.height = 256;
+            const cx = cv.getContext('2d', {willReadFrequently: true});
+            cx.drawImage(bmp, 0, 0);
+            const rgba = cx.getImageData(0, 0, 256, 256).data;
+            return tileIsBlank(rgba) ? null : {...t, time: tm, rgba};
           };
           let time = null;
           let tiles = null;
-          for (let step = 0; step < 7 && !tiles; step++) {
-            const tm = iso(Date.parse(latest) - step * 600e3);
+          const stamps = domainTimes(dom, 24).filter(
+            (tm) => Date.parse(latest) - Date.parse(tm) <= 3 * 3600e3
+          );
+          for (const tm of stamps) {
             const got = await Promise.all(win.tiles.map((t) => tileAt(t, tm)));
-            if (!got.every((r) => r)) continue;
+            if (!got.every((t) => t)) {
+              if (params.has('debug'))
+                console.warn(
+                  'goes: ' +
+                    tm +
+                    ' incomplete (' +
+                    got.filter((t) => t).length +
+                    ' of ' +
+                    got.length +
+                    ' real tiles)'
+                );
+              continue;
+            }
             time = tm;
-            tiles = await Promise.all(
-              got.map(async (r, i) => {
-                const bmp = await createImageBitmap(await r.blob());
-                const cv = document.createElement('canvas');
-                cv.width = cv.height = 256;
-                const cx = cv.getContext('2d', {willReadFrequently: true});
-                cx.drawImage(bmp, 0, 0);
-                return {
-                  ...win.tiles[i],
-                  time,
-                  rgba: cx.getImageData(0, 0, 256, 256).data
-                };
-              })
-            );
+            tiles = got;
+            break;
           }
           if (!tiles)
             throw new Error(
-              'GIBS: no complete mosaic within an hour of ' + latest
+              'GIBS: no complete mosaic within three hours of ' + latest
             );
           if (params.has('debug'))
             console.warn('goes: ' + tiles.length + ' tiles at ' + time);
@@ -2558,6 +2580,10 @@
             win,
             i0,
             j0,
+            // every window pixel's place, for the comparison with
+            // NOAA's own mask at the same places (148th pass)
+            pxLat,
+            pxLon,
             lookAz: P.sectors.cloudiest ? P.sectors.cloudiest.azDeg : null,
             deck: P.deck,
             worldUnits,
@@ -2627,6 +2653,9 @@
           if (cloudSys)
             cloudSys.setGoesCover(P.deck.data, P.deck.rm, worldUnits);
           if (goesOverlayOn) buildGoesOverlay();
+          // NOAA's mask of this mosaic's minute, for the comparison
+          // (148th pass; the daemon caches the window)
+          syncGoesL2();
           record(
             pick.sat.name + ' band 13 (GIBS ' + time.slice(11, 16) + 'Z)',
             `sea within 100 km ${pct(s.waterLow + s.waterMid + s.waterHigh, s.waterMeasured)}% cloud ` +
@@ -6201,6 +6230,230 @@
         } catch (e) {
           if (params.has('debug')) console.warn('sst: ' + e.message);
         }
+      }
+      // NOAA's own operational cloud products (148th pass): the
+      // clear-sky mask (ABI-L2-ACMC, 2-km pixels) and the cloud top
+      // height (ABI-L2-ACHAC, 10-km) cut to +-100 km around the
+      // observer by the daemon's /goesl2 (the open S3 buckets, read
+      // by the gated hdf5.js and navigated by goesl2.js's PUG
+      // equations). The theme's own field is compared with NOAA's at
+      // the same sea pixels (maskAgreement, gated) and the agreement
+      // is stated; the decks keep the theme's field. Every 5 min, the
+      // products' cadence; ?goesl2src=URL overrides; ?goes=0
+      // disables with the field.
+      const GOESL2_PROXY =
+        params.get('goesl2src') ?? 'https://api.ndev.tk/goesl2';
+      let goesL2 = null;
+      let goesL2Reach = null;
+      let goesL2Memo = null; // {obsAt, l2At, agreement}
+      let goesL2Busy = false;
+      let goesL2Rerun = false;
+      const unpackProduct = (p) =>
+        p
+          ? {
+              ...p,
+              g: fixedGridGeometry(p.proj),
+              bcm: p.bcm ? unpackArray(p.bcm) : null,
+              acm: p.acm ? unpackArray(p.acm) : null,
+              dqf: p.dqf ? unpackArray(p.dqf) : null,
+              prob: p.prob ? unpackArray(p.prob) : null,
+              ht: p.ht ? unpackArray(p.ht) : null
+            }
+          : null;
+      async function syncGoesL2() {
+        if (overridden || params.get('goes') === '0') return;
+        if (goesL2Busy) {
+          goesL2Rerun = true;
+          return;
+        }
+        goesL2Busy = true;
+        try {
+          const ask = async (t) => {
+            const r = await fetch(
+              GOESL2_PROXY +
+                '?lat=' +
+                state.lat.toFixed(3) +
+                '&lon=' +
+                state.lon.toFixed(3) +
+                (t ? '&t=' + encodeURIComponent(t) : ''),
+              {credentials: 'omit'}
+            );
+            if (!r.ok) throw new Error('goesl2 ' + r.status);
+            return r.json();
+          };
+          const j = await ask(null);
+          if (!j || !j.sat) {
+            goesL2 = null;
+            goesL2Reach = j && j.reason ? j.reason : null;
+            return;
+          }
+          goesL2 = {
+            at: Date.now(),
+            sat: j.sat,
+            name: j.name,
+            craft: j.craft,
+            bucket: j.bucket,
+            viewZenithDeg: j.viewZenithDeg,
+            mask: unpackProduct(j.mask),
+            height: unpackProduct(j.height),
+            // the files of the theme's mosaic's own minute, for the
+            // comparison (GIBS's tiles lag the bucket - measured 2 h
+            // 12 min on 2026-09-05 at 20:05Z - so the newest mask is
+            // not the mosaic's sky)
+            maskAt: null,
+            heightAt: null
+          };
+          goesL2Reach = null;
+          const m = goesL2.mask;
+          const h = goesL2.height;
+          if (m)
+            record(
+              `NOAA ${j.craft} clear-sky mask (ACMC ${m.time.slice(11, 16)}Z)`,
+              `${m.census.cloudy} of ${m.census.good} good 2-km px within ±100 km cloudy ` +
+                `(${Math.round(100 * (m.census.cloudFrac ?? 0))}%)`
+            );
+          if (h && h.census.n)
+            record(
+              `NOAA ${j.craft} cloud top height (ACHAC ${h.time.slice(11, 16)}Z)`,
+              `median ${(h.census.medianM / 1000).toFixed(1)} km over ${h.census.n} retrieved 10-km px`
+            );
+          if (
+            goesObs &&
+            goesObs.time &&
+            m &&
+            Math.abs(Date.parse(goesObs.time) - Date.parse(m.time)) > 5 * 60e3
+          ) {
+            try {
+              const j2 = await ask(goesObs.time);
+              if (j2 && j2.sat && j2.mask) {
+                goesL2.maskAt = unpackProduct(j2.mask);
+                goesL2.heightAt = unpackProduct(j2.height);
+                goesL2.at = Date.now();
+              }
+            } catch (e) {
+              if (params.has('debug')) console.warn('goesl2 at: ' + e.message);
+            }
+          }
+        } catch (e) {
+          if (params.has('debug')) console.warn('goesl2: ' + e.message);
+        } finally {
+          goesL2Busy = false;
+          if (goesL2Rerun) {
+            goesL2Rerun = false;
+            syncGoesL2();
+          }
+        }
+      }
+      // The theme's window pixels as NOAA's mask sees them: the sea
+      // pixels the theme classified (clear or cloud; unmeasured and
+      // no-data left out, land left out - the theme's land field
+      // detects mid and high cloud only, so it is not a full mask).
+      function goesL2Agreement() {
+        if (!goesObs || !goesObs.panel || !goesL2 || !goesL2.mask) return null;
+        if (
+          goesL2Memo &&
+          goesL2Memo.obsAt === goesObs.at &&
+          goesL2Memo.l2At === goesL2.at
+        )
+          return goesL2Memo.agreement;
+        const F = goesObs.panel.field;
+        const px = [];
+        for (let q = 0; q < F.cls.length; q++) {
+          if (!F.water[q]) continue;
+          const c = F.cls[q];
+          if (c < 2) continue;
+          px.push({
+            latDeg: goesObs.pxLat[q],
+            lonDeg: goesObs.pxLon[q],
+            cloud: c >= 3
+          });
+        }
+        // the mask of the mosaic's own minute when the daemon had
+        // one, else the newest (the line says which)
+        const m = goesL2.maskAt ?? goesL2.mask;
+        const agreement = maskAgreement(px, {
+          g: m.g,
+          xCoord: m.x,
+          yCoord: m.y,
+          box: m.box,
+          bcm: m.bcm,
+          dqf: m.dqf
+        });
+        agreement.themeN = px.length;
+        agreement.maskTime = m.time;
+        agreement.timed = !!goesL2.maskAt;
+        goesL2Memo = {obsAt: goesObs.at, l2At: goesL2.at, agreement};
+        return agreement;
+      }
+      // NOAA's mask at a place: {acm, prob} or null where the window
+      // does not reach or the pixel's quality flag is not good.
+      function goesL2At(latDeg, lonDeg) {
+        const m = goesL2 && goesL2.mask;
+        if (!m) return null;
+        const q = windowIndexOf(latDeg, lonDeg, m.g, m.x, m.y, m.box);
+        if (q < 0 || m.dqf[q] !== 0 || m.acm[q] > 3) return null;
+        return {acm: m.acm[q], prob: m.prob[q] <= 100 ? m.prob[q] : null};
+      }
+      function goesL2Line() {
+        if (!goesL2) return goesL2Reach ? 'NOAA L2: ' + goesL2Reach : null;
+        const m = goesL2.mask;
+        const h = goesL2.height;
+        const pct = (x) => Math.round(100 * x) + '%';
+        const km = (v) => (v / 1000).toFixed(1) + ' km';
+        let line = `${goesL2.name} (${goesL2.craft}, ${goesL2.viewZenithDeg.toFixed(1)}° zenith)`;
+        if (m) {
+          const c = m.census;
+          line +=
+            ` · clear-sky mask ${m.time.slice(11, 16)}Z (ABI-L2-ACMC, ${m.scene}, ` +
+            `${(m.pixel.ewM / 1000).toFixed(1)} × ${(m.pixel.nsM / 1000).toFixed(1)} km px here): ` +
+            `${pct(c.cloudFrac ?? 0)} of ${c.good} good px within ±100 km cloudy ` +
+            `(ACM clear ${c.acm[0]} · probably clear ${c.acm[1]} · probably cloudy ${c.acm[2]} · ` +
+            `cloudy ${c.acm[3]})`;
+          const at = goesL2At(state.lat, state.lon);
+          if (at)
+            line +=
+              ` · overhead ${ACM_MEANINGS[at.acm].replace(/_/g, ' ')}` +
+              (at.prob !== null ? ` (cloud probability ${at.prob}%)` : '');
+          const a = goesL2Agreement();
+          if (a && a.n) {
+            const lagMin = Math.round(
+              (Date.parse(m.time) - Date.parse(goesObs.time)) / 60e3
+            );
+            line +=
+              ` · the theme's field at the same sea pixels (band 13 mosaic ${goesObs.time.slice(11, 16)}Z ` +
+              (a.timed
+                ? `vs the mask of its own minute, ${a.maskTime.slice(11, 16)}Z`
+                : `vs the newest mask ${a.maskTime.slice(11, 16)}Z - no file of the mosaic's minute`) +
+              `): ${pct(a.agreement)} agree over ${a.n} px ` +
+              `(both cloud ${a.bothCloud}, both clear ${a.bothClear}, theme only ${a.themeOnly}, ` +
+              `NOAA only ${a.noaaOnly})` +
+              (Math.abs(lagMin) >= 10
+                ? ` · GIBS's mosaic trails the bucket's newest file by ${Math.abs(lagMin)} min`
+                : '');
+          } else if (goesObs && goesObs.panel)
+            line +=
+              ' · none of the theme’s classified sea pixels fall in NOAA’s window';
+        } else line += ' · clear-sky mask unavailable';
+        if (h && h.census.n) {
+          const c = h.census;
+          line +=
+            ` · cloud top height ${h.time.slice(11, 16)}Z (ABI-L2-ACHAC, 10-km px): median ` +
+            `${km(c.medianM)} over ${c.n} retrieved px (p10 ${km(c.p10M)}, p90 ${km(c.p90M)})`;
+          const hAt = goesL2.heightAt;
+          if (hAt && hAt.census.n && hAt.time !== h.time)
+            line +=
+              `; at the mosaic's minute (${hAt.time.slice(11, 16)}Z) median ${km(hAt.census.medianM)} ` +
+              `over ${hAt.census.n} px`;
+          const s = goesObs && goesObs.panel ? goesObs.panel.r100 : null;
+          if (s) {
+            const own = ['low', 'mid', 'high']
+              .filter((k) => s.topMedianM[k] !== null)
+              .map((k) => `${k} ~${km(s.topMedianM[k])}`);
+            if (own.length)
+              line += ` vs the theme's opaque tops ${own.join(', ')} (ACHA retrieves the emitting top; a thin cirrus reads lower as an opaque top)`;
+          }
+        } else if (h) line += ' · no cloud top retrieved within ±100 km';
+        return line;
       }
       function applyRrs(rrs, note) {
         const rgb = seaColorLinear(rrs);
@@ -11749,6 +12002,14 @@
           else if (goesReach)
             research['cloud field (geostationary band 13 · GIBS)'] = goesReach;
           else delete research['cloud field (geostationary band 13 · GIBS)'];
+          // NOAA's own products beside the theme's field (148th
+          // pass): the mask's census, the agreement at the same sea
+          // pixels, the retrieved tops against the theme's
+          {
+            const l2 = goesL2Line();
+            if (l2) research['NOAA cloud products (ABI L2 ACMC · ACHAC)'] = l2;
+            else delete research['NOAA cloud products (ABI L2 ACMC · ACHAC)'];
+          }
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();
             research['whitecaps (Monahan 1980)'] =
@@ -12290,6 +12551,14 @@
                 PICK_CLASS[P.field.cls[q]] +
                 (P.field.water[q] ? ', sea' : ', land') +
                 ')';
+              // NOAA's mask at the same place (148th pass)
+              const noaa =
+                goesObs.pxLat && goesL2At(goesObs.pxLat[q], goesObs.pxLon[q]);
+              if (noaa)
+                detail +=
+                  ', NOAA ' +
+                  ACM_MEANINGS[noaa.acm].replace(/_/g, ' ') +
+                  (noaa.prob !== null ? ' ' + noaa.prob + '%' : '');
             }
             // a clear low texel under a "low" pixel is the split
             // rule at work: the ceilometer reported no low layer,
@@ -12727,6 +12996,7 @@
         syncChlor();
         syncRrs();
         syncSst();
+        syncGoesL2();
         syncSurface();
         syncPhenology();
         syncBuildings();
@@ -17696,6 +17966,9 @@
         setInterval(syncRrs, 60 * 60 * 1000);
         syncSst();
         setInterval(syncSst, 60 * 60 * 1000);
+        // NOAA's L2 cloud products arrive every 5 min (CONUS)
+        syncGoesL2();
+        setInterval(syncGoesL2, 5 * 60 * 1000);
         // MOD09A1 is an 8-day composite; the same hourly poll (matching
         // the /surface cache) more than covers it.
         syncSurface();

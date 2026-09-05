@@ -10345,6 +10345,171 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 148th pass - NOAA'S OWN CLOUD
+  PRODUCTS READ IN NODE): the theme's cloud field has been a
+  re-implementation of the ATBD's ETROP test on GIBS's colour-mapped
+  tiles since the 143rd; the operator's own answer - the clear-sky
+  mask (ABI-L2-ACMC: BCM, the four-level ACM, Cloud_Probabilities,
+  DQF on the 2-km grid) and the cloud top height (ABI-L2-ACHAC: HT on
+  the 10-km grid) - sits in NetCDF-4 files on the noaa-goes18/19 open
+  buckets that no browser reads and no CORS listing serves. Now the
+  daemon reads them. (1) THE READER (hdf5.js, ~950 lines, pure,
+  zlib supplied by the caller): superblocks 0-3; v1 and v2 object
+  headers; the old symbol-table groups and the new link-info groups
+  through the FRACTAL HEAP and the v2 B-tree name index (the lesson
+  that cost the most: heap IDs carry offsets INTO the managed blocks
+  including the block headers, the offset field is ceil(maxHeapBits/8)
+  bytes wide, and a BTIN node lists its n records first and THEN its
+  n+1 child pointers - the interleaved reading returned garbage
+  names); compact and dense attributes; variable-length strings
+  through the global heap collection; contiguous and v3-chunked
+  layouts through the v1 chunk B-tree; the shuffle, deflate and
+  fletcher32 filters; big-endian types; scalar and array attributes;
+  a layout version 4 or 5 (HDF5 1.10+ chunk indexes) is NAMED unread,
+  never guessed. GATED AGAINST H5PY on the same bytes (hdf5-fixture:
+  the 18:46Z GOES-18 ACHAC file vendored verbatim, 334 kB, with
+  h5py's dump of every dataset's shape, dtype, chunks, filters, fill
+  count, sum, range, sampled pixels and CF attributes, plus two files
+  h5py wrote at its earliest and latest library bounds): THE PRODUCT
+  FILE reads as h5py reads it - 36 variables, 11 datasets checked to
+  the byte, HT 300x500 uint16 in a 262-row chunk plus an edge chunk
+  through shuffle then deflate, its 122906 retrievals' physical mean
+  3752.9 m, the projection's and the root's dense attributes;
+  H5PY'S EARLIEST FILE (symbol table, v1 headers, fletcher32,
+  big-endian, vlen strings); H5PY'S LATEST FILE names "layout
+  version 5". The 4 MB mask file decodes in 2.0 s, the height file in
+  70 ms (measured). (2) THE NAVIGATION (goesl2.js): PUG Volume 5
+  paragraph 4.2.8 read in full - the GRS80 constants, 4.2.8.1 (scan
+  angles to latitude and longitude) and 4.2.8.2 (back, with the
+  visibility inequality) - held to the PUG's own worked example in
+  BOTH directions with every intermediate the PUG prints (a, b, c,
+  rs, sx, sy, sz, phi, lambda; phiC, rC back to the same y, x), the
+  sub-point at rs = the satellite height, a scan angle past the
+  limb, a longitude not visible; the longitude WRAPPED at the
+  antimeridian (GOES-West's CONUS scene begins at 175.9 E - the
+  PUG's lambda0 - atan(...) alone prints -184); the window cut, the
+  pixel's ground size at the slant (11.4 x 13.7 km for the 10-km
+  height pixel over San Diego, 2.3 x 2.8 km for the 2-km mask
+  pixel), the censuses (BCM/ACM/DQF as the files define them),
+  maskAgreement (the theme's pixels looked up in NOAA's window by
+  the inverse navigation - a contingency table over the pixels both
+  measured), heightCensus, the S3 listing helpers (the newest start
+  stamp under the day-of-year/hour prefix), and THE WIRE (typed
+  arrays as base64 - a 101x101 mask is 13.6 kB against 20.4 kB of
+  JSON digits, floats 4 bytes against up to 18 characters; the
+  round trip exact in every length modulo 3, NaN and null as fill,
+  node's own Buffer reading the daemon's base64). PINNED on the
+  frozen file: the home falls in pixel (424, 127), 340 retrieved
+  tops in the 21x21 window, median 3056.6 m. (3) THE ROUTE
+  (/goesl2, the daemon): pickSatellite (moved with the satellite
+  table into satellites.js so the daemon picks without goesir's
+  physics chain; goesir re-exports), the bucket by satellite
+  (Himawari's products are not on AWS in this form - a 200 with
+  sat null and the reason, a real answer; GOES-East's 89-deg zenith
+  at London likewise), this hour's prefix then the last hour's (a
+  listing stands a minute - the cheap part), the newest start stamp
+  OR, with ?t=ISO, the stamp nearest that moment within 15 min
+  (nearestByStart, gated: 18:50Z finds the 18:51:17 file at +77 s,
+  18:44Z the 18:46:17 one, 19:30Z none) - the page asks for the
+  mask of its mosaic's OWN minute, because GIBS's tiles trail the
+  bucket (2 h 12 min measured at 20:05Z: the newest mask against
+  the 17:50Z mosaic agreed on 44% of 4083 sea pixels; THE MASK OF
+  THE MOSAIC'S OWN MINUTE, 17:52Z, AGREES ON 88% of the same 4083 -
+  both cloud 2321, both clear 1288, theme only 330, NOAA only 144,
+  measured 20:20Z: the theme's ETROP test on colour-mapped tiles
+  against NOAA's operational mask, pixel for pixel, for the first
+  time; the 330 theme-only pixels sit where the split rule hands
+  the morning's low pixels to the mid deck near the threshold, the
+  144 NOAA-only where the probably-cloudy edge class falls on the
+  theme's clear side - the next pass's material); download + decode
+  ONLY when that key is not already held, the decode IN A WORKER
+  THREAD (the worker imports the daemon module - main() is guarded
+  by import.meta.url - and posts the typed arrays back; /health
+  answered in 1-3 ms while the 4 MB mask inflated, measured; a
+  worker that cannot start falls back to the main thread, counted);
+  three decoded files per satellite and product (the newest and the
+  mosaics'; typed arrays, tens of MB, RAM only, least recently asked
+  let go, all let go after an hour unasked), one download per file
+  in flight (many windows from one file), a failure holding the
+  product two minutes with the newest decoded file standing in for
+  "latest"; windows keyed by tenth-degree cell AND file keys (a new
+  file keys new windows), +-100 km on both grids (101x101 and
+  21x21), packed with their censuses; ?t= refused past a week (400);
+  warmed for the home; in /probe's health with the held files'
+  times and the worker fallbacks. MEASURED (local daemon, 20:02Z):
+  a cold request for both products answers in 2.7 s (59 kB), the
+  cached window in 2 ms, the next cell in 13 ms, the timed ask for
+  17:50Z in 2.5 s (the 17:51:17 files) and again in 1 ms; the
+  19:56Z mask reads 63% of 10201 good 2-km pixels cloudy within
+  +-100 km of Miramar, ACM clear 3252 / probably clear 496 /
+  probably cloudy 586 / cloudy 5867 (the 17:51Z mask 56%); the ACHA
+  median top 4.2 km over 361 10-km pixels (3.1 km at 17:51Z). GATE
+  (server-reference: NOAA cloud-product windows; the decode
+  worker): the daemon's decode and window cut run on the vendored
+  file and land on goesl2's own pins, the packed heights unpack to
+  the same census, a missing dataset or the mask's datasets on a
+  height decode -> null (502), the URLs and prefixes pinned, the
+  worker's decode equal to the main thread's (150000 heights, the
+  same sum, DQF and projection, 213 ms with the worker's start); the
+  warm-up now runs five paths. install.sh ships hdf5.js, goesl2.js
+  and satellites.js with the sed rewrite (update.sh derives its
+  watch list from that ship list, so the deploy sees them);
+  validate.sh's CPU list gains hdf5 and goesl2 - the box gates the
+  reader against h5py's dump before it deploys. (4) THE PAGE:
+  syncGoesL2 every 5 min and after every field run (?goesl2src,
+  ?goes=0; a second, timed ask for the mosaic's minute when the
+  newest mask is more than 5 min from it), the windows unpacked with
+  the shared code, the research line "NOAA cloud products (ABI L2
+  ACMC · ACHAC)": the newest mask's census and the ACM class
+  overhead with its cloud probability, THE AGREEMENT of the theme's
+  field with NOAA's at the same sea pixels AND minute (the theme's
+  classified sea pixels - clear or cloud; unmeasured, no-data and
+  land left out, the land field detecting mid and high only -
+  looked up in the mosaic-minute mask's window: both cloud / both
+  clear / theme only / NOAA only, memoised on the two fields'
+  stamps, both stamps printed, the fallback to the newest mask
+  named, GIBS's lag behind the bucket printed when 10 min or more),
+  the ACHA median top now and at the mosaic's minute against the
+  theme's opaque tops (stated: ACHA retrieves the emitting top, a
+  thin cirrus reads lower as an opaque top); the pick readout prints
+  NOAA's class and probability under the clicked texel beside the
+  theme's; the records list both products. THE DECKS KEEP THE
+  THEME'S FIELD - the comparison is a closure, never a substitution
+  (goesl2.js's header states the ownership). WHAT THE COMPARISON
+  CAUGHT ON ITS FIRST RUN: the 20:15Z probe's field read "sea 0%
+  clear, 100% mid; land 100% high; warmest sea pixel -18.85 C;
+  closure -39 K" against NOAA's 62% cloudy of the same minute (both
+  clear 0, NOAA only 0) - GIBS had answered 200 for every 19:50Z
+  tile with an 854-byte OPAQUE WHITE placeholder (one colour over
+  65536 pixels; the real 17:50Z tiles carry 97-2973 colours), its
+  domain listing 19:50-20:00 while its cache had nothing, and the
+  grey rule read the white as -18.9 C over every pixel. Two fixes,
+  both gated (goesir-reference: THE DOMAIN'S OWN STAMPS and THE
+  PLACEHOLDER TILE): tileIsBlank - a tile of ONE colour is not a
+  measurement, so the mosaic walk treats it as missing; and
+  domainTimes - the walk steps through the domain's OWN stamps,
+  newest first, at most three hours back, instead of ten blind
+  minutes at a time (the afternoon's domain ran 09:00-17:50 then
+  19:50-20:00 - the blind walk from 19:50 met only 404s and the
+  field kept a stale run; the domain walk lands on 17:50Z, the last
+  real mosaic). The comparison did what a closure is for: it found
+  the drawing wrong before anyone looked at the sky. STATED LIMITS: CONUS
+  scenes only (the full-disk products are a different key family,
+  not read); the mask's window is cut at the tenth-degree cell
+  centre (up to ~8 km off the observer; the agreement looks each
+  theme pixel up by its own place, so only the window's far edge is
+  lost); the timed mask is within 5 min of the mosaic (the products'
+  cadence), the pick readout reads the newest mask; Himawari and
+  Meteosat products are not read. DEPLOY WATCH (unresolved from
+  here): at 20:24Z the deployed api.ndev.tk still answered 404 for
+  /sst - its /probe lists surface and rrs but no sst - fifty minutes
+  after the 147th reached main, while its AIS engine showed a
+  process restart at 20:08Z; the box's self-update either failed its
+  on-box gate or did not run, and only its journal
+  (journalctl -u horizon-live-update) can say which. Until that is
+  read, /sst and /goesl2 are verified on the LOCAL daemon only (the
+  page's ?sstsrc= and ?goesl2src= overrides), and the live page's
+  NOAA line stays absent (a 404 is caught, nothing is drawn wrong).
 - DONE (Sep 5, the review session's 147th pass - THE SEA UNDER EVERY
   PIXEL): the satellite cloud field's clear-sky reference was ONE
   number - the pier's skin through the column - for a 100-km window

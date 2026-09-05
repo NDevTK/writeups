@@ -50,6 +50,23 @@ import {
   sstUrl,
   SST_HALF_DEG,
   SST_STRIDE,
+  decodeL2,
+  decodeL2Async,
+  l2Cell,
+  l2FileUrl,
+  l2HeightBody,
+  l2ListUrl,
+  l2MaskBody,
+  l2Prefixes,
+  l2Window,
+  L2_AT_MAX_AGE_MS,
+  L2_HALF_PX,
+  L2_HEIGHT_SPEC,
+  L2_HELD_PER_PRODUCT,
+  L2_LIST_MS,
+  L2_MASK_SPEC,
+  L2_RETRY_MS,
+  L2_WINDOW_MS,
   prune,
   pruneStrikes,
   aisBox,
@@ -79,6 +96,8 @@ import {
 } from './server/src/index.mjs';
 
 import {haversineKm} from './lightning.js';
+import {heightCensus, unpackArray} from './goesl2.js';
+import {ACHAC_B64, ACHAC_NAME} from './hdf5-fixture.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -673,6 +692,108 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
 }
 
 {
+  // NOAA's L2 cloud-product windows (/goesl2, 148th pass): the
+  // daemon's decode and window cut run on the vendored GOES-18
+  // ACHAC file (hdf5-fixture.js, the file h5py read the same way)
+  // and must land on the goesl2 gate's own pinned home window; the
+  // packed heights unpack to the same census; the bucket URLs and
+  // the hour prefixes are pinned; a file without the grid is
+  // refused as null (502), never guessed.
+  const bytes = new Uint8Array(Buffer.from(ACHAC_B64, 'base64'));
+  const dec = decodeL2(bytes, L2_HEIGHT_SPEC);
+  const cell = l2Cell(32.85, -117.12);
+  const body = dec ? l2HeightBody(dec, 'k', cell.lat, cell.lon) : null;
+  const ht = body ? unpackArray(body.ht) : null;
+  const dq = body ? unpackArray(body.dqf) : null;
+  const again = ht ? heightCensus(Array.from(ht), Array.from(dq)) : null;
+  const w = dec ? l2Window(dec, 32.85, -117.12, 10) : null;
+  const outside = dec ? l2Window(dec, 0, -137, 10) : 'not null';
+  const noGrid = decodeL2(bytes, {no_such_dataset: 'raw'});
+  const maskShape = dec ? l2MaskBody(dec, 'k', cell.lat, cell.lon) : null;
+  const pre = l2Prefixes('ABI-L2-ACMC', new Date('2026-09-05T20:02:00Z'));
+  check(
+    'NOAA cloud-product windows (/goesl2)',
+    dec !== null &&
+      dec.platform === 'G18' &&
+      dec.scene === 'CONUS' &&
+      dec.time.startsWith('2026-09-05T18:4') &&
+      dec.lzaMaxDeg === 70 &&
+      dec.proj.longitude_of_projection_origin === -137 &&
+      dec.x.n === 500 &&
+      dec.y.n === 300 &&
+      dec.data.HT instanceof Float32Array &&
+      dec.data.DQF instanceof Uint8Array &&
+      cell.lat === 32.9 &&
+      cell.lon === -117.1 &&
+      body !== null &&
+      body.product === 'ABI-L2-ACHAC' &&
+      body.key === 'k' &&
+      body.box.i === 424 &&
+      body.box.j === 127 &&
+      body.box.rows === 21 &&
+      body.box.cols === 21 &&
+      body.pixel.ewM === 11438 &&
+      body.pixel.nsM === 13741 &&
+      body.ht.kind === 'f32' &&
+      body.ht.n === 441 &&
+      body.census.n === 340 &&
+      Math.abs(body.census.medianM - 3056.6) < 1 &&
+      again.n === 340 &&
+      again.medianM === body.census.medianM &&
+      w !== null &&
+      w.box.i === 424 &&
+      outside === null &&
+      noGrid === null &&
+      // the mask's datasets are not in a height file: the decode
+      // refuses the spec, and the mask body refuses the height
+      // decode (null, never a throw)
+      decodeL2(bytes, L2_MASK_SPEC) === null &&
+      maskShape === null &&
+      L2_HALF_PX.mask === 50 &&
+      L2_HALF_PX.height === 10 &&
+      L2_LIST_MS === 60e3 &&
+      L2_RETRY_MS === 2 * 60e3 &&
+      L2_WINDOW_MS === 15 * 60e3 &&
+      L2_HELD_PER_PRODUCT === 3 &&
+      L2_AT_MAX_AGE_MS === 7 * 86400e3 &&
+      l2ListUrl('noaa-goes18', 'ABI-L2-ACMC/2026/248/19/') ===
+        'https://noaa-goes18.s3.amazonaws.com/?list-type=2&prefix=ABI-L2-ACMC%2F2026%2F248%2F19%2F&max-keys=200' &&
+      l2FileUrl('noaa-goes19', 'ABI-L2-ACHAC/2026/248/19/x.nc') ===
+        'https://noaa-goes19.s3.amazonaws.com/ABI-L2-ACHAC/2026/248/19/x.nc' &&
+      pre.length === 2 &&
+      pre[0] === 'ABI-L2-ACMC/2026/248/20/' &&
+      pre[1] === 'ABI-L2-ACMC/2026/248/19/',
+    `the vendored ${ACHAC_NAME} decodes to G18 CONUS at ${dec && dec.time} (LZA bound ${dec && dec.lzaMaxDeg}, 500x300, HT as float32 metres with NaN fill, DQF bytes); the tenth-degree cell (32.9/-117.1) cuts the 21x21 window at pixel (424, 127) - the goesl2 gate's own pin - with ${body && body.census.n} retrieved tops, median ${body && body.census.medianM.toFixed(1)} m, ${body && body.pixel.ewM} x ${body && body.pixel.nsM} m pixels at the slant; the packed heights unpack to the same census; the sub-satellite point is outside the scene (null); a missing dataset -> null (502), and the mask body on a height decode is null, never a throw; the listing and file URLs and the this-hour/last-hour prefixes are pinned; listings stand ${L2_LIST_MS / 1000} s, ${L2_HELD_PER_PRODUCT} decoded files per product, ?t= reaches ${L2_AT_MAX_AGE_MS / 86400e3} days back`
+  );
+  // The decode worker (the event loop keeps serving while a 4 MB
+  // mask inflates): the same bytes through the worker come back as
+  // the main thread's decode, typed arrays and all
+  const t0 = Date.now();
+  const decW = await decodeL2Async(bytes, L2_HEIGHT_SPEC);
+  const ms = Date.now() - t0;
+  const sum = (a) => {
+    let s = 0;
+    for (const v of a) if (Number.isFinite(v)) s += v;
+    return s;
+  };
+  check(
+    'the decode worker returns the main thread’s decode',
+    decW !== null &&
+      dec !== null &&
+      decW.time === dec.time &&
+      decW.platform === dec.platform &&
+      decW.x.n === dec.x.n &&
+      decW.data.HT instanceof Float32Array &&
+      decW.data.DQF instanceof Uint8Array &&
+      decW.data.HT.length === dec.data.HT.length &&
+      Math.abs(sum(decW.data.HT) - sum(dec.data.HT)) < 1e-3 &&
+      sum(decW.data.DQF) === sum(dec.data.DQF) &&
+      JSON.stringify(decW.proj) === JSON.stringify(dec.proj),
+    `a worker thread imported this module (main() guarded by import.meta.url), decoded the vendored file and posted ${decW && decW.data.HT.length} heights back as Float32Array with the same sum, DQF and projection - in ${ms} ms including the worker's start`
+  );
+}
+
+{
   check(
     'security headers',
     SEC_HEADERS['content-security-policy'] === 'sandbox' &&
@@ -755,11 +876,12 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     home !== null &&
       home.lat === 32.85 &&
       home.lon === -117.12 &&
-      paths.length === 4 &&
+      paths.length === 5 &&
       paths[0] === '/sounding?lat=32.85&lon=-117.12' &&
       paths[1] === '/buoy?lat=32.85&lon=-117.12' &&
       paths[2] === '/metar?lat=32.85&lon=-117.12' &&
       paths[3] === '/sst?lat=32.85&lon=-117.12' &&
+      paths[4] === '/goesl2?lat=32.85&lon=-117.12' &&
       custom !== null &&
       custom.lat === 51.5 &&
       custom.lon === -0.13 &&
@@ -861,10 +983,11 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       areas.length === 1 &&
       areas[0].lat === 34 &&
       areas[0].lon === -120 &&
-      plan.length === 8 &&
+      plan.length === 10 &&
       plan[0] === '/sounding?lat=32.85&lon=-117.12' &&
       plan[3] === '/sst?lat=32.85&lon=-117.12' &&
-      plan[4] === '/sounding?lat=34.00&lon=-120.00' &&
+      plan[4] === '/goesl2?lat=32.85&lon=-117.12' &&
+      plan[5] === '/sounding?lat=34.00&lon=-120.00' &&
       STATE_SAVE_MS === 5 * 60e3 &&
       STATE_MAX_AGE_MS === 24 * 3600e3,
     `${snap.maps.sounding.length} rows and 1 feed snapshotted (the empty feed and the ` +

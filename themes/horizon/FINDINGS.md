@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **141 reference files, 1122 landmark lines, 7 GPU probes** (live gate
+- **143 reference files, 1134 landmark lines, 7 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -756,7 +756,34 @@ The practice the corpus demonstrates, stated so it can be reused:
    reference), so the analysis's offshore warmth is recorded as
    absent from the satellite's warmest pixels that morning rather
    than assumed (`goesir-reference` THE FOUNDATION SST, the
-   foundation-SST pins; `server-reference` foundation SST box).
+   foundation-SST pins; `server-reference` foundation SST box). Pass
+   148 puts the operator's own answer beside the theme's: NOAA's
+   clear-sky mask and cloud-top height files are read in node by a
+   pure HDF5 reader held to what h5py reads from the same bytes (a
+   real GOES-18 file vendored verbatim and two files h5py wrote at
+   its earliest and latest library bounds; a layout the reader
+   cannot read is named, never guessed), navigated by the PUG's own
+   fixed-grid equations held to the PUG's printed example in both
+   directions, and cut to the theme's window by the daemon; the page
+   states the agreement between its ETROP field and NOAA's mask at
+   the same sea pixels and minute (the daemon serves the mask of the
+   mosaic's own stamp, because GIBS's tiles trail the bucket by tens
+   of minutes to hours) and prints NOAA's class under a clicked texel
+   — the decks keep the theme's field, so the comparison is a
+   closure, never a substitution. Measured at 20:20Z on 2026-09-05:
+   88% of 4083 sea pixels agree at the mosaic's own minute (both
+   cloud 2321, both clear 1288, theme only 330, NOAA only 144) — the
+   first pixel-for-pixel score of the re-implemented ETROP field
+   against the operator's product. Its first run also earned its
+   keep another way: a field reading 100% cloud against NOAA's 62% exposed GIBS's opaque
+   white placeholder tiles (200 OK, one colour over the whole tile)
+   that the grey rule had read as −18.9 °C, so a one-colour tile is
+   now no measurement and the mosaic walk follows the domain's own
+   stamps across its gaps (`goesir-reference` THE PLACEHOLDER TILE,
+   THE DOMAIN'S OWN STAMPS; `hdf5-reference` THE PRODUCT FILE,
+   H5PY'S EARLIEST/LATEST FILES; `goesl2-reference` THE FIXED GRID,
+   THE WINDOW, THE CENSUSES, THE WIRE; `server-reference` NOAA
+   cloud-product windows).
 
 ---
 

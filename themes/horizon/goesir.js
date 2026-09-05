@@ -140,78 +140,96 @@ export function latestTimeFromDomains(xml) {
       ? end + 'T00:00:00Z'
       : null;
 }
-export const GOES_WEST_LON_DEG = -137.0; // goes-r.gov: GOES-18 since 2023-01-04
-export const BAND13_UM = 10.35; // ABI band 13 centre, 10.1-10.6 um
+// Every stamp the domain holds, NEWEST FIRST, at most maxN of them:
+// each period start/end/PTnM expanded (a lone stamp is itself; a
+// date alone is its midnight). The page walks these instead of
+// stepping ten minutes blindly, because the domain has GAPS (148th
+// pass, measured 2026-09-05 20:15Z: 09:00-17:50 then 19:50-20:00 -
+// the blind walk from 19:50 met nothing but 404s).
+export function domainTimes(xml, maxN = 24) {
+  const m = /<Domain>([^<]*)<\/Domain>/.exec(xml);
+  if (!m) return [];
+  const iso = (ms) => new Date(ms).toISOString().slice(0, 19) + 'Z';
+  const parse = (s) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(s)
+      ? Date.parse(s + 'T00:00:00Z')
+      : Date.parse(s);
+  const out = [];
+  for (const p of m[1].split(',')) {
+    const parts = p.trim().split('/');
+    if (!parts[0]) continue;
+    const t0 = parse(parts[0]);
+    if (!Number.isFinite(t0)) continue;
+    if (parts.length < 3) {
+      out.push(t0);
+      if (parts.length === 2 && Number.isFinite(parse(parts[1])))
+        out.push(parse(parts[1]));
+      continue;
+    }
+    const t1 = parse(parts[1]);
+    const pm = /^PT(?:(\d+)H)?(?:(\d+)M)?$/.exec(parts[2]);
+    const step = pm ? (+(pm[1] || 0) * 60 + +(pm[2] || 0)) * 60e3 : 0;
+    if (!Number.isFinite(t1) || !(step > 0)) {
+      out.push(t0);
+      continue;
+    }
+    // walk each period from its end so the newest come first even
+    // when the list is long
+    for (let t = t1, n = 0; t >= t0 && n < 4 * maxN; t -= step, n++)
+      out.push(t);
+  }
+  return [...new Set(out)]
+    .sort((a, b) => b - a)
+    .slice(0, maxN)
+    .map(iso);
+}
+// A tile whose every pixel is ONE colour is not a measurement: GIBS
+// answers 200 with an opaque white 256x256 placeholder (854 bytes)
+// for a stamp its domain lists but its cache has not filled - the
+// 19:50Z tiles of 2026-09-05 at 20:15Z, every one (255,255,255,255),
+// which the grey rule read as -18.9 C and the field called cloud
+// over every pixel (measured, the 148th pass's comparison caught
+// it: NOAA's mask of that minute read 62% cloudy). A real tile has
+// hundreds to thousands of colours (97 to 2973 in the 17:50Z four).
+export function tileIsBlank(rgba) {
+  if (!rgba || rgba.length < 4) return true;
+  const r = rgba[0];
+  const g = rgba[1];
+  const b = rgba[2];
+  const a = rgba[3];
+  for (let k = 4; k < rgba.length; k += 4)
+    if (
+      rgba[k] !== r ||
+      rgba[k + 1] !== g ||
+      rgba[k + 2] !== b ||
+      rgba[k + 3] !== a
+    )
+      return false;
+  return true;
+}
+import {
+  BAND13_UM,
+  GIBS_PALETTE_ID,
+  GOES_WEST_LON_DEG,
+  SATELLITES,
+  VIEW_ZENITH_MAX_DEG,
+  pickSatellite,
+  viewZenithDeg
+} from './satellites.js';
+// the satellite table, the reach and the view geometry live in
+// satellites.js (148th pass: the daemon picks a satellite without
+// this module's physics chain); re-exported so nothing else moves
+export {
+  BAND13_UM,
+  GIBS_PALETTE_ID,
+  GOES_WEST_LON_DEG,
+  SATELLITES,
+  VIEW_ZENITH_MAX_DEG,
+  pickSatellite,
+  viewZenithDeg
+};
 export const BAND13_NU_CM = 1e4 / BAND13_UM; // 966.18 cm^-1
 export const WINDOW_HALF_M = 100e3; // the field's reach around the observer
-// The three geostationary window channels GIBS serves on ONE
-// colormap (146th pass): Worldview's layer configuration declares
-// the palette Clean_Longwave_Infrared_Window_Band for each, so the
-// tile law reads all three. Sub-satellite longitudes from the
-// operators (header): GOES-West/GOES-18 at 137.0 W, GOES-East/
-// GOES-19 at 75.2 W, Himawari-9 at 140.7 E; band centres 10.35 um
-// (ABI band 13) and 10.4073 um (AHI band 13, JMA's table). Meteosat
-// is not on GIBS: longitudes no satellite reaches answer unmeasured.
-export const GIBS_PALETTE_ID = 'Clean_Longwave_Infrared_Window_Band';
-export const SATELLITES = [
-  {
-    id: 'goes-west',
-    name: 'GOES-West',
-    craft: 'GOES-18',
-    lonDeg: GOES_WEST_LON_DEG,
-    layer: 'GOES-West_ABI_Band13_Clean_Infrared',
-    instrument: 'ABI',
-    bandUm: BAND13_UM
-  },
-  {
-    id: 'goes-east',
-    name: 'GOES-East',
-    craft: 'GOES-19',
-    lonDeg: -75.2,
-    layer: 'GOES-East_ABI_Band13_Clean_Infrared',
-    instrument: 'ABI',
-    bandUm: BAND13_UM
-  },
-  {
-    id: 'himawari',
-    name: 'Himawari',
-    craft: 'Himawari-9',
-    lonDeg: 140.7,
-    layer: 'Himawari_AHI_Band13_Clean_Infrared',
-    instrument: 'AHI',
-    bandUm: 10.4073
-  }
-];
-// THE REACH: the operational products print their own qualified
-// range - the ACMC file's quantitative_local_zenith_angle_bounds
-// [0, 70] "local zenith angle degree range where good quality clear
-// sky mask data is produced" and the ACHAC file's
-// local_zenith_angle_bounds [0, 70] for cloud top height (read from
-// OR_ABI-L2-ACMC-M6_G18_s20262481851177 and OR_ABI-L2-ACHAC-M6_G18_
-// s20262481846177 on 2026-09-05; both files also print
-// nominal_satellite_subpoint_lon -137.0). The theme takes the same
-// 70 deg for every satellite (Himawari's products are not read -
-// stated).
-export const VIEW_ZENITH_MAX_DEG = 70;
-// The satellite that sees an observer at the smallest view zenith,
-// or none within the reach: {sat, viewZenithDeg, nearest}.
-export function pickSatellite(
-  latDeg,
-  lonDeg,
-  sats = SATELLITES,
-  maxDeg = VIEW_ZENITH_MAX_DEG
-) {
-  let best = null;
-  for (const s of sats) {
-    const vz = viewZenithDeg(latDeg, lonDeg, s.lonDeg);
-    if (!best || vz < best.viewZenithDeg) best = {sat: s, viewZenithDeg: vz};
-  }
-  if (!best) return {sat: null, viewZenithDeg: null, nearest: null};
-  if (best.viewZenithDeg > maxDeg)
-    return {sat: null, viewZenithDeg: best.viewZenithDeg, nearest: best.sat};
-  return {...best, nearest: best.sat};
-}
-
 const RAD = Math.PI / 180;
 
 // Web Mercator at zoom z with 256-px tiles: global pixel of a point.
@@ -266,22 +284,6 @@ export function windowTiles(
     halfPx,
     mppM: mpp
   };
-}
-
-// Satellite view zenith angle from a geostationary satellite at
-// satLonDeg: the central angle gamma between the point and the
-// sub-satellite point (cos gamma = cos lat cos dlon), then the
-// elevation triangle with the satellite radius 42164 km and the
-// Earth radius 6371 km.
-export function viewZenithDeg(
-  latDeg,
-  lonDeg,
-  satLonDeg = GOES_WEST_LON_DEG,
-  {rEkm = 6371, rSkm = 42164} = {}
-) {
-  const cg = Math.cos(latDeg * RAD) * Math.cos((lonDeg - satLonDeg) * RAD);
-  const sg = Math.sqrt(Math.max(0, 1 - cg * cg));
-  return Math.atan2(sg, cg - rEkm / rSkm) / RAD;
 }
 
 // ---------------------------------------------------------------

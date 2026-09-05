@@ -60,6 +60,8 @@ import {
   pickSatellite,
   waterIndexAt,
   latestTimeFromDomains,
+  domainTimes,
+  tileIsBlank,
   heightOfPressure,
   heightOfTemperature,
   layerContinuumTau,
@@ -355,6 +357,46 @@ check(
       ),
     `three periods with gaps (as GIBS served on 2026-09-05) resolve to ${latestTimeFromDomains(xml)}; ` +
       `a bare date is midnight; an empty document is null`
+  );
+  // THE DOMAIN'S OWN STAMPS, newest first, across the gap (148th
+  // pass): the afternoon GIBS listed 09:00-17:50 then 19:50-20:00,
+  // and a blind ten-minute walk back from 19:50 met nothing but 404s
+  const gap =
+    '<Domain>2026-09-05/2026-09-05T08:40:00Z/PT10M,2026-09-05T09:00:00Z/2026-09-05T17:50:00Z/PT10M,' +
+    '2026-09-05T19:50:00Z/2026-09-05T20:00:00Z/PT10M</Domain>';
+  const st = domainTimes(gap, 6);
+  const lone = domainTimes('<Domain>2026-09-05T12:00:00Z,2026-09-05</Domain>');
+  const hourly = domainTimes(
+    '<Domain>2026-09-05T00:00:00Z/2026-09-05T03:00:00Z/PT1H</Domain>'
+  );
+  // THE PLACEHOLDER TILE: one colour over the whole tile is not a
+  // measurement (GIBS's opaque white 200 for a listed stamp its
+  // cache has not filled - every 19:50Z tile at 20:15Z)
+  const white = new Uint8Array(256 * 256 * 4).fill(255);
+  const clear = new Uint8Array(256 * 256 * 4);
+  const real = new Uint8Array(256 * 256 * 4).fill(255);
+  real[4 * 1000] = 254;
+  check(
+    "THE DOMAIN'S OWN STAMPS and THE PLACEHOLDER TILE",
+    st.length === 6 &&
+      st[0] === '2026-09-05T20:00:00Z' &&
+      st[1] === '2026-09-05T19:50:00Z' &&
+      st[2] === '2026-09-05T17:50:00Z' &&
+      st[5] === '2026-09-05T17:20:00Z' &&
+      domainTimes(gap).length === 24 &&
+      lone.length === 2 &&
+      lone[0] === '2026-09-05T12:00:00Z' &&
+      lone[1] === '2026-09-05T00:00:00Z' &&
+      hourly.join(',') ===
+        '2026-09-05T03:00:00Z,2026-09-05T02:00:00Z,2026-09-05T01:00:00Z,2026-09-05T00:00:00Z' &&
+      domainTimes('<Domains/>').length === 0 &&
+      tileIsBlank(white) &&
+      tileIsBlank(clear) &&
+      !tileIsBlank(real) &&
+      tileIsBlank(null),
+    `the gapped afternoon domain walks 20:00, 19:50, then 17:50 ... 17:20 (six asked; 24 by default); a lone ` +
+      `stamp and a bare date list as themselves; PT1H periods expand hourly; an empty document lists nothing; ` +
+      `an all-white and an all-transparent tile are blank, one differing pixel makes a real tile`
   );
 }
 

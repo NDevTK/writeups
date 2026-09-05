@@ -104,6 +104,22 @@ are gated by `../server-reference.mjs` — the `server` set in
   power (GW). One 60 s poll serves every visitor. Also pushed as
   the `space` event on `/stream` (60 s cadence, initial push on
   connect).
+- `GET /goesl2?lat&lon` — NOAA's own operational cloud products
+  around the point (148th pass): the clear-sky mask
+  (`ABI-L2-ACMC`: BCM, ACM, cloud probability, DQF on the 2-km
+  CONUS grid) and the cloud top height (`ABI-L2-ACHAC`: HT on the
+  10-km grid) from the NOAA Open Data buckets (`noaa-goes18` for
+  GOES-West, `noaa-goes19` for GOES-East; anonymous S3, listed and
+  fetched by the daemon, decoded by the gated pure-JS HDF5 reader
+  `hdf5.js`, navigated by `goesl2.js`'s PUG equations), cut to
+  ±100 km windows (101 × 101 mask pixels, 21 × 21 height pixels)
+  and packed as base64 typed arrays with their censuses. One
+  decoded file per satellite and product is held for the
+  products' 5-minute cadence; windows are keyed by file, so a new
+  file keys new windows. `sat: null` with a `reason` is a real
+  answer (no bucket reaches this longitude; Himawari's products
+  are not on AWS in this form); 502 when both products failed
+  upstream; `upstream: 'partial'` names a body with one of them.
 - `GET /health` — AIS + lightning + space-weather + smoke +
   aerosol engine stats.
 - `GET /probe` — health + the fixed-target reachability
@@ -146,6 +162,28 @@ temperature (a foundation temperature: no diurnal skin, stated on
 the page). One ERDDAP request of ~200 kB answers in about a second;
 successes cache 6 h (the analysis is daily), failures 10 min; the
 answer carries the analysis `time`.
+
+The NOAA cloud-product route (`/goesl2`, 148th pass) lists the UTC
+hour's prefix of the satellite's bucket (then the previous hour's
+when that hour has no file yet - the first file of an hour lands
+about four minutes after its start, measured; a listing stands a
+minute), takes the newest start stamp - or, with `?t=ISO`, the stamp
+nearest that moment within 15 minutes, so the page can compare its
+GIBS mosaic with the mask of the mosaic's own minute (GIBS's tiles
+trailed the bucket by 2 h 12 min on 2026-09-05 at 20:05Z, measured) -
+and downloads and decodes the file only when that key is not already
+held. The decode runs in a worker thread (the 4 MB mask file takes
+about 2 s; the 330 kB height file 70 ms) so the event loop keeps
+serving: `/health` answered in 1-3 ms while a mask inflated,
+measured. A cold request for both products answers in 2.7 s, a cached
+window in 2 ms. One download per file is in flight at a time; a
+listing or download failure holds the product for two minutes, during
+which the newest decoded file stands in for "latest". Decoded files
+are typed arrays of tens of megabytes and live in RAM only (never
+persisted; three per satellite and product, the least recently asked
+for let go; all let go after an hour unasked); the home is warmed on
+start like the other slow routes. `/probe` lists the held files with
+their times and the listing/fetch/error/worker-fallback counters.
 
 ## Security posture
 
