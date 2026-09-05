@@ -129,16 +129,26 @@ are gated by `../server-reference.mjs` — the `server` set in
   SRB algorithm's ATBD read in full) as `dsr`, with the point's own
   pixel (`here`), the mean of the good pixels within 5 pixels
   (`near` - the ATBD's spatial average for reading a pixel against
-  a point on the ground) and the window census in W/m²: seven
-  products in all (about 240 kB a window). Since the 151st pass
+  a point on the ground) and the window census in W/m², and since
+  the 153rd the derived motion winds (`ABI-L2-DMWC` band 14: the
+  cloud features tracked through three images 5 min apart, CONUS
+  every 15 min, day and night; a point list, not a grid - the
+  vectors within 150 km of the point as rounded columns with their
+  distance, speed, from-direction, the tracked cluster's median
+  cloud-top pressure, the tracer's brightness temperature, the flag
+  and the zenith angles, the ATBD layers' vector means at the
+  tightest radius holding three vectors (`layers`), and the scene's
+  own statistics; the DMW ATBD v4.4 read in full) as `dmw`: eight
+  products in all (about 245 kB a window). Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks
   the window touches, so a window of the 32 MB SST file costs about
-  1 MB and the 4 MB mask about 0.9 MB. Windows are held a dozen per
+  1 MB and the 4 MB mask about 0.9 MB; the 0.3 MB winds file is read
+  whole in one range (its head asks for a megabyte). Windows are held a dozen per
   satellite and product, keyed by file and tenth-degree cell, so a
   new file keys new windows; `?t=ISO` asks the five 5-minute
-  products and the 10-minute DSR for that moment (the hourly SST is
-  never asked for a moment). `sat: null` with a `reason` is a real answer (no bucket
+  products and the 10-minute DSR for that moment (the hourly SST and
+  the winds are never asked for a moment). `sat: null` with a `reason` is a real answer (no bucket
   reaches this longitude; Himawari's products are not on AWS in this
   form); 502 when every product failed upstream; `upstream:
 'partial'` names a body missing some.

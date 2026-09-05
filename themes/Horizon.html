@@ -470,6 +470,10 @@
         dcompOverPixels,
         fixedGridGeometry,
         DSR_ATBD,
+        DMW_ATBD,
+        dmwLayers,
+        dmwNearest,
+        dmwUnpack,
         maskAgreement,
         sstAgainstGrid,
         unpackArray,
@@ -6255,6 +6259,7 @@
       let goesL2Reach = null;
       let goesL2Memo = null; // {obsAt, l2At, agreement}
       let goesL2SstMemo = null; // {sstTime, gridTime, audit}
+      let goesL2WindMemo = null; // {time, at, winds}
       let goesL2Busy = false;
       let goesL2Rerun = false;
       // NOAA's skin SST at a place (151st pass): the window pixel's
@@ -6317,6 +6322,72 @@
         goesL2SstMemo = {sstTime: s.time, gridTime: grid.time, audit};
         return audit;
       }
+      // THE DECKS' MEASURED DRIFT (153rd pass): NOAA's derived motion
+      // winds by ATBD layer - the vector mean of the good vectors
+      // within the tightest radius holding three (goesl2.dmwLayers,
+      // gated) - while the file is under DMW_LIVE_MIN old (a CONUS
+      // file every 15 min, landing ~8 min after its scan: three
+      // files' grace). RANKING, stated: the tracked features ARE the
+      // clouds the decks draw, minutes old, so their motion outranks
+      // the balloon's level wind (hours old, one point, and not the
+      // level of a deck whose top the satellite measured) and the
+      // model's for the DRIFT of the decks alone; the balloon keeps
+      // every other use of the level winds (the plume's bend, the
+      // lee-wave hunt, the contrails' drift, the twinkle rate). Per
+      // layer: km/h, the from-direction, how many vectors within
+      // which radius, the median pressure; null past the age or
+      // when no layer holds three.
+      const DMW_LIVE_MIN = 45;
+      function goesL2Winds() {
+        const d = goesL2 && goesL2.dmw;
+        if (!d || !d.layers) return null;
+        const now = Date.now();
+        if (
+          goesL2WindMemo &&
+          goesL2WindMemo.time === d.time &&
+          now - goesL2WindMemo.at < 1000
+        )
+          return goesL2WindMemo.winds;
+        const ageMin = (now - Date.parse(d.time)) / 60e3;
+        let winds = null;
+        if (ageMin < DMW_LIVE_MIN) {
+          const pick = (l) =>
+            l && l.radiusKm !== null
+              ? {
+                  kmh: l.spdMs * 3.6,
+                  dirDeg: l.dirDeg,
+                  n: l.used,
+                  radiusKm: l.radiusKm,
+                  hPa: l.medianHpa
+                }
+              : null;
+          winds = {
+            low: pick(d.layers.low),
+            mid: pick(d.layers.mid),
+            high: pick(d.layers.high),
+            time: d.time,
+            ageMin,
+            craft: goesL2.craft
+          };
+          if (!winds.low && !winds.mid && !winds.high) winds = null;
+        }
+        goesL2WindMemo = {time: d.time, at: now, winds};
+        return winds;
+      }
+      // the nearest good vector to a place within 40 km (the pick
+      // readout - the ATBD's ~38 km spacing, one cell)
+      function goesL2DmwNear(latDeg, lonDeg) {
+        const d = goesL2 && goesL2.dmw;
+        return d && d.list ? dmwNearest(d.list, latDeg, lonDeg, 40) : null;
+      }
+      // the derived motion winds off the wire: the columns back to
+      // vectors, the layers' winds recomputed here from them
+      // (goesl2.dmwLayers - the same gated law the daemon ran)
+      const unpackDmw = (p) => {
+        if (!p || !p.vectors) return null;
+        const list = dmwUnpack(p.vectors);
+        return {...p, list, layers: dmwLayers(list)};
+      };
       const unpackProduct = (p) =>
         p
           ? {
@@ -6414,7 +6485,11 @@
             // NOAA's surface irradiance (152nd pass; full disk, every
             // 10 min), now and at the mosaic's minute
             dsr: unpackProduct(j.dsr),
-            dsrAt: null
+            dsrAt: null,
+            // the derived motion winds (153rd pass; CONUS every 15
+            // min, band 14, the vectors within 150 km): the decks'
+            // drift while fresh (goesL2Winds)
+            dmw: unpackDmw(j.dmw)
           };
           goesL2Reach = null;
           goesL2SstMemo = null;
@@ -6460,6 +6535,19 @@
                     `at ${goesL2SstAudit().n} px`
                   : '')
             );
+          const dw = goesL2.dmw;
+          if (dw && dw.n) {
+            const L = dw.layers;
+            const one = (id) =>
+              L[id] && L[id].radiusKm !== null
+                ? `${id} ${L[id].spdMs.toFixed(1)} m/s from ${Math.round(L[id].dirDeg)}° (${L[id].used} within ${L[id].radiusKm} km)`
+                : `${id} ${L[id] ? L[id].n : 0} vector${L[id] && L[id].n === 1 ? '' : 's'}`;
+            record(
+              `NOAA ${j.craft} derived motion winds (DMWC)`,
+              `${dw.time.slice(11, 16)}Z · ${dw.n} of ${dw.total} band-14 vectors within ${dw.radiusKm} km · ` +
+                `${one('low')} · ${one('mid')} · ${one('high')}`
+            );
+          }
           if (
             goesObs &&
             goesObs.time &&
@@ -6898,6 +6986,52 @@
             line += ` (the ATBD's own ABI validation: accuracy ~${DSR_ATBD.accuracyPct}%, precision ${DSR_ATBD.precisionPct}% = ${DSR_ATBD.precisionWm2} W/m² against SURFRAD/SOLRAD in 50-km squares)`;
           } else
             line += ` · surface irradiance ${dr.time.slice(11, 16)}Z: nothing retrieved within ±100 km (night, or the sun past 70°)`;
+        }
+        // THE MEASURED MOTION (153rd pass): NOAA's derived motion
+        // winds - the tracked clouds' own motion by ATBD layer within
+        // the tightest radius holding three vectors - beside the level
+        // winds the page holds aloft, and which drives the decks
+        const dw = goesL2.dmw;
+        if (dw) {
+          const ms = (v) => (v === null ? '—' : v.toFixed(1) + ' m/s');
+          const lay = (id, span) => {
+            const l = dw.layers[id];
+            if (!l || !l.n) return `${id} (${span}) none`;
+            if (l.radiusKm === null)
+              return `${id} (${span}) ${l.n} vector${l.n === 1 ? '' : 's'} (nearest ${l.nearestKm.toFixed(0)} km), too few for a mean`;
+            return (
+              `${id} (${span}) ${ms(l.spdMs)} from ${Math.round(l.dirDeg)}° - the vector mean of ${l.used} within ${l.radiusKm} km ` +
+              `(speeds ${l.minMs.toFixed(0)}–${l.maxMs.toFixed(0)}, median ${Math.round(l.medianHpa)} hPa, nearest ${l.nearestKm.toFixed(0)} km)`
+            );
+          };
+          const ageMin = Math.round((Date.now() - Date.parse(dw.time)) / 60e3);
+          line +=
+            ` · derived motion winds ${dw.time.slice(11, 16)}Z (ABI-L2-DMWC band 14, ${dw.scene} every 15 min from three images ` +
+            `${Math.round((dw.imageGapS ?? 300) / 60)} min apart, ~38 km between vectors; ${ageMin} min old): ` +
+            `${dw.n} of the scene's ${dw.total} good vectors within ${dw.radiusKm} km - ` +
+            `${lay('low', '700–1000 hPa')} · ${lay('mid', '400–700 hPa')} · ${lay('high', '100–400 hPa')}`;
+          if (Number.isFinite(state.wind700) || Number.isFinite(state.wind250))
+            line +=
+              ` · the level winds the page holds aloft (the balloon where a fresh ascent reached, else the model): ` +
+              (Number.isFinite(state.wind700)
+                ? `700 hPa ${(state.wind700 / 3.6).toFixed(1)} m/s from ${Math.round(state.dir700)}°`
+                : '700 hPa —') +
+              (Number.isFinite(state.wind250)
+                ? `, 250 hPa ${(state.wind250 / 3.6).toFixed(1)} m/s from ${Math.round(state.dir250)}°`
+                : '');
+          const lw = goesL2Winds();
+          const takes = lw ? ['low', 'mid', 'high'].filter((k) => lw[k]) : [];
+          line += takes.length
+            ? ` · the ${takes.join(', ')} deck${takes.length === 1 ? '' : 's'} drift with the measured motion (the tracked features are the clouds drawn; minutes old outranks the balloon's hours for the drift alone)` +
+              (takes.length < 3 ? '; the rest keep the level winds' : '')
+            : ` · the decks keep the level winds (${ageMin >= DMW_LIVE_MIN ? `the file is past ${DMW_LIVE_MIN} min` : 'no layer holds three vectors'})`;
+          const R = DMW_ATBD.lwirVsRaob;
+          const rg = (a) => `${a[0].toFixed(1)}–${a[1].toFixed(1)}`;
+          line +=
+            ` (the ATBD's GOES-17 band-14 validation against radiosondes, Table 16, low / mid / high: accuracy ` +
+            `${rg(R.low.accuracyMs)} / ${rg(R.mid.accuracyMs)} / ${rg(R.high.accuracyMs)} m/s, precision ` +
+            `${rg(R.low.precisionMs)} / ${rg(R.mid.precisionMs)} / ${rg(R.high.precisionMs)}; the requirement ` +
+            `${DMW_ATBD.requirement.accuracyMs} / ${DMW_ATBD.requirement.precisionMs})`;
         }
         return line;
       }
@@ -11956,6 +12090,17 @@
       const windV = new THREE.Vector3(1, 0, 0);
       const windVMid = new THREE.Vector3(1, 0, 0);
       const windVHigh = new THREE.Vector3(1, 0, 0);
+      // The decks' own drift (153rd pass): NOAA's measured layer
+      // motion while fresh, else the level winds - the vectors and
+      // speeds the decks alone read (windV and windVHigh keep the
+      // surface and the 250 hPa wind for everything else)
+      const windVDeckLow = new THREE.Vector3(1, 0, 0);
+      const windVDeckHigh = new THREE.Vector3(1, 0, 0);
+      const deckWind = {
+        low: {kmh: 0, src: 'surface'},
+        mid: {kmh: 0, src: '700 hPa'},
+        high: {kmh: 0, src: '250 hPa'}
+      };
       const treeAxis = new THREE.Vector3(0, 0, 1);
       const treeQ = new THREE.Quaternion();
       const treeM = new THREE.Matrix4();
@@ -13026,6 +13171,21 @@
                   skin.sstC.toFixed(1) +
                   ' °C' +
                   (skin.dqf === 1 ? ' (degraded)' : '');
+              // NOAA's tracked motion nearest the pixel (153rd)
+              const mv =
+                goesObs.pxLat &&
+                goesL2DmwNear(goesObs.pxLat[q], goesObs.pxLon[q]);
+              if (mv)
+                detail +=
+                  ', NOAA DMW ' +
+                  mv.spdMs.toFixed(0) +
+                  ' m/s from ' +
+                  Math.round(mv.dirDeg) +
+                  '° at ' +
+                  Math.round(mv.hPa) +
+                  ' hPa (' +
+                  mv.km.toFixed(0) +
+                  ' km off)';
             }
             // a clear low texel under a "low" pixel is the split
             // rule at work: the ceilometer reported no low layer,
@@ -16489,8 +16649,33 @@
           out.set(Math.sin(a), 0, -Math.cos(a));
         };
         dirOf(state.winddir, windV);
-        dirOf(state.dir700 ?? state.winddir, windVMid);
         dirOf(state.dir250 ?? state.winddir, windVHigh);
+        // The decks' drift (153rd pass): each deck's wind is NOAA's
+        // measured layer motion while fresh (goesL2Winds, the
+        // ranking stated there), else the surface wind (low), the
+        // 700 hPa level (mid) or the 250 hPa level (high) as before
+        const dmwW = goesL2Winds();
+        const dmwLow = dmwW && dmwW.low;
+        const dmwMid = dmwW && dmwW.mid;
+        const dmwHigh = dmwW && dmwW.high;
+        deckWind.low = dmwLow
+          ? {kmh: dmwLow.kmh, src: 'dmw'}
+          : {kmh: state.wind, src: 'surface'};
+        deckWind.mid = dmwMid
+          ? {kmh: dmwMid.kmh, src: 'dmw'}
+          : {kmh: state.wind700 ?? state.wind, src: '700 hPa'};
+        deckWind.high = dmwHigh
+          ? {kmh: dmwHigh.kmh, src: 'dmw'}
+          : {kmh: state.wind250 ?? state.wind, src: '250 hPa'};
+        dirOf(dmwLow ? dmwLow.dirDeg : state.winddir, windVDeckLow);
+        dirOf(
+          dmwMid ? dmwMid.dirDeg : (state.dir700 ?? state.winddir),
+          windVMid
+        );
+        dirOf(
+          dmwHigh ? dmwHigh.dirDeg : (state.dir250 ?? state.winddir),
+          windVDeckHigh
+        );
 
         // The snowline on the peaks tracks the real freezing level (snow
         // lingers a little below the instantaneous 0°C isotherm).
@@ -16974,8 +17159,10 @@
               : yLowTop !== null && yLowTop > yCloud + 4
                 ? yLowTop
                 : yCloud + 8 + lu.cType.value * 9;
-          lu.wOff.value.x += windV.x * state.wind * 0.06 * dt;
-          lu.wOff.value.y += windV.z * state.wind * 0.06 * dt;
+          // the low deck drifts with NOAA's tracked low-layer motion
+          // while fresh (deckWind, 153rd pass), else the surface wind
+          lu.wOff.value.x += windVDeckLow.x * deckWind.low.kmh * 0.06 * dt;
+          lu.wOff.value.y += windVDeckLow.z * deckWind.low.kmh * 0.06 * dt;
 
           // Mid deck: altostratus at the 700 hPa level - stratiform
           // profile, lower liquid water content, advected by the REAL
@@ -17004,7 +17191,7 @@
             ctopMid !== null && ctopMid > mu.yBase.value + 2
               ? ctopMid
               : mu.yBase.value + 6;
-          const w700 = state.wind700 ?? state.wind;
+          const w700 = deckWind.mid.kmh;
           mu.wOff.value.x += windVMid.x * w700 * 0.06 * dt;
           mu.wOff.value.y += windVMid.z * w700 * 0.06 * dt;
         }
@@ -17023,8 +17210,8 @@
               : 16 * Math.asinh(16),
             yCloud + 26
           ),
-          windVHigh,
-          state.wind250 ?? state.wind
+          windVDeckHigh,
+          deckWind.high.kmh
         );
         cirrusMat.opacity = 0.05 + day * 0.12;
 

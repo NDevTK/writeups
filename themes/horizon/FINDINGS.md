@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **143 reference files, 1140 landmark lines, 7 GPU probes** (live gate
+- **143 reference files, 1142 landmark lines, 7 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -829,8 +829,27 @@ The practice the corpus demonstrates, stated so it can be reused:
    pixels within 5 pixels — while it is fresh, the hourly series
    standing otherwise, the source named on the record; at 21:50Z the
    two read 673 and 672 W/m² for the same hour, the ratio printed
-   beside the ATBD's precision
-   (`goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
+   beside the ATBD's precision. Pass 153 gives the decks their own
+   measured drift: NOAA's derived motion winds (the DMW ATBD v4.4,
+   Daniels, Bailey & Bresky 2025, read in full — cloud features
+   tracked through three images 5 minutes apart by nested tracking
+   and clustering, the dominant cluster's median cloud-top pressure
+   the height; GOES-17's band-14 vectors within 3.5–3.7 m/s of
+   radiosondes at low level, 4.9–5.3 aloft, Table 16) are a point
+   list every 15 minutes, read whole in one range as the eighth
+   product; the vectors within 150 km are grouped by the ATBD's
+   three layers, each layer's vector mean taken over the tightest of
+   50/100/150 km holding three vectors, and while the file is under
+   45 minutes old the low, mid and high decks drift with that
+   motion instead of the surface wind and the balloon's or model's
+   700 and 250 hPa levels — the ranking stated (the tracked features
+   are the clouds drawn, minutes old), the balloon keeping every
+   other use of the level winds; at 22:32Z all three decks rode the
+   measured south-westerly (9.2, 14.2 and 21.5 m/s at 834, 479 and
+   328 hPa) beside the model's 11.1 at 700 and 30.5 at 250 hPa
+   (`goesl2-reference` THE MEASURED MOTION; `server-reference` THE
+   VECTORS READ WHOLE, on a real-file cut written by h5py with a
+   python/numpy oracle; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
    imagery and DCOMP windows, DSR pins; `hdf5-reference` THE WINDOW
    READ, THE RANGE READ;
    `server-reference` THE WINDOW READ IN PLACE; `goesl2-reference`

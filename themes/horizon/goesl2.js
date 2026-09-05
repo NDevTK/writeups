@@ -385,7 +385,16 @@ export const L2_PRODUCTS = {
   // min, 2 km (the Enterprise SRB algorithm: Laszlo, Kim & Liu, ATBD
   // v5.0 EPS 2.0, 2020 - read in full), 40 MB a file, its window
   // ~1.4 MB by range
-  dsr: 'ABI-L2-DSRF'
+  dsr: 'ABI-L2-DSRF',
+  // the 153rd pass: the derived motion winds - not a grid but a list
+  // of vectors: features (cloud edges; in clear sky the moisture
+  // gradients of the water-vapour bands) tracked through three
+  // sequential images 5 min apart, the height the median cloud-top
+  // pressure of the tracked cluster (the DMW ATBD v4.4, Daniels,
+  // Bailey & Bresky, 2025, read in full); CONUS every 15 min, one
+  // file per band, band 14 (11.2 um) day and night, ~38 km between
+  // vectors; 0.3 MB a file, read whole in one range
+  dmw: 'ABI-L2-DMWC'
 };
 // The DSR file's own flag meanings (DQF flag_values 0..1): the
 // ATBD's overall quality flag is 1 when the solar or local zenith
@@ -418,6 +427,68 @@ export const SST_DQF_MEANINGS = [
   'severely_degraded_quality_qf',
   'invalid_due_to_unprocessed_qf'
 ];
+// THE MEASURED MOTION (153rd pass): the derived motion winds' band
+// (the DMWC prefix lists a file per band - C02, C07, C08, C09, C10,
+// C14; the 11.2 um window band runs day and night), the ATBD's
+// three layers (Sec. 3.4.2's per-layer statistics, the file's own
+// atmospheric_layer_pressure_bounds), the file's own flag meanings
+// (DQF flag_values 0..22 - the CONUS file writes good winds only,
+// 7008 of 7008 on 2026-09-05 21:46Z; the codes name why a target
+// failed) and the ATBD's own numbers: the requirement (its
+// specification table: mean vector difference 7.5 m/s accuracy,
+// 4.2 m/s precision, 3-155 m/s, quantitative to 70 degrees LZA)
+// and Table 16's GOES-17 band-14 validation against radiosondes
+// (Nov 2018 - Nov 2019, the range of its four seasons, by layer -
+// the low layer the tightest, the errors growing with height and
+// speed, the ATBD's own reading).
+export const DMW_BAND = 'C14';
+export const DMW_LAYERS = [
+  {id: 'high', hPa: [100, 399.9]},
+  {id: 'mid', hPa: [400, 699.9]},
+  {id: 'low', hPa: [700, 1000]}
+];
+export const DMW_DQF_MEANINGS = [
+  'good_wind_qf',
+  'invalid_due_to_max_gradient_below_threshold_qf',
+  'invalid_due_to_location_on_earth_limb_qf',
+  'invalid_due_to_cloud_amount_below_or_exceeds_threshold_qf',
+  'invalid_due_to_median_pressure_retrieval_failure_qf',
+  'invalid_due_to_bad_or_missing_brightness_temp_or_reflectance_qf',
+  'invalid_due_to_multiple_cloud_layers_qf',
+  'invalid_due_to_insufficient_structure_for_reliable_tracking_qf',
+  'invalid_due_to_cloud_tracking_correlation_below_threshold_qf',
+  'invalid_due_to_u_component_acceleration_exceeds_threshold_qf',
+  'invalid_due_to_v_component_acceleration_exceeds_threshold_qf',
+  'invalid_due_to_u_and_v_components_acceleration_exceeds_threshold_qf',
+  'invalid_due_to_wind_speed_below_threshold_qf',
+  'invalid_due_to_day_night_terminator_proximity_below_threshold_qf',
+  'invalid_due_to_cloud_height_median_pressure_below_or_exceeds_threshold_qf',
+  'invalid_due_to_feature_match_at_search_region_boundary_qf',
+  'invalid_due_to_difference_with_forecast_wind_exceeds_threshold_qf',
+  'invalid_due_to_difference_in_image_pairs_cloud_height_median_pressure_exceeds_threshold_qf',
+  'invalid_due_to_data_needed_for_search_region_unavailable_qf',
+  'invalid_due_to_falure_of_quality_indicator_and_expected_error_method_checks_qf',
+  'invalid_due_to_missing_data_in_search_region_qf',
+  'invalid_due_to_winds_not_found_qf',
+  'invalid_due_to_feature_cluster_not_found_qf'
+];
+export const DMW_ATBD = {
+  requirement: {accuracyMs: 7.5, precisionMs: 4.2},
+  speedRangeMs: [3, 155],
+  lzaQuantitativeDeg: 70,
+  lzaGoodDeg: 62, // the file's own retrieval_local_zenith_angle bound
+  targetBoxPx: 19, // band 14's target scene (the file's target_box_size)
+  imageGapS: 300, // CONUS: three images 5 min apart (seconds_between_images)
+  // Table 16, GOES-17 LWIR (11.2 um) vs radiosondes: [winter..fall]
+  // range of the accuracy (mean vector difference) and precision
+  // (its standard deviation), m/s
+  lwirVsRaob: {
+    all: {accuracyMs: [4.6, 4.97], precisionMs: [3.02, 3.28]},
+    high: {accuracyMs: [4.91, 5.29], precisionMs: [3.14, 3.32]},
+    mid: {accuracyMs: [4.35, 5.27], precisionMs: [2.9, 3.53]},
+    low: {accuracyMs: [3.52, 3.69], precisionMs: [2.3, 2.46]}
+  }
+};
 // The imagery bucket lists every band's file under one prefix
 // (OR_ABI-L2-CMIPC-M6C13_G18_s...): the band from a key, and the
 // keys of one band.
@@ -606,6 +677,204 @@ export function boxMean(values, dqf, box, r) {
     min: n ? min : null,
     max: n ? max : null
   };
+}
+// THE MEASURED MOTION (153rd pass): the derived motion winds are a
+// point list, so the window is a radius. Great-circle distance on
+// the mean sphere (the file gives geodetic lat/lon per vector).
+const DMW_EARTH_KM = 6371.0088;
+export function dmwDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = Math.PI / 180;
+  const p1 = lat1 * R;
+  const p2 = lat2 * R;
+  const a =
+    Math.sin(((lat2 - lat1) * R) / 2) ** 2 +
+    Math.cos(p1) * Math.cos(p2) * Math.sin(((lon2 - lon1) * R) / 2) ** 2;
+  return 2 * DMW_EARTH_KM * Math.asin(Math.sqrt(Math.min(1, a)));
+}
+export function dmwLayerOf(hPa) {
+  for (const l of DMW_LAYERS) if (hPa >= l.hPa[0] && hPa <= l.hPa[1]) return l.id;
+  return null;
+}
+// The vectors within a radius of a point from the file's columns
+// ({lat, lon, spdMs, dirDeg, hPa, tK, dqf, lzaDeg, szaDeg}, one
+// entry per vector, the file's -999 fill and any value outside the
+// product's own ranges left out), nearest first, each with its
+// distance. The flag rides along: the layers take DQF 0 only.
+export function dmwWithin(cols, latDeg, lonDeg, radiusKm) {
+  const out = [];
+  for (let i = 0; i < cols.lat.length; i++) {
+    const la = cols.lat[i];
+    const lo = cols.lon[i];
+    const spd = cols.spdMs[i];
+    const dir = cols.dirDeg[i];
+    const p = cols.hPa[i];
+    if (!(Math.abs(la) <= 90) || !(Math.abs(lo) <= 180)) continue;
+    if (!(spd >= 0) || !(dir >= 0 && dir <= 360) || !(p > 0 && p <= 1100))
+      continue;
+    const km = dmwDistanceKm(latDeg, lonDeg, la, lo);
+    if (!(km <= radiusKm)) continue;
+    out.push({
+      km,
+      lat: la,
+      lon: lo,
+      spdMs: spd,
+      dirDeg: dir,
+      hPa: p,
+      tK: cols.tK ? cols.tK[i] : NaN,
+      dqf: cols.dqf ? cols.dqf[i] : 0,
+      lzaDeg: cols.lzaDeg ? cols.lzaDeg[i] : NaN,
+      szaDeg: cols.szaDeg ? cols.szaDeg[i] : NaN
+    });
+  }
+  out.sort((a, b) => a.km - b.km);
+  return out;
+}
+// The wire: the vectors as rounded columns (a few hundred numbers),
+// and the same objects back from them - the daemon packs, the page
+// unpacks, the layers are computed from the unpacked list on both.
+const dmwRound = (v, d) => (Number.isFinite(v) ? +v.toFixed(d) : null);
+export function dmwColumns(vectors) {
+  const cols = {
+    km: [],
+    lat: [],
+    lon: [],
+    spdMs: [],
+    dirDeg: [],
+    hPa: [],
+    tK: [],
+    dqf: [],
+    lzaDeg: [],
+    szaDeg: []
+  };
+  for (const v of vectors) {
+    cols.km.push(dmwRound(v.km, 1));
+    cols.lat.push(dmwRound(v.lat, 4));
+    cols.lon.push(dmwRound(v.lon, 4));
+    cols.spdMs.push(dmwRound(v.spdMs, 2));
+    cols.dirDeg.push(dmwRound(v.dirDeg, 1));
+    cols.hPa.push(dmwRound(v.hPa, 1));
+    cols.tK.push(dmwRound(v.tK, 2));
+    cols.dqf.push(v.dqf);
+    cols.lzaDeg.push(dmwRound(v.lzaDeg, 1));
+    cols.szaDeg.push(dmwRound(v.szaDeg, 1));
+  }
+  return cols;
+}
+export function dmwUnpack(cols) {
+  const out = [];
+  if (!cols || !cols.km) return out;
+  for (let i = 0; i < cols.km.length; i++)
+    out.push({
+      km: cols.km[i],
+      lat: cols.lat[i],
+      lon: cols.lon[i],
+      spdMs: cols.spdMs[i],
+      dirDeg: cols.dirDeg[i],
+      hPa: cols.hPa[i],
+      tK: cols.tK[i],
+      dqf: cols.dqf[i],
+      lzaDeg: cols.lzaDeg[i],
+      szaDeg: cols.szaDeg[i]
+    });
+  return out;
+}
+// The nearest good vector to a point within maxKm, or null.
+export function dmwNearest(vectors, latDeg, lonDeg, maxKm) {
+  let best = null;
+  for (const v of vectors) {
+    if (v.dqf !== 0) continue;
+    const km = dmwDistanceKm(latDeg, lonDeg, v.lat, v.lon);
+    if (km <= maxKm && (!best || km < best.km)) best = {...v, km};
+  }
+  return best;
+}
+// THE LAYERS' WINDS - what the decks drift with: for each ATBD layer
+// the good vectors (DQF 0) in it within the TIGHTEST of the radii
+// holding at least minN of them (the nearest sufficient sample -
+// three vectors span the ATBD's ~38 km spacing once over), their
+// VECTOR mean (u = -V sin(dir), v = -V cos(dir): the meteorological
+// from-direction, the file's own convention; the mean vector's
+// speed and from-direction - two winds 20 degrees apart average to
+// the direction between them, a whisker slower), the speeds' scalar
+// mean, median, min, max and standard deviation, the median
+// pressure, the nearest vector's distance. n counts the layer's
+// good vectors in the whole list; radiusKm null (with the rest
+// null) when no radius holds minN.
+export function dmwLayers(vectors, {minN = 3, radiiKm = [50, 100, 150]} = {}) {
+  const R = Math.PI / 180;
+  const out = {};
+  for (const l of DMW_LAYERS) {
+    const mine = vectors.filter(
+      (v) => v.dqf === 0 && v.hPa >= l.hPa[0] && v.hPa <= l.hPa[1]
+    );
+    let take = null;
+    let radius = null;
+    for (const r of radiiKm) {
+      const s = mine.filter((v) => v.km <= r);
+      if (s.length >= minN) {
+        take = s;
+        radius = r;
+        break;
+      }
+    }
+    if (!take) {
+      out[l.id] = {
+        n: mine.length,
+        used: 0,
+        radiusKm: null,
+        spdMs: null,
+        dirDeg: null,
+        meanMs: null,
+        medianMs: null,
+        minMs: null,
+        maxMs: null,
+        sdMs: null,
+        medianHpa: null,
+        nearestKm: mine.length ? mine[0].km : null
+      };
+      continue;
+    }
+    let su = 0;
+    let sv = 0;
+    let ss = 0;
+    const speeds = [];
+    const press = [];
+    for (const v of take) {
+      su += -v.spdMs * Math.sin(v.dirDeg * R);
+      sv += -v.spdMs * Math.cos(v.dirDeg * R);
+      ss += v.spdMs;
+      speeds.push(v.spdMs);
+      press.push(v.hPa);
+    }
+    const n = take.length;
+    const mu = su / n;
+    const mv = sv / n;
+    const mean = ss / n;
+    let sq = 0;
+    for (const s of speeds) sq += (s - mean) * (s - mean);
+    speeds.sort((a, b) => a - b);
+    press.sort((a, b) => a - b);
+    // the from-direction to a microdegree (the file's own float32
+    // directions carry ~1e-5), so a mean pointing north reads 0,
+    // never 359.999999
+    const dir =
+      Math.round(((Math.atan2(-mu, -mv) / R + 360) % 360) * 1e6) / 1e6;
+    out[l.id] = {
+      n: mine.length,
+      used: n,
+      radiusKm: radius,
+      spdMs: Math.hypot(mu, mv),
+      dirDeg: dir % 360,
+      meanMs: mean,
+      medianMs: quantile(speeds, 0.5),
+      minMs: speeds[0],
+      maxMs: speeds[n - 1],
+      sdMs: Math.sqrt(sq / n),
+      medianHpa: quantile(press, 0.5),
+      nearestKm: take[0].km
+    };
+  }
+  return out;
 }
 // THE DECODER AUDITED: the theme's brightness temperatures (read
 // off GIBS's colour-mapped tiles, C) against NOAA's own CMI (K) at

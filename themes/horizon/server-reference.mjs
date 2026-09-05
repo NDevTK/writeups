@@ -51,9 +51,13 @@ import {
   SST_HALF_DEG,
   SST_STRIDE,
   decodeL2,
+  decodeL2Vectors,
   decodeL2Window,
   l2Cell,
   l2DcompBody,
+  l2DmwBody,
+  L2_DMW_HEAD_BYTES,
+  L2_DMW_RADIUS_KM,
   l2FileUrl,
   l2HeightBody,
   l2ImageryBody,
@@ -111,6 +115,8 @@ import {haversineKm} from './lightning.js';
 import {
   boxMean,
   dcompCensus,
+  dmwLayers,
+  dmwUnpack,
   fieldCensus,
   goodCensus,
   heightCensus,
@@ -119,7 +125,13 @@ import {
 } from './goesl2.js';
 import {openHdf5, openHdf5Lazy} from './hdf5.js';
 import {inflateSync} from 'node:zlib';
-import {ACHAC_B64, ACHAC_NAME} from './hdf5-fixture.js';
+import {
+  ACHAC_B64,
+  ACHAC_NAME,
+  DMWC_B64,
+  DMWC_EXPECT,
+  DMWC_NAME
+} from './hdf5-fixture.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -1097,21 +1109,142 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_DSR_SPEC.DSR === 'raw16' &&
       L2_DSR_SPEC.DQF === 'raw' &&
       L2_HALF_PX.dsr === 50 &&
-      L2_ASKS.length === 7 &&
+      L2_ASKS.length === 8 &&
       L2_ASKS.map((a) => a.id).join(',') ===
-        'mask,height,imagery,cod,cps,sst,dsr' &&
+        'mask,height,imagery,cod,cps,sst,dsr,dmw' &&
       L2_ASKS[2].band === 'C13' &&
-      L2_ASKS.map((a) => a.halfPx).join(',') === '50,10,50,50,50,50,50' &&
+      L2_ASKS.map((a) => a.halfPx ?? '-').join(',') ===
+        '50,10,50,50,50,50,50,-' &&
       // the hourly full-disk SST is never asked for a mosaic's
-      // minute; the 10-minute DSR is (a file within 15 min of any)
+      // minute, nor are the winds (the decks' drift, not a mosaic's
+      // comparison); the 10-minute DSR is (a file within 15 min of any)
       L2_ASKS[5].timed === false &&
-      L2_ASKS.filter((a) => a.timed === false).length === 1 &&
+      L2_ASKS[7].timed === false &&
+      L2_ASKS.filter((a) => a.timed === false).length === 2 &&
       L2_IMAGERY_SPEC.CMI === 'raw16' &&
       L2_COD_SPEC.COD === 'raw16' &&
       L2_CPS_SPEC.CPS === 'raw16' &&
       // the CPS file's flags are the COD file's (measured): not held
       L2_CPS_SPEC.DQF === undefined,
-    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; a DSR body dressed the same way (152nd) carries the home pixel (${dsBody && dsBody.here} W/m2 from the fixture's count there), the mean of ${dsBody && dsBody.near.n} good px within 5 px (${dsBody && dsBody.near.mean} W/m2) and a census of ${dsBody && dsBody.census.good} good px, all recomputed from the wire; /goesl2 asks seven products, the imagery by band C13, the hourly SST never for a mosaic's minute and the 10-minute DSR for one`
+    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; a DSR body dressed the same way (152nd) carries the home pixel (${dsBody && dsBody.here} W/m2 from the fixture's count there), the mean of ${dsBody && dsBody.near.n} good px within 5 px (${dsBody && dsBody.near.mean} W/m2) and a census of ${dsBody && dsBody.census.good} good px, all recomputed from the wire; /goesl2 asks eight products, the imagery by band C13, the hourly SST and the winds never for a mosaic's minute and the 10-minute DSR for one`
+  );
+}
+
+{
+  // THE VECTORS READ WHOLE (153rd pass): the DMWC cut (hdf5-fixture:
+  // the real file's 83 vectors nearest the home, written by h5py
+  // with the file's own names, types, attributes, chunking and
+  // filters) read through the daemon's own range handle with the
+  // winds' head size - one round, one range, the whole file -
+  // decodes to the point list; the vectors within 150 km, the ATBD
+  // layers' counts and vector means agree with python/numpy's
+  // independent reading of the same rows; the body's rounded
+  // columns give the page the same layers; a far point keeps
+  // nothing with nothing more read; a whole-buffer handle agrees;
+  // the eighth ask is the winds by band, whole, never timed.
+  const bytes = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
+  const inflate = (u8) =>
+    new Uint8Array(
+      inflateSync(Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength))
+    );
+  const reads = [];
+  const readRange = async (s, e) => {
+    reads.push([s, e]);
+    return bytes.subarray(s, Math.min(e, bytes.length));
+  };
+  const t0 = Date.now();
+  const lazy = await openHdf5Lazy(readRange, inflate, {
+    blockBytes: L2_RANGE_BLOCK,
+    headBytes: L2_DMW_HEAD_BYTES
+  });
+  const dec = await decodeL2Vectors(lazy, 32.85, -117.12, L2_DMW_RADIUS_KM);
+  const ms = Date.now() - t0;
+  const E = DMWC_EXPECT;
+  const body = dec ? l2DmwBody(dec, 'k') : null;
+  const again = body ? dmwLayers(dmwUnpack(body.vectors)) : null;
+  const readsBefore = reads.length;
+  const far = await decodeL2Vectors(lazy, 0, -137, L2_DMW_RADIUS_KM);
+  const whole = await decodeL2Vectors(
+    openHdf5(bytes, inflate),
+    32.85,
+    -117.12,
+    L2_DMW_RADIUS_KM
+  );
+  const near = (a, b, tol) => Math.abs(a - b) <= tol;
+  // a layer against python's: the counts exact, the statistics to a
+  // millionth (float32 values summed in double on both sides)
+  const layerOk = (id) => {
+    const a = body && body.layers[id];
+    const e = E.layers[id];
+    if (!a || !e) return false;
+    if (a.n !== e.n || a.used !== e.used || a.radiusKm !== e.radiusKm)
+      return false;
+    if (e.radiusKm === null) return a.spdMs === null && a.dirDeg === null;
+    return ['spdMs', 'dirDeg', 'meanMs', 'medianMs', 'minMs', 'maxMs', 'sdMs', 'medianHpa', 'nearestKm'].every(
+      (k) => near(a[k], e[k], 1e-6)
+    );
+  };
+  const againOk = (id) => {
+    const a = again && again[id];
+    const b = body && body.layers[id];
+    if (!a || !b) return false;
+    if (a.n !== b.n || a.used !== b.used || a.radiusKm !== b.radiusKm)
+      return false;
+    if (b.radiusKm === null) return true;
+    return near(a.spdMs, b.spdMs, 0.02) && near(a.dirDeg, b.dirDeg, 0.2);
+  };
+  check(
+    'THE VECTORS READ WHOLE: the point list decodes from the first range, the layers agree with numpy',
+    bytes.length < L2_DMW_HEAD_BYTES &&
+      lazy.stats.rounds === 1 &&
+      lazy.stats.ranges === 1 &&
+      lazy.stats.bytes === bytes.length &&
+      reads[0][0] === 0 &&
+      reads[0][1] === L2_DMW_HEAD_BYTES &&
+      L2_DMW_HEAD_BYTES === 1048576 &&
+      L2_DMW_RADIUS_KM === 150 &&
+      dec !== null &&
+      dec.total === E.total &&
+      dec.vectors.length === E.within150 &&
+      dec.time.startsWith(E.timeIsoMinute) &&
+      dec.platform === 'G18' &&
+      dec.scene === 'CONUS' &&
+      dec.band === 'C14' &&
+      dec.imageGapS === E.gapS &&
+      dec.lzaMaxDeg === E.lzaGood &&
+      near(dec.vectors[0].km, E.nearestKm, 1e-6) &&
+      dec.vectors.every((v, i) => i === 0 || v.km >= dec.vectors[i - 1].km) &&
+      dec.vectors.every((v) => v.dqf === 0 && v.spdMs >= 3 && v.hPa > 0) &&
+      dec.sceneStats.layers.length === 3 &&
+      dec.sceneStats.layers.map((l) => l.n).join(',') ===
+        E.sceneLayerN.join(',') &&
+      dec.sceneStats.layers[0].hPa === 250 &&
+      dec.sceneStats.meanMs > 3 &&
+      body !== null &&
+      body.product === 'ABI-L2-DMWC' &&
+      body.n === E.within150 &&
+      body.vectors.km.length === body.n &&
+      body.vectors.dqf.every((q) => q === 0) &&
+      layerOk('high') &&
+      layerOk('mid') &&
+      layerOk('low') &&
+      againOk('high') &&
+      againOk('mid') &&
+      againOk('low') &&
+      far !== null &&
+      far.vectors.length === 0 &&
+      far.total === E.total &&
+      reads.length === readsBefore &&
+      whole !== null &&
+      whole.vectors.length === dec.vectors.length &&
+      whole.time === dec.time &&
+      L2_ASKS[7].id === 'dmw' &&
+      L2_ASKS[7].kind === 'vectors' &&
+      L2_ASKS[7].band === 'C14' &&
+      L2_ASKS[7].radiusKm === L2_DMW_RADIUS_KM &&
+      L2_ASKS[7].headBytes === L2_DMW_HEAD_BYTES &&
+      L2_ASKS[7].product === 'ABI-L2-DMWC',
+    `the ${DMWC_NAME} cut (${bytes.length} bytes, ${dec && dec.total} vectors) read in ${lazy.stats.rounds} round of ${lazy.stats.ranges} range (${lazy.stats.bytes} bytes: the megabyte head holds the file) in ${ms} ms: ${dec && dec.vectors.length} vectors within ${L2_DMW_RADIUS_KM} km of the home (nearest ${dec && dec.vectors[0].km.toFixed(1)} km) at ${dec && dec.time} from ${dec && dec.platform} ${dec && dec.scene} band ${dec && dec.band}, images ${dec && dec.imageGapS} s apart; the layers - high ${body && body.layers.high.used} of ${body && body.layers.high.n} within ${body && body.layers.high.radiusKm} km at ${body && body.layers.high.spdMs && body.layers.high.spdMs.toFixed(2)} m/s from ${body && body.layers.high.dirDeg && body.layers.high.dirDeg.toFixed(1)} deg, mid ${body && body.layers.mid.n} (too few), low ${body && body.layers.low.used} within ${body && body.layers.low.radiusKm} km at ${body && body.layers.low.spdMs && body.layers.low.spdMs.toFixed(2)} m/s from ${body && body.layers.low.dirDeg && body.layers.low.dirDeg.toFixed(1)} deg - agree with numpy's to a millionth; the wire's rounded columns give the same layers; the sub-satellite point keeps none of the ${E.total} with nothing more read; a whole-buffer handle agrees`
   );
 }
 

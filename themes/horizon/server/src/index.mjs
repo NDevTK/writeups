@@ -114,6 +114,10 @@ import {
   bucketPrefix,
   cutWindow,
   dcompCensus,
+  DMW_BAND,
+  dmwColumns,
+  dmwLayers,
+  dmwWithin,
   fixedGridGeometry,
   boxMean,
   fieldCensus,
@@ -1022,10 +1026,18 @@ export const L2_SST_SPEC = {SST: 'raw16', DQF: 'raw'};
 // goesl2.DSR_DQF_MEANINGS); full disk, every 10 minutes, so a
 // mosaic's minute always has a file within 15 min
 export const L2_DSR_SPEC = {DSR: 'raw16', DQF: 'raw'};
+// The 153rd pass: the derived motion winds (ABI-L2-DMWC, band 14) -
+// a point list, so the "window" is a radius: the vectors within 150
+// km of the point (the ATBD's ~38 km spacing gives a few dozen in
+// cloud), read whole: the head asks for a megabyte and the bucket
+// answers with the 0.3 MB file in one round (kind 'vectors')
+export const L2_DMW_RADIUS_KM = 150;
+export const L2_DMW_HEAD_BYTES = 1048576;
 // what /goesl2 fetches for a point: product, spec, the window's half
 // width on the product's grid, the imagery's band (the CMIPC prefix
 // lists every band's file); timed false = not asked for a mosaic's
-// minute (the hourly full-disk SST has no file within 15 min of it)
+// minute (the hourly full-disk SST has no file within 15 min of it;
+// the winds are the decks' drift now, not a mosaic's comparison)
 export const L2_ASKS = [
   {id: 'mask', product: L2_PRODUCTS.mask, spec: L2_MASK_SPEC, halfPx: 50},
   {id: 'height', product: L2_PRODUCTS.height, spec: L2_HEIGHT_SPEC, halfPx: 10},
@@ -1045,7 +1057,16 @@ export const L2_ASKS = [
     halfPx: 50,
     timed: false
   },
-  {id: 'dsr', product: L2_PRODUCTS.dsr, spec: L2_DSR_SPEC, halfPx: 50}
+  {id: 'dsr', product: L2_PRODUCTS.dsr, spec: L2_DSR_SPEC, halfPx: 50},
+  {
+    id: 'dmw',
+    product: L2_PRODUCTS.dmw,
+    band: DMW_BAND,
+    kind: 'vectors',
+    radiusKm: L2_DMW_RADIUS_KM,
+    headBytes: L2_DMW_HEAD_BYTES,
+    timed: false
+  }
 ];
 const l2Scalar = (a) => (Array.isArray(a) ? a[0] : a);
 const l2Inflate = (u8) =>
@@ -1193,6 +1214,78 @@ export async function decodeL2Window(f, spec, lat, lon, halfPx) {
     meta
   };
 }
+// The vectors decode (153rd pass): the DMW file is a point list -
+// one row per wind vector (its lat/lon, speed, from-direction, the
+// tracked cluster's median cloud-top pressure, the tracer's
+// brightness temperature, the flag, the zenith angles, the
+// triplet's mid-point time) with the scene's own layer statistics
+// beside it - read whole through the same range handle (or a
+// whole-buffer one). Keeps the vectors within radiusKm of the
+// point, nearest first (goesl2.dmwWithin, gated), and the scene's
+// counts by layer. null = not a DMW file.
+const l2Values = async (f, name) => {
+  const d = await f.dataset(name);
+  return d && d.values && !d.values.unread ? d.values : null;
+};
+export async function decodeL2Vectors(f, lat, lon, radiusKm) {
+  const names = {
+    lat: 'lat',
+    lon: 'lon',
+    spdMs: 'wind_speed',
+    dirDeg: 'wind_direction',
+    hPa: 'pressure',
+    tK: 'temperature',
+    dqf: 'DQF',
+    lzaDeg: 'local_zenith_angle',
+    szaDeg: 'solar_zenith_angle'
+  };
+  const cols = {};
+  for (const [k, name] of Object.entries(names)) {
+    const v = await l2Values(f, name);
+    if (!v) return null;
+    cols[k] = v;
+  }
+  const t = await l2Values(f, 'time');
+  if (!t || !t.length) return null;
+  const root = await f.rootAttrs();
+  const lza = await f.dataset('retrieval_local_zenith_angle_bounds');
+  const band = await l2Values(f, 'band_id');
+  const gap = await l2Values(f, 'seconds_between_images');
+  const layerP = await l2Values(f, 'atmospheric_layer_pressure');
+  const layerN = await l2Values(f, 'number_of_wind_vectors_in_atmospheric_layer');
+  const layerCtp = await l2Values(
+    f,
+    'mean_cloud_top_pressure_in_atmospheric_layer'
+  );
+  const scalar = async (name) => {
+    const v = await l2Values(f, name);
+    return v && v.length ? Number(v[0]) : null;
+  };
+  const sceneStats = {
+    meanMs: await scalar('mean_wind_speed'),
+    sdMs: await scalar('standard_deviation_wind_speed'),
+    minMs: await scalar('minimum_wind_speed'),
+    maxMs: await scalar('maximum_wind_speed'),
+    outliers: await scalar('wind_speed_outlier_count'),
+    layers: layerP
+      ? Array.from(layerP).map((p, i) => ({
+          hPa: Number(p),
+          n: layerN ? Number(layerN[i]) : null,
+          meanCtpHpa: layerCtp ? Number(layerCtp[i]) : null
+        }))
+      : null
+  };
+  return {
+    time: productTimeIso(Number(t[0])),
+    ...l2Tail(root, lza),
+    band: band && band.length ? 'C' + String(band[0]).padStart(2, '0') : null,
+    imageGapS: gap && gap.length ? Number(gap[0]) : null,
+    total: cols.lat.length,
+    radiusKm,
+    vectors: dmwWithin(cols, lat, lon, radiusKm),
+    sceneStats
+  };
+}
 // The window around a point on a decoded product: the index box,
 // the pixel's ground size at the view's slant, and every kept
 // dataset cut to it; null when the point is outside the scene. A
@@ -1307,6 +1400,33 @@ export function l2SstBody(dec, key, lat, lon) {
     sstFill: 65535,
     dqf: packArray(w.cut.DQF, 'u8'),
     census: {...goodCensus(sstK, w.cut.DQF), degraded}
+  };
+}
+// The derived motion winds' body (153rd pass): the vectors within
+// the radius as rounded columns (goesl2.dmwColumns), the layers'
+// winds the page will recompute from them (goesl2.dmwLayers - the
+// vector mean of the good vectors within the tightest radius
+// holding three, by ATBD layer), the scene's own statistics, the
+// triplet's spacing and the good-wind zenith bound.
+export function l2DmwBody(dec, key) {
+  if (!dec || !dec.vectors) return null;
+  return {
+    product: L2_PRODUCTS.dmw,
+    key,
+    time: dec.time,
+    start: dec.start,
+    end: dec.end,
+    platform: dec.platform,
+    scene: dec.scene,
+    lzaMaxDeg: dec.lzaMaxDeg,
+    band: dec.band,
+    imageGapS: dec.imageGapS,
+    radiusKm: dec.radiusKm,
+    total: dec.total,
+    n: dec.vectors.length,
+    vectors: dmwColumns(dec.vectors),
+    layers: dmwLayers(dec.vectors),
+    sceneStats: dec.sceneStats
   };
 }
 // The surface irradiance window (152nd pass): NOAA's downward
@@ -2389,16 +2509,9 @@ function main() {
     }
     throw new Error(product + ' ' + r.status);
   };
-  async function l2File(
-    bucket,
-    product,
-    spec,
-    deadline,
-    at,
-    band,
-    cell,
-    halfPx
-  ) {
+  async function l2File(bucket, ask, deadline, at, cell) {
+    const {product, spec, halfPx} = ask;
+    const band = ask.band ?? null;
     const pk = bucket + '/' + product + (band ? '-' + band : '');
     const ck = cell.lat + '/' + cell.lon;
     const held = l2Fail.get(pk);
@@ -2431,9 +2544,15 @@ function main() {
               }
             ),
             l2Inflate,
-            {blockBytes: L2_RANGE_BLOCK, headBytes: L2_HEAD_BYTES}
+            {
+              blockBytes: L2_RANGE_BLOCK,
+              headBytes: ask.headBytes ?? L2_HEAD_BYTES
+            }
           );
-          const dec = await decodeL2Window(f, spec, cell.lat, cell.lon, halfPx);
+          const dec =
+            ask.kind === 'vectors'
+              ? await decodeL2Vectors(f, cell.lat, cell.lon, ask.radiusKm)
+              : await decodeL2Window(f, spec, cell.lat, cell.lon, halfPx);
           if (!dec) throw new Error(product + ': not readable');
           l2State.ranges += f.stats.ranges;
           l2State.rangeBytes += f.stats.bytes;
@@ -2461,7 +2580,11 @@ function main() {
               (total ? `${(total / 1e6).toFixed(1)} MB` : 'unknown size') +
               `, ${f.stats.rounds} rounds in ${Date.now() - t0} ms, ${dec.time}` +
               (at ? `, for ${at}` : '') +
-              (dec.box ? '' : ', outside the scene') +
+              (dec.vectors
+                ? `, ${dec.vectors.length} of ${dec.total} vectors within ${ask.radiusKm} km`
+                : dec.box
+                  ? ''
+                  : ', outside the scene') +
               ')'
           );
           return row;
@@ -2501,18 +2624,7 @@ function main() {
     const deadline = Date.now() + UPSTREAM_BUDGET_MS;
     const asks = at ? L2_ASKS.filter((a) => a.timed !== false) : L2_ASKS;
     const got = await Promise.all(
-      asks.map((a) =>
-        l2File(
-          bucket,
-          a.product,
-          a.spec,
-          deadline,
-          at,
-          a.band ?? null,
-          cell,
-          a.halfPx
-        )
-      )
+      asks.map((a) => l2File(bucket, a, deadline, at, cell))
     );
     const F = Object.fromEntries(asks.map((a, i) => [a.id, got[i]]));
     if (!got.some((f) => f)) return null;
@@ -2551,6 +2663,7 @@ function main() {
         : null,
       sst: F.sst ? l2SstBody(F.sst.dec, F.sst.key, cell.lat, cell.lon) : null,
       dsr: F.dsr ? l2DsrBody(F.dsr.dec, F.dsr.key, cell.lat, cell.lon) : null,
+      dmw: F.dmw ? l2DmwBody(F.dmw.dec, F.dmw.key) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial'
     };
     goesl2Cache.set(ck, {t: Date.now(), body});
@@ -2808,7 +2921,11 @@ function main() {
           cell: v.cell,
           time: v.dec.time,
           scene: v.dec.scene,
-          box: v.dec.box ? `${v.dec.box.rows}x${v.dec.box.cols}` : null,
+          box: v.dec.box
+            ? `${v.dec.box.rows}x${v.dec.box.cols}`
+            : v.dec.vectors
+              ? `${v.dec.vectors.length} of ${v.dec.total} vectors`
+              : null,
           readKb: Math.round(v.bytes / 1024),
           fileMb: v.total ? +(v.total / 1e6).toFixed(1) : null,
           ranges: v.ranges,

@@ -32,6 +32,17 @@ import {
   boxMean,
   DSR_ATBD,
   DSR_DQF_MEANINGS,
+  DMW_ATBD,
+  DMW_BAND,
+  DMW_DQF_MEANINGS,
+  DMW_LAYERS,
+  dmwColumns,
+  dmwDistanceKm,
+  dmwLayerOf,
+  dmwLayers,
+  dmwNearest,
+  dmwUnpack,
+  dmwWithin,
   fieldCensus,
   latLonToFixedGrid,
   latestByStart,
@@ -620,6 +631,128 @@ const inflate = (u8) =>
       `${L2_PRODUCTS.dsr} with its two flag meanings; the ATBD's ABI validation - accuracy ~${DSR_ATBD.accuracyPct}%, ` +
       `precision ${DSR_ATBD.precisionPct}% (${DSR_ATBD.precisionWm2} W/m2), requirement 110/65/85 W/m2 by range, ` +
       `quantitative to ${DSR_ATBD.quantitativeSzaDeg} degrees`
+  );
+}
+
+// ---- THE MEASURED MOTION (153rd pass) ----------------------------
+// dmwWithin: the vectors within a radius from the file's columns,
+// nearest first, fill and out-of-range rows left out, the flag
+// carried; dmwLayerOf at the ATBD's own boundaries; dmwLayers: the
+// tightest radius holding three good vectors, the vector mean (the
+// meteorological from-direction), the scalar statistics; the wire's
+// columns round-trip; dmwNearest; the product, band, flags and the
+// ATBD's figures.
+{
+  const home = [32.85, -117.12];
+  // ten rows: the home's own point (low, from 350), 0.3 deg north
+  // (33.4 km; low, from 10), 0.6 deg north (66.7 km; low, from 0 -
+  // the three low winds 20 degrees apart), 0.9 deg north (100 km;
+  // 399.9 hPa = high's floor), 0.9 deg south (100 km; 400 hPa =
+  // mid's ceiling), 1.2 deg east (~112 km; 699.9 hPa = mid), 1.2 deg
+  // west (700 hPa = low, 112 km), 2 deg north (222 km: outside), a
+  // flagged low vector 0.2 deg south (22 km, DQF 3), a fill row
+  const cols = {
+    lat: [32.85, 33.15, 33.45, 33.75, 31.95, 32.85, 32.85, 34.85, 32.65, -999],
+    lon: [
+      -117.12, -117.12, -117.12, -117.12, -117.12, -115.92, -118.32, -117.12,
+      -117.12, -999
+    ],
+    spdMs: [10, 10, 10, 20, 20, 15, 12, 30, 9, -999],
+    dirDeg: [350, 10, 0, 90, 90, 180, 270, 45, 200, -999],
+    hPa: [900, 850, 1000, 399.9, 400, 699.9, 700, 300, 950, -999],
+    tK: [280, 281, 283, 230, 231, 250, 270, 220, 285, -999],
+    dqf: [0, 0, 0, 0, 0, 0, 0, 0, 3, -128],
+    lzaDeg: [40, 40, 40, 40, 40, 40, 40, 40, 40, -999],
+    szaDeg: [50, 50, 50, 50, 50, 50, 50, 50, 50, -999]
+  };
+  const w = dmwWithin(cols, home[0], home[1], 150);
+  const kms = w.map((v) => v.km);
+  const ordered = kms.every((k, i) => i === 0 || k >= kms[i - 1]);
+  const L = dmwLayers(w);
+  // the low layer: within 50 km only the home's own and the 33-km
+  // vector are good (the 22-km one is flagged) -> 100 km takes the
+  // three 20 degrees apart: u = 10(sin 10 - sin 10 + 0)/3 = 0, v =
+  // -(10 cos 10 + 10 cos 10 + 10)/3 -> from 0 at 9.899 m/s (the 112-km
+  // 700 hPa vector waits outside the 100-km radius, counted in n)
+  const lowSpd = (2 * 10 * Math.cos((10 * Math.PI) / 180) + 10) / 3;
+  const back = dmwUnpack(dmwColumns(w));
+  const Lb = dmwLayers(back);
+  const nearHome = dmwNearest(w, 32.86, -117.12, 30);
+  const nearNone = dmwNearest(w, 40, -117.12, 30);
+  const d0 = dmwDistanceKm(0, 0, 0, 1); // a degree of longitude on the equator
+  check(
+    'THE MEASURED MOTION: the radius, the layers, the vector mean',
+    w.length === 8 &&
+      ordered &&
+      near(w[0].km, 0, 1e-9) &&
+      w[0].dirDeg === 350 &&
+      w[1].dqf === 3 &&
+      near(w[1].km, dmwDistanceKm(32.85, -117.12, 32.65, -117.12), 1e-9) &&
+      w[1].km > 22 &&
+      w[1].km < 22.5 &&
+      w.every((v) => v.km <= 150) &&
+      !w.some((v) => v.hPa === 300) &&
+      !w.some((v) => v.lat === -999) &&
+      dmwLayerOf(399.9) === 'high' &&
+      dmwLayerOf(400) === 'mid' &&
+      dmwLayerOf(699.9) === 'mid' &&
+      dmwLayerOf(700) === 'low' &&
+      dmwLayerOf(1000) === 'low' &&
+      dmwLayerOf(99) === null &&
+      dmwLayerOf(1001) === null &&
+      L.low.n === 4 &&
+      L.low.used === 3 &&
+      L.low.radiusKm === 100 &&
+      near(L.low.spdMs, lowSpd, 1e-9) &&
+      near(L.low.dirDeg, 0, 1e-9) &&
+      L.low.meanMs === 10 &&
+      L.low.medianMs === 10 &&
+      L.low.minMs === 10 &&
+      L.low.maxMs === 10 &&
+      L.low.sdMs === 0 &&
+      L.low.medianHpa === 900 &&
+      L.low.nearestKm === 0 &&
+      L.mid.n === 2 &&
+      L.mid.used === 0 &&
+      L.mid.radiusKm === null &&
+      L.mid.spdMs === null &&
+      L.mid.nearestKm !== null &&
+      L.high.n === 1 &&
+      L.high.radiusKm === null &&
+      JSON.stringify(Lb.low) === JSON.stringify(L.low) &&
+      Lb.mid.n === L.mid.n &&
+      Lb.mid.radiusKm === null &&
+      // the wire rounds a distance to 0.1 km
+      near(Lb.mid.nearestKm, L.mid.nearestKm, 0.05) &&
+      back.length === 8 &&
+      back[0].lat === 32.85 &&
+      back[1].dqf === 3 &&
+      nearHome !== null &&
+      nearHome.dirDeg === 350 &&
+      nearHome.km < 1.2 &&
+      nearNone === null &&
+      near(d0, 111.195, 1e-2) &&
+      L2_PRODUCTS.dmw === 'ABI-L2-DMWC' &&
+      DMW_BAND === 'C14' &&
+      DMW_LAYERS.length === 3 &&
+      DMW_LAYERS[0].id === 'high' &&
+      DMW_DQF_MEANINGS.length === 23 &&
+      DMW_DQF_MEANINGS[0] === 'good_wind_qf' &&
+      DMW_DQF_MEANINGS[22] === 'invalid_due_to_feature_cluster_not_found_qf' &&
+      DMW_ATBD.requirement.accuracyMs === 7.5 &&
+      DMW_ATBD.requirement.precisionMs === 4.2 &&
+      DMW_ATBD.lwirVsRaob.low.accuracyMs[1] === 3.69 &&
+      DMW_ATBD.lwirVsRaob.high.precisionMs[0] === 3.14 &&
+      DMW_ATBD.imageGapS === 300 &&
+      DMW_ATBD.targetBoxPx === 19,
+    `of ten rows eight lie within 150 km (the 222-km and the fill row out), nearest first (the home's own at 0 km, ` +
+      `the flagged one at ${w[1].km.toFixed(1)} km); the ATBD's boundaries 399.9/400 and 699.9/700 hPa fall high/mid and mid/low; ` +
+      `the low layer holds ${L.low.n} good vectors, takes ${L.low.used} within ${L.low.radiusKm} km (50 km held only two) ` +
+      `and their vector mean is ${L.low.spdMs.toFixed(3)} m/s from ${L.low.dirDeg.toFixed(1)} deg against a scalar mean of ` +
+      `${L.low.meanMs} (three winds 20 degrees apart); mid (2) and high (1) hold too few for a mean; the wire's rounded ` +
+      `columns give the same layers; the nearest good vector 1 km from the home is the home's own; a degree of longitude ` +
+      `on the equator is ${d0.toFixed(3)} km; ${L2_PRODUCTS.dmw} band ${DMW_BAND}, ${DMW_DQF_MEANINGS.length} flag meanings, ` +
+      `the requirement 7.5 / 4.2 m/s and Table 16's GOES-17 low-layer accuracy ${DMW_ATBD.lwirVsRaob.low.accuracyMs.join('-')} m/s`
   );
 }
 

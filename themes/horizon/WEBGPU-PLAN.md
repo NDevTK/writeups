@@ -10345,6 +10345,115 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 153rd pass - THE MEASURED
+  MOTION): the decks drifted with the surface wind (low), the 700
+  hPa level (mid) and the 250 hPa level (high) - a balloon's level
+  where a fresh ascent reached, else the model - while NOAA tracks
+  the very clouds the decks draw every fifteen minutes. THE
+  PRIMARY: Daniels, Bailey & Bresky, "ATBD for Derived Motion
+  Winds", v4.4, NOAA NESDIS STAR, 1 Nov 2025, 121 pages, read in
+  full: targets (19 x 19 pixels for band 14) selected on the middle
+  image of three 5 minutes apart (CONUS) under the cloud mask,
+  gradient and cloud-amount tests; nested tracking - sub-scenes of
+  the target box each tracked by sum-of-squared differences, the
+  motions clustered (DBSCAN), the dominant cluster's motion the
+  vector and ITS pixels' median cloud-top pressure the height
+  (Sec. 3.4.2; Daniels & Bresky 2010 for the slow-speed bias it
+  removed); the low-level inversion handling; the quality
+  indicator and expected-error checks; DQF 0 good with failure
+  codes 1-22; the three layers 100-399.9 / 400-699.9 / 700-1000 hPa
+  the statistics are reported by; the requirement (mean vector
+  difference 7.5 m/s accuracy, 4.2 m/s precision, 3-155 m/s,
+  quantitative to 70 degrees LZA); Table 16's GOES-17 band-14
+  validation against radiosondes over four seasons - accuracy
+  4.6-5.0 m/s and precision 3.0-3.3 all levels, low 3.5-3.7 /
+  2.3-2.5, mid 4.4-5.3 / 2.9-3.5, high 4.9-5.3 / 3.1-3.3, the errors
+  growing with height and speed (the ATBD's own reading); the
+  cloud-top water-vapour winds about 1 m/s faster than GFS (Table
+  24) and the clear-sky ones the hardest (Sec. 4.5); Sec. 5.3's
+  quality monitoring (counts by layer, mean/min/max/sd of speed),
+  which the file itself carries; Sec. 6.3.1's own verdict that
+  height assignment is the major error source. THE FILE
+  (OR_ABI-L2-DMWC-M6C14_G18_s20262482146178, read): 7008 vectors,
+  every one DQF 0 (the CONUS file writes good winds only), lat/lon
+  float64, speed/direction/pressure/temperature float32 with -999
+  fill, direction "wind from direction measured positive clockwise
+  from due north", pressure "area: median ... of tracked feature's
+  dominant cluster", DQF int8 with 23 flag meanings, time the
+  triplet's mid-point (J2000 seconds), seconds_between_images 300,
+  target_box_size 19, nested tracking enabled,
+  retrieval_local_zenith_angle 62 degrees, the layer counts 2731 /
+  398 / 4212 (high / mid / low) with mean cloud-top pressures 266 /
+  543 / 919 hPa, "38km at nadir"; 296 kB; the file landing about 8
+  min after its scan (c-stamp 21:54 for s 21:46). (1) goesl2.js:
+  DMW_BAND, DMW_LAYERS, the 23 flag meanings, DMW_ATBD (the
+  requirement, Table 16 by layer); dmwWithin (the vectors within a
+  radius, nearest first, fill and out-of-range rows out), dmwLayers
+  (per layer the good vectors within the TIGHTEST of 50 / 100 / 150
+  km holding three - the nearest sufficient sample, stated - their
+  vector mean in the from-convention, the scalar
+  mean/median/min/max/sd, the median pressure), dmwColumns /
+  dmwUnpack (the wire), dmwNearest, dmwDistanceKm. (2) THE DAEMON:
+  the eighth ask ('dmw', ABI-L2-DMWC by band C14, kind 'vectors',
+  never timed) read WHOLE through the same range handle - the head
+  asks for a megabyte and the bucket answers with the file, one
+  round, one range (measured live: 290 kB in 169 ms) -
+  decodeL2Vectors keeps the vectors within 150 km with the scene's
+  own statistics; l2DmwBody puts the rounded columns (3.4 kB on the
+  wire for 31 vectors), the layers and the scene statistics in the
+  body; /probe's windows list the vectors' count. Measured at
+  22:29Z: the 22:16Z file's 31 of 7045 vectors within 150 km - high
+  3 within 50 km at 21.5 m/s from 218 degrees (median 328 hPa), mid
+  4 within 150 km at 14.2 from 211 (479 hPa), low 5 within 150 km
+  at 9.2 from 203 (834 hPa). (3) THE PAGE: goesL2Winds names each
+  deck's wind - NOAA's layer motion while the file is under 45 min
+  old and the layer holds three vectors, else the level winds as
+  before - and the decks alone read it (windVDeckLow / windVMid /
+  windVDeckHigh, deckWind; windV and windVHigh keep the surface and
+  250 hPa winds for the rain, the trees, the smoke, the contrails,
+  the twinkle rate); RANKING, stated on the line: the tracked
+  features ARE the clouds drawn, minutes old, so their motion
+  outranks the balloon's hours-old level wind for the DRIFT alone -
+  the balloon keeps the plume's bend, the lee-wave hunt, the
+  contrails; the record "NOAA GOES-18 derived motion winds (DMWC)";
+  the NOAA line prints the three layers with their radii, speeds,
+  pressures and nearest distances, the level winds the page holds
+  aloft beside them, which decks drift with the measurement, and
+  Table 16's figures; the pick readout names the nearest vector
+  within 40 km. MEASURED on the page at 22:32Z: the 22:16Z file 16
+  min old, all three decks drifting with the measured motion,
+  beside the model's 700 hPa 11.1 m/s from 217 and 250 hPa 30.5
+  from 247 - the same south-westerly at every level, the tracked
+  clouds between the model's levels (479 hPa reads 14.2, 328 hPa
+  21.5). GATE (goesl2-reference): ten synthetic rows - eight within
+  150 km nearest first, the ATBD's boundaries at 399.9/400 and
+  699.9/700 hPa, the low layer's three winds 20 degrees apart
+  averaging to 9.899 m/s from 0 against a scalar mean of 10, the
+  tightest radius at 100 km when 50 held two, the wire's round
+  trip, the flags and Table 16 pinned; (server-reference): the
+  real file's 83 vectors nearest the home cut with h5py into
+  hdf5-fixture.js (58.8 kB; the file's own names, types,
+  attributes, chunking and filters) read through the daemon's
+  range handle in one round of one range, its 19 vectors within
+  150 km and the layers' vector means agreeing with python/numpy's
+  independent reading of the same rows to a millionth (the oracle
+  summing in double - NumPy 2 keeps float32 arithmetic in float32,
+  which sat 2e-5 off the daemon's double sums on the first run),
+  the far point keeping none with nothing more read, the eight
+  asks pinned. STATED LIMITS: a layer's mean is over three to
+  seven vectors 23-150 km off, and a vector is a 38-km cell's
+  dominant motion carrying Table 16's 3.5-5.3 m/s - the decks'
+  drift, not a wind at the observer; the mid and low layers
+  reached 150 km before holding three (the low vectors sat 95 km
+  off: the marine layer's edge); the cloud top the height came from
+  is the cluster's median, not the deck's drawn top; band 14 only
+  (the visible band-2 winds by day and the water-vapour bands'
+  clear-sky winds stay on the shelf with the range reader's other
+  candidates). THE DEPLOY, WATCHED: https://api.ndev.tk answered
+  nothing (connection failures) from about 22:02Z through 22:34Z -
+  after the 149th's deploy at 21:41Z the box went dark in its next
+  self-update run; the 150th-153rd wait for it to come back, to be
+  checked next pass.
 - DONE (Sep 5, the review session's 152nd pass - THE DAYLIGHT,
   MEASURED; A PREMISE CORRECTED): the 91st pass built the
   clearness index and the radiative closure on Open-Meteo's
