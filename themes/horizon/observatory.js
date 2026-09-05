@@ -87,15 +87,8 @@ import {parseTLEs, satMagnitude, sunlitEci} from './sats.js';
 import {rayFan} from './far-terrain.js';
 import {fleagleFitFilm} from './fleagle.js';
 import {AUTOCONVECTIVE_K_PER_M} from './fleagle.js';
-import {KAPPA, eSatPa, marineColumnRows, moBulk} from './surfacelayer.js';
-import {
-  CP_AIR,
-  airDensity,
-  coolSkin,
-  latentHeat,
-  lwDown,
-  lwDownDefault
-} from './coolskin.js';
+import {eSatPa, marineColumnRows, moBulk} from './surfacelayer.js';
+import {coolSkin, lwDown, lwDownDefault} from './coolskin.js';
 import {localSeconds, warmLayerInit, warmLayerStep} from './warmlayer.js';
 import {
   lehnFitElevated,
@@ -1113,24 +1106,22 @@ export function marinePanel(
     if (!comp) return null;
     if (!lw) break;
     const mo = comp.mo;
-    const rhoA = airDensity(comp.pSeaPa, met.taC, mo.qA ?? mo.qS);
-    // w'theta' = -kappa u* theta* in the module's convention, so
-    // the ocean's sensible loss is -rho cp kappa u* theta*.
-    const hsb = -rhoA * CP_AIR * KAPPA * mo.uStar * mo.thetaStar;
-    const hlb =
-      mo.qA === null
-        ? 0
-        : -rhoA * latentHeat(tsBase) * KAPPA * mo.uStar * mo.qStar;
+    // the fluxes are the module's own (140th pass: COARE 3.6's loop
+    // returns them in the code's frame - its density at the
+    // thermometer's height, its latent heat; positive when the
+    // ocean loses heat) - the composition owns no flux law
+    const hsb = mo.hsbWm2;
+    const hlb = mo.hlbWm2;
     cs = coolSkin({
       uStar: mo.uStar,
-      rhoA,
+      rhoA: mo.rhoA,
       tsC: tsBase,
       hsb,
       hlb,
       lwDn: lw.wm2,
       swNet: swNetWm2
     });
-    flux = {hsb, hlb, rhoA};
+    flux = {hsb, hlb, rhoA: mo.rhoA};
     const converged = Math.abs(cs.dTK - skin) < 1e-5;
     skin = cs.dTK;
     if (converged) {
@@ -1173,8 +1164,16 @@ export function marinePanel(
     L: mo.L,
     zetaU: mo.zetaU,
     clamped: mo.clamped,
+    // the profile forms the column rides (140th pass: COARE 3.6's,
+    // gated on PSL's archive) and the code's first-pass rule for
+    // zeta_u > 50 (a very stable film: the first pass is kept)
+    forms: mo.forms,
+    k50: mo.k50,
     uStar: mo.uStar,
     thetaStar: mo.thetaStar,
+    tauNm2: mo.tauNm2,
+    rhoAKgM3: mo.rhoA,
+    cd10n: mo.cd10n,
     filmLapseKm: lapse,
     filmDropK: mo.tAt(0.5) - mo.tAt(10),
     tSurfaceC: mo.tAt(0),
@@ -1196,12 +1195,9 @@ export function marinePanel(
     // COARE's u10N = usr / von / gf x ln(10/zo): the gust factor
     // gf = sqrt(U^2 + gust^2) / U takes the convective gustiness
     // back OUT, so a calm pier under a warm sea reports a calm
-    // neutral wind, not the gust velocity's
-    u10nMs:
-      met.uMs > 1e-6
-        ? ((mo.uStar / KAPPA) * Math.log(10 / mo.z0)) /
-          (Math.sqrt(met.uMs * met.uMs + mo.gust * mo.gust) / met.uMs)
-        : 0,
+    // neutral wind, not the gust velocity's (the module's own,
+    // since the 140th)
+    u10nMs: mo.u10nMs,
     // the skin (136th pass)
     skinK: skin,
     skinDzM: cs ? cs.dzM : null,
@@ -1218,8 +1214,10 @@ export function marinePanel(
     lwDnWm2: lw ? lw.wm2 : null,
     lwSource: lw ? lw.source : 'none',
     lwRmseWm2: lw ? lw.rmseWm2 : null,
-    hsbWm2: flux ? flux.hsb : null,
-    hlbWm2: flux ? flux.hlb : null,
+    // the bulk fluxes (positive: the ocean loses heat) - the
+    // module's own, on whatever surface the column stands on
+    hsbWm2: flux ? flux.hsb : mo.hsbWm2,
+    hlbWm2: flux ? flux.hlb : mo.hlbWm2,
     rnlWm2: cs ? cs.rnlWm2 : null,
     q0Wm2: cs ? cs.qcolWm2 : null,
     shore: shore ? {id: shore.id, km: shore.km} : null
@@ -1310,15 +1308,16 @@ export function warmLayerDay(
       tsC: s.tsC,
       pPa,
       dewC,
+      latDeg,
       bliM: 600
     });
-    const rhoA = airDensity(pPa, s.taC, mo.qA ?? mo.qS);
-    const hsb = -rhoA * CP_AIR * KAPPA * mo.uStar * mo.thetaStar;
-    const hlb =
-      mo.qA === null
-        ? 0
-        : -rhoA * latentHeat(s.tsC) * KAPPA * mo.uStar * mo.qStar;
-    const tau = rhoA * mo.uStar * mo.uStar;
+    // the module's own fluxes and stress (140th pass): the stress
+    // WITHOUT the gustiness, as the code reports tau and as its
+    // warm-layer routine consumes it
+    const rhoA = mo.rhoA;
+    const hsb = mo.hsbWm2;
+    const hlb = mo.hlbWm2;
+    const tau = mo.tauNm2;
     const eHpa =
       dewC === null ? null : Math.min(eSatPa(dewC), eSatPa(s.taC)) / 100;
     const lwDn =
@@ -1393,6 +1392,7 @@ export function pierWindPanel(met, {bliM = 600} = {}) {
     tsC: met.tsC,
     pPa: Number.isFinite(met.pPa) ? met.pPa : 101325,
     dewC: Number.isFinite(met.dewC) ? met.dewC : null,
+    latDeg: Number.isFinite(met.latDeg) ? met.latDeg : null,
     bliM: Number.isFinite(bliM) ? bliM : 600
   });
   const stability =
@@ -1409,16 +1409,15 @@ export function pierWindPanel(met, {bliM = 600} = {}) {
     gustMs: mo.gust,
     L: mo.L,
     stability,
+    forms: mo.forms,
+    k50: mo.k50,
     u10Ms: mo.uAt(10),
     // COARE's u10N = usr / von / gf x ln(10/zo): the gust factor
     // gf = sqrt(U^2 + gust^2) / U takes the convective gustiness
     // back OUT, so a calm pier under a warm sea reports a calm
-    // neutral wind, not the gust velocity's
-    u10nMs:
-      met.uMs > 1e-6
-        ? ((mo.uStar / KAPPA) * Math.log(10 / mo.z0)) /
-          (Math.sqrt(met.uMs * met.uMs + mo.gust * mo.gust) / met.uMs)
-        : 0
+    // neutral wind, not the gust velocity's (the module's own,
+    // since the 140th)
+    u10nMs: mo.u10nMs
   };
 }
 

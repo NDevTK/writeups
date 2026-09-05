@@ -1,9 +1,15 @@
 // Reference printer for the marine surface layer (node
-// surfacelayer-reference.mjs). Three primaries, all READ IN FULL
+// surfacelayer-reference.mjs). Four primaries, all READ IN FULL
 // (see surfacelayer.js): Businger, Wyngaard, Izumi & Bradley 1971
 // (the Kansas flux-profile relations), Paulson 1970 (their
 // closed-form integrals), Fairall et al. 2003 (COARE 3.0's sea
-// roughness, gustiness and bulk iteration). The gate holds:
+// roughness, gustiness and bulk iteration), and the COARE 3.6
+// code itself (coare36vn_zrf_et - the profile forms the page runs
+// since the 140th pass, gated below on NOAA PSL's measured ship
+// hours). The Kansas landmarks (1-6, 8) run the module's 'kansas'
+// forms where they test Businger's printed physics; the
+// composition and wind landmarks (7, 9) run the page's default.
+// The gate holds:
 //  - the printed constants and the printed neutral values
 //    (kappa 0.35, phi_h(0) 0.74, the eddy-diffusivity ratio 1.35,
 //    the near-neutral slope 3.0 of both phi's)
@@ -30,27 +36,50 @@
 //    film back from the composed column's own fan and closes
 //    against the similarity profile inside the measured band -
 //    two frames (Fleagle's mean lapse, Businger's profile), one
-//    film.
+//    film - and the same contrast on COARE's forms, measured
+//  - COARE 3.6's PROFILE FORMS AS THE CODE WRITES THEM (140th
+//    pass): the convective limb as the integral of (1 - a zeta)^-1/3
+//    (to the code's own rounding of the exponent), the blend
+//    weights, the neutral values and slopes of both branches (the
+//    scalar form's rounded constants leave a 0.0045 step at
+//    neutrality - the code's, measured), the Charnock cap, the
+//    scalar-roughness cap, the gustiness floor, the first-pass rule
+//    and the latitude gravity
+//  - THE ARCHIVE: PSL's measured hours through the module - the
+//    archive's own air, humidity, wind and skin temperature in,
+//    PSL's u*, t*, Hs, Hl, density and U10N out, hour by hour; and
+//    the Kansas pairing measured on the same hours (the reason for
+//    the switch, in W/m^2)
 import {
   ALPHA_EDDY_NEUTRAL,
   BETA_STABLE,
   BUSINGER_KAPPA,
   CHARNOCK_HI,
   CHARNOCK_LO,
+  COARE36,
   KAPPA,
   PR_NEUTRAL,
+  charnock36,
   charnockAlpha,
+  convectiveBlend,
+  gravityOfLat,
   inversionBaseM,
   marineColumnRows,
   moBulk,
   phiH,
   phiM,
+  psiConvective,
   psiH,
+  psiH26,
   psiM,
+  psiM26,
+  psiM40,
   richardsonOfZeta,
   roughnessScalar,
+  roughnessScalar36,
   roughnessZ0
 } from './surfacelayer.js';
+import {SHIPFLUX_AT, SHIPFLUX_SKIN} from './shipflux-fixture.js';
 import {retrievalPanel, flashPanel} from './observatory.js';
 import {ductScan} from './refraction.js';
 import {profileFromRows} from './observatory.js';
@@ -145,7 +174,8 @@ const check = (name, ok, detail) => {
     taC: 20 - (9.80665 / 1004.7) * 10,
     ztM: 10,
     tsC: 20,
-    pPa: 101325
+    pPa: 101325,
+    forms: 'kansas'
   });
   const logLaw = (mo.uStar / KAPPA) * Math.log(10 / mo.z0);
   const cd10n = Math.pow(KAPPA / Math.log(10 / mo.z0), 2);
@@ -185,7 +215,8 @@ const check = (name, ok, detail) => {
     taC: Tat(7),
     ztM: 7,
     tsC,
-    pPa: 101325
+    pPa: 101325,
+    forms: 'kansas'
   });
   check(
     'the bulk solution round-trips its own profiles',
@@ -294,28 +325,37 @@ const balloon = (h0, tSurf, invBaseAgl = 600) => {
 
 // ---- 8. the cross-closure, and the looming class --------------
 // A calm pier with water 5 K warmer than the air (film -169 K/km
-// in the similarity profile), composed under the same synthetic
-// balloon, through the panel's own cascade from the tower eye:
-// the Fleagle instrument must read the film back from the drawn
-// horizon and close INSIDE the pier's measured band - never
-// leaning on the modelled mixed layer. Two frames, one film. And
-// the mirror case - warm air over cold water - must show up as a
-// surface DUCT with one of Young's ducted flash classes: the
-// looming side of the same contrast.
+// in the Kansas similarity profile), composed under the same
+// synthetic balloon, through the panel's own cascade from the
+// tower eye: the Fleagle instrument must read the film back from
+// the drawn horizon and close INSIDE the pier's measured band -
+// never leaning on the modelled mixed layer. Two frames, one film.
+// And the mirror case - warm air over cold water - must show up as
+// a surface DUCT with one of Young's ducted flash classes: the
+// looming side of the same contrast. Since the 140th pass the
+// same contrast is also run on COARE 3.6's forms (the page's):
+// the free-convection limb puts the calm film in the lowest
+// metre, the 0.5-10 m band weaker by a factor of three, and the
+// tower eye's fan is asked the same question - MEASURED, not
+// assumed (the outcome is printed either way).
 {
   const rows = balloon(134, 24);
-  const warm = marineColumnRows(
-    rows,
-    {uMs: 0.5, zuM: 8, taC: 15, ztM: 7, tsC: 20, pPa: 101325},
-    {bliM: 600}
-  );
-  const r = retrievalPanel(warm.rows, {
-    modelBand: warm.modelBand,
+  const met = {uMs: 0.5, zuM: 8, taC: 15, ztM: 7, tsC: 20, pPa: 101325};
+  const warm = marineColumnRows(rows, met, {bliM: 600, forms: 'kansas'});
+  const ladder = {
     eyesM: [22, 30],
     distsM: [10e3, 15e3, 20e3, 25e3, 30e3, 40e3, 60e3]
-  });
+  };
+  const r = retrievalPanel(warm.rows, {modelBand: warm.modelBand, ...ladder});
   const R = r.retrieved;
-  const filmMo = ((warm.mo.tAt(10) - warm.mo.tAt(0.5)) / 9.5) * 1000;
+  const film = (mo) => ((mo.tAt(10) - mo.tAt(0.5)) / 9.5) * 1000;
+  const filmMo = film(warm.mo);
+  const warmC = marineColumnRows(rows, met, {bliM: 600});
+  const rC = retrievalPanel(warmC.rows, {
+    modelBand: warmC.modelBand,
+    ...ladder
+  });
+  const filmC = film(warmC.mo);
   const cold = marineColumnRows(
     rows,
     {uMs: 3, zuM: 8, taC: 21, ztM: 7, tsC: 17, pPa: 101325},
@@ -335,13 +375,17 @@ const balloon = (h0, tSurf, invBaseAgl = 600) => {
     R.params.gammaFilmKpM < -0.08 &&
     R.params.gammaFilmKpM > -0.25 &&
     Math.abs(R.dTretr - R.dTballoon) < 0.6 &&
+    warmC.mo.forms === 'coare36' &&
+    filmC < -34.16 &&
+    filmC > filmMo &&
+    warmC.mo.tAt(0) - warmC.mo.tAt(1) > warm.mo.tAt(0) - warm.mo.tAt(1) &&
     ducts.length >= 1 &&
     ['in-duct', 'ducted-mock-mirage', 'sub-duct'].includes(fl.type);
   check(
     'Fleagle reads Businger: the cross-closure, and the looming class',
     ok,
     R
-      ? `water +5 K, calm: the similarity film is ${filmMo.toFixed(0)} K/km over 0.5-10 m; the tower eye's fold at ${(r.distM / 1000).toFixed(0)} km is read by the film family as ${(R.params.gammaFilmKpM * 1000).toFixed(0)} K/km over ${R.params.wM.toFixed(0)} m (drop ${(-R.dTretr).toFixed(2)} K vs the profile's ${(-R.dTballoon).toFixed(2)} K), closing at ${R.rmsK.toFixed(3)} K RMS over ${R.spanM[0].toFixed(0)}-${R.spanM[1].toFixed(0)} m - inside the pier's ${warm.pierTopM}-m band, no lean on the modelled layer; air +4 K over cold water: ${ducts.length} surface duct(s), flash class "${fl.type}" - the looming side of the same measured contrast`
+      ? `water +5 K, calm, Kansas forms: the similarity film is ${filmMo.toFixed(0)} K/km over 0.5-10 m; the tower eye's fold at ${(r.distM / 1000).toFixed(0)} km is read by the film family as ${(R.params.gammaFilmKpM * 1000).toFixed(0)} K/km over ${R.params.wM.toFixed(0)} m (drop ${(-R.dTretr).toFixed(2)} K vs the profile's ${(-R.dTballoon).toFixed(2)} K), closing at ${R.rmsK.toFixed(3)} K RMS over ${R.spanM[0].toFixed(0)}-${R.spanM[1].toFixed(0)} m - inside the pier's ${warm.pierTopM}-m band, no lean on the modelled layer; the SAME contrast on COARE 3.6's forms: ${filmC.toFixed(0)} K/km over 0.5-10 m (the free-convection limb holds ${(warmC.mo.tAt(0) - warmC.mo.tAt(1)).toFixed(2)} K in the lowest metre against Kansas's ${(warm.mo.tAt(0) - warm.mo.tAt(1)).toFixed(2)}), and the same fan from 22/30 m over 10-60 km ${rC.retrieved ? `folds at ${(rC.distM / 1000).toFixed(0)} km (${rC.mode}, ${rC.retrieved.closes ? 'closes' : 'does not close'})` : 'finds no fold - the archive-gated forms keep the calm film below what the 100-m fan resolves'}; air +4 K over cold water: ${ducts.length} surface duct(s), flash class "${fl.type}" - the looming side of the same measured contrast`
       : `declined: ${r.note}`
   );
 }
@@ -416,6 +460,237 @@ const balloon = (h0, tSurf, invBaseAgl = 600) => {
       )
       .join('; ') +
       ' - the actual wind sits under the neutral wind when the water heats the air and over it when the air is the warmer, meeting it at neutrality'
+  );
+}
+
+// 10. COARE 3.6's PROFILE FORMS AS THE CODE WRITES THEM (140th
+// pass): psiu_26 / psit_26 / psiu_40 and the loop's rules, held as
+// identities and printed measurements of the code's own text.
+{
+  const integ = (f, a, b, n = 40000) => {
+    let s = 0;
+    const h = (b - a) / n;
+    for (let i = 0; i < n; i++) {
+      const x0 = a + i * h;
+      s += (f(x0) + 4 * f(x0 + h / 2) + f(x0 + h)) * (h / 6);
+    }
+    return s;
+  };
+  // (a) the convective limb is the integral of phi = (1 - a zeta)^-1/3
+  // (Fairall 2003 Eq. 13's stated origin), to the code's rounding
+  // of the exponent (0.3333)
+  let worstC = 0;
+  for (const a of [10.15, 34.15, 10])
+    for (const zeta of [-0.3, -2, -10]) {
+      const num = -integ(
+        (z) => (1 - Math.pow(1 - a * z, -1 / 3)) / z,
+        zeta,
+        -1e-9
+      );
+      worstC = Math.max(worstC, Math.abs(num - psiConvective(zeta, a)));
+    }
+  // (b) the blend weights and the Kansas limb near neutral
+  const f = [-0.1, -1, -10].map(convectiveBlend);
+  const kansasNear = Math.abs(psiM26(-0.01) - psiM(-0.01));
+  // (c) the neutral values: the velocity forms vanish exactly; the
+  // scalar form's rounded constants (0.6667 x 14.28 against 8.525
+  // + 1) leave it 0.0045 short - a step the code carries
+  const stepH = psiH26(0);
+  // (d) the slopes at neutrality, both sides of both forms
+  const slope = (fn, side) => (fn(side * 1e-7) - fn(0)) / (side * 1e-7);
+  const sM = [slope(psiM26, -1), slope(psiM26, 1)];
+  // (the unstable branch reaches 0 at neutrality, the stable branch
+  // its rounded step: each side's slope against its own limit)
+  const sH = [psiH26(-1e-7) / -1e-7, slope(psiH26, 1)];
+  // (e) the stable forms' far limit: linear in zeta once the
+  // exponential term has died (a zeta + b c / d)
+  const farM = psiM26(100) + (0.7 * 100 + (0.75 * 5) / 0.35);
+  // (f) the loop's rules
+  const cap =
+    charnock36(19) === charnock36(25) && charnock36(19) === charnock36(19.5);
+  const zoqCap = roughnessScalar36(1e-3) === COARE36.zoqCapM;
+  const stable = moBulk({
+    uMs: 3,
+    zuM: 17.5,
+    taC: 21,
+    ztM: 16.5,
+    tsC: 17,
+    pPa: 101325
+  });
+  const veryStable = moBulk({
+    uMs: 0.3,
+    zuM: 17.5,
+    taC: 30,
+    ztM: 16.5,
+    tsC: 15,
+    pPa: 101325
+  });
+  const calmWarm = moBulk({
+    uMs: 0.5,
+    zuM: 17.5,
+    taC: 17,
+    ztM: 16.5,
+    tsC: 20,
+    pPa: 101325,
+    latDeg: 32.87
+  });
+  const g0 = gravityOfLat(0);
+  const g90 = gravityOfLat(90);
+  const ok =
+    worstC < 2e-3 &&
+    Math.abs(f[0] - 0.0099) < 1e-4 &&
+    f[1] === 0.5 &&
+    Math.abs(f[2] - 0.9901) < 1e-4 &&
+    kansasNear < 1e-4 &&
+    psiM26(0) === 0 &&
+    psiM40(0) === 0 &&
+    Math.abs(stepH + 0.0045) < 2e-4 &&
+    Math.abs(sM[0] + 3.75) < 1e-3 &&
+    Math.abs(sM[1] + 5.2) < 1e-3 &&
+    Math.abs(sH[0] + 7.5) < 1e-3 &&
+    Math.abs(sH[1] + (1.5 * 0.6667 + 0.6667 + 0.6667 * 14.28 * 0.35)) < 1e-4 &&
+    Math.abs(farM) < 1e-9 &&
+    cap &&
+    Math.abs(charnock36(10) - 0.012) < 1e-12 &&
+    zoqCap &&
+    stable.gust === COARE36.gustFloorMs &&
+    !stable.k50 &&
+    veryStable.k50 &&
+    Number.isFinite(veryStable.uStar) &&
+    veryStable.uStar > 0 &&
+    calmWarm.gust > COARE36.gustFloorMs &&
+    calmWarm.z0 > 0 &&
+    calmWarm.forms === 'coare36' &&
+    calmWarm.iterations === COARE36.nits &&
+    g0 === 9.7803267715 &&
+    Math.abs(g90 - 9.8322) < 1e-3;
+  check(
+    "COARE 3.6's profile forms as the code writes them",
+    ok,
+    `the convective limb integrates (1 - a zeta)^-1/3 to ${worstC.toExponential(1)} for a = 10.15, 34.15, 10 (the residual is the code's 0.3333 for 1/3); blend weights zeta^2/(1+zeta^2) = ${f.map((x) => x.toFixed(4)).join(', ')} at zeta -0.1, -1, -10 (psiu_26 is Paulson's psi_1 to ${kansasNear.toExponential(1)} at -0.01); at neutrality psiu_26 = ${psiM26(0)}, psiu_40 = ${psiM40(0)}, psit_26 = ${stepH.toFixed(4)} (the rounded 14.28 / 8.525 leave a step the code carries); slopes at neutrality: velocity ${sM[0].toFixed(2)} unstable (Kansas gamma/4) vs ${sM[1].toFixed(2)} stable (a + b + b c = 0.7 + 0.75 + 3.75), scalar ${sH[0].toFixed(2)} vs ${sH[1].toFixed(2)} (1.5 x 2/3 + 2/3 + 2/3 x 14.28 x 0.35) - both forms change slope across neutral; the stable forms go linear (a zeta + b c/d) once e^-d zeta dies (${farM.toExponential(1)} at zeta 100); Charnock alpha ${charnock36(10).toFixed(4)} at U10N 10 m/s, capped at 19 m/s; z0q capped at ${COARE36.zoqCapM} m; stable air takes the ${COARE36.gustFloorMs}-m/s gustiness floor; air +15 K over calm water trips the first-pass rule (zeta_u > 50: u* ${veryStable.uStar.toFixed(4)} m/s from pass 1, L ${veryStable.L.toFixed(1)} m); calm warm water gusts ${calmWarm.gust.toFixed(2)} m/s over ${COARE36.ziDefaultM} m; g(0) = ${g0}, g(90) = ${g90.toFixed(4)} (grv)`
+  );
+}
+
+// 11. THE ARCHIVE (140th pass): NOAA PSL's measured hours through
+// the module - the frozen skin rows (shipflux-fixture.js) that
+// carry the bulk inputs: air temperature, humidity and wind at
+// their measured heights, the skin temperature PSL fed the
+// algorithm, the pressure, latitude and salinity in; PSL's own u*,
+// t*, Hs, Hl, air density and U10N out. Then the Kansas pairing on
+// the same hours: the 135th's forms, measured in W/m^2.
+{
+  const rows = SHIPFLUX_SKIN.filter((r) =>
+    [
+      r.taC,
+      r.qGkg,
+      r.ztM,
+      r.zqM,
+      r.uMs,
+      r.zuM,
+      r.tskinC,
+      r.pHpa,
+      r.uStar,
+      r.hsDown,
+      r.hlDown,
+      r.rhoA
+    ].every(Number.isFinite)
+  );
+  const dewOfQ = (q, pHpa) => {
+    const e = (q * pHpa * 100) / (0.622 + 0.378 * q);
+    const ln = Math.log(e / 610.94);
+    return (243.04 * ln) / (17.625 - ln);
+  };
+  const run = (forms) => {
+    const acc = {
+      u: [0, 0],
+      ts: [0, 0],
+      hs: [0, 0],
+      hl: [0, 0],
+      rho: [0, 0],
+      u10n: [0, 0]
+    };
+    let n = 0;
+    let nU10 = 0;
+    let far = 0;
+    let uMax = 0;
+    let hlMax = 0;
+    for (const r of rows) {
+      const mo = moBulk({
+        uMs: r.uMs,
+        zuM: r.zuM,
+        taC: r.taC,
+        ztM: r.ztM,
+        zqM: r.zqM,
+        qAKgKg: r.qGkg / 1000,
+        dewC: forms === 'kansas' ? dewOfQ(r.qGkg / 1000, r.pHpa) : null,
+        tsC: r.tskinC,
+        pPa: r.pHpa * 100,
+        latDeg: r.latDeg,
+        ssPsu: r.ssPsu ?? 35,
+        bliM: 600,
+        forms
+      });
+      const d = {
+        u: mo.uStar - r.uStar,
+        ts: Number.isFinite(r.tStar) ? mo.thetaStar * KAPPA - r.tStar : 0,
+        hs: mo.hsbWm2 - -r.hsDown,
+        hl: mo.hlbWm2 - -r.hlDown,
+        rho: mo.rhoA - r.rhoA,
+        u10n: Number.isFinite(r.u10nMs) ? mo.u10nMs - r.u10nMs : null
+      };
+      for (const k of ['u', 'ts', 'hs', 'hl', 'rho']) {
+        acc[k][0] += d[k];
+        acc[k][1] += d[k] * d[k];
+      }
+      if (d.u10n !== null) {
+        acc.u10n[0] += d.u10n;
+        acc.u10n[1] += d.u10n * d.u10n;
+        nU10++;
+      }
+      n++;
+      uMax = Math.max(uMax, Math.abs(d.u));
+      hlMax = Math.max(hlMax, Math.abs(d.hl));
+      if (Math.abs(d.hl) > 5 || Math.abs(d.u) > 0.01) far++;
+    }
+    const st = (k, m = n) => ({
+      bias: acc[k][0] / m,
+      rmse: Math.sqrt(acc[k][1] / m)
+    });
+    return {
+      n,
+      far,
+      uMax,
+      hlMax,
+      u: st('u'),
+      ts: st('ts'),
+      hs: st('hs'),
+      hl: st('hl'),
+      rho: st('rho'),
+      u10n: st('u10n', nU10),
+      nU10
+    };
+  };
+  const c = run('coare36');
+  const k = run('kansas');
+  const ok =
+    c.n >= 200 &&
+    c.u.rmse < 1e-3 &&
+    Math.abs(c.u.bias) < 5e-4 &&
+    c.ts.rmse < 1e-3 &&
+    c.hs.rmse < 0.1 &&
+    Math.abs(c.hs.bias) < 0.05 &&
+    c.hl.rmse < 2.5 &&
+    Math.abs(c.hl.bias) < 1.5 &&
+    c.rho.rmse < 1e-3 &&
+    c.u10n.rmse < 0.05 &&
+    c.far <= Math.ceil(0.01 * c.n) &&
+    k.hl.bias > 10 &&
+    k.hl.rmse > c.hl.rmse * 5;
+  const fmt = (s, d) => `bias ${s.bias.toFixed(d)}, RMSE ${s.rmse.toFixed(d)}`;
+  check(
+    "THE ARCHIVE: PSL's measured hours through the module",
+    ok,
+    `${c.n} frozen night hours (${SHIPFLUX_AT}) with the bulk inputs: on COARE 3.6's forms the module returns PSL's u* to ${fmt(c.u, 5)} m/s (worst ${c.uMax.toFixed(4)}), t* to ${fmt(c.ts, 5)} K, sensible flux ${fmt(c.hs, 3)} W/m^2, latent flux ${fmt(c.hl, 2)} W/m^2 (worst ${c.hlMax.toFixed(1)}; the archive's humidity is printed to 0.1 g/kg), air density ${fmt(c.rho, 5)} kg/m^3, U10N ${fmt(c.u10n, 3)} m/s on ${c.nU10} hours - ${c.far} hour(s) off by more than 5 W/m^2 latent or 0.01 m/s in u*; the Kansas pairing (0.74 Prandtl, COARE 3.0 roughness) on the same hours: u* ${fmt(k.u, 4)}, sensible ${fmt(k.hs, 2)}, latent ${fmt(k.hl, 1)} W/m^2 - the measured reason the page switched forms`
   );
 }
 

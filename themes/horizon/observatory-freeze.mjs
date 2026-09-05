@@ -836,7 +836,14 @@ async function emitPins(fixturePath) {
             mar.warmSurfaceK === null ? null : [mar.warmSurfaceK, 0.02],
           warmDzM: mar.warmDzM === null ? null : [mar.warmDzM, 0.5],
           warmSolarKwhM2:
-            mar.warmSolarKwhM2 === null ? null : [mar.warmSolarKwhM2, 0.05]
+            mar.warmSolarKwhM2 === null ? null : [mar.warmSolarKwhM2, 0.05],
+          // the bulk fluxes on COARE 3.6's own profile forms (140th)
+          forms: mar.forms,
+          k50: mar.k50,
+          uStarMs: [mar.uStar, 0.003],
+          hsbWm2: [mar.hsbWm2, 0.5],
+          hlbWm2: [mar.hlbWm2, 1],
+          tauNm2: [mar.tauNm2, 0.002]
         }
       : null,
     lehnSea: lehSea

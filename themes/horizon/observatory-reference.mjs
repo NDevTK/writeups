@@ -1109,6 +1109,18 @@ if (COOPS_MET && DAY_PINS.marine) {
             ['warm depth m', mar.warmDzM, P.warmDzM],
             ['day solar kWh/m2', mar.warmSolarKwhM2, P.warmSolarKwhM2]
           ]
+        : []),
+      // the bulk fluxes on COARE 3.6's own profile forms (140th
+      // pass), the forms gated on PSL's measured ship hours
+      ...(P.uStarMs !== undefined
+        ? [
+            ['profile forms', mar.forms, P.forms],
+            ['first-pass rule', mar.k50, P.k50],
+            ['u* m/s', mar.uStar, P.uStarMs],
+            ['sensible W/m2', mar.hsbWm2, P.hsbWm2],
+            ['latent W/m2', mar.hlbWm2, P.hlbWm2],
+            ['stress N/m2', mar.tauNm2, P.tauNm2]
+          ]
         : [])
     ],
     `${COOPS_MET.name}: air-sea ${mar.dTairSeaK >= 0 ? '+' : ''}${mar.dTairSeaK.toFixed(1)} K, ${mar.stability}, film ${mar.filmLapseKm.toFixed(0)} K/km in the lowest 10 m - ${mar.klass}; the mixed layer modelled over ${mar.modelBand ? mar.modelBand.map((z) => z.toFixed(0)).join('-') + ' m' : 'no band'}` +
@@ -1122,6 +1134,9 @@ if (COOPS_MET && DAY_PINS.marine) {
         ? mar.warmSurfaceK === null
           ? '; warm layer not integrated'
           : `; the day's warm layer holds ${mar.warmSurfaceK.toFixed(2)} K at the surface over ${mar.warmDzM.toFixed(1)} m (${mar.warmK.toFixed(2)} K above the ${(COOPS_MET.waterSensorM ?? 3.4).toFixed(1)}-m sensor) from ${mar.warmSolarKwhM2.toFixed(1)} kWh/m^2 of solar`
+        : '') +
+      (P.uStarMs !== undefined
+        ? `; on ${mar.forms}'s forms u* ${mar.uStar.toFixed(4)} m/s, the sea losing ${mar.hsbWm2.toFixed(1)} W/m^2 sensible and ${mar.hlbWm2.toFixed(1)} latent under a stress of ${mar.tauNm2.toFixed(4)} N/m^2${mar.k50 ? ' (zeta_u > 50: the code keeps its first pass)' : ''}`
         : '')
   );
   // The sea column's own retrieval - the line the page prints for

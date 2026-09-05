@@ -54,8 +54,12 @@ const r3 = (x) => Math.round(x * 1000) / 1000;
 const r4 = (x) => Math.round(x * 10000) / 10000;
 
 const at = new Date().toISOString().slice(0, 16) + 'Z';
+// (140th pass: the skin rows also carry the BULK INPUTS - air
+// temperature, humidity and wind at their measured heights, the
+// skin temperature PSL fed the algorithm, the pressure - and PSL's
+// own t* and q*, so the profile forms can be gated on the same hours)
 const nightQ =
-  'cruise_name,time,latitude,tair,qair,psealevel,wspd_10N,tsea,dt_skin,depth,dt_warm_to_skin,ustar,hs_bulk,hl_bulk,lw_down,sw_down,rhoair,prate,ssea_ship&sw_down<10&flag_bad_bulk=0&flag_bad_ship=0';
+  'cruise_name,time,latitude,tair,qair,z_tair,z_qair,wspd_sfc,z_wspd,tskin,tstar,qstar,psealevel,wspd_10N,tsea,dt_skin,depth,dt_warm_to_skin,ustar,hs_bulk,hl_bulk,lw_down,sw_down,rhoair,prate,ssea_ship&sw_down<10&flag_bad_bulk=0&flag_bad_ship=0';
 const dayQ =
   'cruise_name,time,latitude,tair,qair,psealevel,lw_down,sw_down,sw_down_clear,prate&sw_down>200&flag_bad_ship=0';
 const night = await fetchCsv(nightQ);
@@ -95,7 +99,18 @@ const skin = skinAll
     swDn: r3(o.sw_down),
     ssPsu: Number.isFinite(o.ssea_ship) ? r3(o.ssea_ship) : null,
     dtSkin: r4(o.dt_skin),
-    dzSkinM: o.depth
+    dzSkinM: o.depth,
+    // the bulk inputs and PSL's scaling parameters (140th pass)
+    taC: Number.isFinite(o.tair) ? r3(o.tair) : null,
+    qGkg: Number.isFinite(o.qair) ? r3(o.qair) : null,
+    ztM: Number.isFinite(o.z_tair) ? o.z_tair : null,
+    zqM: Number.isFinite(o.z_qair) ? o.z_qair : null,
+    uMs: Number.isFinite(o.wspd_sfc) ? r3(o.wspd_sfc) : null,
+    zuM: Number.isFinite(o.z_wspd) ? o.z_wspd : null,
+    tskinC: Number.isFinite(o.tskin) ? r4(o.tskin) : null,
+    pHpa: Number.isFinite(o.psealevel) ? r3(o.psealevel) : null,
+    tStar: Number.isFinite(o.tstar) ? r4(o.tstar) : null,
+    qStar: Number.isFinite(o.qstar) ? Math.round(o.qstar * 1e7) / 1e7 : null
   }));
 
 // night all-sky longwave rows
@@ -251,7 +266,12 @@ const out = `/**
  * the COARE cool skin PSL computed from them, on ${cruises.size}
  * research cruises. Systematic samples in time order:
  *  - skin: every ${STRIDE_SKIN}th of ${skinAll.length} night, rain-free,
- *    good-flag, warm-layer-free hours (${skin.length} rows);
+ *    good-flag, warm-layer-free hours (${skin.length} rows) - since the
+ *    140th pass also carrying the bulk inputs (air temperature,
+ *    humidity and wind at their measured heights, the skin
+ *    temperature PSL fed the algorithm, the pressure) and PSL's
+ *    own u*, t*, q* and fluxes, so the profile forms are gated on
+ *    the same hours as the skin;
  *  - allsky: every ${STRIDE_ALLSKY}th of ${lwAll.length} night hours with a
  *    measured longwave (${allsky.length} rows; the ships log no cover);
  *  - clear: every ${STRIDE_CLEAR}nd of ${clearAll.length} daytime hours whose measured

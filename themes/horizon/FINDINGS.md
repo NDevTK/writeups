@@ -398,6 +398,33 @@ reference`; `observatory-reference` DAY PINS marine: wind)
   misses a day's warming: runs must begin before dawn (measured:
   RMSE 0.17 before the trim, 0.08 after). (`warmlayer-reference`;
   `observatory-reference` DAY PINS marine: warm layer)
+- **The bulk fluxes meet the archive** (pass 140): the marine surface
+  layer had run the printed Kansas forms with COARE 3.0's roughness —
+  gated as identities, never against a measured flux. Measured on the
+  same NOAA PSL ship hours that gate the skin, that pairing returns
+  the latent flux 32 W/m² high (RMSE 38; sensible +2.3, RMSE 4.8 W/m²)
+  — Businger's 0.74 Prandtl factor on the scalar profile, where the
+  COARE code runs 1.0 with its own scalar roughness. The module now
+  ports COARE 3.6's loop as the authors' published code runs it (read
+  in full: ψ_u26/ψ_t26/ψ_u40 with their written constants, Buck's
+  saturation, the wind-dependent Charnock, the 0.2-m/s gustiness
+  floor, the first-pass rule for ζ > 50, the latitude gravity) and
+  returns PSL's own u* to 6·10⁻⁵ m/s, t* to 3·10⁻⁵ K, the sensible
+  flux to 0.004 W/m² and the latent flux to 1.1 W/m² RMS over 275
+  frozen hours — the archive prints humidity to 0.1 g/kg, which
+  bounds the latent closure. Two things the code carries that the
+  papers do not print: its scalar form's rounded constants leave
+  ψ_t(0) = −0.0045, and both profile forms change slope across
+  neutral (−3.75 vs −5.20 for velocity, −7.5 vs −5.0 for scalars).
+  And a measured consequence for the drawn horizon: on COARE's forms
+  the calm warm-water film lives in the lowest metre (4.7 K there
+  against Kansas's 3.9, but −51 K/km over 0.5–10 m against −169), and
+  the tower eye's fan over 10–60 km finds no fold where the Kansas
+  forms folded at 30 km — the inferior mirage from a pier-height eye
+  is a profile-form question the archive decides, and the retrieval's
+  100-m fan does not yet resolve the film the archive-gated forms
+  draw. (`surfacelayer-reference`: the code's forms, THE ARCHIVE;
+  `observatory-reference` DAY PINS marine: fluxes)
 
 ---
 
@@ -482,10 +509,15 @@ between it and the next tier.
   capping inversion remains MODELLED (θ and q constant, the
   inversion's height a proxy from the inland ascent) — tagged, and
   barred from every closure. Further stated limits of the marine
-  layer: the Kansas forms are clamped to their observed range
-  (free-convection nights are reported as past it), COARE's
-  convective blend and Beljaars–Holtslag stable forms are not
-  implemented; since pass 136 the water temperature is the
+  layer: since pass 140 the profile forms are COARE 3.6's as its
+  published code runs them (gated on PSL's measured hours; the
+  Kansas forms kept as the printed anchor), with no ice branch and
+  no wave-age Charnock (the pier measures no phase speed); the
+  archive's humidity is printed to 0.1 g/kg, which bounds the
+  latent-flux closure near 1 W/m²; the Fleagle cross-closure's fold
+  is a Kansas-form fold — on COARE's forms the calm film's mirage
+  sits under the retrieval fan's 100-m resolution; since pass 136
+  the water temperature is the
   INTERFACE (COARE 3.6's cool skin on the pier's bulk sensor, no
   rain term; since pass 139 the day's warm layer lifts the sub-skin
   surface above the 3.4-m sensor by what the scheme holds above it,

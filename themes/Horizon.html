@@ -10823,11 +10823,15 @@
               `${here.rimArcsec.toFixed(0)}″`;
             if (state.marine) {
               const m = state.marine;
-              research['marine surface layer (Businger–Dyer · CO-OPS pier)'] =
+              research['marine surface layer (COARE 3.6 · CO-OPS pier)'] =
                 `${state.coopsMet.name}: air−sea ` +
                 `${m.dTairSeaK >= 0 ? '+' : ''}${m.dTairSeaK.toFixed(1)} K → ` +
                 `${m.stability}, L ${Number.isFinite(m.L) ? (Math.abs(m.L) < 1 ? m.L.toFixed(2) : Math.abs(m.L) < 10 ? m.L.toFixed(1) : m.L.toFixed(0)) + ' m' : '∞'}` +
-                `${m.clamped ? ' (past the Kansas range)' : ''} · film ` +
+                `${m.k50 ? ' (ζ > 50: the code keeps its first pass)' : ''} · ` +
+                // the bulk fluxes on COARE 3.6's own profile forms
+                // (140th pass), gated on PSL's measured ship hours
+                `u* ${m.uStar.toFixed(3)} m/s, sensible ${m.hsbWm2.toFixed(0)} / ` +
+                `latent ${m.hlbWm2.toFixed(0)} W/m² out of the sea · film ` +
                 `${m.filmLapseKm >= 0 ? '+' : ''}${m.filmLapseKm.toFixed(0)} K/km in the lowest 10 m · ` +
                 `${m.klass} · mixed layer modelled ` +
                 (m.modelBand
@@ -10848,9 +10852,7 @@
                   : ' · no skin claimed') +
                 ` (dewpoint: ${m.dewSource})`;
             } else
-              delete research[
-                'marine surface layer (Businger–Dyer · CO-OPS pier)'
-              ];
+              delete research['marine surface layer (COARE 3.6 · CO-OPS pier)'];
             // The SAME scan that gates the drawn trails (set by
             // applySounding); recomputed only if a pin silenced it.
             const con = state.contrailScan ?? contrailPanel(rows);
@@ -11109,9 +11111,7 @@
             delete research['wave ladder (Stull ch. 17)'];
             delete research['green flash tonight (Young)'];
             delete research['mirage inversion retrieval (Lehn 1983)'];
-            delete research[
-              'marine surface layer (Businger–Dyer · CO-OPS pier)'
-            ];
+            delete research['marine surface layer (COARE 3.6 · CO-OPS pier)'];
             delete research['forecast ledger (morning → evening ascent)'];
           }
           if (Number.isFinite(state.wind) || state.windSea) {

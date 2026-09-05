@@ -10217,6 +10217,76 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   code's zenith-angle albedo table replaced by its constant 0.945
   branch; the pier's day integrated in one pass (the code reruns
   the fluxes on the corrected temperature).
+- DONE (Sep 5, the review session's 140th pass - THE BULK FLUXES
+  MEET THE ARCHIVE): the marine surface layer now runs COARE 3.6's
+  profile forms as the authors' published code runs them, and the
+  pier's u*, Hs and Hl are gated on NOAA PSL's measured ship
+  hours. The 135th's pairing - the printed Kansas forms with COARE
+  3.0's roughness - was gated as identities, never against a
+  measured flux; measured against PSL's archive (the same hours
+  that gate the skin) it returns the latent flux 32 W/m^2 high
+  (bias +31.9, RMSE 37.6 W/m^2; sensible +2.3, RMSE 4.8; u*
+  +0.006 m/s) - Businger's 0.74 Prandtl factor on the scalar
+  profile, where the code runs fdg 1.0 with its own scalar
+  roughness. surfacelayer.js ports the code's loop
+  (coare36vn_zrf_et, READ IN FULL; jcool 0 - the skin stays with
+  coolskin.js): psiu_26 / psit_26 / psiu_40 with their written
+  constants (the Kansas limb blended into Grachev's free-
+  convection limb by zeta^2/(1+zeta^2); the stable velocity form's
+  a 0.7, b 3/4, c 5, d 0.35; the scalar's (1 + 2/3 zeta)^1.5 with
+  the rounded 14.28 and 8.525), Buck's saturation with its
+  pressure enhancement and the 1 - 0.02 Ss/35 salinity reduction,
+  the code's density at the thermometer's height, the wind-
+  dependent Charnock alpha = 0.0017 U10N - 0.005 capped at 19 m/s,
+  z0q = min(1.6e-4, 5.8e-5 Rr^-0.72), beta 1.2 with the 0.2-m/s
+  gustiness floor, ten iterations, the first-pass rule for zeta_u
+  > 50, and the latitude gravity (grv). moBulk takes forms
+  > 'coare36' (the default - what the page runs) or 'kansas' (the
+  > printed anchor, kept for the Businger/Paulson landmarks) and
+  > returns the fluxes itself (hsbWm2, hlbWm2, tauNm2 without the
+  > gustiness as the code reports tau, rhoA, u10nMs, cd10n);
+  > observatory.marinePanel, pierWindPanel and warmLayerDay compose
+  > the module's fluxes and own none. shipflux-freeze extends the
+  > skin rows with the bulk inputs (air temperature, humidity and
+  > wind at their measured heights, the skin temperature PSL fed the
+  > algorithm, pressure, PSL's t* and q*) - the same 507 rows,
+  > refrozen. surfacelayer-reference gains two landmarks and
+  > re-cases one: COARE 3.6's FORMS AS THE CODE WRITES THEM (the
+  > convective limb integrates (1 - a zeta)^-1/3 to 5e-4 - the
+  > residual is the code's 0.3333 for 1/3; the blend weights; the
+  > neutral values - psiu_26 and psiu_40 vanish, psit_26's rounded
+  > constants leave it at -0.0045, a step the code carries; the
+  > slopes at neutrality -3.75/-5.20 velocity and -7.5/-5.0 scalar,
+  > both forms changing slope across neutral; the linear stable
+  > limit; the Charnock and z0q caps; the gustiness floor; the
+  > first-pass rule; grv); THE ARCHIVE (275 frozen night hours with
+  > the bulk inputs: the module returns PSL's u* to RMSE 6e-5 m/s,
+  > t* to 3e-5 K, the sensible flux to 0.004 W/m^2, the latent flux
+  > to bias -0.64 / RMSE 1.06 W/m^2 - the archive prints humidity to
+  > 0.1 g/kg - the air density to 4e-5 kg/m^3 and U10N to 0.001 m/s,
+  > no hour off by 5 W/m^2 or 0.01 m/s; and the Kansas pairing on
+  > the same hours, printed); and the cross-closure landmark now
+  > names the Kansas forms it closes on AND runs the same +5 K calm
+  > contrast on COARE's: -51 K/km over 0.5-10 m against Kansas's
+  > -169 (the free-convection limb holds 4.7 K in the lowest metre
+  > against 3.9), and the 22/30-m eye's fan over 10-60 km finds NO
+  > fold - the archive-gated forms keep the calm film below what the
+  > 100-m fan resolves (measured; printed either way). What the page
+  > does: the marine line is 'marine surface layer (COARE 3.6 -
+  > CO-OPS pier)' and carries u*, the sensible and latent loss and
+  > the first-pass flag; the 'past the Kansas range' flag is retired
+  > (the code's forms clamp nothing); DAY PINS marine gains forms,
+  > k50, u*, Hs, Hl and the stress (27 rows); the frozen day is
+  > re-pinned from the same fixture (--pins-only; read: skin 0.347
+  > -> 0.333 K, loss 103 -> 98 W/m^2, U10N 1.74 -> 1.78 m/s, u\*
+  > 0.058 m/s, sensible 1.6 / latent 22.6 W/m^2). STATED LIMITS: no
+  > ice branch and no wave-age Charnock (the pier measures no phase
+  > speed - the wind-speed form is the code's own fallback); the
+  > archive's humidity printed to 0.1 g/kg bounds the latent closure
+  > near 1 W/m^2; the Fleagle cross-closure's fold is a Kansas-form
+  > fold - on COARE's forms the calm film's mirage sits under the
+  > retrieval fan's 100-m resolution, an open question for the
+  > instrument (a finer step near the surface), not settled here.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

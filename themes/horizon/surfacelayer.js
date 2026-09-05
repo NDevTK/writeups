@@ -1,7 +1,10 @@
 /**
  * surfacelayer.js - the MARINE SURFACE LAYER from measured air-sea
- * contrast: Monin-Obukhov similarity in the printed Kansas forms.
- * Three primaries, all READ IN FULL:
+ * contrast: Monin-Obukhov similarity, in COARE 3.6's profile forms
+ * as the authors' published code runs them (the forms the page
+ * runs, since the 140th pass) and in the printed Kansas forms (the
+ * landmarks the module is anchored to). Four primaries, all READ
+ * IN FULL:
  *  - Businger, Wyngaard, Izumi & Bradley 1971, "Flux-Profile
  *    Relationships in the Atmospheric Surface Layer" (J. Atmos.
  *    Sci. 28, 181-189): the Kansas tower's dimensionless
@@ -30,8 +33,27 @@
  *    10 and 18 m/s (their Fig. 1 and text), the scalar roughness
  *    z0q = min(1.1e-4, 5.5e-5 Rr^-0.6) (Eq. 28, adopted for heat
  *    and moisture alike), the 0.98 saturation over seawater, the
- *    gustiness velocity Ug = beta W*, beta = 1.25 (Eq. 8), and
- *    the bulk Richardson first guess.
+ *    gustiness velocity Ug = beta W*, beta = 1.25 (Eq. 8), the
+ *    bulk Richardson first guess, and the convective profile
+ *    forms (their Eq. 13: Kansas blended into Grachev's free-
+ *    convection limit by zeta^2/(1 + zeta^2)).
+ *  - THE COARE 3.6 CODE (coare36vn_zrf_et - Edson and Fairall's
+ *    MATLAB as PSL's Python port publishes it, NOAA-PSL/COARE-
+ *    algorithm, READ IN FULL): the algorithm as it actually runs
+ *    - psiu_26 / psit_26 / psiu_40 with their written constants
+ *    (the stable velocity form's a 0.7, b 3/4, c 5, d 0.35; the
+ *    scalar's (1 + 2/3 zeta)^1.5 with the rounded 14.28 and
+ *    8.525), Buck's saturation with its pressure enhancement, the
+ *    salinity reduction 1 - 0.02 Ss/35, the wind-dependent
+ *    Charnock alpha = 0.0017 U10N - 0.005 capped at 19 m/s (the
+ *    COARE 3.5 fit the code cites to Edson et al. 2013), z0q =
+ *    min(1.6e-4, 5.8e-5 Rr^-0.72), beta 1.2 with the 0.2-m/s
+ *    gustiness floor, fdg 1.0, ten iterations, the first-pass
+ *    rule for zeta_u > 50, and the latitude-dependent gravity.
+ *    This is the routine NOAA PSL ran for the bulk fluxes of
+ *    their hourly ship archive (Fairall et al. 2026, Section 2.1;
+ *    shipflux-fixture.js) - the module reproduces PSL's u*, Hs
+ *    and Hl from the archive's own inputs, hour by hour.
  *
  * WHY: the theme's refraction column is a radiosonde launched
  * inland (Miramar, 134 m); below its floor the drawn sea horizon
@@ -47,26 +69,40 @@
  * Fleagle instrument can read that film back from the drawn
  * horizon and close against the pier.
  *
- * STATED LIMITS: the Kansas forms are used within their observed
- * range (zeta clamped to [-2.5, 2] - Businger's Fig. 1 span);
- * COARE 3.0's convective blend and Beljaars-Holtslag stable forms
- * are not implemented; the water temperature this module is given
- * is whatever the caller measured or corrected - the pier's bulk
- * sensor alone, or (since the 136th pass) the interface under
- * COARE 3.6's cool skin, which observatory.marinePanel solves
- * together with this profile (coolskin.js); the humidity profile
- * rides only when an air-side dewpoint is supplied (the pier's
- * own, the shore METAR's, or the ascent's surface row - the
- * caller names which).
+ * WHY TWO FORMS (140th pass): the 135th ran the Kansas forms with
+ * COARE 3.0's roughness - printed physics, gated as identities.
+ * Measured against PSL's archive (surfacelayer-reference), that
+ * pairing returns the latent flux tens of W/m^2 high (Businger's
+ * 0.74 Prandtl factor on the scalar profile, where COARE runs
+ * fdg 1.0 with its own scalar roughness); the COARE 3.6 forms
+ * return PSL's own fluxes to a fraction of a W/m^2. The page runs
+ * COARE 3.6 (forms 'coare36', the default); the Kansas forms stay
+ * as the module's printed anchor (forms 'kansas') and for the
+ * Businger/Paulson landmarks.
+ *
+ * STATED LIMITS: no ice branch (the code's Andreas roughness and
+ * ice saturation are not ported - the pier's water never freezes);
+ * no wave-age Charnock (the code's cp/sigH branch - the pier has
+ * no measured phase speed; the wind-speed form is the code's own
+ * fallback); the cool skin is solved outside this module
+ * (coolskin.js, observatory.marinePanel - jcool 0 here, the
+ * caller passes the interface temperature); the water temperature
+ * this module is given is whatever the caller measured or
+ * corrected - the pier's bulk sensor alone, or (since the 136th
+ * pass) the interface under COARE 3.6's cool skin, lifted (since
+ * the 139th) by the day's warm layer; the humidity profile rides
+ * only when an air-side humidity is supplied (a dewpoint - the
+ * pier's own, the shore METAR's, or the ascent's surface row - or
+ * a specific humidity; the caller names which).
  */
 
-/** Von Karman's constant AS COARE 3.0 USES IT with the Kansas
- * profile forms (Fairall et al. 2003: "the velocity von Karman
- * constant was adjusted to ... 0.40"); Businger's own measured
- * 0.35 is kept below as his printed landmark. The choice is
- * consistency: COARE's roughness constants were fitted with
- * 0.40, and Businger notes u* from profiles scales with k
- * ("about 15% high" at 0.40 against his 0.35). */
+/** Von Karman's constant AS COARE USES IT (Fairall et al. 2003:
+ * "the velocity von Karman constant was adjusted to ... 0.40";
+ * the 3.6 code's von = 0.4); Businger's own measured 0.35 is kept
+ * below as his printed landmark. The choice is consistency:
+ * COARE's roughness constants were fitted with 0.40, and Businger
+ * notes u* from profiles scales with k ("about 15% high" at 0.40
+ * against his 0.35). */
 export const KAPPA = 0.4;
 export const BUSINGER_KAPPA = 0.35;
 export const GAMMA_M = 15;
@@ -84,6 +120,41 @@ export const ZETA_MAX = 2;
 const G = 9.80665;
 const CP = 1004.7;
 const R_DRY = 287.053;
+
+/** COARE 3.6 AS THE CODE SETS IT (coare36vn_zrf_et): the constants
+ * of the bulk loop, named as the code names them. */
+export const COARE36 = Object.freeze({
+  vonKarman: 0.4,
+  /** gustiness: gust = Beta (Bf zi)^0.333 when the buoyancy flux
+   * heats the air, else the 0.2-m/s floor; 0.5 m/s first guess */
+  beta: 1.2,
+  gustFloorMs: 0.2,
+  gustFirstMs: 0.5,
+  ziDefaultM: 600,
+  /** the scalar profile factor (Kansas ran 0.74) */
+  fdg: 1.0,
+  /** the wind-dependent Charnock: alpha = a1 U10N + a2, U10N
+   * capped at umax (the COARE 3.5 fit); 0.011 for the first guess */
+  charnockA1: 0.0017,
+  charnockA2: -0.005,
+  charnockUmaxMs: 19,
+  charnockFirst: 0.011,
+  /** z0q = min(1.6e-4, 5.8e-5 Rr^-0.72), heat and moisture alike */
+  zoqCapM: 1.6e-4,
+  zoqCoef: 5.8e-5,
+  zoqExp: 0.72,
+  /** the first guess's 10-m Stanton number */
+  ch10First: 0.00115,
+  nits: 10,
+  /** zeta_u > 50 at the bulk-Richardson first guess: the code
+   * keeps its first pass through the loop */
+  zetaFirstPass: 50,
+  t2k: 273.16,
+  rGas: 287.1,
+  cpa: 1004.67,
+  ssDefaultPsu: 35,
+  latDefaultDeg: 45
+});
 
 /** Businger's dimensionless wind shear (Eqs. 8, 10). */
 export function phiM(zeta) {
@@ -148,7 +219,8 @@ export function roughnessScalar(z0, uStar) {
 
 /** Saturation vapour pressure (Pa) over water - the Magnus form
  * the repo's refraction module uses (eLiq); kept local so the
- * layer needs no import from the ray code. */
+ * layer needs no import from the ray code. The Kansas branch's
+ * humidity; the COARE branch runs the code's own Buck form. */
 export function eSatPa(tC) {
   return 610.94 * Math.exp((17.625 * tC) / (tC + 243.04));
 }
@@ -156,26 +228,338 @@ export function specificHumidity(ePa, pPa) {
   return (0.622 * ePa) / (pPa - 0.378 * ePa);
 }
 
+// ---- COARE 3.6's own forms, as the code writes them --------------
+
+/** The Grachev free-convection limb the code blends into the
+ * Kansas forms (psic in psiu_26/psit_26/psiu_40; Fairall 2003
+ * Eq. 13): the integral of phi = (1 - a zeta)^-1/3, with
+ * y = (1 - a zeta)^0.3333 as the code rounds the exponent. */
+export function psiConvective(zeta, a) {
+  const y = Math.pow(1 - a * zeta, 0.3333);
+  return (
+    1.5 * Math.log((1 + y + y * y) / 3) -
+    Math.sqrt(3) * Math.atan((1 + 2 * y) / Math.sqrt(3)) +
+    Math.PI / Math.sqrt(3)
+  );
+}
+/** The code's stable form -(a zeta + b (zeta - c/d) e^-d zeta +
+ * b c/d) with the exponent's argument capped at 50. */
+function psiStable(zeta, a, b, c, d) {
+  const dz = Math.min(50, d * zeta);
+  return -(a * zeta + b * (zeta - c / d) * Math.exp(-dz) + (b * c) / d);
+}
+/** The Kansas limb of the velocity form: Paulson's psi_1 with the
+ * code's gamma. */
+function psiKansasM(zeta, gamma) {
+  const x = Math.pow(1 - gamma * zeta, 0.25);
+  return (
+    2 * Math.log((1 + x) / 2) +
+    Math.log((1 + x * x) / 2) -
+    2 * Math.atan(x) +
+    Math.PI / 2
+  );
+}
+/** The blend weight f = zeta^2 / (1 + zeta^2) (Fairall 2003 Eq.
+ * 13): Kansas near neutral, free convection far from it. */
+export function convectiveBlend(zeta) {
+  return (zeta * zeta) / (1 + zeta * zeta);
+}
+
+/** psiu_26: COARE 3.6's velocity profile function. Unstable: the
+ * Kansas form (gamma 15) blended into Grachev's (10.15) by f;
+ * stable: the code's a 0.7, b 3/4, c 5, d 0.35. */
+export function psiM26(zeta) {
+  if (zeta >= 0) return psiStable(zeta, 0.7, 0.75, 5, 0.35);
+  const f = convectiveBlend(zeta);
+  return (1 - f) * psiKansasM(zeta, 15) + f * psiConvective(zeta, 10.15);
+}
+
+/** psit_26: COARE 3.6's scalar profile function. Unstable: the
+ * Kansas scalar form 2 ln((1+x)/2), x = (1 - 15 zeta)^1/2,
+ * blended into the convective form with 34.15; stable: the
+ * code's -((1 + 0.6667 zeta)^1.5 + 0.6667 (zeta - 14.28) e^-d +
+ * 8.525) - its rounded constants leave psit_26(0) = -0.0045, a
+ * step the code carries (surfacelayer-reference measures it). */
+export function psiH26(zeta) {
+  if (zeta >= 0) {
+    const dz = Math.min(50, 0.35 * zeta);
+    return -(
+      Math.pow(1 + 0.6667 * zeta, 1.5) +
+      0.6667 * (zeta - 14.28) * Math.exp(-dz) +
+      8.525
+    );
+  }
+  const x = Math.pow(1 - 15 * zeta, 0.5);
+  const psik = 2 * Math.log((1 + x) / 2);
+  const f = convectiveBlend(zeta);
+  return (1 - f) * psik + f * psiConvective(zeta, 34.15);
+}
+
+/** psiu_40: the code's first-guess velocity form (gamma 18,
+ * convective 10, stable a 1). */
+export function psiM40(zeta) {
+  if (zeta >= 0) return psiStable(zeta, 1, 0.75, 5, 0.35);
+  const f = convectiveBlend(zeta);
+  return (1 - f) * psiKansasM(zeta, 18) + f * psiConvective(zeta, 10);
+}
+
+/** bucksat: Buck's saturation vapour pressure over water (hPa)
+ * with the code's pressure enhancement (1.0007 + 3.46e-6 P). The
+ * code's ice branch (T below the freezing point) is not ported. */
+export function buckSatHpa(tC, pHpa) {
+  return (
+    6.1121 * Math.exp((17.502 * tC) / (tC + 240.97)) * (1.0007 + 3.46e-6 * pHpa)
+  );
+}
+/** qsat26sea: the sea's saturation specific humidity (g/kg) under
+ * the salinity reduction fs = 1 - 0.02 Ss/35 (0.98 at 35 PSU). */
+export function qSatSeaGkg(tsC, pHpa, ssPsu = COARE36.ssDefaultPsu) {
+  const es = buckSatHpa(tsC, pHpa) * (1 - (0.02 * ssPsu) / 35);
+  return (622 * es) / (pHpa - 0.378 * es);
+}
+/** Specific humidity (g/kg) of a vapour pressure e (hPa) at P
+ * (hPa) - the code's 622 e / (P - 0.378 e). */
+export function qOfVapourGkg(eHpa, pHpa) {
+  return (622 * eHpa) / (pHpa - 0.378 * eHpa);
+}
+/** visa: the code's kinematic viscosity of air (m^2/s) at t (C). */
+export function airViscosity(tC) {
+  return (
+    1.326e-5 * (1 + 0.006542 * tC + 8.301e-6 * tC * tC - 4.84e-9 * tC * tC * tC)
+  );
+}
+/** grv: the code's gravity (m/s^2) at a latitude. */
+export function gravityOfLat(latDeg) {
+  const x = Math.sin((latDeg * Math.PI) / 180);
+  return (
+    9.7803267715 *
+    (1 +
+      0.0052790414 * x ** 2 +
+      0.0000232718 * x ** 4 +
+      1.262e-7 * x ** 6 +
+      7e-10 * x ** 8)
+  );
+}
+/** The COARE 3.5 Charnock parameter: a1 U10N + a2, U10N capped. */
+export function charnock36(u10nMs) {
+  return (
+    COARE36.charnockA1 * Math.min(u10nMs, COARE36.charnockUmaxMs) +
+    COARE36.charnockA2
+  );
+}
+/** The code's scalar roughness from the roughness Reynolds number. */
+export function roughnessScalar36(rr) {
+  return Math.min(
+    COARE36.zoqCapM,
+    COARE36.zoqCoef / Math.pow(rr, COARE36.zoqExp)
+  );
+}
+
 /**
  * THE BULK SOLUTION: from wind at zuM, air temperature at ztM
- * (and optional dewpoint there), water temperature and pressure,
- * find u*, theta* (Businger's definition, -w'theta'/(k u*)), q*
- * and the Obukhov length by fixed-point iteration on the Kansas
- * profiles with COARE's roughness and gustiness. bliM is the
- * convective boundary-layer depth for the gustiness velocity
- * (the balloon's own measured BLH when it has one; COARE's 600 m
- * class otherwise).
+ * (and an optional air-side humidity - a dewpoint there, or a
+ * specific humidity at zqM), water temperature and pressure, find
+ * u*, theta* (Businger's definition, -w'theta'/(k u*)), q* and
+ * the Obukhov length. forms 'coare36' (default): the COARE 3.6
+ * code's own loop - its profile forms, roughness, gustiness,
+ * humidity and density, ten iterations, the first-pass rule;
+ * forms 'kansas': fixed-point iteration on the Kansas profiles
+ * with COARE 3.0's roughness and gustiness (the 135th's pairing,
+ * kept for the printed landmarks). bliM is the convective
+ * boundary-layer depth for the gustiness velocity (the balloon's
+ * own measured BLH when it has one; COARE's 600 m class
+ * otherwise); latDeg sets the code's gravity, ssPsu the sea's
+ * saturation. Both forms return the same shape, the fluxes
+ * included (hsbWm2, hlbWm2 positive when the ocean loses heat;
+ * tauNm2 without the gustiness, as the code reports it).
  */
 export function moBulk({
   uMs,
   zuM,
   taC,
   ztM,
+  zqM = null,
   tsC,
   pPa = 101325,
   dewC = null,
-  bliM = 600
+  qAKgKg = null,
+  ssPsu = null,
+  latDeg = null,
+  bliM = 600,
+  forms = 'coare36'
 }) {
+  const args = {
+    uMs,
+    zuM,
+    taC,
+    ztM,
+    zqM,
+    tsC,
+    pPa,
+    dewC,
+    qAKgKg,
+    ssPsu,
+    latDeg,
+    bliM
+  };
+  return forms === 'kansas' ? kansasBulk(args) : coareBulk(args);
+}
+
+/** The COARE 3.6 loop as the code runs it (jcool 0: tsC is the
+ * surface the air touches). */
+function coareBulk({
+  uMs,
+  zuM,
+  taC,
+  ztM,
+  zqM,
+  tsC,
+  pPa,
+  dewC,
+  qAKgKg,
+  ssPsu,
+  latDeg,
+  bliM
+}) {
+  const C = COARE36;
+  const von = C.vonKarman;
+  const {beta: Beta, fdg, t2k: T2K, rGas: Rgas, cpa} = C;
+  const P = pPa / 100;
+  const Ss = Number.isFinite(ssPsu) ? ssPsu : C.ssDefaultPsu;
+  const grav = gravityOfLat(Number.isFinite(latDeg) ? latDeg : C.latDefaultDeg);
+  const zq = Number.isFinite(zqM) ? zqM : ztM;
+  const zi = Number.isFinite(bliM) && bliM > 0 ? bliM : C.ziDefaultM;
+  const Qs = qSatSeaGkg(tsC, P, Ss) / 1000;
+  // the code's pressure at the thermometer's height
+  const Ptq = P - 0.125 * ztM;
+  let Q = null;
+  if (Number.isFinite(qAKgKg)) Q = qAKgKg;
+  else if (Number.isFinite(dewC))
+    Q = qOfVapourGkg(buckSatHpa(dewC, Ptq), Ptq) / 1000;
+  // density and buoyancy carry the sea's own humidity when the air
+  // side has none (no latent flux is then claimed: dq = 0)
+  const Qd = Q ?? Qs;
+  const Le = (2.501 - 0.00237 * tsC) * 1e6;
+  const rhoa = (Ptq * 100) / (Rgas * (taC + T2K) * (1 + 0.61 * Qd));
+  const visa = airViscosity(taC);
+  const lapse = grav / cpa;
+  // sea minus potential air ("dT = Tskin - Ta - lapse zt")
+  const dT = tsC - taC - lapse * ztM;
+  const dq = Q === null ? 0 : Qs - Q;
+  const ta = taC + T2K;
+  const du = Math.max(uMs, 0);
+  // ---- first guess ------------------------------------------------
+  let gust = C.gustFirstMs;
+  let ut = Math.sqrt(du * du + gust * gust);
+  const u10 = (ut * Math.log(10 / 1e-4)) / Math.log(zuM / 1e-4);
+  let usr = 0.035 * u10;
+  const zo10 = (C.charnockFirst * usr * usr) / grav + (0.11 * visa) / usr;
+  const Cd10 = (von / Math.log(10 / zo10)) ** 2;
+  const Ct10 = C.ch10First / Math.sqrt(Cd10);
+  const zot10 = 10 / Math.exp(von / Ct10);
+  const Cd = (von / Math.log(zuM / zo10)) ** 2;
+  const Ct = von / Math.log(ztM / zot10);
+  const CC = (von * Ct) / Cd;
+  const Ribcu = -zuM / zi / 0.004 / Beta ** 3;
+  const Ribu = (((-grav * zuM) / ta) * (dT + 0.61 * ta * dq)) / (ut * ut);
+  const zetau =
+    Ribu < 0
+      ? (CC * Ribu) / (1 + Ribu / Ribcu)
+      : CC * Ribu * (1 + ((27 / 9) * Ribu) / CC);
+  const k50 = zetau > C.zetaFirstPass;
+  const L10 = zuM / zetau;
+  let gf = du > 0 ? ut / du : Infinity;
+  usr = (ut * von) / (Math.log(zuM / zo10) - psiM40(zuM / L10));
+  let tsr = (-dT * von * fdg) / (Math.log(ztM / zot10) - psiH26(ztM / L10));
+  let qsr = (-dq * von * fdg) / (Math.log(zq / zot10) - psiH26(zq / L10));
+  let charn = charnock36(u10);
+  let L = L10;
+  let zeta = zetau;
+  let zo = zo10;
+  let zoq = zot10;
+  let first = null;
+  // ---- the bulk loop ----------------------------------------------
+  for (let i = 1; i <= C.nits; i++) {
+    zeta = (((von * grav * zuM) / ta) * (tsr + 0.61 * ta * qsr)) / (usr * usr);
+    L = zuM / zeta;
+    zo = (charn * usr * usr) / grav + (0.11 * visa) / usr;
+    const rr = (zo * usr) / visa;
+    zoq = roughnessScalar36(rr);
+    const zot = zoq;
+    const cdhf = von / (Math.log(zuM / zo) - psiM26(zuM / L));
+    const cqhf = (von * fdg) / (Math.log(zq / zoq) - psiH26(zq / L));
+    const cthf = (von * fdg) / (Math.log(ztM / zot) - psiH26(ztM / L));
+    usr = ut * cdhf;
+    qsr = -dq * cqhf;
+    tsr = -dT * cthf;
+    // the buoyancy flux "from Stull (1988) page 146"
+    const tvsr = tsr * (1 + 0.61 * Qd) + 0.61 * ta * qsr;
+    const Bf = (-grav / ta) * usr * tvsr;
+    gust = Bf > 0 ? Beta * Math.pow(Bf * zi, 0.333) : C.gustFloorMs;
+    ut = Math.sqrt(du * du + gust * gust);
+    gf = du > 0 ? ut / du : Infinity;
+    if (i === 1) first = {usr, tsr, qsr, L, zeta};
+    const u10N = du > 0 ? (usr / von / gf) * Math.log(10 / zo) : 0;
+    charn = charnock36(u10N);
+  }
+  if (k50 && first) ({usr, tsr, qsr, L, zeta} = first);
+  // ---- the fluxes ---------------------------------------------------
+  const hsb = -rhoa * cpa * usr * tsr;
+  const hlb = -rhoa * Le * usr * qsr;
+  const tau = Number.isFinite(gf) ? (rhoa * usr * usr) / gf : 0;
+  const u10n = du > 0 ? (usr / von / gf) * Math.log(10 / zo) : 0;
+  const thetaS = tsC;
+  const thetaStar = tsr / von;
+  const qStar = qsr / von;
+  const zetaAt = (z) => (Number.isFinite(L) ? z / L : 0);
+  const thetaAt = (z) => {
+    const zz = Math.max(z, zoq);
+    return thetaS + thetaStar * (Math.log(zz / zoq) - psiH26(zetaAt(zz)));
+  };
+  return {
+    forms: 'coare36',
+    uStar: usr,
+    thetaStar,
+    qStar,
+    L,
+    zetaU: Number.isFinite(L) ? zuM / L : 0,
+    clamped: false,
+    k50,
+    z0: zo,
+    z0s: zoq,
+    gust,
+    gf,
+    dTheta: -dT,
+    dq: Q === null ? 0 : Q - Qs,
+    thetaS,
+    qS: Qs,
+    qA: Q,
+    rhoA: rhoa,
+    hsbWm2: hsb,
+    hlbWm2: hlb,
+    tauNm2: tau,
+    u10nMs: u10n,
+    cd10n: (von / Math.log(10 / zo)) ** 2,
+    iterations: C.nits,
+    /** Potential temperature at height z (C, surface-referenced). */
+    thetaAt,
+    /** Actual temperature at height z (C): theta minus g/cp z. */
+    tAt: (z) => thetaAt(z) - lapse * Math.max(z, zoq),
+    qAt: (z) => {
+      if (Q === null) return null;
+      const zz = Math.max(z, zoq);
+      return Qs + qStar * (Math.log(zz / zoq) - psiH26(zetaAt(zz)));
+    },
+    uAt: (z) => {
+      const zz = Math.max(z, zo);
+      return (usr / von) * (Math.log(zz / zo) - psiM26(zetaAt(zz)));
+    }
+  };
+}
+
+/** The Kansas forms with COARE 3.0's roughness and gustiness (the
+ * 135th's pairing): fixed-point iteration on Businger's profiles. */
+function kansasBulk({uMs, zuM, taC, ztM, tsC, pPa, dewC, bliM}) {
   const tK = taC + 273.15;
   // potential temperatures referenced to the surface: theta(z) =
   // T(z) + (g/cp) z (dry adiabatic, over the surface layer)
@@ -189,6 +573,7 @@ export function moBulk({
       : specificHumidity(eSatPa(dewC), pPa);
   const dq = qA === null ? 0 : qA - qS;
   const tV = tK * (1 + 0.61 * (qA ?? qS));
+  const zi = Number.isFinite(bliM) && bliM > 0 ? bliM : 600;
   let uStar = 0.3;
   let thetaStar = 0;
   let qStar = 0;
@@ -228,7 +613,7 @@ export function moBulk({
     // COARE Eq. (8): gustiness from the convective velocity scale
     // when the surface heats the air (w'theta_v' > 0).
     const wtv = -KAPPA * uNew * tvStar;
-    gust = wtv > 0 ? GUST_BETA * Math.cbrt((G / tV) * wtv * bliM) : 0;
+    gust = wtv > 0 ? GUST_BETA * Math.cbrt((G / tV) * wtv * zi) : 0;
     const dU = Math.abs(uNew - uStar);
     uStar = 0.5 * uStar + 0.5 * uNew;
     thetaStar = 0.5 * thetaStar + 0.5 * tNew;
@@ -237,21 +622,40 @@ export function moBulk({
     zeta = Number.isFinite(L) ? zuM / L : 0;
     if (iter > 5 && dU < 1e-8) break;
   }
+  // the fluxes in the same frame as the COARE branch (the code's
+  // density at the thermometer's height, its latent heat)
+  const Ptq = pPa / 100 - 0.125 * ztM;
+  const rhoA =
+    (Ptq * 100) /
+    (COARE36.rGas * (taC + COARE36.t2k) * (1 + 0.61 * (qA ?? qS)));
+  const gf = uMs > 0 ? Math.sqrt(uMs * uMs + gust * gust) / uMs : Infinity;
   return {
+    forms: 'kansas',
     uStar,
     thetaStar,
     qStar,
     L,
     zetaU: Number.isFinite(L) ? zuM / L : 0,
     clamped: Number.isFinite(L) && (zuM / L < ZETA_MIN || zuM / L > ZETA_MAX),
+    k50: false,
     z0,
     z0s,
     gust,
+    gf,
     dTheta,
     dq,
     thetaS,
     qS,
     qA,
+    rhoA,
+    hsbWm2: -rhoA * CP * KAPPA * uStar * thetaStar,
+    hlbWm2:
+      qA === null
+        ? 0
+        : -rhoA * (2.501 - 0.00237 * tsC) * 1e6 * KAPPA * uStar * qStar,
+    tauNm2: Number.isFinite(gf) ? (rhoA * uStar * uStar) / gf : 0,
+    u10nMs: uMs > 0 ? ((uStar / KAPPA) * Math.log(10 / z0)) / gf : 0,
+    cd10n: (KAPPA / Math.log(10 / z0)) ** 2,
     iterations: iter,
     /** Potential temperature at height z (C, surface-referenced). */
     thetaAt: (z) => {
@@ -329,12 +733,14 @@ export function inversionBaseM(rows, fromM, toM) {
  *              atmosphere both columns share.
  * The modelled band is returned so any closure that would lean
  * on it can decline. Rows are daemon-shape [{p hPa, hM, tC, rh,
- * src}] with hM absolute (sea level = 0).
+ * src}] with hM absolute (sea level = 0). met may carry latDeg
+ * (the code's gravity) and ssPsu (the sea's saturation); opts.forms
+ * picks the profile forms (moBulk's default otherwise).
  */
 export function marineColumnRows(
   balloonRows,
   met,
-  {topM = 100, skipM = 30, bliM = null} = {}
+  {topM = 100, skipM = 30, bliM = null, forms = undefined} = {}
 ) {
   const h0 = balloonRows[0].hM;
   // Where the balloon becomes the sea's column: at the base of
@@ -380,7 +786,10 @@ export function marineColumnRows(
     tsC: met.tsC,
     pPa: pSea,
     dewC,
-    bliM: bliM ?? 600
+    latDeg: Number.isFinite(met.latDeg) ? met.latDeg : null,
+    ssPsu: Number.isFinite(met.ssPsu) ? met.ssPsu : null,
+    bliM: bliM ?? 600,
+    ...(forms ? {forms} : {})
   });
   const first = kept[0];
   const zTop = Math.min(topM, Math.max(5, first.hM - 5));
