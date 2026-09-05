@@ -450,6 +450,24 @@ reference`; `observatory-reference` DAY PINS marine: wind)
   the pier's roughness, measured and stated. (`surfacelayer-
 reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
   `observatory-reference` DAY PINS marine: residual class)
+- **The chain closes on itself** (pass 142): the warm layer now feeds
+  its own fluxes as the authors' code runs it — each step integrates
+  with the previous step's bulk on the warm-corrected surface under
+  the cool skin (the synthetic calm day damps from 2.47 to 1.96 K at
+  the surface; the archive closure is untouched, it integrates PSL's
+  own fluxes); the water sensor's depth comes from the station's
+  published datums under the gauge's measured tide (La Jolla: 4.26 m
+  below MSL, 4.3–5.4 m below the surface across the tide — the 139th
+  read 3.4 m off the MLLW listing); the calm film's fold on COARE's
+  forms subtends 0.05′ at 30 km against the Kansas fold's 0.72′ —
+  under the eye's own minute of arc, so the tower eye sees no
+  inferior mirage from a +5 K calm sea on the archive-gated forms;
+  and the daemon warms its home area on start (a cold sounding walk
+  measured failing once at the 25-s budget, then answering in 16 s),
+  so a deploy no longer costs the first visitor the ascent.
+  (`warmlayer-reference` COMPOSITION; `surfacelayer-reference`
+  landmark 8; `server-reference` warm-up; `observatory-reference`
+  DAY PINS marine: sensor depth)
 
 ---
 
@@ -550,8 +568,12 @@ between it and the next tier.
   since pass 136 the water temperature is the
   INTERFACE (COARE 3.6's cool skin on the pier's bulk sensor, no
   rain term; since pass 139 the day's warm layer lifts the sub-skin
-  surface above the 3.4-m sensor by what the scheme holds above it,
-  under hourly satellite-derived solar) under a sky longwave that is
+  surface above the sensor by what the scheme holds above it, under
+  hourly satellite-derived solar — since pass 142 with the code's
+  own feedback of the warming into the fluxes, a step's fluxes
+  lagging one six-minute reading, and the sensor at its datum-listed
+  depth under the measured tide, 3.4 m standing in only where a
+  station publishes no datums) under a sky longwave that is
   MODELLED
   from the pier's air and the shore's dewpoint and cover (a
   screen-level emissivity fit made over land, held over the clear

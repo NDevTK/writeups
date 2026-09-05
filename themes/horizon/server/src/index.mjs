@@ -493,6 +493,33 @@ export function overBackpressure(buffered, max = SSE_BUFFER_MAX) {
 // as OUR json - never as an edge timeout. 25 s keeps a whole
 // cold walk under the tightest common edge limit with margin.
 export const UPSTREAM_BUDGET_MS = 25000;
+
+// ---- Warm-up on start ------------------------------------------
+
+// A fresh process has empty caches, and the routes that walk slow
+// upstreams (the sounding's Wyoming fetches, the buoy's NDBC
+// files) can spend their whole budget on the first request and
+// answer 502 (measured on /sounding after a deploy: the first
+// fetch failed at the 25-s budget, the second answered in 16 s).
+// So the process warms the home area's caches right after it
+// starts listening - the theme's default scene unless
+// HORIZON_HOME=lat,lon says otherwise. Pure helpers, gated.
+export const HOME_DEFAULT = '32.85,-117.12';
+export function parseHome(s) {
+  const m = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/.exec(s ?? '');
+  if (!m) return null;
+  const lat = Number(m[1]);
+  const lon = Number(m[2]);
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return {lat, lon};
+}
+export function warmUpPaths(home) {
+  if (!home) return [];
+  const q = `lat=${home.lat.toFixed(2)}&lon=${home.lon.toFixed(2)}`;
+  return [`/sounding?${q}`, `/buoy?${q}`, `/metar?${q}`];
+}
+export const WARM_UP_TRIES = 3;
+export const WARM_UP_PAUSE_MS = 5000;
 export function budgetLeftMs(deadlineMs, nowMs) {
   return Math.max(0, deadlineMs - nowMs);
 }
@@ -2473,9 +2500,42 @@ function main() {
 
     return send(404, 'not found');
   });
-  server.listen(PORT, HOST, () =>
-    log(`horizon-live on ${HOST}:${PORT} (origins: ${ALLOW.join(', ')})`)
-  );
+  server.listen(PORT, HOST, () => {
+    log(`horizon-live on ${HOST}:${PORT} (origins: ${ALLOW.join(', ')})`);
+    // the warm-up (see warmUpPaths): one request per slow route for
+    // the home area, sequential, each failure logged and ignored
+    const home = parseHome(env.HORIZON_HOME ?? HOME_DEFAULT);
+    const paths = warmUpPaths(home);
+    const self = `http://${HOST === '0.0.0.0' || HOST === '::' ? '127.0.0.1' : HOST}:${PORT}`;
+    // A cold /sounding can spend its budget on the station list
+    // plus one slow Wyoming answer and fail once (measured in the
+    // smoke run: 502 in 20.5 s, then 200 in 16 s with the list
+    // cached), so each route gets WARM_UP_TRIES attempts, a pause
+    // between, stopping at the first 200.
+    setTimeout(async () => {
+      for (const p of paths) {
+        for (let attempt = 1; attempt <= WARM_UP_TRIES; attempt++) {
+          const t0 = Date.now();
+          let status = 0;
+          try {
+            const r = await fetch(self + p, {
+              signal: AbortSignal.timeout(UPSTREAM_BUDGET_MS + 5000)
+            });
+            status = r.status;
+            log(
+              `warm ${p}: ${r.status} in ${Date.now() - t0} ms (try ${attempt})`
+            );
+          } catch (e) {
+            log(
+              `warm ${p}: failed (${e.message}) in ${Date.now() - t0} ms (try ${attempt})`
+            );
+          }
+          if (status === 200 || attempt === WARM_UP_TRIES) break;
+          await new Promise((r) => setTimeout(r, WARM_UP_PAUSE_MS));
+        }
+      }
+    }, 500).unref();
+  });
 }
 
 // Run only as a program - importing this module (the reference

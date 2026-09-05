@@ -1736,10 +1736,22 @@
       const COOPS_MET_FRESH_MIN = 90;
       const COOPS_MET_MAX_KM = 60;
       // The water sensor's depth below the surface: CO-OPS lists it
-      // against the station datum (La Jolla: -3.43 m), not the
-      // moving surface; the warm-layer scheme reads a thermometer
-      // at this depth (139th pass).
+      // against a tidal datum (La Jolla: -3.43 m re MLLW), not the
+      // moving surface. Since the 142nd pass the station's published
+      // datums put the sensor on MSL and the measured tide puts the
+      // surface above it (La Jolla: 4.3-5.4 m down across the tide);
+      // 3.4 m stands in only when the datums are missing (139th).
       const COOPS_WATER_SENSOR_M = 3.4;
+      function waterSensorDepthM() {
+        const re = state.coopsMet?.waterSensorReMslM;
+        return Number.isFinite(re)
+          ? -re + (Number.isFinite(state.tide) ? state.tide : 0)
+          : COOPS_WATER_SENSOR_M;
+      }
+      const metDatumsUrl = (id) =>
+        'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/' +
+        id +
+        '/datums.json?units=metric';
       // The sea's wind: the nearest measured wind over water when one
       // is fresh (the pier first, a buoy's anemometer when the daemon
       // serves it), else the model's 10-m wind. m/s.
@@ -1778,9 +1790,36 @@
               q
                 ? (q.refdatum === 'Site Elevation' ? site : 0) + q.elevation
                 : null;
+            // THE WATER SENSOR'S DEPTH (142nd pass): the thermometer
+            // is listed against a tidal datum (La Jolla: -3.43 m re
+            // MLLW); the station's published datums put it on MSL,
+            // and the measured tide puts the surface above it.
+            let waterSensorReMslM = null;
+            try {
+              const wt = byName['Water Temperature'];
+              if (wt && Number.isFinite(wt.elevation)) {
+                if (wt.refdatum === 'MSL') waterSensorReMslM = wt.elevation;
+                else {
+                  const dj = await (
+                    await fetch(metDatumsUrl(near.id), {credentials: 'omit'})
+                  ).json();
+                  const datum = {};
+                  for (const d of dj?.datums ?? []) datum[d.name] = d.value;
+                  if (
+                    Number.isFinite(datum[wt.refdatum]) &&
+                    Number.isFinite(datum.MSL)
+                  )
+                    waterSensorReMslM =
+                      wt.elevation + datum[wt.refdatum] - datum.MSL;
+                }
+              }
+            } catch (e) {
+              if (params.has('debug')) console.warn('datums: ' + e.message);
+            }
             coopsSensorCache[near.id] = {
               ztM: above(byName['Air Temperature']),
-              zuM: above(byName['Wind'])
+              zuM: above(byName['Wind']),
+              waterSensorReMslM
             };
           }
           const sens = coopsSensorCache[near.id];
@@ -1897,6 +1936,11 @@
             latDeg: near.lat,
             lonDeg: near.lng,
             shore: null,
+            // the water sensor on MSL (142nd pass; null when the
+            // station publishes no datums - 3.4 m then stands in)
+            waterSensorReMslM: Number.isFinite(sens.waterSensorReMslM)
+              ? sens.waterSensorReMslM
+              : null,
             series
           };
           // THE SHORE SCREEN (136th pass): the pier has no
@@ -4981,7 +5025,7 @@
                     ztM: state.coopsMet.ztM,
                     lonDeg: state.coopsMet.lonDeg,
                     latDeg: state.coopsMet.latDeg,
-                    zSensorM: COOPS_WATER_SENSOR_M,
+                    zSensorM: waterSensorDepthM(),
                     dewC: state.coopsMet.shore?.dewC ?? null,
                     cf: state.coopsMet.shore?.cf ?? 0,
                     solarAt
@@ -10849,7 +10893,7 @@
                 (m.warmSurfaceK !== null
                   ? ` · warm layer +${m.warmSurfaceK.toFixed(2)} K at the surface over ` +
                     `${m.warmDzM.toFixed(1)} m (+${m.warmK.toFixed(2)} K above the ` +
-                    `${COOPS_WATER_SENSOR_M}-m sensor; day's solar ` +
+                    `${(m.warmSensorM ?? COOPS_WATER_SENSOR_M).toFixed(1)}-m sensor; day's solar ` +
                     `${m.warmSolarKwhM2.toFixed(1)} kWh/m²)`
                   : ' · warm layer not integrated') +
                 (m.lwDnWm2 !== null

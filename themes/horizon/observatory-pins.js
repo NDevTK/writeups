@@ -11,7 +11,7 @@
  */
 
 export const DAY_PINS = {
-  generatedFor: '2026-09-05T11:05Z',
+  generatedFor: '2026-09-05T12:21Z',
   column: {
     invDT: [0, 0.05],
     invHM: 134,
@@ -26,30 +26,30 @@ export const DAY_PINS = {
     order: ['Phoenix', 'London', 'Singapore', 'San Diego', 'Bergen', 'Mumbai'],
     raining: ['Mumbai'],
     w: {
-      Bergen: [0.8057142857142857, 0.03],
-      London: [0.3228571428571429, 0.03],
-      Mumbai: [0.9542857142857144, 0.03],
+      Bergen: [0.8142857142857143, 0.03],
+      London: [0.31714285714285717, 0.03],
+      Mumbai: [0.9600000000000001, 0.03],
       Phoenix: [0.12000000000000001, 0.03],
       'San Diego': [0.64, 0.03],
-      Singapore: [0.5657142857142857, 0.03]
+      Singapore: [0.5685714285714286, 0.03]
     }
   },
   pol: {
     maxPure: [0.8699279700373292, 0.02]
   },
   meteors: {
-    zhrNow: [0.0026138460200755705, 0.5],
-    daysToPeak: [-23.24726020533331, 0.1],
+    zhrNow: [0.0025529364259676023, 0.5],
+    daysToPeak: [-23.299205762666638, 0.1],
     topCode: 'NUE',
     topShare: [0.029532030895047707, 0.03]
   },
   aurora: {
-    rows: 133,
-    latestGwN: 20,
-    latestAt: '2026-09-05T11:00Z',
-    ovP: [0.1, 0.02],
-    ovLatDeg: 60,
-    kpEst: [1.67, 0.01]
+    rows: 149,
+    latestGwN: 15,
+    latestAt: '2026-09-05T12:20Z',
+    ovP: [0.06, 0.02],
+    ovLatDeg: 62,
+    kpEst: [0, 0.01]
   },
   contrail: {
     l250TC: [-42, 0.5],
@@ -59,8 +59,8 @@ export const DAY_PINS = {
     formHiM: 16491,
     issr: [[10145, [1.1244703499944904, 0.01]]],
     persistNull: true,
-    acN: 0,
-    acMaxAltM: [0, 0.5],
+    acN: 1,
+    acMaxAltM: [1478.28, 0.5],
     acInForm: 0,
     acInPersist: 0
   },
@@ -73,18 +73,18 @@ export const DAY_PINS = {
   },
   tide: {
     amps: {
-      M2: [0.5280069175750587, 0.01],
-      S2: [0.2669721372671038, 0.01],
-      N2: [0.1195518160381851, 0.01],
-      K1: [0.3405203278957524, 0.01],
-      O1: [0.25549432160913443, 0.01],
-      M4: [0.003674438468615003, 0.01]
+      M2: [0.5282727778223729, 0.01],
+      S2: [0.26482824571285063, 0.01],
+      N2: [0.11683428671294709, 0.01],
+      K1: [0.34148791058716876, 0.01],
+      O1: [0.25698284062606774, 0.01],
+      M4: [0.0027922856593633623, 0.01]
     },
-    rmsOutM: [0.09229487542230862, 0.01],
-    latestResidM: [-0.005557203703552532, 0.02],
-    maxAbsOutM: [0.2266279653635357, 0.02],
-    rM2: [0.9741825047510307, 0.01],
-    rO1: [1.1938986991081049, 0.02]
+    rmsOutM: [0.09134397982832827, 0.01],
+    latestResidM: [0.04766020784281613, 0.02],
+    maxAbsOutM: [0.23626790620033816, 0.02],
+    rM2: [0.974673021812496, 0.01],
+    rO1: [1.2008543954489148, 0.02]
   },
   sats: {
     passes: 82,
@@ -106,11 +106,11 @@ export const DAY_PINS = {
     probedTopM: [449.1650390625, 3]
   },
   flash: {
-    rateArcsecS: [12.500786593828934, 0.05],
+    rateArcsecS: [12.50078659535518, 0.05],
     beachType: 'textbook',
-    beachS: [0.9101091360365587, 0.15],
+    beachS: [0.9101091359254416, 0.15],
     aloftType: 'inferior-mirage',
-    aloftS: [1.2326825380769566, 0.2],
+    aloftS: [1.232682537926456, 0.2],
     aloftWidth: [20.147601992475504, 12],
     aloftMagX: [1.498992167203663, 0.6],
     aloftAppArcmin: [-30.37515545299185, 1],
@@ -118,34 +118,35 @@ export const DAY_PINS = {
   },
   marine: {
     stability: 'unstable',
-    dTairSeaK: [-1, 0.05],
-    filmLapseKm: [-16.635887910914295, 3],
-    filmDropK: [0.15804093515368578, 0.05],
+    dTairSeaK: [-2.099999999999998, 0.05],
+    filmLapseKm: [-28.721049081179586, 3],
+    filmDropK: [0.27284996627120606, 0.05],
     pierTopM: 100,
     joinM: 716,
     modelBand: [100, 716],
     clamped: false,
-    skinK: [0.33347395680632175, 0.02],
-    dTairSkinK: [-0.6665260431936773, 0.05],
-    lwDnWm2: [342.89114858682336, 3],
-    q0Wm2: [98.1620594864928, 3],
+    skinK: [0.3741214657634514, 0.02],
+    dTairSkinK: [-1.7258785342365464, 0.05],
+    lwDnWm2: [342.42257409531027, 3],
+    q0Wm2: [123.20730507202968, 3],
     dewSource: 'METAR KSAN (16 km)',
     lwSource:
       "modelled sky: Brunt on the pier's air + 0% cover from METAR KSAN",
-    uMeasMs: 1.6,
-    u10nMs: [1.7819266920227281, 0.05],
-    u10Ms: [1.637516044674417, 0.05],
+    uMeasMs: 1.9,
+    u10nMs: [2.1699152737201985, 0.05],
+    u10Ms: [1.9768843289810538, 0.05],
     warmK: [0, 0.02],
     warmSurfaceK: [0, 0.02],
     warmDzM: [19, 0.5],
     warmSolarKwhM2: [0, 0.05],
     forms: 'coare36',
     k50: false,
-    uStarMs: [0.05792520142740173, 0.003],
-    hsbWm2: [1.5975965577120694, 0.5],
-    hlbWm2: [22.56846555899342, 1],
-    tauNm2: [0.0038569808979736623, 0.002],
-    residualClass: '0-3 m/s'
+    uStarMs: [0.0704706657187211, 0.003],
+    hsbWm2: [6.26040508829288, 0.5],
+    hlbWm2: [37.14909823973311, 1],
+    tauNm2: [0.0056262203568772364, 0.002],
+    residualClass: '0-3 m/s',
+    warmSensorM: [4.529000000000001, 0.05]
   },
   lehnSea: {
     eyeM: 2,

@@ -10345,6 +10345,58 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 142nd pass - THE CHAIN CLOSES
+  ON ITSELF): four loose ends of the marine chain and the daemon,
+  each measured. (1) THE FEEDBACK: the 139th integrated the pier's
+  day in one pass - every step's fluxes from the bulk on the raw
+  sensor temperature. The code (coare36vnWarm_et, READ IN FULL)
+  runs it differently: each step's integral takes the PREVIOUS
+  step's fluxes (tau_old, hs_old, hl_old - the first sample's own
+  bulk when there is none), the net infrared for the layer is
+  0.97 (sigma (tsea - dT_skin_old + T2K)^4 - lw_dn) on the sensor
+  temperature under the previous skin, and after the step the bulk
+  is rerun on ts = tsea + dT_warm_to_skin with the cool skin
+  applied to that - the warming feeds its own fluxes.
+  observatory.warmLayerDay now runs that order, the bulk and the
+  skin as one three-pass fixed point per step; the synthetic calm
+  September day's layer damps from 2.47 K to 1.96 K at the surface
+  (the warmer surface loses more; the same bands hold), and the
+  archive landmark is untouched (it integrates PSL's own fluxes).
+  (2) THE SENSOR'S DEPTH: CO-OPS lists the La Jolla thermometer at
+  -3.43 m re MLLW; the 139th read that as 3.4 m below the surface.
+  The station's published datums (mdapi datums.json: MLLW 4.37 ft,
+  MSL 7.10 ft on the station datum) put the sensor 4.26 m below
+  MSL, and the station's own measured water level puts the surface
+  above it - 4.53 m at the freeze's +0.27 m tide, 4.3-5.4 m across
+  the tide. The page fetches the datums once per station
+  (waterSensorReMslM) and reads the depth at the measured tide
+  (waterSensorDepthM); the freeze carries waterSensorReMslM,
+  tideMslM and the depth; DAY PINS marine gains the depth (29
+  rows). The layer's warming above the sensor changes only when
+  the layer is deeper than the sensor (dT min(1, z/dz)), so the
+  day pins moved by the day, not by the depth. (3) THE CALM
+  MIRAGE'S SIZE: landmark 8 now states the COARE S's angular size
+  - 0.05 arcmin at 30 km against the Kansas S's 0.72 - under the
+    eye's minute of arc: the 140th's open question ("whether such a
+    fold shows on the drawn horizon") is settled for the tower eye,
+    not by the eye. (4) THE DAEMON'S WARM-UP: a fresh process has
+    empty caches, and a cold /sounding spends its budget on the IGRA
+    station list plus one slow Wyoming answer and fails once
+    (measured in a local smoke run: 502 in 20.5 s, then 200 in 16 s
+    with the list cached; every deploy to main restarts the daemon,
+    so the page's first visitor after each pass saw "no fresh
+    ascent"). main() now warms the home area right after it listens
+    (HORIZON_HOME=lat,lon or the theme's default 32.85,-117.12):
+    /sounding, /buoy, /metar, each up to three tries five seconds
+    apart, stopping at the first 200, every outcome logged
+    (parseHome, warmUpPaths, WARM_UP_TRIES, WARM_UP_PAUSE_MS gated
+    in server-reference). STATED LIMITS: the feedback is the code's
+    explicit scheme (a step's fluxes lag by one six-minute reading);
+    the depth is the sensor's listed elevation on the station's
+    published datums under the gauge's own water level - a station
+    without datums falls back to 3.4 m, stated; the warm-up covers
+    one home area (the theme's default scene) - other areas still
+    take the cold walk once, then stale-serve.
 - HAND-OFF (Aug 7 session close - the review session): the
   approximation sweep after ozone + direct-beam + corona stays
   CLEAN in the physics layers; what remains lives in the LEGACY

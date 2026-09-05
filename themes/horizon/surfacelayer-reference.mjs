@@ -423,6 +423,9 @@ const balloon = (h0, tSurf, invBaseAgl = 600) => {
     spanK > 3 &&
     spanC < spanK / 3 &&
     Math.abs(spanC10 - spanC) < 1 &&
+    // the COARE S subtends under a minute of arc at 30 km - below
+    // the eye; the Kansas one is a naked-eye mirage
+    (spanC / 30e3) * (180 / Math.PI) * 60 < 1 &&
     warmC.mo.tAt(0) - warmC.mo.tAt(1) > warm.mo.tAt(0) - warm.mo.tAt(1) &&
     ducts.length >= 1 &&
     ['in-duct', 'ducted-mock-mirage', 'sub-duct'].includes(fl.type);
@@ -430,7 +433,7 @@ const balloon = (h0, tSurf, invBaseAgl = 600) => {
     'Fleagle reads Businger: the cross-closure, and the looming class',
     ok,
     R
-      ? `water +5 K, calm, Kansas forms: the similarity film is ${filmMo.toFixed(0)} K/km over 0.5-10 m; the tower eye's fold at ${(r.distM / 1000).toFixed(0)} km is read by the film family as ${(R.params.gammaFilmKpM * 1000).toFixed(0)} K/km over ${R.params.wM.toFixed(0)} m (drop ${(-R.dTretr).toFixed(2)} K vs the profile's ${(-R.dTballoon).toFixed(2)} K), closing at ${R.rmsK.toFixed(3)} K RMS over ${R.spanM[0].toFixed(0)}-${R.spanM[1].toFixed(0)} m - inside the pier's ${warm.pierTopM}-m band, no lean on the modelled layer; the SAME contrast on COARE 3.6's forms: ${filmC.toFixed(0)} K/km over 0.5-10 m (the free-convection limb holds ${(warmC.mo.tAt(0) - warmC.mo.tAt(1)).toFixed(2)} K in the lowest metre against Kansas's ${(warm.mo.tAt(0) - warm.mo.tAt(1)).toFixed(2)}), and the same fan from 22/30 m over 10-60 km ${rC.retrieved ? `folds at ${(rC.distM / 1000).toFixed(0)} km (${rC.mode}, ${rC.retrieved.closes ? 'closes' : 'does not close'})` : `finds no fold it will take: the S at 30 km spans ${spanC.toFixed(1)} m on COARE's column against ${spanK.toFixed(1)} m on Kansas's, under the detector's 6-m prominence - the fan step changes nothing (${spanC10.toFixed(1)} m at 10 m); a smaller mirage, not an unresolved one`}; air +4 K over cold water: ${ducts.length} surface duct(s), flash class "${fl.type}" - the looming side of the same measured contrast`
+      ? `water +5 K, calm, Kansas forms: the similarity film is ${filmMo.toFixed(0)} K/km over 0.5-10 m; the tower eye's fold at ${(r.distM / 1000).toFixed(0)} km is read by the film family as ${(R.params.gammaFilmKpM * 1000).toFixed(0)} K/km over ${R.params.wM.toFixed(0)} m (drop ${(-R.dTretr).toFixed(2)} K vs the profile's ${(-R.dTballoon).toFixed(2)} K), closing at ${R.rmsK.toFixed(3)} K RMS over ${R.spanM[0].toFixed(0)}-${R.spanM[1].toFixed(0)} m - inside the pier's ${warm.pierTopM}-m band, no lean on the modelled layer; the SAME contrast on COARE 3.6's forms: ${filmC.toFixed(0)} K/km over 0.5-10 m (the free-convection limb holds ${(warmC.mo.tAt(0) - warmC.mo.tAt(1)).toFixed(2)} K in the lowest metre against Kansas's ${(warm.mo.tAt(0) - warm.mo.tAt(1)).toFixed(2)}), and the same fan from 22/30 m over 10-60 km ${rC.retrieved ? `folds at ${(rC.distM / 1000).toFixed(0)} km (${rC.mode}, ${rC.retrieved.closes ? 'closes' : 'does not close'})` : `finds no fold it will take: the S at 30 km spans ${spanC.toFixed(1)} m on COARE's column against ${spanK.toFixed(1)} m on Kansas's, under the detector's 6-m prominence - the fan step changes nothing (${spanC10.toFixed(1)} m at 10 m); a smaller mirage, not an unresolved one, and at ${((spanC / 30e3) * (180 / Math.PI) * 60).toFixed(2)} arcmin under the eye's own minute of arc (the Kansas S subtends ${((spanK / 30e3) * (180 / Math.PI) * 60).toFixed(2)})`}; air +4 K over cold water: ${ducts.length} surface duct(s), flash class "${fl.type}" - the looming side of the same measured contrast`
       : `declined: ${r.note}`
   );
 }

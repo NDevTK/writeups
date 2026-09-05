@@ -292,6 +292,29 @@ async function main() {
     const site = byName.site?.elevation ?? 0;
     const above = (q) =>
       q ? (q.refdatum === 'Site Elevation' ? site : 0) + q.elevation : null;
+    // THE WATER SENSOR'S DEPTH (142nd pass): CO-OPS lists the
+    // thermometer against a tidal datum (La Jolla: -3.43 m re MLLW);
+    // the station's published datums put that on MSL, and the
+    // station's own measured water level puts the surface above it
+    // - the depth the warm layer is read at follows the tide.
+    const dj = await jget(
+      `https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${MET_STATION}/datums.json?units=metric`
+    );
+    const datum = {};
+    for (const d of dj?.datums ?? []) datum[d.name] = d.value;
+    const wt = byName['Water Temperature'];
+    const waterSensorReMslM =
+      wt && Number.isFinite(wt.elevation)
+        ? wt.refdatum === 'MSL'
+          ? wt.elevation
+          : Number.isFinite(datum[wt.refdatum]) && Number.isFinite(datum.MSL)
+            ? wt.elevation + datum[wt.refdatum] - datum.MSL
+            : null
+        : null;
+    const wlj = await jget(
+      `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=water_level&application=horizon&date=latest&datum=MSL&units=metric&time_zone=gmt&format=json&station=${MET_STATION}`
+    );
+    const tideMslM = parseFloat(wlj?.data?.[0]?.v);
     const grab = async (product) => {
       const j = await jget(
         `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=${product}&application=horizon&date=latest&units=metric&time_zone=gmt&format=json&station=${MET_STATION}`
@@ -412,7 +435,18 @@ async function main() {
       pPa: Number.isFinite(parseFloat(pr?.v)) ? parseFloat(pr.v) * 100 : null,
       dewC: null,
       shore,
-      waterSensorM: 3.4,
+      // the sensor's elevation on MSL, the tide on MSL at the freeze,
+      // and the depth below the surface that follows (3.4 m below
+      // the datum was the 139th's reading; the true depth is deeper
+      // by the datum offset and the tide)
+      waterSensorReMslM: Number.isFinite(waterSensorReMslM)
+        ? waterSensorReMslM
+        : null,
+      tideMslM: Number.isFinite(tideMslM) ? tideMslM : null,
+      waterSensorM:
+        Number.isFinite(waterSensorReMslM) && Number.isFinite(tideMslM)
+          ? -waterSensorReMslM + tideMslM
+          : 3.4,
       series
     };
   });
@@ -845,7 +879,9 @@ async function emitPins(fixturePath) {
           hlbWm2: [mar.hlbWm2, 1],
           tauNm2: [mar.tauNm2, 0.002],
           // the measured residual's wind class (141st)
-          residualClass: mar.residual ? mar.residual.label : null
+          residualClass: mar.residual ? mar.residual.label : null,
+          // the sensor's depth under the tide (142nd)
+          warmSensorM: mar.warmSensorM === null ? null : [mar.warmSensorM, 0.05]
         }
       : null,
     lehnSea: lehSea

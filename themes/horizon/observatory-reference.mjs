@@ -1131,6 +1131,10 @@ if (COOPS_MET && DAY_PINS.marine) {
               P.residualClass
             ]
           ]
+        : []),
+      // the sensor's depth under the tide (142nd pass)
+      ...(P.warmSensorM !== undefined
+        ? [['water sensor depth m', mar.warmSensorM, P.warmSensorM]]
         : [])
     ],
     `${COOPS_MET.name}: air-sea ${mar.dTairSeaK >= 0 ? '+' : ''}${mar.dTairSeaK.toFixed(1)} K, ${mar.stability}, film ${mar.filmLapseKm.toFixed(0)} K/km in the lowest 10 m - ${mar.klass}; the mixed layer modelled over ${mar.modelBand ? mar.modelBand.map((z) => z.toFixed(0)).join('-') + ' m' : 'no band'}` +

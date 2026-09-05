@@ -93,7 +93,14 @@ import {
   marineColumnRows,
   moBulk
 } from './surfacelayer.js';
-import {coolSkin, lwDown, lwDownDefault} from './coolskin.js';
+import {
+  EMISSIVITY_SEA,
+  SIGMA_SB,
+  T_ZERO_K,
+  coolSkin,
+  lwDown,
+  lwDownDefault
+} from './coolskin.js';
 import {localSeconds, warmLayerInit, warmLayerStep} from './warmlayer.js';
 import {
   lehnFitElevated,
@@ -1219,6 +1226,9 @@ export function marinePanel(
     warmSurfaceK: warm && Number.isFinite(warm.dTwarmK) ? warm.dTwarmK : null,
     warmSolarKwhM2:
       warm && Number.isFinite(warm.solarKwhM2) ? warm.solarKwhM2 : null,
+    // the sensor's depth the layer was read at (142nd pass: the
+    // station's datums under the measured tide)
+    warmSensorM: warm && Number.isFinite(warm.zSensorM) ? warm.zSensorM : null,
     tBaseC: tsBase,
     lwDnWm2: lw ? lw.wm2 : null,
     lwSource: lw ? lw.source : 'none',
@@ -1306,27 +1316,55 @@ export function warmLayerDay(
         0.0052790414 * Math.sin((latDeg * Math.PI) / 180) ** 2 +
         0.0000232718 * Math.sin((latDeg * Math.PI) / 180) ** 4)
     : 9.80665;
-  for (const s of series) {
-    if (![s.utcMs, s.taC, s.tsC, s.uMs].every(Number.isFinite)) continue;
+  // THE FEEDBACK (142nd pass), as the code runs it
+  // (coare36vnWarm_et): each step's integral takes the fluxes the
+  // PREVIOUS step's bulk returned on the warm-layer-corrected
+  // surface (its tau_old, hs_old, hl_old; the first sample's own
+  // bulk when there is none), and after the step the bulk is rerun
+  // on ts = tsea + dT_warm_to_skin with the cool skin applied to
+  // that - the warming feeds its own fluxes. The net infrared the
+  // layer absorbs is the code's own line: 0.97 (sigma (tsea -
+  // dT_skin_old + T2K)^4 - lw_dn) on the SENSOR temperature under
+  // the previous skin.
+  const fluxesOn = (s, tsBase, lwDn, swNet) => {
     const pPa = Number.isFinite(s.pPa) ? s.pPa : 101325;
-    const mo = moBulk({
-      uMs: s.uMs,
-      zuM,
-      taC: s.taC,
-      ztM,
-      tsC: s.tsC,
-      pPa,
-      dewC,
-      latDeg,
-      bliM: 600
-    });
+    let skin = 0;
+    let mo = null;
+    let cs = null;
+    // the bulk and the skin as one fixed point (three passes hold
+    // the skin to a millikelvin at the pier's calm)
+    for (let k = 0; k < 3; k++) {
+      mo = moBulk({
+        uMs: s.uMs,
+        zuM,
+        taC: s.taC,
+        ztM,
+        tsC: tsBase - skin,
+        pPa,
+        dewC,
+        latDeg,
+        bliM: 600
+      });
+      cs = coolSkin({
+        uStar: mo.uStar,
+        rhoA: mo.rhoA,
+        tsC: tsBase,
+        hsb: mo.hsbWm2,
+        hlb: mo.hlbWm2,
+        lwDn,
+        swNet
+      });
+      skin = cs.dTK;
+    }
     // the module's own fluxes and stress (140th pass): the stress
     // WITHOUT the gustiness, as the code reports tau and as its
     // warm-layer routine consumes it
-    const rhoA = mo.rhoA;
-    const hsb = mo.hsbWm2;
-    const hlb = mo.hlbWm2;
-    const tau = mo.tauNm2;
+    return {tau: mo.tauNm2, hsb: mo.hsbWm2, hlb: mo.hlbWm2, skin};
+  };
+  let old = null;
+  let lastSkin = 0;
+  for (const s of series) {
+    if (![s.utcMs, s.taC, s.tsC, s.uMs].every(Number.isFinite)) continue;
     const eHpa =
       dewC === null ? null : Math.min(eSatPa(dewC), eSatPa(s.taC)) / 100;
     const lwDn =
@@ -1339,15 +1377,10 @@ export function warmLayerDay(
             rhPct: (100 * eHpa * 100) / eSatPa(s.taC)
           }).wm2;
     const swNet = Math.max(0, solarAt(s.utcMs)) * (1 - albedo);
-    const cs = coolSkin({
-      uStar: mo.uStar,
-      rhoA,
-      tsC: s.tsC,
-      hsb,
-      hlb,
-      lwDn,
-      swNet
-    });
+    if (old === null) old = fluxesOn(s, s.tsC, lwDn, swNet);
+    const lwNet =
+      EMISSIVITY_SEA *
+      (SIGMA_SB * Math.pow(s.tsC - old.skin + T_ZERO_K, 4) - lwDn);
     st = warmLayerStep(
       st,
       {
@@ -1355,14 +1388,18 @@ export function warmLayerDay(
         lonDeg,
         tseaC: s.tsC,
         swNet,
-        lwNet: cs.rnlWm2,
-        hsb,
-        hlb,
-        tau,
+        lwNet,
+        hsb: old.hsb,
+        hlb: old.hlb,
+        tau: old.tau,
         g
       },
       zSensorM
     );
+    // the rerun on the corrected surface: the sensor's reading plus
+    // what the layer now holds above it
+    old = fluxesOn(s, s.tsC + st.dTtoDepth, lwDn, swNet);
+    lastSkin = old.skin;
     if (prevMs !== null && s.utcMs >= dayStartMs)
       solarJ += swNet * ((s.utcMs - prevMs) / 1000);
     prevMs = s.utcMs;
@@ -1376,6 +1413,12 @@ export function warmLayerDay(
     solarKwhM2: solarJ / 3.6e6,
     armed: st.jamset,
     steps,
+    // the last step's fluxes on the corrected surface (the code's
+    // *_old for the next step) and its skin
+    lastTauNm2: old ? old.tau : null,
+    lastHsbWm2: old ? old.hsb : null,
+    lastHlbWm2: old ? old.hlb : null,
+    lastSkinK: lastSkin,
     fromMs: series[0].utcMs,
     toMs: series[series.length - 1].utcMs
   };

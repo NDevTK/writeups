@@ -58,7 +58,12 @@ import {
   sseEvent,
   budgetLeftMs,
   fetchBudgetMs,
-  UPSTREAM_BUDGET_MS
+  UPSTREAM_BUDGET_MS,
+  HOME_DEFAULT,
+  parseHome,
+  warmUpPaths,
+  WARM_UP_TRIES,
+  WARM_UP_PAUSE_MS
 } from './server/src/index.mjs';
 
 import {haversineKm} from './lightning.js';
@@ -659,6 +664,45 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     'rate limiter',
     granted === 60 && otherIp && afterRefill && !stillDry && lim.size() === 2,
     `60/min budget: 70 instant requests -> exactly 60 granted; other IP unaffected; 2 s refill grants ~2 more then dry again`
+  );
+}
+
+// ---- warm-up on start (142nd pass) -----------------------------
+{
+  const home = parseHome(HOME_DEFAULT);
+  const paths = warmUpPaths(home);
+  const custom = parseHome(' 51.5 , -0.13 ');
+  const bad = [
+    parseHome(''),
+    parseHome(undefined),
+    parseHome('91,0'),
+    parseHome('0,181'),
+    parseHome('lat,lon'),
+    parseHome('32.85')
+  ];
+  check(
+    'warm-up on start',
+    home !== null &&
+      home.lat === 32.85 &&
+      home.lon === -117.12 &&
+      paths.length === 3 &&
+      paths[0] === '/sounding?lat=32.85&lon=-117.12' &&
+      paths[1] === '/buoy?lat=32.85&lon=-117.12' &&
+      paths[2] === '/metar?lat=32.85&lon=-117.12' &&
+      custom !== null &&
+      custom.lat === 51.5 &&
+      custom.lon === -0.13 &&
+      warmUpPaths(custom)[0] === '/sounding?lat=51.50&lon=-0.13' &&
+      bad.every((b) => b === null) &&
+      warmUpPaths(null).length === 0 &&
+      WARM_UP_TRIES === 3 &&
+      WARM_UP_PAUSE_MS === 5000 &&
+      // three tries with their pauses fit well inside the hour the
+      // sounding cache lives, and inside a deploy's first minute
+      WARM_UP_TRIES * (UPSTREAM_BUDGET_MS + 5000) +
+        (WARM_UP_TRIES - 1) * WARM_UP_PAUSE_MS <
+        120e3,
+    `a fresh process warms the home area's slow routes right after it listens (measured in a smoke run: a cold /sounding spends its budget on the station list plus one slow Wyoming answer and fails once - 502 in 20.5 s - then answers in 16 s with the list cached): HORIZON_HOME=lat,lon or the theme's default ${HOME_DEFAULT} -> ${paths.join(', ')}, each up to ${WARM_UP_TRIES} tries ${WARM_UP_PAUSE_MS / 1000} s apart, stopping at the first 200; a malformed or out-of-range home warms nothing (${bad.length} bad forms refused)`
   );
 }
 
