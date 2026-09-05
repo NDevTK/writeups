@@ -1165,9 +1165,14 @@ export function classifyField({
   tTropC,
   tropHm,
   rows,
-  landReference = true
+  landReference = true,
+  // the per-pixel clear-sky reference (147th pass): q -> C, when a
+  // foundation-SST field gives each sea pixel its own skin; null
+  // keeps the one point reference for every water pixel
+  refAt = null
 }) {
   const n = ww * wh;
+  const tClr = new Float32Array(n).fill(NaN);
   const water = new Uint8Array(n);
   for (let q = 0; q < n; q++) water[q] = elevM[q] <= 0.3 ? 1 : 0;
   // near-land water: within COAST_PX (Chebyshev) of a land pixel
@@ -1221,7 +1226,8 @@ export function classifyField({
       let cloud;
       let ref;
       if (water[q]) {
-        ref = tClrC;
+        ref = refAt ? refAt(q) : tClrC;
+        tClr[q] = ref;
         const e = etrop(t, ref, tTropC);
         eps[q] = e;
         cloud = e >= ETROP_THRESH.ocean;
@@ -1265,7 +1271,181 @@ export function classifyField({
       const layer = isccpLayer(p);
       cls[q] = layer === 'low' ? CLS.low : layer === 'mid' ? CLS.mid : CLS.high;
     }
-  return {ww, wh, cls, topM, pHpa, eps, sigma, water, coastal, inversion};
+  return {
+    ww,
+    wh,
+    cls,
+    topM,
+    pHpa,
+    eps,
+    sigma,
+    water,
+    coastal,
+    inversion,
+    tClr
+  };
+}
+
+// ---------------------------------------------------------------
+// The foundation-SST field and the per-pixel reference (147th pass)
+// ---------------------------------------------------------------
+// A gridded SST box as the daemon serves it from JPL's MUR analysis
+// (0.01 deg, daily foundation temperature - the temperature under
+// the diurnal skin, GHRSST's definition; the theme's /sst serves a
+// 3-deg box at 0.05 deg): {time, lat0, lon0, dLat, dLon, nLat, nLon,
+// sst} with sst row-major (latitude outer), null over land and
+// where the analysis has no value.
+export function sstAt(grid, latDeg, lonDeg) {
+  if (!grid || !Array.isArray(grid.sst)) return null;
+  const fi = (latDeg - grid.lat0) / grid.dLat;
+  const fj = (lonDeg - grid.lon0) / grid.dLon;
+  if (fi < 0 || fj < 0 || fi > grid.nLat - 1 || fj > grid.nLon - 1) return null;
+  const i0 = Math.min(Math.floor(fi), grid.nLat - 2);
+  const j0 = Math.min(Math.floor(fj), grid.nLon - 2);
+  const ti = fi - i0;
+  const tj = fj - j0;
+  // bilinear over the valid neighbours, weights renormalised where
+  // a neighbour is land or unanalysed
+  let sum = 0;
+  let wsum = 0;
+  for (let di = 0; di <= 1; di++)
+    for (let dj = 0; dj <= 1; dj++) {
+      const v = grid.sst[(i0 + di) * grid.nLon + (j0 + dj)];
+      if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+      const w = (di ? ti : 1 - ti) * (dj ? tj : 1 - tj);
+      sum += w * v;
+      wsum += w;
+    }
+  return wsum > 1e-9 ? sum / wsum : null;
+}
+// The nearest analysed grid value to a point, within maxDeg (an
+// observer on land has no MUR value under them; the pier's skin is
+// tied to the sea beside them).
+export function sstNearest(grid, latDeg, lonDeg, maxDeg = 0.3) {
+  if (!grid || !Array.isArray(grid.sst)) return null;
+  let best = null;
+  for (let i = 0; i < grid.nLat; i++) {
+    const la = grid.lat0 + i * grid.dLat;
+    if (Math.abs(la - latDeg) > maxDeg) continue;
+    for (let j = 0; j < grid.nLon; j++) {
+      const v = grid.sst[i * grid.nLon + j];
+      if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+      const lo = grid.lon0 + j * grid.dLon;
+      const dlo = (lo - lonDeg) * Math.cos(latDeg * RAD);
+      const d = Math.hypot(la - latDeg, dlo);
+      if (d <= maxDeg && (!best || d < best.d))
+        best = {d, sstC: v, latDeg: la, lonDeg: lo};
+    }
+  }
+  return best;
+}
+// The anomaly of each window pixel's foundation SST against the
+// base point (the observer's own sea): the field the per-pixel
+// reference rides on. latLonAt(q) -> {latDeg, lonDeg}. Pixels the
+// analysis does not cover (land, or off the box) take 0 - the point
+// reference stands there. Returns {anomK, baseC, base, coveredN,
+// minK, maxK}; baseC null (no analysed sea within reach of the base
+// point) leaves every anomaly 0.
+export function sstAnomalyField({grid, latLonAt, n, baseLat, baseLon}) {
+  const anomK = new Float32Array(n);
+  const base = sstNearest(grid, baseLat, baseLon);
+  if (!base) return {anomK, baseC: null, base: null, coveredN: 0};
+  let coveredN = 0;
+  let minK = Infinity;
+  let maxK = -Infinity;
+  for (let q = 0; q < n; q++) {
+    const p = latLonAt(q);
+    const v = sstAt(grid, p.latDeg, p.lonDeg);
+    if (v === null) continue;
+    const a = v - base.sstC;
+    anomK[q] = a;
+    coveredN++;
+    if (a < minK) minK = a;
+    if (a > maxK) maxK = a;
+  }
+  return {
+    anomK,
+    baseC: base.sstC,
+    base,
+    coveredN,
+    minK: coveredN ? minK : null,
+    maxK: coveredN ? maxK : null
+  };
+}
+// The per-pixel reference on the anomaly field: the point skin plus
+// the pixel's foundation anomaly through the same column and view
+// (the offshore gradient from the analysis, the absolute skin and
+// its diurnal state from the pier - stated), memoised on 0.02-K
+// steps of the anomaly.
+export function referenceAtFactory({
+  anomK,
+  tSkinC,
+  rows,
+  viewZenithDeg: vz,
+  bandUm = BAND13_UM,
+  stepK = 0.02
+}) {
+  const memo = new Map();
+  const point = clearSkyReference({
+    tSkinC,
+    rows,
+    viewZenithDeg: vz,
+    bandUm
+  }).tClrC;
+  return (q) => {
+    const a = anomK[q];
+    if (!a) return point;
+    const k = Math.round(a / stepK);
+    let v = memo.get(k);
+    if (v === undefined) {
+      v = clearSkyReference({
+        tSkinC: tSkinC + k * stepK,
+        rows,
+        viewZenithDeg: vz,
+        bandUm
+      }).tClrC;
+      memo.set(k, v);
+    }
+    return v;
+  };
+}
+// The warm-pixel closure per pixel: the 95th percentile and the
+// median of (BT - the pixel's own reference) over the measured
+// water pixels within a radius - the point closure's cousin that
+// the offshore gradient can no longer feed.
+export function fieldClosure(field, cx, cy, radiusPx) {
+  const {ww, wh, cls, water, tClr} = field;
+  const d = [];
+  const clear = [];
+  for (let j = 0; j < wh; j++)
+    for (let i = 0; i < ww; i++) {
+      const dx = i + 0.5 - cx;
+      const dy = j + 0.5 - cy;
+      if (dx * dx + dy * dy > radiusPx * radiusPx) continue;
+      const q = j * ww + i;
+      if (!water[q] || cls[q] === CLS.nodata || cls[q] === CLS.unmeasured)
+        continue;
+      if (!field.btAt) continue;
+      const t = field.btAt(q);
+      if (!Number.isFinite(t) || !Number.isFinite(tClr[q])) continue;
+      d.push(t - tClr[q]);
+      if (cls[q] === CLS.clear) clear.push(t - tClr[q]);
+    }
+  const p95 = (a) => a[Math.min(a.length - 1, Math.floor(0.95 * a.length))];
+  const med = (a) => a[Math.floor(a.length / 2)];
+  d.sort((a, b) => a - b);
+  clear.sort((a, b) => a - b);
+  return {
+    n: d.length,
+    p95K: d.length ? p95(d) : null,
+    medianK: d.length ? med(d) : null,
+    // the pixels the test itself called clear: what the clear sea
+    // reads against its own reference (a cloudy median is the
+    // cloud's, not the closure's)
+    clearN: clear.length,
+    clearMedianK: clear.length ? med(clear) : null,
+    clearP95K: clear.length ? p95(clear) : null
+  };
 }
 
 // Census of the field inside a radius (pixels) of a centre (window
@@ -1477,7 +1657,10 @@ export function goesPanel({
   lonDeg,
   metar = null,
   landReference = true,
-  sat = SATELLITES[0]
+  sat = SATELLITES[0],
+  // the foundation-SST anomaly field over the window (147th pass):
+  // {anomK, baseC, coveredN, minK, maxK, time} from sstAnomalyField
+  sst = null
 }) {
   const vz = viewZenithDeg(latDeg, lonDeg, sat.lonDeg);
   const ref = clearSkyReference({
@@ -1488,6 +1671,16 @@ export function goesPanel({
   });
   const trop = coldPoint(rows);
   if (!trop) return null;
+  const perPixel = !!(sst && sst.anomK && sst.baseC !== null && sst.coveredN);
+  const refAt = perPixel
+    ? referenceAtFactory({
+        anomK: sst.anomK,
+        tSkinC,
+        rows,
+        viewZenithDeg: vz,
+        bandUm: sat.bandUm
+      })
+    : null;
   const field = classifyField({
     bt: dec.bt,
     w: dec.w,
@@ -1501,7 +1694,8 @@ export function goesPanel({
     tTropC: trop.tC,
     tropHm: trop.hM,
     rows,
-    landReference
+    landReference,
+    refAt
   });
   field.btAt = (q) => {
     const i = q % ww;
@@ -1511,6 +1705,7 @@ export function goesPanel({
   const cx = win.px - i0;
   const cy = win.py - j0;
   const pxPerKm = 1000 / win.mppM;
+  const closure = fieldClosure(field, cx, cy, 100 * pxPerKm);
   const r100 = fieldStats(field, cx, cy, 100 * pxPerKm);
   const r30 = fieldStats(field, cx, cy, 30 * pxPerKm);
   const sectors = sectorCensus(field, cx, cy, 100 * pxPerKm);
@@ -1559,6 +1754,18 @@ export function goesPanel({
       topM: field.topM[oq]
     },
     warmClosureK: r100.warmP95C === null ? null : r100.warmP95C - ref.tClrC,
+    // the same closure against each pixel's own reference (the
+    // point closure when no SST field rides the window)
+    closure,
+    sst: perPixel
+      ? {
+          time: sst.time ?? null,
+          baseC: sst.baseC,
+          coveredN: sst.coveredN,
+          minK: sst.minK,
+          maxK: sst.maxK
+        }
+      : null,
     // the column's own ISCCP boundaries, for the line
     isccpM: {
       lowTopM: heightOfPressure(rows, ISCCP_LOW_HPA),

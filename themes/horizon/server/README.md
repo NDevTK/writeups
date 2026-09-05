@@ -118,7 +118,7 @@ IP.
 Every deploy restarts the process (the self-update timer), and a
 fresh process holds empty caches. Since the 144th pass the slow
 per-area caches (sounding, buoy, metar, aeronet, aerosol, ozone,
-chlor, ndvi, surface, rrs) and the sitewide feeds (TLEs, GMN, GVP,
+chlor, ndvi, surface, rrs, sst) and the sitewide feeds (TLEs, GMN, GVP,
 COBS, the station lists) are snapshotted to `cache.json` in the
 systemd `StateDirectory` (`/var/lib/horizon-live`, the unit's one
 writable path; `HORIZON_STATE_DIR` overrides) every five minutes
@@ -135,6 +135,17 @@ its 8-day composite in parallel under the shared upstream budget
 (a six-band ERDDAP point query takes about 18 s - the old 15-s
 timeout failed every call); the daily's measurement wins, the
 composite fills its cloud gaps, and the answer names its `product`.
+
+The foundation-SST route (`/sst`, 147th pass) serves JPL's MUR v4.1
+analysis (0.01°, daily, `sea_surface_foundation_temperature`) from
+CoastWatch's ERDDAP as a 3° box at 0.05° around the point's 0.5°
+cell — 61 × 61 values to 0.001 °C, null over land — so the
+satellite cloud field can give every sea pixel its own clear-sky
+reference and a coast with no pier or buoy still has a measured sea
+temperature (a foundation temperature: no diurnal skin, stated on
+the page). One ERDDAP request of ~200 kB answers in about a second;
+successes cache 6 h (the analysis is daily), failures 10 min; the
+answer carries the analysis `time`.
 
 ## Security posture
 

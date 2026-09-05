@@ -454,6 +454,8 @@
         latestTimeFromDomains,
         mercatorLatLon,
         pickSatellite,
+        sstAnomalyField,
+        sstNearest,
         VIEW_ZENITH_MAX_DEG,
         windowTiles
       } from './horizon/goesir.js';
@@ -2336,20 +2338,41 @@
         const pier = state.coopsMet?.tsC;
         const b = state.buoy;
         const buoyOk = b && Number.isFinite(b.wtmp) && b.distKm <= 50;
+        // the foundation analysis stands in where nothing in situ
+        // is within reach (147th pass): the nearest analysed MUR
+        // cell within 0.3 deg of the observer
+        const mur = state.sstGrid
+          ? sstNearest(state.sstGrid, state.lat, state.lon, 0.3)
+          : null;
         const seaSource = Number.isFinite(skin)
           ? 'COARE skin'
           : Number.isFinite(pier)
             ? 'CO-OPS ' + (state.coopsMet.name ?? 'sensor')
             : buoyOk
               ? 'NDBC ' + b.id
-              : null;
+              : mur
+                ? 'MUR foundation SST'
+                : null;
         const tSkinC = Number.isFinite(skin)
           ? skin
           : Number.isFinite(pier)
             ? pier
             : buoyOk
               ? b.wtmp
-              : null;
+              : mur
+                ? mur.sstC
+                : null;
+        // where the sea temperature was measured: the anomaly field
+        // is referred to the analysis at THAT point
+        const seaBase =
+          Number.isFinite(skin) || Number.isFinite(pier)
+            ? {
+                latDeg: state.coopsMet?.latDeg ?? state.lat,
+                lonDeg: state.coopsMet?.lonDeg ?? state.lon
+              }
+            : buoyOk && Number.isFinite(b.lat) && Number.isFinite(b.lon)
+              ? {latDeg: b.lat, lonDeg: b.lon}
+              : {latDeg: state.lat, lonDeg: state.lon};
         const rows = state.rowsSea ?? state.soundingData?.rows;
         if (tSkinC === null || !Array.isArray(rows) || rows.length < 10) {
           const why =
@@ -2440,6 +2463,8 @@
           const ww = 2 * win.halfPx + 1;
           const wh = ww;
           const elevM = new Float32Array(ww * wh);
+          const pxLat = new Float64Array(ww * wh);
+          const pxLon = new Float64Array(ww * wh);
           const mLat = 111320;
           const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
           for (let j = 0; j < wh; j++)
@@ -2448,11 +2473,35 @@
                 win.x0 + i0 + i + 0.5,
                 win.y0 + j0 + j + 0.5
               );
+              pxLat[j * ww + i] = g.latDeg;
+              pxLon[j * ww + i] = g.lonDeg;
               elevM[j * ww + i] = farRingData.elevAt(
                 ((g.lonDeg - state.lon) * mLon) / MPU,
                 (-(g.latDeg - state.lat) * mLat) / MPU
               );
             }
+          // the foundation-SST anomaly of every window pixel against
+          // the analysis at the sea source's point (147th pass)
+          const sstField = state.sstGrid
+            ? {
+                ...sstAnomalyField({
+                  grid: state.sstGrid,
+                  latLonAt: (q) => ({latDeg: pxLat[q], lonDeg: pxLon[q]}),
+                  n: ww * wh,
+                  baseLat: seaBase.latDeg,
+                  baseLon: seaBase.lonDeg
+                }),
+                time: state.sstGrid.time
+              }
+            : null;
+          if (params.has('debug'))
+            console.warn(
+              'goes: sst ' +
+                (sstField
+                  ? `base ${sstField.baseC} C at ${seaBase.latDeg}, ${seaBase.lonDeg}; ` +
+                    `${sstField.coveredN} px covered, ${sstField.minK}..${sstField.maxK} K`
+                  : 'none yet')
+            );
           const metar =
             state.metar && Date.now() - state.metar.at < 90 * 60e3
               ? {
@@ -2474,7 +2523,8 @@
             latDeg: state.lat,
             lonDeg: state.lon,
             metar,
-            sat: pick.sat
+            sat: pick.sat,
+            sst: sstField
           });
           if (!P) return;
           const s = P.r100;
@@ -2546,10 +2596,24 @@
               `${P.reference.depressionK.toFixed(2)} K (sea emissivity ` +
               `${P.reference.emissivity.toFixed(4)} at ${P.viewZenithDeg.toFixed(1)}° view, ` +
               `window τ ${P.reference.tauNadir.toFixed(3)} over ` +
-              `${P.reference.pwMm.toFixed(1)} mm; MT_CKD) · warmest sea pixel ` +
+              `${P.reference.pwMm.toFixed(1)} mm; MT_CKD` +
+              (seaSource === 'MUR foundation SST'
+                ? '; a foundation temperature - the diurnal skin unmeasured here'
+                : '') +
+              `) · warmest sea pixel ` +
               (s.warmP95C !== null
                 ? `${s.warmP95C.toFixed(2)} °C (${sign(P.warmClosureK)} K)`
                 : 'none') +
+              (P.sst
+                ? ` · MUR ${P.sst.time ? P.sst.time.slice(0, 10) : ''} foundation SST ` +
+                  `${P.sst.baseC.toFixed(2)} °C at the ${seaSource === 'MUR foundation SST' ? 'observer' : 'sea source'}, ` +
+                  `${sign(P.sst.minK)}/${sign(P.sst.maxK)} K across ${P.sst.coveredN} px → each sea ` +
+                  `pixel's own reference; closure per pixel ${sign(P.closure.p95K)} K (p95 of ` +
+                  `${P.closure.n} px)` +
+                  (P.closure.clearN
+                    ? `, the ${P.closure.clearN} clear px a median ${sign(P.closure.clearMedianK)} K`
+                    : '')
+                : '') +
               ` · cloud where ε_trop ≥ 0.10 ⇔ BT ≤ ${P.thresholdBtC.toFixed(1)} °C ` +
               `(tropopause ${P.tropopause.tC} °C at ${P.tropopause.hM} m) · ` +
               `overhead ${P.observer.btC.toFixed(1)} °C (` +
@@ -6103,6 +6167,41 @@
       // has a measured spectrum - otherwise the NRT Morel colour stands.
       // ?rrs=v1,...,v6 pins a spectrum; ?rrssrc=URL overrides.
       const RRS_PROXY = params.get('rrssrc') ?? 'https://api.ndev.tk/rrs';
+      // The foundation-SST box (147th pass): JPL MUR through the
+      // daemon's /sst, a 3-deg grid at 0.05 deg around the home
+      // cell - the satellite cloud field's per-pixel clear-sky
+      // reference and the sea temperature where no pier or buoy is
+      // within 50 km (a foundation temperature: no diurnal skin -
+      // stated on the line). Hourly (the analysis is daily);
+      // ?sstsrc=URL overrides; ?sst=0 disables.
+      const SST_PROXY = params.get('sstsrc') ?? 'https://api.ndev.tk/sst';
+      async function syncSst() {
+        if (overridden || params.get('sst') === '0') return;
+        try {
+          const r = await fetch(
+            SST_PROXY +
+              '?lat=' +
+              state.lat.toFixed(3) +
+              '&lon=' +
+              state.lon.toFixed(3),
+            {credentials: 'omit'}
+          );
+          if (!r.ok) throw new Error('sst ' + r.status);
+          const g = await r.json();
+          if (!g || !Array.isArray(g.sst) || !(g.nLat > 1) || !(g.nLon > 1))
+            throw new Error('sst shape');
+          state.sstGrid = g;
+          record(
+            'JPL MUR foundation SST',
+            `${g.validN} analysed cells of ${g.nLat * g.nLon} at 0.05° · ` +
+              (g.time ? g.time.slice(0, 10) : 'undated')
+          );
+          // the cloud field re-runs on the per-pixel reference
+          syncGoesIr();
+        } catch (e) {
+          if (params.has('debug')) console.warn('sst: ' + e.message);
+        }
+      }
       function applyRrs(rrs, note) {
         const rgb = seaColorLinear(rrs);
         chlorColor = chlorColor ?? new THREE.Color();
@@ -12178,6 +12277,9 @@
                     bt.toFixed(1) +
                     ' °C'
                   : '') +
+                (Number.isFinite(P.field.tClr[q])
+                  ? ', clear-sky ref ' + P.field.tClr[q].toFixed(1) + ' °C'
+                  : '') +
                 (Number.isFinite(P.field.eps[q])
                   ? ', ε ' + P.field.eps[q].toFixed(2)
                   : '') +
@@ -12624,6 +12726,7 @@
         syncWater();
         syncChlor();
         syncRrs();
+        syncSst();
         syncSurface();
         syncPhenology();
         syncBuildings();
@@ -17591,6 +17694,8 @@
         // it is a slow product, so the hourly poll is ample.
         syncRrs();
         setInterval(syncRrs, 60 * 60 * 1000);
+        syncSst();
+        setInterval(syncSst, 60 * 60 * 1000);
         // MOD09A1 is an 8-day composite; the same hourly poll (matching
         // the /surface cache) more than covers it.
         syncSurface();

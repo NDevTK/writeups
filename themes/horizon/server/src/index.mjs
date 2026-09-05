@@ -518,7 +518,7 @@ export function parseHome(s) {
 export function warmUpPaths(home) {
   if (!home) return [];
   const q = `lat=${home.lat.toFixed(2)}&lon=${home.lon.toFixed(2)}`;
-  return [`/sounding?${q}`, `/buoy?${q}`, `/metar?${q}`];
+  return [`/sounding?${q}`, `/buoy?${q}`, `/metar?${q}`, `/sst?${q}`];
 }
 export const WARM_UP_TRIES = 3;
 export const WARM_UP_PAUSE_MS = 5000;
@@ -817,6 +817,88 @@ export function parseRrs(j) {
     rrs.push(Math.max(0, val));
   }
   return {rrs, time};
+}
+
+// ---- Foundation SST field: JPL MUR (CoastWatch ERDDAP) ----------
+// The per-pixel clear-sky reference for the satellite cloud field
+// (goesir.js, 147th pass) and the sea temperature where no pier or
+// buoy is within reach: JPL's MUR v4.1 analysis (0.01 deg, daily,
+// sea_surface_foundation_temperature - the temperature under the
+// diurnal skin; "the data for the most recent 7 days is usually
+// revised everyday", the dataset's own summary) as CoastWatch's
+// ERDDAP serves it (no CORS header - the daemon proxies). One request
+// answers a 3-deg box at stride 5 (0.05 deg, 61 x 61 points, ~200 kB
+// upstream in ~1.2 s, measured 2026-09-05), re-encoded compactly
+// (values to 0.001 C, null over land and where the analysis has no
+// value). The pure pieces live here for server-reference.mjs.
+export const SST_DATASET =
+  'https://coastwatch.pfeg.noaa.gov/erddap/griddap/jplMURSST41.json';
+export const SST_HALF_DEG = 1.5;
+export const SST_STRIDE = 5; // 0.05 deg on the 0.01-deg grid
+
+// Snap to a 0.5-deg cell (the box around it covers +-1 deg of any
+// point inside, the cloud field's 100-km window); idempotent; the
+// poles and the antimeridian clamp so the box stays on the grid.
+export function sstCell(lat, lon) {
+  const snap = (x, n) => Math.round(Math.max(-n, Math.min(n, x)) * 2) / 2;
+  return {lat: snap(lat, 88), lon: snap(lon, 178.5)};
+}
+export function sstUrl(cell) {
+  const f = (v) => +v.toFixed(2);
+  const la0 = f(cell.lat - SST_HALF_DEG);
+  const la1 = f(cell.lat + SST_HALF_DEG);
+  const lo0 = f(cell.lon - SST_HALF_DEG);
+  const lo1 = f(cell.lon + SST_HALF_DEG);
+  return (
+    SST_DATASET +
+    `?analysed_sst%5B(last)%5D%5B(${la0}):${SST_STRIDE}:(${la1})%5D` +
+    `%5B(${lo0}):${SST_STRIDE}:(${lo1})%5D`
+  );
+}
+// null = unusable response (-> 502); a grid with every value null is
+// a real answer (an inland box). The grid is row-major with latitude
+// outer, as ERDDAP orders its rows.
+export function parseSst(j) {
+  const t = j?.table;
+  if (!t || !Array.isArray(t.rows) || !Array.isArray(t.columnNames))
+    return null;
+  const col = (name) => t.columnNames.indexOf(name);
+  const ct = col('time');
+  const cla = col('latitude');
+  const clo = col('longitude');
+  const cv = col('analysed_sst');
+  if (ct < 0 || cla < 0 || clo < 0 || cv < 0 || !t.rows.length) return null;
+  const lats = [...new Set(t.rows.map((r) => r[cla]))].sort((a, b) => a - b);
+  const lons = [...new Set(t.rows.map((r) => r[clo]))].sort((a, b) => a - b);
+  const nLat = lats.length;
+  const nLon = lons.length;
+  if (nLat < 2 || nLon < 2 || nLat * nLon !== t.rows.length) return null;
+  const dLat = (lats[nLat - 1] - lats[0]) / (nLat - 1);
+  const dLon = (lons[nLon - 1] - lons[0]) / (nLon - 1);
+  const sst = new Array(nLat * nLon).fill(null);
+  let validN = 0;
+  for (const r of t.rows) {
+    const i = Math.round((r[cla] - lats[0]) / dLat);
+    const jj = Math.round((r[clo] - lons[0]) / dLon);
+    if (i < 0 || jj < 0 || i >= nLat || jj >= nLon) return null;
+    const v = r[cv];
+    if (typeof v === 'number' && Number.isFinite(v) && v > -7 && v < 50) {
+      sst[i * nLon + jj] = Math.round(v * 1000) / 1000;
+      validN++;
+    }
+  }
+  const time = typeof t.rows[0][ct] === 'string' ? t.rows[0][ct] : null;
+  return {
+    time,
+    lat0: lats[0],
+    lon0: lons[0],
+    dLat: +dLat.toFixed(6),
+    dLon: +dLon.toFixed(6),
+    nLat,
+    nLon,
+    validN,
+    sst
+  };
 }
 
 // ---- Aircraft: readsb failover from a clean IP -----------------
@@ -1221,6 +1303,7 @@ function main() {
   const ndviCache = new Map(); // 0.01-deg cell key -> {t, body}
   const surfaceCache = new Map(); // 0.01-deg cell key -> {t, body}
   const rrsCache = new Map(); // 1/24-deg cell key -> {t, body}
+  const sstCache = new Map(); // 0.5-deg cell key -> {t, body} (MUR box)
   setInterval(() => {
     const now = Date.now();
     for (const [k, v] of adsbCache) if (now - v.t > 30e3) adsbCache.delete(k);
@@ -1238,6 +1321,8 @@ function main() {
       if (now - v.t > 12 * 3600e3) surfaceCache.delete(k);
     for (const [k, v] of rrsCache)
       if (now - v.t > 12 * 3600e3) rrsCache.delete(k);
+    for (const [k, v] of sstCache)
+      if (now - v.t > 12 * 3600e3) sstCache.delete(k);
   }, 30e3).unref();
 
   // Persistence (snapshotCaches/restoreCaches): the slow per-area
@@ -1261,7 +1346,8 @@ function main() {
       chlor: chlorCache,
       ndvi: ndviCache,
       surface: surfaceCache,
-      rrs: rrsCache
+      rrs: rrsCache,
+      sst: sstCache
     },
     singles: {
       tles: single(
@@ -1688,6 +1774,36 @@ function main() {
       return null;
     }
   }
+  // The foundation-SST box over the point's 0.5-deg cell: one ERDDAP
+  // request (URL from the gated sstUrl), parsed by the gated
+  // parseSst. MUR is daily, so successes cache 6 h (the newest day
+  // reaches ERDDAP once a day); failures 10 min.
+  const sstState = {fetches: 0, errors: 0, time: ''};
+  async function fetchSst(lat, lon) {
+    const cell = sstCell(lat, lon);
+    const key = cell.lat + '/' + cell.lon;
+    const hit = sstCache.get(key);
+    if (hit && Date.now() - hit.t < (hit.body ? 360 : 10) * 60e3)
+      return hit.body;
+    try {
+      sstState.fetches++;
+      const r = await fetch(sstUrl(cell), {
+        signal: AbortSignal.timeout(UPSTREAM_BUDGET_MS),
+        headers: {'user-agent': UA}
+      });
+      if (!r.ok) throw new Error('mur ' + r.status);
+      const parsed = parseSst(await r.json());
+      if (!parsed) throw new Error('mur shape');
+      if (parsed.time) sstState.time = parsed.time;
+      const body = {...parsed, cell};
+      sstCache.set(key, {t: Date.now(), body});
+      return body;
+    } catch {
+      sstState.errors++;
+      sstCache.set(key, {t: Date.now(), body: null});
+      return null;
+    }
+  }
   // Aircraft near a point via the readsb failover chain, shared
   // by GET /adsb and the /stream pushes - the 15 s per-area cache
   // means many viewers in one place cost ONE upstream request,
@@ -1927,6 +2043,12 @@ function main() {
         fetches: rrsState.fetches,
         errors: rrsState.errors
       };
+      const sstHealth = {
+        cells: sstCache.size,
+        time: sstState.time,
+        fetches: sstState.fetches,
+        errors: sstState.errors
+      };
       if (url.pathname === '/health')
         return json(
           200,
@@ -1960,6 +2082,7 @@ function main() {
           ndvi: ndviHealth,
           surface: surfaceHealth,
           rrs: rrsHealth,
+          sst: sstHealth,
           probe: await probeAll()
         },
         {'cache-control': 'no-store'}
@@ -2655,6 +2778,18 @@ function main() {
       return json(200, body, {
         'cache-control': 'public, max-age=3600',
         'x-rrs-source': 'ESA Ocean Colour CCI v6.0 (CoastWatch ERDDAP)'
+      });
+    }
+
+    if (url.pathname === '/sst') {
+      // The foundation-SST box over the point's cell (MUR, daily).
+      // An all-null grid with a 200 is a real answer (inland); 502
+      // means the upstream itself failed.
+      const body = await fetchSst(lat, lon);
+      if (!body) return json(502, {sst: null, upstream: 'unavailable'});
+      return json(200, body, {
+        'cache-control': 'public, max-age=3600',
+        'x-sst-source': 'JPL MUR SST v4.1 (CoastWatch ERDDAP)'
       });
     }
 

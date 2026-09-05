@@ -45,6 +45,11 @@ import {
   parseRrs,
   rrsCell,
   rrsUrl,
+  parseSst,
+  sstCell,
+  sstUrl,
+  SST_HALF_DEG,
+  SST_STRIDE,
   prune,
   pruneStrikes,
   aisBox,
@@ -610,6 +615,64 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
 }
 
 {
+  // The foundation-SST box (/sst, 147th pass): the pure pieces held to
+  // the shape of the LIVE MUR response (CoastWatch ERDDAP, read
+  // 2026-09-05: a 2-deg box at stride 5 came back as 41 x 41 rows,
+  // latitude outer, nulls over land, time 2026-09-04T09:00:00Z).
+  const cell = sstCell(32.85, -117.12);
+  const idem = sstCell(cell.lat, cell.lon);
+  const u = sstUrl(cell);
+  const PIN =
+    'https://coastwatch.pfeg.noaa.gov/erddap/griddap/jplMURSST41.json' +
+    '?analysed_sst%5B(last)%5D%5B(31.5):5:(34.5)%5D%5B(-118.5):5:(-115.5)%5D';
+  const cols = ['time', 'latitude', 'longitude', 'analysed_sst'];
+  const rows = [];
+  // a 3 x 4 box: land (null) on the east column, one fill value
+  for (let i = 0; i < 3; i++)
+    for (let j = 0; j < 4; j++)
+      rows.push([
+        '2026-09-04T09:00:00Z',
+        32.5 + 0.05 * i,
+        -118 + 0.05 * j,
+        j === 3 ? null : i === 2 && j === 0 ? -7.768 : 20 + i + 0.1 * j
+      ]);
+  const g = parseSst({table: {columnNames: cols, rows}});
+  const shuffled = parseSst({
+    table: {columnNames: cols, rows: [...rows].reverse()}
+  });
+  check(
+    'foundation SST box (/sst)',
+    cell.lat === 33 &&
+      cell.lon === -117 &&
+      idem.lat === cell.lat &&
+      idem.lon === cell.lon &&
+      sstCell(89.9, 179.9).lat === 88 &&
+      sstCell(89.9, 179.9).lon === 178.5 &&
+      SST_HALF_DEG === 1.5 &&
+      SST_STRIDE === 5 &&
+      u === PIN &&
+      g &&
+      g.nLat === 3 &&
+      g.nLon === 4 &&
+      g.lat0 === 32.5 &&
+      g.lon0 === -118 &&
+      Math.abs(g.dLat - 0.05) < 1e-9 &&
+      Math.abs(g.dLon - 0.05) < 1e-9 &&
+      g.validN === 8 &&
+      g.sst[0] === 20 &&
+      g.sst[1 * 4 + 2] === 21.2 &&
+      g.sst[3] === null &&
+      g.sst[2 * 4] === null &&
+      g.time === '2026-09-04T09:00:00Z' &&
+      shuffled &&
+      shuffled.sst[1 * 4 + 2] === 21.2 &&
+      parseSst({}) === null &&
+      parseSst({table: {columnNames: cols, rows: rows.slice(0, 5)}}) === null,
+    `the 0.5-deg cell (33/-117) is idempotent and clamps at 88/178.5 so the +-1.5-deg box stays on the grid; one URL pinned to the MUR dataset at stride 5 with (last); a 3x4 table parses to a row-major grid (lat outer) with land nulls and the -7.768 fill dropped (8 valid), the same grid from the rows reversed; a malformed or ragged table -> null (502)`
+  );
+}
+
+{
   check(
     'security headers',
     SEC_HEADERS['content-security-policy'] === 'sandbox' &&
@@ -692,10 +755,11 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     home !== null &&
       home.lat === 32.85 &&
       home.lon === -117.12 &&
-      paths.length === 3 &&
+      paths.length === 4 &&
       paths[0] === '/sounding?lat=32.85&lon=-117.12' &&
       paths[1] === '/buoy?lat=32.85&lon=-117.12' &&
       paths[2] === '/metar?lat=32.85&lon=-117.12' &&
+      paths[3] === '/sst?lat=32.85&lon=-117.12' &&
       custom !== null &&
       custom.lat === 51.5 &&
       custom.lon === -0.13 &&
@@ -797,9 +861,10 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       areas.length === 1 &&
       areas[0].lat === 34 &&
       areas[0].lon === -120 &&
-      plan.length === 6 &&
+      plan.length === 8 &&
       plan[0] === '/sounding?lat=32.85&lon=-117.12' &&
-      plan[3] === '/sounding?lat=34.00&lon=-120.00' &&
+      plan[3] === '/sst?lat=32.85&lon=-117.12' &&
+      plan[4] === '/sounding?lat=34.00&lon=-120.00' &&
       STATE_SAVE_MS === 5 * 60e3 &&
       STATE_MAX_AGE_MS === 24 * 3600e3,
     `${snap.maps.sounding.length} rows and 1 feed snapshotted (the empty feed and the ` +

@@ -10345,6 +10345,90 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 147th pass - THE SEA UNDER EVERY
+  PIXEL): the satellite cloud field's clear-sky reference was ONE
+  number - the pier's skin through the column - for a 100-km window
+  whose sea can run several kelvin warmer or colder offshore, and a
+  coast with no pier or buoy within 50 km had no field at all. Both
+  end with JPL's MUR analysis. (1) THE ROUTE (/sst, the daemon): MUR
+  v4.1 - "L4 Foundation Sea Surface Temperature", 0.01 deg, daily,
+  sea_surface_foundation_temperature, "the data for the most recent
+  7 days is usually revised everyday" (the dataset's own metadata on
+  CoastWatch's ERDDAP, no CORS header - the daemon proxies) - served
+  as a 3-deg box at 0.05 deg around the point's 0.5-deg cell (61 x
+  61 values to 0.001 C, null over land; one ERDDAP request of 200 kB
+  answers in 1.2 s, measured), cached 6 h, persisted, warmed for the
+  home, in /probe's health. Gated (server-reference: the cell's
+  snap and clamps, one URL pinned at stride 5 with (last), a 3x4
+  table parsed to a row-major grid with the -7.768 fill dropped,
+  the same grid from the rows reversed, malformed -> 502; the
+  warm-up now runs four paths). (2) THE FIELD (goesir): sstAt
+  samples the grid bilinearly over its valid neighbours (a land
+  neighbour renormalises); sstNearest finds the analysed cell
+  nearest an observer on land; sstAnomalyField refers every window
+  pixel's foundation temperature to the analysis at the SEA
+  SOURCE's own point (the pier, the buoy, or the observer) - the
+  offshore gradient from the analysis, the absolute skin and its
+  diurnal state from the pier, STATED; referenceAtFactory runs the
+  clear-sky column at skin + anomaly, memoised on 0.02-K steps;
+  classifyField takes refAt and stores each pixel's own reference
+  (tClr, the pick readout prints it); fieldClosure reads BT minus
+  the pixel's own reference - the p95 over the measured sea and the
+  median over the pixels the test itself called clear. (3) THE
+  FALLBACK: where nothing in situ is within 50 km the nearest
+  analysed MUR cell within 0.3 deg is the sea temperature, named
+  "MUR foundation SST" with "a foundation temperature - the diurnal
+  skin unmeasured here" on the line - New York's field, which
+  waited for a sea temperature yesterday, now waits only for its
+  balloon (measured: "GOES-East (GOES-19) sees this window at 47.1
+  deg zenith; the field waits for the column"). (4) THE FIXTURE:
+  goesir-freeze fetches the day's MUR box through the daemon's own
+  sstUrl/parseSst (the stamp's day at 09:00Z, else the latest - the
+  2026-09-05 tiles took the 2026-09-04T09Z analysis, a day's
+  latency, the fixture's time says so); GOESIR_SST joins the
+  fixture; the pins gained the field and the closure per pixel.
+  READ THE DIFF: tiles and elevation byte-identical; the
+  classification moved 10 of 3045 sea pixels (785 low from 781);
+  MUR reads 21.55 C at the pier's sea against the pier's 21.03
+  skin and -0.31..+2.59 K around it over 4301 px. THE CLOSURE DID
+  NOT TIGHTEN: against each pixel's own reference the 95th-
+  percentile sea pixel closes at -1.01 K (the point reference's
+  -0.51), and the 2260 pixels the test called clear read a median
+  -1.90 K - the analysis's offshore warmth is not in the
+  satellite's warmest pixels that morning. Pinned as measured, not
+  softened: MUR is an ANALYSIS (MODIS, AMSR2, AVHRR and in-situ
+  interpolated), a day old here, under a sea 26% clouded where the
+  25-km microwave carries the gradient; the point reference stays
+  on the line beside it. GATE: THE FOUNDATION SST landmark - the
+  sampler's centre/midpoint/land-neighbour/off-grid cases, the
+  nearest cell for an observer on land and none past 0.3 deg, a
+  flat field reproducing the point day pixel for pixel with the
+  same closure, +2 K under the marginal clear pixel (eps 0.083)
+  lifting its reference 1.62 K - emissivity x slant transmission,
+  1.60 - and making it cloud, -2 K under the marginal cloud pixel
+  (eps 0.101) restoring it clear, one pixel each time, the memo's
+  step; the freeze pins. THE PAGE: syncSst hourly (?sstsrc, ?sst=0),
+  the anomaly field built beside the elevation window from the
+  same pixel coordinates, the line's MUR clause, the readout's
+  per-pixel reference. A NAME COLLISION found by the probe: the
+  page already kept the marine model's sea temperature in state.sst
+  and the marine sync overwrote the grid (the first field run saw
+  4301 covered pixels, the second none) - the grid is state.sstGrid.
+  MEASURED TODAY (San Diego, the 17:50Z field, the local daemon's
+  /sst): "MUR 2026-09-04 foundation SST 21.55 C at the sea source,
+  -0.31/+2.59 K across 4301 px -> each sea pixel's own reference;
+  closure per pixel -2.23 K (p95 of 3064 px), the 834 clear px a
+  median -4.30 K" under a 73% stratus sea at midday - the pixels
+  the single window still calls clear sit near its threshold, the
+  ATBD's own known weakness for thin and broken stratus, now
+  measured per pixel. STATED LIMITS: a foundation temperature is not a skin (the
+  fallback's reference carries no cool skin or warm layer - up to
+  a few tenths of a kelvin by night, more by a calm afternoon); the
+  anomaly is the analysis's gradient applied to the pier's skin;
+  MUR's newest day lags a day and its coastal cells are null (the
+  nearest valid cell stands in within 0.3 deg); the daemon serves
+  one 0.5-deg cell per box - an observer at a cell's edge has 1 deg
+  of coverage on the near side, the window's 100 km.
 - DONE (Sep 5, the review session's 146th pass - THE REACH: THREE
   SATELLITES ON ONE PALETTE): the measured cloud field, GOES-West's
   alone since the 143rd, now comes from whichever geostationary

@@ -39,8 +39,14 @@ import {
   decodePngRgba,
   decodeTile,
   etrop,
+  fieldClosure,
   foreignScale,
   fresnelReflectance,
+  mercatorLatLon,
+  referenceAtFactory,
+  sstAnomalyField,
+  sstAt,
+  sstNearest,
   GIBS_COLORMAP_URL,
   GIBS_PALETTE_ID,
   SATELLITES,
@@ -73,6 +79,7 @@ import {
   GOESIR_ELEV,
   GOESIR_HOME,
   GOESIR_PINS,
+  GOESIR_SST,
   GOESIR_TILES,
   GOESIR_WINDOW
 } from './goesir-fixture.js';
@@ -526,7 +533,24 @@ const mar = marinePanel(COOPS_MET, SOUNDING.rows, {
   shore: COOPS_MET.shore,
   latDeg: COOPS_MET.latDeg
 });
-const P = goesPanel({
+// the frozen day's foundation-SST anomalies (147th pass), referred
+// to the analysis at the pier's own sea
+const pixelLatLon = (q) =>
+  mercatorLatLon(
+    win.x0 + i0 + (q % ww) + 0.5,
+    win.y0 + j0 + Math.floor(q / ww) + 0.5
+  );
+const sstField = {
+  ...sstAnomalyField({
+    grid: GOESIR_SST,
+    latLonAt: pixelLatLon,
+    n: ww * wh,
+    baseLat: COOPS_MET.latDeg,
+    baseLon: COOPS_MET.lonDeg
+  }),
+  time: GOESIR_SST.time
+};
+const panelArgs = {
   dec,
   win,
   elevM: Float32Array.from(elev),
@@ -539,7 +563,10 @@ const P = goesPanel({
   latDeg: GOESIR_HOME.latDeg,
   lonDeg: GOESIR_HOME.lonDeg,
   metar: null
-});
+};
+const P = goesPanel({...panelArgs, sst: sstField});
+// the same day on the one point reference (the 143rd's instrument)
+const P0 = goesPanel(panelArgs);
 
 const pin = (name, actual, pinned) => {
   if (pinned === null || pinned === undefined)
@@ -632,6 +659,154 @@ pinBlock(
     `pixel is ${P.observer.water ? 'water' : 'land'} at ${P.observer.btC.toFixed(2)} C, class ${P.observer.cls} ` +
     `(eps ${P.observer.eps.toFixed(3)})`
 );
+pinBlock(
+  'the foundation-SST field and the closure per pixel',
+  [
+    ['MUR time', sstField.time, Q.sstTime],
+    ['MUR base', sstField.baseC, Q.sstBaseC],
+    ['MUR covered', sstField.coveredN, Q.sstCoveredN],
+    ['MUR min', sstField.minK, Q.sstMinK],
+    ['MUR max', sstField.maxK, Q.sstMaxK],
+    ['closure n', P.closure.n, Q.closureN],
+    ['closure p95', P.closure.p95K, Q.closureP95K],
+    ['closure median', P.closure.medianK, Q.closureMedianK],
+    ['clear n', P.closure.clearN, Q.closureClearN],
+    ['clear median', P.closure.clearMedianK, Q.closureClearMedianK]
+  ],
+  `MUR ${sstField.time} reads ${sstField.baseC.toFixed(2)} C at the pier's sea (the pier's skin ` +
+    `${mar.tInterfaceC.toFixed(2)}) and ${sstField.minK.toFixed(2)}..${sstField.maxK.toFixed(2)} K around it over ` +
+    `${sstField.coveredN} px; against each pixel's own reference the 95th-percentile sea pixel closes at ` +
+    `${P.closure.p95K.toFixed(2)} K (${P.closure.n} px; the ${P.closure.clearN} pixels the test called clear ` +
+    `read a median ${P.closure.clearMedianK.toFixed(2)} K) beside the point reference's ` +
+    `${P.warmClosureK.toFixed(2)} K - the analysis's offshore warmth is NOT in the satellite's warmest ` +
+    `pixels on this day (a day-old foundation analysis under a stratus sea, stated); the classification moved ` +
+    `${P.field.cls.reduce((s, c, q) => s + (c !== P0.field.cls[q] ? 1 : 0), 0)} of ${P.r100.water} sea pixels`
+);
+
+// ---- the foundation-SST field and the per-pixel reference (147th) ----
+{
+  // a 3 x 3 grid at 0.05 deg with two land cells
+  const grid = {
+    time: '2026-09-04T09:00:00Z',
+    lat0: 32,
+    lon0: -118,
+    dLat: 0.05,
+    dLon: 0.05,
+    nLat: 3,
+    nLon: 3,
+    sst: [20, 21, null, 22, 23, 24, null, 25, 26]
+  };
+  const centre = sstAt(grid, 32.05, -117.95);
+  const mid = sstAt(grid, 32.025, -117.975);
+  const nullNb = sstAt(grid, 32.025, -117.925);
+  const out = sstAt(grid, 33, -117);
+  const onLand = sstAt(grid, 32.1, -118);
+  const nearest = sstNearest(grid, 32.1, -117.9, 0.3);
+  const offLand = sstNearest(grid, 32.1, -118, 0.3);
+  const none = sstNearest(grid, 40, -118, 0.3);
+  // the frozen day under a FLAT anomaly field is the point
+  // reference's day exactly; the closure per pixel is the point
+  // closure
+  const n = ww * wh;
+  const flat = {
+    anomK: new Float32Array(n),
+    baseC: mar.tInterfaceC,
+    coveredN: n,
+    minK: 0,
+    maxK: 0,
+    time: 't'
+  };
+  const Pf = goesPanel({...panelArgs, sst: flat});
+  const same = Pf.field.cls.every((c, q) => c === P0.field.cls[q]);
+  // a warmer sea under a marginal clear pixel makes it cloud; a
+  // colder sea under a marginal cloud pixel restores it clear
+  let qClear = -1;
+  let qCloud = -1;
+  for (let q = 0; q < n; q++) {
+    const f = P0.field;
+    if (!f.water[q] || f.coastal[q] || !Number.isFinite(f.eps[q])) continue;
+    if (f.cls[q] === CLS.clear && (qClear < 0 || f.eps[q] > f.eps[qClear]))
+      qClear = q;
+    if (
+      f.cls[q] === CLS.low &&
+      f.sigma[q] <= 0.5 &&
+      (qCloud < 0 || f.eps[q] < f.eps[qCloud])
+    )
+      qCloud = q;
+  }
+  const warm = new Float32Array(n);
+  warm[qClear] = 2;
+  const cold = new Float32Array(n);
+  cold[qCloud] = -2;
+  const Pw = goesPanel({
+    ...panelArgs,
+    sst: {...flat, anomK: warm, minK: 0, maxK: 2}
+  });
+  const Pc = goesPanel({
+    ...panelArgs,
+    sst: {...flat, anomK: cold, minK: -2, maxK: 0}
+  });
+  const changedW = Pw.field.cls.reduce(
+    (s, c, q) => s + (c !== P0.field.cls[q] ? 1 : 0),
+    0
+  );
+  const changedC = Pc.field.cls.reduce(
+    (s, c, q) => s + (c !== P0.field.cls[q] ? 1 : 0),
+    0
+  );
+  const shiftW = Pw.field.tClr[qClear] - P0.field.tClr[qClear];
+  // the reference follows the skin by the emitted fraction that
+  // reaches the satellite: emissivity x the slant transmission
+  // (Planck's curvature adds a few hundredths)
+  const shiftExpected =
+    2 * P0.reference.emissivity * Math.exp(-P0.reference.tauSlant);
+  // the memo: the same anomaly rounds to the same column run
+  const refAt = referenceAtFactory({
+    anomK: Float32Array.from([0, 0.011, 0.029, 1]),
+    tSkinC: mar.tInterfaceC,
+    rows: mar.rows,
+    viewZenithDeg: P0.viewZenithDeg
+  });
+  const r1 = refAt(1);
+  const r2 = refAt(2);
+  const r3 = refAt(3);
+  check(
+    'THE FOUNDATION SST gives each sea pixel its own reference',
+    near(centre, 23, 1e-9) &&
+      near(mid, 21.5, 1e-9) &&
+      near(nullNb, (21 + 23 + 24) / 3, 1e-9) &&
+      out === null &&
+      onLand === null &&
+      nearest.sstC === 26 &&
+      offLand.sstC === 25 &&
+      none === null &&
+      same &&
+      // the per-pixel reference is stored as float32
+      near(Pf.closure.p95K, P0.warmClosureK, 1e-4) &&
+      qClear >= 0 &&
+      qCloud >= 0 &&
+      P0.field.eps[qClear] < ETROP_THRESH.ocean &&
+      Pw.field.cls[qClear] !== CLS.clear &&
+      changedW === 1 &&
+      Pc.field.cls[qCloud] === CLS.clear &&
+      changedC === 1 &&
+      near(shiftW, shiftExpected, 0.05) &&
+      shiftW < 2 &&
+      near(refAt(0), P0.reference.tClrC, 1e-9) &&
+      near(r1, r2, 1e-9) &&
+      r1 > P0.reference.tClrC &&
+      r3 > r1,
+    `bilinear on the 0.05-deg grid: the cell centre reads itself, a midpoint the mean of four, a ` +
+      `land neighbour renormalises (${nullNb.toFixed(3)}), off the grid and on a land cell null; the ` +
+      `nearest analysed cell serves an observer on land (${offLand.sstC} at ${offLand.d.toFixed(3)} deg) ` +
+      `and none beyond 0.3 deg; a flat field reproduces the point day pixel for pixel with the same ` +
+      `closure; +2 K under the marginal clear pixel (eps ${P0.field.eps[qClear].toFixed(3)}) lifts its ` +
+      `reference ${shiftW.toFixed(2)} K (emissivity x slant transmission: ${shiftExpected.toFixed(2)}) ` +
+      `and makes it cloud, -2 K under the marginal cloud pixel ` +
+      `(eps ${P0.field.eps[qCloud].toFixed(3)}) restores it clear, one pixel each time; anomalies ` +
+      `0.011 and 0.029 K share the 0.02-K memo step`
+  );
+}
 
 // ---- the closures --------------------------------------------
 {
