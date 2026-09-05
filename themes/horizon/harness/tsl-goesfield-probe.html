@@ -1,0 +1,202 @@
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body style="margin: 0">
+    <canvas id="gl"></canvas>
+    <script>
+      /* swizzle shim */ if (navigator.gpu && self.GPUTexture) {
+        const ov = GPUTexture.prototype.createView;
+        GPUTexture.prototype.createView = function (d) {
+          if (d && 'swizzle' in d) {
+            d = Object.assign({}, d);
+            delete d.swizzle;
+          }
+          return ov.call(this, d);
+        };
+      }
+    </script>
+    <script type="module">
+      // The measured field arriving AFTER the first frame - the page's
+      // own order: the decks render before the satellite (or radar)
+      // fetch returns - must reach the GPU. A data texture whose image
+      // changes SIZE (the 1x1 zero default to the field's RM x RM) has
+      // to be re-created (clouds-tsl.js resize): the WebGPU backend
+      // otherwise copies the new image into the old 1x1 texture (a
+      // validation error, measured in the page probes: "copySize
+      // 101x101 ... touches outside of [Texture 1x1 RGBA32Float]") and
+      // the decks never see the field. Read through the cloud shadow's
+      // tau map - the same density/coverAt the march samples - with a
+      // clear ceilometer (cov 0), so only a measured field can put
+      // cloud in the low deck: a field with its west half covered and
+      // its east half measured clear, set after a first frame, must
+      // read exactly as the same field present before the first frame;
+      // clearing it back to the default (the reverse resize) empties
+      // the map; the radar field (64 x 64) takes the same path; and the
+      // device reports no validation error along the way.
+      import * as T from 'three/webgpu';
+      import {texture, uv} from 'three/tsl';
+      import {
+        createCloudShadowHook,
+        createCloudSystemTSL,
+        generateCloudTexturesTSL
+      } from './writeups/themes/horizon/clouds-tsl.js';
+      const log = (s) => console.log('GOESF|' + s);
+      const errs = [];
+      try {
+        const r = new T.WebGPURenderer({
+          canvas: document.getElementById('gl'),
+          forceWebGL: false,
+          antialias: false
+        });
+        await r.init();
+        log('backend ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'));
+        if (r.backend.device)
+          r.backend.device.addEventListener('uncapturederror', (e) =>
+            errs.push(e.error && e.error.message ? e.error.message : String(e))
+          );
+        r.setSize(300, 300);
+        const tex = generateCloudTexturesTSL();
+        const WORLD = 280;
+        const mk = () => {
+          const sys = createCloudSystemTSL(r, tex.baseTex, tex.detailTex);
+          const hook = createCloudShadowHook();
+          hook.uniforms.uWorldSize.value = WORLD;
+          sys.attachShadow(hook);
+          sys.uniformsLow.cov.value = 0;
+          sys.uniformsLow.yBase.value = 24;
+          sys.uniformsLow.yTop.value = 41;
+          sys.uniformsMid.cov.value = 0;
+          sys.uniformsMid.yBase.value = 55;
+          sys.uniformsMid.yTop.value = 61;
+          return {sys, hook};
+        };
+        // the low deck's tau per shadow-map pixel (an affine encode
+        // through a float blit, as the cloud-shadow probe reads it)
+        const quad = new T.QuadMesh();
+        const readTau = async (hook) => {
+          const S = hook.size;
+          const rt = new T.RenderTarget(S, S, {
+            type: T.FloatType,
+            depthBuffer: false
+          });
+          const m = new T.MeshBasicNodeMaterial();
+          m.colorNode = texture(hook.tauNode.value)
+            .sample(uv())
+            .mul(0.05)
+            .add(0.5);
+          m.transparent = true;
+          m.blending = T.NoBlending;
+          m.toneMapped = false;
+          quad.material = m;
+          r.setRenderTarget(rt);
+          quad.render(r);
+          r.setRenderTarget(null);
+          const px = await r.readRenderTargetPixelsAsync(rt, 0, 0, S, S);
+          rt.dispose();
+          const tau = new Float32Array(S * S);
+          for (let i = 0; i < S * S; i++) tau[i] = (px[i * 4] - 0.5) / 0.05;
+          return {tau, S};
+        };
+        // the map's west half (x < S/2) against its east half past the
+        // field's own linear-filter band at the boundary (4 px: a
+        // texel of the 64-wide field is 4 map pixels) - the field's
+        // u = x / S (worldUnits = the shadow's own width, the offsets
+        // zero)
+        const stats = ({tau, S}) => {
+          let west = 0;
+          let nWest = 0;
+          let east = 0;
+          let sum = 0;
+          for (let j = 0; j < S; j++)
+            for (let i = 0; i < S; i++) {
+              const v = tau[j * S + i];
+              sum += v;
+              if (i < S / 2) {
+                west += v;
+                nWest++;
+              } else if (i >= S / 2 + 4) east = Math.max(east, v);
+            }
+          return {west: west / nWest, east, mean: sum / (S * S)};
+        };
+        // a measured field: R (low cover) 1 over the west half, 0 over
+        // the east, A (low validity) 1 everywhere inside a zero border
+        // ring (the page's own convention); G/B (the mid deck) 0
+        const field = (rm) => {
+          const d = new Float32Array(rm * rm * 4);
+          for (let jj = 0; jj < rm; jj++)
+            for (let ii = 0; ii < rm; ii++) {
+              const border = ii === 0 || jj === 0 || ii === rm - 1 || jj === rm - 1;
+              const k = (jj * rm + ii) * 4;
+              d[k] = !border && ii < rm / 2 ? 1 : 0;
+              d[k + 3] = border ? 0 : 1;
+            }
+          return d;
+        };
+        const diff = (a, b) => {
+          let m = 0;
+          for (let i = 0; i < a.tau.length; i++)
+            m = Math.max(m, Math.abs(a.tau[i] - b.tau[i]));
+          return m;
+        };
+        // A: the page's order - a frame before the field arrives
+        const A = mk();
+        A.sys.updateShadow();
+        const a0 = stats(await readTau(A.hook));
+        A.sys.setGoesCover(field(101), 101, WORLD);
+        A.sys.updateShadow();
+        const tA = await readTau(A.hook);
+        const a1 = stats(tA);
+        // B: the field before the first frame
+        const B = mk();
+        B.sys.setGoesCover(field(101), 101, WORLD);
+        B.sys.updateShadow();
+        const tB = await readTau(B.hook);
+        const b = stats(tB);
+        const lateVsEarly = diff(tA, tB);
+        // the reverse resize: back to the 1x1 default
+        A.sys.setGoesCover(null);
+        A.sys.updateShadow();
+        const a2 = stats(await readTau(A.hook));
+        // the radar field takes the same path (64 x 64)
+        A.sys.setRadarCover(field(64), 64, WORLD);
+        A.sys.updateShadow();
+        const a3 = stats(await readTau(A.hook));
+        const f = (v) => v.toFixed(4);
+        log(
+          `S=${tA.S} before: mean ${f(a0.mean)} · late field: west mean ${f(a1.west)} east max ${f(a1.east)} · ` +
+            `early field: west mean ${f(b.west)} east max ${f(b.east)} · late vs early max diff ${lateVsEarly.toExponential(2)} · ` +
+            `cleared: mean ${f(a2.mean)} · radar 64: west mean ${f(a3.west)} east max ${f(a3.east)} · device errors ${errs.length}` +
+            (errs.length ? ' :: ' + errs[0].slice(0, 160) : '')
+        );
+        const ok =
+          a0.mean < 1e-6 &&
+          a1.west > 0.3 &&
+          a1.east < 1e-4 &&
+          b.west > 0.3 &&
+          Math.abs(a1.west - b.west) < 1e-4 &&
+          lateVsEarly < 1e-4 &&
+          a2.mean < 1e-6 &&
+          a3.west > 0.3 &&
+          a3.east < 1e-4 &&
+          errs.length === 0;
+        log(ok ? 'GOESF PASS' : 'GOESF FAIL');
+        window.__r = r;
+        window.__THREE = T;
+        log('DONE');
+      } catch (e) {
+        log('ERR ' + e.message + ' :: ' + (e.stack || '').split('\n')[1]);
+        log('DONE');
+      }
+    </script>
+  </body>
+</html>

@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **143 CPU reference files printing
-1140 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
+1142 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **143 reference files, 1142 landmark lines, 7 GPU probes** (live gate
+- **143 reference files, 1142 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -509,7 +509,10 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
   vendored CSV (NREL refuses the proxy).
 - GPU probes assert texel values **at** the CPU reference values
   (bit-exact hashes for glints; band/column/corona/bow probes) — the
-  render is checked against ground truth, never against itself.
+  render is checked against ground truth, never against itself. The
+  eighth (pass 154) pins a lifecycle, not a value: a measured field
+  arriving after the first frame must read on the GPU exactly as the
+  same field present before it.
 
 ## 5. Stated limits and open residuals
 
@@ -849,7 +852,20 @@ The practice the corpus demonstrates, stated so it can be reused:
    328 hPa) beside the model's 11.1 at 700 and 30.5 at 250 hPa
    (`goesl2-reference` THE MEASURED MOTION; `server-reference` THE
    VECTORS READ WHOLE, on a real-file cut written by h5py with a
-   python/numpy oracle; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
+   python/numpy oracle). Pass 154 is a correction of the drawn side:
+   the measured satellite field of pass 143 and the radar field
+   before it never reached the decks on the WebGPU build — a data
+   texture that starts 1×1 and grows to the field's size is only
+   COPIED into by the backend after its first creation, so the copy
+   fell outside the texture (a validation error the page probes had
+   logged every run) and the shader kept the noise cover while the
+   JS-side censuses, comparisons and pick readouts reported the field;
+   the texture is now disposed and re-created on a size change, and
+   the eighth GPU probe sets a field after a first frame and reads it
+   through the cloud shadow's tau map to the last bit as a field
+   present before the first frame (`tsl-goesfield-probe.html`: west
+   half tau 5.99, east 0, max diff 0, zero device errors; the unfixed
+   module reads 0 with two errors) (`goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
    imagery and DCOMP windows, DSR pins; `hdf5-reference` THE WINDOW
    READ, THE RANGE READ;
    `server-reference` THE WINDOW READ IN PLACE; `goesl2-reference`

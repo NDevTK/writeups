@@ -72,6 +72,7 @@ else
   probe dm-column "$BASE/tsl-dm-probe.html" 'DM PASS'
   probe drop-corona "$BASE/tsl-dropcorona-probe.html" 'DROPCOR PASS'
   probe bow-shaft "$BASE/tsl-bow-probe.html" 'BOWP PASS'
+  probe goes-field "$BASE/tsl-goesfield-probe.html" 'GOESF PASS'
 
   # The page wiring: the research section must render inside the
   # THEME itself - the panels' module graph imports, syncResearch

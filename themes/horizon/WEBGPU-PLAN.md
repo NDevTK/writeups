@@ -10345,6 +10345,60 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 154th pass - THE FIELD THAT
+  NEVER ARRIVED): the page probes of the 151st-153rd passes carried
+  one console line every run - "THREE.WebGPURenderer: Uncaptured
+  WebGPU GPUValidationError: Texture copy range (copySize 101x101)
+  touches outside of [Texture (unlabeled 1x1 px, RGBA32Float)]",
+  and its twin at 64x64 - filed as a task and left for after the
+  winds. HUNTED: clouds-tsl.js keeps two data textures that start
+  as the 1x1 zero default "so the pinned harness stays identical" -
+  the radar coverage field (setRadarCover, 64 x 64 when RainViewer
+  reports) and the measured satellite field (setGoesCover, 101 x
+  101 since the 143rd pass) - and on a size change swapped
+  `tex.image` to the new array with needsUpdate. Read in the
+  vendored three.webgpu build (Textures.updateTexture): the backend
+  creates the GPU texture ONCE, at the size of the first upload,
+  and every later version bump only calls backend.updateTexture -
+  a copy into the existing texture - so a larger image is a copy
+  outside a 1x1 texture: Dawn rejects it (the validation error) and
+  the GPU texture stays the 1x1 zero. WebGL re-allocates on every
+  texImage2D and hid this; the build has been WebGPU-only since
+  before July 30 (the harness README's own statement). MEASURED,
+  the new probe against the unfixed module: a field set after one
+  frame reads west-half tau 0.0000 where the same field set before
+  the first frame reads 5.9861, two device errors - THE MEASURED
+  CLOUD FIELD NEVER REACHED THE DECKS in the live page, whose first
+  frame always precedes the fetch: since the 143rd pass the decks
+  RANGED on the field (uGoesOnLow/Mid are JS-side uniforms) but
+  carved their cover from the noise, the pick readout reporting
+  "measured cloud" from the JS-side array while the shader drew
+  the noise; the radar field likewise since the WebGPU-only build.
+  The 143rd-150th's visual claims about the decks' measured cover
+  were therefore claims about the JS field, not the drawn one -
+  stated here; the censuses, comparisons and records of those
+  passes (all JS-side) stand. THE FIX: a size change disposes the
+  texture before the swap (clouds-tsl.js resize): dispose() drops
+  the GPU texture and its bind-group entries, the next frame
+  creates it at the new size, the texture node keeping the same
+  JS object; the reverse (a field cleared back to 1x1) takes the
+  same path. GATE (the eighth GPU probe, tsl-goesfield-probe.html,
+  in validate.sh): a clear ceilometer (cov 0) so only a measured
+  field can put cloud in the low deck; a 101 x 101 field covered
+  over its west half and measured clear over its east, set AFTER a
+  first frame, read through the cloud shadow's tau map (the same
+  density/coverAt the march samples): west mean 5.9861, east max
+  0.0000 past the filter band, and the same map to the last bit
+  (max diff 0) as a second system given the field BEFORE its first
+  frame; cleared back to the default the map empties; the radar
+  field (64 x 64) takes the same path (west 5.8022, east 0); the
+  device's uncapturederror listener counts zero. The page probe
+  after the fix: zero validation errors, zero page errors. STATED:
+  the harness's pinned renders never exercised a field arriving
+  after the first frame (the default 1x1 keeps them identical by
+  design), which is why ten passes of gates were green over a deck
+  that never took its field - the probe now exercises exactly that
+  order.
 - DONE (Sep 5, the review session's 153rd pass - THE MEASURED
   MOTION): the decks drifted with the surface wind (low), the 700
   hPa level (mid) and the 250 hPa level (high) - a balloon's level

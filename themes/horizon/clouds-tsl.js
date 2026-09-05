@@ -861,6 +861,21 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     shadowFill = () => renderer.compute(kernel);
   }
 
+  // A data texture whose field arrives after the first frame changes
+  // SIZE (the 1x1 zero default to the field's RM x RM). The WebGPU
+  // backend creates the GPU texture once, at the size of the first
+  // upload, and every later needsUpdate only COPIES into it - a
+  // larger image is a copy outside the texture (a validation error,
+  // measured: "copySize 101x101 ... touches outside of [Texture 1x1
+  // RGBA32Float]") and the field never reached the decks; WebGL
+  // re-allocated on every upload and hid it. dispose() drops the
+  // GPU texture and its bind-group entries, so the next frame
+  // creates it at the new size (the texture node keeps the same
+  // JS object).
+  const resize = (tex, image) => {
+    tex.dispose();
+    tex.image = image;
+  };
   // _warm is exposed for the validation harness only: forcing it to
   // 1 every frame makes every pixel march fresh - the temporal-free
   // ground truth the moving-camera reprojection test compares
@@ -879,7 +894,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     // anchored to the low deck's CURRENT advection offset.
     setRadarCover(data, rm, worldUnits) {
       if (radarTex.image.width !== rm) {
-        radarTex.image = {data, width: rm, height: rm};
+        resize(radarTex, {data, width: rm, height: rm});
       } else {
         radarTex.image.data.set(data);
       }
@@ -921,14 +936,15 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     },
     setGoesCover(data, rm, worldUnits) {
       if (!data) {
-        goesTex.image = {data: goesZeroData, width: 1, height: 1};
+        if (goesTex.image.width !== 1)
+          resize(goesTex, {data: goesZeroData, width: 1, height: 1});
         goesTex.needsUpdate = true;
         uGoesOnLow.value = 0;
         uGoesOnMid.value = 0;
         return;
       }
       if (goesTex.image.width !== rm) {
-        goesTex.image = {data, width: rm, height: rm};
+        resize(goesTex, {data, width: rm, height: rm});
       } else {
         goesTex.image.data.set(data);
       }
