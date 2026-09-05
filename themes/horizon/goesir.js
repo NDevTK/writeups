@@ -62,7 +62,27 @@
  *    is 1 - the mean Fresnel reflectance of that index (flat sea).
  *  - GOES-R Program (goes-r.gov, Mission): "GOES-18 became the
  *    operational GOES West satellite at 137.0 degrees west
- *    longitude on January 4, 2023".
+ *    longitude on January 4, 2023"; the same site's overview: "GOES
+ *    East is located at 75.2 W" with GOES-19 in operational service
+ *    (146th pass; the overview also prints "GOES West is located at
+ *    137.2 W", GOES-17's former station - the GOES-18 sentence is
+ *    taken).
+ *  - JMA (jma.go.jp, Meteorological Satellites): Himawari-9 sits
+ *    "35,800 km above the equator at around 140.7 degrees east
+ *    longitude"; JMA's AHI band table (mscweb, Himawari-8/9 AHI):
+ *    band 13 central wavelength 10.4073 um ("changed from 11.2 um
+ *    to 10.4 um on 31 October, 2013").
+ *  - NASA Worldview's layer configuration (wv.json): the GOES-West,
+ *    GOES-East and Himawari Band 13 layers all declare the palette
+ *    Clean_Longwave_Infrared_Window_Band - ONE colormap, so the
+ *    tile law below reads all three; the visible-band layers
+ *    declare no palette (their grey levels carry no stated scale).
+ *  - NOAA's operational L2 files (noaa-goes18 open bucket, read
+ *    with h5py on 2026-09-05): the clear-sky mask (ACMC) and cloud
+ *    top height (ACHAC) files print the qualified local zenith
+ *    range [0, 70] degrees in their own metadata and the platform
+ *    longitude -137.0 - the reach rule below and the GOES-West
+ *    station, from the products themselves.
  *
  * OWNERSHIP: this module owns the tile-to-temperature law, the grey
  * rule, the clear-sky reference, the ETROP test and the height
@@ -86,10 +106,11 @@ export const GIBS_COLORMAP_URL =
   'https://gibs.earthdata.nasa.gov/colormaps/v1.3/Clean_Longwave_Infrared_Window_Band.xml';
 // The tile URL; time null asks for the layer's default (its latest
 // image - the response's layer-time-actual header, exposed to CORS,
-// says which).
-export function gibsTileUrl(row, col, time = null) {
+// says which); layer defaults to GOES-West's (pickSatellite names
+// the one that reaches an observer).
+export function gibsTileUrl(row, col, time = null, layer = GIBS_LAYER) {
   return (
-    `${GIBS_WMTS}/${GIBS_LAYER}/default/` +
+    `${GIBS_WMTS}/${layer}/default/` +
     (time ? time + '/' : '') +
     `${GIBS_TMS}/${GIBS_ZOOM}/${row}/${col}.png`
   );
@@ -100,9 +121,9 @@ export function gibsTileUrl(row, col, time = null) {
 // The page asks for the LATEST image by its explicit stamp rather
 // than the layer's default (the default URL's layer-time-actual
 // header, though exposed to CORS, reaches the page unreliably).
-export function gibsDomainsUrl(startIso, endIso) {
+export function gibsDomainsUrl(startIso, endIso, layer = GIBS_LAYER) {
   return (
-    `${GIBS_WMTS}/1.0.0/${GIBS_LAYER}/default/${GIBS_TMS}/all/` +
+    `${GIBS_WMTS}/1.0.0/${layer}/default/${GIBS_TMS}/all/` +
     `${startIso}--${endIso}.xml`
   );
 }
@@ -123,6 +144,73 @@ export const GOES_WEST_LON_DEG = -137.0; // goes-r.gov: GOES-18 since 2023-01-04
 export const BAND13_UM = 10.35; // ABI band 13 centre, 10.1-10.6 um
 export const BAND13_NU_CM = 1e4 / BAND13_UM; // 966.18 cm^-1
 export const WINDOW_HALF_M = 100e3; // the field's reach around the observer
+// The three geostationary window channels GIBS serves on ONE
+// colormap (146th pass): Worldview's layer configuration declares
+// the palette Clean_Longwave_Infrared_Window_Band for each, so the
+// tile law reads all three. Sub-satellite longitudes from the
+// operators (header): GOES-West/GOES-18 at 137.0 W, GOES-East/
+// GOES-19 at 75.2 W, Himawari-9 at 140.7 E; band centres 10.35 um
+// (ABI band 13) and 10.4073 um (AHI band 13, JMA's table). Meteosat
+// is not on GIBS: longitudes no satellite reaches answer unmeasured.
+export const GIBS_PALETTE_ID = 'Clean_Longwave_Infrared_Window_Band';
+export const SATELLITES = [
+  {
+    id: 'goes-west',
+    name: 'GOES-West',
+    craft: 'GOES-18',
+    lonDeg: GOES_WEST_LON_DEG,
+    layer: 'GOES-West_ABI_Band13_Clean_Infrared',
+    instrument: 'ABI',
+    bandUm: BAND13_UM
+  },
+  {
+    id: 'goes-east',
+    name: 'GOES-East',
+    craft: 'GOES-19',
+    lonDeg: -75.2,
+    layer: 'GOES-East_ABI_Band13_Clean_Infrared',
+    instrument: 'ABI',
+    bandUm: BAND13_UM
+  },
+  {
+    id: 'himawari',
+    name: 'Himawari',
+    craft: 'Himawari-9',
+    lonDeg: 140.7,
+    layer: 'Himawari_AHI_Band13_Clean_Infrared',
+    instrument: 'AHI',
+    bandUm: 10.4073
+  }
+];
+// THE REACH: the operational products print their own qualified
+// range - the ACMC file's quantitative_local_zenith_angle_bounds
+// [0, 70] "local zenith angle degree range where good quality clear
+// sky mask data is produced" and the ACHAC file's
+// local_zenith_angle_bounds [0, 70] for cloud top height (read from
+// OR_ABI-L2-ACMC-M6_G18_s20262481851177 and OR_ABI-L2-ACHAC-M6_G18_
+// s20262481846177 on 2026-09-05; both files also print
+// nominal_satellite_subpoint_lon -137.0). The theme takes the same
+// 70 deg for every satellite (Himawari's products are not read -
+// stated).
+export const VIEW_ZENITH_MAX_DEG = 70;
+// The satellite that sees an observer at the smallest view zenith,
+// or none within the reach: {sat, viewZenithDeg, nearest}.
+export function pickSatellite(
+  latDeg,
+  lonDeg,
+  sats = SATELLITES,
+  maxDeg = VIEW_ZENITH_MAX_DEG
+) {
+  let best = null;
+  for (const s of sats) {
+    const vz = viewZenithDeg(latDeg, lonDeg, s.lonDeg);
+    if (!best || vz < best.viewZenithDeg) best = {sat: s, viewZenithDeg: vz};
+  }
+  if (!best) return {sat: null, viewZenithDeg: null, nearest: null};
+  if (best.viewZenithDeg > maxDeg)
+    return {sat: null, viewZenithDeg: best.viewZenithDeg, nearest: best.sat};
+  return {...best, nearest: best.sat};
+}
 
 const RAD = Math.PI / 180;
 
@@ -820,13 +908,19 @@ export function columnWindowTau(rows, nuCm = BAND13_NU_CM) {
 // ---------------------------------------------------------------
 // The sea's emissivity: Fresnel with the complex index (flat sea)
 // ---------------------------------------------------------------
-// Hale & Querry 1973 at 10.0 and 10.5 um, interpolated to 10.35.
+// Hale & Querry 1973 at 10.0 and 10.5 um, interpolated linearly to
+// the band centre (10.35 um for ABI, 10.4073 for AHI - both inside
+// the two tabulated points).
 export const WATER_INDEX_10UM = {n: 1.218, k: 0.0508};
 export const WATER_INDEX_10_5UM = {n: 1.185, k: 0.0662};
-export const WATER_INDEX_B13 = {
-  n: WATER_INDEX_10UM.n + 0.7 * (WATER_INDEX_10_5UM.n - WATER_INDEX_10UM.n),
-  k: WATER_INDEX_10UM.k + 0.7 * (WATER_INDEX_10_5UM.k - WATER_INDEX_10UM.k)
-};
+export function waterIndexAt(um) {
+  const f = (um - 10.0) / 0.5;
+  return {
+    n: WATER_INDEX_10UM.n + f * (WATER_INDEX_10_5UM.n - WATER_INDEX_10UM.n),
+    k: WATER_INDEX_10UM.k + f * (WATER_INDEX_10_5UM.k - WATER_INDEX_10UM.k)
+  };
+}
+export const WATER_INDEX_B13 = waterIndexAt(BAND13_UM);
 // Unpolarized Fresnel reflectance of a smooth interface with complex
 // index m = n + ik at incidence theta, and Kirchhoff's emissivity
 // 1 - R. Complex arithmetic written out (q = sqrt(m^2 - sin^2)).
@@ -870,12 +964,16 @@ export function clearSkyReference({
   tSkinC,
   rows,
   viewZenithDeg: vz,
-  nuCm = BAND13_NU_CM,
+  bandUm = BAND13_UM,
+  nuCm = null,
   emis = null
 }) {
   const sec = 1 / Math.cos(Math.min(vz, 85) * RAD);
-  const col = columnWindowTau(rows, nuCm);
-  const eps = emis ?? seaEmissivity(vz);
+  // the band centre sets the continuum's wavenumber and the sea's
+  // index (the ETROP test's Planck weighting keeps the ABI centre
+  // for every satellite - a 0.6% wavenumber difference, stated)
+  const col = columnWindowTau(rows, nuCm ?? 1e4 / bandUm);
+  const eps = emis ?? seaEmissivity(vz, waterIndexAt(bandUm));
   // downwelling along the mirror direction: top of column downward
   let down = 0;
   for (let i = col.layers.length - 1; i >= 0; i--) {
@@ -891,6 +989,7 @@ export function clearSkyReference({
   const tClrC = planckT(up) - T_ZERO_K;
   return {
     tClrC,
+    bandUm,
     depressionK: tSkinC - tClrC,
     emissivity: eps,
     tauNadir: col.tau,
@@ -1377,10 +1476,16 @@ export function goesPanel({
   latDeg,
   lonDeg,
   metar = null,
-  landReference = true
+  landReference = true,
+  sat = SATELLITES[0]
 }) {
-  const vz = viewZenithDeg(latDeg, lonDeg);
-  const ref = clearSkyReference({tSkinC, rows, viewZenithDeg: vz});
+  const vz = viewZenithDeg(latDeg, lonDeg, sat.lonDeg);
+  const ref = clearSkyReference({
+    tSkinC,
+    rows,
+    viewZenithDeg: vz,
+    bandUm: sat.bandUm
+  });
   const trop = coldPoint(rows);
   if (!trop) return null;
   const field = classifyField({
@@ -1435,6 +1540,7 @@ export function goesPanel({
   deck.lowTopM = med(lowTops);
   const oq = Math.floor(cy) * ww + Math.floor(cx);
   return {
+    satellite: sat,
     viewZenithDeg: vz,
     reference: ref,
     tropopause: trop,

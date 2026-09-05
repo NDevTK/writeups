@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **141 CPU reference files printing
-1118 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
+1119 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **141 reference files, 1118 landmark lines, 7 GPU probes** (live gate
+- **141 reference files, 1119 landmark lines, 7 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -738,7 +738,14 @@ The practice the corpus demonstrates, stated so it can be reused:
    decks carve from. The geometry is a gated module
    (`pick-reference`): the compass convention round-trips against
    the camera's own vector, the texel index inverts the deck field's
-   mapping, and the sea walk is held on synthetic coasts.
+   mapping, and the sea walk is held on synthetic coasts. Pass 146
+   gives the satellite field its reach: GOES-West, GOES-East and
+   Himawari share one GIBS colormap (Worldview's own layer
+   configuration says so), the operators' printed sub-longitudes and
+   band centres fill a table, and the pick is the satellite at the
+   smallest view zenith within the 70° the operational L2 files
+   print as their own qualified range — every other longitude
+   answers unmeasured by name (`goesir-reference` THE REACH).
 
 ---
 

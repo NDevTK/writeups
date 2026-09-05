@@ -453,6 +453,8 @@
         goesPanel,
         latestTimeFromDomains,
         mercatorLatLon,
+        pickSatellite,
+        VIEW_ZENITH_MAX_DEG,
         windowTiles
       } from './horizon/goesir.js';
       import {
@@ -2301,6 +2303,7 @@
       // 50 km (half the window's reach - the theme's rule, stated:
       // a buoy 150 km out does not speak for this window).
       let goesObs = null;
+      let goesReach = null; // why there is no field yet (the research line)
       let goesBusy = false;
       let goesRerun = false; // a call that arrived mid-fetch runs after it
       async function syncGoesIr() {
@@ -2309,6 +2312,26 @@
           goesRerun = true;
           return;
         }
+        // the satellite that reaches this longitude (146th pass:
+        // GOES-West, GOES-East or Himawari on GIBS's one palette);
+        // none within the reach leaves the model's cover standing
+        // and says so in the research line
+        const pick = pickSatellite(state.lat, state.lon);
+        if (!pick.sat) {
+          goesObs = null;
+          goesReach = pick.nearest
+            ? `no geostationary window channel on GIBS reaches ${state.lat.toFixed(2)}°, ` +
+              `${state.lon.toFixed(2)}°: the nearest, ${pick.nearest.name} (${pick.nearest.craft} at ` +
+              `${Math.abs(pick.nearest.lonDeg)}° ${pick.nearest.lonDeg < 0 ? 'W' : 'E'}), sees it at ` +
+              `${pick.viewZenithDeg.toFixed(0)}° zenith past the ${VIEW_ZENITH_MAX_DEG}° reach; ` +
+              `Meteosat is not on GIBS - the decks keep the model's cover`
+            : 'no satellite table';
+          if (cloudSys) cloudSys.setGoesCover(null);
+          return;
+        }
+        const reachLine =
+          `${pick.sat.name} (${pick.sat.craft}) sees this window at ` +
+          `${pick.viewZenithDeg.toFixed(1)}° zenith`;
         const skin = state.marine?.tInterfaceC;
         const pier = state.coopsMet?.tsC;
         const b = state.buoy;
@@ -2329,18 +2352,22 @@
               : null;
         const rows = state.rowsSea ?? state.soundingData?.rows;
         if (tSkinC === null || !Array.isArray(rows) || rows.length < 10) {
-          if (params.has('debug'))
-            console.warn(
-              'goes: waiting for ' +
-                (tSkinC === null ? 'a measured sea temperature' : 'the column')
-            );
+          const why =
+            tSkinC === null
+              ? 'a measured sea temperature within 50 km (COARE skin, CO-OPS sensor or an NDBC buoy)'
+              : 'the column';
+          if (params.has('debug')) console.warn('goes: waiting for ' + why);
+          if (!goesObs) goesReach = reachLine + '; the field waits for ' + why;
           return;
         }
         if (!farRingData || !farRingData.elevAt) {
           if (params.has('debug'))
             console.warn('goes: waiting for the far ring');
+          if (!goesObs)
+            goesReach = reachLine + '; the field waits for the far ring';
           return;
         }
+        goesReach = null;
         goesBusy = true;
         try {
           const win = windowTiles(state.lat, state.lon);
@@ -2351,7 +2378,11 @@
           const iso = (ms) => new Date(ms).toISOString().slice(0, 19) + 'Z';
           const dom = await (
             await fetch(
-              gibsDomainsUrl(iso(now - 86400e3), iso(now + 86400e3)),
+              gibsDomainsUrl(
+                iso(now - 86400e3),
+                iso(now + 86400e3),
+                pick.sat.layer
+              ),
               {
                 credentials: 'omit'
               }
@@ -2366,9 +2397,12 @@
           // minutes at a time until the WHOLE mosaic answers, at
           // most an hour
           const tileAt = async (t, tm) => {
-            const r = await fetch(gibsTileUrl(t.row, t.col, tm), {
-              credentials: 'omit'
-            });
+            const r = await fetch(
+              gibsTileUrl(t.row, t.col, tm, pick.sat.layer),
+              {
+                credentials: 'omit'
+              }
+            );
             return r.ok ? r : null;
           };
           let time = null;
@@ -2439,7 +2473,8 @@
             rows,
             latDeg: state.lat,
             lonDeg: state.lon,
-            metar
+            metar,
+            sat: pick.sat
           });
           if (!P) return;
           const s = P.r100;
@@ -2465,6 +2500,7 @@
           goesObs = {
             at: Date.now(),
             time,
+            sat: pick.sat,
             seaSource,
             // the pick layer reads the field behind a clicked texel
             // and the look link aims at the cloudiest sea sector
@@ -2487,7 +2523,8 @@
               P.deck.midDeckFrac === null ? 0 : 100 * P.deck.midDeckFrac,
             midTopM: P.deck.midTopM,
             line:
-              `${time.slice(11, 16)}Z · sea within 100 km (${s.waterMeasured} px): ` +
+              `${pick.sat.name} (${pick.sat.craft}, ${pick.sat.instrument} band 13 at ` +
+              `${pick.sat.bandUm} µm) ${time.slice(11, 16)}Z · sea within 100 km (${s.waterMeasured} px): ` +
               `${pct(s.waterClear, s.waterMeasured)}% clear, ` +
               `${pct(s.waterLow, s.waterMeasured)}% low` +
               (s.topMedianM.low !== null
@@ -2527,7 +2564,7 @@
             cloudSys.setGoesCover(P.deck.data, P.deck.rm, worldUnits);
           if (goesOverlayOn) buildGoesOverlay();
           record(
-            'GOES-West band 13 (GIBS ' + time.slice(11, 16) + 'Z)',
+            pick.sat.name + ' band 13 (GIBS ' + time.slice(11, 16) + 'Z)',
             `sea within 100 km ${pct(s.waterLow + s.waterMid + s.waterHigh, s.waterMeasured)}% cloud ` +
               `(${pct(s.waterLow, s.waterMeasured)} low · ${pct(s.waterMid, s.waterMeasured)} mid · ` +
               `${pct(s.waterHigh, s.waterMeasured)} high) · clear-sky ref ` +
@@ -11277,12 +11314,6 @@
                 ` (dewpoint: ${m.dewSource})`;
             } else
               delete research['marine surface layer (COARE 3.6 · CO-OPS pier)'];
-            // The measured cloud field (goesir.js): the line is
-            // composed at fetch time from the same panel the decks
-            // read, so the panel and the sky agree to the pixel.
-            if (goesObs)
-              research['cloud field (GOES-West band 13 · GIBS)'] = goesObs.line;
-            else delete research['cloud field (GOES-West band 13 · GIBS)'];
             // Where each line's subject sits (the look links, 145th
             // pass): the satellite's cloudiest sea sector, the open
             // sea for the mirage and the sea-state lines, the sun
@@ -11297,7 +11328,7 @@
                 ? {azDeg: seaHorizon.azDeg, altDeg: 0, note: 'open sea'}
                 : null;
               setLook(
-                'cloud field (GOES-West band 13 · GIBS)',
+                'cloud field (geostationary band 13 · GIBS)',
                 goesObs && goesObs.lookAz !== null
                   ? {
                       azDeg: goesObs.lookAz,
@@ -11606,6 +11637,19 @@
             delete research['marine surface layer (COARE 3.6 · CO-OPS pier)'];
             delete research['forecast ledger (morning → evening ascent)'];
           }
+          // The measured cloud field (goesir.js): the line is
+          // composed at fetch time from the same panel the decks
+          // read, so the panel and the sky agree to the pixel. With
+          // no field yet the line says which satellite reaches this
+          // longitude and what the field waits for (146th pass) -
+          // outside the ascent branch, so a place with no balloon
+          // still learns its satellite.
+          if (goesObs)
+            research['cloud field (geostationary band 13 · GIBS)'] =
+              goesObs.line;
+          else if (goesReach)
+            research['cloud field (geostationary band 13 · GIBS)'] = goesReach;
+          else delete research['cloud field (geostationary band 13 · GIBS)'];
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();
             research['whitecaps (Monahan 1980)'] =
@@ -12127,7 +12171,13 @@
               const bt = P.field.btAt(q);
               cls = P.field.cls[q];
               detail =
-                (Number.isFinite(bt) ? ', GOES ' + bt.toFixed(1) + ' °C' : '') +
+                (Number.isFinite(bt)
+                  ? ', ' +
+                    (goesObs.sat ? goesObs.sat.name : 'satellite') +
+                    ' ' +
+                    bt.toFixed(1) +
+                    ' °C'
+                  : '') +
                 (Number.isFinite(P.field.eps[q])
                   ? ', ε ' + P.field.eps[q].toFixed(2)
                   : '') +

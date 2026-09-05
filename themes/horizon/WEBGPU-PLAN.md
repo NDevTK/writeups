@@ -10345,6 +10345,74 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 146th pass - THE REACH: THREE
+  SATELLITES ON ONE PALETTE): the measured cloud field, GOES-West's
+  alone since the 143rd, now comes from whichever geostationary
+  window channel on GIBS sees the observer. (1) THE TABLE
+  (goesir.SATELLITES): GOES-West/GOES-18 at 137.0 W, GOES-East/
+  GOES-19 at 75.2 W (goes-r.gov: "GOES East is located at 75.2 W",
+  GOES-19 in operational service; the overview also prints 137.2 W
+  for GOES West - GOES-17's former station - and the GOES-18
+  sentence's 137.0 is taken), Himawari-9 at 140.7 E (JMA: "35,800
+  km above the equator at around 140.7 degrees east longitude"),
+  AHI band 13 centred at 10.4073 um (JMA's AHI table; ABI's at
+  10.35). ONE COLORMAP: NASA Worldview's layer configuration
+  (wv.json, read) declares the palette
+  Clean*Longwave_Infrared_Window_Band for all three Band 13 layers,
+  so the vendored map reads every tile; the visible-band layers
+  declare NO palette (their greys carry no stated scale - the
+  planned visible pass moves to the L2 reflectance product). (2)
+  THE PICK (pickSatellite): the satellite at the smallest view
+  zenith, within THE REACH the operational products print
+  themselves - the ACMC file's quantitative_local_zenith_angle_bounds
+  [0, 70] "local zenith angle degree range where good quality clear
+  sky mask data is produced" and the ACHAC file's
+  local_zenith_angle_bounds [0, 70] (OR_ABI-L2-ACMC-M6_G18*
+  s20262481851177 and the 18:46Z ACHAC, read with h5py from the
+  noaa-goes18 open bucket; both print nominal_satellite_subpoint_lon
+  -137.0, the station from the product itself). Past 70 deg, or
+  with no satellite above the horizon, the field answers UNMEASURED
+  and the research line says which satellite is nearest and at what
+  zenith; Meteosat is not on GIBS, so 5 E to 60 E and the Indian
+  Ocean stay unmeasured (stated). (3) THE BAND CENTRE travels with
+  the satellite: the continuum's wavenumber and Hale & Querry's
+  index interpolated to 10.4073 um for AHI (waterIndexAt; the
+  emissivity 0.9873 -> 0.9876 at 44 deg, the reference -0.077 K on
+  the 90% column - pinned); the ETROP test's Planck weighting keeps
+  the ABI centre for all three (a 0.6% wavenumber difference,
+  stated). The layer flows through gibsTileUrl/gibsDomainsUrl,
+  goesPanel takes the satellite and returns it, the freeze script
+  picks it for the fixture's home (San Diego: GOES-West, every pin
+  unchanged), the page's line, record label and pick readout name
+  it. (4) THE RESEARCH LINE moved out of the ascent branch: a place
+  with no balloon still learns its satellite (London's line was
+  missing until then - measured). GATE: THE REACH landmark - San
+  Diego -> GOES-West at 43.8 deg (the 143rd's number), New York ->
+  GOES-East at 47.1, Tokyo -> Himawari at 41.4, Honolulu ->
+  GOES-West at 34.4; London none (GOES-East nearest at 89.5),
+  Nairobi none (111.9, below the horizon); three layers, one
+  colormap URL; the AHI index between the two tabulated points; the
+  reference shift pinned. MEASURED TODAY (the page, ?debug=1): San
+  Diego "GOES-West (GOES-18, ABI band 13 at 10.35 um) 17:50Z - sea
+  within 100 km (3064 px): 27% clear, 73% low ..."; New York
+  "GOES-East (GOES-19) sees this window at 47.1 deg zenith; the
+  field waits for a measured sea temperature within 50 km (COARE
+  skin, CO-OPS sensor or an NDBC buoy)"; Tokyo "Himawari
+  (Himawari-9) sees this window at 41.4 deg zenith; the field waits
+  for a measured sea temperature ..."; London "no geostationary
+  window channel on GIBS reaches 51.51, -0.13: the nearest,
+  GOES-East (GOES-19 at 75.2 W), sees it at 89 deg zenith past the
+  70 deg reach; Meteosat is not on GIBS - the decks keep the model's
+  cover". Both GOES-East (New York, 2026-09-05T17:40Z) and Himawari
+  (Tokyo, 17:20Z) tiles fetched and decoded on the shared map. THE
+  WAIT the eastern cities show is the next pass's subject: the field
+  needs a measured sea temperature within 50 km, and MUR's
+  foundation SST (0.01 deg, daily, a 2-deg box at stride 5 answers
+  in 1.2 s) reaches every coast. STATED LIMITS: Himawari's own
+  cloud products are not read (the 70-deg reach is the GOES-R
+  products'); the split rule and the ceilometer reach are unchanged
+  and the METAR network thins outside the US; no satellite covers
+  Europe, Africa or the Indian Ocean on GIBS.
 - DONE (Sep 5, the review session's 145th pass - THE WORLD ANSWERS A
   CLICK): the research view's diagnoses get hands in the drawn
   world. (1) THE PICK LAYER: a click (no drag) on the canvas casts a

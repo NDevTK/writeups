@@ -33,6 +33,7 @@ import {
   gibsTileUrl,
   goesPanel,
   parseColormapXml,
+  pickSatellite,
   windowTiles
 } from './goesir.js';
 import {marinePanel} from './observatory.js';
@@ -72,11 +73,20 @@ async function main() {
     `colormap: ${live.length} entries, identical to the vendored copy`
   );
 
+  // the satellite that reaches the fixture's home (146th pass)
+  const pick = pickSatellite(LAT, LON);
+  if (!pick.sat)
+    throw new Error(
+      `no satellite on GIBS reaches ${LAT}, ${LON} (nearest ${pick.nearest?.name} at ${pick.viewZenithDeg?.toFixed(0)} deg zenith)`
+    );
+  console.log(
+    `satellite: ${pick.sat.name} (${pick.sat.craft}) at ${pick.viewZenithDeg.toFixed(2)} deg view zenith`
+  );
   const win = windowTiles(LAT, LON);
   const tiles = [];
   let stamp = TIME;
   for (const t of win.tiles) {
-    const url = gibsTileUrl(t.row, t.col, TIME);
+    const url = gibsTileUrl(t.row, t.col, TIME, pick.sat.layer);
     const {bytes, headers} = await getBytes(url);
     const actual = headers.get('layer-time-actual');
     if (!stamp) stamp = actual;
@@ -142,7 +152,8 @@ async function main() {
     rows: mar.rows,
     latDeg: LAT,
     lonDeg: LON,
-    metar: null
+    metar: null,
+    sat: pick.sat
   });
   const f = (v, d = 2) =>
     v === null || v === undefined ? 'null' : (+v).toFixed(d);

@@ -41,9 +41,18 @@ import {
   etrop,
   foreignScale,
   fresnelReflectance,
+  GIBS_COLORMAP_URL,
+  GIBS_PALETTE_ID,
+  SATELLITES,
+  VIEW_ZENITH_MAX_DEG,
+  WATER_INDEX_10UM,
+  WATER_INDEX_10_5UM,
   gibsDomainsUrl,
+  gibsTileUrl,
   goesPanel,
   greyReading,
+  pickSatellite,
+  waterIndexAt,
   latestTimeFromDomains,
   heightOfPressure,
   heightOfTemperature,
@@ -357,6 +366,73 @@ check(
     `view zenith 0 at the sub-satellite point, ${home.toFixed(2)} deg at ${GOESIR_HOME.latDeg}N ` +
       `${-GOESIR_HOME.lonDeg}W (sec ${(1 / Math.cos((home * Math.PI) / 180)).toFixed(3)}), ` +
       `${far.toFixed(1)} deg at 60N 60W`
+  );
+}
+
+// ---- the reach: three satellites on one palette (146th) ----------
+{
+  const sd = pickSatellite(GOESIR_HOME.latDeg, GOESIR_HOME.lonDeg);
+  const ny = pickSatellite(40.71, -74.01);
+  const tk = pickSatellite(35.68, 139.69);
+  const hn = pickSatellite(21.31, -157.86);
+  const ld = pickSatellite(51.51, -0.13);
+  const nb = pickSatellite(-1.29, 36.82);
+  const home = viewZenithDeg(GOESIR_HOME.latDeg, GOESIR_HOME.lonDeg);
+  // the same column, skin and view through AHI's band centre
+  const col = [
+    {p: 1013, hM: 0, tC: 20, rh: 90},
+    {p: 900, hM: 1000, tC: 13.5, rh: 90},
+    {p: 700, hM: 3000, tC: 0.5, rh: 90},
+    {p: 500, hM: 5600, tC: -16, rh: 90},
+    {p: 300, hM: 9200, tC: -40, rh: 90},
+    {p: 100, hM: 16000, tC: -68, rh: 90}
+  ];
+  const rA = clearSkyReference({tSkinC: 20, rows: col, viewZenithDeg: 44});
+  const rH = clearSkyReference({
+    tSkinC: 20,
+    rows: col,
+    viewZenithDeg: 44,
+    bandUm: SATELLITES[2].bandUm
+  });
+  const idx = waterIndexAt(SATELLITES[2].bandUm);
+  const layersDiffer = new Set(SATELLITES.map((s) => s.layer)).size === 3;
+  check(
+    "THE REACH: the nearest of three satellites within the products' printed 70 deg, one palette",
+    sd.sat.id === 'goes-west' &&
+      near(sd.viewZenithDeg, home, 1e-9) &&
+      ny.sat.id === 'goes-east' &&
+      tk.sat.id === 'himawari' &&
+      hn.sat.id === 'goes-west' &&
+      ld.sat === null &&
+      ld.nearest.id === 'goes-east' &&
+      ld.viewZenithDeg > VIEW_ZENITH_MAX_DEG &&
+      nb.sat === null &&
+      nb.viewZenithDeg > 85 &&
+      VIEW_ZENITH_MAX_DEG === 70 &&
+      layersDiffer &&
+      SATELLITES.every((s) => s.layer.includes('Band13')) &&
+      GIBS_COLORMAP_URL.endsWith('/' + GIBS_PALETTE_ID + '.xml') &&
+      gibsTileUrl(1, 2, null, SATELLITES[2].layer).includes(
+        '/Himawari_AHI_Band13_Clean_Infrared/'
+      ) &&
+      gibsDomainsUrl('a', 'b', SATELLITES[1].layer).includes(
+        '/GOES-East_ABI_Band13_Clean_Infrared/'
+      ) &&
+      rH.bandUm === SATELLITES[2].bandUm &&
+      rH.emissivity !== rA.emissivity &&
+      idx.n < WATER_INDEX_10UM.n &&
+      idx.n > WATER_INDEX_10_5UM.n &&
+      idx.k > WATER_INDEX_10UM.k &&
+      idx.k < WATER_INDEX_10_5UM.k &&
+      // run-then-pin: the band centre's effect on the reference
+      near(rH.tClrC - rA.tClrC, -0.077, 0.01),
+    `San Diego -> GOES-West at ${sd.viewZenithDeg.toFixed(1)} deg, New York -> GOES-East at ` +
+      `${ny.viewZenithDeg.toFixed(1)}, Tokyo -> Himawari at ${tk.viewZenithDeg.toFixed(1)}, Honolulu -> ` +
+      `GOES-West at ${hn.viewZenithDeg.toFixed(1)}; London answers none (GOES-East nearest at ` +
+      `${ld.viewZenithDeg.toFixed(1)} deg, past ${VIEW_ZENITH_MAX_DEG}), Nairobi none (nearest at ` +
+      `${nb.viewZenithDeg.toFixed(1)} deg); three layers, one colormap; AHI's 10.4073 um moves the ` +
+      `sea's emissivity from ${rA.emissivity.toFixed(4)} to ${rH.emissivity.toFixed(4)} and the reference ` +
+      `by ${(rH.tClrC - rA.tClrC).toFixed(3)} K on the 90% column at 44 deg`
   );
 }
 
