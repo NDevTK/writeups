@@ -29,6 +29,10 @@ import {
   goodCensus,
   sstAgainstGrid,
   SST_DQF_MEANINGS,
+  boxMean,
+  DSR_ATBD,
+  DSR_DQF_MEANINGS,
+  fieldCensus,
   latLonToFixedGrid,
   latestByStart,
   maskAgreement,
@@ -542,6 +546,80 @@ const inflate = (u8) =>
       `within a tenth of a degree of the point, the analysis covers four, and ABI minus analysis ` +
       `reads median +${au.medianK} K (p10/p90 +${au.p10K}/+${au.p90K}, mean +${au.meanK}); the SST product ` +
       `is ${L2_PRODUCTS.sst} with the file's four flag meanings`
+  );
+}
+
+// ---- THE DAYLIGHT, MEASURED (152nd pass) -------------------------
+// fieldCensus in the field's own units (goodCensus is the kelvin
+// spelling of it); boxMean: the good pixels within r of the
+// window's own centre pixel, clipped to the window - the SRB
+// ATBD's spatial average for reading a pixel against a point; the
+// DSR product, its two flag meanings and the ATBD's printed
+// validation figures.
+{
+  const vals = [
+    100,
+    200,
+    300,
+    400,
+    500,
+    600,
+    700,
+    800,
+    900,
+    1000,
+    NaN,
+    1200,
+    1300,
+    1400,
+    1500,
+    1600
+  ];
+  const dqf = [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const fc = fieldCensus(vals, dqf);
+  const gc = goodCensus(vals, dqf);
+  // a 4x4 window whose centre pixel is (1, 1): r = 1 takes the 3x3
+  // block rows 0-2, cols 0-2 -> values 100..1100 minus the flagged
+  // 600 and the NaN 1100: 100,200,300,500,700,900,1000 (7)
+  const box = {i: 11, j: 21, i0: 10, j0: 20, cols: 4, rows: 4};
+  const bm = boxMean(vals, dqf, box, 1);
+  // r = 0: the centre pixel alone (index 5 = 600, flagged -> none)
+  const bm0 = boxMean(vals, dqf, box, 0);
+  // a centre at the window's corner: the box clips to the window
+  const corner = boxMean(vals, dqf, {...box, i: 10, j: 20}, 1);
+  check(
+    'THE DAYLIGHT, MEASURED: the census, the spatial mean and the ATBD figures',
+    fc.n === 16 &&
+      fc.good === 14 &&
+      fc.min === 100 &&
+      fc.median === 900 &&
+      fc.max === 1600 &&
+      gc.good === 14 &&
+      gc.minK === 100 &&
+      gc.medianK === 900 &&
+      gc.maxK === 1600 &&
+      bm.n === 7 &&
+      near(bm.mean, 3700 / 7, 1e-9) &&
+      bm.min === 100 &&
+      bm.max === 1000 &&
+      bm0.n === 0 &&
+      bm0.mean === null &&
+      corner.n === 3 &&
+      near(corner.mean, (100 + 200 + 500) / 3, 1e-9) &&
+      L2_PRODUCTS.dsr === 'ABI-L2-DSRF' &&
+      DSR_DQF_MEANINGS.length === 2 &&
+      DSR_DQF_MEANINGS[1] === 'degraded_quality_or_invalid_qf' &&
+      DSR_ATBD.accuracyPct === 2 &&
+      DSR_ATBD.precisionPct === 17 &&
+      DSR_ATBD.precisionWm2 === 74 &&
+      DSR_ATBD.requirementWm2.mid === 65 &&
+      DSR_ATBD.quantitativeSzaDeg === 70,
+    `fieldCensus counts ${fc.good} good of ${fc.n} (a flag and a NaN out), min/median/max ${fc.min}/${fc.median}/${fc.max}; ` +
+      `goodCensus is its kelvin spelling; boxMean over a 3x3 around the window's centre takes ${bm.n} good px ` +
+      `(mean ${bm.mean.toFixed(1)}), r = 0 on a flagged centre takes none, a corner centre clips to ${corner.n}; ` +
+      `${L2_PRODUCTS.dsr} with its two flag meanings; the ATBD's ABI validation - accuracy ~${DSR_ATBD.accuracyPct}%, ` +
+      `precision ${DSR_ATBD.precisionPct}% (${DSR_ATBD.precisionWm2} W/m2), requirement 110/65/85 W/m2 by range, ` +
+      `quantitative to ${DSR_ATBD.quantitativeSzaDeg} degrees`
   );
 }
 

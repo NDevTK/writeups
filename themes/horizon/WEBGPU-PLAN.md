@@ -10345,6 +10345,98 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 152nd pass - THE DAYLIGHT,
+  MEASURED; A PREMISE CORRECTED): the 91st pass built the
+  clearness index and the radiative closure on Open-Meteo's
+  satellite radiation API, and every pass since called that hourly
+  series "the geostationary constellations' actual observed
+  irradiance". MEASURED FIRST, this pass: Open-Meteo's own
+  documentation (read 2026-09-05) lists its satellite sources -
+  EUMETSAT MTG/MSG/IODC/SARAH-3 for Europe and Africa, Himawari-9
+  for Asia-Pacific - and states for the Americas that "solar
+  radiation data from NASA GOES satellites has not been integrated
+  yet, so data is currently unavailable for North America"; asked
+  for the home with models=satellite_radiation_seamless the API
+  answers latitude NaN, and the default series carries values for
+  hours not yet come (781 W/m2 at 22:00Z when asked at 21:49Z) - a
+  forecast, so a model. The page had said "measured" of a model at
+  its own home for 61 passes; clearness.js and closure.js now state
+  the correction in their headers and the record is renamed
+  "hourly irradiance (Open-Meteo)" with the source's reach on it.
+  THE PRIMARY: Laszlo, Kim & Liu, "ATBD for Downward Shortwave
+  Radiation (Surface) and Reflected Shortwave Radiation (TOA),
+  Enterprise Processing System Version", v5.0 (EPS 2.0), NOAA
+  NESDIS STAR, 28 Sep 2020, 119 pages, read in full: DSR is the
+  total shortwave irradiance (0.2-4.0 um, direct + diffuse) on a
+  horizontal unit area (Sec. 2.1); a hybrid of the NASA CERES/SARB
+  direct path (a Fu-Liou lookup table driven by ABI's own cloud
+  optical depth, particle size, top height, aerosol optical depth
+  and surface albedo) and the STAR/UMD indirect path (the
+  narrowband-to-broadband TOA albedo through CERES angular
+  distribution models, inverted to transmittance), DSR = T cos(SZA)
+  S0/d^2 (Eq. 1) summed over 18 spectral bands (Eqs. 20-22); the
+  EPS version retrieves at pixel level, 2 km (Sec. 1.5); the
+  requirement is 65 W/m2 accuracy and 130 W/m2 precision in the
+  200-500 W/m2 range (Table 2-1), quantitative to 70 degrees of
+  solar and local zenith (Table 2-2); the quality flag is 1 past 70
+  degrees, on a degraded cloud mask, outside 0-1500 W/m2, or on a
+  failed retrieval (Sec. 3.4.3.1); validated from GOES-16 (six
+  months, the indirect path, 50-km squares around fifteen
+  SURFRAD/SOLRAD/ARM stations): accuracy about 2% (10 W/m2),
+  precision 17% (74 W/m2) (Fig. 4-9; Tables 4-10, 4-11); the
+  sensitivity table (4-8): cloud fraction +10% -> -42 W/m2, cloud
+  optical depth +20% -> -16, aerosol +30% -> -5, channel reflectance
+  +3% -> -12; and the ATBD's own caveat that a pixel and a
+  pyranometer's hemisphere are spatially incompatible at the
+  instant, the usual remedy being to average the satellite in space
+  (Sec. 4.2.2). THE FILE (OR_ABI-L2-DSRF-M6_G18, read): 5424 x 5424
+  uint16 at 0.02289 W/m2 a count, fill 65535, chunked 24 x 5424;
+  DQF flag_values 0, 1 ("good_quality_qf",
+  "degraded_quality_or_invalid_qf"); good for SZA to 70 degrees,
+  produced to 90; wavelength bounds 0.2-4.0 um; "2.0km at nadir";
+  every 10 minutes, the file landing ~15 min after its scan starts
+  (measured on the 21Z hour's six files). (1) THE DAEMON: 'dsr' is
+  the seventh product (ABI-L2-DSRF, half width 50, asked for a
+  mosaic's minute too - the 10-minute cadence always has a file
+  within 15 min); l2DsrBody carries the counts with the file's
+  scaling, the flags, the point's own pixel (`here`), the mean of
+  the good pixels within 5 px (`near`, the ATBD's spatial average;
+  goesl2.boxMean, gated) and the window census in W/m2
+  (goesl2.fieldCensus - goodCensus is now its kelvin spelling).
+  Measured at 21:50Z: the 21:35Z file's window read 672.3 W/m2 at
+  the home pixel, 672.6 over the 121 good pixels within 5 px, a
+  window median of 686 over 10201 good - the 40 MB file costing
+  1.4 MB by range. (2) THE PAGE: one place names the irradiance
+  source - NOAA's DSR (the near mean when at least 30 of the 121
+  are good, else the pixel) while under 30 min old and with the sun
+  above the clearness floor, else the hourly series; the clearness
+  index is taken at the DSR file's own moment's sun; the record is
+  "NOAA GOES-18 surface irradiance (DSRF)" with the stamp, kt and
+  which estimator, or "hourly irradiance (Open-Meteo)" with the
+  source's reach stated; the radiative closure names its measured
+  side; the NOAA line prints the pixel, the spatial mean, the
+  window, the hourly series' figure for the hour with the ratio,
+  which drives the ambient, and the ATBD's validation figures.
+  MEASURED on the page at 21:57Z: the 21:45Z file's near mean read
+  632 W/m2 (the pixel itself 545 - a cloud shadow the mean smooths,
+  the ATBD's point), kt 0.79 at that moment's sun, diffuse x0.98 -
+  DSR driving the ambient; the closure audit read its drawn global
+  x1.28 against NOAA's 69.3 klx on the Erbs cloudy branch; the NOAA
+  line at 21:52Z read overhead 720, 700 over 121 px within 5 px,
+  window median 727 against the series' 673 for the hour (DSR /
+  series 0.94). GATE
+  (goesl2-reference): fieldCensus, boxMean (a 3x3 around the
+  window's centre, r = 0 on a flagged centre, a corner clipped), the
+  product, the flag meanings and the ATBD's figures pinned;
+  (server-reference): a DSR body dressed on the fixture's grid -
+  the home pixel from the file's own count, the 11 x 11 mean and
+  the census recomputed from the wire - seven asks with their half
+  widths, the SST alone never timed. STATED LIMITS: DSR is the
+  global only - the beam/diffuse split the closure audit uses still
+  comes from the hourly series; the near mean spans about 24 x 28
+  km at this slant, the ATBD's 50-km validation squares are wider;
+  a single 10-minute retrieval carries the ATBD's 74 W/m2 precision
+  and the theme prints it beside every reading.
 - DONE (Sep 5, the review session's 151st pass - THE WINDOW READ IN
   PLACE; THE HOUR'S SKIN): the 148th-150th downloaded NOAA's whole
   L2 files (4-5 MB each, five a set, 51 MB) to cut a 101 x 101

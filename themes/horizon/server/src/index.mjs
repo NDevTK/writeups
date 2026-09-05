@@ -115,6 +115,8 @@ import {
   cutWindow,
   dcompCensus,
   fixedGridGeometry,
+  boxMean,
+  fieldCensus,
   goodCensus,
   heightCensus,
   IMAGERY_BAND,
@@ -955,7 +957,7 @@ export function parseSst(j) {
 // (goesl2.js maskAgreement); the decks keep the theme's field -
 // stated in goesl2.js. The pure pieces are exported for
 // server-reference.mjs.
-export const L2_HALF_PX = {mask: 50, height: 10, sst: 50}; // +-100 km on 2-km / 10-km grids
+export const L2_HALF_PX = {mask: 50, height: 10, sst: 50, dsr: 50}; // +-100 km on 2-km / 10-km grids
 export const L2_LIST_MS = 60e3; // a bucket listing stands a minute (the cheap part)
 export const L2_RETRY_MS = 2 * 60e3; // after a listing or fetch failure
 export const L2_WINDOW_MS = 15 * 60e3; // windows outlive their file by design: a new file keys new windows
@@ -1014,6 +1016,12 @@ export const L2_CPS_SPEC = {CPS: 'raw16'};
 // degraded, 2 severely degraded, 3 unprocessed - the file's own
 // flag_meanings, goesl2.SST_DQF_MEANINGS)
 export const L2_SST_SPEC = {SST: 'raw16', DQF: 'raw'};
+// The 152nd pass: the downward shortwave radiation at the surface
+// (uint16 at 0.02289 W/m2 a count, fill 65535; DQF 0 good, 1
+// degraded or invalid - the file's own flag_meanings,
+// goesl2.DSR_DQF_MEANINGS); full disk, every 10 minutes, so a
+// mosaic's minute always has a file within 15 min
+export const L2_DSR_SPEC = {DSR: 'raw16', DQF: 'raw'};
 // what /goesl2 fetches for a point: product, spec, the window's half
 // width on the product's grid, the imagery's band (the CMIPC prefix
 // lists every band's file); timed false = not asked for a mosaic's
@@ -1036,7 +1044,8 @@ export const L2_ASKS = [
     spec: L2_SST_SPEC,
     halfPx: 50,
     timed: false
-  }
+  },
+  {id: 'dsr', product: L2_PRODUCTS.dsr, spec: L2_DSR_SPEC, halfPx: 50}
 ];
 const l2Scalar = (a) => (Array.isArray(a) ? a[0] : a);
 const l2Inflate = (u8) =>
@@ -1298,6 +1307,46 @@ export function l2SstBody(dec, key, lat, lon) {
     sstFill: 65535,
     dqf: packArray(w.cut.DQF, 'u8'),
     census: {...goodCensus(sstK, w.cut.DQF), degraded}
+  };
+}
+// The surface irradiance window (152nd pass): NOAA's downward
+// shortwave radiation at the surface (ABI-L2-DSRF: 0.2-4.0 um,
+// direct + diffuse, W/m2, the Enterprise SRB algorithm) as counts
+// with the file's scaling, its flags, the census over good pixels
+// (DQF 0; W/m2), and the point's own pixel with the mean of the
+// good pixels within 5 pixels of it - the ATBD's remedy for a
+// pixel read against a point on the ground.
+export function l2DsrBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_DSR_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.dsr);
+  if (!w) return null;
+  const m = dec.meta.DSR ?? {scale: 1, offset: 0, fill: 65535};
+  const wm2 = unscale(w.cut.DSR, m);
+  const ci = w.box.i - w.box.i0;
+  const cj = w.box.j - w.box.j0;
+  const qc = cj * w.box.cols + ci;
+  const here =
+    Number.isFinite(wm2[qc]) && w.cut.DQF[qc] === 0
+      ? +wm2[qc].toFixed(1)
+      : null;
+  const near = boxMean(wm2, w.cut.DQF, w.box, 5);
+  return {
+    ...l2Common(dec, L2_PRODUCTS.dsr, key, w),
+    dsr: l2Counts(w.cut.DSR, m.fill),
+    dsrScale: m.scale,
+    dsrOffset: m.offset,
+    dsrFill: 65535,
+    units: 'W m-2',
+    dqf: packArray(w.cut.DQF, 'u8'),
+    here,
+    near: {
+      r: 5,
+      n: near.n,
+      mean: near.mean === null ? null : +near.mean.toFixed(1),
+      min: near.min === null ? null : +near.min.toFixed(1),
+      max: near.max === null ? null : +near.max.toFixed(1)
+    },
+    census: fieldCensus(wm2, w.cut.DQF)
   };
 }
 // The DCOMP window (149th pass): the optical depth at 640 nm and
@@ -2501,6 +2550,7 @@ function main() {
           )
         : null,
       sst: F.sst ? l2SstBody(F.sst.dec, F.sst.key, cell.lat, cell.lon) : null,
+      dsr: F.dsr ? l2DsrBody(F.dsr.dec, F.dsr.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial'
     };
     goesl2Cache.set(ck, {t: Date.now(), body});

@@ -18,9 +18,13 @@
  *    with the LIVE measured aerosol channel set) times E0_LUX
  *    times sin(alt) for the horizontal projection.
  *
- * The measured side arrives in W/m^2 (Open-Meteo satellite
- * radiation: shortwave_radiation = GHI, direct_radiation = the
- * beam on the horizontal, diffuse_radiation). The bridge is a
+ * The measured side arrives in W/m^2 (since the 152nd pass NOAA's
+ * own surface irradiance, ABI-L2-DSRF, where a GOES bucket reaches
+ * - the global only; the beam/diffuse split still comes from
+ * Open-Meteo's hourly series: shortwave_radiation = GHI,
+ * direct_radiation = the beam on the horizontal,
+ * diffuse_radiation - a model over the Americas, satellite
+ * elsewhere, stated in clearness.js). The bridge is a
  * LUMINOUS EFFICACY derived EXACTLY - no assumed constant - from
  * the vendored ASTM G173-03 reference spectra (g173-data.js)
  * through the repo's own gated CIE Y (airglow.js) and 683 lm/W:

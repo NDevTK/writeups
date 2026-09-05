@@ -122,15 +122,23 @@ are gated by `../server-reference.mjs` — the `server` set in
   word) as `imagery` and `dcomp`, and since the 151st the hour's sea
   surface (skin) temperature (`ABI-L2-SSTF`, the hourly full-disk
   file - there is no CONUS SST product - as counts from 180 K with
-  the file's flags) as `sst`: six products in all (about 220 kB a
-  window). Since the 151st pass every file is read by HTTP RANGE
+  the file's flags) as `sst`, and since the 152nd NOAA's downward
+  shortwave radiation at the surface (`ABI-L2-DSRF`: the full-disk
+  10-minute file, 0.2-4.0 µm direct + diffuse in W/m² as counts at
+  0.0229 W/m², DQF 0 good / 1 degraded or invalid; the Enterprise
+  SRB algorithm's ATBD read in full) as `dsr`, with the point's own
+  pixel (`here`), the mean of the good pixels within 5 pixels
+  (`near` - the ATBD's spatial average for reading a pixel against
+  a point on the ground) and the window census in W/m²: seven
+  products in all (about 240 kB a window). Since the 151st pass
+  every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks
   the window touches, so a window of the 32 MB SST file costs about
   1 MB and the 4 MB mask about 0.9 MB. Windows are held a dozen per
   satellite and product, keyed by file and tenth-degree cell, so a
   new file keys new windows; `?t=ISO` asks the five 5-minute
-  products for that moment (the hourly SST is never asked for a
-  moment). `sat: null` with a `reason` is a real answer (no bucket
+  products and the 10-minute DSR for that moment (the hourly SST is
+  never asked for a moment). `sat: null` with a `reason` is a real answer (no bucket
   reaches this longitude; Himawari's products are not on AWS in this
   form); 502 when every product failed upstream; `upstream:
 'partial'` names a body missing some.

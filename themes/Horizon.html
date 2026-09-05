@@ -469,6 +469,7 @@
         dcompAt,
         dcompOverPixels,
         fixedGridGeometry,
+        DSR_ATBD,
         maskAgreement,
         sstAgainstGrid,
         unpackArray,
@@ -6265,6 +6266,35 @@
         if (q < 0 || !Number.isFinite(s.sstK[q])) return null;
         return {sstC: s.sstK[q] - 273.15, dqf: s.dqf ? s.dqf[q] : null};
       }
+      // NOAA's surface irradiance at the point (152nd pass): the
+      // point's own good pixel and the mean of the good pixels within
+      // 5 px of it (the SRB ATBD's remedy for reading a 2-km pixel
+      // against a point on the ground - average in space), the file's
+      // stamp and age (the caller takes the sun's cos(zenith) at that
+      // stamp with its own ephemeris). null past DSR_LIVE_MIN or with
+      // nothing good near the point (night, or the flag set - zenith
+      // angles past 70 degrees are flagged by the ATBD's own rule).
+      const DSR_LIVE_MIN = 30;
+      function goesL2DsrHere() {
+        const d = goesL2 && goesL2.dsr;
+        if (!d || !d.dsrWm2) return null;
+        const ageMin = (Date.now() - Date.parse(d.time)) / 60e3;
+        if (!(ageMin < DSR_LIVE_MIN)) return null;
+        const nearOk = d.near && d.near.n >= 30 && Number.isFinite(d.near.mean);
+        const wm2 = nearOk ? d.near.mean : d.here;
+        if (!Number.isFinite(wm2)) return null;
+        return {
+          wm2,
+          here: d.here,
+          near: d.near,
+          time: d.time,
+          ageMin,
+          craft: goesL2.craft,
+          how: nearOk
+            ? `the mean of ${d.near.n} good px within 5 px`
+            : 'the point’s own pixel'
+        };
+      }
       // The hour's skin against the day-old MUR analysis at the same
       // pixels (goesl2.sstAgainstGrid, gated), memoised per pair of
       // stamps
@@ -6319,6 +6349,14 @@
                     offset: p.sstOffset,
                     fill: p.sstFill
                   })
+                : null,
+              // the surface irradiance in W/m2 (152nd pass)
+              dsrWm2: p.dsr
+                ? unscale(unpackArray(p.dsr), {
+                    scale: p.dsrScale,
+                    offset: p.dsrOffset,
+                    fill: p.dsrFill
+                  })
                 : null
             }
           : null;
@@ -6372,7 +6410,11 @@
             dcompAt: null,
             // the hour's sea surface temperature (151st pass; the
             // full-disk hourly file, never asked for a mosaic's minute)
-            sst: unpackProduct(j.sst)
+            sst: unpackProduct(j.sst),
+            // NOAA's surface irradiance (152nd pass; full disk, every
+            // 10 min), now and at the mosaic's minute
+            dsr: unpackProduct(j.dsr),
+            dsrAt: null
           };
           goesL2Reach = null;
           goesL2SstMemo = null;
@@ -6431,6 +6473,7 @@
                 goesL2.heightAt = unpackProduct(j2.height);
                 goesL2.imageryAt = unpackProduct(j2.imagery);
                 goesL2.dcompAt = unpackProduct(j2.dcomp);
+                goesL2.dsrAt = unpackProduct(j2.dsr);
                 goesL2.at = Date.now();
               }
             } catch (e) {
@@ -6815,6 +6858,46 @@
                   : '');
           } else
             line += ` · sea surface temperature ${ss.time.slice(11, 16)}Z: no good retrieval within ±100 km (cloud)`;
+        }
+        // THE DAYLIGHT, MEASURED (152nd pass): NOAA's own downward
+        // shortwave radiation at the surface (the SRB ATBD's hybrid
+        // retrieval, 2 km, every 10 min) - the point's pixel, the
+        // spatial mean the ATBD asks for, the window - beside the
+        // hourly series the page had called "satellite" (a model
+        // over the Americas, Open-Meteo's own statement)
+        const dr = goesL2.dsrAt ?? goesL2.dsr;
+        if (dr && dr.census) {
+          const c = dr.census;
+          const wm2 = (v) => (v === null ? '—' : v.toFixed(0) + ' W/m²');
+          if (c.good) {
+            line +=
+              ` · surface irradiance ${dr.time.slice(11, 16)}Z (ABI-L2-DSRF, full disk, 10-min, 0.2–4.0 µm): ` +
+              (Number.isFinite(dr.here)
+                ? `overhead ${wm2(dr.here)}`
+                : 'overhead not retrieved (flagged)') +
+              (dr.near && dr.near.n
+                ? `, ${wm2(dr.near.mean)} mean over ${dr.near.n} good px within 5 px (the ATBD's spatial average)`
+                : '') +
+              `, window median ${wm2(c.median)} over ${c.good} good px (${wm2(c.min)} to ${wm2(c.max)})`;
+            const live = goesL2DsrHere();
+            const h = state.ghiSeries
+              ? pickHour(state.ghiSeries.time, state.ghiSeries.vals, Date.now())
+              : null;
+            if (h)
+              line +=
+                ` · the hourly series (Open-Meteo, a model over the Americas by its own statement) says ${wm2(h.ghi)} for the hour` +
+                (live && Number.isFinite(live.wm2) && h.ghi > 0
+                  ? `; DSR / series ${(live.wm2 / h.ghi).toFixed(2)}`
+                  : '');
+            line +=
+              state.ktSource === 'dsr'
+                ? ' · DSR drives the ambient (kt)'
+                : state.ktSource === 'series'
+                  ? ' · the series drives the ambient (DSR stale, dark or flagged)'
+                  : '';
+            line += ` (the ATBD's own ABI validation: accuracy ~${DSR_ATBD.accuracyPct}%, precision ${DSR_ATBD.precisionPct}% = ${DSR_ATBD.precisionWm2} W/m² against SURFRAD/SOLRAD in 50-km squares)`;
+          } else
+            line += ` · surface irradiance ${dr.time.slice(11, 16)}Z: nothing retrieved within ±100 km (night, or the sun past 70°)`;
         }
         return line;
       }
@@ -13838,22 +13921,46 @@
                 );
               }
             }
-            // Measured daylight: the satellite's own GHI against
-            // the Haurwitz clear sky at the picked hour's
-            // midpoint sun, split by Erbs - the ambient's
-            // measured scale (clearness.js).
+            // Measured daylight: the irradiance at the point against
+            // the Haurwitz clear sky at its own moment's sun, split
+            // by Erbs - the ambient's measured scale (clearness.js).
+            // THE SOURCE, NAMED (152nd pass): NOAA's own surface
+            // irradiance (ABI-L2-DSRF: a 2-km, 10-minute retrieval,
+            // the SRB ATBD read in full) while it is under 30 min old
+            // and the sun is up; else the hourly series - which over
+            // the Americas is a MODEL (Open-Meteo: "GOES not yet
+            // integrated", read 2026-09-05), satellite only where its
+            // constellations reach - stated on the record.
+            const dsrHere = goesL2DsrHere();
             if (
-              (state.ghiSeries || params.has('ghi')) &&
+              (state.ghiSeries || params.has('ghi') || dsrHere) &&
               t - (astro.ktAt ?? -1e9) > 60000
             ) {
               astro.ktAt = t;
               state.ktAmbient = null;
               let ghi = null;
               let cosZ = null;
+              let src = null;
+              // the sun at the DSR file's own moment
+              let dsrCosZ = null;
+              if (dsrHere) {
+                const at = new Date(dsrHere.time);
+                const eqd = AE.Equator(AE.Body.Sun, at, obs, true, true);
+                const hd = AE.Horizon(at, obs, eqd.ra, eqd.dec, 'normal');
+                dsrCosZ = Math.sin(Math.max(hd.altitude * RAD, 0));
+              }
               if (params.has('ghi')) {
                 ghi = +params.get('ghi');
                 cosZ = Math.sin(Math.max(astro.sun.alt, 0));
-              } else if (Date.now() - state.ghiSeries.at < 3 * 3600e3) {
+                src = 'override';
+              } else if (dsrHere && dsrCosZ > 0.1) {
+                ghi = dsrHere.wm2;
+                cosZ = dsrCosZ;
+                src = 'dsr';
+              } else if (
+                state.ghiSeries &&
+                Date.now() - state.ghiSeries.at < 3 * 3600e3
+              ) {
                 const h = pickHour(
                   state.ghiSeries.time,
                   state.ghiSeries.vals,
@@ -13865,20 +13972,45 @@
                   const eqm = AE.Equator(AE.Body.Sun, dm, obs, true, true);
                   const hm = AE.Horizon(dm, obs, eqm.ra, eqm.dec, 'normal');
                   cosZ = Math.sin(Math.max(hm.altitude * RAD, 0));
+                  src = 'series';
                 }
               }
               const kt = ghi != null ? clearnessIndex(ghi, cosZ) : null;
+              state.ktSource = kt != null ? src : null;
               if (kt != null) {
                 state.ktAmbient = ambientFactor(kt);
-                record(
-                  'satellite irradiance',
-                  ghi.toFixed(0) +
-                    ' W/m\u00b2 \u00b7 kt ' +
-                    kt.toFixed(2) +
-                    ' (Haurwitz clear sky) \u00b7 diffuse \u00d7' +
-                    state.ktAmbient.toFixed(2) +
-                    ' (Erbs)'
-                );
+                const ktText =
+                  ' W/m\u00b2 \u00b7 kt ' +
+                  kt.toFixed(2) +
+                  ' (Haurwitz clear sky) \u00b7 diffuse \u00d7' +
+                  state.ktAmbient.toFixed(2) +
+                  ' (Erbs)';
+                if (src === 'dsr')
+                  record(
+                    `NOAA ${dsrHere.craft} surface irradiance (DSRF)`,
+                    dsrHere.time.slice(11, 16) +
+                      'Z \u00b7 ' +
+                      ghi.toFixed(0) +
+                      ktText +
+                      ' \u00b7 ' +
+                      dsrHere.how +
+                      (Number.isFinite(dsrHere.here)
+                        ? ', the pixel itself ' + dsrHere.here.toFixed(0)
+                        : '') +
+                      ' \u00b7 drives the ambient'
+                  );
+                else
+                  record(
+                    'hourly irradiance (Open-Meteo)',
+                    ghi.toFixed(0) +
+                      ktText +
+                      (src === 'series'
+                        ? ' \u00b7 the hour\u2019s mean; satellite where Open-Meteo\u2019s constellations reach, a model over the Americas (its own statement)' +
+                          (goesL2 && goesL2.dsr
+                            ? ' \u00b7 NOAA\u2019s DSR stale or dark, the series drives'
+                            : '')
+                        : ' \u00b7 ?ghi override')
+                  );
                 // Stage the picked hour for the radiative closure
                 // audit - it runs later this frame, once the live
                 // mie/ozone/NO2 dress is on (TDZ order).
@@ -13907,7 +14039,8 @@
                   dirW,
                   difW,
                   altRad: Math.asin(cosZ),
-                  kt
+                  kt,
+                  src
                 };
               }
             }
@@ -14397,7 +14530,12 @@
               (r.drawnGlobalLux / 1000).toFixed(1) +
               ' klx vs measured ' +
               (r.measGlobalLux / 1000).toFixed(1) +
-              ' klx';
+              ' klx' +
+              (c.src === 'dsr'
+                ? ' (NOAA DSR, the global; the split from the hourly series)'
+                : c.src === 'series'
+                  ? ' (the hourly series - a model over the Americas)'
+                  : '');
             record(
               REC,
               c.kt > 0.8

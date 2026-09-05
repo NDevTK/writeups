@@ -1,9 +1,19 @@
 /**
- * clearness.js - the daylight, measured. Open-Meteo's satellite
- * radiation API (keyless, CORS-open) serves the geostationary
- * constellations' actual observed global horizontal irradiance
- * (W/m^2) at the anchor; this module turns it into the scene's
- * ambient response through two classical, published pieces:
+ * clearness.js - the daylight, measured. The global horizontal
+ * irradiance (W/m^2) at the anchor comes from two sources, named on
+ * the record (152nd pass): NOAA's own downward shortwave radiation
+ * at the surface (ABI-L2-DSRF through the daemon - the 2-km,
+ * 10-minute retrieval of the Enterprise SRB algorithm, read in
+ * full) where a GOES bucket reaches, and Open-Meteo's hourly
+ * satellite radiation API (keyless, CORS-open) otherwise. CORRECTED
+ * in the 152nd pass: the hourly series is the geostationary
+ * constellations' observed irradiance only where Open-Meteo's
+ * constellations reach (Europe, Africa, Asia-Pacific); over the
+ * Americas Open-Meteo states "solar radiation data from NASA GOES
+ * satellites has not been integrated yet" (its documentation, read
+ * 2026-09-05) and the series is a model - the page said "measured"
+ * of it for 61 passes. This module turns whichever value into the
+ * scene's ambient response through two classical, published pieces:
  *
  *  - Haurwitz (1945/46): the clear-sky global irradiance
  *    GHI_clear = 1098 cos(Z) exp(-0.057/cos(Z)) - the venerable

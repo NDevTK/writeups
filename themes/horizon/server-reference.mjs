@@ -60,6 +60,7 @@ import {
   l2ListUrl,
   l2MaskBody,
   l2Prefixes,
+  l2DsrBody,
   l2SstBody,
   l2Window,
   L2_ASKS,
@@ -75,6 +76,7 @@ import {
   L2_MASK_SPEC,
   L2_RANGE_BLOCK,
   L2_RETRY_MS,
+  L2_DSR_SPEC,
   L2_SST_SPEC,
   L2_WINDOW_MS,
   prune,
@@ -107,7 +109,9 @@ import {
 
 import {haversineKm} from './lightning.js';
 import {
+  boxMean,
   dcompCensus,
+  fieldCensus,
   goodCensus,
   heightCensus,
   unpackArray,
@@ -982,6 +986,37 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
   const ssAgain = ss ? goodCensus(ssBack, ssDq) : null;
   let ssDegraded = 0;
   if (ssDq) for (const v of ssDq) if (v === 1) ssDegraded++;
+  // a synthetic DSR decode on the fixture's grid (152nd): counts =
+  // the HT counts at 0.02289 W/m2 a count (0..1500 W/m2 spans the
+  // 16 bits the way the product's own scale does), DQF 0 where
+  // retrieved, 1 where fill
+  const dsrArr = new Uint16Array(raw.data.HT.length);
+  const dsrDqf = new Uint8Array(raw.data.HT.length);
+  for (let q = 0; q < dsrArr.length; q++) {
+    const h = raw.data.HT[q];
+    dsrArr[q] = h;
+    dsrDqf[q] = h === 65535 ? 1 : 0;
+  }
+  const dsrDec = {
+    ...raw,
+    data: {DSR: dsrArr, DQF: dsrDqf},
+    meta: {DSR: {scale: 0.022890279, offset: 0, fill: 65535, units: 'W m-2'}}
+  };
+  const dsBody = l2DsrBody(dsrDec, 'kd', cell.lat, cell.lon);
+  const dsBack = dsBody
+    ? unscale(unpackArray(dsBody.dsr), {
+        scale: dsBody.dsrScale,
+        offset: dsBody.dsrOffset,
+        fill: dsBody.dsrFill
+      })
+    : null;
+  const dsDq = dsBody ? unpackArray(dsBody.dqf) : null;
+  const dsAgain = dsBody ? fieldCensus(dsBack, dsDq) : null;
+  const dsNear = dsBody ? boxMean(dsBack, dsDq, dsBody.box, 5) : null;
+  // the home pixel (424, 127) on the file's own grid
+  const homeCount = raw.data.HT[127 * 500 + 424];
+  const homeWm2 =
+    homeCount === 65535 ? null : +(homeCount * 0.022890279).toFixed(1);
   check(
     'the imagery and DCOMP windows (/goesl2, 149th)',
     rawOk &&
@@ -1040,20 +1075,43 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_SST_SPEC.SST === 'raw16' &&
       L2_SST_SPEC.DQF === 'raw' &&
       L2_HALF_PX.sst === 50 &&
-      L2_ASKS.length === 6 &&
+      // the DSR body (152nd): the point's pixel, the ATBD's spatial
+      // mean within 5 px, the census in W/m2 - recomputed from the
+      // wire exactly
+      dsBody !== null &&
+      dsBody.product === 'ABI-L2-DSRF' &&
+      dsBody.units === 'W m-2' &&
+      dsBody.dsr.kind === 'u16' &&
+      dsBody.dsrFill === 65535 &&
+      dsBody.box.i === 424 &&
+      dsBody.box.cols === 101 &&
+      dsBody.here === homeWm2 &&
+      dsBody.near.r === 5 &&
+      dsBody.near.n === dsNear.n &&
+      dsBody.near.n > 0 &&
+      Math.abs(dsBody.near.mean - dsNear.mean) < 0.06 &&
+      dsBody.census.good === dsAgain.good &&
+      dsBody.census.median === dsAgain.median &&
+      dsBody.census.good + (dsBody.census.n - dsBody.census.good) ===
+        dsBody.census.n &&
+      L2_DSR_SPEC.DSR === 'raw16' &&
+      L2_DSR_SPEC.DQF === 'raw' &&
+      L2_HALF_PX.dsr === 50 &&
+      L2_ASKS.length === 7 &&
       L2_ASKS.map((a) => a.id).join(',') ===
-        'mask,height,imagery,cod,cps,sst' &&
+        'mask,height,imagery,cod,cps,sst,dsr' &&
       L2_ASKS[2].band === 'C13' &&
-      L2_ASKS.map((a) => a.halfPx).join(',') === '50,10,50,50,50,50' &&
-      // the hourly full-disk SST is never asked for a mosaic's minute
+      L2_ASKS.map((a) => a.halfPx).join(',') === '50,10,50,50,50,50,50' &&
+      // the hourly full-disk SST is never asked for a mosaic's
+      // minute; the 10-minute DSR is (a file within 15 min of any)
       L2_ASKS[5].timed === false &&
-      L2_ASKS.slice(0, 5).every((a) => a.timed === undefined) &&
+      L2_ASKS.filter((a) => a.timed === false).length === 1 &&
       L2_IMAGERY_SPEC.CMI === 'raw16' &&
       L2_COD_SPEC.COD === 'raw16' &&
       L2_CPS_SPEC.CPS === 'raw16' &&
       // the CPS file's flags are the COD file's (measured): not held
       L2_CPS_SPEC.DQF === undefined,
-    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; /goesl2 asks six products, the imagery by band C13, the hourly SST never for a mosaic's minute`
+    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; a DSR body dressed the same way (152nd) carries the home pixel (${dsBody && dsBody.here} W/m2 from the fixture's count there), the mean of ${dsBody && dsBody.near.n} good px within 5 px (${dsBody && dsBody.near.mean} W/m2) and a census of ${dsBody && dsBody.census.good} good px, all recomputed from the wire; /goesl2 asks seven products, the imagery by band C13, the hourly SST never for a mosaic's minute and the 10-minute DSR for one`
   );
 }
 

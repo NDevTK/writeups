@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **143 CPU reference files printing
-1139 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
+1140 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **143 reference files, 1139 landmark lines, 7 GPU probes** (live gate
+- **143 reference files, 1140 landmark lines, 7 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -810,8 +810,29 @@ The practice the corpus demonstrates, stated so it can be reused:
    the worker thread and memory guard retired with the whole files).
    That affords the hour's skin SST as the sixth product, set beside
    the day-old MUR analysis at the same pixels with the warm-layer
-   caveat stated (ABI is skin, MUR foundation), never blended
-   (`hdf5-reference` THE WINDOW READ, THE RANGE READ;
+   caveat stated (ABI is skin, MUR foundation), never blended. Pass
+   152 corrects a premise and measures the daylight: the hourly
+   irradiance series the page had called "the geostationary
+   constellations' actual observed GHI" since pass 91 is, over the
+   Americas, a model — Open-Meteo's own documentation says GOES is
+   not yet integrated, its seamless satellite endpoint answers NaN
+   for the home, and the default series carries hours not yet come;
+   the headers and the record now say so. NOAA's own downward
+   shortwave radiation at the surface (the Enterprise SRB algorithm's
+   ATBD, Laszlo, Kim & Liu 2020, read in full: a Fu-Liou lookup-table
+   forward path driven by ABI's own cloud and aerosol retrievals with
+   the STAR/UMD inversion as fallback, 2 km, every 10 minutes,
+   validated from ABI at about 2% accuracy and 17% precision in 50-km
+   squares) becomes the seventh product through the range reader,
+   and the clearness index is now taken from it at its own moment's
+   sun — the point's pixel or the ATBD's spatial mean over the good
+   pixels within 5 pixels — while it is fresh, the hourly series
+   standing otherwise, the source named on the record; at 21:50Z the
+   two read 673 and 672 W/m² for the same hour, the ratio printed
+   beside the ATBD's precision
+   (`goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
+   imagery and DCOMP windows, DSR pins; `hdf5-reference` THE WINDOW
+   READ, THE RANGE READ;
    `server-reference` THE WINDOW READ IN PLACE; `goesl2-reference`
    THE HOUR'S SKIN; and from passes 148-150: `goesl2-reference` THE
    IMAGERY AND DCOMP; `server-reference` the imagery and DCOMP

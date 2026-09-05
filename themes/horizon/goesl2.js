@@ -379,7 +379,35 @@ export const L2_PRODUCTS = {
   // the 151st pass: the sea surface (skin) temperature - full disk
   // only (no CONUS SST product), hourly, 2 km, 32 MB a file, read
   // by HTTP range (its window costs ~1 MB)
-  sst: 'ABI-L2-SSTF'
+  sst: 'ABI-L2-SSTF',
+  // the 152nd pass: the downward shortwave radiation at the surface
+  // (0.2-4.0 um, direct + diffuse, W/m2) - full disk only, every 10
+  // min, 2 km (the Enterprise SRB algorithm: Laszlo, Kim & Liu, ATBD
+  // v5.0 EPS 2.0, 2020 - read in full), 40 MB a file, its window
+  // ~1.4 MB by range
+  dsr: 'ABI-L2-DSRF'
+};
+// The DSR file's own flag meanings (DQF flag_values 0..1): the
+// ATBD's overall quality flag is 1 when the solar or local zenith
+// angle exceeds 70 degrees, the cloud mask's quality is degraded,
+// the flux falls outside 0-1500 W/m2, or the retrieval failed.
+export const DSR_DQF_MEANINGS = [
+  'good_quality_qf',
+  'degraded_quality_or_invalid_qf'
+];
+// The ATBD's own numbers (Tables 2-1, 4-10, 4-11; Fig. 4-9): the
+// requirement and the measured accuracy/precision of DSR from ABI
+// against SURFRAD/SOLRAD ground stations in 50-km squares - the
+// figure to read a single 2-km pixel's value with, stated on the
+// line (the ATBD: a pixel and a pyranometer's hemisphere are
+// spatially incompatible at the instant; average in space).
+export const DSR_ATBD = {
+  accuracyPct: 2, // "about 2%" overall, ABI six months
+  precisionPct: 17, // "17%", 74 W/m2 overall
+  precisionWm2: 74,
+  accuracyWm2: 10,
+  requirementWm2: {low: 110, mid: 65, high: 85}, // <200, 200-500, >500
+  quantitativeSzaDeg: 70
 };
 // The SST file's own flag meanings (DQF flag_values 0..3, read from
 // OR_ABI-L2-SSTF-M6_G18_s20262482000212...nc): only 0 is a
@@ -521,21 +549,62 @@ export function sstAgainstGrid(sstK, dqf, {g, xCoord, yCoord, box}, lookup) {
     meanK: d.length ? sum / d.length : null
   };
 }
-// The census of a kelvin field over a window, DQF 0 (good) only:
-// how many pixels, how many good, their minimum, median, maximum.
-// The imagery's brightness temperature and the SST share it.
-export function goodCensus(valuesK, dqf) {
+// The census of a field over a window, DQF 0 (good) only: how many
+// pixels, how many good, their minimum, median, maximum (the
+// field's own units).
+export function fieldCensus(values, dqf) {
   const good = [];
-  for (let q = 0; q < valuesK.length; q++)
-    if (Number.isFinite(valuesK[q]) && (!dqf || dqf[q] === 0))
-      good.push(valuesK[q]);
+  for (let q = 0; q < values.length; q++)
+    if (Number.isFinite(values[q]) && (!dqf || dqf[q] === 0))
+      good.push(values[q]);
   good.sort((a, b) => a - b);
   return {
-    n: valuesK.length,
+    n: values.length,
     good: good.length,
-    minK: good.length ? good[0] : null,
-    medianK: quantile(good, 0.5),
-    maxK: good.length ? good[good.length - 1] : null
+    min: good.length ? good[0] : null,
+    median: quantile(good, 0.5),
+    max: good.length ? good[good.length - 1] : null
+  };
+}
+// The same for a kelvin field, the keys saying so. The imagery's
+// brightness temperature and the SST share it.
+export function goodCensus(valuesK, dqf) {
+  const c = fieldCensus(valuesK, dqf);
+  return {n: c.n, good: c.good, minK: c.min, medianK: c.median, maxK: c.max};
+}
+// The mean of a field's good pixels within r pixels of the window's
+// own centre (the point's pixel: box.i, box.j) - the ATBD's remedy
+// for reading a pixel product against a point on the ground, where
+// a pyranometer sees the whole hemisphere and a pixel one column:
+// average in space. {n, mean, min, max} over the (2r+1)^2 box,
+// clipped to the window.
+export function boxMean(values, dqf, box, r) {
+  const ci = box.i - box.i0;
+  const cj = box.j - box.j0;
+  let n = 0;
+  let sum = 0;
+  let min = Infinity;
+  let max = -Infinity;
+  for (let dj = -r; dj <= r; dj++) {
+    const j = cj + dj;
+    if (j < 0 || j >= box.rows) continue;
+    for (let di = -r; di <= r; di++) {
+      const i = ci + di;
+      if (i < 0 || i >= box.cols) continue;
+      const q = j * box.cols + i;
+      const v = values[q];
+      if (!Number.isFinite(v) || (dqf && dqf[q] !== 0)) continue;
+      n++;
+      sum += v;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  }
+  return {
+    n,
+    mean: n ? sum / n : null,
+    min: n ? min : null,
+    max: n ? max : null
   };
 }
 // THE DECODER AUDITED: the theme's brightness temperatures (read
