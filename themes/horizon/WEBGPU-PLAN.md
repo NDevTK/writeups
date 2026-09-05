@@ -10369,8 +10369,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   4.6-5.0 m/s and precision 3.0-3.3 all levels, low 3.5-3.7 /
   2.3-2.5, mid 4.4-5.3 / 2.9-3.5, high 4.9-5.3 / 3.1-3.3, the errors
   growing with height and speed (the ATBD's own reading); the
-  cloud-top water-vapour winds about 1 m/s faster than GFS (Table
-  24) and the clear-sky ones the hardest (Sec. 4.5); Sec. 5.3's
+  cloud-top water-vapour winds about 1 m/s faster than GFS (Table 24) and the clear-sky ones the hardest (Sec. 4.5); Sec. 5.3's
   quality monitoring (counts by layer, mean/min/max/sd of speed),
   which the file itself carries; Sec. 6.3.1's own verdict that
   height assignment is the major error source. THE FILE

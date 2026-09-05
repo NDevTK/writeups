@@ -1252,7 +1252,10 @@ export async function decodeL2Vectors(f, lat, lon, radiusKm) {
   const band = await l2Values(f, 'band_id');
   const gap = await l2Values(f, 'seconds_between_images');
   const layerP = await l2Values(f, 'atmospheric_layer_pressure');
-  const layerN = await l2Values(f, 'number_of_wind_vectors_in_atmospheric_layer');
+  const layerN = await l2Values(
+    f,
+    'number_of_wind_vectors_in_atmospheric_layer'
+  );
   const layerCtp = await l2Values(
     f,
     'mean_cloud_top_pressure_in_atmospheric_layer'

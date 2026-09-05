@@ -692,7 +692,8 @@ export function dmwDistanceKm(lat1, lon1, lat2, lon2) {
   return 2 * DMW_EARTH_KM * Math.asin(Math.sqrt(Math.min(1, a)));
 }
 export function dmwLayerOf(hPa) {
-  for (const l of DMW_LAYERS) if (hPa >= l.hPa[0] && hPa <= l.hPa[1]) return l.id;
+  for (const l of DMW_LAYERS)
+    if (hPa >= l.hPa[0] && hPa <= l.hPa[1]) return l.id;
   return null;
 }
 // The vectors within a radius of a point from the file's columns

@@ -1180,9 +1180,17 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     if (a.n !== e.n || a.used !== e.used || a.radiusKm !== e.radiusKm)
       return false;
     if (e.radiusKm === null) return a.spdMs === null && a.dirDeg === null;
-    return ['spdMs', 'dirDeg', 'meanMs', 'medianMs', 'minMs', 'maxMs', 'sdMs', 'medianHpa', 'nearestKm'].every(
-      (k) => near(a[k], e[k], 1e-6)
-    );
+    return [
+      'spdMs',
+      'dirDeg',
+      'meanMs',
+      'medianMs',
+      'minMs',
+      'maxMs',
+      'sdMs',
+      'medianHpa',
+      'nearestKm'
+    ].every((k) => near(a[k], e[k], 1e-6));
   };
   const againOk = (id) => {
     const a = again && again[id];
