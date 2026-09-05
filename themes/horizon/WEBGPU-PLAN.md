@@ -10345,6 +10345,79 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 155th pass - THE PAGE READS THE
+  BUCKET ITSELF): the live daemon went dark at 22:02Z and stayed
+  dark through the 154th pass, and with it the page lost every NOAA
+  product - eight products, thirteen passes of instruments, behind
+  one e2-micro. The buckets are CORS-open with Range (measured in
+  the 151st; measured again this pass: the listing and a ranged GET
+  answer Access-Control-Allow-Origin * with `range` allowed in the
+  preflight, Content-Range NOT exposed), so the page now reads its
+  own windows. (1) goesl2-decode.js: the daemon's L2 block - the
+  listing and file URLs, the asks, the window and vector decodes,
+  the bodies, 543 lines - moved verbatim into a pure module; the
+  daemon re-exports it and adds node's inflate (the whole-bytes
+  decodeL2's default) and its caches; server-reference.mjs runs
+  unchanged through the re-exports (27 landmarks). (2)
+  goesl2-client.js: inflateStream (the browser's DecompressionStream
+  over the files' zlib chunks - a Promise the lazy reader replays,
+  gated against node's zlib on a 70 kB pattern), rangeReader (the
+  daemon's own 206/416/200 rules), createGoesL2Client (listings held
+  a minute, windows by file key and cell, four per product;
+  fetchGoesL2 answers the daemon's body with via 'bucket' and what
+  the refresh moved). MEASURED from node against the live bucket at
+  23:03Z: all eight products in 1.24 s - 14 listings, 30 ranges,
+  6.4 MB; from Chrome through the repaired bridge at 23:22Z: all
+  eight in 2.3 s - 9 listings, 31 ranges, 6.5 MB, every range
+  honoured. (3) THE PAGE: the daemon first; on any failure - or
+  ?goesl2src=direct - the client; `via` on the object, the record
+  "NOAA L2 products via" and the NOAA line's opening name the
+  source and the bytes moved. (4) TWO THINGS THE PASS FOUND. The
+  hourly SST landed null from the daemon at 23:01Z with "no file
+  listed": the SST file of an hour lands 63 minutes after the
+  hour's start (s2100 at 22:03:25, s2200 at 23:02:47, the bucket's
+  own LastModified), so this hour and the last held no SST file at
+  all and the two-prefix lookback missed the 21Z file sitting one
+  prefix further back; l2Prefixes now lists three hours (a 2 kB
+  listing, cached a minute; server-reference and the client gate
+  pin it). And the harness's own request bridge (shoot.mjs answers
+  the page's non-local requests through curl, the only egress the
+  sandbox Chrome has) forwarded the method, URL and body but not
+  the headers, so every range ask came back as the whole file at
+  200: the client's first browser run stalled two minutes on the 40
+  MB irradiance and the 32 MB SST files. A local echo server proved
+  Chrome sends Range (206 with Content-Range), curl with Chrome's
+  full header set through the sandbox proxy got 206, so the bridge
+  was the one ignoring it; it now forwards Range and the status
+  curl saw. The client is hardened for a range-ignoring path
+  anyway: the reader keeps a whole 200 answer once and cuts every
+  later range from it, and once ranges were ignored the full-disk
+  products are left unasked (a page cannot move 72 MB every ten
+  minutes), `rangesHonoured` on the body. GATE
+  (goesl2-client-reference, the 144th reference file): the
+  browser's inflate; the range reader's 206 with its total, a short
+  last range, 416, a 200 cut, a 500 named; the client over a fake
+  S3 serving the vendored ACHAC and DMWC files with S3's semantics -
+  14 listings for eight products, the heights' body equal to the
+  daemon's from the same bytes, 19 of 83 vectors with numpy's layer
+  mean, the rest null and upstream partial, nothing listed or read
+  anew within the minute, the timed asks leaving the winds and SST
+  out, Himawari's longitude answered with the daemon's own reason;
+  the range-ignoring path - three asks one download, the client's
+  two files whole, rangesHonoured false, and after the listings age
+  out fourteen prefixes re-listed for the CONUS products and none
+  for the full-disk two. STATED LIMITS: the page-side path costs
+  each viewer the daemon's own range figures (about 6 MB a refresh)
+  and is the fallback, never the first choice; a viewer at a cell
+  the daemon never saw costs the same either way; the buckets'
+  CORS policy hides Content-Range from the page, so the file's size
+  is unknown there (the journal figure only); the sandbox's page
+  probes exercise the direct path only through the repaired bridge
+  - the live site's browsers talk to S3 themselves. THE DEPLOY,
+  WATCHED: api.ndev.tk still answered nothing at 23:27Z (the page's
+  own metar call through the harness bridge read a 522 - the
+  origin unreachable behind its front); the 150th-155th wait for
+  the box, and the page no longer waits with them.
 - DONE (Sep 5, the review session's 154th pass - THE FIELD THAT
   NEVER ARRIVED): the page probes of the 151st-153rd passes carried
   one console line every run - "THREE.WebGPURenderer: Uncaptured

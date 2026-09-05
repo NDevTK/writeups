@@ -148,7 +148,16 @@ are gated by `../server-reference.mjs` — the `server` set in
   satellite and product, keyed by file and tenth-degree cell, so a
   new file keys new windows; `?t=ISO` asks the five 5-minute
   products and the 10-minute DSR for that moment (the hourly SST and
-  the winds are never asked for a moment). `sat: null` with a `reason` is a real answer (no bucket
+  the winds are never asked for a moment). Since the 155th pass the
+  listing, the asks, the decodes and the bodies live in the pure
+  `goesl2-decode.js` (this daemon re-exports them and adds node's
+  inflate and the caches), and the PAGE runs the same code itself
+  over the CORS-open buckets when this daemon is unreachable
+  (`goesl2-client.js`: fetch with `Range`, the browser's
+  `DecompressionStream` for the zlib chunks, the same body with
+  `via: 'bucket'`; about 6 MB a refresh, so the fallback and never
+  the first choice - the live box went dark on 2026-09-05 at 22:02Z
+  and the page kept its NOAA products). `sat: null` with a `reason` is a real answer (no bucket
   reaches this longitude; Himawari's products are not on AWS in this
   form); 502 when every product failed upstream; `upstream:
 'partial'` names a body missing some.

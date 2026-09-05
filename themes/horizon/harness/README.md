@@ -31,7 +31,11 @@ Pieces:
   Playwright-launched browsers break Dawn), attaches via
   `connectOverCDP`, captures through `window.__capture` /
   `readRenderTargetPixelsAsync`, normalises readback row order,
-  writes PPM. Needs
+  writes PPM. The launched Chrome cannot egress from the sandbox, so
+  the page's non-local requests are answered through curl (which
+  honours the agent proxy); the bridge forwards the page's `Range`
+  header and returns the status curl saw (since the 155th pass -
+  before that every range ask came back as the whole file). Needs
   `playwright-core` installed next to it and `SHOOT_CHROME` pointing
   at a Chrome for Testing binary
   (`npx @puppeteer/browsers install chrome@stable`).

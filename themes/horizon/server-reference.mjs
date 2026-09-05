@@ -794,10 +794,13 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
         'https://noaa-goes18.s3.amazonaws.com/?list-type=2&prefix=ABI-L2-ACMC%2F2026%2F248%2F19%2F&max-keys=1000' &&
       l2FileUrl('noaa-goes19', 'ABI-L2-ACHAC/2026/248/19/x.nc') ===
         'https://noaa-goes19.s3.amazonaws.com/ABI-L2-ACHAC/2026/248/19/x.nc' &&
-      pre.length === 2 &&
+      // this hour, the last, and the one before (the hourly SST lands
+      // 63 min after its hour, measured 155th)
+      pre.length === 3 &&
       pre[0] === 'ABI-L2-ACMC/2026/248/20/' &&
-      pre[1] === 'ABI-L2-ACMC/2026/248/19/',
-    `the vendored ${ACHAC_NAME} decodes to G18 CONUS at ${dec && dec.time} (LZA bound ${dec && dec.lzaMaxDeg}, 500x300, HT as float32 metres with NaN fill, DQF bytes); the tenth-degree cell (32.9/-117.1) cuts the 21x21 window at pixel (424, 127) - the goesl2 gate's own pin - with ${body && body.census.n} retrieved tops, median ${body && body.census.medianM.toFixed(1)} m, ${body && body.pixel.ewM} x ${body && body.pixel.nsM} m pixels at the slant; the packed heights unpack to the same census; the sub-satellite point is outside the scene (null); a missing dataset -> null (502), and the mask body on a height decode is null, never a throw; the listing and file URLs and the this-hour/last-hour prefixes are pinned; listings stand ${L2_LIST_MS / 1000} s, ${L2_HELD_WINDOWS} decoded windows per product, ?t= reaches ${L2_AT_MAX_AGE_MS / 86400e3} days back`
+      pre[1] === 'ABI-L2-ACMC/2026/248/19/' &&
+      pre[2] === 'ABI-L2-ACMC/2026/248/18/',
+    `the vendored ${ACHAC_NAME} decodes to G18 CONUS at ${dec && dec.time} (LZA bound ${dec && dec.lzaMaxDeg}, 500x300, HT as float32 metres with NaN fill, DQF bytes); the tenth-degree cell (32.9/-117.1) cuts the 21x21 window at pixel (424, 127) - the goesl2 gate's own pin - with ${body && body.census.n} retrieved tops, median ${body && body.census.medianM.toFixed(1)} m, ${body && body.pixel.ewM} x ${body && body.pixel.nsM} m pixels at the slant; the packed heights unpack to the same census; the sub-satellite point is outside the scene (null); a missing dataset -> null (502), and the mask body on a height decode is null, never a throw; the listing and file URLs and the three hourly prefixes (this hour, last, the one before - the hourly SST lands 63 min after its hour) are pinned; listings stand ${L2_LIST_MS / 1000} s, ${L2_HELD_WINDOWS} decoded windows per product, ?t= reaches ${L2_AT_MAX_AGE_MS / 86400e3} days back`
   );
   // THE WINDOW READ IN PLACE (151st pass): the daemon's decode reads
   // the vendored file by ranges - a counting readRange over the

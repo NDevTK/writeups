@@ -480,6 +480,7 @@
         unscale,
         windowIndexOf
       } from './horizon/goesl2.js';
+      import {createGoesL2Client} from './horizon/goesl2-client.js';
       import {
         azAltFromDir,
         catalogueIndexNear,
@@ -6255,6 +6256,12 @@
       // disables with the field.
       const GOESL2_PROXY =
         params.get('goesl2src') ?? 'https://api.ndev.tk/goesl2';
+      // THE PAGE READS THE BUCKET ITSELF (155th pass): when the
+      // daemon is unreachable the same gated decode runs here over
+      // the CORS-open buckets by HTTP range (goesl2-client.js) - the
+      // fallback, about 6 MB a refresh; ?goesl2src=direct asks for
+      // it outright. The source is named on the line and the record.
+      const goesL2Client = createGoesL2Client();
       let goesL2 = null;
       let goesL2Reach = null;
       let goesL2Memo = null; // {obsAt, l2At, agreement}
@@ -6440,17 +6447,30 @@
         goesL2Busy = true;
         try {
           const ask = async (t) => {
-            const r = await fetch(
-              GOESL2_PROXY +
-                '?lat=' +
-                state.lat.toFixed(3) +
-                '&lon=' +
-                state.lon.toFixed(3) +
-                (t ? '&t=' + encodeURIComponent(t) : ''),
-              {credentials: 'omit'}
-            );
-            if (!r.ok) throw new Error('goesl2 ' + r.status);
-            return r.json();
+            if (GOESL2_PROXY !== 'direct') {
+              try {
+                const r = await fetch(
+                  GOESL2_PROXY +
+                    '?lat=' +
+                    state.lat.toFixed(3) +
+                    '&lon=' +
+                    state.lon.toFixed(3) +
+                    (t ? '&t=' + encodeURIComponent(t) : ''),
+                  {credentials: 'omit'}
+                );
+                if (!r.ok) throw new Error('goesl2 ' + r.status);
+                const j = await r.json();
+                if (j) j.via = 'daemon';
+                return j;
+              } catch (e) {
+                if (params.has('debug'))
+                  console.warn(
+                    'goesl2 daemon: ' + e.message + ' - reading the bucket'
+                  );
+              }
+            }
+            // the page's own range reads of the open bucket
+            return goesL2Client.fetchGoesL2(state.lat, state.lon, t);
           };
           const j = await ask(null);
           if (!j || !j.sat) {
@@ -6464,6 +6484,10 @@
             name: j.name,
             craft: j.craft,
             bucket: j.bucket,
+            // 'daemon' (the shared cache) or 'bucket' (the page's own
+            // range reads, the daemon unreachable)
+            via: j.via ?? 'daemon',
+            read: j.read ?? null,
             viewZenithDeg: j.viewZenithDeg,
             mask: unpackProduct(j.mask),
             height: unpackProduct(j.height),
@@ -6493,6 +6517,15 @@
           };
           goesL2Reach = null;
           goesL2SstMemo = null;
+          record(
+            'NOAA L2 products via',
+            goesL2.via === 'bucket'
+              ? `the page's own range reads of ${goesL2.bucket} (the daemon unreachable)` +
+                  (goesL2.read && goesL2.read.length
+                    ? `: ${goesL2.read.length} files, ${goesL2.read.reduce((s, r) => s + r.kb, 0)} kB in ${goesL2.read.reduce((s, r) => s + r.ranges, 0)} ranges`
+                    : '')
+              : `the daemon (api.ndev.tk, the shared cache of ${goesL2.bucket})`
+          );
           const m = goesL2.mask;
           const h = goesL2.height;
           // stable record names (the stamp rides in the value, so a
@@ -6784,7 +6817,15 @@
         const h = goesL2.height;
         const pct = (x) => Math.round(100 * x) + '%';
         const km = (v) => (v / 1000).toFixed(1) + ' km';
-        let line = `${goesL2.name} (${goesL2.craft}, ${goesL2.viewZenithDeg.toFixed(1)}° zenith)`;
+        let line =
+          `${goesL2.name} (${goesL2.craft}, ${goesL2.viewZenithDeg.toFixed(1)}° zenith` +
+          (goesL2.via === 'bucket'
+            ? `; read from ${goesL2.bucket} by the page itself - the daemon unreachable` +
+              (goesL2.read && goesL2.read.length
+                ? `, ${goesL2.read.reduce((s, r) => s + r.kb, 0)} kB in ${goesL2.read.reduce((s, r) => s + r.ranges, 0)} ranges this refresh`
+                : '') +
+              ')'
+            : ')');
         if (m) {
           const c = m.census;
           line +=

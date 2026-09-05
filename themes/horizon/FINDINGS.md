@@ -9,8 +9,8 @@ from the code. Run the whole corpus with:
 cd themes/horizon/harness && bash validate.sh
 ```
 
-At the time of writing the gate holds **143 CPU reference files printing
-1142 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+At the time of writing the gate holds **144 CPU reference files printing
+1146 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **143 reference files, 1142 landmark lines, 8 GPU probes** (live gate
+- **144 reference files, 1146 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -865,7 +865,20 @@ The practice the corpus demonstrates, stated so it can be reused:
    through the cloud shadow's tau map to the last bit as a field
    present before the first frame (`tsl-goesfield-probe.html`: west
    half tau 5.99, east 0, max diff 0, zero device errors; the unfixed
-   module reads 0 with two errors) (`goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
+   module reads 0 with two errors). Pass 155 makes the NOAA products
+   independent of the daemon: the decode block became the pure
+   `goesl2-decode.js` shared by the daemon and the page, and
+   `goesl2-client.js` reads the CORS-open buckets from the browser by
+   HTTP range with the browser's own DecompressionStream, answering
+   the daemon's body with the source named — the fallback (about 6 MB
+   a refresh) when the daemon is unreachable, as it was from 22:02Z;
+   the pass also found the hourly SST file landing 63 minutes after
+   its hour (the lookback now spans three) and the harness's request
+   bridge dropping the page's Range header (repaired; the client is
+   hardened for a range-ignoring path regardless)
+   (`goesl2-client-reference`: the browser's inflate, the range
+   reader, the client over a fake S3 of the vendored fixtures, the
+   range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
    imagery and DCOMP windows, DSR pins; `hdf5-reference` THE WINDOW
    READ, THE RANGE READ;
    `server-reference` THE WINDOW READ IN PLACE; `goesl2-reference`

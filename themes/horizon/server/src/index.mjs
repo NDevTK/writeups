@@ -938,574 +938,90 @@ export function parseSst(j) {
   };
 }
 
-// ---- NOAA's operational cloud products: ACMC + ACHAC (148th) -----
-// The clear-sky mask (ABI-L2-ACMC: BCM, ACM, Cloud_Probabilities,
-// DQF on the 2-km CONUS grid, every 5 min) and the cloud top height
-// (ABI-L2-ACHAC: HT on the 10-km grid) from the NOAA Open Data
-// buckets (noaa-goes18 for GOES-West, noaa-goes19 for GOES-East;
-// anonymous S3 - and CORS-open with Range, measured in the 151st
-// pass: the page could read them itself). The 151st pass reads
-// each file by HTTP RANGE (hdf5.js openHdf5Lazy): the first quarter
-// megabyte carries the object headers and coordinate vectors, then
-// only the chunks a window touches - NOAA chunks these files in
-// full-width row strips (52 rows on the 2-km CONUS grid, 24 on the
-// full disk), so a 101 x 101 window is two or three strips. Measured
-// on the files themselves: the 4 MB mask in 4 rounds and 0.9 MB, the
-// 3.8 MB band-13 imagery in 3 rounds and 0.76 MB, the 32 MB
-// full-disk SST in 6 rounds and 1.1 MB - every window pixel equal to
-// the whole-file decode's (hdf5-reference.mjs). Windows are held
-// per satellite, product, file and tenth-degree cell (tens of kB
-// each; the whole-file decodes of the 148th-150th passes, 15 MB
-// apiece, their worker thread and memory guard are retired). The
-// page compares its own field with NOAA's at the same pixels
-// (goesl2.js maskAgreement); the decks keep the theme's field -
-// stated in goesl2.js. The pure pieces are exported for
-// server-reference.mjs.
-export const L2_HALF_PX = {mask: 50, height: 10, sst: 50, dsr: 50}; // +-100 km on 2-km / 10-km grids
-export const L2_LIST_MS = 60e3; // a bucket listing stands a minute (the cheap part)
-export const L2_RETRY_MS = 2 * 60e3; // after a listing or fetch failure
-export const L2_WINDOW_MS = 15 * 60e3; // windows outlive their file by design: a new file keys new windows
-export const L2_HELD_WINDOWS = 12; // decoded windows held per satellite and product (the newest and the mosaics' stamps, the cells asked)
-export const L2_AT_MAX_AGE_MS = 7 * 86400e3; // how far back ?t= may ask
-export const L2_RANGE_BLOCK = 65536; // range reads are whole 64 kB blocks (a B-tree node and its neighbours in one)
-export const L2_HEAD_BYTES = 262144; // the first read: NetCDF-4's headers and coordinate vectors live up front
-export const L2_LIST_KEYS = 1000; // an hour of CMIPC lists 16 bands x 12 files
-export function l2ListUrl(bucket, prefix) {
-  return (
-    `https://${bucket}.s3.amazonaws.com/?list-type=2&prefix=` +
-    `${encodeURIComponent(prefix)}&max-keys=${L2_LIST_KEYS}`
-  );
-}
-export function l2FileUrl(bucket, key) {
-  return `https://${bucket}.s3.amazonaws.com/${key}`;
-}
-// The prefixes to list for the latest file: this UTC hour, then the
-// hour before when this hour has no file yet (the first file of an
-// hour lands ~4 min after its start - measured).
-export function l2Prefixes(product, now = new Date()) {
-  return [
-    bucketPrefix(product, now),
-    bucketPrefix(product, new Date(now.getTime() - 3600e3))
-  ];
-}
-// The window's cell: a tenth of a degree, so a window is at most
-// ~8 km off the observer (the file, not the window, is the cost).
-export function l2Cell(lat, lon) {
-  return {lat: Math.round(lat * 10) / 10, lon: Math.round(lon * 10) / 10};
-}
-// What each product's decode keeps: raw bytes for the flags, the
-// physical field (scale/offset, fill -> NaN) for the heights, and
-// the cloud probability as a percent byte (the file's uint16 at
-// 1.5e-5 per count, valid_range [0, 1]).
-export const L2_MASK_SPEC = {
-  BCM: 'raw',
-  ACM: 'raw',
-  DQF: 'raw',
-  Cloud_Probabilities: 'pct'
-};
-export const L2_HEIGHT_SPEC = {HT: 'phys', DQF: 'raw'};
-// The 149th pass: the imagery's brightness temperature (CMI, int16
-// counts with the file's scale and offset - kept raw with its
-// scaling so the wire carries 2 bytes a pixel) and DCOMP's optical
-// depth and particle size (uint16 counts, the same 0.00244163 per
-// count) with their shared flag word.
-export const L2_IMAGERY_SPEC = {CMI: 'raw16', DQF: 'raw'};
-export const L2_COD_SPEC = {COD: 'raw16', DQF: 'raw16'};
-// the CPS file's DQF equals the COD file's pixel for pixel (measured,
-// 149th), so only the radii are held - 7.5 MB a file kept out of a
-// 512 MB service (horizon-live.service MemoryMax)
-export const L2_CPS_SPEC = {CPS: 'raw16'};
-// The 151st pass: the sea surface (skin) temperature's counts (uint16
-// at 0.00244163 K from 180 K, fill 65535) with its flags (0 good, 1
-// degraded, 2 severely degraded, 3 unprocessed - the file's own
-// flag_meanings, goesl2.SST_DQF_MEANINGS)
-export const L2_SST_SPEC = {SST: 'raw16', DQF: 'raw'};
-// The 152nd pass: the downward shortwave radiation at the surface
-// (uint16 at 0.02289 W/m2 a count, fill 65535; DQF 0 good, 1
-// degraded or invalid - the file's own flag_meanings,
-// goesl2.DSR_DQF_MEANINGS); full disk, every 10 minutes, so a
-// mosaic's minute always has a file within 15 min
-export const L2_DSR_SPEC = {DSR: 'raw16', DQF: 'raw'};
-// The 153rd pass: the derived motion winds (ABI-L2-DMWC, band 14) -
-// a point list, so the "window" is a radius: the vectors within 150
-// km of the point (the ATBD's ~38 km spacing gives a few dozen in
-// cloud), read whole: the head asks for a megabyte and the bucket
-// answers with the 0.3 MB file in one round (kind 'vectors')
-export const L2_DMW_RADIUS_KM = 150;
-export const L2_DMW_HEAD_BYTES = 1048576;
-// what /goesl2 fetches for a point: product, spec, the window's half
-// width on the product's grid, the imagery's band (the CMIPC prefix
-// lists every band's file); timed false = not asked for a mosaic's
-// minute (the hourly full-disk SST has no file within 15 min of it;
-// the winds are the decks' drift now, not a mosaic's comparison)
-export const L2_ASKS = [
-  {id: 'mask', product: L2_PRODUCTS.mask, spec: L2_MASK_SPEC, halfPx: 50},
-  {id: 'height', product: L2_PRODUCTS.height, spec: L2_HEIGHT_SPEC, halfPx: 10},
-  {
-    id: 'imagery',
-    product: L2_PRODUCTS.imagery,
-    spec: L2_IMAGERY_SPEC,
-    band: IMAGERY_BAND,
-    halfPx: 50
-  },
-  {id: 'cod', product: L2_PRODUCTS.cod, spec: L2_COD_SPEC, halfPx: 50},
-  {id: 'cps', product: L2_PRODUCTS.cps, spec: L2_CPS_SPEC, halfPx: 50},
-  {
-    id: 'sst',
-    product: L2_PRODUCTS.sst,
-    spec: L2_SST_SPEC,
-    halfPx: 50,
-    timed: false
-  },
-  {id: 'dsr', product: L2_PRODUCTS.dsr, spec: L2_DSR_SPEC, halfPx: 50},
-  {
-    id: 'dmw',
-    product: L2_PRODUCTS.dmw,
-    band: DMW_BAND,
-    kind: 'vectors',
-    radiusKm: L2_DMW_RADIUS_KM,
-    headBytes: L2_DMW_HEAD_BYTES,
-    timed: false
-  }
-];
-const l2Scalar = (a) => (Array.isArray(a) ? a[0] : a);
+// ---- NOAA's operational cloud products (148th-153rd) ------------
+// The listing and file URLs, the asks, the window and vector decodes
+// and the bodies live in goesl2-decode.js since the 155th pass -
+// pure, so the PAGE runs the same code against the CORS-open buckets
+// when this daemon is unreachable (goesl2-client.js). Re-exported
+// here for server-reference.mjs; node's inflate is this side's only
+// addition (the whole-bytes decodeL2 takes it by default).
+import * as L2 from '../../goesl2-decode.js';
+export {
+  L2_HALF_PX,
+  L2_LIST_MS,
+  L2_RETRY_MS,
+  L2_WINDOW_MS,
+  L2_HELD_WINDOWS,
+  L2_AT_MAX_AGE_MS,
+  L2_RANGE_BLOCK,
+  L2_HEAD_BYTES,
+  L2_LIST_KEYS,
+  l2ListUrl,
+  l2FileUrl,
+  l2Prefixes,
+  l2Cell,
+  L2_MASK_SPEC,
+  L2_HEIGHT_SPEC,
+  L2_IMAGERY_SPEC,
+  L2_COD_SPEC,
+  L2_CPS_SPEC,
+  L2_SST_SPEC,
+  L2_DSR_SPEC,
+  L2_DMW_RADIUS_KM,
+  L2_DMW_HEAD_BYTES,
+  L2_ASKS,
+  decodeL2Window,
+  decodeL2Vectors,
+  l2Window,
+  l2MaskBody,
+  l2HeightBody,
+  l2ImageryBody,
+  l2SstBody,
+  l2DmwBody,
+  l2DsrBody,
+  l2DcompBody
+} from '../../goesl2-decode.js';
+const {
+  L2_HALF_PX,
+  L2_LIST_MS,
+  L2_RETRY_MS,
+  L2_WINDOW_MS,
+  L2_HELD_WINDOWS,
+  L2_AT_MAX_AGE_MS,
+  L2_RANGE_BLOCK,
+  L2_HEAD_BYTES,
+  L2_LIST_KEYS,
+  l2ListUrl,
+  l2FileUrl,
+  l2Prefixes,
+  l2Cell,
+  L2_MASK_SPEC,
+  L2_HEIGHT_SPEC,
+  L2_IMAGERY_SPEC,
+  L2_COD_SPEC,
+  L2_CPS_SPEC,
+  L2_SST_SPEC,
+  L2_DSR_SPEC,
+  L2_DMW_RADIUS_KM,
+  L2_DMW_HEAD_BYTES,
+  L2_ASKS,
+  decodeL2Window,
+  decodeL2Vectors,
+  l2Window,
+  l2MaskBody,
+  l2HeightBody,
+  l2ImageryBody,
+  l2SstBody,
+  l2DmwBody,
+  l2DsrBody,
+  l2DcompBody
+} = L2;
 const l2Inflate = (u8) =>
   new Uint8Array(
     inflateSync(Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength))
   );
-// The product's frame from its datasets: the projection's
-// attributes, the coordinate vectors' scaling and length, the time;
-// null when any is missing or unread.
-function l2Frame(projD, xd, yd, td) {
-  if (!projD || !xd || !yd || !td) return null;
-  if (!xd.values || xd.values.unread || !yd.values || yd.values.unread)
-    return null;
-  if (!td.values || td.values.unread) return null;
-  const p = projD.attrs;
-  const proj = {
-    semi_major_axis: l2Scalar(p.semi_major_axis),
-    semi_minor_axis: l2Scalar(p.semi_minor_axis),
-    perspective_point_height: l2Scalar(p.perspective_point_height),
-    longitude_of_projection_origin: l2Scalar(p.longitude_of_projection_origin)
-  };
-  if (!Object.values(proj).every(Number.isFinite)) return null;
-  const coord = (d) => ({
-    scale: l2Scalar(d.attrs.scale_factor),
-    offset: l2Scalar(d.attrs.add_offset),
-    n: d.values.length
-  });
-  const x = coord(xd);
-  const y = coord(yd);
-  if (![x.scale, x.offset, y.scale, y.offset].every(Number.isFinite))
-    return null;
-  return {proj, x, y, time: productTimeIso(td.values[0])};
-}
-// One dataset in its spec mode - {value, meta} or null when unread
-// or not the expected size: raw bytes, the physical field, the
-// counts as stored with the file's own scaling beside them (a
-// signed int16 fill of -1 becomes 65535 on the wire), or a percent
-// byte.
-function l2Convert(d, mode, n) {
-  if (!d || !d.values || d.values.unread) return null;
-  if (d.values.length !== n) return null;
-  if (mode === 'raw') return {value: d.values, meta: null};
-  if (mode === 'phys') return {value: physicalValues(d), meta: null};
-  if (mode === 'raw16')
-    return {
-      value: d.values,
-      meta: {
-        scale: l2Scalar(d.attrs.scale_factor) ?? 1,
-        offset: l2Scalar(d.attrs.add_offset) ?? 0,
-        fill: l2Scalar(d.attrs._FillValue) ?? 65535,
-        units: d.attrs.units ?? null
-      }
-    };
-  const ph = physicalValues(d);
-  const pct = new Uint8Array(ph.length);
-  for (let q = 0; q < ph.length; q++)
-    pct[q] = Number.isFinite(ph[q]) ? Math.round(100 * ph[q]) : 255;
-  return {value: pct, meta: null};
-}
-const l2Tail = (root, lza) => ({
-  platform: root.platform_ID ?? null,
-  scene: root.scene_id ?? null,
-  start: root.time_coverage_start ?? null,
-  end: root.time_coverage_end ?? null,
-  lzaMaxDeg:
-    lza && lza.values && !lza.values.unread ? Number(lza.values[1]) : null
-});
-// The whole grid from whole bytes (the gate's path, and any caller
-// holding a file). null = not a product file the daemon can read
-// (the route answers 502 and the journal names the dataset).
 export function decodeL2(bytes, spec, inflate = l2Inflate) {
-  const f = openHdf5(bytes, inflate);
-  const frame = l2Frame(
-    f.dataset('goes_imager_projection'),
-    f.dataset('x'),
-    f.dataset('y'),
-    f.dataset('t')
-  );
-  if (!frame) return null;
-  const data = {};
-  const meta = {};
-  for (const [name, mode] of Object.entries(spec)) {
-    const c = l2Convert(f.dataset(name), mode, frame.x.n * frame.y.n);
-    if (!c) return null;
-    data[name] = c.value;
-    if (c.meta) meta[name] = c.meta;
-  }
-  const lza =
-    f.dataset('quantitative_local_zenith_angle_bounds') ??
-    f.dataset('local_zenith_angle_bounds');
-  return {...frame, ...l2Tail(f.rootAttrs(), lza), data, meta};
-}
-// The window decode (151st pass) over a range-read handle
-// (hdf5.js openHdf5Lazy) - or a whole-buffer one, every call
-// awaited either way: the frame first (the projection, the
-// coordinate vectors, the time: the file's first quarter megabyte),
-// the window's box from the point, then ONLY that window of each
-// dataset. null = not a product file; box null = the point is
-// outside the scene (nothing more was read).
-export async function decodeL2Window(f, spec, lat, lon, halfPx) {
-  const frame = l2Frame(
-    await f.dataset('goes_imager_projection'),
-    await f.dataset('x'),
-    await f.dataset('y'),
-    await f.dataset('t')
-  );
-  if (!frame) return null;
-  const lza =
-    (await f.dataset('quantitative_local_zenith_angle_bounds')) ??
-    (await f.dataset('local_zenith_angle_bounds'));
-  const head = {...frame, ...l2Tail(await f.rootAttrs(), lza)};
-  const g = fixedGridGeometry(frame.proj);
-  const box = windowBox(
-    lat,
-    lon,
-    g,
-    frame.x,
-    frame.y,
-    frame.x.n,
-    frame.y.n,
-    halfPx
-  );
-  if (!box) return {...head, box: null, pixel: null, data: null, meta: null};
-  const window = [
-    [box.j0, box.j0 + box.rows],
-    [box.i0, box.i0 + box.cols]
-  ];
-  const data = {};
-  const meta = {};
-  for (const [name, mode] of Object.entries(spec)) {
-    const c = l2Convert(
-      await f.dataset(name, {window}),
-      mode,
-      box.rows * box.cols
-    );
-    if (!c) return null;
-    data[name] = c.value;
-    if (c.meta) meta[name] = c.meta;
-  }
-  return {
-    ...head,
-    box,
-    pixel: pixelSizeM(box, g, frame.x, frame.y),
-    data,
-    meta
-  };
-}
-// The vectors decode (153rd pass): the DMW file is a point list -
-// one row per wind vector (its lat/lon, speed, from-direction, the
-// tracked cluster's median cloud-top pressure, the tracer's
-// brightness temperature, the flag, the zenith angles, the
-// triplet's mid-point time) with the scene's own layer statistics
-// beside it - read whole through the same range handle (or a
-// whole-buffer one). Keeps the vectors within radiusKm of the
-// point, nearest first (goesl2.dmwWithin, gated), and the scene's
-// counts by layer. null = not a DMW file.
-const l2Values = async (f, name) => {
-  const d = await f.dataset(name);
-  return d && d.values && !d.values.unread ? d.values : null;
-};
-export async function decodeL2Vectors(f, lat, lon, radiusKm) {
-  const names = {
-    lat: 'lat',
-    lon: 'lon',
-    spdMs: 'wind_speed',
-    dirDeg: 'wind_direction',
-    hPa: 'pressure',
-    tK: 'temperature',
-    dqf: 'DQF',
-    lzaDeg: 'local_zenith_angle',
-    szaDeg: 'solar_zenith_angle'
-  };
-  const cols = {};
-  for (const [k, name] of Object.entries(names)) {
-    const v = await l2Values(f, name);
-    if (!v) return null;
-    cols[k] = v;
-  }
-  const t = await l2Values(f, 'time');
-  if (!t || !t.length) return null;
-  const root = await f.rootAttrs();
-  const lza = await f.dataset('retrieval_local_zenith_angle_bounds');
-  const band = await l2Values(f, 'band_id');
-  const gap = await l2Values(f, 'seconds_between_images');
-  const layerP = await l2Values(f, 'atmospheric_layer_pressure');
-  const layerN = await l2Values(
-    f,
-    'number_of_wind_vectors_in_atmospheric_layer'
-  );
-  const layerCtp = await l2Values(
-    f,
-    'mean_cloud_top_pressure_in_atmospheric_layer'
-  );
-  const scalar = async (name) => {
-    const v = await l2Values(f, name);
-    return v && v.length ? Number(v[0]) : null;
-  };
-  const sceneStats = {
-    meanMs: await scalar('mean_wind_speed'),
-    sdMs: await scalar('standard_deviation_wind_speed'),
-    minMs: await scalar('minimum_wind_speed'),
-    maxMs: await scalar('maximum_wind_speed'),
-    outliers: await scalar('wind_speed_outlier_count'),
-    layers: layerP
-      ? Array.from(layerP).map((p, i) => ({
-          hPa: Number(p),
-          n: layerN ? Number(layerN[i]) : null,
-          meanCtpHpa: layerCtp ? Number(layerCtp[i]) : null
-        }))
-      : null
-  };
-  return {
-    time: productTimeIso(Number(t[0])),
-    ...l2Tail(root, lza),
-    band: band && band.length ? 'C' + String(band[0]).padStart(2, '0') : null,
-    imageGapS: gap && gap.length ? Number(gap[0]) : null,
-    total: cols.lat.length,
-    radiusKm,
-    vectors: dmwWithin(cols, lat, lon, radiusKm),
-    sceneStats
-  };
-}
-// The window around a point on a decoded product: the index box,
-// the pixel's ground size at the view's slant, and every kept
-// dataset cut to it; null when the point is outside the scene. A
-// window decode (decodeL2Window) is already cut - its own box and
-// arrays, as plain arrays for the bodies.
-export function l2Window(dec, lat, lon, halfPx) {
-  if (dec.box !== undefined) {
-    if (!dec.box || !dec.data) return null;
-    const cut = {};
-    for (const [n, arr] of Object.entries(dec.data)) cut[n] = Array.from(arr);
-    return {box: dec.box, pixel: dec.pixel, cut};
-  }
-  const g = fixedGridGeometry(dec.proj);
-  const box = windowBox(lat, lon, g, dec.x, dec.y, dec.x.n, dec.y.n, halfPx);
-  if (!box) return null;
-  const pixel = pixelSizeM(box, g, dec.x, dec.y);
-  const cut = {};
-  for (const [n, arr] of Object.entries(dec.data))
-    cut[n] = cutWindow(arr, dec.x.n, box);
-  return {box, pixel, cut};
-}
-const l2Common = (dec, product, key, w) => ({
-  product,
-  key,
-  time: dec.time,
-  start: dec.start,
-  end: dec.end,
-  platform: dec.platform,
-  scene: dec.scene,
-  lzaMaxDeg: dec.lzaMaxDeg,
-  proj: dec.proj,
-  x: {scale: dec.x.scale, offset: dec.x.offset, n: dec.x.n},
-  y: {scale: dec.y.scale, offset: dec.y.offset, n: dec.y.n},
-  box: w.box,
-  pixel: w.pixel
-    ? {ewM: Math.round(w.pixel.ewM), nsM: Math.round(w.pixel.nsM)}
-    : null
-});
-const l2Has = (dec, spec) =>
-  !!dec.data && Object.keys(spec).every((n) => dec.data[n]);
-export function l2MaskBody(dec, key, lat, lon) {
-  if (!l2Has(dec, L2_MASK_SPEC)) return null;
-  const w = l2Window(dec, lat, lon, L2_HALF_PX.mask);
-  if (!w) return null;
-  return {
-    ...l2Common(dec, L2_PRODUCTS.mask, key, w),
-    bcm: packArray(w.cut.BCM, 'u8'),
-    acm: packArray(w.cut.ACM, 'u8'),
-    dqf: packArray(w.cut.DQF, 'u8'),
-    prob: packArray(w.cut.Cloud_Probabilities, 'u8'),
-    census: maskCensus(w.cut.BCM, w.cut.ACM, w.cut.DQF)
-  };
-}
-export function l2HeightBody(dec, key, lat, lon) {
-  if (!l2Has(dec, L2_HEIGHT_SPEC)) return null;
-  const w = l2Window(dec, lat, lon, L2_HALF_PX.height);
-  if (!w) return null;
-  return {
-    ...l2Common(dec, L2_PRODUCTS.height, key, w),
-    ht: packArray(w.cut.HT, 'f32'),
-    dqf: packArray(w.cut.DQF, 'u8'),
-    census: heightCensus(w.cut.HT, w.cut.DQF)
-  };
-}
-// raw counts on the wire: a signed fill (-1) becomes 65535, the
-// page unscales with the scaling beside it
-const l2Counts = (cut, fill) =>
-  packArray(
-    cut.map((v) => (v === fill || v == null || v < 0 ? 65535 : v)),
-    'u16'
-  );
-// The imagery window (149th pass): band 13's brightness temperature
-// as NOAA computed it from the radiance (the CMIP ATBD's modified
-// Planck function, the file's own planck_fk1/fk2/bc1/bc2), 12-bit
-// counts at 0.0615 K, DQF 0 good.
-export function l2ImageryBody(dec, key, lat, lon) {
-  if (!l2Has(dec, L2_IMAGERY_SPEC)) return null;
-  const w = l2Window(dec, lat, lon, L2_HALF_PX.mask);
-  if (!w) return null;
-  const m = dec.meta.CMI ?? {scale: 1, offset: 0, fill: -1};
-  const btK = unscale(w.cut.CMI, m);
-  return {
-    ...l2Common(dec, L2_PRODUCTS.imagery, key, w),
-    band: IMAGERY_BAND,
-    bt: l2Counts(w.cut.CMI, m.fill),
-    btScale: m.scale,
-    btOffset: m.offset,
-    btFill: 65535,
-    dqf: packArray(w.cut.DQF, 'u8'),
-    census: goodCensus(btK, w.cut.DQF)
-  };
-}
-// The sea surface temperature window (151st pass): ABI's own skin
-// SST (ABI-L2-SSTF: full disk, hourly, 2 km) as counts with the
-// file's scaling, its flags, and the census over good pixels (DQF
-// 0) with the degraded count (DQF 1) beside it. The page sets it
-// beside the day-old MUR analysis at the same pixels - a fresher
-// measurement, stated on the line.
-export function l2SstBody(dec, key, lat, lon) {
-  if (!l2Has(dec, L2_SST_SPEC)) return null;
-  const w = l2Window(dec, lat, lon, L2_HALF_PX.sst);
-  if (!w) return null;
-  const m = dec.meta.SST ?? {scale: 1, offset: 0, fill: 65535};
-  const sstK = unscale(w.cut.SST, m);
-  let degraded = 0;
-  for (const q of w.cut.DQF) if (q === 1) degraded++;
-  return {
-    ...l2Common(dec, L2_PRODUCTS.sst, key, w),
-    sst: l2Counts(w.cut.SST, m.fill),
-    sstScale: m.scale,
-    sstOffset: m.offset,
-    sstFill: 65535,
-    dqf: packArray(w.cut.DQF, 'u8'),
-    census: {...goodCensus(sstK, w.cut.DQF), degraded}
-  };
-}
-// The derived motion winds' body (153rd pass): the vectors within
-// the radius as rounded columns (goesl2.dmwColumns), the layers'
-// winds the page will recompute from them (goesl2.dmwLayers - the
-// vector mean of the good vectors within the tightest radius
-// holding three, by ATBD layer), the scene's own statistics, the
-// triplet's spacing and the good-wind zenith bound.
-export function l2DmwBody(dec, key) {
-  if (!dec || !dec.vectors) return null;
-  return {
-    product: L2_PRODUCTS.dmw,
-    key,
-    time: dec.time,
-    start: dec.start,
-    end: dec.end,
-    platform: dec.platform,
-    scene: dec.scene,
-    lzaMaxDeg: dec.lzaMaxDeg,
-    band: dec.band,
-    imageGapS: dec.imageGapS,
-    radiusKm: dec.radiusKm,
-    total: dec.total,
-    n: dec.vectors.length,
-    vectors: dmwColumns(dec.vectors),
-    layers: dmwLayers(dec.vectors),
-    sceneStats: dec.sceneStats
-  };
-}
-// The surface irradiance window (152nd pass): NOAA's downward
-// shortwave radiation at the surface (ABI-L2-DSRF: 0.2-4.0 um,
-// direct + diffuse, W/m2, the Enterprise SRB algorithm) as counts
-// with the file's scaling, its flags, the census over good pixels
-// (DQF 0; W/m2), and the point's own pixel with the mean of the
-// good pixels within 5 pixels of it - the ATBD's remedy for a
-// pixel read against a point on the ground.
-export function l2DsrBody(dec, key, lat, lon) {
-  if (!l2Has(dec, L2_DSR_SPEC)) return null;
-  const w = l2Window(dec, lat, lon, L2_HALF_PX.dsr);
-  if (!w) return null;
-  const m = dec.meta.DSR ?? {scale: 1, offset: 0, fill: 65535};
-  const wm2 = unscale(w.cut.DSR, m);
-  const ci = w.box.i - w.box.i0;
-  const cj = w.box.j - w.box.j0;
-  const qc = cj * w.box.cols + ci;
-  const here =
-    Number.isFinite(wm2[qc]) && w.cut.DQF[qc] === 0
-      ? +wm2[qc].toFixed(1)
-      : null;
-  const near = boxMean(wm2, w.cut.DQF, w.box, 5);
-  return {
-    ...l2Common(dec, L2_PRODUCTS.dsr, key, w),
-    dsr: l2Counts(w.cut.DSR, m.fill),
-    dsrScale: m.scale,
-    dsrOffset: m.offset,
-    dsrFill: 65535,
-    units: 'W m-2',
-    dqf: packArray(w.cut.DQF, 'u8'),
-    here,
-    near: {
-      r: 5,
-      n: near.n,
-      mean: near.mean === null ? null : +near.mean.toFixed(1),
-      min: near.min === null ? null : +near.min.toFixed(1),
-      max: near.max === null ? null : +near.max.toFixed(1)
-    },
-    census: fieldCensus(wm2, w.cut.DQF)
-  };
-}
-// The DCOMP window (149th pass): the optical depth at 640 nm and
-// the effective radius (um) with the flag word the two files share
-// (the CPS file's DQF equals the COD file's pixel for pixel,
-// measured), censused by value and phase (goesl2.dcompCensus).
-export function l2DcompBody(decCod, decCps, keyCod, keyCps, lat, lon) {
-  if (!l2Has(decCod, L2_COD_SPEC)) return null;
-  const w = l2Window(decCod, lat, lon, L2_HALF_PX.mask);
-  if (!w) return null;
-  const mc = decCod.meta.COD ?? {scale: 1, offset: 0, fill: 65535};
-  let cpsCut = null;
-  let mp = null;
-  if (decCps && l2Has(decCps, L2_CPS_SPEC)) {
-    const wp = l2Window(decCps, lat, lon, L2_HALF_PX.mask);
-    if (wp && wp.box.i0 === w.box.i0 && wp.box.j0 === w.box.j0) {
-      cpsCut = wp.cut.CPS;
-      mp = decCps.meta.CPS ?? mc;
-    }
-  }
-  const cod = unscale(w.cut.COD, mc);
-  const cps = cpsCut
-    ? unscale(cpsCut, mp)
-    : new Float32Array(cod.length).fill(NaN);
-  return {
-    ...l2Common(decCod, L2_PRODUCTS.cod, keyCod, w),
-    cpsKey: cpsCut ? keyCps : null,
-    cpsTime: cpsCut && decCps ? decCps.time : null,
-    cod: l2Counts(w.cut.COD, mc.fill),
-    codScale: mc.scale,
-    cps: cpsCut ? l2Counts(cpsCut, mp.fill) : null,
-    cpsScale: mp ? mp.scale : null,
-    fill: 65535,
-    dqf: packArray(w.cut.DQF, 'u16'),
-    census: dcompCensus(cod, cps, w.cut.DQF)
-  };
+  return L2.decodeL2(bytes, spec, inflate);
 }
 
 // ---- Aircraft: readsb failover from a clean IP -----------------

@@ -89,9 +89,13 @@ await page.setViewportSize({width: 1280, height: 720});
 // honour the agent proxy, the same mechanism view-serve.mjs uses. A page
 // that fetches live data (the theme now calls the CORS-open feeds itself)
 // thus reaches the network "like the curl version". Localhost (the
-// fixture server) stays direct.
+// fixture server) stays direct. The page's Range header rides along
+// (155th pass: the bridge had answered every range ask with the whole
+// file at 200 - a window of the 40 MB full-disk irradiance took two
+// minutes - while a real browser sends Range and the buckets answer
+// 206); the status comes back as curl saw it.
 let curlN = 0;
-const curlFetch = (method, u, body) =>
+const curlFetch = (method, u, body, headers = {}) =>
   new Promise((resolve) => {
     const tmp = `/tmp/shoot-curl-${process.pid}-${curlN++}.body`;
     const args = [
@@ -106,6 +110,7 @@ const curlFetch = (method, u, body) =>
       '%{http_code}\t%{content_type}',
       u
     ];
+    for (const [k, v] of Object.entries(headers)) args.push('-H', `${k}: ${v}`);
     if (body && body.length) args.push('--data-binary', '@-');
     const p = spawn('curl', args);
     let out = '';
@@ -133,10 +138,12 @@ await page.route(
   async (route) => {
     const req = route.request();
     try {
+      const h = req.headers();
       const {buf, status, type} = await curlFetch(
         req.method(),
         req.url(),
-        req.postDataBuffer()
+        req.postDataBuffer(),
+        h.range ? {Range: h.range} : {}
       );
       await route.fulfill({status, contentType: type, body: buf});
     } catch {
