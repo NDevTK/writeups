@@ -9,8 +9,8 @@ from the code. Run the whole corpus with:
 cd themes/horizon/harness && bash validate.sh
 ```
 
-At the time of writing the gate holds **133 CPU reference files printing
-993 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
+At the time of writing the gate holds **140 CPU reference files printing
+1109 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -468,12 +468,31 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
   (`warmlayer-reference` COMPOSITION; `surfacelayer-reference`
   landmark 8; `server-reference` warm-up; `observatory-reference`
   DAY PINS marine: sensor depth)
+- **The satellite's warmest sea meets the pier's chain** (pass 143):
+  the cloud field is now measured from GOES-West Band 13 through NASA
+  GIBS's colour-mapped tiles, read back to brightness temperature
+  (the published colormap vendored verbatim; the two grey ramps that
+  share levels resolved per connected region by the colour border
+  that encloses it), and tested for cloud by the GOES-R cloud mask's
+  own ETROP (0.10 over the ocean) against a clear-sky reference the
+  theme builds without a tile: the pier's COARE skin seen at the
+  satellite's slant through the sea column with the MT_CKD continuum
+  as LBLRTM ships it, off a sea whose emissivity is Fresnel on Hale &
+  Querry's index. On the frozen morning the 95th-percentile sea pixel
+  within 100 km reads 19.15 °C against the chain's 19.66 °C — −0.51 K
+  under a 74% clear sea, inside the test's own 5.5-K margin — and the
+  pre-dawn field (26% of the sea under low cloud with 855-m opaque
+  tops on ACHA's inversion rule, 19% within 30 km) sits under KSAN's
+  CLR. The decks now carve their cover from the measured texels
+  where the sea was measured and keep the ceilometer's and the
+  model's cover where it was not. (`goesir-reference`: THE WARM
+  PIXELS, THE CEILOMETER; DAY PINS)
 
 ---
 
 ## 4. The verified corpus
 
-- **133 reference files, 993 landmark lines, 7 GPU probes** (live gate
+- **140 reference files, 1109 landmark lines, 7 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -582,6 +601,27 @@ between it and the next tier.
   the pier's humidity is the nearest coastal
   METAR's dewpoint, the ascent's surface row standing in only when
   no shore screen is fresh.
+- **The measured cloud field is a lower bound** (pass 143): one
+  infrared window, colour-mapped and resampled by the server, read at
+  the band centre alone (no spectral response; line absorption, ozone
+  and CO₂ neglected in the clean window) against a clear sky built
+  from ONE sea-temperature point (the pier's skin, else the CO-OPS
+  sensor, else a buoy within 50 km — the offshore gradient shows up
+  as the warm-pixel closure and is reported, not corrected) off a
+  flat-Fresnel sea. Over the sea the test misses cloud filling under
+  about a third of a 2-km pixel and thin cirrus under the threshold
+  (so the field lifts the cirrus scalar and never clears it); over
+  land the reference is free air at the pixel's elevation for a skin
+  the theme does not measure, so the mask finds mid and high cloud
+  only and a land "clear" carves nothing away; no local radiative
+  centre, no snow or desert classes. Heights are ACHA's opaque
+  lookups with its inversion rule, whose known bias reads thin mid
+  cloud low — the theme's own split rule hands such pixels to the mid
+  deck on a fresh ceilometer's word (no low layer under a mid or high
+  one), a 60-km-old point report speaking for the whole window. The
+  sea column that references the field is the observatory day's, so
+  the fixture and the observatory refreeze together while GIBS still
+  serves the day.
 
 ## 6. Method — reference-first validation
 

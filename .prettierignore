@@ -1,3 +1,4 @@
 .github/workflows
 themes/horizon/shipflux-fixture.js
 themes/horizon/shipflux-cov-fixture.js
+themes/horizon/goesir-fixture.js

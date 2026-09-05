@@ -416,6 +416,15 @@
         tileAt,
         windowStats
       } from './horizon/radar.js';
+      import {
+        decodeMosaic,
+        gibsDomainsUrl,
+        gibsTileUrl,
+        goesPanel,
+        latestTimeFromDomains,
+        mercatorLatLon,
+        windowTiles
+      } from './horizon/goesir.js';
       import {geomagneticLatitude, igrfField} from './horizon/igrf.js';
       import {HorizonWaterMesh} from './horizon/water-tsl.js';
       import {createOceanFFT} from './horizon/ocean-tsl.js';
@@ -2221,6 +2230,253 @@
       // the model's point value. No coverage or offline: the model
       // stands silently.
       let radarObs = null; // {rain, snow, coverage, snowFrac, time}
+      // MEASURED cloud field (goesir.js, 143rd pass): GOES-West Band
+      // 13 (10.35 um) through NASA GIBS, read back to brightness
+      // temperature, tested for cloud against the pier's skin seen
+      // through the sea column at the satellite's slant (the ATBD's
+      // ETROP test on the theme's OWN clear-sky reference), lifted
+      // to opaque tops on the same column, and handed to the decks
+      // as a texel field (cloudSys.setGoesCover). Every 10 minutes,
+      // the layer's cadence; ?goes=0 disables; silent under pins.
+      // The field needs a measured sea temperature within reach:
+      // the COARE skin, else the CO-OPS sensor, else a buoy within
+      // 50 km - a buoy 150 km out does not speak for this window.
+      let goesObs = null;
+      let goesBusy = false;
+      let goesRerun = false; // a call that arrived mid-fetch runs after it
+      async function syncGoesIr() {
+        if (overridden || params.get('goes') === '0') return;
+        if (goesBusy) {
+          goesRerun = true;
+          return;
+        }
+        const skin = state.marine?.tInterfaceC;
+        const pier = state.coopsMet?.tsC;
+        const b = state.buoy;
+        const buoyOk = b && Number.isFinite(b.wtmp) && b.distKm <= 50;
+        const seaSource = Number.isFinite(skin)
+          ? 'COARE skin'
+          : Number.isFinite(pier)
+            ? 'CO-OPS ' + (state.coopsMet.name ?? 'sensor')
+            : buoyOk
+              ? 'NDBC ' + b.id
+              : null;
+        const tSkinC = Number.isFinite(skin)
+          ? skin
+          : Number.isFinite(pier)
+            ? pier
+            : buoyOk
+              ? b.wtmp
+              : null;
+        const rows = state.rowsSea ?? state.soundingData?.rows;
+        if (tSkinC === null || !Array.isArray(rows) || rows.length < 10) {
+          if (params.has('debug'))
+            console.warn(
+              'goes: waiting for ' +
+                (tSkinC === null ? 'a measured sea temperature' : 'the column')
+            );
+          return;
+        }
+        if (!farRingData || !farRingData.elevAt) {
+          if (params.has('debug'))
+            console.warn('goes: waiting for the far ring');
+          return;
+        }
+        goesBusy = true;
+        try {
+          const win = windowTiles(state.lat, state.lon);
+          // the layer's latest stamp from its time domain (the
+          // tile's own layer-time-actual header, though exposed to
+          // CORS, does not reach the page reliably - measured)
+          const now = Date.now();
+          const iso = (ms) => new Date(ms).toISOString().slice(0, 19) + 'Z';
+          const dom = await (
+            await fetch(
+              gibsDomainsUrl(iso(now - 86400e3), iso(now + 86400e3)),
+              {
+                credentials: 'omit'
+              }
+            )
+          ).text();
+          const latest = latestTimeFromDomains(dom);
+          if (!latest) throw new Error('no GIBS time domain');
+          // the domain runs a step or two ahead of the tile cache,
+          // and a fresh stamp's tiles arrive one by one (measured:
+          // a 17:00Z end with one of four tiles served at 17:19Z,
+          // the default tile serving 16:50Z) - step back ten
+          // minutes at a time until the WHOLE mosaic answers, at
+          // most an hour
+          const tileAt = async (t, tm) => {
+            const r = await fetch(gibsTileUrl(t.row, t.col, tm), {
+              credentials: 'omit'
+            });
+            return r.ok ? r : null;
+          };
+          let time = null;
+          let tiles = null;
+          for (let step = 0; step < 7 && !tiles; step++) {
+            const tm = iso(Date.parse(latest) - step * 600e3);
+            const got = await Promise.all(win.tiles.map((t) => tileAt(t, tm)));
+            if (!got.every((r) => r)) continue;
+            time = tm;
+            tiles = await Promise.all(
+              got.map(async (r, i) => {
+                const bmp = await createImageBitmap(await r.blob());
+                const cv = document.createElement('canvas');
+                cv.width = cv.height = 256;
+                const cx = cv.getContext('2d', {willReadFrequently: true});
+                cx.drawImage(bmp, 0, 0);
+                return {
+                  ...win.tiles[i],
+                  time,
+                  rgba: cx.getImageData(0, 0, 256, 256).data
+                };
+              })
+            );
+          }
+          if (!tiles)
+            throw new Error(
+              'GIBS: no complete mosaic within an hour of ' + latest
+            );
+          if (params.has('debug'))
+            console.warn('goes: ' + tiles.length + ' tiles at ' + time);
+          const dec = decodeMosaic(tiles, win.w, win.h);
+          // the elevation window from the far ring's own 200-km DEM
+          const i0 = Math.floor(win.px) - win.halfPx;
+          const j0 = Math.floor(win.py) - win.halfPx;
+          const ww = 2 * win.halfPx + 1;
+          const wh = ww;
+          const elevM = new Float32Array(ww * wh);
+          const mLat = 111320;
+          const mLon = Math.max(111320 * Math.cos(state.lat * RAD), 1e-6);
+          for (let j = 0; j < wh; j++)
+            for (let i = 0; i < ww; i++) {
+              const g = mercatorLatLon(
+                win.x0 + i0 + i + 0.5,
+                win.y0 + j0 + j + 0.5
+              );
+              elevM[j * ww + i] = farRingData.elevAt(
+                ((g.lonDeg - state.lon) * mLon) / MPU,
+                (-(g.latDeg - state.lat) * mLat) / MPU
+              );
+            }
+          const metar =
+            state.metar && Date.now() - state.metar.at < 90 * 60e3
+              ? {
+                  low: state.metar.low,
+                  mid: state.metar.mid ?? 0,
+                  high: state.metar.high ?? 0
+                }
+              : null;
+          const P = goesPanel({
+            dec,
+            win,
+            elevM,
+            i0,
+            j0,
+            ww,
+            wh,
+            tSkinC,
+            rows,
+            latDeg: state.lat,
+            lonDeg: state.lon,
+            metar
+          });
+          if (!P) return;
+          const s = P.r100;
+          const pct = (n, d) => (d ? Math.round((100 * n) / d) : 0);
+          const worldUnits = (P.deck.rm * win.mppM) / MPU;
+          let deckOn = false;
+          for (let k = 0; k < P.deck.data.length; k += 4)
+            if (P.deck.data[k] > 0 || P.deck.data[k + 1] > 0) {
+              deckOn = true;
+              break;
+            }
+          const CLASS = [
+            'no data',
+            'unmeasured',
+            'clear',
+            'low',
+            'mid',
+            'high'
+          ];
+          const sign = (v) => (v >= 0 ? '+' : '') + v.toFixed(2);
+          const km = (m) => (m / 1000).toFixed(1) + ' km';
+          const lowToMid = P.deck.lowToMid;
+          goesObs = {
+            at: Date.now(),
+            time,
+            seaSource,
+            deck: P.deck,
+            worldUnits,
+            deckOn,
+            highPct: s.measured ? (100 * s.high) / s.measured : 0,
+            lowPct: lowToMid
+              ? 0
+              : s.waterMeasured
+                ? (100 * s.waterLow) / s.waterMeasured
+                : 0,
+            lowTopM: lowToMid ? null : P.deck.lowTopM,
+            midDeckPct:
+              P.deck.midDeckFrac === null ? 0 : 100 * P.deck.midDeckFrac,
+            midTopM: P.deck.midTopM,
+            line:
+              `${time.slice(11, 16)}Z · sea within 100 km (${s.waterMeasured} px): ` +
+              `${pct(s.waterClear, s.waterMeasured)}% clear, ` +
+              `${pct(s.waterLow, s.waterMeasured)}% low` +
+              (s.topMedianM.low !== null
+                ? ` (opaque tops ~${km(s.topMedianM.low)}${P.inversion ? ' on the inversion rule' : ''})`
+                : '') +
+              `, ${pct(s.waterMid, s.waterMeasured)}% mid, ` +
+              `${pct(s.waterHigh, s.waterMeasured)}% high; land (${s.land} px): ` +
+              `${pct(s.mid - s.waterMid, s.land)}% mid, ` +
+              `${pct(s.high - s.waterHigh, s.land)}% high found` +
+              (lowToMid
+                ? ` · the ceilometer reports no low layer under a mid or high one → ` +
+                  `the satellite's low pixels are handed to the mid deck` +
+                  (P.deck.midTopM !== null
+                    ? ` (the profile lookup puts those tops at ~${km(P.deck.midTopM)})`
+                    : '')
+                : '') +
+              ` · clear-sky reference ` +
+              `${P.reference.tClrC.toFixed(2)} °C = ${seaSource} ${tSkinC.toFixed(2)} − ` +
+              `${P.reference.depressionK.toFixed(2)} K (sea emissivity ` +
+              `${P.reference.emissivity.toFixed(4)} at ${P.viewZenithDeg.toFixed(1)}° view, ` +
+              `window τ ${P.reference.tauNadir.toFixed(3)} over ` +
+              `${P.reference.pwMm.toFixed(1)} mm; MT_CKD) · warmest sea pixel ` +
+              (s.warmP95C !== null
+                ? `${s.warmP95C.toFixed(2)} °C (${sign(P.warmClosureK)} K)`
+                : 'none') +
+              ` · cloud where ε_trop ≥ 0.10 ⇔ BT ≤ ${P.thresholdBtC.toFixed(1)} °C ` +
+              `(tropopause ${P.tropopause.tC} °C at ${P.tropopause.hM} m) · ` +
+              `overhead ${P.observer.btC.toFixed(1)} °C (` +
+              (P.observer.water
+                ? `sea pixel, ${CLASS[P.observer.cls]}`
+                : P.observer.cls === 2
+                  ? 'land pixel: no mid or high cloud found; the low deck is the ceilometer’s'
+                  : `land pixel, ${CLASS[P.observer.cls]}`) +
+              ')'
+          };
+          if (cloudSys)
+            cloudSys.setGoesCover(P.deck.data, P.deck.rm, worldUnits);
+          record(
+            'GOES-West band 13 (GIBS ' + time.slice(11, 16) + 'Z)',
+            `sea within 100 km ${pct(s.waterLow + s.waterMid + s.waterHigh, s.waterMeasured)}% cloud ` +
+              `(${pct(s.waterLow, s.waterMeasured)} low · ${pct(s.waterMid, s.waterMeasured)} mid · ` +
+              `${pct(s.waterHigh, s.waterMeasured)} high) · clear-sky ref ` +
+              `${P.reference.tClrC.toFixed(1)} °C · warm closure ${sign(P.warmClosureK ?? 0)} K`
+          );
+        } catch (e) {
+          // the model's cover stands
+          if (params.has('debug')) console.warn('goes: ' + e.message);
+        } finally {
+          goesBusy = false;
+          if (goesRerun) {
+            goesRerun = false;
+            syncGoesIr();
+          }
+        }
+      }
       async function syncRadar() {
         if (overridden) return;
         try {
@@ -4867,6 +5123,8 @@
             id: s.id,
             km: s.km,
             low: e.low,
+            mid: e.mid,
+            high: e.high,
             baseM: e.baseM,
             visM: visibilityM(s.visib),
             wx: s.wx
@@ -5045,6 +5303,12 @@
                 state.marine = mp;
                 state.rowsSea = mp.rows;
                 colRows = mp.rows;
+                // the satellite field's first run waits for this
+                // column (its clear-sky reference is the skin here);
+                // a field referenced on a lesser sea temperature
+                // reruns once the skin exists
+                if (!goesObs || goesObs.seaSource !== 'COARE skin')
+                  syncGoesIr();
               }
             } catch (e) {
               if (params.has('debug'))
@@ -7794,6 +8058,9 @@
             // needs no resampling of tiles).
             elevAt: (x, z) => demElevOf(dem, x, z, world)
           };
+          // the satellite cloud field reads this DEM for its sea
+          // mask: its first run waits for the ring (syncGoesIr)
+          if (!goesObs) syncGoesIr();
           if (!farMesh) {
             farMesh = new THREE.Mesh(geo, makeFarMaterial());
             farMesh.frustumCulled = false;
@@ -10906,6 +11173,12 @@
                 ` (dewpoint: ${m.dewSource})`;
             } else
               delete research['marine surface layer (COARE 3.6 · CO-OPS pier)'];
+            // The measured cloud field (goesir.js): the line is
+            // composed at fetch time from the same panel the decks
+            // read, so the panel and the sky agree to the pixel.
+            if (goesObs)
+              research['cloud field (GOES-West band 13 · GIBS)'] = goesObs.line;
+            else delete research['cloud field (GOES-West band 13 · GIBS)'];
             // The SAME scan that gates the drawn trails (set by
             // applySounding); recomputed only if a pin silenced it.
             const con = state.contrailScan ?? contrailPanel(rows);
@@ -15074,9 +15347,25 @@
         // global annual type sums, Rossow & Schiffer 1999 Table 5
         // (cloud-climatology.js, gated) - retiring the invented
         // overlapping 0.7/0.5/0.3.
+        // MEASURED satellite field (goesir.js, 143rd pass): where
+        // GOES-West measured the sea within 100 km the decks carve
+        // their cover from the field's texels (setGoesCover), and
+        // the slabs range whenever the field holds cloud. The scalar
+        // covers stay the ceilometer's/model's for the UNMEASURED
+        // sky (land for the low deck, beyond the window); only the
+        // cirrus level, which has no texel field, takes the
+        // satellite's high fraction as a floor - the single-window
+        // test is a lower bound (thin cirrus escapes it), so it
+        // lifts the model and never clears it.
+        const goes =
+          goesObs && Date.now() - goesObs.at < 40 * 60e3 ? goesObs : null;
         const cLow = mzr ? mzr.low : (state.cloudLow ?? state.cloud * LOW_FRAC);
         const cMid = state.cloudMid ?? state.cloud * MID_FRAC;
-        const cHigh = state.cloudHigh ?? state.cloud * HIGH_FRAC;
+        const cHigh = Math.max(
+          state.cloudHigh ?? state.cloud * HIGH_FRAC,
+          goes ? goes.highPct : 0
+        );
+        const goesOn = !!(goes && goes.deckOn);
         const baseAgl =
           mzr && mzr.baseM !== null
             ? mzr.baseM // ceilometer measurement
@@ -15102,7 +15391,11 @@
         };
         // Volumetric decks: real cover carves the density field, the
         // real wind advects it, the physically transmitted sun lights it.
-        if ((cLow > 3 || cMid > 3) && !cloudTexPending && skyIrrReady) {
+        if (
+          (cLow > 3 || cMid > 3 || goesOn) &&
+          !cloudTexPending &&
+          skyIrrReady
+        ) {
           cloudTexPending = true;
           setTimeout(() => {
             const tex = generateCloudTexturesTSL();
@@ -15114,6 +15407,12 @@
             cloudSys.attachShadow(cloudShadow);
             if (radarObs && radarObs.field)
               cloudSys.setRadarCover(radarObs.field, radarObs.fieldSize, WORLD);
+            if (goesObs && goesObs.deck)
+              cloudSys.setGoesCover(
+                goesObs.deck.data,
+                goesObs.deck.rm,
+                goesObs.worldUnits
+              );
             sizeCloudTargets();
             record(
               'Nubis cloud noise (generated)',
@@ -15125,7 +15424,7 @@
             );
           }, 60);
         }
-        cloudsActive = !!cloudSys && (cLow > 2 || cMid > 2);
+        cloudsActive = !!cloudSys && (cLow > 2 || cMid > 2 || goesOn);
         if (cloudsActive) {
           cloudSys.shared.sunDirW.value.copy(sunVec);
           // The deck's direct beam on the physical frame: the
@@ -15192,10 +15491,17 @@
           // floor) corroborates but cannot override yesterday's
           // pass onto today's storm. A slab thinner than 4 units
           // degenerates - the hand thickness stands there, stated.
+          // RANKING, stated: the satellite's opaque top of the
+          // measured sea stratus (goesir.js, minutes old, the
+          // pier's own column) outranks the up-to-two-day-old VIIRS
+          // census when the field holds a low deck worth sizing
+          // (5% of the sea or more).
           const ctopLow =
-            state.ctop && Number.isFinite(state.ctop.lowM)
-              ? state.ctop.lowM
-              : null;
+            goes && goes.lowTopM !== null && goes.lowPct >= 5
+              ? goes.lowTopM
+              : state.ctop && Number.isFinite(state.ctop.lowM)
+                ? state.ctop.lowM
+                : null;
           const yLowTop =
             wmo < 80 && ctopLow !== null
               ? 16 * Math.asinh((ctopLow - centerElev) / 500) + 8
@@ -15218,9 +15524,19 @@
           mu.yBase.value = Math.max(16 * Math.asinh(8), yCloud + 16);
           // The mid deck's top: measured (VIIRS mid-band median)
           // when the census saw altostratus, the hand +6 otherwise.
+          // RANKING, stated: as for the low deck, the satellite's
+          // fresh opaque tops of the pixels the mid deck actually
+          // holds (goesir.js) outrank the VIIRS census when they
+          // cover 5% of the measured window or more.
+          const midTopMeas =
+            goes && goes.midTopM !== null && goes.midDeckPct >= 5
+              ? goes.midTopM
+              : state.ctop && Number.isFinite(state.ctop.midM)
+                ? state.ctop.midM
+                : null;
           const ctopMid =
-            state.ctop && Number.isFinite(state.ctop.midM)
-              ? 16 * Math.asinh((state.ctop.midM - centerElev) / 500) + 8
+            midTopMeas !== null
+              ? 16 * Math.asinh((midTopMeas - centerElev) / 500) + 8
               : null;
           mu.yTop.value =
             ctopMid !== null && ctopMid > mu.yBase.value + 2
@@ -16666,6 +16982,10 @@
         setInterval(syncMarine, 15 * 60 * 1000);
         syncRadar();
         setInterval(syncRadar, 10 * 60 * 1000);
+        // the satellite field waits for the sea column and the far
+        // ring (syncMarine re-calls it once they exist)
+        syncGoesIr();
+        setInterval(syncGoesIr, 10 * 60 * 1000);
         syncAloft();
         setInterval(syncAloft, 30 * 60 * 1000);
         syncForests();

@@ -10345,6 +10345,112 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 143rd pass - THE MEASURED CLOUD
+  FIELD): the sky's cloud cover within 100 km of the observer is now
+  MEASURED, every ten minutes, from GOES-West's Band 13 (10.35 um)
+  as NASA GIBS serves it - keyless, CORS-open, colour-mapped 2-km
+  tiles (WMTS GoogleMapsCompatible_Level6, a 2x2 mosaic around the
+  home) - and the volumetric decks carve their coverage from where
+  the satellite saw cloud over the sea instead of from a model
+  fraction. goesir.js owns the law; observatory composes; the page
+  feeds tiles and its own far-ring DEM. (1) TILE TO TEMPERATURE:
+  GIBS's colormap v1.3 (238 bins, vendored VERBATIM, refetched and
+  compared entry by entry at every freeze) runs white/purple below
+  -80.1 C, a GREY ramp over (-80.1, -70.1], a colour ramp to -19.1,
+  and a second GREY ramp from -19.1 C up - the two grey ramps share
+  levels, and the resampled tiles carry in-between greys, so a grey
+  pixel is ambiguous by itself. THE GREY RULE: 4-connected grey
+  regions; a region reads on the cold ramp only when at least half
+  its colour border is colder than -60 C AND that border ENCLOSES it
+  (the region's bounding box inside its cold contacts') - the
+  enclosure is what tells an anvil's core from the warm sea around
+  the anvil (a scene of clear sea and one storm has no other colour;
+  a bare majority flips the whole sea cold - the synthetic landmark).
+  A pixel-continuity rule, tried first, floods 258,634 of 258,636
+  greys on the real tiles; the region rule reads 11 px cold on the
+  frozen mosaic, all inside one enclosed region. (2) THE CLEAR-SKY
+  REFERENCE, the theme's own: the pier's COARE skin (21.03 C on the
+  frozen day) seen at the satellite's slant (GOES-18 at 137.0 W,
+  goes-r.gov; view zenith 43.8 deg at the home) through the SEA
+  COLUMN (marinePanel's rows: the pier's film under the balloon)
+  with the MT_CKD water-vapour continuum as LBLRTM v12.13 ships it
+  (contnm.f90 BLOCK DATA BS296/BSP/BFH2O sliced at 940-1000 cm^-1
+  and read verbatim, the mt_ckd_2.4 foreign correction with its
+  printed constants, RADFN from oprop.f90, RADCN2 from
+  phys_consts.f90 - the theme's SI constants reproduce it to 1e-6),
+  the sea's emissivity from Fresnel on Hale & Querry's complex index
+  at 10.35 um (n 1.1949, k 0.0616 -> 0.9874 at 43.8 deg), the sky's
+  window radiance reflected specularly from the mirror direction.
+  Frozen day: tau 0.152 nadir over 18.9 mm of vapour, reference
+  19.66 C = skin - 1.37 K (0.78 K emissivity, 0.59 K column). (3)
+  THE TEST: the ACM's ETROP, eps = (I - I_clr)/(I_bb(T_trop) -
+  I_clr) on the column's cold point, Table 3's 0.10 over the ocean
+  (5.5 K under the reference at these temperatures - Planck, not a
+  fixed margin) with the two printed constraints (a non-coast pixel
+  whose 3x3 sigma exceeds 0.5 K is cloud under 0.20; a near-land
+  pixel under 1.0 K sigma and 0.20 eps is restored clear); over LAND
+  the reference is the column's free air at the pixel's elevation (a
+  skin the theme does not measure) at the land threshold 0.30, which
+  finds mid and high cloud only - the low deck over land stays the
+  ceilometer's, and a land "clear" carves nothing away. (4) THE
+  HEIGHTS: ACHA's opaque profile lookup from the tropopause down,
+  its inversion rule over water ((T_sfc - T_c)/9.8 K per km when any
+  layer between 700 hPa and surface - 50 hPa warms upward), ISCCP's
+  680/440 hPa layers on the column's own pressures. (5) THE DECKS:
+  an RM x RM texel field (one texel per satellite pixel, zero
+  border) with R low cover, G mid cover, B mid validity, A low
+  validity, sampled in coverAt: where each deck's texel is MEASURED
+  it REPLACES the noise cover (clear sea stays clear, a stratus sheet
+  is solid at the theme's 0.95 cap), the radar field still taking
+  the max; each deck anchors the field to its own advection offset;
+  the slabs range when the field holds cloud even at zero scalar
+  cover (a clear ceilometer on land under a stratus sea); the cirrus
+  scalar takes the satellite's high fraction as a floor. THE SPLIT
+  RULE (the theme's, stated): a single window reads thin mid cloud
+  low (the ATBD's own known bias), so where a fresh ceilometer
+  reports NO low layer under a mid or high one, the satellite's low
+  pixels are handed to the mid deck and re-placed by the profile
+  lookup without the inversion rule; a low layer keeps them. The
+  decks' tops take the field's fresh medians over the VIIRS census
+  when the deck holds 5% of the window. (6) THE FIXTURE: the four
+  tiles at the observatory's own stamp (12:20Z, bytes verbatim,
+  base64) and the terrarium elevation window at zoom 6, frozen by
+  goesir-freeze.mjs bound to the observatory day; GOESIR_PINS
+  generated with them; 21 landmarks in goesir-reference (colormap
+  contiguity and its three grey families, every bin reading back as
+  itself, the synthetic anvil, Planck/RADFN, the MT_CKD slopes and
+  the e^2 law, Fresnel, the reference's identities, the time-domain
+  parser, the view, ETROP's endpoints, the height rule, the frozen
+  field's census, the closures, the deck field). CROSS-CLOSURES on
+  the frozen day: the 95th-percentile sea pixel within 100 km reads
+  19.15 C against the modelled 19.66 - the satellite's warmest sea
+  meets a chain (COARE skin, MT_CKD column, Fresnel) that never saw
+  a tile, to -0.51 K under a 74% clear sea; the pre-dawn field (781
+  low pixels of 3045 sea, opaque tops 855 m on the inversion rule,
+  the sea 19% cloudy within 30 km) under KSAN's CLR. LIVE (17:00Z
+  the same day, the page's own line): the sea 83% under cloud with
+  tops 1.6 km on the inversion rule, KNKX reporting OVC with no low
+  layer -> handed to the mid deck at ~4.2 km by the profile lookup,
+  reference 20.52 C off the nearshore buoy (the first run beat the
+  pier's column; it reruns on the skin), warmest sea pixel -1.87 K.
+  MEASURED TODAY, stated: the default tile's layer-time-actual
+  header, exposed to CORS and read by curl, does not reach the page
+  - the field asks the WMTS time domain for the latest stamp; the
+  domain runs ahead of the tile cache and a fresh stamp's four tiles
+  arrive one by one (a 17:00Z end with one tile of four at 17:19Z),
+  so the page steps back ten minutes until the whole mosaic answers.
+  STATED LIMITS: the window is the band centre alone (no spectral
+  response; line absorption, ozone and CO2 neglected in the clean
+  window); the sea's emissivity is the flat Fresnel value (no
+  roughness term); the SST is one point (pier skin, else the CO-OPS
+  sensor, else a buoy within 50 km) - the offshore gradient shows up
+  as the warm-pixel closure and is reported, not corrected; over the
+  sea the single window misses cloud filling under a third of a
+  pixel and thin cirrus under the threshold (the field is a lower
+  bound: it lifts the cirrus scalar and never clears it); over land
+  the mask sees mid and high only; no LRC, no snow/desert classes;
+  the ceilometer split is the theme's rule, not the ATBD's; a
+  60-km-old METAR speaks for the whole window's split.
 - DONE (Sep 5, the review session's 142nd pass - THE CHAIN CLOSES
   ON ITSELF): four loose ends of the marine chain and the daemon,
   each measured. (1) THE FEEDBACK: the 139th integrated the pier's

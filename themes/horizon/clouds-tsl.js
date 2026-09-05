@@ -246,8 +246,34 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   const uRadarWorld = uniform(280);
   const uRadarOff = uniform(new Vector2(0, 0));
 
+  // Measured SATELLITE cloud field (goesir.js, 143rd pass): one
+  // texel per 2-km GOES-West pixel over +/-100 km, R = low-deck
+  // cover, G = mid-deck cover, B = mid validity, A = low validity.
+  // Where a texel is MEASURED (validity 1) it REPLACES the noise
+  // cover - a clear sea stays clear, a stratus sheet is solid -
+  // and unmeasured texels (land for the low deck, outside the
+  // window, no field yet) keep the noise. Each deck anchors the
+  // field to its OWN advection offset at fetch time and drifts it
+  // with its own wOff, as the radar field does for the low deck.
+  // The default 1x1 zero texture keeps the pinned harness identical.
+  const goesZeroData = new Float32Array([0, 0, 0, 0]);
+  const goesTex = new DataTexture(goesZeroData, 1, 1, RGBAFormat, FloatType);
+  goesTex.minFilter = goesTex.magFilter = LinearFilter;
+  goesTex.needsUpdate = true;
+  const goesNode = texture(goesTex);
+  const uGoesWorld = uniform(280);
+  const uGoesOffLow = uniform(new Vector2(0, 0));
+  const uGoesOffMid = uniform(new Vector2(0, 0));
+  // 1 when the field holds any cloud for that deck: the slab then
+  // ranges even when the scalar cover is zero (a clear ceilometer
+  // on land under a measured stratus sheet at sea).
+  const uGoesOnLow = uniform(0);
+  const uGoesOnMid = uniform(0);
+  const goesOn = (rad) => mix(uGoesOnMid, uGoesOnLow, rad);
+
   // Weather map: zero-mean difference of two samples of the same
   // stationary noise - the REAL reported cover is conserved; the
+  // measured satellite field replaces it where measured; the
   // measured radar field then takes the max.
   const coverAt = Fn(([xz, cov, wOff, rad]) => {
     const q = xz.add(wOff).mul(0.0019);
@@ -259,8 +285,15 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       0.0,
       1.0
     );
+    const pg = xz
+      .add(wOff)
+      .sub(mix(uGoesOffMid, uGoesOffLow, rad))
+      .div(uGoesWorld)
+      .add(0.5);
+    const g = goesNode.sample(pg);
+    const covM = mix(covN, mix(g.g, g.r, rad), mix(g.b, g.a, rad));
     const pr = xz.add(wOff).sub(uRadarOff).div(uRadarWorld).add(0.5);
-    return max(covN, radarNode.sample(pr).r.mul(rad));
+    return max(covM, radarNode.sample(pr).r.mul(rad));
   });
 
   // Height gradients by cloud type (Nubis).
@@ -373,26 +406,32 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   // still runs exactly once per deck.
   const slabFront = Fn(([ro, rd, sceneD, yB, yT, cov, cTy, wO, rad]) => {
     const tStart = float(-1).toVar();
-    If(cov.greaterThan(0.02).and(rd.y.abs().greaterThan(1e-4)), () => {
-      const tA = yB.sub(ro.y).div(rd.y);
-      const tB = yT.sub(ro.y).div(rd.y);
-      const t0 = max(min(tA, tB), 0.0).toVar();
-      const t1 = min(max(tA, tB), min(2600.0, sceneD)).toVar();
-      If(t1.greaterThan(t0), () => {
-        const COARSE = 14;
-        const dtc = t1.sub(t0).div(COARSE);
-        const tc = t0.add(dtc.mul(0.5)).toVar();
-        Loop(COARSE, () => {
-          const pc = ro.add(rd.mul(tc));
-          const hc = clamp(pc.y.sub(yB).div(yT.sub(yB)), 0.0, 1.0);
-          If(densityCoarse(pc, hc, cov, cTy, wO, rad).greaterThan(0.0), () => {
-            tStart.assign(max(tc.sub(dtc), t0));
-            Break();
+    If(
+      max(cov, goesOn(rad)).greaterThan(0.02).and(rd.y.abs().greaterThan(1e-4)),
+      () => {
+        const tA = yB.sub(ro.y).div(rd.y);
+        const tB = yT.sub(ro.y).div(rd.y);
+        const t0 = max(min(tA, tB), 0.0).toVar();
+        const t1 = min(max(tA, tB), min(2600.0, sceneD)).toVar();
+        If(t1.greaterThan(t0), () => {
+          const COARSE = 14;
+          const dtc = t1.sub(t0).div(COARSE);
+          const tc = t0.add(dtc.mul(0.5)).toVar();
+          Loop(COARSE, () => {
+            const pc = ro.add(rd.mul(tc));
+            const hc = clamp(pc.y.sub(yB).div(yT.sub(yB)), 0.0, 1.0);
+            If(
+              densityCoarse(pc, hc, cov, cTy, wO, rad).greaterThan(0.0),
+              () => {
+                tStart.assign(max(tc.sub(dtc), t0));
+                Break();
+              }
+            );
+            tc.addAssign(dtc);
           });
-          tc.addAssign(dtc);
         });
-      });
-    });
+      }
+    );
     return tStart;
   });
 
@@ -846,6 +885,37 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       radarTex.needsUpdate = true;
       uRadarWorld.value = worldUnits;
       uRadarOff.value.copy(uniformsLow.wOff.value);
+    },
+    // Feed the measured satellite field (goesir.js): data is RM x RM
+    // RGBA float32 (R low cover, G mid cover, B mid validity, A low
+    // validity, zero border ring) spanning worldUnits of scene space
+    // centred on the observer, anchored to EACH deck's current
+    // advection offset. null clears it back to the pinned default.
+    setGoesCover(data, rm, worldUnits) {
+      if (!data) {
+        goesTex.image = {data: goesZeroData, width: 1, height: 1};
+        goesTex.needsUpdate = true;
+        uGoesOnLow.value = 0;
+        uGoesOnMid.value = 0;
+        return;
+      }
+      if (goesTex.image.width !== rm) {
+        goesTex.image = {data, width: rm, height: rm};
+      } else {
+        goesTex.image.data.set(data);
+      }
+      goesTex.needsUpdate = true;
+      uGoesWorld.value = worldUnits;
+      uGoesOffLow.value.copy(uniformsLow.wOff.value);
+      uGoesOffMid.value.copy(uniformsMid.wOff.value);
+      let low = 0;
+      let mid = 0;
+      for (let k = 0; k < data.length; k += 4) {
+        if (data[k] > 0) low = 1;
+        if (data[k + 1] > 0) mid = 1;
+      }
+      uGoesOnLow.value = low;
+      uGoesOnMid.value = mid;
     },
     updateShadow() {
       if (!shadowFill) return;
