@@ -72,6 +72,7 @@ import {
   L2_LIST_MS,
   L2_MASK_SPEC,
   L2_RETRY_MS,
+  L2_HELD_TRIM_MB,
   L2_WINDOW_MS,
   prune,
   pruneStrikes,
@@ -927,7 +928,12 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_ASKS[2].band === 'C13' &&
       L2_IMAGERY_SPEC.CMI === 'raw16' &&
       L2_COD_SPEC.COD === 'raw16' &&
-      L2_CPS_SPEC.CPS === 'raw16',
+      L2_CPS_SPEC.CPS === 'raw16' &&
+      // the CPS file's flags are the COD file's (measured): not held
+      L2_CPS_SPEC.DQF === undefined &&
+      // the memory guard (held arrays, not resident size) sits well
+      // under the service's 512 MB MemoryMax
+      L2_HELD_TRIM_MB === 160,
     `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; /goesl2 asks five products, the imagery by band C13`
   );
 }

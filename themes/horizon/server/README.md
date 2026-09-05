@@ -189,9 +189,18 @@ in flight at a time; a listing or download failure holds the product
 for two minutes, during which the newest decoded file stands in for
 "latest". Decoded files are typed arrays of tens of megabytes and
 live in RAM only (never persisted; two per satellite and product, the
-least recently asked for let go; all let go after an hour unasked);
-the home is warmed on start like the other slow routes. `/probe`
-lists the held files with their times and the
+least recently asked for let go; all let go after an hour unasked;
+the CPS file's flag word is not held - it equals the COD file's
+pixel for pixel, measured). The service runs under
+`MemoryMax=512M`, so past 160 MB of held decoded arrays (counted
+exactly - one set of five files is 47 MB; resident size is the
+wrong gauge, V8 keeps ~200 MB of heap and worker residue that no
+eviction returns) the daemon trims the decoded files to the most
+recently asked of every product rather than be killed (measured
+with a 60 MB test threshold: the second set tripped the trim and the
+older files were let go); the home is
+warmed on start like the other slow routes. `/probe` lists the held
+files with their times, the resident size, the trims and the
 listing/fetch/error/worker-fallback counters.
 
 ## Security posture

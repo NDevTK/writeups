@@ -2662,8 +2662,8 @@
           // (148th pass; the daemon caches the window)
           syncGoesL2();
           record(
-            pick.sat.name + ' band 13 (GIBS ' + time.slice(11, 16) + 'Z)',
-            `sea within 100 km ${pct(s.waterLow + s.waterMid + s.waterHigh, s.waterMeasured)}% cloud ` +
+            pick.sat.name + ' band 13 (GIBS)',
+            `${time.slice(11, 16)}Z · sea within 100 km ${pct(s.waterLow + s.waterMid + s.waterHigh, s.waterMeasured)}% cloud ` +
               `(${pct(s.waterLow, s.waterMeasured)} low · ${pct(s.waterMid, s.waterMeasured)} mid · ` +
               `${pct(s.waterHigh, s.waterMeasured)} high) · clear-sky ref ` +
               `${P.reference.tClrC.toFixed(1)} °C · warm closure ${sign(P.warmClosureK ?? 0)} K`
@@ -6332,29 +6332,31 @@
           goesL2Reach = null;
           const m = goesL2.mask;
           const h = goesL2.height;
+          // stable record names (the stamp rides in the value, so a
+          // session's five-minute refreshes do not pile up entries)
           if (m)
             record(
-              `NOAA ${j.craft} clear-sky mask (ACMC ${m.time.slice(11, 16)}Z)`,
-              `${m.census.cloudy} of ${m.census.good} good 2-km px within ±100 km cloudy ` +
+              `NOAA ${j.craft} clear-sky mask (ACMC)`,
+              `${m.time.slice(11, 16)}Z · ${m.census.cloudy} of ${m.census.good} good 2-km px within ±100 km cloudy ` +
                 `(${Math.round(100 * (m.census.cloudFrac ?? 0))}%)`
             );
           if (h && h.census.n)
             record(
-              `NOAA ${j.craft} cloud top height (ACHAC ${h.time.slice(11, 16)}Z)`,
-              `median ${(h.census.medianM / 1000).toFixed(1)} km over ${h.census.n} retrieved 10-km px`
+              `NOAA ${j.craft} cloud top height (ACHAC)`,
+              `${h.time.slice(11, 16)}Z · median ${(h.census.medianM / 1000).toFixed(1)} km over ${h.census.n} retrieved 10-km px`
             );
           const im = goesL2.imagery;
           if (im && im.census.good)
             record(
-              `NOAA ${j.craft} band 13 imagery (CMIPC ${im.time.slice(11, 16)}Z)`,
-              `brightness temperature ${(im.census.minK - 273.15).toFixed(1)} to ` +
+              `NOAA ${j.craft} band 13 imagery (CMIPC)`,
+              `${im.time.slice(11, 16)}Z · brightness temperature ${(im.census.minK - 273.15).toFixed(1)} to ` +
                 `${(im.census.maxK - 273.15).toFixed(1)} °C over ${im.census.good} good 2-km px within ±100 km`
             );
           const dc = goesL2.dcomp;
           if (dc && dc.census.retrieved)
             record(
-              `NOAA ${j.craft} DCOMP (CODC/CPSC ${dc.time.slice(11, 16)}Z)`,
-              `τ640 median ${dc.census.codMedian.toFixed(1)} over ${dc.census.retrieved} retrieved px` +
+              `NOAA ${j.craft} DCOMP (CODC/CPSC)`,
+              `${dc.time.slice(11, 16)}Z · τ640 median ${dc.census.codMedian.toFixed(1)} over ${dc.census.retrieved} retrieved px` +
                 (dc.census.water.reffMedian !== null
                   ? ` · water r_eff ${dc.census.water.reffMedian.toFixed(1)} µm`
                   : '')
@@ -6378,6 +6380,7 @@
               if (params.has('debug')) console.warn('goesl2 at: ' + e.message);
             }
           }
+          updateLiveDroplets();
         } catch (e) {
           if (params.has('debug')) console.warn('goesl2: ' + e.message);
         } finally {
@@ -6437,6 +6440,61 @@
         const q = windowIndexOf(latDeg, lonDeg, m.g, m.x, m.y, m.box);
         if (q < 0 || m.dqf[q] !== 0 || m.acm[q] > 3) return null;
         return {acm: m.acm[q], prob: m.prob[q] <= 100 ? m.prob[q] : null};
+      }
+      // TODAY'S DROPLETS (150th pass): DCOMP's water effective radius
+      // over the theme's own sea (else the whole window's water),
+      // minutes old, is the droplet size the corona, the overcast
+      // veil and the lee-wave deck ring - it outranks VIIRS's r_eff
+      // of a day or more ago (the 84th pass) while it is fresh;
+      // dropletSource() is the one place the drawing asks. At night
+      // or over a clear window DCOMP retrieves nothing and VIIRS's
+      // day stands again (stated on the line).
+      const DROPLETS_LIVE_MS = 30 * 60e3;
+      const DROPLETS_MIN_PX = 50; // fewer retrievals than this do not speak for the sky
+      function updateLiveDroplets() {
+        const sea = goesL2SeaDcomp();
+        const dc = goesL2 && (goesL2.dcompAt ?? goesL2.dcomp);
+        const pick =
+          sea && sea.water.reffN >= DROPLETS_MIN_PX
+            ? {census: sea, where: 'the theme’s sea'}
+            : dc && dc.census && dc.census.water.reffN >= DROPLETS_MIN_PX
+              ? {census: dc.census, where: 'the ±100 km window'}
+              : null;
+        if (!pick) {
+          state.creffLive = null;
+          return;
+        }
+        const c = pick.census;
+        state.creffLive = {
+          waterUm: c.water.reffMedian,
+          iceUm: c.ice.reffN ? c.ice.reffMedian : null,
+          n: c.water.reffN,
+          where: pick.where,
+          time: dc.time,
+          day: 'DCOMP ' + dc.time.slice(11, 16) + 'Z',
+          at: Date.now()
+        };
+        record(
+          'DCOMP droplet size',
+          `${dc.time.slice(11, 16)}Z · water r_eff ${c.water.reffMedian.toFixed(1)} µm (D_e ${(2 * c.water.reffMedian).toFixed(1)} µm) ` +
+            `over ${c.water.reffN} px of ${pick.where}` +
+            (c.ice.reffN
+              ? ` · ice ${c.ice.reffMedian.toFixed(1)} µm over ${c.ice.reffN}`
+              : '') +
+            ' · rings the corona while fresh'
+        );
+      }
+      function dropletSource() {
+        const live = state.creffLive;
+        if (
+          live &&
+          Number.isFinite(live.waterUm) &&
+          Date.now() - live.at < DROPLETS_LIVE_MS
+        )
+          return live;
+        if (state.creff && Number.isFinite(state.creff.waterUm))
+          return state.creff;
+        return null;
       }
       // NOAA's own brightness temperature and DCOMP retrieval at a
       // place (149th pass): {btC, tau, reff, ice, thin, thick} with
@@ -6647,7 +6705,13 @@
                   ? `, water r_eff ${um(sea.water.reffMedian)}`
                   : '') +
                 (state.creff && Number.isFinite(state.creff.waterUm)
-                  ? ` vs VIIRS’s ${state.creff.waterUm.toFixed(1)} µm of ${state.creff.day} that rings the corona (84th)`
+                  ? ` (VIIRS read ${state.creff.waterUm.toFixed(1)} µm on ${state.creff.day})`
+                  : '') +
+                (dropletSource()
+                  ? ` → the corona rings ${dropletSource().waterUm.toFixed(1)} µm droplets from ${dropletSource().day}` +
+                    (dropletSource() === state.creffLive
+                      ? ` (today’s, over ${state.creffLive.n} px of ${state.creffLive.where})`
+                      : ' (VIIRS’s; DCOMP has too few water retrievals here now)')
                   : '');
             const ov = goesL2ImageryAt(state.lat, state.lon);
             if (ov && ov.dcomp)
@@ -9103,8 +9167,8 @@
         // MEASURED water droplet size when VIIRS saw one, else
         // the printed observed mode for the air mass.
         const reLee =
-          (state.creff && Number.isFinite(state.creff.waterUm)
-            ? 2 * state.creff.waterUm
+          (dropletSource()
+            ? 2 * dropletSource().waterUm
             : state.marineAir
               ? DROPLET_DE_OBS_UM.marine
               : DROPLET_DE_OBS_UM.continental) / 2;
@@ -11407,10 +11471,7 @@
         // size: VIIRS water-phase r_eff x 2 (syncCreff) rescales
         // the printed mode when the satellite saw liquid here
         // today - the class average stands otherwise.
-        const deMeas =
-          state.creff && Number.isFinite(state.creff.waterUm)
-            ? 2 * state.creff.waterUm
-            : null;
+        const deMeas = dropletSource() ? 2 * dropletSource().waterUm : null;
         if (
           sunDrift ||
           cls !== dropCls ||
@@ -14419,8 +14480,8 @@
         // is retired.
         {
           const reOv =
-            (state.creff && Number.isFinite(state.creff.waterUm)
-              ? 2 * state.creff.waterUm
+            (dropletSource()
+              ? 2 * dropletSource().waterUm
               : state.marineAir
                 ? DROPLET_DE_OBS_UM.marine
                 : DROPLET_DE_OBS_UM.continental) / 2;

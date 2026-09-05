@@ -10345,6 +10345,64 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 150th pass - TODAY'S DROPLETS RING
+  THE CORONA; THE DAEMON FITS ITS 512 MB): the 84th pass let VIIRS's
+  effective radius, a day or more old, size the droplet corona, the
+  overcast veil and the lee-wave deck; the 149th put DCOMP's radius -
+  the same cloud-top effective radius (the DCOMP ATBD: the third over
+  the second moment of the droplet distribution; CPS accuracy 4 um
+  against MODIS, 3.03 um measured), minutes old, 2-km pixels over the
+  theme's own window - on the line beside it. Now the fresher
+  measurement outranks the older one, the theme's standing rule. (1)
+  THE PAGE: dropletSource() is the ONE place the drawing asks for
+  the droplet size (the corona's mode at 11408, the overcast veil's
+  r_e, the lee-wave deck's) - state.creffLive from DCOMP when at
+  least 50 water retrievals over the theme's sea (else over the
+  +-100 km window) are under 30 min old, else VIIRS's state.creff as
+  before; updateLiveDroplets runs after every /goesl2 answer,
+  including the one after each field run; the research line prints
+  both radii and names which rings the corona ("today's, over N px
+  of the theme's sea" / "VIIRS's; DCOMP has too few water
+  retrievals here now") and the records carry "DCOMP droplet size".
+  At night DCOMP retrieves nothing, the live radius ages past 30
+  min, and VIIRS's day stands again - stated. (2) THE DAEMON'S
+  MEMORY: horizon-live.service runs under MemoryMax=512M (read this
+  pass - the 148th/149th daemon had not been measured against it):
+  five products x ~15 MB x two sets = 262 MB with one satellite,
+  measured, and a second satellite's sets would have doubled it
+  beside the decode worker's ~100 MB transient. The CPS file's flag
+  word is no longer held (it equals the COD file's pixel for pixel,
+  measured in the 149th - 7.5 MB a file), and L2_HELD_TRIM_MB = 160:
+  past that many megabytes of decoded arrays - counted EXACTLY from
+  the held typed arrays, one set of five files being 47 MB - the
+  decoded files are trimmed to the most recently asked of every
+  product and the trim counted in /probe beside the resident, heap
+  and held sizes. Resident size was tried first and rejected: V8
+  keeps ~200 MB of heap and worker residue that no eviction returns
+  (236-254 MB resident with five files held) and
+  process.memoryUsage's arrayBuffers counts the inflate buffers and
+  worker copies not yet collected (108-180 MB "held" around a decode
+  with 47 MB kept), so either gauge oscillates. MEASURED on a copy
+  of the daemon with the threshold at 60 MB: one set held 47 MB with
+  no trim, the second set's arrival tripped it and the older files
+  were let go, every answer still served. GATE (server-reference):
+  the CPS spec holds no DQF, the trim threshold pinned. THE RECORDS:
+  the satellite records' names are now stable ("NOAA GOES-18
+  clear-sky mask (ACMC)", "GOES-West band 13 (GIBS)", "DCOMP droplet
+  size") with the stamp in the value - a stamp in the name piled up
+  an entry every five minutes of a session. STATED LIMITS: the trim
+  is a guard, not a budget - a visitor under each satellite at once
+  still holds two products' worth of newest files (~100 MB) plus
+  the worker. THE DEPLOY SILENCE, READ: the live daemon began
+  answering /sst at 20:56Z - the 147th, 83 minutes after it reached
+  main, its /probe carrying the sst key and a seven-minute uptime at
+  21:03Z - while /goesl2 still answered 404: the box deploys one
+  revision per self-update run and gates each with the FULL CPU
+  reference set, which takes it about an hour and a quarter (this
+  sandbox runs the same set in twelve minutes; the e2-micro's shared
+  core is the difference). Each later revision follows in its own
+  run, so the 148th-150th reach the live daemon in turn, an hour or
+  more apart; nothing was failing - the watch was too short.
 - DONE (Sep 5, the review session's 149th pass - THE IMAGERY AND THE
   RETRIEVALS BESIDE THE THEME'S): the 148th put NOAA's mask beside
   the theme's field; this pass puts NOAA's brightness temperature
@@ -10596,12 +10654,13 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   here): at 20:24Z the deployed api.ndev.tk still answered 404 for
   /sst - its /probe lists surface and rrs but no sst - fifty minutes
   after the 147th reached main, while its AIS engine showed a
-  process restart at 20:08Z; the box's self-update either failed its
-  on-box gate or did not run, and only its journal
-  (journalctl -u horizon-live-update) can say which. Until that is
-  read, /sst and /goesl2 are verified on the LOCAL daemon only (the
-  page's ?sstsrc= and ?goesl2src= overrides), and the live page's
-  NOAA line stays absent (a 404 is caught, nothing is drawn wrong).
+  process restart at 20:08Z. RESOLVED in the 150th's watch: /sst
+  answered from 20:56Z, 83 minutes after the 147th's push - the
+  on-box gate simply takes over an hour per revision (see the 150th
+  entry); until each revision's turn comes, the live page's NOAA
+  line stays absent (a 404 is caught, nothing is drawn wrong), and
+  the routes are verified on the local daemon (?sstsrc=,
+  ?goesl2src=).
 - DONE (Sep 5, the review session's 147th pass - THE SEA UNDER EVERY
   PIXEL): the satellite cloud field's clear-sky reference was ONE
   number - the pier's skin through the column - for a 100-km window

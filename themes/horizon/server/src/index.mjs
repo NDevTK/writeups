@@ -994,7 +994,20 @@ export const L2_HEIGHT_SPEC = {HT: 'phys', DQF: 'raw'};
 // count) with their shared flag word.
 export const L2_IMAGERY_SPEC = {CMI: 'raw16', DQF: 'raw'};
 export const L2_COD_SPEC = {COD: 'raw16', DQF: 'raw16'};
-export const L2_CPS_SPEC = {CPS: 'raw16', DQF: 'raw16'};
+// the CPS file's DQF equals the COD file's pixel for pixel (measured,
+// 149th), so only the radii are held - 7.5 MB a file kept out of a
+// 512 MB service (horizon-live.service MemoryMax)
+export const L2_CPS_SPEC = {CPS: 'raw16'};
+// when the decoded arrays the daemon holds (counted exactly: ~50 MB
+// a set of five files) grow past this, the decoded files are
+// trimmed to the newest per product. The service is OOM-killed at
+// 512 MB resident, and resident size is the wrong gauge for the
+// trim: V8 keeps ~200 MB of heap and worker residue that no
+// eviction returns (measured: 236-254 MB resident with five files
+// held), so a resident-size trim would oscillate. One satellite's
+// two sets (~100 MB) fit under this; a second satellite's sets trip
+// it and only the newest file of each product stays.
+export const L2_HELD_TRIM_MB = 160;
 // what /goesl2 fetches for a point: product, spec, the imagery's
 // band (the CMIPC prefix lists every band's file)
 export const L2_ASKS = [
@@ -2203,6 +2216,7 @@ function main() {
     fetches: 0,
     errors: 0,
     workerFallbacks: 0,
+    trims: 0,
     lastError: ''
   };
   async function l2Listing(bucket, prefix, deadline) {
@@ -2238,6 +2252,16 @@ function main() {
     for (const [k, v] of l2Decoded)
       if (k.startsWith(pk + '/') && (!best || v.stamp > best.stamp)) best = v;
     return best;
+  };
+  // the bytes of decoded arrays the daemon holds - exact, unlike
+  // process.memoryUsage's arrayBuffers, which counts the inflate
+  // buffers and worker copies not yet collected (measured 108-180
+  // MB "held" around a decode with 50 MB of files kept)
+  const l2HeldMb = () => {
+    let b = 0;
+    for (const v of l2Decoded.values())
+      for (const a of Object.values(v.dec.data)) b += a.byteLength ?? 0;
+    return b / 1048576;
   };
   // one decode at a time: five products can arrive together, and
   // five workers with their inflated arrays would not fit a small
@@ -2304,6 +2328,32 @@ function main() {
             .sort((a, b) => a[1].t - b[1].t);
           while (mine.length > L2_HELD_PER_PRODUCT)
             l2Decoded.delete(mine.shift()[0]);
+          // the memory guard: past L2_HELD_TRIM_MB of held arrays
+          // keep only the newest file of every product (the
+          // service's MemoryMax would otherwise kill the whole
+          // daemon)
+          const heldMb = l2HeldMb();
+          const rssMb = process.memoryUsage().rss / 1048576;
+          if (heldMb > L2_HELD_TRIM_MB) {
+            const newest = new Map();
+            for (const [k, v] of l2Decoded) {
+              const prod = k.split('/').slice(0, 2).join('/');
+              const cur = newest.get(prod);
+              if (!cur || v.t > cur.t) newest.set(prod, {k, t: v.t});
+            }
+            const keep = new Set([...newest.values()].map((e) => e.k));
+            let dropped = 0;
+            for (const k of [...l2Decoded.keys()])
+              if (!keep.has(k)) {
+                l2Decoded.delete(k);
+                dropped++;
+              }
+            l2State.trims++;
+            log(
+              `goesl2: ${heldMb.toFixed(0)} MB of arrays held (${rssMb.toFixed(0)} MB resident), ` +
+                `${dropped} decoded files let go`
+            );
+          }
           log(
             `goesl2: ${pick.key.split('/').pop()} (${(bytes.length / 1e6).toFixed(1)} MB, ` +
               `decoded in ${Date.now() - t0} ms, ${dec.time}` +
@@ -2650,6 +2700,10 @@ function main() {
         fetches: l2State.fetches,
         errors: l2State.errors,
         workerFallbacks: l2State.workerFallbacks,
+        trims: l2State.trims,
+        rssMb: Math.round(process.memoryUsage().rss / 1048576),
+        heapMb: Math.round(process.memoryUsage().heapUsed / 1048576),
+        heldMb: Math.round(l2HeldMb()),
         lastError: l2State.lastError
       };
       if (url.pathname === '/health')

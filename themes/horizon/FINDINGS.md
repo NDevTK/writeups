@@ -9,8 +9,8 @@ from the code. Run the whole corpus with:
 cd themes/horizon/harness && bash validate.sh
 ```
 
-At the time of writing the gate holds **141 CPU reference files printing
-1122 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
+At the time of writing the gate holds **143 CPU reference files printing
+1136 landmark lines, plus 7 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -789,7 +789,14 @@ The practice the corpus demonstrates, stated so it can be reused:
    depth and effective radius per pixel beside the theme's VIIRS
    radius, after measuring the product's flag word against the mask
    of the same minute (three of its bits contradict their names in
-   v02r03 and are named, not read) (`goesl2-reference` THE IMAGERY
+   v02r03 and are named, not read). Pass 150 lets that radius ring
+   the corona while it is fresh — the theme's standing rule that the
+   newer measurement outranks the older one, applied to the droplet
+   size: DCOMP's water r_eff over the theme's own sea, minutes old,
+   sizes the corona, the overcast veil and the lee-wave deck, and
+   VIIRS's day-old radius stands again when DCOMP retrieves nothing
+   (night, or a clear window); one function, `dropletSource`, is the
+   only place the drawing asks (`goesl2-reference` THE IMAGERY
    AND DCOMP; `server-reference` the imagery and DCOMP windows;
    `hdf5-reference` THE PRODUCT FILE,
    H5PY'S EARLIEST/LATEST FILES; `goesl2-reference` THE FIXED GRID,
