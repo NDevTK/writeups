@@ -135,7 +135,8 @@
           const d = new Float32Array(rm * rm * 4);
           for (let jj = 0; jj < rm; jj++)
             for (let ii = 0; ii < rm; ii++) {
-              const border = ii === 0 || jj === 0 || ii === rm - 1 || jj === rm - 1;
+              const border =
+                ii === 0 || jj === 0 || ii === rm - 1 || jj === rm - 1;
               const k = (jj * rm + ii) * 4;
               d[k] = !border && ii < rm / 2 ? 1 : 0;
               d[k + 3] = border ? 0 : 1;
