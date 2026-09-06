@@ -10435,51 +10435,51 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   screen temperature and dew point (29.5 / 25.7 C at 1013 hPa): CAPE
   3848 J/kg -> EL 14576 m (LCL 489 m, LFC 744 m, lifted index -7.6 K)
   - what it stands in for: the freezing level ... and the storm deck's
-  ceiling at the parcel's EL 14576 m (no shower or thunder code now,
-  WMO 0: the deck keeps its own top)"; "stability from orbit ... LI
-  -4.7 K (unstable) - CAPE 1048 J/kg (moderate potential energy) - TT
-  42.8 (little or none) - SI +3.8 K (no severe signal) - KI 26.5 - the
-  scene: mean CAPE 428 J/kg (max 1992), mean LI -1.0 K over 73,031
-  attempted retrievals - from the profile itself: LI -4.7 (+0.06 from
-  NOAA's) - CAPE 1870 (+822) - TT 42.8 (-0.01) - SI +1.6 (-2.17, past
-  the 2 accuracy) - KI 26.5 (-0.00)". FINDINGS: over the open Gulf the
-  lifted index, the total totals and the K index re-derived from the
-  profile match NOAA's own product to 0.06, 0.01 and 0.00 K - the
-  profile the page carries reproduces NOAA's derived product; the
-  mean-layer CAPE differs by 822 J/kg (inside the ATBD's 1000
-  accuracy; CAPE's precision requirement is 2500 - the integral is
-  the parcel path's, and NOAA's wet-bulb SATLFT path is not the
-  pseudo-adiabat) and the Showalter index by 2.2 K, which the ATBD's
-  own text foretells; the station's surface parcel (29.5 / 25.7 C
-  over 29.5 C water) carries 3,848 J/kg to 14.6 km against the mean
-  layer's 1,048-1,870 - the drawn tower is the afternoon's surface
-  parcel, and the line says so. MEASURED under a shower deck (Savannah,
-  32.08 N 81.10 W, open-meteo "showers", 98% cloud, the same scan): "no
-  usable field of regard in the 3 x 3 (invalid: insufficient clear
-  pixels in the field of regard; 0 good, 0 degraded, 9 cloud of 9) -
-  what it stands in for: nothing - the balloon stands (CHARLESTON 135
-  km, 10 h old)" and the balloon's own "CAPE 326 J/kg -> EL 8762 m"
-  tops the storm deck as before: under the storm itself the retrieval
-  has no clear fifth of any field, so the satellite's ceiling comes
-  at a storm's edge or from the balloon - stated; a wider profile
-  window (the 3 x 3 is 30 km; a storm's anvil covers it) is the
-  obvious next lead, at two to three more chunks a file. THE GATE'S
-  OWN REPORT (the same
-  pass): the box was found at 21:48Z still on the 166th's revision
-  (installed 20:25Z) with the 167th-171st pushed since - an e2-micro's
-  gate is the better part of an hour per revision, and a failure
-  there is invisible without the journal - so update.sh now writes
-  its phase (gating / deployed / failed), the revision, the start,
-  the seconds and the failing lines (the gate tee'd to a log) as JSON
-  to /opt/horizon-live-update.status.json and the daemon serves it
-  fresh under /health as version.update (parseUpdateStatus; the first
-  deploy with the new script cannot report its own gate, every later
-  one does). STATED LIMITS: the parcel's environment in the lowest
-  kilometres is the retrieval's smear (the LFC and any CIN the least
-  trustworthy parts; the EL, set aloft where the retrieval is good to
-  1 K, the most); the storm deck reads the EL only on shower and
-  thunder codes; NOAA's CAPE is a different parcel and path, printed
-  beside the page's, never merged.
+    ceiling at the parcel's EL 14576 m (no shower or thunder code now,
+    WMO 0: the deck keeps its own top)"; "stability from orbit ... LI
+    -4.7 K (unstable) - CAPE 1048 J/kg (moderate potential energy) - TT
+    42.8 (little or none) - SI +3.8 K (no severe signal) - KI 26.5 - the
+    scene: mean CAPE 428 J/kg (max 1992), mean LI -1.0 K over 73,031
+    attempted retrievals - from the profile itself: LI -4.7 (+0.06 from
+    NOAA's) - CAPE 1870 (+822) - TT 42.8 (-0.01) - SI +1.6 (-2.17, past
+    the 2 accuracy) - KI 26.5 (-0.00)". FINDINGS: over the open Gulf the
+    lifted index, the total totals and the K index re-derived from the
+    profile match NOAA's own product to 0.06, 0.01 and 0.00 K - the
+    profile the page carries reproduces NOAA's derived product; the
+    mean-layer CAPE differs by 822 J/kg (inside the ATBD's 1000
+    accuracy; CAPE's precision requirement is 2500 - the integral is
+    the parcel path's, and NOAA's wet-bulb SATLFT path is not the
+    pseudo-adiabat) and the Showalter index by 2.2 K, which the ATBD's
+    own text foretells; the station's surface parcel (29.5 / 25.7 C
+    over 29.5 C water) carries 3,848 J/kg to 14.6 km against the mean
+    layer's 1,048-1,870 - the drawn tower is the afternoon's surface
+    parcel, and the line says so. MEASURED under a shower deck (Savannah,
+    32.08 N 81.10 W, open-meteo "showers", 98% cloud, the same scan): "no
+    usable field of regard in the 3 x 3 (invalid: insufficient clear
+    pixels in the field of regard; 0 good, 0 degraded, 9 cloud of 9) -
+    what it stands in for: nothing - the balloon stands (CHARLESTON 135
+    km, 10 h old)" and the balloon's own "CAPE 326 J/kg -> EL 8762 m"
+    tops the storm deck as before: under the storm itself the retrieval
+    has no clear fifth of any field, so the satellite's ceiling comes
+    at a storm's edge or from the balloon - stated; a wider profile
+    window (the 3 x 3 is 30 km; a storm's anvil covers it) is the
+    obvious next lead, at two to three more chunks a file. THE GATE'S
+    OWN REPORT (the same
+    pass): the box was found at 21:48Z still on the 166th's revision
+    (installed 20:25Z) with the 167th-171st pushed since - an e2-micro's
+    gate is the better part of an hour per revision, and a failure
+    there is invisible without the journal - so update.sh now writes
+    its phase (gating / deployed / failed), the revision, the start,
+    the seconds and the failing lines (the gate tee'd to a log) as JSON
+    to /opt/horizon-live-update.status.json and the daemon serves it
+    fresh under /health as version.update (parseUpdateStatus; the first
+    deploy with the new script cannot report its own gate, every later
+    one does). STATED LIMITS: the parcel's environment in the lowest
+    kilometres is the retrieval's smear (the LFC and any CIN the least
+    trustworthy parts; the EL, set aloft where the retrieval is good to
+    1 K, the most); the storm deck reads the EL only on shower and
+    thunder codes; NOAA's CAPE is a different parcel and path, printed
+    beside the page's, never merged.
 - DONE (Sep 6, the review session's 171st pass - THE COLUMN FROM
   ORBIT, ABOVE THE BOUNDARY LAYER): the scene's upper air has been the
   nearest balloon's since the sounding pass - and at sea the nearest

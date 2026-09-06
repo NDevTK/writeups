@@ -2028,7 +2028,9 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       /write_status failed "\$NEW"/.test(srcUpd) &&
       srcUpd.includes('/opt/horizon-live-update.status.json') &&
       srcUpd.includes('tee "$GATE_LOG"') &&
-      srcIdx.includes("env.UPDATE_STATUS ?? '/opt/horizon-live-update.status.json'") &&
+      srcIdx.includes(
+        "env.UPDATE_STATUS ?? '/opt/horizon-live-update.status.json'"
+      ) &&
       /update: updateStatus\(\)/.test(srcIdx),
     `a failed report reads back (${okS.rev} after ${okS.gatedS} s, tail "${okS.tail.split('\n')[0]}"), a gating one with zero seconds, an unknown phase / junk / nothing as null; update.sh writes gating, deployed and failed to ${'/opt/horizon-live-update.status.json'} through a tee'd gate log, and index.mjs serves the file as version.update`
   );

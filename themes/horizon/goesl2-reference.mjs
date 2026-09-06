@@ -1432,7 +1432,10 @@ const inflate = (u8) =>
   {
     const V = dsiVerdict({li: -2, cape: 1500, tt: 50, si: -4, ki: 31});
     const V2 = dsiVerdict({li: 3, cape: 3500, tt: 57, si: 1, ki: 20});
-    const V3 = dsiVerdict({li: NaN, cape: 0, tt: 38, si: null, ki: 25}, {west: true});
+    const V3 = dsiVerdict(
+      {li: NaN, cape: 0, tt: 38, si: null, ki: 25},
+      {west: true}
+    );
     const V4 = dsiVerdict({tt: 57, cape: 200}, {west: true});
     // a column with exact rows at the discrete levels: T 20/10/0/-15 C
     // at 1000/850/700/500, Td 15/5/-10 (none at 500 needed)
@@ -1452,7 +1455,14 @@ const inflate = (u8) =>
     // 0): the 100-hPa mean is the midpoint's 15 / 5 at 950 hPa
     const lin = [];
     for (let p = 1000; p >= 500; p -= 25)
-      lin.push({p, hM: (1000 - p) * 9, tC: 20 - (1000 - p) / 10, rh: 50, tdC: 10 - (1000 - p) / 10, q: 0.005});
+      lin.push({
+        p,
+        hM: (1000 - p) * 9,
+        tC: 20 - (1000 - p) / 10,
+        rh: 50,
+        tdC: 10 - (1000 - p) / 10,
+        q: 0.005
+      });
     const mean = lapMeanLayerStart(lin);
     const pr = lapParcelRows(syn, {p: 950, hM: 450, tC: 18, tdC: 12});
     const stable = lapStability(syn, {sfcTC: 12, sfcTdC: 0});
@@ -1462,17 +1472,31 @@ const inflate = (u8) =>
     // the real column (the rows of THE COLUMN, READ above) against
     // NOAA's own indices at the same field of regard and scan
     const noaa = {};
-    for (const id of DSI_NAMES) noaa[id] = DSI_EXPECT.here[id.toUpperCase()].value;
+    for (const id of DSI_NAMES)
+      noaa[id] = DSI_EXPECT.here[id.toUpperCase()].value;
     const st = lapStability(rows);
-    const mine = {li: st.li, cape: st.capeMeanLayer, tt: st.tt, si: st.si, ki: st.ki};
+    const mine = {
+      li: st.li,
+      cape: st.capeMeanLayer,
+      tt: st.tt,
+      si: st.si,
+      ki: st.ki
+    };
     const agree = dsiAgreement(noaa, mine);
-    const d = openHdf5(new Uint8Array(Buffer.from(DSIC_B64, 'base64')), inflate);
-    const qcen = DSI_EXPECT.centre.row * DSI_EXPECT.cols + DSI_EXPECT.centre.col;
+    const d = openHdf5(
+      new Uint8Array(Buffer.from(DSIC_B64, 'base64')),
+      inflate
+    );
+    const qcen =
+      DSI_EXPECT.centre.row * DSI_EXPECT.cols + DSI_EXPECT.centre.col;
     const read = {};
     for (const id of DSI_NAMES) {
       const ds = d.dataset(id.toUpperCase());
       const v = ds.values[qcen];
-      read[id] = v === 65535 ? NaN : v * sc(ds.attrs.scale_factor) + sc(ds.attrs.add_offset);
+      read[id] =
+        v === 65535
+          ? NaN
+          : v * sc(ds.attrs.scale_factor) + sc(ds.attrs.add_offset);
     }
     const A = DSI_ATBD.requirement.accuracy;
     check(

@@ -1683,7 +1683,13 @@ export const DSI_ATBD = {
     horizontalKm: 10,
     refreshMinConus: 30,
     lzaQuantitativeDeg: 67,
-    range: {li: [-10, 40], cape: [0, 5000], si: [-10, 4], tt: [-43, 56], ki: [0, 40]},
+    range: {
+      li: [-10, 40],
+      cape: [0, 5000],
+      si: [-10, 4],
+      tt: [-43, 56],
+      ki: [0, 40]
+    },
     accuracy: {li: 2, cape: 1000, si: 2, tt: 1, ki: 2},
     precision: {li: 6.5, cape: 2500, si: 6.5, tt: 4, ki: 5}
   },
@@ -1706,7 +1712,13 @@ export const DSI_ATBD = {
   }
 };
 export const DSI_NAMES = ['li', 'cape', 'tt', 'si', 'ki'];
-export const DSI_FIELDS = {li: 'LI', cape: 'CAPE', tt: 'TT', si: 'SI', ki: 'KI'};
+export const DSI_FIELDS = {
+  li: 'LI',
+  cape: 'CAPE',
+  tt: 'TT',
+  si: 'SI',
+  ki: 'KI'
+};
 export const DSI_UNITS = {li: 'K', cape: 'J/kg', tt: 'K', si: 'K', ki: 'K'};
 /** The ATBD's own reading of each index (its Sec. 3.4.2 words); the
  * TT threshold is the western one west of the Rockies (the caller's
@@ -1715,7 +1727,11 @@ export function dsiVerdict({li, cape, tt, si, ki} = {}, {west = false} = {}) {
   const W = DSI_ATBD.words;
   const fin = (v) => Number.isFinite(v);
   return {
-    li: fin(li) ? (li < 0 ? 'unstable: the parcel warmer than its surroundings' : 'stable') : null,
+    li: fin(li)
+      ? li < 0
+        ? 'unstable: the parcel warmer than its surroundings'
+        : 'stable'
+      : null,
     cape: fin(cape)
       ? cape > W.capeVeryLarge
         ? 'very large potential energy, often strong or severe weather'
@@ -1734,8 +1750,16 @@ export function dsiVerdict({li, cape, tt, si, ki} = {}, {west = false} = {}) {
             ? "little or none (the ATBD's 40-45 band)"
             : 'thunderstorms possible'
       : null,
-    si: fin(si) ? (si < W.siSevere ? 'severe weather possible (under -3)' : 'no severe signal') : null,
-    ki: fin(ki) ? (ki > W.kiSevere ? 'severe weather very likely (over 30)' : 'not conducive to severe weather') : null
+    si: fin(si)
+      ? si < W.siSevere
+        ? 'severe weather possible (under -3)'
+        : 'no severe signal'
+      : null,
+    ki: fin(ki)
+      ? ki > W.kiSevere
+        ? 'severe weather very likely (over 30)'
+        : 'not conducive to severe weather'
+      : null
   };
 }
 /** The ATBD's discrete-level indices from the rows: TT (Eq. 9) and KI
@@ -1746,7 +1770,8 @@ export function lapIndicesFromRows(rows) {
   const l850 = lapLevelAt(rows, 850);
   const l700 = lapLevelAt(rows, 700);
   const l500 = lapLevelAt(rows, 500);
-  if (!l850 || !l700 || !l500 || l850.tdC === null || l700.tdC === null) return null;
+  if (!l850 || !l700 || !l500 || l850.tdC === null || l700.tdC === null)
+    return null;
   return {
     tt: l850.tC - l500.tC + (l850.tdC - l500.tC),
     ki: l850.tC - l500.tC + l850.tdC - (l700.tC - l700.tdC),
@@ -1761,9 +1786,17 @@ export function lapIndicesFromRows(rows) {
  * rows; with `start` ({p, hM, tC, tdC}) the parcel begins there - the
  * start row first, then only the rows above it. */
 export function lapParcelRows(rows, start = null) {
-  const out = rows.map((r) => ({p: r.p, hM: r.hM, tC: r.tC, dwC: r.tdC ?? undefined}));
+  const out = rows.map((r) => ({
+    p: r.p,
+    hM: r.hM,
+    tC: r.tC,
+    dwC: r.tdC ?? undefined
+  }));
   if (!start) return out;
-  return [{p: start.p, hM: start.hM, tC: start.tC, dwC: start.tdC}, ...out.filter((r) => r.p < start.p)];
+  return [
+    {p: start.p, hM: start.hM, tC: start.tC, dwC: start.tdC},
+    ...out.filter((r) => r.p < start.p)
+  ];
 }
 /** The ATBD's lifted-index parcel: the pressure-weighted mean
  * temperature and dew point of the lowest `depthHpa` of the column
@@ -1775,7 +1808,11 @@ export function lapMeanLayerStart(rows, depthHpa = DSI_ATBD.parcel.layerHpa) {
   const pTop = pS - depthHpa;
   const top = lapLevelAt(rows, pTop);
   if (!top || top.tdC === null) return null;
-  const pts = [rows[0], ...rows.filter((r) => r.p < pS && r.p > pTop), {p: pTop, tC: top.tC, tdC: top.tdC}];
+  const pts = [
+    rows[0],
+    ...rows.filter((r) => r.p < pS && r.p > pTop),
+    {p: pTop, tC: top.tC, tdC: top.tdC}
+  ];
   let wT = 0;
   let wTd = 0;
   let W = 0;
@@ -1790,7 +1827,13 @@ export function lapMeanLayerStart(rows, depthHpa = DSI_ATBD.parcel.layerHpa) {
   }
   const pMid = pS - depthHpa / 2;
   const mid = lapLevelAt(rows, pMid);
-  return {p: pMid, hM: mid ? mid.hM : rows[0].hM, tC: wT / W, tdC: wTd / W, depthHpa};
+  return {
+    p: pMid,
+    hM: mid ? mid.hM : rows[0].hM,
+    tC: wT / W,
+    tdC: wTd / W,
+    depthHpa
+  };
 }
 /** The column's stability: the ATBD's five indices re-derived from the
  * rows (TT and KI from the discrete levels, LI from the mean
@@ -1805,11 +1848,20 @@ export function lapStability(rows, {sfcTC = null, sfcTdC = null} = {}) {
   if (!rows || rows.length < 5) return null;
   const levels = lapIndicesFromRows(rows);
   const meanLayer = lapMeanLayerStart(rows);
-  const meanAscent = meanLayer ? parcelAscent(lapParcelRows(rows, meanLayer)) : null;
+  const meanAscent = meanLayer
+    ? parcelAscent(lapParcelRows(rows, meanLayer))
+    : null;
   const l850 = lapLevelAt(rows, DSI_ATBD.parcel.siFromHpa);
   const siAscent =
     l850 && l850.tdC !== null
-      ? parcelAscent(lapParcelRows(rows, {p: DSI_ATBD.parcel.siFromHpa, hM: l850.hM, tC: l850.tC, tdC: l850.tdC}))
+      ? parcelAscent(
+          lapParcelRows(rows, {
+            p: DSI_ATBD.parcel.siFromHpa,
+            hM: l850.hM,
+            tC: l850.tC,
+            tdC: l850.tdC
+          })
+        )
       : null;
   const own = Number.isFinite(sfcTC) && Number.isFinite(sfcTdC);
   const start = own
@@ -1848,7 +1900,12 @@ export function dsiAgreement(noaa, mine) {
     const b = mine ? mine[id] : null;
     out[id] =
       Number.isFinite(a) && Number.isFinite(b)
-        ? {noaa: a, mine: b, diff: b - a, withinAccuracy: Math.abs(b - a) <= DSI_ATBD.requirement.accuracy[id]}
+        ? {
+            noaa: a,
+            mine: b,
+            diff: b - a,
+            withinAccuracy: Math.abs(b - a) <= DSI_ATBD.requirement.accuracy[id]
+          }
         : null;
   }
   return out;

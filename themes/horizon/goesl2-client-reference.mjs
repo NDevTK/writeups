@@ -686,27 +686,46 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
   const X = DSI_EXPECT;
   const calls = [];
   const s3 = async (url, opts) => {
-    const m = /bytes=(\d+)-(\d+)/.exec((opts.headers && opts.headers.range) || '');
+    const m = /bytes=(\d+)-(\d+)/.exec(
+      (opts.headers && opts.headers.range) || ''
+    );
     const s = +m[1];
     const e = Math.min(+m[2] + 1, crop.length);
     calls.push([s, e]);
     if (s >= crop.length)
-      return {status: 416, headers: {get: () => null}, arrayBuffer: async () => new ArrayBuffer(0)};
+      return {
+        status: 416,
+        headers: {get: () => null},
+        arrayBuffer: async () => new ArrayBuffer(0)
+      };
     return {
       status: 206,
-      headers: {get: (h) => (h === 'content-range' ? `bytes ${s}-${e - 1}/${crop.length}` : null)},
+      headers: {
+        get: (h) =>
+          h === 'content-range' ? `bytes ${s}-${e - 1}/${crop.length}` : null
+      },
       arrayBuffer: async () => crop.slice(s, e).buffer
     };
   };
   const rr = rangeReader('u', s3);
-  const f = await openHdf5Lazy(rr, inflateStream, {blockBytes: 4096, headBytes: 8192});
-  const dec = await decodeL2Window(f, L2_DSI_SPEC, X.centre.lat, X.centre.lon, 1, L2_DSI_EXTRAS);
+  const f = await openHdf5Lazy(rr, inflateStream, {
+    blockBytes: 4096,
+    headBytes: 8192
+  });
+  const dec = await decodeL2Window(
+    f,
+    L2_DSI_SPEC,
+    X.centre.lat,
+    X.centre.lon,
+    1,
+    L2_DSI_EXTRAS
+  );
   const body = dec ? l2DsiBody(dec, 'k', X.centre.lat, X.centre.lon) : null;
   const h = body ? body.here : null;
   const li = body ? unpackArray(body.li) : null;
   const expect = (id) => X.here[id.toUpperCase()].value;
   check(
-    'THE INDICES, READ BY RANGE: the lazy reader cuts the 3 x 3 stability window from the crop by range, and the body carries the five indices in their units with the ATBD\'s words',
+    "THE INDICES, READ BY RANGE: the lazy reader cuts the 3 x 3 stability window from the crop by range, and the body carries the five indices in their units with the ATBD's words",
     dec !== null &&
       body !== null &&
       body.product === 'ABI-L2-DSIC' &&

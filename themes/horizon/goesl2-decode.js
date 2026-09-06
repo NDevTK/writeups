@@ -1479,7 +1479,10 @@ export function l2DsiBody(dec, key, lat, lon) {
       ? {
           ...nearest,
           ...at(nearest.q),
-          quality: lapQuality(overall[nearest.q], retrieval ? retrieval[nearest.q] : null),
+          quality: lapQuality(
+            overall[nearest.q],
+            retrieval ? retrieval[nearest.q] : null
+          ),
           verdict: dsiVerdict(at(nearest.q), {west})
         }
       : null,
