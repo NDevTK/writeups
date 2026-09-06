@@ -10395,7 +10395,19 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   REVISION (the VERSION file's shape, and nothing on anything else;
   30). Docs: the daemon README's Verify step, the /goesl2 entry and
   the self-update section (the two lessons); FINDINGS pass 158.
-  validate: 145 files, 1,160 landmarks, 8 probes.
+  MEASURED LIVE against the stale box itself (probe, 09:47Z, the
+  page pointed at api.ndev.tk's /goesl2): zero PAGEERROR; the record
+  "the daemon (api.ndev.tk, the shared cache of noaa-goes18) - a
+  deploy behind the page: sst, dsr, dmw, aod, lst read from
+  noaa-goes18 by the page itself (2,433 kB in 15 ranges)" - the
+  mask from the daemon (09:42Z, 93% cloudy), the hour's SST (08:55Z,
+  17 good px, ABI - MUR +1.14 K), the AOD (09:37Z, nothing retrieved
+  at night) and the LST (09:02Z, 22 high px under the cloud, none
+  within 5 px of the point - the land layer stood down, stated) from
+  the page's own reads. validate: 145 files, 1,160 landmarks, 8
+  probes. THE DEPLOY, WATCHED: main carries this pass; the box's
+  timer gates it within minutes, and /health's `version` is the
+  proof once it lands.
 - DONE (Sep 5-6, the review session's 157th pass - THE LAND'S
   SKIN; rebuilt after a container restart at 02:22Z wiped the
   uncommitted first build, and committed stage by stage on the
