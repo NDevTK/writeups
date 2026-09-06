@@ -1032,18 +1032,64 @@ export const ADP_ATBD = {
     resolutionKm: 2
   },
   confidence: {lowSzaDeg: 60, lowVzaDeg: 70, marginLow: 0.01, marginHigh: 0.02},
-  dust: {thinBtdK: 0.4, thickBtdK: -0.4, cirrusR138: 0.055, waterThinBtd39K: [3, 10], waterThickBtd39K: 20},
-  smoke: {fireBt39K: 350, fireBtdK: 10, r1: [1.2, 1.8], r2: [1.0, 1.8], stdR064: 0.04, waterR3Thick: 6, waterR3Thin: 10},
+  dust: {
+    thinBtdK: 0.4,
+    thickBtdK: -0.4,
+    cirrusR138: 0.055,
+    waterThinBtd39K: [3, 10],
+    waterThickBtd39K: 20
+  },
+  smoke: {
+    fireBt39K: 350,
+    fireBtdK: 10,
+    r1: [1.2, 1.8],
+    r2: [1.0, 1.8],
+    stdR064: 0.04,
+    waterR3Thick: 6,
+    waterR3Thin: 10
+  },
   matchup: {radiusKm: 25, coverageMin: 0.8, dominantFrac: 0.5},
   validation: {
     period: '2017-12-14 to 2018-10-13, GOES-16',
     dust: {
-      aeronet: {tp: 6540, fp: 173, fn: 883, tn: 57439, accuracy: 0.985, pocd: 0.884, pofd: 0.026},
-      calipso: {tp: 4612, fp: 1476, fn: 667, tn: 488749, accuracy: 0.994, pocd: 0.874, pofd: 0.242}
+      aeronet: {
+        tp: 6540,
+        fp: 173,
+        fn: 883,
+        tn: 57439,
+        accuracy: 0.985,
+        pocd: 0.884,
+        pofd: 0.026
+      },
+      calipso: {
+        tp: 4612,
+        fp: 1476,
+        fn: 667,
+        tn: 488749,
+        accuracy: 0.994,
+        pocd: 0.874,
+        pofd: 0.242
+      }
     },
     smoke: {
-      calipso: {tp: 794, fp: 176, fn: 46, tn: 1034572, accuracy: 0.996, pocd: 0.945, pofd: 0.181},
-      aeronet: {tp: 2205, fp: 6371, fn: 3202, tn: 289476, accuracy: 0.954, pocd: 0.874, pofd: 0.224}
+      calipso: {
+        tp: 794,
+        fp: 176,
+        fn: 46,
+        tn: 1034572,
+        accuracy: 0.996,
+        pocd: 0.945,
+        pofd: 0.181
+      },
+      aeronet: {
+        tp: 2205,
+        fp: 6371,
+        fn: 3202,
+        tn: 289476,
+        accuracy: 0.954,
+        pocd: 0.874,
+        pofd: 0.224
+      }
     }
   }
 };
@@ -1059,7 +1105,12 @@ export function adpFlagBytes(values) {
   const out = new Uint8Array(values.length);
   for (let q = 0; q < values.length; q++) {
     const v = values[q];
-    out[q] = v === -128 || v === 128 || v === 255 || !Number.isFinite(v) ? 255 : v === 1 ? 1 : 0;
+    out[q] =
+      v === -128 || v === 128 || v === 255 || !Number.isFinite(v)
+        ? 255
+        : v === 1
+          ? 1
+          : 0;
   }
   return out;
 }
@@ -1087,7 +1138,8 @@ export function adpConfidence(dqf, kind) {
  * for the fill; a present flag with a null confidence is a call the
  * ATBD's own quality word disowns (kept, stated). */
 export function adpPixel(flag, dqf, kind) {
-  if (!Number.isFinite(flag) || flag === ADP_FLAG_FILL) return {present: null, confidence: null};
+  if (!Number.isFinite(flag) || flag === ADP_FLAG_FILL)
+    return {present: null, confidence: null};
   return {present: flag === 1, confidence: adpConfidence(dqf, kind)};
 }
 /**
@@ -1097,8 +1149,24 @@ export function adpPixel(flag, dqf, kind) {
  * split.
  */
 export function adpCensus(smoke, dust, dqf, pqi2 = null) {
-  const kind = () => ({retrieved: 0, present: 0, high: 0, medium: 0, low: 0, disowned: 0});
-  const c = {n: smoke.length, fill: 0, night: 0, glint: 0, land: 0, water: 0, smoke: kind(), dust: kind()};
+  const kind = () => ({
+    retrieved: 0,
+    present: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    disowned: 0
+  });
+  const c = {
+    n: smoke.length,
+    fill: 0,
+    night: 0,
+    glint: 0,
+    land: 0,
+    water: 0,
+    smoke: kind(),
+    dust: kind()
+  };
   for (let q = 0; q < smoke.length; q++) {
     const s = smoke[q];
     const d = dust[q];
@@ -1139,20 +1207,35 @@ export function adpCensus(smoke, dust, dqf, pqi2 = null) {
  * night circle: no call). Counts and the confidence split come with
  * the verdict.
  */
-export function adpDominant(smoke, dust, dqf, pqi2, {cols, rows, ci, cj, radiusPx}) {
+export function adpDominant(
+  smoke,
+  dust,
+  dqf,
+  pqi2,
+  {cols, rows, ci, cj, radiusPx}
+) {
   const r2 = radiusPx * radiusPx;
   let inCircle = 0;
   let valid = 0;
   const s = {present: 0, high: 0, medium: 0, low: 0};
   const d = {present: 0, high: 0, medium: 0, low: 0};
-  for (let j = Math.max(0, cj - radiusPx); j <= Math.min(rows - 1, cj + radiusPx); j++) {
-    for (let i = Math.max(0, ci - radiusPx); i <= Math.min(cols - 1, ci + radiusPx); i++) {
+  for (
+    let j = Math.max(0, cj - radiusPx);
+    j <= Math.min(rows - 1, cj + radiusPx);
+    j++
+  ) {
+    for (
+      let i = Math.max(0, ci - radiusPx);
+      i <= Math.min(cols - 1, ci + radiusPx);
+      i++
+    ) {
       if ((i - ci) * (i - ci) + (j - cj) * (j - cj) > r2) continue;
       inCircle++;
       const q = j * cols + i;
       const sf = smoke[q];
       const df = dust[q];
-      if (sf === ADP_FLAG_FILL || df === ADP_FLAG_FILL || sf === undefined) continue;
+      if (sf === ADP_FLAG_FILL || df === ADP_FLAG_FILL || sf === undefined)
+        continue;
       const p2 = pqi2 ? pqi2[q] : 0;
       if (p2 & ADP_PQI2.withinGlint) continue;
       const w = dqf ? dqf[q] : ADP_DQF_FILL;
@@ -1184,7 +1267,15 @@ export function adpDominant(smoke, dust, dqf, pqi2, {cols, rows, ci, cj, radiusP
     dust: d,
     smokeFrac: valid ? s.present / valid : null,
     dustFrac: valid ? d.present / valid : null,
-    dominant: !enough ? null : smokeDom && dustDom ? 'both' : smokeDom ? 'smoke' : dustDom ? 'dust' : 'none'
+    dominant: !enough
+      ? null
+      : smokeDom && dustDom
+        ? 'both'
+        : smokeDom
+          ? 'smoke'
+          : dustDom
+            ? 'dust'
+            : 'none'
   };
 }
 /**
@@ -1200,19 +1291,25 @@ export function adpReweight(fractions, dominant, floor = ADP_CALLED_FLOOR) {
   const f = {...(fractions || {})};
   const keys = Object.keys(f);
   const sum = keys.reduce((a, k) => a + Math.max(f[k] ?? 0, 0), 0);
-  if (!(dominant === 'dust' || dominant === 'smoke') || !keys.length || !(sum > 0))
+  if (
+    !(dominant === 'dust' || dominant === 'smoke') ||
+    !keys.length ||
+    !(sum > 0)
+  )
     return {fractions: f, changed: false, from: null, to: null};
   const group = dominant === 'dust' ? ['dust'] : ['organic', 'blackCarbon'];
   const gSum = group.reduce((a, k) => a + Math.max(f[k] ?? 0, 0), 0);
   const gShare = gSum / sum;
-  if (gShare >= floor) return {fractions: f, changed: false, from: gShare, to: gShare};
+  if (gShare >= floor)
+    return {fractions: f, changed: false, from: gShare, to: gShare};
   const target = floor * sum;
   const restKeys = keys.filter((k) => !group.includes(k));
   const restSum = restKeys.reduce((a, k) => a + Math.max(f[k] ?? 0, 0), 0);
   const restScale = restSum > 0 ? (sum - target) / restSum : 0;
   const out = {};
   for (const k of restKeys) out[k] = Math.max(f[k] ?? 0, 0) * restScale;
-  if (gSum > 0) for (const k of group) out[k] = (Math.max(f[k] ?? 0, 0) / gSum) * target;
+  if (gSum > 0)
+    for (const k of group) out[k] = (Math.max(f[k] ?? 0, 0) / gSum) * target;
   else {
     out[group[0]] = target;
     for (const k of group.slice(1)) out[k] = 0;

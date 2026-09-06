@@ -6254,7 +6254,9 @@
             adp: state.aerosolAdp
               ? {
                   ...state.aerosolAdp,
-                  amountSource: state.aeronet ? "the photometer's" : "the model's"
+                  amountSource: state.aeronet
+                    ? "the photometer's"
+                    : "the model's"
                 }
               : null
           };
@@ -6508,7 +6510,9 @@
         p.present === null
           ? 'no pixel'
           : (p.present ? 'present' : 'absent') +
-            (p.confidence ? ` (${p.confidence} confidence)` : ' (test not run)');
+            (p.confidence
+              ? ` (${p.confidence} confidence)`
+              : ' (test not run)');
       function adpWords(a) {
         const c = a.census;
         const m = a.matchup;

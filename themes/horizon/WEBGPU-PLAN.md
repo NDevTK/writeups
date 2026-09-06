@@ -10436,27 +10436,27 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   (23.30 N 63.54 W, the dust sheet's edge at sea, 20:3xZ, looking into
   the Sun at 275 deg): "NOAA GOES-19 aerosol detection (ADPC) - 20:22Z
   - overhead smoke absent (high confidence), dust absent (high
-  confidence) - within 25 km: 493 valid of 529 px (93% coverage): smoke
-  0, dust 0 -> neither dominant - within +-100 km: dust 682 px (0 high,
-  74 medium, 608 low) of 5,664 retrieved, smoke 0 px of 4,982 retrieved
+    confidence) - within 25 km: 493 valid of 529 px (93% coverage): smoke
+    0, dust 0 -> neither dominant - within +-100 km: dust 682 px (0 high,
+    74 medium, 608 low) of 5,664 retrieved, smoke 0 px of 4,982 retrieved
   - the scene 2,983 dust and 239 smoke detections" and the model's
-  split standing (du/ss/su/om/bc 11/71/10/6/2%, aureole f550 0.050,
-  cone 30.0 deg, marine droplets); a search of the whole 20:21Z CONUS
-  file found NO 25-km circle meeting the rule (3,003 dust and 1,244
-  smoke pixels, patchy and cloud-broken), so the mechanism was
-  measured through the pin: ?adpkind=dust gives "du/ss/su/om/bc
-  60/32/5/3/1% - aureole f550 0.029 - cone 9.0 deg - desert 3-mode
-  (dust majority, OPAC Table 4) - deck droplets continental Dn 7.7 um
+    split standing (du/ss/su/om/bc 11/71/10/6/2%, aureole f550 0.050,
+    cone 30.0 deg, marine droplets); a search of the whole 20:21Z CONUS
+    file found NO 25-km circle meeting the rule (3,003 dust and 1,244
+    smoke pixels, patchy and cloud-broken), so the mechanism was
+    measured through the pin: ?adpkind=dust gives "du/ss/su/om/bc
+    60/32/5/3/1% - aureole f550 0.029 - cone 9.0 deg - desert 3-mode
+    (dust majority, OPAC Table 4) - deck droplets continental Dn 7.7 um
   - ADP dust pinned (?adpkind): dust 11% -> 60%" - the coarse mode's
-  spike narrowing from the transported 30-deg cone to the desert
-  mixture's 9 and the corona's air class turning continental, from one
-  measured word. STATED LIMITS: the detection is binary above AOD 0.2
-  and daytime only; a called kind moves the species' shares, never the
-  column's amount, single-scattering albedo, asymmetry or spectral
-  slope - the type's own absorption (Dubovik et al. 2002's AERONET
-  climatology, fetched, 55 pp, unread yet) is the next stage; the
-  ATBD's rule needs 80% of a 25-km circle valid, so a sheet under
-  broken cloud makes no call (today's did not).
+    spike narrowing from the transported 30-deg cone to the desert
+    mixture's 9 and the corona's air class turning continental, from one
+    measured word. STATED LIMITS: the detection is binary above AOD 0.2
+    and daytime only; a called kind moves the species' shares, never the
+    column's amount, single-scattering albedo, asymmetry or spectral
+    slope - the type's own absorption (Dubovik et al. 2002's AERONET
+    climatology, fetched, 55 pp, unread yet) is the next stage; the
+    ATBD's rule needs 80% of a 25-km circle valid, so a sheet under
+    broken cloud makes no call (today's did not).
 - DONE (Sep 6, the review session's 168th pass - THE FLASHES FROM
   ORBIT): the scene's lightning has been Blitzortung's since the live
   channel's first pass - a ground network of hobbyist receivers, dense

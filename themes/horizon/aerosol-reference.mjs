@@ -230,15 +230,27 @@ const prod = aerosolProducts(msgs, 47, 8);
     }
   };
   const before = channelSet(prod);
-  const rw = reweightSpecies(prod, {dust: 0.6, seaSalt: 0.12, sulfate: 0.16, organic: 0.09, blackCarbon: 0.03});
+  const rw = reweightSpecies(prod, {
+    dust: 0.6,
+    seaSalt: 0.12,
+    sulfate: 0.16,
+    organic: 0.09,
+    blackCarbon: 0.03
+  });
   const after = channelSet(rw);
   const sumAot = Object.values(rw.species).reduce((a, s) => a + s.aot, 0);
   const noFine = reweightSpecies(
-    {...prod, species: {dust: {aot: 0.2, sct: 0.19}, seaSalt: {aot: 0.2, sct: 0.2}}},
+    {
+      ...prod,
+      species: {dust: {aot: 0.2, sct: 0.19}, seaSalt: {aot: 0.2, sct: 0.2}}
+    },
     {dust: 0.2, seaSalt: 0.2, organic: 0.6}
   );
   const same = reweightSpecies(prod, null);
-  const noBand = reweightSpecies({...prod, bands: [340, 440], tau: {340: 0.5, 440: 0.45}}, {dust: 0.6});
+  const noBand = reweightSpecies(
+    {...prod, bands: [340, 440], tau: {340: 0.5, 440: 0.45}},
+    {dust: 0.6}
+  );
   check(
     "THE HAZE'S KIND re-weights the species, never the column",
     near(before.fractions.dust, 0.1) &&

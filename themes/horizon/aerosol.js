@@ -181,7 +181,10 @@ export function reweightSpecies(prod, fractions) {
     ? clamp(prod.sct555 / total, 0, 1)
     : 1;
   const species = {};
-  const keys = new Set([...Object.keys(prod.species || {}), ...Object.keys(fractions)]);
+  const keys = new Set([
+    ...Object.keys(prod.species || {}),
+    ...Object.keys(fractions)
+  ]);
   for (const k of keys) {
     const was = (prod.species || {})[k] || {};
     const f = Number.isFinite(fractions[k]) ? Math.max(fractions[k], 0) : 0;

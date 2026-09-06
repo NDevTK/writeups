@@ -1130,7 +1130,7 @@ The practice the corpus demonstrates, stated so it can be reused:
    scene met the rule (3,003 dust and 1,244 smoke pixels, patchy and
    cloud-broken), so the mechanism is shown by a labelled pin: the
    home column's dust 11% → 60%, the aureole's cone 30° → 9° (`goesl2-
-   reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
+reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    KIND, READ; `aerosol-reference` THE HAZE'S KIND re-weights the
    species, never the column)
    (`goesl2-client-reference`: the browser's inflate, the range

@@ -1251,7 +1251,13 @@ const inflate = (u8) =>
   // a circle whose valid coverage falls short: every word bad but one
   const dqBad = new Uint16Array(W * W).fill(0xffff);
   dqBad[10 * W + 10] = 0;
-  const shortC = adpDominant(sm, du, dqBad, p2, {cols: W, rows: W, ci: 10, cj: 10, radiusPx: 4});
+  const shortC = adpDominant(sm, du, dqBad, p2, {
+    cols: W,
+    rows: W,
+    ci: 10,
+    cj: 10,
+    radiusPx: 4
+  });
   // both: a window where every valid pixel carries both flags
   const both = adpDominant(
     new Uint8Array(9).fill(1),
@@ -1260,7 +1266,13 @@ const inflate = (u8) =>
     null,
     {cols: 3, rows: 3, ci: 1, cj: 1, radiusPx: 1}
   );
-  const model = {dust: 0.1, seaSalt: 0.3, sulfate: 0.4, organic: 0.15, blackCarbon: 0.05};
+  const model = {
+    dust: 0.1,
+    seaSalt: 0.3,
+    sulfate: 0.4,
+    organic: 0.15,
+    blackCarbon: 0.05
+  };
   const rwD = adpReweight(model, 'dust');
   const rwS = adpReweight(model, 'smoke');
   const rwN = adpReweight(model, 'none');
@@ -1324,7 +1336,11 @@ const inflate = (u8) =>
       near(rwD.fractions.seaSalt / rwD.fractions.sulfate, 0.75, 1e-12) &&
       near(rwD.from, 0.1, 1e-12) &&
       rwS.changed === true &&
-      near(rwS.fractions.organic + rwS.fractions.blackCarbon, ADP_CALLED_FLOOR, 1e-12) &&
+      near(
+        rwS.fractions.organic + rwS.fractions.blackCarbon,
+        ADP_CALLED_FLOOR,
+        1e-12
+      ) &&
       near(rwS.fractions.organic / rwS.fractions.blackCarbon, 3, 1e-12) &&
       near(sumS, 1, 1e-12) &&
       rwN.changed === false &&
