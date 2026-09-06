@@ -10469,7 +10469,14 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   fine texels under the mask's cloud shaped, mean fraction 0.60,
   the rest keeping the 2-km cover; the coarse field's next arrival
   re-cut the held window in 520 ms without a new read; the record
-  and the research line print all of it. A first probe an hour
+  and the research line print all of it. The same read five
+  minutes later (the 11:32Z file, 3,706 kB in 6 ranges) took 54.8 s
+  through a slow proxy tunnel - the bytes are the measurement's
+  price, the seconds the network's, both printed. The screenshots
+  toward the low sun (look 160 deg, the sun 77 deg from the zenith)
+  wash out to a hazy band and tell the two fields apart no better
+  than the eye would; the pair facing the cloudiest sea sector is
+  the visual record. A first probe an hour
   earlier had no line at all: the field lands only once the column
   and a sea temperature stand, and Hatteras's 00Z ascent (Newport
   NC) had burst at 594 hPa - the page's own rule (t250 finite)
