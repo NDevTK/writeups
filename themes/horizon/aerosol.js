@@ -287,7 +287,8 @@ export function lnInterp(nmTable, values, nm) {
   if (nm >= nmTable[last]) return values[last];
   for (let i = 1; i <= last; i++)
     if (nm <= nmTable[i]) {
-      const f = Math.log(nm / nmTable[i - 1]) / Math.log(nmTable[i] / nmTable[i - 1]);
+      const f =
+        Math.log(nm / nmTable[i - 1]) / Math.log(nmTable[i] / nmTable[i - 1]);
       return values[i - 1] + f * (values[i] - values[i - 1]);
     }
   return values[last];
@@ -322,7 +323,11 @@ export function mixTypeOptics(set, kind, share) {
   const s = clamp(share, 0, 1);
   const tau550 = set.tau[1];
   const tau = set.tau.map((v, c) =>
-    clamp((1 - s) * v + s * tau550 * Math.pow(CHANNEL_NM[c] / 550, -t.alpha), TAU_MIN, TAU_MAX)
+    clamp(
+      (1 - s) * v + s * tau550 * Math.pow(CHANNEL_NM[c] / 550, -t.alpha),
+      TAU_MIN,
+      TAU_MAX
+    )
   );
   const ssa = set.ssa.map((v, c) => clamp((1 - s) * v + s * t.ssa[c], 0.05, 1));
   const g = clamp((1 - s) * set.g + s * t.g, 0, 0.95);

@@ -294,7 +294,12 @@ const prod = aerosolProducts(msgs, 47, 8);
   const f680 = Math.log(680 / 670) / Math.log(870 / 670);
   const dust = typeOptics('dust');
   const smoke = typeOptics('smoke');
-  const set = {tau: [0.1, 0.132, 0.18], ssa: [0.98, 0.98, 0.98], g: 0.8, fractions: {dust: 0.6}};
+  const set = {
+    tau: [0.1, 0.132, 0.18],
+    ssa: [0.98, 0.98, 0.98],
+    g: 0.8,
+    fractions: {dust: 0.6}
+  };
   const none = mixTypeOptics(set, 'dust', 0);
   const whole = mixTypeOptics(set, 'dust', 1);
   const mixed = mixTypeOptics(set, 'dust', 0.6);
@@ -333,7 +338,10 @@ const prod = aerosolProducts(msgs, 47, 8);
       near(mixed.ssa[1], 0.4 * 0.98 + 0.6 * dust.ssa[1]) &&
       near(mixed.g, 0.4 * 0.8 + 0.6 * dust.g) &&
       near(mixed.tau[1], 0.132) &&
-      near(mixed.tau[2], 0.4 * 0.18 + 0.6 * 0.132 * Math.pow(440 / 550, -0.3)) &&
+      near(
+        mixed.tau[2],
+        0.4 * 0.18 + 0.6 * 0.132 * Math.pow(440 / 550, -0.3)
+      ) &&
       mixed.type.kind === 'dust' &&
       mixed.type.share === 0.6 &&
       mixed.type.before.ssa[1] === 0.98 &&

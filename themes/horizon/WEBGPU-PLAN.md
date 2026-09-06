@@ -10352,8 +10352,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   read in full: Dubovik, Holben, Eck, Smirnov, Kaufman, King, Tanre &
   Slutsker 2002 (J. Atmos. Sci. 59, 590-608; the NASA GSFC preprint,
   55 pp) - the climatology the ADP ATBD itself cites: eight years of
-  AERONET sun-and-sky radiance at twelve sites inverted (Dubovik & King
-  2000) to the column's omega0, g, n and k at 440, 670, 870 and 1020
+  AERONET sun-and-sky radiance at twelve sites inverted (Dubovik & King 2000) to the column's omega0, g, n and k at 440, 670, 870 and 1020
   nm, omega0 good to 0.03 at tau(440) over 0.5 and solar zenith past
   50 deg (0.05-0.07 below tau 0.2), Table 1 given for tau(440) at or
   over 0.4 (dust for tau(1020) over 0.3 and alpha under 0.6). DUST
