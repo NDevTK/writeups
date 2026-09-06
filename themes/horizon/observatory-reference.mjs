@@ -29,6 +29,7 @@ import {
   flashFromProfile,
   flashLedgerVerdict,
   flashPanel,
+  landPanel,
   leewavePanel,
   retrievalPanel,
   marinePanel,
@@ -1220,5 +1221,68 @@ pinBlock(
         `${clo.ratios.diffuseRatio.toFixed(2)})`
     : 'night hour - the audit sleeps'
 );
+
+// ---- THE LAND SURFACE LAYER (157th pass): the panel composes -----
+// landlayer's gated column (Monin-Obukhov over a prescribed
+// roughness, the WMO/Rigden thermal roughness, Fleagle's
+// autoconvective test, Hirt's k) on the fixture's balloon rows and
+// owns no law: the verdicts must follow the numbers it carries.
+// Day-invariant - a fixed afternoon and a fixed night over the same
+// grass (z0 0.03 m, Rigden's grassland kB^-1 2.5), the fixture's
+// ascent above.
+{
+  const metDay = {
+    uMs: 3.5,
+    zuM: 10,
+    taC: 27.8,
+    ztM: 2,
+    tsC: 31.4,
+    pPa: 101300,
+    rhFrac: 0.5
+  };
+  const metNight = {...metDay, uMs: 1.5, taC: 16, tsC: 12};
+  const opts = {z0M: 0.03, kbInv: 2.5, h0M: 20, bliM: null};
+  const day = landPanel(metDay, SOUNDING.rows, opts);
+  const night = landPanel(metNight, SOUNDING.rows, opts);
+  const rowsUp = (r) => r.every((q, i) => i === 0 || q.hM > r[i - 1].hM);
+  const okDay =
+    !!day &&
+    day.stability === 'unstable' &&
+    day.L < 0 &&
+    /^sinking/.test(day.klass) &&
+    (day.autoFilmTopM === null || day.lapses[0].super === true) &&
+    Number.isFinite(day.kLand) &&
+    day.k0to100 < day.kLand &&
+    day.uStar > 0 &&
+    day.hsbWm2 > 0 &&
+    day.t2C < day.tSkinC &&
+    day.t2C > day.t100C &&
+    rowsUp(day.rows) &&
+    day.sensitivity.length === 2 &&
+    day.sensitivity.every((s) => Number.isFinite(s.hsbWm2) && s.thetaStar < 0);
+  const okNight =
+    !!night &&
+    night.stability === 'stable' &&
+    night.L > 0 &&
+    /^looming/.test(night.klass) &&
+    night.hsbWm2 < 0 &&
+    night.t2C > night.tSkinC &&
+    night.kLand > day.kLand &&
+    rowsUp(night.rows);
+  check(
+    'THE LAND SURFACE LAYER composes without owning a law',
+    okDay && okNight,
+    day && night
+      ? `afternoon skin +${day.dTskinAirK.toFixed(1)} K over grass: ${day.stability}, ` +
+        `L ${day.L.toFixed(0)} m, u* ${day.uStar.toFixed(2)} m/s, H ${day.hsbWm2.toFixed(0)} W/m2, ` +
+        `${day.klass}, k(2-100 m) ${day.kLand.toFixed(3)} above k(0-100 m) ${day.k0to100.toFixed(3)} ` +
+        `(the film's steepest metres pull the deeper mean down), the kB^-1 sensitivity ` +
+        `H ${day.sensitivity.map((s) => s.hsbWm2.toFixed(0)).join('/')} W/m2 (Rigden ALL / Kanda bluff); ` +
+        `night skin ${night.dTskinAirK.toFixed(1)} K: ${night.stability}, ${night.klass}, ` +
+        `H ${night.hsbWm2.toFixed(0)} W/m2, k ${night.kLand.toFixed(3)} above the afternoon's - ` +
+        `every verdict follows the column's own numbers`
+      : 'the panel declined the fixture'
+  );
+}
 
 process.exit(fail ? 1 : 0);

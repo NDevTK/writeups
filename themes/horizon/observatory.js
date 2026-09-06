@@ -108,6 +108,15 @@ import {
   lehnInvertTC,
   tcCriticalPoints
 } from './lehn.js';
+import {
+  autoconvective,
+  KB_BLUFF_C1,
+  KB_INV_RIGDEN,
+  kbInvBluff,
+  kbSensitivity,
+  landColumnRows,
+  landRefractionK
+} from './landlayer.js';
 
 // The drawn ocean's whitecap coverage law (Monahan &
 // O'Muircheartaigh 1980, W = 3.84e-6 U10^3.41) - the GPU copy
@@ -1240,6 +1249,100 @@ export function marinePanel(
     rnlWm2: cs ? cs.rnlWm2 : null,
     q0Wm2: cs ? cs.qcolWm2 : null,
     shore: shore ? {id: shore.id, km: shore.km} : null
+  };
+}
+
+/**
+ * THE LAND SURFACE LAYER (157th pass): the satellite's land skin
+ * against the screen air and the 10-m wind on the footprint's own
+ * roughness through Monin-Obukhov similarity (landlayer.js - the
+ * Kansas forms over a PRESCRIBED z0, the thermal roughness by cover:
+ * Rigden's AmeriFlux constants for canopies, the Kanda/Brutsaert
+ * bluff-body law for built and bare ground), composed under the
+ * balloon into the LAND's column the far ring's land spokes refract
+ * through; the film's verdicts in Fleagle's own terms (the
+ * autoconvective test layer by layer) and Hirt's coefficient over
+ * the eye's 2-100 m (the ring's mean-k layer) and over 0-100 m
+ * beside it; the sensitivity to the thermal-roughness choice
+ * (Rigden's all-cover constant against Kanda's law on the whole
+ * footprint). met: {uMs, zuM, taC, ztM, tsC, pPa?, rhFrac?}; rows:
+ * the ascent's daemon rows; z0M and kbInv (a number, or a function
+ * of u*) the footprint census's; h0M the eye's own ground; bliM the
+ * ascent's measured mixed-layer depth. This function owns no law.
+ */
+export function landPanel(
+  met,
+  balloonRows,
+  {z0M = 0.03, kbInv = KB_INV_RIGDEN.GRA, h0M = null, bliM = null} = {}
+) {
+  const comp = landColumnRows(balloonRows, met, {z0M, kbInv, h0M, bliM});
+  if (!comp) return null;
+  const mo = comp.mo;
+  const auto = autoconvective(mo);
+  const kLand = landRefractionK(mo, comp.pSurfPa);
+  const k0to100 = landRefractionK(mo, comp.pSurfPa, {zA: 0, zB: 100});
+  const sens = kbSensitivity(
+    {
+      uMs: met.uMs,
+      zuM: met.zuM ?? 10,
+      taC: met.taC,
+      ztM: met.ztM ?? 2,
+      tsC: met.tsC,
+      pPa: comp.pSurfPa,
+      z0M,
+      rhFrac: met.rhFrac ?? null,
+      bliM: bliM ?? 1000
+    },
+    [KB_INV_RIGDEN.ALL, (u) => kbInvBluff(z0M, u, KB_BLUFF_C1.kanda)]
+  );
+  const stability =
+    !Number.isFinite(mo.L) || Math.abs(mo.L) > 1e4
+      ? 'neutral'
+      : mo.L < 0
+        ? 'unstable'
+        : 'stable';
+  const klass =
+    stability === 'unstable'
+      ? auto.filmTopM
+        ? `sinking (inferior-mirage film to ${auto.filmTopM} m)`
+        : 'sinking (sub-autoconvective film)'
+      : stability === 'stable'
+        ? 'looming (surface inversion: ducted/towering class)'
+        : 'neutral film';
+  return {
+    rows: comp.rows,
+    modelBand: comp.modelBand,
+    filmTopM: comp.filmTopM,
+    joinM: comp.joinM,
+    h0M: comp.h0M,
+    pSurfPa: comp.pSurfPa,
+    stability,
+    klass,
+    L: mo.L,
+    zetaU: mo.zetaU,
+    clamped: mo.clamped,
+    uStar: mo.uStar,
+    thetaStar: mo.thetaStar,
+    hsbWm2: mo.hsbWm2,
+    gustMs: mo.gust,
+    rhoAKgM3: mo.rhoA,
+    z0M: mo.z0,
+    z0hM: mo.z0h,
+    kbInv: mo.kbInv,
+    kLand,
+    k0to100,
+    lapses: auto.layers,
+    autoFilmTopM: auto.filmTopM,
+    autoRateKm: auto.rateKm,
+    dTskinAirK: met.tsC - met.taC,
+    tSkinC: met.tsC,
+    t2C: mo.tAt(2),
+    t10C: mo.tAt(10),
+    t100C: mo.tAt(100),
+    u10Ms: mo.uAt(10),
+    uMeasMs: met.uMs,
+    sensitivity: sens,
+    iterations: mo.iterations
   };
 }
 
