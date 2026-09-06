@@ -10489,7 +10489,24 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   echo on 0% of 289 px · radar over 100% of the window · zoom 7
   (0.96 km/px), Universal Blue palette · 4 min old" - a covered dry
   pixel, measured, where the placeholder had said "no radar
-  coverage here".
+  coverage here". At the morning's heaviest Kansas pixel (39.76 N
+  97.88 W, 14:3xZ, the cell moved on in the twenty minutes between
+  the census and the probe): "NOAA GOES-19 rainfall rate (RRQPEF) -
+  14:25Z - overhead dry (good) - nearest rain 5.3 mm/h 12.1 km off -
+  1286 raining of 10,201 retrieved 2-km px within +-100 km (max 10.0
+  mm/h, mean 4.5 over the raining) - the disk 447,109 raining px,
+  max 99.92 mm/h" beside "RainViewer radar - here 0.00 mm/h (-32
+  dBZ) - 18-km window: rain 0.00 mm/h over the ground the radar
+  sees, max 0.0, echo on 0% of 361 px - radar over 100% of the
+  window - zoom 7 (0.94 km/px), Universal Blue palette - 5 min old",
+  and the line's verdict "the scene's rain: the radar sees this
+  pixel (0.00 mm/h) and outranks the satellite" - the two
+  measurements agreeing the pixel is dry while the satellite names
+  the cell 12 km off. validate 146 files, 1,173 landmarks, 8 probes,
+  page-wiring - PASS. NEXT: the raining pixels within reach drawn as
+  rain shafts under the cloud base at their bearings (the fire
+  renderer's placement, the precipitation block's base), so the rain
+  the satellite measures is seen falling where it falls.
 - DONE (Sep 6, the review session's 163rd pass - THE COLUMN'S WATER):
   the clear-sky reference that decides which sea pixel is cloud has
   stood on the balloon's column since the 145th pass - the nearest
