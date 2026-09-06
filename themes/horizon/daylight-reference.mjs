@@ -73,7 +73,16 @@ const rhoOf = (km) => (km < 40 ? RHO_CLOUD : km < 60 ? RHO_THIN : RHO_CLEAR);
 // the visible window: 401 x 401 around the home, the factor = the
 // reflectance times the pixel's own cos(sun) at the file's time;
 // every 97th pixel flagged no value (fill)
-const visBox = windowBox(HOME.lat, HOME.lon, g, G500.x, G500.y, 6000, 6000, 200);
+const visBox = windowBox(
+  HOME.lat,
+  HOME.lon,
+  g,
+  G500.x,
+  G500.y,
+  6000,
+  6000,
+  200
+);
 const geo = solarGeometry(Date.parse(AT));
 const nVis = visBox.cols * visBox.rows;
 const vis = {
@@ -126,11 +135,21 @@ const cj = Math.floor(win.py - j0);
 const frame = {win, i0, j0, ci, cj, halfPx: win.halfPx};
 const ww = 2 * win.halfPx + 1;
 // the theme's field: every pixel sea, low cloud within 60 km
-const field = {ww, wh: ww, cls: new Uint8Array(ww * ww), water: new Uint8Array(ww * ww).fill(1)};
+const field = {
+  ww,
+  wh: ww,
+  cls: new Uint8Array(ww * ww),
+  water: new Uint8Array(ww * ww).fill(1)
+};
 for (let j = 0; j < ww; j++)
   for (let i = 0; i < ww; i++) {
-    const ll = mercatorLatLon(win.x0 + i0 + i + 0.5, win.y0 + j0 + j + 0.5, win.z);
-    field.cls[j * ww + i] = distKm(ll.latDeg, ll.lonDeg) < 60 ? CLS.low : CLS.clear;
+    const ll = mercatorLatLon(
+      win.x0 + i0 + i + 0.5,
+      win.y0 + j0 + j + 0.5,
+      win.z
+    );
+    field.cls[j * ww + i] =
+      distKm(ll.latDeg, ll.lonDeg) < 60 ? CLS.low : CLS.clear;
   }
 // the coarse deck field as deckField lays it: a zero border, the
 // interior texel ii from field pixel ci - halfPx - 1 + ii, low cover
@@ -153,7 +172,10 @@ for (let jj = 1; jj < rm - 1; jj++)
 
 // ---- the words at a pixel, the reflectance back out ---------------
 {
-  const qHome = visBox.j * 0 + (visBox.j - visBox.j0) * visBox.cols + (visBox.i - visBox.i0);
+  const qHome =
+    visBox.j * 0 +
+    (visBox.j - visBox.j0) * visBox.cols +
+    (visBox.i - visBox.i0);
   const clearOf = maskClearOf(vis, mask);
   const ownOf = fieldClearOf(vis, field, frame);
   // a pixel 61 km east: the ring's flag not good -> null from the
@@ -164,8 +186,15 @@ for (let jj = 1; jj < rm - 1; jj++)
     const s = windowScanAngles(vis, q);
     const ll = fixedGridToLatLon(s.x, s.y, g);
     const km = distKm(ll.latDeg, ll.lonDeg);
-    if (qRing < 0 && km > 60.5 && km < 61.5 && Math.abs(ll.latDeg - HOME.lat) < 0.01) qRing = q;
-    if (qFar < 0 && km > 80 && km < 85 && Math.abs(ll.latDeg - HOME.lat) < 0.01) qFar = q;
+    if (
+      qRing < 0 &&
+      km > 60.5 &&
+      km < 61.5 &&
+      Math.abs(ll.latDeg - HOME.lat) < 0.01
+    )
+      qRing = q;
+    if (qFar < 0 && km > 80 && km < 85 && Math.abs(ll.latDeg - HOME.lat) < 0.01)
+      qFar = q;
   }
   const refl = visReflectance(vis, Date.parse(AT));
   const dark = visReflectance(vis, Date.parse('2026-09-06T06:00:00Z'));
@@ -197,10 +226,33 @@ for (let jj = 1; jj < rm - 1; jj++)
 // ---- the field composed -------------------------------------------
 {
   const res = daylightField({vis, deck, frame, mask, ms: Date.parse(AT)});
-  const own = daylightField({vis, deck, frame, mask: null, field, ms: Date.parse(AT)});
-  const night = daylightField({vis, deck, frame, mask, ms: Date.parse('2026-09-06T06:00:00Z')});
-  const allCloud = {...mask, bcm: new Uint8Array(nMask).fill(1), dqf: new Uint8Array(nMask)};
-  const thin = daylightField({vis, deck, frame, mask: allCloud, ms: Date.parse(AT)});
+  const own = daylightField({
+    vis,
+    deck,
+    frame,
+    mask: null,
+    field,
+    ms: Date.parse(AT)
+  });
+  const night = daylightField({
+    vis,
+    deck,
+    frame,
+    mask,
+    ms: Date.parse('2026-09-06T06:00:00Z')
+  });
+  const allCloud = {
+    ...mask,
+    bcm: new Uint8Array(nMask).fill(1),
+    dqf: new Uint8Array(nMask)
+  };
+  const thin = daylightField({
+    vis,
+    deck,
+    frame,
+    mask: allCloud,
+    ms: Date.parse(AT)
+  });
   const rf = rm * DAYLIGHT_FACTOR;
   const sum = (d, ch) => {
     let s = 0;
@@ -220,7 +272,11 @@ for (let jj = 1; jj < rm - 1; jj++)
       const jj = Math.floor(fj / DAYLIGHT_FACTOR);
       if (!(deck.data[(jj * rm + ii) * 4] > 0)) continue;
       coarseCloudFine++;
-      const ll = mercatorLatLon(X0 + (fi + 0.5) / DAYLIGHT_FACTOR, Y0 + (fj + 0.5) / DAYLIGHT_FACTOR, win.z);
+      const ll = mercatorLatLon(
+        X0 + (fi + 0.5) / DAYLIGHT_FACTOR,
+        Y0 + (fj + 0.5) / DAYLIGHT_FACTOR,
+        win.z
+      );
       const km = distKm(ll.latDeg, ll.lonDeg);
       if (km < 40) bright++;
       else if (km < 60) annulus++;

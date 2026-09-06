@@ -997,7 +997,7 @@ pinBlock(
   })();
   // the fine texel under the observer's coarse texel (its first
   // quarter: fine (4(halfPx+1), 4(halfPx+1)))
-  const of = ((4 * (win.halfPx + 1)) * half.rm + 4 * (win.halfPx + 1)) * 4;
+  const of = (4 * (win.halfPx + 1) * half.rm + 4 * (win.halfPx + 1)) * 4;
   check(
     'THE DAYLIGHT FIELD splits the deck field four ways by the visible band’s fraction inside the mask’s cloud',
     half.rm === 4 * rm &&
@@ -1020,7 +1020,7 @@ pinBlock(
       near(sum(zero, 2), 16 * sum(d0, 2), 1e-6),
     `${half.rm}x${half.rm} fine texels from ${rm}x${rm}: ${half.cloudy} lie under the ${cloudyCoarse} cloudy coarse texels and ${half.refined} of them ` +
       `took a fraction (the even columns at 0.5, the odd ones without a reflectance keeping the coarse cover), the low and mid cover summing to ` +
-      `${(sum(half, 0) / (16 * sum(d0, 0)) * 100).toFixed(0)}% of the coarse field's and the validity and measured flags copied whole; ` +
+      `${((sum(half, 0) / (16 * sum(d0, 0))) * 100).toFixed(0)}% of the coarse field's and the validity and measured flags copied whole; ` +
       `a fraction of 1 everywhere leaves the clear texels clear and the cover whole, 0 everywhere empties the cloud and keeps the validity`
   );
 }

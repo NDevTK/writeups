@@ -885,7 +885,8 @@ export function solarGeometry(ms) {
   const n = (ms - Date.UTC(2000, 0, 1, 12)) / 86400e3;
   const L = (280.46 + 0.9856474 * n) % 360;
   const g = ((357.528 + 0.9856003 * n) * Math.PI) / 180;
-  const lam = ((L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * Math.PI) / 180;
+  const lam =
+    ((L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * Math.PI) / 180;
   const eps = ((23.439 - 0.0000004 * n) * Math.PI) / 180;
   const gmstH = (18.697374558 + 24.06570982441908 * n) % 24;
   return {
@@ -925,7 +926,15 @@ export function coverFraction(rho, rhoClear, rhoCloud) {
  * about a degree across the window, stated).
  */
 export function visCensus(rf, dqf, cosSza) {
-  const c = {n: rf.length, good: 0, usable: 0, outOfRange: 0, noValue: 0, fpt: 0, fill: 0};
+  const c = {
+    n: rf.length,
+    good: 0,
+    usable: 0,
+    outOfRange: 0,
+    noValue: 0,
+    fpt: 0,
+    fill: 0
+  };
   const good = [];
   for (let q = 0; q < rf.length; q++) {
     const d = dqf ? dqf[q] : 0;

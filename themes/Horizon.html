@@ -7028,7 +7028,9 @@
         if (daylightBusy) return;
         if (daylightOff()) {
           daylightReach =
-            params.get('daylight') === '0' ? 'off (?daylight=0)' : 'off (data saver)';
+            params.get('daylight') === '0'
+              ? 'off (?daylight=0)'
+              : 'off (data saver)';
           return;
         }
         const sza = solarZenithDeg(state.lat, state.lon, Date.now());
@@ -7067,15 +7069,21 @@
         try {
           const tRead = performance.now();
           if (params.has('debug'))
-            console.warn(`daylight: reading the visible window (sun ${sza.toFixed(1)}°)`);
+            console.warn(
+              `daylight: reading the visible window (sun ${sza.toFixed(1)}°)`
+            );
           const j = await goesL2Client.fetchGoesL2(state.lat, state.lon, null, [
             'vis'
           ]);
           if (params.has('debug'))
             console.warn(
               `daylight: window ${j && j.vis ? j.vis.key.split('/').pop() : 'none'} in ${Math.round(performance.now() - tRead)} ms` +
-                (j && j.read ? ` (${j.read.map((r) => `${r.kb} kB in ${r.ranges} ranges${r.whole ? ', whole' : ''}`).join('; ')})` : '') +
-                (goesL2Client.stats.lastError ? ` - last error: ${goesL2Client.stats.lastError}` : '')
+                (j && j.read
+                  ? ` (${j.read.map((r) => `${r.kb} kB in ${r.ranges} ranges${r.whole ? ', whole' : ''}`).join('; ')})`
+                  : '') +
+                (goesL2Client.stats.lastError
+                  ? ` - last error: ${goesL2Client.stats.lastError}`
+                  : '')
             );
           if (!j || !j.sat || !j.vis) {
             daylightReach = j && j.reason ? j.reason : 'no visible window read';
@@ -7176,7 +7184,8 @@
       // (the pick layer, 159th): the fraction it took and the
       // reflectance under it, or null where the coarse cover stands
       function daylightAtTexel(fi, fj, rm) {
-        if (!daylight || !daylight.res || daylight.res.fine.rm !== rm) return null;
+        if (!daylight || !daylight.res || daylight.res.fine.rm !== rm)
+          return null;
         const f = daylight.res.frac[fj * rm + fi];
         if (!Number.isFinite(f)) return null;
         return {
@@ -13516,8 +13525,10 @@
             // shaping the decks inside the mask's cloud, or why the
             // 2-km field stands alone (night, off, thin references)
             const dl = goesObs ? daylightLine() : null;
-            if (dl) research['daylight field (ABI band 2 · CMIP reflectance)'] = dl;
-            else delete research['daylight field (ABI band 2 · CMIP reflectance)'];
+            if (dl)
+              research['daylight field (ABI band 2 · CMIP reflectance)'] = dl;
+            else
+              delete research['daylight field (ABI band 2 · CMIP reflectance)'];
           }
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();

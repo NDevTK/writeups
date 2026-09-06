@@ -245,8 +245,7 @@ export function createGoesL2Client({
     // when named - the default body stays the daemon's own
     const asks = L2_ASKS.filter(
       (a) =>
-        (!at || a.timed !== false) &&
-        (wanted ? wanted.has(a.id) : !a.pageOnly)
+        (!at || a.timed !== false) && (wanted ? wanted.has(a.id) : !a.pageOnly)
     );
     const got = await Promise.all(asks.map((a) => file(bucket, a, at, cell)));
     const F = Object.fromEntries(asks.map((a, i) => [a.id, got[i]]));

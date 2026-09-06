@@ -1130,10 +1130,21 @@ const inflate = (u8) =>
   for (let q = 0; q < n; q++) {
     rf[q] = 0.1 + (0.4 * (q % 100)) / 99;
     dqf[q] =
-      q >= 380 ? 255 : q % 17 === 0 ? 4 : q % 13 === 0 ? 3 : q % 11 === 0 ? 2 : q % 7 === 0 ? 1 : 0;
+      q >= 380
+        ? 255
+        : q % 17 === 0
+          ? 4
+          : q % 13 === 0
+            ? 3
+            : q % 11 === 0
+              ? 2
+              : q % 7 === 0
+                ? 1
+                : 0;
   }
   const vc = visCensus(rf, dqf, 0.5);
-  const counted = vc.good + vc.usable + vc.outOfRange + vc.noValue + vc.fpt + vc.fill;
+  const counted =
+    vc.good + vc.usable + vc.outOfRange + vc.noValue + vc.fpt + vc.fill;
   const goodRf = [];
   for (let q = 0; q < n; q++) if (dqf[q] === 0) goodRf.push(rf[q]);
   goodRf.sort((a, b) => a - b);
@@ -1154,7 +1165,9 @@ const inflate = (u8) =>
     }
   }
   const refs = visReferences(rho, (q) => kind[q]);
-  const thin = visReferences(rho, (q) => (q < 120 ? true : q < 130 ? false : null));
+  const thin = visReferences(rho, (q) =>
+    q < 120 ? true : q < 130 ? false : null
+  );
   const frac = coverFraction(0.5, refs.rhoClear, refs.rhoCloud);
   check(
     'THE DAYLIGHT FIELD: kappa from the file’s own d and Esun, Eq. 3-3 inverted, the sun held to Meeus, the cover fraction, the census and the references',
@@ -1202,7 +1215,11 @@ const inflate = (u8) =>
       thin.rhoClear !== null &&
       thin.rhoCloud === null &&
       thin.nCloud === 10 &&
-      near(frac, (0.5 - refs.rhoClear) / (refs.rhoCloud - refs.rhoClear), 1e-9) &&
+      near(
+        frac,
+        (0.5 - refs.rhoClear) / (refs.rhoCloud - refs.rhoClear),
+        1e-9
+      ) &&
       frac > 0.5 &&
       frac < 0.55,
     `kappa = pi d^2 / Esun from the file's d ${VIS_ATBD.file.dAu} AU and Esun ${VIS_ATBD.file.esunWm2Um} W/m2/um is ${kappa.toExponential(6)} ` +

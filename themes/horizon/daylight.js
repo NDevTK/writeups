@@ -110,7 +110,11 @@ export function fieldClearOf(vis, field, frame) {
  * factor fill, the pixel off the earth or the sun under minCos.
  * Returns {rho, n, lit, geo}: lit = the pixels that answered.
  */
-export function visReflectance(vis, ms, {dqfMax = DAYLIGHT_DQF_MAX, minCos = 0.05} = {}) {
+export function visReflectance(
+  vis,
+  ms,
+  {dqfMax = DAYLIGHT_DQF_MAX, minCos = 0.05} = {}
+) {
   const geo = solarGeometry(ms);
   const n = vis.rfac.length;
   const rho = new Float32Array(n);
@@ -128,7 +132,11 @@ export function visReflectance(vis, ms, {dqfMax = DAYLIGHT_DQF_MAX, minCos = 0.0
       rho[q] = NaN;
       continue;
     }
-    const r = reflectanceOfFactor(rf, cosSolarZenith(ll.latDeg, ll.lonDeg, geo), {minCos});
+    const r = reflectanceOfFactor(
+      rf,
+      cosSolarZenith(ll.latDeg, ll.lonDeg, geo),
+      {minCos}
+    );
     rho[q] = r;
     if (Number.isFinite(r)) lit++;
   }
@@ -144,7 +152,13 @@ export function visReflectance(vis, ms, {dqfMax = DAYLIGHT_DQF_MAX, minCos = 0.0
  * the window or without a reflectance. `frame` = {win, i0, j0, ci, cj,
  * halfPx}; `refs` = visReferences' answer.
  */
-export function fineFractionAt(frame, vis, rho, refs, factor = DAYLIGHT_FACTOR) {
+export function fineFractionAt(
+  frame,
+  vis,
+  rho,
+  refs,
+  factor = DAYLIGHT_FACTOR
+) {
   const {win, i0, j0, ci, cj, halfPx} = frame;
   const X0 = win.x0 + i0 + ci - halfPx - 1;
   const Y0 = win.y0 + j0 + cj - halfPx - 1;
@@ -153,7 +167,11 @@ export function fineFractionAt(frame, vis, rho, refs, factor = DAYLIGHT_FACTOR) 
   return (fi, fj) => {
     if (fi < factor || fj < factor || fi >= rf - factor || fj >= rf - factor)
       return NaN;
-    const ll = mercatorLatLon(X0 + (fi + 0.5) / factor, Y0 + (fj + 0.5) / factor, win.z);
+    const ll = mercatorLatLon(
+      X0 + (fi + 0.5) / factor,
+      Y0 + (fj + 0.5) / factor,
+      win.z
+    );
     const q = windowIndexOf(ll.latDeg, ll.lonDeg, vis.g, vis.x, vis.y, vis.box);
     if (q < 0) return NaN;
     return coverFraction(rho[q], refs.rhoClear, refs.rhoCloud);
@@ -193,7 +211,20 @@ export function daylightField({
   if (!clearOf) return null;
   const refs = visReferences(refl.rho, clearOf, {minN});
   if (refs.rhoClear === null || refs.rhoCloud === null) {
-    return {fine: null, frac: null, refs, sortedBy: mask ? 'ACM' : 'field', rho: refl.rho, stats: {lit: refl.lit, n: refl.n, refined: 0, cloudy: 0, meanFraction: null}};
+    return {
+      fine: null,
+      frac: null,
+      refs,
+      sortedBy: mask ? 'ACM' : 'field',
+      rho: refl.rho,
+      stats: {
+        lit: refl.lit,
+        n: refl.n,
+        refined: 0,
+        cloudy: 0,
+        meanFraction: null
+      }
+    };
   }
   const at = fineFractionAt(frame, vis, refl.rho, refs, factor);
   const rf = deck.rm * factor;

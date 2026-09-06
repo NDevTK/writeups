@@ -10404,101 +10404,101 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   them, NaN without a reflectance or a span. THE FIELD:
   goesir.refineDeckField splits the coarse field `factor` = 4 ways
   - each fine texel keeps its coarse texel's validity and measured
-  flag (B, A) and takes cover = the coarse cover x its fraction
-  where the coarse texel HOLDS cloud and a fraction stands; a clear
-  coarse texel stays clear whatever the fine reflectance says (the
-  mask decides where cloud is, the visible band shapes it inside),
-  and a NaN keeps the coarse cover (night, fill, a low sun - the
-  pixel's cos under 0.05 -, off the window). daylight.js composes
-  it: the fine texel's centre on the mosaic (deckField's own index
-  rule, X0 = win.x0 + i0 + ci - halfPx - 1) -> mercatorLatLon ->
-  windowIndexOf on the visible window -> the fraction; the fine
-  field goes to cloudSys.setGoesCover with the SAME worldUnits (the
-  shader samples by scene position, texel count free), re-cut
-  whenever the coarse field is (syncGoesIr) or a new file lands
-  (syncGoesL2's five minutes, the window re-read at the mosaic's
-  ten-minute cadence unless the coarse field changed - about 15 MB
-  an hour by day, the line stating the bytes), withdrawn at night (the observer's sun past 85 deg
-  zenith, the LST ATBD's day rule), on ?daylight=0 or under the
-  browser's data saver - the line says which. The pick layer maps a
-  fine texel to its coarse one and prints the band-2 fraction and
-  the references. GATES: goesl2-reference THE DAYLIGHT FIELD (kappa
-  from the file's own d and Esun, Eq. 3-3 inverted and refused under
-  a low sun, the sun held to Meeus at eight points, the split
-  series, the cover fraction's clamp and refusals, a synthetic
-  window's census by the five flags with every pixel counted once,
-  the references and their thin-side nulls; 12 landmarks);
-  daylight-reference (new: THE WORDS AT A PIXEL - the ACM and the
-  theme's field read at a visible pixel's scan angles, the
-  reflectance back out of the factor at each pixel's own sun, the
-  dark window unlit; THE DAYLIGHT FIELD composed on synthetic
-  windows laid on GOES-West's real fixed grid around the home - a
-  bright disc, a thin annulus, a clear sea - the references measured
-  back out to 1e-4, the fraction 1 over the home and 0.500 in the
-  annulus, none on the border, the flagged holes keeping the coarse
-  cover, the low cover's sum within 0.4% of an independent count
-  over the fine centres by distance, the validities copied whole,
-  the theme's field standing in for the mask to the same field, the
-  dark window null, a mask all cloud leaving the clear reference
-  unmeasurable; 2); goesir-reference THE DAYLIGHT FIELD splits the
-  deck field (the even columns at 0.5, the odd ones keeping the
-  coarse cover, 75% of the coarse cover, the validities x16; 28);
-  goesl2-client-reference (11 asks, 10 served, the eleventh listed
-  only when named - 3 CMIPC prefixes and null on the fake bucket;
-  5); server-reference (the ask pins: ids, half widths, 5 untimed,
-  the eleventh pageOnly; 30). Docs: the daemon README's /goesl2
-  entry (the eleventh ask), FINDINGS pass 159. MEASURED LIVE on
-  GOES-East (the home was still dark; Montauk Point's water, 41.075
-  N 71.84 W, GOES-19 at 47.6 deg zenith, the Upton ascent 87 km
-  off): in node at 11:08Z the 11:02Z band-2 window (401 x 401 px of
-  0.53 x 0.78 km) came in 1.3 s over 6 ranges and 3,339 kB, its
-  kappa0 0.0019679 against pi d^2 / Esun 4.8e-9 apart (GOES-19's own
-  Esun 1622.09 and d 1.00801 - the pin holds on the second craft's
-  file), every pixel good, the factor's median 0.050 at cos 0.128
-  (82.6 deg): reflectance median 0.39 and 2.35 at most on side-lit
-  cloud - past 80 deg the Lambertian normalisation overshoots on
-  bright cloud, so the ABSOLUTE reflectance is stated as such while
-  the fraction, measured between the scene's own references, is
-  unaffected. In the page (probe, 11:3xZ, the sun 77.9 deg at the
-  scan): the 11:27Z window read by the page itself in 5.4 s (3,609
-  kB in 6 ranges), 160,801 good px, the factor 0.011-0.456 (median
-  0.089); the references under NOAA's mask clear rho 0.091 (median
-  of 12,556 clear px) and cloud rho 0.670 (p90 of 148,245); the
-  2-km field (11:00Z mosaic: the sea 10% clear, 17% low with tops
-  at 2.1 km, 73% mid) cut 4x finer in 335 ms - 171,986 of 172,400
-  fine texels under the mask's cloud shaped, mean fraction 0.60,
-  the rest keeping the 2-km cover; the coarse field's next arrival
-  re-cut the held window in 520 ms without a new read; the record
-  and the research line print all of it. The same read five
-  minutes later (the 11:32Z file, 3,706 kB in 6 ranges) took 54.8 s
-  through a slow proxy tunnel - the bytes are the measurement's
-  price, the seconds the network's, both printed. The screenshots
-  toward the low sun (look 160 deg, the sun 77 deg from the zenith)
-  wash out to a hazy band and tell the two fields apart no better
-  than the eye would; facing the cloudiest sea sector (look 11 deg,
-  the sun behind) the coarse field drew a grey-based deck and the
-  cut field (11:46Z window, 3,816 kB in 5.7 s, 170,273 of 170,432
-  shaped, references 0.079/0.670) a brighter, thinner-looking one -
-  taken minutes apart under a proxy that answered a fifth of the
-  page's fetches with 502 that hour, so the pair is an indication,
-  not the A/B it was meant to be; one run whose model-weather fetch
-  failed drew no deck at all with the visible window still pending
-  (the proxy's failure, not the field's); toward the low sun (look
-  90) the cut deck shows the broken, dotted structure the 500-m
-  pixels carry. STATED LIMIT: the fraction is a COVERAGE - the
-  position of a fine pixel's reflectance between the scene's own
-  clear and cloudy references - so a partly filled 2-km pixel is
-  read exactly, while a uniformly thin veil in a scene whose cloudy
-  p90 is a thicker cloud reads as broken cover rather than thin
-  cover (a scene that is all veil keeps its own brightness as the
-  reference and reads whole). The home's marine layer after 14Z,
-  the sun behind a west-facing camera, is the next visual test. A first probe an hour
-  earlier had no line at all: the field lands only once the column
-  and a sea temperature stand, and Hatteras's 00Z ascent (Newport
-  NC) had burst at 594 hPa - the page's own rule (t250 finite)
-  refused it, so the field waited for the 12Z balloon; Montauk's
-  Upton ascent reached 8 hPa. (?vis=0 was the visibility pin
-  already - the switch is ?daylight=0.)
+    flag (B, A) and takes cover = the coarse cover x its fraction
+    where the coarse texel HOLDS cloud and a fraction stands; a clear
+    coarse texel stays clear whatever the fine reflectance says (the
+    mask decides where cloud is, the visible band shapes it inside),
+    and a NaN keeps the coarse cover (night, fill, a low sun - the
+    pixel's cos under 0.05 -, off the window). daylight.js composes
+    it: the fine texel's centre on the mosaic (deckField's own index
+    rule, X0 = win.x0 + i0 + ci - halfPx - 1) -> mercatorLatLon ->
+    windowIndexOf on the visible window -> the fraction; the fine
+    field goes to cloudSys.setGoesCover with the SAME worldUnits (the
+    shader samples by scene position, texel count free), re-cut
+    whenever the coarse field is (syncGoesIr) or a new file lands
+    (syncGoesL2's five minutes, the window re-read at the mosaic's
+    ten-minute cadence unless the coarse field changed - about 15 MB
+    an hour by day, the line stating the bytes), withdrawn at night (the observer's sun past 85 deg
+    zenith, the LST ATBD's day rule), on ?daylight=0 or under the
+    browser's data saver - the line says which. The pick layer maps a
+    fine texel to its coarse one and prints the band-2 fraction and
+    the references. GATES: goesl2-reference THE DAYLIGHT FIELD (kappa
+    from the file's own d and Esun, Eq. 3-3 inverted and refused under
+    a low sun, the sun held to Meeus at eight points, the split
+    series, the cover fraction's clamp and refusals, a synthetic
+    window's census by the five flags with every pixel counted once,
+    the references and their thin-side nulls; 12 landmarks);
+    daylight-reference (new: THE WORDS AT A PIXEL - the ACM and the
+    theme's field read at a visible pixel's scan angles, the
+    reflectance back out of the factor at each pixel's own sun, the
+    dark window unlit; THE DAYLIGHT FIELD composed on synthetic
+    windows laid on GOES-West's real fixed grid around the home - a
+    bright disc, a thin annulus, a clear sea - the references measured
+    back out to 1e-4, the fraction 1 over the home and 0.500 in the
+    annulus, none on the border, the flagged holes keeping the coarse
+    cover, the low cover's sum within 0.4% of an independent count
+    over the fine centres by distance, the validities copied whole,
+    the theme's field standing in for the mask to the same field, the
+    dark window null, a mask all cloud leaving the clear reference
+    unmeasurable; 2); goesir-reference THE DAYLIGHT FIELD splits the
+    deck field (the even columns at 0.5, the odd ones keeping the
+    coarse cover, 75% of the coarse cover, the validities x16; 28);
+    goesl2-client-reference (11 asks, 10 served, the eleventh listed
+    only when named - 3 CMIPC prefixes and null on the fake bucket;
+    5); server-reference (the ask pins: ids, half widths, 5 untimed,
+    the eleventh pageOnly; 30). Docs: the daemon README's /goesl2
+    entry (the eleventh ask), FINDINGS pass 159. MEASURED LIVE on
+    GOES-East (the home was still dark; Montauk Point's water, 41.075
+    N 71.84 W, GOES-19 at 47.6 deg zenith, the Upton ascent 87 km
+    off): in node at 11:08Z the 11:02Z band-2 window (401 x 401 px of
+    0.53 x 0.78 km) came in 1.3 s over 6 ranges and 3,339 kB, its
+    kappa0 0.0019679 against pi d^2 / Esun 4.8e-9 apart (GOES-19's own
+    Esun 1622.09 and d 1.00801 - the pin holds on the second craft's
+    file), every pixel good, the factor's median 0.050 at cos 0.128
+    (82.6 deg): reflectance median 0.39 and 2.35 at most on side-lit
+    cloud - past 80 deg the Lambertian normalisation overshoots on
+    bright cloud, so the ABSOLUTE reflectance is stated as such while
+    the fraction, measured between the scene's own references, is
+    unaffected. In the page (probe, 11:3xZ, the sun 77.9 deg at the
+    scan): the 11:27Z window read by the page itself in 5.4 s (3,609
+    kB in 6 ranges), 160,801 good px, the factor 0.011-0.456 (median
+    0.089); the references under NOAA's mask clear rho 0.091 (median
+    of 12,556 clear px) and cloud rho 0.670 (p90 of 148,245); the
+    2-km field (11:00Z mosaic: the sea 10% clear, 17% low with tops
+    at 2.1 km, 73% mid) cut 4x finer in 335 ms - 171,986 of 172,400
+    fine texels under the mask's cloud shaped, mean fraction 0.60,
+    the rest keeping the 2-km cover; the coarse field's next arrival
+    re-cut the held window in 520 ms without a new read; the record
+    and the research line print all of it. The same read five
+    minutes later (the 11:32Z file, 3,706 kB in 6 ranges) took 54.8 s
+    through a slow proxy tunnel - the bytes are the measurement's
+    price, the seconds the network's, both printed. The screenshots
+    toward the low sun (look 160 deg, the sun 77 deg from the zenith)
+    wash out to a hazy band and tell the two fields apart no better
+    than the eye would; facing the cloudiest sea sector (look 11 deg,
+    the sun behind) the coarse field drew a grey-based deck and the
+    cut field (11:46Z window, 3,816 kB in 5.7 s, 170,273 of 170,432
+    shaped, references 0.079/0.670) a brighter, thinner-looking one -
+    taken minutes apart under a proxy that answered a fifth of the
+    page's fetches with 502 that hour, so the pair is an indication,
+    not the A/B it was meant to be; one run whose model-weather fetch
+    failed drew no deck at all with the visible window still pending
+    (the proxy's failure, not the field's); toward the low sun (look
+  90. the cut deck shows the broken, dotted structure the 500-m
+      pixels carry. STATED LIMIT: the fraction is a COVERAGE - the
+      position of a fine pixel's reflectance between the scene's own
+      clear and cloudy references - so a partly filled 2-km pixel is
+      read exactly, while a uniformly thin veil in a scene whose cloudy
+      p90 is a thicker cloud reads as broken cover rather than thin
+      cover (a scene that is all veil keeps its own brightness as the
+      reference and reads whole). The home's marine layer after 14Z,
+      the sun behind a west-facing camera, is the next visual test. A first probe an hour
+      earlier had no line at all: the field lands only once the column
+      and a sea temperature stand, and Hatteras's 00Z ascent (Newport
+      NC) had burst at 594 hPa - the page's own rule (t250 finite)
+      refused it, so the field waited for the 12Z balloon; Montauk's
+      Upton ascent reached 8 hPa. (?vis=0 was the visibility pin
+      already - the switch is ?daylight=0.)
 - DONE (Sep 6, the review session's 158th pass - THE DEPLOY
   REPAIRED): api.ndev.tk answered again at 09:2xZ after its long
   dark - HTTP 200 on /goesl2, /sounding and /sst - but its /goesl2

@@ -845,7 +845,9 @@ export function l2VisBody(dec, key, lat, lon, {cosSza = null} = {}) {
   const num = (v) => (Number.isFinite(v) ? v : null);
   const cs = Number.isFinite(cosSza)
     ? cosSza
-    : Math.cos((solarZenithDeg(lat, lon, Date.parse(dec.time)) * Math.PI) / 180);
+    : Math.cos(
+        (solarZenithDeg(lat, lon, Date.parse(dec.time)) * Math.PI) / 180
+      );
   return {
     ...l2Common(dec, L2_PRODUCTS.imagery, key, w),
     band: L2_VIS_BAND,
@@ -863,7 +865,10 @@ export function l2VisBody(dec, key, lat, lon, {cosSza = null} = {}) {
       maxRf: num(x.max_reflectance_factor),
       validPx: num(x.valid_pixel_count)
     },
-    sunZenithDeg: +((Math.acos(Math.max(-1, Math.min(1, cs))) * 180) / Math.PI).toFixed(2),
+    sunZenithDeg: +(
+      (Math.acos(Math.max(-1, Math.min(1, cs))) * 180) /
+      Math.PI
+    ).toFixed(2),
     cosSza: +cs.toFixed(4),
     census: visCensus(rf, w.cut.DQF, cs)
   };
