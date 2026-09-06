@@ -10475,8 +10475,24 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   price, the seconds the network's, both printed. The screenshots
   toward the low sun (look 160 deg, the sun 77 deg from the zenith)
   wash out to a hazy band and tell the two fields apart no better
-  than the eye would; the pair facing the cloudiest sea sector is
-  the visual record. A first probe an hour
+  than the eye would; facing the cloudiest sea sector (look 11 deg,
+  the sun behind) the coarse field drew a grey-based deck and the
+  cut field (11:46Z window, 3,816 kB in 5.7 s, 170,273 of 170,432
+  shaped, references 0.079/0.670) a brighter, thinner-looking one -
+  taken minutes apart under a proxy that answered a fifth of the
+  page's fetches with 502 that hour, so the pair is an indication,
+  not the A/B it was meant to be; one run whose model-weather fetch
+  failed drew no deck at all with the visible window still pending
+  (the proxy's failure, not the field's); toward the low sun (look
+  90) the cut deck shows the broken, dotted structure the 500-m
+  pixels carry. STATED LIMIT: the fraction is a COVERAGE - the
+  position of a fine pixel's reflectance between the scene's own
+  clear and cloudy references - so a partly filled 2-km pixel is
+  read exactly, while a uniformly thin veil in a scene whose cloudy
+  p90 is a thicker cloud reads as broken cover rather than thin
+  cover (a scene that is all veil keeps its own brightness as the
+  reference and reads whole). The home's marine layer after 14Z,
+  the sun behind a west-facing camera, is the next visual test. A first probe an hour
   earlier had no line at all: the field lands only once the column
   and a sea temperature stand, and Hatteras's 00Z ascent (Newport
   NC) had burst at 594 hPa - the page's own rule (t250 finite)
