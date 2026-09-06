@@ -7065,9 +7065,18 @@
           return;
         daylightBusy = true;
         try {
+          const tRead = performance.now();
+          if (params.has('debug'))
+            console.warn(`daylight: reading the visible window (sun ${sza.toFixed(1)}°)`);
           const j = await goesL2Client.fetchGoesL2(state.lat, state.lon, null, [
             'vis'
           ]);
+          if (params.has('debug'))
+            console.warn(
+              `daylight: window ${j && j.vis ? j.vis.key.split('/').pop() : 'none'} in ${Math.round(performance.now() - tRead)} ms` +
+                (j && j.read ? ` (${j.read.map((r) => `${r.kb} kB in ${r.ranges} ranges${r.whole ? ', whole' : ''}`).join('; ')})` : '') +
+                (goesL2Client.stats.lastError ? ` - last error: ${goesL2Client.stats.lastError}` : '')
+            );
           if (!j || !j.sat || !j.vis) {
             daylightReach = j && j.reason ? j.reason : 'no visible window read';
             return;
@@ -7106,6 +7115,15 @@
             ms: Date.parse(vis.time)
           });
           const cutMs = Math.round(performance.now() - t0);
+          if (params.has('debug'))
+            console.warn(
+              `daylight: cut in ${cutMs} ms - ` +
+                (res && res.fine
+                  ? `${res.fine.refined} of ${res.fine.cloudy} fine texels shaped, references ${res.refs.rhoClear.toFixed(3)}/${res.refs.rhoCloud.toFixed(3)} under the ${res.sortedBy}`
+                  : res
+                    ? `references thin (${res.refs.nClear} clear, ${res.refs.nCloud} cloudy)`
+                    : 'nothing lit')
+            );
           if (!res || !res.fine) {
             daylight = null;
             daylightReach = res
