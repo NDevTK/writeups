@@ -150,9 +150,20 @@ are gated by `../server-reference.mjs` — the `server` set in
   that box (`est`: the lowest 20% and highest 50% screened, the rest
   averaged - the quantity its Table 4-6 validation measured) and the
   scene's own land/water means from the file's head (`sceneStats`,
-  read as `extras` without a further range): nine
-  products in all (313 kB a body for the home, measured; the AOD's
-  42 kB). Since the 151st pass
+  read as `extras` without a further range), and since the 157th
+  the land surface (skin) temperature (`ABI-L2-LSTC`: CONUS hourly,
+  2 km, day and night, quantitative to a local zenith angle of 55°;
+  uint16 counts at 0.0025 K from 190 K with the file's DQF quality
+  levels and its 16-bit PQI word - the ATBD's quality, cloud,
+  surface-type, water-vapour, view-angle and day/night bits; the
+  Enterprise LST ATBD v4 read in full) as `lst`, with the point's
+  own pixel and quality word (`here`), the nearest high-quality
+  pixel within 5 px with its distance in km (`nearest` - the pixel
+  the page's land surface layer stands on), the census by quality
+  and the scene's own statistics and angle bounds from the file's
+  head (`sceneStats`, `lzaBounds`): ten products in all (383 kB a
+  body for the home, measured; the AOD's 42 kB, the LST's 69 kB).
+  Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks
   the window touches, so a window of the 32 MB SST file costs about
@@ -161,7 +172,7 @@ are gated by `../server-reference.mjs` — the `server` set in
   satellite and product, keyed by file and tenth-degree cell, so a
   new file keys new windows; `?t=ISO` asks the five 5-minute cloud
   products and the 10-minute DSR for that moment (the hourly SST,
-  the winds and the haze are never asked for a moment). Since the 155th pass the
+  the winds, the haze and the land skin are never asked for a moment). Since the 155th pass the
   listing, the asks, the decodes and the bodies live in the pure
   `goesl2-decode.js` (this daemon re-exports them and adds node's
   inflate and the caches), and the PAGE runs the same code itself

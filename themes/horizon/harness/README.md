@@ -38,7 +38,18 @@ Pieces:
   before that every range ask came back as the whole file). Needs
   `playwright-core` installed next to it and `SHOOT_CHROME` pointing
   at a Chrome for Testing binary
-  (`npx @puppeteer/browsers install chrome@stable`).
+  (`npx @puppeteer/browsers install chrome@stable`). The current
+  Stable is not a fixed point (157th pass, measured under Xvfb on
+  this box): 152.0.7977.82 loses Dawn's instance 3.6 s into the theme
+  ("A valid external Instance reference no longer exists", every
+  flag set tried), 151.0.7922.138 fails `createBuffer` at 264 kB
+  `mappedAtCreation`, 150.0.7871.124 runs the page and the probes
+  clean - so `SHOOT_CHROME` names a version that works
+  (`/tmp/cft-cache/150.0.7871.124/chrome-linux64/chrome`, fetched
+  from `storage.googleapis.com/chrome-for-testing-public`) rather
+  than whatever `setup-chrome.mjs` resolves today; `CFT_VERSION=
+  150.0.7871.124` makes `setup-chrome.mjs` fetch and cache that
+  named build itself.
 - `validate.sh` — the reference-first gate and the ONE correctness
   entrypoint: every CPU double-precision reference (77 sets), then
   the GPU-vs-reference probes asserting texels at the reference

@@ -469,6 +469,11 @@
         aodChannelTau,
         aodFigures,
         btDifference,
+        LST_ATBD,
+        LST_PQI_CLOUD,
+        LST_PQI_SURFACE,
+        lstPqi,
+        lstValidationSpan,
         DCOMP_COD_MAX,
         dcompAt,
         dcompOverPixels,
@@ -642,6 +647,7 @@
         eveningKey,
         flashLedgerVerdict,
         flashPanel,
+        landPanel,
         leewavePanel,
         meteorsPanel,
         monahanW,
@@ -654,6 +660,11 @@
         warmLayerDay,
         SEA_RETRIEVAL_DISTS_M
       } from './horizon/observatory.js';
+      // The land surface layer's footprint (157th pass): the painted
+      // cover's roughness census (landlayer.js) and the screen's
+      // saturation vapour pressure for its humidity
+      import {roughnessCensus} from './horizon/landlayer.js';
+      import {eSatPa} from './horizon/surfacelayer.js';
       import {
         lunarEclipse,
         moonAngularRadiusRad,
@@ -697,6 +708,7 @@
         curvatureDrop,
         fanBranches,
         farRadii,
+        farRingBaseY,
         farRingGeometry,
         rayFan,
         refractionK
@@ -5544,6 +5556,8 @@
             rh: (colRows[0].rh ?? 0) / 100
           });
           state.profile = state.profileMeas;
+          // the land surface layer stands on this ascent too (157th)
+          syncLandLayer();
           record(
             state.marine
               ? 'refraction column (pier film + radiosonde)'
@@ -6476,6 +6490,136 @@
           quality: aodQualityName(dqf)
         };
       }
+      // THE LAND SURFACE LAYER (157th pass): NOAA's land skin - the
+      // nearest high-quality LST pixel, hourly - against the screen
+      // air and the 10-m wind (Open-Meteo's current: a model's where
+      // no thermometer stands, stated) on the footprint's roughness
+      // (landlayer.roughnessCensus over the painted land cover, the
+      // Guide's ln-average), composed by observatory's landPanel on
+      // the balloon's rows: the film's rows become the land ray fan's
+      // column, Hirt's k the land spokes' drop, Fleagle's test the
+      // line's verdict. Stands while the skin is under LST_LIVE_MIN
+      // old (an hourly file landing ~5 min after its hour: the next
+      // hour's grace), the air fresh and an ascent held; stands
+      // down, stated, otherwise.
+      const LST_LIVE_MIN = 75;
+      function syncLandLayer() {
+        const before = state.land ? state.land.at : null;
+        let land = null;
+        let profileLand = null;
+        try {
+          const l = goesL2 && goesL2.lst;
+          const s = state.soundingData;
+          const ageMin = l ? (Date.now() - Date.parse(l.time)) / 60e3 : Infinity;
+          const uMs = Number.isFinite(state.wind) ? state.wind / 3.6 : NaN;
+          if (
+            l &&
+            l.nearest &&
+            ageMin < LST_LIVE_MIN &&
+            s &&
+            Array.isArray(s.rows) &&
+            s.rows.length >= 10 &&
+            Number.isFinite(state.temp) &&
+            Number.isFinite(uMs)
+          ) {
+            const census = roughnessCensus(landGeo, state.lat, state.lon, {
+              radiusM: 1000,
+              n: 41
+            });
+            const prof = state.profileMeas ?? state.profile;
+            const pSurf =
+              prof && prof.at
+                ? prof.at(Math.max(prof.h0, centerElev)).pPa
+                : 101325 * Math.exp(-centerElev / 8400);
+            const rhFrac =
+              Number.isFinite(state.dew) && Number.isFinite(state.temp)
+                ? Math.min(eSatPa(state.dew) / eSatPa(state.temp), 1)
+                : null;
+            const met = {
+              uMs,
+              zuM: 10,
+              taC: state.temp,
+              ztM: 2,
+              tsC: l.nearest.K - 273.15,
+              pPa: pSurf,
+              rhFrac
+            };
+            const lp = landPanel(met, s.rows, {
+              z0M: census.z0M,
+              kbInv: census.kbInvAt,
+              h0M: centerElev,
+              bliM: state.blhAglMeas ?? null
+            });
+            if (lp) {
+              land = {
+                ...lp,
+                census,
+                skin: {
+                  K: l.nearest.K,
+                  km: l.nearest.km,
+                  pqi: lstPqi(l.nearest.pqi),
+                  time: l.time,
+                  ageMin,
+                  craft: goesL2.craft
+                },
+                air: {
+                  tC: state.temp,
+                  uMs,
+                  dewC: state.dew,
+                  src: 'Open-Meteo current (2 m, 10 m)'
+                },
+                at: Date.now()
+              };
+              const lv = lp.rows
+                .filter((q) => q.hM > lp.rows[0].hM + 0.5)
+                .map((q) => ({
+                  pPa: q.p * 100,
+                  hM: q.hM,
+                  tC: q.tC,
+                  rh: (q.rh ?? 0) / 100
+                }));
+              profileLand = buildProfile(lv, {
+                hM: lp.rows[0].hM,
+                tC: lp.rows[0].tC,
+                rh: (lp.rows[0].rh ?? 0) / 100
+              });
+            }
+          }
+        } catch (e) {
+          if (params.has('debug')) console.warn('land layer: ' + e.message);
+        }
+        state.land = land;
+        state.profileLand = profileLand;
+        if (land)
+          record(
+            'land surface layer (ABI skin)',
+            `skin ${land.tSkinC.toFixed(1)} °C (${land.skin.km} km off) vs air ${land.air.tC.toFixed(1)} °C at ${land.air.uMs.toFixed(1)} m/s → ${land.stability}, ` +
+              `u* ${land.uStar.toFixed(2)} m/s, ${land.hsbWm2.toFixed(0)} W/m² ${land.hsbWm2 >= 0 ? 'up' : 'down'} · z0 ${land.z0M.toFixed(2)} m ` +
+              `(${land.census.dominant.name} ${Math.round(100 * land.census.dominant.frac)}%), kB⁻¹ ${land.kbInv.toFixed(1)} · ${land.klass} · land k ${land.kLand.toFixed(3)}`
+          );
+        else if (before !== null)
+          record(
+            'land surface layer (ABI skin)',
+            'stands down (no fresh skin, screen air or ascent)'
+          );
+        rebaseFarRing();
+        applyMirageFan();
+      }
+      // NOAA's land skin at a place (157th pass; the pick readout):
+      // the window pixel's kelvin, quality and decoded quality word
+      function goesL2LstAt(latDeg, lonDeg) {
+        const l = goesL2 && goesL2.lst;
+        if (!l || !l.lstK) return null;
+        const q = windowIndexOf(latDeg, lonDeg, l.g, l.x, l.y, l.box);
+        if (q < 0) return null;
+        const dqf = l.dqf ? l.dqf[q] : 255;
+        return {
+          K: Number.isFinite(l.lstK[q]) ? l.lstK[q] : null,
+          dqf,
+          quality: aodQualityName(dqf),
+          pqi: l.pqi ? lstPqi(l.pqi[q]) : null
+        };
+      }
       // the derived motion winds off the wire: the columns back to
       // vectors, the layers' winds recomputed here from them
       // (goesl2.dmwLayers - the same gated law the daemon ran)
@@ -6532,7 +6676,17 @@
                     offset: p.aodOffset,
                     fill: p.aodFill
                   })
-                : null
+                : null,
+              // the land surface (skin) temperature in kelvin with
+              // its quality word (157th pass)
+              lstK: p.lst
+                ? unscale(unpackArray(p.lst), {
+                    scale: p.lstScale,
+                    offset: p.lstOffset,
+                    fill: p.lstFill
+                  })
+                : null,
+              pqi: p.pqi ? unpackArray(p.pqi) : null
             }
           : null;
       async function syncGoesL2() {
@@ -6614,7 +6768,11 @@
             // the aerosol optical depth at 550 nm (156th pass; CONUS
             // every 5 min, by day): the aerosol channel's 550 nm
             // value while fresh (goesL2AodNow)
-            aod: unpackProduct(j.aod)
+            aod: unpackProduct(j.aod),
+            // the land surface temperature (157th pass; CONUS hourly,
+            // day and night): the land surface layer's skin
+            // (syncLandLayer)
+            lst: unpackProduct(j.lst)
           };
           goesL2Reach = null;
           goesL2SstMemo = null;
@@ -6698,6 +6856,26 @@
                   : `nothing retrieved within ±100 km (${c.none} none · ${c.low} low quality: night, cloud, glint or a bright surface)`)
             );
           }
+          const ls = goesL2.lst;
+          if (ls && ls.census) {
+            const c = ls.census;
+            const q = ls.here ? lstPqi(ls.here.pqi) : null;
+            record(
+              `NOAA ${j.craft} land surface temperature (LSTC)`,
+              `${ls.time.slice(11, 16)}Z · ` +
+                (ls.nearest
+                  ? `skin ${(ls.nearest.K - 273.15).toFixed(1)} °C ${ls.nearest.km} km off (the nearest high-quality px)`
+                  : `no high-quality px within ${ls.nearPx} px`) +
+                ` · overhead ${
+                  ls.here && ls.here.K !== null
+                    ? (ls.here.K - 273.15).toFixed(1) + ' °C (' + aodQualityName(ls.here.dqf) + ')'
+                    : q
+                      ? LST_PQI_CLOUD[q.cloud] + ', ' + LST_PQI_SURFACE[q.surface] + ', no retrieval'
+                      : 'no retrieval'
+                }` +
+                ` · ${c.high} high · ${c.medium} medium · ${c.low} low · ${c.none} none of ${c.n} 2-km px within ±100 km`
+            );
+          }
           if (
             goesObs &&
             goesObs.time &&
@@ -6719,6 +6897,7 @@
             }
           }
           updateLiveDroplets();
+          syncLandLayer();
         } catch (e) {
           if (params.has('debug')) console.warn('goesl2: ' + e.message);
         } finally {
@@ -7276,6 +7455,56 @@
             line +=
               ` · the scene's own means: land ${t3(s.meanLand)} ± ${t3(s.sdLand)} over ${s.attemptedLand === null ? '—' : s.attemptedLand.toLocaleString('en-US')} attempted, ` +
               `water ${t3(s.meanWater)} ± ${t3(s.sdWater)} over ${s.attemptedWater === null ? '—' : s.attemptedWater.toLocaleString('en-US')}`;
+        }
+        // THE LAND'S SKIN (157th pass): NOAA's land surface
+        // temperature - the point's own pixel and word, the nearest
+        // high-quality pixel the land surface layer stands on, the
+        // census by quality, the scene's statistics, and the ATBD's
+        // SURFRAD validation for the craft that flew this slot
+        // through it
+        const ls = goesL2.lst;
+        if (ls && ls.census) {
+          const c = ls.census;
+          const ageMin = Math.round((Date.now() - Date.parse(ls.time)) / 60e3);
+          const word = (w) => {
+            const q = lstPqi(w);
+            if (!q) return 'no word';
+            return (
+              `${LST_PQI_CLOUD[q.cloud]}, ${LST_PQI_SURFACE[q.surface]}, ${q.day ? 'day' : 'night'}` +
+              (q.viewLarge ? ', view past 55°' : '')
+            );
+          };
+          const degC = (K) => (K - 273.15).toFixed(1) + ' °C';
+          line +=
+            ` · land surface (skin) temperature ${ls.time.slice(11, 16)}Z (ABI-L2-LSTC, ${ls.scene} hourly, ` +
+            `${(ls.pixel.ewM / 1000).toFixed(1)} × ${(ls.pixel.nsM / 1000).toFixed(1)} km px here, quantitative to ` +
+            `${ls.lzaBounds ? ls.lzaBounds[1] : LST_ATBD.quantitativeLzaDeg}° of view; ${ageMin} min old): `;
+          if (c.high || c.medium) {
+            line +=
+              `${c.high} high · ${c.medium} medium · ${c.low} low · ${c.none} none of ${c.n} px within ±100 km` +
+              (c.high
+                ? `, high-quality median ${degC(c.median)} (${degC(c.min)} to ${degC(c.max)})`
+                : '') +
+              ` · overhead ` +
+              (ls.here && ls.here.K !== null
+                ? `${degC(ls.here.K)} (${aodQualityName(ls.here.dqf)}; ${word(ls.here.pqi)})`
+                : `no retrieval (${word(ls.here ? ls.here.pqi : null)})`) +
+              (ls.nearest
+                ? ` · the nearest high-quality px ${degC(ls.nearest.K)}, ${ls.nearest.km} km off (${word(ls.nearest.pqi)})` +
+                  (state.land ? ' - the land surface layer stands on it' : '')
+                : ` · no high-quality px within ${ls.nearPx} px`);
+          } else
+            line += `nothing retrieved within ±100 km (${c.none} none · ${c.low} low quality: cloud, or the view past the retrieval bound)`;
+          const s = ls.sceneStats;
+          if (s && s.meanK !== null)
+            line +=
+              ` · the scene's own mean ${degC(s.meanK)} ± ${s.sdK} K over ` +
+              `${s.retrieved === null ? '—' : s.retrieved.toLocaleString('en-US')} retrieved px (${s.good === null ? '—' : s.good.toLocaleString('en-US')} good)`;
+          const span = lstValidationSpan(goesL2.craft === 'GOES-18' ? 'GOES-17' : 'GOES-16');
+          line +=
+            ` (the ATBD's SURFRAD validation of ${span.craft}, the ${goesL2.craft === 'GOES-18' ? 'West' : 'East'} slot's craft through it: ` +
+            `bias ${span.biasK[0]} to +${span.biasK[1]} K by site, precision ${span.precisionK[0]}–${span.precisionK[1]} K over ` +
+            `${span.n.toLocaleString('en-US')} matchups; the requirement ${LST_ATBD.requirement.accuracyK} / ${LST_ATBD.requirement.precisionK} K)`;
         }
         return line;
       }
@@ -9304,13 +9533,19 @@
             k = refractionK(a.pPa / 100, a.tC + 273.15, (b.tC - a.tC) / 100);
           }
           k = Math.max(0, Math.min(0.4, k));
+          // THE LAND'S OWN REFRACTION (157th pass): the spokes that
+          // leave the box over land drop by the measured land
+          // layer's coefficient when it stands (syncLandLayer);
+          // the sea spokes keep the column's
+          const kLand = landRingK();
           const ring = farRingGeometry({
             radiiU: farRadii(FAR_R0, FAR_R1, 44),
             nAz: 512,
             mpu: MPU,
             centerElev,
             k,
-            elevAt: (x, z) => demElevOf(dem, x, z, world)
+            elevAt: (x, z) => demElevOf(dem, x, z, world),
+            kLand
           });
           const geo = new THREE.BufferGeometry();
           geo.setAttribute(
@@ -9333,6 +9568,15 @@
             baseY,
             centerElev,
             appliedProf: undefined,
+            // the spokes' land marks and the two coefficients the
+            // base was built with (157th): rebaseFarRing re-solves
+            // the base when the land layer's coefficient moves, and
+            // the fan keys its land branch on appliedLand
+            spokeLand: ring.spokeLand,
+            nAz: ring.nAz,
+            kSea: k,
+            kLand,
+            appliedLand: undefined,
             // The 200 km mosaic stays readable: the lee-wave pass
             // hunts its upwind ridge on this same DEM (a transect
             // needs no resampling of tiles).
@@ -9403,6 +9647,42 @@
         }
       }
 
+      // The land's coefficient for the ring (157th pass): the measured
+      // land surface layer's Hirt k over the eye's own 2-100 m - the
+      // same first-100-m rule the sea spokes' k follows - bounded to
+      // twice the bare-Earth drop either way (a hot afternoon's film
+      // sinks the far ground; a night inversion lifts it); null when
+      // no layer stands, and the sea spokes' k serves every spoke as
+      // before.
+      const LAND_K_BOUND = 0.5;
+      function landRingK() {
+        const l = state.land;
+        if (!l || !Number.isFinite(l.kLand)) return null;
+        return Math.max(-LAND_K_BOUND, Math.min(LAND_K_BOUND, l.kLand));
+      }
+      // The ring's base re-solved without the DEM when the land
+      // layer moves (hourly): the retained elevations and distances
+      // give every vertex's mean-k y for the sea and land
+      // coefficients (farRingBaseY), and the fan re-applies on top.
+      function rebaseFarRing() {
+        if (!farRingData || !farRingData.spokeLand) return;
+        const kLand = landRingK();
+        if (kLand === farRingData.kLand) return;
+        farRingData.kLand = kLand;
+        farRingData.baseY = farRingBaseY({
+          trueEM: farRingData.trueEM,
+          distU: farRingData.distU,
+          spokeLand: farRingData.spokeLand,
+          nAz: farRingData.nAz,
+          mpu: MPU,
+          centerElev: farRingData.centerElev,
+          k: farRingData.kSea,
+          kLand
+        });
+        farRingData.appliedProf = undefined;
+        farRingData.appliedLand = undefined;
+        applyMirageFan();
+      }
       // The world mirages. When the balloon shipped its rows,
       // every far-ring vertex re-solves its apparent altitude
       // through the terrestrial ray fan (far-terrain.js): kappa(h)
@@ -9421,8 +9701,16 @@
       function applyMirageFan() {
         if (!farRingData) return;
         const prof = state.profileMeas;
-        if (farRingData.appliedProf === prof) return; // up to date
-        const {geo, trueEM, distU, baseY} = farRingData;
+        // THE LAND FAN (157th pass): the land spokes re-solve through
+        // the land column (the measured skin's film under the same
+        // balloon) when one stands; the sea spokes through the pier's
+        const profLand = state.profileLand ?? null;
+        if (
+          farRingData.appliedProf === prof &&
+          farRingData.appliedLand === profLand
+        )
+          return; // up to date
+        const {geo, trueEM, distU, baseY, spokeLand, nAz} = farRingData;
         const pos = geo.getAttribute('position');
         // The observer: the eye 2 m over the ring's own anchor
         // elevation. The fan claims nothing when the measured
@@ -9438,6 +9726,7 @@
           geo.computeVertexNormals();
           if (farMesh2) farMesh2.visible = false;
           farRingData.appliedProf = prof || null;
+          farRingData.appliedLand = profLand;
           if (had || prof)
             record(
               'far horizon (mirage fan)',
@@ -9452,22 +9741,34 @@
         // The fan is the horizon-band instrument: -1.4 deg
         // reaches ~210 m below the eye at the box edge (8.6 km)
         // and covers the dip of any horizon the ring can hold;
-        // +0.8 deg tops the grazing band where refraction still
-        // bends. 600 rays = 0.22 arcmin spacing (the gated
-        // Novaya-Zemlya squeeze is 1.4 arcmin structure).
-        const nA = 600;
+        // +3.0 deg tops the band (157th pass: measured on the
+        // fixture column, the mean-k base and the fan part by
+        // 55-127 m at 100-194 km for targets 0.2-0.8 deg up - one
+        // to two pixels of step at the old +0.8 deg top, so the
+        // band reaches the ring's high far ground and the base
+        // serves only the hidden and the steep). 1200 rays keep
+        // the 0.22 arcmin spacing (the gated Novaya-Zemlya squeeze
+        // is 1.4 arcmin structure).
+        const nA = 1200;
         const alphas = new Float64Array(nA);
         for (let i = 0; i < nA; i++)
-          alphas[i] = ((-1.4 + (2.2 * i) / (nA - 1)) * Math.PI) / 180;
+          alphas[i] = ((-1.4 + (4.4 * i) / (nA - 1)) * Math.PI) / 180;
         const fan = rayFan(prof, obsHm, alphas, FAR_R1 * MPU + 1000, 100);
+        const fanLand =
+          profLand && profLand.at && obsHm >= profLand.h0 - 1 && spokeLand
+            ? rayFan(profLand, obsHm, alphas, FAR_R1 * MPU + 1000, 100)
+            : null;
         const pos2 = farRingData.geo2
           ? farRingData.geo2.getAttribute('position')
           : null;
         let warped = 0;
         let stacked = 0;
+        let viaLand = 0;
         for (let v = 0; v < trueEM.length; v++) {
           const dM = distU[v] * MPU;
-          const br = fanBranches(fan, dM, trueEM[v]);
+          const onLand = fanLand && spokeLand[v % nAz];
+          if (onLand) viaLand++;
+          const br = fanBranches(onLand ? fanLand : fan, dM, trueEM[v]);
           if (!br.length) {
             // Hidden through the measured column, or outside the
             // fan band: the mean-k datum stands.
@@ -9507,12 +9808,16 @@
         }
         if (farMesh2) farMesh2.visible = stacked > 0;
         farRingData.appliedProf = prof;
+        farRingData.appliedLand = profLand;
         record(
           'far horizon (mirage fan)',
           warped +
             ' of ' +
             trueEM.length +
             ' ring vertices re-solved through the balloon column' +
+            (fanLand
+              ? ` (${viaLand} vertices on the ${spokeLand.reduce((a, b) => a + (b ? 1 : 0), 0)} of ${nAz} spokes whose inner ring is land through the measured land film, k ${farRingData.kLand === null ? '—' : farRingData.kLand.toFixed(3)} at their base)`
+              : '') +
             (stacked
               ? ' · ' +
                 stacked +
@@ -12457,6 +12762,53 @@
               `${here.r0IsaArcmin.toFixed(1)}′ · sunset flattening ` +
               `${here.flatten.toFixed(2)} · green rim ` +
               `${here.rimArcsec.toFixed(0)}″`;
+            // THE LAND SURFACE LAYER (157th pass): the satellite's
+            // skin against the screen air and the wind on the
+            // footprint's roughness - the land horizon's own film
+            if (state.land) {
+              const l = state.land;
+              const sk = l.skin;
+              const q = sk.pqi;
+              const fmtL = (L) =>
+                Number.isFinite(L)
+                  ? (Math.abs(L) < 1
+                      ? L.toFixed(2)
+                      : Math.abs(L) < 10
+                        ? L.toFixed(1)
+                        : L.toFixed(0)) + ' m'
+                  : '∞';
+              const covers = l.census.covers
+                .slice(0, 3)
+                .map((c) => `${c.osm.replace(/_/g, ' ')} ${Math.round(100 * c.frac)}%`)
+                .join(', ');
+              const kSea =
+                farRingData && Number.isFinite(farRingData.kSea)
+                  ? farRingData.kSea.toFixed(3)
+                  : '—';
+              const span = lstValidationSpan(
+                sk.craft === 'GOES-18' ? 'GOES-17' : 'GOES-16'
+              );
+              research['land surface layer (ABI skin · Businger–Dyer)'] =
+                `skin ${l.tSkinC.toFixed(1)} °C (NOAA ${sk.craft} LSTC ${sk.time.slice(11, 16)}Z, the nearest high-quality px ${sk.km} km off` +
+                (q
+                  ? `, ${LST_PQI_CLOUD[q.cloud]}, ${LST_PQI_SURFACE[q.surface]}, ${q.day ? 'day' : 'night'}`
+                  : '') +
+                `) against ${l.air.tC.toFixed(1)} °C screen air at ${l.air.uMs.toFixed(1)} m/s (${l.air.src}): skin−air ` +
+                `${l.dTskinAirK >= 0 ? '+' : ''}${l.dTskinAirK.toFixed(1)} K → ${l.stability}, L ${fmtL(l.L)} · ` +
+                `u* ${l.uStar.toFixed(3)} m/s, θ* ${l.thetaStar.toFixed(2)} K, sensible ${l.hsbWm2.toFixed(0)} W/m² ${l.hsbWm2 >= 0 ? 'up' : 'down'}, ` +
+                `convective gust ${l.gustMs.toFixed(1)} m/s · roughness ${l.z0M.toFixed(3)} m over the square kilometre (${covers}; ` +
+                `the Guide's ln-average), kB⁻¹ ${l.kbInv.toFixed(1)} (${Math.round(100 * l.census.bluffFrac)}% of the footprint under the bluff law; ` +
+                `Rigden's all-cover constant / Kanda's law on the whole footprint would give ${l.sensitivity.map((s) => s.hsbWm2.toFixed(0)).join(' / ')} W/m²) · ` +
+                `film ${(((l.t10C - l.t2C) / 8) * 1000).toFixed(0)} K/km over 2–10 m vs Fleagle's ${l.autoRateKm.toFixed(0)}: ${l.klass} · ` +
+                `Hirt k over the eye's 2–100 m ${l.kLand.toFixed(3)} (0–100 m ${l.k0to100.toFixed(3)}) - the far land spokes drop by it; ` +
+                `the sea spokes keep the column's ${kSea} · column: film to ${l.filmTopM} m above the ground, mixed layer modelled ` +
+                (l.modelBand
+                  ? `${l.modelBand[0].toFixed(0)}–${l.modelBand[1].toFixed(0)} m`
+                  : 'nowhere') +
+                `, the ascent above ${l.joinM.toFixed(0)} m (the ATBD's SURFRAD validation of ${span.craft}: bias ${span.biasK[0]} to +${span.biasK[1]} K by site, ` +
+                `precision ${span.precisionK[0]}–${span.precisionK[1]} K over ${span.n.toLocaleString('en-US')} matchups; the skin ${Math.round(sk.ageMin)} min old)`;
+            } else
+              delete research['land surface layer (ABI skin · Businger–Dyer)'];
             if (state.marine) {
               const m = state.marine;
               research['marine surface layer (COARE 3.6 · CO-OPS pier)'] =
@@ -12523,6 +12875,17 @@
               );
               setLook('mirage (measured column)', sea);
               setLook('mirage inversion retrieval (Lehn 1983)', sea);
+              // the land horizon: away from the open sea (157th)
+              setLook(
+                'land surface layer (ABI skin · Businger–Dyer)',
+                sea
+                  ? {
+                      azDeg: (sea.azDeg + 180) % 360,
+                      altDeg: 0,
+                      note: 'the land horizon'
+                    }
+                  : null
+              );
               const sunLow = astro.sun && astro.sun.alt / RAD < 12;
               setLook(
                 'green flash tonight (Young)',
@@ -12819,6 +13182,7 @@
             delete research['green flash tonight (Young)'];
             delete research['mirage inversion retrieval (Lehn 1983)'];
             delete research['marine surface layer (COARE 3.6 · CO-OPS pier)'];
+            delete research['land surface layer (ABI skin · Businger–Dyer)'];
             delete research['forecast ledger (morning → evening ascent)'];
           }
           // The measured cloud field (goesir.js): the line is
@@ -13437,6 +13801,23 @@
               if (hz && hz.tau !== null)
                 detail +=
                   ', NOAA AOD ' + hz.tau.toFixed(2) + ' (' + hz.quality + ')';
+              // NOAA's land skin at the pixel (157th)
+              const lk =
+                goesObs.pxLat &&
+                goesL2LstAt(goesObs.pxLat[q], goesObs.pxLon[q]);
+              if (lk && lk.K !== null)
+                detail +=
+                  ', NOAA LST ' +
+                  (lk.K - 273.15).toFixed(1) +
+                  ' °C (' +
+                  lk.quality +
+                  (lk.pqi
+                    ? '; ' +
+                      LST_PQI_CLOUD[lk.pqi.cloud] +
+                      ', ' +
+                      (lk.pqi.day ? 'day' : 'night')
+                    : '') +
+                  ')';
             }
             // a clear low texel under a "low" pixel is the split
             // rule at work: the ceilometer reported no low layer,

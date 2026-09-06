@@ -9,8 +9,8 @@ from the code. Run the whole corpus with:
 cd themes/horizon/harness && bash validate.sh
 ```
 
-At the time of writing the gate holds **144 CPU reference files printing
-1148 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+At the time of writing the gate holds **145 CPU reference files printing
+1158 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **144 reference files, 1148 landmark lines, 8 GPU probes** (live gate
+- **145 reference files, 1158 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -897,7 +897,42 @@ The practice the corpus demonstrates, stated so it can be reused:
    (`goesl2-reference` THE MEASURED HAZE; `server-reference` THE
    MEASURED HAZE — the body dressed on the fixture, recomputed from
    the wire, the extras read without a further range;
-   `goesl2-client-reference` nine asks over 23 listings)
+   `goesl2-client-reference` nine asks over 23 listings). Pass 157
+   puts NOAA's land surface temperature under the land horizon: the
+   Enterprise LST ATBD (v4, read in full — the split-window
+   retrieval with its emissivity pair, the 2.5 K accuracy / 2.3 K
+   precision requirement over 213–330 K, the PQI word's bits, and
+   the SURFRAD validation of both satellites: GOES-16 at biases of
+   −2.63 to +1.80 K and precisions of 1.59–2.26 K over 21,621
+   matchups, GOES-17 — the West slot's own craft — −2.41 to +1.78
+   and 1.28–2.41 K over 5,713) becomes the tenth product (hourly,
+   2 km, day and night; five ranges, 0.63 MB of a 1.4 MB file), and
+   a measured LAND surface layer stands beside the pier's marine
+   one: the nearest high-quality skin pixel against the screen air
+   and the 10-m wind on the footprint's roughness (the WMO CIMO
+   Guide's Davenport classes ln-averaged over the painted cover,
+   Stull's drag column shown to be the log law's own print; Rigden's
+   AmeriFlux kB⁻¹ by cover, the Kanda/Brutsaert bluff-body law over
+   built and bare ground — a constant kB⁻¹ over a suburb returned
+   975 W/m² where the law returns 90, the pass's own finding)
+   through the Kansas profile forms, Fleagle's autoconvective test
+   and Hirt's k over the eye's own metres; the far ring's drop takes
+   the land k on the spokes whose inner ring is land, and a land ray
+   fan re-solves them. The pass also found that the far ring's
+   mirage fan had never run in the page since pass 99: the ring
+   handed the fan a typed array of launch angles, the fan's row map
+   coerced every row to NaN, and the first write threw inside a
+   silent catch on every probe with a measured column — so the
+   drawn ring now moves with the balloon for the first time (probe:
+   7,454 of 22,528 vertices re-solved, all 512 spokes land at the
+   inland home), and the fan's band reaches +3° so the mean-k base
+   serves only the hidden and the steep (measured: the base and the
+   fan part by 55–127 m at 100–194 km for targets 0.2–0.8° up)
+   (`landlayer-reference`; `goesl2-reference` THE LAND'S SKIN;
+   `server-reference` THE LAND'S SKIN; `far-terrain-reference` the
+   per-spoke k and the typed-array march; `observatory-reference`
+   THE LAND SURFACE LAYER; `goesl2-client-reference` ten asks over
+   26 listings)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

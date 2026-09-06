@@ -10345,6 +10345,159 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5-6, the review session's 157th pass - THE LAND'S
+  SKIN; rebuilt after a container restart at 02:22Z wiped the
+  uncommitted first build, and committed stage by stage on the
+  branch since): NOAA's land surface temperature (ABI-L2-LSTC: CONUS
+  hourly, 2 km, day and night, quantitative to a local zenith angle
+  of 55 deg - the file's own bound) becomes the tenth product, and a
+  MEASURED LAND SURFACE LAYER stands beside the pier's marine one:
+  the terrestrial refraction and the inferior-mirage verdict over
+  the land horizon from the satellite's skin, the screen air and
+  the wind. THE PRIMARIES, read in full: the Enterprise LST ATBD v4
+  (NOAA NESDIS STAR, 4 Jun 2020, 77 pp) - the split-window retrieval
+  (Eq. 3.5: T11, T11-T12, the emissivity and its difference, the
+  coefficients stratified by day/night, water vapour and view zenith
+  angle; "all results assume perfect cloud detection"), the F&PS
+  requirement (accuracy 2.5 K conditional on known emissivity,
+  atmospheric correction and 80% channel correction, 5 K otherwise;
+  precision 2.3 K; 213-330 K; LZA under 70; day = SZA <= 85), the PQI
+  word's bits (Table 3.7: quality, cloud, bad input, AOD out of
+  range, surface type, water vapour, emissivity-other, view angle,
+  day, cirrus, fire - lstPqi decodes the 16-bit word; the file's own
+  flag_meanings stop at day_qf, so cirrus and fire are the ATBD's,
+  stated), the quality rules (Table 3.9), and the SURFRAD validation
+  of BOTH satellites (Table 4.1 GOES-16, 14 Dec 2017 - 31 Aug 2019:
+  Bondville 1.16/2.05, Boulder -0.44/1.59, Desert Rock -2.63/1.84,
+  Fort Peck -0.32/1.88, Goodwin Creek 1.59/1.78, Penn State
+  1.80/2.26, Sioux Falls 0.62/1.96 K bias / precision, 21,621
+  matchups; Table 4.2 GOES-17, 12 Aug 2018 - 31 Aug 2019: 1.41/1.94,
+  -0.35/1.28, -2.41/1.73, -0.81/2.20, 1.18/2.41, 1.78/1.61, 0.71/1.40,
+  5,713 matchups - the West slot's own craft, named as such on the
+  line; matched within 0.02 deg and 1 min under a 3x3 cloud screen;
+  lstValidationSpan carries both); WMO-No. 8's CIMO Guide (Vol. I
+  Ch. 5 Annex 5.B: the Davenport/Wieringa roughness classes
+  0.0002-2 m, the sectors to 2 km, the effective roughness by
+  averaging ln z0 rather than z0); Stull 2017 Practical Meteorology
+  Table 18-1 (the classes' 10-m drag coefficients 0.0014-0.062: the
+  neutral log law (kappa / ln(10/z0))^2 reproduces every entry within
+  2.4% - the table is the law's own print, gate-held); Oke 2006 (WMO
+  IOM-81) Table 2 (the classes' urban faces: a regularly built-up
+  area 'closed', a city centre 'chaotic'); Rigden, Li & Salvucci 2018
+  (AgForMet 249: the AmeriFlux kB^-1 by cover at eps 0.98 - shrub
+  3.5, grass 2.5, crop 1.75, deciduous 0.25, evergreen 0.75, all
+  1.75; Eq. 10 the bluff-body law kB^-1 = C1 Re*^0.25 - 2 with C1
+  2.46 Brutsaert / 1.29 Kanda). THE FILE (OR_ABI-L2-LSTC-M6_G18_
+  s20262490201178, 1.4 MB): LST uint16 at 0.0025 K from 190 K, fill
+  65535, valid_range [9200, 61200]; DQF 0..3 with the AOD's four
+  flag_meanings; PQI uint16 with 26 flag_values; the scene's own
+  mean/min/max/sd and retrieved/good counts and both LZA bounds as
+  scalar datasets in the head (read as extras). (1) goesl2.js:
+  LST_DQF_MEANINGS, the PQI tables and lstPqi, LST_ATBD,
+  lstValidationSpan, qualityCensus (the AOD census shared),
+  nearestGood (the nearest pixel of a quality, ring by ring, ties by
+  distance). (2) goesl2-decode.js: L2_LST_SPEC, the tenth ask
+  (halfPx 50, timed false, extras), L2_LST_NEAR_PX 5, l2LstBody
+  (counts, DQF u8, PQI u16, the point's pixel and word, the nearest
+  high-quality pixel within 5 px with its offset and distance in km,
+  the census, the scene's statistics, the bounds); the daemon and
+  the client pass it through. MEASURED in node on the 02Z file: the
+  window in 5 ranges, 626 kB of 1,394 kB, whole and by range byte
+  for byte; the daemon's home body 383 kB (the LST's 69 kB). (3)
+  landlayer.js (NEW): DAVENPORT / davenportClass / cdLogLaw,
+  OSM_ROUGHNESS (the painted cover's class), KB_INV_RIGDEN,
+  KB_BLUFF_C1, kbInvBluff, KB_LAW_OF_OSM and kbInvOfLaw (built and
+  bare covers take the bluff law - Kanda's C1 over built, Brutsaert's
+  over bare - canopies Rigden's constants), effectiveZ0 (the Guide's
+  ln-average), insidePolygon, roughnessCensus (41 x 41 samples over
+  the square kilometre's disc, the later smaller parcel winning a
+  point as the paint does, the covers' kB^-1 combined as the
+  ln-average of z0h), landBulk (Monin-Obukhov over a prescribed z0
+  with the Kansas psi forms, kappa 0.40, Prandtl 0.74, COARE's
+  convective gustiness, z0h = z0 exp(-kB^-1) at the current u*; the
+  latent flux not claimed, stated), kbSensitivity, autoconvective
+  (Fleagle's g/R = 34.16 K/km tested layer by layer, the film's top),
+  landRefractionK (Hirt's k = 503 P/T^2 (0.0343 + dT/dh) over the
+  eye's 2-100 m), landColumnRows (the film's rows from the eye's
+  ground, the modelled band to the balloon's inversion base, the
+  ascent above). THE PASS'S OWN FINDING: Rigden's all-cover constant
+  over a suburb (z0 1 m, +3.6 K skin, 3.5 m/s) returns H 975 W/m^2
+  where Kanda's law (kB^-1 17) returns 90 and Brutsaert's (34) 44 -
+  the sublayer resistance of built ground is not a canopy's - so
+  built and bare ground take the law; the grass (0.03 m, GRA 2.5)
+  reads 109 W/m^2, u* 0.31, L -24 m, the film super-autoconvective
+  to 8 m, k(2-100 m) +0.072 with k(0-100 m) -0.128. (4)
+  observatory.landPanel composes the column, the verdicts (sinking
+  with the film's top / looming) and the kB^-1 sensitivity (Rigden
+  ALL against Kanda's law) and owns no law. (5) THE PAGE:
+  syncLandLayer (the nearest high-quality skin pixel under 75 min
+  old, the screen air and the 10-m wind - Open-Meteo's current where
+  no thermometer stands, stated - on the footprint's census; the
+  film's rows become state.profileLand; called after the products
+  and after the ascent), the record, the research line ('land
+  surface layer (ABI skin · Businger–Dyer)' with a look at the land
+  horizon), the NOAA line's LST clause (the point's word, the
+  nearest pixel the layer stands on, the scene, the slot's own
+  validation), the pick readout ("NOAA LST 23.6 °C (high; clear,
+  night)"); THE FAR RING: farRingGeometry marks each spoke land or
+  sea at its inner ring and drops it by the land or the sea
+  coefficient (rebaseFarRing re-solves the base from the retained
+  elevations when the layer moves, farRingBaseY), and applyMirageFan
+  marches a LAND ray fan through the land column for the land
+  spokes. (6) THE SECOND FINDING, older than the pass: the far ring's
+  mirage fan had NEVER run in the page since the 99th - the ring
+  hands rayFan a Float64Array of launch angles, a typed array's own
+  .map coerces each new row to a number (NaN), and the march's first
+  write threw "Cannot create property '0' on number 'NaN'" inside the
+  sounding sync's catch (every probe with a measured column had
+  logged it: 152, 152b, 156, 156b); rayFan builds its rows with
+  Array.from now, the gate marches the page's typed array bit for
+  bit against the plain one, and the probe records 'far horizon
+  (mirage fan)' for the first time: 7,454 of 22,528 ring vertices
+  re-solved through the balloon column, all 512 spokes' inner ring
+  land at the inland home. MEASURED on the fixture column: the mean-k
+  base (the first-100-m k) and the fan part by 55 / 94 / 104 m at 100
+  km for targets 1.0 / 1.5 / 2.0 km up (0.16-0.76 deg) and 127 m at
+  194 km - a one-to-two-pixel step at the old +0.8 deg band top, so
+  the band reaches +3.0 deg (1200 rays, the same 0.22 arcmin) and the
+  base serves only the hidden and the steep. MEASURED LIVE (probe,
+  03:10Z Sep 6, a night frame at rod 100%): skin 23.6 °C 8.8 km off
+  (the nearest high-quality px, clear, land, night; overhead cloudy,
+  no retrieval; 1,573 high / 524 medium / 509 low / 7,595 none of
+  10,201 px; the scene's mean 17.9 °C over 330,949 retrieved,
+  138,732 good) against 23.9 °C air at 2.1 m/s: skin-air -0.3 K,
+  stable, L 52 m, u* 0.123 m/s, theta* +0.05 K, H -3 W/m^2, z0 0.030
+  m (the Guide's 'open' class - the home's square kilometre carried
+  no painted cover in the probe, stated on the line), kB^-1 2.5, the
+  film +3 K/km over 2-10 m against Fleagle's -34 (looming: the night
+  inversion), Hirt k over the eye's 2-100 m +0.177 (0-100 m 0.192)
+  against the sea column's 0.012 (the 00Z ascent's own surface
+  lapse); the column: film to 100 m, the modelled band 231-494 m,
+  the ascent above 494 m; zero PAGEERROR. THE HARNESS: Chrome for
+  Testing 152.0.7977.82 (this week's Stable) loses Dawn's instance
+  under Xvfb ("A valid external Instance reference no longer exists"
+  3.6 s in, every flag set tried), 151.0.7922.138 fails createBuffer
+  at 264 kB mappedAtCreation, 150.0.7871.124 runs the page clean -
+  the probes and validate pin it through SHOOT_CHROME (setup-chrome's
+  "current Stable" is not a fixed point; stated in the harness
+  README). GATES: landlayer-reference (NEW; 5 landmarks); goesl2-
+  reference THE LAND'S SKIN (11); server-reference THE LAND'S SKIN
+  (29); goesl2-client-reference (ten asks over 26 listings, six CONUS
+  products re-listed on the range-ignoring path); far-terrain-
+  reference (the per-spoke k on a coast fixture, the typed-array
+  march; 14); observatory-reference THE LAND SURFACE LAYER (35);
+  validate: 145 files, 1,158 landmarks, 8 probes. STATED LIMITS: the
+  skin is one hourly pixel kilometres off, the air and wind a model's
+  current where no station stands; the roughness census reads the
+  painted OSM cover and falls to the Guide's 'open' class where none
+  is painted; the bluff law's C1 is a choice between two authors'
+  fits (both carried, the sensitivity printed); the latent flux is
+  not claimed; the land film is the eye's own footprint applied
+  along a spoke's whole path, and a spoke is land or sea by its inner
+  ring though it may cross the coast; the LST validation figures are
+  GOES-16's and GOES-17's over SURFRAD, not GOES-18's here. THE
+  DEPLOY, WATCHED: api.ndev.tk answered nothing at 23:35Z Sep 5
+  (curl 000); the 150th-157th wait for the box.
 - DONE (Sep 5, the review session's 156th pass - THE MEASURED
   HAZE): NOAA's aerosol optical depth at 550 nm (ABI-L2-AODC: CONUS
   every 5 min, 2 km, retrieved by day over dark land and glint-free

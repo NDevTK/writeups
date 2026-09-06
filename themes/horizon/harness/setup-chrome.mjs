@@ -10,9 +10,14 @@
 //
 // Order of resolution:
 //   1. $SHOOT_CHROME, if it points at a real binary  (explicit override)
-//   2. a cached download of the current CfT Stable    (the normal path)
-//   3. fetch + unzip the current CfT Stable, then cache it
-//   4. the pinned Playwright chromium                 (offline fallback)
+//   2. $CFT_VERSION, a named Chrome-for-Testing version, cached or
+//      fetched from the public bucket (157th pass: the current Stable
+//      is not a fixed point - 152.0.7977.82 loses Dawn's instance
+//      under Xvfb, 151.0.7922.138 fails createBuffer, 150.0.7871.124
+//      runs clean; a version that works is named, not resolved)
+//   3. a cached download of the current CfT Stable    (the normal path)
+//   4. fetch + unzip the current CfT Stable, then cache it
+//   5. the pinned Playwright chromium                 (offline fallback)
 //
 // Network + unzip go through curl/unzip (execSync) so the agent proxy
 // and its CA bundle are honoured exactly as elsewhere in the repo.
@@ -67,6 +72,15 @@ function resolveStable() {
   return {version: stable.version, url: dl.url};
 }
 
+// A NAMED version ($CFT_VERSION): the public bucket lays every
+// Chrome-for-Testing build out by version, so no listing is needed.
+const PUBLIC_BUCKET = 'https://storage.googleapis.com/chrome-for-testing-public';
+function resolveNamed(version) {
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(version))
+    throw new Error(`CFT_VERSION ${version} is not a Chrome version`);
+  return {version, url: `${PUBLIC_BUCKET}/${version}/linux64/chrome-linux64.zip`};
+}
+
 let cached = null;
 
 /**
@@ -85,7 +99,9 @@ export async function ensureChrome() {
   }
 
   try {
-    const {version, url} = resolveStable();
+    const {version, url} = process.env.CFT_VERSION
+      ? resolveNamed(process.env.CFT_VERSION)
+      : resolveStable();
     const dir = join(CACHE_ROOT, version);
     let bin = binIn(dir);
     if (!bin) {
