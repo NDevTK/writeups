@@ -34,8 +34,10 @@ import {
   VIS_BAND,
   VIS_DQF_MEANINGS,
   coverFraction,
+  cosSolarZenith,
   kappaFactor,
   reflectanceOfFactor,
+  solarGeometry,
   solarZenithDeg,
   visCensus,
   visReferences,
@@ -1108,6 +1110,16 @@ const inflate = (u8) =>
   const sunErr = Math.max(
     ...sunPins.map(([la, lo, iso, z]) => Math.abs(sun(la, lo, iso) - z))
   );
+  // the split series (the sun's place once, the cosine a pixel) is
+  // the whole series at every pin
+  const geoErr = Math.max(
+    ...sunPins.map(([la, lo, iso]) =>
+      Math.abs(
+        cosSolarZenith(la, lo, solarGeometry(Date.parse(iso))) -
+          Math.cos((sun(la, lo, iso) * Math.PI) / 180)
+      )
+    )
+  );
   // a synthetic 20x20 window: counts of reflectance factor, the flags
   // by a pattern - every 7th pixel conditionally usable, every 11th
   // out of range, every 13th no value, every 17th the focal plane,
@@ -1160,6 +1172,7 @@ const inflate = (u8) =>
       near(reflectanceOfFactor(0.4, 0.06, {minCos: 0.05}), 0.4 / 0.06, 1e-12) &&
       Number.isNaN(reflectanceOfFactor(NaN, 0.8)) &&
       sunErr < 0.02 &&
+      geoErr < 1e-12 &&
       sun(32.85, -117.12, '2026-09-06T02:00:00Z') > 85 &&
       sun(32.85, -117.12, '2026-09-06T20:00:00Z') < 30 &&
       near(coverFraction(0.5, 0.2, 0.8), 0.5, 1e-12) &&

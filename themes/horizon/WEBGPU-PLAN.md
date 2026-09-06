@@ -10345,6 +10345,108 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 159th pass - THE DAYLIGHT
+  FIELD): the cloud decks' texel field has been the band-13
+  mosaic's 2-km classes since the 143rd - a texel cloud or clear
+  whole, the noise inside it the theme's own. By day the ABI sees
+  the same sky at 500 m in band 2 (0.64 um, the one 500-m band,
+  every five minutes over CONUS), and a partly filled 2-km pixel
+  reflects the linear mix of its clear and cloudy parts: this pass
+  shapes the decks INSIDE the mask's cloud with that reflectance,
+  measured, never drawn. THE PRIMARY, read again in full for the
+  reflective bands: the Cloud and Moisture Imagery Product ATBD,
+  Enterprise v4 (Schmit & Gunshor, 13 Jan 2021; the 149th's read
+  covered the emissive bands), Sec. 3.4.1.2 - Eq. 3-2 rho_f = kappa
+  L with kappa = pi d^2 / Esun ("the incident Lambertian-equivalent
+  radiance"; d the instantaneous Earth-Sun distance in AU, Esun the
+  bandpass solar irradiance), Eq. 3-3 rho_f = rho cos(theta0) - the
+  reflectance FACTOR is the reflectance times the cosine of the
+  solar zenith angle (the CMI's standard_name says the same); DQF 0
+  good, 1 conditionally usable, 2 out of range, 3 no value, 4 the
+  focal-plane temperature threshold exceeded (5 added for GOES-17's
+  loop heat pipe). THE FILE (OR_ABI-L2-CMIPC-M6C02_G18, 09:51Z):
+  33.6 MB at night, CMI int16 counts 0..4095 at 0.00031746 a count
+  (fill -1, 65535 on the wire as band 13's), kappa0 0.0019646999,
+  esun 1624.774 W m^-2 um^-1, earth_sun_distance_anomaly_in_AU
+  1.00802 - and pi x 1.00802^2 / 1624.774 = 0.0019646953, 4.6e-9
+  from the attribute: the file's kappa IS Eq. 3-2, pinned. A 401 x
+  401 window (+-100 km on the 500-m grid, 572 x 688 m a pixel here)
+  costs 5 ranges and 2.3-2.6 MB, about a second - too much for the
+  free tier's egress every five minutes, nothing for the bucket's
+  CORS: the ask is pageOnly (goesl2-decode's eleventh ask, 'vis',
+  half width 200 with the file's kappa0, esun, d, scene mean/max
+  factor and valid count as extras; the daemon never lists, fetches
+  or serves it; goesl2-client reads it only when named). THE SUN
+  OVER EVERY PIXEL: goesl2.solarZenithDeg (the USNO low-precision
+  series: mean longitude 280.460 + 0.9856474 n, anomaly 357.528 +
+  0.9856003 n, ecliptic longitude L + 1.915 sin g + 0.020 sin 2g,
+  obliquity 23.439 - 4e-7 n, GMST 18.697374558 + 24.06570982441908
+  n hours) was HELD to an independent Meeus computation (ch. 25 low
+  accuracy with apparent sidereal time, written separately in the
+  scratchpad) at eight points - the equator's noon, the home by day
+  and night, Cape Hatteras at 12Z and 13:30Z, the June solstice's
+  noon on the tropic, Meeus's own 1992 example - within 0.005 deg;
+  the NOAA solar calculator's Spencer series, tried first, sat
+  0.1-0.4 deg off both and was not used. solarGeometry(ms) holds
+  the shared part (declination, right ascension, Greenwich's
+  sidereal angle) once and cosSolarZenith(lat, lon, geo) costs three
+  trig calls a pixel - the split is the whole series to 1e-12 at
+  every pin. THE REFERENCES, MEASURED: visReferences sorts the
+  window's reflectances by a mask - NOAA's ACM at the SAME SCAN
+  ANGLES (both windows lie on one fixed grid: the 500-m pixel's
+  angle falls in one 2-km pixel by indexOfScanAngle, no navigation
+  at all), DQF 0 only; the theme's own band-13 field stands in
+  without a mask window - the clear reference the clear pixels'
+  MEDIAN, the cloudy one the cloudy pixels' 90TH PERCENTILE (the
+  bright, filled cloud; a median would sit on the edges and holes
+  the fraction is meant to find), null under 50 pixels a side.
+  coverFraction(rho, clear, cloud) is the clamped position between
+  them, NaN without a reflectance or a span. THE FIELD:
+  goesir.refineDeckField splits the coarse field `factor` = 4 ways
+  - each fine texel keeps its coarse texel's validity and measured
+  flag (B, A) and takes cover = the coarse cover x its fraction
+  where the coarse texel HOLDS cloud and a fraction stands; a clear
+  coarse texel stays clear whatever the fine reflectance says (the
+  mask decides where cloud is, the visible band shapes it inside),
+  and a NaN keeps the coarse cover (night, fill, a low sun - the
+  pixel's cos under 0.05 -, off the window). daylight.js composes
+  it: the fine texel's centre on the mosaic (deckField's own index
+  rule, X0 = win.x0 + i0 + ci - halfPx - 1) -> mercatorLatLon ->
+  windowIndexOf on the visible window -> the fraction; the fine
+  field goes to cloudSys.setGoesCover with the SAME worldUnits (the
+  shader samples by scene position, texel count free), re-cut
+  whenever the coarse field is (syncGoesIr) or a new file lands
+  (syncGoesL2's five minutes, the client's held windows sparing a
+  re-read), withdrawn at night (the observer's sun past 85 deg
+  zenith, the LST ATBD's day rule), on ?vis=0 or under the
+  browser's data saver - the line says which. The pick layer maps a
+  fine texel to its coarse one and prints the band-2 fraction and
+  the references. GATES: goesl2-reference THE DAYLIGHT FIELD (kappa
+  from the file's own d and Esun, Eq. 3-3 inverted and refused under
+  a low sun, the sun held to Meeus at eight points, the split
+  series, the cover fraction's clamp and refusals, a synthetic
+  window's census by the five flags with every pixel counted once,
+  the references and their thin-side nulls; 12 landmarks);
+  daylight-reference (new: THE WORDS AT A PIXEL - the ACM and the
+  theme's field read at a visible pixel's scan angles, the
+  reflectance back out of the factor at each pixel's own sun, the
+  dark window unlit; THE DAYLIGHT FIELD composed on synthetic
+  windows laid on GOES-West's real fixed grid around the home - a
+  bright disc, a thin annulus, a clear sea - the references measured
+  back out to 1e-4, the fraction 1 over the home and 0.500 in the
+  annulus, none on the border, the flagged holes keeping the coarse
+  cover, the low cover's sum within 0.4% of an independent count
+  over the fine centres by distance, the validities copied whole,
+  the theme's field standing in for the mask to the same field, the
+  dark window null, a mask all cloud leaving the clear reference
+  unmeasurable; 2); goesir-reference THE DAYLIGHT FIELD splits the
+  deck field (the even columns at 0.5, the odd ones keeping the
+  coarse cover, 75% of the coarse cover, the validities x16; 28);
+  goesl2-client-reference (11 asks, 10 served, the eleventh listed
+  only when named - 3 CMIPC prefixes and null on the fake bucket;
+  5); server-reference (the ask pins: ids, half widths, 5 untimed,
+  the eleventh pageOnly; 30). Docs: the daemon README's /goesl2
+  entry (the eleventh ask), FINDINGS pass 159.
 - DONE (Sep 6, the review session's 158th pass - THE DEPLOY
   REPAIRED): api.ndev.tk answered again at 09:2xZ after its long
   dark - HTTP 200 on /goesl2, /sounding and /sst - but its /goesl2

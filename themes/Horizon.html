@@ -484,12 +484,18 @@
         dmwNearest,
         dmwUnpack,
         maskAgreement,
+        solarZenithDeg,
         sstAgainstGrid,
         unpackArray,
         unscale,
         windowIndexOf
       } from './horizon/goesl2.js';
       import {createGoesL2Client} from './horizon/goesl2-client.js';
+      import {
+        DAYLIGHT_FACTOR,
+        DAYLIGHT_SZA_MAX_DEG,
+        daylightField
+      } from './horizon/daylight.js';
       import {
         azAltFromDir,
         catalogueIndexNear,
@@ -2686,6 +2692,8 @@
           // NOAA's mask of this mosaic's minute, for the comparison
           // (148th pass; the daemon caches the window)
           syncGoesL2();
+          // the daylight field re-cut over the new coarse one (159th)
+          syncDaylight();
           record(
             pick.sat.name + ' band 13 (GIBS)',
             `${time.slice(11, 16)}Z · sea within 100 km ${pct(s.waterLow + s.waterMid + s.waterHigh, s.waterMeasured)}% cloud ` +
@@ -6701,7 +6709,16 @@
                     fill: p.lstFill
                   })
                 : null,
-              pqi: p.pqi ? unpackArray(p.pqi) : null
+              pqi: p.pqi ? unpackArray(p.pqi) : null,
+              // the visible band's reflectance factor (159th pass):
+              // the CMIP ATBD's rho cos(solar zenith), NaN fill
+              rfac: p.rf
+                ? unscale(unpackArray(p.rf), {
+                    scale: p.rfScale,
+                    offset: p.rfOffset,
+                    fill: p.rfFill
+                  })
+                : null
             }
           : null;
       async function syncGoesL2() {
@@ -6962,6 +6979,7 @@
           }
           updateLiveDroplets();
           syncLandLayer();
+          syncDaylight();
         } catch (e) {
           if (params.has('debug')) console.warn('goesl2: ' + e.message);
         } finally {
@@ -6971,6 +6989,183 @@
             syncGoesL2();
           }
         }
+      }
+      // THE DAYLIGHT FIELD (159th pass): by day the ABI's band 2
+      // (0.64 um, the one 500-m band, every five minutes over CONUS)
+      // shapes the decks' cover INSIDE the mask's cloud - the 2-km
+      // texel field (goesir.deckField, the band-13 mosaic's classes)
+      // split four ways, each fine texel's cover the coarse cover
+      // times its position between the scene's own clear and cloudy
+      // reflectances (daylight.js composes goesl2's laws: the CMIP
+      // ATBD's reflectance factor inverted at each pixel's own sun,
+      // the references measured under NOAA's ACM at the same scan
+      // angles, the fraction clamped). The window is the page's OWN
+      // range read of the open bucket (goesl2-client, the ask named
+      // 'vis': 2.6 MB a file, never the daemon's - the free tier's
+      // egress cannot carry it); a refresh re-lists but reads only a
+      // new file. At night (the observer's sun past 85 deg zenith,
+      // the LST ATBD's day rule), on ?vis=0 or under the browser's
+      // data-saver the coarse field stands alone, and the line says
+      // which. The fine field is re-cut whenever the coarse one is
+      // (syncGoesIr) or a new visible file lands (syncGoesL2's five
+      // minutes).
+      let daylight = null; // {at, key, time, sunZenithDeg, vis, res, coarseAt}
+      let daylightBusy = false;
+      let daylightReach = null; // why the coarse field stands alone
+      function daylightOff() {
+        return (
+          params.get('vis') === '0' ||
+          (navigator.connection && navigator.connection.saveData === true)
+        );
+      }
+      async function syncDaylight() {
+        if (overridden || params.get('goes') === '0') return;
+        if (!goesObs || !goesObs.deck || !cloudSys) return;
+        if (daylightBusy) return;
+        if (daylightOff()) {
+          daylightReach = params.get('vis') === '0' ? 'off (?vis=0)' : 'off (data saver)';
+          return;
+        }
+        const sza = solarZenithDeg(state.lat, state.lon, Date.now());
+        if (sza >= DAYLIGHT_SZA_MAX_DEG) {
+          daylightReach = `night here (sun ${sza.toFixed(0)}° from the zenith): the 2-km field stands alone`;
+          if (daylight) {
+            // the day's fine field withdrawn: the coarse field back
+            daylight = null;
+            cloudSys.setGoesCover(
+              goesObs.deck.data,
+              goesObs.deck.rm,
+              goesObs.worldUnits
+            );
+          }
+          return;
+        }
+        daylightBusy = true;
+        try {
+          const j = await goesL2Client.fetchGoesL2(state.lat, state.lon, null, [
+            'vis'
+          ]);
+          if (!j || !j.sat || !j.vis) {
+            daylightReach = j && j.reason ? j.reason : 'no visible window read';
+            return;
+          }
+          // the same file over the same coarse field: nothing to re-cut
+          if (
+            daylight &&
+            daylight.key === j.vis.key &&
+            daylight.coarseAt === goesObs.at
+          )
+            return;
+          const vis = unpackProduct(j.vis);
+          const win = goesObs.win;
+          const frame = {
+            win,
+            i0: goesObs.i0,
+            j0: goesObs.j0,
+            ci: Math.floor(win.px - goesObs.i0),
+            cj: Math.floor(win.py - goesObs.j0),
+            halfPx: win.halfPx
+          };
+          // the mask of the same satellite (the daemon's or the page's
+          // own read) sorts the references; the theme's own field
+          // stands in without one
+          const mask =
+            goesL2 && goesL2.mask && goesL2.sat === j.sat ? goesL2.mask : null;
+          const t0 = performance.now();
+          const res = daylightField({
+            vis,
+            deck: goesObs.deck,
+            frame,
+            mask,
+            field: goesObs.panel.field,
+            ms: Date.parse(vis.time)
+          });
+          const cutMs = Math.round(performance.now() - t0);
+          if (!res || !res.fine) {
+            daylight = null;
+            daylightReach = res
+              ? `band 2 ${vis.time.slice(11, 16)}Z read (${res.stats.lit.toLocaleString('en-US')} px lit) but the references are thin ` +
+                `(${res.refs.nClear} clear, ${res.refs.nCloud} cloudy px under the ${res.sortedBy === 'ACM' ? 'ACM' : "theme's field"}): the 2-km field stands alone`
+              : `band 2 ${vis.time.slice(11, 16)}Z read but nothing lit: the 2-km field stands alone`;
+            cloudSys.setGoesCover(
+              goesObs.deck.data,
+              goesObs.deck.rm,
+              goesObs.worldUnits
+            );
+            return;
+          }
+          cloudSys.setGoesCover(res.fine.data, res.fine.rm, goesObs.worldUnits);
+          daylight = {
+            at: Date.now(),
+            key: j.vis.key,
+            time: vis.time,
+            sunZenithDeg: vis.sunZenithDeg,
+            census: vis.census,
+            pixel: vis.pixel,
+            read: j.read ?? null,
+            vis,
+            res,
+            cutMs,
+            coarseAt: goesObs.at
+          };
+          daylightReach = null;
+          const c = vis.census;
+          record(
+            `NOAA ${j.craft} visible band 2 (CMIPC C02)`,
+            `${vis.time.slice(11, 16)}Z · 500-m reflectance factor over ${c.good.toLocaleString('en-US')} good px within ±100 km ` +
+              `(median ${f3(c.rfMedian)}, sun ${vis.sunZenithDeg.toFixed(0)}° from the zenith) · ` +
+              `the decks' cover cut ${DAYLIGHT_FACTOR}× finer inside the mask's cloud: ${res.fine.refined.toLocaleString('en-US')} of ` +
+              `${res.fine.cloudy.toLocaleString('en-US')} fine texels shaped, mean fraction ${res.stats.meanFraction.toFixed(2)} ` +
+              `between clear ρ ${res.refs.rhoClear.toFixed(3)} and cloud ρ ${res.refs.rhoCloud.toFixed(3)} (${res.sortedBy === 'ACM' ? "NOAA's mask" : "the theme's field"} sorting)` +
+              (j.read && j.read.length
+                ? ` · ${j.read.reduce((s, r) => s + r.kb, 0).toLocaleString('en-US')} kB in ${j.read.reduce((s, r) => s + r.ranges, 0)} ranges from ${j.bucket}`
+                : ' · the held window') +
+              ` · cut in ${cutMs} ms`
+          );
+        } catch (e) {
+          daylightReach = 'band 2: ' + e.message;
+          if (params.has('debug')) console.warn('daylight: ' + e.message);
+        } finally {
+          daylightBusy = false;
+        }
+      }
+      // the visible band's word at a fine texel of the decks' field
+      // (the pick layer, 159th): the fraction it took and the
+      // reflectance under it, or null where the coarse cover stands
+      function daylightAtTexel(fi, fj, rm) {
+        if (!daylight || !daylight.res || daylight.res.fine.rm !== rm) return null;
+        const f = daylight.res.frac[fj * rm + fi];
+        if (!Number.isFinite(f)) return null;
+        return {
+          fraction: f,
+          rhoClear: daylight.res.refs.rhoClear,
+          rhoCloud: daylight.res.refs.rhoCloud
+        };
+      }
+      // a census figure or a dash (a window with no good pixel)
+      const f3 = (v) => (Number.isFinite(v) ? v.toFixed(3) : '–');
+      function daylightLine() {
+        if (daylight) {
+          const d = daylight;
+          const r = d.res;
+          const c = d.census;
+          return (
+            `band 2 (0.64 µm, ${d.pixel ? `${(d.pixel.ewM / 1000).toFixed(2)} × ${(d.pixel.nsM / 1000).toFixed(2)} km` : '500-m'} px) ${d.time.slice(11, 16)}Z: ` +
+            `reflectance factor ρ·cos θ₀ over ${c.good.toLocaleString('en-US')} good px (${f3(c.rfMin)}–${f3(c.rfMax)}, median ${f3(c.rfMedian)}; ` +
+            `the sun ${d.sunZenithDeg.toFixed(1)}° from the zenith at the scan, cos ${d.vis.cosSza.toFixed(3)}) → reflectance by each pixel's own sun; ` +
+            `the scene's references under ${r.sortedBy === 'ACM' ? "NOAA's mask" : "the theme's own field"}: clear ρ ${r.refs.rhoClear.toFixed(3)} ` +
+            `(median of ${r.refs.nClear.toLocaleString('en-US')} px), cloud ρ ${r.refs.rhoCloud.toFixed(3)} (p90 of ${r.refs.nCloud.toLocaleString('en-US')}) · ` +
+            `the decks' 2-km field cut ${DAYLIGHT_FACTOR}× finer: ${r.fine.refined.toLocaleString('en-US')} of ${r.fine.cloudy.toLocaleString('en-US')} fine texels ` +
+            `under the mask's cloud shaped by their reflectance (mean fraction ${r.stats.meanFraction.toFixed(2)}), the rest keeping the 2-km cover; ` +
+            `κ = πd²/E_sun = ${d.vis.kappa0 !== null ? d.vis.kappa0.toExponential(3) : '–'} from the file's own d = ${d.vis.dAu !== null ? d.vis.dAu.toFixed(5) : '–'} AU ` +
+            `and E_sun ${d.vis.esunWm2Um !== null ? d.vis.esunWm2Um.toFixed(1) : '–'} W m⁻² µm⁻¹ (CMIP ATBD Eq. 3-2, 3-3) · ` +
+            (d.read && d.read.length
+              ? `${d.read.reduce((s, r) => s + r.kb, 0).toLocaleString('en-US')} kB in ${d.read.reduce((s, r) => s + r.ranges, 0)} ranges read by the page itself`
+              : 'the held window') +
+            ` · cut in ${d.cutMs} ms`
+          );
+        }
+        return daylightReach ? `band 2: ${daylightReach}` : null;
       }
       // The theme's window pixels as NOAA's mask sees them: the sea
       // pixels the theme classified (clear or cloud; unmeasured and
@@ -13274,6 +13469,12 @@
             const l2 = goesL2Line();
             if (l2) research['NOAA cloud products (ABI L2 ACMC · ACHAC)'] = l2;
             else delete research['NOAA cloud products (ABI L2 ACMC · ACHAC)'];
+            // THE DAYLIGHT FIELD (159th pass): the visible band
+            // shaping the decks inside the mask's cloud, or why the
+            // 2-km field stands alone (night, off, thin references)
+            const dl = goesObs ? daylightLine() : null;
+            if (dl) research['daylight field (ABI band 2 · CMIP reflectance)'] = dl;
+            else delete research['daylight field (ABI band 2 · CMIP reflectance)'];
           }
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();
@@ -13775,14 +13976,21 @@
             if (!tx) continue;
             const P = goesObs.panel;
             const win = goesObs.win;
+            // the daylight field's fine texel (159th) maps to its
+            // coarse one: the field pixel is the coarse texel's
+            const fac =
+              goesObs.deck && tx.rm > goesObs.deck.rm
+                ? Math.round(tx.rm / goesObs.deck.rm)
+                : 1;
             const fp = fieldPixelOfTexel(
-              tx.ii,
-              tx.jj,
+              Math.floor(tx.ii / fac),
+              Math.floor(tx.jj / fac),
               win.halfPx,
               Math.floor(win.px - goesObs.i0),
               Math.floor(win.py - goesObs.j0),
-              tx.rm
+              tx.rm / fac
             );
+            const dl = fac > 1 ? daylightAtTexel(tx.ii, tx.jj, tx.rm) : null;
             let detail = '';
             let cls = null;
             if (
@@ -13904,11 +14112,25 @@
                 (tx.valid
                   ? tx.cover > 0
                     ? 'measured cloud'
-                    : handed
-                      ? 'the pixel is low cloud handed to the mid deck ' +
-                        '(the ceilometer reports no low layer)'
-                      : 'measured clear'
+                    : dl
+                      ? 'measured cloud, cleared by the visible band'
+                      : handed
+                        ? 'the pixel is low cloud handed to the mid deck ' +
+                          '(the ceilometer reports no low layer)'
+                        : 'measured clear'
                   : 'unmeasured, the noise cover') +
+                // the visible band's fraction at the fine texel (159th)
+                (dl
+                  ? ' (band 2: ' +
+                    Math.round(100 * dl.fraction) +
+                    '% of the 2-km cover at this 500-m texel, between clear ρ ' +
+                    dl.rhoClear.toFixed(2) +
+                    ' and cloud ρ ' +
+                    dl.rhoCloud.toFixed(2) +
+                    ')'
+                  : fac > 1 && tx.valid && tx.cover > 0
+                    ? ' (band 2: no reflectance at this texel, the 2-km cover kept)'
+                    : '') +
                 detail
             );
             break;
@@ -17784,6 +18006,13 @@
               cloudSys.setGoesCover(
                 goesObs.deck.data,
                 goesObs.deck.rm,
+                goesObs.worldUnits
+              );
+            // the daylight field (159th): the fine field when held
+            if (daylight && daylight.res && daylight.coarseAt === goesObs.at)
+              cloudSys.setGoesCover(
+                daylight.res.fine.data,
+                daylight.res.fine.rm,
                 goesObs.worldUnits
               );
             sizeCloudTargets();

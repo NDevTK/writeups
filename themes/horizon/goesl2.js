@@ -875,19 +875,34 @@ export function reflectanceOfFactor(rf, cosSza, {minCos = 0.05} = {}) {
  * a percent of its cosine).
  */
 export function solarZenithDeg(latDeg, lonDeg, ms) {
+  const cosZ = cosSolarZenith(latDeg, lonDeg, solarGeometry(ms));
+  return (Math.acos(Math.max(-1, Math.min(1, cosZ))) * 180) / Math.PI;
+}
+/** The sun's place at a moment (the series above, once): its
+ * declination and right ascension and Greenwich's sidereal angle,
+ * radians - the part a whole window of pixels shares. */
+export function solarGeometry(ms) {
   const n = (ms - Date.UTC(2000, 0, 1, 12)) / 86400e3;
   const L = (280.46 + 0.9856474 * n) % 360;
   const g = ((357.528 + 0.9856003 * n) * Math.PI) / 180;
   const lam = ((L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * Math.PI) / 180;
   const eps = ((23.439 - 0.0000004 * n) * Math.PI) / 180;
-  const ra = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam));
-  const dec = Math.asin(Math.sin(eps) * Math.sin(lam));
   const gmstH = (18.697374558 + 24.06570982441908 * n) % 24;
-  const ha = ((gmstH * 15 + lonDeg) * Math.PI) / 180 - ra;
+  return {
+    raRad: Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam)),
+    decRad: Math.asin(Math.sin(eps) * Math.sin(lam)),
+    gmstRad: (gmstH * 15 * Math.PI) / 180
+  };
+}
+/** cos(solar zenith) at a place from the sun's geometry: three trig
+ * calls a pixel, the per-pixel part of the series. */
+export function cosSolarZenith(latDeg, lonDeg, geo) {
+  const ha = geo.gmstRad + (lonDeg * Math.PI) / 180 - geo.raRad;
   const la = (latDeg * Math.PI) / 180;
-  const cosZ =
-    Math.sin(la) * Math.sin(dec) + Math.cos(la) * Math.cos(dec) * Math.cos(ha);
-  return (Math.acos(Math.max(-1, Math.min(1, cosZ))) * 180) / Math.PI;
+  return (
+    Math.sin(la) * Math.sin(geo.decRad) +
+    Math.cos(la) * Math.cos(geo.decRad) * Math.cos(ha)
+  );
 }
 /**
  * THE COVER FRACTION of a fine pixel from its reflectance between the

@@ -945,7 +945,28 @@ The practice the corpus demonstrates, stated so it can be reused:
    all 145 references), and the page reads from the bucket itself
    any product an older daemon's body lacks outright and says so in
    its record (`goesl2-client-reference` THE OLDER DAEMON'S GAPS;
-   `server-reference` THE DEPLOYED REVISION)
+   `server-reference` THE DEPLOYED REVISION). Pass 159 gives the
+   cloud decks a daylight texture measured, not drawn: by day the
+   ABI's band 2 (0.64 µm, the one 500-m band, every five minutes
+   over CONUS) is read by the page itself from the open bucket (a
+   401 × 401 window, 2.6 MB a file, an ask the daemon never serves),
+   its reflectance factor turned into reflectance at each pixel's
+   own sun by the CMIP ATBD's Eq. 3-3 (the file's own κ = πd²/E_sun
+   recomputed to 5 × 10⁻⁹ of the attribute it carries), the scene's
+   clear and cloudy references measured under NOAA's mask at the
+   same scan angles (the clear median, the cloudy 90th percentile),
+   and the 2-km deck field split four ways with each fine texel's
+   cover the coarse cover times its position between them — the
+   mask decides where cloud is, the visible band shapes it inside,
+   and where no reflectance stands the 2-km cover is kept. The sun
+   series (USNO's low-precision coordinates) was held to an
+   independent Meeus computation at eight points (within 0.005°; the
+   NOAA calculator's Spencer series is 0.1–0.4° off both)
+   (`goesl2-reference` THE DAYLIGHT FIELD; `daylight-reference` the
+   words at a pixel and the field composed on synthetic windows on
+   the real fixed grid; `goesir-reference` THE DAYLIGHT FIELD splits
+   the deck field; `goesl2-client-reference` and `server-reference`
+   the page-only eleventh ask)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
