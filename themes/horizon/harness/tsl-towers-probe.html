@@ -33,7 +33,9 @@
       // field can put cloud in the low deck: with the field's east half
       // holding towers of top 60 (yTop 60, the base top 30) the east
       // must carry optical depth and the west none; a shorter tower (top
-      // 40) must carry less than the tall one; without any field the
+      // 40) must carry less than the tall one; a flank below the deck's
+      // ordinary top adds nothing while a measured core at the same
+      // height is cloud at that ordinary top; without any field the
       // deck stays empty (the pinned default), and clearing the field
       // empties it again; the device reports no validation error.
       import * as T from 'three/webgpu';
@@ -117,9 +119,9 @@
             }
           return {west: west / nWest, westMax, east: east / nEast, mean: sum / (S * S)};
         };
-        // a top field: towers of top `top` over the east half (A 1),
-        // nothing west (A 0), inside a zero border ring
-        const field = (rm, top) => {
+        // a top field: towers of top `top` over the east half (A 1, G
+        // = core), nothing west (A 0), inside a zero border ring
+        const field = (rm, top, core = 1) => {
           const d = new Float32Array(rm * rm * 4);
           for (let jj = 0; jj < rm; jj++)
             for (let ii = 0; ii < rm; ii++) {
@@ -127,6 +129,7 @@
               const k = (jj * rm + ii) * 4;
               const tower = !border && ii >= rm / 2;
               d[k] = tower ? top : 0;
+              d[k + 1] = tower ? core : 0;
               d[k + 3] = tower ? 1 : 0;
             }
           return d;
@@ -139,6 +142,17 @@
         sys.setTopField(field(64, 40), 64, WORLD);
         sys.updateShadow();
         const a2 = stats(await readTau());
+        // a flank below the deck's ordinary top (top 20 under a base
+        // top of 30, no core): the deck keeps its own top and the
+        // flank adds nothing; the same top on a measured core is cloud
+        // at the deck's ordinary top
+        sys.setTopField(field(64, 20, 0), 64, WORLD);
+        sys.updateShadow();
+        const a4 = stats(await readTau());
+        sys.setTopField(field(64, 20, 1), 64, WORLD);
+        sys.updateShadow();
+        const a5 = stats(await readTau());
+        const tc = sys.topTexelAt(70, 0);
         sys.setTopField(null);
         sys.updateShadow();
         const a3 = stats(await readTau());
@@ -147,7 +161,8 @@
         const f = (v) => v.toFixed(4);
         log(
           `S=${hook.size} empty: mean ${f(a0.mean)} · towers to 60: west mean ${f(a1.west)} max ${f(a1.westMax)}, east mean ${f(a1.east)} · ` +
-            `towers to 40: east mean ${f(a2.east)} · cleared: mean ${f(a3.mean)} · texel at +70: ${t === null ? 'none' : 'top ' + t.top + ' valid ' + t.valid} · device errors ${errs.length}` +
+            `towers to 40: east mean ${f(a2.east)} · a flank to 20 under a base top of 30: east mean ${f(a4.east)} · a core to 20: east mean ${f(a5.east)} (texel at +70: ${tc === null ? 'none' : 'top ' + tc.top + ' core ' + tc.core}) · ` +
+            `cleared: mean ${f(a3.mean)} · texel at +70: ${t === null ? 'none' : 'top ' + t.top + ' valid ' + t.valid} · device errors ${errs.length}` +
             (errs.length ? ' :: ' + errs[0].slice(0, 160) : '')
         );
         const ok =
@@ -156,6 +171,13 @@
           a1.westMax < 1e-4 &&
           a2.east > 0.05 &&
           a2.east < a1.east * 0.9 &&
+          a4.east < 1e-6 &&
+          a4.westMax < 1e-4 &&
+          a5.east > 0.02 &&
+          a5.east < a2.east &&
+          tc !== null &&
+          tc.top === 20 &&
+          tc.core === 1 &&
           a3.mean < 1e-6 &&
           t === null && // cleared
           tw === null &&

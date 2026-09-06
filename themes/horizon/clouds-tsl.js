@@ -281,15 +281,20 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
 
   // THE TOWERS AT THEIR PLACES (175th pass): the measured TOP field -
   // one texel per cell of the radar's 1-km echo-top grid over the
-  // scene, R = the tower's top in scene units, A = 1 where a storm
-  // stands (the deck's own y mapping applied by the page). The low
-  // deck's slab top becomes local: a tower's texel rises to R, every
-  // other texel to yTopBase, and the march's bound yTop is the tallest
-  // tower. A tower is a measured cloud, so its texel's cover is lifted
-  // to the radar field's cap. The field anchors to the low deck's
-  // advection offset at set time and drifts with the SAME wOff the
-  // noise uses, as the other measured fields do. The default 1x1 zero
-  // texture with uTopOn 0 keeps the pinned harness identical.
+  // scene, R = the tower's top in scene units, G = 1 on a measured
+  // (echoing) cell's own footprint, A = 1 wherever a tower or its
+  // flank stands (the deck's own y mapping applied by the page). The
+  // low deck's slab top becomes local: a texel rises to the field's
+  // top where that is higher than yTopBase and keeps yTopBase where
+  // the field is lower or absent (the echo top bounds the cloud top
+  // from below), and the march's bound yTop is the tallest tower. An
+  // echoing cell is a measured cloud, so its footprint's cover is
+  // lifted to the radar field's cap, and a flank standing above the
+  // deck's top is the tower's wall and lifted as it rises. The field
+  // anchors to the low deck's advection offset at set time and drifts
+  // with the SAME wOff the noise uses, as the other measured fields
+  // do. The default 1x1 zero texture with uTopOn 0 keeps the pinned
+  // harness identical.
   const topZeroData = new Float32Array([0, 0, 0, 0]);
   const topTex = new DataTexture(topZeroData, 1, 1, RGBAFormat, FloatType);
   topTex.minFilter = topTex.magFilter = LinearFilter;
@@ -301,10 +306,19 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   const TOWER_COVER = 0.95;
   const topSample = (xz, wOff) =>
     topNode.sample(xz.add(wOff).sub(uTopOff).div(uTopWorld).add(0.5));
-  // the slab's local top at scene xz for a deck: yT without a field
-  const topAt = Fn(([xz, wOff, yT, yTBase, rad]) => {
+  // the field's top at scene xz un-premultiplied: the linear filter
+  // averages R and A separately across a tower's edge, so R/A is the
+  // painted neighbours' mean top rather than a dip toward zero
+  const topFieldAt = (xz, wOff) => {
     const t = topSample(xz, wOff);
-    const local = mix(yTBase, t.r, t.a.mul(rad));
+    return {t, top: t.r.div(max(t.a, 1e-4))};
+  };
+  // the slab's local top at scene xz for a deck: yT without a field;
+  // with one, the field's top where it stands above the deck's
+  // ordinary top and that top elsewhere
+  const topAt = Fn(([xz, wOff, yT, yTBase, rad]) => {
+    const {t, top} = topFieldAt(xz, wOff);
+    const local = max(yTBase, mix(yTBase, top, clamp(t.a.mul(rad), 0.0, 1.0)));
     return select(uTopOn.greaterThan(0.5), local, yT);
   });
 
@@ -331,7 +345,15 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     const g = goesNode.sample(pg);
     const covM = mix(covN, mix(g.g, g.r, rad), mix(g.b, g.a, rad));
     const pr = xz.add(wOff).sub(uRadarOff).div(uRadarWorld).add(0.5);
-    const tower = topSample(xz, wOff).a.mul(rad).mul(uTopOn).mul(TOWER_COVER);
+    // a measured cell's footprint (G) is cloud outright; a flank is
+    // cloud as far as it stands above the low deck's ordinary top
+    // (full over 4 scene units). Only the low deck takes the field.
+    const {t, top} = topFieldAt(xz, wOff);
+    const above = clamp(top.sub(uniformsLow.yTopBase).mul(0.25), 0.0, 1.0);
+    const tower = max(t.g, above.mul(t.a))
+      .mul(rad)
+      .mul(uTopOn)
+      .mul(TOWER_COVER);
     return max(max(covM, radarNode.sample(pr).r.mul(rad)), tower);
   });
 
@@ -1012,11 +1034,12 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       uGoesOnMid.value = mid;
     },
     // THE TOWERS AT THEIR PLACES (175th): feed the measured top field
-    // - data is RM x RM RGBA float32 (R = the tower's top in scene
-    // units, A = 1 where a storm stands, zero border ring) spanning
-    // worldUnits of scene space centred on the observer, anchored to
-    // the low deck's CURRENT advection offset. null clears it back to
-    // the pinned default (the slab top is yTop again).
+    // - data is RM x RM RGBA float32 (R = the top in scene units, G =
+    // 1 on an echoing cell's own footprint, A = 1 where a tower or its
+    // flank stands, zero border ring) spanning worldUnits of scene
+    // space centred on the observer, anchored to the low deck's
+    // CURRENT advection offset. null clears it back to the pinned
+    // default (the slab top is yTop again).
     setTopField(data, rm, worldUnits) {
       if (!data) {
         if (topTex.image.width !== 1)
@@ -1045,7 +1068,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       const t = texelIndex(x + wOff.x - off.x, z + wOff.y - off.y, uTopWorld.value, img.width);
       if (!t) return null;
       const k = (t.jj * img.width + t.ii) * 4;
-      return {ii: t.ii, jj: t.jj, rm: img.width, top: img.data[k], valid: img.data[k + 3]};
+      return {ii: t.ii, jj: t.jj, rm: img.width, top: img.data[k], core: img.data[k + 1], valid: img.data[k + 3]};
     },
     updateShadow() {
       if (!shadowFill) return;

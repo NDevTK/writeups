@@ -144,9 +144,19 @@ are gated by `../server-reference.mjs` — the `server` set in
   product's cadence; the body carries the observer's own cell (an echo
   top in km, "no echo" or "no coverage"), the window's census (cells
   covered and echoing, the tops' median, tallest tenth and tallest,
-  the tallest cell placed by bearing and distance), the storms - the
-  cells at or above 8 km, tallest first, capped at 300 - and the
-  words. `covered: false` with a reason is a real answer (off the
+  the tallest cell placed by bearing and distance), the storms - every
+  echoing cell within the low deck's own ±9 km whatever its top
+  (tallest first; `stormsNear` counts them), then the cells at or
+  above 8 km beyond, tallest first, capped at 300 - and the words.
+  Since the 175th the page paints those cells onto the low deck's
+  per-texel TOP field (`mrms.echoTopField`): each cell's 1-km footprint
+  rises to its own echo top at its bearing and distance, its flank
+  falling at the theme's stated 2:1 slope beyond the footprint, the
+  taller value keeping a texel; the deck's ordinary top stands
+  wherever the field is lower, so the towers rise from the deck at
+  their places the way the rain shafts do (an older daemon's
+  tallest-300 list still paints, with the near flanks missing - the
+  page says so). `covered: false` with a reason is a real answer (off the
   CONUS grid, 20-55 N and 130-60 W); 502 when the file could not be
   read. STATED: the MRMS product documentation (the NSSL tables, Smith
   et al. 2016) could not be read from the build sandbox, so the body
