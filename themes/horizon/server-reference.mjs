@@ -2037,6 +2037,61 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
 }
 
 {
+  // THE SHIP LIST, WHOLE (174th): every '../../X.js' import in
+  // index.mjs must have BOTH an install line and a sed rewrite in
+  // install.sh - the 158th guarded the ship line, and the 168th's
+  // glm.js had one while its rewrite was missing, so install.sh's own
+  // drift guard refused every revision from the 168th on AFTER a
+  // passing gate, and update.sh under set -e re-gated the same tip an
+  // hour a time with nothing recorded (found on 2026-09-06 with the
+  // box on the 166th's build at 22:20Z). Also the updater's new
+  // phases: an install that fails is recorded and reported.
+  const srcIdx = readFileSync(
+    new URL('./server/src/index.mjs', import.meta.url),
+    'utf8'
+  );
+  const srcInstall = readFileSync(
+    new URL('./server/install.sh', import.meta.url),
+    'utf8'
+  );
+  const srcUpd = readFileSync(
+    new URL('./server/update.sh', import.meta.url),
+    'utf8'
+  );
+  const imports = [
+    ...new Set(
+      [...srcIdx.matchAll(/from '\.\.\/\.\.\/([a-z0-9-]+\.js)'/g)].map((m) => m[1])
+    )
+  ].sort();
+  const noShip = imports.filter(
+    (f) => !srcInstall.includes(`install -m 644 ../${f} /opt/horizon-live/${f}`)
+  );
+  const noRewrite = imports.filter(
+    (f) => !srcInstall.includes(`s#'../../${f}'#'./${f}'#`)
+  );
+  const inst = parseUpdateStatus(
+    '{"phase":"install-failed","rev":"abc","startedAt":"2026-09-06T22:00:00Z","gatedS":3300,"at":"2026-09-06T22:56:00Z","tail":"install.sh: unshipped ../../ import in index.mjs"}'
+  );
+  const installing = parseUpdateStatus('{"phase":"installing","rev":"abc"}');
+  check(
+    'THE SHIP LIST, WHOLE: every shared import of the daemon has its install line and its rewrite, and an install that fails after a passing gate is recorded',
+    imports.length >= 19 &&
+      imports.includes('glm.js') &&
+      imports.includes('mrms.js') &&
+      noShip.length === 0 &&
+      noRewrite.length === 0 &&
+      inst !== null &&
+      inst.phase === 'install-failed' &&
+      installing !== null &&
+      installing.phase === 'installing' &&
+      /write_status install-failed "\$NEW"/.test(srcUpd) &&
+      /write_status installing "\$NEW"/.test(srcUpd) &&
+      /echo "\$NEW failed \$\(date \+%s\)" >"\$STATE"\n\s+write_status install-failed/.test(srcUpd),
+    `${imports.length} shared imports (${imports.join(', ')}): ${noShip.length === 0 ? 'every one shipped' : 'NOT shipped: ' + noShip.join(', ')}, ${noRewrite.length === 0 ? 'every one rewritten' : 'NOT rewritten: ' + noRewrite.join(', ')}; update.sh records an install failure as a failed revision (the cooldown applies) and reports phases installing and install-failed`
+  );
+}
+
+{
   // THE FLASHES FROM ORBIT (168th): the daemon's /glm route is bound
   // to the shared law module and the install ships it with the
   // bearing helper it imports - a source-level guard like the

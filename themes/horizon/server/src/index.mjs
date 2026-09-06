@@ -62,7 +62,7 @@ import {haversineKm} from '../../lightning.js';
 import {parseHemiPower, parsePropagated} from '../../solarwind.js';
 import {normalizeMetars} from '../../metar.js';
 import {parseHmsKml, smokeAt} from '../../smoke.js';
-import {parseGrib2, gridValue} from '../../grib2.js';
+import {parseGrib2, gridValue, grib2Header, grib2Window} from '../../grib2.js';
 import {aerosolProducts} from '../../aerosol.js';
 import {
   latestFresh,
@@ -106,7 +106,7 @@ import {
   parseSurfaceState,
   surfaceQaClean
 } from '../../modis-land.js';
-import {inflateSync} from 'node:zlib';
+import {inflateSync, gunzipSync, createInflate} from 'node:zlib';
 import {pickSatellite} from '../../satellites.js';
 import {openHdf5, openHdf5Lazy, physicalValues} from '../../hdf5.js';
 // THE FLASHES FROM ORBIT (168th): GLM's flashes decoded and composed
@@ -117,6 +117,8 @@ import {
   glmSummary,
   parseGlmFlashes
 } from '../../glm.js';
+// the radar's own heights (174th): the MRMS echo-top law
+import {echoTopCensus, echoTopWords, MRMS_FACTS, mrmsCell} from '../../mrms.js';
 import {
   bandKeys,
   bucketPrefix,
@@ -716,7 +718,7 @@ export function parseUpdateStatus(text) {
   try {
     const v = JSON.parse(text);
     if (!v || typeof v !== 'object') return null;
-    const phase = ['gating', 'deployed', 'failed'].includes(v.phase)
+    const phase = ['gating', 'installing', 'deployed', 'failed', 'install-failed'].includes(v.phase)
       ? v.phase
       : null;
     if (!phase) return null;
@@ -2285,6 +2287,91 @@ function main() {
   // refreshed at most every 20 s, so a page asking every 30 s costs
   // this box one 400-kB read per 20 s per craft and answers in
   // microseconds from the ring.
+  // THE RADAR'S OWN HEIGHTS (174th): NCEP's MRMS 18-dBZ echo top (a
+  // 1-km grid every 2 min, PNG-packed GRIB2) - the latest file (1.7
+  // MB gzipped) held once for every point and refreshed on the
+  // product's own cadence, a +-50-km window cut for each cell asked by
+  // grib2.js's streaming PNG read (a few rows of memory, never the
+  // 49-MB raster), the census cached per cell until the next file.
+  const MRMS_URL =
+    env.MRMS_URL ??
+    'https://mrms.ncep.noaa.gov/2D/EchoTop_18/MRMS_EchoTop_18.latest.grib2.gz';
+  const MRMS_REFRESH_MS = MRMS_FACTS.cadenceS * 1000;
+  const MRMS_HALF_CELLS = 50;
+  const mrmsHeld = {at: 0, buf: null, header: null, bytes: 0, error: null, fetchedAt: null};
+  const mrmsCache = new Map(); // "j,i" -> {refTime, body}
+  async function mrmsRefresh(deadline) {
+    if (Date.now() - mrmsHeld.at < MRMS_REFRESH_MS) return mrmsHeld;
+    mrmsHeld.at = Date.now();
+    try {
+      const r = await fetch(MRMS_URL, {
+        signal: AbortSignal.timeout(
+          fetchBudgetMs(deadline, Date.now(), UPSTREAM_BUDGET_MS)
+        )
+      });
+      if (!r.ok) throw new Error('MRMS ' + r.status);
+      const gz = Buffer.from(await r.arrayBuffer());
+      const buf = new Uint8Array(gunzipSync(gz));
+      const header = grib2Header(buf);
+      if (!header.drt || header.drt.tmpl !== 41)
+        throw new Error('MRMS file is not PNG-packed');
+      mrmsHeld.buf = buf;
+      mrmsHeld.header = header;
+      mrmsHeld.bytes = gz.length;
+      mrmsHeld.fetchedAt = new Date().toISOString();
+      mrmsHeld.error = null;
+      mrmsCache.clear();
+      log(
+        `mrms: ${MRMS_FACTS.product} ${header.refTimeIso} (${Math.round(gz.length / 1024)} kB gzipped, ${header.grid.ni} x ${header.grid.nj})`
+      );
+    } catch (e) {
+      mrmsHeld.error = e.message;
+    }
+    return mrmsHeld;
+  }
+  async function fetchMrms(lat, lon) {
+    const deadline = Date.now() + UPSTREAM_BUDGET_MS;
+    const h = await mrmsRefresh(deadline);
+    if (!h.buf) return null;
+    const cell = mrmsCell(lat, lon);
+    const refTime = h.header.refTimeIso;
+    if (!cell)
+      return {
+        product: MRMS_FACTS.product,
+        refTime,
+        covered: false,
+        reason: 'outside the MRMS CONUS grid (20-55 N, 130-60 W)',
+        census: null
+      };
+    const ck = `${cell.j},${cell.i}`;
+    const hit = mrmsCache.get(ck);
+    if (hit && hit.refTime === refTime) return hit.body;
+    const t0 = Date.now();
+    const w = await grib2Window(h.buf, lat, lon, MRMS_HALF_CELLS, {
+      createInflate
+    });
+    if (!w) return null;
+    const census = echoTopCensus(w.values, w.box, lat, lon);
+    const body = {
+      product: MRMS_FACTS.product,
+      meaning: MRMS_FACTS.meaning,
+      source: MRMS_FACTS.source,
+      refTime,
+      fetchedAt: h.fetchedAt,
+      at: new Date().toISOString(),
+      covered: census.covered > 0,
+      cell,
+      box: w.box,
+      halfKm: MRMS_HALF_CELLS,
+      cellKm: MRMS_FACTS.cellKm,
+      census,
+      words: echoTopWords(census, {refTimeIso: refTime, halfKm: MRMS_HALF_CELLS}),
+      read: {rows: w.rowsRead, chunks: w.chunks, ms: Date.now() - t0, fileBytes: h.bytes},
+      documentation: MRMS_FACTS.documentation
+    };
+    mrmsCache.set(ck, {refTime, body});
+    return body;
+  }
   const glmHeld = new Map(); // bucket -> {at, files: [...], error}
   const GLM_REFRESH_MS = 20e3;
   const GLM_KEEP = 3;
@@ -3502,6 +3589,19 @@ function main() {
       return json(200, body, {
         'cache-control': 'public, max-age=3600',
         'x-sst-source': 'JPL MUR SST v4.1 (CoastWatch ERDDAP)'
+      });
+    }
+
+    if (url.pathname === '/mrms') {
+      // THE RADAR'S OWN HEIGHTS (174th): the 18-dBZ echo tops within
+      // +-50 km of the point from NCEP's latest 2-minute MRMS file.
+      // 200 with covered false is a real answer (off the CONUS grid or
+      // no radar there); 502 when the file could not be read at all.
+      const body = await fetchMrms(lat, lon);
+      if (!body) return json(502, {census: null, upstream: 'unavailable'});
+      return json(200, body, {
+        'cache-control': 'public, max-age=60',
+        'x-mrms-source': 'NCEP MRMS EchoTop_18 (mrms.ncep.noaa.gov/2D)'
       });
     }
 

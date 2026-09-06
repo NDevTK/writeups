@@ -131,6 +131,29 @@ are gated by `../server-reference.mjs` — the `server` set in
   one 20-s file a minute itself from the bucket (never under data
   saver), replaying each flash the ground network did not report at
   its bearing and distance.
+- `GET /mrms?lat&lon` — the radar's own heights (174th pass): NCEP's
+  MRMS 18-dBZ echo tops within ±50 km of the point, from the latest
+  2-minute CONUS file (`mrms.ncep.noaa.gov/2D/EchoTop_18/`, 1.7 MB
+  gzipped, a 7000 × 3500 grid of 0.01° cells packed as a 16-bit PNG
+  inside GRIB2 - data representation template 5.41, which `grib2.js`
+  now reads by a STREAMING window: the PNG's rows unfiltered one
+  against the one above and dropped unless in the window, the
+  inflater closed at the window's last row, a few rows of memory and
+  never the 49-MB raster; measured 100-200 ms and ~40 MB transient a
+  window). The file is held once for every point and refreshed on the
+  product's cadence; the body carries the observer's own cell (an echo
+  top in km, "no echo" or "no coverage"), the window's census (cells
+  covered and echoing, the tops' median, tallest tenth and tallest,
+  the tallest cell placed by bearing and distance), the storms - the
+  cells at or above 8 km, tallest first, capped at 300 - and the
+  words. `covered: false` with a reason is a real answer (off the
+  CONUS grid, 20-55 N and 130-60 W); 502 when the file could not be
+  read. STATED: the MRMS product documentation (the NSSL tables, Smith
+  et al. 2016) could not be read from the build sandbox, so the body
+  claims only what the file and the catalogue carry - the product
+  name (the 18-dBZ echo top), the file's scaling (kilometres), and
+  MRMS's own height convention (MSL, unverified here); the bright band
+  and the precipitation-type flag were measured and left out.
 - `GET /goesl2?lat&lon` — NOAA's own operational cloud products
   around the point (148th pass): the clear-sky mask
   (`ABI-L2-ACMC`: BCM, ACM, cloud probability, DQF on the 2-km
@@ -474,6 +497,18 @@ build from before the 151st while main carried the 157th:
   now `curl /health` says which revision is gating, for how long, or
   why it failed. The first deploy with this script cannot report its
   own gate (the old script ran it); every later one does.
+- **The ship list has two halves** (174th - the actual cause of the
+  stall above, found at 22:20Z): a shared import needs its `install`
+  line AND its `sed` rewrite. `glm.js` (168th) had the first and not
+  the second, so `install.sh`'s own drift guard refused every revision
+  from the 168th on - correctly - AFTER the box's hour-long gate had
+  passed, and `update.sh` under `set -e` aborted before writing its
+  state, so the same revision was gated again at the next tick, an
+  hour a time, with nothing recorded. Now `server-reference` (THE
+  SHIP LIST, WHOLE) holds every `'../../X.js'` import of `index.mjs`
+  to both halves, and `update.sh` records an install failure like a
+  failed gate (`install-failed` in the status file with the guard's
+  words; the six-hour cooldown applies) instead of looping.
 
 `install.sh` also writes `/opt/horizon-live/VERSION` (`{rev,
 installedAt}`); the daemon logs it at start and reports it in

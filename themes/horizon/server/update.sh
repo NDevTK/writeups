@@ -89,12 +89,30 @@ STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 T0=$(date +%s)
 write_status gating "$NEW" "$STARTED_AT" 0 ""
 if (cd themes/horizon/harness && SHOOT_CHROME= ./validate.sh 2>&1 | tee "$GATE_LOG"); then
-  write_status deployed "$NEW" "$STARTED_AT" $(( $(date +%s) - T0 )) "$(grep -c '^\[ok\]' "$GATE_LOG" 2>/dev/null || echo 0) files passed"
+  GATED_S=$(( $(date +%s) - T0 ))
+  write_status installing "$NEW" "$STARTED_AT" "$GATED_S" "$(grep -c '^\[ok\]' "$GATE_LOG" 2>/dev/null || echo 0) files passed"
   rm -rf /opt/horizon-live.prev
   [ -d /opt/horizon-live ] && cp -a /opt/horizon-live /opt/horizon-live.prev
-  ./themes/horizon/server/install.sh
-  echo "$NEW" >"$STATE"
-  echo "horizon-live update: deployed $NEW (previous kept at /opt/horizon-live.prev)"
+  # THE INSTALL CAN FAIL AFTER A PASSING GATE (174th, measured): the
+  # ship-list drift guard refuses an index.mjs whose '../../' import was
+  # not rewritten - and under set -e that abort used to leave the state
+  # file unwritten, so the same revision was gated again at the next
+  # tick, an hour a time, with nothing recorded (the 168th-173rd sat
+  # behind it for hours). Record it like a failed gate (the cooldown
+  # applies) and say so in the status file.
+  INSTALL_LOG=${UPDATE_INSTALL_LOG:-/opt/horizon-live-update.install.log}
+  if ./themes/horizon/server/install.sh >"$INSTALL_LOG" 2>&1; then
+    cat "$INSTALL_LOG"
+    write_status deployed "$NEW" "$STARTED_AT" "$GATED_S" "$(grep -c '^\[ok\]' "$GATE_LOG" 2>/dev/null || echo 0) files passed"
+    echo "$NEW" >"$STATE"
+    echo "horizon-live update: deployed $NEW (previous kept at /opt/horizon-live.prev)"
+  else
+    cat "$INSTALL_LOG" >&2
+    echo "$NEW failed $(date +%s)" >"$STATE"
+    write_status install-failed "$NEW" "$STARTED_AT" "$GATED_S" "$(tail -n 8 "$INSTALL_LOG")"
+    echo "horizon-live update: INSTALL FAILED for $NEW after a passing gate - keeping current deploy (retry in ${RETRY_AFTER_S}s)" >&2
+    exit 1
+  fi
 else
   # remember the failure and its time so the timer does not retry it
   # every five minutes (a retry after the cooldown above); the

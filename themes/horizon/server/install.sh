@@ -64,13 +64,16 @@ install -m 644 ../satellites.js /opt/horizon-live/satellites.js
 install -m 644 ../goesl2-decode.js /opt/horizon-live/goesl2-decode.js
 # the flashes from orbit (168th): the GLM law and its bearing helper
 install -m 644 ../glm.js /opt/horizon-live/glm.js
+# the radar's own heights (174th): the MRMS echo-top law (imports
+# './lightning.js', flat here; the PNG-packed GRIB2 read is grib2.js's)
+install -m 644 ../mrms.js /opt/horizon-live/mrms.js
 install -m 644 ../wildfire.js /opt/horizon-live/wildfire.js
 # The '../../' import paths must keep resolving from
 # /opt/horizon-live/index.mjs - rewrite them for the flat deploy
 # (metar.js's own './lightning.js', aerosol.js's own './grib2.js'
 # and sounding.js's own './contrails.js' imports already resolve
 # there).
-sed -i "s#'../../lightning.js'#'./lightning.js'#; s#'../../solarwind.js'#'./solarwind.js'#; s#'../../metar.js'#'./metar.js'#; s#'../../smoke.js'#'./smoke.js'#; s#'../../grib2.js'#'./grib2.js'#; s#'../../aerosol.js'#'./aerosol.js'#; s#'../../aeronet.js'#'./aeronet.js'#; s#'../../gmn.js'#'./gmn.js'#; s#'../../gvp.js'#'./gvp.js'#; s#'../../sounding.js'#'./sounding.js'#; s#'../../buoy.js'#'./buoy.js'#; s#'../../cobs.js'#'./cobs.js'#; s#'../../ozone.js'#'./ozone.js'#; s#'../../modis-land.js'#'./modis-land.js'#; s#'../../hdf5.js'#'./hdf5.js'#; s#'../../goesl2.js'#'./goesl2.js'#; s#'../../satellites.js'#'./satellites.js'#; s#'../../goesl2-decode.js'#'./goesl2-decode.js'#" /opt/horizon-live/index.mjs.new
+sed -i "s#'../../lightning.js'#'./lightning.js'#; s#'../../solarwind.js'#'./solarwind.js'#; s#'../../metar.js'#'./metar.js'#; s#'../../smoke.js'#'./smoke.js'#; s#'../../grib2.js'#'./grib2.js'#; s#'../../aerosol.js'#'./aerosol.js'#; s#'../../aeronet.js'#'./aeronet.js'#; s#'../../gmn.js'#'./gmn.js'#; s#'../../gvp.js'#'./gvp.js'#; s#'../../sounding.js'#'./sounding.js'#; s#'../../buoy.js'#'./buoy.js'#; s#'../../cobs.js'#'./cobs.js'#; s#'../../ozone.js'#'./ozone.js'#; s#'../../modis-land.js'#'./modis-land.js'#; s#'../../hdf5.js'#'./hdf5.js'#; s#'../../goesl2.js'#'./goesl2.js'#; s#'../../satellites.js'#'./satellites.js'#; s#'../../goesl2-decode.js'#'./goesl2-decode.js'#; s#'../../glm.js'#'./glm.js'#; s#'../../mrms.js'#'./mrms.js'#" /opt/horizon-live/index.mjs.new
 # Ship-list drift guard: any '../../*.js' import left unrewritten means
 # a shared file was added to index.mjs without being added HERE, and the
 # flat deploy would crash-loop on ERR_MODULE_NOT_FOUND (Cloudflare 502s
