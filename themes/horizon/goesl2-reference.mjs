@@ -1622,8 +1622,12 @@ const inflate = (u8) =>
   const nLow = good.filter((v) => v < 3240).length;
   const nMid = good.filter((v) => v >= 3240 && v < 6508).length;
   const nHigh = good.filter((v) => v >= 6508).length;
-  const p90 = good.length ? good[Math.min(good.length - 1, Math.floor(0.9 * good.length))] : null;
-  const sample = ACHAC_EXPECT.datasets.HT.samples.find((x) => x[0] === 200 && x[1] === 100);
+  const p90 = good.length
+    ? good[Math.min(good.length - 1, Math.floor(0.9 * good.length))]
+    : null;
+  const sample = ACHAC_EXPECT.datasets.HT.samples.find(
+    (x) => x[0] === 200 && x[1] === 100
+  );
   const vs = ht.values[200 * cols + 100];
   const R = ACHA_ATBD.requirement;
   check(

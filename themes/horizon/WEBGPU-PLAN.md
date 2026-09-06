@@ -10403,46 +10403,46 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   window's TALLEST TENTH when ten good fields stand - the storms in
   view are measured, the parcel's EL (172nd) is what they could reach
   - the EL otherwise, the ?el pin over both; the record "NOAA GOES-19
-  cloud tops by layer (ACHAC)"; the research line "cloud tops from
-  orbit (ABI cloud top height)" with the bands, the tallest tenth,
-  what the decks read now and the ATBD's numbers. GATE:
-  goesl2-reference THE TOPS FROM ORBIT (the ATBD's accuracy and
-  precision; the bands on a synthetic window of ten with a marginal
-  pixel and a fill skipped - 3 / 1 / 4, medians 1200 / 3300 / 9000,
-  the tallest tenth 11000; the vendored ACHAC file's home window, 21 x
-  21 fields at column 424 row 127, against a plain count written in
-  the gate: 340 good tops of 441 - 181 low, median 1,803 m; 77 mid,
-  4,149 m; 82 high, 9,340 m; the tallest tenth 9,650 m, the tallest
-  13,448 m - to the pixel; h5py's sample count at (200, 100) unscales
-  to 3,512.9 m). Docs: FINDINGS pass 173 (148 files, 1,194 landmarks),
-  README (the height product's use). MEASURED in the page (Charlotte,
-  35.23 N 80.84 W, open-meteo overcast with 100% high cloud, the
-  21:57Z scan through the local daemon, 18:05 local): "cloud tops from
-  orbit (ABI cloud top height) - GOES-19's cloud-top heights ...: 21:57Z
+    cloud tops by layer (ACHAC)"; the research line "cloud tops from
+    orbit (ABI cloud top height)" with the bands, the tallest tenth,
+    what the decks read now and the ATBD's numbers. GATE:
+    goesl2-reference THE TOPS FROM ORBIT (the ATBD's accuracy and
+    precision; the bands on a synthetic window of ten with a marginal
+    pixel and a fill skipped - 3 / 1 / 4, medians 1200 / 3300 / 9000,
+    the tallest tenth 11000; the vendored ACHAC file's home window, 21 x
+    21 fields at column 424 row 127, against a plain count written in
+    the gate: 340 good tops of 441 - 181 low, median 1,803 m; 77 mid,
+    4,149 m; 82 high, 9,340 m; the tallest tenth 9,650 m, the tallest
+    13,448 m - to the pixel; h5py's sample count at (200, 100) unscales
+    to 3,512.9 m). Docs: FINDINGS pass 173 (148 files, 1,194 landmarks),
+    README (the height product's use). MEASURED in the page (Charlotte,
+    35.23 N 80.84 W, open-meteo overcast with 100% high cloud, the
+    21:57Z scan through the local daemon, 18:05 local): "cloud tops from
+    orbit (ABI cloud top height) - GOES-19's cloud-top heights ...: 21:57Z
   - 430 good fields of the +-100 km window: low 33 (median 1908 m),
-  mid 27 (4964 m), high 370 (11815 m) - the tallest tenth 13712 m, the
-  tallest 15632 m - bands at 3.39 / 6.83 km (the balloon's 680 and 440
-  hPa) - what they feed now: the low deck's top, the mid deck's top,
-  the cirrus level" beside "VIIRS cloud tops 2026-09-04 - 11% of the
-  box cloudy - tops 2175 m low - 3575 m mid" (no high band at all: two
-  days ago the sky was nearly clear) and the balloon's "GREENSBORO 126
-  km - 09-06 12Z ... CAPE 980 J/kg -> EL 11872 m": the cirrus level
-  moved from the VIIRS census's absence (the 8-km hand) to the
-  satellite's 11.8-km high-band median of the hour, which the morning
-  balloon's own equilibrium level (11.9 km) corroborates to 60 m - the
-  sheet overhead is the outflow of the day's convection at its ceiling;
-  the record fires before the balloon's profile stands, so it prints
-  ISA's bands (3.24 / 6.51 km: 26 mid, 371 high) and the line the
-  balloon's (27 / 370) - one field crosses the 440-hPa edge between
-  them, stated. STATED LIMITS: a 10-km field is a
-  5 x 5 block mean of 2-km tops, so a lone tower's top is smeared with
-  its neighbours (the tallest tenth of the window is the storm's, the
-  tallest field is not a single cell's); thin cirrus tops carry the
-  ATBD's own caution, and the cirrus level takes the high-band MEDIAN,
-  not the tallest; a low deck under a low-level inversion is the dry
-  lapse's height, as the ATBD says - and the theme's own field, which
-  applies the same rule with the pier's measured column, stays ahead
-  of it where it covers 5% of the sea.
+    mid 27 (4964 m), high 370 (11815 m) - the tallest tenth 13712 m, the
+    tallest 15632 m - bands at 3.39 / 6.83 km (the balloon's 680 and 440
+    hPa) - what they feed now: the low deck's top, the mid deck's top,
+    the cirrus level" beside "VIIRS cloud tops 2026-09-04 - 11% of the
+    box cloudy - tops 2175 m low - 3575 m mid" (no high band at all: two
+    days ago the sky was nearly clear) and the balloon's "GREENSBORO 126
+    km - 09-06 12Z ... CAPE 980 J/kg -> EL 11872 m": the cirrus level
+    moved from the VIIRS census's absence (the 8-km hand) to the
+    satellite's 11.8-km high-band median of the hour, which the morning
+    balloon's own equilibrium level (11.9 km) corroborates to 60 m - the
+    sheet overhead is the outflow of the day's convection at its ceiling;
+    the record fires before the balloon's profile stands, so it prints
+    ISA's bands (3.24 / 6.51 km: 26 mid, 371 high) and the line the
+    balloon's (27 / 370) - one field crosses the 440-hPa edge between
+    them, stated. STATED LIMITS: a 10-km field is a
+    5 x 5 block mean of 2-km tops, so a lone tower's top is smeared with
+    its neighbours (the tallest tenth of the window is the storm's, the
+    tallest field is not a single cell's); thin cirrus tops carry the
+    ATBD's own caution, and the cirrus level takes the high-band MEDIAN,
+    not the tallest; a low deck under a low-level inversion is the dry
+    lapse's height, as the ATBD says - and the theme's own field, which
+    applies the same rule with the pier's measured column, stays ahead
+    of it where it covers 5% of the sea.
 - DONE (Sep 6, the review session's 172nd pass - THE TOWER'S CEILING
   FROM ORBIT): the storm deck's top has been the balloon's parcel EL
   since the sounding pass (applySounding, the ?el pin) and the hand

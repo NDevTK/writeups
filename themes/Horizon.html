@@ -6713,7 +6713,10 @@
         // the tops by layer (173rd), column or not
         const tops = goesL2TopsNow();
         if (tops)
-          record(`NOAA ${craft} cloud tops by layer (ACHAC)`, satTopsWords(tops));
+          record(
+            `NOAA ${craft} cloud tops by layer (ACHAC)`,
+            satTopsWords(tops)
+          );
         if (!c) {
           satColumn = null;
           return;
@@ -6804,7 +6807,9 @@
         );
       }
       const dsiSigned = (v, dp = 1) =>
-        Number.isFinite(v) ? `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(dp)}` : '—';
+        Number.isFinite(v)
+          ? `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(dp)}`
+          : '—';
       // THE TOWER'S CEILING FROM ORBIT (172nd pass): NOAA's derived
       // stability indices over the observer's field of regard (the
       // profiles' own retrieval, goesl2.DSI_ATBD's Table 1.3) while
@@ -6847,7 +6852,13 @@
         if (st) {
           const noaa =
             s && s.pick
-              ? {li: s.pick.li, cape: s.pick.cape, tt: s.pick.tt, si: s.pick.si, ki: s.pick.ki}
+              ? {
+                  li: s.pick.li,
+                  cape: s.pick.cape,
+                  tt: s.pick.tt,
+                  si: s.pick.si,
+                  ki: s.pick.ki
+                }
               : null;
           const ag = dsiAgreement(noaa, {
             li: st.li,
@@ -6913,9 +6924,17 @@
           const lo = lapLevelAt(satColumn.rows, 680);
           const hi = lapLevelAt(satColumn.rows, 440);
           if (lo && hi)
-            return {lowTopM: lo.hM, midTopM: hi.hM, source: "the satellite column's"};
+            return {
+              lowTopM: lo.hM,
+              midTopM: hi.hM,
+              source: "the satellite column's"
+            };
         }
-        return {lowTopM: ISCCP_LOW_TOP_M, midTopM: ISCCP_MID_TOP_M, source: "ISA's"};
+        return {
+          lowTopM: ISCCP_LOW_TOP_M,
+          midTopM: ISCCP_MID_TOP_M,
+          source: "ISA's"
+        };
       }
       function goesL2TopsNow() {
         const h = goesL2 && goesL2.height;
@@ -6955,7 +6974,9 @@
         ].filter(Boolean);
         return (
           `${goesL2.craft || 'GOES'}'s cloud-top heights (ABI-L2-ACHAC, 10-km fields of 5 × 5 good pixels, every 5 min): ` +
-          (t ? satTopsWords(t) : 'none fresh (the window past 30 min or unread)') +
+          (t
+            ? satTopsWords(t)
+            : 'none fresh (the window past 30 min or unread)') +
           ` · what they feed now: ${feeds.length ? feeds.join(', ') : "nothing - the theme's own field, the balloon's ceiling or the hand stand"}` +
           ` (ranking: the theme's own opaque tops where they cover 5% of the sea, then these, then the VIIRS census; on storm codes these tallest tops over the parcel's EL when ten good fields stand)` +
           ` · the ATBD: ${R.accuracyM} m accuracy and ${R.precisionM} m precision for emissivity > ${R.emissivityFloor}, quantitative to ${R.lzaQuantitativeDeg}°; against CALIPSO a ${E.sdKm} km standard deviation for low cloud, thin cirrus and low-level inversions the stated concerns`
@@ -15126,12 +15147,16 @@
               research['stability from orbit (ABI derived stability indices)'] =
                 ssl;
             else
-              delete research['stability from orbit (ABI derived stability indices)'];
+              delete research[
+                'stability from orbit (ABI derived stability indices)'
+              ];
             // the tops from orbit (173rd): NOAA's cloud-top heights by
             // layer and what the decks read from them
             const stl = satTopsLine();
-            if (stl) research['cloud tops from orbit (ABI cloud top height)'] = stl;
-            else delete research['cloud tops from orbit (ABI cloud top height)'];
+            if (stl)
+              research['cloud tops from orbit (ABI cloud top height)'] = stl;
+            else
+              delete research['cloud tops from orbit (ABI cloud top height)'];
           }
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();
@@ -19852,7 +19877,10 @@
           // EL is what they could reach; the EL stands where the
           // satellite has too few good fields, the pin over both
           const stormTopSat =
-            EL_PIN === null && topsSat && topsSat.n >= 10 && Number.isFinite(topsSat.p90M)
+            EL_PIN === null &&
+            topsSat &&
+            topsSat.n >= 10 &&
+            Number.isFinite(topsSat.p90M)
               ? topsSat.p90M
               : null;
           const stormTop = stormTopSat ?? elMeas;
