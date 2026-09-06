@@ -141,6 +141,7 @@ import {
   lapStability
 } from './goesl2.js';
 import {parcelAscent} from './sounding.js';
+import {ACHA_ATBD, heightBands} from './goesl2.js';
 import {
   ADP_ATBD,
   ADP_CALLED_FLOOR,
@@ -1584,6 +1585,90 @@ const inflate = (u8) =>
         `the column's own smeared surface (${st.tower.start.tC.toFixed(1)} / ${st.tower.start.tdC.toFixed(1)} C) lifts to an EL of ${st.tower.elM} m on ${st.tower.capeJkg} J/kg`
     );
   }
+}
+
+// ---- THE TOPS FROM ORBIT (173rd pass) ------------------------------
+// The ATBD's numbers; the ISCCP bands on a synthetic window (a
+// marginal pixel and a fill skipped); then the vendored ACHAC file's
+// home window (21 x 21 fields around column 424, row 127 - the server
+// gate's own) censused by layer against a plain count written here,
+// the file's counts unscaled as h5py sampled them.
+{
+  const synth = [500, 1200, 2500, 3300, 4000, 6600, 9000, 11000, NaN, 7000];
+  const dq = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0];
+  const b = heightBands(synth, dq);
+  const f = openHdf5(new Uint8Array(Buffer.from(ACHAC_B64, 'base64')), inflate);
+  const ht = f.dataset('HT');
+  const dqf = f.dataset('DQF');
+  const sc = (a) => (Array.isArray(a) ? a[0] : a);
+  const scale = sc(ht.attrs.scale_factor);
+  const cols = 500;
+  const ci = 424;
+  const cj = 127;
+  const half = 10;
+  const win = [];
+  const winQ = [];
+  for (let j = cj - half; j <= cj + half; j++)
+    for (let i = ci - half; i <= ci + half; i++) {
+      const q = j * cols + i;
+      const v = ht.values[q];
+      win.push(v === 65535 ? NaN : v * scale);
+      winQ.push(dqf.values[q]);
+    }
+  const bands = heightBands(win, winQ);
+  const good = win
+    .filter((v, k) => winQ[k] === 0 && Number.isFinite(v))
+    .sort((x, y) => x - y);
+  const nLow = good.filter((v) => v < 3240).length;
+  const nMid = good.filter((v) => v >= 3240 && v < 6508).length;
+  const nHigh = good.filter((v) => v >= 6508).length;
+  const p90 = good.length ? good[Math.min(good.length - 1, Math.floor(0.9 * good.length))] : null;
+  const sample = ACHAC_EXPECT.datasets.HT.samples.find((x) => x[0] === 200 && x[1] === 100);
+  const vs = ht.values[200 * cols + 100];
+  const R = ACHA_ATBD.requirement;
+  check(
+    "THE TOPS FROM ORBIT: the ATBD's accuracy and precision, the ISCCP bands on a synthetic window, and the vendored file's home window censused by layer against a plain count",
+    R.accuracyM === 500 &&
+      R.precisionM === 1500 &&
+      R.emissivityFloor === 0.8 &&
+      R.horizontalKm === 10 &&
+      R.blockPx === 5 &&
+      R.lzaQuantitativeDeg === 62 &&
+      ACHA_ATBD.layers.highHpa === 440 &&
+      ACHA_ATBD.layers.lowHpa === 680 &&
+      ACHA_ATBD.errorBudget.sdKm === 0.94 &&
+      ACHA_ATBD.inversion.lapseKPerKm === 9.8 &&
+      b.n === 8 &&
+      b.nLow === 3 &&
+      b.nMid === 1 &&
+      b.nHigh === 4 &&
+      b.lowM === 1200 &&
+      b.midM === 3300 &&
+      b.highM === 9000 &&
+      b.p90M === 11000 &&
+      b.maxM === 11000 &&
+      b.lowTopM === 3240 &&
+      b.midTopM === 6508 &&
+      heightBands([], null).n === 0 &&
+      heightBands([], null).highM === null &&
+      win.length === 441 &&
+      bands.n === good.length &&
+      bands.n > 0 &&
+      bands.nLow === nLow &&
+      bands.nMid === nMid &&
+      bands.nHigh === nHigh &&
+      bands.p90M === p90 &&
+      bands.maxM === good[good.length - 1] &&
+      (bands.lowM === null || (bands.lowM < 3240 && bands.lowM >= good[0])) &&
+      (bands.highM === null || bands.highM >= 6508) &&
+      sample !== undefined &&
+      vs === sample[2] &&
+      near(vs * scale, sample[2] * 0.30520370602607727, 1e-6),
+    `Table 1: ${R.accuracyM} m accuracy, ${R.precisionM} m precision for emissivity > ${R.emissivityFloor}, ${R.horizontalKm} km from ${R.blockPx} x ${R.blockPx} blocks, quantitative to ${R.lzaQuantitativeDeg} deg; Table 6: sd ${ACHA_ATBD.errorBudget.sdKm} km against CALIPSO; ` +
+      `a synthetic window of ten (one marginal, one fill) bands ${b.nLow} / ${b.nMid} / ${b.nHigh} with medians ${b.lowM} / ${b.midM} / ${b.highM} m, its tallest tenth ${b.p90M} m; ` +
+      `the vendored ${ACHAC_EXPECT.file.slice(0, 24)} home window (21 x 21 fields at 424, 127): ${bands.n} good tops of ${win.length} - ${bands.nLow} low (median ${bands.lowM === null ? 'none' : bands.lowM.toFixed(0) + ' m'}), ${bands.nMid} mid (${bands.midM === null ? 'none' : bands.midM.toFixed(0) + ' m'}), ${bands.nHigh} high (${bands.highM === null ? 'none' : bands.highM.toFixed(0) + ' m'}), ` +
+      `the tallest tenth ${bands.p90M.toFixed(0)} m and the tallest ${bands.maxM.toFixed(0)} m - the plain count agrees to the pixel; h5py's count ${sample[2]} at (200, 100) unscales to ${(vs * scale).toFixed(1)} m`
+  );
 }
 
 // ---- THE HAZE'S KIND (169th pass) ----------------------------------

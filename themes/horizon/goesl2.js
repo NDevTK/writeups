@@ -389,6 +389,101 @@ export function heightCensus(htM, dqf) {
       : null
   };
 }
+// THE TOPS FROM ORBIT (173rd pass): the ABI Cloud Height Algorithm's
+// own numbers, its ATBD read in full (ATBD_GOES-R_Cloud_Height_v3.0,
+// Heidinger, July 2012, 79 pp). Table 1 (F&PS v2.2): CONUS cloud top
+// height at 10 km (5 km mapping), ACCURACY 500 m and PRECISION 1500 m
+// for clouds with emissivity > 0.8, quantitative to 62 deg local
+// zenith, day and night, refresh 60 min in Mode 3 (the bucket now
+// scans CONUS every 5 min). Sec. 1.11.3.1: the 10-km product is the
+// mean of the good 2-km pixels over a 5 x 5 block. Sec. 1.11.2: the
+// cloud temperature, 11-um emissivity and beta(12/11) are retrieved by
+// optimal estimation on the 11, 12 and 13.3-um channels (a CO2 channel
+// beside the split window - the CALIPSO-shown gain over window-only
+// sets for thin cirrus), the a priori from the cloud type (opaque
+// types start at the 11-um brightness temperature, cirrus at the
+// tropopause minus 15 K); Sec. 1.11.2.7: Tc becomes height through the
+// NWP temperature profile, constrained to the surface and the
+// tropopause, and under a low-level inversion (any layer below 700
+// hPa and 50 hPa above the surface warmer than the one below it, a
+// water cloud over water) by the dry-adiabatic 9.8 K/km from the
+// surface temperature - "this issue plagues all infrared cloud height
+// algorithms"; Sec. 1.11.2.8: the ISCCP layers, high Pc < 440 hPa,
+// low Pc > 680 hPa. Table 6 (against CALIPSO, four seasons of SEVIRI,
+// low clouds with emissivity > 0.8): bias -0.0002 km, standard
+// deviation 0.94 km against the 1.5-km spec; the drivers are
+// low-level inversions, the 13.3-um channel's characterisation and
+// multi-layer cloud; Sec. 2.2.1.2.1 names the precision for optically
+// thin cirrus as the other concern; the height-based layer flag's POD
+// 91.4% against CALIPSO (spec 80%). The file's DQF: 0 good, 1
+// marginal, 2 retrieval attempted, 3 bad, 4 opaque retrieval - only 0
+// is censused here, as heightCensus does.
+export const ACHA_ATBD = {
+  version: 'GOES-R ABI Cloud Height (ACHA) ATBD v3.0, 2012-07',
+  requirement: {
+    horizontalKm: 10,
+    mappingKm: 5,
+    accuracyM: 500,
+    precisionM: 1500,
+    emissivityFloor: 0.8,
+    lzaQuantitativeDeg: 62,
+    refreshMinMode3: 60,
+    blockPx: 5
+  },
+  layers: {highHpa: 440, lowHpa: 680},
+  errorBudget: {biasKm: -0.0002, sdKm: 0.94, layerPodPct: 91.4},
+  inversion: {belowHpa: 700, aboveSurfaceHpa: 50, lapseKPerKm: 9.8}
+};
+export const ACHA_DQF_WORDS = [
+  'good',
+  'marginal',
+  'retrieval attempted',
+  'bad',
+  'opaque retrieval'
+];
+/** The window's cloud tops by ISCCP layer (metres a.s.l.): the medians
+ * and counts of the good (DQF 0) tops below lowTopM (low), from lowTopM
+ * to midTopM (mid) and above (high) - the caller hands in the 680- and
+ * 440-hPa heights of the column it trusts - with the tallest tenth
+ * (p90M) and the tallest of all (maxM); null where a band is empty. The
+ * median is the display's own single-slab reduction, as cloudtop.js
+ * says of the VIIRS census. */
+export function heightBands(htM, dqf, {lowTopM = 3240, midTopM = 6508} = {}) {
+  const low = [];
+  const mid = [];
+  const high = [];
+  const all = [];
+  for (let q = 0; q < htM.length; q++) {
+    if (dqf && dqf[q] !== 0) continue;
+    const v = htM[q];
+    if (v === null || v === undefined || !Number.isFinite(v)) continue;
+    all.push(v);
+    if (v >= midTopM) high.push(v);
+    else if (v >= lowTopM) mid.push(v);
+    else low.push(v);
+  }
+  const med = (a) => {
+    if (!a.length) return null;
+    const s = [...a].sort((x, y) => x - y);
+    return s[s.length >> 1];
+  };
+  all.sort((a, b) => a - b);
+  return {
+    n: all.length,
+    lowM: med(low),
+    midM: med(mid),
+    highM: med(high),
+    nLow: low.length,
+    nMid: mid.length,
+    nHigh: high.length,
+    p90M: all.length
+      ? all[Math.min(all.length - 1, Math.floor(0.9 * all.length))]
+      : null,
+    maxM: all.length ? all[all.length - 1] : null,
+    lowTopM,
+    midTopM
+  };
+}
 // The bucket's listing (S3 ListObjectsV2 XML) -> the keys, and the
 // latest product file by its start stamp (s + YYYYDDDHHMMSSs) -
 // the file name carries the start time, as the PUG's naming states.

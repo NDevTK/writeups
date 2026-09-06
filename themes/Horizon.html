@@ -505,6 +505,8 @@
         DSI_ATBD,
         dsiAgreement,
         lapStability,
+        ACHA_ATBD,
+        heightBands,
         LAP_ATBD,
         isaPressureHpa,
         lapColumnRows,
@@ -6708,6 +6710,10 @@
             `NOAA ${craft} derived stability indices (DSIC)`,
             satStabilityWords(stab)
           );
+        // the tops by layer (173rd), column or not
+        const tops = goesL2TopsNow();
+        if (tops)
+          record(`NOAA ${craft} cloud tops by layer (ACHAC)`, satTopsWords(tops));
         if (!c) {
           satColumn = null;
           return;
@@ -6798,9 +6804,7 @@
         );
       }
       const dsiSigned = (v, dp = 1) =>
-        Number.isFinite(v)
-          ? `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(dp)}`
-          : '—';
+        Number.isFinite(v) ? `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(dp)}` : '—';
       // THE TOWER'S CEILING FROM ORBIT (172nd pass): NOAA's derived
       // stability indices over the observer's field of regard (the
       // profiles' own retrieval, goesl2.DSI_ATBD's Table 1.3) while
@@ -6843,13 +6847,7 @@
         if (st) {
           const noaa =
             s && s.pick
-              ? {
-                  li: s.pick.li,
-                  cape: s.pick.cape,
-                  tt: s.pick.tt,
-                  si: s.pick.si,
-                  ki: s.pick.ki
-                }
+              ? {li: s.pick.li, cape: s.pick.cape, tt: s.pick.tt, si: s.pick.si, ki: s.pick.ki}
               : null;
           const ag = dsiAgreement(noaa, {
             li: st.li,
@@ -6883,6 +6881,84 @@
           mine +
           ` · the ATBD's accuracies: LI ${A.li} K, CAPE ${A.cape} J/kg (its precision ${DSI_ATBD.requirement.precision.cape}), TT ${A.tt}, SI ${A.si} K, KI ${A.ki}; TT's severe threshold ${s && s.body.west ? '65, west of the Rockies' : '55, east of the Rockies'}` +
           ` · the drawn tower is the station's own parcel through the column (the satellite column's line), not the mean-layer one`
+        );
+      }
+      // THE TOPS FROM ORBIT (173rd pass): NOAA's ACHA cloud-top heights
+      // over the ±100 km window (the fourth served product: 10-km
+      // fields, each the mean of the good 2-km pixels of a 5 × 5 block)
+      // censused by ISCCP layer with the band edges of the column the
+      // scene trusts (goesl2.heightBands) - the storm deck's slab, the
+      // low and mid decks' tops behind the theme's own field, and the
+      // cirrus level read them while fresh, ahead of the VIIRS census
+      // (up to two days old). The ATBD (goesl2.ACHA_ATBD, read in
+      // full): 500 m accuracy and 1.5 km precision for emissivity >
+      // 0.8, a CALIPSO error budget of 0.94 km for low cloud, thin
+      // cirrus and low-level inversions the stated concerns.
+      const ACHA_LIVE_MS = 30 * 60e3;
+      const TOPS_MIN_PX = 3;
+      const topsFeeds = {storm: false, low: false, mid: false, high: false};
+      let satTopsMemo = null;
+      function topsBandEdges() {
+        // the 680- and 440-hPa heights of the column the scene trusts:
+        // the fresh balloon, else the satellite's column, else ISA -
+        // the same edges the VIIRS census takes
+        const sr = state.profileMeas ? state.soundingData?.rows : null;
+        if (sr) {
+          const lo = levelAt(sr, 680, 'hM');
+          const hi = levelAt(sr, 440, 'hM');
+          if (Number.isFinite(lo) && Number.isFinite(hi))
+            return {lowTopM: lo, midTopM: hi, source: "the balloon's"};
+        }
+        if (satColumnStands()) {
+          const lo = lapLevelAt(satColumn.rows, 680);
+          const hi = lapLevelAt(satColumn.rows, 440);
+          if (lo && hi)
+            return {lowTopM: lo.hM, midTopM: hi.hM, source: "the satellite column's"};
+        }
+        return {lowTopM: ISCCP_LOW_TOP_M, midTopM: ISCCP_MID_TOP_M, source: "ISA's"};
+      }
+      function goesL2TopsNow() {
+        const h = goesL2 && goesL2.height;
+        if (!h || !h.ht || !h.time) return null;
+        if (Date.now() - Date.parse(h.time) > ACHA_LIVE_MS) return null;
+        const edges = topsBandEdges();
+        const key = `${h.time}|${edges.lowTopM.toFixed(0)}|${edges.midTopM.toFixed(0)}`;
+        if (satTopsMemo && satTopsMemo.key === key) return satTopsMemo.tops;
+        const tops = {
+          ...heightBands(h.ht, h.dqf, edges),
+          time: h.time,
+          edgesSource: edges.source,
+          craft: goesL2.craft || 'GOES'
+        };
+        satTopsMemo = {key, tops};
+        return tops;
+      }
+      function satTopsWords(t) {
+        const m = (v) => (v === null ? 'none' : `${Math.round(v)} m`);
+        return (
+          `${t.time.slice(11, 16)}Z · ${t.n} good fields of the ±100 km window: ` +
+          `low ${t.nLow} (median ${m(t.lowM)}), mid ${t.nMid} (${m(t.midM)}), high ${t.nHigh} (${m(t.highM)}) · ` +
+          `the tallest tenth ${m(t.p90M)}, the tallest ${m(t.maxM)} · ` +
+          `bands at ${(t.lowTopM / 1000).toFixed(2)} / ${(t.midTopM / 1000).toFixed(2)} km (${t.edgesSource} 680 and 440 hPa)`
+        );
+      }
+      function satTopsLine() {
+        if (!goesL2 || !goesL2.height) return null;
+        const t = goesL2TopsNow();
+        const R = ACHA_ATBD.requirement;
+        const E = ACHA_ATBD.errorBudget;
+        const feeds = [
+          topsFeeds.storm ? "the storm deck's slab (the tallest tenth)" : null,
+          topsFeeds.low ? "the low deck's top" : null,
+          topsFeeds.mid ? "the mid deck's top" : null,
+          topsFeeds.high ? 'the cirrus level' : null
+        ].filter(Boolean);
+        return (
+          `${goesL2.craft || 'GOES'}'s cloud-top heights (ABI-L2-ACHAC, 10-km fields of 5 × 5 good pixels, every 5 min): ` +
+          (t ? satTopsWords(t) : 'none fresh (the window past 30 min or unread)') +
+          ` · what they feed now: ${feeds.length ? feeds.join(', ') : "nothing - the theme's own field, the balloon's ceiling or the hand stand"}` +
+          ` (ranking: the theme's own opaque tops where they cover 5% of the sea, then these, then the VIIRS census; on storm codes these tallest tops over the parcel's EL when ten good fields stand)` +
+          ` · the ATBD: ${R.accuracyM} m accuracy and ${R.precisionM} m precision for emissivity > ${R.emissivityFloor}, quantitative to ${R.lzaQuantitativeDeg}°; against CALIPSO a ${E.sdKm} km standard deviation for low cloud, thin cirrus and low-level inversions the stated concerns`
         );
       }
       function satColumnLine() {
@@ -15050,9 +15126,12 @@
               research['stability from orbit (ABI derived stability indices)'] =
                 ssl;
             else
-              delete research[
-                'stability from orbit (ABI derived stability indices)'
-              ];
+              delete research['stability from orbit (ABI derived stability indices)'];
+            // the tops from orbit (173rd): NOAA's cloud-top heights by
+            // layer and what the decks read from them
+            const stl = satTopsLine();
+            if (stl) research['cloud tops from orbit (ABI cloud top height)'] = stl;
+            else delete research['cloud tops from orbit (ABI cloud top height)'];
           }
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();
@@ -19632,6 +19711,15 @@
         // fresh within four image cadences (40 min; the theme's rule)
         const goes =
           goesObs && Date.now() - goesObs.at < 40 * 60e3 ? goesObs : null;
+        // THE TOPS FROM ORBIT (173rd): NOAA's ACHA cloud-top heights
+        // within ±100 km by ISCCP layer, minutes old (goesL2TopsNow;
+        // null past 30 min or unread) - the decks' measured tops where
+        // the theme's own field holds none, ahead of the VIIRS census
+        const topsSat = goesL2TopsNow();
+        const topsBand = (band, n) =>
+          topsSat && topsSat[n] >= TOPS_MIN_PX && Number.isFinite(topsSat[band])
+            ? topsSat[band]
+            : null;
         const cLow = mzr ? mzr.low : (state.cloudLow ?? state.cloud * LOW_FRAC);
         const cMid = state.cloudMid ?? state.cloud * MID_FRAC;
         const cHigh = Math.max(
@@ -19757,9 +19845,21 @@
           // where no fresh unstable ascent reaches, or when the
           // measured EL would degenerate the slab.
           const elMeas = EL_PIN ?? state.stormTopM;
+          // THE TOPS FROM ORBIT (173rd): on storm codes the tallest
+          // tenth of NOAA's measured tops within ±100 km (ten good
+          // fields or more, minutes old) outranks the parcel's
+          // theoretical ceiling - the storms in view are measured, the
+          // EL is what they could reach; the EL stands where the
+          // satellite has too few good fields, the pin over both
+          const stormTopSat =
+            EL_PIN === null && topsSat && topsSat.n >= 10 && Number.isFinite(topsSat.p90M)
+              ? topsSat.p90M
+              : null;
+          const stormTop = stormTopSat ?? elMeas;
+          topsFeeds.storm = wmo >= 80 && stormTopSat !== null;
           const yEl =
-            wmo >= 80 && Number.isFinite(elMeas)
-              ? 16 * Math.asinh((elMeas - centerElev) / 500) + 8
+            wmo >= 80 && Number.isFinite(stormTop)
+              ? 16 * Math.asinh((stormTop - centerElev) / 500) + 8
               : null;
           // MEASURED low-deck top for the NON-storm sky: the VIIRS
           // census's low-band median through the same mapping
@@ -19776,12 +19876,21 @@
           // census when the field holds a low deck worth sizing
           // (5% of the sea or more - the theme's rule, stated: a
           // median over fewer texels is not trusted over the census).
+          // RANKING (173rd): NOAA's ACHA low-band median (minutes old,
+          // three good fields or more) stands between the theme's own
+          // field and the up-to-two-day-old VIIRS census
           const ctopLow =
             goes && goes.lowTopM !== null && goes.lowPct >= 5
               ? goes.lowTopM
-              : state.ctop && Number.isFinite(state.ctop.lowM)
-                ? state.ctop.lowM
-                : null;
+              : topsBand('lowM', 'nLow') !== null
+                ? topsBand('lowM', 'nLow')
+                : state.ctop && Number.isFinite(state.ctop.lowM)
+                  ? state.ctop.lowM
+                  : null;
+          topsFeeds.low =
+            wmo < 80 &&
+            !(goes && goes.lowTopM !== null && goes.lowPct >= 5) &&
+            topsBand('lowM', 'nLow') !== null;
           const yLowTop =
             wmo < 80 && ctopLow !== null
               ? 16 * Math.asinh((ctopLow - centerElev) / 500) + 8
@@ -19813,9 +19922,14 @@
           const midTopMeas =
             goes && goes.midTopM !== null && goes.midDeckPct >= 5
               ? goes.midTopM
-              : state.ctop && Number.isFinite(state.ctop.midM)
-                ? state.ctop.midM
-                : null;
+              : topsBand('midM', 'nMid') !== null
+                ? topsBand('midM', 'nMid')
+                : state.ctop && Number.isFinite(state.ctop.midM)
+                  ? state.ctop.midM
+                  : null;
+          topsFeeds.mid =
+            !(goes && goes.midTopM !== null && goes.midDeckPct >= 5) &&
+            topsBand('midM', 'nMid') !== null;
           const ctopMid =
             midTopMeas !== null
               ? 16 * Math.asinh((midTopMeas - centerElev) / 500) + 8
@@ -19832,14 +19946,24 @@
         // zero (full sun) whenever the decks are inactive.
         cloudShadow.update(sunVec, cloudsActive);
         if (cloudsActive) cloudSys.updateShadow();
-        // The cirrus level: measured (VIIRS high-band median)
-        // when the census saw high cloud, the 8 km hand otherwise.
+        // The cirrus level: measured - NOAA's ACHA high-band median
+        // (173rd; minutes old, three good fields or more) ahead of the
+        // VIIRS high-band median (up to two days old) - and the 8 km
+        // hand where neither saw high cloud.
+        const highTopSat = topsBand('highM', 'nHigh');
+        topsFeeds.high = highTopSat !== null;
+        const highTopMeas =
+          highTopSat !== null
+            ? highTopSat
+            : state.ctop && Number.isFinite(state.ctop.highM)
+              ? state.ctop.highM
+              : null;
         driftLayer(
           cloudsHigh,
           cHigh,
           Math.max(
-            state.ctop && Number.isFinite(state.ctop.highM)
-              ? 16 * Math.asinh((state.ctop.highM - centerElev) / 500) + 8
+            highTopMeas !== null
+              ? 16 * Math.asinh((highTopMeas - centerElev) / 500) + 8
               : 16 * Math.asinh(16),
             yCloud + 26
           ),

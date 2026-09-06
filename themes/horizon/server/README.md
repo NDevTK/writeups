@@ -135,7 +135,11 @@ are gated by `../server-reference.mjs` — the `server` set in
   around the point (148th pass): the clear-sky mask
   (`ABI-L2-ACMC`: BCM, ACM, cloud probability, DQF on the 2-km
   CONUS grid) and the cloud top height (`ABI-L2-ACHAC`: HT on the
-  10-km grid) from the NOAA Open Data buckets (`noaa-goes18` for
+  10-km grid - since the 173rd the page censuses the window by ISCCP
+  layer and its decks read the tops: the cirrus level, the low and
+  mid decks' tops behind the theme's own field, the storm slab's top
+  at the tallest tenth; the ACHA ATBD's 500 m accuracy and 1.5 km
+  precision stated on the page) from the NOAA Open Data buckets (`noaa-goes18` for
   GOES-West, `noaa-goes19` for GOES-East; anonymous S3, listed and
   fetched by the daemon, decoded by the gated pure-JS HDF5 reader
   `hdf5.js`, navigated by `goesl2.js`'s PUG equations), cut to

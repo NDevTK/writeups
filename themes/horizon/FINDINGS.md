@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1193 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1194 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **148 reference files, 1193 landmark lines, 8 GPU probes** (live gate
+- **148 reference files, 1194 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1214,7 +1214,30 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    167th–171st sat unseen behind an e2-micro's hour-long gate
    (`goesl2-reference` THE TOWER'S CEILING FROM ORBIT;
    `goesl2-client-reference` THE INDICES, READ BY RANGE;
-   `server-reference` the nineteen asks, THE GATE'S OWN REPORT)
+   `server-reference` the nineteen asks, THE GATE'S OWN REPORT).
+   Pass 173 lets the decks read a product the page had only printed:
+   NOAA's ACHA cloud-top heights (ABI-L2-ACHAC, the fourth served
+   product — 10-km fields, each the mean of the good 2-km pixels of a
+   5 × 5 block, every 5 min; the ACHA ATBD v3.0 read in full: optimal
+   estimation on the 11, 12 and 13.3-µm channels, Tc to height through
+   the NWP profile, the dry-adiabatic 9.8 K/km under a low-level
+   inversion, the ISCCP layers at 440 and 680 hPa; Table 1's 500 m
+   accuracy and 1.5 km precision for emissivity > 0.8; Table 6's
+   CALIPSO error budget, bias −0.0002 km and 0.94 km standard deviation
+   for low cloud, thin cirrus and inversions the stated drivers) are
+   censused by ISCCP layer over the ±100 km window with the band edges
+   of the column the scene trusts (the balloon's, the satellite
+   column's, else ISA — the VIIRS census's own rule), and the decks
+   read them while fresh: the cirrus level at the high-band median and
+   the low and mid decks' tops behind the theme's own opaque field,
+   ahead of the up-to-two-day-old VIIRS census; on shower and thunder
+   codes the storm slab tops at the window's tallest tenth — the storms
+   in view are measured, the parcel's EL is what they could reach —
+   when ten good fields stand, the EL otherwise. The vendored ACHAC
+   file's home window censuses to 340 good tops of 441: 181 low
+   (median 1,803 m), 77 mid (4,149 m), 82 high (9,340 m), the tallest
+   tenth 9,650 m, to the pixel of a plain count (`goesl2-reference` THE
+   TOPS FROM ORBIT)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
