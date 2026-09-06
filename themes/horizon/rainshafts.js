@@ -34,7 +34,11 @@ export const RAIN_EXTINCTION = {
 };
 
 /** Atlas's extinction coefficient (km^-1) at a rain rate (mm/h). */
-export function rainExtinctionPerKm(mmh, a = RAIN_EXTINCTION.a, b = RAIN_EXTINCTION.b) {
+export function rainExtinctionPerKm(
+  mmh,
+  a = RAIN_EXTINCTION.a,
+  b = RAIN_EXTINCTION.b
+) {
   return mmh > 0 ? a * Math.pow(mmh, b) : 0;
 }
 
@@ -61,7 +65,12 @@ export function rainVisibilityKm(mmh) {
  * as a curtain) are left out; a degraded pixel (past the zenith
  * block-out) is kept and flagged.
  */
-export function rainShaftsNear(list, lat, lon, {maxKm = 100, cap = 160, minMmH = 0.2} = {}) {
+export function rainShaftsNear(
+  list,
+  lat,
+  lon,
+  {maxKm = 100, cap = 160, minMmH = 0.2} = {}
+) {
   const out = [];
   for (const p of list || []) {
     if (!(p.mmh >= minMmH)) continue;

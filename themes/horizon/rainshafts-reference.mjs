@@ -65,7 +65,9 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   const home = [32.85, -117.12];
   const at = (km, brg) => {
     const dLat = (km * Math.cos((brg * Math.PI) / 180)) / 111.2;
-    const dLon = (km * Math.sin((brg * Math.PI) / 180)) / (111.2 * Math.cos((home[0] * Math.PI) / 180));
+    const dLon =
+      (km * Math.sin((brg * Math.PI) / 180)) /
+      (111.2 * Math.cos((home[0] * Math.PI) / 180));
     return {latDeg: home[0] + dLat, lonDeg: home[1] + dLon};
   };
   const list = [
@@ -75,7 +77,11 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     {...at(150, 90), mmh: 20, quality: 'good'},
     {...at(40, 0), mmh: 3, quality: 'degraded'}
   ];
-  const shafts = rainShaftsNear(list, home[0], home[1], {maxKm: 100, cap: 160, minMmH: 0.2});
+  const shafts = rainShaftsNear(list, home[0], home[1], {
+    maxKm: 100,
+    cap: 160,
+    minMmH: 0.2
+  });
   const capped = rainShaftsNear(list, home[0], home[1], {maxKm: 100, cap: 2});
   const sum = rainShaftsSummary(shafts);
   const rbW = rangeBearing(home[0], home[1], list[1].latDeg, list[1].lonDeg);

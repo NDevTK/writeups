@@ -7594,8 +7594,17 @@
           rainShafts = null;
           return null;
         }
-        const list = rainShaftsNear(rn.list, state.lat, state.lon, {maxKm: 100, cap: 160, minMmH: 0.2});
-        rainShafts = {at: Date.now(), time: rn.time, list, summary: rainShaftsSummary(list)};
+        const list = rainShaftsNear(rn.list, state.lat, state.lon, {
+          maxKm: 100,
+          cap: 160,
+          minMmH: 0.2
+        });
+        rainShafts = {
+          at: Date.now(),
+          time: rn.time,
+          list,
+          summary: rainShaftsSummary(list)
+        };
         return rainShafts.summary;
       }
       const shaftWords = (sm) =>
@@ -15270,7 +15279,10 @@
       let shaftCount = 0;
       function updateRainShafts() {
         const list = rainShafts && rainShafts.list;
-        const fresh = list && list.length && Date.now() - Date.parse(rainShafts.time) < 25 * 60e3;
+        const fresh =
+          list &&
+          list.length &&
+          Date.now() - Date.parse(rainShafts.time) < 25 * 60e3;
         if (!fresh) {
           if (shaftMesh) shaftMesh.visible = false;
           return;
@@ -15281,9 +15293,18 @@
             scene.remove(shaftMesh);
             shaftMesh.geometry.dispose();
           }
-          const posAttr = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
-          const sclAttr = new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 2);
-          const opAttr = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
+          const posAttr = new THREE.InstancedBufferAttribute(
+            new Float32Array(n * 3),
+            3
+          );
+          const sclAttr = new THREE.InstancedBufferAttribute(
+            new Float32Array(n * 2),
+            2
+          );
+          const opAttr = new THREE.InstancedBufferAttribute(
+            new Float32Array(n),
+            1
+          );
           const mat = new THREE.SpriteNodeMaterial();
           mat.transparent = true;
           mat.depthWrite = false;
@@ -15292,7 +15313,11 @@
           const grad = uv().y.mul(0.35).add(0.65); // denser toward the base
           mat.colorNode = aerial.encodeFog(tslVec3(0.5, 0.56, 0.62));
           mat.opacityNode = instancedBufferAttribute(opAttr).mul(grad);
-          shaftMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat, n);
+          shaftMesh = new THREE.InstancedMesh(
+            new THREE.PlaneGeometry(1, 1),
+            mat,
+            n
+          );
           shaftMesh.frustumCulled = false;
           shaftMesh.userData = {posAttr, sclAttr, opAttr};
           shaftMesh.layers.set(4); // the post-cloud overlay pass, with the precipitation
@@ -15313,7 +15338,11 @@
         for (let k = 0; k < n; k++) {
           const f = list[k];
           const s = geoToScene(f.lat, f.lon, dressAnchor);
-          const e = geoToScene(f.lat, f.lon + 2 / (111.2 * Math.cos((f.lat * Math.PI) / 180)), dressAnchor);
+          const e = geoToScene(
+            f.lat,
+            f.lon + 2 / (111.2 * Math.cos((f.lat * Math.PI) / 180)),
+            dressAnchor
+          );
           const w = Math.max(Math.hypot(e.x - s.x, e.z - s.z), 0.5);
           let x = s.x;
           let z = s.z;
