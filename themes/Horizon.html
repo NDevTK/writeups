@@ -6976,7 +6976,12 @@
             record(
               `NOAA ${j.craft} cloud top phase (ACTPC)`,
               `${cp.time.slice(11, 16)}Z · overhead ${
-                here ? here.words + (here.quality.high ? '' : ' (low quality: ' + here.quality.why.join(', ') + ')') : 'no pixel'
+                here
+                  ? here.words +
+                    (here.quality.high
+                      ? ''
+                      : ' (low quality: ' + here.quality.why.join(', ') + ')')
+                  : 'no pixel'
               } · ${c.liquid.toLocaleString('en-US')} liquid · ${c.supercooled.toLocaleString('en-US')} supercooled · ` +
                 `${c.mixed.toLocaleString('en-US')} mixed · ${c.ice.toLocaleString('en-US')} ice of ${c.cloudy.toLocaleString('en-US')} cloudy ` +
                 `high-quality 2-km px within ±100 km` +
@@ -6984,7 +6989,9 @@
                 ` · ${c.clear} clear · ${c.low} low quality` +
                 (phaseGate().why
                   ? ` → ${phaseGate().why}` +
-                    (phaseGate().ice ? '' : ': no halo family, no cirrus corona') +
+                    (phaseGate().ice
+                      ? ''
+                      : ': no halo family, no cirrus corona') +
                     (phaseGate().water ? '' : ': no droplet corona')
                   : '')
             );
@@ -7336,15 +7343,29 @@
         if (!p || !p.time || Date.now() - Date.parse(p.time) > PHASE_LIVE_MS)
           return open;
         const t = Date.now();
-        if (phaseGateMemo && phaseGateMemo.l2At === goesL2.at && t - phaseGateMemo.t < 5000)
+        if (
+          phaseGateMemo &&
+          phaseGateMemo.l2At === goesL2.at &&
+          t - phaseGateMemo.t < 5000
+        )
           return phaseGateMemo.gate;
         const at = goesL2PhaseAt(state.lat, state.lon);
         let gate = open;
         if (at && at.quality && at.quality.high) {
-          if (at.phase === 4) gate = {ice: 1, water: 0, why: 'ice top overhead (NOAA phase)'};
+          if (at.phase === 4)
+            gate = {ice: 1, water: 0, why: 'ice top overhead (NOAA phase)'};
           else if (at.phase === 1 || at.phase === 2)
-            gate = {ice: 0, water: 1, why: at.words + ' top overhead (NOAA phase)'};
-          else if (at.phase === 3) gate = {ice: 1, water: 1, why: 'mixed-phase top overhead (NOAA phase): both families stand'};
+            gate = {
+              ice: 0,
+              water: 1,
+              why: at.words + ' top overhead (NOAA phase)'
+            };
+          else if (at.phase === 3)
+            gate = {
+              ice: 1,
+              water: 1,
+              why: 'mixed-phase top overhead (NOAA phase): both families stand'
+            };
         }
         phaseGateMemo = {t, l2At: goesL2.at, gate};
         return gate;
@@ -7584,7 +7605,9 @@
               ` · ` +
               (g.why
                 ? g.why +
-                  (g.ice ? '' : ' → the halo family and the cirrus corona closed') +
+                  (g.ice
+                    ? ''
+                    : ' → the halo family and the cirrus corona closed') +
                   (g.water ? '' : ' → the droplet corona closed')
                 : 'no phase call overhead: the optics keep their own gates') +
               ` · the ATBD's validation: 93% agreed with CALIOP over 52,043 thick clouds (ice 98%, water 90%), the requirement 80%`;
@@ -19146,11 +19169,11 @@
             atmo.cloudCorona.setMoonDrop(
               params.get('dropcorona') !== '0' && moon.alt > 0
                 ? phaseGate().water *
-                  moonIrradianceE0(
-                    astro.moonRel,
-                    astro.moonDistKm,
-                    1 - (astro.lunarEcl?.inUmbra ?? 0)
-                  ) *
+                    moonIrradianceE0(
+                      astro.moonRel,
+                      astro.moonDistKm,
+                      1 - (astro.lunarEcl?.inUmbra ?? 0)
+                    ) *
                     DROPLET_DIFF_SHARE *
                     Math.exp(
                       -cirrusSlantTau(cHighFrac, Math.sin(moon.alt), eyeVeilM)

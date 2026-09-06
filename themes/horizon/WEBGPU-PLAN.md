@@ -10435,8 +10435,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   page's own probe caught it before main: the landmark reads the
   daemon's source and holds every called builder bound and
   re-exported and every served ask to a builder; 31). Docs: the
-  daemon README's /goesl2 entry and products count, FINDINGS pass
-  161. MEASURED in the page (the home, 13:1xZ, night): the record
+  daemon README's /goesl2 entry and products count, FINDINGS pass 161. MEASURED in the page (the home, 13:1xZ, night): the record
   "NOAA GOES-18 cloud top phase (ACTPC) - 13:07Z - overhead mixed
   phase - 0 liquid - 0 supercooled - 6,665 mixed - 3,372 ice of
   10,037 cloudy high-quality 2-km px within +-100 km (ice 34%) - 164

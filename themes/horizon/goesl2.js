@@ -870,7 +870,12 @@ export const PHASE_QF = {
 };
 export const PHASE_ATBD = {
   version: 'Enterprise Cloud Type and Cloud Phase ATBD v3, 2020-06-01',
-  requirement: {correctFraction: 0.8, minOpticalDepth: 1, lzaQuantitativeDeg: 65, precisionCategories: 1.5},
+  requirement: {
+    correctFraction: 0.8,
+    minOpticalDepth: 1,
+    lzaQuantitativeDeg: 65,
+    precisionCategories: 1.5
+  },
   liquidTopK: 273,
   homogeneousFreezingK: 238,
   spontaneousFreezingK: 233,
@@ -878,9 +883,22 @@ export const PHASE_ATBD = {
   validation: {
     source: 'SEVIRI vs CALIOP, Tables 40-41',
     matchups: 95249,
-    all: {liquid: {n: 49642, agree: 0.9048}, ice: {n: 45607, agree: 0.8484}, total: {n: 95249, agree: 0.8778}},
-    thick: {liquid: {n: 34446, agree: 0.903}, ice: {n: 17597, agree: 0.9844}, total: {n: 52043, agree: 0.9305}},
-    mixedSetAside: {all: 21434, thick: 13087, tolerableErrorAll: 0.54, tolerableErrorThick: 0.72}
+    all: {
+      liquid: {n: 49642, agree: 0.9048},
+      ice: {n: 45607, agree: 0.8484},
+      total: {n: 95249, agree: 0.8778}
+    },
+    thick: {
+      liquid: {n: 34446, agree: 0.903},
+      ice: {n: 17597, agree: 0.9844},
+      total: {n: 52043, agree: 0.9305}
+    },
+    mixedSetAside: {
+      all: 21434,
+      thick: 13087,
+      tolerableErrorAll: 0.54,
+      tolerableErrorThick: 0.72
+    }
   }
 };
 /** The phase's word for a pixel value, or null for the fill. */
@@ -907,7 +925,17 @@ export function phaseQuality(qf) {
  * for the corona's purposes, stated).
  */
 export function phaseCensus(phase, dqf) {
-  const c = {n: phase.length, clear: 0, liquid: 0, supercooled: 0, mixed: 0, ice: 0, unknown: 0, low: 0, fill: 0};
+  const c = {
+    n: phase.length,
+    clear: 0,
+    liquid: 0,
+    supercooled: 0,
+    mixed: 0,
+    ice: 0,
+    unknown: 0,
+    low: 0,
+    fill: 0
+  };
   for (let q = 0; q < phase.length; q++) {
     const v = phase[q];
     if (v === 255 || v === undefined) {

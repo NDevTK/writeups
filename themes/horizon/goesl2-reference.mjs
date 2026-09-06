@@ -1123,7 +1123,15 @@ const inflate = (u8) =>
       c.n === 40 &&
       c.fill === 5 &&
       c.low === 2 &&
-      c.clear + c.liquid + c.supercooled + c.mixed + c.ice + c.unknown + c.low + c.fill === 40 &&
+      c.clear +
+        c.liquid +
+        c.supercooled +
+        c.mixed +
+        c.ice +
+        c.unknown +
+        c.low +
+        c.fill ===
+        40 &&
       c.cloudy === c.liquid + c.supercooled + c.mixed + c.ice &&
       near(c.iceFrac, c.ice / c.cloudy, 1e-12) &&
       near(c.waterFrac + c.iceFrac, 1, 1e-12) &&
@@ -1134,9 +1142,17 @@ const inflate = (u8) =>
       PHASE_ATBD.liquidTopK === 273 &&
       v.matchups === 95249 &&
       v.all.liquid.n + v.all.ice.n === v.all.total.n &&
-      Math.abs(v.all.liquid.n * v.all.liquid.agree + v.all.ice.n * v.all.ice.agree - agreeAll) < 60 &&
+      Math.abs(
+        v.all.liquid.n * v.all.liquid.agree +
+          v.all.ice.n * v.all.ice.agree -
+          agreeAll
+      ) < 60 &&
       v.thick.liquid.n + v.thick.ice.n === v.thick.total.n &&
-      Math.abs(v.thick.liquid.n * v.thick.liquid.agree + v.thick.ice.n * v.thick.ice.agree - Math.round(v.thick.total.n * v.thick.total.agree)) < 60 &&
+      Math.abs(
+        v.thick.liquid.n * v.thick.liquid.agree +
+          v.thick.ice.n * v.thick.ice.agree -
+          Math.round(v.thick.total.n * v.thick.total.agree)
+      ) < 60 &&
       v.thick.total.agree > PHASE_ATBD.requirement.correctFraction &&
       v.all.ice.agree > PHASE_ATBD.requirement.correctFraction,
     `${PHASE_MEANINGS.length} categories as the file numbers them (${PHASE_MEANINGS.join(', ')}), the QF word's six bits; a 40-px window ` +

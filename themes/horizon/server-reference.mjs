@@ -1898,21 +1898,35 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
 // bound from L2 and re-exported, and every served ask must have a
 // builder named for it (the DCOMP pair through l2DcompBody).
 {
-  const src = readFileSync(new URL('./server/src/index.mjs', import.meta.url), 'utf8');
-  const called = [...new Set([...src.matchAll(/\b(l2[A-Z][A-Za-z]*Body)\(/g)].map((m) => m[1]))].sort();
+  const src = readFileSync(
+    new URL('./server/src/index.mjs', import.meta.url),
+    'utf8'
+  );
+  const called = [
+    ...new Set(
+      [...src.matchAll(/\b(l2[A-Z][A-Za-z]*Body)\(/g)].map((m) => m[1])
+    )
+  ].sort();
   const bound = (src.match(/const \{([^}]*)\} = L2;/) ?? ['', ''])[1]
     .split(',')
     .map((t) => t.trim())
     .filter(Boolean);
-  const exported = (src.match(/export \{([^}]*)\} from '\.\.\/\.\.\/goesl2-decode\.js';/) ?? ['', ''])[1]
+  const exported = (src.match(
+    /export \{([^}]*)\} from '\.\.\/\.\.\/goesl2-decode\.js';/
+  ) ?? ['', ''])[1]
     .split(',')
     .map((t) => t.trim())
     .filter(Boolean);
   const unbound = called.filter((n) => !bound.includes(n));
   const unexported = called.filter((n) => !exported.includes(n));
   const served = L2_ASKS.filter((a) => !a.pageOnly && a.id !== 'cps');
-  const builderOf = (id) => 'l2' + (id === 'cod' ? 'Dcomp' : id[0].toUpperCase() + id.slice(1)) + 'Body';
-  const missing = served.map((a) => builderOf(a.id)).filter((n) => !called.includes(n));
+  const builderOf = (id) =>
+    'l2' +
+    (id === 'cod' ? 'Dcomp' : id[0].toUpperCase() + id.slice(1)) +
+    'Body';
+  const missing = served
+    .map((a) => builderOf(a.id))
+    .filter((n) => !called.includes(n));
   check(
     "THE DAEMON'S BINDINGS: every body builder the daemon calls is bound from the decode block, every served ask has one",
     called.length >= 10 &&
