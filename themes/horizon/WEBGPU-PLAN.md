@@ -10416,9 +10416,10 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   field goes to cloudSys.setGoesCover with the SAME worldUnits (the
   shader samples by scene position, texel count free), re-cut
   whenever the coarse field is (syncGoesIr) or a new file lands
-  (syncGoesL2's five minutes, the client's held windows sparing a
-  re-read), withdrawn at night (the observer's sun past 85 deg
-  zenith, the LST ATBD's day rule), on ?vis=0 or under the
+  (syncGoesL2's five minutes, the window re-read at the mosaic's
+  ten-minute cadence unless the coarse field changed - about 15 MB
+  an hour by day, the line stating the bytes), withdrawn at night (the observer's sun past 85 deg
+  zenith, the LST ATBD's day rule), on ?daylight=0 or under the
   browser's data saver - the line says which. The pick layer maps a
   fine texel to its coarse one and prints the band-2 fraction and
   the references. GATES: goesl2-reference THE DAYLIGHT FIELD (kappa

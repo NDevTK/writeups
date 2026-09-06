@@ -172,8 +172,9 @@ are gated by `../server-reference.mjs` — the `server` set in
   401 x 401 px of the CMIP ATBD's reflectance factor with the
   file's kappa, Esun and Earth-Sun distance) that the page reads
   from the bucket itself by day to shape the cloud decks inside the
-  mask's cloud - 2.6 MB a file every five minutes, which this box's
-  free-tier egress cannot carry and the bucket's CORS can. This
+  mask's cloud - 2.6 MB a file, re-read at the mosaic's ten-minute
+  cadence (about 15 MB an hour by day), which this box's free-tier
+  egress cannot carry and the bucket's CORS can. This
   daemon never lists, fetches or serves it; `/health`'s
   `version.products` names the ten it does.
   Since the 151st pass

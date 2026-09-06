@@ -9,8 +9,8 @@ from the code. Run the whole corpus with:
 cd themes/horizon/harness && bash validate.sh
 ```
 
-At the time of writing the gate holds **145 CPU reference files printing
-1160 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+At the time of writing the gate holds **146 CPU reference files printing
+1164 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **145 reference files, 1160 landmark lines, 8 GPU probes** (live gate
+- **146 reference files, 1164 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what

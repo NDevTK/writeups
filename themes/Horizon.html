@@ -227,7 +227,11 @@
         (pin
         bare-soil tints dry), comets=0 (skip MPC
         comets), comet=g (synthetic comet for the harness), irr=0
-        (skip satellite irradiance), ghi=W (override it), debug=1,
+        (skip satellite irradiance), ghi=W (override it),
+        daylight=0 (keep the 2-km cloud field by day - never read
+        the 500-m visible window that shapes the decks inside the
+        mask's cloud; the browser's data saver does the same),
+        debug=1,
         look=az,alt (degrees - pin the default camera's view
         direction, e.g. antisolar for a rainbow)
     -->
@@ -7004,26 +7008,27 @@
       // 'vis': 2.6 MB a file, never the daemon's - the free tier's
       // egress cannot carry it); a refresh re-lists but reads only a
       // new file. At night (the observer's sun past 85 deg zenith,
-      // the LST ATBD's day rule), on ?vis=0 or under the browser's
+      // the LST ATBD's day rule), on ?daylight=0 or under the browser's
       // data-saver the coarse field stands alone, and the line says
       // which. The fine field is re-cut whenever the coarse one is
       // (syncGoesIr) or a new visible file lands (syncGoesL2's five
       // minutes).
+      const DAYLIGHT_REREAD_MS = 9.5 * 60e3;
       let daylight = null; // {at, key, time, sunZenithDeg, vis, res, coarseAt}
       let daylightBusy = false;
       let daylightReach = null; // why the coarse field stands alone
       function daylightOff() {
         return (
-          params.get('vis') === '0' ||
+          params.get('daylight') === '0' ||
           (navigator.connection && navigator.connection.saveData === true)
         );
       }
       async function syncDaylight() {
         if (overridden || params.get('goes') === '0') return;
-        if (!goesObs || !goesObs.deck || !cloudSys) return;
         if (daylightBusy) return;
         if (daylightOff()) {
-          daylightReach = params.get('vis') === '0' ? 'off (?vis=0)' : 'off (data saver)';
+          daylightReach =
+            params.get('daylight') === '0' ? 'off (?daylight=0)' : 'off (data saver)';
           return;
         }
         const sza = solarZenithDeg(state.lat, state.lon, Date.now());
@@ -7032,14 +7037,32 @@
           if (daylight) {
             // the day's fine field withdrawn: the coarse field back
             daylight = null;
-            cloudSys.setGoesCover(
-              goesObs.deck.data,
-              goesObs.deck.rm,
-              goesObs.worldUnits
-            );
+            if (cloudSys && goesObs && goesObs.deck)
+              cloudSys.setGoesCover(
+                goesObs.deck.data,
+                goesObs.deck.rm,
+                goesObs.worldUnits
+              );
           }
           return;
         }
+        if (!goesObs || !goesObs.deck) return;
+        if (!cloudSys) {
+          // no deck drawn: the ceilometer, the model and the field
+          // report no cloud, so there is nothing to shape
+          daylightReach = `day here (sun ${sza.toFixed(0)}° from the zenith) but no cloud deck is drawn: nothing to shape`;
+          return;
+        }
+        // a new file every five minutes is 2.6 MB each: the window is
+        // re-read at the mosaic's own cadence (ten minutes) unless the
+        // coarse field it shapes has changed - about 15 MB an hour by
+        // day, stated on the line
+        if (
+          daylight &&
+          daylight.coarseAt === goesObs.at &&
+          Date.now() - daylight.at < DAYLIGHT_REREAD_MS
+        )
+          return;
         daylightBusy = true;
         try {
           const j = await goesL2Client.fetchGoesL2(state.lat, state.lon, null, [
@@ -7049,11 +7072,18 @@
             daylightReach = j && j.reason ? j.reason : 'no visible window read';
             return;
           }
-          // the same file over the same coarse field: nothing to re-cut
+          // the mask of the same satellite (the daemon's or the page's
+          // own read) sorts the references; the theme's own field
+          // stands in without one
+          const mask =
+            goesL2 && goesL2.mask && goesL2.sat === j.sat ? goesL2.mask : null;
+          // the same file over the same coarse field under the same
+          // sorting: nothing to re-cut
           if (
             daylight &&
             daylight.key === j.vis.key &&
-            daylight.coarseAt === goesObs.at
+            daylight.coarseAt === goesObs.at &&
+            (daylight.res.sortedBy === 'ACM') === !!mask
           )
             return;
           const vis = unpackProduct(j.vis);
@@ -7066,11 +7096,6 @@
             cj: Math.floor(win.py - goesObs.j0),
             halfPx: win.halfPx
           };
-          // the mask of the same satellite (the daemon's or the page's
-          // own read) sorts the references; the theme's own field
-          // stands in without one
-          const mask =
-            goesL2 && goesL2.mask && goesL2.sat === j.sat ? goesL2.mask : null;
           const t0 = performance.now();
           const res = daylightField({
             vis,
