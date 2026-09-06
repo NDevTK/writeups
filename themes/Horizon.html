@@ -6510,7 +6510,9 @@
         try {
           const l = goesL2 && goesL2.lst;
           const s = state.soundingData;
-          const ageMin = l ? (Date.now() - Date.parse(l.time)) / 60e3 : Infinity;
+          const ageMin = l
+            ? (Date.now() - Date.parse(l.time)) / 60e3
+            : Infinity;
           const uMs = Number.isFinite(state.wind) ? state.wind / 3.6 : NaN;
           if (
             l &&
@@ -6868,9 +6870,15 @@
                   : `no high-quality px within ${ls.nearPx} px`) +
                 ` · overhead ${
                   ls.here && ls.here.K !== null
-                    ? (ls.here.K - 273.15).toFixed(1) + ' °C (' + aodQualityName(ls.here.dqf) + ')'
+                    ? (ls.here.K - 273.15).toFixed(1) +
+                      ' °C (' +
+                      aodQualityName(ls.here.dqf) +
+                      ')'
                     : q
-                      ? LST_PQI_CLOUD[q.cloud] + ', ' + LST_PQI_SURFACE[q.surface] + ', no retrieval'
+                      ? LST_PQI_CLOUD[q.cloud] +
+                        ', ' +
+                        LST_PQI_SURFACE[q.surface] +
+                        ', no retrieval'
                       : 'no retrieval'
                 }` +
                 ` · ${c.high} high · ${c.medium} medium · ${c.low} low · ${c.none} none of ${c.n} 2-km px within ±100 km`
@@ -7500,7 +7508,9 @@
             line +=
               ` · the scene's own mean ${degC(s.meanK)} ± ${s.sdK} K over ` +
               `${s.retrieved === null ? '—' : s.retrieved.toLocaleString('en-US')} retrieved px (${s.good === null ? '—' : s.good.toLocaleString('en-US')} good)`;
-          const span = lstValidationSpan(goesL2.craft === 'GOES-18' ? 'GOES-17' : 'GOES-16');
+          const span = lstValidationSpan(
+            goesL2.craft === 'GOES-18' ? 'GOES-17' : 'GOES-16'
+          );
           line +=
             ` (the ATBD's SURFRAD validation of ${span.craft}, the ${goesL2.craft === 'GOES-18' ? 'West' : 'East'} slot's craft through it: ` +
             `bias ${span.biasK[0]} to +${span.biasK[1]} K by site, precision ${span.precisionK[0]}–${span.precisionK[1]} K over ` +
@@ -12779,7 +12789,10 @@
                   : '∞';
               const covers = l.census.covers
                 .slice(0, 3)
-                .map((c) => `${c.osm.replace(/_/g, ' ')} ${Math.round(100 * c.frac)}%`)
+                .map(
+                  (c) =>
+                    `${c.osm.replace(/_/g, ' ')} ${Math.round(100 * c.frac)}%`
+                )
                 .join(', ');
               const kSea =
                 farRingData && Number.isFinite(farRingData.kSea)

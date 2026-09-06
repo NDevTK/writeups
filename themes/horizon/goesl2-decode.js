@@ -59,7 +59,14 @@ import {
   windowBox
 } from './goesl2.js';
 
-export const L2_HALF_PX = {mask: 50, height: 10, sst: 50, dsr: 50, aod: 50, lst: 50}; // +-100 km on 2-km / 10-km grids
+export const L2_HALF_PX = {
+  mask: 50,
+  height: 10,
+  sst: 50,
+  dsr: 50,
+  aod: 50,
+  lst: 50
+}; // +-100 km on 2-km / 10-km grids
 export const L2_LIST_MS = 60e3; // a bucket listing stands a minute (the cheap part)
 export const L2_RETRY_MS = 2 * 60e3; // after a listing or fetch failure
 export const L2_WINDOW_MS = 15 * 60e3; // windows outlive their file by design: a new file keys new windows

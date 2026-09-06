@@ -271,7 +271,10 @@ const near = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol;
     (mo.tAt(100) - mo.tAt(2)) / 98
   );
   const kStd = refractionK(1013.25, 288.15, -0.0065);
-  const kNight = landRefractionK(landBulk({...met, taC: 16, tsC: 12, uMs: 2}), met.pPa);
+  const kNight = landRefractionK(
+    landBulk({...met, taC: 16, tsC: 12, uMs: 2}),
+    met.pPa
+  );
   const contiguous = a.layers.findIndex((l) => !l.super);
   check(
     'FLEAGLE’S TEST AND HIRT’S COEFFICIENT: the film is super-autoconvective from the ground to a stated top; k over the eye’s 2-100 m by hand',
@@ -284,7 +287,9 @@ const near = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol;
       a.filmTopM < 100 &&
       contiguous > 0 &&
       a.filmTopM === a.layers[contiguous - 1].zB &&
-      a.layers.every((l, i) => i === 0 || l.lapseKm > a.layers[i - 1].lapseKm || !l.super) &&
+      a.layers.every(
+        (l, i) => i === 0 || l.lapseKm > a.layers[i - 1].lapseKm || !l.super
+      ) &&
       cool.filmTopM === null &&
       cool.layers.every((l) => !l.super) &&
       near(k, kByHand, 1e-12) &&
@@ -333,8 +338,7 @@ const near = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol;
   const pByHand =
     r0.p *
     Math.exp(
-      (-(r1.hM - r0.hM) * 9.80665) /
-        (287.053 * ((r0.tC + r1.tC) / 2 + 273.15))
+      (-(r1.hM - r0.hM) * 9.80665) / (287.053 * ((r0.tC + r1.tC) / 2 + 273.15))
     );
   const noAscent = landColumnRows(SOUNDING.rows.slice(0, 3), met, {h0M: 20});
   const short = landColumnRows(SOUNDING.rows, met, {h0M: 20, topM: 30});

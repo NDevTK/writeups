@@ -1274,13 +1274,13 @@ pinBlock(
     okDay && okNight,
     day && night
       ? `afternoon skin +${day.dTskinAirK.toFixed(1)} K over grass: ${day.stability}, ` +
-        `L ${day.L.toFixed(0)} m, u* ${day.uStar.toFixed(2)} m/s, H ${day.hsbWm2.toFixed(0)} W/m2, ` +
-        `${day.klass}, k(2-100 m) ${day.kLand.toFixed(3)} above k(0-100 m) ${day.k0to100.toFixed(3)} ` +
-        `(the film's steepest metres pull the deeper mean down), the kB^-1 sensitivity ` +
-        `H ${day.sensitivity.map((s) => s.hsbWm2.toFixed(0)).join('/')} W/m2 (Rigden ALL / Kanda bluff); ` +
-        `night skin ${night.dTskinAirK.toFixed(1)} K: ${night.stability}, ${night.klass}, ` +
-        `H ${night.hsbWm2.toFixed(0)} W/m2, k ${night.kLand.toFixed(3)} above the afternoon's - ` +
-        `every verdict follows the column's own numbers`
+          `L ${day.L.toFixed(0)} m, u* ${day.uStar.toFixed(2)} m/s, H ${day.hsbWm2.toFixed(0)} W/m2, ` +
+          `${day.klass}, k(2-100 m) ${day.kLand.toFixed(3)} above k(0-100 m) ${day.k0to100.toFixed(3)} ` +
+          `(the film's steepest metres pull the deeper mean down), the kB^-1 sensitivity ` +
+          `H ${day.sensitivity.map((s) => s.hsbWm2.toFixed(0)).join('/')} W/m2 (Rigden ALL / Kanda bluff); ` +
+          `night skin ${night.dTskinAirK.toFixed(1)} K: ${night.stability}, ${night.klass}, ` +
+          `H ${night.hsbWm2.toFixed(0)} W/m2, k ${night.kLand.toFixed(3)} above the afternoon's - ` +
+          `every verdict follows the column's own numbers`
       : 'the panel declined the fixture'
   );
 }

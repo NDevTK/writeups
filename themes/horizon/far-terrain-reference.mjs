@@ -199,7 +199,10 @@ const check = (name, ok, detail) => {
     const r = radii[Math.floor(v / 8)];
     const kk = coast.spokeLand[ai] ? kLand : k;
     const want =
-      16 * Math.asinh((coast.trueEM[v] - curvatureDrop(r * mpu, kk) - centerElev) / 500);
+      16 *
+      Math.asinh(
+        (coast.trueEM[v] - curvatureDrop(r * mpu, kk) - centerElev) / 500
+      );
     if (Math.abs(coast.positions[v * 3 + 1] - want) > 1e-5) dropOk = false;
     const d = coast.positions[v * 3 + 1] - plain.positions[v * 3 + 1];
     // kLand 0.05 < k 0.17: less refraction lift, so the land SINKS
@@ -232,7 +235,10 @@ const check = (name, ok, detail) => {
   let maxPlainNull = 0;
   for (let v = 0; v < base.length; v++) {
     maxBase = Math.max(maxBase, Math.abs(base[v] - coast.positions[v * 3 + 1]));
-    maxNull = Math.max(maxNull, Math.abs(baseNull[v] - plain.positions[v * 3 + 1]));
+    maxNull = Math.max(
+      maxNull,
+      Math.abs(baseNull[v] - plain.positions[v * 3 + 1])
+    );
     maxPlainNull = Math.max(
       maxPlainNull,
       Math.abs(nullLand.positions[v * 3 + 1] - plain.positions[v * 3 + 1])

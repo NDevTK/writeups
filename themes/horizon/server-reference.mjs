@@ -1388,15 +1388,19 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
   const dq = body ? unpackArray(body.dqf) : null;
   const pq = body ? unpackArray(body.pqi) : null;
   const again = body ? qualityCensus(back, dq) : null;
-  const nearAgain = body ? nearestGood(back, dq, body.box, L2_LST_NEAR_PX, 0) : null;
+  const nearAgain = body
+    ? nearestGood(back, dq, body.box, L2_LST_NEAR_PX, 0)
+    : null;
   const ci = body ? body.box.i - body.box.i0 : 0;
   const cj = body ? body.box.j - body.box.j0 : 0;
   const qc = body ? cj * body.box.cols + ci : 0;
   const kmAgain =
     body && nearAgain
       ? +(
-          Math.hypot(nearAgain.di * body.pixel.ewM, nearAgain.dj * body.pixel.nsM) /
-          1000
+          Math.hypot(
+            nearAgain.di * body.pixel.ewM,
+            nearAgain.dj * body.pixel.nsM
+          ) / 1000
         ).toFixed(1)
       : null;
   const nearWord = body && nearAgain ? lstPqi(pq[nearAgain.q]) : null;

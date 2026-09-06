@@ -74,11 +74,15 @@ function resolveStable() {
 
 // A NAMED version ($CFT_VERSION): the public bucket lays every
 // Chrome-for-Testing build out by version, so no listing is needed.
-const PUBLIC_BUCKET = 'https://storage.googleapis.com/chrome-for-testing-public';
+const PUBLIC_BUCKET =
+  'https://storage.googleapis.com/chrome-for-testing-public';
 function resolveNamed(version) {
   if (!/^\d+\.\d+\.\d+\.\d+$/.test(version))
     throw new Error(`CFT_VERSION ${version} is not a Chrome version`);
-  return {version, url: `${PUBLIC_BUCKET}/${version}/linux64/chrome-linux64.zip`};
+  return {
+    version,
+    url: `${PUBLIC_BUCKET}/${version}/linux64/chrome-linux64.zip`
+  };
 }
 
 let cached = null;

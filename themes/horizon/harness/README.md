@@ -48,7 +48,7 @@ Pieces:
   (`/tmp/cft-cache/150.0.7871.124/chrome-linux64/chrome`, fetched
   from `storage.googleapis.com/chrome-for-testing-public`) rather
   than whatever `setup-chrome.mjs` resolves today; `CFT_VERSION=
-  150.0.7871.124` makes `setup-chrome.mjs` fetch and cache that
+150.0.7871.124` makes `setup-chrome.mjs` fetch and cache that
   named build itself.
 - `validate.sh` — the reference-first gate and the ONE correctness
   entrypoint: every CPU double-precision reference (77 sets), then

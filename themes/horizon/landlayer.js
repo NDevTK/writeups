@@ -168,7 +168,10 @@ export const KB_LAW_OF_OSM = {
   retail: {bluff: 'kanda'},
   industrial: {bluff: 'kanda'},
   railway: {bluff: 'kanda'},
-  forest: {constant: (KB_INV_RIGDEN.DBF + KB_INV_RIGDEN.ENF) / 2, of: 'DBF/ENF'},
+  forest: {
+    constant: (KB_INV_RIGDEN.DBF + KB_INV_RIGDEN.ENF) / 2,
+    of: 'DBF/ENF'
+  },
   wood: {constant: (KB_INV_RIGDEN.DBF + KB_INV_RIGDEN.ENF) / 2, of: 'DBF/ENF'},
   orchard: {constant: KB_INV_RIGDEN.CRO, of: 'CRO'},
   vineyard: {constant: KB_INV_RIGDEN.CRO, of: 'CRO'},
@@ -389,15 +392,16 @@ export function landBulk({
   const zeta = (z) => (Number.isFinite(L) ? clampZeta(z / L) : 0);
   const thetaAt = (z) => {
     const zz = Math.max(z, z0hUse);
-    return thetaS + thetaStar * PR_NEUTRAL * (Math.log(zz / z0hUse) - psiH(zeta(zz)));
+    return (
+      thetaS + thetaStar * PR_NEUTRAL * (Math.log(zz / z0hUse) - psiH(zeta(zz)))
+    );
   };
   return {
     uStar,
     thetaStar,
     L,
     zetaU: Number.isFinite(L) ? zuM / L : 0,
-    clamped:
-      Number.isFinite(L) && (zuM / L < ZETA_MIN || zuM / L > ZETA_MAX),
+    clamped: Number.isFinite(L) && (zuM / L < ZETA_MIN || zuM / L > ZETA_MAX),
     z0: z0M,
     z0h,
     kbInv: kb,
@@ -488,7 +492,14 @@ export function landRefractionK(mo, pPa, {zA = 2, zB = 100} = {}) {
 export function landColumnRows(
   balloonRows,
   met,
-  {z0M = 0.03, kbInv = KB_INV_RIGDEN.ALL, h0M = null, topM = 100, skipM = 30, bliM = null} = {}
+  {
+    z0M = 0.03,
+    kbInv = KB_INV_RIGDEN.ALL,
+    h0M = null,
+    topM = 100,
+    skipM = 30,
+    bliM = null
+  } = {}
 ) {
   if (!Array.isArray(balloonRows) || balloonRows.length < 5) return null;
   const hb = balloonRows[0].hM;
