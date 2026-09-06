@@ -4,6 +4,10 @@
 // a navigated list - placed by real bearing and distance, the
 // drizzle left out, the far ones left out, nearest first, capped.
 import {
+  COVER_CAP,
+  coverOfRate,
+  mergeCoverFields,
+  rainCoverField,
   RAIN_EXTINCTION,
   rainExtinctionPerKm,
   rainOpticalDepth,
@@ -116,4 +120,71 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   );
 }
 
+{
+  // THE RAIN'S COVER (167th): a 10 mm/h pixel at the centre of a 16-km
+  // box paints the 8 x 8 texels of its 2-km footprint (250-m texels)
+  // at the cap, a drizzle pixel 3 km east paints its own footprint at
+  // its lesser cover, a pixel 20 km north is outside the box, the
+  // border ring stays zero; the merge takes the radar's texel where
+  // the mask says covered and the satellite's where it says black
+  const lat = 32.85;
+  const lon = -117.12;
+  const mLon = 111320 * Math.cos((lat * Math.PI) / 180);
+  const list = [
+    {latDeg: lat, lonDeg: lon, mmh: 10},
+    {latDeg: lat, lonDeg: lon + 3000 / mLon, mmh: 0.3},
+    {latDeg: lat + 20000 / 111320, lonDeg: lon, mmh: 50}
+  ];
+  const f = rainCoverField(list, lat, lon, {rm: 64, worldM: 16000, pixelM: 2000});
+  const at = (ii, jj) => f.data[(jj * 64 + ii) * 4];
+  // the centre pixel spans metres -1000..+1000 -> texels 28..35 (250 m each, index floor((m+8000)/250))
+  let centreOk = true;
+  for (let jj = 28; jj <= 35; jj++) for (let ii = 28; ii <= 35; ii++) if (Math.abs(at(ii, jj) - COVER_CAP) > 1e-6) centreOk = false;
+  // the drizzle pixel at +3000 m east: metres 2000..4000 -> texels 40..47, rows 28..35
+  const drizzle = coverOfRate(0.3);
+  let eastOk = true;
+  for (let jj = 28; jj <= 35; jj++) for (let ii = 40; ii <= 47; ii++) if (Math.abs(at(ii, jj) - drizzle) > 1e-7) eastOk = false;
+  let border = 0;
+  for (let t = 0; t < 64; t++) border += at(t, 0) + at(t, 63) + at(0, t) + at(63, t);
+  let paintedCount = 0;
+  for (let k = 0; k < f.data.length; k += 4) if (f.data[k] > 0) paintedCount++;
+  // the merge: a radar field with cover 0.5 everywhere, the mask covered on the west half
+  const radar = new Float32Array(64 * 64 * 4);
+  for (let k = 0; k < radar.length; k += 4) radar[k] = 0.5;
+  const covered = new Uint8Array(64 * 64);
+  for (let t = 0; t < 64 * 64; t++) covered[t] = t % 64 < 32 ? 1 : 0;
+  const m = mergeCoverFields(radar, f.data, covered, 64);
+  const mAt = (ii, jj) => m.data[(jj * 64 + ii) * 4];
+  const allRadar = mergeCoverFields(radar, f.data, null, 64);
+  check(
+    "THE RAIN'S COVER paints each pixel's footprint and the merge takes the radar where it sees",
+    near(coverOfRate(10), COVER_CAP, 1e-12) &&
+      coverOfRate(0) === 0 &&
+      coverOfRate(0.05) === 0 &&
+      near(coverOfRate(1), COVER_CAP, 1e-12) &&
+      drizzle > 0 &&
+      drizzle < COVER_CAP &&
+      f.pixels === 2 &&
+      centreOk &&
+      eastOk &&
+      at(27, 31) === 0 &&
+      at(36, 31) === 0 &&
+      at(31, 27) === 0 &&
+      at(31, 36) === 0 &&
+      border === 0 &&
+      paintedCount === 128 &&
+      f.painted === 128 &&
+      mAt(31, 31) === 0.5 &&
+      near(mAt(44, 31), drizzle, 1e-6) &&
+      mAt(36, 31) === 0 &&
+      m.fromRadar === 32 * 64 &&
+      m.fromSatellite === 96 &&
+      allRadar.fromRadar === 64 * 64 &&
+      allRadar.fromSatellite === 0,
+    `a 10 mm/h pixel at the centre paints its 8 x 8 texels at ${COVER_CAP} (the texels around them 0), a 0.3 mm/h pixel 3 km east its own 64 at ${drizzle.toFixed(3)}, ` +
+      `the 50 mm/h pixel 20 km north is outside the 16-km box (${f.pixels} of 3 pixels painted, ${f.painted} texels), the border ring 0; ` +
+      `merged with a radar field of 0.5 seen over the west half: the centre keeps the radar's 0.5, the drizzle's texels in the east take the satellite's ${drizzle.toFixed(3)}, ` +
+      `an unpainted eastern texel stays 0 - ${m.fromRadar} texels from the radar, ${m.fromSatellite} from the satellite (the drizzle's 64 and the centre pixel's four eastern columns); without a mask every texel is the radar's`
+  );
+}
 process.exit(fail ? 1 : 0);

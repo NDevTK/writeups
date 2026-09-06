@@ -10345,6 +10345,69 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 167th pass - THE RAIN'S COVER
+  WHERE NO RADAR SEES): the decks' measured cover has been the radar
+  composite's since the weather map's first pass - a 64 x 64 field
+  over the 16-km world box, each texel the local cover mapped from
+  the radar's rain rate (0.95 x smoothstep from 0.05 to 1 mm/h) -
+  and since the 164th the mask says where that field is blind:
+  RainViewer's black over the sea and between radars said nothing,
+  and the decks kept the model's cover there. The 164th's satellite
+  rain gives the same field the same way. THE LAW (rainshafts.js):
+  coverOfRate (the radar field's own rule, one function now);
+  rainCoverField (each raining pixel's 2-km footprint splatted onto
+  the texels it touches - equirectangular offsets from the observer,
+  the mapping roam.geoToScene uses, a footprint ending on a texel
+  edge to floating error kept on its own side by a millionth of a
+  texel - the stronger rate keeping a texel, the border ring zero);
+  mergeCoverFields (the radar's texel wherever it sees, the
+  satellite's where it does not, the counts of texels each gave).
+  THE PAGE: the radar sync keeps which texels the radar sees (the
+  mask's transparent pixels; every texel without a mask), the L2
+  sync builds the satellite's field beside the shafts, and one
+  applyMeasuredCover feeds the decks the merged field - no radar at
+  all leaves every texel to the satellite, a radar without a mask
+  keeps every texel; the rain record says "the decks' cover: N
+  texels from the satellite's rain where no radar sees, M from the
+  radar" or "the satellite's rain paints N texels the radar already
+  sees". GATE: rainshafts-reference THE RAIN'S COVER (a 10 mm/h
+  pixel at the centre paints its 8 x 8 texels at the cap and none
+  around them, a 0.3 mm/h pixel 3 km east its own 64 at 0.163, a 50
+  mm/h pixel 20 km north outside the box, the border zero; merged
+  with a radar field of 0.5 seen over the west half: 2,048 texels
+  the radar's, 96 the satellite's - the drizzle's 64 and the centre
+  pixel's four eastern columns - and every texel the radar's without
+  a mask; 3). The first draft painted nine texels for an eight-texel
+  footprint whose east edge fell a floating hair under a boundary,
+  and pinned 64 for the merge where the geometry says 96 - both
+  caught by the landmark before the page saw them. Docs: FINDINGS
+  pass 167 (147 files, 1,177 landmarks). MEASURED in the page (the
+  open Pacific under the day's tropical rain, 13.17 N 95.0 W,
+  19:2xZ, looking east): "RainViewer radar - no radar here
+  (RainViewer's coverage mask; 0% of the 18-km window covered) -
+  zoom 7 (1.19 km/px), Universal Blue palette - 9 min old" and "NOAA
+  GOES-19 rainfall rate (RRQPEF) - 19:05Z - overhead 48.2 mm/h
+  (good) - nearest rain 48.2 mm/h 0 km off - 4109 raining of 10,201
+  retrieved 2-km px within +-100 km (max 68.2 mm/h, mean 24.4 over
+  the raining) - the disk 537,459 raining px, max 99.39 mm/h - 160
+  rain shafts drawn within 100 km: the nearest 6 km at 37° (49.0
+  mm/h), the heaviest 68.3 mm/h 67 km off hiding 100% of what
+  stands behind it - the decks' cover: 383 texels from the
+  satellite's rain where no radar sees" - and the frame: a grey
+  overcast the satellite alone measured, two translucent curtains
+  standing on the sea horizon at the left of the eastward view (the
+  37° pixel), the observer's own rain falling, the sea below - a
+  storm at sea drawn from orbit where the theme had only ever had
+  the model's guess. THE GATE'S OWN FLAKE, measured: the harness's
+  page-wiring probe dumped NOTHING in three of six runs today (the
+  CPU suite and the eight GPU probes green each time), while the
+  same probe run by hand - the harness's own xvfb-run form included
+  - dumped 111, 114 and 120 lines with the markers every time; an
+  empty dump is the probe's browser producing nothing (a dropped GPU
+  instance, a display not granted), not the page failing its wiring,
+  so the harness now retries an empty dump once and still fails a
+  dump that has lines without the markers - the distinction stated
+  in validate.sh.
 - DONE (Sep 6, the review session's 166th pass - THE INVERTED
   REFERENCES): the rule the home's scheduled A/B asked for. The
   daylight field (159th-160th) cuts the decks' 2-km cover by each

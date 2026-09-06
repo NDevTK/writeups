@@ -108,3 +108,89 @@ export function rainShaftsSummary(shafts) {
     heaviestOpacity: heaviest.opacity
   };
 }
+
+// ---- THE RAIN'S COVER WHERE NO RADAR SEES (167th pass) --------------
+// The decks' measured cover field (the radar's, RM x RM texels over
+// the world box, R = the local cover mapped from the rain rate: 0.95
+// x smoothstep(rate, 0.05, 1)) says nothing under RainViewer's black.
+// The satellite's raining pixels give the same field the same way:
+// each pixel's 2-km footprint splatted over the texels it covers
+// (equirectangular offsets from the observer, +x east, +z south, the
+// mapping roam.geoToScene uses), the strongest rate keeping a texel,
+// a zero border ring so the field fades at the world edge.
+export const COVER_RATE_FLOOR_MMH = 0.05; // below drizzle nothing shows
+export const COVER_RATE_FULL_MMH = 1; // saturate toward the cap by 1 mm/h
+export const COVER_CAP = 0.95;
+const M_LAT = 111320;
+const smooth = (x, a, b) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+/** The local cover a rain rate maps to (the radar field's own rule). */
+export function coverOfRate(mmh) {
+  return COVER_CAP * smooth(mmh, COVER_RATE_FLOOR_MMH, COVER_RATE_FULL_MMH);
+}
+/**
+ * The satellite's cover field: RM x RM RGBA float32 (R the cover, A
+ * 1) spanning worldM metres centred on (lat, lon). Each raining pixel
+ * within the box paints the texels its pixelM footprint touches with
+ * coverOfRate, the larger value keeping a texel; the border ring
+ * stays zero. Returns {data, rm, painted, pixels}.
+ */
+export function rainCoverField(list, lat, lon, {rm = 64, worldM = 16000, pixelM = 2000} = {}) {
+  const data = new Float32Array(rm * rm * 4);
+  for (let k = 3; k < data.length; k += 4) data[k] = 1;
+  const mPerTexel = worldM / rm;
+  const mLon = Math.max(M_LAT * Math.cos((lat * Math.PI) / 180), 1e-6);
+  let painted = 0;
+  let pixels = 0;
+  const half = pixelM / 2;
+  for (const p of list || []) {
+    const cover = coverOfRate(p.mmh);
+    if (!(cover > 0)) continue;
+    const xM = (p.lonDeg - lon) * mLon;
+    const zM = -(p.latDeg - lat) * M_LAT;
+    if (Math.abs(xM) > worldM / 2 + half || Math.abs(zM) > worldM / 2 + half) continue;
+    pixels++;
+    // the footprint [a, b) touches texels floor(a/T) .. ceil(b/T) - 1: a
+    // pixel ending exactly on a texel edge does not paint the texel beyond
+    // (an epsilon of a millionth of a texel keeps a footprint that ends
+    // on a texel edge, to floating error, on its own side of it)
+    const EPS = 1e-6;
+    const i0 = Math.floor((xM - half + worldM / 2) / mPerTexel + EPS);
+    const i1 = Math.ceil((xM + half + worldM / 2) / mPerTexel - EPS) - 1;
+    const j0 = Math.floor((zM - half + worldM / 2) / mPerTexel + EPS);
+    const j1 = Math.ceil((zM + half + worldM / 2) / mPerTexel - EPS) - 1;
+    for (let jj = Math.max(j0, 1); jj <= Math.min(j1, rm - 2); jj++)
+      for (let ii = Math.max(i0, 1); ii <= Math.min(i1, rm - 2); ii++) {
+        const k = (jj * rm + ii) * 4;
+        if (data[k] === 0) painted++;
+        if (cover > data[k]) data[k] = cover;
+      }
+  }
+  return {data, rm, painted, pixels};
+}
+/**
+ * The merged measured cover: the radar's texel where the radar sees
+ * it (covered[k] true), the satellite's where it does not. Returns
+ * {data, fromRadar, fromSatellite} - the counts of texels each
+ * measurement gave a cover above zero.
+ */
+export function mergeCoverFields(radar, satellite, covered, rm) {
+  const data = new Float32Array(rm * rm * 4);
+  let fromRadar = 0;
+  let fromSatellite = 0;
+  for (let t = 0; t < rm * rm; t++) {
+    const k = t * 4;
+    const useRadar = !covered || covered[t];
+    const src = useRadar ? radar : satellite;
+    data[k] = src ? src[k] : 0;
+    data[k + 3] = 1;
+    if (data[k] > 0) {
+      if (useRadar) fromRadar++;
+      else fromSatellite++;
+    }
+  }
+  return {data, fromRadar, fromSatellite};
+}
+

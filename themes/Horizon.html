@@ -445,6 +445,8 @@
       import {
         rainShaftsNear,
         rainShaftsSummary,
+        rainCoverField,
+        mergeCoverFields,
         RAIN_EXTINCTION
       } from './horizon/rainshafts.js';
       import {
@@ -2844,6 +2846,10 @@
           // radar does not see (the mask's black) says nothing.
           const RM = 64;
           const field = new Float32Array(RM * RM * 4);
+          // which texels the radar SEES (167th): the mask's transparent
+          // pixels, every one without a mask; the satellite's rain
+          // stands in for the rest (applyMeasuredCover)
+          const coveredTex = new Uint8Array(RM * RM);
           const mppScene = mpp / MPU;
           for (let jj = 0; jj < RM; jj++) {
             for (let ii = 0; ii < RM; ii++) {
@@ -2858,6 +2864,7 @@
               if (pi < 0 || pi > 255 || pj < 0 || pj > 255) continue;
               const kk = (pj * 256 + pi) * 4;
               if (mask && mask[kk + 3] !== 0) continue; // no radar here
+              coveredTex[jj * RM + ii] = 1;
               if (data[kk + 3] === 0) continue; // no echo
               const dec = decodePixel(data, kk, s.scheme);
               const rate = dec.snow ? snowRate(dec.dbz) : rainRate(dec.dbz);
@@ -2868,7 +2875,8 @@
           }
           radarObs.field = field;
           radarObs.fieldSize = RM;
-          if (cloudSys) cloudSys.setRadarCover(field, RM, WORLD);
+          radarObs.coveredTex = coveredTex;
+          applyMeasuredCover();
           const ageMin = Math.round((Date.now() - radarObs.time) / 60000);
           const kmWin = ((2 * h + 1) * mpp) / 1000;
           record(
@@ -7230,7 +7238,8 @@
                 (rn.sceneStats && rn.sceneStats.rainingPx !== null
                   ? ` · the disk ${rn.sceneStats.rainingPx.toLocaleString('en-US')} raining px, max ${rn.sceneStats.maxMmH} mm/h`
                   : '') +
-                shaftWords(applyRainShafts(rn))
+                shaftWords(applyRainShafts(rn)) +
+                (buildRainCover(rn), applyMeasuredCover(), coverWords())
             );
           }
           if (
@@ -7613,6 +7622,38 @@
         };
         return rainShafts.summary;
       }
+      // THE RAIN'S COVER WHERE NO RADAR SEES (167th): the satellite's
+      // raining pixels as the decks' measured cover on the texels the
+      // radar's mask leaves black (the sea, the gaps between radars) -
+      // the radar's own texel wherever it sees (rainshafts.js)
+      let rainCover = null; // {at, time, field, painted, pixels}
+      let coverMerge = null; // {fromRadar, fromSatellite, radar, satellite}
+      function buildRainCover(rn) {
+        if (!rn || !rn.list) {
+          rainCover = null;
+          return;
+        }
+        const f = rainCoverField(rn.list, state.lat, state.lon, {rm: 64, worldM: WORLD * MPU, pixelM: 2000});
+        rainCover = {at: Date.now(), time: rn.time, field: f.data, painted: f.painted, pixels: f.pixels};
+      }
+      function applyMeasuredCover() {
+        const RM = 64;
+        const radarFresh = radarObs && radarObs.field && Date.now() - radarObs.time < 25 * 60e3;
+        const satFresh = rainCover && Date.now() - Date.parse(rainCover.time) < RAIN_LIVE_MS;
+        if (!radarFresh && !satFresh) return;
+        // no radar at all: every texel is the satellite's; a radar
+        // without a mask: every texel the radar's
+        const covered = radarFresh ? radarObs.coveredTex : new Uint8Array(RM * RM);
+        const m = mergeCoverFields(radarFresh ? radarObs.field : null, satFresh ? rainCover.field : null, covered, RM);
+        coverMerge = {fromRadar: m.fromRadar, fromSatellite: m.fromSatellite, radar: !!radarFresh, satellite: !!satFresh};
+        if (cloudSys) cloudSys.setRadarCover(m.data, RM, WORLD);
+      }
+      const coverWords = () =>
+        coverMerge && coverMerge.fromSatellite > 0
+          ? ` · the decks' cover: ${coverMerge.fromSatellite} texels from the satellite's rain where no radar sees${coverMerge.fromRadar ? `, ${coverMerge.fromRadar} from the radar` : ''}`
+          : coverMerge && coverMerge.satellite && rainCover && rainCover.painted
+            ? ` · the satellite's rain paints ${rainCover.painted} texels the radar already sees`
+            : '';
       const shaftWords = (sm) =>
         sm
           ? ` · ${sm.n} rain shaft${sm.n === 1 ? '' : 's'} drawn within 100 km: the nearest ${sm.nearestKm.toFixed(0)} km at ${Math.round(sm.nearestBearingDeg)}° (${sm.nearestMmH.toFixed(1)} mm/h), ` +
@@ -18713,8 +18754,7 @@
               tex.detailTex
             );
             cloudSys.attachShadow(cloudShadow);
-            if (radarObs && radarObs.field)
-              cloudSys.setRadarCover(radarObs.field, radarObs.fieldSize, WORLD);
+            if (radarObs && radarObs.field) applyMeasuredCover();
             if (goesObs && goesObs.deck)
               cloudSys.setGoesCover(
                 goesObs.deck.data,

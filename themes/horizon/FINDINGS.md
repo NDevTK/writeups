@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **147 CPU reference files printing
-1176 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1177 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **147 reference files, 1176 landmark lines, 8 GPU probes** (live gate
+- **147 reference files, 1177 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1071,7 +1071,17 @@ The practice the corpus demonstrates, stated so it can be reused:
    at all — the cut withdraws whole, the 2-km cover stands, and the
    research line says why in the mask's own numbers
    (`goesl2-reference` THE DAYLIGHT FIELD's inverted pair;
-   `daylight-reference` THE INVERTED PAIR)
+   `daylight-reference` THE INVERTED PAIR). Pass 167 gives the decks'
+   measured cover to the satellite's rain where no radar sees: the
+   radar's 64 × 64 field over the 16-km world box said nothing under
+   RainViewer's black (the sea, the gaps between radars); now each
+   raining satellite pixel paints the texels its 2-km footprint
+   touches with the same rate-to-cover rule (0.95 × smoothstep of the
+   rate from 0.05 to 1 mm/h, the stronger keeping a texel, a zero
+   border ring), and one merge feeds the decks the radar's texel
+   wherever the mask says the radar sees and the satellite's
+   elsewhere, the records counting the texels each gave
+   (`rainshafts-reference` THE RAIN'S COVER)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

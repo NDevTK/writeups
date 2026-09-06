@@ -89,6 +89,17 @@ else
     timeout 240 xvfb-run -a node shoot.mjs \
       "$PAGEBASE/themes/Horizon.html?debug=1" /dev/null --wgpu \
       --wait-ms 50000 --dump-text "$ptxt" >/dev/null 2>&1
+    # an EMPTY dump is the probe's browser producing nothing (a GPU
+    # instance dropped, a display not granted - measured on 2026-09-06:
+    # three empty dumps in six runs, none reproducible by hand) and is
+    # retried once; a dump with lines but without the markers is the
+    # page's own failure and is not
+    if [ ! -s "$ptxt" ]; then
+      echo "       page-wiring: the probe dumped nothing - retrying once"
+      timeout 240 xvfb-run -a node shoot.mjs \
+        "$PAGEBASE/themes/Horizon.html?debug=1" /dev/null --wgpu \
+        --wait-ms 50000 --dump-text "$ptxt" >/dev/null 2>&1
+    fi
     if grep -qa "research · the drawn world diagnosed" "$ptxt" &&
       grep -qa "mirage (measured column)" "$ptxt" &&
       { grep -qa "no fresh ascent" "$ptxt" ||
