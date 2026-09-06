@@ -458,6 +458,18 @@ build from before the 151st while main carried the 157th:
   commit. The gate itself is light: measured peak 198 MB
   (rayleighpol) and 153 s of CPU on a fast box for all 145
   references — an e2-micro gets through it.
+- **The gate reports itself** (172nd). `update.sh` writes its phase
+  (`gating`, `deployed`, `failed`), the revision, when it started,
+  the seconds it took and — on a failure — the failing lines of the
+  gate's output (tee'd to `/opt/horizon-live-update.gate.log`) as
+  JSON to `/opt/horizon-live-update.status.json` (`UPDATE_STATUS`),
+  and the daemon serves that file fresh under `/health` as
+  `version.update`. The 167th–171st sat unseen behind the box's gate
+  for hours (an e2-micro takes the better part of an hour per
+  revision, and a failure there was invisible without the journal);
+  now `curl /health` says which revision is gating, for how long, or
+  why it failed. The first deploy with this script cannot report its
+  own gate (the old script ran it); every later one does.
 
 `install.sh` also writes `/opt/horizon-live/VERSION` (`{rev,
 installedAt}`); the daemon logs it at start and reports it in

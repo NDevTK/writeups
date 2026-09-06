@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1192 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1193 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **148 reference files, 1192 landmark lines, 8 GPU probes** (live gate
+- **148 reference files, 1193 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1203,9 +1203,18 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    stated), and its equilibrium level becomes the storm deck's top on
    shower and thunder codes where no fresh balloon stands within 300 km
    and 13 h — the balloon's own writer outranks it while an ascent is
-   fresh, a stable column clears it (`goesl2-reference` THE TOWER'S
-   CEILING FROM ORBIT; `goesl2-client-reference` THE INDICES, READ BY
-   RANGE; `server-reference` the nineteen asks)
+   fresh, a stable column clears it. Live over the western Gulf the
+   profile's lifted index, total totals and K index matched NOAA's
+   product to 0.06, 0.01 and 0.00 K while the mean-layer CAPE differed
+   by 822 J/kg (inside the ATBD's 1000, whose precision requirement is
+   2500 — the integral is the parcel path's) and the station's own
+   afternoon parcel carried 3,848 J/kg to 14.6 km. The same pass makes
+   the box's self-updater report its gate (phase, revision, seconds,
+   failing lines) under `/health` as `version.update`, after the
+   167th–171st sat unseen behind an e2-micro's hour-long gate
+   (`goesl2-reference` THE TOWER'S CEILING FROM ORBIT;
+   `goesl2-client-reference` THE INDICES, READ BY RANGE;
+   `server-reference` the nineteen asks, THE GATE'S OWN REPORT)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

@@ -70,7 +70,26 @@ if [ -z "$CHANGED" ] && [ -z "$FORCE" ]; then
 fi
 
 echo "horizon-live update: $CUR -> $NEW (gating...)"
-if (cd themes/horizon/harness && SHOOT_CHROME= ./validate.sh); then
+# THE GATE'S OWN REPORT (172nd pass): the phase, the revision, the
+# seconds the gate took and, on a failure, the failing lines of its
+# output are written as JSON to a world-readable status file that the
+# running daemon serves under /health as version.update - so a box
+# whose gate fails or crawls is seen from anywhere, without the
+# journal (the 167th-171st sat unseen behind a gate for hours).
+STATUS=${UPDATE_STATUS:-/opt/horizon-live-update.status.json}
+GATE_LOG=${UPDATE_GATE_LOG:-/opt/horizon-live-update.gate.log}
+json_str() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\r' | awk 'BEGIN{ORS=""} NR>1{print "\\n"} {print}'; }
+write_status() { # phase rev startedAt seconds tail
+  printf '{"phase":"%s","rev":"%s","startedAt":"%s","gatedS":%s,"at":"%s","tail":"%s"}\n' \
+    "$1" "$2" "$3" "$4" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(json_str "$5")" >"$STATUS.tmp"
+  mv -f "$STATUS.tmp" "$STATUS"
+  chmod 644 "$STATUS" 2>/dev/null || true
+}
+STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+T0=$(date +%s)
+write_status gating "$NEW" "$STARTED_AT" 0 ""
+if (cd themes/horizon/harness && SHOOT_CHROME= ./validate.sh 2>&1 | tee "$GATE_LOG"); then
+  write_status deployed "$NEW" "$STARTED_AT" $(( $(date +%s) - T0 )) "$(grep -c '^\[ok\]' "$GATE_LOG" 2>/dev/null || echo 0) files passed"
   rm -rf /opt/horizon-live.prev
   [ -d /opt/horizon-live ] && cp -a /opt/horizon-live /opt/horizon-live.prev
   ./themes/horizon/server/install.sh
@@ -81,6 +100,7 @@ else
   # every five minutes (a retry after the cooldown above); the
   # RUNNING version is untouched
   echo "$NEW failed $(date +%s)" >"$STATE"
+  write_status failed "$NEW" "$STARTED_AT" $(( $(date +%s) - T0 )) "$(grep -aE '^\[FAIL\]|FAIL |Error|error' "$GATE_LOG" 2>/dev/null | tail -n 8)"
   echo "horizon-live update: GATE FAILED for $NEW - keeping current deploy (retry in ${RETRY_AFTER_S}s)" >&2
   exit 1
 fi

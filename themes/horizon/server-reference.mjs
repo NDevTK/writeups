@@ -106,6 +106,7 @@ import {
   budgetLeftMs,
   fetchBudgetMs,
   parseVersion,
+  parseUpdateStatus,
   UPSTREAM_BUDGET_MS,
   HOME_DEFAULT,
   parseHome,
@@ -1982,6 +1983,54 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     `the daemon calls ${called.length} builders (${called.join(', ')}), all ${unbound.length === 0 ? 'bound' : 'NOT bound: ' + unbound.join(', ')} ` +
       `and ${unexported.length === 0 ? 'all re-exported' : 'not re-exported: ' + unexported.join(', ')}; the ${served.length} served asks each name one` +
       (missing.length ? ` - MISSING ${missing.join(', ')}` : '')
+  );
+}
+
+{
+  // THE GATE'S OWN REPORT (172nd): update.sh writes its phase, revision,
+  // start, seconds and failing lines to a status file; the daemon reads
+  // it fresh under /health as version.update. The parser takes the
+  // file's shape and nothing else; the script's three phases and the
+  // daemon's read are guarded at source level like the ship list.
+  const okS = parseUpdateStatus(
+    '{"phase":"failed","rev":"abc123","startedAt":"2026-09-06T21:00:00Z","gatedS":3120,"at":"2026-09-06T21:52:00Z","tail":"[FAIL] glm-reference.mjs\\nError: x"}'
+  );
+  const gating = parseUpdateStatus(
+    '{"phase":"gating","rev":"abc123","startedAt":"2026-09-06T21:00:00Z","gatedS":0,"at":"2026-09-06T21:00:00Z","tail":""}'
+  );
+  const badPhase = parseUpdateStatus('{"phase":"resting","rev":"abc"}');
+  const junkS = parseUpdateStatus('not json');
+  const emptyS = parseUpdateStatus('');
+  const srcUpd = readFileSync(
+    new URL('./server/update.sh', import.meta.url),
+    'utf8'
+  );
+  const srcIdx = readFileSync(
+    new URL('./server/src/index.mjs', import.meta.url),
+    'utf8'
+  );
+  check(
+    "THE GATE'S OWN REPORT: the updater's status file parses to its phases and to nothing else, the script writes all three, the daemon serves it under /health",
+    okS !== null &&
+      okS.phase === 'failed' &&
+      okS.rev === 'abc123' &&
+      okS.gatedS === 3120 &&
+      okS.tail.startsWith('[FAIL] glm-reference.mjs') &&
+      okS.tail.includes('\n') &&
+      gating.phase === 'gating' &&
+      gating.gatedS === 0 &&
+      gating.tail === '' &&
+      badPhase === null &&
+      junkS === null &&
+      emptyS === null &&
+      /write_status gating "\$NEW"/.test(srcUpd) &&
+      /write_status deployed "\$NEW"/.test(srcUpd) &&
+      /write_status failed "\$NEW"/.test(srcUpd) &&
+      srcUpd.includes('/opt/horizon-live-update.status.json') &&
+      srcUpd.includes('tee "$GATE_LOG"') &&
+      srcIdx.includes("env.UPDATE_STATUS ?? '/opt/horizon-live-update.status.json'") &&
+      /update: updateStatus\(\)/.test(srcIdx),
+    `a failed report reads back (${okS.rev} after ${okS.gatedS} s, tail "${okS.tail.split('\n')[0]}"), a gating one with zero seconds, an unknown phase / junk / nothing as null; update.sh writes gating, deployed and failed to ${'/opt/horizon-live-update.status.json'} through a tee'd gate log, and index.mjs serves the file as version.update`
   );
 }
 

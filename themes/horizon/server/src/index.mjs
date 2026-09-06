@@ -709,6 +709,29 @@ export function parseVersion(text) {
     return {rev: null, installedAt: null};
   }
 }
+// The self-updater's status file (172nd pass): {phase, rev, startedAt,
+// gatedS, at, tail} as update.sh writes it; anything else reads as
+// null, never as a throw.
+export function parseUpdateStatus(text) {
+  try {
+    const v = JSON.parse(text);
+    if (!v || typeof v !== 'object') return null;
+    const phase = ['gating', 'deployed', 'failed'].includes(v.phase)
+      ? v.phase
+      : null;
+    if (!phase) return null;
+    return {
+      phase,
+      rev: typeof v.rev === 'string' && v.rev ? v.rev : null,
+      startedAt: typeof v.startedAt === 'string' ? v.startedAt : null,
+      gatedS: Number.isFinite(v.gatedS) ? v.gatedS : null,
+      at: typeof v.at === 'string' ? v.at : null,
+      tail: typeof v.tail === 'string' ? v.tail.slice(0, 2000) : ''
+    };
+  } catch {
+    return null;
+  }
+}
 export function originCheck(origin, allowed) {
   if (!origin) return {ok: true, acao: null};
   return allowed.includes(origin)
@@ -1559,8 +1582,24 @@ function main() {
   log(
     `version: ${VERSION.rev ? VERSION.rev.slice(0, 12) + ' installed ' + VERSION.installedAt : 'no VERSION file (a hand-run tree)'}`
   );
+  // THE GATE'S OWN REPORT (172nd pass): update.sh writes its phase
+  // (gating / deployed / failed), the revision, when it started, the
+  // seconds it took and the failing lines to a status file
+  // (UPDATE_STATUS, default /opt/horizon-live-update.status.json);
+  // /health carries it as version.update, read fresh each time (the
+  // file changes under the running daemon), null when there is none
+  const UPDATE_STATUS =
+    env.UPDATE_STATUS ?? '/opt/horizon-live-update.status.json';
+  const updateStatus = () => {
+    try {
+      return parseUpdateStatus(readFileSync(UPDATE_STATUS, 'utf8'));
+    } catch {
+      return null;
+    }
+  };
   const versionInfo = () => ({
     ...VERSION,
+    update: updateStatus(),
     // the products this box serves (a pageOnly ask is the page's own)
     products: L2_ASKS.filter((a) => !a.pageOnly).map((a) => a.id),
     node: process.versions.node

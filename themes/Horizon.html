@@ -6852,7 +6852,7 @@
           });
           const each = (id, val, dp) =>
             Number.isFinite(val)
-              ? `${id.toUpperCase()} ${dp === 0 ? val.toFixed(0) : dsiSigned(val, dp)}` +
+              ? `${id.toUpperCase()} ${id === 'li' || id === 'si' ? dsiSigned(val, dp) : val.toFixed(dp)}` +
                 (ag[id]
                   ? ` (${dsiSigned(ag[id].diff, dp === 0 ? 0 : 2)} from NOAA's${ag[id].withinAccuracy ? '' : `, past the ${A[id]} accuracy`})`
                   : '')

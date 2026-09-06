@@ -10345,6 +10345,141 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 172nd pass - THE TOWER'S CEILING
+  FROM ORBIT): the storm deck's top has been the balloon's parcel EL
+  since the sounding pass (applySounding, the ?el pin) and the hand
+  thickness wherever no fresh ascent lay within 300 km and 13 h - at
+  sea, most of the time. NOAA's derived stability indices and the
+  171st's own column give the scene two things: NOAA's reading of the
+  column's stability, and the parcel ascent through the satellite's
+  column from the station's MEASURED screen. THE PRIMARY (the Legacy
+  Soundings ATBD v3.1, Sec. 3.4.2 and Table 1.3, read): the lifted
+  index (Galway 1956) lifts the MEAN of the lowest 100 hPa (surface to
+  ps - 100) dry to its condensation level and moist to 500 hPa (Eq.
+  4-6; WLIFT5, to be replaced by SATLFT - Baker & Schlatter 1982's
+  iteration on the Wobus function, printed in full); CAPE integrates
+  from the surface level to the 57th level (100 hPa) on wet-bulb
+  potential temperatures with g 9.806 (Eq. 7-8); TT = (T850 - T500) +
+  (Td850 - T500) and KI = (T850 - T500) + Td850 - (T700 - Td700) on
+  levels interpolated from the 101-level ordinate (Eq. 3, 9, 10); SI
+  lifts the 850-hPa parcel the same way, and the text says of its own
+  SI "needs to be improved" (its polynomial refers to 1000 hPa). The
+  words: CAPE over 1000 "moderate", over 3000 "very large ... often
+  associated with strong/severe weather"; TT below 40-45 "little or no
+  thunderstorm activity", over 55 in the eastern and central United
+  States or 65 in the west "considerable severe weather"; SI under -3
+  "the possible condition for a severe weather"; KI over 30 "severe
+  weathers are very likely". Table 1.3: 10 km, quantitative to 67 deg,
+  CONUS 30 min; ranges LI -10..40, CAPE 0..5000, SI 4..-10, TT -43..56,
+  KI 0..40; ACCURACY LI 2 K, CAPE 1000 J/kg, SI 2 K, TT 1, KI 2;
+  PRECISION 6.5 K, 2500 J/kg, 6.5 K, 4, 5. THE FILE (ABI-L2-DSIC,
+  measured): LI, CAPE, TT, SI, KI as uint16 (scales 7.63e-4 from -10;
+  0.0763; 1.5718e-3 from -43; 5.3411e-4 from -10; 1.8312e-3 from
+  -70), fill 65535, CHUNKED 262 rows by the full width - any window
+  reads nearly the whole 0.9-MB file (8 ranges, 836 kB, measured);
+  the profiles' three flag words; final_air_pressure 500 hPa; the
+  scene's statistics as scalars. THE LAW (goesl2.js): DSI_ATBD;
+  dsiVerdict (the words at the thresholds, the western TT threshold
+  west of 105 W); lapIndicesFromRows (TT and KI on lapLevelAt's ln-p
+  levels); lapParcelRows (the adapter to sounding.parcelAscent: a
+  start row, then only the rows above it); lapMeanLayerStart (the
+  pressure-weighted mean temperature and dew point of the lowest 100
+  hPa, lifted from the layer's middle); lapStability (TT, KI, LI from
+  the mean-layer parcel, SI from the 850-hPa parcel, the mean-layer
+  CAPE, and THE TOWER: the station's screen temperature and dew point
+  lifted from the surface row through the column - the boundary
+  layer's real base under the retrieval's 3-5 km smear - or without a
+  station the column's own smeared surface, its source stated);
+  dsiAgreement (each index against NOAA's, within Table 1.3's
+  accuracy or not). sounding.parcelAscent now reads the parcel's and
+  the environment's temperatures at the lifted-index level (liK,
+  linear in ln p inside the crossing step; the Payerne pins
+  unchanged). THE DECODE, DAEMON, CLIENT: L2_DSI_SPEC and extras, the
+  nineteenth ask (a window at half width 1 on the 10-km grid),
+  l2DsiBody (the five as f32 in their units, the two flag windows,
+  the observer's field with its values, quality and verdict, the
+  nearest usable field, the census, the LI's ending level, the
+  scene's head), the bindings. THE PAGE: 'dsi' in the body products
+  (an older daemon's body is filled from the bucket); the column's
+  stability computed in goesL2ColumnNow from state.temp / state.dew;
+  applySatColumn writes state.stormTopM from the tower's EL where no
+  fresh ascent stands (null when the column is stable - the hand
+  thickness) and applySounding's clear falls back to it, so the storm
+  deck (WMO >= 80) tops at the satellite's EL through the terrain's
+  height mapping exactly as at the balloon's; the DSIC record; the
+  tower's words on the satellite column's line (source, start, CAPE
+  -> EL, LCL, LFC, LI) and "what it stands in for" naming the storm
+  deck's ceiling with the WMO code's verdict; the research line
+  "stability from orbit (ABI derived stability indices)": NOAA's five
+  with their words and the scene's head, then the profile's own five
+  with their differences from NOAA's and the accuracies. GATES:
+  goesl2-reference THE TOWER'S CEILING FROM ORBIT (the words at their
+  thresholds; TT and KI in closed form on an exact column; a linear
+  column's mean layer is its midpoint; a 12 / 0 C screen through a
+  synthetic column builds no tower and a 32 / 24 C one 7,841 J/kg to
+  11.8 km; THE REAL FIELD - a 6 x 6 DSIC crop of the profile crops'
+  own scan and field, dsi-fixture.js, h5py's values: the file's
+  counts unscale to h5py's, and the 171st's column re-derives TT
+  52.337 vs NOAA's 52.331, KI 29.235 vs 29.234, LI -2.32 vs -2.74,
+  mean-layer CAPE 289 vs 347, SI -2.31 vs -1.13 - every index inside
+  Table 1.3's accuracy, the discrete-level ones a hundred times
+  inside it); goesl2-client-reference THE INDICES, READ BY RANGE (the
+  crop over the range-honouring fake bucket: the body's five to the
+  hundredth, the words, the census, the head); server-reference (the
+  nineteen asks, eighteen served, thirteen untimed; THE GATE'S OWN
+  REPORT). Docs: server README (the eighteenth product, the
+  nineteenth ask, the gate's report); FINDINGS pass 172 (148 files,
+  1,193 landmarks). MEASURED in the page (the western Gulf, 25.87 N
+  93.71 W, the 21:42Z scan through the local daemon; open-meteo 29.5 /
+  25.7 C, clear): "satellite column ... the tower from the station's
+  screen temperature and dew point (29.5 / 25.7 C at 1013 hPa): CAPE
+  3848 J/kg -> EL 14576 m (LCL 489 m, LFC 744 m, lifted index -7.6 K)
+  - what it stands in for: the freezing level ... and the storm deck's
+  ceiling at the parcel's EL 14576 m (no shower or thunder code now,
+  WMO 0: the deck keeps its own top)"; "stability from orbit ... LI
+  -4.7 K (unstable) - CAPE 1048 J/kg (moderate potential energy) - TT
+  42.8 (little or none) - SI +3.8 K (no severe signal) - KI 26.5 - the
+  scene: mean CAPE 428 J/kg (max 1992), mean LI -1.0 K over 73,031
+  attempted retrievals - from the profile itself: LI -4.7 (+0.06 from
+  NOAA's) - CAPE 1870 (+822) - TT 42.8 (-0.01) - SI +1.6 (-2.17, past
+  the 2 accuracy) - KI 26.5 (-0.00)". FINDINGS: over the open Gulf the
+  lifted index, the total totals and the K index re-derived from the
+  profile match NOAA's own product to 0.06, 0.01 and 0.00 K - the
+  profile the page carries reproduces NOAA's derived product; the
+  mean-layer CAPE differs by 822 J/kg (inside the ATBD's 1000
+  accuracy; CAPE's precision requirement is 2500 - the integral is
+  the parcel path's, and NOAA's wet-bulb SATLFT path is not the
+  pseudo-adiabat) and the Showalter index by 2.2 K, which the ATBD's
+  own text foretells; the station's surface parcel (29.5 / 25.7 C
+  over 29.5 C water) carries 3,848 J/kg to 14.6 km against the mean
+  layer's 1,048-1,870 - the drawn tower is the afternoon's surface
+  parcel, and the line says so. MEASURED under a shower deck (Savannah,
+  32.08 N 81.10 W, open-meteo "showers", 98% cloud, the same scan): "no
+  usable field of regard in the 3 x 3 (invalid: insufficient clear
+  pixels in the field of regard; 0 good, 0 degraded, 9 cloud of 9) -
+  what it stands in for: nothing - the balloon stands (CHARLESTON 135
+  km, 10 h old)" and the balloon's own "CAPE 326 J/kg -> EL 8762 m"
+  tops the storm deck as before: under the storm itself the retrieval
+  has no clear fifth of any field, so the satellite's ceiling comes
+  at a storm's edge or from the balloon - stated; a wider profile
+  window (the 3 x 3 is 30 km; a storm's anvil covers it) is the
+  obvious next lead, at two to three more chunks a file. THE GATE'S
+  OWN REPORT (the same
+  pass): the box was found at 21:48Z still on the 166th's revision
+  (installed 20:25Z) with the 167th-171st pushed since - an e2-micro's
+  gate is the better part of an hour per revision, and a failure
+  there is invisible without the journal - so update.sh now writes
+  its phase (gating / deployed / failed), the revision, the start,
+  the seconds and the failing lines (the gate tee'd to a log) as JSON
+  to /opt/horizon-live-update.status.json and the daemon serves it
+  fresh under /health as version.update (parseUpdateStatus; the first
+  deploy with the new script cannot report its own gate, every later
+  one does). STATED LIMITS: the parcel's environment in the lowest
+  kilometres is the retrieval's smear (the LFC and any CIN the least
+  trustworthy parts; the EL, set aloft where the retrieval is good to
+  1 K, the most); the storm deck reads the EL only on shower and
+  thunder codes; NOAA's CAPE is a different parcel and path, printed
+  beside the page's, never merged.
 - DONE (Sep 6, the review session's 171st pass - THE COLUMN FROM
   ORBIT, ABOVE THE BOUNDARY LAYER): the scene's upper air has been the
   nearest balloon's since the sounding pass - and at sea the nearest
