@@ -10345,6 +10345,85 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 173rd pass - THE TOPS FROM ORBIT):
+  NOAA's cloud-top heights (ABI-L2-ACHAC) have been served since the
+  148th and only PRINTED - the census median on the NOAA L2 line -
+  while the decks' tops came from the theme's own band-13 field (the
+  sea's low and mid decks), the VIIRS census (up to two days old) and
+  the balloon's parcel EL on storm codes. THE PRIMARY, read in full:
+  the GOES-R ABI Cloud Height Algorithm (ACHA) ATBD v3.0 (Heidinger,
+  NOAA/NESDIS, July 2012, 79 pp): the CO2/split-window merger of the
+  GOES-NOP CO2 slicing and the AVHRR split window - optimal
+  estimation (Rodgers 1976; up to 10 iterations) of the cloud
+  temperature, the 11-um emissivity and beta(12/11) on the 11, 12 and
+  13.3-um channels, whose Jacobians the document prints (Eq. 13-22),
+  the a priori by cloud type (Table 3: opaque types start at the 11-um
+  brightness temperature with sigma 10 K, cirrus at the tropopause
+  minus 15 K with 20 K; beta 1.1 ice / 1.3 water), the forward-model
+  uncertainty (Table 4: 1 / 1.5 / 5 K instrument / ocean / land on the
+  11-um temperature), the local radiative centre (the gradient filter
+  toward the cloud's opaque interior, Pavolonis), the multi-layer
+  lower boundary at 2 km, the pixel order (radiative centres, water,
+  multi-layer, the rest); Sec. 1.11.2.7: Tc to height through the NWP
+  temperature profile (linear, constrained to the surface and the
+  tropopause), and under a LOW-LEVEL INVERSION (any layer below 700
+  hPa and 50 hPa above the surface warmer than the one below it; a
+  water cloud over water) by the dry-adiabatic 9.8 K/km from the
+  surface temperature - "this issue plagues all infrared cloud height
+  algorithms" (goesir.js's own rule since the 143rd); Sec. 1.11.2.8:
+  the ISCCP layers, high Pc < 440 hPa, low Pc > 680 hPa; Sec.
+  1.11.3.1: the 10-km CONUS product is the mean of the good 2-km
+  pixels of a 5 x 5 block. TABLE 1 (F&PS v2.2): CONUS cloud top height
+  10 km (5 km mapping), ACCURACY 500 m and PRECISION 1500 m for clouds
+  with emissivity > 0.8, quantitative to 62 deg local zenith, day and
+  night, refresh 60 min in Mode 3 (the bucket scans CONUS every 5 min
+  now); the layer flag 80% correct. TABLE 6 (against CALIPSO, four
+  seasons of SEVIRI as proxy, low clouds with emissivity > 0.8): bias
+  -0.0002 km, standard deviation 0.94 km against the 1.5-km spec (the
+  temperature -0.22 / 4.75 K, the pressure -0.02 / 94 hPa); the
+  height-based layer flag's POD 91.4%; the drivers named: low-level
+  inversions, the 13.3-um channel's characterisation, multi-layer
+  cloud; and Sec. 2.2.1.2.1: the precision for optically thin cirrus
+  is the other concern. THE LAW (goesl2.js): ACHA_ATBD (the numbers
+  above), ACHA_DQF_WORDS (the file's 0 good / 1 marginal / 2 attempted
+  / 3 bad / 4 opaque), heightBands (the window's good tops by ISCCP
+  layer with the CALLER's 680- and 440-hPa heights, the medians and
+  counts per layer, the tallest tenth and the tallest; the median the
+  display's own single-slab reduction, as cloudtop.js says). THE PAGE:
+  goesL2TopsNow censuses the served +-100 km window (21 x 21 fields)
+  with the band edges of the column the scene trusts - the fresh
+  balloon's 680/440-hPa heights, else the satellite column's (171st),
+  else ISA's 3,240 / 6,508 m: the VIIRS census's own rule - memoised
+  per file and edges, null past 30 min; the decks' RANKING, stated in
+  the code and on the line: the theme's own opaque tops where they
+  cover 5% of the measured sea (goesir.js, the pier's column), then
+  NOAA's ACHA layer median (three good fields or more), then the VIIRS
+  census, then the hand; the cirrus level the same without a theme
+  field; on shower and thunder codes the storm slab tops at the
+  window's TALLEST TENTH when ten good fields stand - the storms in
+  view are measured, the parcel's EL (172nd) is what they could reach
+  - the EL otherwise, the ?el pin over both; the record "NOAA GOES-19
+  cloud tops by layer (ACHAC)"; the research line "cloud tops from
+  orbit (ABI cloud top height)" with the bands, the tallest tenth,
+  what the decks read now and the ATBD's numbers. GATE:
+  goesl2-reference THE TOPS FROM ORBIT (the ATBD's accuracy and
+  precision; the bands on a synthetic window of ten with a marginal
+  pixel and a fill skipped - 3 / 1 / 4, medians 1200 / 3300 / 9000,
+  the tallest tenth 11000; the vendored ACHAC file's home window, 21 x
+  21 fields at column 424 row 127, against a plain count written in
+  the gate: 340 good tops of 441 - 181 low, median 1,803 m; 77 mid,
+  4,149 m; 82 high, 9,340 m; the tallest tenth 9,650 m, the tallest
+  13,448 m - to the pixel; h5py's sample count at (200, 100) unscales
+  to 3,512.9 m). Docs: FINDINGS pass 173 (148 files, 1,194 landmarks),
+  README (the height product's use). STATED LIMITS: a 10-km field is a
+  5 x 5 block mean of 2-km tops, so a lone tower's top is smeared with
+  its neighbours (the tallest tenth of the window is the storm's, the
+  tallest field is not a single cell's); thin cirrus tops carry the
+  ATBD's own caution, and the cirrus level takes the high-band MEDIAN,
+  not the tallest; a low deck under a low-level inversion is the dry
+  lapse's height, as the ATBD says - and the theme's own field, which
+  applies the same rule with the pier's measured column, stays ahead
+  of it where it covers 5% of the sea.
 - DONE (Sep 6, the review session's 172nd pass - THE TOWER'S CEILING
   FROM ORBIT): the storm deck's top has been the balloon's parcel EL
   since the sounding pass (applySounding, the ?el pin) and the hand
