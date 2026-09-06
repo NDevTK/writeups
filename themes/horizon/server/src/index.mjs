@@ -2298,11 +2298,23 @@ function main() {
     'https://mrms.ncep.noaa.gov/2D/EchoTop_18/MRMS_EchoTop_18.latest.grib2.gz';
   const MRMS_REFRESH_MS = MRMS_FACTS.cadenceS * 1000;
   const MRMS_HALF_CELLS = 50;
-  const mrmsHeld = {at: 0, buf: null, header: null, bytes: 0, error: null, fetchedAt: null};
+  const mrmsHeld = {at: 0, buf: null, header: null, bytes: 0, error: null, fetchedAt: null, refreshing: null};
   const mrmsCache = new Map(); // "j,i" -> {refTime, body}
-  async function mrmsRefresh(deadline) {
+  // A request never waits for NCEP while a file is held: a due refresh
+  // runs in the background and the held file (at most one cadence
+  // old) answers now - measured: the page's 20-s fetch aborted while
+  // the first request after a cadence paid the 1.7-MB upstream read.
+  // Only the very first request awaits the fetch.
+  function mrmsRefresh(deadline) {
     if (Date.now() - mrmsHeld.at < MRMS_REFRESH_MS) return mrmsHeld;
+    if (mrmsHeld.refreshing) return mrmsHeld.buf ? mrmsHeld : mrmsHeld.refreshing;
     mrmsHeld.at = Date.now();
+    mrmsHeld.refreshing = mrmsFetch(deadline).finally(() => {
+      mrmsHeld.refreshing = null;
+    });
+    return mrmsHeld.buf ? mrmsHeld : mrmsHeld.refreshing;
+  }
+  async function mrmsFetch(deadline) {
     try {
       const r = await fetch(MRMS_URL, {
         signal: AbortSignal.timeout(

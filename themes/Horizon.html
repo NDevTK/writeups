@@ -13061,7 +13061,10 @@
         try {
           const r = await fetch(
             `${MRMS_PROXY}?lat=${state.lat.toFixed(3)}&lon=${state.lon.toFixed(3)}`,
-            {signal: AbortSignal.timeout(20000)}
+            // the daemon's first read of a file pays NCEP's 1.7 MB;
+            // later asks answer from the held file in well under a
+            // second (measured: a 20-s limit aborted the first)
+            {signal: AbortSignal.timeout(45000)}
           );
           if (r.status === 404) {
             mrmsDaemonLacks = true; // an older daemon

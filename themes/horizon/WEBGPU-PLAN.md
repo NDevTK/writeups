@@ -10452,7 +10452,28 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   SHIP LIST, WHOLE holds every '../../X.js' import of index.mjs (20) to
   both halves - the 158th's lesson completed. Docs: server README
   (/mrms; the third deploy lesson), FINDINGS pass 174 (149 files, 1,197
-  landmarks). STATED LIMITS: the documentation gap above; the window is
+  landmarks). MEASURED in the page (Savannah, 32.08 N 81.10 W, 18:35
+  local, open-meteo drizzle - no shower code - under the evening's
+  storms): "the radar's storm tops (MRMS echo top) - NCEP MRMS
+  EchoTop_18 ...: 22:26Z - 7,679 cells with an 18-dBZ echo of 10,201
+  covered within +-50 km - tops median 9.0 km, tallest tenth 11.0 km,
+  tallest 13.0 km at 36 deg and 57 km - 5441 cells at or above 8 km -
+  overhead 11.0 km - what it feeds now: the towering deck (a storm at
+  or above 8 km in view though the station reports none); the tallest
+  storm 13.0 km at 36 deg and 57 km" beside the ACHA line's "what they
+  feed now: the storm deck's slab (the tallest tenth)" - the radar's
+  storms made the deck towering with no shower code at the station,
+  and the slab topped at ACHA's tallest tenth (14,031 m) by the
+  ranking, the radar's 13-km echo top the fallback it did not need;
+  the record two minutes later read a newer file (22:28Z: the tallest
+  14.0 km at 81 deg and 45 km) - the storms move between files, and
+  the line and the record can differ by one cadence, stated. At
+  Charlotte the first probe's radar fetch aborted at the page's 20-s
+  limit: the daemon had made the request wait for NCEP's 1.7 MB (a
+  refresh due at the 2-minute cadence, paid by whoever asked first) -
+  fixed the same hour: a due refresh runs in the background and the
+  held file answers at once (only the very first request ever waits),
+  and the page allows 45 s for that one. STATED LIMITS: the documentation gap above; the window is
   +-50 km on a 1-km grid (the storms beyond it are the satellite's);
   the tallest echo top is one cell's, not a storm's mean; 8 km is the
   theme's threshold, not MRMS's; the towers are drawn as the deck's
