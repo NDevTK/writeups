@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1197 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1198 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **149 reference files, 1197 landmark lines, 8 GPU probes** (live gate
+- **149 reference files, 1198 landmark lines, 9 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1278,7 +1278,46 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    km, 11.0 km overhead: the deck went towering on the radar's storms
    alone and its slab topped at ACHA's tallest tenth, 14.0 km, by the
    stated ranking (`mrms-reference` THE PNG ROWS, THE ECHO TOP, READ;
-   `server-reference` THE SHIP LIST, WHOLE)
+   `server-reference` THE SHIP LIST, WHOLE). Pass 175 puts the towers
+   at their places: the radar's cells become the low deck's per-texel
+   TOP field (`mrms.echoTopField`, 64 × 64 texels over the deck's
+   16-km world, 250 m a texel) — every echoing cell within the deck's
+   ±9 km is kept by the daemon whatever its top (the tallest cells
+   beyond it still capped at 300), each cell's 1-km footprint rises to
+   its own echo top and its flank falls at the theme's stated 2:1
+   slope beyond the footprint, the taller value keeping a texel, and
+   the cloud shader's slab top becomes local: the field's top where it
+   stands above the deck's ordinary top, that ordinary top wherever
+   the field is lower or absent (the 18-dBZ echo top is the
+   precipitation core's top, a lower bound on the cloud's), an echoing
+   footprint's cover lifted to cloud outright and a flank's as it
+   rises; the sampled top is un-premultiplied (R/A) so the linear
+   filter never dips a tower's edge toward the ground. The field
+   rebuilds on a new file, place or datum and clears when the file
+   ages out or a pin stands; the decks now activate on measured towers
+   alone under a station reporting a clear sky. Gated: the reference
+   recomputes a 16 × 16 field texel by texel from the rule (109 texels
+   from three storms: a 12-km core over a 9-km one, its flank at 11 km
+   beating an 8.2-km neighbour's own core, 9 at 1.5 km, 7.757 on the
+   diagonal, 1 at 5.5 km, nothing at 6.5 km, a storm 20 km out and a
+   km-0 entry skipped), the vendored crop's 623 kept cells paint 3,024
+   texels of a 60-km field with the tallest at its own scene y, and a
+   GPU probe reads the cloud shadow's optical depth east and west of a
+   synthetic field (towers to 60 carry 17.8 of mean tau on the east
+   half and none west, towers to 40 carry 7.2, a flank below the
+   deck's ordinary top adds nothing, a measured core at the same
+   height is cloud at that ordinary top, the cleared field is empty).
+   Live on the Georgia coast (31.65 N, 81.25 W, 23:19Z, the 23:16Z
+   file) under a station reporting no shower: 6,916 echoing cells
+   within ±50 km, 81 within the deck's ±9 km, the field 105 cells
+   (with the far flanks reaching in) on 3,518 of the deck's 3,844
+   texels, the tallest 13.0 km standing at its own place, the tops
+   10-12 km to the south 6-10 km off. STATED: the flank between the
+   last echoing cell and the deck is the theme's rule (a cumulonimbus
+   wall is steep, not vertical); the field's 250-m texels quantise
+   the radar's 1-km cells; the cloud around and above the
+   precipitation core is not measured here (`mrms-reference` THE
+   TOWERS' FIELD; the `towers` GPU probe)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

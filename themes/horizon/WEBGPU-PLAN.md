@@ -10345,6 +10345,98 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 175th pass - THE TOWERS AT THEIR
+  PLACES): the 174th's named lead. The radar's cells are now the low
+  deck's per-texel TOP field, so a tower stands at its bearing and
+  distance at its measured height the way the rain shafts do, instead
+  of the whole slab rising to the tallest echo top in the window. THE
+  DAEMON (mrms.js echoTopCensus): the storms list keeps every echoing
+  cell within the deck's own +-9 km (roam.js's DEM_HALF_M 8 km plus a
+  cell) WHATEVER its top - the flanks below 8 km matter to the field
+  as much as the cores above it - tallest first, then the cells at or
+  above 8 km beyond, tallest first, capped at 300 (stormsNear counts
+  the first kind; a first cut kept only the tallest 300 of the window
+  and at Savannah, with 5,168 cells at or above 8 km, that dropped
+  most of the cells near the observer - measured, then changed). THE
+  LAW (mrms.js echoTopField): a 64 x 64 RGBA float32 field over the
+  deck's 16-km world (250 m a texel): a texel's top is the tallest over
+  every cell of the cell's echo top less the flank's fall - 2 m of top
+  a metre beyond the cell's 1-km footprint (MRMS_FLANK_SLOPE, a
+  63-degree wall: the theme's own rule, stated) - painted where that
+  stands above the ground (A 1), a texel centre on a footprint marked
+  as measured (G 1), R the top through the page's height mapping,
+  maxTop the tallest value AS STORED (float32) so the march bound set
+  from it is never under the field. The first cut painted only the
+  footprints at their own tops with the neighbours untouched: the
+  render showed the towers as hard-edged boxes (a 14-km core beside
+  the deck's 5-km top over one 250-m texel) - the flank rule replaced
+  it the same hour. THE SHADER (clouds-tsl.js): the deck's slab top is
+  local (topAt) - the field's top where it stands above the deck's
+  ordinary top (a new yTopBase uniform per deck; the low deck's is the
+  measured low-band median or the hand thickness, the mid deck's its
+  own top since the field never reaches it), that ordinary top
+  wherever the field is lower or absent (the 18-dBZ echo top is the
+  precipitation core's top, a LOWER bound on the cloud's), and yTop is
+  then only the march's bound; the sampled top is un-premultiplied
+  (R/A: the linear filter averages R and A separately, so a raw mix
+  dipped every tower's edge toward zero - found by reading the
+  shader, fixed before it was seen); coverAt lifts an echoing
+  footprint's cover to the radar cap (cloud outright) and a flank's as
+  it rises above the ordinary top (full over 4 scene units), so the
+  towers stand under a station reporting a clear sky; slabFront,
+  marchSlab, the sun taps and the shadow map's deckTau all read the
+  local top; the 1x1 zero default with uTopOn 0 keeps the pinned
+  harness identical. THE PAGE: applyRadarTops builds the field keyed
+  on the file, the place and the datum (a frame's call is a string
+  compare) and clears it when the file ages out or a pin stands; the
+  decks activate on measured towers alone (towersOn joins cLow, cMid
+  and goesOn in both gates); the radar line says what it painted ("the
+  towers painted: N echoing cells on M texels of the low deck (+-8 km,
+  each cell's own top, its flank at the stated 2:1 slope, the deck's
+  ordinary top wherever the field is lower), the tallest K km standing
+  at its own place", or that no cell is within reach and the whole
+  slab keeps the ranking's top; an older daemon's tallest-300 list is
+  named as such). GATED: mrms-reference THE TOWERS' FIELD recomputes a
+  16 x 16 field texel by texel from the rule (109 texels from three
+  storms: a 12-km core over a 9-km one, its flank at 11 on the
+  neighbours beating an 8.2-km storm's own core on texel 11, 9 at 1.5
+  km, 7.757 on the diagonal, 1 at 5.5 km, nothing at 6.5 km, the ring
+  zero, a storm 20 km out and a km-0 entry skipped) and paints the
+  vendored crop's 623 kept cells onto 3,024 texels of a 60-km field
+  with the tallest at its own scene y; THE ECHO TOP, READ holds the
+  near-first list to the window's own counts by hand (323 echoing
+  cells within +-9 km, 245 of them at or above 8 km, then the tallest
+  300 beyond; a 16-km field takes the near cells and the far flanks
+  reaching in); the GPU probe tsl-towers-probe.html reads the cloud
+  shadow's tau map east and west of a synthetic field (towers to 60:
+  east mean 17.8, west 0; to 40: 7.2; a flank to 20 under a base top
+  of 30: 0; a core to 20: 2.5 - cloud at the ordinary top; cleared: 0;
+  no device error). Docs: server README (/mrms: the near cells, the
+  page's field), FINDINGS pass 175 (149 files, 1,198 landmarks, 9 GPU
+  probes). MEASURED in the page (the Georgia coast, 31.65 N 81.25 W,
+  19:19 local, the station reporting no shower, the 23:16Z file):
+  "6,916 cells with an 18-dBZ echo of 10,201 covered within +-50 km -
+  tops median 8.5 km, tallest tenth 10.5 km, tallest 13.2 km at 141
+  deg and 24 km - 4177 cells at or above 8 km - nothing overhead -
+  what it feeds now: the towering deck ...; the towers painted: 105
+  echoing cells on 3518 texels of the low deck (+-8 km, ...), the
+  tallest 13.0 km standing at its own place" - 81 echoing cells within
+  the deck's +-9 km in the body (the tops 1-12 km; the 10-12 km cells
+  6-10 km off to the south at 130-215 deg), the far flanks reaching in
+  from beyond the box, the field's row through the tallest texel
+  falling 0.5 km a texel from a 12-km core as the rule says. STATED
+  LIMITS: the flank is the theme's rule, not a measurement; the
+  field's 250-m texels quantise the radar's 1-km cells (a cell is a
+  4 x 4 plateau); the cloud above and around the precipitation core -
+  the anvil, the turrets - is not measured here, so the towers are
+  precipitation cores with 63-degree walls; the mid deck takes no
+  field; the deck's world is +-8 km (the storms beyond it stand only
+  as the ranking's slab top, or not at all when the station reports
+  no cloud and none is within reach). The named next lead: the
+  satellite's top OVER the radar's core - ACHA's cloud-top height at a
+  tower's own 10-km pixel (already read, 21 x 21 of them) as the
+  texel's top where it stands above the echo top, so a tower rises to
+  its measured anvil rather than its precipitation core.
 - DONE (Sep 6, the review session's 174th pass - THE RADAR'S OWN
   HEIGHTS): the scene's storms had heights from orbit (ACHA's tops,
   173rd; the parcel's EL, 172nd) and rain from RainViewer's composite
