@@ -63,7 +63,12 @@ Pieces:
 Fixture site layout (not in the repo; rebuild per WEBGPU-PLAN.md):
 `site/` mirrors the published site with `/tiles/{z}/{x}/{y}.png`
 terrarium fixtures and `osm-fixtures.js`, served by
-`python3 -m http.server 8901`.
+`python3 -m http.server 8901`. The probe pages import the theme's
+modules and the vendored three through `./writeups/themes/horizon/...`,
+so this directory carries a git-ignored symlink to the repo root
+(`ln -s /home/user/writeups themes/horizon/harness/writeups`); without
+it every GPU probe 404s quietly into a `no-capture` (measured in the
+157th pass after a fresh clone).
 
 ## Asset viewer (design loop)
 
