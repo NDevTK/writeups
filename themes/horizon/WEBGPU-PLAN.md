@@ -10345,6 +10345,59 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 166th pass - THE INVERTED
+  REFERENCES): the rule the home's scheduled A/B asked for. The
+  daylight field (159th-160th) cuts the decks' 2-km cover by each
+  500-m pixel's reflectance between two references read from the
+  scene itself - the clear median and the cloud's coverage edge
+  (Otsu's threshold or the dim tenth). MEASURED at the home at
+  18:17Z under a high deck (the sea 100% high, ACHA's median top
+  9.7 km): NOAA's mask called 159,745 of 160,801 pixels cloudy and
+  left 1,056 "clear" - pixels at cloud edges, their median rho
+  0.765 ABOVE the cloud's dim tenth 0.480 (the bright p90 0.820).
+  A fraction between such references runs backwards (a pixel
+  darker than "clear" would read as cloud over 100%), and the
+  159th's rule had no name for it: the cut found nothing to shape
+  (0 of 4,032) and said only "none took a fraction". THE RULE:
+  visReferences (goesl2.js) marks the pair INVERTED when the clear
+  median is at or above the coverage edge - mode 'inverted', both
+  values kept for the words; daylightField (daylight.js) takes its
+  no-reference return on it (no fine field, no fraction, the 2-km
+  cover whole); the page's line reads "band 2 HH:MMZ read (N px
+  lit) but the references are inverted: the clear median rho X (M
+  px the ACM calls clear) sits at or above the coverage edge rho Y
+  of K cloudy px - the few clear pixels under a high deck sit at
+  cloud edges, and a fraction between them would run backwards: the
+  2-km field stands alone", the debug line the same. GATES:
+  goesl2-reference THE DAYLIGHT FIELD (the same synthetic pixels
+  with the kinds swapped: clear 0.653 above the edge 0.060, mode
+  'inverted', the honest pairs not; 16); daylight-reference THE
+  INVERTED PAIR (the mask's kinds swapped on the composed fixture:
+  the clear median 0.350 over 29,776 px above the edge 0.050 of
+  127,357 "cloudy" px, no fine field, no fraction, the same 159,143
+  pixels lit; 3). Docs: FINDINGS pass 166 (147 files, 1,176
+  landmarks). Also in this pass: the rain shafts' sides fade (full
+  over the middle 70% of the curtain, to nothing at the edges) after
+  the Houston frame (18:50Z, looking 296° at 10°) showed the 6-km
+  curtain as a hard-edged grey-blue wall from the sky to the ground
+  across two thirds of the view, the building and trees dim behind
+  it and the observer's own rain falling - the 165th's visual,
+  recorded. MEASURED in the page (the home, 18:5xZ, the sun 29° from
+  the zenith, the high deck still over the window): "band 2 18:47Z
+  read (160,801 px lit) but the references are inverted: the clear
+  median rho 0.820 (416 px the ACM calls clear) sits at or above the
+  coverage edge rho 0.527 of 160,385 cloudy px - the few clear
+  pixels under a high deck sit at cloud edges, and a fraction
+  between them would run backwards: the 2-km field stands alone",
+  and the next cut four minutes later "references inverted (clear
+  0.840 at or above the coverage edge 0.521 over 320 clear px)" -
+  the mask's clear count falling from 1,056 to 416 to 320 as the
+  deck thickened, their reflectance rising, the rule holding each
+  time. The softened curtain's own frame is not yet had: the second
+  Houston probe caught the canopy before the scene's light settled
+  (the proxy answering 502 for minutes) - the 18:50Z frame stands as
+  the curtains' record, the soft sides verified by the gate's
+  page-wiring and owed a frame.
 - DONE (Sep 6, the review session's 165th pass - THE RAIN SHAFTS):
   the rain the satellite measures, seen falling where it falls. The
   164th's raining pixels within 100 km of the view (goesl2.rainList,

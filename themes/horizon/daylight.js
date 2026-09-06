@@ -214,7 +214,11 @@ export function daylightField({
       : null;
   if (!clearOf) return null;
   const refs = visReferences(refl.rho, clearOf, {minN});
-  if (refs.rhoClear === null || refs.rhoCloud === null) {
+  // no reference at all: too few of either, or the pair INVERTED
+  // (the clear median at or above the coverage edge - the mask's few
+  // clear pixels at cloud edges under a high deck; 166th) - the 2-km
+  // cover stands whole and the caller says why
+  if (refs.rhoClear === null || refs.rhoCloud === null || refs.inverted) {
     return {
       fine: null,
       frac: null,

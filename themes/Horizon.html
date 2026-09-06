@@ -7400,15 +7400,21 @@
               `daylight: cut in ${cutMs} ms - ` +
                 (res && res.fine
                   ? `${res.fine.refined} of ${res.fine.cloudy} fine texels shaped, references ${res.refs.rhoClear.toFixed(3)}/${res.refs.rhoCloud.toFixed(3)} (${res.refs.mode}, eta ${res.refs.eta.toFixed(2)}) under the ${res.sortedBy}`
-                  : res
-                    ? `references thin (${res.refs.nClear} clear, ${res.refs.nCloud} cloudy)`
-                    : 'nothing lit')
+                  : res && res.refs.inverted
+                    ? `references inverted (clear ${res.refs.rhoClear.toFixed(3)} at or above the coverage edge ${res.refs.rhoCloud.toFixed(3)} over ${res.refs.nClear} clear px) - the 2-km cover stands`
+                    : res
+                      ? `references thin (${res.refs.nClear} clear, ${res.refs.nCloud} cloudy)`
+                      : 'nothing lit')
             );
           if (!res || !res.fine) {
             daylight = null;
             daylightReach = res
-              ? `band 2 ${vis.time.slice(11, 16)}Z read (${res.stats.lit.toLocaleString('en-US')} px lit) but the references are thin ` +
-                `(${res.refs.nClear} clear, ${res.refs.nCloud} cloudy px under the ${res.sortedBy === 'ACM' ? 'ACM' : "theme's field"}): the 2-km field stands alone`
+              ? res.refs.inverted
+                ? `band 2 ${vis.time.slice(11, 16)}Z read (${res.stats.lit.toLocaleString('en-US')} px lit) but the references are inverted: the clear median ρ ${res.refs.rhoClear.toFixed(3)} ` +
+                  `(${res.refs.nClear.toLocaleString('en-US')} px the ${res.sortedBy === 'ACM' ? 'ACM' : "theme's field"} calls clear) sits at or above the coverage edge ρ ${res.refs.rhoCloud.toFixed(3)} ` +
+                  `of ${res.refs.nCloud.toLocaleString('en-US')} cloudy px - the few clear pixels under a high deck sit at cloud edges, and a fraction between them would run backwards: the 2-km field stands alone`
+                : `band 2 ${vis.time.slice(11, 16)}Z read (${res.stats.lit.toLocaleString('en-US')} px lit) but the references are thin ` +
+                  `(${res.refs.nClear} clear, ${res.refs.nCloud} cloudy px under the ${res.sortedBy === 'ACM' ? 'ACM' : "theme's field"}): the 2-km field stands alone`
               : `band 2 ${vis.time.slice(11, 16)}Z read but nothing lit: the 2-km field stands alone`;
             cloudSys.setGoesCover(
               goesObs.deck.data,
@@ -7594,17 +7600,8 @@
           rainShafts = null;
           return null;
         }
-        const list = rainShaftsNear(rn.list, state.lat, state.lon, {
-          maxKm: 100,
-          cap: 160,
-          minMmH: 0.2
-        });
-        rainShafts = {
-          at: Date.now(),
-          time: rn.time,
-          list,
-          summary: rainShaftsSummary(list)
-        };
+        const list = rainShaftsNear(rn.list, state.lat, state.lon, {maxKm: 100, cap: 160, minMmH: 0.2});
+        rainShafts = {at: Date.now(), time: rn.time, list, summary: rainShaftsSummary(list)};
         return rainShafts.summary;
       }
       const shaftWords = (sm) =>
@@ -15279,10 +15276,7 @@
       let shaftCount = 0;
       function updateRainShafts() {
         const list = rainShafts && rainShafts.list;
-        const fresh =
-          list &&
-          list.length &&
-          Date.now() - Date.parse(rainShafts.time) < 25 * 60e3;
+        const fresh = list && list.length && Date.now() - Date.parse(rainShafts.time) < 25 * 60e3;
         if (!fresh) {
           if (shaftMesh) shaftMesh.visible = false;
           return;
@@ -15293,31 +15287,21 @@
             scene.remove(shaftMesh);
             shaftMesh.geometry.dispose();
           }
-          const posAttr = new THREE.InstancedBufferAttribute(
-            new Float32Array(n * 3),
-            3
-          );
-          const sclAttr = new THREE.InstancedBufferAttribute(
-            new Float32Array(n * 2),
-            2
-          );
-          const opAttr = new THREE.InstancedBufferAttribute(
-            new Float32Array(n),
-            1
-          );
+          const posAttr = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+          const sclAttr = new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 2);
+          const opAttr = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
           const mat = new THREE.SpriteNodeMaterial();
           mat.transparent = true;
           mat.depthWrite = false;
           mat.positionNode = instancedBufferAttribute(posAttr);
           mat.scaleNode = instancedBufferAttribute(sclAttr);
           const grad = uv().y.mul(0.35).add(0.65); // denser toward the base
+          // the curtain's sides fade (a rain shaft has no wall): full
+          // over the middle 70%, to nothing at the edges
+          const edge = uv().x.sub(0.5).abs().smoothstep(0.35, 0.5).oneMinus();
           mat.colorNode = aerial.encodeFog(tslVec3(0.5, 0.56, 0.62));
-          mat.opacityNode = instancedBufferAttribute(opAttr).mul(grad);
-          shaftMesh = new THREE.InstancedMesh(
-            new THREE.PlaneGeometry(1, 1),
-            mat,
-            n
-          );
+          mat.opacityNode = instancedBufferAttribute(opAttr).mul(grad).mul(edge);
+          shaftMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat, n);
           shaftMesh.frustumCulled = false;
           shaftMesh.userData = {posAttr, sclAttr, opAttr};
           shaftMesh.layers.set(4); // the post-cloud overlay pass, with the precipitation
@@ -15338,11 +15322,7 @@
         for (let k = 0; k < n; k++) {
           const f = list[k];
           const s = geoToScene(f.lat, f.lon, dressAnchor);
-          const e = geoToScene(
-            f.lat,
-            f.lon + 2 / (111.2 * Math.cos((f.lat * Math.PI) / 180)),
-            dressAnchor
-          );
+          const e = geoToScene(f.lat, f.lon + 2 / (111.2 * Math.cos((f.lat * Math.PI) / 180)), dressAnchor);
           const w = Math.max(Math.hypot(e.x - s.x, e.z - s.z), 0.5);
           let x = s.x;
           let z = s.z;

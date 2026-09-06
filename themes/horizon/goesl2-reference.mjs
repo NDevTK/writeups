@@ -1584,6 +1584,12 @@ const inflate = (u8) =>
     else rho2[q] = 0.5 + (0.1 * (q - 150)) / 89;
   }
   const refs2 = visReferences(rho2, (q) => kind[q]);
+  // THE INVERTED PAIR (166th pass): the same pixels with the kinds
+  // swapped - the bright side called clear, the dim side cloud (the
+  // home under a high deck, where the mask's few clear pixels sat at
+  // cloud edges above the cloud's dim tenth) - is no reference: the
+  // mode says 'inverted', both values are kept for the words
+  const inv = visReferences(rho, (q) => (kind[q] === null ? null : !kind[q]));
   // Otsu's own pins: a normal sample splits at its mean with eta 2/pi
   // (a fixed-seed Box-Muller draw), two deltas at 0.1 and 0.6 part at
   // 0.35 with eta 1, an equal mixture of two normals 4 sigma apart
@@ -1677,6 +1683,16 @@ const inflate = (u8) =>
       near(refs2.rhoCloud, (0.09 + 0.5) / 2, 1e-6) &&
       refs2.threshold === refs2.rhoCloud &&
       refs2.nCloud === 80 &&
+      refs.inverted === false &&
+      refs2.inverted === false &&
+      thin.inverted === false &&
+      inv.inverted === true &&
+      inv.mode === 'inverted' &&
+      inv.nClear === 80 &&
+      inv.nCloud === 120 &&
+      inv.rhoClear > inv.rhoCloud &&
+      near(inv.rhoClear, 0.4 + (0.5 * 40) / 79, 1e-6) &&
+      near(inv.rhoCloud, 0.05 + (0.1 * 12) / 119, 1e-6) &&
       near(coverFraction(0.55, refs2.rhoClear, refs2.rhoCloud), 1, 1e-9) &&
       coverFraction(0.2, refs2.rhoClear, refs2.rhoCloud) > 0.4 &&
       coverFraction(0.2, refs2.rhoClear, refs2.rhoCloud) < 0.6 &&
@@ -1704,6 +1720,7 @@ const inflate = (u8) =>
       `${vc.noValue} no value, ${vc.fpt} focal-plane, ${vc.fill} fill (every pixel counted once), the good factor ${vc.rfMin.toFixed(3)}-${vc.rfMax.toFixed(3)} ` +
       `median ${vc.rfMedian.toFixed(3)}, reflectance ${vc.rhoMedian.toFixed(3)} at cos ${vc.cosSza}; the scene's references from ${refs.nClear} clear ` +
       `and ${refs.nCloud} cloudy pixels: clear median ${refs.rhoClear.toFixed(3)}, the cloudy side one mode (eta ${refs.eta.toFixed(3)}) so its dim tenth ` +
+      `(the same pixels with the kinds swapped are an INVERTED pair - clear ${inv.rhoClear.toFixed(3)} above the edge ${inv.rhoCloud.toFixed(3)} - and no reference: mode '${inv.mode}') ` +
       `${refs.rhoCloud.toFixed(3)} is the coverage edge (its p90 ${refs.rhoBright.toFixed(3)} the bright cloud; ten cloudy pixels answer null), ` +
       `a 0.5 reflectance ${(frac * 100).toFixed(0)}% covered; a cloudy side of gaps at 0.08 and cloud at 0.55 is two modes (eta ${refs2.eta.toFixed(3)}) ` +
       `parted at Otsu's ${refs2.rhoCloud.toFixed(3)}, a 0.2 reflectance ${(100 * coverFraction(0.2, refs2.rhoClear, refs2.rhoCloud)).toFixed(0)}% covered; ` +

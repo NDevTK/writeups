@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **147 CPU reference files printing
-1175 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1176 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **147 reference files, 1175 landmark lines, 8 GPU probes** (live gate
+- **147 reference files, 1176 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1062,7 +1062,16 @@ The practice the corpus demonstrates, stated so it can be reused:
    39% of what stands behind it, 10 mm/h 88%, drizzle at 0.2 mm/h
    17%, with Koschmieder's 3/σ naming the visibility inside the rain
    (12 km at 1 mm/h, 2.8 km at 10) (`rainshafts-reference` THE
-   CURTAIN'S OPACITY, THE SHAFTS)
+   CURTAIN'S OPACITY, THE SHAFTS). Pass 166 closes the daylight
+   field's inverted case, found by the home's scheduled A/B under a
+   high deck: NOAA's mask left 1,056 "clear" pixels at cloud edges
+   whose median reflectance (0.765) stood above the cloud's dim tenth
+   (0.480), so a fraction between them would have run backwards; a
+   clear reference at or above the coverage edge is now no reference
+   at all — the cut withdraws whole, the 2-km cover stands, and the
+   research line says why in the mask's own numbers
+   (`goesl2-reference` THE DAYLIGHT FIELD's inverted pair;
+   `daylight-reference` THE INVERTED PAIR)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

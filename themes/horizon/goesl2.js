@@ -1801,11 +1801,21 @@ export function visReferences(rho, clearOf, {minN = 50} = {}) {
   const enough = cloud.length >= minN;
   const otsu = enough ? otsuThreshold(cloud) : null;
   const bimodal = !!otsu && otsu.eta >= OTSU_BIMODAL_ETA;
+  const rhoClear = clear.length >= minN ? quantile(clear, 0.5) : null;
+  const rhoCloud = enough ? (bimodal ? otsu.t : quantile(cloud, 0.1)) : null;
+  // THE INVERTED PAIR (166th pass, measured at the home under a high
+  // deck: the mask's 1,056 "clear" pixels sat at cloud edges at rho
+  // 0.765 above the cloud's dim tenth 0.480): a clear reference at or
+  // above the coverage edge is no reference - a fraction between them
+  // would run backwards. Both values are kept for the words; the mode
+  // says so and the cut withdraws (daylight.js).
+  const inverted = rhoClear !== null && rhoCloud !== null && rhoClear >= rhoCloud;
   return {
-    rhoClear: clear.length >= minN ? quantile(clear, 0.5) : null,
-    rhoCloud: enough ? (bimodal ? otsu.t : quantile(cloud, 0.1)) : null,
+    rhoClear,
+    rhoCloud,
     rhoBright: enough ? quantile(cloud, 0.9) : null,
-    mode: enough ? (bimodal ? 'bimodal' : 'unimodal') : null,
+    mode: inverted ? 'inverted' : enough ? (bimodal ? 'bimodal' : 'unimodal') : null,
+    inverted,
     eta: otsu ? otsu.eta : null,
     threshold: otsu ? otsu.t : null,
     nClear: clear.length,
