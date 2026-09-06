@@ -10431,28 +10431,28 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   one standing PAGEERROR ("Unexpected end of JSON input") was the
   pollen fetch: two `(await fetch()).json()` inside one Promise.all
   - the first .json() rejecting while the second fetch was still
-  awaited had no handler yet; both promises are made first now
-  (probe-156: zero PAGEERROR lines). GATE: goesl2-reference THE
-  MEASURED HAZE (the census, the estimator on a 4x4 window by hand -
-  5 high px keep 2 for 0.40, the whole window 3 of 10 for 0.6333 -
-  the figures by range, the re-scaling, the ATBD's numbers; 10
-  landmarks); server-reference THE MEASURED HAZE (an AOD body
-  dressed on the ACHAC fixture: 2,729 high / 1,365 medium / 1,024
-  low / 5,083 none, 247 high px in the box, the estimate 0.543 from
-  75 kept against the plain mean 1.111, every figure recomputed from
-  the wire; the extras read whole and by range in the same 3 reads;
-  the ninth ask's pins; 28 landmarks); goesl2-client-reference (nine
-  asks over 23 listings, aod null over the fake bucket, 17 prefixes
-  re-listed on the range-ignoring path). STATED LIMITS: the surface
-  for the figures is the page's own call (the marine model's
-  partitions say water) while the box mixes land and water pixels;
-  the ten-pixel floor is this pass's rule from one day's evidence,
-  not the ATBD's; the satellite retrieves extinction at one
-  wavelength, so SSA, asymmetry and the species split stay the
-  model's; a clear day's AOD near the coast is flagged low by the
-  coastal mask, so the overhead pixel is rarely quantitative here.
-  THE DEPLOY, WATCHED: api.ndev.tk answered nothing at 23:35Z (curl
-  000); the 150th-156th wait for the box.
+    awaited had no handler yet; both promises are made first now
+    (probe-156: zero PAGEERROR lines). GATE: goesl2-reference THE
+    MEASURED HAZE (the census, the estimator on a 4x4 window by hand -
+    5 high px keep 2 for 0.40, the whole window 3 of 10 for 0.6333 -
+    the figures by range, the re-scaling, the ATBD's numbers; 10
+    landmarks); server-reference THE MEASURED HAZE (an AOD body
+    dressed on the ACHAC fixture: 2,729 high / 1,365 medium / 1,024
+    low / 5,083 none, 247 high px in the box, the estimate 0.543 from
+    75 kept against the plain mean 1.111, every figure recomputed from
+    the wire; the extras read whole and by range in the same 3 reads;
+    the ninth ask's pins; 28 landmarks); goesl2-client-reference (nine
+    asks over 23 listings, aod null over the fake bucket, 17 prefixes
+    re-listed on the range-ignoring path). STATED LIMITS: the surface
+    for the figures is the page's own call (the marine model's
+    partitions say water) while the box mixes land and water pixels;
+    the ten-pixel floor is this pass's rule from one day's evidence,
+    not the ATBD's; the satellite retrieves extinction at one
+    wavelength, so SSA, asymmetry and the species split stay the
+    model's; a clear day's AOD near the coast is flagged low by the
+    coastal mask, so the overhead pixel is rarely quantitative here.
+    THE DEPLOY, WATCHED: api.ndev.tk answered nothing at 23:35Z (curl
+    000); the 150th-156th wait for the box.
 - DONE (Sep 5, the review session's 155th pass - THE PAGE READS THE
   BUCKET ITSELF): the live daemon went dark at 22:02Z and stayed
   dark through the 154th pass, and with it the page lost every NOAA

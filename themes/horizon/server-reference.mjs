@@ -1197,7 +1197,9 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     : null;
   const dq = body ? unpackArray(body.dqf) : null;
   const again = body ? aodCensus(back, dq) : null;
-  const estAgain = body ? aodBoxEstimate(back, dq, body.box, L2_AOD_BOX_R) : null;
+  const estAgain = body
+    ? aodBoxEstimate(back, dq, body.box, L2_AOD_BOX_R)
+    : null;
   const nearAgain = body ? boxMean(back, dq, body.box, L2_AOD_BOX_R) : null;
   // the home pixel (424, 127) on the file's own grid
   const gq = 127 * 500 + 424;
@@ -1249,7 +1251,12 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       body.box.j === 127 &&
       body.box.cols === 101 &&
       body.census.n === body.box.rows * body.box.cols &&
-      body.census.high + body.census.medium + body.census.low + body.census.none + body.census.fill === body.census.n &&
+      body.census.high +
+        body.census.medium +
+        body.census.low +
+        body.census.none +
+        body.census.fill ===
+        body.census.n &&
       body.census.high > 0 &&
       body.census.medium > 0 &&
       body.census.low > 0 &&
@@ -1258,7 +1265,8 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       body.census.min >= -0.05 &&
       body.census.max <= 5 &&
       JSON.stringify(again) === JSON.stringify(body.census) &&
-      body.here === (homeDqf <= 1 && homeTau !== null ? +homeTau.toFixed(4) : null) &&
+      body.here ===
+        (homeDqf <= 1 && homeTau !== null ? +homeTau.toFixed(4) : null) &&
       body.hereDqf === homeDqf &&
       body.near.r === L2_AOD_BOX_R &&
       body.near.n === nearAgain.n &&

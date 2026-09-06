@@ -906,11 +906,7 @@ export function aodFigures(tau, surface = 'land') {
 // floor (no shape to keep) becomes flat at the satellite's value;
 // every channel clamped to [floor, ceil]. Pure, so the page and the
 // gate run one law.
-export function aodChannelTau(
-  tau3,
-  tau550,
-  {floor = 1e-4, ceil = 3} = {}
-) {
+export function aodChannelTau(tau3, tau550, {floor = 1e-4, ceil = 3} = {}) {
   const t = Math.min(ceil, Math.max(floor, tau550));
   const ref = tau3[1];
   if (!(ref > floor)) return [t, t, t];

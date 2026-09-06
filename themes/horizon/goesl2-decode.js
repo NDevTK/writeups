@@ -641,12 +641,14 @@ export function l2AodBody(dec, key, lat, lon) {
   const cj = w.box.j - w.box.j0;
   const qc = cj * w.box.cols + ci;
   const hereDqf = w.cut.DQF[qc];
-  const here = Number.isFinite(tau[qc]) && hereDqf <= 1 ? +tau[qc].toFixed(4) : null;
+  const here =
+    Number.isFinite(tau[qc]) && hereDqf <= 1 ? +tau[qc].toFixed(4) : null;
   const near = boxMean(tau, w.cut.DQF, w.box, L2_AOD_BOX_R);
   const est = aodBoxEstimate(tau, w.cut.DQF, w.box, L2_AOD_BOX_R);
   const x = dec.extras ?? {};
   const r4 = (v) => (Number.isFinite(v) ? +v.toFixed(4) : null);
-  const pair = (v) => (Array.isArray(v) && v.length === 2 ? v.map(Number) : null);
+  const pair = (v) =>
+    Array.isArray(v) && v.length === 2 ? v.map(Number) : null;
   return {
     ...l2Common(dec, L2_PRODUCTS.aod, key, w),
     wavelengthNm: 550,

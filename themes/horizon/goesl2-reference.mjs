@@ -778,7 +778,21 @@ const inflate = (u8) =>
   // index 10; DQF 0 high at ten pixels, medium at 1 and 8, low at 3
   // and 12, no retrieval at 6, fill (255) at 10
   const tau = [
-    0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, NaN, 1.2, 1.3, 1.4, 1.5,
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0,
+    NaN,
+    1.2,
+    1.3,
+    1.4,
+    1.5,
     1.6
   ];
   const dqf = [0, 1, 0, 2, 0, 0, 3, 0, 1, 0, 255, 0, 2, 0, 0, 0];
