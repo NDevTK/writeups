@@ -10434,7 +10434,14 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   scale, the saturated pixel, the merge; 4); server-reference (13
   asks, 12 served, 7 untimed); goesl2-client-reference (12 served,
   the fire null on the fake bucket, eight CONUS products re-listed).
-  Docs: the daemon README, FINDINGS pass 162.
+  Docs: the daemon README, FINDINGS pass 162. MEASURED in the page
+  (the home, 13:3xZ, night, the local daemon serving eleven
+  products): "NOAA GOES-18 fire hot spots (FDCC) - 13:27Z - no fire
+  px within +-100 km (QA: 0 fire-free land - 5,724 under opaque
+  cloud - 4,477 water, glint or unusable) - the CONUS scene holds 14
+  fire px" beside the phase record (overhead mixed phase, 6,500
+  mixed and 3,392 ice of 9,892) - the first quiet night; the
+  scene's fires will show the pixels the day brings.
 - DONE (Sep 6, the review session's 161st pass - THE CLOUD'S PHASE):
   NOAA's cloud top phase (ABI-L2-ACTPC: CONUS every five minutes, 2
   km, day and night) becomes the eleventh product the daemon serves
