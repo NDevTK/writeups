@@ -29,6 +29,15 @@ import {glmFlashesNear} from './glm.js';
 import {ADP_B64, ADP_EXPECT} from './adp-fixture.js';
 import {adpDominant, adpFlagBytes, ADP_RADIUS_PX} from './goesl2.js';
 import {L2_ADP_EXTRAS, L2_ADP_SPEC, l2AdpBody} from './goesl2-decode.js';
+import {LAP_EXPECT, LVTPC_B64} from './lap-fixture.js';
+import {lapColumnRows, lapPwMm, unpackArray, unscale} from './goesl2.js';
+import {
+  decodeL2Column,
+  L2_LAP_EXTRAS,
+  L2_LVT_SPEC,
+  l2LvtBody
+} from './goesl2-decode.js';
+import {openHdf5Lazy} from './hdf5.js';
 import {
   decodeL2,
   L2_ASKS,
@@ -264,8 +273,8 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       // lists nothing under; the pageOnly ask (159th: the 500-m
       // visible window) is not listed unless named
       listsAfterFirst === (served.length - 2) * 3 + 2 &&
-      L2_ASKS.length === 16 &&
-      served.length === 15 &&
+      L2_ASKS.length === 18 &&
+      served.length === 17 &&
       filesAfterFirst === 2 &&
       // the range reads: the heights' head then its strips, the winds
       // whole in one megabyte ask
@@ -298,7 +307,7 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       client.windows.size === 2 &&
       CLIENT_HELD_WINDOWS === 4 &&
       asked.size === 0,
-    `the home asks the ${served.length} products the daemon serves (of ${L2_ASKS.length} asks: the 500-m visible window is the page's own, read only when named) over ${listsAfterFirst} listings (this hour's prefix for each, two more hours back for the thirteen found empty) and reads the two the fake bucket holds ` +
+    `the home asks the ${served.length} products the daemon serves (of ${L2_ASKS.length} asks: the 500-m visible window is the page's own, read only when named) over ${listsAfterFirst} listings (this hour's prefix for each, two more hours back for the fifteen found empty) and reads the two the fake bucket holds ` +
       `(${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB in ${r.ranges} range${r.ranges === 1 ? '' : 's'}`).join('; ')}): ` +
       `the heights' window at (424, 127) with ${body && body.height.census.n} tops, median ${body && body.height.census.medianM.toFixed(1)} m ` +
       `- the daemon's own body from the same bytes - and ${body && body.dmw.n} of ${body && body.dmw.total} vectors within 150 km, ` +
@@ -475,15 +484,15 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       // the CONUS products re-listed (three prefixes for the six the
       // fake bucket lacks, one for the two it holds), the full-disk
       // ones not
-      // the CONUS products the fake bucket lacks: eleven since the
-      // 169th's aerosol detection
-      listedAgain.length === 11 * 3 + 2 &&
+      // the CONUS products the fake bucket lacks: thirteen since the
+      // 171st's two profile columns
+      listedAgain.length === 13 * 3 + 2 &&
       !listedAgain.some(
         (p) => p.startsWith('ABI-L2-SSTF') || p.startsWith('ABI-L2-DSRF')
       ),
     `three range asks of a whole-answering server cost ${calls} download (${a.length}, ${b.length} and ${c.length} bytes cut from it, the last short at the end); ` +
       `the client over such a bucket reads its two files whole (${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB`).join(', ')}), ` +
-      `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the eleven CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
+      `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the thirteen CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
   );
 }
 
@@ -569,6 +578,77 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       `and its 25-km circle ${body && body.matchup.valid} valid of ${body && body.matchup.inCircle} (${body && (100 * body.matchup.coverage).toFixed(1)}%): no call; ` +
       `the best-covered circle at (${bc.row}, ${bc.col}) ${best.valid} valid of ${best.inCircle} (${(100 * best.coverage).toFixed(1)}%), dust on ${best.dust.present}: '${best.dominant}'; ` +
       `the scene's head: ${body && body.sceneStats.dustDetected} dust and ${body && body.sceneStats.smokeDetected} smoke detections of ${body && body.sceneStats.goodDust.toLocaleString('en-US')} good dust retrievals`
+  );
+}
+
+// ---- THE COLUMN, READ BY RANGE (171st pass) ------------------------
+// The vendored profile crop through the RANGE path the daemon and the
+// page use - hdf5.js's lazy reader over a fake bucket honouring
+// ranges, the column decode's three-dimensional window, the body the
+// wire carries - held to the whole-buffer read and to h5py's pins.
+{
+  const crop = new Uint8Array(Buffer.from(LVTPC_B64, 'base64'));
+  const X = LAP_EXPECT;
+  const calls = [];
+  const s3 = async (url, opts) => {
+    const m = /bytes=(\d+)-(\d+)/.exec((opts.headers && opts.headers.range) || '');
+    const s = +m[1];
+    const e = Math.min(+m[2] + 1, crop.length);
+    calls.push([s, e]);
+    if (s >= crop.length)
+      return {status: 416, headers: {get: () => null}, arrayBuffer: async () => new ArrayBuffer(0)};
+    return {
+      status: 206,
+      headers: {get: (h) => (h === 'content-range' ? `bytes ${s}-${e - 1}/${crop.length}` : null)},
+      arrayBuffer: async () => crop.slice(s, e).buffer
+    };
+  };
+  // a small head so the column's chunk must come in its own range
+  const rr = rangeReader('u', s3);
+  const f = await openHdf5Lazy(rr, inflateStream, {blockBytes: 4096, headBytes: 8192});
+  const dec = await decodeL2Column(f, L2_LVT_SPEC, X.centre.lat, X.centre.lon, 1, L2_LAP_EXTRAS);
+  const body = dec ? l2LvtBody(dec, 'k', X.centre.lat, X.centre.lon) : null;
+  const counts = body ? unpackArray(body.counts) : null;
+  const levels = body ? unpackArray(body.levels) : null;
+  const overall = body ? unpackArray(body.overall) : null;
+  const q = body ? body.here.q : -1;
+  const tK = counts
+    ? Array.from(counts.subarray(q * 101, q * 101 + 101)).map((v) =>
+        v === body.fill ? NaN : v * body.scale + body.offset
+      )
+    : null;
+  check(
+    'THE COLUMN, READ BY RANGE: the lazy reader cuts one field of regard with all its levels from the crop by range, and the body carries it',
+    dec !== null &&
+      body !== null &&
+      body.product === 'ABI-L2-LVTPC' &&
+      body.field === 'LVT' &&
+      dec.box.rows === 3 &&
+      dec.box.cols === 3 &&
+      dec.box.i - dec.box.i0 === 1 &&
+      dec.box.j - dec.box.j0 === 1 &&
+      levels.length === X.levels &&
+      near(levels[3], 1013.9475708007812, 1e-4) &&
+      counts.length === 9 * X.levels &&
+      near(body.scale, X.tScale, 1e-15) &&
+      near(body.offset, X.tOffset, 1e-9) &&
+      body.fill === 65535 &&
+      q === 4 &&
+      near(tK[3], X.tK.i3, 1e-9) &&
+      near(tK[25], X.tK.i25, 1e-9) &&
+      near(tK[52], X.tK.i52, 1e-9) &&
+      overall.length === 9 &&
+      overall.every((v) => v === 0) &&
+      body.here.overall === 0 &&
+      body.here.quality.usable === true &&
+      body.census.good === 9 &&
+      body.nearest.q === 4 &&
+      body.nearest.d2 === 0 &&
+      body.lzaQuantitativeDeg !== null &&
+      f.stats.ranges >= 2 &&
+      calls.length === f.stats.ranges,
+    `the crop by range: ${f.stats.ranges} ranges in ${f.stats.rounds} rounds (${f.stats.bytes} bytes; head 8 kB, blocks 4 kB), a 3 x 3 window of fields around (${X.centre.lat.toFixed(2)}, ${X.centre.lon.toFixed(2)}) with the observer's at q ${q}; ` +
+      `${counts.length} counts on the wire unscale to ${tK[3].toFixed(3)} K at 1013.9 hPa, ${tK[25].toFixed(3)} K at 500 and ${tK[52].toFixed(3)} K at 134 - h5py's values; ${body.census.good} of 9 fields good, the nearest usable the observer's own; quantitative zenith ${body.lzaQuantitativeDeg} deg`
   );
 }
 

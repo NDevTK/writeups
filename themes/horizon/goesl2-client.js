@@ -30,6 +30,7 @@ import {
   parseS3Keys
 } from './goesl2.js';
 import {
+  decodeL2Column,
   decodeL2Vectors,
   decodeL2Window,
   L2_ASKS,
@@ -55,6 +56,8 @@ import {
   l2TpwBody,
   l2RainBody,
   l2AdpBody,
+  l2LvtBody,
+  l2LvmBody,
   l2VisBody
 } from './goesl2-decode.js';
 import {pickSatellite} from './satellites.js';
@@ -299,14 +302,23 @@ export function createGoesL2Client({
       const dec =
         ask.kind === 'vectors'
           ? await decodeL2Vectors(f, cell.lat, cell.lon, ask.radiusKm)
-          : await decodeL2Window(
-              f,
-              ask.spec,
-              cell.lat,
-              cell.lon,
-              ask.halfPx,
-              ask.extras ?? null
-            );
+          : ask.kind === 'column'
+            ? await decodeL2Column(
+                f,
+                ask.spec,
+                cell.lat,
+                cell.lon,
+                ask.halfPx,
+                ask.extras ?? null
+              )
+            : await decodeL2Window(
+                f,
+                ask.spec,
+                cell.lat,
+                cell.lon,
+                ask.halfPx,
+                ask.extras ?? null
+              );
       if (!dec) throw new Error(ask.product + ': not readable');
       stats.ranges += f.stats.ranges;
       stats.bytes += f.stats.bytes;
@@ -406,6 +418,9 @@ export function createGoesL2Client({
         : null,
       // the haze's kind (169th): the smoke and dust flags by day
       adp: F.adp ? l2AdpBody(F.adp.dec, F.adp.key, cell.lat, cell.lon) : null,
+      // the column from orbit (171st): the profiles over the observer
+      lvt: F.lvt ? l2LvtBody(F.lvt.dec, F.lvt.key, cell.lat, cell.lon) : null,
+      lvm: F.lvm ? l2LvmBody(F.lvm.dec, F.lvm.key, cell.lat, cell.lon) : null,
       // the daylight field (159th): the page's own read, only when asked
       vis: F.vis ? l2VisBody(F.vis.dec, F.vis.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial',

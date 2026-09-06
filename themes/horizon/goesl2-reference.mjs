@@ -115,6 +115,21 @@ import {
   windowIndexOf
 } from './goesl2.js';
 import {
+  LAP_ATBD,
+  LAP_DQF_OVERALL,
+  lapCensus,
+  lapColumnRows,
+  lapFreezingLevelM,
+  lapLevelAt,
+  lapNearestUsable,
+  lapPwMm,
+  lapQuality,
+  dewPointC,
+  specificHumidity
+} from './goesl2.js';
+import {eLiq} from './contrails.js';
+import {LAP_EXPECT, LVMPC_B64, LVTPC_B64} from './lap-fixture.js';
+import {
   ADP_ATBD,
   ADP_CALLED_FLOOR,
   ADP_FLAG_FILL,
@@ -1195,6 +1210,159 @@ const inflate = (u8) =>
       `${(100 * v.all.ice.agree).toFixed(2)}% make ${agreeAll.toLocaleString('en-US')} agreed of ${v.all.total.n.toLocaleString('en-US')} (${(100 * v.all.total.agree).toFixed(2)}%), ` +
       `the thick-cloud qualifier ${(100 * v.thick.total.agree).toFixed(2)}% of ${v.thick.total.n.toLocaleString('en-US')} against the 80% requirement; ` +
       `tops at or under ${PHASE_ATBD.homogeneousFreezingK} K are ice, liquid tops over ${PHASE_ATBD.liquidTopK} K are warm`
+  );
+}
+
+// ---- THE COLUMN FROM ORBIT (171st pass) ----------------------------
+// The flags' words, the humidity and dew-point helpers against the
+// theme's own Murphy-Koop water, a synthetic isothermal dry column
+// whose hypsometric heights close in closed form, the freezing level,
+// the level interpolation, the census and the nearest usable field of
+// regard; then the REAL crop: the centre column through hdf5.js and
+// the law against h5py's independent hypsometric column.
+{
+  const qGood = lapQuality(0, 0);
+  const qDeg = lapQuality(3, 0);
+  const qCloud = lapQuality(4, 255);
+  const qBad = lapQuality(0, 2);
+  const tK = 280;
+  const e = eLiq(tK);
+  const tdBack = dewPointC(e);
+  // an isothermal dry column: z = (Rd T / g) ln(p0 / p) exactly
+  const pr = [1100, 1000, 900, 800, 700, 600, 500, 400, 300, 200, 100, 50];
+  const tCol = pr.map(() => tK);
+  const rhCol = pr.map(() => NaN);
+  const dry = lapColumnRows(pr, tCol, rhCol, {pSfcHpa: 1000, zSfcM: 0});
+  const zClosed = (p) => ((287.053 * tK) / 9.80665) * Math.log(1000 / p);
+  // a column crossing 0 C between two levels
+  const pr2 = [1100, 1000, 900, 800, 700, 600, 500, 400, 300, 200, 100];
+  const tC2 = [20, 18, 12, 6, 1, -5, -12, -22, -35, -50, -60];
+  const wet = lapColumnRows(pr2, tC2.map((c) => c + 273.15), pr2.map(() => 0.5), {pSfcHpa: 1000, zSfcM: 0});
+  const fz = lapFreezingLevelM(wet);
+  const a700 = lapLevelAt(wet, 700);
+  const pw = lapPwMm(wet);
+  const overall = Uint8Array.from([4, 0, 4, 255, 4, 0, 3, 1, 5]);
+  const retrieval = Uint8Array.from([255, 0, 255, 255, 255, 2, 0, 255, 255]);
+  const cen = lapCensus(overall, retrieval);
+  const nearest = lapNearestUsable(overall, retrieval, {cols: 3, rows: 3, ci: 1, cj: 1});
+  const noneUsable = lapNearestUsable(Uint8Array.from([4, 4, 4, 4]), null, {cols: 2, rows: 2, ci: 0, cj: 0});
+  const tooFew = lapColumnRows([1000, 900, 800], [280, 275, 270], [0.5, 0.5, 0.5], {pSfcHpa: 1013});
+  check(
+    'THE COLUMN FROM ORBIT: the flags, the water helpers, a closed-form column, the freezing level, the census',
+    qGood.usable === true &&
+      qGood.words === 'good' &&
+      qDeg.usable === true &&
+      qDeg.degraded === true &&
+      qDeg.words === LAP_DQF_OVERALL[3] &&
+      qCloud.usable === false &&
+      qCloud.words.startsWith('invalid: insufficient clear') &&
+      qBad.usable === true &&
+      qBad.words.includes('residual') &&
+      lapQuality(255, 255).usable === false &&
+      near(tdBack, tK - 273.15, 1e-9) &&
+      near(specificHumidity(e, 100000), (0.622 * e) / (100000 - 0.378 * e), 1e-15) &&
+      dry !== null &&
+      // the surface row and the nine levels from 900 to 100 hPa (50
+      // is past the ATBD's useful top, 1100 under the surface)
+      dry.length === 10 &&
+      dry[0].p === 1000 &&
+      dry[0].hM === 0 &&
+      near(dry[0].tC, tK - 273.15, 1e-12) &&
+      dry.every((r) => near(r.hM, zClosed(r.p), 1e-6)) &&
+      dry.every((r) => r.rh === null && r.q === 0) &&
+      dry[dry.length - 1].p === 100 &&
+      wet.length === 10 &&
+      wet[0].rh === 50 &&
+      wet[0].q > 0 &&
+      wet.filter((r) => r.rh === null).length === 2 &&
+      fz !== null &&
+      // rows: the surface, 900, 800, 700 (+1 C), 600 (-5 C) ...
+      wet[3].p === 700 &&
+      fz > wet[3].hM &&
+      fz < wet[4].hM &&
+      near(fz, wet[3].hM + ((wet[4].hM - wet[3].hM) * 1) / 6, 1e-9) &&
+      near(a700.tC, 1, 1e-12) &&
+      near(a700.hM, wet[3].hM, 1e-9) &&
+      pw > 10 &&
+      pw < 60 &&
+      cen.n === 9 &&
+      cen.good === 2 &&
+      cen.degraded === 1 &&
+      cen.cloud === 3 &&
+      cen.zenith === 1 &&
+      cen.nwp === 1 &&
+      cen.fill === 1 &&
+      cen.retrieved === 2 &&
+      nearest !== null &&
+      nearest.q === 1 &&
+      nearest.d2 === 1 &&
+      noneUsable === null &&
+      tooFew === null &&
+      LAP_ATBD.requirement.verticalResolutionKm.join() === '3,5' &&
+      LAP_ATBD.requirement.tAccuracyK === 1 &&
+      LAP_ATBD.requirement.rhAccuracyPct.to100 === 20 &&
+      LAP_ATBD.requirement.tUsefulBelowHpa === 100 &&
+      LAP_ATBD.requirement.rhUsefulBelowHpa === 300 &&
+      LAP_ATBD.requirement.levels === 101,
+    `good / degraded (${qDeg.words}) / cloud (${qCloud.words}) / a bad retrieval (${qBad.words}); Murphy-Koop water at 280 K round-trips through the dew point to ${tdBack.toFixed(9)} C; ` +
+      `an isothermal 280-K dry column from 1000 hPa: ${dry.length} rows whose heights match (Rd T / g) ln(p0/p) to a micrometre (${dry[dry.length - 1].hM.toFixed(1)} m at 100 hPa); ` +
+      `a moist column crossing 0 C between 700 and 600 hPa freezes at ${fz.toFixed(1)} m (${wet[3].hM.toFixed(0)}-${wet[4].hM.toFixed(0)} m, one sixth of the way), holds ${pw.toFixed(1)} mm, and drops its humidity above 300 hPa (${wet.filter((r) => r.rh === null).length} rows); ` +
+      `a 3 x 3 census: ${cen.good} good, ${cen.degraded} degraded, ${cen.cloud} cloud, ${cen.zenith} zenith, ${cen.nwp} NWP, ${cen.fill} fill, ${cen.retrieved} retrieved; the nearest usable field to a cloudy centre is q ${nearest.q}; the ATBD: ${LAP_ATBD.requirement.verticalResolutionKm.join('-')} km resolution, 1 K, 18/20% humidity`
+  );
+}
+
+{
+  // THE COLUMN, READ: the vendored Ontario crop's centre column through
+  // hdf5.js, the physical values and the hypsometric column held to
+  // h5py's independent numbers
+  const X = LAP_EXPECT;
+  const t = openHdf5(new Uint8Array(Buffer.from(LVTPC_B64, 'base64')), inflate);
+  const m = openHdf5(new Uint8Array(Buffer.from(LVMPC_B64, 'base64')), inflate);
+  const pr = Array.from(t.dataset('pressure').values);
+  const lvt = t.dataset('LVT', {window: [[X.centre.row, X.centre.row + 1], [X.centre.col, X.centre.col + 1], [0, X.levels]]});
+  const lvm = m.dataset('LVM', {window: [[X.centre.row, X.centre.row + 1], [X.centre.col, X.centre.col + 1], [0, X.levels]]});
+  const sc = (a) => (Array.isArray(a) ? a[0] : a);
+  const tK = Array.from(lvt.values).map((v) => (v === 65535 ? NaN : v * sc(lvt.attrs.scale_factor) + sc(lvt.attrs.add_offset)));
+  const rh = Array.from(lvm.values).map((v) => (v === 65535 ? NaN : v * sc(lvm.attrs.scale_factor)));
+  const rows = lapColumnRows(pr, tK, rh, {pSfcHpa: X.column.pSfcHpa, zSfcM: X.column.zSfcM});
+  const top = rows[rows.length - 1];
+  const at250 = lapLevelAt(rows, 250);
+  const at700 = lapLevelAt(rows, 700);
+  const h500 = lapLevelAt(rows, 500).hM;
+  const ov = t.dataset('DQF_Overall');
+  const cen = lapCensus(ov.values, t.dataset('DQF_Retrieval').values);
+  check(
+    'THE COLUMN, READ: the vendored profile crop through the reader and the law agrees with h5py to the millimetre of water',
+    pr.length === X.levels &&
+      near(pr[0], X.pressureFirst, 1e-6) &&
+      near(pr[100], X.pressureLast, 1e-9) &&
+      near(sc(lvt.attrs.scale_factor), X.tScale, 1e-15) &&
+      near(sc(lvt.attrs.add_offset), X.tOffset, 1e-9) &&
+      near(sc(lvm.attrs.scale_factor), X.rhScale, 1e-15) &&
+      near(tK[3], X.tK.i3, 1e-9) &&
+      near(tK[25], X.tK.i25, 1e-9) &&
+      near(tK[52], X.tK.i52, 1e-9) &&
+      near(rh[7], X.rh.i7, 1e-9) &&
+      rows !== null &&
+      rows.length === X.column.nRows &&
+      near(rows[0].tC, X.column.tSfcC, 1e-9) &&
+      near(rows[0].rh, X.column.rhSfcPct, 1e-9) &&
+      near(top.p, X.column.topHpa, 1e-9) &&
+      near(top.hM, X.column.topM, 1e-6) &&
+      near(lapPwMm(rows), X.column.pwMm, 1e-9) &&
+      near(lapFreezingLevelM(rows), X.column.freezingM, 1e-6) &&
+      near(at250.tC, X.column.at250.tC, 1e-9) &&
+      near(at250.hM, X.column.at250.hM, 1e-6) &&
+      at250.rh === null &&
+      near(at700.tC, X.column.at700.tC, 1e-9) &&
+      near(at700.rh, X.column.at700.rh, 1e-9) &&
+      near(h500, X.column.h500, 1e-6) &&
+      cen.n === X.rows * X.cols &&
+      cen.good === X.census['0'] &&
+      cen.cloud === 0,
+    `${X.fileT.slice(0, 24)} at ${X.centre.lat.toFixed(2)} N ${(-X.centre.lon).toFixed(2)} W: ${pr.length} levels ${pr[0]} to ${pr[100]} hPa, the centre column's 1013.9-hPa temperature ${tK[3].toFixed(3)} K, ` +
+      `500-hPa ${tK[25].toFixed(3)} K, 134-hPa ${tK[52].toFixed(3)} K and 905-hPa humidity ${(100 * rh[7]).toFixed(2)}% as h5py read them; the column from a 1013.25-hPa sea level: ${rows.length} rows to ${top.p.toFixed(1)} hPa at ${top.hM.toFixed(1)} m, ` +
+      `${lapPwMm(rows).toFixed(3)} mm of water, freezing at ${lapFreezingLevelM(rows).toFixed(1)} m, 250 hPa ${at250.tC.toFixed(2)} C at ${at250.hM.toFixed(1)} m (no humidity above 300 hPa), 700 hPa ${at700.tC.toFixed(2)} C at ${at700.rh.toFixed(1)}% - every number h5py's; ${cen.good} of ${cen.n} fields good`
   );
 }
 

@@ -10345,6 +10345,119 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 171st pass - THE COLUMN FROM
+  ORBIT, ABOVE THE BOUNDARY LAYER): the scene's upper air has been the
+  nearest balloon's since the sounding pass - and at sea the nearest
+  balloon is far (St. Maarten 587 km from the dust sheet; none at all
+  in the western Gulf), so the infrared reference ran on a distant
+  column or waited, the freezing level was the model's, the contrail
+  criterion the model's single level. NOAA retrieves a column over
+  every clear 10-km field of regard: ABI-L2-LVTPC and LVMPC (CONUS
+  every 5 min, 101 RTTOV pressure levels 1100-0.005 hPa, day and
+  night, a fifth of the 5 x 5 field clear). THE PRIMARY: the
+  Enterprise Legacy Soundings ATBD v3.1 (Li, Schmit, Jin, Martin, Li
+  2019 - read in full in the 163rd for the column's water; its profile
+  requirements here): a regression first guess from the infrared bands
+  and the NWP forecast, then a physical retrieval; Tables 1.1-1.2:
+  "inherent vertical resolution is only 3 to 5 km", temperature to 1 K
+  (precision 2 K) below 400 hPa AND above the boundary layer, humidity
+  to 18% from the surface to 300 hPa and 20% to 100, quantitative to
+  67 deg local zenith; Table 7: the temperature useful below 100 hPa
+  only, the humidity below 300 only, the skin temperature over land
+  only. THE FILE (measured): LVT (300 x 500 x 101) uint16 K at
+  0.00236533 from 165 K; LVM the same shape as a FRACTION of relative
+  humidity (the units attribute says percent; the counts top out at
+  1.0) at 1.526e-5; fill 65535; chunks two rows by the full width by
+  all levels, so a point's column is one chunk; DQF_Overall 0-10 (good
+  / not geolocated / degraded latitude / degraded zenith / cloud /
+  missing NWP / missing L1b / bad surface pressure / indeterminate
+  emissivity / bad TPW level / NaN), DQF_Retrieval 0-5 (fill 255 where
+  nothing ran), DQF_SkinTemp 0-2; at 20:51Z 73,949 of 150,000 fields
+  good and 71,942 cloudy; 9.7 MB a file. THE LAW (goesl2.js, importing
+  the theme's Murphy-Koop water): lapQuality (good, degraded 2-3, else
+  invalid, the words), specificHumidity, dewPointC (a bisection on
+  eLiq: 280 K round-trips to a nanokelvin), isaPressureHpa (the
+  standard atmosphere at the observer's elevation - the page carries
+  no measured surface pressure; 10 hPa move every height 80 m, nothing
+  against 3-5 km, stated), lapColumnRows (the surface row interpolated
+  in ln p between the levels bracketing the surface - the retrieval
+  extrapolates under the ground - then every level to 100 hPa, the
+  heights by the hypsometric equation on the layer-mean virtual
+  temperature, the humidity null above 300 hPa: an isothermal dry
+  column matches (Rd T / g) ln(p0/p) to a micrometre), lapPwMm (q dp /
+  g), lapFreezingLevelM, lapLevelAt (ln p), lapCensus,
+  lapNearestUsable. THE DECODE: the 'column16' mode and
+  decodeL2Column - hdf5.js's window takes one range per dimension, so
+  the column field's window is the box and the whole third axis (no
+  reader change: the 151st's N-dimensional window, tried on the real
+  file whole: 23 ms, h5py's values to 0.1 K at every sampled level);
+  the asks 'lvt' and 'lvm' of kind 'column' at half width 1 (a 3 x 3
+  of 10-km fields, two or three chunks); l2LvtBody / l2LvmBody (the
+  counts and scaling, the pressure vector, the three flag windows, the
+  observer's field with its words, the census, the nearest usable
+  field); the daemon and the client dispatch the kind (the daemon
+  destructures its decode functions from a namespace - the first draft
+  put decodeL2Column in the re-export list and the journal said
+  "decodeL2Column is not defined": measured, fixed); the daemon reads
+  a window in 4-5 ranges and ~500 kB per file (measured: 550 kB of 9.7
+  MB in 452 ms). THE PAGE: 'lvt'/'lvm' in the body products (an older
+  daemon's body is filled from the bucket by the page); goesL2ColumnNow
+  pairs the two files by time (within 6 min), takes the observer's own
+  field when usable else the nearest usable, unscales the column and
+  builds the rows from the standard atmosphere at the observer's
+  elevation; applySatColumn: the freezing level where no fresh balloon
+  stands (the weather sync leaves it while the column stands), the
+  infrared field re-run once on a new column when it ran on a lesser
+  one, the record "NOAA GOES-19 legacy profiles (LVTPC/LVMPC)"; the
+  infrared sync's column order is now the sea column, a fresh balloon
+  within its gates, the satellite's column, then a far or old balloon
+  as before - the source named on the cloud-field line; the research
+  line "satellite column (ABI legacy profiles)" with the contrail
+  formation band by its temperature (persistence unjudged: the
+  humidity is not useful above 300 hPa, so the drawn trails keep their
+  own judge) and the ATBD's limits; the mirage claims stay closed
+  without a balloon. GATES: goesl2-reference THE COLUMN FROM ORBIT
+  (the flags' words, the water round trip, the closed-form dry column,
+  a moist column freezing one sixth of the way between 700 and 600
+  hPa, the humidity dropped above 300, the census, the nearest usable
+  field, too few levels null) and THE COLUMN, READ (a REAL 6 x 6 crop
+  of both files vendored - lap-fixture.js, Ontario 50.50 N 92.25 W,
+  every field good, the coordinate vectors re-based - through hdf5.js
+  and the law against h5py's INDEPENDENT hypsometric column: 54 rows
+  to 103.0 hPa at 16,370.8 m, 34.351 mm, freezing 4,082.9 m, 250 hPa
+  -48.95 C at 10,745.6 m, 700 hPa 6.73 C at 47.0% - to a micrometre
+  and a nanomillimetre); goesl2-client-reference THE COLUMN, READ BY
+  RANGE (the lazy reader over a range-honouring fake bucket with an
+  8-kB head and 4-kB blocks: 9 ranges, the 3 x 3 window's 909 counts
+  unscaling to h5py's kelvin, the observer's field q 4 good, the
+  nearest usable its own); server-reference (eighteen asks, seventeen
+  served, twelve untimed, the two column asks' kind and spec, the
+  bindings). Docs: server README (the sixteenth and seventeenth
+  products, the eighteenth ask); FINDINGS pass 171 (148 files, 1,190
+  landmarks). MEASURED in the page (the western Gulf, 25.87 N 93.71 W,
+  21:1xZ, the local daemon): "satellite column (ABI legacy profiles) -
+  GOES-19's legacy profiles: 21:12Z - the observer's own field of
+  regard (good) - 54 levels 1013 -> 103 hPa (16.5 km) - surface 27.8 C
+  81% (the standard atmosphere's 1013 hPa at 0 m) - freezing 4869 m -
+  700 hPa 10.0 C 49% at 3.2 km - 250 hPa -41.7 C at 11.0 km - 45.8 mm
+  of water (the TPW product's own 45.0 mm: 2% apart) - no balloon
+  within 300 km and 13 h: the column stands in above the boundary
+  layer - what it stands in for: the freezing level and the infrared
+  reference's column; contrails forming 12.8-16.5 km by its
+  temperature" beside "mirage (measured column) - no fresh ascent - no
+  mirage claim" and the cloud field's "clear-sky reference 26.09 C =
+  NDBC 42002 31.20 - 5.11 K (... window tau 0.534 over 45.6 mm ...) -
+  the reference's column: satellite (GOES-19 legacy profiles 21:12Z,
+  the observer's own 10-km field, 3-5 km resolution)": the band-13
+  field ran on the satellite's own column over the open Gulf, where
+  before it had waited for a balloon that never comes within 300 km;
+  two products of the same ATBD, the profile's integrated water and
+  the TPW, agree to 2%. STATED LIMITS: the column's lowest layers are
+  the retrieval's smear of the boundary layer (3-5 km resolution) -
+  usable for the freezing level and the infrared window, never for the
+  surface layer; the surface pressure is the standard atmosphere's;
+  the humidity above 300 hPa is the ATBD's own "not useful" and is
+  dropped, so the contrail persistence from this column is unjudged.
 - DONE (Sep 6, the review session's 170th pass - THE KIND'S OWN
   OPTICS): the 169th let the satellite say WHICH aerosol hazes the
   scene and moved the species' shares; the sky's single-scattering

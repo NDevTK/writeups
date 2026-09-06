@@ -66,6 +66,9 @@ import {
   adpDominant,
   adpFlagBytes,
   adpPixel,
+  lapCensus,
+  lapNearestUsable,
+  lapQuality,
   packArray,
   pixelSizeM,
   productTimeIso,
@@ -309,6 +312,31 @@ export const L2_ADP_EXTRAS = [
   'retrieval_solar_zenith_angle'
 ];
 L2_HALF_PX.adp = 50;
+// The 171st pass: the legacy profiles (LVT air temperature and LVM
+// relative humidity at 101 pressure levels, uint16 counts with the
+// files' scaling, fill 65535 - the 'column16' mode keeps all levels
+// of each field of regard in the window) with the three flag words
+// and the zenith thresholds as extras; a 3 x 3 window of 10-km fields
+// (halfPx 1: the observer's own field and its neighbours, two or
+// three of the files' two-row chunks)
+export const L2_LVT_SPEC = {
+  LVT: 'column16',
+  DQF_Overall: 'raw',
+  DQF_Retrieval: 'raw',
+  DQF_SkinTemp: 'raw'
+};
+export const L2_LVM_SPEC = {
+  LVM: 'column16',
+  DQF_Overall: 'raw',
+  DQF_Retrieval: 'raw',
+  DQF_SkinTemp: 'raw'
+};
+export const L2_LAP_EXTRAS = [
+  'quantitative_local_zenith_angle',
+  'retrieval_local_zenith_angle'
+];
+L2_HALF_PX.lvt = 1;
+L2_HALF_PX.lvm = 1;
 export const L2_RAIN_MIN_MMH = 0.1;
 // how far (Chebyshev, px) the nearest good TPW pixel is sought
 export const L2_TPW_NEAR_PX = 2;
@@ -431,6 +459,26 @@ export const L2_ASKS = [
     halfPx: 50,
     extras: L2_ADP_EXTRAS,
     timed: false
+  },
+  // the column from orbit (171st): the temperature and moisture
+  // profiles over the observer's field of regard, the scene's now
+  {
+    id: 'lvt',
+    product: L2_PRODUCTS.lvt,
+    kind: 'column',
+    spec: L2_LVT_SPEC,
+    halfPx: 1,
+    extras: L2_LAP_EXTRAS,
+    timed: false
+  },
+  {
+    id: 'lvm',
+    product: L2_PRODUCTS.lvm,
+    kind: 'column',
+    spec: L2_LVM_SPEC,
+    halfPx: 1,
+    extras: L2_LAP_EXTRAS,
+    timed: false
   }
 ];
 const l2Scalar = (a) => (Array.isArray(a) ? a[0] : a);
@@ -471,7 +519,7 @@ function l2Convert(d, mode, n) {
   if (d.values.length !== n) return null;
   if (mode === 'raw') return {value: d.values, meta: null};
   if (mode === 'phys') return {value: physicalValues(d), meta: null};
-  if (mode === 'raw16')
+  if (mode === 'raw16' || mode === 'column16')
     return {
       value: d.values,
       meta: {
@@ -585,6 +633,63 @@ export async function decodeL2Window(f, spec, lat, lon, halfPx, extras = null) {
   }
   return {
     ...head,
+    box,
+    pixel: pixelSizeM(box, g, frame.x, frame.y),
+    data,
+    meta
+  };
+}
+// THE COLUMN DECODE (171st pass): the profile files are three-
+// dimensional (rows x cols x 101 levels); the window keeps every
+// level of the fields of regard it covers - hdf5.js's window takes
+// one range per dimension, so the column field's window is the box
+// and the whole third axis (one two-row chunk of the file for a
+// point, read by range like the rest). The pressure vector rides as
+// `levels`; the flags are two-dimensional windows as ever.
+export async function decodeL2Column(f, spec, lat, lon, halfPx, extras = null) {
+  const frame = l2Frame(
+    await f.dataset('goes_imager_projection'),
+    await f.dataset('x'),
+    await f.dataset('y'),
+    await f.dataset('t')
+  );
+  if (!frame) return null;
+  const pr = await f.dataset('pressure');
+  if (!pr || !pr.values || pr.values.unread) return null;
+  const levels = Float32Array.from(pr.values, Number);
+  const lza =
+    (await f.dataset('quantitative_local_zenith_angle_bounds')) ??
+    (await f.dataset('local_zenith_angle_bounds'));
+  const head = {...frame, ...l2Tail(await f.rootAttrs(), lza)};
+  if (extras) {
+    head.extras = {};
+    for (const n of extras) head.extras[n] = l2Extra(await f.dataset(n));
+  } else head.extras = null;
+  const g = fixedGridGeometry(frame.proj);
+  const box = windowBox(lat, lon, g, frame.x, frame.y, frame.x.n, frame.y.n, halfPx);
+  if (!box)
+    return {...head, levels, box: null, pixel: null, data: null, meta: null};
+  const window2 = [
+    [box.j0, box.j0 + box.rows],
+    [box.i0, box.i0 + box.cols]
+  ];
+  const window3 = [...window2, [0, levels.length]];
+  const data = {};
+  const meta = {};
+  for (const [name, mode] of Object.entries(spec)) {
+    const column = mode === 'column16';
+    const c = l2Convert(
+      await f.dataset(name, {window: column ? window3 : window2}),
+      mode,
+      box.rows * box.cols * (column ? levels.length : 1)
+    );
+    if (!c) return null;
+    data[name] = c.value;
+    if (c.meta) meta[name] = c.meta;
+  }
+  return {
+    ...head,
+    levels,
     box,
     pixel: pixelSizeM(box, g, frame.x, frame.y),
     data,
@@ -1208,6 +1313,65 @@ export function l2AdpBody(dec, key, lat, lon) {
     lzaRetrievalDeg: num(x.retrieval_local_zenith_angle),
     szaRetrievalDeg: num(x.retrieval_solar_zenith_angle)
   };
+}
+// THE COLUMN FROM ORBIT (171st pass): a profile window as the file
+// holds it - every level of every field of regard as uint16 counts
+// with the file's scaling (the page unscales), the pressure vector,
+// the three flag windows, the observer's own field with its quality
+// words, the census (goesl2.lapCensus) and the usable field nearest
+// the observer (goesl2.lapNearestUsable). One builder for both files;
+// the page pairs the temperature and the moisture by their times and
+// builds the rows itself (goesl2.lapColumnRows).
+function l2ProfileBody(dec, key, lat, lon, field) {
+  if (!dec || !dec.data || !dec.data[field] || !dec.box || !dec.levels) return null;
+  const box = dec.box;
+  const ci = box.i - box.i0;
+  const cj = box.j - box.j0;
+  const qc = cj * box.cols + ci;
+  const overall = dec.data.DQF_Overall;
+  const retrieval = dec.data.DQF_Retrieval;
+  const skin = dec.data.DQF_SkinTemp;
+  const m = dec.meta[field] ?? {};
+  const x = dec.extras ?? {};
+  const num = (v) => (Number.isFinite(v) ? v : null);
+  return {
+    ...l2Common(dec, field === 'LVT' ? L2_PRODUCTS.lvt : L2_PRODUCTS.lvm, key, {
+      box,
+      pixel: dec.pixel
+    }),
+    field,
+    levels: packArray(dec.levels, 'f32'),
+    counts: packArray(dec.data[field], 'u16'),
+    scale: m.scale ?? 1,
+    offset: m.offset ?? 0,
+    fill: m.fill ?? 65535,
+    units: m.units ?? null,
+    overall: packArray(overall, 'u8'),
+    retrieval: packArray(retrieval, 'u8'),
+    skin: skin ? packArray(skin, 'u8') : null,
+    here: {
+      q: qc,
+      overall: overall[qc] ?? null,
+      retrieval: retrieval ? (retrieval[qc] ?? null) : null,
+      skin: skin ? (skin[qc] ?? null) : null,
+      quality: lapQuality(overall[qc], retrieval ? retrieval[qc] : null)
+    },
+    census: lapCensus(overall, retrieval),
+    nearest: lapNearestUsable(overall, retrieval, {
+      cols: box.cols,
+      rows: box.rows,
+      ci,
+      cj
+    }),
+    lzaQuantitativeDeg: num(x.quantitative_local_zenith_angle),
+    lzaRetrievalDeg: num(x.retrieval_local_zenith_angle)
+  };
+}
+export function l2LvtBody(dec, key, lat, lon) {
+  return l2ProfileBody(dec, key, lat, lon, 'LVT');
+}
+export function l2LvmBody(dec, key, lat, lon) {
+  return l2ProfileBody(dec, key, lat, lon, 'LVM');
 }
 export function l2RainBody(dec, key, lat, lon) {
   if (!l2Has(dec, L2_RAIN_SPEC)) return null;

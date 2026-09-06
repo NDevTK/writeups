@@ -481,6 +481,11 @@ export const L2_PRODUCTS = {
   // the haze's kind (169th): the aerosol detection - smoke and dust
   // flags, CONUS every 10 min, 2 km, daytime; 0.8 MB a file
   adp: 'ABI-L2-ADPC',
+  // the column from orbit (171st): the legacy temperature and moisture
+  // profiles, 101 levels on the 10-km grid, CONUS every 5 min, day and
+  // night; 9.7 MB a file, a point's column one 200-kB chunk
+  lvt: 'ABI-L2-LVTPC',
+  lvm: 'ABI-L2-LVMPC',
   // the 152nd pass: the downward shortwave radiation at the surface
   // (0.2-4.0 um, direct + diffuse, W/m2) - full disk only, every 10
   // min, 2 km (the Enterprise SRB algorithm: Laszlo, Kim & Liu, ATBD
@@ -1315,6 +1320,273 @@ export function adpReweight(fractions, dominant, floor = ADP_CALLED_FLOOR) {
     for (const k of group.slice(1)) out[k] = 0;
   }
   return {fractions: out, changed: true, from: gShare, to: floor};
+}
+// ---------------------------------------------------------------
+// THE COLUMN FROM ORBIT (171st pass): NOAA's legacy vertical
+// temperature and moisture profiles (ABI-L2-LVTPC and LVMPC: CONUS
+// every 5 min - measured, the requirement says 30 - 10 km, day and
+// night, clear fields of regard) - the Enterprise Legacy Soundings
+// ATBD v3.1 (Li, Schmit, Jin, Martin, Li 2019, read in full in the
+// 163rd for the column's water; its profile requirements here). A
+// regression first guess from the ABI's infrared bands and the NWP
+// forecast, then a physical retrieval on the 101 RTTOV pressure
+// levels (1100 to 0.005 hPa), over a 5 x 5 field of regard of 2-km
+// pixels of which a fifth must be clear. REQUIREMENT (Tables 1.1-1.2):
+// "inherent vertical resolution is only 3 to 5 km"; temperature to 1
+// K (precision 2 K) below 400 hPa AND above the boundary layer;
+// relative humidity to 18% from the surface to 300 hPa and 20% from
+// 300 to 100; quantitative to 67 deg local zenith; the temperature
+// useful below 100 hPa only, the humidity below 300 hPa only (Table
+// 7); the skin temperature retrieved over land only. So the satellite
+// says what the balloon says ABOVE the boundary layer - the freezing
+// level, the contrail criterion's levels, the cold gate's 250 hPa, the
+// infrared reference's water and warmth aloft - and nothing of the
+// surface layer the mirages live in: that stays the balloon's or
+// nobody's, stated. THE FILE (measured 2026-09-06): LVT (300 x 500 x
+// 101) uint16 K at 0.00236533 from 165 K, LVM the same shape as a
+// FRACTION of relative humidity at 1.526e-5 (the units attribute says
+// percent; the counts top out at 1.0), fill 65535; chunks of two rows
+// by the full width by all levels, so a point's column is one chunk;
+// DQF_Overall 0-10, DQF_Retrieval 0-5 (fill 255 where nothing was
+// retrieved), DQF_SkinTemp 0-2; at 20:51Z 73,949 of 150,000 fields of
+// regard good, 71,942 invalid for cloud.
+// ---------------------------------------------------------------
+import {eLiq} from './contrails.js';
+export const LAP_ATBD = {
+  version: 'Enterprise Legacy Soundings ATBD v3.1, 2019-11-01',
+  requirement: {
+    tAccuracyK: 1,
+    tPrecisionK: 2,
+    tAccuracyBelowHpa: 400,
+    rhAccuracyPct: {surfaceTo500: 18, to300: 18, to100: 20},
+    verticalResolutionKm: [3, 5],
+    horizontalKm: 10,
+    lzaQuantitativeDeg: 67,
+    clearFraction: 0.2,
+    levels: 101,
+    tUsefulBelowHpa: 100,
+    rhUsefulBelowHpa: 300,
+    refreshMinConus: 30
+  }
+};
+export const LAP_DQF_OVERALL = [
+  'good',
+  'invalid: not geolocated or past the retrieval zenith',
+  'degraded: latitude threshold',
+  'degraded: quantitative zenith threshold',
+  'invalid: insufficient clear pixels in the field of regard',
+  'invalid: missing NWP',
+  'invalid: missing L1b or a fatal error',
+  'invalid: bad NWP surface pressure index',
+  'invalid: indeterminate land emissivity',
+  'invalid: bad TPW sigma level',
+  'invalid: not a number'
+];
+export const LAP_DQF_RETRIEVAL = [
+  'good',
+  'nonconvergent',
+  'brightness temperature residual past the threshold',
+  'incomplete convergence',
+  'unrealistic value',
+  'invalid radiative-transfer brightness temperature'
+];
+export const LAP_FILL = 65535;
+export const LAP_RD = 287.053;
+export const LAP_G = 9.80665;
+/** A field of regard's usability from its two flags: good (0), degraded
+ * (2, 3: past the latitude or the quantitative zenith - the retrieval
+ * ran), else invalid; the words say why. */
+export function lapQuality(overall, retrieval) {
+  const o = Number.isFinite(overall) && overall !== 255 ? overall : null;
+  const r = Number.isFinite(retrieval) && retrieval !== 255 ? retrieval : null;
+  const usable = o === 0 || o === 2 || o === 3;
+  return {
+    usable,
+    degraded: o === 2 || o === 3,
+    overall: o,
+    retrieval: r,
+    words:
+      (o === null ? 'no flag' : LAP_DQF_OVERALL[o] ?? `flag ${o}`) +
+      (r !== null && r !== 0 ? `; ${LAP_DQF_RETRIEVAL[r] ?? `retrieval flag ${r}`}` : '')
+  };
+}
+/** The standard atmosphere's pressure (hPa) at a height (m): the
+ * surface the satellite column stands on where the page carries no
+ * measured pressure - a 10-hPa error moves every height 80 m,
+ * nothing against the ATBD's 3-5 km resolution, stated. */
+export function isaPressureHpa(zM) {
+  return 1013.25 * Math.pow(Math.max(1 - 2.25577e-5 * (zM || 0), 0.01), 5.25588);
+}
+/** Specific humidity (kg/kg) from the vapour pressure and the pressure
+ * (both Pa): the usual 0.622 e / (p - 0.378 e). */
+export function specificHumidity(ePa, pPa) {
+  return (0.622 * ePa) / Math.max(pPa - 0.378 * ePa, 1);
+}
+/** The dew point (C) whose Murphy-Koop saturation pressure is ePa: a
+ * bisection on the theme's own eLiq (monotonic in T). */
+export function dewPointC(ePa) {
+  if (!(ePa > 0)) return null;
+  let lo = 150;
+  let hi = 340;
+  for (let i = 0; i < 48; i++) {
+    const mid = (lo + hi) / 2;
+    if (eLiq(mid) > ePa) hi = mid;
+    else lo = mid;
+  }
+  return (lo + hi) / 2 - 273.15;
+}
+/** T (K) and RH (fraction) interpolated linearly in ln p between two
+ * levels. */
+const lnInterpLevel = (p, p0, p1, v0, v1) =>
+  v0 + ((v1 - v0) * Math.log(p / p0)) / Math.log(p1 / p0);
+/**
+ * The satellite's column as sounding rows [{p (hPa), hM, tC, tdC, rh
+ * (%)}] from the surface upward: the surface row at pSfcHpa and zSfcM
+ * (the temperature and humidity interpolated in ln p between the
+ * levels that bracket the surface), then every level above it to
+ * tUsefulBelowHpa (the ATBD's 100 hPa), the heights by the hypsometric
+ * equation on the layer-mean virtual temperature (the specific
+ * humidity from the retrieved relative humidity over Murphy-Koop
+ * water), the humidity dropped above rhUsefulBelowHpa (the ATBD's 300
+ * hPa: null there). pressureHpa descends with the index (1100 first);
+ * tK and rhFrac are the physical values with NaN for the fill. null
+ * when fewer than four levels are usable.
+ */
+export function lapColumnRows(
+  pressureHpa,
+  tK,
+  rhFrac,
+  {
+    pSfcHpa = 1013.25,
+    zSfcM = 0,
+    tUsefulBelowHpa = LAP_ATBD.requirement.tUsefulBelowHpa,
+    rhUsefulBelowHpa = LAP_ATBD.requirement.rhUsefulBelowHpa
+  } = {}
+) {
+  const n = pressureHpa.length;
+  // the levels at or above the surface (p <= pSfc) with a finite T
+  const idx = [];
+  for (let i = 0; i < n; i++)
+    if (pressureHpa[i] < pSfcHpa && pressureHpa[i] >= tUsefulBelowHpa && Number.isFinite(tK[i]))
+      idx.push(i);
+  if (idx.length < 4) return null;
+  // the surface's own values: bracket pSfc between the level below
+  // (p > pSfc, the retrieval extrapolates under the ground) and the
+  // first level above; without a level below, hold the first above
+  const first = idx[0];
+  let below = -1;
+  for (let i = first - 1; i >= 0; i--)
+    if (Number.isFinite(tK[i])) {
+      below = i;
+      break;
+    }
+  const rhOf = (i) => (Number.isFinite(rhFrac[i]) ? Math.min(Math.max(rhFrac[i], 0), 1) : null);
+  const tSfcK =
+    below >= 0
+      ? lnInterpLevel(pSfcHpa, pressureHpa[below], pressureHpa[first], tK[below], tK[first])
+      : tK[first];
+  const rhSfc =
+    below >= 0 && rhOf(below) !== null && rhOf(first) !== null
+      ? lnInterpLevel(pSfcHpa, pressureHpa[below], pressureHpa[first], rhOf(below), rhOf(first))
+      : rhOf(first);
+  const row = (pHpa, hM, tKv, rh) => {
+    const rhUse = pHpa >= rhUsefulBelowHpa ? rh : null;
+    const ePa = rhUse !== null ? rhUse * eLiq(tKv) : null;
+    return {
+      p: pHpa,
+      hM,
+      tC: tKv - 273.15,
+      rh: rhUse !== null ? 100 * rhUse : null,
+      tdC: ePa !== null && ePa > 0 ? dewPointC(ePa) : null,
+      q: ePa !== null ? specificHumidity(ePa, pHpa * 100) : 0
+    };
+  };
+  const rows = [row(pSfcHpa, zSfcM, tSfcK, rhSfc)];
+  let z = zSfcM;
+  let pPrev = pSfcHpa;
+  let tvPrev = tSfcK * (1 + 0.608 * rows[0].q);
+  for (const i of idx) {
+    const p = pressureHpa[i];
+    const r = row(p, 0, tK[i], rhOf(i));
+    const tv = tK[i] * (1 + 0.608 * r.q);
+    z += ((LAP_RD * (tvPrev + tv)) / 2 / LAP_G) * Math.log(pPrev / p);
+    r.hM = z;
+    rows.push(r);
+    pPrev = p;
+    tvPrev = tv;
+  }
+  return rows;
+}
+/** The column's precipitable water (mm): the specific humidity
+ * integrated over pressure, q dp / g, layer by layer. */
+export function lapPwMm(rows) {
+  let pw = 0;
+  for (let i = 0; i + 1 < rows.length; i++) {
+    const a = rows[i];
+    const b = rows[i + 1];
+    pw += ((((a.q ?? 0) + (b.q ?? 0)) / 2) * ((a.p - b.p) * 100)) / LAP_G;
+  }
+  return pw;
+}
+/** The freezing level (m): the first upward crossing of 0 C, linear in
+ * height between the rows; null when the column never freezes (or
+ * starts frozen: 0 at the surface, stated by the caller). */
+export function lapFreezingLevelM(rows) {
+  if (!rows || !rows.length) return null;
+  if (rows[0].tC <= 0) return rows[0].hM;
+  for (let i = 0; i + 1 < rows.length; i++) {
+    const a = rows[i];
+    const b = rows[i + 1];
+    if (a.tC > 0 && b.tC <= 0) return a.hM + ((b.hM - a.hM) * a.tC) / (a.tC - b.tC);
+  }
+  return null;
+}
+/** The rows' values at a pressure level (hPa), linear in ln p: {tC,
+ * rh, tdC, hM}, null outside the column. */
+export function lapLevelAt(rows, hPa) {
+  for (let i = 0; i + 1 < rows.length; i++) {
+    const a = rows[i];
+    const b = rows[i + 1];
+    if (hPa <= a.p && hPa >= b.p) {
+      const f = Math.log(hPa / a.p) / Math.log(b.p / a.p);
+      const mix = (u, v) => (u === null || v === null ? null : u + f * (v - u));
+      return {tC: mix(a.tC, b.tC), rh: mix(a.rh, b.rh), tdC: mix(a.tdC, b.tdC), hM: mix(a.hM, b.hM)};
+    }
+  }
+  return null;
+}
+/** The window's census by the overall flag: good, degraded, and the
+ * invalid by reason, with the fields of regard whose retrieval ran. */
+export function lapCensus(overall, retrieval) {
+  const c = {n: overall.length, good: 0, degraded: 0, cloud: 0, zenith: 0, nwp: 0, other: 0, fill: 0, retrieved: 0};
+  for (let q = 0; q < overall.length; q++) {
+    const o = overall[q];
+    if (o === 255 || o === undefined) {
+      c.fill++;
+      continue;
+    }
+    if (o === 0) c.good++;
+    else if (o === 2 || o === 3) c.degraded++;
+    else if (o === 4) c.cloud++;
+    else if (o === 1) c.zenith++;
+    else if (o === 5 || o === 7) c.nwp++;
+    else c.other++;
+    if (retrieval && retrieval[q] === 0) c.retrieved++;
+  }
+  return c;
+}
+/** The usable field of regard nearest the window's centre: the centre
+ * itself when usable, else the nearest by distance, else null. */
+export function lapNearestUsable(overall, retrieval, {cols, rows, ci, cj}) {
+  let best = null;
+  for (let j = 0; j < rows; j++)
+    for (let i = 0; i < cols; i++) {
+      const q = j * cols + i;
+      if (!lapQuality(overall[q], retrieval ? retrieval[q] : null).usable) continue;
+      const d2 = (i - ci) * (i - ci) + (j - cj) * (j - cj);
+      if (!best || d2 < best.d2) best = {q, i, j, d2};
+    }
+  return best;
 }
 // ---------------------------------------------------------------
 // THE FIRE'S HEAT (162nd pass): NOAA's fire / hot spot

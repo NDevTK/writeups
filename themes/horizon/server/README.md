@@ -235,10 +235,34 @@ are gated by `../server-reference.mjs` — the `server` set in
   matchup rule around the point (`matchup`: the coverage of valid
   retrievals, the dominant type when more than half of them carry it,
   no call under 80% coverage) and the scene's own detection counts
-  from the file's head (`sceneStats`): fifteen products served (a
-  window of +-100 km costs 437-547 kB in 4-6 ranges, measured, the
-  aerosol window a few tens of kB more). A
-  SIXTEENTH ask exists in the shared decode block but is the page's
+  from the file's head (`sceneStats`), and since the 171st NOAA's
+  legacy vertical temperature and moisture profiles (`ABI-L2-LVTPC`
+  and `ABI-L2-LVMPC`: CONUS every 5 min, 10-km fields of regard, 101
+  pressure levels from 1100 to 0.005 hPa, day and night where a fifth
+  of the field is clear - the Enterprise Legacy Soundings ATBD v3.1,
+  whose inherent vertical resolution is 3-5 km and whose temperature
+  is good to 1 K only above the boundary layer, stated on the page)
+  as `lvt` and `lvm`: a 3 x 3 window of fields around the observer
+  with every level of each as uint16 counts and the file's scaling
+  (`counts`, `scale`, `offset`, `fill`), the pressure vector
+  (`levels`), the three flag windows (`overall`, `retrieval`, `skin`),
+  the observer's own field with its quality words (`here`), the
+  census by flag and the usable field nearest the observer
+  (`nearest`); a 9.7-MB file costs a window 4-5 ranges and about
+  500 kB (the files are chunked two rows by the full width by all
+  levels: a point's column is one chunk), the column decode's
+  three-dimensional window (`decodeL2Column`) keeping every level.
+  The page pairs the two files by their times, builds the rows
+  itself (`goesl2.lapColumnRows`: the surface from the standard
+  atmosphere at the observer's elevation, hypsometric heights, the
+  humidity dropped above 300 hPa as the ATBD says) and lets the
+  column stand in above the boundary layer - the freezing level and
+  the infrared reference's column - where no balloon flew within 300
+  km and 13 h: seventeen products served (a window of +-100 km costs
+  437-547 kB in 4-6 ranges, measured, the aerosol window a few tens
+  of kB more, the two profile windows about a megabyte between them
+  at the five-minute cadence). An
+  EIGHTEENTH ask exists in the shared decode block but is the page's
   own (`pageOnly`, 159th): the 500-m visible band 2 window (`vis`,
   401 x 401 px of the CMIP ATBD's reflectance factor with the
   file's kappa, Esun and Earth-Sun distance) that the page reads
@@ -247,7 +271,7 @@ are gated by `../server-reference.mjs` — the `server` set in
   cadence (about 15 MB an hour by day), which this box's free-tier
   egress cannot carry and the bucket's CORS can. This
   daemon never lists, fetches or serves it; `/health`'s
-  `version.products` names the fifteen it does.
+  `version.products` names the seventeen it does.
   Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks

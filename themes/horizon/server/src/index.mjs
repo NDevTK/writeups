@@ -1027,10 +1027,16 @@ export {
   L2_RAIN_EXTRAS,
   L2_ADP_SPEC,
   L2_ADP_EXTRAS,
+  L2_LVT_SPEC,
+  L2_LVM_SPEC,
+  L2_LAP_EXTRAS,
   L2_TPW_EXTRAS,
   l2TpwBody,
   l2RainBody,
   l2AdpBody,
+  l2LvtBody,
+  l2LvmBody,
+  decodeL2Column,
   l2DcompBody
 } from '../../goesl2-decode.js';
 const {
@@ -1059,6 +1065,7 @@ const {
   L2_ASKS,
   decodeL2Window,
   decodeL2Vectors,
+  decodeL2Column,
   l2Window,
   l2MaskBody,
   l2HeightBody,
@@ -1073,6 +1080,8 @@ const {
   l2TpwBody,
   l2RainBody,
   l2AdpBody,
+  l2LvtBody,
+  l2LvmBody,
   l2DcompBody
 } = L2;
 const l2Inflate = (u8) =>
@@ -2153,14 +2162,23 @@ function main() {
           const dec =
             ask.kind === 'vectors'
               ? await decodeL2Vectors(f, cell.lat, cell.lon, ask.radiusKm)
-              : await decodeL2Window(
-                  f,
-                  spec,
-                  cell.lat,
-                  cell.lon,
-                  halfPx,
-                  ask.extras ?? null
-                );
+              : ask.kind === 'column'
+                ? await decodeL2Column(
+                    f,
+                    spec,
+                    cell.lat,
+                    cell.lon,
+                    halfPx,
+                    ask.extras ?? null
+                  )
+                : await decodeL2Window(
+                    f,
+                    spec,
+                    cell.lat,
+                    cell.lon,
+                    halfPx,
+                    ask.extras ?? null
+                  );
           if (!dec) throw new Error(product + ': not readable');
           l2State.ranges += f.stats.ranges;
           l2State.rangeBytes += f.stats.bytes;
@@ -2407,6 +2425,9 @@ function main() {
         : null,
       // the haze's kind (169th): the smoke and dust flags by day
       adp: F.adp ? l2AdpBody(F.adp.dec, F.adp.key, cell.lat, cell.lon) : null,
+      // the column from orbit (171st): the profiles over the observer
+      lvt: F.lvt ? l2LvtBody(F.lvt.dec, F.lvt.key, cell.lat, cell.lon) : null,
+      lvm: F.lvm ? l2LvmBody(F.lvm.dec, F.lvm.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial',
       // the deployed revision (158th): the page can tell an older
       // daemon's body from a fresh one's

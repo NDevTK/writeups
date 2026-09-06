@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1187 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1190 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **148 reference files, 1187 landmark lines, 8 GPU probes** (live gate
+- **148 reference files, 1190 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1149,7 +1149,32 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    toward the kind's α at fixed 550 nm so the measured amount stands
    and only the haze's colour becomes the kind's: flat and
    blue-absorbing for dust, steep and blue-scattering for smoke
-   (`aerosol-reference` THE KIND'S OWN OPTICS)
+   (`aerosol-reference` THE KIND'S OWN OPTICS). Pass 171 gives the
+   scene a measured column where no balloon flew: NOAA's legacy
+   vertical temperature and moisture profiles (ABI-L2-LVTPC/LVMPC,
+   101 pressure levels over 10-km fields of regard, CONUS every 5 min)
+   become the sixteenth and seventeenth served products, read by the
+   reader's three-dimensional window (every level of one field is one
+   two-row chunk of a 9.7-MB file) and turned into sounding rows by the
+   hypsometric equation on the layer-mean virtual temperature with
+   Murphy–Koop water — the surface from the standard atmosphere at the
+   observer's elevation, the humidity dropped above 300 hPa and the
+   temperature above 100 hPa as the Legacy Soundings ATBD says. The
+   ATBD's own limits are the law's: "inherent vertical resolution is
+   only 3 to 5 km", 1 K only below 400 hPa and above the boundary
+   layer, humidity to 18% — so the column stands in ABOVE the boundary
+   layer where no fresh balloon lies within 300 km and 13 h (the
+   freezing level the bow shaft caps at, the infrared clear-sky
+   reference's column, the contrail formation band by its
+   temperature for the words) and never the surface layer: no mirage
+   claim from orbit. A real 6 × 6 crop of both files is vendored and
+   the reader, the column decode and the law are held to h5py's
+   independent hypsometric column — 54 rows to 103 hPa, 34.351 mm of
+   water, the freezing level at 4,082.9 m, 250 hPa at −48.95 °C — to
+   a micrometre of height and a millimetre of water, through the
+   whole-buffer read and the range path alike (`goesl2-reference` THE
+   COLUMN FROM ORBIT, THE COLUMN, READ; `goesl2-client-reference` THE
+   COLUMN, READ BY RANGE; `server-reference` the eighteen asks)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

@@ -502,6 +502,13 @@
         rainQuality,
         ADP_ATBD,
         adpReweight,
+        LAP_ATBD,
+        isaPressureHpa,
+        lapColumnRows,
+        lapFreezingLevelM,
+        lapLevelAt,
+        lapPwMm,
+        lapQuality,
         phaseQuality,
         phaseWords,
         solarZenithDeg,
@@ -1573,7 +1580,9 @@
           state.dir700 = h.wind_direction_700hPa[0];
           state.wind250 = h.wind_speed_250hPa[0];
           state.dir250 = h.wind_direction_250hPa[0];
-          state.freezing = h.freezing_level_height[0];
+          // the satellite column's freezing level stands while it
+          // stands (171st); the model's otherwise
+          if (!satColumnStands()) state.freezing = h.freezing_level_height[0];
           record(
             'open-meteo winds aloft',
             '700hPa ' +
@@ -2486,7 +2495,24 @@
             : buoyOk && Number.isFinite(b.lat) && Number.isFinite(b.lon)
               ? {latDeg: b.lat, lonDeg: b.lon}
               : {latDeg: state.lat, lonDeg: state.lon};
-        const rows = state.rowsSea ?? state.soundingData?.rows;
+        // the column the reference reads (171st): the sea column, then
+        // a fresh balloon within its gates, then the satellite's own
+        // column overhead, then a far or old balloon as ever - the
+        // source named on the line
+        const satRows = satColumn && satColumn.rows ? satColumn.rows : null;
+        const rows =
+          state.rowsSea ??
+          (ascentStands() ? state.soundingData.rows : null) ??
+          satRows ??
+          state.soundingData?.rows;
+        irColumnSource = !rows
+          ? null
+          : rows === state.rowsSea
+            ? 'pier film + radiosonde'
+            : rows === satRows
+              ? `satellite (${satColumn.craft} legacy profiles ${satColumn.time.slice(11, 16)}Z, ${satColumn.own ? 'the observer’s own' : 'the nearest usable'} 10-km field, 3–5 km resolution)`
+              : `radiosonde ${state.soundingData.name} ${state.soundingData.distKm} km` +
+                (ascentStands() ? '' : ' (past the 300-km / 13-h gates; no satellite column)');
         if (tSkinC === null || !Array.isArray(rows) || rows.length < 10) {
           const why =
             tSkinC === null
@@ -2762,7 +2788,7 @@
                     : '')
                 : '') +
               ` · cloud where ε_trop ≥ 0.10 ⇔ BT ≤ ${P.thresholdBtC.toFixed(1)} °C ` +
-              `(tropopause ${P.tropopause.tC} °C at ${P.tropopause.hM} m) · ` +
+              `(tropopause ${P.tropopause.tC.toFixed(1)} °C at ${Math.round(P.tropopause.hM)} m) · ` +
               `overhead ${P.observer.btC.toFixed(1)} °C (` +
               (P.observer.water
                 ? `sea pixel, ${CLASS[P.observer.cls]}`
@@ -6509,7 +6535,9 @@
         'fire',
         'tpw',
         'rain',
-        'adp'
+        'adp',
+        'lvt',
+        'lvm'
       ];
       let goesL2Busy = false;
       // THE HAZE'S KIND (169th pass): NOAA's aerosol detection while
@@ -6557,6 +6585,182 @@
           (a.sceneStats && a.sceneStats.dustDetected !== null
             ? ` · the scene ${a.sceneStats.dustDetected.toLocaleString('en-US')} dust and ${(a.sceneStats.smokeDetected ?? 0).toLocaleString('en-US')} smoke detections`
             : '')
+        );
+      }
+      // THE COLUMN FROM ORBIT (171st pass): NOAA's legacy temperature
+      // and moisture profiles over the observer's 10-km field of regard
+      // (goesl2.lapColumnRows: the surface from the standard atmosphere
+      // at the observer's elevation, the heights hypsometric, the
+      // humidity dropped above 300 hPa as the ATBD says). Where no
+      // fresh balloon stands within 300 km and 13 h the column stands
+      // in ABOVE the boundary layer: the freezing level and the
+      // infrared reference's column; the contrail band by its
+      // temperature for the words only (its humidity is not useful
+      // above 300 hPa, so persistence stays unjudged and the drawn
+      // trails keep their own judge); never the surface layer - the
+      // ATBD's inherent resolution is 3-5 km, and the mirage claims
+      // stay closed without a balloon.
+      const LAP_LIVE_MS = 30 * 60e3;
+      let satColumn = null;
+      let irColumnSource = null;
+      function ascentStands() {
+        const s = state.soundingData;
+        if (!s || !s.at || !Array.isArray(s.rows) || s.rows.length < 10)
+          return false;
+        if (overridden && !params.has('sounding')) return false;
+        const ageH = (Date.now() - Date.parse(s.at)) / 3600e3;
+        return ageH <= SOUNDING_FRESH_H && s.distKm <= SOUNDING_MAX_KM;
+      }
+      function satColumnStands() {
+        return !!(
+          satColumn &&
+          satColumn.rows &&
+          Date.now() - satColumn.at < LAP_LIVE_MS &&
+          !ascentStands()
+        );
+      }
+      function goesL2ColumnNow() {
+        const t = goesL2 && goesL2.lvt;
+        const m = goesL2 && goesL2.lvm;
+        if (!t || !m || !t.counts || !m.counts || !t.levels || !t.time || !m.time)
+          return null;
+        // one scene: the two files of the same 5 minutes
+        if (Math.abs(Date.parse(t.time) - Date.parse(m.time)) > 6 * 60e3)
+          return null;
+        if (Date.now() - Date.parse(t.time) > LAP_LIVE_MS) return null;
+        const pick =
+          t.here && t.here.quality && t.here.quality.usable
+            ? {q: t.here.q, own: true}
+            : t.nearest
+              ? {q: t.nearest.q, own: false}
+              : null;
+        if (!pick) return {none: true, t, m};
+        const n = t.levels.length;
+        const col = (b) => {
+          const out = new Array(n);
+          for (let k = 0; k < n; k++) {
+            const v = b.counts[pick.q * n + k];
+            out[k] = v === b.fill ? NaN : v * b.scale + b.offset;
+          }
+          return out;
+        };
+        const pSfc = isaPressureHpa(centerElev);
+        const rows = lapColumnRows(t.levels, col(t), col(m), {
+          pSfcHpa: pSfc,
+          zSfcM: centerElev
+        });
+        if (!rows) return {none: true, t, m};
+        return {
+          t,
+          m,
+          q: pick.q,
+          own: pick.own,
+          rows,
+          pSfc,
+          pwMm: lapPwMm(rows),
+          freezingM: lapFreezingLevelM(rows),
+          at250: lapLevelAt(rows, 250),
+          at700: lapLevelAt(rows, 700),
+          quality: lapQuality(
+            t.overall[pick.q],
+            t.retrieval ? t.retrieval[pick.q] : null
+          )
+        };
+      }
+      function applySatColumn() {
+        const c = goesL2ColumnNow();
+        const craft = (goesL2 && goesL2.craft) || 'GOES';
+        if (!c) {
+          satColumn = null;
+          return;
+        }
+        const fresh =
+          !satColumn || satColumn.time !== c.t.time || satColumn.q !== c.q;
+        satColumn = {at: Date.now(), time: c.t.time, craft, ...c};
+        record(`NOAA ${craft} legacy profiles (LVTPC/LVMPC)`, satColumnWords());
+        if (c.none) return;
+        // the freezing level where no balloon stands (the bow shaft's
+        // cap; the weather sync leaves it while this column stands)
+        if (!ascentStands() && Number.isFinite(c.freezingM))
+          state.freezing = c.freezingM;
+        // the infrared field re-runs once on a new column when it ran on
+        // a lesser one (a far balloon, or none at all)
+        if (
+          fresh &&
+          !ascentStands() &&
+          (irColumnSource === null || !irColumnSource.startsWith('satellite'))
+        )
+          syncGoesIr();
+      }
+      function satColumnWords() {
+        const c = satColumn;
+        if (!c) return '';
+        const t = c.t;
+        const cen = t.census;
+        if (c.none)
+          return (
+            `${t.time.slice(11, 16)}Z · no usable field of regard in the 3 × 3 (${t.here.quality.words}; ` +
+            `${cen.good} good, ${cen.degraded} degraded, ${cen.cloud} cloud of ${cen.n})`
+          );
+        const r = c.rows;
+        const top = r[r.length - 1];
+        const tpw = goesL2 && goesL2.tpw && goesL2.tpw.here;
+        const tpwMm =
+          tpw && Number.isFinite(tpw.mm)
+            ? tpw.mm
+            : tpw && Number.isFinite(tpw.pwMm)
+              ? tpw.pwMm
+              : null;
+        return (
+          `${c.time.slice(11, 16)}Z · ${c.own ? "the observer's own field of regard" : 'the nearest usable field of regard'} (${c.quality.words}) · ` +
+          `${r.length} levels ${r[0].p.toFixed(0)} → ${top.p.toFixed(0)} hPa (${(top.hM / 1000).toFixed(1)} km) · surface ${r[0].tC.toFixed(1)} °C` +
+          (r[0].rh !== null ? ` ${r[0].rh.toFixed(0)}%` : '') +
+          ` (the standard atmosphere's ${c.pSfc.toFixed(0)} hPa at ${Math.round(centerElev)} m) · freezing ${c.freezingM !== null ? Math.round(c.freezingM) + ' m' : 'nowhere'}` +
+          (c.at700
+            ? ` · 700 hPa ${c.at700.tC.toFixed(1)} °C${c.at700.rh !== null ? ' ' + c.at700.rh.toFixed(0) + '%' : ''} at ${(c.at700.hM / 1000).toFixed(1)} km`
+            : '') +
+          (c.at250
+            ? ` · 250 hPa ${c.at250.tC.toFixed(1)} °C at ${(c.at250.hM / 1000).toFixed(1)} km`
+            : '') +
+          ` · ${c.pwMm.toFixed(1)} mm of water` +
+          (tpwMm !== null
+            ? ` (the TPW product's own ${tpwMm.toFixed(1)} mm: ${Math.abs(100 * (c.pwMm - tpwMm) / tpwMm).toFixed(0)}% apart)`
+            : '') +
+          ` · ${
+            ascentStands()
+              ? `a fresh balloon within ${SOUNDING_MAX_KM} km stands; the column beside it`
+              : `no balloon within ${SOUNDING_MAX_KM} km and ${SOUNDING_FRESH_H} h: the column stands in above the boundary layer`
+          }`
+        );
+      }
+      function satColumnLine() {
+        if (!goesL2 || (!goesL2.lvt && !goesL2.lvm)) return null;
+        const a = LAP_ATBD.requirement;
+        const s = state.soundingData;
+        const balloon =
+          s && s.name
+            ? `${s.name} ${s.distKm} km, ${((Date.now() - Date.parse(s.at)) / 3600e3).toFixed(0)} h old`
+            : 'none found';
+        let con = null;
+        try {
+          con = satColumn && satColumn.rows ? contrailPanel(satColumn.rows) : null;
+        } catch {
+          con = null;
+        }
+        return (
+          `${goesL2.craft || 'GOES'}'s legacy profiles (ABI-L2-LVTPC/LVMPC, 10-km field of regard, 101 levels, every 5 min): ` +
+          (satColumn ? satColumnWords() : 'no column yet') +
+          ` · what it stands in for: ${
+            satColumnStands()
+              ? "the freezing level (the bow shaft's cap) and the infrared reference's column" +
+                (con && con.formBand
+                  ? `; contrails forming ${(con.formBand.loM / 1000).toFixed(1)}–${(con.formBand.hiM / 1000).toFixed(1)} km by its temperature (persistence unjudged: its humidity is not useful above 300 hPa, so the drawn trails keep their own judge)`
+                  : '; no contrail formation band by its temperature')
+              : ascentStands()
+                ? `nothing - the balloon stands (${balloon})`
+                : 'nothing - no usable column'
+          } · the balloon: ${balloon} · the ATBD: ${a.verticalResolutionKm.join('–')} km inherent vertical resolution, ${a.tAccuracyK} K below 400 hPa and above the boundary layer, humidity ${a.rhAccuracyPct.to300}% to 300 hPa` +
+          ` - the surface layer stays the balloon's or nobody's: no mirage claim from orbit`
         );
       }
       let goesL2Rerun = false;
@@ -6960,6 +7164,13 @@
                   })
                 : null,
               pqi: p.pqi ? unpackArray(p.pqi) : null,
+              // the column from orbit (171st): the pressure vector, every
+              // level of every field of regard as counts, the three flags
+              levels: p.levels ? unpackArray(p.levels) : null,
+              counts: p.counts ? unpackArray(p.counts) : null,
+              overall: p.overall ? unpackArray(p.overall) : null,
+              retrieval: p.retrieval ? unpackArray(p.retrieval) : null,
+              skin: p.skin ? unpackArray(p.skin) : null,
               // the cloud top phase's categories (161st pass)
               phaseArr: p.phase ? unpackArray(p.phase) : null,
               // the fire mask's codes (162nd pass; the -99 fill as 65535)
@@ -7120,6 +7331,11 @@
             // the haze's kind (169th pass; CONUS every 10 min, 2 km,
             // daytime): the smoke and dust flags, the ATBD's verdict
             adp: unpackProduct(j.adp),
+            // the column from orbit (171st pass; CONUS every 5 min, 10 km,
+            // 101 levels): the temperature and moisture profiles over the
+            // observer's field of regard (applySatColumn)
+            lvt: unpackProduct(j.lvt),
+            lvm: unpackProduct(j.lvm),
             // the daemon's deployed revision and the products the
             // page read for it from the bucket (158th pass)
             rev: j.rev ?? null,
@@ -7399,6 +7615,10 @@
               }
             }
           }
+          // THE COLUMN FROM ORBIT (171st pass): the profiles over the
+          // observer, standing in above the boundary layer where no
+          // balloon does
+          applySatColumn();
           if (
             goesObs &&
             goesObs.time &&
@@ -14598,7 +14818,8 @@
           // still learns its satellite.
           if (goesObs)
             research['cloud field (geostationary band 13 · GIBS)'] =
-              goesObs.line;
+              goesObs.line +
+              (irColumnSource ? ` · the reference's column: ${irColumnSource}` : '');
           else if (goesReach)
             research['cloud field (geostationary band 13 · GIBS)'] = goesReach;
           else delete research['cloud field (geostationary band 13 · GIBS)'];
@@ -14636,6 +14857,11 @@
               delete research[GLM_LINE];
               delete researchLook[GLM_LINE];
             }
+            // THE COLUMN FROM ORBIT (171st pass): the satellite's
+            // profiles over the observer and what they stand in for
+            const scl = satColumnLine();
+            if (scl) research['satellite column (ABI legacy profiles)'] = scl;
+            else delete research['satellite column (ABI legacy profiles)'];
           }
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();
