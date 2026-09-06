@@ -187,6 +187,50 @@ export function echoTopCensus(
     stormsTotal: cells.length
   };
 }
+/**
+ * THE TOWERS AT THEIR PLACES (175th): the storms as the low deck's
+ * measured TOP field - RM x RM RGBA float32 (R the tower's top in the
+ * deck's own units through yOf(metres), A 1 where a storm stands, a
+ * zero border ring) spanning worldM metres centred on (lat, lon). Each
+ * storm cell within the box paints the texels its cellM footprint
+ * touches (the rain cover field's own footprint rule), the taller
+ * value keeping a texel. Returns {data, rm, painted, cells, maxKm,
+ * maxTop}. Storms are {lat, lon, km} (echoTopCensus's list).
+ */
+export function echoTopField(storms, lat, lon, {rm = 64, worldM = 16000, cellM = 1000} = {}, yOf = (m) => m) {
+  const data = new Float32Array(rm * rm * 4);
+  const mPerTexel = worldM / rm;
+  const mLon = Math.max(111320 * Math.cos((lat * Math.PI) / 180), 1e-6);
+  const half = cellM / 2;
+  const EPS = 1e-6;
+  let painted = 0;
+  let cells = 0;
+  let maxKm = null;
+  let maxTop = null;
+  for (const s of storms || []) {
+    if (!(s.km > 0)) continue;
+    const xM = (s.lon - lon) * mLon;
+    const zM = -(s.lat - lat) * 111320;
+    if (Math.abs(xM) > worldM / 2 + half || Math.abs(zM) > worldM / 2 + half) continue;
+    cells++;
+    const top = yOf(s.km * 1000);
+    if (!Number.isFinite(top)) continue;
+    const i0 = Math.floor((xM - half + worldM / 2) / mPerTexel + EPS);
+    const i1 = Math.ceil((xM + half + worldM / 2) / mPerTexel - EPS) - 1;
+    const j0 = Math.floor((zM - half + worldM / 2) / mPerTexel + EPS);
+    const j1 = Math.ceil((zM + half + worldM / 2) / mPerTexel - EPS) - 1;
+    for (let jj = Math.max(j0, 1); jj <= Math.min(j1, rm - 2); jj++)
+      for (let ii = Math.max(i0, 1); ii <= Math.min(i1, rm - 2); ii++) {
+        const k = (jj * rm + ii) * 4;
+        if (data[k + 3] === 0) painted++;
+        data[k + 3] = 1;
+        if (top > data[k]) data[k] = top;
+        if (maxTop === null || top > maxTop) maxTop = top;
+        if (maxKm === null || s.km > maxKm) maxKm = s.km;
+      }
+  }
+  return {data, rm, painted, cells, maxKm, maxTop};
+}
 /** The words for a census. */
 export function echoTopWords(c, {refTimeIso = null, halfKm = null} = {}) {
   const km = (v) => (v === null ? 'none' : `${v.toFixed(1)} km`);

@@ -16,6 +16,7 @@ import {
 import {
   bearingDeg,
   echoTopCensus,
+  echoTopField,
   echoTopWords,
   MRMS_FACTS,
   MRMS_TOWER_KM,
@@ -270,6 +271,66 @@ const createInflate = () => zlib.createInflate();
     `${X.file.slice(0, 16)} ${h.refTimeIso}, discipline ${h.discipline} category ${h.paramCategory} number ${h.paramNumber}, template 5.${h.drt.tmpl} R ${h.drt.R} D ${h.drt.D}: a ${w.box.rows} x ${w.box.cols} window read in ${w.rowsRead} rows and ${w.chunks} chunks; ` +
       `the centre cell ${centre} km (Pillow ${X.centre.value}), ${X.samples.length} sampled counts exact, ${tops.length} echoing cells, ${noEcho} echo-free, ${noCov} uncovered; tops median ${cen.medianKm}, tallest tenth ${cen.p90Km}, tallest ${cen.maxKm} km at ${cen.tallest.bearingDeg}° and ${cen.tallest.distKm} km (a plain great-circle: ${plainBrg.toFixed(1)}°, ${plainKm.toFixed(1)} km); ` +
       `${cen.stormsTotal} cells at or above ${MRMS_TOWER_KM} km, ${cen.storms.length} kept; a window at 10 N is null, one at the crop's corner clips to ${corner.box.rows} x ${corner.box.cols}; the words: "${words.slice(0, 120)}..."`
+  );
+}
+
+// ---- THE TOWERS' FIELD (175th pass) -----------------------------------
+// Storms painted onto the low deck's texel field: a cell's 1-km
+// footprint touches the texels the rain cover field's own rule says,
+// the taller value keeps a texel, the border ring stays zero, storms
+// outside the box are skipped, the caller's y mapping is applied; the
+// vendored crop's census list paints its towers.
+{
+  const rm = 16;
+  const worldM = 16000; // 1 km a texel
+  const lat = 32.075;
+  const lon = -81.105;
+  const mLon = 111320 * Math.cos((lat * Math.PI) / 180);
+  // a storm centred on texel (10, 5): x = +2.5 km, z = -2.5 km -> its
+  // 1-km footprint [2, 3) km touches texel 10 only; a second storm
+  // 0.5 km east of it straddles texels 10 and 11; a taller one on the
+  // same texel keeps the texel; one 20 km away is outside the box
+  const at = (xKm, zKm, km) => ({lat: lat - (zKm * 1000) / 111320, lon: lon + (xKm * 1000) / mLon, km});
+  const storms = [at(2.5, -2.5, 9), at(3.0, -2.5, 8.2), at(2.5, -2.5, 12), at(20, 0, 15), {lat, lon, km: 0}];
+  const f = echoTopField(storms, lat, lon, {rm, worldM, cellM: 1000}, (m) => m / 1000);
+  const k = (ii, jj) => (jj * rm + ii) * 4;
+  const border = [];
+  for (let ii = 0; ii < rm; ii++) border.push(f.data[k(ii, 0) + 3], f.data[k(ii, rm - 1) + 3], f.data[k(0, ii) + 3], f.data[k(rm - 1, ii) + 3]);
+  // the vendored crop's own storms through the field with the page's
+  // mapping (16 asinh((top - elev)/500) + 8 at an elevation of 0)
+  const X = MRMS_EXPECT;
+  const bytes = new Uint8Array(Buffer.from(ECHOTOP_B64, 'base64'));
+  const w = await grib2Window(bytes, X.centre.lat, X.centre.lon, 25, {createInflate});
+  const cen = echoTopCensus(w.values, w.box, X.centre.lat, X.centre.lon, {grid: {ni: X.cols, nj: X.rows, la1: X.la1, lo1: X.lo1}, cellDeg: X.d});
+  const yOf = (m) => 16 * Math.asinh(m / 500) + 8;
+  const g = echoTopField(cen.storms, X.centre.lat, X.centre.lon, {rm: 64, worldM: 60000, cellM: 1000}, yOf);
+  const empty = echoTopField([], lat, lon, {rm, worldM});
+  check(
+    "THE TOWERS' FIELD: storms paint their own texels with their tops through the caller's mapping, the taller keeps a texel, the ring stays zero, a storm beyond the box is skipped",
+    f.cells === 3 &&
+      f.painted === 2 &&
+      near(f.data[k(10, 5)], 12, 1e-12) &&
+      f.data[k(10, 5) + 3] === 1 &&
+      near(f.data[k(11, 5)], 8.2, 1e-6) && // the field is float32 (8.2 lands at 8.1999998)
+      f.data[k(11, 5) + 3] === 1 &&
+      f.data[k(9, 5) + 3] === 0 &&
+      f.data[k(10, 4) + 3] === 0 &&
+      f.data[k(10, 6) + 3] === 0 &&
+      border.every((v) => v === 0) &&
+      near(f.maxTop, 12, 1e-12) &&
+      f.maxKm === 12 &&
+      empty.painted === 0 &&
+      empty.cells === 0 &&
+      empty.maxTop === null &&
+      g.cells === cen.storms.length &&
+      g.painted > 0 &&
+      g.painted <= cen.storms.length * 4 &&
+      near(g.maxTop, yOf(cen.maxKm * 1000), 1e-9) &&
+      g.maxKm === cen.maxKm &&
+      Array.from({length: 64 * 64}).every((_, t) => g.data[t * 4 + 3] === 0 || g.data[t * 4] >= yOf(MRMS_TOWER_KM * 1000) - 1e-9),
+    `a 16 x 16 field a kilometre a texel: a 9-km storm centred on texel (10, 5) and a 12-km one on the same cell keep the texel at 12, a storm straddling two texels paints both (8.2 on the second), ` +
+      `the texel's neighbours stay unpainted, the ring is zero, a storm 20 km out and a km-0 entry are skipped (${f.cells} of the 5 entries counted, ${f.painted} texels); ` +
+      `the vendored crop's ${cen.storms.length} storms at or above ${MRMS_TOWER_KM} km paint ${g.painted} texels of a 64 x 64 field over 60 km, the tallest ${g.maxKm} km at scene y ${g.maxTop.toFixed(2)} (the page's asinh mapping), every painted texel at or above the 8-km tower's y`
   );
 }
 

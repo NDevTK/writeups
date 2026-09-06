@@ -197,6 +197,13 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     cov: uniform(0),
     yBase: uniform(24),
     yTop: uniform(38),
+    // THE TOWERS AT THEIR PLACES (175th): with a measured top field
+    // set (setTopField) the deck's slab top varies per texel - a
+    // tower's texel rises to its own measured top, every other texel
+    // to yTopBase - and yTop is then only the march's upper bound
+    // (the tallest tower). Without a field yTopBase is unread and the
+    // slab top is yTop as before, so the pinned harness is identical.
+    yTopBase: uniform(38),
     cType: uniform(cType),
     sigma: uniform(sigma),
     // 1 = this deck accepts the measured radar coverage field (the
@@ -272,10 +279,40 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   const uGoesOnMid = uniform(0);
   const goesOn = (rad) => mix(uGoesOnMid, uGoesOnLow, rad);
 
+  // THE TOWERS AT THEIR PLACES (175th pass): the measured TOP field -
+  // one texel per cell of the radar's 1-km echo-top grid over the
+  // scene, R = the tower's top in scene units, A = 1 where a storm
+  // stands (the deck's own y mapping applied by the page). The low
+  // deck's slab top becomes local: a tower's texel rises to R, every
+  // other texel to yTopBase, and the march's bound yTop is the tallest
+  // tower. A tower is a measured cloud, so its texel's cover is lifted
+  // to the radar field's cap. The field anchors to the low deck's
+  // advection offset at set time and drifts with the SAME wOff the
+  // noise uses, as the other measured fields do. The default 1x1 zero
+  // texture with uTopOn 0 keeps the pinned harness identical.
+  const topZeroData = new Float32Array([0, 0, 0, 0]);
+  const topTex = new DataTexture(topZeroData, 1, 1, RGBAFormat, FloatType);
+  topTex.minFilter = topTex.magFilter = LinearFilter;
+  topTex.needsUpdate = true;
+  const topNode = texture(topTex);
+  const uTopWorld = uniform(280);
+  const uTopOff = uniform(new Vector2(0, 0));
+  const uTopOn = uniform(0);
+  const TOWER_COVER = 0.95;
+  const topSample = (xz, wOff) =>
+    topNode.sample(xz.add(wOff).sub(uTopOff).div(uTopWorld).add(0.5));
+  // the slab's local top at scene xz for a deck: yT without a field
+  const topAt = Fn(([xz, wOff, yT, yTBase, rad]) => {
+    const t = topSample(xz, wOff);
+    const local = mix(yTBase, t.r, t.a.mul(rad));
+    return select(uTopOn.greaterThan(0.5), local, yT);
+  });
+
   // Weather map: zero-mean difference of two samples of the same
   // stationary noise - the REAL reported cover is conserved; the
   // measured satellite field replaces it where measured; the
-  // measured radar field then takes the max.
+  // measured radar field then takes the max; a measured tower's
+  // texel is cloud (175th).
   const coverAt = Fn(([xz, cov, wOff, rad]) => {
     const q = xz.add(wOff).mul(0.0019);
     const wvar = baseNode
@@ -294,7 +331,8 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
     const g = goesNode.sample(pg);
     const covM = mix(covN, mix(g.g, g.r, rad), mix(g.b, g.a, rad));
     const pr = xz.add(wOff).sub(uRadarOff).div(uRadarWorld).add(0.5);
-    return max(covM, radarNode.sample(pr).r.mul(rad));
+    const tower = topSample(xz, wOff).a.mul(rad).mul(uTopOn).mul(TOWER_COVER);
+    return max(max(covM, radarNode.sample(pr).r.mul(rad)), tower);
   });
 
   // Height gradients by cloud type (Nubis).
@@ -405,10 +443,12 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   // doubles as the CLOUD FRONT DEPTH the depth-aware reprojection
   // stores per pixel; marchSlab receives its result so the ranging
   // still runs exactly once per deck.
-  const slabFront = Fn(([ro, rd, sceneD, yB, yT, cov, cTy, wO, rad]) => {
+  const slabFront = Fn(([ro, rd, sceneD, yB, yT, yTB, cov, cTy, wO, rad]) => {
     const tStart = float(-1).toVar();
     If(
-      max(cov, goesOn(rad)).greaterThan(0.02).and(rd.y.abs().greaterThan(1e-4)),
+      max(max(cov, goesOn(rad)), uTopOn.mul(rad))
+        .greaterThan(0.02)
+        .and(rd.y.abs().greaterThan(1e-4)),
       () => {
         const tA = yB.sub(ro.y).div(rd.y);
         const tB = yT.sub(ro.y).div(rd.y);
@@ -420,7 +460,8 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
           const tc = t0.add(dtc.mul(0.5)).toVar();
           Loop(COARSE, () => {
             const pc = ro.add(rd.mul(tc));
-            const hc = clamp(pc.y.sub(yB).div(yT.sub(yB)), 0.0, 1.0);
+            const topC = topAt(pc.xz, wO, yT, yTB, rad);
+            const hc = clamp(pc.y.sub(yB).div(topC.sub(yB)), 0.0, 1.0);
             If(
               densityCoarse(pc, hc, cov, cTy, wO, rad).greaterThan(0.0),
               () => {
@@ -439,7 +480,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   // One slab: fine march from the pre-ranged start with 4-tap Beer,
   // Beer-powder, dual-lobe HG; PREMULTIPLIED output with horizon fade.
   const marchSlab = Fn(
-    ([ro, rd, jit, sceneD, tStart, yB, yT, cov, cTy, sg, wO, rad, phase]) => {
+    ([ro, rd, jit, sceneD, tStart, yB, yT, yTB, cov, cTy, sg, wO, rad, phase]) => {
       const result = vec4(0).toVar();
       If(tStart.greaterThanEqual(0.0), () => {
         const tA = yB.sub(ro.y).div(rd.y);
@@ -456,7 +497,8 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
             const T = float(1).toVar();
             Loop(STEPS, () => {
               const p = ro.add(rd.mul(t)).toVar();
-              const h = clamp(p.y.sub(yB).div(yT.sub(yB)), 0.0, 1.0);
+              const topP = topAt(p.xz, wO, yT, yTB, rad);
+              const h = clamp(p.y.sub(yB).div(topP.sub(yB)), 0.0, 1.0);
               const d = density(p, h, cov, cTy, wO, rad);
               If(d.greaterThan(0.01), () => {
                 // 4-tap Beer toward the sun.
@@ -470,7 +512,8 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
                   const ps = p.add(
                     shared.sunDirW.mul(dts.mul(float(s).add(1.0)))
                   );
-                  const hs = clamp(ps.y.sub(yB).div(yT.sub(yB)), 0.0, 1.0);
+                  const topS = topAt(ps.xz, wO, yT, yTB, rad);
+                  const hs = clamp(ps.y.sub(yB).div(topS.sub(yB)), 0.0, 1.0);
                   tauS.addAssign(density(ps, hs, cov, cTy, wO, rad).mul(dts));
                 });
                 tauS.mulAssign(sg);
@@ -606,6 +649,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
         sceneD,
         uniformsLow.yBase,
         uniformsLow.yTop,
+        uniformsLow.yTopBase,
         uniformsLow.cov,
         uniformsLow.cType,
         uniformsLow.wOff,
@@ -617,6 +661,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
         sceneD,
         uniformsMid.yBase,
         uniformsMid.yTop,
+        uniformsMid.yTopBase,
         uniformsMid.cov,
         uniformsMid.cType,
         uniformsMid.wOff,
@@ -630,6 +675,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
         fLow,
         uniformsLow.yBase,
         uniformsLow.yTop,
+        uniformsLow.yTopBase,
         uniformsLow.cov,
         uniformsLow.cType,
         uniformsLow.sigma,
@@ -645,6 +691,7 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
         fMid,
         uniformsMid.yBase,
         uniformsMid.yTop,
+        uniformsMid.yTopBase,
         uniformsMid.cov,
         uniformsMid.cType,
         uniformsMid.sigma,
@@ -837,7 +884,10 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
           .add(0.5)
           .mul(1 / K);
         const p = vec3(wxz.x, d.yBase.add(hh.mul(dy)), wxz.y);
-        acc.addAssign(density(p, hh, d.cov, d.cType, d.wOff, d.rad));
+        // the local top (175th): a texel's own tower or the base top
+        const topH = topAt(wxz, d.wOff, d.yTop, d.yTopBase, d.rad);
+        const h = clamp(p.y.sub(d.yBase).div(topH.sub(d.yBase)), 0.0, 1.0);
+        acc.addAssign(density(p, h, d.cov, d.cType, d.wOff, d.rad));
       });
       return acc.mul(dy.div(K)).mul(d.sigma);
     };
@@ -960,6 +1010,42 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       }
       uGoesOnLow.value = low;
       uGoesOnMid.value = mid;
+    },
+    // THE TOWERS AT THEIR PLACES (175th): feed the measured top field
+    // - data is RM x RM RGBA float32 (R = the tower's top in scene
+    // units, A = 1 where a storm stands, zero border ring) spanning
+    // worldUnits of scene space centred on the observer, anchored to
+    // the low deck's CURRENT advection offset. null clears it back to
+    // the pinned default (the slab top is yTop again).
+    setTopField(data, rm, worldUnits) {
+      if (!data) {
+        if (topTex.image.width !== 1)
+          resize(topTex, {data: topZeroData, width: 1, height: 1});
+        topTex.needsUpdate = true;
+        uTopOn.value = 0;
+        return;
+      }
+      if (topTex.image.width !== rm) {
+        resize(topTex, {data, width: rm, height: rm});
+      } else {
+        topTex.image.data.set(data);
+      }
+      topTex.needsUpdate = true;
+      uTopWorld.value = worldUnits;
+      uTopOff.value.copy(uniformsLow.wOff.value);
+      uTopOn.value = 1;
+    },
+    // the top texel the low deck samples at scene xz (the pick layer's
+    // readout): {top, valid} or null without a field or outside it
+    topTexelAt(x, z) {
+      const img = topTex.image;
+      if (!img || !(img.width > 1)) return null;
+      const wOff = uniformsLow.wOff.value;
+      const off = uTopOff.value;
+      const t = texelIndex(x + wOff.x - off.x, z + wOff.y - off.y, uTopWorld.value, img.width);
+      if (!t) return null;
+      const k = (t.jj * img.width + t.ii) * 4;
+      return {ii: t.ii, jj: t.jj, rm: img.width, top: img.data[k], valid: img.data[k + 3]};
     },
     updateShadow() {
       if (!shadowFill) return;

@@ -1,0 +1,173 @@
+<!doctype html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/webgpu": "./writeups/themes/horizon/three.webgpu.min.js",
+          "three/tsl": "./writeups/themes/horizon/three.tsl.min.js"
+        }
+      }
+    </script>
+  </head>
+  <body style="margin: 0">
+    <canvas id="gl"></canvas>
+    <script>
+      /* swizzle shim */ if (navigator.gpu && self.GPUTexture) {
+        const ov = GPUTexture.prototype.createView;
+        GPUTexture.prototype.createView = function (d) {
+          if (d && 'swizzle' in d) {
+            d = Object.assign({}, d);
+            delete d.swizzle;
+          }
+          return ov.call(this, d);
+        };
+      }
+    </script>
+    <script type="module">
+      // THE TOWERS AT THEIR PLACES (175th): the measured TOP field puts
+      // a storm's tower on its own texels and nowhere else. Read through
+      // the cloud shadow's tau map - the same density/coverAt/topAt the
+      // march samples - with a clear ceilometer (cov 0), so only the
+      // field can put cloud in the low deck: with the field's east half
+      // holding towers of top 60 (yTop 60, the base top 30) the east
+      // must carry optical depth and the west none; a shorter tower (top
+      // 40) must carry less than the tall one; without any field the
+      // deck stays empty (the pinned default), and clearing the field
+      // empties it again; the device reports no validation error.
+      import * as T from 'three/webgpu';
+      import {texture, uv} from 'three/tsl';
+      import {
+        createCloudShadowHook,
+        createCloudSystemTSL,
+        generateCloudTexturesTSL
+      } from './writeups/themes/horizon/clouds-tsl.js';
+      const log = (s) => console.log('TOWER|' + s);
+      const errs = [];
+      try {
+        const r = new T.WebGPURenderer({
+          canvas: document.getElementById('gl'),
+          forceWebGL: false,
+          antialias: false
+        });
+        await r.init();
+        log('backend ' + (r.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'));
+        if (r.backend.device)
+          r.backend.device.addEventListener('uncapturederror', (e) =>
+            errs.push(e.error && e.error.message ? e.error.message : String(e))
+          );
+        r.setSize(300, 300);
+        const tex = generateCloudTexturesTSL();
+        const WORLD = 280;
+        const sys = createCloudSystemTSL(r, tex.baseTex, tex.detailTex);
+        const hook = createCloudShadowHook();
+        hook.uniforms.uWorldSize.value = WORLD;
+        sys.attachShadow(hook);
+        sys.uniformsLow.cov.value = 0;
+        sys.uniformsLow.cType.value = 1.85; // towering
+        sys.uniformsLow.yBase.value = 24;
+        sys.uniformsLow.yTop.value = 60;
+        sys.uniformsLow.yTopBase.value = 30;
+        sys.uniformsMid.cov.value = 0;
+        sys.uniformsMid.yBase.value = 70;
+        sys.uniformsMid.yTop.value = 76;
+        sys.uniformsMid.yTopBase.value = 76;
+        const quad = new T.QuadMesh();
+        const readTau = async () => {
+          const S = hook.size;
+          const rt = new T.RenderTarget(S, S, {type: T.FloatType, depthBuffer: false});
+          const m = new T.MeshBasicNodeMaterial();
+          m.colorNode = texture(hook.tauNode.value).sample(uv()).mul(0.05).add(0.5);
+          m.transparent = true;
+          m.blending = T.NoBlending;
+          m.toneMapped = false;
+          quad.material = m;
+          r.setRenderTarget(rt);
+          quad.render(r);
+          r.setRenderTarget(null);
+          const px = await r.readRenderTargetPixelsAsync(rt, 0, 0, S, S);
+          rt.dispose();
+          const tau = new Float32Array(S * S);
+          for (let i = 0; i < S * S; i++) tau[i] = (px[i * 4] - 0.5) / 0.05;
+          return {tau, S};
+        };
+        // the map's west half against its east half past the field's
+        // own linear-filter band at the boundary (a 64-wide field is 4
+        // map pixels a texel)
+        const stats = ({tau, S}) => {
+          let west = 0;
+          let nWest = 0;
+          let east = 0;
+          let nEast = 0;
+          let westMax = 0;
+          let sum = 0;
+          for (let j = 0; j < S; j++)
+            for (let i = 0; i < S; i++) {
+              const v = tau[j * S + i];
+              sum += v;
+              if (i < S / 2 - 4) {
+                west += v;
+                nWest++;
+                westMax = Math.max(westMax, v);
+              } else if (i >= S / 2 + 4) {
+                east += v;
+                nEast++;
+              }
+            }
+          return {west: west / nWest, westMax, east: east / nEast, mean: sum / (S * S)};
+        };
+        // a top field: towers of top `top` over the east half (A 1),
+        // nothing west (A 0), inside a zero border ring
+        const field = (rm, top) => {
+          const d = new Float32Array(rm * rm * 4);
+          for (let jj = 0; jj < rm; jj++)
+            for (let ii = 0; ii < rm; ii++) {
+              const border = ii === 0 || jj === 0 || ii === rm - 1 || jj === rm - 1;
+              const k = (jj * rm + ii) * 4;
+              const tower = !border && ii >= rm / 2;
+              d[k] = tower ? top : 0;
+              d[k + 3] = tower ? 1 : 0;
+            }
+          return d;
+        };
+        sys.updateShadow();
+        const a0 = stats(await readTau());
+        sys.setTopField(field(64, 60), 64, WORLD);
+        sys.updateShadow();
+        const a1 = stats(await readTau());
+        sys.setTopField(field(64, 40), 64, WORLD);
+        sys.updateShadow();
+        const a2 = stats(await readTau());
+        sys.setTopField(null);
+        sys.updateShadow();
+        const a3 = stats(await readTau());
+        const t = sys.topTexelAt(70, 0);
+        const tw = sys.topTexelAt(-70, 0);
+        const f = (v) => v.toFixed(4);
+        log(
+          `S=${hook.size} empty: mean ${f(a0.mean)} · towers to 60: west mean ${f(a1.west)} max ${f(a1.westMax)}, east mean ${f(a1.east)} · ` +
+            `towers to 40: east mean ${f(a2.east)} · cleared: mean ${f(a3.mean)} · texel at +70: ${t === null ? 'none' : 'top ' + t.top + ' valid ' + t.valid} · device errors ${errs.length}` +
+            (errs.length ? ' :: ' + errs[0].slice(0, 160) : '')
+        );
+        const ok =
+          a0.mean < 1e-6 &&
+          a1.east > 0.3 &&
+          a1.westMax < 1e-4 &&
+          a2.east > 0.05 &&
+          a2.east < a1.east * 0.9 &&
+          a3.mean < 1e-6 &&
+          t === null && // cleared
+          tw === null &&
+          errs.length === 0;
+        log(ok ? 'TOWER PASS' : 'TOWER FAIL');
+        window.__r = r;
+        window.__THREE = T;
+        log('DONE');
+      } catch (e) {
+        log('ERR ' + e.message + ' :: ' + (e.stack || '').split('\n')[1]);
+        log('DONE');
+      }
+    </script>
+  </body>
+</html>
