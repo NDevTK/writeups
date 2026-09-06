@@ -1236,8 +1236,14 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    when ten good fields stand, the EL otherwise. The vendored ACHAC
    file's home window censuses to 340 good tops of 441: 181 low
    (median 1,803 m), 77 mid (4,149 m), 82 high (9,340 m), the tallest
-   tenth 9,650 m, to the pixel of a plain count (`goesl2-reference` THE
-   TOPS FROM ORBIT)
+   tenth 9,650 m, to the pixel of a plain count. Live at Charlotte under
+   a 100% high overcast the VIIRS census of two days before held no high
+   band at all (the 8-km hand would have stood) while the hour's ACHA
+   window censused 370 high fields at a median of 11,815 m — and the
+   morning balloon's own equilibrium level 126 km away was 11,872 m:
+   the cirrus sheet sat at the day's convective ceiling, two
+   independent measurements 60 m apart (`goesl2-reference` THE TOPS
+   FROM ORBIT)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
