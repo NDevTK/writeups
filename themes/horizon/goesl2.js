@@ -467,6 +467,9 @@ export const L2_PRODUCTS = {
   // only (no CONUS SST product), hourly, 2 km, 32 MB a file, read
   // by HTTP range (its window costs ~1 MB)
   sst: 'ABI-L2-SSTF',
+  // the 161st pass: the cloud top phase (CONUS every 5 min, 2 km,
+  // day and night; 0.5 MB a file, its window a few tens of kB)
+  phase: 'ABI-L2-ACTPC',
   // the 152nd pass: the downward shortwave radiation at the surface
   // (0.2-4.0 um, direct + diffuse, W/m2) - full disk only, every 10
   // min, 2 km (the Enterprise SRB algorithm: Laszlo, Kim & Liu, ATBD
@@ -811,6 +814,124 @@ export function lstValidationSpan(craft = 'GOES-16') {
     precisionK: [pLo, pHi],
     meanBiasK: sb / n,
     meanPrecisionK: sp / n
+  };
+}
+// ---------------------------------------------------------------
+// THE CLOUD'S PHASE (161st pass): NOAA's cloud top phase
+// (ABI-L2-ACTPC: CONUS every 5 min, 2 km, day and night) - the
+// Enterprise Cloud Type and Cloud Phase ATBD v3 (Pavolonis, 1 Jun
+// 2020, 113 pp; read in full). The phase is derived from the cloud
+// type (Table 29): clear; liquid water (a liquid-topped cloud whose
+// opaque 11-um cloud temperature exceeds 273 K); supercooled liquid
+// water (under 273 K); mixed phase (a high probability of liquid and
+// ice near the top); ice (thick ice with infrared optical depth over
+// 2, thin ice, multilayered ice); undetermined (bad input). The
+// homogeneous-freezing test calls any top at or under 238 K ice (233
+// K the spontaneous-freezing temperature of small droplets, Rogers &
+// Yau 1989; Korolev et al. 2003 found ice dominant to 238 K). A 3x3
+// median filter finishes the type, kept consistent with the mask
+// (Sec. 3.4.2.7). Requirement (Table 1): 80% correct classification
+// over liquid / solid / supercooled / mixed for clouds of optical
+// depth over 1, quantitative to 65 deg local zenith and qualitative
+// beyond, precision 1.5 categories. Validation (Tables 40-41,
+// SEVIRI against CALIOP, 95,249 cloudy matchups over all seasons,
+// the potentially mixed 268-238 K tops set aside): liquid and
+// supercooled together 90.48% agreed of 49,642, ice 84.84% of
+// 45,607, 87.78% in all; with the optical-depth-over-1 qualifier
+// 90.30% of 34,446, 98.44% of 17,597, 93.05% of 52,043. The file's
+// QF word (Table 32): bit 0 overall low quality, 1 L1b, 2 a beta
+// ratio outside 0.1-10, 3 an ice call on a weak signal (epsilon
+// under 0.05), 4 a low surface emissivity mattering, 5 the satellite
+// zenith past cos 0.15 (~82 deg).
+// ---------------------------------------------------------------
+export const PHASE_MEANINGS = [
+  'clear_sky',
+  'liquid_water',
+  'super_cooled_liquid_water',
+  'mixed_phase',
+  'ice',
+  'unknown'
+];
+export const PHASE_WORDS = [
+  'clear',
+  'liquid water',
+  'supercooled water',
+  'mixed phase',
+  'ice',
+  'undetermined'
+];
+export const PHASE_QF = {
+  low: 1,
+  l1b: 2,
+  beta: 4,
+  weakIce: 8,
+  emissivity: 16,
+  zenith: 32
+};
+export const PHASE_ATBD = {
+  version: 'Enterprise Cloud Type and Cloud Phase ATBD v3, 2020-06-01',
+  requirement: {correctFraction: 0.8, minOpticalDepth: 1, lzaQuantitativeDeg: 65, precisionCategories: 1.5},
+  liquidTopK: 273,
+  homogeneousFreezingK: 238,
+  spontaneousFreezingK: 233,
+  medianFilterPx: 3,
+  validation: {
+    source: 'SEVIRI vs CALIOP, Tables 40-41',
+    matchups: 95249,
+    all: {liquid: {n: 49642, agree: 0.9048}, ice: {n: 45607, agree: 0.8484}, total: {n: 95249, agree: 0.8778}},
+    thick: {liquid: {n: 34446, agree: 0.903}, ice: {n: 17597, agree: 0.9844}, total: {n: 52043, agree: 0.9305}},
+    mixedSetAside: {all: 21434, thick: 13087, tolerableErrorAll: 0.54, tolerableErrorThick: 0.72}
+  }
+};
+/** The phase's word for a pixel value, or null for the fill. */
+export function phaseWords(v) {
+  return v >= 0 && v <= 5 ? PHASE_WORDS[v] : null;
+}
+/** A pixel's quality by the QF word: 'high' (no bit set), else the
+ * low-quality reasons named. */
+export function phaseQuality(qf) {
+  if (!Number.isFinite(qf) || qf === 255) return null;
+  const why = [];
+  if (qf & PHASE_QF.l1b) why.push('L1b');
+  if (qf & PHASE_QF.beta) why.push('beta ratio');
+  if (qf & PHASE_QF.weakIce) why.push('weak ice signal');
+  if (qf & PHASE_QF.emissivity) why.push('surface emissivity');
+  if (qf & PHASE_QF.zenith) why.push('satellite zenith');
+  return {high: !(qf & PHASE_QF.low), why};
+}
+/**
+ * The window's census by phase over the high-quality pixels (the
+ * overall bit clear): counts per category, the cloudy total, the
+ * low-quality and fill counts, and the ice and water shares of the
+ * cloudy pixels (liquid + supercooled + mixed count as water-topped
+ * for the corona's purposes, stated).
+ */
+export function phaseCensus(phase, dqf) {
+  const c = {n: phase.length, clear: 0, liquid: 0, supercooled: 0, mixed: 0, ice: 0, unknown: 0, low: 0, fill: 0};
+  for (let q = 0; q < phase.length; q++) {
+    const v = phase[q];
+    if (v === 255 || v === undefined) {
+      c.fill++;
+      continue;
+    }
+    const qf = dqf ? dqf[q] : 0;
+    if (qf === 255 || qf & PHASE_QF.low) {
+      c.low++;
+      continue;
+    }
+    if (v === 0) c.clear++;
+    else if (v === 1) c.liquid++;
+    else if (v === 2) c.supercooled++;
+    else if (v === 3) c.mixed++;
+    else if (v === 4) c.ice++;
+    else c.unknown++;
+  }
+  const cloudy = c.liquid + c.supercooled + c.mixed + c.ice;
+  return {
+    ...c,
+    cloudy,
+    iceFrac: cloudy ? c.ice / cloudy : null,
+    waterFrac: cloudy ? (c.liquid + c.supercooled + c.mixed) / cloudy : null
   };
 }
 // ---------------------------------------------------------------

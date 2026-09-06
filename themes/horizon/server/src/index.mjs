@@ -2250,6 +2250,10 @@ function main() {
       dmw: F.dmw ? l2DmwBody(F.dmw.dec, F.dmw.key) : null,
       aod: F.aod ? l2AodBody(F.aod.dec, F.aod.key, cell.lat, cell.lon) : null,
       lst: F.lst ? l2LstBody(F.lst.dec, F.lst.key, cell.lat, cell.lon) : null,
+      // the cloud top phase (161st)
+      phase: F.phase
+        ? l2PhaseBody(F.phase.dec, F.phase.key, cell.lat, cell.lon)
+        : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial',
       // the deployed revision (158th): the page can tell an older
       // daemon's body from a fresh one's

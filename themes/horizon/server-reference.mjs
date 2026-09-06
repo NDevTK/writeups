@@ -1126,12 +1126,12 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_DSR_SPEC.DSR === 'raw16' &&
       L2_DSR_SPEC.DQF === 'raw' &&
       L2_HALF_PX.dsr === 50 &&
-      L2_ASKS.length === 11 &&
+      L2_ASKS.length === 12 &&
       L2_ASKS.map((a) => a.id).join(',') ===
-        'mask,height,imagery,cod,cps,sst,dsr,dmw,aod,lst,vis' &&
+        'mask,height,imagery,cod,cps,sst,dsr,dmw,aod,lst,vis,phase' &&
       L2_ASKS[2].band === 'C13' &&
       L2_ASKS.map((a) => a.halfPx ?? '-').join(',') ===
-        '50,10,50,50,50,50,50,-,50,50,200' &&
+        '50,10,50,50,50,50,50,-,50,50,200,50' &&
       // the hourly full-disk SST is never asked for a mosaic's
       // minute, nor are the winds (the decks' drift, not a mosaic's
       // comparison), the haze (the channel's now), the hourly land
@@ -1142,7 +1142,13 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_ASKS[8].timed === false &&
       L2_ASKS[9].timed === false &&
       L2_ASKS[10].timed === false &&
-      L2_ASKS.filter((a) => a.timed === false).length === 5 &&
+      // the cloud top phase (161st): the optics' now, never a
+      // mosaic's minute
+      L2_ASKS[11].id === 'phase' &&
+      L2_ASKS[11].product === 'ABI-L2-ACTPC' &&
+      L2_ASKS[11].timed === false &&
+      L2_ASKS[11].pageOnly === undefined &&
+      L2_ASKS.filter((a) => a.timed === false).length === 6 &&
       // the eleventh ask (159th) is the page's own: the daemon never
       // lists, fetches or serves the 500-m visible window (a 2.6 MB
       // read every five minutes by day, a 430 kB body - the free
@@ -1150,14 +1156,14 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_ASKS[10].pageOnly === true &&
       L2_ASKS[10].band === 'C02' &&
       L2_ASKS[10].product === 'ABI-L2-CMIPC' &&
-      L2_ASKS.filter((a) => !a.pageOnly).length === 10 &&
+      L2_ASKS.filter((a) => !a.pageOnly).length === 11 &&
       L2_ASKS.filter((a) => a.pageOnly).length === 1 &&
       L2_IMAGERY_SPEC.CMI === 'raw16' &&
       L2_COD_SPEC.COD === 'raw16' &&
       L2_CPS_SPEC.CPS === 'raw16' &&
       // the CPS file's flags are the COD file's (measured): not held
       L2_CPS_SPEC.DQF === undefined,
-    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; a DSR body dressed the same way (152nd) carries the home pixel (${dsBody && dsBody.here} W/m2 from the fixture's count there), the mean of ${dsBody && dsBody.near.n} good px within 5 px (${dsBody && dsBody.near.mean} W/m2) and a census of ${dsBody && dsBody.census.good} good px, all recomputed from the wire; /goesl2 asks ten products, the imagery by band C13, the hourly SST, the winds, the haze and the hourly land skin never for a mosaic's minute and the 10-minute DSR for one; the eleventh ask, the page's own 500-m visible window (band C02 at half width 200), the daemon never lists or serves`
+    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; a DSR body dressed the same way (152nd) carries the home pixel (${dsBody && dsBody.here} W/m2 from the fixture's count there), the mean of ${dsBody && dsBody.near.n} good px within 5 px (${dsBody && dsBody.near.mean} W/m2) and a census of ${dsBody && dsBody.census.good} good px, all recomputed from the wire; /goesl2 asks eleven products, the imagery by band C13, the hourly SST, the winds, the haze, the hourly land skin and the cloud top phase never for a mosaic's minute and the 10-minute DSR for one; the eleventh ask, the page's own 500-m visible window (band C02 at half width 200), the daemon never lists or serves`
   );
 }
 

@@ -166,9 +166,15 @@ are gated by `../server-reference.mjs` — the `server` set in
   and the scene's own statistics and angle bounds from the file's
   head (`sceneStats`, `lzaBounds`): ten products in all (383 kB a
   body for the home, measured; the AOD's 42 kB, the LST's 69 kB),
-  and since the 158th the daemon's deployed revision (`rev`). An
-  ELEVENTH ask exists in the shared decode block but is the page's
-  own (`pageOnly`, 159th): the 500-m visible band 2 window (`vis`,
+  and since the 158th the daemon's deployed revision (`rev`), and
+  since the 161st NOAA's cloud top phase (`ABI-L2-ACTPC`: CONUS every
+  5 min, 2 km, day and night - clear / liquid water / supercooled /
+  mixed / ice / undetermined with the Enterprise Cloud Type and Phase
+  ATBD v3's quality word; the Enterprise ATBD read in full) as
+  `phase`, with the point's own pixel (`here`), the census by phase
+  over the high-quality pixels and the scene's cloudy count: eleven
+  products served. A TWELFTH ask exists in the shared decode block
+  but is the page's own (`pageOnly`, 159th): the 500-m visible band 2 window (`vis`,
   401 x 401 px of the CMIP ATBD's reflectance factor with the
   file's kappa, Esun and Earth-Sun distance) that the page reads
   from the bucket itself by day to shape the cloud decks inside the
@@ -176,7 +182,7 @@ are gated by `../server-reference.mjs` — the `server` set in
   cadence (about 15 MB an hour by day), which this box's free-tier
   egress cannot carry and the bucket's CORS can. This
   daemon never lists, fetches or serves it; `/health`'s
-  `version.products` names the ten it does.
+  `version.products` names the eleven it does.
   Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks

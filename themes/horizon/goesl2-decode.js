@@ -51,6 +51,8 @@ import {
   L2_PRODUCTS,
   maskCensus,
   nearestGood,
+  PHASE_MEANINGS,
+  phaseCensus,
   packArray,
   pixelSizeM,
   productTimeIso,
@@ -206,6 +208,17 @@ export const L2_VIS_EXTRAS = [
   'valid_pixel_count'
 ];
 L2_HALF_PX.vis = 200; // +-115 km on the 500-m grid here
+// The 161st pass: the cloud top phase (Phase uint8 0..5 by the ATBD's
+// Table 31, fill 255; DQF the QF word of Table 32) with the scene's
+// cloudy count and angle thresholds as extras.
+export const L2_PHASE_SPEC = {Phase: 'raw', DQF: 'raw'};
+export const L2_PHASE_EXTRAS = [
+  'total_number_cloudy_pixels',
+  'quantitative_local_zenith_angle',
+  'retrieval_local_zenith_angle',
+  'solar_zenith_angle'
+];
+L2_HALF_PX.phase = 50;
 // what /goesl2 fetches for a point: product, spec, the window's half
 // width on the product's grid, the imagery's band (the CMIPC prefix
 // lists every band's file); timed false = not asked for a mosaic's
@@ -277,6 +290,16 @@ export const L2_ASKS = [
     extras: L2_VIS_EXTRAS,
     timed: false,
     pageOnly: true
+  },
+  // the cloud top phase (161st): the optics' ice-or-water overhead,
+  // the phase's now
+  {
+    id: 'phase',
+    product: L2_PRODUCTS.phase,
+    spec: L2_PHASE_SPEC,
+    halfPx: 50,
+    extras: L2_PHASE_EXTRAS,
+    timed: false
   }
 ];
 const l2Scalar = (a) => (Array.isArray(a) ? a[0] : a);
@@ -871,6 +894,32 @@ export function l2VisBody(dec, key, lat, lon, {cosSza = null} = {}) {
     ).toFixed(2),
     cosSza: +cs.toFixed(4),
     census: visCensus(rf, w.cut.DQF, cs)
+  };
+}
+// THE CLOUD'S PHASE (161st pass): the phase window as the file's
+// categories with the QF word, the point's own pixel, the census by
+// phase over the high-quality pixels (goesl2.phaseCensus) and the
+// scene's cloudy count and angle thresholds from the head.
+export function l2PhaseBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_PHASE_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.phase);
+  if (!w) return null;
+  const ci = w.box.i - w.box.i0;
+  const cj = w.box.j - w.box.j0;
+  const qc = cj * w.box.cols + ci;
+  const x = dec.extras ?? {};
+  const num = (v) => (Number.isFinite(v) ? v : null);
+  return {
+    ...l2Common(dec, L2_PRODUCTS.phase, key, w),
+    phase: packArray(w.cut.Phase, 'u8'),
+    dqf: packArray(w.cut.DQF, 'u8'),
+    meanings: PHASE_MEANINGS,
+    here: {phase: w.cut.Phase[qc] ?? null, qf: w.cut.DQF[qc] ?? null},
+    census: phaseCensus(w.cut.Phase, w.cut.DQF),
+    sceneStats: {cloudy: num(x.total_number_cloudy_pixels)},
+    lzaQuantitativeDeg: num(x.quantitative_local_zenith_angle),
+    lzaRetrievalDeg: num(x.retrieval_local_zenith_angle),
+    szaThresholdDeg: num(x.solar_zenith_angle)
   };
 }
 // The DCOMP window (149th pass): the optical depth at 640 nm and

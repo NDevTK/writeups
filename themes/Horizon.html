@@ -488,6 +488,8 @@
         dmwNearest,
         dmwUnpack,
         maskAgreement,
+        phaseQuality,
+        phaseWords,
         solarZenithDeg,
         sstAgainstGrid,
         unpackArray,
@@ -6310,7 +6312,8 @@
         'dsr',
         'dmw',
         'aod',
-        'lst'
+        'lst',
+        'phase'
       ];
       let goesL2Busy = false;
       let goesL2Rerun = false;
@@ -6714,6 +6717,8 @@
                   })
                 : null,
               pqi: p.pqi ? unpackArray(p.pqi) : null,
+              // the cloud top phase's categories (161st pass)
+              phaseArr: p.phase ? unpackArray(p.phase) : null,
               // the visible band's reflectance factor (159th pass):
               // the CMIP ATBD's rho cos(solar zenith), NaN fill
               rfac: p.rf
@@ -6839,6 +6844,9 @@
             // day and night): the land surface layer's skin
             // (syncLandLayer)
             lst: unpackProduct(j.lst),
+            // the cloud top phase (161st pass; CONUS every 5 min, day
+            // and night): the optics' ice-or-water overhead (phaseGate)
+            phase: unpackProduct(j.phase),
             // the daemon's deployed revision and the products the
             // page read for it from the bucket (158th pass)
             rev: j.rev ?? null,
@@ -6959,6 +6967,22 @@
                       : 'no retrieval'
                 }` +
                 ` · ${c.high} high · ${c.medium} medium · ${c.low} low · ${c.none} none of ${c.n} 2-km px within ±100 km`
+            );
+          }
+          const cp = goesL2.phase;
+          if (cp && cp.census) {
+            const c = cp.census;
+            const here = goesL2PhaseAt(state.lat, state.lon);
+            record(
+              `NOAA ${j.craft} cloud top phase (ACTPC)`,
+              `${cp.time.slice(11, 16)}Z · overhead ${
+                here ? here.words + (here.quality.high ? '' : ' (low quality: ' + here.quality.why.join(', ') + ')') : 'no pixel'
+              } · ${c.liquid.toLocaleString('en-US')} liquid · ${c.supercooled.toLocaleString('en-US')} supercooled · ` +
+                `${c.mixed.toLocaleString('en-US')} mixed · ${c.ice.toLocaleString('en-US')} ice of ${c.cloudy.toLocaleString('en-US')} cloudy ` +
+                `high-quality 2-km px within ±100 km` +
+                (c.cloudy ? ` (ice ${Math.round(100 * c.iceFrac)}%)` : '') +
+                ` · ${c.clear} clear · ${c.low} low quality` +
+                (phaseGate().why ? ` → ${phaseGate().why}: ${phaseGate().ice ? '' : 'no halo family, no cirrus corona'}${phaseGate().water ? '' : 'no droplet corona'}` : '')
             );
           }
           if (
@@ -7278,6 +7302,49 @@
         if (q < 0 || m.dqf[q] !== 0 || m.acm[q] > 3) return null;
         return {acm: m.acm[q], prob: m.prob[q] <= 100 ? m.prob[q] : null};
       }
+      // THE CLOUD'S PHASE OVERHEAD (161st pass): NOAA's cloud top
+      // phase at a place - {phase, words, quality} or null off the
+      // window or on the fill.
+      function goesL2PhaseAt(latDeg, lonDeg) {
+        const p = goesL2 && goesL2.phase;
+        if (!p || !p.phaseArr) return null;
+        const q = windowIndexOf(latDeg, lonDeg, p.g, p.x, p.y, p.box);
+        if (q < 0) return null;
+        const v = p.phaseArr[q];
+        const qf = p.dqf ? p.dqf[q] : 0;
+        if (v === 255 || qf === 255) return null;
+        return {phase: v, words: phaseWords(v), quality: phaseQuality(qf)};
+      }
+      // THE OPTICS' GATE from the measured phase: the top overhead is
+      // ice (the halo family and the cirrus corona may ring, a
+      // droplet corona cannot) or liquid/supercooled water (the
+      // droplet corona may ring, crystals are not there) - a
+      // high-quality pixel within PHASE_LIVE_MS of its scan. Both
+      // stand without a measurement, on a clear pixel (thin cirrus
+      // escapes the mask: the model's gates keep their say), on mixed
+      // phase or undetermined. Measured outranks modelled; the record
+      // and the line say which family the measurement closed.
+      const PHASE_LIVE_MS = 30 * 60e3;
+      let phaseGateMemo = null; // {t, l2At, gate}
+      function phaseGate() {
+        const p = goesL2 && goesL2.phase;
+        const open = {ice: 1, water: 1, why: null};
+        if (!p || !p.time || Date.now() - Date.parse(p.time) > PHASE_LIVE_MS)
+          return open;
+        const t = Date.now();
+        if (phaseGateMemo && phaseGateMemo.l2At === goesL2.at && t - phaseGateMemo.t < 5000)
+          return phaseGateMemo.gate;
+        const at = goesL2PhaseAt(state.lat, state.lon);
+        let gate = open;
+        if (at && at.quality && at.quality.high) {
+          if (at.phase === 4) gate = {ice: 1, water: 0, why: 'ice top overhead (NOAA phase)'};
+          else if (at.phase === 1 || at.phase === 2)
+            gate = {ice: 0, water: 1, why: at.words + ' top overhead (NOAA phase)'};
+          else if (at.phase === 3) gate = {ice: 1, water: 1, why: 'mixed-phase top overhead (NOAA phase): both families stand'};
+        }
+        phaseGateMemo = {t, l2At: goesL2.at, gate};
+        return gate;
+      }
       // TODAY'S DROPLETS (150th pass): DCOMP's water effective radius
       // over the theme's own sea (else the whole window's water),
       // minutes old, is the droplet size the corona, the overcast
@@ -7494,6 +7561,29 @@
               line += ` vs the theme's opaque tops ${own.join(', ')} (ACHA retrieves the emitting top; a thin cirrus reads lower as an opaque top)`;
           }
         } else if (h) line += ' · no cloud top retrieved within ±100 km';
+        // THE CLOUD'S PHASE (161st pass): NOAA's cloud top phase
+        // overhead and its census, and the optics' gate it closes
+        {
+          const cp = goesL2.phase;
+          if (cp && cp.census) {
+            const c = cp.census;
+            const here = goesL2PhaseAt(state.lat, state.lon);
+            const g = phaseGate();
+            line +=
+              ` · cloud top phase ${cp.time.slice(11, 16)}Z (ABI-L2-ACTPC, 2-km px, day and night): overhead ` +
+              (here
+                ? `${here.words}${here.quality.high ? '' : ' (low quality: ' + here.quality.why.join(', ') + ')'}`
+                : 'no pixel') +
+              ` · ${c.cloudy.toLocaleString('en-US')} cloudy high-quality px within ±100 km: ${c.liquid.toLocaleString('en-US')} liquid, ` +
+              `${c.supercooled.toLocaleString('en-US')} supercooled, ${c.mixed.toLocaleString('en-US')} mixed, ${c.ice.toLocaleString('en-US')} ice` +
+              (c.cloudy ? ` (ice ${Math.round(100 * c.iceFrac)}%)` : '') +
+              ` · ` +
+              (g.why
+                ? `${g.why} → ${g.ice ? '' : 'the halo family and the cirrus corona closed'}${g.ice || g.water ? '' : '; '}${g.water ? '' : 'the droplet corona closed'}${g.ice && g.water ? '' : ''}`
+                : 'no phase call overhead: the optics keep their own gates') +
+              ` · the ATBD's validation: 93% agreed with CALIOP over 52,043 thick clouds (ice 98%, water 90%), the requirement 80%`;
+          }
+        }
         // THE DECODER AUDITED (149th pass): the palette decode
         // against NOAA's own kelvin, pixel for pixel
         const sgn = (v) => (v >= 0 ? '+' : '') + v.toFixed(2);
@@ -16185,7 +16275,8 @@
           const corOn =
             params.get('cirruscorona') !== '0' &&
             sun.alt > 0 &&
-            coronaColdGate(state.t250);
+            coronaColdGate(state.t250) &&
+            phaseGate().ice > 0;
           atmo.cloudCorona.setAmp(
             corOn
               ? coronaAmp(
@@ -16204,7 +16295,7 @@
           // harness A/B override.
           atmo.cloudCorona.setDropAmp(
             params.get('dropcorona') !== '0' && sun.alt > 0
-              ? DROPLET_DIFF_SHARE * cirrusT
+              ? DROPLET_DIFF_SHARE * cirrusT * phaseGate().water
               : 0
           );
           // Bishop's Ring: the measured OMPS excess through the
@@ -18565,7 +18656,11 @@
         // for the harness A/B.
         const haloOcc = params.has('halooccur')
           ? +params.get('halooccur')
-          : haloOccurrence(state.lat, state.lon, now().getTime());
+          : haloOccurrence(state.lat, state.lon, now().getTime()) *
+            // the measured top overhead (161st): a liquid top has no
+            // crystals - the family closes; ice or none measured, the
+            // draw stands
+            phaseGate().ice;
         {
           // The family lives past ground sunset: its crystals sit
           // on the deck along the sun sight line, where the
@@ -19004,7 +19099,8 @@
             const corMoonOn =
               params.get('cirruscorona') !== '0' &&
               moon.alt > 0 &&
-              coronaColdGate(state.t250);
+              coronaColdGate(state.t250) &&
+              phaseGate().ice > 0;
             atmo.cloudCorona.setMoon(
               moonVec2,
               corMoonOn
@@ -19043,7 +19139,8 @@
             // fragment, its extinction the composite.
             atmo.cloudCorona.setMoonDrop(
               params.get('dropcorona') !== '0' && moon.alt > 0
-                ? moonIrradianceE0(
+                ? phaseGate().water *
+                  moonIrradianceE0(
                     astro.moonRel,
                     astro.moonDistKm,
                     1 - (astro.lunarEcl?.inUmbra ?? 0)

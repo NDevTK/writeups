@@ -38,6 +38,12 @@ import {
   kappaFactor,
   OTSU_BIMODAL_ETA,
   otsuThreshold,
+  PHASE_ATBD,
+  PHASE_MEANINGS,
+  PHASE_QF,
+  phaseCensus,
+  phaseQuality,
+  phaseWords,
   reflectanceOfFactor,
   solarGeometry,
   solarZenithDeg,
@@ -1079,6 +1085,68 @@ const inflate = (u8) =>
       `weighted ${s17.meanBiasK.toFixed(3)} / ${s17.meanPrecisionK.toFixed(3)} K; the requirement ${LST_ATBD.requirement.accuracyK} / ` +
       `${LST_ATBD.requirement.precisionK} K over ${LST_ATBD.requirement.rangeK.join('-')} K within ${LST_ATBD.requirement.lzaMaxDeg} deg, ` +
       `quantitative to ${LST_ATBD.quantitativeLzaDeg}; an unknown craft answers GOES-16's table`
+  );
+}
+
+// ---- THE CLOUD'S PHASE (161st pass) ------------------------------
+// The ATBD's categories (Table 31) as the file numbers them, the QF
+// word's bits (Table 32), the census on a synthetic window (every
+// category, a low-quality word, the fill), the requirement and the
+// validation tables recomputed: the agreed counts over the matchups.
+{
+  const ph = new Uint8Array(40);
+  const qf = new Uint8Array(40);
+  for (let q = 0; q < 40; q++) ph[q] = q % 8 === 7 ? 255 : q % 6;
+  qf[1] = PHASE_QF.low | PHASE_QF.beta; // a liquid pixel of low quality
+  qf[4] = PHASE_QF.weakIce; // a bit without the overall bit: still high
+  qf[10] = 255;
+  const c = phaseCensus(ph, qf);
+  const qLow = phaseQuality(qf[1]);
+  const qHigh = phaseQuality(qf[4]);
+  const v = PHASE_ATBD.validation;
+  const agreeAll = Math.round(v.all.total.n * v.all.total.agree);
+  check(
+    'THE CLOUD’S PHASE: the ATBD’s categories and quality bits, the census by phase, the validation tables',
+    L2_PRODUCTS.phase === 'ABI-L2-ACTPC' &&
+      PHASE_MEANINGS.length === 6 &&
+      PHASE_MEANINGS[0] === 'clear_sky' &&
+      PHASE_MEANINGS[2] === 'super_cooled_liquid_water' &&
+      PHASE_MEANINGS[4] === 'ice' &&
+      phaseWords(4) === 'ice' &&
+      phaseWords(255) === null &&
+      PHASE_QF.zenith === 32 &&
+      qLow.high === false &&
+      qLow.why.join() === 'beta ratio' &&
+      qHigh.high === true &&
+      qHigh.why.join() === 'weak ice signal' &&
+      phaseQuality(255) === null &&
+      c.n === 40 &&
+      c.fill === 5 &&
+      c.low === 2 &&
+      c.clear + c.liquid + c.supercooled + c.mixed + c.ice + c.unknown + c.low + c.fill === 40 &&
+      c.cloudy === c.liquid + c.supercooled + c.mixed + c.ice &&
+      near(c.iceFrac, c.ice / c.cloudy, 1e-12) &&
+      near(c.waterFrac + c.iceFrac, 1, 1e-12) &&
+      PHASE_ATBD.requirement.correctFraction === 0.8 &&
+      PHASE_ATBD.requirement.minOpticalDepth === 1 &&
+      PHASE_ATBD.requirement.lzaQuantitativeDeg === 65 &&
+      PHASE_ATBD.homogeneousFreezingK === 238 &&
+      PHASE_ATBD.liquidTopK === 273 &&
+      v.matchups === 95249 &&
+      v.all.liquid.n + v.all.ice.n === v.all.total.n &&
+      Math.abs(v.all.liquid.n * v.all.liquid.agree + v.all.ice.n * v.all.ice.agree - agreeAll) < 60 &&
+      v.thick.liquid.n + v.thick.ice.n === v.thick.total.n &&
+      Math.abs(v.thick.liquid.n * v.thick.liquid.agree + v.thick.ice.n * v.thick.ice.agree - Math.round(v.thick.total.n * v.thick.total.agree)) < 60 &&
+      v.thick.total.agree > PHASE_ATBD.requirement.correctFraction &&
+      v.all.ice.agree > PHASE_ATBD.requirement.correctFraction,
+    `${PHASE_MEANINGS.length} categories as the file numbers them (${PHASE_MEANINGS.join(', ')}), the QF word's six bits; a 40-px window ` +
+      `censuses ${c.clear} clear, ${c.liquid} liquid, ${c.supercooled} supercooled, ${c.mixed} mixed, ${c.ice} ice, ${c.unknown} undetermined, ` +
+      `${c.low} low quality (one liquid pixel's word ${qf[1]}: ${qLow.why.join(', ')}), ${c.fill} fill - every pixel counted once, ice ` +
+      `${(100 * c.iceFrac).toFixed(0)}% of ${c.cloudy} cloudy; a weak-ice bit without the overall bit stays high quality; the ATBD's Tables 40-41 ` +
+      `recomputed: ${v.all.liquid.n.toLocaleString('en-US')} liquid at ${(100 * v.all.liquid.agree).toFixed(2)}% and ${v.all.ice.n.toLocaleString('en-US')} ice at ` +
+      `${(100 * v.all.ice.agree).toFixed(2)}% make ${agreeAll.toLocaleString('en-US')} agreed of ${v.all.total.n.toLocaleString('en-US')} (${(100 * v.all.total.agree).toFixed(2)}%), ` +
+      `the thick-cloud qualifier ${(100 * v.thick.total.agree).toFixed(2)}% of ${v.thick.total.n.toLocaleString('en-US')} against the 80% requirement; ` +
+      `tops at or under ${PHASE_ATBD.homogeneousFreezingK} K are ice, liquid tops over ${PHASE_ATBD.liquidTopK} K are warm`
   );
 }
 

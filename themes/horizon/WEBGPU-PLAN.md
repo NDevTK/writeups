@@ -10345,6 +10345,90 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 161st pass - THE CLOUD'S PHASE):
+  NOAA's cloud top phase (ABI-L2-ACTPC: CONUS every five minutes, 2
+  km, day and night) becomes the eleventh product the daemon serves
+  and the page reads from the bucket when a box lacks it, and the
+  MEASURED top overhead gates the optics that depend on what the
+  cloud is made of. THE PRIMARY, read in full: the Enterprise Cloud
+  Type and Cloud Phase ATBD v3 (Pavolonis, 1 Jun 2020, 113 pp; the
+  index page names it "Cloud Type and Cloud Phase"). The phase is
+  derived from the type (Table 29): clear; liquid water - a liquid
+  -topped cloud whose opaque 11-um cloud temperature exceeds 273 K;
+  supercooled liquid water - under 273 K; mixed phase - a high
+  probability of liquid and ice near the top; ice - thick ice
+  (infrared optical depth over 2), thin ice, multilayered ice;
+  undetermined - bad input (Tables 30-31, the file's own numbering 0
+  to 5, fill 255). The decision tree is a dozen beta-ratio tests
+  (b(12/11 um), b(8.5/11 um) against the tropopause and the opaque
+  assumptions, the water-vapour multilayer tests) and a homogeneous
+  -freezing test: an opaque 11-um temperature at or under 238 K is
+  ice (233 K the spontaneous-freezing temperature of small droplets,
+  Rogers & Yau 1989; Korolev et al. 2003 found ice dominant to 238 K,
+  Sec. 3.4.2.6.8); a 3 x 3 median filter finishes the type, kept
+  consistent with the mask (3.4.2.7). THE QUALITY WORD (Table 32):
+  bit 1 overall low quality (set when any other is), 2 L1b, 3 a beta
+  ratio outside 0.1-10, 4 an ice call on a weak signal (epsilon under
+  0.05), 5 a low surface emissivity that mattered, 6 the satellite
+  zenith past cos 0.15 (about 82 deg) - the file's flag_masks say the
+  same. REQUIREMENT (Table 1): 80% correct classification over
+  liquid / solid / supercooled / mixed "in presence of clouds with
+  optical depth > 1", quantitative to at least 65 deg local zenith
+  and qualitative beyond, precision 1.5 categories. VALIDATION
+  (Tables 40-41: SEVIRI against CALIOP, 95,249 cloudy matchups over
+  all seasons, liquid and supercooled combined since only the 11-um
+  temperature parts them, the potentially mixed 268-238 K tops set
+  aside - 21,434 of them): liquid 90.48% agreed of 49,642, ice 84.84%
+  of 45,607, 87.78% in all; with the optical-depth-over-1 qualifier
+  liquid 90.30% of 34,446, ice 98.44% of 17,597, 93.05% of 52,043;
+  errors of 54% and 72% in the mixed category could be tolerated and
+  still meet the specification (Fig. 31). THE FILE (surveyed on
+  noaa-goes18, 13:01Z): 0.5 MB, Phase uint8 1500 x 2500 in rows of
+  104 x 2500, DQF the same, flag_values 0-5 with the ATBD's meanings,
+  the scene's total_number_cloudy_pixels, the thresholds
+  quantitative_local_zenith_angle 82 and retrieval 90 (the file's
+  own; the requirement's 65 is the F&PS's), solar_zenith_angle 180
+  (day and night) - a 101 x 101 window costs 3 ranges and about 345
+  kB (the head's 256 kB most of it). MEASURED at 13:07Z: the home
+  (GOES-18, 2.3 x 2.8 km px) overhead MIXED PHASE at high quality,
+  6,665 mixed and 3,372 ice of 10,037 cloudy high-quality pixels
+  (ice 34%), 164 clear, none low; Montauk's water (GOES-19, 2.1 x
+  3.1 km) overhead LIQUID WATER, 4,214 liquid, 4,693 supercooled,
+  776 mixed, 126 ice of 9,809 (ice 1%), 49 low-quality words (5, 9
+  and 13: the overall bit with the beta or the weak-ice bit) - the
+  same sky the 160th's window showed as one solid mode. (1)
+  goesl2.js: L2_PRODUCTS.phase, PHASE_MEANINGS (the file's), PHASE
+  _WORDS, PHASE_QF (the six bits), PHASE_ATBD (the requirement, the
+  273 / 238 / 233 K rules, the validation tables), phaseWords,
+  phaseQuality (high unless the overall bit, the reasons named),
+  phaseCensus (per category over the high-quality pixels, the cloudy
+  total, the ice and water shares). (2) goesl2-decode.js:
+  L2_PHASE_SPEC {Phase raw, DQF raw}, L2_PHASE_EXTRAS, half width
+  50, the twelfth ask (timed false: the optics' now), l2PhaseBody
+  (the categories and the word packed u8, the point's own pixel, the
+  census, the scene's cloudy count and the file's angle thresholds).
+  (3) The daemon and the client carry `phase`; /health's products
+  count eleven. (4) THE PAGE: unpackProduct's phaseArr, the gap fill
+  names 'phase' (a box behind the page: the bucket read), the record
+  "NOAA GOES-18 cloud top phase (ACTPC)" and a line clause with the
+  overhead call, the census and the ATBD's validation; goesL2PhaseAt;
+  THE OPTICS' GATE phaseGate(): a high-quality pixel within 30 min of
+  its scan - an ICE top closes the droplet corona (sun and moon), a
+  LIQUID or SUPERCOOLED top closes the halo family (the occurrence
+  draw multiplied by 0) and the cirrus corona (sun and moon); mixed,
+  clear (thin cirrus escapes the mask: the model's gates keep their
+  say), undetermined, low quality or no measurement leave every gate
+  standing. Measured outranks modelled; the record and the line say
+  which family the measurement closed. GATES: goesl2-reference THE
+  CLOUD'S PHASE (the categories and bits, a 40-px census with every
+  pixel counted once, the quality words, the requirement, the
+  validation tables recomputed - the agreed counts of the two
+  categories summing to the total's within rounding; 13 landmarks);
+  server-reference (12 asks, ids, half widths, 6 untimed, 11 served,
+  the twelfth's product and timing); goesl2-client-reference (11
+  served, the phase null on the fake bucket, the re-list of seven
+  CONUS products). Docs: the daemon README's /goesl2 entry and
+  products count, FINDINGS pass 161.
 - DONE (Sep 6, the review session's 160th pass - THE COVERAGE EDGE):
   the 159th's stated limit closed before its first solid-deck test.
   The decks' texel field is a COVERAGE (the noise threshold: a texel

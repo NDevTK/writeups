@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **146 CPU reference files printing
-1164 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1165 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **146 reference files, 1164 landmark lines, 8 GPU probes** (live gate
+- **146 reference files, 1165 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -981,7 +981,18 @@ The practice the corpus demonstrates, stated so it can be reused:
    one-mode population (a solid deck, a veil) takes its own dim tenth
    as the edge, so a stratus sheet stays whole instead of reading as
    0.6 coverage (`goesl2-reference` THE DAYLIGHT FIELD, the coverage
-   edge and Otsu's pins; `daylight-reference` repinned)
+   edge and Otsu's pins; `daylight-reference` repinned). Pass 161
+   adds NOAA's cloud top phase (ABI-L2-ACTPC, every five minutes,
+   day and night) as the eleventh served product and lets the
+   measured top overhead gate the optics: an ice top closes the
+   droplet corona, a liquid or supercooled top closes the halo family
+   and the cirrus corona, a mixed, clear or undetermined top leaves
+   the model's gates standing — the Enterprise Cloud Type and Phase
+   ATBD v3 read in full, its categories, quality bits, requirement
+   (80% correct over optical depth > 1) and CALIOP validation tables
+   (93.05% agreed over 52,043 thick clouds; 87.78% over all 95,249)
+   pinned and recomputed (`goesl2-reference` THE CLOUD'S PHASE;
+   `server-reference` and `goesl2-client-reference` the twelfth ask)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
