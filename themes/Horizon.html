@@ -7335,7 +7335,10 @@
             `${vis.time.slice(11, 16)}Z · 500-m reflectance factor over ${c.good.toLocaleString('en-US')} good px within ±100 km ` +
               `(median ${f3(c.rfMedian)}, sun ${vis.sunZenithDeg.toFixed(0)}° from the zenith) · ` +
               `the decks' cover cut ${DAYLIGHT_FACTOR}× finer inside the mask's cloud: ${res.fine.refined.toLocaleString('en-US')} of ` +
-              `${res.fine.cloudy.toLocaleString('en-US')} fine texels shaped, mean fraction ${res.stats.meanFraction.toFixed(2)} ` +
+              `${res.fine.cloudy.toLocaleString('en-US')} fine texels shaped` +
+              (res.stats.meanFraction !== null
+                ? `, mean fraction ${res.stats.meanFraction.toFixed(2)} `
+                : ' (none took a fraction - the 2-km cover stands) ') +
               `between clear ρ ${res.refs.rhoClear.toFixed(3)} and the coverage edge ρ ${res.refs.rhoCloud.toFixed(3)} (${refEdgeWords(res.refs)}; ${res.sortedBy === 'ACM' ? "NOAA's mask" : "the theme's field"} sorting)` +
               (j.read && j.read.length
                 ? ` · ${j.read.reduce((s, r) => s + r.kb, 0).toLocaleString('en-US')} kB in ${j.read.reduce((s, r) => s + r.ranges, 0)} ranges from ${j.bucket}`
@@ -7371,8 +7374,8 @@
       // a thickness
       const refEdgeWords = (refs) =>
         refs.mode === 'bimodal'
-          ? `Otsu's threshold between the sub-pixel gaps and the cloud, two modes at η ${refs.eta.toFixed(2)}`
-          : `the dim tenth of one mode at η ${refs.eta.toFixed(2)}`;
+          ? `Otsu's threshold between the sub-pixel gaps and the cloud, two modes at η ${Number.isFinite(refs.eta) ? refs.eta.toFixed(2) : '–'}`
+          : `the dim tenth of one mode${Number.isFinite(refs.eta) ? ` at η ${refs.eta.toFixed(2)}` : ''}`;
       function daylightLine() {
         if (daylight) {
           const d = daylight;
@@ -7386,7 +7389,9 @@
             `(median of ${r.refs.nClear.toLocaleString('en-US')} px), the coverage edge ρ ${r.refs.rhoCloud.toFixed(3)} (${refEdgeWords(r.refs)} of ${r.refs.nCloud.toLocaleString('en-US')} cloudy px; ` +
             `the bright cloud's p90 ${r.refs.rhoBright.toFixed(3)}) · ` +
             `the decks' 2-km field cut ${DAYLIGHT_FACTOR}× finer: ${r.fine.refined.toLocaleString('en-US')} of ${r.fine.cloudy.toLocaleString('en-US')} fine texels ` +
-            `under the mask's cloud shaped by their reflectance (mean fraction ${r.stats.meanFraction.toFixed(2)}), the rest keeping the 2-km cover; ` +
+            `under the mask's cloud shaped by their reflectance ${
+              r.stats.meanFraction !== null ? `(mean fraction ${r.stats.meanFraction.toFixed(2)})` : '(none took a fraction)'
+            }, the rest keeping the 2-km cover; ` +
             `κ = πd²/E_sun = ${d.vis.kappa0 !== null ? d.vis.kappa0.toExponential(3) : '–'} from the file's own d = ${d.vis.dAu !== null ? d.vis.dAu.toFixed(5) : '–'} AU ` +
             `and E_sun ${d.vis.esunWm2Um !== null ? d.vis.esunWm2Um.toFixed(1) : '–'} W m⁻² µm⁻¹ (CMIP ATBD Eq. 3-2, 3-3) · ` +
             (d.read && d.read.length

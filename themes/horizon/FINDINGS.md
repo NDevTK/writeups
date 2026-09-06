@@ -1025,7 +1025,11 @@ The practice the corpus demonstrates, stated so it can be reused:
    reference, only an opaque column cools it, and a 15 °C skin is seen
    warm through twice its water) (`goesl2-reference` THE COLUMN'S
    WATER; `goesir-reference` THE COLUMN'S WATER; `server-reference` and
-   `goesl2-client-reference` the fourteenth ask)
+   `goesl2-client-reference` the fourteenth ask); the pass's live probe
+   also caught a fault of the 159th's daylight line — with the sun 84°
+   from the zenith no lit fine texel took a fraction and the null mean
+   fraction threw on every panel render — now worded as "none took a
+   fraction"
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
