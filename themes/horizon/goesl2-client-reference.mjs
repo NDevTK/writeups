@@ -237,6 +237,7 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       body.aod === null &&
       body.lst === null &&
       body.phase === null &&
+      body.fire === null &&
       body.height !== null &&
       body.height.product === 'ABI-L2-ACHAC' &&
       body.height.census.n === heightWhole.census.n &&
@@ -254,8 +255,8 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       // lists nothing under; the pageOnly ask (159th: the 500-m
       // visible window) is not listed unless named
       listsAfterFirst === (served.length - 2) * 3 + 2 &&
-      L2_ASKS.length === 12 &&
-      served.length === 11 &&
+      L2_ASKS.length === 13 &&
+      served.length === 12 &&
       filesAfterFirst === 2 &&
       // the range reads: the heights' head then its strips, the winds
       // whole in one megabyte ask
@@ -288,7 +289,7 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       client.windows.size === 2 &&
       CLIENT_HELD_WINDOWS === 4 &&
       asked.size === 0,
-    `the home asks the ${served.length} products the daemon serves (of ${L2_ASKS.length} asks: the 500-m visible window is the page's own, read only when named) over ${listsAfterFirst} listings (this hour's prefix for each, two more hours back for the nine found empty) and reads the two the fake bucket holds ` +
+    `the home asks the ${served.length} products the daemon serves (of ${L2_ASKS.length} asks: the 500-m visible window is the page's own, read only when named) over ${listsAfterFirst} listings (this hour's prefix for each, two more hours back for the ten found empty) and reads the two the fake bucket holds ` +
       `(${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB in ${r.ranges} range${r.ranges === 1 ? '' : 's'}`).join('; ')}): ` +
       `the heights' window at (424, 127) with ${body && body.height.census.n} tops, median ${body && body.height.census.medianM.toFixed(1)} m ` +
       `- the daemon's own body from the same bytes - and ${body && body.dmw.n} of ${body && body.dmw.total} vectors within 150 km, ` +
@@ -467,13 +468,13 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       // ones not
       // the CONUS products the fake bucket lacks: seven since the
       // 161st's cloud top phase
-      listedAgain.length === 7 * 3 + 2 &&
+      listedAgain.length === 8 * 3 + 2 &&
       !listedAgain.some(
         (p) => p.startsWith('ABI-L2-SSTF') || p.startsWith('ABI-L2-DSRF')
       ),
     `three range asks of a whole-answering server cost ${calls} download (${a.length}, ${b.length} and ${c.length} bytes cut from it, the last short at the end); ` +
       `the client over such a bucket reads its two files whole (${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB`).join(', ')}), ` +
-      `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the seven CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
+      `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the eight CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
   );
 }
 

@@ -10345,6 +10345,96 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 162nd pass - THE FIRE'S HEAT):
+  the scene's wildfires have been NASA EONET's open events since the
+  wildfire module's first pass - a day-old centroid per event, its
+  glow fading with age. NOAA's fire / hot spot characterization
+  (ABI-L2-FDCC: CONUS every five minutes, 2 km, day and night) puts
+  the pixel that burns NOW in its place with its own radiative
+  power, and becomes the twelfth product the daemon serves. THE
+  PRIMARY, read in full: the Enterprise Fire / Hot Spot
+  Characterization ATBD v2.7 (Schmidt et al., 31 Oct 2020, 73 pp) -
+  the WFABBA heritage (Prins & Menzel 1992-94, GOES-8 onward), a
+  dynamic multispectral thresholding contextual algorithm on the
+  3.9-um and 11.2-um windows (bands 7 and 14; band 2 by day and band
+  15 when available for cloud screening; a hybrid longwave band from
+  13 and 14 when the focal plane runs past 90 K). Part I loops every
+  pixel: local zenith past 80 deg blocked (code 50), sun glint or
+  the sub-solar point within 10 deg blocked (60), band 7 or 14
+  missing / saturated / under 200 K (120-127), water and coast
+  (150-153); the 3.9-um minimum 285 K at night and 285 + 15 cos(sza)
+  by day, the reflectivity product's 315 / 315 + 5 cos; opaque cloud
+  at T11.2 < 270 K, T3.9 - T11.2 < -4 K, > 20 K with T3.9 < 285 K,
+  albedo over 0.38 by day, T12.3 <= 265 K (codes 200-245); the
+  background window grows five pixels a side until a fifth of it is
+  clear land, to 111 x 111 (code 170 when it never is); contextual
+  thresholds of scaled standard deviations (3 sigma of the 3.9 - 11.2
+  difference capped at 4 K; 3.75 sigma of 3.9 um plus a window
+  offset, floored at 4 and capped at 10 K); the corrections - NCEP
+  precipitable water through a 5 x 7 lookup, MODIS emissivity, the
+  solar component as the background's 3.9-11.2 residual, a
+  diffraction split 0.15 / 0.85 (band 7) and 0.30 / 0.70 (band 14);
+  the modified Dozier (1981) solution for the sub-pixel size p and
+  temperature Tt (15 bisections then Newton to 1e-20; a fire under
+  400 K is not characterised, 350-400 K may smoulder), and the
+  middle-infrared radiative power (Wooster et al. 2003, Eq. 3.4):
+  FRP = A_pixel sigma / a (L_MIR - L_background), a = 3.0e-9 W m^-2
+  sr^-1 um^-1 K^-4, valid 600-1400 K - not reported for saturated,
+  cloud-contaminated or low-probability pixels or a background of
+  more than ten passes. Part II re-tests the candidates and assigns
+  the class: 10 processed, 11 saturated, 12 cloud-contaminated, 13 /
+  14 / 15 high / medium / low probability, 30-35 the same seen within
+  12 h and a pixel of an earlier fire (the temporal filter). Band 7
+  saturates at 411.86 K (412 K measured on GOES-16/17), band 14 at
+  340 K; the minimum detectable fire about 0.004 km^2 at 800 K at the
+  sub-satellite point. REQUIREMENT (Table 2.1): 2 km, 5 min CONUS,
+  275-400 K at 2.0 K on band 7, quantitative to 65 deg local zenith,
+  day and night. VALIDATION (Sec. 4): deep-dive against Landsat-8
+  OLI - Hall et al. 2019 found severe false positives in the first
+  FDCA, the 25 Jul 2019 update cut them; the Rhea Fire's overnight
+  fires fell below the detection thresholds at 10:00Z; the Topaz
+  solar farm's reflection gave high-confidence false alarms (Fig.
+  4.4) - the ATBD's own caution, on the line. THE FILE (noaa-goes18,
+  13:22Z): 0.3 MB; Mask int16 1500 x 2500 in rows of 52 (fill -99),
+  Power float32 (MW, fill -9, -99 on non-fire pixels), Temp uint16 (K
+  at 0.0549 from 400), Area uint16 (m^2 at 60.98 from 4000), DQF
+  (0 fire, 1 fire-free land, 2 opaque cloud, 3 unusable surface /
+  glint / off disk, 4 bad input, 5 algorithm failure); the scene's
+  counts and power statistics as scalars. MEASURED at 13:22Z: the
+  CONUS scene held 35 fire pixels on GOES-18 and 12 on GOES-19, none
+  within +-100 km of the home (QA 5,724 under opaque cloud, 4,477
+  water or unusable), the Sierra (9,327 fire-free land), Georgia or
+  Kansas; a window costs 2-5 ranges and 291-505 kB in 0.2-0.8 s.
+  (1) goesl2.js: L2_PRODUCTS.fire, FIRE_CODES, FIRE_QA_WORDS,
+  FIRE_ATBD (the thresholds, block-outs, saturation, the MIR law's
+  a, the requirement), fireClass (a code's class and words),
+  frpMir (Eq. 3.4), fireCensus (by class, the power's count / sum /
+  maximum, the hottest temperature, the QA counts), fireList (the
+  fire pixels navigated to their places, the strongest first). (2)
+  goesl2-decode.js: L2_FIRE_SPEC {Mask raw16, Power phys, Temp raw16,
+  Area raw16, DQF raw}, L2_FIRE_EXTRAS, half width 50, the thirteenth
+  ask (untimed), l2FireBody (the mask u16 with the fill as 65535, the
+  list, the census, the scene's counts, the file's own zenith and
+  glint thresholds). (3) The daemon binds and re-exports l2FireBody
+  (the 161st's guard holds it); the client carries `fire`. (4)
+  wildfire.js: goesFiresNear (the pixels as the scene's fires - the
+  intensity the radiative power on a log scale, 1 MW faint at 0.35,
+  1000 MW full, a saturated pixel full, a probable fire without power
+  0.3, times firesNear's own distance fade; the age the file's
+  minutes) and mergeFires (the measured pixels first, EONET's events
+  only where no pixel burns within 10 km). (5) THE PAGE: applyFires
+  composes the two (the hot spots fresh within 20 minutes; the demo
+  ?fire=N untouched), the record "NOAA GOES-18 fire hot spots
+  (FDCC)" and the line clause (the census, the power, what the scene
+  drew, the ATBD's caution). GATES: goesl2-reference THE FIRE'S HEAT
+  (the classes, Eq. 3.4 by hand - a 4-km^2 pixel 0.5 W m^-2 sr^-1
+  um^-1 above its background radiates 37.8 MW -, a 5 x 5 census with
+  every class and QA counted once, the list navigated to the home's
+  own pixel; 14); wildfire-reference THE MEASURED HOT SPOTS (the heat
+  scale, the saturated pixel, the merge; 4); server-reference (13
+  asks, 12 served, 7 untimed); goesl2-client-reference (12 served,
+  the fire null on the fake bucket, eight CONUS products re-listed).
+  Docs: the daemon README, FINDINGS pass 162.
 - DONE (Sep 6, the review session's 161st pass - THE CLOUD'S PHASE):
   NOAA's cloud top phase (ABI-L2-ACTPC: CONUS every five minutes, 2
   km, day and night) becomes the eleventh product the daemon serves

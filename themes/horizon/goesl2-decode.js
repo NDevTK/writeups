@@ -53,6 +53,8 @@ import {
   nearestGood,
   PHASE_MEANINGS,
   phaseCensus,
+  fireCensus,
+  fireList,
   packArray,
   pixelSizeM,
   productTimeIso,
@@ -219,6 +221,22 @@ export const L2_PHASE_EXTRAS = [
   'solar_zenith_angle'
 ];
 L2_HALF_PX.phase = 50;
+// The 162nd pass: the fire mask (int16 codes of the ATBD's Table
+// 3.11, fill -99), the radiative power (float32 MW, fill -9; -99 on
+// non-fire pixels), the sub-pixel temperature (uint16 K at 0.0549
+// from 400) and area (uint16 m2 at 60.98 from 4000), the QA flag;
+// the scene's fire counts and power statistics as extras.
+export const L2_FIRE_SPEC = {Mask: 'raw16', Power: 'phys', Temp: 'raw16', Area: 'raw16', DQF: 'raw'};
+export const L2_FIRE_EXTRAS = [
+  'total_number_of_pixels_with_fires_detected',
+  'total_number_of_pixels_with_fire_radiative_power',
+  'mean_fire_radiative_power',
+  'maximum_fire_radiative_power',
+  'maximum_fire_temperature',
+  'local_zenith_angle',
+  'sunglint_angle'
+];
+L2_HALF_PX.fire = 50;
 // what /goesl2 fetches for a point: product, spec, the window's half
 // width on the product's grid, the imagery's band (the CMIPC prefix
 // lists every band's file); timed false = not asked for a mosaic's
@@ -299,6 +317,16 @@ export const L2_ASKS = [
     spec: L2_PHASE_SPEC,
     halfPx: 50,
     extras: L2_PHASE_EXTRAS,
+    timed: false
+  },
+  // the fire's heat (162nd): the hot spots burning now, never a
+  // mosaic's minute
+  {
+    id: 'fire',
+    product: L2_PRODUCTS.fire,
+    spec: L2_FIRE_SPEC,
+    halfPx: 50,
+    extras: L2_FIRE_EXTRAS,
     timed: false
   }
 ];
@@ -920,6 +948,41 @@ export function l2PhaseBody(dec, key, lat, lon) {
     lzaQuantitativeDeg: num(x.quantitative_local_zenith_angle),
     lzaRetrievalDeg: num(x.retrieval_local_zenith_angle),
     szaThresholdDeg: num(x.solar_zenith_angle)
+  };
+}
+// THE FIRE'S HEAT (162nd pass): the fire window - the mask codes
+// (u16 on the wire, the -99 fill as 65535), the fire pixels navigated
+// to their places with their power, temperature and area
+// (goesl2.fireList), the census (goesl2.fireCensus) and the scene's
+// counts from the head.
+export function l2FireBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_FIRE_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.fire);
+  if (!w) return null;
+  const mt = dec.meta.Temp ?? {scale: 1, offset: 0, fill: 65535};
+  const ma = dec.meta.Area ?? {scale: 1, offset: 0, fill: 65535};
+  const tempK = unscale(w.cut.Temp, mt);
+  const areaM2 = unscale(w.cut.Area, ma);
+  const power = Float32Array.from(w.cut.Power, (v) => (Number.isFinite(v) && v >= 0 ? v : NaN));
+  const mask = Array.from(w.cut.Mask, (v) => (v < 0 ? 65535 : v));
+  const x = dec.extras ?? {};
+  const num = (v) => (Number.isFinite(v) ? v : null);
+  return {
+    ...l2Common(dec, L2_PRODUCTS.fire, key, w),
+    mask: packArray(mask, 'u16'),
+    maskFill: 65535,
+    dqf: packArray(w.cut.DQF, 'u8'),
+    fires: fireList(w.cut.Mask, power, tempK, areaM2, w.box, dec.g ?? fixedGridGeometry(dec.proj), dec.x, dec.y),
+    census: fireCensus(w.cut.Mask, power, tempK, areaM2, w.cut.DQF),
+    sceneStats: {
+      fires: num(x.total_number_of_pixels_with_fires_detected),
+      withFrp: num(x.total_number_of_pixels_with_fire_radiative_power),
+      meanFrpMW: num(x.mean_fire_radiative_power),
+      maxFrpMW: num(x.maximum_fire_radiative_power),
+      maxTempK: num(x.maximum_fire_temperature)
+    },
+    lzaThresholdDeg: num(x.local_zenith_angle),
+    glintThresholdDeg: num(x.sunglint_angle)
   };
 }
 // The DCOMP window (149th pass): the optical depth at 640 nm and

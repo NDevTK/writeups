@@ -470,6 +470,9 @@ export const L2_PRODUCTS = {
   // the 161st pass: the cloud top phase (CONUS every 5 min, 2 km,
   // day and night; 0.5 MB a file, its window a few tens of kB)
   phase: 'ABI-L2-ACTPC',
+  // the 162nd pass: the fire / hot spot characterization (CONUS every
+  // 5 min, 2 km, day and night; 0.3 MB a file)
+  fire: 'ABI-L2-FDCC',
   // the 152nd pass: the downward shortwave radiation at the surface
   // (0.2-4.0 um, direct + diffuse, W/m2) - full disk only, every 10
   // min, 2 km (the Enterprise SRB algorithm: Laszlo, Kim & Liu, ATBD
@@ -961,6 +964,193 @@ export function phaseCensus(phase, dqf) {
     iceFrac: cloudy ? c.ice / cloudy : null,
     waterFrac: cloudy ? (c.liquid + c.supercooled + c.mixed) / cloudy : null
   };
+}
+// ---------------------------------------------------------------
+// THE FIRE'S HEAT (162nd pass): NOAA's fire / hot spot
+// characterization (ABI-L2-FDCC: CONUS every 5 min, 2 km, day and
+// night) - the Enterprise Fire / Hot Spot Characterization ATBD
+// v2.7 (Schmidt et al., 31 Oct 2020, 73 pp; read in full): the
+// WFABBA heritage, a dynamic multispectral thresholding contextual
+// algorithm on the 3.9-um and 11.2-um windows (bands 7 and 14; band
+// 2 by day and band 15 when available for cloud screening). A fire
+// pixel's 3.9-um brightness temperature must clear 285 K at night,
+// 285 + 15 cos(solar zenith) K by day (the reflectivity product's
+// threshold 315 / 315 + 5 cos), and stand above its background
+// window (expanded until a fifth of it is clear land, to 111 x 111
+// pixels) by scaled standard deviations; opaque cloud is called at
+// T11.2 < 270 K, T3.9 - T11.2 < -4 K, > 20 K with T3.9 < 285 K, an
+// albedo over 0.38 by day, T12.3 <= 265 K; local zenith past 80 deg
+// and sun glint or the sub-solar point within 10 deg are blocked
+// out; band 7 saturates at 411.86 K, band 14 at 340 K. A modified
+// Dozier (1981) solution gives the sub-pixel fire's size and
+// temperature (15 bisections then Newton; a fire under 400 K is not
+// characterised, 350-400 K may smoulder), and the fire radiative
+// power follows the middle-infrared law (Wooster et al. 2003, Eq.
+// 3.4): FRP = A_pixel sigma / a (L_MIR - L_background) with a =
+// 3.0e-9 W m^-2 sr^-1 um^-1 K^-4, valid for 600-1400 K fires; FRP is
+// not reported for saturated, cloud-contaminated or low-probability
+// pixels. Codes 10-15 are this scan's fires (processed, saturated,
+// cloud-contaminated, high / medium / low probability), 30-35 the
+// same seen within 12 h and a pixel of an earlier fire (the temporal
+// filter, Sec. 3.4.2.16); the QA flag folds the mask (Table 3.12).
+// Requirement (Table 2.1): 2 km, 5 min, 275-400 K at 2.0 K on band
+// 7, quantitative to 65 deg local zenith; the minimum detectable
+// fire about 0.004 km^2 at 800 K at the sub-satellite point.
+// Validation (Sec. 4): deep-dive against Landsat-8 OLI (Hall et al.
+// 2019 found severe false positives in the first FDCA; the 25 Jul
+// 2019 update cut them); the Topaz solar farm's reflection gave
+// high-confidence false alarms - stated on the line as the ATBD's
+// own caution.
+// ---------------------------------------------------------------
+export const FIRE_CODES = {
+  10: 'processed',
+  11: 'saturated',
+  12: 'cloud-contaminated',
+  13: 'high probability',
+  14: 'medium probability',
+  15: 'low probability'
+};
+export const FIRE_QA_WORDS = [
+  'fire',
+  'fire-free land',
+  'opaque cloud',
+  'unusable surface, glint or off the disk',
+  'bad input',
+  'algorithm failed'
+];
+export const FIRE_ATBD = {
+  version: 'Enterprise Fire / Hot Spot Characterization ATBD v2.7, 2020-10-31',
+  requirement: {rangeK: [275, 400], accuracyK: 2, lzaQuantitativeDeg: 65, refreshMin: 5, resolutionKm: 2},
+  t39MinNightK: 285,
+  t39MinDayAddK: 15,
+  reflThresholdNightK: 315,
+  reflThresholdDayAddK: 5,
+  cloud: {t112BelowK: 270, diffBelowK: -4, diffAboveK: 20, warmBelowK: 285, albedoAbove: 0.38, t123AtOrBelowK: 265},
+  blockOut: {lzaDeg: 80, glintDeg: 10, subSolarDeg: 10},
+  saturationK: {band7: 411.86, band14: 340},
+  minFireK: 400,
+  smoulderingK: 350,
+  minDetectableKm2: 0.004,
+  minDetectableAtK: 800,
+  mir: {a: 3.0e-9, rangeK: [600, 1400]},
+  sigma: 5.67e-8,
+  temporalFilterH: 12,
+  backgroundMaxPx: 111,
+  backgroundValidFrac: 0.2,
+  frpUnreportedCodes: [11, 12, 15, 31, 32, 35]
+};
+/** The mask code's class: {fire, filtered, kind, words}; a non-fire
+ * code names its reason (Table 3.11's families). */
+export function fireClass(code) {
+  const c = Number(code);
+  if (c >= 10 && c <= 15) return {fire: true, filtered: false, kind: FIRE_CODES[c], words: FIRE_CODES[c] + ' fire pixel'};
+  if (c >= 30 && c <= 35)
+    return {fire: true, filtered: true, kind: FIRE_CODES[c - 20], words: FIRE_CODES[c - 20] + ' fire pixel, seen before'};
+  let words = 'unprocessed';
+  if (c === 40) words = 'space';
+  else if (c === 50) words = 'local zenith past 80 deg';
+  else if (c === 60) words = 'sun glint or sub-solar block-out';
+  else if (c === 100) words = 'fire-free land';
+  else if (c >= 120 && c <= 127) words = 'bad input data';
+  else if (c >= 150 && c <= 155) words = 'water, coast or invalid surface';
+  else if (c === 160) words = 'invalid emissivity';
+  else if (c >= 170 && c <= 188) words = 'a calculation failed';
+  else if (c >= 200 && c <= 245) words = 'an opaque cloud test';
+  return {fire: false, filtered: false, kind: null, words};
+}
+/** The middle-infrared fire radiative power (Eq. 3.4): the pixel's
+ * area (m^2) times sigma / a times the 3.9-um radiance above the
+ * background (W m^-2 sr^-1 um^-1), in megawatts. */
+export function frpMir(lMir, lBackground, areaM2) {
+  return ((areaM2 * FIRE_ATBD.sigma) / FIRE_ATBD.mir.a) * (lMir - lBackground) / 1e6;
+}
+/**
+ * The window's census: fire pixels by class (this scan's and the
+ * temporally filtered), the reported radiative power's count, sum
+ * and maximum (MW), the characterised temperature's maximum (K) and
+ * the QA flag's six counts. `power`, `tempK` and `areaM2` are the
+ * physical arrays (NaN where not reported).
+ */
+export function fireCensus(mask, power, tempK, areaM2, dqf) {
+  const c = {
+    n: mask.length,
+    fires: 0,
+    filtered: 0,
+    processed: 0,
+    saturated: 0,
+    cloudy: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    frp: {n: 0, sumMW: 0, maxMW: null},
+    temp: {n: 0, maxK: null},
+    area: {n: 0, sumM2: 0},
+    qa: [0, 0, 0, 0, 0, 0],
+    qaOther: 0
+  };
+  for (let q = 0; q < mask.length; q++) {
+    const d = dqf ? dqf[q] : 255;
+    if (d >= 0 && d <= 5) c.qa[d]++;
+    else c.qaOther++;
+    const k = fireClass(mask[q]);
+    if (!k.fire) continue;
+    c.fires++;
+    if (k.filtered) c.filtered++;
+    const key = {processed: 'processed', saturated: 'saturated', 'cloud-contaminated': 'cloudy', 'high probability': 'high', 'medium probability': 'medium', 'low probability': 'low'}[k.kind];
+    c[key]++;
+    const p = power ? power[q] : NaN;
+    if (Number.isFinite(p) && p >= 0) {
+      c.frp.n++;
+      c.frp.sumMW += p;
+      c.frp.maxMW = c.frp.maxMW === null ? p : Math.max(c.frp.maxMW, p);
+    }
+    const t = tempK ? tempK[q] : NaN;
+    if (Number.isFinite(t)) {
+      c.temp.n++;
+      c.temp.maxK = c.temp.maxK === null ? t : Math.max(c.temp.maxK, t);
+    }
+    const a = areaM2 ? areaM2[q] : NaN;
+    if (Number.isFinite(a)) {
+      c.area.n++;
+      c.area.sumM2 += a;
+    }
+  }
+  return c;
+}
+/**
+ * The fire pixels of a window as a list, each navigated to its
+ * place (the fixed grid's own equations): {q, i, j, latDeg, lonDeg,
+ * code, kind, filtered, frpMW, tempK, areaM2}, the strongest
+ * radiative power first (unreported last).
+ */
+export function fireList(mask, power, tempK, areaM2, box, g, xCoord, yCoord) {
+  const out = [];
+  for (let q = 0; q < mask.length; q++) {
+    const k = fireClass(mask[q]);
+    if (!k.fire) continue;
+    const i = box.i0 + (q % box.cols);
+    const j = box.j0 + Math.floor(q / box.cols);
+    const ll = fixedGridToLatLon(xCoord.offset + i * xCoord.scale, yCoord.offset + j * yCoord.scale, g);
+    if (!ll) continue;
+    const p = power ? power[q] : NaN;
+    const t = tempK ? tempK[q] : NaN;
+    const a = areaM2 ? areaM2[q] : NaN;
+    out.push({
+      q,
+      i,
+      j,
+      latDeg: +ll.latDeg.toFixed(4),
+      lonDeg: +ll.lonDeg.toFixed(4),
+      code: mask[q],
+      kind: k.kind,
+      filtered: k.filtered,
+      frpMW: Number.isFinite(p) && p >= 0 ? +p.toFixed(1) : null,
+      tempK: Number.isFinite(t) ? +t.toFixed(0) : null,
+      areaM2: Number.isFinite(a) ? +a.toFixed(0) : null
+    });
+  }
+  out.sort((a, b) => (b.frpMW ?? -1) - (a.frpMW ?? -1));
+  return out;
 }
 // ---------------------------------------------------------------
 // THE DAYLIGHT FIELD (159th pass): the reflective bands' CMI - the

@@ -11,7 +11,13 @@
 //  - firesNear filters by distance and fades intensity with age and
 //    range (a fresh near fire burns bright, an old far one is a faint
 //    horizon glow).
-import {parseWildfires, rangeBearing, firesNear} from './wildfire.js';
+import {
+  firesNear,
+  goesFiresNear,
+  mergeFires,
+  parseWildfires,
+  rangeBearing
+} from './wildfire.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -142,6 +148,56 @@ const FIXTURE = {
     ok
       ? `California fire ${a.distKm.toFixed(0)}km intensity ${a.intensity.toFixed(2)}; Swiss fire excluded at 200km; nearer fire brighter`
       : `atCA=${atCA.map((f) => f.id).join(',')}`
+  );
+}
+
+// ---- THE MEASURED HOT SPOTS (162nd pass) -------------------------
+// NOAA's fire pixels as the scene's fires: the intensity from the
+// radiative power on a log scale (1 MW faint, 1000 MW full, a
+// saturated pixel full, a probable fire without power 0.3) times the
+// distance fade; the merge keeps every measured pixel and drops the
+// EONET events a measured pixel stands within 10 km of.
+{
+  const now = Date.parse('2026-09-06T14:00:00Z');
+  const fileMs = now - 6 * 60e3; // a six-minute-old file
+  const list = [
+    {i: 1, j: 1, latDeg: 33.0, lonDeg: -117.2, code: 10, kind: 'processed', filtered: false, frpMW: 100, tempK: 800, areaM2: 50000},
+    {i: 2, j: 1, latDeg: 33.4, lonDeg: -117.5, code: 31, kind: 'saturated', filtered: true, frpMW: null, tempK: null, areaM2: null},
+    {i: 3, j: 1, latDeg: 33.1, lonDeg: -117.0, code: 15, kind: 'low probability', filtered: false, frpMW: null, tempK: null, areaM2: null},
+    {i: 4, j: 1, latDeg: 34.2, lonDeg: -117.1, code: 10, kind: 'processed', filtered: false, frpMW: 1000, tempK: 900, areaM2: 90000},
+    {i: 5, j: 1, latDeg: 36.0, lonDeg: -117.1, code: 10, kind: 'processed', filtered: false, frpMW: 5, tempK: 600, areaM2: 5000}
+  ];
+  const near = goesFiresNear(list, 32.85, -117.12, fileMs, now, 200);
+  const byId = Object.fromEntries(near.map((n) => [n.id, n]));
+  const events = [
+    {id: 'E-close', title: 'Event beside the processed pixel', lat: 33.02, lon: -117.2, distKm: 19, bearingDeg: 0, intensity: 0.5, ageH: 20},
+    {id: 'E-far', title: 'Event on its own', lat: 32.6, lon: -116.5, distKm: 64, bearingDeg: 110, intensity: 0.4, ageH: 30}
+  ];
+  const merged = mergeFires(near, events, 10);
+  check(
+    'THE MEASURED HOT SPOTS: the heat sets the glow, the merge keeps the pixel over the event',
+    near.length === 4 && // the 36 N pixel is 350 km off, past 200
+      near[0].id === 'goes-1-1' &&
+      near[0].measured === true &&
+      near[0].kind === 'processed' &&
+      near[0].frpMW === 100 &&
+      near[0].title === 'processed fire pixel 100 MW' &&
+      Math.abs(near[0].ageH - 0.1) < 1e-9 &&
+      near[0].intensity > 0.7 &&
+      near[0].intensity < 0.9 && // heat 0.35 + 0.65 log10(101)/3 = 0.784, the distance fade ~0.9
+      byId['goes-2-1'].intensity > byId['goes-1-1'].intensity * 0.9 && // saturated: heat 1 (farther, faded)
+      byId['goes-2-1'].title.endsWith(', seen before') &&
+      byId['goes-3-1'].intensity < 0.31 && // a low-probability pixel without power: 0.3 x fade
+      byId['goes-4-1'].intensity < byId['goes-1-1'].intensity && // 1000 MW (full heat) but 150 km off: the distance fade wins
+      merged.length === 5 &&
+      merged.some((m) => m.id === 'E-far') &&
+      !merged.some((m) => m.id === 'E-close') &&
+      merged[0].distKm <= merged[1].distKm,
+    `${near.length} measured pixels within 200 km (a fifth 350 km off dropped); the 100-MW processed pixel glows at ${near[0].intensity.toFixed(2)} ` +
+      `and the 1000-MW pixel 150 km off at ${byId['goes-4-1'].intensity.toFixed(2)} ` +
+      `(heat ${(0.35 + (0.65 * Math.log10(101)) / 3).toFixed(3)} times its distance fade), the saturated pixel full heat, the low-probability one ` +
+      `${byId['goes-3-1'].intensity.toFixed(2)}; the file ${(near[0].ageH * 60).toFixed(0)} min old; the merge keeps the EONET event 64 km away ` +
+      `and drops the one 2 km from the processed pixel: ${merged.map((m) => m.id).join(', ')}`
   );
 }
 

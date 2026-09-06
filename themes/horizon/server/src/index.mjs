@@ -1011,6 +1011,9 @@ export {
   L2_PHASE_SPEC,
   L2_PHASE_EXTRAS,
   l2PhaseBody,
+  L2_FIRE_SPEC,
+  L2_FIRE_EXTRAS,
+  l2FireBody,
   l2DcompBody
 } from '../../goesl2-decode.js';
 const {
@@ -1049,6 +1052,7 @@ const {
   l2AodBody,
   l2LstBody,
   l2PhaseBody,
+  l2FireBody,
   l2DcompBody
 } = L2;
 const l2Inflate = (u8) =>
@@ -2258,6 +2262,8 @@ function main() {
       phase: F.phase
         ? l2PhaseBody(F.phase.dec, F.phase.key, cell.lat, cell.lon)
         : null,
+      // the fire's heat (162nd)
+      fire: F.fire ? l2FireBody(F.fire.dec, F.fire.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial',
       // the deployed revision (158th): the page can tell an older
       // daemon's body from a fresh one's

@@ -44,6 +44,12 @@ import {
   phaseCensus,
   phaseQuality,
   phaseWords,
+  FIRE_ATBD,
+  FIRE_QA_WORDS,
+  fireCensus,
+  fireClass,
+  fireList,
+  frpMir,
   reflectanceOfFactor,
   solarGeometry,
   solarZenithDeg,
@@ -1163,6 +1169,104 @@ const inflate = (u8) =>
       `${(100 * v.all.ice.agree).toFixed(2)}% make ${agreeAll.toLocaleString('en-US')} agreed of ${v.all.total.n.toLocaleString('en-US')} (${(100 * v.all.total.agree).toFixed(2)}%), ` +
       `the thick-cloud qualifier ${(100 * v.thick.total.agree).toFixed(2)}% of ${v.thick.total.n.toLocaleString('en-US')} against the 80% requirement; ` +
       `tops at or under ${PHASE_ATBD.homogeneousFreezingK} K are ice, liquid tops over ${PHASE_ATBD.liquidTopK} K are warm`
+  );
+}
+
+// ---- THE FIRE'S HEAT (162nd pass) --------------------------------
+// The ATBD's mask codes and QA flags as classes, the MIR radiative
+// power law (Eq. 3.4) by hand, the census and the navigated list on
+// a synthetic window laid on GOES-West's real fixed grid: a
+// processed fire with power, a saturated one seen before, a
+// cloud-contaminated one, a low-probability one, a fire-free land
+// pixel, cloud and water, the fill.
+{
+  const g = fixedGridGeometry({
+    semi_major_axis: 6378137,
+    semi_minor_axis: 6356752.31414,
+    perspective_point_height: 35786023,
+    longitude_of_projection_origin: -137
+  });
+  const home = latLonToFixedGrid(32.85, -117.12, g);
+  const x = {scale: 56e-6, offset: home.x - 750 * 56e-6, n: 1500};
+  const y = {scale: -56e-6, offset: home.y + 750 * 56e-6, n: 1500};
+  const box = {i: 750, j: 750, i0: 748, j0: 748, cols: 5, rows: 5};
+  const n = 25;
+  const mask = new Int16Array(n).fill(100);
+  const power = new Float32Array(n).fill(NaN);
+  const temp = new Float32Array(n).fill(NaN);
+  const area = new Float32Array(n).fill(NaN);
+  const dqf = new Uint8Array(n).fill(1);
+  const at = (i, j) => j * 5 + i;
+  mask[at(2, 2)] = 10; power[at(2, 2)] = 120.5; temp[at(2, 2)] = 850; area[at(2, 2)] = 60000; dqf[at(2, 2)] = 0;
+  mask[at(3, 2)] = 31; dqf[at(3, 2)] = 0; // saturated, seen before: no power reported
+  mask[at(1, 1)] = 12; dqf[at(1, 1)] = 0; // cloud-contaminated
+  mask[at(4, 4)] = 15; power[at(4, 4)] = 3; dqf[at(4, 4)] = 0; // low probability (a power the file would not report; counted as reported here)
+  mask[at(0, 0)] = 200; dqf[at(0, 0)] = 2; // opaque cloud
+  mask[at(0, 4)] = 151; dqf[at(0, 4)] = 3; // sea water
+  mask[at(4, 0)] = -99; dqf[at(4, 0)] = 255; // fill
+  const c = fireCensus(mask, power, temp, area, dqf);
+  const list = fireList(mask, power, temp, area, box, g, x, y);
+  const homeLL = fixedGridToLatLon(x.offset + 750 * x.scale, y.offset + 750 * y.scale, g);
+  // Eq. 3.4 by hand: a 4-km2 pixel, 0.5 W m^-2 sr^-1 um^-1 above the
+  // background -> 4e6 x 5.67e-8 / 3e-9 x 0.5 W = 37.8 MW
+  const frp = frpMir(1.2, 0.7, 4e6);
+  check(
+    'THE FIRE’S HEAT: the mask codes as classes, the MIR power law, the census and the navigated list',
+    L2_PRODUCTS.fire === 'ABI-L2-FDCC' &&
+      fireClass(10).fire === true &&
+      fireClass(10).kind === 'processed' &&
+      fireClass(35).filtered === true &&
+      fireClass(35).kind === 'low probability' &&
+      fireClass(100).fire === false &&
+      fireClass(100).words === 'fire-free land' &&
+      fireClass(60).words.startsWith('sun glint') &&
+      fireClass(215).words === 'an opaque cloud test' &&
+      fireClass(151).words.startsWith('water') &&
+      FIRE_QA_WORDS.length === 6 &&
+      FIRE_ATBD.mir.a === 3.0e-9 &&
+      FIRE_ATBD.saturationK.band7 === 411.86 &&
+      FIRE_ATBD.t39MinNightK === 285 &&
+      FIRE_ATBD.blockOut.lzaDeg === 80 &&
+      FIRE_ATBD.minFireK === 400 &&
+      FIRE_ATBD.temporalFilterH === 12 &&
+      FIRE_ATBD.frpUnreportedCodes.join() === '11,12,15,31,32,35' &&
+      near(frp, (4e6 * 5.67e-8 / 3e-9) * 0.5 / 1e6, 1e-9) &&
+      Math.abs(frp - 37.8) < 1e-9 &&
+      c.n === 25 &&
+      c.fires === 4 &&
+      c.filtered === 1 &&
+      c.processed === 1 &&
+      c.saturated === 1 &&
+      c.cloudy === 1 &&
+      c.low === 1 &&
+      c.high === 0 &&
+      c.frp.n === 2 &&
+      near(c.frp.sumMW, 123.5, 1e-6) &&
+      near(c.frp.maxMW, 120.5, 1e-6) &&
+      c.temp.n === 1 &&
+      c.temp.maxK === 850 &&
+      c.area.n === 1 &&
+      c.qa.join() === '4,18,1,1,0,0' &&
+      c.qaOther === 1 &&
+      list.length === 4 &&
+      list[0].code === 10 &&
+      list[0].frpMW === 120.5 &&
+      list[0].tempK === 850 &&
+      list[0].areaM2 === 60000 &&
+      list[0].i === 750 &&
+      list[0].j === 750 &&
+      Math.abs(list[0].latDeg - homeLL.latDeg) < 1e-3 &&
+      Math.abs(list[0].lonDeg - homeLL.lonDeg) < 1e-3 &&
+      list[1].code === 15 &&
+      list[1].frpMW === 3 &&
+      list[2].frpMW === null &&
+      list[3].frpMW === null &&
+      list.some((f) => f.code === 31 && f.filtered && f.kind === 'saturated'),
+    `codes 10-15 and 30-35 are fires (35: ${fireClass(35).words}), 100 ${fireClass(100).words}, 60 ${fireClass(60).words}, 215 ${fireClass(215).words}; ` +
+      `Eq. 3.4 by hand: a 4-km2 pixel 0.5 W m^-2 sr^-1 um^-1 above its background radiates ${frp.toFixed(1)} MW; a 5x5 window censuses ${c.fires} fires ` +
+      `(${c.processed} processed, ${c.saturated} saturated, ${c.cloudy} cloud-contaminated, ${c.low} low probability; ${c.filtered} seen before), ` +
+      `${c.frp.n} with power (${c.frp.sumMW.toFixed(1)} MW in all, ${c.frp.maxMW} at most), the hottest ${c.temp.maxK} K, QA ${c.qa.join('/')} with ${c.qaOther} fill; ` +
+      `the list navigates the processed pixel to ${list[0].latDeg}, ${list[0].lonDeg} (the home's own pixel) and orders it first by power`
   );
 }
 

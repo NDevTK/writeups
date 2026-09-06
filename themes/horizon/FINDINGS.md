@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **146 CPU reference files printing
-1166 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1168 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **146 reference files, 1166 landmark lines, 8 GPU probes** (live gate
+- **146 reference files, 1168 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -996,7 +996,20 @@ The practice the corpus demonstrates, stated so it can be reused:
    `server-reference` THE DAEMON'S BINDINGS, a source-level guard that
    every body builder the daemon calls is bound from the decode block
    — the pass's own first build had missed one and crashed the daemon
-   on its first request while every gate stayed green)
+   on its first request while every gate stayed green). Pass 162
+   adds NOAA's fire / hot spot characterization (ABI-L2-FDCC, every
+   five minutes, day and night) as the twelfth served product and
+   makes the measured hot spots the scene's fires: each fire pixel is
+   navigated to its place with the ATBD's mask class and, where
+   characterised, its radiative power, and glows by that heat (1 MW
+   faint, 1000 MW full, a saturated pixel full); NASA EONET's
+   day-old event points remain only where no pixel burns within
+   10 km — the Enterprise Fire ATBD v2.7 read in full, its detection
+   thresholds, block-out zones, saturation ceilings, the Dozier
+   characterisation and the middle-infrared power law pinned
+   (`goesl2-reference` THE FIRE'S HEAT; `wildfire-reference` THE
+   MEASURED HOT SPOTS; `server-reference` and `goesl2-client-reference`
+   the thirteenth ask)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
