@@ -971,7 +971,17 @@ The practice the corpus demonstrates, stated so it can be reused:
    words at a pixel and the field composed on synthetic windows on
    the real fixed grid; `goesir-reference` THE DAYLIGHT FIELD splits
    the deck field; `goesl2-client-reference` and `server-reference`
-   the page-only eleventh ask)
+   the page-only eleventh ask). Pass 160 makes the fraction a
+   coverage in law: the fine pixels under a cloudy 2-km pixel are two
+   populations, the cloud and the clear sub-pixels in its gaps, and
+   Otsu's threshold (1979) parts them when his effectiveness measure
+   η reaches 0.8 (a normal sample gives 2/π, a uniform one 0.75, two
+   normals 4σ apart 0.81 — pinned); above the threshold a fine pixel
+   is covered whole, below it the gaps and edges read partial; a
+   one-mode population (a solid deck, a veil) takes its own dim tenth
+   as the edge, so a stratus sheet stays whole instead of reading as
+   0.6 coverage (`goesl2-reference` THE DAYLIGHT FIELD, the coverage
+   edge and Otsu's pins; `daylight-reference` repinned)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

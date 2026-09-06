@@ -961,14 +961,80 @@ export function visCensus(rf, dqf, cosSza) {
   };
 }
 /**
+ * OTSU'S THRESHOLD (Otsu 1979, IEEE Trans. SMC 9(1) 62-66): the split
+ * of a sorted sample into two classes that maximises the between-class
+ * variance sigma_b^2 = w0 w1 (mu0 - mu1)^2 - every split tried, the
+ * class sums running. Returns the threshold (the midpoint between the
+ * two values the best split parts), the effectiveness eta = sigma_b^2
+ * / sigma^2 (0..1: Otsu's own measure of how well two classes explain
+ * the sample - a normal sample splits at its mean with eta = 2/pi,
+ * two separated modes approach 1) and the classes' counts and means.
+ * A constant sample has eta 0 and the value itself as threshold.
+ */
+export function otsuThreshold(sorted) {
+  const n = sorted.length;
+  if (!n) return null;
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += sorted[i];
+  const mean = sum / n;
+  let ss = 0;
+  for (let i = 0; i < n; i++) ss += (sorted[i] - mean) ** 2;
+  const variance = ss / n;
+  let best = -1;
+  let k = 0;
+  let acc = 0;
+  for (let i = 1; i < n; i++) {
+    acc += sorted[i - 1];
+    const w0 = i / n;
+    const w1 = 1 - w0;
+    const mu0 = acc / i;
+    const mu1 = (sum - acc) / (n - i);
+    const sb = w0 * w1 * (mu0 - mu1) ** 2;
+    if (sb > best) {
+      best = sb;
+      k = i;
+    }
+  }
+  // a constant sample (its range within rounding of zero: a hundred
+  // 0.3s sum to 30.000000000000004) has no classes at all
+  const range = sorted[n - 1] - sorted[0];
+  if (!(range > 1e-9 * Math.max(1, Math.abs(mean))) || !(variance > 0) || best <= 0) {
+    return {t: sorted[0], eta: 0, nLow: n, nHigh: 0, meanLow: mean, meanHigh: null};
+  }
+  let low = 0;
+  for (let i = 0; i < k; i++) low += sorted[i];
+  return {
+    t: (sorted[k - 1] + sorted[k]) / 2,
+    eta: best / variance,
+    nLow: k,
+    nHigh: n - k,
+    meanLow: low / k,
+    meanHigh: (sum - low) / (n - k)
+  };
+}
+// a cloudy population split this well (Otsu's eta) into two classes is
+// two things - the sub-pixel gaps and the cloud (an equal mixture of
+// two normals 4 sigma apart gives 0.8; one normal 0.64, one uniform
+// 0.75); below it the population is one mode
+export const OTSU_BIMODAL_ETA = 0.8;
+/**
  * THE SCENE'S OWN REFERENCES: the reflectance of the clear and of the
  * cloudy pixels as the mask sorts them - `clearOf(q)` says whether the
  * fine pixel q lies under a clear (true), cloudy (false) or unknown
  * (null) mask pixel. The clear reference is the clear pixels' median
- * reflectance, the cloudy one the cloudy pixels' 90th percentile (the
- * bright, filled cloud - a median would sit on the edges and holes
- * the fraction is meant to find). {rhoClear, rhoCloud, nClear,
- * nCloud} with nulls where either side is thin (under minN).
+ * reflectance. THE CLOUD REFERENCE IS A COVERAGE EDGE (160th pass):
+ * the fine pixels under a cloudy 2-km pixel are two populations - the
+ * cloud, and the clear sub-pixels inside its gaps - so when Otsu's
+ * threshold parts them well (eta at or over OTSU_BIMODAL_ETA) the
+ * reference is that threshold: a fine pixel at or above it is covered
+ * whole and only the darker ones, the gaps and edges, read partial;
+ * when the population is one mode (a solid deck, a veil) the reference
+ * is its own dim tenth (the 10th percentile), so the deck stays whole
+ * whatever its brightness - the fraction is a coverage, never a
+ * thickness (the 159th's 90th percentile read a dim solid deck as
+ * gaps). rhoBright is the 90th percentile still, for the line.
+ * {rhoClear, rhoCloud, rhoBright, mode, eta, threshold, nClear,
+ * nCloud} with null references where either side is thin (under minN).
  */
 export function visReferences(rho, clearOf, {minN = 50} = {}) {
   const clear = [];
@@ -981,9 +1047,16 @@ export function visReferences(rho, clearOf, {minN = 50} = {}) {
   }
   clear.sort((a, b) => a - b);
   cloud.sort((a, b) => a - b);
+  const enough = cloud.length >= minN;
+  const otsu = enough ? otsuThreshold(cloud) : null;
+  const bimodal = !!otsu && otsu.eta >= OTSU_BIMODAL_ETA;
   return {
     rhoClear: clear.length >= minN ? quantile(clear, 0.5) : null,
-    rhoCloud: cloud.length >= minN ? quantile(cloud, 0.9) : null,
+    rhoCloud: enough ? (bimodal ? otsu.t : quantile(cloud, 0.1)) : null,
+    rhoBright: enough ? quantile(cloud, 0.9) : null,
+    mode: enough ? (bimodal ? 'bimodal' : 'unimodal') : null,
+    eta: otsu ? otsu.eta : null,
+    threshold: otsu ? otsu.t : null,
     nClear: clear.length,
     nCloud: cloud.length
   };

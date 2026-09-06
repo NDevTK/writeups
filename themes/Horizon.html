@@ -7127,7 +7127,7 @@
             console.warn(
               `daylight: cut in ${cutMs} ms - ` +
                 (res && res.fine
-                  ? `${res.fine.refined} of ${res.fine.cloudy} fine texels shaped, references ${res.refs.rhoClear.toFixed(3)}/${res.refs.rhoCloud.toFixed(3)} under the ${res.sortedBy}`
+                  ? `${res.fine.refined} of ${res.fine.cloudy} fine texels shaped, references ${res.refs.rhoClear.toFixed(3)}/${res.refs.rhoCloud.toFixed(3)} (${res.refs.mode}, eta ${res.refs.eta.toFixed(2)}) under the ${res.sortedBy}`
                   : res
                     ? `references thin (${res.refs.nClear} clear, ${res.refs.nCloud} cloudy)`
                     : 'nothing lit')
@@ -7167,7 +7167,7 @@
               `(median ${f3(c.rfMedian)}, sun ${vis.sunZenithDeg.toFixed(0)}° from the zenith) · ` +
               `the decks' cover cut ${DAYLIGHT_FACTOR}× finer inside the mask's cloud: ${res.fine.refined.toLocaleString('en-US')} of ` +
               `${res.fine.cloudy.toLocaleString('en-US')} fine texels shaped, mean fraction ${res.stats.meanFraction.toFixed(2)} ` +
-              `between clear ρ ${res.refs.rhoClear.toFixed(3)} and cloud ρ ${res.refs.rhoCloud.toFixed(3)} (${res.sortedBy === 'ACM' ? "NOAA's mask" : "the theme's field"} sorting)` +
+              `between clear ρ ${res.refs.rhoClear.toFixed(3)} and the coverage edge ρ ${res.refs.rhoCloud.toFixed(3)} (${refEdgeWords(res.refs)}; ${res.sortedBy === 'ACM' ? "NOAA's mask" : "the theme's field"} sorting)` +
               (j.read && j.read.length
                 ? ` · ${j.read.reduce((s, r) => s + r.kb, 0).toLocaleString('en-US')} kB in ${j.read.reduce((s, r) => s + r.ranges, 0)} ranges from ${j.bucket}`
                 : ' · the held window') +
@@ -7196,6 +7196,14 @@
       }
       // a census figure or a dash (a window with no good pixel)
       const f3 = (v) => (Number.isFinite(v) ? v.toFixed(3) : '–');
+      // how the cloud reference was found (160th): Otsu's threshold
+      // between the gaps and the cloud when the cloudy pixels are two
+      // modes, else the one mode's dim tenth - a coverage edge, never
+      // a thickness
+      const refEdgeWords = (refs) =>
+        refs.mode === 'bimodal'
+          ? `Otsu's threshold between the sub-pixel gaps and the cloud, two modes at η ${refs.eta.toFixed(2)}`
+          : `the dim tenth of one mode at η ${refs.eta.toFixed(2)}`;
       function daylightLine() {
         if (daylight) {
           const d = daylight;
@@ -7206,7 +7214,8 @@
             `reflectance factor ρ·cos θ₀ over ${c.good.toLocaleString('en-US')} good px (${f3(c.rfMin)}–${f3(c.rfMax)}, median ${f3(c.rfMedian)}; ` +
             `the sun ${d.sunZenithDeg.toFixed(1)}° from the zenith at the scan, cos ${d.vis.cosSza.toFixed(3)}) → reflectance by each pixel's own sun; ` +
             `the scene's references under ${r.sortedBy === 'ACM' ? "NOAA's mask" : "the theme's own field"}: clear ρ ${r.refs.rhoClear.toFixed(3)} ` +
-            `(median of ${r.refs.nClear.toLocaleString('en-US')} px), cloud ρ ${r.refs.rhoCloud.toFixed(3)} (p90 of ${r.refs.nCloud.toLocaleString('en-US')}) · ` +
+            `(median of ${r.refs.nClear.toLocaleString('en-US')} px), the coverage edge ρ ${r.refs.rhoCloud.toFixed(3)} (${refEdgeWords(r.refs)} of ${r.refs.nCloud.toLocaleString('en-US')} cloudy px; ` +
+            `the bright cloud's p90 ${r.refs.rhoBright.toFixed(3)}) · ` +
             `the decks' 2-km field cut ${DAYLIGHT_FACTOR}× finer: ${r.fine.refined.toLocaleString('en-US')} of ${r.fine.cloudy.toLocaleString('en-US')} fine texels ` +
             `under the mask's cloud shaped by their reflectance (mean fraction ${r.stats.meanFraction.toFixed(2)}), the rest keeping the 2-km cover; ` +
             `κ = πd²/E_sun = ${d.vis.kappa0 !== null ? d.vis.kappa0.toExponential(3) : '–'} from the file's own d = ${d.vis.dAu !== null ? d.vis.dAu.toFixed(5) : '–'} AU ` +

@@ -10345,6 +10345,57 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 160th pass - THE COVERAGE EDGE):
+  the 159th's stated limit closed before its first solid-deck test.
+  The decks' texel field is a COVERAGE (the noise threshold: a texel
+  of cover c draws cloud over about c of its area), so a fine pixel's
+  fraction must say how much of it is cloud, not how bright the cloud
+  is - and the 159th's reference, the cloudy pixels' 90th percentile,
+  made a dim solid deck read as 0.6 coverage: pinholes over a stratus
+  sheet. THE LAW: the fine pixels under a cloudy 2-km pixel are two
+  populations - the cloud, and the clear sub-pixels inside its gaps
+  (the 500-m children of a partly filled 2-km pixel) - and Otsu's
+  threshold (Otsu 1979, IEEE Trans. SMC 9(1) 62-66: the split that
+  maximises the between-class variance w0 w1 (mu0 - mu1)^2, every
+  split of the sorted sample tried with running sums) parts them.
+  When it parts them WELL - Otsu's own effectiveness eta = sigma_b^2
+  / sigma^2 at or over 0.8 - the cloud reference is that threshold:
+  a fine pixel at or above it is covered whole, and only the darker
+  ones, the gaps and the edges, read partial between the clear
+  reference and the threshold. When the cloudy population is ONE
+  mode (a solid deck, a veil) the reference is its own dim tenth (the
+  10th percentile): the deck stays whole whatever its brightness. The
+  0.8 rule is pinned to Otsu's measure itself: a normal sample splits
+  at its mean with eta = 2/pi = 0.637 (a fixed-seed Box-Muller draw
+  of 20,000 lands at 0.637), a uniform sample at 0.75, an equal
+  mixture of two normals 4 sigma apart at 0.81, two deltas at 1, a
+  constant at 0 - and the gate's own cloudy side (uniform 0.4-0.9)
+  sits at 0.750 and is one mode, its dim tenth 0.451 the edge, while
+  a cloudy side of gaps at 0.08 and cloud at 0.55 is two modes at
+  0.996, parted at 0.295, a 0.2 reflectance 51% covered. On the
+  daylight gate's synthetic scene the thin annulus (0.35) beside the
+  bright disc (0.65) is now two modes (eta 0.955) parted at 0.500, so
+  the annulus reads 2/3 covered (two thirds of the way from clear to
+  the edge) instead of 1/2, the field's low cover within 0.2% of the
+  independent count. STATED LIMIT, narrowed: a veil beside thick
+  cloud still reads as partial cover (it is the dark mode); a veil
+  alone reads whole. goesl2.js: otsuThreshold, OTSU_BIMODAL_ETA,
+  visReferences {rhoClear, rhoCloud (the edge), rhoBright (the p90,
+  for the line), mode, eta, threshold, nClear, nCloud}. The line and
+  the record say which edge: "Otsu's threshold between the sub-pixel
+  gaps and the cloud, two modes at eta 0.91" or "the dim tenth of one
+  mode at eta 0.63". MEASURED on the real sky (node, the 12:51Z
+  GOES-19 window at Montauk under the 12:52Z mask, 96% cloudy, the
+  sun 62 deg from the zenith): 154,387 cloudy fine pixels are ONE
+  mode - eta 0.634, the normal's own figure - spread 0.150 (p5) /
+  0.222 (p10) / 0.472 (median) / 0.672 (p90), so the edge is the dim
+  tenth 0.222: 90% of the cloudy fine pixels covered whole, the mean
+  fraction 0.953; the 159th's p90 edge (0.672) had read the same sky
+  as 0.643 mean coverage with 10% of its pixels whole - pinholes
+  through a 96%-cloudy sky, the exact failure the law closes. GATES:
+  goesl2-reference THE DAYLIGHT FIELD (the coverage edge both ways
+  and Otsu's four pins); daylight-reference repinned (2/3 in the
+  annulus).
 - DONE (Sep 6, the review session's 159th pass - THE DAYLIGHT
   FIELD): the cloud decks' texel field has been the band-13
   mosaic's 2-km classes since the 143rd - a texel cloud or clear

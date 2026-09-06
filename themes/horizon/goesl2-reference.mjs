@@ -36,6 +36,8 @@ import {
   coverFraction,
   cosSolarZenith,
   kappaFactor,
+  OTSU_BIMODAL_ETA,
+  otsuThreshold,
   reflectanceOfFactor,
   solarGeometry,
   solarZenithDeg,
@@ -1130,21 +1132,10 @@ const inflate = (u8) =>
   for (let q = 0; q < n; q++) {
     rf[q] = 0.1 + (0.4 * (q % 100)) / 99;
     dqf[q] =
-      q >= 380
-        ? 255
-        : q % 17 === 0
-          ? 4
-          : q % 13 === 0
-            ? 3
-            : q % 11 === 0
-              ? 2
-              : q % 7 === 0
-                ? 1
-                : 0;
+      q >= 380 ? 255 : q % 17 === 0 ? 4 : q % 13 === 0 ? 3 : q % 11 === 0 ? 2 : q % 7 === 0 ? 1 : 0;
   }
   const vc = visCensus(rf, dqf, 0.5);
-  const counted =
-    vc.good + vc.usable + vc.outOfRange + vc.noValue + vc.fpt + vc.fill;
+  const counted = vc.good + vc.usable + vc.outOfRange + vc.noValue + vc.fpt + vc.fill;
   const goodRf = [];
   for (let q = 0; q < n; q++) if (dqf[q] === 0) goodRf.push(rf[q]);
   goodRf.sort((a, b) => a - b);
@@ -1165,10 +1156,38 @@ const inflate = (u8) =>
     }
   }
   const refs = visReferences(rho, (q) => kind[q]);
-  const thin = visReferences(rho, (q) =>
-    q < 120 ? true : q < 130 ? false : null
-  );
+  const thin = visReferences(rho, (q) => (q < 120 ? true : q < 130 ? false : null));
   const frac = coverFraction(0.5, refs.rhoClear, refs.rhoCloud);
+  // THE COVERAGE EDGE (160th pass): the cloudy side above is one
+  // uniform mode (eta 0.75 for a uniform sample, under the 0.8 rule),
+  // so the reference is its dim tenth; a cloudy side made of clear
+  // sub-pixels at 0.08 and cloud at 0.55 is two modes (eta near 1)
+  // and the reference is Otsu's threshold between them
+  const rho2 = new Float32Array(240);
+  for (let q = 0; q < 240; q++) {
+    if (q < 120) rho2[q] = 0.05 + (0.1 * q) / 119;
+    else if (q < 150) rho2[q] = 0.07 + (0.02 * (q - 120)) / 29;
+    else rho2[q] = 0.5 + (0.1 * (q - 150)) / 89;
+  }
+  const refs2 = visReferences(rho2, (q) => kind[q]);
+  // Otsu's own pins: a normal sample splits at its mean with eta 2/pi
+  // (a fixed-seed Box-Muller draw), two deltas at 0.1 and 0.6 part at
+  // 0.35 with eta 1, an equal mixture of two normals 4 sigma apart
+  // gives eta 0.8, a constant sample eta 0
+  let seed = 12345;
+  const rnd = () => {
+    seed = (1103515245 * seed + 12345) % 2147483648;
+    return (seed + 0.5) / 2147483648;
+  };
+  const gauss = () => Math.sqrt(-2 * Math.log(rnd())) * Math.cos(2 * Math.PI * rnd());
+  const normal = Float64Array.from({length: 20000}, () => 5 + 2 * gauss()).sort();
+  const deltas = Float64Array.from({length: 200}, (_, i) => (i < 100 ? 0.1 : 0.6));
+  const mix = Float64Array.from({length: 20000}, (_, i) => (i < 10000 ? -2 : 2) + gauss()).sort();
+  const flat = new Float64Array(100).fill(0.3);
+  const oN = otsuThreshold(normal);
+  const oD = otsuThreshold(deltas);
+  const oM = otsuThreshold(mix);
+  const oF = otsuThreshold(flat);
   check(
     'THE DAYLIGHT FIELD: kappa from the file’s own d and Esun, Eq. 3-3 inverted, the sun held to Meeus, the cover fraction, the census and the references',
     VIS_BAND === 'C02' &&
@@ -1210,18 +1229,44 @@ const inflate = (u8) =>
       refs.nCloud === 80 &&
       // the median as the theme's quantile takes it: element floor(n/2)
       near(refs.rhoClear, 0.05 + (0.1 * 60) / 119, 1e-6) &&
-      refs.rhoCloud > 0.84 &&
-      refs.rhoCloud < 0.86 &&
+      // one uniform mode: the reference is its dim tenth (element 8)
+      refs.mode === 'unimodal' &&
+      refs.eta > 0.7 &&
+      refs.eta < OTSU_BIMODAL_ETA &&
+      near(refs.rhoCloud, 0.4 + (0.5 * 8) / 79, 1e-6) &&
+      refs.rhoBright > 0.84 &&
+      refs.rhoBright < 0.86 &&
       thin.rhoClear !== null &&
       thin.rhoCloud === null &&
+      thin.mode === null &&
       thin.nCloud === 10 &&
-      near(
-        frac,
-        (0.5 - refs.rhoClear) / (refs.rhoCloud - refs.rhoClear),
-        1e-9
-      ) &&
-      frac > 0.5 &&
-      frac < 0.55,
+      frac === 1 &&
+      near(coverFraction(0.3, refs.rhoClear, refs.rhoCloud), (0.3 - refs.rhoClear) / (refs.rhoCloud - refs.rhoClear), 1e-9) &&
+      // two modes: Otsu's threshold between the gaps and the cloud
+      refs2.mode === 'bimodal' &&
+      refs2.eta > 0.95 &&
+      refs2.rhoCloud > 0.09 &&
+      refs2.rhoCloud < 0.5 &&
+      near(refs2.rhoCloud, (0.09 + 0.5) / 2, 1e-6) &&
+      refs2.threshold === refs2.rhoCloud &&
+      refs2.nCloud === 80 &&
+      near(coverFraction(0.55, refs2.rhoClear, refs2.rhoCloud), 1, 1e-9) &&
+      coverFraction(0.2, refs2.rhoClear, refs2.rhoCloud) > 0.4 &&
+      coverFraction(0.2, refs2.rhoClear, refs2.rhoCloud) < 0.6 &&
+      Math.abs(oN.eta - 2 / Math.PI) < 0.02 &&
+      Math.abs(oN.t - 5) < 0.1 &&
+      near(oD.t, 0.35, 1e-12) &&
+      near(oD.eta, 1, 1e-9) &&
+      oD.nLow === 100 &&
+      oD.nHigh === 100 &&
+      near(oD.meanLow, 0.1, 1e-12) &&
+      near(oD.meanHigh, 0.6, 1e-12) &&
+      Math.abs(oM.eta - 0.8) < 0.02 &&
+      Math.abs(oM.t) < 0.1 &&
+      oF.eta === 0 &&
+      oF.t === 0.3 &&
+      oF.nHigh === 0 &&
+      OTSU_BIMODAL_ETA === 0.8,
     `kappa = pi d^2 / Esun from the file's d ${VIS_ATBD.file.dAu} AU and Esun ${VIS_ATBD.file.esunWm2Um} W/m2/um is ${kappa.toExponential(6)} ` +
       `against the file's kappa0 ${fileKappa} (${Math.abs(kappa - fileKappa).toExponential(1)} apart); rho = rho_f / cos(sza): 0.4 / 0.8 = ` +
       `${reflectanceOfFactor(0.4, 0.8)}, NaN at cos 0.05 and below; the sun's zenith within ${sunErr.toFixed(3)} deg of Meeus at ${sunPins.length} points ` +
@@ -1231,8 +1276,12 @@ const inflate = (u8) =>
       `outside, NaN without a reflectance or a span; a 20x20 window censuses ${vc.good} good, ${vc.usable} usable, ${vc.outOfRange} out of range, ` +
       `${vc.noValue} no value, ${vc.fpt} focal-plane, ${vc.fill} fill (every pixel counted once), the good factor ${vc.rfMin.toFixed(3)}-${vc.rfMax.toFixed(3)} ` +
       `median ${vc.rfMedian.toFixed(3)}, reflectance ${vc.rhoMedian.toFixed(3)} at cos ${vc.cosSza}; the scene's references from ${refs.nClear} clear ` +
-      `and ${refs.nCloud} cloudy pixels: clear median ${refs.rhoClear.toFixed(3)}, cloudy p90 ${refs.rhoCloud.toFixed(3)} (ten cloudy pixels answer null), ` +
-      `a 0.5 reflectance ${(frac * 100).toFixed(0)}% cloud between them`
+      `and ${refs.nCloud} cloudy pixels: clear median ${refs.rhoClear.toFixed(3)}, the cloudy side one mode (eta ${refs.eta.toFixed(3)}) so its dim tenth ` +
+      `${refs.rhoCloud.toFixed(3)} is the coverage edge (its p90 ${refs.rhoBright.toFixed(3)} the bright cloud; ten cloudy pixels answer null), ` +
+      `a 0.5 reflectance ${(frac * 100).toFixed(0)}% covered; a cloudy side of gaps at 0.08 and cloud at 0.55 is two modes (eta ${refs2.eta.toFixed(3)}) ` +
+      `parted at Otsu's ${refs2.rhoCloud.toFixed(3)}, a 0.2 reflectance ${(100 * coverFraction(0.2, refs2.rhoClear, refs2.rhoCloud)).toFixed(0)}% covered; ` +
+      `Otsu's own: a normal sample splits at ${oN.t.toFixed(2)} with eta ${oN.eta.toFixed(3)} (2/pi = ${(2 / Math.PI).toFixed(3)}), two deltas at ${oD.t} with eta ${oD.eta.toFixed(3)}, ` +
+      `an equal mixture 4 sigma apart eta ${oM.eta.toFixed(3)}, a constant eta ${oF.eta}`
   );
 }
 

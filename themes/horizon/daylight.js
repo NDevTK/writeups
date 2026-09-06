@@ -14,11 +14,15 @@
  *  - goesl2.reflectanceOfFactor: the CMIP ATBD's Eq. 3-3 inverted -
  *    the reflectance from the file's reflectance factor and the
  *    pixel's own cos(solar zenith);
- *  - goesl2.visReferences: the scene's OWN clear and cloudy
- *    reflectances, sorted by the mask - NOAA's ACM at the same scan
+ *  - goesl2.visReferences: the scene's OWN clear reflectance and its
+ *    COVERAGE EDGE, sorted by the mask - NOAA's ACM at the same scan
  *    angles when a mask window stands (the two windows lie on one
  *    fixed grid: a 500-m pixel's angle falls in one 2-km pixel), else
- *    the theme's own band-13 field; the result says which;
+ *    the theme's own band-13 field; the result says which. The edge
+ *    (160th pass) is Otsu's threshold between the sub-pixel gaps and
+ *    the cloud when the cloudy pixels are two modes, else the one
+ *    mode's dim tenth - so a solid deck or a veil stays whole and
+ *    only true gaps and edges read partial;
  *  - goesl2.coverFraction: each fine texel's position between them;
  *  - goesir.refineDeckField: the coarse field split four ways, the
  *    fraction applied only where the coarse texel holds cloud - the

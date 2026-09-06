@@ -281,19 +281,27 @@ for (let jj = 1; jj < rm - 1; jj++)
       if (km < 40) bright++;
       else if (km < 60) annulus++;
     }
-  const expectedLow = 0.95 * (bright + 0.5 * annulus);
+  // the coverage edge (160th): the cloudy side is two modes - the
+  // bright disc at 0.65 and the thin annulus at 0.35 - so Otsu's
+  // threshold between them, 0.5, is the reference, and the annulus
+  // reads (0.35 - 0.05) / (0.5 - 0.05) = 2/3 covered
+  const annulusFrac = (RHO_THIN - RHO_CLEAR) / (0.5 - RHO_CLEAR);
+  const expectedLow = 0.95 * (bright + annulusFrac * annulus);
   const centre = 4 * (win.halfPx + 1) + 2;
   const fracAt = (fi, fj) => res.frac[fj * rf + fi];
   // a fine texel about 50 km east of the home
   const east = centre + Math.round(50e3 / (win.mppM / DAYLIGHT_FACTOR));
   const lowSum = sum(res.fine, 0);
   check(
-    'THE DAYLIGHT FIELD composed: the scene’s references measured back out, the fractions 1 and 0.5 and none, the holes kept, the field standing in, the dark and the thin refused',
+    'THE DAYLIGHT FIELD composed: the scene’s references measured back out, the fractions 1 and 2/3 and none, the holes kept, the field standing in, the dark and the thin refused',
     res !== null &&
       res.fine !== null &&
       res.sortedBy === 'ACM' &&
       near(res.refs.rhoClear, RHO_CLEAR, 1e-4) &&
-      near(res.refs.rhoCloud, RHO_CLOUD, 1e-4) &&
+      res.refs.mode === 'bimodal' &&
+      res.refs.eta > 0.95 &&
+      near(res.refs.rhoCloud, 0.5, 1e-3) &&
+      near(res.refs.rhoBright, RHO_CLOUD, 1e-4) &&
       res.refs.nClear > 20000 &&
       res.refs.nCloud > 20000 &&
       res.fine.rm === rf &&
@@ -306,7 +314,7 @@ for (let jj = 1; jj < rm - 1; jj++)
       res.stats.lit === nVis - flagged &&
       // 1 to the float32 the window carries its reflectance in
       near(fracAt(centre, centre), 1, 1e-6) &&
-      near(fracAt(east, centre), 0.5, 1e-3) &&
+      near(fracAt(east, centre), annulusFrac, 1e-3) &&
       Number.isNaN(fracAt(2, 2)) &&
       Number.isNaN(fracAt(rf - 3, rf - 3)) &&
       near(lowSum, expectedLow, 0.02 * expectedLow) &&
@@ -318,7 +326,8 @@ for (let jj = 1; jj < rm - 1; jj++)
       own !== null &&
       own.sortedBy === 'field' &&
       near(own.refs.rhoClear, RHO_CLEAR, 1e-4) &&
-      near(own.refs.rhoCloud, RHO_CLOUD, 1e-4) &&
+      own.refs.mode === 'bimodal' &&
+      near(own.refs.rhoCloud, 0.5, 1e-3) &&
       near(sum(own.fine, 0), lowSum, 1e-6) &&
       night === null &&
       thin !== null &&
@@ -327,11 +336,12 @@ for (let jj = 1; jj < rm - 1; jj++)
       thin.refs.rhoCloud !== null &&
       thin.stats.refined === 0,
     `${rf}x${rf} fine texels from ${rm}x${rm}: the references measured back out of the window under the ACM - clear ` +
-      `${res.refs.rhoClear.toFixed(4)} (median of ${res.refs.nClear.toLocaleString('en-US')} clear px) and cloud ` +
-      `${res.refs.rhoCloud.toFixed(4)} (p90 of ${res.refs.nCloud.toLocaleString('en-US')}) against the scene's ${RHO_CLEAR} and ${RHO_CLOUD}; ` +
+      `${res.refs.rhoClear.toFixed(4)} (median of ${res.refs.nClear.toLocaleString('en-US')} clear px) against the scene's ${RHO_CLEAR}, ` +
+      `the coverage edge ${res.refs.rhoCloud.toFixed(4)} (Otsu's threshold between the thin annulus at ${RHO_THIN} and the disc at ${RHO_CLOUD}, ` +
+      `two modes at eta ${res.refs.eta.toFixed(3)} over ${res.refs.nCloud.toLocaleString('en-US')} cloudy px; the bright p90 ${res.refs.rhoBright.toFixed(4)}); ` +
       `${res.fine.cloudy.toLocaleString('en-US')} fine texels under the ${cloudyCoarse.toLocaleString('en-US')} cloudy coarse ones, ` +
       `${res.fine.refined.toLocaleString('en-US')} shaped (the rest on flagged pixels keep the coarse cover); the fraction 1 over the home, ` +
-      `${fracAt(east, centre).toFixed(3)} 50 km east in the thin annulus, none on the border; the low cover sums to ${lowSum.toFixed(0)} ` +
+      `${fracAt(east, centre).toFixed(3)} 50 km east in the thin annulus (2/3: the annulus sits two thirds of the way from clear to the edge), none on the border; the low cover sums to ${lowSum.toFixed(0)} ` +
       `against ${expectedLow.toFixed(0)} counted over the fine centres by distance (${((100 * lowSum) / expectedLow - 100).toFixed(2)}%), ` +
       `the validities copied whole, the mean fraction ${res.stats.meanFraction.toFixed(3)}; the theme's field standing in for the mask ` +
       `measures the same references and the same field; the dark window answers null, a mask all cloud leaves the clear reference ` +
