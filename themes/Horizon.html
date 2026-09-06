@@ -508,7 +508,16 @@
         unscale,
         windowIndexOf
       } from './horizon/goesl2.js';
-      import {createGoesL2Client} from './horizon/goesl2-client.js';
+      import {
+        createGoesL2Client,
+        readGlmLatest
+      } from './horizon/goesl2-client.js';
+      import {
+        GLM_ATBD,
+        flashesNotInNetwork,
+        glmFlashesNear,
+        glmSummary
+      } from './horizon/glm.js';
       import {
         DAYLIGHT_FACTOR,
         DAYLIGHT_SZA_MAX_DEG,
@@ -12063,10 +12072,13 @@
         });
       }
       let strikeCount = 0;
-      function spawnFlash(azDeg, distKm, rands) {
+      // strength scales the apparent amplitude: 1 for the network's
+      // strikes (no energy is carried), the satellite's own
+      // logarithmic strength for a GLM flash (168th pass)
+      function spawnFlash(azDeg, distKm, rands, strength = 1) {
         const p = flashPool.find((f) => !f.active) ?? flashPool[0];
         p.seq = strokeSequence(rands);
-        p.amp0 = Math.min(apparentFlash(distKm), 4);
+        p.amp0 = Math.min(apparentFlash(distKm) * strength, 4);
         p.t = 0;
         p.active = true;
         const az = azDeg * RAD;
@@ -12080,7 +12092,6 @@
         p.mesh.scale.set(s, s, 1);
         p.mesh.lookAt(camera.position);
         p.mesh.visible = true;
-        strikeCount++;
       }
       // ---- Red sprites above the strikes (sprites.js physics,
       // sources read in full this pass): each located flash rolls
@@ -12288,6 +12299,17 @@
           try {
             const s = JSON.parse(ev.data);
             const az = strikeBearing({lat: state.lat, lon: state.lon}, s);
+            strikeCount++;
+            // the network's last two minutes, for the satellite's
+            // flashes to be told from them (168th pass; the event
+            // carries no time - its arrival is within seconds of
+            // the strike)
+            strikeRing.push({lat: s.lat, lon: s.lon, tMs: Date.now()});
+            while (
+              strikeRing.length &&
+              Date.now() - strikeRing[0].tMs > STRIKE_RING_MS
+            )
+              strikeRing.shift();
             spawnFlash(
               az,
               s.km,
@@ -12334,6 +12356,277 @@
           }
         });
         // EventSource reconnects itself; nothing else to manage.
+      }
+      // ---- THE FLASHES FROM ORBIT (168th pass): GOES's Geostationary
+      // Lightning Mapper stares at the disk through a 777.4-nm filter
+      // and writes every optical flash to a 20-s file every 20 s
+      // (GLM-L2-LCFA: events of 2-ms frames clustered within 330 ms
+      // and 16.5 km; the ATBD read in full - glm.js). Where the ground
+      // network is thin - the sea, the tropics, the far side of a
+      // coast - the satellite's flashes are the measured lightning the
+      // scene can show. The daemon's /glm holds the newest three files
+      // of the craft that sees this longitude and answers the flashes
+      // within 200 km with their bearings, distances and strengths;
+      // asked every 20 s (the file cadence). Without it the page reads
+      // the newest file itself from the open bucket (readGlmLatest: a
+      // 450-kB whole read, one file a minute, never under data saver).
+      // Each flash the network did not already report (a strike within
+      // 20 km and 30 s - the network's own, closer located, stands) is
+      // replayed at its true bearing and distance in the file's own
+      // order and spacing, its amplitude the logarithm of its optical
+      // energy; the source is named on the record and the line.
+      // ?glmsrc=URL|direct overrides; ?glm=0 disables; the harness's
+      // ?strike=N and any weather pin leave the flashes off (pinned
+      // shots stay reproducible).
+      const GLM_PROXY =
+        params.get('glmsrc') ??
+        (GOESL2_PROXY === 'direct'
+          ? 'direct'
+          : GOESL2_PROXY.replace(/\/goesl2$/, '/glm'));
+      const GLM_DAEMON_MS = GLM_ATBD.fileSeconds * 1000;
+      const GLM_DIRECT_MS = 60e3;
+      const GLM_SEEN_MS = 5 * 60e3;
+      const STRIKE_RING_MS = 120e3;
+      const strikeRing = []; // {lat, lon, tMs}
+      const glmSeen = new Map(); // flash key -> first seen (ms)
+      let glmObs = null;
+      let glmBusy = false;
+      let glmDirectAt = 0;
+      let glmLastKey = null;
+      let glmDaemonLacks = false; // 404: an older daemon, the bucket from here on
+      let glmSpawned = 0;
+      let glmNetworkKept = 0;
+      function glmOff() {
+        return (
+          overridden || strikeOv !== null || params.get('glm') === '0'
+        );
+      }
+      function glmSaveData() {
+        return navigator.connection && navigator.connection.saveData === true;
+      }
+      const glmKey = (f) =>
+        f.id + ':' + Math.round((f.tFirstMs ?? 0) / 1000);
+      const glmHms = (iso) => (iso ? iso.slice(11, 19) + 'Z' : '?');
+      async function syncGlm() {
+        if (glmOff() || glmBusy) return;
+        if (!Number.isFinite(state.lat) || !Number.isFinite(state.lon)) return;
+        glmBusy = true;
+        try {
+          let body = null;
+          let via = null;
+          if (GLM_PROXY !== 'direct' && !glmDaemonLacks) {
+            try {
+              const r = await fetch(
+                `${GLM_PROXY}?lat=${state.lat.toFixed(3)}&lon=${state.lon.toFixed(3)}&km=200`,
+                {signal: AbortSignal.timeout(15000)}
+              );
+              if (r.status === 404) glmDaemonLacks = true;
+              else if (r.ok) {
+                body = await r.json();
+                via = 'daemon';
+              }
+            } catch {
+              // unreachable: the bucket below, on its own cadence
+            }
+          }
+          if (
+            !body &&
+            !glmSaveData() &&
+            Date.now() - glmDirectAt >= GLM_DIRECT_MS
+          ) {
+            glmDirectAt = Date.now();
+            const d = await readGlmLatest(state.lat, state.lon, {
+              skipKey: glmLastKey
+            });
+            if (d.sat === null) {
+              glmObs = {
+                at: Date.now(),
+                via: 'bucket',
+                sat: null,
+                reason: d.reason,
+                n: 0,
+                fresh: 0,
+                alone: 0
+              };
+            } else if (d.error) {
+              glmObs = {
+                ...(glmObs ?? {n: 0, fresh: 0, alone: 0}),
+                at: Date.now(),
+                via: 'bucket',
+                sat: d.sat,
+                craft: d.craft,
+                error: d.error
+              };
+            } else if (!d.same) {
+              glmLastKey = d.key;
+              const flashes = glmFlashesNear(d.flashes, state.lat, state.lon, {
+                maxKm: 200,
+                cap: 300
+              });
+              body = {
+                sat: d.sat,
+                name: d.name,
+                craft: d.craft,
+                files: [{key: d.key.split('/').pop()}],
+                windowStart: new Date(d.startMs).toISOString(),
+                windowEnd: new Date(d.endMs).toISOString(),
+                ageS: Math.round((Date.now() - d.endMs) / 1000),
+                diskFlashes: d.diskFlashes,
+                n: flashes.length,
+                flashes,
+                summary: glmSummary(flashes),
+                bytes: d.bytes,
+                ms: d.ms,
+                error: null
+              };
+              via = 'bucket';
+            }
+          } else if (!body && glmSaveData() && !glmObs) {
+            glmObs = {
+              at: Date.now(),
+              via: 'off',
+              reason:
+                'data saver: the daemon did not answer and the bucket read (450 kB a minute) stays off',
+              n: 0,
+              fresh: 0,
+              alone: 0
+            };
+          }
+          if (body && body.sat === null) {
+            glmObs = {
+              at: Date.now(),
+              via,
+              sat: null,
+              reason: body.reason ?? 'no craft sees this longitude',
+              n: 0,
+              fresh: 0,
+              alone: 0
+            };
+            record(
+              'NOAA GLM flashes (LCFA)',
+              'no craft: ' + glmObs.reason + ' · via the ' + via
+            );
+          } else if (body) {
+            const now = Date.now();
+            for (const [k, t] of glmSeen)
+              if (now - t > GLM_SEEN_MS) glmSeen.delete(k);
+            const fresh = (body.flashes ?? []).filter(
+              (f) => !glmSeen.has(glmKey(f))
+            );
+            for (const f of fresh) glmSeen.set(glmKey(f), now);
+            const alone = flashesNotInNetwork(fresh, strikeRing, {
+              km: 20,
+              ms: 30000
+            });
+            // the replay: the file's own order and spacing from the
+            // earliest new flash, within one file's 20 s
+            const t0 = alone.reduce(
+              (m, f) => Math.min(m, f.tFirstMs ?? m),
+              Infinity
+            );
+            for (const f of alone) {
+              const delay = Number.isFinite(t0)
+                ? Math.min(GLM_DAEMON_MS, Math.max(0, (f.tFirstMs ?? t0) - t0))
+                : 0;
+              setTimeout(() => {
+                if (glmOff()) return;
+                spawnFlash(
+                  f.bearingDeg,
+                  Math.max(f.distKm, 1),
+                  Array.from({length: 12}, () => Math.random()),
+                  f.strength
+                );
+                // the same ISUAL-statistics sprite roll the network's
+                // strikes get: a flash is a flash
+                if (
+                  Math.random() < spriteProbPerFlash(state.sst != null ? 1 : 0)
+                )
+                  spawnSprite(
+                    f.bearingDeg,
+                    f.distKm,
+                    Array.from({length: 8}, () => Math.random())
+                  );
+              }, delay);
+            }
+            glmSpawned += alone.length;
+            glmNetworkKept += fresh.length - alone.length;
+            glmObs = {
+              at: now,
+              via,
+              sat: body.sat,
+              name: body.name,
+              craft: body.craft,
+              files: body.files ? body.files.length : 1,
+              windowStart: body.windowStart,
+              windowEnd: body.windowEnd,
+              ageS: body.ageS,
+              diskFlashes: body.diskFlashes,
+              n: body.n ?? (body.flashes ?? []).length,
+              fresh: fresh.length,
+              alone: alone.length,
+              summary: body.summary ?? null,
+              bytes: body.bytes ?? null,
+              error: body.error ?? null
+            };
+            record(
+              'NOAA ' + (body.craft ?? 'GOES') + ' GLM flashes (LCFA)',
+              glmWords()
+            );
+          }
+        } catch (e) {
+          if (params.has('debug')) console.warn('glm: ' + e.message);
+        } finally {
+          glmBusy = false;
+        }
+      }
+      function glmWords() {
+        const g = glmObs;
+        if (!g) return '';
+        if (g.sat === null) return 'no craft: ' + g.reason;
+        if (g.via === 'off') return g.reason;
+        const s = g.summary;
+        const win =
+          g.windowStart && g.windowEnd
+            ? Math.round(
+                (Date.parse(g.windowEnd) - Date.parse(g.windowStart)) / 1000
+              )
+            : GLM_ATBD.fileSeconds;
+        return (
+          `${g.n} flashes within 200 km in the ${win} s to ${glmHms(g.windowEnd)}` +
+          ` (${g.files} 20-s file${g.files === 1 ? '' : 's'}, ${g.ageS} s old; the disk ${(g.diskFlashes ?? 0).toLocaleString('en-US')} in the newest)` +
+          (s
+            ? ` · nearest ${s.nearestKm.toFixed(0)} km at ${s.nearestBearingDeg.toFixed(0)}° (${s.nearestEnergyJ.toExponential(1)} J), brightest ${s.brightestEnergyJ.toExponential(1)} J ${s.brightestKm.toFixed(0)} km off (strength ${s.brightestStrength.toFixed(2)})`
+            : '') +
+          ` · this read ${g.alone} new to the scene, ${g.fresh - g.alone} the network's already` +
+          ` · ${glmSpawned} replayed so far` +
+          (g.via === 'bucket'
+            ? ` · the page read the file itself (${Math.round((g.bytes ?? 0) / 1024)} kB; one 20-s file a minute)`
+            : ' · via the daemon') +
+          (g.error ? ` · the daemon's last read failed: ${g.error}` : '')
+        );
+      }
+      // the research line: the satellite's lightning against the
+      // ATBD's own numbers, with the nearest flash's bearing to look at
+      function glmLine() {
+        if (glmOff()) return null;
+        const g = glmObs;
+        if (!g)
+          return (
+            'waiting for the first 20-s file' +
+            (GLM_PROXY === 'direct'
+              ? ' (the page reads the bucket itself)'
+              : ' from ' + GLM_PROXY.replace(/^https?:\/\//, ''))
+          );
+        if (g.sat === null) return 'no craft sees this longitude: ' + g.reason;
+        if (g.via === 'off') return g.reason;
+        const a = GLM_ATBD;
+        return (
+          `${g.craft}'s Geostationary Lightning Mapper: ${glmWords()}` +
+          ` — each flash replayed at its bearing and distance about ${a.requirement.latencyS + a.fileSeconds}-${a.requirement.latencyS + 2 * a.fileSeconds} s after its light` +
+          ` (the ${a.fileSeconds}-s file, the ${a.requirement.latencyS}-s latency), its amplitude the logarithm of its optical energy; a network strike within 20 km and 30 s claims a flash` +
+          ` (${glmNetworkKept} so far) — ATBD v3: ${a.wavelengthNm} nm, ${a.frameMs}-ms frames, a flash within ${a.flash.timeMs} ms and ${a.flash.distanceKm} km, ${a.pixelKm[0]}-${a.pixelKm[1]} km pixels,` +
+          ` detection ${Math.round(a.requirement.detectionEfficiencyMin * 100)}% or better, ${a.requirement.locationKm} km, intracloud and cloud-to-ground alike (the two cannot be told apart optically)`
+        );
       }
       const mFlashDir = new THREE.Vector3();
       const eshV = new THREE.Vector3(); // earthshine phase temp
@@ -14154,6 +14447,25 @@
               research['daylight field (ABI band 2 · CMIP reflectance)'] = dl;
             else
               delete research['daylight field (ABI band 2 · CMIP reflectance)'];
+            // THE FLASHES FROM ORBIT (168th pass): the satellite's
+            // lightning within 200 km, the nearest flash's bearing
+            // the place to look
+            const gl = glmLine();
+            const GLM_LINE = 'lightning from orbit (GLM LCFA · 777 nm)';
+            if (gl) {
+              research[GLM_LINE] = gl;
+              const s = glmObs && glmObs.summary;
+              if (s)
+                researchLook[GLM_LINE] = {
+                  azDeg: s.nearestBearingDeg,
+                  altDeg: 3,
+                  note: `nearest flash ${s.nearestKm.toFixed(0)} km`
+                };
+              else delete researchLook[GLM_LINE];
+            } else {
+              delete research[GLM_LINE];
+              delete researchLook[GLM_LINE];
+            }
           }
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();
@@ -15226,6 +15538,7 @@
         syncRrs();
         syncSst();
         syncGoesL2();
+        syncGlm();
         syncSurface();
         syncPhenology();
         syncBuildings();
@@ -20437,6 +20750,9 @@
         // NOAA's L2 cloud products arrive every 5 min (CONUS)
         syncGoesL2();
         setInterval(syncGoesL2, 5 * 60 * 1000);
+        // the satellite's flashes: a 20-s file every 20 s (168th)
+        syncGlm();
+        setInterval(syncGlm, GLM_DAEMON_MS);
         // MOD09A1 is an 8-day composite; the same hourly poll (matching
         // the /surface cache) more than covers it.
         syncSurface();

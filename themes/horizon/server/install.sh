@@ -62,6 +62,9 @@ install -m 644 ../satellites.js /opt/horizon-live/satellites.js
 # the box refused every revision from the 155th to the 157th: the
 # drift guard below did its job and the old build stayed (158th).
 install -m 644 ../goesl2-decode.js /opt/horizon-live/goesl2-decode.js
+# the flashes from orbit (168th): the GLM law and its bearing helper
+install -m 644 ../glm.js /opt/horizon-live/glm.js
+install -m 644 ../wildfire.js /opt/horizon-live/wildfire.js
 # The '../../' import paths must keep resolving from
 # /opt/horizon-live/index.mjs - rewrite them for the flat deploy
 # (metar.js's own './lightning.js', aerosol.js's own './grib2.js'

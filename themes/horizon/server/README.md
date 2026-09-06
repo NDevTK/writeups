@@ -107,6 +107,30 @@ are gated by `../server-reference.mjs` — the `server` set in
   power (GW). One 60 s poll serves every visitor. Also pushed as
   the `space` event on `/stream` (60 s cadence, initial push on
   connect).
+- `GET /glm?lat&lon&km` — the flashes from orbit (168th pass): the
+  Geostationary Lightning Mapper's flashes of the last minute within
+  km (≤ 400, default 200) of the point, from the craft that sees this
+  longitude (the same pick as the ABI windows). GLM stares at the
+  disk through a 777.4-nm filter and writes a 20-second file every
+  20 seconds (`GLM-L2-LCFA`, about 450 kB, read whole from the open
+  bucket); the daemon holds the newest three per bucket - a minute of
+  flashes - refreshed at most every 20 s, so any number of pages
+  asking every 20 s cost this box one read per 20 s per craft. The
+  body: the files held (key, span, flash count, size), the window,
+  the age, the disk's flash count, and each flash within reach with
+  its position, optical energy (J), lit area (km²), quality flag and
+  words, first-light time, duration, distance, bearing and display
+  strength (the logarithm of its energy on the day's measured
+  population), earliest first, capped at 300, with a summary (the
+  nearest, the brightest) and the ATBD's version. The gated `glm.js`
+  parses the file (the LCFA ATBD v3.0 read in full; int16 counts read
+  unsigned, the file's own scalings); `sat: null` with a reason is a
+  real answer where no craft reaches, 502 when no file could be read.
+  Cached 10 s at the edge. The page asks every 20 s and, where the
+  daemon has no `/glm` (an older build) or does not answer, reads
+  one 20-s file a minute itself from the bucket (never under data
+  saver), replaying each flash the ground network did not report at
+  its bearing and distance.
 - `GET /goesl2?lat&lon` — NOAA's own operational cloud products
   around the point (148th pass): the clear-sky mask
   (`ABI-L2-ACMC`: BCM, ACM, cloud probability, DQF on the 2-km

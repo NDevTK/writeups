@@ -21,6 +21,7 @@
  * goesl2-client-reference.mjs over a fetch of the vendored fixtures.
  */
 import {openHdf5Lazy} from './hdf5.js';
+import {parseGlmFlashes} from './glm.js';
 import {
   bandKeys,
   L2_BUCKETS,
@@ -108,6 +109,107 @@ export function rangeReader(url, fetchFn = fetch, onTotal = null) {
   };
   read.state = state;
   return read;
+}
+
+// THE FLASHES READ BY THE PAGE (168th pass): the newest GLM-L2-LCFA
+// file of the craft that sees the point, read whole - a 20-s file is
+// about 450 kB (a busy minute more), so the first read asks for a
+// megabyte and a bigger file costs one more round - and parsed by
+// glm.js over a handle whose datasets were awaited up front (the
+// lazy reader answers Promises; the parser is synchronous, as the
+// daemon runs it over a buffer). skipKey names the file already
+// read: the listing alone is asked and {same: true} answers when the
+// newest is still that file (a listing costs nothing; a file costs
+// 450 kB). Answers {sat, name, craft, bucket, key, startMs, endMs,
+// n, diskFlashes, flashes, platform, bytes, ranges, rounds, ms,
+// error: null}, {sat, ..., error} when the read failed, or {sat:
+// null, reason} where no bucket reaches. The page reads one file a
+// minute this way when the daemon has no /glm - stated on the line.
+export const GLM_PRODUCT = 'GLM-L2-LCFA';
+export const GLM_HEAD_BYTES = 1048576;
+const GLM_DATASETS = [
+  'flash_lat',
+  'flash_lon',
+  'flash_energy',
+  'flash_area',
+  'flash_quality_flag',
+  'flash_time_offset_of_first_event',
+  'flash_time_offset_of_last_event',
+  'flash_id',
+  'flash_count'
+];
+export async function readGlmLatest(
+  lat,
+  lon,
+  {
+    fetchFn = (...a) => fetch(...a),
+    inflate = inflateStream,
+    now = () => Date.now(),
+    skipKey = null
+  } = {}
+) {
+  const pick = pickSatellite(lat, lon);
+  const bucket = pick.sat ? L2_BUCKETS[pick.sat.id] : null;
+  if (!bucket)
+    return {sat: null, name: null, reason: noBucketReason(pick), flashes: []};
+  const head = {
+    sat: pick.sat.id,
+    name: pick.sat.name,
+    craft: pick.sat.craft,
+    bucket
+  };
+  const t0 = now();
+  try {
+    let key = null;
+    let lists = 0;
+    for (const prefix of l2Prefixes(GLM_PRODUCT, new Date(now()))) {
+      lists++;
+      const r = await fetchFn(l2ListUrl(bucket, prefix), {credentials: 'omit'});
+      if (!r.ok) throw new Error('list ' + r.status);
+      const pk = latestByStart(parseS3Keys(await r.text()));
+      if (pk) {
+        key = pk.key;
+        break;
+      }
+    }
+    if (!key) throw new Error('no GLM file listed');
+    if (skipKey && key === skipKey)
+      return {...head, key, same: true, lists, flashes: [], error: null};
+    const reader = rangeReader(l2FileUrl(bucket, key), fetchFn);
+    const f = await openHdf5Lazy(reader, inflate, {
+      blockBytes: GLM_HEAD_BYTES,
+      headBytes: GLM_HEAD_BYTES
+    });
+    const ds = {};
+    for (const n of GLM_DATASETS) {
+      try {
+        ds[n] = await f.dataset(n);
+      } catch {
+        ds[n] = null;
+      }
+    }
+    const ra = await f.rootAttrs();
+    const parsed = parseGlmFlashes({
+      dataset: (n) => ds[n] ?? null,
+      rootAttrs: () => ra
+    });
+    if (!parsed) throw new Error('GLM file unreadable');
+    return {
+      ...head,
+      key,
+      same: false,
+      lists,
+      ...parsed,
+      bytes: f.stats.bytes,
+      ranges: f.stats.ranges,
+      rounds: f.stats.rounds,
+      whole: reader.state.ignored,
+      ms: now() - t0,
+      error: null
+    };
+  } catch (e) {
+    return {...head, key: null, same: false, flashes: [], error: e.message};
+  }
 }
 
 // The daemon's answer for a point where no bucket reaches (a real

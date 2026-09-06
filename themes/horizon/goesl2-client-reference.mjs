@@ -18,10 +18,14 @@ import {
 import {
   CLIENT_HELD_WINDOWS,
   createGoesL2Client,
+  GLM_HEAD_BYTES,
   inflateStream,
   noBucketReason,
-  rangeReader
+  rangeReader,
+  readGlmLatest
 } from './goesl2-client.js';
+import {GLM_B64, GLM_EXPECT, GLM_NAME} from './glm-fixture.js';
+import {glmFlashesNear} from './glm.js';
 import {
   decodeL2,
   L2_ASKS,
@@ -477,6 +481,115 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
     `three range asks of a whole-answering server cost ${calls} download (${a.length}, ${b.length} and ${c.length} bytes cut from it, the last short at the end); ` +
       `the client over such a bucket reads its two files whole (${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB`).join(', ')}), ` +
       `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the ten CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
+  );
+}
+
+// ---- THE FLASHES READ BY THE PAGE (168th pass) ---------------------
+// A fake bucket holding the vendored GLM file under its product's
+// prefix with S3's range semantics; the page's own read at Tampa,
+// the newest file already read (the listing alone), a point no bucket
+// reaches, and the failures named.
+{
+  const glm = new Uint8Array(Buffer.from(GLM_B64, 'base64'));
+  const log = {lists: [], ranges: [], other: []};
+  const fetchGlm = async (url, opts = {}) => {
+    const u = new URL(url);
+    if (u.searchParams.has('list-type')) {
+      const prefix = u.searchParams.get('prefix');
+      log.lists.push(prefix);
+      const body =
+        '<?xml version="1.0"?><ListBucketResult>' +
+        (prefix.startsWith('GLM-L2-LCFA/')
+          ? `<Contents><Key>${prefix}${GLM_NAME}</Key></Contents>`
+          : '') +
+        '</ListBucketResult>';
+      return {ok: true, status: 200, text: async () => body};
+    }
+    const name = u.pathname.split('/').pop();
+    if (name !== GLM_NAME) {
+      log.other.push(name);
+      return {ok: false, status: 404, headers: {get: () => null}};
+    }
+    const m = /bytes=(\d+)-(\d+)/.exec(
+      (opts.headers && opts.headers.range) || ''
+    );
+    const s = m ? +m[1] : 0;
+    const e = m ? Math.min(+m[2] + 1, glm.length) : glm.length;
+    log.ranges.push([s, m ? +m[2] + 1 : null]);
+    if (s >= glm.length)
+      return {
+        status: 416,
+        headers: {get: () => null},
+        arrayBuffer: async () => new ArrayBuffer(0)
+      };
+    return {
+      status: m ? 206 : 200,
+      headers: {
+        get: (h) =>
+          h === 'content-range' ? `bytes ${s}-${e - 1}/${glm.length}` : null
+      },
+      arrayBuffer: async () => glm.slice(s, e).buffer
+    };
+  };
+  const clock = Date.parse('2026-09-06T19:52:00Z');
+  const opts = {fetchFn: fetchGlm, inflate: inflateStream, now: () => clock};
+  const d = await readGlmLatest(27.9, -82.5, opts);
+  const rangesAfterRead = log.ranges.length;
+  const nr = glmFlashesNear(d.flashes, 27.9, -82.5, {maxKm: 200, cap: 300});
+  const again = await readGlmLatest(27.9, -82.5, {...opts, skipKey: d.key});
+  const nowhere = await readGlmLatest(-20, 80, opts);
+  const noList = await readGlmLatest(27.9, -82.5, {
+    ...opts,
+    fetchFn: async () => ({ok: false, status: 403})
+  });
+  const noFile = await readGlmLatest(27.9, -82.5, {
+    ...opts,
+    fetchFn: async (url, o) =>
+      new URL(url).searchParams.has('list-type')
+        ? fetchGlm(url, o)
+        : {ok: false, status: 404, headers: {get: () => null}}
+  });
+  check(
+    "THE FLASHES READ BY THE PAGE: the newest 20-s file whole in one range, the listing alone when it is the file already read, the failures named",
+    d.sat === 'goes-east' &&
+      d.craft === 'GOES-19' &&
+      d.bucket === 'noaa-goes19' &&
+      d.error === null &&
+      d.same === false &&
+      d.key === 'GLM-L2-LCFA/2026/249/19/' + GLM_NAME &&
+      d.lists === 1 &&
+      log.lists[0] === 'GLM-L2-LCFA/2026/249/19/' &&
+      d.n === GLM_EXPECT.n &&
+      d.diskFlashes === GLM_EXPECT.flashCount &&
+      d.platform === GLM_EXPECT.platform &&
+      d.startMs === Date.parse(GLM_EXPECT.start) &&
+      d.flashes[0].id === GLM_EXPECT.first.id &&
+      Math.abs(d.flashes[0].energyJ - GLM_EXPECT.first.energyJ) < 1e-27 &&
+      d.bytes === glm.length &&
+      d.ranges === 1 &&
+      d.rounds === 1 &&
+      d.whole === false &&
+      rangesAfterRead === 1 &&
+      log.ranges[0][0] === 0 &&
+      log.ranges[0][1] === GLM_HEAD_BYTES &&
+      nr.length === GLM_EXPECT.within200 &&
+      again.same === true &&
+      again.key === d.key &&
+      again.flashes.length === 0 &&
+      log.ranges.length === rangesAfterRead &&
+      // the first read, the skip, the missing-file case: three
+      // listings through this fake (the 403 case has its own)
+      log.lists.length === 3 &&
+      nowhere.sat === null &&
+      /no open L2 bucket|past the products' reach/.test(nowhere.reason) &&
+      noList.sat === 'goes-east' &&
+      noList.error === 'list 403' &&
+      noList.flashes.length === 0 &&
+      noFile.error === 'range 404' &&
+      noFile.key === null,
+    `Tampa reads ${d.craft}'s ${d.key.split('/').pop().slice(0, 30)} from ${d.bucket} (one listing, ${d.lists} prefix): ${d.n} flashes, ${d.bytes} bytes in ${d.ranges} range of ${d.rounds} round ` +
+      `(the megabyte asked, the file's ${glm.length} answered short), ${nr.length} within 200 km; asked again with the key it read, the listing alone answers same (${log.ranges.length} ranges in all); ` +
+      `20 S 80 E: "${nowhere.reason}"; a 403 listing says "${noList.error}", a missing file "${noFile.error}"`
   );
 }
 

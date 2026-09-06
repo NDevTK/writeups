@@ -109,6 +109,9 @@ import {
 import {inflateSync} from 'node:zlib';
 import {pickSatellite} from '../../satellites.js';
 import {openHdf5, openHdf5Lazy, physicalValues} from '../../hdf5.js';
+// THE FLASHES FROM ORBIT (168th): GLM's flashes decoded and composed
+// by the shared law module (gated by glm-reference.mjs)
+import {GLM_ATBD, glmFlashesNear, glmSummary, parseGlmFlashes} from '../../glm.js';
 import {
   bandKeys,
   bucketPrefix,
@@ -2204,6 +2207,118 @@ function main() {
   // when its product failed or the point is outside its scene. With
   // `at` (ISO) the files nearest that moment, for the page's
   // comparison at its mosaic's own minute.
+  // THE FLASHES FROM ORBIT (168th pass): the Geostationary Lightning
+  // Mapper's flashes of the last minute around a point. The craft that
+  // sees this longitude (the same pick as the ABI windows) writes a
+  // 20-second LCFA file every 20 seconds (about 400 kB, read whole);
+  // the newest three are held per bucket - a minute of flashes -
+  // refreshed at most every 20 s, so a page asking every 30 s costs
+  // this box one 400-kB read per 20 s per craft and answers in
+  // microseconds from the ring.
+  const glmHeld = new Map(); // bucket -> {at, files: [...], error}
+  const GLM_REFRESH_MS = 20e3;
+  const GLM_KEEP = 3;
+  const GLM_WINDOW_MS = 60e3;
+  async function glmRefresh(bucket, deadline) {
+    const h = glmHeld.get(bucket) ?? {at: 0, files: [], error: null};
+    if (Date.now() - h.at < GLM_REFRESH_MS) return h;
+    h.at = Date.now();
+    glmHeld.set(bucket, h);
+    try {
+      const pick = await l2KeyFor(bucket, 'GLM-L2-LCFA', null, deadline);
+      if (!pick) throw new Error('no GLM file listed');
+      if (!h.files.some((f) => f.key === pick.key)) {
+        const r = await fetch(l2FileUrl(bucket, pick.key), {
+          signal: AbortSignal.timeout(
+            fetchBudgetMs(deadline, Date.now(), UPSTREAM_BUDGET_MS)
+          )
+        });
+        if (!r.ok) throw new Error('GLM ' + r.status);
+        const buf = new Uint8Array(await r.arrayBuffer());
+        const parsed = parseGlmFlashes(openHdf5(buf, l2Inflate));
+        if (!parsed) throw new Error('GLM file unreadable');
+        h.files.push({
+          key: pick.key,
+          startMs: parsed.startMs,
+          endMs: parsed.endMs,
+          flashes: parsed.flashes,
+          diskFlashes: parsed.diskFlashes,
+          platform: parsed.platform,
+          bytes: buf.length
+        });
+        h.files.sort((a, b) => a.startMs - b.startMs);
+        while (h.files.length > GLM_KEEP) h.files.shift();
+        // the ring is the last MINUTE, not the last three reads: a
+        // file fetched before a quiet spell would otherwise stretch
+        // the window (measured: 740 s across a 12-minute gap)
+        const newest = h.files[h.files.length - 1].endMs;
+        h.files = h.files.filter((f) => newest - f.endMs <= GLM_WINDOW_MS);
+      }
+      h.error = null;
+    } catch (e) {
+      h.error = e.message;
+    }
+    return h;
+  }
+  async function fetchGlm(lat, lon, km) {
+    const pick = pickSatellite(lat, lon);
+    const bucket = pick.sat ? L2_BUCKETS[pick.sat.id] : null;
+    if (!bucket)
+      return {
+        sat: null,
+        name: null,
+        reason: pick.sat
+          ? `${pick.sat.name} (${pick.sat.craft}) has no open bucket`
+          : pick.nearest
+            ? `${pick.nearest.name} sees this point at ${pick.viewZenithDeg.toFixed(0)} deg zenith, past the reach`
+            : 'no satellite table',
+        flashes: [],
+        summary: null
+      };
+    const deadline = Date.now() + UPSTREAM_BUDGET_MS;
+    const h = await glmRefresh(bucket, deadline);
+    if (!h.files.length) return null;
+    const all = h.files.flatMap((f) => f.flashes);
+    const near = glmFlashesNear(all, lat, lon, {maxKm: km, cap: 300}).map((f) => ({
+      id: f.id,
+      lat: +f.lat.toFixed(4),
+      lon: +f.lon.toFixed(4),
+      energyJ: f.energyJ,
+      areaKm2: f.areaKm2 === null ? null : +f.areaKm2.toFixed(1),
+      quality: f.quality,
+      words: f.words,
+      tFirstMs: f.tFirstMs,
+      durationMs: f.durationMs === null ? null : Math.round(f.durationMs),
+      distKm: +f.distKm.toFixed(1),
+      bearingDeg: +f.bearingDeg.toFixed(1),
+      strength: +f.strength.toFixed(3)
+    }));
+    const last = h.files[h.files.length - 1];
+    return {
+      sat: pick.sat.id,
+      name: pick.sat.name,
+      craft: pick.sat.craft,
+      bucket,
+      km,
+      files: h.files.map((f) => ({
+        key: f.key.split('/').pop(),
+        start: new Date(f.startMs).toISOString(),
+        end: new Date(f.endMs).toISOString(),
+        n: f.flashes.length,
+        diskFlashes: f.diskFlashes,
+        kb: Math.round(f.bytes / 1024)
+      })),
+      windowStart: new Date(h.files[0].startMs).toISOString(),
+      windowEnd: new Date(last.endMs).toISOString(),
+      ageS: Math.round((Date.now() - last.endMs) / 1000),
+      diskFlashes: last.diskFlashes,
+      n: near.length,
+      flashes: near,
+      summary: glmSummary(near),
+      error: h.error,
+      atbd: GLM_ATBD.version
+    };
+  }
   async function fetchGoesL2(lat, lon, at = null) {
     const pick = pickSatellite(lat, lon);
     const bucket = pick.sat ? L2_BUCKETS[pick.sat.id] : null;
@@ -3307,6 +3422,22 @@ function main() {
       return json(200, body, {
         'cache-control': 'public, max-age=3600',
         'x-sst-source': 'JPL MUR SST v4.1 (CoastWatch ERDDAP)'
+      });
+    }
+
+    if (url.pathname === '/glm') {
+      // THE FLASHES FROM ORBIT (168th): GLM's flashes of the last
+      // minute within km of the point. 200 with sat null is a real
+      // answer (no craft reaches this longitude); 502 when no file
+      // could be read at all.
+      const km = Math.min(Number(url.searchParams.get('km')) || 200, 400);
+      if (!(km > 0)) return send(400, 'bad request');
+      const body = await fetchGlm(lat, lon, km);
+      if (!body) return json(502, {sat: null, upstream: 'unavailable'});
+      return json(200, body, {
+        'cache-control': 'public, max-age=10',
+        'x-glm-source':
+          'NOAA GOES-R GLM L2 LCFA (NOAA Open Data Dissemination, S3)'
       });
     }
 

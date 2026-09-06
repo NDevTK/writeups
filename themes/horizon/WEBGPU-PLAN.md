@@ -10345,6 +10345,102 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 168th pass - THE FLASHES FROM
+  ORBIT): the scene's lightning has been Blitzortung's since the live
+  channel's first pass - a ground network of hobbyist receivers, dense
+  over Europe and North America, thin over the sea and the tropics
+  where most of the world's lightning is. GOES's Geostationary
+  Lightning Mapper stares at the whole disk through a 777.4-nm filter
+  (the OI(1) line) and writes every optical flash to a 20-second file
+  every 20 seconds (GLM-L2-LCFA, CORS-open on the NOAA buckets, about
+  450 kB, read whole in 0.1 s). THE PRIMARY, read in full: the GLM
+  Lightning Cluster-Filter Algorithm ATBD v3.0 (Goodman, Mach, Koshak,
+  Blakeslee 2012, 73 pp) - an event is one pixel over its background
+  in one 2-ms frame, a group the adjacent events of a frame, a flash
+  the groups within 330 ms and 16.5 km of one another, located by the
+  amplitude-weighted centroid; a 1372 x 1300 CCD of 8-14 km pixels,
+  a 2-ms integration against the 400-us pulse, the daytime background
+  150 times the signal subtracted frame to frame; the cloud scatters
+  but hardly absorbs the near infrared so every flash type is seen
+  from above, intracloud and cloud-to-ground alike and optically
+  indistinguishable; the requirement 70% detection or better, under
+  5% false alarms, 5-km location, 20-s latency. MEASURED on the day
+  (three 20-s files of GOES-19): 2,876 flashes a minute on the disk,
+  energies 3.3e-15 to 4.4e-12 J (median 4.2e-14, p90 3.1e-13, p99
+  1.3e-12), areas 64-4,271 km^2, durations median 199 ms, 98% flagged
+  good; the file's int16 counts carry an UNSIGNED valid range ([0, -6]
+  is 0..65530). THE LAW (glm.js): parseGlmFlashes (the file's own
+  scalings, the counts read unsigned, first light from the file's
+  start - the offsets' -5 s add_offset lets a flash begin before the
+  nominal start, and they do); flashStrength (0.4 at 1e-14 J rising
+  with the logarithm to about 1 at the day's brightest, floored 0.3,
+  the day's population the anchor, stated); glmFlashesNear (bearing
+  and distance by wildfire.js's rangeBearing, earliest first);
+  flashesNotInNetwork (a network strike within 20 km and 30 s is the
+  same lightning - the network's own, closer located, stands);
+  glmSummary. THE DAEMON: /glm?lat&lon&km holds the newest three
+  files per bucket - the last MINUTE, a file older than a minute
+  behind the newest dropped (the first draft kept the newest three
+  READS and a page after a 12-minute quiet spell was told "80 flashes
+  in the 740 s") - refreshed at most every 20 s, answering the flashes
+  within reach with bearings, distances and strengths, the files held,
+  the window, the disk's count, a summary; install.sh ships glm.js and
+  wildfire.js. THE PAGE: syncGlm every 20 s (the file cadence) through
+  the daemon (glmsrc derived from goesl2src; ?glm=0 off; the harness's
+  ?strike=N and any weather pin leave it off); a 404 from an older
+  daemon or no answer falls to readGlmLatest (goesl2-client.js): the
+  newest file read whole from the bucket in one megabyte range, its
+  datasets awaited into a synchronous handle for the parser, one file
+  a minute, the listing alone when the newest is the file already
+  read, never under data saver; a two-minute ring of the network's
+  strikes (the SSE event carries no time - arrival stamps it) tells
+  the satellite's flashes from them; each flash new to the scene and
+  not the network's is replayed at its bearing and distance in the
+  file's own order and spacing within 20 s, its amplitude
+  apparentFlash times its strength (spawnFlash's new fourth argument;
+  the network's strikes keep 1), with the same ISUAL sprite roll; the
+  record "NOAA GOES-19 GLM flashes (LCFA)" and the research line
+  "lightning from orbit (GLM LCFA · 777 nm)" with a look link at the
+  nearest flash's bearing. GATES: glm-reference THE FILE'S FLASHES
+  (a synthetic handle with the file's scalings: -6 is 65530, id -1 is
+  65535, first light from the start, a handle without datasets null),
+  THE FLASH'S STRENGTH (the day's quantiles, the ATBD's numbers), THE
+  FLASHES (Houston: the faint western flash first, the bright
+  north-eastern next, the 250-km one out of reach, a strike 5 km and
+  8 s off claiming the western one, a strike a minute later not), and
+  THE FILE, READ: a REAL 20-s file vendored (glm-fixture.js, GOES-19
+  19:51:00-19:51:20Z, 462,569 bytes, gate-only) through hdf5.js and
+  the parser against h5py's INDEPENDENT read of the same bytes - 1,026
+  flashes, the file's own count, ids all distinct, the first flash's
+  every field, 1,001 good and 25 flagged 3, the energy floor, ceiling
+  and median (numpy's even-count mean), the 24 within 200 km of Tampa
+  with the nearest (id 38731, 97.75 km at 28.34°) and the brightest
+  (id 38888, 1.72e-12 J, 160.9 km, 2,627 km^2, 575 ms) to a millionth
+  (the first draft took the upper middle value for the median; numpy
+  averages the two - caught by the landmark); goesl2-client-reference
+  THE FLASHES READ BY THE PAGE (a fake bucket with S3's range
+  semantics: one listing, one range of one round for the whole file
+  answered short of the megabyte, 24 within 200 km, the listing alone
+  when asked with the key it read, "Himawari sees this point at 71 deg
+  zenith, past the products' reach" at 20 S 80 E, "list 403" and
+  "range 404" named); server-reference THE FLASHES' ROUTE (source-level:
+  the route, the binding, the ring's three files and the minute rule,
+  the ship list). Docs: server README /glm; FINDINGS pass 168 (148
+  files, 1,183 landmarks). MEASURED in the page (Tampa, 27.9 N 82.5 W,
+  20:03Z, the local daemon): "GOES-19's Geostationary Lightning
+  Mapper: 80 flashes within 200 km in the 740 s to 20:03:20Z (3 20-s
+  files, 20 s old; the disk 1,061 in the newest) - nearest 27 km at
+  70° (1.5e-13 J), brightest 2.8e-12 J 126 km off (strength 0.99) -
+  this read 5 new to the scene, 21 the network's already - 34 replayed
+  so far - via the daemon" beside "Blitzortung.org lightning - 113
+  strikes streamed - nearest 196 km": the network had 113 strikes in
+  the 200-km circle over the probe's two minutes and the satellite 80
+  flashes in a minute of files, 46 of them claimed by the network -
+  the rest the satellite's alone, over the Gulf and the far side of
+  the peninsula where the receivers are thin. The 740-s window is the
+  ring flaw above, measured before the rule; after it the daemon
+  answered "1 file, 20:04:40-20:05:00Z, 29 flashes, the nearest 37.5
+  km at 46°".
 - DONE (Sep 6, the review session's 167th pass - THE RAIN'S COVER
   WHERE NO RADAR SEES): the decks' measured cover has been the radar
   composite's since the weather map's first pass - a 64 x 64 field

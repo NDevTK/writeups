@@ -9,8 +9,8 @@ from the code. Run the whole corpus with:
 cd themes/horizon/harness && bash validate.sh
 ```
 
-At the time of writing the gate holds **147 CPU reference files printing
-1177 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+At the time of writing the gate holds **148 CPU reference files printing
+1183 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **147 reference files, 1177 landmark lines, 8 GPU probes** (live gate
+- **148 reference files, 1183 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1081,7 +1081,32 @@ The practice the corpus demonstrates, stated so it can be reused:
    border ring), and one merge feeds the decks the radar's texel
    wherever the mask says the radar sees and the satellite's
    elsewhere, the records counting the texels each gave
-   (`rainshafts-reference` THE RAIN'S COVER)
+   (`rainshafts-reference` THE RAIN'S COVER). Pass 168 puts the
+   satellite's lightning where the ground network is thin: GOES's
+   Geostationary Lightning Mapper stares at the disk through a
+   777.4-nm filter and writes every optical flash to a 20-s file every
+   20 s (GLM-L2-LCFA; the Lightning Cluster-Filter Algorithm ATBD v3.0
+   read in full — events of 2-ms frames, groups, flashes within 330 ms
+   and 16.5 km, the amplitude-weighted centroid, 8–14 km pixels, ≥ 70%
+   detection, 5-km location, 20-s latency; intracloud and
+   cloud-to-ground alike, indistinguishable optically). The daemon's
+   `/glm` holds a minute of files per craft and answers the flashes
+   within 200 km with bearings, distances and a display strength from
+   the logarithm of each flash's optical energy on the day's measured
+   population (2,876 flashes a minute on GOES-19's disk, energies
+   3.3e-15 to 4.4e-12 J, median 4.2e-14); the page asks every 20 s,
+   reads one 20-s file a minute itself from the open bucket when the
+   daemon cannot answer, and replays each flash the ground network did
+   not report (a strike within 20 km and 30 s claims it) at its true
+   bearing in the file's own order and spacing. A real 20-s file is
+   vendored and the gated reader and parser are held to h5py's
+   independent read of the same bytes — 1,026 flashes, every field of
+   the first, the quality census, the energy population, the 24 within
+   200 km of Tampa with the nearest (97.75 km at 28.34°) and the
+   brightest (1.72e-12 J at 160.9 km) to a millionth of a kilometre
+   (`glm-reference` THE FILE'S FLASHES, THE FLASH'S STRENGTH, THE
+   FLASHES, THE FILE, READ; `goesl2-client-reference` THE FLASHES READ
+   BY THE PAGE; `server-reference` THE FLASHES' ROUTE)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
