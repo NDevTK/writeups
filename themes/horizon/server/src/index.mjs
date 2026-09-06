@@ -684,6 +684,23 @@ export function fetchBudgetMs(deadlineMs, nowMs, capMs) {
 // the CORS grant, anything else is refused outright. Non-browser
 // requests (no Origin) pass without a grant - the rate limiter
 // still applies to them.
+// The deployed revision's file (158th pass): install.sh writes
+// {"rev", "installedAt"} beside index.mjs; anything else reads as
+// no version, never as a throw (a hand-run daemon has none).
+export function parseVersion(text) {
+  try {
+    const v = JSON.parse(text);
+    return {
+      rev: typeof v.rev === 'string' && v.rev ? v.rev : null,
+      installedAt:
+        typeof v.installedAt === 'string' && v.installedAt
+          ? v.installedAt
+          : null
+    };
+  } catch {
+    return {rev: null, installedAt: null};
+  }
+}
 export function originCheck(origin, allowed) {
   if (!origin) return {ok: true, acao: null};
   return allowed.includes(origin)
@@ -1480,6 +1497,28 @@ function main() {
   // systemd StateDirectory (HORIZON_STATE_DIR overrides; none set:
   // no persistence, logged once). The short-lived adsb cache and
   // the streaming pictures are not persisted.
+  // THE DEPLOYED REVISION (158th pass): install.sh writes VERSION
+  // beside index.mjs ({rev, installedAt}); /health, /probe and the
+  // /goesl2 body carry it, so a box that silently kept an old deploy
+  // (the 151st-157th: the ship list lacked goesl2-decode.js and the
+  // drift guard refused every revision) is seen from anywhere.
+  const VERSION = (() => {
+    try {
+      return parseVersion(
+        readFileSync(new URL('./VERSION', import.meta.url), 'utf8')
+      );
+    } catch {
+      return {rev: null, installedAt: null};
+    }
+  })();
+  log(
+    `version: ${VERSION.rev ? VERSION.rev.slice(0, 12) + ' installed ' + VERSION.installedAt : 'no VERSION file (a hand-run tree)'}`
+  );
+  const versionInfo = () => ({
+    ...VERSION,
+    products: L2_ASKS.map((a) => a.id),
+    node: process.versions.node
+  });
   const STATE_DIR = (env.HORIZON_STATE_DIR ?? env.STATE_DIRECTORY ?? '')
     .split(':')[0]
     .trim();
@@ -2202,7 +2241,10 @@ function main() {
       dmw: F.dmw ? l2DmwBody(F.dmw.dec, F.dmw.key) : null,
       aod: F.aod ? l2AodBody(F.aod.dec, F.aod.key, cell.lat, cell.lon) : null,
       lst: F.lst ? l2LstBody(F.lst.dec, F.lst.key, cell.lat, cell.lon) : null,
-      upstream: got.every((f) => f) ? 'ok' : 'partial'
+      upstream: got.every((f) => f) ? 'ok' : 'partial',
+      // the deployed revision (158th): the page can tell an older
+      // daemon's body from a fresh one's
+      rev: VERSION.rev
     };
     goesl2Cache.set(ck, {t: Date.now(), body});
     return body;
@@ -2497,7 +2539,10 @@ function main() {
             // pass's lesson finished): ok = served fresh from
             // upstream, cached = cache/stale-serve, fail = 4xx/5xx
             // with its time - the next incident diagnoses itself.
-            endpoints: Object.fromEntries(epStats)
+            endpoints: Object.fromEntries(epStats),
+            // the deployed revision and the products this build
+            // serves (158th pass)
+            version: versionInfo()
           },
           {'cache-control': 'no-store'}
         );
@@ -2516,6 +2561,7 @@ function main() {
           rrs: rrsHealth,
           sst: sstHealth,
           goesl2: goesl2Health,
+          version: versionInfo(),
           probe: await probeAll()
         },
         {'cache-control': 'no-store'}

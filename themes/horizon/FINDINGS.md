@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **145 CPU reference files printing
-1158 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1160 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **145 reference files, 1158 landmark lines, 8 GPU probes** (live gate
+- **145 reference files, 1160 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -932,7 +932,20 @@ The practice the corpus demonstrates, stated so it can be reused:
    `server-reference` THE LAND'S SKIN; `far-terrain-reference` the
    per-spoke k and the typed-array march; `observatory-reference`
    THE LAND SURFACE LAYER; `goesl2-client-reference` ten asks over
-   26 listings)
+   26 listings). Pass 158 repairs the deploy: the box at api.ndev.tk
+   was found running a build from before pass 151 while main
+   carried the 157th — the installer's ship list had never gained
+   `goesl2-decode.js` (pass 155), so its own drift guard refused
+   every revision since, correctly and silently; the module is
+   shipped, the installer writes a VERSION file the daemon reports
+   in `/health`, `/probe` and every `/goesl2` body, the updater
+   retries a failed gate after a cooldown instead of pinning the box
+   to the old build until the next commit, the gate's cost was
+   measured for the e2-micro (peak 198 MB, 153 s of CPU here for
+   all 145 references), and the page reads from the bucket itself
+   any product an older daemon's body lacks outright and says so in
+   its record (`goesl2-client-reference` THE OLDER DAEMON'S GAPS;
+   `server-reference` THE DEPLOYED REVISION)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

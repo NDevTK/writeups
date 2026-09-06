@@ -104,6 +104,7 @@ import {
   sseEvent,
   budgetLeftMs,
   fetchBudgetMs,
+  parseVersion,
   UPSTREAM_BUDGET_MS,
   HOME_DEFAULT,
   parseHome,
@@ -1483,6 +1484,36 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       `${body && body.sceneStats.retrieved.toLocaleString('en-US')} retrieved and ${body && body.sceneStats.good.toLocaleString('en-US')} good px, ` +
       `quantitative to ${body && body.lzaBounds[1]} deg; the tenth ask ${ask.product} at half width ${ask.halfPx} with ${L2_LST_EXTRAS.length} extras, ` +
       `never for a mosaic's minute`
+  );
+}
+
+{
+  // THE DEPLOYED REVISION (158th pass): install.sh writes the VERSION
+  // file beside the entry point and the daemon reports it - the
+  // parser takes the file's own shape, and anything else (a hand-run
+  // tree without one, an empty file, a stray string) reads as no
+  // version rather than a throw.
+  const good = parseVersion(
+    '{"rev":"9d25f5f0000000000000000000000000abcdef12","installedAt":"2026-09-06T10:00:00Z"}'
+  );
+  const partial = parseVersion('{"rev":"abc"}');
+  const empty = parseVersion('');
+  const junk = parseVersion('{"rev":12,"installedAt":null}');
+  const notJson = parseVersion('9d25f5f');
+  check(
+    'THE DEPLOYED REVISION: the VERSION file parses to its own shape and to nothing on anything else',
+    good.rev === '9d25f5f0000000000000000000000000abcdef12' &&
+      good.installedAt === '2026-09-06T10:00:00Z' &&
+      partial.rev === 'abc' &&
+      partial.installedAt === null &&
+      empty.rev === null &&
+      empty.installedAt === null &&
+      junk.rev === null &&
+      junk.installedAt === null &&
+      notJson.rev === null &&
+      Object.keys(good).join() === 'rev,installedAt',
+    `{"rev","installedAt"} reads back as written (${good.rev.slice(0, 7)} installed ${good.installedAt}); a rev alone keeps a null install time; ` +
+      `an empty file, a numeric rev and a bare hash all read as no version - the daemon starts either way and says which`
   );
 }
 

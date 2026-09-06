@@ -38,7 +38,10 @@ are gated by `../server-reference.mjs` — the `server` set in
    - `curl -s localhost:8127/health` — `frames` climbing into the
      thousands within seconds proves the key and the global
      subscription (the world's AIS never goes quiet). `frames: 0`
-     after a minute means the key is wrong.
+     after a minute means the key is wrong. `version` names the
+     deployed revision, its install time and the products this
+     build serves (158th pass: the same `rev` rides every `/goesl2`
+     body, so a box that kept an old deploy is seen from the page).
    - `curl -s https://<host>/probe` — measures what THIS box's IP
      can reach (adsb.lol, adsb.fi, airplanes.live, OpenSky) so
      upstream order can be tuned on evidence.
@@ -162,7 +165,8 @@ are gated by `../server-reference.mjs` — the `server` set in
   the page's land surface layer stands on), the census by quality
   and the scene's own statistics and angle bounds from the file's
   head (`sceneStats`, `lzaBounds`): ten products in all (383 kB a
-  body for the home, measured; the AOD's 42 kB, the LST's 69 kB).
+  body for the home, measured; the AOD's 42 kB, the LST's 69 kB),
+  and since the 158th the daemon's deployed revision (`rev`).
   Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks
@@ -311,3 +315,28 @@ kept at `/opt/horizon-live.prev` for instant rollback. A failing
 gate leaves the running version untouched and lands in
 `journalctl -u horizon-live-update`. Nothing deploys unverified —
 the same rule the repo itself lives by.
+
+Two lessons from the 158th pass, when the box was found running a
+build from before the 151st while main carried the 157th:
+
+- **The ship list is the deploy.** `install.sh` copies the shared
+  modules the daemon imports into the flat `/opt/horizon-live`, and
+  its drift guard refuses an `index.mjs` that still imports a
+  `'../../'` path it did not ship. `goesl2-decode.js` (155th) never
+  entered the list, so the guard refused every revision from the
+  155th on — correctly, and silently from outside. A new shared
+  import means a new `install -m 644` line AND its `sed` rewrite.
+- **A failed gate is retried.** `update.sh` records a failure as
+  `<rev> failed <epoch>` and gates that revision again after
+  `UPDATE_RETRY_S` (default 21600 s, six hours), so a transient
+  failure no longer pins the box to the old build until the next
+  commit. The gate itself is light: measured peak 198 MB
+  (rayleighpol) and 153 s of CPU on a fast box for all 145
+  references — an e2-micro gets through it.
+
+`install.sh` also writes `/opt/horizon-live/VERSION` (`{rev,
+installedAt}`); the daemon logs it at start and reports it in
+`/health`, `/probe` and every `/goesl2` body (`rev`), which is how a
+stale deploy is seen from anywhere. The page, for its part, reads
+from the bucket itself any product a daemon's body lacks outright
+(an older build's), and says so in its record.

@@ -57,12 +57,17 @@ install -m 644 ../modis-land.js /opt/horizon-live/modis-land.js
 install -m 644 ../hdf5.js /opt/horizon-live/hdf5.js
 install -m 644 ../goesl2.js /opt/horizon-live/goesl2.js
 install -m 644 ../satellites.js /opt/horizon-live/satellites.js
+# The shared L2 decode block (155th pass; imports './hdf5.js' and
+# './goesl2.js', both flat here). Its absence from this list is why
+# the box refused every revision from the 155th to the 157th: the
+# drift guard below did its job and the old build stayed (158th).
+install -m 644 ../goesl2-decode.js /opt/horizon-live/goesl2-decode.js
 # The '../../' import paths must keep resolving from
 # /opt/horizon-live/index.mjs - rewrite them for the flat deploy
 # (metar.js's own './lightning.js', aerosol.js's own './grib2.js'
 # and sounding.js's own './contrails.js' imports already resolve
 # there).
-sed -i "s#'../../lightning.js'#'./lightning.js'#; s#'../../solarwind.js'#'./solarwind.js'#; s#'../../metar.js'#'./metar.js'#; s#'../../smoke.js'#'./smoke.js'#; s#'../../grib2.js'#'./grib2.js'#; s#'../../aerosol.js'#'./aerosol.js'#; s#'../../aeronet.js'#'./aeronet.js'#; s#'../../gmn.js'#'./gmn.js'#; s#'../../gvp.js'#'./gvp.js'#; s#'../../sounding.js'#'./sounding.js'#; s#'../../buoy.js'#'./buoy.js'#; s#'../../cobs.js'#'./cobs.js'#; s#'../../ozone.js'#'./ozone.js'#; s#'../../modis-land.js'#'./modis-land.js'#; s#'../../hdf5.js'#'./hdf5.js'#; s#'../../goesl2.js'#'./goesl2.js'#; s#'../../satellites.js'#'./satellites.js'#" /opt/horizon-live/index.mjs.new
+sed -i "s#'../../lightning.js'#'./lightning.js'#; s#'../../solarwind.js'#'./solarwind.js'#; s#'../../metar.js'#'./metar.js'#; s#'../../smoke.js'#'./smoke.js'#; s#'../../grib2.js'#'./grib2.js'#; s#'../../aerosol.js'#'./aerosol.js'#; s#'../../aeronet.js'#'./aeronet.js'#; s#'../../gmn.js'#'./gmn.js'#; s#'../../gvp.js'#'./gvp.js'#; s#'../../sounding.js'#'./sounding.js'#; s#'../../buoy.js'#'./buoy.js'#; s#'../../cobs.js'#'./cobs.js'#; s#'../../ozone.js'#'./ozone.js'#; s#'../../modis-land.js'#'./modis-land.js'#; s#'../../hdf5.js'#'./hdf5.js'#; s#'../../goesl2.js'#'./goesl2.js'#; s#'../../satellites.js'#'./satellites.js'#; s#'../../goesl2-decode.js'#'./goesl2-decode.js'#" /opt/horizon-live/index.mjs.new
 # Ship-list drift guard: any '../../*.js' import left unrewritten means
 # a shared file was added to index.mjs without being added HERE, and the
 # flat deploy would crash-loop on ERR_MODULE_NOT_FOUND (Cloudflare 502s
@@ -75,6 +80,14 @@ if grep -q "'\.\./\.\./" /opt/horizon-live/index.mjs.new; then
   exit 1
 fi
 mv /opt/horizon-live/index.mjs.new /opt/horizon-live/index.mjs
+# The deployed revision beside the entry point (158th pass): the
+# daemon reports it in /health, /probe and the /goesl2 body, so a
+# stale deploy is seen from anywhere instead of inferred from a
+# body's missing products.
+REV=$(git rev-parse HEAD 2>/dev/null || echo unknown)
+printf '{"rev":"%s","installedAt":"%s"}\n' "$REV" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  >/opt/horizon-live/VERSION
+chmod 644 /opt/horizon-live/VERSION
 
 # Environment (created once; never overwritten - your key lives here).
 if [ ! -f /etc/horizon-live.env ]; then

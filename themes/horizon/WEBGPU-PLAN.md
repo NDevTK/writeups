@@ -10345,6 +10345,57 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 158th pass - THE DEPLOY
+  REPAIRED): api.ndev.tk answered again at 09:2xZ after its long
+  dark - HTTP 200 on /goesl2, /sounding and /sst - but its /goesl2
+  body carried only the mask, the heights, the band-13 imagery and
+  DCOMP: a build from before the 151st, with main at the 157th. THE
+  CAUSE, read in the repo's own deploy path: update.sh (the box's
+  5-minute self-update timer) fetches main, gates the new revision
+  with the CPU reference suite on the box, and on PASS runs
+  install.sh, which copies the shared modules the daemon imports
+  into the flat /opt/horizon-live and REFUSES an index.mjs that
+  still imports a '../../' path it did not ship (the drift guard of
+  the 14xth); goesl2-decode.js (the 155th's shared decode block,
+  imported by index.mjs since) never entered install.sh's ship list,
+  so the guard refused every revision from the 155th to the 157th -
+  correctly, and silently from outside, because a refused install
+  is recorded as considered and never retried until the next commit.
+  (1) install.sh ships goesl2-decode.js with its sed rewrite (its own
+  imports, './hdf5.js' and './goesl2.js', already resolve flat), and
+  writes /opt/horizon-live/VERSION ({rev, installedAt}) beside the
+  entry point. (2) index.mjs: parseVersion (pure, gated) and the
+  daemon's VERSION at start (logged: "version: <rev> installed
+  <time>", or "no VERSION file (a hand-run tree)"); /health and
+  /probe carry `version` {rev, installedAt, products, node}, every
+  /goesl2 body carries `rev` - a stale deploy is seen from anywhere
+  instead of inferred from a body's missing keys. (3) update.sh
+  records a failed gate as "<rev> failed <epoch>" and retries that
+  revision after UPDATE_RETRY_S (six hours by default; the tree is
+  already at the revision, so the change check is bypassed on the
+  retry) - a transient failure no longer pins the box to the old
+  build until the next commit. (4) THE GATE MEASURED for the
+  e2-micro: every reference's peak RSS and wall time on this box -
+  the heaviest rayleighpol at 198 MB and 70 s, then lehn 142 MB,
+  server 138 MB, observatory 119 MB; 153 s of CPU for all 145; a
+  1 GB box gets through it. (5) THE PAGE (goesl2-client.js):
+  fetchGoesL2 takes `only` - the ask ids to read - and the body
+  names the asks it answered (`asked`); the page, handed a daemon
+  body that lacks a product outright (undefined, where a fresh
+  daemon answers null for one it could not read), reads the missing
+  products from the bucket itself beside the daemon's own and the
+  record says so ("the daemon (api.ndev.tk, the shared cache of
+  noaa-goes18, revision xxxxxxx) - a deploy behind the page: sst,
+  dsr, dmw, aod, lst read from noaa-goes18 by the page itself (N kB
+  in M ranges)"); the daemon's `rev` rides goesL2.rev. GATES:
+  goesl2-client-reference THE OLDER DAEMON'S GAPS (a subset of the
+  asks lists and reads its own products alone: height, lst and
+  dcomp list 10 prefixes and read one file, the winds alone one
+  listing and one read; 5 landmarks); server-reference THE DEPLOYED
+  REVISION (the VERSION file's shape, and nothing on anything else;
+  30). Docs: the daemon README's Verify step, the /goesl2 entry and
+  the self-update section (the two lessons); FINDINGS pass 158.
+  validate: 145 files, 1,160 landmarks, 8 probes.
 - DONE (Sep 5-6, the review session's 157th pass - THE LAND'S
   SKIN; rebuilt after a container restart at 02:22Z wiped the
   uncommitted first build, and committed stage by stage on the

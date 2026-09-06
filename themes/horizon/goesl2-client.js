@@ -227,13 +227,22 @@ export function createGoesL2Client({
       return null;
     }
   }
-  async function fetchGoesL2(lat, lon, at = null) {
+  // `only` (158th pass): the ask ids to fetch - the products an OLDER
+  // daemon's body lacks (a deploy that lags the page), read from the
+  // bucket beside the daemon's own; null = every ask. The DCOMP pair
+  // travels together: 'dcomp' names both files.
+  async function fetchGoesL2(lat, lon, at = null, only = null) {
     const pick = pickSatellite(lat, lon);
     const bucket = pick.sat ? L2_BUCKETS[pick.sat.id] : null;
     if (!bucket)
       return {sat: null, via: 'bucket', reason: noBucketReason(pick)};
     const cell = l2Cell(lat, lon);
-    const asks = at ? L2_ASKS.filter((a) => a.timed !== false) : L2_ASKS;
+    const wanted = only
+      ? new Set(only.flatMap((id) => (id === 'dcomp' ? ['cod', 'cps'] : [id])))
+      : null;
+    const asks = L2_ASKS.filter(
+      (a) => (!at || a.timed !== false) && (!wanted || wanted.has(a.id))
+    );
     const got = await Promise.all(asks.map((a) => file(bucket, a, at, cell)));
     const F = Object.fromEntries(asks.map((a, i) => [a.id, got[i]]));
     if (!got.some((f) => f)) return null;
@@ -273,6 +282,9 @@ export function createGoesL2Client({
       lst: F.lst ? l2LstBody(F.lst.dec, F.lst.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial',
       rangesHonoured: !stats.rangesIgnored,
+      // the ask ids this body answered (a subset under `only`): a
+      // product not asked is null here without having failed
+      asked: asks.map((a) => a.id),
       // what this refresh moved
       read: got
         .filter((f) => f)

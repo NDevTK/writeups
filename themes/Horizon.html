@@ -6287,6 +6287,19 @@
       let goesL2SstMemo = null; // {sstTime, gridTime, audit}
       let goesL2WindMemo = null; // {time, at, winds}
       let goesL2AodMemo = null; // {time, at, value}
+      // the products a /goesl2 body carries (the DCOMP pair as one):
+      // what an older daemon's body may lack (158th pass)
+      const L2_BODY_PRODUCTS = [
+        'mask',
+        'height',
+        'imagery',
+        'dcomp',
+        'sst',
+        'dsr',
+        'dmw',
+        'aod',
+        'lst'
+      ];
       let goesL2Busy = false;
       let goesL2Rerun = false;
       // NOAA's skin SST at a place (151st pass): the window pixel's
@@ -6726,6 +6739,33 @@
             return goesL2Client.fetchGoesL2(state.lat, state.lon, t);
           };
           const j = await ask(null);
+          // THE OLDER DAEMON'S GAPS (158th pass): a body from a deploy
+          // behind the page lacks the newer products outright
+          // (undefined, where a fresh daemon answers null for a
+          // product it could not read); the page reads those from the
+          // bucket itself beside the daemon's own, and the record says
+          // which - a stale box no longer hides the measurements
+          if (j && j.sat && j.via === 'daemon') {
+            const missing = L2_BODY_PRODUCTS.filter((id) => j[id] === undefined);
+            if (missing.length) {
+              try {
+                const fill = await goesL2Client.fetchGoesL2(
+                  state.lat,
+                  state.lon,
+                  null,
+                  missing
+                );
+                if (fill && fill.sat) {
+                  for (const id of missing)
+                    if (fill[id] !== undefined) j[id] = fill[id];
+                  j.filled = missing.filter((id) => j[id]);
+                  j.fillRead = fill.read ?? null;
+                }
+              } catch (e) {
+                if (params.has('debug')) console.warn('goesl2 fill: ' + e.message);
+              }
+            }
+          }
           if (!j || !j.sat) {
             goesL2 = null;
             goesL2Reach = j && j.reason ? j.reason : null;
@@ -6774,7 +6814,12 @@
             // the land surface temperature (157th pass; CONUS hourly,
             // day and night): the land surface layer's skin
             // (syncLandLayer)
-            lst: unpackProduct(j.lst)
+            lst: unpackProduct(j.lst),
+            // the daemon's deployed revision and the products the
+            // page read for it from the bucket (158th pass)
+            rev: j.rev ?? null,
+            filled: j.filled ?? null,
+            fillRead: j.fillRead ?? null
           };
           goesL2Reach = null;
           goesL2SstMemo = null;
@@ -6786,7 +6831,15 @@
                   (goesL2.read && goesL2.read.length
                     ? `: ${goesL2.read.length} files, ${goesL2.read.reduce((s, r) => s + r.kb, 0)} kB in ${goesL2.read.reduce((s, r) => s + r.ranges, 0)} ranges`
                     : '')
-              : `the daemon (api.ndev.tk, the shared cache of ${goesL2.bucket})`
+              : `the daemon (api.ndev.tk, the shared cache of ${goesL2.bucket}` +
+                  (goesL2.rev ? `, revision ${goesL2.rev.slice(0, 7)}` : '') +
+                  ')' +
+                  (goesL2.filled && goesL2.filled.length
+                    ? ` - a deploy behind the page: ${goesL2.filled.join(', ')} read from ${goesL2.bucket} by the page itself` +
+                      (goesL2.fillRead && goesL2.fillRead.length
+                        ? ` (${goesL2.fillRead.reduce((s, r) => s + r.kb, 0)} kB in ${goesL2.fillRead.reduce((s, r) => s + r.ranges, 0)} ranges)`
+                        : '')
+                    : '')
           );
           const m = goesL2.mask;
           const h = goesL2.height;

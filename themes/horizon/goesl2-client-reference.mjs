@@ -291,6 +291,64 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       `asked again within the minute nothing is listed or read anew; the ACHAC's own minute asks the timed products only ` +
       `and finds the same file; Himawari's longitude answers sat null: "${far && far.reason}"`
   );
+  // THE OLDER DAEMON'S GAPS (158th pass): the page asks the bucket for
+  // the products a stale daemon's body lacks and nothing else - a
+  // fresh client over the same fake bucket asked for the heights, the
+  // land skin and the DCOMP pair lists their prefixes alone (one for
+  // the heights, three each for the three found empty), reads the one
+  // file it holds, names the asks it answered, and leaves the
+  // products it was not asked for null without a failure; asked for
+  // the winds alone it lists once and reads once.
+  {
+    const sub = createGoesL2Client({
+      fetchFn: fetchFake,
+      inflate: inflateStream,
+      now: () => clock
+    });
+    const before = log.lists.length;
+    const part = await sub.fetchGoesL2(32.85, -117.12, null, [
+      'height',
+      'lst',
+      'dcomp'
+    ]);
+    const listedPart = log.lists.slice(before);
+    const filesAfterPart = sub.stats.files;
+    const windsOnly = await sub.fetchGoesL2(32.85, -117.12, null, ['dmw']);
+    check(
+      'THE OLDER DAEMON’S GAPS: a subset of the asks lists and reads its own products alone',
+      part !== null &&
+        part.via === 'bucket' &&
+        part.asked.join(',') === 'height,cod,cps,lst' &&
+        listedPart.length === 1 + 3 * 3 &&
+        listedPart.filter((p) => p.startsWith('ABI-L2-ACHAC')).length === 1 &&
+        listedPart.filter((p) => p.startsWith('ABI-L2-LSTC')).length === 3 &&
+        !listedPart.some((p) => p.startsWith('ABI-L2-ACMC')) &&
+        !listedPart.some((p) => p.startsWith('ABI-L2-DMWC')) &&
+        filesAfterPart === 1 &&
+        part.height !== null &&
+        part.height.census.medianM === body.height.census.medianM &&
+        part.lst === null &&
+        part.dcomp === null &&
+        part.mask === null &&
+        part.dmw === null &&
+        part.upstream === 'partial' &&
+        part.read.length === 1 &&
+        part.read[0].file.startsWith('OR_ABI-L2-ACHAC') &&
+        windsOnly !== null &&
+        windsOnly.asked.join(',') === 'dmw' &&
+        windsOnly.dmw !== null &&
+        windsOnly.dmw.n === DMWC_EXPECT.within150 &&
+        windsOnly.height === null &&
+        windsOnly.read.length === 1 &&
+        sub.stats.files === 2 &&
+        sub.stats.errors === 0 &&
+        body.asked.length === L2_ASKS.length,
+      `asked for height, lst and dcomp the client lists ${listedPart.length} prefixes (${listedPart.filter((p) => p.startsWith('ABI-L2-ACHAC')).length} for the heights, ` +
+        `three each for the land skin and the DCOMP pair the fake bucket lacks), reads ${part.read.length} file, answers asks ${part.asked.join(',')} ` +
+        `with the heights' median ${part.height.census.medianM.toFixed(1)} m - the daemon's own - and the rest null, upstream partial; ` +
+        `asked for the winds alone it answers ${windsOnly.dmw.n} vectors from one more read; the full ask names all ${body.asked.length} products`
+    );
+  }
 }
 
 // ---- THE RANGE-IGNORING PATH ---------------------------------------
