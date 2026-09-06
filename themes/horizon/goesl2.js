@@ -1809,12 +1809,19 @@ export function visReferences(rho, clearOf, {minN = 50} = {}) {
   // above the coverage edge is no reference - a fraction between them
   // would run backwards. Both values are kept for the words; the mode
   // says so and the cut withdraws (daylight.js).
-  const inverted = rhoClear !== null && rhoCloud !== null && rhoClear >= rhoCloud;
+  const inverted =
+    rhoClear !== null && rhoCloud !== null && rhoClear >= rhoCloud;
   return {
     rhoClear,
     rhoCloud,
     rhoBright: enough ? quantile(cloud, 0.9) : null,
-    mode: inverted ? 'inverted' : enough ? (bimodal ? 'bimodal' : 'unimodal') : null,
+    mode: inverted
+      ? 'inverted'
+      : enough
+        ? bimodal
+          ? 'bimodal'
+          : 'unimodal'
+        : null,
     inverted,
     eta: otsu ? otsu.eta : null,
     threshold: otsu ? otsu.t : null,

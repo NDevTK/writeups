@@ -267,28 +267,28 @@ for (let jj = 1; jj < rm - 1; jj++)
     mask: {...mask, bcm: swapped},
     ms: Date.parse(AT)
   });
-{
-  const r = inv && inv.refs;
-  check(
-    'THE INVERTED PAIR withdraws the cut: a clear reference at or above the coverage edge is no reference',
-    inv !== null &&
-      inv.fine === null &&
-      inv.frac === null &&
-      r.inverted === true &&
-      r.mode === 'inverted' &&
-      r.rhoClear !== null &&
-      r.rhoCloud !== null &&
-      r.rhoClear > r.rhoCloud &&
-      near(r.rhoCloud, RHO_CLEAR, 1e-4) &&
-      inv.stats.refined === 0 &&
-      inv.stats.cloudy === 0 &&
-      inv.stats.meanFraction === null &&
-      inv.stats.lit === res.stats.lit,
-    `the mask's kinds swapped: the clear median ${r.rhoClear.toFixed(3)} (${r.nClear.toLocaleString('en-US')} px) sits above the coverage edge ${r.rhoCloud.toFixed(3)} ` +
-      `(the dim tenth of ${r.nCloud.toLocaleString('en-US')} "cloudy" px at the clear ring's ${RHO_CLEAR}) - mode '${r.mode}', no fine field, no fraction, ` +
-      `the same ${inv.stats.lit.toLocaleString('en-US')} pixels lit as the honest pair's; the 2-km cover stands whole`
-  );
-}
+  {
+    const r = inv && inv.refs;
+    check(
+      'THE INVERTED PAIR withdraws the cut: a clear reference at or above the coverage edge is no reference',
+      inv !== null &&
+        inv.fine === null &&
+        inv.frac === null &&
+        r.inverted === true &&
+        r.mode === 'inverted' &&
+        r.rhoClear !== null &&
+        r.rhoCloud !== null &&
+        r.rhoClear > r.rhoCloud &&
+        near(r.rhoCloud, RHO_CLEAR, 1e-4) &&
+        inv.stats.refined === 0 &&
+        inv.stats.cloudy === 0 &&
+        inv.stats.meanFraction === null &&
+        inv.stats.lit === res.stats.lit,
+      `the mask's kinds swapped: the clear median ${r.rhoClear.toFixed(3)} (${r.nClear.toLocaleString('en-US')} px) sits above the coverage edge ${r.rhoCloud.toFixed(3)} ` +
+        `(the dim tenth of ${r.nCloud.toLocaleString('en-US')} "cloudy" px at the clear ring's ${RHO_CLEAR}) - mode '${r.mode}', no fine field, no fraction, ` +
+        `the same ${inv.stats.lit.toLocaleString('en-US')} pixels lit as the honest pair's; the 2-km cover stands whole`
+    );
+  }
   const rf = rm * DAYLIGHT_FACTOR;
   const sum = (d, ch) => {
     let s = 0;
