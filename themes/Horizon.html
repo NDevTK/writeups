@@ -443,7 +443,7 @@
       import {EYE_D_CM, youngSigma} from './horizon/scintillation.js';
       import {buildMomentPyramid, slopesFromHeights} from './horizon/leadr.js';
       import {
-        decodeRed,
+        decodePixel,
         metresPerPixel,
         rainRate,
         snowRate,
@@ -491,6 +491,8 @@
         maskAgreement,
         TPW_DQF_MEANINGS,
         tpwQuality,
+        RAIN_ATBD,
+        rainQuality,
         phaseQuality,
         phaseWords,
         solarZenithDeg,
@@ -2773,6 +2775,18 @@
           }
         }
       }
+      // THE RADAR RESTORED (164th pass). MEASURED 2026-09-06: RainViewer's
+      // public tiles stop at zoom 7 ("Maximum zoom level is 7"; a zoom-8
+      // tile is a "Zoom Level Not Supported" placeholder in black, white
+      // and grey, which the grey dBZ rule had read as no echo and as
+      // snow at 95 dBZ), and they are drawn in the Universal Blue palette
+      // whatever colour index is asked. The composite is read at zoom 7
+      // (about 1 km a pixel here), decoded by its own colour table
+      // (radar.js), and RainViewer's coverage mask (/v2/coverage/0,
+      // black = no radar) tells a covered pixel without echo from no
+      // radar at all - the record says which. Snow is asked in its own
+      // colours (the options' snow flag).
+      const RADAR_ZOOM = 7;
       async function syncRadar() {
         if (overridden) return;
         try {
@@ -2784,32 +2798,36 @@
           const frames = cat.radar && cat.radar.past;
           if (!frames || !frames.length) return;
           const f = frames[frames.length - 1];
-          const {tx, ty, px, py} = tileAt(state.lat, state.lon, 8);
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.src =
-            cat.host + f.path + '/256/8/' + tx + '/' + ty + '/0/0_0.png';
-          await img.decode();
-          const cv = document.createElement('canvas');
-          cv.width = cv.height = 256;
-          const cx = cv.getContext('2d', {willReadFrequently: true});
-          cx.drawImage(img, 0, 0);
-          const data = cx.getImageData(0, 0, 256, 256).data;
+          const {tx, ty, px, py} = tileAt(state.lat, state.lon, RADAR_ZOOM);
+          const load = async (src) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.src = src;
+            await img.decode();
+            const cv = document.createElement('canvas');
+            cv.width = cv.height = 256;
+            const cx = cv.getContext('2d', {willReadFrequently: true});
+            cx.drawImage(img, 0, 0);
+            return cx.getImageData(0, 0, 256, 256).data;
+          };
+          const [data, mask] = await Promise.all([
+            load(`${cat.host}${f.path}/256/${RADAR_ZOOM}/${tx}/${ty}/2/0_1.png`),
+            load(`${cat.host}/v2/coverage/0/256/${RADAR_ZOOM}/${tx}/${ty}/0/0_0.png`).catch(() => null)
+          ]);
           // window sized to the 16 km world footprint
-          const h = Math.max(
-            Math.round(8000 / metresPerPixel(state.lat, 8)),
-            1
-          );
-          const s = windowStats(data, px, py, h);
-          radarObs = {...s, time: f.time * 1000};
+          const mpp = metresPerPixel(state.lat, RADAR_ZOOM);
+          const h = Math.max(Math.round(8000 / mpp), 1);
+          const s = windowStats(data, px, py, h, {mask});
+          radarObs = {...s, time: f.time * 1000, masked: !!mask, zoom: RADAR_ZOOM, mpp};
           // The measured coverage field for the cloud decks (the
           // Nubis weather map, from data): precip at a texel means
           // cloud overhead - map the local rate onto a coverage
           // value with the drizzle floor as threshold. Zero border
-          // ring so the field fades at the world edge.
+          // ring so the field fades at the world edge; a texel the
+          // radar does not see (the mask's black) says nothing.
           const RM = 64;
           const field = new Float32Array(RM * RM * 4);
-          const mppScene = metresPerPixel(state.lat, 8) / MPU;
+          const mppScene = mpp / MPU;
           for (let jj = 0; jj < RM; jj++) {
             for (let ii = 0; ii < RM; ii++) {
               const k = (jj * RM + ii) * 4;
@@ -2822,8 +2840,9 @@
               const pj = Math.round(py + zs / mppScene);
               if (pi < 0 || pi > 255 || pj < 0 || pj > 255) continue;
               const kk = (pj * 256 + pi) * 4;
-              if (data[kk + 3] === 0) continue;
-              const dec = decodeRed(data[kk]);
+              if (mask && mask[kk + 3] !== 0) continue; // no radar here
+              if (data[kk + 3] === 0) continue; // no echo
+              const dec = decodePixel(data, kk, s.scheme);
               const rate = dec.snow ? snowRate(dec.dbz) : rainRate(dec.dbz);
               // >0.05 mm/h (below drizzle nothing shows on radar
               // reliably); saturate toward 0.95 local cover by 1 mm/h
@@ -2833,23 +2852,24 @@
           radarObs.field = field;
           radarObs.fieldSize = RM;
           if (cloudSys) cloudSys.setRadarCover(field, RM, WORLD);
+          const ageMin = Math.round((Date.now() - radarObs.time) / 60000);
+          const kmWin = ((2 * h + 1) * mpp) / 1000;
           record(
             'RainViewer radar',
-            (s.coverage > 0.05
-              ? 'rain ' +
-                s.rain.toFixed(2) +
-                ' mm/h · snow ' +
-                s.snow.toFixed(2) +
-                ' mm/h liq · ' +
-                Math.round(s.snowFrac * 100) +
-                '% snow px'
-              : 'no radar coverage here') +
-              ' · ' +
-              Math.round((Date.now() - radarObs.time) / 60000) +
-              ' min old'
+            (s.here
+              ? `here ${s.here.rate.toFixed(2)} mm/h${s.here.snow ? ' snow (liquid)' : ''} (${s.here.dbz} dBZ) · ` +
+                `${kmWin.toFixed(0)}-km window: rain ${s.rain.toFixed(2)} mm/h over the ground the radar sees, ` +
+                `max ${s.maxRate.toFixed(1)}, echo on ${Math.round(s.echoFrac * 100)}% of ${s.covered} px` +
+                (s.snowFrac > 0 ? ` (${Math.round(s.snowFrac * 100)}% snow)` : '') +
+                (mask ? ` · radar over ${Math.round(s.coverage * 100)}% of the window` : ' · coverage unknown (no mask)')
+              : mask
+                ? `no radar here (RainViewer's coverage mask; ${Math.round(s.coverage * 100)}% of the ${kmWin.toFixed(0)}-km window covered)`
+                : 'no radar pixel here') +
+              ` · zoom ${RADAR_ZOOM} (${(mpp / 1000).toFixed(2)} km/px), ${s.scheme === 'bw' ? 'grey dBZ' : 'Universal Blue'} palette · ${ageMin} min old`
           );
-        } catch {
+        } catch (e) {
           // Keep the model's precipitation.
+          if (params.has('debug')) console.warn('radar: ' + e.message);
         }
       }
 
@@ -6370,7 +6390,8 @@
         'lst',
         'phase',
         'fire',
-        'tpw'
+        'tpw',
+        'rain'
       ];
       let goesL2Busy = false;
       let goesL2Rerun = false;
@@ -6786,6 +6807,14 @@
                     fill: p.tpwFill
                   })
                 : null,
+              // the rain in mm/h (164th pass)
+              rainMmH: p.rain
+                ? unscale(unpackArray(p.rain), {
+                    scale: p.rainScale,
+                    offset: p.rainOffset,
+                    fill: p.rainFill
+                  })
+                : null,
               // the visible band's reflectance factor (159th pass):
               // the CMIP ATBD's rho cos(solar zenith), NaN fill
               rfac: p.rf
@@ -6920,6 +6949,9 @@
             // the column's water (163rd pass; CONUS every 5 min at 10 km):
             // the clear-sky reference's total precipitable water
             tpw: unpackProduct(j.tpw),
+            // the rain (164th pass; full disk every 10 min, 2 km): the
+            // scene's rain where no radar sees the observer
+            rain: unpackProduct(j.rain),
             // the daemon's deployed revision and the products the
             // page read for it from the bucket (158th pass)
             rev: j.rev ?? null,
@@ -7145,6 +7177,26 @@
                 syncGoesIr();
               } else goesObs.tpwTime = tw.time ?? null;
             }
+          }
+          const rn = goesL2.rain;
+          if (rn && rn.census) {
+            const c = rn.census;
+            const here = rn.here;
+            const hereOk = here && here.mmh !== null && here.quality && here.quality !== 'invalid';
+            record(
+              `NOAA ${j.craft} rainfall rate (RRQPEF)`,
+              `${rn.time.slice(11, 16)}Z · overhead ${
+                hereOk
+                  ? (here.mmh > 0 ? here.mmh.toFixed(1) + ' mm/h' : 'dry') + ' (' + here.quality + ')'
+                  : 'no retrieval (' + (here ? here.words.join(', ') : 'fill') + ')'
+              }` +
+                (rn.nearest ? ` · nearest rain ${rn.nearest.mmh.toFixed(1)} mm/h ${rn.nearest.km} km off` : ' · no rain within ±100 km') +
+                ` · ${c.raining} raining of ${(c.good + c.degraded).toLocaleString('en-US')} retrieved 2-km px within ±100 km` +
+                (c.raining ? ` (max ${c.maxMmH.toFixed(1)} mm/h, mean ${c.meanRainingMmH.toFixed(1)} over the raining)` : '') +
+                (rn.sceneStats && rn.sceneStats.rainingPx !== null
+                  ? ` · the disk ${rn.sceneStats.rainingPx.toLocaleString('en-US')} raining px, max ${rn.sceneStats.maxMmH} mm/h`
+                  : '')
+            );
           }
           if (
             goesObs &&
@@ -7497,6 +7549,31 @@
           return t.here.mm;
         return t.nearest ? t.nearest.mm : null;
       }
+      // THE RAIN (164th pass): NOAA's rainfall rate at a place - the
+      // pixel's own good or degraded retrieval in mm/h, or null off
+      // the window, on the fill or invalid
+      const RAIN_LIVE_MS = 20 * 60e3;
+      function goesL2RainAt(latDeg, lonDeg) {
+        const r = goesL2 && goesL2.rain;
+        if (!r || !r.rainMmH) return null;
+        const q = windowIndexOf(latDeg, lonDeg, r.g, r.x, r.y, r.box);
+        if (q < 0) return null;
+        const mmh = r.rainMmH[q];
+        const dqf = r.dqf ? r.dqf[q] : 0;
+        const quality = rainQuality(dqf);
+        if (!Number.isFinite(mmh) || quality === null || quality === 'invalid') return null;
+        return {mmh, dqf, quality};
+      }
+      // the satellite's rain at the observer while its file is fresh
+      // (within 20 minutes of the scan): {mmh, quality, ageMin} or null
+      function satRainHere() {
+        const r = goesL2 && goesL2.rain;
+        if (!r || !r.time) return null;
+        const age = Date.now() - Date.parse(r.time);
+        if (age > RAIN_LIVE_MS) return null;
+        const at = goesL2RainAt(state.lat, state.lon);
+        return at ? {...at, ageMin: Math.round(age / 60e3)} : null;
+      }
       // THE CLOUD'S PHASE OVERHEAD (161st pass): NOAA's cloud top
       // phase at a place - {phase, words, quality} or null off the
       // window or on the fill.
@@ -7796,6 +7873,34 @@
                   : ` · the clear-sky reference's column scaled ×${used.pwScale.toFixed(2)} from the ascent's ${used.pwSoundingMm.toFixed(1)} mm to the satellite's ${used.pwMm.toFixed(1)} mm${used.pwSource.endsWith('clamped') ? ' (the ratio past the ×4 bound, clamped)' : ''}`
                 : '') +
               ` · the ATBD's validation: 11.5% against radiosondes over land, r 0.96 against AMSR-E over the ocean`;
+          }
+        }
+        // THE RAIN (164th pass): the satellite's rain within reach and
+        // which measurement the scene's rain takes
+        {
+          const rn = goesL2.rain;
+          if (rn && rn.census) {
+            const c = rn.census;
+            const sat = satRainHere();
+            const radarSees = radarObs && radarObs.here && Date.now() - radarObs.time < 25 * 60e3;
+            const hereOk = rn.here && rn.here.quality && rn.here.quality !== 'invalid' && rn.here.mmh !== null;
+            line +=
+              ` · rainfall rate ${rn.time.slice(11, 16)}Z (ABI-L2-RRQPEF, 2-km px, every 10 min, day and night; SCaMPR's ${RAIN_ATBD.method.classes} classes calibrated on microwave rain, ` +
+              `${RAIN_ATBD.requirement.accuracyMmHAt10} / ${RAIN_ATBD.requirement.precisionMmHAt10} mm/h accuracy / precision at 10 mm/h): ` +
+              (hereOk
+                ? `overhead ${rn.here.mmh > 0 ? rn.here.mmh.toFixed(1) + ' mm/h' : 'dry'} (${rn.here.quality})`
+                : `no retrieval overhead (${rn.here ? rn.here.words.join(', ') : 'fill'})`) +
+              (rn.nearest ? `, the nearest rain ${rn.nearest.mmh.toFixed(1)} mm/h ${rn.nearest.km} km off` : ', none within ±100 km') +
+              ` · ${c.raining} raining of ${(c.good + c.degraded).toLocaleString('en-US')} px` +
+              (c.raining ? ` (max ${c.maxMmH.toFixed(1)} mm/h)` : '') +
+              ` · the scene's rain: ` +
+              (radarSees
+                ? `the radar sees this pixel (${radarObs.here.rate.toFixed(2)} mm/h) and outranks the satellite`
+                : sat
+                  ? `no radar sees this pixel - the satellite's ${sat.mmh > 0 ? sat.mmh.toFixed(1) + ' mm/h' : 'dry pixel'} stands (${sat.ageMin} min old)`
+                  : 'no radar sees this pixel and no fresh satellite pixel - the model stands') +
+              ` · the ATBD's validation: r ${RAIN_ATBD.validation.mrms.r.g16} against gauge-adjusted MRMS, precision ${RAIN_ATBD.validation.mrms.precisionMmH.g16} mm/h at 10 mm/h on GOES-16 ` +
+              `(${RAIN_ATBD.validation.mrms.precisionMmH.g17} on GOES-17, past the spec); best for convective warm-season rain, worst for stratiform and orographic - its own caution`;
           }
         }
         // THE FIRE'S HEAT (162nd pass): the hot spots within reach and
@@ -18640,23 +18745,32 @@
           );
         }
 
-        const snowing =
-          state.snow > 0 ||
-          (state.code >= 71 &&
-            state.code <= 86 &&
-            ![80, 81, 82].includes(state.code));
-        // Radar measurement over model value when fresh and covered.
+        // Radar measurement over model value when fresh and the radar
+        // sees the observer's own pixel (164th: the pixel itself, about
+        // 1 km at zoom 7, not the window's mean over the echoes; a
+        // covered pixel without echo is a measured 0 and outranks the
+        // model's rain). Snow from the composite's own snow colours.
         const radarFresh =
           radarObs &&
           Date.now() - radarObs.time < 25 * 60 * 1000 &&
-          radarObs.coverage > 0.05;
-        const precipMeas = radarFresh
-          ? radarObs.rain + radarObs.snow
-          : state.precip;
-        const raining = !snowing && (precipMeas > 0.02 || state.code >= 51);
+          !!radarObs.here;
+        const radarSnow = radarFresh && radarObs.here.snow && radarObs.here.rate > 0.02;
+        const snowing =
+          radarSnow ||
+          (!radarFresh &&
+            (state.snow > 0 ||
+              (state.code >= 71 &&
+                state.code <= 86 &&
+                ![80, 81, 82].includes(state.code))));
+        // no radar over this pixel: NOAA's rainfall rate (164th, the
+        // satellite's 2-km pixel within 20 minutes) before the model
+        const sat = !radarFresh ? satRainHere() : null;
+        const precipMeas = radarFresh ? radarObs.here.rate : sat ? sat.mmh : state.precip;
+        const raining =
+          !snowing && (precipMeas > 0.02 || (!radarFresh && !sat && state.code >= 51));
         const rate = snowing
           ? THREE.MathUtils.clamp(
-              radarFresh ? radarObs.snow * 1.2 : state.snow / 2,
+              radarFresh ? radarObs.here.rate * 1.2 : sat ? sat.mmh * 1.2 : state.snow / 2,
               0.3,
               1
             )

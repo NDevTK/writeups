@@ -476,6 +476,8 @@ export const L2_PRODUCTS = {
   // the 163rd pass: the total precipitable water (CONUS every 5 min,
   // 10 km, day and night; 0.3 MB a file)
   tpw: 'ABI-L2-TPWC',
+  // the rain (164th): the rainfall rate / QPE, full disk every 10 min
+  rain: 'ABI-L2-RRQPEF',
   // the 152nd pass: the downward shortwave radiation at the surface
   // (0.2-4.0 um, direct + diffuse, W/m2) - full disk only, every 10
   // min, 2 km (the Enterprise SRB algorithm: Laszlo, Kim & Liu, ATBD
@@ -1298,6 +1300,242 @@ export function tpwCensus(mm, dqf) {
         }
       : {n: 0, minMm: null, medianMm: null, maxMm: null};
   return {...c, goodStats: stats(good), degradedStats: stats(degraded)};
+}
+
+// ---- THE RAIN (164th pass) ------------------------------------------
+// NOAA's Rainfall Rate / QPE (ABI-L2-RRQPEF: full disk every 10 min,
+// 2 km at nadir, day and night). THE PRIMARY, read in full: the
+// Enterprise Rainfall Rate ATBD v3.0 (Kuligowski, 10 Jul 2020, 46
+// pp) - SCaMPR (Kuligowski 2002; 2013; 2016): the ABI brightness
+// temperatures are parallax-shifted by the GFS-derived cloud-top
+// height (Vicente et al. 2002, an ellipsoid of 6378.1 / 6356.6 km),
+// matched to CPC's combined microwave rain rates (MWCOMB, 0.073 deg,
+// 8-km footprints assumed, ABI 2 km, area-weighted), and the
+// retrieval calibrated per CLASS - 15 x 15 deg boxes times three
+// cloud types from the 9 x 9 window: water (T7.34 < T11.2 and
+// T8.5 - T11.2 < -0.3 K), ice (T7.34 < T11.2, the difference at or
+// above -0.3), cold-top convective (T7.34 >= T11.2) - 330 classes on
+// GOES-16 (440 on GOES-17, band 14 alone under the loop heat pipe).
+// Rain / no rain by discriminant analysis on two of nine predictors
+// (Table 5: T6.2, S = 0.568 (Tmin,11.2 - 217 K), Tavg - Tmin - S,
+// four brightness-temperature differences, T11.2), the threshold at
+// the best Heidke skill with the raining count within 5%; the rate by
+// linear regression on two of fourteen predictors (the nine and
+// their power-law transforms, gamma stepped by 25 to 2500 for the
+// best correlation), then a distribution-matching lookup at 0.01
+// mm/h (identity from 50 to 100 mm/h), the 3 x 3 neighbouring
+// boxes' retrievals blended by inverse cube distance, and the GFS
+// lowest-third relative humidity adjusting for evaporation below
+// cloud base (Eq. 35-36). The training set keeps 10,000 pixels
+// above 2.5 mm/h and rolls with the newest matches. Output: tenths
+// of mm/h as short integers, 0-100 mm/h, with Table 6's flag bits.
+// REQUIREMENT (Table 1): 2 km, 10 min, 0-100 mm/h, accuracy 6 mm/h
+// and precision 9 mm/h at 10 mm/h (68% within), quantitative to 70
+// deg local zenith or 60 deg latitude. VALIDATION (Sec. 4, June 2019
+// - May 2020, a 10-km "fuzzy" neighbourhood): against gauge-adjusted
+// MRMS r 0.32 (GOES-16) / 0.28 (GOES-17), accuracy 4.36 / 5.50 mm/h,
+// precision 7.81 / 9.39 over 11,201,180 / 6,867,843 points (GOES-17
+// misses the precision spec); against GPM DPR r 0.127 / 0.170,
+// accuracy 5.21 / 5.91, precision 8.69 / 8.96 over 161,680 / 347,934;
+// a systematic dry bias at high rates; skill best in the tropics and
+// the convective warm season, worst for stratiform winter rain and
+// orography (Sec. 6) - the ATBD's own caution, on the line.
+// ---------------------------------------------------------------------
+// Table 6's bits as the file's flag values: 0 good; 1 bad data; 2 the
+// local zenith angle past 70 deg or latitude past 60 deg; 4, 8 the
+// first / second rain-or-no-rain predictor's input bad; 16, 32 the
+// first / second rate predictor's; 64 the retrieval coefficients
+// missing (a box without calibration).
+export const RAIN_DQF_BITS = {
+  bad: 1,
+  blockOut: 2,
+  detect1: 4,
+  detect2: 8,
+  rate1: 16,
+  rate2: 32,
+  coefficients: 64
+};
+export const RAIN_DQF_WORDS = {
+  1: 'bad data',
+  2: 'past 70° zenith or 60° latitude',
+  4: 'first rain predictor bad',
+  8: 'second rain predictor bad',
+  16: 'first rate predictor bad',
+  32: 'second rate predictor bad',
+  64: 'no retrieval coefficients'
+};
+export const RAIN_ATBD = {
+  version: 'Enterprise Rainfall Rate ATBD v3.0, 2020-07-10',
+  resolutionKm: 2,
+  refreshMin: 10,
+  requirement: {
+    rangeMmH: [0, 100],
+    accuracyMmHAt10: 6,
+    precisionMmHAt10: 9,
+    lzaQuantitativeDeg: 70,
+    latitudeDeg: 60
+  },
+  method: {
+    classes: 330,
+    classesG17: 440,
+    boxDeg: 15,
+    cloudTypes: 3,
+    typeThresholdK: -0.3,
+    rainThresholdMmH: 1,
+    detectBiasTolerance: 0.05,
+    predictors: 9,
+    selected: 2,
+    gammaStep: 25,
+    gammaMax: 2500,
+    lutStepMmH: 0.01,
+    lutIdentityFromMmH: 50,
+    trainingRainPx: 10000,
+    trainingRainMinMmH: 2.5,
+    mwFootprintKm: 8,
+    mwGridDeg: 0.073,
+    evaporation: {
+      addSlope: 0.115825,
+      addOffset: -10.7354,
+      addRhFloor: 61,
+      multA: 0.000112891,
+      multB: -0.00504012,
+      multC: 0.476117,
+      multRhFloor: 22.32
+    }
+  },
+  validation: {
+    period: '2019-06-01 to 2020-05-31',
+    neighbourhoodKm: 10,
+    mrms: {
+      r: {g16: 0.32, g17: 0.28},
+      accuracyMmH: {g16: 4.36, g17: 5.5},
+      precisionMmH: {g16: 7.81, g17: 9.39},
+      n: {g16: 11201180, g17: 6867843},
+      cdf68MmH: {g16: 7.8, g17: 9.4}
+    },
+    dpr: {
+      r: {g16: 0.127, g17: 0.17},
+      accuracyMmH: {g16: 5.21, g17: 5.91},
+      precisionMmH: {g16: 8.69, g17: 8.96},
+      n: {g16: 161680, g17: 347934}
+    }
+  }
+};
+/**
+ * The ATBD's evaporation adjustment (Eq. 35-36): the retrieved rate
+ * corrected by the GFS lowest-third mean-layer relative humidity
+ * (percent) - an additive step floored at 61% RH, then a
+ * multiplicative one floored at 22.32%. The product has applied it;
+ * this is the law pinned, not re-applied.
+ */
+export function rainEvaporationAdjust(rrMmH, rhPct) {
+  const e = RAIN_ATBD.method.evaporation;
+  const add = rrMmH + e.addSlope * Math.max(rhPct, e.addRhFloor) + e.addOffset;
+  const rh = Math.max(rhPct, e.multRhFloor);
+  return add * (e.multA * rh * rh + e.multB * rh + e.multC);
+}
+/** A flag word's quality: 'good' (0), 'degraded' (the block-out bit
+ * alone), 'invalid' (any other bit); null for the fill. */
+export function rainQuality(dqf) {
+  if (!Number.isFinite(dqf) || dqf === 255) return null;
+  if (dqf === 0) return 'good';
+  if (dqf === RAIN_DQF_BITS.blockOut) return 'degraded';
+  return 'invalid';
+}
+/** The words of a flag word's set bits. */
+export function rainFlagWords(dqf) {
+  if (!Number.isFinite(dqf) || dqf === 255) return ['fill'];
+  if (dqf === 0) return ['good'];
+  const out = [];
+  for (const [bit, words] of Object.entries(RAIN_DQF_WORDS))
+    if (dqf & +bit) out.push(words);
+  return out.length ? out : [`flag ${dqf}`];
+}
+/**
+ * The window's census: counts by quality, the raining pixels among
+ * the good and degraded ones (any rate above 0, and above the file's
+ * own 1 mm/h "raining" definition), the heaviest rate, the mean over
+ * the raining pixels and the sum (mm/h summed over pixels, the
+ * file's total_rain_volume in kind).
+ */
+export function rainCensus(mmh, dqf) {
+  const c = {
+    n: mmh.length,
+    good: 0,
+    degraded: 0,
+    invalid: 0,
+    fill: 0,
+    raining: 0,
+    rainingGE1: 0,
+    maxMmH: 0,
+    meanRainingMmH: null,
+    sumMmH: 0
+  };
+  let sum = 0;
+  for (let q = 0; q < mmh.length; q++) {
+    const k = rainQuality(dqf ? dqf[q] : 0);
+    const v = mmh[q];
+    if (k === null || (k !== 'invalid' && !Number.isFinite(v))) {
+      c.fill++;
+      continue;
+    }
+    c[k]++;
+    if (k === 'invalid' || !(v > 0)) continue;
+    c.raining++;
+    if (v >= 1) c.rainingGE1++;
+    sum += v;
+    if (v > c.maxMmH) c.maxMmH = v;
+  }
+  c.sumMmH = sum;
+  c.meanRainingMmH = c.raining ? sum / c.raining : null;
+  return c;
+}
+/**
+ * The raining pixels of a window (good or degraded, at or above
+ * minMmH), each navigated to its place: {q, i, j, latDeg, lonDeg,
+ * mmh, quality}, the heaviest first, capped.
+ */
+export function rainList(mmh, dqf, box, g, xCoord, yCoord, {minMmH = 0.1, cap = 200} = {}) {
+  const out = [];
+  for (let q = 0; q < mmh.length; q++) {
+    const k = rainQuality(dqf ? dqf[q] : 0);
+    if (k === null || k === 'invalid') continue;
+    const v = mmh[q];
+    if (!(v >= minMmH)) continue;
+    const i = box.i0 + (q % box.cols);
+    const j = box.j0 + Math.floor(q / box.cols);
+    const ll = fixedGridToLatLon(
+      xCoord.offset + i * xCoord.scale,
+      yCoord.offset + j * yCoord.scale,
+      g
+    );
+    if (!ll) continue;
+    out.push({q, i, j, latDeg: ll.latDeg, lonDeg: ll.lonDeg, mmh: v, quality: k});
+  }
+  out.sort((a, b) => b.mmh - a.mmh);
+  return out.slice(0, cap);
+}
+/**
+ * The nearest raining pixel (good or degraded, at or above minMmH)
+ * to the window's centre, by pixel distance: {q, di, dj, mmh} or null.
+ */
+export function nearestRain(mmh, dqf, box, {minMmH = 0.1} = {}) {
+  const ci = box.i - box.i0;
+  const cj = box.j - box.j0;
+  let best = null;
+  for (let q = 0; q < mmh.length; q++) {
+    const k = rainQuality(dqf ? dqf[q] : 0);
+    if (k === null || k === 'invalid') continue;
+    const v = mmh[q];
+    if (!(v >= minMmH)) continue;
+    const di = (q % box.cols) - ci;
+    const dj = Math.floor(q / box.cols) - cj;
+    const d2 = di * di + dj * dj;
+    if (!best || d2 < best.d2) best = {q, di, dj, mmh: v, d2};
+  }
+  if (!best) return null;
+  const {d2, ...rest} = best;
+  return rest;
 }
 // ---------------------------------------------------------------
 // THE DAYLIGHT FIELD (159th pass): the reflective bands' CMI - the

@@ -1127,12 +1127,12 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_DSR_SPEC.DSR === 'raw16' &&
       L2_DSR_SPEC.DQF === 'raw' &&
       L2_HALF_PX.dsr === 50 &&
-      L2_ASKS.length === 14 &&
+      L2_ASKS.length === 15 &&
       L2_ASKS.map((a) => a.id).join(',') ===
-        'mask,height,imagery,cod,cps,sst,dsr,dmw,aod,lst,vis,phase,fire,tpw' &&
+        'mask,height,imagery,cod,cps,sst,dsr,dmw,aod,lst,vis,phase,fire,tpw,rain' &&
       L2_ASKS[2].band === 'C13' &&
       L2_ASKS.map((a) => a.halfPx ?? '-').join(',') ===
-        '50,10,50,50,50,50,50,-,50,50,200,50,50,10' &&
+        '50,10,50,50,50,50,50,-,50,50,200,50,50,10,50' &&
       // the hourly full-disk SST is never asked for a mosaic's
       // minute, nor are the winds (the decks' drift, not a mosaic's
       // comparison), the haze (the channel's now), the hourly land
@@ -1158,7 +1158,13 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_ASKS[13].product === 'ABI-L2-TPWC' &&
       L2_ASKS[13].halfPx === 10 &&
       L2_ASKS[13].timed === false &&
-      L2_ASKS.filter((a) => a.timed === false).length === 8 &&
+      // the rain (164th): the rate falling now, the full disk's
+      // 10-minute file
+      L2_ASKS[14].id === 'rain' &&
+      L2_ASKS[14].product === 'ABI-L2-RRQPEF' &&
+      L2_ASKS[14].halfPx === 50 &&
+      L2_ASKS[14].timed === false &&
+      L2_ASKS.filter((a) => a.timed === false).length === 9 &&
       // the eleventh ask (159th) is the page's own: the daemon never
       // lists, fetches or serves the 500-m visible window (a 2.6 MB
       // read every five minutes by day, a 430 kB body - the free
@@ -1166,7 +1172,7 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_ASKS[10].pageOnly === true &&
       L2_ASKS[10].band === 'C02' &&
       L2_ASKS[10].product === 'ABI-L2-CMIPC' &&
-      L2_ASKS.filter((a) => !a.pageOnly).length === 13 &&
+      L2_ASKS.filter((a) => !a.pageOnly).length === 14 &&
       L2_ASKS.filter((a) => a.pageOnly).length === 1 &&
       L2_IMAGERY_SPEC.CMI === 'raw16' &&
       L2_COD_SPEC.COD === 'raw16' &&

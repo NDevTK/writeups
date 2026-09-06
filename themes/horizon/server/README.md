@@ -188,8 +188,19 @@ are gated by `../server-reference.mjs` — the `server` set in
   (`nearest` - the column the page's clear-sky reference scales the
   balloon's water to), the census by quality with the good pixels'
   range and the scene's own statistics from the file's head
-  (`sceneStats`): thirteen products served. A
-  FOURTEENTH ask exists in the shared decode block but is the page's
+  (`sceneStats`), and since the 164th NOAA's rainfall rate
+  (`ABI-L2-RRQPEF`: full disk every 10 min, 2 km, day and night -
+  SCaMPR's rate calibrated on microwave rain; uint16 counts in mm/h
+  with the file's scale and Table 6's flag bits; the Enterprise
+  Rainfall Rate ATBD v3 read in full) as `rain`, with the point's own
+  pixel and its flag words (`here`), the nearest raining pixel with
+  its distance (`nearest`), the raining pixels navigated to their
+  places, the heaviest first (`list`, at or above 0.1 mm/h, 200 at
+  most), the census by quality with the raining count, maximum and
+  mean, and the disk's own rain statistics from the file's head
+  (`sceneStats`): fourteen products served (a window of +-100 km
+  costs 437-547 kB in 4-6 ranges, measured). A
+  FIFTEENTH ask exists in the shared decode block but is the page's
   own (`pageOnly`, 159th): the 500-m visible band 2 window (`vis`,
   401 x 401 px of the CMIP ATBD's reflectance factor with the
   file's kappa, Esun and Earth-Sun distance) that the page reads
@@ -198,7 +209,7 @@ are gated by `../server-reference.mjs` — the `server` set in
   cadence (about 15 MB an hour by day), which this box's free-tier
   egress cannot carry and the bucket's CORS can. This
   daemon never lists, fetches or serves it; `/health`'s
-  `version.products` names the thirteen it does.
+  `version.products` names the fourteen it does.
   Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks

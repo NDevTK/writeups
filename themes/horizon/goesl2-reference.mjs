@@ -68,6 +68,14 @@ import {
   dcompOverPixels,
   fixedGridGeometry,
   fixedGridToLatLon,
+  RAIN_ATBD,
+  RAIN_DQF_BITS,
+  rainCensus,
+  rainEvaporationAdjust,
+  rainFlagWords,
+  rainList,
+  rainQuality,
+  nearestRain,
   heightCensus,
   indexOfScanAngle,
   keyBand,
@@ -1239,6 +1247,111 @@ const inflate = (u8) =>
       `18% moisture accuracy to 300 hPa, quantitative to ${TPW_ATBD.requirement.lzaQuantitativeDeg} deg (the file says ${TPW_ATBD.file.lzaQuantitativeDeg}), ` +
       `${TPW_ATBD.validation.raobLandErrorPct}% against radiosondes over land, r ${TPW_ATBD.validation.amsreR} against AMSR-E on ` +
       `${TPW_ATBD.validation.amsreN.toLocaleString('en-US')} ocean matchups, the forecast improved by ${TPW_ATBD.validation.forecastGainMm.ocean} mm over the ocean`
+  );
+}
+
+// ---- THE RAIN (164th pass) -----------------------------------------
+// Table 6's flag bits as qualities and words, the ATBD's evaporation
+// adjustment (Eq. 35-36) by hand, the census and the navigated list
+// on a synthetic window laid on GOES-West's real fixed grid: a
+// downpour, drizzle, a dry good pixel, a pixel past the zenith
+// block-out that still rains, an invalid one, the fill; the ATBD's
+// requirement and validation numbers.
+{
+  const g = fixedGridGeometry({
+    semi_major_axis: 6378137,
+    semi_minor_axis: 6356752.31414,
+    perspective_point_height: 35786023,
+    longitude_of_projection_origin: -137
+  });
+  const home = latLonToFixedGrid(32.85, -117.12, g);
+  const x = {scale: 56e-6, offset: home.x - 750 * 56e-6, n: 1500};
+  const y = {scale: -56e-6, offset: home.y + 750 * 56e-6, n: 1500};
+  const box = {i: 750, j: 750, i0: 748, j0: 748, cols: 5, rows: 5};
+  const n = 25;
+  const mmh = new Float32Array(n).fill(0);
+  const dqf = new Uint8Array(n).fill(0);
+  const at = (i, j) => j * 5 + i;
+  mmh[at(4, 4)] = 25.4; // a downpour, two pixels off diagonally
+  mmh[at(3, 2)] = 0.6; // drizzle next door (the nearest raining)
+  mmh[at(0, 0)] = 3.2;
+  dqf[at(0, 0)] = RAIN_DQF_BITS.blockOut; // rains, past the block-out: degraded
+  mmh[at(0, 4)] = 9;
+  dqf[at(0, 4)] = RAIN_DQF_BITS.bad; // invalid whatever the value
+  mmh[at(4, 0)] = NaN;
+  dqf[at(4, 0)] = 255; // the fill
+  mmh[at(1, 3)] = 0.05; // under the 0.1 mm/h listing floor, still raining
+  const c = rainCensus(mmh, dqf);
+  const list = rainList(mmh, dqf, box, g, x, y, {minMmH: 0.1, cap: 10});
+  const nr = nearestRain(mmh, dqf, box, {minMmH: 0.1});
+  const homeLL = fixedGridToLatLon(x.offset + 750 * x.scale, y.offset + 750 * y.scale, g);
+  const heavyLL = fixedGridToLatLon(x.offset + 752 * x.scale, y.offset + 752 * y.scale, g);
+  // Eq. 35-36 by hand at 10 mm/h: RH 100 -> (10 + 11.5825 - 10.7354) x (1.12891 - 0.504012 + 0.476117)
+  const e100 = (10 + 0.115825 * 100 - 10.7354) * (0.000112891 * 1e4 - 0.00504012 * 100 + 0.476117);
+  const e61 = (10 + 0.115825 * 61 - 10.7354) * (0.000112891 * 61 * 61 - 0.00504012 * 61 + 0.476117);
+  const e30 = (10 + 0.115825 * 61 - 10.7354) * (0.000112891 * 30 * 30 - 0.00504012 * 30 + 0.476117);
+  check(
+    'THE RAIN: the flag bits as qualities, the evaporation law, the census and the navigated list',
+    L2_PRODUCTS.rain === 'ABI-L2-RRQPEF' &&
+      rainQuality(0) === 'good' &&
+      rainQuality(2) === 'degraded' &&
+      rainQuality(1) === 'invalid' &&
+      rainQuality(6) === 'invalid' &&
+      rainQuality(64) === 'invalid' &&
+      rainQuality(255) === null &&
+      rainFlagWords(66).join(' + ') === 'past 70° zenith or 60° latitude + no retrieval coefficients' &&
+      rainFlagWords(0)[0] === 'good' &&
+      c.n === 25 &&
+      c.good + c.degraded + c.invalid + c.fill === 25 &&
+      c.good === 22 &&
+      c.degraded === 1 &&
+      c.invalid === 1 &&
+      c.fill === 1 &&
+      c.raining === 4 &&
+      c.rainingGE1 === 2 &&
+      near(c.maxMmH, 25.4, 1e-5) &&
+      near(c.sumMmH, 25.4 + 0.6 + 3.2 + 0.05, 1e-5) &&
+      list.length === 3 &&
+      near(list[0].mmh, 25.4, 1e-5) &&
+      list[0].i === 752 &&
+      list[0].j === 752 &&
+      near(list[0].latDeg, heavyLL.latDeg, 1e-9) &&
+      near(list[0].lonDeg, heavyLL.lonDeg, 1e-9) &&
+      list[1].quality === 'degraded' &&
+      near(list[1].mmh, 3.2, 1e-5) &&
+      near(list[2].mmh, 0.6, 1e-5) &&
+      near(homeLL.latDeg, 32.85, 1e-6) &&
+      nr !== null &&
+      nr.di === 1 &&
+      nr.dj === 0 &&
+      near(nr.mmh, 0.6, 1e-5) &&
+      near(rainEvaporationAdjust(10, 100), e100, 1e-9) &&
+      near(rainEvaporationAdjust(10, 61), e61, 1e-9) &&
+      near(rainEvaporationAdjust(10, 30), e30, 1e-9) &&
+      e30 < e61 &&
+      e100 > 10 &&
+      e61 < 5 &&
+      RAIN_ATBD.resolutionKm === 2 &&
+      RAIN_ATBD.refreshMin === 10 &&
+      RAIN_ATBD.requirement.accuracyMmHAt10 === 6 &&
+      RAIN_ATBD.requirement.precisionMmHAt10 === 9 &&
+      RAIN_ATBD.requirement.lzaQuantitativeDeg === 70 &&
+      RAIN_ATBD.method.classes === 330 &&
+      RAIN_ATBD.method.trainingRainPx === 10000 &&
+      RAIN_ATBD.validation.mrms.r.g16 === 0.32 &&
+      RAIN_ATBD.validation.mrms.precisionMmH.g16 === 7.81 &&
+      RAIN_ATBD.validation.mrms.precisionMmH.g17 === 9.39 &&
+      RAIN_ATBD.validation.mrms.n.g16 === 11201180 &&
+      RAIN_ATBD.validation.dpr.accuracyMmH.g16 === 5.21,
+    `flag 0 good, 2 (past 70° zenith / 60° latitude) degraded, any other bit invalid, 255 the fill (66 reads "${rainFlagWords(66).join(' + ')}"); ` +
+      `a 5x5 window on the fixed grid censuses ${c.good} good, ${c.degraded} degraded, ${c.invalid} invalid, ${c.fill} fill - every pixel once - with ${c.raining} raining ` +
+      `(${c.rainingGE1} at or above the file's 1 mm/h), the heaviest ${c.maxMmH.toFixed(1)} mm/h, ${c.sumMmH.toFixed(2)} mm/h summed; the list navigates ${list.length} pixels at or above 0.1 mm/h, ` +
+      `the downpour first at ${list[0].latDeg.toFixed(4)}, ${list[0].lonDeg.toFixed(4)} (the fixed grid's own equations; the window's centre ${homeLL.latDeg.toFixed(4)}, ${homeLL.lonDeg.toFixed(4)}), ` +
+      `the degraded 3.2 mm/h kept and named, the invalid 9 mm/h dropped; the nearest raining pixel is the drizzle one pixel east (${nr.mmh.toFixed(1)} mm/h); ` +
+      `Eq. 35-36 by hand: 10 mm/h under a saturated lowest third becomes ${e100.toFixed(2)} mm/h, under 61% (the additive floor) ${e61.toFixed(2)}, under 30% ${e30.toFixed(2)} (the multiplicative term's own floor at 22.32%) - the product's own evaporation term, pinned not re-applied; ` +
+      `the ATBD: ${RAIN_ATBD.resolutionKm} km every ${RAIN_ATBD.refreshMin} min, ${RAIN_ATBD.requirement.accuracyMmHAt10} / ${RAIN_ATBD.requirement.precisionMmHAt10} mm/h accuracy / precision at 10 mm/h, ` +
+      `${RAIN_ATBD.method.classes} classes; validation r ${RAIN_ATBD.validation.mrms.r.g16} against MRMS over ${RAIN_ATBD.validation.mrms.n.g16.toLocaleString('en-US')} points ` +
+      `(precision ${RAIN_ATBD.validation.mrms.precisionMmH.g16} mm/h on GOES-16, ${RAIN_ATBD.validation.mrms.precisionMmH.g17} on GOES-17 past the spec), DPR accuracy ${RAIN_ATBD.validation.dpr.accuracyMmH.g16}`
   );
 }
 

@@ -1029,7 +1029,30 @@ The practice the corpus demonstrates, stated so it can be reused:
    also caught a fault of the 159th's daylight line — with the sun 84°
    from the zenith no lit fine texel took a fraction and the null mean
    fraction threw on every panel render — now worded as "none took a
-   fraction"
+   fraction". Pass 164 restores the radar and adds the rain: measured
+   on the day, RainViewer's public tiles stop at zoom 7 ("Maximum zoom
+   level is 7") and the page's zoom-8 tile was a "Zoom Level Not
+   Supported" placeholder, and every colour index returns the
+   Universal Blue palette, which the grey dBZ rule read as no echo
+   (a 24-dBZ blue) or as snow at 95 dBZ (the placeholder's white); the
+   palette is now vendored verbatim from RainViewer's own table and
+   decoded by colour (163 colours, the floor −10 dBZ, a resampled
+   pixel to its nearest colour with the distance stated), the tile's
+   scheme told from its pixels, RainViewer's coverage mask
+   (`/v2/coverage/0`, black = no radar) bounding the ground the radar
+   sees, the statistics areal over that ground with the observer's own
+   pixel, and the scene's rain taking that pixel where the radar sees
+   it. Where no radar sees it, NOAA's rainfall rate (ABI-L2-RRQPEF,
+   full disk every 10 min, 2 km) becomes the fourteenth served
+   product and the scene's rain — the Enterprise Rainfall Rate ATBD
+   v3 read in full (SCaMPR's 330 classes on microwave rain, the
+   discriminant detection, the two-predictor rate with power
+   transforms and the distribution-matching lookup, Eq. 35–36's
+   evaporation term pinned by hand, the 6 / 9 mm/h requirement at
+   10 mm/h, the MRMS and DPR validation with GOES-17 past the
+   precision spec) (`radar-reference` THE PALETTE, THE SCHEME AND THE
+   MASK, THE GREY WINDOW; `goesl2-reference` THE RAIN; `server-reference`
+   and `goesl2-client-reference` the fifteenth ask)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

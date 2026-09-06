@@ -56,6 +56,11 @@ import {
   fireCensus,
   fireList,
   tpwCensus,
+  rainCensus,
+  rainList,
+  nearestRain,
+  rainQuality,
+  rainFlagWords,
   packArray,
   pixelSizeM,
   productTimeIso,
@@ -259,6 +264,25 @@ export const L2_TPW_EXTRAS = [
   'latitude'
 ];
 L2_HALF_PX.tpw = 10; // +-100 km on the 10-km grid
+// THE RAIN (164th): the rainfall rate window (mm/h as tenths in
+// uint16 with the file's scale, Table 6's flag bits) and the file's
+// own scene scalars
+export const L2_RAIN_SPEC = {RRQPE: 'raw16', DQF: 'raw'};
+export const L2_RAIN_EXTRAS = [
+  'total_pixels_with_rain',
+  'total_rain_volume',
+  'mean_rainfall_rate',
+  'maximum_rainfall_rate',
+  'minimum_rainfall_rate',
+  'accounted_rainfall_rate',
+  'total_pixels_with_successful_retrieval',
+  'rainfall_rate_outlier_pixel_count',
+  'quantitative_local_zenith_angle',
+  'retrieval_local_zenith_angle',
+  'latitude'
+];
+L2_HALF_PX.rain = 50; // +-100 km on the 2-km grid
+export const L2_RAIN_MIN_MMH = 0.1;
 // how far (Chebyshev, px) the nearest good TPW pixel is sought
 export const L2_TPW_NEAR_PX = 2;
 // what /goesl2 fetches for a point: product, spec, the window's half
@@ -360,6 +384,15 @@ export const L2_ASKS = [
     spec: L2_TPW_SPEC,
     halfPx: 10,
     extras: L2_TPW_EXTRAS,
+    timed: false
+  },
+  // the rain (164th): the rate falling now, full disk every 10 min
+  {
+    id: 'rain',
+    product: L2_PRODUCTS.rain,
+    spec: L2_RAIN_SPEC,
+    halfPx: 50,
+    extras: L2_RAIN_EXTRAS,
     timed: false
   }
 ];
@@ -1073,6 +1106,70 @@ export function l2TpwBody(dec, key, lat, lon) {
       maxMm: r2(x.maximum_total_precipitable_water),
       sdMm: r2(x.standard_deviation_total_precipitable_water),
       attempted: num(x.total_attempted_retrievals)
+    },
+    lzaQuantitativeDeg: num(x.quantitative_local_zenith_angle),
+    lzaRetrievalDeg: num(x.retrieval_local_zenith_angle),
+    latitudeThresholdDeg: num(x.latitude)
+  };
+}
+// THE RAIN (164th pass): the rainfall rate window as mm/h counts
+// with the file's scaling and Table 6's flag word, the point's own
+// pixel, the nearest raining pixel and the raining pixels navigated
+// to their places (the heaviest first), the census, the scene's own
+// rain statistics and the file's thresholds.
+export function l2RainBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_RAIN_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.rain);
+  if (!w) return null;
+  const m = dec.meta.RRQPE ?? {scale: 1, offset: 0, fill: 65535};
+  const mmh = unscale(w.cut.RRQPE, m);
+  const ci = w.box.i - w.box.i0;
+  const cj = w.box.j - w.box.j0;
+  const qc = cj * w.box.cols + ci;
+  const ew = w.pixel ? w.pixel.ewM : 2000;
+  const ns = w.pixel ? w.pixel.nsM : 2000;
+  const near = nearestRain(mmh, w.cut.DQF, w.box, {minMmH: L2_RAIN_MIN_MMH});
+  const x = dec.extras ?? {};
+  const num = (v) => (Number.isFinite(v) ? v : null);
+  const r2 = (v) => (Number.isFinite(v) ? +v.toFixed(2) : null);
+  const hereDqf = w.cut.DQF[qc] ?? null;
+  return {
+    ...l2Common(dec, L2_PRODUCTS.rain, key, w),
+    rain: packArray(w.cut.RRQPE, 'u16'),
+    rainScale: m.scale,
+    rainOffset: m.offset,
+    rainFill: 65535,
+    units: 'mm h-1',
+    dqf: packArray(w.cut.DQF, 'u8'),
+    here: {
+      mmh: r2(mmh[qc]),
+      dqf: hereDqf,
+      quality: rainQuality(hereDqf),
+      words: rainFlagWords(hereDqf)
+    },
+    nearest: near
+      ? {
+          mmh: r2(near.mmh),
+          di: near.di,
+          dj: near.dj,
+          km: +(Math.hypot(near.di * ew, near.dj * ns) / 1000).toFixed(1)
+        }
+      : null,
+    minMmH: L2_RAIN_MIN_MMH,
+    list: rainList(mmh, w.cut.DQF, w.box, dec.g ?? fixedGridGeometry(dec.proj), dec.x, dec.y, {
+      minMmH: L2_RAIN_MIN_MMH,
+      cap: 200
+    }).map((r) => ({...r, mmh: r2(r.mmh)})),
+    census: rainCensus(mmh, w.cut.DQF),
+    sceneStats: {
+      rainingPx: num(x.total_pixels_with_rain),
+      volumeMmH: r2(x.total_rain_volume),
+      meanMmH: r2(x.mean_rainfall_rate),
+      maxMmH: r2(x.maximum_rainfall_rate),
+      minMmH: r2(x.minimum_rainfall_rate),
+      accountedFromMmH: r2(x.accounted_rainfall_rate),
+      retrieved: num(x.total_pixels_with_successful_retrieval),
+      outliers: num(x.rainfall_rate_outlier_pixel_count)
     },
     lzaQuantitativeDeg: num(x.quantitative_local_zenith_angle),
     lzaRetrievalDeg: num(x.retrieval_local_zenith_angle),

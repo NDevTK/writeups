@@ -239,6 +239,7 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       body.phase === null &&
       body.fire === null &&
       body.tpw === null &&
+      body.rain === null &&
       body.height !== null &&
       body.height.product === 'ABI-L2-ACHAC' &&
       body.height.census.n === heightWhole.census.n &&
@@ -256,8 +257,8 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       // lists nothing under; the pageOnly ask (159th: the 500-m
       // visible window) is not listed unless named
       listsAfterFirst === (served.length - 2) * 3 + 2 &&
-      L2_ASKS.length === 14 &&
-      served.length === 13 &&
+      L2_ASKS.length === 15 &&
+      served.length === 14 &&
       filesAfterFirst === 2 &&
       // the range reads: the heights' head then its strips, the winds
       // whole in one megabyte ask
@@ -469,13 +470,13 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       // ones not
       // the CONUS products the fake bucket lacks: seven since the
       // 161st's cloud top phase
-      listedAgain.length === 9 * 3 + 2 &&
+      listedAgain.length === 10 * 3 + 2 &&
       !listedAgain.some(
         (p) => p.startsWith('ABI-L2-SSTF') || p.startsWith('ABI-L2-DSRF')
       ),
     `three range asks of a whole-answering server cost ${calls} download (${a.length}, ${b.length} and ${c.length} bytes cut from it, the last short at the end); ` +
       `the client over such a bucket reads its two files whole (${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB`).join(', ')}), ` +
-      `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the nine CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
+      `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the ten CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
   );
 }
 
