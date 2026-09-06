@@ -6746,7 +6746,9 @@
           // bucket itself beside the daemon's own, and the record says
           // which - a stale box no longer hides the measurements
           if (j && j.sat && j.via === 'daemon') {
-            const missing = L2_BODY_PRODUCTS.filter((id) => j[id] === undefined);
+            const missing = L2_BODY_PRODUCTS.filter(
+              (id) => j[id] === undefined
+            );
             if (missing.length) {
               try {
                 const fill = await goesL2Client.fetchGoesL2(
@@ -6762,7 +6764,8 @@
                   j.fillRead = fill.read ?? null;
                 }
               } catch (e) {
-                if (params.has('debug')) console.warn('goesl2 fill: ' + e.message);
+                if (params.has('debug'))
+                  console.warn('goesl2 fill: ' + e.message);
               }
             }
           }
