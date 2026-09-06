@@ -998,8 +998,19 @@ export function otsuThreshold(sorted) {
   // a constant sample (its range within rounding of zero: a hundred
   // 0.3s sum to 30.000000000000004) has no classes at all
   const range = sorted[n - 1] - sorted[0];
-  if (!(range > 1e-9 * Math.max(1, Math.abs(mean))) || !(variance > 0) || best <= 0) {
-    return {t: sorted[0], eta: 0, nLow: n, nHigh: 0, meanLow: mean, meanHigh: null};
+  if (
+    !(range > 1e-9 * Math.max(1, Math.abs(mean))) ||
+    !(variance > 0) ||
+    best <= 0
+  ) {
+    return {
+      t: sorted[0],
+      eta: 0,
+      nLow: n,
+      nHigh: 0,
+      meanLow: mean,
+      meanHigh: null
+    };
   }
   let low = 0;
   for (let i = 0; i < k; i++) low += sorted[i];

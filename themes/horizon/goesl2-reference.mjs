@@ -1132,10 +1132,21 @@ const inflate = (u8) =>
   for (let q = 0; q < n; q++) {
     rf[q] = 0.1 + (0.4 * (q % 100)) / 99;
     dqf[q] =
-      q >= 380 ? 255 : q % 17 === 0 ? 4 : q % 13 === 0 ? 3 : q % 11 === 0 ? 2 : q % 7 === 0 ? 1 : 0;
+      q >= 380
+        ? 255
+        : q % 17 === 0
+          ? 4
+          : q % 13 === 0
+            ? 3
+            : q % 11 === 0
+              ? 2
+              : q % 7 === 0
+                ? 1
+                : 0;
   }
   const vc = visCensus(rf, dqf, 0.5);
-  const counted = vc.good + vc.usable + vc.outOfRange + vc.noValue + vc.fpt + vc.fill;
+  const counted =
+    vc.good + vc.usable + vc.outOfRange + vc.noValue + vc.fpt + vc.fill;
   const goodRf = [];
   for (let q = 0; q < n; q++) if (dqf[q] === 0) goodRf.push(rf[q]);
   goodRf.sort((a, b) => a - b);
@@ -1156,7 +1167,9 @@ const inflate = (u8) =>
     }
   }
   const refs = visReferences(rho, (q) => kind[q]);
-  const thin = visReferences(rho, (q) => (q < 120 ? true : q < 130 ? false : null));
+  const thin = visReferences(rho, (q) =>
+    q < 120 ? true : q < 130 ? false : null
+  );
   const frac = coverFraction(0.5, refs.rhoClear, refs.rhoCloud);
   // THE COVERAGE EDGE (160th pass): the cloudy side above is one
   // uniform mode (eta 0.75 for a uniform sample, under the 0.8 rule),
@@ -1179,10 +1192,19 @@ const inflate = (u8) =>
     seed = (1103515245 * seed + 12345) % 2147483648;
     return (seed + 0.5) / 2147483648;
   };
-  const gauss = () => Math.sqrt(-2 * Math.log(rnd())) * Math.cos(2 * Math.PI * rnd());
-  const normal = Float64Array.from({length: 20000}, () => 5 + 2 * gauss()).sort();
-  const deltas = Float64Array.from({length: 200}, (_, i) => (i < 100 ? 0.1 : 0.6));
-  const mix = Float64Array.from({length: 20000}, (_, i) => (i < 10000 ? -2 : 2) + gauss()).sort();
+  const gauss = () =>
+    Math.sqrt(-2 * Math.log(rnd())) * Math.cos(2 * Math.PI * rnd());
+  const normal = Float64Array.from(
+    {length: 20000},
+    () => 5 + 2 * gauss()
+  ).sort();
+  const deltas = Float64Array.from({length: 200}, (_, i) =>
+    i < 100 ? 0.1 : 0.6
+  );
+  const mix = Float64Array.from(
+    {length: 20000},
+    (_, i) => (i < 10000 ? -2 : 2) + gauss()
+  ).sort();
   const flat = new Float64Array(100).fill(0.3);
   const oN = otsuThreshold(normal);
   const oD = otsuThreshold(deltas);
@@ -1241,7 +1263,11 @@ const inflate = (u8) =>
       thin.mode === null &&
       thin.nCloud === 10 &&
       frac === 1 &&
-      near(coverFraction(0.3, refs.rhoClear, refs.rhoCloud), (0.3 - refs.rhoClear) / (refs.rhoCloud - refs.rhoClear), 1e-9) &&
+      near(
+        coverFraction(0.3, refs.rhoClear, refs.rhoCloud),
+        (0.3 - refs.rhoClear) / (refs.rhoCloud - refs.rhoClear),
+        1e-9
+      ) &&
       // two modes: Otsu's threshold between the gaps and the cloud
       refs2.mode === 'bimodal' &&
       refs2.eta > 0.95 &&
