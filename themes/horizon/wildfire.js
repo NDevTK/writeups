@@ -123,9 +123,20 @@ export function parseWildfires(json, nowMs = 0, maxAgeH = 240) {
  * ceiling) burns full. ageH is the file's age in hours: minutes.
  * Sorted nearest first, capped.
  */
-export function goesFiresNear(list, lat, lon, fileMs, nowMs, maxKm = 200, cap = 24) {
+export function goesFiresNear(
+  list,
+  lat,
+  lon,
+  fileMs,
+  nowMs,
+  maxKm = 200,
+  cap = 24
+) {
   const near = [];
-  const ageH = Number.isFinite(fileMs) && Number.isFinite(nowMs) ? Math.max(0, (nowMs - fileMs) / 3600000) : 0;
+  const ageH =
+    Number.isFinite(fileMs) && Number.isFinite(nowMs)
+      ? Math.max(0, (nowMs - fileMs) / 3600000)
+      : 0;
   for (const f of list || []) {
     const rb = rangeBearing(lat, lon, f.latDeg, f.lonDeg);
     if (rb.distKm > maxKm) continue;
@@ -134,7 +145,10 @@ export function goesFiresNear(list, lat, lon, fileMs, nowMs, maxKm = 200, cap = 
       f.kind === 'saturated'
         ? 1
         : Number.isFinite(f.frpMW) && f.frpMW > 0
-          ? Math.min(1, Math.max(0.35, 0.35 + (0.65 * Math.log10(1 + f.frpMW)) / 3))
+          ? Math.min(
+              1,
+              Math.max(0.35, 0.35 + (0.65 * Math.log10(1 + f.frpMW)) / 3)
+            )
           : 0.3;
     near.push({
       id: `goes-${f.i}-${f.j}`,

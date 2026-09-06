@@ -1197,16 +1197,31 @@ const inflate = (u8) =>
   const area = new Float32Array(n).fill(NaN);
   const dqf = new Uint8Array(n).fill(1);
   const at = (i, j) => j * 5 + i;
-  mask[at(2, 2)] = 10; power[at(2, 2)] = 120.5; temp[at(2, 2)] = 850; area[at(2, 2)] = 60000; dqf[at(2, 2)] = 0;
-  mask[at(3, 2)] = 31; dqf[at(3, 2)] = 0; // saturated, seen before: no power reported
-  mask[at(1, 1)] = 12; dqf[at(1, 1)] = 0; // cloud-contaminated
-  mask[at(4, 4)] = 15; power[at(4, 4)] = 3; dqf[at(4, 4)] = 0; // low probability (a power the file would not report; counted as reported here)
-  mask[at(0, 0)] = 200; dqf[at(0, 0)] = 2; // opaque cloud
-  mask[at(0, 4)] = 151; dqf[at(0, 4)] = 3; // sea water
-  mask[at(4, 0)] = -99; dqf[at(4, 0)] = 255; // fill
+  mask[at(2, 2)] = 10;
+  power[at(2, 2)] = 120.5;
+  temp[at(2, 2)] = 850;
+  area[at(2, 2)] = 60000;
+  dqf[at(2, 2)] = 0;
+  mask[at(3, 2)] = 31;
+  dqf[at(3, 2)] = 0; // saturated, seen before: no power reported
+  mask[at(1, 1)] = 12;
+  dqf[at(1, 1)] = 0; // cloud-contaminated
+  mask[at(4, 4)] = 15;
+  power[at(4, 4)] = 3;
+  dqf[at(4, 4)] = 0; // low probability (a power the file would not report; counted as reported here)
+  mask[at(0, 0)] = 200;
+  dqf[at(0, 0)] = 2; // opaque cloud
+  mask[at(0, 4)] = 151;
+  dqf[at(0, 4)] = 3; // sea water
+  mask[at(4, 0)] = -99;
+  dqf[at(4, 0)] = 255; // fill
   const c = fireCensus(mask, power, temp, area, dqf);
   const list = fireList(mask, power, temp, area, box, g, x, y);
-  const homeLL = fixedGridToLatLon(x.offset + 750 * x.scale, y.offset + 750 * y.scale, g);
+  const homeLL = fixedGridToLatLon(
+    x.offset + 750 * x.scale,
+    y.offset + 750 * y.scale,
+    g
+  );
   // Eq. 3.4 by hand: a 4-km2 pixel, 0.5 W m^-2 sr^-1 um^-1 above the
   // background -> 4e6 x 5.67e-8 / 3e-9 x 0.5 W = 37.8 MW
   const frp = frpMir(1.2, 0.7, 4e6);
@@ -1230,7 +1245,7 @@ const inflate = (u8) =>
       FIRE_ATBD.minFireK === 400 &&
       FIRE_ATBD.temporalFilterH === 12 &&
       FIRE_ATBD.frpUnreportedCodes.join() === '11,12,15,31,32,35' &&
-      near(frp, (4e6 * 5.67e-8 / 3e-9) * 0.5 / 1e6, 1e-9) &&
+      near(frp, (((4e6 * 5.67e-8) / 3e-9) * 0.5) / 1e6, 1e-9) &&
       Math.abs(frp - 37.8) < 1e-9 &&
       c.n === 25 &&
       c.fires === 4 &&

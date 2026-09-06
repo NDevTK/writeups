@@ -1020,12 +1020,25 @@ export const FIRE_QA_WORDS = [
 ];
 export const FIRE_ATBD = {
   version: 'Enterprise Fire / Hot Spot Characterization ATBD v2.7, 2020-10-31',
-  requirement: {rangeK: [275, 400], accuracyK: 2, lzaQuantitativeDeg: 65, refreshMin: 5, resolutionKm: 2},
+  requirement: {
+    rangeK: [275, 400],
+    accuracyK: 2,
+    lzaQuantitativeDeg: 65,
+    refreshMin: 5,
+    resolutionKm: 2
+  },
   t39MinNightK: 285,
   t39MinDayAddK: 15,
   reflThresholdNightK: 315,
   reflThresholdDayAddK: 5,
-  cloud: {t112BelowK: 270, diffBelowK: -4, diffAboveK: 20, warmBelowK: 285, albedoAbove: 0.38, t123AtOrBelowK: 265},
+  cloud: {
+    t112BelowK: 270,
+    diffBelowK: -4,
+    diffAboveK: 20,
+    warmBelowK: 285,
+    albedoAbove: 0.38,
+    t123AtOrBelowK: 265
+  },
   blockOut: {lzaDeg: 80, glintDeg: 10, subSolarDeg: 10},
   saturationK: {band7: 411.86, band14: 340},
   minFireK: 400,
@@ -1043,9 +1056,20 @@ export const FIRE_ATBD = {
  * code names its reason (Table 3.11's families). */
 export function fireClass(code) {
   const c = Number(code);
-  if (c >= 10 && c <= 15) return {fire: true, filtered: false, kind: FIRE_CODES[c], words: FIRE_CODES[c] + ' fire pixel'};
+  if (c >= 10 && c <= 15)
+    return {
+      fire: true,
+      filtered: false,
+      kind: FIRE_CODES[c],
+      words: FIRE_CODES[c] + ' fire pixel'
+    };
   if (c >= 30 && c <= 35)
-    return {fire: true, filtered: true, kind: FIRE_CODES[c - 20], words: FIRE_CODES[c - 20] + ' fire pixel, seen before'};
+    return {
+      fire: true,
+      filtered: true,
+      kind: FIRE_CODES[c - 20],
+      words: FIRE_CODES[c - 20] + ' fire pixel, seen before'
+    };
   let words = 'unprocessed';
   if (c === 40) words = 'space';
   else if (c === 50) words = 'local zenith past 80 deg';
@@ -1062,7 +1086,10 @@ export function fireClass(code) {
  * area (m^2) times sigma / a times the 3.9-um radiance above the
  * background (W m^-2 sr^-1 um^-1), in megawatts. */
 export function frpMir(lMir, lBackground, areaM2) {
-  return ((areaM2 * FIRE_ATBD.sigma) / FIRE_ATBD.mir.a) * (lMir - lBackground) / 1e6;
+  return (
+    (((areaM2 * FIRE_ATBD.sigma) / FIRE_ATBD.mir.a) * (lMir - lBackground)) /
+    1e6
+  );
 }
 /**
  * The window's census: fire pixels by class (this scan's and the
@@ -1096,7 +1123,14 @@ export function fireCensus(mask, power, tempK, areaM2, dqf) {
     if (!k.fire) continue;
     c.fires++;
     if (k.filtered) c.filtered++;
-    const key = {processed: 'processed', saturated: 'saturated', 'cloud-contaminated': 'cloudy', 'high probability': 'high', 'medium probability': 'medium', 'low probability': 'low'}[k.kind];
+    const key = {
+      processed: 'processed',
+      saturated: 'saturated',
+      'cloud-contaminated': 'cloudy',
+      'high probability': 'high',
+      'medium probability': 'medium',
+      'low probability': 'low'
+    }[k.kind];
     c[key]++;
     const p = power ? power[q] : NaN;
     if (Number.isFinite(p) && p >= 0) {
@@ -1130,7 +1164,11 @@ export function fireList(mask, power, tempK, areaM2, box, g, xCoord, yCoord) {
     if (!k.fire) continue;
     const i = box.i0 + (q % box.cols);
     const j = box.j0 + Math.floor(q / box.cols);
-    const ll = fixedGridToLatLon(xCoord.offset + i * xCoord.scale, yCoord.offset + j * yCoord.scale, g);
+    const ll = fixedGridToLatLon(
+      xCoord.offset + i * xCoord.scale,
+      yCoord.offset + j * yCoord.scale,
+      g
+    );
     if (!ll) continue;
     const p = power ? power[q] : NaN;
     const t = tempK ? tempK[q] : NaN;

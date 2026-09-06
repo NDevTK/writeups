@@ -226,7 +226,13 @@ L2_HALF_PX.phase = 50;
 // non-fire pixels), the sub-pixel temperature (uint16 K at 0.0549
 // from 400) and area (uint16 m2 at 60.98 from 4000), the QA flag;
 // the scene's fire counts and power statistics as extras.
-export const L2_FIRE_SPEC = {Mask: 'raw16', Power: 'phys', Temp: 'raw16', Area: 'raw16', DQF: 'raw'};
+export const L2_FIRE_SPEC = {
+  Mask: 'raw16',
+  Power: 'phys',
+  Temp: 'raw16',
+  Area: 'raw16',
+  DQF: 'raw'
+};
 export const L2_FIRE_EXTRAS = [
   'total_number_of_pixels_with_fires_detected',
   'total_number_of_pixels_with_fire_radiative_power',
@@ -963,7 +969,9 @@ export function l2FireBody(dec, key, lat, lon) {
   const ma = dec.meta.Area ?? {scale: 1, offset: 0, fill: 65535};
   const tempK = unscale(w.cut.Temp, mt);
   const areaM2 = unscale(w.cut.Area, ma);
-  const power = Float32Array.from(w.cut.Power, (v) => (Number.isFinite(v) && v >= 0 ? v : NaN));
+  const power = Float32Array.from(w.cut.Power, (v) =>
+    Number.isFinite(v) && v >= 0 ? v : NaN
+  );
   const mask = Array.from(w.cut.Mask, (v) => (v < 0 ? 65535 : v));
   const x = dec.extras ?? {};
   const num = (v) => (Number.isFinite(v) ? v : null);
@@ -972,7 +980,16 @@ export function l2FireBody(dec, key, lat, lon) {
     mask: packArray(mask, 'u16'),
     maskFill: 65535,
     dqf: packArray(w.cut.DQF, 'u8'),
-    fires: fireList(w.cut.Mask, power, tempK, areaM2, w.box, dec.g ?? fixedGridGeometry(dec.proj), dec.x, dec.y),
+    fires: fireList(
+      w.cut.Mask,
+      power,
+      tempK,
+      areaM2,
+      w.box,
+      dec.g ?? fixedGridGeometry(dec.proj),
+      dec.x,
+      dec.y
+    ),
     census: fireCensus(w.cut.Mask, power, tempK, areaM2, w.cut.DQF),
     sceneStats: {
       fires: num(x.total_number_of_pixels_with_fires_detected),

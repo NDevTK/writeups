@@ -841,7 +841,13 @@
       } from './horizon/airframes.js';
       import {aircraftDims} from './horizon/aircraft.js';
       import {liveryForCallsign} from './horizon/airline.js';
-      import {firesNear, goesFiresNear, mergeFires, parseWildfires, rangeBearing} from './horizon/wildfire.js';
+      import {
+        firesNear,
+        goesFiresNear,
+        mergeFires,
+        parseWildfires,
+        rangeBearing
+      } from './horizon/wildfire.js';
       import {buildingsGeometry, parseBuildings} from './horizon/buildings.js';
       import {
         BLD_NEAR_M,
@@ -2299,11 +2305,23 @@
       // the fire's own radiative power. ?fire=N (the demo) is left alone.
       const FIRE_LIVE_MS = 20 * 60e3;
       function applyFires() {
-        if (params.get('fire') === '0' || (params.has('fire') && +params.get('fire') > 0)) return;
+        if (
+          params.get('fire') === '0' ||
+          (params.has('fire') && +params.get('fire') > 0)
+        )
+          return;
         const fh = goesL2 && goesL2.fire;
-        const fresh = fh && fh.time && Date.now() - Date.parse(fh.time) < FIRE_LIVE_MS;
+        const fresh =
+          fh && fh.time && Date.now() - Date.parse(fh.time) < FIRE_LIVE_MS;
         const measured = fresh
-          ? goesFiresNear(fh.fires, state.lat, state.lon, Date.parse(fh.time), Date.now(), 200)
+          ? goesFiresNear(
+              fh.fires,
+              state.lat,
+              state.lon,
+              Date.parse(fh.time),
+              Date.now(),
+              200
+            )
           : [];
         state.fires = mergeFires(measured, state.firesEonet || [], 10);
         state.firesMeasured = measured.length;
@@ -7024,22 +7042,32 @@
           if (fh && fh.census) {
             const c = fh.census;
             const top = fh.fires && fh.fires.length ? fh.fires[0] : null;
-            const nearest = fh.fires && fh.fires.length
-              ? fh.fires
-                  .map((f) => ({f, rb: rangeBearing(state.lat, state.lon, f.latDeg, f.lonDeg)}))
-                  .sort((a, b) => a.rb.distKm - b.rb.distKm)[0]
-              : null;
+            const nearest =
+              fh.fires && fh.fires.length
+                ? fh.fires
+                    .map((f) => ({
+                      f,
+                      rb: rangeBearing(state.lat, state.lon, f.latDeg, f.lonDeg)
+                    }))
+                    .sort((a, b) => a.rb.distKm - b.rb.distKm)[0]
+                : null;
             record(
               `NOAA ${j.craft} fire hot spots (FDCC)`,
               `${fh.time.slice(11, 16)}Z · ` +
                 (c.fires
                   ? `${c.fires} fire px within ±100 km (${c.processed} processed · ${c.saturated} saturated · ${c.cloudy} cloud-contaminated · ` +
                     `${c.high} high · ${c.medium} medium · ${c.low} low probability; ${c.filtered} seen before)` +
-                    (c.frp.n ? ` · radiative power ${c.frp.sumMW.toFixed(0)} MW in all, ${c.frp.maxMW.toFixed(0)} MW at most` : ' · no power reported') +
-                    (nearest ? ` · nearest ${nearest.rb.distKm.toFixed(0)} km at ${Math.round(nearest.rb.bearingDeg)}° (${nearest.f.kind})` : '')
+                    (c.frp.n
+                      ? ` · radiative power ${c.frp.sumMW.toFixed(0)} MW in all, ${c.frp.maxMW.toFixed(0)} MW at most`
+                      : ' · no power reported') +
+                    (nearest
+                      ? ` · nearest ${nearest.rb.distKm.toFixed(0)} km at ${Math.round(nearest.rb.bearingDeg)}° (${nearest.f.kind})`
+                      : '')
                   : `no fire px within ±100 km (QA: ${c.qa[1].toLocaleString('en-US')} fire-free land · ${c.qa[2].toLocaleString('en-US')} under opaque cloud · ` +
                     `${c.qa[3].toLocaleString('en-US')} water, glint or unusable)`) +
-                (fh.sceneStats && fh.sceneStats.fires !== null ? ` · the CONUS scene holds ${fh.sceneStats.fires} fire px` : '')
+                (fh.sceneStats && fh.sceneStats.fires !== null
+                  ? ` · the CONUS scene holds ${fh.sceneStats.fires} fire px`
+                  : '')
             );
           }
           applyFires();
@@ -7649,11 +7677,17 @@
                     ? ` - radiative power ${c.frp.sumMW.toFixed(0)} MW in all, ${c.frp.maxMW.toFixed(0)} MW at most (the MIR law: A σ/a (L − L_b), a = 3.0e-9)`
                     : ' - no power reported (saturated, cloud-contaminated and low-probability pixels carry none)') +
                   `; ${state.firesMeasured ?? 0} drawn as the scene's fires by their own heat` +
-                  (state.firesEonet && state.firesEonet.length ? `, EONET's ${state.firesEonet.length} events beside them where no pixel burns within 10 km` : '')
+                  (state.firesEonet && state.firesEonet.length
+                    ? `, EONET's ${state.firesEonet.length} events beside them where no pixel burns within 10 km`
+                    : '')
                 : `no fire px within ±100 km (${c.qa[1].toLocaleString('en-US')} fire-free land, ${c.qa[2].toLocaleString('en-US')} under opaque cloud, ` +
                   `${c.qa[3].toLocaleString('en-US')} water, glint or unusable)` +
-                  (state.firesEonet && state.firesEonet.length ? `; EONET's ${state.firesEonet.length} events stand alone` : '')) +
-              (fh.sceneStats && fh.sceneStats.fires !== null ? ` · the CONUS scene ${fh.sceneStats.fires} fire px` : '') +
+                  (state.firesEonet && state.firesEonet.length
+                    ? `; EONET's ${state.firesEonet.length} events stand alone`
+                    : '')) +
+              (fh.sceneStats && fh.sceneStats.fires !== null
+                ? ` · the CONUS scene ${fh.sceneStats.fires} fire px`
+                : '') +
               ` · the ATBD's caution: a solar farm's glint gave high-confidence false alarms in the deep-dive validation`;
           }
         }

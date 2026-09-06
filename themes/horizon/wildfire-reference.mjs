@@ -161,17 +161,90 @@ const FIXTURE = {
   const now = Date.parse('2026-09-06T14:00:00Z');
   const fileMs = now - 6 * 60e3; // a six-minute-old file
   const list = [
-    {i: 1, j: 1, latDeg: 33.0, lonDeg: -117.2, code: 10, kind: 'processed', filtered: false, frpMW: 100, tempK: 800, areaM2: 50000},
-    {i: 2, j: 1, latDeg: 33.4, lonDeg: -117.5, code: 31, kind: 'saturated', filtered: true, frpMW: null, tempK: null, areaM2: null},
-    {i: 3, j: 1, latDeg: 33.1, lonDeg: -117.0, code: 15, kind: 'low probability', filtered: false, frpMW: null, tempK: null, areaM2: null},
-    {i: 4, j: 1, latDeg: 34.2, lonDeg: -117.1, code: 10, kind: 'processed', filtered: false, frpMW: 1000, tempK: 900, areaM2: 90000},
-    {i: 5, j: 1, latDeg: 36.0, lonDeg: -117.1, code: 10, kind: 'processed', filtered: false, frpMW: 5, tempK: 600, areaM2: 5000}
+    {
+      i: 1,
+      j: 1,
+      latDeg: 33.0,
+      lonDeg: -117.2,
+      code: 10,
+      kind: 'processed',
+      filtered: false,
+      frpMW: 100,
+      tempK: 800,
+      areaM2: 50000
+    },
+    {
+      i: 2,
+      j: 1,
+      latDeg: 33.4,
+      lonDeg: -117.5,
+      code: 31,
+      kind: 'saturated',
+      filtered: true,
+      frpMW: null,
+      tempK: null,
+      areaM2: null
+    },
+    {
+      i: 3,
+      j: 1,
+      latDeg: 33.1,
+      lonDeg: -117.0,
+      code: 15,
+      kind: 'low probability',
+      filtered: false,
+      frpMW: null,
+      tempK: null,
+      areaM2: null
+    },
+    {
+      i: 4,
+      j: 1,
+      latDeg: 34.2,
+      lonDeg: -117.1,
+      code: 10,
+      kind: 'processed',
+      filtered: false,
+      frpMW: 1000,
+      tempK: 900,
+      areaM2: 90000
+    },
+    {
+      i: 5,
+      j: 1,
+      latDeg: 36.0,
+      lonDeg: -117.1,
+      code: 10,
+      kind: 'processed',
+      filtered: false,
+      frpMW: 5,
+      tempK: 600,
+      areaM2: 5000
+    }
   ];
   const near = goesFiresNear(list, 32.85, -117.12, fileMs, now, 200);
   const byId = Object.fromEntries(near.map((n) => [n.id, n]));
   const events = [
-    {id: 'E-close', title: 'Event beside the processed pixel', lat: 33.02, lon: -117.2, distKm: 19, bearingDeg: 0, intensity: 0.5, ageH: 20},
-    {id: 'E-far', title: 'Event on its own', lat: 32.6, lon: -116.5, distKm: 64, bearingDeg: 110, intensity: 0.4, ageH: 30}
+    {
+      id: 'E-close',
+      title: 'Event beside the processed pixel',
+      lat: 33.02,
+      lon: -117.2,
+      distKm: 19,
+      bearingDeg: 0,
+      intensity: 0.5,
+      ageH: 20
+    },
+    {
+      id: 'E-far',
+      title: 'Event on its own',
+      lat: 32.6,
+      lon: -116.5,
+      distKm: 64,
+      bearingDeg: 110,
+      intensity: 0.4,
+      ageH: 30
+    }
   ];
   const merged = mergeFires(near, events, 10);
   check(
