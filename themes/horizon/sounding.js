@@ -136,7 +136,14 @@ const wsat = (tK, pHpa) => {
   return es >= pHpa ? Infinity : (EPS * es) / (pHpa - es);
 };
 
-export function parcelAscent(rows) {
+// The 172nd pass adds the lifted-index reading: liHpa names a level
+// (500 hPa, Galway 1956) and the result carries the parcel's and the
+// environment's temperatures there, both linear in ln p inside the
+// step that crosses it, and their difference liK = Tenv - Tparcel
+// (negative: the parcel warmer than its surroundings, unstable) -
+// the Legacy Soundings ATBD's Eq. 4 with the same parcel the caller
+// hands in (the surface's own, or the mean of the lowest 100 hPa).
+export function parcelAscent(rows, {liHpa = 500} = {}) {
   const lv = rows
     .filter(
       (r) =>
@@ -144,8 +151,18 @@ export function parcelAscent(rows) {
     )
     .sort((a, b) => b.p - a.p);
   if (lv.length < 5 || !Number.isFinite(lv[0].dwC)) {
-    return {lclM: null, lfcM: null, elM: null, capeJkg: null};
+    return {
+      lclM: null,
+      lfcM: null,
+      elM: null,
+      capeJkg: null,
+      liK: null,
+      tParcelLiC: null,
+      tEnvLiC: null
+    };
   }
+  let tParcelLi = null;
+  let tEnvLi = null;
   const kappa = RD_J_KGK / CP;
   const sfc = lv[0];
   let T = sfc.tC + 273.15;
@@ -219,6 +236,17 @@ export function parcelAscent(rows) {
         elM = env.hM; // keeps extending while buoyant
       }
     }
+    // the lifted-index level, crossed inside this step
+    if (
+      tParcelLi === null &&
+      Number.isFinite(liHpa) &&
+      liHpa <= prev.p &&
+      liHpa >= env.p
+    ) {
+      const f = dlnp > 0 ? Math.log(prev.p / liHpa) / dlnp : 0;
+      tParcelLi = prev.T + f * (Tnew - prev.T);
+      tEnvLi = prev.Te + f * (Te - prev.Te);
+    }
     prev = {p: env.p, hM: env.hM, T: Tnew, Te};
     T = Tnew;
   }
@@ -226,7 +254,10 @@ export function parcelAscent(rows) {
     lclM: lclM !== null ? Math.round(lclM) : null,
     lfcM: lfcM !== null ? Math.round(lfcM) : null,
     elM: elM !== null && cape > 0 ? Math.round(elM) : null,
-    capeJkg: cape > 0 ? Math.round(cape) : 0
+    capeJkg: cape > 0 ? Math.round(cape) : 0,
+    liK: tParcelLi !== null ? tEnvLi - tParcelLi : null,
+    tParcelLiC: tParcelLi !== null ? tParcelLi - 273.15 : null,
+    tEnvLiC: tEnvLi !== null ? tEnvLi - 273.15 : null
   };
 }
 

@@ -69,6 +69,10 @@ import {
   lapCensus,
   lapNearestUsable,
   lapQuality,
+  DSI_FIELDS,
+  DSI_NAMES,
+  DSI_UNITS,
+  dsiVerdict,
   packArray,
   pixelSizeM,
   productTimeIso,
@@ -337,6 +341,33 @@ export const L2_LAP_EXTRAS = [
 ];
 L2_HALF_PX.lvt = 1;
 L2_HALF_PX.lvm = 1;
+// The 172nd pass: the derived stability indices of the same retrieval
+// (LI, CAPE, TT, SI, KI as uint16 counts with the file's scaling, fill
+// 65535) with the flag words, the LI's ending level and the scene's
+// own statistics as extras; the same 3 x 3 window of 10-km fields
+export const L2_DSI_SPEC = {
+  LI: 'raw16',
+  CAPE: 'raw16',
+  TT: 'raw16',
+  SI: 'raw16',
+  KI: 'raw16',
+  DQF_Overall: 'raw',
+  DQF_Retrieval: 'raw'
+};
+export const L2_DSI_EXTRAS = [
+  'final_air_pressure',
+  'mean_CAPE',
+  'maximum_CAPE',
+  'mean_lifted_index',
+  'minimum_lifted_index',
+  'mean_total_totals_index',
+  'mean_k_index',
+  'mean_showalter_index',
+  'total_attempted_retrievals',
+  'quantitative_local_zenith_angle',
+  'retrieval_local_zenith_angle'
+];
+L2_HALF_PX.dsi = 1;
 export const L2_RAIN_MIN_MMH = 0.1;
 // how far (Chebyshev, px) the nearest good TPW pixel is sought
 export const L2_TPW_NEAR_PX = 2;
@@ -478,6 +509,16 @@ export const L2_ASKS = [
     spec: L2_LVM_SPEC,
     halfPx: 1,
     extras: L2_LAP_EXTRAS,
+    timed: false
+  },
+  // the tower's ceiling (172nd): the stability indices of the same
+  // retrieval over the observer's field of regard, the scene's now
+  {
+    id: 'dsi',
+    product: L2_PRODUCTS.dsi,
+    spec: L2_DSI_SPEC,
+    halfPx: 1,
+    extras: L2_DSI_EXTRAS,
     timed: false
   }
 ];
@@ -1382,6 +1423,82 @@ export function l2LvtBody(dec, key, lat, lon) {
 }
 export function l2LvmBody(dec, key, lat, lon) {
   return l2ProfileBody(dec, key, lat, lon, 'LVM');
+}
+// THE TOWER'S CEILING FROM ORBIT (172nd pass): the stability window -
+// the five indices unscaled to their units (f32, NaN where the file
+// holds fill), the two flag windows, the observer's own field with
+// its values, quality words and the ATBD's own reading of each value
+// (goesl2.dsiVerdict; the western TT threshold west of 105 W), the
+// usable field nearest the observer with its values, the census, the
+// LI's ending level and the scene's statistics from the head.
+export function l2DsiBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_DSI_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.dsi);
+  if (!w) return null;
+  const ci = w.box.i - w.box.i0;
+  const cj = w.box.j - w.box.j0;
+  const cols = w.box.cols;
+  const overall = w.cut.DQF_Overall;
+  const retrieval = w.cut.DQF_Retrieval;
+  const rows = Math.round(overall.length / cols);
+  const qc = cj * cols + ci;
+  const vals = {};
+  for (const id of DSI_NAMES) {
+    const f = DSI_FIELDS[id];
+    const m = dec.meta[f] ?? {scale: 1, offset: 0, fill: 65535};
+    vals[id] = unscale(w.cut[f], m);
+  }
+  const x = dec.extras ?? {};
+  const num = (v) => (Number.isFinite(v) ? v : null);
+  const r2 = (v) => (Number.isFinite(v) ? +v.toFixed(2) : null);
+  const at = (q) => {
+    const o = {};
+    for (const id of DSI_NAMES) o[id] = r2(vals[id][q]);
+    return o;
+  };
+  const west = lon < -105;
+  const here = at(qc);
+  const nearest = lapNearestUsable(overall, retrieval, {cols, rows, ci, cj});
+  const packed = {};
+  for (const id of DSI_NAMES) packed[id] = packArray(vals[id], 'f32');
+  return {
+    ...l2Common(dec, L2_PRODUCTS.dsi, key, w),
+    ...packed,
+    units: {...DSI_UNITS},
+    overall: packArray(overall, 'u8'),
+    retrieval: packArray(retrieval, 'u8'),
+    here: {
+      q: qc,
+      ...here,
+      overall: overall[qc] ?? null,
+      retrieval: retrieval ? (retrieval[qc] ?? null) : null,
+      quality: lapQuality(overall[qc], retrieval ? retrieval[qc] : null),
+      verdict: dsiVerdict(here, {west})
+    },
+    nearest: nearest
+      ? {
+          ...nearest,
+          ...at(nearest.q),
+          quality: lapQuality(overall[nearest.q], retrieval ? retrieval[nearest.q] : null),
+          verdict: dsiVerdict(at(nearest.q), {west})
+        }
+      : null,
+    west,
+    census: lapCensus(overall, retrieval),
+    finalHpa: num(x.final_air_pressure),
+    scene: {
+      capeMean: num(x.mean_CAPE),
+      capeMax: num(x.maximum_CAPE),
+      liMean: num(x.mean_lifted_index),
+      liMin: num(x.minimum_lifted_index),
+      ttMean: num(x.mean_total_totals_index),
+      kiMean: num(x.mean_k_index),
+      siMean: num(x.mean_showalter_index),
+      attempted: num(x.total_attempted_retrievals)
+    },
+    lzaQuantitativeDeg: num(x.quantitative_local_zenith_angle),
+    lzaRetrievalDeg: num(x.retrieval_local_zenith_angle)
+  };
 }
 export function l2RainBody(dec, key, lat, lon) {
   if (!l2Has(dec, L2_RAIN_SPEC)) return null;

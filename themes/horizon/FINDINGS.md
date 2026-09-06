@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1190 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1192 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **148 reference files, 1190 landmark lines, 8 GPU probes** (live gate
+- **148 reference files, 1192 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1174,7 +1174,38 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    a micrometre of height and a millimetre of water, through the
    whole-buffer read and the range path alike (`goesl2-reference` THE
    COLUMN FROM ORBIT, THE COLUMN, READ; `goesl2-client-reference` THE
-   COLUMN, READ BY RANGE; `server-reference` the eighteen asks)
+   COLUMN, READ BY RANGE; `server-reference` the eighteen asks). Pass
+   172 gives the storm deck a measured ceiling where no balloon flew and
+   holds two products of one retrieval against each other: NOAA's
+   derived stability indices (ABI-L2-DSIC — lifted index, CAPE, total
+   totals, Showalter and K index on the profiles' own 10-km grid, CONUS
+   every 5 min; the Legacy Soundings ATBD's Sec. 3.4.2 and Table 1.3,
+   read: the LI parcel is the mean of the lowest 100 hPa lifted to 500
+   hPa, CAPE integrates to 100 hPa on wet-bulb potential temperatures,
+   TT and KI are the discrete levels' sums; accuracies LI 2 K, CAPE
+   1000 J/kg, TT 1, SI 2 K, KI 2, precisions 6.5 / 2500 / 4 / 6.5 / 5)
+   become the eighteenth served product, and the same five are
+   re-derived from the profile window itself — TT and KI from the
+   850/700/500-hPa levels in ln p, LI and CAPE from the ATBD's
+   mean-layer parcel and SI from the 850-hPa parcel through the
+   balloon's own gated ascent (`sounding.parcelAscent`, which now reads
+   the parcel's and the environment's temperatures at the lifted-index
+   level). On the vendored Ontario scan the column's TT and KI match
+   NOAA's DSIC values at the same field to a hundredth of a kelvin
+   (52.34 vs 52.33; 29.24 vs 29.23), LI to 0.4 K, the mean-layer CAPE
+   to 58 J/kg and SI to 1.2 K (the ATBD's own SI "still uses the
+   1000-hPa polynomial ... needs to be improved") — every index inside
+   Table 1.3's accuracy, the discrete-level ones a hundred times inside
+   it: the profile the page already carries reproduces NOAA's derived
+   product. The drawn tower is the station's own measured screen
+   temperature and dew point lifted through the satellite's column (the
+   boundary layer's real base under the retrieval's 3–5-km smear,
+   stated), and its equilibrium level becomes the storm deck's top on
+   shower and thunder codes where no fresh balloon stands within 300 km
+   and 13 h — the balloon's own writer outranks it while an ascent is
+   fresh, a stable column clears it (`goesl2-reference` THE TOWER'S
+   CEILING FROM ORBIT; `goesl2-client-reference` THE INDICES, READ BY
+   RANGE; `server-reference` the nineteen asks)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

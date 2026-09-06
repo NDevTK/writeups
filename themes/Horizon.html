@@ -502,6 +502,9 @@
         rainQuality,
         ADP_ATBD,
         adpReweight,
+        DSI_ATBD,
+        dsiAgreement,
+        lapStability,
         LAP_ATBD,
         isaPressureHpa,
         lapColumnRows,
@@ -5591,7 +5594,15 @@
         // model fields below have their own re-syncs; these two
         // have no other writer, so a roam must not fossilise them).
         state.blhAglMeas = null;
-        state.stormTopM = null;
+        // (172nd) without a fresh ascent the satellite's column keeps
+        // its own measured tower, when one stands (applySatColumn)
+        state.stormTopM =
+          satColumnStands() &&
+          satColumn.stability &&
+          satColumn.stability.tower &&
+          Number.isFinite(satColumn.stability.tower.elM)
+            ? satColumn.stability.tower.elM
+            : null;
         // (profileMeas clears too - the model column's own sync
         // rebuilds state.profile on its cadence.)
         state.profileMeas = null;
@@ -6539,7 +6550,8 @@
         'rain',
         'adp',
         'lvt',
-        'lvm'
+        'lvm',
+        'dsi'
       ];
       let goesL2Busy = false;
       // THE HAZE'S KIND (169th pass): NOAA's aerosol detection while
@@ -6671,6 +6683,15 @@
           freezingM: lapFreezingLevelM(rows),
           at250: lapLevelAt(rows, 250),
           at700: lapLevelAt(rows, 700),
+          // the tower (172nd): the station's screen temperature and dew
+          // point lifted through this column (goesl2.lapStability;
+          // the column's own smeared surface when the station has
+          // none, stated in its source), and the ATBD's five indices
+          // re-derived from the column beside NOAA's own
+          stability: lapStability(rows, {
+            sfcTC: state.temp,
+            sfcTdC: state.dew
+          }),
           quality: lapQuality(
             t.overall[pick.q],
             t.retrieval ? t.retrieval[pick.q] : null
@@ -6680,6 +6701,13 @@
       function applySatColumn() {
         const c = goesL2ColumnNow();
         const craft = (goesL2 && goesL2.craft) || 'GOES';
+        // the stability indices' record (172nd), column or not
+        const stab = goesL2StabilityNow();
+        if (stab)
+          record(
+            `NOAA ${craft} derived stability indices (DSIC)`,
+            satStabilityWords(stab)
+          );
         if (!c) {
           satColumn = null;
           return;
@@ -6693,6 +6721,16 @@
         // cap; the weather sync leaves it while this column stands)
         if (!ascentStands() && Number.isFinite(c.freezingM))
           state.freezing = c.freezingM;
+        // the storm deck's ceiling (172nd): the parcel's equilibrium
+        // level where no balloon stands - the deck reads it on shower
+        // and thunder codes only (the slab's top through the terrain's
+        // height mapping); a stable column clears it, and the balloon's
+        // own writer (applySounding) outranks it while a fresh ascent
+        // stands
+        if (!ascentStands()) {
+          const tw = c.stability && c.stability.tower;
+          state.stormTopM = tw && Number.isFinite(tw.elM) ? tw.elM : null;
+        }
         // the infrared field re-runs once on a new column when it ran on
         // a lesser one (a far balloon, or none at all)
         if (
@@ -6740,7 +6778,103 @@
             ascentStands()
               ? `a fresh balloon within ${SOUNDING_MAX_KM} km stands; the column beside it`
               : `no balloon within ${SOUNDING_MAX_KM} km and ${SOUNDING_FRESH_H} h: the column stands in above the boundary layer`
-          }`
+          }` +
+          satTowerWords(c.stability)
+        );
+      }
+      // the tower's words (172nd): the parcel named by its source, its
+      // start, and where it stops
+      function satTowerWords(st) {
+        const tw = st && st.tower;
+        if (!tw) return '';
+        const start = tw.start
+          ? ` (${tw.start.tC.toFixed(1)} / ${tw.start.tdC.toFixed(1)} °C at ${tw.start.p.toFixed(0)} hPa)`
+          : '';
+        return (
+          ` · the tower from ${tw.source}${start}: ` +
+          (Number.isFinite(tw.elM)
+            ? `CAPE ${tw.capeJkg} J/kg → EL ${tw.elM} m (LCL ${tw.lclM} m, LFC ${tw.lfcM} m, lifted index ${dsiSigned(tw.liK)} K)`
+            : `stable, no tower (CAPE ${tw.capeJkg}${Number.isFinite(tw.liK) ? `, lifted index ${dsiSigned(tw.liK)} K` : ''}${Number.isFinite(tw.lclM) ? `, condensation at ${tw.lclM} m` : ''})`)
+        );
+      }
+      const dsiSigned = (v, dp = 1) =>
+        Number.isFinite(v) ? `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(dp)}` : '—';
+      // THE TOWER'S CEILING FROM ORBIT (172nd pass): NOAA's derived
+      // stability indices over the observer's field of regard (the
+      // profiles' own retrieval, goesl2.DSI_ATBD's Table 1.3) while
+      // fresh, beside the five re-derived from the column itself
+      const DSI_LIVE_MS = 30 * 60e3;
+      function goesL2StabilityNow() {
+        const d = goesL2 && goesL2.dsi;
+        if (!d || !d.time || !d.here || !d.census) return null;
+        if (Date.now() - Date.parse(d.time) > DSI_LIVE_MS) return null;
+        const pick =
+          d.here.quality && d.here.quality.usable
+            ? {...d.here, own: true}
+            : d.nearest
+              ? {...d.nearest, own: false}
+              : null;
+        return {body: d, pick};
+      }
+      function satStabilityWords(s) {
+        const d = s.body;
+        const p = s.pick;
+        if (!p)
+          return `${d.time.slice(11, 16)}Z · no usable field of regard in the 3 × 3 (${d.here.quality ? d.here.quality.words : 'no field'}; ${d.census.good} good of ${d.census.n})`;
+        const v = p.verdict || {};
+        const word = (w) => (w ? w.split(' (')[0].split(':')[0] : '—');
+        const num = (x, dp) => (Number.isFinite(x) ? x.toFixed(dp) : '—');
+        return (
+          `${d.time.slice(11, 16)}Z · ${p.own ? "the observer's own field of regard" : 'the nearest usable field of regard'} (${p.quality.words}) · ` +
+          `LI ${dsiSigned(p.li)} K (${word(v.li)}) · CAPE ${num(p.cape, 0)} J/kg (${word(v.cape)}) · TT ${num(p.tt, 1)} (${word(v.tt)}) · SI ${dsiSigned(p.si)} K (${word(v.si)}) · KI ${num(p.ki, 1)} (${word(v.ki)})` +
+          (d.scene && Number.isFinite(d.scene.capeMean)
+            ? ` · the scene: mean CAPE ${d.scene.capeMean.toFixed(0)} J/kg (max ${d.scene.capeMax.toFixed(0)}), mean LI ${dsiSigned(d.scene.liMean)} K over ${d.scene.attempted.toLocaleString('en-US')} attempted retrievals`
+            : '')
+        );
+      }
+      function satStabilityLine() {
+        if (!goesL2 || !goesL2.dsi) return null;
+        const s = goesL2StabilityNow();
+        const A = DSI_ATBD.requirement.accuracy;
+        const st = satColumn && satColumn.stability;
+        let mine = '';
+        if (st) {
+          const noaa =
+            s && s.pick
+              ? {li: s.pick.li, cape: s.pick.cape, tt: s.pick.tt, si: s.pick.si, ki: s.pick.ki}
+              : null;
+          const ag = dsiAgreement(noaa, {
+            li: st.li,
+            cape: st.capeMeanLayer,
+            tt: st.tt,
+            si: st.si,
+            ki: st.ki
+          });
+          const each = (id, val, dp) =>
+            Number.isFinite(val)
+              ? `${id.toUpperCase()} ${dp === 0 ? val.toFixed(0) : dsiSigned(val, dp)}` +
+                (ag[id]
+                  ? ` (${dsiSigned(ag[id].diff, dp === 0 ? 0 : 2)} from NOAA's${ag[id].withinAccuracy ? '' : `, past the ${A[id]} accuracy`})`
+                  : '')
+              : null;
+          mine =
+            ` · from the profile itself (the ATBD's mean lowest-100-hPa parcel for LI and CAPE, its 850-hPa parcel for SI, the discrete levels for TT and KI): ` +
+            [
+              each('li', st.li, 1),
+              each('cape', st.capeMeanLayer, 0),
+              each('tt', st.tt, 1),
+              each('si', st.si, 1),
+              each('ki', st.ki, 1)
+            ]
+              .filter(Boolean)
+              .join(' · ');
+        }
+        return (
+          `${goesL2.craft || 'GOES'}'s derived stability indices (ABI-L2-DSIC, the profiles' own retrieval, 10-km field of regard, every 5 min): ` +
+          (s ? satStabilityWords(s) : 'none fresh') +
+          mine +
+          ` · the ATBD's accuracies: LI ${A.li} K, CAPE ${A.cape} J/kg (its precision ${DSI_ATBD.requirement.precision.cape}), TT ${A.tt}, SI ${A.si} K, KI ${A.ki}; TT's severe threshold ${s && s.body.west ? '65, west of the Rockies' : '55, east of the Rockies'}` +
+          ` · the drawn tower is the station's own parcel through the column (the satellite column's line), not the mean-layer one`
         );
       }
       function satColumnLine() {
@@ -6764,6 +6898,17 @@
           ` · what it stands in for: ${
             satColumnStands()
               ? "the freezing level (the bow shaft's cap) and the infrared reference's column" +
+                (satColumn.stability &&
+                satColumn.stability.tower &&
+                Number.isFinite(satColumn.stability.tower.elM)
+                  ? `, and the storm deck's ceiling at the parcel's EL ${satColumn.stability.tower.elM} m ${
+                      (state.code || 0) >= 80
+                        ? `(showers or thunder reported, WMO ${state.code}: the slab tops there)`
+                        : `(no shower or thunder code now, WMO ${state.code || 0}: the deck keeps its own top)`
+                    }`
+                  : satColumn.stability && satColumn.stability.tower
+                    ? "; no tower: the column is stable for the station's parcel"
+                    : '') +
                 (con && con.formBand
                   ? `; contrails forming ${(con.formBand.loM / 1000).toFixed(1)}–${(con.formBand.hiM / 1000).toFixed(1)} km by its temperature (persistence unjudged: its humidity is not useful above 300 hPa, so the drawn trails keep their own judge)`
                   : '; no contrail formation band by its temperature')
@@ -7182,6 +7327,18 @@
               overall: p.overall ? unpackArray(p.overall) : null,
               retrieval: p.retrieval ? unpackArray(p.retrieval) : null,
               skin: p.skin ? unpackArray(p.skin) : null,
+              // the tower's ceiling (172nd): the five stability indices
+              // in their units (f32, NaN where the file holds fill)
+              indices:
+                p.li && p.cape && p.tt && p.si && p.ki
+                  ? {
+                      li: unpackArray(p.li),
+                      cape: unpackArray(p.cape),
+                      tt: unpackArray(p.tt),
+                      si: unpackArray(p.si),
+                      ki: unpackArray(p.ki)
+                    }
+                  : null,
               // the cloud top phase's categories (161st pass)
               phaseArr: p.phase ? unpackArray(p.phase) : null,
               // the fire mask's codes (162nd pass; the -99 fill as 65535)
@@ -7347,6 +7504,9 @@
             // observer's field of regard (applySatColumn)
             lvt: unpackProduct(j.lvt),
             lvm: unpackProduct(j.lvm),
+            // the tower's ceiling (172nd): NOAA's stability indices of
+            // the same retrieval (goesL2StabilityNow)
+            dsi: unpackProduct(j.dsi),
             // the daemon's deployed revision and the products the
             // page read for it from the bucket (158th pass)
             rev: j.rev ?? null,
@@ -14875,6 +15035,14 @@
             const scl = satColumnLine();
             if (scl) research['satellite column (ABI legacy profiles)'] = scl;
             else delete research['satellite column (ABI legacy profiles)'];
+            // the tower's ceiling (172nd): NOAA's stability indices
+            // beside the column's own
+            const ssl = satStabilityLine();
+            if (ssl)
+              research['stability from orbit (ABI derived stability indices)'] =
+                ssl;
+            else
+              delete research['stability from orbit (ABI derived stability indices)'];
           }
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();

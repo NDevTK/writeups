@@ -486,6 +486,10 @@ export const L2_PRODUCTS = {
   // night; 9.7 MB a file, a point's column one 200-kB chunk
   lvt: 'ABI-L2-LVTPC',
   lvm: 'ABI-L2-LVMPC',
+  // the tower's ceiling (172nd): the derived stability indices of the
+  // same retrieval - LI, CAPE, TT, SI, KI on the 10-km grid, CONUS
+  // every 5 min; 0.9 MB a file
+  dsi: 'ABI-L2-DSIC',
   // the 152nd pass: the downward shortwave radiation at the surface
   // (0.2-4.0 um, direct + diffuse, W/m2) - full disk only, every 10
   // min, 2 km (the Enterprise SRB algorithm: Laszlo, Kim & Liu, ATBD
@@ -1352,6 +1356,9 @@ export function adpReweight(fractions, dominant, floor = ADP_CALLED_FLOOR) {
 // regard good, 71,942 invalid for cloud.
 // ---------------------------------------------------------------
 import {eLiq} from './contrails.js';
+// the parcel ascent is sounding.js's gated law (the balloon's tower);
+// the 172nd runs it through the satellite's column
+import {parcelAscent} from './sounding.js';
 export const LAP_ATBD = {
   version: 'Enterprise Legacy Soundings ATBD v3.1, 2019-11-01',
   requirement: {
@@ -1625,6 +1632,226 @@ export function lapNearestUsable(overall, retrieval, {cols, rows, ci, cj}) {
       if (!best || d2 < best.d2) best = {q, i, j, d2};
     }
   return best;
+}
+// ---------------------------------------------------------------
+// THE TOWER'S CEILING FROM ORBIT (172nd pass): NOAA's derived
+// stability indices (ABI-L2-DSIC - the same Legacy Soundings ATBD
+// v3.1, Sec. 3.4.2 and Table 1.3; the same retrieval as the profiles,
+// on the same 10-km grid, CONUS every 5 min) and the same indices
+// re-derived from the profile itself, so the two products of one
+// retrieval can be held against each other on the line; and the
+// parcel ascent (sounding.js's gated law) through the satellite's
+// column from the station's own measured screen temperature and dew
+// point - the storm deck's ceiling where no balloon flew.
+// THE ATBD, read: LI (Galway 1956) is the temperature difference
+// between the environment at 500 hPa and a parcel lifted dry
+// adiabatically from the MEAN of the lowest 100 hPa (surface to ps -
+// 100) to its condensation level and moist adiabatically to 500 hPa
+// (Eq. 4-6; negative = the parcel warmer than its surroundings,
+// unstable); CAPE integrates the parcel's buoyancy from the surface
+// level to the 57th level (100 hPa) on wet-bulb potential temperatures
+// with g = 9.806 (Eq. 7-8, the SATLFT iteration of Baker & Schlatter
+// 1982); TT = (T850 - T500) + (Td850 - T500) (Eq. 9); SI lifts the
+// 850-hPa parcel the same way to 500 hPa; KI = (T850 - T500) + Td850 -
+// (T700 - Td700) (Eq. 10); the discrete levels are interpolated from
+// the 101-level ordinate (Eq. 3). The text's own reading: CAPE over
+// 1000 J/kg "moderate", over 3000 "very large ... often associated
+// with strong/severe weather"; TT below 40-45 "little or no
+// thunderstorm activity", over 55 in the eastern and central United
+// States or 65 in the west "considerable severe weather"; SI under -3
+// "the possible condition for a severe weather"; KI over 30 "severe
+// weathers are very likely". Table 1.3: 10 km, quantitative to 67 deg
+// local zenith, CONUS refresh 30 min, day and night; measurement
+// ranges LI -10..40 K, CAPE 0..5000 J/kg, SI 4..-10 K, TT -43..56, KI
+// 0..40; ACCURACY LI 2 K, CAPE 1000 J/kg, SI 2 K, TT 1, KI 2;
+// PRECISION LI 6.5 K, CAPE 2500 J/kg, SI 6.5 K, TT 4, KI 5 - the
+// CAPE's requirement is coarse, and the line says so.
+// THE FILE, read (h5py): LI, CAPE, TT, SI, KI as uint16 counts
+// (scale 7.63e-4 from -10 K; 0.0763 J/kg; 1.5718e-3 from -43;
+// 5.3411e-4 from -10; 1.8312e-3 from -70), fill 65535, chunked 262
+// rows by the full width; DQF_Overall / DQF_Retrieval / DQF_SkinTemp
+// as the profiles'; final_air_pressure 500 hPa (the LI's ending
+// level); the scene's own statistics as scalars. MEASURED on the
+// vendored crop (Ontario 20:51Z): TT and KI re-derived from the
+// profile crops' centre column match NOAA's DSIC values at the same
+// field to a hundredth of a kelvin (52.34 vs 52.33; 29.24 vs 29.23).
+// ---------------------------------------------------------------
+export const DSI_ATBD = {
+  version: LAP_ATBD.version,
+  product: 'ABI-L2-DSIC',
+  requirement: {
+    horizontalKm: 10,
+    refreshMinConus: 30,
+    lzaQuantitativeDeg: 67,
+    range: {li: [-10, 40], cape: [0, 5000], si: [-10, 4], tt: [-43, 56], ki: [0, 40]},
+    accuracy: {li: 2, cape: 1000, si: 2, tt: 1, ki: 2},
+    precision: {li: 6.5, cape: 2500, si: 6.5, tt: 4, ki: 5}
+  },
+  words: {
+    capeModerate: 1000,
+    capeVeryLarge: 3000,
+    ttLittle: 40,
+    ttLittleBand: 45,
+    ttConsiderableEast: 55,
+    ttConsiderableWest: 65,
+    siSevere: -3,
+    kiSevere: 30
+  },
+  parcel: {
+    layerHpa: 100,
+    liLevelHpa: 500,
+    siFromHpa: 850,
+    capeTopHpa: 100,
+    gCape: 9.806
+  }
+};
+export const DSI_NAMES = ['li', 'cape', 'tt', 'si', 'ki'];
+export const DSI_FIELDS = {li: 'LI', cape: 'CAPE', tt: 'TT', si: 'SI', ki: 'KI'};
+export const DSI_UNITS = {li: 'K', cape: 'J/kg', tt: 'K', si: 'K', ki: 'K'};
+/** The ATBD's own reading of each index (its Sec. 3.4.2 words); the
+ * TT threshold is the western one west of the Rockies (the caller's
+ * `west`, stated on the line). null where the value is missing. */
+export function dsiVerdict({li, cape, tt, si, ki} = {}, {west = false} = {}) {
+  const W = DSI_ATBD.words;
+  const fin = (v) => Number.isFinite(v);
+  return {
+    li: fin(li) ? (li < 0 ? 'unstable: the parcel warmer than its surroundings' : 'stable') : null,
+    cape: fin(cape)
+      ? cape > W.capeVeryLarge
+        ? 'very large potential energy, often strong or severe weather'
+        : cape > W.capeModerate
+          ? 'moderate potential energy'
+          : cape > 0
+            ? 'little potential energy'
+            : 'none'
+      : null,
+    tt: fin(tt)
+      ? tt > (west ? W.ttConsiderableWest : W.ttConsiderableEast)
+        ? `considerable severe weather (over ${west ? W.ttConsiderableWest : W.ttConsiderableEast}, the ${west ? 'western' : 'eastern and central'} United States' threshold)`
+        : tt < W.ttLittle
+          ? 'little or no thunderstorm activity'
+          : tt <= W.ttLittleBand
+            ? "little or none (the ATBD's 40-45 band)"
+            : 'thunderstorms possible'
+      : null,
+    si: fin(si) ? (si < W.siSevere ? 'severe weather possible (under -3)' : 'no severe signal') : null,
+    ki: fin(ki) ? (ki > W.kiSevere ? 'severe weather very likely (over 30)' : 'not conducive to severe weather') : null
+  };
+}
+/** The ATBD's discrete-level indices from the rows: TT (Eq. 9) and KI
+ * (Eq. 10) with T and Td at 850, 700 and 500 hPa linear in ln p
+ * (lapLevelAt); null when a level or its dew point is missing. */
+export function lapIndicesFromRows(rows) {
+  if (!rows || rows.length < 4) return null;
+  const l850 = lapLevelAt(rows, 850);
+  const l700 = lapLevelAt(rows, 700);
+  const l500 = lapLevelAt(rows, 500);
+  if (!l850 || !l700 || !l500 || l850.tdC === null || l700.tdC === null) return null;
+  return {
+    tt: l850.tC - l500.tC + (l850.tdC - l500.tC),
+    ki: l850.tC - l500.tC + l850.tdC - (l700.tC - l700.tdC),
+    t850C: l850.tC,
+    td850C: l850.tdC,
+    t700C: l700.tC,
+    td700C: l700.tdC,
+    t500C: l500.tC
+  };
+}
+/** Rows for sounding.parcelAscent ({p, hM, tC, dwC}) from the column's
+ * rows; with `start` ({p, hM, tC, tdC}) the parcel begins there - the
+ * start row first, then only the rows above it. */
+export function lapParcelRows(rows, start = null) {
+  const out = rows.map((r) => ({p: r.p, hM: r.hM, tC: r.tC, dwC: r.tdC ?? undefined}));
+  if (!start) return out;
+  return [{p: start.p, hM: start.hM, tC: start.tC, dwC: start.tdC}, ...out.filter((r) => r.p < start.p)];
+}
+/** The ATBD's lifted-index parcel: the pressure-weighted mean
+ * temperature and dew point of the lowest `depthHpa` of the column
+ * (the layer's top interpolated in ln p), lifted from the layer's
+ * middle pressure; null when the layer's dew points are missing. */
+export function lapMeanLayerStart(rows, depthHpa = DSI_ATBD.parcel.layerHpa) {
+  if (!rows || rows.length < 3 || rows[0].tdC === null) return null;
+  const pS = rows[0].p;
+  const pTop = pS - depthHpa;
+  const top = lapLevelAt(rows, pTop);
+  if (!top || top.tdC === null) return null;
+  const pts = [rows[0], ...rows.filter((r) => r.p < pS && r.p > pTop), {p: pTop, tC: top.tC, tdC: top.tdC}];
+  let wT = 0;
+  let wTd = 0;
+  let W = 0;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[i + 1];
+    if (a.tdC === null || b.tdC === null) return null;
+    const dp = a.p - b.p;
+    wT += (dp * (a.tC + b.tC)) / 2;
+    wTd += (dp * (a.tdC + b.tdC)) / 2;
+    W += dp;
+  }
+  const pMid = pS - depthHpa / 2;
+  const mid = lapLevelAt(rows, pMid);
+  return {p: pMid, hM: mid ? mid.hM : rows[0].hM, tC: wT / W, tdC: wTd / W, depthHpa};
+}
+/** The column's stability: the ATBD's five indices re-derived from the
+ * rows (TT and KI from the discrete levels, LI from the mean
+ * lowest-100-hPa parcel and SI from the 850-hPa parcel, each lifted to
+ * 500 hPa by sounding.parcelAscent), and THE TOWER - the parcel the
+ * scene draws: the station's own screen temperature and dew point
+ * (sfcTC, sfcTdC, the boundary layer's real base) lifted through the
+ * satellite's column above it, or without a station the column's own
+ * surface row, which is the retrieval's smear of the boundary layer
+ * (stated in `source`). null under five rows. */
+export function lapStability(rows, {sfcTC = null, sfcTdC = null} = {}) {
+  if (!rows || rows.length < 5) return null;
+  const levels = lapIndicesFromRows(rows);
+  const meanLayer = lapMeanLayerStart(rows);
+  const meanAscent = meanLayer ? parcelAscent(lapParcelRows(rows, meanLayer)) : null;
+  const l850 = lapLevelAt(rows, DSI_ATBD.parcel.siFromHpa);
+  const siAscent =
+    l850 && l850.tdC !== null
+      ? parcelAscent(lapParcelRows(rows, {p: DSI_ATBD.parcel.siFromHpa, hM: l850.hM, tC: l850.tC, tdC: l850.tdC}))
+      : null;
+  const own = Number.isFinite(sfcTC) && Number.isFinite(sfcTdC);
+  const start = own
+    ? {p: rows[0].p, hM: rows[0].hM, tC: sfcTC, tdC: Math.min(sfcTdC, sfcTC)}
+    : rows[0].tdC !== null
+      ? {p: rows[0].p, hM: rows[0].hM, tC: rows[0].tC, tdC: rows[0].tdC}
+      : null;
+  const ascent = start ? parcelAscent(lapParcelRows(rows, start)) : null;
+  return {
+    tt: levels ? levels.tt : null,
+    ki: levels ? levels.ki : null,
+    levels,
+    li: meanAscent ? meanAscent.liK : null,
+    si: siAscent ? siAscent.liK : null,
+    capeMeanLayer: meanAscent ? meanAscent.capeJkg : null,
+    elMeanLayerM: meanAscent ? meanAscent.elM : null,
+    meanLayer,
+    tower: ascent
+      ? {
+          ...ascent,
+          start,
+          source: own
+            ? "the station's screen temperature and dew point"
+            : "the column's own surface row (the retrieval's smear of the boundary layer)"
+        }
+      : null
+  };
+}
+/** NOAA's index against the same index from the profile: the
+ * difference and whether it sits within the ATBD's accuracy
+ * requirement for that index. */
+export function dsiAgreement(noaa, mine) {
+  const out = {};
+  for (const id of DSI_NAMES) {
+    const a = noaa ? noaa[id] : null;
+    const b = mine ? mine[id] : null;
+    out[id] =
+      Number.isFinite(a) && Number.isFinite(b)
+        ? {noaa: a, mine: b, diff: b - a, withinAccuracy: Math.abs(b - a) <= DSI_ATBD.requirement.accuracy[id]}
+        : null;
+  }
+  return out;
 }
 // ---------------------------------------------------------------
 // THE FIRE'S HEAT (162nd pass): NOAA's fire / hot spot

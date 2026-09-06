@@ -258,11 +258,31 @@ are gated by `../server-reference.mjs` — the `server` set in
   humidity dropped above 300 hPa as the ATBD says) and lets the
   column stand in above the boundary layer - the freezing level and
   the infrared reference's column - where no balloon flew within 300
-  km and 13 h: seventeen products served (a window of +-100 km costs
-  437-547 kB in 4-6 ranges, measured, the aerosol window a few tens
-  of kB more, the two profile windows about a megabyte between them
-  at the five-minute cadence). An
-  EIGHTEENTH ask exists in the shared decode block but is the page's
+  km and 13 h; and since the 172nd NOAA's derived stability indices
+  of the same retrieval (`ABI-L2-DSIC`: lifted index, CAPE, total
+  totals, Showalter and K index on the same 10-km grid, CONUS every 5
+  min - the same ATBD's Sec. 3.4.2 and Table 1.3, whose accuracies are
+  LI 2 K, CAPE 1000 J/kg, TT 1, SI 2 K, KI 2, stated on the page) as
+  `dsi`: the 3 x 3 window's five indices in their units (`li`,
+  `cape`, `tt`, `si`, `ki` as f32, NaN where the file holds fill),
+  the two flag windows, the observer's own field with its values, its
+  quality words and the ATBD's own reading of each value (`here`,
+  `verdict`; the western TT threshold west of 105 W, `west`), the
+  usable field nearest the observer (`nearest`), the census, the LI's
+  ending level (`finalHpa`) and the scene's own statistics from the
+  file's head (`scene`). The page re-derives the same five from the
+  profile window itself (`goesl2.lapStability`) and prints both with
+  their differences, and lifts the station's own screen temperature
+  and dew point through the satellite's column for the storm deck's
+  ceiling where no balloon flew (the same `sounding.parcelAscent` the
+  balloon's tower uses): eighteen products served (a window of +-100
+  km costs 437-547 kB in 4-6 ranges, measured, the aerosol window a
+  few tens of kB more, the two profile windows about a megabyte
+  between them at the five-minute cadence, the stability window
+  nearly its whole 0.9-MB file - its fields are chunked 262 rows by
+  the full width, so any window touches the chunk: 8 ranges, 836 kB,
+  measured). A
+  NINETEENTH ask exists in the shared decode block but is the page's
   own (`pageOnly`, 159th): the 500-m visible band 2 window (`vis`,
   401 x 401 px of the CMIP ATBD's reflectance factor with the
   file's kappa, Esun and Earth-Sun distance) that the page reads
@@ -271,7 +291,7 @@ are gated by `../server-reference.mjs` — the `server` set in
   cadence (about 15 MB an hour by day), which this box's free-tier
   egress cannot carry and the bucket's CORS can. This
   daemon never lists, fetches or serves it; `/health`'s
-  `version.products` names the seventeen it does.
+  `version.products` names the eighteen it does.
   Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks

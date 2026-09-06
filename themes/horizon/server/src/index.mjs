@@ -1030,12 +1030,15 @@ export {
   L2_LVT_SPEC,
   L2_LVM_SPEC,
   L2_LAP_EXTRAS,
+  L2_DSI_SPEC,
+  L2_DSI_EXTRAS,
   L2_TPW_EXTRAS,
   l2TpwBody,
   l2RainBody,
   l2AdpBody,
   l2LvtBody,
   l2LvmBody,
+  l2DsiBody,
   decodeL2Column,
   l2DcompBody
 } from '../../goesl2-decode.js';
@@ -1082,6 +1085,7 @@ const {
   l2AdpBody,
   l2LvtBody,
   l2LvmBody,
+  l2DsiBody,
   l2DcompBody
 } = L2;
 const l2Inflate = (u8) =>
@@ -2428,6 +2432,9 @@ function main() {
       // the column from orbit (171st): the profiles over the observer
       lvt: F.lvt ? l2LvtBody(F.lvt.dec, F.lvt.key, cell.lat, cell.lon) : null,
       lvm: F.lvm ? l2LvmBody(F.lvm.dec, F.lvm.key, cell.lat, cell.lon) : null,
+      // the tower's ceiling (172nd): NOAA's stability indices of the
+      // same retrieval
+      dsi: F.dsi ? l2DsiBody(F.dsi.dec, F.dsi.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial',
       // the deployed revision (158th): the page can tell an older
       // daemon's body from a fresh one's

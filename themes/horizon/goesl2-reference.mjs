@@ -129,6 +129,18 @@ import {
 } from './goesl2.js';
 import {eLiq} from './contrails.js';
 import {LAP_EXPECT, LVMPC_B64, LVTPC_B64} from './lap-fixture.js';
+import {DSI_EXPECT, DSIC_B64} from './dsi-fixture.js';
+import {
+  DSI_ATBD,
+  DSI_NAMES,
+  dsiAgreement,
+  dsiVerdict,
+  lapIndicesFromRows,
+  lapMeanLayerStart,
+  lapParcelRows,
+  lapStability
+} from './goesl2.js';
+import {parcelAscent} from './sounding.js';
 import {
   ADP_ATBD,
   ADP_CALLED_FLOOR,
@@ -1409,6 +1421,145 @@ const inflate = (u8) =>
       `500-hPa ${tK[25].toFixed(3)} K, 134-hPa ${tK[52].toFixed(3)} K and 905-hPa humidity ${(100 * rh[7]).toFixed(2)}% as h5py read them; the column from a 1013.25-hPa sea level: ${rows.length} rows to ${top.p.toFixed(1)} hPa at ${top.hM.toFixed(1)} m, ` +
       `${lapPwMm(rows).toFixed(3)} mm of water, freezing at ${lapFreezingLevelM(rows).toFixed(1)} m, 250 hPa ${at250.tC.toFixed(2)} C at ${at250.hM.toFixed(1)} m (no humidity above 300 hPa), 700 hPa ${at700.tC.toFixed(2)} C at ${at700.rh.toFixed(1)}% - every number h5py's; ${cen.good} of ${cen.n} fields good`
   );
+
+  // ---- THE TOWER'S CEILING FROM ORBIT (172nd pass) -------------------
+  // The ATBD's words at their thresholds; TT and KI in closed form on
+  // a column whose 850, 700 and 500 hPa rows are exact; the mean
+  // lowest-100-hPa parcel of a linear column is its midpoint; the
+  // parcel adapter; a stable column builds no tower, a hot moist
+  // surface through the same column does; then the SAME Ontario
+  // column against NOAA's own DSIC indices at the same field.
+  {
+    const V = dsiVerdict({li: -2, cape: 1500, tt: 50, si: -4, ki: 31});
+    const V2 = dsiVerdict({li: 3, cape: 3500, tt: 57, si: 1, ki: 20});
+    const V3 = dsiVerdict({li: NaN, cape: 0, tt: 38, si: null, ki: 25}, {west: true});
+    const V4 = dsiVerdict({tt: 57, cape: 200}, {west: true});
+    // a column with exact rows at the discrete levels: T 20/10/0/-15 C
+    // at 1000/850/700/500, Td 15/5/-10 (none at 500 needed)
+    const syn = [
+      {p: 1000, hM: 0, tC: 20, rh: 70, tdC: 15, q: 0.01},
+      {p: 850, hM: 1450, tC: 10, rh: 70, tdC: 5, q: 0.006},
+      {p: 700, hM: 3000, tC: 0, rh: 50, tdC: -10, q: 0.002},
+      {p: 500, hM: 5600, tC: -15, rh: 40, tdC: -25, q: 0.001},
+      {p: 300, hM: 9200, tC: -45, rh: null, tdC: null, q: 0},
+      {p: 200, hM: 11800, tC: -55, rh: null, tdC: null, q: 0},
+      {p: 100, hM: 16200, tC: -60, rh: null, tdC: null, q: 0}
+    ];
+    const ix = lapIndicesFromRows(syn);
+    const ttClosed = 10 - -15 + (5 - -15); // 45
+    const kiClosed = 10 - -15 + 5 - (0 - -10); // 20
+    // a column linear in p from 1000 to 900 hPa (T 20 -> 10, Td 10 ->
+    // 0): the 100-hPa mean is the midpoint's 15 / 5 at 950 hPa
+    const lin = [];
+    for (let p = 1000; p >= 500; p -= 25)
+      lin.push({p, hM: (1000 - p) * 9, tC: 20 - (1000 - p) / 10, rh: 50, tdC: 10 - (1000 - p) / 10, q: 0.005});
+    const mean = lapMeanLayerStart(lin);
+    const pr = lapParcelRows(syn, {p: 950, hM: 450, tC: 18, tdC: 12});
+    const stable = lapStability(syn, {sfcTC: 12, sfcTdC: 0});
+    const hot = lapStability(syn, {sfcTC: 32, sfcTdC: 24});
+    const own = lapStability(syn);
+    const tooFew = lapStability(syn.slice(0, 4));
+    // the real column (the rows of THE COLUMN, READ above) against
+    // NOAA's own indices at the same field of regard and scan
+    const noaa = {};
+    for (const id of DSI_NAMES) noaa[id] = DSI_EXPECT.here[id.toUpperCase()].value;
+    const st = lapStability(rows);
+    const mine = {li: st.li, cape: st.capeMeanLayer, tt: st.tt, si: st.si, ki: st.ki};
+    const agree = dsiAgreement(noaa, mine);
+    const d = openHdf5(new Uint8Array(Buffer.from(DSIC_B64, 'base64')), inflate);
+    const qcen = DSI_EXPECT.centre.row * DSI_EXPECT.cols + DSI_EXPECT.centre.col;
+    const read = {};
+    for (const id of DSI_NAMES) {
+      const ds = d.dataset(id.toUpperCase());
+      const v = ds.values[qcen];
+      read[id] = v === 65535 ? NaN : v * sc(ds.attrs.scale_factor) + sc(ds.attrs.add_offset);
+    }
+    const A = DSI_ATBD.requirement.accuracy;
+    check(
+      "THE TOWER'S CEILING FROM ORBIT: the ATBD's words, TT and KI in closed form, the mean-layer parcel, the tower, and the Ontario column's five indices against NOAA's own at the same field",
+      V.li.startsWith('unstable') &&
+        V.cape === 'moderate potential energy' &&
+        V.tt === 'thunderstorms possible' &&
+        V.si.startsWith('severe weather possible') &&
+        V.ki.startsWith('severe weather very likely') &&
+        V2.li === 'stable' &&
+        V2.cape.startsWith('very large') &&
+        V2.tt.startsWith('considerable severe weather (over 55') &&
+        V2.si === 'no severe signal' &&
+        V2.ki === 'not conducive to severe weather' &&
+        V3.li === null &&
+        V3.cape === 'none' &&
+        V3.tt === 'little or no thunderstorm activity' &&
+        V3.si === null &&
+        V4.tt === 'thunderstorms possible' &&
+        V4.cape === 'little potential energy' &&
+        ix !== null &&
+        near(ix.tt, ttClosed, 1e-12) &&
+        near(ix.ki, kiClosed, 1e-12) &&
+        near(ix.t850C, 10, 1e-12) &&
+        near(ix.td700C, -10, 1e-12) &&
+        mean !== null &&
+        near(mean.p, 950, 1e-12) &&
+        near(mean.tC, 15, 1e-9) &&
+        near(mean.tdC, 5, 1e-9) &&
+        mean.depthHpa === 100 &&
+        pr.length === 7 &&
+        pr[0].p === 950 &&
+        pr[0].dwC === 12 &&
+        pr[1].p === 850 &&
+        pr[1].dwC === 5 &&
+        pr.every((r, i) => i === 0 || r.p < 950) &&
+        stable !== null &&
+        stable.tower.capeJkg === 0 &&
+        stable.tower.elM === null &&
+        stable.tower.liK > 0 &&
+        stable.tower.source.startsWith("the station's") &&
+        near(stable.tt, ttClosed, 1e-12) &&
+        hot.tower.capeJkg > 1000 &&
+        hot.tower.elM > 9000 &&
+        hot.tower.lfcM !== null &&
+        hot.tower.lfcM < hot.tower.elM &&
+        hot.tower.liK < -5 &&
+        hot.tower.start.tC === 32 &&
+        own.tower.source.startsWith("the column's own surface row") &&
+        own.tower.start.tC === 20 &&
+        tooFew === null &&
+        // the real field: TT and KI re-derived from the profile match
+        // NOAA's to a hundredth of a kelvin, LI to half a kelvin, the
+        // mean-layer CAPE to a hundred J/kg, SI to two kelvin - all
+        // inside Table 1.3's accuracies, and the file's counts unscale
+        // to h5py's values
+        DSI_NAMES.every((id) => near(read[id], noaa[id], 1e-9)) &&
+        near(agree.tt.diff, 0, 0.01) &&
+        near(agree.ki.diff, 0, 0.01) &&
+        Math.abs(agree.li.diff) < 0.5 &&
+        Math.abs(agree.cape.diff) < 100 &&
+        Math.abs(agree.si.diff) < 2 &&
+        DSI_NAMES.every((id) => agree[id].withinAccuracy) &&
+        A.tt === 1 &&
+        A.ki === 2 &&
+        A.li === 2 &&
+        A.cape === 1000 &&
+        A.si === 2 &&
+        DSI_ATBD.requirement.precision.cape === 2500 &&
+        DSI_ATBD.parcel.layerHpa === 100 &&
+        DSI_ATBD.parcel.liLevelHpa === 500 &&
+        DSI_EXPECT.finalHpa === 500 &&
+        st.tower.elM > 0 &&
+        // the hand check (numpy) interpolates the humidity to the level
+        // and takes the dew point there; the law takes each level's
+        // dew point and interpolates it - a thousandth of a kelvin
+        near(st.tt, DSI_EXPECT.fromColumn.TT, 0.01) &&
+        near(st.ki, DSI_EXPECT.fromColumn.KI, 0.01),
+      `LI -2 / CAPE 1500 / TT 50 / SI -4 / KI 31 read "${V.li.split(':')[0]}", "${V.cape}", "${V.tt}", "${V.si.split(' (')[0]}", "${V.ki.split(' (')[0]}"; TT 57 is severe east of the Rockies and only possible west; ` +
+        `an exact column gives TT ${ix.tt} and KI ${ix.ki} (closed form ${ttClosed}, ${kiClosed}); the lowest 100 hPa of a linear column averages to its midpoint (${mean.tC.toFixed(6)} / ${mean.tdC.toFixed(6)} C at ${mean.p} hPa); ` +
+        `a 12 / 0 C screen through that column builds no tower (CAPE 0, LI +${stable.tower.liK.toFixed(1)} K), a 32 / 24 C screen ${hot.tower.capeJkg} J/kg to an EL of ${hot.tower.elM} m (LFC ${hot.tower.lfcM} m, LI ${hot.tower.liK.toFixed(1)} K); ` +
+        `THE REAL FIELD (${DSI_EXPECT.file.slice(0, 23)}, the profile crops' own scan and field): the file's counts unscale to LI ${read.li.toFixed(3)} K, CAPE ${read.cape.toFixed(1)} J/kg, TT ${read.tt.toFixed(3)}, SI ${read.si.toFixed(3)}, KI ${read.ki.toFixed(3)} (h5py's); ` +
+        `the column re-derives TT ${st.tt.toFixed(3)} (${agree.tt.diff >= 0 ? '+' : ''}${agree.tt.diff.toFixed(3)}), KI ${st.ki.toFixed(3)} (${agree.ki.diff >= 0 ? '+' : ''}${agree.ki.diff.toFixed(3)}), LI ${st.li.toFixed(2)} (${agree.li.diff >= 0 ? '+' : ''}${agree.li.diff.toFixed(2)} K), ` +
+        `mean-layer CAPE ${st.capeMeanLayer} (${agree.cape.diff >= 0 ? '+' : ''}${agree.cape.diff.toFixed(0)}), SI ${st.si.toFixed(2)} (${agree.si.diff >= 0 ? '+' : ''}${agree.si.diff.toFixed(2)} K; the ATBD's own SI still uses the 1000-hPa polynomial, "needs to be improved") - every index inside Table 1.3's accuracy (TT 1, KI 2, LI 2, CAPE 1000, SI 2); ` +
+        `the column's own smeared surface (${st.tower.start.tC.toFixed(1)} / ${st.tower.start.tdC.toFixed(1)} C) lifts to an EL of ${st.tower.elM} m on ${st.tower.capeJkg} J/kg`
+    );
+  }
 }
 
 // ---- THE HAZE'S KIND (169th pass) ----------------------------------

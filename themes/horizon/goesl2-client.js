@@ -58,6 +58,7 @@ import {
   l2AdpBody,
   l2LvtBody,
   l2LvmBody,
+  l2DsiBody,
   l2VisBody
 } from './goesl2-decode.js';
 import {pickSatellite} from './satellites.js';
@@ -421,6 +422,8 @@ export function createGoesL2Client({
       // the column from orbit (171st): the profiles over the observer
       lvt: F.lvt ? l2LvtBody(F.lvt.dec, F.lvt.key, cell.lat, cell.lon) : null,
       lvm: F.lvm ? l2LvmBody(F.lvm.dec, F.lvm.key, cell.lat, cell.lon) : null,
+      // the tower's ceiling (172nd): the stability indices
+      dsi: F.dsi ? l2DsiBody(F.dsi.dec, F.dsi.key, cell.lat, cell.lon) : null,
       // the daylight field (159th): the page's own read, only when asked
       vis: F.vis ? l2VisBody(F.vis.dec, F.vis.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial',
