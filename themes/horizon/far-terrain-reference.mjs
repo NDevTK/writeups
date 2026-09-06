@@ -19,6 +19,7 @@ import {
   curvatureDrop,
   fanBranches,
   farRadii,
+  farRingBaseY,
   farRingGeometry,
   kappaTable,
   koschmiederT,
@@ -153,6 +154,112 @@ const check = (name, ok, detail) => {
       surfOk,
     `the island fixture keeps ${isle.indices.length / 3} of ${g.indices.length / 3} triangles - every one touches land, the open water stays the LUT's measured sea, and every kept shoreline sea corner sits at the dropped SURFACE (0 m), never the -80 m seabed`
   );
+  // THE LAND'S OWN REFRACTION (157th pass): a coast fixture - sea
+  // (-80 m bathymetry) west of the anchor, rising land east of it.
+  // The spokes whose inner ring stands on land drop by the land
+  // layer's coefficient, the sea spokes by the column's; the base
+  // re-solved from the retained elevations (farRingBaseY) is the
+  // build's own, bit for bit; without a land coefficient every
+  // spoke keeps k, and a new land coefficient moves the land spokes
+  // alone.
+  const coastAt = (x, z) => (x > 0.5 ? 200 + 0.2 * Math.hypot(x, z) : -80);
+  const kLand = 0.05;
+  const coast = farRingGeometry({
+    radiiU: radii,
+    nAz: 8,
+    mpu,
+    centerElev,
+    k,
+    elevAt: coastAt,
+    kLand
+  });
+  const plain = farRingGeometry({
+    radiiU: radii,
+    nAz: 8,
+    mpu,
+    centerElev,
+    k,
+    elevAt: coastAt
+  });
+  const nullLand = farRingGeometry({
+    radiiU: radii,
+    nAz: 8,
+    mpu,
+    centerElev,
+    k,
+    elevAt: coastAt,
+    kLand: null
+  });
+  const marks = Array.from(coast.spokeLand).join('');
+  let dropOk = true;
+  let landMoved = 0;
+  let seaSame = 0;
+  for (let v = 0; v < coast.trueEM.length; v++) {
+    const ai = v % 8;
+    const r = radii[Math.floor(v / 8)];
+    const kk = coast.spokeLand[ai] ? kLand : k;
+    const want =
+      16 * Math.asinh((coast.trueEM[v] - curvatureDrop(r * mpu, kk) - centerElev) / 500);
+    if (Math.abs(coast.positions[v * 3 + 1] - want) > 1e-5) dropOk = false;
+    const d = coast.positions[v * 3 + 1] - plain.positions[v * 3 + 1];
+    // kLand 0.05 < k 0.17: less refraction lift, so the land SINKS
+    if (coast.spokeLand[ai]) {
+      if (d < 0) landMoved++;
+    } else if (d === 0) seaSame++;
+  }
+  const base = farRingBaseY({
+    trueEM: coast.trueEM,
+    distU: coast.distU,
+    spokeLand: coast.spokeLand,
+    nAz: 8,
+    mpu,
+    centerElev,
+    k,
+    kLand
+  });
+  const baseNull = farRingBaseY({
+    trueEM: coast.trueEM,
+    distU: coast.distU,
+    spokeLand: coast.spokeLand,
+    nAz: 8,
+    mpu,
+    centerElev,
+    k,
+    kLand: null
+  });
+  let maxBase = 0;
+  let maxNull = 0;
+  let maxPlainNull = 0;
+  for (let v = 0; v < base.length; v++) {
+    maxBase = Math.max(maxBase, Math.abs(base[v] - coast.positions[v * 3 + 1]));
+    maxNull = Math.max(maxNull, Math.abs(baseNull[v] - plain.positions[v * 3 + 1]));
+    maxPlainNull = Math.max(
+      maxPlainNull,
+      Math.abs(nullLand.positions[v * 3 + 1] - plain.positions[v * 3 + 1])
+    );
+  }
+  const nLandSp = coast.spokeLand.reduce((s, b) => s + b, 0);
+  const nLandV = (coast.trueEM.length / 8) * nLandSp;
+  const nSeaV = coast.trueEM.length - nLandV;
+  check(
+    'the land spokes drop by the land coefficient (per spoke)',
+    marks === '01110000' &&
+      nLandSp === 3 &&
+      dropOk &&
+      landMoved === nLandV &&
+      seaSame === nSeaV &&
+      // the retained elevation is Float32: the re-solve differs from
+      // the build by that rounding alone (one ulp of the datum)
+      maxBase < 4e-6 &&
+      maxNull < 4e-6 &&
+      maxPlainNull === 0 &&
+      base.length === coast.trueEM.length,
+    `the coast fixture marks spokes ${marks} land at their inner ring (east of the anchor); every land vertex drops by k ${kLand} ` +
+      `and every sea vertex by k ${k} to the build's datum - all ${landMoved} land vertices sit LOWER than under k ${k} (the smaller ` +
+      `coefficient is less refraction lift: the hot land's ground sinks), the ${seaSame} sea vertices unmoved; farRingBaseY reproduces ` +
+      `the build's y to the retained Float32 elevation's own rounding (max diff ${maxBase.toExponential(1)} in the datum), with kLand null ` +
+      `the plain build's (${maxNull.toExponential(1)}), and a build handed kLand null is the plain build (${maxPlainNull})`
+  );
 }
 
 {
@@ -214,6 +321,35 @@ const check = (name, ok, detail) => {
       `LOWER because the long ray samples thinner air aloft where kappa ` +
       `falls - physics the parabola cannot know, in the physical direction`
   );
+  // THE PAGE'S OWN CALL FORM (157th pass): the ring hands the fan a
+  // Float64Array of launch angles. A typed array's .map returns a
+  // typed array, so the rows came back as NaN and the march's first
+  // write threw - every page probe with a measured column had logged
+  // it since the 99th pass, caught and silent. The fan must march the
+  // same rows from either list, bit for bit.
+  {
+    const fanT = rayFan(prof, 50, Float64Array.from(alphas), 200e3, 100);
+    let same =
+      fanT.hs.length === fan.hs.length && fanT.hs[0] instanceof Float32Array;
+    let maxD = 0;
+    for (let i = 0; same && i < fan.hs.length; i++)
+      for (let j = 0; j < fan.hs[i].length; j++) {
+        const a = fan.hs[i][j];
+        const b = fanT.hs[i][j];
+        if (Number.isNaN(a) !== Number.isNaN(b)) same = false;
+        else if (!Number.isNaN(a)) maxD = Math.max(maxD, Math.abs(a - b));
+      }
+    const brT = fanBranches(fanT, 20e3, 0);
+    const brA = fanBranches(fan, 20e3, 0);
+    check(
+      "the fan marches typed-array launch angles (the page's call)",
+      same && maxD === 0 && brT.length === brA.length && brT[0] === brA[0],
+      `${fanT.hs.length} rows of Float32Array from a Float64Array of alphas, ` +
+        `every height and every NaN identical to the plain-array march ` +
+        `(max |diff| ${maxD}), the 20-km branch ${((brT[0] * 180) / Math.PI).toFixed(4)} deg ` +
+        `either way - the ring's fan was the one caller handing a typed array`
+    );
+  }
   // The classical superior-mirage column: +6 degC across 30-60 m
   // over a cold sea, eye at 15 m, targets low and far.
   const profInv = buildProfile(

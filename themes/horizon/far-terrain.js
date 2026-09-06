@@ -26,7 +26,13 @@
  *    despike), the curvature drop subtracted from each vertex's
  *    METRES before the box's own asinh datum compression, so the
  *    ring speaks the box's exact vertical language and meets it
- *    continuously at the seam (drop(0) = 0).
+ *    continuously at the seam (drop(0) = 0). Since the 157th pass
+ *    each spoke is marked land or sea at its inner ring and drops
+ *    by the land layer's coefficient or the sea's (farRingBaseY
+ *    re-solves the base from the retained elevations when the
+ *    layer moves).
+ *  - rayFan / fanBranches: the terrestrial ray fan (below) - the
+ *    exact remap the ring rides where the column is measured.
  */
 
 export const R_EARTH = 6371000; // mean radius, metres
@@ -53,7 +59,15 @@ export function curvatureDrop(dM, k) {
  * indexed triangle mesh; y carries the asinh datum compression of
  * (e - drop - centerElev).
  */
-export function farRingGeometry({radiiU, nAz, mpu, centerElev, k, elevAt}) {
+export function farRingGeometry({
+  radiiU,
+  nAz,
+  mpu,
+  centerElev,
+  k,
+  elevAt,
+  kLand = null
+}) {
   const nR = radiiU.length;
   const positions = new Float32Array(nR * nAz * 3);
   const sea = new Uint8Array(nR * nAz);
@@ -64,6 +78,21 @@ export function farRingGeometry({radiiU, nAz, mpu, centerElev, k, elevAt}) {
   // fanBranches below) without resampling the DEM.
   const trueEM = new Float32Array(nR * nAz);
   const distU = new Float32Array(nR * nAz);
+  // THE LAND'S OWN REFRACTION (157th pass): a spoke whose inner ring
+  // (the box edge) stands on land leaves the eye over the land
+  // surface layer, one over the sea over the marine one; when the
+  // caller hands a land coefficient the land spokes drop by it and
+  // the sea spokes by k - the same first-100-m rule each column
+  // gives (the fan refines both within its band). Marked per spoke
+  // from ring 0 and returned, so the base can be re-solved
+  // (farRingBaseY) when the layer moves without resampling the DEM.
+  const spokeLand = new Uint8Array(nAz);
+  for (let ai = 0; ai < nAz; ai++) {
+    const az = (ai / nAz) * 2 * Math.PI;
+    const e0 = elevAt(Math.sin(az) * radiiU[0], -Math.cos(az) * radiiU[0]);
+    spokeLand[ai] = e0 <= 0.3 ? 0 : 1;
+  }
+  const kOf = (ai) => (kLand !== null && spokeLand[ai] ? kLand : k);
   for (let ri = 0; ri < nR; ri++) {
     const r = radiiU[ri];
     for (let ai = 0; ai < nAz; ai++) {
@@ -76,7 +105,8 @@ export function farRingGeometry({radiiU, nAz, mpu, centerElev, k, elevAt}) {
       // survive inside shoreline triangles) clamp to 0 m before
       // the drop - never to the seabed.
       const e =
-        Math.max(eRaw, eRaw <= 0.3 ? 0 : eRaw) - curvatureDrop(r * mpu, k);
+        Math.max(eRaw, eRaw <= 0.3 ? 0 : eRaw) -
+        curvatureDrop(r * mpu, kOf(ai));
       const y = 16 * Math.asinh((e - centerElev) / 500);
       // The box's sea rule: at or below the waterline this is
       // open water - the ring does NOT draw it (the sky-view
@@ -114,8 +144,38 @@ export function farRingGeometry({radiiU, nAz, mpu, centerElev, k, elevAt}) {
     nR,
     nAz,
     trueEM,
-    distU
+    distU,
+    spokeLand
   };
+}
+
+/**
+ * The ring's mean-k base re-solved without the DEM (157th pass): the
+ * retained true elevations and scene-unit distances give every
+ * vertex's y for a sea coefficient k and a land coefficient kLand
+ * (null: every spoke takes k) on the spokes farRingGeometry marked
+ * land at their inner ring - the build's own datum, bit for bit
+ * (gate-held), so the land layer's hourly coefficient moves the ring
+ * without a rebuild and the fan re-applies on top.
+ */
+export function farRingBaseY({
+  trueEM,
+  distU,
+  spokeLand,
+  nAz,
+  mpu,
+  centerElev,
+  k,
+  kLand = null
+}) {
+  const out = new Float32Array(trueEM.length);
+  for (let v = 0; v < trueEM.length; v++) {
+    const ai = v % nAz;
+    const kk = kLand !== null && spokeLand && spokeLand[ai] ? kLand : k;
+    const e = trueEM[v] - curvatureDrop(distU[v] * mpu, kk);
+    out[v] = 16 * Math.asinh((e - centerElev) / 500);
+  }
+  return out;
 }
 
 /**
@@ -209,7 +269,14 @@ export function rayFan(profile, obsHm, alphas, dMaxM = 200e3, dsM = 100) {
     return kt.kap[i];
   };
   const nS = Math.ceil(dMaxM / dsM);
-  const hs = alphas.map(() => new Float32Array(nS));
+  // One row per launch angle whatever the caller's list is: the
+  // gates pass plain arrays, the page a Float64Array - and a typed
+  // array's own .map coerces each new row to a number (NaN), so the
+  // march's first write threw and the page's fan never ran (found
+  // in the 157th pass: every probe with a measured column had
+  // logged "far ring: Cannot create property '0' on number 'NaN'"
+  // since the 99th). Array.from builds a plain array of rows.
+  const hs = Array.from(alphas, () => new Float32Array(nS));
   for (let i = 0; i < alphas.length; i++) {
     let h = obsHm;
     let slope = Math.tan(alphas[i]);
