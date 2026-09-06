@@ -66,11 +66,15 @@ import {
   l2Prefixes,
   l2DsrBody,
   l2AodBody,
+  l2LstBody,
   l2SstBody,
   l2Window,
   L2_AOD_BOX_R,
   L2_AOD_EXTRAS,
   L2_AOD_SPEC,
+  L2_LST_SPEC,
+  L2_LST_EXTRAS,
+  L2_LST_NEAR_PX,
   L2_ASKS,
   L2_AT_MAX_AGE_MS,
   L2_COD_SPEC,
@@ -126,6 +130,9 @@ import {
   fieldCensus,
   goodCensus,
   heightCensus,
+  lstPqi,
+  nearestGood,
+  qualityCensus,
   unpackArray,
   unscale
 } from './goesl2.js';
@@ -1118,26 +1125,28 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_DSR_SPEC.DSR === 'raw16' &&
       L2_DSR_SPEC.DQF === 'raw' &&
       L2_HALF_PX.dsr === 50 &&
-      L2_ASKS.length === 9 &&
+      L2_ASKS.length === 10 &&
       L2_ASKS.map((a) => a.id).join(',') ===
-        'mask,height,imagery,cod,cps,sst,dsr,dmw,aod' &&
+        'mask,height,imagery,cod,cps,sst,dsr,dmw,aod,lst' &&
       L2_ASKS[2].band === 'C13' &&
       L2_ASKS.map((a) => a.halfPx ?? '-').join(',') ===
-        '50,10,50,50,50,50,50,-,50' &&
+        '50,10,50,50,50,50,50,-,50,50' &&
       // the hourly full-disk SST is never asked for a mosaic's
       // minute, nor are the winds (the decks' drift, not a mosaic's
-      // comparison) nor the haze (the channel's now); the 10-minute
-      // DSR is (a file within 15 min of any)
+      // comparison), the haze (the channel's now) or the hourly land
+      // skin (the land layer's now); the 10-minute DSR is (a file
+      // within 15 min of any)
       L2_ASKS[5].timed === false &&
       L2_ASKS[7].timed === false &&
       L2_ASKS[8].timed === false &&
-      L2_ASKS.filter((a) => a.timed === false).length === 3 &&
+      L2_ASKS[9].timed === false &&
+      L2_ASKS.filter((a) => a.timed === false).length === 4 &&
       L2_IMAGERY_SPEC.CMI === 'raw16' &&
       L2_COD_SPEC.COD === 'raw16' &&
       L2_CPS_SPEC.CPS === 'raw16' &&
       // the CPS file's flags are the COD file's (measured): not held
       L2_CPS_SPEC.DQF === undefined,
-    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; a DSR body dressed the same way (152nd) carries the home pixel (${dsBody && dsBody.here} W/m2 from the fixture's count there), the mean of ${dsBody && dsBody.near.n} good px within 5 px (${dsBody && dsBody.near.mean} W/m2) and a census of ${dsBody && dsBody.census.good} good px, all recomputed from the wire; /goesl2 asks nine products, the imagery by band C13, the hourly SST, the winds and the haze never for a mosaic's minute and the 10-minute DSR for one`
+    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; a DSR body dressed the same way (152nd) carries the home pixel (${dsBody && dsBody.here} W/m2 from the fixture's count there), the mean of ${dsBody && dsBody.near.n} good px within 5 px (${dsBody && dsBody.near.mean} W/m2) and a census of ${dsBody && dsBody.census.good} good px, all recomputed from the wire; /goesl2 asks ten products, the imagery by band C13, the hourly SST, the winds, the haze and the hourly land skin never for a mosaic's minute and the 10-minute DSR for one`
   );
 }
 
@@ -1312,6 +1321,164 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       `from the ${body && body.est.kept} kept - every figure recomputed from the wire; the extras read whole (${raw.extras.cloud_pixels} cloud pixels, ` +
       `mean top ${raw.extras.mean_cloud_top_height.toFixed(1)} m, an absent name null) and by range in ${withEx.reads} reads, the same ${plain.reads} without them; ` +
       `the ninth ask ${ask.product} at half width ${ask.halfPx} with ${L2_AOD_EXTRAS.length} extras, never for a mosaic's minute`
+  );
+}
+
+{
+  // THE LAND'S SKIN (157th pass): an LST body dressed on the
+  // fixture's grid - counts = the HT counts folded into the file's
+  // valid range (9200..61200 at 0.0025 K from 190 K), DQF by a
+  // pattern over the retrieved pixels (every 5th low, every 3rd of
+  // the rest medium, the others high; no retrieval where HT is
+  // fill), the PQI word carrying the quality, the mask's state and
+  // a day bit by pattern, the home pixel (424, 127) forced to no
+  // retrieval under cloud so the body must stand the layer on its
+  // nearest high-quality neighbour - the census, the point, the
+  // nearest and the scene's statistics recomputed from the wire; the
+  // tenth ask's pins.
+  const bytes = new Uint8Array(Buffer.from(ACHAC_B64, 'base64'));
+  const raw = decodeL2(bytes, {HT: 'raw16', DQF: 'raw'});
+  const cell = l2Cell(32.85, -117.12);
+  const n = raw.data.HT.length;
+  const lstArr = new Uint16Array(n);
+  const lstDqf = new Uint8Array(n);
+  const lstPqiArr = new Uint16Array(n);
+  const gq = 127 * 500 + 424;
+  let kept = 0;
+  for (let q = 0; q < n; q++) {
+    const h = raw.data.HT[q];
+    if (h === 65535 || q === gq) {
+      lstArr[q] = 65535;
+      lstDqf[q] = 3;
+      lstPqiArr[q] = 3 + (3 << 2); // no retrieval, cloudy
+      continue;
+    }
+    kept++;
+    lstArr[q] = 9200 + (h % 52000);
+    lstDqf[q] = kept % 5 === 0 ? 2 : kept % 3 === 0 ? 1 : 0;
+    lstPqiArr[q] =
+      lstDqf[q] + (lstDqf[q] === 2 ? 2 << 2 : 0) + (kept % 2 === 0 ? 4096 : 0);
+  }
+  const lstDec = {
+    ...raw,
+    data: {LST: lstArr, DQF: lstDqf, PQI: lstPqiArr},
+    meta: {
+      LST: {scale: 0.0025, offset: 190, fill: 65535, units: 'K'},
+      PQI: {scale: 1, offset: 0, fill: 65535, units: null}
+    },
+    extras: {
+      mean_lst: 293.0574,
+      min_lst: 228.6577,
+      max_lst: 313.0973,
+      standard_deviation_lst: 7.0881,
+      total_pixels_where_lst_is_retrieved: 330835,
+      number_good_retrievals: 101687,
+      quantitative_local_zenith_angle_bounds: [0, 55],
+      retrieval_local_zenith_angle_bounds: [0, 85]
+    }
+  };
+  const body = l2LstBody(lstDec, 'kl', cell.lat, cell.lon);
+  const back = body
+    ? unscale(unpackArray(body.lst), {
+        scale: body.lstScale,
+        offset: body.lstOffset,
+        fill: body.lstFill
+      })
+    : null;
+  const dq = body ? unpackArray(body.dqf) : null;
+  const pq = body ? unpackArray(body.pqi) : null;
+  const again = body ? qualityCensus(back, dq) : null;
+  const nearAgain = body ? nearestGood(back, dq, body.box, L2_LST_NEAR_PX, 0) : null;
+  const ci = body ? body.box.i - body.box.i0 : 0;
+  const cj = body ? body.box.j - body.box.j0 : 0;
+  const qc = body ? cj * body.box.cols + ci : 0;
+  const kmAgain =
+    body && nearAgain
+      ? +(
+          Math.hypot(nearAgain.di * body.pixel.ewM, nearAgain.dj * body.pixel.nsM) /
+          1000
+        ).toFixed(1)
+      : null;
+  const nearWord = body && nearAgain ? lstPqi(pq[nearAgain.q]) : null;
+  const ask = L2_ASKS[9];
+  check(
+    'THE LAND’S SKIN: the LST body dressed on the fixture, the point under cloud, the layer’s pixel its nearest high-quality neighbour, every figure recomputed from the wire',
+    body !== null &&
+      body.product === 'ABI-L2-LSTC' &&
+      body.units === 'K' &&
+      body.lst.kind === 'u16' &&
+      body.dqf.kind === 'u8' &&
+      body.pqi.kind === 'u16' &&
+      body.lstFill === 65535 &&
+      body.lstScale === 0.0025 &&
+      body.lstOffset === 190 &&
+      body.box.i === 424 &&
+      body.box.j === 127 &&
+      body.box.cols === 101 &&
+      body.census.n === body.box.rows * body.box.cols &&
+      body.census.high +
+        body.census.medium +
+        body.census.low +
+        body.census.none +
+        body.census.fill ===
+        body.census.n &&
+      body.census.high > 0 &&
+      body.census.medium > 0 &&
+      body.census.low > 0 &&
+      body.census.none > 0 &&
+      body.census.fill === 0 &&
+      body.census.min >= 213 &&
+      body.census.max <= 343 &&
+      JSON.stringify(again) === JSON.stringify(body.census) &&
+      body.here.K === null &&
+      body.here.dqf === 3 &&
+      lstPqi(body.here.pqi).cloud === 3 &&
+      lstPqi(body.here.pqi).quality === 3 &&
+      dq[qc] === 3 &&
+      body.nearest !== null &&
+      nearAgain !== null &&
+      body.nearest.di === nearAgain.di &&
+      body.nearest.dj === nearAgain.dj &&
+      Math.max(Math.abs(body.nearest.di), Math.abs(body.nearest.dj)) === 1 &&
+      body.nearest.K === +back[nearAgain.q].toFixed(2) &&
+      body.nearest.km === kmAgain &&
+      // one pixel of the fixture's 10-km grid at this view angle
+      body.nearest.km > 8 &&
+      body.nearest.km < 20 &&
+      body.nearest.pqi === pq[nearAgain.q] &&
+      nearWord.quality === 0 &&
+      nearWord.cloud === 0 &&
+      dq[nearAgain.q] === 0 &&
+      body.nearPx === L2_LST_NEAR_PX &&
+      body.sceneStats.meanK === 293.06 &&
+      body.sceneStats.sdK === 7.09 &&
+      body.sceneStats.retrieved === 330835 &&
+      body.sceneStats.good === 101687 &&
+      body.lzaBounds[1] === 55 &&
+      body.lzaRetrievalBounds[1] === 85 &&
+      body.lzaMaxDeg === raw.lzaMaxDeg &&
+      ask.id === 'lst' &&
+      ask.product === 'ABI-L2-LSTC' &&
+      ask.halfPx === 50 &&
+      ask.spec === L2_LST_SPEC &&
+      ask.extras === L2_LST_EXTRAS &&
+      ask.timed === false &&
+      L2_LST_EXTRAS.length === 8 &&
+      L2_LST_EXTRAS[0] === 'mean_lst' &&
+      L2_LST_EXTRAS[5] === 'number_good_retrievals' &&
+      L2_LST_SPEC.LST === 'raw16' &&
+      L2_LST_SPEC.DQF === 'raw' &&
+      L2_LST_SPEC.PQI === 'raw16' &&
+      L2_LST_NEAR_PX === 5 &&
+      L2_HALF_PX.lst === 50,
+    `an LST body dressed on the fixture's grid censuses ${body && body.census.n} px - ${body && body.census.high} high, ${body && body.census.medium} medium, ` +
+      `${body && body.census.low} low, ${body && body.census.none} none - with the high-quality median ${body && body.census.median.toFixed(2)} K ` +
+      `(${body && body.census.min.toFixed(1)} to ${body && body.census.max.toFixed(1)}); the home pixel (424, 127) no retrieval under cloud, so the layer's pixel is ` +
+      `its neighbour at (${body && body.nearest.di}, ${body && body.nearest.dj}), ${body && body.nearest.km} km off, ${body && body.nearest.K} K, ` +
+      `high quality and clear by its word${nearWord && nearWord.day ? ', day' : ', night'} - every figure recomputed from the wire; the scene's own ` +
+      `${body && body.sceneStats.retrieved.toLocaleString('en-US')} retrieved and ${body && body.sceneStats.good.toLocaleString('en-US')} good px, ` +
+      `quantitative to ${body && body.lzaBounds[1]} deg; the tenth ask ${ask.product} at half width ${ask.halfPx} with ${L2_LST_EXTRAS.length} extras, ` +
+      `never for a mosaic's minute`
   );
 }
 

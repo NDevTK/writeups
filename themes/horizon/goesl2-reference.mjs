@@ -20,6 +20,16 @@ import {
   IMAGERY_BAND,
   L2_BUCKETS,
   L2_PRODUCTS,
+  LST_ATBD,
+  LST_DQF_MEANINGS,
+  LST_PQI_CLOUD,
+  LST_PQI_QUALITY,
+  LST_PQI_SURFACE,
+  LST_PQI_WV,
+  lstPqi,
+  lstValidationSpan,
+  nearestGood,
+  qualityCensus,
   bandKeys,
   btDifference,
   bucketPrefix,
@@ -906,6 +916,155 @@ const inflate = (u8) =>
       `${L2_PRODUCTS.aod} with ${AOD_DQF_MEANINGS.length} flag meanings; the ATBD's box ${AOD_ATBD.boxKm} km, ` +
       `the low flag past ${AOD_ATBD.lowFlagSzaDeg} deg sun and ${AOD_ATBD.lowFlagLzaDeg} deg satellite zenith, ` +
       `the Angstrom precision requirement ${AOD_ATBD.aePrecisionReq} not met`
+  );
+}
+
+// ---- THE LAND'S SKIN (157th pass) --------------------------------
+// lstPqi: the PQI word by Table 3.7's bit numbers - two words read
+// from the 02Z file of 6 Sep 2026 (the home pixel 1583: no retrieval
+// under cloud, land, moist, the emissivity not the AWG's, the AOD
+// flag "out of range or missing" at night; its northern neighbour
+// 1568: high quality, clear), synthetic words for the bits the file
+// never set here, the fill null; nearestGood: the nearest pixel of a
+// quality ring by ring, ties by Euclidean distance; the ATBD's
+// numbers and the validation spans of both satellites (the
+// matchup-weighted means recomputed from the tables).
+{
+  const home = lstPqi(1583);
+  const north = lstPqi(1568);
+  // day (4096) + view angle large (2048) + coastal (192) + probably
+  // cloudy (8) + medium (1)
+  const syn = lstPqi(4096 + 2048 + 192 + 8 + 1);
+  // cirrus (8192) + fire (16384) + snow/ice (64) + very moist (768)
+  const syn2 = lstPqi(8192 + 16384 + 64 + 768);
+  // a 5x5 window, centre (2, 2) flagged no retrieval; high pixels at
+  // (1, 2) [di -1, dj 0], (2, 0) [dj -2] and (4, 4); a medium at (3, 2)
+  const vals = new Float32Array(25).fill(300);
+  const dqf = new Uint8Array(25).fill(3);
+  const at = (i, j) => j * 5 + i;
+  dqf[at(2, 2)] = 3;
+  dqf[at(1, 2)] = 0;
+  dqf[at(2, 0)] = 0;
+  dqf[at(4, 4)] = 0;
+  dqf[at(3, 2)] = 1;
+  vals[at(1, 2)] = 301;
+  vals[at(2, 0)] = 302;
+  vals[at(4, 4)] = 303;
+  const box = {i: 12, j: 22, i0: 10, j0: 20, cols: 5, rows: 5};
+  const n0 = nearestGood(vals, dqf, box, 4, 0);
+  const n1 = nearestGood(vals, dqf, box, 4, 1);
+  const nNone = nearestGood(vals, dqf, box, 0, 0);
+  const nFar = nearestGood(vals, dqf, {...box, i: 10, j: 20}, 4, 0);
+  // a finite-value rule: a good flag over a NaN value is skipped
+  const vals2 = Float32Array.from(vals);
+  vals2[at(1, 2)] = NaN;
+  const n0b = nearestGood(vals2, dqf, box, 4, 0);
+  const s16 = lstValidationSpan('GOES-16');
+  const s17 = lstValidationSpan('GOES-17');
+  const sX = lstValidationSpan('GOES-18');
+  const near4 = (a, b) => Math.abs(a - b) < 1e-4;
+  check(
+    'THE LAND’S SKIN: the PQI word by the ATBD’s bits, the nearest pixel of a quality, the validation spans',
+    home !== null &&
+      home.quality === 3 &&
+      home.cloud === 3 &&
+      home.inputBad === false &&
+      home.aodOut === true &&
+      home.surface === 0 &&
+      home.waterVapour === 2 &&
+      home.emissivityOther === true &&
+      home.viewLarge === false &&
+      home.day === false &&
+      home.cirrus === false &&
+      home.fire === false &&
+      north.quality === 0 &&
+      north.cloud === 0 &&
+      north.surface === 0 &&
+      north.waterVapour === 2 &&
+      syn.day === true &&
+      syn.viewLarge === true &&
+      syn.surface === 3 &&
+      syn.cloud === 2 &&
+      syn.quality === 1 &&
+      syn.cirrus === false &&
+      syn2.cirrus === true &&
+      syn2.fire === true &&
+      syn2.surface === 1 &&
+      syn2.waterVapour === 3 &&
+      syn2.quality === 0 &&
+      lstPqi(65535) === null &&
+      lstPqi(NaN) === null &&
+      LST_PQI_QUALITY[home.quality] === 'no retrieval' &&
+      LST_PQI_CLOUD[home.cloud] === 'cloudy' &&
+      LST_PQI_SURFACE[syn.surface] === 'coastal' &&
+      LST_PQI_WV[syn2.waterVapour].startsWith('very moist') &&
+      n0 !== null &&
+      n0.q === at(1, 2) &&
+      n0.di === -1 &&
+      n0.dj === 0 &&
+      n0.r === 1 &&
+      n1 !== null &&
+      n1.q === at(3, 2) &&
+      n1.r === 1 &&
+      nNone === null &&
+      nFar !== null &&
+      nFar.q === at(2, 0) &&
+      nFar.di === 2 &&
+      nFar.dj === 0 &&
+      nFar.r === 2 &&
+      n0b !== null &&
+      n0b.q === at(2, 0) &&
+      n0b.dj === -2 &&
+      n0b.r === 2 &&
+      L2_PRODUCTS.lst === 'ABI-L2-LSTC' &&
+      LST_DQF_MEANINGS.length === 4 &&
+      LST_DQF_MEANINGS[0] === 'high_quality_retrieval_qf' &&
+      LST_DQF_MEANINGS[3] === 'no_retrieval_qf' &&
+      LST_DQF_MEANINGS.join() === AOD_DQF_MEANINGS.join() &&
+      qualityCensus === aodCensus &&
+      LST_ATBD.requirement.accuracyK === 2.5 &&
+      LST_ATBD.requirement.precisionK === 2.3 &&
+      LST_ATBD.requirement.unconditionalK === 5 &&
+      LST_ATBD.requirement.rangeK[0] === 213 &&
+      LST_ATBD.requirement.rangeK[1] === 330 &&
+      LST_ATBD.requirement.lzaMaxDeg === 70 &&
+      LST_ATBD.quantitativeLzaDeg === 55 &&
+      LST_ATBD.dayMaxSzaDeg === 85 &&
+      LST_ATBD.qualityRules.length === 5 &&
+      LST_ATBD.qualityRules[4].quality.join() === 'high,medium,low' &&
+      LST_ATBD.qualityRules[3].quality.join() === 'medium,medium,low' &&
+      LST_ATBD.matchup.maxDeg === 0.02 &&
+      s16.n === 21621 &&
+      s16.sites === 7 &&
+      s16.biasK[0] === -2.63 &&
+      s16.biasK[1] === 1.8 &&
+      s16.precisionK[0] === 1.59 &&
+      s16.precisionK[1] === 2.26 &&
+      near4(s16.meanBiasK, 0.1945) &&
+      near4(s16.meanPrecisionK, 1.8883) &&
+      s16.table === '4.1' &&
+      s17.n === 5713 &&
+      s17.biasK[0] === -2.41 &&
+      s17.biasK[1] === 1.78 &&
+      s17.precisionK[0] === 1.28 &&
+      s17.precisionK[1] === 2.41 &&
+      near4(s17.meanBiasK, -0.7378) &&
+      near4(s17.meanPrecisionK, 1.7654) &&
+      s17.table === '4.2' &&
+      s17.from === '2018-08-12' &&
+      sX.craft === 'GOES-16',
+    `the home word 1583 reads ${LST_PQI_QUALITY[home.quality]} under ${LST_PQI_CLOUD[home.cloud]} over ${LST_PQI_SURFACE[home.surface]}, ` +
+      `${LST_PQI_WV[home.waterVapour]}, night, the AOD flag out of range or missing (no retrieval at night), the emissivity not the AWG's; ` +
+      `its neighbour 1568 ${LST_PQI_QUALITY[north.quality]} under ${LST_PQI_CLOUD[north.cloud]}; the synthetic words set day, the large view angle, ` +
+      `${LST_PQI_SURFACE[syn.surface]}, cirrus and fire as the ATBD numbers them, the fill null; the nearest high pixel of a 5x5 window sits ` +
+      `at (${n0.di}, ${n0.dj}) ring ${n0.r} (ties broken by distance: with the ring-1 pixel's value NaN the ring-2 corner at (2, 2) loses ` +
+      `to (${n0b.di}, ${n0b.dj})), a medium at ring ${n1.r}, none within 0; GOES-16's seven SURFRAD sites (Table 4.1): ${s16.n.toLocaleString('en-US')} matchups, ` +
+      `bias ${s16.biasK[0]} to +${s16.biasK[1]} K, precision ${s16.precisionK[0]}-${s16.precisionK[1]} K, the weighted mean bias ` +
+      `${s16.meanBiasK.toFixed(3)} and precision ${s16.meanPrecisionK.toFixed(3)} K; GOES-17's (Table 4.2, the West slot's own craft): ` +
+      `${s17.n.toLocaleString('en-US')} matchups, bias ${s17.biasK[0]} to +${s17.biasK[1]}, precision ${s17.precisionK[0]}-${s17.precisionK[1]}, ` +
+      `weighted ${s17.meanBiasK.toFixed(3)} / ${s17.meanPrecisionK.toFixed(3)} K; the requirement ${LST_ATBD.requirement.accuracyK} / ` +
+      `${LST_ATBD.requirement.precisionK} K over ${LST_ATBD.requirement.rangeK.join('-')} K within ${LST_ATBD.requirement.lzaMaxDeg} deg, ` +
+      `quantitative to ${LST_ATBD.quantitativeLzaDeg}; an unknown craft answers GOES-16's table`
   );
 }
 

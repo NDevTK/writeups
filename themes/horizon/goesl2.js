@@ -116,6 +116,53 @@
  *    the low flag - the file's own outrank the print, stated);
  *    sunglint_angle_bounds [0, 36]; AE1/AE2 over water only, held
  *    out (the precision the ATBD says is not met).
+ *  - (157th pass) The GOES-R ABI Enterprise Land Surface Temperature
+ *    ATBD, version 4 (NOAA NESDIS STAR, 4 June 2020, 77 pp), read in
+ *    full: the skin temperature of land from the split window (Eq.
+ *    3.5: Ts = C + A1 T11 + A2 (T11 - T12) + A3 e + A4 e (T11 - T12)
+ *    + A5 de, the coefficients stratified by day/night, water vapour
+ *    and view zenith angle, de = e11 - e12 the emissivity difference
+ *    the baseline lacked; "all results assume perfect cloud
+ *    detection"); the F&PS requirement (Sec. 2: CONUS 2 km hourly,
+ *    213-330 K, accuracy 2.5 K - "conditional with known emissivity,
+ *    known atmospheric correction and 80% channel correction; 5 K
+ *    otherwise" - precision 2.3 K, LZA < 70); the PQI word (Table
+ *    3.7: bits 1-0 quality, 3-2 cloud, 4 input, 5 AOD range, 7-6
+ *    surface cover, 9-8 water vapour, 10 emissivity source, 11 view
+ *    angle > 55, 12 day (SZA <= 85), 13 thin cirrus, 14 fire; the DQF
+ *    the quality alone, Table 3.8); the quality rules (Table 3.9: a
+ *    valid LST is HIGH when clear within 55 deg of view with no fire,
+ *    the AOD in range and no cirrus, MEDIUM past 55 deg or when the
+ *    mask says probably clear, LOW under probably cloudy or with
+ *    cirrus, fire or the AOD out of range; nothing under cloud); the
+ *    validation (Sec. 4.2: SURFRAD's seven stations, the station LST
+ *    from the upwelling and downwelling infrared through the AWG
+ *    daily emissivity, matched within 0.02 deg and 1 min, a 3 x 3
+ *    cloud screen on the mask, the band-14 texture and the in-situ
+ *    30-min downwelling scatter); Table 4.1, GOES-16 enterprise
+ *    (14 Dec 2017 - 31 Aug 2019) bias / precision in K: Bondville
+ *    1.16 / 2.05 (3,227), Boulder -0.44 / 1.59 (3,161), Desert Rock
+ *    -2.63 / 1.84 (3,275), Fort Peck -0.32 / 1.88 (2,937), Goodwin
+ *    Creek 1.59 / 1.78 (3,566), Penn State 1.80 / 2.26 (1,995), Sioux
+ *    Falls 0.62 / 1.96 (3,460); Table 4.2, GOES-17 (12 Aug 2018 - 31
+ *    Aug 2019): Bondville 1.41 / 1.94 (395), Boulder -0.35 / 1.28
+ *    (1,375), Desert Rock -2.41 / 1.73 (1,736), Fort Peck -0.81 /
+ *    2.20 (1,314), Goodwin Creek 1.18 / 2.41 (383), Penn State 1.78 /
+ *    1.61 (134), Sioux Falls 0.71 / 1.40 (376) - "significantly
+ *    better than the baseline at the dry sites", Desert Rock's
+ *    underestimate 3.5 K reduced by ~1 K. The file
+ *    (OR_ABI-L2-LSTC-M6_G18_s20262490201178, 1.4 MB): LST uint16 at
+ *    scale_factor 0.0025 K from 190 K, fill 65535, valid_range [9200,
+ *    61200] (213-343 K - the file's own, wider above than the
+ *    requirement's); DQF 0 high, 1 medium, 2 low, 3 no retrieval
+ *    (the file's own flag_meanings, the AOD's four names); PQI
+ *    uint16 with 26 flag_values through day_qf (4096) - the cirrus
+ *    and fire bits of Table 3.7 are not in the file's flag_meanings
+ *    (decoded from the ATBD's bit numbers, stated as such);
+ *    quantitative_local_zenith_angle_bounds [0, 55],
+ *    retrieval_local_zenith_angle_bounds [0, 85]; the scene's own
+ *    mean/min/max/sd and its retrieved and good counts as scalar
+ *    datasets in the head.
  *
  * OWNERSHIP: this module owns the navigation, the window cut and
  * the comparison census; the daemon lists and fetches the buckets
@@ -440,7 +487,12 @@ export const L2_PRODUCTS = {
   // by day over dark land and glint-free water; the files run all
   // night with nothing retrieved (listed at 06Z, measured); 8.3 MB
   // a file, the window ~0.4 MB by range
-  aod: 'ABI-L2-AODC'
+  aod: 'ABI-L2-AODC',
+  // the 157th pass: the land surface (skin) temperature (the
+  // Enterprise LST ATBD v4, read in full) - CONUS hourly, 2 km, day
+  // and night, quantitative to 55 deg of local zenith (the file's
+  // own bound); 1.4 MB a file, the window ~0.6 MB by range
+  lst: 'ABI-L2-LSTC'
 };
 // The DSR file's own flag meanings (DQF flag_values 0..1): the
 // ATBD's overall quality flag is 1 when the solar or local zenith
@@ -614,6 +666,153 @@ export const AOD_ATBD = {
   aeAccuracyReq: 0.3, // met (Table 4-5)
   aePrecisionReq: 0.15 // not met, by either satellite (Sec. 4.2)
 };
+// ---------------------------------------------------------------
+// THE LAND'S SKIN (157th pass): the Enterprise LST product's own
+// flags and the ATBD's printed numbers (the header's entry).
+// ---------------------------------------------------------------
+// The LST file's DQF flag_meanings (flag_values 0..3): the quality
+// alone (Table 3.8) - the AOD's four names.
+export const LST_DQF_MEANINGS = [
+  'high_quality_retrieval_qf',
+  'medium_quality_retrieval_qf',
+  'low_quality_retrieval_qf',
+  'no_retrieval_qf'
+];
+// The PQI word's two-bit fields (Table 3.7; the file's flag_meanings
+// name the same states)
+export const LST_PQI_QUALITY = ['high', 'medium', 'low', 'no retrieval'];
+export const LST_PQI_CLOUD = [
+  'clear',
+  'probably clear',
+  'probably cloudy',
+  'cloudy'
+];
+export const LST_PQI_SURFACE = ['land', 'snow/ice', 'inland water', 'coastal'];
+export const LST_PQI_WV = [
+  'very dry (< 1.5 g/cm²)',
+  'dry (1.5–3)',
+  'moist (3–4.5)',
+  'very moist (≥ 4.5)'
+];
+/**
+ * The PQI word decoded by Table 3.7's bit numbers: {quality, cloud,
+ * inputBad, aodOut, surface, waterVapour, emissivityOther, viewLarge,
+ * day, cirrus, fire}; null for the fill (65535). The cirrus (bit 13)
+ * and fire (bit 14) flags are the ATBD's - the file's own
+ * flag_meanings stop at day_qf (bit 12), stated.
+ */
+export function lstPqi(v) {
+  if (!Number.isFinite(v) || v === 65535) return null;
+  return {
+    quality: v & 3,
+    cloud: (v >> 2) & 3,
+    inputBad: (v & 16) !== 0,
+    aodOut: (v & 32) !== 0,
+    surface: (v >> 6) & 3,
+    waterVapour: (v >> 8) & 3,
+    emissivityOther: (v & 1024) !== 0,
+    viewLarge: (v & 2048) !== 0,
+    day: (v & 4096) !== 0,
+    cirrus: (v & 8192) !== 0,
+    fire: (v & 16384) !== 0
+  };
+}
+// The ATBD's numbers: the requirement (Sec. 2), the angle bounds,
+// the quality rules (Table 3.9) and the SURFRAD validation of both
+// satellites (Tables 4.1 and 4.2: bias, precision, matchups by site).
+export const LST_ATBD = {
+  units: 'K',
+  requirement: {
+    accuracyK: 2.5, // conditional (known emissivity, atmospheric correction, 80% channel correction)
+    unconditionalK: 5,
+    precisionK: 2.3,
+    rangeK: [213, 330],
+    lzaMaxDeg: 70,
+    resolutionKm: 2,
+    refreshMin: 60
+  },
+  quantitativeLzaDeg: 55, // the product's own bound (the file's quantitative_local_zenith_angle_bounds)
+  dayMaxSzaDeg: 85, // Table 3.7: day = solar zenith <= 85
+  aodInRangeMax: 1, // Table 3.7: the AOD flag's range
+  // Table 3.9 by the mask's state for a valid LST: [clear, probably
+  // clear, probably cloudy]
+  qualityRules: [
+    {when: 'thin cirrus', quality: ['low', 'low', 'low']},
+    {when: 'AOD out of range', quality: ['low', 'low', 'low']},
+    {when: 'fire', quality: ['low', 'low', 'low']},
+    {when: 'view angle > 55°', quality: ['medium', 'medium', 'low']},
+    {when: 'view angle ≤ 55°', quality: ['high', 'medium', 'low']}
+  ],
+  matchup: {maxDeg: 0.02, maxMin: 1, cloudBoxPx: 3},
+  validation: {
+    'GOES-16': {
+      from: '2017-12-14',
+      to: '2019-08-31',
+      table: '4.1',
+      sites: [
+        {site: 'Bondville', n: 3227, biasK: 1.16, precisionK: 2.05},
+        {site: 'Boulder', n: 3161, biasK: -0.44, precisionK: 1.59},
+        {site: 'Desert Rock', n: 3275, biasK: -2.63, precisionK: 1.84},
+        {site: 'Fort Peck', n: 2937, biasK: -0.32, precisionK: 1.88},
+        {site: 'Goodwin Creek', n: 3566, biasK: 1.59, precisionK: 1.78},
+        {site: 'Penn State', n: 1995, biasK: 1.8, precisionK: 2.26},
+        {site: 'Sioux Falls', n: 3460, biasK: 0.62, precisionK: 1.96}
+      ]
+    },
+    'GOES-17': {
+      from: '2018-08-12',
+      to: '2019-08-31',
+      table: '4.2',
+      sites: [
+        {site: 'Bondville', n: 395, biasK: 1.41, precisionK: 1.94},
+        {site: 'Boulder', n: 1375, biasK: -0.35, precisionK: 1.28},
+        {site: 'Desert Rock', n: 1736, biasK: -2.41, precisionK: 1.73},
+        {site: 'Fort Peck', n: 1314, biasK: -0.81, precisionK: 2.2},
+        {site: 'Goodwin Creek', n: 383, biasK: 1.18, precisionK: 2.41},
+        {site: 'Penn State', n: 134, biasK: 1.78, precisionK: 1.61},
+        {site: 'Sioux Falls', n: 376, biasK: 0.71, precisionK: 1.4}
+      ]
+    }
+  }
+};
+/**
+ * The span of a satellite's SURFRAD validation (Table 4.1 or 4.2):
+ * the matchups, the biases' and precisions' ranges over the seven
+ * sites and their matchup-weighted means. The West slot's own table
+ * is GOES-17's - the craft that flew it through the validation, not
+ * GOES-18 - so a GOES-West view names it as such.
+ */
+export function lstValidationSpan(craft = 'GOES-16') {
+  const v = LST_ATBD.validation[craft] ?? LST_ATBD.validation['GOES-16'];
+  let n = 0;
+  let sb = 0;
+  let sp = 0;
+  let bLo = Infinity;
+  let bHi = -Infinity;
+  let pLo = Infinity;
+  let pHi = -Infinity;
+  for (const s of v.sites) {
+    n += s.n;
+    sb += s.n * s.biasK;
+    sp += s.n * s.precisionK;
+    bLo = Math.min(bLo, s.biasK);
+    bHi = Math.max(bHi, s.biasK);
+    pLo = Math.min(pLo, s.precisionK);
+    pHi = Math.max(pHi, s.precisionK);
+  }
+  return {
+    craft: LST_ATBD.validation[craft] ? craft : 'GOES-16',
+    table: v.table,
+    from: v.from,
+    to: v.to,
+    sites: v.sites.length,
+    n,
+    biasK: [bLo, bHi],
+    precisionK: [pLo, pHi],
+    meanBiasK: sb / n,
+    meanPrecisionK: sp / n
+  };
+}
 // The imagery bucket lists every band's file under one prefix
 // (OR_ABI-L2-CMIPC-M6C13_G18_s...): the band from a key, and the
 // keys of one band.
@@ -834,6 +1033,40 @@ export function aodCensus(tau, dqf) {
     usableN: usable.length,
     usableMedian: quantile(usable, 0.5)
   };
+}
+// The same census for any product flagged by the four levels (the
+// LST's DQF 0..3 carries the AOD's own names): the window by
+// quality with the high-quality statistics.
+export const qualityCensus = aodCensus;
+/**
+ * THE NEAREST PIXEL OF A QUALITY (157th pass): the pixel nearest the
+ * window's centre whose flag is `good` and whose value is finite,
+ * searched ring by ring out to maxR (Chebyshev), ties within a ring
+ * broken by Euclidean distance. {q, di, dj, r} or null - the LST
+ * body stands the land surface layer on it when the point's own
+ * pixel is cloudy or water.
+ */
+export function nearestGood(values, dqf, box, maxR, good = 0) {
+  const ci = box.i - box.i0;
+  const cj = box.j - box.j0;
+  for (let r = 0; r <= maxR; r++) {
+    let best = null;
+    for (let dj = -r; dj <= r; dj++) {
+      const j = cj + dj;
+      if (j < 0 || j >= box.rows) continue;
+      for (let di = -r; di <= r; di++) {
+        if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
+        const i = ci + di;
+        if (i < 0 || i >= box.cols) continue;
+        const q = j * box.cols + i;
+        if (!Number.isFinite(values[q]) || (dqf && dqf[q] !== good)) continue;
+        const d2 = di * di + dj * dj;
+        if (!best || d2 < best.d2) best = {q, di, dj, r, d2};
+      }
+    }
+    if (best) return {q: best.q, di: best.di, dj: best.dj, r};
+  }
+  return null;
 }
 // The ATBD's own collocation estimator (Sec. 4.2, after Ichoku et
 // al. 2002 and Remer et al. 2005): the high-quality pixels within r

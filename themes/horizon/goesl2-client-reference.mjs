@@ -234,6 +234,7 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       body.sst === null &&
       body.dsr === null &&
       body.aod === null &&
+      body.lst === null &&
       body.height !== null &&
       body.height.product === 'ABI-L2-ACHAC' &&
       body.height.census.n === heightWhole.census.n &&
@@ -249,7 +250,7 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       // this hour's prefix for every product, then last hour's and the
       // one before for the seven the fake bucket lists nothing under
       listsAfterFirst === (L2_ASKS.length - 2) * 3 + 2 &&
-      L2_ASKS.length === 9 &&
+      L2_ASKS.length === 10 &&
       filesAfterFirst === 2 &&
       // the range reads: the heights' head then its strips, the winds
       // whole in one megabyte ask
@@ -282,7 +283,7 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       client.windows.size === 2 &&
       CLIENT_HELD_WINDOWS === 4 &&
       asked.size === 0,
-    `the home asks ${L2_ASKS.length} products over ${listsAfterFirst} listings (this hour's prefix for each, two more hours back for the seven found empty) and reads the two the fake bucket holds ` +
+    `the home asks ${L2_ASKS.length} products over ${listsAfterFirst} listings (this hour's prefix for each, two more hours back for the eight found empty) and reads the two the fake bucket holds ` +
       `(${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB in ${r.ranges} range${r.ranges === 1 ? '' : 's'}`).join('; ')}): ` +
       `the heights' window at (424, 127) with ${body && body.height.census.n} tops, median ${body && body.height.census.medianM.toFixed(1)} m ` +
       `- the daemon's own body from the same bytes - and ${body && body.dmw.n} of ${body && body.dmw.total} vectors within 150 km, ` +
@@ -383,16 +384,17 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       again.sst === null &&
       again.dsr === null &&
       again.aod === null &&
-      // the CONUS products re-listed (three prefixes for the five the
+      again.lst === null &&
+      // the CONUS products re-listed (three prefixes for the six the
       // fake bucket lacks, one for the two it holds), the full-disk
       // ones not
-      listedAgain.length === 5 * 3 + 2 &&
+      listedAgain.length === 6 * 3 + 2 &&
       !listedAgain.some(
         (p) => p.startsWith('ABI-L2-SSTF') || p.startsWith('ABI-L2-DSRF')
       ),
     `three range asks of a whole-answering server cost ${calls} download (${a.length}, ${b.length} and ${c.length} bytes cut from it, the last short at the end); ` +
       `the client over such a bucket reads its two files whole (${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB`).join(', ')}), ` +
-      `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the five CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
+      `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the six CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
   );
 }
 

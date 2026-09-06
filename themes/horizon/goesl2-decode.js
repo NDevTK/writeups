@@ -16,8 +16,9 @@
  * (ABI-L2-ACHAC: HT on the 10-km grid), the band-13 imagery
  * (CMIPC), DCOMP (CODC/CPSC), the hourly full-disk SST (SSTF), the
  * 10-minute surface irradiance (DSRF), the 15-minute derived motion
- * winds (DMWC, a point list) and, since the 156th pass, the
- * 5-minute aerosol optical depth at 550 nm (AODC) from noaa-goes18
+ * winds (DMWC, a point list), since the 156th pass the 5-minute
+ * aerosol optical depth at 550 nm (AODC) and since the 157th the
+ * hourly land surface temperature (LSTC) from noaa-goes18
  * (GOES-West) and noaa-goes19 (GOES-East). Every file is read by HTTP RANGE
  * (hdf5.js openHdf5Lazy): the first quarter megabyte carries the
  * object headers and coordinate vectors, then only the chunks a
@@ -49,14 +50,16 @@ import {
   IMAGERY_BAND,
   L2_PRODUCTS,
   maskCensus,
+  nearestGood,
   packArray,
   pixelSizeM,
   productTimeIso,
+  qualityCensus,
   unscale,
   windowBox
 } from './goesl2.js';
 
-export const L2_HALF_PX = {mask: 50, height: 10, sst: 50, dsr: 50, aod: 50}; // +-100 km on 2-km / 10-km grids
+export const L2_HALF_PX = {mask: 50, height: 10, sst: 50, dsr: 50, aod: 50, lst: 50}; // +-100 km on 2-km / 10-km grids
 export const L2_LIST_MS = 60e3; // a bucket listing stands a minute (the cheap part)
 export const L2_RETRY_MS = 2 * 60e3; // after a listing or fetch failure
 export const L2_WINDOW_MS = 15 * 60e3; // windows outlive their file by design: a new file keys new windows
@@ -155,6 +158,26 @@ export const L2_AOD_EXTRAS = [
 ];
 // the ATBD's collocation box on the 2-km grid: 25 x 25 px = 50 km
 export const L2_AOD_BOX_R = 12;
+// The 157th pass: the land surface (skin) temperature (LST uint16 at
+// 0.0025 K a count from 190 K, fill 65535) with the quality DQF
+// (0..3, the AOD's four names - goesl2.LST_DQF_MEANINGS) and the
+// 16-bit PQI word (goesl2.lstPqi: the mask's state, the surface
+// cover, the water vapour, the view angle, day or night); the
+// scene's own statistics and the angle bounds ride as extras.
+export const L2_LST_SPEC = {LST: 'raw16', DQF: 'raw', PQI: 'raw16'};
+export const L2_LST_EXTRAS = [
+  'mean_lst',
+  'min_lst',
+  'max_lst',
+  'standard_deviation_lst',
+  'total_pixels_where_lst_is_retrieved',
+  'number_good_retrievals',
+  'quantitative_local_zenith_angle_bounds',
+  'retrieval_local_zenith_angle_bounds'
+];
+// how far (Chebyshev, px) the nearest high-quality skin pixel is
+// sought from the point: 5 px = about 11 km on the 2-km grid here
+export const L2_LST_NEAR_PX = 5;
 // what /goesl2 fetches for a point: product, spec, the window's half
 // width on the product's grid, the imagery's band (the CMIPC prefix
 // lists every band's file); timed false = not asked for a mosaic's
@@ -203,6 +226,16 @@ export const L2_ASKS = [
     spec: L2_AOD_SPEC,
     halfPx: 50,
     extras: L2_AOD_EXTRAS,
+    timed: false
+  },
+  // the hourly land skin (157th): the land surface layer's now, not
+  // a mosaic's comparison
+  {
+    id: 'lst',
+    product: L2_PRODUCTS.lst,
+    spec: L2_LST_SPEC,
+    halfPx: 50,
+    extras: L2_LST_EXTRAS,
     timed: false
   }
 ];
@@ -687,6 +720,69 @@ export function l2AodBody(dec, key, lat, lon) {
     },
     szaBounds: pair(x.quantitative_solar_zenith_angle_bounds),
     glintBounds: pair(x.sunglint_angle_bounds)
+  };
+}
+// THE LAND'S SKIN (157th pass): NOAA's land surface temperature
+// (ABI-L2-LSTC: CONUS hourly, 2 km, day and night) as counts with
+// the file's scaling, its quality flags and its PQI word, the
+// census by quality (goesl2.qualityCensus), the point's own pixel
+// with its quality and word (`here`), the nearest high-quality
+// pixel within L2_LST_NEAR_PX with its offset and distance
+// (`nearest` - the pixel the page's land surface layer stands on
+// when the point's own is cloudy or water), and the scene's own
+// statistics and angle bounds from the file's head.
+export function l2LstBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_LST_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.lst);
+  if (!w) return null;
+  const m = dec.meta.LST ?? {scale: 1, offset: 0, fill: 65535};
+  const tK = unscale(w.cut.LST, m);
+  const ci = w.box.i - w.box.i0;
+  const cj = w.box.j - w.box.j0;
+  const qc = cj * w.box.cols + ci;
+  const r2 = (v) => (Number.isFinite(v) ? +v.toFixed(2) : null);
+  const num = (v) => (Number.isFinite(v) ? v : null);
+  const pair = (v) =>
+    Array.isArray(v) && v.length === 2 ? v.map(Number) : null;
+  const near = nearestGood(tK, w.cut.DQF, w.box, L2_LST_NEAR_PX, 0);
+  const ew = w.pixel ? w.pixel.ewM : 2000;
+  const ns = w.pixel ? w.pixel.nsM : 2000;
+  const x = dec.extras ?? {};
+  return {
+    ...l2Common(dec, L2_PRODUCTS.lst, key, w),
+    lst: l2Counts(w.cut.LST, m.fill),
+    lstScale: m.scale,
+    lstOffset: m.offset,
+    lstFill: 65535,
+    units: 'K',
+    dqf: packArray(w.cut.DQF, 'u8'),
+    pqi: packArray(w.cut.PQI, 'u16'),
+    here: {
+      K: r2(tK[qc]),
+      dqf: w.cut.DQF[qc] ?? null,
+      pqi: w.cut.PQI[qc] ?? null
+    },
+    nearest: near
+      ? {
+          K: r2(tK[near.q]),
+          di: near.di,
+          dj: near.dj,
+          km: +(Math.hypot(near.di * ew, near.dj * ns) / 1000).toFixed(1),
+          pqi: w.cut.PQI[near.q] ?? null
+        }
+      : null,
+    nearPx: L2_LST_NEAR_PX,
+    census: qualityCensus(tK, w.cut.DQF),
+    sceneStats: {
+      meanK: r2(x.mean_lst),
+      minK: r2(x.min_lst),
+      maxK: r2(x.max_lst),
+      sdK: r2(x.standard_deviation_lst),
+      retrieved: num(x.total_pixels_where_lst_is_retrieved),
+      good: num(x.number_good_retrievals)
+    },
+    lzaBounds: pair(x.quantitative_local_zenith_angle_bounds),
+    lzaRetrievalBounds: pair(x.retrieval_local_zenith_angle_bounds)
   };
 }
 // The DCOMP window (149th pass): the optical depth at 640 nm and

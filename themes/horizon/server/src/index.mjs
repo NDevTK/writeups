@@ -972,6 +972,9 @@ export {
   L2_AOD_SPEC,
   L2_AOD_EXTRAS,
   L2_AOD_BOX_R,
+  L2_LST_SPEC,
+  L2_LST_EXTRAS,
+  L2_LST_NEAR_PX,
   L2_ASKS,
   decodeL2Window,
   decodeL2Vectors,
@@ -983,6 +986,7 @@ export {
   l2DmwBody,
   l2DsrBody,
   l2AodBody,
+  l2LstBody,
   l2DcompBody
 } from '../../goesl2-decode.js';
 const {
@@ -1019,6 +1023,7 @@ const {
   l2DmwBody,
   l2DsrBody,
   l2AodBody,
+  l2LstBody,
   l2DcompBody
 } = L2;
 const l2Inflate = (u8) =>
@@ -2196,6 +2201,7 @@ function main() {
       dsr: F.dsr ? l2DsrBody(F.dsr.dec, F.dsr.key, cell.lat, cell.lon) : null,
       dmw: F.dmw ? l2DmwBody(F.dmw.dec, F.dmw.key) : null,
       aod: F.aod ? l2AodBody(F.aod.dec, F.aod.key, cell.lat, cell.lon) : null,
+      lst: F.lst ? l2LstBody(F.lst.dec, F.lst.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial'
     };
     goesl2Cache.set(ck, {t: Date.now(), body});
