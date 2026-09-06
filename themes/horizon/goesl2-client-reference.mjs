@@ -591,22 +591,41 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
   const X = LAP_EXPECT;
   const calls = [];
   const s3 = async (url, opts) => {
-    const m = /bytes=(\d+)-(\d+)/.exec((opts.headers && opts.headers.range) || '');
+    const m = /bytes=(\d+)-(\d+)/.exec(
+      (opts.headers && opts.headers.range) || ''
+    );
     const s = +m[1];
     const e = Math.min(+m[2] + 1, crop.length);
     calls.push([s, e]);
     if (s >= crop.length)
-      return {status: 416, headers: {get: () => null}, arrayBuffer: async () => new ArrayBuffer(0)};
+      return {
+        status: 416,
+        headers: {get: () => null},
+        arrayBuffer: async () => new ArrayBuffer(0)
+      };
     return {
       status: 206,
-      headers: {get: (h) => (h === 'content-range' ? `bytes ${s}-${e - 1}/${crop.length}` : null)},
+      headers: {
+        get: (h) =>
+          h === 'content-range' ? `bytes ${s}-${e - 1}/${crop.length}` : null
+      },
       arrayBuffer: async () => crop.slice(s, e).buffer
     };
   };
   // a small head so the column's chunk must come in its own range
   const rr = rangeReader('u', s3);
-  const f = await openHdf5Lazy(rr, inflateStream, {blockBytes: 4096, headBytes: 8192});
-  const dec = await decodeL2Column(f, L2_LVT_SPEC, X.centre.lat, X.centre.lon, 1, L2_LAP_EXTRAS);
+  const f = await openHdf5Lazy(rr, inflateStream, {
+    blockBytes: 4096,
+    headBytes: 8192
+  });
+  const dec = await decodeL2Column(
+    f,
+    L2_LVT_SPEC,
+    X.centre.lat,
+    X.centre.lon,
+    1,
+    L2_LAP_EXTRAS
+  );
   const body = dec ? l2LvtBody(dec, 'k', X.centre.lat, X.centre.lon) : null;
   const counts = body ? unpackArray(body.counts) : null;
   const levels = body ? unpackArray(body.levels) : null;

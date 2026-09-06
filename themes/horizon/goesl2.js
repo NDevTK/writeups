@@ -1406,8 +1406,10 @@ export function lapQuality(overall, retrieval) {
     overall: o,
     retrieval: r,
     words:
-      (o === null ? 'no flag' : LAP_DQF_OVERALL[o] ?? `flag ${o}`) +
-      (r !== null && r !== 0 ? `; ${LAP_DQF_RETRIEVAL[r] ?? `retrieval flag ${r}`}` : '')
+      (o === null ? 'no flag' : (LAP_DQF_OVERALL[o] ?? `flag ${o}`)) +
+      (r !== null && r !== 0
+        ? `; ${LAP_DQF_RETRIEVAL[r] ?? `retrieval flag ${r}`}`
+        : '')
   };
 }
 /** The standard atmosphere's pressure (hPa) at a height (m): the
@@ -1415,7 +1417,9 @@ export function lapQuality(overall, retrieval) {
  * measured pressure - a 10-hPa error moves every height 80 m,
  * nothing against the ATBD's 3-5 km resolution, stated. */
 export function isaPressureHpa(zM) {
-  return 1013.25 * Math.pow(Math.max(1 - 2.25577e-5 * (zM || 0), 0.01), 5.25588);
+  return (
+    1013.25 * Math.pow(Math.max(1 - 2.25577e-5 * (zM || 0), 0.01), 5.25588)
+  );
 }
 /** Specific humidity (kg/kg) from the vapour pressure and the pressure
  * (both Pa): the usual 0.622 e / (p - 0.378 e). */
@@ -1467,7 +1471,11 @@ export function lapColumnRows(
   // the levels at or above the surface (p <= pSfc) with a finite T
   const idx = [];
   for (let i = 0; i < n; i++)
-    if (pressureHpa[i] < pSfcHpa && pressureHpa[i] >= tUsefulBelowHpa && Number.isFinite(tK[i]))
+    if (
+      pressureHpa[i] < pSfcHpa &&
+      pressureHpa[i] >= tUsefulBelowHpa &&
+      Number.isFinite(tK[i])
+    )
       idx.push(i);
   if (idx.length < 4) return null;
   // the surface's own values: bracket pSfc between the level below
@@ -1480,14 +1488,27 @@ export function lapColumnRows(
       below = i;
       break;
     }
-  const rhOf = (i) => (Number.isFinite(rhFrac[i]) ? Math.min(Math.max(rhFrac[i], 0), 1) : null);
+  const rhOf = (i) =>
+    Number.isFinite(rhFrac[i]) ? Math.min(Math.max(rhFrac[i], 0), 1) : null;
   const tSfcK =
     below >= 0
-      ? lnInterpLevel(pSfcHpa, pressureHpa[below], pressureHpa[first], tK[below], tK[first])
+      ? lnInterpLevel(
+          pSfcHpa,
+          pressureHpa[below],
+          pressureHpa[first],
+          tK[below],
+          tK[first]
+        )
       : tK[first];
   const rhSfc =
     below >= 0 && rhOf(below) !== null && rhOf(first) !== null
-      ? lnInterpLevel(pSfcHpa, pressureHpa[below], pressureHpa[first], rhOf(below), rhOf(first))
+      ? lnInterpLevel(
+          pSfcHpa,
+          pressureHpa[below],
+          pressureHpa[first],
+          rhOf(below),
+          rhOf(first)
+        )
       : rhOf(first);
   const row = (pHpa, hM, tKv, rh) => {
     const rhUse = pHpa >= rhUsefulBelowHpa ? rh : null;
@@ -1537,7 +1558,8 @@ export function lapFreezingLevelM(rows) {
   for (let i = 0; i + 1 < rows.length; i++) {
     const a = rows[i];
     const b = rows[i + 1];
-    if (a.tC > 0 && b.tC <= 0) return a.hM + ((b.hM - a.hM) * a.tC) / (a.tC - b.tC);
+    if (a.tC > 0 && b.tC <= 0)
+      return a.hM + ((b.hM - a.hM) * a.tC) / (a.tC - b.tC);
   }
   return null;
 }
@@ -1550,7 +1572,12 @@ export function lapLevelAt(rows, hPa) {
     if (hPa <= a.p && hPa >= b.p) {
       const f = Math.log(hPa / a.p) / Math.log(b.p / a.p);
       const mix = (u, v) => (u === null || v === null ? null : u + f * (v - u));
-      return {tC: mix(a.tC, b.tC), rh: mix(a.rh, b.rh), tdC: mix(a.tdC, b.tdC), hM: mix(a.hM, b.hM)};
+      return {
+        tC: mix(a.tC, b.tC),
+        rh: mix(a.rh, b.rh),
+        tdC: mix(a.tdC, b.tdC),
+        hM: mix(a.hM, b.hM)
+      };
     }
   }
   return null;
@@ -1558,7 +1585,17 @@ export function lapLevelAt(rows, hPa) {
 /** The window's census by the overall flag: good, degraded, and the
  * invalid by reason, with the fields of regard whose retrieval ran. */
 export function lapCensus(overall, retrieval) {
-  const c = {n: overall.length, good: 0, degraded: 0, cloud: 0, zenith: 0, nwp: 0, other: 0, fill: 0, retrieved: 0};
+  const c = {
+    n: overall.length,
+    good: 0,
+    degraded: 0,
+    cloud: 0,
+    zenith: 0,
+    nwp: 0,
+    other: 0,
+    fill: 0,
+    retrieved: 0
+  };
   for (let q = 0; q < overall.length; q++) {
     const o = overall[q];
     if (o === 255 || o === undefined) {
@@ -1582,7 +1619,8 @@ export function lapNearestUsable(overall, retrieval, {cols, rows, ci, cj}) {
   for (let j = 0; j < rows; j++)
     for (let i = 0; i < cols; i++) {
       const q = j * cols + i;
-      if (!lapQuality(overall[q], retrieval ? retrieval[q] : null).usable) continue;
+      if (!lapQuality(overall[q], retrieval ? retrieval[q] : null).usable)
+        continue;
       const d2 = (i - ci) * (i - ci) + (j - cj) * (j - cj);
       if (!best || d2 < best.d2) best = {q, i, j, d2};
     }

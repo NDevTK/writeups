@@ -666,7 +666,16 @@ export async function decodeL2Column(f, spec, lat, lon, halfPx, extras = null) {
     for (const n of extras) head.extras[n] = l2Extra(await f.dataset(n));
   } else head.extras = null;
   const g = fixedGridGeometry(frame.proj);
-  const box = windowBox(lat, lon, g, frame.x, frame.y, frame.x.n, frame.y.n, halfPx);
+  const box = windowBox(
+    lat,
+    lon,
+    g,
+    frame.x,
+    frame.y,
+    frame.x.n,
+    frame.y.n,
+    halfPx
+  );
   if (!box)
     return {...head, levels, box: null, pixel: null, data: null, meta: null};
   const window2 = [
@@ -1323,7 +1332,8 @@ export function l2AdpBody(dec, key, lat, lon) {
 // the page pairs the temperature and the moisture by their times and
 // builds the rows itself (goesl2.lapColumnRows).
 function l2ProfileBody(dec, key, lat, lon, field) {
-  if (!dec || !dec.data || !dec.data[field] || !dec.box || !dec.levels) return null;
+  if (!dec || !dec.data || !dec.data[field] || !dec.box || !dec.levels)
+    return null;
   const box = dec.box;
   const ci = box.i - box.i0;
   const cj = box.j - box.j0;

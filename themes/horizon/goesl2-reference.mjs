@@ -1237,16 +1237,36 @@ const inflate = (u8) =>
   // a column crossing 0 C between two levels
   const pr2 = [1100, 1000, 900, 800, 700, 600, 500, 400, 300, 200, 100];
   const tC2 = [20, 18, 12, 6, 1, -5, -12, -22, -35, -50, -60];
-  const wet = lapColumnRows(pr2, tC2.map((c) => c + 273.15), pr2.map(() => 0.5), {pSfcHpa: 1000, zSfcM: 0});
+  const wet = lapColumnRows(
+    pr2,
+    tC2.map((c) => c + 273.15),
+    pr2.map(() => 0.5),
+    {pSfcHpa: 1000, zSfcM: 0}
+  );
   const fz = lapFreezingLevelM(wet);
   const a700 = lapLevelAt(wet, 700);
   const pw = lapPwMm(wet);
   const overall = Uint8Array.from([4, 0, 4, 255, 4, 0, 3, 1, 5]);
   const retrieval = Uint8Array.from([255, 0, 255, 255, 255, 2, 0, 255, 255]);
   const cen = lapCensus(overall, retrieval);
-  const nearest = lapNearestUsable(overall, retrieval, {cols: 3, rows: 3, ci: 1, cj: 1});
-  const noneUsable = lapNearestUsable(Uint8Array.from([4, 4, 4, 4]), null, {cols: 2, rows: 2, ci: 0, cj: 0});
-  const tooFew = lapColumnRows([1000, 900, 800], [280, 275, 270], [0.5, 0.5, 0.5], {pSfcHpa: 1013});
+  const nearest = lapNearestUsable(overall, retrieval, {
+    cols: 3,
+    rows: 3,
+    ci: 1,
+    cj: 1
+  });
+  const noneUsable = lapNearestUsable(Uint8Array.from([4, 4, 4, 4]), null, {
+    cols: 2,
+    rows: 2,
+    ci: 0,
+    cj: 0
+  });
+  const tooFew = lapColumnRows(
+    [1000, 900, 800],
+    [280, 275, 270],
+    [0.5, 0.5, 0.5],
+    {pSfcHpa: 1013}
+  );
   check(
     'THE COLUMN FROM ORBIT: the flags, the water helpers, a closed-form column, the freezing level, the census',
     qGood.usable === true &&
@@ -1260,7 +1280,11 @@ const inflate = (u8) =>
       qBad.words.includes('residual') &&
       lapQuality(255, 255).usable === false &&
       near(tdBack, tK - 273.15, 1e-9) &&
-      near(specificHumidity(e, 100000), (0.622 * e) / (100000 - 0.378 * e), 1e-15) &&
+      near(
+        specificHumidity(e, 100000),
+        (0.622 * e) / (100000 - 0.378 * e),
+        1e-15
+      ) &&
       dry !== null &&
       // the surface row and the nine levels from 900 to 100 hPa (50
       // is past the ATBD's useful top, 1100 under the surface)
@@ -1319,12 +1343,33 @@ const inflate = (u8) =>
   const t = openHdf5(new Uint8Array(Buffer.from(LVTPC_B64, 'base64')), inflate);
   const m = openHdf5(new Uint8Array(Buffer.from(LVMPC_B64, 'base64')), inflate);
   const pr = Array.from(t.dataset('pressure').values);
-  const lvt = t.dataset('LVT', {window: [[X.centre.row, X.centre.row + 1], [X.centre.col, X.centre.col + 1], [0, X.levels]]});
-  const lvm = m.dataset('LVM', {window: [[X.centre.row, X.centre.row + 1], [X.centre.col, X.centre.col + 1], [0, X.levels]]});
+  const lvt = t.dataset('LVT', {
+    window: [
+      [X.centre.row, X.centre.row + 1],
+      [X.centre.col, X.centre.col + 1],
+      [0, X.levels]
+    ]
+  });
+  const lvm = m.dataset('LVM', {
+    window: [
+      [X.centre.row, X.centre.row + 1],
+      [X.centre.col, X.centre.col + 1],
+      [0, X.levels]
+    ]
+  });
   const sc = (a) => (Array.isArray(a) ? a[0] : a);
-  const tK = Array.from(lvt.values).map((v) => (v === 65535 ? NaN : v * sc(lvt.attrs.scale_factor) + sc(lvt.attrs.add_offset)));
-  const rh = Array.from(lvm.values).map((v) => (v === 65535 ? NaN : v * sc(lvm.attrs.scale_factor)));
-  const rows = lapColumnRows(pr, tK, rh, {pSfcHpa: X.column.pSfcHpa, zSfcM: X.column.zSfcM});
+  const tK = Array.from(lvt.values).map((v) =>
+    v === 65535
+      ? NaN
+      : v * sc(lvt.attrs.scale_factor) + sc(lvt.attrs.add_offset)
+  );
+  const rh = Array.from(lvm.values).map((v) =>
+    v === 65535 ? NaN : v * sc(lvm.attrs.scale_factor)
+  );
+  const rows = lapColumnRows(pr, tK, rh, {
+    pSfcHpa: X.column.pSfcHpa,
+    zSfcM: X.column.zSfcM
+  });
   const top = rows[rows.length - 1];
   const at250 = lapLevelAt(rows, 250);
   const at700 = lapLevelAt(rows, 700);

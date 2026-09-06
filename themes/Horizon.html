@@ -2512,7 +2512,9 @@
             : rows === satRows
               ? `satellite (${satColumn.craft} legacy profiles ${satColumn.time.slice(11, 16)}Z, ${satColumn.own ? 'the observer’s own' : 'the nearest usable'} 10-km field, 3–5 km resolution)`
               : `radiosonde ${state.soundingData.name} ${state.soundingData.distKm} km` +
-                (ascentStands() ? '' : ' (past the 300-km / 13-h gates; no satellite column)');
+                (ascentStands()
+                  ? ''
+                  : ' (past the 300-km / 13-h gates; no satellite column)');
         if (tSkinC === null || !Array.isArray(rows) || rows.length < 10) {
           const why =
             tSkinC === null
@@ -6622,7 +6624,15 @@
       function goesL2ColumnNow() {
         const t = goesL2 && goesL2.lvt;
         const m = goesL2 && goesL2.lvm;
-        if (!t || !m || !t.counts || !m.counts || !t.levels || !t.time || !m.time)
+        if (
+          !t ||
+          !m ||
+          !t.counts ||
+          !m.counts ||
+          !t.levels ||
+          !t.time ||
+          !m.time
+        )
           return null;
         // one scene: the two files of the same 5 minutes
         if (Math.abs(Date.parse(t.time) - Date.parse(m.time)) > 6 * 60e3)
@@ -6724,7 +6734,7 @@
             : '') +
           ` · ${c.pwMm.toFixed(1)} mm of water` +
           (tpwMm !== null
-            ? ` (the TPW product's own ${tpwMm.toFixed(1)} mm: ${Math.abs(100 * (c.pwMm - tpwMm) / tpwMm).toFixed(0)}% apart)`
+            ? ` (the TPW product's own ${tpwMm.toFixed(1)} mm: ${Math.abs((100 * (c.pwMm - tpwMm)) / tpwMm).toFixed(0)}% apart)`
             : '') +
           ` · ${
             ascentStands()
@@ -6743,7 +6753,8 @@
             : 'none found';
         let con = null;
         try {
-          con = satColumn && satColumn.rows ? contrailPanel(satColumn.rows) : null;
+          con =
+            satColumn && satColumn.rows ? contrailPanel(satColumn.rows) : null;
         } catch {
           con = null;
         }
@@ -14819,7 +14830,9 @@
           if (goesObs)
             research['cloud field (geostationary band 13 · GIBS)'] =
               goesObs.line +
-              (irColumnSource ? ` · the reference's column: ${irColumnSource}` : '');
+              (irColumnSource
+                ? ` · the reference's column: ${irColumnSource}`
+                : '');
           else if (goesReach)
             research['cloud field (geostationary band 13 · GIBS)'] = goesReach;
           else delete research['cloud field (geostationary band 13 · GIBS)'];
