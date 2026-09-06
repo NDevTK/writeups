@@ -10345,6 +10345,81 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 170th pass - THE KIND'S OWN
+  OPTICS): the 169th let the satellite say WHICH aerosol hazes the
+  scene and moved the species' shares; the sky's single-scattering
+  albedo, asymmetry and spectral slope stayed the model's. THE PRIMARY,
+  read in full: Dubovik, Holben, Eck, Smirnov, Kaufman, King, Tanre &
+  Slutsker 2002 (J. Atmos. Sci. 59, 590-608; the NASA GSFC preprint,
+  55 pp) - the climatology the ADP ATBD itself cites: eight years of
+  AERONET sun-and-sky radiance at twelve sites inverted (Dubovik & King
+  2000) to the column's omega0, g, n and k at 440, 670, 870 and 1020
+  nm, omega0 good to 0.03 at tau(440) over 0.5 and solar zenith past
+  50 deg (0.05-0.07 below tau 0.2), Table 1 given for tau(440) at or
+  over 0.4 (dust for tau(1020) over 0.3 and alpha under 0.6). DUST
+  (Cape Verde, the Saharan outflow, 1993-2000; 1,500 measurements, 300
+  for omega0): 0.93 / 0.98 / 0.99 / 0.99 - weak absorption beyond 550
+  nm and pronounced in the blue, against the 0.63-0.89 the older
+  models (Shettle & Fenn, WMO, OPAC) put at 500 nm, the paper's own
+  headline; g 0.73 / 0.71 / 0.71 / 0.71 (coarse: rvc 1.90 um, Cvc/Cvf
+  ~50); alpha -0.1 to 0.7; n 1.48; k 0.0025 at 440 falling to 0.0006
+  (3-4 times higher in the blue: hematite). SMOKE (boreal forest, USA
+  and Canada 1994-98; 1,000 measurements, 250 for omega0): 0.94 /
+  0.935 / 0.92 / 0.91 falling with wavelength (fine particles, rvf
+  0.15 um, scatter the blue), g 0.69 / 0.61 / 0.55 / 0.53, alpha
+  1.0-2.3, n 1.50, k 0.0094; the African savanna's 0.88 / 0.84 / 0.80 /
+  0.78 (85% flaming combustion, Ward 1996) the absorbing bound, the
+  Amazon's 0.94 / 0.93 / 0.91 / 0.90 the forest twin, the cerrado
+  between (0.91 / 0.89 / 0.87 / 0.85); AERONET's omega0 runs 0.05-0.1
+  above in-situ aircraft values (Reid 1998: 0.86 at 550 for Amazonian
+  haze against 0.935 retrieved) - unresolved in the paper, stated.
+  OCEANIC (Lanai): 0.98 / 0.97 / 0.97 / 0.97, g 0.75 -> 0.68, n 1.36.
+  Nonsphericity: dust's spheroids alter the phase function past 90 deg
+  scattering but omega0 and g are recovered by Mie within the paper's
+  tests (Fig. 4: g 0.78 spheres vs 0.74 spheroids for Cape Verde);
+  fine-mode smoke and urban aerosol are spherical to the light. THE
+  LAW (aerosol.js): DUBOVIK_2002 (the five types' rows as printed);
+  lnInterp; typeOptics - the sky's 440 is the table's own, 550 and 680
+  bridged linearly in ln(lambda) between 440-670 and 670-870 (dust
+  0.930 / 0.9565 / 0.9806 at 440 / 550 / 680, g 0.7194 at 550, alpha
+  0.3 the range's midpoint; smoke 0.940 / 0.9373 / 0.9341, g 0.6475,
+  alpha 1.65); mixTypeOptics - an external mixture's albedo is the
+  extinction-weighted mean of its parts, so the kind's omega0 enters by
+  its share and the model's stands for the rest, g the same (a
+  scattering weight approximated by the extinction share, stated),
+  tau's slope turned toward the kind's alpha at fixed 550 nm (the
+  measured amount kept; the blue tau of a 0.98-albedo column falls
+  0.18 -> 0.141 under dust, rises to 0.191 under smoke), share 0 and
+  an unknown kind the set itself, `type` carrying what was mixed. THE
+  PAGE: after the 169th's species re-weight the channel set is mixed
+  by the called share (the floor 0.6, or the split's own share past
+  it) before AERONET's measured extinction, which still outranks the
+  slope; the record and the research clause carry the site, the
+  albedos before and after at 440/550/680, g and alpha with the
+  paper's scatter (0.01-0.03) and its caution (a site average, not this
+  column's retrieval). GATE: aerosol-reference THE KIND'S OWN OPTICS
+  (Table 1's rows as printed, the bridge by hand at 550 and 680, share
+  0 and an unknown kind identity, share 1 the kind's own values with
+  tau 550 kept, share 0.6 the extinction-share means, the Mie
+  coefficients recovering the blended albedo exactly, the input
+  untouched). Docs: FINDINGS pass 170 (148 files, 1,187 landmarks).
+  MEASURED in the page (23.30 N 63.54 W, 20:5xZ, looking east along
+  the low sky; the rule called nothing today, so the pin): unpinned
+  "GEFS-Aerosols - tau550 0.132 - SSA 0.98 - g 0.80 - du/ss/su/om/bc
+  11/71/10/6/2%"; ?adpkind=dust "SSA 0.96 - g 0.75 - du/ss/su/om/bc
+  60/32/5/3/1% - aureole f550 0.029 - cone 9.9 deg - desert 3-mode -
+  ADP dust pinned: dust 11% -> 60% - the kind's optics (Dubovik 2002,
+  Cape Verde 1993-2000 (Saharan outflow)): SSA 440/550/680
+  0.968/0.977/0.985 -> 0.945/0.965/0.982, g 0.80 -> 0.75, the slope
+  toward alpha 0.30 at 60% share" - the model's near-white marine
+  column made a blue-absorbing, forward-scattering, spectrally flat
+  dust haze from one measured word and one read paper. STATED LIMITS:
+  the numbers are Dubovik's site averages (Cape Verde for dust, the
+  boreal forest for smoke - the continent GOES's CONUS scene burns),
+  with the paper's own in-situ discrepancy; the kind's share is the
+  169th's floor when the model's split lay below it; the phase
+  function beyond the asymmetry (the spheroids' side scattering) is
+  not represented.
 - DONE (Sep 6, the review session's 169th pass - THE HAZE'S KIND FROM
   ORBIT): the sky's Mie term has been GEFS-Aerosols' since the aerosol
   pass - the model's optical thickness, single-scattering albedo,

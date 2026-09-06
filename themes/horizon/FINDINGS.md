@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1186 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1187 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **148 reference files, 1186 landmark lines, 8 GPU probes** (live gate
+- **148 reference files, 1187 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1132,7 +1132,24 @@ The practice the corpus demonstrates, stated so it can be reused:
    home column's dust 11% → 60%, the aureole's cone 30° → 9° (`goesl2-
 reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    KIND, READ; `aerosol-reference` THE HAZE'S KIND re-weights the
-   species, never the column)
+   species, never the column). Pass 170 gives the called kind its own
+   optics from the climatology the ATBD itself cites — Dubovik et al.
+   2002 (J. Atmos. Sci. 59, 590–608, read in full): eight years of
+   AERONET sky radiance inverted to the column's single-scattering
+   albedo, asymmetry and refractive index at 440/670/870/1020 nm for
+   twelve sites. Cape Verde dust 0.93/0.98/0.99/0.99 (weak absorption
+   beyond 550 nm, pronounced in the blue, against the 0.63–0.89 of the
+   older models), g 0.73 nearly flat, α −0.1..0.7; boreal-forest smoke
+   0.94/0.935/0.92/0.91, g 0.69 → 0.53, α 1.0–2.3, with the savanna's
+   0.88 → 0.78 as the absorbing bound. The sky's 550 and 680 nm are
+   bridged in ln λ (dust 0.930/0.957/0.981 at 440/550/680, smoke
+   0.940/0.937/0.934), and the kind enters the channel set by its share
+   of the column as an external mixture does — the extinction-weighted
+   mean of the albedos, the asymmetry likewise, tau's slope turned
+   toward the kind's α at fixed 550 nm so the measured amount stands
+   and only the haze's colour becomes the kind's: flat and
+   blue-absorbing for dust, steep and blue-scattering for smoke
+   (`aerosol-reference` THE KIND'S OWN OPTICS)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

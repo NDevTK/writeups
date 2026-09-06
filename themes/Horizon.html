@@ -784,6 +784,7 @@
       import {
         channelSet,
         mieCoefficients,
+        mixTypeOptics,
         reweightSpecies,
         TAU_MAX,
         TAU_MIN
@@ -6156,7 +6157,24 @@
               to: null,
               group: null
             };
-          const set = channelSet(prod);
+          let set = channelSet(prod);
+          // THE KIND'S OWN OPTICS (170th pass): the called kind's
+          // single-scattering albedo, asymmetry and spectral slope from
+          // Dubovik 2002's climatology, mixed in by the kind's share of
+          // the column (aerosol.mixTypeOptics); AERONET's measured
+          // extinction, applied below, still outranks the slope
+          if (dom === 'dust' || dom === 'smoke') {
+            const share = Math.max(
+              state.aerosolAdp.to ?? 0,
+              state.aerosolAdp.from ?? 0
+            );
+            const before = set;
+            set = mixTypeOptics(set, dom, share);
+            if (set !== before && set.type)
+              adpNote +=
+                ` · the kind's optics (Dubovik 2002, ${set.type.site}): SSA 440/550/680 ${before.ssa[2].toFixed(3)}/${before.ssa[1].toFixed(3)}/${before.ssa[0].toFixed(3)} → ${set.ssa[2].toFixed(3)}/${set.ssa[1].toFixed(3)}/${set.ssa[0].toFixed(3)}` +
+                `, g ${before.g.toFixed(2)} → ${set.g.toFixed(2)}, the slope toward α ${set.type.alpha.toFixed(2)} at ${Math.round(100 * share)}% share`;
+          }
           // MEASURED direct-sun AOD outranks the model where a
           // photometer actually looked (aeronet.js, gated -
           // Giles 2019 V3 Level 1.5): the nearest station's
@@ -8205,7 +8223,10 @@
               adpWords(ad).replace(/^\d\d:\d\dZ · /, '') +
               ` · the sky's species split: ` +
               (rw && rw.changed
-                ? `${rw.dominant} ${rw.pinned ? 'pinned (?adpkind)' : 'called within 25 km'} - ${rw.group} ${Math.round(100 * rw.from)}% → ${Math.round(100 * rw.to)}% of the measured 555-nm column (the aureole's coarse mode and the corona's air follow; the column's amount stays ${rw.amountSource})`
+                ? `${rw.dominant} ${rw.pinned ? 'pinned (?adpkind)' : 'called within 25 km'} - ${rw.group} ${Math.round(100 * rw.from)}% → ${Math.round(100 * rw.to)}% of the measured 555-nm column (the aureole's coarse mode and the corona's air follow; the column's amount stays ${rw.amountSource})` +
+                  (state.aerosol.set && state.aerosol.set.type
+                    ? ` · the kind's own optics (Dubovik 2002, ${state.aerosol.set.type.site}; Table 1's site average, ±0.01-0.03 in SSA): SSA at 440/550/680 ${state.aerosol.set.type.before.ssa[2].toFixed(3)}/${state.aerosol.set.type.before.ssa[1].toFixed(3)}/${state.aerosol.set.type.before.ssa[0].toFixed(3)} → ${state.aerosol.set.ssa[2].toFixed(3)}/${state.aerosol.set.ssa[1].toFixed(3)}/${state.aerosol.set.ssa[0].toFixed(3)}, g ${state.aerosol.set.type.before.g.toFixed(2)} → ${state.aerosol.set.g.toFixed(2)}, tau's slope toward α ${state.aerosol.set.type.alpha.toFixed(2)} (the range ${state.aerosol.set.type.alphaRange.join('..')}) at fixed 550 nm - ${state.aerosol.set.type.kind === 'dust' ? 'a flat, blue-absorbing dust haze' : 'a steep, blue-scattering smoke'}`
+                    : '')
                 : rw && rw.dominant && rw.dominant !== 'none'
                   ? `${rw.dominant} called within 25 km and the model's split already carries it (${Math.round(100 * rw.from)}%)`
                   : goesL2AdpNow()

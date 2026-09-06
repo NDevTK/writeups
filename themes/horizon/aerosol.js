@@ -199,6 +199,152 @@ export function reweightSpecies(prod, fractions) {
 }
 
 /**
+ * THE KIND'S OWN OPTICS (170th pass): what the satellite's called kind
+ * says about the haze's ABSORPTION and ANGULAR scattering, from the
+ * climatology the ADP ATBD itself cites - Dubovik et al. 2002 (J.
+ * Atmos. Sci. 59, 590-608; read in full): eight years of AERONET sky
+ * radiance at twelve sites inverted to the column's single-scattering
+ * albedo omega0, phase-function asymmetry g and refractive index at
+ * 440, 670, 870 and 1020 nm (Table 1; omega0 good to 0.03 at tau(440)
+ * >= 0.5 and solar zenith over 50 deg; the values given for tau(440)
+ * >= 0.4, dust for tau(1020) >= 0.3 and alpha <= 0.6). DUST (Cape
+ * Verde, the Saharan outflow over the Atlantic, 1993-2000): omega0
+ * 0.93 / 0.98 / 0.99 / 0.99 - weak absorption beyond 550 nm,
+ * pronounced in the blue, the paper's own conclusion against the
+ * 0.63-0.89 of the older models; g 0.73 / 0.71 / 0.71 / 0.71, nearly
+ * flat: coarse particles (rvc 1.9 um, Cvc/Cvf ~50); Angstrom alpha
+ * -0.1 to 0.7; n 1.48, k 0.0025 at 440 falling to 0.0006. SMOKE
+ * (boreal forest, USA and Canada 1994-98 - the continent GOES's CONUS
+ * scene burns): omega0 0.94 / 0.935 / 0.92 / 0.91 falling with
+ * wavelength (fine particles, rvf 0.15 um, scatter the blue), g 0.69 /
+ * 0.61 / 0.55 / 0.53, alpha 1.0-2.3; the African savanna's 0.88 /
+ * 0.84 / 0.80 / 0.78 (85% flaming combustion) is the absorbing bound,
+ * the Amazon's 0.94 / 0.93 / 0.91 / 0.90 the forest twin. The sky's
+ * channels sit at 680, 550 and 440 nm: 440 is the table's own, 550 and
+ * 680 interpolate linearly in ln(lambda) between 440-670 and 670-870
+ * (the bridging channelSet already applies between the model's
+ * anchors). THE MIX: an external mixture's single-scattering albedo is
+ * the extinction-weighted mean of its parts, so the called kind's
+ * omega0 enters by its share of the column and the model's value
+ * stands for the rest; g the same (a scattering weight, approximated
+ * by the extinction share - stated); tau's spectral slope turns toward
+ * the kind's alpha (the range's midpoint) at fixed 550 nm, so the
+ * measured amount is kept and the colour of the haze becomes the
+ * kind's - white-brown and flat for dust, blue-steep for smoke. Share
+ * 0 is the input itself. The values are the paper's site averages,
+ * each with its printed scatter (0.01-0.03 in omega0) - a climatology,
+ * not this column's retrieval, stated on the line.
+ */
+export const DUBOVIK_2002 = {
+  source: 'Dubovik et al. 2002, J. Atmos. Sci. 59, 590-608, Table 1',
+  wavelengthsNm: [440, 670, 870, 1020],
+  dust: {
+    site: 'Cape Verde 1993-2000 (Saharan outflow)',
+    omega0: [0.93, 0.98, 0.99, 0.99],
+    g: [0.73, 0.71, 0.71, 0.71],
+    alpha: [-0.1, 0.7],
+    n: 1.48,
+    k440: 0.0025
+  },
+  smoke: {
+    site: 'boreal forest, USA and Canada 1994-98',
+    omega0: [0.94, 0.935, 0.92, 0.91],
+    g: [0.69, 0.61, 0.55, 0.53],
+    alpha: [1.0, 2.3],
+    n: 1.5,
+    k440: 0.0094
+  },
+  smokeSavanna: {
+    site: 'African savanna, Zambia 1995-2000',
+    omega0: [0.88, 0.84, 0.8, 0.78],
+    g: [0.64, 0.53, 0.48, 0.47],
+    alpha: [1.4, 2.2],
+    n: 1.51,
+    k440: 0.021
+  },
+  smokeAmazon: {
+    site: 'Amazonian forest, Brazil and Bolivia 1993-99',
+    omega0: [0.94, 0.93, 0.91, 0.9],
+    g: [0.69, 0.58, 0.51, 0.48],
+    alpha: [1.2, 2.1],
+    n: 1.47,
+    k440: 0.0093
+  },
+  oceanic: {
+    site: 'Lanai, Hawaii 1995-2000',
+    omega0: [0.98, 0.97, 0.97, 0.97],
+    g: [0.75, 0.71, 0.69, 0.68],
+    alpha: [0, 1.55],
+    n: 1.36,
+    k440: 0.0015
+  }
+};
+/** Linear in ln(lambda) between the table's wavelengths, held at the
+ * ends. */
+export function lnInterp(nmTable, values, nm) {
+  if (nm <= nmTable[0]) return values[0];
+  const last = nmTable.length - 1;
+  if (nm >= nmTable[last]) return values[last];
+  for (let i = 1; i <= last; i++)
+    if (nm <= nmTable[i]) {
+      const f = Math.log(nm / nmTable[i - 1]) / Math.log(nmTable[i] / nmTable[i - 1]);
+      return values[i - 1] + f * (values[i] - values[i - 1]);
+    }
+  return values[last];
+}
+/** The kind's optics at the theme's channels: {kind, site, ssa
+ * [680, 550, 440], g (at 550), alpha (the range's midpoint)}; null
+ * for a kind the table lacks. */
+export function typeOptics(kind) {
+  const t = DUBOVIK_2002[kind];
+  if (!t || !Array.isArray(t.omega0)) return null;
+  const w = DUBOVIK_2002.wavelengthsNm;
+  return {
+    kind,
+    site: t.site,
+    ssa: CHANNEL_NM.map((nm) => lnInterp(w, t.omega0, nm)),
+    g: lnInterp(w, t.g, 550),
+    alpha: (t.alpha[0] + t.alpha[1]) / 2,
+    alphaRange: t.alpha
+  };
+}
+/**
+ * The channel set with the called kind mixed in by its share of the
+ * column: ssa and g the extinction-share means, tau's slope turned
+ * toward the kind's alpha at fixed 550 nm (tau[1] unchanged), every
+ * value clamped as channelSet clamps. Share 0 (or an unknown kind)
+ * returns the input itself; `type` carries what was mixed for the
+ * words.
+ */
+export function mixTypeOptics(set, kind, share) {
+  const t = typeOptics(kind);
+  if (!set || !t || !(share > 0)) return set;
+  const s = clamp(share, 0, 1);
+  const tau550 = set.tau[1];
+  const tau = set.tau.map((v, c) =>
+    clamp((1 - s) * v + s * tau550 * Math.pow(CHANNEL_NM[c] / 550, -t.alpha), TAU_MIN, TAU_MAX)
+  );
+  const ssa = set.ssa.map((v, c) => clamp((1 - s) * v + s * t.ssa[c], 0.05, 1));
+  const g = clamp((1 - s) * set.g + s * t.g, 0, 0.95);
+  return {
+    ...set,
+    tau,
+    ssa,
+    g,
+    type: {
+      kind: t.kind,
+      site: t.site,
+      share: s,
+      ssa: t.ssa,
+      g: t.g,
+      alpha: t.alpha,
+      alphaRange: t.alphaRange,
+      before: {tau: set.tau, ssa: set.ssa, g: set.g}
+    }
+  };
+}
+
+/**
  * Calibrate the exp(-h/MIE_H) profile so the column ABOVE the
  * local terrain (hSurf metres) integrates to the measured tau:
  * sigma(0) = tau / (MIE_H * exp(-hSurf/MIE_H)), i.e.

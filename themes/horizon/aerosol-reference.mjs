@@ -20,8 +20,12 @@ import {
   aerosolProducts,
   angstromTau,
   channelSet,
+  DUBOVIK_2002,
+  lnInterp,
   mieCoefficients,
-  reweightSpecies
+  mixTypeOptics,
+  reweightSpecies,
+  typeOptics
 } from './aerosol.js';
 import {AER_SUBSET_B64, PINS} from './grib2-fixture.mjs';
 import {parseGrib2} from './grib2.js';
@@ -273,6 +277,76 @@ const prod = aerosolProducts(msgs, 47, 8);
       noBand.species === prod.species,
     `a dust call on a 10%-dust column: dust 0.04 -> ${rw.species.dust.aot.toFixed(3)} of the 0.4 total (${(100 * after.fractions.dust).toFixed(0)}%), its scattering ratio kept at ${(rw.species.dust.sct / rw.species.dust.aot).toFixed(2)}, ` +
       `black carbon's at ${(rw.species.blackCarbon.sct / rw.species.blackCarbon.aot).toFixed(2)}, the species summing to ${sumAot.toFixed(3)}; the channel tau, SSA and g unchanged; a smoke call on a column without fine absorbers gives organic ${noFine.species.organic.aot.toFixed(2)} at the total's ratio 0.9; no fractions or no 555 band returns the input`
+  );
+}
+
+{
+  // THE KIND'S OWN OPTICS (170th pass): Dubovik 2002's Table 1 as the
+  // law holds it, the ln(lambda) bridge to the sky's 680/550/440 by
+  // hand, the mix by share - identity at 0, the kind's own numbers at
+  // 1, the extinction-share mean between, tau's amount at 550 kept
+  // while its slope turns to the kind's alpha
+  const near = (a, b, tol = 1e-12) => Math.abs(a - b) <= tol;
+  const w = DUBOVIK_2002.wavelengthsNm;
+  const d = DUBOVIK_2002.dust;
+  const sm = DUBOVIK_2002.smoke;
+  const f550 = Math.log(550 / 440) / Math.log(670 / 440);
+  const f680 = Math.log(680 / 670) / Math.log(870 / 670);
+  const dust = typeOptics('dust');
+  const smoke = typeOptics('smoke');
+  const set = {tau: [0.1, 0.132, 0.18], ssa: [0.98, 0.98, 0.98], g: 0.8, fractions: {dust: 0.6}};
+  const none = mixTypeOptics(set, 'dust', 0);
+  const whole = mixTypeOptics(set, 'dust', 1);
+  const mixed = mixTypeOptics(set, 'dust', 0.6);
+  const smoky = mixTypeOptics(set, 'smoke', 1);
+  const unknown = mixTypeOptics(set, 'ash', 1);
+  const {scat, abs} = mieCoefficients(whole, 0);
+  check(
+    "THE KIND'S OWN OPTICS: Dubovik 2002's dust and smoke at the sky's channels, mixed by the kind's share",
+    w.join() === '440,670,870,1020' &&
+      d.omega0.join() === '0.93,0.98,0.99,0.99' &&
+      sm.omega0.join() === '0.94,0.935,0.92,0.91' &&
+      DUBOVIK_2002.smokeSavanna.omega0[3] === 0.78 &&
+      near(lnInterp(w, d.omega0, 440), 0.93) &&
+      near(lnInterp(w, d.omega0, 1100), 0.99) &&
+      near(lnInterp(w, d.omega0, 400), 0.93) &&
+      near(dust.ssa[2], 0.93) &&
+      near(dust.ssa[1], 0.93 + f550 * 0.05) &&
+      near(dust.ssa[0], 0.98 + f680 * 0.01) &&
+      near(dust.g, 0.73 - f550 * 0.02) &&
+      near(dust.alpha, 0.3) &&
+      near(smoke.ssa[2], 0.94) &&
+      near(smoke.ssa[1], 0.94 - f550 * 0.005) &&
+      near(smoke.ssa[0], 0.935 - f680 * 0.015) &&
+      near(smoke.g, 0.69 - f550 * 0.08) &&
+      near(smoke.alpha, 1.65) &&
+      typeOptics('ash') === null &&
+      none === set &&
+      unknown === set &&
+      whole.ssa.every((v, c) => near(v, dust.ssa[c])) &&
+      near(whole.g, dust.g) &&
+      near(whole.tau[1], 0.132) &&
+      near(whole.tau[0], 0.132 * Math.pow(680 / 550, -0.3)) &&
+      near(whole.tau[2], 0.132 * Math.pow(440 / 550, -0.3)) &&
+      whole.tau[2] < set.tau[2] &&
+      whole.tau[0] > set.tau[0] &&
+      near(mixed.ssa[1], 0.4 * 0.98 + 0.6 * dust.ssa[1]) &&
+      near(mixed.g, 0.4 * 0.8 + 0.6 * dust.g) &&
+      near(mixed.tau[1], 0.132) &&
+      near(mixed.tau[2], 0.4 * 0.18 + 0.6 * 0.132 * Math.pow(440 / 550, -0.3)) &&
+      mixed.type.kind === 'dust' &&
+      mixed.type.share === 0.6 &&
+      mixed.type.before.ssa[1] === 0.98 &&
+      smoky.tau[2] > set.tau[2] * 0.9 &&
+      near(smoky.tau[2], 0.132 * Math.pow(440 / 550, -1.65)) &&
+      near(smoky.ssa[1], smoke.ssa[1]) &&
+      near(scat[2] / (scat[2] + abs[2]), dust.ssa[2]) &&
+      set.ssa[1] === 0.98 &&
+      set.tau[2] === 0.18,
+    `Cape Verde dust ${d.omega0.join('/')} at ${w.join('/')} nm reaches the sky as SSA ${dust.ssa.map((v) => v.toFixed(4)).join('/')} at 680/550/440 (550 and 680 bridged in ln lambda), g ${dust.g.toFixed(4)} at 550, alpha ${dust.alpha}; ` +
+      `boreal smoke ${sm.omega0.join('/')} as ${smoke.ssa.map((v) => v.toFixed(4)).join('/')}, g ${smoke.g.toFixed(4)}, alpha ${smoke.alpha}; share 0 and an unknown kind return the set itself; ` +
+      `share 1 on a 0.98-albedo column gives the dust's own SSA and g with tau 550 kept at ${whole.tau[1]} and the blue tau ${set.tau[2]} -> ${whole.tau[2].toFixed(4)} (flat dust), the smoke's ${smoky.tau[2].toFixed(4)} (steep); ` +
+      `share 0.6 mixes SSA(550) to ${mixed.ssa[1].toFixed(4)} and g to ${mixed.g.toFixed(4)} - the extinction-share means; the Mie coefficients recover the blended albedo exactly; the input untouched`
   );
 }
 
