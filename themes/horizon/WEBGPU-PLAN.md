@@ -10403,11 +10403,11 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   CPU suite and the eight GPU probes green each time), while the
   same probe run by hand - the harness's own xvfb-run form included
   - dumped 111, 114 and 120 lines with the markers every time; an
-  empty dump is the probe's browser producing nothing (a dropped GPU
-  instance, a display not granted), not the page failing its wiring,
-  so the harness now retries an empty dump once and still fails a
-  dump that has lines without the markers - the distinction stated
-  in validate.sh.
+    empty dump is the probe's browser producing nothing (a dropped GPU
+    instance, a display not granted), not the page failing its wiring,
+    so the harness now retries an empty dump once and still fails a
+    dump that has lines without the markers - the distinction stated
+    in validate.sh.
 - DONE (Sep 6, the review session's 166th pass - THE INVERTED
   REFERENCES): the rule the home's scheduled A/B asked for. The
   daylight field (159th-160th) cuts the decks' 2-km cover by each

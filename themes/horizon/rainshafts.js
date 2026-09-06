@@ -137,7 +137,12 @@ export function coverOfRate(mmh) {
  * coverOfRate, the larger value keeping a texel; the border ring
  * stays zero. Returns {data, rm, painted, pixels}.
  */
-export function rainCoverField(list, lat, lon, {rm = 64, worldM = 16000, pixelM = 2000} = {}) {
+export function rainCoverField(
+  list,
+  lat,
+  lon,
+  {rm = 64, worldM = 16000, pixelM = 2000} = {}
+) {
   const data = new Float32Array(rm * rm * 4);
   for (let k = 3; k < data.length; k += 4) data[k] = 1;
   const mPerTexel = worldM / rm;
@@ -150,7 +155,8 @@ export function rainCoverField(list, lat, lon, {rm = 64, worldM = 16000, pixelM 
     if (!(cover > 0)) continue;
     const xM = (p.lonDeg - lon) * mLon;
     const zM = -(p.latDeg - lat) * M_LAT;
-    if (Math.abs(xM) > worldM / 2 + half || Math.abs(zM) > worldM / 2 + half) continue;
+    if (Math.abs(xM) > worldM / 2 + half || Math.abs(zM) > worldM / 2 + half)
+      continue;
     pixels++;
     // the footprint [a, b) touches texels floor(a/T) .. ceil(b/T) - 1: a
     // pixel ending exactly on a texel edge does not paint the texel beyond
@@ -193,4 +199,3 @@ export function mergeCoverFields(radar, satellite, covered, rm) {
   }
   return {data, fromRadar, fromSatellite};
 }
-

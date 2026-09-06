@@ -135,17 +135,26 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     {latDeg: lat, lonDeg: lon + 3000 / mLon, mmh: 0.3},
     {latDeg: lat + 20000 / 111320, lonDeg: lon, mmh: 50}
   ];
-  const f = rainCoverField(list, lat, lon, {rm: 64, worldM: 16000, pixelM: 2000});
+  const f = rainCoverField(list, lat, lon, {
+    rm: 64,
+    worldM: 16000,
+    pixelM: 2000
+  });
   const at = (ii, jj) => f.data[(jj * 64 + ii) * 4];
   // the centre pixel spans metres -1000..+1000 -> texels 28..35 (250 m each, index floor((m+8000)/250))
   let centreOk = true;
-  for (let jj = 28; jj <= 35; jj++) for (let ii = 28; ii <= 35; ii++) if (Math.abs(at(ii, jj) - COVER_CAP) > 1e-6) centreOk = false;
+  for (let jj = 28; jj <= 35; jj++)
+    for (let ii = 28; ii <= 35; ii++)
+      if (Math.abs(at(ii, jj) - COVER_CAP) > 1e-6) centreOk = false;
   // the drizzle pixel at +3000 m east: metres 2000..4000 -> texels 40..47, rows 28..35
   const drizzle = coverOfRate(0.3);
   let eastOk = true;
-  for (let jj = 28; jj <= 35; jj++) for (let ii = 40; ii <= 47; ii++) if (Math.abs(at(ii, jj) - drizzle) > 1e-7) eastOk = false;
+  for (let jj = 28; jj <= 35; jj++)
+    for (let ii = 40; ii <= 47; ii++)
+      if (Math.abs(at(ii, jj) - drizzle) > 1e-7) eastOk = false;
   let border = 0;
-  for (let t = 0; t < 64; t++) border += at(t, 0) + at(t, 63) + at(0, t) + at(63, t);
+  for (let t = 0; t < 64; t++)
+    border += at(t, 0) + at(t, 63) + at(0, t) + at(63, t);
   let paintedCount = 0;
   for (let k = 0; k < f.data.length; k += 4) if (f.data[k] > 0) paintedCount++;
   // the merge: a radar field with cover 0.5 everywhere, the mask covered on the west half

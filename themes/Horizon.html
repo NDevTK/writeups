@@ -7633,19 +7633,43 @@
           rainCover = null;
           return;
         }
-        const f = rainCoverField(rn.list, state.lat, state.lon, {rm: 64, worldM: WORLD * MPU, pixelM: 2000});
-        rainCover = {at: Date.now(), time: rn.time, field: f.data, painted: f.painted, pixels: f.pixels};
+        const f = rainCoverField(rn.list, state.lat, state.lon, {
+          rm: 64,
+          worldM: WORLD * MPU,
+          pixelM: 2000
+        });
+        rainCover = {
+          at: Date.now(),
+          time: rn.time,
+          field: f.data,
+          painted: f.painted,
+          pixels: f.pixels
+        };
       }
       function applyMeasuredCover() {
         const RM = 64;
-        const radarFresh = radarObs && radarObs.field && Date.now() - radarObs.time < 25 * 60e3;
-        const satFresh = rainCover && Date.now() - Date.parse(rainCover.time) < RAIN_LIVE_MS;
+        const radarFresh =
+          radarObs && radarObs.field && Date.now() - radarObs.time < 25 * 60e3;
+        const satFresh =
+          rainCover && Date.now() - Date.parse(rainCover.time) < RAIN_LIVE_MS;
         if (!radarFresh && !satFresh) return;
         // no radar at all: every texel is the satellite's; a radar
         // without a mask: every texel the radar's
-        const covered = radarFresh ? radarObs.coveredTex : new Uint8Array(RM * RM);
-        const m = mergeCoverFields(radarFresh ? radarObs.field : null, satFresh ? rainCover.field : null, covered, RM);
-        coverMerge = {fromRadar: m.fromRadar, fromSatellite: m.fromSatellite, radar: !!radarFresh, satellite: !!satFresh};
+        const covered = radarFresh
+          ? radarObs.coveredTex
+          : new Uint8Array(RM * RM);
+        const m = mergeCoverFields(
+          radarFresh ? radarObs.field : null,
+          satFresh ? rainCover.field : null,
+          covered,
+          RM
+        );
+        coverMerge = {
+          fromRadar: m.fromRadar,
+          fromSatellite: m.fromSatellite,
+          radar: !!radarFresh,
+          satellite: !!satFresh
+        };
         if (cloudSys) cloudSys.setRadarCover(m.data, RM, WORLD);
       }
       const coverWords = () =>
