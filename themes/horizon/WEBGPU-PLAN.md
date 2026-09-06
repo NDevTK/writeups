@@ -10447,7 +10447,35 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   only when named - 3 CMIPC prefixes and null on the fake bucket;
   5); server-reference (the ask pins: ids, half widths, 5 untimed,
   the eleventh pageOnly; 30). Docs: the daemon README's /goesl2
-  entry (the eleventh ask), FINDINGS pass 159.
+  entry (the eleventh ask), FINDINGS pass 159. MEASURED LIVE on
+  GOES-East (the home was still dark; Montauk Point's water, 41.075
+  N 71.84 W, GOES-19 at 47.6 deg zenith, the Upton ascent 87 km
+  off): in node at 11:08Z the 11:02Z band-2 window (401 x 401 px of
+  0.53 x 0.78 km) came in 1.3 s over 6 ranges and 3,339 kB, its
+  kappa0 0.0019679 against pi d^2 / Esun 4.8e-9 apart (GOES-19's own
+  Esun 1622.09 and d 1.00801 - the pin holds on the second craft's
+  file), every pixel good, the factor's median 0.050 at cos 0.128
+  (82.6 deg): reflectance median 0.39 and 2.35 at most on side-lit
+  cloud - past 80 deg the Lambertian normalisation overshoots on
+  bright cloud, so the ABSOLUTE reflectance is stated as such while
+  the fraction, measured between the scene's own references, is
+  unaffected. In the page (probe, 11:3xZ, the sun 77.9 deg at the
+  scan): the 11:27Z window read by the page itself in 5.4 s (3,609
+  kB in 6 ranges), 160,801 good px, the factor 0.011-0.456 (median
+  0.089); the references under NOAA's mask clear rho 0.091 (median
+  of 12,556 clear px) and cloud rho 0.670 (p90 of 148,245); the
+  2-km field (11:00Z mosaic: the sea 10% clear, 17% low with tops
+  at 2.1 km, 73% mid) cut 4x finer in 335 ms - 171,986 of 172,400
+  fine texels under the mask's cloud shaped, mean fraction 0.60,
+  the rest keeping the 2-km cover; the coarse field's next arrival
+  re-cut the held window in 520 ms without a new read; the record
+  and the research line print all of it. A first probe an hour
+  earlier had no line at all: the field lands only once the column
+  and a sea temperature stand, and Hatteras's 00Z ascent (Newport
+  NC) had burst at 594 hPa - the page's own rule (t250 finite)
+  refused it, so the field waited for the 12Z balloon; Montauk's
+  Upton ascent reached 8 hPa. (?vis=0 was the visibility pin
+  already - the switch is ?daylight=0.)
 - DONE (Sep 6, the review session's 158th pass - THE DEPLOY
   REPAIRED): api.ndev.tk answered again at 09:2xZ after its long
   dark - HTTP 200 on /goesl2, /sounding and /sst - but its /goesl2

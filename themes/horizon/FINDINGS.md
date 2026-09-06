@@ -961,7 +961,12 @@ The practice the corpus demonstrates, stated so it can be reused:
    and where no reflectance stands the 2-km cover is kept. The sun
    series (USNO's low-precision coordinates) was held to an
    independent Meeus computation at eight points (within 0.005°; the
-   NOAA calculator's Spencer series is 0.1–0.4° off both)
+   NOAA calculator's Spencer series is 0.1–0.4° off both). Measured
+   live over Montauk Point's water on GOES-East: the 11:27Z window
+   read by the page itself in 5.4 s (3,609 kB in six ranges), the
+   references under NOAA's mask at clear ρ 0.091 and cloud ρ 0.670,
+   171,986 of 172,400 fine texels under the mask's cloud shaped in
+   335 ms, mean fraction 0.60
    (`goesl2-reference` THE DAYLIGHT FIELD; `daylight-reference` the
    words at a pixel and the field composed on synthetic windows on
    the real fixed grid; `goesir-reference` THE DAYLIGHT FIELD splits
