@@ -26,6 +26,9 @@ import {
 } from './goesl2-client.js';
 import {GLM_B64, GLM_EXPECT, GLM_NAME} from './glm-fixture.js';
 import {glmFlashesNear} from './glm.js';
+import {ADP_B64, ADP_EXPECT} from './adp-fixture.js';
+import {adpDominant, adpFlagBytes, ADP_RADIUS_PX} from './goesl2.js';
+import {L2_ADP_EXTRAS, L2_ADP_SPEC, l2AdpBody} from './goesl2-decode.js';
 import {
   decodeL2,
   L2_ASKS,
@@ -261,8 +264,8 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       // lists nothing under; the pageOnly ask (159th: the 500-m
       // visible window) is not listed unless named
       listsAfterFirst === (served.length - 2) * 3 + 2 &&
-      L2_ASKS.length === 15 &&
-      served.length === 14 &&
+      L2_ASKS.length === 16 &&
+      served.length === 15 &&
       filesAfterFirst === 2 &&
       // the range reads: the heights' head then its strips, the winds
       // whole in one megabyte ask
@@ -295,7 +298,7 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       client.windows.size === 2 &&
       CLIENT_HELD_WINDOWS === 4 &&
       asked.size === 0,
-    `the home asks the ${served.length} products the daemon serves (of ${L2_ASKS.length} asks: the 500-m visible window is the page's own, read only when named) over ${listsAfterFirst} listings (this hour's prefix for each, two more hours back for the eleven found empty) and reads the two the fake bucket holds ` +
+    `the home asks the ${served.length} products the daemon serves (of ${L2_ASKS.length} asks: the 500-m visible window is the page's own, read only when named) over ${listsAfterFirst} listings (this hour's prefix for each, two more hours back for the thirteen found empty) and reads the two the fake bucket holds ` +
       `(${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB in ${r.ranges} range${r.ranges === 1 ? '' : 's'}`).join('; ')}): ` +
       `the heights' window at (424, 127) with ${body && body.height.census.n} tops, median ${body && body.height.census.medianM.toFixed(1)} m ` +
       `- the daemon's own body from the same bytes - and ${body && body.dmw.n} of ${body && body.dmw.total} vectors within 150 km, ` +
@@ -472,15 +475,100 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       // the CONUS products re-listed (three prefixes for the six the
       // fake bucket lacks, one for the two it holds), the full-disk
       // ones not
-      // the CONUS products the fake bucket lacks: seven since the
-      // 161st's cloud top phase
-      listedAgain.length === 10 * 3 + 2 &&
+      // the CONUS products the fake bucket lacks: eleven since the
+      // 169th's aerosol detection
+      listedAgain.length === 11 * 3 + 2 &&
       !listedAgain.some(
         (p) => p.startsWith('ABI-L2-SSTF') || p.startsWith('ABI-L2-DSRF')
       ),
     `three range asks of a whole-answering server cost ${calls} download (${a.length}, ${b.length} and ${c.length} bytes cut from it, the last short at the end); ` +
       `the client over such a bucket reads its two files whole (${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB`).join(', ')}), ` +
-      `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the ten CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
+      `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the eleven CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
+  );
+}
+
+// ---- THE HAZE'S KIND, READ (169th pass) ----------------------------
+// The vendored Aerosol Detection crop (a Saharan dust field at sea)
+// through the shared decode and the body the daemon and the page
+// build, held to h5py's independent census of the same bytes: the
+// central window's counts by kind and confidence, the centre pixel,
+// the ATBD's circle at the centre (under cloud: no call) and the
+// best-covered circle in the crop (424 valid of 529, dust on 37: a
+// patchy, cloud-broken field is no dominant call by the rule).
+{
+  const crop = new Uint8Array(Buffer.from(ADP_B64, 'base64'));
+  const X = ADP_EXPECT;
+  const dec = decodeL2(crop, L2_ADP_SPEC, inflateNode, L2_ADP_EXTRAS);
+  const body = dec ? l2AdpBody(dec, 'k', X.centre.lat, X.centre.lon) : null;
+  const c = body && body.census;
+  const e = X.census101;
+  const f = openHdf5(crop, inflateNode);
+  const smoke = adpFlagBytes(f.dataset('Smoke').values);
+  const dust = adpFlagBytes(f.dataset('Dust').values);
+  const dqf = f.dataset('DQF').values;
+  const pqi2 = f.dataset('PQI2').values;
+  const bc = X.bestCircle;
+  const best = adpDominant(smoke, dust, dqf, pqi2, {
+    cols: X.cols,
+    rows: X.rows,
+    ci: bc.col,
+    cj: bc.row,
+    radiusPx: ADP_RADIUS_PX
+  });
+  const whole = adpDominant(smoke, dust, dqf, pqi2, {
+    cols: X.cols,
+    rows: X.rows,
+    ci: (X.cols - 1) / 2,
+    cj: (X.rows - 1) / 2,
+    radiusPx: ADP_RADIUS_PX
+  });
+  check(
+    "THE HAZE'S KIND, READ: the vendored dust field through the decode and the body agrees with h5py to the pixel; the ATBD's circle makes no call under cloud and none on a patchy field",
+    body !== null &&
+      body.product === 'ABI-L2-ADPC' &&
+      body.time !== null &&
+      c.n === e.n &&
+      c.fill === e.fill &&
+      c.night === e.night &&
+      c.glint === e.glint &&
+      c.land === e.land &&
+      c.water === e.water &&
+      c.dust.retrieved === e.dust.retrieved &&
+      c.dust.present === e.dust.present &&
+      c.dust.high === e.dust.high &&
+      c.dust.medium === e.dust.medium &&
+      c.dust.low === e.dust.low &&
+      c.dust.disowned === e.dust.disowned &&
+      c.smoke.retrieved === e.smoke.retrieved &&
+      c.smoke.present === e.smoke.present &&
+      body.here.smoke.present === (X.centre.smoke === 1) &&
+      body.here.dust.present === (X.centre.dust === 1) &&
+      body.here.dqf === X.centre.dqf &&
+      body.here.smoke.confidence === null &&
+      body.here.dust.confidence === null &&
+      body.matchup.inCircle === X.dominant.inCircle &&
+      body.matchup.valid === X.dominant.valid &&
+      body.matchup.dominant === null &&
+      body.matchup.enough === false &&
+      whole.valid === X.dominant.valid &&
+      whole.dust.present === X.dominant.dustPresent &&
+      best.inCircle === bc.inCircle &&
+      best.valid === bc.valid &&
+      near(best.coverage, bc.coverage, 1e-12) &&
+      best.dust.present === bc.dustPresent &&
+      best.smoke.present === bc.smokePresent &&
+      best.enough === true &&
+      best.dominant === bc.dominant &&
+      body.sceneStats.dustDetected === X.scene.dustDetected &&
+      body.sceneStats.smokeDetected === X.scene.smokeDetected &&
+      body.sceneStats.goodDust === X.scene.goodDust &&
+      body.radiusPx === ADP_RADIUS_PX,
+    `${X.file.slice(0, 24)} cropped ${X.rows} x ${X.cols} around ${X.centre.lat.toFixed(2)} N ${(-X.centre.lon).toFixed(2)} W: the body's central 101 x 101 window censuses ` +
+      `${c && c.dust.present} dust px (${c && c.dust.medium} medium, ${c && c.dust.low} low) of ${c && c.dust.retrieved} retrieved and ${c && c.smoke.present} smoke of ${c && c.smoke.retrieved}, ` +
+      `all ${c && c.water} over water, ${c && c.night} night, ${c && c.glint} in glint - h5py's numbers to the pixel; the centre pixel's word ${body && body.here.dqf} (both tests unrun: cloud) ` +
+      `and its 25-km circle ${body && body.matchup.valid} valid of ${body && body.matchup.inCircle} (${body && (100 * body.matchup.coverage).toFixed(1)}%): no call; ` +
+      `the best-covered circle at (${bc.row}, ${bc.col}) ${best.valid} valid of ${best.inCircle} (${(100 * best.coverage).toFixed(1)}%), dust on ${best.dust.present}: '${best.dominant}'; ` +
+      `the scene's head: ${body && body.sceneStats.dustDetected} dust and ${body && body.sceneStats.smokeDetected} smoke detections of ${body && body.sceneStats.goodDust.toLocaleString('en-US')} good dust retrievals`
   );
 }
 

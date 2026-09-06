@@ -20,7 +20,8 @@ import {
   aerosolProducts,
   angstromTau,
   channelSet,
-  mieCoefficients
+  mieCoefficients,
+  reweightSpecies
 } from './aerosol.js';
 import {AER_SUBSET_B64, PINS} from './grib2-fixture.mjs';
 import {parseGrib2} from './grib2.js';
@@ -202,6 +203,64 @@ const prod = aerosolProducts(msgs, 47, 8);
       storm.g === 0.95 &&
       none === null,
     `tau clamps to [${TAU_MIN}, ${TAU_MAX}], SSA to 1, g to 0.95; a census without the essentials is null`
+  );
+}
+
+{
+  // THE HAZE'S KIND (169th pass): the species split re-weighted to a
+  // measured kind - each species' 555 nm AOT its new share of the
+  // total, its scattering AOT at its own ratio, the totals, bands and
+  // anchors untouched; a species the feed had no column for takes the
+  // total's scattering ratio; a missing 555 band or no fractions
+  // returns the input itself
+  const near = (a, b, tol = 1e-12) => Math.abs(a - b) <= tol;
+  const bands = [340, 440, 555, 645, 858.5];
+  const prod = {
+    bands,
+    tau: Object.fromEntries(bands.map((nm) => [nm, 0.4])),
+    sct555: 0.36,
+    ssalb340: 0.9,
+    asy340: 0.7,
+    species: {
+      dust: {aot: 0.04, sct: 0.038},
+      seaSalt: {aot: 0.12, sct: 0.12},
+      sulfate: {aot: 0.16, sct: 0.16},
+      organic: {aot: 0.06, sct: 0.054},
+      blackCarbon: {aot: 0.02, sct: 0.005}
+    }
+  };
+  const before = channelSet(prod);
+  const rw = reweightSpecies(prod, {dust: 0.6, seaSalt: 0.12, sulfate: 0.16, organic: 0.09, blackCarbon: 0.03});
+  const after = channelSet(rw);
+  const sumAot = Object.values(rw.species).reduce((a, s) => a + s.aot, 0);
+  const noFine = reweightSpecies(
+    {...prod, species: {dust: {aot: 0.2, sct: 0.19}, seaSalt: {aot: 0.2, sct: 0.2}}},
+    {dust: 0.2, seaSalt: 0.2, organic: 0.6}
+  );
+  const same = reweightSpecies(prod, null);
+  const noBand = reweightSpecies({...prod, bands: [340, 440], tau: {340: 0.5, 440: 0.45}}, {dust: 0.6});
+  check(
+    "THE HAZE'S KIND re-weights the species, never the column",
+    near(before.fractions.dust, 0.1) &&
+      near(after.fractions.dust, 0.6) &&
+      near(rw.species.dust.aot, 0.24) &&
+      near(rw.species.dust.sct / rw.species.dust.aot, 0.95) &&
+      near(rw.species.blackCarbon.aot, 0.012) &&
+      near(rw.species.blackCarbon.sct / rw.species.blackCarbon.aot, 0.25) &&
+      near(sumAot, 0.4) &&
+      after.tau.every((t, c) => t === before.tau[c]) &&
+      after.ssa.every((s, c) => s === before.ssa[c]) &&
+      after.g === before.g &&
+      rw.tau === prod.tau &&
+      rw.sct555 === prod.sct555 &&
+      prod.species.dust.aot === 0.04 &&
+      near(noFine.species.organic.aot, 0.24) &&
+      near(noFine.species.organic.sct, 0.24 * 0.9) &&
+      near(noFine.species.dust.aot, 0.08) &&
+      same === prod &&
+      noBand.species === prod.species,
+    `a dust call on a 10%-dust column: dust 0.04 -> ${rw.species.dust.aot.toFixed(3)} of the 0.4 total (${(100 * after.fractions.dust).toFixed(0)}%), its scattering ratio kept at ${(rw.species.dust.sct / rw.species.dust.aot).toFixed(2)}, ` +
+      `black carbon's at ${(rw.species.blackCarbon.sct / rw.species.blackCarbon.aot).toFixed(2)}, the species summing to ${sumAot.toFixed(3)}; the channel tau, SSA and g unchanged; a smoke call on a column without fine absorbers gives organic ${noFine.species.organic.aot.toFixed(2)} at the total's ratio 0.9; no fractions or no 555 band returns the input`
   );
 }
 

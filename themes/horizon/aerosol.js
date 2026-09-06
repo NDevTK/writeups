@@ -160,6 +160,42 @@ export function channelSet(prod) {
 }
 
 /**
+ * THE HAZE'S KIND (169th pass): the measured products with their
+ * species split re-weighted - each species' 555 nm extinction AOT
+ * set to its new share of the measured 555 nm total, its scattering
+ * AOT kept at the species' own single-scattering ratio (the total's
+ * ratio for a species the feed had no column for). The totals, the
+ * band AOTs, the anchors and the bands are untouched: the satellite's
+ * detection says WHICH aerosol, never how much - the amount stays the
+ * model's or the photometer's, stated. Returns a new products object;
+ * fractions null or the 555 band missing return the input unchanged.
+ */
+export function reweightSpecies(prod, fractions) {
+  if (!prod || !fractions) return prod;
+  const band555 = Array.isArray(prod.bands)
+    ? prod.bands.find((nm) => Math.abs(nm - 555) < 1)
+    : undefined;
+  const total = band555 !== undefined ? prod.tau[band555] : NaN;
+  if (!Number.isFinite(total) || !(total > 0)) return prod;
+  const totalRatio = Number.isFinite(prod.sct555)
+    ? clamp(prod.sct555 / total, 0, 1)
+    : 1;
+  const species = {};
+  const keys = new Set([...Object.keys(prod.species || {}), ...Object.keys(fractions)]);
+  for (const k of keys) {
+    const was = (prod.species || {})[k] || {};
+    const f = Number.isFinite(fractions[k]) ? Math.max(fractions[k], 0) : 0;
+    const aot = f * total;
+    const ratio =
+      Number.isFinite(was.aot) && was.aot > 0 && Number.isFinite(was.sct)
+        ? clamp(was.sct / was.aot, 0, 1)
+        : totalRatio;
+    species[k] = {...was, aot, sct: aot * ratio};
+  }
+  return {...prod, species};
+}
+
+/**
  * Calibrate the exp(-h/MIE_H) profile so the column ABOVE the
  * local terrain (hSurf metres) integrates to the measured tau:
  * sigma(0) = tau / (MIE_H * exp(-hSurf/MIE_H)), i.e.

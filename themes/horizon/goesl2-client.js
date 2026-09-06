@@ -54,6 +54,7 @@ import {
   l2SstBody,
   l2TpwBody,
   l2RainBody,
+  l2AdpBody,
   l2VisBody
 } from './goesl2-decode.js';
 import {pickSatellite} from './satellites.js';
@@ -403,6 +404,8 @@ export function createGoesL2Client({
       rain: F.rain
         ? l2RainBody(F.rain.dec, F.rain.key, cell.lat, cell.lon)
         : null,
+      // the haze's kind (169th): the smoke and dust flags by day
+      adp: F.adp ? l2AdpBody(F.adp.dec, F.adp.key, cell.lat, cell.lon) : null,
       // the daylight field (159th): the page's own read, only when asked
       vis: F.vis ? l2VisBody(F.vis.dec, F.vis.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial',

@@ -478,6 +478,9 @@ export const L2_PRODUCTS = {
   tpw: 'ABI-L2-TPWC',
   // the rain (164th): the rainfall rate / QPE, full disk every 10 min
   rain: 'ABI-L2-RRQPEF',
+  // the haze's kind (169th): the aerosol detection - smoke and dust
+  // flags, CONUS every 10 min, 2 km, daytime; 0.8 MB a file
+  adp: 'ABI-L2-ADPC',
   // the 152nd pass: the downward shortwave radiation at the surface
   // (0.2-4.0 um, direct + diffuse, W/m2) - full disk only, every 10
   // min, 2 km (the Enterprise SRB algorithm: Laszlo, Kim & Liu, ATBD
@@ -969,6 +972,252 @@ export function phaseCensus(phase, dqf) {
     iceFrac: cloudy ? c.ice / cloudy : null,
     waterFrac: cloudy ? (c.liquid + c.supercooled + c.mixed) / cloudy : null
   };
+}
+// ---------------------------------------------------------------
+// THE HAZE'S KIND (169th pass): NOAA's aerosol detection (ABI-L2-ADPC:
+// CONUS every 10 min, 2 km, daytime) - the Enterprise Aerosol
+// Detection Product ATBD v1.0 (Ciren & Kondragunta, 1 Oct 2020, 87
+// pp; read in full). Two binary flags a pixel, smoke and dust, from
+// threshold tests on the reflectances at 0.47, 0.64, 0.86, 1.38, 1.61
+// and 2.25 um and the brightness temperatures at 3.9, 10.3, 11.2 and
+// 12.3 um. DUST absorbs more at 12 um than at 11 (Sec. 3.5.1: the
+// split window BT11 - BT12 at or under 0.4 K thin and under -0.4 K
+// thick over land, with BT3.9 - BT11 against towering cumulus and the
+// 1.38-um reflectance under 0.055 against cirrus, MNDVI against the
+// surface; over water BT3.9 - BT10.3 in 3-10 K thin and over 20 K
+// thick with NDVI in -0.3..0.05) and looks brown (0.47/0.64 under
+// 1.5). SMOKE is transparent at 2.25 um and bright at 0.64 against the
+// surface the 2.25-um band predicts (four NDVI classes, the intercept
+// and slope with the Sun's zenith), the Rayleigh term 5.0 x 0.75 x (1
+// + cos^2 of the scattering angle), 1.2-1.8 in 0.47/0.64 and 1.0-1.8
+// in 0.86/0.64, uniform within 3 x 3 (StdR0.64 at or under 0.04); a
+// fire pixel (BT3.9 over 350 K and 10 K over BT11) is smoke by
+// assumption; over water the Rayleigh-corrected 0.47/1.61 ratio (6
+// thick, 10 thin) with 2.25/1.61 under 0.5-0.7 and the 0.86-um
+// uniformity in 0.0025-0.05. Daytime only (solar zenith at or under
+// 87 deg), quantitative to 60 deg local zenith, sun glint within 40
+// deg excluded over water, a 3 x 3 buddy check (under five of nine
+// reverses a call), the confidence from the crucial test's margin
+// (under 1% of the threshold low, over 2% high) and low past 60 deg
+// solar or 70 deg view zenith. REQUIREMENT (Table 1): binary
+// detection above 0.2 optical depth, 80% correct for dust, 80% for
+// smoke over land, 70% for smoke over water. VALIDATION on GOES-16
+// (Dec 2017 - Oct 2018, Tables 15-16): dust against AERONET 98.5%
+// accuracy, 88.4% of the dust caught, 2.6% false; against CALIPSO
+// 99.4 / 87.4 / 24.2; smoke against CALIPSO 99.6 / 94.5 / 18.1,
+// against AERONET 95.4 / 87.4 / 22.4. The AERONET matchup's own rule
+// (Sec. 5.1.2): within 25 km of the site, 80% of the pixels cloud-,
+// snow- and glint-free, the dominant type the type of more than half
+// the valid retrievals. LIMITS (Sec. 7): daytime only, smoke over
+// land on dark surfaces, thin aerosol not optimal, co-existing types
+// untested. THE FILE (measured 2026-09-06, GOES-19 20:01Z): Smoke,
+// Dust, Cloud and SnowIce int8 0/1 with fill -128; DQF uint16 with a
+// two-bit confidence per type (bits 0-1 ash, 2-3 smoke, 4-5 dust, 6-7
+// none/unknown/clear: 0 high, 1 medium, 2 low, 3 bad or missing, fill
+// 65535); PQI2's bits 1 (within sun glint), 2 (land), 3 (night); the
+// CONUS scene 624 smoke and 3,089 dust pixels of 3.7 million.
+// ---------------------------------------------------------------
+export const ADP_ATBD = {
+  version: 'Enterprise Aerosol Detection Product ATBD v1.0, 2020-10-01',
+  requirement: {
+    aodThreshold: 0.2,
+    dust: 0.8,
+    smokeLand: 0.8,
+    smokeWater: 0.7,
+    refreshMin: 15,
+    lzaQuantitativeDeg: 60,
+    szaDayDeg: 87,
+    glintDeg: 40,
+    buddyMin: 5,
+    resolutionKm: 2
+  },
+  confidence: {lowSzaDeg: 60, lowVzaDeg: 70, marginLow: 0.01, marginHigh: 0.02},
+  dust: {thinBtdK: 0.4, thickBtdK: -0.4, cirrusR138: 0.055, waterThinBtd39K: [3, 10], waterThickBtd39K: 20},
+  smoke: {fireBt39K: 350, fireBtdK: 10, r1: [1.2, 1.8], r2: [1.0, 1.8], stdR064: 0.04, waterR3Thick: 6, waterR3Thin: 10},
+  matchup: {radiusKm: 25, coverageMin: 0.8, dominantFrac: 0.5},
+  validation: {
+    period: '2017-12-14 to 2018-10-13, GOES-16',
+    dust: {
+      aeronet: {tp: 6540, fp: 173, fn: 883, tn: 57439, accuracy: 0.985, pocd: 0.884, pofd: 0.026},
+      calipso: {tp: 4612, fp: 1476, fn: 667, tn: 488749, accuracy: 0.994, pocd: 0.874, pofd: 0.242}
+    },
+    smoke: {
+      calipso: {tp: 794, fp: 176, fn: 46, tn: 1034572, accuracy: 0.996, pocd: 0.945, pofd: 0.181},
+      aeronet: {tp: 2205, fp: 6371, fn: 3202, tn: 289476, accuracy: 0.954, pocd: 0.874, pofd: 0.224}
+    }
+  }
+};
+// the DQF word's two-bit fields (Table 4; the file's flag_masks)
+export const ADP_DQF_SHIFT = {ash: 0, smoke: 2, dust: 4, nuc: 6};
+export const ADP_CONFIDENCE_WORDS = ['high', 'medium', 'low', null];
+export const ADP_DQF_FILL = 65535;
+// the flags on the wire: a byte code 0 absent, 1 present, 255 fill
+// (the file's int8 -128 - a byte view reads it as 128; both are the
+// fill here)
+export const ADP_FLAG_FILL = 255;
+export function adpFlagBytes(values) {
+  const out = new Uint8Array(values.length);
+  for (let q = 0; q < values.length; q++) {
+    const v = values[q];
+    out[q] = v === -128 || v === 128 || v === 255 || !Number.isFinite(v) ? 255 : v === 1 ? 1 : 0;
+  }
+  return out;
+}
+// PQI2's bits (Table 6)
+export const ADP_PQI2 = {glintInternal: 1, withinGlint: 2, land: 4, night: 8};
+// the ATBD's 25-km matchup circle on the nominal 2-km grid
+export const ADP_RADIUS_PX = 13;
+/** The ATBD's accuracy, probability of correct detection and false
+ * alarm ratio from a confusion table (Eq. 4.3.1-4.3.3). */
+export function adpScores({tp, fp, fn, tn}) {
+  return {
+    accuracy: (tp + tn) / (tp + fp + fn + tn),
+    pocd: tp / (tp + fn),
+    pofd: fp / (fp + tp)
+  };
+}
+/** A pixel's confidence for a kind ('smoke' | 'dust' | 'ash' | 'nuc')
+ * from the DQF word: 'high', 'medium', 'low', or null when the test
+ * did not run (bad or missing) or the word is the fill. */
+export function adpConfidence(dqf, kind) {
+  if (!Number.isFinite(dqf) || dqf === ADP_DQF_FILL) return null;
+  return ADP_CONFIDENCE_WORDS[(dqf >> ADP_DQF_SHIFT[kind]) & 3];
+}
+/** A pixel's call for a kind: {present, confidence} - present null
+ * for the fill; a present flag with a null confidence is a call the
+ * ATBD's own quality word disowns (kept, stated). */
+export function adpPixel(flag, dqf, kind) {
+  if (!Number.isFinite(flag) || flag === ADP_FLAG_FILL) return {present: null, confidence: null};
+  return {present: flag === 1, confidence: adpConfidence(dqf, kind)};
+}
+/**
+ * The window's census: pixels, fill, night, within glint, land and
+ * water (PQI2), and for smoke and dust the retrieved count (the test
+ * ran: a non-bad confidence), the present count and its confidence
+ * split.
+ */
+export function adpCensus(smoke, dust, dqf, pqi2 = null) {
+  const kind = () => ({retrieved: 0, present: 0, high: 0, medium: 0, low: 0, disowned: 0});
+  const c = {n: smoke.length, fill: 0, night: 0, glint: 0, land: 0, water: 0, smoke: kind(), dust: kind()};
+  for (let q = 0; q < smoke.length; q++) {
+    const s = smoke[q];
+    const d = dust[q];
+    if (s === ADP_FLAG_FILL || d === ADP_FLAG_FILL || s === undefined) {
+      c.fill++;
+      continue;
+    }
+    const p2 = pqi2 ? pqi2[q] : 0;
+    if (p2 & ADP_PQI2.night) c.night++;
+    if (p2 & ADP_PQI2.withinGlint) c.glint++;
+    if (p2 & ADP_PQI2.land) c.land++;
+    else c.water++;
+    const w = dqf ? dqf[q] : ADP_DQF_FILL;
+    for (const [k, flag] of [
+      ['smoke', s],
+      ['dust', d]
+    ]) {
+      const conf = adpConfidence(w, k);
+      const t = c[k];
+      if (conf) t.retrieved++;
+      if (flag === 1) {
+        t.present++;
+        if (conf) t[conf]++;
+        else t.disowned++;
+      }
+    }
+  }
+  return c;
+}
+/**
+ * The ATBD's own matchup rule around a point (Sec. 5.1.2): within
+ * radiusPx of (ci, cj) on a cols-wide window, the valid retrievals
+ * are the pixels whose smoke or dust test ran outside sun glint; the
+ * coverage is their share of the circle's pixels (0.8 required); the
+ * dominant type is the type of more than half the valid retrievals,
+ * 'none' when neither, 'both' when both (co-existing types the ATBD
+ * left untested), null when the coverage falls short (a cloudy or
+ * night circle: no call). Counts and the confidence split come with
+ * the verdict.
+ */
+export function adpDominant(smoke, dust, dqf, pqi2, {cols, rows, ci, cj, radiusPx}) {
+  const r2 = radiusPx * radiusPx;
+  let inCircle = 0;
+  let valid = 0;
+  const s = {present: 0, high: 0, medium: 0, low: 0};
+  const d = {present: 0, high: 0, medium: 0, low: 0};
+  for (let j = Math.max(0, cj - radiusPx); j <= Math.min(rows - 1, cj + radiusPx); j++) {
+    for (let i = Math.max(0, ci - radiusPx); i <= Math.min(cols - 1, ci + radiusPx); i++) {
+      if ((i - ci) * (i - ci) + (j - cj) * (j - cj) > r2) continue;
+      inCircle++;
+      const q = j * cols + i;
+      const sf = smoke[q];
+      const df = dust[q];
+      if (sf === ADP_FLAG_FILL || df === ADP_FLAG_FILL || sf === undefined) continue;
+      const p2 = pqi2 ? pqi2[q] : 0;
+      if (p2 & ADP_PQI2.withinGlint) continue;
+      const w = dqf ? dqf[q] : ADP_DQF_FILL;
+      const cs = adpConfidence(w, 'smoke');
+      const cd = adpConfidence(w, 'dust');
+      if (!cs && !cd) continue;
+      valid++;
+      if (sf === 1) {
+        s.present++;
+        if (cs) s[cs]++;
+      }
+      if (df === 1) {
+        d.present++;
+        if (cd) d[cd]++;
+      }
+    }
+  }
+  const coverage = inCircle ? valid / inCircle : 0;
+  const enough = coverage >= ADP_ATBD.matchup.coverageMin;
+  const half = valid * ADP_ATBD.matchup.dominantFrac;
+  const smokeDom = enough && s.present > half;
+  const dustDom = enough && d.present > half;
+  return {
+    inCircle,
+    valid,
+    coverage,
+    enough,
+    smoke: s,
+    dust: d,
+    smokeFrac: valid ? s.present / valid : null,
+    dustFrac: valid ? d.present / valid : null,
+    dominant: !enough ? null : smokeDom && dustDom ? 'both' : smokeDom ? 'smoke' : dustDom ? 'dust' : 'none'
+  };
+}
+/**
+ * The measured kind over the model's split: a dominant dust call makes
+ * dust the majority of the species fractions (at least floor, the
+ * others scaled to fit); a dominant smoke call does the same for the
+ * fine absorbing pair (organic + black carbon, keeping their ratio,
+ * organic alone when the model has neither); 'both', 'none' and null
+ * leave the split alone. Returns {fractions, changed, from, to}.
+ */
+export const ADP_CALLED_FLOOR = 0.6;
+export function adpReweight(fractions, dominant, floor = ADP_CALLED_FLOOR) {
+  const f = {...(fractions || {})};
+  const keys = Object.keys(f);
+  const sum = keys.reduce((a, k) => a + Math.max(f[k] ?? 0, 0), 0);
+  if (!(dominant === 'dust' || dominant === 'smoke') || !keys.length || !(sum > 0))
+    return {fractions: f, changed: false, from: null, to: null};
+  const group = dominant === 'dust' ? ['dust'] : ['organic', 'blackCarbon'];
+  const gSum = group.reduce((a, k) => a + Math.max(f[k] ?? 0, 0), 0);
+  const gShare = gSum / sum;
+  if (gShare >= floor) return {fractions: f, changed: false, from: gShare, to: gShare};
+  const target = floor * sum;
+  const restKeys = keys.filter((k) => !group.includes(k));
+  const restSum = restKeys.reduce((a, k) => a + Math.max(f[k] ?? 0, 0), 0);
+  const restScale = restSum > 0 ? (sum - target) / restSum : 0;
+  const out = {};
+  for (const k of restKeys) out[k] = Math.max(f[k] ?? 0, 0) * restScale;
+  if (gSum > 0) for (const k of group) out[k] = (Math.max(f[k] ?? 0, 0) / gSum) * target;
+  else {
+    out[group[0]] = target;
+    for (const k of group.slice(1)) out[k] = 0;
+  }
+  return {fractions: out, changed: true, from: gShare, to: floor};
 }
 // ---------------------------------------------------------------
 // THE FIRE'S HEAT (162nd pass): NOAA's fire / hot spot

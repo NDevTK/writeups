@@ -61,6 +61,11 @@ import {
   nearestRain,
   rainQuality,
   rainFlagWords,
+  ADP_RADIUS_PX,
+  adpCensus,
+  adpDominant,
+  adpFlagBytes,
+  adpPixel,
   packArray,
   pixelSizeM,
   productTimeIso,
@@ -282,6 +287,28 @@ export const L2_RAIN_EXTRAS = [
   'latitude'
 ];
 L2_HALF_PX.rain = 50; // +-100 km on the 2-km grid
+// The 169th pass: the aerosol detection (Smoke, Dust int8 0/1 with
+// fill -128 - byte codes on the wire; DQF uint16 with a two-bit
+// confidence per type; PQI2 uint16 with the glint, land and night
+// bits) and the scene's counts and angle thresholds as extras.
+export const L2_ADP_SPEC = {
+  Smoke: 'raw',
+  Dust: 'raw',
+  DQF: 'raw16',
+  PQI2: 'raw16'
+};
+export const L2_ADP_EXTRAS = [
+  'number_of_good_retrievals_where_smoke_detected',
+  'number_of_good_retrievals_where_dust_detected',
+  'number_of_good_smoke_retrievals',
+  'number_of_good_dust_retrievals',
+  'number_good_LZA_pixels',
+  'number_good_SZA_pixels',
+  'quantitative_local_zenith_angle',
+  'retrieval_local_zenith_angle',
+  'retrieval_solar_zenith_angle'
+];
+L2_HALF_PX.adp = 50;
 export const L2_RAIN_MIN_MMH = 0.1;
 // how far (Chebyshev, px) the nearest good TPW pixel is sought
 export const L2_TPW_NEAR_PX = 2;
@@ -393,6 +420,16 @@ export const L2_ASKS = [
     spec: L2_RAIN_SPEC,
     halfPx: 50,
     extras: L2_RAIN_EXTRAS,
+    timed: false
+  },
+  // the haze's kind (169th): the smoke and dust flags of the daytime
+  // scene, CONUS every 10 min
+  {
+    id: 'adp',
+    product: L2_PRODUCTS.adp,
+    spec: L2_ADP_SPEC,
+    halfPx: 50,
+    extras: L2_ADP_EXTRAS,
     timed: false
   }
 ];
@@ -1117,6 +1154,61 @@ export function l2TpwBody(dec, key, lat, lon) {
 // pixel, the nearest raining pixel and the raining pixels navigated
 // to their places (the heaviest first), the census, the scene's own
 // rain statistics and the file's thresholds.
+// THE HAZE'S KIND (169th pass): the aerosol detection window - the
+// smoke and dust flags as byte codes (0 absent, 1 present, 255 fill;
+// goesl2.adpFlagBytes), the DQF word (the two-bit confidences) and
+// PQI2 (glint, land, night), the point's own pixel with its calls,
+// the census by kind and confidence (goesl2.adpCensus), the ATBD's
+// own 25-km matchup rule around the point (goesl2.adpDominant, 13 px
+// on the 2-km grid) and the scene's counts and thresholds from the
+// head.
+export function l2AdpBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_ADP_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.adp);
+  if (!w) return null;
+  const ci = w.box.i - w.box.i0;
+  const cj = w.box.j - w.box.j0;
+  const cols = w.box.cols;
+  const rows = Math.round(w.cut.DQF.length / cols);
+  const qc = cj * cols + ci;
+  const smoke = adpFlagBytes(w.cut.Smoke);
+  const dust = adpFlagBytes(w.cut.Dust);
+  const x = dec.extras ?? {};
+  const num = (v) => (Number.isFinite(v) ? v : null);
+  return {
+    ...l2Common(dec, L2_PRODUCTS.adp, key, w),
+    smoke: packArray(smoke, 'u8'),
+    dust: packArray(dust, 'u8'),
+    dqf: packArray(w.cut.DQF, 'u16'),
+    pqi2: packArray(w.cut.PQI2, 'u16'),
+    here: {
+      smoke: adpPixel(smoke[qc], w.cut.DQF[qc], 'smoke'),
+      dust: adpPixel(dust[qc], w.cut.DQF[qc], 'dust'),
+      dqf: w.cut.DQF[qc] ?? null,
+      pqi2: w.cut.PQI2[qc] ?? null
+    },
+    census: adpCensus(smoke, dust, w.cut.DQF, w.cut.PQI2),
+    matchup: adpDominant(smoke, dust, w.cut.DQF, w.cut.PQI2, {
+      cols,
+      rows,
+      ci,
+      cj,
+      radiusPx: ADP_RADIUS_PX
+    }),
+    radiusPx: ADP_RADIUS_PX,
+    sceneStats: {
+      smokeDetected: num(x.number_of_good_retrievals_where_smoke_detected),
+      dustDetected: num(x.number_of_good_retrievals_where_dust_detected),
+      goodSmoke: num(x.number_of_good_smoke_retrievals),
+      goodDust: num(x.number_of_good_dust_retrievals),
+      goodLza: num(x.number_good_LZA_pixels),
+      goodSza: num(x.number_good_SZA_pixels)
+    },
+    lzaQuantitativeDeg: num(x.quantitative_local_zenith_angle),
+    lzaRetrievalDeg: num(x.retrieval_local_zenith_angle),
+    szaRetrievalDeg: num(x.retrieval_solar_zenith_angle)
+  };
+}
 export function l2RainBody(dec, key, lat, lon) {
   if (!l2Has(dec, L2_RAIN_SPEC)) return null;
   const w = l2Window(dec, lat, lon, L2_HALF_PX.rain);

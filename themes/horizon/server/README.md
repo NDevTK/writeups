@@ -222,9 +222,23 @@ are gated by `../server-reference.mjs` — the `server` set in
   places, the heaviest first (`list`, at or above 0.1 mm/h, 200 at
   most), the census by quality with the raining count, maximum and
   mean, and the disk's own rain statistics from the file's head
-  (`sceneStats`): fourteen products served (a window of +-100 km
-  costs 437-547 kB in 4-6 ranges, measured). A
-  FIFTEENTH ask exists in the shared decode block but is the page's
+  (`sceneStats`), and since the 169th NOAA's aerosol detection
+  (`ABI-L2-ADPC`: CONUS every 10 min, 2 km, daytime - the smoke and
+  dust flags of the Enterprise Aerosol Detection Product ATBD v1.0,
+  read in full: threshold tests on six reflective and four emissive
+  bands, dust by the 11-12 um split window and its brown 0.47/0.64
+  ratio, smoke by its brightness at 0.64 um over the surface the
+  2.25-um band predicts, a 3 x 3 buddy check, a two-bit confidence per
+  type in the DQF word) as `adp`, with the point's own pixel and its
+  calls (`here`), the census by kind and confidence over the window
+  with the night, glint, land and water counts, the ATBD's own 25-km
+  matchup rule around the point (`matchup`: the coverage of valid
+  retrievals, the dominant type when more than half of them carry it,
+  no call under 80% coverage) and the scene's own detection counts
+  from the file's head (`sceneStats`): fifteen products served (a
+  window of +-100 km costs 437-547 kB in 4-6 ranges, measured, the
+  aerosol window a few tens of kB more). A
+  SIXTEENTH ask exists in the shared decode block but is the page's
   own (`pageOnly`, 159th): the 500-m visible band 2 window (`vis`,
   401 x 401 px of the CMIP ATBD's reflectance factor with the
   file's kappa, Esun and Earth-Sun distance) that the page reads
@@ -233,7 +247,7 @@ are gated by `../server-reference.mjs` — the `server` set in
   cadence (about 15 MB an hour by day), which this box's free-tier
   egress cannot carry and the bucket's CORS can. This
   daemon never lists, fetches or serves it; `/health`'s
-  `version.products` names the fourteen it does.
+  `version.products` names the fifteen it does.
   Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks

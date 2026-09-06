@@ -10345,6 +10345,118 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 169th pass - THE HAZE'S KIND FROM
+  ORBIT): the sky's Mie term has been GEFS-Aerosols' since the aerosol
+  pass - the model's optical thickness, single-scattering albedo,
+  asymmetry and its split into dust, sea salt, sulphate, organic and
+  black carbon - with AERONET's measured extinction over it where a
+  photometer looked; nothing measured said WHICH aerosol hazed the
+  scene. NOAA's Aerosol Detection Product does (ABI-L2-ADPC: CONUS
+  every 10 min, 2 km, daytime; ~800 kB a file, a window 548 kB in 6
+  ranges, measured): a smoke flag and a dust flag per pixel. THE
+  PRIMARY, read in full: the Enterprise Aerosol Detection Product ATBD
+  v1.0 (Ciren & Kondragunta, 1 Oct 2020, 87 pp). Dust absorbs more at
+  12 um than 11 (BT11 - BT12 at or under 0.4 K thin, under -0.4 K
+  thick over land, with BT3.9 - BT11 against towering cumulus and the
+  1.38-um reflectance under 0.055 against cirrus; over water BT3.9 -
+  BT10.3 in 3-10 K thin, over 20 K thick) and looks brown (0.47/0.64
+  under 1.5); smoke is transparent at 2.25 um and bright at 0.64
+  against the surface the 2.25-um band predicts from four NDVI classes
+  with the Sun's zenith, the Rayleigh term 5.0 x 0.75 x (1 + cos^2 of
+  the scattering angle), uniform within 3 x 3; a fire pixel (BT3.9
+  over 350 K, 10 K over BT11) is smoke by assumption; over water the
+  Rayleigh-corrected 0.47/1.61 ratio (6 thick, 10 thin) with 2.25/1.61
+  under 0.5-0.7. Daytime only (solar zenith at or under 87), the
+  sun-glint cone of 40 deg excluded over water, a 3 x 3 buddy check
+  (under five of nine reverses a call), the confidence from the
+  crucial test's margin (1-2% of the threshold) and low past 60 deg
+  solar or 70 deg view zenith; the requirement binary detection above
+  AOD 0.2 at 80% (dust), 80% (smoke over land), 70% (smoke over
+  water); GOES-16's validation (Tables 15-16): dust against AERONET
+  98.5% accuracy, 88.4% caught, 2.6% false, against CALIPSO 99.4 /
+  87.4 / 24.2; smoke against CALIPSO 99.6 / 94.5 / 18.1, against
+  AERONET 95.4 / 87.4 / 22.4 - the tables' printed percentages
+  reproduce from their own counts only to 0.3% (stated in the gate).
+  THE FILE (measured): Smoke, Dust, Cloud, SnowIce int8 0/1 with fill
+  -128 (a byte view reads 128: both are the fill here); DQF uint16
+  with a two-bit confidence per type (bits 0-1 ash, 2-3 smoke, 4-5
+  dust, 6-7 none/unknown/clear: 0 high, 1 medium, 2 low, 3 bad or
+  missing); PQI2's bits for glint, land and night; the 20:01Z scene
+  624 smoke and 3,089 dust pixels of 3.7 million, 45 of the dust and
+  426 of the smoke flags disowned by their own quality word (counted
+  as such). THE LAW (goesl2.js): adpConfidence, adpPixel, adpFlagBytes,
+  adpCensus (by kind and confidence with the night, glint, land and
+  water counts), adpDominant - the ATBD's OWN AERONET-matchup rule
+  (Sec. 5.1.2) as the scene's verdict: within 25 km (13 px on the 2-km
+  grid), the valid retrievals are the pixels whose smoke or dust test
+  ran outside glint, 80% of the circle must be valid, the dominant
+  type is the type of more than half of them ('both' when both, 'none'
+  when neither, no call under the coverage bar); adpReweight - a dust
+  call makes dust at least 60% of the species split, a smoke call the
+  same for organic + black carbon at their ratio (organic alone when
+  the model has neither), the rest scaled to fit; adpScores. THE
+  DECODE: the sixteenth ask (spec Smoke/Dust raw, DQF/PQI2 raw16, the
+  scene's counts and thresholds as extras); l2AdpBody (the flags as
+  byte codes on the wire, the point's own calls, the census, the
+  matchup at the point, the scene's head). The daemon and the client
+  bind it; /health names fifteen products. THE PAGE: 'adp' in the body
+  products (an older daemon's body is filled from the bucket by the
+  page); the record "NOAA GOES-19 aerosol detection (ADPC)"; a
+  research clause on the NOAA products line; and the aerosol sync
+  re-weights the model's split when the fresh verdict (30 min) calls a
+  kind - aerosol.reweightSpecies scales each species' 555-nm AOT to
+  its new share of the measured total at its own scattering ratio, the
+  totals, bands and anchors untouched: the detection says WHICH, never
+  how much, and the amount stays the model's or the photometer's
+  (stated); a changed verdict re-runs the aerosol sync at once;
+  ?adpkind=dust|smoke is the labelled pin. GATES: goesl2-reference THE
+  HAZE'S KIND (the word's fields, the fills, a 21 x 21 window's census
+  with a disowned flag, the circle rule - a circle in the dust calls
+  dust, a 9-px smoke patch of 43 valid does not, 1 valid of 49 makes
+  no call, all-both makes 'both', a column past the grid's edge clips
+  the circle to 48 - the re-weight both ways and its no-ops, the
+  validation tables from their counts); goesl2-client-reference THE
+  HAZE'S KIND, READ (a REAL 161 x 161 crop of the day's densest field
+  vendored - a Saharan dust sheet at sea east of the Bahamas, 24.28 N
+  62.60 W, 1,985 dust pixels, no smoke - written by h5py with the
+  file's projection and its coordinate vectors re-based to the crop's
+  first pixel (the reader navigates from index 0 by offset and scale;
+  the first crop kept the full image's offset and the box fell off the
+  grid), the decode and the body held to h5py's independent census to
+  the pixel: 1,224 dust of 2,027 retrieved in the central window, all
+  over water, the cloudy centre's circle 26 valid of 529 - no call, the
+  best-covered circle 424 of 529 with dust on 37 - 'none'; a first
+  draft of the crop script reused the confidence array's name for a
+  scalar and reported every pixel valid: caught when the gate's count
+  disagreed with the law's); aerosol-reference THE HAZE'S KIND
+  re-weights the species, never the column; server-reference the
+  sixteen asks, the fifteen served, the ten untimed, the bindings.
+  Docs: server README (the fifteenth product, the sixteenth ask);
+  FINDINGS pass 169 (148 files, 1,186 landmarks). MEASURED in the page
+  (23.30 N 63.54 W, the dust sheet's edge at sea, 20:3xZ, looking into
+  the Sun at 275 deg): "NOAA GOES-19 aerosol detection (ADPC) - 20:22Z
+  - overhead smoke absent (high confidence), dust absent (high
+  confidence) - within 25 km: 493 valid of 529 px (93% coverage): smoke
+  0, dust 0 -> neither dominant - within +-100 km: dust 682 px (0 high,
+  74 medium, 608 low) of 5,664 retrieved, smoke 0 px of 4,982 retrieved
+  - the scene 2,983 dust and 239 smoke detections" and the model's
+  split standing (du/ss/su/om/bc 11/71/10/6/2%, aureole f550 0.050,
+  cone 30.0 deg, marine droplets); a search of the whole 20:21Z CONUS
+  file found NO 25-km circle meeting the rule (3,003 dust and 1,244
+  smoke pixels, patchy and cloud-broken), so the mechanism was
+  measured through the pin: ?adpkind=dust gives "du/ss/su/om/bc
+  60/32/5/3/1% - aureole f550 0.029 - cone 9.0 deg - desert 3-mode
+  (dust majority, OPAC Table 4) - deck droplets continental Dn 7.7 um
+  - ADP dust pinned (?adpkind): dust 11% -> 60%" - the coarse mode's
+  spike narrowing from the transported 30-deg cone to the desert
+  mixture's 9 and the corona's air class turning continental, from one
+  measured word. STATED LIMITS: the detection is binary above AOD 0.2
+  and daytime only; a called kind moves the species' shares, never the
+  column's amount, single-scattering albedo, asymmetry or spectral
+  slope - the type's own absorption (Dubovik et al. 2002's AERONET
+  climatology, fetched, 55 pp, unread yet) is the next stage; the
+  ATBD's rule needs 80% of a 25-km circle valid, so a sheet under
+  broken cloud makes no call (today's did not).
 - DONE (Sep 6, the review session's 168th pass - THE FLASHES FROM
   ORBIT): the scene's lightning has been Blitzortung's since the live
   channel's first pass - a ground network of hobbyist receivers, dense

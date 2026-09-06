@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1183 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1186 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **148 reference files, 1183 landmark lines, 8 GPU probes** (live gate
+- **148 reference files, 1186 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1106,7 +1106,33 @@ The practice the corpus demonstrates, stated so it can be reused:
    brightest (1.72e-12 J at 160.9 km) to a millionth of a kilometre
    (`glm-reference` THE FILE'S FLASHES, THE FLASH'S STRENGTH, THE
    FLASHES, THE FILE, READ; `goesl2-client-reference` THE FLASHES READ
-   BY THE PAGE; `server-reference` THE FLASHES' ROUTE)
+   BY THE PAGE; `server-reference` THE FLASHES' ROUTE). Pass 169 lets
+   the satellite say WHICH aerosol hazes the scene: NOAA's Aerosol
+   Detection Product (ABI-L2-ADPC, CONUS every 10 min, 2 km, daytime)
+   becomes the fifteenth served product — the Enterprise ADP ATBD v1.0
+   read in full (dust by the 11–12 µm split window and its brown
+   0.47/0.64 ratio, smoke by its 0.64-µm brightness over the surface
+   the 2.25-µm band predicts from four NDVI classes, the fire pixel
+   smoke by assumption, the over-water Rayleigh-corrected ratios, a
+   3 × 3 buddy check, a two-bit confidence per type from the crucial
+   test's margin, the 80 / 80 / 70% requirement above AOD 0.2, the
+   GOES-16 validation with dust 88% caught and 2.6% false against
+   AERONET). The ATBD's own AERONET-matchup rule decides the scene's
+   kind — within 25 km, 80% of the pixels valid, the type of more than
+   half of them — and a dust or smoke call re-weights the model's
+   species split to that kind's majority (the aureole's coarse mode
+   and the corona's air follow) while the column's amount stays the
+   model's or the photometer's: the detection is binary, it says which,
+   never how much. A real 161-px crop of the day's densest field (a
+   Saharan dust sheet at sea east of the Bahamas, 1,985 dust pixels)
+   is vendored and the decode and body are held to h5py's independent
+   census to the pixel; on the day no 25-km circle on the whole CONUS
+   scene met the rule (3,003 dust and 1,244 smoke pixels, patchy and
+   cloud-broken), so the mechanism is shown by a labelled pin: the
+   home column's dust 11% → 60%, the aureole's cone 30° → 9° (`goesl2-
+   reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
+   KIND, READ; `aerosol-reference` THE HAZE'S KIND re-weights the
+   species, never the column)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

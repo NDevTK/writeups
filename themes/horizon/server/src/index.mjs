@@ -1025,9 +1025,12 @@ export {
   L2_TPW_SPEC,
   L2_RAIN_SPEC,
   L2_RAIN_EXTRAS,
+  L2_ADP_SPEC,
+  L2_ADP_EXTRAS,
   L2_TPW_EXTRAS,
   l2TpwBody,
   l2RainBody,
+  l2AdpBody,
   l2DcompBody
 } from '../../goesl2-decode.js';
 const {
@@ -1069,6 +1072,7 @@ const {
   l2FireBody,
   l2TpwBody,
   l2RainBody,
+  l2AdpBody,
   l2DcompBody
 } = L2;
 const l2Inflate = (u8) =>
@@ -2401,6 +2405,8 @@ function main() {
       rain: F.rain
         ? l2RainBody(F.rain.dec, F.rain.key, cell.lat, cell.lon)
         : null,
+      // the haze's kind (169th): the smoke and dust flags by day
+      adp: F.adp ? l2AdpBody(F.adp.dec, F.adp.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial',
       // the deployed revision (158th): the page can tell an older
       // daemon's body from a fresh one's

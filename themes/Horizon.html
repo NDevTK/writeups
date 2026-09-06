@@ -500,6 +500,8 @@
         tpwQuality,
         RAIN_ATBD,
         rainQuality,
+        ADP_ATBD,
+        adpReweight,
         phaseQuality,
         phaseWords,
         solarZenithDeg,
@@ -782,6 +784,7 @@
       import {
         channelSet,
         mieCoefficients,
+        reweightSpecies,
         TAU_MAX,
         TAU_MIN
       } from './horizon/aerosol.js';
@@ -6104,7 +6107,56 @@
             )
           ).json();
           if (!r.products) return;
-          const set = channelSet(r.products);
+          // THE HAZE'S KIND (169th pass): the satellite's dominant kind
+          // within 25 km (the ATBD's own matchup rule, fresh within 30
+          // min) re-weights the model's species split - dust to the
+          // majority under a dust call, organic + black carbon under a
+          // smoke call (goesl2.adpReweight); the column's amount stays
+          // the model's or the photometer's (aerosol.reweightSpecies
+          // scales the species, never the total) - measured WHICH
+          // outranks modelled which, stated on the line and the record
+          let prod = r.products;
+          let adpNote = '';
+          const ak = goesL2AdpNow();
+          // ?adpkind=dust|smoke is the labelled harness pin (the A/B of
+          // the re-weight on a day the rule calls nothing - measured
+          // 2026-09-06: no 25-km circle on the CONUS scene met it)
+          const adpPin = params.get('adpkind');
+          const dom =
+            adpPin === 'dust' || adpPin === 'smoke'
+              ? adpPin
+              : ak && ak.matchup
+                ? ak.matchup.dominant
+                : null;
+          if (dom === 'dust' || dom === 'smoke') {
+            const rw = adpReweight(channelSet(prod).fractions, dom);
+            const group = dom === 'dust' ? 'dust' : 'organic + black carbon';
+            if (rw.changed) {
+              prod = reweightSpecies(prod, rw.fractions);
+              adpNote =
+                (adpPin
+                  ? ` · ADP ${dom} pinned (?adpkind)`
+                  : ` · ADP ${dom} dominant within 25 km (${ak.matchup[dom].present} of ${ak.matchup.valid} valid)`) +
+                `: ${group} ${Math.round(100 * rw.from)}% → ${Math.round(100 * rw.to)}%`;
+            }
+            state.aerosolAdp = {
+              dominant: dom,
+              pinned: !!adpPin,
+              changed: rw.changed,
+              from: rw.from,
+              to: rw.to,
+              group
+            };
+          } else
+            state.aerosolAdp = {
+              dominant: dom,
+              pinned: false,
+              changed: false,
+              from: null,
+              to: null,
+              group: null
+            };
+          const set = channelSet(prod);
           // MEASURED direct-sun AOD outranks the model where a
           // photometer actually looked (aeronet.js, gated -
           // Giles 2019 V3 Level 1.5): the nearest station's
@@ -6174,7 +6226,7 @@
                   1
                 ) * 100
               : undefined;
-          const aur = aureoleSet(set, r.products, rhPct);
+          const aur = aureoleSet(set, prod, rhPct);
           // The deck droplet corona's air-mass class (Miles,
           // Verlinde & Clothiaux 2000 Table 3 marine vs
           // continental): sea salt carrying the MAJORITY of the
@@ -6182,15 +6234,15 @@
           // own majority test, run on the marine species. Without
           // products the class stays continental (the default
           // site's air), never a guess of the sea.
-          const b555c = Array.isArray(r.products.bands)
-            ? r.products.bands.find((nm) => Math.abs(nm - 555) < 1)
+          const b555c = Array.isArray(prod.bands)
+            ? prod.bands.find((nm) => Math.abs(nm - 555) < 1)
             : undefined;
           const tot555c =
-            b555c !== undefined && Number.isFinite(r.products.tau?.[b555c])
-              ? Math.max(r.products.tau[b555c], 1e-9)
+            b555c !== undefined && Number.isFinite(prod.tau?.[b555c])
+              ? Math.max(prod.tau[b555c], 1e-9)
               : null;
-          const ssAotC = Number.isFinite(r.products.species?.seaSalt?.aot)
-            ? Math.max(r.products.species.seaSalt.aot, 0)
+          const ssAotC = Number.isFinite(prod.species?.seaSalt?.aot)
+            ? Math.max(prod.species.seaSalt.aot, 0)
             : 0;
           state.marineAir = tot555c !== null && ssAotC / tot555c > 0.5;
           state.aerosol = {
@@ -6198,7 +6250,13 @@
             set,
             aur,
             cycle: r.cycle,
-            fhr: r.fhr
+            fhr: r.fhr,
+            adp: state.aerosolAdp
+              ? {
+                  ...state.aerosolAdp,
+                  amountSource: state.aeronet ? "the photometer's" : "the model's"
+                }
+              : null
           };
           const f = set.fractions;
           const pct = (k) => Math.round((f[k] ?? 0) * 100);
@@ -6235,7 +6293,8 @@
               (state.marineAir
                 ? 'marine Dₙ 13.1 µm (sea-salt majority)'
                 : 'continental Dₙ 7.7 µm') +
-              ' (Miles 2000 Table 3)'
+              ' (Miles 2000 Table 3)' +
+              adpNote
           );
         } catch {
           // The CAMS total AOD stands.
@@ -6429,9 +6488,55 @@
         'phase',
         'fire',
         'tpw',
-        'rain'
+        'rain',
+        'adp'
       ];
       let goesL2Busy = false;
+      // THE HAZE'S KIND (169th pass): NOAA's aerosol detection while
+      // fresh (a 10-minute CONUS product; 30 min covers a missed file)
+      // - the smoke and dust flags around the observer and the ATBD's
+      // own 25-km verdict (goesl2.adpDominant)
+      const ADP_LIVE_MS = 30 * 60e3;
+      let adpLastDominant = null;
+      function goesL2AdpNow() {
+        const a = goesL2 && goesL2.adp;
+        if (!a || !a.time || !a.census) return null;
+        if (Date.now() - Date.parse(a.time) > ADP_LIVE_MS) return null;
+        return a;
+      }
+      const adpCallWords = (p) =>
+        p.present === null
+          ? 'no pixel'
+          : (p.present ? 'present' : 'absent') +
+            (p.confidence ? ` (${p.confidence} confidence)` : ' (test not run)');
+      function adpWords(a) {
+        const c = a.census;
+        const m = a.matchup;
+        const kind = (k) =>
+          `${k} ${c[k].present} px` +
+          (c[k].present
+            ? ` (${c[k].high} high, ${c[k].medium} medium, ${c[k].low} low${c[k].disowned ? `, ${c[k].disowned} disowned by the word` : ''})`
+            : '') +
+          ` of ${c[k].retrieved.toLocaleString('en-US')} retrieved`;
+        const dayWords =
+          c.smoke.retrieved + c.dust.retrieved === 0
+            ? ' · no test ran in the window (the product is daytime only: cloud, night or glint over all of it)'
+            : '';
+        return (
+          `${a.time.slice(11, 16)}Z · overhead smoke ${adpCallWords(a.here.smoke)}, dust ${adpCallWords(a.here.dust)}` +
+          ` · within ${ADP_ATBD.matchup.radiusKm} km: ${m.valid} valid of ${m.inCircle} px (${Math.round(100 * m.coverage)}% coverage${m.enough ? '' : ', under the 80% the rule needs'})` +
+          (m.enough
+            ? `: smoke ${m.smoke.present}, dust ${m.dust.present} → ${m.dominant === 'none' ? 'neither dominant' : m.dominant === 'both' ? 'both (untested by the ATBD)' : m.dominant + ' dominant'}`
+            : ': no call') +
+          ` · within ±100 km: ${kind('dust')}, ${kind('smoke')}` +
+          (c.night ? ` · ${c.night} night` : '') +
+          (c.glint ? ` · ${c.glint} in sun glint` : '') +
+          dayWords +
+          (a.sceneStats && a.sceneStats.dustDetected !== null
+            ? ` · the scene ${a.sceneStats.dustDetected.toLocaleString('en-US')} dust and ${(a.sceneStats.smokeDetected ?? 0).toLocaleString('en-US')} smoke detections`
+            : '')
+        );
+      }
       let goesL2Rerun = false;
       // NOAA's skin SST at a place (151st pass): the window pixel's
       // kelvin and flag, or null off the window / no retrieval
@@ -6990,6 +7095,9 @@
             // the rain (164th pass; full disk every 10 min, 2 km): the
             // scene's rain where no radar sees the observer
             rain: unpackProduct(j.rain),
+            // the haze's kind (169th pass; CONUS every 10 min, 2 km,
+            // daytime): the smoke and dust flags, the ATBD's verdict
+            adp: unpackProduct(j.adp),
             // the daemon's deployed revision and the products the
             // page read for it from the bucket (158th pass)
             rev: j.rev ?? null,
@@ -7250,6 +7358,24 @@
                 shaftWords(applyRainShafts(rn)) +
                 (buildRainCover(rn), applyMeasuredCover(), coverWords())
             );
+          }
+          // THE HAZE'S KIND (169th pass): the satellite's smoke and dust
+          // around the observer; a changed verdict re-runs the aerosol
+          // sync so the species split follows it now, not at the next
+          // half hour
+          {
+            const ad = goesL2.adp;
+            if (ad && ad.census && ad.matchup) {
+              record(`NOAA ${j.craft} aerosol detection (ADPC)`, adpWords(ad));
+              const dom =
+                Date.now() - Date.parse(ad.time) <= ADP_LIVE_MS
+                  ? ad.matchup.dominant
+                  : null;
+              if (dom !== adpLastDominant) {
+                adpLastDominant = dom;
+                syncAerosol();
+              }
+            }
           }
           if (
             goesObs &&
@@ -8060,6 +8186,28 @@
               (rainShafts && rainShafts.summary
                 ? ` (each curtain's opacity 1 − e^−τ with τ = ${RAIN_EXTINCTION.a} R^${RAIN_EXTINCTION.b} × ${RAIN_EXTINCTION.pixelPathKm} km, Atlas 1953's extinction over the pixel's own path)`
                 : '');
+          }
+        }
+        // THE HAZE'S KIND (169th pass): the satellite's smoke and dust
+        // flags, the ATBD's 25-km verdict, and what the sky's species
+        // split did with it
+        {
+          const ad = goesL2.adp;
+          if (ad && ad.census && ad.matchup) {
+            const v = ADP_ATBD.validation;
+            const rw = state.aerosol && state.aerosol.adp;
+            line +=
+              ` · aerosol detection ${ad.time.slice(11, 16)}Z (ABI-L2-ADPC, 2-km px, every 10 min, daytime; dust by the 11-12 µm split window and its brown 0.47/0.64 ratio, smoke by its 0.64-µm brightness over the surface the 2.25-µm band predicts, a 3 × 3 buddy check): ` +
+              adpWords(ad).replace(/^\d\d:\d\dZ · /, '') +
+              ` · the sky's species split: ` +
+              (rw && rw.changed
+                ? `${rw.dominant} ${rw.pinned ? 'pinned (?adpkind)' : 'called within 25 km'} - ${rw.group} ${Math.round(100 * rw.from)}% → ${Math.round(100 * rw.to)}% of the measured 555-nm column (the aureole's coarse mode and the corona's air follow; the column's amount stays ${rw.amountSource})`
+                : rw && rw.dominant && rw.dominant !== 'none'
+                  ? `${rw.dominant} called within 25 km and the model's split already carries it (${Math.round(100 * rw.from)}%)`
+                  : goesL2AdpNow()
+                    ? 'no dominant kind within 25 km - the model\u2019s split stands'
+                    : 'the detection is stale - the model\u2019s split stands') +
+              ` · the ATBD's validation on GOES-16: dust ${Math.round(100 * v.dust.aeronet.pocd)}% caught with ${(100 * v.dust.aeronet.pofd).toFixed(1)}% false against AERONET, smoke ${Math.round(100 * v.smoke.aeronet.pocd)}% with ${Math.round(100 * v.smoke.aeronet.pofd)}%; binary above AOD ${ADP_ATBD.requirement.aodThreshold}, daytime only, thin aerosol not optimal - its own limits`;
           }
         }
         // THE FIRE'S HEAT (162nd pass): the hot spots within reach and

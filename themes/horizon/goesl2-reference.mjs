@@ -114,6 +114,20 @@ import {
   windowBox,
   windowIndexOf
 } from './goesl2.js';
+import {
+  ADP_ATBD,
+  ADP_CALLED_FLOOR,
+  ADP_FLAG_FILL,
+  ADP_PQI2,
+  ADP_RADIUS_PX,
+  adpCensus,
+  adpConfidence,
+  adpDominant,
+  adpFlagBytes,
+  adpPixel,
+  adpReweight,
+  adpScores
+} from './goesl2.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -1181,6 +1195,175 @@ const inflate = (u8) =>
       `${(100 * v.all.ice.agree).toFixed(2)}% make ${agreeAll.toLocaleString('en-US')} agreed of ${v.all.total.n.toLocaleString('en-US')} (${(100 * v.all.total.agree).toFixed(2)}%), ` +
       `the thick-cloud qualifier ${(100 * v.thick.total.agree).toFixed(2)}% of ${v.thick.total.n.toLocaleString('en-US')} against the 80% requirement; ` +
       `tops at or under ${PHASE_ATBD.homogeneousFreezingK} K are ice, liquid tops over ${PHASE_ATBD.liquidTopK} K are warm`
+  );
+}
+
+// ---- THE HAZE'S KIND (169th pass) ----------------------------------
+// The DQF word's two-bit confidences as the file lays them, the
+// flags' fill through the byte view, a synthetic window censused by
+// kind and confidence with the night, glint, land and water bits, the
+// ATBD's 25-km matchup rule (the coverage bar, the majority, both,
+// none, no call), the measured kind over the model's split, and the
+// ATBD's validation tables recomputed from their confusion counts.
+{
+  // a word with smoke high (0), dust low (2), ash bad (3), NUC medium (1)
+  const word = (3 << 0) | (0 << 2) | (2 << 4) | (1 << 6);
+  const fb = adpFlagBytes(Int8Array.from([-128, 0, 1, 1]));
+  const fb2 = adpFlagBytes(Uint8Array.from([128, 255, 1, 0]));
+  // a 21 x 21 window: dust present with medium confidence on the
+  // west half's rows 3..17, smoke present (high) on a 3 x 3 patch at
+  // the east, one disowned smoke flag (bad confidence), night on the
+  // last row, glint on the last column, land on the north half
+  const W = 21;
+  const sm = new Uint8Array(W * W);
+  const du = new Uint8Array(W * W);
+  const dq = new Uint16Array(W * W);
+  const p2 = new Uint16Array(W * W);
+  for (let j = 0; j < W; j++)
+    for (let i = 0; i < W; i++) {
+      const q = j * W + i;
+      // both tests ran with high confidence by default
+      dq[q] = (3 << 0) | (0 << 2) | (0 << 4) | (3 << 6);
+      if (i < 10 && j >= 3 && j <= 17) {
+        du[q] = 1;
+        dq[q] = (3 << 0) | (0 << 2) | (1 << 4) | (3 << 6); // dust medium
+      }
+      if (i >= 16 && i <= 18 && j >= 8 && j <= 10) sm[q] = 1;
+      if (j === W - 1) p2[q] |= ADP_PQI2.night;
+      if (i === W - 1) p2[q] |= ADP_PQI2.withinGlint;
+      if (j < 10) p2[q] |= ADP_PQI2.land;
+    }
+  sm[5 * W + 15] = 1;
+  dq[5 * W + 15] = (3 << 0) | (3 << 2) | (0 << 4) | (3 << 6); // a smoke flag the word disowns
+  sm[0] = ADP_FLAG_FILL;
+  du[0] = ADP_FLAG_FILL;
+  const c = adpCensus(sm, du, dq, p2);
+  // the matchup circles: at (5, 10) the dust half - every valid pixel
+  // within 4 px carries dust; at (17, 9) the smoke patch is 9 of the
+  // circle's valid pixels; a circle in the fill-less clear east has
+  // no call of either; a circle of radius 4 at (19, 19) touches the
+  // glint column and the night row
+  const circ = (ci, cj, r = 4) =>
+    adpDominant(sm, du, dq, p2, {cols: W, rows: W, ci, cj, radiusPx: r});
+  const dustC = circ(5, 10);
+  const smokeC = circ(17, 9);
+  const noneC = circ(14, 14, 1);
+  // a circle whose valid coverage falls short: every word bad but one
+  const dqBad = new Uint16Array(W * W).fill(0xffff);
+  dqBad[10 * W + 10] = 0;
+  const shortC = adpDominant(sm, du, dqBad, p2, {cols: W, rows: W, ci: 10, cj: 10, radiusPx: 4});
+  // both: a window where every valid pixel carries both flags
+  const both = adpDominant(
+    new Uint8Array(9).fill(1),
+    new Uint8Array(9).fill(1),
+    new Uint16Array(9).fill(0),
+    null,
+    {cols: 3, rows: 3, ci: 1, cj: 1, radiusPx: 1}
+  );
+  const model = {dust: 0.1, seaSalt: 0.3, sulfate: 0.4, organic: 0.15, blackCarbon: 0.05};
+  const rwD = adpReweight(model, 'dust');
+  const rwS = adpReweight(model, 'smoke');
+  const rwN = adpReweight(model, 'none');
+  const rwAlready = adpReweight({dust: 0.7, seaSalt: 0.3}, 'dust');
+  const rwNoFine = adpReweight({dust: 0.5, seaSalt: 0.5}, 'smoke');
+  const sumD = Object.values(rwD.fractions).reduce((a, v) => a + v, 0);
+  const sumS = Object.values(rwS.fractions).reduce((a, v) => a + v, 0);
+  const v = ADP_ATBD.validation;
+  const sc = adpScores(v.dust.aeronet);
+  const sc2 = adpScores(v.smoke.calipso);
+  check(
+    "THE HAZE'S KIND: the confidence word, the flags' fill, the census, the ATBD's 25-km rule, the measured kind over the model's split, the validation recomputed",
+    adpConfidence(word, 'smoke') === 'high' &&
+      adpConfidence(word, 'dust') === 'low' &&
+      adpConfidence(word, 'ash') === null &&
+      adpConfidence(word, 'nuc') === 'medium' &&
+      adpConfidence(65535, 'dust') === null &&
+      fb.join() === '255,0,1,1' &&
+      fb2.join() === '255,255,1,0' &&
+      adpPixel(1, word, 'dust').present === true &&
+      adpPixel(1, word, 'dust').confidence === 'low' &&
+      adpPixel(ADP_FLAG_FILL, word, 'dust').present === null &&
+      c.n === W * W &&
+      c.fill === 1 &&
+      c.night === W &&
+      c.glint === W &&
+      c.land === 10 * W - 1 &&
+      c.water === 11 * W &&
+      c.land + c.water + c.fill === W * W &&
+      c.dust.present === 10 * 15 &&
+      c.dust.medium === 150 &&
+      c.dust.high === 0 &&
+      c.dust.retrieved === W * W - 1 &&
+      c.smoke.present === 10 &&
+      c.smoke.high === 9 &&
+      c.smoke.disowned === 1 &&
+      c.smoke.retrieved === W * W - 2 &&
+      dustC.dominant === 'dust' &&
+      dustC.inCircle === 49 &&
+      dustC.valid === 49 &&
+      dustC.dust.present === 49 &&
+      dustC.dust.medium === 49 &&
+      smokeC.dominant === 'none' &&
+      smokeC.smoke.present === 9 &&
+      // 49 lattice points within 4 px, one column past the grid's
+      // east edge (48 in the window), five in the glint column
+      smokeC.inCircle === 48 &&
+      smokeC.valid === 43 &&
+      near(smokeC.smokeFrac, 9 / 43, 1e-12) &&
+      noneC.dominant === 'none' &&
+      noneC.inCircle === 5 &&
+      shortC.dominant === null &&
+      shortC.valid === 1 &&
+      shortC.enough === false &&
+      near(shortC.coverage, 1 / 49, 1e-12) &&
+      both.dominant === 'both' &&
+      both.valid === 5 &&
+      rwD.changed === true &&
+      near(rwD.fractions.dust, ADP_CALLED_FLOOR, 1e-12) &&
+      near(sumD, 1, 1e-12) &&
+      near(rwD.fractions.seaSalt / rwD.fractions.sulfate, 0.75, 1e-12) &&
+      near(rwD.from, 0.1, 1e-12) &&
+      rwS.changed === true &&
+      near(rwS.fractions.organic + rwS.fractions.blackCarbon, ADP_CALLED_FLOOR, 1e-12) &&
+      near(rwS.fractions.organic / rwS.fractions.blackCarbon, 3, 1e-12) &&
+      near(sumS, 1, 1e-12) &&
+      rwN.changed === false &&
+      rwAlready.changed === false &&
+      near(rwAlready.from, 0.7, 1e-12) &&
+      rwNoFine.changed === true &&
+      near(rwNoFine.fractions.organic, ADP_CALLED_FLOOR, 1e-12) &&
+      rwNoFine.fractions.blackCarbon === 0 &&
+      near(rwNoFine.fractions.dust, 0.2, 1e-12) &&
+      ADP_RADIUS_PX === 13 &&
+      ADP_ATBD.matchup.radiusKm === 25 &&
+      ADP_ATBD.matchup.coverageMin === 0.8 &&
+      ADP_ATBD.requirement.dust === 0.8 &&
+      ADP_ATBD.requirement.smokeWater === 0.7 &&
+      ADP_ATBD.requirement.aodThreshold === 0.2 &&
+      ADP_ATBD.requirement.glintDeg === 40 &&
+      ADP_ATBD.requirement.szaDayDeg === 87 &&
+      ADP_ATBD.dust.thinBtdK === 0.4 &&
+      ADP_ATBD.smoke.fireBt39K === 350 &&
+      // the ATBD's printed percentages reproduce from its own counts
+      // only to within half a percent (dust against AERONET: 98.4%
+      // accuracy and 88.1% caught from the counts, 98.5 and 88.4
+      // printed) - the tables' arithmetic, stated
+      near(sc.accuracy, v.dust.aeronet.accuracy, 5e-3) &&
+      near(sc.pocd, v.dust.aeronet.pocd, 5e-3) &&
+      near(sc.pofd, v.dust.aeronet.pofd, 5e-3) &&
+      near(sc2.accuracy, v.smoke.calipso.accuracy, 5e-3) &&
+      near(sc2.pocd, v.smoke.calipso.pocd, 5e-3) &&
+      near(sc2.pofd, v.smoke.calipso.pofd, 5e-3) &&
+      sc.pocd > ADP_ATBD.requirement.dust &&
+      sc2.pocd > ADP_ATBD.requirement.smokeLand,
+    `word ${word}: smoke ${adpConfidence(word, 'smoke')}, dust ${adpConfidence(word, 'dust')}, ash ${adpConfidence(word, 'ash')}, none/unknown/clear ${adpConfidence(word, 'nuc')}; ` +
+      `the int8 fill -128 and the byte view's 128 both read ${ADP_FLAG_FILL}; a ${W} x ${W} window: ${c.dust.present} dust px (${c.dust.medium} medium) of ${c.dust.retrieved} retrieved, ` +
+      `${c.smoke.present} smoke px (${c.smoke.high} high, ${c.smoke.disowned} disowned by the word), ${c.night} night, ${c.glint} in glint, ${c.land} land and ${c.water} water, ${c.fill} fill; ` +
+      `the 25-km rule: a circle in the dust calls dust (${dustC.dust.present} of ${dustC.valid} valid), the smoke patch is ${smokeC.smoke.present} of ${smokeC.valid} - ${smokeC.dominant}, ` +
+      `a circle with ${shortC.valid} valid of ${shortC.inCircle} (${(100 * shortC.coverage).toFixed(0)}% coverage) makes no call, every pixel both makes '${both.dominant}'; ` +
+      `the model's split (dust 10%) under a dust call goes to ${(100 * rwD.fractions.dust).toFixed(0)}% dust with the rest scaled (sea salt ${(100 * rwD.fractions.seaSalt).toFixed(1)}%, sulphate ${(100 * rwD.fractions.sulfate).toFixed(1)}%), ` +
+      `under a smoke call organic + black carbon to ${(100 * (rwS.fractions.organic + rwS.fractions.blackCarbon)).toFixed(0)}% at their 3:1, a split already past the floor untouched, a model without fine absorbers puts it all in organic; ` +
+      `the ATBD's Tables 15-16 recomputed from their counts: dust against AERONET ${(100 * sc.accuracy).toFixed(1)}% accuracy, ${(100 * sc.pocd).toFixed(1)}% caught, ${(100 * sc.pofd).toFixed(1)}% false (printed ${(100 * v.dust.aeronet.accuracy).toFixed(1)} / ${(100 * v.dust.aeronet.pocd).toFixed(1)} / ${(100 * v.dust.aeronet.pofd).toFixed(1)}: the tables' own arithmetic is off by up to 0.3%); smoke against CALIPSO ${(100 * sc2.accuracy).toFixed(1)} / ${(100 * sc2.pocd).toFixed(1)} / ${(100 * sc2.pofd).toFixed(1)} - both past the 80% requirement`
   );
 }
 
