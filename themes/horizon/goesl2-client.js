@@ -292,7 +292,9 @@ export function createGoesL2Client({
         ? l2PhaseBody(F.phase.dec, F.phase.key, cell.lat, cell.lon)
         : null,
       // the fire's heat (162nd)
-      fire: F.fire ? l2FireBody(F.fire.dec, F.fire.key, cell.lat, cell.lon) : null,
+      fire: F.fire
+        ? l2FireBody(F.fire.dec, F.fire.key, cell.lat, cell.lon)
+        : null,
       // the column's water (163rd)
       tpw: F.tpw ? l2TpwBody(F.tpw.dec, F.tpw.key, cell.lat, cell.lon) : null,
       // the daylight field (159th): the page's own read, only when asked

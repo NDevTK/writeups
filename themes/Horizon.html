@@ -2616,7 +2616,8 @@
           // and the file it came from - the L2 sync re-runs the field
           // only when a NEWER file changes what the reference would take
           const pwTpw = goesL2TpwForField(seaBase);
-          const tpwTime = goesL2 && goesL2.tpw && goesL2.tpw.time ? goesL2.tpw.time : null;
+          const tpwTime =
+            goesL2 && goesL2.tpw && goesL2.tpw.time ? goesL2.tpw.time : null;
           const P = goesPanel({
             dec,
             win,
@@ -7108,13 +7109,26 @@
               `NOAA ${j.craft} total precipitable water (TPWC)`,
               `${tw.time.slice(11, 16)}Z · overhead ${
                 tw.here && tw.here.mm !== null
-                  ? tw.here.mm.toFixed(1) + ' mm (' + tpwQuality(tw.here.dqf) + ')'
-                  : 'no retrieval (' + (TPW_DQF_MEANINGS[tw.here ? tw.here.dqf : 255] ?? 'fill').replace(/_qf$/, '').replace(/_/g, ' ') + ')'
+                  ? tw.here.mm.toFixed(1) +
+                    ' mm (' +
+                    tpwQuality(tw.here.dqf) +
+                    ')'
+                  : 'no retrieval (' +
+                    (TPW_DQF_MEANINGS[tw.here ? tw.here.dqf : 255] ?? 'fill')
+                      .replace(/_qf$/, '')
+                      .replace(/_/g, ' ') +
+                    ')'
               }` +
-                (tw.nearest ? ` · nearest good ${tw.nearest.mm.toFixed(1)} mm ${tw.nearest.km} km off` : ` · no good px within ${tw.nearPx} px`) +
+                (tw.nearest
+                  ? ` · nearest good ${tw.nearest.mm.toFixed(1)} mm ${tw.nearest.km} km off`
+                  : ` · no good px within ${tw.nearPx} px`) +
                 ` · ${c.good} good of ${c.n} 10-km px within ±100 km` +
-                (c.goodStats.n ? ` (${c.goodStats.minMm.toFixed(1)}–${c.goodStats.maxMm.toFixed(1)} mm)` : '') +
-                (tw.sceneStats && tw.sceneStats.meanMm !== null ? ` · the scene ${tw.sceneStats.minMm.toFixed(1)}–${tw.sceneStats.maxMm.toFixed(1)} mm` : '')
+                (c.goodStats.n
+                  ? ` (${c.goodStats.minMm.toFixed(1)}–${c.goodStats.maxMm.toFixed(1)} mm)`
+                  : '') +
+                (tw.sceneStats && tw.sceneStats.meanMm !== null
+                  ? ` · the scene ${tw.sceneStats.minMm.toFixed(1)}–${tw.sceneStats.maxMm.toFixed(1)} mm`
+                  : '')
             );
             // the field's reference rides the measured column: re-run
             // the field once when a NEWER TPW file changes the water it
@@ -7125,7 +7139,9 @@
               const want = goesL2TpwForField(goesObs.seaBase) ?? null;
               if (want !== (goesObs.pwMeasuredMm ?? null)) {
                 if (params.has('debug'))
-                  console.log(`tpw: ${tw.time.slice(11, 16)}Z changes the field's water ${goesObs.pwMeasuredMm ?? 'ascent'} -> ${want ?? 'ascent'} mm; re-running the field`);
+                  console.log(
+                    `tpw: ${tw.time.slice(11, 16)}Z changes the field's water ${goesObs.pwMeasuredMm ?? 'ascent'} -> ${want ?? 'ascent'} mm; re-running the field`
+                  );
                 syncGoesIr();
               } else goesObs.tpwTime = tw.time ?? null;
             }
@@ -7390,7 +7406,9 @@
             `the bright cloud's p90 ${r.refs.rhoBright.toFixed(3)}) · ` +
             `the decks' 2-km field cut ${DAYLIGHT_FACTOR}× finer: ${r.fine.refined.toLocaleString('en-US')} of ${r.fine.cloudy.toLocaleString('en-US')} fine texels ` +
             `under the mask's cloud shaped by their reflectance ${
-              r.stats.meanFraction !== null ? `(mean fraction ${r.stats.meanFraction.toFixed(2)})` : '(none took a fraction)'
+              r.stats.meanFraction !== null
+                ? `(mean fraction ${r.stats.meanFraction.toFixed(2)})`
+                : '(none took a fraction)'
             }, the rest keeping the 2-km cover; ` +
             `κ = πd²/E_sun = ${d.vis.kappa0 !== null ? d.vis.kappa0.toExponential(3) : '–'} from the file's own d = ${d.vis.dAu !== null ? d.vis.dAu.toFixed(5) : '–'} AU ` +
             `and E_sun ${d.vis.esunWm2Um !== null ? d.vis.esunWm2Um.toFixed(1) : '–'} W m⁻² µm⁻¹ (CMIP ATBD Eq. 3-2, 3-3) · ` +
@@ -7471,10 +7489,12 @@
       // minutes of the scan; null leaves the ascent's own column
       function goesL2TpwForField(seaBase = null) {
         const t = goesL2 && goesL2.tpw;
-        if (!t || !t.time || Date.now() - Date.parse(t.time) > TPW_LIVE_MS) return null;
+        if (!t || !t.time || Date.now() - Date.parse(t.time) > TPW_LIVE_MS)
+          return null;
         const at = seaBase ? goesL2TpwAt(seaBase.latDeg, seaBase.lonDeg) : null;
         if (at) return at.mm;
-        if (t.here && t.here.mm !== null && tpwQuality(t.here.dqf) === 'good') return t.here.mm;
+        if (t.here && t.here.mm !== null && tpwQuality(t.here.dqf) === 'good')
+          return t.here.mm;
         return t.nearest ? t.nearest.mm : null;
       }
       // THE CLOUD'S PHASE OVERHEAD (161st pass): NOAA's cloud top
@@ -7756,15 +7776,20 @@
           const tw = goesL2.tpw;
           if (tw && tw.census) {
             const c = tw.census;
-            const used = goesObs && goesObs.panel ? goesObs.panel.reference : null;
+            const used =
+              goesObs && goesObs.panel ? goesObs.panel.reference : null;
             line +=
               ` · total precipitable water ${tw.time.slice(11, 16)}Z (ABI-L2-TPWC, 10-km px, a 5×5 field of regard at least a fifth clear): ` +
               (tw.here && tw.here.mm !== null
                 ? `overhead ${tw.here.mm.toFixed(1)} mm (${tpwQuality(tw.here.dqf)})`
                 : `no retrieval overhead (${(TPW_DQF_MEANINGS[tw.here ? tw.here.dqf : 255] ?? 'fill').replace(/_qf$/, '').replace(/_/g, ' ')})`) +
-              (tw.nearest ? `, the nearest good ${tw.nearest.mm.toFixed(1)} mm ${tw.nearest.km} km off` : '') +
+              (tw.nearest
+                ? `, the nearest good ${tw.nearest.mm.toFixed(1)} mm ${tw.nearest.km} km off`
+                : '') +
               ` · ${c.good} good of ${c.n} px within ±100 km` +
-              (c.goodStats.n ? ` (${c.goodStats.minMm.toFixed(1)}–${c.goodStats.maxMm.toFixed(1)} mm, median ${c.goodStats.medianMm.toFixed(1)})` : '') +
+              (c.goodStats.n
+                ? ` (${c.goodStats.minMm.toFixed(1)}–${c.goodStats.maxMm.toFixed(1)} mm, median ${c.goodStats.medianMm.toFixed(1)})`
+                : '') +
               (used
                 ? used.pwSource === 'ascent'
                   ? ` · the clear-sky reference keeps the ascent's ${used.pwMm.toFixed(1)} mm (no good pixel within reach or the scan too old)`

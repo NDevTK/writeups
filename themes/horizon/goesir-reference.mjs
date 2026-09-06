@@ -1044,11 +1044,31 @@ pinBlock(
 {
   const rows = SOUNDING.rows;
   const base = clearSkyReference({tSkinC: 20, rows, viewZenithDeg: 45});
-  const same = clearSkyReference({tSkinC: 20, rows, viewZenithDeg: 45, pwMmMeasured: base.pwMm});
-  const twice = clearSkyReference({tSkinC: 20, rows, viewZenithDeg: 45, pwMmMeasured: 2 * base.pwMm});
-  const wild = clearSkyReference({tSkinC: 20, rows, viewZenithDeg: 45, pwMmMeasured: 100 * base.pwMm});
+  const same = clearSkyReference({
+    tSkinC: 20,
+    rows,
+    viewZenithDeg: 45,
+    pwMmMeasured: base.pwMm
+  });
+  const twice = clearSkyReference({
+    tSkinC: 20,
+    rows,
+    viewZenithDeg: 45,
+    pwMmMeasured: 2 * base.pwMm
+  });
+  const wild = clearSkyReference({
+    tSkinC: 20,
+    rows,
+    viewZenithDeg: 45,
+    pwMmMeasured: 100 * base.pwMm
+  });
   const cold = clearSkyReference({tSkinC: 15, rows, viewZenithDeg: 45});
-  const coldTwice = clearSkyReference({tSkinC: 15, rows, viewZenithDeg: 45, pwMmMeasured: 2 * cold.pwMm});
+  const coldTwice = clearSkyReference({
+    tSkinC: 15,
+    rows,
+    viewZenithDeg: 45,
+    pwMmMeasured: 2 * cold.pwMm
+  });
   const airC = rows[0].tC;
   check(
     "THE COLUMN'S WATER scales the balloon's column to the satellite's total",

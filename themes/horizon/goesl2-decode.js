@@ -1058,7 +1058,12 @@ export function l2TpwBody(dec, key, lat, lon) {
     dqf: packArray(w.cut.DQF_Overall, 'u8'),
     here: {mm: r2(mm[qc]), dqf: w.cut.DQF_Overall[qc] ?? null},
     nearest: near
-      ? {mm: r2(mm[near.q]), di: near.di, dj: near.dj, km: +(Math.hypot(near.di * ew, near.dj * ns) / 1000).toFixed(1)}
+      ? {
+          mm: r2(mm[near.q]),
+          di: near.di,
+          dj: near.dj,
+          km: +(Math.hypot(near.di * ew, near.dj * ns) / 1000).toFixed(1)
+        }
       : null,
     nearPx: L2_TPW_NEAR_PX,
     census: tpwCensus(mm, w.cut.DQF_Overall),

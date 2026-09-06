@@ -1240,7 +1240,11 @@ export const TPW_ATBD = {
   resolutionKm: 10,
   fieldOfRegardPx: 5,
   clearFractionMin: 0.2,
-  requirement: {moistureAccuracyPct: {sfcTo300hPa: 18, above300hPa: 20}, lzaQuantitativeDeg: 67, refreshMinConus: 30},
+  requirement: {
+    moistureAccuracyPct: {sfcTo300hPa: 18, above300hPa: 20},
+    lzaQuantitativeDeg: 67,
+    refreshMinConus: 30
+  },
   file: {lzaQuantitativeDeg: 70, lzaRetrievalDeg: 80, latitudeDeg: 70},
   validation: {
     raobLandErrorPct: 11.5,
@@ -1286,7 +1290,12 @@ export function tpwCensus(mm, dqf) {
   degraded.sort((a, b) => a - b);
   const stats = (v) =>
     v.length
-      ? {n: v.length, minMm: +v[0].toFixed(2), medianMm: +quantile(v, 0.5).toFixed(2), maxMm: +v[v.length - 1].toFixed(2)}
+      ? {
+          n: v.length,
+          minMm: +v[0].toFixed(2),
+          medianMm: +quantile(v, 0.5).toFixed(2),
+          maxMm: +v[v.length - 1].toFixed(2)
+        }
       : {n: 0, minMm: null, medianMm: null, maxMm: null};
   return {...c, goodStats: stats(good), degradedStats: stats(degraded)};
 }

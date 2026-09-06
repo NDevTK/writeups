@@ -10453,23 +10453,23 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   13:57Z file arrived the L2 sync logged "changes the field's water
   43.69 -> 43.59 mm; re-running the field" ONCE - a step, not a loop
   - and the 13:40Z mosaic read again on the new column. The same
-  probe found a fault of the 159th's: with the sun 83.9 deg from the
-  zenith the terminator crossed the window, 32 fine texels lay lit
-  under the mask's cloud and none took a fraction (references
-  0.556/0.318, one mode), and the daylight record and line printed
-  the null mean fraction - an uncaught error on every panel render
-  that silenced the probe's own text dump. Fixed in this pass: the
-  record and the line say "none took a fraction - the 2-km cover
-  stands" and Otsu's eta is worded only when it exists. The third
-  probe, on the fixed page (14:0xZ): the field line reads "window tau
-  0.334 over 43.7 mm - the ascent's 53.1 mm scaled x0.82 to NOAA's
-  TPW" and the L2 line "the clear-sky reference's column scaled x0.82
-  from the ascent's 53.1 mm to the satellite's 43.7 mm" - the morning
-  ascent a fifth wetter than the column the satellite measured over
-  the pier; the same probe watched the window turn from the night's
-  stratus to a high deck (the sea 100% high at 13:30Z, ACHA's median
-  top 9.7 km, the warmest sea pixel -17.4 C) with the products
-  agreeing.
+    probe found a fault of the 159th's: with the sun 83.9 deg from the
+    zenith the terminator crossed the window, 32 fine texels lay lit
+    under the mask's cloud and none took a fraction (references
+    0.556/0.318, one mode), and the daylight record and line printed
+    the null mean fraction - an uncaught error on every panel render
+    that silenced the probe's own text dump. Fixed in this pass: the
+    record and the line say "none took a fraction - the 2-km cover
+    stands" and Otsu's eta is worded only when it exists. The third
+    probe, on the fixed page (14:0xZ): the field line reads "window tau
+    0.334 over 43.7 mm - the ascent's 53.1 mm scaled x0.82 to NOAA's
+    TPW" and the L2 line "the clear-sky reference's column scaled x0.82
+    from the ascent's 53.1 mm to the satellite's 43.7 mm" - the morning
+    ascent a fifth wetter than the column the satellite measured over
+    the pier; the same probe watched the window turn from the night's
+    stratus to a high deck (the sea 100% high at 13:30Z, ACHA's median
+    top 9.7 km, the warmest sea pixel -17.4 C) with the products
+    agreeing.
 - DONE (Sep 6, the review session's 162nd pass - THE FIRE'S HEAT):
   the scene's wildfires have been NASA EONET's open events since the
   wildfire module's first pass - a day-old centroid per event, its
