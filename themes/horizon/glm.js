@@ -54,7 +54,12 @@ export const GLM_ATBD = {
     latencyS: 20,
     eventsPerSecondMax: 20000
   },
-  optics: {riseLengthenedUs: 215, widthLengthenedUs: 210, litTopKm: 10, litTopMaxKm: 60},
+  optics: {
+    riseLengthenedUs: 215,
+    widthLengthenedUs: 210,
+    litTopKm: 10,
+    litTopMaxKm: 60
+  },
   fileSeconds: 20
 };
 // the file's flash quality flag (flash_quality_flag: 0 good; 1, 3, 5
@@ -67,7 +72,13 @@ export const GLM_QUALITY_WORDS = {
 };
 // MEASURED energy quantiles of the day's population (J), the display
 // scale's anchors - stated as the day's, not a law
-export const GLM_ENERGY_J = {floor: 3.3e-15, median: 4.2e-14, p90: 3.1e-13, p99: 1.3e-12, max: 4.4e-12};
+export const GLM_ENERGY_J = {
+  floor: 3.3e-15,
+  median: 4.2e-14,
+  p90: 3.1e-13,
+  p99: 1.3e-12,
+  max: 4.4e-12
+};
 
 // The file stores its counts as int16 with an UNSIGNED valid range
 // ([0, -6] reads as 0..65530): a negative count is the count plus
@@ -90,15 +101,19 @@ export function parseGlmFlashes(f) {
   const t0 = d('flash_time_offset_of_first_event');
   const t1 = d('flash_time_offset_of_last_event');
   const id = d('flash_id');
-  if (!lat || !lon || !e || !lat.values || !lon.values || !e.values) return null;
-  const sc = (ds, k = 'scale_factor', dflt = 1) => (ds && ds.attrs && Number.isFinite(ds.attrs[k]) ? ds.attrs[k] : dflt);
+  if (!lat || !lon || !e || !lat.values || !lon.values || !e.values)
+    return null;
+  const sc = (ds, k = 'scale_factor', dflt = 1) =>
+    ds && ds.attrs && Number.isFinite(ds.attrs[k]) ? ds.attrs[k] : dflt;
   const es = sc(e);
   const eo = sc(e, 'add_offset', 0);
   const as = sc(a);
   const ts = sc(t0);
   const to = sc(t0, 'add_offset', 0);
   const ra = f.rootAttrs ? f.rootAttrs() : {};
-  const startMs = ra.time_coverage_start ? Date.parse(ra.time_coverage_start) : NaN;
+  const startMs = ra.time_coverage_start
+    ? Date.parse(ra.time_coverage_start)
+    : NaN;
   const n = lat.values.length;
   const flashes = [];
   for (let i = 0; i < n; i++) {
@@ -113,8 +128,14 @@ export function parseGlmFlashes(f) {
       areaKm2: a && a.values ? (u16(a.values[i]) * as) / 1e6 : null,
       quality: qv,
       words: GLM_QUALITY_WORDS[qv] ?? `flag ${qv}`,
-      tFirstMs: Number.isFinite(startMs) && Number.isFinite(tf) ? startMs + tf * 1000 : null,
-      durationMs: Number.isFinite(tf) && Number.isFinite(tl) ? Math.max(0, (tl - tf) * 1000) : null
+      tFirstMs:
+        Number.isFinite(startMs) && Number.isFinite(tf)
+          ? startMs + tf * 1000
+          : null,
+      durationMs:
+        Number.isFinite(tf) && Number.isFinite(tl)
+          ? Math.max(0, (tl - tf) * 1000)
+          : null
     });
   }
   const fc = d('flash_count');
@@ -136,22 +157,37 @@ export function parseGlmFlashes(f) {
  */
 export function flashStrength(energyJ) {
   if (!(energyJ > 0)) return 0.3;
-  return Math.min(1.6, Math.max(0.3, 0.4 + (0.6 * Math.log10(energyJ / 1e-14)) / 2.5));
+  return Math.min(
+    1.6,
+    Math.max(0.3, 0.4 + (0.6 * Math.log10(energyJ / 1e-14)) / 2.5)
+  );
 }
 
 /**
  * The flashes within maxKm of (lat, lon), each with its distance,
  * bearing and strength, earliest first, capped.
  */
-export function glmFlashesNear(flashes, lat, lon, {maxKm = 200, cap = 200} = {}) {
+export function glmFlashesNear(
+  flashes,
+  lat,
+  lon,
+  {maxKm = 200, cap = 200} = {}
+) {
   const out = [];
   for (const f of flashes || []) {
     if (!Number.isFinite(f.lat) || !Number.isFinite(f.lon)) continue;
     const rb = rangeBearing(lat, lon, f.lat, f.lon);
     if (rb.distKm > maxKm) continue;
-    out.push({...f, distKm: rb.distKm, bearingDeg: rb.bearingDeg, strength: flashStrength(f.energyJ)});
+    out.push({
+      ...f,
+      distKm: rb.distKm,
+      bearingDeg: rb.bearingDeg,
+      strength: flashStrength(f.energyJ)
+    });
   }
-  out.sort((a, b) => (a.tFirstMs ?? 0) - (b.tFirstMs ?? 0) || a.distKm - b.distKm);
+  out.sort(
+    (a, b) => (a.tFirstMs ?? 0) - (b.tFirstMs ?? 0) || a.distKm - b.distKm
+  );
   return out.slice(0, cap);
 }
 
@@ -161,12 +197,21 @@ export function glmFlashesNear(flashes, lat, lon, {maxKm = 200, cap = 200} = {})
  * lightning (the network's own strike, closer located, stands); the
  * rest are the satellite's alone. strikes: [{lat, lon, tMs}].
  */
-export function flashesNotInNetwork(flashes, strikes, {km = 20, ms = 30000} = {}) {
+export function flashesNotInNetwork(
+  flashes,
+  strikes,
+  {km = 20, ms = 30000} = {}
+) {
   const out = [];
   for (const f of flashes || []) {
     let seen = false;
     for (const s of strikes || []) {
-      if (Number.isFinite(f.tFirstMs) && Number.isFinite(s.tMs) && Math.abs(f.tFirstMs - s.tMs) > ms) continue;
+      if (
+        Number.isFinite(f.tFirstMs) &&
+        Number.isFinite(s.tMs) &&
+        Math.abs(f.tFirstMs - s.tMs) > ms
+      )
+        continue;
       if (rangeBearing(f.lat, f.lon, s.lat, s.lon).distKm <= km) {
         seen = true;
         break;

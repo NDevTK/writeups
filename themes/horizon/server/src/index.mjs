@@ -111,7 +111,12 @@ import {pickSatellite} from '../../satellites.js';
 import {openHdf5, openHdf5Lazy, physicalValues} from '../../hdf5.js';
 // THE FLASHES FROM ORBIT (168th): GLM's flashes decoded and composed
 // by the shared law module (gated by glm-reference.mjs)
-import {GLM_ATBD, glmFlashesNear, glmSummary, parseGlmFlashes} from '../../glm.js';
+import {
+  GLM_ATBD,
+  glmFlashesNear,
+  glmSummary,
+  parseGlmFlashes
+} from '../../glm.js';
 import {
   bandKeys,
   bucketPrefix,
@@ -2279,20 +2284,22 @@ function main() {
     const h = await glmRefresh(bucket, deadline);
     if (!h.files.length) return null;
     const all = h.files.flatMap((f) => f.flashes);
-    const near = glmFlashesNear(all, lat, lon, {maxKm: km, cap: 300}).map((f) => ({
-      id: f.id,
-      lat: +f.lat.toFixed(4),
-      lon: +f.lon.toFixed(4),
-      energyJ: f.energyJ,
-      areaKm2: f.areaKm2 === null ? null : +f.areaKm2.toFixed(1),
-      quality: f.quality,
-      words: f.words,
-      tFirstMs: f.tFirstMs,
-      durationMs: f.durationMs === null ? null : Math.round(f.durationMs),
-      distKm: +f.distKm.toFixed(1),
-      bearingDeg: +f.bearingDeg.toFixed(1),
-      strength: +f.strength.toFixed(3)
-    }));
+    const near = glmFlashesNear(all, lat, lon, {maxKm: km, cap: 300}).map(
+      (f) => ({
+        id: f.id,
+        lat: +f.lat.toFixed(4),
+        lon: +f.lon.toFixed(4),
+        energyJ: f.energyJ,
+        areaKm2: f.areaKm2 === null ? null : +f.areaKm2.toFixed(1),
+        quality: f.quality,
+        words: f.words,
+        tFirstMs: f.tFirstMs,
+        durationMs: f.durationMs === null ? null : Math.round(f.durationMs),
+        distKm: +f.distKm.toFixed(1),
+        bearingDeg: +f.bearingDeg.toFixed(1),
+        strength: +f.strength.toFixed(3)
+      })
+    );
     const last = h.files[h.files.length - 1];
     return {
       sat: pick.sat.id,

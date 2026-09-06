@@ -12397,15 +12397,12 @@
       let glmSpawned = 0;
       let glmNetworkKept = 0;
       function glmOff() {
-        return (
-          overridden || strikeOv !== null || params.get('glm') === '0'
-        );
+        return overridden || strikeOv !== null || params.get('glm') === '0';
       }
       function glmSaveData() {
         return navigator.connection && navigator.connection.saveData === true;
       }
-      const glmKey = (f) =>
-        f.id + ':' + Math.round((f.tFirstMs ?? 0) / 1000);
+      const glmKey = (f) => f.id + ':' + Math.round((f.tFirstMs ?? 0) / 1000);
       const glmHms = (iso) => (iso ? iso.slice(11, 19) + 'Z' : '?');
       async function syncGlm() {
         if (glmOff() || glmBusy) return;

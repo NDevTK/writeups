@@ -550,7 +550,7 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
         : {ok: false, status: 404, headers: {get: () => null}}
   });
   check(
-    "THE FLASHES READ BY THE PAGE: the newest 20-s file whole in one range, the listing alone when it is the file already read, the failures named",
+    'THE FLASHES READ BY THE PAGE: the newest 20-s file whole in one range, the listing alone when it is the file already read, the failures named',
     d.sat === 'goes-east' &&
       d.craft === 'GOES-19' &&
       d.bucket === 'noaa-goes19' &&

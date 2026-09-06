@@ -1961,8 +1961,14 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
   // to the shared law module and the install ships it with the
   // bearing helper it imports - a source-level guard like the
   // 161st's, so a build that forgets a file cannot deploy
-  const srcGlm = readFileSync(new URL('./server/src/index.mjs', import.meta.url), 'utf8');
-  const instGlm = readFileSync(new URL('./server/install.sh', import.meta.url), 'utf8');
+  const srcGlm = readFileSync(
+    new URL('./server/src/index.mjs', import.meta.url),
+    'utf8'
+  );
+  const instGlm = readFileSync(
+    new URL('./server/install.sh', import.meta.url),
+    'utf8'
+  );
   check(
     "THE FLASHES' ROUTE is bound to the law and shipped with what it imports",
     srcGlm.includes("url.pathname === '/glm'") &&
@@ -1977,7 +1983,9 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       srcGlm.includes('GLM_WINDOW_MS = 60e3') &&
       srcGlm.includes('newest - f.endMs <= GLM_WINDOW_MS') &&
       instGlm.includes('install -m 644 ../glm.js /opt/horizon-live/glm.js') &&
-      instGlm.includes('install -m 644 ../wildfire.js /opt/horizon-live/wildfire.js'),
+      instGlm.includes(
+        'install -m 644 ../wildfire.js /opt/horizon-live/wildfire.js'
+      ),
     "the daemon answers /glm from glm.js's parseGlmFlashes over the newest LCFA file of the craft that sees the point, holding three 20-s files (a minute) refreshed at most every 20 s; install.sh ships glm.js and wildfire.js (rangeBearing)"
   );
 }

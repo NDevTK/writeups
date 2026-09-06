@@ -26,7 +26,9 @@ const check = (name, ok, detail) => {
 };
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 const inflateNode = (u8) =>
-  new Uint8Array(inflateSync(Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength)));
+  new Uint8Array(
+    inflateSync(Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength))
+  );
 
 {
   // a synthetic LCFA handle: the file's own scalings (energy int16 at
@@ -42,15 +44,32 @@ const inflateNode = (u8) =>
       ({
         flash_lat: at(Float32Array.from([29.5, 13.2, 40.0])),
         flash_lon: at(Float32Array.from([-95.0, -95.2, -70.0])),
-        flash_energy: at(Int16Array.from([14, 4000, -6]), {scale_factor: es, add_offset: eo, valid_range: [0, -6]}),
-        flash_area: at(Int16Array.from([428, 28000, 1000]), {scale_factor: as, add_offset: 0}),
+        flash_energy: at(Int16Array.from([14, 4000, -6]), {
+          scale_factor: es,
+          add_offset: eo,
+          valid_range: [0, -6]
+        }),
+        flash_area: at(Int16Array.from([428, 28000, 1000]), {
+          scale_factor: as,
+          add_offset: 0
+        }),
         flash_quality_flag: at(Int16Array.from([0, 3, 0])),
-        flash_time_offset_of_first_event: at(Int16Array.from([11710, 13000, 13100]), {scale_factor: ts, add_offset: -5}),
-        flash_time_offset_of_last_event: at(Int16Array.from([11971, 14000, 13100]), {scale_factor: ts, add_offset: -5}),
+        flash_time_offset_of_first_event: at(
+          Int16Array.from([11710, 13000, 13100]),
+          {scale_factor: ts, add_offset: -5}
+        ),
+        flash_time_offset_of_last_event: at(
+          Int16Array.from([11971, 14000, 13100]),
+          {scale_factor: ts, add_offset: -5}
+        ),
         flash_id: at(Int16Array.from([24964, -1, 7])),
         flash_count: at(Int32Array.from([856]))
       })[n] ?? null,
-    rootAttrs: () => ({time_coverage_start: '2026-09-06T19:31:20.0Z', time_coverage_end: '2026-09-06T19:31:40.0Z', platform_ID: 'G19'})
+    rootAttrs: () => ({
+      time_coverage_start: '2026-09-06T19:31:20.0Z',
+      time_coverage_end: '2026-09-06T19:31:40.0Z',
+      platform_ID: 'G19'
+    })
   };
   const p = parseGlmFlashes(f);
   const a = p.flashes[0];
@@ -71,7 +90,11 @@ const inflateNode = (u8) =>
       b.words === 'degraded' &&
       a.id === 24964 &&
       b.id === 65535 &&
-      near(a.tFirstMs, Date.parse('2026-09-06T19:31:20.0Z') + (11710 * ts - 5) * 1000, 1e-6) &&
+      near(
+        a.tFirstMs,
+        Date.parse('2026-09-06T19:31:20.0Z') + (11710 * ts - 5) * 1000,
+        1e-6
+      ) &&
       near(a.durationMs, (11971 - 11710) * ts * 1000, 1e-6) &&
       c.durationMs === 0 &&
       parseGlmFlashes({dataset: () => null, rootAttrs: () => ({})}) === null,
@@ -92,7 +115,11 @@ const inflateNode = (u8) =>
       s(GLM_ENERGY_J.median) < 0.6 &&
       s(GLM_ENERGY_J.p90) > s(GLM_ENERGY_J.median) &&
       s(GLM_ENERGY_J.p99) > s(GLM_ENERGY_J.p90) &&
-      near(s(GLM_ENERGY_J.max), 0.4 + (0.6 * Math.log10(4.4e-12 / 1e-14)) / 2.5, 1e-12) &&
+      near(
+        s(GLM_ENERGY_J.max),
+        0.4 + (0.6 * Math.log10(4.4e-12 / 1e-14)) / 2.5,
+        1e-12
+      ) &&
       s(1e-9) === 1.6 &&
       GLM_ATBD.wavelengthNm === 777.4 &&
       GLM_ATBD.frameMs === 2 &&
@@ -115,7 +142,13 @@ const inflateNode = (u8) =>
   // west (faint, earlier), one 250 km south (out of reach); a network
   // strike 5 km from the western flash within 10 s claims it
   const home = [29.76, -95.37];
-  const at = (km, brg) => ({lat: home[0] + (km * Math.cos((brg * Math.PI) / 180)) / 111.2, lon: home[1] + (km * Math.sin((brg * Math.PI) / 180)) / (111.2 * Math.cos((home[0] * Math.PI) / 180))});
+  const at = (km, brg) => ({
+    lat: home[0] + (km * Math.cos((brg * Math.PI) / 180)) / 111.2,
+    lon:
+      home[1] +
+      (km * Math.sin((brg * Math.PI) / 180)) /
+        (111.2 * Math.cos((home[0] * Math.PI) / 180))
+  });
   const t = Date.parse('2026-09-06T19:31:25Z');
   const flashes = [
     {id: 1, ...at(30, 45), energyJ: 1e-12, tFirstMs: t + 3000, quality: 0},
@@ -125,7 +158,10 @@ const inflateNode = (u8) =>
   const nearBy = glmFlashesNear(flashes, home[0], home[1], {maxKm: 200});
   const strikes = [{...at(12, 265), tMs: t + 8000}];
   const alone = flashesNotInNetwork(nearBy, strikes, {km: 20, ms: 30000});
-  const late = flashesNotInNetwork(nearBy, [{...at(12, 265), tMs: t + 60000}], {km: 20, ms: 30000});
+  const late = flashesNotInNetwork(nearBy, [{...at(12, 265), tMs: t + 60000}], {
+    km: 20,
+    ms: 30000
+  });
   const sm = glmSummary(nearBy);
   const rbW = rangeBearing(home[0], home[1], flashes[1].lat, flashes[1].lon);
   check(
@@ -174,7 +210,10 @@ const inflateNode = (u8) =>
       : (energies[energies.length / 2 - 1] + energies[energies.length / 2]) / 2;
   const good = p.flashes.filter((f) => f.quality === 0).length;
   const flagged3 = p.flashes.filter((f) => f.quality === 3).length;
-  const nr = glmFlashesNear(p.flashes, X.home[0], X.home[1], {maxKm: 200, cap: 300});
+  const nr = glmFlashesNear(p.flashes, X.home[0], X.home[1], {
+    maxKm: 200,
+    cap: 300
+  });
   const sm = glmSummary(nr);
   const nearest = nr.reduce((a, f) => (f.distKm < a.distKm ? f : a), nr[0]);
   const brightest = nr.reduce((a, f) => (f.energyJ > a.energyJ ? f : a), nr[0]);
@@ -206,7 +245,11 @@ const inflateNode = (u8) =>
       nr.length === X.within200 &&
       nr.every((f) => f.quality === 0) === (X.degradedWithin200 === 0) &&
       nr[0].id === X.earliestWithin200.id &&
-      near(nr[0].tFirstMs, startMs + X.earliestWithin200.tFirstS * 1000, 1e-6) &&
+      near(
+        nr[0].tFirstMs,
+        startMs + X.earliestWithin200.tFirstS * 1000,
+        1e-6
+      ) &&
       nearest.id === X.nearest.id &&
       near(nearest.distKm, X.nearest.km, 1e-6) &&
       near(nearest.bearingDeg, X.nearest.bearingDeg, 1e-6) &&
@@ -219,7 +262,11 @@ const inflateNode = (u8) =>
       sm.n === X.within200 &&
       near(sm.nearestKm, X.nearest.km, 1e-6) &&
       near(sm.brightestEnergyJ, X.brightest.energyJ, 1e-25) &&
-      near(flashStrength(brightest.energyJ), 0.4 + (0.6 * Math.log10(X.brightest.energyJ / 1e-14)) / 2.5, 1e-12),
+      near(
+        flashStrength(brightest.energyJ),
+        0.4 + (0.6 * Math.log10(X.brightest.energyJ / 1e-14)) / 2.5,
+        1e-12
+      ),
     `${X.file.slice(0, 40)}: ${p.n} flashes on ${p.platform}'s disk (the file's own count ${p.diskFlashes}), ${good} good and ${flagged3} flagged 3, ids all distinct; ` +
       `the first (id ${f0.id}) at ${f0.lat.toFixed(4)}, ${f0.lon.toFixed(4)}: ${f0.energyJ.toExponential(4)} J, ${f0.areaKm2.toFixed(2)} km^2, first light ${((f0.tFirstMs - startMs) / 1000).toFixed(4)} s ` +
       `${f0.tFirstMs < startMs ? 'before' : 'after'} the file's start, ${f0.durationMs.toFixed(2)} ms - each as h5py read it; energies ${energies[0].toExponential(3)} to ${energies[energies.length - 1].toExponential(3)} J, median ${median.toExponential(3)}; ` +
