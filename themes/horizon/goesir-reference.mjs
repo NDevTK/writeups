@@ -69,6 +69,7 @@ import {
   mtCkdAt,
   planckB,
   planckT,
+  PW_SCALE_BOUNDS,
   radfn,
   refineDeckField,
   resolveGreys,
@@ -1022,6 +1023,67 @@ pinBlock(
       `took a fraction (the even columns at 0.5, the odd ones without a reflectance keeping the coarse cover), the low and mid cover summing to ` +
       `${((sum(half, 0) / (16 * sum(d0, 0))) * 100).toFixed(0)}% of the coarse field's and the validity and measured flags copied whole; ` +
       `a fraction of 1 everywhere leaves the clear texels clear and the cover whole, 0 everywhere empties the cloud and keeps the validity`
+  );
+}
+
+// ---- THE COLUMN'S WATER (163rd pass) -----------------------------
+// The clear-sky reference with the satellite's total precipitable
+// water: the balloon's column scaled to it - the same total gives the
+// same reference to the last digit; twice the water deepens the
+// window's optical depth and reports the doubled column; a hundredfold
+// asks past the bound and is clamped at 4, stated; nothing measured
+// leaves the ascent's own. The depression is NOT monotone in the
+// water, and the gate pins why: the fixture's surface air (26.4 C)
+// is warmer than the 20 C skin, so the first doubling adds emission
+// from a boundary layer warmer than the sea and the reference WARMS;
+// only when the column grows opaque (fourfold, tau above 1) does the
+// emission climb to colder air and the depression deepen past the
+// ascent's own. A 15 C skin under that air reads warmer than itself
+// through the doubled column - a cold upwelling sea under warm moist
+// air is seen warm, the sign the clear-sky test must carry.
+{
+  const rows = SOUNDING.rows;
+  const base = clearSkyReference({tSkinC: 20, rows, viewZenithDeg: 45});
+  const same = clearSkyReference({tSkinC: 20, rows, viewZenithDeg: 45, pwMmMeasured: base.pwMm});
+  const twice = clearSkyReference({tSkinC: 20, rows, viewZenithDeg: 45, pwMmMeasured: 2 * base.pwMm});
+  const wild = clearSkyReference({tSkinC: 20, rows, viewZenithDeg: 45, pwMmMeasured: 100 * base.pwMm});
+  const cold = clearSkyReference({tSkinC: 15, rows, viewZenithDeg: 45});
+  const coldTwice = clearSkyReference({tSkinC: 15, rows, viewZenithDeg: 45, pwMmMeasured: 2 * cold.pwMm});
+  const airC = rows[0].tC;
+  check(
+    "THE COLUMN'S WATER scales the balloon's column to the satellite's total",
+    base.pwSource === 'ascent' &&
+      base.pwScale === 1 &&
+      base.pwMeasuredMm === null &&
+      near(base.pwSoundingMm, base.pwMm, 1e-12) &&
+      same.pwSource === 'measured' &&
+      near(same.pwScale, 1, 1e-12) &&
+      near(same.tClrC, base.tClrC, 1e-9) &&
+      near(same.tauNadir, base.tauNadir, 1e-12) &&
+      twice.pwSource === 'measured' &&
+      near(twice.pwScale, 2, 1e-12) &&
+      near(twice.pwMm, 2 * base.pwMm, 1e-6) &&
+      near(twice.pwSoundingMm, base.pwMm, 1e-12) &&
+      twice.tauNadir > 3.5 * base.tauNadir &&
+      twice.tauNadir < 4.5 * base.tauNadir &&
+      airC > 20 &&
+      twice.tClrC > base.tClrC &&
+      twice.depressionK < base.depressionK &&
+      twice.pwMeasuredMm === 2 * base.pwMm &&
+      wild.pwSource === 'measured, clamped' &&
+      wild.pwScale === PW_SCALE_BOUNDS[1] &&
+      near(wild.pwMm, 4 * base.pwMm, 1e-6) &&
+      wild.tauNadir > 1 &&
+      wild.depressionK > base.depressionK &&
+      cold.depressionK > 0 &&
+      coldTwice.depressionK < 0 &&
+      PW_SCALE_BOUNDS[0] === 0.25,
+    `the ascent's column holds ${base.pwMm.toFixed(2)} mm (window tau ${base.tauNadir.toFixed(4)}, the reference ${base.tClrC.toFixed(3)} C); ` +
+      `the same total measured gives the same reference (${same.tClrC.toFixed(3)} C, scale ${same.pwScale}); twice the water scales every layer by ` +
+      `${twice.pwScale} to ${twice.pwMm.toFixed(2)} mm and the window's tau to ${twice.tauNadir.toFixed(4)} (x${(twice.tauNadir / base.tauNadir).toFixed(2)}, the self continuum's e^2), ` +
+      `yet the reference WARMS to ${twice.tClrC.toFixed(3)} C (depression ${twice.depressionK.toFixed(3)} K against ${base.depressionK.toFixed(3)}) - the surface air is ${airC} C over a 20 C skin, ` +
+      `so the added vapour emits warmer than the sea; a hundredfold is clamped at x${wild.pwScale} (${wild.pwSource}), tau ${wild.tauNadir.toFixed(3)}, and only there the depression deepens to ${wild.depressionK.toFixed(3)} K; ` +
+      `a 15 C skin under that air is seen ${cold.depressionK.toFixed(3)} K cold through the ascent's column and ${(-coldTwice.depressionK).toFixed(3)} K WARM through twice its water`
   );
 }
 

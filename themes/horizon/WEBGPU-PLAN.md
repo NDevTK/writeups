@@ -10345,6 +10345,109 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 163rd pass - THE COLUMN'S WATER):
+  the clear-sky reference that decides which sea pixel is cloud has
+  stood on the balloon's column since the 145th pass - the nearest
+  station's ascent, hours old, its water taken as the window's whole
+  vapour. NOAA's total precipitable water (ABI-L2-TPWC: CONUS every
+  five minutes, 10 km) measures that column NOW over the sea source,
+  and becomes the thirteenth product the daemon serves; the reference
+  scales the ascent's column, layer by layer, to it. THE PRIMARY, read
+  in full: the Enterprise Legacy Soundings ATBD v3.1 (Li, Schmit et
+  al., 1 Nov 2019) - the GOES Sounder's legacy atmospheric profile
+  carried to ABI's infrared bands. The retrieval runs on a FIELD OF
+  REGARD of M x M pixels (5 x 5 of 2 km in the file, 10 km a
+  product pixel) where at least a fifth of the pixels are clear under
+  the cloud mask, the FOR's brightness temperatures taken at the
+  10.8-um-warmest clear pixel (the default, Sec. 3.4.2.1: a
+  misidentified cloudy pixel's cold bias outweighs the noise the mean
+  would average away); a 3-18 h NWP forecast interpolated to the
+  RTM's 101 levels as the background, a radiance bias adjustment, a
+  generalized least squares regression as the first guess and a
+  variational iterative physical retrieval on IR bands 8, 9, 10, 13,
+  14, 15 and 16 (the 3.9-, 8.5- and 9.7-um bands left out of the
+  physical step); TPW is the integral of the retrieved moisture
+  profile, its three layer sums reported beside it. REQUIREMENT
+  (Table 1): moisture 18% (surface to 300 hPa) and 20% above, 10 km,
+  a 30-minute CONUS refresh, quantitative to 67 deg local zenith (the
+  file's own thresholds 70 deg quantitative, 80 deg retrieval, 70 deg
+  latitude). VALIDATION (Sec. 4, SEVIRI as the proxy): 11.5% against
+  radiosondes over land; r 0.96 against AMSR-E over the ocean on
+  2,822,939 matches (a wet bias below 25 mm); about 9% against ECMWF
+  analyses (203,491 land and 149,724 ocean matchups in January
+  2008); the retrieval improves on the forecast by 0.7 mm over the
+  ocean and 0.4 over land. The DQF word's eleven meanings (0 good; 2
+  and 3 degraded past the latitude and quantitative-zenith
+  thresholds; 1 and 4-10 invalid - not geolocated, too few clear
+  pixels in the FOR, missing NWP, missing L1b, a bad surface pressure
+  index, an indeterminate land emissivity). THE FILE (noaa-goes18,
+  13:46Z): 256 kB, eleven an hour, TPW uint16 500 x 300 at 0.001526
+  mm per count from 0 (fill 65535), DQF_Overall uint8, the scene's
+  mean / min / max / sd and attempted count as scalars; a window of
+  +-10 px costs 2 ranges and 257-293 kB in 0.2-0.5 s. MEASURED at
+  13:46Z: the home's own 10-km pixel had no retrieval (flag 4: too
+  few clear pixels in its FOR under the marine stratus), the nearest
+  good 43.7 mm two pixels (22.9 km) to the south-west; 40 good of 441
+  px within +-100 km, 37.0-44.5 mm (median 40.4); the CONUS scene
+  3.4-68.9 mm, mean 30.6, over 58,606 attempted FORs; Montauk none
+  good within 2 px; Kansas 38.9 mm overhead. (1) goesl2.js:
+  L2_PRODUCTS.tpw, TPW_DQF_MEANINGS, TPW_ATBD (the FOR, the
+  requirement, the file's thresholds, the validation, the scale
+  bounds), tpwQuality (good / degraded / invalid / fill), tpwCensus
+  (by quality, the good and degraded pixels' mm range and median; an
+  invalid flag counts as invalid whatever the value). (2)
+  goesl2-decode.js: L2_TPW_SPEC {TPW raw16, DQF_Overall raw},
+  L2_TPW_EXTRAS, half width 10, the fourteenth ask (untimed),
+  l2TpwBody (the counts with their scale and fill, the flag, the
+  point's own pixel, the nearest good within 2 px with its distance,
+  the census, the scene's statistics, the thresholds). (3) The daemon
+  binds and re-exports l2TpwBody; the client carries `tpw`. (4)
+  goesir.js: columnWindowTau takes a pwScale that multiplies every
+  layer's vapour pressure; clearSkyReference takes pwMmMeasured,
+  computes the ascent's own column first, scales it by the ratio
+  within PW_SCALE_BOUNDS [0.25, 4] (past them clamped and stated:
+  "measured, clamped" - the two do not describe one air mass) and
+  recomputes the window's transmission on the scaled column,
+  reporting pwSoundingMm, pwMeasuredMm, pwScale and pwSource; the
+  factory and goesPanel pass it through. (5) THE PAGE: the L2 body's
+  water unpacked; goesL2TpwAt (a good pixel at a place) and
+  goesL2TpwForField (the good pixel over the sea source, else the
+  observer's own, else the body's nearest, within 30 minutes of the
+  scan); the field's sync hands it to goesPanel and remembers the TPW
+  file it came from; the L2 sync re-runs the field once when a NEWER
+  file changes the water it would take - the file time keeps that a
+  step, not a loop, since the field's sync calls the L2 sync at its
+  end (the first build compared the sea-source pixel against the
+  observer's and would have looped forever where the two differ);
+  the field line appends "the ascent's X mm scaled xS to NOAA's TPW"
+  when the reference took the measured column, the record "NOAA
+  GOES-18 total precipitable water (TPWC)" and the line clause (the
+  overhead retrieval and its flag in words, the nearest good, the
+  census, the scene, the ATBD's validation). GATES: goesl2-reference
+  THE COLUMN'S WATER (the ATBD's numbers, the quality words, a census
+  with every flag; 15); goesir-reference THE COLUMN'S WATER (the same
+  total gives the same reference to the last digit; twice the water
+  scales every layer by 2 and the window's tau x3.92 - the self
+  continuum's e^2 - yet the reference WARMS 0.13 K, because the
+  fixture's surface air is 26.4 C over the 20 C skin and the added
+  vapour emits warmer than the sea; only the fourfold, clamped column
+  (tau 1.08) deepens the depression past the ascent's own; a 15 C
+  skin under that air reads 0.19 K cold through the ascent's column
+  and 1.09 K WARM through twice its water - the gate's first draft
+  asserted a deeper depression and the physics refused it; 29);
+  server-reference (14 asks, 13 served, 8 untimed, the bindings
+  guard); goesl2-client-reference (13 served, the water null on the
+  fake bucket, nine CONUS products re-listed). Docs: the daemon
+  README, FINDINGS pass 163 (1,170 landmarks). MEASURED in the page
+  (the home, 13:5xZ, the local daemon serving thirteen products,
+  the proxy answering 502 and 504 for minutes): "NOAA GOES-18 total
+  precipitable water (TPWC) - 13:47Z - overhead no retrieval
+  (invalid due to insufficient clear pixels in field of regard) -
+  nearest good 43.7 mm 22.9 km off - 40 good of 441 10-km px within
+  +-100 km (37.0-44.5 mm) - the scene 3.4-68.9 mm" and the line
+  clause with the ATBD's validation beside the phase (overhead mixed,
+  6,864 mixed and 3,185 ice of 10,049) and the fire (none within 100
+  km; 7 in the scene) clauses.
 - DONE (Sep 6, the review session's 162nd pass - THE FIRE'S HEAT):
   the scene's wildfires have been NASA EONET's open events since the
   wildfire module's first pass - a day-old centroid per event, its

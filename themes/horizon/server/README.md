@@ -178,8 +178,18 @@ are gated by `../server-reference.mjs` — the `server` set in
   codes of the Enterprise Fire ATBD v2.7, read in full, the fire
   pixels navigated to their places with their radiative power (MW),
   sub-pixel temperature and area, the census by class and QA, the
-  scene's fire count) as `fire`: twelve products served. A
-  THIRTEENTH ask exists in the shared decode block but is the page's
+  scene's fire count) as `fire`, and since the 163rd NOAA's total
+  precipitable water (`ABI-L2-TPWC`: CONUS every 5 min, 10 km - a 5 x 5 field of
+  regard of 2-km pixels retrieved where a fifth of it is clear -
+  uint16 counts in mm with the file's scale and offset, its overall
+  DQF word of eleven meanings; the Enterprise Legacy Soundings ATBD
+  v3.1 read in full) as `tpw`, with the point's own pixel and flag
+  (`here`), the nearest good pixel within 2 px with its distance
+  (`nearest` - the column the page's clear-sky reference scales the
+  balloon's water to), the census by quality with the good pixels'
+  range and the scene's own statistics from the file's head
+  (`sceneStats`): thirteen products served. A
+  FOURTEENTH ask exists in the shared decode block but is the page's
   own (`pageOnly`, 159th): the 500-m visible band 2 window (`vis`,
   401 x 401 px of the CMIP ATBD's reflectance factor with the
   file's kappa, Esun and Earth-Sun distance) that the page reads
@@ -188,7 +198,7 @@ are gated by `../server-reference.mjs` — the `server` set in
   cadence (about 15 MB an hour by day), which this box's free-tier
   egress cannot carry and the bucket's CORS can. This
   daemon never lists, fetches or serves it; `/health`'s
-  `version.products` names the twelve it does.
+  `version.products` names the thirteen it does.
   Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks

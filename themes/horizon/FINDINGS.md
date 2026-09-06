@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **146 CPU reference files printing
-1168 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1170 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **146 reference files, 1168 landmark lines, 8 GPU probes** (live gate
+- **146 reference files, 1170 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1009,7 +1009,23 @@ The practice the corpus demonstrates, stated so it can be reused:
    characterisation and the middle-infrared power law pinned
    (`goesl2-reference` THE FIRE'S HEAT; `wildfire-reference` THE
    MEASURED HOT SPOTS; `server-reference` and `goesl2-client-reference`
-   the thirteenth ask)
+   the thirteenth ask). Pass 163 adds NOAA's total precipitable water
+   (ABI-L2-TPWC, 10 km, a 5 × 5 field of regard retrieved where a
+   fifth of it is clear) as the thirteenth served product and lets the
+   measured column set the clear-sky reference's water: the balloon's
+   ascent column is scaled, layer by layer, to the satellite's total
+   over the sea source (a ratio past 0.25–4 is clamped and stated),
+   so the sea's cloud threshold rides the air mass the satellite sees
+   rather than the morning's launch — the Enterprise Legacy Soundings
+   ATBD v3.1 read in full, its requirement (18% / 20% moisture, 67°
+   quantitative zenith), its RAOB, AMSR-E (r 0.96 over 2,822,939
+   matches) and ECMWF validation pinned; the gate finds the depression
+   NOT monotone in the water and states why (the fixture's 26.4 °C
+   surface air over a 20 °C skin: the first doubling warms the
+   reference, only an opaque column cools it, and a 15 °C skin is seen
+   warm through twice its water) (`goesl2-reference` THE COLUMN'S
+   WATER; `goesir-reference` THE COLUMN'S WATER; `server-reference` and
+   `goesl2-client-reference` the fourteenth ask)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

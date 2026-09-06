@@ -889,13 +889,17 @@ export function columnLayers(rows, {topM = 20000} = {}) {
   }
   return out;
 }
-export function columnWindowTau(rows, nuCm = BAND13_NU_CM) {
+// pwScale (163rd pass): the balloon's humidity profile keeps its
+// shape and the satellite's column sets its total - every layer's
+// vapour pressure scaled by one factor before the continuum
+export function columnWindowTau(rows, nuCm = BAND13_NU_CM, {pwScale = 1} = {}) {
   const layers = columnLayers(rows);
   let tau = 0;
   let self = 0;
   let foreign = 0;
   let pwMm = 0;
   for (const L of layers) {
+    if (pwScale !== 1) L.ePa *= pwScale;
     const t = layerContinuumTau(L, nuCm);
     L.tau = t.tau;
     tau += t.tau;
@@ -962,19 +966,38 @@ export function seaEmissivity(thetaDeg, index = WATER_INDEX_B13) {
  * every layer above and topped up by each layer's own emission.
  * Returns the reference temperature and its parts.
  */
+// THE COLUMN'S WATER (163rd pass): pwMmMeasured is the satellite's
+// total precipitable water over the point (NOAA's TPW, minutes old,
+// 10 km); when given and the balloon's column holds water, every
+// layer's vapour is scaled so the column's total equals it - the
+// profile's shape the balloon's, its total the satellite's - within
+// pwScaleBounds (a ratio past them says the two do not describe one
+// air mass: the bound is applied and stated). pwSource says which.
+export const PW_SCALE_BOUNDS = [0.25, 4];
 export function clearSkyReference({
   tSkinC,
   rows,
   viewZenithDeg: vz,
   bandUm = BAND13_UM,
   nuCm = null,
-  emis = null
+  emis = null,
+  pwMmMeasured = null,
+  pwScaleBounds = PW_SCALE_BOUNDS
 }) {
   const sec = 1 / Math.cos(Math.min(vz, 85) * RAD);
   // the band centre sets the continuum's wavenumber and the sea's
   // index (the ETROP test's Planck weighting keeps the ABI centre
   // for every satellite - a 0.6% wavenumber difference, stated)
-  const col = columnWindowTau(rows, nuCm ?? 1e4 / bandUm);
+  const nu = nuCm ?? 1e4 / bandUm;
+  const ascent = columnWindowTau(rows, nu);
+  let pwScale = 1;
+  let pwSource = 'ascent';
+  if (Number.isFinite(pwMmMeasured) && pwMmMeasured > 0 && ascent.pwMm > 0) {
+    const raw = pwMmMeasured / ascent.pwMm;
+    pwScale = Math.min(pwScaleBounds[1], Math.max(pwScaleBounds[0], raw));
+    pwSource = pwScale === raw ? 'measured' : 'measured, clamped';
+  }
+  const col = pwScale === 1 ? ascent : columnWindowTau(rows, nu, {pwScale});
   const eps = emis ?? seaEmissivity(vz, waterIndexAt(bandUm));
   // downwelling along the mirror direction: top of column downward
   let down = 0;
@@ -998,6 +1021,10 @@ export function clearSkyReference({
     tauSlant: col.tau * sec,
     secTheta: sec,
     pwMm: col.pwMm,
+    pwSoundingMm: ascent.pwMm,
+    pwMeasuredMm: Number.isFinite(pwMmMeasured) ? pwMmMeasured : null,
+    pwScale,
+    pwSource,
     skyDownTC: down > 0 ? planckT(down) - T_ZERO_K : null,
     emissionOnlyTC: planckT(eps * planckB(tSkinC + T_ZERO_K)) - T_ZERO_K
   };
@@ -1385,14 +1412,16 @@ export function referenceAtFactory({
   rows,
   viewZenithDeg: vz,
   bandUm = BAND13_UM,
-  stepK = 0.02
+  stepK = 0.02,
+  pwMmMeasured = null
 }) {
   const memo = new Map();
   const point = clearSkyReference({
     tSkinC,
     rows,
     viewZenithDeg: vz,
-    bandUm
+    bandUm,
+    pwMmMeasured
   }).tClrC;
   return (q) => {
     const a = anomK[q];
@@ -1404,7 +1433,8 @@ export function referenceAtFactory({
         tSkinC: tSkinC + k * stepK,
         rows,
         viewZenithDeg: vz,
-        bandUm
+        bandUm,
+        pwMmMeasured
       }).tClrC;
       memo.set(k, v);
     }
@@ -1710,14 +1740,18 @@ export function goesPanel({
   sat = SATELLITES[0],
   // the foundation-SST anomaly field over the window (147th pass):
   // {anomK, baseC, coveredN, minK, maxK, time} from sstAnomalyField
-  sst = null
+  sst = null,
+  // the satellite's total precipitable water over the sea source
+  // (163rd pass): the balloon's column scaled to it
+  pwMmMeasured = null
 }) {
   const vz = viewZenithDeg(latDeg, lonDeg, sat.lonDeg);
   const ref = clearSkyReference({
     tSkinC,
     rows,
     viewZenithDeg: vz,
-    bandUm: sat.bandUm
+    bandUm: sat.bandUm,
+    pwMmMeasured
   });
   const trop = coldPoint(rows);
   if (!trop) return null;
@@ -1728,7 +1762,8 @@ export function goesPanel({
         tSkinC,
         rows,
         viewZenithDeg: vz,
-        bandUm: sat.bandUm
+        bandUm: sat.bandUm,
+        pwMmMeasured
       })
     : null;
   const field = classifyField({

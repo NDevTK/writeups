@@ -489,6 +489,8 @@
         dmwUnpack,
         FIRE_ATBD,
         maskAgreement,
+        TPW_DQF_MEANINGS,
+        tpwQuality,
         phaseQuality,
         phaseWords,
         solarZenithDeg,
@@ -2610,6 +2612,11 @@
                   high: state.metar.high ?? 0
                 }
               : null;
+          // the satellite's column water over the sea source (163rd),
+          // and the file it came from - the L2 sync re-runs the field
+          // only when a NEWER file changes what the reference would take
+          const pwTpw = goesL2TpwForField(seaBase);
+          const tpwTime = goesL2 && goesL2.tpw && goesL2.tpw.time ? goesL2.tpw.time : null;
           const P = goesPanel({
             dec,
             win,
@@ -2624,7 +2631,8 @@
             lonDeg: state.lon,
             metar,
             sat: pick.sat,
-            sst: sstField
+            sst: sstField,
+            pwMmMeasured: pwTpw
           });
           if (!P) return;
           const s = P.r100;
@@ -2666,6 +2674,12 @@
             deck: P.deck,
             worldUnits,
             deckOn,
+            // the column water the reference took (163rd): null = the
+            // ascent's; the TPW file it was read from and the sea source
+            // it was read at, so the L2 sync can tell a new answer
+            pwMeasuredMm: P.reference.pwMeasuredMm ?? null,
+            tpwTime,
+            seaBase: {latDeg: seaBase.latDeg, lonDeg: seaBase.lonDeg},
             highPct: s.measured ? (100 * s.high) / s.measured : 0,
             lowPct: lowToMid
               ? 0
@@ -2700,7 +2714,11 @@
               `${P.reference.depressionK.toFixed(2)} K (sea emissivity ` +
               `${P.reference.emissivity.toFixed(4)} at ${P.viewZenithDeg.toFixed(1)}° view, ` +
               `window τ ${P.reference.tauNadir.toFixed(3)} over ` +
-              `${P.reference.pwMm.toFixed(1)} mm; MT_CKD` +
+              `${P.reference.pwMm.toFixed(1)} mm` +
+              (P.reference.pwSource !== 'ascent'
+                ? ` - the ascent's ${P.reference.pwSoundingMm.toFixed(1)} mm scaled ×${P.reference.pwScale.toFixed(2)} to NOAA's TPW${P.reference.pwSource.endsWith('clamped') ? ', clamped' : ''}`
+                : '') +
+              `; MT_CKD` +
               (seaSource === 'MUR foundation SST'
                 ? '; a foundation temperature - the diurnal skin unmeasured here'
                 : '') +
@@ -6350,7 +6368,8 @@
         'aod',
         'lst',
         'phase',
-        'fire'
+        'fire',
+        'tpw'
       ];
       let goesL2Busy = false;
       let goesL2Rerun = false;
@@ -6758,6 +6777,14 @@
               phaseArr: p.phase ? unpackArray(p.phase) : null,
               // the fire mask's codes (162nd pass; the -99 fill as 65535)
               fireMask: p.fires && p.mask ? unpackArray(p.mask) : null,
+              // the column's water in mm (163rd pass)
+              tpwMm: p.tpw
+                ? unscale(unpackArray(p.tpw), {
+                    scale: p.tpwScale,
+                    offset: p.tpwOffset,
+                    fill: p.tpwFill
+                  })
+                : null,
               // the visible band's reflectance factor (159th pass):
               // the CMIP ATBD's rho cos(solar zenith), NaN fill
               rfac: p.rf
@@ -6889,6 +6916,9 @@
             // the fire hot spots (162nd pass; CONUS every 5 min, day and
             // night): the scene's fires while fresh (applyFires)
             fire: unpackProduct(j.fire),
+            // the column's water (163rd pass; CONUS every 5 min at 10 km):
+            // the clear-sky reference's total precipitable water
+            tpw: unpackProduct(j.tpw),
             // the daemon's deployed revision and the products the
             // page read for it from the bucket (158th pass)
             rev: j.rev ?? null,
@@ -7071,6 +7101,35 @@
             );
           }
           applyFires();
+          const tw = goesL2.tpw;
+          if (tw && tw.census) {
+            const c = tw.census;
+            record(
+              `NOAA ${j.craft} total precipitable water (TPWC)`,
+              `${tw.time.slice(11, 16)}Z · overhead ${
+                tw.here && tw.here.mm !== null
+                  ? tw.here.mm.toFixed(1) + ' mm (' + tpwQuality(tw.here.dqf) + ')'
+                  : 'no retrieval (' + (TPW_DQF_MEANINGS[tw.here ? tw.here.dqf : 255] ?? 'fill').replace(/_qf$/, '').replace(/_/g, ' ') + ')'
+              }` +
+                (tw.nearest ? ` · nearest good ${tw.nearest.mm.toFixed(1)} mm ${tw.nearest.km} km off` : ` · no good px within ${tw.nearPx} px`) +
+                ` · ${c.good} good of ${c.n} 10-km px within ±100 km` +
+                (c.goodStats.n ? ` (${c.goodStats.minMm.toFixed(1)}–${c.goodStats.maxMm.toFixed(1)} mm)` : '') +
+                (tw.sceneStats && tw.sceneStats.meanMm !== null ? ` · the scene ${tw.sceneStats.minMm.toFixed(1)}–${tw.sceneStats.maxMm.toFixed(1)} mm` : '')
+            );
+            // the field's reference rides the measured column: re-run
+            // the field once when a NEWER TPW file changes the water it
+            // would take at its own sea source (the field's sync calls
+            // this sync at its end - the file time keeps that a step,
+            // not a loop: the re-run's field carries this file's time)
+            if (goesObs && goesObs.tpwTime !== (tw.time ?? null)) {
+              const want = goesL2TpwForField(goesObs.seaBase) ?? null;
+              if (want !== (goesObs.pwMeasuredMm ?? null)) {
+                if (params.has('debug'))
+                  console.log(`tpw: ${tw.time.slice(11, 16)}Z changes the field's water ${goesObs.pwMeasuredMm ?? 'ascent'} -> ${want ?? 'ascent'} mm; re-running the field`);
+                syncGoesIr();
+              } else goesObs.tpwTime = tw.time ?? null;
+            }
+          }
           if (
             goesObs &&
             goesObs.time &&
@@ -7388,6 +7447,31 @@
         if (q < 0 || m.dqf[q] !== 0 || m.acm[q] > 3) return null;
         return {acm: m.acm[q], prob: m.prob[q] <= 100 ? m.prob[q] : null};
       }
+      // THE COLUMN'S WATER (163rd pass): NOAA's total precipitable
+      // water at a place - the pixel's own good retrieval, or null
+      const TPW_LIVE_MS = 30 * 60e3;
+      function goesL2TpwAt(latDeg, lonDeg) {
+        const t = goesL2 && goesL2.tpw;
+        if (!t || !t.tpwMm) return null;
+        const q = windowIndexOf(latDeg, lonDeg, t.g, t.x, t.y, t.box);
+        if (q < 0) return null;
+        const mm = t.tpwMm[q];
+        const dqf = t.dqf ? t.dqf[q] : 0;
+        if (!Number.isFinite(mm) || tpwQuality(dqf) !== 'good') return null;
+        return {mm, dqf};
+      }
+      // the water the clear-sky reference takes (goesPanel's
+      // pwMmMeasured): the good pixel over the sea source, else the
+      // nearest good pixel within 2 px of the observer's, within 30
+      // minutes of the scan; null leaves the ascent's own column
+      function goesL2TpwForField(seaBase = null) {
+        const t = goesL2 && goesL2.tpw;
+        if (!t || !t.time || Date.now() - Date.parse(t.time) > TPW_LIVE_MS) return null;
+        const at = seaBase ? goesL2TpwAt(seaBase.latDeg, seaBase.lonDeg) : null;
+        if (at) return at.mm;
+        if (t.here && t.here.mm !== null && tpwQuality(t.here.dqf) === 'good') return t.here.mm;
+        return t.nearest ? t.nearest.mm : null;
+      }
       // THE CLOUD'S PHASE OVERHEAD (161st pass): NOAA's cloud top
       // phase at a place - {phase, words, quality} or null off the
       // window or on the fill.
@@ -7661,6 +7745,29 @@
               line += ` vs the theme's opaque tops ${own.join(', ')} (ACHA retrieves the emitting top; a thin cirrus reads lower as an opaque top)`;
           }
         } else if (h) line += ' · no cloud top retrieved within ±100 km';
+        // THE COLUMN'S WATER (163rd pass): the satellite's total over
+        // the window and what the reference took
+        {
+          const tw = goesL2.tpw;
+          if (tw && tw.census) {
+            const c = tw.census;
+            const used = goesObs && goesObs.panel ? goesObs.panel.reference : null;
+            line +=
+              ` · total precipitable water ${tw.time.slice(11, 16)}Z (ABI-L2-TPWC, 10-km px, a 5×5 field of regard at least a fifth clear): ` +
+              (tw.here && tw.here.mm !== null
+                ? `overhead ${tw.here.mm.toFixed(1)} mm (${tpwQuality(tw.here.dqf)})`
+                : `no retrieval overhead (${(TPW_DQF_MEANINGS[tw.here ? tw.here.dqf : 255] ?? 'fill').replace(/_qf$/, '').replace(/_/g, ' ')})`) +
+              (tw.nearest ? `, the nearest good ${tw.nearest.mm.toFixed(1)} mm ${tw.nearest.km} km off` : '') +
+              ` · ${c.good} good of ${c.n} px within ±100 km` +
+              (c.goodStats.n ? ` (${c.goodStats.minMm.toFixed(1)}–${c.goodStats.maxMm.toFixed(1)} mm, median ${c.goodStats.medianMm.toFixed(1)})` : '') +
+              (used
+                ? used.pwSource === 'ascent'
+                  ? ` · the clear-sky reference keeps the ascent's ${used.pwMm.toFixed(1)} mm (no good pixel within reach or the scan too old)`
+                  : ` · the clear-sky reference's column scaled ×${used.pwScale.toFixed(2)} from the ascent's ${used.pwSoundingMm.toFixed(1)} mm to the satellite's ${used.pwMm.toFixed(1)} mm${used.pwSource.endsWith('clamped') ? ' (the ratio past the ×4 bound, clamped)' : ''}`
+                : '') +
+              ` · the ATBD's validation: 11.5% against radiosondes over land, r 0.96 against AMSR-E over the ocean`;
+          }
+        }
         // THE FIRE'S HEAT (162nd pass): the hot spots within reach and
         // what the scene draws from them
         {

@@ -38,6 +38,10 @@ import {
   kappaFactor,
   OTSU_BIMODAL_ETA,
   otsuThreshold,
+  TPW_ATBD,
+  TPW_DQF_MEANINGS,
+  tpwCensus,
+  tpwQuality,
   PHASE_ATBD,
   PHASE_MEANINGS,
   PHASE_QF,
@@ -1169,6 +1173,63 @@ const inflate = (u8) =>
       `${(100 * v.all.ice.agree).toFixed(2)}% make ${agreeAll.toLocaleString('en-US')} agreed of ${v.all.total.n.toLocaleString('en-US')} (${(100 * v.all.total.agree).toFixed(2)}%), ` +
       `the thick-cloud qualifier ${(100 * v.thick.total.agree).toFixed(2)}% of ${v.thick.total.n.toLocaleString('en-US')} against the 80% requirement; ` +
       `tops at or under ${PHASE_ATBD.homogeneousFreezingK} K are ice, liquid tops over ${PHASE_ATBD.liquidTopK} K are warm`
+  );
+}
+
+// ---- THE COLUMN'S WATER (163rd pass) -----------------------------
+// The file's eleven overall flags as qualities, the census on a
+// synthetic window (good, degraded, invalid, fill - every pixel
+// counted once, the good and degraded statistics apart), the ATBD's
+// requirement and validation numbers.
+{
+  const mm = new Float32Array(30);
+  const dqf = new Uint8Array(30);
+  for (let q = 0; q < 30; q++) {
+    mm[q] = 10 + q;
+    dqf[q] = q % 10 === 9 ? 4 : q % 7 === 6 ? 3 : q % 5 === 4 ? 2 : q % 11 === 10 ? 1 : 0;
+  }
+  mm[3] = NaN;
+  dqf[8] = 255;
+  const c = tpwCensus(mm, dqf);
+  check(
+    'THE COLUMN’S WATER: the overall flag’s qualities, the census by quality, the ATBD’s numbers',
+    L2_PRODUCTS.tpw === 'ABI-L2-TPWC' &&
+      TPW_DQF_MEANINGS.length === 11 &&
+      TPW_DQF_MEANINGS[0] === 'good_quality_qf' &&
+      TPW_DQF_MEANINGS[3].startsWith('degraded_due_to_quantitative_LZA') &&
+      tpwQuality(0) === 'good' &&
+      tpwQuality(2) === 'degraded' &&
+      tpwQuality(3) === 'degraded' &&
+      tpwQuality(1) === 'invalid' &&
+      tpwQuality(10) === 'invalid' &&
+      tpwQuality(255) === null &&
+      c.n === 30 &&
+      c.good + c.degraded + c.invalid + c.fill === 30 &&
+      c.fill === 2 &&
+      c.goodStats.n === c.good &&
+      c.degradedStats.n === c.degraded &&
+      c.goodStats.minMm === 10 &&
+      c.goodStats.maxMm <= 39 &&
+      c.goodStats.medianMm > c.goodStats.minMm &&
+      c.goodStats.medianMm < c.goodStats.maxMm &&
+      TPW_ATBD.resolutionKm === 10 &&
+      TPW_ATBD.fieldOfRegardPx === 5 &&
+      TPW_ATBD.clearFractionMin === 0.2 &&
+      TPW_ATBD.requirement.moistureAccuracyPct.sfcTo300hPa === 18 &&
+      TPW_ATBD.requirement.lzaQuantitativeDeg === 67 &&
+      TPW_ATBD.file.lzaQuantitativeDeg === 70 &&
+      TPW_ATBD.validation.raobLandErrorPct === 11.5 &&
+      TPW_ATBD.validation.amsreR === 0.96 &&
+      TPW_ATBD.validation.amsreN === 2822939 &&
+      TPW_ATBD.validation.forecastGainMm.ocean === 0.7 &&
+      TPW_ATBD.scaleBounds[0] === 0.25 &&
+      TPW_ATBD.scaleBounds[1] === 4,
+    `${TPW_DQF_MEANINGS.length} overall flags: 0 good, 2 and 3 degraded (latitude, quantitative zenith), the rest invalid, 255 the fill; ` +
+      `a 30-px window censuses ${c.good} good (${c.goodStats.minMm}-${c.goodStats.maxMm} mm, median ${c.goodStats.medianMm}), ${c.degraded} degraded ` +
+      `(median ${c.degradedStats.medianMm} mm), ${c.invalid} invalid, ${c.fill} fill - every pixel once; the ATBD: a 5x5 field of regard at least a fifth clear, ` +
+      `18% moisture accuracy to 300 hPa, quantitative to ${TPW_ATBD.requirement.lzaQuantitativeDeg} deg (the file says ${TPW_ATBD.file.lzaQuantitativeDeg}), ` +
+      `${TPW_ATBD.validation.raobLandErrorPct}% against radiosondes over land, r ${TPW_ATBD.validation.amsreR} against AMSR-E on ` +
+      `${TPW_ATBD.validation.amsreN.toLocaleString('en-US')} ocean matchups, the forecast improved by ${TPW_ATBD.validation.forecastGainMm.ocean} mm over the ocean`
   );
 }
 

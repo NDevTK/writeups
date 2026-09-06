@@ -473,6 +473,9 @@ export const L2_PRODUCTS = {
   // the 162nd pass: the fire / hot spot characterization (CONUS every
   // 5 min, 2 km, day and night; 0.3 MB a file)
   fire: 'ABI-L2-FDCC',
+  // the 163rd pass: the total precipitable water (CONUS every 5 min,
+  // 10 km, day and night; 0.3 MB a file)
+  tpw: 'ABI-L2-TPWC',
   // the 152nd pass: the downward shortwave radiation at the surface
   // (0.2-4.0 um, direct + diffuse, W/m2) - full disk only, every 10
   // min, 2 km (the Enterprise SRB algorithm: Laszlo, Kim & Liu, ATBD
@@ -1189,6 +1192,103 @@ export function fireList(mask, power, tempK, areaM2, box, g, xCoord, yCoord) {
   }
   out.sort((a, b) => (b.frpMW ?? -1) - (a.frpMW ?? -1));
   return out;
+}
+// ---------------------------------------------------------------
+// THE COLUMN'S WATER (163rd pass): NOAA's total precipitable water
+// (ABI-L2-TPWC: CONUS every 5 min at 10 km, day and night) - the
+// Enterprise Legacy Soundings ATBD v3.1 (Li et al., 1 Nov 2019, 110
+// pp; read in full): the Legacy Atmospheric Profile retrieval on a
+// field of regard of 5 x 5 ABI pixels (at least a fifth clear), a
+// regression first guess on the seven emissive bands (6.2-13.3 um)
+// with the NWP forecast, then a physical iteration with a fast
+// radiative transfer model and a discrepancy-principle
+// regularisation; the profile at 101 levels, the total precipitable
+// water its integral. The requirement (Table 1.2, the moisture
+// profile): 10 km, 18% accuracy from the surface to 300 hPa and 20%
+// above, quantitative to 67 deg local zenith, day and night, clear
+// sky only. Validation (Sec. 4.3.2.5, SEVIRI as the proxy): an
+// average error of 11.5% against radiosondes over land (August
+// 2006); r = 0.96 against AMSR-E over the ocean on 2,822,939
+// matchups within 15 min and 10 km (a slight wet bias under 25 mm,
+// dry above, as MODIS shows); about 9% against the ECMWF analysis
+// over land and ocean, the retrieval improving the forecast by 0.7
+// mm over the ocean and 0.4 mm over land. The file's DQF_Overall
+// (11 values): 0 good, 1 invalid (not geolocated or past the
+// retrieval zenith), 2 degraded past the latitude threshold (70
+// deg), 3 degraded past the quantitative zenith (70 deg in the
+// file, 67 in the requirement), 4-10 invalid (too few clear pixels,
+// missing NWP or L1b, a bad surface pressure index, an
+// indeterminate emissivity, ...). The theme's use: the balloon's
+// humidity profile keeps its shape and the satellite's column sets
+// its total (goesir.clearSkyReference's pwMmMeasured).
+// ---------------------------------------------------------------
+export const TPW_DQF_MEANINGS = [
+  'good_quality_qf',
+  'invalid_due_to_not_geolocated_or_retrieval_LZA_threshold_exceeded_qf',
+  'degraded_due_to_latitude_threshold_exceeded_qf',
+  'degraded_due_to_quantitative_LZA_threshold_exceeded_qf',
+  'invalid_due_to_insufficient_clear_pixels_in_field_of_regard_qf',
+  'invalid_due_to_missing_NWP_data_qf',
+  'invalid_due_to_missing_L1b_data_or_fatal_processing_error_qf',
+  'invalid_due_to_bad_NWP_surface_pressure_index_qf',
+  'invalid_due_to_indeterminate_land_surface_emissivity_qf',
+  'invalid_9_qf',
+  'invalid_10_qf'
+];
+export const TPW_ATBD = {
+  version: 'Enterprise Legacy Soundings ATBD v3.1, 2019-11-01',
+  resolutionKm: 10,
+  fieldOfRegardPx: 5,
+  clearFractionMin: 0.2,
+  requirement: {moistureAccuracyPct: {sfcTo300hPa: 18, above300hPa: 20}, lzaQuantitativeDeg: 67, refreshMinConus: 30},
+  file: {lzaQuantitativeDeg: 70, lzaRetrievalDeg: 80, latitudeDeg: 70},
+  validation: {
+    raobLandErrorPct: 11.5,
+    amsreR: 0.96,
+    amsreN: 2822939,
+    amsreWetBiasBelowMm: 25,
+    ecmwfErrorPct: 9,
+    forecastGainMm: {ocean: 0.7, land: 0.4}
+  },
+  // the scale the balloon's column may be stretched by (stated: a
+  // ratio past it says the two do not describe one air mass)
+  scaleBounds: [0.25, 4]
+};
+/** The overall flag's quality: 'good' (0), 'degraded' (2, 3) or
+ * 'invalid' (1, 4-10); null for the fill. */
+export function tpwQuality(dqf) {
+  if (!Number.isFinite(dqf) || dqf === 255) return null;
+  if (dqf === 0) return 'good';
+  if (dqf === 2 || dqf === 3) return 'degraded';
+  return 'invalid';
+}
+/** The window's census: counts by quality and the good pixels' mm
+ * statistics (degraded ones counted apart, their mm stated). */
+export function tpwCensus(mm, dqf) {
+  const c = {n: mm.length, good: 0, degraded: 0, invalid: 0, fill: 0};
+  const good = [];
+  const degraded = [];
+  for (let q = 0; q < mm.length; q++) {
+    const d = dqf ? dqf[q] : 0;
+    const k = tpwQuality(d);
+    // an invalid flag counts as invalid whatever the value (the file
+    // leaves such pixels at the fill); a good or degraded flag over
+    // no value is fill
+    if (k === null || (k !== 'invalid' && !Number.isFinite(mm[q]))) {
+      c.fill++;
+      continue;
+    }
+    c[k]++;
+    if (k === 'good') good.push(mm[q]);
+    else if (k === 'degraded') degraded.push(mm[q]);
+  }
+  good.sort((a, b) => a - b);
+  degraded.sort((a, b) => a - b);
+  const stats = (v) =>
+    v.length
+      ? {n: v.length, minMm: +v[0].toFixed(2), medianMm: +quantile(v, 0.5).toFixed(2), maxMm: +v[v.length - 1].toFixed(2)}
+      : {n: 0, minMm: null, medianMm: null, maxMm: null};
+  return {...c, goodStats: stats(good), degradedStats: stats(degraded)};
 }
 // ---------------------------------------------------------------
 // THE DAYLIGHT FIELD (159th pass): the reflective bands' CMI - the

@@ -55,6 +55,7 @@ import {
   phaseCensus,
   fireCensus,
   fireList,
+  tpwCensus,
   packArray,
   pixelSizeM,
   productTimeIso,
@@ -243,6 +244,23 @@ export const L2_FIRE_EXTRAS = [
   'sunglint_angle'
 ];
 L2_HALF_PX.fire = 50;
+// The 163rd pass: the total precipitable water (uint16 mm at 0.001526,
+// fill 65535) with its overall flag; the scene's statistics and the
+// file's thresholds as extras.
+export const L2_TPW_SPEC = {TPW: 'raw16', DQF_Overall: 'raw'};
+export const L2_TPW_EXTRAS = [
+  'mean_total_precipitable_water',
+  'minimum_total_precipitable_water',
+  'maximum_total_precipitable_water',
+  'standard_deviation_total_precipitable_water',
+  'total_attempted_retrievals',
+  'quantitative_local_zenith_angle',
+  'retrieval_local_zenith_angle',
+  'latitude'
+];
+L2_HALF_PX.tpw = 10; // +-100 km on the 10-km grid
+// how far (Chebyshev, px) the nearest good TPW pixel is sought
+export const L2_TPW_NEAR_PX = 2;
 // what /goesl2 fetches for a point: product, spec, the window's half
 // width on the product's grid, the imagery's band (the CMIPC prefix
 // lists every band's file); timed false = not asked for a mosaic's
@@ -333,6 +351,15 @@ export const L2_ASKS = [
     spec: L2_FIRE_SPEC,
     halfPx: 50,
     extras: L2_FIRE_EXTRAS,
+    timed: false
+  },
+  // the column's water (163rd): the clear-sky reference's now
+  {
+    id: 'tpw',
+    product: L2_PRODUCTS.tpw,
+    spec: L2_TPW_SPEC,
+    halfPx: 10,
+    extras: L2_TPW_EXTRAS,
     timed: false
   }
 ];
@@ -1000,6 +1027,51 @@ export function l2FireBody(dec, key, lat, lon) {
     },
     lzaThresholdDeg: num(x.local_zenith_angle),
     glintThresholdDeg: num(x.sunglint_angle)
+  };
+}
+// THE COLUMN'S WATER (163rd pass): the TPW window as mm counts with
+// the file's scaling and the overall flag, the point's own pixel and
+// the nearest good pixel within 2 px, the census by quality, the
+// scene's statistics and the file's thresholds.
+export function l2TpwBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_TPW_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.tpw);
+  if (!w) return null;
+  const m = dec.meta.TPW ?? {scale: 1, offset: 0, fill: 65535};
+  const mm = unscale(w.cut.TPW, m);
+  const ci = w.box.i - w.box.i0;
+  const cj = w.box.j - w.box.j0;
+  const qc = cj * w.box.cols + ci;
+  const near = nearestGood(mm, w.cut.DQF_Overall, w.box, L2_TPW_NEAR_PX, 0);
+  const ew = w.pixel ? w.pixel.ewM : 10000;
+  const ns = w.pixel ? w.pixel.nsM : 10000;
+  const x = dec.extras ?? {};
+  const num = (v) => (Number.isFinite(v) ? v : null);
+  const r2 = (v) => (Number.isFinite(v) ? +v.toFixed(2) : null);
+  return {
+    ...l2Common(dec, L2_PRODUCTS.tpw, key, w),
+    tpw: l2Counts(w.cut.TPW, m.fill),
+    tpwScale: m.scale,
+    tpwOffset: m.offset,
+    tpwFill: 65535,
+    units: 'mm',
+    dqf: packArray(w.cut.DQF_Overall, 'u8'),
+    here: {mm: r2(mm[qc]), dqf: w.cut.DQF_Overall[qc] ?? null},
+    nearest: near
+      ? {mm: r2(mm[near.q]), di: near.di, dj: near.dj, km: +(Math.hypot(near.di * ew, near.dj * ns) / 1000).toFixed(1)}
+      : null,
+    nearPx: L2_TPW_NEAR_PX,
+    census: tpwCensus(mm, w.cut.DQF_Overall),
+    sceneStats: {
+      meanMm: r2(x.mean_total_precipitable_water),
+      minMm: r2(x.minimum_total_precipitable_water),
+      maxMm: r2(x.maximum_total_precipitable_water),
+      sdMm: r2(x.standard_deviation_total_precipitable_water),
+      attempted: num(x.total_attempted_retrievals)
+    },
+    lzaQuantitativeDeg: num(x.quantitative_local_zenith_angle),
+    lzaRetrievalDeg: num(x.retrieval_local_zenith_angle),
+    latitudeThresholdDeg: num(x.latitude)
   };
 }
 // The DCOMP window (149th pass): the optical depth at 640 nm and
