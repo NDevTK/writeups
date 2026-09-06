@@ -2276,7 +2276,9 @@ function main() {
         : null,
       // the column's water (163rd)
       tpw: F.tpw ? l2TpwBody(F.tpw.dec, F.tpw.key, cell.lat, cell.lon) : null,
-      rain: F.rain ? l2RainBody(F.rain.dec, F.rain.key, cell.lat, cell.lon) : null,
+      rain: F.rain
+        ? l2RainBody(F.rain.dec, F.rain.key, cell.lat, cell.lon)
+        : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial',
       // the deployed revision (158th): the page can tell an older
       // daemon's body from a fresh one's

@@ -1495,7 +1495,15 @@ export function rainCensus(mmh, dqf) {
  * minMmH), each navigated to its place: {q, i, j, latDeg, lonDeg,
  * mmh, quality}, the heaviest first, capped.
  */
-export function rainList(mmh, dqf, box, g, xCoord, yCoord, {minMmH = 0.1, cap = 200} = {}) {
+export function rainList(
+  mmh,
+  dqf,
+  box,
+  g,
+  xCoord,
+  yCoord,
+  {minMmH = 0.1, cap = 200} = {}
+) {
   const out = [];
   for (let q = 0; q < mmh.length; q++) {
     const k = rainQuality(dqf ? dqf[q] : 0);
@@ -1510,7 +1518,15 @@ export function rainList(mmh, dqf, box, g, xCoord, yCoord, {minMmH = 0.1, cap = 
       g
     );
     if (!ll) continue;
-    out.push({q, i, j, latDeg: ll.latDeg, lonDeg: ll.lonDeg, mmh: v, quality: k});
+    out.push({
+      q,
+      i,
+      j,
+      latDeg: ll.latDeg,
+      lonDeg: ll.lonDeg,
+      mmh: v,
+      quality: k
+    });
   }
   out.sort((a, b) => b.mmh - a.mmh);
   return out.slice(0, cap);

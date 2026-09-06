@@ -10396,117 +10396,117 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   THE RAIN, NOAA's: where no radar sees the pixel - the sea, the
   mountains between radars, every coast the composite leaves black
   - the Rainfall Rate / QPE (ABI-L2-RRQPEF: full disk every 10 min,
-  2 km, day and night) becomes the fourteenth product the daemon
-  serves and the scene's rain, before the model. THE PRIMARY, read
-  in full: the Enterprise Rainfall Rate ATBD v3.0 (Kuligowski, 10
-  Jul 2020, 46 pp): SCaMPR - the ABI brightness temperatures
-  parallax-shifted by the GFS cloud-top height (Vicente et al. 2002,
-  the 6378.1 / 6356.6 km ellipsoid, Eq. 1-19), matched to CPC's
-  combined microwave rain (MWCOMB, 0.073 deg, 8-km footprints, the
-  ABI's 2-km ones area-weighted, Eq. 20-25), calibrated per class -
-  15 x 15 deg boxes times three cloud types from the 9 x 9 window
-  (water: T7.34 < T11.2 and T8.5 - T11.2 < -0.3 K; ice; cold-top
-  convective: T7.34 >= T11.2) - 330 classes on GOES-16, 440 on
-  GOES-17 (band 14 alone under the loop heat pipe: predictors 2, 3
-  and 9 only); rain / no rain by discriminant analysis on two of
-  nine predictors (Table 5; the threshold at the best Heidke skill
-  with the raining count within 5%, Eq. 26-28); the rate by linear
-  regression on two of fourteen (the nine and their power-law
-  transforms, gamma stepped by 25 to 2500 for the best correlation,
-  Eq. 29-34), a distribution-matching lookup at 0.01 mm/h (identity
-  from 50 to 100 mm/h) against the dry bias, the 3 x 3 neighbouring
-  boxes blended by inverse cube distance, and the GFS lowest-third
-  relative humidity's evaporation term (Eq. 35: RR + 0.115825
-  max(RH, 61) - 10.7354; Eq. 36: times 0.000112891 RH^2 - 0.00504012
-  RH + 0.476117 at max(RH, 22.32)) - pinned by hand: 10 mm/h under a
-  saturated lowest third becomes 11.94, under 61% 3.73, under 30%
-  2.70; the training set keeps 10,000 pixels above 2.5 mm/h and
-  rolls with the newest matches. Output tenths of mm/h as short
-  integers, 0-100, Table 6's flag bits (1 bad, 2 past 70 deg zenith
-  or 60 deg latitude, 4-32 the predictors' inputs, 64 no
-  coefficients). REQUIREMENT (Table 1): 2 km, 10 min, accuracy 6
-  and precision 9 mm/h at 10 mm/h. VALIDATION (Sec. 4, June 2019 -
-  May 2020, a 10-km "fuzzy" neighbourhood): against gauge-adjusted
-  MRMS r 0.32 / 0.28 (GOES-16 / 17), accuracy 4.36 / 5.50,
-  precision 7.81 / 9.39 over 11,201,180 / 6,867,843 points - GOES-17
-  past the precision spec; against GPM DPR r 0.127 / 0.170, accuracy
-  5.21 / 5.91, precision 8.69 / 8.96; a systematic dry bias at high
-  rates, skill best in convective warm-season rain, worst for
-  stratiform winter rain and orography - the ATBD's own caution, on
-  the line. THE FILE (noaa-goes18 / 19, 14:15Z): 2.0 MB, six an
-  hour, RRQPE uint16 5424 x 5424 in rows of 24 at 0.001526 mm/h per
-  count (fill 65535), DQF uint8 with the eight flag values, the
-  disk's raining count, maximum, mean and volume as scalars; a
-  window of +-50 px costs 4-6 ranges and 437-547 kB in 0.4-1.0 s;
-  the whole disk read at once 2.0 MB in 0.27 s, decoded in 1.0 s.
-  MEASURED at 14:15Z: the home's window dry (10,201 good px, none
-  raining; 22 faint pixels 167 km to the north-west); Kansas 252
-  raining px within +-100 km (226 at or above 1 mm/h), the heaviest
-  7.97 mm/h at 39.76 N 97.88 W, the nearest 0.96 mm/h 51 km off;
-  Florida 343; the disk 651,298 raining px on GOES-18, 447,415 on
-  GOES-19, the maximum 97.6 / 99.8 mm/h at the cap; the rates take
-  the microwave training distribution's discrete values (7.97,
-  6.46, 5.41, 5.32 mm/h recur at Kansas and Florida alike - the
-  lookup's own quantisation, stated). (1) radar.js: the palette
-  vendored, decodeUniversalBlue, detectScheme, decodePixel,
-  UNIVERSAL_BLUE_FLOOR_DBZ, PALETTE_COLOURS, windowStats over the
-  covered ground with the mask; the header's law corrected and the
-  measurement stated. (2) goesl2.js: L2_PRODUCTS.rain,
-  RAIN_DQF_BITS / WORDS, RAIN_ATBD (the requirement, the method's
-  constants, the evaporation coefficients, the validation),
-  rainEvaporationAdjust (Eq. 35-36, pinned not re-applied),
-  rainQuality, rainFlagWords, rainCensus, rainList (the raining
-  pixels navigated, the heaviest first), nearestRain. (3)
-  goesl2-decode.js: L2_RAIN_SPEC {RRQPE raw16, DQF raw},
-  L2_RAIN_EXTRAS, half width 50, the fifteenth ask (untimed),
-  l2RainBody (the counts with their scale and fill, the flag word,
-  the point's own pixel with its words, the nearest raining pixel
-  with its distance, the list, the census, the disk's statistics,
-  the thresholds). (4) The daemon binds and re-exports l2RainBody
-  (the 161st's guard holds it); the client carries `rain`. (5) THE
-  PAGE: the body's rain unpacked, goesL2RainAt, satRainHere (the
-  observer's pixel within 20 minutes of the scan), the precipitation
-  block's order - the radar's own covered pixel, else the
-  satellite's, else the model - the record "NOAA GOES-19 rainfall
-  rate (RRQPEF)" and the line clause (the overhead pixel and its
-  words, the nearest rain, the census, WHICH measurement the scene's
-  rain takes and why, the ATBD's validation and caution). GATES:
-  radar-reference THE PALETTE (the table's own values, the measured
-  colours decoded, the nearest-colour rule and its distance, the
-  grey rule's misreadings pinned), THE SCHEME AND THE MASK (a grey
-  tile, a blue tile, an empty one; the mask's black leaving 231 of
-  441 px covered, the snow block out of the radar's sight, a point
-  under the black with no pixel of its own), THE GREY WINDOW (the
-  old landmark under the areal semantics; 8); goesl2-reference THE
-  RAIN (the flag bits, Eq. 35-36 by hand, the census and the
-  navigated list on the real fixed grid; 16); server-reference (15
-  asks, 14 served, 9 untimed, the bindings guard; 31);
-  goesl2-client-reference (14 served, the rain null on the fake
-  bucket, ten CONUS products re-listed; 5). Docs: the daemon README,
-  FINDINGS pass 164. MEASURED in the page: Kansas (38.5 N 98 W,
-  14:2xZ) "RainViewer radar - here 0.00 mm/h (-32 dBZ) · 16-km
-  window: rain 0.00 mm/h over the ground the radar sees, max 0.0,
-  echo on 0% of 289 px · radar over 100% of the window · zoom 7
-  (0.96 km/px), Universal Blue palette · 4 min old" - a covered dry
-  pixel, measured, where the placeholder had said "no radar
-  coverage here". At the morning's heaviest Kansas pixel (39.76 N
-  97.88 W, 14:3xZ, the cell moved on in the twenty minutes between
-  the census and the probe): "NOAA GOES-19 rainfall rate (RRQPEF) -
-  14:25Z - overhead dry (good) - nearest rain 5.3 mm/h 12.1 km off -
-  1286 raining of 10,201 retrieved 2-km px within +-100 km (max 10.0
-  mm/h, mean 4.5 over the raining) - the disk 447,109 raining px,
-  max 99.92 mm/h" beside "RainViewer radar - here 0.00 mm/h (-32
-  dBZ) - 18-km window: rain 0.00 mm/h over the ground the radar
-  sees, max 0.0, echo on 0% of 361 px - radar over 100% of the
-  window - zoom 7 (0.94 km/px), Universal Blue palette - 5 min old",
-  and the line's verdict "the scene's rain: the radar sees this
-  pixel (0.00 mm/h) and outranks the satellite" - the two
-  measurements agreeing the pixel is dry while the satellite names
-  the cell 12 km off. validate 146 files, 1,173 landmarks, 8 probes,
-  page-wiring - PASS. NEXT: the raining pixels within reach drawn as
-  rain shafts under the cloud base at their bearings (the fire
-  renderer's placement, the precipitation block's base), so the rain
-  the satellite measures is seen falling where it falls.
+    2 km, day and night) becomes the fourteenth product the daemon
+    serves and the scene's rain, before the model. THE PRIMARY, read
+    in full: the Enterprise Rainfall Rate ATBD v3.0 (Kuligowski, 10
+    Jul 2020, 46 pp): SCaMPR - the ABI brightness temperatures
+    parallax-shifted by the GFS cloud-top height (Vicente et al. 2002,
+    the 6378.1 / 6356.6 km ellipsoid, Eq. 1-19), matched to CPC's
+    combined microwave rain (MWCOMB, 0.073 deg, 8-km footprints, the
+    ABI's 2-km ones area-weighted, Eq. 20-25), calibrated per class -
+    15 x 15 deg boxes times three cloud types from the 9 x 9 window
+    (water: T7.34 < T11.2 and T8.5 - T11.2 < -0.3 K; ice; cold-top
+    convective: T7.34 >= T11.2) - 330 classes on GOES-16, 440 on
+    GOES-17 (band 14 alone under the loop heat pipe: predictors 2, 3
+    and 9 only); rain / no rain by discriminant analysis on two of
+    nine predictors (Table 5; the threshold at the best Heidke skill
+    with the raining count within 5%, Eq. 26-28); the rate by linear
+    regression on two of fourteen (the nine and their power-law
+    transforms, gamma stepped by 25 to 2500 for the best correlation,
+    Eq. 29-34), a distribution-matching lookup at 0.01 mm/h (identity
+    from 50 to 100 mm/h) against the dry bias, the 3 x 3 neighbouring
+    boxes blended by inverse cube distance, and the GFS lowest-third
+    relative humidity's evaporation term (Eq. 35: RR + 0.115825
+    max(RH, 61) - 10.7354; Eq. 36: times 0.000112891 RH^2 - 0.00504012
+    RH + 0.476117 at max(RH, 22.32)) - pinned by hand: 10 mm/h under a
+    saturated lowest third becomes 11.94, under 61% 3.73, under 30%
+    2.70; the training set keeps 10,000 pixels above 2.5 mm/h and
+    rolls with the newest matches. Output tenths of mm/h as short
+    integers, 0-100, Table 6's flag bits (1 bad, 2 past 70 deg zenith
+    or 60 deg latitude, 4-32 the predictors' inputs, 64 no
+    coefficients). REQUIREMENT (Table 1): 2 km, 10 min, accuracy 6
+    and precision 9 mm/h at 10 mm/h. VALIDATION (Sec. 4, June 2019 -
+    May 2020, a 10-km "fuzzy" neighbourhood): against gauge-adjusted
+    MRMS r 0.32 / 0.28 (GOES-16 / 17), accuracy 4.36 / 5.50,
+    precision 7.81 / 9.39 over 11,201,180 / 6,867,843 points - GOES-17
+    past the precision spec; against GPM DPR r 0.127 / 0.170, accuracy
+    5.21 / 5.91, precision 8.69 / 8.96; a systematic dry bias at high
+    rates, skill best in convective warm-season rain, worst for
+    stratiform winter rain and orography - the ATBD's own caution, on
+    the line. THE FILE (noaa-goes18 / 19, 14:15Z): 2.0 MB, six an
+    hour, RRQPE uint16 5424 x 5424 in rows of 24 at 0.001526 mm/h per
+    count (fill 65535), DQF uint8 with the eight flag values, the
+    disk's raining count, maximum, mean and volume as scalars; a
+    window of +-50 px costs 4-6 ranges and 437-547 kB in 0.4-1.0 s;
+    the whole disk read at once 2.0 MB in 0.27 s, decoded in 1.0 s.
+    MEASURED at 14:15Z: the home's window dry (10,201 good px, none
+    raining; 22 faint pixels 167 km to the north-west); Kansas 252
+    raining px within +-100 km (226 at or above 1 mm/h), the heaviest
+    7.97 mm/h at 39.76 N 97.88 W, the nearest 0.96 mm/h 51 km off;
+    Florida 343; the disk 651,298 raining px on GOES-18, 447,415 on
+    GOES-19, the maximum 97.6 / 99.8 mm/h at the cap; the rates take
+    the microwave training distribution's discrete values (7.97,
+    6.46, 5.41, 5.32 mm/h recur at Kansas and Florida alike - the
+    lookup's own quantisation, stated). (1) radar.js: the palette
+    vendored, decodeUniversalBlue, detectScheme, decodePixel,
+    UNIVERSAL_BLUE_FLOOR_DBZ, PALETTE_COLOURS, windowStats over the
+    covered ground with the mask; the header's law corrected and the
+    measurement stated. (2) goesl2.js: L2_PRODUCTS.rain,
+    RAIN_DQF_BITS / WORDS, RAIN_ATBD (the requirement, the method's
+    constants, the evaporation coefficients, the validation),
+    rainEvaporationAdjust (Eq. 35-36, pinned not re-applied),
+    rainQuality, rainFlagWords, rainCensus, rainList (the raining
+    pixels navigated, the heaviest first), nearestRain. (3)
+    goesl2-decode.js: L2_RAIN_SPEC {RRQPE raw16, DQF raw},
+    L2_RAIN_EXTRAS, half width 50, the fifteenth ask (untimed),
+    l2RainBody (the counts with their scale and fill, the flag word,
+    the point's own pixel with its words, the nearest raining pixel
+    with its distance, the list, the census, the disk's statistics,
+    the thresholds). (4) The daemon binds and re-exports l2RainBody
+    (the 161st's guard holds it); the client carries `rain`. (5) THE
+    PAGE: the body's rain unpacked, goesL2RainAt, satRainHere (the
+    observer's pixel within 20 minutes of the scan), the precipitation
+    block's order - the radar's own covered pixel, else the
+    satellite's, else the model - the record "NOAA GOES-19 rainfall
+    rate (RRQPEF)" and the line clause (the overhead pixel and its
+    words, the nearest rain, the census, WHICH measurement the scene's
+    rain takes and why, the ATBD's validation and caution). GATES:
+    radar-reference THE PALETTE (the table's own values, the measured
+    colours decoded, the nearest-colour rule and its distance, the
+    grey rule's misreadings pinned), THE SCHEME AND THE MASK (a grey
+    tile, a blue tile, an empty one; the mask's black leaving 231 of
+    441 px covered, the snow block out of the radar's sight, a point
+    under the black with no pixel of its own), THE GREY WINDOW (the
+    old landmark under the areal semantics; 8); goesl2-reference THE
+    RAIN (the flag bits, Eq. 35-36 by hand, the census and the
+    navigated list on the real fixed grid; 16); server-reference (15
+    asks, 14 served, 9 untimed, the bindings guard; 31);
+    goesl2-client-reference (14 served, the rain null on the fake
+    bucket, ten CONUS products re-listed; 5). Docs: the daemon README,
+    FINDINGS pass 164. MEASURED in the page: Kansas (38.5 N 98 W,
+    14:2xZ) "RainViewer radar - here 0.00 mm/h (-32 dBZ) · 16-km
+    window: rain 0.00 mm/h over the ground the radar sees, max 0.0,
+    echo on 0% of 289 px · radar over 100% of the window · zoom 7
+    (0.96 km/px), Universal Blue palette · 4 min old" - a covered dry
+    pixel, measured, where the placeholder had said "no radar
+    coverage here". At the morning's heaviest Kansas pixel (39.76 N
+    97.88 W, 14:3xZ, the cell moved on in the twenty minutes between
+    the census and the probe): "NOAA GOES-19 rainfall rate (RRQPEF) -
+    14:25Z - overhead dry (good) - nearest rain 5.3 mm/h 12.1 km off -
+    1286 raining of 10,201 retrieved 2-km px within +-100 km (max 10.0
+    mm/h, mean 4.5 over the raining) - the disk 447,109 raining px,
+    max 99.92 mm/h" beside "RainViewer radar - here 0.00 mm/h (-32
+    dBZ) - 18-km window: rain 0.00 mm/h over the ground the radar
+    sees, max 0.0, echo on 0% of 361 px - radar over 100% of the
+    window - zoom 7 (0.94 km/px), Universal Blue palette - 5 min old",
+    and the line's verdict "the scene's rain: the radar sees this
+    pixel (0.00 mm/h) and outranks the satellite" - the two
+    measurements agreeing the pixel is dry while the satellite names
+    the cell 12 km off. validate 146 files, 1,173 landmarks, 8 probes,
+    page-wiring - PASS. NEXT: the raining pixels within reach drawn as
+    rain shafts under the cloud base at their bearings (the fire
+    renderer's placement, the precipitation block's base), so the rain
+    the satellite measures is seen falling where it falls.
 - DONE (Sep 6, the review session's 163rd pass - THE COLUMN'S WATER):
   the clear-sky reference that decides which sea pixel is cloud has
   stood on the balloon's column since the 145th pass - the nearest

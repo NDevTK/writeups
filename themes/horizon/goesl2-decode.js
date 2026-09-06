@@ -1156,10 +1156,18 @@ export function l2RainBody(dec, key, lat, lon) {
         }
       : null,
     minMmH: L2_RAIN_MIN_MMH,
-    list: rainList(mmh, w.cut.DQF, w.box, dec.g ?? fixedGridGeometry(dec.proj), dec.x, dec.y, {
-      minMmH: L2_RAIN_MIN_MMH,
-      cap: 200
-    }).map((r) => ({...r, mmh: r2(r.mmh)})),
+    list: rainList(
+      mmh,
+      w.cut.DQF,
+      w.box,
+      dec.g ?? fixedGridGeometry(dec.proj),
+      dec.x,
+      dec.y,
+      {
+        minMmH: L2_RAIN_MIN_MMH,
+        cap: 200
+      }
+    ).map((r) => ({...r, mmh: r2(r.mmh)})),
     census: rainCensus(mmh, w.cut.DQF),
     sceneStats: {
       rainingPx: num(x.total_pixels_with_rain),

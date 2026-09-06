@@ -1284,12 +1284,26 @@ const inflate = (u8) =>
   const c = rainCensus(mmh, dqf);
   const list = rainList(mmh, dqf, box, g, x, y, {minMmH: 0.1, cap: 10});
   const nr = nearestRain(mmh, dqf, box, {minMmH: 0.1});
-  const homeLL = fixedGridToLatLon(x.offset + 750 * x.scale, y.offset + 750 * y.scale, g);
-  const heavyLL = fixedGridToLatLon(x.offset + 752 * x.scale, y.offset + 752 * y.scale, g);
+  const homeLL = fixedGridToLatLon(
+    x.offset + 750 * x.scale,
+    y.offset + 750 * y.scale,
+    g
+  );
+  const heavyLL = fixedGridToLatLon(
+    x.offset + 752 * x.scale,
+    y.offset + 752 * y.scale,
+    g
+  );
   // Eq. 35-36 by hand at 10 mm/h: RH 100 -> (10 + 11.5825 - 10.7354) x (1.12891 - 0.504012 + 0.476117)
-  const e100 = (10 + 0.115825 * 100 - 10.7354) * (0.000112891 * 1e4 - 0.00504012 * 100 + 0.476117);
-  const e61 = (10 + 0.115825 * 61 - 10.7354) * (0.000112891 * 61 * 61 - 0.00504012 * 61 + 0.476117);
-  const e30 = (10 + 0.115825 * 61 - 10.7354) * (0.000112891 * 30 * 30 - 0.00504012 * 30 + 0.476117);
+  const e100 =
+    (10 + 0.115825 * 100 - 10.7354) *
+    (0.000112891 * 1e4 - 0.00504012 * 100 + 0.476117);
+  const e61 =
+    (10 + 0.115825 * 61 - 10.7354) *
+    (0.000112891 * 61 * 61 - 0.00504012 * 61 + 0.476117);
+  const e30 =
+    (10 + 0.115825 * 61 - 10.7354) *
+    (0.000112891 * 30 * 30 - 0.00504012 * 30 + 0.476117);
   check(
     'THE RAIN: the flag bits as qualities, the evaporation law, the census and the navigated list',
     L2_PRODUCTS.rain === 'ABI-L2-RRQPEF' &&
@@ -1299,7 +1313,8 @@ const inflate = (u8) =>
       rainQuality(6) === 'invalid' &&
       rainQuality(64) === 'invalid' &&
       rainQuality(255) === null &&
-      rainFlagWords(66).join(' + ') === 'past 70° zenith or 60° latitude + no retrieval coefficients' &&
+      rainFlagWords(66).join(' + ') ===
+        'past 70° zenith or 60° latitude + no retrieval coefficients' &&
       rainFlagWords(0)[0] === 'good' &&
       c.n === 25 &&
       c.good + c.degraded + c.invalid + c.fill === 25 &&

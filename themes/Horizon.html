@@ -2811,14 +2811,24 @@
             return cx.getImageData(0, 0, 256, 256).data;
           };
           const [data, mask] = await Promise.all([
-            load(`${cat.host}${f.path}/256/${RADAR_ZOOM}/${tx}/${ty}/2/0_1.png`),
-            load(`${cat.host}/v2/coverage/0/256/${RADAR_ZOOM}/${tx}/${ty}/0/0_0.png`).catch(() => null)
+            load(
+              `${cat.host}${f.path}/256/${RADAR_ZOOM}/${tx}/${ty}/2/0_1.png`
+            ),
+            load(
+              `${cat.host}/v2/coverage/0/256/${RADAR_ZOOM}/${tx}/${ty}/0/0_0.png`
+            ).catch(() => null)
           ]);
           // window sized to the 16 km world footprint
           const mpp = metresPerPixel(state.lat, RADAR_ZOOM);
           const h = Math.max(Math.round(8000 / mpp), 1);
           const s = windowStats(data, px, py, h, {mask});
-          radarObs = {...s, time: f.time * 1000, masked: !!mask, zoom: RADAR_ZOOM, mpp};
+          radarObs = {
+            ...s,
+            time: f.time * 1000,
+            masked: !!mask,
+            zoom: RADAR_ZOOM,
+            mpp
+          };
           // The measured coverage field for the cloud decks (the
           // Nubis weather map, from data): precip at a texel means
           // cloud overhead - map the local rate onto a coverage
@@ -2860,8 +2870,12 @@
               ? `here ${s.here.rate.toFixed(2)} mm/h${s.here.snow ? ' snow (liquid)' : ''} (${s.here.dbz} dBZ) · ` +
                 `${kmWin.toFixed(0)}-km window: rain ${s.rain.toFixed(2)} mm/h over the ground the radar sees, ` +
                 `max ${s.maxRate.toFixed(1)}, echo on ${Math.round(s.echoFrac * 100)}% of ${s.covered} px` +
-                (s.snowFrac > 0 ? ` (${Math.round(s.snowFrac * 100)}% snow)` : '') +
-                (mask ? ` · radar over ${Math.round(s.coverage * 100)}% of the window` : ' · coverage unknown (no mask)')
+                (s.snowFrac > 0
+                  ? ` (${Math.round(s.snowFrac * 100)}% snow)`
+                  : '') +
+                (mask
+                  ? ` · radar over ${Math.round(s.coverage * 100)}% of the window`
+                  : ' · coverage unknown (no mask)')
               : mask
                 ? `no radar here (RainViewer's coverage mask; ${Math.round(s.coverage * 100)}% of the ${kmWin.toFixed(0)}-km window covered)`
                 : 'no radar pixel here') +
@@ -7182,17 +7196,30 @@
           if (rn && rn.census) {
             const c = rn.census;
             const here = rn.here;
-            const hereOk = here && here.mmh !== null && here.quality && here.quality !== 'invalid';
+            const hereOk =
+              here &&
+              here.mmh !== null &&
+              here.quality &&
+              here.quality !== 'invalid';
             record(
               `NOAA ${j.craft} rainfall rate (RRQPEF)`,
               `${rn.time.slice(11, 16)}Z · overhead ${
                 hereOk
-                  ? (here.mmh > 0 ? here.mmh.toFixed(1) + ' mm/h' : 'dry') + ' (' + here.quality + ')'
-                  : 'no retrieval (' + (here ? here.words.join(', ') : 'fill') + ')'
+                  ? (here.mmh > 0 ? here.mmh.toFixed(1) + ' mm/h' : 'dry') +
+                    ' (' +
+                    here.quality +
+                    ')'
+                  : 'no retrieval (' +
+                    (here ? here.words.join(', ') : 'fill') +
+                    ')'
               }` +
-                (rn.nearest ? ` · nearest rain ${rn.nearest.mmh.toFixed(1)} mm/h ${rn.nearest.km} km off` : ' · no rain within ±100 km') +
+                (rn.nearest
+                  ? ` · nearest rain ${rn.nearest.mmh.toFixed(1)} mm/h ${rn.nearest.km} km off`
+                  : ' · no rain within ±100 km') +
                 ` · ${c.raining} raining of ${(c.good + c.degraded).toLocaleString('en-US')} retrieved 2-km px within ±100 km` +
-                (c.raining ? ` (max ${c.maxMmH.toFixed(1)} mm/h, mean ${c.meanRainingMmH.toFixed(1)} over the raining)` : '') +
+                (c.raining
+                  ? ` (max ${c.maxMmH.toFixed(1)} mm/h, mean ${c.meanRainingMmH.toFixed(1)} over the raining)`
+                  : '') +
                 (rn.sceneStats && rn.sceneStats.rainingPx !== null
                   ? ` · the disk ${rn.sceneStats.rainingPx.toLocaleString('en-US')} raining px, max ${rn.sceneStats.maxMmH} mm/h`
                   : '')
@@ -7561,7 +7588,8 @@
         const mmh = r.rainMmH[q];
         const dqf = r.dqf ? r.dqf[q] : 0;
         const quality = rainQuality(dqf);
-        if (!Number.isFinite(mmh) || quality === null || quality === 'invalid') return null;
+        if (!Number.isFinite(mmh) || quality === null || quality === 'invalid')
+          return null;
         return {mmh, dqf, quality};
       }
       // the satellite's rain at the observer while its file is fresh
@@ -7882,15 +7910,24 @@
           if (rn && rn.census) {
             const c = rn.census;
             const sat = satRainHere();
-            const radarSees = radarObs && radarObs.here && Date.now() - radarObs.time < 25 * 60e3;
-            const hereOk = rn.here && rn.here.quality && rn.here.quality !== 'invalid' && rn.here.mmh !== null;
+            const radarSees =
+              radarObs &&
+              radarObs.here &&
+              Date.now() - radarObs.time < 25 * 60e3;
+            const hereOk =
+              rn.here &&
+              rn.here.quality &&
+              rn.here.quality !== 'invalid' &&
+              rn.here.mmh !== null;
             line +=
               ` · rainfall rate ${rn.time.slice(11, 16)}Z (ABI-L2-RRQPEF, 2-km px, every 10 min, day and night; SCaMPR's ${RAIN_ATBD.method.classes} classes calibrated on microwave rain, ` +
               `${RAIN_ATBD.requirement.accuracyMmHAt10} / ${RAIN_ATBD.requirement.precisionMmHAt10} mm/h accuracy / precision at 10 mm/h): ` +
               (hereOk
                 ? `overhead ${rn.here.mmh > 0 ? rn.here.mmh.toFixed(1) + ' mm/h' : 'dry'} (${rn.here.quality})`
                 : `no retrieval overhead (${rn.here ? rn.here.words.join(', ') : 'fill'})`) +
-              (rn.nearest ? `, the nearest rain ${rn.nearest.mmh.toFixed(1)} mm/h ${rn.nearest.km} km off` : ', none within ±100 km') +
+              (rn.nearest
+                ? `, the nearest rain ${rn.nearest.mmh.toFixed(1)} mm/h ${rn.nearest.km} km off`
+                : ', none within ±100 km') +
               ` · ${c.raining} raining of ${(c.good + c.degraded).toLocaleString('en-US')} px` +
               (c.raining ? ` (max ${c.maxMmH.toFixed(1)} mm/h)` : '') +
               ` · the scene's rain: ` +
@@ -18754,7 +18791,8 @@
           radarObs &&
           Date.now() - radarObs.time < 25 * 60 * 1000 &&
           !!radarObs.here;
-        const radarSnow = radarFresh && radarObs.here.snow && radarObs.here.rate > 0.02;
+        const radarSnow =
+          radarFresh && radarObs.here.snow && radarObs.here.rate > 0.02;
         const snowing =
           radarSnow ||
           (!radarFresh &&
@@ -18765,12 +18803,21 @@
         // no radar over this pixel: NOAA's rainfall rate (164th, the
         // satellite's 2-km pixel within 20 minutes) before the model
         const sat = !radarFresh ? satRainHere() : null;
-        const precipMeas = radarFresh ? radarObs.here.rate : sat ? sat.mmh : state.precip;
+        const precipMeas = radarFresh
+          ? radarObs.here.rate
+          : sat
+            ? sat.mmh
+            : state.precip;
         const raining =
-          !snowing && (precipMeas > 0.02 || (!radarFresh && !sat && state.code >= 51));
+          !snowing &&
+          (precipMeas > 0.02 || (!radarFresh && !sat && state.code >= 51));
         const rate = snowing
           ? THREE.MathUtils.clamp(
-              radarFresh ? radarObs.here.rate * 1.2 : sat ? sat.mmh * 1.2 : state.snow / 2,
+              radarFresh
+                ? radarObs.here.rate * 1.2
+                : sat
+                  ? sat.mmh * 1.2
+                  : state.snow / 2,
               0.3,
               1
             )

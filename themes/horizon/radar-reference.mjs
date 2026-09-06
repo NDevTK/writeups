@@ -103,7 +103,10 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
       s.coverage === 1 &&
       near(s.echoFrac, 200 / 441, 1e-12) &&
       near(s.snowFrac, 0.5, 1e-12) &&
-      s.here && !s.here.snow && s.here.dbz === 40 && near(s.here.rate, rainRate(40), 1e-12) &&
+      s.here &&
+      !s.here.snow &&
+      s.here.dbz === 40 &&
+      near(s.here.rate, rainRate(40), 1e-12) &&
       near(s.maxRate, rainRate(40), 1e-12),
     `scheme ${s.scheme}; rain ${s.rain.toFixed(4)} mm/h (${expRain.toFixed(4)} = 40 dBZ over 100 of 441 px), snow ${s.snow.toFixed(4)} (${expSnow.toFixed(4)}), ` +
       `coverage ${s.coverage} without a mask, echo ${s.echoFrac.toFixed(4)} (${(200 / 441).toFixed(4)}), snow fraction of the echoes ${s.snowFrac.toFixed(2)}, ` +
@@ -147,16 +150,29 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
       UNIVERSAL_BLUE_FLOOR_DBZ === -10 &&
       PALETTE_COLOURS === 163 &&
       overlap === 0 &&
-      blue.dbz === 24 && !blue.snow && blue.exact &&
-      sand.dbz === 14 && !sand.snow && sand.exact &&
-      faint.dbz === 0 && faint.exact &&
-      light.dbz === 15 && !light.snow &&
-      off.dbz === 24 && !off.exact && near(off.dist, Math.sqrt(6), 1e-9) &&
-      snow.dbz === 24 && snow.snow && snow.exact &&
-      clear.dbz === DBZ_MIN && clear.exact &&
+      blue.dbz === 24 &&
+      !blue.snow &&
+      blue.exact &&
+      sand.dbz === 14 &&
+      !sand.snow &&
+      sand.exact &&
+      faint.dbz === 0 &&
+      faint.exact &&
+      light.dbz === 15 &&
+      !light.snow &&
+      off.dbz === 24 &&
+      !off.exact &&
+      near(off.dist, Math.sqrt(6), 1e-9) &&
+      snow.dbz === 24 &&
+      snow.snow &&
+      snow.exact &&
+      clear.dbz === DBZ_MIN &&
+      clear.exact &&
       oldBlue.dbz === -32 &&
-      oldLight.snow && oldLight.dbz === -24 &&
-      oldWhite.snow && oldWhite.dbz === 95,
+      oldLight.snow &&
+      oldLight.dbz === -24 &&
+      oldWhite.snow &&
+      oldWhite.dbz === 95,
     `128 rain and 128 snow rows for -32..95 dBZ (24 dBZ rain ${rain24}, snow ${snow24}); the palette's floor ${UNIVERSAL_BLUE_FLOOR_DBZ} dBZ, ` +
       `${PALETTE_COLOURS} colours, the rain and snow ramps sharing none; the measured tile's (0,127,180) is ${blue.dbz} dBZ, its sand (222,208,151,190) ${sand.dbz} dBZ, ` +
       `the faint (130,123,105,73) ${faint.dbz} dBZ, the light blue (136,221,238) ${light.dbz} dBZ; a colour off by one in three channels takes the nearest, ${off.dbz} dBZ at distance ${off.dist.toFixed(2)}; ` +
@@ -186,7 +202,8 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   for (let j = 100; j < 110; j++)
     for (let i = 110; i < 120; i++) paint(blue, i, j, [0x65, 0xa5, 0xff, 255]); // 24 dBZ snow
   // the mask's black over the eastern half of the window: no radar there
-  for (let j = 90; j < 120; j++) for (let i = 110; i < 130; i++) paint(mask, i, j, [0, 0, 0, 255]);
+  for (let j = 90; j < 120; j++)
+    for (let i = 110; i < 130; i++) paint(mask, i, j, [0, 0, 0, 255]);
   const sg = windowStats(grey, 104, 104, 10);
   const sb = windowStats(blue, 109, 104, 10);
   const sm = windowStats(blue, 109, 104, 10, {mask});
@@ -198,17 +215,22 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     detectScheme(grey) === 'bw' &&
       detectScheme(blue) === 'universal-blue' &&
       detectScheme(empty) === null &&
-      sg.scheme === 'bw' && sg.here.dbz === 40 &&
-      sb.scheme === 'universal-blue' && px24.dbz === 24 &&
+      sg.scheme === 'bw' &&
+      sg.here.dbz === 40 &&
+      sb.scheme === 'universal-blue' &&
+      px24.dbz === 24 &&
       near(sb.rain, (rainRate(24) * 100) / 441, 1e-12) &&
       near(sb.snow, (snowRate(24) * 100) / 441, 1e-12) &&
       sb.coverage === 1 &&
-      sm.covered === 231 && near(sm.coverage, 231 / 441, 1e-12) &&
+      sm.covered === 231 &&
+      near(sm.coverage, 231 / 441, 1e-12) &&
       near(sm.rain, (rainRate(24) * 100) / 231, 1e-12) &&
       sm.snow === 0 &&
       near(sm.echoFrac, 100 / 231, 1e-12) &&
-      sm.here && sm.here.dbz === 24 &&
-      sOut.here === null && near(sOut.coverage, 105 / 441, 1e-12),
+      sm.here &&
+      sm.here.dbz === 24 &&
+      sOut.here === null &&
+      near(sOut.coverage, 105 / 441, 1e-12),
     `a grey tile is 'bw' (40 dBZ read at the point), a blue one 'universal-blue' (${px24.dbz} dBZ), an empty one null; without a mask 441 px are covered: ` +
       `rain ${sb.rain.toFixed(4)} mm/h (24 dBZ over 100 px), snow ${sb.snow.toFixed(4)} (the snow ramp's 100 px); the mask's black over the eastern ten columns leaves ${sm.covered} covered ` +
       `(coverage ${sm.coverage.toFixed(3)}): the snow block is out of the radar's sight (snow 0), rain ${sm.rain.toFixed(4)} over the 231 seen, echo ${sm.echoFrac.toFixed(4)}; ` +
