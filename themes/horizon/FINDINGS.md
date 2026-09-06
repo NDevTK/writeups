@@ -9,8 +9,8 @@ from the code. Run the whole corpus with:
 cd themes/horizon/harness && bash validate.sh
 ```
 
-At the time of writing the gate holds **146 CPU reference files printing
-1173 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+At the time of writing the gate holds **147 CPU reference files printing
+1175 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **146 reference files, 1173 landmark lines, 8 GPU probes** (live gate
+- **147 reference files, 1175 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1052,7 +1052,17 @@ The practice the corpus demonstrates, stated so it can be reused:
    10 mm/h, the MRMS and DPR validation with GOES-17 past the
    precision spec) (`radar-reference` THE PALETTE, THE SCHEME AND THE
    MASK, THE GREY WINDOW; `goesl2-reference` THE RAIN; `server-reference`
-   and `goesl2-client-reference` the fifteenth ask)
+   and `goesl2-client-reference` the fifteenth ask). Pass 165 draws
+   that rain where it falls: the raining pixels within 100 km become
+   curtains hung from the cloud base at their true bearings and
+   distances, each as opaque as the rain itself — Atlas's (1953)
+   optical extinction from the Marshall–Palmer spectrum, σ = 0.25
+   R^0.63 per km for Bergeron rain (orographic an order of magnitude
+   denser, a 1.25–2.6), over the pixel's own 2-km path: 1 mm/h hides
+   39% of what stands behind it, 10 mm/h 88%, drizzle at 0.2 mm/h
+   17%, with Koschmieder's 3/σ naming the visibility inside the rain
+   (12 km at 1 mm/h, 2.8 km at 10) (`rainshafts-reference` THE
+   CURTAIN'S OPACITY, THE SHAFTS)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

@@ -10345,6 +10345,89 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 165th pass - THE RAIN SHAFTS):
+  the rain the satellite measures, seen falling where it falls. The
+  164th's raining pixels within 100 km of the view (goesl2.rainList,
+  navigated by the fixed grid's own equations) become curtains hung
+  from the cloud base to the ground at their true bearings and
+  distances, 2 km wide (the pixel), camera-facing, grey-blue through
+  the aerial fog, far ones clamped to the horizon ring like the
+  fires. THE LAW: Atlas (1953), "Optical extinction by rainfall", J.
+  Meteor. 10, 486-488 - the extinction coefficient of rain from the
+  Marshall-Palmer spectrum, sigma_e = 0.25 R^0.63 km^-1 for
+  Bergeron-process rain (R in mm/h), an order of magnitude more for
+  orographic rain (a between 1.25 and 2.6); the AMS page is behind a
+  wall (403), so the coefficients are taken as two open sources
+  quote them alike (US patent 9,621,265; Reyes et al. 2025,
+  Atmosfera, whose own PWS100 fits above 10 mm/h give 0.11 R^0.88
+  and 0.12 R^0.81, and Shipley et al. 1974's 0.25-0.36) - stated.
+  A curtain seen through its own 2-km pixel has optical depth tau =
+  sigma_e L, and hides 1 - exp(-tau) of what stands behind it: 39%
+  at 1 mm/h, 88% at 10, 17% in drizzle at 0.2, nothing at 0;
+  Koschmieder's 3/sigma names the visibility inside the rain (12 km
+  at 1 mm/h, 2.8 km at 10) beside it. (1) rainshafts.js (pure):
+  RAIN_EXTINCTION, rainExtinctionPerKm, rainOpticalDepth,
+  shaftOpacity, rainVisibilityKm, rainShaftsNear (nearest first,
+  capped at 160, the drizzle under 0.2 mm/h and the pixels past the
+  reach left out, a degraded pixel kept and flagged),
+  rainShaftsSummary. (2) THE PAGE: applyRainShafts in the L2 sync,
+  updateRainShafts each frame beside the fires - one instanced
+  camera-facing curtain per pixel (SpriteNodeMaterial, the position
+  and the vec2 scale and the opacity as instanced attributes, a
+  gradient a little denser at the base), the base the field's low
+  deck top where the sea holds one, else the VIIRS census's low top,
+  else 1,500 m (stated in the code), the ground sampled at the place;
+  ?shafts=0 leaves the sky clean; the rain record and the line
+  append "N rain shafts drawn within 100 km: the nearest X km at Y°
+  (rate), the heaviest Z mm/h W km off hiding P% of what stands
+  behind it" and the law's words. GATES: rainshafts-reference THE
+  CURTAIN'S OPACITY (the law by hand at 1, 10 and 0.2 mm/h, the
+  orographic band, Koschmieder), THE SHAFTS (a navigated list around
+  the home: the rain 12 km west first, the downpour 30 km north-east,
+  the degraded pixel kept, the drizzle and the far shower left out,
+  the cap; 2). Docs: FINDINGS pass 165 (147 files, 1,175 landmarks).
+  THE GATE EARNED ITS KEEP: the first build named the colour node
+  `vec3` where the page imports it as `tslVec3`; the renderer threw
+  every frame, the Houston probe timed out without a frame, and the
+  full validate FAILED on page-wiring ("0 lines of page text") while
+  every CPU gate stayed green - fixed, re-validated. MEASURED in the
+  page (Houston, 29.76 N 95.37 W, 18:2xZ, a storm over the city):
+  "RainViewer radar - here 27.34 mm/h (46 dBZ) - 18-km window: rain
+  9.26 mm/h over the ground the radar sees, max 64.8, echo on 100% of
+  289 px - radar over 100% of the window - zoom 7 (1.06 km/px),
+  Universal Blue palette - 1 min old" beside "NOAA GOES-19 rainfall
+  rate (RRQPEF) - 18:25Z - overhead dry (good) - nearest rain 8.1
+  mm/h 2.6 km off - 1371 raining of 10,201 retrieved 2-km px within
+  +-100 km (max 13.3 mm/h, mean 5.2 over the raining) - the disk
+  511,583 raining px, max 99.6 mm/h - 160 rain shafts drawn within
+  100 km: the nearest 7 km at 5° (8.1 mm/h), the heaviest 13.3 mm/h
+  68 km off hiding 92% of what stands behind it", the line's verdict
+  "the radar sees this pixel (27.34 mm/h) and outranks the
+  satellite" - the two measurements DISAGREE at the pixel (the radar
+  46 dBZ, the satellite dry with rain 2.6 km off): the ATBD's own
+  displacement (parallax, shear, the 10-minute age) and its 10-km
+  "fuzzy" validation say exactly this, and the composition's rule
+  (the radar's own covered pixel first) is what the line applies;
+  the satellite's window maximum 13.3 mm/h against the radar's 64.8
+  is the dry bias at high rates the ATBD states. The first frame
+  looked into the neighbourhood's trees at 4° - the curtains stand
+  behind the canopy; the Galveston shoreline (29.27 N 94.83 W,
+  looking 330° over the bay) is the vantage for the visual, its
+  frame recorded with this entry's measurements. THE HOME'S DAYLIGHT
+  A/B (the 159th-160th's scheduled check, 18:17Z, the sun 33.8° from
+  the zenith): the daylight line read "the scene's references under
+  NOAA's mask: clear rho 0.765 (median of 1,056 px), the coverage
+  edge rho 0.480 (the dim tenth of one mode at eta 0.67 of 159,745
+  cloudy px; the bright cloud's p90 0.820) - 0 of 4,032 fine texels
+  under the mask's cloud shaped (none took a fraction)": under the
+  day's high deck the mask left 1,056 "clear" pixels, brighter (0.77)
+  than the cloud's dim tenth (0.48) - the references INVERTED (the
+  mask's few clear pixels sit at cloud edges), so no texel could take
+  a fraction and the two frames could differ only by their load
+  state (they did: the "on" frame caught the placeholder terrain, the
+  "off" frame the settled sea). The rule that follows, in the next
+  stage: an inverted pair (clear at or above the coverage edge) is no
+  reference at all - the 2-km field stands and the line says why.
 - DONE (Sep 6, the review session's 164th pass - THE RAIN): the
   scene's rain has been the RainViewer radar composite's since the
   radar module's first pass, and the measurement this pass began

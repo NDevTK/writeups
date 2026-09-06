@@ -443,6 +443,11 @@
       import {EYE_D_CM, youngSigma} from './horizon/scintillation.js';
       import {buildMomentPyramid, slopesFromHeights} from './horizon/leadr.js';
       import {
+        rainShaftsNear,
+        rainShaftsSummary,
+        RAIN_EXTINCTION
+      } from './horizon/rainshafts.js';
+      import {
         decodePixel,
         metresPerPixel,
         rainRate,
@@ -823,6 +828,8 @@
         REFERENCE_REFLECTANCE
       } from './horizon/surface-color.js';
       import {
+        instancedBufferAttribute,
+        uv,
         attribute as tslAttribute,
         cameraPosition as tslCameraPosition,
         dot as tslDot,
@@ -7222,7 +7229,8 @@
                   : '') +
                 (rn.sceneStats && rn.sceneStats.rainingPx !== null
                   ? ` · the disk ${rn.sceneStats.rainingPx.toLocaleString('en-US')} raining px, max ${rn.sceneStats.maxMmH} mm/h`
-                  : '')
+                  : '') +
+                shaftWords(applyRainShafts(rn))
             );
           }
           if (
@@ -7576,6 +7584,27 @@
           return t.here.mm;
         return t.nearest ? t.nearest.mm : null;
       }
+      // THE RAIN SHAFTS (165th pass): the raining pixels within 100 km
+      // as curtains hung from the cloud base at their bearings, each
+      // as opaque as Atlas's extinction over its own 2-km path
+      // (rainshafts.js); ?shafts=0 leaves the sky clean
+      let rainShafts = null; // {at, time, list, summary}
+      function applyRainShafts(rn) {
+        if (!rn || !rn.list || params.get('shafts') === '0') {
+          rainShafts = null;
+          return null;
+        }
+        const list = rainShaftsNear(rn.list, state.lat, state.lon, {maxKm: 100, cap: 160, minMmH: 0.2});
+        rainShafts = {at: Date.now(), time: rn.time, list, summary: rainShaftsSummary(list)};
+        return rainShafts.summary;
+      }
+      const shaftWords = (sm) =>
+        sm
+          ? ` · ${sm.n} rain shaft${sm.n === 1 ? '' : 's'} drawn within 100 km: the nearest ${sm.nearestKm.toFixed(0)} km at ${Math.round(sm.nearestBearingDeg)}° (${sm.nearestMmH.toFixed(1)} mm/h), ` +
+            `the heaviest ${sm.heaviestMmH.toFixed(1)} mm/h ${sm.heaviestKm.toFixed(0)} km off hiding ${Math.round(100 * sm.heaviestOpacity)}% of what stands behind it`
+          : params.get('shafts') === '0'
+            ? ' · rain shafts off (?shafts=0)'
+            : ' · no rain shaft within 100 km';
       // THE RAIN (164th pass): NOAA's rainfall rate at a place - the
       // pixel's own good or degraded retrieval in mm/h, or null off
       // the window, on the fill or invalid
@@ -7937,7 +7966,11 @@
                   ? `no radar sees this pixel - the satellite's ${sat.mmh > 0 ? sat.mmh.toFixed(1) + ' mm/h' : 'dry pixel'} stands (${sat.ageMin} min old)`
                   : 'no radar sees this pixel and no fresh satellite pixel - the model stands') +
               ` · the ATBD's validation: r ${RAIN_ATBD.validation.mrms.r.g16} against gauge-adjusted MRMS, precision ${RAIN_ATBD.validation.mrms.precisionMmH.g16} mm/h at 10 mm/h on GOES-16 ` +
-              `(${RAIN_ATBD.validation.mrms.precisionMmH.g17} on GOES-17, past the spec); best for convective warm-season rain, worst for stratiform and orographic - its own caution`;
+              `(${RAIN_ATBD.validation.mrms.precisionMmH.g17} on GOES-17, past the spec); best for convective warm-season rain, worst for stratiform and orographic - its own caution` +
+              shaftWords(rainShafts ? rainShafts.summary : null) +
+              (rainShafts && rainShafts.summary
+                ? ` (each curtain's opacity 1 − e^−τ with τ = ${RAIN_EXTINCTION.a} R^${RAIN_EXTINCTION.b} × ${RAIN_EXTINCTION.pixelPathKm} km, Atlas 1953's extinction over the pixel's own path)`
+                : '');
           }
         }
         // THE FIRE'S HEAT (162nd pass): the hot spots within reach and
@@ -15226,6 +15259,79 @@
       let fireGlow = null;
       let fireT = 0;
       const EMBERS = 5;
+      // THE RAIN SHAFTS drawn (165th): one camera-facing curtain per
+      // raining pixel within reach, 2 km wide (the pixel), hung from
+      // the cloud base (the field's low deck top, else the VIIRS
+      // census's, else 1,500 m - stated) to the ground at its place,
+      // far ones clamped to the horizon ring at their true bearing
+      // like the fires; grey-blue through the aerial fog, the opacity
+      // Atlas's, a little denser at the base than at the ground.
+      let shaftMesh = null;
+      let shaftCount = 0;
+      function updateRainShafts() {
+        const list = rainShafts && rainShafts.list;
+        const fresh = list && list.length && Date.now() - Date.parse(rainShafts.time) < 25 * 60e3;
+        if (!fresh) {
+          if (shaftMesh) shaftMesh.visible = false;
+          return;
+        }
+        const n = list.length;
+        if (!shaftMesh || shaftCount !== n) {
+          if (shaftMesh) {
+            scene.remove(shaftMesh);
+            shaftMesh.geometry.dispose();
+          }
+          const posAttr = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+          const sclAttr = new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 2);
+          const opAttr = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
+          const mat = new THREE.SpriteNodeMaterial();
+          mat.transparent = true;
+          mat.depthWrite = false;
+          mat.positionNode = instancedBufferAttribute(posAttr);
+          mat.scaleNode = instancedBufferAttribute(sclAttr);
+          const grad = uv().y.mul(0.35).add(0.65); // denser toward the base
+          mat.colorNode = aerial.encodeFog(tslVec3(0.5, 0.56, 0.62));
+          mat.opacityNode = instancedBufferAttribute(opAttr).mul(grad);
+          shaftMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat, n);
+          shaftMesh.frustumCulled = false;
+          shaftMesh.userData = {posAttr, sclAttr, opAttr};
+          shaftMesh.layers.set(4); // the post-cloud overlay pass, with the precipitation
+          scene.add(shaftMesh);
+          shaftCount = n;
+        }
+        shaftMesh.visible = true;
+        const {posAttr, sclAttr, opAttr} = shaftMesh.userData;
+        const goes = goesObs;
+        const baseM =
+          goes && goes.lowTopM !== null && goes.lowPct >= 5
+            ? goes.lowTopM
+            : state.ctop && Number.isFinite(state.ctop.lowM)
+              ? state.ctop.lowM
+              : 1500;
+        const yBase = 16 * Math.asinh((baseM - centerElev) / 500) + 8;
+        const MAXR = 130;
+        for (let k = 0; k < n; k++) {
+          const f = list[k];
+          const s = geoToScene(f.lat, f.lon, dressAnchor);
+          const e = geoToScene(f.lat, f.lon + 2 / (111.2 * Math.cos((f.lat * Math.PI) / 180)), dressAnchor);
+          const w = Math.max(Math.hypot(e.x - s.x, e.z - s.z), 0.5);
+          let x = s.x;
+          let z = s.z;
+          const r = Math.hypot(x, z) || 1;
+          if (r > MAXR) {
+            x = (x / r) * MAXR;
+            z = (z / r) * MAXR;
+          }
+          const gy = sample(x, z).y;
+          const top = Math.max(yBase, gy + 1);
+          posAttr.setXYZ(k, x, (gy + top) / 2, z);
+          sclAttr.setXY(k, w, top - gy);
+          opAttr.setX(k, f.opacity);
+        }
+        posAttr.needsUpdate = true;
+        sclAttr.needsUpdate = true;
+        opAttr.needsUpdate = true;
+      }
       function updateFires(dt) {
         const fires = state.fires;
         if (!fires || !fires.length || params.get('fire') === '0') {
@@ -20079,6 +20185,7 @@
 
         camera.updateMatrixWorld();
         updateFires(dt);
+        updateRainShafts();
 
         if (cloudsActive) {
           // Terrain depth prepass (cheap: colour writes off, override
