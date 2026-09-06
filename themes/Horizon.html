@@ -6982,7 +6982,11 @@
                 `high-quality 2-km px within ±100 km` +
                 (c.cloudy ? ` (ice ${Math.round(100 * c.iceFrac)}%)` : '') +
                 ` · ${c.clear} clear · ${c.low} low quality` +
-                (phaseGate().why ? ` → ${phaseGate().why}: ${phaseGate().ice ? '' : 'no halo family, no cirrus corona'}${phaseGate().water ? '' : 'no droplet corona'}` : '')
+                (phaseGate().why
+                  ? ` → ${phaseGate().why}` +
+                    (phaseGate().ice ? '' : ': no halo family, no cirrus corona') +
+                    (phaseGate().water ? '' : ': no droplet corona')
+                  : '')
             );
           }
           if (
@@ -7579,7 +7583,9 @@
               (c.cloudy ? ` (ice ${Math.round(100 * c.iceFrac)}%)` : '') +
               ` · ` +
               (g.why
-                ? `${g.why} → ${g.ice ? '' : 'the halo family and the cirrus corona closed'}${g.ice || g.water ? '' : '; '}${g.water ? '' : 'the droplet corona closed'}${g.ice && g.water ? '' : ''}`
+                ? g.why +
+                  (g.ice ? '' : ' → the halo family and the cirrus corona closed') +
+                  (g.water ? '' : ' → the droplet corona closed')
                 : 'no phase call overhead: the optics keep their own gates') +
               ` · the ATBD's validation: 93% agreed with CALIOP over 52,043 thick clouds (ice 98%, water 90%), the requirement 80%`;
           }

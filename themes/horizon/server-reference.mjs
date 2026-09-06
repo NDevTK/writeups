@@ -19,6 +19,7 @@
 //    holds, refills with time, and IPs are isolated
 // All time-dependent landmarks pass explicit clocks - nothing
 // here reads the wall clock.
+import {readFileSync} from 'node:fs';
 import {
   chlorCell,
   chlorUrl,
@@ -1883,6 +1884,46 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     `daily with data wins; a daily cloud gap takes the 8-day composite; a lone null is still ` +
       `a real answer; the composite asks the 8-day dataset for the same six bands (a six-band ` +
       `point query measured at 17.7 s on 2026-09-05 - the old 15-s timeout failed every call)`
+  );
+}
+
+// ---- THE DAEMON'S BINDINGS (161st pass) --------------------------
+// The daemon binds the decode block's names by destructuring its
+// namespace (const {...} = L2), so a body builder it CALLS but never
+// bound throws ReferenceError at request time - the 161st's first
+// build did exactly that with l2PhaseBody: the daemon crashed on its
+// first /goesl2 while every gate stayed green, and a deploy would
+// have crash-looped the box on every request. This landmark reads
+// the daemon's own source: every l2...Body the code calls must be
+// bound from L2 and re-exported, and every served ask must have a
+// builder named for it (the DCOMP pair through l2DcompBody).
+{
+  const src = readFileSync(new URL('./server/src/index.mjs', import.meta.url), 'utf8');
+  const called = [...new Set([...src.matchAll(/\b(l2[A-Z][A-Za-z]*Body)\(/g)].map((m) => m[1]))].sort();
+  const bound = (src.match(/const \{([^}]*)\} = L2;/) ?? ['', ''])[1]
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const exported = (src.match(/export \{([^}]*)\} from '\.\.\/\.\.\/goesl2-decode\.js';/) ?? ['', ''])[1]
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const unbound = called.filter((n) => !bound.includes(n));
+  const unexported = called.filter((n) => !exported.includes(n));
+  const served = L2_ASKS.filter((a) => !a.pageOnly && a.id !== 'cps');
+  const builderOf = (id) => 'l2' + (id === 'cod' ? 'Dcomp' : id[0].toUpperCase() + id.slice(1)) + 'Body';
+  const missing = served.map((a) => builderOf(a.id)).filter((n) => !called.includes(n));
+  check(
+    "THE DAEMON'S BINDINGS: every body builder the daemon calls is bound from the decode block, every served ask has one",
+    called.length >= 10 &&
+      unbound.length === 0 &&
+      unexported.length === 0 &&
+      missing.length === 0 &&
+      bound.includes('l2PhaseBody') &&
+      called.includes('l2PhaseBody'),
+    `the daemon calls ${called.length} builders (${called.join(', ')}), all ${unbound.length === 0 ? 'bound' : 'NOT bound: ' + unbound.join(', ')} ` +
+      `and ${unexported.length === 0 ? 'all re-exported' : 'not re-exported: ' + unexported.join(', ')}; the ${served.length} served asks each name one` +
+      (missing.length ? ` - MISSING ${missing.join(', ')}` : '')
   );
 }
 

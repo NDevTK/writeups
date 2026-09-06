@@ -10427,8 +10427,23 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   server-reference (12 asks, ids, half widths, 6 untimed, 11 served,
   the twelfth's product and timing); goesl2-client-reference (11
   served, the phase null on the fake bucket, the re-list of seven
-  CONUS products). Docs: the daemon README's /goesl2 entry and
-  products count, FINDINGS pass 161.
+  CONUS products); server-reference THE DAEMON'S BINDINGS (new: the
+  daemon binds the decode block's names by destructuring, so a body
+  builder it calls but never bound throws at request time - this
+  pass's first build did exactly that with l2PhaseBody, the daemon
+  crashed on its first /goesl2 while every gate stayed green, and the
+  page's own probe caught it before main: the landmark reads the
+  daemon's source and holds every called builder bound and
+  re-exported and every served ask to a builder; 31). Docs: the
+  daemon README's /goesl2 entry and products count, FINDINGS pass
+  161. MEASURED in the page (the home, 13:1xZ, night): the record
+  "NOAA GOES-18 cloud top phase (ACTPC) - 13:07Z - overhead mixed
+  phase - 0 liquid - 0 supercooled - 6,665 mixed - 3,372 ice of
+  10,037 cloudy high-quality 2-km px within +-100 km (ice 34%) - 164
+  clear - 0 low quality -> mixed-phase top overhead (NOAA phase):
+  both families stand", the daemon's own body carrying the phase
+  (upstream ok, eleven products in /health) once the binding was
+  fixed.
 - DONE (Sep 6, the review session's 160th pass - THE COVERAGE EDGE):
   the 159th's stated limit closed before its first solid-deck test.
   The decks' texel field is a COVERAGE (the noise threshold: a texel

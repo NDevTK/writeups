@@ -1008,6 +1008,9 @@ export {
   l2DsrBody,
   l2AodBody,
   l2LstBody,
+  L2_PHASE_SPEC,
+  L2_PHASE_EXTRAS,
+  l2PhaseBody,
   l2DcompBody
 } from '../../goesl2-decode.js';
 const {
@@ -1045,6 +1048,7 @@ const {
   l2DsrBody,
   l2AodBody,
   l2LstBody,
+  l2PhaseBody,
   l2DcompBody
 } = L2;
 const l2Inflate = (u8) =>
