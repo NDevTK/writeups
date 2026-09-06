@@ -10412,8 +10412,25 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   is the dry bias at high rates the ATBD states. The first frame
   looked into the neighbourhood's trees at 4° - the curtains stand
   behind the canopy; the Galveston shoreline (29.27 N 94.83 W,
-  looking 330° over the bay) is the vantage for the visual, its
-  frame recorded with this entry's measurements. THE HOME'S DAYLIGHT
+  looking 330° over the bay, 18:3xZ) read "143 rain shafts drawn
+  within 100 km: the nearest 41 km at 14° (10.0 mm/h), the heaviest
+  13.3 mm/h 75 km off" under a clear model sky with the radar dry
+  over its 16-km window - the nearest curtain outside the 330° view
+  and near the world's edge, the frame a park under blue sky: the
+  curtains' VISUAL is still owed, a shaft within a dozen km in the
+  view direction being what it takes. The third probe (Houston,
+  18:4xZ, the storm now over the pixel): "NOAA GOES-19 rainfall rate
+  (RRQPEF) - 18:35Z - overhead 6.5 mm/h (good) - nearest rain 6.5
+  mm/h 0 km off - 1495 raining of 10,201 retrieved 2-km px within
+  +-100 km (max 15.5 mm/h, mean 5.2 over the raining) - the disk
+  518,213 raining px, max 99.92 mm/h - 160 rain shafts drawn within
+  100 km: the nearest 6 km at 296° (10.0 mm/h), the heaviest 15.4
+  mm/h 62 km off hiding 94% of what stands behind it" - the
+  satellite's own pixel raining now where twenty minutes earlier it
+  read dry with the radar at 46 dBZ; its frame was lost to a
+  dropped WebGPU instance as the harness's own browser probes began
+  beside it (the two contend for one GPU on this box) - the visual
+  retried alone. THE HOME'S DAYLIGHT
   A/B (the 159th-160th's scheduled check, 18:17Z, the sun 33.8° from
   the zenith): the daylight line read "the scene's references under
   NOAA's mask: clear rho 0.765 (median of 1,056 px), the coverage
