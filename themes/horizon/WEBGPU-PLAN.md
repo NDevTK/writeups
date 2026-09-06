@@ -10345,6 +10345,120 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 6, the review session's 174th pass - THE RADAR'S OWN
+  HEIGHTS): the scene's storms had heights from orbit (ACHA's tops,
+  173rd; the parcel's EL, 172nd) and rain from RainViewer's composite
+  and the satellite's rate, but no radar-measured HEIGHT of a storm
+  at its place. NCEP's MRMS (Multi-Radar/Multi-Sensor) 2-D grids serve
+  it: mrms.ncep.noaa.gov/2D/ lists ~150 CONUS products (EchoTop_18 /
+  30 / 50 / 60, MergedReflectivityQCComposite, PrecipRate, PrecipFlag,
+  VIL, MESH, the bright band's top and bottom, NLDN lightning
+  densities, probability-of-lightning nowcasts ...) with ALASKA,
+  HAWAII, CARIB and GUAM roots, each as MRMS_<product>.latest.grib2.gz
+  every 2 minutes. THE FILE (EchoTop_18, measured 22:06Z): 1.70 MB
+  gzipped, 1.75 MB GRIB2; discipline 209 (a local table); grid template
+  3.0, 7000 x 3500 cells at 0.01 deg from 54.995 N 129.995 W to 20.005
+  N 60.005 W, rows from the north; product template 4.0 category 3
+  number 44; DATA REPRESENTATION TEMPLATE 5.41 - PNG-packed - 16 bits,
+  R -3000, E 0, D 3, so value = (X - 3000) / 1000 km: -3 no coverage
+  (8.2 M of 24.5 M cells), -1 no echo, else the 18-dBZ echo top (3.9%
+  of the grid; p50 8.1, p95 14.6, max 19 km). THE PRIMARY, and what
+  could not be read - stated: the MRMS product guide and Smith et al.
+  2016 (BAMS 97, 1617-1630) sit behind hosts the sandbox cannot reach
+  (AMS 403 on the download path and 404 on the article-pdf link
+  CrossRef gives; www.nssl.noaa.gov and mrms.nssl.noaa.gov return
+  nothing through the egress proxy - blocked, not to be routed around;
+  vlab and NCEI 404; the Wayback Machine blocked); CrossRef delivered
+  the abstract only ("approximately 1 km, with 33 vertical levels,
+  updating every 2 min over the conterminous United States and
+  southern Canada"). So the pass claims only what the file and the
+  catalogue carry: the product's name (the 18-dBZ echo top), its
+  scaling (kilometres), MRMS's height convention (MSL, marked
+  unverified). The bright band (BrightBandTopHeight / BottomHeight, 18
+  MB a file, a smooth field over 93.8% of the grid - model-blended, not
+  a radar-only measurement) and PrecipFlag (codes 0/1/3/6/7/10/91/96
+  whose table nobody here could read) were measured and LEFT OUT. THE
+  DECODER (grib2.js): grib2Sections / grib2Header (the head without
+  the data), pngChunks, pngUnfilterRow (RFC 2083's None / Sub / Up /
+  Average / Paeth), pngWindow16 - a STREAMING read: the IDAT chunks
+  fed to an injected inflater (node's zlib.createInflate), each
+  finished row unfiltered against the one above and dropped unless it
+  lies in the window, the inflater closed once the window's last row
+  is out - and grib2Window (template 5.41 only, the cell containing
+  the point by floor(x + 0.5), the window clipped to the grid, null off
+  it); measured: 93 MB peak RSS for three windows in node (a ~50-MB
+  baseline; the 49-MB raster never allocated), 100-440 ms a window,
+  1,900-2,700 inflater chunks. A point on a cell edge (32.08 N sits
+  between two 0.01-deg cells) rounds differently in numpy and JS - the
+  reader's rule is floor(x + 0.5) and the fixture asks at a cell's own
+  centre. THE LAW (mrms.js): MRMS_FACTS (the file's and the
+  catalogue's facts, the documentation gap, the absence caveat),
+  MRMS_TOWER_KM 8 (the theme's own rule for a storm worth a tower,
+  stated), mrmsCell / mrmsCellCentre, bearingDeg, echoTopCensus (the
+  window's covered and echoing cells, the tops' median, tallest tenth
+  and tallest, the tallest cell placed by bearing and great-circle
+  distance, the observer's own cell, the storms at or above 8 km
+  tallest first, capped at 300), echoTopWords. THE DAEMON: /mrms - the
+  latest file held once for every point and refreshed on the product's
+  cadence (gunzipSync, grib2Header), a +-50-km window cut per cell
+  (grib2Window with zlib.createInflate), the census cached per cell
+  until the next file, 200 with covered false off the grid, 502 when
+  the file cannot be read; MEASURED 22:26Z: Savannah 7,679 echoing
+  cells of 10,201, tops p90 11 km, the tallest 13 km at 35.8 deg and
+  56.9 km (381 ms, 2,343 rows); Miami 552 cells, the tallest 14 km at
+  51.7 deg and 56.6 km; Charlotte 976 cells, the tallest 11 km at
+  195.3 deg and 22.5 km; the western Gulf 0 of 10,201 - every cell -1:
+  the mosaic's domain reaches 300 km past the nearest radar, so a -1
+  is NOT clear air (the absence caveat, on every no-echo line);
+  Grindelwald off the grid. THE PAGE: syncMrms every 2 min through the
+  daemon (?mrmssrc, ?mrms=0; an older daemon's 404 turns it off),
+  state.radarTops, the record "NCEP MRMS 18-dBZ echo tops"; a radar
+  storm at or above 8 km within +-50 km in a file under 10 min old
+  makes the low deck TOWERING even when the station's own code reports
+  no shower (the storm is in view); the storm slab's top RANKING,
+  stated on the line: ACHA's tallest tenth when ten good fields stand
+  (the cloud top - the anvil), else the radar's tallest 18-dBZ echo top
+  (the precipitation core's top, under the anvil), else the parcel's
+  EL (predicted), the ?el pin over all; the research line "the radar's
+  storm tops (MRMS echo top)" with the words, what it feeds, the
+  tallest storm's bearing and distance, the ranking and the
+  documentation gap. GATES: mrms-reference THE PNG ROWS (a 9 x 7
+  16-bit image filtered with every row filter, deflated and wrapped as
+  PNG chunks in the gate: a middle window and the whole exact, a row
+  undone by hand, a window past the image throws) and THE ECHO TOP,
+  READ (mrms-fixture.js: a 51 x 51 crop of the 22:06Z file around
+  Savannah re-packed by python as a complete GRIB2 message - the
+  original sections 1, 4 and 5, section 3 re-based, Pillow's 16-bit
+  PNG - through grib2Header and the streaming window against Pillow's
+  independent numbers: the centre cell 8 km, five sampled counts, 2,476
+  echoing / 125 echo-free / 0 uncovered cells, the tops' median 9.4,
+  tallest tenth 10.571, tallest 13 km at 60.7 deg and 20.5 km against a
+  plain great-circle, 1,968 cells at or above 8 km; a window at 10 N
+  null, one at the crop's corner clipped to 6 x 6); server-reference
+  THE SHIP LIST, WHOLE (below); validate.sh lists mrms (149 files). THE
+  DEPLOY STALL'S ACTUAL CAUSE, found on the way (the box on the 166th's
+  build since 20:25Z with five revisions pushed): install.sh's sed
+  rewrite list lacked glm.js (168th) while its install line was
+  present, so install.sh's OWN drift guard refused every revision from
+  the 168th on - correctly - AFTER the box's hour-long gate had
+  passed, and update.sh under set -e aborted before writing its state,
+  so the same revision was gated again at the next tick, an hour a
+  time, with nothing recorded (the 172nd's status file would have said
+  "deployed" before the install). Fixed: the rewrites for glm.js and
+  mrms.js; update.sh records an install failure like a failed gate
+  (the state "<rev> failed <epoch>", the six-hour cooldown, the status
+  file's phase install-failed with the guard's words; a new phase
+  installing between the gate and the install); server-reference THE
+  SHIP LIST, WHOLE holds every '../../X.js' import of index.mjs (20) to
+  both halves - the 158th's lesson completed. Docs: server README
+  (/mrms; the third deploy lesson), FINDINGS pass 174 (149 files, 1,197
+  landmarks). STATED LIMITS: the documentation gap above; the window is
+  +-50 km on a 1-km grid (the storms beyond it are the satellite's);
+  the tallest echo top is one cell's, not a storm's mean; 8 km is the
+  theme's threshold, not MRMS's; the towers are drawn as the deck's
+  uniform towering slab, not yet at their bearings and heights - the
+  named next lead (a per-texel top field for the towering deck from
+  the storms list, the way the rain shafts stand at their bearings).
 - DONE (Sep 6, the review session's 173rd pass - THE TOPS FROM ORBIT):
   NOAA's cloud-top heights (ABI-L2-ACHAC) have been served since the
   148th and only PRINTED - the census median on the NOAA L2 line -

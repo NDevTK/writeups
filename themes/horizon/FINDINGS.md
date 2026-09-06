@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1194 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1197 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **148 reference files, 1194 landmark lines, 8 GPU probes** (live gate
+- **149 reference files, 1197 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1243,7 +1243,37 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    morning balloon's own equilibrium level 126 km away was 11,872 m:
    the cirrus sheet sat at the day's convective ceiling, two
    independent measurements 60 m apart (`goesl2-reference` THE TOPS
-   FROM ORBIT)
+   FROM ORBIT). Pass 174 brings the radar's own heights: NCEP's MRMS
+   18-dBZ echo tops (mrms.ncep.noaa.gov/2D/EchoTop_18, a 7000 × 3500
+   grid of 0.01° cells every 2 min, 1.7 MB gzipped) — a GRIB2 message
+   packed by data representation template 5.41, a 16-bit PNG of the
+   counts, which `grib2.js` now reads by a STREAMING window (the PNG's
+   rows unfiltered one against the one above and dropped unless in the
+   window, the inflater closed at the window's last row: a few rows of
+   memory, never the 49-MB raster; a synthetic image through every row
+   filter and the vendored 51 × 51 crop of the 22:06Z file, re-packed
+   as its own GRIB2 message, come back exact against Pillow). The
+   daemon serves `/mrms`: the observer's cell, the ±50-km census (the
+   cells covered and echoing, the tops' median, tallest tenth and
+   tallest, the tallest storm placed by bearing and distance) and the
+   storms at or above 8 km; a radar storm in view makes the deck
+   towering even when the station reports no shower, and the storm
+   slab's top ranks the measured tops — ACHA's tallest tenth, else the
+   radar's tallest echo top, else the parcel's EL. STATED: the MRMS
+   product documentation could not be read from the build sandbox (AMS
+   403/404, nssl.noaa.gov blocked), so the page claims only what the
+   file and the catalogue carry — the product's name, its scaling
+   (kilometres), MRMS's MSL convention marked unverified — and a −1
+   far offshore is not clear air (the mosaic's domain reaches past the
+   radars: an echo is a measurement, its absence is not). The same pass
+   found the deploy stall's actual cause: `install.sh`'s rewrite list
+   lacked `glm.js` (168th) while its ship line was present, so the
+   box's own drift guard refused every revision from the 168th on after
+   an hour-long passing gate and `update.sh` re-gated the same tip
+   every tick with nothing recorded; the rewrite is added, every shared
+   import is now held to both halves, and an install failure is
+   recorded like a failed gate (`mrms-reference` THE PNG ROWS, THE ECHO
+   TOP, READ; `server-reference` THE SHIP LIST, WHOLE)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
