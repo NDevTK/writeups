@@ -1641,6 +1641,54 @@ export function deckField(
 }
 
 /**
+ * THE DAYLIGHT FIELD (159th pass): the deck field's texels split
+ * `factor` ways, each fine texel keeping its coarse texel's deck
+ * assignment and validity (B, A) while its cover (R for the low
+ * deck, G for the mid) is the coarse cover times the fraction the
+ * visible band reads at the fine texel's own place - `fracAt(fi,
+ * fj)` answers 0..1 (goesl2.coverFraction from the band-2
+ * reflectance between the scene's own clear and cloudy references)
+ * or NaN where no reflectance stands (night, fill, off the visible
+ * window), and a NaN keeps the coarse cover. The mask decides where
+ * cloud is; the visible band shapes it inside - a clear coarse texel
+ * stays clear whatever the fine reflectance says. Returns {data, rm,
+ * factor, refined, cloudy}: the fine field, its width, how many
+ * fine texels took a fraction and how many lay under cloud.
+ */
+export function refineDeckField(deck, fracAt, factor = 4) {
+  const rm = deck.rm;
+  const rf = rm * factor;
+  const data = new Float32Array(rf * rf * 4);
+  let refined = 0;
+  let cloudy = 0;
+  for (let fj = 0; fj < rf; fj++) {
+    const jj = Math.floor(fj / factor);
+    for (let fi = 0; fi < rf; fi++) {
+      const ii = Math.floor(fi / factor);
+      const k = (jj * rm + ii) * 4;
+      const o = (fj * rf + fi) * 4;
+      const low = deck.data[k];
+      const mid = deck.data[k + 1];
+      data[o + 2] = deck.data[k + 2];
+      data[o + 3] = deck.data[k + 3];
+      if (low > 0 || mid > 0) {
+        cloudy++;
+        const f = fracAt(fi, fj);
+        if (Number.isFinite(f)) {
+          refined++;
+          data[o] = low * f;
+          data[o + 1] = mid * f;
+          continue;
+        }
+      }
+      data[o] = low;
+      data[o + 1] = mid;
+    }
+  }
+  return {data, rm: rf, factor, refined, cloudy};
+}
+
+/**
  * The whole instrument on one mosaic - what the page and the gate
  * both run. Returns the field, the reference, the stats within 100
  * and 30 km and the deck field.

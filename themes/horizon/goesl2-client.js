@@ -48,7 +48,8 @@ import {
   l2LstBody,
   l2MaskBody,
   l2Prefixes,
-  l2SstBody
+  l2SstBody,
+  l2VisBody
 } from './goesl2-decode.js';
 import {pickSatellite} from './satellites.js';
 
@@ -240,8 +241,12 @@ export function createGoesL2Client({
     const wanted = only
       ? new Set(only.flatMap((id) => (id === 'dcomp' ? ['cod', 'cps'] : [id])))
       : null;
+    // a pageOnly ask (159th: the 500-m visible window) is read only
+    // when named - the default body stays the daemon's own
     const asks = L2_ASKS.filter(
-      (a) => (!at || a.timed !== false) && (!wanted || wanted.has(a.id))
+      (a) =>
+        (!at || a.timed !== false) &&
+        (wanted ? wanted.has(a.id) : !a.pageOnly)
     );
     const got = await Promise.all(asks.map((a) => file(bucket, a, at, cell)));
     const F = Object.fromEntries(asks.map((a, i) => [a.id, got[i]]));
@@ -280,6 +285,8 @@ export function createGoesL2Client({
       dmw: F.dmw ? l2DmwBody(F.dmw.dec, F.dmw.key) : null,
       aod: F.aod ? l2AodBody(F.aod.dec, F.aod.key, cell.lat, cell.lon) : null,
       lst: F.lst ? l2LstBody(F.lst.dec, F.lst.key, cell.lat, cell.lon) : null,
+      // the daylight field (159th): the page's own read, only when asked
+      vis: F.vis ? l2VisBody(F.vis.dec, F.vis.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial',
       rangesHonoured: !stats.rangesIgnored,
       // the ask ids this body answered (a subset under `only`): a

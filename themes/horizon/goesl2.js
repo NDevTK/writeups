@@ -813,6 +813,157 @@ export function lstValidationSpan(craft = 'GOES-16') {
     meanPrecisionK: sp / n
   };
 }
+// ---------------------------------------------------------------
+// THE DAYLIGHT FIELD (159th pass): the reflective bands' CMI - the
+// CMIP ATBD's reflectance factor - and the sun that lit it. The
+// Cloud and Moisture Imagery Product ATBD, Enterprise v4 (Schmit &
+// Gunshor, 13 Jan 2021; the header's 149th entry), Sec. 3.4.1.2:
+// Eq. 3-2 rho_f = kappa L with kappa = pi d^2 / Esun ("the incident
+// Lambertian-equivalent radiance", d the instantaneous Earth-Sun
+// distance in AU, Esun the bandpass solar irradiance) - the file's
+// own kappa0, esun and earth_sun_distance_anomaly_in_AU; Eq. 3-3
+// rho_f = rho cos(theta0), the reflectance factor being the
+// reflectance times the cosine of the solar zenith angle (the CMI's
+// standard_name says the same); DQF 0 good, 1 conditionally usable,
+// 2 out of range, 3 no value, 4 focal-plane temperature exceeded (5
+// added for GOES-17's loop heat pipe). Band 2 (0.64 um) is the one
+// 500-m band; its CMI is int16 counts 0..4095 at 0.00031746 a count,
+// fill -1 (65535 on the wire, as band 13's).
+// ---------------------------------------------------------------
+export const VIS_BAND = 'C02';
+export const VIS_DQF_MEANINGS = [
+  'good_pixel_qf',
+  'conditionally_usable_pixel_qf',
+  'out_of_range_pixel_qf',
+  'no_value_pixel_qf',
+  'focal_plane_temperature_threshold_exceeded_qf'
+];
+export const VIS_ATBD = {
+  bandUm: 0.64,
+  resolutionM: 500,
+  kappaLaw: 'kappa = pi d^2 / Esun (Eq. 3-2)',
+  factorLaw: 'rho_f = rho cos(solar zenith) (Eq. 3-3)',
+  // the file's own (OR_ABI-L2-CMIPC-M6C02_G18_s20262490951178)
+  file: {
+    kappa0: 0.0019647,
+    esunWm2Um: 1624.774,
+    dAu: 1.00802,
+    scale: 0.00031746,
+    countsValid: [0, 4095],
+    sizeMbNight: 33.6
+  }
+};
+/** Eq. 3-2's kappa from the file's own Earth-Sun distance (AU) and
+ * bandpass solar irradiance (W m^-2 um^-1). */
+export function kappaFactor(dAu, esunWm2Um) {
+  return (Math.PI * dAu * dAu) / esunWm2Um;
+}
+/** Eq. 3-3 inverted: the reflectance from the reflectance factor and
+ * the cosine of the solar zenith angle; NaN where the sun is too low
+ * for the division to mean anything (cos below minCos). */
+export function reflectanceOfFactor(rf, cosSza, {minCos = 0.05} = {}) {
+  return Number.isFinite(rf) && cosSza > minCos ? rf / cosSza : NaN;
+}
+/**
+ * The solar zenith angle (deg) at a place and a time: the USNO
+ * "Approximate Solar Coordinates" low-precision series the page's
+ * own sun rides (mean longitude 280.460 + 0.9856474 n, anomaly
+ * 357.528 + 0.9856003 n, ecliptic longitude L + 1.915 sin g + 0.020
+ * sin 2g, obliquity 23.439 - 0.0000004 n, Greenwich sidereal time
+ * 18.697374558 + 24.06570982441908 n hours; good to about a minute of
+ * arc across 1950-2050 - the satellite pixel's own sun to a tenth of
+ * a percent of its cosine).
+ */
+export function solarZenithDeg(latDeg, lonDeg, ms) {
+  const n = (ms - Date.UTC(2000, 0, 1, 12)) / 86400e3;
+  const L = (280.46 + 0.9856474 * n) % 360;
+  const g = ((357.528 + 0.9856003 * n) * Math.PI) / 180;
+  const lam = ((L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * Math.PI) / 180;
+  const eps = ((23.439 - 0.0000004 * n) * Math.PI) / 180;
+  const ra = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam));
+  const dec = Math.asin(Math.sin(eps) * Math.sin(lam));
+  const gmstH = (18.697374558 + 24.06570982441908 * n) % 24;
+  const ha = ((gmstH * 15 + lonDeg) * Math.PI) / 180 - ra;
+  const la = (latDeg * Math.PI) / 180;
+  const cosZ =
+    Math.sin(la) * Math.sin(dec) + Math.cos(la) * Math.cos(dec) * Math.cos(ha);
+  return (Math.acos(Math.max(-1, Math.min(1, cosZ))) * 180) / Math.PI;
+}
+/**
+ * THE COVER FRACTION of a fine pixel from its reflectance between the
+ * scene's own clear and cloudy reflectances (a plane-parallel pixel
+ * partly filled with cloud reflects the linear mix of the two - the
+ * fraction is the position between them, clamped): NaN without a
+ * reflectance or a span. The clear and cloudy references are
+ * MEASURED under the mask (visReferences), never quoted.
+ */
+export function coverFraction(rho, rhoClear, rhoCloud) {
+  if (!Number.isFinite(rho)) return NaN;
+  const span = rhoCloud - rhoClear;
+  if (!(span > 1e-3)) return NaN;
+  return Math.min(1, Math.max(0, (rho - rhoClear) / span));
+}
+/**
+ * The window's census by the file's five flags (255 fill) with the
+ * good pixels' reflectance-factor and reflectance statistics at one
+ * cosine of the solar zenith (the observer's: the sun's angle moves
+ * about a degree across the window, stated).
+ */
+export function visCensus(rf, dqf, cosSza) {
+  const c = {n: rf.length, good: 0, usable: 0, outOfRange: 0, noValue: 0, fpt: 0, fill: 0};
+  const good = [];
+  for (let q = 0; q < rf.length; q++) {
+    const d = dqf ? dqf[q] : 0;
+    if (d === 0) c.good++;
+    else if (d === 1) c.usable++;
+    else if (d === 2) c.outOfRange++;
+    else if (d === 3) c.noValue++;
+    else if (d === 4) c.fpt++;
+    else c.fill++;
+    if (d === 0 && Number.isFinite(rf[q])) good.push(rf[q]);
+  }
+  good.sort((a, b) => a - b);
+  const rho = (v) => (v === null ? null : reflectanceOfFactor(v, cosSza));
+  const med = quantile(good, 0.5);
+  return {
+    ...c,
+    rfMin: good.length ? good[0] : null,
+    rfMedian: med,
+    rfMax: good.length ? good[good.length - 1] : null,
+    cosSza,
+    rhoMin: rho(good.length ? good[0] : null),
+    rhoMedian: rho(med),
+    rhoMax: rho(good.length ? good[good.length - 1] : null)
+  };
+}
+/**
+ * THE SCENE'S OWN REFERENCES: the reflectance of the clear and of the
+ * cloudy pixels as the mask sorts them - `clearOf(q)` says whether the
+ * fine pixel q lies under a clear (true), cloudy (false) or unknown
+ * (null) mask pixel. The clear reference is the clear pixels' median
+ * reflectance, the cloudy one the cloudy pixels' 90th percentile (the
+ * bright, filled cloud - a median would sit on the edges and holes
+ * the fraction is meant to find). {rhoClear, rhoCloud, nClear,
+ * nCloud} with nulls where either side is thin (under minN).
+ */
+export function visReferences(rho, clearOf, {minN = 50} = {}) {
+  const clear = [];
+  const cloud = [];
+  for (let q = 0; q < rho.length; q++) {
+    if (!Number.isFinite(rho[q])) continue;
+    const c = clearOf(q);
+    if (c === true) clear.push(rho[q]);
+    else if (c === false) cloud.push(rho[q]);
+  }
+  clear.sort((a, b) => a - b);
+  cloud.sort((a, b) => a - b);
+  return {
+    rhoClear: clear.length >= minN ? quantile(clear, 0.5) : null,
+    rhoCloud: cloud.length >= minN ? quantile(cloud, 0.9) : null,
+    nClear: clear.length,
+    nCloud: cloud.length
+  };
+}
 // The imagery bucket lists every band's file under one prefix
 // (OR_ABI-L2-CMIPC-M6C13_G18_s...): the band from a key, and the
 // keys of one band.

@@ -55,7 +55,9 @@ import {
   pixelSizeM,
   productTimeIso,
   qualityCensus,
+  solarZenithDeg,
   unscale,
+  visCensus,
   windowBox
 } from './goesl2.js';
 
@@ -185,6 +187,25 @@ export const L2_LST_EXTRAS = [
 // how far (Chebyshev, px) the nearest high-quality skin pixel is
 // sought from the point: 5 px = about 11 km on the 2-km grid here
 export const L2_LST_NEAR_PX = 5;
+// The 159th pass: the visible band 2 (0.64 um, the one 500-m band)
+// reflectance factor - the CMIP ATBD's rho cos(solar zenith), int16
+// counts at 0.00031746 with fill -1 (65535 on the wire, as band 13),
+// the file's own kappa, Esun and Earth-Sun distance as extras. The
+// daylight field the PAGE reads itself (pageOnly): a 401 x 401
+// window is 2.6 MB off the bucket every five minutes by day and a
+// 430 kB body - the free tier's egress cannot carry it, the bucket's
+// CORS can.
+export const L2_VIS_BAND = 'C02';
+export const L2_VIS_SPEC = {CMI: 'raw16', DQF: 'raw'};
+export const L2_VIS_EXTRAS = [
+  'kappa0',
+  'esun',
+  'earth_sun_distance_anomaly_in_AU',
+  'mean_reflectance_factor',
+  'max_reflectance_factor',
+  'valid_pixel_count'
+];
+L2_HALF_PX.vis = 200; // +-115 km on the 500-m grid here
 // what /goesl2 fetches for a point: product, spec, the window's half
 // width on the product's grid, the imagery's band (the CMIPC prefix
 // lists every band's file); timed false = not asked for a mosaic's
@@ -244,6 +265,18 @@ export const L2_ASKS = [
     halfPx: 50,
     extras: L2_LST_EXTRAS,
     timed: false
+  },
+  // the daylight field (159th): the 500-m visible band, the page's
+  // own read (pageOnly - the daemon never lists, fetches or serves it)
+  {
+    id: 'vis',
+    product: L2_PRODUCTS.imagery,
+    spec: L2_VIS_SPEC,
+    band: L2_VIS_BAND,
+    halfPx: 200,
+    extras: L2_VIS_EXTRAS,
+    timed: false,
+    pageOnly: true
   }
 ];
 const l2Scalar = (a) => (Array.isArray(a) ? a[0] : a);
@@ -790,6 +823,49 @@ export function l2LstBody(dec, key, lat, lon) {
     },
     lzaBounds: pair(x.quantitative_local_zenith_angle_bounds),
     lzaRetrievalBounds: pair(x.retrieval_local_zenith_angle_bounds)
+  };
+}
+// THE DAYLIGHT FIELD (159th pass): the visible band 2 window - the
+// 500-m reflectance factor (the CMIP ATBD's rho cos theta0) as counts
+// with the file's scaling and flags, the census by flag with the
+// good pixels' reflectance-factor and reflectance statistics at the
+// observer's sun (the file's own scan time through
+// goesl2.solarZenithDeg unless a cosine is handed in), and the file's
+// own kappa, Esun and Earth-Sun distance from the head (extras). The
+// page turns the factor into reflectance by each fine texel's sun and
+// carves the decks' cover with it.
+export function l2VisBody(dec, key, lat, lon, {cosSza = null} = {}) {
+  if (!l2Has(dec, L2_VIS_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.vis);
+  if (!w) return null;
+  const m = dec.meta.CMI ?? {scale: 1, offset: 0, fill: -1};
+  // the fill rides as 65535 in the raw16 cut (band 13's own rule)
+  const rf = unscale(w.cut.CMI, {...m, fill: 65535});
+  const x = dec.extras ?? {};
+  const num = (v) => (Number.isFinite(v) ? v : null);
+  const cs = Number.isFinite(cosSza)
+    ? cosSza
+    : Math.cos((solarZenithDeg(lat, lon, Date.parse(dec.time)) * Math.PI) / 180);
+  return {
+    ...l2Common(dec, L2_PRODUCTS.imagery, key, w),
+    band: L2_VIS_BAND,
+    wavelengthUm: 0.64,
+    rf: l2Counts(w.cut.CMI, m.fill),
+    rfScale: m.scale,
+    rfOffset: m.offset,
+    rfFill: 65535,
+    dqf: packArray(w.cut.DQF, 'u8'),
+    kappa0: num(x.kappa0),
+    esunWm2Um: num(x.esun),
+    dAu: num(x.earth_sun_distance_anomaly_in_AU),
+    sceneStats: {
+      meanRf: num(x.mean_reflectance_factor),
+      maxRf: num(x.max_reflectance_factor),
+      validPx: num(x.valid_pixel_count)
+    },
+    sunZenithDeg: +((Math.acos(Math.max(-1, Math.min(1, cs))) * 180) / Math.PI).toFixed(2),
+    cosSza: +cs.toFixed(4),
+    census: visCensus(rf, w.cut.DQF, cs)
   };
 }
 // The DCOMP window (149th pass): the optical depth at 640 nm and

@@ -202,6 +202,7 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
   const body = await client.fetchGoesL2(32.85, -117.12);
   const listsAfterFirst = client.stats.lists;
   const filesAfterFirst = client.stats.files;
+  const served = L2_ASKS.filter((a) => !a.pageOnly);
   // the daemon's own build of the same bytes
   const decWhole = decodeL2(achac, L2_HEIGHT_SPEC, inflateNode);
   const heightWhole = l2HeightBody(decWhole, 'k', 32.9, -117.1);
@@ -247,10 +248,13 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       near(body.dmw.layers.high.spdMs, DMWC_EXPECT.layers.high.spdMs, 1e-6) &&
       body.read.length === 2 &&
       body.read.every((r) => r.kb > 0 && r.rounds >= 1) &&
-      // this hour's prefix for every product, then last hour's and the
-      // one before for the seven the fake bucket lists nothing under
-      listsAfterFirst === (L2_ASKS.length - 2) * 3 + 2 &&
-      L2_ASKS.length === 10 &&
+      // this hour's prefix for every product the daemon serves, then
+      // last hour's and the one before for the eight the fake bucket
+      // lists nothing under; the pageOnly ask (159th: the 500-m
+      // visible window) is not listed unless named
+      listsAfterFirst === (served.length - 2) * 3 + 2 &&
+      L2_ASKS.length === 11 &&
+      served.length === 10 &&
       filesAfterFirst === 2 &&
       // the range reads: the heights' head then its strips, the winds
       // whole in one megabyte ask
@@ -283,7 +287,7 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       client.windows.size === 2 &&
       CLIENT_HELD_WINDOWS === 4 &&
       asked.size === 0,
-    `the home asks ${L2_ASKS.length} products over ${listsAfterFirst} listings (this hour's prefix for each, two more hours back for the eight found empty) and reads the two the fake bucket holds ` +
+    `the home asks the ${served.length} products the daemon serves (of ${L2_ASKS.length} asks: the 500-m visible window is the page's own, read only when named) over ${listsAfterFirst} listings (this hour's prefix for each, two more hours back for the eight found empty) and reads the two the fake bucket holds ` +
       `(${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB in ${r.ranges} range${r.ranges === 1 ? '' : 's'}`).join('; ')}): ` +
       `the heights' window at (424, 127) with ${body && body.height.census.n} tops, median ${body && body.height.census.medianM.toFixed(1)} m ` +
       `- the daemon's own body from the same bytes - and ${body && body.dmw.n} of ${body && body.dmw.total} vectors within 150 km, ` +
@@ -314,9 +318,22 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
     const listedPart = log.lists.slice(before);
     const filesAfterPart = sub.stats.files;
     const windsOnly = await sub.fetchGoesL2(32.85, -117.12, null, ['dmw']);
+    // the daylight field (159th): named alone it lists the imagery
+    // prefix (three hours, the fake bucket holds no CMIPC file) and
+    // answers null - no file, nothing read
+    const beforeVis = log.lists.length;
+    const visOnly = await sub.fetchGoesL2(32.85, -117.12, null, ['vis']);
+    const listedVis = log.lists.slice(beforeVis);
     check(
       'THE OLDER DAEMON’S GAPS: a subset of the asks lists and reads its own products alone',
       part !== null &&
+        visOnly === null &&
+        listedVis.length === 3 &&
+        listedVis.every((p) => p.startsWith('ABI-L2-CMIPC')) &&
+        L2_ASKS[10].id === 'vis' &&
+        L2_ASKS[10].pageOnly === true &&
+        !body.asked.includes('vis') &&
+        body.vis === null &&
         part.via === 'bucket' &&
         part.asked.join(',') === 'height,cod,cps,lst' &&
         listedPart.length === 1 + 3 * 3 &&
@@ -342,11 +359,12 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
         windsOnly.read.length === 1 &&
         sub.stats.files === 2 &&
         sub.stats.errors === 0 &&
-        body.asked.length === L2_ASKS.length,
+        body.asked.length === L2_ASKS.filter((a) => !a.pageOnly).length,
       `asked for height, lst and dcomp the client lists ${listedPart.length} prefixes (${listedPart.filter((p) => p.startsWith('ABI-L2-ACHAC')).length} for the heights, ` +
         `three each for the land skin and the DCOMP pair the fake bucket lacks), reads ${part.read.length} file, answers asks ${part.asked.join(',')} ` +
         `with the heights' median ${part.height.census.medianM.toFixed(1)} m - the daemon's own - and the rest null, upstream partial; ` +
-        `asked for the winds alone it answers ${windsOnly.dmw.n} vectors from one more read; the full ask names all ${body.asked.length} products`
+        `asked for the winds alone it answers ${windsOnly.dmw.n} vectors from one more read; the full ask names the ${body.asked.length} products the daemon serves ` +
+        `and leaves the page-only visible window unlisted; named alone it lists ${listedVis.length} CMIPC prefixes and answers null`
     );
   }
 }

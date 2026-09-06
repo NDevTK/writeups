@@ -992,6 +992,10 @@ export {
   L2_LST_SPEC,
   L2_LST_EXTRAS,
   L2_LST_NEAR_PX,
+  L2_VIS_BAND,
+  L2_VIS_SPEC,
+  L2_VIS_EXTRAS,
+  l2VisBody,
   L2_ASKS,
   decodeL2Window,
   decodeL2Vectors,
@@ -1516,7 +1520,8 @@ function main() {
   );
   const versionInfo = () => ({
     ...VERSION,
-    products: L2_ASKS.map((a) => a.id),
+    // the products this box serves (a pageOnly ask is the page's own)
+    products: L2_ASKS.filter((a) => !a.pageOnly).map((a) => a.id),
     node: process.versions.node
   });
   const STATE_DIR = (env.HORIZON_STATE_DIR ?? env.STATE_DIRECTORY ?? '')
@@ -2197,7 +2202,11 @@ function main() {
       };
     const cell = l2Cell(lat, lon);
     const deadline = Date.now() + UPSTREAM_BUDGET_MS;
-    const asks = at ? L2_ASKS.filter((a) => a.timed !== false) : L2_ASKS;
+    // a pageOnly ask (159th: the 500-m visible window, a 430 kB body)
+    // is the page's own read of the bucket, never this box's egress
+    const asks = L2_ASKS.filter(
+      (a) => !a.pageOnly && (!at || a.timed !== false)
+    );
     const got = await Promise.all(
       asks.map((a) => l2File(bucket, a, deadline, at, cell))
     );

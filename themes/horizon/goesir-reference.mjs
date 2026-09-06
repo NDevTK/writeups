@@ -70,6 +70,7 @@ import {
   planckB,
   planckT,
   radfn,
+  refineDeckField,
   resolveGreys,
   seaEmissivity,
   sectorCensus,
@@ -977,6 +978,50 @@ pinBlock(
       `(${landCloudN} mid/high${landLowN ? `, +${landLowN} handed over` : ''}) - a land "clear" carves nothing away; ` +
       `the observer's texel is ${d0.data[ot + 3] ? 'measured' : 'unmeasured'} for the low deck ` +
       `(${P.field.water[oq] ? 'water' : 'land'})`
+  );
+  // THE DAYLIGHT FIELD (159th pass): the deck field split four ways
+  // by a visible-band fraction - half the fine columns (even fi)
+  // handed 0.5, the rest NaN (no reflectance: the coarse cover kept),
+  // so every cloudy coarse texel's cover sums to 0.75 of itself; the
+  // validity and the measured flag copied to every fine texel; a
+  // fraction of 1 everywhere adds no cloud to a clear texel and a
+  // fraction of 0 everywhere empties every cloudy one; the counts
+  const half = refineDeckField(d0, (fi) => (fi % 2 ? NaN : 0.5), 4);
+  const one = refineDeckField(d0, () => 1, 4);
+  const zero = refineDeckField(d0, () => 0, 4);
+  const cloudyCoarse = (() => {
+    let c = 0;
+    for (let k = 0; k < d0.data.length; k += 4)
+      if (d0.data[k] > 0 || d0.data[k + 1] > 0) c++;
+    return c;
+  })();
+  // the fine texel under the observer's coarse texel (its first
+  // quarter: fine (4(halfPx+1), 4(halfPx+1)))
+  const of = ((4 * (win.halfPx + 1)) * half.rm + 4 * (win.halfPx + 1)) * 4;
+  check(
+    'THE DAYLIGHT FIELD splits the deck field four ways by the visible band’s fraction inside the mask’s cloud',
+    half.rm === 4 * rm &&
+      half.factor === 4 &&
+      half.data.length === 16 * d0.data.length &&
+      half.cloudy === 16 * cloudyCoarse &&
+      half.refined === 8 * cloudyCoarse &&
+      near(sum(half, 0), 0.75 * 16 * sum(d0, 0), 1e-3) &&
+      near(sum(half, 1), 0.75 * 16 * sum(d0, 1), 1e-3) &&
+      near(sum(half, 2), 16 * sum(d0, 2), 1e-6) &&
+      near(sum(half, 3), 16 * sum(d0, 3), 1e-6) &&
+      half.data[of + 3] === d0.data[ot + 3] &&
+      half.data[of + 2] === d0.data[ot + 2] &&
+      one.refined === 16 * cloudyCoarse &&
+      near(sum(one, 0), 16 * sum(d0, 0), 1e-3) &&
+      near(sum(one, 1), 16 * sum(d0, 1), 1e-3) &&
+      zero.refined === 16 * cloudyCoarse &&
+      sum(zero, 0) === 0 &&
+      sum(zero, 1) === 0 &&
+      near(sum(zero, 2), 16 * sum(d0, 2), 1e-6),
+    `${half.rm}x${half.rm} fine texels from ${rm}x${rm}: ${half.cloudy} lie under the ${cloudyCoarse} cloudy coarse texels and ${half.refined} of them ` +
+      `took a fraction (the even columns at 0.5, the odd ones without a reflectance keeping the coarse cover), the low and mid cover summing to ` +
+      `${(sum(half, 0) / (16 * sum(d0, 0)) * 100).toFixed(0)}% of the coarse field's and the validity and measured flags copied whole; ` +
+      `a fraction of 1 everywhere leaves the clear texels clear and the cover whole, 0 everywhere empties the cloud and keeps the validity`
   );
 }
 

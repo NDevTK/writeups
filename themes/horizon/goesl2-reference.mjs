@@ -30,6 +30,15 @@ import {
   lstValidationSpan,
   nearestGood,
   qualityCensus,
+  VIS_ATBD,
+  VIS_BAND,
+  VIS_DQF_MEANINGS,
+  coverFraction,
+  kappaFactor,
+  reflectanceOfFactor,
+  solarZenithDeg,
+  visCensus,
+  visReferences,
   bandKeys,
   btDifference,
   bucketPrefix,
@@ -69,6 +78,7 @@ import {
   parseS3Keys,
   pixelSizeM,
   productTimeIso,
+  quantile,
   scanAngle,
   stampToIso,
   unpackArray,
@@ -1065,6 +1075,134 @@ const inflate = (u8) =>
       `weighted ${s17.meanBiasK.toFixed(3)} / ${s17.meanPrecisionK.toFixed(3)} K; the requirement ${LST_ATBD.requirement.accuracyK} / ` +
       `${LST_ATBD.requirement.precisionK} K over ${LST_ATBD.requirement.rangeK.join('-')} K within ${LST_ATBD.requirement.lzaMaxDeg} deg, ` +
       `quantitative to ${LST_ATBD.quantitativeLzaDeg}; an unknown craft answers GOES-16's table`
+  );
+}
+
+// ---- THE DAYLIGHT FIELD (159th pass) -----------------------------
+// The CMIP ATBD's Eq. 3-2 kappa recomputed from the band-2 file's own
+// Earth-Sun distance and Esun against the kappa0 the file carries;
+// Eq. 3-3 inverted (the reflectance from the factor and the sun's
+// cosine, NaN under a low sun); the solar zenith series held to Meeus
+// (Astronomical Algorithms ch. 25 with apparent sidereal time,
+// computed independently: agreement within 0.005 deg at every point,
+// the NOAA calculator's Spencer series 0.1-0.4 deg off both) at the
+// equator's noon, the home's day and night, Cape Hatteras at 12Z and
+// 13:30Z, the June solstice's noon on the tropic and Meeus's own
+// 1992 example; the cover fraction's clamp and its refusals; the
+// census of a synthetic window by the five flags; the scene's own
+// references and their thin-side nulls.
+{
+  const kappa = kappaFactor(VIS_ATBD.file.dAu, VIS_ATBD.file.esunWm2Um);
+  const fileKappa = 0.0019646999; // the file's kappa0 attribute
+  const sun = (la, lo, iso) => solarZenithDeg(la, lo, Date.parse(iso));
+  const sunPins = [
+    [0, 0, '2026-09-06T11:58:00Z', 6.326],
+    [32.85, -117.12, '2026-09-06T17:00:00Z', 46.953],
+    [32.85, -117.12, '2026-09-06T02:00:00Z', 89.206],
+    [35.25, -75.5, '2026-09-06T12:00:00Z', 74.193],
+    [35.25, -75.5, '2026-09-06T13:30:00Z', 56.186],
+    [23.44, 0, '2026-06-21T12:00:00Z', 0.421],
+    [0, 0, '2026-09-06T00:00:00Z', 173.479],
+    [0, 0, '1992-10-13T00:00:00Z', 171.501]
+  ];
+  const sunErr = Math.max(
+    ...sunPins.map(([la, lo, iso, z]) => Math.abs(sun(la, lo, iso) - z))
+  );
+  // a synthetic 20x20 window: counts of reflectance factor, the flags
+  // by a pattern - every 7th pixel conditionally usable, every 11th
+  // out of range, every 13th no value, every 17th the focal plane,
+  // the last row fill (255); the good pixels' factor 0.1..0.5
+  const n = 400;
+  const rf = new Float32Array(n);
+  const dqf = new Uint8Array(n);
+  for (let q = 0; q < n; q++) {
+    rf[q] = 0.1 + (0.4 * (q % 100)) / 99;
+    dqf[q] =
+      q >= 380 ? 255 : q % 17 === 0 ? 4 : q % 13 === 0 ? 3 : q % 11 === 0 ? 2 : q % 7 === 0 ? 1 : 0;
+  }
+  const vc = visCensus(rf, dqf, 0.5);
+  const counted = vc.good + vc.usable + vc.outOfRange + vc.noValue + vc.fpt + vc.fill;
+  const goodRf = [];
+  for (let q = 0; q < n; q++) if (dqf[q] === 0) goodRf.push(rf[q]);
+  goodRf.sort((a, b) => a - b);
+  // references: 120 clear pixels at 0.05..0.15, 80 cloudy at 0.4..0.9
+  // (the p90 near 0.85), 40 under an unknown mask, some NaN
+  const rho = new Float32Array(240);
+  const kind = new Array(240);
+  for (let q = 0; q < 240; q++) {
+    if (q < 120) {
+      rho[q] = 0.05 + (0.1 * q) / 119;
+      kind[q] = true;
+    } else if (q < 200) {
+      rho[q] = 0.4 + (0.5 * (q - 120)) / 79;
+      kind[q] = false;
+    } else {
+      rho[q] = q % 2 ? NaN : 0.3;
+      kind[q] = null;
+    }
+  }
+  const refs = visReferences(rho, (q) => kind[q]);
+  const thin = visReferences(rho, (q) => (q < 120 ? true : q < 130 ? false : null));
+  const frac = coverFraction(0.5, refs.rhoClear, refs.rhoCloud);
+  check(
+    'THE DAYLIGHT FIELD: kappa from the file’s own d and Esun, Eq. 3-3 inverted, the sun held to Meeus, the cover fraction, the census and the references',
+    VIS_BAND === 'C02' &&
+      VIS_DQF_MEANINGS.length === 5 &&
+      VIS_DQF_MEANINGS[0] === 'good_pixel_qf' &&
+      VIS_DQF_MEANINGS[4].startsWith('focal_plane') &&
+      VIS_ATBD.bandUm === 0.64 &&
+      VIS_ATBD.resolutionM === 500 &&
+      Math.abs(kappa - fileKappa) < 1e-8 &&
+      Math.abs(kappa - VIS_ATBD.file.kappa0) < 1e-8 &&
+      near(reflectanceOfFactor(0.4, 0.8), 0.5, 1e-12) &&
+      Number.isNaN(reflectanceOfFactor(0.4, 0.04)) &&
+      Number.isNaN(reflectanceOfFactor(0.4, 0.05)) &&
+      near(reflectanceOfFactor(0.4, 0.06, {minCos: 0.05}), 0.4 / 0.06, 1e-12) &&
+      Number.isNaN(reflectanceOfFactor(NaN, 0.8)) &&
+      sunErr < 0.02 &&
+      sun(32.85, -117.12, '2026-09-06T02:00:00Z') > 85 &&
+      sun(32.85, -117.12, '2026-09-06T20:00:00Z') < 30 &&
+      near(coverFraction(0.5, 0.2, 0.8), 0.5, 1e-12) &&
+      coverFraction(0.1, 0.2, 0.8) === 0 &&
+      coverFraction(0.9, 0.2, 0.8) === 1 &&
+      Number.isNaN(coverFraction(NaN, 0.2, 0.8)) &&
+      Number.isNaN(coverFraction(0.5, 0.5, 0.5)) &&
+      Number.isNaN(coverFraction(0.5, 0.8, 0.2)) &&
+      vc.n === n &&
+      counted === n &&
+      vc.fill === 20 &&
+      vc.fpt === 23 &&
+      vc.good === goodRf.length &&
+      vc.good > 250 &&
+      near(vc.rfMin, goodRf[0], 1e-9) &&
+      near(vc.rfMax, goodRf[goodRf.length - 1], 1e-9) &&
+      near(vc.rfMedian, quantile(goodRf, 0.5), 1e-9) &&
+      vc.cosSza === 0.5 &&
+      near(vc.rhoMedian, vc.rfMedian / 0.5, 1e-9) &&
+      near(vc.rhoMax, vc.rfMax / 0.5, 1e-9) &&
+      refs.nClear === 120 &&
+      refs.nCloud === 80 &&
+      // the median as the theme's quantile takes it: element floor(n/2)
+      near(refs.rhoClear, 0.05 + (0.1 * 60) / 119, 1e-6) &&
+      refs.rhoCloud > 0.84 &&
+      refs.rhoCloud < 0.86 &&
+      thin.rhoClear !== null &&
+      thin.rhoCloud === null &&
+      thin.nCloud === 10 &&
+      near(frac, (0.5 - refs.rhoClear) / (refs.rhoCloud - refs.rhoClear), 1e-9) &&
+      frac > 0.5 &&
+      frac < 0.55,
+    `kappa = pi d^2 / Esun from the file's d ${VIS_ATBD.file.dAu} AU and Esun ${VIS_ATBD.file.esunWm2Um} W/m2/um is ${kappa.toExponential(6)} ` +
+      `against the file's kappa0 ${fileKappa} (${Math.abs(kappa - fileKappa).toExponential(1)} apart); rho = rho_f / cos(sza): 0.4 / 0.8 = ` +
+      `${reflectanceOfFactor(0.4, 0.8)}, NaN at cos 0.05 and below; the sun's zenith within ${sunErr.toFixed(3)} deg of Meeus at ${sunPins.length} points ` +
+      `(the equator's noon ${sun(0, 0, '2026-09-06T11:58:00Z').toFixed(2)}, the home at 17Z ${sun(32.85, -117.12, '2026-09-06T17:00:00Z').toFixed(2)} ` +
+      `and at 02Z ${sun(32.85, -117.12, '2026-09-06T02:00:00Z').toFixed(2)}, Hatteras at 12Z ${sun(35.25, -75.5, '2026-09-06T12:00:00Z').toFixed(2)}, ` +
+      `the solstice noon on the tropic ${sun(23.44, 0, '2026-06-21T12:00:00Z').toFixed(2)}); the cover fraction 0.5 between 0.2 and 0.8, clamped to 0 and 1 ` +
+      `outside, NaN without a reflectance or a span; a 20x20 window censuses ${vc.good} good, ${vc.usable} usable, ${vc.outOfRange} out of range, ` +
+      `${vc.noValue} no value, ${vc.fpt} focal-plane, ${vc.fill} fill (every pixel counted once), the good factor ${vc.rfMin.toFixed(3)}-${vc.rfMax.toFixed(3)} ` +
+      `median ${vc.rfMedian.toFixed(3)}, reflectance ${vc.rhoMedian.toFixed(3)} at cos ${vc.cosSza}; the scene's references from ${refs.nClear} clear ` +
+      `and ${refs.nCloud} cloudy pixels: clear median ${refs.rhoClear.toFixed(3)}, cloudy p90 ${refs.rhoCloud.toFixed(3)} (ten cloudy pixels answer null), ` +
+      `a 0.5 reflectance ${(frac * 100).toFixed(0)}% cloud between them`
   );
 }
 
