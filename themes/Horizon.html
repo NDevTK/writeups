@@ -464,6 +464,10 @@
       } from './horizon/goesir.js';
       import {
         ACM_MEANINGS,
+        AOD_ATBD,
+        AOD_DQF_MEANINGS,
+        aodChannelTau,
+        aodFigures,
         btDifference,
         DCOMP_COD_MAX,
         dcompAt,
@@ -737,6 +741,7 @@
         TAU_MIN
       } from './horizon/aerosol.js';
       import {
+        AERONET_FRESH_MIN,
         AERONET_MAX_KM,
         aeronetChannelTau,
         latestFresh
@@ -5773,27 +5778,27 @@
       async function syncPollen() {
         if (params.has('pollen') || overridden) return;
         try {
+          // both promises made before either is awaited: a `.json()`
+          // rejecting while the second fetch was still awaited had no
+          // handler yet and surfaced as an unhandled rejection (the
+          // harness probes' one PAGEERROR, 156th pass)
+          const asJson = (u) =>
+            fetch(u, {credentials: 'omit'}).then((r) => r.json());
           const [aq, fc] = await Promise.all([
-            (
-              await fetch(
-                'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' +
-                  state.lat.toFixed(4) +
-                  '&longitude=' +
-                  state.lon.toFixed(4) +
-                  '&hourly=birch_pollen&forecast_hours=1',
-                {credentials: 'omit'}
-              )
-            ).json(),
-            (
-              await fetch(
-                'https://api.open-meteo.com/v1/forecast?latitude=' +
-                  state.lat.toFixed(4) +
-                  '&longitude=' +
-                  state.lon.toFixed(4) +
-                  '&hourly=boundary_layer_height&forecast_hours=1',
-                {credentials: 'omit'}
-              )
-            ).json()
+            asJson(
+              'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' +
+                state.lat.toFixed(4) +
+                '&longitude=' +
+                state.lon.toFixed(4) +
+                '&hourly=birch_pollen&forecast_hours=1'
+            ),
+            asJson(
+              'https://api.open-meteo.com/v1/forecast?latitude=' +
+                state.lat.toFixed(4) +
+                '&longitude=' +
+                state.lon.toFixed(4) +
+                '&hourly=boundary_layer_height&forecast_hours=1'
+            )
           ]);
           const birch = aq.hourly?.birch_pollen?.[0];
           // The MEASURED boundary layer (radiosonde bulk
@@ -6267,6 +6272,7 @@
       let goesL2Memo = null; // {obsAt, l2At, agreement}
       let goesL2SstMemo = null; // {sstTime, gridTime, audit}
       let goesL2WindMemo = null; // {time, at, winds}
+      let goesL2AodMemo = null; // {time, at, value}
       let goesL2Busy = false;
       let goesL2Rerun = false;
       // NOAA's skin SST at a place (151st pass): the window pixel's
@@ -6387,6 +6393,89 @@
         const d = goesL2 && goesL2.dmw;
         return d && d.list ? dmwNearest(d.list, latDeg, lonDeg, 40) : null;
       }
+      // THE MEASURED HAZE (156th pass): NOAA's aerosol optical depth
+      // at 550 nm through the ATBD's own collocation estimator
+      // (goesl2.aodBoxEstimate, computed by the daemon or the client:
+      // the high-quality pixels of the 50-km box, the lowest 20% and
+      // highest 50% screened, the rest averaged - the quantity Table
+      // 4-6's bias and precision were measured for) while the file
+      // is under AOD_LIVE_MIN old (a CONUS file every 5 min, landing
+      // ~4 min after its scan) and the box holds AOD_MIN_PX
+      // high-quality pixels. RANKING on the aerosol channel, stated:
+      // a fresh AERONET triplet within 75 km (a direct-sun
+      // photometer - the ATBD's own reference) outranks the
+      // satellite; the satellite (minutes old, 2 km) outranks the
+      // model (GEFS-Aerosols, hours old on a quarter-degree cell, or
+      // the CAMS total): it re-scales the channel set to its 550 nm
+      // value with the set's spectral shape kept
+      // (goesl2.aodChannelTau, gated); SSA, asymmetry and the species
+      // split stay the model's (the satellite retrieves extinction
+      // at one wavelength). The figures beside it are the ATBD's for
+      // the value's range over the surface the page stands on (the
+      // marine model's partitions say water). Memoised a second.
+      // The estimator drives the channel from ten high-quality pixels
+      // in the box (three survive the ATBD's screen): measured on
+      // 2026-09-05 23:42Z, a 69%-cloudy window left six high-quality
+      // pixels between clouds in the box at 0.10-0.15 while the ±100
+      // km window's 834 read a median 0.039 and AERONET La Jolla
+      // 0.036 - a thin sample between clouds is the pixels the cloud
+      // touched, not the column; stated on the line either way.
+      const AOD_LIVE_MIN = 30;
+      const AOD_MIN_PX = 10;
+      const aodQualityName = (q) =>
+        q >= 0 && q < AOD_DQF_MEANINGS.length
+          ? AOD_DQF_MEANINGS[q]
+              .replace(/_qf$/, '')
+              .replace(/_quality_retrieval$/, ' quality')
+              .replace(/_/g, ' ')
+          : 'fill';
+      function goesL2AodNow() {
+        const a = goesL2 && goesL2.aod;
+        if (!a || !a.est) return null;
+        const now = Date.now();
+        if (
+          goesL2AodMemo &&
+          goesL2AodMemo.time === a.time &&
+          now - goesL2AodMemo.at < 1000
+        )
+          return goesL2AodMemo.value;
+        const ageMin = (now - Date.parse(a.time)) / 60e3;
+        let value = null;
+        if (
+          ageMin < AOD_LIVE_MIN &&
+          a.est.n >= AOD_MIN_PX &&
+          Number.isFinite(a.est.mean)
+        ) {
+          const surface = state.sea ? 'water' : 'land';
+          value = {
+            tau550: a.est.mean,
+            n: a.est.n,
+            kept: a.est.kept,
+            r: a.est.r,
+            surface,
+            figures: aodFigures(a.est.mean, surface),
+            time: a.time,
+            ageMin,
+            craft: goesL2.craft
+          };
+        }
+        goesL2AodMemo = {time: a.time, at: now, value};
+        return value;
+      }
+      // NOAA's AOD at a place (the pick readout): the window pixel's
+      // value and quality, null off the window
+      function goesL2AodAt(latDeg, lonDeg) {
+        const a = goesL2 && goesL2.aod;
+        if (!a || !a.aodTau) return null;
+        const q = windowIndexOf(latDeg, lonDeg, a.g, a.x, a.y, a.box);
+        if (q < 0) return null;
+        const dqf = a.dqf ? a.dqf[q] : 255;
+        return {
+          tau: Number.isFinite(a.aodTau[q]) ? a.aodTau[q] : null,
+          dqf,
+          quality: aodQualityName(dqf)
+        };
+      }
       // the derived motion winds off the wire: the columns back to
       // vectors, the layers' winds recomputed here from them
       // (goesl2.dmwLayers - the same gated law the daemon ran)
@@ -6434,6 +6523,14 @@
                     scale: p.dsrScale,
                     offset: p.dsrOffset,
                     fill: p.dsrFill
+                  })
+                : null,
+              // the aerosol optical depth at 550 nm (156th pass)
+              aodTau: p.aod
+                ? unscale(unpackArray(p.aod), {
+                    scale: p.aodScale,
+                    offset: p.aodOffset,
+                    fill: p.aodFill
                   })
                 : null
             }
@@ -6513,10 +6610,15 @@
             // the derived motion winds (153rd pass; CONUS every 15
             // min, band 14, the vectors within 150 km): the decks'
             // drift while fresh (goesL2Winds)
-            dmw: unpackDmw(j.dmw)
+            dmw: unpackDmw(j.dmw),
+            // the aerosol optical depth at 550 nm (156th pass; CONUS
+            // every 5 min, by day): the aerosol channel's 550 nm
+            // value while fresh (goesL2AodNow)
+            aod: unpackProduct(j.aod)
           };
           goesL2Reach = null;
           goesL2SstMemo = null;
+          goesL2AodMemo = null;
           record(
             'NOAA L2 products via',
             goesL2.via === 'bucket'
@@ -6579,6 +6681,21 @@
               `NOAA ${j.craft} derived motion winds (DMWC)`,
               `${dw.time.slice(11, 16)}Z · ${dw.n} of ${dw.total} band-14 vectors within ${dw.radiusKm} km · ` +
                 `${one('low')} · ${one('mid')} · ${one('high')}`
+            );
+          }
+          const ao = goesL2.aod;
+          if (ao && ao.census) {
+            const c = ao.census;
+            record(
+              `NOAA ${j.craft} aerosol optical depth (AODC)`,
+              `${ao.time.slice(11, 16)}Z · ` +
+                (c.high || c.medium
+                  ? `${c.high} high · ${c.medium} medium · ${c.low} low · ${c.none} none of ${c.n} 2-km px within ±100 km` +
+                    (ao.est && ao.est.n
+                      ? ` · τ550 ${ao.est.mean.toFixed(3)} by the ATBD's 50-km collocation (${ao.est.kept} of ${ao.est.n} high-quality px kept)`
+                      : ' · no high-quality px in the 50-km box') +
+                    ` · overhead ${ao.here !== null ? ao.here.toFixed(3) + ' (' + aodQualityName(ao.hereDqf) + ')' : aodQualityName(ao.hereDqf)}`
+                  : `nothing retrieved within ±100 km (${c.none} none · ${c.low} low quality: night, cloud, glint or a bright surface)`)
             );
           }
           if (
@@ -7073,6 +7190,92 @@
             `${rg(R.low.accuracyMs)} / ${rg(R.mid.accuracyMs)} / ${rg(R.high.accuracyMs)} m/s, precision ` +
             `${rg(R.low.precisionMs)} / ${rg(R.mid.precisionMs)} / ${rg(R.high.precisionMs)}; the requirement ` +
             `${DMW_ATBD.requirement.accuracyMs} / ${DMW_ATBD.requirement.precisionMs})`;
+        }
+        // THE MEASURED HAZE (156th pass): NOAA's aerosol optical
+        // depth at 550 nm - the window's census by the file's four
+        // quality levels, the overhead pixel, the ATBD's own
+        // collocation estimate over the 50-km box, and what the
+        // aerosol channel takes (AERONET, the satellite or the model
+        // - the ranking stated) with the ATBD's figures for the
+        // value's range over this surface
+        const ao = goesL2.aod;
+        if (ao && ao.census) {
+          const c = ao.census;
+          const t3 = (v) =>
+            v === null || v === undefined || !Number.isFinite(v)
+              ? '—'
+              : v.toFixed(3);
+          const ageMin = Math.round((Date.now() - Date.parse(ao.time)) / 60e3);
+          line +=
+            ` · aerosol optical depth ${ao.time.slice(11, 16)}Z (ABI-L2-AODC at 550 nm, ${ao.scene} every 5 min, ` +
+            `${(ao.pixel.ewM / 1000).toFixed(1)} × ${(ao.pixel.nsM / 1000).toFixed(1)} km px here, by day; ${ageMin} min old): `;
+          if (c.high || c.medium) {
+            line +=
+              `${c.high} high · ${c.medium} medium · ${c.low} low · ${c.none} none of ${c.n} px within ±100 km` +
+              (c.high
+                ? `, high-quality median ${t3(c.median)} (${t3(c.min)} to ${t3(c.max)})`
+                : '') +
+              ` · overhead ` +
+              (ao.here !== null
+                ? `${t3(ao.here)} (${aodQualityName(ao.hereDqf)})`
+                : `${aodQualityName(ao.hereDqf)}` +
+                  (ao.hereDqf === 2
+                    ? ' - the ATBD flags a coastal, shallow-water, cloud-tested or high-residual pixel low'
+                    : '')) +
+              (ao.est && ao.est.n
+                ? ` · the ATBD's collocation estimate ${t3(ao.est.mean)}: ${ao.est.kept} of ${ao.est.n} high-quality px in the 50-km box ` +
+                  `after the lowest ${Math.round(AOD_ATBD.screenLow * 100)}% and highest ${Math.round(AOD_ATBD.screenHigh * 100)}% are screened ` +
+                  `(their plain mean ${t3(ao.near.mean)}, ${t3(ao.near.min)} to ${t3(ao.near.max)})`
+                : ' · no high-quality px in the 50-km box');
+            const live = goesL2AodNow();
+            const src = state.tauSource;
+            const ms = state.aerosol && state.aerosol.set;
+            const model = ms
+              ? `GEFS-Aerosols ${t3(ms.tau[1])} at 550 nm`
+              : `the CAMS total ${t3(state.aod)}`;
+            if (src === 'aeronet' && state.aeronet) {
+              const ph = ms ? ms.tau[1] : null;
+              const est = ao.est && ao.est.n ? ao.est.mean : null;
+              const f =
+                est !== null
+                  ? aodFigures(est, state.sea ? 'water' : 'land')
+                  : null;
+              line +=
+                ` · the aerosol channel keeps AERONET ${state.aeronet.site.replace(/_/g, ' ')}'s measured sun` +
+                (Number.isFinite(ph) ? ` (${t3(ph)} at 550 nm, ` : ' (') +
+                `${state.aeronet.distKm.toFixed(0)} km; the photometer is the ATBD's own reference)` +
+                (est !== null && Number.isFinite(ph)
+                  ? `; the satellite's estimate ${t3(est)} sits ${est - ph >= 0 ? '+' : '−'}${Math.abs(est - ph).toFixed(3)} from it` +
+                    (f
+                      ? ` (Table 4-6 precision ${f.precision} for AOD ${f.range} over ${f.surface}` +
+                        (ao.est.n < AOD_MIN_PX
+                          ? `; a thin sample - ${ao.est.n} high-quality px in the box, ${AOD_MIN_PX} needed to drive the channel)`
+                          : ')')
+                      : '')
+                  : '');
+            } else if (src === 'abi' && live) {
+              const f = live.figures;
+              line +=
+                ` · the aerosol channel takes ${t3(live.tau550)} at 550 nm (${model} re-scaled, the spectral shape kept; minutes old and 2 km outrank the model's hours on a quarter degree)` +
+                (f
+                  ? ` (Table 4-6, GOES-16 high quality against AERONET, AOD ${f.range} over ${f.surface}: bias ${f.bias >= 0 ? '+' : ''}${f.bias}, precision ${f.precision} over ${f.n.toLocaleString('en-US')} matchups; the requirement ${f.reqAccuracy} / ${f.reqPrecision})`
+                  : '');
+            } else
+              line +=
+                ` · the aerosol channel keeps ${model} (` +
+                (ageMin >= AOD_LIVE_MIN
+                  ? `the file is past ${AOD_LIVE_MIN} min`
+                  : `${ao.est ? ao.est.n : 0} high-quality px in the 50-km box, ${AOD_MIN_PX} needed - a thin sample between clouds reads the pixels the cloud touched`) +
+                ')';
+          } else
+            line +=
+              `nothing retrieved within ±100 km (${c.none} none · ${c.low} low quality: night, cloud, glint or a bright surface - the product runs by day, ` +
+              `the sun within ${ao.szaBounds ? ao.szaBounds[1] : 78.5}° and the glint angle past ${ao.glintBounds ? ao.glintBounds[1] : 36}°)`;
+          const s = ao.sceneStats;
+          if (s && (s.meanLand !== null || s.meanWater !== null))
+            line +=
+              ` · the scene's own means: land ${t3(s.meanLand)} ± ${t3(s.sdLand)} over ${s.attemptedLand === null ? '—' : s.attemptedLand.toLocaleString('en-US')} attempted, ` +
+              `water ${t3(s.meanWater)} ± ${t3(s.sdWater)} over ${s.attemptedWater === null ? '—' : s.attemptedWater.toLocaleString('en-US')}`;
         }
         return line;
       }
@@ -13227,6 +13430,13 @@
                   ' hPa (' +
                   mv.km.toFixed(0) +
                   ' km off)';
+              // NOAA's aerosol optical depth at the pixel (156th)
+              const hz =
+                goesObs.pxLat &&
+                goesL2AodAt(goesObs.pxLat[q], goesObs.pxLon[q]);
+              if (hz && hz.tau !== null)
+                detail +=
+                  ', NOAA AOD ' + hz.tau.toFixed(2) + ' (' + hz.quality + ')';
             }
             // a clear low texel under a "low" pixel is the split
             // rule at work: the ceilometer reported no low layer,
@@ -14654,9 +14864,35 @@
         const aeroFresh =
           state.aerosol && Date.now() - state.aerosol.at < 6 * 3600e3;
         const aodC = THREE.MathUtils.clamp(state.aod, TAU_MIN, TAU_MAX);
-        const mieSet = aeroFresh
+        let mieSet = aeroFresh
           ? state.aerosol.set
           : {tau: [aodC, aodC, aodC], ssa: [0.9, 0.9, 0.9], g: 0.8};
+        // THE MEASURED HAZE (156th pass): NOAA's AOD at 550 nm
+        // (goesL2AodNow - the ATBD's own collocation estimate,
+        // minutes old) re-scales the channel set to its value with
+        // the set's spectral shape kept, unless a fresh AERONET
+        // triplet wrote the set (the photometer outranks the
+        // satellite). The source is stated on the NOAA line.
+        const abiAod = goesL2AodNow();
+        const aeronetStands =
+          aeroFresh &&
+          state.aeronet &&
+          Date.now() - state.aeronet.at < AERONET_FRESH_MIN * 60e3;
+        if (abiAod && !aeronetStands)
+          mieSet = {
+            ...mieSet,
+            tau: aodChannelTau(mieSet.tau, abiAod.tau550, {
+              floor: TAU_MIN,
+              ceil: TAU_MAX
+            })
+          };
+        state.tauSource = aeronetStands
+          ? 'aeronet'
+          : abiAod
+            ? 'abi'
+            : aeroFresh
+              ? 'model'
+              : 'cams';
         // The polarized-sky bake reads the same channel AODs the
         // dome draws with (maybeBakeSkyPol - one aerosol truth).
         state.mieSetNow = mieSet;

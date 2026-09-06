@@ -138,17 +138,30 @@ are gated by `../server-reference.mjs` — the `server` set in
   cloud-top pressure, the tracer's brightness temperature, the flag
   and the zenith angles, the ATBD layers' vector means at the
   tightest radius holding three vectors (`layers`), and the scene's
-  own statistics; the DMW ATBD v4.4 read in full) as `dmw`: eight
-  products in all (about 245 kB a window). Since the 151st pass
+  own statistics; the DMW ATBD v4.4 read in full) as `dmw`, and
+  since the 156th the aerosol optical depth at 550 nm (`ABI-L2-AODC`:
+  CONUS every 5 min, 2 km, retrieved by day over dark land and
+  glint-free water; uint16 counts at 7.706e-5 from -0.05 with the
+  file's four quality levels - high, medium, low, no retrieval; the
+  AOD ATBD v4.2 read in full) as `aod`, with the census by quality,
+  the point's own pixel and its quality (`here`, `hereDqf`), the
+  plain mean of the high-quality pixels in the ATBD's 50 x 50 km
+  collocation box (`near`, r = 12), the ATBD's own estimator over
+  that box (`est`: the lowest 20% and highest 50% screened, the rest
+  averaged - the quantity its Table 4-6 validation measured) and the
+  scene's own land/water means from the file's head (`sceneStats`,
+  read as `extras` without a further range): nine
+  products in all (313 kB a body for the home, measured; the AOD's
+  42 kB). Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks
   the window touches, so a window of the 32 MB SST file costs about
   1 MB and the 4 MB mask about 0.9 MB; the 0.3 MB winds file is read
   whole in one range (its head asks for a megabyte). Windows are held a dozen per
   satellite and product, keyed by file and tenth-degree cell, so a
-  new file keys new windows; `?t=ISO` asks the five 5-minute
-  products and the 10-minute DSR for that moment (the hourly SST and
-  the winds are never asked for a moment). Since the 155th pass the
+  new file keys new windows; `?t=ISO` asks the five 5-minute cloud
+  products and the 10-minute DSR for that moment (the hourly SST,
+  the winds and the haze are never asked for a moment). Since the 155th pass the
   listing, the asks, the decodes and the bodies live in the pure
   `goesl2-decode.js` (this daemon re-exports them and adds node's
   inflate and the caches), and the PAGE runs the same code itself

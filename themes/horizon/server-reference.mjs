@@ -65,8 +65,12 @@ import {
   l2MaskBody,
   l2Prefixes,
   l2DsrBody,
+  l2AodBody,
   l2SstBody,
   l2Window,
+  L2_AOD_BOX_R,
+  L2_AOD_EXTRAS,
+  L2_AOD_SPEC,
   L2_ASKS,
   L2_AT_MAX_AGE_MS,
   L2_COD_SPEC,
@@ -113,6 +117,8 @@ import {
 
 import {haversineKm} from './lightning.js';
 import {
+  aodBoxEstimate,
+  aodCensus,
   boxMean,
   dcompCensus,
   dmwLayers,
@@ -1112,24 +1118,192 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_DSR_SPEC.DSR === 'raw16' &&
       L2_DSR_SPEC.DQF === 'raw' &&
       L2_HALF_PX.dsr === 50 &&
-      L2_ASKS.length === 8 &&
+      L2_ASKS.length === 9 &&
       L2_ASKS.map((a) => a.id).join(',') ===
-        'mask,height,imagery,cod,cps,sst,dsr,dmw' &&
+        'mask,height,imagery,cod,cps,sst,dsr,dmw,aod' &&
       L2_ASKS[2].band === 'C13' &&
       L2_ASKS.map((a) => a.halfPx ?? '-').join(',') ===
-        '50,10,50,50,50,50,50,-' &&
+        '50,10,50,50,50,50,50,-,50' &&
       // the hourly full-disk SST is never asked for a mosaic's
       // minute, nor are the winds (the decks' drift, not a mosaic's
-      // comparison); the 10-minute DSR is (a file within 15 min of any)
+      // comparison) nor the haze (the channel's now); the 10-minute
+      // DSR is (a file within 15 min of any)
       L2_ASKS[5].timed === false &&
       L2_ASKS[7].timed === false &&
-      L2_ASKS.filter((a) => a.timed === false).length === 2 &&
+      L2_ASKS[8].timed === false &&
+      L2_ASKS.filter((a) => a.timed === false).length === 3 &&
       L2_IMAGERY_SPEC.CMI === 'raw16' &&
       L2_COD_SPEC.COD === 'raw16' &&
       L2_CPS_SPEC.CPS === 'raw16' &&
       // the CPS file's flags are the COD file's (measured): not held
       L2_CPS_SPEC.DQF === undefined,
-    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; a DSR body dressed the same way (152nd) carries the home pixel (${dsBody && dsBody.here} W/m2 from the fixture's count there), the mean of ${dsBody && dsBody.near.n} good px within 5 px (${dsBody && dsBody.near.mean} W/m2) and a census of ${dsBody && dsBody.census.good} good px, all recomputed from the wire; /goesl2 asks eight products, the imagery by band C13, the hourly SST and the winds never for a mosaic's minute and the 10-minute DSR for one`
+    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; a DSR body dressed the same way (152nd) carries the home pixel (${dsBody && dsBody.here} W/m2 from the fixture's count there), the mean of ${dsBody && dsBody.near.n} good px within 5 px (${dsBody && dsBody.near.mean} W/m2) and a census of ${dsBody && dsBody.census.good} good px, all recomputed from the wire; /goesl2 asks nine products, the imagery by band C13, the hourly SST, the winds and the haze never for a mosaic's minute and the 10-minute DSR for one`
+  );
+}
+
+{
+  // THE MEASURED HAZE (156th pass): an AOD body dressed on the
+  // fixture's grid - counts = the HT counts (0..65530 spans -0.05..5
+  // at 7.706e-5 a count, the product's own scale), DQF by a pattern
+  // over the retrieved pixels (every 5th low, every 3rd of the rest
+  // medium, the others high; no retrieval where HT is fill) - its
+  // census, the point's own pixel, the plain 50-km box mean and the
+  // ATBD's collocation estimator recomputed from the wire; the
+  // extras (the file's own scalar datasets) read whole and by range
+  // without a further range; the ninth ask's pins.
+  const bytes = new Uint8Array(Buffer.from(ACHAC_B64, 'base64'));
+  const extras = [
+    'mean_cloud_top_height',
+    'cloud_pixels',
+    'solar_zenith_angle_bounds',
+    'no_such_dataset'
+  ];
+  const raw = decodeL2(bytes, {HT: 'raw16', DQF: 'raw'}, undefined, extras);
+  const cell = l2Cell(32.85, -117.12);
+  const aodArr = new Uint16Array(raw.data.HT.length);
+  const aodDqf = new Uint8Array(raw.data.HT.length);
+  let kept = 0;
+  for (let q = 0; q < aodArr.length; q++) {
+    const h = raw.data.HT[q];
+    aodArr[q] = h === 65535 ? 65535 : Math.min(h, 65530);
+    if (h === 65535) aodDqf[q] = 3;
+    else {
+      kept++;
+      aodDqf[q] = kept % 5 === 0 ? 2 : kept % 3 === 0 ? 1 : 0;
+    }
+  }
+  const aodDec = {
+    ...raw,
+    data: {AOD: aodArr, DQF: aodDqf},
+    meta: {AOD: {scale: 7.706e-5, offset: -0.05, fill: 65535, units: '1'}},
+    extras: {
+      mean_aod550_land: 0.0461,
+      std_dev_aod550_land: 0.0517,
+      mean_aod550_water: 0.0614,
+      std_dev_aod550_water: 0.0344,
+      aod550_retrievals_attempted_land: 274782,
+      aod550_retrievals_attempted_water: 1151286,
+      quantitative_solar_zenith_angle_bounds: [0, 78.5],
+      sunglint_angle_bounds: [0, 36]
+    }
+  };
+  const body = l2AodBody(aodDec, 'ka', cell.lat, cell.lon);
+  const back = body
+    ? unscale(unpackArray(body.aod), {
+        scale: body.aodScale,
+        offset: body.aodOffset,
+        fill: body.aodFill
+      })
+    : null;
+  const dq = body ? unpackArray(body.dqf) : null;
+  const again = body ? aodCensus(back, dq) : null;
+  const estAgain = body ? aodBoxEstimate(back, dq, body.box, L2_AOD_BOX_R) : null;
+  const nearAgain = body ? boxMean(back, dq, body.box, L2_AOD_BOX_R) : null;
+  // the home pixel (424, 127) on the file's own grid
+  const gq = 127 * 500 + 424;
+  const homeTau =
+    raw.data.HT[gq] === 65535
+      ? null
+      : Math.min(raw.data.HT[gq], 65530) * 7.706e-5 - 0.05;
+  const homeDqf = aodDqf[gq];
+  // the extras by range: the lazy handle over the same bytes, the
+  // reads counted with and without them
+  const near = (a, b, tol) => Math.abs(a - b) <= tol;
+  const inflateHere = (u8) =>
+    new Uint8Array(
+      inflateSync(Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength))
+    );
+  const lazyReads = async (ex) => {
+    const reads = [];
+    const f = await openHdf5Lazy(
+      async (s, e) => {
+        reads.push([s, e]);
+        return bytes.subarray(s, Math.min(e, bytes.length));
+      },
+      inflateHere,
+      {blockBytes: L2_RANGE_BLOCK, headBytes: L2_HEAD_BYTES}
+    );
+    const win = await decodeL2Window(
+      f,
+      {HT: 'raw16', DQF: 'raw'},
+      cell.lat,
+      cell.lon,
+      L2_HALF_PX.height,
+      ex
+    );
+    return {win, reads: reads.length};
+  };
+  const plain = await lazyReads(null);
+  const withEx = await lazyReads(extras);
+  const ask = L2_ASKS[8];
+  check(
+    'THE MEASURED HAZE: the AOD body dressed on the fixture, recomputed from the wire; the extras without a further range',
+    body !== null &&
+      body.product === 'ABI-L2-AODC' &&
+      body.wavelengthNm === 550 &&
+      body.aod.kind === 'u16' &&
+      body.aodFill === 65535 &&
+      near(body.aodScale, 7.706e-5, 1e-12) &&
+      body.aodOffset === -0.05 &&
+      body.box.i === 424 &&
+      body.box.j === 127 &&
+      body.box.cols === 101 &&
+      body.census.n === body.box.rows * body.box.cols &&
+      body.census.high + body.census.medium + body.census.low + body.census.none + body.census.fill === body.census.n &&
+      body.census.high > 0 &&
+      body.census.medium > 0 &&
+      body.census.low > 0 &&
+      body.census.none > 0 &&
+      body.census.fill === 0 &&
+      body.census.min >= -0.05 &&
+      body.census.max <= 5 &&
+      JSON.stringify(again) === JSON.stringify(body.census) &&
+      body.here === (homeDqf <= 1 && homeTau !== null ? +homeTau.toFixed(4) : null) &&
+      body.hereDqf === homeDqf &&
+      body.near.r === L2_AOD_BOX_R &&
+      body.near.n === nearAgain.n &&
+      body.near.n > 0 &&
+      Math.abs(body.near.mean - nearAgain.mean) < 6e-5 &&
+      body.est.r === L2_AOD_BOX_R &&
+      body.est.n === estAgain.n &&
+      body.est.n === body.near.n &&
+      body.est.kept === estAgain.kept &&
+      body.est.kept > 0 &&
+      body.est.kept < body.est.n &&
+      Math.abs(body.est.mean - estAgain.mean) < 6e-5 &&
+      body.est.mean <= body.near.mean &&
+      body.sceneStats.meanLand === 0.0461 &&
+      body.sceneStats.attemptedWater === 1151286 &&
+      body.szaBounds[1] === 78.5 &&
+      body.glintBounds[1] === 36 &&
+      raw.extras.cloud_pixels === 122906 &&
+      near(raw.extras.mean_cloud_top_height, 3752.858, 1e-3) &&
+      raw.extras.solar_zenith_angle_bounds.join(',') === '0,180' &&
+      raw.extras.no_such_dataset === null &&
+      plain.win.extras === null &&
+      withEx.win.extras.cloud_pixels === 122906 &&
+      near(withEx.win.extras.mean_cloud_top_height, 3752.858, 1e-3) &&
+      withEx.win.extras.no_such_dataset === null &&
+      withEx.reads === plain.reads &&
+      withEx.win.box.i === plain.win.box.i &&
+      ask.id === 'aod' &&
+      ask.product === 'ABI-L2-AODC' &&
+      ask.halfPx === 50 &&
+      ask.spec === L2_AOD_SPEC &&
+      ask.extras === L2_AOD_EXTRAS &&
+      L2_AOD_EXTRAS.length === 8 &&
+      L2_AOD_EXTRAS[0] === 'mean_aod550_land' &&
+      L2_AOD_SPEC.AOD === 'raw16' &&
+      L2_AOD_SPEC.DQF === 'raw' &&
+      L2_AOD_BOX_R === 12 &&
+      L2_HALF_PX.aod === 50,
+    `an AOD body dressed on the fixture's grid censuses ${body && body.census.n} px - ${body && body.census.high} high, ${body && body.census.medium} medium, ` +
+      `${body && body.census.low} low, ${body && body.census.none} none - with the high-quality median ${body && body.census.median.toFixed(3)}, ` +
+      `the home pixel (424, 127) ${body && body.here === null ? 'not usable (' + body.hereDqf + ')' : body && body.here + ' (DQF ' + body.hereDqf + ')'}, ` +
+      `${body && body.near.n} high-quality px in the 50-km box (plain mean ${body && body.near.mean}) and the ATBD's estimate ${body && body.est.mean} ` +
+      `from the ${body && body.est.kept} kept - every figure recomputed from the wire; the extras read whole (${raw.extras.cloud_pixels} cloud pixels, ` +
+      `mean top ${raw.extras.mean_cloud_top_height.toFixed(1)} m, an absent name null) and by range in ${withEx.reads} reads, the same ${plain.reads} without them; ` +
+      `the ninth ask ${ask.product} at half width ${ask.halfPx} with ${L2_AOD_EXTRAS.length} extras, never for a mosaic's minute`
   );
 }
 

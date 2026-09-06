@@ -36,6 +36,7 @@ import {
   L2_HEAD_BYTES,
   L2_LIST_MS,
   L2_RANGE_BLOCK,
+  l2AodBody,
   l2Cell,
   l2DcompBody,
   l2DmwBody,
@@ -189,7 +190,14 @@ export function createGoesL2Client({
       const dec =
         ask.kind === 'vectors'
           ? await decodeL2Vectors(f, cell.lat, cell.lon, ask.radiusKm)
-          : await decodeL2Window(f, ask.spec, cell.lat, cell.lon, ask.halfPx);
+          : await decodeL2Window(
+              f,
+              ask.spec,
+              cell.lat,
+              cell.lon,
+              ask.halfPx,
+              ask.extras ?? null
+            );
       if (!dec) throw new Error(ask.product + ': not readable');
       stats.ranges += f.stats.ranges;
       stats.bytes += f.stats.bytes;
@@ -260,6 +268,7 @@ export function createGoesL2Client({
       sst: F.sst ? l2SstBody(F.sst.dec, F.sst.key, cell.lat, cell.lon) : null,
       dsr: F.dsr ? l2DsrBody(F.dsr.dec, F.dsr.key, cell.lat, cell.lon) : null,
       dmw: F.dmw ? l2DmwBody(F.dmw.dec, F.dmw.key) : null,
+      aod: F.aod ? l2AodBody(F.aod.dec, F.aod.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial',
       rangesHonoured: !stats.rangesIgnored,
       // what this refresh moved

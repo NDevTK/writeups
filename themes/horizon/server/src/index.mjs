@@ -969,6 +969,9 @@ export {
   L2_DSR_SPEC,
   L2_DMW_RADIUS_KM,
   L2_DMW_HEAD_BYTES,
+  L2_AOD_SPEC,
+  L2_AOD_EXTRAS,
+  L2_AOD_BOX_R,
   L2_ASKS,
   decodeL2Window,
   decodeL2Vectors,
@@ -979,6 +982,7 @@ export {
   l2SstBody,
   l2DmwBody,
   l2DsrBody,
+  l2AodBody,
   l2DcompBody
 } from '../../goesl2-decode.js';
 const {
@@ -1014,14 +1018,15 @@ const {
   l2SstBody,
   l2DmwBody,
   l2DsrBody,
+  l2AodBody,
   l2DcompBody
 } = L2;
 const l2Inflate = (u8) =>
   new Uint8Array(
     inflateSync(Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength))
   );
-export function decodeL2(bytes, spec, inflate = l2Inflate) {
-  return L2.decodeL2(bytes, spec, inflate);
+export function decodeL2(bytes, spec, inflate = l2Inflate, extras = null) {
+  return L2.decodeL2(bytes, spec, inflate, extras);
 }
 
 // ---- Aircraft: readsb failover from a clean IP -----------------
@@ -2071,7 +2076,14 @@ function main() {
           const dec =
             ask.kind === 'vectors'
               ? await decodeL2Vectors(f, cell.lat, cell.lon, ask.radiusKm)
-              : await decodeL2Window(f, spec, cell.lat, cell.lon, halfPx);
+              : await decodeL2Window(
+                  f,
+                  spec,
+                  cell.lat,
+                  cell.lon,
+                  halfPx,
+                  ask.extras ?? null
+                );
           if (!dec) throw new Error(product + ': not readable');
           l2State.ranges += f.stats.ranges;
           l2State.rangeBytes += f.stats.bytes;
@@ -2183,6 +2195,7 @@ function main() {
       sst: F.sst ? l2SstBody(F.sst.dec, F.sst.key, cell.lat, cell.lon) : null,
       dsr: F.dsr ? l2DsrBody(F.dsr.dec, F.dsr.key, cell.lat, cell.lon) : null,
       dmw: F.dmw ? l2DmwBody(F.dmw.dec, F.dmw.key) : null,
+      aod: F.aod ? l2AodBody(F.aod.dec, F.aod.key, cell.lat, cell.lon) : null,
       upstream: got.every((f) => f) ? 'ok' : 'partial'
     };
     goesl2Cache.set(ck, {t: Date.now(), body});

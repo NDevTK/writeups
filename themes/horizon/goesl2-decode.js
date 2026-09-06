@@ -15,9 +15,10 @@
  * DQF on the 2-km CONUS grid, every 5 min), the cloud top height
  * (ABI-L2-ACHAC: HT on the 10-km grid), the band-13 imagery
  * (CMIPC), DCOMP (CODC/CPSC), the hourly full-disk SST (SSTF), the
- * 10-minute surface irradiance (DSRF) and the 15-minute derived
- * motion winds (DMWC, a point list) from noaa-goes18 (GOES-West)
- * and noaa-goes19 (GOES-East). Every file is read by HTTP RANGE
+ * 10-minute surface irradiance (DSRF), the 15-minute derived motion
+ * winds (DMWC, a point list) and, since the 156th pass, the
+ * 5-minute aerosol optical depth at 550 nm (AODC) from noaa-goes18
+ * (GOES-West) and noaa-goes19 (GOES-East). Every file is read by HTTP RANGE
  * (hdf5.js openHdf5Lazy): the first quarter megabyte carries the
  * object headers and coordinate vectors, then only the chunks a
  * window touches - NOAA chunks these files in full-width row strips
@@ -31,6 +32,8 @@
  */
 import {openHdf5, physicalValues} from './hdf5.js';
 import {
+  aodBoxEstimate,
+  aodCensus,
   boxMean,
   bucketPrefix,
   cutWindow,
@@ -53,7 +56,7 @@ import {
   windowBox
 } from './goesl2.js';
 
-export const L2_HALF_PX = {mask: 50, height: 10, sst: 50, dsr: 50}; // +-100 km on 2-km / 10-km grids
+export const L2_HALF_PX = {mask: 50, height: 10, sst: 50, dsr: 50, aod: 50}; // +-100 km on 2-km / 10-km grids
 export const L2_LIST_MS = 60e3; // a bucket listing stands a minute (the cheap part)
 export const L2_RETRY_MS = 2 * 60e3; // after a listing or fetch failure
 export const L2_WINDOW_MS = 15 * 60e3; // windows outlive their file by design: a new file keys new windows
@@ -131,11 +134,33 @@ export const L2_DSR_SPEC = {DSR: 'raw16', DQF: 'raw'};
 // answers with the 0.3 MB file in one round (kind 'vectors')
 export const L2_DMW_RADIUS_KM = 150;
 export const L2_DMW_HEAD_BYTES = 1048576;
+// The 156th pass: the aerosol optical depth at 550 nm (uint16 at
+// 7.706e-5 a count from -0.05, fill 65535) with its four quality
+// levels (DQF 0 high, 1 medium, 2 low, 3 none - the file's own
+// flag_meanings, goesl2.AOD_DQF_MEANINGS); the Angstrom exponents
+// (AE1/AE2, over water only) held out - the ATBD says their
+// precision requirement is not met. The scene's own statistics and
+// the day's bounds ride as extras (scalar datasets in the file's
+// head: no further range).
+export const L2_AOD_SPEC = {AOD: 'raw16', DQF: 'raw'};
+export const L2_AOD_EXTRAS = [
+  'mean_aod550_land',
+  'std_dev_aod550_land',
+  'mean_aod550_water',
+  'std_dev_aod550_water',
+  'aod550_retrievals_attempted_land',
+  'aod550_retrievals_attempted_water',
+  'quantitative_solar_zenith_angle_bounds',
+  'sunglint_angle_bounds'
+];
+// the ATBD's collocation box on the 2-km grid: 25 x 25 px = 50 km
+export const L2_AOD_BOX_R = 12;
 // what /goesl2 fetches for a point: product, spec, the window's half
 // width on the product's grid, the imagery's band (the CMIPC prefix
 // lists every band's file); timed false = not asked for a mosaic's
 // minute (the hourly full-disk SST has no file within 15 min of it;
-// the winds are the decks' drift now, not a mosaic's comparison)
+// the winds are the decks' drift now, not a mosaic's comparison;
+// the haze is the channel's now)
 export const L2_ASKS = [
   {id: 'mask', product: L2_PRODUCTS.mask, spec: L2_MASK_SPEC, halfPx: 50},
   {id: 'height', product: L2_PRODUCTS.height, spec: L2_HEIGHT_SPEC, halfPx: 10},
@@ -170,6 +195,14 @@ export const L2_ASKS = [
     kind: 'vectors',
     radiusKm: L2_DMW_RADIUS_KM,
     headBytes: L2_DMW_HEAD_BYTES,
+    timed: false
+  },
+  {
+    id: 'aod',
+    product: L2_PRODUCTS.aod,
+    spec: L2_AOD_SPEC,
+    halfPx: 50,
+    extras: L2_AOD_EXTRAS,
     timed: false
   }
 ];
@@ -235,10 +268,19 @@ const l2Tail = (root, lza) => ({
   lzaMaxDeg:
     lza && lza.values && !lza.values.unread ? Number(lza.values[1]) : null
 });
+// The extras (156th pass): a product's own scalar datasets (the
+// scene's statistics, the day's bounds) as plain numbers - a scalar
+// as a number, a short vector as an array, null when unread or
+// absent; `null` extras = nothing asked.
+const l2Extra = (d) => {
+  if (!d || !d.values || d.values.unread) return null;
+  const v = Array.from(d.values, Number);
+  return v.length === 1 ? v[0] : v;
+};
 // The whole grid from whole bytes (the gate's path, and any caller
 // holding a file). null = not a product file the daemon can read
 // (the route answers 502 and the journal names the dataset).
-export function decodeL2(bytes, spec, inflate) {
+export function decodeL2(bytes, spec, inflate, extras = null) {
   const f = openHdf5(bytes, inflate);
   const frame = l2Frame(
     f.dataset('goes_imager_projection'),
@@ -258,7 +300,10 @@ export function decodeL2(bytes, spec, inflate) {
   const lza =
     f.dataset('quantitative_local_zenith_angle_bounds') ??
     f.dataset('local_zenith_angle_bounds');
-  return {...frame, ...l2Tail(f.rootAttrs(), lza), data, meta};
+  const ex = extras
+    ? Object.fromEntries(extras.map((n) => [n, l2Extra(f.dataset(n))]))
+    : null;
+  return {...frame, ...l2Tail(f.rootAttrs(), lza), data, meta, extras: ex};
 }
 // The window decode (151st pass) over a range-read handle
 // (hdf5.js openHdf5Lazy) - or a whole-buffer one, every call
@@ -267,7 +312,7 @@ export function decodeL2(bytes, spec, inflate) {
 // the window's box from the point, then ONLY that window of each
 // dataset. null = not a product file; box null = the point is
 // outside the scene (nothing more was read).
-export async function decodeL2Window(f, spec, lat, lon, halfPx) {
+export async function decodeL2Window(f, spec, lat, lon, halfPx, extras = null) {
   const frame = l2Frame(
     await f.dataset('goes_imager_projection'),
     await f.dataset('x'),
@@ -279,6 +324,10 @@ export async function decodeL2Window(f, spec, lat, lon, halfPx) {
     (await f.dataset('quantitative_local_zenith_angle_bounds')) ??
     (await f.dataset('local_zenith_angle_bounds'));
   const head = {...frame, ...l2Tail(await f.rootAttrs(), lza)};
+  if (extras) {
+    head.extras = {};
+    for (const n of extras) head.extras[n] = l2Extra(await f.dataset(n));
+  } else head.extras = null;
   const g = fixedGridGeometry(frame.proj);
   const box = windowBox(
     lat,
@@ -571,6 +620,71 @@ export function l2DsrBody(dec, key, lat, lon) {
       max: near.max === null ? null : +near.max.toFixed(1)
     },
     census: fieldCensus(wm2, w.cut.DQF)
+  };
+}
+// The aerosol optical depth window (156th pass): NOAA's AOD at 550
+// nm (ABI-L2-AODC: CONUS every 5 min, 2 km, by day) as counts with
+// the file's scaling, its four-level flags, the census by quality
+// (goesl2.aodCensus), the point's own pixel with its quality, the
+// plain mean of the high-quality pixels within the ATBD's 50-km box
+// (`near`) and the ATBD's own collocation estimator over the same
+// box (`est`: the lowest 20% and highest 50% screened, the rest
+// averaged - the quantity Table 4-6 was measured for), and the
+// scene's own statistics from the file's head.
+export function l2AodBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_AOD_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.aod);
+  if (!w) return null;
+  const m = dec.meta.AOD ?? {scale: 1, offset: 0, fill: 65535};
+  const tau = unscale(w.cut.AOD, m);
+  const ci = w.box.i - w.box.i0;
+  const cj = w.box.j - w.box.j0;
+  const qc = cj * w.box.cols + ci;
+  const hereDqf = w.cut.DQF[qc];
+  const here = Number.isFinite(tau[qc]) && hereDqf <= 1 ? +tau[qc].toFixed(4) : null;
+  const near = boxMean(tau, w.cut.DQF, w.box, L2_AOD_BOX_R);
+  const est = aodBoxEstimate(tau, w.cut.DQF, w.box, L2_AOD_BOX_R);
+  const x = dec.extras ?? {};
+  const r4 = (v) => (Number.isFinite(v) ? +v.toFixed(4) : null);
+  const pair = (v) => (Array.isArray(v) && v.length === 2 ? v.map(Number) : null);
+  return {
+    ...l2Common(dec, L2_PRODUCTS.aod, key, w),
+    wavelengthNm: 550,
+    aod: l2Counts(w.cut.AOD, m.fill),
+    aodScale: m.scale,
+    aodOffset: m.offset,
+    aodFill: 65535,
+    dqf: packArray(w.cut.DQF, 'u8'),
+    here,
+    hereDqf: hereDqf == null ? null : hereDqf,
+    near: {
+      r: L2_AOD_BOX_R,
+      n: near.n,
+      mean: r4(near.mean),
+      min: r4(near.min),
+      max: r4(near.max)
+    },
+    est: {
+      r: L2_AOD_BOX_R,
+      n: est.n,
+      kept: est.kept,
+      mean: r4(est.mean)
+    },
+    census: aodCensus(tau, w.cut.DQF),
+    sceneStats: {
+      meanLand: r4(x.mean_aod550_land),
+      sdLand: r4(x.std_dev_aod550_land),
+      meanWater: r4(x.mean_aod550_water),
+      sdWater: r4(x.std_dev_aod550_water),
+      attemptedLand: Number.isFinite(x.aod550_retrievals_attempted_land)
+        ? x.aod550_retrievals_attempted_land
+        : null,
+      attemptedWater: Number.isFinite(x.aod550_retrievals_attempted_water)
+        ? x.aod550_retrievals_attempted_water
+        : null
+    },
+    szaBounds: pair(x.quantitative_solar_zenith_angle_bounds),
+    glintBounds: pair(x.sunglint_angle_bounds)
   };
 }
 // The DCOMP window (149th pass): the optical depth at 640 nm and

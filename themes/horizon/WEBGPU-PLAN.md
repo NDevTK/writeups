@@ -10345,6 +10345,114 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 5, the review session's 156th pass - THE MEASURED
+  HAZE): NOAA's aerosol optical depth at 550 nm (ABI-L2-AODC: CONUS
+  every 5 min, 2 km, retrieved by day over dark land and glint-free
+  water; the files run all night with nothing retrieved - the 06Z
+  prefix lists them, measured) becomes the ninth product, on the
+  aerosol channel beside AERONET and the model. THE PRIMARY: the GOES-R
+  ABI Suspended Matter / Aerosol Optical Depth ATBD v4.2 (NOAA NESDIS
+  STAR, 14 Feb 2018, 112 pp), read in full - a look-up-table
+  retrieval of top-of-atmosphere reflectance for candidate aerosol
+  models (bands 0.47/0.64/2.25 um over land by the dark-target
+  relationship, 0.64/0.86/1.61/2.25 over water); four quality levels
+  (Table 3-9: no retrieval - cloud, sea ice, shallow water, glint;
+  low - out of [-0.05, 5], sun past 80 deg, satellite past 60 deg,
+  the internal cloud/cirrus tests failed, COASTAL, shallow inland
+  water, residual > 0.3; medium - adjacent to cloud, adjacent to
+  snow, residual > 0.25, shallow ocean, 'probably clear'; high - the
+  rest, "recommended for quantitative applications"); the F&PS
+  requirement by AOD range (Table 2-1: land accuracy 0.06 / 0.04 /
+  0.12 below 0.04 / to 0.8 / above, precision 0.13 / 0.25 / 0.35;
+  water 0.02 / 0.10 and 0.15 / 0.23 about 0.4); the validation
+  protocol (Sec. 4.2, after Ichoku 2002 and Remer 2005: AERONET
+  averaged within an hour, the satellite pixels averaged in a 50 x
+  50 km box centred on the station, the lowest 20% and highest 50%
+  of the box screened out first); Table 4-6, GOES-16's high-quality
+  product against AERONET (29 Apr 2017 - 15 Jan 2018): land bias
+  0.02 / precision 0.07 below 0.04 (4,591 matchups), 0.04 / 0.11 to
+  0.8 (38,694), -0.10 / 0.65 above (254, "may not be statistically
+  robust"); water 0.01 / 0.04 below 0.4 (6,758), -0.003 / 0.11
+  above (54); overall land 0.04 / 0.12, water 0.01 / 0.04; the
+  Angstrom exponent meets its accuracy requirement (0.3) and neither
+  satellite its precision (0.15) - so AE1/AE2 are held out. THE FILE
+  (OR_ABI-L2-AODC-M6_G18_s20262482321178, 8.3 MB): AOD uint16 at
+  7.706e-5 from -0.05, fill 65535, chunked [52, 2500]; DQF 0..3 with
+  the file's own flag_meanings; quantitative zenith bounds [0, 78.5]
+  for the satellite AND the sun (the operational bounds, wider than
+  the ATBD's 60/80 low-flag rules - the file's own outrank the
+  print, stated); sunglint_angle_bounds [0, 36]; the scene's own
+  land/water means and attempted counts as scalar datasets in the
+  head. (1) goesl2.js: AOD_DQF_MEANINGS, AOD_ATBD (the tables
+  above), aodCensus (the window by quality with the high-quality
+  statistics and the usable count and median beside them),
+  aodBoxEstimate (THE ATBD'S OWN ESTIMATOR: the high-quality pixels
+  within r = 12 of the point - 25 x 25 px = 50 km on the 2-km grid -
+  sorted, 20% and 50% screened, the rest averaged: the quantity
+  Table 4-6's figures were measured for and the only one they apply
+  to), aodFigures (the row of Table 2-1 / 4-6 for a value over a
+  surface), aodChannelTau (THE RANKING'S LAW: the channel set
+  re-scaled to the satellite's 550 nm value with the set's spectral
+  shape kept, flat from a floored set, clamped). (2)
+  goesl2-decode.js: L2_AOD_SPEC, the ninth ask (halfPx 50, timed
+  false, `extras` - a product's own scalar datasets read as plain
+  numbers by decodeL2 and decodeL2Window alike, from the head: no
+  further range, gated), l2AodBody (counts, flags, census, the
+  point's pixel and quality, the plain box mean, the ATBD estimate,
+  the scene's means, the sun and glint bounds); the daemon and the
+  client pass it through. MEASURED on the 23:21Z file in node: the
+  window in 5 ranges, 0.9 MB of 8.3 MB, 22 ms after the head; the
+  daemon at 23:47Z: 4 ranges, 944 kB, 442 ms; whole and by range the
+  bodies agree byte for byte, every figure recomputed from the wire.
+  (3) THE PAGE: goesL2AodNow (the estimate while the file is under
+  30 min old and the box holds ten high-quality pixels), the
+  per-frame Mie set re-scaled through aodChannelTau unless a fresh
+  AERONET triplet wrote the set, state.tauSource naming the source
+  (aeronet / abi / model / cams); the NOAA line's clause - the
+  census by quality, the overhead pixel with its quality (a coastal
+  pixel's 'low' explained by the ATBD's rule), the ATBD estimate
+  with the plain mean beside it, the ranking and the Table 4-6
+  figures for the value's range, the scene's means; the record;
+  the pick readout ("NOAA AOD 0.20 (low quality)"); goesL2AodAt.
+  (4) THE PASS'S OWN FINDING, measured at 23:42Z on a 69%-cloudy
+  window: the 50-km box held SIX high-quality pixels between clouds
+  reading 0.10-0.15 (the ATBD estimate 0.112 from the two kept)
+  while the +-100 km window's 834 high-quality pixels read a median
+  0.039, AERONET La Jolla's fresh triplet 0.036 at 550 nm and
+  GEFS-Aerosols 0.036 - a thin sample between clouds is the pixels
+  the cloud touched, not the column (the ATBD's medium flag reaches
+  one pixel from cloud; the halo of cloud contamination reaches
+  further). So the estimator drives the channel from TEN
+  high-quality pixels in the box (three survive the screen), stated
+  on the line with the count either way; with fewer the model
+  stands and the line says why; with AERONET fresh the line prints
+  the satellite's estimate against the photometer (+0.076 today)
+  with Table 4-6's precision for the range. (5) The harness probes'
+  one standing PAGEERROR ("Unexpected end of JSON input") was the
+  pollen fetch: two `(await fetch()).json()` inside one Promise.all
+  - the first .json() rejecting while the second fetch was still
+  awaited had no handler yet; both promises are made first now
+  (probe-156: zero PAGEERROR lines). GATE: goesl2-reference THE
+  MEASURED HAZE (the census, the estimator on a 4x4 window by hand -
+  5 high px keep 2 for 0.40, the whole window 3 of 10 for 0.6333 -
+  the figures by range, the re-scaling, the ATBD's numbers; 10
+  landmarks); server-reference THE MEASURED HAZE (an AOD body
+  dressed on the ACHAC fixture: 2,729 high / 1,365 medium / 1,024
+  low / 5,083 none, 247 high px in the box, the estimate 0.543 from
+  75 kept against the plain mean 1.111, every figure recomputed from
+  the wire; the extras read whole and by range in the same 3 reads;
+  the ninth ask's pins; 28 landmarks); goesl2-client-reference (nine
+  asks over 23 listings, aod null over the fake bucket, 17 prefixes
+  re-listed on the range-ignoring path). STATED LIMITS: the surface
+  for the figures is the page's own call (the marine model's
+  partitions say water) while the box mixes land and water pixels;
+  the ten-pixel floor is this pass's rule from one day's evidence,
+  not the ATBD's; the satellite retrieves extinction at one
+  wavelength, so SSA, asymmetry and the species split stay the
+  model's; a clear day's AOD near the coast is flagged low by the
+  coastal mask, so the overhead pixel is rarely quantitative here.
+  THE DEPLOY, WATCHED: api.ndev.tk answered nothing at 23:35Z (curl
+  000); the 150th-156th wait for the box.
 - DONE (Sep 5, the review session's 155th pass - THE PAGE READS THE
   BUCKET ITSELF): the live daemon went dark at 22:02Z and stayed
   dark through the 154th pass, and with it the page lost every NOAA

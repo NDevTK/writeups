@@ -76,6 +76,46 @@
  *    [0, 65]; the DQF flag_masks 1..512 with their flag_meanings
  *    (DCOMP_FLAGS below), MEASURED against the mask of the same
  *    minute before use.
+ *  - (156th pass) The GOES-R ABI Suspended Matter / Aerosol Optical
+ *    Depth and Aerosol Size Parameter ATBD, version 4.2 (NOAA NESDIS
+ *    STAR, 14 February 2018, 112 pp), read in full: the AOD at 550
+ *    nm retrieved by day over dark, clear, snow-free land (bands
+ *    0.47, 0.64, 2.25 um - the dark-target relationship) and
+ *    glint-free water (0.64, 0.86, 1.61, 2.25 um) from look-up
+ *    tables of top-of-atmosphere reflectance for candidate aerosol
+ *    models; four quality levels (Table 3-9: no retrieval - cloud,
+ *    sea ice, shallow water, sunglint; low - out of the [-0.05, 5]
+ *    range, solar zenith > 80 deg, satellite zenith > 60 deg, the
+ *    internal cloud or cirrus tests failed, coastal, shallow inland
+ *    water, residual > 0.3; medium - adjacent to cloud, adjacent to
+ *    snow within 3 px, residual > 0.25, shallow ocean, the mask's
+ *    'probably clear'; high - the rest; "the high quality retrievals
+ *    are recommended for quantitative applications"); the F&PS
+ *    requirement (Table 2-1: accuracy over land 0.06 below 0.04,
+ *    0.04 from 0.04 to 0.8, 0.12 above; precision 0.13 / 0.25 /
+ *    0.35; over water 0.02 below 0.4, 0.10 above; precision 0.15 /
+ *    0.23; 2 km, CONUS every 5 min); the validation (Sec. 4.2: the
+ *    MODIS strategy of Ichoku et al. 2002 and Remer et al. 2005 -
+ *    AERONET averaged within an hour, the satellite pixels averaged
+ *    in a 50 x 50 km box centred on the station, the highest 50% and
+ *    lowest 20% of the box screened out, the rest averaged); Table
+ *    4-6, GOES-16 ABI high-quality AOD against AERONET (29 April 2017
+ *    to 15 January 2018): land bias 0.02 / precision 0.07 below 0.04
+ *    (4,591 points), 0.04 / 0.11 from 0.04 to 0.8 (38,694), -0.10 /
+ *    0.65 above 0.8 (254 - "may not be statistically robust");
+ *    water 0.01 / 0.04 below 0.4 (6,758), -0.003 / 0.11 above (54);
+ *    overall land 0.04 / 0.12, water 0.01 / 0.04; the Angstrom
+ *    exponent meets its accuracy requirement (0.3) and neither
+ *    satellite meets its precision one (0.15). The file
+ *    (OR_ABI-L2-AODC-M6_G18_s20262482321178): AOD uint16 at
+ *    scale_factor 7.706e-5 from -0.05, fill 65535, valid_range [0,
+ *    65530]; DQF 0 high, 1 medium, 2 low, 3 no retrieval (the file's
+ *    own flag_meanings); quantitative_local_zenith_angle_bounds [0,
+ *    78.5] and quantitative_solar_zenith_angle_bounds [0, 78.5]
+ *    (the operational bounds, wider than the ATBD's 60 and 80 for
+ *    the low flag - the file's own outrank the print, stated);
+ *    sunglint_angle_bounds [0, 36]; AE1/AE2 over water only, held
+ *    out (the precision the ATBD says is not met).
  *
  * OWNERSHIP: this module owns the navigation, the window cut and
  * the comparison census; the daemon lists and fetches the buckets
@@ -394,7 +434,13 @@ export const L2_PRODUCTS = {
   // Bailey & Bresky, 2025, read in full); CONUS every 15 min, one
   // file per band, band 14 (11.2 um) day and night, ~38 km between
   // vectors; 0.3 MB a file, read whole in one range
-  dmw: 'ABI-L2-DMWC'
+  dmw: 'ABI-L2-DMWC',
+  // the 156th pass: the aerosol optical depth at 550 nm (the AOD
+  // ATBD v4.2, read in full) - CONUS every 5 min, 2 km, retrieved
+  // by day over dark land and glint-free water; the files run all
+  // night with nothing retrieved (listed at 06Z, measured); 8.3 MB
+  // a file, the window ~0.4 MB by range
+  aod: 'ABI-L2-AODC'
 };
 // The DSR file's own flag meanings (DQF flag_values 0..1): the
 // ATBD's overall quality flag is 1 when the solar or local zenith
@@ -488,6 +534,85 @@ export const DMW_ATBD = {
     mid: {accuracyMs: [4.35, 5.27], precisionMs: [2.9, 3.53]},
     low: {accuracyMs: [3.52, 3.69], precisionMs: [2.3, 2.46]}
   }
+};
+// THE MEASURED HAZE (156th pass): the AOD file's own flag meanings
+// (DQF flag_values 0..3) and the ATBD's own numbers - the F&PS
+// requirement by AOD range and surface (Table 2-1) and Table 4-6's
+// GOES-16 validation of the HIGH-quality product against AERONET
+// (bias = accuracy, standard deviation = precision, the count of
+// matchups), the overall figures of Sec. 4.2, the collocation the
+// figures were measured with (a 50 x 50 km box, the highest 50% and
+// lowest 20% screened, the rest averaged) and the angle rules of
+// the low flag.
+export const AOD_DQF_MEANINGS = [
+  'high_quality_retrieval_qf',
+  'medium_quality_retrieval_qf',
+  'low_quality_retrieval_qf',
+  'no_retrieval_qf'
+];
+export const AOD_ATBD = {
+  wavelengthNm: 550,
+  rangeValid: [-0.05, 5],
+  // Table 2-1 (accuracy, precision) and Table 4-6 (bias, sd, n) by
+  // AOD range: [upper bound of the range (Infinity for the last),
+  // requirement accuracy, requirement precision, measured bias,
+  // measured precision, matchups]
+  land: [
+    {
+      below: 0.04,
+      reqAccuracy: 0.06,
+      reqPrecision: 0.13,
+      bias: 0.02,
+      precision: 0.07,
+      n: 4591
+    },
+    {
+      below: 0.8,
+      reqAccuracy: 0.04,
+      reqPrecision: 0.25,
+      bias: 0.04,
+      precision: 0.11,
+      n: 38694
+    },
+    {
+      below: Infinity,
+      reqAccuracy: 0.12,
+      reqPrecision: 0.35,
+      bias: -0.1,
+      precision: 0.65,
+      n: 254
+    }
+  ],
+  water: [
+    {
+      below: 0.4,
+      reqAccuracy: 0.02,
+      reqPrecision: 0.15,
+      bias: 0.01,
+      precision: 0.04,
+      n: 6758
+    },
+    {
+      below: Infinity,
+      reqAccuracy: 0.1,
+      reqPrecision: 0.23,
+      bias: -0.003,
+      precision: 0.11,
+      n: 54
+    }
+  ],
+  overall: {
+    land: {bias: 0.04, precision: 0.12},
+    water: {bias: 0.01, precision: 0.04}
+  },
+  validation: {from: '2017-04-29', to: '2018-01-15', craft: 'GOES-16'},
+  boxKm: 50, // the collocation box centred on the station
+  screenLow: 0.2, // the lowest 20% of the box's AODs screened out
+  screenHigh: 0.5, // and the highest 50%
+  lowFlagSzaDeg: 80, // the ATBD's low-quality rules (Table 3-9)
+  lowFlagLzaDeg: 60,
+  aeAccuracyReq: 0.3, // met (Table 4-5)
+  aePrecisionReq: 0.15 // not met, by either satellite (Sec. 4.2)
 };
 // The imagery bucket lists every band's file under one prefix
 // (OR_ABI-L2-CMIPC-M6C13_G18_s...): the band from a key, and the
@@ -677,6 +802,120 @@ export function boxMean(values, dqf, box, r) {
     min: n ? min : null,
     max: n ? max : null
   };
+}
+// THE MEASURED HAZE (156th pass): the AOD window's census by the
+// file's own quality levels (DQF 0 high, 1 medium, 2 low, 3 no
+// retrieval, 255 fill) with the statistics of the high-quality
+// pixels (the ones the ATBD recommends for quantitative use) and,
+// beside them, the count and median of high + medium ("usable" -
+// reported, never driving).
+export function aodCensus(tau, dqf) {
+  const c = {n: tau.length, high: 0, medium: 0, low: 0, none: 0, fill: 0};
+  const hi = [];
+  const usable = [];
+  for (let q = 0; q < tau.length; q++) {
+    const d = dqf ? dqf[q] : 0;
+    if (d === 0) c.high++;
+    else if (d === 1) c.medium++;
+    else if (d === 2) c.low++;
+    else if (d === 3) c.none++;
+    else c.fill++;
+    if (!Number.isFinite(tau[q])) continue;
+    if (d === 0) hi.push(tau[q]);
+    if (d <= 1) usable.push(tau[q]);
+  }
+  hi.sort((a, b) => a - b);
+  usable.sort((a, b) => a - b);
+  return {
+    ...c,
+    min: hi.length ? hi[0] : null,
+    median: quantile(hi, 0.5),
+    max: hi.length ? hi[hi.length - 1] : null,
+    usableN: usable.length,
+    usableMedian: quantile(usable, 0.5)
+  };
+}
+// The ATBD's own collocation estimator (Sec. 4.2, after Ichoku et
+// al. 2002 and Remer et al. 2005): the high-quality pixels within r
+// of the window's centre (r = 12 on the 2-km grid is the 50 x 50 km
+// box), sorted, the lowest `low` and highest `high` fractions
+// screened out, the rest averaged - the quantity Table 4-6's bias
+// and precision were measured for, so the figures apply to it and
+// to nothing else. {n, kept, mean, min, max}: n the high-quality
+// pixels in the box, kept how many survived the screen, min/max
+// over the n.
+export function aodBoxEstimate(
+  tau,
+  dqf,
+  box,
+  r,
+  {low = AOD_ATBD.screenLow, high = AOD_ATBD.screenHigh} = {}
+) {
+  const ci = box.i - box.i0;
+  const cj = box.j - box.j0;
+  const vals = [];
+  for (let dj = -r; dj <= r; dj++) {
+    const j = cj + dj;
+    if (j < 0 || j >= box.rows) continue;
+    for (let di = -r; di <= r; di++) {
+      const i = ci + di;
+      if (i < 0 || i >= box.cols) continue;
+      const q = j * box.cols + i;
+      const v = tau[q];
+      if (!Number.isFinite(v) || (dqf && dqf[q] !== 0)) continue;
+      vals.push(v);
+    }
+  }
+  vals.sort((a, b) => a - b);
+  const n = vals.length;
+  if (!n) return {n: 0, kept: 0, mean: null, min: null, max: null};
+  const a = Math.round(n * low);
+  const b = Math.max(a + 1, Math.round(n * (1 - high)));
+  let sum = 0;
+  let kept = 0;
+  for (let k = a; k < b && k < n; k++) {
+    sum += vals[k];
+    kept++;
+  }
+  return {n, kept, mean: sum / kept, min: vals[0], max: vals[n - 1]};
+}
+// The requirement and the measured figures for an AOD over a
+// surface (Table 2-1 and Table 4-6 by range): the row the value
+// falls in, with its range named.
+export function aodFigures(tau, surface = 'land') {
+  if (!Number.isFinite(tau)) return null;
+  const rows = AOD_ATBD[surface] ?? AOD_ATBD.land;
+  for (let k = 0; k < rows.length; k++) {
+    const row = rows[k];
+    if (tau < row.below || k === rows.length - 1) {
+      const range =
+        k === 0
+          ? `< ${row.below}`
+          : k === rows.length - 1
+            ? `> ${rows[k - 1].below}`
+            : `${rows[k - 1].below}–${row.below}`;
+      return {surface: AOD_ATBD[surface] ? surface : 'land', range, ...row};
+    }
+  }
+  return null;
+}
+// THE RANKING ON THE CHANNEL: the model's channel set (tau at the
+// theme's 680/550/440 nm) re-scaled so its 550 nm value equals the
+// satellite's, the spectral shape (the model's Angstrom slope, or
+// AERONET's when the photometer wrote the set) kept; a set at the
+// floor (no shape to keep) becomes flat at the satellite's value;
+// every channel clamped to [floor, ceil]. Pure, so the page and the
+// gate run one law.
+export function aodChannelTau(
+  tau3,
+  tau550,
+  {floor = 1e-4, ceil = 3} = {}
+) {
+  const t = Math.min(ceil, Math.max(floor, tau550));
+  const ref = tau3[1];
+  if (!(ref > floor)) return [t, t, t];
+  const s = t / ref;
+  return tau3.map((v) => Math.min(ceil, Math.max(floor, v * s)));
 }
 // THE MEASURED MOTION (153rd pass): the derived motion winds are a
 // point list, so the window is a radius. Great-circle distance on

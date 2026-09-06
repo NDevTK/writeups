@@ -8,6 +8,12 @@ import {openHdf5, physicalValues} from './hdf5.js';
 import {ACHAC_B64, ACHAC_EXPECT} from './hdf5-fixture.js';
 import {
   ACM_MEANINGS,
+  AOD_ATBD,
+  AOD_DQF_MEANINGS,
+  aodBoxEstimate,
+  aodCensus,
+  aodChannelTau,
+  aodFigures,
   BCM_MEANINGS,
   DCOMP_COD_MAX,
   DCOMP_FLAGS,
@@ -753,6 +759,139 @@ const inflate = (u8) =>
       `columns give the same layers; the nearest good vector 1 km from the home is the home's own; a degree of longitude ` +
       `on the equator is ${d0.toFixed(3)} km; ${L2_PRODUCTS.dmw} band ${DMW_BAND}, ${DMW_DQF_MEANINGS.length} flag meanings, ` +
       `the requirement 7.5 / 4.2 m/s and Table 16's GOES-17 low-layer accuracy ${DMW_ATBD.lwirVsRaob.low.accuracyMs.join('-')} m/s`
+  );
+}
+
+// ---- THE MEASURED HAZE (156th pass) ------------------------------
+// aodCensus: the window by the file's four quality levels with the
+// high-quality statistics and the usable (high + medium) count and
+// median beside them; aodBoxEstimate: the ATBD's own collocation
+// estimator - the high-quality pixels within r of the centre,
+// sorted, the lowest 20% and highest 50% screened, the rest
+// averaged; aodFigures: Table 2-1's requirement and Table 4-6's
+// measured bias and precision for a value's range over a surface;
+// aodChannelTau: the channel set re-scaled to the satellite's 550
+// nm value with its shape kept, flat from a floored set, clamped;
+// the product, the flag meanings and the ATBD's numbers.
+{
+  // a 4x4 window, centre (1, 1): tau = 0.1 .. 1.6 with a fill at
+  // index 10; DQF 0 high at ten pixels, medium at 1 and 8, low at 3
+  // and 12, no retrieval at 6, fill (255) at 10
+  const tau = [
+    0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, NaN, 1.2, 1.3, 1.4, 1.5,
+    1.6
+  ];
+  const dqf = [0, 1, 0, 2, 0, 0, 3, 0, 1, 0, 255, 0, 2, 0, 0, 0];
+  const box = {i: 11, j: 21, i0: 10, j0: 20, cols: 4, rows: 4};
+  const c = aodCensus(tau, dqf);
+  // r = 1: the 3x3 block rows 0-2, cols 0-2 holds the high pixels
+  // 0.1, 0.3, 0.5, 0.6, 1.0 -> the lowest 20% (one) and the highest
+  // 50% (from the third) screened -> 0.3 and 0.5 kept, mean 0.4
+  const e1 = aodBoxEstimate(tau, dqf, box, 1);
+  // r = 0: the centre pixel alone (index 5, 0.6, high)
+  const e0 = aodBoxEstimate(tau, dqf, box, 0);
+  // r = 3: the whole window's ten high values -> two and five
+  // screened, 0.5, 0.6, 0.8 kept
+  const e3 = aodBoxEstimate(tau, dqf, box, 3);
+  // no high pixel in reach: a centre on the flagged corner (3, 0)
+  const eNone = aodBoxEstimate(tau, dqf, {...box, i: 13, j: 20}, 0);
+  const fLand = aodFigures(0.11, 'land');
+  const fHigh = aodFigures(1, 'land');
+  const fWater = aodFigures(0.03, 'water');
+  const fWaterHi = aodFigures(0.5, 'water');
+  const ch = aodChannelTau([0.2, 0.1, 0.05], 0.2);
+  const chFlat = aodChannelTau([1e-4, 1e-4, 1e-4], 0.15);
+  const chClamp = aodChannelTau([2, 2.5, 3], 3.5);
+  const chNeg = aodChannelTau([0.2, 0.1, 0.05], -0.02);
+  check(
+    'THE MEASURED HAZE: the quality census, the ATBD’s collocation estimator, its figures by range, the channel re-scaled',
+    c.n === 16 &&
+      c.high === 10 &&
+      c.medium === 2 &&
+      c.low === 2 &&
+      c.none === 1 &&
+      c.fill === 1 &&
+      c.high + c.medium + c.low + c.none + c.fill === c.n &&
+      near(c.min, 0.1) &&
+      near(c.median, 1.0) &&
+      near(c.max, 1.6) &&
+      c.usableN === 12 &&
+      near(c.usableMedian, 0.9) &&
+      e1.n === 5 &&
+      e1.kept === 2 &&
+      near(e1.mean, 0.4) &&
+      near(e1.min, 0.1) &&
+      near(e1.max, 1.0) &&
+      e0.n === 1 &&
+      e0.kept === 1 &&
+      near(e0.mean, 0.6) &&
+      e3.n === 10 &&
+      e3.kept === 3 &&
+      near(e3.mean, (0.5 + 0.6 + 0.8) / 3) &&
+      eNone.n === 0 &&
+      eNone.mean === null &&
+      fLand.range === '0.04–0.8' &&
+      fLand.surface === 'land' &&
+      fLand.bias === 0.04 &&
+      fLand.precision === 0.11 &&
+      fLand.n === 38694 &&
+      fLand.reqAccuracy === 0.04 &&
+      fLand.reqPrecision === 0.25 &&
+      aodFigures(0.02, 'land').range === '< 0.04' &&
+      fHigh.range === '> 0.8' &&
+      fHigh.bias === -0.1 &&
+      fHigh.precision === 0.65 &&
+      fHigh.n === 254 &&
+      fWater.range === '< 0.4' &&
+      fWater.bias === 0.01 &&
+      fWater.precision === 0.04 &&
+      fWater.n === 6758 &&
+      fWaterHi.range === '> 0.4' &&
+      fWaterHi.bias === -0.003 &&
+      aodFigures(NaN, 'land') === null &&
+      aodFigures(0.1, 'moon').surface === 'land' &&
+      near(ch[0], 0.4) &&
+      near(ch[1], 0.2) &&
+      near(ch[2], 0.1) &&
+      chFlat.every((v) => near(v, 0.15)) &&
+      near(chClamp[0], 2.4) &&
+      chClamp[1] === 3 &&
+      chClamp[2] === 3 &&
+      near(chNeg[1], 1e-4) &&
+      chNeg[2] === 1e-4 &&
+      L2_PRODUCTS.aod === 'ABI-L2-AODC' &&
+      AOD_DQF_MEANINGS.length === 4 &&
+      AOD_DQF_MEANINGS[0] === 'high_quality_retrieval_qf' &&
+      AOD_DQF_MEANINGS[3] === 'no_retrieval_qf' &&
+      AOD_ATBD.wavelengthNm === 550 &&
+      AOD_ATBD.land.length === 3 &&
+      AOD_ATBD.water.length === 2 &&
+      AOD_ATBD.land[0].reqAccuracy === 0.06 &&
+      AOD_ATBD.land[2].reqPrecision === 0.35 &&
+      AOD_ATBD.water[1].reqAccuracy === 0.1 &&
+      AOD_ATBD.overall.land.precision === 0.12 &&
+      AOD_ATBD.overall.water.bias === 0.01 &&
+      AOD_ATBD.boxKm === 50 &&
+      AOD_ATBD.screenLow === 0.2 &&
+      AOD_ATBD.screenHigh === 0.5 &&
+      AOD_ATBD.lowFlagSzaDeg === 80 &&
+      AOD_ATBD.lowFlagLzaDeg === 60 &&
+      AOD_ATBD.aeAccuracyReq === 0.3 &&
+      AOD_ATBD.aePrecisionReq === 0.15 &&
+      AOD_ATBD.validation.craft === 'GOES-16',
+    `of 16 px ${c.high} high, ${c.medium} medium, ${c.low} low, ${c.none} none, ${c.fill} fill; the high-quality ` +
+      `min/median/max ${c.min}/${c.median}/${c.max}, ${c.usableN} usable with median ${c.usableMedian}; the ATBD's ` +
+      `estimator over the 3x3 keeps ${e1.kept} of ${e1.n} high px (the lowest 20% and highest 50% screened) for ` +
+      `${e1.mean.toFixed(2)}, the centre alone gives ${e0.mean}, the whole window keeps ${e3.kept} of ${e3.n} for ` +
+      `${e3.mean.toFixed(4)}, a flagged corner none; 0.11 over land falls in ${fLand.range} (Table 4-6 bias ` +
+      `${fLand.bias}, precision ${fLand.precision} over ${fLand.n}; the requirement ${fLand.reqAccuracy} / ` +
+      `${fLand.reqPrecision}), 1.0 in ${fHigh.range} (${fHigh.bias} / ${fHigh.precision} over ${fHigh.n}), 0.03 over ` +
+      `water in ${fWater.range} (${fWater.bias} / ${fWater.precision} over ${fWater.n}); a set 0.2/0.1/0.05 re-scaled ` +
+      `to 0.2 at 550 nm is ${ch.map((v) => v.toFixed(2)).join('/')} (the shape kept), a floored set becomes flat ` +
+      `${chFlat[1]}, 3.5 clamps to ${chClamp.join('/')}, a negative retrieval floors to ${chNeg[1]}; ` +
+      `${L2_PRODUCTS.aod} with ${AOD_DQF_MEANINGS.length} flag meanings; the ATBD's box ${AOD_ATBD.boxKm} km, ` +
+      `the low flag past ${AOD_ATBD.lowFlagSzaDeg} deg sun and ${AOD_ATBD.lowFlagLzaDeg} deg satellite zenith, ` +
+      `the Angstrom precision requirement ${AOD_ATBD.aePrecisionReq} not met`
   );
 }
 

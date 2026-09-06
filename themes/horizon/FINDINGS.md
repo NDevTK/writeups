@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **144 CPU reference files printing
-1146 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
+1148 landmark lines, plus 8 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **144 reference files, 1146 landmark lines, 8 GPU probes** (live gate
+- **144 reference files, 1148 landmark lines, 8 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -875,7 +875,29 @@ The practice the corpus demonstrates, stated so it can be reused:
    the pass also found the hourly SST file landing 63 minutes after
    its hour (the lookback now spans three) and the harness's request
    bridge dropping the page's Range header (repaired; the client is
-   hardened for a range-ignoring path regardless)
+   hardened for a range-ignoring path regardless). Pass 156 puts
+   NOAA's aerosol optical depth on the aerosol channel: the AOD ATBD
+   (v4.2, read in full — a look-up-table retrieval at 550 nm over
+   dark land and glint-free water, four quality levels, the F&PS
+   requirement by AOD range, and GOES-16's high-quality product
+   validated against AERONET at a land bias of 0.04 and precision
+   0.12, water 0.01 and 0.04, through a 50 × 50 km collocation box
+   whose lowest 20% and highest 50% are screened before averaging)
+   becomes the ninth product, its window read in five ranges (0.9 MB
+   of an 8.3 MB file), and the page computes the ATBD's own
+   estimator over that box; the ranking on the channel is stated —
+   a fresh AERONET triplet outranks the satellite, the satellite
+   outranks the model and re-scales the channel set to its 550 nm
+   value with the spectral shape kept — and the first live read
+   (23:42Z, a 69%-cloudy window) is the pass's own finding: six
+   high-quality pixels between clouds read 0.10–0.15 while the ±100
+   km window's 834 read a median 0.039 and AERONET La Jolla 0.036,
+   so the estimator drives the channel only from ten high-quality
+   pixels in the box, the thin sample stated otherwise
+   (`goesl2-reference` THE MEASURED HAZE; `server-reference` THE
+   MEASURED HAZE — the body dressed on the fixture, recomputed from
+   the wire, the extras read without a further range;
+   `goesl2-client-reference` nine asks over 23 listings)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
