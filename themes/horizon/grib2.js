@@ -277,7 +277,13 @@ export function grib2Sections(buf) {
   const secs = {};
   let o = 16;
   while (o < b.length - 4) {
-    if (b[o] === 0x37 && b[o + 1] === 0x37 && b[o + 2] === 0x37 && b[o + 3] === 0x37) break;
+    if (
+      b[o] === 0x37 &&
+      b[o + 1] === 0x37 &&
+      b[o + 2] === 0x37 &&
+      b[o + 3] === 0x37
+    )
+      break;
     const len = u32(b, o);
     if (!(len >= 5)) throw new Error(`corrupt GRIB2 section length ${len}`);
     secs[b[o + 4]] = {pos: o, len};
@@ -294,7 +300,14 @@ export function grib2Header(buf) {
   const h = {discipline: b[6], secs};
   if (secs[1]) {
     const o = secs[1].pos;
-    h.refTime = {y: u16(b, o + 12), m: b[o + 14], d: b[o + 15], H: b[o + 16], M: b[o + 17], S: b[o + 18]};
+    h.refTime = {
+      y: u16(b, o + 12),
+      m: b[o + 14],
+      d: b[o + 15],
+      H: b[o + 16],
+      M: b[o + 17],
+      S: b[o + 18]
+    };
     h.refTimeIso = `${String(h.refTime.y).padStart(4, '0')}-${String(h.refTime.m).padStart(2, '0')}-${String(h.refTime.d).padStart(2, '0')}T${String(h.refTime.H).padStart(2, '0')}:${String(h.refTime.M).padStart(2, '0')}:${String(h.refTime.S).padStart(2, '0')}Z`;
   }
   if (secs[3]) {
@@ -345,7 +358,12 @@ export function pngChunks(png) {
   let p = 8;
   while (p + 8 <= png.length) {
     const len = u32(png, p);
-    const type = String.fromCharCode(png[p + 4], png[p + 5], png[p + 6], png[p + 7]);
+    const type = String.fromCharCode(
+      png[p + 4],
+      png[p + 5],
+      png[p + 6],
+      png[p + 7]
+    );
     const data = png.subarray(p + 8, p + 8 + len);
     if (type === 'IHDR') {
       out.width = u32(data, 0);
@@ -389,7 +407,8 @@ export function pngUnfilterRow(ft, src, prev, cur, bpp) {
  * on('error'), on('end'), write(chunk) -> boolean, once('drain'),
  * end(), close()). Resolves {counts, rowsRead, chunks}. */
 export function pngWindow16(png, j0, j1, i0, i1, {createInflate} = {}) {
-  if (typeof createInflate !== 'function') throw new Error('pngWindow16 needs createInflate');
+  if (typeof createInflate !== 'function')
+    throw new Error('pngWindow16 needs createInflate');
   const c = pngChunks(png);
   if (c.depth !== 16 || c.ctype !== 0)
     throw new Error(`unsupported PNG ${c.depth}-bit colour type ${c.ctype}`);
@@ -429,10 +448,17 @@ export function pngWindow16(png, j0, j1, i0, i1, {createInflate} = {}) {
       } else data = chunk;
       let off = 0;
       while (data.length - off >= rowBytes && row < j1) {
-        pngUnfilterRow(data[off], data.subarray(off + 1, off + rowBytes), prev, cur, bpp);
+        pngUnfilterRow(
+          data[off],
+          data.subarray(off + 1, off + rowBytes),
+          prev,
+          cur,
+          bpp
+        );
         if (row >= j0) {
           const base = (row - j0) * cols;
-          for (let i = i0; i < i1; i++) out[base + i - i0] = (cur[i * 2] << 8) | cur[i * 2 + 1];
+          for (let i = i0; i < i1; i++)
+            out[base + i - i0] = (cur[i * 2] << 8) | cur[i * 2 + 1];
         }
         const t = prev;
         prev = cur;
@@ -453,7 +479,9 @@ export function pngWindow16(png, j0, j1, i0, i1, {createInflate} = {}) {
       }
     });
     inf.on('error', (e) => finish(e));
-    inf.on('end', () => finish(row >= j1 ? null : new Error(`PNG ended at row ${row} of ${j1}`)));
+    inf.on('end', () =>
+      finish(row >= j1 ? null : new Error(`PNG ended at row ${row} of ${j1}`))
+    );
     (async () => {
       for (const d of c.idat) {
         if (done) break;
@@ -475,8 +503,12 @@ export async function grib2Window(buf, lat, lon, halfCells, opts = {}) {
   const g = h.grid;
   const d = h.drt;
   if (!g || !d) throw new Error('grid or data representation missing');
-  if (d.tmpl !== 41) throw new Error(`unsupported data representation template 5.${d.tmpl} for a window`);
-  if (g.jPos || g.iNeg) throw new Error('window needs rows from the north and columns eastward');
+  if (d.tmpl !== 41)
+    throw new Error(
+      `unsupported data representation template 5.${d.tmpl} for a window`
+    );
+  if (g.jPos || g.iNeg)
+    throw new Error('window needs rows from the north and columns eastward');
   if (h.bitmapIndicator !== undefined && h.bitmapIndicator !== 255)
     throw new Error(`unsupported bitmap indicator ${h.bitmapIndicator}`);
   const lo = ((lon % 360) + 360) % 360;
@@ -497,7 +529,14 @@ export async function grib2Window(buf, lat, lon, halfCells, opts = {}) {
   return {
     values,
     box: {j0, j1, i0, i1, cj, ci, rows: j1 - j0, cols: i1 - i0},
-    header: {refTimeIso: h.refTimeIso, discipline: h.discipline, paramCategory: h.paramCategory, paramNumber: h.paramNumber, grid: g, drt: d},
+    header: {
+      refTimeIso: h.refTimeIso,
+      discipline: h.discipline,
+      paramCategory: h.paramCategory,
+      paramNumber: h.paramNumber,
+      grid: g,
+      drt: d
+    },
     rowsRead: w.rowsRead,
     chunks: w.chunks
   };

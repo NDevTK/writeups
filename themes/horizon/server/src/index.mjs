@@ -718,7 +718,13 @@ export function parseUpdateStatus(text) {
   try {
     const v = JSON.parse(text);
     if (!v || typeof v !== 'object') return null;
-    const phase = ['gating', 'installing', 'deployed', 'failed', 'install-failed'].includes(v.phase)
+    const phase = [
+      'gating',
+      'installing',
+      'deployed',
+      'failed',
+      'install-failed'
+    ].includes(v.phase)
       ? v.phase
       : null;
     if (!phase) return null;
@@ -2298,7 +2304,15 @@ function main() {
     'https://mrms.ncep.noaa.gov/2D/EchoTop_18/MRMS_EchoTop_18.latest.grib2.gz';
   const MRMS_REFRESH_MS = MRMS_FACTS.cadenceS * 1000;
   const MRMS_HALF_CELLS = 50;
-  const mrmsHeld = {at: 0, buf: null, header: null, bytes: 0, error: null, fetchedAt: null, refreshing: null};
+  const mrmsHeld = {
+    at: 0,
+    buf: null,
+    header: null,
+    bytes: 0,
+    error: null,
+    fetchedAt: null,
+    refreshing: null
+  };
   const mrmsCache = new Map(); // "j,i" -> {refTime, body}
   // A request never waits for NCEP while a file is held: a due refresh
   // runs in the background and the held file (at most one cadence
@@ -2307,7 +2321,8 @@ function main() {
   // Only the very first request awaits the fetch.
   function mrmsRefresh(deadline) {
     if (Date.now() - mrmsHeld.at < MRMS_REFRESH_MS) return mrmsHeld;
-    if (mrmsHeld.refreshing) return mrmsHeld.buf ? mrmsHeld : mrmsHeld.refreshing;
+    if (mrmsHeld.refreshing)
+      return mrmsHeld.buf ? mrmsHeld : mrmsHeld.refreshing;
     mrmsHeld.at = Date.now();
     mrmsHeld.refreshing = mrmsFetch(deadline).finally(() => {
       mrmsHeld.refreshing = null;
@@ -2377,8 +2392,16 @@ function main() {
       halfKm: MRMS_HALF_CELLS,
       cellKm: MRMS_FACTS.cellKm,
       census,
-      words: echoTopWords(census, {refTimeIso: refTime, halfKm: MRMS_HALF_CELLS}),
-      read: {rows: w.rowsRead, chunks: w.chunks, ms: Date.now() - t0, fileBytes: h.bytes},
+      words: echoTopWords(census, {
+        refTimeIso: refTime,
+        halfKm: MRMS_HALF_CELLS
+      }),
+      read: {
+        rows: w.rowsRead,
+        chunks: w.chunks,
+        ms: Date.now() - t0,
+        fileBytes: h.bytes
+      },
       documentation: MRMS_FACTS.documentation
     };
     mrmsCache.set(ck, {refTime, body});

@@ -2060,7 +2060,9 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
   );
   const imports = [
     ...new Set(
-      [...srcIdx.matchAll(/from '\.\.\/\.\.\/([a-z0-9-]+\.js)'/g)].map((m) => m[1])
+      [...srcIdx.matchAll(/from '\.\.\/\.\.\/([a-z0-9-]+\.js)'/g)].map(
+        (m) => m[1]
+      )
     )
   ].sort();
   const noShip = imports.filter(
@@ -2086,7 +2088,9 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       installing.phase === 'installing' &&
       /write_status install-failed "\$NEW"/.test(srcUpd) &&
       /write_status installing "\$NEW"/.test(srcUpd) &&
-      /echo "\$NEW failed \$\(date \+%s\)" >"\$STATE"\n\s+write_status install-failed/.test(srcUpd),
+      /echo "\$NEW failed \$\(date \+%s\)" >"\$STATE"\n\s+write_status install-failed/.test(
+        srcUpd
+      ),
     `${imports.length} shared imports (${imports.join(', ')}): ${noShip.length === 0 ? 'every one shipped' : 'NOT shipped: ' + noShip.join(', ')}, ${noRewrite.length === 0 ? 'every one rewritten' : 'NOT rewritten: ' + noRewrite.join(', ')}; update.sh records an install failure as a failed revision (the cooldown applies) and reports phases installing and install-failed`
   );
 }

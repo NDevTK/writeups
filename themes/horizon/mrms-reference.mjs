@@ -44,7 +44,8 @@ const createInflate = () => zlib.createInflate();
   const H = 7;
   const img = new Uint16Array(W * H);
   for (let j = 0; j < H; j++)
-    for (let i = 0; i < W; i++) img[j * W + i] = (j * 4001 + i * 257 + 12345) & 0xffff;
+    for (let i = 0; i < W; i++)
+      img[j * W + i] = (j * 4001 + i * 257 + 12345) & 0xffff;
   const raw = new Uint8Array(H * W * 2);
   for (let k = 0; k < img.length; k++) {
     raw[k * 2] = img[k] >> 8;
@@ -81,7 +82,10 @@ const createInflate = () => zlib.createInflate();
     const len = new Uint8Array(4);
     new DataView(len.buffer).setUint32(0, data.length);
     const td = new Uint8Array(4 + data.length);
-    td.set([...type].map((ch) => ch.charCodeAt(0)), 0);
+    td.set(
+      [...type].map((ch) => ch.charCodeAt(0)),
+      0
+    );
     td.set(data, 4);
     const crc = new Uint8Array(4); // the reader ignores the CRC
     return [len, td, crc];
@@ -110,15 +114,27 @@ const createInflate = () => zlib.createInflate();
   const whole = await pngWindow16(png, 0, H, 0, W, {createInflate});
   let midOk = true;
   for (let j = 2; j < 5; j++)
-    for (let i = 3; i < 8; i++) if (mid.counts[(j - 2) * 5 + (i - 3)] !== img[j * W + i]) midOk = false;
+    for (let i = 3; i < 8; i++)
+      if (mid.counts[(j - 2) * 5 + (i - 3)] !== img[j * W + i]) midOk = false;
   let wholeOk = true;
-  for (let k = 0; k < img.length; k++) if (whole.counts[k] !== img[k]) wholeOk = false;
+  for (let k = 0; k < img.length; k++)
+    if (whole.counts[k] !== img[k]) wholeOk = false;
   // a row unfiltered by hand against the previous
   const prev = raw.subarray(0, W * bpp);
   const cur = new Uint8Array(W * bpp);
-  pngUnfilterRow(4, filtered.subarray(1 + 4 * (1 + W * bpp) + 0, 1 + 4 * (1 + W * bpp) + W * bpp), raw.subarray(3 * W * bpp, 4 * W * bpp), cur, bpp);
+  pngUnfilterRow(
+    4,
+    filtered.subarray(
+      1 + 4 * (1 + W * bpp) + 0,
+      1 + 4 * (1 + W * bpp) + W * bpp
+    ),
+    raw.subarray(3 * W * bpp, 4 * W * bpp),
+    cur,
+    bpp
+  );
   let rowOk = true;
-  for (let x = 0; x < W * bpp; x++) if (cur[x] !== raw[4 * W * bpp + x]) rowOk = false;
+  for (let x = 0; x < W * bpp; x++)
+    if (cur[x] !== raw[4 * W * bpp + x]) rowOk = false;
   let threw = null;
   try {
     await pngWindow16(png, 0, H + 1, 0, W, {createInflate});
@@ -152,14 +168,23 @@ const createInflate = () => zlib.createInflate();
   const X = MRMS_EXPECT;
   const bytes = new Uint8Array(Buffer.from(ECHOTOP_B64, 'base64'));
   const h = grib2Header(bytes);
-  const w = await grib2Window(bytes, X.centre.lat, X.centre.lon, 25, {createInflate});
+  const w = await grib2Window(bytes, X.centre.lat, X.centre.lon, 25, {
+    createInflate
+  });
   const v = w.values;
   const centre = v[(w.box.cj - w.box.j0) * w.box.cols + (w.box.ci - w.box.i0)];
-  const tops = Array.from(v).filter((x) => x > 0).sort((a, b) => a - b);
+  const tops = Array.from(v)
+    .filter((x) => x > 0)
+    .sort((a, b) => a - b);
   const noEcho = Array.from(v).filter((x) => x === -1).length;
   const noCov = Array.from(v).filter((x) => x === -3).length;
-  const samplesOk = X.samples.every(([r, c, count]) => near(v[r * w.box.cols + c], (X.drt.R + count) / 1000, 1e-9));
-  const cen = echoTopCensus(v, w.box, X.centre.lat, X.centre.lon, {grid: {ni: X.cols, nj: X.rows, la1: X.la1, lo1: X.lo1}, cellDeg: X.d});
+  const samplesOk = X.samples.every(([r, c, count]) =>
+    near(v[r * w.box.cols + c], (X.drt.R + count) / 1000, 1e-9)
+  );
+  const cen = echoTopCensus(v, w.box, X.centre.lat, X.centre.lon, {
+    grid: {ni: X.cols, nj: X.rows, la1: X.la1, lo1: X.lo1},
+    cellDeg: X.d
+  });
   // the tallest cell placed by a plain great-circle from the crop's grid
   const tl = X.tallest;
   const tLat = X.la1 - tl.row * X.d;
@@ -171,10 +196,18 @@ const createInflate = () => zlib.createInflate();
   const words = echoTopWords(cen, {refTimeIso: h.refTimeIso, halfKm: 25});
   // a window off the grid is null; a window at the crop's corner clips
   const off = await grib2Window(bytes, 10, -81.1, 25, {createInflate});
-  const corner = await grib2Window(bytes, X.la1, X.lo1 - 360, 5, {createInflate});
-  const cornerCen = echoTopCensus(corner.values, corner.box, X.la1, X.lo1 - 360, {grid: {ni: X.cols, nj: X.rows, la1: X.la1, lo1: X.lo1}, cellDeg: X.d});
+  const corner = await grib2Window(bytes, X.la1, X.lo1 - 360, 5, {
+    createInflate
+  });
+  const cornerCen = echoTopCensus(
+    corner.values,
+    corner.box,
+    X.la1,
+    X.lo1 - 360,
+    {grid: {ni: X.cols, nj: X.rows, la1: X.la1, lo1: X.lo1}, cellDeg: X.d}
+  );
   check(
-    'THE ECHO TOP, READ: the vendored MRMS crop through the PNG-packed window read agrees with Pillow to the cell, the census places the tallest storm by a plain great-circle, and the facts are the file\'s own',
+    "THE ECHO TOP, READ: the vendored MRMS crop through the PNG-packed window read agrees with Pillow to the cell, the census places the tallest storm by a plain great-circle, and the facts are the file's own",
     h.discipline === 209 &&
       h.drt.tmpl === 41 &&
       near(h.drt.R, X.drt.R, 1e-6) &&
