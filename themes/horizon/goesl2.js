@@ -514,30 +514,42 @@ export function heightBlockClosure(fine, coarse) {
   const nC = cb.rows * cb.cols;
   const sum = new Float64Array(nC);
   const cnt = new Uint32Array(nC);
+  // every fine pixel the window holds under each field, good or not:
+  // a field at the fine window's edge holds only part of its block
+  // (a +-50-pixel window is not block-aligned - the first live
+  // closure read 1.8 km on such a corner field, measured), so only a
+  // field whose whole block lies in the window closes
+  const cov = new Uint32Array(nC);
+  const full = Math.round(
+    (coarse.x.scale / fine.x.scale) * (coarse.y.scale / fine.y.scale)
+  );
   let fineGood = 0;
   let fineOutside = 0;
   for (let j = 0; j < fine.box.rows; j++)
     for (let i = 0; i < fine.box.cols; i++) {
       const q = j * fine.box.cols + i;
-      if (fine.dqf && fine.dqf[q] !== 0) continue;
-      const h = fine.ht[q];
-      if (h === null || h === undefined || !Number.isFinite(h)) continue;
-      fineGood++;
       const ic =
         indexOfScanAngle(scanAngle(fine.box.i0 + i, fine.x), coarse.x) - cb.i0;
       const jc =
         indexOfScanAngle(scanAngle(fine.box.j0 + j, fine.y), coarse.y) - cb.j0;
-      if (ic < 0 || jc < 0 || ic >= cb.cols || jc >= cb.rows) {
+      const inside = ic >= 0 && jc >= 0 && ic < cb.cols && jc < cb.rows;
+      const qc = inside ? jc * cb.cols + ic : -1;
+      if (inside) cov[qc]++;
+      if (fine.dqf && fine.dqf[q] !== 0) continue;
+      const h = fine.ht[q];
+      if (h === null || h === undefined || !Number.isFinite(h)) continue;
+      fineGood++;
+      if (!inside) {
         fineOutside++;
         continue;
       }
-      const qc = jc * cb.cols + ic;
       sum[qc] += h;
       cnt[qc]++;
     }
   let withBoth = 0;
   let onlyCoarse = 0;
   let onlyFine = 0;
+  let partial = 0;
   let coarseGood = 0;
   let maxAbsM = 0;
   let sq = 0;
@@ -551,6 +563,10 @@ export function heightBlockClosure(fine, coarse) {
       coarse.ht[qc] !== undefined &&
       Number.isFinite(coarse.ht[qc]);
     if (good) coarseGood++;
+    if (cov[qc] && cov[qc] < full) {
+      partial++;
+      continue;
+    }
     if (good && cnt[qc]) {
       const d = sum[qc] / cnt[qc] - coarse.ht[qc];
       withBoth++;
@@ -567,11 +583,13 @@ export function heightBlockClosure(fine, coarse) {
           n: cnt[qc]
         };
       }
-    } else if (good) onlyCoarse++;
+    } else if (good && cov[qc]) onlyCoarse++;
     else if (cnt[qc]) onlyFine++;
   }
   return {
     fields: nC,
+    full,
+    partial,
     coarseGood,
     fineGood,
     fineOutside,
@@ -588,12 +606,15 @@ export function heightBlockClosure(fine, coarse) {
 /** The closure in words. */
 export function heightBlockClosureWords(c) {
   if (!c || !c.withBoth)
-    return `no field carries both a 10-km height and good 2-km pixels (${c ? c.coarseGood : 0} good fields, ${c ? c.fineGood : 0} good pixels)`;
+    return `no field carries both a 10-km height and a whole block of 2-km pixels (${c ? c.coarseGood : 0} good fields, ${c ? c.fineGood : 0} good pixels${c && c.partial ? `, ${c.partial} fields only partly under the window` : ''})`;
   return (
-    `the 2-km pixels' block means close against the 10-km fields to ${c.maxAbsM.toFixed(2)} m at most (rms ${c.rmsM.toFixed(2)} m) over ${c.withBoth} fields of ${c.perField.toFixed(1)} good pixels each` +
+    `the 2-km pixels' block means close against the 10-km fields to ${c.maxAbsM.toFixed(2)} m at most (rms ${c.rmsM.toFixed(2)} m) over ${c.withBoth} whole blocks of ${c.perField.toFixed(1)} good pixels each` +
     (c.onlyCoarse || c.onlyFine
       ? `; ${c.onlyCoarse} fields good with no good pixel under them, ${c.onlyFine} the other way`
       : '; no field good on one side only') +
+    (c.partial
+      ? `; ${c.partial} fields only partly under the window, left out`
+      : '') +
     ' - the PUG’s 5 x 5 mean, measured'
   );
 }

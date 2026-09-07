@@ -3060,6 +3060,19 @@ const inflate = (u8) =>
     near(c.p10M, e.p10M, tolM) &&
     near(c.p90M, e.p90M, tolM);
   const cl = heightBlockClosure(w2, w10);
+  // the fine window cut by its first column: the first block column's
+  // ten fields hold 20 of their 25 pixels and are left out as partial
+  // (a live +-50-pixel window is not block-aligned: its edge fields
+  // read kilometres off the closure before the law learnt to skip
+  // them - measured, 1.8 km on a corner field with 6 pixels)
+  const clipBox = {...A.box, i0: 1, cols: 49};
+  const w2clip = {
+    ...w2,
+    box: clipBox,
+    ht: cutWindow(w2.ht, 50, clipBox),
+    dqf: cutWindow(w2.dqf, 50, clipBox)
+  };
+  const clC = heightBlockClosure(w2clip, w10);
   // the closure by a plain loop over the crop's own layout: pixel
   // (j, i) lies in block (j / 5, i / 5)
   const bSum = new Float64Array(100);
@@ -3167,6 +3180,16 @@ const inflate = (u8) =>
       censusOk(c2, E.good2km) &&
       censusOk(c10, E.good10km) &&
       cl.fields === 100 &&
+      cl.full === 25 &&
+      cl.partial === 0 &&
+      clC.full === 25 &&
+      clC.partial === 10 &&
+      clC.withBoth === 90 &&
+      clC.fineOutside === 0 &&
+      clC.maxAbsM <= cl.maxAbsM + 1e-9 &&
+      heightBlockClosureWords(clC).includes(
+        '10 fields only partly under the window, left out'
+      ) &&
       cl.withBoth === E.closure.withBoth &&
       cl.withBoth === 100 &&
       cl.onlyCoarse === E.closure.goodOnlyIn10 &&
