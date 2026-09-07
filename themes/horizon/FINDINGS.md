@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1198 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
+1199 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **149 reference files, 1198 landmark lines, 9 GPU probes** (live gate
+- **149 reference files, 1199 landmark lines, 9 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1318,7 +1318,31 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    wall is steep, not vertical); the field's 250-m texels quantise
    the radar's 1-km cells; the cloud around and above the
    precipitation core is not measured here (`mrms-reference` THE
-   TOWERS' FIELD; the `towers` GPU probe)
+   TOWERS' FIELD; the `towers` GPU probe). Pass 176 puts the
+   satellite's top over the radar's core: a storm cell's tower rises
+   to ACHA's cloud-top height at the cell's own 10-km pixel where that
+   is higher than its 18-dBZ echo top (the precipitation core's top, a
+   lower bound on the cloud's), the lookup displaced AWAY from the
+   sub-satellite point by h tan(view zenith) — the PUG navigates a
+   pixel's line of sight to the ellipsoid and states the L1b source is
+   not parallax-corrected, so a 12-km top at 37° is reported 9 km from
+   the storm, a pixel's width; the shift is taken from the echo top
+   first and once more from the lifted top — DQF 0 only, the ATBD's
+   500 m accuracy and 1.5 km precision riding on the value, and the
+   PUG's own words that the 10-km product is aggregated from 2-km
+   retrievals. Gated on the vendored GOES-West ACHAC grid: a 9.83-km
+   core placed 18.7 km toward the satellite from a 10,331-m pixel at
+   62° zenith looks up its top 18.6 km away from it and lands on that
+   pixel, lifted 500 m (the wrong direction would land on an 11,671-m
+   pixel), the spherical view zenith 0.16° from the ellipsoid's own
+   geometry, a core above the satellite's top keeps its own, a flagged
+   pixel and a point outside the window are named (`goesl2-reference`
+   THE TOP OVER THE CORE). STATED: a 10-km pixel is a block mean over
+   ~100 radar cells; the residual parallax of a top lifted by Δh is
+   Δh tan θ (under a pixel for 3 km at 37°); the anvil beyond the
+   echoing cells is not painted (the field's flank rule stands there);
+   thin anvils below the ATBD's emissivity 0.8 fall outside its stated
+   accuracy and DQF does not separate them
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

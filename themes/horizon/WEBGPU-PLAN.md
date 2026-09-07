@@ -10345,6 +10345,77 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 7, the review session's 176th pass - THE SATELLITE'S TOP
+  OVER THE RADAR'S CORE): the 175th's named lead. A storm cell's tower
+  rises to ACHA's cloud-top height at the cell's own 10-km pixel where
+  that is higher than its 18-dBZ echo top - the anvil over the
+  precipitation core. PRIMARIES READ: PUG Volume 5 (L2+ products, 721
+  pages, fetched from goes-r.gov): "The Cloud Top Height product image
+  is produced on the ABI fixed grid at 10 km resolution for Full Disk
+  and CONUS ... The Cloud Top Height algorithm operates on 2 km
+  resolution pixels ... but the delivered Cloud Top Height and
+  Pressure products are aggregated to 4 km or 10 km", produced "to
+  local zenith angles of 70 degrees"; and, under the rainfall product,
+  "The ABI Level 1b source data is not parallax corrected" (the only
+  parallax sentence in the volume; PUG Volume 3, 442 pages, has none
+  beyond a star catalogue's parallax constant). PUG Volume 3 4.2.8 -
+  already the theme's navigation (fixedGridToLatLon solves the line of
+  sight's intersection with the ellipsoid) - is the geometry: a cloud
+  top at height h on that line stands nearer the satellite than the
+  pixel's ground point, so a storm at ground point P has its top
+  reported in the pixel at P displaced AWAY from the sub-satellite
+  point by h tan(view zenith): 9 km for a 12-km top at 37 deg, a
+  pixel's width. THE LAW (goesl2.js towerTopsFromOrbit): for each
+  storm cell the view zenith (satellites.viewZenithDeg, the spherical
+  triangle), the bearing to the sub-satellite point, the point moved
+  h tan(zenith) the other way on the local flat metres, the window
+  pixel there (windowIndexOf), DQF 0 and a finite HT; the top is the
+  taller of the echo top and HT; a lifted top looks up once more from
+  its own height (the residual parallax) and keeps the first pixel
+  where the second finds no good height; per storm echoKm, satM,
+  liftM, from ('satellite' | 'radar'), reason ('outside the window' |
+  'flagged' | 'no retrieval'), q, shiftM, viewZenithDeg; a summary
+  (n, withTop, lifted, satBelow, outside, flagged, noRetrieval,
+  maxLift, meanLiftM, the shift's range, the zenith, the satellite's
+  longitude from the product's own projection); towerTopsWords. THE
+  PAGE: applyRadarTops lifts the storms through a live ACHA window (30
+  min; keyed on the window's time as well) before echoTopField paints
+  them; the radar line adds "N of M storm cells took the satellite's
+  top (ACHA HT at each cell's own 10-km pixel, shifted a-b km away
+  from the sub-satellite point for the top's parallax at Z deg zenith,
+  DQF 0; the ATBD's 500 m), the largest lift L km: a c-km core under a
+  t km top at bearing and distance; k with the satellite's top below
+  the echo top (the radar stands); j without a good height (...)" or
+  "no ACHA window within 30 min: the towers stand at their echo tops";
+  the ranking sentence names the taller of the two. GATED
+  (goesl2-reference THE TOP OVER THE CORE, on the vendored GOES-West
+  ACHAC grid, the 148th's fixture): the first good pixel at or above
+  10 km with a good 5 x 5 neighbourhood whose pixel two shifts back
+  toward the satellite differs by a kilometre or more - (95, 5) at
+  50.517 N 161.395 W, 10,331 m, 62.12 deg zenith - takes a 9.83-km
+  core placed 18.71 km toward the satellite (the ellipsoid's own
+  zenith, 62.28 deg: the geodetic normal against the line to the
+  satellite in earth-centred coordinates) and lands its lookup 18.58
+  km away from it on the pixel, lifted exactly 500 m; the wrong
+  direction would land on an 11,671-m pixel; parallax off at the
+  centre lifts an 8-km core by 2.331 km; a 12.33-km core keeps its own
+  top (satBelow); a flagged centre (a copy of the window) and a point
+  at 10 N are named; the words. Docs: server README (/goesl2), FINDINGS
+  pass 176 (149 files, 1,199 landmarks, 9 GPU probes). STATED LIMITS: a
+  10-km pixel is a block mean of 2-km retrievals over ~100 radar
+  cells, so a tower takes its pixel's mean top, not its own turret's;
+  the residual parallax of a top lifted by dh is dh tan(zenith) (under
+  a pixel for 3 km at 37 deg, taken up by the second look only when
+  it crosses into a good pixel); the anvil beyond the echoing cells is
+  not painted - the field's flank rule stands there; thin anvils below
+  the ATBD's emissivity 0.8 fall outside its stated accuracy and DQF
+  does not separate them; the spherical view zenith is a tenth of a
+  degree from the ellipsoid's (measured 0.16 deg at 62 deg zenith -
+  under 150 m of shift at 10 km). The named next lead: the anvil's
+  spread - the satellite's own top field over the deck's world (every
+  good 10-km pixel whose HT stands above the deck's ordinary top
+  paints its parallax-corrected footprint), so the anvil reaches
+  beyond the echoing cells the way the satellite sees it.
 - DONE (Sep 6, the review session's 175th pass - THE TOWERS AT THEIR
   PLACES): the 174th's named lead. The radar's cells are now the low
   deck's per-texel TOP field, so a tower stands at its bearing and

@@ -171,7 +171,13 @@ are gated by `../server-reference.mjs` — the `server` set in
   10-km grid - since the 173rd the page censuses the window by ISCCP
   layer and its decks read the tops: the cirrus level, the low and
   mid decks' tops behind the theme's own field, the storm slab's top
-  at the tallest tenth; the ACHA ATBD's 500 m accuracy and 1.5 km
+  at the tallest tenth; since the 176th each radar storm cell's tower
+  (the `/mrms` list) rises to HT at the cell's own 10-km pixel where
+  that is higher than its 18-dBZ echo top, the lookup shifted away
+  from the sub-satellite point by h tan(view zenith) for the top's
+  parallax - PUG Vol. 5: the height is aggregated to 10 km from 2-km
+  retrievals and the L1b source is not parallax-corrected; the ACHA
+  ATBD's 500 m accuracy and 1.5 km
   precision stated on the page) from the NOAA Open Data buckets (`noaa-goes18` for
   GOES-West, `noaa-goes19` for GOES-East; anonymous S3, listed and
   fetched by the daemon, decoded by the gated pure-JS HDF5 reader
