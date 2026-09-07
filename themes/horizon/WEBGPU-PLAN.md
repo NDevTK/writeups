@@ -10402,7 +10402,20 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   words' source phrase inside the emissivity clause, which an
   imagery-less gate never prints - the phrase is its own clause now.
   The README's /goesl2 entry (twenty served, the twenty-first ask the
-  page's own).
+  page's own). MEASURED in the daemon (the home, 09:15Z): the
+  temperature window 8,978 good of 10,201 (median 253.2 K,
+  199.0-296.6), the file's 32.7 MB read in 6 ranges of 1,197 kB in
+  697 ms. THE THIRD LESSON, live: by the 09:26Z scan every pixel of
+  the home's window stood "no retrieval attempted" in the 10-km, the
+  2-km and the temperature products alike (the scan itself held 2.2
+  million good pixels - the sky over the home had cleared or the mask
+  had called it clear; Denver, Phoenix, Salt Lake and Los Angeles as
+  empty, Seattle 6,850 good), and the page took the fresh, empty 2-km
+  window as live: no sheets, no bands, no tops, where the 10-km window
+  should have stood - goesL2HeightLive now counts a window live only
+  with good pixels, and the ACHA line says when the 2-km window is
+  empty. The live measurement of the product's temperatures in the
+  sheets waits for cloud over a window (Seattle's, next).
 - DONE (Sep 7, the review session's 182nd pass - THE ENTERPRISE
   HEIGHT, READ): the 181st found (OSPO's notice) that the served
   heights have been the Enterprise algorithm's since 27 March 2023,
