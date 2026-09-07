@@ -143,12 +143,19 @@ import {
 import {parcelAscent} from './sounding.js';
 import {
   ACHA_ATBD,
+  SHEET_OPACITY_RULES,
   cirrusSheetsFromOrbit,
   cirrusSheetsWords,
+  columnTemperatureAt,
   heightBands,
+  planckRadiance,
+  planckTemperature,
+  sheetOpacity,
+  sheetOpacityWords,
   towerTopsFromOrbit,
   towerTopsWords
 } from './goesl2.js';
+import {planckB as goesirPlanckB, planckT as goesirPlanckT} from './goesir.js';
 import {
   ADP_ATBD,
   ADP_CALLED_FLOOR,
@@ -2796,6 +2803,128 @@ const inflate = (u8) =>
           `the first, pixel (${s0.i}, ${s0.j}) at ${s0.htM.toFixed(0)} m, navigated to ${G0.latDeg.toFixed(3)} N ${(-G0.lonDeg).toFixed(3)} W and moved ${(s0.shiftM / 1000).toFixed(2)} km toward GOES-West (${g.lon0Deg} E) at ${s0.viewZenithDeg.toFixed(2)}° zenith (the ellipsoid's ${vzE.toFixed(2)}°, ${(dHand / 1000).toFixed(2)} km; the bearing ${dBrg.toFixed(3)}° off the sub-point's), ${s0.distKm.toFixed(1)} km at ${s0.bearingDeg.toFixed(0)}° from the home; ` +
           `the synthetic mask's fractions match pixel by pixel (the flagged pixel dropped from the first sheet's 25: ${(r.sheets[0].fraction * 100).toFixed(1)}%); no mask: opaque; a 1-km reach: none; the words: "${words.slice(0, 140)}..."`
       : 'no high pixel within 100 km of the home window'
+  );
+}
+
+// ---- THE SHEET'S OWN OPACITY (178th pass) ---------------------------
+// The ACHA ATBD's Eq. 1 solved for the 11-um emissivity on synthetic
+// windows whose physics is written here: a clear sky at 290 K, three
+// cloud blocks whose radiances are mixed by hand at e 0.5, 1 and 0.2
+// over a 220-K top, a column that reads 220 K at 10 km - the law
+// recovers each e exactly in radiance, a brightness-temperature
+// average would not; DCOMP's optical depth outranks the emissivity
+// where it stands and closes against 2 tau_IR at the stated ratio; no
+// column, too few clear pixels and a cloud warmer than the clear sky
+// fall back to the mask's fraction; the Planck pair matches goesir's.
+{
+  // a 3 x 3 height window, 5 x 5 imagery / mask / DCOMP pixels each,
+  // on made-up but consistent scan-angle coordinates
+  const hx = {scale: 0.00028, offset: -0.01};
+  const hy = {scale: -0.00028, offset: 0.01};
+  const box = {i0: 100, j0: 200, cols: 3, rows: 3};
+  const fx = {scale: hx.scale / 5, offset: hx.offset - 2 * (hx.scale / 5)};
+  const fy = {scale: hy.scale / 5, offset: hy.offset - 2 * (hy.scale / 5)};
+  const fbox = {i0: 500, j0: 1000, cols: 15, rows: 15};
+  const hwin = {ht: new Float64Array(9).fill(10000), dqf: new Uint8Array(9), box, x: hx, y: hy};
+  const tClr = 290;
+  const tTop = 220;
+  const rClr = planckRadiance(tClr);
+  const rTop = planckRadiance(tTop);
+  // blocks (0,0) clear, (1,0) e 0.5, (2,0) e 1, (0,1) e 0.2, (1,1) clear
+  // but WARMER than the clear sky (a fog at 295 K, a cloud the law
+  // cannot weigh), the rest clear; the mask marks the cloud blocks
+  const eOf = {1: 0.5, 2: 1, 3: 0.2};
+  const btK = new Float64Array(225);
+  const idq = new Uint8Array(225);
+  const bcm = new Uint8Array(225);
+  const mdq = new Uint8Array(225);
+  const cod = new Float64Array(225).fill(NaN);
+  for (let j = 0; j < 15; j++)
+    for (let i = 0; i < 15; i++) {
+      const q = j * 15 + i;
+      const b = Math.floor(j / 5) * 3 + Math.floor(i / 5);
+      if (eOf[b] !== undefined) {
+        const e = eOf[b];
+        btK[q] = planckTemperature(e * rTop + (1 - e) * rClr);
+        bcm[q] = 1;
+        if (b === 1) cod[q] = 2 * Math.log(2); // tau_vis = 2 tau_IR = 2 ln 2 for e 0.5
+      } else if (b === 4) {
+        btK[q] = 295;
+        bcm[q] = 1;
+      } else {
+        btK[q] = tClr;
+        bcm[q] = 0;
+      }
+    }
+  // one flagged imagery pixel and one flagged mask pixel in the clear
+  idq[0] = 1;
+  mdq[1] = 3;
+  const imagery = {btK, dqf: idq, box: fbox, x: fx, y: fy};
+  const mask = {bcm, dqf: mdq, box: fbox, x: fx, y: fy};
+  const dcomp = {cod, dqf: new Uint8Array(225), box: fbox, x: fx, y: fy};
+  const rows = [
+    {hM: 0, tC: 17},
+    {hM: 8000, tC: 240 - 273.15},
+    {hM: 12000, tC: 200 - 273.15}
+  ];
+  const sheet = (q) => ({q, i: q % 3, j: Math.floor(q / 3), htM: 10000, fraction: 0.6});
+  const sheets = [sheet(1), sheet(2), sheet(3), sheet(4)];
+  const r = sheetOpacity(hwin, sheets, imagery, mask, rows, dcomp);
+  const [sA, sB, sC, sD] = r.sheets;
+  // the brightness-temperature average's error for the e 0.5 block: the
+  // mean BT of the mixed pixels is not the BT of the mean radiance
+  const btMean = planckTemperature(0.5 * rTop + 0.5 * rClr);
+  const eWrong = (btMean - tClr) / (tTop - tClr);
+  const noCol = sheetOpacity(hwin, sheets, imagery, mask, null, null);
+  const fewClear = sheetOpacity(hwin, sheets, imagery, mask, rows, null, {clearMin: 200});
+  const noDcomp = sheetOpacity(hwin, sheets, imagery, mask, rows, null);
+  const t10 = columnTemperatureAt(rows, 10000);
+  const words = sheetOpacityWords(r.summary);
+  check(
+    "THE SHEET'S OWN OPACITY: the 11-um emissivity from the ATBD's Eq. 1 in radiance recovers each block's, DCOMP's optical depth outranks it and closes against 2 tau_IR, the fallbacks stand where the equation cannot",
+    near(t10, 220, 1e-9) &&
+      near(planckRadiance(250), goesirPlanckB(250), goesirPlanckB(250) * 1e-12) &&
+      near(planckTemperature(goesirPlanckB(250)), 250, 1e-9) &&
+      near(goesirPlanckT(planckRadiance(300)), 300, 1e-9) &&
+      r.summary.n === 4 &&
+      r.summary.clearPixels === 5 * 25 - 2 &&
+      near(r.summary.clearRefK, tClr, 1e-9) &&
+      sA.source === 'dcomp' &&
+      near(sA.emissivity, 0.5, 1e-9) &&
+      near(sA.tauDcomp, 2 * Math.log(2), 1e-12) &&
+      near(sA.alpha, 1 - Math.exp(-2 * Math.log(2)), 1e-12) &&
+      near(sA.opacityIr, 0.75, 1e-9) &&
+      sB.source === 'emissivity' &&
+      near(sB.emissivity, 1, 1e-9) &&
+      near(sB.alpha, 1, 1e-9) &&
+      sC.source === 'emissivity' &&
+      near(sC.emissivity, 0.2, 1e-9) &&
+      near(sC.alpha, 1 - 0.8 * 0.8, 1e-9) &&
+      sD.source === 'mask' &&
+      sD.emissivity === null &&
+      sD.alpha === 0.6 &&
+      r.summary.warmer === 1 &&
+      r.summary.fromDcomp === 1 &&
+      r.summary.fromEmissivity === 2 &&
+      r.summary.fromMask === 1 &&
+      r.summary.closureN === 1 &&
+      near(r.summary.closureRatioMedian, 1, 1e-9) &&
+      Math.abs(eWrong - 0.5) > 0.02 &&
+      noCol.sheets.every((s) => s.source === 'mask') &&
+      noCol.summary.column === 'none' &&
+      fewClear.sheets.every((s) => s.source === 'mask') &&
+      fewClear.summary.clearRefK === null &&
+      noDcomp.sheets[0].source === 'emissivity' &&
+      near(noDcomp.sheets[0].alpha, 0.75, 1e-9) &&
+      SHEET_OPACITY_RULES.visToIr === 2 &&
+      words.includes('from DCOMP') &&
+      words.includes('10.35-um cloud emissivity') &&
+      words.includes('1 is the stated ratio'),
+    `a clear sky at ${tClr} K (${r.summary.clearPixels} clear pixels, two flagged out) and a 220-K top read by the column at 10 km: ` +
+      `the e 0.5 block (mixed in radiance) comes back e ${sA.emissivity.toFixed(6)} - a brightness-temperature average would read ${eWrong.toFixed(3)} - ` +
+      `and DCOMP's tau ${sA.tauDcomp.toFixed(3)} there gives opacity ${sA.alpha.toFixed(3)} over the IR's ${sA.opacityIr.toFixed(2)}, the closure 2 tau_IR / tau ${r.summary.closureRatioMedian.toFixed(3)}; ` +
+      `e 1 -> opacity 1, e 0.2 -> ${sC.alpha.toFixed(2)}; the 295-K block is warmer than the clear sky and keeps the mask's 0.6; no column or fewer than ${SHEET_OPACITY_RULES.clearMinPixels} clear pixels leave every sheet to the mask; ` +
+      `the Planck pair matches goesir's to 1e-12; the words: "${words.slice(0, 120)}..."`
   );
 }
 

@@ -510,6 +510,8 @@
         heightBands,
         cirrusSheetsFromOrbit,
         cirrusSheetsWords,
+        sheetOpacity,
+        sheetOpacityWords,
         towerTopsFromOrbit,
         towerTopsWords,
         LAP_ATBD,
@@ -6997,6 +6999,9 @@
           ` · what they feed now: ${feeds.length ? feeds.join(', ') : "nothing - the theme's own field, the balloon's ceiling or the hand stand"}` +
           ` (ranking: the theme's own opaque tops where they cover 5% of the sea, then these, then the VIIRS census; on storm codes - or with a radar storm at or above 8 km in view - these tallest tops when ten good fields stand, else the radar's tallest echo top, else the parcel's EL)` +
           ` · the cirrus sheets: ${cirrusSheetsInfo ? cirrusSheetsWords(cirrusSheetsInfo.summary) : 'none measured - no window live, the seven drifting sheets stand'}` +
+          (cirrusSheetsInfo && cirrusSheetsInfo.opacity
+            ? ` · ${sheetOpacityWords(cirrusSheetsInfo.opacity)} (the visible opacity 1 - (1 - e)^2: twice the 11-um absorption depth, the geometric limit - stated; the sheets' colour the sky's ambient on the underside plus a little transmitted sun - stated)`
+            : '') +
           ` (the parallax undone: a pixel's navigated point is where its line of sight meets the ground, so a top at height h is moved h tan(zenith) toward the sub-satellite point; a pixel is a 10-km block mean of 2-km retrievals)` +
           ` · the ATBD: ${R.accuracyM} m accuracy and ${R.precisionM} m precision for emissivity > ${R.emissivityFloor}, quantitative to ${R.lzaQuantitativeDeg}°; against CALIPSO a ${E.sdKm} km standard deviation for low cloud, thin cirrus and low-level inversions the stated concerns`
         );
@@ -14199,9 +14204,25 @@
       const cirrusSheets = new THREE.Group();
       cirrusSheets.visible = false;
       scene.add(cirrusSheets);
-      cirrusMat.vertexColors = true;
+      // THE SHEET'S OWN OPACITY (178th): the measured sheets have their
+      // own material - opacity 1, the vertex alpha the sheet's measured
+      // opacity (DCOMP's optical depth by day, else the 10.35-um
+      // emissivity from the ACHA ATBD's Eq. 1, else the mask's
+      // fraction), the colour set each frame from the same lights the
+      // decks use (the sky's ambient on the underside plus a little
+      // transmitted sun) - so an opaque anvil is dark at night and
+      // hides the stars, where the thin-cirrus hand let them through
+      const cirrusSheetMat = new THREE.MeshBasicNodeMaterial({
+        color: '#ffffff',
+        transparent: true,
+        opacity: 1,
+        depthWrite: false,
+        vertexColors: true
+      });
+      applyAerial(cirrusSheetMat);
+      const cirrusSheetTmp = new THREE.Color();
       let cirrusSheetsKey = null;
-      let cirrusSheetsInfo = null; // {summary, builtAt}
+      let cirrusSheetsInfo = null; // {summary, opacity, builtAt}
       const CIRRUS_SHEETS_MAX_KM = 100;
       function applyCirrusSheets() {
         const hw = goesL2 && goesL2.height;
@@ -14230,12 +14251,28 @@
         const r = cirrusSheetsFromOrbit(live, mask, state.lat, state.lon, {
           maxKm: CIRRUS_SHEETS_MAX_KM
         });
-        for (const s of r.sheets) {
+        // the sheets' own opacity (178th): the satellite column's rows
+        // for the tops' temperatures, else the balloon's
+        const colRows =
+          satColumn && satColumn.rows && satColumn.rows.length >= 2
+            ? satColumn.rows
+            : ascentStands() && state.soundingData && state.soundingData.rows
+              ? state.soundingData.rows
+              : null;
+        const op = sheetOpacity(
+          live,
+          r.sheets,
+          goesL2.imagery && goesL2.imagery.btK ? goesL2.imagery : null,
+          mask,
+          colRows,
+          goesL2.dcomp && goesL2.dcomp.cod ? goesL2.dcomp : null
+        );
+        for (const s of op.sheets) {
           const geo = new THREE.PlaneGeometry(
             (s.ewM || 10000) / MPU,
             (s.nsM || 10000) / MPU
           );
-          const a = s.fraction === null ? 1 : s.fraction;
+          const a = s.alpha;
           const n = geo.attributes.position.count;
           const col = new Float32Array(n * 4);
           for (let k = 0; k < n; k++) {
@@ -14245,7 +14282,7 @@
             col[k * 4 + 3] = a;
           }
           geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
-          const mesh = new THREE.Mesh(geo, cirrusMat);
+          const mesh = new THREE.Mesh(geo, cirrusSheetMat);
           mesh.rotation.x = -Math.PI / 2;
           mesh.position.set(
             s.dxM / MPU,
@@ -14254,7 +14291,11 @@
           );
           cirrusSheets.add(mesh);
         }
-        cirrusSheetsInfo = {summary: r.summary, builtAt: Date.now()};
+        cirrusSheetsInfo = {
+          summary: r.summary,
+          opacity: op.summary,
+          builtAt: Date.now()
+        };
         cirrusSheets.visible = r.sheets.length > 0;
       }
 
@@ -20314,6 +20355,21 @@
             windVDeckHigh.x * deckWind.high.kmh * 0.06 * dt;
           cirrusSheets.position.z +=
             windVDeckHigh.z * deckWind.high.kmh * 0.06 * dt;
+          // the measured sheets' colour (178th): the underside lit by
+          // the sky's ambient as the decks are, plus a little of the sun
+          // transmitted and forward-scattered while it stands above the
+          // horizon - the theme's display rule, stated on the line
+          if (cloudSys) {
+            cirrusSheetMat.color.copy(cloudSys.shared.ambCol.value);
+            cirrusSheetTmp.copy(cloudSys.shared.sunCol.value);
+          } else {
+            cirrusSheetMat.color.copy(ambient.color).multiplyScalar(0.6);
+            cirrusSheetTmp
+              .copy(sunLight.color)
+              .multiplyScalar(sunLight.intensity);
+          }
+          cirrusSheetTmp.multiplyScalar(0.08 * Math.max(sunVec.y, 0));
+          cirrusSheetMat.color.add(cirrusSheetTmp);
         }
         cirrusMat.opacity = 0.05 + day * 0.12;
 

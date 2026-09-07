@@ -764,6 +764,266 @@ export function cirrusSheetsFromOrbit(
     }
   };
 }
+// ---- THE SHEET'S OWN OPACITY (178th pass) ---------------------------
+// ACHA ATBD v3.0, Sec. 1.11.1.2, Eq. 1: R_obs = e_c R_ac + e_c t_ac
+// B(T_c) + (1 - e_c) R_clr, "where R_obs is the observed
+// top-of-atmosphere radiance, T_c is the cloud temperature, B()
+// represents the Planck Function and R_clr is the clear-sky radiance
+// (both measured at the top of the atmosphere). R_ac is the
+// above-cloud emission; t_ac is the above-cloud transmission along
+// the path from the satellite sensor to the cloud pixel. Finally, the
+// cloud emissivity is represented by e_c." ACHA takes R_ac and t_ac
+// from NWP; for a high cloud (6.5 km and above) the theme takes R_ac
+// as 0 and t_ac as 1 at 10.35 um - the air above is the upper
+// troposphere's and the stratosphere's - stated. So
+//   e_c = (R_obs - R_clr) / (B(T_c) - R_clr),
+// in RADIANCE, never in brightness temperature (Planck is not linear;
+// the gate shows the difference). R_obs is the mean radiance of the
+// good band-13 pixels inside the sheet's 10-km pixel; R_clr the
+// median radiance of the window's clear pixels (the mask's BCM 0, DQF
+// 0, under good imagery) - the scene's own clear sky, stated, where
+// ACHA's is per pixel from NWP; T_c the satellite column's (or the
+// balloon's) temperature at the sheet's height, linear in height
+// between its rows. The cloud must be colder than the reference
+// (B(T_c) < R_clr) or the equation has no solution here. The 11-um
+// absorption optical depth is tau_IR = -ln(1 - e_c); the visible
+// extinction optical depth of an ice cloud is about twice it - the
+// geometric limit, extinction efficiency 2 in the visible and
+// absorption efficiency near 1 at 11 um for crystals large against
+// the wavelength; the theme's rule, stated - so the sheet's visible
+// opacity is 1 - exp(-2 tau_IR) = 1 - (1 - e_c)^2. By day DCOMP's
+// optical depth (the block's good retrievals' median) gives
+// 1 - exp(-tau) directly and outranks it; where both stand, 2 tau_IR
+// closes against DCOMP's tau on the line. The mask's fraction stands
+// last.
+const PLANCK_H_SI = 6.62607015e-34; // J s (CODATA 2018, exact)
+const LIGHT_C_SI = 299792458; // m/s (exact)
+const BOLTZMANN_K_SI = 1.380649e-23; // J/K (exact)
+export const BAND13_CENTRE_UM = 10.35;
+export const SHEET_OPACITY_RULES = {
+  aboveCloud: 'R_ac 0 and t_ac 1 at 10.35 um above 6.5 km (stated)',
+  visToIr: 2, // tau_vis / tau_IR, the geometric limit (stated)
+  clearMinPixels: 20 // the window's clear pixels needed for a reference
+};
+/** Planck spectral radiance (W m^-2 sr^-1 m^-1) at a wavelength. */
+export function planckRadiance(tK, um = BAND13_CENTRE_UM) {
+  const lam = um * 1e-6;
+  const c1 = 2 * PLANCK_H_SI * LIGHT_C_SI * LIGHT_C_SI;
+  const c2 = (PLANCK_H_SI * LIGHT_C_SI) / BOLTZMANN_K_SI;
+  return c1 / lam ** 5 / Math.expm1(c2 / (lam * tK));
+}
+export function planckTemperature(B, um = BAND13_CENTRE_UM) {
+  const lam = um * 1e-6;
+  const c1 = 2 * PLANCK_H_SI * LIGHT_C_SI * LIGHT_C_SI;
+  const c2 = (PLANCK_H_SI * LIGHT_C_SI) / BOLTZMANN_K_SI;
+  return c2 / lam / Math.log1p(c1 / (lam ** 5 * B));
+}
+/** The column's temperature (K) at a height, linear in height between
+ * the bracketing rows ({hM, tC}); null outside the rows. */
+export function columnTemperatureAt(rows, hM) {
+  if (!rows || !Number.isFinite(hM)) return null;
+  const r = rows
+    .filter((x) => Number.isFinite(x.hM) && Number.isFinite(x.tC))
+    .sort((a, b) => a.hM - b.hM);
+  if (r.length < 2 || hM < r[0].hM || hM > r[r.length - 1].hM) return null;
+  for (let i = 1; i < r.length; i++)
+    if (hM <= r[i].hM) {
+      const a = r[i - 1];
+      const b = r[i];
+      const f = b.hM === a.hM ? 0 : (hM - a.hM) / (b.hM - a.hM);
+      return a.tC + f * (b.tC - a.tC) + 273.15;
+    }
+  return null;
+}
+/** Each sheet's opacity: {alpha, source, emissivity, tauIr, tauDcomp,
+ * opacityIr, opacityDcomp, btObsK, n} added to a copy of the sheet;
+ * and a summary. imagery {btK, dqf, box, x, y}, mask {bcm, dqf, box,
+ * x, y}, rows [{hM, tC}] or null, dcomp {cod, dqf, box, x, y} or
+ * null; hwin the height window the sheets were cut from. */
+export function sheetOpacity(
+  hwin,
+  sheets,
+  imagery,
+  mask,
+  rows,
+  dcomp,
+  {visToIr = SHEET_OPACITY_RULES.visToIr, clearMin = SHEET_OPACITY_RULES.clearMinPixels} = {}
+) {
+  const box = hwin.box;
+  const nPix = box.rows * box.cols;
+  const radSum = new Float64Array(nPix);
+  const radN = new Uint32Array(nPix);
+  const clear = [];
+  const toHeight = (xa, ya) => {
+    const i = indexOfScanAngle(xa, hwin.x) - box.i0;
+    const j = indexOfScanAngle(ya, hwin.y) - box.j0;
+    return i < 0 || j < 0 || i >= box.cols || j >= box.rows ? -1 : j * box.cols + i;
+  };
+  if (imagery && imagery.btK && imagery.box) {
+    for (let jm = 0; jm < imagery.box.rows; jm++)
+      for (let im = 0; im < imagery.box.cols; im++) {
+        const qm = jm * imagery.box.cols + im;
+        if (imagery.dqf && imagery.dqf[qm] !== 0) continue;
+        const t = imagery.btK[qm];
+        if (!Number.isFinite(t) || t <= 0) continue;
+        const xa = scanAngle(imagery.box.i0 + im, imagery.x);
+        const ya = scanAngle(imagery.box.j0 + jm, imagery.y);
+        const rad = planckRadiance(t);
+        const q = toHeight(xa, ya);
+        if (q >= 0) {
+          radSum[q] += rad;
+          radN[q]++;
+        }
+        if (mask && mask.bcm && mask.box) {
+          const i = indexOfScanAngle(xa, mask.x) - mask.box.i0;
+          const j = indexOfScanAngle(ya, mask.y) - mask.box.j0;
+          if (i >= 0 && j >= 0 && i < mask.box.cols && j < mask.box.rows) {
+            const qk = j * mask.box.cols + i;
+            if ((!mask.dqf || mask.dqf[qk] === 0) && mask.bcm[qk] === 0) clear.push(rad);
+          }
+        }
+      }
+  }
+  clear.sort((a, b) => a - b);
+  const rClr = clear.length >= clearMin ? clear[clear.length >> 1] : null;
+  // DCOMP's optical depth per height pixel: the good retrievals' median
+  const tauLists = dcomp && dcomp.cod && dcomp.box ? new Map() : null;
+  if (tauLists)
+    for (let jm = 0; jm < dcomp.box.rows; jm++)
+      for (let im = 0; im < dcomp.box.cols; im++) {
+        const qm = jm * dcomp.box.cols + im;
+        const v = dcomp.cod[qm];
+        if (!Number.isFinite(v) || v <= 0) continue;
+        const q = toHeight(scanAngle(dcomp.box.i0 + im, dcomp.x), scanAngle(dcomp.box.j0 + jm, dcomp.y));
+        if (q < 0) continue;
+        if (!tauLists.has(q)) tauLists.set(q, []);
+        tauLists.get(q).push(v);
+      }
+  const median = (a) => {
+    const s = a.slice().sort((x, y) => x - y);
+    return s[s.length >> 1];
+  };
+  const out = [];
+  const es = [];
+  const taus = [];
+  const ratios = [];
+  const sum = {
+    n: 0,
+    fromDcomp: 0,
+    fromEmissivity: 0,
+    fromMask: 0,
+    fromNone: 0,
+    warmer: 0,
+    noPixels: 0,
+    clearPixels: clear.length,
+    clearRefK: rClr !== null ? planckTemperature(rClr) : null,
+    column: rows && rows.length >= 2 ? 'column' : 'none',
+    eMedian: null,
+    eMin: null,
+    eMax: null,
+    tauDcompMedian: null,
+    closureN: 0,
+    closureRatioMedian: null,
+    visToIr
+  };
+  for (const s of sheets || []) {
+    sum.n++;
+    const q = s.q;
+    const n = q >= 0 && q < nPix ? radN[q] : 0;
+    const rObs = n ? radSum[q] / n : null;
+    const tC = columnTemperatureAt(rows, s.htM);
+    let e = null;
+    let warmer = false;
+    if (rObs !== null && rClr !== null && tC !== null) {
+      const bC = planckRadiance(tC);
+      // the top must be colder than the clear sky and the pixel must
+      // not be warmer than it (a fog warmer than the reference has no
+      // emissivity here); a pixel colder than the column's top reads
+      // as fully emitting
+      const raw = bC < rClr ? (rObs - rClr) / (bC - rClr) : -1;
+      if (raw < 0) warmer = true;
+      else e = Math.min(1, raw);
+    }
+    const tauIr = e !== null ? -Math.log(Math.max(1e-9, 1 - Math.min(e, 1 - 1e-9))) : null;
+    const opacityIr = e !== null ? 1 - (1 - e) ** visToIr : null;
+    const tl = tauLists && tauLists.get(q);
+    const tauDcomp = tl && tl.length ? median(tl) : null;
+    const opacityDcomp = tauDcomp !== null ? 1 - Math.exp(-tauDcomp) : null;
+    let alpha;
+    let source;
+    if (opacityDcomp !== null) {
+      alpha = opacityDcomp;
+      source = 'dcomp';
+      sum.fromDcomp++;
+    } else if (opacityIr !== null) {
+      alpha = opacityIr;
+      source = 'emissivity';
+      sum.fromEmissivity++;
+    } else if (s.fraction !== null && s.fraction !== undefined) {
+      alpha = s.fraction;
+      source = 'mask';
+      sum.fromMask++;
+    } else {
+      alpha = 1;
+      source = 'none';
+      sum.fromNone++;
+    }
+    if (warmer) sum.warmer++;
+    if (!n) sum.noPixels++;
+    if (e !== null) es.push(e);
+    if (tauDcomp !== null) taus.push(tauDcomp);
+    if (e !== null && tauDcomp !== null && tauIr > 0) ratios.push((visToIr * tauIr) / tauDcomp);
+    out.push({
+      ...s,
+      alpha,
+      source,
+      emissivity: e,
+      tauIr,
+      tauDcomp,
+      opacityIr,
+      opacityDcomp,
+      btObsK: rObs !== null ? planckTemperature(rObs) : null,
+      tTopK: tC,
+      n
+    });
+  }
+  es.sort((a, b) => a - b);
+  if (es.length) {
+    sum.eMedian = es[es.length >> 1];
+    sum.eMin = es[0];
+    sum.eMax = es[es.length - 1];
+  }
+  if (taus.length) sum.tauDcompMedian = median(taus);
+  if (ratios.length) {
+    sum.closureN = ratios.length;
+    sum.closureRatioMedian = median(ratios);
+  }
+  return {sheets: out, summary: sum};
+}
+/** The words for an opacity summary. */
+export function sheetOpacityWords(sm) {
+  if (!sm || !sm.n) return 'no sheet to weigh';
+  const parts = [];
+  if (sm.fromDcomp)
+    parts.push(
+      `${sm.fromDcomp} from DCOMP's optical depth by day (1 - e^-tau; the block medians' median ${sm.tauDcompMedian.toFixed(1)})`
+    );
+  if (sm.fromEmissivity)
+    parts.push(
+      `${sm.fromEmissivity} from the 10.35-um cloud emissivity (the ACHA ATBD's Eq. 1 with the window's ${sm.clearPixels} clear pixels as the clear sky, ${sm.clearRefK.toFixed(1)} K, and the column's temperature at each top; e ${sm.eMin.toFixed(2)}-${sm.eMax.toFixed(2)}, median ${sm.eMedian.toFixed(2)}; opacity 1 - (1 - e)^${sm.visToIr})`
+    );
+  if (sm.fromMask) parts.push(`${sm.fromMask} the mask's cloudy fraction`);
+  if (sm.fromNone) parts.push(`${sm.fromNone} opaque for want of any`);
+  return (
+    `the sheets' opacity: ${parts.join(', ')}` +
+    (sm.warmer ? `; ${sm.warmer} not colder than the clear sky (no emissivity there)` : '') +
+    (sm.clearRefK === null ? `; no clear reference (${sm.clearPixels} clear pixels, ${SHEET_OPACITY_RULES.clearMinPixels} needed)` : '') +
+    (sm.column === 'none' ? '; no column for the tops’ temperatures' : '') +
+    (sm.closureN
+      ? `; where both stand, 2 tau_IR against DCOMP's tau: ${sm.closureRatioMedian.toFixed(2)} over ${sm.closureN} (1 is the stated ratio)`
+      : '')
+  );
+}
 /** The words for a sheets summary. */
 export function cirrusSheetsWords(sm) {
   if (!sm) return 'no height window';
