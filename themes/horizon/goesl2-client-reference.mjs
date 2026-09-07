@@ -279,8 +279,11 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       // lists nothing under; the pageOnly ask (159th: the 500-m
       // visible window) is not listed unless named
       listsAfterFirst === (served.length - 2) * 3 + 2 &&
-      L2_ASKS.length === 19 &&
-      served.length === 18 &&
+      // the anvil at two kilometres (181st): the twentieth ask, the
+      // nineteenth served - the fake bucket lacks it, so null
+      L2_ASKS.length === 20 &&
+      served.length === 19 &&
+      body.height2km === null &&
       filesAfterFirst === 2 &&
       // the range reads: the heights' head then its strips, the winds
       // whole in one megabyte ask
@@ -490,15 +493,16 @@ const dmwc = new Uint8Array(Buffer.from(DMWC_B64, 'base64'));
       // the CONUS products re-listed (three prefixes for the six the
       // fake bucket lacks, one for the two it holds), the full-disk
       // ones not
-      // the CONUS products the fake bucket lacks: fourteen since the
-      // 172nd's stability indices
-      listedAgain.length === 14 * 3 + 2 &&
+      // the CONUS products the fake bucket lacks: fifteen since the
+      // 181st's 2-km cloud top height (fourteen since the 172nd's
+      // stability indices)
+      listedAgain.length === 15 * 3 + 2 &&
       !listedAgain.some(
         (p) => p.startsWith('ABI-L2-SSTF') || p.startsWith('ABI-L2-DSRF')
       ),
     `three range asks of a whole-answering server cost ${calls} download (${a.length}, ${b.length} and ${c.length} bytes cut from it, the last short at the end); ` +
       `the client over such a bucket reads its two files whole (${body && body.read.map((r) => `${r.file.slice(0, 20)} ${r.kb} kB`).join(', ')}), ` +
-      `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the fourteen CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
+      `answers rangesHonoured false with the heights and ${body && body.dmw.n} vectors, and two minutes later re-lists ${listedAgain.length} prefixes for the fifteen CONUS products it lacks and the two it holds, none for the full-disk SST and DSR`
   );
 }
 
