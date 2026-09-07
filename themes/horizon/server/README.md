@@ -379,15 +379,31 @@ are gated by `../server-reference.mjs` — the `server` set in
   (the count rules kept in fields of 10 km: 25 pixels a field); the
   10-km window stands where the 2-km is unread or past 30 min, and
   keeps the mosaic-minute comparison (`?t=`) the 2-km ask never
-  answers: nineteen products served (a window of +-100
+  answers. Since the 183rd the retrieval's own cloud top TEMPERATURE
+  (`ABI-L2-ACHTF` - full disk only, no CONUS sector; 2 km, every 10
+  min, 32.6 MB a file, the window 1.2 MB in 6 ranges, measured - TEMP
+  uint16 at 0.00244 K a count from 180 K, chunked 24 rows by the full
+  width) as `topTemp`: the +-100 km window's kelvin counts with their
+  scaling (`temp`, `tempScale`, `tempOffset`, `tempFill`), the flags,
+  a census (`good`, `minK`, `medianK`, `maxK`) and the flag census.
+  It is the very state the Enterprise ACHA solves for (the height is
+  derived from it through the NWP profile), so the page's emissivity
+  law takes each cirrus sheet's T_c from the product's pixel at the
+  sheet's own scan angles where the retrieval is good, the satellite
+  column's or balloon's interpolation standing only where it is not,
+  and closes the column against the product where both stand (the
+  median and tenth of the difference on the line); the full-disk grid
+  is the CONUS grid 422 rows and 1462 columns in (measured), gated on
+  a vendored crop of the home's pixels beside the 2-km height crop:
+  twenty products served (a window of +-100
   km costs 437-547 kB in 4-6 ranges, measured, the aerosol window a
   few tens of kB more, the two profile windows about a megabyte
   between them at the five-minute cadence, the stability window
   nearly its whole 0.9-MB file - its fields are chunked 262 rows by
   the full width, so any window touches the chunk: 8 ranges, 836 kB,
   measured). A
-  TWENTIETH ask exists in the shared decode block but is the page's
-  own (`pageOnly`, 159th): the 500-m visible band 2 window (`vis`,
+  TWENTY-FIRST ask exists in the shared decode block but is the
+  page's own (`pageOnly`, 159th): the 500-m visible band 2 window (`vis`,
   401 x 401 px of the CMIP ATBD's reflectance factor with the
   file's kappa, Esun and Earth-Sun distance) that the page reads
   from the bucket itself by day to shape the cloud decks inside the
@@ -395,7 +411,7 @@ are gated by `../server-reference.mjs` — the `server` set in
   cadence (about 15 MB an hour by day), which this box's free-tier
   egress cannot carry and the bucket's CORS can. This
   daemon never lists, fetches or serves it; `/health`'s
-  `version.products` names the nineteen it does.
+  `version.products` names the twenty it does.
   Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks

@@ -10345,6 +10345,64 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 7, the review session's 183rd pass - THE TOP'S OWN
+  TEMPERATURE): the 178th's emissivity law needs the top's
+  temperature and took it from the satellite column's (or the
+  balloon's) profile interpolated at the sheet's height - and stood
+  idle where no column was live (the coast night of the 178th). The
+  Enterprise ATBD (182nd) says the retrieval solves for T_c itself
+  and DERIVES the height from it through the NWP profile (Sec.
+  4.4.2.8); NOAA serves that T_c as its own product. MEASURED FIRST:
+  ABI-L2-ACHTF - full disk only (no CONUS sector; the mesoscale ACHTM
+  361 kB where the sector points), 5424 x 5424 at 2 km every 10 min,
+  32.6 MB a file, TEMP uint16 at 0.00244163 K a count from 180 K
+  (180-340 K), DQF 0..4 as the heights', chunked 24 rows (TEMP) and 48
+  (DQF) by the full width; the 09:00Z disk held 15.99 million good
+  tops of 29.4 million (median 265.4 K); the full-disk grid is the
+  CONUS grid 422 rows and 1462 columns in (the offsets integer to 2e-4
+  of a pixel, measured: the same 56-urad scan-angle lattice), so a
+  CONUS 2-km height pixel and a full-disk temperature pixel are the
+  same pixel. THE DAEMON: the twenty-first ask and twentieth served
+  product (`topTemp`: TEMP raw16 and DQF, halfPx 50, fullDisk - not
+  for a page whose ranges are ignored - untimed): the kelvin counts
+  with their scaling on the wire like the SST's, the census and the
+  flag census; the window 1,197 kB of 32.7 MB in 6 ranges, 697 ms
+  (measured). THE LAW (goesl2.js sheetOpacity, option topTemp): each
+  sheet's T_c is the product's temperature at the sheet's own scan
+  angles (indexOfScanAngle across the two grids; DQF 0, finite), the
+  column's interpolation where the product has none; per sheet
+  tSource, tProductK, tColumnK; the summary counts (topTempN,
+  columnN) and closes the column against the product where both
+  stand (tCol - tProd: the median, |dT| median and tenth); the words
+  name the sources and the closure. THE PAGE: goesL2.topTemp unpacked
+  to kelvin (tK), passed while as fresh as the heights (30 min) and in
+  the sheets' key. GATED: goesl2-reference THE TOP'S OWN TEMPERATURE
+  on acht-fixture (the home's 50 x 50 pixels of the 08:00Z disk - the
+  2-km height crop's own pixels - 31.6 kB; ACHT_EXPECT by numpy):
+  the flag census {0: 2252, 1: 179, 2: 1, 3: 68}, 2,252 good tops
+  203.5-293.8 K (median 234.82 to a centimetre of numpy's), six
+  sampled counts, the crops' scan angles landing on each other's
+  indices; the 2-km crop's 2,003 sheets weighed with the product's
+  temperatures: 1,932 take the product's (a plain count over the crop
+  the same; numpy's 1,934 high pixels with a temperature, two beyond
+  the 100-km reach), 71 the column's, a product sheet's T_c its own
+  pixel's and a column sheet's the interpolation's; an ISA column
+  (6.5 K/km from 288.15 K, two rows) closed against the product:
+  -16.68 K at the median (numpy -16.69 over its 1,934), |dT| 16.7 K,
+  the tenth 27.4 (numpy 27.5, the two-pixel difference) - the
+  retrieved tops WARMER than ISA at their heights, by a subtropical
+  September's real column; without the product every sheet falls to
+  the column and no closure stands; server-reference THE TOP'S OWN
+  TEMPERATURE (the daemon's body: the product named, the whole crop,
+  the counts unpacking to numpy's census and flags, the pixel the
+  height body's) and the asks pinned (21 asks, 20 served, 15 untimed,
+  the full-disk temperature never re-listed by a range-ignored
+  client); the client gate's counts. A first cut named the census's
+  median by the wrong field (`median` for `medianK`) and tested the
+  words' source phrase inside the emissivity clause, which an
+  imagery-less gate never prints - the phrase is its own clause now.
+  The README's /goesl2 entry (twenty served, the twenty-first ask the
+  page's own).
 - DONE (Sep 7, the review session's 182nd pass - THE ENTERPRISE
   HEIGHT, READ): the 181st found (OSPO's notice) that the served
   heights have been the Enterprise algorithm's since 27 March 2023,

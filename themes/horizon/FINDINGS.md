@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1204 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
+1206 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **149 reference files, 1204 landmark lines, 9 GPU probes** (live gate
+- **149 reference files, 1206 landmark lines, 9 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1539,7 +1539,23 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    long path through it. STATED: µ is the satellite's and the line is
    the sheet's centre's; the surface is the observer's elevation, not
    each pixel's terrain; the product's size ratio is not held, so the
-   0.78 is read, not predicted
+   0.78 is read, not predicted. Pass 183 brings the top's own
+   temperature: NOAA's cloud top temperature (`ABI-L2-ACHTF`, full disk
+   only, 2 km, every 10 min, 32.6 MB a file read in six ranges of 1.2
+   MB) as the twentieth served product — the very state the Enterprise
+   ACHA solves for, the height derived from it — so each cirrus sheet's
+   T_c in the emissivity law is the product's temperature at the
+   sheet's own pixel where the retrieval is good (the full-disk grid is
+   the CONUS grid 422 rows and 1,462 columns in, measured: the same
+   pixel), the column's interpolation standing only where it is not,
+   and the column is closed against the product on the line (the
+   median and tenth of the difference). Gated on a vendored crop of the
+   home's pixels beside the 2-km height crop against numpy: 1,932 of
+   the 2,003 sheets take the product's temperature (two of numpy's
+   1,934 beyond the reach), 71 the column's, an ISA column 16.7 K colder
+   than the retrieved tops at their heights (`goesl2-reference` THE
+   TOP'S OWN TEMPERATURE; `server-reference` the body and the
+   twenty-one asks)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
