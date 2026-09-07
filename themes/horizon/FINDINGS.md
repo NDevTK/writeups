@@ -1365,11 +1365,17 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    44.27° and 6.74 km; the bearing 0.02° off the sub-point's), a
    synthetic mask laid five to a pixel matching fraction by fraction
    with a flagged pixel dropped, no mask opaque, a 1-km reach empty
-   (`goesl2-reference` THE ANVIL'S SPREAD). STATED: a sheet is a 10-km
-   block's mean top; the mask's fraction is the block's cloudiness,
-   not the sheet's optical depth (the ATBD's emissivity is not
-   carried); the sheets drift with the high-level wind between files;
-   beyond 100 km the sky's own cirrus stands
+   (`goesl2-reference` THE ANVIL'S SPREAD). Live on the Georgia coast
+   (07:20Z, the 06:52Z window) under the night's anvil: 415 high
+   fields of 436, 235 of them within 100 km once moved 5.2–12.3 km for
+   the parallax at 39°, tops 6.7–15.6 km (median 11.3), every one
+   fully cloudy in the mask. STATED: a sheet is a 10-km block's mean
+   top; the mask's fraction is the block's cloudiness, not the sheet's
+   optical depth (the ATBD's emissivity is not carried), and the cirrus
+   material's thin-cirrus opacity still scales it — the stars showed
+   through the measured anvil, the next pass's lead; the sheets drift
+   with the high-level wind between files; beyond 100 km the sky's own
+   cirrus stands
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
