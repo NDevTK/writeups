@@ -10345,6 +10345,55 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 7, the review session's 179th pass - THE RAIN AT A
+  KILOMETRE): the scene's rain shafts (165th) and the decks' rain
+  cover (167th) drew from the satellite's 2-km RRQPE pixels every 10
+  min and RainViewer's composite; the radar's own rate at a kilometre
+  every 2 minutes sits in the same MRMS catalogue as the echo top.
+  MEASURED FIRST: mrms.ncep.noaa.gov/2D/PrecipRate/MRMS_PrecipRate.
+  latest.grib2.gz - 689 kB gzipped, 727 kB unpacked (the field is
+  sparse: 613,014 raining cells of 24.5 million, 8.3 million uncovered
+  at 07:46Z), the same 7000 x 3500 grid at 0.01 deg, discipline 209
+  category 6 number 1, template 5.41 with R -30, E 0, D 1 - a count c
+  is (c - 30) / 10 mm/h, so 0 is -3 (no coverage) and 30 is 0 (dry);
+  the maximum in that file 175 mm/h; the theme's reader took a
+  +-50-km window in 2,386 rows; the coast window held 83 raining
+  cells (max 2.8 mm/h) and the rainiest 51 x 51 window of the file,
+  north-east Montana, 2,478 (max 89.5). THE DAEMON: the MRMS block is
+  one feed law now (mrmsFeed: a held file per product, the refresh on
+  the product's cadence in the background, the census per cell cached
+  until the next file) serving the echo top as before and /mrmsrate:
+  the census (mrms.js precipRateCensus: covered, raining, the rates'
+  median / heaviest tenth / heaviest, the heaviest placed, the
+  observer's own cell, the raining cells nearest first capped at 400
+  with lat/lon and latDeg/lonDeg both - the shafts' own names) and the
+  words; MRMS_RATE_FACTS holds the file's own scaling and codes and
+  the same documentation gap. THE PAGE: syncMrmsRate every 2 min (45
+  s allowed, 404 an older daemon), state.radarRate, radarRateNow (10
+  min), radarRateCells; applyRainShafts and buildRainCover take the
+  radar's cells first (pixelM 1000) and the satellite's list where the
+  radar has none, each remembering its source; the shafts' and the
+  cover's words name the source; the new research line "the radar's
+  rain (MRMS PrecipRate)" with what it feeds and the ranking, stated:
+  where the radar covers, its 1-km rate every 2 min outranks the
+  satellite's 2-km RRQPE every 10 min and RainViewer's composite;
+  beyond its reach the satellite stands. GATED (mrms-reference THE
+  RAIN AT A KILOMETRE): the rainiest window re-packed as its own GRIB2
+  message (mrms-fixture RATE_EXPECT / PRECIPRATE_B64, 3.4 kB) read
+  through grib2Header and grib2Window against Pillow - the file's
+  facts, the centre 75.0 mm/h, five sampled counts exact, 2,478
+  raining / 123 dry / 0 uncovered, median 24.7, heaviest tenth 75.0,
+  heaviest 89.5 mm/h at 354.2 deg and 14.5 km (a plain great-circle
+  14.5), 400 of 2,478 cells sent nearest first with the observer's own
+  at 0 km first, a cap of 5 honoured, the words. Docs: server README
+  (/mrmsrate), FINDINGS pass 179 (149 files, 1,202 landmarks, 9 GPU
+  probes). STATED LIMITS: the rate is the radar's surface estimate by
+  MRMS's own method (unread: the product guide is unreachable from the
+  sandbox); a -3 cell is unmeasured, not dry; the shafts keep Atlas
+  1953's extinction per rate and the 2-km curtain shape; the daemon's
+  +-50 km reach means the shafts' 100-km reach is the radar's only to
+  50 km and the satellite's beyond (stated on the line by what it
+  feeds).
 - DONE (Sep 7, the review session's 178th pass - THE SHEET'S OWN
   OPACITY): the 177th's named lead - the measured anvil let the stars
   through because the cirrus material's night opacity (0.05) was the

@@ -164,6 +164,23 @@ are gated by `../server-reference.mjs` — the `server` set in
   name (the 18-dBZ echo top), the file's scaling (kilometres), and
   MRMS's own height convention (MSL, unverified here); the bright band
   and the precipitation-type flag were measured and left out.
+- `GET /mrmsrate?lat&lon` — the rain at a kilometre (179th pass):
+  NCEP's MRMS PrecipRate within ±50 km of the point - the radar's
+  precipitation rate on the echo top's 1-km grid every 2 minutes,
+  PNG-packed the same way (`mrms.ncep.noaa.gov/2D/PrecipRate/`, 689
+  kB gzipped: the field is sparse) - as the daemon's second held MRMS
+  file on the same refresh law. The body carries the window's census
+  (the cells covered and raining, the rates' median, heaviest tenth
+  and heaviest, the heaviest cell placed by bearing and distance, the
+  observer's own cell) and the raining cells nearest first, 400 at
+  most, each with its rate, distance and bearing (as `latDeg`/`lonDeg`
+  too, the page's rain-shaft names). The scaling is the file's own
+  data representation section: a count c is (c − 30)/10 mm/h, so −3 is
+  no coverage and 0 is measured dry; discipline 209, category 6,
+  number 1; the product guide is still unreachable from the build
+  sandbox (stated). The page draws the rain shafts and the deck's rain
+  cover from these cells wherever the radar covers, ahead of the
+  satellite's 2-km RRQPE pixels and RainViewer's composite.
 - `GET /goesl2?lat&lon` — NOAA's own operational cloud products
   around the point (148th pass): the clear-sky mask
   (`ABI-L2-ACMC`: BCM, ACM, cloud probability, DQF on the 2-km

@@ -8282,18 +8282,23 @@
       // (rainshafts.js); ?shafts=0 leaves the sky clean
       let rainShafts = null; // {at, time, list, summary}
       function applyRainShafts(rn) {
-        if (!rn || !rn.list || params.get('shafts') === '0') {
+        // the radar's 1-km cells first (179th), the satellite's 2-km
+        // pixels where the radar has none
+        const radarCells = radarRateCells();
+        const src = radarCells ?? (rn && rn.list) ?? null;
+        if (!src || params.get('shafts') === '0') {
           rainShafts = null;
           return null;
         }
-        const list = rainShaftsNear(rn.list, state.lat, state.lon, {
+        const list = rainShaftsNear(src, state.lat, state.lon, {
           maxKm: 100,
           cap: 160,
           minMmH: 0.2
         });
         rainShafts = {
           at: Date.now(),
-          time: rn.time,
+          time: radarCells ? state.radarRate.refTime : rn.time,
+          source: radarCells ? 'radar' : 'satellite',
           list,
           summary: rainShaftsSummary(list)
         };
@@ -8306,23 +8311,32 @@
       let rainCover = null; // {at, time, field, painted, pixels}
       let coverMerge = null; // {fromRadar, fromSatellite, radar, satellite}
       function buildRainCover(rn) {
-        if (!rn || !rn.list) {
+        // the radar's 1-km cells first (179th), the satellite's 2-km
+        // pixels where the radar has none
+        const radarCells = radarRateCells();
+        const src = radarCells ?? (rn && rn.list) ?? null;
+        if (!src) {
           rainCover = null;
           return;
         }
-        const f = rainCoverField(rn.list, state.lat, state.lon, {
+        const f = rainCoverField(src, state.lat, state.lon, {
           rm: 64,
           worldM: WORLD * MPU,
-          pixelM: 2000
+          pixelM: radarCells ? 1000 : 2000
         });
         rainCover = {
           at: Date.now(),
-          time: rn.time,
+          time: radarCells ? state.radarRate.refTime : rn.time,
+          source: radarCells ? 'radar' : 'satellite',
           field: f.data,
           painted: f.painted,
           pixels: f.pixels
         };
       }
+      const rainCoverSrc = () =>
+        rainCover && rainCover.source === 'radar'
+          ? "the radar's 1-km rain (MRMS PrecipRate)"
+          : "the satellite's rain";
       function applyMeasuredCover() {
         const RM = 64;
         const radarFresh =
@@ -8351,13 +8365,13 @@
       }
       const coverWords = () =>
         coverMerge && coverMerge.fromSatellite > 0
-          ? ` · the decks' cover: ${coverMerge.fromSatellite} texels from the satellite's rain where no radar sees${coverMerge.fromRadar ? `, ${coverMerge.fromRadar} from the radar` : ''}`
+          ? ` · the decks' cover: ${coverMerge.fromSatellite} texels from ${rainCoverSrc()} where RainViewer's mask sees none${coverMerge.fromRadar ? `, ${coverMerge.fromRadar} from RainViewer's composite` : ''}`
           : coverMerge && coverMerge.satellite && rainCover && rainCover.painted
-            ? ` · the satellite's rain paints ${rainCover.painted} texels the radar already sees`
+            ? ` · ${rainCoverSrc()} paints ${rainCover.painted} texels RainViewer's composite already sees`
             : '';
       const shaftWords = (sm) =>
         sm
-          ? ` · ${sm.n} rain shaft${sm.n === 1 ? '' : 's'} drawn within 100 km: the nearest ${sm.nearestKm.toFixed(0)} km at ${Math.round(sm.nearestBearingDeg)}° (${sm.nearestMmH.toFixed(1)} mm/h), ` +
+          ? ` · ${sm.n} rain shaft${sm.n === 1 ? '' : 's'} drawn within 100 km${rainShafts && rainShafts.source === 'radar' ? " from the radar's 1-km cells (MRMS PrecipRate, 2 min)" : " from the satellite's 2-km pixels"}: the nearest ${sm.nearestKm.toFixed(0)} km at ${Math.round(sm.nearestBearingDeg)}° (${sm.nearestMmH.toFixed(1)} mm/h), ` +
             `the heaviest ${sm.heaviestMmH.toFixed(1)} mm/h ${sm.heaviestKm.toFixed(0)} km off hiding ${Math.round(100 * sm.heaviestOpacity)}% of what stands behind it`
           : params.get('shafts') === '0'
             ? ' · rain shafts off (?shafts=0)'
@@ -13238,6 +13252,92 @@
                 : '; no ACHA window within 30 min: the towers stand at their echo tops')
             : `; no echoing cell within reach of the low deck's ±${Math.round((WORLD * MPU) / 2000)} km (${radarTopsField.sent} sent) - the whole slab keeps the ranking's top`
           : '';
+      // THE RAIN AT A KILOMETRE (179th): NCEP's MRMS PrecipRate - the
+      // radar's rain at 1 km every 2 min - through the daemon's
+      // /mrmsrate (the raining cells within ±50 km nearest first, 400
+      // at most). Where the radar covers, its cells are the rain
+      // shafts' and the deck's rain cover's cells, outranking the
+      // satellite's 2-km RRQPE pixels (10 min) and RainViewer's
+      // composite; the satellite stands beyond the radar's reach and
+      // where the daemon has no rate (an older build: 404). ?mrms=0
+      // turns both MRMS feeds off; ?mrmsratesrc=URL overrides.
+      const MRMS_RATE_PROXY =
+        params.get('mrmsratesrc') ??
+        (MRMS_PROXY ? MRMS_PROXY.replace(/\/mrms$/, '/mrmsrate') : null);
+      let mrmsRateBusy = false;
+      let mrmsRateDaemonLacks = false;
+      function mrmsRateOff() {
+        return overridden || params.get('mrms') === '0' || !MRMS_RATE_PROXY;
+      }
+      async function syncMrmsRate() {
+        if (mrmsRateOff() || mrmsRateBusy || mrmsRateDaemonLacks) return;
+        if (!Number.isFinite(state.lat) || !Number.isFinite(state.lon)) return;
+        mrmsRateBusy = true;
+        try {
+          const r = await fetch(
+            `${MRMS_RATE_PROXY}?lat=${state.lat.toFixed(3)}&lon=${state.lon.toFixed(3)}`,
+            {signal: AbortSignal.timeout(45000)}
+          );
+          if (r.status === 404) {
+            mrmsRateDaemonLacks = true; // an older daemon
+            return;
+          }
+          if (!r.ok) return;
+          const j = await r.json();
+          state.radarRate = {...j, at: Date.now()};
+          record(
+            'NCEP MRMS precipitation rate',
+            j.census
+              ? j.words
+              : `${j.refTime ? j.refTime.slice(11, 16) + 'Z · ' : ''}${j.reason || 'no coverage'}`
+          );
+          // the shafts and the deck's cover take the radar's cells now
+          const rn = goesL2 && goesL2.rain;
+          applyRainShafts(rn);
+          buildRainCover(rn);
+          applyMeasuredCover();
+        } catch {
+          // unreachable: the last answer stands until it ages out
+        } finally {
+          mrmsRateBusy = false;
+        }
+      }
+      function radarRateNow() {
+        const t = state.radarRate;
+        if (!t || !t.census || !t.refTime) return null;
+        if (Date.now() - Date.parse(t.refTime) > MRMS_LIVE_MS) return null;
+        return t;
+      }
+      // the radar's raining cells for the shafts and the cover: the
+      // fresh census's cells (each {latDeg, lonDeg, mmh}), or null
+      function radarRateCells() {
+        const t = radarRateNow();
+        return t && t.covered && t.census.cells ? t.census.cells : null;
+      }
+      function radarRateLine() {
+        if (mrmsRateOff() || mrmsRateDaemonLacks) return null;
+        const t = state.radarRate;
+        if (!t) return null;
+        const c = t.census;
+        const live = radarRateNow();
+        return (
+          `NCEP MRMS ${t.product} (${t.meaning || 'the radar precipitation rate'}; ${t.cellKm || 1}-km cells every 2 min, read by the daemon in ${t.read ? t.read.ms + ' ms, ' + t.read.rows + ' PNG rows' : '?'}): ` +
+          (c
+            ? t.words
+            : `${t.refTime ? t.refTime.slice(11, 16) + 'Z · ' : ''}${t.reason || 'no coverage'}`) +
+          (live
+            ? ` · what it feeds now: ${
+                live.covered && c.cells.length
+                  ? `the rain shafts and the deck's rain cover (${c.cells.length} of ${c.cellsTotal} raining cells sent, nearest first)`
+                  : live.covered
+                    ? 'nothing to draw - no raining cell within ±50 km; the satellite stands beyond'
+                    : 'nothing - no radar coverage here; the satellite stands'
+              }`
+            : ' · stale (past 10 min) or unread: the satellite stands') +
+          ` · ranking, stated: where the radar covers, its 1-km rate every 2 min outranks the satellite's 2-km RRQPE every 10 min and RainViewer's composite; beyond its reach the satellite stands` +
+          (t.documentation ? ` · ${t.documentation}` : '')
+        );
+      }
       const GLM_DIRECT_MS = 60e3;
       const GLM_SEEN_MS = 5 * 60e3;
       const STRIKE_RING_MS = 120e3;
@@ -15466,6 +15566,9 @@
             const rtl = radarTopsLine();
             if (rtl) research["the radar's storm tops (MRMS echo top)"] = rtl;
             else delete research["the radar's storm tops (MRMS echo top)"];
+            const rrl = radarRateLine();
+            if (rrl) research["the radar's rain (MRMS PrecipRate)"] = rrl;
+            else delete research["the radar's rain (MRMS PrecipRate)"];
           }
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();
@@ -21879,6 +21982,8 @@
         // the radar's echo tops: a 1-km grid every 2 min (174th)
         syncMrms();
         setInterval(syncMrms, MRMS_POLL_MS);
+        syncMrmsRate();
+        setInterval(syncMrmsRate, MRMS_POLL_MS);
         // MOD09A1 is an 8-day composite; the same hourly poll (matching
         // the /surface cache) more than covers it.
         syncSurface();

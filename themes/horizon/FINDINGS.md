@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1201 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
+1202 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **149 reference files, 1201 landmark lines, 9 GPU probes** (live gate
+- **149 reference files, 1202 landmark lines, 9 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1419,7 +1419,27 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    window's, not the pixel's; the above-cloud terms are dropped; the
    2:1 ratio and the colour rule are the theme's; the product's night
    retrieval is the same physics solved with NWP's clear sky, so the
-   theme's emissivity stands only where the product retrieved nothing
+   theme's emissivity stands only where the product retrieved nothing.
+   Pass 179 brings the rain at a kilometre: NCEP's MRMS PrecipRate —
+   the radar's precipitation rate on the echo top's 1-km grid every 2
+   min, PNG-packed the same way, 689 kB gzipped — as the daemon's
+   second held file (`/mrmsrate`: the window's census and the raining
+   cells nearest first, 400 at most, each with its rate, distance and
+   bearing) and, where the radar covers, as the rain shafts' and the
+   deck's rain cover's cells in place of the satellite's 2-km RRQPE
+   pixels every 10 min and RainViewer's composite; the scaling is the
+   file's own data representation section ((count − 30)/10 mm/h, −3
+   no coverage, 0 measured dry), the product guide still unreachable.
+   Gated on the rainiest 51 × 51 window of the 07:46Z file (north-east
+   Montana, re-packed as its own GRIB2 message): the window read
+   agrees with Pillow to the cell — the centre 75.0 mm/h, 2,478
+   raining cells, 123 dry, none uncovered, the heaviest 89.5 mm/h
+   placed 14.5 km at 354° by a plain great-circle — and the census
+   lists the cells nearest first with the shafts' own field names
+   (`mrms-reference` THE RAIN AT A KILOMETRE). STATED: the rate is the
+   radar's surface estimate by MRMS's own method, unread; a −3 cell is
+   unmeasured, not dry; the shafts keep Atlas 1953's extinction per
+   rate
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
