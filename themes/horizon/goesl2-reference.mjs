@@ -2627,8 +2627,14 @@ const inflate = (u8) =>
   });
   const xd = f.dataset('x');
   const yd = f.dataset('y');
-  const xc = {scale: sc(xd.attrs.scale_factor), offset: sc(xd.attrs.add_offset)};
-  const yc = {scale: sc(yd.attrs.scale_factor), offset: sc(yd.attrs.add_offset)};
+  const xc = {
+    scale: sc(xd.attrs.scale_factor),
+    offset: sc(xd.attrs.add_offset)
+  };
+  const yc = {
+    scale: sc(yd.attrs.scale_factor),
+    offset: sc(yd.attrs.add_offset)
+  };
   const nx = xd.values.length;
   const ny = yd.values.length;
   const ht = physicalValues(f.dataset('HT'));
@@ -2651,17 +2657,31 @@ const inflate = (u8) =>
     const phi = latDeg * D2R;
     const lam = lonDeg * D2R;
     const N = a / Math.sqrt(1 - e2 * Math.sin(phi) ** 2);
-    const P = [N * Math.cos(phi) * Math.cos(lam), N * Math.cos(phi) * Math.sin(lam), N * (1 - e2) * Math.sin(phi)];
+    const P = [
+      N * Math.cos(phi) * Math.cos(lam),
+      N * Math.cos(phi) * Math.sin(lam),
+      N * (1 - e2) * Math.sin(phi)
+    ];
     const lam0 = g.lon0Deg * D2R;
     const Sat = [g.H * Math.cos(lam0), g.H * Math.sin(lam0), 0];
     const v = [Sat[0] - P[0], Sat[1] - P[1], Sat[2] - P[2]];
-    const n = [Math.cos(phi) * Math.cos(lam), Math.cos(phi) * Math.sin(lam), Math.sin(phi)];
-    return Math.acos((v[0] * n[0] + v[1] * n[1] + v[2] * n[2]) / Math.hypot(v[0], v[1], v[2])) / D2R;
+    const n = [
+      Math.cos(phi) * Math.cos(lam),
+      Math.cos(phi) * Math.sin(lam),
+      Math.sin(phi)
+    ];
+    return (
+      Math.acos(
+        (v[0] * n[0] + v[1] * n[1] + v[2] * n[2]) / Math.hypot(v[0], v[1], v[2])
+      ) / D2R
+    );
   };
   const bearing = (lat1, lon1, lat2, lon2) => {
     const dl = (lon2 - lon1) * D2R;
     const y = Math.sin(dl) * Math.cos(lat2 * D2R);
-    const x = Math.cos(lat1 * D2R) * Math.sin(lat2 * D2R) - Math.sin(lat1 * D2R) * Math.cos(lat2 * D2R) * Math.cos(dl);
+    const x =
+      Math.cos(lat1 * D2R) * Math.sin(lat2 * D2R) -
+      Math.sin(lat1 * D2R) * Math.cos(lat2 * D2R) * Math.cos(dl);
     return (Math.atan2(y, x) / D2R + 360) % 360;
   };
   // the sheets without a mask first: their places, and which pixel to
@@ -2674,7 +2694,12 @@ const inflate = (u8) =>
   // height pixel flagged (a cloudy one where its count is 1 or more)
   const xm = {scale: xc.scale / 5, offset: xc.offset - 2 * (xc.scale / 5)};
   const ym = {scale: yc.scale / 5, offset: yc.offset - 2 * (yc.scale / 5)};
-  const mbox = {i0: 5 * box.i0, j0: 5 * box.j0, cols: 5 * box.cols, rows: 5 * box.rows};
+  const mbox = {
+    i0: 5 * box.i0,
+    j0: 5 * box.j0,
+    cols: 5 * box.cols,
+    rows: 5 * box.rows
+  };
   const bcm = new Uint8Array(mbox.cols * mbox.rows);
   const mdq = new Uint8Array(mbox.cols * mbox.rows);
   for (let j = 0; j < box.rows; j++)
@@ -2688,7 +2713,14 @@ const inflate = (u8) =>
         }
     }
   if (s0) mdq[5 * s0.j * mbox.cols + 5 * s0.i] = 1;
-  const mask = {bcm, dqf: mdq, box: mbox, x: xm, y: ym, time: 'the synthetic mask'};
+  const mask = {
+    bcm,
+    dqf: mdq,
+    box: mbox,
+    x: xm,
+    y: ym,
+    time: 'the synthetic mask'
+  };
   const r = cirrusSheetsFromOrbit(hwin, mask, lat0, lon0);
   const rNear = cirrusSheetsFromOrbit(hwin, mask, lat0, lon0, {maxKm: 1});
   let plainHigh = 0;
@@ -2708,14 +2740,23 @@ const inflate = (u8) =>
     });
   // one sheet by hand: the navigated pixel, the ellipsoid's zenith,
   // the shift and its direction toward the sub-satellite point
-  const G0 = s0 && fixedGridToLatLon(scanAngle(box.i0 + s0.i, xc), scanAngle(box.j0 + s0.j, yc), g);
+  const G0 =
+    s0 &&
+    fixedGridToLatLon(
+      scanAngle(box.i0 + s0.i, xc),
+      scanAngle(box.j0 + s0.j, yc),
+      g
+    );
   const vzE = G0 ? zenithEllipsoid(G0.latDeg, G0.lonDeg) : NaN;
   const dHand = s0 ? s0.htM * Math.tan(vzE * D2R) : NaN;
   const brgSub = G0 ? bearing(G0.latDeg, G0.lonDeg, 0, g.lon0Deg) : NaN;
   const brgMoved = G0 ? bearing(G0.latDeg, G0.lonDeg, s0.lat, s0.lon) : NaN;
   const dBrg = ((brgMoved - brgSub + 540) % 360) - 180;
   const movedM = G0
-    ? Math.hypot((s0.lon - G0.lonDeg) * 111320 * Math.cos(G0.latDeg * D2R), (s0.lat - G0.latDeg) * 111320)
+    ? Math.hypot(
+        (s0.lon - G0.lonDeg) * 111320 * Math.cos(G0.latDeg * D2R),
+        (s0.lat - G0.latDeg) * 111320
+      )
     : NaN;
   const words = cirrusSheetsWords(r.summary);
   check(
@@ -2726,7 +2767,14 @@ const inflate = (u8) =>
       r.summary.n > 0 &&
       r.summary.n <= plainHigh &&
       r.summary.n === rNone.summary.n &&
-      r.sheets.every((s) => s.htM >= 6508 && s.distKm <= 100 && s.fraction !== null && s.ewM > 9000 && s.ewM < 15000) &&
+      r.sheets.every(
+        (s) =>
+          s.htM >= 6508 &&
+          s.distKm <= 100 &&
+          s.fraction !== null &&
+          s.ewM > 9000 &&
+          s.ewM < 15000
+      ) &&
       r.summary.withMask === r.summary.n &&
       fracOk &&
       rNone.summary.withMask === 0 &&
@@ -2745,8 +2793,8 @@ const inflate = (u8) =>
       cirrusSheetsWords(rNear.summary).includes('no high pixel'),
     s0
       ? `the vendored ${ACHAC_EXPECT.file.slice(0, 24)} home window (San Diego, 21 x 21): ${plainGood} good heights, ${plainHigh} at or above 6508 m, ${r.summary.n} within 100 km as sheets (tops ${r.summary.minM.toFixed(0)}-${r.summary.maxM.toFixed(0)} m, median ${r.summary.medianM.toFixed(0)}), each ${(s0.ewM / 1000).toFixed(2)} x ${(s0.nsM / 1000).toFixed(2)} km; ` +
-        `the first, pixel (${s0.i}, ${s0.j}) at ${s0.htM.toFixed(0)} m, navigated to ${G0.latDeg.toFixed(3)} N ${(-G0.lonDeg).toFixed(3)} W and moved ${(s0.shiftM / 1000).toFixed(2)} km toward GOES-West (${g.lon0Deg} E) at ${s0.viewZenithDeg.toFixed(2)}° zenith (the ellipsoid's ${vzE.toFixed(2)}°, ${(dHand / 1000).toFixed(2)} km; the bearing ${dBrg.toFixed(3)}° off the sub-point's), ${s0.distKm.toFixed(1)} km at ${s0.bearingDeg.toFixed(0)}° from the home; ` +
-        `the synthetic mask's fractions match pixel by pixel (the flagged pixel dropped from the first sheet's 25: ${(r.sheets[0].fraction * 100).toFixed(1)}%); no mask: opaque; a 1-km reach: none; the words: "${words.slice(0, 140)}..."`
+          `the first, pixel (${s0.i}, ${s0.j}) at ${s0.htM.toFixed(0)} m, navigated to ${G0.latDeg.toFixed(3)} N ${(-G0.lonDeg).toFixed(3)} W and moved ${(s0.shiftM / 1000).toFixed(2)} km toward GOES-West (${g.lon0Deg} E) at ${s0.viewZenithDeg.toFixed(2)}° zenith (the ellipsoid's ${vzE.toFixed(2)}°, ${(dHand / 1000).toFixed(2)} km; the bearing ${dBrg.toFixed(3)}° off the sub-point's), ${s0.distKm.toFixed(1)} km at ${s0.bearingDeg.toFixed(0)}° from the home; ` +
+          `the synthetic mask's fractions match pixel by pixel (the flagged pixel dropped from the first sheet's 25: ${(r.sheets[0].fraction * 100).toFixed(1)}%); no mask: opaque; a 1-km reach: none; the words: "${words.slice(0, 140)}..."`
       : 'no high pixel within 100 km of the home window'
   );
 }

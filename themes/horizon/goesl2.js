@@ -665,8 +665,12 @@ export function cirrusSheetsFromOrbit(
         if (mask.dqf && mask.dqf[qm] !== 0) continue;
         const b = mask.bcm[qm];
         if (b !== 0 && b !== 1) continue;
-        const i = indexOfScanAngle(scanAngle(mask.box.i0 + im, mask.x), hwin.x) - box.i0;
-        const j = indexOfScanAngle(scanAngle(mask.box.j0 + jm, mask.y), hwin.y) - box.j0;
+        const i =
+          indexOfScanAngle(scanAngle(mask.box.i0 + im, mask.x), hwin.x) -
+          box.i0;
+        const j =
+          indexOfScanAngle(scanAngle(mask.box.j0 + jm, mask.y), hwin.y) -
+          box.j0;
         if (i < 0 || j < 0 || i >= box.cols || j >= box.rows) continue;
         const q = j * box.cols + i;
         cnt[q]++;

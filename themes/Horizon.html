@@ -14206,10 +14206,14 @@
       function applyCirrusSheets() {
         const hw = goesL2 && goesL2.height;
         const live =
-          hw && hw.ht && hw.time && Date.now() - Date.parse(hw.time) <= ACHA_LIVE_MS
+          hw &&
+          hw.ht &&
+          hw.time &&
+          Date.now() - Date.parse(hw.time) <= ACHA_LIVE_MS
             ? hw
             : null;
-        const mask = live && goesL2.mask && goesL2.mask.bcm ? goesL2.mask : null;
+        const mask =
+          live && goesL2.mask && goesL2.mask.bcm ? goesL2.mask : null;
         const key = live
           ? `${live.time}:${mask && mask.time ? mask.time : '-'}:${state.lat.toFixed(3)},${state.lon.toFixed(3)}:${Math.round(centerElev)}`
           : null;

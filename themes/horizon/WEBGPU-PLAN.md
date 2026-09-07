@@ -10411,27 +10411,27 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   6.7 km-15.6 km (median 11.3 km), each 10.4 x 13.0 km, 235 carrying
   the mask's cloudy fraction inside the pixel as opacity (mean 100%)"
   - 415 high fields, 235 of them within 100 km once moved (the window
-  is +-100 km square, the reach a circle), every one fully cloudy in
-  the mask. The render showed the stars through them: the cirrus
-  material's night opacity (0.05) is the theme's thin-cirrus hand and
-  it scaled a 100%-cloudy 11-km anvil to 5% - not a regression (the
-  seven random sheets stood at the same 0.05 under a 100% reported
-  high cover) but now a measured contradiction, stated below and
-  carried into the next lead. STATED LIMITS: a sheet is a
-  10-km block's mean top, its edges the pixel's, not the anvil's; the
-  mask's fraction is the block's cloudiness, not the sheet's optical
-  depth (the ATBD's emissivity is not carried; DCOMP's optical depth
-  is served by day - the named next lead); the sheets drift with the
-  high-level wind between files and are rebuilt on the next; beyond
-  100 km the sky's own cirrus stands; the cirrus material's opacity
-  (0.05 + 0.12 day) still scales every sheet, so a measured anvil lets
-  the stars through at night. The named next lead: the sheet's own
-  opacity - by day DCOMP's cloud optical depth (ABI-L2-CODC, already
-  served) at the sheet's pixel as 1 - exp(-tau); at night, with the
-  ATBD's emissivity not served, a stated rule from what is measured
-  (a high top over a radar storm or a 100%-cloudy block is an anvil,
-  opaque; a thin sheet keeps the hand) - so the stars vanish behind
-  what the satellite calls solid.
+    is +-100 km square, the reach a circle), every one fully cloudy in
+    the mask. The render showed the stars through them: the cirrus
+    material's night opacity (0.05) is the theme's thin-cirrus hand and
+    it scaled a 100%-cloudy 11-km anvil to 5% - not a regression (the
+    seven random sheets stood at the same 0.05 under a 100% reported
+    high cover) but now a measured contradiction, stated below and
+    carried into the next lead. STATED LIMITS: a sheet is a
+    10-km block's mean top, its edges the pixel's, not the anvil's; the
+    mask's fraction is the block's cloudiness, not the sheet's optical
+    depth (the ATBD's emissivity is not carried; DCOMP's optical depth
+    is served by day - the named next lead); the sheets drift with the
+    high-level wind between files and are rebuilt on the next; beyond
+    100 km the sky's own cirrus stands; the cirrus material's opacity
+    (0.05 + 0.12 day) still scales every sheet, so a measured anvil lets
+    the stars through at night. The named next lead: the sheet's own
+    opacity - by day DCOMP's cloud optical depth (ABI-L2-CODC, already
+    served) at the sheet's pixel as 1 - exp(-tau); at night, with the
+    ATBD's emissivity not served, a stated rule from what is measured
+    (a high top over a radar storm or a 100%-cloudy block is an anvil,
+    opaque; a thin sheet keeps the hand) - so the stars vanish behind
+    what the satellite calls solid.
 - DONE (Sep 7, the review session's 176th pass - THE SATELLITE'S TOP
   OVER THE RADAR'S CORE): the 175th's named lead. A storm cell's tower
   rises to ACHA's cloud-top height at the cell's own 10-km pixel where
