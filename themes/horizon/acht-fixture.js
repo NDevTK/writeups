@@ -11,8 +11,8 @@
 // INDEPENDENTLY of hdf5.js and goesl2.js by h5py and numpy: the flag
 // census, the good pixels' statistics, six sampled counts, and the
 // pairs with the height crop (2,129 pixels good in both, 1,934 of them
-// high, the fitted lapse 5.57 K/km, the ISA column 16.7 K warmer than
-// the retrieved tops at the median - the reason a real column is
+// high, the fitted lapse 5.57 K/km, an ISA column 16.7 K COLDER than
+// the retrieved tops at their heights at the median - the reason a real column is
 // wanted). Gate-only: install.sh does not ship this file.
 export const ACHT_EXPECT = {
   file: 'OR_ABI-L2-ACHTF-M6_G18_s20262500800212_e20262500809520_c20262500811271.nc',
