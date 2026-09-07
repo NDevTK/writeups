@@ -10345,6 +10345,37 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 7, the review session's gate-speed pass - THE GATE IN
+  PARALLEL): the full gate had grown to 10-15 minutes a run and stood
+  between every pass and main. MEASURED first (every reference file
+  timed one after another, as validate.sh ran them): 185 s for the
+  149 files, 138 of them under a second, the whole stage five physics
+  integrators - rayleighpol 79.5 s, observatory 27.4, ocean 12.4,
+  halos 12.2, nz 11.0 (kcorona, surfacelayer and atmo 5 s each) - and
+  the fixture decoders cheap (hdf5 0.17 s, goesl2 0.26, mrms 0.13, glm
+  0.08, server 0.63: the vendored files cost a second and a half in
+  all). THE CHANGE (harness/validate.sh): the CPU references run JOBS
+  at a time through xargs -P (the machine's cores by default; JOBS=1
+  is the old run and what the deploy box uses - server/update.sh sets
+  it, an e2-micro with 1 GB should never hold two fixture decoders at
+  once), each file's output captured to a temp file and the report
+  printed afterwards in the list's fixed order, so the [ok]/[FAIL]
+  lines, the landmark counts and their order are byte-identical to
+  the sequential run (diffed against validate-185); the GPU probes
+  stay one at a time (one GPU) and the page-wiring check follows.
+  MEASURED after: the CPU stage 88 s with four workers (bounded by
+  rayleighpol's own 80 s, not by the count), the full gate 242 s - 4
+  minutes, from 10-15 - with the same 159 [ok] lines and 1,200
+  landmarks (validate-186, PASS). rayleighpol PROFILED section by
+  section: the neutral-point sweep 29.8 s, the energy conservation 20.2
+  s, the benchmark 8.1 s, the polarized sea 3.9 s - adaptive
+  doubling-method solves at half-degree steps; NOT changed: a coarser
+  sweep would trade the neutral points' pinned precision for time, and
+  with four workers it is no longer the gate's bottleneck (the GPU
+  stage's 150 s is). Docs: harness/README.md (JOBS, the measured
+  shape). STATED: the parallel report loses the sequential run's
+  streaming progress (each line appeared as its file finished); the
+  status JSON carries the phases on the box instead.
 - DONE (Sep 7, the review session's 177th pass - THE ANVIL'S SPREAD):
   the 176th's named lead, taken as the cirrus layer's rather than the
   low deck's: an anvil overhangs clear air, so a per-texel TOP field
