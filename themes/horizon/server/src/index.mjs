@@ -1026,6 +1026,7 @@ export {
   l2Cell,
   L2_MASK_SPEC,
   L2_HEIGHT_SPEC,
+  L2_TOPTEMP_SPEC,
   L2_IMAGERY_SPEC,
   L2_COD_SPEC,
   L2_CPS_SPEC,
@@ -1050,6 +1051,7 @@ export {
   l2MaskBody,
   l2HeightBody,
   l2Height2kmBody,
+  l2TopTempBody,
   l2ImageryBody,
   l2SstBody,
   l2DmwBody,
@@ -1098,6 +1100,7 @@ const {
   l2Cell,
   L2_MASK_SPEC,
   L2_HEIGHT_SPEC,
+  L2_TOPTEMP_SPEC,
   L2_IMAGERY_SPEC,
   L2_COD_SPEC,
   L2_CPS_SPEC,
@@ -1113,6 +1116,7 @@ const {
   l2MaskBody,
   l2HeightBody,
   l2Height2kmBody,
+  l2TopTempBody,
   l2ImageryBody,
   l2SstBody,
   l2DmwBody,
@@ -2604,6 +2608,10 @@ function main() {
       // the anvil at two kilometres (181st): the same product at 2 km
       height2km: F.height2km
         ? l2Height2kmBody(F.height2km.dec, F.height2km.key, cell.lat, cell.lon)
+        : null,
+      // the top's own temperature (183rd): the full-disk product
+      topTemp: F.topTemp
+        ? l2TopTempBody(F.topTemp.dec, F.topTemp.key, cell.lat, cell.lon)
         : null,
       imagery: F.imagery
         ? l2ImageryBody(F.imagery.dec, F.imagery.key, cell.lat, cell.lon)

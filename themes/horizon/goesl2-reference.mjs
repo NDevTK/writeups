@@ -9,6 +9,9 @@ import {ACHAC_B64, ACHAC_EXPECT} from './hdf5-fixture.js';
 // the anvil at two kilometres (181st): the 2-km height crop and the
 // same scan's 10-km fields, with numpy's reading of both
 import {ACHA10KM_B64, ACHA2KM_B64, ACHA2KM_EXPECT} from './acha2km-fixture.js';
+// the top's own temperature (183rd): the same pixels' cloud top
+// temperature from the full-disk file, with numpy's reading
+import {ACHT_EXPECT, ACHTF_B64} from './acht-fixture.js';
 import {
   ACHA_DQF_MEANINGS,
   heightBlockClosure,
@@ -3346,6 +3349,143 @@ const inflate = (u8) =>
       `the tallest pixel (${tCol}, ${tRow}) ${w2.ht[qt].toFixed(0)} m over its block's mean ${(bSum[tBlock] / bN[tBlock]).toFixed(0)} (the 10-km field ${w10.ht[tBlock].toFixed(0)}): a ${storm.km.toFixed(1)}-km core there lifts to ${s2.satM.toFixed(0)} m at 2 km, while the 10-km field's ${s10.satM.toFixed(0)} stands below it and the core keeps its own top; block (${excessAt % 10}, ${Math.floor(excessAt / 10)}) hides a ${bMax[excessAt].toFixed(0)}-m pixel under a ${(bSum[excessAt] / bN[excessAt]).toFixed(0)}-m mean (${bN[excessAt]} good); ` +
       `the centre pixel count ${A.raw[qc]} = ${w2.ht[qc].toFixed(1)} m at ${Gc.latDeg.toFixed(4)} N ${(-Gc.lonDeg).toFixed(4)} W (numpy ${E.centre.lat.toFixed(4)}, ${(-E.centre.lon).toFixed(4)}); ${E.samples.length} samples exact; ` +
       `${r2.summary.n} sheets of ${(r2.summary.pixelEwM / 1000).toFixed(2)} x ${(r2.summary.pixelNsM / 1000).toFixed(2)} km against ${r10.summary.n} of ${(r10.summary.pixelEwM / 1000).toFixed(2)} x ${(r10.summary.pixelNsM / 1000).toFixed(2)} (ratio ${pxRatio.toFixed(2)}); the words: "${wordsT.slice(0, 110)}..."`
+  );
+}
+
+// ---- THE TOP'S OWN TEMPERATURE (183rd pass) --------------------------
+// The vendored cloud top temperature crop (the home's 50 x 50 pixels of
+// the 08:00Z full disk, the SAME pixels as the 2-km height crop) read
+// by hdf5.js against numpy: the flag census, the good pixels'
+// statistics, six sampled counts; then the 2-km crop's sheets weighed
+// with the product's temperature at each sheet's own scan angles - the
+// count that took it against a plain count over the crop, the column's
+// interpolation standing for the rest - and an ISA column (6.5 K/km
+// from 288.15 K) closed against the product's tops: numpy's median
+// difference to a centimetre of kelvin; the words.
+{
+  const E = ACHT_EXPECT;
+  const H = ACHA2KM_EXPECT;
+  const sc = (a) => (Array.isArray(a) ? a[0] : a);
+  const open = (b64, name) => {
+    const f = openHdf5(new Uint8Array(Buffer.from(b64, 'base64')), inflate);
+    const proj = f.dataset('goes_imager_projection').attrs;
+    const g = fixedGridGeometry({
+      semi_major_axis: sc(proj.semi_major_axis),
+      semi_minor_axis: sc(proj.semi_minor_axis),
+      perspective_point_height: sc(proj.perspective_point_height),
+      longitude_of_projection_origin: sc(proj.longitude_of_projection_origin)
+    });
+    const xd = f.dataset('x');
+    const yd = f.dataset('y');
+    const x = {scale: sc(xd.attrs.scale_factor), offset: sc(xd.attrs.add_offset)};
+    const y = {scale: sc(yd.attrs.scale_factor), offset: sc(yd.attrs.add_offset)};
+    const nx = xd.values.length;
+    const ny = yd.values.length;
+    const box = windowBox(H.centre.lat, H.centre.lon, g, x, y, nx, ny, 1000);
+    const d = f.dataset(name);
+    return {
+      g,
+      x,
+      y,
+      nx,
+      ny,
+      box,
+      raw: d.values,
+      vals: cutWindow(physicalValues(d), nx, box),
+      dqf: cutWindow(f.dataset('DQF').values, nx, box)
+    };
+  };
+  const T = open(ACHTF_B64, 'TEMP');
+  const A = open(ACHA2KM_B64, 'HT');
+  const wT = {tK: T.vals, dqf: T.dqf, box: T.box, x: T.x, y: T.y};
+  const w2 = {ht: A.vals, dqf: A.dqf, box: A.box, x: A.x, y: A.y, g: A.g, time: 'the fixture'};
+  const flags = heightFlags(T.dqf);
+  const sameFlags = (a, b) =>
+    Object.keys(b).every((k) => a[k] === b[k]) &&
+    Object.keys(a).every((k) => b[k] !== undefined);
+  const good = [];
+  for (let q = 0; q < T.vals.length; q++)
+    if (T.dqf[q] === 0 && Number.isFinite(T.vals[q])) good.push(T.vals[q]);
+  good.sort((a, b) => a - b);
+  const samplesOk = E.samples.every((s) => {
+    const q = s.row * 50 + s.col;
+    return (
+      T.raw[q] === s.count &&
+      T.dqf[q] === s.dqf &&
+      (s.K === null ? !Number.isFinite(T.vals[q]) : near(T.vals[q], s.K, 1e-2))
+    );
+  });
+  // the same pixels: the temperature crop's scan angles land on the
+  // height crop's own indices
+  const alignOk =
+    indexOfScanAngle(scanAngle(0, T.x), A.x) === 0 &&
+    indexOfScanAngle(scanAngle(49, T.y), A.y) === 49 &&
+    indexOfScanAngle(scanAngle(25, A.x), T.x) === 25;
+  // the sheets from the 2-km crop with the product's temperatures and
+  // an ISA column (linear between two rows: 6.5 K/km from 15 C)
+  const isa = [
+    {hM: 0, tC: 15},
+    {hM: 20000, tC: 15 - 130}
+  ];
+  const r2 = cirrusSheetsFromOrbit(w2, null, H.centre.lat, H.centre.lon);
+  const op = sheetOpacity(w2, r2.sheets, null, null, isa, null, {topTemp: wT});
+  const opNoT = sheetOpacity(w2, r2.sheets, null, null, isa, null);
+  // a plain count: sheets whose own pixel holds a good temperature
+  let plainProduct = 0;
+  const dts = [];
+  for (const s of r2.sheets) {
+    const q = s.j * 50 + s.i;
+    if (T.dqf[q] === 0 && Number.isFinite(T.vals[q])) {
+      plainProduct++;
+      dts.push(288.15 - 0.0065 * s.htM - T.vals[q]);
+    }
+  }
+  dts.sort((a, b) => a - b);
+  const sP = op.sheets.find((s) => s.tSource === 'product');
+  const sC = op.sheets.find((s) => s.tSource === 'column');
+  const words = sheetOpacityWords(op.summary);
+  check(
+    "THE TOP'S OWN TEMPERATURE: the cloud top temperature crop reads as numpy read it on the 2-km height crop's own pixels, each sheet takes the product's temperature at its own scan angles where the retrieval is good and the column's where it is not, and the column closes against the product's tops",
+    T.nx === 50 &&
+      T.ny === 50 &&
+      T.box.i === H.centre.col &&
+      T.box.j === H.centre.row &&
+      sameFlags(flags, E.flags) &&
+      good.length === E.good.n &&
+      near(good[good.length >> 1], E.good.medianK, 1e-2) &&
+      near(good[0], E.good.minK, 1e-2) &&
+      near(good[good.length - 1], E.good.maxK, 1e-2) &&
+      near(good[Math.floor(0.1 * good.length)], E.good.p10K, 1e-2) &&
+      samplesOk &&
+      alignOk &&
+      op.summary.topTemp === true &&
+      op.summary.topTempN === plainProduct &&
+      op.summary.topTempN + op.summary.columnN === op.summary.n &&
+      op.summary.topTempN > 0.9 * op.summary.n &&
+      op.summary.columnN > 0 &&
+      Math.abs(op.summary.topTempN - E.pairs.highWithTemp) <= 2 &&
+      !!sP &&
+      near(sP.tTopK, sP.tProductK, 1e-12) &&
+      near(sP.tColumnK, 288.15 - 0.0065 * sP.htM, 1e-9) &&
+      !!sC &&
+      sC.tProductK === null &&
+      near(sC.tTopK, sC.tColumnK, 1e-12) &&
+      op.summary.tempClosureN === plainProduct &&
+      near(op.summary.tempDiffMedianK, dts[dts.length >> 1], 1e-9) &&
+      Math.abs(op.summary.tempDiffMedianK - E.pairs.isaColumn.dMedianK) < 0.05 &&
+      Math.abs(op.summary.tempAbsDiffMedianK - E.pairs.isaColumn.absMedianK) < 0.05 &&
+      // numpy's set is the whole crop's 1,934 high pixels, the sheets
+      // the 1,932 within 100 km: the tenth shifts by a tenth of a kelvin
+      Math.abs(op.summary.tempAbsDiffP90K - E.pairs.isaColumn.absP90K) < 0.2 &&
+      opNoT.summary.topTemp === false &&
+      opNoT.summary.topTempN === 0 &&
+      opNoT.summary.columnN === opNoT.summary.n &&
+      opNoT.summary.tempClosureN === 0 &&
+      words.includes("from the product's own cloud top temperature") &&
+      words.includes("the column against the product's top temperature"),
+    `${E.file.slice(0, 26)} (the ${E.rows} x ${E.cols} home window, ${E.colShift} columns and ${E.rowShift} rows into the disk): flags ${JSON.stringify(flags)}, ${good.length} good tops ${good[0].toFixed(1)}-${good[good.length - 1].toFixed(1)} K (median ${good[good.length >> 1].toFixed(2)}; numpy ${E.good.medianK.toFixed(2)}), ${E.samples.length} samples exact; ` +
+      `of the height crop's ${op.summary.n} sheets ${op.summary.topTempN} take the product's own temperature at their pixel (a plain count ${plainProduct}; numpy's ${E.pairs.highWithTemp} high pixels with a temperature) and ${op.summary.columnN} the column's; ` +
+      `an ISA column reads ${op.summary.tempDiffMedianK.toFixed(2)} K against the product's tops at the median (numpy ${E.pairs.isaColumn.dMedianK.toFixed(2)}; |dT| ${op.summary.tempAbsDiffMedianK.toFixed(1)}, tenth ${op.summary.tempAbsDiffP90K.toFixed(1)}) over ${op.summary.tempClosureN} - the retrieved tops warmer than ISA at their heights; the words: "${words.slice(0, 150)}..."`
   );
 }
 

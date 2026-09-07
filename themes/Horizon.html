@@ -6563,7 +6563,8 @@
         'lvt',
         'lvm',
         'dsi',
-        'height2km'
+        'height2km',
+        'topTemp'
       ];
       let goesL2Busy = false;
       // THE HAZE'S KIND (169th pass): NOAA's aerosol detection while
@@ -7482,6 +7483,14 @@
                     fill: p.sstFill
                   })
                 : null,
+              // the cloud top temperature in kelvin (183rd pass)
+              tK: p.temp
+                ? unscale(unpackArray(p.temp), {
+                    scale: p.tempScale,
+                    offset: p.tempOffset,
+                    fill: p.tempFill
+                  })
+                : null,
               // the surface irradiance in W/m2 (152nd pass)
               dsrWm2: p.dsr
                 ? unscale(unpackArray(p.dsr), {
@@ -7700,6 +7709,10 @@
             // decks' bands take this window where it is live
             // (goesL2HeightLive), the 10-km window where it is not
             height2km: unpackProduct(j.height2km),
+            // the top's own temperature (183rd): the retrieval's cloud
+            // top temperature at 2 km (full disk, every 10 min) - each
+            // cirrus sheet's T_c in the emissivity law where it is good
+            topTemp: unpackProduct(j.topTemp),
             // the daemon's deployed revision and the products the
             // page read for it from the bucket (158th pass)
             rev: j.rev ?? null,
@@ -14416,8 +14429,18 @@
             : ascentStands() && state.soundingData && state.soundingData.rows
               ? state.soundingData.rows
               : null;
+        // the top's own temperature (183rd): the product's window while
+        // as fresh as the heights - each sheet's T_c ahead of the column
+        const topLive =
+          live &&
+          goesL2.topTemp &&
+          goesL2.topTemp.tK &&
+          goesL2.topTemp.time &&
+          Date.now() - Date.parse(goesL2.topTemp.time) <= ACHA_LIVE_MS
+            ? goesL2.topTemp
+            : null;
         const key = live
-          ? `${hl.res}:${live.time}:${mask && mask.time ? mask.time : '-'}:${dcompLive ? dcompLive.time : '-'}:${colRows ? colRows.length + ':' + (satColumn && satColumn.rows === colRows ? satColumn.time : 'balloon') : '-'}:${state.lat.toFixed(3)},${state.lon.toFixed(3)}:${Math.round(centerElev)}`
+          ? `${hl.res}:${live.time}:${topLive ? topLive.time : '-'}:${mask && mask.time ? mask.time : '-'}:${dcompLive ? dcompLive.time : '-'}:${colRows ? colRows.length + ':' + (satColumn && satColumn.rows === colRows ? satColumn.time : 'balloon') : '-'}:${state.lat.toFixed(3)},${state.lon.toFixed(3)}:${Math.round(centerElev)}`
           : null;
         if (key === cirrusSheetsKey) return;
         cirrusSheetsKey = key;
@@ -14445,7 +14468,7 @@
           mask,
           colRows,
           dcompLive,
-          {observerM: centerElev}
+          {observerM: centerElev, topTemp: topLive}
         );
         // one geometry for every sheet (181st: a 2-km window holds
         // thousands of sheets where the 10-km held hundreds - one mesh,

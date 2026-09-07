@@ -91,7 +91,8 @@ export const L2_HALF_PX = {
   dsr: 50,
   aod: 50,
   lst: 50,
-  height2km: 50 // the 2-km cloud top height (181st): +-100 km at 2 km
+  height2km: 50, // the 2-km cloud top height (181st): +-100 km at 2 km
+  topTemp: 50 // the cloud top temperature (183rd): full disk, 2 km
 }; // +-100 km on 2-km / 10-km grids
 export const L2_LIST_MS = 60e3; // a bucket listing stands a minute (the cheap part)
 export const L2_RETRY_MS = 2 * 60e3; // after a listing or fetch failure
@@ -157,6 +158,9 @@ export const L2_CPS_SPEC = {CPS: 'raw16'};
 // degraded, 2 severely degraded, 3 unprocessed - the file's own
 // flag_meanings, goesl2.SST_DQF_MEANINGS)
 export const L2_SST_SPEC = {SST: 'raw16', DQF: 'raw'};
+// the top's own temperature (183rd): kelvin counts with the file's
+// scaling beside them, the flags raw
+export const L2_TOPTEMP_SPEC = {TEMP: 'raw16', DQF: 'raw'};
 // The 152nd pass: the downward shortwave radiation at the surface
 // (uint16 at 0.02289 W/m2 a count, fill 65535; DQF 0 good, 1
 // degraded or invalid - the file's own flag_meanings,
@@ -534,6 +538,17 @@ export const L2_ASKS = [
     spec: L2_HEIGHT_SPEC,
     halfPx: 50,
     timed: false
+  },
+  // the top's own temperature (183rd): the retrieval's cloud top
+  // temperature - full disk only (32.6 MB a file, every 10 min), a
+  // +-100 km window of 101 x 101 pixels by range, the scene's now
+  {
+    id: 'topTemp',
+    product: L2_PRODUCTS.topTemp,
+    spec: L2_TOPTEMP_SPEC,
+    halfPx: 50,
+    timed: false,
+    fullDisk: true // 32.6 MB: not for a page whose ranges are ignored
   }
 ];
 const l2Scalar = (a) => (Array.isArray(a) ? a[0] : a);
@@ -912,6 +927,26 @@ export function l2Height2kmBody(dec, key, lat, lon) {
     ht: packArray(w.cut.HT, 'f32'),
     dqf: packArray(w.cut.DQF, 'u8'),
     census: heightCensus(w.cut.HT, w.cut.DQF),
+    flags: heightFlags(w.cut.DQF)
+  };
+}
+// The cloud top temperature window (183rd): kelvin counts on the wire
+// with the file's scaling (like the SST's), the flags, a census of the
+// good pixels and the flag census.
+export function l2TopTempBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_TOPTEMP_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.topTemp);
+  if (!w) return null;
+  const m = dec.meta.TEMP ?? {scale: 1, offset: 0, fill: 65535};
+  const tK = unscale(w.cut.TEMP, m);
+  return {
+    ...l2Common(dec, L2_PRODUCTS.topTemp, key, w),
+    temp: l2Counts(w.cut.TEMP, m.fill),
+    tempScale: m.scale,
+    tempOffset: m.offset,
+    tempFill: 65535,
+    dqf: packArray(w.cut.DQF, 'u8'),
+    census: goodCensus(tK, w.cut.DQF),
     flags: heightFlags(w.cut.DQF)
   };
 }

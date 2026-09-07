@@ -1051,11 +1051,31 @@ export function sheetOpacity(
   {
     visToIr = SHEET_OPACITY_RULES.visToIr,
     clearMin = SHEET_OPACITY_RULES.clearMinPixels,
-    observerM = 0
+    observerM = 0,
+    // the top's own temperature (183rd): the cloud top temperature
+    // window {tK (kelvin, NaN fill), dqf, box, x, y} - each sheet's
+    // T_c read at its own scan angles where the retrieval is good,
+    // the column's interpolation standing where it is not
+    topTemp = null
   } = {}
 ) {
   const box = hwin.box;
   const nPix = box.rows * box.cols;
+  const topOf = (s) => {
+    if (!topTemp || !topTemp.tK || !topTemp.box || !topTemp.x || !topTemp.y)
+      return null;
+    if (!Number.isFinite(s.i) || !Number.isFinite(s.j)) return null;
+    const xa = scanAngle(box.i0 + s.i, hwin.x);
+    const ya = scanAngle(box.j0 + s.j, hwin.y);
+    const i = indexOfScanAngle(xa, topTemp.x) - topTemp.box.i0;
+    const j = indexOfScanAngle(ya, topTemp.y) - topTemp.box.j0;
+    if (i < 0 || j < 0 || i >= topTemp.box.cols || j >= topTemp.box.rows)
+      return null;
+    const q = j * topTemp.box.cols + i;
+    if (topTemp.dqf && topTemp.dqf[q] !== 0) return null;
+    const t = topTemp.tK[q];
+    return Number.isFinite(t) && t > 0 ? t : null;
+  };
   const radSum = new Float64Array(nPix);
   const radN = new Uint32Array(nPix);
   const clear = [];
@@ -1152,16 +1172,33 @@ export function sheetOpacity(
     muMedian: null,
     slantMedian: null,
     slantMax: null,
-    observerM
+    observerM,
+    // the tops' temperatures (183rd): how many sheets read the
+    // product's own, how many the column's; the column against the
+    // product where both stand (column minus product, kelvin)
+    topTemp: !!topTemp,
+    topTempN: 0,
+    columnN: 0,
+    tempClosureN: 0,
+    tempDiffMedianK: null,
+    tempAbsDiffMedianK: null,
+    tempAbsDiffP90K: null
   };
   const mus = [];
   const slants = [];
+  const dts = [];
   for (const s of sheets || []) {
     sum.n++;
     const q = s.q;
     const n = q >= 0 && q < nPix ? radN[q] : 0;
     const rObs = n ? radSum[q] / n : null;
-    const tC = columnTemperatureAt(rows, s.htM);
+    const tCol = columnTemperatureAt(rows, s.htM);
+    const tProd = topOf(s);
+    const tC = tProd ?? tCol;
+    const tSource = tProd !== null ? 'product' : tCol !== null ? 'column' : null;
+    if (tProd !== null) sum.topTempN++;
+    else if (tCol !== null) sum.columnN++;
+    if (tProd !== null && tCol !== null) dts.push(tCol - tProd);
     let e = null;
     let warmer = false;
     if (rObs !== null && rClr !== null && tC !== null) {
@@ -1256,8 +1293,18 @@ export function sheetOpacity(
       dcompNight: nightBlock,
       btObsK: rObs !== null ? planckTemperature(rObs) : null,
       tTopK: tC,
+      tSource,
+      tProductK: tProd,
+      tColumnK: tCol,
       n
     });
+  }
+  if (dts.length) {
+    const ad = dts.map(Math.abs).sort((a, b) => a - b);
+    sum.tempClosureN = dts.length;
+    sum.tempDiffMedianK = median(dts);
+    sum.tempAbsDiffMedianK = ad[ad.length >> 1];
+    sum.tempAbsDiffP90K = ad[Math.min(ad.length - 1, Math.floor(0.9 * ad.length))];
   }
   if (mus.length) {
     sum.muMedian = median(mus);
@@ -1291,7 +1338,7 @@ export function sheetOpacityWords(sm) {
     );
   if (sm.fromEmissivity)
     parts.push(
-      `${sm.fromEmissivity} from the 10.35-um cloud emissivity (the ACHA ATBD's Eq. 1 with the window's ${sm.clearPixels} clear pixels as the clear sky, ${sm.clearRefK.toFixed(1)} K, and the column's temperature at each top; e ${sm.eMin.toFixed(2)}-${sm.eMax.toFixed(2)}, median ${sm.eMedian.toFixed(2)}; the vertical absorption depth -mu ln(1 - e), Eq. 37, mu ${sm.muMedian === null ? '1' : sm.muMedian.toFixed(2)}; the visible depth ${sm.visToIr} times it)`
+      `${sm.fromEmissivity} from the 10.35-um cloud emissivity (the ACHA ATBD's Eq. 1 with the window's ${sm.clearPixels} clear pixels as the clear sky, ${sm.clearRefK.toFixed(1)} K, and each top's temperature (the product's own where it is good, else the column's); e ${sm.eMin.toFixed(2)}-${sm.eMax.toFixed(2)}, median ${sm.eMedian.toFixed(2)}; the vertical absorption depth -mu ln(1 - e), Eq. 37, mu ${sm.muMedian === null ? '1' : sm.muMedian.toFixed(2)}; the visible depth ${sm.visToIr} times it)`
     );
   if (sm.fromMask) parts.push(`${sm.fromMask} the mask's cloudy fraction`);
   if (sm.fromNone) parts.push(`${sm.fromNone} opaque for want of any`);
@@ -1303,7 +1350,17 @@ export function sheetOpacityWords(sm) {
     (sm.clearRefK === null
       ? `; no clear reference (${sm.clearPixels} clear pixels, ${SHEET_OPACITY_RULES.clearMinPixels} needed)`
       : '') +
-    (sm.column === 'none' ? '; no column for the tops’ temperatures' : '') +
+    (sm.topTemp
+      ? `; the tops' temperatures: ${sm.topTempN} from the product's own cloud top temperature (ABI-L2-ACHTF, the retrieval's T_c at each sheet's pixel), ${sm.columnN} from the column`
+      : '') +
+    (sm.column === 'none' && !sm.topTempN
+      ? '; no column and no product temperature for the tops'
+      : sm.column === 'none'
+        ? "; no column (the product's own temperatures stand)"
+        : '') +
+    (sm.tempClosureN
+      ? `; the column against the product's top temperature where both stand: ${sm.tempDiffMedianK >= 0 ? '+' : ''}${sm.tempDiffMedianK.toFixed(1)} K at the median (|dT| ${sm.tempAbsDiffMedianK.toFixed(1)} K, tenth ${sm.tempAbsDiffP90K.toFixed(1)}) over ${sm.tempClosureN}`
+      : '') +
     (sm.closureN
       ? `; where both stand, 2 mu tau_IR against the product's tau: ${sm.closureRatioMedian.toFixed(2)} over ${sm.closureN} (at or below 1 as the crystals' 11-um absorption efficiency falls short of the visible extinction's 2 - Eq. 37-38)`
       : '') +
@@ -1493,7 +1550,15 @@ export const L2_PRODUCTS = {
   // mean of each 5 x 5 block's good pixels (measured: the whole CONUS
   // scene of 2026-09-07 08:06Z closes to 0.09 m rms over 126,312
   // fields - heightBlockClosure)
-  height2km: 'ABI-L2-ACHA2KMC'
+  height2km: 'ABI-L2-ACHA2KMC',
+  // the top's own temperature (183rd): the cloud top temperature the
+  // same retrieval solves for (the height is derived from it through
+  // the NWP profile - the Enterprise ATBD Sec. 4.4.2.8) - FULL DISK
+  // only (no CONUS sector; 32.6 MB a file, every 10 min, 2 km, TEMP
+  // uint16 at 0.00244 K a count from 180 K, chunked 24 rows by the
+  // full width; the window ~1 MB by range), the sheets' T_c ahead of
+  // the column's interpolation
+  topTemp: 'ABI-L2-ACHTF'
 };
 // The height files' own flag meanings (DQF flag_values 0..4, the same
 // string in the 10-km and 2-km files, read from the files): 4, the
