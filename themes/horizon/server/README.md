@@ -182,8 +182,9 @@ are gated by `../server-reference.mjs` — the `server` set in
   parallax-corrected place and its own height, the mask's
   (`ABI-L2-ACMC`) cloudy fraction inside the pixel its opacity, the
   seven random sheets standing only where no window is live; since
-  the 178th each sheet's opacity is its own: DCOMP's optical depth
-  (`ABI-L2-CODC`) at the block by day, else the 10.35-µm cloud
+  the 178th each sheet's opacity is its own: the served optical depth
+  (`ABI-L2-CODC` - DCOMP's by day, the enterprise IR retrieval by
+  night where the DQF's not-day bit is set) at the block, else the 10.35-µm cloud
   emissivity from the ACHA ATBD's Eq. 1 with the band-13 window
   (`ABI-L2-CMIPC`) inside the pixel, the mask's clear pixels as the
   clear sky and the column's temperature at the top, doubled to the

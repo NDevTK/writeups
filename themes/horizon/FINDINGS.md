@@ -1389,11 +1389,15 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    absorption depth −ln(1 − ε) doubled to the visible (the geometric
    limit: extinction efficiency 2, absorption efficiency near 1 for
    crystals large against the wavelength — stated) gives the sheet's
-   opacity 1 − (1 − ε)²; by day DCOMP's optical depth at the block
-   (the good retrievals' median) gives 1 − e^−τ directly and outranks
-   it, and where both stand 2 τ_IR closes against DCOMP's τ on the
-   line; the mask's fraction stands last, and a pixel warmer than the
-   clear sky or a missing column leaves it there. The measured sheets
+   opacity 1 − (1 − ε)²; the served optical depth (`ABI-L2-CODC`:
+   DCOMP's by day, and by night the enterprise retrieval from the IR
+   where the DQF's not-day bit is set — measured: 9,940 retrievals of
+   9,940 at 03:02 local, a fact the 149th's daytime label had missed)
+   at the block, the retrievals' median, gives 1 − e^−τ directly and
+   outranks it, and where both stand 2 τ_IR closes against the
+   product's τ on the line; the mask's fraction stands last, and a
+   pixel warmer than the clear sky or a missing column leaves it
+   there. The measured sheets
    carry their own material (opacity 1, the vertex alpha the measured
    opacity, the colour the sky's ambient on the underside plus a
    little transmitted sun, as the decks are lit — the display rule,
@@ -1405,9 +1409,17 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    at 1.000, a 295-K fog keeps the mask's fraction, no column or too
    few clear pixels leave every sheet to it, the Planck pair matches
    `goesir`'s to 1e-12 (`goesl2-reference` THE SHEET'S OWN OPACITY).
-   STATED: the clear reference is the window's, not the pixel's; the
-   above-cloud terms are dropped; the 2:1 ratio and the colour rule
-   are the theme's
+   Live on the Georgia coast (07:35Z, the 07:27Z window under the
+   night's anvil): all 233 sheets took the product's night optical
+   depth (the block medians' median 2.3, an opacity of 0.90), the
+   column absent under the overcast (the legacy profile needs clear
+   pixels) and the balloon past its gate, so the emissivity path had
+   no work that night; the sky went dark behind the anvil where pass
+   177's render showed the stars. STATED: the clear reference is the
+   window's, not the pixel's; the above-cloud terms are dropped; the
+   2:1 ratio and the colour rule are the theme's; the product's night
+   retrieval is the same physics solved with NWP's clear sky, so the
+   theme's emissivity stands only where the product retrieved nothing
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

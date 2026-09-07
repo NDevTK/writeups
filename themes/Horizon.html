@@ -8845,7 +8845,7 @@
           const tau = (v) => (v === null ? '—' : v.toFixed(1));
           if (c.retrieved) {
             line +=
-              ` · DCOMP ${dc.time.slice(11, 16)}Z (ABI-L2-CODC/CPSC, daytime; the 640-nm optical depth and the ` +
+              ` · DCOMP ${dc.time.slice(11, 16)}Z (ABI-L2-CODC/CPSC - DCOMP by day, the enterprise IR retrieval by night where the DQF's not-day bit is set; the 640-nm optical depth and the ` +
               `cloud-top effective radius): ${c.retrieved} retrieved of ${c.n - c.fill} 2-km px within ±100 km - ` +
               `τ median ${tau(c.codMedian)} (p10/p90 ${tau(c.codP10)}/${tau(c.codP90)})`;
             if (c.water.n)

@@ -886,8 +886,13 @@ export function sheetOpacity(
   }
   clear.sort((a, b) => a - b);
   const rClr = clear.length >= clearMin ? clear[clear.length >> 1] : null;
-  // DCOMP's optical depth per height pixel: the good retrievals' median
+  // the product's optical depth per height pixel: the retrievals'
+  // median, and how many of them the DQF marks not-day - the
+  // enterprise product retrieves at night too (the 149th's window
+  // held 9,940 retrievals of 9,940 at 03:02 local, measured), from
+  // the IR rather than DCOMP's reflectances, and the words say which
   const tauLists = dcomp && dcomp.cod && dcomp.box ? new Map() : null;
+  const nightCounts = new Map();
   if (tauLists)
     for (let jm = 0; jm < dcomp.box.rows; jm++)
       for (let im = 0; im < dcomp.box.cols; im++) {
@@ -898,6 +903,8 @@ export function sheetOpacity(
         if (q < 0) continue;
         if (!tauLists.has(q)) tauLists.set(q, []);
         tauLists.get(q).push(v);
+        if (dcomp.dqf && dcomp.dqf[qm] & DCOMP_FLAGS.notDay)
+          nightCounts.set(q, (nightCounts.get(q) || 0) + 1);
       }
   const median = (a) => {
     const s = a.slice().sort((x, y) => x - y);
@@ -910,6 +917,7 @@ export function sheetOpacity(
   const sum = {
     n: 0,
     fromDcomp: 0,
+    dcompNight: 0, // blocks whose retrievals the DQF marks not-day (the IR's)
     fromEmissivity: 0,
     fromMask: 0,
     fromNone: 0,
@@ -949,12 +957,14 @@ export function sheetOpacity(
     const tl = tauLists && tauLists.get(q);
     const tauDcomp = tl && tl.length ? median(tl) : null;
     const opacityDcomp = tauDcomp !== null ? 1 - Math.exp(-tauDcomp) : null;
+    const nightBlock = tl && tl.length ? (nightCounts.get(q) || 0) * 2 > tl.length : false;
     let alpha;
     let source;
     if (opacityDcomp !== null) {
       alpha = opacityDcomp;
       source = 'dcomp';
       sum.fromDcomp++;
+      if (nightBlock) sum.dcompNight++;
     } else if (opacityIr !== null) {
       alpha = opacityIr;
       source = 'emissivity';
@@ -982,6 +992,7 @@ export function sheetOpacity(
       tauDcomp,
       opacityIr,
       opacityDcomp,
+      dcompNight: nightBlock,
       btObsK: rObs !== null ? planckTemperature(rObs) : null,
       tTopK: tC,
       n
@@ -1006,7 +1017,11 @@ export function sheetOpacityWords(sm) {
   const parts = [];
   if (sm.fromDcomp)
     parts.push(
-      `${sm.fromDcomp} from DCOMP's optical depth by day (1 - e^-tau; the block medians' median ${sm.tauDcompMedian.toFixed(1)})`
+      `${sm.fromDcomp} from the enterprise cloud optical depth (ABI-L2-CODC, 1 - e^-tau; the block medians' median ${sm.tauDcompMedian.toFixed(1)}` +
+        (sm.dcompNight
+          ? `; ${sm.dcompNight} of them the night retrieval by the DQF's not-day bit, the IR's rather than DCOMP's reflectances`
+          : "; DCOMP's daytime retrieval") +
+        ')'
     );
   if (sm.fromEmissivity)
     parts.push(

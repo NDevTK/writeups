@@ -2861,7 +2861,11 @@ const inflate = (u8) =>
   mdq[1] = 3;
   const imagery = {btK, dqf: idq, box: fbox, x: fx, y: fy};
   const mask = {bcm, dqf: mdq, box: fbox, x: fx, y: fy};
-  const dcomp = {cod, dqf: new Uint8Array(225), box: fbox, x: fx, y: fy};
+  // the tau block's retrievals marked not-day (the enterprise night
+  // retrieval, the IR's), as the DQF's bit 1 says
+  const ddq = new Uint8Array(225);
+  for (let q = 0; q < 225; q++) if (Number.isFinite(cod[q])) ddq[q] = 1;
+  const dcomp = {cod, dqf: ddq, box: fbox, x: fx, y: fy};
   const rows = [
     {hM: 0, tC: 17},
     {hM: 8000, tC: 240 - 273.15},
@@ -2905,6 +2909,8 @@ const inflate = (u8) =>
       sD.alpha === 0.6 &&
       r.summary.warmer === 1 &&
       r.summary.fromDcomp === 1 &&
+      r.summary.dcompNight === 1 &&
+      sA.dcompNight === true &&
       r.summary.fromEmissivity === 2 &&
       r.summary.fromMask === 1 &&
       r.summary.closureN === 1 &&
@@ -2917,7 +2923,8 @@ const inflate = (u8) =>
       noDcomp.sheets[0].source === 'emissivity' &&
       near(noDcomp.sheets[0].alpha, 0.75, 1e-9) &&
       SHEET_OPACITY_RULES.visToIr === 2 &&
-      words.includes('from DCOMP') &&
+      words.includes('from the enterprise cloud optical depth') &&
+      words.includes('the night retrieval by the DQF') &&
       words.includes('10.35-um cloud emissivity') &&
       words.includes('1 is the stated ratio'),
     `a clear sky at ${tClr} K (${r.summary.clearPixels} clear pixels, two flagged out) and a 220-K top read by the column at 10 km: ` +

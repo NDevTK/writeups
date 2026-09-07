@@ -10375,10 +10375,15 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   it (the geometric limit: extinction efficiency 2 in the visible,
   absorption efficiency near 1 at 11 um for crystals large against
   the wavelength - the theme's rule, stated), so the visible opacity
-  is 1 - (1 - e)^2. By day DCOMP's optical depth (the 149th's window,
-  the block's good retrievals' median) gives 1 - exp(-tau) directly
-  and outranks it; where both stand 2 tau_IR / tau is the closure on
-  the line (1 is the stated ratio). The mask's fraction stands last.
+  is 1 - (1 - e)^2. The served optical depth (the 149th's CODC window,
+  the block's retrievals' median) gives 1 - exp(-tau) directly and
+  outranks it - and it stands by NIGHT too: the enterprise product
+  retrieves an optical depth from the IR where the DQF's not-day bit
+  is set (the 149th had labelled the line "daytime"; the 03:02 local
+  window held 9,940 retrievals of 9,940 - measured, the label
+  corrected, the words now count the not-day blocks); where both
+  stand 2 tau_IR / tau is the closure on the line (1 is the stated
+  ratio). The mask's fraction stands last.
   planckRadiance/planckTemperature live in goesl2.js on the CODATA
   constants (no new server import: goesir.js is not shipped);
   columnTemperatureAt. THE PAGE: the measured sheets get their own
@@ -10412,7 +10417,23 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   tested the column's top against the clear sky but not the pixel, so
   the fog block came back at e 0 instead of no emissivity - caught by
   the gate's count of sources. Docs: server README (/goesl2), FINDINGS
-  pass 178 (149 files, 1,201 landmarks, 9 GPU probes). STATED LIMITS:
+  pass 178 (149 files, 1,201 landmarks, 9 GPU probes). MEASURED in
+  the page (the Georgia coast, 31.65 N 81.25 W, 03:35 local, the
+  07:27Z windows under the night's anvil): "the sheets' opacity: 233
+  from the enterprise cloud optical depth (ABI-L2-CODC, 1 - e^-tau;
+  the block medians' median 2.3; 233 of them the night retrieval by
+  the DQF's not-day bit ...); no column for the tops' temperatures" -
+  the legacy profile had "no usable field of regard in the 3 x 3
+  (invalid: insufficient clear pixels)" under the overcast and the
+  balloon (Jacksonville, 137 km) stood past its 13-h gate, so the
+  theme's emissivity had no work that night; the render's sky went
+  dark behind the anvil (opacity 0.90 on the sheets, their colour the
+  night's ambient) where the 177th's showed the stars. A first build
+  read the previous evening's daytime DCOMP window (233 sheets took a
+  daytime tau at 03:40 local) - the window's own time is now held to
+  the heights' 30 minutes - and had built before the column landed -
+  the column's and the balloon's identity are in the key now.
+  STATED LIMITS:
   the clear reference is the window's median, not the pixel's own
   clear-sky radiance; the above-cloud terms are dropped (a few tenths
   of a kelvin at 10.35 um above 6.5 km); the 2:1 visible-to-IR ratio
