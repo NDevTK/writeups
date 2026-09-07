@@ -2825,7 +2825,13 @@ const inflate = (u8) =>
   const fx = {scale: hx.scale / 5, offset: hx.offset - 2 * (hx.scale / 5)};
   const fy = {scale: hy.scale / 5, offset: hy.offset - 2 * (hy.scale / 5)};
   const fbox = {i0: 500, j0: 1000, cols: 15, rows: 15};
-  const hwin = {ht: new Float64Array(9).fill(10000), dqf: new Uint8Array(9), box, x: hx, y: hy};
+  const hwin = {
+    ht: new Float64Array(9).fill(10000),
+    dqf: new Uint8Array(9),
+    box,
+    x: hx,
+    y: hy
+  };
   const tClr = 290;
   const tTop = 220;
   const rClr = planckRadiance(tClr);
@@ -2871,7 +2877,13 @@ const inflate = (u8) =>
     {hM: 8000, tC: 240 - 273.15},
     {hM: 12000, tC: 200 - 273.15}
   ];
-  const sheet = (q) => ({q, i: q % 3, j: Math.floor(q / 3), htM: 10000, fraction: 0.6});
+  const sheet = (q) => ({
+    q,
+    i: q % 3,
+    j: Math.floor(q / 3),
+    htM: 10000,
+    fraction: 0.6
+  });
   const sheets = [sheet(1), sheet(2), sheet(3), sheet(4)];
   const r = sheetOpacity(hwin, sheets, imagery, mask, rows, dcomp);
   const [sA, sB, sC, sD] = r.sheets;
@@ -2880,14 +2892,20 @@ const inflate = (u8) =>
   const btMean = planckTemperature(0.5 * rTop + 0.5 * rClr);
   const eWrong = (btMean - tClr) / (tTop - tClr);
   const noCol = sheetOpacity(hwin, sheets, imagery, mask, null, null);
-  const fewClear = sheetOpacity(hwin, sheets, imagery, mask, rows, null, {clearMin: 200});
+  const fewClear = sheetOpacity(hwin, sheets, imagery, mask, rows, null, {
+    clearMin: 200
+  });
   const noDcomp = sheetOpacity(hwin, sheets, imagery, mask, rows, null);
   const t10 = columnTemperatureAt(rows, 10000);
   const words = sheetOpacityWords(r.summary);
   check(
     "THE SHEET'S OWN OPACITY: the 11-um emissivity from the ATBD's Eq. 1 in radiance recovers each block's, DCOMP's optical depth outranks it and closes against 2 tau_IR, the fallbacks stand where the equation cannot",
     near(t10, 220, 1e-9) &&
-      near(planckRadiance(250), goesirPlanckB(250), goesirPlanckB(250) * 1e-12) &&
+      near(
+        planckRadiance(250),
+        goesirPlanckB(250),
+        goesirPlanckB(250) * 1e-12
+      ) &&
       near(planckTemperature(goesirPlanckB(250)), 250, 1e-9) &&
       near(goesirPlanckT(planckRadiance(300)), 300, 1e-9) &&
       r.summary.n === 4 &&

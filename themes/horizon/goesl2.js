@@ -847,7 +847,10 @@ export function sheetOpacity(
   mask,
   rows,
   dcomp,
-  {visToIr = SHEET_OPACITY_RULES.visToIr, clearMin = SHEET_OPACITY_RULES.clearMinPixels} = {}
+  {
+    visToIr = SHEET_OPACITY_RULES.visToIr,
+    clearMin = SHEET_OPACITY_RULES.clearMinPixels
+  } = {}
 ) {
   const box = hwin.box;
   const nPix = box.rows * box.cols;
@@ -857,7 +860,9 @@ export function sheetOpacity(
   const toHeight = (xa, ya) => {
     const i = indexOfScanAngle(xa, hwin.x) - box.i0;
     const j = indexOfScanAngle(ya, hwin.y) - box.j0;
-    return i < 0 || j < 0 || i >= box.cols || j >= box.rows ? -1 : j * box.cols + i;
+    return i < 0 || j < 0 || i >= box.cols || j >= box.rows
+      ? -1
+      : j * box.cols + i;
   };
   if (imagery && imagery.btK && imagery.box) {
     for (let jm = 0; jm < imagery.box.rows; jm++)
@@ -879,7 +884,8 @@ export function sheetOpacity(
           const j = indexOfScanAngle(ya, mask.y) - mask.box.j0;
           if (i >= 0 && j >= 0 && i < mask.box.cols && j < mask.box.rows) {
             const qk = j * mask.box.cols + i;
-            if ((!mask.dqf || mask.dqf[qk] === 0) && mask.bcm[qk] === 0) clear.push(rad);
+            if ((!mask.dqf || mask.dqf[qk] === 0) && mask.bcm[qk] === 0)
+              clear.push(rad);
           }
         }
       }
@@ -899,7 +905,10 @@ export function sheetOpacity(
         const qm = jm * dcomp.box.cols + im;
         const v = dcomp.cod[qm];
         if (!Number.isFinite(v) || v <= 0) continue;
-        const q = toHeight(scanAngle(dcomp.box.i0 + im, dcomp.x), scanAngle(dcomp.box.j0 + jm, dcomp.y));
+        const q = toHeight(
+          scanAngle(dcomp.box.i0 + im, dcomp.x),
+          scanAngle(dcomp.box.j0 + jm, dcomp.y)
+        );
         if (q < 0) continue;
         if (!tauLists.has(q)) tauLists.set(q, []);
         tauLists.get(q).push(v);
@@ -952,12 +961,14 @@ export function sheetOpacity(
       if (raw < 0) warmer = true;
       else e = Math.min(1, raw);
     }
-    const tauIr = e !== null ? -Math.log(Math.max(1e-9, 1 - Math.min(e, 1 - 1e-9))) : null;
+    const tauIr =
+      e !== null ? -Math.log(Math.max(1e-9, 1 - Math.min(e, 1 - 1e-9))) : null;
     const opacityIr = e !== null ? 1 - (1 - e) ** visToIr : null;
     const tl = tauLists && tauLists.get(q);
     const tauDcomp = tl && tl.length ? median(tl) : null;
     const opacityDcomp = tauDcomp !== null ? 1 - Math.exp(-tauDcomp) : null;
-    const nightBlock = tl && tl.length ? (nightCounts.get(q) || 0) * 2 > tl.length : false;
+    const nightBlock =
+      tl && tl.length ? (nightCounts.get(q) || 0) * 2 > tl.length : false;
     let alpha;
     let source;
     if (opacityDcomp !== null) {
@@ -982,7 +993,8 @@ export function sheetOpacity(
     if (!n) sum.noPixels++;
     if (e !== null) es.push(e);
     if (tauDcomp !== null) taus.push(tauDcomp);
-    if (e !== null && tauDcomp !== null && tauIr > 0) ratios.push((visToIr * tauIr) / tauDcomp);
+    if (e !== null && tauDcomp !== null && tauIr > 0)
+      ratios.push((visToIr * tauIr) / tauDcomp);
     out.push({
       ...s,
       alpha,
@@ -1031,8 +1043,12 @@ export function sheetOpacityWords(sm) {
   if (sm.fromNone) parts.push(`${sm.fromNone} opaque for want of any`);
   return (
     `the sheets' opacity: ${parts.join(', ')}` +
-    (sm.warmer ? `; ${sm.warmer} not colder than the clear sky (no emissivity there)` : '') +
-    (sm.clearRefK === null ? `; no clear reference (${sm.clearPixels} clear pixels, ${SHEET_OPACITY_RULES.clearMinPixels} needed)` : '') +
+    (sm.warmer
+      ? `; ${sm.warmer} not colder than the clear sky (no emissivity there)`
+      : '') +
+    (sm.clearRefK === null
+      ? `; no clear reference (${sm.clearPixels} clear pixels, ${SHEET_OPACITY_RULES.clearMinPixels} needed)`
+      : '') +
     (sm.column === 'none' ? '; no column for the tops’ temperatures' : '') +
     (sm.closureN
       ? `; where both stand, 2 tau_IR against DCOMP's tau: ${sm.closureRatioMedian.toFixed(2)} over ${sm.closureN} (1 is the stated ratio)`
