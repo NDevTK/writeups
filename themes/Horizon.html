@@ -16764,6 +16764,19 @@
       // Atlas's, a little denser at the base than at the ground.
       let shaftMesh = null;
       let shaftCount = 0;
+      // THE SHAFTS IN THE SCENE'S LIGHT (180th): the curtains' colour
+      // was a constant grey-blue (0.5, 0.56, 0.62) through the aerial
+      // fog, so they stood light grey against a black sky at 2 a.m.
+      // (measured in Montana, 179th). It is a uniform now, set each
+      // frame from the same lights the decks and the measured cirrus
+      // sheets use: the sky's ambient on the curtain (rain scatters
+      // without absorbing, so the curtain is as bright as the light
+      // that falls on it, its opacity already Atlas's) plus a tenth of
+      // the sun's colour while the sun stands up - the theme's display
+      // rule, stated on the line. Without the decks (no cloud system
+      // built) the hemisphere light's colour stands in.
+      const shaftColU = tslUniform(new THREE.Color(0.5, 0.56, 0.62));
+      const shaftColTmp = new THREE.Color();
       function updateRainShafts() {
         const list = rainShafts && rainShafts.list;
         const fresh =
@@ -16801,7 +16814,7 @@
           // the curtain's sides fade (a rain shaft has no wall): full
           // over the middle 70%, to nothing at the edges
           const edge = uv().x.sub(0.5).abs().smoothstep(0.35, 0.5).oneMinus();
-          mat.colorNode = aerial.encodeFog(tslVec3(0.5, 0.56, 0.62));
+          mat.colorNode = aerial.encodeFog(shaftColU);
           mat.opacityNode = instancedBufferAttribute(opAttr)
             .mul(grad)
             .mul(edge);
@@ -16817,6 +16830,16 @@
           shaftCount = n;
         }
         shaftMesh.visible = true;
+        // the curtains' colour from the scene's lights (180th)
+        if (cloudSys) {
+          shaftColU.value.copy(cloudSys.shared.ambCol.value);
+          shaftColTmp
+            .copy(cloudSys.shared.sunCol.value)
+            .multiplyScalar(0.1 * Math.max(cloudSys.shared.sunDirW.value.y, 0));
+          shaftColU.value.add(shaftColTmp);
+        } else {
+          shaftColU.value.copy(ambient.color).multiplyScalar(0.6);
+        }
         const {posAttr, sclAttr, opAttr} = shaftMesh.userData;
         const goes = goesObs;
         const baseM =
