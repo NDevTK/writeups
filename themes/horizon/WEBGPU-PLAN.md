@@ -11235,7 +11235,14 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   (the ring hour on, 27% of the cirrus), the convective decks' dark
   flat bases under them - neither glowing white nor black, the same
   ambient the decks take; the colour rule's constants (0.6 of the
-  ambient, 0.08 of the sun) stand unchanged.
+  ambient, 0.08 of the sun) stand unchanged. A second look (12:16Z,
+  210 deg at 38 deg up - away from the sun): 1,892 sheets on the
+  12:07Z windows, read as grey-violet patches a little DARKER than
+  the dawn-blue sky with their 2-km cross-hatch showing - lit by the
+  ambient alone with the sun 13 deg up behind the camera. STATED:
+  whether a high sun should make them brighter than the sky (the
+  crystals' forward and side scatter, which the 0.08 sun term does
+  not model) is the noon question, not answered at sunrise.
   STATED LIMITS:
   the clear reference is the window's median, not the pixel's own
   clear-sky radiance; the above-cloud terms are dropped (a few tenths
