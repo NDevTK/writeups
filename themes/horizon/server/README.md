@@ -347,14 +347,39 @@ are gated by `../server-reference.mjs` — the `server` set in
   their differences, and lifts the station's own screen temperature
   and dew point through the satellite's column for the storm deck's
   ceiling where no balloon flew (the same `sounding.parcelAscent` the
-  balloon's tower uses): eighteen products served (a window of +-100
+  balloon's tower uses); since the 181st the cloud top height at its
+  native 2 km (`ABI-L2-ACHA2KMC` - NCEI's record of the product:
+  "the product's spatial resolution increased from 10 and 4 km to 2
+  km on 24 March 2023"; CONUS every 5 min, day and night, 5.2 MB a
+  file, the window 0.9-1.1 MB in 4 ranges, measured - its HT is
+  chunked 52 rows by the full width) as `height2km`: the +-100 km
+  window of 101 x 101 pixels with the same `ht`, `dqf` and `census`
+  as `height` and a `flags` census beside them (the DQF values'
+  counts: the 2-km product carries a marginal class, DQF 1, that the
+  census leaves out and the page names). The 10-km product is the mean
+  of each 5 x 5 block's good 2-km pixels - the ATBD's and PUG's
+  aggregation, measured on the whole CONUS scene of 2026-09-07 08:06Z:
+  126,312 fields close to 0.09 m rms, every one within the 10-km
+  count's own quantum (0.305 m), none good on one side only
+  (`goesl2.heightBlockClosure`, gated on a vendored crop of the home's
+  50 x 50 pixels against the same scan's 10 x 10 fields and h5py) - so
+  the page takes the 2-km window as the same retrieval unsmoothed
+  wherever it is live: the cirrus sheets a fifth the size at each
+  pixel's own height, a radar storm cell's top looked up in its own
+  2-km pixel (the block mean stood 3.4 km under the tallest pixel of
+  the crop, and left a 14.4-km core unlifted where the pixel lifts it),
+  the decks' bands and the storm slab's tallest tenth from the pixels
+  (the count rules kept in fields of 10 km: 25 pixels a field); the
+  10-km window stands where the 2-km is unread or past 30 min, and
+  keeps the mosaic-minute comparison (`?t=`) the 2-km ask never
+  answers: nineteen products served (a window of +-100
   km costs 437-547 kB in 4-6 ranges, measured, the aerosol window a
   few tens of kB more, the two profile windows about a megabyte
   between them at the five-minute cadence, the stability window
   nearly its whole 0.9-MB file - its fields are chunked 262 rows by
   the full width, so any window touches the chunk: 8 ranges, 836 kB,
   measured). A
-  NINETEENTH ask exists in the shared decode block but is the page's
+  TWENTIETH ask exists in the shared decode block but is the page's
   own (`pageOnly`, 159th): the 500-m visible band 2 window (`vis`,
   401 x 401 px of the CMIP ATBD's reflectance factor with the
   file's kappa, Esun and Earth-Sun distance) that the page reads
@@ -363,7 +388,7 @@ are gated by `../server-reference.mjs` — the `server` set in
   cadence (about 15 MB an hour by day), which this box's free-tier
   egress cannot carry and the bucket's CORS can. This
   daemon never lists, fetches or serves it; `/health`'s
-  `version.products` names the eighteen it does.
+  `version.products` names the nineteen it does.
   Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks

@@ -508,6 +508,8 @@
         lapStability,
         ACHA_ATBD,
         heightBands,
+        heightBlockClosure,
+        heightBlockClosureWords,
         cirrusSheetsFromOrbit,
         cirrusSheetsWords,
         sheetOpacity,
@@ -6560,7 +6562,8 @@
         'adp',
         'lvt',
         'lvm',
-        'dsi'
+        'dsi',
+        'height2km'
       ];
       let goesL2Busy = false;
       // THE HAZE'S KIND (169th pass): NOAA's aerosol detection while
@@ -6949,18 +6952,53 @@
           source: "ISA's"
         };
       }
+      // THE ANVIL AT TWO KILOMETRES (181st): the height window the laws
+      // take - the 2-km product's (ABI-L2-ACHA2KMC) while it is live
+      // (30 min), else the 10-km product's. Each 10-km field is the mean
+      // of its 5 x 5 block of good 2-km pixels (the PUG's aggregation,
+      // measured to 0.09 m rms over the CONUS scene and gated on a
+      // vendored crop), so the 2-km window is the same retrieval
+      // unsmoothed: its tallest tenth and tallest stand higher, its
+      // sheets are a fifth the size, a core's top is looked up in its
+      // own pixel. perField: the 2-km pixels a 10-km field holds - the
+      // count rules stay in fields of 10 km.
+      function goesL2HeightLive() {
+        const live = (h) =>
+          h &&
+          h.ht &&
+          h.time &&
+          Date.now() - Date.parse(h.time) <= ACHA_LIVE_MS;
+        if (goesL2 && live(goesL2.height2km))
+          return {
+            win: goesL2.height2km,
+            res: '2 km',
+            perField: 25,
+            product: 'ABI-L2-ACHA2KMC'
+          };
+        if (goesL2 && live(goesL2.height))
+          return {
+            win: goesL2.height,
+            res: '10 km',
+            perField: 1,
+            product: 'ABI-L2-ACHAC'
+          };
+        return null;
+      }
       function goesL2TopsNow() {
-        const h = goesL2 && goesL2.height;
-        if (!h || !h.ht || !h.time) return null;
-        if (Date.now() - Date.parse(h.time) > ACHA_LIVE_MS) return null;
+        const hl = goesL2HeightLive();
+        if (!hl) return null;
+        const h = hl.win;
         const edges = topsBandEdges();
-        const key = `${h.time}|${edges.lowTopM.toFixed(0)}|${edges.midTopM.toFixed(0)}`;
+        const key = `${hl.res}|${h.time}|${edges.lowTopM.toFixed(0)}|${edges.midTopM.toFixed(0)}`;
         if (satTopsMemo && satTopsMemo.key === key) return satTopsMemo.tops;
         const tops = {
           ...heightBands(h.ht, h.dqf, edges),
           time: h.time,
           edgesSource: edges.source,
-          craft: goesL2.craft || 'GOES'
+          craft: goesL2.craft || 'GOES',
+          res: hl.res,
+          perField: hl.perField,
+          product: hl.product
         };
         satTopsMemo = {key, tops};
         return tops;
@@ -6968,15 +7006,36 @@
       function satTopsWords(t) {
         const m = (v) => (v === null ? 'none' : `${Math.round(v)} m`);
         return (
-          `${t.time.slice(11, 16)}Z · ${t.n} good fields of the ±100 km window: ` +
+          `${t.time.slice(11, 16)}Z · ${t.n} good ${t.perField > 1 ? `2-km pixels (${(t.n / t.perField).toFixed(0)} fields of 10 km)` : 'fields'} of the ±100 km window: ` +
           `low ${t.nLow} (median ${m(t.lowM)}), mid ${t.nMid} (${m(t.midM)}), high ${t.nHigh} (${m(t.highM)}) · ` +
           `the tallest tenth ${m(t.p90M)}, the tallest ${m(t.maxM)} · ` +
           `bands at ${(t.lowTopM / 1000).toFixed(2)} / ${(t.midTopM / 1000).toFixed(2)} km (${t.edgesSource} 680 and 440 hPa)`
         );
       }
       function satTopsLine() {
-        if (!goesL2 || !goesL2.height) return null;
+        if (!goesL2 || (!goesL2.height && !goesL2.height2km)) return null;
         const t = goesL2TopsNow();
+        // the 2-km window against the 10-km while both are live: every
+        // 10-km field the mean of its block's good 2-km pixels - the
+        // PUG's aggregation, closed live on the line (181st)
+        const hl = goesL2HeightLive();
+        const closure =
+          hl &&
+          hl.res === '2 km' &&
+          goesL2.height &&
+          goesL2.height.ht &&
+          goesL2.height.time === goesL2.height2km.time
+            ? heightBlockClosure(goesL2.height2km, goesL2.height)
+            : null;
+        const label =
+          hl && hl.res === '2 km'
+            ? `ABI-L2-ACHA2KMC, the retrieval at its native 2 km, every 5 min - the 10-km product is the mean of each 5 × 5 block of good pixels (measured: the CONUS scene closes to 0.09 m rms over 126,312 fields; ${closure ? heightBlockClosureWords(closure) : 'the two windows of different scans here'})`
+            : 'ABI-L2-ACHAC, 10-km fields of 5 × 5 good pixels, every 5 min' +
+              (goesL2.height2km === undefined
+                ? ''
+                : goesL2.height2km === null
+                  ? '; the 2-km product unread'
+                  : '; the 2-km window past 30 min');
         const R = ACHA_ATBD.requirement;
         const E = ACHA_ATBD.errorBudget;
         const feeds = [
@@ -6992,13 +7051,13 @@
             : null
         ].filter(Boolean);
         return (
-          `${goesL2.craft || 'GOES'}'s cloud-top heights (ABI-L2-ACHAC, 10-km fields of 5 × 5 good pixels, every 5 min): ` +
+          `${goesL2.craft || 'GOES'}'s cloud-top heights (${label}): ` +
           (t
             ? satTopsWords(t)
             : 'none fresh (the window past 30 min or unread)') +
           ` · what they feed now: ${feeds.length ? feeds.join(', ') : "nothing - the theme's own field, the balloon's ceiling or the hand stand"}` +
           ` (ranking: the theme's own opaque tops where they cover 5% of the sea, then these, then the VIIRS census; on storm codes - or with a radar storm at or above 8 km in view - these tallest tops when ten good fields stand, else the radar's tallest echo top, else the parcel's EL)` +
-          ` · the cirrus sheets: ${cirrusSheetsInfo ? cirrusSheetsWords(cirrusSheetsInfo.summary) : 'none measured - no window live, the seven drifting sheets stand'}` +
+          ` · the cirrus sheets: ${cirrusSheetsInfo ? `(${cirrusSheetsInfo.product}, ${cirrusSheetsInfo.res} pixels) ` + cirrusSheetsWords(cirrusSheetsInfo.summary) : 'none measured - no window live, the seven drifting sheets stand'}` +
           (cirrusSheetsInfo && cirrusSheetsInfo.opacity
             ? ` · ${sheetOpacityWords(cirrusSheetsInfo.opacity)} (the visible opacity 1 - (1 - e)^2: twice the 11-um absorption depth, the geometric limit - stated; the sheets' colour the sky's ambient on the underside plus a little transmitted sun - stated)`
             : '') +
@@ -7636,6 +7695,11 @@
             // the tower's ceiling (172nd): NOAA's stability indices of
             // the same retrieval (goesL2StabilityNow)
             dsi: unpackProduct(j.dsi),
+            // the anvil at two kilometres (181st): the same heights at
+            // their native 2 km - the sheets, the towers' tops and the
+            // decks' bands take this window where it is live
+            // (goesL2HeightLive), the 10-km window where it is not
+            height2km: unpackProduct(j.height2km),
             // the daemon's deployed revision and the products the
             // page read for it from the bucket (158th pass)
             rev: j.rev ?? null,
@@ -13200,17 +13264,13 @@
         // ACHA window (30 min) lifts a cell's top to the satellite's
         // cloud-top height at the cell's own parallax-shifted 10-km
         // pixel where that is higher - the anvil over the core
-        const hw = goesL2 && goesL2.height;
-        const hLive =
-          hw &&
-          hw.ht &&
-          hw.time &&
-          Date.now() - Date.parse(hw.time) <= ACHA_LIVE_MS
-            ? hw
-            : null;
+        // the 2-km window where it is live (181st): the core's top read
+        // in its own pixel, not the block's mean
+        const hl = goesL2HeightLive();
+        const hLive = hl ? hl.win : null;
         const key =
           storms && storms.length
-            ? `${t.at}:${hLive ? hLive.time : '-'}:${state.lat.toFixed(3)},${state.lon.toFixed(3)}:${Math.round(centerElev)}`
+            ? `${t.at}:${hLive ? hl.res + ':' + hLive.time : '-'}:${state.lat.toFixed(3)},${state.lon.toFixed(3)}:${Math.round(centerElev)}`
             : null;
         if ((radarTopsField ? radarTopsField.key : null) === key) return;
         if (!key) {
@@ -14318,7 +14378,10 @@
         transparent: true,
         opacity: 1,
         depthWrite: false,
-        vertexColors: true
+        vertexColors: true,
+        // a sheet is a layer seen from under and, from a hill, from
+        // above (181st: the merged geometry is wound once)
+        side: THREE.DoubleSide
       });
       applyAerial(cirrusSheetMat);
       const cirrusSheetTmp = new THREE.Color();
@@ -14326,14 +14389,10 @@
       let cirrusSheetsInfo = null; // {summary, opacity, builtAt}
       const CIRRUS_SHEETS_MAX_KM = 100;
       function applyCirrusSheets() {
-        const hw = goesL2 && goesL2.height;
-        const live =
-          hw &&
-          hw.ht &&
-          hw.time &&
-          Date.now() - Date.parse(hw.time) <= ACHA_LIVE_MS
-            ? hw
-            : null;
+        // the 2-km window where it is live (181st): a sheet a fifth the
+        // size at each 2-km pixel's own height; else the 10-km fields
+        const hl = goesL2HeightLive();
+        const live = hl ? hl.win : null;
         const mask =
           live && goesL2.mask && goesL2.mask.bcm ? goesL2.mask : null;
         // the sheets' own opacity (178th): DCOMP's window only while it
@@ -14356,7 +14415,7 @@
               ? state.soundingData.rows
               : null;
         const key = live
-          ? `${live.time}:${mask && mask.time ? mask.time : '-'}:${dcompLive ? dcompLive.time : '-'}:${colRows ? colRows.length + ':' + (satColumn && satColumn.rows === colRows ? satColumn.time : 'balloon') : '-'}:${state.lat.toFixed(3)},${state.lon.toFixed(3)}:${Math.round(centerElev)}`
+          ? `${hl.res}:${live.time}:${mask && mask.time ? mask.time : '-'}:${dcompLive ? dcompLive.time : '-'}:${colRows ? colRows.length + ':' + (satColumn && satColumn.rows === colRows ? satColumn.time : 'balloon') : '-'}:${state.lat.toFixed(3)},${state.lon.toFixed(3)}:${Math.round(centerElev)}`
           : null;
         if (key === cirrusSheetsKey) return;
         cirrusSheetsKey = key;
@@ -14379,33 +14438,66 @@
           colRows,
           dcompLive
         );
-        for (const s of op.sheets) {
-          const geo = new THREE.PlaneGeometry(
-            (s.ewM || 10000) / MPU,
-            (s.nsM || 10000) / MPU
-          );
-          const a = s.alpha;
-          const n = geo.attributes.position.count;
-          const col = new Float32Array(n * 4);
+        // one geometry for every sheet (181st: a 2-km window holds
+        // thousands of sheets where the 10-km held hundreds - one mesh,
+        // one draw): four corners a sheet on the flat, its alpha on
+        // each, two triangles wound to face down (the material draws
+        // both sides)
+        const n = op.sheets.length;
+        if (n) {
+          const pos = new Float32Array(n * 12);
+          const col = new Float32Array(n * 16);
+          const idx = new Uint32Array(n * 6);
           for (let k = 0; k < n; k++) {
-            col[k * 4] = 1;
-            col[k * 4 + 1] = 1;
-            col[k * 4 + 2] = 1;
-            col[k * 4 + 3] = a;
+            const s = op.sheets[k];
+            const hw = (s.ewM || 10000) / MPU / 2;
+            const hd = (s.nsM || 10000) / MPU / 2;
+            const cx = s.dxM / MPU;
+            const cz = s.dzM / MPU;
+            const y = 16 * Math.asinh((s.htM - centerElev) / 500) + 8;
+            const o = k * 12;
+            pos[o] = cx - hw;
+            pos[o + 1] = y;
+            pos[o + 2] = cz - hd;
+            pos[o + 3] = cx + hw;
+            pos[o + 4] = y;
+            pos[o + 5] = cz - hd;
+            pos[o + 6] = cx + hw;
+            pos[o + 7] = y;
+            pos[o + 8] = cz + hd;
+            pos[o + 9] = cx - hw;
+            pos[o + 10] = y;
+            pos[o + 11] = cz + hd;
+            const a = s.alpha;
+            for (let v = 0; v < 4; v++) {
+              const c = k * 16 + v * 4;
+              col[c] = 1;
+              col[c + 1] = 1;
+              col[c + 2] = 1;
+              col[c + 3] = a;
+            }
+            const b = k * 4;
+            const t = k * 6;
+            idx[t] = b;
+            idx[t + 1] = b + 1;
+            idx[t + 2] = b + 2;
+            idx[t + 3] = b;
+            idx[t + 4] = b + 2;
+            idx[t + 5] = b + 3;
           }
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
           geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
+          geo.setIndex(new THREE.BufferAttribute(idx, 1));
           const mesh = new THREE.Mesh(geo, cirrusSheetMat);
-          mesh.rotation.x = -Math.PI / 2;
-          mesh.position.set(
-            s.dxM / MPU,
-            16 * Math.asinh((s.htM - centerElev) / 500) + 8,
-            s.dzM / MPU
-          );
+          mesh.frustumCulled = false;
           cirrusSheets.add(mesh);
         }
         cirrusSheetsInfo = {
           summary: r.summary,
           opacity: op.summary,
+          res: hl.res,
+          product: hl.product,
           builtAt: Date.now()
         };
         cirrusSheets.visible = r.sheets.length > 0;
@@ -20177,8 +20269,12 @@
         // null past 30 min or unread) - the decks' measured tops where
         // the theme's own field holds none, ahead of the VIIRS census
         const topsSat = goesL2TopsNow();
+        // the count rules stay in fields of 10 km: a 2-km window
+        // (181st) needs 25 pixels for each field
         const topsBand = (band, n) =>
-          topsSat && topsSat[n] >= TOPS_MIN_PX && Number.isFinite(topsSat[band])
+          topsSat &&
+          topsSat[n] >= TOPS_MIN_PX * (topsSat.perField || 1) &&
+          Number.isFinite(topsSat[band])
             ? topsSat[band]
             : null;
         const cLow = mzr ? mzr.low : (state.cloudLow ?? state.cloud * LOW_FRAC);
@@ -20334,7 +20430,7 @@
           const stormTopSat =
             EL_PIN === null &&
             topsSat &&
-            topsSat.n >= 10 &&
+            topsSat.n >= 10 * (topsSat.perField || 1) &&
             Number.isFinite(topsSat.p90M)
               ? topsSat.p90M
               : null;

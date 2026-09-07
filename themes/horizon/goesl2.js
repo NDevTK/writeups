@@ -1355,7 +1355,8 @@ export const L2_PRODUCTS = {
   // "The product's spatial resolution increased from 10 and 4 km to 2
   // km on 24 March 2023" - CONUS every 5 min, day and night, 5.2 MB a
   // file (HT uint16 at 0.3052 m a count, chunked 52 rows by the full
-  // width; the window ~0.5 MB by range); the 10-km product is the
+  // width; the window 0.9-1.1 MB in 4 ranges, measured); the 10-km
+  // product is the
   // mean of each 5 x 5 block's good pixels (measured: the whole CONUS
   // scene of 2026-09-07 08:06Z closes to 0.09 m rms over 126,312
   // fields - heightBlockClosure)
