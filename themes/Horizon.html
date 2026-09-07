@@ -15866,7 +15866,9 @@
               research["the radar's own doubt (MRMS radar quality index)"] =
                 rql;
             else
-              delete research["the radar's own doubt (MRMS radar quality index)"];
+              delete research[
+                "the radar's own doubt (MRMS radar quality index)"
+              ];
             const rhl = radarHailLine();
             if (rhl) research["the hail's size (MRMS MESH)"] = rhl;
             else delete research["the hail's size (MRMS MESH)"];

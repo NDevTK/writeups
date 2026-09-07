@@ -824,9 +824,7 @@ const createInflate = () => zlib.createInflate();
       near(mc.cells[0].mm, M.nearest.mm, 1e-9) &&
       near(mc.cells[0].distKm, M.nearest.distKm, 0.06) &&
       near(mc.cells[0].bearingDeg, M.nearest.bearingDeg, 0.06) &&
-      mc.cells.every(
-        (c, k) => k === 0 || c.distKm >= mc.cells[k - 1].distKm
-      ) &&
+      mc.cells.every((c, k) => k === 0 || c.distKm >= mc.cells[k - 1].distKm) &&
       mc.cells.every(
         (c) => c.mm > 0 && c.latDeg === c.lat && c.lonDeg === c.lon
       ) &&

@@ -263,7 +263,8 @@ export const MRMS_RQI_FACTS = {
     E: 0,
     D: 1,
     nbits: 8,
-    words: '(count - 30) / 10, an 8-bit count; the scaling is read from each file'
+    words:
+      '(count - 30) / 10, an 8-bit count; the scaling is read from each file'
   },
   codes: {noCoverage: -3},
   law: {
