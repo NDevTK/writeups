@@ -42,11 +42,19 @@ import {haversineKm} from './lightning.js';
 export const MRMS_FACTS = {
   source: 'NCEP MRMS 2-D grids (mrms.ncep.noaa.gov/2D)',
   product: 'EchoTop_18',
-  meaning: 'the height of the 18-dBZ radar echo top, kilometres (MSL by the MRMS convention, unverified here)',
+  meaning:
+    'the height of the 18-dBZ radar echo top, kilometres (MSL by the MRMS convention, unverified here)',
   cadenceS: 120,
   cellDeg: 0.01,
   cellKm: 1,
-  grid: {ni: 7000, nj: 3500, la1: 54.995, lo1: 230.005, la2: 20.005, lo2: 299.995},
+  grid: {
+    ni: 7000,
+    nj: 3500,
+    la1: 54.995,
+    lo1: 230.005,
+    la2: 20.005,
+    lo2: 299.995
+  },
   drt: {tmpl: 41, R: -3000, E: 0, D: 3, nbits: 16},
   codes: {noCoverage: -3, noEcho: -1},
   // measured 22:26Z: a +-50-km window in the open Gulf 300 km from the
@@ -81,7 +89,12 @@ export const MRMS_FLANK_SLOPE = 2;
 
 /** The MRMS cell containing (lat, lon), floor(x + 0.5) as the reader;
  * null off the grid. */
-export function mrmsCell(lat, lon, g = MRMS_FACTS.grid, d = MRMS_FACTS.cellDeg) {
+export function mrmsCell(
+  lat,
+  lon,
+  g = MRMS_FACTS.grid,
+  d = MRMS_FACTS.cellDeg
+) {
   const lo = ((lon % 360) + 360) % 360;
   const j = Math.floor((g.la1 - lat) / d + 0.5);
   const i = Math.floor((lo - g.lo1) / d + 0.5);
@@ -89,7 +102,12 @@ export function mrmsCell(lat, lon, g = MRMS_FACTS.grid, d = MRMS_FACTS.cellDeg) 
   return {j, i};
 }
 /** The cell's centre (lat, lon) for a grid row/column. */
-export function mrmsCellCentre(j, i, g = MRMS_FACTS.grid, d = MRMS_FACTS.cellDeg) {
+export function mrmsCellCentre(
+  j,
+  i,
+  g = MRMS_FACTS.grid,
+  d = MRMS_FACTS.cellDeg
+) {
   let lon = g.lo1 + i * d;
   if (lon > 180) lon -= 360;
   return {lat: g.la1 - j * d, lon};
@@ -99,7 +117,9 @@ export function bearingDeg(lat1, lon1, lat2, lon2) {
   const r = Math.PI / 180;
   const dl = (lon2 - lon1) * r;
   const y = Math.sin(dl) * Math.cos(lat2 * r);
-  const x = Math.cos(lat1 * r) * Math.sin(lat2 * r) - Math.sin(lat1 * r) * Math.cos(lat2 * r) * Math.cos(dl);
+  const x =
+    Math.cos(lat1 * r) * Math.sin(lat2 * r) -
+    Math.sin(lat1 * r) * Math.cos(lat2 * r) * Math.cos(dl);
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 /** The window's census: the cells covered, the cells with an echo,
@@ -112,7 +132,19 @@ export function bearingDeg(lat1, lon1, lat2, lon2) {
  * stormsNear counts the first kind, stormsTotal the cells at or above
  * MRMS_TOWER_KM anywhere in the window. `values` is the window
  * row-major (rows from the north), `box` the reader's. */
-export function echoTopCensus(values, box, lat, lon, {towerKm = MRMS_TOWER_KM, cap = MRMS_STORM_CAP, nearKm = MRMS_NEAR_KM, grid = MRMS_FACTS.grid, cellDeg = MRMS_FACTS.cellDeg} = {}) {
+export function echoTopCensus(
+  values,
+  box,
+  lat,
+  lon,
+  {
+    towerKm = MRMS_TOWER_KM,
+    cap = MRMS_STORM_CAP,
+    nearKm = MRMS_NEAR_KM,
+    grid = MRMS_FACTS.grid,
+    cellDeg = MRMS_FACTS.cellDeg
+  } = {}
+) {
   const n = values.length;
   let covered = 0;
   const tops = [];
@@ -127,7 +159,10 @@ export function echoTopCensus(values, box, lat, lon, {towerKm = MRMS_TOWER_KM, c
   const mLon = Math.max(111320 * Math.cos((lat * Math.PI) / 180), 1e-6);
   const isNear = (c) => {
     const p = mrmsCellCentre(c.j, c.i, grid, cellDeg);
-    return Math.abs((p.lon - lon) * mLon) <= nearKm * 1000 && Math.abs((p.lat - lat) * 111320) <= nearKm * 1000;
+    return (
+      Math.abs((p.lon - lon) * mLon) <= nearKm * 1000 &&
+      Math.abs((p.lat - lat) * 111320) <= nearKm * 1000
+    );
   };
   for (let k = 0; k < n; k++) {
     const v = values[k];
@@ -167,12 +202,23 @@ export function echoTopCensus(values, box, lat, lon, {towerKm = MRMS_TOWER_KM, c
     echo: tops.length,
     coverage: n ? covered / n : 0,
     medianKm: tops.length ? tops[tops.length >> 1] : null,
-    p90Km: tops.length ? tops[Math.min(tops.length - 1, Math.floor(0.9 * tops.length))] : null,
+    p90Km: tops.length
+      ? tops[Math.min(tops.length - 1, Math.floor(0.9 * tops.length))]
+      : null,
     maxKm: tops.length ? tops[tops.length - 1] : null,
     tallest: tallest ? place(tallest) : null,
     here: {
       km: hereV > 0 ? hereV : null,
-      code: hereV > 0 ? 'echo' : hereV === -1 ? 'no echo' : hereV === -3 ? 'no coverage' : Number.isFinite(hereV) ? 'other' : 'off the window'
+      code:
+        hereV > 0
+          ? 'echo'
+          : hereV === -1
+            ? 'no echo'
+            : hereV === -3
+              ? 'no coverage'
+              : Number.isFinite(hereV)
+                ? 'other'
+                : 'off the window'
     },
     towerKm,
     nearKm,
@@ -195,7 +241,13 @@ export function echoTopCensus(values, box, lat, lon, {towerKm = MRMS_TOWER_KM, c
  * the tallest of them. Returns {data, rm, painted, cells, maxKm,
  * maxTop}. Storms are {lat, lon, km} (echoTopCensus's list).
  */
-export function echoTopField(storms, lat, lon, {rm = 64, worldM = 16000, cellM = 1000, slope = MRMS_FLANK_SLOPE} = {}, yOf = (m) => m) {
+export function echoTopField(
+  storms,
+  lat,
+  lon,
+  {rm = 64, worldM = 16000, cellM = 1000, slope = MRMS_FLANK_SLOPE} = {},
+  yOf = (m) => m
+) {
   const data = new Float32Array(rm * rm * 4);
   const mPerTexel = worldM / rm;
   const mLon = Math.max(111320 * Math.cos((lat * Math.PI) / 180), 1e-6);
@@ -213,10 +265,22 @@ export function echoTopField(storms, lat, lon, {rm = 64, worldM = 16000, cellM =
     const xM = (s.lon - lon) * mLon;
     const zM = -(s.lat - lat) * 111320;
     const reach = hM / slope; // beyond this the flank has fallen to nothing
-    const i0 = Math.max(1, Math.floor((xM - half - reach + worldM / 2) / mPerTexel));
-    const i1 = Math.min(rm - 2, Math.floor((xM + half + reach + worldM / 2) / mPerTexel));
-    const j0 = Math.max(1, Math.floor((zM - half - reach + worldM / 2) / mPerTexel));
-    const j1 = Math.min(rm - 2, Math.floor((zM + half + reach + worldM / 2) / mPerTexel));
+    const i0 = Math.max(
+      1,
+      Math.floor((xM - half - reach + worldM / 2) / mPerTexel)
+    );
+    const i1 = Math.min(
+      rm - 2,
+      Math.floor((xM + half + reach + worldM / 2) / mPerTexel)
+    );
+    const j0 = Math.max(
+      1,
+      Math.floor((zM - half - reach + worldM / 2) / mPerTexel)
+    );
+    const j1 = Math.min(
+      rm - 2,
+      Math.floor((zM + half + reach + worldM / 2) / mPerTexel)
+    );
     if (i0 > i1 || j0 > j1) continue;
     let touched = false;
     for (let jj = j0; jj <= j1; jj++) {
@@ -268,14 +332,16 @@ export function echoTopWords(c, {refTimeIso = null, halfKm = null} = {}) {
       : c.here.code === 'no echo'
         ? 'nothing overhead'
         : c.here.code === 'no coverage'
-          ? 'the observer\'s own cell uncovered'
+          ? "the observer's own cell uncovered"
           : `overhead ${c.here.code}`;
   if (!c.echo)
     return `${when}${Math.round(100 * c.coverage)}% of the ${reach} cells in the mosaic, no 18-dBZ echo in any (${MRMS_FACTS.absenceCaveat}) · ${here}`;
   return (
     `${when}${c.echo.toLocaleString('en-US')} cells with an 18-dBZ echo of ${c.covered.toLocaleString('en-US')} covered ${reach} · ` +
     `tops median ${km(c.medianKm)}, tallest tenth ${km(c.p90Km)}, tallest ${km(c.maxKm)}` +
-    (c.tallest ? ` at ${c.tallest.bearingDeg.toFixed(0)}° and ${c.tallest.distKm.toFixed(0)} km` : '') +
+    (c.tallest
+      ? ` at ${c.tallest.bearingDeg.toFixed(0)}° and ${c.tallest.distKm.toFixed(0)} km`
+      : '') +
     ` · ${c.stormsTotal} cells at or above ${c.towerKm} km` +
     ` · ${here}`
   );

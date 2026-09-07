@@ -78,9 +78,15 @@
         const quad = new T.QuadMesh();
         const readTau = async () => {
           const S = hook.size;
-          const rt = new T.RenderTarget(S, S, {type: T.FloatType, depthBuffer: false});
+          const rt = new T.RenderTarget(S, S, {
+            type: T.FloatType,
+            depthBuffer: false
+          });
           const m = new T.MeshBasicNodeMaterial();
-          m.colorNode = texture(hook.tauNode.value).sample(uv()).mul(0.05).add(0.5);
+          m.colorNode = texture(hook.tauNode.value)
+            .sample(uv())
+            .mul(0.05)
+            .add(0.5);
           m.transparent = true;
           m.blending = T.NoBlending;
           m.toneMapped = false;
@@ -117,7 +123,12 @@
                 nEast++;
               }
             }
-          return {west: west / nWest, westMax, east: east / nEast, mean: sum / (S * S)};
+          return {
+            west: west / nWest,
+            westMax,
+            east: east / nEast,
+            mean: sum / (S * S)
+          };
         };
         // a top field: towers of top `top` over the east half (A 1, G
         // = core), nothing west (A 0), inside a zero border ring
@@ -125,7 +136,8 @@
           const d = new Float32Array(rm * rm * 4);
           for (let jj = 0; jj < rm; jj++)
             for (let ii = 0; ii < rm; ii++) {
-              const border = ii === 0 || jj === 0 || ii === rm - 1 || jj === rm - 1;
+              const border =
+                ii === 0 || jj === 0 || ii === rm - 1 || jj === rm - 1;
               const k = (jj * rm + ii) * 4;
               const tower = !border && ii >= rm / 2;
               d[k] = tower ? top : 0;

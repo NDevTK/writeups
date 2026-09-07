@@ -502,7 +502,22 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
   // One slab: fine march from the pre-ranged start with 4-tap Beer,
   // Beer-powder, dual-lobe HG; PREMULTIPLIED output with horizon fade.
   const marchSlab = Fn(
-    ([ro, rd, jit, sceneD, tStart, yB, yT, yTB, cov, cTy, sg, wO, rad, phase]) => {
+    ([
+      ro,
+      rd,
+      jit,
+      sceneD,
+      tStart,
+      yB,
+      yT,
+      yTB,
+      cov,
+      cTy,
+      sg,
+      wO,
+      rad,
+      phase
+    ]) => {
       const result = vec4(0).toVar();
       If(tStart.greaterThanEqual(0.0), () => {
         const tA = yB.sub(ro.y).div(rd.y);
@@ -1065,10 +1080,22 @@ export function createCloudSystemTSL(renderer, baseTex, detailTex) {
       if (!img || !(img.width > 1)) return null;
       const wOff = uniformsLow.wOff.value;
       const off = uTopOff.value;
-      const t = texelIndex(x + wOff.x - off.x, z + wOff.y - off.y, uTopWorld.value, img.width);
+      const t = texelIndex(
+        x + wOff.x - off.x,
+        z + wOff.y - off.y,
+        uTopWorld.value,
+        img.width
+      );
       if (!t) return null;
       const k = (t.jj * img.width + t.ii) * 4;
-      return {ii: t.ii, jj: t.jj, rm: img.width, top: img.data[k], core: img.data[k + 1], valid: img.data[k + 3]};
+      return {
+        ii: t.ii,
+        jj: t.jj,
+        rm: img.width,
+        top: img.data[k],
+        core: img.data[k + 1],
+        valid: img.data[k + 3]
+      };
     },
     updateShadow() {
       if (!shadowFill) return;
