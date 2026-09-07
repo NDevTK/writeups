@@ -1674,7 +1674,11 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    ORBIT; `server-reference` and `goesl2-client-reference` the 22
    asks, 21 served). Live in the daemon (11:16Z, the 11:01Z file):
    Mount Katahdin's window at dawn 268 good pixels of 10,201, every
-   one snow-free, 8,404 still night; the Front Range all night.
+   one snow-free, 8,404 still night; the Front Range all night. Live
+   in the page by day (Mount Washington, 12:11Z, the 12:02Z file):
+   8,115 good pixels of 10,201, every one snow-free, the observer's
+   own pixel 0 %, the box 81% the satellite's texels and 19% the
+   snowline where the day-old MODIS composite saw nothing.
    STATED: a September file has no snow to show, so the ranking's
    effect on a snowy box is gated, not yet seen live; the fraction is
    the viewable one (a forest's snow under its canopy is not in it);

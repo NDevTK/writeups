@@ -10353,110 +10353,120 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   Fractional Snow Cover ATBD v1.0 (Romanov, NOAA/NESDIS/STAR, June
   2020; 35 pp, read in full): the product is the VIEWABLE snow fraction
   - the snow the instrument sees, the canopy hiding what lies under it
-    (Sec. 1.1.1); Eq. 1's linear unmixing of the 0.64-um reflectance
-    between a snow-free and a snow end-member (Romanov et al. 2003's GOES
-    Imager heritage: Greenland's ice fields and North America's summer
-    land as the end-members), each end-member's angular anisotropy by an
-    8-term kernel model in the solar and satellite zenith cosines (Eq. 2;
-    Table 2-4's loads, C0 19.02 snow-free and 63.45 snow; the model cuts
-    the snow reflectance's 40% angular variation to 6-7%, the land's 7%
-    to 2%); the NDSI-based fraction (-0.01 + 1.45 NDSI - the MODIS
-    heritage the theme's snowcover.js applies; the unmixing between NDSI
-    0.007 and 0.70) derived for VIIRS only, ABI and MetImage carrying
-    the reflectance-based fraction alone (Sec. 2.4; the NDSI law
-    "saturates" at high NDSI, Sec. 2.2); the theoretical error budgets
-    (Tables 2-7 and 2-8, all factors combined): 0.15-0.20 reflectance-
-    based, 0.33-0.40 NDSI-based, the snow-free land's variable
-    reflectance the largest term; the requirement 20% of the FSC area by
-    day under 85 deg of solar zenith for pixels identified as snow-
-    covered (Table 1-1); Table 2-6's quality codes (0 good, 105 water,
-    110 cloud, 111-114 rejected snow by the snow climatology, the
-    surface-temperature climatology, the spatial and the temperature-
-    uniformity tests, 121 night, 122 undetermined, 124 bad pixel, 125
-    fill, 128 no retrieval) - the file's own flag_meanings say the same
-    twelve. The GOES-18 ABI L2+ FSC full-maturity read-me (OSPO, 2 Dec
-    2024, read): bands 2, 3, 5 and 13; full validation 4 Jan 2025; the
-    known issue - the derived fraction varies with the solar-satellite
-    relative azimuth, so with the time of day (the accuracy, not the
-    precision; snow/no-snow discrimination unaffected). NOT READ,
-    stated: the companion Enterprise Binary Snow Map ATBD. MEASURED
-    FIRST: the bucket lists ONE CONUS file an hour, at :01, day and
-    night (7 Sep hours 00, 04, 09, 10, 11 and 20 Jan hours 15, 18, 21 one
-    file each - not the five-minute cadence of the cloud products): 351-
-    459 kB by day (the 20 January 18:01Z file 601,623 good pixels at a
-    scene mean 54%), 106 kB by night with every pixel 121; FSC uint8
-    with _FillValue 125 and valid_range 0-255; the
-    file's own retrieval_solar_zenith_angle 80 (the ATBD's 85); the
-    scene statistics -999 while the scene has too few good pixels. THE
-    LAW (goesl2.js): FSC_DQF_MEANINGS, FSC_ATBD, fscGood (DQF 0 and a
-    count at or under 100), fscFlags, fscCensus (snow-free, part-
-    covered, full; median, mean, tenth; cloud, water, night), fscAt;
-    latLonToFixedGrid and windowIndexOf take a height above the
-    ellipsoid (the geocentric radius lifted; the radial lift stands for
-    the normal one - their angle e^2 sin 2phi / 2, a dozen metres at 3
-    km) so a texel is looked up in the pixel that SEES its ground - a
-    surface product's parallax, the inverse of the cloud sheets' (177th):
-    from GOES-East over the Front Range (view zenith 56 deg) a 3-km
-    mountain's pixel stands 2.2 px from the flat navigation's, away from
-    the sub-satellite point; snowFieldFromOrbit (n x n texels in the
-    MODIS field's own layout, row 0 the south edge, through an injected
-    scene mapping and an optional per-texel DEM; nearest sampling as
-    MODIS's, a 2-km pixel a dozen texels of the 16-km box);
-    mergeSnowFields (the satellite's texel where it knows, MODIS's where
-    only it does, -1 where neither); snowFromOrbitWords. THE DECODE:
-    L2_FSC_SPEC (u8 counts and flags raw), L2_FSC_EXTRAS (the scene's
-    statistics, the solar and local zenith thresholds), the twenty-second
-    ask (CONUS, never for a mosaic's minute), l2FscBody (the counts and
-    flags on the wire, the observer's pixel with its code named, the
-    census with the flag table, the scene's statistics with -999 as
-    null). THE DAEMON AND CLIENT: both binding lists, the body's own
-    call, the client's field. THE PAGE: the FSC body unpacked;
-    goesL2SnowRebuild builds the field at the page's anchor through
-    roam.js's sceneToGeo with each texel lifted to demElev's elevation,
-    holds a field with good pixels for a day (the night's files carry the
-    night code alone), drops it on a hop; applySnowFields merges it with
-    the MODIS field into the terrain's snow texture (the same DataTexture
-    path the MODIS field took alone, the roofs' bldSnowAt on the merged
-    field, snowFSC the merged mean, no churn on an unchanged pair); the
-    research line "the snow's cover from orbit (ABI FSC)": the census
-    within reach, the observer's pixel, the box's shares (from orbit,
-    from MODIS, the snowline) and the ranking; a file without a good
-    pixel over the box says why and what stands. GATED: goesl2-reference
-    THE SNOW'S COVER FROM ORBIT on a vendored 101 x 101 crop of the 20
-    January 18:01Z file over the Front Range (39.6 N 105.8 W, 28.6 kB):
-    the flag census (4,092 good, 6,016 cloud, 81 water, 12 rejected by
-    the spatial test), the good pixels' fractions (2,886 snow-free, 1,165
-    part-covered, 41 full; median 0, mean 13.81, tenth 54 %) and seven
-    samples as numpy read them, the scene's mean 53.97%; the observer's
-    pixel 47 %; the 96 x 96 world-box field through roam.js's own
-    mapping: 7,589 texels from 48 pixels (share 0.8235, mean 0.4892)
-    flat, 9,023 lifted 3 km (mean 0.5822), both numpy's to the last
-    digit, the centre texel's pixel (50, 50) flat and (49, 49) lifted -
-    one row north and one column west, away from the sub-satellite
-    point; the merge with a MODIS field (82% from orbit, 9% MODIS, 9%
-    unknown; every texel the satellite's where it knows); the words.
-    server-reference: 22 asks, 21 served, the bindings (21 builders);
-    goesl2-client-reference: 21 served, sixteen CONUS products
-    re-listed. MEASURED in the daemon (11:16Z, the 11:01Z file): Mount
-    Katahdin's window at dawn 268 good pixels of 10,201 - every one
-    snow-free - 8,404 night, 1,332 cloud, 116 water, 81 rejected by the
-    snow climatology, the observer's own pixel still night; the Front
-    Range, Mount Washington and Mount Marcy 10,201 night; the file read
-    whole in one range (106 kB, 241 ms). MEASURED in the page (Mount
-    Katahdin, 11:19Z, the daemon's 11:01Z file): the line "11:02Z: no
-    good pixel over the box (268 of 10201 within ±100 km retrieved;
-    night 8404, cloud 1332, water 116 px) · MODIS NDSI 2026-09-06
-    stands" beside MODIS's own "1% of the box seen · mean cover 18%
-    there" - the fall-back path whole; the ranking with good pixels
-    over the box waits for the day's first hourly file (12:01Z).
-    STATED: the fraction
-    is the viewable one (a forest's snow under its canopy is not in it);
-    the read-me's azimuth issue rides the accuracy; the field's texel is
-    the nearest 2-km pixel; the lift is the DEM's elevation, the geoid's
-    separation (under 100 m) not taken; the held afternoon field ages up
-    to a day while the night's files show nothing - the line says its
-    time; a September file has no snow to show, so the ranking's effect
-    on a snowy box is gated, not yet seen live.
+  (Sec. 1.1.1); Eq. 1's linear unmixing of the 0.64-um reflectance
+  between a snow-free and a snow end-member (Romanov et al. 2003's GOES
+  Imager heritage: Greenland's ice fields and North America's summer
+  land as the end-members), each end-member's angular anisotropy by an
+  8-term kernel model in the solar and satellite zenith cosines (Eq. 2;
+  Table 2-4's loads, C0 19.02 snow-free and 63.45 snow; the model cuts
+  the snow reflectance's 40% angular variation to 6-7%, the land's 7%
+  to 2%); the NDSI-based fraction (-0.01 + 1.45 NDSI - the MODIS
+  heritage the theme's snowcover.js applies; the unmixing between NDSI
+  0.007 and 0.70) derived for VIIRS only, ABI and MetImage carrying
+  the reflectance-based fraction alone (Sec. 2.4; the NDSI law
+  "saturates" at high NDSI, Sec. 2.2); the theoretical error budgets
+  (Tables 2-7 and 2-8, all factors combined): 0.15-0.20 reflectance-
+  based, 0.33-0.40 NDSI-based, the snow-free land's variable
+  reflectance the largest term; the requirement 20% of the FSC area by
+  day under 85 deg of solar zenith for pixels identified as snow-
+  covered (Table 1-1); Table 2-6's quality codes (0 good, 105 water,
+  110 cloud, 111-114 rejected snow by the snow climatology, the
+  surface-temperature climatology, the spatial and the temperature-
+  uniformity tests, 121 night, 122 undetermined, 124 bad pixel, 125
+  fill, 128 no retrieval) - the file's own flag_meanings say the same
+  twelve. The GOES-18 ABI L2+ FSC full-maturity read-me (OSPO, 2 Dec
+  2024, read): bands 2, 3, 5 and 13; full validation 4 Jan 2025; the
+  known issue - the derived fraction varies with the solar-satellite
+  relative azimuth, so with the time of day (the accuracy, not the
+  precision; snow/no-snow discrimination unaffected). NOT READ,
+  stated: the companion Enterprise Binary Snow Map ATBD. MEASURED
+  FIRST: the bucket lists ONE CONUS file an hour, at :01, day and
+  night (7 Sep hours 00, 04, 09, 10, 11 and 20 Jan hours 15, 18, 21 one
+  file each - not the five-minute cadence of the cloud products): 351-
+  459 kB by day (the 20 January 18:01Z file 601,623 good pixels at a
+  scene mean 54%), 106 kB by night with every pixel 121; FSC uint8
+  with _FillValue 125 and valid_range 0-255; the
+  file's own retrieval_solar_zenith_angle 80 (the ATBD's 85); the
+  scene statistics -999 while the scene has too few good pixels. THE
+  LAW (goesl2.js): FSC_DQF_MEANINGS, FSC_ATBD, fscGood (DQF 0 and a
+  count at or under 100), fscFlags, fscCensus (snow-free, part-
+  covered, full; median, mean, tenth; cloud, water, night), fscAt;
+  latLonToFixedGrid and windowIndexOf take a height above the
+  ellipsoid (the geocentric radius lifted; the radial lift stands for
+  the normal one - their angle e^2 sin 2phi / 2, a dozen metres at 3
+  km) so a texel is looked up in the pixel that SEES its ground - a
+  surface product's parallax, the inverse of the cloud sheets' (177th):
+  from GOES-East over the Front Range (view zenith 56 deg) a 3-km
+  mountain's pixel stands 2.2 px from the flat navigation's, away from
+  the sub-satellite point; snowFieldFromOrbit (n x n texels in the
+  MODIS field's own layout, row 0 the south edge, through an injected
+  scene mapping and an optional per-texel DEM; nearest sampling as
+  MODIS's, a 2-km pixel a dozen texels of the 16-km box);
+  mergeSnowFields (the satellite's texel where it knows, MODIS's where
+  only it does, -1 where neither); snowFromOrbitWords. THE DECODE:
+  L2_FSC_SPEC (u8 counts and flags raw), L2_FSC_EXTRAS (the scene's
+  statistics, the solar and local zenith thresholds), the twenty-second
+  ask (CONUS, never for a mosaic's minute), l2FscBody (the counts and
+  flags on the wire, the observer's pixel with its code named, the
+  census with the flag table, the scene's statistics with -999 as
+  null). THE DAEMON AND CLIENT: both binding lists, the body's own
+  call, the client's field. THE PAGE: the FSC body unpacked;
+  goesL2SnowRebuild builds the field at the page's anchor through
+  roam.js's sceneToGeo with each texel lifted to demElev's elevation,
+  holds a field with good pixels for a day (the night's files carry the
+  night code alone), drops it on a hop; applySnowFields merges it with
+  the MODIS field into the terrain's snow texture (the same DataTexture
+  path the MODIS field took alone, the roofs' bldSnowAt on the merged
+  field, snowFSC the merged mean, no churn on an unchanged pair); the
+  research line "the snow's cover from orbit (ABI FSC)": the census
+  within reach, the observer's pixel, the box's shares (from orbit,
+  from MODIS, the snowline) and the ranking; a file without a good
+  pixel over the box says why and what stands. GATED: goesl2-reference
+  THE SNOW'S COVER FROM ORBIT on a vendored 101 x 101 crop of the 20
+  January 18:01Z file over the Front Range (39.6 N 105.8 W, 28.6 kB):
+  the flag census (4,092 good, 6,016 cloud, 81 water, 12 rejected by
+  the spatial test), the good pixels' fractions (2,886 snow-free, 1,165
+  part-covered, 41 full; median 0, mean 13.81, tenth 54 %) and seven
+  samples as numpy read them, the scene's mean 53.97%; the observer's
+  pixel 47 %; the 96 x 96 world-box field through roam.js's own
+  mapping: 7,589 texels from 48 pixels (share 0.8235, mean 0.4892)
+  flat, 9,023 lifted 3 km (mean 0.5822), both numpy's to the last
+  digit, the centre texel's pixel (50, 50) flat and (49, 49) lifted -
+  one row north and one column west, away from the sub-satellite
+  point; the merge with a MODIS field (82% from orbit, 9% MODIS, 9%
+  unknown; every texel the satellite's where it knows); the words.
+  server-reference: 22 asks, 21 served, the bindings (21 builders);
+  goesl2-client-reference: 21 served, sixteen CONUS products
+  re-listed. MEASURED in the daemon (11:16Z, the 11:01Z file): Mount
+  Katahdin's window at dawn 268 good pixels of 10,201 - every one
+  snow-free - 8,404 night, 1,332 cloud, 116 water, 81 rejected by the
+  snow climatology, the observer's own pixel still night; the Front
+  Range, Mount Washington and Mount Marcy 10,201 night; the file read
+  whole in one range (106 kB, 241 ms). MEASURED in the page (Mount
+  Katahdin, 11:19Z, the daemon's 11:01Z file): the line "11:02Z: no
+  good pixel over the box (268 of 10201 within ±100 km retrieved;
+  night 8404, cloud 1332, water 116 px) · MODIS NDSI 2026-09-06
+  stands" beside MODIS's own "1% of the box seen · mean cover 18%
+  there" - the fall-back path whole. MEASURED BY DAY (Mount
+  Washington, 44.27 N 71.30 W, 12:11Z, the 12:02Z file, the sun up):
+  "8115 of 10201 pixels within ±100 km retrieved - 8115 snow-free, 0
+  part-covered, 0 full; median 0 %, mean 0 %, tenth 0 %; cloud 1130,
+  water 892 px · the observer's pixel 0 % · the box: 81% of its texels
+  from the satellite's good pixels, 19% the snowline; mean cover 0 %"
+  beside MODIS's "0% of the box seen" - the satellite's field stands
+  on four fifths of the box where the day-old composite saw nothing,
+  and says the summit (1,917 m) is bare, as September's is (the
+  heuristic snowline stood at 2,757 m, so the picture is the same
+  either way); the Georgia coast at the same hour 431 good pixels,
+  the box 21% the satellite's (water and cloud the rest), the
+  observer's own pixel water. STATED: the fraction
+  is the viewable one (a forest's snow under its canopy is not in it);
+  the read-me's azimuth issue rides the accuracy; the field's texel is
+  the nearest 2-km pixel; the lift is the DEM's elevation, the geoid's
+  separation (under 100 m) not taken; the held afternoon field ages up
+  to a day while the night's files show nothing - the line says its
+  time; a September file has no snow to show, so the ranking's effect
+  on a snowy box is gated, not yet seen live.
 - DONE (Sep 7, the review session's 185th pass - THE RAIN'S KIND):
   every rain curtain since the 165th hung by Atlas 1953's rain law,
   whatever fell - the radar's own precipitation type, which picks the
