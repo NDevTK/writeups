@@ -118,7 +118,15 @@ import {
   parseGlmFlashes
 } from '../../glm.js';
 // the radar's own heights (174th): the MRMS echo-top law
-import {echoTopCensus, echoTopWords, MRMS_FACTS, mrmsCell} from '../../mrms.js';
+import {
+  echoTopCensus,
+  echoTopWords,
+  MRMS_FACTS,
+  MRMS_RATE_FACTS,
+  mrmsCell,
+  precipRateCensus,
+  precipRateWords
+} from '../../mrms.js';
 import {
   bandKeys,
   bucketPrefix,
@@ -2302,111 +2310,145 @@ function main() {
   const MRMS_URL =
     env.MRMS_URL ??
     'https://mrms.ncep.noaa.gov/2D/EchoTop_18/MRMS_EchoTop_18.latest.grib2.gz';
-  const MRMS_REFRESH_MS = MRMS_FACTS.cadenceS * 1000;
+  // THE RAIN AT A KILOMETRE (179th): the same reader on NCEP's
+  // PrecipRate - the radar's rain at 1 km every 2 min, PNG-packed the
+  // same way (689 kB gzipped measured: the field is sparse) - held as
+  // a second file on the same law.
+  const MRMS_RATE_URL =
+    env.MRMS_RATE_URL ??
+    'https://mrms.ncep.noaa.gov/2D/PrecipRate/MRMS_PrecipRate.latest.grib2.gz';
   const MRMS_HALF_CELLS = 50;
-  const mrmsHeld = {
-    at: 0,
-    buf: null,
-    header: null,
-    bytes: 0,
-    error: null,
-    fetchedAt: null,
-    refreshing: null
-  };
-  const mrmsCache = new Map(); // "j,i" -> {refTime, body}
+  // One held file per product, refreshed on the product's own cadence.
   // A request never waits for NCEP while a file is held: a due refresh
   // runs in the background and the held file (at most one cadence
   // old) answers now - measured: the page's 20-s fetch aborted while
   // the first request after a cadence paid the 1.7-MB upstream read.
-  // Only the very first request awaits the fetch.
-  function mrmsRefresh(deadline) {
-    if (Date.now() - mrmsHeld.at < MRMS_REFRESH_MS) return mrmsHeld;
-    if (mrmsHeld.refreshing)
-      return mrmsHeld.buf ? mrmsHeld : mrmsHeld.refreshing;
-    mrmsHeld.at = Date.now();
-    mrmsHeld.refreshing = mrmsFetch(deadline).finally(() => {
-      mrmsHeld.refreshing = null;
-    });
-    return mrmsHeld.buf ? mrmsHeld : mrmsHeld.refreshing;
-  }
-  async function mrmsFetch(deadline) {
-    try {
-      const r = await fetch(MRMS_URL, {
-        signal: AbortSignal.timeout(
-          fetchBudgetMs(deadline, Date.now(), UPSTREAM_BUDGET_MS)
-        )
-      });
-      if (!r.ok) throw new Error('MRMS ' + r.status);
-      const gz = Buffer.from(await r.arrayBuffer());
-      const buf = new Uint8Array(gunzipSync(gz));
-      const header = grib2Header(buf);
-      if (!header.drt || header.drt.tmpl !== 41)
-        throw new Error('MRMS file is not PNG-packed');
-      mrmsHeld.buf = buf;
-      mrmsHeld.header = header;
-      mrmsHeld.bytes = gz.length;
-      mrmsHeld.fetchedAt = new Date().toISOString();
-      mrmsHeld.error = null;
-      mrmsCache.clear();
-      log(
-        `mrms: ${MRMS_FACTS.product} ${header.refTimeIso} (${Math.round(gz.length / 1024)} kB gzipped, ${header.grid.ni} x ${header.grid.nj})`
-      );
-    } catch (e) {
-      mrmsHeld.error = e.message;
-    }
-    return mrmsHeld;
-  }
-  async function fetchMrms(lat, lon) {
-    const deadline = Date.now() + UPSTREAM_BUDGET_MS;
-    const h = await mrmsRefresh(deadline);
-    if (!h.buf) return null;
-    const cell = mrmsCell(lat, lon);
-    const refTime = h.header.refTimeIso;
-    if (!cell)
-      return {
-        product: MRMS_FACTS.product,
-        refTime,
-        covered: false,
-        reason: 'outside the MRMS CONUS grid (20-55 N, 130-60 W)',
-        census: null
-      };
-    const ck = `${cell.j},${cell.i}`;
-    const hit = mrmsCache.get(ck);
-    if (hit && hit.refTime === refTime) return hit.body;
-    const t0 = Date.now();
-    const w = await grib2Window(h.buf, lat, lon, MRMS_HALF_CELLS, {
-      createInflate
-    });
-    if (!w) return null;
-    const census = echoTopCensus(w.values, w.box, lat, lon);
-    const body = {
-      product: MRMS_FACTS.product,
-      meaning: MRMS_FACTS.meaning,
-      source: MRMS_FACTS.source,
-      refTime,
-      fetchedAt: h.fetchedAt,
-      at: new Date().toISOString(),
-      covered: census.covered > 0,
-      cell,
-      box: w.box,
-      halfKm: MRMS_HALF_CELLS,
-      cellKm: MRMS_FACTS.cellKm,
-      census,
-      words: echoTopWords(census, {
-        refTimeIso: refTime,
-        halfKm: MRMS_HALF_CELLS
-      }),
-      read: {
-        rows: w.rowsRead,
-        chunks: w.chunks,
-        ms: Date.now() - t0,
-        fileBytes: h.bytes
-      },
-      documentation: MRMS_FACTS.documentation
+  // Only the very first request awaits the fetch. The census per cell
+  // is cached until the next file.
+  function mrmsFeed(url, facts) {
+    const held = {
+      at: 0,
+      buf: null,
+      header: null,
+      bytes: 0,
+      error: null,
+      fetchedAt: null,
+      refreshing: null,
+      cache: new Map() // "j,i" -> {refTime, body}
     };
-    mrmsCache.set(ck, {refTime, body});
-    return body;
+    const refreshMs = facts.cadenceS * 1000;
+    async function fetchFile(deadline) {
+      try {
+        const r = await fetch(url, {
+          signal: AbortSignal.timeout(
+            fetchBudgetMs(deadline, Date.now(), UPSTREAM_BUDGET_MS)
+          )
+        });
+        if (!r.ok) throw new Error('MRMS ' + r.status);
+        const gz = Buffer.from(await r.arrayBuffer());
+        const buf = new Uint8Array(gunzipSync(gz));
+        const header = grib2Header(buf);
+        if (!header.drt || header.drt.tmpl !== 41)
+          throw new Error('MRMS file is not PNG-packed');
+        held.buf = buf;
+        held.header = header;
+        held.bytes = gz.length;
+        held.fetchedAt = new Date().toISOString();
+        held.error = null;
+        held.cache.clear();
+        log(
+          `mrms: ${facts.product} ${header.refTimeIso} (${Math.round(gz.length / 1024)} kB gzipped, ${header.grid.ni} x ${header.grid.nj})`
+        );
+      } catch (e) {
+        held.error = e.message;
+      }
+      return held;
+    }
+    function refresh(deadline) {
+      if (Date.now() - held.at < refreshMs) return held;
+      if (held.refreshing) return held.buf ? held : held.refreshing;
+      held.at = Date.now();
+      held.refreshing = fetchFile(deadline).finally(() => {
+        held.refreshing = null;
+      });
+      return held.buf ? held : held.refreshing;
+    }
+    // the window at a point: the cached body for the cell until the
+    // next file, else the streaming read and the caller's census
+    async function windowAt(lat, lon, census) {
+      const deadline = Date.now() + UPSTREAM_BUDGET_MS;
+      const h = await refresh(deadline);
+      if (!h.buf) return null;
+      const cell = mrmsCell(lat, lon);
+      const refTime = h.header.refTimeIso;
+      if (!cell)
+        return {
+          product: facts.product,
+          refTime,
+          covered: false,
+          reason: 'outside the MRMS CONUS grid (20-55 N, 130-60 W)',
+          census: null
+        };
+      const ck = `${cell.j},${cell.i}`;
+      const hit = held.cache.get(ck);
+      if (hit && hit.refTime === refTime) return hit.body;
+      const t0 = Date.now();
+      const w = await grib2Window(h.buf, lat, lon, MRMS_HALF_CELLS, {
+        createInflate
+      });
+      if (!w) return null;
+      const c = census(w.values, w.box, lat, lon, refTime);
+      const body = {
+        product: facts.product,
+        meaning: facts.meaning,
+        source: facts.source,
+        refTime,
+        fetchedAt: h.fetchedAt,
+        at: new Date().toISOString(),
+        covered: c.census.covered > 0,
+        cell,
+        box: w.box,
+        halfKm: MRMS_HALF_CELLS,
+        cellKm: facts.cellKm,
+        census: c.census,
+        words: c.words,
+        read: {
+          rows: w.rowsRead,
+          chunks: w.chunks,
+          ms: Date.now() - t0,
+          fileBytes: h.bytes
+        },
+        documentation: facts.documentation
+      };
+      held.cache.set(ck, {refTime, body});
+      return body;
+    }
+    return {held, refresh, windowAt};
   }
+  const mrmsTop = mrmsFeed(MRMS_URL, MRMS_FACTS);
+  const mrmsRate = mrmsFeed(MRMS_RATE_URL, MRMS_RATE_FACTS);
+  const fetchMrms = (lat, lon) =>
+    mrmsTop.windowAt(lat, lon, (values, box, la, lo, refTime) => {
+      const census = echoTopCensus(values, box, la, lo);
+      return {
+        census,
+        words: echoTopWords(census, {
+          refTimeIso: refTime,
+          halfKm: MRMS_HALF_CELLS
+        })
+      };
+    });
+  const fetchMrmsRate = (lat, lon) =>
+    mrmsRate.windowAt(lat, lon, (values, box, la, lo, refTime) => {
+      const census = precipRateCensus(values, box, la, lo);
+      return {
+        census,
+        words: precipRateWords(census, {
+          refTimeIso: refTime,
+          halfKm: MRMS_HALF_CELLS
+        })
+      };
+    });
   const glmHeld = new Map(); // bucket -> {at, files: [...], error}
   const GLM_REFRESH_MS = 20e3;
   const GLM_KEEP = 3;
@@ -3637,6 +3679,20 @@ function main() {
       return json(200, body, {
         'cache-control': 'public, max-age=60',
         'x-mrms-source': 'NCEP MRMS EchoTop_18 (mrms.ncep.noaa.gov/2D)'
+      });
+    }
+
+    if (url.pathname === '/mrmsrate') {
+      // THE RAIN AT A KILOMETRE (179th): the radar's precipitation
+      // rate within +-50 km of the point from NCEP's latest 2-minute
+      // PrecipRate file - the raining cells nearest first, capped.
+      // 200 with covered false is a real answer; 502 when the file
+      // could not be read at all.
+      const body = await fetchMrmsRate(lat, lon);
+      if (!body) return json(502, {census: null, upstream: 'unavailable'});
+      return json(200, body, {
+        'cache-control': 'public, max-age=60',
+        'x-mrms-source': 'NCEP MRMS PrecipRate (mrms.ncep.noaa.gov/2D)'
       });
     }
 

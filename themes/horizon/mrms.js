@@ -87,6 +87,117 @@ export const MRMS_STORM_CAP = 300;
 // the cloud around it is not measured here)
 export const MRMS_FLANK_SLOPE = 2;
 
+// ---- THE RAIN AT A KILOMETRE (179th pass) ----------------------------
+// NCEP's PrecipRate on the same grid and cadence as the echo top: a
+// 1-km radar precipitation rate every 2 minutes, PNG-packed the same
+// way (template 5.41), the file a third the size (689 kB gzipped on
+// 2026-09-07 07:46Z - the field is sparse). The facts below are the
+// file's own: discipline 209 category 6 number 1, R -30, E 0, D 1 -
+// a count c is (c - 30) / 10 mm/h, so 0 is no coverage's -3 and 30
+// is no rain; the catalogue names the product PrecipRate and the
+// units follow from the scaling (a 175 mm/h maximum in that file);
+// the product guide could not be read from the build sandbox
+// (MRMS_FACTS.documentation). A cell that rains is measured; a cell
+// at 0 under the mosaic's reach is measured dry; -3 is unmeasured.
+export const MRMS_RATE_FACTS = {
+  source: 'NCEP MRMS (mrms.ncep.noaa.gov/2D/PrecipRate/MRMS_PrecipRate.latest.grib2.gz)',
+  product: 'PrecipRate',
+  meaning: "the radar precipitation rate at the surface, mm/h (the catalogue's name; the scaling the file's own)",
+  cadenceS: 120,
+  cellDeg: 0.01,
+  cellKm: 1,
+  discipline: 209,
+  category: 6,
+  number: 1,
+  drt: {tmpl: 41, R: -30, E: 0, D: 1, words: '(count - 30) / 10 mm/h'},
+  codes: {noCoverage: -3, noRain: 0},
+  documentation: MRMS_FACTS.documentation
+};
+// what the daemon sends of a rate window: the raining cells nearest
+// first, capped (the shafts take the nearest 160 within 100 km, the
+// deck's cover field the cells within its own 8 km)
+export const MRMS_RATE_CAP = 400;
+/** The rate window's census: the cells covered and raining, the rates'
+ * median, tallest tenth and max, the observer's own cell, the heaviest
+ * cell placed, and the raining cells nearest first (each with lat/lon
+ * - as latDeg/lonDeg too, the shafts' own names - its rate, distance
+ * and bearing), capped. */
+export function precipRateCensus(values, box, lat, lon, {cap = MRMS_RATE_CAP, grid = MRMS_FACTS.grid, cellDeg = MRMS_FACTS.cellDeg} = {}) {
+  const n = values.length;
+  let covered = 0;
+  const rates = [];
+  const cells = [];
+  let heaviest = null;
+  for (let k = 0; k < n; k++) {
+    const v = values[k];
+    if (!(v > -3)) continue;
+    covered++;
+    if (v > 0) {
+      rates.push(v);
+      const j = box.j0 + Math.floor(k / box.cols);
+      const i = box.i0 + (k % box.cols);
+      cells.push({j, i, mmh: v});
+      if (!heaviest || v > heaviest.mmh) heaviest = {j, i, mmh: v};
+    }
+  }
+  rates.sort((a, b) => a - b);
+  const place = (c) => {
+    const p = mrmsCellCentre(c.j, c.i, grid, cellDeg);
+    const la = +p.lat.toFixed(4);
+    const lo = +p.lon.toFixed(4);
+    return {
+      mmh: c.mmh,
+      lat: la,
+      lon: lo,
+      latDeg: la,
+      lonDeg: lo,
+      distKm: +haversineKm(lat, lon, p.lat, p.lon).toFixed(1),
+      bearingDeg: +bearingDeg(lat, lon, p.lat, p.lon).toFixed(1)
+    };
+  };
+  const placed = cells.map(place).sort((a, b) => a.distKm - b.distKm);
+  const hereK = (box.cj - box.j0) * box.cols + (box.ci - box.i0);
+  const hereV = hereK >= 0 && hereK < n ? values[hereK] : NaN;
+  return {
+    n,
+    covered,
+    raining: rates.length,
+    coverage: n ? covered / n : 0,
+    medianMmH: rates.length ? rates[rates.length >> 1] : null,
+    p90MmH: rates.length ? rates[Math.min(rates.length - 1, Math.floor(0.9 * rates.length))] : null,
+    maxMmH: rates.length ? rates[rates.length - 1] : null,
+    heaviest: heaviest ? place(heaviest) : null,
+    here: {
+      mmh: hereV > 0 ? hereV : null,
+      code: hereV > 0 ? 'rain' : hereV === 0 ? 'no rain' : hereV === -3 ? 'no coverage' : Number.isFinite(hereV) ? 'other' : 'off the window'
+    },
+    cells: placed.slice(0, cap),
+    cellsTotal: cells.length
+  };
+}
+/** The words for a rate census. */
+export function precipRateWords(c, {refTimeIso = null, halfKm = null} = {}) {
+  const when = refTimeIso ? `${refTimeIso.slice(11, 16)}Z · ` : '';
+  const reach = halfKm !== null ? `within ±${halfKm} km` : 'in the window';
+  if (!c.covered) return `${when}no radar coverage ${reach} (${c.n} cells at -3)`;
+  const here =
+    c.here.code === 'rain'
+      ? `overhead ${c.here.mmh.toFixed(1)} mm/h`
+      : c.here.code === 'no rain'
+        ? 'dry overhead'
+        : c.here.code === 'no coverage'
+          ? "the observer's own cell uncovered"
+          : `overhead ${c.here.code}`;
+  if (!c.raining)
+    return `${when}${Math.round(100 * c.coverage)}% of the ${reach} cells in the mosaic, none raining (${MRMS_FACTS.absenceCaveat}) · ${here}`;
+  return (
+    `${when}${c.raining.toLocaleString('en-US')} raining cells of ${c.covered.toLocaleString('en-US')} covered ${reach} · ` +
+    `rates median ${c.medianMmH.toFixed(1)} mm/h, heaviest tenth ${c.p90MmH.toFixed(1)}, heaviest ${c.maxMmH.toFixed(1)}` +
+    (c.heaviest ? ` at ${c.heaviest.bearingDeg.toFixed(0)}° and ${c.heaviest.distKm.toFixed(0)} km` : '') +
+    ` · the nearest ${c.cells.length ? `${c.cells[0].mmh.toFixed(1)} mm/h at ${c.cells[0].bearingDeg.toFixed(0)}° and ${c.cells[0].distKm.toFixed(0)} km` : 'none'}` +
+    ` · ${here}`
+  );
+}
 /** The MRMS cell containing (lat, lon), floor(x + 0.5) as the reader;
  * null off the grid. */
 export function mrmsCell(

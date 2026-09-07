@@ -24,7 +24,8 @@ import {
   mrmsCellCentre
 } from './mrms.js';
 import {haversineKm} from './lightning.js';
-import {ECHOTOP_B64, MRMS_EXPECT} from './mrms-fixture.js';
+import {ECHOTOP_B64, MRMS_EXPECT, PRECIPRATE_B64, RATE_EXPECT} from './mrms-fixture.js';
+import {MRMS_RATE_FACTS, precipRateCensus, precipRateWords} from './mrms.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -471,6 +472,86 @@ const createInflate = () => zlib.createInflate();
       `the 12-km flank at 11 on the neighbours beats the 8.2-km storm's own core on texel 11, 9 at 1.5 km out, ${(12 - 2 * Math.hypot(1.5, 1.5)).toFixed(3)} on the diagonal, 1 at 5.5 km, nothing at 6.5 km; the ring is zero; ` +
       `a storm 20 km out and a km-0 entry are skipped (${f.cells} of the 5 entries counted); ` +
       `the vendored crop's ${cen.storms.length} cells (${cen.stormsNear} echoing within ±${cen.nearKm} km, then those at or above ${MRMS_TOWER_KM} km) paint ${g.painted} texels of a 64 x 64 field over 60 km, the tallest ${g.maxKm} km at scene y ${g.maxTop.toFixed(2)} (the page's asinh mapping), every painted texel between the ground's y and that`
+  );
+}
+
+// ---- THE RAIN AT A KILOMETRE (179th pass) ----------------------------
+// The vendored PrecipRate crop (the rainiest 51 x 51 window of the
+// 07:46Z file, north-east Montana) through the same header and window
+// read against Pillow: the file's own facts (discipline 209 category 6
+// number 1, template 5.41 R -30 D 1: (count - 30) / 10 mm/h), the
+// centre 75.0 mm/h, sampled counts exact, the raining, dry and
+// uncovered counts, the rates' median, heaviest tenth and heaviest,
+// the heaviest cell placed by a plain great-circle, the nearest
+// raining cell the observer's own, the cells nearest first and capped
+// with the shafts' own field names, the words.
+{
+  const X = RATE_EXPECT;
+  const bytes = new Uint8Array(Buffer.from(PRECIPRATE_B64, 'base64'));
+  const h = grib2Header(bytes);
+  const w = await grib2Window(bytes, X.centre.lat, X.centre.lon, 25, {createInflate});
+  const gridOpt = {grid: {ni: X.cols, nj: X.rows, la1: X.la1, lo1: X.lo1}, cellDeg: X.d};
+  const cen = precipRateCensus(w.values, w.box, X.centre.lat, X.centre.lon, gridOpt);
+  const cap5 = precipRateCensus(w.values, w.box, X.centre.lat, X.centre.lon, {...gridOpt, cap: 5});
+  const centre = w.values[25 * w.box.cols + 25];
+  const samplesOk = X.samples.every(([r, c, count]) => near(w.values[r * w.box.cols + c], (count - 30) / 10, 1e-9));
+  const all = Array.from(w.values);
+  const rates = all.filter((v) => v > 0).sort((a, b) => a - b);
+  const noCov = all.filter((v) => v === -3).length;
+  const zero = all.filter((v) => v === 0).length;
+  const words = precipRateWords(cen, {refTimeIso: h.refTimeIso, halfKm: 25});
+  // the heaviest cell by hand: its crop row/col to lat/lon, a plain
+  // great-circle from the centre
+  const tl = X.top;
+  const tLat = X.la1 - tl.row * X.d;
+  const tLon = X.lo1 + tl.col * X.d - 360;
+  const plainKm = haversineKm(X.centre.lat, X.centre.lon, tLat, tLon);
+  check(
+    "THE RAIN AT A KILOMETRE: the vendored PrecipRate crop through the PNG-packed window read agrees with Pillow to the cell, the census places the heaviest cell by a plain great-circle and lists the raining cells nearest first, and the facts are the file's own",
+    h.refTimeIso === X.refTime &&
+      h.discipline === X.discipline &&
+      h.paramCategory === X.category &&
+      h.paramNumber === X.number &&
+      h.drt.tmpl === 41 &&
+      h.drt.R === X.drt.R &&
+      h.drt.D === X.drt.D &&
+      w.box.rows === X.rows &&
+      w.box.cols === X.cols &&
+      near(centre, X.centre.mmh, 1e-9) &&
+      samplesOk &&
+      rates.length === X.raining &&
+      noCov === X.noCoverage &&
+      zero === X.zero &&
+      near(rates[rates.length - 1], X.maxMmH, 1e-9) &&
+      cen.raining === X.raining &&
+      cen.cellsTotal === X.raining &&
+      cen.covered === X.rows * X.cols - X.noCoverage &&
+      near(cen.maxMmH, X.maxMmH, 1e-9) &&
+      near(cen.medianMmH, X.medianMmH, 1e-9) &&
+      near(cen.p90MmH, X.p90MmH, 1e-9) &&
+      cen.here.code === 'rain' &&
+      near(cen.here.mmh, X.centre.mmh, 1e-9) &&
+      cen.heaviest !== null &&
+      near(cen.heaviest.mmh, tl.mmh, 1e-9) &&
+      near(cen.heaviest.distKm, plainKm, 0.06) &&
+      near(cen.heaviest.distKm, tl.distKm, 0.06) &&
+      near(cen.heaviest.bearingDeg, tl.bearingDeg, 0.06) &&
+      cen.cells.length === Math.min(400, X.raining) &&
+      cen.cells[0].distKm === 0 &&
+      near(cen.cells[0].mmh, X.nearest.mmh, 1e-9) &&
+      cen.cells.every((c, k) => k === 0 || c.distKm >= cen.cells[k - 1].distKm) &&
+      cen.cells.every((c) => c.mmh > 0 && c.latDeg === c.lat && c.lonDeg === c.lon) &&
+      cap5.cells.length === 5 &&
+      cap5.cellsTotal === X.raining &&
+      MRMS_RATE_FACTS.drt.R === -30 &&
+      MRMS_RATE_FACTS.drt.D === 1 &&
+      MRMS_RATE_FACTS.cadenceS === 120 &&
+      MRMS_RATE_FACTS.codes.noCoverage === -3 &&
+      words.includes('raining cells of') &&
+      words.includes(`overhead ${X.centre.mmh.toFixed(1)} mm/h`),
+    `${X.file.slice(0, 18)} ${h.refTimeIso}, discipline ${h.discipline} category ${h.paramCategory} number ${h.paramNumber}, template 5.${h.drt.tmpl} R ${h.drt.R} D ${h.drt.D}: a ${w.box.rows} x ${w.box.cols} window read in ${w.rowsRead} rows; ` +
+      `the centre cell ${centre} mm/h (Pillow ${X.centre.mmh}), ${X.samples.length} sampled counts exact, ${rates.length} raining cells, ${zero} dry, ${noCov} uncovered; rates median ${cen.medianMmH}, heaviest tenth ${cen.p90MmH}, heaviest ${cen.maxMmH} mm/h at ${cen.heaviest.bearingDeg}° and ${cen.heaviest.distKm} km (a plain great-circle: ${plainKm.toFixed(1)} km); ` +
+      `${cen.cells.length} of ${cen.cellsTotal} raining cells sent nearest first (the observer's own at 0 km first), 5 with a cap of 5; the words: "${words.slice(0, 130)}..."`
   );
 }
 
