@@ -8372,7 +8372,8 @@
       const shaftWords = (sm) =>
         sm
           ? ` · ${sm.n} rain shaft${sm.n === 1 ? '' : 's'} drawn within 100 km${rainShafts && rainShafts.source === 'radar' ? " from the radar's 1-km cells (MRMS PrecipRate, 2 min)" : " from the satellite's 2-km pixels"}: the nearest ${sm.nearestKm.toFixed(0)} km at ${Math.round(sm.nearestBearingDeg)}° (${sm.nearestMmH.toFixed(1)} mm/h), ` +
-            `the heaviest ${sm.heaviestMmH.toFixed(1)} mm/h ${sm.heaviestKm.toFixed(0)} km off hiding ${Math.round(100 * sm.heaviestOpacity)}% of what stands behind it`
+            `the heaviest ${sm.heaviestMmH.toFixed(1)} mm/h ${sm.heaviestKm.toFixed(0)} km off hiding ${Math.round(100 * sm.heaviestOpacity)}% of what stands behind it` +
+            ` (the curtains lit by the scene's own lights: the sky's ambient and a tenth of the sun while it stands up - the theme's display rule, stated)`
           : params.get('shafts') === '0'
             ? ' · rain shafts off (?shafts=0)'
             : ' · no rain shaft within 100 km';
