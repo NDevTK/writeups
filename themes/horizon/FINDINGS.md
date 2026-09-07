@@ -1532,7 +1532,14 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    km up), the nadir sheets keeping every pass-178 number, a surface 1
    km up shortening a sheet's move by a tenth of its 10-km top
    (`goesl2-reference` THE SHEET'S OWN OPACITY, THE ANVIL'S SPREAD, THE
-   TOP OVER THE CORE)
+   TOP OVER THE CORE). Live at the home (08:56Z, 2 a.m., 3,083 sheets
+   at 2 km): the closure 0.78 over 3,080 where pass 178 read 1.05 at
+   the same 45° zenith, the median sheet 9° up with its line 6.4 times
+   its vertical depth, the far anvil drawn as opaque as the light's
+   long path through it. STATED: µ is the satellite's and the line is
+   the sheet's centre's; the surface is the observer's elevation, not
+   each pixel's terrain; the product's size ratio is not held, so the
+   0.78 is read, not predicted
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

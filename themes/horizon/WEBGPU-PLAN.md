@@ -10431,7 +10431,30 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   1 km up shortens the first sheet's move by a tenth of its 10-km top;
   THE TOP OVER THE CORE: a surface 500 m up shortens the core's look.
   The README's /goesl2 entry and FINDINGS pass 178 carry the
-  provenance and the corrections.
+  provenance and the corrections. MEASURED in the page (the home,
+  32.85 N 117.12 W, 02:10 local, the 08:56Z 2-km window through the
+  local daemon): "the sheets' opacity: 3083 from the enterprise cloud
+  optical depth (ABI-L2-CODC, 1 - e^-tau; the block medians' median
+  1.2; 3083 of them the night retrieval by the DQF's not-day bit
+  ...); 3 not colder than the clear sky (no emissivity there); where
+  both stand, 2 mu tau_IR against the product's tau: 0.78 over 3080
+  (at or below 1 as the crystals' 11-um absorption efficiency falls
+  short of the visible extinction's 2 - Eq. 37-38); each sheet's
+  opacity along the observer's own line through it (the path 6.43
+  times the vertical at the median, 15.5 at most)" - the 178th's
+  closure of 1.05 at this zenith (45 deg, mu 0.71) is 0.78 with the
+  cosine in, on the stated side of 1, and the median sheet of 3,083
+  within 100 km stands 9 deg up (its line 6.4 times its vertical
+  depth): the far anvil is drawn as opaque as the light's long path
+  through it; the frame's mean colour 15.0 / 11.7 / 8.2 against the
+  181st's 20.4 / 15.7 / 10.4 from the same place, the low sheets
+  darker; no page errors. STATED LIMITS: mu is the satellite's, the
+  observer's line is the sheet's centre's (one alpha a sheet, no
+  angle across it); the surface under the sheets is the observer's
+  elevation, not each pixel's terrain; the product's visible depth's
+  size ratio (Eq. 38's coefficients) is not held, so the closure's
+  0.78 is read, not predicted; the vertical depth over 1 / cos
+  assumes a plane-parallel layer to 87 deg.
 - DONE (Sep 7, the review session's 181st pass - THE ANVIL AT TWO
   KILOMETRES): the 173rd's bands, the 176th's tower tops and the
   177th's sheets read the 10-km ACHAC fields, each the mean of a 5 x 5
