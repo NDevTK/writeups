@@ -508,6 +508,8 @@
         lapStability,
         ACHA_ATBD,
         heightBands,
+        towerTopsFromOrbit,
+        towerTopsWords,
         LAP_ATBD,
         isaPressureHpa,
         lapColumnRows,
@@ -6714,10 +6716,7 @@
         // the tops by layer (173rd), column or not
         const tops = goesL2TopsNow();
         if (tops)
-          record(
-            `NOAA ${craft} cloud tops by layer (ACHAC)`,
-            satTopsWords(tops)
-          );
+          record(`NOAA ${craft} cloud tops by layer (ACHAC)`, satTopsWords(tops));
         if (!c) {
           satColumn = null;
           return;
@@ -6808,9 +6807,7 @@
         );
       }
       const dsiSigned = (v, dp = 1) =>
-        Number.isFinite(v)
-          ? `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(dp)}`
-          : '—';
+        Number.isFinite(v) ? `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(dp)}` : '—';
       // THE TOWER'S CEILING FROM ORBIT (172nd pass): NOAA's derived
       // stability indices over the observer's field of regard (the
       // profiles' own retrieval, goesl2.DSI_ATBD's Table 1.3) while
@@ -6853,13 +6850,7 @@
         if (st) {
           const noaa =
             s && s.pick
-              ? {
-                  li: s.pick.li,
-                  cape: s.pick.cape,
-                  tt: s.pick.tt,
-                  si: s.pick.si,
-                  ki: s.pick.ki
-                }
+              ? {li: s.pick.li, cape: s.pick.cape, tt: s.pick.tt, si: s.pick.si, ki: s.pick.ki}
               : null;
           const ag = dsiAgreement(noaa, {
             li: st.li,
@@ -6908,13 +6899,7 @@
       // cirrus and low-level inversions the stated concerns.
       const ACHA_LIVE_MS = 30 * 60e3;
       const TOPS_MIN_PX = 3;
-      const topsFeeds = {
-        storm: false,
-        radar: false,
-        low: false,
-        mid: false,
-        high: false
-      };
+      const topsFeeds = {storm: false, radar: false, low: false, mid: false, high: false};
       let satTopsMemo = null;
       function topsBandEdges() {
         // the 680- and 440-hPa heights of the column the scene trusts:
@@ -6931,17 +6916,9 @@
           const lo = lapLevelAt(satColumn.rows, 680);
           const hi = lapLevelAt(satColumn.rows, 440);
           if (lo && hi)
-            return {
-              lowTopM: lo.hM,
-              midTopM: hi.hM,
-              source: "the satellite column's"
-            };
+            return {lowTopM: lo.hM, midTopM: hi.hM, source: "the satellite column's"};
         }
-        return {
-          lowTopM: ISCCP_LOW_TOP_M,
-          midTopM: ISCCP_MID_TOP_M,
-          source: "ISA's"
-        };
+        return {lowTopM: ISCCP_LOW_TOP_M, midTopM: ISCCP_MID_TOP_M, source: "ISA's"};
       }
       function goesL2TopsNow() {
         const h = goesL2 && goesL2.height;
@@ -6984,9 +6961,7 @@
         ].filter(Boolean);
         return (
           `${goesL2.craft || 'GOES'}'s cloud-top heights (ABI-L2-ACHAC, 10-km fields of 5 × 5 good pixels, every 5 min): ` +
-          (t
-            ? satTopsWords(t)
-            : 'none fresh (the window past 30 min or unread)') +
+          (t ? satTopsWords(t) : 'none fresh (the window past 30 min or unread)') +
           ` · what they feed now: ${feeds.length ? feeds.join(', ') : "nothing - the theme's own field, the balloon's ceiling or the hand stand"}` +
           ` (ranking: the theme's own opaque tops where they cover 5% of the sea, then these, then the VIIRS census; on storm codes - or with a radar storm at or above 8 km in view - these tallest tops when ten good fields stand, else the radar's tallest echo top, else the parcel's EL)` +
           ` · the ATBD: ${R.accuracyM} m accuracy and ${R.precisionM} m precision for emissivity > ${R.emissivityFloor}, quantitative to ${R.lzaQuantitativeDeg}°; against CALIPSO a ${E.sdKm} km standard deviation for low cloud, thin cirrus and low-level inversions the stated concerns`
@@ -13133,12 +13108,10 @@
             : `${t.refTime ? t.refTime.slice(11, 16) + 'Z · ' : ''}${t.reason || 'no coverage'}`) +
           (live
             ? ` · what it feeds now: ${radarStormsInView(live) ? `the towering deck (a storm at or above ${c.towerKm} km in view${(state.code || 0) >= 80 ? ', with showers or thunder reported' : ' though the station reports none'})` : 'nothing - no storm at or above ' + (c ? c.towerKm : 8) + ' km within reach'}` +
-              (s
-                ? `; the tallest storm ${s.km.toFixed(1)} km at ${s.bearingDeg.toFixed(0)}° and ${s.distKm.toFixed(0)} km`
-                : '') +
+              (s ? `; the tallest storm ${s.km.toFixed(1)} km at ${s.bearingDeg.toFixed(0)}° and ${s.distKm.toFixed(0)} km` : '') +
               towersWords()
             : ' · stale (past 10 min) or uncovered: nothing fed') +
-          ` · ranking, stated: the storm slab's top is the cloud top - ACHA's tallest tenth when ten good fields stand, else the radar's tallest echo top, else the parcel's EL; with storm cells in the deck's world each cell's texels rise to their own echo top and the texels between keep the deck's ordinary top; the echo top is the precipitation core's top, under the anvil` +
+          ` · ranking, stated: the storm slab's top is the cloud top - ACHA's tallest tenth when ten good fields stand, else the radar's tallest echo top, else the parcel's EL; with storm cells in the deck's world each cell's texels rise to their own echo top, or to the satellite's cloud top at the cell's parallax-shifted pixel where that is higher (the anvil over the core), and the texels between keep the deck's ordinary top; the echo top is the precipitation core's top, under the anvil` +
           (t.documentation ? ` · ${t.documentation}` : '')
         );
       }
@@ -13167,9 +13140,18 @@
       let radarTopsField = null; // {key, painted, cells, maxKm, maxTop, sent, near}
       function applyRadarTops(t) {
         const storms = t && t.census && t.census.storms;
+        // THE SATELLITE'S TOP OVER THE RADAR'S CORE (176th): a live
+        // ACHA window (30 min) lifts a cell's top to the satellite's
+        // cloud-top height at the cell's own parallax-shifted 10-km
+        // pixel where that is higher - the anvil over the core
+        const hw = goesL2 && goesL2.height;
+        const hLive =
+          hw && hw.ht && hw.time && Date.now() - Date.parse(hw.time) <= ACHA_LIVE_MS
+            ? hw
+            : null;
         const key =
           storms && storms.length
-            ? `${t.at}:${state.lat.toFixed(3)},${state.lon.toFixed(3)}:${Math.round(centerElev)}`
+            ? `${t.at}:${hLive ? hLive.time : '-'}:${state.lat.toFixed(3)},${state.lon.toFixed(3)}:${Math.round(centerElev)}`
             : null;
         if ((radarTopsField ? radarTopsField.key : null) === key) return;
         if (!key) {
@@ -13177,8 +13159,9 @@
           if (cloudSys) cloudSys.setTopField(null);
           return;
         }
+        const orbit = hLive ? towerTopsFromOrbit(storms, hLive) : null;
         const f = echoTopField(
-          storms,
+          orbit ? orbit.storms : storms,
           state.lat,
           state.lon,
           {rm: 64, worldM: WORLD * MPU, cellM: (t.cellKm || 1) * 1000},
@@ -13191,20 +13174,19 @@
           maxKm: f.maxKm,
           maxTop: f.maxTop,
           sent: storms.length,
-          near: Number.isFinite(t.census.stormsNear)
-            ? t.census.stormsNear
-            : null
+          near: Number.isFinite(t.census.stormsNear) ? t.census.stormsNear : null,
+          orbit: orbit ? orbit.summary : null
         };
-        if (cloudSys)
-          cloudSys.setTopField(f.painted ? f.data : null, f.rm, WORLD);
+        if (cloudSys) cloudSys.setTopField(f.painted ? f.data : null, f.rm, WORLD);
       }
       const towersWords = () =>
         radarTopsField
           ? radarTopsField.painted
             ? `; the towers painted: ${radarTopsField.cells} echoing cells on ${radarTopsField.painted} texels of the low deck (±${Math.round((WORLD * MPU) / 2000)} km, each cell's own top, its flank at the stated 2:1 slope, the deck's ordinary top wherever the field is lower), the tallest ${radarTopsField.maxKm.toFixed(1)} km standing at its own place` +
-              (radarTopsField.near === null
-                ? ' (an older daemon: the tallest 300 only, the near flanks missing)'
-                : '')
+              (radarTopsField.near === null ? ' (an older daemon: the tallest 300 only, the near flanks missing)' : '') +
+              (radarTopsField.orbit
+                ? `; ${towerTopsWords(radarTopsField.orbit)}`
+                : '; no ACHA window within 30 min: the towers stand at their echo tops')
             : `; no echoing cell within reach of the low deck's ±${Math.round((WORLD * MPU) / 2000)} km (${radarTopsField.sent} sent) - the whole slab keeps the ranking's top`
           : '';
       const GLM_DIRECT_MS = 60e3;
@@ -15301,16 +15283,12 @@
               research['stability from orbit (ABI derived stability indices)'] =
                 ssl;
             else
-              delete research[
-                'stability from orbit (ABI derived stability indices)'
-              ];
+              delete research['stability from orbit (ABI derived stability indices)'];
             // the tops from orbit (173rd): NOAA's cloud-top heights by
             // layer and what the decks read from them
             const stl = satTopsLine();
-            if (stl)
-              research['cloud tops from orbit (ABI cloud top height)'] = stl;
-            else
-              delete research['cloud tops from orbit (ABI cloud top height)'];
+            if (stl) research['cloud tops from orbit (ABI cloud top height)'] = stl;
+            else delete research['cloud tops from orbit (ABI cloud top height)'];
             // the radar's own heights (174th): the storms in view
             const rtl = radarTopsLine();
             if (rtl) research["the radar's storm tops (MRMS echo top)"] = rtl;
@@ -20030,11 +20008,8 @@
           // is in view; the slab's top then follows the measured tops
           const radarStorm = radarStormsInView();
           const stormy = wmo >= 80 || radarStorm;
-          const cTypeT = stormy
-            ? 1.85
-            : wmo === 3 || (wmo >= 45 && wmo <= 67)
-              ? 0.15
-              : 1;
+          const cTypeT =
+            stormy ? 1.85 : wmo === 3 || (wmo >= 45 && wmo <= 67) ? 0.15 : 1;
           lu.cType.value += (cTypeT - lu.cType.value) * Math.min(dt * 0.5, 1);
           lu.yBase.value = yCloud;
           // MEASURED storm top: on shower/thunder codes the deck
@@ -20054,10 +20029,7 @@
           // EL is what they could reach; the EL stands where the
           // satellite has too few good fields, the pin over both
           const stormTopSat =
-            EL_PIN === null &&
-            topsSat &&
-            topsSat.n >= 10 &&
-            Number.isFinite(topsSat.p90M)
+            EL_PIN === null && topsSat && topsSat.n >= 10 && Number.isFinite(topsSat.p90M)
               ? topsSat.p90M
               : null;
           // the radar's tallest 18-dBZ echo top within ±50 km (174th):
@@ -20071,8 +20043,7 @@
               : null;
           const stormTop = stormTopSat ?? stormTopRadar ?? elMeas;
           topsFeeds.storm = stormy && stormTopSat !== null;
-          topsFeeds.radar =
-            stormy && stormTopSat === null && stormTopRadar !== null;
+          topsFeeds.radar = stormy && stormTopSat === null && stormTopRadar !== null;
           const yEl =
             stormy && Number.isFinite(stormTop)
               ? 16 * Math.asinh((stormTop - centerElev) / 500) + 8

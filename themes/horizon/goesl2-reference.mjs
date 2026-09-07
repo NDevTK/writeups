@@ -141,7 +141,7 @@ import {
   lapStability
 } from './goesl2.js';
 import {parcelAscent} from './sounding.js';
-import {ACHA_ATBD, heightBands} from './goesl2.js';
+import {ACHA_ATBD, heightBands, towerTopsFromOrbit, towerTopsWords} from './goesl2.js';
 import {
   ADP_ATBD,
   ADP_CALLED_FLOOR,
@@ -2402,6 +2402,164 @@ const inflate = (u8) =>
       `parted at Otsu's ${refs2.rhoCloud.toFixed(3)}, a 0.2 reflectance ${(100 * coverFraction(0.2, refs2.rhoClear, refs2.rhoCloud)).toFixed(0)}% covered; ` +
       `Otsu's own: a normal sample splits at ${oN.t.toFixed(2)} with eta ${oN.eta.toFixed(3)} (2/pi = ${(2 / Math.PI).toFixed(3)}), two deltas at ${oD.t} with eta ${oD.eta.toFixed(3)}, ` +
       `an equal mixture 4 sigma apart eta ${oM.eta.toFixed(3)}, a constant eta ${oF.eta}`
+  );
+}
+
+// ---- THE TOP OVER THE CORE (176th pass) ----------------------------
+// The vendored ACHAC file's own grid (GOES-West's CONUS at 10 km, the
+// 148th's fixture): a storm under a good, tall pixel takes that
+// pixel's height over a lower echo top through the parallax shift -
+// the lookup lands on the pixel only when the shift goes AWAY from
+// the sub-satellite point by h tan(zenith); the wrong direction lands
+// two shifts off, on a pixel whose top differs by a kilometre or more
+// - keeps the radar's top where the satellite's is lower, reports a
+// flagged pixel and a point outside the window, and its spherical
+// view zenith stands within a quarter degree of the ellipsoid's own
+// geometry (the geodetic normal against the line to the satellite).
+{
+  const D2R = Math.PI / 180;
+  const f = openHdf5(new Uint8Array(Buffer.from(ACHAC_B64, 'base64')), inflate);
+  const proj = f.dataset('goes_imager_projection').attrs;
+  const sc = (a) => (Array.isArray(a) ? a[0] : a);
+  const g = fixedGridGeometry({
+    semi_major_axis: sc(proj.semi_major_axis),
+    semi_minor_axis: sc(proj.semi_minor_axis),
+    perspective_point_height: sc(proj.perspective_point_height),
+    longitude_of_projection_origin: sc(proj.longitude_of_projection_origin)
+  });
+  const xd = f.dataset('x');
+  const yd = f.dataset('y');
+  const xc = {scale: sc(xd.attrs.scale_factor), offset: sc(xd.attrs.add_offset)};
+  const yc = {scale: sc(yd.attrs.scale_factor), offset: sc(yd.attrs.add_offset)};
+  const nx = xd.values.length;
+  const ny = yd.values.length;
+  const ht = physicalValues(f.dataset('HT'));
+  const dqf = f.dataset('DQF').values;
+  const zenithEllipsoid = (latDeg, lonDeg) => {
+    const a = g.req;
+    const e2 = 1 - (g.rpol * g.rpol) / (a * a);
+    const phi = latDeg * D2R;
+    const lam = lonDeg * D2R;
+    const N = a / Math.sqrt(1 - e2 * Math.sin(phi) ** 2);
+    const P = [
+      N * Math.cos(phi) * Math.cos(lam),
+      N * Math.cos(phi) * Math.sin(lam),
+      N * (1 - e2) * Math.sin(phi)
+    ];
+    const lam0 = g.lon0Deg * D2R;
+    const Sat = [g.H * Math.cos(lam0), g.H * Math.sin(lam0), 0];
+    const v = [Sat[0] - P[0], Sat[1] - P[1], Sat[2] - P[2]];
+    const n = [Math.cos(phi) * Math.cos(lam), Math.cos(phi) * Math.sin(lam), Math.sin(phi)];
+    return Math.acos((v[0] * n[0] + v[1] * n[1] + v[2] * n[2]) / Math.hypot(v[0], v[1], v[2])) / D2R;
+  };
+  const bearing = (lat1, lon1, lat2, lon2) => {
+    const dl = (lon2 - lon1) * D2R;
+    const y = Math.sin(dl) * Math.cos(lat2 * D2R);
+    const x = Math.cos(lat1 * D2R) * Math.sin(lat2 * D2R) - Math.sin(lat1 * D2R) * Math.cos(lat2 * D2R) * Math.cos(dl);
+    return (Math.atan2(y, x) / D2R + 360) % 360;
+  };
+  const moved = (lat, lon, brg, dM) => ({
+    lat: lat + (dM * Math.cos(brg * D2R)) / 111320,
+    lon: lon + (dM * Math.sin(brg * D2R)) / (111320 * Math.cos(lat * D2R))
+  });
+  // a good pixel at or above 10 km with a good 5 x 5 neighbourhood
+  // whose pixel two parallax shifts back toward the satellite (where
+  // a wrong-way lookup would land) differs by a kilometre or more
+  let pick = null;
+  for (let j = 5; j < ny - 5 && !pick; j++)
+    for (let i = 5; i < nx - 5 && !pick; i++) {
+      const q = j * nx + i;
+      if (dqf[q] !== 0 || !(ht[q] >= 10000)) continue;
+      let ok = true;
+      for (let dj = -2; dj <= 2 && ok; dj++)
+        for (let di = -2; di <= 2 && ok; di++) {
+          const r = (j + dj) * nx + (i + di);
+          if (dqf[r] !== 0 || !Number.isFinite(ht[r])) ok = false;
+        }
+      if (!ok) continue;
+      const c = fixedGridToLatLon(scanAngle(i, xc), scanAngle(j, yc), g);
+      if (!c) continue;
+      const vz = zenithEllipsoid(c.latDeg, c.lonDeg);
+      const h0 = ht[q] - 500;
+      const d = h0 * Math.tan(vz * D2R);
+      const toward = bearing(c.latDeg, c.lonDeg, 0, g.lon0Deg);
+      const box = windowBox(c.latDeg, c.lonDeg, g, xc, yc, nx, ny, 10);
+      if (!box) continue;
+      const wrong = moved(c.latDeg, c.lonDeg, toward, 2 * d);
+      const qW = windowIndexOf(wrong.lat, wrong.lon, g, xc, yc, box);
+      const qC = windowIndexOf(c.latDeg, c.lonDeg, g, xc, yc, box);
+      if (qW < 0 || qW === qC) continue;
+      const wHt = cutWindow(ht, nx, box)[qW];
+      const wDq = cutWindow(dqf, nx, box)[qW];
+      if (wDq !== 0 || !Number.isFinite(wHt) || Math.abs(wHt - ht[q]) < 1000) continue;
+      pick = {i, j, q, htM: ht[q], c, vz, h0, d, toward, box, qC, qW, wHt};
+    }
+  const hwin = pick && {
+    ht: cutWindow(ht, nx, pick.box),
+    dqf: cutWindow(dqf, nx, pick.box),
+    box: pick.box,
+    x: xc,
+    y: yc,
+    g,
+    time: 'the fixture'
+  };
+  // A: under the pixel's top, placed a shift toward the satellite so
+  // the parallax lands the lookup on the pixel; B: parallax off at the
+  // centre; C: an echo top above the satellite's; D: the centre flagged
+  // in a copy of the window; E: a point outside the window and a km-0
+  // entry
+  const A = pick && {...moved(pick.c.latDeg, pick.c.lonDeg, pick.toward, pick.d), km: pick.h0 / 1000, distKm: 3, bearingDeg: 90};
+  const rA = pick && towerTopsFromOrbit([A], hwin);
+  const sA = rA && rA.storms[0];
+  const B = pick && {lat: pick.c.latDeg, lon: pick.c.lonDeg, km: 8};
+  const rB = pick && towerTopsFromOrbit([B], hwin, {parallax: false});
+  const C = pick && {lat: pick.c.latDeg, lon: pick.c.lonDeg, km: pick.htM / 1000 + 2};
+  const rC = pick && towerTopsFromOrbit([C], hwin, {parallax: false});
+  const dqFlag = pick && Uint8Array.from(hwin.dqf);
+  if (pick) dqFlag[pick.qC] = 2;
+  const rD = pick && towerTopsFromOrbit([B], {...hwin, dqf: dqFlag}, {parallax: false});
+  const rE = pick && towerTopsFromOrbit([{lat: 10, lon: -60, km: 9}, {lat: 0, lon: 0, km: 0}], hwin);
+  const words = pick && towerTopsWords(rA.summary);
+  const vzLaw = sA ? sA.viewZenithDeg : NaN;
+  check(
+    "THE TOP OVER THE CORE: a storm cell takes the satellite's height at its own parallax-shifted pixel where that is higher, the shift going away from the sub-satellite point by h tan(zenith), keeps the radar's top where the satellite's is lower, and names a flagged pixel and a point outside the window",
+    !!pick &&
+      sA.from === 'satellite' &&
+      near(sA.satM, pick.htM, 1e-9) &&
+      near(sA.liftM, 500, 1e-6) &&
+      near(sA.km, pick.htM / 1000, 1e-12) &&
+      near(sA.echoKm, pick.h0 / 1000, 1e-12) &&
+      sA.q === pick.qC &&
+      near(sA.shiftM, pick.h0 * Math.tan(vzLaw * D2R), 1e-6) &&
+      Math.abs(vzLaw - pick.vz) < 0.25 &&
+      Math.abs(sA.shiftM - pick.d) < 150 &&
+      Math.abs(pick.wHt - pick.htM) >= 1000 &&
+      rA.summary.n === 1 &&
+      rA.summary.lifted === 1 &&
+      near(rA.summary.maxLiftM, 500, 1e-6) &&
+      rA.summary.satLonDeg === g.lon0Deg &&
+      rB.storms[0].satM === pick.htM &&
+      rB.storms[0].shiftM === 0 &&
+      rB.storms[0].q === pick.qC &&
+      near(rB.storms[0].liftM, pick.htM - 8000, 1e-9) &&
+      rC.storms[0].from === 'radar' &&
+      rC.storms[0].km === C.km &&
+      rC.storms[0].liftM === 0 &&
+      rC.summary.satBelow === 1 &&
+      rD.storms[0].reason === 'flagged' &&
+      rD.storms[0].km === 8 &&
+      rD.summary.flagged === 1 &&
+      rE.storms[0].reason === 'outside the window' &&
+      rE.summary.outside === 1 &&
+      rE.summary.n === 1 &&
+      rE.storms[1].km === 0 &&
+      words.includes("1 of 1 storm cells took the satellite's top") &&
+      words.includes('the largest lift 0.5 km'),
+    pick
+      ? `the vendored ${ACHAC_EXPECT.file.slice(0, 24)} pixel (${pick.i}, ${pick.j}) at ${pick.c.latDeg.toFixed(3)} N ${(-pick.c.lonDeg).toFixed(3)} W holds ${pick.htM.toFixed(0)} m; ` +
+        `a ${(pick.h0 / 1000).toFixed(2)}-km core placed ${(pick.d / 1000).toFixed(2)} km toward GOES-West (${g.lon0Deg} E) looks up its top ${(sA.shiftM / 1000).toFixed(2)} km away from it at ${vzLaw.toFixed(2)}° zenith (the ellipsoid's own ${pick.vz.toFixed(2)}°) and lands on the pixel - lifted 500 m to ${sA.km.toFixed(3)} km; ` +
+        `the wrong way would land on a ${pick.wHt.toFixed(0)}-m pixel; parallax off at the centre lifts an 8-km core by ${(rB.storms[0].liftM / 1000).toFixed(3)} km; a ${C.km.toFixed(2)}-km core keeps its own top; a flagged centre and a point at 10 N are named; the words: "${words.slice(0, 150)}..."`
+      : 'no pixel in the fixture met the search (a good 10-km top with a good 5 x 5 neighbourhood and a differing pixel two shifts back)'
   );
 }
 

@@ -484,6 +484,175 @@ export function heightBands(htM, dqf, {lowTopM = 3240, midTopM = 6508} = {}) {
     midTopM
   };
 }
+// ---- THE SATELLITE'S TOP OVER THE RADAR'S CORE (176th pass) --------
+// PUG Volume 5 (L2+ products, 2019): "The Cloud Top Height product
+// image is produced on the ABI fixed grid at 10 km resolution for Full
+// Disk and CONUS ... The Cloud Top Height algorithm operates on 2 km
+// resolution pixels, generating intermediate temperature, pressure,
+// and height products at this resolution, but the delivered Cloud Top
+// Height and Pressure products are aggregated to 4 km or 10 km",
+// produced "to local zenith angles of 70 degrees"; and of the L1b
+// source (stated under the rainfall product): "The ABI Level 1b
+// source data is not parallax corrected." PUG Volume 3 4.2.8
+// navigates a pixel's line of sight to the ellipsoid
+// (fixedGridToLatLon above), so a cloud top at height h on that line
+// stands NEARER the satellite than the pixel's ground point: the top
+// over a storm at ground point P is reported in the pixel at P
+// displaced away from the sub-satellite point by h tan(view zenith) -
+// 9 km for a 12-km top at 37 deg, a pixel's width. The radar's 18-dBZ
+// echo top is the precipitation core's top, a lower bound on the
+// cloud's; the satellite's height at the core's own shifted pixel is
+// the top of what stands over it - a 10-km block mean of 2-km
+// retrievals (the ATBD: 500 m accuracy, 1.5 km precision, for
+// emissivity above 0.8). A tower takes the taller of the two. The
+// lookup shifts by the echo top first and once more by the
+// satellite's own top where that is higher (the lifted top's residual
+// parallax); DQF 0 only; the shift is laid out on the local flat
+// metres (a few kilometres: under a metre of error), the view zenith
+// is satellites.viewZenithDeg's spherical triangle (a tenth of a
+// degree from the ellipsoid's, measured in the gate).
+const towerBearingDeg = (lat1, lon1, lat2, lon2) => {
+  const dl = (lon2 - lon1) * RAD;
+  const y = Math.sin(dl) * Math.cos(lat2 * RAD);
+  const x =
+    Math.cos(lat1 * RAD) * Math.sin(lat2 * RAD) -
+    Math.sin(lat1 * RAD) * Math.cos(lat2 * RAD) * Math.cos(dl);
+  return ((Math.atan2(y, x) / RAD) + 360) % 360;
+};
+/** The storms (echoTopCensus's {lat, lon, km, ...}) with each cell's
+ * top lifted to the satellite's cloud-top height at its own
+ * parallax-shifted pixel where that is higher. hwin is the height
+ * window: {ht (metres, NaN fill), dqf, box, x, y, g or proj, time}.
+ * Returns {storms, summary}; a storm gains echoKm, satM, liftM, from
+ * ('satellite' | 'radar'), reason (why no satellite top), q, shiftM,
+ * viewZenithDeg. */
+export function towerTopsFromOrbit(
+  storms,
+  hwin,
+  {parallax = true, rEkm = 6371, rSkm = 42164} = {}
+) {
+  const g = hwin.g ?? fixedGridGeometry(hwin.proj);
+  const satLon = g.lon0Deg;
+  const out = [];
+  const sum = {
+    n: 0,
+    withTop: 0,
+    lifted: 0,
+    satBelow: 0,
+    outside: 0,
+    flagged: 0,
+    noRetrieval: 0,
+    maxLiftM: 0,
+    maxLift: null,
+    meanLiftM: null,
+    shiftMinM: null,
+    shiftMaxM: null,
+    viewZenithDeg: null,
+    satLonDeg: satLon,
+    time: hwin.time ?? null,
+    parallax
+  };
+  let liftSum = 0;
+  for (const s of storms || []) {
+    if (!(s.km > 0)) {
+      out.push(s);
+      continue;
+    }
+    sum.n++;
+    const h0 = s.km * 1000;
+    const vz = viewZenithDeg(s.lat, s.lon, satLon, {rEkm, rSkm});
+    const tanVz = Math.tan(vz * RAD);
+    const away = (towerBearingDeg(s.lat, s.lon, 0, satLon) + 180) % 360;
+    const look = (hM) => {
+      const shiftM = parallax ? hM * tanVz : 0;
+      const lat = s.lat + (shiftM * Math.cos(away * RAD)) / 111320;
+      const lon =
+        s.lon +
+        (shiftM * Math.sin(away * RAD)) / (111320 * Math.cos(s.lat * RAD));
+      const q = windowIndexOf(lat, lon, g, hwin.x, hwin.y, hwin.box);
+      if (q < 0) return {q, shiftM, reason: 'outside the window'};
+      if (hwin.dqf && hwin.dqf[q] !== 0) return {q, shiftM, reason: 'flagged'};
+      const v = hwin.ht[q];
+      if (v === null || v === undefined || !Number.isFinite(v))
+        return {q, shiftM, reason: 'no retrieval'};
+      return {q, shiftM, satM: v};
+    };
+    let p = look(h0);
+    // the lifted top's residual parallax: look once more from the
+    // satellite's own height; the first look stands where the second
+    // finds no good height
+    if (p.satM !== undefined && p.satM > h0 && parallax) {
+      const p2 = look(p.satM);
+      if (p2.q !== p.q && p2.satM !== undefined) p = p2;
+    }
+    const lifted = p.satM !== undefined && p.satM > h0;
+    const liftM = lifted ? p.satM - h0 : 0;
+    if (p.satM !== undefined) {
+      sum.withTop++;
+      if (lifted) {
+        sum.lifted++;
+        liftSum += liftM;
+        if (liftM > sum.maxLiftM) {
+          sum.maxLiftM = liftM;
+          sum.maxLift = {
+            liftM,
+            echoKm: s.km,
+            satM: p.satM,
+            lat: s.lat,
+            lon: s.lon,
+            distKm: s.distKm ?? null,
+            bearingDeg: s.bearingDeg ?? null
+          };
+        }
+      } else sum.satBelow++;
+    } else if (p.reason === 'outside the window') sum.outside++;
+    else if (p.reason === 'flagged') sum.flagged++;
+    else sum.noRetrieval++;
+    if (sum.shiftMinM === null || p.shiftM < sum.shiftMinM) sum.shiftMinM = p.shiftM;
+    if (sum.shiftMaxM === null || p.shiftM > sum.shiftMaxM) sum.shiftMaxM = p.shiftM;
+    if (sum.viewZenithDeg === null) sum.viewZenithDeg = vz;
+    out.push({
+      ...s,
+      echoKm: s.km,
+      km: lifted ? p.satM / 1000 : s.km,
+      satM: p.satM ?? null,
+      liftM,
+      from: lifted ? 'satellite' : 'radar',
+      reason: p.reason ?? null,
+      q: p.q,
+      shiftM: p.shiftM,
+      viewZenithDeg: vz
+    });
+  }
+  sum.meanLiftM = sum.lifted ? liftSum / sum.lifted : null;
+  return {storms: out, summary: sum};
+}
+/** The words for a summary. */
+export function towerTopsWords(sm) {
+  if (!sm || !sm.n) return 'no storm cell to lift';
+  const km = (m) => `${(m / 1000).toFixed(1)} km`;
+  const shift =
+    sm.shiftMinM !== null
+      ? `${(sm.shiftMinM / 1000).toFixed(1)}-${(sm.shiftMaxM / 1000).toFixed(1)} km`
+      : 'none';
+  const ml = sm.maxLift;
+  return (
+    `${sm.lifted} of ${sm.n} storm cells took the satellite's top (ACHA HT at each cell's own 10-km pixel, ` +
+    `shifted ${shift} away from the sub-satellite point for the top's parallax at ${sm.viewZenithDeg.toFixed(0)}° zenith, DQF 0; the ATBD's 500 m)` +
+    (ml
+      ? `, the largest lift ${km(ml.liftM)}: a ${ml.echoKm.toFixed(1)}-km core under a ${km(ml.satM)} top` +
+        (Number.isFinite(ml.bearingDeg) && Number.isFinite(ml.distKm)
+          ? ` at ${ml.bearingDeg.toFixed(0)}° and ${ml.distKm.toFixed(0)} km`
+          : '')
+      : '') +
+    (sm.satBelow
+      ? `; ${sm.satBelow} with the satellite's top below the echo top (the radar stands)`
+      : '') +
+    (sm.noRetrieval + sm.flagged + sm.outside
+      ? `; ${sm.noRetrieval + sm.flagged + sm.outside} without a good height (${sm.noRetrieval} no retrieval, ${sm.flagged} flagged, ${sm.outside} outside the window)`
+      : '')
+  );
+}
 // The bucket's listing (S3 ListObjectsV2 XML) -> the keys, and the
 // latest product file by its start stamp (s + YYYYDDDHHMMSSs) -
 // the file name carries the start time, as the PUG's naming states.
@@ -1451,6 +1620,7 @@ export function adpReweight(fractions, dominant, floor = ADP_CALLED_FLOOR) {
 // regard good, 71,942 invalid for cloud.
 // ---------------------------------------------------------------
 import {eLiq} from './contrails.js';
+import {viewZenithDeg} from './satellites.js';
 // the parcel ascent is sounding.js's gated law (the balloon's tower);
 // the 172nd runs it through the satellite's column
 import {parcelAscent} from './sounding.js';
