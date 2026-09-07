@@ -46,6 +46,37 @@ import {
   rqiWords
 } from './mrms.js';
 import {kindCensus, kindName, kindWords, MRMS_KIND_FACTS} from './mrms.js';
+// the storm's body (187th): the cube's law and the vendored 33-level crop
+import {
+  cubeCensus,
+  cubeCode,
+  cubeDbz,
+  cubePack,
+  cubeTop,
+  cubeTopClosure,
+  cubeUnpack,
+  cubeWords,
+  MRMS_CUBE_FACTS,
+  MRMS_CUBE_LEVELS_KM,
+  MRMS_ZR,
+  zrKind,
+  zrRate
+} from './mrms.js';
+import {
+  CUBE_B64,
+  CUBE_ECHOTOP_B64,
+  CUBE_EXPECT,
+  CUBE_FLAG_B64,
+  CUBE_LEVEL_KEYS
+} from './mrms-cube-fixture.js';
+import {
+  CUBE_EXTINCTION,
+  cubeExtinctionField,
+  cubeExtinctionPerKm,
+  cubeLevelAt,
+  rainExtinctionPerKm,
+  snowExtinctionPerKm
+} from './rainshafts.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -963,6 +994,275 @@ const createInflate = () => zlib.createInflate();
       MRMS_KIND_FACTS.law.detect.includes('5 dBZ') &&
       MRMS_KIND_FACTS.documentation.includes('not reachable'),
     `${K.file.slice(0, 15)} ${kh.refTimeIso}, discipline ${kh.discipline} category ${kh.paramCategory} number ${kh.paramNumber}, template 5.${kh.drt.tmpl} at ${kh.drt.nbits} bits R ${kh.drt.R} D ${kh.drt.D}: a ${kw.box.rows} x ${kw.box.cols} window read in ${kw.rowsRead} rows; ${K.samples.length} sampled counts exact; ${kc.precip} precipitating cells of ${kc.covered} covered: ${kc.shares.map((s) => `${s.name} ${s.n}`).join(', ')} (numpy the same), the observer's cell ${kc.here.name}, ${kc.cells.length} cells sent nearest first (the ${hailCells.length} hail cells beyond them, in the uncapped ${kAllCells.cells.length}), 7 with a cap of 7; the words: "${kWords.slice(0, 120)}..."`
+  );
+}
+
+// THE STORM'S BODY (187th pass): the vendored 33-level crop of the 3-D
+// reflectivity mosaic over a convective mass east of Florida (12:22:42Z,
+// every level the same minute) read by grib2.js and censused by mrms.js
+// against numpy: the header (discipline 209, category 9, number 0,
+// template 5.41 at 16 bits, R -9990 D 1), the echo count and strongest
+// at every level, the column over the centre (no coverage under 3.5 km,
+// then 29 dBZ falling to 16 at 17 km), the cube's own 18-dBZ top at the
+// centre and closed against the product's echo top over every cell
+// (2,601 pairs, median 0.0 km, 99.7% within a kilometre), the 51 cores
+// and the strongest cell; the wire's byte code round-trips every value
+// (the mosaic's half-dBZ steps); Zhang et al. 2016's five relations by
+// hand at the strongest cell and at 30 dBZ; the kinds' mapping; the
+// extinction laws composed (Atlas under the freezing level, Rasmussen's
+// dry aggregates above); the extinction field over a 16-km box at
+// seven heights; the words.
+{
+  const E = CUBE_EXPECT;
+  const levels = [];
+  const headers = [];
+  let win = null;
+  for (const key of CUBE_LEVEL_KEYS) {
+    const b = new Uint8Array(Buffer.from(CUBE_B64[key], 'base64'));
+    headers.push(grib2Header(b));
+    const w = await grib2Window(b, E.centre.lat, E.centre.lon, 25, {
+      createInflate
+    });
+    levels.push(w.values);
+    win = w;
+  }
+  const eb = new Uint8Array(Buffer.from(CUBE_ECHOTOP_B64, 'base64'));
+  const eh = grib2Header(eb);
+  const ew = await grib2Window(eb, E.centre.lat, E.centre.lon, 25, {
+    createInflate
+  });
+  const fb = new Uint8Array(Buffer.from(CUBE_FLAG_B64, 'base64'));
+  const fw = await grib2Window(fb, E.centre.lat, E.centre.lon, 25, {
+    createInflate
+  });
+  const box = win.box;
+  const n = box.rows * box.cols;
+  const gridOpt = {
+    grid: {ni: E.cols, nj: E.rows, la1: E.geo.la1, lo1: E.geo.lo1},
+    cellDeg: E.geo.d
+  };
+  const c = cubeCensus(MRMS_CUBE_LEVELS_KM, levels, box, E.centre.lat, E.centre.lon, {
+    echoTop: ew.values,
+    ...gridOpt
+  });
+  const h0 = headers[0];
+  const headersOk = headers.every(
+    (h) =>
+      h.discipline === 209 &&
+      h.paramCategory === 9 &&
+      h.paramNumber === 0 &&
+      h.drt.tmpl === 41 &&
+      h.drt.nbits === 16 &&
+      near(h.drt.R, -9990, 1e-6) &&
+      h.drt.D === 1 &&
+      h.refTimeIso === E.refTime &&
+      near(h.grid.la1, E.geo.la1, 1e-6) &&
+      near(h.grid.lo1, E.geo.lo1, 1e-6)
+  );
+  const perOk = c.levels.every((l, k) => {
+    const p = E.perLevel[k];
+    return (
+      l.km === p.km &&
+      l.echo === p.echo &&
+      (p.max === null ? l.maxDbz === null : near(l.maxDbz, p.max, 1e-6)) &&
+      l.noCoverage === p.noCoverage &&
+      l.noEcho === p.noEcho
+    );
+  });
+  const colOk = c.column.every((r, k) => {
+    const v = E.column[k];
+    if (v <= -900) return r.code === 'no coverage' && r.dbz === null;
+    if (v <= -90) return r.code === 'no echo' && r.dbz === null;
+    return r.code === 'echo' && near(r.dbz, v, 1e-6);
+  });
+  const samplesOk = E.samples.every(
+    ([k, r, cc, count]) =>
+      near(levels[k][r * box.cols + cc], (count - 9990) / 10, 1e-6)
+  );
+  // the wire's byte: every value of the crop comes back within a
+  // quarter dBZ (the byte holds half-dBZ steps; the mosaic's merged
+  // values carry tenths - 41.2 dBZ stands in this crop - so the wire
+  // rounds them, a twelfth of the linear reflectivity at most, stated)
+  let codesOk = true;
+  let tenths = 0;
+  const distinct = new Set();
+  for (const v of levels) for (let q = 0; q < n; q++) distinct.add(v[q]);
+  for (const v of distinct) {
+    if (v > -90 && Math.abs(v * 2 - Math.round(v * 2)) > 1e-6) tenths++;
+    const back = cubeDbz(cubeCode(v));
+    if (
+      v <= -900
+        ? back !== -999
+        : v <= -90
+          ? back !== -99
+          : Math.abs(back - v) > 0.25 + 1e-9
+    )
+      codesOk = false;
+  }
+  const packed = cubePack(levels, n);
+  const back = cubeUnpack(packed, levels.length, n);
+  let packOk = packed.length === levels.length * n;
+  let packMaxErr = 0;
+  for (let k = 0; k < levels.length && packOk; k++)
+    for (let q = 0; q < n; q++) {
+      const a = levels[k][q];
+      const b = back[k][q];
+      const err = a <= -90 ? (a !== b ? 1 : 0) : Math.abs(b - a);
+      if (err > packMaxErr) packMaxErr = err;
+      if (err > 0.25 + 1e-9) {
+        packOk = false;
+        break;
+      }
+    }
+  const top = cubeTop(MRMS_CUBE_LEVELS_KM, levels, n);
+  const cl = cubeTopClosure(top, ew.values);
+  const X = E.closure;
+  const closureOk =
+    cl.n === X.n &&
+    cl.cubeOnly === X.cubeOnly &&
+    cl.productOnly === X.productOnly &&
+    near(cl.medianKm, X.medianKm, 1e-9) &&
+    near(cl.absMedianKm, X.absMedianKm, 1e-9) &&
+    near(cl.absP90Km, X.absP90Km, 1e-9) &&
+    near(cl.within1km, X.within1km, 1e-12) &&
+    near(cl.meanKm, X.meanKm, 1e-9) &&
+    c.closure !== null &&
+    c.closure.n === cl.n &&
+    near(c.closure.meanKm, cl.meanKm, 1e-12);
+  // Zhang et al. 2016's relations by hand at the strongest cell and at 30 dBZ
+  const zrOk = [E.zrAt, E.zrAt30].every(
+    (z) =>
+      near(zrRate(z.dbz, 'stratiform'), z.stra, 1e-9) &&
+      near(zrRate(z.dbz, 'convective'), z.conv, 1e-9) &&
+      near(zrRate(z.dbz, 'hail'), z.hail, 1e-9) &&
+      near(zrRate(z.dbz, 'snow'), z.snow, 1e-9) &&
+      near(zrRate(z.dbz, 'tropical'), z.trop, 1e-9)
+  );
+  const kindsOk =
+    zrKind(1) === 'stratiform' &&
+    zrKind(2) === 'stratiform' &&
+    zrKind(10) === 'stratiform' &&
+    zrKind(3) === 'snow' &&
+    zrKind(4) === 'snow' &&
+    zrKind(6) === 'convective' &&
+    zrKind(7) === 'hail' &&
+    zrKind(91) === 'tropical' &&
+    zrKind(96) === 'tropical' &&
+    zrKind(0) === 'stratiform' &&
+    zrKind(-3) === 'stratiform' &&
+    zrRate(-99) === 0 &&
+    zrRate(-999) === 0 &&
+    near(zrRate(60, 'hail'), 53.8, 1e-9) &&
+    near(zrRate(60, 'convective'), 103.8, 1e-9) &&
+    near(zrRate(60, 'stratiform'), 48.6, 1e-9);
+  // the extinction laws composed
+  const extOk =
+    near(
+      cubeExtinctionPerKm(49, 'convective'),
+      rainExtinctionPerKm(zrRate(49, 'convective')),
+      1e-12
+    ) &&
+    near(
+      cubeExtinctionPerKm(49, 'convective', {frozen: true}),
+      snowExtinctionPerKm(zrRate(49, 'convective'), {wet: false}),
+      1e-12
+    ) &&
+    cubeExtinctionPerKm(-99, 'convective') === 0 &&
+    cubeExtinctionPerKm(-999) === 0 &&
+    cubeLevelAt(3400) === 11 &&
+    cubeLevelAt(0) === 0 &&
+    cubeLevelAt(30000) === 32 &&
+    cubeLevelAt(9400) === 22 &&
+    cubeLevelAt(9600) === 23;
+  // the field over a 16-km box at the centre, seven heights, the
+  // freezing level at 4.5 km: under 3.5 km nothing (no coverage),
+  // at 3.5 km the centre's 29 dBZ by the cell's own kind, at 12 km
+  // the frozen law
+  const heightsM = [1000, 3500, 5000, 8000, 12000, 16000, 19000];
+  const f = cubeExtinctionField(
+    MRMS_CUBE_LEVELS_KM,
+    levels,
+    box,
+    E.centre.lat,
+    E.centre.lon,
+    heightsM,
+    {rm: 32, worldM: 16000, kinds: fw.values, freezingM: 4500, ...gridOpt}
+  );
+  const centreTexel = (z) => f.data[z * 32 * 32 + 16 * 32 + 16];
+  const qc = 25 * box.cols + 25;
+  const kindHere = zrKind(fw.values[qc]);
+  const want35 = Math.min(
+    255,
+    Math.round(cubeExtinctionPerKm(levels[11][qc], kindHere) * CUBE_EXTINCTION.codeScale)
+  );
+  const want12 = Math.min(
+    255,
+    Math.round(
+      cubeExtinctionPerKm(levels[25][qc], kindHere, {frozen: true}) *
+        CUBE_EXTINCTION.codeScale
+    )
+  );
+  const fieldOk =
+    f.nz === 7 &&
+    f.rm === 32 &&
+    f.data.length === 7 * 32 * 32 &&
+    centreTexel(0) === 0 &&
+    centreTexel(1) === want35 &&
+    want35 > 0 &&
+    centreTexel(4) === want12 &&
+    want12 > 0 &&
+    f.painted > 0 &&
+    f.painted <= 32 * 32 &&
+    f.cells > 0 &&
+    f.cells <= E.echoCells &&
+    f.maxPerKm > 0;
+  const words = cubeWords(c, {refTimeIso: h0.refTimeIso, halfKm: 25});
+  check(
+    "THE STORM'S BODY: the vendored 33-level reflectivity crop reads as numpy read it (the header, every level's echo count and strongest, the column over the centre, the cube's 18-dBZ top at the centre and closed against the product's echo top over every cell), the wire's byte round-trips the mosaic's half-dBZ values, Zhang 2016's relations and the kinds hold by hand, the extinction laws compose, and the field over the box paints the centre's own cell at its heights",
+    headersOk &&
+      eh.paramCategory === 3 &&
+      box.rows === E.rows &&
+      box.cols === E.cols &&
+      perOk &&
+      c.echoCells === E.echoCells &&
+      c.covered === E.rows * E.cols &&
+      colOk &&
+      samplesOk &&
+      c.here.topKm === E.top18Here &&
+      near(c.here.echoTopKm, E.echoTopHere, 1e-6) &&
+      c.here.lowestCoveredKm === 3.5 &&
+      near(c.here.dbzMax, 29, 1e-6) &&
+      c.coresTotal === E.cores40 &&
+      c.cores.length === E.cores40 &&
+      c.cores.every((a, i) => i === 0 || a.distKm >= c.cores[i - 1].distKm) &&
+      near(c.strongest.dbz, E.strongest.dbz, 1e-6) &&
+      c.strongest.km === E.strongest.levelKm &&
+      near(c.strongest.lat, E.geo.la1 - E.strongest.row * E.geo.d, 1e-9) &&
+      near(c.strongest.lon, E.geo.lo1 + E.strongest.col * E.geo.d - 360, 1e-9) &&
+      codesOk &&
+      packOk &&
+      packMaxErr <= 0.25 + 1e-9 &&
+      tenths > 0 &&
+      closureOk &&
+      zrOk &&
+      kindsOk &&
+      extOk &&
+      fieldOk &&
+      MRMS_CUBE_LEVELS_KM.length === 33 &&
+      MRMS_CUBE_FACTS.levelsKm === MRMS_CUBE_LEVELS_KM &&
+      MRMS_CUBE_FACTS.cadenceS === 600 &&
+      MRMS_CUBE_FACTS.law.caveat.includes('bright-band') &&
+      MRMS_CUBE_FACTS.documentation.includes('not reachable') &&
+      MRMS_ZR.stratiform.capMmh === 48.6 &&
+      MRMS_ZR.tropical.terms[0][1] === 0.833 &&
+      words.includes('2,601 cells with an echo') &&
+      words.includes('the strongest 49.0 dBZ at 3.5 km') &&
+      words.includes('no coverage under 3.5 km') &&
+      words.includes("the cube's 18-dBZ top against EchoTop_18 over 2,601 cells: median +0.00 km"),
+    `${E.file.slice(0, 32)} ${h0.refTimeIso} (${CUBE_LEVEL_KEYS.length} levels, every one ${headersOk ? 'the same minute and header' : 'NOT alike'}): a ${box.rows} x ${box.cols} window, ${c.echoCells} echoing cells of ${c.covered}, echo from ${c.levels.find((l) => l.echo).km} to ${[...c.levels].reverse().find((l) => l.echo).km} km; the column over the centre: no coverage under ${c.here.lowestCoveredKm} km, ${c.here.dbzMax} dBZ at ${c.here.dbzMaxKm} km, the cube's 18-dBZ top ${c.here.topKm} km and the product's ${c.here.echoTopKm}; ` +
+      `the closure over ${cl.n} cells: median ${cl.medianKm.toFixed(2)} km, |d| ${cl.absMedianKm.toFixed(2)} / ${cl.absP90Km.toFixed(2)} (tenth), ${(cl.within1km * 100).toFixed(1)}% within a kilometre, mean ${cl.meanKm.toFixed(3)} (numpy the same); ${c.coresTotal} cores, the strongest ${c.strongest.dbz} dBZ at ${c.strongest.km} km; ${distinct.size} distinct values (${tenths} of them off the half-dBZ step: the mosaic's tenths), the byte brings every one back within ${packMaxErr.toFixed(2)} dBZ and the pack is ${packed.length} bytes; ` +
+      `Zhang 2016 at ${E.zrAt.dbz} dBZ: stratiform ${zrRate(E.zrAt.dbz, 'stratiform').toFixed(1)}, convective ${zrRate(E.zrAt.dbz, 'convective').toFixed(1)}, hail ${zrRate(E.zrAt.dbz, 'hail').toFixed(1)}, snow ${zrRate(E.zrAt.dbz, 'snow').toFixed(1)}, tropical ${zrRate(E.zrAt.dbz, 'tropical').toFixed(1)} mm/h (numpy the same); the extinction at 49 dBZ convective ${cubeExtinctionPerKm(49, 'convective').toFixed(2)} /km as rain, ${cubeExtinctionPerKm(49, 'convective', {frozen: true}).toFixed(0)} /km as dry aggregates (out of Rasmussen's domain, capped by the byte); ` +
+      `the field over a 16-km box at ${heightsM.length} heights: ${f.painted} of ${32 * 32} texels painted from ${f.cells} cells, the centre 0 at 1 km, ${centreTexel(1)} at 3.5 km (${kindHere}), ${centreTexel(4)} at 12 km (frozen), the strongest ${f.maxPerKm.toFixed(1)} /km; the words: "${words.slice(0, 160)}..."`
   );
 }
 

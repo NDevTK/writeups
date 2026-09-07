@@ -23,6 +23,7 @@
  * at 1 mm/h, 2.8 km at 10) - stated beside it, not drawn.
  */
 import {rangeBearing} from './wildfire.js';
+import {mrmsCell, MRMS_CUBE_LEVELS_KM, zrKind, zrRate} from './mrms.js';
 
 export const RAIN_EXTINCTION = {
   source: 'Atlas 1953, J. Meteor. 10, 486-488',
@@ -291,4 +292,135 @@ export function mergeCoverFields(radar, satellite, covered, rm) {
     }
   }
   return {data, fromRadar, fromSatellite};
+}
+
+// ---------------------------------------------------------------
+// THE STORM'S BODY (187th pass): the cube's extinction. Each cell of
+// NCEP's 3-D reflectivity mosaic (mrms.js: MRMS_CUBE_FACTS) gives a
+// rain rate by Zhang et al. 2016's relation for its PrecipFlag kind
+// (mrms.zrRate) and that rate an extinction: Atlas 1953's for rain
+// under the freezing level, Rasmussen et al. 1999's dry aggregates
+// (snowExtinctionPerKm) above it - the theme's two laws already gated
+// here. The field over the roam box: rm x rm texels at each of the
+// heights asked (metres MSL - the page's own scene-y slices), each
+// texel's cell looked up in the cube's window and its level the
+// nearest of the 33 to the height; the extinction in 1/km packed to a
+// byte at CUBE_EXTINCTION.codeScale. Where the cube has no coverage or
+// no echo the texel is 0: the radar sees precipitation-sized particles
+// only, so the field is a FLOOR under the deck's own density where the
+// storm is filled with precipitation, never a ceiling (the caveat in
+// mrms.MRMS_CUBE_FACTS.law); the bright band's enhanced reflectivity
+// under the freezing level reads as heavier rain there (stated).
+// ---------------------------------------------------------------
+export const CUBE_EXTINCTION = {
+  source:
+    "Zhang et al. 2016's Z-R relations (mrms.MRMS_ZR) with Atlas 1953 (RAIN_EXTINCTION) under the freezing level and Rasmussen et al. 1999 (SNOW_EXTINCTION, dry aggregates) above it",
+  codeScale: 25, // a byte holds 0-10.2 /km at 0.04 /km
+  words:
+    "a cell's rain rate from its reflectivity by the kind's Z-R relation, then the rate's extinction by the rain law under the freezing level and the snow law above it"
+};
+/** The extinction (1/km) of a cell's reflectivity for a kind: 0 where
+ * the cube has no coverage or no echo. */
+export function cubeExtinctionPerKm(
+  dbz,
+  kind = 'stratiform',
+  {frozen = false, wet = false} = {}
+) {
+  const mmh = zrRate(dbz, kind);
+  if (!(mmh > 0)) return 0;
+  return frozen
+    ? snowExtinctionPerKm(mmh, {wet})
+    : rainExtinctionPerKm(mmh);
+}
+/** The nearest of the cube's levels (index) to a height in metres MSL. */
+export function cubeLevelAt(hM, levelsKm = MRMS_CUBE_LEVELS_KM) {
+  let best = 0;
+  let bd = Infinity;
+  for (let k = 0; k < levelsKm.length; k++) {
+    const d = Math.abs(levelsKm[k] * 1000 - hM);
+    if (d < bd) {
+      bd = d;
+      best = k;
+    }
+  }
+  return best;
+}
+/**
+ * The extinction field over the roam box: rm x rm texels spanning
+ * worldM metres centred on (lat, lon) at each height of heightsM
+ * (metres MSL), packed height-major as bytes (extinction x codeScale,
+ * capped 255). levels: the cube's windows (mrms.cubeUnpack's arrays)
+ * on `box`; kinds: the PrecipFlag window on the same box (or null:
+ * stratiform); freezingM: the column's 0 C height (null: rain at every
+ * level); wet: the snow law's wet aggregates. Returns {data, rm, nz,
+ * painted (texels with any extinction), maxPerKm, cells (echoing
+ * cells the box's texels fell in)}.
+ */
+export function cubeExtinctionField(
+  levelsKm,
+  levels,
+  box,
+  lat,
+  lon,
+  heightsM,
+  {
+    rm = 64,
+    worldM = 16000,
+    kinds = null,
+    freezingM = null,
+    wet = false,
+    codeScale = CUBE_EXTINCTION.codeScale,
+    echoDbz = 5,
+    grid = undefined, // the cube's own grid (a vendored crop's, in the gate)
+    cellDeg = undefined
+  } = {}
+) {
+  const nz = heightsM.length;
+  const data = new Uint8Array(nz * rm * rm);
+  const mPerTexel = worldM / rm;
+  const mLon = Math.max(111320 * Math.cos((lat * Math.PI) / 180), 1e-6);
+  const levelOf = heightsM.map((h) => cubeLevelAt(h, levelsKm));
+  const frozenAt = heightsM.map((h) => freezingM !== null && h > freezingM);
+  const cellsSeen = new Set();
+  let painted = 0;
+  let maxPerKm = 0;
+  const cache = new Map(); // "q,k" -> byte
+  for (let jj = 0; jj < rm; jj++) {
+    const zM = (jj + 0.5) * mPerTexel - worldM / 2;
+    const cLat = lat - zM / 111320;
+    for (let ii = 0; ii < rm; ii++) {
+      const xM = (ii + 0.5) * mPerTexel - worldM / 2;
+      const cLon = lon + xM / mLon;
+      const cell = mrmsCell(cLat, cLon, grid, cellDeg);
+      if (!cell) continue;
+      const r = cell.j - box.j0;
+      const c = cell.i - box.i0;
+      if (r < 0 || c < 0 || r >= box.rows || c >= box.cols) continue;
+      const q = r * box.cols + c;
+      const kind = kinds ? zrKind(kinds[q]) : 'stratiform';
+      let any = false;
+      for (let z = 0; z < nz; z++) {
+        const k = levelOf[z];
+        const ck = q * 64 + k;
+        let byte = cache.get(ck);
+        if (byte === undefined) {
+          const dbz = levels[k][q];
+          const beta =
+            dbz >= echoDbz
+              ? cubeExtinctionPerKm(dbz, kind, {frozen: frozenAt[z], wet})
+              : 0;
+          byte = Math.min(255, Math.round(beta * codeScale));
+          cache.set(ck, byte);
+          if (beta > maxPerKm) maxPerKm = beta;
+        }
+        if (byte > 0) {
+          any = true;
+          cellsSeen.add(q);
+        }
+        data[z * rm * rm + jj * rm + ii] = byte;
+      }
+      if (any) painted++;
+    }
+  }
+  return {data, rm, nz, painted, maxPerKm, cells: cellsSeen.size};
 }

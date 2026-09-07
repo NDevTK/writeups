@@ -963,3 +963,367 @@ export function echoTopWords(c, {refTimeIso = null, halfKm = null} = {}) {
     ` · ${here}`
   );
 }
+// ---------------------------------------------------------------
+// THE STORM'S BODY (187th pass): NCEP's 3-D reflectivity mosaic -
+// MRMS MergedReflectivityQC at 33 constant altitudes above mean sea
+// level (0.5-19 km, the 3-D grid of Smith et al. 2016 and Zhang et al.
+// 2016, both read in full: 0.25-km steps to 3 km, 0.5-km to 9, 1-km
+// above), one PNG-packed GRIB2 file a level every 2 min on
+// mrms.ncep.noaa.gov/3DRefl/MergedReflectivityQC_<level>/ (measured 7
+// Sep 2026: 157 kB at 15 km to 1.28 MB at 5 km gzipped, a whole level
+// decoded in 651 ms by grib2.js; discipline 209, category 9, number
+// 0; template 5.41 at 16 bits, R -9990 D 1, so a count c is (c -
+// 9990) / 10 dBZ; -999 no coverage (count 0), -99 no echo (9000)). The
+// WDTD's product page for the "Continental Constant Altitude
+// Reflectivity Mosaic" (vlab.noaa.gov, read): the reflectivity at a
+// constant altitude MSL from the 3-D reflectivity cube of the WSR-88D
+// and Canadian radars, 0.01 deg every 2 min; non-hydrometeor echoes
+// removed (ground clutter, anomalous propagation, chaff, interference,
+// bioscatter) but "bright band contamination is not removed" and "the
+// temperature at the specified height is not identified"; the page
+// calls the CAPPI product discontinued in v12 while the /3DRefl files
+// serve every 2 min - the cube itself, its input, stands (measured).
+// NOT READ, stated: Lakshmanan et al. 2006 (Wea. Forecasting 21) and
+// Lakshmanan & Humphrey 2014 (IEEE JSTARS), the merger's papers (AMS
+// and IEEE answer 403 to this sandbox). THE LAW: a cell's rain rate
+// from its reflectivity by Zhang et al. 2016's own relations for its
+// PrecipFlag kind (Eq. 1 and the text: stratiform max(0.0365 Z^0.625,
+// 0.1155 Z^0.5) capped 48.6 mm/h, convective 0.017 Z^0.714 capped
+// 103.8, hail the same capped 53.8, snow 0.1155 Z^0.5, tropical 0.010
+// Z^0.833 capped 147.4 - the tropical mixes take the tropical relation
+// whole, their weight not in any served file, stated); the extinction
+// of that rate is rainshafts.js's (Atlas 1953 below the freezing
+// level, Rasmussen 1999's dry aggregates above it). The cube's own
+// 18-dBZ top per cell is closed against the EchoTop_18 product (the
+// same cube's derived field: median 0.0 km, 99.7% within a kilometre
+// on the vendored storm - the 1-km level steps above 9 km the width).
+// ---------------------------------------------------------------
+export const MRMS_CUBE_LEVELS_KM = [
+  0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.5, 4, 4.5, 5, 5.5,
+  6, 6.5, 7, 7.5, 8, 8.5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+];
+export const MRMS_CUBE_ECHO_DBZ = 5; // the WDTD's precipitation threshold (the SPT page, 185th)
+export const MRMS_CUBE_TOP_DBZ = 18; // EchoTop_18's own threshold
+export const MRMS_CUBE_CORE_DBZ = 40;
+export const MRMS_CUBE_CADENCE_S = 600; // the theme reads the cube every 10 min while a storm stands
+export const MRMS_CUBE_CORE_CAP = 300;
+export const MRMS_CUBE_FACTS = {
+  product: 'MergedReflectivityQC',
+  meaning:
+    'the radar reflectivity mosaic at 33 constant altitudes above mean sea level, 0.5-19 km, dBZ (the 3-D reflectivity cube of Smith et al. 2016 and Zhang et al. 2016)',
+  source:
+    'NCEP MRMS (mrms.ncep.noaa.gov/3DRefl/MergedReflectivityQC_<level>/), one file a level every 2 min',
+  discipline: 209,
+  category: 9,
+  number: 0,
+  cellKm: 1,
+  cadenceS: MRMS_CUBE_CADENCE_S,
+  levelsKm: MRMS_CUBE_LEVELS_KM,
+  drt: {
+    tmpl: 41,
+    R: -9990,
+    E: 0,
+    D: 1,
+    nbits: 16,
+    words: '(count - 9990) / 10 dBZ, a 16-bit count'
+  },
+  codes: {noCoverage: -999, noEcho: -99},
+  wire: 'one byte a cell at half-dBZ steps (cubeCode): the mosaic\'s tenths rounded, stated',
+  echoDbz: MRMS_CUBE_ECHO_DBZ,
+  topDbz: MRMS_CUBE_TOP_DBZ,
+  coreDbz: MRMS_CUBE_CORE_DBZ,
+  law: {
+    rate: "each cell's rain rate from its reflectivity by Zhang et al. 2016's relation for its PrecipFlag kind (MRMS_ZR)",
+    extinction:
+      "the rate's extinction by Atlas 1953 under the freezing level and Rasmussen et al. 1999's dry aggregates above it (rainshafts.js)",
+    closure:
+      "the cube's own 18-dBZ top per cell against the EchoTop_18 product",
+    caveat:
+      'the radar sees precipitation-sized particles, not the cloud droplets that make a cloud opaque: the cube marks where a storm is filled with precipitation and how thick that is, never where the cloud ends; bright-band contamination is not removed (the WDTD), so the melting layer reads as heavier rain a few hundred metres under the freezing level'
+  },
+  limits: [
+    'no coverage under the lowest beam far from the radars (-999 at the low levels: the column starts where the beam does)',
+    'the levels step 0.25 km to 3 km, 0.5 km to 9 km and 1 km above',
+    'the tropical mixes take the tropical relation whole (their weight is not in any served file)'
+  ],
+  documentation:
+    "the WDTD's Continental Constant Altitude Reflectivity Mosaic page (vlab.noaa.gov) read in full in the 187th; Smith et al. 2016 and Zhang et al. 2016 read in full in the 184th; Lakshmanan et al. 2006 and Lakshmanan & Humphrey 2014 not reachable (AMS and IEEE 403)"
+};
+// Zhang et al. 2016's Z-R relations (Eq. 1 and the text, read in full
+// in the 184th): the rate is the largest of the terms a Z^b (Z the
+// linear reflectivity, mm^6/m^3), capped where the paper caps it.
+export const MRMS_ZR = {
+  source:
+    'Zhang et al. 2016, BAMS 97, 621-638 (the MRMS QPE paper; NOAA repository copy noaa_15285_DS1.pdf), Eq. 1 and the text on p. 626',
+  stratiform: {
+    terms: [
+      [0.0365, 0.625],
+      [0.1155, 0.5]
+    ],
+    capMmh: 48.6
+  },
+  convective: {terms: [[0.017, 0.714]], capMmh: 103.8},
+  hail: {terms: [[0.017, 0.714]], capMmh: 53.8},
+  snow: {terms: [[0.1155, 0.5]], capMmh: null},
+  tropical: {terms: [[0.01, 0.833]], capMmh: 147.4}
+};
+/** The Z-R kind of a PrecipFlag code (MRMS_KIND_FACTS.codes): warm and
+ * cool stratiform (1, 2, 10) stratiform, snow (3, 4), convective (6),
+ * hail (7), the tropical mixes (91, 96) tropical; anything else (none,
+ * no coverage, unknown) stratiform - the mosaic's own default. */
+export function zrKind(code) {
+  if (code === 3 || code === 4) return 'snow';
+  if (code === 6) return 'convective';
+  if (code === 7) return 'hail';
+  if (code === 91 || code === 96) return 'tropical';
+  return 'stratiform';
+}
+/** The rain rate (mm/h) of a reflectivity (dBZ) by the kind's relation;
+ * 0 at or under the mosaic's no-echo codes. */
+export function zrRate(dbz, kind = 'stratiform') {
+  if (!Number.isFinite(dbz) || dbz <= -90) return 0;
+  const rel = MRMS_ZR[kind] ?? MRMS_ZR.stratiform;
+  const Z = Math.pow(10, dbz / 10);
+  let r = 0;
+  for (const [a, b] of rel.terms) r = Math.max(r, a * Math.pow(Z, b));
+  return rel.capMmh !== null ? Math.min(r, rel.capMmh) : r;
+}
+/** The cube on the wire: one byte a cell - 0 no coverage, 1 no echo,
+ * else (dBZ + 30) * 2 + 2 at half-dBZ steps (-30 to 96 dBZ); back by
+ * cubeDbz (-999 / -99 for the codes). The mosaic's merged values carry
+ * tenths of a dBZ (41.2 stands in the vendored crop), which the byte
+ * rounds to the nearest half - a twelfth of the linear reflectivity at
+ * most, a few percent of the rain rate; stated. */
+export function cubeCode(dbz) {
+  if (!Number.isFinite(dbz) || dbz <= -900) return 0;
+  if (dbz <= -90) return 1;
+  return Math.max(2, Math.min(254, Math.round((dbz + 30) * 2) + 2));
+}
+export function cubeDbz(code) {
+  if (code === 0) return -999;
+  if (code === 1) return -99;
+  return (code - 2) / 2 - 30;
+}
+/** The levels' windows packed level-major: Uint8Array(levels x n). */
+export function cubePack(levels, n) {
+  const out = new Uint8Array(levels.length * n);
+  for (let k = 0; k < levels.length; k++) {
+    const v = levels[k];
+    for (let q = 0; q < n; q++) out[k * n + q] = cubeCode(v[q]);
+  }
+  return out;
+}
+export function cubeUnpack(u8, nLevels, n) {
+  const out = [];
+  for (let k = 0; k < nLevels; k++) {
+    const v = new Float32Array(n);
+    for (let q = 0; q < n; q++) v[q] = cubeDbz(u8[k * n + q]);
+    out.push(v);
+  }
+  return out;
+}
+/** The cube's own echo top per cell: the highest level at or above
+ * topDbz (km MSL), NaN where none. levels: the windows in
+ * MRMS_CUBE_LEVELS_KM's order, n cells each. */
+export function cubeTop(levelsKm, levels, n, topDbz = MRMS_CUBE_TOP_DBZ) {
+  const top = new Float32Array(n).fill(NaN);
+  for (let k = 0; k < levels.length; k++) {
+    const v = levels[k];
+    const km = levelsKm[k];
+    for (let q = 0; q < n; q++) if (v[q] >= topDbz) top[q] = km;
+  }
+  return top;
+}
+/** The cube's top against the product's (EchoTop_18 on the same
+ * window): over the cells both call echoing, the difference cube minus
+ * product in km - its median, the absolute median and tenth, the share
+ * within a kilometre; the cells one side alone counts. */
+export function cubeTopClosure(top, echoTop) {
+  const d = [];
+  let cubeOnly = 0;
+  let productOnly = 0;
+  for (let q = 0; q < top.length; q++) {
+    const a = Number.isFinite(top[q]);
+    const b = echoTop[q] > 0;
+    if (a && b) d.push(top[q] - echoTop[q]);
+    else if (a) cubeOnly++;
+    else if (b) productOnly++;
+  }
+  const s = d.slice().sort((x, y) => x - y);
+  const abs = d.map((x) => Math.abs(x)).sort((x, y) => x - y);
+  const q = (arr, f) =>
+    arr.length ? arr[Math.min(arr.length - 1, Math.floor(f * arr.length))] : null;
+  return {
+    n: d.length,
+    cubeOnly,
+    productOnly,
+    medianKm: q(s, 0.5),
+    absMedianKm: q(abs, 0.5),
+    absP90Km: q(abs, 0.9),
+    within1km: d.length ? abs.filter((x) => x <= 1).length / d.length : null,
+    meanKm: d.length ? d.reduce((a, b) => a + b, 0) / d.length : null
+  };
+}
+/**
+ * The cube's census over a window: per level the echoing cells (at or
+ * above echoDbz), the strongest and the no-coverage count; the column
+ * over the observer's own cell (the window's centre: box.j, box.i);
+ * the cube's 18-dBZ top there and over every cell (cubeTop); the
+ * cores (cells whose strongest level reaches coreDbz) nearest first
+ * with their strength, its height, bearing and distance, capped; the
+ * strongest cell; the closure against the product's echo top when a
+ * window of it is given (the same box). levels: the windows in
+ * MRMS_CUBE_LEVELS_KM's order.
+ */
+export function cubeCensus(
+  levelsKm,
+  levels,
+  box,
+  lat,
+  lon,
+  {
+    echoDbz = MRMS_CUBE_ECHO_DBZ,
+    topDbz = MRMS_CUBE_TOP_DBZ,
+    coreDbz = MRMS_CUBE_CORE_DBZ,
+    cap = MRMS_CUBE_CORE_CAP,
+    echoTop = null,
+    grid = MRMS_FACTS.grid,
+    cellDeg = MRMS_FACTS.cellDeg
+  } = {}
+) {
+  const n = box.rows * box.cols;
+  const per = [];
+  const compMax = new Float32Array(n).fill(-999);
+  const compKm = new Float32Array(n).fill(NaN);
+  const anyCover = new Uint8Array(n);
+  for (let k = 0; k < levels.length; k++) {
+    const v = levels[k];
+    let echo = 0;
+    let max = null;
+    let noCoverage = 0;
+    let noEcho = 0;
+    for (let q = 0; q < n; q++) {
+      const x = v[q];
+      if (x <= -900) {
+        noCoverage++;
+        continue;
+      }
+      anyCover[q] = 1;
+      if (x <= -90) {
+        noEcho++;
+        continue;
+      }
+      if (x >= echoDbz) {
+        echo++;
+        if (max === null || x > max) max = x; // the strongest echo (at or above echoDbz)
+      }
+      if (x > compMax[q]) {
+        compMax[q] = x;
+        compKm[q] = levelsKm[k];
+      }
+    }
+    per.push({km: levelsKm[k], echo, maxDbz: max, noCoverage, noEcho});
+  }
+  let covered = 0;
+  let echoCells = 0;
+  for (let q = 0; q < n; q++) {
+    if (anyCover[q]) covered++;
+    if (compMax[q] >= echoDbz) echoCells++;
+  }
+  const top = cubeTop(levelsKm, levels, n, topDbz);
+  // the observer's own cell: the reader's box carries it as cj/ci
+  const ci = (box.ci ?? box.i) - box.i0;
+  const cj = (box.cj ?? box.j) - box.j0;
+  const qc = cj * box.cols + ci;
+  const column = levels.map((v, k) => ({
+    km: levelsKm[k],
+    dbz: v[qc] > -90 ? v[qc] : null,
+    code: v[qc] <= -900 ? 'no coverage' : v[qc] <= -90 ? 'no echo' : 'echo'
+  }));
+  let lowestCoveredKm = null;
+  for (const c of column)
+    if (c.code !== 'no coverage') {
+      lowestCoveredKm = c.km;
+      break;
+    }
+  const here = {
+    dbzMax: compMax[qc] > -90 ? compMax[qc] : null,
+    dbzMaxKm: Number.isFinite(compKm[qc]) ? compKm[qc] : null,
+    topKm: Number.isFinite(top[qc]) ? top[qc] : null,
+    echoTopKm: echoTop && echoTop[qc] > 0 ? echoTop[qc] : null,
+    lowestCoveredKm
+  };
+  // the cores nearest first
+  const cores = [];
+  let strongest = null;
+  for (let q = 0; q < n; q++) {
+    if (compMax[q] < echoDbz) continue;
+    const r = Math.floor(q / box.cols);
+    const c = q % box.cols;
+    const cc = mrmsCellCentre(box.j0 + r, box.i0 + c, grid, cellDeg);
+    const dx = (cc.lon - lon) * 111.32 * Math.cos((lat * Math.PI) / 180);
+    const dy = (cc.lat - lat) * 111.32;
+    const cell = {
+      dbz: compMax[q],
+      km: compKm[q],
+      topKm: Number.isFinite(top[q]) ? top[q] : null,
+      lat: cc.lat,
+      lon: cc.lon,
+      distKm: +Math.hypot(dx, dy).toFixed(3),
+      bearingDeg: +bearingDeg(lat, lon, cc.lat, cc.lon).toFixed(1)
+    };
+    if (!strongest || cell.dbz > strongest.dbz) strongest = cell;
+    if (compMax[q] >= coreDbz) cores.push(cell);
+  }
+  cores.sort((a, b) => a.distKm - b.distKm);
+  return {
+    n,
+    levels: per,
+    covered,
+    echoCells,
+    column,
+    here,
+    cores: cores.slice(0, cap),
+    coresTotal: cores.length,
+    strongest,
+    closure: echoTop ? cubeTopClosure(top, echoTop) : null
+  };
+}
+/** The words for a cube census. */
+export function cubeWords(c, {refTimeIso = null, halfKm = null} = {}) {
+  const when = refTimeIso ? `${refTimeIso.slice(11, 16)}Z · ` : '';
+  const reach = halfKm !== null ? `within ±${halfKm} km` : 'in the window';
+  if (!c.covered) return `${when}no radar coverage ${reach} at any level`;
+  const echoLevels = c.levels.filter((l) => l.echo > 0);
+  const lowest = echoLevels.length ? echoLevels[0].km : null;
+  const highest = echoLevels.length
+    ? echoLevels[echoLevels.length - 1].km
+    : null;
+  const busiest = echoLevels.length
+    ? echoLevels.reduce((a, b) => (b.echo > a.echo ? b : a))
+    : null;
+  const h = c.here;
+  const hereWords =
+    h.dbzMax !== null
+      ? `overhead ${h.dbzMax.toFixed(1)} dBZ at most (at ${h.dbzMaxKm} km), the cube's 18-dBZ top ${h.topKm !== null ? h.topKm + ' km' : 'none'}${h.echoTopKm !== null ? ` (the product's ${h.echoTopKm.toFixed(1)})` : ''}${h.lowestCoveredKm !== null && h.lowestCoveredKm > 0.5 ? `, no coverage under ${h.lowestCoveredKm} km` : ''}`
+      : h.lowestCoveredKm === null
+        ? 'no coverage overhead at any level'
+        : `no echo overhead${h.lowestCoveredKm > 0.5 ? ` (no coverage under ${h.lowestCoveredKm} km)` : ''}`;
+  const cl = c.closure;
+  const closureWords =
+    cl && cl.n
+      ? ` · the cube's 18-dBZ top against EchoTop_18 over ${cl.n.toLocaleString('en-US')} cells: median ${cl.medianKm >= 0 ? '+' : ''}${cl.medianKm.toFixed(2)} km, |d| ${cl.absMedianKm.toFixed(2)} at the median and ${cl.absP90Km.toFixed(2)} at the tenth, ${Math.round(cl.within1km * 100)}% within a kilometre`
+      : '';
+  return (
+    `${when}${c.echoCells.toLocaleString('en-US')} cells with an echo (5 dBZ or more at some level) of ${c.covered.toLocaleString('en-US')} covered ${reach}` +
+    (echoLevels.length
+      ? `, echo from ${lowest} to ${highest} km MSL (the busiest level ${busiest.km} km with ${busiest.echo.toLocaleString('en-US')} cells)`
+      : '') +
+    (c.strongest
+      ? ` · the strongest ${c.strongest.dbz.toFixed(1)} dBZ at ${c.strongest.km} km, ${c.strongest.bearingDeg}° and ${c.strongest.distKm.toFixed(1)} km` +
+        ` · ${c.coresTotal} cells at or above 40 dBZ${c.coresTotal ? ` (the nearest ${c.cores[0].distKm.toFixed(1)} km off)` : ''}`
+      : '') +
+    ` · ${hereWords}` +
+    closureWords
+  );
+}
