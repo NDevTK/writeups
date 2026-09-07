@@ -1436,10 +1436,16 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    raining cells, 123 dry, none uncovered, the heaviest 89.5 mm/h
    placed 14.5 km at 354° by a plain great-circle — and the census
    lists the cells nearest first with the shafts' own field names
-   (`mrms-reference` THE RAIN AT A KILOMETRE). STATED: the rate is the
-   radar's surface estimate by MRMS's own method, unread; a −3 cell is
-   unmeasured, not dry; the shafts keep Atlas 1953's extinction per
-   rate
+   (`mrms-reference` THE RAIN AT A KILOMETRE). Live in north-east
+   Montana (07:56Z, the observer set in the file's rainiest window):
+   6,663 raining cells of 10,201 covered within ±50 km, 19.6 mm/h
+   overhead against the satellite's 18.6 mm/h a kilometre and ten
+   minutes apart, 160 shafts drawn from the radar's cells and 3,810
+   deck texels covered by them where RainViewer's mask saw none.
+   STATED: the rate is the radar's surface estimate by MRMS's own
+   method, unread; a −3 cell is unmeasured, not dry; the shafts keep
+   Atlas 1953's extinction per rate, and their flat grey untouched by
+   the scene's lights is the next pass's lead
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

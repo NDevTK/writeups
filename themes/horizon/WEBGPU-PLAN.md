@@ -10387,13 +10387,35 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   14.5), 400 of 2,478 cells sent nearest first with the observer's own
   at 0 km first, a cap of 5 honoured, the words. Docs: server README
   (/mrmsrate), FINDINGS pass 179 (149 files, 1,202 landmarks, 9 GPU
-  probes). STATED LIMITS: the rate is the radar's surface estimate by
+  probes). MEASURED in the page (north-east Montana, 48.795 N 106.965
+  W, 02:00 local, the 07:56Z file, the observer set in the storm the
+  file's rainiest window found): "6,663 raining cells of 10,201
+  covered within +-50 km - rates median 5.9 mm/h, heaviest tenth 53.8,
+  heaviest 125.0 at 5 deg and 26 km - the nearest 19.6 mm/h at 180 deg
+  and 0 km - overhead 19.6 mm/h - what it feeds now: the rain shafts
+  and the deck's rain cover (400 of 6663 raining cells sent, nearest
+  first)"; the RRQPE line: "overhead 18.6 mm/h (good) ... 160 rain
+  shafts drawn within 100 km from the radar's 1-km cells (MRMS
+  PrecipRate, 2 min): the nearest 0 km at 0 deg (16.4 mm/h), the
+  heaviest 75.0 mm/h 1 km off hiding 100% of what stands behind it -
+  the decks' cover: 3810 texels from the radar's 1-km rain (MRMS
+  PrecipRate) where RainViewer's mask sees none" - the radar's 19.6
+  and the satellite's 18.6 mm/h overhead a kilometre and ten minutes
+  apart (a closure the line now shows side by side); the render, from
+  inside a 20 mm/h shaft at 2 a.m., a wall of curtains. A first cut of
+  the page's research line broke the echo-top line's if/else (a
+  syntax error the module check caught before any render). STATED
+  LIMITS: the rate is the radar's surface estimate by
   MRMS's own method (unread: the product guide is unreachable from the
   sandbox); a -3 cell is unmeasured, not dry; the shafts keep Atlas
   1953's extinction per rate and the 2-km curtain shape; the daemon's
   +-50 km reach means the shafts' 100-km reach is the radar's only to
   50 km and the satellite's beyond (stated on the line by what it
-  feeds).
+  feeds); the shafts' curtains are drawn in a flat grey that the
+  scene's lights do not touch - at 2 a.m. they stood light grey
+  against a black sky - the named next lead: the shafts' colour from
+  the same lights the decks and the measured sheets use, so a night
+  curtain is dark and a sunlit one bright.
 - DONE (Sep 7, the review session's 178th pass - THE SHEET'S OWN
   OPACITY): the 177th's named lead - the measured anvil let the stars
   through because the cirrus material's night opacity (0.05) was the
