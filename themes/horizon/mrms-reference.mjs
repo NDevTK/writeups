@@ -881,9 +881,12 @@ const createInflate = () => zlib.createInflate();
   );
   const kAll = Array.from(kw.values);
   const countsOk = Object.entries(K.counts).every(
-    ([code, m]) => kc.counts[code] === m && kAll.filter((v) => v === +code).length === m
+    ([code, m]) =>
+      kc.counts[code] === m && kAll.filter((v) => v === +code).length === m
   );
-  const codesSeen = Object.keys(kc.counts).map(Number).sort((a, b) => a - b);
+  const codesSeen = Object.keys(kc.counts)
+    .map(Number)
+    .sort((a, b) => a - b);
   const kWords = kindWords(kc, {refTimeIso: kh.refTimeIso, halfKm: 25});
   // the hail cells sit beyond the 400 nearest (measured: none within
   // them), so they are counted in an uncapped census
@@ -911,7 +914,11 @@ const createInflate = () => zlib.createInflate();
       kc.precip === K.precip &&
       kc.cellsTotal === K.precip &&
       countsOk &&
-      codesSeen.join(',') === Object.keys(K.counts).map(Number).sort((a, b) => a - b).join(',') &&
+      codesSeen.join(',') ===
+        Object.keys(K.counts)
+          .map(Number)
+          .sort((a, b) => a - b)
+          .join(',') &&
       kc.shares.length === 5 &&
       kc.shares[0].kind === 1 &&
       kc.shares[0].n === K.counts['1'] &&
@@ -922,9 +929,7 @@ const createInflate = () => zlib.createInflate();
       kc.cells.length === Math.min(400, K.precip) &&
       kc.cells[0].distKm === 0 &&
       kc.cells[0].kind === K.nearest.kind &&
-      kc.cells.every(
-        (c, k) => k === 0 || c.distKm >= kc.cells[k - 1].distKm
-      ) &&
+      kc.cells.every((c, k) => k === 0 || c.distKm >= kc.cells[k - 1].distKm) &&
       kc.cells.every(
         (c) =>
           c.kind > 0 &&

@@ -106,14 +106,145 @@ export const PRECIPRATE_B64 =
 // counts - the RadarQualityIndex's most varied window (the Columbia
 // Mountains, every tenth from 0.0 to 1.0) and the MESH window beside
 // the largest hail of the file (south-east Saskatchewan)
-export const RQI_EXPECT = {"refTime": "2026-09-07T09:42:00Z", "rows": 51, "cols": 51, "row0": 266, "col0": 1157, "la1": 52.335, "lo1": 241.575, "la2": 51.835, "lo2": 242.075, "d": 0.01, "drt": {"tmpl": 41, "R": -30.0, "E": 0, "D": 1, "nbits": 8}, "discipline": 209, "category": 8, "number": 0, "centre": {"lat": 52.085, "lon": -118.175, "row": 25, "col": 25, "count": 38, "value": 0.8}, "samples": [[0, 0, 37], [25, 25, 38], [50, 50, 40], [10, 40, 31], [40, 10, 34], [3, 48, 31]], "pngBytes": 639, "grib2Bytes": 818, "file": "MRMS_RadarQualityIndex.latest.grib2.gz", "noCoverage": 0, "covered": 2601, "hist": [48, 685, 420, 256, 151, 138, 198, 178, 260, 223, 44], "medianRqi": 0.3, "meanRqi": 0.4055, "minRqi": 0.0, "maxRqi": 1.0, "belowHalf": 1560, "zero": 48, "full": 44, "scene": "the most varied 51 x 51 window of the 09:42Z file - the Columbia Mountains of British Columbia (52.09 N 118.18 W), where the beams are blocked: every tenth from 0.0 to 1.0"};
-export const RQI_B64 = "R1JJQgAA0QIAAAAAAAADMgAAABUBAKEAAP8BAwfqCQcJKgACBwAAAEgDAAAACikAAAAAAgEAYSjuAQBhUrABAGD/JwAAADMAAAAzAAAAAQAPQkADHpGYDmYkWDADFvB4Dm3FeAAAJxAAACcQAAAAACIEAAAAAAgACABhAAAAAAAAAABmAAAAAAD/AQAAAAAAAAAVBQAACikAKcHwAAAAAAABCAAAAAAGBv8AAAKEB4lQTkcNChoKAAAADUlIRFIAAAAzAAAAMwgAAAAAH8pv9gAAAkZJREFUeJx1llGS4zAIRF97pPgke//zTZyE/UACpHhcFVdJAnUDDY7+sT5Pvp4fQLzAfN0ADDTf308D4IUfG7Rh7VfYam03lwiamWwuwK7FBYMeMAXYSJ9bcndki+HvRgN7ALbA0OBwIrZjGMADQNdy0FRtnruLv7fb2shN5sFGJnEYA67NBz6TXkaB+NTlFw7wltjuE2AnYDuM13S5rdRVdgvUjmTwJbUOW5kLtxJPlY8FBxt6NOc2DMXvzqNhwHv6zZ+1JbWbRpku1MDONtVbVWckhY21eJSD160+EyYdW2ztvHaYyaycvPZD5W657mRVzfI8FvECio0/GAyga1lptMb0eU06I/fnbQEe9zgqLxeTIkWD3ei5XVOP/ZpsWqypQG8yfuZeLYSOHcYM6EadJ+YuJ5ObYoom2j4hZ1qWeFb8nt0ZbTfsZNBAPLUq1UCMPc3E+dRCJdfKqfQD2LvkQ9MlBZ89rXyXHHqZk2Db7IGOjUwGtPmgc5NP+xodvXRxbJYaf/7S6KUYGUlS7jLmTrm2J9ccFd1iDTQ9l2AGTESDMJfFzEfkIKR7hktAq5g4zpXBplzXBPRY+JCcM1GlcoUZRAdkCG3kwjgqi6oAp6Cp3SO+WcHC67X3s1UxNo3uyGAi7tIhC4NWdzuMVssOiHol5UZKZVKH4zO3iovmJ6VqZ0Qj9lEZ/ehz8ZDs689RrvpYSvFtE80THdGsIu9xw8ddBKZj/Tbeic/ShZGDmfkeBuHXw6lMQfncsSnRaxFmTbMK/H9Dit8aqxGVLAAAAABJRU5ErkJggjc3Nzc=";
-export const MESH_EXPECT = {"refTime": "2026-09-07T09:42:40Z", "rows": 51, "cols": 51, "row0": 532, "col0": 2550, "la1": 49.675, "lo1": 255.505, "la2": 49.175, "lo2": 256.005, "d": 0.01, "drt": {"tmpl": 41, "R": -30.0, "E": 0, "D": 1, "nbits": 8}, "discipline": 209, "category": 3, "number": 28, "centre": {"lat": 49.425, "lon": -104.245, "row": 25, "col": 25, "count": 20, "value": -1.0}, "samples": [[0, 0, 20], [25, 25, 20], [50, 50, 20], [10, 40, 20], [40, 10, 20], [3, 48, 20]], "pngBytes": 201, "grib2Bytes": 380, "file": "MRMS_MESH.latest.grib2.gz", "noCoverage": 0, "covered": 2601, "noHail": 2545, "hail": 56, "maxMm": 20.5, "medianMm": 3.4, "p90Mm": 9.2, "largest": {"row": 16, "col": 37, "mm": 20.5, "count": 235, "lat": 49.515, "lon": -104.125, "distKm": 13.242, "bearingDeg": 40.9}, "nearest": {"row": 17, "col": 33, "mm": 0.9, "distKm": 10.609, "bearingDeg": 33.0}, "scene": "the 51 x 51 window 10 km south-west of the largest hail cell of the 09:42Z file (49.52 N 104.13 W, south-east Saskatchewan): the storm cores hold hail, the observer's own cell none"};
-export const MESH_B64 = "R1JJQgAA0QIAAAAAAAABfAAAABUBAKEAAP8BAwfqCQcJKigCBwAAAEgDAAAACikAAAAAAgEAYSjuAQBhUrABAGD/JwAAADMAAAAzAAAAAQAPQkAC9fr4DzqyaDAC7lnYD0JTiAAAJxAAACcQAAAAACIEAAAAAAMcCABhAAAAAAAAAABmAAAAAfT/AQAAAAAAAAAVBQAACikAKcHwAAAAAAABCAAAAAAGBv8AAADOB4lQTkcNChoKAAAADUlIRFIAAAAzAAAAMwgAAAAAH8pv9gAAAJBJREFUeJxjFGEgGTCRrmVUz8jWIwRjMBKT3iReMDAIMbAzMPz785aBgYGFCC2iDIq/BZg5nv/7/e8tsW5jZWKTMRX+w8PA9JqBgTh7lIT+CEp/+fzr7UuoAGE9xqLi/yv/hjNfhosQdtsD/Wccj2axf0SIEBNuBhdQ+USFNRoYhGlnVM+onlE9o3pG9QwxPQC7DRzNCPL/sAAAAABJRU5ErkJggjc3Nzc=";
+export const RQI_EXPECT = {
+  refTime: '2026-09-07T09:42:00Z',
+  rows: 51,
+  cols: 51,
+  row0: 266,
+  col0: 1157,
+  la1: 52.335,
+  lo1: 241.575,
+  la2: 51.835,
+  lo2: 242.075,
+  d: 0.01,
+  drt: {tmpl: 41, R: -30.0, E: 0, D: 1, nbits: 8},
+  discipline: 209,
+  category: 8,
+  number: 0,
+  centre: {lat: 52.085, lon: -118.175, row: 25, col: 25, count: 38, value: 0.8},
+  samples: [
+    [0, 0, 37],
+    [25, 25, 38],
+    [50, 50, 40],
+    [10, 40, 31],
+    [40, 10, 34],
+    [3, 48, 31]
+  ],
+  pngBytes: 639,
+  grib2Bytes: 818,
+  file: 'MRMS_RadarQualityIndex.latest.grib2.gz',
+  noCoverage: 0,
+  covered: 2601,
+  hist: [48, 685, 420, 256, 151, 138, 198, 178, 260, 223, 44],
+  medianRqi: 0.3,
+  meanRqi: 0.4055,
+  minRqi: 0.0,
+  maxRqi: 1.0,
+  belowHalf: 1560,
+  zero: 48,
+  full: 44,
+  scene:
+    'the most varied 51 x 51 window of the 09:42Z file - the Columbia Mountains of British Columbia (52.09 N 118.18 W), where the beams are blocked: every tenth from 0.0 to 1.0'
+};
+export const RQI_B64 =
+  'R1JJQgAA0QIAAAAAAAADMgAAABUBAKEAAP8BAwfqCQcJKgACBwAAAEgDAAAACikAAAAAAgEAYSjuAQBhUrABAGD/JwAAADMAAAAzAAAAAQAPQkADHpGYDmYkWDADFvB4Dm3FeAAAJxAAACcQAAAAACIEAAAAAAgACABhAAAAAAAAAABmAAAAAAD/AQAAAAAAAAAVBQAACikAKcHwAAAAAAABCAAAAAAGBv8AAAKEB4lQTkcNChoKAAAADUlIRFIAAAAzAAAAMwgAAAAAH8pv9gAAAkZJREFUeJx1llGS4zAIRF97pPgke//zTZyE/UACpHhcFVdJAnUDDY7+sT5Pvp4fQLzAfN0ADDTf308D4IUfG7Rh7VfYam03lwiamWwuwK7FBYMeMAXYSJ9bcndki+HvRgN7ALbA0OBwIrZjGMADQNdy0FRtnruLv7fb2shN5sFGJnEYA67NBz6TXkaB+NTlFw7wltjuE2AnYDuM13S5rdRVdgvUjmTwJbUOW5kLtxJPlY8FBxt6NOc2DMXvzqNhwHv6zZ+1JbWbRpku1MDONtVbVWckhY21eJSD160+EyYdW2ztvHaYyaycvPZD5W657mRVzfI8FvECio0/GAyga1lptMb0eU06I/fnbQEe9zgqLxeTIkWD3ei5XVOP/ZpsWqypQG8yfuZeLYSOHcYM6EadJ+YuJ5ObYoom2j4hZ1qWeFb8nt0ZbTfsZNBAPLUq1UCMPc3E+dRCJdfKqfQD2LvkQ9MlBZ89rXyXHHqZk2Db7IGOjUwGtPmgc5NP+xodvXRxbJYaf/7S6KUYGUlS7jLmTrm2J9ccFd1iDTQ9l2AGTESDMJfFzEfkIKR7hktAq5g4zpXBplzXBPRY+JCcM1GlcoUZRAdkCG3kwjgqi6oAp6Cp3SO+WcHC67X3s1UxNo3uyGAi7tIhC4NWdzuMVssOiHol5UZKZVKH4zO3iovmJ6VqZ0Qj9lEZ/ehz8ZDs689RrvpYSvFtE80THdGsIu9xw8ddBKZj/Tbeic/ShZGDmfkeBuHXw6lMQfncsSnRaxFmTbMK/H9Dit8aqxGVLAAAAABJRU5ErkJggjc3Nzc=';
+export const MESH_EXPECT = {
+  refTime: '2026-09-07T09:42:40Z',
+  rows: 51,
+  cols: 51,
+  row0: 532,
+  col0: 2550,
+  la1: 49.675,
+  lo1: 255.505,
+  la2: 49.175,
+  lo2: 256.005,
+  d: 0.01,
+  drt: {tmpl: 41, R: -30.0, E: 0, D: 1, nbits: 8},
+  discipline: 209,
+  category: 3,
+  number: 28,
+  centre: {
+    lat: 49.425,
+    lon: -104.245,
+    row: 25,
+    col: 25,
+    count: 20,
+    value: -1.0
+  },
+  samples: [
+    [0, 0, 20],
+    [25, 25, 20],
+    [50, 50, 20],
+    [10, 40, 20],
+    [40, 10, 20],
+    [3, 48, 20]
+  ],
+  pngBytes: 201,
+  grib2Bytes: 380,
+  file: 'MRMS_MESH.latest.grib2.gz',
+  noCoverage: 0,
+  covered: 2601,
+  noHail: 2545,
+  hail: 56,
+  maxMm: 20.5,
+  medianMm: 3.4,
+  p90Mm: 9.2,
+  largest: {
+    row: 16,
+    col: 37,
+    mm: 20.5,
+    count: 235,
+    lat: 49.515,
+    lon: -104.125,
+    distKm: 13.242,
+    bearingDeg: 40.9
+  },
+  nearest: {row: 17, col: 33, mm: 0.9, distKm: 10.609, bearingDeg: 33.0},
+  scene:
+    "the 51 x 51 window 10 km south-west of the largest hail cell of the 09:42Z file (49.52 N 104.13 W, south-east Saskatchewan): the storm cores hold hail, the observer's own cell none"
+};
+export const MESH_B64 =
+  'R1JJQgAA0QIAAAAAAAABfAAAABUBAKEAAP8BAwfqCQcJKigCBwAAAEgDAAAACikAAAAAAgEAYSjuAQBhUrABAGD/JwAAADMAAAAzAAAAAQAPQkAC9fr4DzqyaDAC7lnYD0JTiAAAJxAAACcQAAAAACIEAAAAAAMcCABhAAAAAAAAAABmAAAAAfT/AQAAAAAAAAAVBQAACikAKcHwAAAAAAABCAAAAAAGBv8AAADOB4lQTkcNChoKAAAADUlIRFIAAAAzAAAAMwgAAAAAH8pv9gAAAJBJREFUeJxjFGEgGTCRrmVUz8jWIwRjMBKT3iReMDAIMbAzMPz785aBgYGFCC2iDIq/BZg5nv/7/e8tsW5jZWKTMRX+w8PA9JqBgTh7lIT+CEp/+fzr7UuoAGE9xqLi/yv/hjNfhosQdtsD/Wccj2axf0SIEBNuBhdQ+USFNRoYhGlnVM+onlE9o3pG9QwxPQC7DRzNCPL/sAAAAABJRU5ErkJggjc3Nzc=';
 
 // THE RAIN'S KIND (185th): an 8-bit window of the 10:20Z PrecipFlag file
 // over western Iowa re-packed as its own GRIB2 message (R -3, D 0: a
 // count is c - 3), five kinds among its 2,515 precipitating cells, with
 // the counts Pillow and numpy read from the same bytes
-export const KIND_EXPECT = {"refTime": "2026-09-07T10:20:00Z", "rows": 51, "cols": 51, "row0": 1256, "col0": 3443, "la1": 42.435, "lo1": 264.435, "la2": 41.935, "lo2": 264.935, "d": 0.01, "drt": {"tmpl": 41, "R": -3.0, "E": 0, "D": 0, "nbits": 8}, "discipline": 209, "category": 6, "number": 0, "centre": {"lat": 42.185, "lon": -95.315, "row": 25, "col": 25, "count": 4, "value": 1.0}, "samples": [[0, 0, 4], [25, 25, 4], [50, 50, 4], [10, 40, 4], [40, 10, 99], [3, 48, 4]], "pngBytes": 456, "grib2Bytes": 635, "file": "MRMS_PrecipFlag.latest.grib2.gz", "noCoverage": 0, "covered": 2601, "precip": 2515, "counts": {"0": 86, "1": 1964, "6": 54, "7": 31, "91": 380, "96": 86}, "nearest": {"row": 25, "col": 25, "kind": 1, "distKm": 0.0, "bearingDeg": 0.0}, "here": {"kind": 1}, "scene": "a 51 x 51 window of the 10:20Z file over western Iowa (42.19 N 95.32 W) holding five kinds - warm stratiform, convective, hail and the two tropical mixes"};
-export const PRECIPFLAG_B64 = "R1JJQgAA0QIAAAAAAAACewAAABUBAKEAAP8BAwfqCQcKFAACBwAAAEgDAAAACikAAAAAAgEAYSjuAQBhUrABAGD/JwAAADMAAAAzAAAAAQAPQkACh4G4D8L1ODACf+CYD8qWWAAAJxAAACcQAAAAACIEAAAAAAYACABhAAAAAAAAAABmAAAAAAD/AQAAAAAAAAAVBQAACikAKcBAAAAAAAAACAAAAAAGBv8AAAHNB4lQTkcNChoKAAAADUlIRFIAAAAzAAAAMwgAAAAAH8pv9gAAAY9JREFUeJytlLtyxCAMRY8YSJH/22IpvPm1NLjYT3RBCh62AcskE5qdxTrociUh1geU5QGaCLFq3AjBqAm6cJ05ks2SpT1rD6vymojzdTwQKnXljiz1QHw4iwnjNCmPL19piaELZt8LaqFOeS4ilQOuvNZy3tRnuLreqU5cZxq0G4Tr2sD/3efO8xEzbEyNCffQ+D469Jf69F6HGW1xsK1SlkiUNlp320YoyETbFG3S7t3VtPNgYvAsRBlOvcpkbSerYq94X9nrPkmMoxoUZlQgJUvV1tocNc4i/XOrI1gZNErUxYktRBqckBj1PrLggO0X5cE4B+BuB/rIpJ9tngDDekTcDCOfz4q82dxMSrMjbjLN4Q2Ziz8xLtd2wg3DtgHuPZ0FTDr3++LzcCIMQAgvAXg8tg3AOfL9ZDQpskCAj2JfwG0ut12S0DefTc1ZHfcO1vW5I4N2NenI7yQqBAcrrB7pzS8qxUJEshrn18P31vby3oqtkqPwykjSdhyPeJApNv+NwNdagWrJSVaCfgCAenMjNCU9DAAAAABJRU5ErkJggjc3Nzc=";
+export const KIND_EXPECT = {
+  refTime: '2026-09-07T10:20:00Z',
+  rows: 51,
+  cols: 51,
+  row0: 1256,
+  col0: 3443,
+  la1: 42.435,
+  lo1: 264.435,
+  la2: 41.935,
+  lo2: 264.935,
+  d: 0.01,
+  drt: {tmpl: 41, R: -3.0, E: 0, D: 0, nbits: 8},
+  discipline: 209,
+  category: 6,
+  number: 0,
+  centre: {lat: 42.185, lon: -95.315, row: 25, col: 25, count: 4, value: 1.0},
+  samples: [
+    [0, 0, 4],
+    [25, 25, 4],
+    [50, 50, 4],
+    [10, 40, 4],
+    [40, 10, 99],
+    [3, 48, 4]
+  ],
+  pngBytes: 456,
+  grib2Bytes: 635,
+  file: 'MRMS_PrecipFlag.latest.grib2.gz',
+  noCoverage: 0,
+  covered: 2601,
+  precip: 2515,
+  counts: {0: 86, 1: 1964, 6: 54, 7: 31, 91: 380, 96: 86},
+  nearest: {row: 25, col: 25, kind: 1, distKm: 0.0, bearingDeg: 0.0},
+  here: {kind: 1},
+  scene:
+    'a 51 x 51 window of the 10:20Z file over western Iowa (42.19 N 95.32 W) holding five kinds - warm stratiform, convective, hail and the two tropical mixes'
+};
+export const PRECIPFLAG_B64 =
+  'R1JJQgAA0QIAAAAAAAACewAAABUBAKEAAP8BAwfqCQcKFAACBwAAAEgDAAAACikAAAAAAgEAYSjuAQBhUrABAGD/JwAAADMAAAAzAAAAAQAPQkACh4G4D8L1ODACf+CYD8qWWAAAJxAAACcQAAAAACIEAAAAAAYACABhAAAAAAAAAABmAAAAAAD/AQAAAAAAAAAVBQAACikAKcBAAAAAAAAACAAAAAAGBv8AAAHNB4lQTkcNChoKAAAADUlIRFIAAAAzAAAAMwgAAAAAH8pv9gAAAY9JREFUeJytlLtyxCAMRY8YSJH/22IpvPm1NLjYT3RBCh62AcskE5qdxTrociUh1geU5QGaCLFq3AjBqAm6cJ05ks2SpT1rD6vymojzdTwQKnXljiz1QHw4iwnjNCmPL19piaELZt8LaqFOeS4ilQOuvNZy3tRnuLreqU5cZxq0G4Tr2sD/3efO8xEzbEyNCffQ+D469Jf69F6HGW1xsK1SlkiUNlp320YoyETbFG3S7t3VtPNgYvAsRBlOvcpkbSerYq94X9nrPkmMoxoUZlQgJUvV1tocNc4i/XOrI1gZNErUxYktRBqckBj1PrLggO0X5cE4B+BuB/rIpJ9tngDDekTcDCOfz4q82dxMSrMjbjLN4Q2Ziz8xLtd2wg3DtgHuPZ0FTDr3++LzcCIMQAgvAXg8tg3AOfL9ZDQpskCAj2JfwG0ut12S0DefTc1ZHfcO1vW5I4N2NenI7yQqBAcrrB7pzS8qxUJEshrn18P31vby3oqtkqPwykjSdhyPeJApNv+NwNdagWrJSVaCfgCAenMjNCU9DAAAAABJRU5ErkJggjc3Nzc=';

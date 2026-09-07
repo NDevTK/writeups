@@ -588,7 +588,7 @@ export const MRMS_KIND_FACTS = {
     convective:
       'convective against stratiform by the freezing-level height, the vertically integrated liquid and the reflectivity at -10 C; warm against cool stratiform by a surface temperature of 5 C; the tropical mixes by the tropical rain delineation',
     caveat:
-      "the type carries the errors of the model temperature, the MESH and the separation it is built from (the WDTD); v12.2 mitigated false convective calls in strong bright bands (the NWS IDP note)"
+      'the type carries the errors of the model temperature, the MESH and the separation it is built from (the WDTD); v12.2 mitigated false convective calls in strong bright bands (the NWS IDP note)'
   },
   documentation:
     "Zhang et al. 2016 (BAMS 97, 621-638) read in full - the seven types and their Z-R relations; the WDTD's SPT page read; the code table from the NMQ precipitation products note (Kirstetter 2017, NASA Wallops PRF) read; the NSSL GRIB2 tables not reachable from the build sandbox"

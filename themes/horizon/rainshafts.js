@@ -89,7 +89,12 @@ export const SNOW_EXTINCTION = {
     'Rasmussen, Vivekanandan, Cole, Myers and Masters 1999, J. Appl. Meteor. 38, 1542-1563 (Eq. 13; NCAR OpenSky copy read in full)',
   eq: 13,
   koschmieder: 3.912, // the paper's Eq. 3 (a contrast threshold of 0.02)
-  dry: {c3: 0.017, vtCmS: 100, words: 'dry aggregates - unmelted, unrimed (Holroyd 1971 / Magono and Nakamura 1965)'},
+  dry: {
+    c3: 0.017,
+    vtCmS: 100,
+    words:
+      'dry aggregates - unmelted, unrimed (Holroyd 1971 / Magono and Nakamura 1965)'
+  },
   wet: {c3: 0.072, vtCmS: 200, words: 'wet or rimed aggregates (Rogers 1974)'},
   wetAtOrAboveC: -1, // the paper's Table 6 split
   fig10Km: {dry: 0.3, wet: 2.6, atMmH: 2}, // the text's readings of Fig. 10

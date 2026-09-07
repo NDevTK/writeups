@@ -2333,7 +2333,9 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       srcM.includes(
         'const mrmsMesh = mrmsFeed(MRMS_MESH_URL, MRMS_MESH_FACTS)'
       ) &&
-      srcM.includes('const mrmsKind = mrmsFeed(MRMS_KIND_URL, MRMS_KIND_FACTS)') &&
+      srcM.includes(
+        'const mrmsKind = mrmsFeed(MRMS_KIND_URL, MRMS_KIND_FACTS)'
+      ) &&
       srcM.includes('env.MRMS_KIND_URL ??') &&
       srcM.includes('2D/PrecipFlag/MRMS_PrecipFlag.latest.grib2.gz') &&
       srcM.includes('const census = kindCensus(values, box, la, lo)') &&
