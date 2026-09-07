@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1202 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
+1204 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **149 reference files, 1202 landmark lines, 9 GPU probes** (live gate
+- **149 reference files, 1204 landmark lines, 9 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1454,7 +1454,50 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    decks. Measured in the same Montana storm at 2 a.m. (08:08Z): the
    frame's mean colour fell from 124/129/132 to 0.4/0.1/0.0 out of
    255, the curtains dark against the night sky and the stars back
-   between them; no gate changes, the display rule only
+   between them; no gate changes, the display rule only. Pass 181
+   brings the anvil at two kilometres: NOAA's cloud top height at its
+   native 2 km (`ABI-L2-ACHA2KMC`, CONUS every 5 min, 5.2 MB a file;
+   NCEI: "the product's spatial resolution increased from 10 and 4 km
+   to 2 km on 24 March 2023"; OSPO's notice of 23 March 2023: the
+   baseline replaced by the Enterprise algorithm, the 2-km files named
+   "2KM", the DQF gaining retrieval_attempted and opaque_retrieval — so
+   the heights read since pass 148 are the Enterprise algorithm's,
+   whose ATBD v3.4 is downloaded and not yet read) as the nineteenth
+   served product, the window 0.9–1.1 MB in four ranges. Measured
+   first on the whole CONUS scene of 08:06Z: every 10-km field is the
+   mean of its 5 × 5 block's good 2-km pixels — 126,312 fields within
+   0.17 m (the count's quantum 0.305 m), rms 0.09 m, none good on one
+   side only — the ATBD's and PUG's aggregation reproduced exactly, so
+   the theme takes the 2-km window as the same retrieval unsmoothed
+   wherever it is live: the cirrus sheets a fifth the size at each
+   pixel's own height in one merged geometry, a radar storm cell's top
+   read in its own 2-km pixel (the block mean stood 3.4 km under the
+   crop's tallest pixel and left a 14.4-km core unlifted where the
+   pixel lifts it), the decks' bands and the storm slab's tallest
+   tenth from the pixels with the count rules kept in fields of 10 km;
+   the 10-km window stands where the 2-km is not live and keeps the
+   mosaic-minute comparison. The closure is a law
+   (`goesl2.heightBlockClosure`: whole blocks only — a ±50-pixel
+   window's edge fields hold part of their blocks and read kilometres
+   off, 1.8 km on a corner field of 6 pixels, measured and left out)
+   printed live on the ACHA line where both windows are of one scan.
+   Gated on a vendored crop of the home's 50 × 50 pixels and the same
+   scan's 10 × 10 fields against h5py and numpy (`goesl2-reference`
+   THE ANVIL AT TWO KILOMETRES: the flag censuses, the statistics,
+   every field's closure by the law and a plain loop to 0.17 m, the
+   tallest pixel 16,358 m over its block's 12,960, the block hiding a
+   9.7-km pixel under a 5.1-km mean, the centre pixel navigated to
+   numpy's place, the sheets a fifth the size, the bands' tallest tenth
+   and tallest higher; `server-reference` THE ANVIL AT TWO KILOMETRES:
+   the daemon's body, and the twenty asks pinned). Live at the home
+   (08:37Z, 2 a.m.): the same scan's two windows side by side — 437
+   fields against 8,460 pixels, the tallest tenth 12,980 against
+   13,248 m, the tallest 15,579 against 16,529, 164 sheets of 11 × 14
+   km against 3,307 of 2.3 × 2.8 — and the live closure 359 whole
+   blocks to 0.20 m (80 edge fields left out). STATED: the Enterprise
+   ATBD is unread and the accuracies quoted are the baseline's; the
+   marginal class is left out with the bad; the mask's fraction per
+   2-km pixel is one mask pixel's
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

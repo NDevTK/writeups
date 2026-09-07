@@ -10345,6 +10345,123 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 7, the review session's 181st pass - THE ANVIL AT TWO
+  KILOMETRES): the 173rd's bands, the 176th's tower tops and the
+  177th's sheets read the 10-km ACHAC fields, each the mean of a 5 x 5
+  block of 2-km retrievals; NOAA has served the same retrieval at its
+  native 2 km since March 2023 (ABI-L2-ACHA2KMC, CONUS every 5 min,
+  in the same open bucket). PRIMARIES READ: NCEI's record of the
+  product (gov.noaa.ncdc:C01505): "The product's spatial resolution
+  increased from 10 and 4 km to 2 km on 24 March 2023", the two
+  identifiers ABI-L2-ACHA and ABI-L2-ACHA2KM; OSPO's notice of 23
+  March 2023 17:07 UTC ("GOES-16 and GOES-18 software build
+  (PR.11.05.00) implementation"; GOES-18 on 27 March 2023 18:00 UTC):
+  the baseline Cloud Top Height replaced by the ENTERPRISE version,
+  2-km versions added with "2KM" in the file names (ACHA2KMF, ACHP2KMF
+  and COD2KMF named), the DQF gaining retrieval_attempted_qf and
+  opaque_retrieval_qf - so the heights the theme has read since the
+  148th are the Enterprise algorithm's; the 173rd's ATBD v3.0 (the
+  baseline, Heidinger 2012) describes its ancestor, and the Enterprise
+  ACHA ATBD v3.4 (Heidinger and Li, September 2020, STAR, 5.9 MB) is
+  downloaded and NOT yet read - the named next lead, with the 178th's
+  emissivity and the stated 500 m / 1.5 km to be re-read against it.
+  MEASURED FIRST: the file (OR_ABI-L2-ACHA2KMC-M6_G18_s20262500806180,
+  5.2 MB): 1500 x 2500 at 2 km, HT uint16 at 0.3052 m a count, DQF
+  0..4 (the 2-km file's flag census {0: 2,581,705, 1: 63,415, 2:
+  1,445, 3: 1,103,435}, no 4 anywhere; the marginal class's median
+  11.2 km - thin high cloud; the 10-km file of the same scan 120
+  marginal of 150,000), chunked 52 rows (HT) and 104 (DQF) by the
+  full width, gzip and shuffle; against the same scan's 10-km file:
+  126,312 fields with both, EVERY one within 0.17 m (the 10-km count's
+  quantum is 0.305 m), rms 0.09 m, mean -0.00007 m, no field good on
+  one side only - the 10-km product is the mean of its block's good
+  (DQF 0) 2-km pixels, exactly, the ATBD's Sec. 1.11.3.1 and the PUG's
+  aggregation reproduced on the whole scene; the 08:36Z pair the same
+  (126,186 fields, max 0.29 m, rms 0.09). THE DAEMON: the twentieth
+  ask and nineteenth served product (`height2km`: the 10-km product's
+  own HT and DQF spec, halfPx 50, the scene's now - never a mosaic's
+  minute, which the 10-km window keeps): the 101 x 101 window with the
+  height census and a flag census; the window 0.9-1.1 MB in 4 ranges
+  in ~0.5 s (1,082 kB of 5.2 MB; 887 kB of 4.6, measured);
+  l2Height2kmBody, the client and the page's fill list. THE LAW
+  (goesl2.js): heightBlockClosure - every good fine pixel binned by
+  its scan angles into the coarse grid, a field closing only when its
+  WHOLE block lies under the fine window (the count of pixels under
+  each field against the scale ratio squared, 25), the partial fields
+  counted and said; heightFlags; ACHA_DQF_MEANINGS; towerTopsWords
+  names the pixel's measured size. THE PAGE: goesL2HeightLive - the
+  2-km window while live (30 min), else the 10-km, with `perField` 25
+  or 1 so the count rules stay in fields of 10 km (three fields for a
+  band's median, ten for the storm slab); applyCirrusSheets takes it
+  (a sheet a fifth the size at each pixel's own height) and builds ONE
+  geometry for every sheet (four corners each, the alpha on each, two
+  triangles; the material two-sided) where the 177th made a mesh a
+  sheet - a 2-km window holds thousands; applyRadarTops takes it (the
+  core's top read in its own 2-km pixel, not the block's mean);
+  goesL2TopsNow takes it (the bands, the tallest tenth and the tallest
+  from the pixels); the ACHA line names the product at its native 2 km,
+  says the 10-km product is each block's mean (the scene's 0.09 m rms
+  over 126,312 fields), closes the two live windows against each other
+  where both are of one scan, prints the pixels beside the fields they
+  make, and names which window the sheets took. GATED:
+  goesl2-reference THE ANVIL AT TWO KILOMETRES on a vendored crop
+  (acha2km-fixture, 89 kB: the home's 50 x 50 pixels of the 08:06Z
+  scan and the same scan's 10 x 10 fields they are the blocks of,
+  re-written by h5py with the coordinates re-based; ACHA2KM_EXPECT by
+  numpy): the flag censuses {0: 2230, 1: 181, 3: 89} and {0: 100}, the
+  statistics, every field's closure by the law and by a plain loop
+  (max 0.171 m, rms 0.084, each block mean to a centimetre of numpy's),
+  the tallest pixel (23, 21) 16,358 m over its block's mean 12,960 (the
+  10-km field 12,960) so a 14.4-km core there lifts 2 km at 2 km while
+  the 10-km field stands below it and the radar's top keeps, block (9,
+  5) hiding a 9,677-m pixel under a 5,083-m mean, the centre count
+  18224 = 5,562.0 m navigated to 32.9531 N 117.1512 W (numpy's inverse
+  to 1e-5 deg), eight samples, 2,003 sheets of 2.29 x 2.75 km against
+  89 of 11.44 x 13.74 (ratio 5.00), the bands' tallest tenth 13,068
+  against 12,721 and tallest 16,358 against 13,451, a window cut by a
+  column leaving its ten partial fields out; server-reference THE
+  ANVIL AT TWO KILOMETRES (the body: 2286 x 2753 m a pixel against
+  11438 x 13741, the census and flags recomputed from the wire) and the
+  asks pinned (20 asks, 19 served, 14 untimed), the bindings landmark
+  reading a builder's name with a digit. FIRST-CUT LESSONS: (1) the
+  first live closure read 2,979 m at most and 269 m rms - a +-50-pixel
+  window is not block-aligned, so its 80 edge fields held part of their
+  blocks (a corner field 6 of 25 pixels, 1.8 km off on the daemon's
+  08:37Z body); whole blocks only now, and the same body closes 359
+  fields to 0.20 m (rms 0.09) - what numpy reads for that window (0.20
+  m over its 437 fields); (2) the reader's float32 field against
+  numpy's float64 needs a centimetre, not a micrometre; (3) the
+  bindings gate's regex had no digits. MEASURED in the page (the home,
+  32.85 N 117.12 W, 01:50 local, the 08:42Z windows through the local
+  daemon): "8447 good 2-km pixels (338 fields of 10 km) of the +-100 km
+  window: low 531 (median 2384 m), mid 2210 (5896 m), high 5706 (10042
+  m) · the tallest tenth 13038 m, the tallest 16660 m"; "the cirrus
+  sheets: (ABI-L2-ACHA2KMC, 2 km pixels) 3180 high pixels within 100 km
+  as sheets at their parallax-corrected places (moved 6.2-16.5 km
+  toward the sub-satellite point at 45° zenith), tops 6.5 km-16.5 km
+  (median 10.1 km), each 2.3 x 2.8 km ... 3180 from the enterprise
+  cloud optical depth (... the block medians' median 1.1; 3180 of them
+  the night retrieval ...) ... 2 tau_IR against DCOMP's tau: 1.05 over
+  3170"; the same scan's two windows side by side (the daemon's 08:37Z
+  body): 437 fields against 8,460 pixels, high 291 against 5,873, the
+  tallest tenth 12,980 against 13,248 m (+268), the tallest 15,579
+  against 16,529 (+950), 164 sheets of 11.4 x 13.7 km against 3,307 of
+  2.3 x 2.8 - the frame at 2 a.m. a dark sky with the stars between
+  thin 2-km slabs where the 10-km showed one block; no page errors.
+  The line's own closure, live on the next render (the 08:47Z
+  windows): "the 2-km pixels' block means close against the 10-km
+  fields to 0.19 m at most (rms 0.09 m) over 358 whole blocks of 20.7
+  good pixels each; no field good on one side only; 80 fields only
+  partly under the window, left out - the PUG's 5 x 5 mean, measured".
+  STATED LIMITS: the served retrieval is the Enterprise algorithm's
+  and its ATBD is unread here (the theme's accuracies are the
+  baseline's requirement table); the 2-km product's marginal class is
+  left out with the bad, as the 10-km census does; the mask's fraction
+  per 2-km height pixel is one mask pixel's (0 or 1) - the opacity law
+  ranks DCOMP and the emissivity above it; the closure needs the two
+  windows of one scan (the two asks list separately and can straddle a
+  file); the sheets' daylight look at 2 km is not yet judged (the
+  scheduled check-in).
 - DONE (Sep 7, the review session's 180th pass - THE SHAFTS IN THE
   SCENE'S LIGHT): the 179th's named lead - the rain curtains (165th)
   were drawn in a constant grey-blue (0.5, 0.56, 0.62) through the
