@@ -100,9 +100,11 @@ export const MRMS_FLANK_SLOPE = 2;
 // (MRMS_FACTS.documentation). A cell that rains is measured; a cell
 // at 0 under the mosaic's reach is measured dry; -3 is unmeasured.
 export const MRMS_RATE_FACTS = {
-  source: 'NCEP MRMS (mrms.ncep.noaa.gov/2D/PrecipRate/MRMS_PrecipRate.latest.grib2.gz)',
+  source:
+    'NCEP MRMS (mrms.ncep.noaa.gov/2D/PrecipRate/MRMS_PrecipRate.latest.grib2.gz)',
   product: 'PrecipRate',
-  meaning: "the radar precipitation rate at the surface, mm/h (the catalogue's name; the scaling the file's own)",
+  meaning:
+    "the radar precipitation rate at the surface, mm/h (the catalogue's name; the scaling the file's own)",
   cadenceS: 120,
   cellDeg: 0.01,
   cellKm: 1,
@@ -122,7 +124,17 @@ export const MRMS_RATE_CAP = 400;
  * cell placed, and the raining cells nearest first (each with lat/lon
  * - as latDeg/lonDeg too, the shafts' own names - its rate, distance
  * and bearing), capped. */
-export function precipRateCensus(values, box, lat, lon, {cap = MRMS_RATE_CAP, grid = MRMS_FACTS.grid, cellDeg = MRMS_FACTS.cellDeg} = {}) {
+export function precipRateCensus(
+  values,
+  box,
+  lat,
+  lon,
+  {
+    cap = MRMS_RATE_CAP,
+    grid = MRMS_FACTS.grid,
+    cellDeg = MRMS_FACTS.cellDeg
+  } = {}
+) {
   const n = values.length;
   let covered = 0;
   const rates = [];
@@ -164,12 +176,23 @@ export function precipRateCensus(values, box, lat, lon, {cap = MRMS_RATE_CAP, gr
     raining: rates.length,
     coverage: n ? covered / n : 0,
     medianMmH: rates.length ? rates[rates.length >> 1] : null,
-    p90MmH: rates.length ? rates[Math.min(rates.length - 1, Math.floor(0.9 * rates.length))] : null,
+    p90MmH: rates.length
+      ? rates[Math.min(rates.length - 1, Math.floor(0.9 * rates.length))]
+      : null,
     maxMmH: rates.length ? rates[rates.length - 1] : null,
     heaviest: heaviest ? place(heaviest) : null,
     here: {
       mmh: hereV > 0 ? hereV : null,
-      code: hereV > 0 ? 'rain' : hereV === 0 ? 'no rain' : hereV === -3 ? 'no coverage' : Number.isFinite(hereV) ? 'other' : 'off the window'
+      code:
+        hereV > 0
+          ? 'rain'
+          : hereV === 0
+            ? 'no rain'
+            : hereV === -3
+              ? 'no coverage'
+              : Number.isFinite(hereV)
+                ? 'other'
+                : 'off the window'
     },
     cells: placed.slice(0, cap),
     cellsTotal: cells.length
@@ -179,7 +202,8 @@ export function precipRateCensus(values, box, lat, lon, {cap = MRMS_RATE_CAP, gr
 export function precipRateWords(c, {refTimeIso = null, halfKm = null} = {}) {
   const when = refTimeIso ? `${refTimeIso.slice(11, 16)}Z · ` : '';
   const reach = halfKm !== null ? `within ±${halfKm} km` : 'in the window';
-  if (!c.covered) return `${when}no radar coverage ${reach} (${c.n} cells at -3)`;
+  if (!c.covered)
+    return `${when}no radar coverage ${reach} (${c.n} cells at -3)`;
   const here =
     c.here.code === 'rain'
       ? `overhead ${c.here.mmh.toFixed(1)} mm/h`
@@ -193,7 +217,9 @@ export function precipRateWords(c, {refTimeIso = null, halfKm = null} = {}) {
   return (
     `${when}${c.raining.toLocaleString('en-US')} raining cells of ${c.covered.toLocaleString('en-US')} covered ${reach} · ` +
     `rates median ${c.medianMmH.toFixed(1)} mm/h, heaviest tenth ${c.p90MmH.toFixed(1)}, heaviest ${c.maxMmH.toFixed(1)}` +
-    (c.heaviest ? ` at ${c.heaviest.bearingDeg.toFixed(0)}° and ${c.heaviest.distKm.toFixed(0)} km` : '') +
+    (c.heaviest
+      ? ` at ${c.heaviest.bearingDeg.toFixed(0)}° and ${c.heaviest.distKm.toFixed(0)} km`
+      : '') +
     ` · the nearest ${c.cells.length ? `${c.cells[0].mmh.toFixed(1)} mm/h at ${c.cells[0].bearingDeg.toFixed(0)}° and ${c.cells[0].distKm.toFixed(0)} km` : 'none'}` +
     ` · ${here}`
   );

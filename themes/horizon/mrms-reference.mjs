@@ -24,7 +24,12 @@ import {
   mrmsCellCentre
 } from './mrms.js';
 import {haversineKm} from './lightning.js';
-import {ECHOTOP_B64, MRMS_EXPECT, PRECIPRATE_B64, RATE_EXPECT} from './mrms-fixture.js';
+import {
+  ECHOTOP_B64,
+  MRMS_EXPECT,
+  PRECIPRATE_B64,
+  RATE_EXPECT
+} from './mrms-fixture.js';
 import {MRMS_RATE_FACTS, precipRateCensus, precipRateWords} from './mrms.js';
 
 let fail = 0;
@@ -489,12 +494,28 @@ const createInflate = () => zlib.createInflate();
   const X = RATE_EXPECT;
   const bytes = new Uint8Array(Buffer.from(PRECIPRATE_B64, 'base64'));
   const h = grib2Header(bytes);
-  const w = await grib2Window(bytes, X.centre.lat, X.centre.lon, 25, {createInflate});
-  const gridOpt = {grid: {ni: X.cols, nj: X.rows, la1: X.la1, lo1: X.lo1}, cellDeg: X.d};
-  const cen = precipRateCensus(w.values, w.box, X.centre.lat, X.centre.lon, gridOpt);
-  const cap5 = precipRateCensus(w.values, w.box, X.centre.lat, X.centre.lon, {...gridOpt, cap: 5});
+  const w = await grib2Window(bytes, X.centre.lat, X.centre.lon, 25, {
+    createInflate
+  });
+  const gridOpt = {
+    grid: {ni: X.cols, nj: X.rows, la1: X.la1, lo1: X.lo1},
+    cellDeg: X.d
+  };
+  const cen = precipRateCensus(
+    w.values,
+    w.box,
+    X.centre.lat,
+    X.centre.lon,
+    gridOpt
+  );
+  const cap5 = precipRateCensus(w.values, w.box, X.centre.lat, X.centre.lon, {
+    ...gridOpt,
+    cap: 5
+  });
   const centre = w.values[25 * w.box.cols + 25];
-  const samplesOk = X.samples.every(([r, c, count]) => near(w.values[r * w.box.cols + c], (count - 30) / 10, 1e-9));
+  const samplesOk = X.samples.every(([r, c, count]) =>
+    near(w.values[r * w.box.cols + c], (count - 30) / 10, 1e-9)
+  );
   const all = Array.from(w.values);
   const rates = all.filter((v) => v > 0).sort((a, b) => a - b);
   const noCov = all.filter((v) => v === -3).length;
@@ -539,8 +560,12 @@ const createInflate = () => zlib.createInflate();
       cen.cells.length === Math.min(400, X.raining) &&
       cen.cells[0].distKm === 0 &&
       near(cen.cells[0].mmh, X.nearest.mmh, 1e-9) &&
-      cen.cells.every((c, k) => k === 0 || c.distKm >= cen.cells[k - 1].distKm) &&
-      cen.cells.every((c) => c.mmh > 0 && c.latDeg === c.lat && c.lonDeg === c.lon) &&
+      cen.cells.every(
+        (c, k) => k === 0 || c.distKm >= cen.cells[k - 1].distKm
+      ) &&
+      cen.cells.every(
+        (c) => c.mmh > 0 && c.latDeg === c.lat && c.lonDeg === c.lon
+      ) &&
       cap5.cells.length === 5 &&
       cap5.cellsTotal === X.raining &&
       MRMS_RATE_FACTS.drt.R === -30 &&
