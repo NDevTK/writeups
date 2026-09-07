@@ -470,15 +470,36 @@ are gated by `../server-reference.mjs` — the `server` set in
   and closes the column against the product where both stand (the
   median and tenth of the difference on the line); the full-disk grid
   is the CONUS grid 422 rows and 1462 columns in (measured), gated on
-  a vendored crop of the home's pixels beside the 2-km height crop:
-  twenty products served (a window of +-100
+  a vendored crop of the home's pixels beside the 2-km height crop.
+  Since the 186th the fractional snow cover (`ABI-L2-FSCC`: CONUS
+  every 5 min by day, 2 km, 59-93 kB a file read whole in one range,
+  measured - FSC uint8 percent 0-100 with 125 fill and 128 no
+  retrieval, DQF the twelve codes of `goesl2.FSC_DQF_MEANINGS`) as
+  `fsc`: the +-100 km window's counts and flags (`fsc`, `dqf`, u8),
+  the observer's own pixel with its code named (`here`), the census
+  (snow-free, part-covered and full pixels; the median, mean, tenth
+  and maximum percent; the cloud, water and night counts; the flag
+  table) and the scene's own statistics from the head (`sceneStats`,
+  null while the scene has too few good pixels - the night's and
+  dawn's files) with the file's solar and local zenith thresholds
+  (`szaMaxDeg` 80, `lzaRetrievalDeg` 90). The Enterprise FSC ATBD
+  v1.0 and the GOES-18 read-me (read in full) make it the VIEWABLE
+  snow fraction by Eq. 1's unmixing, with a theoretical error budget
+  of 0.15-0.20 against the NDSI law's 0.33-0.40, so the page builds
+  the terrain's snow field from the counts at its own anchor and DEM
+  (each texel looked up in the pixel that sees its lifted ground -
+  `goesl2.snowFieldFromOrbit`) and lets it outrank the MODIS NDSI
+  field where the retrieval is good, MODIS standing under cloud,
+  water and night; gated on a vendored crop of the Colorado Front
+  Range against numpy, flat and lifted 3 km:
+  twenty-one products served (a window of +-100
   km costs 437-547 kB in 4-6 ranges, measured, the aerosol window a
   few tens of kB more, the two profile windows about a megabyte
   between them at the five-minute cadence, the stability window
   nearly its whole 0.9-MB file - its fields are chunked 262 rows by
   the full width, so any window touches the chunk: 8 ranges, 836 kB,
   measured). A
-  TWENTY-FIRST ask exists in the shared decode block but is the
+  TWENTY-SECOND ask exists in the shared decode block but is the
   page's own (`pageOnly`, 159th): the 500-m visible band 2 window (`vis`,
   401 x 401 px of the CMIP ATBD's reflectance factor with the
   file's kappa, Esun and Earth-Sun distance) that the page reads
@@ -487,7 +508,7 @@ are gated by `../server-reference.mjs` — the `server` set in
   cadence (about 15 MB an hour by day), which this box's free-tier
   egress cannot carry and the bucket's CORS can. This
   daemon never lists, fetches or serves it; `/health`'s
-  `version.products` names the twenty it does.
+  `version.products` names the twenty-one it does.
   Since the 151st pass
   every file is read by HTTP RANGE
   (`hdf5.js` `openHdf5Lazy`): the first 256 kB, then only the chunks

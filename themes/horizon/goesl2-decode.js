@@ -976,7 +976,9 @@ export function l2FscBody(dec, key, lat, lon) {
   const qc = cj * w.box.cols + ci;
   const x = dec.extras ?? {};
   const num = (v) => (Number.isFinite(v) ? v : null);
-  const r2 = (v) => (Number.isFinite(v) ? +v.toFixed(2) : null);
+  // the scene's statistics carry -999 (their _FillValue) while the
+  // scene has too few good pixels - the night's and dawn's files
+  const r2 = (v) => (Number.isFinite(v) && v > -998 ? +v.toFixed(2) : null);
   const hereDqf = w.cut.DQF[qc];
   return {
     ...l2Common(dec, L2_PRODUCTS.fsc, key, w),

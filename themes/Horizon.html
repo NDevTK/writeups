@@ -528,6 +528,9 @@
         phaseWords,
         solarZenithDeg,
         sstAgainstGrid,
+        mergeSnowFields,
+        snowFieldFromOrbit,
+        snowFromOrbitWords,
         unpackArray,
         unscale,
         windowIndexOf
@@ -4089,6 +4092,159 @@
       }
 
       let snowCovSeq = 0;
+      // THE SNOW'S COVER FROM ORBIT (186th pass): NOAA's fractional
+      // snow cover at 2 km (ABI-L2-FSCC, every 5 min by day) as the
+      // terrain's per-texel snow field where the retrieval is good -
+      // the satellite's viewable fraction outranks the MODIS NDSI
+      // field (minutes old against a day's composite; the Enterprise
+      // FSC ATBD's error budget 0.15-0.20 against NDSI's 0.33-0.40,
+      // Tables 2-7 and 2-8), MODIS stands where the satellite has
+      // cloud, water or night, the heuristic snowline where neither
+      // knows (goesl2.mergeSnowFields). The field is built at the
+      // page's own anchor through roam.js's scene mapping with each
+      // texel lifted to its ground elevation (the DEM the terrain
+      // stands on): the pixel that sees a mountain lies beyond it,
+      // away from the sub-satellite point - a surface product's
+      // parallax, the inverse of the cloud sheets' (177th). A field
+      // with good pixels is held for a day, so the night keeps the
+      // afternoon's (the night's files carry the night code alone);
+      // a hop drops it with the MODIS field.
+      let modisSnow = null; // {field, day}: the MODIS NDSI field (snowcover.snowField)
+      let orbitSnow = null; // {field, time, at, craft, census, here, anchorKey}
+      let snowFieldMerged = null; // the field the terrain reads (goesl2.mergeSnowFields)
+      const FSC_HOLD_MS = 24 * 3600e3;
+      const SNOW_FIELD_N = 96;
+      const snowAnchorKey = () => state.lat.toFixed(4) + ',' + state.lon.toFixed(4);
+      function goesL2SnowRebuild() {
+        const key = snowAnchorKey();
+        if (orbitSnow && orbitSnow.anchorKey !== key) orbitSnow = null;
+        const w = goesL2 && goesL2.fsc;
+        if (!w || !w.fsc || !w.dqf || !w.box || !w.g) {
+          applySnowFields();
+          return;
+        }
+        const anchor = {lat: state.lat, lon: state.lon};
+        let f = null;
+        try {
+          f = snowFieldFromOrbit(
+            w,
+            (x, z) => sceneToGeo(x, z, anchor),
+            WORLD,
+            SNOW_FIELD_N,
+            {elevM: demData ? demElev : null}
+          );
+        } catch (e) {
+          if (params.has('debug')) console.warn('fsc field: ' + e.message);
+        }
+        const at = Date.parse(w.time) || Date.now();
+        if (f && f.cells) {
+          orbitSnow = {
+            field: f,
+            time: w.time,
+            at,
+            craft: goesL2.craft,
+            census: w.census,
+            here: w.here,
+            anchorKey: key
+          };
+        } else if (orbitSnow && at - orbitSnow.at > FSC_HOLD_MS) {
+          // the held afternoon field is a day old: it stands down
+          orbitSnow = null;
+        }
+        goesL2SnowLast = {time: w.time, census: w.census, cells: f ? f.cells : 0};
+        applySnowFields();
+      }
+      let goesL2SnowLast = null; // the latest file's census, good pixels or not
+      // The terrain's snow texture from the merged field (the same
+      // DataTexture path the MODIS field alone took before the 186th);
+      // the town's roofs read the same field (bldSnowAt).
+      let snowFieldsAppliedKey = null;
+      function applySnowFields() {
+        if (!terrainObj) return;
+        const orbit =
+          orbitSnow && orbitSnow.anchorKey === snowAnchorKey()
+            ? orbitSnow.field
+            : null;
+        const modis = modisSnow ? modisSnow.field : null;
+        if (!orbit && !modis) {
+          snowFieldMerged = null;
+          snowFieldsAppliedKey = null;
+          return;
+        }
+        // the same two fields make the same texture: no churn on a
+        // five-minute body that brought no new snow file
+        const key =
+          (orbit ? orbitSnow.time + '@' + orbitSnow.anchorKey : '-') +
+          '|' +
+          (modis ? modisSnow.day : '-');
+        if (key === snowFieldsAppliedKey) return;
+        snowFieldsAppliedKey = key;
+        const merged = mergeSnowFields(orbit, modis);
+        snowFieldMerged = merged;
+        const N = merged.n;
+        snowFSC = merged.snowy || 0;
+        const tex = new THREE.DataTexture(
+          merged.data,
+          N,
+          N,
+          THREE.RedFormat,
+          THREE.FloatType
+        );
+        tex.minFilter = tex.magFilter = THREE.NearestFilter;
+        tex.needsUpdate = true;
+        const old = terrainObj.snowTexNode.value;
+        terrainObj.snowTexNode.value = tex;
+        if (old && old.image && old.image.width > 1) old.dispose();
+        terrainUniforms.uSnowCovOn.value = 1;
+        // The town's roofs read the SAME measured field - re-seat
+        // the buildings so their snow attribute picks it up.
+        bldSnowAt = (x, z) => {
+          const gi = Math.round((x / WORLD + 0.5) * N - 0.5);
+          const gj = Math.round((0.5 - z / WORLD) * N - 0.5);
+          if (gi < 0 || gi >= N || gj < 0 || gj >= N) return 0;
+          const v = merged.data[gj * N + gi];
+          return v > 0 ? v : 0;
+        };
+        if (worldBuilt) placeBuildings();
+      }
+      // The research line: the latest file's census within reach, the
+      // observer's own pixel, the box's merged shares and the ranking
+      // (goesl2.snowFromOrbitWords); a file without a good pixel says
+      // why and what stands.
+      function snowOrbitLine() {
+        const last = goesL2SnowLast;
+        if (!last || !last.census) return null;
+        const when = last.time ? last.time.slice(11, 16) + 'Z' : '';
+        const merged =
+          snowFieldMerged && orbitSnow && orbitSnow.anchorKey === snowAnchorKey()
+            ? snowFieldMerged
+            : null;
+        if (!last.cells) {
+          const c = last.census;
+          const why = [
+            c.night ? `night ${c.night}` : '',
+            c.cloud ? `cloud ${c.cloud}` : '',
+            c.water ? `water ${c.water}` : ''
+          ]
+            .filter(Boolean)
+            .join(', ');
+          return (
+            `${when}: no good pixel over the box (${c.good} of ${c.n} within ±100 km retrieved; ${why} px)` +
+            (orbitSnow && orbitSnow.field
+              ? ` · the field of ${orbitSnow.time.slice(11, 16)}Z stands (held a day: ${Math.round(orbitSnow.field.known * 100)}% of the box)`
+              : modisSnow
+                ? ` · MODIS NDSI ${modisSnow.day} stands`
+                : ' · the snowline stands')
+          );
+        }
+        return snowFromOrbitWords(
+          last.census,
+          goesL2 && goesL2.fsc ? goesL2.fsc.here : null,
+          merged,
+          modisSnow ? modisSnow.day : null,
+          when
+        );
+      }
       // MEASURED cloud tops (cloudtop.js): the VIIRS afternoon
       // pass's cloud-top heights over the box, censused through
       // the same GIBS WMTS as the snow and lights. The ISCCP band
@@ -4360,32 +4516,12 @@
             const o = ((iy & 255) * 256 + (ix & 255)) * 4;
             return [d[o], d[o + 1], d[o + 2], d[o + 3]];
           };
-          const N = 96;
+          const N = SNOW_FIELD_N;
           const f = snowField(pxAt, anchor, WORLD, N);
-          snowFSC = f.snowy || 0;
-          const tex = new THREE.DataTexture(
-            f.data,
-            N,
-            N,
-            THREE.RedFormat,
-            THREE.FloatType
-          );
-          tex.minFilter = tex.magFilter = THREE.NearestFilter;
-          tex.needsUpdate = true;
-          const old = terrainObj.snowTexNode.value;
-          terrainObj.snowTexNode.value = tex;
-          if (old && old.image && old.image.width > 1) old.dispose();
-          terrainUniforms.uSnowCovOn.value = 1;
-          // The town's roofs read the SAME measured field - re-seat
-          // the buildings so their snow attribute picks it up.
-          bldSnowAt = (x, z) => {
-            const gi = Math.round((x / WORLD + 0.5) * N - 0.5);
-            const gj = Math.round((0.5 - z / WORLD) * N - 0.5);
-            if (gi < 0 || gi >= N || gj < 0 || gj >= N) return 0;
-            const v = f.data[gj * N + gi];
-            return v > 0 ? v : 0;
-          };
-          if (worldBuilt) placeBuildings();
+          // the terrain reads the merge (186th): the satellite's texels
+          // outrank these where its retrieval is good
+          modisSnow = {field: f, day};
+          applySnowFields();
           record(
             'MODIS NDSI snow cover ' + day,
             Math.round(f.known * 100) +
@@ -6565,7 +6701,8 @@
         'lvm',
         'dsi',
         'height2km',
-        'topTemp'
+        'topTemp',
+        'fsc'
       ];
       let goesL2Busy = false;
       // THE HAZE'S KIND (169th pass): NOAA's aerosol detection while
@@ -7468,6 +7605,8 @@
               dqf: p.dqf ? unpackArray(p.dqf) : null,
               prob: p.prob ? unpackArray(p.prob) : null,
               ht: p.ht ? unpackArray(p.ht) : null,
+              // the snow's cover from orbit (186th): the percent counts
+              fsc: p.fsc && p.fsc.b64 ? unpackArray(p.fsc) : null,
               // the imagery's kelvin and DCOMP's tau and r_eff from
               // the counts on the wire (149th pass; goesl2.unscale)
               btK: p.bt
@@ -7721,6 +7860,10 @@
             // top temperature at 2 km (full disk, every 10 min) - each
             // cirrus sheet's T_c in the emissivity law where it is good
             topTemp: unpackProduct(j.topTemp),
+            // the snow's cover from orbit (186th): the fractional snow
+            // cover at 2 km - the terrain's snow field where the
+            // retrieval is good (goesL2SnowRebuild)
+            fsc: unpackProduct(j.fsc),
             // the daemon's deployed revision and the products the
             // page read for it from the bucket (158th pass)
             rev: j.rev ?? null,
@@ -8027,6 +8170,7 @@
           updateLiveDroplets();
           syncLandLayer();
           syncDaylight();
+          goesL2SnowRebuild();
         } catch (e) {
           if (params.has('debug')) console.warn('goesl2: ' + e.message);
         } finally {
@@ -15967,6 +16111,10 @@
             const rkl = radarKindLine();
             if (rkl) research["the rain's kind (MRMS PrecipFlag)"] = rkl;
             else delete research["the rain's kind (MRMS PrecipFlag)"];
+            // the snow's cover from orbit (186th)
+            const sol = snowOrbitLine();
+            if (sol) research["the snow's cover from orbit (ABI FSC)"] = sol;
+            else delete research["the snow's cover from orbit (ABI FSC)"];
           }
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();
@@ -17056,8 +17204,14 @@
         syncSoil();
         syncTrains();
         // The snow field is anchored to the OLD box too - stand
-        // the heuristic back up until the new box's field lands.
+        // the heuristic back up until the new box's field lands
+        // (both fields dropped: the satellite's is rebuilt from the
+        // next /goesl2 body at the new anchor, 186th)
         terrainUniforms.uSnowCovOn.value = 0;
+        modisSnow = null;
+        orbitSnow = null;
+        snowFieldMerged = null;
+        snowFieldsAppliedKey = null;
         syncSnowCover();
         syncStratAOD();
         syncNO2();

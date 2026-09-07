@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1211 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
+1212 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **149 reference files, 1211 landmark lines, 9 GPU probes** (live gate
+- **149 reference files, 1212 landmark lines, 9 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1639,7 +1639,46 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    stood anywhere in the September file (one cell of 24.5 million),
    so the snow curtain is gated, not yet seen live; the kinds carry
    the errors of the model temperature, the MESH and the separation
-   they are built from
+   they are built from. Pass 186 brings the snow's cover from orbit:
+   NOAA's fractional snow cover (`ABI-L2-FSCC`, CONUS every 5 min by
+   day, 2 km, 59–93 kB a file) as the twenty-first served product —
+   the Enterprise FSC ATBD v1.0 (Romanov 2020, read in full) makes it
+   the VIEWABLE snow fraction of each pixel by Eq. 1's linear unmixing
+   of the 0.64-µm reflectance between a snow-free and a snow
+   end-member, each corrected by an 8-term kernel model of the solar
+   and satellite zenith cosines (Table 2-4's loads), with a
+   theoretical error budget of 0.15–0.20 (Table 2-7) against 0.33–0.40
+   for the NDSI-based fraction (Table 2-8) — the very law the theme's
+   MODIS snow field applies (Salomonson & Appel; derived for VIIRS
+   only, the ATBD says) — so the satellite's fraction outranks the
+   MODIS field where its retrieval is good (DQF 0 of the file's twelve
+   codes: water, cloud, four rejected-snow tests, night, undetermined,
+   bad pixel, fill, no retrieval), MODIS standing under cloud, water
+   and night, the heuristic snowline where neither knows. The field is
+   built at the page's own anchor with each texel looked up in the
+   pixel that SEES its lifted ground: the fixed-grid navigation takes
+   the DEM's elevation (the geocentric radius lifted), a surface
+   product's parallax and the inverse of the cloud sheets' — from
+   GOES-East over the Front Range a 3-km mountain's pixel stands one
+   row north and one column west of the flat navigation's, away from
+   the sub-satellite point (the GOES-18 read-me's known issue, the
+   fraction's variation with the relative azimuth, rides the
+   accuracy). Gated on a vendored 101 × 101 crop of the 2026-01-20
+   18:01Z file over the Front Range against numpy: the flag census
+   (4,092 good, 6,016 cloud), the good pixels' fractions (2,886
+   snow-free, 1,165 part-covered, 41 full), the observer's pixel 47 %,
+   the 96 × 96 world-box field through roam.js's own scene mapping
+   (7,589 texels from 48 pixels flat, 9,023 lifted 3 km, numpy's to the
+   last digit) and the merge (`goesl2-reference` THE SNOW'S COVER FROM
+   ORBIT; `server-reference` and `goesl2-client-reference` the 22
+   asks, 21 served). Live in the daemon (11:16Z, the 11:01Z file):
+   Mount Katahdin's window at dawn 268 good pixels of 10,201, every
+   one snow-free, 8,404 still night; the Front Range all night.
+   STATED: a September file has no snow to show, so the ranking's
+   effect on a snowy box is gated, not yet seen live; the fraction is
+   the viewable one (a forest's snow under its canopy is not in it);
+   the held afternoon field ages up to a day through the night and
+   the line says its time
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
