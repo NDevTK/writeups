@@ -13251,6 +13251,7 @@
                 : '') +
               towersWords()
             : ' · stale (past 10 min) or uncovered: nothing fed') +
+          rqiClause() +
           ` · ranking, stated: the storm slab's top is the cloud top - ACHA's tallest tenth when ten good fields stand, else the radar's tallest echo top, else the parcel's EL; with storm cells in the deck's world each cell's texels rise to their own echo top, or to the satellite's cloud top at the cell's parallax-shifted pixel where that is higher (the anvil over the core), and the texels between keep the deck's ordinary top; the echo top is the precipitation core's top, under the anvil` +
           (t.documentation ? ` · ${t.documentation}` : '')
         );
@@ -13417,7 +13418,165 @@
                     : 'nothing - no radar coverage here; the satellite stands'
               }`
             : ' · stale (past 10 min) or unread: the satellite stands') +
+          rqiClause() +
           ` · ranking, stated: where the radar covers, its 1-km rate every 2 min outranks the satellite's 2-km RRQPE every 10 min and RainViewer's composite; beyond its reach the satellite stands` +
+          (t.documentation ? ` · ${t.documentation}` : '')
+        );
+      }
+      // THE RADAR'S OWN DOUBT AND THE HAIL'S SIZE (184th): NCEP's
+      // RadarQualityIndex and MESH through the daemon's /mrmsrqi and
+      // /mrmshail (8-bit PNG-packed files on the echo top's grid and
+      // cadence). The quality index says how far the radar's rate and
+      // tops can be trusted at the observer's cell and over the window
+      // - Zhang et al. 2016's blockage and beam-height factors, not
+      // the Z-R relation - and rides on the rain and echo-top lines,
+      // moving no geometry; the hail cells within reach thicken and
+      // brighten the rain curtains standing in their cells (a display
+      // rule, stated on the line) and are named on their own line.
+      // ?mrms=0 turns every MRMS feed off; ?mrmsrqisrc= and
+      // ?mrmshailsrc= override.
+      const MRMS_RQI_PROXY =
+        params.get('mrmsrqisrc') ??
+        (MRMS_PROXY ? MRMS_PROXY.replace(/\/mrms$/, '/mrmsrqi') : null);
+      const MRMS_HAIL_PROXY =
+        params.get('mrmshailsrc') ??
+        (MRMS_PROXY ? MRMS_PROXY.replace(/\/mrms$/, '/mrmshail') : null);
+      const mrmsAux = {
+        rqi: {
+          proxy: MRMS_RQI_PROXY,
+          busy: false,
+          lacks: false,
+          key: 'radarQuality',
+          name: 'NCEP MRMS radar quality index'
+        },
+        hail: {
+          proxy: MRMS_HAIL_PROXY,
+          busy: false,
+          lacks: false,
+          key: 'radarHail',
+          name: 'NCEP MRMS hail size (MESH)'
+        }
+      };
+      function mrmsAuxOff(which) {
+        const f = mrmsAux[which];
+        return overridden || params.get('mrms') === '0' || !f.proxy || f.lacks;
+      }
+      async function syncMrmsAux(which) {
+        const f = mrmsAux[which];
+        if (mrmsAuxOff(which) || f.busy) return;
+        if (!Number.isFinite(state.lat) || !Number.isFinite(state.lon)) return;
+        f.busy = true;
+        try {
+          const r = await fetch(
+            `${f.proxy}?lat=${state.lat.toFixed(3)}&lon=${state.lon.toFixed(3)}`,
+            {signal: AbortSignal.timeout(45000)}
+          );
+          if (r.status === 404) {
+            f.lacks = true; // an older daemon
+            return;
+          }
+          if (!r.ok) return;
+          const j = await r.json();
+          state[f.key] = {...j, at: Date.now()};
+          record(
+            f.name,
+            j.census
+              ? j.words
+              : `${j.refTime ? j.refTime.slice(11, 16) + 'Z · ' : ''}${j.reason || 'no coverage'}`
+          );
+          if (which === 'hail') hailIndexRebuild();
+        } catch {
+          // unreachable: the last answer stands until it ages out
+        } finally {
+          f.busy = false;
+        }
+      }
+      const syncMrmsRqi = () => syncMrmsAux('rqi');
+      const syncMrmsHail = () => syncMrmsAux('hail');
+      function mrmsAuxNow(which) {
+        const t = state[mrmsAux[which].key];
+        if (!t || !t.census || !t.refTime) return null;
+        if (Date.now() - Date.parse(t.refTime) > MRMS_LIVE_MS) return null;
+        return t;
+      }
+      // the hail cells keyed by their cell centres - the rate cells'
+      // own names, both rounded to 1e-4 deg by mrms.js - so a rain
+      // shaft finds its cell's hail in one lookup
+      let hailIndex = null; // Map "lat,lon" -> mm
+      let hailShafts = null; // {n, of, largestMm, at}
+      function hailIndexRebuild() {
+        const t = mrmsAuxNow('hail');
+        const cells = t && t.covered && t.census.cells;
+        if (!cells || !cells.length) {
+          hailIndex = null;
+          return;
+        }
+        hailIndex = new Map();
+        for (const c of cells)
+          hailIndex.set(`${c.lat.toFixed(4)},${c.lon.toFixed(4)}`, c.mm);
+      }
+      function hailAtShaft(f) {
+        if (!hailIndex || !mrmsAuxNow('hail')) return 0;
+        return hailIndex.get(`${f.lat.toFixed(4)},${f.lon.toFixed(4)}`) || 0;
+      }
+      // the radar's stated doubt, for the rain and echo-top lines
+      function rqiClause() {
+        if (mrmsAuxOff('rqi')) return '';
+        const t = mrmsAuxNow('rqi');
+        if (!t) return '';
+        const c = t.census;
+        if (!t.covered || !c)
+          return " · the radar's own doubt: no quality index here (uncovered)";
+        const here =
+          c.here.code === 'rqi'
+            ? `RQI ${c.here.rqi.toFixed(1)} at the observer's cell`
+            : "the observer's cell without a quality index";
+        return ` · the radar's own doubt (RQI, ${t.refTime.slice(11, 16)}Z): ${here}, the window's median ${c.medianRqi.toFixed(1)}, ${Math.round(100 * c.belowHalfShare)}% of covered cells below 0.5 - the beam's blockage and its height against the melting layer, not the Z-R relation (Zhang et al. 2016)`;
+      }
+      function radarQualityLine() {
+        if (mrmsAuxOff('rqi')) return null;
+        const t = state.radarQuality;
+        if (!t) return null;
+        const c = t.census;
+        const live = mrmsAuxNow('rqi');
+        return (
+          `NCEP MRMS ${t.product} (${t.meaning || 'the radar quality index'}; ${t.cellKm || 1}-km cells every 2 min, read by the daemon in ${t.read ? t.read.ms + ' ms, ' + t.read.rows + ' PNG rows' : '?'}): ` +
+          (c
+            ? t.words
+            : `${t.refTime ? t.refTime.slice(11, 16) + 'Z · ' : ''}${t.reason || 'no coverage'}`) +
+          (t.law
+            ? ` · the law (Zhang et al. 2016): ${t.law.blockage}; ${t.law.height}`
+            : '') +
+          (live
+            ? " · what it feeds now: the radar's own doubt on the rain and echo-top lines - no geometry moves; the trust it states is the beam's sampling, not the retrieval's"
+            : ' · stale (past 10 min) or unread: nothing stated') +
+          (t.documentation ? ` · ${t.documentation}` : '')
+        );
+      }
+      function radarHailLine() {
+        if (mrmsAuxOff('hail')) return null;
+        const t = state.radarHail;
+        if (!t) return null;
+        const c = t.census;
+        const live = mrmsAuxNow('hail');
+        const hs = hailShafts;
+        return (
+          `NCEP MRMS ${t.product} (${t.meaning || 'the maximum estimated size of hail'}; ${t.cellKm || 1}-km cells every 2 min, read by the daemon in ${t.read ? t.read.ms + ' ms, ' + t.read.rows + ' PNG rows' : '?'}): ` +
+          (c
+            ? t.words
+            : `${t.refTime ? t.refTime.slice(11, 16) + 'Z · ' : ''}${t.reason || 'no coverage'}`) +
+          (live
+            ? ` · what it feeds now: ${
+                live.covered && c.cells.length
+                  ? hs && hs.n
+                    ? `${hs.n} of the ${hs.of} rain curtains within 100 km stand in hail cells (the largest ${hs.largestMm.toFixed(1)} mm) and are drawn denser and brighter`
+                    : `no rain curtain stands in a hail cell (${c.cells.length} hail cells sent, ${hs ? hs.of : 0} curtains drawn${rainShafts && rainShafts.source !== 'radar' ? "; the curtains are the satellite's 2-km pixels, which no 1-km hail cell names" : ''})`
+                  : live.covered
+                    ? 'nothing - no hail within ±50 km'
+                    : 'nothing - no radar coverage here'
+              } · the display rule, stated: a hail shaft's stones scatter more light than rain, so a curtain in a hail cell is drawn brighter by up to a half and its opacity lifted toward 1 by the size to 20 mm - a rule of the display, not a law`
+            : ' · stale (past 10 min) or unread: nothing fed') +
+          (t.limits ? ` · limits (the WDTD): ${t.limits}` : '') +
           (t.documentation ? ` · ${t.documentation}` : '')
         );
       }
@@ -15701,6 +15860,16 @@
             const rrl = radarRateLine();
             if (rrl) research["the radar's rain (MRMS PrecipRate)"] = rrl;
             else delete research["the radar's rain (MRMS PrecipRate)"];
+            // the radar's own doubt and the hail's size (184th)
+            const rql = radarQualityLine();
+            if (rql)
+              research["the radar's own doubt (MRMS radar quality index)"] =
+                rql;
+            else
+              delete research["the radar's own doubt (MRMS radar quality index)"];
+            const rhl = radarHailLine();
+            if (rhl) research["the hail's size (MRMS MESH)"] = rhl;
+            else delete research["the hail's size (MRMS MESH)"];
           }
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();
@@ -16937,6 +17106,14 @@
             new Float32Array(n),
             1
           );
+          // THE HAIL'S SIZE (184th): the hail in the curtain's own
+          // 1-km cell, mm (0 without) - a display rule, stated on the
+          // line: the curtain brighter by up to a half and its opacity
+          // lifted toward 1 by the size to 20 mm
+          const hailAttr = new THREE.InstancedBufferAttribute(
+            new Float32Array(n),
+            1
+          );
           const mat = new THREE.SpriteNodeMaterial();
           mat.transparent = true;
           mat.depthWrite = false;
@@ -16946,8 +17123,13 @@
           // the curtain's sides fade (a rain shaft has no wall): full
           // over the middle 70%, to nothing at the edges
           const edge = uv().x.sub(0.5).abs().smoothstep(0.35, 0.5).oneMinus();
-          mat.colorNode = aerial.encodeFog(shaftColU);
-          mat.opacityNode = instancedBufferAttribute(opAttr)
+          const hailK = instancedBufferAttribute(hailAttr).div(20).clamp(0, 1);
+          mat.colorNode = aerial.encodeFog(
+            shaftColU.mul(hailK.mul(0.5).add(1))
+          );
+          const op = instancedBufferAttribute(opAttr);
+          mat.opacityNode = op
+            .add(op.oneMinus().mul(hailK))
             .mul(grad)
             .mul(edge);
           shaftMesh = new THREE.InstancedMesh(
@@ -16956,7 +17138,7 @@
             n
           );
           shaftMesh.frustumCulled = false;
-          shaftMesh.userData = {posAttr, sclAttr, opAttr};
+          shaftMesh.userData = {posAttr, sclAttr, opAttr, hailAttr};
           shaftMesh.layers.set(4); // the post-cloud overlay pass, with the precipitation
           scene.add(shaftMesh);
           shaftCount = n;
@@ -16972,7 +17154,9 @@
         } else {
           shaftColU.value.copy(ambient.color).multiplyScalar(0.6);
         }
-        const {posAttr, sclAttr, opAttr} = shaftMesh.userData;
+        const {posAttr, sclAttr, opAttr, hailAttr} = shaftMesh.userData;
+        let hailN = 0;
+        let hailMax = 0;
         const goes = goesObs;
         const baseM =
           goes && goes.lowTopM !== null && goes.lowPct >= 5
@@ -17003,10 +17187,20 @@
           posAttr.setXYZ(k, x, (gy + top) / 2, z);
           sclAttr.setXY(k, w, top - gy);
           opAttr.setX(k, f.opacity);
+          // the hail in this curtain's cell (184th): the radar's 1-km
+          // cells name it, the satellite's 2-km pixels never match
+          const mm = hailAtShaft(f);
+          hailAttr.setX(k, mm);
+          if (mm > 0) {
+            hailN++;
+            if (mm > hailMax) hailMax = mm;
+          }
         }
         posAttr.needsUpdate = true;
         sclAttr.needsUpdate = true;
         opAttr.needsUpdate = true;
+        hailAttr.needsUpdate = true;
+        hailShafts = {n: hailN, of: n, largestMm: hailMax, at: Date.now()};
       }
       function updateFires(dt) {
         const fires = state.fires;
@@ -22143,6 +22337,11 @@
         setInterval(syncMrms, MRMS_POLL_MS);
         syncMrmsRate();
         setInterval(syncMrmsRate, MRMS_POLL_MS);
+        // the radar's own doubt and the hail's size (184th)
+        syncMrmsRqi();
+        setInterval(syncMrmsRqi, MRMS_POLL_MS);
+        syncMrmsHail();
+        setInterval(syncMrmsHail, MRMS_POLL_MS);
         // MOD09A1 is an 8-day composite; the same hourly poll (matching
         // the /surface cache) more than covers it.
         syncSurface();

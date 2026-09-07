@@ -10345,6 +10345,133 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 7, the review session's 184th pass - THE RADAR'S OWN
+  DOUBT AND THE HAIL'S SIZE): the radar's rate and tops (174th, 179th)
+  came with no word on how far the beam could be trusted, and its
+  hail - the field the network's severe-weather products exist for -
+  was not read. READ FIRST: Zhang et al. 2016 (BAMS 97, 621-638, the
+  MRMS QPE paper; the AMS journal answers 403 to this sandbox, NOAA's
+  repository copy noaa_15285_DS1.pdf read in full, 18 pp): the Z-R
+  relations by precipitation type (stratiform max(0.0365 Z^0.625,
+  0.1155 Z^0.5) capped 48.6 mm/h; convective and hail 0.017 Z^0.714
+  capped 103.8 and 53.8; snow 0.1155 Z^0.5; tropical 0.010 Z^0.833
+  capped 147.4), the seven precipitation types (hail by MESH,
+  convective cores by VIL), the mosaic weights exp(-d^2/L^2)
+  exp(-h^2/H^2) (L 100 km, H 2 km), and the RADAR QUALITY INDEX: a
+  blockage factor (1 at none, linear to 0 at 50% blockage; the terrain
+  under standard refraction) times a beam-height factor (1 below the
+  melting layer, exponential in the beam height where the beam meets
+  it), which "does not represent" the Z-R relation's uncertainty; the
+  WDTD's RQI page (read): RQI = RQI_blk x RQI_hgt, v12 in hundredths.
+  Smith et al. 2016 (BAMS 97, 1617-1630, the severe-weather and
+  aviation products; unreachable in the 174th, NOAA's repository copy
+  noaa_32168_DS1.pdf read in full, 14 pp): 143 WSR-88Ds and 30
+  Canadian radars blended by exponential distance weighting onto
+  0.01-deg cells with 33 levels FROM 0 TO 20 KM MSL - the height
+  convention the 174th took on trust is the grid's own, and mrms.js
+  says so now (the "unverified" retired, the gate's pin turned); an
+  echo top "the highest altitude in the vertical column where the
+  particular reflectivity value is found" (Lakshmanan et al. 2013's
+  interpolation), the 18-dBZ top the aviation field for anvil
+  turbulence; MESH "an estimate of hail size that is based on the
+  vertical profiles of radar reflectivity and environmental
+  temperature (Witt et al. 1998; Lakshmanan et al. 2006b) ...
+  calculated for each horizontal grid point". The WDTD's MESH and SHI
+  pages (read): the Severe Hail Index a thermally weighted vertical
+  integral of the hail kinetic energy flux, the reflectivity weighted
+  between 40 and 50 dBZ and the temperature between the model's 0 and
+  -20 C heights, MESH a fit to it in millimetres; the stated limits
+  (tilted storms under strong shear, left-moving supercells, giant
+  bounded weak echo regions, dry hail, the model profile's biases).
+  NOT READ, stated: Witt et al. 1998 (Wea. Forecasting 13, 286-303;
+  AMS 403 for the page and the PDF; NOAA's repository search answers
+  403), so the fit's constants are not claimed; Zhang et al. 2012's
+  RQI paper (Weather Radar and Hydrology 351) likewise. MEASURED
+  FIRST (09:42Z): RadarQualityIndex 723 kB gzipped, MESH 51 kB -
+  discipline 209, categories 8/0 and 3/28, template 5.41 at EIGHT bits
+  (the echo top and the rate pack 16), R -30 E 0 D 1 both, so a count
+  is (c - 30)/10: the index's 12 distinct counts (-3 no coverage 8.17
+  million cells; 0.0 2.55 million - the domain past the radars'
+  useful range - to 1.0 5.44 million), the hail's 178 (-3; -1 no hail
+  16.3 million; 0.8-20.5 mm over 7,864 cells, the largest at 49.515 N
+  104.125 W in south-east Saskatchewan); an 8-bit count at this
+  scaling reaches 22.5 mm, and whether the packer rescales for larger
+  hail is unmeasured (the scaling is read from each file). THE READER:
+  grib2.js's pngWindow16 takes 8-bit greyscale rows (a byte a cell,
+  the depth reported); the whole 24.5-million-cell grid reads in ~1 s.
+  THE LAW (mrms.js): MRMS_RQI_FACTS with the paper's two factors and
+  its caveat, rqiCensus (the observer's cell, the covered cells'
+  median, mean, range, histogram by tenths, the share below a half)
+  and rqiWords; MRMS_MESH_FACTS with the WDTD's limits and the unread
+  paper named, meshCensus (the hail cells nearest first with the
+  shafts' field names, capped 200, the largest placed) and meshWords.
+  THE DAEMON: mrmsRqi and mrmsMesh as the third and fourth feeds of
+  the one mrmsFeed factory, /mrmsrqi and /mrmshail (200 with covered
+  false real; 502 with the file's error - new on all four routes), the
+  law and the limits riding with the bodies, MRMS_RQI_URL /
+  MRMS_MESH_URL overrides. A fetch that lands on NCEP's rewrite of a
+  "latest" file reads a truncated gzip ("unexpected end of file" on
+  the MESH at 10:11Z and on the index at 10:09Z - twice in ten
+  minutes), and the old law then waited a whole cadence with the route
+  answering 502: a failed read is retried after 15 s now
+  (MRMS_RETRY_MS) and logged. THE PAGE: syncMrmsRqi / syncMrmsHail
+  every 2 min beside the other two; the doubt's clause on the rain
+  line and the echo-top line (the observer's cell, the window's
+  median, the share below 0.5, the paper's meaning) and its own
+  research line with the law; the hail's line naming the cells, the
+  largest and what the curtains do; the rain curtains standing in hail
+  cells (the 1-km rate cells and the 1-km hail cells share their
+  centres, matched by name) drawn denser - the opacity lifted toward 1
+  by the size to 20 mm - and brighter by up to a half: a DISPLAY RULE,
+  stated on the line, not a law (a satellite-sourced curtain never
+  matches a hail cell). GATED: mrms-reference THE PNG ROWS, EIGHT BITS
+  (a 9 x 7 8-bit image through every row filter, the depth reported)
+  and THE HAIL'S SIZE AND THE RADAR'S DOUBT on two vendored 8-bit
+  crops re-packed as their own GRIB2 messages (818 and 380 bytes)
+  against Pillow and numpy: the index's most varied 51 x 51 window of
+  the 09:42Z file (the Columbia Mountains of British Columbia, 52.09 N
+  118.18 W, every tenth 0.0-1.0: the centre 0.8, the histogram [48 685
+  420 256 151 138 198 178 260 223 44], median 0.3, mean 0.4055, 1,560
+  of 2,601 below a half) and the MESH window 10 km south-west of the
+  file's largest hail (56 hail cells of 2,601, median 3.4 mm, the
+  largest 20.5 mm at 40.9 deg and 13.2 km by a plain great-circle, the
+  nearest 0.9 mm at 10.6 km, the observer's own cell without hail);
+  server-reference THE DOUBT'S AND THE HAIL'S ROUTES (the four feeds,
+  the bindings, the 502's error, the retry, the ship list). MEASURED
+  in the daemon (10:08Z): the home's window RQI 1.0 at the cell,
+  median 1.0, 0% below a half (2,265 rows of the 723-kB file read in
+  289 ms); Seattle's the same; the Columbia Mountains' 0.8 at the
+  cell, median 0.6, 31% below a half; a Saskatchewan storm (49.5 N
+  105.5 W, 4 a.m. local): RQI 1.0 and median 0.9, 942 hail cells
+  within +-50 km at 10:14Z (median 2.1 mm, the largest 9.4 mm at 47
+  km, the nearest at 15 km), 7,129 raining cells, echo tops to 19 km.
+  MEASURED in the page (the storm, 49.5 N 105.5 W, 10:12Z): the rain
+  line and the echo-top line carry the doubt's clause ("RQI 1.0 at the
+  observer's cell, the window's median 0.9, 0% of covered cells below
+  0.5"), the quality line its law, 160 curtains drawn from the radar's
+  cells - and the hail line absent: the daemon's MESH read had landed
+  on the rewrite and the page's two polls both met the 502 (the retry
+  rule was written from this). THE LESSON OF THE CURTAINS: the shafts
+  are the 160 NEAREST raining cells (within ~7 km in a 7,000-cell
+  window) and the hail sits where the cores are, so an observer beside
+  a storm sees no curtain in a hail cell - the rule bites at the core.
+  MEASURED in the page at the core (the file's largest hail of 10:14Z,
+  49.095 N 105.305 W, 4:15 a.m. local, the 10:12Z rate): "730 hail
+  cells of 10,201 covered within ±50 km · sizes median 2.4 mm, largest
+  tenth 5.0, largest 9.4 at 0° and 0 km · hail 9.4 mm overhead · what
+  it feeds now: 23 of the 160 rain curtains within 100 km stand in
+  hail cells (the largest 9.4 mm) and are drawn denser and brighter";
+  the rain line's doubt there "RQI 0.8 at the observer's cell, the
+  window's median 0.9, 0% of covered cells below 0.5" - the beam a
+  little high or a little blocked at the core itself; the frame dark
+  (a mean of 0.26 on 255 at 4 a.m.), so the curtains' brightening is
+  unseen by night - the daylight look belongs to the 11:26Z check-in.
+  STATED: the thickening and brightening are a display rule; the
+  hail's size is the radar's model-profile-weighted estimate with the
+  WDTD's limits; the index is the beam's sampling, not the
+  retrieval's; the 8-bit MESH ceiling (22.5 mm) stands untested
+  against a larger-hail day; a satellite-sourced curtain never matches
+  a hail cell.
 - DONE (Sep 7, the review session's 183rd pass - THE TOP'S OWN
   TEMPERATURE): the 178th's emissivity law needs the top's
   temperature and took it from the satellite column's (or the

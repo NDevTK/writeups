@@ -158,12 +158,15 @@ are gated by `../server-reference.mjs` — the `server` set in
   tallest-300 list still paints, with the near flanks missing - the
   page says so). `covered: false` with a reason is a real answer (off the
   CONUS grid, 20-55 N and 130-60 W); 502 when the file could not be
-  read. STATED: the MRMS product documentation (the NSSL tables, Smith
-  et al. 2016) could not be read from the build sandbox, so the body
-  claims only what the file and the catalogue carry - the product
-  name (the 18-dBZ echo top), the file's scaling (kilometres), and
-  MRMS's own height convention (MSL, unverified here); the bright band
-  and the precipitation-type flag were measured and left out.
+  read. Smith et al. 2016 (BAMS 97, 1617-1630; unreachable at the AMS
+  in the 174th, read in full in the 184th from NOAA's repository copy)
+  is the product's paper: the 3-D mosaic's 33 levels run 0-20 km MSL,
+  so the height convention the 174th took on trust is the grid's own;
+  an echo top is the highest altitude in the column where the
+  reflectivity is found (Lakshmanan et al. 2013's interpolation), the
+  18-dBZ top the aviation field for anvil turbulence. The NSSL tables
+  remain unreachable from the build sandbox; the bright band and the
+  precipitation-type flag were measured and left out.
 - `GET /mrmsrate?lat&lon` — the rain at a kilometre (179th pass):
   NCEP's MRMS PrecipRate within ±50 km of the point - the radar's
   precipitation rate on the echo top's 1-km grid every 2 minutes,
@@ -177,10 +180,57 @@ are gated by `../server-reference.mjs` — the `server` set in
   too, the page's rain-shaft names). The scaling is the file's own
   data representation section: a count c is (c − 30)/10 mm/h, so −3 is
   no coverage and 0 is measured dry; discipline 209, category 6,
-  number 1; the product guide is still unreachable from the build
-  sandbox (stated). The page draws the rain shafts and the deck's rain
-  cover from these cells wherever the radar covers, ahead of the
-  satellite's 2-km RRQPE pixels and RainViewer's composite.
+  number 1; the rate's own paper (Zhang et al. 2016, BAMS 97, 621-638)
+  was read in full in the 184th from NOAA's repository copy - the
+  Z-R relations by precipitation type, the mosaic's weights, the
+  radar quality index's definition. The page draws the rain shafts and
+  the deck's rain cover from these cells wherever the radar covers,
+  ahead of the satellite's 2-km RRQPE pixels and RainViewer's
+  composite.
+- `GET /mrmsrqi?lat&lon` — the radar's own doubt (184th pass): NCEP's
+  MRMS RadarQualityIndex within ±50 km of the point, the daemon's
+  third held MRMS file on the same refresh law
+  (`mrms.ncep.noaa.gov/2D/RadarQualityIndex/`, 706 kB gzipped,
+  PNG-packed at 8 bits - `grib2.js`'s streaming read takes a byte a
+  cell since this pass, gated on a synthetic 8-bit image and a
+  vendored crop). Zhang et al. 2016 define the index as the product
+  of a blockage factor (1 with no beam blockage, falling linearly to
+  0 at 50%) and a beam-height factor (1 below the melting layer,
+  falling exponentially with the beam height once the beam reaches
+  it), and say what it leaves out: the Z-R relation, the calibration,
+  the attenuation. The body carries the observer's own cell's index,
+  the window's census (the covered cells' median, mean, range,
+  histogram by tenths and share below 0.5), the law's words and the
+  words. The scaling is the file's own: (count − 30)/10, so −3 is no
+  coverage and the values run 0.0 to 1.0 in tenths (2.5 million of
+  the mosaic's 16.3 million covered cells stood at 0.0 in the 09:42Z
+  file: the domain reaches past the radars' useful range); discipline
+  209, category 8, number 0. The page puts the index on its rain and
+  echo-top lines as the radar's stated doubt; it moves no geometry.
+- `GET /mrmshail?lat&lon` — the hail's size (184th pass): NCEP's MRMS
+  MESH (the maximum estimated size of hail, mm) within ±50 km of the
+  point, the fourth held file (`mrms.ncep.noaa.gov/2D/MESH/`, 57 kB
+  gzipped: the field is sparse; 8-bit PNG). Smith et al. 2016 (read
+  in full) describe it as an estimate of hail size from the vertical
+  profiles of radar reflectivity and environmental temperature (Witt
+  et al. 1998), computed for every grid cell; the WDTD's MESH and SHI
+  pages (read) give the Severe Hail Index's weights (the reflectivity
+  between 40 and 50 dBZ, the temperature between the 0 and −20 °C
+  heights of the model analysis) and the product's stated limits
+  (tilted storms under strong shear, left-movers, giant bounded weak
+  echo regions, dry hail, the model profile's biases); Witt et al.
+  1998 itself sits behind an AMS host the build sandbox cannot reach
+  (403), so the fit's constants are not claimed. The body carries the
+  window's census (the cells covered and holding hail, the sizes'
+  median, largest tenth and largest, the largest cell placed by
+  bearing and distance, the observer's own cell) and the hail cells
+  nearest first, 200 at most, with the rain-shaft field names. The
+  scaling is the file's own: (count − 30)/10 mm, −3 no coverage, −1
+  no hail; discipline 209, category 3, number 28; an 8-bit count at
+  this scaling reaches 22.5 mm (whether the packer rescales for larger
+  hail is unmeasured). The page draws the rain curtains standing in
+  hail cells denser and brighter (a display rule, stated) and names
+  the largest.
 - `GET /goesl2?lat&lon` — NOAA's own operational cloud products
   around the point (148th pass): the clear-sky mask
   (`ABI-L2-ACMC`: BCM, ACM, cloud probability, DQF on the 2-km

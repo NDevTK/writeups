@@ -20,19 +20,23 @@
  * 24.5 million), -1 (coverage, no 18-dBZ echo) or the echo top in
  * kilometres (3.9% of the grid at 22:06Z; p50 8.1, p95 14.6, max 19).
  *
- * WHAT COULD NOT BE READ HERE, stated: the MRMS product guide and the
- * papers that define these fields (Smith et al. 2016, BAMS 97,
- * 1617-1630, "Multi-Radar Multi-Sensor (MRMS) Severe Weather and
- * Aviation Products: Initial Operating Capabilities"; the NSSL
- * operational tables) sit behind hosts this sandbox cannot reach
- * (AMS 403/404, nssl.noaa.gov blocked, vlab and NCEI 404). Only the
- * paper's abstract came through CrossRef: MRMS products "at a spatial
- * resolution of approximately 1 km, with 33 vertical levels, updating
- * every 2 min over the conterminous United States and southern
- * Canada". So this module claims only what the file and the catalogue
- * carry: the product's name says the 18-dBZ echo top; its scaling
- * says kilometres; MRMS heights are above mean sea level by the
- * system's convention, taken here and marked unverified. The bright
+ * WHAT THE PAPER SAYS (Smith et al. 2016, BAMS 97, 1617-1630,
+ * "Multi-Radar Multi-Sensor (MRMS) Severe Weather and Aviation
+ * Products: Initial Operating Capabilities" - unreachable at the AMS
+ * in the 174th, read in full in the 184th from NOAA's repository
+ * copy, noaa_32168_DS1.pdf, 14 pp): the 3-D reflectivity mosaic is
+ * blended from 143 WSR-88Ds and 30 Canadian radars by exponential
+ * distance weighting onto 0.01 x 0.01 deg cells with 33 vertical
+ * levels FROM 0 TO 20 KM MSL (250 m to 3 km, 500 m to 9 km, 1 km to
+ * 20 km), rewritten every 2 min; an echo top is "the highest altitude
+ * in the vertical column where the particular reflectivity value is
+ * found (18, 30, 50, or 60 dBZ)" by Lakshmanan et al. 2013's
+ * interpolation, the 18-dBZ top the aviation field for anvil
+ * turbulence, the 50- and 60-dBZ tops the hail forecaster's; the
+ * domain runs from 55 N 130 W to 20 N 60 W. So the height convention
+ * this module took on trust in the 174th (MSL) is the paper's own
+ * grid. What still could not be read: the NSSL operational tables
+ * (nssl.noaa.gov blocked) and Witt et al. 1998 (AMS 403). The bright
  * band and the precipitation-type flag were measured too (18 MB a
  * file, model-blended over 94% of the grid; a code table nobody here
  * could read) and are NOT used.
@@ -43,7 +47,7 @@ export const MRMS_FACTS = {
   source: 'NCEP MRMS 2-D grids (mrms.ncep.noaa.gov/2D)',
   product: 'EchoTop_18',
   meaning:
-    'the height of the 18-dBZ radar echo top, kilometres (MSL by the MRMS convention, unverified here)',
+    'the height of the 18-dBZ radar echo top, kilometres MSL (the 3-D grid runs 0-20 km MSL; Smith et al. 2016)',
   cadenceS: 120,
   cellDeg: 0.01,
   cellKm: 1,
@@ -65,7 +69,7 @@ export const MRMS_FACTS = {
   absenceCaveat:
     '-1 also marks cells the mosaic holds with no radar in range: an echo is a measurement, its absence is not clear air',
   documentation:
-    'the MRMS product guide and Smith et al. 2016 (BAMS) were not reachable from the build sandbox; the abstract only (CrossRef): ~1 km, 33 levels, every 2 min over CONUS and southern Canada'
+    "Smith et al. 2016 (BAMS 97, 1617-1630; NOAA repository copy) read in full in the 184th: 0.01-deg cells, 33 levels 0-20 km MSL, every 2 min over CONUS and southern Canada, an echo top the highest altitude in the column where the reflectivity is found (Lakshmanan et al. 2013's interpolation); the NSSL tables still not reachable from the build sandbox"
 };
 // a storm worth drawing as a tower: an 18-dBZ echo top at or above
 // this height - the theme's own rule (the deep convection of the
@@ -221,6 +225,284 @@ export function precipRateWords(c, {refTimeIso = null, halfKm = null} = {}) {
       ? ` at ${c.heaviest.bearingDeg.toFixed(0)}° and ${c.heaviest.distKm.toFixed(0)} km`
       : '') +
     ` · the nearest ${c.cells.length ? `${c.cells[0].mmh.toFixed(1)} mm/h at ${c.cells[0].bearingDeg.toFixed(0)}° and ${c.cells[0].distKm.toFixed(0)} km` : 'none'}` +
+    ` · ${here}`
+  );
+}
+// ---- THE RADAR'S OWN DOUBT (184th pass) ------------------------------
+// NCEP's RadarQualityIndex on the same grid and cadence: Zhang et al.
+// 2016 (BAMS 97, 621-638, read in full from NOAA's repository copy)
+// define it as the product of a blockage factor (1 with no blockage,
+// falling linearly to 0 at 50% blockage; the terrain under standard
+// refraction, static) and a beam-height factor (1 while the beam axis
+// stands below the melting layer, falling exponentially with the beam
+// height once the beam reaches it or the bright band sits on the
+// ground) - "RQI = RQI_blk x RQI_hgt" in the WDTD's words - and say
+// what it does NOT carry: the Z-R relation's, the calibration's and
+// the attenuation's uncertainties. The file's own facts (measured
+// 2026-09-07 09:42Z): discipline 209 category 8 number 0, template
+// 5.41 at 8 bits, R -30 E 0 D 1 - a count c is (c - 30) / 10, so 0 is
+// no coverage's -3 and the values run 0.0 to 1.0 in tenths (12
+// distinct counts in the whole grid); 2.5 million cells of the 16.3
+// million the mosaic holds stand at 0.0 - the domain reaches past the
+// radars' useful range - and 5.4 million at 1.0.
+export const MRMS_RQI_FACTS = {
+  source:
+    'NCEP MRMS (mrms.ncep.noaa.gov/2D/RadarQualityIndex/MRMS_RadarQualityIndex.latest.grib2.gz)',
+  product: 'RadarQualityIndex',
+  meaning:
+    "the radar QPE's quality index, 0 (no usable beam) to 1 (the beam unblocked and below the melting layer): RQI = RQI_blk x RQI_hgt (Zhang et al. 2016)",
+  cadenceS: 120,
+  cellDeg: 0.01,
+  cellKm: 1,
+  discipline: 209,
+  category: 8,
+  number: 0,
+  drt: {
+    tmpl: 41,
+    R: -30,
+    E: 0,
+    D: 1,
+    nbits: 8,
+    words: '(count - 30) / 10, an 8-bit count; the scaling is read from each file'
+  },
+  codes: {noCoverage: -3},
+  law: {
+    blockage:
+      'RQI_blk = 1 with no beam blockage, falling linearly to 0 at 50% blockage (the terrain under standard refraction; static)',
+    height:
+      'RQI_hgt = 1 while the beam axis stands below the melting layer, falling exponentially with the beam height once the beam reaches it or the bright band sits on the ground',
+    caveat:
+      "the RQI carries the beam's sampling only - blockage, height and the melting layer - not the Z-R relation, the calibration or the attenuation (Zhang et al. 2016)"
+  },
+  documentation:
+    "Zhang et al. 2016 (BAMS 97, 621-638; NOAA repository copy) read in full in the 184th, with the WDTD's RQI page; Zhang et al. 2012 (Weather Radar and Hydrology 351, 388-393), the index's own paper, not reachable from the build sandbox"
+};
+/** The quality window's census: the cells covered, the observer's own
+ * cell, the covered cells' median, mean, range and histogram by
+ * tenths, and the share below a half - the theme's own summary of the
+ * window, the meaning the paper's. */
+export function rqiCensus(values, box, lat, lon) {
+  const n = values.length;
+  let covered = 0;
+  let sum = 0;
+  let min = Infinity;
+  let max = -Infinity;
+  let belowHalf = 0;
+  const hist = new Array(11).fill(0);
+  const vs = [];
+  for (let k = 0; k < n; k++) {
+    const v = values[k];
+    if (!(v > -3)) continue;
+    covered++;
+    sum += v;
+    vs.push(v);
+    if (v < min) min = v;
+    if (v > max) max = v;
+    if (v < 0.5) belowHalf++;
+    const bin = Math.round(v * 10);
+    if (bin >= 0 && bin <= 10) hist[bin]++;
+  }
+  vs.sort((a, b) => a - b);
+  const hereK = (box.cj - box.j0) * box.cols + (box.ci - box.i0);
+  const hereV = hereK >= 0 && hereK < n ? values[hereK] : NaN;
+  return {
+    n,
+    covered,
+    coverage: n ? covered / n : 0,
+    medianRqi: vs.length ? vs[vs.length >> 1] : null,
+    meanRqi: vs.length ? +(sum / vs.length).toFixed(4) : null,
+    minRqi: vs.length ? min : null,
+    maxRqi: vs.length ? max : null,
+    belowHalf,
+    belowHalfShare: vs.length ? belowHalf / vs.length : null,
+    hist,
+    here: {
+      rqi: hereV > -3 ? hereV : null,
+      code:
+        hereV > -3
+          ? 'rqi'
+          : hereV === -3
+            ? 'no coverage'
+            : Number.isFinite(hereV)
+              ? 'other'
+              : 'off the window'
+    }
+  };
+}
+/** The words for a quality census. */
+export function rqiWords(c, {refTimeIso = null, halfKm = null} = {}) {
+  const when = refTimeIso ? `${refTimeIso.slice(11, 16)}Z · ` : '';
+  const reach = halfKm !== null ? `within ±${halfKm} km` : 'in the window';
+  if (!c.covered)
+    return `${when}no radar coverage ${reach} (${c.n} cells at -3)`;
+  const here =
+    c.here.code === 'rqi'
+      ? `RQI ${c.here.rqi.toFixed(1)} at the observer's own cell`
+      : c.here.code === 'no coverage'
+        ? "the observer's own cell uncovered"
+        : `the observer's cell ${c.here.code}`;
+  return (
+    `${when}${here} · ${c.covered.toLocaleString('en-US')} covered cells ${reach}: median ${c.medianRqi.toFixed(1)}, mean ${c.meanRqi.toFixed(2)}, ${c.minRqi.toFixed(1)}-${c.maxRqi.toFixed(1)}, ` +
+    `${Math.round(100 * c.belowHalfShare)}% below 0.5` +
+    ` · ${MRMS_RQI_FACTS.law.caveat}`
+  );
+}
+// ---- THE HAIL'S SIZE (184th pass) -------------------------------------
+// NCEP's MESH - the maximum estimated size of hail - on the same grid
+// and cadence. Smith et al. 2016 (BAMS 97, 1617-1630, read in full
+// from NOAA's repository copy): "an estimate of hail size that is
+// based on the vertical profiles of radar reflectivity and
+// environmental temperature (Witt et al. 1998; Lakshmanan et al.
+// 2006b) ... calculated for each horizontal grid point; thus, the data
+// show the spatial extent and hail-size distribution of hail cores
+// within thunderstorms". The WDTD's MESH and SHI pages (read): the
+// Severe Hail Index is a thermally weighted vertical integral of the
+// hail kinetic energy flux from the 3-D reflectivity, the reflectivity
+// weighted between 40 and 50 dBZ and the temperature between the 0 and
+// -20 C heights of the model analysis, and MESH is a fit to it,
+// computed in millimetres; it underestimates in tilted storms under
+// strong shear, left-moving supercells, giant bounded weak echo
+// regions and low-density dry hail, and carries the model profile's
+// biases. Witt et al. 1998 (Wea. Forecasting 13, 286-303), the
+// algorithm's own paper, sits behind an AMS host this sandbox cannot
+// reach (403): the fit's constants are NOT claimed here. The file's
+// own facts (measured 2026-09-07 09:42Z): discipline 209 category 3
+// number 28, template 5.41 at 8 bits, R -30 E 0 D 1 - a count c is (c
+// - 30) / 10 mm, so 0 is no coverage's -3, 20 is -1 (covered, no
+// hail) and 7,864 cells held 0.8-20.5 mm; an 8-bit count at this
+// scaling reaches 22.5 mm, and whether the packer rescales for larger
+// hail is unmeasured (the scaling is read from each file).
+export const MRMS_MESH_FACTS = {
+  source: 'NCEP MRMS (mrms.ncep.noaa.gov/2D/MESH/MRMS_MESH.latest.grib2.gz)',
+  product: 'MESH',
+  meaning:
+    'the maximum estimated size of hail, mm - a thermally weighted vertical integral of the 3-D reflectivity between the 0 and -20 C heights (the Severe Hail Index of Witt et al. 1998, the reflectivity weighted between 40 and 50 dBZ) fitted to hail size (Smith et al. 2016; the WDTD)',
+  cadenceS: 120,
+  cellDeg: 0.01,
+  cellKm: 1,
+  discipline: 209,
+  category: 3,
+  number: 28,
+  drt: {
+    tmpl: 41,
+    R: -30,
+    E: 0,
+    D: 1,
+    nbits: 8,
+    words:
+      '(count - 30) / 10 mm, an 8-bit count (22.5 mm at most at this scaling; the scaling is read from each file)'
+  },
+  codes: {noCoverage: -3, noHail: -1},
+  limits:
+    "underestimates in tilted storms under strong deep-layer shear, left-moving supercells, giant bounded weak echo regions and low-density dry hail, and carries the model temperature profile's biases (the WDTD's MESH page)",
+  documentation:
+    "Smith et al. 2016 (BAMS 97, 1617-1630; NOAA repository copy) read in full in the 184th, with the WDTD's MESH and SHI pages; Witt et al. 1998 (Wea. Forecasting 13, 286-303) not reachable from the build sandbox (AMS 403), so the fit's constants are not claimed"
+};
+// what the daemon sends of a hail window: the hail cells nearest
+// first, capped (the shafts within 100 km are 160 at most)
+export const MRMS_HAIL_CAP = 200;
+/** The hail window's census: the cells covered and holding hail, the
+ * sizes' median, largest tenth and largest, the largest cell placed,
+ * the observer's own cell, and the hail cells nearest first (each
+ * with lat/lon - as latDeg/lonDeg too - its size, distance and
+ * bearing), capped. */
+export function meshCensus(
+  values,
+  box,
+  lat,
+  lon,
+  {
+    cap = MRMS_HAIL_CAP,
+    grid = MRMS_FACTS.grid,
+    cellDeg = MRMS_FACTS.cellDeg
+  } = {}
+) {
+  const n = values.length;
+  let covered = 0;
+  const sizes = [];
+  const cells = [];
+  let largest = null;
+  for (let k = 0; k < n; k++) {
+    const v = values[k];
+    if (!(v > -3)) continue;
+    covered++;
+    if (v > 0) {
+      sizes.push(v);
+      const j = box.j0 + Math.floor(k / box.cols);
+      const i = box.i0 + (k % box.cols);
+      cells.push({j, i, mm: v});
+      if (!largest || v > largest.mm) largest = {j, i, mm: v};
+    }
+  }
+  sizes.sort((a, b) => a - b);
+  const place = (c) => {
+    const p = mrmsCellCentre(c.j, c.i, grid, cellDeg);
+    const la = +p.lat.toFixed(4);
+    const lo = +p.lon.toFixed(4);
+    return {
+      mm: c.mm,
+      lat: la,
+      lon: lo,
+      latDeg: la,
+      lonDeg: lo,
+      distKm: +haversineKm(lat, lon, p.lat, p.lon).toFixed(1),
+      bearingDeg: +bearingDeg(lat, lon, p.lat, p.lon).toFixed(1)
+    };
+  };
+  const placed = cells.map(place).sort((a, b) => a.distKm - b.distKm);
+  const hereK = (box.cj - box.j0) * box.cols + (box.ci - box.i0);
+  const hereV = hereK >= 0 && hereK < n ? values[hereK] : NaN;
+  return {
+    n,
+    covered,
+    hail: sizes.length,
+    coverage: n ? covered / n : 0,
+    medianMm: sizes.length ? sizes[sizes.length >> 1] : null,
+    p90Mm: sizes.length
+      ? sizes[Math.min(sizes.length - 1, Math.floor(0.9 * sizes.length))]
+      : null,
+    maxMm: sizes.length ? sizes[sizes.length - 1] : null,
+    largest: largest ? place(largest) : null,
+    here: {
+      mm: hereV > 0 ? hereV : null,
+      code:
+        hereV > 0
+          ? 'hail'
+          : hereV > -3
+            ? 'no hail'
+            : hereV === -3
+              ? 'no coverage'
+              : Number.isFinite(hereV)
+                ? 'other'
+                : 'off the window'
+    },
+    cells: placed.slice(0, cap),
+    cellsTotal: cells.length
+  };
+}
+/** The words for a hail census. */
+export function meshWords(c, {refTimeIso = null, halfKm = null} = {}) {
+  const when = refTimeIso ? `${refTimeIso.slice(11, 16)}Z · ` : '';
+  const reach = halfKm !== null ? `within ±${halfKm} km` : 'in the window';
+  if (!c.covered)
+    return `${when}no radar coverage ${reach} (${c.n} cells at -3)`;
+  const here =
+    c.here.code === 'hail'
+      ? `hail ${c.here.mm.toFixed(1)} mm overhead`
+      : c.here.code === 'no hail'
+        ? 'no hail overhead'
+        : c.here.code === 'no coverage'
+          ? "the observer's own cell uncovered"
+          : `overhead ${c.here.code}`;
+  if (!c.hail)
+    return `${when}no hail ${reach} (${c.covered.toLocaleString('en-US')} covered cells, none with hail) · ${here}`;
+  return (
+    `${when}${c.hail.toLocaleString('en-US')} hail cells of ${c.covered.toLocaleString('en-US')} covered ${reach} · ` +
+    `sizes median ${c.medianMm.toFixed(1)} mm, largest tenth ${c.p90Mm.toFixed(1)}, largest ${c.maxMm.toFixed(1)}` +
+    (c.largest
+      ? ` at ${c.largest.bearingDeg.toFixed(0)}° and ${c.largest.distKm.toFixed(0)} km`
+      : '') +
+    ` · the nearest ${c.cells.length ? `${c.cells[0].mm.toFixed(1)} mm at ${c.cells[0].bearingDeg.toFixed(0)}° and ${c.cells[0].distKm.toFixed(0)} km` : 'none'}` +
     ` · ${here}`
   );
 }

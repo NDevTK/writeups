@@ -2301,6 +2301,72 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
   );
 }
 
+{
+  // THE RADAR'S OWN DOUBT AND THE HAIL'S SIZE (184th): the daemon's
+  // /mrmsrqi and /mrmshail routes are bound to mrms.js's census and
+  // words on the same held-file law as the echo top and the rate
+  // (four feeds through one mrmsFeed factory), the quality index's
+  // law and the hail size's stated limits ride with their bodies, a
+  // 502 says why the file could not be read, the env overrides stand,
+  // and install.sh ships the shared reader whose 8-bit rows the two
+  // files need
+  const srcM = readFileSync(
+    new URL('./server/src/index.mjs', import.meta.url),
+    'utf8'
+  );
+  const instM = readFileSync(
+    new URL('./server/install.sh', import.meta.url),
+    'utf8'
+  );
+  const feeds = [
+    ...srcM.matchAll(/= mrmsFeed\(MRMS_[A-Z_]*URL, MRMS_[A-Z_]*FACTS\)/g)
+  ].length;
+  const errors = [...srcM.matchAll(/error: mrms[A-Za-z]+\.held\.error/g)].map(
+    (m) => m[0]
+  );
+  check(
+    "THE DOUBT'S AND THE HAIL'S ROUTES: /mrmsrqi and /mrmshail are bound to mrms.js's census and words as the third and fourth held MRMS files on the one feed law, their law and limits ride with the bodies, a 502 carries the file's error, and the 8-bit reader ships",
+    srcM.includes("url.pathname === '/mrmsrqi'") &&
+      srcM.includes("url.pathname === '/mrmshail'") &&
+      srcM.includes('const mrmsRqi = mrmsFeed(MRMS_RQI_URL, MRMS_RQI_FACTS)') &&
+      srcM.includes(
+        'const mrmsMesh = mrmsFeed(MRMS_MESH_URL, MRMS_MESH_FACTS)'
+      ) &&
+      feeds === 4 &&
+      srcM.includes('env.MRMS_RQI_URL ??') &&
+      srcM.includes('env.MRMS_MESH_URL ??') &&
+      srcM.includes(
+        '2D/RadarQualityIndex/MRMS_RadarQualityIndex.latest.grib2.gz'
+      ) &&
+      srcM.includes('2D/MESH/MRMS_MESH.latest.grib2.gz') &&
+      srcM.includes('const census = rqiCensus(values, box, la, lo)') &&
+      srcM.includes('const census = meshCensus(values, box, la, lo)') &&
+      srcM.includes('words: rqiWords(census,') &&
+      srcM.includes('words: meshWords(census,') &&
+      srcM.includes('...(facts.law ? {law: facts.law} : {})') &&
+      srcM.includes('...(facts.limits ? {limits: facts.limits} : {})') &&
+      srcM.includes(
+        "'x-mrms-source': 'NCEP MRMS RadarQualityIndex (mrms.ncep.noaa.gov/2D)'"
+      ) &&
+      srcM.includes(
+        "'x-mrms-source': 'NCEP MRMS MESH (mrms.ncep.noaa.gov/2D)'"
+      ) &&
+      errors.length === 4 &&
+      new Set(errors).size === 4 &&
+      srcM.includes('log(`mrms: ${facts.product} failed: ${e.message}`)') &&
+      // a truncated read (NCEP rewriting "latest") is retried after 15
+      // s, not after a whole 2-min cadence
+      srcM.includes('const MRMS_RETRY_MS = 15e3') &&
+      srcM.includes('held.at = Date.now() - refreshMs + MRMS_RETRY_MS') &&
+      /import \{[^}]*\bmeshCensus\b[^}]*\bmeshWords\b[^}]*\bMRMS_MESH_FACTS\b[^}]*\bMRMS_RQI_FACTS\b[^}]*\brqiCensus\b[^}]*\brqiWords\b[^}]*\} from '\.\.\/\.\.\/mrms\.js'/s.test(
+        srcM
+      ) &&
+      instM.includes('install -m 644 ../grib2.js /opt/horizon-live/grib2.js') &&
+      instM.includes('install -m 644 ../mrms.js /opt/horizon-live/mrms.js'),
+    `${feeds} feeds through mrmsFeed (the echo top, the rate, the quality index, the hail size); /mrmsrqi answers rqiCensus + rqiWords with the law's words, /mrmshail meshCensus + meshWords with the stated limits; each route's 502 carries its held file's error (${errors.length} routes), a failed fetch is logged and tried again after 15 s (a truncated "latest" mid-rewrite, measured); MRMS_RQI_URL and MRMS_MESH_URL override the NCEP files; install.sh ships grib2.js and mrms.js`
+  );
+}
+
 if (fail) {
   console.log(`${fail} LANDMARK(S) FAILED`);
   process.exit(1);

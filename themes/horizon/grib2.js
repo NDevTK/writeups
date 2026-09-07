@@ -401,20 +401,24 @@ export function pngUnfilterRow(ft, src, prev, cur, bpp) {
     cur[x] = v & 255;
   }
 }
-/** Rows [j0, j1) and columns [i0, i1) of a 16-bit greyscale PNG as
- * raw counts (Uint16Array, row-major), streaming through an injected
- * inflater (node's zlib.createInflate: an object with on('data'),
- * on('error'), on('end'), write(chunk) -> boolean, once('drain'),
- * end(), close()). Resolves {counts, rowsRead, chunks}. */
+/** Rows [j0, j1) and columns [i0, i1) of a 16-bit - or, since the
+ * 184th, an 8-bit - greyscale PNG as raw counts (Uint16Array,
+ * row-major), streaming through an injected inflater (node's
+ * zlib.createInflate: an object with on('data'), on('error'),
+ * on('end'), write(chunk) -> boolean, once('drain'), end(), close()).
+ * MRMS packs its echo tops and rates 16 bits a cell and its hail size
+ * and radar quality index 8 (nbits 8 in the data representation
+ * section, measured); the 8-bit rows filter a byte a pixel. Resolves
+ * {counts, rowsRead, chunks, depth}. */
 export function pngWindow16(png, j0, j1, i0, i1, {createInflate} = {}) {
   if (typeof createInflate !== 'function')
     throw new Error('pngWindow16 needs createInflate');
   const c = pngChunks(png);
-  if (c.depth !== 16 || c.ctype !== 0)
+  if ((c.depth !== 16 && c.depth !== 8) || c.ctype !== 0)
     throw new Error(`unsupported PNG ${c.depth}-bit colour type ${c.ctype}`);
   if (j0 < 0 || i0 < 0 || j1 > c.height || i1 > c.width || j1 <= j0 || i1 <= i0)
     throw new Error('PNG window outside the image');
-  const bpp = 2;
+  const bpp = c.depth === 16 ? 2 : 1;
   const width = c.width;
   const rowLen = width * bpp;
   const rowBytes = 1 + rowLen;
@@ -437,7 +441,7 @@ export function pngWindow16(png, j0, j1, i0, i1, {createInflate} = {}) {
         // already closed
       }
       if (err) reject(err);
-      else resolve({counts: out, rowsRead: row, chunks});
+      else resolve({counts: out, rowsRead: row, chunks, depth: c.depth});
     };
     const consume = (chunk) => {
       let data;
@@ -457,8 +461,10 @@ export function pngWindow16(png, j0, j1, i0, i1, {createInflate} = {}) {
         );
         if (row >= j0) {
           const base = (row - j0) * cols;
-          for (let i = i0; i < i1; i++)
-            out[base + i - i0] = (cur[i * 2] << 8) | cur[i * 2 + 1];
+          if (bpp === 2)
+            for (let i = i0; i < i1; i++)
+              out[base + i - i0] = (cur[i * 2] << 8) | cur[i * 2 + 1];
+          else for (let i = i0; i < i1; i++) out[base + i - i0] = cur[i];
         }
         const t = prev;
         prev = cur;

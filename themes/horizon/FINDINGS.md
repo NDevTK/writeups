@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1206 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
+1209 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **149 reference files, 1206 landmark lines, 9 GPU probes** (live gate
+- **149 reference files, 1209 landmark lines, 9 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1565,7 +1565,45 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    a window counts as live only with good pixels now. STATED: the
    comparison is at the product's own height, so it measures the two
    profiles, not the retrieval; the full-disk temperature sweeps the
-   window minutes apart from the CONUS heights
+   window minutes apart from the CONUS heights. Pass 184 brings the
+   radar's own doubt and the hail's size: NCEP's MRMS
+   RadarQualityIndex and MESH (8-bit PNG-packed files on the echo top's
+   grid and cadence; `grib2.js`'s streaming read takes a byte a cell
+   now) as the daemon's third and fourth held MRMS files. Zhang et al.
+   2016 (BAMS 97, 621–638; NOAA's repository copy read in full) define
+   the index as a blockage factor (1 with none, linearly to 0 at 50%)
+   times a beam-height factor (1 below the melting layer, exponential
+   once the beam reaches it), carrying the beam's sampling and not the
+   Z-R relation, and the page states it on its rain and echo-top lines
+   as the radar's doubt (the observer's cell, the window's median, the
+   share below 0.5) — it moves no geometry. Smith et al. 2016 (BAMS 97,
+   1617–1630; read in full, unreachable at the AMS in pass 174) describe
+   MESH as an estimate of hail size from the vertical profiles of
+   reflectivity and environmental temperature (Witt et al. 1998, still
+   unreachable: the fit's constants are not claimed; the WDTD's pages
+   give the Severe Hail Index's 40–50 dBZ and 0 to −20 °C weights) and
+   verify the height convention pass 174 took on trust: the 3-D
+   mosaic's 33 levels run 0–20 km MSL. The hail cells within ±50 km,
+   nearest first, thicken and brighten the rain curtains standing in
+   their cells — a display rule, stated on the line — and the largest
+   is named. Gated on a synthetic 8-bit image through every row filter
+   and on two vendored 8-bit crops against Pillow and numpy: the
+   index's most varied window (the Columbia Mountains, every tenth
+   from 0.0 to 1.0, the median 0.3, 60% below a half) and the MESH
+   window beside the largest hail of the 09:42Z file (south-east
+   Saskatchewan: 56 hail cells, the largest 20.5 mm placed by a plain
+   great-circle at 13.2 km) (`mrms-reference` THE PNG ROWS, EIGHT BITS
+   and THE HAIL'S SIZE AND THE RADAR'S DOUBT; `server-reference` THE
+   DOUBT'S AND THE HAIL'S ROUTES). Live in the daemon (10:08Z): the
+   home's window RQI 1.0 at the cell and 0% below 0.5, Seattle's the
+   same, the Columbia Mountains' 0.8 at the cell with a median 0.6 and
+   31% below a half; a fetch landing on NCEP's rewrite of a "latest"
+   file read a truncated gzip twice in ten minutes, so a failed read is
+   retried after 15 s instead of a cadence. STATED: the index is the
+   beam's, not the retrieval's; an 8-bit MESH count at the file's
+   scaling reaches 22.5 mm and whether the packer rescales for larger
+   hail is unmeasured; a satellite-sourced curtain (2-km pixels) never
+   matches a 1-km hail cell
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

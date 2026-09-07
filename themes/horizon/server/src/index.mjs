@@ -121,11 +121,17 @@ import {
 import {
   echoTopCensus,
   echoTopWords,
+  meshCensus,
+  meshWords,
   MRMS_FACTS,
+  MRMS_MESH_FACTS,
   MRMS_RATE_FACTS,
+  MRMS_RQI_FACTS,
   mrmsCell,
   precipRateCensus,
-  precipRateWords
+  precipRateWords,
+  rqiCensus,
+  rqiWords
 } from '../../mrms.js';
 import {
   bandKeys,
@@ -2323,7 +2329,18 @@ function main() {
   const MRMS_RATE_URL =
     env.MRMS_RATE_URL ??
     'https://mrms.ncep.noaa.gov/2D/PrecipRate/MRMS_PrecipRate.latest.grib2.gz';
+  // THE RADAR'S OWN DOUBT AND THE HAIL'S SIZE (184th): NCEP's
+  // RadarQualityIndex (706 kB gzipped measured) and MESH (57 kB) -
+  // 8-bit PNG-packed on the same grid and cadence, the reader's 8-bit
+  // rows - held as the third and fourth files on the same law.
+  const MRMS_RQI_URL =
+    env.MRMS_RQI_URL ??
+    'https://mrms.ncep.noaa.gov/2D/RadarQualityIndex/MRMS_RadarQualityIndex.latest.grib2.gz';
+  const MRMS_MESH_URL =
+    env.MRMS_MESH_URL ??
+    'https://mrms.ncep.noaa.gov/2D/MESH/MRMS_MESH.latest.grib2.gz';
   const MRMS_HALF_CELLS = 50;
+  const MRMS_RETRY_MS = 15e3;
   // One held file per product, refreshed on the product's own cadence.
   // A request never waits for NCEP while a file is held: a due refresh
   // runs in the background and the held file (at most one cadence
@@ -2367,6 +2384,13 @@ function main() {
         );
       } catch (e) {
         held.error = e.message;
+        // NCEP rewrites each "latest" file every 2 min, and a fetch
+        // that lands on the rewrite reads a truncated gzip (measured
+        // 2026-09-07: "unexpected end of file" on the MESH at 10:11Z
+        // and on the quality index at 10:09Z); a failed read is tried
+        // again after MRMS_RETRY_MS, not after a whole cadence
+        held.at = Date.now() - refreshMs + MRMS_RETRY_MS;
+        log(`mrms: ${facts.product} failed: ${e.message}`);
       }
       return held;
     }
@@ -2424,6 +2448,10 @@ function main() {
           ms: Date.now() - t0,
           fileBytes: h.bytes
         },
+        // the quality index's law and the hail size's stated limits
+        // (184th) ride with their bodies
+        ...(facts.law ? {law: facts.law} : {}),
+        ...(facts.limits ? {limits: facts.limits} : {}),
         documentation: facts.documentation
       };
       held.cache.set(ck, {refTime, body});
@@ -2453,6 +2481,28 @@ function main() {
           refTimeIso: refTime,
           halfKm: MRMS_HALF_CELLS
         })
+      };
+    });
+  // THE RADAR'S OWN DOUBT AND THE HAIL'S SIZE (184th): the quality
+  // index's window census (the observer's cell, the covered cells'
+  // median, mean, range and share below a half) and the hail cells
+  // nearest first, capped, on the same held-file law
+  const mrmsRqi = mrmsFeed(MRMS_RQI_URL, MRMS_RQI_FACTS);
+  const mrmsMesh = mrmsFeed(MRMS_MESH_URL, MRMS_MESH_FACTS);
+  const fetchMrmsRqi = (lat, lon) =>
+    mrmsRqi.windowAt(lat, lon, (values, box, la, lo, refTime) => {
+      const census = rqiCensus(values, box, la, lo);
+      return {
+        census,
+        words: rqiWords(census, {refTimeIso: refTime, halfKm: MRMS_HALF_CELLS})
+      };
+    });
+  const fetchMrmsHail = (lat, lon) =>
+    mrmsMesh.windowAt(lat, lon, (values, box, la, lo, refTime) => {
+      const census = meshCensus(values, box, la, lo);
+      return {
+        census,
+        words: meshWords(census, {refTimeIso: refTime, halfKm: MRMS_HALF_CELLS})
       };
     });
   const glmHeld = new Map(); // bucket -> {at, files: [...], error}
@@ -3689,7 +3739,12 @@ function main() {
       // 200 with covered false is a real answer (off the CONUS grid or
       // no radar there); 502 when the file could not be read at all.
       const body = await fetchMrms(lat, lon);
-      if (!body) return json(502, {census: null, upstream: 'unavailable'});
+      if (!body)
+        return json(502, {
+          census: null,
+          upstream: 'unavailable',
+          error: mrmsTop.held.error
+        });
       return json(200, body, {
         'cache-control': 'public, max-age=60',
         'x-mrms-source': 'NCEP MRMS EchoTop_18 (mrms.ncep.noaa.gov/2D)'
@@ -3703,10 +3758,52 @@ function main() {
       // 200 with covered false is a real answer; 502 when the file
       // could not be read at all.
       const body = await fetchMrmsRate(lat, lon);
-      if (!body) return json(502, {census: null, upstream: 'unavailable'});
+      if (!body)
+        return json(502, {
+          census: null,
+          upstream: 'unavailable',
+          error: mrmsRate.held.error
+        });
       return json(200, body, {
         'cache-control': 'public, max-age=60',
         'x-mrms-source': 'NCEP MRMS PrecipRate (mrms.ncep.noaa.gov/2D)'
+      });
+    }
+
+    if (url.pathname === '/mrmsrqi') {
+      // THE RADAR'S OWN DOUBT (184th): the radar quality index within
+      // +-50 km of the point from NCEP's latest 2-minute file - the
+      // observer's own cell and the window's census. 200 with covered
+      // false is a real answer; 502 when the file could not be read.
+      const body = await fetchMrmsRqi(lat, lon);
+      if (!body)
+        return json(502, {
+          census: null,
+          upstream: 'unavailable',
+          error: mrmsRqi.held.error
+        });
+      return json(200, body, {
+        'cache-control': 'public, max-age=60',
+        'x-mrms-source': 'NCEP MRMS RadarQualityIndex (mrms.ncep.noaa.gov/2D)'
+      });
+    }
+
+    if (url.pathname === '/mrmshail') {
+      // THE HAIL'S SIZE (184th): the maximum estimated size of hail
+      // within +-50 km of the point from NCEP's latest 2-minute MESH
+      // file - the hail cells nearest first, capped, the largest
+      // placed. 200 with covered false is a real answer; 502 when the
+      // file could not be read.
+      const body = await fetchMrmsHail(lat, lon);
+      if (!body)
+        return json(502, {
+          census: null,
+          upstream: 'unavailable',
+          error: mrmsMesh.held.error
+        });
+      return json(200, body, {
+        'cache-control': 'public, max-age=60',
+        'x-mrms-source': 'NCEP MRMS MESH (mrms.ncep.noaa.gov/2D)'
       });
     }
 

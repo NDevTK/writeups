@@ -26,11 +26,23 @@ import {
 import {haversineKm} from './lightning.js';
 import {
   ECHOTOP_B64,
+  MESH_B64,
+  MESH_EXPECT,
   MRMS_EXPECT,
   PRECIPRATE_B64,
-  RATE_EXPECT
+  RATE_EXPECT,
+  RQI_B64,
+  RQI_EXPECT
 } from './mrms-fixture.js';
 import {MRMS_RATE_FACTS, precipRateCensus, precipRateWords} from './mrms.js';
+import {
+  meshCensus,
+  meshWords,
+  MRMS_MESH_FACTS,
+  MRMS_RQI_FACTS,
+  rqiCensus,
+  rqiWords
+} from './mrms.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -329,7 +341,10 @@ const createInflate = () => zlib.createInflate();
       MRMS_FACTS.codes.noCoverage === -3 &&
       MRMS_FACTS.codes.noEcho === -1 &&
       MRMS_FACTS.drt.R === -3000 &&
-      MRMS_FACTS.documentation.includes('not reachable'),
+      // the paper read in full in the 184th (NOAA's repository copy):
+      // the MSL convention is its grid's
+      MRMS_FACTS.documentation.includes('read in full') &&
+      MRMS_FACTS.meaning.includes('MSL'),
     `${X.file.slice(0, 16)} ${h.refTimeIso}, discipline ${h.discipline} category ${h.paramCategory} number ${h.paramNumber}, template 5.${h.drt.tmpl} R ${h.drt.R} D ${h.drt.D}: a ${w.box.rows} x ${w.box.cols} window read in ${w.rowsRead} rows and ${w.chunks} chunks; ` +
       `the centre cell ${centre} km (Pillow ${X.centre.value}), ${X.samples.length} sampled counts exact, ${tops.length} echoing cells, ${noEcho} echo-free, ${noCov} uncovered; tops median ${cen.medianKm}, tallest tenth ${cen.p90Km}, tallest ${cen.maxKm} km at ${cen.tallest.bearingDeg}° and ${cen.tallest.distKm} km (a plain great-circle: ${plainBrg.toFixed(1)}°, ${plainKm.toFixed(1)} km); ` +
       `${cen.stormsTotal} cells at or above ${MRMS_TOWER_KM} km, ${cen.storms.length} kept (every echoing cell within the deck's ±${cen.nearKm} km, ${cen.stormsNear} of them ${nearTowers} at or above ${MRMS_TOWER_KM} km, then the tallest ${cen.storms.length - cen.stormsNear} beyond; a 16-km field takes ${nearOnly.cells} of the near cells and ${deckField.cells - nearOnly.cells} far flanks reaching in); a window at 10 N is null, one at the crop's corner clips to ${corner.box.rows} x ${corner.box.cols}; the words: "${words.slice(0, 120)}..."`
@@ -577,6 +592,259 @@ const createInflate = () => zlib.createInflate();
     `${X.file.slice(0, 18)} ${h.refTimeIso}, discipline ${h.discipline} category ${h.paramCategory} number ${h.paramNumber}, template 5.${h.drt.tmpl} R ${h.drt.R} D ${h.drt.D}: a ${w.box.rows} x ${w.box.cols} window read in ${w.rowsRead} rows; ` +
       `the centre cell ${centre} mm/h (Pillow ${X.centre.mmh}), ${X.samples.length} sampled counts exact, ${rates.length} raining cells, ${zero} dry, ${noCov} uncovered; rates median ${cen.medianMmH}, heaviest tenth ${cen.p90MmH}, heaviest ${cen.maxMmH} mm/h at ${cen.heaviest.bearingDeg}° and ${cen.heaviest.distKm} km (a plain great-circle: ${plainKm.toFixed(1)} km); ` +
       `${cen.cells.length} of ${cen.cellsTotal} raining cells sent nearest first (the observer's own at 0 km first), 5 with a cap of 5; the words: "${words.slice(0, 130)}..."`
+  );
+}
+
+// ---- THE PNG ROWS, EIGHT BITS (184th pass) ----------------------------
+// MRMS packs its hail size and radar quality index a byte a cell
+// (nbits 8, measured): the same 9 x 7 image at 8 bits through the same
+// row filters comes back exactly through the streaming window read,
+// the depth reported, in a middle window and whole.
+{
+  const W = 9;
+  const H = 7;
+  const img = new Uint8Array(W * H);
+  for (let j = 0; j < H; j++)
+    for (let i = 0; i < W; i++) img[j * W + i] = (j * 41 + i * 13 + 7) & 255;
+  const types = [0, 1, 2, 3, 4, 2, 4];
+  const filtered = new Uint8Array(H * (1 + W));
+  const paeth = (a, b, c) => {
+    const p = a + b - c;
+    const pa = Math.abs(p - a);
+    const pb = Math.abs(p - b);
+    const pc = Math.abs(p - c);
+    return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+  };
+  for (let j = 0; j < H; j++) {
+    const ft = types[j];
+    filtered[j * (1 + W)] = ft;
+    for (let x = 0; x < W; x++) {
+      const v = img[j * W + x];
+      const a = x >= 1 ? img[j * W + x - 1] : 0;
+      const up = j > 0 ? img[(j - 1) * W + x] : 0;
+      const c = j > 0 && x >= 1 ? img[(j - 1) * W + x - 1] : 0;
+      let f = v;
+      if (ft === 1) f = v - a;
+      else if (ft === 2) f = v - up;
+      else if (ft === 3) f = v - ((a + up) >> 1);
+      else if (ft === 4) f = v - paeth(a, up, c);
+      filtered[j * (1 + W) + 1 + x] = f & 255;
+    }
+  }
+  const z = zlib.deflateSync(filtered);
+  const chunk = (type, data) => {
+    const len = new Uint8Array(4);
+    new DataView(len.buffer).setUint32(0, data.length);
+    const td = new Uint8Array(4 + data.length);
+    td.set(
+      [...type].map((ch) => ch.charCodeAt(0)),
+      0
+    );
+    td.set(data, 4);
+    return [len, td, new Uint8Array(4)];
+  };
+  const ihdr = new Uint8Array(13);
+  const dv = new DataView(ihdr.buffer);
+  dv.setUint32(0, W);
+  dv.setUint32(4, H);
+  ihdr[8] = 8;
+  ihdr[9] = 0;
+  const parts = [
+    Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    ...chunk('IHDR', ihdr),
+    ...chunk('IDAT', z.subarray(0, 5)),
+    ...chunk('IDAT', z.subarray(5)),
+    ...chunk('IEND', new Uint8Array(0))
+  ];
+  const png = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
+  let o = 0;
+  for (const p of parts) {
+    png.set(p, o);
+    o += p.length;
+  }
+  const c = pngChunks(png);
+  const mid = await pngWindow16(png, 2, 5, 3, 8, {createInflate});
+  const whole = await pngWindow16(png, 0, H, 0, W, {createInflate});
+  let midOk = true;
+  for (let j = 2; j < 5; j++)
+    for (let i = 3; i < 8; i++)
+      if (mid.counts[(j - 2) * 5 + (i - 3)] !== img[j * W + i]) midOk = false;
+  let wholeOk = true;
+  for (let k = 0; k < img.length; k++)
+    if (whole.counts[k] !== img[k]) wholeOk = false;
+  let threw = null;
+  try {
+    await pngWindow16(png, 0, H, 0, W + 1, {createInflate});
+  } catch (e) {
+    threw = e.message;
+  }
+  check(
+    'THE PNG ROWS, EIGHT BITS: an 8-bit image filtered with every row filter comes back exactly through the same streaming window read, a byte a cell, the depth reported; a window past the image throws',
+    c.depth === 8 &&
+      c.ctype === 0 &&
+      c.idat.length === 2 &&
+      mid.depth === 8 &&
+      whole.depth === 8 &&
+      midOk &&
+      mid.counts.length === 15 &&
+      mid.rowsRead === 5 &&
+      wholeOk &&
+      whole.counts.length === W * H &&
+      whole.rowsRead === H &&
+      threw !== null,
+    `a ${W} x ${H} 8-bit image (filters ${types.join(',')}) in ${c.idat.length} IDAT chunks: the middle window ${mid.counts.length} counts exact after ${mid.rowsRead} rows, the whole ${whole.counts.length} exact after ${whole.rowsRead}, depth ${whole.depth}; a window past the image: "${threw}"`
+  );
+}
+
+// ---- THE HAIL'S SIZE AND THE RADAR'S DOUBT (184th pass) ---------------
+// The two vendored 8-bit crops through the same header and window read
+// against Pillow and numpy. The RadarQualityIndex's most varied window
+// (the Columbia Mountains of British Columbia: every tenth from 0.0 to
+// 1.0; the file's own facts, discipline 209 category 8 number 0,
+// template 5.41 at 8 bits, (count - 30) / 10): the centre 0.8, the
+// sampled counts exact, the histogram by tenths, the covered cells'
+// median, mean, range and share below a half, the observer's own cell,
+// the words. The MESH window beside the largest hail of the file
+// (south-east Saskatchewan; category 3 number 28; millimetres): 56
+// hail cells among 2,545 without, the largest 20.5 mm placed by a
+// plain great-circle written here, the nearest hail cell, the cells
+// nearest first with the shafts' own field names and capped, the
+// observer's own cell without hail, the words; and the facts the
+// modules claim, including what was read and what was not.
+{
+  const Q = RQI_EXPECT;
+  const qb = new Uint8Array(Buffer.from(RQI_B64, 'base64'));
+  const qh = grib2Header(qb);
+  const qw = await grib2Window(qb, Q.centre.lat, Q.centre.lon, 25, {
+    createInflate
+  });
+  const qc = rqiCensus(qw.values, qw.box, Q.centre.lat, Q.centre.lon);
+  const qCentre = qw.values[25 * qw.box.cols + 25];
+  const qSamples = Q.samples.every(([r, c, count]) =>
+    near(qw.values[r * qw.box.cols + c], (count - 30) / 10, 1e-9)
+  );
+  const qHistOk =
+    qc.hist.length === 11 && qc.hist.every((n, k) => n === Q.hist[k]);
+  const qWords = rqiWords(qc, {refTimeIso: qh.refTimeIso, halfKm: 25});
+  const M = MESH_EXPECT;
+  const mb = new Uint8Array(Buffer.from(MESH_B64, 'base64'));
+  const mh = grib2Header(mb);
+  const mw = await grib2Window(mb, M.centre.lat, M.centre.lon, 25, {
+    createInflate
+  });
+  const gridOpt = {
+    grid: {ni: M.cols, nj: M.rows, la1: M.la1, lo1: M.lo1},
+    cellDeg: M.d
+  };
+  const mc = meshCensus(mw.values, mw.box, M.centre.lat, M.centre.lon, gridOpt);
+  const mcap = meshCensus(mw.values, mw.box, M.centre.lat, M.centre.lon, {
+    ...gridOpt,
+    cap: 5
+  });
+  const mSamples = M.samples.every(([r, c, count]) =>
+    near(mw.values[r * mw.box.cols + c], (count - 30) / 10, 1e-9)
+  );
+  const mAll = Array.from(mw.values);
+  const mSizes = mAll.filter((v) => v > 0).sort((a, b) => a - b);
+  const mNoHail = mAll.filter((v) => v > -3 && v <= 0).length;
+  const tl = M.largest;
+  const tLat = M.la1 - tl.row * M.d;
+  const tLon = M.lo1 + tl.col * M.d - 360;
+  const plainKm = haversineKm(M.centre.lat, M.centre.lon, tLat, tLon);
+  const plainBrg = bearingDeg(M.centre.lat, M.centre.lon, tLat, tLon);
+  const mWords = meshWords(mc, {refTimeIso: mh.refTimeIso, halfKm: 25});
+  check(
+    "THE HAIL'S SIZE AND THE RADAR'S DOUBT: the vendored 8-bit RadarQualityIndex and MESH crops through the PNG-packed window read agree with Pillow to the cell, the quality census keeps the observer's cell, the histogram by tenths and the share below a half, the hail census places the largest cell by a plain great-circle and lists the hail cells nearest first, the facts are the files' own and the modules say what was read",
+    qh.refTimeIso === Q.refTime &&
+      qh.discipline === Q.discipline &&
+      qh.paramCategory === Q.category &&
+      qh.paramNumber === Q.number &&
+      qh.drt.tmpl === 41 &&
+      qh.drt.nbits === 8 &&
+      qh.drt.R === Q.drt.R &&
+      qh.drt.D === Q.drt.D &&
+      qw.box.rows === Q.rows &&
+      qw.box.cols === Q.cols &&
+      near(qCentre, Q.centre.value, 1e-9) &&
+      qSamples &&
+      qc.n === Q.rows * Q.cols &&
+      qc.covered === Q.covered &&
+      qHistOk &&
+      near(qc.medianRqi, Q.medianRqi, 1e-9) &&
+      near(qc.meanRqi, Q.meanRqi, 1e-3) &&
+      near(qc.minRqi, Q.minRqi, 1e-9) &&
+      near(qc.maxRqi, Q.maxRqi, 1e-9) &&
+      qc.belowHalf === Q.belowHalf &&
+      near(qc.belowHalfShare, Q.belowHalf / Q.covered, 1e-9) &&
+      qc.here.code === 'rqi' &&
+      near(qc.here.rqi, Q.centre.value, 1e-9) &&
+      qWords.includes(
+        `RQI ${Q.centre.value.toFixed(1)} at the observer's own cell`
+      ) &&
+      qWords.includes('below 0.5') &&
+      qWords.includes('not the Z-R relation') &&
+      MRMS_RQI_FACTS.discipline === 209 &&
+      MRMS_RQI_FACTS.category === 8 &&
+      MRMS_RQI_FACTS.number === 0 &&
+      MRMS_RQI_FACTS.drt.nbits === 8 &&
+      MRMS_RQI_FACTS.codes.noCoverage === -3 &&
+      MRMS_RQI_FACTS.law.blockage.includes('50%') &&
+      MRMS_RQI_FACTS.law.height.includes('melting layer') &&
+      MRMS_RQI_FACTS.documentation.includes('read in full') &&
+      mh.refTimeIso === M.refTime &&
+      mh.discipline === M.discipline &&
+      mh.paramCategory === M.category &&
+      mh.paramNumber === M.number &&
+      mh.drt.tmpl === 41 &&
+      mh.drt.nbits === 8 &&
+      mh.drt.R === M.drt.R &&
+      mh.drt.D === M.drt.D &&
+      mw.box.rows === M.rows &&
+      mw.box.cols === M.cols &&
+      mSamples &&
+      mSizes.length === M.hail &&
+      mNoHail === M.noHail &&
+      near(mSizes[mSizes.length - 1], M.maxMm, 1e-9) &&
+      mc.n === M.rows * M.cols &&
+      mc.hail === M.hail &&
+      mc.cellsTotal === M.hail &&
+      mc.covered === M.covered &&
+      near(mc.maxMm, M.maxMm, 1e-9) &&
+      near(mc.medianMm, M.medianMm, 1e-9) &&
+      near(mc.p90Mm, M.p90Mm, 1e-9) &&
+      mc.here.code === 'no hail' &&
+      mc.here.mm === null &&
+      mc.largest !== null &&
+      near(mc.largest.mm, tl.mm, 1e-9) &&
+      near(mc.largest.distKm, plainKm, 0.06) &&
+      near(mc.largest.distKm, tl.distKm, 0.06) &&
+      near(mc.largest.bearingDeg, plainBrg, 0.06) &&
+      near(mc.largest.bearingDeg, tl.bearingDeg, 0.06) &&
+      mc.cells.length === Math.min(200, M.hail) &&
+      near(mc.cells[0].mm, M.nearest.mm, 1e-9) &&
+      near(mc.cells[0].distKm, M.nearest.distKm, 0.06) &&
+      near(mc.cells[0].bearingDeg, M.nearest.bearingDeg, 0.06) &&
+      mc.cells.every(
+        (c, k) => k === 0 || c.distKm >= mc.cells[k - 1].distKm
+      ) &&
+      mc.cells.every(
+        (c) => c.mm > 0 && c.latDeg === c.lat && c.lonDeg === c.lon
+      ) &&
+      mcap.cells.length === 5 &&
+      mcap.cellsTotal === M.hail &&
+      mWords.includes('hail cells of') &&
+      mWords.includes(`largest ${M.maxMm.toFixed(1)}`) &&
+      mWords.includes('no hail overhead') &&
+      MRMS_MESH_FACTS.discipline === 209 &&
+      MRMS_MESH_FACTS.category === 3 &&
+      MRMS_MESH_FACTS.number === 28 &&
+      MRMS_MESH_FACTS.drt.nbits === 8 &&
+      MRMS_MESH_FACTS.codes.noHail === -1 &&
+      MRMS_MESH_FACTS.meaning.includes('40 and 50 dBZ') &&
+      MRMS_MESH_FACTS.documentation.includes('Witt et al. 1998') &&
+      MRMS_MESH_FACTS.documentation.includes('not reachable'),
+    `${Q.file.slice(0, 26)} ${qh.refTimeIso}, discipline ${qh.discipline} category ${qh.paramCategory} number ${qh.paramNumber}, template 5.${qh.drt.tmpl} at ${qh.drt.nbits} bits R ${qh.drt.R} D ${qh.drt.D}: a ${qw.box.rows} x ${qw.box.cols} window read in ${qw.rowsRead} rows; the centre ${qCentre.toFixed(1)} (Pillow ${Q.centre.value}), ${Q.samples.length} sampled counts exact, ${qc.covered} covered, histogram by tenths [${qc.hist.join(' ')}], median ${qc.medianRqi.toFixed(1)}, mean ${qc.meanRqi}, ${qc.minRqi.toFixed(1)}-${qc.maxRqi.toFixed(1)}, ${qc.belowHalf} below 0.5 (${Math.round(100 * qc.belowHalfShare)}%); ` +
+      `${M.file.slice(0, 14)} ${mh.refTimeIso}, category ${mh.paramCategory} number ${mh.paramNumber} at ${mh.drt.nbits} bits: ${mc.hail} hail cells of ${mc.covered} covered (${mNoHail} without), sizes median ${mc.medianMm}, largest tenth ${mc.p90Mm}, largest ${mc.maxMm} mm at ${mc.largest.bearingDeg}° and ${mc.largest.distKm} km (a plain great-circle: ${plainBrg.toFixed(1)}°, ${plainKm.toFixed(1)} km), the nearest ${mc.cells[0].mm} mm at ${mc.cells[0].distKm} km, ${mc.cells.length} sent nearest first, 5 with a cap of 5, the observer's cell "${mc.here.code}"; the words: "${mWords.slice(0, 110)}..."`
   );
 }
 
