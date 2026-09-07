@@ -10345,6 +10345,93 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 7, the review session's 182nd pass - THE ENTERPRISE
+  HEIGHT, READ): the 181st found (OSPO's notice) that the served
+  heights have been the Enterprise algorithm's since 27 March 2023,
+  and left its ATBD unread. PRIMARY READ IN FULL: "Enterprise AWG
+  Cloud Height Algorithm (ACHA)", ATBD v3.4, Heidinger (STAR), Li and
+  Wanzong (CIMSS), September 2020, 72 pages (STAR's JPSS document
+  list; PyMuPDF's text, 106 k characters). WHAT IT SAYS: Table 1
+  (F&PS v2.2): cloud height accuracy 0.5 km and precision 1.5 km for
+  11-um emissivities > 0.80, "Resolution of IR Pixels" - the SAME
+  requirement the 173rd took from the baseline v3.0, so the theme's
+  stated accuracies stand; Table 3: the GOES-R default is mode 10 (11,
+  12 and 13.3 um), sixteen modes in all, 10.4 um as GOES-17's
+  stand-in; Sec. 4.4.1.2 Eq. 1 is the 178th's equation unchanged,
+  R_clr now written out as e_s B(T_s) t_all + R_atm; Eq. 2-4: beta =
+  ln(1 - e2) / ln(1 - e1), the 12- and 13.3-um emissivities from the
+  11-um one; Sec. 4.4.2: optimal estimation (Rodgers 1976) on a
+  FIVE-element state since v3.3 - T_c, e(11), beta(12/11), T_s (the
+  surface or the lower cloud under a multi-layer pixel) and the ice
+  fraction; Table 4: the a priori (water clouds start at the local
+  radiative centre's opaque temperature, ice at a cirrus lookup, beta
+  1.06 ice / 1.3 water, sigma 0.2); Table 5: the forward model's
+  uncertainties (T11 1.0 K instrument, 1.5 K ocean / 5.0 K land
+  clear-sky); Sec. 4.4.2.4: a four-level parameter quality indicator
+  from S_x against S_a; Sec. 4.4.2.7: the pixel order - single-layer
+  radiative centres, water clouds, multi-layer, the rest, then thin
+  cirrus REDONE with the a priori temperature of nearby thicker ice
+  (a KD-tree on latitude, longitude and type) - the anvil's thin edge
+  is tied to its thick core; Sec. 4.4.2.8: an inversion below 600 hPa
+  (a layer warmer than the one beneath) puts the height on a
+  CALIPSO lapse-rate table from the cloud-surface temperature
+  difference, over water and now land ("along the stratocumulus
+  coastal regions"); Sec. 4.4.2.9: ISCCP's 440 / 680 hPa layers;
+  Sec. 4.4.2.11 Eq. 37: tau_abs = -mu ln(1 - e_c), "where mu is the
+  cosine of the viewing zenith angle", Eq. 38 the visible depth from
+  it by the retrieved particle size's scattering properties; Sec.
+  4.4.2.12 Eq. 39-43: the parallax shift (Z_c - Z_s) tan(theta) -
+  the height ABOVE THE SURFACE - resolved along the satellite's
+  azimuth, 8.9932e-6 deg of latitude a metre; Sec. 4.4.3.3: the
+  product quality flag 0 fully successful, 1 marginally successful, 2
+  attempted and failed, 3 not attempted (the files add
+  opaque_retrieval_qf, unseen); Table 6: against CALIPSO for
+  low-level clouds with e > 0.8, height bias 0.41 km and sd 0.75 km,
+  temperature 0.95 / 3.65 K, pressure -22.6 / 47.0 hPa; the error
+  budget's three drivers: unknown low-level inversions, the missing
+  CO2 channel (VIIRS), multi-layer clouds; Appendix A: GOES-17's loop
+  heat pipe, the 3.9 + 11 um night mode, June 2019 CALIPSO
+  collocations "within required specifications" (0.5 / 1.5 km).
+  THE THEME'S CORRECTIONS: (1) the 178th took the emissivity's
+  -ln(1 - e) as the vertical absorption depth; it is the depth along
+  the satellite's slant path, and Eq. 37 makes the vertical depth mu
+  times it - at the home's 45 deg zenith the 178th overstated tau_IR
+  by 1.41; sheetOpacity now takes mu = cos(each sheet's own view
+  zenith) (nadir where a sheet has none), tau_IR = mu tau_slant, the
+  nadir opacity 1 - e^(-2 tau_IR); (2) a sheet's alpha is now the
+  opacity along the OBSERVER's own line through it - the vertical
+  depth (the theme's or DCOMP's, which is vertical by definition)
+  over the cosine of the angle from the observer's zenith to the
+  sheet's centre (its dx, dz and height above the observer; floored
+  at 87 deg, twenty times the vertical - stated), the nadir opacity
+  kept beside it; the 178th drew every sheet at its nadir opacity
+  whatever its elevation - a sheet 20 deg up was drawn thinner than
+  the light's path through it; (3) the closure's stated ratio: 2 mu
+  tau_IR against the product's tau stands AT OR BELOW 1, since the
+  product's own visible depth is its absorption depth times the
+  crystals' extinction-to-absorption ratio (2 or more - Eq. 38 with
+  the retrieved size), where the 178th said 1; (4) the parallax
+  shift is by the height above the surface (Eq. 40-41): the sheets
+  and the tower lookups take surfaceM, the page passing its
+  elevation as the surface under the sheets (stated: the terrain
+  under each pixel is not held); a Denver anvil at 12 km moves 1.6
+  km less than before. ACHA_ATBD.enterprise holds the citation, the
+  mode, the state, the requirement, Table 6, Eq. 37 and 40-41, the
+  four quality values, the 600-hPa inversion rule. GATED
+  (goesl2-reference THE SHEET'S OWN OPACITY, extended): a fifth
+  synthetic sheet on the e 0.5 block at 60 deg satellite zenith and 60
+  deg from the observer's zenith (10 km up, 17.32 km out): mu 0.5,
+  tau_IR 0.5 ln 2 against the nadir sheet's ln 2, the IR's nadir
+  opacity 0.5 against 0.75, DCOMP's 2 ln 2 standing (nadir 0.75) and
+  the doubled line giving 1 - 1/16, from 5 km up (the line 3.606
+  times the vertical) 0.993, without DCOMP the emissivity path 0.5 at
+  nadir and 0.75 along the line, its closure 0.5 with the two-sheet
+  median still 1; the nadir sheets keep every 178th number (mu 1,
+  overhead); the ATBD's numbers as held; THE ANVIL'S SPREAD: a surface
+  1 km up shortens the first sheet's move by a tenth of its 10-km top;
+  THE TOP OVER THE CORE: a surface 500 m up shortens the core's look.
+  The README's /goesl2 entry and FINDINGS pass 178 carry the
+  provenance and the corrections.
 - DONE (Sep 7, the review session's 181st pass - THE ANVIL AT TWO
   KILOMETRES): the 173rd's bands, the 176th's tower tops and the
   177th's sheets read the 10-km ACHAC fields, each the mean of a 5 x 5

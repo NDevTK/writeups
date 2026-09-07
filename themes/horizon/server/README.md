@@ -185,14 +185,19 @@ are gated by `../server-reference.mjs` — the `server` set in
   around the point (148th pass): the clear-sky mask
   (`ABI-L2-ACMC`: BCM, ACM, cloud probability, DQF on the 2-km
   CONUS grid) and the cloud top height (`ABI-L2-ACHAC`: HT on the
-  10-km grid - since the 173rd the page censuses the window by ISCCP
+  10-km grid - the ENTERPRISE algorithm's since 27 March 2023 by
+  OSPO's notice, its ATBD v3.4 read in full in the 182nd: the same
+  requirement as the baseline's, 500 m accuracy and 1.5 km precision
+  for emissivity above 0.8, Table 6's bias 0.41 km and sd 0.75 km
+  against CALIPSO - since the 173rd the page censuses the window by ISCCP
   layer and its decks read the tops: the cirrus level, the low and
   mid decks' tops behind the theme's own field, the storm slab's top
   at the tallest tenth; since the 176th each radar storm cell's tower
   (the `/mrms` list) rises to HT at the cell's own 10-km pixel where
   that is higher than its 18-dBZ echo top, the lookup shifted away
-  from the sub-satellite point by h tan(view zenith) for the top's
-  parallax - PUG Vol. 5: the height is aggregated to 10 km from 2-km
+  from the sub-satellite point by (h - the surface) tan(view zenith)
+  for the top's parallax (the Enterprise ATBD's Eq. 40-41, the
+  observer's elevation as the surface; 182nd) - PUG Vol. 5: the height is aggregated to 10 km from 2-km
   retrievals and the L1b source is not parallax-corrected; since the
   177th every good high pixel (at or above the ISCCP floor, 6,508 m)
   within 100 km is a cirrus sheet in the scene at its
@@ -204,8 +209,10 @@ are gated by `../server-reference.mjs` — the `server` set in
   night where the DQF's not-day bit is set) at the block, else the 10.35-µm cloud
   emissivity from the ACHA ATBD's Eq. 1 with the band-13 window
   (`ABI-L2-CMIPC`) inside the pixel, the mask's clear pixels as the
-  clear sky and the column's temperature at the top, doubled to the
-  visible, else the mask's fraction; the ACHA
+  clear sky and the column's temperature at the top, made vertical by
+  the satellite's cosine (the Enterprise ATBD's Eq. 37; 182nd) and
+  doubled to the visible, each sheet then as opaque as the observer's
+  own line through it, else the mask's fraction; the ACHA
   ATBD's 500 m accuracy and 1.5 km
   precision stated on the page) from the NOAA Open Data buckets (`noaa-goes18` for
   GOES-West, `noaa-goes19` for GOES-East; anonymous S3, listed and

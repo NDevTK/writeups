@@ -1419,7 +1419,11 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    window's, not the pixel's; the above-cloud terms are dropped; the
    2:1 ratio and the colour rule are the theme's; the product's night
    retrieval is the same physics solved with NWP's clear sky, so the
-   theme's emissivity stands only where the product retrieved nothing.
+   theme's emissivity stands only where the product retrieved nothing
+   (pass 182 reads the Enterprise ATBD that the served product has
+   followed since March 2023: the absorption depth carries the cosine
+   of the satellite's zenith, Eq. 37, and each sheet is now as opaque
+   as the observer's own line through it).
    Pass 179 brings the rain at a kilometre: NCEP's MRMS PrecipRate —
    the radar's precipitation rate on the echo top's 1-km grid every 2
    min, PNG-packed the same way, 689 kB gzipped — as the daemon's
@@ -1497,7 +1501,38 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    blocks to 0.20 m (80 edge fields left out). STATED: the Enterprise
    ATBD is unread and the accuracies quoted are the baseline's; the
    marginal class is left out with the bad; the mask's fraction per
-   2-km pixel is one mask pixel's
+   2-km pixel is one mask pixel's. Pass 182 reads that ATBD in full —
+   the Enterprise AWG Cloud Height Algorithm v3.4 (Heidinger, Li,
+   Wanzong; September 2020; 72 pages), the algorithm behind every
+   height the theme has read since March 2023: the requirement is the
+   baseline's (0.5 km accuracy, 1.5 km precision for emissivity above
+   0.8; Table 6 against CALIPSO: bias 0.41 km, sd 0.75 km; GOES-17's
+   June 2019 collocations within it), optimal estimation on the 11, 12
+   and 13.3 µm channels for five elements (the top's temperature, the
+   11-µm emissivity, β, the surface or lower cloud's temperature, the
+   ice fraction), thin cirrus redone with the a priori temperature of
+   nearby thicker ice, the ISCCP layers, a 600-hPa inversion rule with
+   a CALIPSO lapse-rate table, four quality values. Three of the
+   theme's laws were wrong against it and are corrected: Eq. 37 makes
+   the vertical 11-µm absorption depth −µ ln(1 − ε) with µ the cosine
+   of the satellite's zenith (pass 178 had the slant depth as
+   vertical, 1.41 too deep at the home's 45°); a sheet's opacity is
+   now taken along the observer's own line through it (the vertical
+   depth over the cosine of the angle from the observer's zenith,
+   floored at 87°, stated), where pass 178 drew every sheet at its
+   nadir opacity; and the parallax shift is by the height above the
+   surface (Eq. 40–41), the observer's elevation standing for the
+   surface (stated), where passes 176–177 shifted by the height above
+   the sea. The closure's expected ratio is restated at or below 1 (the
+   product's visible depth is its absorption depth times the crystals'
+   extinction-to-absorption ratio, 2 or more — Eq. 38). Gated on a
+   fifth synthetic sheet at 60° satellite zenith and 60° from the
+   observer (µ 0.5: the IR's nadir opacity 0.5 against 0.75; DCOMP's
+   0.75 at nadir becomes 1 − 1/16 along the doubled line, 0.993 from 5
+   km up), the nadir sheets keeping every pass-178 number, a surface 1
+   km up shortening a sheet's move by a tenth of its 10-km top
+   (`goesl2-reference` THE SHEET'S OWN OPACITY, THE ANVIL'S SPREAD, THE
+   TOP OVER THE CORE)
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
