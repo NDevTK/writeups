@@ -47,6 +47,7 @@ import {
   l2HeightBody,
   l2Height2kmBody,
   l2TopTempBody,
+  l2FscBody,
   l2ImageryBody,
   l2ListUrl,
   l2LstBody,
@@ -396,6 +397,8 @@ export function createGoesL2Client({
       topTemp: F.topTemp
         ? l2TopTempBody(F.topTemp.dec, F.topTemp.key, cell.lat, cell.lon)
         : null,
+      // the snow's cover from orbit (186th): the fractional snow cover
+      fsc: F.fsc ? l2FscBody(F.fsc.dec, F.fsc.key, cell.lat, cell.lon) : null,
       imagery: F.imagery
         ? l2ImageryBody(F.imagery.dec, F.imagery.key, cell.lat, cell.lon)
         : null,

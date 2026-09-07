@@ -35,6 +35,9 @@ import {openHdf5, physicalValues} from './hdf5.js';
 import {
   aodBoxEstimate,
   aodCensus,
+  FSC_DQF_MEANINGS,
+  fscCensus,
+  fscGood,
   boxMean,
   bucketPrefix,
   cutWindow,
@@ -92,7 +95,8 @@ export const L2_HALF_PX = {
   aod: 50,
   lst: 50,
   height2km: 50, // the 2-km cloud top height (181st): +-100 km at 2 km
-  topTemp: 50 // the cloud top temperature (183rd): full disk, 2 km
+  topTemp: 50, // the cloud top temperature (183rd): full disk, 2 km
+  fsc: 50 // the fractional snow cover (186th): CONUS, 2 km, by day
 }; // +-100 km on 2-km / 10-km grids
 export const L2_LIST_MS = 60e3; // a bucket listing stands a minute (the cheap part)
 export const L2_RETRY_MS = 2 * 60e3; // after a listing or fetch failure
@@ -161,6 +165,20 @@ export const L2_SST_SPEC = {SST: 'raw16', DQF: 'raw'};
 // the top's own temperature (183rd): kelvin counts with the file's
 // scaling beside them, the flags raw
 export const L2_TOPTEMP_SPEC = {TEMP: 'raw16', DQF: 'raw'};
+// The snow's cover from orbit (186th): the fractional snow cover (FSC
+// uint8 percent 0-100, 125 fill, 128 no retrieval; DQF the twelve
+// codes of goesl2.FSC_DQF_MEANINGS), CONUS every 5 min by day; the
+// scene's own statistics of its good pixels and the file's solar
+// zenith threshold ride as extras (scalar datasets in the head).
+export const L2_FSC_SPEC = {FSC: 'raw', DQF: 'raw'};
+export const L2_FSC_EXTRAS = [
+  'minimum_snow_fraction',
+  'maximum_snow_fraction',
+  'mean_snow_fraction',
+  'standard_deviations_of_snow_fractions',
+  'retrieval_solar_zenith_angle',
+  'retrieval_local_zenith_angle'
+];
 // The 152nd pass: the downward shortwave radiation at the surface
 // (uint16 at 0.02289 W/m2 a count, fill 65535; DQF 0 good, 1
 // degraded or invalid - the file's own flag_meanings,
@@ -549,6 +567,18 @@ export const L2_ASKS = [
     halfPx: 50,
     timed: false,
     fullDisk: true // 32.6 MB: not for a page whose ranges are ignored
+  },
+  // the snow's cover from orbit (186th): the fractional snow cover -
+  // CONUS every 5 min by day (the night's files carry the night code
+  // alone), 59-93 kB a file, a +-100 km window of 101 x 101 pixels,
+  // the scene's now (never a mosaic's minute: snow is the ground's)
+  {
+    id: 'fsc',
+    product: L2_PRODUCTS.fsc,
+    spec: L2_FSC_SPEC,
+    halfPx: 50,
+    extras: L2_FSC_EXTRAS,
+    timed: false
   }
 ];
 const l2Scalar = (a) => (Array.isArray(a) ? a[0] : a);
@@ -928,6 +958,48 @@ export function l2Height2kmBody(dec, key, lat, lon) {
     dqf: packArray(w.cut.DQF, 'u8'),
     census: heightCensus(w.cut.HT, w.cut.DQF),
     flags: heightFlags(w.cut.DQF)
+  };
+}
+// THE SNOW'S COVER FROM ORBIT (186th pass): the fractional snow cover
+// window - the percent counts and the flags raw on the wire (u8), the
+// census of the good pixels with the flag table (goesl2.fscCensus),
+// the observer's own pixel with its code named, and the scene's own
+// statistics and thresholds from the file's head. The page builds the
+// terrain's snow field from the counts itself (goesl2.snowFieldFromOrbit
+// at its own anchor and DEM), so the body carries no field.
+export function l2FscBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_FSC_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.fsc);
+  if (!w) return null;
+  const ci = w.box.i - w.box.i0;
+  const cj = w.box.j - w.box.j0;
+  const qc = cj * w.box.cols + ci;
+  const x = dec.extras ?? {};
+  const num = (v) => (Number.isFinite(v) ? v : null);
+  const r2 = (v) => (Number.isFinite(v) ? +v.toFixed(2) : null);
+  const hereDqf = w.cut.DQF[qc];
+  return {
+    ...l2Common(dec, L2_PRODUCTS.fsc, key, w),
+    fsc: packArray(w.cut.FSC, 'u8'),
+    dqf: packArray(w.cut.DQF, 'u8'),
+    units: 'percent',
+    fill: 125,
+    noRetrieval: 128,
+    here: {
+      pct: fscGood(w.cut.FSC, w.cut.DQF, qc),
+      dqf: hereDqf ?? null,
+      meaning:
+        hereDqf == null ? null : (FSC_DQF_MEANINGS[hereDqf] ?? 'code ' + hereDqf)
+    },
+    census: fscCensus(w.cut.FSC, w.cut.DQF),
+    sceneStats: {
+      minPct: r2(x.minimum_snow_fraction),
+      maxPct: r2(x.maximum_snow_fraction),
+      meanPct: r2(x.mean_snow_fraction),
+      sdPct: r2(x.standard_deviations_of_snow_fractions)
+    },
+    szaMaxDeg: num(x.retrieval_solar_zenith_angle),
+    lzaRetrievalDeg: num(x.retrieval_local_zenith_angle)
   };
 }
 // The cloud top temperature window (183rd): kelvin counts on the wire

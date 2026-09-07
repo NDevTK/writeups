@@ -12,6 +12,21 @@ import {ACHA10KM_B64, ACHA2KM_B64, ACHA2KM_EXPECT} from './acha2km-fixture.js';
 // the top's own temperature (183rd): the same pixels' cloud top
 // temperature from the full-disk file, with numpy's reading
 import {ACHT_EXPECT, ACHTF_B64} from './acht-fixture.js';
+// the snow's cover from orbit (186th): the Colorado Front Range crop of
+// the fractional snow cover with numpy's reading and its world-box field
+import {FSC_EXPECT, FSCC_B64} from './fscc-fixture.js';
+import {
+  FSC_ATBD,
+  FSC_DQF_MEANINGS,
+  fscAt,
+  fscCensus,
+  fscFlags,
+  fscGood,
+  mergeSnowFields,
+  snowFieldFromOrbit,
+  snowFromOrbitWords
+} from './goesl2.js';
+import {DEM_HALF_M, sceneToGeo, WORLD} from './roam.js';
 import {
   ACHA_DQF_MEANINGS,
   heightBlockClosure,
@@ -3502,6 +3517,198 @@ const inflate = (u8) =>
     `${E.file.slice(0, 26)} (the ${E.rows} x ${E.cols} home window, ${E.colShift} columns and ${E.rowShift} rows into the disk): flags ${JSON.stringify(flags)}, ${good.length} good tops ${good[0].toFixed(1)}-${good[good.length - 1].toFixed(1)} K (median ${good[good.length >> 1].toFixed(2)}; numpy ${E.good.medianK.toFixed(2)}), ${E.samples.length} samples exact; ` +
       `of the height crop's ${op.summary.n} sheets ${op.summary.topTempN} take the product's own temperature at their pixel (a plain count ${plainProduct}; numpy's ${E.pairs.highWithTemp} high pixels with a temperature) and ${op.summary.columnN} the column's; ` +
       `an ISA column reads ${op.summary.tempDiffMedianK.toFixed(2)} K against the product's tops at the median (numpy ${E.pairs.isaColumn.dMedianK.toFixed(2)}; |dT| ${op.summary.tempAbsDiffMedianK.toFixed(1)}, tenth ${op.summary.tempAbsDiffP90K.toFixed(1)}) over ${op.summary.tempClosureN} - the retrieved tops warmer than ISA at their heights; the words: "${words.slice(0, 150)}..."`
+  );
+}
+
+// THE SNOW'S COVER FROM ORBIT (186th pass): the vendored fractional
+// snow cover crop (the Colorado Front Range, 101 x 101 pixels of the
+// 2026-01-20 18:01Z CONUS file) read by hdf5.js against numpy: the flag
+// census, the good pixels' fractions, seven sampled counts, the scene's
+// own statistics from the head; the observer's own pixel; the world-box
+// field at the crop's centre through roam.js's own scene mapping, flat
+// and lifted 3,000 m (the pixel that sees a mountain stands one row
+// north and one column west of the flat one - away from the
+// sub-satellite point, the inverse of the cloud sheets' shift) against
+// numpy's shares and samples; the merge with a MODIS field (the
+// satellite's texel where it knows, MODIS's where only it does, -1
+// where neither); the words.
+{
+  const E = FSC_EXPECT;
+  const F = E.field;
+  const sc = (a) => (Array.isArray(a) ? a[0] : a);
+  const f = openHdf5(new Uint8Array(Buffer.from(FSCC_B64, 'base64')), inflate);
+  const proj = f.dataset('goes_imager_projection').attrs;
+  const g = fixedGridGeometry({
+    semi_major_axis: sc(proj.semi_major_axis),
+    semi_minor_axis: sc(proj.semi_minor_axis),
+    perspective_point_height: sc(proj.perspective_point_height),
+    longitude_of_projection_origin: sc(proj.longitude_of_projection_origin)
+  });
+  const xd = f.dataset('x');
+  const yd = f.dataset('y');
+  const x = {scale: sc(xd.attrs.scale_factor), offset: sc(xd.attrs.add_offset)};
+  const y = {scale: sc(yd.attrs.scale_factor), offset: sc(yd.attrs.add_offset)};
+  const nx = xd.values.length;
+  const ny = yd.values.length;
+  const box = windowBox(E.centre.lat, E.centre.lon, g, x, y, nx, ny, 1000);
+  const fsc = cutWindow(f.dataset('FSC').values, nx, box);
+  const dqf = cutWindow(f.dataset('DQF').values, nx, box);
+  const win = {fsc, dqf, box, x, y, g};
+  const census = fscCensus(fsc, dqf);
+  const flags = fscFlags(dqf);
+  const sameFlags = (a, b) =>
+    Object.keys(b).every((k) => a[k] === b[k]) &&
+    Object.keys(a).every((k) => b[k] !== undefined);
+  const samplesOk = E.samples.every((s) => {
+    const q = s.row * E.cols + s.col;
+    return (
+      fsc[q] === s.fsc &&
+      dqf[q] === s.dqf &&
+      fscGood(fsc, dqf, q) === (s.dqf === 0 && s.fsc <= 100 ? s.fsc : null)
+    );
+  });
+  const here = fscAt(win, E.centre.lat, E.centre.lon);
+  const cloudy = fscAt(win, E.centre.lat, E.centre.lon);
+  const q00 = E.samples.find((s) => s.row === 0 && s.col === 0);
+  const scalar = (v) => (typeof v === 'number' ? v : Number(v[0]));
+  const sceneMean = scalar(f.dataset('mean_snow_fraction').values);
+  const sceneSd = scalar(
+    f.dataset('standard_deviations_of_snow_fractions').values
+  );
+  const szaMax = scalar(f.dataset('retrieval_solar_zenith_angle').values);
+  // the world-box field through the theme's own scene mapping
+  const anchor = {lat: F.anchor.lat, lon: F.anchor.lon};
+  const toGeo = (px, pz) => sceneToGeo(px, pz, anchor);
+  const flat = snowFieldFromOrbit(win, toGeo, WORLD, F.n);
+  const lifted = snowFieldFromOrbit(win, toGeo, WORLD, F.n, {
+    elevM: () => 3000
+  });
+  // the field is a Float32Array (the terrain's texture): a float's
+  // tolerance
+  const fieldSamplesOk = F.samples.every((s) =>
+    near(flat.data[s.row * F.n + s.i], s.v, 1e-6)
+  );
+  let unknownFlat = 0;
+  for (let q = 0; q < F.n * F.n; q++) if (flat.data[q] < 0) unknownFlat++;
+  // the centre texel's pixel, flat and lifted, by the navigation itself
+  const ct = F.at3000m.centreTexel;
+  const cx = ((ct.i + 0.5) / F.n) * WORLD - WORLD / 2;
+  const cz = ((F.n - 1 - ct.row + 0.5) / F.n) * WORLD - WORLD / 2;
+  const Gc = toGeo(cx, cz);
+  const qFlat = windowIndexOf(Gc.lat, Gc.lon, g, x, y, box);
+  const qLift = windowIndexOf(Gc.lat, Gc.lon, g, x, y, box, 3000);
+  const pix = (q) => [Math.floor(q / box.cols), q % box.cols];
+  const pixFlat = pix(qFlat);
+  const pixLift = pix(qLift);
+  // the merge with a MODIS field: half the satellite's unknown texels
+  // known to MODIS as 0.5, a third of its known ones as 0.9 (which
+  // must lose)
+  const modis = {n: F.n, data: new Float32Array(F.n * F.n).fill(-1)};
+  let modisOnly = 0;
+  let both = 0;
+  for (let q = 0; q < F.n * F.n; q++) {
+    if (flat.data[q] < 0) {
+      if (q % 2 === 0) {
+        modis.data[q] = 0.5;
+        modisOnly++;
+      }
+    } else if (q % 3 === 0) {
+      modis.data[q] = 0.9;
+      both++;
+    }
+  }
+  const merged = mergeSnowFields(flat, modis);
+  const nn = F.n * F.n;
+  let mergedCellsOk = true;
+  for (let q = 0; q < nn; q++) {
+    const want = flat.data[q] >= 0 ? flat.data[q] : modis.data[q];
+    if (merged.data[q] !== want) mergedCellsOk = false;
+  }
+  const modisAlone = mergeSnowFields(null, modis);
+  const orbitAlone = mergeSnowFields(flat, null);
+  const words = snowFromOrbitWords(census, here, merged, '2026-01-19', '18:01Z');
+  check(
+    "THE SNOW'S COVER FROM ORBIT: the fractional snow cover crop reads as numpy read it, the observer's own pixel is named, the world-box field through the theme's own scene mapping holds numpy's texels flat and lifted to the mountains' height (the lifted pixel one row north and one column west - away from the sub-satellite point), and the merge lets the satellite's texel outrank MODIS's",
+    nx === E.cols &&
+      ny === E.rows &&
+      box.i === E.centre.col &&
+      box.j === E.centre.row &&
+      box.rows === E.rows &&
+      box.cols === E.cols &&
+      sameFlags(flags, E.flags) &&
+      sameFlags(census.flags, E.flags) &&
+      census.n === E.rows * E.cols &&
+      census.good === E.good.n &&
+      census.zero === E.good.zero &&
+      census.partial === E.good.partial &&
+      census.full === E.good.full &&
+      census.medianPct === E.good.medianPct &&
+      near(census.meanPct, E.good.meanPct, 5e-3) &&
+      census.p90Pct === E.good.p90Pct &&
+      census.maxPct === E.good.maxPct &&
+      census.cloud === E.flags['110'] &&
+      census.water === E.flags['105'] &&
+      census.night === 0 &&
+      samplesOk &&
+      here.q === E.centre.row * E.cols + E.centre.col &&
+      here.pct === E.centre.fsc &&
+      here.dqf === 0 &&
+      here.meaning === 'good retrieval' &&
+      FSC_DQF_MEANINGS[q00.dqf] === 'cloud' &&
+      Object.keys(FSC_DQF_MEANINGS).length === 12 &&
+      near(sceneMean, E.sceneMean, 1e-4) &&
+      near(sceneSd, E.sceneStd, 1e-4) &&
+      szaMax === FSC_ATBD.szaMaxDeg.abiFile &&
+      FSC_ATBD.szaMaxDeg.atbd === 85 &&
+      FSC_ATBD.errorBudget.reflectance[0] === 0.15 &&
+      FSC_ATBD.errorBudget.ndsi[1] === 0.4 &&
+      FSC_ATBD.kernel.loads.land[0] === 19.02 &&
+      FSC_ATBD.kernel.loads.snow[0] === 63.45 &&
+      FSC_ATBD.ndsi.b === 1.45 &&
+      FSC_ATBD.codes.noRetrieval === E.noRetrieval &&
+      FSC_ATBD.codes.fill === E.fill &&
+      // the world-box field: roam.js's own constants are the fixture's
+      WORLD === F.world &&
+      DEM_HALF_M === F.demHalfM &&
+      flat.n === F.n &&
+      flat.cells === F.flat.known &&
+      near(flat.known, F.flat.knownShare, 1e-12) &&
+      near(flat.snowy, F.flat.snowy, 1e-12) &&
+      unknownFlat === F.flat.unknown &&
+      flat.pixels === F.flat.distinctPixels &&
+      flat.offCells === 0 &&
+      flat.liftMaxM === 0 &&
+      fieldSamplesOk &&
+      // the centre texel's own value is the centre pixel's (47 %)
+      near(flat.data[ct.row * F.n + ct.i], E.centre.fsc / 100, 1e-6) &&
+      pixFlat[0] === ct.pixelFlat[0] &&
+      pixFlat[1] === ct.pixelFlat[1] &&
+      pixLift[0] === ct.pixelLifted[0] &&
+      pixLift[1] === ct.pixelLifted[1] &&
+      pixLift[0] === pixFlat[0] - 1 &&
+      pixLift[1] === pixFlat[1] - 1 &&
+      lifted.cells === F.at3000m.known &&
+      near(lifted.snowy, F.at3000m.snowy, 1e-12) &&
+      lifted.liftMaxM === 3000 &&
+      lifted.cells !== flat.cells &&
+      // the merge
+      mergedCellsOk &&
+      near(merged.fromOrbit * nn, flat.cells, 1e-6) &&
+      near(merged.fromModis * nn, modisOnly, 1e-6) &&
+      near(merged.unknown * nn, nn - flat.cells - modisOnly, 1e-6) &&
+      near(merged.known, merged.fromOrbit + merged.fromModis, 1e-12) &&
+      near(modisAlone.fromModis * nn, modisOnly + both, 1e-6) &&
+      modisAlone.fromOrbit === 0 &&
+      near(orbitAlone.fromOrbit * nn, flat.cells, 1e-6) &&
+      orbitAlone.fromModis === 0 &&
+      near(orbitAlone.snowy, flat.snowy, 1e-6) &&
+      words.includes('4092 of 10201 pixels') &&
+      words.includes("the observer's pixel 47 %") &&
+      words.includes('from MODIS NDSI (2026-01-19') &&
+      words.includes('0.15-0.20 against 0.33-0.40'),
+    `${E.file.slice(0, 25)} (${E.rows} x ${E.cols} over the Front Range at ${E.centre.lat} N ${-E.centre.lon} W): flags ${JSON.stringify(flags)}, ${census.good} good pixels (${census.zero} snow-free, ${census.partial} part-covered, ${census.full} full; median ${census.medianPct} %, mean ${census.meanPct} %, tenth ${census.p90Pct} %; numpy ${E.good.meanPct.toFixed(2)}), ${E.samples.length} samples exact, the scene's mean ${sceneMean.toFixed(2)} %; ` +
+      `the observer's pixel ${here.pct} % (${here.meaning}); the ${F.n} x ${F.n} box: ${flat.cells} texels from ${flat.pixels} pixels flat (share ${flat.known.toFixed(4)}, mean ${flat.snowy.toFixed(4)}; numpy ${F.flat.knownShare.toFixed(4)}, ${F.flat.snowy.toFixed(4)}), ${lifted.cells} lifted 3 km (mean ${lifted.snowy.toFixed(4)}); ` +
+      `the centre texel's pixel (${pixFlat}) flat, (${pixLift}) lifted; merged with a MODIS field: ${Math.round(merged.fromOrbit * 100)}% from orbit, ${Math.round(merged.fromModis * 100)}% MODIS, ${Math.round(merged.unknown * 100)}% unknown; the words: "${words.slice(0, 160)}..."`
   );
 }
 

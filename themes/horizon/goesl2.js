@@ -219,14 +219,21 @@ export function fixedGridToLatLon(x, y, g) {
 }
 // PUG 4.2.8.2: geodetic latitude and longitude (degrees) to scan
 // angles (radians); null where the point is not visible from the
-// satellite (the PUG's inequality).
-export function latLonToFixedGrid(latDeg, lonDeg, g) {
+// satellite (the PUG's inequality). hM (186th): the point's height
+// above the ellipsoid - the ground's own elevation for a surface
+// product - added to the geocentric radius, so the scan angles are
+// those of the pixel that SEES the lifted point (the ellipsoid point
+// beyond it, away from the sub-satellite point by about hM tan(view
+// zenith): 2 px over the Rockies from GOES-East). The radial lift
+// stands for the normal one: their angle is e^2 sin(2 phi) / 2, a
+// dozen metres at 3 km - stated. 0 keeps the PUG's own navigation.
+export function latLonToFixedGrid(latDeg, lonDeg, g, hM = 0) {
   const {req, rpol, H, e} = g;
   const phi = latDeg * RAD;
   const lam = lonDeg * RAD;
   const lam0 = g.lon0Deg * RAD;
   const phiC = Math.atan(((rpol * rpol) / (req * req)) * Math.tan(phi));
-  const rC = rpol / Math.sqrt(1 - e * e * Math.cos(phiC) ** 2);
+  const rC = rpol / Math.sqrt(1 - e * e * Math.cos(phiC) ** 2) + hM;
   const Sx = H - rC * Math.cos(phiC) * Math.cos(lam - lam0);
   const Sy = -rC * Math.cos(phiC) * Math.sin(lam - lam0);
   const Sz = rC * Math.sin(phiC);
@@ -312,9 +319,11 @@ export function pixelSizeM(box, g, xCoord, yCoord) {
   return {ewM: dx, nsM: dy};
 }
 // Which product pixel a lat/lon falls in, on a window: the index
-// into the window's arrays or -1.
-export function windowIndexOf(latDeg, lonDeg, g, xCoord, yCoord, box) {
-  const s = latLonToFixedGrid(latDeg, lonDeg, g);
+// into the window's arrays or -1. hM (186th): the point's elevation,
+// so the pixel is the one that sees the lifted ground (0: the PUG's
+// ellipsoid navigation, every earlier caller's).
+export function windowIndexOf(latDeg, lonDeg, g, xCoord, yCoord, box, hM = 0) {
+  const s = latLonToFixedGrid(latDeg, lonDeg, g, hM);
   if (!s) return -1;
   const i = indexOfScanAngle(s.x, xCoord) - box.i0;
   const j = indexOfScanAngle(s.y, yCoord) - box.j0;
@@ -1542,6 +1551,12 @@ export const L2_PRODUCTS = {
   // and night, quantitative to 55 deg of local zenith (the file's
   // own bound); 1.4 MB a file, the window ~0.6 MB by range
   lst: 'ABI-L2-LSTC',
+  // the snow's cover from orbit (186th): the fractional snow cover
+  // (the Enterprise FSC ATBD v1.0 and the GOES-18 read-me, read in
+  // full) - CONUS every 5 min by day, 2 km, the viewable snow
+  // fraction of each pixel as a uint8 percent with twelve quality
+  // codes; 59-93 kB a file (measured), the window a few kB by range
+  fsc: 'ABI-L2-FSCC',
   // the anvil at two kilometres (181st): the cloud top height on the
   // 2-km grid - NCEI's record of the product (gov.noaa.ncdc:C01505):
   // "The product's spatial resolution increased from 10 and 4 km to 2
@@ -4525,4 +4540,284 @@ export function dcompAt(q, cod, cps, dqf) {
     thick: !!(d & DCOMP_FLAGS.thick),
     glint: !!(d & DCOMP_FLAGS.glint)
   };
+}
+// ---- THE SNOW'S COVER FROM ORBIT (186th pass) ------------------------
+// NOAA's Enterprise Fractional Snow Cover (ABI-L2-FSCC: CONUS every 5
+// min by day, 2 km): FSC a uint8 percent (0 snow-free land, 1-100 the
+// snow fraction, 125 fill, 128 no retrieval) with a DQF of twelve
+// codes (the file's own flag_values and flag_meanings; the ATBD's
+// Table 2-6). The Enterprise FSC ATBD v1.0 (Romanov, NOAA/NESDIS/STAR,
+// June 2020, 35 pp) and the GOES-18 ABI L2+ FSC full-maturity read-me
+// (OSPO, 2 Dec 2024) read in full. The product is the VIEWABLE snow
+// fraction - the snow the instrument sees, a forest canopy hiding what
+// lies under it (Sec. 1.1.1) - by Eq. 1's linear unmixing of the
+// 0.64-um reflectance between a snow-free and a snow end-member, each
+// end-member's angular anisotropy by the 8-term kernel model of Eq. 2
+// with Table 2-4's loads; ABI carries the reflectance-based fraction
+// alone (Sec. 2.4: the MODIS-heritage NDSI law the theme's snowcover.js
+// applies to MODIS tiles is derived for VIIRS only). The ATBD's
+// theoretical error budgets (Tables 2-7 and 2-8, all factors combined):
+// 0.15-0.20 for the reflectance-based fraction, 0.33-0.40 for the
+// NDSI-based one - the reason the satellite's own fraction outranks the
+// theme's NDSI field where both stand, beside its freshness (minutes
+// against a day's composite). The requirement: 20 % of the FSC area,
+// clear sky by day, for pixels identified as snow-covered (Table 1-1);
+// daytime is a solar zenith under 85 deg in the ATBD, the ABI file's
+// own threshold 80 deg (retrieval_solar_zenith_angle, measured). The
+// read-me's known issue at full maturity: the derived fraction varies
+// with the solar-satellite relative azimuth, so with the time of day -
+// the product's accuracy, not its precision; snow/no-snow
+// discrimination unaffected.
+export const FSC_DQF_MEANINGS = {
+  0: 'good retrieval',
+  105: 'water',
+  110: 'cloud',
+  111: 'rejected snow: inconsistent with the snow climatology',
+  112: 'rejected snow: inconsistent with the surface temperature climatology',
+  113: 'rejected snow: failed the spatial consistency test',
+  114: 'rejected snow: failed the temperature uniformity test',
+  121: 'night: insufficient solar illumination',
+  122: 'undetermined',
+  124: 'bad pixel (SDR)',
+  125: 'fill value',
+  128: 'no retrieval'
+};
+export const FSC_ATBD = {
+  source:
+    'Enterprise Fractional Snow Cover ATBD v1.0 (Romanov, NOAA/NESDIS/STAR, June 2020; 35 pp) and the GOES-18 ABI L2+ FSC full-maturity read-me (OSPO, 2 Dec 2024) - read in full in the 186th pass',
+  quantity:
+    'the viewable snow fraction of the pixel (0-100 %): the snow the instrument sees, not the snow on the ground under a canopy (Sec. 1.1.1)',
+  eq1: 'SnowFraction = (R - Rland) / (Rsnow - Rland) on the 0.64-um reflectance, each end-member at its own anisotropy',
+  kernel: {
+    terms: 8,
+    functions:
+      'C0 + C1 cos(sol) + C2 cos(sat) + C3 cos(sol)cos(sat) + C4 cos^2(sol) + C5 cos^2(sat) + C6 cos^4(sol) + C7 cos^4(sat) (Eq. 2)',
+    loads: {
+      land: [19.02, 9.699, -9.944, 13.16, -36.3, -6.289, 20.18, 5.419],
+      snow: [63.45, 89.9, -16.33, 61.81, -140.9, -5.114, 51.62, -2.623]
+    }
+  },
+  ndsi: {
+    a: -0.01,
+    b: 1.45,
+    ndsiLand: 0.007,
+    ndsiSnow: 0.7,
+    viirsOnly: true,
+    words:
+      "the NDSI-based fraction (-0.01 + 1.45 NDSI, the unmixing between NDSI 0.007 and 0.70) is derived for VIIRS only; ABI and MetImage carry the reflectance-based fraction alone (Sec. 2.4) - the theme's MODIS NDSI field applies the same MODIS-heritage law"
+  },
+  errorBudget: {
+    reflectance: [0.15, 0.2],
+    ndsi: [0.33, 0.4],
+    words:
+      'Tables 2-7 and 2-8, all factors combined, in units of snow fraction'
+  },
+  requirement: {
+    accuracy: 0.2,
+    words:
+      '20 % of the FSC area, clear sky by day, for pixels identified as snow-covered (Table 1-1)'
+  },
+  szaMaxDeg: {atbd: 85, abiFile: 80},
+  abiBands: [2, 3, 5, 13],
+  resolutionKm: 2,
+  cadenceMin: 5,
+  readme: {
+    maturity: 'full validation (GOES-18: 4 Jan 2025)',
+    knownIssue:
+      'an excessive variation of the derived fraction with the solar-satellite relative azimuth, so with the time of day - the accuracy, not the precision; snow/no-snow discrimination unaffected'
+  },
+  codes: {fill: 125, noRetrieval: 128, max: 100}
+};
+// A pixel's fraction where the retrieval is good: DQF 0 and a count
+// at or under 100; null for every other code (the flag says why).
+export function fscGood(fsc, dqf, q) {
+  const d = dqf ? dqf[q] : 0;
+  const v = fsc[q];
+  return d === 0 && v <= 100 ? v : null;
+}
+// The flag census (how many pixels carry each DQF code)
+export function fscFlags(dqf) {
+  return heightFlags(dqf);
+}
+// The census of a window: the good pixels' fractions (snow-free,
+// part-covered, full; median, mean, tenth, maximum, in percent) and
+// the flags - cloud, water and night named beside the whole table.
+export function fscCensus(fsc, dqf) {
+  const flags = fscFlags(dqf);
+  const good = [];
+  let zero = 0;
+  let partial = 0;
+  let full = 0;
+  let sum = 0;
+  for (let q = 0; q < fsc.length; q++) {
+    const v = fscGood(fsc, dqf, q);
+    if (v === null) continue;
+    good.push(v);
+    sum += v;
+    if (v === 0) zero++;
+    else if (v === 100) full++;
+    else partial++;
+  }
+  good.sort((a, b) => a - b);
+  return {
+    n: fsc.length,
+    good: good.length,
+    zero,
+    partial,
+    full,
+    medianPct: quantile(good, 0.5),
+    meanPct: good.length ? +(sum / good.length).toFixed(2) : null,
+    p90Pct: quantile(good, 0.9),
+    maxPct: good.length ? good[good.length - 1] : null,
+    cloud: flags[110] || 0,
+    water: flags[105] || 0,
+    night: flags[121] || 0,
+    flags
+  };
+}
+/**
+ * The fraction the satellite sees at a ground point: the pixel that
+ * sees (latDeg, lonDeg) at elevation hM (latLonToFixedGrid's lift),
+ * {q, pct, dqf, meaning} - pct null where the retrieval is not good,
+ * q -1 off the window. win: {fsc, dqf, box, x, y, g | proj}.
+ */
+export function fscAt(win, latDeg, lonDeg, hM = 0) {
+  const g = win.g ?? fixedGridGeometry(win.proj);
+  const q = windowIndexOf(latDeg, lonDeg, g, win.x, win.y, win.box, hM);
+  if (q < 0) return {q, pct: null, dqf: null, meaning: 'off the window'};
+  const d = win.dqf ? win.dqf[q] : 0;
+  return {
+    q,
+    pct: fscGood(win.fsc, win.dqf, q),
+    dqf: d,
+    meaning: FSC_DQF_MEANINGS[d] ?? 'code ' + d
+  };
+}
+/**
+ * The satellite's snow field over the roam box: n x n texels in the
+ * MODIS field's own layout (snowcover.snowField: row 0 the SOUTH edge,
+ * values the fraction 0..1 where the retrieval is good, -1 where it is
+ * not), each texel's centre mapped to Earth by toGeo(x, z) -> {lat,
+ * lon} (the page's roam.sceneToGeo at its anchor) and lifted to its
+ * own ground elevation elevM(x, z) (metres; the DEM the terrain
+ * stands on) so the pixel is the one that SEES the texel - a surface
+ * product's parallax, the inverse of the cloud sheets' (177th). A
+ * 2-km pixel spans a dozen texels of a 16-km box: nearest sampling,
+ * as the MODIS field's. {data, n, known, snowy, cells, cloudCells,
+ * offCells, pixels, liftMaxM}.
+ */
+export function snowFieldFromOrbit(win, toGeo, world, n, {elevM = null} = {}) {
+  const g = win.g ?? fixedGridGeometry(win.proj);
+  const data = new Float32Array(n * n).fill(-1);
+  let known = 0;
+  let sum = 0;
+  let cloud = 0;
+  let off = 0;
+  let liftMax = 0;
+  const pixels = new Set();
+  for (let j = 0; j < n; j++)
+    for (let i = 0; i < n; i++) {
+      const x = ((i + 0.5) / n) * world - world / 2;
+      const z = ((j + 0.5) / n) * world - world / 2;
+      const G = toGeo(x, z);
+      const h = elevM ? elevM(x, z) : 0;
+      const hM = Number.isFinite(h) ? h : 0;
+      if (hM > liftMax) liftMax = hM;
+      const q = windowIndexOf(G.lat, G.lon, g, win.x, win.y, win.box, hM);
+      if (q < 0) {
+        off++;
+        continue;
+      }
+      pixels.add(q);
+      if (win.dqf && win.dqf[q] === 110) cloud++;
+      const v = fscGood(win.fsc, win.dqf, q);
+      if (v === null) continue;
+      const row = n - 1 - j;
+      data[row * n + i] = v / 100;
+      known++;
+      sum += v / 100;
+    }
+  return {
+    data,
+    n,
+    known: known / (n * n),
+    snowy: known ? sum / known : 0,
+    cells: known,
+    cloudCells: cloud,
+    offCells: off,
+    pixels: pixels.size,
+    liftMaxM: liftMax
+  };
+}
+/**
+ * The two fields merged, texel by texel: the satellite's where it
+ * knows (a good retrieval), MODIS's where only it does, -1 where
+ * neither (the terrain's heuristic snowline stands there) - the
+ * ranking the header states, the ATBD's error budgets and the
+ * freshness. Either may be null; both carry {data, n}. {data, n,
+ * known, snowy, fromOrbit, fromModis, unknown} (shares of the box).
+ */
+export function mergeSnowFields(orbit, modis) {
+  const n = orbit ? orbit.n : modis ? modis.n : 0;
+  const data = new Float32Array(n * n).fill(-1);
+  let a = 0;
+  let b = 0;
+  let sum = 0;
+  for (let q = 0; q < n * n; q++) {
+    const vo = orbit ? orbit.data[q] : -1;
+    const vm = modis && modis.n === n ? modis.data[q] : -1;
+    if (vo >= 0) {
+      data[q] = vo;
+      a++;
+      sum += vo;
+    } else if (vm >= 0) {
+      data[q] = vm;
+      b++;
+      sum += vm;
+    }
+  }
+  const known = a + b;
+  const nn = n * n || 1;
+  return {
+    data,
+    n,
+    known: known / nn,
+    snowy: known ? sum / known : 0,
+    fromOrbit: a / nn,
+    fromModis: b / nn,
+    unknown: 1 - known / nn
+  };
+}
+// The line's words: the window's census, the observer's own pixel,
+// the box's merged field and the ranking. modisDay: the MODIS field's
+// day (null when none stands); when: the file's time.
+export function snowFromOrbitWords(census, here, merged, modisDay, when) {
+  const c = census;
+  const pct = (v) => (Number.isFinite(v) ? Math.round(v) + ' %' : '-');
+  const share = (v) => Math.round(v * 100) + '%';
+  const head =
+    `NOAA ABI L2+ fractional snow cover${when ? ' ' + when : ''}: ${c.good} of ${c.n} pixels within ±100 km retrieved` +
+    (c.good
+      ? ` - ${c.zero} snow-free, ${c.partial} part-covered, ${c.full} full; median ${pct(c.medianPct)}, mean ${pct(c.meanPct)}, tenth ${pct(c.p90Pct)}`
+      : '') +
+    `; cloud ${c.cloud}, water ${c.water}${c.night ? ', night ' + c.night : ''} px`;
+  const own = here
+    ? here.pct !== null && here.pct !== undefined
+      ? ` · the observer's pixel ${here.pct} %`
+      : ` · the observer's pixel: ${here.meaning}`
+    : '';
+  const box = merged
+    ? ` · the box: ${share(merged.fromOrbit)} of its texels from the satellite's good pixels` +
+      (merged.fromModis > 0
+        ? `, ${share(merged.fromModis)} from MODIS NDSI${modisDay ? ' (' + modisDay + "'s composite)" : ''}`
+        : '') +
+      (merged.unknown > 0.005 ? `, ${share(merged.unknown)} the snowline` : '') +
+      (merged.known ? `; mean cover ${pct(merged.snowy * 100)}` : '')
+    : '';
+  return (
+    head +
+    own +
+    box +
+    " · the viewable fraction (Eq. 1's unmixing) outranks the NDSI law: error budget 0.15-0.20 against 0.33-0.40 (ATBD Tables 2-7 and 2-8), minutes old against a day's composite"
+  );
 }
