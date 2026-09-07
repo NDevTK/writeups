@@ -1272,7 +1272,8 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    an hour-long passing gate and `update.sh` re-gated the same tip
    every tick with nothing recorded; the rewrite is added, every shared
    import is now held to both halves, and an install failure is
-   recorded like a failed gate. Live at Savannah under the evening's
+   recorded like a failed gate (verified: the box took main's tip at
+   23:37Z the same evening, all 18 products served). Live at Savannah under the evening's
    storms, with the station reporting drizzle and no shower, the radar
    window held 7,679 echoing cells, the tallest 13.0 km at 36° and 57
    km, 11.0 km overhead: the deck went towering on the radar's storms

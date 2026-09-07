@@ -10424,12 +10424,26 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the deck's +-9 km in the body (the tops 1-12 km; the 10-12 km cells
   6-10 km off to the south at 130-215 deg), the far flanks reaching in
   from beyond the box, the field's row through the tallest texel
-  falling 0.5 km a texel from a 12-km core as the rule says. STATED
+  falling 0.5 km a texel from a 12-km core as the rule says. The
+  daylight A/B outside Phoenix (33.37 N 111.92 W, 16:45 local, nine
+  echoing cells of 4-8 km at 4-9 km to the south-east under a mostly
+  clear station sky, the 9-km cell 52 km off making the deck
+  towering): with the field the deck shows a lit, turreted mass with a
+  dark base at the cells' bearings where without it the same patch is
+  a flat blue smear (phoenix175-on/off in the session's scratch); the
+  first east view on the Georgia coast showed hard-edged boxes that
+  were taken for the towers and were the 165th's rain shafts 1 km off
+  (the same boxes with the field off; ?shafts=0 removes them) -
+  stated, so the next reader does not chase them. STATED
   LIMITS: the flank is the theme's rule, not a measurement; the
   field's 250-m texels quantise the radar's 1-km cells (a cell is a
   4 x 4 plateau); the cloud above and around the precipitation core -
   the anvil, the turrets - is not measured here, so the towers are
-  precipitation cores with 63-degree walls; the mid deck takes no
+  precipitation cores with 63-degree walls; a freshly set field shows
+  a fine stipple over the towers in the capture (the quarter-res
+  march's reprojection meeting per-texel tops - a smoothing of the
+  field over its 250-m texels is the cheap remedy, not taken yet); the
+  mid deck takes no
   field; the deck's world is +-8 km (the storms beyond it stand only
   as the ranking's slab top, or not at all when the station reports
   no cloud and none is within reach). The named next lead: the
@@ -10542,7 +10556,15 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   file's phase install-failed with the guard's words; a new phase
   installing between the gate and the install); server-reference THE
   SHIP LIST, WHOLE holds every '../../X.js' import of index.mjs (20) to
-  both halves - the 158th's lesson completed. Docs: server README
+  both halves - the 158th's lesson completed. VERIFIED (the 175th's
+  check-in): the box took main's tip 8a8d2ed (the 174th under
+  Prettier) at 23:37:49Z with all 18 products, three hours after the
+  166th's build, and answered /mrms with the 00:04Z file in 2.1 s
+  (1,472 PNG chunks through the e2-micro's inflater; its list is the
+  174th's tallest-300, which the 175th's page names as such); /health's
+  update field stayed null - no status file at the daemon's path, so
+  the copy of update.sh the box's timer ran was not yet the one that
+  writes it; the next revision's install will tell. Docs: server README
   (/mrms; the third deploy lesson), FINDINGS pass 174 (149 files, 1,197
   landmarks). MEASURED in the page (Savannah, 32.08 N 81.10 W, 18:35
   local, open-meteo drizzle - no shower code - under the evening's
