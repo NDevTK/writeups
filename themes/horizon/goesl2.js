@@ -443,7 +443,13 @@ export const ACHA_ATBD = {
     // Table 3: the GOES-R default mode; the 11, 12 and 13.3 um channels
     mode: {number: 10, channelsUm: [11.2, 12.3, 13.3]},
     // Sec. 4.4.2 and the v3.1/v3.3 revisions: five retrieved elements
-    state: ['Tc', 'e11', 'beta(12/11)', 'Ts or the lower cloud', 'ice fraction'],
+    state: [
+      'Tc',
+      'e11',
+      'beta(12/11)',
+      'Ts or the lower cloud',
+      'ice fraction'
+    ],
     // Table 1 (F&PS v2.2): the same requirement as the baseline's
     requirement: {accuracyM: 500, precisionM: 1500, emissivityFloor: 0.8},
     // Table 6: against CALIPSO, low-level clouds with emissivity > 0.8
