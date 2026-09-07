@@ -88,7 +88,10 @@ write_status() { # phase rev startedAt seconds tail
 STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 T0=$(date +%s)
 write_status gating "$NEW" "$STARTED_AT" 0 ""
-if (cd themes/horizon/harness && SHOOT_CHROME= ./validate.sh 2>&1 | tee "$GATE_LOG"); then
+# JOBS=1: the box is an e2-micro (2 shared vCPUs, 1 GB); the gate's
+# references run one after another here so two fixture decoders never
+# stand in memory together - the development box runs them in parallel
+if (cd themes/horizon/harness && JOBS=1 SHOOT_CHROME= ./validate.sh 2>&1 | tee "$GATE_LOG"); then
   GATED_S=$(( $(date +%s) - T0 ))
   write_status installing "$NEW" "$STARTED_AT" "$GATED_S" "$(grep -c '^\[ok\]' "$GATE_LOG" 2>/dev/null || echo 0) files passed"
   rm -rf /opt/horizon-live.prev

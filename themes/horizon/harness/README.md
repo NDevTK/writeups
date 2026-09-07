@@ -51,10 +51,16 @@ Pieces:
 150.0.7871.124` makes `setup-chrome.mjs` fetch and cache that
   named build itself.
 - `validate.sh` — the reference-first gate and the ONE correctness
-  entrypoint: every CPU double-precision reference (77 sets), then
-  the GPU-vs-reference probes asserting texels at the reference
-  values.
-  Nothing compares one render against another.
+  entrypoint: every CPU double-precision reference (149 files, run
+  `JOBS` at a time - the machine's cores by default, `JOBS=1` one
+  after another as the deploy box runs them on its 1 GB - with each
+  file's output captured and the report printed in the list's fixed
+  order), then the GPU-vs-reference probes one at a time (one GPU)
+  asserting texels at the reference values, then the page-wiring
+  check. Nothing compares one render against another. Measured on a
+  4-core box: the sequential CPU stage is a few heavy fixture
+  decoders plus a hundred and forty files under a second each; the
+  parallel stage is bounded by the slowest file, not the count.
 - `sweep-pin.sh` — the eight-scene pinned smoke matrix on WebGPU
   (PAGEERROR detection + visual inspection).
 - `ppmdiff.py a.ppm b.ppm [diff.png]` — mean/max abs diff plus

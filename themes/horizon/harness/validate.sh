@@ -24,10 +24,25 @@ REFDIR=${REFDIR:-..} # where the *-reference.mjs live
 fail=0
 
 echo "== CPU references (double precision, ground truth) =="
-for name in ozone no2 cloud-corona cloud-climatology cloudtop creff moonlight overcast adaptation stars-color varstars planets-color stratos volcanic gvp bishop psc aureole ocean atmo moon lunar-umbra optics surf glint coxmunk whitecap aurora steve leadr radar igrf scintillation ross-li cn2 airglow gwaves zodiacal meteors gmn comets cobs contrails ships navlights aircraft airline wildfire lightning sprites blondel tides milkyway earthshine nlc sats satmags eclipses skyglow rainbow fogbow mie halos explore roam solarwind metar sounding buoy seasmoke clearness closure refraction smoke terrain-sample far-terrain leewave hindcast nz rayleighpol beads kcorona looming lehn fleagle surfacelayer coolskin warmlayer wetground landlayer observatory goesir hdf5 goesl2 goesl2-client daylight rainshafts glm mrms pick spectral sunspots lakes buildings facade roads landuse rivers rails trains aerialways turbines wakes peaks snowcover snowage snotel seaice meltpond lakeice grib2 aerosol aeronet pollen nightlights lightpillars morel ocean-glint ocean-color ocean-measured-color vegetation land-color surface-color spectral-color crops livery forest grassland bldlod linelod veglod kelvin corona waterfalls powerlines geotiles modis-land phenology server; do
+# The references are independent node processes: they run JOBS at a
+# time (default the machine's cores; JOBS=1 is the old one-after-
+# another run, what the deploy box uses on its 1 GB), each file's
+# output captured, and the report is printed afterwards in the list's
+# fixed order so logs stay comparable run to run. Measured on a 4-core
+# box: the sequential stage was dominated by a handful of files (the
+# fixture decoders), and four workers cut it by the critical path,
+# not the count - see harness/README.md.
+JOBS=${JOBS:-$(nproc 2>/dev/null || echo 1)}
+LIST="ozone no2 cloud-corona cloud-climatology cloudtop creff moonlight overcast adaptation stars-color varstars planets-color stratos volcanic gvp bishop psc aureole ocean atmo moon lunar-umbra optics surf glint coxmunk whitecap aurora steve leadr radar igrf scintillation ross-li cn2 airglow gwaves zodiacal meteors gmn comets cobs contrails ships navlights aircraft airline wildfire lightning sprites blondel tides milkyway earthshine nlc sats satmags eclipses skyglow rainbow fogbow mie halos explore roam solarwind metar sounding buoy seasmoke clearness closure refraction smoke terrain-sample far-terrain leewave hindcast nz rayleighpol beads kcorona looming lehn fleagle surfacelayer coolskin warmlayer wetground landlayer observatory goesir hdf5 goesl2 goesl2-client daylight rainshafts glm mrms pick spectral sunspots lakes buildings facade roads landuse rivers rails trains aerialways turbines wakes peaks snowcover snowage snotel seaice meltpond lakeice grib2 aerosol aeronet pollen nightlights lightpillars morel ocean-glint ocean-color ocean-measured-color vegetation land-color surface-color spectral-color crops livery forest grassland bldlod linelod veglod kelvin corona waterfalls powerlines geotiles modis-land phenology server"
+outdir=$(mktemp -d)
+printf '%s\n' $LIST | xargs -P "$JOBS" -I{} sh -c \
+  '[ -f "$1/$2-reference.mjs" ] || exit 0; node "$1/$2-reference.mjs" > "$3/$2.out" 2>&1; echo $? > "$3/$2.code"' \
+  _ "$REFDIR" {} "$outdir"
+for name in $LIST; do
   ref="$REFDIR/$name-reference.mjs"
   if [ ! -f "$ref" ]; then echo "[FAIL] $name-reference.mjs missing"; fail=1; continue; fi
-  if out=$(node "$ref" 2>&1); then
+  out=$(cat "$outdir/$name.out" 2>/dev/null)
+  if [ "$(cat "$outdir/$name.code" 2>/dev/null)" = "0" ]; then
     echo "[ok]   $(basename "$ref") ($(echo "$out" | wc -l) landmarks)"
   else
     echo "[FAIL] $(basename "$ref")"
@@ -35,6 +50,7 @@ for name in ozone no2 cloud-corona cloud-climatology cloudtop creff moonlight ov
     fail=1
   fi
 done
+rm -rf "$outdir"
 
 if [ -z "${SHOOT_CHROME:-}" ]; then
   echo "== GPU probes skipped (SHOOT_CHROME unset) =="
