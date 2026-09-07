@@ -508,6 +508,8 @@
         lapStability,
         ACHA_ATBD,
         heightBands,
+        cirrusSheetsFromOrbit,
+        cirrusSheetsWords,
         towerTopsFromOrbit,
         towerTopsWords,
         LAP_ATBD,
@@ -6982,7 +6984,10 @@
             : null,
           topsFeeds.low ? "the low deck's top" : null,
           topsFeeds.mid ? "the mid deck's top" : null,
-          topsFeeds.high ? 'the cirrus level' : null
+          topsFeeds.high ? 'the cirrus level' : null,
+          cirrusSheetsInfo && cirrusSheetsInfo.summary.n
+            ? 'the cirrus sheets at their own pixels (177th)'
+            : null
         ].filter(Boolean);
         return (
           `${goesL2.craft || 'GOES'}'s cloud-top heights (ABI-L2-ACHAC, 10-km fields of 5 × 5 good pixels, every 5 min): ` +
@@ -6991,6 +6996,8 @@
             : 'none fresh (the window past 30 min or unread)') +
           ` · what they feed now: ${feeds.length ? feeds.join(', ') : "nothing - the theme's own field, the balloon's ceiling or the hand stand"}` +
           ` (ranking: the theme's own opaque tops where they cover 5% of the sea, then these, then the VIIRS census; on storm codes - or with a radar storm at or above 8 km in view - these tallest tops when ten good fields stand, else the radar's tallest echo top, else the parcel's EL)` +
+          ` · the cirrus sheets: ${cirrusSheetsInfo ? cirrusSheetsWords(cirrusSheetsInfo.summary) : 'none measured - no window live, the seven drifting sheets stand'}` +
+          ` (the parallax undone: a pixel's navigated point is where its line of sight meets the ground, so a top at height h is moved h tan(zenith) toward the sub-satellite point; a pixel is a 10-km block mean of 2-km retrievals)` +
           ` · the ATBD: ${R.accuracyM} m accuracy and ${R.precisionM} m precision for emissivity > ${R.emissivityFloor}, quantitative to ${R.lzaQuantitativeDeg}°; against CALIPSO a ${E.sdKm} km standard deviation for low cloud, thin cirrus and low-level inversions the stated concerns`
         );
       }
@@ -14177,6 +14184,75 @@
         cloudGroup.add(sheet);
       }
       scene.add(cloudGroup);
+      // THE ANVIL'S SPREAD (177th): the cirrus sheets at the
+      // satellite's high pixels - while a height window is live (30
+      // min) every good ACHA pixel at or above the ISCCP high floor
+      // within 100 km is a sheet at its parallax-corrected place
+      // (goesl2.cirrusSheetsFromOrbit: moved toward the sub-satellite
+      // point by HT tan(zenith)) and its own height, the pixel's ground
+      // size wide, the mask's cloudy fraction inside the pixel its
+      // alpha (a four-component vertex colour on the shared cirrus
+      // material; a sheet without a mask is opaque); the seven drifting
+      // sheets stand only where no window is live (the pinned
+      // harness). The group drifts with the high-level wind between
+      // files and is rebuilt on a new window, place or datum.
+      const cirrusSheets = new THREE.Group();
+      cirrusSheets.visible = false;
+      scene.add(cirrusSheets);
+      cirrusMat.vertexColors = true;
+      let cirrusSheetsKey = null;
+      let cirrusSheetsInfo = null; // {summary, builtAt}
+      const CIRRUS_SHEETS_MAX_KM = 100;
+      function applyCirrusSheets() {
+        const hw = goesL2 && goesL2.height;
+        const live =
+          hw && hw.ht && hw.time && Date.now() - Date.parse(hw.time) <= ACHA_LIVE_MS
+            ? hw
+            : null;
+        const mask = live && goesL2.mask && goesL2.mask.bcm ? goesL2.mask : null;
+        const key = live
+          ? `${live.time}:${mask && mask.time ? mask.time : '-'}:${state.lat.toFixed(3)},${state.lon.toFixed(3)}:${Math.round(centerElev)}`
+          : null;
+        if (key === cirrusSheetsKey) return;
+        cirrusSheetsKey = key;
+        for (const m of cirrusSheets.children) m.geometry.dispose();
+        cirrusSheets.clear();
+        cirrusSheets.position.set(0, 0, 0);
+        if (!key) {
+          cirrusSheetsInfo = null;
+          cirrusSheets.visible = false;
+          return;
+        }
+        const r = cirrusSheetsFromOrbit(live, mask, state.lat, state.lon, {
+          maxKm: CIRRUS_SHEETS_MAX_KM
+        });
+        for (const s of r.sheets) {
+          const geo = new THREE.PlaneGeometry(
+            (s.ewM || 10000) / MPU,
+            (s.nsM || 10000) / MPU
+          );
+          const a = s.fraction === null ? 1 : s.fraction;
+          const n = geo.attributes.position.count;
+          const col = new Float32Array(n * 4);
+          for (let k = 0; k < n; k++) {
+            col[k * 4] = 1;
+            col[k * 4 + 1] = 1;
+            col[k * 4 + 2] = 1;
+            col[k * 4 + 3] = a;
+          }
+          geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
+          const mesh = new THREE.Mesh(geo, cirrusMat);
+          mesh.rotation.x = -Math.PI / 2;
+          mesh.position.set(
+            s.dxM / MPU,
+            16 * Math.asinh((s.htM - centerElev) / 500) + 8,
+            s.dzM / MPU
+          );
+          cirrusSheets.add(mesh);
+        }
+        cirrusSheetsInfo = {summary: r.summary, builtAt: Date.now()};
+        cirrusSheets.visible = r.sheets.length > 0;
+      }
 
       // The ISS: real orbital mechanics. Current elements from
       // wheretheiss.at, propagated locally with SGP4 (satellite.js), shown
@@ -20224,6 +20300,17 @@
           windVDeckHigh,
           deckWind.high.kmh
         );
+        // THE ANVIL'S SPREAD (177th): the measured sheets at the
+        // satellite's high pixels stand in for the drifting seven
+        // while a window is live, and drift with the same high wind
+        applyCirrusSheets();
+        if (cirrusSheets.visible) {
+          for (const c of cloudsHigh) c.visible = false;
+          cirrusSheets.position.x +=
+            windVDeckHigh.x * deckWind.high.kmh * 0.06 * dt;
+          cirrusSheets.position.z +=
+            windVDeckHigh.z * deckWind.high.kmh * 0.06 * dt;
+        }
         cirrusMat.opacity = 0.05 + day * 0.12;
 
         // Ground snow cover reacts live to the real temperature.

@@ -629,6 +629,151 @@ export function towerTopsFromOrbit(
   sum.meanLiftM = sum.lifted ? liftSum / sum.lifted : null;
   return {storms: out, summary: sum};
 }
+// ---- THE ANVIL'S SPREAD (177th pass) ---------------------------------
+// The cirrus sheets at the satellite's high pixels: every good height
+// pixel (DQF 0) at or above the ISCCP high floor (ACHA_ATBD.layers'
+// 440 hPa, 6,508 m in the standard atmosphere - heightBands' midTopM)
+// within reach becomes a sheet at the pixel's parallax-corrected
+// ground place - the navigated point moved TOWARD the sub-satellite
+// point by HT tan(view zenith), the inverse of towerTopsFromOrbit's
+// lookup - at its own height, the pixel's ground size wide, with the
+// mask's cloudy fraction inside the pixel (the 2-km BCM pixels whose
+// scan angles fall in the 10-km pixel, DQF 0) as its opacity, or null
+// where no mask stands. A pixel is a 10-km block mean of 2-km
+// retrievals (PUG Vol. 5), so a sheet is that block's mean top, and
+// the mask's fraction is the block's own cloudiness - stated.
+export function cirrusSheetsFromOrbit(
+  hwin,
+  mask,
+  latDeg,
+  lonDeg,
+  {maxKm = 100, highM = 6508, rEkm = 6371, rSkm = 42164} = {}
+) {
+  const g = hwin.g ?? fixedGridGeometry(hwin.proj);
+  const satLon = g.lon0Deg;
+  const box = hwin.box;
+  const nPix = box.rows * box.cols;
+  // the mask's cloudy fraction per height pixel: each good 2-km mask
+  // pixel binned by its scan angles into the height grid
+  let frac = null;
+  if (mask && mask.bcm && mask.box && mask.x && mask.y) {
+    const cnt = new Uint16Array(nPix);
+    const cld = new Uint16Array(nPix);
+    for (let jm = 0; jm < mask.box.rows; jm++)
+      for (let im = 0; im < mask.box.cols; im++) {
+        const qm = jm * mask.box.cols + im;
+        if (mask.dqf && mask.dqf[qm] !== 0) continue;
+        const b = mask.bcm[qm];
+        if (b !== 0 && b !== 1) continue;
+        const i = indexOfScanAngle(scanAngle(mask.box.i0 + im, mask.x), hwin.x) - box.i0;
+        const j = indexOfScanAngle(scanAngle(mask.box.j0 + jm, mask.y), hwin.y) - box.j0;
+        if (i < 0 || j < 0 || i >= box.cols || j >= box.rows) continue;
+        const q = j * box.cols + i;
+        cnt[q]++;
+        if (b === 1) cld[q]++;
+      }
+    frac = new Float64Array(nPix).fill(NaN);
+    for (let q = 0; q < nPix; q++) if (cnt[q]) frac[q] = cld[q] / cnt[q];
+  }
+  const size = pixelSizeM(box, g, hwin.x, hwin.y);
+  const mLon = 111320 * Math.cos(latDeg * RAD);
+  const sheets = [];
+  const tops = [];
+  let nHigh = 0;
+  let nGood = 0;
+  let shiftMinM = null;
+  let shiftMaxM = null;
+  for (let j = 0; j < box.rows; j++)
+    for (let i = 0; i < box.cols; i++) {
+      const q = j * box.cols + i;
+      if (hwin.dqf && hwin.dqf[q] !== 0) continue;
+      const h = hwin.ht[q];
+      if (h === null || h === undefined || !Number.isFinite(h)) continue;
+      nGood++;
+      if (h < highM) continue;
+      nHigh++;
+      const G = fixedGridToLatLon(
+        scanAngle(box.i0 + i, hwin.x),
+        scanAngle(box.j0 + j, hwin.y),
+        g
+      );
+      if (!G) continue;
+      const vz = viewZenithDeg(G.latDeg, G.lonDeg, satLon, {rEkm, rSkm});
+      const shiftM = h * Math.tan(vz * RAD);
+      const toward = towerBearingDeg(G.latDeg, G.lonDeg, 0, satLon);
+      const lat = G.latDeg + (shiftM * Math.cos(toward * RAD)) / 111320;
+      const lon =
+        G.lonDeg +
+        (shiftM * Math.sin(toward * RAD)) / (111320 * Math.cos(G.latDeg * RAD));
+      const dxM = (lon - lonDeg) * mLon;
+      const dzM = -(lat - latDeg) * 111320;
+      const distKm = Math.hypot(dxM, dzM) / 1000;
+      if (distKm > maxKm) continue;
+      const f = frac && Number.isFinite(frac[q]) ? frac[q] : null;
+      tops.push(h);
+      if (shiftMinM === null || shiftM < shiftMinM) shiftMinM = shiftM;
+      if (shiftMaxM === null || shiftM > shiftMaxM) shiftMaxM = shiftM;
+      sheets.push({
+        q,
+        i,
+        j,
+        lat,
+        lon,
+        htM: h,
+        ewM: size ? size.ewM : null,
+        nsM: size ? size.nsM : null,
+        fraction: f,
+        shiftM,
+        viewZenithDeg: vz,
+        distKm,
+        bearingDeg: (Math.atan2(dxM, -dzM) / RAD + 360) % 360,
+        dxM,
+        dzM
+      });
+    }
+  tops.sort((a, b) => a - b);
+  const withMask = sheets.filter((s) => s.fraction !== null);
+  return {
+    sheets,
+    summary: {
+      n: sheets.length,
+      nHigh,
+      nGood,
+      nPixels: nPix,
+      medianM: tops.length ? tops[tops.length >> 1] : null,
+      minM: tops.length ? tops[0] : null,
+      maxM: tops.length ? tops[tops.length - 1] : null,
+      withMask: withMask.length,
+      meanFraction: withMask.length
+        ? withMask.reduce((a, s) => a + s.fraction, 0) / withMask.length
+        : null,
+      viewZenithDeg: sheets.length ? sheets[0].viewZenithDeg : null,
+      shiftMinM,
+      shiftMaxM,
+      pixelEwM: size ? size.ewM : null,
+      pixelNsM: size ? size.nsM : null,
+      highM,
+      maxKm,
+      satLonDeg: satLon,
+      time: hwin.time ?? null,
+      maskTime: mask && mask.time ? mask.time : null
+    }
+  };
+}
+/** The words for a sheets summary. */
+export function cirrusSheetsWords(sm) {
+  if (!sm) return 'no height window';
+  const km = (m) => `${(m / 1000).toFixed(1)} km`;
+  if (!sm.n)
+    return `no high pixel (at or above ${km(sm.highM)}) within ${sm.maxKm} km of ${sm.nGood} good heights`;
+  return (
+    `${sm.n} high pixels within ${sm.maxKm} km as sheets at their parallax-corrected places (moved ${(sm.shiftMinM / 1000).toFixed(1)}-${(sm.shiftMaxM / 1000).toFixed(1)} km toward the sub-satellite point at ${sm.viewZenithDeg.toFixed(0)}° zenith), ` +
+    `tops ${km(sm.minM)}-${km(sm.maxM)} (median ${km(sm.medianM)}), each ${(sm.pixelEwM / 1000).toFixed(1)} x ${(sm.pixelNsM / 1000).toFixed(1)} km` +
+    (sm.withMask
+      ? `, ${sm.withMask} carrying the mask's cloudy fraction inside the pixel as opacity (mean ${(100 * sm.meanFraction).toFixed(0)}%)`
+      : ', no mask inside them: opaque')
+  );
+}
 /** The words for a summary. */
 export function towerTopsWords(sm) {
   if (!sm || !sm.n) return 'no storm cell to lift';

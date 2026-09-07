@@ -143,6 +143,8 @@ import {
 import {parcelAscent} from './sounding.js';
 import {
   ACHA_ATBD,
+  cirrusSheetsFromOrbit,
+  cirrusSheetsWords,
   heightBands,
   towerTopsFromOrbit,
   towerTopsWords
@@ -2600,6 +2602,152 @@ const inflate = (u8) =>
           `a ${(pick.h0 / 1000).toFixed(2)}-km core placed ${(pick.d / 1000).toFixed(2)} km toward GOES-West (${g.lon0Deg} E) looks up its top ${(sA.shiftM / 1000).toFixed(2)} km away from it at ${vzLaw.toFixed(2)}° zenith (the ellipsoid's own ${pick.vz.toFixed(2)}°) and lands on the pixel - lifted 500 m to ${sA.km.toFixed(3)} km; ` +
           `the wrong way would land on a ${pick.wHt.toFixed(0)}-m pixel; parallax off at the centre lifts an 8-km core by ${(rB.storms[0].liftM / 1000).toFixed(3)} km; a ${C.km.toFixed(2)}-km core keeps its own top; a flagged centre and a point at 10 N are named; the words: "${words.slice(0, 150)}..."`
       : 'no pixel in the fixture met the search (a good 10-km top with a good 5 x 5 neighbourhood and a differing pixel two shifts back)'
+  );
+}
+
+// ---- THE ANVIL'S SPREAD (177th pass) ---------------------------------
+// The vendored ACHAC file's home window: every good pixel at or above
+// the ISCCP high floor within 100 km becomes a sheet at its
+// parallax-corrected place - moved TOWARD the sub-satellite point by
+// HT tan(zenith), one sheet checked against the ellipsoid's own zenith
+// and the great-circle bearing - the counts against a plain count, a
+// synthetic 2-km mask laid five to a height pixel giving each sheet
+// the fraction its 25 mask pixels say (a flagged mask pixel left
+// out), no mask meaning opaque, a reach of 1 km keeping none.
+{
+  const D2R = Math.PI / 180;
+  const f = openHdf5(new Uint8Array(Buffer.from(ACHAC_B64, 'base64')), inflate);
+  const proj = f.dataset('goes_imager_projection').attrs;
+  const sc = (a) => (Array.isArray(a) ? a[0] : a);
+  const g = fixedGridGeometry({
+    semi_major_axis: sc(proj.semi_major_axis),
+    semi_minor_axis: sc(proj.semi_minor_axis),
+    perspective_point_height: sc(proj.perspective_point_height),
+    longitude_of_projection_origin: sc(proj.longitude_of_projection_origin)
+  });
+  const xd = f.dataset('x');
+  const yd = f.dataset('y');
+  const xc = {scale: sc(xd.attrs.scale_factor), offset: sc(xd.attrs.add_offset)};
+  const yc = {scale: sc(yd.attrs.scale_factor), offset: sc(yd.attrs.add_offset)};
+  const nx = xd.values.length;
+  const ny = yd.values.length;
+  const ht = physicalValues(f.dataset('HT'));
+  const dqf = f.dataset('DQF').values;
+  const lat0 = 32.85;
+  const lon0 = -117.12;
+  const box = windowBox(lat0, lon0, g, xc, yc, nx, ny, 10);
+  const hwin = {
+    ht: cutWindow(ht, nx, box),
+    dqf: cutWindow(dqf, nx, box),
+    box,
+    x: xc,
+    y: yc,
+    g,
+    time: 'the fixture'
+  };
+  const zenithEllipsoid = (latDeg, lonDeg) => {
+    const a = g.req;
+    const e2 = 1 - (g.rpol * g.rpol) / (a * a);
+    const phi = latDeg * D2R;
+    const lam = lonDeg * D2R;
+    const N = a / Math.sqrt(1 - e2 * Math.sin(phi) ** 2);
+    const P = [N * Math.cos(phi) * Math.cos(lam), N * Math.cos(phi) * Math.sin(lam), N * (1 - e2) * Math.sin(phi)];
+    const lam0 = g.lon0Deg * D2R;
+    const Sat = [g.H * Math.cos(lam0), g.H * Math.sin(lam0), 0];
+    const v = [Sat[0] - P[0], Sat[1] - P[1], Sat[2] - P[2]];
+    const n = [Math.cos(phi) * Math.cos(lam), Math.cos(phi) * Math.sin(lam), Math.sin(phi)];
+    return Math.acos((v[0] * n[0] + v[1] * n[1] + v[2] * n[2]) / Math.hypot(v[0], v[1], v[2])) / D2R;
+  };
+  const bearing = (lat1, lon1, lat2, lon2) => {
+    const dl = (lon2 - lon1) * D2R;
+    const y = Math.sin(dl) * Math.cos(lat2 * D2R);
+    const x = Math.cos(lat1 * D2R) * Math.sin(lat2 * D2R) - Math.sin(lat1 * D2R) * Math.cos(lat2 * D2R) * Math.cos(dl);
+    return (Math.atan2(y, x) / D2R + 360) % 360;
+  };
+  // the sheets without a mask first: their places, and which pixel to
+  // flag in the synthetic mask (the first sheet's own)
+  const rNone = cirrusSheetsFromOrbit(hwin, null, lat0, lon0);
+  const s0 = rNone.sheets[0];
+  // a synthetic mask five pixels to a height pixel: mask pixel 5i+2 on
+  // the height pixel's own scan angle, (i + j) mod 26 of the 25 cloudy
+  // in row-major order; the first mask pixel of the first sheet's
+  // height pixel flagged (a cloudy one where its count is 1 or more)
+  const xm = {scale: xc.scale / 5, offset: xc.offset - 2 * (xc.scale / 5)};
+  const ym = {scale: yc.scale / 5, offset: yc.offset - 2 * (yc.scale / 5)};
+  const mbox = {i0: 5 * box.i0, j0: 5 * box.j0, cols: 5 * box.cols, rows: 5 * box.rows};
+  const bcm = new Uint8Array(mbox.cols * mbox.rows);
+  const mdq = new Uint8Array(mbox.cols * mbox.rows);
+  for (let j = 0; j < box.rows; j++)
+    for (let i = 0; i < box.cols; i++) {
+      const want = (i + j) % 26;
+      let k = 0;
+      for (let dj = 0; dj < 5; dj++)
+        for (let di = 0; di < 5; di++) {
+          bcm[(5 * j + dj) * mbox.cols + (5 * i + di)] = k < want ? 1 : 0;
+          k++;
+        }
+    }
+  if (s0) mdq[5 * s0.j * mbox.cols + 5 * s0.i] = 1;
+  const mask = {bcm, dqf: mdq, box: mbox, x: xm, y: ym, time: 'the synthetic mask'};
+  const r = cirrusSheetsFromOrbit(hwin, mask, lat0, lon0);
+  const rNear = cirrusSheetsFromOrbit(hwin, mask, lat0, lon0, {maxKm: 1});
+  let plainHigh = 0;
+  let plainGood = 0;
+  for (let q = 0; q < hwin.ht.length; q++) {
+    if (hwin.dqf[q] !== 0 || !Number.isFinite(hwin.ht[q])) continue;
+    plainGood++;
+    if (hwin.ht[q] >= 6508) plainHigh++;
+  }
+  const fracOk =
+    !!s0 &&
+    r.sheets.every((s) => {
+      const want = (s.i + s.j) % 26;
+      const flagged = s.i === s0.i && s.j === s0.j;
+      const exp = flagged ? (want - (want >= 1 ? 1 : 0)) / 24 : want / 25;
+      return near(s.fraction, exp, 1e-9);
+    });
+  // one sheet by hand: the navigated pixel, the ellipsoid's zenith,
+  // the shift and its direction toward the sub-satellite point
+  const G0 = s0 && fixedGridToLatLon(scanAngle(box.i0 + s0.i, xc), scanAngle(box.j0 + s0.j, yc), g);
+  const vzE = G0 ? zenithEllipsoid(G0.latDeg, G0.lonDeg) : NaN;
+  const dHand = s0 ? s0.htM * Math.tan(vzE * D2R) : NaN;
+  const brgSub = G0 ? bearing(G0.latDeg, G0.lonDeg, 0, g.lon0Deg) : NaN;
+  const brgMoved = G0 ? bearing(G0.latDeg, G0.lonDeg, s0.lat, s0.lon) : NaN;
+  const dBrg = ((brgMoved - brgSub + 540) % 360) - 180;
+  const movedM = G0
+    ? Math.hypot((s0.lon - G0.lonDeg) * 111320 * Math.cos(G0.latDeg * D2R), (s0.lat - G0.latDeg) * 111320)
+    : NaN;
+  const words = cirrusSheetsWords(r.summary);
+  check(
+    "THE ANVIL'S SPREAD: every good high pixel within reach is a sheet at its parallax-corrected place and its own height, the mask's cloudy fraction inside the pixel its opacity, no mask opaque, a short reach empty",
+    !!s0 &&
+      r.summary.nGood === plainGood &&
+      r.summary.nHigh === plainHigh &&
+      r.summary.n > 0 &&
+      r.summary.n <= plainHigh &&
+      r.summary.n === rNone.summary.n &&
+      r.sheets.every((s) => s.htM >= 6508 && s.distKm <= 100 && s.fraction !== null && s.ewM > 9000 && s.ewM < 15000) &&
+      r.summary.withMask === r.summary.n &&
+      fracOk &&
+      rNone.summary.withMask === 0 &&
+      rNone.sheets.every((s) => s.fraction === null) &&
+      Math.abs(s0.viewZenithDeg - vzE) < 0.25 &&
+      Math.abs(s0.shiftM - dHand) < 150 &&
+      Math.abs(movedM - s0.shiftM) < 1 &&
+      Math.abs(dBrg) < 0.5 &&
+      near(r.summary.minM, Math.min(...r.sheets.map((s) => s.htM)), 1e-9) &&
+      near(r.summary.maxM, Math.max(...r.sheets.map((s) => s.htM)), 1e-9) &&
+      rNear.summary.n === 0 &&
+      rNear.summary.nHigh === plainHigh &&
+      r.summary.satLonDeg === g.lon0Deg &&
+      words.includes('high pixels within 100 km as sheets') &&
+      words.includes("carrying the mask's cloudy fraction") &&
+      cirrusSheetsWords(rNear.summary).includes('no high pixel'),
+    s0
+      ? `the vendored ${ACHAC_EXPECT.file.slice(0, 24)} home window (San Diego, 21 x 21): ${plainGood} good heights, ${plainHigh} at or above 6508 m, ${r.summary.n} within 100 km as sheets (tops ${r.summary.minM.toFixed(0)}-${r.summary.maxM.toFixed(0)} m, median ${r.summary.medianM.toFixed(0)}), each ${(s0.ewM / 1000).toFixed(2)} x ${(s0.nsM / 1000).toFixed(2)} km; ` +
+        `the first, pixel (${s0.i}, ${s0.j}) at ${s0.htM.toFixed(0)} m, navigated to ${G0.latDeg.toFixed(3)} N ${(-G0.lonDeg).toFixed(3)} W and moved ${(s0.shiftM / 1000).toFixed(2)} km toward GOES-West (${g.lon0Deg} E) at ${s0.viewZenithDeg.toFixed(2)}° zenith (the ellipsoid's ${vzE.toFixed(2)}°, ${(dHand / 1000).toFixed(2)} km; the bearing ${dBrg.toFixed(3)}° off the sub-point's), ${s0.distKm.toFixed(1)} km at ${s0.bearingDeg.toFixed(0)}° from the home; ` +
+        `the synthetic mask's fractions match pixel by pixel (the flagged pixel dropped from the first sheet's 25: ${(r.sheets[0].fraction * 100).toFixed(1)}%); no mask: opaque; a 1-km reach: none; the words: "${words.slice(0, 140)}..."`
+      : 'no high pixel within 100 km of the home window'
   );
 }
 
