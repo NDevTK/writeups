@@ -10345,6 +10345,81 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 7, the review session's 178th pass - THE SHEET'S OWN
+  OPACITY): the 177th's named lead - the measured anvil let the stars
+  through because the cirrus material's night opacity (0.05) was the
+  theme's thin-cirrus hand. PRIMARY READ: the ACHA ATBD v3.0 Sec.
+  1.11.1.2, Eq. 1: R_obs = e_c R_ac + e_c t_ac B(T_c) + (1 - e_c)
+  R_clr, "where R_obs is the observed top-of-atmosphere radiance, T_c
+  is the cloud temperature, B() represents the Planck Function and
+  R_clr is the clear-sky radiance (both measured at the top of the
+  atmosphere). R_ac is the above-cloud emission; t_ac is the
+  above-cloud transmission along the path from the satellite sensor
+  to the cloud pixel. Finally, the cloud emissivity is represented by
+  e_c" - "the 11 um cloud emissivity is directly retrieved by the
+  ACHA" but is not in the served product, so the theme solves the same
+  equation with what it holds. THE LAW (goesl2.js sheetOpacity): for a
+  high sheet R_ac 0 and t_ac 1 at 10.35 um (the air above 6.5 km;
+  stated - ACHA takes them from NWP), so e_c = (R_obs - R_clr) /
+  (B(T_c) - R_clr) in RADIANCE: R_obs the mean Planck radiance of the
+  good band-13 pixels (the 149th's imagery window, 2 km) whose scan
+  angles fall in the sheet's 10-km pixel; R_clr the median radiance
+  of the window's clear pixels (the mask's BCM 0, DQF 0, under good
+  imagery; twenty at least) - the scene's own clear sky, stated; T_c
+  the satellite column's (171st; else the balloon's) temperature at
+  the sheet's height, linear in height between rows; the top must be
+  colder than the clear sky and the pixel not warmer than it (a fog
+  warmer than the reference has no emissivity here), a pixel colder
+  than the column's top reads as fully emitting. The 11-um absorption
+  depth tau_IR = -ln(1 - e); the visible extinction depth about twice
+  it (the geometric limit: extinction efficiency 2 in the visible,
+  absorption efficiency near 1 at 11 um for crystals large against
+  the wavelength - the theme's rule, stated), so the visible opacity
+  is 1 - (1 - e)^2. By day DCOMP's optical depth (the 149th's window,
+  the block's good retrievals' median) gives 1 - exp(-tau) directly
+  and outranks it; where both stand 2 tau_IR / tau is the closure on
+  the line (1 is the stated ratio). The mask's fraction stands last.
+  planckRadiance/planckTemperature live in goesl2.js on the CODATA
+  constants (no new server import: goesir.js is not shipped);
+  columnTemperatureAt. THE PAGE: the measured sheets get their own
+  material (MeshBasicNodeMaterial, opacity 1, vertexColors, the aerial
+  perspective applied) with the vertex alpha the sheet's opacity, and
+  its colour each frame from the decks' own lights - the sky's
+  ambient (cloudSys.shared.ambCol, the underside lit by the sky) plus
+  the sun's colour times 0.08 max(sunDir.y, 0) (a little transmitted
+  and forward-scattered sun) - the display rule, stated on the line;
+  the seven random sheets keep the old material and its hand
+  untouched (the pinned harness). The ACHA line adds "the sheets'
+  opacity: N from DCOMP's optical depth by day (...), M from the
+  10.35-um cloud emissivity (the ACHA ATBD's Eq. 1 with the window's K
+  clear pixels as the clear sky, T K, and the column's temperature at
+  each top; e a-b, median m; opacity 1 - (1 - e)^2), P the mask's
+  cloudy fraction; ... where both stand, 2 tau_IR against DCOMP's tau:
+  r over n (1 is the stated ratio)". GATED (goesl2-reference THE
+  SHEET'S OWN OPACITY) on synthetic windows whose physics is written
+  in the gate: a 3 x 3 height window with 5 x 5 imagery, mask and
+  DCOMP pixels each on consistent scan-angle coordinates, a clear sky
+  at 290 K (123 clear pixels, two flagged out), three cloud blocks
+  whose radiances are mixed by hand at e 0.5, 1 and 0.2 over a 220-K
+  top that the column (rows at 8 and 12 km) reads at 10 km: each e
+  comes back to 1e-9 - a brightness-temperature average would read
+  0.387 for the half-emissive block - DCOMP's tau 2 ln 2 on that block
+  gives opacity 0.750 over the IR's 0.75 with the closure 1.000, e 1
+  gives 1, e 0.2 gives 0.36, a 295-K fog block (warmer than the clear
+  sky) keeps the mask's 0.6, no column or fewer than 20 clear pixels
+  leave every sheet to the mask, no DCOMP leaves the emissivity
+  standing, and the Planck pair matches goesir's to 1e-12. A first cut
+  tested the column's top against the clear sky but not the pixel, so
+  the fog block came back at e 0 instead of no emissivity - caught by
+  the gate's count of sources. Docs: server README (/goesl2), FINDINGS
+  pass 178 (149 files, 1,201 landmarks, 9 GPU probes). STATED LIMITS:
+  the clear reference is the window's median, not the pixel's own
+  clear-sky radiance; the above-cloud terms are dropped (a few tenths
+  of a kelvin at 10.35 um above 6.5 km); the 2:1 visible-to-IR ratio
+  is the geometric limit, not a retrieval; the sheets' colour is a
+  display rule; a mixed block (cloud over part of the 10-km pixel)
+  reads a lower emissivity than its cloud has - the mask's fraction
+  within it is the reason and is not folded in.
 - DONE (Sep 7, the review session's gate-speed pass - THE GATE IN
   PARALLEL): the full gate had grown to 10-15 minutes a run and stood
   between every pass and main. MEASURED first (every reference file

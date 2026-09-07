@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1200 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
+1201 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **149 reference files, 1200 landmark lines, 9 GPU probes** (live gate
+- **149 reference files, 1201 landmark lines, 9 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1375,7 +1375,39 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    material's thin-cirrus opacity still scales it — the stars showed
    through the measured anvil, the next pass's lead; the sheets drift
    with the high-level wind between files; beyond 100 km the sky's own
-   cirrus stands
+   cirrus stands. Pass 178 gives each sheet its own opacity: the ACHA
+   ATBD's radiative transfer equation (Eq. 1, R_obs = ε R_ac +
+   ε t_ac B(T_c) + (1 − ε) R_clr) solved for the 11-µm cloud
+   emissivity with the above-cloud terms taken as 0 and 1 above 6.5 km
+   (stated) — the mean radiance of the good band-13 pixels inside the
+   sheet's 10-km pixel against the median radiance of the window's
+   clear pixels (the mask's BCM 0, DQF 0, twenty at least: the scene's
+   own clear sky where ACHA's is per pixel from NWP, stated) and the
+   Planck radiance of the satellite column's temperature at the
+   sheet's height — in radiance, never in brightness temperature (a
+   BT average reads 0.39 for a half-emissive block); the 11-µm
+   absorption depth −ln(1 − ε) doubled to the visible (the geometric
+   limit: extinction efficiency 2, absorption efficiency near 1 for
+   crystals large against the wavelength — stated) gives the sheet's
+   opacity 1 − (1 − ε)²; by day DCOMP's optical depth at the block
+   (the good retrievals' median) gives 1 − e^−τ directly and outranks
+   it, and where both stand 2 τ_IR closes against DCOMP's τ on the
+   line; the mask's fraction stands last, and a pixel warmer than the
+   clear sky or a missing column leaves it there. The measured sheets
+   carry their own material (opacity 1, the vertex alpha the measured
+   opacity, the colour the sky's ambient on the underside plus a
+   little transmitted sun, as the decks are lit — the display rule,
+   stated), so an opaque anvil is dark at night and hides the stars
+   that pass 177 let through. Gated on synthetic windows whose physics
+   is written in the gate: three blocks mixed by hand at ε 0.5, 1 and
+   0.2 over a 220-K top under a 290-K clear sky come back exactly, the
+   half-emissive block's DCOMP τ (2 ln 2) outranks the IR and closes
+   at 1.000, a 295-K fog keeps the mask's fraction, no column or too
+   few clear pixels leave every sheet to it, the Planck pair matches
+   `goesir`'s to 1e-12 (`goesl2-reference` THE SHEET'S OWN OPACITY).
+   STATED: the clear reference is the window's, not the pixel's; the
+   above-cloud terms are dropped; the 2:1 ratio and the colour rule
+   are the theme's
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

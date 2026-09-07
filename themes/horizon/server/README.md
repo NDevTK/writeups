@@ -181,7 +181,13 @@ are gated by `../server-reference.mjs` — the `server` set in
   within 100 km is a cirrus sheet in the scene at its
   parallax-corrected place and its own height, the mask's
   (`ABI-L2-ACMC`) cloudy fraction inside the pixel its opacity, the
-  seven random sheets standing only where no window is live; the ACHA
+  seven random sheets standing only where no window is live; since
+  the 178th each sheet's opacity is its own: DCOMP's optical depth
+  (`ABI-L2-CODC`) at the block by day, else the 10.35-µm cloud
+  emissivity from the ACHA ATBD's Eq. 1 with the band-13 window
+  (`ABI-L2-CMIPC`) inside the pixel, the mask's clear pixels as the
+  clear sky and the column's temperature at the top, doubled to the
+  visible, else the mask's fraction; the ACHA
   ATBD's 500 m accuracy and 1.5 km
   precision stated on the page) from the NOAA Open Data buckets (`noaa-goes18` for
   GOES-West, `noaa-goes19` for GOES-East; anonymous S3, listed and
