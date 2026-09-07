@@ -484,6 +484,119 @@ export function heightBands(htM, dqf, {lowTopM = 3240, midTopM = 6508} = {}) {
     midTopM
   };
 }
+// The flag census of a height window: how many pixels carry each DQF
+// value (ACHA_DQF_MEANINGS' order; 255 the fill), the 2-km product's
+// marginal class made visible.
+export function heightFlags(dqf) {
+  const out = {};
+  if (!dqf) return out;
+  for (let q = 0; q < dqf.length; q++) {
+    const v = dqf[q];
+    out[v] = (out[v] || 0) + 1;
+  }
+  return out;
+}
+// ---- THE ANVIL AT TWO KILOMETRES (181st pass) ------------------------
+// The 2-km cloud top height (ABI-L2-ACHA2KMC) against the 10-km
+// product (ABI-L2-ACHAC) of the same scan: the ATBD (Sec. 1.11.3.1)
+// and the PUG say the 10-km field is the mean of the good 2-km pixels
+// of its 5 x 5 block. Each good fine pixel (DQF 0, a finite height) is
+// binned by its scan angles into the coarse grid; a coarse field with
+// a good height of its own and at least one good fine pixel closes:
+// its block mean against its value. Measured on the whole CONUS scene
+// of 2026-09-07 08:06Z: 126,312 fields, every one within 0.17 m (the
+// 10-km count's quantum is 0.305 m), rms 0.09 m, no field good on one
+// side only - the theme takes the 2-km pixels as the same retrieval
+// at its native resolution, and says so. fine and coarse are height
+// windows {ht, dqf, box, x, y}.
+export function heightBlockClosure(fine, coarse) {
+  const cb = coarse.box;
+  const nC = cb.rows * cb.cols;
+  const sum = new Float64Array(nC);
+  const cnt = new Uint32Array(nC);
+  let fineGood = 0;
+  let fineOutside = 0;
+  for (let j = 0; j < fine.box.rows; j++)
+    for (let i = 0; i < fine.box.cols; i++) {
+      const q = j * fine.box.cols + i;
+      if (fine.dqf && fine.dqf[q] !== 0) continue;
+      const h = fine.ht[q];
+      if (h === null || h === undefined || !Number.isFinite(h)) continue;
+      fineGood++;
+      const ic =
+        indexOfScanAngle(scanAngle(fine.box.i0 + i, fine.x), coarse.x) - cb.i0;
+      const jc =
+        indexOfScanAngle(scanAngle(fine.box.j0 + j, fine.y), coarse.y) - cb.j0;
+      if (ic < 0 || jc < 0 || ic >= cb.cols || jc >= cb.rows) {
+        fineOutside++;
+        continue;
+      }
+      const qc = jc * cb.cols + ic;
+      sum[qc] += h;
+      cnt[qc]++;
+    }
+  let withBoth = 0;
+  let onlyCoarse = 0;
+  let onlyFine = 0;
+  let coarseGood = 0;
+  let maxAbsM = 0;
+  let sq = 0;
+  let sd = 0;
+  let perField = 0;
+  let worst = null;
+  for (let qc = 0; qc < nC; qc++) {
+    const good =
+      (!coarse.dqf || coarse.dqf[qc] === 0) &&
+      coarse.ht[qc] !== null &&
+      coarse.ht[qc] !== undefined &&
+      Number.isFinite(coarse.ht[qc]);
+    if (good) coarseGood++;
+    if (good && cnt[qc]) {
+      const d = sum[qc] / cnt[qc] - coarse.ht[qc];
+      withBoth++;
+      perField += cnt[qc];
+      sq += d * d;
+      sd += d;
+      if (Math.abs(d) > maxAbsM) {
+        maxAbsM = Math.abs(d);
+        worst = {
+          i: qc % cb.cols,
+          j: Math.floor(qc / cb.cols),
+          coarseM: coarse.ht[qc],
+          meanM: sum[qc] / cnt[qc],
+          n: cnt[qc]
+        };
+      }
+    } else if (good) onlyCoarse++;
+    else if (cnt[qc]) onlyFine++;
+  }
+  return {
+    fields: nC,
+    coarseGood,
+    fineGood,
+    fineOutside,
+    withBoth,
+    onlyCoarse,
+    onlyFine,
+    perField: withBoth ? perField / withBoth : null,
+    maxAbsM,
+    rmsM: withBoth ? Math.sqrt(sq / withBoth) : null,
+    meanM: withBoth ? sd / withBoth : null,
+    worst
+  };
+}
+/** The closure in words. */
+export function heightBlockClosureWords(c) {
+  if (!c || !c.withBoth)
+    return `no field carries both a 10-km height and good 2-km pixels (${c ? c.coarseGood : 0} good fields, ${c ? c.fineGood : 0} good pixels)`;
+  return (
+    `the 2-km pixels' block means close against the 10-km fields to ${c.maxAbsM.toFixed(2)} m at most (rms ${c.rmsM.toFixed(2)} m) over ${c.withBoth} fields of ${c.perField.toFixed(1)} good pixels each` +
+    (c.onlyCoarse || c.onlyFine
+      ? `; ${c.onlyCoarse} fields good with no good pixel under them, ${c.onlyFine} the other way`
+      : '; no field good on one side only') +
+    ' - the PUG’s 5 x 5 mean, measured'
+  );
+}
 // ---- THE SATELLITE'S TOP OVER THE RADAR'S CORE (176th pass) --------
 // PUG Volume 5 (L2+ products, 2019): "The Cloud Top Height product
 // image is produced on the ABI fixed grid at 10 km resolution for Full
@@ -550,8 +663,19 @@ export function towerTopsFromOrbit(
     viewZenithDeg: null,
     satLonDeg: satLon,
     time: hwin.time ?? null,
-    parallax
+    parallax,
+    // the window's own pixel size (181st: the 2-km product's pixels
+    // or the 10-km product's fields - the words say which)
+    pixelEwM: null,
+    pixelNsM: null
   };
+  if (hwin.box) {
+    const size = pixelSizeM(hwin.box, g, hwin.x, hwin.y);
+    if (size) {
+      sum.pixelEwM = size.ewM;
+      sum.pixelNsM = size.nsM;
+    }
+  }
   let liftSum = 0;
   for (const s of storms || []) {
     if (!(s.km > 0)) {
@@ -1078,8 +1202,12 @@ export function towerTopsWords(sm) {
       ? `${(sm.shiftMinM / 1000).toFixed(1)}-${(sm.shiftMaxM / 1000).toFixed(1)} km`
       : 'none';
   const ml = sm.maxLift;
+  const px =
+    Number.isFinite(sm.pixelEwM) && Number.isFinite(sm.pixelNsM)
+      ? `${(sm.pixelEwM / 1000).toFixed(1)} x ${(sm.pixelNsM / 1000).toFixed(1)}-km pixel`
+      : '10-km pixel';
   return (
-    `${sm.lifted} of ${sm.n} storm cells took the satellite's top (ACHA HT at each cell's own 10-km pixel, ` +
+    `${sm.lifted} of ${sm.n} storm cells took the satellite's top (ACHA HT at each cell's own ${px}, ` +
     `shifted ${shift} away from the sub-satellite point for the top's parallax at ${sm.viewZenithDeg.toFixed(0)}° zenith, DQF 0; the ATBD's 500 m)` +
     (ml
       ? `, the largest lift ${km(ml.liftM)}: a ${ml.echoKm.toFixed(1)}-km core under a ${km(ml.satM)} top` +
@@ -1221,8 +1349,31 @@ export const L2_PRODUCTS = {
   // Enterprise LST ATBD v4, read in full) - CONUS hourly, 2 km, day
   // and night, quantitative to 55 deg of local zenith (the file's
   // own bound); 1.4 MB a file, the window ~0.6 MB by range
-  lst: 'ABI-L2-LSTC'
+  lst: 'ABI-L2-LSTC',
+  // the anvil at two kilometres (181st): the cloud top height on the
+  // 2-km grid - NCEI's record of the product (gov.noaa.ncdc:C01505):
+  // "The product's spatial resolution increased from 10 and 4 km to 2
+  // km on 24 March 2023" - CONUS every 5 min, day and night, 5.2 MB a
+  // file (HT uint16 at 0.3052 m a count, chunked 52 rows by the full
+  // width; the window ~0.5 MB by range); the 10-km product is the
+  // mean of each 5 x 5 block's good pixels (measured: the whole CONUS
+  // scene of 2026-09-07 08:06Z closes to 0.09 m rms over 126,312
+  // fields - heightBlockClosure)
+  height2km: 'ABI-L2-ACHA2KMC'
 };
+// The height files' own flag meanings (DQF flag_values 0..4, the same
+// string in the 10-km and 2-km files, read from the files): 4, the
+// opaque retrieval, is outside the valid range 0..3 and never seen
+// (0 of 3.75 million 2-km pixels in the measured scene); 1, marginal,
+// is 1.7% of the 2-km scene (63,415 pixels, median 11.2 km - thin
+// high cloud) and a few of the 10-km fields (120 of 150,000).
+export const ACHA_DQF_MEANINGS = [
+  'good_quality_qf',
+  'marginal_quality_qf',
+  'retrieval_attempted_qf',
+  'bad_quality_qf',
+  'opaque_retrieval_qf'
+];
 // The DSR file's own flag meanings (DQF flag_values 0..1): the
 // ATBD's overall quality flag is 1 when the solar or local zenith
 // angle exceeds 70 degrees, the cloud mask's quality is degraded,

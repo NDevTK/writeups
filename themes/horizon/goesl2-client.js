@@ -45,6 +45,7 @@ import {
   l2DsrBody,
   l2FileUrl,
   l2HeightBody,
+  l2Height2kmBody,
   l2ImageryBody,
   l2ListUrl,
   l2LstBody,
@@ -385,6 +386,15 @@ export function createGoesL2Client({
         : null,
       height: F.height
         ? l2HeightBody(F.height.dec, F.height.key, cell.lat, cell.lon)
+        : null,
+      // the anvil at two kilometres (181st): the same product at 2 km
+      height2km: F.height2km
+        ? l2Height2kmBody(
+            F.height2km.dec,
+            F.height2km.key,
+            cell.lat,
+            cell.lon
+          )
         : null,
       imagery: F.imagery
         ? l2ImageryBody(F.imagery.dec, F.imagery.key, cell.lat, cell.lon)

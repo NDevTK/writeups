@@ -6,6 +6,19 @@
 import {inflateSync} from 'node:zlib';
 import {openHdf5, physicalValues} from './hdf5.js';
 import {ACHAC_B64, ACHAC_EXPECT} from './hdf5-fixture.js';
+// the anvil at two kilometres (181st): the 2-km height crop and the
+// same scan's 10-km fields, with numpy's reading of both
+import {
+  ACHA10KM_B64,
+  ACHA2KM_B64,
+  ACHA2KM_EXPECT
+} from './acha2km-fixture.js';
+import {
+  ACHA_DQF_MEANINGS,
+  heightBlockClosure,
+  heightBlockClosureWords,
+  heightFlags
+} from './goesl2.js';
 import {
   ACM_MEANINGS,
   AOD_ATBD,
@@ -2950,6 +2963,286 @@ const inflate = (u8) =>
       `and DCOMP's tau ${sA.tauDcomp.toFixed(3)} there gives opacity ${sA.alpha.toFixed(3)} over the IR's ${sA.opacityIr.toFixed(2)}, the closure 2 tau_IR / tau ${r.summary.closureRatioMedian.toFixed(3)}; ` +
       `e 1 -> opacity 1, e 0.2 -> ${sC.alpha.toFixed(2)}; the 295-K block is warmer than the clear sky and keeps the mask's 0.6; no column or fewer than ${SHEET_OPACITY_RULES.clearMinPixels} clear pixels leave every sheet to the mask; ` +
       `the Planck pair matches goesir's to 1e-12; the words: "${words.slice(0, 120)}..."`
+  );
+}
+
+// ---- THE ANVIL AT TWO KILOMETRES (181st pass) ------------------------
+// The vendored 2-km window (the home's 50 x 50 pixels of the 08:06Z
+// scan, acha2km-fixture) and the same scan's 10-km fields cut to the
+// 10 x 10 those pixels are the blocks of, both read by hdf5.js: the
+// flag censuses, the good pixels' statistics, the centre pixel's count,
+// value and place and eight sampled pixels against h5py and numpy;
+// every field's closure against the mean of its block's good pixels -
+// the PUG's aggregation, the 10-km count's own quantum the bound - by
+// the law and by a plain loop over the crop's layout; the tallest
+// pixel over its block's mean and the block that hides most under its
+// mean (what the 10-km product cannot show); the 2-km window through
+// the orbit laws: the sheets a fifth the size, a storm under the
+// tallest pixel lifted to it and not to the block's mean, the tallest
+// tenth and the tallest of the bands at each resolution; the words.
+{
+  const E = ACHA2KM_EXPECT;
+  // the reader's float32 field against numpy's float64: a centimetre
+  // (0.3052 m a count; the float32 quantum at 16 km is a millimetre)
+  const tolM = 1e-2;
+  const sc = (a) => (Array.isArray(a) ? a[0] : a);
+  const open = (b64) => {
+    const f = openHdf5(new Uint8Array(Buffer.from(b64, 'base64')), inflate);
+    const proj = f.dataset('goes_imager_projection').attrs;
+    const g = fixedGridGeometry({
+      semi_major_axis: sc(proj.semi_major_axis),
+      semi_minor_axis: sc(proj.semi_minor_axis),
+      perspective_point_height: sc(proj.perspective_point_height),
+      longitude_of_projection_origin: sc(proj.longitude_of_projection_origin)
+    });
+    const xd = f.dataset('x');
+    const yd = f.dataset('y');
+    const x = {
+      scale: sc(xd.attrs.scale_factor),
+      offset: sc(xd.attrs.add_offset)
+    };
+    const y = {
+      scale: sc(yd.attrs.scale_factor),
+      offset: sc(yd.attrs.add_offset)
+    };
+    const nx = xd.values.length;
+    const ny = yd.values.length;
+    // the whole crop as the window (a reach past its edges clips to it)
+    const box = windowBox(E.centre.lat, E.centre.lon, g, x, y, nx, ny, 1000);
+    const hd = f.dataset('HT');
+    const ht = physicalValues(hd);
+    const dqf = f.dataset('DQF').values;
+    return {
+      g,
+      x,
+      y,
+      nx,
+      ny,
+      box,
+      raw: hd.values,
+      win: {
+        ht: cutWindow(ht, nx, box),
+        dqf: cutWindow(dqf, nx, box),
+        box,
+        x,
+        y,
+        g,
+        time: 'the fixture'
+      }
+    };
+  };
+  const A = open(ACHA2KM_B64);
+  const B = open(ACHA10KM_B64);
+  const w2 = A.win;
+  const w10 = B.win;
+  const whole =
+    A.nx === E.cols &&
+    A.ny === E.rows &&
+    A.box.i0 === 0 &&
+    A.box.j0 === 0 &&
+    A.box.cols === E.cols &&
+    A.box.rows === E.rows &&
+    A.box.i === E.centre.col &&
+    A.box.j === E.centre.row &&
+    B.nx === E.cols10 &&
+    B.box.cols === E.cols10 &&
+    B.box.rows === E.rows10;
+  const flags2 = heightFlags(w2.dqf);
+  const flags10 = heightFlags(w10.dqf);
+  const sameFlags = (a, b) =>
+    Object.keys(b).every((k) => a[k] === b[k]) &&
+    Object.keys(a).every((k) => b[k] !== undefined);
+  const c2 = heightCensus(w2.ht, w2.dqf);
+  const c10 = heightCensus(w10.ht, w10.dqf);
+  const censusOk = (c, e) =>
+    c.n === e.n &&
+    near(c.medianM, e.medianM, tolM) &&
+    near(c.p10M, e.p10M, tolM) &&
+    near(c.p90M, e.p90M, tolM);
+  const cl = heightBlockClosure(w2, w10);
+  // the closure by a plain loop over the crop's own layout: pixel
+  // (j, i) lies in block (j / 5, i / 5)
+  const bSum = new Float64Array(100);
+  const bN = new Uint32Array(100);
+  const bMax = new Float64Array(100).fill(-1);
+  for (let j = 0; j < 50; j++)
+    for (let i = 0; i < 50; i++) {
+      const q = j * 50 + i;
+      if (w2.dqf[q] !== 0 || !Number.isFinite(w2.ht[q])) continue;
+      const qb = Math.floor(j / 5) * 10 + Math.floor(i / 5);
+      bSum[qb] += w2.ht[q];
+      bN[qb]++;
+      if (w2.ht[q] > bMax[qb]) bMax[qb] = w2.ht[q];
+    }
+  let plainMax = 0;
+  let plainBoth = 0;
+  let numpyOk = true;
+  let tenOk = true;
+  let excessMax = -1;
+  let excessAt = -1;
+  for (let qb = 0; qb < 100; qb++) {
+    const j = Math.floor(qb / 10);
+    const i = qb % 10;
+    const mean = bN[qb] ? bSum[qb] / bN[qb] : null;
+    const np = E.closure.blockMeans[j][i];
+    if (
+      (mean === null) !== (np === null) ||
+      (mean !== null && !near(mean, np, tolM)) ||
+      bN[qb] !== E.closure.blockGood[j][i]
+    )
+      numpyOk = false;
+    const good10 = w10.dqf[qb] === 0 && Number.isFinite(w10.ht[qb]);
+    if (
+      (good10 && E.closure.tenKm[j][i] === null) ||
+      (good10 && !near(w10.ht[qb], E.closure.tenKm[j][i], tolM))
+    )
+      tenOk = false;
+    if (mean !== null && good10) {
+      plainBoth++;
+      const d = Math.abs(mean - w10.ht[qb]);
+      if (d > plainMax) plainMax = d;
+      const ex = bMax[qb] - mean;
+      if (ex > excessMax) {
+        excessMax = ex;
+        excessAt = qb;
+      }
+    }
+  }
+  // the tallest good pixel and its block
+  let qt = -1;
+  for (let q = 0; q < w2.ht.length; q++)
+    if (
+      w2.dqf[q] === 0 &&
+      Number.isFinite(w2.ht[q]) &&
+      (qt < 0 || w2.ht[q] > w2.ht[qt])
+    )
+      qt = q;
+  const tRow = Math.floor(qt / 50);
+  const tCol = qt % 50;
+  const tBlock = Math.floor(tRow / 5) * 10 + Math.floor(tCol / 5);
+  // the centre pixel and the samples, the counts as stored
+  const qc = E.centre.row * 50 + E.centre.col;
+  const Gc = fixedGridToLatLon(
+    scanAngle(E.centre.col, A.x),
+    scanAngle(E.centre.row, A.y),
+    A.g
+  );
+  const samplesOk = E.samples.every((s) => {
+    const q = s.row * 50 + s.col;
+    return (
+      A.raw[q] === s.count &&
+      w2.dqf[q] === s.dqf &&
+      (s.m === null
+        ? !Number.isFinite(w2.ht[q])
+        : near(w2.ht[q], s.m, tolM))
+    );
+  });
+  // the marginal class (DQF 1): counted, named, left out of the census
+  const marg = [];
+  for (let q = 0; q < w2.ht.length; q++)
+    if (w2.dqf[q] === 1 && Number.isFinite(w2.ht[q])) marg.push(w2.ht[q]);
+  marg.sort((a, b) => a - b);
+  // the orbit laws on the 2-km window: the sheets, a storm under the
+  // tallest pixel, the bands
+  const r2 = cirrusSheetsFromOrbit(w2, null, E.centre.lat, E.centre.lon);
+  const r10 = cirrusSheetsFromOrbit(w10, null, E.centre.lat, E.centre.lon);
+  const Gt = fixedGridToLatLon(scanAngle(tCol, A.x), scanAngle(tRow, A.y), A.g);
+  const storm = {lat: Gt.latDeg, lon: Gt.lonDeg, km: E.tallest.m / 1000 - 2};
+  const tw2 = towerTopsFromOrbit([storm], w2, {parallax: false});
+  const tw10 = towerTopsFromOrbit([storm], w10, {parallax: false});
+  const s2 = tw2.storms[0];
+  const s10 = tw10.storms[0];
+  const b2 = heightBands(w2.ht, w2.dqf);
+  const b10 = heightBands(w10.ht, w10.dqf);
+  const pxRatio = r10.summary.pixelEwM / r2.summary.pixelEwM;
+  const wordsT = towerTopsWords(tw2.summary);
+  const wordsC = heightBlockClosureWords(cl);
+  check(
+    "THE ANVIL AT TWO KILOMETRES: the 2-km height window reads as numpy read it, every 10-km field is the mean of its block's good 2-km pixels within the count's quantum, the tallest pixel stands kilometres over its block's mean, and the orbit laws take the 2-km window as they took the 10-km",
+    whole &&
+      sameFlags(flags2, E.flags2km) &&
+      sameFlags(flags10, E.flags10km) &&
+      E.flagMeanings.split(' ').join(',') === ACHA_DQF_MEANINGS.join(',') &&
+      flags2[4] === undefined &&
+      censusOk(c2, E.good2km) &&
+      censusOk(c10, E.good10km) &&
+      cl.fields === 100 &&
+      cl.withBoth === E.closure.withBoth &&
+      cl.withBoth === 100 &&
+      cl.onlyCoarse === E.closure.goodOnlyIn10 &&
+      cl.onlyFine === E.closure.goodOnlyIn2 &&
+      cl.onlyCoarse === 0 &&
+      cl.onlyFine === 0 &&
+      cl.fineOutside === 0 &&
+      cl.fineGood === E.good2km.n &&
+      cl.coarseGood === E.good10km.n &&
+      near(cl.maxAbsM, E.closure.maxAbsM, tolM) &&
+      near(cl.rmsM, E.closure.rmsM, tolM) &&
+      near(cl.meanM, E.closure.meanM, tolM) &&
+      near(cl.perField, E.good2km.n / 100, 1e-9) &&
+      cl.maxAbsM < E.scale10km &&
+      near(plainMax, cl.maxAbsM, 1e-6) &&
+      plainBoth === 100 &&
+      numpyOk &&
+      tenOk &&
+      tRow === E.tallest.row &&
+      tCol === E.tallest.col &&
+      A.raw[qt] === E.tallest.count &&
+      near(w2.ht[qt], E.tallest.m, tolM) &&
+      near(bSum[tBlock] / bN[tBlock], E.tallest.block.meanM, tolM) &&
+      near(w10.ht[tBlock], E.tallest.block.tenKmM, tolM) &&
+      Math.floor(excessAt / 10) === E.smoothing.row &&
+      excessAt % 10 === E.smoothing.col &&
+      near(excessMax, E.smoothing.excessM, tolM) &&
+      near(bMax[excessAt], E.smoothing.tallestM, tolM) &&
+      bN[excessAt] === E.smoothing.good &&
+      A.raw[qc] === E.centre.count &&
+      w2.dqf[qc] === E.centre.dqf &&
+      near(w2.ht[qc], E.centre.m, tolM) &&
+      Math.abs(Gc.latDeg - E.centre.lat) < 1e-5 &&
+      Math.abs(Gc.lonDeg - E.centre.lon) < 1e-5 &&
+      samplesOk &&
+      marg.length === E.marginal2km.n &&
+      near(marg[marg.length >> 1], E.marginal2km.medianM, tolM) &&
+      r2.summary.nGood === E.good2km.n &&
+      r2.summary.nHigh === E.high2km &&
+      r2.summary.n > 0 &&
+      r2.summary.n <= r2.summary.nHigh &&
+      r2.sheets.every((s) => s.ewM > 2000 && s.ewM < 3500 && s.nsM > 2000 && s.nsM < 4000) &&
+      r10.summary.nHigh === E.high10km &&
+      pxRatio > 4.9 &&
+      pxRatio < 5.1 &&
+      s2.from === 'satellite' &&
+      near(s2.satM, E.tallest.m, tolM) &&
+      near(s2.liftM, 2000, tolM) &&
+      // the same core against the 10-km field: the block's mean stands
+      // BELOW the core's top, so the radar's top keeps and no lift
+      // comes - the 2-km pixel lifts it 2 km
+      s10.from === 'radar' &&
+      s10.liftM === 0 &&
+      s10.km === storm.km &&
+      tw10.summary.satBelow === 1 &&
+      near(s10.satM, E.tallest.block.tenKmM, tolM) &&
+      near(s2.satM - s10.satM, E.tallest.m - E.tallest.block.tenKmM, tolM) &&
+      s2.satM - s10.satM > 3000 &&
+      near(tw2.summary.pixelEwM, r2.summary.pixelEwM, 1e-9) &&
+      near(b2.p90M, E.good2km.p90M, tolM) &&
+      near(b2.maxM, E.good2km.maxM, tolM) &&
+      near(b10.p90M, E.good10km.p90M, tolM) &&
+      near(b10.maxM, E.good10km.maxM, tolM) &&
+      b2.p90M > b10.p90M &&
+      b2.maxM > b10.maxM &&
+      wordsT.includes('-km pixel') &&
+      wordsT.includes(`${(tw2.summary.pixelEwM / 1000).toFixed(1)} x`) &&
+      wordsC.includes('close against the 10-km fields to') &&
+      wordsC.includes('no field good on one side only') &&
+      wordsC.includes('5 x 5 mean, measured'),
+    `${E.file2km.slice(0, 27)} (${E.rows} x ${E.cols} at rows ${E.row0}+, cols ${E.col0}+) against ${E.file10km.slice(0, 24)} (${E.rows10} x ${E.cols10}): flags ${JSON.stringify(flags2)} and ${JSON.stringify(flags10)} (${ACHA_DQF_MEANINGS[1]} ${marg.length} pixels, median ${(marg[marg.length >> 1] / 1000).toFixed(2)} km, left out); ` +
+      `${c2.n} good pixels (median ${c2.medianM.toFixed(0)} m, tallest tenth ${b2.p90M.toFixed(0)}, tallest ${b2.maxM.toFixed(0)}) and ${c10.n} good fields (median ${c10.medianM.toFixed(0)}, tallest tenth ${b10.p90M.toFixed(0)}, tallest ${b10.maxM.toFixed(0)}); ` +
+      `${wordsC}; the plain loop's worst ${plainMax.toFixed(3)} m over ${plainBoth} fields, the 10-km quantum ${E.scale10km.toFixed(4)} m; ` +
+      `the tallest pixel (${tCol}, ${tRow}) ${w2.ht[qt].toFixed(0)} m over its block's mean ${(bSum[tBlock] / bN[tBlock]).toFixed(0)} (the 10-km field ${w10.ht[tBlock].toFixed(0)}): a ${storm.km.toFixed(1)}-km core there lifts to ${s2.satM.toFixed(0)} m at 2 km, while the 10-km field's ${s10.satM.toFixed(0)} stands below it and the core keeps its own top; block (${excessAt % 10}, ${Math.floor(excessAt / 10)}) hides a ${bMax[excessAt].toFixed(0)}-m pixel under a ${(bSum[excessAt] / bN[excessAt]).toFixed(0)}-m mean (${bN[excessAt]} good); ` +
+      `the centre pixel count ${A.raw[qc]} = ${w2.ht[qc].toFixed(1)} m at ${Gc.latDeg.toFixed(4)} N ${(-Gc.lonDeg).toFixed(4)} W (numpy ${E.centre.lat.toFixed(4)}, ${(-E.centre.lon).toFixed(4)}); ${E.samples.length} samples exact; ` +
+      `${r2.summary.n} sheets of ${(r2.summary.pixelEwM / 1000).toFixed(2)} x ${(r2.summary.pixelNsM / 1000).toFixed(2)} km against ${r10.summary.n} of ${(r10.summary.pixelEwM / 1000).toFixed(2)} x ${(r10.summary.pixelNsM / 1000).toFixed(2)} (ratio ${pxRatio.toFixed(2)}); the words: "${wordsT.slice(0, 110)}..."`
   );
 }
 

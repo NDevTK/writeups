@@ -61,6 +61,7 @@ import {
   L2_DMW_RADIUS_KM,
   l2FileUrl,
   l2HeightBody,
+  l2Height2kmBody,
   l2ImageryBody,
   l2ListUrl,
   l2MaskBody,
@@ -148,6 +149,13 @@ import {
   DMWC_EXPECT,
   DMWC_NAME
 } from './hdf5-fixture.js';
+// the anvil at two kilometres (181st): the 2-km height crop and the
+// same scan's 10-km fields, with numpy's reading of both
+import {
+  ACHA10KM_B64,
+  ACHA2KM_B64,
+  ACHA2KM_EXPECT
+} from './acha2km-fixture.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -742,6 +750,75 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
 }
 
 {
+  // THE ANVIL AT TWO KILOMETRES (181st): the daemon's body for the 2-km
+  // height on the vendored crop (acha2km-fixture: the home's 50 x 50
+  // pixels of the 08:06Z scan) - the product named, the whole crop as
+  // the +-100 km window, the packed heights and flags unpacking to
+  // numpy's census and flag counts, the pixel a fifth of the 10-km
+  // body's on the same scan's fields (the same crop, cut to 10 x 10).
+  {
+    const E = ACHA2KM_EXPECT;
+    const d2 = decodeL2(
+      new Uint8Array(Buffer.from(ACHA2KM_B64, 'base64')),
+      L2_HEIGHT_SPEC
+    );
+    const d10 = decodeL2(
+      new Uint8Array(Buffer.from(ACHA10KM_B64, 'base64')),
+      L2_HEIGHT_SPEC
+    );
+    const body = d2
+      ? l2Height2kmBody(d2, 'k2', E.centre.lat, E.centre.lon)
+      : null;
+    const body10 = d10
+      ? l2HeightBody(d10, 'k10', E.centre.lat, E.centre.lon)
+      : null;
+    const ht = body ? unpackArray(body.ht) : null;
+    const dq = body ? unpackArray(body.dqf) : null;
+    const again = ht ? heightCensus(Array.from(ht), Array.from(dq)) : null;
+    const flagsOk =
+      !!body &&
+      Object.keys(E.flags2km).every((k) => body.flags[k] === E.flags2km[k]) &&
+      Object.keys(body.flags).length === Object.keys(E.flags2km).length;
+    check(
+      "THE ANVIL AT TWO KILOMETRES: the daemon's 2-km height body on the vendored crop names the product, cuts the whole crop, packs heights and flags that unpack to numpy's census and flag counts, and stands a fifth the pixel of the 10-km body on the same scan",
+      d2 !== null &&
+        d2.platform === 'G18' &&
+        d2.scene === 'CONUS' &&
+        d2.time.startsWith('2026-09-07T08:0') &&
+        d2.x.n === 50 &&
+        d2.y.n === 50 &&
+        body !== null &&
+        body.product === 'ABI-L2-ACHA2KMC' &&
+        body.key === 'k2' &&
+        body.box.i === E.centre.col &&
+        body.box.j === E.centre.row &&
+        body.box.rows === 50 &&
+        body.box.cols === 50 &&
+        body.ht.kind === 'f32' &&
+        body.ht.n === 2500 &&
+        body.dqf.n === 2500 &&
+        body.census.n === E.good2km.n &&
+        Math.abs(body.census.medianM - E.good2km.medianM) < 0.01 &&
+        Math.abs(body.census.p90M - E.good2km.p90M) < 0.01 &&
+        again.n === body.census.n &&
+        again.medianM === body.census.medianM &&
+        flagsOk &&
+        body10 !== null &&
+        body10.product === 'ABI-L2-ACHAC' &&
+        body10.box.rows === 10 &&
+        body10.box.cols === 10 &&
+        body10.census.n === E.good10km.n &&
+        Math.abs(body10.census.medianM - E.good10km.medianM) < 0.01 &&
+        body.pixel.ewM > 2000 &&
+        body.pixel.ewM < 3500 &&
+        Math.abs(body10.pixel.ewM / body.pixel.ewM - 5) < 0.1 &&
+        Math.abs(body10.pixel.nsM / body.pixel.nsM - 5) < 0.1,
+      body && body10
+        ? `${E.file2km.slice(0, 27)}: the crop's ${d2.x.n} x ${d2.y.n} pixels as the window about (${body.box.i}, ${body.box.j}), ${body.pixel.ewM} x ${body.pixel.nsM} m a pixel against the 10-km body's ${body10.pixel.ewM} x ${body10.pixel.nsM}; ` +
+          `census ${body.census.n} good (median ${body.census.medianM.toFixed(0)} m, tallest tenth ${body.census.p90M.toFixed(0)}; numpy ${E.good2km.medianM.toFixed(0)} / ${E.good2km.p90M.toFixed(0)}), flags ${JSON.stringify(body.flags)} (numpy ${JSON.stringify(E.flags2km)}), recomputed from the wire exactly; the 10-km body ${body10.census.n} good fields (median ${body10.census.medianM.toFixed(0)})`
+        : `no body: 2 km ${body ? 'ok' : 'null'}, 10 km ${body10 ? 'ok' : 'null'}`
+    );
+  }
   // NOAA's L2 cloud-product windows (/goesl2, 148th pass): the
   // daemon's decode and window cut run on the vendored GOES-18
   // ACHAC file (hdf5-fixture.js, the file h5py read the same way)
@@ -1128,12 +1205,12 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_DSR_SPEC.DSR === 'raw16' &&
       L2_DSR_SPEC.DQF === 'raw' &&
       L2_HALF_PX.dsr === 50 &&
-      L2_ASKS.length === 19 &&
+      L2_ASKS.length === 20 &&
       L2_ASKS.map((a) => a.id).join(',') ===
-        'mask,height,imagery,cod,cps,sst,dsr,dmw,aod,lst,vis,phase,fire,tpw,rain,adp,lvt,lvm,dsi' &&
+        'mask,height,imagery,cod,cps,sst,dsr,dmw,aod,lst,vis,phase,fire,tpw,rain,adp,lvt,lvm,dsi,height2km' &&
       L2_ASKS[2].band === 'C13' &&
       L2_ASKS.map((a) => a.halfPx ?? '-').join(',') ===
-        '50,10,50,50,50,50,50,-,50,50,200,50,50,10,50,50,1,1,1' &&
+        '50,10,50,50,50,50,50,-,50,50,200,50,50,10,50,50,1,1,1,50' &&
       // the hourly full-disk SST is never asked for a mosaic's
       // minute, nor are the winds (the decks' drift, not a mosaic's
       // comparison), the haze (the channel's now), the hourly land
@@ -1194,7 +1271,18 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_ASKS[18].halfPx === 1 &&
       L2_ASKS[18].timed === false &&
       L2_ASKS[18].pageOnly === undefined &&
-      L2_ASKS.filter((a) => a.timed === false).length === 13 &&
+      // the anvil at two kilometres (181st): the cloud top height at
+      // its native 2 km - the 10-km product's own datasets and spec,
+      // a +-100 km window, the scene's now
+      L2_ASKS[19].id === 'height2km' &&
+      L2_ASKS[19].product === 'ABI-L2-ACHA2KMC' &&
+      L2_ASKS[19].spec === L2_HEIGHT_SPEC &&
+      L2_ASKS[19].halfPx === 50 &&
+      L2_ASKS[19].kind === undefined &&
+      L2_ASKS[19].timed === false &&
+      L2_ASKS[19].pageOnly === undefined &&
+      L2_HALF_PX.height2km === 50 &&
+      L2_ASKS.filter((a) => a.timed === false).length === 14 &&
       // the eleventh ask (159th) is the page's own: the daemon never
       // lists, fetches or serves the 500-m visible window (a 2.6 MB
       // read every five minutes by day, a 430 kB body - the free
@@ -1202,14 +1290,14 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       L2_ASKS[10].pageOnly === true &&
       L2_ASKS[10].band === 'C02' &&
       L2_ASKS[10].product === 'ABI-L2-CMIPC' &&
-      L2_ASKS.filter((a) => !a.pageOnly).length === 18 &&
+      L2_ASKS.filter((a) => !a.pageOnly).length === 19 &&
       L2_ASKS.filter((a) => a.pageOnly).length === 1 &&
       L2_IMAGERY_SPEC.CMI === 'raw16' &&
       L2_COD_SPEC.COD === 'raw16' &&
       L2_CPS_SPEC.CPS === 'raw16' &&
       // the CPS file's flags are the COD file's (measured): not held
       L2_CPS_SPEC.DQF === undefined,
-    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; a DSR body dressed the same way (152nd) carries the home pixel (${dsBody && dsBody.here} W/m2 from the fixture's count there), the mean of ${dsBody && dsBody.near.n} good px within 5 px (${dsBody && dsBody.near.mean} W/m2) and a census of ${dsBody && dsBody.census.good} good px, all recomputed from the wire; /goesl2 asks eighteen products, the imagery by band C13, the hourly SST, the winds, the haze, the hourly land skin, the cloud top phase, the fire hot spots, the column's water, the rain, the aerosol detection, the two profile columns and the stability indices never for a mosaic's minute and the 10-minute DSR for one; the eleventh ask, the page's own 500-m visible window (band C02 at half width 200), the daemon never lists or serves`
+    `raw16 keeps the vendored HT as uint16 counts with scale 0.3052037 and fill 65535 (count x scale = the height); an imagery body dressed on the fixture's grid packs ${btRaw && btRaw.length} counts (u16, fill 65535) that unscale back to kelvin at the home pixel (424, 127), census ${im && im.census.good} good; a DCOMP body with ${dc && dc.census.retrieved} retrievals (${dc && dc.census.water.n} water, ${dc && dc.census.ice.n} ice, ${dc && dc.census.thin} thin) whose census the page recomputes from the wire exactly; without a CPS file the body carries no radii; an SST body dressed the same way censuses ${ss && ss.census.good} good px (${ss && ss.census.degraded} degraded beside them) from 180 K counts, recomputed from the wire exactly; a DSR body dressed the same way (152nd) carries the home pixel (${dsBody && dsBody.here} W/m2 from the fixture's count there), the mean of ${dsBody && dsBody.near.n} good px within 5 px (${dsBody && dsBody.near.mean} W/m2) and a census of ${dsBody && dsBody.census.good} good px, all recomputed from the wire; /goesl2 asks nineteen products, the imagery by band C13, the hourly SST, the winds, the haze, the hourly land skin, the cloud top phase, the fire hot spots, the column's water, the rain, the aerosol detection, the two profile columns, the stability indices and the 2-km cloud top height (181st) never for a mosaic's minute and the 10-minute DSR for one; the eleventh ask, the page's own 500-m visible window (band C02 at half width 200), the daemon never lists or serves`
   );
 }
 
@@ -1949,7 +2037,8 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
   );
   const called = [
     ...new Set(
-      [...src.matchAll(/\b(l2[A-Z][A-Za-z]*Body)\(/g)].map((m) => m[1])
+      // a builder's name may carry a digit (l2Height2kmBody, 181st)
+      [...src.matchAll(/\b(l2[A-Z][A-Za-z0-9]*Body)\(/g)].map((m) => m[1])
     )
   ].sort();
   const bound = (src.match(/const \{([^}]*)\} = L2;/) ?? ['', ''])[1]

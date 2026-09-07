@@ -47,6 +47,7 @@ import {
   fixedGridGeometry,
   goodCensus,
   heightCensus,
+  heightFlags,
   IMAGERY_BAND,
   L2_PRODUCTS,
   maskCensus,
@@ -89,7 +90,8 @@ export const L2_HALF_PX = {
   sst: 50,
   dsr: 50,
   aod: 50,
-  lst: 50
+  lst: 50,
+  height2km: 50 // the 2-km cloud top height (181st): +-100 km at 2 km
 }; // +-100 km on 2-km / 10-km grids
 export const L2_LIST_MS = 60e3; // a bucket listing stands a minute (the cheap part)
 export const L2_RETRY_MS = 2 * 60e3; // after a listing or fetch failure
@@ -520,6 +522,18 @@ export const L2_ASKS = [
     halfPx: 1,
     extras: L2_DSI_EXTRAS,
     timed: false
+  },
+  // the anvil at two kilometres (181st): the cloud top height at its
+  // native 2 km - the same HT and DQF datasets as the 10-km product
+  // (the same spec), a +-100 km window of 101 x 101 pixels, the
+  // scene's now (never a mosaic's minute: the 10-km window keeps that
+  // comparison)
+  {
+    id: 'height2km',
+    product: L2_PRODUCTS.height2km,
+    spec: L2_HEIGHT_SPEC,
+    halfPx: 50,
+    timed: false
   }
 ];
 const l2Scalar = (a) => (Array.isArray(a) ? a[0] : a);
@@ -883,6 +897,22 @@ export function l2HeightBody(dec, key, lat, lon) {
     ht: packArray(w.cut.HT, 'f32'),
     dqf: packArray(w.cut.DQF, 'u8'),
     census: heightCensus(w.cut.HT, w.cut.DQF)
+  };
+}
+// The 2-km height window (181st): the same fields as the 10-km body
+// on the product's own grid, with the flag census beside the height
+// census - the 2-km product carries a marginal class (DQF 1) the page
+// names and leaves out, as the census does.
+export function l2Height2kmBody(dec, key, lat, lon) {
+  if (!l2Has(dec, L2_HEIGHT_SPEC)) return null;
+  const w = l2Window(dec, lat, lon, L2_HALF_PX.height2km);
+  if (!w) return null;
+  return {
+    ...l2Common(dec, L2_PRODUCTS.height2km, key, w),
+    ht: packArray(w.cut.HT, 'f32'),
+    dqf: packArray(w.cut.DQF, 'u8'),
+    census: heightCensus(w.cut.HT, w.cut.DQF),
+    flags: heightFlags(w.cut.DQF)
   };
 }
 // raw counts on the wire: a signed fill (-1) becomes 65535, the
