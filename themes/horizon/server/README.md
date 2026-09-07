@@ -472,8 +472,9 @@ are gated by `../server-reference.mjs` — the `server` set in
   is the CONUS grid 422 rows and 1462 columns in (measured), gated on
   a vendored crop of the home's pixels beside the 2-km height crop.
   Since the 186th the fractional snow cover (`ABI-L2-FSCC`: CONUS
-  every 5 min by day, 2 km, 59-93 kB a file read whole in one range,
-  measured - FSC uint8 percent 0-100 with 125 fill and 128 no
+  HOURLY - one file at :01, day and night, the bucket's listings
+  measured; 2 km; 350-460 kB a file by day and 106 kB by night, read
+  whole in one range - FSC uint8 percent 0-100 with 125 fill and 128 no
   retrieval, DQF the twelve codes of `goesl2.FSC_DQF_MEANINGS`) as
   `fsc`: the +-100 km window's counts and flags (`fsc`, `dqf`, u8),
   the observer's own pixel with its code named (`here`), the census

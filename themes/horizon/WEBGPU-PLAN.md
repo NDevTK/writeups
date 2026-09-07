@@ -10349,7 +10349,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   ORBIT): the terrain's measured snow field was the MODIS NDSI tile
   field (Salomonson & Appel's regression on a day-old composite), the
   heuristic snowline under it; NOAA's own fractional snow cover at 2 km
-  every five minutes by day was not read. READ FIRST: the Enterprise
+  every hour was not read. READ FIRST: the Enterprise
   Fractional Snow Cover ATBD v1.0 (Romanov, NOAA/NESDIS/STAR, June
   2020; 35 pp, read in full): the product is the VIEWABLE snow fraction
   - the snow the instrument sees, the canopy hiding what lies under it
@@ -10380,9 +10380,12 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   relative azimuth, so with the time of day (the accuracy, not the
   precision; snow/no-snow discrimination unaffected). NOT READ,
   stated: the companion Enterprise Binary Snow Map ATBD. MEASURED
-  FIRST: the CONUS file 59-93 kB by day (the 20 January 18:01Z file
-  601,623 good pixels at a scene mean 54%), 106 kB by night with every
-  pixel 121; FSC uint8 with _FillValue 125 and valid_range 0-255; the
+  FIRST: the bucket lists ONE CONUS file an hour, at :01, day and
+  night (7 Sep hours 00, 04, 09, 10, 11 and 20 Jan hours 15, 18, 21 one
+  file each - not the five-minute cadence of the cloud products): 351-
+  459 kB by day (the 20 January 18:01Z file 601,623 good pixels at a
+  scene mean 54%), 106 kB by night with every pixel 121; FSC uint8
+  with _FillValue 125 and valid_range 0-255; the
   file's own retrieval_solar_zenith_angle 80 (the ATBD's 85); the
   scene statistics -999 while the scene has too few good pixels. THE
   LAW (goesl2.js): FSC_DQF_MEANINGS, FSC_ATBD, fscGood (DQF 0 and a
@@ -10438,8 +10441,15 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   Katahdin's window at dawn 268 good pixels of 10,201 - every one
   snow-free - 8,404 night, 1,332 cloud, 116 water, 81 rejected by the
   snow climatology, the observer's own pixel still night; the Front
-  Range 10,201 night; the file read whole in one range (106 kB, 241
-  ms). MEASURED in the page: the first render (Mount Katahdin at dawn, 11:19Z) was still running when stage 2 was committed; its line is recorded in stage 3. STATED: the fraction
+  Range, Mount Washington and Mount Marcy 10,201 night; the file read
+  whole in one range (106 kB, 241 ms). MEASURED in the page (Mount
+  Katahdin, 11:19Z, the daemon's 11:01Z file): the line "11:02Z: no
+  good pixel over the box (268 of 10201 within ±100 km retrieved;
+  night 8404, cloud 1332, water 116 px) · MODIS NDSI 2026-09-06
+  stands" beside MODIS's own "1% of the box seen · mean cover 18%
+  there" - the fall-back path whole; the ranking with good pixels
+  over the box waits for the day's first hourly file (12:01Z).
+  STATED: the fraction
   is the viewable one (a forest's snow under its canopy is not in it);
   the read-me's azimuth issue rides the accuracy; the field's texel is
   the nearest 2-km pixel; the lift is the DEM's elevation, the geoid's

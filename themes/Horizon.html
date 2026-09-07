@@ -4093,8 +4093,9 @@
 
       let snowCovSeq = 0;
       // THE SNOW'S COVER FROM ORBIT (186th pass): NOAA's fractional
-      // snow cover at 2 km (ABI-L2-FSCC, every 5 min by day) as the
-      // terrain's per-texel snow field where the retrieval is good -
+      // snow cover at 2 km (ABI-L2-FSCC, one CONUS file an hour,
+      // retrieved by day) as the terrain's per-texel snow field where
+      // the retrieval is good -
       // the satellite's viewable fraction outranks the MODIS NDSI
       // field (minutes old against a day's composite; the Enterprise
       // FSC ATBD's error budget 0.15-0.20 against NDSI's 0.33-0.40,
@@ -4107,8 +4108,8 @@
       // away from the sub-satellite point - a surface product's
       // parallax, the inverse of the cloud sheets' (177th). A field
       // with good pixels is held for a day, so the night keeps the
-      // afternoon's (the night's files carry the night code alone);
-      // a hop drops it with the MODIS field.
+      // afternoon's (the night's hourly files carry the night code
+      // alone); a hop drops it with the MODIS field.
       let modisSnow = null; // {field, day}: the MODIS NDSI field (snowcover.snowField)
       let orbitSnow = null; // {field, time, at, craft, census, here, anchorKey}
       let snowFieldMerged = null; // the field the terrain reads (goesl2.mergeSnowFields)
@@ -4172,7 +4173,7 @@
           return;
         }
         // the same two fields make the same texture: no churn on a
-        // five-minute body that brought no new snow file
+        // five-minute body that brought no new (hourly) snow file
         const key =
           (orbit ? orbitSnow.time + '@' + orbitSnow.anchorKey : '-') +
           '|' +

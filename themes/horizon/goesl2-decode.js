@@ -167,9 +167,10 @@ export const L2_SST_SPEC = {SST: 'raw16', DQF: 'raw'};
 export const L2_TOPTEMP_SPEC = {TEMP: 'raw16', DQF: 'raw'};
 // The snow's cover from orbit (186th): the fractional snow cover (FSC
 // uint8 percent 0-100, 125 fill, 128 no retrieval; DQF the twelve
-// codes of goesl2.FSC_DQF_MEANINGS), CONUS every 5 min by day; the
-// scene's own statistics of its good pixels and the file's solar
-// zenith threshold ride as extras (scalar datasets in the head).
+// codes of goesl2.FSC_DQF_MEANINGS), CONUS hourly (one file at :01,
+// measured), retrieved by day; the scene's own statistics of its good
+// pixels and the file's solar and local zenith thresholds ride as
+// extras (scalar datasets in the head).
 export const L2_FSC_SPEC = {FSC: 'raw', DQF: 'raw'};
 export const L2_FSC_EXTRAS = [
   'minimum_snow_fraction',
@@ -569,9 +570,10 @@ export const L2_ASKS = [
     fullDisk: true // 32.6 MB: not for a page whose ranges are ignored
   },
   // the snow's cover from orbit (186th): the fractional snow cover -
-  // CONUS every 5 min by day (the night's files carry the night code
-  // alone), 59-93 kB a file, a +-100 km window of 101 x 101 pixels,
-  // the scene's now (never a mosaic's minute: snow is the ground's)
+  // CONUS hourly at :01 (the night's file carries the night code
+  // alone), 106-460 kB a file read whole in one range, a +-100 km
+  // window of 101 x 101 pixels, the scene's now (never a mosaic's
+  // minute: snow is the ground's)
   {
     id: 'fsc',
     product: L2_PRODUCTS.fsc,

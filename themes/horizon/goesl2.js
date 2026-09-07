@@ -1553,9 +1553,11 @@ export const L2_PRODUCTS = {
   lst: 'ABI-L2-LSTC',
   // the snow's cover from orbit (186th): the fractional snow cover
   // (the Enterprise FSC ATBD v1.0 and the GOES-18 read-me, read in
-  // full) - CONUS every 5 min by day, 2 km, the viewable snow
-  // fraction of each pixel as a uint8 percent with twelve quality
-  // codes; 59-93 kB a file (measured), the window a few kB by range
+  // full) - CONUS HOURLY (one file an hour at :01 in the bucket's
+  // listings, day and night, measured; the night's carries the night
+  // code alone), 2 km, the viewable snow fraction of each pixel as a
+  // uint8 percent with twelve quality codes; 350-460 kB a file by
+  // day, 106 kB by night (measured), read whole in one range
   fsc: 'ABI-L2-FSCC',
   // the anvil at two kilometres (181st): the cloud top height on the
   // 2-km grid - NCEI's record of the product (gov.noaa.ncdc:C01505):
@@ -4542,9 +4544,9 @@ export function dcompAt(q, cod, cps, dqf) {
   };
 }
 // ---- THE SNOW'S COVER FROM ORBIT (186th pass) ------------------------
-// NOAA's Enterprise Fractional Snow Cover (ABI-L2-FSCC: CONUS every 5
-// min by day, 2 km): FSC a uint8 percent (0 snow-free land, 1-100 the
-// snow fraction, 125 fill, 128 no retrieval) with a DQF of twelve
+// NOAA's Enterprise Fractional Snow Cover (ABI-L2-FSCC: CONUS hourly,
+// 2 km, retrieved by day): FSC a uint8 percent (0 snow-free land, 1-100
+// the snow fraction, 125 fill, 128 no retrieval) with a DQF of twelve
 // codes (the file's own flag_values and flag_meanings; the ATBD's
 // Table 2-6). The Enterprise FSC ATBD v1.0 (Romanov, NOAA/NESDIS/STAR,
 // June 2020, 35 pp) and the GOES-18 ABI L2+ FSC full-maturity read-me
@@ -4620,7 +4622,7 @@ export const FSC_ATBD = {
   szaMaxDeg: {atbd: 85, abiFile: 80},
   abiBands: [2, 3, 5, 13],
   resolutionKm: 2,
-  cadenceMin: 5,
+  cadenceMin: 60, // one CONUS file an hour at :01 (the bucket's listings, measured)
   readme: {
     maturity: 'full validation (GOES-18: 4 Jan 2025)',
     knownIssue:

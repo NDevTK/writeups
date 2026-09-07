@@ -1640,8 +1640,9 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    so the snow curtain is gated, not yet seen live; the kinds carry
    the errors of the model temperature, the MESH and the separation
    they are built from. Pass 186 brings the snow's cover from orbit:
-   NOAA's fractional snow cover (`ABI-L2-FSCC`, CONUS every 5 min by
-   day, 2 km, 59–93 kB a file) as the twenty-first served product —
+   NOAA's fractional snow cover (`ABI-L2-FSCC`, one CONUS file an
+   hour at :01 by the bucket's listings, 2 km, 350–460 kB by day and
+   106 kB by night) as the twenty-first served product —
    the Enterprise FSC ATBD v1.0 (Romanov 2020, read in full) makes it
    the VIEWABLE snow fraction of each pixel by Eq. 1's linear unmixing
    of the 0.64-µm reflectance between a snow-free and a snow
