@@ -432,7 +432,45 @@ export const ACHA_ATBD = {
   },
   layers: {highHpa: 440, lowHpa: 680},
   errorBudget: {biasKm: -0.0002, sdKm: 0.94, layerPodPct: 91.4},
-  inversion: {belowHpa: 700, aboveSurfaceHpa: 50, lapseKPerKm: 9.8}
+  inversion: {belowHpa: 700, aboveSurfaceHpa: 50, lapseKPerKm: 9.8},
+  // THE ENTERPRISE HEIGHT, READ (182nd): the served product has been
+  // the Enterprise algorithm's since 27 March 2023 (GOES-18; OSPO's
+  // notice PR.11.05.00 of 23 March 2023) - its ATBD read in full
+  enterprise: {
+    version:
+      'Enterprise AWG Cloud Height Algorithm (ACHA) ATBD v3.4, 2020-09 (Heidinger, Li, Wanzong; 72 pp)',
+    since: '2023-03-27T18:00Z on GOES-18 (2023-03-23 on GOES-16)',
+    // Table 3: the GOES-R default mode; the 11, 12 and 13.3 um channels
+    mode: {number: 10, channelsUm: [11.2, 12.3, 13.3]},
+    // Sec. 4.4.2 and the v3.1/v3.3 revisions: five retrieved elements
+    state: ['Tc', 'e11', 'beta(12/11)', 'Ts or the lower cloud', 'ice fraction'],
+    // Table 1 (F&PS v2.2): the same requirement as the baseline's
+    requirement: {accuracyM: 500, precisionM: 1500, emissivityFloor: 0.8},
+    // Table 6: against CALIPSO, low-level clouds with emissivity > 0.8
+    // (the VIIRS specification 1 km / 2 km); Appendix A: GOES-17 within
+    // 0.5 km / 1.5 km in June 2019
+    errorBudget: {biasKm: 0.41, sdKm: 0.75, tempBiasK: 0.95, tempSdK: 3.65},
+    // Eq. 37: the absorption depth from the emissivity carries the
+    // cosine of the viewing zenith; Eq. 38 turns it to the visible by
+    // the retrieved particle size's scattering properties
+    tauAbs: 'tau_abs = -mu ln(1 - e_c), mu = cos(viewing zenith)',
+    // Eq. 40-41: the parallax shift is by the height above the surface
+    parallax: '(Zc - Zs) tan(theta)',
+    // Sec. 4.4.3.3, the product quality flag's four values (the files
+    // add a fifth, opaque_retrieval_qf, unseen in the measured scenes)
+    dqf: [
+      'fully successful retrieval',
+      'marginally successful retrieval',
+      'retrieval attempted and failed',
+      'no retrieval attempted'
+    ],
+    // Sec. 4.4.2.8: an inversion below 600 hPa, the height from the
+    // cloud-surface temperature difference by a CALIPSO lapse-rate
+    // table, over water and now land; Sec. 4.4.2.7: thin cirrus redone
+    // with the a priori temperature of nearby thicker ice (a KD-tree)
+    inversionHpa: 600,
+    layers: {highHpa: 440, lowHpa: 680}
+  }
 };
 export const ACHA_DQF_WORDS = [
   'good',
@@ -663,7 +701,7 @@ const towerBearingDeg = (lat1, lon1, lat2, lon2) => {
 export function towerTopsFromOrbit(
   storms,
   hwin,
-  {parallax = true, rEkm = 6371, rSkm = 42164} = {}
+  {parallax = true, rEkm = 6371, rSkm = 42164, surfaceM = 0} = {}
 ) {
   const g = hwin.g ?? fixedGridGeometry(hwin.proj);
   const satLon = g.lon0Deg;
@@ -685,6 +723,7 @@ export function towerTopsFromOrbit(
     satLonDeg: satLon,
     time: hwin.time ?? null,
     parallax,
+    surfaceM,
     // the window's own pixel size (181st: the 2-km product's pixels
     // or the 10-km product's fields - the words say which)
     pixelEwM: null,
@@ -709,7 +748,9 @@ export function towerTopsFromOrbit(
     const tanVz = Math.tan(vz * RAD);
     const away = (towerBearingDeg(s.lat, s.lon, 0, satLon) + 180) % 360;
     const look = (hM) => {
-      const shiftM = parallax ? hM * tanVz : 0;
+      // the shift by the top's height above the surface (the ATBD's
+      // Eq. 40-41; 182nd) - the observer's elevation as the surface
+      const shiftM = parallax ? Math.max(0, hM - surfaceM) * tanVz : 0;
       const lat = s.lat + (shiftM * Math.cos(away * RAD)) / 111320;
       const lon =
         s.lon +
@@ -792,7 +833,7 @@ export function cirrusSheetsFromOrbit(
   mask,
   latDeg,
   lonDeg,
-  {maxKm = 100, highM = 6508, rEkm = 6371, rSkm = 42164} = {}
+  {maxKm = 100, highM = 6508, rEkm = 6371, rSkm = 42164, surfaceM = 0} = {}
 ) {
   const g = hwin.g ?? fixedGridGeometry(hwin.proj);
   const satLon = g.lon0Deg;
@@ -848,7 +889,10 @@ export function cirrusSheetsFromOrbit(
       );
       if (!G) continue;
       const vz = viewZenithDeg(G.latDeg, G.lonDeg, satLon, {rEkm, rSkm});
-      const shiftM = h * Math.tan(vz * RAD);
+      // the Enterprise ATBD's Eq. 40-41 (182nd): the shift is (Zc - Zs)
+      // tan(theta) - the top's height ABOVE THE SURFACE; the observer's
+      // elevation stands for the surface under the sheets (stated)
+      const shiftM = Math.max(0, h - surfaceM) * Math.tan(vz * RAD);
       const toward = towerBearingDeg(G.latDeg, G.lonDeg, 0, satLon);
       const lat = G.latDeg + (shiftM * Math.cos(toward * RAD)) / 111320;
       const lon =
@@ -903,6 +947,7 @@ export function cirrusSheetsFromOrbit(
       pixelNsM: size ? size.nsM : null,
       highM,
       maxKm,
+      surfaceM,
       satLonDeg: satLon,
       time: hwin.time ?? null,
       maskTime: mask && mask.time ? mask.time : null
@@ -948,7 +993,12 @@ export const BAND13_CENTRE_UM = 10.35;
 export const SHEET_OPACITY_RULES = {
   aboveCloud: 'R_ac 0 and t_ac 1 at 10.35 um above 6.5 km (stated)',
   visToIr: 2, // tau_vis / tau_IR, the geometric limit (stated)
-  clearMinPixels: 20 // the window's clear pixels needed for a reference
+  clearMinPixels: 20, // the window's clear pixels needed for a reference
+  // the observer's line through a sheet (182nd): the path is 1 / cos
+  // of the angle from the observer's zenith to the sheet, floored at
+  // 87 deg (twenty times the vertical depth) - a sheet on the horizon
+  // is not infinitely opaque in a curved atmosphere (stated)
+  cosObsFloor: 0.05
 };
 /** Planck spectral radiance (W m^-2 sr^-1 m^-1) at a wavelength. */
 export function planckRadiance(tK, um = BAND13_CENTRE_UM) {
@@ -994,7 +1044,8 @@ export function sheetOpacity(
   dcomp,
   {
     visToIr = SHEET_OPACITY_RULES.visToIr,
-    clearMin = SHEET_OPACITY_RULES.clearMinPixels
+    clearMin = SHEET_OPACITY_RULES.clearMinPixels,
+    observerM = 0
   } = {}
 ) {
   const box = hwin.box;
@@ -1086,8 +1137,19 @@ export function sheetOpacity(
     tauDcompMedian: null,
     closureN: 0,
     closureRatioMedian: null,
-    visToIr
+    visToIr,
+    // the Enterprise ATBD's Eq. 37 (182nd): the absorption depth is
+    // -mu ln(1 - e) with mu the cosine of the satellite's zenith - the
+    // sheets' median mu; and each sheet's opacity is taken along the
+    // observer's own line through it (1 / cos of the angle from the
+    // observer's zenith): the medians and the extremes
+    muMedian: null,
+    slantMedian: null,
+    slantMax: null,
+    observerM
   };
+  const mus = [];
+  const slants = [];
   for (const s of sheets || []) {
     sum.n++;
     const q = s.q;
@@ -1106,30 +1168,56 @@ export function sheetOpacity(
       if (raw < 0) warmer = true;
       else e = Math.min(1, raw);
     }
-    const tauIr =
+    // the emissivity is along the satellite's slant path; the ATBD's
+    // Eq. 37 makes the VERTICAL absorption depth tau_abs = -mu ln(1 -
+    // e) with mu the cosine of the viewing zenith (a sheet without a
+    // zenith reads at nadir)
+    const mu = Number.isFinite(s.viewZenithDeg)
+      ? Math.max(0.05, Math.cos(s.viewZenithDeg * RAD))
+      : 1;
+    const tauSlant =
       e !== null ? -Math.log(Math.max(1e-9, 1 - Math.min(e, 1 - 1e-9))) : null;
-    const opacityIr = e !== null ? 1 - (1 - e) ** visToIr : null;
+    const tauIr = tauSlant !== null ? mu * tauSlant : null;
+    // the nadir opacities: the visible depth twice the vertical
+    // absorption depth (the geometric limit, stated), DCOMP's tau
+    // vertical by definition
+    const opacityIr = tauIr !== null ? 1 - Math.exp(-visToIr * tauIr) : null;
     const tl = tauLists && tauLists.get(q);
     const tauDcomp = tl && tl.length ? median(tl) : null;
     const opacityDcomp = tauDcomp !== null ? 1 - Math.exp(-tauDcomp) : null;
     const nightBlock =
       tl && tl.length ? (nightCounts.get(q) || 0) * 2 > tl.length : false;
+    // the observer's own line through the sheet: the vertical depth
+    // over the cosine of the angle from the observer's zenith to the
+    // sheet's centre (a sheet without a place reads overhead)
+    const up = Number.isFinite(s.htM) ? s.htM - observerM : NaN;
+    const horiz = Math.hypot(s.dxM ?? 0, s.dzM ?? 0);
+    const cosObs =
+      Number.isFinite(up) && up > 0
+        ? Math.max(SHEET_OPACITY_RULES.cosObsFloor, up / Math.hypot(up, horiz))
+        : 1;
+    const slant = 1 / cosObs;
     let alpha;
+    let opacityNadir;
     let source;
     if (opacityDcomp !== null) {
-      alpha = opacityDcomp;
+      opacityNadir = opacityDcomp;
+      alpha = 1 - Math.exp(-tauDcomp * slant);
       source = 'dcomp';
       sum.fromDcomp++;
       if (nightBlock) sum.dcompNight++;
     } else if (opacityIr !== null) {
-      alpha = opacityIr;
+      opacityNadir = opacityIr;
+      alpha = 1 - Math.exp(-visToIr * tauIr * slant);
       source = 'emissivity';
       sum.fromEmissivity++;
     } else if (s.fraction !== null && s.fraction !== undefined) {
+      opacityNadir = s.fraction;
       alpha = s.fraction;
       source = 'mask';
       sum.fromMask++;
     } else {
+      opacityNadir = 1;
       alpha = 1;
       source = 'none';
       sum.fromNone++;
@@ -1138,14 +1226,24 @@ export function sheetOpacity(
     if (!n) sum.noPixels++;
     if (e !== null) es.push(e);
     if (tauDcomp !== null) taus.push(tauDcomp);
+    // the closure: the theme's visible depth (2 mu tau_slant) against
+    // the product's; the product's own visible depth is its
+    // absorption depth times the crystals' extinction-to-absorption
+    // ratio (Eq. 38), 2 or more, so the ratio stands at or below 1
     if (e !== null && tauDcomp !== null && tauIr > 0)
       ratios.push((visToIr * tauIr) / tauDcomp);
+    mus.push(mu);
+    slants.push(slant);
     out.push({
       ...s,
       alpha,
+      opacityNadir,
       source,
       emissivity: e,
+      tauSlant,
       tauIr,
+      mu,
+      cosObs,
       tauDcomp,
       opacityIr,
       opacityDcomp,
@@ -1154,6 +1252,11 @@ export function sheetOpacity(
       tTopK: tC,
       n
     });
+  }
+  if (mus.length) {
+    sum.muMedian = median(mus);
+    sum.slantMedian = median(slants);
+    sum.slantMax = Math.max(...slants);
   }
   es.sort((a, b) => a - b);
   if (es.length) {
@@ -1182,7 +1285,7 @@ export function sheetOpacityWords(sm) {
     );
   if (sm.fromEmissivity)
     parts.push(
-      `${sm.fromEmissivity} from the 10.35-um cloud emissivity (the ACHA ATBD's Eq. 1 with the window's ${sm.clearPixels} clear pixels as the clear sky, ${sm.clearRefK.toFixed(1)} K, and the column's temperature at each top; e ${sm.eMin.toFixed(2)}-${sm.eMax.toFixed(2)}, median ${sm.eMedian.toFixed(2)}; opacity 1 - (1 - e)^${sm.visToIr})`
+      `${sm.fromEmissivity} from the 10.35-um cloud emissivity (the ACHA ATBD's Eq. 1 with the window's ${sm.clearPixels} clear pixels as the clear sky, ${sm.clearRefK.toFixed(1)} K, and the column's temperature at each top; e ${sm.eMin.toFixed(2)}-${sm.eMax.toFixed(2)}, median ${sm.eMedian.toFixed(2)}; the vertical absorption depth -mu ln(1 - e), Eq. 37, mu ${sm.muMedian === null ? '1' : sm.muMedian.toFixed(2)}; the visible depth ${sm.visToIr} times it)`
     );
   if (sm.fromMask) parts.push(`${sm.fromMask} the mask's cloudy fraction`);
   if (sm.fromNone) parts.push(`${sm.fromNone} opaque for want of any`);
@@ -1196,7 +1299,10 @@ export function sheetOpacityWords(sm) {
       : '') +
     (sm.column === 'none' ? '; no column for the tops’ temperatures' : '') +
     (sm.closureN
-      ? `; where both stand, 2 tau_IR against DCOMP's tau: ${sm.closureRatioMedian.toFixed(2)} over ${sm.closureN} (1 is the stated ratio)`
+      ? `; where both stand, 2 mu tau_IR against the product's tau: ${sm.closureRatioMedian.toFixed(2)} over ${sm.closureN} (at or below 1 as the crystals' 11-um absorption efficiency falls short of the visible extinction's 2 - Eq. 37-38)`
+      : '') +
+    (sm.slantMedian !== null
+      ? `; each sheet's opacity along the observer's own line through it (the path ${sm.slantMedian.toFixed(2)} times the vertical at the median, ${sm.slantMax.toFixed(1)} at most)`
       : '')
   );
 }

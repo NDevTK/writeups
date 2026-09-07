@@ -2579,6 +2579,9 @@ const inflate = (u8) =>
     );
   const words = pick && towerTopsWords(rA.summary);
   const vzLaw = sA ? sA.viewZenithDeg : NaN;
+  // the shift by the height above the surface (182nd): a surface 500
+  // m up shortens every look
+  const rS = pick && towerTopsFromOrbit([A], hwin, {surfaceM: 500});
   check(
     "THE TOP OVER THE CORE: a storm cell takes the satellite's height at its own parallax-shifted pixel where that is higher, the shift going away from the sub-satellite point by h tan(zenith), keeps the radar's top where the satellite's is lower, and names a flagged pixel and a point outside the window",
     !!pick &&
@@ -2611,6 +2614,10 @@ const inflate = (u8) =>
       rE.summary.outside === 1 &&
       rE.summary.n === 1 &&
       rE.storms[1].km === 0 &&
+      rS.storms[0].shiftM < sA.shiftM &&
+      rS.storms[0].shiftM > 0 &&
+      rS.summary.surfaceM === 500 &&
+      rA.summary.surfaceM === 0 &&
       words.includes("1 of 1 storm cells took the satellite's top") &&
       words.includes('the largest lift 0.5 km'),
     pick
@@ -2739,6 +2746,13 @@ const inflate = (u8) =>
   };
   const r = cirrusSheetsFromOrbit(hwin, mask, lat0, lon0);
   const rNear = cirrusSheetsFromOrbit(hwin, mask, lat0, lon0, {maxKm: 1});
+  // the Enterprise ATBD's Eq. 40-41 (182nd): the shift by the height
+  // above the surface - a surface 1 km up shortens the first sheet's
+  // move by a tenth of its 10-km top
+  const rSurf = cirrusSheetsFromOrbit(hwin, null, lat0, lon0, {
+    surfaceM: 1000
+  });
+  const sSurf = rSurf.sheets.find((s) => s0 && s.q === s0.q);
   let plainHigh = 0;
   let plainGood = 0;
   for (let q = 0; q < hwin.ht.length; q++) {
@@ -2803,6 +2817,10 @@ const inflate = (u8) =>
       near(r.summary.maxM, Math.max(...r.sheets.map((s) => s.htM)), 1e-9) &&
       rNear.summary.n === 0 &&
       rNear.summary.nHigh === plainHigh &&
+      !!sSurf &&
+      near(sSurf.shiftM, (s0.shiftM * (s0.htM - 1000)) / s0.htM, 1e-6) &&
+      rSurf.summary.surfaceM === 1000 &&
+      r.summary.surfaceM === 0 &&
       r.summary.satLonDeg === g.lon0Deg &&
       words.includes('high pixels within 100 km as sheets') &&
       words.includes("carrying the mask's cloudy fraction") &&
@@ -2893,9 +2911,31 @@ const inflate = (u8) =>
     htM: 10000,
     fraction: 0.6
   });
-  const sheets = [sheet(1), sheet(2), sheet(3), sheet(4)];
+  // THE ENTERPRISE HEIGHT, READ (182nd): a fifth sheet on the e 0.5
+  // block seen by the satellite at 60 deg zenith (mu 0.5 - the ATBD's
+  // Eq. 37 halves the vertical absorption depth) and standing 60 deg
+  // from the observer's zenith (10 km up, 17.32 km out: the observer's
+  // line through it is twice the vertical)
+  const sE = {
+    ...sheet(1),
+    viewZenithDeg: 60,
+    dxM: 10000 * Math.sqrt(3),
+    dzM: 0
+  };
+  const sheets = [sheet(1), sheet(2), sheet(3), sheet(4), sE];
   const r = sheetOpacity(hwin, sheets, imagery, mask, rows, dcomp);
-  const [sA, sB, sC, sD] = r.sheets;
+  const [sA, sB, sC, sD, sSlant] = r.sheets;
+  // the same fifth sheet from an observer 5 km up: 5 km above the eye,
+  // 17.32 km out - the line 3.606 times the vertical
+  const rUp = sheetOpacity(hwin, [sE], imagery, mask, rows, dcomp, {
+    observerM: 5000
+  });
+  const sUp = rUp.sheets[0];
+  const cosUp = 5000 / Math.hypot(5000, 10000 * Math.sqrt(3));
+  // the emissivity path at 60 deg: no DCOMP for that sheet
+  const rSlantIr = sheetOpacity(hwin, [sE], imagery, mask, rows, null);
+  const sSlantIr = rSlantIr.sheets[0];
+  const E = ACHA_ATBD.enterprise;
   // the brightness-temperature average's error for the e 0.5 block: the
   // mean BT of the mixed pixels is not the BT of the mean radiance
   const btMean = planckTemperature(0.5 * rTop + 0.5 * rClr);
@@ -2917,7 +2957,7 @@ const inflate = (u8) =>
       ) &&
       near(planckTemperature(goesirPlanckB(250)), 250, 1e-9) &&
       near(goesirPlanckT(planckRadiance(300)), 300, 1e-9) &&
-      r.summary.n === 4 &&
+      r.summary.n === 5 &&
       r.summary.clearPixels === 5 * 25 - 2 &&
       near(r.summary.clearRefK, tClr, 1e-9) &&
       sA.source === 'dcomp' &&
@@ -2935,13 +2975,57 @@ const inflate = (u8) =>
       sD.emissivity === null &&
       sD.alpha === 0.6 &&
       r.summary.warmer === 1 &&
-      r.summary.fromDcomp === 1 &&
-      r.summary.dcompNight === 1 &&
+      r.summary.fromDcomp === 2 &&
+      r.summary.dcompNight === 2 &&
       sA.dcompNight === true &&
       r.summary.fromEmissivity === 2 &&
       r.summary.fromMask === 1 &&
-      r.summary.closureN === 1 &&
+      r.summary.closureN === 2 &&
       near(r.summary.closureRatioMedian, 1, 1e-9) &&
+      // the nadir sheets keep the 178th's numbers (mu 1, overhead)
+      near(sA.mu, 1, 1e-12) &&
+      near(sA.cosObs, 1, 1e-12) &&
+      near(sA.opacityNadir, sA.alpha, 1e-12) &&
+      // THE ENTERPRISE HEIGHT, READ (182nd): the fifth sheet at 60 deg
+      // satellite zenith - mu 0.5 halves the vertical absorption depth
+      // (Eq. 37): tau_IR 0.5 ln 2, the IR's nadir opacity 0.5 where the
+      // nadir sheet reads 0.75; DCOMP's tau 2 ln 2 stands (vertical by
+      // definition, nadir opacity 0.75) and the observer's line at 60
+      // deg doubles the path: alpha 1 - 1/16; its closure 2 mu tau over
+      // tau = 0.5, the median over the two still 1
+      sSlant.source === 'dcomp' &&
+      near(sSlant.mu, 0.5, 1e-12) &&
+      near(sSlant.tauSlant, Math.log(2), 1e-9) &&
+      near(sSlant.tauIr, 0.5 * Math.log(2), 1e-9) &&
+      near(sSlant.opacityIr, 0.5, 1e-9) &&
+      near(sSlant.opacityNadir, 0.75, 1e-9) &&
+      near(sSlant.cosObs, 0.5, 1e-9) &&
+      near(sSlant.alpha, 1 - 1 / 16, 1e-9) &&
+      near(r.summary.slantMax, 2, 1e-9) &&
+      // from 5 km up the same sheet stands lower: the line 3.6 times
+      // the vertical, the opacity 0.993
+      near(sUp.cosObs, cosUp, 1e-12) &&
+      near(sUp.alpha, 1 - Math.exp((-2 * Math.log(2)) / cosUp), 1e-9) &&
+      rUp.summary.observerM === 5000 &&
+      // without DCOMP the emissivity path at 60 deg: the nadir opacity
+      // 0.5, along the observer's doubled line 0.75
+      sSlantIr.source === 'emissivity' &&
+      near(sSlantIr.opacityNadir, 0.5, 1e-9) &&
+      near(sSlantIr.alpha, 0.75, 1e-9) &&
+      // the ATBD's own numbers as the theme holds them
+      E.dqf.length === 4 &&
+      E.dqf[1] === 'marginally successful retrieval' &&
+      E.requirement.accuracyM === 500 &&
+      E.requirement.precisionM === 1500 &&
+      E.requirement.emissivityFloor === 0.8 &&
+      E.errorBudget.biasKm === 0.41 &&
+      E.errorBudget.sdKm === 0.75 &&
+      E.mode.number === 10 &&
+      E.mode.channelsUm.length === 3 &&
+      E.state.length === 5 &&
+      E.layers.highHpa === ACHA_ATBD.layers.highHpa &&
+      words.includes('Eq. 37') &&
+      words.includes("along the observer's own line") &&
       Math.abs(eWrong - 0.5) > 0.02 &&
       noCol.sheets.every((s) => s.source === 'mask') &&
       noCol.summary.column === 'none' &&
@@ -2953,12 +3037,12 @@ const inflate = (u8) =>
       words.includes('from the enterprise cloud optical depth') &&
       words.includes('the night retrieval by the DQF') &&
       words.includes('10.35-um cloud emissivity') &&
-      words.includes('1 is the stated ratio'),
+      words.includes('at or below 1 as the crystals'),
     `a clear sky at ${tClr} K (${r.summary.clearPixels} clear pixels, two flagged out) and a 220-K top read by the column at 10 km: ` +
       `the e 0.5 block (mixed in radiance) comes back e ${sA.emissivity.toFixed(6)} - a brightness-temperature average would read ${eWrong.toFixed(3)} - ` +
       `and DCOMP's tau ${sA.tauDcomp.toFixed(3)} there gives opacity ${sA.alpha.toFixed(3)} over the IR's ${sA.opacityIr.toFixed(2)}, the closure 2 tau_IR / tau ${r.summary.closureRatioMedian.toFixed(3)}; ` +
       `e 1 -> opacity 1, e 0.2 -> ${sC.alpha.toFixed(2)}; the 295-K block is warmer than the clear sky and keeps the mask's 0.6; no column or fewer than ${SHEET_OPACITY_RULES.clearMinPixels} clear pixels leave every sheet to the mask; ` +
-      `the Planck pair matches goesir's to 1e-12; the words: "${words.slice(0, 120)}..."`
+      `the Planck pair matches goesir's to 1e-12; the fifth sheet at 60° satellite zenith (mu ${sSlant.mu.toFixed(2)}, Eq. 37): tau_IR ${sSlant.tauIr.toFixed(3)} against the nadir sheet's ${sA.tauIr.toFixed(3)}, the IR's nadir opacity ${sSlant.opacityIr.toFixed(2)}, DCOMP's ${sSlant.opacityNadir.toFixed(2)} at nadir and ${sSlant.alpha.toFixed(4)} along the observer's line at 60° (${(1 / sSlant.cosObs).toFixed(1)} times the vertical; from 5 km up ${sUp.alpha.toFixed(4)}), its closure 2 mu tau / tau ${((2 * sSlant.tauIr) / sSlant.tauDcomp).toFixed(2)}; the ATBD's requirement ${E.requirement.accuracyM} / ${E.requirement.precisionM} m, Table 6's bias ${E.errorBudget.biasKm} km, sd ${E.errorBudget.sdKm}, ${E.dqf.length} quality values; the words: "${words.slice(0, 120)}..."`
   );
 }
 

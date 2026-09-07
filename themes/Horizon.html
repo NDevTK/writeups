@@ -7059,9 +7059,9 @@
           ` (ranking: the theme's own opaque tops where they cover 5% of the sea, then these, then the VIIRS census; on storm codes - or with a radar storm at or above 8 km in view - these tallest tops when ten good fields stand, else the radar's tallest echo top, else the parcel's EL)` +
           ` · the cirrus sheets: ${cirrusSheetsInfo ? `(${cirrusSheetsInfo.product}, ${cirrusSheetsInfo.res} pixels) ` + cirrusSheetsWords(cirrusSheetsInfo.summary) : 'none measured - no window live, the seven drifting sheets stand'}` +
           (cirrusSheetsInfo && cirrusSheetsInfo.opacity
-            ? ` · ${sheetOpacityWords(cirrusSheetsInfo.opacity)} (the visible opacity 1 - (1 - e)^2: twice the 11-um absorption depth, the geometric limit - stated; the sheets' colour the sky's ambient on the underside plus a little transmitted sun - stated)`
+            ? ` · ${sheetOpacityWords(cirrusSheetsInfo.opacity)} (the vertical 11-um absorption depth -mu ln(1 - e) with the satellite's mu, the Enterprise ATBD's Eq. 37; the visible depth twice it, the geometric limit - stated; each sheet as opaque as the observer's own line through it, 1 - e^-tau/cos - stated; the sheets' colour the sky's ambient on the underside plus a little transmitted sun - stated)`
             : '') +
-          ` (the parallax undone: a pixel's navigated point is where its line of sight meets the ground, so a top at height h is moved h tan(zenith) toward the sub-satellite point; a pixel is a 10-km block mean of 2-km retrievals)` +
+          ` (the parallax undone: a pixel's navigated point is where its line of sight meets the ground, so a top at height h above the surface is moved h tan(zenith) toward the sub-satellite point - the Enterprise ATBD's Eq. 40-41, the observer's elevation as the surface; a 10-km field is the block mean of 2-km retrievals, the 2-km window the retrieval itself)` +
           ` · the ATBD: ${R.accuracyM} m accuracy and ${R.precisionM} m precision for emissivity > ${R.emissivityFloor}, quantitative to ${R.lzaQuantitativeDeg}°; against CALIPSO a ${E.sdKm} km standard deviation for low cloud, thin cirrus and low-level inversions the stated concerns`
         );
       }
@@ -13278,7 +13278,9 @@
           if (cloudSys) cloudSys.setTopField(null);
           return;
         }
-        const orbit = hLive ? towerTopsFromOrbit(storms, hLive) : null;
+        const orbit = hLive
+          ? towerTopsFromOrbit(storms, hLive, {surfaceM: centerElev})
+          : null;
         const f = echoTopField(
           orbit ? orbit.storms : storms,
           state.lat,
@@ -14427,8 +14429,14 @@
           cirrusSheets.visible = false;
           return;
         }
+        // the Enterprise ATBD read (182nd): the parallax shift by the
+        // top's height above the surface (the observer's elevation as
+        // the surface, stated), the absorption depth with the
+        // satellite's cosine, and each sheet's opacity along the
+        // observer's own line through it
         const r = cirrusSheetsFromOrbit(live, mask, state.lat, state.lon, {
-          maxKm: CIRRUS_SHEETS_MAX_KM
+          maxKm: CIRRUS_SHEETS_MAX_KM,
+          surfaceM: centerElev
         });
         const op = sheetOpacity(
           live,
@@ -14436,7 +14444,8 @@
           goesL2.imagery && goesL2.imagery.btK ? goesL2.imagery : null,
           mask,
           colRows,
-          dcompLive
+          dcompLive,
+          {observerM: centerElev}
         );
         // one geometry for every sheet (181st: a 2-km window holds
         // thousands of sheets where the 10-km held hundreds - one mesh,
