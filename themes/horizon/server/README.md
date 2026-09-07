@@ -176,7 +176,12 @@ are gated by `../server-reference.mjs` — the `server` set in
   that is higher than its 18-dBZ echo top, the lookup shifted away
   from the sub-satellite point by h tan(view zenith) for the top's
   parallax - PUG Vol. 5: the height is aggregated to 10 km from 2-km
-  retrievals and the L1b source is not parallax-corrected; the ACHA
+  retrievals and the L1b source is not parallax-corrected; since the
+  177th every good high pixel (at or above the ISCCP floor, 6,508 m)
+  within 100 km is a cirrus sheet in the scene at its
+  parallax-corrected place and its own height, the mask's
+  (`ABI-L2-ACMC`) cloudy fraction inside the pixel its opacity, the
+  seven random sheets standing only where no window is live; the ACHA
   ATBD's 500 m accuracy and 1.5 km
   precision stated on the page) from the NOAA Open Data buckets (`noaa-goes18` for
   GOES-West, `noaa-goes19` for GOES-East; anonymous S3, listed and

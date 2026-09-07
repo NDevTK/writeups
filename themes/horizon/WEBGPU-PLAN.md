@@ -10345,6 +10345,75 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 7, the review session's 177th pass - THE ANVIL'S SPREAD):
+  the 176th's named lead, taken as the cirrus layer's rather than the
+  low deck's: an anvil overhangs clear air, so a per-texel TOP field
+  on the low deck (which fills its slab from the deck's base) would
+  have drawn a 12-km-thick cloud where a thin sheet stands; the
+  theme's cirrus layer is a 2-D sheet layer at the measured cirrus
+  level (173rd), and that is what the satellite's high pixels feed.
+  Until now the layer was seven random planes (80-130 x 9-17 scene
+  units) drifting at the cirrus level, shown by the reported high
+  cover. THE LAW (goesl2.js cirrusSheetsFromOrbit): every good height
+  pixel (DQF 0) at or above the ISCCP high floor (ACHA_ATBD.layers'
+  440 hPa - heightBands' 6,508 m) whose parallax-corrected place lies
+  within 100 km of the observer becomes a sheet: the pixel's navigated
+  point (fixedGridToLatLon, where its line of sight meets the
+  ellipsoid) moved TOWARD the sub-satellite point by HT tan(view
+  zenith) - the inverse of the 176th's lookup, the same spherical
+  zenith and great-circle bearing - at its own height, the pixel's
+  ground size (pixelSizeM at the window's centre), with the mask's
+  cloudy fraction inside the pixel as its opacity: each good 2-km BCM
+  pixel (DQF 0, BCM 0 or 1) binned by its scan angles into the 10-km
+  grid (indexOfScanAngle on the height coordinates), cloudy over
+  counted; null where no mask pixel fell in. The summary: n, nHigh,
+  nGood, the tops' min/median/max, withMask, meanFraction, the shift's
+  range, the zenith, the pixel size; cirrusSheetsWords. THE PAGE: a
+  measured sheet group (one PlaneGeometry per pixel, the pixel's size
+  in scene units, at 16 asinh((HT - elev)/500) + 8, placed by the
+  sheet's east/south metres over MPU) sharing the cirrus material with
+  vertexColors on - a four-component colour attribute carries the
+  fraction as alpha (three's node materials multiply the colour and
+  alpha by the vertex colour only where a geometry HAS the attribute,
+  so the seven random sheets, without one, are untouched); rebuilt
+  when the height window, the mask, the place or the datum changes
+  (keyed); while it stands the seven random sheets are hidden and the
+  group drifts with the same high-level wind driftLayer uses; the ACHA
+  line adds "the cirrus sheets: N high pixels within 100 km as sheets
+  at their parallax-corrected places (moved a-b km toward the
+  sub-satellite point at Z deg zenith), tops h1-h2 km (median m), each
+  w x h km, k carrying the mask's cloudy fraction inside the pixel as
+  opacity (mean f%)" with the parallax rule spelled out, and "the
+  cirrus sheets at their own pixels (177th)" among what the heights
+  feed; without a live window: "none measured - no window live, the
+  seven drifting sheets stand" (the pinned harness). GATED
+  (goesl2-reference THE ANVIL'S SPREAD, on the vendored GOES-West
+  ACHAC home window, San Diego 21 x 21): 340 good heights, 82 at or
+  above 6,508 m, 29 within 100 km as sheets (tops 6,722-12,419 m,
+  median 8,082; each 11.44 x 13.74 km at the slant); the first, pixel
+  (16, 10) at 6,916 m, navigated to 32.932 N 116.379 W and moved 6.75
+  km toward GOES-West at 44.28 deg zenith (the ellipsoid's own 44.27
+  deg and 6.74 km; the bearing 0.019 deg off the sub-point's), 65.5 km
+  at 87 deg from the home; a synthetic 2-km mask laid five to a height
+  pixel ((i + j) mod 26 of the 25 cloudy, the first mask pixel of the
+  first sheet's pixel flagged) matches the law's fractions pixel by
+  pixel with the flagged pixel dropped from the 25; no mask: every
+  sheet opaque (fraction null); a 1-km reach: no sheet, the counts
+  unchanged; the words. A first cut held the fractions in float32 and
+  the gate's 1e-9 pins caught the rounding (0.68 read 0.67999997) -
+  doubles now. Docs: server README (/goesl2), FINDINGS pass 177 (149
+  files, 1,200 landmarks, 9 GPU probes). STATED LIMITS: a sheet is a
+  10-km block's mean top, its edges the pixel's, not the anvil's; the
+  mask's fraction is the block's cloudiness, not the sheet's optical
+  depth (the ATBD's emissivity is not carried; DCOMP's optical depth
+  is served by day - the named next lead); the sheets drift with the
+  high-level wind between files and are rebuilt on the next; beyond
+  100 km the sky's own cirrus stands; the cirrus material's opacity
+  (0.05 + 0.12 day) still scales every sheet. The named next lead: the
+  sheet's own opacity by day - DCOMP's cloud optical depth
+  (ABI-L2-CODC, already served) at the sheet's pixel as exp(-tau)
+  transmittance where the retrieval stands, the mask's fraction at
+  night.
 - DONE (Sep 7, the review session's 176th pass - THE SATELLITE'S TOP
   OVER THE RADAR'S CORE): the 175th's named lead. A storm cell's tower
   rises to ACHA's cloud-top height at the cell's own 10-km pixel where

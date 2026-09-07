@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1199 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
+1200 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **149 reference files, 1199 landmark lines, 9 GPU probes** (live gate
+- **149 reference files, 1200 landmark lines, 9 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1348,7 +1348,28 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    Δh tan θ (under a pixel for 3 km at 37°); the anvil beyond the
    echoing cells is not painted (the field's flank rule stands there);
    thin anvils below the ATBD's emissivity 0.8 fall outside its stated
-   accuracy and DQF does not separate them
+   accuracy and DQF does not separate them. Pass 177 spreads the
+   anvil: the cirrus sheets — until now seven random planes drifting
+   at the measured cirrus level — stand at the satellite's high
+   pixels: every good ACHA pixel at or above the ISCCP high floor
+   (6,508 m) within 100 km becomes a sheet at its parallax-corrected
+   place (the navigated point moved HT tan θ toward the sub-satellite
+   point, the inverse of pass 176's lookup), at its own height, the
+   pixel's ground size wide, with the 2-km mask's cloudy fraction
+   inside the pixel as its opacity (the 25 BCM pixels whose scan angles
+   fall in the 10-km pixel, DQF 0), opaque where no mask stands; the
+   random sheets stand only where no window is live. Gated on the
+   vendored home window: 340 good heights, 82 high, 29 within 100 km as
+   sheets (6,722–12,419 m, 11.4 × 13.7 km each at the slant), the first
+   moved 6.75 km toward GOES-West at 44.28° zenith (the ellipsoid's
+   44.27° and 6.74 km; the bearing 0.02° off the sub-point's), a
+   synthetic mask laid five to a pixel matching fraction by fraction
+   with a flagged pixel dropped, no mask opaque, a 1-km reach empty
+   (`goesl2-reference` THE ANVIL'S SPREAD). STATED: a sheet is a 10-km
+   block's mean top; the mask's fraction is the block's cloudiness,
+   not the sheet's optical depth (the ATBD's emissivity is not
+   carried); the sheets drift with the high-level wind between files;
+   beyond 100 km the sky's own cirrus stands
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
