@@ -10413,8 +10413,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   (max 0.171 m, rms 0.084, each block mean to a centimetre of numpy's),
   the tallest pixel (23, 21) 16,358 m over its block's mean 12,960 (the
   10-km field 12,960) so a 14.4-km core there lifts 2 km at 2 km while
-  the 10-km field stands below it and the radar's top keeps, block (9,
-  5) hiding a 9,677-m pixel under a 5,083-m mean, the centre count
+  the 10-km field stands below it and the radar's top keeps, block (9, 5) hiding a 9,677-m pixel under a 5,083-m mean, the centre count
   18224 = 5,562.0 m navigated to 32.9531 N 117.1512 W (numpy's inverse
   to 1e-5 deg), eight samples, 2,003 sheets of 2.29 x 2.75 km against
   89 of 11.44 x 13.74 (ratio 5.00), the bands' tallest tenth 13,068

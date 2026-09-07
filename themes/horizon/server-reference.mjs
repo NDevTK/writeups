@@ -151,11 +151,7 @@ import {
 } from './hdf5-fixture.js';
 // the anvil at two kilometres (181st): the 2-km height crop and the
 // same scan's 10-km fields, with numpy's reading of both
-import {
-  ACHA10KM_B64,
-  ACHA2KM_B64,
-  ACHA2KM_EXPECT
-} from './acha2km-fixture.js';
+import {ACHA10KM_B64, ACHA2KM_B64, ACHA2KM_EXPECT} from './acha2km-fixture.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -815,7 +811,7 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
         Math.abs(body10.pixel.nsM / body.pixel.nsM - 5) < 0.1,
       body && body10
         ? `${E.file2km.slice(0, 27)}: the crop's ${d2.x.n} x ${d2.y.n} pixels as the window about (${body.box.i}, ${body.box.j}), ${body.pixel.ewM} x ${body.pixel.nsM} m a pixel against the 10-km body's ${body10.pixel.ewM} x ${body10.pixel.nsM}; ` +
-          `census ${body.census.n} good (median ${body.census.medianM.toFixed(0)} m, tallest tenth ${body.census.p90M.toFixed(0)}; numpy ${E.good2km.medianM.toFixed(0)} / ${E.good2km.p90M.toFixed(0)}), flags ${JSON.stringify(body.flags)} (numpy ${JSON.stringify(E.flags2km)}), recomputed from the wire exactly; the 10-km body ${body10.census.n} good fields (median ${body10.census.medianM.toFixed(0)})`
+            `census ${body.census.n} good (median ${body.census.medianM.toFixed(0)} m, tallest tenth ${body.census.p90M.toFixed(0)}; numpy ${E.good2km.medianM.toFixed(0)} / ${E.good2km.p90M.toFixed(0)}), flags ${JSON.stringify(body.flags)} (numpy ${JSON.stringify(E.flags2km)}), recomputed from the wire exactly; the 10-km body ${body10.census.n} good fields (median ${body10.census.medianM.toFixed(0)})`
         : `no body: 2 km ${body ? 'ok' : 'null'}, 10 km ${body10 ? 'ok' : 'null'}`
     );
   }

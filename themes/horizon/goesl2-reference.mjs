@@ -8,11 +8,7 @@ import {openHdf5, physicalValues} from './hdf5.js';
 import {ACHAC_B64, ACHAC_EXPECT} from './hdf5-fixture.js';
 // the anvil at two kilometres (181st): the 2-km height crop and the
 // same scan's 10-km fields, with numpy's reading of both
-import {
-  ACHA10KM_B64,
-  ACHA2KM_B64,
-  ACHA2KM_EXPECT
-} from './acha2km-fixture.js';
+import {ACHA10KM_B64, ACHA2KM_B64, ACHA2KM_EXPECT} from './acha2km-fixture.js';
 import {
   ACHA_DQF_MEANINGS,
   heightBlockClosure,
@@ -3145,9 +3141,7 @@ const inflate = (u8) =>
     return (
       A.raw[q] === s.count &&
       w2.dqf[q] === s.dqf &&
-      (s.m === null
-        ? !Number.isFinite(w2.ht[q])
-        : near(w2.ht[q], s.m, tolM))
+      (s.m === null ? !Number.isFinite(w2.ht[q]) : near(w2.ht[q], s.m, tolM))
     );
   });
   // the marginal class (DQF 1): counted, named, left out of the census
@@ -3231,7 +3225,9 @@ const inflate = (u8) =>
       r2.summary.nHigh === E.high2km &&
       r2.summary.n > 0 &&
       r2.summary.n <= r2.summary.nHigh &&
-      r2.sheets.every((s) => s.ewM > 2000 && s.ewM < 3500 && s.nsM > 2000 && s.nsM < 4000) &&
+      r2.sheets.every(
+        (s) => s.ewM > 2000 && s.ewM < 3500 && s.nsM > 2000 && s.nsM < 4000
+      ) &&
       r10.summary.nHigh === E.high10km &&
       pxRatio > 4.9 &&
       pxRatio < 5.1 &&
