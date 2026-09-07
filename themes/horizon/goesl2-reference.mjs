@@ -141,7 +141,12 @@ import {
   lapStability
 } from './goesl2.js';
 import {parcelAscent} from './sounding.js';
-import {ACHA_ATBD, heightBands, towerTopsFromOrbit, towerTopsWords} from './goesl2.js';
+import {
+  ACHA_ATBD,
+  heightBands,
+  towerTopsFromOrbit,
+  towerTopsWords
+} from './goesl2.js';
 import {
   ADP_ATBD,
   ADP_CALLED_FLOOR,
@@ -2429,8 +2434,14 @@ const inflate = (u8) =>
   });
   const xd = f.dataset('x');
   const yd = f.dataset('y');
-  const xc = {scale: sc(xd.attrs.scale_factor), offset: sc(xd.attrs.add_offset)};
-  const yc = {scale: sc(yd.attrs.scale_factor), offset: sc(yd.attrs.add_offset)};
+  const xc = {
+    scale: sc(xd.attrs.scale_factor),
+    offset: sc(xd.attrs.add_offset)
+  };
+  const yc = {
+    scale: sc(yd.attrs.scale_factor),
+    offset: sc(yd.attrs.add_offset)
+  };
   const nx = xd.values.length;
   const ny = yd.values.length;
   const ht = physicalValues(f.dataset('HT'));
@@ -2449,13 +2460,23 @@ const inflate = (u8) =>
     const lam0 = g.lon0Deg * D2R;
     const Sat = [g.H * Math.cos(lam0), g.H * Math.sin(lam0), 0];
     const v = [Sat[0] - P[0], Sat[1] - P[1], Sat[2] - P[2]];
-    const n = [Math.cos(phi) * Math.cos(lam), Math.cos(phi) * Math.sin(lam), Math.sin(phi)];
-    return Math.acos((v[0] * n[0] + v[1] * n[1] + v[2] * n[2]) / Math.hypot(v[0], v[1], v[2])) / D2R;
+    const n = [
+      Math.cos(phi) * Math.cos(lam),
+      Math.cos(phi) * Math.sin(lam),
+      Math.sin(phi)
+    ];
+    return (
+      Math.acos(
+        (v[0] * n[0] + v[1] * n[1] + v[2] * n[2]) / Math.hypot(v[0], v[1], v[2])
+      ) / D2R
+    );
   };
   const bearing = (lat1, lon1, lat2, lon2) => {
     const dl = (lon2 - lon1) * D2R;
     const y = Math.sin(dl) * Math.cos(lat2 * D2R);
-    const x = Math.cos(lat1 * D2R) * Math.sin(lat2 * D2R) - Math.sin(lat1 * D2R) * Math.cos(lat2 * D2R) * Math.cos(dl);
+    const x =
+      Math.cos(lat1 * D2R) * Math.sin(lat2 * D2R) -
+      Math.sin(lat1 * D2R) * Math.cos(lat2 * D2R) * Math.cos(dl);
     return (Math.atan2(y, x) / D2R + 360) % 360;
   };
   const moved = (lat, lon, brg, dM) => ({
@@ -2491,7 +2512,8 @@ const inflate = (u8) =>
       if (qW < 0 || qW === qC) continue;
       const wHt = cutWindow(ht, nx, box)[qW];
       const wDq = cutWindow(dqf, nx, box)[qW];
-      if (wDq !== 0 || !Number.isFinite(wHt) || Math.abs(wHt - ht[q]) < 1000) continue;
+      if (wDq !== 0 || !Number.isFinite(wHt) || Math.abs(wHt - ht[q]) < 1000)
+        continue;
       pick = {i, j, q, htM: ht[q], c, vz, h0, d, toward, box, qC, qW, wHt};
     }
   const hwin = pick && {
@@ -2508,17 +2530,35 @@ const inflate = (u8) =>
   // centre; C: an echo top above the satellite's; D: the centre flagged
   // in a copy of the window; E: a point outside the window and a km-0
   // entry
-  const A = pick && {...moved(pick.c.latDeg, pick.c.lonDeg, pick.toward, pick.d), km: pick.h0 / 1000, distKm: 3, bearingDeg: 90};
+  const A = pick && {
+    ...moved(pick.c.latDeg, pick.c.lonDeg, pick.toward, pick.d),
+    km: pick.h0 / 1000,
+    distKm: 3,
+    bearingDeg: 90
+  };
   const rA = pick && towerTopsFromOrbit([A], hwin);
   const sA = rA && rA.storms[0];
   const B = pick && {lat: pick.c.latDeg, lon: pick.c.lonDeg, km: 8};
   const rB = pick && towerTopsFromOrbit([B], hwin, {parallax: false});
-  const C = pick && {lat: pick.c.latDeg, lon: pick.c.lonDeg, km: pick.htM / 1000 + 2};
+  const C = pick && {
+    lat: pick.c.latDeg,
+    lon: pick.c.lonDeg,
+    km: pick.htM / 1000 + 2
+  };
   const rC = pick && towerTopsFromOrbit([C], hwin, {parallax: false});
   const dqFlag = pick && Uint8Array.from(hwin.dqf);
   if (pick) dqFlag[pick.qC] = 2;
-  const rD = pick && towerTopsFromOrbit([B], {...hwin, dqf: dqFlag}, {parallax: false});
-  const rE = pick && towerTopsFromOrbit([{lat: 10, lon: -60, km: 9}, {lat: 0, lon: 0, km: 0}], hwin);
+  const rD =
+    pick && towerTopsFromOrbit([B], {...hwin, dqf: dqFlag}, {parallax: false});
+  const rE =
+    pick &&
+    towerTopsFromOrbit(
+      [
+        {lat: 10, lon: -60, km: 9},
+        {lat: 0, lon: 0, km: 0}
+      ],
+      hwin
+    );
   const words = pick && towerTopsWords(rA.summary);
   const vzLaw = sA ? sA.viewZenithDeg : NaN;
   check(
@@ -2557,8 +2597,8 @@ const inflate = (u8) =>
       words.includes('the largest lift 0.5 km'),
     pick
       ? `the vendored ${ACHAC_EXPECT.file.slice(0, 24)} pixel (${pick.i}, ${pick.j}) at ${pick.c.latDeg.toFixed(3)} N ${(-pick.c.lonDeg).toFixed(3)} W holds ${pick.htM.toFixed(0)} m; ` +
-        `a ${(pick.h0 / 1000).toFixed(2)}-km core placed ${(pick.d / 1000).toFixed(2)} km toward GOES-West (${g.lon0Deg} E) looks up its top ${(sA.shiftM / 1000).toFixed(2)} km away from it at ${vzLaw.toFixed(2)}° zenith (the ellipsoid's own ${pick.vz.toFixed(2)}°) and lands on the pixel - lifted 500 m to ${sA.km.toFixed(3)} km; ` +
-        `the wrong way would land on a ${pick.wHt.toFixed(0)}-m pixel; parallax off at the centre lifts an 8-km core by ${(rB.storms[0].liftM / 1000).toFixed(3)} km; a ${C.km.toFixed(2)}-km core keeps its own top; a flagged centre and a point at 10 N are named; the words: "${words.slice(0, 150)}..."`
+          `a ${(pick.h0 / 1000).toFixed(2)}-km core placed ${(pick.d / 1000).toFixed(2)} km toward GOES-West (${g.lon0Deg} E) looks up its top ${(sA.shiftM / 1000).toFixed(2)} km away from it at ${vzLaw.toFixed(2)}° zenith (the ellipsoid's own ${pick.vz.toFixed(2)}°) and lands on the pixel - lifted 500 m to ${sA.km.toFixed(3)} km; ` +
+          `the wrong way would land on a ${pick.wHt.toFixed(0)}-m pixel; parallax off at the centre lifts an 8-km core by ${(rB.storms[0].liftM / 1000).toFixed(3)} km; a ${C.km.toFixed(2)}-km core keeps its own top; a flagged centre and a point at 10 N are named; the words: "${words.slice(0, 150)}..."`
       : 'no pixel in the fixture met the search (a good 10-km top with a good 5 x 5 neighbourhood and a differing pixel two shifts back)'
   );
 }

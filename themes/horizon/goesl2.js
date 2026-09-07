@@ -517,7 +517,7 @@ const towerBearingDeg = (lat1, lon1, lat2, lon2) => {
   const x =
     Math.cos(lat1 * RAD) * Math.sin(lat2 * RAD) -
     Math.sin(lat1 * RAD) * Math.cos(lat2 * RAD) * Math.cos(dl);
-  return ((Math.atan2(y, x) / RAD) + 360) % 360;
+  return (Math.atan2(y, x) / RAD + 360) % 360;
 };
 /** The storms (echoTopCensus's {lat, lon, km, ...}) with each cell's
  * top lifted to the satellite's cloud-top height at its own
@@ -608,8 +608,10 @@ export function towerTopsFromOrbit(
     } else if (p.reason === 'outside the window') sum.outside++;
     else if (p.reason === 'flagged') sum.flagged++;
     else sum.noRetrieval++;
-    if (sum.shiftMinM === null || p.shiftM < sum.shiftMinM) sum.shiftMinM = p.shiftM;
-    if (sum.shiftMaxM === null || p.shiftM > sum.shiftMaxM) sum.shiftMaxM = p.shiftM;
+    if (sum.shiftMinM === null || p.shiftM < sum.shiftMinM)
+      sum.shiftMinM = p.shiftM;
+    if (sum.shiftMaxM === null || p.shiftM > sum.shiftMaxM)
+      sum.shiftMaxM = p.shiftM;
     if (sum.viewZenithDeg === null) sum.viewZenithDeg = vz;
     out.push({
       ...s,
