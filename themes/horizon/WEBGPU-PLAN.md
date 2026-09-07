@@ -10414,8 +10414,30 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   window as live: no sheets, no bands, no tops, where the 10-km window
   should have stood - goesL2HeightLive now counts a window live only
   with good pixels, and the ACHA line says when the 2-km window is
-  empty. The live measurement of the product's temperatures in the
-  sheets waits for cloud over a window (Seattle's, next).
+  empty. MEASURED in the page (Seattle, 47.61 N 122.33 W, 02:45
+  local, the 09:36Z windows through the local daemon, 1,631 sheets of
+  2.3 x 2.8 km at 57 deg zenith, tops 6.5-10.7 km): "the tops'
+  temperatures: 1584 from the product's own cloud top temperature
+  (ABI-L2-ACHTF, the retrieval's T_c at each sheet's pixel), 47 from
+  the column; the column against the product's top temperature where
+  both stand: +1.5 K at the median (|dT| 4.6 K, tenth 18.5) over
+  1584; where both stand, 2 mu tau_IR against the product's tau: 0.83
+  over 1627 ...; each sheet's opacity along the observer's own line
+  through it (the path 7.30 times the vertical at the median, 15.3 at
+  most)" - the satellite's legacy column reads the retrieved tops to
+  1.5 K at the median and 4.6 K in magnitude (the retrieval's own NWP
+  profile against NOAA's legacy sounding: two profiles of one
+  atmosphere), the tenth 18.5 K where a sheet's height and the
+  column's lapse disagree most; the 47 column sheets are the pixels
+  whose temperature the product flagged; the frame at 2:45 a.m. dark
+  under the deck, no page errors. STATED LIMITS: the product's T_c
+  and the column's are compared at the product's own height (the
+  height is derived from T_c by the retrieval's profile, so the
+  difference measures the two profiles, not the retrieval); the
+  full-disk temperature scan sweeps the window minutes apart from the
+  CONUS heights' (the 08:00-08:09 disk against the 08:06 scan in the
+  fixture); the sheets under the temperature's DQF 1-3 fall to the
+  column, the marginal class with the bad.
 - DONE (Sep 7, the review session's 182nd pass - THE ENTERPRISE
   HEIGHT, READ): the 181st found (OSPO's notice) that the served
   heights have been the Enterprise algorithm's since 27 March 2023,

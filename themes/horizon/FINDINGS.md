@@ -1555,7 +1555,17 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    1,934 beyond the reach), 71 the column's, an ISA column 16.7 K colder
    than the retrieved tops at their heights (`goesl2-reference` THE
    TOP'S OWN TEMPERATURE; `server-reference` the body and the
-   twenty-one asks)
+   twenty-one asks). Live at Seattle (09:36Z, 2:45 a.m., 1,631 sheets
+   at 57° zenith): 1,584 sheets took the product's own temperature and
+   47 the column's, and the satellite's legacy column read the
+   retrieved tops to +1.5 K at the median (|dT| 4.6 K, the tenth 18.5)
+   over 1,584 — two profiles of one atmosphere; the home's window that
+   night emptied across the products (every pixel "no retrieval
+   attempted") and the fresh empty 2-km window had shadowed the 10-km:
+   a window counts as live only with good pixels now. STATED: the
+   comparison is at the product's own height, so it measures the two
+   profiles, not the retrieval; the full-disk temperature sweeps the
+   window minutes apart from the CONUS heights
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the
