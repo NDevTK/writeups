@@ -26,9 +26,11 @@ import {
 import {haversineKm} from './lightning.js';
 import {
   ECHOTOP_B64,
+  KIND_EXPECT,
   MESH_B64,
   MESH_EXPECT,
   MRMS_EXPECT,
+  PRECIPFLAG_B64,
   PRECIPRATE_B64,
   RATE_EXPECT,
   RQI_B64,
@@ -43,6 +45,7 @@ import {
   rqiCensus,
   rqiWords
 } from './mrms.js';
+import {kindCensus, kindName, kindWords, MRMS_KIND_FACTS} from './mrms.js';
 
 let fail = 0;
 const check = (name, ok, detail) => {
@@ -843,6 +846,118 @@ const createInflate = () => zlib.createInflate();
       MRMS_MESH_FACTS.documentation.includes('not reachable'),
     `${Q.file.slice(0, 26)} ${qh.refTimeIso}, discipline ${qh.discipline} category ${qh.paramCategory} number ${qh.paramNumber}, template 5.${qh.drt.tmpl} at ${qh.drt.nbits} bits R ${qh.drt.R} D ${qh.drt.D}: a ${qw.box.rows} x ${qw.box.cols} window read in ${qw.rowsRead} rows; the centre ${qCentre.toFixed(1)} (Pillow ${Q.centre.value}), ${Q.samples.length} sampled counts exact, ${qc.covered} covered, histogram by tenths [${qc.hist.join(' ')}], median ${qc.medianRqi.toFixed(1)}, mean ${qc.meanRqi}, ${qc.minRqi.toFixed(1)}-${qc.maxRqi.toFixed(1)}, ${qc.belowHalf} below 0.5 (${Math.round(100 * qc.belowHalfShare)}%); ` +
       `${M.file.slice(0, 14)} ${mh.refTimeIso}, category ${mh.paramCategory} number ${mh.paramNumber} at ${mh.drt.nbits} bits: ${mc.hail} hail cells of ${mc.covered} covered (${mNoHail} without), sizes median ${mc.medianMm}, largest tenth ${mc.p90Mm}, largest ${mc.maxMm} mm at ${mc.largest.bearingDeg}° and ${mc.largest.distKm} km (a plain great-circle: ${plainBrg.toFixed(1)}°, ${plainKm.toFixed(1)} km), the nearest ${mc.cells[0].mm} mm at ${mc.cells[0].distKm} km, ${mc.cells.length} sent nearest first, 5 with a cap of 5, the observer's cell "${mc.here.code}"; the words: "${mWords.slice(0, 110)}..."`
+  );
+}
+
+// ---- THE RAIN'S KIND (185th pass) -------------------------------------
+// The vendored 8-bit PrecipFlag crop (a 51 x 51 window of the 10:20Z
+// file over western Iowa holding five kinds) through the same header
+// and window read against Pillow and numpy: the file's own facts
+// (discipline 209 category 6 number 0, template 5.41 at 8 bits, R -3
+// D 0: a count is c - 3), the sampled counts exact, the count of each
+// kind, the observer's own cell (warm stratiform rain), the
+// precipitating cells nearest first with the shafts' field names and
+// their names, capped; the words; and the facts the module claims -
+// the NMQ note's codes, the WDTD's rules, what was read and what was
+// not.
+{
+  const K = KIND_EXPECT;
+  const kb = new Uint8Array(Buffer.from(PRECIPFLAG_B64, 'base64'));
+  const kh = grib2Header(kb);
+  const kw = await grib2Window(kb, K.centre.lat, K.centre.lon, 25, {
+    createInflate
+  });
+  const gridOpt = {
+    grid: {ni: K.cols, nj: K.rows, la1: K.la1, lo1: K.lo1},
+    cellDeg: K.d
+  };
+  const kc = kindCensus(kw.values, kw.box, K.centre.lat, K.centre.lon, gridOpt);
+  const kcap = kindCensus(kw.values, kw.box, K.centre.lat, K.centre.lon, {
+    ...gridOpt,
+    cap: 7
+  });
+  const kSamples = K.samples.every(
+    ([r, c, count]) => kw.values[r * kw.box.cols + c] === count - 3
+  );
+  const kAll = Array.from(kw.values);
+  const countsOk = Object.entries(K.counts).every(
+    ([code, m]) => kc.counts[code] === m && kAll.filter((v) => v === +code).length === m
+  );
+  const codesSeen = Object.keys(kc.counts).map(Number).sort((a, b) => a - b);
+  const kWords = kindWords(kc, {refTimeIso: kh.refTimeIso, halfKm: 25});
+  // the hail cells sit beyond the 400 nearest (measured: none within
+  // them), so they are counted in an uncapped census
+  const kAllCells = kindCensus(kw.values, kw.box, K.centre.lat, K.centre.lon, {
+    ...gridOpt,
+    cap: 1e9
+  });
+  const hailCells = kAllCells.cells.filter((c) => c.kind === 7);
+  check(
+    "THE RAIN'S KIND: the vendored 8-bit PrecipFlag crop through the PNG-packed window read agrees with Pillow to the cell, the census counts every kind, names the observer's own and lists the precipitating cells nearest first, and the module's codes are the NMQ note's",
+    kh.refTimeIso === K.refTime &&
+      kh.discipline === K.discipline &&
+      kh.paramCategory === K.category &&
+      kh.paramNumber === K.number &&
+      kh.drt.tmpl === 41 &&
+      kh.drt.nbits === 8 &&
+      kh.drt.R === K.drt.R &&
+      kh.drt.D === K.drt.D &&
+      kw.box.rows === K.rows &&
+      kw.box.cols === K.cols &&
+      kw.values[25 * kw.box.cols + 25] === K.centre.value &&
+      kSamples &&
+      kc.n === K.rows * K.cols &&
+      kc.covered === K.covered &&
+      kc.precip === K.precip &&
+      kc.cellsTotal === K.precip &&
+      countsOk &&
+      codesSeen.join(',') === Object.keys(K.counts).map(Number).sort((a, b) => a - b).join(',') &&
+      kc.shares.length === 5 &&
+      kc.shares[0].kind === 1 &&
+      kc.shares[0].n === K.counts['1'] &&
+      kc.shares.every((s, i) => i === 0 || s.n <= kc.shares[i - 1].n) &&
+      kc.here.code === 'kind' &&
+      kc.here.kind === K.here.kind &&
+      kc.here.name === 'warm stratiform rain' &&
+      kc.cells.length === Math.min(400, K.precip) &&
+      kc.cells[0].distKm === 0 &&
+      kc.cells[0].kind === K.nearest.kind &&
+      kc.cells.every(
+        (c, k) => k === 0 || c.distKm >= kc.cells[k - 1].distKm
+      ) &&
+      kc.cells.every(
+        (c) =>
+          c.kind > 0 &&
+          c.name === kindName(c.kind) &&
+          c.latDeg === c.lat &&
+          c.lonDeg === c.lon
+      ) &&
+      hailCells.length === K.counts['7'] &&
+      hailCells.every((c) => c.name === 'hail') &&
+      kAllCells.cells.length === K.precip &&
+      kcap.cells.length === 7 &&
+      kcap.cellsTotal === K.precip &&
+      kWords.includes('precipitating cells of') &&
+      kWords.includes('warm stratiform rain') &&
+      kWords.includes('overhead warm stratiform rain') &&
+      kindName(3) === 'snow' &&
+      kindName(96) === 'tropical/convective rain mix' &&
+      kindName(-3) === 'no coverage' &&
+      kindName(42) === 'code 42' &&
+      MRMS_KIND_FACTS.discipline === 209 &&
+      MRMS_KIND_FACTS.category === 6 &&
+      MRMS_KIND_FACTS.number === 0 &&
+      MRMS_KIND_FACTS.drt.R === -3 &&
+      MRMS_KIND_FACTS.drt.D === 0 &&
+      MRMS_KIND_FACTS.drt.nbits === 8 &&
+      MRMS_KIND_FACTS.codes.snow === 3 &&
+      MRMS_KIND_FACTS.codes.snowBeamHigh === 4 &&
+      MRMS_KIND_FACTS.codes.hail === 7 &&
+      MRMS_KIND_FACTS.codes.tropicalConvective === 96 &&
+      MRMS_KIND_FACTS.law.hail.includes('0 mm') &&
+      MRMS_KIND_FACTS.law.detect.includes('5 dBZ') &&
+      MRMS_KIND_FACTS.documentation.includes('not reachable'),
+    `${K.file.slice(0, 15)} ${kh.refTimeIso}, discipline ${kh.discipline} category ${kh.paramCategory} number ${kh.paramNumber}, template 5.${kh.drt.tmpl} at ${kh.drt.nbits} bits R ${kh.drt.R} D ${kh.drt.D}: a ${kw.box.rows} x ${kw.box.cols} window read in ${kw.rowsRead} rows; ${K.samples.length} sampled counts exact; ${kc.precip} precipitating cells of ${kc.covered} covered: ${kc.shares.map((s) => `${s.name} ${s.n}`).join(', ')} (numpy the same), the observer's cell ${kc.here.name}, ${kc.cells.length} cells sent nearest first (the ${hailCells.length} hail cells beyond them, in the uncapped ${kAllCells.cells.length}), 7 with a cap of 7; the words: "${kWords.slice(0, 120)}..."`
   );
 }
 

@@ -121,9 +121,12 @@ import {
 import {
   echoTopCensus,
   echoTopWords,
+  kindCensus,
+  kindWords,
   meshCensus,
   meshWords,
   MRMS_FACTS,
+  MRMS_KIND_FACTS,
   MRMS_MESH_FACTS,
   MRMS_RATE_FACTS,
   MRMS_RQI_FACTS,
@@ -2339,6 +2342,12 @@ function main() {
   const MRMS_MESH_URL =
     env.MRMS_MESH_URL ??
     'https://mrms.ncep.noaa.gov/2D/MESH/MRMS_MESH.latest.grib2.gz';
+  // THE RAIN'S KIND (185th): NCEP's PrecipFlag (212 kB gzipped
+  // measured, 8-bit) - the surface precipitation type of each cell -
+  // held as the fifth file on the same law.
+  const MRMS_KIND_URL =
+    env.MRMS_KIND_URL ??
+    'https://mrms.ncep.noaa.gov/2D/PrecipFlag/MRMS_PrecipFlag.latest.grib2.gz';
   const MRMS_HALF_CELLS = 50;
   const MRMS_RETRY_MS = 15e3;
   // One held file per product, refreshed on the product's own cadence.
@@ -2503,6 +2512,17 @@ function main() {
       return {
         census,
         words: meshWords(census, {refTimeIso: refTime, halfKm: MRMS_HALF_CELLS})
+      };
+    });
+  // THE RAIN'S KIND (185th): each cell's precipitation type, the
+  // precipitating cells nearest first, capped as the rate's
+  const mrmsKind = mrmsFeed(MRMS_KIND_URL, MRMS_KIND_FACTS);
+  const fetchMrmsKind = (lat, lon) =>
+    mrmsKind.windowAt(lat, lon, (values, box, la, lo, refTime) => {
+      const census = kindCensus(values, box, la, lo);
+      return {
+        census,
+        words: kindWords(census, {refTimeIso: refTime, halfKm: MRMS_HALF_CELLS})
       };
     });
   const glmHeld = new Map(); // bucket -> {at, files: [...], error}
@@ -3804,6 +3824,26 @@ function main() {
       return json(200, body, {
         'cache-control': 'public, max-age=60',
         'x-mrms-source': 'NCEP MRMS MESH (mrms.ncep.noaa.gov/2D)'
+      });
+    }
+
+    if (url.pathname === '/mrmskind') {
+      // THE RAIN'S KIND (185th): the surface precipitation type
+      // within +-50 km of the point from NCEP's latest 2-minute
+      // PrecipFlag file - the counts by kind, the observer's own
+      // cell, the precipitating cells nearest first, capped. 200 with
+      // covered false is a real answer; 502 when the file could not
+      // be read.
+      const body = await fetchMrmsKind(lat, lon);
+      if (!body)
+        return json(502, {
+          census: null,
+          upstream: 'unavailable',
+          error: mrmsKind.held.error
+        });
+      return json(200, body, {
+        'cache-control': 'public, max-age=60',
+        'x-mrms-source': 'NCEP MRMS PrecipFlag (mrms.ncep.noaa.gov/2D)'
       });
     }
 

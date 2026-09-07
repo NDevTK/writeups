@@ -231,6 +231,32 @@ are gated by `../server-reference.mjs` — the `server` set in
   hail is unmeasured). The page draws the rain curtains standing in
   hail cells denser and brighter (a display rule, stated) and names
   the largest.
+- `GET /mrmskind?lat&lon` — the rain's kind (185th pass): NCEP's MRMS
+  PrecipFlag - the surface precipitation type of each cell, the kind
+  that picks its Z-R relation - within ±50 km of the point, the fifth
+  held file (`mrms.ncep.noaa.gov/2D/PrecipFlag/`, 212 kB gzipped,
+  8-bit PNG; R −3, D 0, so a count is c − 3). The codes are the NMQ
+  precipitation products note's (Kirstetter, NASA Wallops PRF, 2017,
+  read): 0 none, 1 warm stratiform, 2 warm stratiform with the beam in
+  or above the melting layer, 3 snow, 4 snow with the beam 1.5 km or
+  more above the ground, 6 convective, 7 hail, 10 cool stratiform, 91
+  tropical/stratiform, 96 tropical/convective; the rules are the
+  WDTD's Surface Precipitation Type page's (read): a cell precipitates
+  at 5 dBZ of seamless hybrid-scan reflectivity, snow by surface and
+  wet-bulb temperature thresholds, hail where MESH exceeds 0 mm,
+  convective against stratiform by the freezing level, VIL and the
+  reflectivity at −10 °C, warm against cool stratiform at 5 °C, the
+  tropical mixes by the tropical delineation - and the type carries
+  the errors of what it is built from. The body carries the window's
+  census (the cells covered and precipitating, the count and share of
+  each kind, the observer's own cell's kind) and the precipitating
+  cells nearest first, 400 at most, each with its kind and name and the
+  rain-shaft field names, so the page joins them to the rate's cells by
+  name: a cell the radar calls snow hangs a snow curtain (Rasmussen et
+  al. 1999's extinction for its liquid-equivalent rate, dry or wet by
+  the station's temperature at the paper's −1 °C split) instead of
+  Atlas's rain curtain, and the other kinds are said on the line. The
+  NSSL GRIB2 tables remain unreachable from the build sandbox.
 - `GET /goesl2?lat&lon` — NOAA's own operational cloud products
   around the point (148th pass): the clear-sky mask
   (`ABI-L2-ACMC`: BCM, ACM, cloud probability, DQF on the 2-km

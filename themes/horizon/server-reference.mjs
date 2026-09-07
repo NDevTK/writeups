@@ -2325,14 +2325,23 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
     (m) => m[0]
   );
   check(
-    "THE DOUBT'S AND THE HAIL'S ROUTES: /mrmsrqi and /mrmshail are bound to mrms.js's census and words as the third and fourth held MRMS files on the one feed law, their law and limits ride with the bodies, a 502 carries the file's error, and the 8-bit reader ships",
+    "THE DOUBT'S, THE HAIL'S AND THE KIND'S ROUTES: /mrmsrqi, /mrmshail and /mrmskind are bound to mrms.js's census and words as the third, fourth and fifth held MRMS files on the one feed law, their law and limits ride with the bodies, a 502 carries the file's error, and the 8-bit reader ships",
     srcM.includes("url.pathname === '/mrmsrqi'") &&
       srcM.includes("url.pathname === '/mrmshail'") &&
+      srcM.includes("url.pathname === '/mrmskind'") &&
       srcM.includes('const mrmsRqi = mrmsFeed(MRMS_RQI_URL, MRMS_RQI_FACTS)') &&
       srcM.includes(
         'const mrmsMesh = mrmsFeed(MRMS_MESH_URL, MRMS_MESH_FACTS)'
       ) &&
-      feeds === 4 &&
+      srcM.includes('const mrmsKind = mrmsFeed(MRMS_KIND_URL, MRMS_KIND_FACTS)') &&
+      srcM.includes('env.MRMS_KIND_URL ??') &&
+      srcM.includes('2D/PrecipFlag/MRMS_PrecipFlag.latest.grib2.gz') &&
+      srcM.includes('const census = kindCensus(values, box, la, lo)') &&
+      srcM.includes('words: kindWords(census,') &&
+      srcM.includes(
+        "'x-mrms-source': 'NCEP MRMS PrecipFlag (mrms.ncep.noaa.gov/2D)'"
+      ) &&
+      feeds === 5 &&
       srcM.includes('env.MRMS_RQI_URL ??') &&
       srcM.includes('env.MRMS_MESH_URL ??') &&
       srcM.includes(
@@ -2351,19 +2360,19 @@ const FRAME = (mmsi, lat, lon, over = {}) => ({
       srcM.includes(
         "'x-mrms-source': 'NCEP MRMS MESH (mrms.ncep.noaa.gov/2D)'"
       ) &&
-      errors.length === 4 &&
-      new Set(errors).size === 4 &&
+      errors.length === 5 &&
+      new Set(errors).size === 5 &&
       srcM.includes('log(`mrms: ${facts.product} failed: ${e.message}`)') &&
       // a truncated read (NCEP rewriting "latest") is retried after 15
       // s, not after a whole 2-min cadence
       srcM.includes('const MRMS_RETRY_MS = 15e3') &&
       srcM.includes('held.at = Date.now() - refreshMs + MRMS_RETRY_MS') &&
-      /import \{[^}]*\bmeshCensus\b[^}]*\bmeshWords\b[^}]*\bMRMS_MESH_FACTS\b[^}]*\bMRMS_RQI_FACTS\b[^}]*\brqiCensus\b[^}]*\brqiWords\b[^}]*\} from '\.\.\/\.\.\/mrms\.js'/s.test(
+      /import \{[^}]*\bkindCensus\b[^}]*\bkindWords\b[^}]*\bmeshCensus\b[^}]*\bmeshWords\b[^}]*\bMRMS_KIND_FACTS\b[^}]*\bMRMS_MESH_FACTS\b[^}]*\bMRMS_RQI_FACTS\b[^}]*\brqiCensus\b[^}]*\brqiWords\b[^}]*\} from '\.\.\/\.\.\/mrms\.js'/s.test(
         srcM
       ) &&
       instM.includes('install -m 644 ../grib2.js /opt/horizon-live/grib2.js') &&
       instM.includes('install -m 644 ../mrms.js /opt/horizon-live/mrms.js'),
-    `${feeds} feeds through mrmsFeed (the echo top, the rate, the quality index, the hail size); /mrmsrqi answers rqiCensus + rqiWords with the law's words, /mrmshail meshCensus + meshWords with the stated limits; each route's 502 carries its held file's error (${errors.length} routes), a failed fetch is logged and tried again after 15 s (a truncated "latest" mid-rewrite, measured); MRMS_RQI_URL and MRMS_MESH_URL override the NCEP files; install.sh ships grib2.js and mrms.js`
+    `${feeds} feeds through mrmsFeed (the echo top, the rate, the quality index, the hail size, the precipitation type); /mrmsrqi answers rqiCensus + rqiWords with the law's words, /mrmshail meshCensus + meshWords with the stated limits, /mrmskind kindCensus + kindWords with the NMQ note's codes; each route's 502 carries its held file's error (${errors.length} routes), a failed fetch is logged and tried again after 15 s (a truncated "latest" mid-rewrite, measured); MRMS_RQI_URL, MRMS_MESH_URL and MRMS_KIND_URL override the NCEP files; install.sh ships grib2.js and mrms.js`
   );
 }
 

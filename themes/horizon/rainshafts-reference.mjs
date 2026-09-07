@@ -6,6 +6,7 @@
 import {
   COVER_CAP,
   coverOfRate,
+  isSnowKind,
   mergeCoverFields,
   rainCoverField,
   RAIN_EXTINCTION,
@@ -14,7 +15,11 @@ import {
   rainShaftsNear,
   rainShaftsSummary,
   rainVisibilityKm,
-  shaftOpacity
+  shaftOpacity,
+  SNOW_EXTINCTION,
+  snowExtinctionPerKm,
+  snowOpticalDepth,
+  snowVisibilityKm
 } from './rainshafts.js';
 import {rangeBearing} from './wildfire.js';
 
@@ -117,6 +122,108 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
       `the downpour 30 km north-east (${shafts[1].distKm.toFixed(1)} km at ${shafts[1].bearingDeg.toFixed(0)}°, ${shafts[1].mmh} mm/h, opacity ${shafts[1].opacity.toFixed(2)}), ` +
       `the degraded 3 mm/h 40 km north kept and flagged; the 0.1 mm/h drizzle under the ${0.2} mm/h floor and the 20 mm/h shower 150 km east past the 100-km reach left out; ` +
       `a cap of 2 keeps the two nearest; the summary names ${sum.n}, the nearest ${sum.nearestKm.toFixed(0)} km, the heaviest ${sum.heaviestMmH} mm/h at ${sum.heaviestKm.toFixed(0)} km`
+  );
+}
+
+{
+  // THE SNOW'S CURTAIN (185th): Rasmussen et al. 1999's Eq. 13 by hand
+  // - S = 1.3 C3 Vt / Vis in cgs, so sigma = 3 S / (C3 Vt) with
+  // Koschmieder's 3.912 - at 2 mm/h liquid equivalent: dry aggregates
+  // (C3 0.017 g/cm^2, Vt 100 cm/s) and wet or rimed (0.072, 200); the
+  // wet/dry visibility ratio 8.47 (the paper: "over a factor of 8");
+  // the equation's 0.40 and 3.37 km against the text's Fig. 10
+  // readings 0.3 and 2.6 (a log-log plot read by eye, within a factor
+  // 1.35); the visibility Eq. 13 turned round; the NWS intensity
+  // thresholds; the snow kinds; and the shafts: a snow cell and a rain
+  // cell at the same rate take their own laws, dry or wet by the
+  // caller, a cell without a kind Atlas's rain, the summary counting
+  const S2 = 2 / 10 / 3600; // 2 mm/h in cm/s
+  const sigDry = ((3 * S2) / (0.017 * 100)) * 1e5; // km^-1
+  const sigWet = ((3 * S2) / (0.072 * 200)) * 1e5;
+  const visDry = 3.912 / sigDry;
+  const visWet = 3.912 / sigWet;
+  const visEq13Dry = ((1.304 * 0.017 * 100) / S2) * 1e-5; // Vis = 1.304 C3 Vt / S, cm -> km
+  const home = [40.0, -105.25];
+  const at = (km, brg) => {
+    const dLat = (km * Math.cos((brg * Math.PI) / 180)) / 111.2;
+    const dLon =
+      (km * Math.sin((brg * Math.PI) / 180)) /
+      (111.2 * Math.cos((home[0] * Math.PI) / 180));
+    return {latDeg: home[0] + dLat, lonDeg: home[1] + dLon};
+  };
+  const list = [
+    {...at(10, 90), mmh: 2, kind: 3}, // snow
+    {...at(10, 270), mmh: 2, kind: 1}, // warm stratiform rain
+    {...at(20, 0), mmh: 2}, // no kind: rain
+    {...at(20, 180), mmh: 2, kind: 4} // snow, the beam high
+  ];
+  const dry = rainShaftsNear(list, home[0], home[1], {maxKm: 100, cap: 10});
+  const wet = rainShaftsNear(list, home[0], home[1], {
+    maxKm: 100,
+    cap: 10,
+    wetSnow: true
+  });
+  const snowD = dry.find((s) => s.kind === 3);
+  const rainD = dry.find((s) => s.kind === 1);
+  const noneD = dry.find((s) => s.kind === null);
+  const snowW = wet.find((s) => s.kind === 3);
+  const highW = wet.find((s) => s.kind === 4);
+  const sumD = rainShaftsSummary(dry);
+  check(
+    "THE SNOW'S CURTAIN: Rasmussen 1999's Eq. 13 gives the snow's extinction from its liquid-equivalent rate, dry or wet aggregates, a factor 8.5 apart; a cell the radar calls snow takes it and a rain cell keeps Atlas's",
+    SNOW_EXTINCTION.eq === 13 &&
+      SNOW_EXTINCTION.koschmieder === 3.912 &&
+      SNOW_EXTINCTION.dry.c3 === 0.017 &&
+      SNOW_EXTINCTION.dry.vtCmS === 100 &&
+      SNOW_EXTINCTION.wet.c3 === 0.072 &&
+      SNOW_EXTINCTION.wet.vtCmS === 200 &&
+      SNOW_EXTINCTION.wetAtOrAboveC === -1 &&
+      near(snowExtinctionPerKm(2), sigDry, 1e-9) &&
+      near(snowExtinctionPerKm(2, {wet: true}), sigWet, 1e-9) &&
+      snowExtinctionPerKm(0) === 0 &&
+      snowExtinctionPerKm(-1) === 0 &&
+      near(snowVisibilityKm(2), visDry, 1e-9) &&
+      near(snowVisibilityKm(2, {wet: true}), visWet, 1e-9) &&
+      near(snowVisibilityKm(2), visEq13Dry, 1e-6) &&
+      near(visWet / visDry, (0.072 * 200) / (0.017 * 100), 1e-9) &&
+      visDry > 0.39 &&
+      visDry < 0.41 &&
+      visWet > 3.3 &&
+      visWet < 3.4 &&
+      visDry / SNOW_EXTINCTION.fig10Km.dry < 1.35 &&
+      visWet / SNOW_EXTINCTION.fig10Km.wet < 1.35 &&
+      snowVisibilityKm(0) === Infinity &&
+      near(snowOpticalDepth(2), 2 * sigDry, 1e-9) &&
+      near(snowOpticalDepth(2, {wet: true}, 1), sigWet, 1e-9) &&
+      // dry snow at 2 mm/h through the pixel's 2 km is opaque; the
+      // same liquid rate as rain (Atlas) hides about half
+      1 - Math.exp(-snowOpticalDepth(2)) > 0.999 &&
+      shaftOpacity(2) < 0.6 &&
+      SNOW_EXTINCTION.nwsIntensity.heavyKmMax === 0.402 &&
+      SNOW_EXTINCTION.nwsIntensity.moderateKmMax === 1.0 &&
+      isSnowKind(3) &&
+      isSnowKind(4) &&
+      !isSnowKind(1) &&
+      !isSnowKind(7) &&
+      !isSnowKind(undefined) &&
+      dry.length === 4 &&
+      snowD.law === 'snow-dry' &&
+      near(snowD.tau, snowOpticalDepth(2), 1e-12) &&
+      rainD.law === 'rain' &&
+      near(rainD.tau, rainOpticalDepth(2), 1e-12) &&
+      noneD.law === 'rain' &&
+      near(noneD.tau, rainOpticalDepth(2), 1e-12) &&
+      snowW.law === 'snow-wet' &&
+      near(snowW.tau, snowOpticalDepth(2, {wet: true}), 1e-12) &&
+      highW.law === 'snow-wet' &&
+      snowD.tau > 10 * rainD.tau &&
+      snowW.tau > rainD.tau &&
+      sumD.snow === 2 &&
+      sumD.rain === 2 &&
+      sumD.typed === 3,
+    `sigma = 3 S / (C3 Vt) (${SNOW_EXTINCTION.source}): at 2 mm/h dry ${sigDry.toFixed(2)} km^-1 (visibility ${visDry.toFixed(3)} km; Fig. 10 read ${SNOW_EXTINCTION.fig10Km.dry}), wet or rimed ${sigWet.toFixed(2)} (${visWet.toFixed(2)} km; Fig. 10 ${SNOW_EXTINCTION.fig10Km.wet}), the ratio ${(visWet / visDry).toFixed(2)}; ` +
+      `through the pixel's 2 km dry snow at 2 mm/h hides ${(100 * (1 - Math.exp(-snowOpticalDepth(2)))).toFixed(1)}% where Atlas's rain hides ${(100 * shaftOpacity(2)).toFixed(0)}%; ` +
+      `the shafts: the snow cell tau ${snowD.tau.toFixed(1)} (${snowD.law}), the rain cell ${rainD.tau.toFixed(2)}, the kind-less cell Atlas's; wet: the snow cell ${snowW.tau.toFixed(2)} (${snowW.law}); the summary ${sumD.snow} snow, ${sumD.rain} rain, ${sumD.typed} typed`
   );
 }
 

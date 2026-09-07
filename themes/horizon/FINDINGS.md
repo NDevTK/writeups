@@ -10,7 +10,7 @@ cd themes/horizon/harness && bash validate.sh
 ```
 
 At the time of writing the gate holds **148 CPU reference files printing
-1209 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
+1211 landmark lines, plus 9 GPU-vs-reference probes** — every landmark
 either a printed number from a primary read in full, an internal identity,
 a cross-module closure, or a recorded observation reproduced. The narrative
 history lives in `WEBGPU-PLAN.md` (one dated entry per pass); this register
@@ -492,7 +492,7 @@ reference`: THE MEASURED STRESS, THE WAVE BRANCH TRIED;
 
 ## 4. The verified corpus
 
-- **149 reference files, 1209 landmark lines, 9 GPU probes** (live gate
+- **149 reference files, 1211 landmark lines, 9 GPU probes** (live gate
   count at the time of writing; `validate.sh` prints the current totals).
 - Every module header carries its provenance: the primary (with the
   access route when non-obvious), what was vendored verbatim, and what
@@ -1603,7 +1603,43 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    beam's, not the retrieval's; an 8-bit MESH count at the file's
    scaling reaches 22.5 mm and whether the packer rescales for larger
    hail is unmeasured; a satellite-sourced curtain (2-km pixels) never
-   matches a 1-km hail cell
+   matches a 1-km hail cell. Pass 185 brings the rain's kind: NCEP's
+   MRMS PrecipFlag (212 kB, 8-bit; a count is c − 3) as the fifth held
+   file — the surface precipitation type of every cell, the kind that
+   picks its Z-R relation (Zhang et al. 2016, read in full), coded by
+   the NMQ note (Kirstetter 2017, NASA Wallops PRF, read: 1 warm
+   stratiform, 3 snow, 6 convective, 7 hail, 10 cool stratiform, 91/96
+   the tropical mixes, 2/4 the beam-high variants) and ruled by the
+   WDTD's SPT page (read: 5 dBZ to precipitate, snow by surface and
+   wet-bulb thresholds, hail where MESH exceeds 0, convective against
+   stratiform by the freezing level, VIL and the −10 °C reflectivity).
+   The precipitating cells come nearest first with the rate's own
+   field names and the page joins them by cell name, so each rain
+   curtain carries its kind: a cell the radar calls snow hangs a snow
+   curtain by Rasmussen, Vivekanandan, Cole, Myers and Masters 1999
+   (J. Appl. Meteor. 38, 1542–1563; NCAR's OpenSky copy read in full)
+   — their Eq. 13, S = 1.3 C₃ Vₜ / Vis for aggregates whose density
+   falls as 1/D, so σ = 3 S / (C₃ Vₜ): dry aggregates (C₃ 0.017
+   g cm⁻², Vₜ 1 m/s) or wet and rimed (0.072, 2 m/s), a factor 8.5
+   apart in visibility at one liquid rate, split at the paper's −1 °C
+   by the station's temperature — instead of Atlas's rain, and the
+   other kinds are said on the line. Dry snow at 2 mm/h through the
+   pixel's 2 km is opaque where Atlas's rain hides half; the paper's
+   own caution stands on the line (a factor 3 to 10 of scatter by
+   crystal type, riming, aggregation and wetness; the night eye
+   seeing twice as far). Gated on Eq. 13 by hand (0.399 km dry and
+   3.38 km wet at 2 mm/h against the text's Fig. 10 readings 0.3 and
+   2.6, within a factor 1.35) and on a vendored 8-bit crop over
+   western Iowa holding five kinds against numpy (`rainshafts-reference`
+   THE SNOW'S CURTAIN; `mrms-reference` THE RAIN'S KIND;
+   `server-reference` the five feeds). Live in the daemon (10:36Z): a
+   Saskatchewan storm core 56% warm stratiform, 32% convective, 12%
+   hail with convective rain overhead; western Iowa 86% warm
+   stratiform with the tropical mixes; the home dry. STATED: no snow
+   stood anywhere in the September file (one cell of 24.5 million),
+   so the snow curtain is gated, not yet seen live; the kinds carry
+   the errors of the model temperature, the MESH and the separation
+   they are built from
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

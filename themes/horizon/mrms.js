@@ -507,6 +507,203 @@ export function meshWords(c, {refTimeIso = null, halfKm = null} = {}) {
     ` · ${here}`
   );
 }
+// ---- THE RAIN'S KIND (185th pass) -------------------------------------
+// NCEP's PrecipFlag - the surface precipitation type the mosaic gives
+// each cell, the kind that picks its Z-R relation (Zhang et al. 2016,
+// read in full: warm and cool stratiform, convective, tropical
+// stratiform and convective mixes, hail, snow, each with its own
+// relation). The WDTD's Surface Precipitation Type page (read): a
+// cell precipitates where the seamless hybrid-scan reflectivity is 5
+// dBZ or more; snow by thresholds of the surface and wet-bulb
+// temperatures; hail where MESH exceeds 0 mm; convective against
+// stratiform by the freezing level, the vertically integrated liquid
+// and the reflectivity at -10 C; warm against cool stratiform by a
+// 5 C surface temperature; the tropical mixes by the tropical rain
+// delineation - and the type "is subject to the errors" of what it
+// is built from. The numeric codes are the NMQ precipitation
+// products note's (Kirstetter, NASA Wallops PRF, May 2017, read): -1
+// missing, 0 no precipitation, 1 warm stratiform, 2 warm stratiform
+// with the radar in or above the melting layer, 3 snow, 4 snow with
+// the radar 1.5 km or higher above the ground, 6 convective, 7 hail,
+// 10 cool stratiform, 91 tropical/stratiform, 96 tropical/convective;
+// the same note gives the snow rule (T below 2 C and Tw below 0 C, a
+// fixed Z = 75 S^2 - Zhang 2016's 0.1155 Z^0.5 turned round). The
+// file's own facts (measured 2026-09-07 10:20Z): discipline 209
+// category 6 number 0, template 5.41 at 8 bits, R -3 E 0 D 0 - a
+// count c is c - 3; the 24.5 million cells held -3 (8.26 million),
+// 0 (15.3 million), 1 (885,768), 3 (one cell), 6 (41,160), 7
+// (6,872), 10 (2,481), 91 (4,945) and 96 (1,241) - a September file:
+// no snow to speak of. The NSSL GRIB2 tables stay unreachable.
+export const MRMS_KIND_FACTS = {
+  source:
+    'NCEP MRMS (mrms.ncep.noaa.gov/2D/PrecipFlag/MRMS_PrecipFlag.latest.grib2.gz)',
+  product: 'PrecipFlag',
+  meaning:
+    "the surface precipitation type the radar mosaic assigns each cell - the kind that picks its Z-R relation (Zhang et al. 2016; the WDTD's SPT page)",
+  cadenceS: 120,
+  cellDeg: 0.01,
+  cellKm: 1,
+  discipline: 209,
+  category: 6,
+  number: 0,
+  drt: {
+    tmpl: 41,
+    R: -3,
+    E: 0,
+    D: 0,
+    nbits: 8,
+    words: 'count - 3, an 8-bit count; the scaling is read from each file'
+  },
+  codes: {
+    noCoverage: -3,
+    none: 0,
+    warmStratiform: 1,
+    warmStratiformBeamHigh: 2,
+    snow: 3,
+    snowBeamHigh: 4,
+    convective: 6,
+    hail: 7,
+    coolStratiform: 10,
+    tropicalStratiform: 91,
+    tropicalConvective: 96
+  },
+  names: {
+    '-3': 'no coverage',
+    0: 'no precipitation',
+    1: 'warm stratiform rain',
+    2: 'warm stratiform rain, the beam in or above the melting layer',
+    3: 'snow',
+    4: 'snow, the beam 1.5 km or more above the ground',
+    6: 'convective rain',
+    7: 'hail',
+    10: 'cool stratiform rain',
+    91: 'tropical/stratiform rain mix',
+    96: 'tropical/convective rain mix'
+  },
+  law: {
+    detect:
+      'a cell precipitates where the seamless hybrid-scan reflectivity is 5 dBZ or more (no cut-off in the cold season)',
+    snow: 'snow by thresholds of the surface temperature and the wet-bulb temperature (the NMQ note: T below 2 C and Tw below 0 C; a fixed Z = 75 S^2)',
+    hail: 'hail where the maximum estimated size of hail exceeds 0 mm',
+    convective:
+      'convective against stratiform by the freezing-level height, the vertically integrated liquid and the reflectivity at -10 C; warm against cool stratiform by a surface temperature of 5 C; the tropical mixes by the tropical rain delineation',
+    caveat:
+      "the type carries the errors of the model temperature, the MESH and the separation it is built from (the WDTD); v12.2 mitigated false convective calls in strong bright bands (the NWS IDP note)"
+  },
+  documentation:
+    "Zhang et al. 2016 (BAMS 97, 621-638) read in full - the seven types and their Z-R relations; the WDTD's SPT page read; the code table from the NMQ precipitation products note (Kirstetter 2017, NASA Wallops PRF) read; the NSSL GRIB2 tables not reachable from the build sandbox"
+};
+// what the daemon sends of a kind window: the precipitating cells
+// nearest first, capped as the rate's (the shafts join by cell name)
+export const MRMS_KIND_CAP = 400;
+/** The name of a precipitation type code. */
+export function kindName(code) {
+  return MRMS_KIND_FACTS.names[String(code)] ?? `code ${code}`;
+}
+/** The kind window's census: the cells covered and precipitating, the
+ * count of each code, the observer's own cell's kind, and the
+ * precipitating cells nearest first (each with lat/lon - as
+ * latDeg/lonDeg too - its kind and name, distance and bearing),
+ * capped. */
+export function kindCensus(
+  values,
+  box,
+  lat,
+  lon,
+  {
+    cap = MRMS_KIND_CAP,
+    grid = MRMS_FACTS.grid,
+    cellDeg = MRMS_FACTS.cellDeg
+  } = {}
+) {
+  const n = values.length;
+  let covered = 0;
+  const counts = {};
+  const cells = [];
+  for (let k = 0; k < n; k++) {
+    const v = values[k];
+    if (!(v > -3)) continue;
+    covered++;
+    const code = Math.round(v);
+    counts[code] = (counts[code] || 0) + 1;
+    if (code > 0) {
+      const j = box.j0 + Math.floor(k / box.cols);
+      const i = box.i0 + (k % box.cols);
+      cells.push({j, i, kind: code});
+    }
+  }
+  const place = (c) => {
+    const p = mrmsCellCentre(c.j, c.i, grid, cellDeg);
+    const la = +p.lat.toFixed(4);
+    const lo = +p.lon.toFixed(4);
+    return {
+      kind: c.kind,
+      name: kindName(c.kind),
+      lat: la,
+      lon: lo,
+      latDeg: la,
+      lonDeg: lo,
+      distKm: +haversineKm(lat, lon, p.lat, p.lon).toFixed(1),
+      bearingDeg: +bearingDeg(lat, lon, p.lat, p.lon).toFixed(1)
+    };
+  };
+  const placed = cells.map(place).sort((a, b) => a.distKm - b.distKm);
+  const hereK = (box.cj - box.j0) * box.cols + (box.ci - box.i0);
+  const hereV = hereK >= 0 && hereK < n ? values[hereK] : NaN;
+  const hereCode = hereV > -3 ? Math.round(hereV) : null;
+  const shares = Object.entries(counts)
+    .filter(([code]) => +code > 0)
+    .map(([code, m]) => ({kind: +code, name: kindName(+code), n: m}))
+    .sort((a, b) => b.n - a.n);
+  return {
+    n,
+    covered,
+    coverage: n ? covered / n : 0,
+    precip: cells.length,
+    counts,
+    shares,
+    here: {
+      kind: hereCode,
+      name: hereCode !== null ? kindName(hereCode) : null,
+      code:
+        hereCode !== null
+          ? hereCode > 0
+            ? 'kind'
+            : 'none'
+          : hereV === -3
+            ? 'no coverage'
+            : Number.isFinite(hereV)
+              ? 'other'
+              : 'off the window'
+    },
+    cells: placed.slice(0, cap),
+    cellsTotal: cells.length
+  };
+}
+/** The words for a kind census. */
+export function kindWords(c, {refTimeIso = null, halfKm = null} = {}) {
+  const when = refTimeIso ? `${refTimeIso.slice(11, 16)}Z · ` : '';
+  const reach = halfKm !== null ? `within ±${halfKm} km` : 'in the window';
+  if (!c.covered)
+    return `${when}no radar coverage ${reach} (${c.n} cells at -3)`;
+  const here =
+    c.here.code === 'kind'
+      ? `overhead ${c.here.name}`
+      : c.here.code === 'none'
+        ? 'no precipitation overhead'
+        : c.here.code === 'no coverage'
+          ? "the observer's own cell uncovered"
+          : `overhead ${c.here.code}`;
+  if (!c.precip)
+    return `${when}no precipitating cell ${reach} (${c.covered.toLocaleString('en-US')} covered) · ${here}`;
+  const kinds = c.shares
+    .map((s) => `${s.name} ${Math.round((100 * s.n) / c.precip)}%`)
+    .join(', ');
+  return (
+    `${when}${c.precip.toLocaleString('en-US')} precipitating cells of ${c.covered.toLocaleString('en-US')} covered ${reach}: ${kinds}` +
+    ` · ${here}`
+  );
+}
 /** The MRMS cell containing (lat, lon), floor(x + 0.5) as the reader;
  * null off the grid. */
 export function mrmsCell(

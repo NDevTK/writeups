@@ -10345,6 +10345,114 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 7, the review session's 185th pass - THE RAIN'S KIND):
+  every rain curtain since the 165th hung by Atlas 1953's rain law,
+  whatever fell - the radar's own precipitation type, which picks the
+  mosaic's Z-R relation cell by cell, was measured in the 174th and
+  left out for want of a readable code table. READ FIRST: the WDTD's
+  Surface Precipitation Type page (vlab.noaa.gov, read): seven
+  categories - warm and cool stratiform rain, convective rain, the
+  tropical/stratiform and tropical/convective mixes, hail, snow; a
+  cell precipitates where the seamless hybrid-scan reflectivity is 5
+  dBZ or more (no cut-off in the cold season); snow by thresholds of
+  the surface and wet-bulb temperatures; hail where MESH exceeds 0
+  mm; convective against stratiform by the freezing-level height, the
+  vertically integrated liquid and the reflectivity at -10 C; warm
+  against cool stratiform by a 5 C surface temperature; the tropical
+  mixes by the tropical rain delineation; "subject to the errors" of
+  what it is built from. The numeric codes from the NMQ precipitation
+  products note (Kirstetter, NASA Wallops PRF, May 2017; a 2-page PDF
+  read whole): -1 missing, 0 none, 1 warm stratiform, 2 warm
+  stratiform with the radar in or above the melting layer, 3 snow, 4
+  snow with the radar 1.5 km or higher above the ground, 6
+  convective, 7 hail, 10 cool stratiform, 91 tropical/stratiform, 96
+  tropical/convective; its snow rule (T below 2 C, Tw below 0 C; a
+  fixed Z = 75 S^2 - Zhang 2016's 0.1155 Z^0.5 turned round). The NWS
+  IDP v12.2 note (read): "Updated PrecipFlag to mitigate false
+  convective identifications in strong bright band areas". NOT READ,
+  stated: the NSSL GRIB2 tables (blocked). THE SNOW LAW, READ:
+  Rasmussen, Vivekanandan, Cole, Myers and Masters 1999, "The
+  estimation of snowfall rate using visibility", J. Appl. Meteor. 38,
+  1542-1563 (AMS 403; NCAR OpenSky's articles_15245.pdf read in full,
+  22 pp): for aggregates whose bulk density falls as one over the
+  diameter (rho_s D = C3: Holroyd 1971's dry snow 0.017 g/cm^2,
+  Rogers 1974's wet or rimed 0.072) the size-distribution integrals
+  cancel and S = 1.3 C3 Vt / Vis (Eq. 13; the 1.3 is Koschmieder's
+  3.912/3 with a 0.02 contrast threshold, Eq. 3), so sigma = 3 S /
+  (C3 Vt) - dry aggregates at 1 m/s, wet or rimed at 2 m/s, a factor
+  of 8.5 in visibility at one liquid-equivalent rate (the text's Fig.
+  10 readings 0.3 and 2.6 km at 2 mm/h; the equation 0.40 and 3.37);
+  27 crystal types by power laws (Table 2, Eq. 19) spreading the
+  visibility at one rate over two orders of magnitude - needles the
+  lowest, thick plates and graupel the highest; the Marshall site's
+  two winters within the theory's curves (a dry-aggregate storm on
+  17-18 January 1996 on the dry curve exactly); Table 6's split at
+  -1 C for the wetter criteria; Sec. 6's day/night factor (Allard's
+  law against Koschmieder's: a 25-candle light seen about twice as
+  far at night at the same extinction; the ASOS parameters I0 25
+  candles, epsilon 0.055, CDB 0.084/mi); the NWS thresholds (heavy
+  at or under 1/4 mi, moderate to 5/8, light above). Also read:
+  Black, Rasmussen and Landolt's AMS preprint 164079 (ASOS intensity
+  by visibility against LWE gauges: visibility underestimated the
+  liquid intensity 6-38% of the time). MEASURED FIRST (10:20Z):
+  PrecipFlag 212 kB gzipped, discipline 209 category 6 number 0,
+  template 5.41 at 8 bits, R -3 E 0 D 0 (a count is c - 3), 27 IDAT
+  chunks; the grid held -3 (8.26 million), 0 (15.3 million), 1
+  (885,768), 3 (ONE cell), 6 (41,160), 7 (6,872), 10 (2,481), 91
+  (4,945), 96 (1,241) - a September file with no snow to speak of.
+  THE LAW (rainshafts.js): SNOW_EXTINCTION (Eq. 13's constants, the
+  Fig. 10 readings, the -1 C split, the scatter, the NWS thresholds),
+  snowExtinctionPerKm / snowOpticalDepth / snowVisibilityKm, isSnowKind
+  (3 and 4); rainShaftsNear takes each cell's `kind` and a `wetSnow`
+  option - a snow cell's tau by Rasmussen, dry or wet, every other
+  kind's and a kind-less cell's by Atlas; each shaft carries kind and
+  law; the summary counts snow, rain and typed. mrms.js:
+  MRMS_KIND_FACTS (the codes and names, the rules, the caveat, what
+  was read), kindCensus (the counts and shares by kind, the observer's
+  own cell, the precipitating cells nearest first with the shafts'
+  field names, capped 400), kindName, kindWords. THE DAEMON: mrmsKind
+  as the fifth feed of the one factory, /mrmskind (200 with covered
+  false real; 502 with the error), MRMS_KIND_URL. THE PAGE:
+  syncMrmsKind every 2 min; the kind cells keyed by centre and the
+  rate's cells annotated by name (radarRateCells), so the shafts are
+  typed; wetSnow by the station's temperature at the paper's -1 C;
+  a snow curtain drawn brighter by a half (a display rule, stated);
+  the rate line's kinds clause and the kind's own research line with
+  the rules. GATED: rainshafts-reference THE SNOW'S CURTAIN (Eq. 13 by
+  hand at 2 mm/h: dry 9.80 /km and 0.399 km, wet 1.16 /km and 3.38
+  km, the ratio 8.47, both within a factor 1.35 of the Fig. 10
+  readings; dry snow through the pixel's 2 km hides 100.0% where
+  Atlas's rain hides 54%; a list of a snow cell, a rain cell, a
+  kind-less cell and a beam-high snow cell at one rate: the snow
+  cell's tau 19.6 dry / 2.31 wet, the rain cell's 0.77, the kind-less
+  Atlas's; the summary 2 snow, 2 rain, 3 typed); mrms-reference THE
+  RAIN'S KIND on a vendored 8-bit crop (a 51 x 51 window of the 10:20Z
+  file over western Iowa, 42.19 N 95.32 W, 635 bytes: 2,515
+  precipitating cells of 2,601 - warm stratiform 1,964, the tropical
+  stratiform mix 380, the tropical convective mix 86, convective 54,
+  hail 31 - numpy the same, the observer's cell warm stratiform, the
+  400 nearest first with the 31 hail cells beyond them in the
+  uncapped 2,515, the words); server-reference the five feeds, the
+  route, the bindings, the 502's error. MEASURED in the daemon
+  (10:36Z): the Saskatchewan storm core (49.10 N 105.31 W) 7,650
+  precipitating cells of 10,201 - warm stratiform 56%, convective
+  32%, hail 12%, convective rain overhead (641 rows of the 214-kB file
+  in 130 ms); western Iowa 6,886 - warm stratiform 86%, the tropical
+  stratiform mix 8%, convective 5%, the tropical convective mix 1%;
+  the home no precipitating cell. MEASURED in the page (the storm
+  core, 4:40 a.m. local, the 10:34Z rate and the 10:36Z kinds): the
+  rate line "the curtains' kinds: 160 of 160 curtains named by the
+  radar's own cell - 0 snow, 160 rain by Atlas 1953", the kind's line
+  with its 7,650 cells (56/32/12%) and the rules, the hail's line "17
+  of the 160 rain curtains within 100 km stand in hail cells (the
+  largest 3.0 mm)" - the join by cell name complete on every curtain.
+  STATED: no snow curtain has been
+  seen live - the September file held one snow cell in 24.5 million,
+  so the law stands on its gate and waits for a winter; the kinds
+  carry the errors of the model temperature, the MESH and the
+  separation they are built from; the snow's wet/dry split is the
+  station's temperature, not each cell's; a satellite-sourced curtain
+  has no kind.
 - DONE (Sep 7, the review session's 184th pass - THE RADAR'S OWN
   DOUBT AND THE HAIL'S SIZE): the radar's rate and tops (174th, 179th)
   came with no word on how far the beam could be trusted, and its

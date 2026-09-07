@@ -447,7 +447,8 @@
         rainShaftsSummary,
         rainCoverField,
         mergeCoverFields,
-        RAIN_EXTINCTION
+        RAIN_EXTINCTION,
+        SNOW_EXTINCTION
       } from './horizon/rainshafts.js';
       import {echoTopField} from './horizon/mrms.js';
       import {
@@ -8377,7 +8378,10 @@
         const list = rainShaftsNear(src, state.lat, state.lon, {
           maxKm: 100,
           cap: 160,
-          minMmH: 0.2
+          minMmH: 0.2,
+          // a snow cell's curtain wet or dry by the station's
+          // temperature (185th)
+          wetSnow: wetSnowNow()
         });
         rainShafts = {
           at: Date.now(),
@@ -13396,7 +13400,11 @@
       // fresh census's cells (each {latDeg, lonDeg, mmh}), or null
       function radarRateCells() {
         const t = radarRateNow();
-        return t && t.covered && t.census.cells ? t.census.cells : null;
+        const cells = t && t.covered && t.census.cells ? t.census.cells : null;
+        // THE RAIN'S KIND (185th): each cell's precipitation type from
+        // the kind window where one is live, by the cells' shared names
+        if (!cells || !kindIndex || !mrmsAuxNow('kind')) return cells;
+        return cells.map((c) => ({...c, kind: kindOfCell(c)}));
       }
       function radarRateLine() {
         if (mrmsRateOff() || mrmsRateDaemonLacks) return null;
@@ -13419,6 +13427,7 @@
               }`
             : ' · stale (past 10 min) or unread: the satellite stands') +
           rqiClause() +
+          shaftKindsWords() +
           ` · ranking, stated: where the radar covers, its 1-km rate every 2 min outranks the satellite's 2-km RRQPE every 10 min and RainViewer's composite; beyond its reach the satellite stands` +
           (t.documentation ? ` · ${t.documentation}` : '')
         );
@@ -13441,7 +13450,21 @@
       const MRMS_HAIL_PROXY =
         params.get('mrmshailsrc') ??
         (MRMS_PROXY ? MRMS_PROXY.replace(/\/mrms$/, '/mrmshail') : null);
+      // THE RAIN'S KIND (185th): the daemon's /mrmskind - each cell's
+      // surface precipitation type - joined to the rate's cells by
+      // name, so a cell the radar calls snow hangs a snow curtain
+      // (Rasmussen 1999) and every other kind Atlas's rain
+      const MRMS_KIND_PROXY =
+        params.get('mrmskindsrc') ??
+        (MRMS_PROXY ? MRMS_PROXY.replace(/\/mrms$/, '/mrmskind') : null);
       const mrmsAux = {
+        kind: {
+          proxy: MRMS_KIND_PROXY,
+          busy: false,
+          lacks: false,
+          key: 'radarKind',
+          name: 'NCEP MRMS precipitation type'
+        },
         rqi: {
           proxy: MRMS_RQI_PROXY,
           busy: false,
@@ -13485,6 +13508,11 @@
               : `${j.refTime ? j.refTime.slice(11, 16) + 'Z · ' : ''}${j.reason || 'no coverage'}`
           );
           if (which === 'hail') hailIndexRebuild();
+          if (which === 'kind') {
+            // the curtains take their kinds now
+            kindIndexRebuild();
+            applyRainShafts(goesL2 && goesL2.rain);
+          }
         } catch {
           // unreachable: the last answer stands until it ages out
         } finally {
@@ -13493,6 +13521,7 @@
       }
       const syncMrmsRqi = () => syncMrmsAux('rqi');
       const syncMrmsHail = () => syncMrmsAux('hail');
+      const syncMrmsKind = () => syncMrmsAux('kind');
       function mrmsAuxNow(which) {
         const t = state[mrmsAux[which].key];
         if (!t || !t.census || !t.refTime) return null;
@@ -13518,6 +13547,68 @@
       function hailAtShaft(f) {
         if (!hailIndex || !mrmsAuxNow('hail')) return 0;
         return hailIndex.get(`${f.lat.toFixed(4)},${f.lon.toFixed(4)}`) || 0;
+      }
+      // THE RAIN'S KIND (185th): the precipitating cells' kinds keyed
+      // by their centres, the rate's cells annotated by name
+      let kindIndex = null; // Map "lat,lon" -> MRMS PrecipFlag code
+      function kindIndexRebuild() {
+        const t = mrmsAuxNow('kind');
+        const cells = t && t.covered && t.census.cells;
+        if (!cells || !cells.length) {
+          kindIndex = null;
+          return;
+        }
+        kindIndex = new Map();
+        for (const c of cells)
+          kindIndex.set(`${c.lat.toFixed(4)},${c.lon.toFixed(4)}`, c.kind);
+      }
+      function kindOfCell(c) {
+        if (!kindIndex || !mrmsAuxNow('kind')) return null;
+        const k = kindIndex.get(
+          `${c.latDeg.toFixed(4)},${c.lonDeg.toFixed(4)}`
+        );
+        return Number.isFinite(k) ? k : null;
+      }
+      // wet or rimed snow at or above the paper's -1 C split (Table
+      // 6), by the station's temperature; dry below it or unknown
+      const wetSnowNow = () =>
+        Number.isFinite(state.temp) &&
+        state.temp >= SNOW_EXTINCTION.wetAtOrAboveC;
+      function shaftKindsWords() {
+        const s = rainShafts && rainShafts.summary;
+        if (!s) return '';
+        if (rainShafts.source !== 'radar')
+          return " · the curtains' kinds: the satellite's pixels carry none - every curtain Atlas's rain";
+        if (!mrmsAuxNow('kind'))
+          return " · the curtains' kinds: none read (no fresh PrecipFlag window) - every curtain Atlas's rain";
+        const wet = wetSnowNow();
+        return (
+          ` · the curtains' kinds: ${s.typed} of ${s.n} curtains named by the radar's own cell - ${s.snow} snow` +
+          (s.snow
+            ? ` (Rasmussen 1999's Eq. 13 for ${wet ? 'wet or rimed' : 'dry'} aggregates, the station's ${Number.isFinite(state.temp) ? state.temp.toFixed(1) + ' °C' : 'unknown temperature'} against the paper's ${SNOW_EXTINCTION.wetAtOrAboveC} °C split; the scatter stated: ${SNOW_EXTINCTION.scatter})`
+            : '') +
+          `, ${s.rain} rain by Atlas 1953 (the unnamed among them too)`
+        );
+      }
+      function radarKindLine() {
+        if (mrmsAuxOff('kind')) return null;
+        const t = state.radarKind;
+        if (!t) return null;
+        const c = t.census;
+        const live = mrmsAuxNow('kind');
+        return (
+          `NCEP MRMS ${t.product} (${t.meaning || 'the surface precipitation type'}; ${t.cellKm || 1}-km cells every 2 min, read by the daemon in ${t.read ? t.read.ms + ' ms, ' + t.read.rows + ' PNG rows' : '?'}): ` +
+          (c
+            ? t.words
+            : `${t.refTime ? t.refTime.slice(11, 16) + 'Z · ' : ''}${t.reason || 'no coverage'}`) +
+          (t.law
+            ? ` · the rules (the WDTD's SPT page): ${t.law.detect}; ${t.law.snow}; ${t.law.hail}; ${t.law.convective}; ${t.law.caveat}`
+            : '') +
+          (live
+            ? ` · what it feeds now: each rain curtain's law by its own cell's kind (${c && c.cells ? c.cells.length + ' of ' + c.cellsTotal + ' precipitating cells sent nearest first' : 'no cells'})${shaftKindsWords()}; the other kinds are named here and change no curtain`
+            : " · stale (past 10 min) or unread: every curtain Atlas's rain") +
+          (t.documentation ? ` · ${t.documentation}` : '')
+        );
       }
       // the radar's stated doubt, for the rain and echo-top lines
       function rqiClause() {
@@ -15872,6 +15963,10 @@
             const rhl = radarHailLine();
             if (rhl) research["the hail's size (MRMS MESH)"] = rhl;
             else delete research["the hail's size (MRMS MESH)"];
+            // the rain's kind (185th)
+            const rkl = radarKindLine();
+            if (rkl) research["the rain's kind (MRMS PrecipFlag)"] = rkl;
+            else delete research["the rain's kind (MRMS PrecipFlag)"];
           }
           if (Number.isFinite(state.wind) || state.windSea) {
             const u = seaWindMs();
@@ -17125,9 +17220,18 @@
           // the curtain's sides fade (a rain shaft has no wall): full
           // over the middle 70%, to nothing at the edges
           const edge = uv().x.sub(0.5).abs().smoothstep(0.35, 0.5).oneMinus();
+          // THE RAIN'S KIND (185th): a snow curtain (1) is drawn
+          // brighter by a half than a rain curtain in the same light
+          // - snow's albedo, a display rule stated on the line; its
+          // opacity is already Rasmussen's law
+          const snowAttr = new THREE.InstancedBufferAttribute(
+            new Float32Array(n),
+            1
+          );
           const hailK = instancedBufferAttribute(hailAttr).div(20).clamp(0, 1);
+          const snowK = instancedBufferAttribute(snowAttr).clamp(0, 1);
           mat.colorNode = aerial.encodeFog(
-            shaftColU.mul(hailK.mul(0.5).add(1))
+            shaftColU.mul(hailK.mul(0.5).add(snowK.mul(0.5)).add(1))
           );
           const op = instancedBufferAttribute(opAttr);
           mat.opacityNode = op
@@ -17140,7 +17244,7 @@
             n
           );
           shaftMesh.frustumCulled = false;
-          shaftMesh.userData = {posAttr, sclAttr, opAttr, hailAttr};
+          shaftMesh.userData = {posAttr, sclAttr, opAttr, hailAttr, snowAttr};
           shaftMesh.layers.set(4); // the post-cloud overlay pass, with the precipitation
           scene.add(shaftMesh);
           shaftCount = n;
@@ -17156,7 +17260,8 @@
         } else {
           shaftColU.value.copy(ambient.color).multiplyScalar(0.6);
         }
-        const {posAttr, sclAttr, opAttr, hailAttr} = shaftMesh.userData;
+        const {posAttr, sclAttr, opAttr, hailAttr, snowAttr} =
+          shaftMesh.userData;
         let hailN = 0;
         let hailMax = 0;
         const goes = goesObs;
@@ -17197,11 +17302,14 @@
             hailN++;
             if (mm > hailMax) hailMax = mm;
           }
+          // a snow curtain by its cell's kind (185th)
+          snowAttr.setX(k, f.law && f.law !== 'rain' ? 1 : 0);
         }
         posAttr.needsUpdate = true;
         sclAttr.needsUpdate = true;
         opAttr.needsUpdate = true;
         hailAttr.needsUpdate = true;
+        snowAttr.needsUpdate = true;
         hailShafts = {n: hailN, of: n, largestMm: hailMax, at: Date.now()};
       }
       function updateFires(dt) {
@@ -22344,6 +22452,9 @@
         setInterval(syncMrmsRqi, MRMS_POLL_MS);
         syncMrmsHail();
         setInterval(syncMrmsHail, MRMS_POLL_MS);
+        // the rain's kind (185th)
+        syncMrmsKind();
+        setInterval(syncMrmsKind, MRMS_POLL_MS);
         // MOD09A1 is an 8-day composite; the same hourly poll (matching
         // the /surface cache) more than covers it.
         syncSurface();

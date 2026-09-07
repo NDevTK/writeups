@@ -58,6 +58,73 @@ export function rainVisibilityKm(mmh) {
   return s > 0 ? RAIN_EXTINCTION.koschmieder / s : Infinity;
 }
 
+// ---- THE SNOW'S CURTAIN (185th pass) ----------------------------------
+// A cell the radar calls snow is not rain: Rasmussen, Vivekanandan,
+// Cole, Myers and Masters 1999, "The estimation of snowfall rate
+// using visibility", J. Appl. Meteor. 38, 1542-1563 (NCAR's OpenSky
+// copy read in full; the AMS page is behind a wall) derive, for
+// aggregates whose bulk density falls as one over the diameter (rho_s
+// D = C3, Holroyd 1971 for dry snow, Rogers 1974 for wet or rimed),
+// the snowfall rate against the visibility independent of the size
+// distribution: S = 1.3 C3 Vt / Vis (their Eq. 13; S the liquid
+// equivalent in cm/s, Vt the fall speed in cm/s, Vis in cm, C3 in
+// g/cm^2 - the 1.3 is Koschmieder's 3.912 over 3, their Eq. 3 with a
+// contrast threshold of 0.02). So the extinction coefficient is sigma
+// = 3 S / (C3 Vt). Dry aggregates: C3 0.017 g/cm^2 and Vt 100 cm/s;
+// wet or rimed: 0.072 and 200 - a factor of 8.5 in visibility at the
+// same rate (the paper's Fig. 10 reads 0.3 km dry and 2.6 km wet at
+// 2 mm/h; Eq. 13 gives 0.40 and 3.37 - the text's readings of a
+// log-log plot, stated). Their Table 6 splits the wetter case at -1
+// C (at or above it wet snow and riming are the more frequent), which
+// is the caller's rule here. What the paper says the law is NOT: a
+// unique relation - crystal type, riming, aggregation and wetness
+// spread the visibility at one rate over a factor of 3 to 10 storm to
+// storm, and the eye sees a 25-candle light at night about twice as
+// far as a black object by day at the same extinction (Allard's law
+// against Koschmieder's; their Sec. 6). The curtain drawn here is the
+// aggregates' law for the radar's liquid-equivalent rate - measured
+// rate, stated law, the scatter stated.
+export const SNOW_EXTINCTION = {
+  source:
+    'Rasmussen, Vivekanandan, Cole, Myers and Masters 1999, J. Appl. Meteor. 38, 1542-1563 (Eq. 13; NCAR OpenSky copy read in full)',
+  eq: 13,
+  koschmieder: 3.912, // the paper's Eq. 3 (a contrast threshold of 0.02)
+  dry: {c3: 0.017, vtCmS: 100, words: 'dry aggregates - unmelted, unrimed (Holroyd 1971 / Magono and Nakamura 1965)'},
+  wet: {c3: 0.072, vtCmS: 200, words: 'wet or rimed aggregates (Rogers 1974)'},
+  wetAtOrAboveC: -1, // the paper's Table 6 split
+  fig10Km: {dry: 0.3, wet: 2.6, atMmH: 2}, // the text's readings of Fig. 10
+  scatter:
+    'a factor of 3 to 10 in visibility at one rate storm to storm (crystal type, riming, aggregation, wetness); the night eye sees about twice as far',
+  nwsIntensity: {heavyKmMax: 0.402, moderateKmMax: 1.0} // 1/4 and 5/8 statute miles
+};
+/** Rasmussen 1999's extinction coefficient (km^-1) at a liquid
+ * equivalent snowfall rate (mm/h): sigma = 3 S / (C3 Vt) in cgs. */
+export function snowExtinctionPerKm(mmh, {wet = false} = {}) {
+  if (!(mmh > 0)) return 0;
+  const p = wet ? SNOW_EXTINCTION.wet : SNOW_EXTINCTION.dry;
+  const sCmS = mmh / 10 / 3600;
+  return ((3 * sCmS) / (p.c3 * p.vtCmS)) * 1e5;
+}
+/** The optical depth of a path (km) through snow at a rate. */
+export function snowOpticalDepth(
+  mmh,
+  opts = {},
+  pathKm = RAIN_EXTINCTION.pixelPathKm
+) {
+  return snowExtinctionPerKm(mmh, opts) * pathKm;
+}
+/** The paper's own visibility (km) inside the snow, Eq. 13 turned
+ * round: Vis = 1.304 C3 Vt / S. */
+export function snowVisibilityKm(mmh, opts = {}) {
+  const s = snowExtinctionPerKm(mmh, opts);
+  return s > 0 ? SNOW_EXTINCTION.koschmieder / s : Infinity;
+}
+/** The MRMS precipitation types that are snow: 3 (snow) and 4 (snow
+ * at the ground with the beam 1.5 km or more above it). */
+export function isSnowKind(kind) {
+  return kind === 3 || kind === 4;
+}
+
 /**
  * The raining pixels within maxKm of (lat, lon) as shafts: each with
  * its distance, bearing, rate, optical depth and opacity, nearest
@@ -69,19 +136,29 @@ export function rainShaftsNear(
   list,
   lat,
   lon,
-  {maxKm = 100, cap = 160, minMmH = 0.2} = {}
+  {maxKm = 100, cap = 160, minMmH = 0.2, wetSnow = false} = {}
 ) {
   const out = [];
   for (const p of list || []) {
     if (!(p.mmh >= minMmH)) continue;
     const rb = rangeBearing(lat, lon, p.latDeg, p.lonDeg);
     if (rb.distKm > maxKm) continue;
-    const tau = rainOpticalDepth(p.mmh);
+    // THE RAIN'S KIND (185th): a cell the radar calls snow (MRMS
+    // PrecipFlag 3, or 4 with the beam high) takes Rasmussen 1999's
+    // extinction for its liquid-equivalent rate, dry or wet by the
+    // caller's surface temperature; every other kind - and a cell
+    // without a kind - Atlas's rain
+    const snow = isSnowKind(p.kind);
+    const tau = snow
+      ? snowOpticalDepth(p.mmh, {wet: wetSnow})
+      : rainOpticalDepth(p.mmh);
     out.push({
       lat: p.latDeg,
       lon: p.lonDeg,
       mmh: p.mmh,
       quality: p.quality ?? 'good',
+      kind: Number.isFinite(p.kind) ? p.kind : null,
+      law: snow ? (wetSnow ? 'snow-wet' : 'snow-dry') : 'rain',
       distKm: rb.distKm,
       bearingDeg: rb.bearingDeg,
       tau,
@@ -92,11 +169,19 @@ export function rainShaftsNear(
   return out.slice(0, cap);
 }
 
-/** The shafts' words for a line: how many, the nearest, the heaviest. */
+/** The shafts' words for a line: how many, the nearest, the heaviest,
+ * and since the 185th how many took the snow law and how many the
+ * rain's. */
 export function rainShaftsSummary(shafts) {
   if (!shafts || !shafts.length) return null;
   let heaviest = shafts[0];
-  for (const s of shafts) if (s.mmh > heaviest.mmh) heaviest = s;
+  let snow = 0;
+  let typed = 0;
+  for (const s of shafts) {
+    if (s.mmh > heaviest.mmh) heaviest = s;
+    if (s.law && s.law !== 'rain') snow++;
+    if (Number.isFinite(s.kind)) typed++;
+  }
   const nearest = shafts[0];
   return {
     n: shafts.length,
@@ -105,7 +190,10 @@ export function rainShaftsSummary(shafts) {
     nearestMmH: nearest.mmh,
     heaviestMmH: heaviest.mmh,
     heaviestKm: heaviest.distKm,
-    heaviestOpacity: heaviest.opacity
+    heaviestOpacity: heaviest.opacity,
+    snow,
+    rain: shafts.length - snow,
+    typed
   };
 }
 
