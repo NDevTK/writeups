@@ -3626,7 +3626,13 @@ const inflate = (u8) =>
   }
   const modisAlone = mergeSnowFields(null, modis);
   const orbitAlone = mergeSnowFields(flat, null);
-  const words = snowFromOrbitWords(census, here, merged, '2026-01-19', '18:01Z');
+  const words = snowFromOrbitWords(
+    census,
+    here,
+    merged,
+    '2026-01-19',
+    '18:01Z'
+  );
   check(
     "THE SNOW'S COVER FROM ORBIT: the fractional snow cover crop reads as numpy read it, the observer's own pixel is named, the world-box field through the theme's own scene mapping holds numpy's texels flat and lifted to the mountains' height (the lifted pixel one row north and one column west - away from the sub-satellite point), and the merge lets the satellite's texel outrank MODIS's",
     nx === E.cols &&

@@ -32,9 +32,9 @@ export const FSC_EXPECT = {
     lon: -105.8
   },
   grid: {
-    xScale: 5.6000000768108293e-05,
+    xScale: 5.6000000768108293e-5,
     xOffset: -0.10133200138807297,
-    yScale: -5.6000000768108293e-05,
+    yScale: -5.6000000768108293e-5,
     yOffset: 0.12821200489997864,
     nx: 2500,
     ny: 1500
@@ -42,10 +42,10 @@ export const FSC_EXPECT = {
   fill: 125,
   noRetrieval: 128,
   flags: {
-    '0': 4092,
-    '105': 81,
-    '110': 6016,
-    '113': 12
+    0: 4092,
+    105: 81,
+    110: 6016,
+    113: 12
   },
   good: {
     n: 4092,
@@ -57,42 +57,50 @@ export const FSC_EXPECT = {
     p90Pct: 54.0,
     maxPct: 100.0
   },
-  samples: [{
+  samples: [
+    {
       row: 0,
       col: 0,
       fsc: 128,
       dqf: 110
-    }, {
+    },
+    {
       row: 50,
       col: 50,
       fsc: 47,
       dqf: 0
-    }, {
+    },
+    {
       row: 100,
       col: 100,
       fsc: 0,
       dqf: 0
-    }, {
+    },
+    {
       row: 20,
       col: 80,
       fsc: 128,
       dqf: 110
-    }, {
+    },
+    {
       row: 80,
       col: 20,
       fsc: 0,
       dqf: 0
-    }, {
+    },
+    {
       row: 37,
       col: 63,
       fsc: 0,
       dqf: 0
-    }, {
+    },
+    {
       row: 63,
       col: 37,
       fsc: 0,
       dqf: 0
-    }],
+    }
+  ],
   sceneMean: 53.97262191772461,
   sceneStd: 22.30742835998535,
   cropBytes: 28572,
@@ -123,47 +131,56 @@ export const FSC_EXPECT = {
         pixelLifted: [49, 49]
       }
     },
-    samples: [{
+    samples: [
+      {
         row: 0,
         i: 0,
         v: -1.0,
         pixel: [53, 45]
-      }, {
+      },
+      {
         row: 95,
         i: 95,
         v: -1.0,
         pixel: [47, 54]
-      }, {
+      },
+      {
         row: 47,
         i: 48,
         v: 0.47,
         pixel: [50, 50]
-      }, {
+      },
+      {
         row: 0,
         i: 95,
         v: 0.0,
         pixel: [53, 51]
-      }, {
+      },
+      {
         row: 95,
         i: 0,
         v: 0.99,
         pixel: [48, 48]
-      }, {
+      },
+      {
         row: 20,
         i: 70,
         v: 0.0,
         pixel: [52, 50]
-      }, {
+      },
+      {
         row: 70,
         i: 20,
         v: 1.0,
         pixel: [49, 49]
-      }, {
+      },
+      {
         row: 48,
         i: 47,
         v: 0.47,
         pixel: [50, 50]
-      }]
+      }
+    ]
   }
 };
 export const FSCC_B64 =

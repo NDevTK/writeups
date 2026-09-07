@@ -993,7 +993,9 @@ export function l2FscBody(dec, key, lat, lon) {
       pct: fscGood(w.cut.FSC, w.cut.DQF, qc),
       dqf: hereDqf ?? null,
       meaning:
-        hereDqf == null ? null : (FSC_DQF_MEANINGS[hereDqf] ?? 'code ' + hereDqf)
+        hereDqf == null
+          ? null
+          : (FSC_DQF_MEANINGS[hereDqf] ?? 'code ' + hereDqf)
     },
     census: fscCensus(w.cut.FSC, w.cut.DQF),
     sceneStats: {

@@ -4115,7 +4115,8 @@
       let snowFieldMerged = null; // the field the terrain reads (goesl2.mergeSnowFields)
       const FSC_HOLD_MS = 24 * 3600e3;
       const SNOW_FIELD_N = 96;
-      const snowAnchorKey = () => state.lat.toFixed(4) + ',' + state.lon.toFixed(4);
+      const snowAnchorKey = () =>
+        state.lat.toFixed(4) + ',' + state.lon.toFixed(4);
       function goesL2SnowRebuild() {
         const key = snowAnchorKey();
         if (orbitSnow && orbitSnow.anchorKey !== key) orbitSnow = null;
@@ -4152,7 +4153,11 @@
           // the held afternoon field is a day old: it stands down
           orbitSnow = null;
         }
-        goesL2SnowLast = {time: w.time, census: w.census, cells: f ? f.cells : 0};
+        goesL2SnowLast = {
+          time: w.time,
+          census: w.census,
+          cells: f ? f.cells : 0
+        };
         applySnowFields();
       }
       let goesL2SnowLast = null; // the latest file's census, good pixels or not
@@ -4217,7 +4222,9 @@
         if (!last || !last.census) return null;
         const when = last.time ? last.time.slice(11, 16) + 'Z' : '';
         const merged =
-          snowFieldMerged && orbitSnow && orbitSnow.anchorKey === snowAnchorKey()
+          snowFieldMerged &&
+          orbitSnow &&
+          orbitSnow.anchorKey === snowAnchorKey()
             ? snowFieldMerged
             : null;
         if (!last.cells) {

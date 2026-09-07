@@ -4611,8 +4611,7 @@ export const FSC_ATBD = {
   errorBudget: {
     reflectance: [0.15, 0.2],
     ndsi: [0.33, 0.4],
-    words:
-      'Tables 2-7 and 2-8, all factors combined, in units of snow fraction'
+    words: 'Tables 2-7 and 2-8, all factors combined, in units of snow fraction'
   },
   requirement: {
     accuracy: 0.2,
@@ -4813,7 +4812,9 @@ export function snowFromOrbitWords(census, here, merged, modisDay, when) {
       (merged.fromModis > 0
         ? `, ${share(merged.fromModis)} from MODIS NDSI${modisDay ? ' (' + modisDay + "'s composite)" : ''}`
         : '') +
-      (merged.unknown > 0.005 ? `, ${share(merged.unknown)} the snowline` : '') +
+      (merged.unknown > 0.005
+        ? `, ${share(merged.unknown)} the snowline`
+        : '') +
       (merged.known ? `; mean cover ${pct(merged.snowy * 100)}` : '')
     : '';
   return (
