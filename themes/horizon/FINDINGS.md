@@ -1337,7 +1337,13 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    pixel), the spherical view zenith 0.16° from the ellipsoid's own
    geometry, a core above the satellite's top keeps its own, a flagged
    pixel and a point outside the window are named (`goesl2-reference`
-   THE TOP OVER THE CORE). STATED: a 10-km pixel is a block mean over
+   THE TOP OVER THE CORE). Live on the Georgia coast (31.65 N, 81.25 W,
+   03:20Z, the 02:58Z radar file and the 02:57Z ACHA window) under the
+   evening storms' anvil: 201 of 509 storm cells took the satellite's
+   top, shifted 0.8-11.5 km for the parallax at 38° zenith, the
+   largest lift 6.8 km (a 1.0-km core under a 7.8-km top 10 km off),
+   308 keeping the radar's taller echo top, every texel of the deck
+   painted. STATED: a 10-km pixel is a block mean over
    ~100 radar cells; the residual parallax of a top lifted by Δh is
    Δh tan θ (under a pixel for 3 km at 37°); the anvil beyond the
    echoing cells is not painted (the field's flank rule stands there);

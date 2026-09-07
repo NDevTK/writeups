@@ -10401,7 +10401,24 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   centre lifts an 8-km core by 2.331 km; a 12.33-km core keeps its own
   top (satBelow); a flagged centre (a copy of the window) and a point
   at 10 N are named; the words. Docs: server README (/goesl2), FINDINGS
-  pass 176 (149 files, 1,199 landmarks, 9 GPU probes). STATED LIMITS: a
+  pass 176 (149 files, 1,199 landmarks, 9 GPU probes). MEASURED in the
+  page (the Georgia coast, 31.65 N 81.25 W, 23:20 local, the 02:58Z
+  MRMS file and the 02:57Z ACHA window, the station reporting no
+  shower under the evening storms' anvil): "the towers painted: 209
+  echoing cells on 3844 texels of the low deck ..., the tallest 10.6
+  km standing at its own place; 201 of 509 storm cells took the
+  satellite's top (ACHA HT at each cell's own 10-km pixel, shifted
+  0.8-11.5 km away from the sub-satellite point for the top's parallax
+  at 38 deg zenith, DQF 0; the ATBD's 500 m), the largest lift 6.8 km:
+  a 1.0-km core under a 7.8 km top at 45 deg and 10 km; 308 with the
+  satellite's top below the echo top (the radar stands)" beside the
+  ACHA line's "median 11.4 km over 441 retrieved px (p10 9.1 km, p90
+  12.4 km)" - every texel of the deck painted (the anvil's plateau
+  over the observer), the lifts falling on the weak echoes under the
+  anvil, the strong cores keeping their own tops where the 10-km
+  block mean sits below the tallest 1-km echo (the IR top of a thick
+  cloud lies below its physical top - the ATBD's own caveat on deep
+  convection, stated). STATED LIMITS: a
   10-km pixel is a block mean of 2-km retrievals over ~100 radar
   cells, so a tower takes its pixel's mean top, not its own turret's;
   the residual parallax of a top lifted by dh is dh tan(zenith) (under
