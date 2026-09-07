@@ -1445,7 +1445,16 @@ reference` THE HAZE'S KIND; `goesl2-client-reference` THE HAZE'S
    STATED: the rate is the radar's surface estimate by MRMS's own
    method, unread; a −3 cell is unmeasured, not dry; the shafts keep
    Atlas 1953's extinction per rate, and their flat grey untouched by
-   the scene's lights is the next pass's lead
+   the scene's lights is the next pass's lead. Pass 180 lights the
+   curtains from the scene: the shafts' colour is a uniform set each
+   frame from the decks' own lights — the sky's ambient on the
+   curtain plus a tenth of the sun's colour while it stands above the
+   horizon (the display rule, stated on the rain line) — in place of
+   the constant grey-blue; the hemisphere light stands in without the
+   decks. Measured in the same Montana storm at 2 a.m. (08:08Z): the
+   frame's mean colour fell from 124/129/132 to 0.4/0.1/0.0 out of
+   255, the curtains dark against the night sky and the stars back
+   between them; no gate changes, the display rule only
    (`goesl2-client-reference`: the browser's inflate, the range
    reader, the client over a fake S3 of the vendored fixtures, the
    range-ignoring path; `goesl2-reference` THE DAYLIGHT, MEASURED; `server-reference` the

@@ -10345,6 +10345,43 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   the calm and gale classes are thin (96 and 34 latent hours) and
   their ratios are printed, not banded; the wave hours are one
   altimeter's on a subset of cruises, mostly old swell.
+- DONE (Sep 7, the review session's 180th pass - THE SHAFTS IN THE
+  SCENE'S LIGHT): the 179th's named lead - the rain curtains (165th)
+  were drawn in a constant grey-blue (0.5, 0.56, 0.62) through the
+  aerial fog and nothing else, so at 2 a.m. in the Montana storm they
+  stood light grey against a black sky: a curtain lit by no light. THE
+  RULE (a display rule, stated on the line): the curtains' colour is a
+  uniform (shaftColU) set each frame from the same lights the decks and
+  the measured cirrus sheets (178th) take - the sky's ambient
+  (cloudSys.shared.ambCol: the light that falls on the curtain; rain
+  scatters without absorbing, so the curtain is as bright as what
+  lights it, its opacity already Atlas's per rate) plus the sun's
+  colour times 0.1 max(sunDir.y, 0) (a little of the sun through and
+  off the drops while it stands up); without the decks (no cloud
+  system built) the hemisphere light's colour at 0.6 stands in. The
+  material's colorNode is aerial.encodeFog(shaftColU) - the fog as
+  before, the colour under it live. THE LINE: the rain shafts' words
+  add "(the curtains lit by the scene's own lights: the sky's ambient
+  and a tenth of the sun while it stands up - the theme's display rule,
+  stated)". No gate changes: the shafts' law (rainshafts.js, the
+  165th's gate) is untouched and the harness's nine GPU probes do not
+  draw the shaft material; the page-module check and the full gate
+  stand. MEASURED (the same north-east Montana storm, 48.795 N 106.965
+  W, 02:08 local, the 08:06Z rate file, the observer inside the rain:
+  "160 rain shafts drawn within 100 km from the radar's 1-km cells
+  (MRMS PrecipRate, 2 min): the nearest 0 km at 0 deg (5.1 mm/h), the
+  heaviest 20.9 mm/h 3 km off hiding 97% of what stands behind it"):
+  the frame's mean colour 0.4 / 0.1 / 0.0 of 255 against the 179th's
+  124.3 / 128.7 / 132.3 from the same place ten minutes earlier - the
+  wall of light-grey curtains is a wall of dark ones now, the stars
+  back between them; no page errors. STATED LIMITS: the colour is a
+  display rule, not a radiative transfer - no single scattering off the
+  drops toward the eye by angle, no darkening of the far curtain by the
+  near one beyond their stacked opacities; the 0.1 sun share is the
+  theme's number beside the sheets' 0.08; the daylight look of the
+  curtains and the measured sheets is not yet judged by day (the
+  scheduled daylight check-in) - the named next lead beside the mid
+  deck's field and the top field's stipple.
 - DONE (Sep 7, the review session's 179th pass - THE RAIN AT A
   KILOMETRE): the scene's rain shafts (165th) and the decks' rain
   cover (167th) drew from the satellite's 2-km RRQPE pixels every 10
