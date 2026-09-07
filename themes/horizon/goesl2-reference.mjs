@@ -3377,8 +3377,14 @@ const inflate = (u8) =>
     });
     const xd = f.dataset('x');
     const yd = f.dataset('y');
-    const x = {scale: sc(xd.attrs.scale_factor), offset: sc(xd.attrs.add_offset)};
-    const y = {scale: sc(yd.attrs.scale_factor), offset: sc(yd.attrs.add_offset)};
+    const x = {
+      scale: sc(xd.attrs.scale_factor),
+      offset: sc(xd.attrs.add_offset)
+    };
+    const y = {
+      scale: sc(yd.attrs.scale_factor),
+      offset: sc(yd.attrs.add_offset)
+    };
     const nx = xd.values.length;
     const ny = yd.values.length;
     const box = windowBox(H.centre.lat, H.centre.lon, g, x, y, nx, ny, 1000);
@@ -3398,7 +3404,15 @@ const inflate = (u8) =>
   const T = open(ACHTF_B64, 'TEMP');
   const A = open(ACHA2KM_B64, 'HT');
   const wT = {tK: T.vals, dqf: T.dqf, box: T.box, x: T.x, y: T.y};
-  const w2 = {ht: A.vals, dqf: A.dqf, box: A.box, x: A.x, y: A.y, g: A.g, time: 'the fixture'};
+  const w2 = {
+    ht: A.vals,
+    dqf: A.dqf,
+    box: A.box,
+    x: A.x,
+    y: A.y,
+    g: A.g,
+    time: 'the fixture'
+  };
   const flags = heightFlags(T.dqf);
   const sameFlags = (a, b) =>
     Object.keys(b).every((k) => a[k] === b[k]) &&
@@ -3472,8 +3486,10 @@ const inflate = (u8) =>
       near(sC.tTopK, sC.tColumnK, 1e-12) &&
       op.summary.tempClosureN === plainProduct &&
       near(op.summary.tempDiffMedianK, dts[dts.length >> 1], 1e-9) &&
-      Math.abs(op.summary.tempDiffMedianK - E.pairs.isaColumn.dMedianK) < 0.05 &&
-      Math.abs(op.summary.tempAbsDiffMedianK - E.pairs.isaColumn.absMedianK) < 0.05 &&
+      Math.abs(op.summary.tempDiffMedianK - E.pairs.isaColumn.dMedianK) <
+        0.05 &&
+      Math.abs(op.summary.tempAbsDiffMedianK - E.pairs.isaColumn.absMedianK) <
+        0.05 &&
       // numpy's set is the whole crop's 1,934 high pixels, the sheets
       // the 1,932 within 100 km: the tenth shifts by a tenth of a kelvin
       Math.abs(op.summary.tempAbsDiffP90K - E.pairs.isaColumn.absP90K) < 0.2 &&

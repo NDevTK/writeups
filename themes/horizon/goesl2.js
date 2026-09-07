@@ -1195,7 +1195,8 @@ export function sheetOpacity(
     const tCol = columnTemperatureAt(rows, s.htM);
     const tProd = topOf(s);
     const tC = tProd ?? tCol;
-    const tSource = tProd !== null ? 'product' : tCol !== null ? 'column' : null;
+    const tSource =
+      tProd !== null ? 'product' : tCol !== null ? 'column' : null;
     if (tProd !== null) sum.topTempN++;
     else if (tCol !== null) sum.columnN++;
     if (tProd !== null && tCol !== null) dts.push(tCol - tProd);
@@ -1304,7 +1305,8 @@ export function sheetOpacity(
     sum.tempClosureN = dts.length;
     sum.tempDiffMedianK = median(dts);
     sum.tempAbsDiffMedianK = ad[ad.length >> 1];
-    sum.tempAbsDiffP90K = ad[Math.min(ad.length - 1, Math.floor(0.9 * ad.length))];
+    sum.tempAbsDiffP90K =
+      ad[Math.min(ad.length - 1, Math.floor(0.9 * ad.length))];
   }
   if (mus.length) {
     sum.muMedian = median(mus);
