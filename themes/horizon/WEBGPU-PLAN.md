@@ -11207,6 +11207,25 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   daytime tau at 03:40 local) - the window's own time is now held to
   the heights' 30 minutes - and had built before the column landed -
   the column's and the balloon's identity are in the key now.
+  MEASURED BY DAY (the scheduled daylight check-in, 7 Sep 12:05Z: the
+  Georgia coast at sunrise, the sun 12.8 deg up at 91 deg, the 12:02Z
+  windows, the look 120 deg at 12 deg up): "the sheets' opacity: 2041
+  from the enterprise cloud optical depth (ABI-L2-CODC, 1 - e^-tau;
+  the block medians' median 2.7; DCOMP's daytime retrieval); 4 not
+  colder than the clear sky (no emissivity there); the tops'
+  temperatures: 1977 from the product's own cloud top temperature
+  (ABI-L2-ACHTF ...), 64 from the column; the column against the
+  product's top temperature where both stand: -0.7 K at the median
+  (|dT| 3.3 K, tenth 11.2) over 1977; where both stand, 2 mu tau_IR
+  against the product's tau: 0.33 over 2037" - every sheet by day
+  DCOMP's, none the night bit's, the closure at or below 1 as the
+  182nd's Eq. 37-38 expects. THE LOOK: the 2,041 sheets (tops median
+  11.0 km, the parallax 5-12 km) stand as a grey-violet overcast in
+  the dawn's ambient with the 22-degree halo's arc drawn through them
+  (the ring hour on, 27% of the cirrus), the convective decks' dark
+  flat bases under them - neither glowing white nor black, the same
+  ambient the decks take; the colour rule's constants (0.6 of the
+  ambient, 0.08 of the sun) stand unchanged.
   STATED LIMITS:
   the clear reference is the window's median, not the pixel's own
   clear-sky radiance; the above-cloud terms are dropped (a few tenths
