@@ -6969,7 +6969,12 @@
           h.ht &&
           h.time &&
           Date.now() - Date.parse(h.time) <= ACHA_LIVE_MS;
-        if (goesL2 && live(goesL2.height2km))
+        // a fresh 2-km window with no good pixel (the 09:26Z scan of
+        // Sep 7 flagged every pixel "no retrieval attempted" - the page
+        // took it as live and emptied the sheets, the bands and the
+        // tops, measured) must not shadow the 10-km window (183rd)
+        const filled = (h) => h && h.census && h.census.n > 0;
+        if (goesL2 && live(goesL2.height2km) && filled(goesL2.height2km))
           return {
             win: goesL2.height2km,
             res: '2 km',
@@ -7036,7 +7041,9 @@
                 ? ''
                 : goesL2.height2km === null
                   ? '; the 2-km product unread'
-                  : '; the 2-km window past 30 min');
+                  : goesL2.height2km.census && goesL2.height2km.census.n === 0
+                    ? '; the 2-km window holds no good pixel (every one flagged) - the 10-km stands'
+                    : '; the 2-km window past 30 min');
         const R = ACHA_ATBD.requirement;
         const E = ACHA_ATBD.errorBudget;
         const feeds = [
