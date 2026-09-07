@@ -14235,8 +14235,27 @@
             : null;
         const mask =
           live && goesL2.mask && goesL2.mask.bcm ? goesL2.mask : null;
+        // the sheets' own opacity (178th): DCOMP's window only while it
+        // is as fresh as the heights (a night holds the last daytime
+        // retrievals otherwise), and the column's or the balloon's rows
+        // for the tops' temperatures - each in the key, so the sheets
+        // are rebuilt when a feed lands after them
+        const dcompLive =
+          live &&
+          goesL2.dcomp &&
+          goesL2.dcomp.cod &&
+          goesL2.dcomp.time &&
+          Date.now() - Date.parse(goesL2.dcomp.time) <= ACHA_LIVE_MS
+            ? goesL2.dcomp
+            : null;
+        const colRows =
+          satColumn && satColumn.rows && satColumn.rows.length >= 2
+            ? satColumn.rows
+            : ascentStands() && state.soundingData && state.soundingData.rows
+              ? state.soundingData.rows
+              : null;
         const key = live
-          ? `${live.time}:${mask && mask.time ? mask.time : '-'}:${state.lat.toFixed(3)},${state.lon.toFixed(3)}:${Math.round(centerElev)}`
+          ? `${live.time}:${mask && mask.time ? mask.time : '-'}:${dcompLive ? dcompLive.time : '-'}:${colRows ? colRows.length + ':' + (satColumn && satColumn.rows === colRows ? satColumn.time : 'balloon') : '-'}:${state.lat.toFixed(3)},${state.lon.toFixed(3)}:${Math.round(centerElev)}`
           : null;
         if (key === cirrusSheetsKey) return;
         cirrusSheetsKey = key;
@@ -14251,21 +14270,13 @@
         const r = cirrusSheetsFromOrbit(live, mask, state.lat, state.lon, {
           maxKm: CIRRUS_SHEETS_MAX_KM
         });
-        // the sheets' own opacity (178th): the satellite column's rows
-        // for the tops' temperatures, else the balloon's
-        const colRows =
-          satColumn && satColumn.rows && satColumn.rows.length >= 2
-            ? satColumn.rows
-            : ascentStands() && state.soundingData && state.soundingData.rows
-              ? state.soundingData.rows
-              : null;
         const op = sheetOpacity(
           live,
           r.sheets,
           goesL2.imagery && goesL2.imagery.btK ? goesL2.imagery : null,
           mask,
           colRows,
-          goesL2.dcomp && goesL2.dcomp.cod ? goesL2.dcomp : null
+          dcompLive
         );
         for (const s of op.sheets) {
           const geo = new THREE.PlaneGeometry(
