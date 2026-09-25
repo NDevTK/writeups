@@ -18,6 +18,11 @@ APIClient stores request data locally in IndexedDB this can be cleared via popup
 Uses GitHub Pages <https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement> and Google Fonts <https://fonts.google.com/>.  
 Sometimes data is stored in localStorage for website functionality.
 
+# `/website/` Privacy Policy
+
+The following services are in use `cdn.jsdelivr.net`, Cloudflare, GitHub pages.
+Sometimes data is stored in localStorage for website functionality.
+
 # Contact Information
 
 Site owner: [ndevtk@protonmail.com](mailto:ndevtk@protonmail.com)
