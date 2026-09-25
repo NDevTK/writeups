@@ -301,7 +301,7 @@ async function start() {
         title: 'postLogger',
         url: 'https://chrome.google.com/webstore/detail/aodfhblfhpcdadgcnpkfibjgjdoenoja'
       },
-      {title: 'ndev.tk', url: 'https://ndev.tk/'}
+      {title: 'ndevtk', url: 'https://ndevtk.github.io/website/'}
     ];
     await gecko.evalChrome(`(() => {
       const seed = async () => {
