@@ -4,11 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Surveillance</title>
-    <!-- Leaflet + the OSM/Nominatim geocoder. For production add SRI hashes. -->
+    <!-- Leaflet + MapLibre GL + the OSM/Nominatim geocoder. For production add SRI hashes. -->
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H"
+      crossorigin="anonymous" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
       crossorigin="anonymous" />
     <link
       rel="stylesheet"
@@ -123,6 +127,12 @@
       integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH"
       crossorigin="anonymous"></script>
     <script
+      src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"
+      crossorigin="anonymous"></script>
+    <script
+      src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"
+      crossorigin="anonymous"></script>
+    <script
       src="https://unpkg.com/leaflet-control-geocoder@3.3.1/dist/Control.Geocoder.js"
       integrity="sha384-Bfl31bOQuT8Lw6OrGjU5VoBPSS95TwHMsWkt/7Rx1Wbk2TeR5wgoaNP7f2cxR3gS"
       crossorigin="anonymous"></script>
@@ -223,14 +233,9 @@
       // No zoom buttons: they'd sit under the host's ✦ controls toggle, and
       // scroll / double-click / pinch / +- keys still zoom the wallpaper.
       const map = L.map('map', {zoomControl: false}).setView([25, 0], 2);
-      L.tileLayer(
-        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-        {
-          subdomains: 'abcd',
-          maxZoom: 19,
-          attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-        }
-      ).addTo(map);
+      L.maplibreGL({
+        style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+      }).addTo(map);
 
       // Search (OpenStreetMap / Nominatim, keyless).
       L.Control.geocoder({
