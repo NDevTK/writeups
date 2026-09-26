@@ -932,7 +932,7 @@ The practice the corpus demonstrates, stated so it can be reused:
    `server-reference` THE LAND'S SKIN; `far-terrain-reference` the
    per-spoke k and the typed-array march; `observatory-reference`
    THE LAND SURFACE LAYER; `goesl2-client-reference` ten asks over
-   26 listings). Pass 158 repairs the deploy: the box at api.ndev.tk
+   26 listings). Pass 158 repairs the deploy: the box at 35.209.228.68
    was found running a build from before pass 151 while main
    carried the 157th — the installer's ship list had never gained
    `goesl2-decode.js` (pass 155), so its own drift guard refused

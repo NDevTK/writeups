@@ -8,7 +8,7 @@
  *
  *   node observatory-freeze.mjs --out observatory-fixture.js
  *
- * It fetches every feed the observatory reads (the api.ndev.tk
+ * It fetches every feed the observatory reads (the 35.209.228.68
  * daemon's sounding/gmn/adsb digests, NDBC realtime2, open-meteo
  * weather/air-quality/radiation, SWPC regions + hemispheric power
  * + OVATION + Kp, NOAA CO-OPS water levels), computes the
@@ -126,8 +126,8 @@ async function main() {
   };
 
   const at = stampIso();
-  const snd = await feed('sounding (api.ndev.tk)', () =>
-    jget(`https://api.ndev.tk/sounding?lat=${LAT}&lon=${LON}`)
+  const snd = await feed('sounding (35.209.228.68)', () =>
+    jget(`https://35.209.228.68/sounding?lat=${LAT}&lon=${LON}`)
   );
   const buoyTxt = await feed('buoy met (NDBC realtime2)', async () => {
     // The nearest spectral buoy is the daemon's job at draw time;
@@ -196,8 +196,8 @@ async function main() {
     }
     return out;
   });
-  const gmn = await feed('meteors (api.ndev.tk/gmn)', async () => {
-    const g = await jget('https://api.ndev.tk/gmn');
+  const gmn = await feed('meteors (35.209.228.68/gmn)', async () => {
+    const g = await jget('https://35.209.228.68/gmn');
     const top = Object.entries(g.medians)
       .filter(([k]) => k !== 'all')
       .sort((a, b) => b[1].n - a[1].n)
@@ -243,9 +243,9 @@ async function main() {
       sunAltDeg: sunAt(radAt, LAT, LON).altDeg
     };
   });
-  const adsb = await feed('aircraft (api.ndev.tk/adsb)', async () => {
+  const adsb = await feed('aircraft (35.209.228.68/adsb)', async () => {
     const j = await jget(
-      `https://api.ndev.tk/adsb?lat=${LAT}&lon=${LON}&dist=60`
+      `https://35.209.228.68/adsb?lat=${LAT}&lon=${LON}&dist=60`
     );
     return {
       at,
@@ -275,8 +275,8 @@ async function main() {
       values
     };
   });
-  const tles = await feed('TLEs (api.ndev.tk/tles)', async () => {
-    const txt = (await tget('https://api.ndev.tk/tles')).trim();
+  const tles = await feed('TLEs (35.209.228.68/tles)', async () => {
+    const txt = (await tget('https://35.209.228.68/tles')).trim();
     if (!txt.startsWith('1 ') && !txt.includes('\n1 '))
       throw new Error('not TLE text');
     if (txt.includes('`') || txt.includes('${'))
@@ -395,7 +395,7 @@ async function main() {
     const pierLat = Number.isFinite(+st.lat) ? +st.lat : LAT;
     const pierLon = Number.isFinite(+st.lng) ? +st.lng : LON;
     const mj = await jget(
-      `https://api.ndev.tk/metar?lat=${pierLat.toFixed(3)}&lon=${pierLon.toFixed(3)}`
+      `https://35.209.228.68/metar?lat=${pierLat.toFixed(3)}&lon=${pierLon.toFixed(3)}`
     );
     const {pickStation, coverFraction} = await import('./metar.js');
     // coastal-plain stations first (elevation under 60 m), as the

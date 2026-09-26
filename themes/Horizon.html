@@ -2136,7 +2136,7 @@
           try {
             const mj = await (
               await fetch(
-                (params.get('metar') ?? 'https://api.ndev.tk/metar') +
+                (params.get('metar') ?? 'https://35.209.228.68/metar') +
                   '?lat=' +
                   near.lat.toFixed(3) +
                   '&lon=' +
@@ -5638,7 +5638,7 @@
       // automated ceilometers are blind above a few km, so the
       // mid and high decks stay with the model. Via the daemon
       // (/metar - aviationweather.gov sends no CORS header).
-      const METAR_PROXY = params.get('metar') ?? 'https://api.ndev.tk/metar';
+      const METAR_PROXY = params.get('metar') ?? 'https://35.209.228.68/metar';
       async function syncMetar() {
         if (overridden) return;
         try {
@@ -5701,7 +5701,7 @@
       // the one gray knob (total AOD) becomes measured spectral
       // extinction, measured albedo and measured phase asymmetry.
       const AEROSOL_PROXY =
-        params.get('aerosol') ?? 'https://api.ndev.tk/aerosol';
+        params.get('aerosol') ?? 'https://35.209.228.68/aerosol';
       // The AERONET endpoint rides the same daemon origin
       // (?aeronet= overrides for the harness; aeronet=0 skips
       // the measured override entirely).
@@ -6528,7 +6528,7 @@
       // measured optical fact it is. ?du=N is the labelled harness
       // pin; ?ozone=URL overrides the endpoint and composes with
       // weather pins like ?aerosol= does.
-      const OZONE_PROXY = params.get('ozone') ?? 'https://api.ndev.tk/ozone';
+      const OZONE_PROXY = params.get('ozone') ?? 'https://35.209.228.68/ozone';
       async function syncOzone() {
         if (params.has('du')) {
           const du = parseFloat(params.get('du'));
@@ -6572,7 +6572,7 @@
       // painted gradient. The colour rides the per-frame water block so
       // it survives a roam rebuild. ?chl=X pins the concentration (the
       // deterministic A/B knob); ?chlor=URL overrides the endpoint.
-      const CHLOR_PROXY = params.get('chlor') ?? 'https://api.ndev.tk/chlor';
+      const CHLOR_PROXY = params.get('chlor') ?? 'https://35.209.228.68/chlor';
       let chlorColor = null; // linear-sRGB body colour once [Chl] is known
       function applyChlor(chl, note) {
         const rgb = waterColorLinear(chl);
@@ -6628,7 +6628,7 @@
       // runs AFTER syncChlor and only overrides the water colour when it
       // has a measured spectrum - otherwise the NRT Morel colour stands.
       // ?rrs=v1,...,v6 pins a spectrum; ?rrssrc=URL overrides.
-      const RRS_PROXY = params.get('rrssrc') ?? 'https://api.ndev.tk/rrs';
+      const RRS_PROXY = params.get('rrssrc') ?? 'https://35.209.228.68/rrs';
       // The foundation-SST box (147th pass): JPL MUR through the
       // daemon's /sst, a 3-deg grid at 0.05 deg around the home
       // cell - the satellite cloud field's per-pixel clear-sky
@@ -6636,7 +6636,7 @@
       // within 50 km (a foundation temperature: no diurnal skin -
       // stated on the line). Hourly (the analysis is daily);
       // ?sstsrc=URL overrides; ?sst=0 disables.
-      const SST_PROXY = params.get('sstsrc') ?? 'https://api.ndev.tk/sst';
+      const SST_PROXY = params.get('sstsrc') ?? 'https://35.209.228.68/sst';
       async function syncSst() {
         if (overridden || params.get('sst') === '0') return;
         try {
@@ -6675,7 +6675,7 @@
       // products' cadence; ?goesl2src=URL overrides; ?goes=0
       // disables with the field.
       const GOESL2_PROXY =
-        params.get('goesl2src') ?? 'https://api.ndev.tk/goesl2';
+        params.get('goesl2src') ?? 'https://35.209.228.68/goesl2';
       // THE PAGE READS THE BUCKET ITSELF (155th pass): when the
       // daemon is unreachable the same gated decode runs here over
       // the CORS-open buckets by HTTP range (goesl2-client.js) - the
@@ -7888,7 +7888,7 @@
                   (goesL2.read && goesL2.read.length
                     ? `: ${goesL2.read.length} files, ${goesL2.read.reduce((s, r) => s + r.kb, 0)} kB in ${goesL2.read.reduce((s, r) => s + r.ranges, 0)} ranges`
                     : '')
-              : `the daemon (api.ndev.tk, the shared cache of ${goesL2.bucket}` +
+              : `the daemon (35.209.228.68, the shared cache of ${goesL2.bucket}` +
                   (goesL2.rev ? `, revision ${goesL2.rev.slice(0, 7)}` : '') +
                   ')' +
                   (goesL2.filled && goesL2.filled.length
@@ -9815,7 +9815,7 @@
       // measured single-scattering albedo wherever a plume
       // actually absorbs - HMS stays the analyst-verified
       // provenance layer.
-      const SMOKE_PROXY = params.get('smoke') ?? 'https://api.ndev.tk/smoke';
+      const SMOKE_PROXY = params.get('smoke') ?? 'https://35.209.228.68/smoke';
       async function syncSmoke() {
         try {
           const j = await (
@@ -12379,7 +12379,7 @@
       // Unreachable daemon (offline harness): the ambient traffic
       // above stands in. ?adsb=URL overrides (the harness points
       // it at fixture vectors).
-      const ADSB_PROXY = params.get('adsb') ?? 'https://api.ndev.tk/adsb';
+      const ADSB_PROXY = params.get('adsb') ?? 'https://35.209.228.68/adsb';
       let liveTraffic = null; // queue of unclaimed cruise snapshots
       const seenFlights = new Map(); // hex -> last spawn ms
       async function syncTraffic() {
@@ -12658,7 +12658,7 @@
       // heights - ships.js, gated). ?ais=URL overrides the proxy;
       // ?ship=N spawns N deterministic vessels (one per class)
       // for the offline harness.
-      const AIS_PROXY = params.get('ais') ?? 'https://api.ndev.tk/ais';
+      const AIS_PROXY = params.get('ais') ?? 'https://35.209.228.68/ais';
       const SHIP_N = 8;
       const NAV_COLOR = {
         masthead: '#ffffff',
@@ -12999,7 +12999,7 @@
       // BY-SA Blitzortung.org (credited in the provenance panel).
       // ?live=URL overrides the stream base; ?strike=N spawns
       // deterministic synthetic flashes for the offline harness.
-      const LIVE_STREAM = params.get('live') ?? 'https://api.ndev.tk/stream';
+      const LIVE_STREAM = params.get('live') ?? 'https://35.209.228.68/stream';
       const FLASH_N = 5;
       const flashPool = [];
       for (let i = 0; i < FLASH_N; i++) {

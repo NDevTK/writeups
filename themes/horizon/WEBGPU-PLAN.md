@@ -1525,7 +1525,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
       deliberately a few KB). Optional: Cloudflare orange-cloud
       in FRONT for inbound shielding while outbound keeps the
       clean IP - the best of both measured worlds.
-    - DEPLOYED at https://api.ndev.tk (GCP box behind
+    - DEPLOYED at https://35.209.228.68 (GCP box behind
       Cloudflare orange-cloud with an Origin CA cert, Full
       strict - the 525 on first try was the Caddy-ACME
       chicken-and-egg, solved exactly that way). Measured from
@@ -1541,7 +1541,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
       hdg 017, GAS NOBLE, NAVIGATOR LUNA...). Origin lock holds
       through Cloudflare: foreign origin 403, site origin exact
       echo. ADSB_PROXY/AIS_PROXY defaults in Horizon.html now
-      point at api.ndev.tk; the horizon-adsb worker stays
+      point at 35.209.228.68; the horizon-adsb worker stays
       deployed as documented fallback (?adsb=/?ais= overrides).
   - DONE (live end-to-end): real-time lightning - Blitzortung.org
     strikes flash on the horizon, the item the worker era had to
@@ -4940,7 +4940,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   causes, both now fixed or documented. (1) window.\_\_r and the
   capture hooks only install with ?debug=1: a healthy page looks
   dead to the probes without it. (2) Boot is SLOW, not stalled:
-  the live-stream endpoint (api.ndev.tk/stream - an EventSource
+  the live-stream endpoint (35.209.228.68/stream - an EventSource
   that can never complete through the buffering curl route) and
   heavy Overpass queries each eat a full curl timeout;
   view-serve now logs REQ|status|ms|url for every failed or slow
@@ -7319,7 +7319,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   references + 7 GPU probes.
 - DONE (Aug 8, the review session's 73rd pass - the aeronet
   deploy ships): the 72nd pass's daemon endpoint never reached
-  api.ndev.tk - install.sh's ship list lacked aeronet.js, and
+  35.209.228.68 - install.sh's ship list lacked aeronet.js, and
   the box's own drift guard did exactly what it was built for:
   caught the unrewritten '../../aeronet.js' import in the staged
   entry point, discarded it, and kept the previous deploy
@@ -7790,7 +7790,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   clean smoke capture (no A/B pair: the override moves numbers
   many layers already draw). Gate (7 landmarks) registered
   after metar. Production /volcano from the 80th pass verified
-  LIVE on api.ndev.tk (~7 min after push, 23 volcanoes served);
+  LIVE on 35.209.228.68 (~7 min after push, 23 volcanoes served);
   /sounding to be verified the same way after this push. Full
   gate green - 117 CPU references + 7 GPU probes.
 - DONE (Aug 9, the review session's 82nd pass - beta Lyrae's
@@ -7943,7 +7943,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   red outer rim is the R ring's tail. Gate (5 landmarks)
   registered after aeronet. Full gate green - 119 CPU
   references + 7 GPU probes.
-- DONE (Aug 9, the review session's 86th pass - api.ndev.tk /ais
+- DONE (Aug 9, the review session's 86th pass - 35.209.228.68 /ais
   incident: the wedged reconnect loop). A production audit of
   the two vehicle feeds found /adsb HEALTHY (live aircraft from
   api.adsb.lol - a 737 at FL360 over Zurich in the check) and
@@ -8496,7 +8496,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     each other (100% cloud at 8.7 km + an all-ice r_eff box =
     one winter high-cloud sheet, seen twice). INSTRUMENT LIMIT,
     stated: the shoot harness's server-side fetch cannot reach
-    api.ndev.tk, so the daemon-fed records (metar, sounding,
+    35.209.228.68, so the daemon-fed records (metar, sounding,
     buoy, aeronet, comets, volcano, smoke, aerosol, streams)
     are absent HERE while verified live in production after
     every daemon push - the census audits the browser-direct
@@ -9129,7 +9129,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   feeds through the already-gated modules and draws five panels
   (SVG, hover layer, table views, validated palette in both color
   schemes - the dataviz gate run on every series set): THE COLUMN
-  (api.ndev.tk/sounding daemon rows -> profileFromRows, the theme's
+  (35.209.228.68/sounding daemon rows -> profileFromRows, the theme's
   applySounding mapping verbatim -> transferCurve/foldCount at two
   eyes + horizon refraction vs ISA + flattening + green-rim split,
   the fan chart windowed on any fold), THE SEA (Monahan
@@ -9174,7 +9174,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   shelved with their feeds verified. BUILT: THE PERSEIDS AT THE DOOR
   (peak in 2.7 days - the printed Jenniskens profile via meteors.js
   zhrAt against the LIVE Global Meteor Network daily digest
-  (api.ndev.tk/gmn): 1842 measured Perseids = 33% of yesterday's
+  (35.209.228.68/gmn): 1842 measured Perseids = 33% of yesterday's
   5571 meteors, the shower already dominating the sky; tonight's
   rate at the point through hourlyRate x visibleRateFactor - 18/h
   dark, 5/h suburban - with the lm 6.5 perception fold asserted
@@ -9220,7 +9220,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   kept as individual levels since thin sheets survive the daemon's
   row thinning as single rows), and their OVERLAP, where a trail
   both forms and persists. The live ADS-B state vectors (the
-  daemon's readsb digest, api.ndev.tk/adsb dist=60; alt_baro feet
+  daemon's readsb digest, 35.209.228.68/adsb dist=60; alt_baro feet
   through the module's own exact FT_M) then say who is actually up
   there. TODAY'S DIAGNOSIS - the honest negative with a reason the
   scan can point at: the 12Z Miramar column HOLDS supersaturated
@@ -13238,7 +13238,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
       Upton ascent reached 8 hPa. (?vis=0 was the visibility pin
       already - the switch is ?daylight=0.)
 - DONE (Sep 6, the review session's 158th pass - THE DEPLOY
-  REPAIRED): api.ndev.tk answered again at 09:2xZ after its long
+  REPAIRED): 35.209.228.68 answered again at 09:2xZ after its long
   dark - HTTP 200 on /goesl2, /sounding and /sst - but its /goesl2
   body carried only the mask, the heights, the band-13 imagery and
   DCOMP: a build from before the 151st, with main at the 157th. THE
@@ -13276,7 +13276,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   body that lacks a product outright (undefined, where a fresh
   daemon answers null for one it could not read), reads the missing
   products from the bucket itself beside the daemon's own and the
-  record says so ("the daemon (api.ndev.tk, the shared cache of
+  record says so ("the daemon (35.209.228.68, the shared cache of
   noaa-goes18, revision xxxxxxx) - a deploy behind the page: sst,
   dsr, dmw, aod, lst read from noaa-goes18 by the page itself (N kB
   in M ranges)"); the daemon's `rev` rides goesL2.rev. GATES:
@@ -13288,8 +13288,8 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   30). Docs: the daemon README's Verify step, the /goesl2 entry and
   the self-update section (the two lessons); FINDINGS pass 158.
   MEASURED LIVE against the stale box itself (probe, 09:47Z, the
-  page pointed at api.ndev.tk's /goesl2): zero PAGEERROR; the record
-  "the daemon (api.ndev.tk, the shared cache of noaa-goes18) - a
+  page pointed at 35.209.228.68's /goesl2): zero PAGEERROR; the record
+  "the daemon (35.209.228.68, the shared cache of noaa-goes18) - a
   deploy behind the page: sst, dsr, dmw, aod, lst read from
   noaa-goes18 by the page itself (2,433 kB in 15 ranges)" - the
   mask from the daemon (09:42Z, 93% cloudy), the hour's SST (08:55Z,
@@ -13451,7 +13451,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   along a spoke's whole path, and a spoke is land or sea by its inner
   ring though it may cross the coast; the LST validation figures are
   GOES-16's and GOES-17's over SURFRAD, not GOES-18's here. THE
-  DEPLOY, WATCHED: api.ndev.tk answered nothing at 23:35Z Sep 5
+  DEPLOY, WATCHED: 35.209.228.68 answered nothing at 23:35Z Sep 5
   (curl 000); the 150th-157th wait for the box.
 - DONE (Sep 5, the review session's 156th pass - THE MEASURED
   HAZE): NOAA's aerosol optical depth at 550 nm (ABI-L2-AODC: CONUS
@@ -13559,7 +13559,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
     wavelength, so SSA, asymmetry and the species split stay the
     model's; a clear day's AOD near the coast is flagged low by the
     coastal mask, so the overhead pixel is rarely quantitative here.
-    THE DEPLOY, WATCHED: api.ndev.tk answered nothing at 23:35Z (curl
+    THE DEPLOY, WATCHED: 35.209.228.68 answered nothing at 23:35Z (curl
     000); the 150th-156th wait for the box.
 - DONE (Sep 5, the review session's 155th pass - THE PAGE READS THE
   BUCKET ITSELF): the live daemon went dark at 22:02Z and stayed
@@ -13630,7 +13630,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   is unknown there (the journal figure only); the sandbox's page
   probes exercise the direct path only through the repaired bridge
   - the live site's browsers talk to S3 themselves. THE DEPLOY,
-    WATCHED: api.ndev.tk still answered nothing at 23:27Z (the page's
+    WATCHED: 35.209.228.68 still answered nothing at 23:27Z (the page's
     own metar call through the harness bridge read a 522 - the
     origin unreachable behind its front); the 150th-155th wait for
     the box, and the page no longer waits with them.
@@ -13791,7 +13791,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   is the cluster's median, not the deck's drawn top; band 14 only
   (the visible band-2 winds by day and the water-vapour bands'
   clear-sky winds stay on the shelf with the range reader's other
-  candidates). THE DEPLOY, WATCHED: https://api.ndev.tk answered
+  candidates). THE DEPLOY, WATCHED: https://35.209.228.68 answered
   nothing (connection failures) from about 22:02Z through 22:34Z -
   after the 149th's deploy at 21:41Z the box went dark in its next
   self-update run; the 150th-153rd wait for it to come back, to be
@@ -13897,7 +13897,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   half a kilometre 68 MB) that no whole download could afford on the
   e2-micro. MEASURED FIRST: the buckets answer HTTP Range (206 with
   the Content-Range total) and are CORS-open with it (an OPTIONS
-  preflight from https://ndev.tk allows GET with the range header;
+  preflight from https://35.209.228.68 allows GET with the range header;
   the listing too), and NOAA chunks every field in FULL-WIDTH ROW
   STRIPS - 52 rows x 2500 on the 2-km CONUS grid for the 16-bit
   fields, 104 for the 8-bit flags, 24 x 5424 on the full disk - so
@@ -14306,7 +14306,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   lost); the timed mask is within 5 min of the mosaic (the products'
   cadence), the pick readout reads the newest mask; Himawari and
   Meteosat products are not read. DEPLOY WATCH (unresolved from
-  here): at 20:24Z the deployed api.ndev.tk still answered 404 for
+  here): at 20:24Z the deployed 35.209.228.68 still answered 404 for
   /sst - its /probe lists surface and rrs but no sst - fifty minutes
   after the 147th reached main, while its AIS engine showed a
   process restart at 20:08Z. RESOLVED in the 150th's watch: /sst
@@ -14859,7 +14859,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
   (noaacwNPPN20VIIRSDINEOFDaily) is 2 days fresh and returned
   3.1-4.7 mg/m3 off San Francisco (upwelling-plausible); NO
   CORS headers on either host, so a browser integration must
-  route through the api.ndev.tk daemon like /aerosol.
+  route through the 35.209.228.68 daemon like /aerosol.
   (3) NASA SVS CGI Moon Kit (LROC albedo asset) - unreachable
   from this environment (TLS failure through the proxy);
   deferred until the asset and its licence text are actually
@@ -15213,7 +15213,7 @@ secret put AISSTREAM_KEY && npx wrangler deploy`.
 - DONE: the visual QA pass, round two (Jul 10 evening - "same
   standard as boats and planes, need to show stuff happening").
   Ships and planes joined the seen-not-asserted club: the daemon
-  (api.ndev.tk) IS reachable through the environment's proxy -
+  (35.209.228.68) IS reachable through the environment's proxy -
   the earlier NET-FAIL was the harness shim waiting for a
   bounded body on the unbounded /stream SSE; the plain /adsb and
   /ais poll endpoints answer fine. VIEWED: live AIS vessels off

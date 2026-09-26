@@ -92,7 +92,7 @@ for (const [name, lat, lon] of STATIONS) {
   let line = name.padEnd(14);
   try {
     const snd = await jget(
-      `https://api.ndev.tk/sounding?lat=${lat}&lon=${lon}`
+      `https://35.209.228.68/sounding?lat=${lat}&lon=${lon}`
     );
     const rows = snd?.rows;
     if (!Array.isArray(rows) || rows.length < 10) {
