@@ -4,17 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Surveillance</title>
-    <!-- Leaflet + the OSM/Nominatim geocoder. For production add SRI hashes. -->
+    <!-- MapLibre GL JS v6 (vector basemap) -->
     <link
       rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H"
-      crossorigin="anonymous" />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet-control-geocoder@3.3.1/dist/Control.Geocoder.css"
-      integrity="sha384-vreRpx6017gtwUzcBhs2vpY19++6YuBl7eZVucKz1McFCXT2qTGrnVoXtheRZeSR"
-      crossorigin="anonymous" />
+      href="https://unpkg.com/maplibre-gl@^6.0.0/dist/maplibre-gl.css" />
+
     <style>
       html,
       body {
@@ -29,44 +23,88 @@
         position: fixed;
         inset: 0;
       }
-      .leaflet-container {
-        background: #0b0f14;
+      .maplibregl-canvas {
+        outline: none;
       }
-      /* Make the search control fit the dark map */
-      .leaflet-control-geocoder,
-      .leaflet-control-geocoder-alternatives {
-        background: #0b0f14;
-        border: 1px solid rgba(120, 200, 255, 0.3);
-        color: #d7e6f0;
-      }
-      .leaflet-control-geocoder-form input {
-        color: #d7e6f0;
-        background: transparent;
-      }
-      .leaflet-control-geocoder-alternatives a {
-        color: #d7e6f0;
-      }
-      .leaflet-control-geocoder-alternatives li:hover {
-        background: rgba(120, 200, 255, 0.12);
-      }
-      /* Search stays hidden until the wallpaper is brought forward */
-      .leaflet-control-geocoder {
+      /* Search control */
+      .search-ctrl {
         display: none;
+        position: relative;
+        width: 260px;
       }
-      body.controls .leaflet-control-geocoder {
+      body.controls .search-ctrl {
         display: block;
       }
-      /* Dark popups for the camera details */
-      .leaflet-popup-content-wrapper,
-      .leaflet-popup-tip {
+      .search-ctrl input {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 7px 10px;
+        border: 1px solid rgba(120, 200, 255, 0.3);
+        border-radius: 4px;
         background: #0b0f14;
         color: #d7e6f0;
+        font: inherit;
+        font-size: 13px;
+        outline: none;
       }
-      .leaflet-popup-content-wrapper {
+      .search-ctrl input::placeholder { color: #667; }
+      .search-ctrl input:focus {
+        border-color: rgba(120, 200, 255, 0.6);
+      }
+      .search-ctrl ul {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        margin: 2px 0 0;
+        padding: 0;
+        list-style: none;
+        background: #0b0f14;
         border: 1px solid rgba(120, 200, 255, 0.3);
+        border-radius: 4px;
+        max-height: 220px;
+        overflow-y: auto;
+        z-index: 10;
       }
-      .leaflet-container a.leaflet-popup-close-button {
+      .search-ctrl ul.open { display: block; }
+      .search-ctrl li {
+        padding: 6px 10px;
+        font-size: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .search-ctrl li:hover {
+        background: rgba(120, 200, 255, 0.12);
+      }
+      /* Dark popups for the camera details */
+      .maplibregl-popup-content {
+        background: #0b0f14;
+        color: #d7e6f0;
+        border: 1px solid rgba(120, 200, 255, 0.3);
+        border-radius: 6px;
+        padding: 10px 12px;
+      }
+      .maplibregl-popup-tip {
+        border-top-color: #0b0f14;
+      }
+      .maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+        border-top-color: #0b0f14;
+      }
+      .maplibregl-popup-anchor-top .maplibregl-popup-tip {
+        border-bottom-color: #0b0f14;
+      }
+      .maplibregl-popup-anchor-left .maplibregl-popup-tip {
+        border-right-color: #0b0f14;
+      }
+      .maplibregl-popup-anchor-right .maplibregl-popup-tip {
+        border-left-color: #0b0f14;
+      }
+      .maplibregl-popup-close-button {
         color: #7fb6d6;
+        font-size: 18px;
       }
       .cam b {
         display: block;
@@ -80,6 +118,15 @@
       }
       .cam a {
         color: #9be7ff;
+      }
+      /* Hide the default attribution toggle to keep the map clean */
+      .maplibregl-ctrl-attrib {
+        background: rgba(11, 15, 20, 0.7) !important;
+        color: #667 !important;
+        font-size: 10px !important;
+      }
+      .maplibregl-ctrl-attrib a {
+        color: #889 !important;
       }
       /* Legend rides along with the other controls */
       .legend {
@@ -118,15 +165,16 @@
       <div><span class="dot" style="background: #9be37d"></span>Guard</div>
     </div>
 
-    <script
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH"
-      crossorigin="anonymous"></script>
-    <script
-      src="https://unpkg.com/leaflet-control-geocoder@3.3.1/dist/Control.Geocoder.js"
-      integrity="sha384-Bfl31bOQuT8Lw6OrGjU5VoBPSS95TwHMsWkt/7Rx1Wbk2TeR5wgoaNP7f2cxR3gS"
-      crossorigin="anonymous"></script>
-    <script>
+    <script type="importmap">
+      {
+        "imports": {
+          "maplibre-gl": "https://unpkg.com/maplibre-gl@^6.0.0/dist/maplibre-gl.mjs"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as maplibregl from 'maplibre-gl';
       'use strict';
 
       // HTML-escape OSM tag values before they touch a popup.
@@ -222,30 +270,144 @@
 
       // No zoom buttons: they'd sit under the host's ✦ controls toggle, and
       // scroll / double-click / pinch / +- keys still zoom the wallpaper.
-      const map = L.map('map', {zoomControl: false}).setView([25, 0], 2);
-      L.tileLayer(
-        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-        {
-          subdomains: 'abcd',
-          maxZoom: 19,
-          attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://tiles.openfreemap.org/styles/dark',
+        center: [0, 25],
+        zoom: 2,
+        attributionControl: true
+      });
+
+      // Lightweight Nominatim search control (replaces external geocoder dep).
+      class SearchControl {
+        onAdd(map) {
+          this._map = map;
+          const el = (this._container = document.createElement('div'));
+          el.className = 'maplibregl-ctrl search-ctrl';
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.placeholder = 'Search…';
+          const list = document.createElement('ul');
+          el.append(input, list);
+
+          let debounce;
+          input.addEventListener('input', () => {
+            clearTimeout(debounce);
+            const q = input.value.trim();
+            if (!q) {
+              list.innerHTML = '';
+              list.classList.remove('open');
+              return;
+            }
+            debounce = setTimeout(() => this._search(q, list), 350);
+          });
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+              list.innerHTML = '';
+              list.classList.remove('open');
+              input.blur();
+            }
+          });
+          return el;
         }
-      ).addTo(map);
+        async _search(query, list) {
+          try {
+            const params = new URLSearchParams({
+              q: query,
+              format: 'json',
+              limit: '5'
+            });
+            const r = await fetch(
+              'https://nominatim.openstreetmap.org/search?' + params,
+              {credentials: 'omit'}
+            );
+            const results = await r.json();
+            list.innerHTML = '';
+            if (!results.length) {
+              list.classList.remove('open');
+              return;
+            }
+            for (const place of results) {
+              const li = document.createElement('li');
+              li.textContent = place.display_name;
+              li.addEventListener('click', () => {
+                this._map.flyTo({
+                  center: [parseFloat(place.lon), parseFloat(place.lat)],
+                  zoom: 16
+                });
+                list.innerHTML = '';
+                list.classList.remove('open');
+              });
+              list.append(li);
+            }
+            list.classList.add('open');
+          } catch (_) {}
+        }
+        onRemove() {
+          this._container.remove();
+          this._map = undefined;
+        }
+      }
+      map.addControl(new SearchControl(), 'top-right');
 
-      // Search (OpenStreetMap / Nominatim, keyless).
-      L.Control.geocoder({
-        collapsed: false,
-        defaultMarkGeocode: true,
-        position: 'topright'
-      }).addTo(map);
-
-      // Cameras for whatever is currently on screen — no invented radius.
-      const cameras = L.layerGroup().addTo(map);
+      // GeoJSON source + layers for surveillance cameras.
+      const CAMERA_SOURCE = 'cameras';
       const MIN_ZOOM = 14; // below this the view is too large to query responsibly
 
+      // Keep the raw Overpass elements so we can look up tags on click.
+      let cameraElements = [];
+
+      map.on('load', () => {
+        map.addSource(CAMERA_SOURCE, {
+          type: 'geojson',
+          data: {type: 'FeatureCollection', features: []}
+        });
+
+        // Circle layer for all cameras.
+        map.addLayer({
+          id: 'cameras-circle',
+          type: 'circle',
+          source: CAMERA_SOURCE,
+          paint: {
+            'circle-radius': 4,
+            'circle-color': ['get', 'fill'],
+            'circle-stroke-color': ['get', 'color'],
+            'circle-stroke-width': 1,
+            'circle-opacity': 0.85
+          }
+        });
+
+        // Pointer cursor on hover over cameras.
+        map.on('mouseenter', 'cameras-circle', () => {
+          map.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mouseleave', 'cameras-circle', () => {
+          map.getCanvas().style.cursor = '';
+        });
+
+        // Popup on click.
+        map.on('click', 'cameras-circle', (e) => {
+          const feat = e.features[0];
+          const nodeId = feat.properties.nodeId;
+          const node = cameraElements.find((n) => n.id === nodeId);
+          if (!node) return;
+          new maplibregl.Popup({maxWidth: '280px'})
+            .setLngLat(e.lngLat)
+            .setHTML(popupHtml(node))
+            .addTo(map);
+        });
+
+        // Fire initial refresh after style is loaded.
+        refresh();
+      });
+
       function refresh() {
+        if (!map.getSource(CAMERA_SOURCE)) return;
         if (map.getZoom() < MIN_ZOOM) {
-          cameras.clearLayers();
+          map
+            .getSource(CAMERA_SOURCE)
+            .setData({type: 'FeatureCollection', features: []});
+          cameraElements = [];
           return;
         }
         const b = map.getBounds();
@@ -266,20 +428,24 @@
         )
           .then((r) => r.json())
           .then((d) => {
-            cameras.clearLayers();
-            (d.elements || []).forEach((n) => {
-              if (!n.lat || !n.lon) return;
+            cameraElements = (d.elements || []).filter(
+              (n) => n.lat && n.lon
+            );
+            const features = cameraElements.map((n) => {
               const info = kindInfo(n.tags || {});
-              L.circleMarker([n.lat, n.lon], {
-                radius: 4,
-                color: info.color,
-                weight: 1,
-                fillColor: info.fill,
-                fillOpacity: 0.85
-              })
-                .bindPopup(popupHtml(n))
-                .addTo(cameras);
+              return {
+                type: 'Feature',
+                geometry: {type: 'Point', coordinates: [n.lon, n.lat]},
+                properties: {
+                  nodeId: n.id,
+                  color: info.color,
+                  fill: info.fill
+                }
+              };
             });
+            map
+              .getSource(CAMERA_SOURCE)
+              .setData({type: 'FeatureCollection', features});
           })
           .catch(() => {});
       }
@@ -296,7 +462,8 @@
         .then((g) => {
           const lat = parseFloat(g.latitude);
           const lon = parseFloat(g.longitude);
-          if (isFinite(lat) && isFinite(lon)) map.setView([lat, lon], 16);
+          if (isFinite(lat) && isFinite(lon))
+            map.flyTo({center: [lon, lat], zoom: 16});
           else refresh();
         })
         .catch(() => refresh());
@@ -310,7 +477,7 @@
           {type: 'shaderwall', state: shown ? 'shown' : 'hidden'},
           location.origin
         );
-        setTimeout(() => map.invalidateSize(), 60);
+        setTimeout(() => map.resize(), 60);
       }
       addEventListener('message', (e) => {
         if (e.origin != location.origin) return;
