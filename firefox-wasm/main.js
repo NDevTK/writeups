@@ -12,6 +12,11 @@ const percent = document.getElementById('progress-percent');
 const fill = document.getElementById('progress-fill');
 const progressbar = document.querySelector('.progress-track');
 const consoleOutput = document.getElementById('console-output');
+
+if (location.ancestorOrigins.length === 1 && location.ancestorOrigins[0] === 'https://ndevtk.github.io') {
+ throw new Error("Page not embedded on intended target");
+}
+
 function setUiPhase(next) {
   splashShell.dataset.phase = next;
   stageCard.dataset.phase = next;
@@ -85,9 +90,7 @@ function setProgress(p) {
   percent.textContent = `${rounded}%`;
 }
 const BROWSER_CHROME_URL = 'chrome://browser/content/browser.xhtml';
-const defaultWisp =
-  new URLSearchParams(location.search).get('wisp') ||
-  'wss://wisp.mercurywork.shop/';
+const defaultWisp = 'wss://wisp.mercurywork.shop/';
 const puterBranding = false;
 const LS_KEY = 'chrome-demo-opts';
 const saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
@@ -127,9 +130,6 @@ function buildEnv(o) {
     optEnv.GECKO_APZ = '1';
   }
   if (!o.jit) optEnv.GECKO_NOWASMJIT = '1';
-  for (const [k, v] of new URLSearchParams(location.search)) {
-    if (k.startsWith('env.')) optEnv[k.slice(4)] = v;
-  }
   return optEnv;
 }
 const hasJspi =
@@ -356,9 +356,9 @@ async function start() {
         return 'search-seed-started';
       })()`);
     }
-    const initialPage =
-      new URLSearchParams(location.search).get('url') ||
-      'https://ndevtk.github.io/writeups/';
+    const homeURL = 'https://ndevtk.github.io/writeups/';
+    const unsafeURL = new URLSearchParams(location.search).get('url') || '';
+    const initialPage = unsafeURL.startsWith(homeURL) ? unsafeURL : homeURL;
     void gecko.evalChrome(
       `openTrustedLinkIn(${JSON.stringify(initialPage)}, 'current'); 'ok'`
     );
