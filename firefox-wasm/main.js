@@ -13,13 +13,6 @@ const fill = document.getElementById('progress-fill');
 const progressbar = document.querySelector('.progress-track');
 const consoleOutput = document.getElementById('console-output');
 
-if (
-  location.ancestorOrigins.length === 1 &&
-  location.ancestorOrigins[0] === 'https://ndevtk.github.io'
-) {
-  throw new Error('Page not embedded on intended target');
-}
-
 function setUiPhase(next) {
   splashShell.dataset.phase = next;
   stageCard.dataset.phase = next;
