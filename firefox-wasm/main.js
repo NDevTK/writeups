@@ -1,8 +1,5 @@
-if (
-  location.ancestorOrigins.length !== 2 ||
-  location.ancestorOrigins[0] !== 'https://ndevtk.github.io'
-) {
-  throw new Error('Page not embedded on intended target');
+for (let o of location.ancestorOrigins) {
+  if (o !== location.origin) throw new Error('No embed');
 }
 
 import {Gecko} from './gecko.js';
