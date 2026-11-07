@@ -360,7 +360,10 @@ async function start() {
       })()`);
     }
     const homeURL = 'https://ndevtk.github.io/writeups/';
-    const unsafeURL = new URL(new URLSearchParams(location.search).get('url') || '', homeURL).href;
+    const unsafeURL = new URL(
+      new URLSearchParams(location.search).get('url') || '',
+      homeURL
+    ).href;
     const initialPage = unsafeURL.startsWith(homeURL) ? unsafeURL : homeURL;
     void gecko.evalChrome(
       `openTrustedLinkIn(${JSON.stringify(initialPage)}, 'current'); 'ok'`
