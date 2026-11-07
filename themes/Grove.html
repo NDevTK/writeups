@@ -88,6 +88,10 @@
     <script src="grove/pixi.min.js"></script>
     <script>
       'use strict';
+for (let o of location.ancestorOrigins) {
+  if (o !== location.origin) throw new Error('No embed');
+}
+
       let VW = 1280; // canvas width — tracks the display aspect so any screen ratio fills (see fitVW)
       const VWBASE = 1280, // the width the per-biome art was composed at; backgrounds scale from this
         VH = 720,
