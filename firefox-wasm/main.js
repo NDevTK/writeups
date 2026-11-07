@@ -1,3 +1,10 @@
+if (
+  location.ancestorOrigins.length === 1 &&
+  location.ancestorOrigins[0] === 'https://ndevtk.github.io'
+) {
+  throw new Error('Page not embedded on intended target');
+}
+
 import {Gecko} from './gecko.js';
 import {prepareChromeFs, PROFILE_OPFS_PATH} from './chrome-fs.js';
 const __GECKO_WASM__ = {url: 'gecko.wasm.zst', compressed: true};
