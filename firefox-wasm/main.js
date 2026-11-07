@@ -1,6 +1,6 @@
 if (
-  location.ancestorOrigins.length === 1 &&
-  location.ancestorOrigins[0] === 'https://ndevtk.github.io'
+  location.ancestorOrigins.length !== 2 ||
+  location.ancestorOrigins[0] !== 'https://ndevtk.github.io'
 ) {
   throw new Error('Page not embedded on intended target');
 }
