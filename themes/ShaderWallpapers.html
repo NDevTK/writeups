@@ -505,6 +505,10 @@
     </div>
 
     <script>
+for (let o of location.ancestorOrigins) {
+  if (o !== location.origin) throw new Error('No embed');
+}
+
       /* ============================================================= *
        *  Shader Wallpapers — WebGL renderer + 6 animated shaders
        * ============================================================= */
