@@ -1,5 +1,5 @@
 for (let o of location.ancestorOrigins) {
-  if (o !== location.origin) throw new Error('No embed');
+  if (o !== location.origin) throw new Error('No embed');
 }
 
 import {Gecko} from './gecko.js';
