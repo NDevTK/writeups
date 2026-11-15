@@ -43,7 +43,13 @@ onkeyup = (e) => {
   if (e.key === '.' && location.pathname === '/writeups/') {
     count += 1;
     if (count === 10) {
-      alert('Developer Mode enabled.');
+      alert('You are now a developer!');
+    }
+    if (count == 11) {
+      alert('No need, you are already a developer.');
+    }
+    if (count == 20) {
+      alert('Resetting count to 0.');
       count = 0;
     }
   }
