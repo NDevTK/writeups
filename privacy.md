@@ -10,7 +10,7 @@ No data is collected or shared by the Android apps.
 # Browser Extension Privacy Policy
 
 No data is collected or shared by the extensions with the exception of "RCE PoC" as that depends on google drive there <https://www.google.com/drive/terms-of-service/> still applies.  
-Sometimes data is stored in chrome.storage or localStorage for extension functionality.  
+Sometimes data is stored in chrome.storage or localStorage for extension functionality.
 
 # Writeups Privacy Policy
 
